@@ -730,7 +730,7 @@ else {
     for (i = 0; i < BOOT2_LEN; i++)
         M[(BOOT_START >> 1) + i] = boot2_rom[i];
     }
-M[BOOT_UNIT >> 1] = unitno;
+M[BOOT_UNIT >> 1] = (uint16)unitno;
 M[BOOT_CSR >> 1] = (tm_dib.ba & DMASK) + 06;
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;

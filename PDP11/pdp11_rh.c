@@ -178,7 +178,7 @@ void mba_set_int (uint32 mb);
 void mba_clr_int (uint32 mb);
 void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb);
 void mba_set_cs2 (uint32 flg, uint32 mb);
-uint32 mba_map_pa (int32 pa, int32 *ofs);
+int32 mba_map_pa (int32 pa, int32 *ofs);
 t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *rh_description (DEVICE *dptr);
 
@@ -794,7 +794,7 @@ return mba2_dib.vec;                                    /* acknowledge */
 
 /* Map physical address to Massbus number, offset */
 
-uint32 mba_map_pa (int32 pa, int32 *ofs)
+int32 mba_map_pa (int32 pa, int32 *ofs)
 {
 int32 i, uo, ba, lnt;
 DIB *dibp;

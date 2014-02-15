@@ -372,7 +372,7 @@ t_stat rp_reset (DEVICE *dptr);
 t_stat rp_boot (int32 unitno, DEVICE *dptr);
 t_stat rp_attach (UNIT *uptr, char *cptr);
 t_stat rp_detach (UNIT *uptr);
-void set_rper (int32 flag, int32 drv);
+void set_rper (int16 flag, int32 drv);
 void update_rpcs (int32 flags, int32 drv);
 void rp_go (int32 drv, int32 fnc);
 t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -633,7 +633,7 @@ if (reg_in_drive[j] && sim_is_active (uptr) && (uptr->flags & UNIT_UTS)) { /* un
     update_rpcs (0, drv);
     return SCPE_OK;
     }
-rmhr[drv] = data;
+rmhr[drv] = (uint16)data;
 
 switch (j) {                                            /* decode PA<5:1> */
 
@@ -685,7 +685,7 @@ switch (j) {                                            /* decode PA<5:1> */
     case 003:                                           /* RPDA */
         if ((access == WRITEB) && (PA & 1))
             data = data << 8;
-        rpda[drv] = data & ~DA_MBZ;
+        rpda[drv] = (uint16)(data & ~DA_MBZ);
         break;
 
     case 004:                                           /* RPCS2 */
@@ -706,7 +706,7 @@ switch (j) {                                            /* decode PA<5:1> */
     case 006:                                           /* RPER1 */
         if ((access == WRITEB) && (PA & 1))
             data = data << 8;
-        rper1[drv] = data;
+        rper1[drv] = (uint16)data;
         break;
 
     case 007:                                           /* RPAS */
@@ -727,17 +727,17 @@ switch (j) {                                            /* decode PA<5:1> */
     case 012:                                           /* RPMR */
         if ((access == WRITEB) && (PA & 1))
             data = data << 8;
-        rpmr[drv] = data;
+        rpmr[drv] = (uint16)data;
         break;
 
     case 015:                                           /* RPOF */
-        rpof[drv] = data & ~OF_MBZ;
+        rpof[drv] = (uint16)(data & ~OF_MBZ);
         break;
 
     case 016:                                           /* RPDC */
         if ((access == WRITEB) && (PA & 1))
             data = data << 8;
-        rpdc[drv] = data & ~DC_MBZ;
+        rpdc[drv] = (uint16)(data & ~DC_MBZ);
         break;
 
     case 005:                                           /* RPDS */
@@ -1017,10 +1017,10 @@ switch (uptr->FUNC) {                                   /* case on function */
         if (da >= drv_tab[dtype].size)
             rpds[drv] = rpds[drv] | DS_LST;
         da = da / RP_NUMWD;
-        rpda[drv] = da % drv_tab[dtype].sect;
+        rpda[drv] = (uint16)(da % drv_tab[dtype].sect);
         da = da / drv_tab[dtype].sect;
-        rpda[drv] = rpda[drv] | ((da % drv_tab[dtype].surf) << DA_V_SF);
-        rpdc[drv] = da / drv_tab[dtype].surf;
+        rpda[drv] = (uint16)(rpda[drv] | ((da % drv_tab[dtype].surf) << DA_V_SF));
+        rpdc[drv] = (uint16)(da / drv_tab[dtype].surf);
 
         if (err != 0) {                                 /* error? */
             set_rper (ER1_PAR, drv);                    /* set drive error */
@@ -1040,7 +1040,7 @@ return SCPE_OK;
 
 /* Set drive error */
 
-void set_rper (int32 flag, int32 drv)
+void set_rper (int16 flag, int32 drv)
 {
 rper1[drv] = rper1[drv] | flag;
 rpds[drv] = rpds[drv] | DS_ATA;

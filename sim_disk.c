@@ -472,8 +472,8 @@ if (ctx->asynch_io) {
 uptr->a_check_completion = _disk_completion_dispatch;
 uptr->a_is_active = _disk_is_active;
 uptr->a_cancel = _disk_cancel;
-#endif
 return SCPE_OK;
+#endif
 }
 
 /* Disable asynchronous operation */
@@ -3284,7 +3284,7 @@ if (bFixedVHD) {
 /* Dynamic Disk */
 memset (&Dynamic, 0, sizeof(Dynamic));
 memcpy (Dynamic.Cookie, "cxsparse", 8);
-Dynamic.DataOffset = NtoHll (0xFFFFFFFFFFFFFFFFLL);
+Dynamic.DataOffset = NtoHll ((uint64)0xFFFFFFFFFFFFFFFFLL);
 TableOffset = NtoHll(Footer.DataOffset)+sizeof(Dynamic);
 Dynamic.TableOffset = NtoHll (TableOffset);
 Dynamic.HeaderVersion = NtoHl (0x00010000);

@@ -122,7 +122,7 @@ switch (rg) {
             }
         else {
             if (ctx->port[PORT_A].put_char != NULL)
-                ctx->port[PORT_A].put_char (data);
+                ctx->port[PORT_A].put_char ((uint8)data);
             }
         ua2681_update_txi (ctx);
         break;
@@ -183,7 +183,7 @@ switch (rg) {
             }
         else {
             if (ctx->port[PORT_B].put_char != NULL)
-                ctx->port[PORT_B].put_char (data);
+                ctx->port[PORT_B].put_char ((uint8)data);
             }
         ua2681_update_txi (ctx);
         break;

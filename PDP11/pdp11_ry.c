@@ -145,11 +145,11 @@ extern int32 int_req[IPL_HLVL];
 int32 ry_csr = 0;                                       /* control/status */
 int32 ry_dbr = 0;                                       /* data buffer */
 int32 ry_esr = 0;                                       /* error status */
-int32 ry_ecode = 0;                                     /* error code */
-int32 ry_track = 0;                                     /* desired track */
-int32 ry_sector = 0;                                    /* desired sector */
+uint8 ry_ecode = 0;                                     /* error code */
+uint8 ry_track = 0;                                     /* desired track */
+uint8 ry_sector = 0;                                    /* desired sector */
 int32 ry_ba = 0;                                        /* bus addr */
-int32 ry_wc = 0;                                        /* word count */
+uint8 ry_wc = 0;                                        /* word count */
 int32 ry_state = IDLE;                                  /* controller state */
 int32 ry_stopioe = 1;                                   /* stop on error */
 int32 ry_cwait = 100;                                   /* command time */
@@ -163,7 +163,7 @@ t_stat ry_wr (int32 data, int32 PA, int32 access);
 t_stat ry_svc (UNIT *uptr);
 t_stat ry_reset (DEVICE *dptr);
 t_stat ry_boot (int32 unitno, DEVICE *dptr);
-void ry_done (int32 esr_flags, int32 new_ecode);
+void ry_done (int32 esr_flags, uint8 new_ecode);
 t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ry_attach (UNIT *uptr, char *cptr);
 t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
@@ -421,7 +421,7 @@ switch (ry_state) {                                     /* case on state */
             t = Map_ReadB (ba, ry_wc << 1, rx2xb);
             }
         else t = Map_WriteB (ba, ry_wc << 1, rx2xb);
-        ry_wc = t >> 1;                                 /* adjust wc */
+        ry_wc = (uint8)(t >> 1);                        /* adjust wc */
         ry_done (t? RYES_NXM: 0, 0);                    /* done */
         break;
 
@@ -507,8 +507,8 @@ switch (ry_state) {                                     /* case on state */
     case ESXFR:
         estat[0] = ry_ecode;                            /* fill 8B status */
         estat[1] = ry_wc;
-        estat[2] = ry_unit[0].TRACK;
-        estat[3] = ry_unit[1].TRACK;
+        estat[2] = (uint8)ry_unit[0].TRACK;
+        estat[3] = (uint8)ry_unit[1].TRACK;
         estat[4] = ry_track;
         estat[5] = ry_sector;
         estat[6] = ((ry_csr & RYCS_DRV)? 0200: 0) |
@@ -516,7 +516,7 @@ switch (ry_state) {                                     /* case on state */
                    ((uptr->flags & UNIT_ATT)? 0040: 0) |
                    ((ry_unit[0].flags & UNIT_DEN)? 0020: 0) |
                    ((ry_csr & RYCS_DEN)? 0001: 0);
-        estat[7] = uptr->TRACK;
+        estat[7] = (uint8)uptr->TRACK;
         t = Map_WriteB (ba, 8, estat);                  /* DMA to memory */
         ry_done (t? RYES_NXM: 0, 0);                    /* done */
         break;
@@ -548,7 +548,7 @@ return SCPE_OK;
    request interrupt if needed, return to IDLE state.
 */
 
-void ry_done (int32 esr_flags, int32 new_ecode)
+void ry_done (int32 esr_flags, uint8 new_ecode)
 {
 int32 drv = (ry_csr & RYCS_DRV)? 1: 0;
 

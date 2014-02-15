@@ -277,7 +277,7 @@ while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
         lp->rxpbsize += 512;
         lp->rxpb = (uint8 *)realloc (lp->rxpb, lp->rxpbsize);
         }
-    lp->rxpb[lp->rxpboffset] = c;
+    lp->rxpb[lp->rxpboffset] = (uint8)c;
     if ((lp->rxpboffset == 0) && ((c == DDCMP_SYN) || (c == DDCMP_DEL))) {
         tmxr_debug (DDCMP_DBG_PRCV, lp, "Ignoring Interframe Sync Character", (char *)&lp->rxpb[0], 1);
         continue;
@@ -313,7 +313,7 @@ while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
         if (lp->rxpboffset >= 10 + payloadsize) {
             ++lp->rxpcnt;
             *pbuf = lp->rxpb;
-            *psize = 10 + payloadsize;
+            *psize = (uint16)(10 + payloadsize);
             if (lp->mp->lines > 1)
                 sprintf (msg, "Line%d: <<< RCV Packet", (int)(lp-lp->mp->ldsc));
             else

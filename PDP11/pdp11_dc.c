@@ -415,7 +415,7 @@ for (ln = 0; ln < DCX_LINES; ln++) {                    /* loop thru lines */
                 c = (c & 0177) | odd_par[c & 0177];
             else if (dco_unit[ln].flags & DCX_EPAR)     /* even parity */
                 c = (c & 0177) | (odd_par[c & 0177] ^ 0200);
-            dci_buf[ln] = c;
+            dci_buf[ln] = (uint8)c;
             if ((c & 0200) == odd_par[c & 0177])        /* odd par? */
                 dci_csr[ln] |= DCICSR_PAR;
             else dci_csr[ln] &= ~DCICSR_PAR;

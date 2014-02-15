@@ -118,7 +118,7 @@ while (fgets (line, sizeof(line)-1, iFile)) {
                     allocated_size += 2048;
                     *pROMData = (unsigned char *)realloc(*pROMData, allocated_size);
                     }
-                *(*pROMData + bytes_written++) = byte;
+                *(*pROMData + bytes_written++) = (unsigned char)byte;
                 c += 5;
                 }
             break;
@@ -171,7 +171,7 @@ while ((c = strchr (rom_filename, '\\')))
 strcpy (array_name, rom_filename);
 for (c=array_name; *c; ++c)
     if (isupper(*c))
-        *c = tolower(*c);
+        *c = (char)tolower(*c);
 if ((c = strchr (array_name, '.')))
     *c = '_';
 if ((c = strchr (array_name, '/')))

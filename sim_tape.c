@@ -373,8 +373,8 @@ if (ctx->asynch_io) {
 uptr->a_check_completion = _tape_completion_dispatch;
 uptr->a_is_active = _tape_is_active;
 uptr->a_cancel = _tape_cancel;
-#endif
 return SCPE_OK;
+#endif
 }
 
 /* Disable asynchronous operation */
@@ -1723,7 +1723,7 @@ return r;
 
 /* Position Tape */
 
-t_stat sim_tape_position (UNIT *uptr, uint8 flags, uint32 recs, uint32 *recsskipped, uint32 files, uint32 *filesskipped, uint32 *objectsskipped)
+t_stat sim_tape_position (UNIT *uptr, uint32 flags, uint32 recs, uint32 *recsskipped, uint32 files, uint32 *filesskipped, uint32 *objectsskipped)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat r = MTSE_OK;
@@ -1773,7 +1773,7 @@ else {
 return r;
 }
 
-t_stat sim_tape_position_a (UNIT *uptr, uint8 flags, uint32 recs, uint32 *recsskipped, uint32 files, uint32 *filesskipped, uint32 *objectsskipped, TAPE_PCALLBACK callback)
+t_stat sim_tape_position_a (UNIT *uptr, uint32 flags, uint32 recs, uint32 *recsskipped, uint32 files, uint32 *filesskipped, uint32 *objectsskipped, TAPE_PCALLBACK callback)
 {
 t_stat r = MTSE_OK;
 AIO_CALLSETUP

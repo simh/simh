@@ -464,7 +464,7 @@ return tptr;
 
 t_stat get_spec (char *cptr, int32 addr, int32 n1, int32 *sptr, int32 *dptr)
 {
-int32 reg, indir, pflag, disp;
+int32 reg, indir, pflag, disp = 0;
 
 indir = 0;                                              /* no indirect */
 pflag = 0;

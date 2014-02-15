@@ -234,7 +234,7 @@ int32 rlcs = 0;                                         /* control/status */
 int32 rlba = 0;                                         /* memory address */
 int32 rlbae = 0;                                        /* mem addr extension */
 int32 rlda = 0;                                         /* disk addr */
-int32 rlmp = 0, rlmp1 = 0, rlmp2 = 0;                   /* mp register queue */
+uint16 rlmp = 0, rlmp1 = 0, rlmp2 = 0;                  /* mp register queue */
 int32 rl_swait = 10;                                    /* seek wait */
 int32 rl_rwait = 10;                                    /* rotate wait */
 int32 rl_stopioe = 1;                                   /* stop on error */
@@ -542,7 +542,7 @@ max 17ms for 1 track seek w/head switch
             if (rlda & RLDA_GS_CLR)                 /* reset errors? */
                 uptr->STAT &= ~RLDS_ERR;
                 /* develop drive state */
-            rlmp = uptr->STAT | (uptr->TRK & RLDS_HD);
+            rlmp = (uint16)(uptr->STAT | (uptr->TRK & RLDS_HD));
             if (uptr->flags & UNIT_RL02)
                 rlmp |= RLDS_RL02;
             if (uptr->flags & UNIT_WPRT)
@@ -605,7 +605,7 @@ says, bit 0 can be written and read (as 1) on an RLV12 (verified
     case 3:                                             /* RLMP */
         if (access == WRITEB)
             data = (PA & 1)? (rlmp & 0377) | (data << 8): (rlmp & ~0377) | data;
-        rlmp = rlmp1 = rlmp2 = data;
+        rlmp = rlmp1 = rlmp2 = (uint16)data;
         if (DEBUG_PRS (rl_dev))
             fprintf (sim_deb, ">>RL wr: RLMP %06o\n", rlmp);
         break;
@@ -628,7 +628,7 @@ return SCPE_OK;
 }
 
 /* CRC16 as implemented by the DEC 9401 chip */
-static uint32 calcCRC (const int wc, const uint16 *data)
+static uint16 calcCRC (const int wc, const uint16 *data)
 {
     uint32  crc, j, d;
     int32   i;
@@ -643,7 +643,7 @@ static uint32 calcCRC (const int wc, const uint16 *data)
             d >>= 1;
         }
     }
-    return (crc);
+    return (uint16)crc;
 }
 
 /*
@@ -697,12 +697,12 @@ static void rlv_maint (void)
     rlba = ma & RLBA_IMP;                               /* lower 16b */
 
     /* 4: check the CRC of (DAR + 3) */
-    w = rlda;
+    w = (uint16)rlda;
     rlxb[0] = calcCRC (1, &w);                          /* calculate CRC */
     rlda = (rlda & ~0377) | ((rlda + 1) & 0377);
 
     /* 5: check the CRC of (DAR + 4) */
-    w = rlda;
+    w = (uint16)rlda;
     rlxb[1] = calcCRC (1, &w);                          /* calculate CRC */
     rlda = (rlda & ~0377) | ((rlda + 1) & 0377);
 

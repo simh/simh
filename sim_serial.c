@@ -303,9 +303,9 @@ for (i=0; i<len; i++) {
     s1 = string1[i];
     s2 = string2[i];
     if (islower (s1))
-        s1 = toupper (s1);
+        s1 = (unsigned char)toupper (s1);
     if (islower (s2))
-        s2 = toupper (s2);
+        s2 = (unsigned char)toupper (s2);
     if (s1 < s2)
         return -1;
     if (s1 > s2)
@@ -493,7 +493,7 @@ config.charsize = (uint32)strtotv (sptr, &tptr, 10);    /* parse character size 
 arg_error = arg_error || (sptr == tptr);                /* check for bad argument */
 
 if (*tptr)                                              /* parity character present? */
-    config.parity = toupper (*tptr++);                  /* save parity character */
+    config.parity = (char)toupper (*tptr++);            /* save parity character */
 
 config.stopbits = (uint32)strtotv (tptr, &sptr, 10);    /* parse number of stop bits */
 arg_error = arg_error || (tptr == sptr);                /* check for bad argument */
@@ -699,7 +699,7 @@ if (!GetCommState (port, &dcb)) {                       /* get the current comm 
 dcb.BaudRate = config.baudrate;                         /* assign baud rate */
 
 if (config.charsize >= 5 && config.charsize <= 8)       /* character size OK? */
-    dcb.ByteSize = config.charsize;                     /* assign character size */
+    dcb.ByteSize = (BYTE)config.charsize;               /* assign character size */
 else
     return SCPE_ARG;                                    /* not a valid size */
 

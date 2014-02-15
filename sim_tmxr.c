@@ -344,22 +344,22 @@
 /* Telnet protocol constants - negatives are for init'ing signed char data */
 
 /* Commands */
-#define TN_IAC          0xFF /* -1 */                              /* protocol delim */
-#define TN_DONT         0xFE /* -2 */                              /* dont */
-#define TN_DO           0xFD /* -3 */                              /* do */
-#define TN_WONT         0xFC /* -4 */                              /* wont */
-#define TN_WILL         0xFB /* -5 */                              /* will */
-#define TN_SB           0xFA /* -6 */                              /* sub-option negotiation */
-#define TN_GA           0xF9 /* -7 */                              /* go ahead */
-#define TN_EL           0xF8 /* -8 */                              /* erase line */
-#define TN_EC           0xF7 /* -9 */                              /* erase character */
-#define TN_AYT          0xF6 /* -10 */                             /* are you there */
-#define TN_AO           0xF5 /* -11 */                             /* abort output */
-#define TN_IP           0xF4 /* -12 */                             /* interrupt process */
-#define TN_BRK          0xF3 /* -13 */                             /* break */
-#define TN_DATAMK       0xF2 /* -14 */                             /* data mark */
-#define TN_NOP          0xF1 /* -15 */                             /* no operation */
-#define TN_SE           0xF0 /* -16 */                             /* end sub-option negot */
+#define TN_IAC          0xFFu /* -1 */                  /* protocol delim */
+#define TN_DONT         0xFEu /* -2 */                  /* dont */
+#define TN_DO           0xFDu /* -3 */                  /* do */
+#define TN_WONT         0xFCu /* -4 */                  /* wont */
+#define TN_WILL         0xFBu /* -5 */                  /* will */
+#define TN_SB           0xFAu /* -6 */                  /* sub-option negotiation */
+#define TN_GA           0xF9u /* -7 */                  /* go ahead */
+#define TN_EL           0xF8u /* -8 */                  /* erase line */
+#define TN_EC           0xF7u /* -9 */                  /* erase character */
+#define TN_AYT          0xF6u /* -10 */                 /* are you there */
+#define TN_AO           0xF5u /* -11 */                 /* abort output */
+#define TN_IP           0xF4u /* -12 */                 /* interrupt process */
+#define TN_BRK          0xF3u /* -13 */                 /* break */
+#define TN_DATAMK       0xF2u /* -14 */                 /* data mark */
+#define TN_NOP          0xF1u /* -15 */                 /* no operation */
+#define TN_SE           0xF0u /* -16 */                 /* end sub-option negot */
 
 /* Options */
 

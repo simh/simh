@@ -258,7 +258,7 @@ typedef struct buffer_list BDL;
 
 struct dupstate {
     int32  kmc;                                 /* Controlling KMC */
-    int32  line;                                /* OS-assigned line number */
+    uint8  line;                                /* OS-assigned line number */
     int32  dupidx;                              /* DUP API Number amongst all DUP11's on Unibus (-1 == unassigned) */
     int32  linkstate;                           /* Line Link Status (i.e. 1 when DCD/DSR is on, 0 otherwise */
  #define LINK_DSR     1
@@ -499,6 +499,7 @@ static char *kmc_description (DEVICE *dptr);
 /* Global data */
 
 extern int32 IREQ (HLVL);
+extern int32 tmxr_poll;                         /* calibrated delay */
 
 static int32 kmc_AintAck (void);
 static int32 kmc_BintAck (void);
@@ -629,15 +630,15 @@ static void kmc_startUcode (int32 k);
 static void kmc_dispatchInputCmd(int32 k);
 
 /* Control functions */
-static void kmc_baseIn (int32 k, dupstate *d, uint16 cmdsel2, int line);
+static void kmc_baseIn (int32 k, dupstate *d, uint16 cmdsel2, uint8 line);
 static void kmc_ctrlIn (int32 k, dupstate *d, int line);
 
 /* Receive functions */
-void kmc_rxBufferIn(dupstate *d, int32 ba, uint32 sel6v);
+void kmc_rxBufferIn(dupstate *d, int32 ba, uint16 sel6v);
 static void kdp_receive(int32 dupidx, int count);
 
 /* Transmit functions */
-static void kmc_txBufferIn(dupstate *d, int32 ba, uint32 sel6v);
+static void kmc_txBufferIn(dupstate *d, int32 ba, uint16 sel6v);
 static void kmc_txComplete (int32 dupidx, int status);
 static t_bool kmc_txNewBdl(dupstate *d);
 static t_bool kmc_txNewBd(dupstate *d);
@@ -666,7 +667,7 @@ static int32 kmc_BintAck (void);
 /* DUP access */
 
 /* Debug support */
-static t_bool kmc_printBufferIn (int32 k, DEVICE *dev, int32 line, t_bool rx,
+static t_bool kmc_printBufferIn (int32 k, DEVICE *dev, uint8 line, t_bool rx,
                                  int32 count, int32 ba, uint16 sel6v);
 static t_bool kmc_printBDL(int32 k, uint32 dbits, DEVICE *dev, uint8 line, int32 ba, int prbuf);
 
@@ -812,7 +813,7 @@ static t_stat kmc_writeCsr (int32 data, int32 PA, int32 access) {
                 : ((data & 0377) | (sel0 & 0177400));
         }
         changed = sel0 ^ data;
-        sel0 = data;
+        sel0 = (uint16)data;
         if (sel0 & SEL0_MRC) {
             if (((sel0 & SEL0_RUN) == 0) && (changed & SEL0_RUN)) {
                 kmc_halt (k, HALT_MRC);
@@ -871,7 +872,7 @@ static t_stat kmc_writeCsr (int32 data, int32 PA, int32 access) {
              * if another output command is ready.
              */
             if ((sel2 & SEL2_RDO) && (!(data & SEL2_RDO))) {
-                sel2 = data;                    /* RDO clearing, RDI can't be set */
+                sel2 = (uint16)data;            /* RDO clearing, RDI can't be set */
                 if (sel0 & SEL0_RQI) {
                     sel2 = (sel2 & 0xFF00) | SEL2_RDI;
                     kmc_updints(k);
@@ -879,28 +880,28 @@ static t_stat kmc_writeCsr (int32 data, int32 PA, int32 access) {
                     kmc_processCompletions(k);
             } else {
                 if ((sel2 & SEL2_RDI) && (!(data & SEL2_RDI))) {
-                    sel2 = data;                /* RDI clearing,  RDO can't be set */
+                    sel2 = (uint16)data;        /* RDI clearing,  RDO can't be set */
                     kmc_dispatchInputCmd(k);    /* Can set RDO */
                     if ((sel0 & SEL0_RQI) && !(sel2 & SEL2_RDO))
                         sel2 = (sel2 & 0xFF00) | SEL2_RDI;
                     kmc_updints(k);
                 } else {
-                    sel2 = data;
+                    sel2 = (uint16)data;
                 }
             }
         } else {
-            sel2 = data;
+            sel2 = (uint16)data;
         }
         break;
     case 02: /* SEL4 */
         mna = data & (KMC_CRAMSIZE -1);
-        sel4 = data;
+        sel4 = (uint16)data;
         break;
     case 03: /* SEL6 */
         if (sel0 & SEL0_RMI) {
-            mni = data;
+            mni = (uint16)data;
         }
-        sel6 = data;
+        sel6 = (uint16)data;
         break;
     }
 
@@ -1266,7 +1267,7 @@ static t_stat kmc_rxService (UNIT *rxup) {
     dupstate *d = line2dup[rxup->unit_line];
     BDL *bdl;
     t_stat r;
-    int32 xrem, seglen;
+    uint16 xrem, seglen;
 
     assert ((k >= 0) && (k < (int32) kmc_dev.numunits) && (d->kmc == k) &&
              (d->line == rxup->unit_line));
@@ -1295,7 +1296,8 @@ static t_stat kmc_rxService (UNIT *rxup) {
             kmc_updateDSR (d);
             break;
         }
-        if ((r != SCPE_OK) || (d->rxmsg == NULL)) {
+        if ((r != SCPE_OK) || (d->rxmsg == NULL)) {  /* No packet? */
+            rxup->wait = tmxr_poll;
             break;
         }
 
@@ -1386,7 +1388,7 @@ static t_stat kmc_rxService (UNIT *rxup) {
         }
         assert (seglen > 0);
 
-        xrem = Map_WriteB (d->rx.ba, seglen, d->rxmsg + d->rxused);
+        xrem = (uint16)Map_WriteB (d->rx.ba, seglen, d->rxmsg + d->rxused);
         if (xrem != 0) {
             uint16 bd[3];
             memcpy (bd, &d->rx.bd, sizeof bd);
@@ -1513,7 +1515,10 @@ static t_stat kmc_rxService (UNIT *rxup) {
     }
 
     if ((d->rxstate != RXIDLE) || d->rxavail) {
-        sim_activate_after(rxup, rxup->wait);
+        if (rxup->wait == tmxr_poll)
+            sim_clock_coschedule(rxup, tmxr_poll);
+        else
+            sim_activate_after(rxup, rxup->wait);
     }
 
     return SCPE_OK;
@@ -1678,7 +1683,7 @@ static void kmc_startUcode (int32 k) {
  */
 
 static void kmc_dispatchInputCmd(int32 k) {
-    int line;
+    uint8 line;
     int32 ba;
     int16 cmdsel2 = sel2;
     dupstate* d;
@@ -1734,7 +1739,7 @@ static void kmc_dispatchInputCmd(int32 k) {
  * There is no way  to release a line, short of re-starting the microcode.
  *
  */
-static void kmc_baseIn (int32 k, dupstate *d, uint16 cmdsel2, int line) {
+static void kmc_baseIn (int32 k, dupstate *d, uint16 cmdsel2, uint8 line) {
     uint32 csraddress;
     int32 dupidx;
 
@@ -1901,7 +1906,7 @@ static void kmc_ctrlIn (int32 k, dupstate *d, int line) {
  *
  */
 
-void kmc_rxBufferIn(dupstate *d, int32 ba, uint32 sel6v) {
+void kmc_rxBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
     int32 k = d->kmc;
     BDL *qe;
     uint32 bda = 0;
@@ -1998,7 +2003,8 @@ static void kdp_receive(int32 dupidx, int count) {
     k = d->kmc;
     rxup = &rx_units[d->line][k];
 
-    if ((d->rxstate == RXIDLE) && !sim_is_active (rxup)) {
+    if (d->rxstate == RXIDLE){
+        sim_cancel (rxup);
         sim_activate_after (rxup, RXNEWBD_DELAY);
     }
     return;
@@ -2023,7 +2029,7 @@ static void kdp_receive(int32 dupidx, int count) {
  *
  */
 
-void kmc_txBufferIn(dupstate *d, int32 ba, uint32 sel6v) {
+void kmc_txBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
     int32 k = d->kmc;
     BDL *qe;
 
@@ -2186,16 +2192,16 @@ static t_bool kmc_txNewBd(dupstate *d) {
 
 static t_bool kmc_txAppendBuffer(dupstate *d) {
     int32 k = d->kmc;
-    int32 rem;
+    uint16 rem;
 
     if (!d->txmsg || (d->txmsize < d->txmlen+d->tx.bd[1])) {
         d->txmsize = d->txmlen+d->tx.bd[1];
         d->txmsg = (uint8 *)realloc(d->txmsg, d->txmsize);
         assert (d->txmsg);
     }
-    rem = Map_ReadB (d->tx.ba, d->tx.bd[1], d->txmsg+d->txmlen);
+    rem = (uint16)Map_ReadB (d->tx.ba, d->tx.bd[1], d->txmsg+d->txmlen);
     d->tx.bd[1] -= rem;
-    rem += kmc_updateBDCount (d->tx.bda, d->tx.bd);
+    rem += (uint16)kmc_updateBDCount (d->tx.bda, d->tx.bd);
     if (rem) {
         kmc_ctrlOut (k, SEL6_CO_NXM, 0, d->line, d->tx.bda);
         return FALSE;
@@ -2558,7 +2564,7 @@ static int32 kmc_BintAck (void) {
  * (b) only one completion per bdl.
  */
 
-static t_bool kmc_printBufferIn (int32 k, DEVICE *dev, int32 line, t_bool rx, 
+static t_bool kmc_printBufferIn (int32 k, DEVICE *dev, uint8 line, t_bool rx, 
                                  int32 count, int32 ba, uint16 sel6v) {
     t_bool kill = ((sel6v & (SEL6_BI_KILL|SEL6_BI_ENABLE)) == SEL6_BI_KILL);
     const char *dir = rx? "RX": "TX";
@@ -2773,7 +2779,7 @@ static t_stat kmc_setDeviceCount (UNIT *txup, int32 val, char *cptr, void *desc)
         }
     }
     newln = (int32) get_uint (cptr, 10, KMC_UNITS, &r);
-    if ((r != SCPE_OK) || (newln == dptr->numunits))
+    if ((r != SCPE_OK) || (newln == (int32)dptr->numunits))
         return r;
     if (newln == 0)
         return SCPE_ARG;

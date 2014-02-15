@@ -594,7 +594,7 @@ t_stat xq_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw)
   /* on PDP-11, allow EX command to look at bootrom */
 #ifdef VM_PDP11
   CTLR* xq = xq_unit2ctlr(uptr);
-  uint16 *bootrom;
+  uint16 *bootrom = NULL;
 
   if (xq->var->type == XQ_T_DEQNA)
     bootrom = xq_bootrom_deqna;
@@ -649,8 +649,8 @@ void xq_make_checksum(CTLR* xq)
     checksum = 0;
 
   /* set checksum bytes */
-  xq->var->mac_checksum[0] = checksum & 0xFF;
-  xq->var->mac_checksum[1] = checksum >> 8;
+  xq->var->mac_checksum[0] = (uint8)(checksum);
+  xq->var->mac_checksum[1] = (uint8)(checksum >> 8);
 }
 
 t_stat xq_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
@@ -905,7 +905,7 @@ t_stat xq_nxm_error(CTLR* xq)
 void xq_write_callback (CTLR* xq, int status)
 {
   int32 wstatus;
-  const uint16 TDR = 100 + xq->var->write_buffer.len * 8; /* arbitrary value */
+  const uint16 TDR = (uint16)(100 + xq->var->write_buffer.len * 8); /* arbitrary value */
   uint16 write_success[2] = {0};
   uint16 write_failure[2] = {XQ_DSC_C};
   write_success[1] = TDR & 0x03FF; /* Does TDR get set on successful packets ?? */
@@ -1057,14 +1057,14 @@ t_stat xq_process_rbdl(CTLR* xq)
     if (xq->var->rbdl_buf[1] & XQ_DSC_L) b_length -= 1;
 
     item = &xq->var->ReadQ.item[xq->var->ReadQ.head];
-    rbl = item->packet.len;
+    rbl = (uint16)item->packet.len;
     rbuf = item->packet.msg;
     if (item->packet.oversize)
       rbuf = item->packet.oversize;
 
     /* see if packet must be size-adjusted or is splitting */
     if (item->packet.used) {
-      int used = item->packet.used;
+      uint16 used = (uint16)item->packet.used;
       rbl -= used;
       rbuf = &rbuf[used];
     } else {
@@ -1233,7 +1233,7 @@ t_stat xq_process_setup(CTLR* xq)
 {
   int i,j;
   int count = 0;
-  float secs;
+  float secs = 0;
   uint32 saved_debug = xq->dev->dctrl;
   ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
   ETH_MAC filters[XQ_FILTER_MAX + 1];
@@ -1287,7 +1287,7 @@ t_stat xq_process_setup(CTLR* xq)
   xq->var->setup.promiscuous = 0;
   /* process high byte count */
   if (xq->var->write_buffer.len > 128) {
-    uint16 len = xq->var->write_buffer.len;
+    uint16 len = (uint16)xq->var->write_buffer.len;
     uint16 led, san;
 
     xq->var->setup.multicast = (0 != (len & XQ_SETUP_MC));
@@ -1648,12 +1648,12 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
     b_length = ETH_FRAME_SIZE;
 
     item = &xq->var->ReadQ.item[xq->var->ReadQ.head];
-    rbl = item->packet.len + ETH_CRC_SIZE;
+    rbl = (uint16)(item->packet.len + ETH_CRC_SIZE);
     rbuf = item->packet.msg;
 
     /* see if packet must be size-adjusted or is splitting */
     if (item->packet.used) {
-      int used = item->packet.used;
+      uint16 used = (uint16)item->packet.used;
       rbl -= used;
       rbuf = &item->packet.msg[used];
     } else {
@@ -1802,13 +1802,13 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
         sim_debug(DBG_WRN, xq->dev, "Packet Write Error!\n");
         xq->var->stats.fail += 1;
         xq->var->xring[i].tmd0 = XQ_TMD0_ERR1;
-        xq->var->xring[i].tmd1 = 100 + xq->var->write_buffer.len * 8; /* arbitrary value */
+        xq->var->xring[i].tmd1 = (uint16)(100 + xq->var->write_buffer.len * 8); /* arbitrary value */
         xq->var->xring[i].tmd1 |= XQ_TMD1_LCA;
       } else {
         if (DBG_PCK & xq->dev->dctrl)
           eth_packet_trace_ex(xq->var->etherface, xq->var->write_buffer.msg, xq->var->write_buffer.len, "xq-write", DBG_DAT & xq->dev->dctrl, DBG_PCK);
         xq->var->xring[i].tmd0 = 0;
-        xq->var->xring[i].tmd1 = 100 + xq->var->write_buffer.len * 8; /* arbitrary value */
+        xq->var->xring[i].tmd1 = (uint16)(100 + xq->var->write_buffer.len * 8); /* arbitrary value */
       }
       sim_debug(DBG_WRN, xq->dev, "XBDL completed processing write\n");
       /* clear transmit buffer */
@@ -2112,8 +2112,8 @@ t_stat xq_process_bootrom (CTLR* xq)
   */
 
   ETH_PACK pack;
-  uint8*  bootrom_b;
-  size_t bootrom_size;
+  uint8*  bootrom_b = NULL;
+  size_t bootrom_size = 0;
 
   sim_debug(DBG_TRC, xq->dev, "xq_process_bootrom()\n");
 
@@ -2327,10 +2327,11 @@ t_stat xq_wr_icr(CTLR* xq, int32 data)
   return SCPE_OK;
 }
 
-t_stat xq_wr(int32 data, int32 PA, int32 access)
+t_stat xq_wr(int32 ldata, int32 PA, int32 access)
 {
   CTLR* xq = xq_pa2ctlr(PA);
   int index = (PA >> 1) & 07;   /* word index */
+  uint16 data = (uint16)ldata;
 
   sim_debug(DBG_REG, xq->dev, "xq_wr(data=0x%08X, PA=0x%08X[%s], access=%d)\n", data, PA, ((xq->var->mode == XQ_T_DELQA_PLUS) ? xqt_xmit_regnames[index] : xq_xmit_regnames[index]), access);
 
@@ -2888,7 +2889,7 @@ void xq_debug_setup(CTLR* xq)
 
   if (xq->var->write_buffer.len > 128) {
     char buffer[20] = {0};
-    uint16 len = xq->var->write_buffer.len;
+    uint16 len = (uint16)xq->var->write_buffer.len;
     if (len & XQ_SETUP_MC) strcat(buffer, "MC ");
     if (len & XQ_SETUP_PM) strcat(buffer, "PM ");
     if (len & XQ_SETUP_LD) strcat(buffer, "LD ");
@@ -2952,7 +2953,7 @@ t_stat xq_boot (int32 unitno, DEVICE *dptr)
 size_t i;
 DIB *dib = (DIB *)dptr->ctxt;
 CTLR *xq = xq_unit2ctlr(&dptr->units[unitno]);
-uint16 *bootrom;
+uint16 *bootrom = NULL;
 extern int32 REGFILE[6][2];                 /* R0-R5, two sets */
 extern uint16 *M;                           /* Memory */
 

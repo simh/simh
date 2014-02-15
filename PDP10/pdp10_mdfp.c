@@ -728,7 +728,7 @@ if (r->sign) {
             r->fhi = r->fhi | FP_UCRY;
         else {
             r->exp = r->exp + 1;
-            r->fhi = FP_UCRY | FP_UNORM;
+            r->fhi = (t_uint64)(FP_UCRY | FP_UNORM);
             }
         }
     else {                                              /* abs frac */

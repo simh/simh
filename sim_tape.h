@@ -157,8 +157,8 @@ t_stat sim_tape_spfilebyrecr (UNIT *uptr, uint32 count, uint32 *skipped, uint32 
 t_stat sim_tape_spfilebyrecr_a (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, TAPE_PCALLBACK callback);
 t_stat sim_tape_rewind (UNIT *uptr);
 t_stat sim_tape_rewind_a (UNIT *uptr, TAPE_PCALLBACK callback);
-t_stat sim_tape_position (UNIT *uptr, uint8 flags, uint32 recs, uint32 *recskipped, uint32 files, uint32 *fileskipped, uint32 *objectsskipped);
-t_stat sim_tape_position_a (UNIT *uptr, uint8 flags, uint32 recs, uint32 *recsskipped, uint32 files, uint32 *filesskipped, uint32 *objectsskipped, TAPE_PCALLBACK callback);
+t_stat sim_tape_position (UNIT *uptr, uint32 flags, uint32 recs, uint32 *recskipped, uint32 files, uint32 *fileskipped, uint32 *objectsskipped);
+t_stat sim_tape_position_a (UNIT *uptr, uint32 flags, uint32 recs, uint32 *recsskipped, uint32 files, uint32 *filesskipped, uint32 *objectsskipped, TAPE_PCALLBACK callback);
 t_stat sim_tape_reset (UNIT *uptr);
 t_bool sim_tape_bot (UNIT *uptr);
 t_bool sim_tape_wrp (UNIT *uptr);

@@ -876,11 +876,11 @@ int32 xu_command(CTLR* xu)
       if ((xu->var->pcb[1] & 1) || (xu->var->pcb[2] & 0374)) 
         return PCSR0_PCEI;
       xu->var->udb[0] = xu->var->tdrb & 0177776;
-      xu->var->udb[1] = (xu->var->telen << 8) + ((xu->var->tdrb >> 16) & 3);
-      xu->var->udb[2] = xu->var->trlen;
+      xu->var->udb[1] = (uint16)((xu->var->telen << 8) + ((xu->var->tdrb >> 16) & 3));
+      xu->var->udb[2] = (uint16)xu->var->trlen;
       xu->var->udb[3] = xu->var->rdrb & 0177776;
-      xu->var->udb[4] = (xu->var->relen << 8) + ((xu->var->rdrb >> 16) & 3);
-      xu->var->udb[5] = xu->var->rrlen;
+      xu->var->udb[4] = (uint16)((xu->var->relen << 8) + ((xu->var->rdrb >> 16) & 3));
+      xu->var->udb[5] = (uint16)xu->var->rrlen;
 
       /* Write UDB to host memory. */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
@@ -933,7 +933,7 @@ int32 xu_command(CTLR* xu)
       udb[4]  = stats->mfrecv & 0xFFFF;   /* multicast frames received <15:00> */
       udb[5]  = stats->mfrecv >> 16;      /* multicast frames received <31:16> */
       udb[6]  = stats->rxerf;             /* receive error status bits */
-      udb[7]  = stats->frecve;            /* frames received with error */
+      udb[7]  = (uint16)stats->frecve;    /* frames received with error */
       udb[8]  = stats->rbytes & 0xFFFF;   /* data bytes received <15:00> */
       udb[9]  = stats->rbytes >> 16;      /* data bytes received <31:16> */
       udb[10] = stats->mrbytes & 0xFFFF;  /* multicast data bytes received <15:00> */
@@ -974,14 +974,14 @@ int32 xu_command(CTLR* xu)
       break;
 
     case FC_RMODE:          /* read mode register */
-      value = xu->var->mode;
+      value = (uint16)xu->var->mode;
       wstatus = Map_WriteW(xu->var->pcbb+2, 2, &value);
       if (wstatus)
         return PCSR0_PCEI + 1;
       break;
 
     case FC_WMODE:          /* write mode register */
-      value = xu->var->mode;
+      value = (uint16)xu->var->mode;
       xu->var->mode = xu->var->pcb[1];
       sim_debug(DBG_TRC, xu->dev, "FC_WMODE: mode=%04x\n", xu->var->mode);
 
@@ -1350,7 +1350,7 @@ void xu_process_transmit(CTLR* xu)
       /* update transmit status in transmit buffer */
       if (xu->var->write_buffer.status != 0) {
         /* failure */
-        const uint16 tdr = 100 + wlen * 8; /* arbitrary value */
+        const uint16 tdr = (uint16)(100 + wlen * 8); /* arbitrary value */
         xu->var->txhdr[3] |= TXR_RTRY;
         xu->var->txhdr[3] |= tdr & TXR_TDR;
         xu->var->txhdr[2] |= TXR_ERRS;

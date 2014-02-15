@@ -685,7 +685,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                         sim_rem_buf_size[i] += 1024;
                         sim_rem_buf[i] = (char *)realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
                         }
-                    sim_rem_buf[i][sim_rem_buf_ptr[i]++] = c;
+                    sim_rem_buf[i][sim_rem_buf_ptr[i]++] = (char)c;
                     sim_rem_buf[i][sim_rem_buf_ptr[i]] = '\0';
                     if (((size_t)sim_rem_buf_ptr[i]) >= sizeof(cbuf))
                         got_command = TRUE;                 /* command too long */
@@ -1111,6 +1111,7 @@ sim_switches = saved_deb_switches;
 sim_set_debon (0, saved_debug_filename);
 sim_deb_basetime = saved_deb_basetime;
 sim_switches = saved_sim_switches;
+sim_quiet = saved_quiet;
 return SCPE_OK;
 }
 

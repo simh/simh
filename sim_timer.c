@@ -979,7 +979,7 @@ else {
     if (cptr == tptr)
         return SCPE_ARG;
     sim_throt_sleep_time = sim_idle_rate_ms;
-    c = toupper (*tptr++);
+    c = (char)toupper (*tptr++);
     if (c == '/')
         val2 = strtotv (tptr, &tptr, 10);
     if ((*tptr != 0) || (val == 0))

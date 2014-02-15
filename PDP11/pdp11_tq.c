@@ -225,14 +225,14 @@ struct tqpkt {
 
 struct drvtyp {
     uint32      uqpm;                                   /* UQ port model */
-    uint32      cmod;                                   /* ctrl model */
+    uint16      cmod;                                   /* ctrl model */
     uint32      med;                                    /* MSCP media */
-    uint32      fmt;                                    /* flags */
+    uint16      fmt;                                    /* flags */
     t_addr      cap;                                    /* capacity */
-    uint32      umod;                                   /* unit model */
-    uint32      cver;
-    uint32      fver;
-    uint32      uver;
+    uint16      umod;                                   /* unit model */
+    uint16      cver;
+    uint16      fver;
+    uint16      uver;
     char        *name;
     };
 
@@ -252,14 +252,14 @@ uint32 tq_saw = 0;                                      /* written data */
 uint32 tq_s1dat = 0;                                    /* S1 data */
 uint32 tq_csta = 0;                                     /* ctrl state */
 uint32 tq_perr = 0;                                     /* last error */
-uint32 tq_cflgs = 0;                                    /* ctrl flags */
+uint16 tq_cflgs = 0;                                    /* ctrl flags */
 uint32 tq_prgi = 0;                                     /* purge int */
 uint32 tq_pip = 0;                                      /* poll in progress */
 struct uq_ring tq_cq = { 0 };                           /* cmd ring */
 struct uq_ring tq_rq = { 0 };                           /* rsp ring */
 struct tqpkt tq_pkt[TQ_NPKTS];                          /* packet queue */
-int32 tq_freq = 0;                                      /* free list */
-int32 tq_rspq = 0;                                      /* resp list */
+uint16 tq_freq = 0;                                      /* free list */
+uint16 tq_rspq = 0;                                      /* resp list */
 uint32 tq_pbsy = 0;                                     /* #busy pkts */
 uint32 tq_credits = 0;                                  /* credits */
 uint32 tq_hat = 0;                                      /* host timer */
@@ -362,21 +362,21 @@ static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cpt
 char *tq_description (DEVICE *dptr);
 
 t_bool tq_step4 (void);
-t_bool tq_mscp (int32 pkt, t_bool q);
-t_bool tq_abo (int32 pkt);
-t_bool tq_avl (int32 pkt);
-t_bool tq_erase (int32 pkt);
-t_bool tq_flu (int32 pkt);
-t_bool tq_gcs (int32 pkt);
-t_bool tq_gus (int32 pkt);
-t_bool tq_onl (int32 pkt);
-t_bool tq_pos (int32 pkt);
-t_bool tq_rw (int32 pkt);
-t_bool tq_scc (int32 pkt);
-t_bool tq_suc (int32 pkt);
-t_bool tq_wtm (int32 pkt);
+t_bool tq_mscp (uint16 pkt, t_bool q);
+t_bool tq_abo (uint16 pkt);
+t_bool tq_avl (uint16 pkt);
+t_bool tq_erase (uint16 pkt);
+t_bool tq_flu (uint16 pkt);
+t_bool tq_gcs (uint16 pkt);
+t_bool tq_gus (uint16 pkt);
+t_bool tq_onl (uint16 pkt);
+t_bool tq_pos (uint16 pkt);
+t_bool tq_rw (uint16 pkt);
+t_bool tq_scc (uint16 pkt);
+t_bool tq_suc (uint16 pkt);
+t_bool tq_wtm (uint16 pkt);
 t_bool tq_plf (uint32 err);
-t_bool tq_dte (UNIT *uptr, uint32 err);
+t_bool tq_dte (UNIT *uptr, uint16 err);
 t_bool tq_hbe (UNIT *uptr, uint32 ba);
 t_bool tq_una (UNIT *uptr);
 uint32 tq_map_status (UNIT *uptr, t_stat st);
@@ -384,25 +384,25 @@ void tq_rdbuff_top (UNIT *uptr, t_mtrlnt *tbc);
 uint32 tq_rdbuff_bottom (UNIT *uptr, t_mtrlnt *tbc);
 void tq_rdbufr_top (UNIT *uptr, t_mtrlnt *tbc);
 uint32 tq_rdbufr_bottom (UNIT *uptr, t_mtrlnt *tbc);
-t_bool tq_deqf (int32 *pkt);
-int32 tq_deqh (int32 *lh);
-void tq_enqh (int32 *lh, int32 pkt);
-void tq_enqt (int32 *lh, int32 pkt);
-t_bool tq_getpkt (int32 *pkt);
-t_bool tq_putpkt (int32 pkt, t_bool qt);
+t_bool tq_deqf (uint16 *pkt);
+uint16 tq_deqh (uint16 *lh);
+void tq_enqh (uint16 *lh, int16 pkt);
+void tq_enqt (uint16 *lh, int16 pkt);
+t_bool tq_getpkt (uint16 *pkt);
+t_bool tq_putpkt (uint16 pkt, t_bool qt);
 t_bool tq_getdesc (struct uq_ring *ring, uint32 *desc);
 t_bool tq_putdesc (struct uq_ring *ring, uint32 desc);
-int32 tq_mot_valid (UNIT *uptr, uint32 cmd);
+uint16 tq_mot_valid (UNIT *uptr, uint32 cmd);
 t_stat tq_mot_err (UNIT *uptr, uint32 rsiz);
-t_bool tq_mot_end (UNIT *uptr, uint32 flg, uint32 sts, uint32 rsiz);
-void tq_putr (int32 pkt, uint32 cmd, uint32 flg, uint32 sts, uint32 lnt, uint32 typ);
-void tq_putr_unit (int32 pkt, UNIT *uptr, uint32 lu, t_bool all);
-void tq_setf_unit (int32 pkt, UNIT *uptr);
+t_bool tq_mot_end (UNIT *uptr, uint32 flg, uint16 sts, uint32 rsiz);
+void tq_putr (int32 pkt, uint32 cmd, uint32 flg, uint16 sts, uint16 lnt, uint16 typ);
+void tq_putr_unit (int16 pkt, UNIT *uptr, uint16 lu, t_bool all);
+void tq_setf_unit (int16 pkt, UNIT *uptr);
 uint32 tq_efl (UNIT *uptr);
 void tq_init_int (void);
 void tq_ring_int (struct uq_ring *ring);
 t_bool tq_fatal (uint32 err);
-UNIT *tq_getucb (uint32 lu);
+UNIT *tq_getucb (uint16 lu);
 
 /* TQ data structures
 
@@ -658,7 +658,7 @@ return OK;
 t_stat tq_quesvc (UNIT *uptr)
 {
 int32 i, cnid;
-int32 pkt = 0;
+uint16 pkt = 0;
 UNIT *nuptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_quesvc\n");
@@ -731,7 +731,7 @@ for (i = 0; i < TQ_NUMDR; i++) {                        /* chk unit q's */
     nuptr = tq_dev.units + i;                           /* ptr to unit */
     if (nuptr->cpkt || (nuptr->pktq == 0))
         continue;
-    pkt = tq_deqh (&nuptr->pktq);                       /* get top of q */
+    pkt = tq_deqh ((uint16 *)&nuptr->pktq);             /* get top of q */
     if (!tq_mscp (pkt, FALSE))                          /* process */
         return SCPE_OK;
     }
@@ -772,7 +772,7 @@ if ((pkt == 0) && tq_pip) {                             /* polling? */
     else tq_pip = 0;                                    /* discontinue poll */
     }                                                   /* end if pip */
 if (tq_rspq) {                                          /* resp q? */
-    pkt = tq_deqh (&tq_rspq);                           /* get top of q */
+    pkt = tq_deqh ((uint16 *)&tq_rspq);                 /* get top of q */
     if (!tq_putpkt (pkt, FALSE))                        /* send to host */
         return SCPE_OK;
     }                                                   /* end if resp q */
@@ -808,13 +808,13 @@ return SCPE_OK;
 
 /* MSCP packet handling */
 
-t_bool tq_mscp (int32 pkt, t_bool q)
+t_bool tq_mscp (uint16 pkt, t_bool q)
 {
-uint32 sts;
+uint16 sts;
 uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* command */
 uint32 flg = GETP (pkt, CMD_OPC, FLG);                  /* flags */
 uint32 mdf = tq_pkt[pkt].d[CMD_MOD];                    /* modifier */
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_mscp\n");
@@ -835,7 +835,7 @@ else {                                                  /* valid cmd */
     if ((uptr = tq_getucb (lu))) {                      /* valid unit? */
         if (q && (tq_cmf[cmd] & CMF_SEQ) &&             /* queueing, seq, */
             (uptr->cpkt || uptr->pktq)) {               /* and active? */
-            tq_enqt (&uptr->pktq, pkt);                 /* do later */
+            tq_enqt ((uint16 *)&uptr->pktq, pkt);       /* do later */
             return OK;
             }
 /*      if (tq_cmf[cmd] & MD_CDL)                     *//* clr cch lost? */
@@ -903,11 +903,11 @@ return tq_putpkt (pkt, TRUE);
 
 /* Abort a command - 1st parameter is ref # of cmd to abort */
 
-t_bool tq_abo (int32 pkt)
+t_bool tq_abo (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 ref = GETP32 (pkt, ABO_REFL);                    /* cmd ref # */
-int32 tpkt, prv;
+uint16 tpkt, prv;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_abo\n");
@@ -916,17 +916,17 @@ tpkt = 0;                                               /* set no mtch */
 if ((uptr = tq_getucb (lu))) {                          /* get unit */
     if (uptr->cpkt &&                                   /* curr pkt? */
         (GETP32 (uptr->cpkt, CMD_REFL) == ref)) {       /* match ref? */
-        tpkt = uptr->cpkt;                              /* save match */
+        tpkt = (uint16)uptr->cpkt;                      /* save match */
         uptr->cpkt = 0;                                 /* gonzo */
         sim_cancel (uptr);                              /* cancel unit */
         sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);
         }
     else if (uptr->pktq &&                              /* head of q? */
         (GETP32 (uptr->pktq, CMD_REFL) == ref)) {       /* match ref? */
-        tpkt = uptr->pktq;                              /* save match */
+        tpkt = (uint16)uptr->pktq;                      /* save match */
         uptr->pktq = tq_pkt[tpkt].link;                 /* unlink */
         }
-    else if ((prv = uptr->pktq)) {                      /* srch pkt q */
+    else if ((prv = (uint16)uptr->pktq)) {              /* srch pkt q */
         while ((tpkt = tq_pkt[prv].link)) {             /* walk list */
             if (GETP32 (tpkt, RSP_REFL) == ref) {       /* match ref? */
                 tq_pkt[prv].link = tq_pkt[tpkt].link;   /* unlink */
@@ -949,11 +949,11 @@ return tq_putpkt (pkt, TRUE);
 /* Unit available - set unit status to available
    Deferred if q'd cmds, bypassed if ser exc */
 
-t_bool tq_avl (int32 pkt)
+t_bool tq_avl (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 mdf = tq_pkt[pkt].d[CMD_MOD];                    /* modifiers */
-uint32 sts;
+uint16 sts;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_avl\n");
@@ -980,9 +980,9 @@ return tq_putpkt (pkt, TRUE);
 
 /* Get command status - only interested in active xfr cmd */
 
-t_bool tq_gcs (int32 pkt)
+t_bool tq_gcs (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 ref = GETP32 (pkt, GCS_REFL);                    /* ref # */
 int32 tpkt;
 UNIT *uptr;
@@ -1003,10 +1003,10 @@ return tq_putpkt (pkt, TRUE);
 
 /* Get unit status */
 
-t_bool tq_gus (int32 pkt)
+t_bool tq_gus (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
-uint32 sts;
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 sts;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_gus\n");
@@ -1014,7 +1014,7 @@ sim_debug(DBG_TRC, &tq_dev, "tq_gus\n");
 if (tq_pkt[pkt].d[CMD_MOD] & MD_NXU) {                  /* next unit? */
     if (lu >= TQ_NUMDR) {                               /* end of range? */
         lu = 0;                                         /* reset to 0 */
-        tq_pkt[pkt].d[RSP_UN] = lu;
+        tq_pkt[pkt].d[RSP_UN] = (uint16)lu;
         }
     }
 if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
@@ -1036,10 +1036,10 @@ return tq_putpkt (pkt, TRUE);
 
 /* Unit online - deferred if q'd commands */
 
-t_bool tq_onl (int32 pkt)
+t_bool tq_onl (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
-uint32 sts;
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 sts;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_onl\n");
@@ -1066,7 +1066,7 @@ return tq_putpkt (pkt, TRUE);
 
 /* Set controller characteristics */
 
-t_bool tq_scc (int32 pkt)
+t_bool tq_scc (uint16 pkt)
 {
 sim_debug(DBG_TRC, &tq_dev, "tq_scc\n");
 
@@ -1093,10 +1093,10 @@ return tq_putpkt (pkt, TRUE);
     
 /* Set unit characteristics - defer if q'd commands */
 
-t_bool tq_suc (int32 pkt)
+t_bool tq_suc (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
-uint32 sts;
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 sts;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_suc\n");
@@ -1117,10 +1117,10 @@ return tq_putpkt (pkt, TRUE);
 
 /* Flush - sequential nop - deferred if q'd cmds, bypassed if ser exc */
 
-t_bool tq_flu (int32 pkt)
+t_bool tq_flu (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
-uint32 sts;
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 sts;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_flu\n");
@@ -1134,11 +1134,11 @@ return tq_putpkt (pkt, TRUE);
 
 /* Erase, erase gap - deferred if q'd cmds, bypassed if ser exc */
 
-t_bool tq_erase (int32 pkt)
+t_bool tq_erase (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* opcode */
-uint32 sts;
+uint16 sts;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_erase\n");
@@ -1159,10 +1159,11 @@ return tq_putpkt (pkt, TRUE);
 
 /* Write tape mark - deferred if q'd cmds, bypassed if ser exc */
 
-t_bool tq_wtm (int32 pkt)
+t_bool tq_wtm (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
-uint32 sts, objp = 0;
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 sts;
+uint32 objp = 0;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_wtm\n");
@@ -1185,10 +1186,11 @@ return tq_putpkt (pkt, TRUE);
 
 /* Position - deferred if q'd cmds, bypassed if ser exc */
 
-t_bool tq_pos (int32 pkt)
+t_bool tq_pos (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
-uint32 sts, objp = 0;
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 sts;
+uint32 objp = 0;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_pos\n");
@@ -1218,12 +1220,13 @@ return tq_putpkt (pkt, TRUE);
 
 /* Data transfer commands - deferred if q'd commands, bypassed if ser exc */
 
-t_bool tq_rw (int32 pkt)
+t_bool tq_rw (uint16 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint16 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* opcode */
 uint32 bc = GETP32 (pkt, RW_BCL);                       /* byte count */
-uint32 sts, objp = 0;
+uint16 sts;
+uint32 objp = 0;
 UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_rw\n");
@@ -1254,7 +1257,7 @@ return tq_putpkt (pkt, TRUE);
 
 /* Validity checks */
 
-int32 tq_mot_valid (UNIT *uptr, uint32 cmd)
+uint16 tq_mot_valid (UNIT *uptr, uint32 cmd)
 {
 sim_debug(DBG_TRC, &tq_dev, "tq_mot_valid\n");
 
@@ -1481,7 +1484,7 @@ switch (cmd) {                                          /* case on command */
         return SCPE_IERR;
         }
 
-tq_mot_end (uptr, 0, res->sts, res->tbc);               /* done */
+tq_mot_end (uptr, 0, (uint16)res->sts, res->tbc);       /* done */
 return SCPE_OK;
 }
 
@@ -1499,11 +1502,11 @@ return SCPE_IOERR;
 
 /* Motion command complete */
 
-t_bool tq_mot_end (UNIT *uptr, uint32 flg, uint32 sts, uint32 rsiz)
+t_bool tq_mot_end (UNIT *uptr, uint32 flg, uint16 sts, uint32 rsiz)
 {
-int32 pkt = uptr->cpkt;                                 /* packet */
+uint16 pkt = (uint16)uptr->cpkt;                        /* packet */
 uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* get cmd */
-uint32 lnt = RW_LNT_T;                                  /* assume rw */
+uint16 lnt = RW_LNT_T;                                  /* assume rw */
 
 if (cmd == OP_ERG)                                      /* set pkt lnt */
     lnt = ERG_LNT;
@@ -1629,16 +1632,16 @@ return ST_SUC;
 
 /* Data transfer error log packet */
 
-t_bool tq_dte (UNIT *uptr, uint32 err)
+t_bool tq_dte (UNIT *uptr, uint16 err)
 {
-int32 pkt, tpkt;
-uint32 lu;
+uint16 pkt, tpkt;
+uint16 lu;
 
 if ((tq_cflgs & CF_THS) == 0)                           /* logging? */
     return OK;
 if (!tq_deqf (&pkt))                                    /* get log pkt */
     return ERR;
-tpkt = uptr->cpkt;                                      /* rw pkt */
+tpkt = (uint16)uptr->cpkt;                              /* rw pkt */
 lu = tq_pkt[tpkt].d[CMD_UN];                            /* unit # */
 
 tq_pkt[pkt].d[ELP_REFL] = tq_pkt[tpkt].d[CMD_REFL];     /* copy cmd ref */
@@ -1668,13 +1671,13 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_hbe (UNIT *uptr, uint32 ba)
 {
-int32 pkt, tpkt;
+uint16 pkt, tpkt;
 
 if ((tq_cflgs & CF_THS) == 0)                           /* logging? */
     return OK;
 if (!tq_deqf (&pkt))                                    /* get log pkt */
     return ERR;
-tpkt = uptr->cpkt;                                      /* rw pkt */
+tpkt = (uint16)uptr->cpkt;                              /* rw pkt */
 tq_pkt[pkt].d[ELP_REFL] = tq_pkt[tpkt].d[CMD_REFL];     /* copy cmd ref */
 tq_pkt[pkt].d[ELP_REFH] = tq_pkt[tpkt].d[CMD_REFH];     /* copy cmd ref */
 tq_pkt[pkt].d[ELP_UN] = tq_pkt[tpkt].d[CMD_UN];         /* copy unit */
@@ -1695,7 +1698,7 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_plf (uint32 err)
 {
-int32 pkt = 0;
+uint16 pkt = 0;
 
 if (!tq_deqf (&pkt))                                    /* get log pkt */
     return ERR;
@@ -1707,7 +1710,7 @@ tq_pkt[pkt].d[PLF_CIDC] = 0;
 tq_pkt[pkt].d[PLF_CIDD] = (TQ_CLASS << PLF_CIDD_V_CLS) |
     (drv_tab[tq_typ].cmod << PLF_CIDD_V_MOD);
 tq_pkt[pkt].d[PLF_VER] = drv_tab[tq_typ].cver;
-tq_pkt[pkt].d[PLF_ERR] = err;
+tq_pkt[pkt].d[PLF_ERR] = (uint16)err;
 tq_putr (pkt, FM_CNT, LF_SNR, ST_CNT, PLF_LNT, UQ_TYP_DAT);
 tq_pkt[pkt].d[UQ_HCTC] |= (UQ_CID_DIAG << UQ_HCTC_V_CID);
 return tq_putpkt (pkt, TRUE);
@@ -1717,12 +1720,12 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_una (UNIT *uptr)
 {
-int32 pkt;
-uint32 lu;
+uint16 pkt;
+uint16 lu;
 
 if (!tq_deqf (&pkt))                                    /* get log pkt */
     return ERR;
-lu = (uint32) (uptr - tq_dev.units);                    /* get unit */
+lu = (uint16) (uptr - tq_dev.units);                    /* get unit */
 tq_pkt[pkt].d[RSP_REFL] = tq_pkt[pkt].d[RSP_REFH] = 0;  /* ref = 0 */
 tq_pkt[pkt].d[RSP_UN] = lu;
 tq_pkt[pkt].d[RSP_RSV] = 0;
@@ -1739,7 +1742,7 @@ return tq_putpkt (pkt, TRUE);
    tq_enqt      -       enqueue at tail of list
 */
 
-t_bool tq_deqf (int32 *pkt)
+t_bool tq_deqf (uint16 *pkt)
 {
 if (tq_freq == 0)                                       /* no free pkts?? */
     return tq_fatal (PE_NSR);
@@ -1749,16 +1752,16 @@ tq_freq = tq_pkt[tq_freq].link;                         /* next */
 return OK;
 }
 
-int32 tq_deqh (int32 *lh)
+uint16 tq_deqh (uint16 *lh)
 {
-int32 ptr = *lh;                                        /* head of list */
+int16 ptr = *lh;                                        /* head of list */
 
 if (ptr)                                                /* next */
     *lh = tq_pkt[ptr].link;
 return ptr;
 }
 
-void tq_enqh (int32 *lh, int32 pkt)
+void tq_enqh (uint16 *lh, int16 pkt)
 {
 if (pkt == 0)                                           /* any pkt? */
     return;
@@ -1767,7 +1770,7 @@ tq_pkt[pkt].link = *lh;                                 /* link is old lh */
 return;
 }
 
-void tq_enqt (int32 *lh, int32 pkt)
+void tq_enqt (uint16 *lh, int16 pkt)
 {
 if (pkt == 0)                                           /* any pkt? */
     return;
@@ -1775,7 +1778,7 @@ tq_pkt[pkt].link = 0;                                   /* it will be tail */
 if (*lh == 0)                                           /* if empty, enqh */
     *lh = pkt;
 else {
-    uint32 ptr = *lh;                                   /* chase to end */
+    uint16 ptr = *lh;                                   /* chase to end */
     while (tq_pkt[ptr].link)
         ptr = tq_pkt[ptr].link;
     tq_pkt[ptr].link = pkt;                             /* enq at tail */
@@ -1787,7 +1790,7 @@ return;
 
 /* Get packet from command ring */
 
-t_bool tq_getpkt (int32 *pkt)
+t_bool tq_getpkt (uint16 *pkt)
 {
 uint32 addr, desc;
 
@@ -1811,7 +1814,7 @@ return tq_putdesc (&tq_cq, desc);                       /* release desc */
    supplies one credit for every response packet sent over.  Simple!
 */
 
-t_bool tq_putpkt (int32 pkt, t_bool qt)
+t_bool tq_putpkt (uint16 pkt, t_bool qt)
 {
 uint32 addr, desc, lnt, cr;
 UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
@@ -1900,7 +1903,7 @@ return OK;
 /* Get unit descriptor for logical unit - trivial now,
    but eventually, hide multiboard complexities here */
 
-UNIT *tq_getucb (uint32 lu)
+UNIT *tq_getucb (uint16 lu)
 {
 UNIT *uptr;
 
@@ -1914,7 +1917,7 @@ return uptr;
 
 /* Hack unit flags */
 
-void tq_setf_unit (int32 pkt, UNIT *uptr)
+void tq_setf_unit (int16 pkt, UNIT *uptr)
 {
 uptr->uf = tq_pkt[pkt].d[ONL_UFL] & UF_MSK;             /* settable flags */
 if ((tq_pkt[pkt].d[CMD_MOD] & MD_SWP) &&                /* swre wrp enb? */
@@ -1942,13 +1945,13 @@ return t;
 
 /* Unit response fields */
 
-void tq_putr_unit (int32 pkt, UNIT *uptr, uint32 lu, t_bool all)
+void tq_putr_unit (int16 pkt, UNIT *uptr, uint16 lu, t_bool all)
 {
-tq_pkt[pkt].d[ONL_MLUN] = lu;                           /* multi-unit */
-tq_pkt[pkt].d[ONL_UFL] = uptr->uf | TQ_WPH (uptr);      /* unit flags */
+tq_pkt[pkt].d[ONL_MLUN] = (uint16)lu;                   /* multi-unit */
+tq_pkt[pkt].d[ONL_UFL] = (uint16)(uptr->uf | TQ_WPH (uptr));/* unit flags */
 tq_pkt[pkt].d[ONL_UFL] |= tq_efl (uptr);                /* end flags accordingly */
 tq_pkt[pkt].d[ONL_RSVL] = tq_pkt[pkt].d[ONL_RSVH] = 0;  /* reserved */
-tq_pkt[pkt].d[ONL_UIDA] = lu;                           /* UID low */
+tq_pkt[pkt].d[ONL_UIDA] = (uint16)lu;                           /* UID low */
 tq_pkt[pkt].d[ONL_UIDB] = 0;
 tq_pkt[pkt].d[ONL_UIDC] = 0;
 tq_pkt[pkt].d[ONL_UIDD] = (UID_TAPE << ONL_UIDD_V_CLS) |
@@ -1966,10 +1969,10 @@ return;
 
 /* UQ_HDR and RSP_OP fields */
 
-void tq_putr (int32 pkt, uint32 cmd, uint32 flg, uint32 sts, uint32 lnt, uint32 typ)
+void tq_putr (int32 pkt, uint32 cmd, uint32 flg, uint16 sts, uint16 lnt, uint16 typ)
 {
-tq_pkt[pkt].d[RSP_OPF] = (cmd << RSP_OPF_V_OPC) |       /* set cmd, flg */
-    (flg << RSP_OPF_V_FLG);
+tq_pkt[pkt].d[RSP_OPF] = (uint16)((cmd << RSP_OPF_V_OPC) |/* set cmd, flg */
+                                  (flg << RSP_OPF_V_FLG));
 tq_pkt[pkt].d[RSP_STS] = sts;
 tq_pkt[pkt].d[UQ_HLNT] = lnt;                           /* length */
 tq_pkt[pkt].d[UQ_HCTC] = (typ << UQ_HCTC_V_TYP) |       /* type, cid */

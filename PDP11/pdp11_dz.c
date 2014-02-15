@@ -267,7 +267,7 @@ t_stat dz_reset (DEVICE *dptr);
 t_stat dz_attach (UNIT *uptr, char *cptr);
 t_stat dz_detach (UNIT *uptr);
 t_stat dz_clear (int32 dz, t_bool flag);
-int32 dz_getc (int32 dz);
+uint16 dz_getc (int32 dz);
 void dz_update_rcvi (void);
 void dz_update_xmti (void);
 void dz_clr_rxint (int32 dz);
@@ -426,13 +426,14 @@ sim_debug_bits(DBG_REG, &dz_dev, bitdefs[(PA >> 1) & 03], (uint32)(*data), (uint
 return SCPE_OK;
 }
 
-t_stat dz_wr (int32 data, int32 PA, int32 access)
+t_stat dz_wr (int32 ldata, int32 PA, int32 access)
 {
 int32 dz = ((PA - dz_dib.ba) >> 3);                     /* get mux num */
 static BITFIELD* bitdefs[] = {dz_csr_bits, dz_lpr_bits, dz_tcr_bits, dz_tdr_bits};
 int32 i, c, line;
 char lineconfig[16];
 TMLN *lp;
+uint16 data = (uint16)ldata;
 
 if (dz > DZ_MAXMUX)
     return SCPE_IERR;
@@ -567,7 +568,7 @@ return SCPE_OK;
 
 /* Get first available character for mux, if any */
 
-int32 dz_getc (int32 dz)
+uint16 dz_getc (int32 dz)
 {
 uint32 i, line, c;
 
@@ -579,7 +580,7 @@ for (i = c = 0; (i < DZ_LINES) && (c == 0); i++) {      /* loop thru lines */
     if (c)                                              /* or in line # */
         c = c | (i << RBUF_V_RLINE);
     }                                                   /* end for */
-return c;
+return (uint16)c;
 }
 
 /* Update receive interrupts */

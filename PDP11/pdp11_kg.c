@@ -440,7 +440,7 @@ static void do_poly (int unit, t_bool step)
 
 static t_stat set_units (UNIT *u, int32 val, char *s, void *desc)
 {
-    int32       i, units;
+    uint32      i, units;
     t_stat      stat;
 
     if (s == NULL)

@@ -366,7 +366,7 @@ for (ln = 0; ln < DLX_LINES; ln++) {                    /* loop thru lines */
             else dli_csr[ln] |= CSR_DONE;
             if (dli_csr[ln] & CSR_IE)
                 dli_set_int (ln, DLI_RCI);
-            dli_buf[ln] = c;
+            dli_buf[ln] = (uint16)c;
             }
         }
     else if (dlo_unit[ln].flags & DLX_MDM) {            /* discpnn & modem? */

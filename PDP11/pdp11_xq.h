@@ -259,9 +259,9 @@ struct xq_device {
   ETH_MAC           mac;                                /* Hardware MAC address */
   enum xq_type      type;                               /* controller type */
   enum xq_type      mode;                               /* controller operating mode */
-  uint16            poll;                               /* configured poll ethernet times/sec for receive */
-  uint16            coalesce_latency;                   /* microseconds to hold-off interrupts when not polling */
-  uint16            coalesce_latency_ticks;             /* instructions in coalesce_latency microseconds */
+  uint32            poll;                               /* configured poll ethernet times/sec for receive */
+  uint32            coalesce_latency;                   /* microseconds to hold-off interrupts when not polling */
+  uint32            coalesce_latency_ticks;             /* instructions in coalesce_latency microseconds */
   struct xq_sanity  sanity;                             /* sanity timer information */
   t_bool            lockmode;                           /* DEQNA-Lock mode */
                                                         /*- initialized values - DO NOT MOVE */

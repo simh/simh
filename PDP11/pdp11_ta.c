@@ -399,7 +399,7 @@ switch (uptr->FNC) {                                    /* case on function */
         else {
             if ((ta_bptr < TA_MAXFR) &&                 /* room in buf? */
                 ((uptr->pos + ta_bptr) < uptr->capac))  /* room on tape? */
-                ta_xb[ta_bptr++] = ta_odb;              /* store char */
+                ta_xb[ta_bptr++] = (uint8)ta_odb;       /* store char */
             ta_set_tr ();                               /* set tra req */
             sim_activate (uptr, ta_ctime);              /* sched next char */
             }

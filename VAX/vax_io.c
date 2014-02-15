@@ -725,7 +725,7 @@ if ((ba | bc) & 03) {                                   /* check alignment */
             if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
                 return (bc - i);
             }
-        *buf = ReadB (ma);
+        *buf = (uint8)ReadB (ma);
         ma = ma + 1;
         }
     }
@@ -759,7 +759,7 @@ if ((ba | bc) & 03) {                                   /* check alignment */
             if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
                 return (bc - i);
             }
-        *buf = ReadW (ma);
+        *buf = (uint16)ReadW (ma);
         ma = ma + 2;
         }
     }

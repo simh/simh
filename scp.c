@@ -5912,8 +5912,8 @@ UNIT *uptr;
 
 #define PUT_RVAL(sz,rp,id,v,m) \
     *(((sz *) rp->loc) + id) = \
-            (*(((sz *) rp->loc) + id) & \
-            ~((m) << (rp)->offset)) | ((v) << (rp)->offset)
+            (sz)((*(((sz *) rp->loc) + id) & \
+            ~((m) << (rp)->offset)) | ((v) << (rp)->offset))
 
 if (rptr == sim_PC)
     sim_brk_npc (0);
@@ -6322,7 +6322,7 @@ while ((*iptr != 0) &&
             }
         }
     if (islower (*iptr) && uc)
-        *optr = toupper (*iptr);
+        *optr = (char)toupper (*iptr);
     else *optr = *iptr;
     iptr++; optr++;
     }
@@ -7011,7 +7011,7 @@ do {
     d = d - 1;
     digit = (int32) (val % radix);
     val = val / radix;
-    dbuf[d] = (digit <= 9)? '0' + digit: 'A' + (digit - 10);
+    dbuf[d] = (char)((digit <= 9)? '0' + digit: 'A' + (digit - 10));
     } while ((d > 0) && (val != 0));
 
 switch (format) {
@@ -7804,15 +7804,15 @@ if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
     clock_gettime(CLOCK_REALTIME, &time_now);
     if (sim_deb_switches & SWMASK ('R'))
         sim_timespec_diff (&time_now, &time_now, &sim_deb_basetime);
-    }
-if (sim_deb_switches & SWMASK ('T')) {
-    time_t tnow = (time_t)time_now.tv_sec;
-    struct tm *now = gmtime(&tnow);
+    if (sim_deb_switches & SWMASK ('T')) {
+        time_t tnow = (time_t)time_now.tv_sec;
+        struct tm *now = gmtime(&tnow);
 
-    sprintf(tim_t, "%02d:%02d:%02d.%03d ", now->tm_hour, now->tm_min, now->tm_sec, (int)(time_now.tv_nsec/1000000));
-    }
-if (sim_deb_switches & SWMASK ('A')) {
-    sprintf(tim_t, "%" LL_FMT "d.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
+        sprintf(tim_t, "%02d:%02d:%02d.%03d ", now->tm_hour, now->tm_min, now->tm_sec, (int)(time_now.tv_nsec/1000000));
+        }
+    if (sim_deb_switches & SWMASK ('A')) {
+        sprintf(tim_t, "%" LL_FMT "d.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
+        }
     }
 if (sim_deb_switches & SWMASK ('P')) {
     t_value val;
@@ -8471,7 +8471,7 @@ for (i = 0; i < topic->kids; i++) {
             *cptr++ = '_';
             } 
         else {
-            *cptr = toupper (*cptr);
+            *cptr = (char)toupper (*cptr);
             cptr++;
             }
         }
@@ -8493,7 +8493,7 @@ t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
                   const char *help, const char *cptr, va_list ap)
 {
 
-TOPIC top = { 0, NULL, NULL, &top, NULL, 0, NULL, 0, 0};
+TOPIC top;
 TOPIC *topic = &top;
 int failed;
 size_t match;
@@ -8515,6 +8515,8 @@ static const char help_help[] = {
     "    To exit help at any time, type EXIT.\n"
     };
 
+memset (&top, 0, sizeof(top));
+top.parent = &top;
 if ((failed = setjmp (help_env)) != 0) {
     fprintf (stderr, "\nHelp was unable to process the help for this device.\n"
                      "Error in block %u line %u: %s\n"
@@ -8541,7 +8543,7 @@ else
     p = sim_name;
 top.title = (char *) malloc (strlen (p) + ((flag & SCP_HELP_ATTACH)? sizeof (attach_help)-1: 0) +1);
 for (i = 0; p[i]; i++ )
-    top.title[i] = toupper (p[i]);
+    top.title[i] = (char)toupper (p[i]);
 top.title[i] = '\0';
 if (flag & SCP_HELP_ATTACH)
     strcpy (top.title+i, attach_help);
@@ -8826,7 +8828,7 @@ while ((c = fgetc (fp)) != EOF) {
         size += XPANDQ;
         p += n;
         }
-    *p++ = c;
+    *p++ = (char)c;
     }
 *p++ = '\0';
 

@@ -353,7 +353,7 @@ switch (rx_state) {                                     /* case on state */
         break;
 
     case FILL:                                          /* fill buffer */
-        rx_buf[rx_bptr] = rx_dbr;                       /* write next */
+        rx_buf[rx_bptr] = (uint8)rx_dbr;                /* write next */
         rx_bptr = rx_bptr + 1;
         if (rx_bptr < RX_NUMBY)                         /* more? set xfer */
             rx_csr = rx_csr | RXCS_TR;

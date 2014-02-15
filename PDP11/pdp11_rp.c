@@ -576,9 +576,9 @@ t_stat rp_reset (DEVICE *dptr);
 t_stat rp_attach (UNIT *uptr, char *cptr);
 t_stat rp_detach (UNIT *uptr);
 t_stat rp_boot (int32 unitno, DEVICE *dptr);
-void rp_set_er (int32 flg, int32 drv);
+void rp_set_er (int16 flg, int32 drv);
 void rp_clr_as (int32 mask);
-void rp_update_ds (int32 flg, int32 drv);
+void rp_update_ds (int16 flg, int32 drv);
 t_stat rp_go (int32 drv);
 t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -909,7 +909,7 @@ if ((ofs != RP_AS_OF) && sim_is_active (uptr)) {        /* unit busy? */
     rp_update_ds (0, drv);
     return SCPE_OK;
     }
-rmhr[drv] = data;                                       /* save write */
+rmhr[drv] = (uint16)data;                               /* save write */
 ofs = ofs & MBA_RMASK;                                  /* mask offset */
 if (drv_tab[dtype].ctrl == RM_CTRL)                     /* RM? convert */
     ofs = ofs + RM_OF;
@@ -926,7 +926,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
 
     case RP_DA_OF: case RM_DA_OF:                       /* RPDA */
         old_reg = rpds[drv];
-        rpda[drv] = data & ~DA_MBZ;
+        rpda[drv] = (uint16)(data & ~DA_MBZ);
         sim_debug_bits(DBG_REG, &rp_dev, rp_reg_bits[ofs], old_reg, rpds[drv], 1);
         break;
 
@@ -937,25 +937,25 @@ switch (ofs) {                                          /* decode PA<5:1> */
 
     case RP_MR_OF: case RM_MR_OF:                       /* RPMR */
         old_reg = rpmr[drv];
-        rpmr[drv] = data;
+        rpmr[drv] = (uint16)data;
         sim_debug_bits(DBG_REG, &rp_dev, rp_reg_bits[ofs], old_reg, rpmr[drv], 1);
         break;
 
     case RP_OF_OF: case RM_OF_OF:                       /* RPOF */
         old_reg = rpof[drv];
-        rpof[drv] = data & ~OF_MBZ;
+        rpof[drv] = (uint16)(data & ~OF_MBZ);
         sim_debug_bits(DBG_REG, &rp_dev, rp_reg_bits[ofs], old_reg, rpof[drv], 1);
         break;
 
     case RP_DC_OF: case RM_DC_OF:                       /* RPDC */
         old_reg = rpdc[drv];
-        rpdc[drv] = data & ~DC_MBZ;
+        rpdc[drv] = (uint16)(data & ~DC_MBZ);
         sim_debug_bits(DBG_REG, &rp_dev, rp_reg_bits[ofs], old_reg, rpdc[drv], 1);
         break;
 
     case RM_MR2_OF:                                     /* RMMR2 */
         old_reg = rmmr2[drv];
-        rmmr2[drv] = data;
+        rmmr2[drv] = (uint16)data;
         sim_debug_bits(DBG_REG, &rp_dev, rp_reg_bits[ofs], old_reg, rmmr2[drv], 1);
         break;
 
@@ -1171,7 +1171,7 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
         case FNC_WCHK:                                  /* write check */
         case FNC_READ:                                  /* read */
         case FNC_READH:                                 /* read headers */
-            mbc = rpxbc[drv] = mba_get_bc (dibp->ba);   /* get byte count */
+            mbc = rpxbc[drv] = (uint16)mba_get_bc (dibp->ba);/* get byte count */
             wc = (mbc + 1) >> 1;                        /* convert to words */
             if ((da + wc) > drv_tab[dtype].size) {      /* disk overrun? */
                 rp_set_er (ER1_AOE, drv);               /* set err */
@@ -1242,10 +1242,10 @@ else { /* Bottom End (After I/O processing) */
             if (da >= drv_tab[dtype].size)
                 rpds[drv] = rpds[drv] | DS_LST;
             da = da / RP_NUMWD;
-            rpda[drv] = da % drv_tab[dtype].sect;
+            rpda[drv] = (uint16)(da % drv_tab[dtype].sect);
             da = da / drv_tab[dtype].sect;
-            rpda[drv] = rpda[drv] | ((da % drv_tab[dtype].surf) << DA_V_SF);
-            rpdc[drv] = da / drv_tab[dtype].surf;
+            rpda[drv] = (uint16)(rpda[drv] | ((da % drv_tab[dtype].surf) << DA_V_SF));
+            rpdc[drv] = (uint16)(da / drv_tab[dtype].surf);
             uptr->CYL = rpdc[drv];
 
             if (err != 0) {                             /* error? */
@@ -1270,7 +1270,7 @@ return SCPE_OK;
 
 /* Set drive error */
 
-void rp_set_er (int32 flag, int32 drv)
+void rp_set_er (int16 flag, int32 drv)
 {
 sim_debug(DBG_TRC, &rp_dev, "rp_set_er(rp%d, flag=0x%X)\n", drv, flag);
 rper1[drv] = rper1[drv] | flag;
@@ -1300,7 +1300,7 @@ return;
 
 /* Drive status update */
 
-void rp_update_ds (int32 flag, int32 drv)
+void rp_update_ds (int16 flag, int32 drv)
 {
 uint16 o_ds = rpds[drv];
 

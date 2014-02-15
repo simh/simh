@@ -881,7 +881,7 @@ switch (j) {                                            /* decode PA<4:1> */
 
     case 012:                                           /* HKDB */
         old_val = hkdb[0];
-        new_val = hkdb[0] = data;
+        new_val = hkdb[0] = (int16)data;
         break;
 
     case 013:                                           /* HKMR */
@@ -1036,7 +1036,7 @@ switch (fnc) {                                          /* case on function */
             hk_err (CS1_ERR|CS1_DONE, 0, ER_OPI, drv);  /* set err, no op */
             return;
             }
-        hk_dif[drv] = hkdc - uptr->CYL;                 /* cyl diff */
+        hk_dif[drv] = (int16)(hkdc - uptr->CYL);        /* cyl diff */
         t = abs (hk_dif[drv]);                          /* |cyl diff| */
         uptr->FNC = fnc;                                /* save function */
         sim_activate (uptr, hk_rwait + (hk_swait * t)); /* schedule */
@@ -1104,7 +1104,7 @@ switch (fnc) {                                          /* case on function */
             uptr->FNC = uptr->FNC | FNC_2ND;            /* second state */
             hk_off[drv] = 0;                            /* clr offset */
             dc = (fnc == FNC_SEEK)? hkdc: 0;            /* get cyl */
-            hk_dif[drv] = dc - uptr->CYL;               /* cyl diff */
+            hk_dif[drv] = (int16)(dc - uptr->CYL);      /* cyl diff */
             t = abs (hk_dif[drv]) * hk_swait;           /* |cyl diff| */
             if (t < hk_min2wait)                        /* min time */
                 t = hk_min2wait;
@@ -1117,7 +1117,7 @@ switch (fnc) {                                          /* case on function */
 /* Data transfer commands only generate one interrupt */
 
     case FNC_READH:
-        hkdb[0] = uptr->CYL << RDH1_V_CYL;              /* first word */
+        hkdb[0] = (int16)(uptr->CYL << RDH1_V_CYL);     /* first word */
         hkdb[1] = (GET_SC (hkda) << RDH2_V_SEC) |       /* second word */
             (1 << (GET_SF (hkda) + RDH2_V_DHA)) | RDH2_GOOD;
         hkdb[2] = hkdb[0] ^ hkdb[1];                    /* checksum */

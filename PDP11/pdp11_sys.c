@@ -267,8 +267,8 @@ do {                                                    /* block loop */
         if (org >= MEMSIZE)                             /* invalid addr? */
             return SCPE_NXM;
         M[org >> 1] = (org & 1)?                        /* store data */
-            (M[org >> 1] & 0377) | (d << 8):
-            (M[org >> 1] & 0177400) | d;
+            (M[org >> 1] & 0377) | (uint16)(d << 8):
+            (M[org >> 1] & 0177400) | (uint16)d;
         org = (org + 1) & 0177777;                      /* inc origin */
         }
     if ((d = getc (fileref)) == EOF)                    /* get csum */
@@ -816,7 +816,7 @@ return tptr;
 t_stat get_spec (char *cptr, t_addr addr, int32 n1, int32 *sptr, t_value *dptr,
     int32 cflag, int32 iflag)
 {
-int32 reg, indir, pflag, disp;
+int32 reg, indir, pflag, disp = 0;
 
 indir = 0;                                              /* no indirect */
 pflag = 0;

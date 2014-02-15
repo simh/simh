@@ -601,7 +601,8 @@ return vc_buf[rg];
 void vc_mem_wr (int32 pa, int32 val, int32 lnt)
 {
 uint32 rg = (pa >> 2) & 0xFFFF;
-int32 nval, i;
+uint32 nval;
+int32 i;
 int32 sc;
 uint32 scrln, bufln;
 uint32 idx;
@@ -610,12 +611,12 @@ if (!vc_buf)                                            /* QVSS disabled? */
     MACH_CHECK (MCHK_WRITE);                            /* Invalid memory reference */
 
 if (lnt < L_LONG) {
-    int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
-    int32 t = vc_buf[rg];
+    uint32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
+    uint32 t = vc_buf[rg];
     sc = (pa & 3) << 3;
     nval = ((val & mask) << sc) | (t & ~(mask << sc));
     }
-else nval = val;
+else nval = (uint32)val;
 
 if (rg >= 0xFFF8) {                                     /* cursor image */
     idx = (pa << 3) & 0xFF;                             /* get byte index */

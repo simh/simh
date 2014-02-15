@@ -180,9 +180,9 @@ t_stat rs_reset (DEVICE *dptr);
 t_stat rs_attach (UNIT *uptr, char *cptr);
 t_stat rs_detach (UNIT *uptr);
 t_stat rs_boot (int32 unitno, DEVICE *dptr);
-void rs_set_er (int32 flg, int32 drv);
+void rs_set_er (uint16 flg, int32 drv);
 void rs_clr_as (int32 mask);
-void rs_update_ds (int32 flg, int32 drv);
+void rs_update_ds (uint16 flg, int32 drv);
 t_stat rs_go (int32 drv);
 t_stat rs_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 rs_abort (void);
@@ -353,7 +353,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
         break;  
 
     case RS_DA_OF:                                      /* RSDA */
-        rsda[drv] = data;
+        rsda[drv] = (uint16)data;
         break;
 
     case RS_AS_OF:                                      /* RSAS */
@@ -361,7 +361,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
         break;
 
     case RS_MR_OF:                                      /* RSMR */
-        rsmr[drv] = data;
+        rsmr[drv] = (uint16)data;
         break;
 
     case RS_ER_OF:                                      /* RSER */
@@ -515,7 +515,7 @@ switch (fnc) {                                          /* case on function */
         da = da + wc + (RS_NUMWD (dtype) - 1);
         if (da >= RS_SIZE (dtype))
             rsds[drv] = rsds[drv] | DS_LST;
-        rsda[drv] = da / RS_NUMWD (dtype);
+        rsda[drv] = (uint16)(da / RS_NUMWD (dtype));
         mba_set_don (rs_dib.ba);                        /* set done */
         rs_update_ds (0, drv);                          /* update ds */
         break;
@@ -529,7 +529,7 @@ return SCPE_OK;
 
 /* Set drive error */
 
-void rs_set_er (int32 flag, int32 drv)
+void rs_set_er (uint16 flag, int32 drv)
 {
 rser[drv] = rser[drv] | flag;
 rsds[drv] = rsds[drv] | DS_ATA;
@@ -555,7 +555,7 @@ return;
 
 /* Drive status update */
 
-void rs_update_ds (int32 flag, int32 drv)
+void rs_update_ds (uint16 flag, int32 drv)
 {
 if (flag & DS_ATA)
     mba_upd_ata (rs_dib.ba, 1);
@@ -690,7 +690,6 @@ t_stat rs_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
 extern uint16 *M;
-UNIT *uptr = rs_dev.units + unitno;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

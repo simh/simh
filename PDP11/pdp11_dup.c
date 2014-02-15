@@ -70,9 +70,9 @@ static uint16 dup_rxdbuf[DUP_LINES];
 static uint16 dup_parcsr[DUP_LINES];
 static uint16 dup_txcsr[DUP_LINES];
 static uint16 dup_txdbuf[DUP_LINES];
-static uint16 dup_W3[DUP_LINES];
-static uint16 dup_W5[DUP_LINES];
-static uint16 dup_W6[DUP_LINES];
+static t_bool dup_W3[DUP_LINES];
+static t_bool dup_W5[DUP_LINES];
+static t_bool dup_W6[DUP_LINES];
 static uint32 dup_rxi = 0;                                     /* rcv interrupts */
 static uint32 dup_txi = 0;                                     /* xmt interrupts */
 static uint32 dup_wait[DUP_LINES];                             /* rcv/xmt byte delay */
@@ -495,7 +495,6 @@ static t_stat dup_rd (int32 *data, int32 PA, int32 access)
 static BITFIELD* bitdefs[] = {dup_rxcsr_bits, dup_rxdbuf_bits, dup_txcsr_bits, dup_txdbuf_bits};
 static uint16 *regs[] = {dup_rxcsr, dup_rxdbuf, dup_txcsr, dup_txdbuf};
 int32 dup = ((PA - dup_dib.ba) >> 3);                   /* get line num */
-TMLN *lp = &dup_desc.ldsc[dup];
 int32 orig_val;
 
 if (dup >= dup_desc.lines)                              /* validate line number */
@@ -892,7 +891,7 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
         dup_xmtpkstart[dup] = sim_grtime();
         }
     if (dup_xmtpkoffset[dup] + 2 + len > dup_xmtpksize[dup]) {
-        dup_xmtpksize[dup] += 2 + len;
+        dup_xmtpksize[dup] += 2 + (uint16)len;
         dup_xmtpacket[dup] = (uint8 *)realloc (dup_xmtpacket[dup], dup_xmtpksize[dup]);
         }
     /* Strip sync bytes at the beginning of a message */
@@ -903,7 +902,7 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
     /* Insert remaining bytes into transmit buffer */
     if (len) {
         memcpy (&dup_xmtpacket[dup][dup_xmtpkoffset[dup]], bytes, len);
-        dup_xmtpkoffset[dup] += len;
+        dup_xmtpkoffset[dup] += (uint16)len;
         }
     dup_txcsr[dup] |= TXCSR_M_TXDONE;
     if (dup_txcsr[dup] & TXCSR_M_TXIE)

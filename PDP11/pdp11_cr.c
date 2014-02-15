@@ -622,7 +622,7 @@ static t_bool fileEOF ( UNIT  *uptr,
         /* Generate EOD card, which empties the hopper */
         for (col = 1; col <= 8; col++) {
             hcard[col] = PUNCH_EOD;
-            ccard[col] = h2c_code[PUNCH_EOD];
+            ccard[col] = (char)h2c_code[PUNCH_EOD];
             acard[col] = ' ';
         }
         while (col <= colEnd) {
@@ -705,13 +705,13 @@ static t_bool readCardImage (   UNIT    *uptr,
             /* convert to 2 columns */
             i = ((c1 << 4) | ( c2 >> 4)) & 0xFFF;
             hcard[col] = i;
-            ccard[col] = h2c_code[i];
+            ccard[col] = (char)h2c_code[i];
             acard[col] = ascii_code[i];
             col++;
 
             i = (((c2 & 017) << 8) | c3) & 0xFFF;
             hcard[col] = i;
-            ccard[col] = h2c_code[i];
+            ccard[col] = (char)h2c_code[i];
             acard[col] = ascii_code[i];
             col++;
         }
@@ -742,7 +742,7 @@ static t_bool readColumnBinary (    UNIT    *uptr,
             return fileEOF (uptr, hcard, ccard, acard, CDDB_READ);
         i = (c1 & 077) | ((c2 & 077) << 6);
         hcard[col] = i;
-        ccard[col] = h2c_code[i];
+        ccard[col] = (char)h2c_code[i];
         acard[col] = ascii_code[i];
     }
     return (TRUE);
@@ -810,7 +810,7 @@ static t_bool readCardASCII (   UNIT    *uptr,
             } while (((col & 07) != 1) && (col <= colEnd));
             break;
         default:
-            hcard[col] = codeTbl[c & 0177];
+            hcard[col] = (uint16)codeTbl[c & 0177];
             /* check for unrepresentable ASCII characters */
             if (hcard[col] == ERROR) {
                 cdst |= CDCSR_DATAERR;
@@ -819,8 +819,8 @@ static t_bool readCardASCII (   UNIT    *uptr,
                         "error character at column %d (%c)\n",
                             col, c & 0177);
             }
-            ccard[col] = h2c_code[hcard[col]];
-            acard[col] = c;
+            ccard[col] = (char)h2c_code[hcard[col]];
+            acard[col] = (char)c;
             col++;
             break;
         }
@@ -861,7 +861,7 @@ static void initTranslation (void)
 
     memset (ascii_code, '~', sizeof (ascii_code));
     for (i = 0; i < 0177; i++)
-        ascii_code[codeTbl[i]] = i;
+        ascii_code[codeTbl[i]] = (char)i;
 }
 
 /*
@@ -1305,9 +1305,9 @@ subsequent memory writes, thus insuring the address registers are
 incremented properly.  If this causes problems, I'll fix it.
 */
         if (cdst & CDCSR_PACK)
-            c = cddb = ccard[currCol] & 0377;
+            cddb = c = ccard[currCol] & 0377;
         else
-            w = cddb = hcard[currCol] & 07777;  /* Punched zones: <12><11><0><1><2><3><4><5><6><7><8><9> */
+            cddb = w = hcard[currCol] & 07777;  /* Punched zones: <12><11><0><1><2><3><4><5><6><7><8><9> */
 
         if (cdcc == 0) /* Transfer requires CC non-zero */
              cdst |= CDCSR_LATE;

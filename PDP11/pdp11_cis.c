@@ -1174,7 +1174,7 @@ return SCPE_OK;
 
 int32 ReadDstr (int32 *dscr, DSTR *src, int32 flag)
 {
-int32 c, i, end, lnt, type, t;
+int32 c, i, end, lnt, type, t = 0;
 
 *src = Dstr0;                                           /* clear result */
 type = GET_DTYP (dscr[0]);                              /* get type */

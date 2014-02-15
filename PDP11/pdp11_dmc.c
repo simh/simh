@@ -1227,7 +1227,6 @@ int32 dmc = (int32)(uptr-dptr->units);
 char *peer = ((dptr == &dmc_dev)? &dmc_peer[dmc][0] : &dmp_peer[dmc][0]);
 t_stat status = SCPE_OK;
 char host[CBUFSIZE], port[CBUFSIZE];
-CTLR *controller = dmc_get_controller_from_unit(uptr);
 
 if ((!cptr) || (!*cptr))
     return SCPE_ARG;
@@ -1258,7 +1257,6 @@ return SCPE_OK;
 
 t_stat dmc_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc)
 {
-t_stat status = SCPE_OK;
 DEVICE *dptr = (UNIBUS) ? ((&dmc_dev == find_dev_from_unit(uptr)) ? &dmc_dev : &dmp_dev) : &dmv_dev;
 int32 dmc = (int32)(uptr-dptr->units);
 uint32 *speeds = ((dptr == &dmc_dev)? dmc_speed : dmp_speed);
@@ -1343,8 +1341,6 @@ return SCPE_OK;
 
 t_stat dmc_showtype (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
-DEVICE *dptr = (UNIBUS) ? ((&dmc_dev == find_dev_from_unit(uptr)) ? &dmc_dev : &dmp_dev) : &dmv_dev;
-int32 dmc = (int32)(uptr-dptr->units);
 CTLR *controller = dmc_get_controller_from_unit(uptr);
 
 switch (controller->dev_type) {
@@ -1572,7 +1568,7 @@ for (i=0; i<dptr->numunits; i++)
 if (cptr == NULL)
     return SCPE_ARG;
 newln = (int32) get_uint (cptr, 10, maxunits, &r);
-if ((r != SCPE_OK) || (newln == (dptr->numunits - 2)))
+if ((r != SCPE_OK) || (newln == (int32)(dptr->numunits - 2)))
     return r;
 if (newln == 0)
     return SCPE_ARG;
@@ -1884,7 +1880,7 @@ return (addr >> 1) & ((UNIBUS) ? 03 : 07);
 
 uint16 dmc_bitfld(int data, int start_bit, int length)
 {
-uint16 ans = data >> start_bit;
+uint16 ans = (uint16)(data >> start_bit);
 uint32 mask = (1 << (length))-1;
 ans &= mask;
 return ans;
@@ -2207,7 +2203,7 @@ void dmc_set_addr(CTLR *controller, uint32 addr)
 {
 if (dmc_is_dmc(controller) || (!(*controller->csrs->sel2 & DMP_SEL2_M_22BIT))) {
     dmc_setreg(controller, 4, addr & 0xFFFF, DBG_RGC);
-    dmc_setreg(controller, 6, ((addr >> 2) << 14) | (*controller->csrs->sel6 & 0x3FFF) , DBG_RGC);
+    dmc_setreg(controller, 6, (uint16)(((addr >> 2) << 14) | (*controller->csrs->sel6 & 0x3FFF)) , DBG_RGC);
     }
 else {
     dmc_setreg(controller, 4, addr & 0xFFFF, DBG_RGC);
@@ -2438,9 +2434,6 @@ t_stat dmc_poll_svc (UNIT *uptr)
 {
 DEVICE *dptr = ((CTLR *)uptr->ctlr)->device;
 CTLR *controller;
-int maxunits = (&dmc_dev == dptr) ? DMC_NUMDEVICE : DMP_NUMDEVICE;
-DIB *dibptr = (DIB *)dptr->ctxt;
-int addrlnt = (UNIBUS) ? IOLN_DMC : IOLN_DMV;
 TMXR *mp = (dptr == &dmc_dev) ? &dmc_desc : &dmp_desc;
 int32 dmc, active, attached;
 
@@ -2659,7 +2652,7 @@ if ((!head) ||
     (controller->transfer_state != Idle) ||
     (dmc_is_rdyo_set(controller)))
     return;
-count = head->actual_bytes_transferred;
+count = (uint16)head->actual_bytes_transferred;
 switch (head->type) {
     case Receive:
         sim_debug(DBG_INF, controller->device, "%s%d: Starting data output transfer for receive, address=0x%08x, count=%d\n", controller->device->name, controller->index, head->address, count);
@@ -2716,7 +2709,6 @@ if (dmc_is_dmc(controller)) {
     if (dmc_is_run_set(controller) && 
         (!dmc_is_rqi_set(controller))) {
         /* Time to decode input command arguments */
-        uint16 sel4 = *controller->csrs->sel4;
         uint16 sel6 = *controller->csrs->sel6;
         uint32 addr = dmc_get_addr(controller);
         uint16 count = dmc_get_count(controller);
@@ -3510,7 +3502,7 @@ if (access == WRITE) {
     if (PA & 1) {
         sim_debug(DBG_WRN, controller->device, "dmc_wr(%s%d), Unexpected non-16-bit write access to SEL%d\n", controller->device->name, controller->index, reg);
         }
-    dmc_setreg(controller, PA, data, DBG_REG);
+    dmc_setreg(controller, PA, (uint16)data, DBG_REG);
     }
 else {
     uint16 mask;
@@ -3678,41 +3670,40 @@ if (0 == dmc_units[0].flags) {       /* First Time Initializations */
     dmp_desc.dptr = &dmp_dev;                      /* Connect appropriate device */
     dmp_desc.uptr = dmp_units+dmp_desc.lines;      /* Identify polling unit */
     }
-else {
-    BUFFER *buffer;
-
-    /* Avoid memory leaks by moving all buffers back to the free queue
-       and then freeing any allocated transfer buffers for each buffer
-       on the free queue */
-    while (controller->ack_wait_queue->count) {
-        buffer = (BUFFER *)remqueue (controller->ack_wait_queue->hdr.next);
-        assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
-        }
-    while (controller->completion_queue->count) {
-        buffer = (BUFFER *)remqueue (controller->completion_queue->hdr.next);
-        assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
-        }
-    while (controller->rcv_queue->count) {
-        buffer = (BUFFER *)remqueue (controller->rcv_queue->hdr.next);
-        assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
-        }
-    while (controller->xmt_queue->count) {
-        buffer = (BUFFER *)remqueue (controller->xmt_queue->hdr.next);
-        assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
-        }
-    for (i = 0; i < controller->free_queue->size; i++) {
-        buffer = (BUFFER *)remqueue (controller->free_queue->hdr.next);
-        free (buffer->transfer_buffer);
-        assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
-        }
-    }
 
 ans = auto_config (dptr->name, (dptr->flags & DEV_DIS) ? 0 : dptr->numunits - 2);
 
 if (!(dptr->flags & DEV_DIS)) {
     for (i = 0; i < DMC_NUMDEVICE + DMP_NUMDEVICE; i++) {
         if (dmc_ctrls[i].device == dptr) {
+            BUFFER *buffer;
+
             controller = &dmc_ctrls[i];
+            /* Avoid memory leaks by moving all buffers back to the free queue
+               and then freeing any allocated transfer buffers for each buffer
+               on the free queue */
+            while (controller->ack_wait_queue->count) {
+                buffer = (BUFFER *)remqueue (controller->ack_wait_queue->hdr.next);
+                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                }
+            while (controller->completion_queue->count) {
+                buffer = (BUFFER *)remqueue (controller->completion_queue->hdr.next);
+                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                }
+            while (controller->rcv_queue->count) {
+                buffer = (BUFFER *)remqueue (controller->rcv_queue->hdr.next);
+                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                }
+            while (controller->xmt_queue->count) {
+                buffer = (BUFFER *)remqueue (controller->xmt_queue->hdr.next);
+                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                }
+            for (j = 0; j < controller->free_queue->size; j++) {
+                buffer = (BUFFER *)remqueue (controller->free_queue->hdr.next);
+                free (buffer->transfer_buffer);
+                buffer->transfer_buffer = NULL;
+                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                }
             dmc_buffer_queue_init_all(controller);
             dmc_clrinint(controller);
             dmc_clroutint(controller);

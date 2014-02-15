@@ -475,7 +475,7 @@ return SCPE_OK;
 
 t_stat rk_wr (int32 data, int32 PA, int32 access)
 {
-int32 old_val = *rk_regs[(PA >> 1) & 07], new_val = 0;
+int32 old_val = *rk_regs[(PA >> 1) & 07];
 
 switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
 
@@ -677,7 +677,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                     wc = i;                             /* trim transfer */
                     break;
                     }
-                rkxb[i] = ((cda / RK_NUMWD) / (RK_NUMSF * RK_NUMSC)) << RKDA_V_CYL;
+                rkxb[i] = (uint16)(((cda / RK_NUMWD) / (RK_NUMSF * RK_NUMSC)) << RKDA_V_CYL);
                 cda = cda + RK_NUMWD;                   /* next sector */
                 }                                       /* end for wc */
             }                                           /* end if format */

@@ -229,7 +229,7 @@ struct hostent *he;
 struct servent *se = NULL;
 struct sockaddr_in *sin;
 struct addrinfo *result = NULL;
-struct addrinfo *ai, *lai;
+struct addrinfo *ai, *lai = NULL;
 struct addrinfo dhints;
 struct in_addr ipaddr;
 struct in_addr *fixed[2];
@@ -355,7 +355,7 @@ for (ip=ips; (ip != NULL) && (*ip != NULL); ++ip) {
         }
     sin = (struct sockaddr_in *)ai->ai_addr;
     sin->sin_family = PF_INET;
-    sin->sin_port = port;
+    sin->sin_port = (unsigned short)port;
     memcpy(&sin->sin_addr, *ip, sizeof(sin->sin_addr));
     if (NULL == result)
         result = ai;

@@ -450,7 +450,7 @@ switch ((pa >> 1) & 07) {                               /* case on PA<3:1> */
 
     case 05:                                            /* LPRDAT */
         *data = lprdat & RDAT_MASK;
-        if (evenbits(*data))
+        if (evenbits((int16)*data))
             *data |= TX_PARITY;
         if (((lprdat & TX_PARITY) == 0) && (lpcsa & CSA_PAR)) /* Data invalid & parity checked? */
             *data ^= TX_PARITY;                         /* Invalid: Provide bad parity */
@@ -531,7 +531,7 @@ switch ((pa >> 1) & 07) {                               /* case on PA<3:1> */
         if (access == WRITEB)
             data = (pa & 1)? (lprdat & 0377) | (data << 8): (lprdat & ~0377) | data;
         lprdat = data & RDAT_MASK;
-        txram[lpcbuf & TX_AMASK] = lprdat | TX_PARITY;  /* load RAM and mark valid */
+        txram[lpcbuf & TX_AMASK] = (int16)(lprdat | TX_PARITY);/* load RAM and mark valid */
         break;
 
     case 06:                                            /* LPCOLC/LPCBUF */
@@ -671,7 +671,7 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
             }
         else if (dvld == 3) {                       /* odd state? */
             if (dvlnt < DV_SIZE) {
-                davfu[dvlnt++] = dvld_hold | ((lpcbuf & DV_DMASK) << 6);
+                davfu[dvlnt++] = (int16)(dvld_hold | ((lpcbuf & DV_DMASK) << 6));
                 dvld = 2;
                 }
             else {
@@ -1036,7 +1036,7 @@ if (fname)
     *fname++ = '\0';
 
 for (cp = cptr; *cp; cp++)
-    *cp = toupper (*cp);
+    *cp = (char)toupper (*cp);
 
 if (strncmp (cptr, "DAVFU", strlen(cptr)) == 0) { /* set lp20 vfutype=davfu: Switch to DAVFU, empty */
     if (fname && *fname)
