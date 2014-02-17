@@ -216,7 +216,7 @@ tempbase[0] = tim_base[0];                              /* copy time base */
 tempbase[1] = tim_base[1];
 
 used = tmr_poll - (sim_activate_time (&tim_unit) - 1);
-fract = (double)used / (double)tmr_poll;
+fract = ((double)used) / ((double)tmr_poll);
 
 /*
  * incr is approximate number of HW ticks to add to the timebase
@@ -286,13 +286,13 @@ static t_bool update_interval (d10 new_interval)
  * AA-H391A-TK_DECsystem-10_DECSYSTEM-20_Processor_Reference_Jun1982.pdf
  * (page 4-37)
  */
-int32 interval_millis = (int32)(((new_interval >> 12) +
-                                (new_interval & TIM_HWRE_MASK ? 1 : 0)));
+d10 interval_millis = (int32)(((new_interval >> 12) +
+                               (new_interval & TIM_HWRE_MASK ? 1 : 0)));
 if (interval_millis == 0)
     interval_millis = 1;
 
 /* tim_new_period is the new value for the interval in hw ticks */
-tim_new_period = interval_millis * (TIM_HW_FREQ / 1000);
+tim_new_period = (d10) interval_millis * ((double)TIM_HW_FREQ / 1000.0);
 /* clk_tps is the new number of clocks ticks per second */
 clk_tps = 1000 / interval_millis;
    
