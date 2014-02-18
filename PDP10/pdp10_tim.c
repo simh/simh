@@ -292,7 +292,7 @@ tim_new_period = new_interval & ~TIM_HWRE_MASK;
 if (new_interval & TIM_HWRE_MASK) tim_new_period += 010000;
     
 /* clk_tps is the new number of clocks ticks per second */
-clk_tps = ceil((double)TIM_HW_FREQ /(double)tim_new_period);
+clk_tps = (int32) ceil((double)TIM_HW_FREQ /(double)tim_new_period);
    
 /* tmxr is polled every tim_mult clks.  Compute the divisor matching the target. */
 tim_mult = (clk_tps <= TIM_TMXR_FREQ) ? 1 : (clk_tps / TIM_TMXR_FREQ) ;
