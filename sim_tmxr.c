@@ -2222,12 +2222,13 @@ while (*tptr) {
             cptr = init_cptr;
             }
         cptr = get_glyph_nc (cptr, port, ';');
-        sock = sim_master_sock (port, &r);                      /* make master socket */
+        sock = sim_master_sock (port, &r);                      /* make master socket to validate port */
         if (r != SCPE_OK)
             return r;
         if (sock == INVALID_SOCKET)                             /* open error */
             return SCPE_OPENERR;
         sim_close_sock (sock, 1);
+        sim_os_ms_sleep (2);                                    /* let the close finish (required on some platforms) */
         strcpy(listen, port);
         cptr = get_glyph (cptr, option, ';');
         if (option[0]) {
