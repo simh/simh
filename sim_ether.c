@@ -2965,9 +2965,11 @@ dev->read_callback = routine;
 /* dispatch read request to either receive a filtered packet or timeout */
 do {
   switch (dev->eth_api) {
+#ifdef HAVE_PCAP_NETWORK
     case ETH_API_PCAP:
       status = pcap_dispatch((pcap_t*)dev->handle, 1, &_eth_callback, (u_char*)dev);
       break;
+#endif
 #ifdef HAVE_TAP_NETWORK
     case ETH_API_TAP:
       if (1) {

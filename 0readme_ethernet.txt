@@ -173,6 +173,10 @@ Linux (Ubuntu 11.10):
     # Build and Run simulator and:
        sim> attach xq vde:/tmp/switch1  #simulator uses IP address 192.168.6.2
 
+OSX:
+    The macports package manager (http://www.macports.org) can be used to 
+    install the net/vde2 package.
+
 -------------------------------------------------------------------------------
 
 Windows notes:
@@ -284,7 +288,15 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
                        # apt-get install libpcap-dev
                 RedHat/Fedora Based distributions:
                        # yum install libpcap-devel
-      OS/X   : Apple Developer's site?
+                       
+      OS/X   : The libpcap components are installed as part of the Xcode 
+               developer package.  Instructions to install Xcode on various 
+               OSX versions are available at: 
+                  https://guide.macports.org/chunked/installing.xcode.html
+               Be sure to install the command line tools which are installed
+               with the command "xcode-select --install" in more recent 
+               versions of the Apple developer support.
+                  
       HP-UX  : ftp://hpux.connect.org.uk/hpux/Networking/Admin/
 
 	    NOTE: The repositories for older versions of these platforms
@@ -314,7 +326,7 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
     you want to force direct libpcap linking during a build you do so by 
     typing 'make USE_NETWORK=1'.  You must build with gcc to do this.  There 
     is no observable benefit to statically linking against libpcap and as 
-    such support for this ia deprecated.
+    such support for this ia deprecated and will be removed in the future.
     
  4. Some platforms (HP-UX in particular) may not have vendor supplied libpcap 
     components available and installed with the operating system.  The packages
