@@ -39,6 +39,7 @@
 */
 
 #include "pdp10_defs.h"
+#include <math.h>
 #include <time.h>
 
 /* The KS timer works off a 4.100 MHz (243.9024 nsec) oscillator that
@@ -216,7 +217,7 @@ tempbase[0] = tim_base[0];                              /* copy time base */
 tempbase[1] = tim_base[1];
 
 used = tmr_poll - (sim_activate_time (&tim_unit) - 1);
-fract = (double)used / (double)tmr_poll;
+fract = ((double)used) / ((double)tmr_poll);
 
 /*
  * incr is approximate number of HW ticks to add to the timebase
@@ -280,21 +281,18 @@ return update_interval (tim_interval);
 static t_bool update_interval (d10 new_interval)
 {
 /*
- * The value provided is in milliseconds shifted 12 positions to the
- * left; if any of the 12 rightmost bits is different to zero we must
- * add one millisecond to the interval. Reference:
+ * The value provided is in hardware clicks. For a frequency of 4.1 
+ * MHz, that means that dividing by 4096 (shifting 12 to the right) we get
+ * the aproximate value in millisenconds. If any of rhe rightmost bits is
+ * one, we add one unit (4096 ticks ). Reference:
  * AA-H391A-TK_DECsystem-10_DECSYSTEM-20_Processor_Reference_Jun1982.pdf
  * (page 4-37)
  */
-int32 interval_millis = (int32)(((new_interval >> 12) +
-                                (new_interval & TIM_HWRE_MASK ? 1 : 0)));
-if (interval_millis == 0)
-    interval_millis = 1;
-
-/* tim_new_period is the new value for the interval in hw ticks */
-tim_new_period = interval_millis * (TIM_HW_FREQ / 1000);
+tim_new_period = new_interval & ~TIM_HWRE_MASK;
+if (new_interval & TIM_HWRE_MASK) tim_new_period += 010000;
+    
 /* clk_tps is the new number of clocks ticks per second */
-clk_tps = 1000 / interval_millis;
+clk_tps = (int32) ceil((double)TIM_HW_FREQ /(double)tim_new_period);
    
 /* tmxr is polled every tim_mult clks.  Compute the divisor matching the target. */
 tim_mult = (clk_tps <= TIM_TMXR_FREQ) ? 1 : (clk_tps / TIM_TMXR_FREQ) ;
@@ -320,6 +318,7 @@ static t_stat tim_svc (UNIT *uptr)
 if (cpu_unit.flags & UNIT_KLAD)                         /* diags? */
     tmr_poll = uptr->wait;                              /* fixed clock */
 else tmr_poll = sim_rtc_calb (clk_tps);                 /* else calibrate */
+    
 sim_activate (uptr, tmr_poll);                          /* reactivate unit */
 tmxr_poll = tmr_poll * tim_mult;                        /* set mux poll */
 tim_incr_base (tim_base, tim_period);                   /* incr time base based on period of expired interval */
