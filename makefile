@@ -1307,13 +1307,13 @@ ${BIN}sds${EXE} : ${SDS} ${SIM}
 
 swtp6800mp-a : ${BIN}swtp6800mp-a${EXE}
 
-${BIN}swtp6800mp-a${EXE} : ${SWTP6800MP-A} ${SIM}
+${BIN}swtp6800mp-a${EXE} : ${SWTP6800MP-A} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
 
-${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM}
+${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
