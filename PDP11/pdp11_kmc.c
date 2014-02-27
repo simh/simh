@@ -157,6 +157,7 @@ typedef struct queuehdr QH;
 #define SEL2_LINE   (0177 << SEL2_V_LINE)
 #define   MAX_LINE   017                        /* Maximum line number allowed in BASE_IN */
 #define   MAX_ACTIVE (MAX_LINE+1)
+#define   UNASSIGNED_LINE (MAX_ACTIVE+1)
 #define SEL2_RDO    0000200                     /* Ready for output transaction. */
 #define SEL2_RDI    0000020                     /* Ready for input transaction. */
 #define SEL2_IOT    0000004                     /* I/O type, 1 = rx, 0 = tx. */
@@ -1636,7 +1637,7 @@ static void kmc_startUcode (int32 k) {
         if ((d->kmc == k) || (d->kmc == -1)) {
             d->dupidx = -1;
             d->kmc = -1;
-            d->line = MAX_LINE;
+            d->line = UNASSIGNED_LINE;
 
             initqueue (&d->rxqh, &d->rxavail, INIT_HDR_ONLY);
             initqueue (&d->txqh, &d->txavail, INIT_HDR_ONLY);
@@ -1912,7 +1913,7 @@ void kmc_rxBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
     uint32 bda = 0;
     UNIT *rxup;
 
-    if (d->line == -1)
+    if (d->line == UNASSIGNED_LINE)
         return;
 
     assert ((k >= 0) && (((unsigned int)k) < kmc_dev.numunits) && (d->dupidx != -1));
@@ -2033,7 +2034,7 @@ void kmc_txBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
     int32 k = d->kmc;
     BDL *qe;
 
-    if (d->line == -1)
+    if (d->line == UNASSIGNED_LINE)
         return;
 
     assert ((k >= 0) && (((unsigned int)k) < kmc_dev.numunits) && (d->dupidx != -1));
