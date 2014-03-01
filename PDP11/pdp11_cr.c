@@ -1042,13 +1042,12 @@ t_stat cr_wr (  int32   data,
                     crs |= CSR_ERR | (curr_crs & (CRCSR_SUPPLY | CRCSR_RDCHK |
                                                   CRCSR_OFFLINE));
                     if (crs & CSR_IE) SET_INT(CR);
+                }
+                if (blowerState != BLOW_ON) {
+                    blowerState = BLOW_START;
+                    sim_activate_after (&cr_unit, spinUp);
                 } else {
-                    if (blowerState != BLOW_ON) {
-                        blowerState = BLOW_START;
-                        sim_activate_after (&cr_unit, spinUp);
-                    } else {
-                        sim_activate_after (&cr_unit, cr_unit.wait);
-                    }
+                    sim_activate_after (&cr_unit, cr_unit.wait);
                 }
             }
             if (DEBUG_PRS (cr_dev))
