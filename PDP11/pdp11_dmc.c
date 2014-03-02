@@ -2374,10 +2374,10 @@ buffer->actual_bytes_transferred = buffer->count;
 controller->buffers_transmitted_to_net++;
 if (buffer->type == TransmitData) {
     buffer->actual_bytes_transferred = buffer->count - (DDCMP_HEADER_SIZE + DDCMP_CRC_SIZE);
-    assert (insqueue (&buffer->hdr, controller->ack_wait_queue->hdr.prev));
+    ASSURE (insqueue (&buffer->hdr, controller->ack_wait_queue->hdr.prev));
     }
 else {
-    assert (insqueue (&buffer->hdr, &controller->free_queue->hdr));
+    ASSURE (insqueue (&buffer->hdr, &controller->free_queue->hdr));
     }
 controller->link.xmt_buffer = NULL;
 }
@@ -2589,7 +2589,7 @@ if (buffer) {
     buffer->type = type;
     buffer->address = address;
     buffer->count = count;
-    assert (insqueue (&buffer->hdr, q->hdr.prev)); /* Insert at tail */
+    ASSURE (insqueue (&buffer->hdr, q->hdr.prev)); /* Insert at tail */
     sim_debug(DBG_INF, q->controller->device, "%s%d: Queued %s buffer address=0x%08x count=%d\n", q->controller->device->name, q->controller->index, q->name, address, count);
     }
 else {
@@ -2680,7 +2680,7 @@ if ((dmc_is_rdyo_set(controller)) ||
     return;
 sim_debug(DBG_INF, controller->device, "%s%d: Output transfer completed\n", controller->device->name, controller->index);
 buffer = (BUFFER *)remqueue (controller->completion_queue->hdr.next);
-assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+ASSURE (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
 controller->transmit_buffer_output_transfers_completed++;
 controller->transfer_state = Idle;
 dmc_process_command(controller); // check for any other transfers
@@ -2891,7 +2891,7 @@ controller->link.nak_reason = 0;
 while (controller->ack_wait_queue->count) {
     buffer = (BUFFER *)remqueue (controller->ack_wait_queue->hdr.prev);
     memset (buffer->transfer_buffer, 0, DDCMP_HEADER_SIZE);
-    assert (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
+    ASSURE (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
     }
 /* Also make sure that the transmit queue has no control packets in it 
    and that any non transmit buffer(s) have zeroed headers so they will
@@ -2902,7 +2902,7 @@ while (controller->xmt_queue->count - data_packets) {
         BUFFER *buffer_next = (BUFFER *)buffer->hdr.next;
 
         buffer = (BUFFER *)remqueue (&buffer->hdr);
-        assert (insqueue (&buffer->hdr, &controller->free_queue->hdr));
+        ASSURE (insqueue (&buffer->hdr, &controller->free_queue->hdr));
         buffer = buffer_next;
         continue;
         }
@@ -2918,7 +2918,7 @@ BUFFER *buffer = dmc_buffer_allocate(controller);
 buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
 buffer->count = DDCMP_HEADER_SIZE;
 ddcmp_build_start_packet (buffer->transfer_buffer);
-assert (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
+ASSURE (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
 dmc_ddcmp_start_transmitter (controller);
 }
 void ddcmp_SendStack              (CTLR *controller)
@@ -2928,7 +2928,7 @@ BUFFER *buffer = dmc_buffer_allocate(controller);
 buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
 buffer->count = DDCMP_HEADER_SIZE;
 ddcmp_build_start_ack_packet (buffer->transfer_buffer);
-assert (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
+ASSURE (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
 dmc_ddcmp_start_transmitter (controller);
 }
 void ddcmp_SendAck                (CTLR *controller)
@@ -2938,7 +2938,7 @@ BUFFER *buffer = dmc_buffer_allocate(controller);
 buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
 buffer->count = DDCMP_HEADER_SIZE;
 ddcmp_build_ack_packet (buffer->transfer_buffer, controller->link.R, DDCMP_FLAG_SELECT);
-assert (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
+ASSURE (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
 dmc_ddcmp_start_transmitter (controller);
 }
 void ddcmp_SendNak                (CTLR *controller)
@@ -2948,7 +2948,7 @@ BUFFER *buffer = dmc_buffer_allocate(controller);
 buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
 buffer->count = DDCMP_HEADER_SIZE;
 ddcmp_build_nak_packet (buffer->transfer_buffer, controller->link.nak_reason, controller->link.R, DDCMP_FLAG_SELECT);
-assert (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
+ASSURE (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
 dmc_ddcmp_start_transmitter (controller);
 }
 void ddcmp_SendRep                (CTLR *controller)
@@ -2958,7 +2958,7 @@ BUFFER *buffer = dmc_buffer_allocate(controller);
 buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
 buffer->count = DDCMP_HEADER_SIZE;
 ddcmp_build_rep_packet (buffer->transfer_buffer, controller->link.N, DDCMP_FLAG_SELECT);
-assert (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
+ASSURE (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
 dmc_ddcmp_start_transmitter (controller);
 }
 void ddcmp_SetSACK                (CTLR *controller)
@@ -3020,7 +3020,7 @@ while (ddcmp_compare (controller->link.rcv_pkt[DDCMP_NUM_OFFSET], GE, R, control
     buffer->count = DDCMP_HEADER_SIZE;
     ddcmp_build_nak_packet (buffer->transfer_buffer, 2, R, DDCMP_FLAG_SELECT);
     R = R + 1;
-    assert (insqueue (&buffer->hdr, qh));
+    ASSURE (insqueue (&buffer->hdr, qh));
     qh = &buffer->hdr;
     }
 dmc_ddcmp_start_transmitter (controller);
@@ -3055,7 +3055,7 @@ if (!buffer) {
 
 buffer->actual_bytes_transferred = controller->link.rcv_pkt_size - (DDCMP_HEADER_SIZE + DDCMP_CRC_SIZE);
 Map_WriteB(buffer->address, buffer->actual_bytes_transferred, controller->link.rcv_pkt + DDCMP_HEADER_SIZE);
-assert (insqueue (&buffer->hdr, controller->completion_queue->hdr.prev));     /* Insert at tail */
+ASSURE (insqueue (&buffer->hdr, controller->completion_queue->hdr.prev));     /* Insert at tail */
 ddcmp_IncrementR (controller);
 ddcmp_SetSACK (controller);
 }
@@ -3069,7 +3069,7 @@ while (buffer != NULL) {
         ddcmp_compare (buffer->transfer_buffer[DDCMP_NUM_OFFSET], GT, controller->link.rcv_pkt[DDCMP_RESP_OFFSET], controller))
         break;
     buffer = (BUFFER *)remqueue (&buffer->hdr);
-    assert (insqueue (&buffer->hdr, controller->completion_queue->hdr.prev)); /* Insert at tail */
+    ASSURE (insqueue (&buffer->hdr, controller->completion_queue->hdr.prev)); /* Insert at tail */
     buffer = dmc_buffer_queue_head(controller->ack_wait_queue);
     }
 }
@@ -3086,7 +3086,7 @@ for (i=0; i < controller->ack_wait_queue->count; ++i) {
         }
     ddcmp_build_data_packet (buffer->transfer_buffer, buffer->count - (DDCMP_HEADER_SIZE + DDCMP_CRC_SIZE), DDCMP_FLAG_SELECT|DDCMP_FLAG_QSYNC, controller->link.T, controller->link.R);
     buffer = (BUFFER *)remqueue (&buffer->hdr);
-    assert (insqueue (&buffer->hdr, controller->xmt_queue->hdr.prev)); /* Insert at tail */
+    ASSURE (insqueue (&buffer->hdr, controller->xmt_queue->hdr.prev)); /* Insert at tail */
     break;
     }
 }
@@ -3684,25 +3684,25 @@ if (!(dptr->flags & DEV_DIS)) {
                on the free queue */
             while (controller->ack_wait_queue->count) {
                 buffer = (BUFFER *)remqueue (controller->ack_wait_queue->hdr.next);
-                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                ASSURE (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
                 }
             while (controller->completion_queue->count) {
                 buffer = (BUFFER *)remqueue (controller->completion_queue->hdr.next);
-                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                ASSURE (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
                 }
             while (controller->rcv_queue->count) {
                 buffer = (BUFFER *)remqueue (controller->rcv_queue->hdr.next);
-                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                ASSURE (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
                 }
             while (controller->xmt_queue->count) {
                 buffer = (BUFFER *)remqueue (controller->xmt_queue->hdr.next);
-                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                ASSURE (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
                 }
             for (j = 0; j < controller->free_queue->size; j++) {
                 buffer = (BUFFER *)remqueue (controller->free_queue->hdr.next);
                 free (buffer->transfer_buffer);
                 buffer->transfer_buffer = NULL;
-                assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
+                ASSURE (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
                 }
             dmc_buffer_queue_init_all(controller);
             dmc_clrinint(controller);

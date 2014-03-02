@@ -609,7 +609,7 @@ static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
         }
         install_ALTAIRbootROM();                                            /* install modified ROM */
     }
-    assert(install_bootrom(bootrom_hdsk, BOOTROM_SIZE_HDSK, HDSK_BOOT_ADDRESS, FALSE) == SCPE_OK);
+    ASSURE(install_bootrom(bootrom_hdsk, BOOTROM_SIZE_HDSK, HDSK_BOOT_ADDRESS, FALSE) == SCPE_OK);
     *((int32 *) sim_PC -> loc) = HDSK_BOOT_ADDRESS;
     return SCPE_OK;
 }
