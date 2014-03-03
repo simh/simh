@@ -1589,7 +1589,7 @@ if ((r = Read (va, &dat)))                              /* get operand */
 dat = AddM24 (dat, val);                                /* mem +/- 1 */
 if ((r = Write (va, dat)))                              /* rewrite */
     return r;
-if (dat == 0)                                           /* set clk sync int */
+if ((op == MIN && dat == 0) || (dat & SIGN))            /* set clk sync int */
     int_req = int_req | INT_RTCS;
 return SCPE_OK;
 }
