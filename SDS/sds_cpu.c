@@ -428,9 +428,31 @@ while (reason == 0) {                                   /* loop until halted */
         int_reqhi = api_findreq ();                     /* recalc int req */
         }
     else {                                              /* normal instr */
-        if (sim_brk_summ && sim_brk_test (P, SWMASK ('E'))) { /* breakpoint? */
-            reason = STOP_IBKPT;                        /* stop simulation */
-            break;
+        if (sim_brk_summ) {
+            uint32 btyp = SWMASK ('E');
+
+            if (nml_mode)
+                btyp = SWMASK ('E') | SWMASK ('N');
+            else
+                btyp = usr_mode ? SWMASK ('E') | SWMASK ('U')
+                                : SWMASK ('E') | SWMASK ('M');
+            btyp = sim_brk_test (P, btyp); 
+            if (btyp) {
+                if (btyp & SWMASK ('E'))                /* unqualified breakpoint? */
+                    reason = STOP_IBKPT;                /* stop simulation */
+                else switch (btyp) {                    /* qualified breakpoint */
+                    case SWMASK ('M'):                  /* monitor mode */
+                        reason = STOP_MBKPT;            /* stop simulation */
+                        break;
+                    case SWMASK ('N'):                  /* normal (SDS 930) mode */
+                        reason = STOP_NBKPT;            /* stop simulation */
+                        break;
+                    case SWMASK ('U'):                  /* user mode */
+                        reason = STOP_UBKPT;            /* stop simulation */
+                        break;
+                    }
+                break;
+                }
             }
         reason = Read (save_P = P, &inst);              /* get instr */
         P = (P + 1) & VA_MASK;                          /* incr PC */
@@ -1473,7 +1495,8 @@ pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
 else return SCPE_IERR;
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
+sim_brk_dflt = SWMASK ('E');
+sim_brk_types = SWMASK ('E') | SWMASK ('M') | SWMASK ('N') | SWMASK ('U');
 return SCPE_OK;
 }
 

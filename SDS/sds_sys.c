@@ -96,7 +96,10 @@ const char *sim_stop_messages[] = {
     "Trap instruction not BRM",
     "RTC instruction not MIN or SKR",
     "Interrupt vector zero",
-    "Runaway carriage control tape"
+    "Runaway carriage control tape",
+    "Monitor-mode Breakpoint",
+    "Normal-mode Breakpoint",
+    "User-mode Breakpoint"
     };
 
 /* Character conversion tables */
