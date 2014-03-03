@@ -422,6 +422,7 @@ static int32    spinDown = 2000000;                     /* blower spin-down time
 static int      EOFcard = 0;                            /* played special card yet? */
 static t_bool   eofPending = FALSE;                     /* Manual EOF switch pressed */
 static int32    cpm = DFLT_CPM;                         /* reader rate: cards per minute */
+static int      schedule_svc=0;                         /* Re-schedule service if true */
 /* card image in various formats */
 static int16    hcard[82];                              /* Hollerith format */
 static char     ccard[82];                              /* DEC compressed format */
@@ -443,6 +444,7 @@ DEVICE cr_dev;
 static void setupCardFile (UNIT *, int32);
 t_stat cr_rd (int32 *, int32, int32);
 t_stat cr_wr (int32, int32, int32);
+int32  cr_intac(void);
 t_stat cr_svc (UNIT *);
 t_stat cr_reset (DEVICE *);
 t_stat cr_attach (UNIT *, char *);
@@ -474,7 +476,7 @@ char *cr_description (DEVICE *dptr);
 #define IOLN_CR         010
 
 static DIB cr_dib = { IOBA_AUTO, IOLN_CR, &cr_rd, &cr_wr,
-        1, IVCL (CR), VEC_AUTO, { NULL } };
+        1, IVCL (CR), VEC_AUTO, { cr_intac } };
 
 static UNIT cr_unit = {
     UDATA (&cr_svc,
@@ -615,7 +617,7 @@ static t_bool fileEOF ( UNIT  *uptr,
     int col;
 
     if (DEBUG_PRS (cr_dev))
-        fprintf (sim_deb, "hopper empty\n");
+        fprintf (sim_deb, "hopper empty-eof\n");
 
     if (!EOFcard && (uptr->flags & UNIT_AUTOEOF) && !ferror(uptr->fileref)) {
         EOFcard = -1;
@@ -635,6 +637,7 @@ static t_bool fileEOF ( UNIT  *uptr,
         cdst |= CDCSR_HOPPER;
         return (TRUE);
     }
+    
     /* Not auto EOF, or EOF already handled. This is an attempt to read
      * with an empty hopper.  Report a pick, read or stacker check as well
      * as hopper empty to indicate that no data was transfered.  One might
@@ -1021,15 +1024,25 @@ t_stat cr_wr (  int32   data,
                 data = (crs & ~0377) | (data & 0377); 
             if (!(data & CSR_IE))
                 CLR_INT (CR);
+            int curr_crs = crs;     /* Save current crs to recover status */
             crs = (crs & ~CRCSR_RW) | (data & CRCSR_RW);
             /* Clear status bits after CSR load */
             crs &= ~(CSR_ERR | CRCSR_ONLINE | CRCSR_CRDDONE | CRCSR_TIMERR);
             if (crs & CRCSR_OFFLINE)
                 crs |= CSR_ERR;
-            if (DEBUG_PRS (cr_dev))
-                fprintf (sim_deb, "cr_wr data %06o crs %06o\n",
-                    data, crs);
+            /* 
+             * Read card requested:
+             * Check if there was any error which required an operator
+             * intervention, and if so, reassert the corresponding
+             * error bits and assert interrupt.
+             * (Expected by the VMS CRDRIVER)
+             */
             if (data & CSR_GO) {
+                if (curr_crs & (CRCSR_SUPPLY | CRCSR_RDCHK | CRCSR_OFFLINE)) {
+                    crs |= CSR_ERR | (curr_crs & (CRCSR_SUPPLY | CRCSR_RDCHK |
+                                                  CRCSR_OFFLINE));
+                    if (crs & CSR_IE) SET_INT(CR);
+                }
                 if (blowerState != BLOW_ON) {
                     blowerState = BLOW_START;
                     sim_activate_after (&cr_unit, spinUp);
@@ -1037,6 +1050,9 @@ t_stat cr_wr (  int32   data,
                     sim_activate_after (&cr_unit, cr_unit.wait);
                 }
             }
+            if (DEBUG_PRS (cr_dev))
+                fprintf (sim_deb, "cr_wr data %06o crs %06o\n",
+                         data, crs);
         } else { /* CD11 */
             if (access == WRITEB)
                 data = (PA & 1)? (((data & 0xff)<<8) | (cdst & 0x00ff)):
@@ -1149,6 +1165,24 @@ t_stat cr_wr (  int32   data,
 }
 
 /*
+ * Interrupt acknowledge routine
+ * Reschedule service routine if needed (based on 
+ * schedule_svc flag).
+ * Do the actual scheduling just for the CR11 (VAX/PDP11). The PDP10 does
+ * not seem to call this entry point.
+ */
+
+int32 cr_intac() {
+    if CR11_CTL(&cr_unit) {
+        if (schedule_svc) {
+            sim_activate_after (&cr_unit, cr_unit.wait);
+            schedule_svc = 0;
+        }
+    }
+    return cr_dib.vec;      /* Constant interrupt vector */
+}
+
+/*
 Enter the service routine once for each column read from the card.
 CR state bits drive this primarily (see _BUSY and _CRDDONE).  However,
 when in CD mode, also execute one column of DMA input.
@@ -1222,14 +1256,27 @@ t_stat cr_svc ( UNIT    *uptr    )
          * The card read routine set the appropriate error bits.  Shutdown. 
          */
         if (!readRtn (uptr, hcard, ccard, acard)) {
+            blowerState = BLOW_STOP;
             if (CD11_CTL(uptr)) {
 readFault:
-                blowerState = BLOW_STOP;
                 cdst |= CDCSR_RDY;
                 if (cdst & (CDCSR_RDRCHK | CDCSR_HOPPER))
                     cdst |= CSR_ERR | CDCSR_OFFLINE;
                 if (cdst & CSR_IE)
                     SET_INT (CR);
+
+            } else {
+                /*
+                 * CR11 handling: assert SUPPLY and ERROR bits,
+                 * put de device offline and DO NOT TRIGGER AN INTERRUPT
+                 * (if the interrupt is asserted RSX and VMS will get 80
+                 * bytes of garbage, and RSX could crash).
+                 */
+                if (crs & (CRCSR_RDCHK | CRCSR_SUPPLY)) {
+                    crs |= CSR_ERR | CRCSR_OFFLINE;
+                    crs &= ~(CRCSR_ONLINE | CRCSR_BUSY | CRCSR_CRDDONE);
+                    CLR_INT(CR);
+                }
             }
             sim_activate_after (uptr, spinDown);
             return (SCPE_OK);
@@ -1265,9 +1312,11 @@ readFault:
                 eofPending = FALSE;
             }
         }
+        
         if (EOFcard)
             EOFcard = 1;
-
+        
+        
         if (CD11_CTL(uptr)) {
              /* Handle read check: punches in col 0 or 81/last (DEC only did 80 cols, but...) */
             if ((uptr->flags & UNIT_RDCHECK) && 
@@ -1358,7 +1407,15 @@ incremented properly.  If this causes problems, I'll fix it.
     currCol++;    /* advance the column counter */
 
     /* Schedule next service cycle */
-    sim_activate_after (uptr, uptr->wait);
+    /* CR11 (VAX/PDP11): just raise the schedule_svc flag; the intack 
+     * routine will do the actual rescheduling.
+     * CD11/20 (PDP10): Do the rescheduling (the intack seems to do nothing)
+     */
+    if (CD11_CTL(uptr)) {
+        sim_activate_after(uptr, uptr->wait);
+    } else {
+        schedule_svc = 1;
+    }
     return (SCPE_OK);
 }
 
