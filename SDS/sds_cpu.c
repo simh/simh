@@ -448,6 +448,8 @@ while (reason == 0) {                                   /* loop until halted */
             }                                           /* end if r == 0 */
         if (reason < 0) {                               /* mm (fet or ex)? */
             pa = -reason;                               /* get vector */
+            if (reason == MM_MONUSR)                    /* record P of user-mode */
+                save_P = P;                             /*  transition point     */
             reason = 0;                                 /* defang */
             tinst = ReadP (pa);                         /* get inst */
             if (I_GETOP (tinst) != BRM) {               /* not BRM? */
@@ -505,7 +507,7 @@ if (inst & I_POP) {                                     /* POP? */
             if ((r = Write (0, dat)))
                 return r;
             }
-        }               
+        }
     else {                                              /* mon mode */
         dat = (OV << 21) | dat;                         /* ov in <2> */
         WriteP (0, dat);                                /* store return */
@@ -776,7 +778,7 @@ switch (op) {                                           /* case on opcode */
             return r;
         inst = dat;
         goto EXU_LOOP;
- 
+
    case BRU:
         if (nml_mode && (inst & I_IND)) api_dismiss (); /* normal BRU*, dism */
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
@@ -785,6 +787,11 @@ switch (op) {                                           /* case on opcode */
             return r;
         PCQ_ENTRY;
         P = va & VA_MASK;                               /* branch */
+        if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
+            usr_mode = 1;                               /* transition to user mode */
+            if (mon_usr_trap)
+                return MM_MONUSR;
+            }
         break;
 
     case BRX:
@@ -796,6 +803,11 @@ switch (op) {                                           /* case on opcode */
                 return r;
             PCQ_ENTRY;
             P = va & VA_MASK;                           /* branch */
+            if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
+                usr_mode = 1;                               /* transition to user mode */
+                if (mon_usr_trap)
+                    return MM_MONUSR;
+                }
             }
         break;
 
@@ -810,6 +822,11 @@ switch (op) {                                           /* case on opcode */
             return r;
         PCQ_ENTRY;
         P = (va + 1) & VA_MASK;                         /* branch */
+        if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
+            usr_mode = 1;                               /* transition to user mode */
+            if (mon_usr_trap)
+                return MM_MONUSR;
+            }
         break;
 
     case BRR:
@@ -1191,7 +1208,7 @@ uint32 nml = nml_mode, usr = usr_mode;
 uint32 pa, pgn, map;
 
 if (sw & SWMASK ('N'))                                  /* -n: normal */
-    nml = 1; 
+    nml = 1;
 else if (sw & SWMASK ('X'))                             /* -x: mon */
     nml = usr = 0;
 else if (sw & SWMASK ('U')) {                           /* -u: user */
@@ -1269,7 +1286,7 @@ return;
 
 /* Divide - the SDS 940 uses a non-restoring divide.  The algorithm
    runs even for overflow cases.  Hence it must be emulated precisely
-   to give the right answers for diagnostics. If the dividend is 
+   to give the right answers for diagnostics. If the dividend is
    negative, AB are 2's complemented starting at B<22>, and B<23>
    is unchanged. */
 
