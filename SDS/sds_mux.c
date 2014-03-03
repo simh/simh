@@ -54,6 +54,7 @@
 #define MUX_SETFLG(l,x) mux_flags[((l) * MUX_FLAGS) + (x)] = 1
 #define MUX_SETINT(x)   int_req = int_req | (INT_MUXR >> (x))
 #define MUX_CLRINT(x)   int_req = int_req & ~(INT_MUXR >> (x))
+#define MUX_CHKINT(x)   (int_req & (INT_MUXR >> (x)))
 
 /* PIN/POT */
 
@@ -274,7 +275,7 @@ switch (fnc) {
                 ((inst & SKS_DSR) && !(mux_sta[ln] & MUX_SDSR)))
                 *dat = 0;                               /* no skip if fail */
             }
-        else CRETINS;   
+        else CRETINS;
 
     default:
         return SCPE_IERR;
@@ -290,6 +291,8 @@ t_stat pin_mux (uint32 num, uint32 *dat)
 uint32 ln = mux_scan >> 2;
 uint32 flag = mux_scan & MUX_FLAGMASK;
 
+if (!mux_slck)                                          /* scanner must be locked */
+    return SCPE_IERR;
 mux_scan = mux_scan & MUX_SCANMASK;                     /* mask scan */
 mux_flags[mux_scan] = 0;                                /* clear flag */
 if (flag == MUX_FRCV) {                                 /* rcv event? */
@@ -333,6 +336,12 @@ else {                                                  /* enabled */
     else mux_sta[ln] = mux_sta[ln] & ~MUX_SXIE;
     mux_sta[ln] = mux_sta[ln] | MUX_SLNE;               /* line is enabled */
     mux_ldsc[ln].rcve = 1;
+    if ((*dat & POT_NOX) &&                             /* if no transmit char && */
+        (mux_sta[ln] & MUX_SXIE) &&                     /* line enabled && */
+        !sim_is_active (&muxl_unit[ln])) {              /* tx buffer empty */
+        MUX_SETFLG (ln, MUX_FXMT);                      /* then set flag to request */
+        mux_scan_next ();                               /* a tx interrupt */
+        }
     }
 return SCPE_OK;
 }
@@ -407,7 +416,23 @@ if (mux_sta[ln] & MUX_SXIE) {
 return SCPE_OK;
 }
 
-/* Kick scanner */
+/* Kick scanner
+*
+* Per 940 Ref Man:
+*   If more than one raised flag is encountered by the scanner, only
+*   the one of highest priority will result in an interrupt. The others
+*   will be ignored until the scanner has completed scanning all other
+*   channels. The receive flag will be given highest priority, followed
+*   by the transmit flag, the carrier-on flag, and the carrier-off flag.
+*
+* To implement, advance mux_scan to last flag of current channel (by
+* merging MUX_FLAGMASK) so scan loop commences with receive flag of next
+* channel.
+*
+* When two or more channels are active, do not queue an interrupt
+* request if the same interrupt is already requesting.  To do so will
+* cause an interrupt to be lost.
+*/
 
 void mux_scan_next (void)
 {
@@ -415,9 +440,12 @@ int32 i;
 
 if (mux_slck)                                           /* locked? */
     return;
+mux_scan |= MUX_FLAGMASK;                               /* last flag of current ch.     */
+                                                        /*  will be Rx flag of next ch. */
 for (i = 0; i < MUX_SCANMAX; i++) {                     /* scan flags */
     mux_scan = (mux_scan + 1) & MUX_SCANMASK;           /* next flag */
-    if (mux_flags[mux_scan]) {                          /* flag set? */
+    if (mux_flags[mux_scan] &&                          /* flag set */
+        !MUX_CHKINT (mux_scan & MUX_FLAGMASK)) {        /*  and not requesting int? */
         mux_slck = 1;                                   /* lock scanner */
         MUX_SETINT (mux_scan & MUX_FLAGMASK);           /* request int */
         return;

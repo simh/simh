@@ -439,6 +439,8 @@ switch (mod) {
 
     case 3:                                             /* special */
         dev = I_GETDEV3 (inst);                         /* special device */
+        if (dev == DEV3_SMUX && !(cpu_unit.flags & UNIT_GENIE))
+            dev = DEV3_GMUX;
         if (dev3_dsp[dev])                              /* defined? */
             return dev3_dsp[dev] (IO_CONN, inst, NULL);
         CRETINS;
@@ -500,6 +502,8 @@ switch (mod) {
 
     case 3:                                             /* special */
         dev = I_GETDEV3 (inst);                         /* special device */
+        if (dev == DEV3_SMUX && !(cpu_unit.flags & UNIT_GENIE))
+            dev = DEV3_GMUX;
         if (dev3_dsp[dev])
             dev3_dsp[dev] (IO_SKS, inst, dat);
         else CRETINS;
@@ -547,9 +551,9 @@ return SCPE_OK;
 t_stat pot_fork (uint32 num, uint32 *dat)
 {
 uint32 igrp = SYI_GETGRP (*dat);                        /* get group */
-uint32 fbit = (1 << (VEC_FORK & 017));                  /* bit in group */
+uint32 fbit = (0100000 >> (VEC_FORK & 017));            /* bit in group */
 
-if (igrp == (VEC_FORK / 020)) {                         /* right group? */
+if (igrp == ((VEC_FORK-0200) / 020)) {                  /* right group? */
     if ((*dat & SYI_ARM) && (*dat & fbit))              /* arm, bit set? */
         int_req = int_req | INT_FORK;
     if ((*dat & SYI_DIS) && !(*dat & fbit))             /* disarm, bit clr? */
