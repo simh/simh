@@ -1582,13 +1582,17 @@ return SCPE_OK;
    a unit service routine and a reset routine.  The service routine
    sets an interrupt that invokes the clock counter.  The clock counter
    is a "one instruction interrupt", and only MIN/SKR are valid.
+
+   Temporarily divide rtc_tps by 2 because clock is running twice as
+   fast as it should. Eventually have to find problem in the clock
+   calibration or setup code.
 */
 
 t_stat rtc_svc (UNIT *uptr)
 {
 if (rtc_pie)                                            /* set pulse intr */
     int_req = int_req | INT_RTCP;
-sim_activate (&rtc_unit, sim_rtcn_calb (rtc_tps, TMR_RTC)); /* reactivate */
+sim_activate (&rtc_unit, sim_rtcn_calb (rtc_tps/2, TMR_RTC)); /* reactivate */
 return SCPE_OK;
 }
 
