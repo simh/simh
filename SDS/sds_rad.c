@@ -116,7 +116,7 @@ DEVICE rad_dev = {
     };
 
 /* Fixed head disk routine
-        
+
    conn -       inst = EOM0, dat = NULL
    eom1 -       inst = EOM1, dat = NULL
    sks -        inst = SKS, dat = ptr to result
@@ -157,7 +157,7 @@ switch (fnc) {                                          /* case function */
         if (new_ch != rad_dib.chan)                     /* wrong chan? */
             return SCPE_IERR;
         if ((inst & 00600) == 00200)                    /* alert for sec */
-            alert = POT_RADS;     
+            alert = POT_RADS;
         else if ((inst & 06600) == 0) {                 /* alert for addr */
             if (sim_is_active (&rad_unit))              /* busy? */
                 rad_err = 1;
@@ -287,7 +287,7 @@ if (rad_sba >= (RAD_NUMWD * 2)) {                       /* next sector? */
         ((rad_da + 1) & RAD_SCMASK);
     else rad_da = (rad_da & ~RAD_TRSCMASK) +            /* cross band */
         ((rad_da + 1) & RAD_TRSCMASK);
-    sba = 0;                                            /* start new sec */
+    sba = 1;                                            /* start new sec */
     }
 return sba;
 }

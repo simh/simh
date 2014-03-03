@@ -96,7 +96,10 @@ const char *sim_stop_messages[] = {
     "Trap instruction not BRM",
     "RTC instruction not MIN or SKR",
     "Interrupt vector zero",
-    "Runaway carriage control tape"
+    "Runaway carriage control tape",
+    "Monitor-mode Breakpoint",
+    "Normal-mode Breakpoint",
+    "User-mode Breakpoint"
     };
 
 /* Character conversion tables */
@@ -212,7 +215,7 @@ for (i = wd = 0; i < 4; ) {
     }
 return wd;
 }
-    
+
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 i, wd, buf[8];
@@ -227,7 +230,7 @@ for (i = 0; i < 8; i++) {                               /* read boot */
     if ((wd = get_word (fileref, &ldr)) < 0)
         return SCPE_FMT;
     buf[i] = wd;
-	}
+    }
 if ((buf[0] != 023200012) ||                            /* 2 = WIM 12,2 */
     (buf[1] != 004100002) ||                            /* 3 = BRX 2 */
     (buf[2] != 007100011) ||                            /* 4 = LDX 11 */
@@ -260,15 +263,15 @@ return SCPE_NXM;
 #define I_V_OPO         006                             /* opcode only */
 #define I_V_CHC         007                             /* chan cmd */
 #define I_V_CHT         010                             /* chan test */
-#define I_NPN           (I_V_NPN << I_V_FL)     
-#define I_PPO           (I_V_PPO << I_V_FL)     
-#define I_IOI           (I_V_IOI << I_V_FL)     
-#define I_MRF           (I_V_MRF << I_V_FL)     
-#define I_REG           (I_V_REG << I_V_FL)     
-#define I_SHF           (I_V_SHF << I_V_FL)     
+#define I_NPN           (I_V_NPN << I_V_FL)
+#define I_PPO           (I_V_PPO << I_V_FL)
+#define I_IOI           (I_V_IOI << I_V_FL)
+#define I_MRF           (I_V_MRF << I_V_FL)
+#define I_REG           (I_V_REG << I_V_FL)
+#define I_SHF           (I_V_SHF << I_V_FL)
 #define I_OPO           (I_V_OPO << I_V_FL)
 #define I_CHC           (I_V_CHC << I_V_FL)
-#define I_CHT           (I_V_CHT << I_V_FL)     
+#define I_CHT           (I_V_CHT << I_V_FL)
 
 static const int32 masks[] = {
  037777777, 010000000, 017700000,
@@ -299,7 +302,7 @@ static const char *opcode[] = {
  "SKM", "LDX", "SKA", "SKG",
  "SKD", "LDB", "LDA", "EAX",
 
-         "BRU*", 
+         "BRU*",
  "MIY*", "BRI*", "MIW*", "POT*",
  "ETR*", "MRG*", "EOR*",
          "EXU*",
@@ -430,17 +433,17 @@ va = inst & VA_MASK;
 shf = inst & I_SHFMSK;
 nonop = inst & 077777;
 
-if (sw & SWMASK ('A')) {                                /* ASCII? */
-    if (inst > 0377)
-        return SCPE_ARG;
-    fprintf (of, FMTASC (inst & 0177));
+if (sw & SWMASK ('A')) {                                /* SDS internal ASCII? */
+    for (i = 16; i >= 0; i -= 8) {
+        ch = (inst >> i) & 0377;                        /* map printable chars     */
+        ch = ch <= 0137 ? ch += 040 : '.';              /* from int. to ext. ASCII */
+        fprintf (of, "%c", ch);
+        }
     return SCPE_OK;
     }
-if (sw & SWMASK ('C')) {                                /* character? */
-    fprintf (of, "%c", sds_to_ascii[(inst >> 18) & 077]);
-    fprintf (of, "%c", sds_to_ascii[(inst >> 12) & 077]);
-    fprintf (of, "%c", sds_to_ascii[(inst >> 6) & 077]);
-    fprintf (of, "%c", sds_to_ascii[inst & 077]);
+if (sw & SWMASK ('C')) {                                /* six-bit character? */
+    for (i = 18; i >= 0; i -= 6)
+        fprintf (of, "%c", sds_to_ascii[(inst >> i) & 077]);
     return SCPE_OK;
     }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
@@ -539,7 +542,7 @@ return cptr;                                            /* no change */
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-int32 i, j, k;
+int32 i, j, k, ch;
 t_value d, tag;
 t_stat r;
 char gbuf[CBUFSIZE];
@@ -554,10 +557,21 @@ for (i = 1; (i < 4) && (cptr[i] != 0); i++) {
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;
-    val[0] = (t_value) cptr[0] | 0200;
+    for (i = j = 0, val[0] = 0; i < 3; i++) {
+        if (cptr[i] == 0)                               /* latch str end */
+            j = 1;
+        ch = cptr[i] & 0377;
+        if (ch <= 037 || ch >= 0200)
+            k = -1;
+        else
+            k = ch - 040;                               /* map ext. to int. ASCII */
+        if (j || (k < 0))                               /* bad, end? spc */
+            k = 0;
+        val[0] = (val[0] << 8) | k;
+        }
     return SCPE_OK;
     }
-if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* string? */
+if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* string of 6-bit chars? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;
     for (i = j = 0, val[0] = 0; i < 4; i++) {

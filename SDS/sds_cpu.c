@@ -428,9 +428,31 @@ while (reason == 0) {                                   /* loop until halted */
         int_reqhi = api_findreq ();                     /* recalc int req */
         }
     else {                                              /* normal instr */
-        if (sim_brk_summ && sim_brk_test (P, SWMASK ('E'))) { /* breakpoint? */
-            reason = STOP_IBKPT;                        /* stop simulation */
-            break;
+        if (sim_brk_summ) {
+            uint32 btyp = SWMASK ('E');
+
+            if (nml_mode)
+                btyp = SWMASK ('E') | SWMASK ('N');
+            else
+                btyp = usr_mode ? SWMASK ('E') | SWMASK ('U')
+                                : SWMASK ('E') | SWMASK ('M');
+            btyp = sim_brk_test (P, btyp); 
+            if (btyp) {
+                if (btyp & SWMASK ('E'))                /* unqualified breakpoint? */
+                    reason = STOP_IBKPT;                /* stop simulation */
+                else switch (btyp) {                    /* qualified breakpoint */
+                    case SWMASK ('M'):                  /* monitor mode */
+                        reason = STOP_MBKPT;            /* stop simulation */
+                        break;
+                    case SWMASK ('N'):                  /* normal (SDS 930) mode */
+                        reason = STOP_NBKPT;            /* stop simulation */
+                        break;
+                    case SWMASK ('U'):                  /* user mode */
+                        reason = STOP_UBKPT;            /* stop simulation */
+                        break;
+                    }
+                break;
+                }
             }
         reason = Read (save_P = P, &inst);              /* get instr */
         P = (P + 1) & VA_MASK;                          /* incr PC */
@@ -448,6 +470,8 @@ while (reason == 0) {                                   /* loop until halted */
             }                                           /* end if r == 0 */
         if (reason < 0) {                               /* mm (fet or ex)? */
             pa = -reason;                               /* get vector */
+            if (reason == MM_MONUSR)                    /* record P of user-mode */
+                save_P = P;                             /*  transition point     */
             reason = 0;                                 /* defang */
             tinst = ReadP (pa);                         /* get inst */
             if (I_GETOP (tinst) != BRM) {               /* not BRM? */
@@ -505,7 +529,7 @@ if (inst & I_POP) {                                     /* POP? */
             if ((r = Write (0, dat)))
                 return r;
             }
-        }               
+        }
     else {                                              /* mon mode */
         dat = (OV << 21) | dat;                         /* ov in <2> */
         WriteP (0, dat);                                /* store return */
@@ -776,7 +800,7 @@ switch (op) {                                           /* case on opcode */
             return r;
         inst = dat;
         goto EXU_LOOP;
- 
+
    case BRU:
         if (nml_mode && (inst & I_IND)) api_dismiss (); /* normal BRU*, dism */
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
@@ -785,6 +809,11 @@ switch (op) {                                           /* case on opcode */
             return r;
         PCQ_ENTRY;
         P = va & VA_MASK;                               /* branch */
+        if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
+            usr_mode = 1;                               /* transition to user mode */
+            if (mon_usr_trap)
+                return MM_MONUSR;
+            }
         break;
 
     case BRX:
@@ -796,6 +825,11 @@ switch (op) {                                           /* case on opcode */
                 return r;
             PCQ_ENTRY;
             P = va & VA_MASK;                           /* branch */
+            if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
+                usr_mode = 1;                               /* transition to user mode */
+                if (mon_usr_trap)
+                    return MM_MONUSR;
+                }
             }
         break;
 
@@ -810,6 +844,11 @@ switch (op) {                                           /* case on opcode */
             return r;
         PCQ_ENTRY;
         P = (va + 1) & VA_MASK;                         /* branch */
+        if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
+            usr_mode = 1;                               /* transition to user mode */
+            if (mon_usr_trap)
+                return MM_MONUSR;
+            }
         break;
 
     case BRR:
@@ -1191,7 +1230,7 @@ uint32 nml = nml_mode, usr = usr_mode;
 uint32 pa, pgn, map;
 
 if (sw & SWMASK ('N'))                                  /* -n: normal */
-    nml = 1; 
+    nml = 1;
 else if (sw & SWMASK ('X'))                             /* -x: mon */
     nml = usr = 0;
 else if (sw & SWMASK ('U')) {                           /* -u: user */
@@ -1269,7 +1308,7 @@ return;
 
 /* Divide - the SDS 940 uses a non-restoring divide.  The algorithm
    runs even for overflow cases.  Hence it must be emulated precisely
-   to give the right answers for diagnostics. If the dividend is 
+   to give the right answers for diagnostics. If the dividend is
    negative, AB are 2's complemented starting at B<22>, and B<23>
    is unchanged. */
 
@@ -1456,7 +1495,8 @@ pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
 else return SCPE_IERR;
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
+sim_brk_dflt = SWMASK ('E');
+sim_brk_types = SWMASK ('E') | SWMASK ('M') | SWMASK ('N') | SWMASK ('U');
 return SCPE_OK;
 }
 
@@ -1542,13 +1582,17 @@ return SCPE_OK;
    a unit service routine and a reset routine.  The service routine
    sets an interrupt that invokes the clock counter.  The clock counter
    is a "one instruction interrupt", and only MIN/SKR are valid.
+
+   Temporarily divide rtc_tps by 2 because clock is running twice as
+   fast as it should. Eventually have to find problem in the clock
+   calibration or setup code.
 */
 
 t_stat rtc_svc (UNIT *uptr)
 {
 if (rtc_pie)                                            /* set pulse intr */
     int_req = int_req | INT_RTCP;
-sim_activate (&rtc_unit, sim_rtcn_calb (rtc_tps, TMR_RTC)); /* reactivate */
+sim_activate (&rtc_unit, sim_rtcn_calb (rtc_tps/2, TMR_RTC)); /* reactivate */
 return SCPE_OK;
 }
 
@@ -1572,7 +1616,7 @@ if ((r = Read (va, &dat)))                              /* get operand */
 dat = AddM24 (dat, val);                                /* mem +/- 1 */
 if ((r = Write (va, dat)))                              /* rewrite */
     return r;
-if (dat == 0)                                           /* set clk sync int */
+if ((op == MIN && dat == 0) || (dat & SIGN))            /* set clk sync int */
     int_req = int_req | INT_RTCS;
 return SCPE_OK;
 }

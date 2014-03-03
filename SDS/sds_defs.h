@@ -1,4 +1,4 @@
-/* sds_defs.h: SDS 940 simulator definitions 
+/* sds_defs.h: SDS 940 simulator definitions
 
    Copyright (c) 2001-2010, Robert M. Supnik
 
@@ -52,6 +52,9 @@
 #define STOP_RTCINS     12                              /* rtc inst not MIN/SKR */
 #define STOP_ILLVEC     13                              /* zero vector */
 #define STOP_CCT        14                              /* runaway CCT */
+#define STOP_MBKPT      15                              /* monitor-mode breakpoint */
+#define STOP_NBKPT      16                              /* normal-mode breakpoint */
+#define STOP_UBKPT      17                              /* user-mode breakpoint */
 
 /* Trap codes */
 

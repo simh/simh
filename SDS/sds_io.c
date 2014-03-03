@@ -148,7 +148,7 @@ extern void set_dyn_map (void);
    Channels could, optionally, handle 12b or 24b characters.  The simulator can
    support all widths.
 */
-   
+
 t_stat chan_show_reg (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 struct aldisp {
@@ -233,11 +233,11 @@ t_stat (*dev3_dsp[64])() = { NULL };
 struct aldisp dev_alt[] = {
     { NULL, NULL },
     { NULL, &pot_ilc }, { NULL, &pot_ilc },
-    { NULL, &pot_ilc }, { NULL, &pot_ilc }, 
     { NULL, &pot_ilc }, { NULL, &pot_ilc },
-    { NULL, &pot_ilc }, { NULL, &pot_ilc }, 
+    { NULL, &pot_ilc }, { NULL, &pot_ilc },
+    { NULL, &pot_ilc }, { NULL, &pot_ilc },
     { NULL, &pot_dcr }, { NULL, &pot_dcr },
-    { NULL, &pot_dcr }, { NULL, &pot_dcr }, 
+    { NULL, &pot_dcr }, { NULL, &pot_dcr },
     { NULL, &pot_dcr }, { NULL, &pot_dcr },
     { NULL, &pot_dcr }, { NULL, &pot_dcr },
     { &pin_adr, NULL }, { &pin_adr, NULL },
@@ -330,15 +330,22 @@ switch (mod) {
             if (INV_DEV (dev, ch))                      /* inv dev? err */
                 CRETDEV;
             chan_war[ch] = chan_cnt[ch] = 0;            /* init chan */
-            chan_flag[ch] = chan_dcr[ch] = 0;
-            chan_mode[ch] = chan_uar[ch] = 0;
-            if (ch >= CHAN_E)
-                chan_mode[ch] = CHM_CE;
+            chan_dcr[ch] = 0;
+            chan_uar[ch] = 0;
+            if (!(chan_flag[ch] & CHF_ILCE) &&          /* ignore if ilc */
+                !QAILCE (alert)) {                      /* already alerted */
+                chan_flag[ch] = chan_mode[ch] = 0;
+                if (ch >= CHAN_E)
+                    chan_mode[ch] = CHM_CE;
+                }
             if ((r = dev_dsp[dev][ch] (IO_CONN, inst, NULL)))/* connect */
                 return r;
-            if ((inst & I_IND) || (ch >= CHAN_C)) {     /* C-H? alert ilc */
-                alert = POT_ILCY + ch;
-                chan_mar[ch] = chan_wcr[ch] = 0;
+            if (!(chan_flag[ch] & CHF_ILCE) &&          /* ignore if ilc */
+                !QAILCE (alert)) {                      /* already alerted */
+                if ((inst & I_IND) || (ch >= CHAN_C)) { /* C-H? alert ilc */
+                    alert = POT_ILCY + ch;
+                    chan_mar[ch] = chan_wcr[ch] = 0;
+                    }
                 }
             if (chan_flag[ch] & CHF_24B)                /* 24B? 1 ch/wd */
                 chan_cpw[ch] = 0;
@@ -390,7 +397,7 @@ switch (mod) {
                     }                                   /* end else change scan */
                 }                                       /* end else term output */
             }                                           /* end else chan EOM */
-        break;               
+        break;
 
     case 2:                                             /* internal */
         if (ch >= CHAN_E) {                             /* EOD? */
@@ -432,6 +439,8 @@ switch (mod) {
 
     case 3:                                             /* special */
         dev = I_GETDEV3 (inst);                         /* special device */
+        if (dev == DEV3_SMUX && !(cpu_unit.flags & UNIT_GENIE))
+            dev = DEV3_GMUX;
         if (dev3_dsp[dev])                              /* defined? */
             return dev3_dsp[dev] (IO_CONN, inst, NULL);
         CRETINS;
@@ -493,8 +502,10 @@ switch (mod) {
 
     case 3:                                             /* special */
         dev = I_GETDEV3 (inst);                         /* special device */
+        if (dev == DEV3_SMUX && !(cpu_unit.flags & UNIT_GENIE))
+            dev = DEV3_GMUX;
         if (dev3_dsp[dev])
-            dev3_dsp[dev] (IO_SKS, inst, dat);       
+            dev3_dsp[dev] (IO_SKS, inst, dat);
         else CRETINS;
         }                                               /* end case */
 
@@ -540,9 +551,9 @@ return SCPE_OK;
 t_stat pot_fork (uint32 num, uint32 *dat)
 {
 uint32 igrp = SYI_GETGRP (*dat);                        /* get group */
-uint32 fbit = (1 << (VEC_FORK & 017));                  /* bit in group */
+uint32 fbit = (0100000 >> (VEC_FORK & 017));            /* bit in group */
 
-if (igrp == (VEC_FORK / 020)) {                         /* right group? */
+if (igrp == ((VEC_FORK-0200) / 020)) {                  /* right group? */
     if ((*dat & SYI_ARM) && (*dat & fbit))              /* arm, bit set? */
         int_req = int_req | INT_FORK;
     if ((*dat & SYI_DIS) && !(*dat & fbit))             /* disarm, bit clr? */
@@ -568,7 +579,7 @@ return SCPE_OK;
 
    Note that the channel can be disconnected if CHN_EOR is set, but must
    not be if XFR_REQ is set */
-                    
+
 t_stat chan_read (int32 ch)
 {
 uint32 dat = 0;
@@ -626,7 +637,7 @@ if (TST_EOR (ch)) {                                     /* end record? */
         }                                               /* end else if cnt */
     return chan_eor (ch);                               /* eot/eor int */
     }
-return r;               
+return r;
 }
 
 void chan_write_mem (int32 ch)
