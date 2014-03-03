@@ -157,6 +157,7 @@ typedef struct queuehdr QH;
 #define SEL2_LINE   (0177 << SEL2_V_LINE)
 #define   MAX_LINE   017                        /* Maximum line number allowed in BASE_IN */
 #define   MAX_ACTIVE (MAX_LINE+1)
+#define   UNASSIGNED_LINE (MAX_ACTIVE+1)
 #define SEL2_RDO    0000200                     /* Ready for output transaction. */
 #define SEL2_RDI    0000020                     /* Ready for input transaction. */
 #define SEL2_IOT    0000004                     /* I/O type, 1 = rx, 0 = tx. */
@@ -1352,7 +1353,7 @@ static t_stat kmc_rxService (UNIT *rxup) {
             break;
         }
         d->rx.bda = bdl->ba;
-        assert (insqueue (&bdl->hdr, d->bdqh.prev, &d->bdavail, DIM(d->bdq)));
+        ASSURE (insqueue (&bdl->hdr, d->bdqh.prev, &d->bdavail, DIM(d->bdq)));
 
         sim_debug (DF_BUF, &kmc_dev, "KMC%u line %u: receiving bdl=%06o\n",
                    k, rxup->unit_line, d->rx.bda);
@@ -1423,9 +1424,9 @@ static t_stat kmc_rxService (UNIT *rxup) {
             }
             if (d->ctrlFlags & SEL6_CI_ENASS) { /* Note that spec requires first bd >= 6 if SS match enabled */
                 if (!(d->rxmsg[5] == (d->ctrlFlags & SEL6_CI_SADDR))) { /* Also include SELECT? */
-                    assert ((bdl = (BDL *)remqueue(d->bdqh.prev, &d->bdavail)) != NULL);
+                    ASSURE ((bdl = (BDL *)remqueue(d->bdqh.prev, &d->bdavail)) != NULL);
                     assert (bdl->ba == d->rx.bda);
-                    assert (insqueue (&bdl->hdr, &d->rxqh, &d->rxavail, MAXQUEUE));
+                    ASSURE (insqueue (&bdl->hdr, &d->rxqh, &d->rxavail, MAXQUEUE));
                     d->rxstate = RXIDLE;
                     break;
                 }
@@ -1636,7 +1637,7 @@ static void kmc_startUcode (int32 k) {
         if ((d->kmc == k) || (d->kmc == -1)) {
             d->dupidx = -1;
             d->kmc = -1;
-            d->line = MAX_LINE;
+            d->line = UNASSIGNED_LINE;
 
             initqueue (&d->rxqh, &d->rxavail, INIT_HDR_ONLY);
             initqueue (&d->txqh, &d->txavail, INIT_HDR_ONLY);
@@ -1912,7 +1913,7 @@ void kmc_rxBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
     uint32 bda = 0;
     UNIT *rxup;
 
-    if (d->line == -1)
+    if (d->line == UNASSIGNED_LINE)
         return;
 
     assert ((k >= 0) && (((unsigned int)k) < kmc_dev.numunits) && (d->dupidx != -1));
@@ -1945,7 +1946,7 @@ void kmc_rxBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
         d->rxstate = RXIDLE;
         sim_cancel (rxup);
         while ((qe = (BDL *)remqueue (d->rxqh.next, &d->rxavail)) != NULL) {
-            assert (insqueue (&qe->hdr, d->bdqh.prev, &d->bdavail, DIM(d->bdq)));
+            ASSURE (insqueue (&qe->hdr, d->bdqh.prev, &d->bdavail, DIM(d->bdq)));
         }
         if (!(sel6v & SEL6_BI_ENABLE)) {
             kmc_ctrlOut (k, SEL6_CO_KDONE, SEL2_IOT, d->line, bda);
@@ -1961,7 +1962,7 @@ void kmc_rxBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
         return;
     }
     qe->ba = ba;
-    assert (insqueue (&qe->hdr, d->rxqh.prev, &d->rxavail, MAXQUEUE));
+    ASSURE (insqueue (&qe->hdr, d->rxqh.prev, &d->rxavail, MAXQUEUE));
     
     if (sel6v & SEL6_BI_KILL) {                 /* KILL & Replace - ENABLE is set too */
         kmc_ctrlOut (k, SEL6_CO_KDONE, SEL2_IOT, d->line, bda);
@@ -2033,7 +2034,7 @@ void kmc_txBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
     int32 k = d->kmc;
     BDL *qe;
 
-    if (d->line == -1)
+    if (d->line == UNASSIGNED_LINE)
         return;
 
     assert ((k >= 0) && (((unsigned int)k) < kmc_dev.numunits) && (d->dupidx != -1));
@@ -2050,7 +2051,7 @@ void kmc_txBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
        * not handed to the DUP can be stopped here.
        */
         while ((qe = (BDL *)remqueue (d->txqh.next, &d->txavail)) != NULL) {
-            assert (insqueue (&qe->hdr, d->bdqh.prev, &d->bdavail, DIM(d->bdq)));
+            ASSURE (insqueue (&qe->hdr, d->bdqh.prev, &d->bdavail, DIM(d->bdq)));
         }
         if (d->txstate < TXACT) {               /* DUP is idle */
             sim_cancel (&tx_units[d->line][k]); /* Stop tx bdl walker */
@@ -2077,7 +2078,7 @@ void kmc_txBufferIn(dupstate *d, int32 ba, uint16 sel6v) {
         return;
     }
     qe->ba = ba;
-    assert (insqueue (&qe->hdr, d->txqh.prev, &d->txavail, MAXQUEUE));
+    ASSURE (insqueue (&qe->hdr, d->txqh.prev, &d->txavail, MAXQUEUE));
     if (d->txstate == TXIDLE) {
         UNIT *txup = &tx_units[d->line][k];   
         if (!sim_is_active (txup)) {
@@ -2148,7 +2149,7 @@ static t_bool kmc_txNewBdl(dupstate *d) {
         return FALSE;
     }
     d->tx.bda = qe->ba;
-    assert (insqueue (&qe->hdr, d->bdqh.prev, &d->bdavail, DIM(d->bdq)));
+    ASSURE (insqueue (&qe->hdr, d->bdqh.prev, &d->bdavail, DIM(d->bdq)));
     
     d->tx.first = TRUE;
     d->tx.bd[1] = 0;
@@ -2242,7 +2243,7 @@ static void kmc_processCompletions (int32 k) {
         return;
     }
 
-    assert (insqueue (&qe->hdr, freecqHead.prev, &freecqCount, CQUEUE_MAX));
+    ASSURE (insqueue (&qe->hdr, freecqHead.prev, &freecqCount, CQUEUE_MAX));
     sel2 = qe->bsel2;
     sel4 = qe->bsel4;
     sel6 = qe->bsel6;
@@ -2296,7 +2297,7 @@ static void kmc_ctrlOut (int32 k, uint8 code, uint16 rx, uint8 line, uint32 bda)
   qe->bsel2 = ((line << SEL2_V_LINE) & SEL2_LINE) | rx | CMD_CTRLOUT;
   qe->bsel4 = bda & 0177777;
   qe->bsel6 = ((bda >> (16-SEL6_V_CO_XAD)) & SEL6_CO_XAD) | code;
-  assert (insqueue (&qe->hdr, cqueueHead.prev, &cqueueCount, CQUEUE_MAX));
+  ASSURE (insqueue (&qe->hdr, cqueueHead.prev, &cqueueCount, CQUEUE_MAX));
   kmc_processCompletions(k);
   return;
 }
@@ -2376,7 +2377,7 @@ static t_bool kmc_bufferAddressOut (int32 k, uint16 flags, uint16 rx, uint8 line
     qe->bsel2 = ((line << SEL2_V_LINE) & SEL2_LINE) | rx | CMD_BUFFOUT;
     qe->bsel4 = bda & 0177777;
     qe->bsel6 = ((bda >> (16-SEL6_V_CO_XAD)) & SEL6_CO_XAD) | flags;
-    assert (insqueue (&qe->hdr, cqueueHead.prev, &cqueueCount, CQUEUE_MAX));
+    ASSURE (insqueue (&qe->hdr, cqueueHead.prev, &cqueueCount, CQUEUE_MAX));
 
     kmc_processCompletions(k);
     return TRUE;

@@ -743,6 +743,15 @@ typedef struct sim_bitfield BITFIELD;
 #include "sim_timer.h"
 #include "sim_fio.h"
 
+/* Macro to ALWAYS execute the specified expression and fail if it evaluates to false. */
+/* This replaces any references to "assert()" which should never be invoked */
+/* with an expression which causes side effects (i.e. must be executed for */
+/* the program to work correctly) */
+#define ASSURE(_Expression) if (_Expression) {fprintf(stderr, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
+                                              if (sim_log) fprintf(sim_log, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
+                                              if (sim_deb) fprintf(sim_deb, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
+                                              abort();} else (void)0
+
 /* Asynch/Threaded I/O support */
 
 #if defined (SIM_ASYNCH_IO)

@@ -306,7 +306,7 @@ static t_stat dsk_reset(DEVICE *dptr) {
 }
 
 void install_ALTAIRbootROM(void) {
-    assert(install_bootrom(bootrom_dsk, BOOTROM_SIZE_DSK, ALTAIR_ROM_LOW, TRUE) == SCPE_OK);
+    ASSURE(install_bootrom(bootrom_dsk, BOOTROM_SIZE_DSK, ALTAIR_ROM_LOW, TRUE) == SCPE_OK);
 }
 
 /*  The boot routine modifies the boot ROM in such a way that subsequently
