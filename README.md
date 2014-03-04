@@ -62,6 +62,11 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     KDP11 (from Timothe Litt) for DECnet connectivity to simulators with DMC, DUP or KDP devices
     DMR11 for DECnet connectivity to simulators with DMC, DUP or KDP devices on TOPS10.
 
+#### SDS 940 Enhancements
+    Support for SDS internal ASCII character encoding during display and data entry.
+    Allow breakpoints to be qualified by normal, monitor or user mode.
+    Fix CPU, RAD, MUX and I/O bugs that prevented SDS Time Share System Monitor and Executive from executing properly.
+
 #### Terminal Multiplexer additions
     Added support for TCP connections using IPv4 and/or IPv6.
     Logging - Traffic going out individual lines can be optionally logged to 
