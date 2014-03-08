@@ -1013,6 +1013,8 @@ t_stat cr_wr (  int32   data,
                 int32   PA,
                 int32   access    )
 {
+    int curr_crs = crs;     /* Save current crs to recover status */
+
     switch ((PA >> 1) & 03) {
     case 0:
         if (CR11_CTL(&cr_unit)) {
@@ -1024,7 +1026,6 @@ t_stat cr_wr (  int32   data,
                 data = (crs & ~0377) | (data & 0377); 
             if (!(data & CSR_IE))
                 CLR_INT (CR);
-            int curr_crs = crs;     /* Save current crs to recover status */
             crs = (crs & ~CRCSR_RW) | (data & CRCSR_RW);
             /* Clear status bits after CSR load */
             crs &= ~(CSR_ERR | CRCSR_ONLINE | CRCSR_CRDDONE | CRCSR_TIMERR);
