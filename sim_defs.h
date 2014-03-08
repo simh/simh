@@ -747,10 +747,11 @@ typedef struct sim_bitfield BITFIELD;
 /* This replaces any references to "assert()" which should never be invoked */
 /* with an expression which causes side effects (i.e. must be executed for */
 /* the program to work correctly) */
-#define ASSURE(_Expression) if (_Expression) {fprintf(stderr, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
-                                              if (sim_log) fprintf(sim_log, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
-                                              if (sim_deb) fprintf(sim_deb, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
-                                              abort();} else (void)0
+#define ASSURE(_Expression) if (!(_Expression)) {char *_exp = #_Expression; char *_file = __FILE__;                                 \
+                                                 fprintf(stderr, "%s failed at %s line %d\n", _exp, _file, __LINE__);               \
+                                                 if (sim_log) fprintf(sim_log, "%s failed at %s line %d\n", _exp, _file, __LINE__); \
+                                                 if (sim_deb) fprintf(sim_deb, "%s failed at %s line %d\n", _exp, _file, __LINE__); \
+                                                 abort();} else (void)0
 
 /* Asynch/Threaded I/O support */
 
