@@ -831,7 +831,7 @@ if (mp->buffered)
 if (mp->logfiletmpl[0])                                 /* logfile info */
     sprintf (growstring(&tptr, 7 + strlen (mp->logfiletmpl)), ",Log=%s", mp->logfiletmpl);
 while ((*tptr == ',') || (*tptr == ' '))
-    strcpy(tptr, tptr+1);
+    memcpy (tptr, tptr+1, strlen(tptr+1)+1);
 for (i=0; i<mp->lines; ++i) {
     char *lptr;
     lp = mp->ldsc + i;
@@ -844,7 +844,7 @@ for (i=0; i<mp->lines; ++i) {
     }
 if (mp->lines == 1)
     while ((*tptr == ',') || (*tptr == ' '))
-        strcpy(tptr, tptr+1);
+        memcpy (tptr, tptr+1, strlen(tptr+1)+1);
 if (*tptr == '\0') {
     free (tptr);
     tptr = NULL;
@@ -2124,7 +2124,7 @@ while (*tptr) {
                 }
             if (0 == MATCH_CMD (gbuf, "BUFFERED")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
-                    strcpy(buffered, "32768");
+                    strcpy (buffered, "32768");
                 else {
                     i = (int32) get_uint (cptr, 10, 1024*1024, &r);
                     if ((r != SCPE_OK) || (i == 0))
@@ -2203,7 +2203,7 @@ while (*tptr) {
                         return SCPE_ARG;
                     cptr = hostport;
                     }
-                strcpy(destination, cptr);
+                strcpy (destination, cptr);
                 continue;
                 }
             cptr = get_glyph (gbuf, port, ';');
@@ -2229,7 +2229,7 @@ while (*tptr) {
             return SCPE_OPENERR;
         sim_close_sock (sock, 1);
         sim_os_ms_sleep (2);                                    /* let the close finish (required on some platforms) */
-        strcpy(listen, port);
+        strcpy (listen, port);
         cptr = get_glyph (cptr, option, ';');
         if (option[0]) {
             if (0 == MATCH_CMD (option, "NOTELNET"))
@@ -2254,10 +2254,10 @@ while (*tptr) {
                 if (mp->lines > 1)
                     sprintf(lp->txlogname, "%s_%d", mp->logfiletmpl, i);
                 else
-                    strcpy(lp->txlogname, mp->logfiletmpl);
+                    strcpy (lp->txlogname, mp->logfiletmpl);
                 r = sim_open_logfile (lp->txlogname, TRUE, &lp->txlog, &lp->txlogref);
                 if (r == SCPE_OK)
-                    setvbuf(lp->txlog, NULL, _IOFBF, 65536);
+                    setvbuf (lp->txlog, NULL, _IOFBF, 65536);
                 else {
                     free (lp->txlogname);
                     lp->txlogname = NULL;
@@ -2384,7 +2384,7 @@ while (*tptr) {
                 if (datagram) {
                     if (listen[0]) {
                         lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
-                        strcpy(lp->port, listen);           /* save port */
+                        strcpy (lp->port, listen);           /* save port */
                         }
                     else
                         return SCPE_ARG;
@@ -2419,7 +2419,7 @@ while (*tptr) {
             sim_close_logfile (&lp->txlogref);
             lp->txlog = NULL;
             lp->txlogname = (char *)realloc (lp->txlogname, 1 + strlen (logfiletmpl));
-            strcpy(lp->txlogname, mp->logfiletmpl);
+            strcpy (lp->txlogname, mp->logfiletmpl);
             r = sim_open_logfile (lp->txlogname, TRUE, &lp->txlog, &lp->txlogref);
             if (r == SCPE_OK)
                 setvbuf(lp->txlog, NULL, _IOFBF, 65536);
@@ -2467,7 +2467,7 @@ while (*tptr) {
             if (sim_log)
                 fprintf (sim_log, "Line %d Listening on port %s\n", line, listen);
             lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
-            strcpy(lp->port, listen);                       /* save port */
+            strcpy (lp->port, listen);                       /* save port */
             lp->master = sock;                              /* save master socket */
             if (listennotelnet != mp->notelnet)
                 lp->notelnet = listennotelnet;
@@ -2497,7 +2497,7 @@ while (*tptr) {
                 if (datagram) {
                     if (listen[0]) {
                         lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
-                        strcpy(lp->port, listen);           /* save port */
+                        strcpy (lp->port, listen);          /* save port */
                         }
                     else
                         return SCPE_ARG;
