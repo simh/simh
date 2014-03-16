@@ -2670,7 +2670,7 @@ if (!File) {
     goto Return_Cleanup;
     }
 if (ModifiedTimeStamp) {
-    if (stat (szVHDPath, &statb)) {
+    if (fstat (fileno (File), &statb)) {
         Return = errno;
         goto Return_Cleanup;
         }
