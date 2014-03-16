@@ -567,6 +567,7 @@ const struct scp_error {
          {"STALL",   "Console Telnet output stall"},
          {"AFAIL",   "Assertion failed"},
          {"INVREM",  "Invalid remote console command"},
+         {"NOTATT",  "Not attached"},
     };
 
 const size_t size_map[] = { sizeof (int8),

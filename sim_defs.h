@@ -304,8 +304,9 @@ typedef uint32          t_addr;
 #define SCPE_STALL      (SCPE_BASE + 41)                /* Telnet conn stall */
 #define SCPE_AFAIL      (SCPE_BASE + 42)                /* assert failed */
 #define SCPE_INVREM     (SCPE_BASE + 43)                /* invalid remote console command */
+#define SCPE_NOTATT     (SCPE_BASE + 44)                /* not attached */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 44)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 45)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x1000                          /* tti data flag */
 #define SCPE_BREAK      0x2000                          /* tti break flag */
 #define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
