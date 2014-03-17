@@ -3574,7 +3574,9 @@ uint32 i, j;
 sim_debug(DBG_TRC, dptr, "dmc_reset(%s)\n", dptr->name);
 
 dmc_desc.packet = TRUE;
+dmc_desc.buffered = 16384;
 dmp_desc.packet = TRUE;
+dmp_desc.buffered = 16384;
 /* Connect structures together */
 for (i=0; i < DMC_NUMDEVICE; i++) {
     dmc_csrs[i].sel0 = &dmc_sel0[i];
@@ -3738,7 +3740,7 @@ if (!peer[0]) {
         fprintf (sim_log, "Peer must be specified before attach\n");
     return SCPE_ARG;
     }
-sprintf (attach_string, "Line=%d,Buffered=16384,Connect=%s,%s", dmc, peer, cptr);
+sprintf (attach_string, "Line=%d,Connect=%s,%s", dmc, peer, cptr);
 ans = tmxr_open_master (mp, attach_string);                 /* open master socket */
 if (ans != SCPE_OK)
     return ans;

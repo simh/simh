@@ -484,7 +484,6 @@ FILEREF *sim_log_ref = NULL;                            /* log file file referen
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
 int32 sim_deb_switches = 0;                             /* debug switches */
-REG *sim_deb_PC = NULL;                                 /* debug PC register pointer */
 struct timespec sim_deb_basetime;                       /* debug timestamp relative base time */
 char *sim_prompt = NULL;                                /* prompt string */
 static FILE *sim_gotofile;                              /* the currently open do file */
@@ -568,6 +567,7 @@ const struct scp_error {
          {"STALL",   "Console Telnet output stall"},
          {"AFAIL",   "Assertion failed"},
          {"INVREM",  "Invalid remote console command"},
+         {"NOTATT",  "Not attached"},
     };
 
 const size_t size_map[] = { sizeof (int8),
@@ -7826,9 +7826,9 @@ if (sim_deb_switches & SWMASK ('P')) {
     if (sim_vm_pc_value)
         val = (*sim_vm_pc_value)();
     else
-        val = get_rval (sim_deb_PC, 0);
-    sprintf(pc_s, "-%s:", sim_deb_PC->name);
-    sprint_val (&pc_s[strlen(pc_s)], val, sim_deb_PC->radix, sim_deb_PC->width, sim_deb_PC->flags & REG_FMT);
+        val = get_rval (sim_PC, 0);
+    sprintf(pc_s, "-%s:", sim_PC->name);
+    sprint_val (&pc_s[strlen(pc_s)], val, sim_PC->radix, sim_PC->width, sim_PC->flags & REG_FMT);
     }
 sprintf(debug_line_prefix, "DBG(%s%s%.0f%s)%s> %s %s: ", tim_t, tim_a, sim_gtime(), pc_s, AIO_MAIN_THREAD ? "" : "+", dptr->name, debug_type);
 return debug_line_prefix;

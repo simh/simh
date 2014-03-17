@@ -180,7 +180,6 @@ extern FILE *sim_deb;                                   /* debug file */
 extern FILEREF *sim_deb_ref;                            /* debug file file reference */
 extern int32 sim_deb_switches;                          /* debug display flags */
 extern struct timespec sim_deb_basetime;                /* debug base time for relative time output */
-extern REG *sim_deb_PC;                                 /* debug PC register */
 extern UNIT *sim_clock_queue;
 extern int32 sim_is_running;
 extern char *sim_prompt;                                /* prompt string */

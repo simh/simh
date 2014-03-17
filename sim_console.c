@@ -1063,8 +1063,6 @@ if (sim_deb_switches & SWMASK ('R')) {
     if (!(sim_deb_switches & (SWMASK ('A') | SWMASK ('T'))))
         sim_deb_switches |= SWMASK ('T');
     }
-if (sim_deb_switches & SWMASK ('P'))
-    sim_deb_PC = find_reg ("PC", NULL, sim_dflt_dev);
 if (!sim_quiet) {
     printf ("Debug output to \"%s\"\n", 
             sim_logfile_name (sim_deb, sim_deb_ref));
@@ -1126,7 +1124,6 @@ if (sim_deb == NULL)                                    /* no debug? */
 sim_close_logfile (&sim_deb_ref);
 sim_deb = NULL;
 sim_deb_switches = 0;
-sim_deb_PC = NULL;
 if (!sim_quiet) {
     printf ("Debug output disabled\n");
     if (sim_log)

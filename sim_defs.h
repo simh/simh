@@ -304,8 +304,9 @@ typedef uint32          t_addr;
 #define SCPE_STALL      (SCPE_BASE + 41)                /* Telnet conn stall */
 #define SCPE_AFAIL      (SCPE_BASE + 42)                /* assert failed */
 #define SCPE_INVREM     (SCPE_BASE + 43)                /* invalid remote console command */
+#define SCPE_NOTATT     (SCPE_BASE + 44)                /* not attached */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 44)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 45)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x1000                          /* tti data flag */
 #define SCPE_BREAK      0x2000                          /* tti break flag */
 #define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
@@ -747,10 +748,11 @@ typedef struct sim_bitfield BITFIELD;
 /* This replaces any references to "assert()" which should never be invoked */
 /* with an expression which causes side effects (i.e. must be executed for */
 /* the program to work correctly) */
-#define ASSURE(_Expression) if (_Expression) {fprintf(stderr, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
-                                              if (sim_log) fprintf(sim_log, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
-                                              if (sim_deb) fprintf(sim_deb, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__); \
-                                              abort();} else (void)0
+#define ASSURE(_Expression) if (!(_Expression)) {char *_exp = #_Expression; char *_file = __FILE__;                                 \
+                                                 fprintf(stderr, "%s failed at %s line %d\n", _exp, _file, __LINE__);               \
+                                                 if (sim_log) fprintf(sim_log, "%s failed at %s line %d\n", _exp, _file, __LINE__); \
+                                                 if (sim_deb) fprintf(sim_deb, "%s failed at %s line %d\n", _exp, _file, __LINE__); \
+                                                 abort();} else (void)0
 
 /* Asynch/Threaded I/O support */
 
