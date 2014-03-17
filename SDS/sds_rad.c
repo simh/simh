@@ -70,9 +70,7 @@ DSPT rad_tplt[] = {                                     /* template */
 DEVICE rad_dev;
 t_stat rad_svc (UNIT *uptr);
 t_stat rad_reset (DEVICE *dptr);
-#if RAD_CHAN == CHAN_W
 t_stat rad_boot (int32 unitno, DEVICE *dptr);
-#endif
 t_stat rad_fill (int32 sba);
 void rad_end_op (int32 fl);
 int32 rad_adjda (int32 sba, int32 inc);
@@ -116,11 +114,7 @@ DEVICE rad_dev = {
     "RAD", &rad_unit, rad_reg, rad_mod,
     1, 8, 21, 1, 8, 24,
     NULL, NULL, &rad_reset,
-#if RAD_CHAN == CHAN_W
     &rad_boot, NULL, NULL,
-#else
-    NULL, NULL, NULL,
-#endif
     &rad_dib, DEV_DISABLE
     };
 
@@ -329,7 +323,6 @@ sim_cancel (&rad_unit);                                 /* deactivate */
 return SCPE_OK;
 }
 
-#if RAD_CHAN == CHAN_W
 /* Boot routine - simulate FILL console command */
 
 t_stat rad_boot (int32 unitno, DEVICE *dptr)
@@ -338,6 +331,8 @@ extern uint32 P, M[];
 
 if (unitno)                                             /* only unit 0 */
     return SCPE_ARG;
+if (rad_dib.chan != CHAN_W)                             /* only on W channel */
+    return SCPE_IOERR;
 M[0] = 077777771;                                       /* -7B */
 M[1] = 007100000;                                       /* LDX 0 */
 M[2] = 000203226;                                       /* EOM 3226B */
@@ -346,4 +341,3 @@ M[4] = 000100002;                                       /* BRU 2 */
 P = 1;                                                  /* start at 1 */
 return SCPE_OK;
 }
-#endif
