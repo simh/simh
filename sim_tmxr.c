@@ -1238,13 +1238,6 @@ if ((lp->destination) && (!lp->serport)) {
         }
     }
 tmxr_init_line (lp);                                /* initialize line state */
-if (lp->mp->uptr) {
-    /* Revise the unit's connect string to reflect the current attachments */
-    lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
-    /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
-    if (lp->mp->uptr->filename == NULL)
-        tmxr_detach (lp->mp, lp->mp->uptr);
-    }
 return SCPE_OK;
 }
 
@@ -2014,7 +2007,7 @@ if (lp->sock) {                             /* if existing tcp, drop it */
 if (close_connecting) {
     free (lp->destination);
     lp->destination = NULL;
-    if (lp->connecting) {      /* if existing outgoing tcp, drop it */
+    if (lp->connecting) {                   /* if existing outgoing tcp, drop it */
         lp->sock = lp->connecting;
         lp->connecting = 0;
         tmxr_reset_ln (lp);
@@ -2031,6 +2024,13 @@ if (lp->serport) {                          /* close current serial connection *
     lp->destination = NULL;
     }
 tmxr_set_line_loopback (lp, FALSE);
+if ((lp->mp->uptr) && ((lp->uptr == NULL) || (lp->uptr == lp->mp->uptr))) {
+    /* Revise the unit's connect string to reflect the current attachments */
+    lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
+    /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
+    if (lp->mp->uptr->filename == NULL)
+        tmxr_detach (lp->mp, lp->mp->uptr);
+    }
 }
 
 t_stat tmxr_detach_ln (TMLN *lp)
