@@ -3516,32 +3516,22 @@ for (i=0; i < strlen(RelativeParentVHDPath); i++)
     RelativeParentVHDPathUnicode[i*2] = RelativeParentVHDPath[i];
 hVHD->Dynamic.ParentTimeStamp = ParentTimeStamp;
 memcpy (hVHD->Dynamic.ParentUniqueID, ParentFooter.UniqueID, sizeof (hVHD->Dynamic.ParentUniqueID));
-hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataSpace = NtoHl (BytesPerSector);
-hVHD->Dynamic.ParentLocatorEntries[7].Reserved = 0;
-hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
-++LocatorsWritten;
-memcpy (hVHD->Dynamic.ParentLocatorEntries[6].PlatformCode, "Wi2k", 4);
-hVHD->Dynamic.ParentLocatorEntries[6].PlatformDataSpace = NtoHl (BytesPerSector);
-hVHD->Dynamic.ParentLocatorEntries[6].Reserved = 0;
-hVHD->Dynamic.ParentLocatorEntries[6].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
+/* There are two potential parent locators on current vhds */
+memcpy (hVHD->Dynamic.ParentLocatorEntries[0].PlatformCode, "W2ku", 4);
+hVHD->Dynamic.ParentLocatorEntries[0].PlatformDataSpace = NtoHl (BytesPerSector);
+hVHD->Dynamic.ParentLocatorEntries[0].PlatformDataLength = NtoHl ((uint32)(2*strlen(FullParentVHDPath)));
+hVHD->Dynamic.ParentLocatorEntries[0].Reserved = 0;
+hVHD->Dynamic.ParentLocatorEntries[0].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
 ++LocatorsWritten;
 if (RelativeMatch) {
-    memcpy (hVHD->Dynamic.ParentLocatorEntries[7].PlatformCode, "Wi2r", 4);
-    hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataLength = NtoHl ((uint32)(strlen(RelativeParentVHDPath)));
-    memcpy (hVHD->Dynamic.ParentLocatorEntries[5].PlatformCode, "W2ru", 4);
-    hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataSpace = NtoHl (BytesPerSector);
-    hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataLength = NtoHl ((uint32)(2*strlen(RelativeParentVHDPath)));
-    hVHD->Dynamic.ParentLocatorEntries[5].Reserved = 0;
-    hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
+    memcpy (hVHD->Dynamic.ParentLocatorEntries[1].PlatformCode, "W2ru", 4);
+    hVHD->Dynamic.ParentLocatorEntries[1].PlatformDataSpace = NtoHl (BytesPerSector);
+    hVHD->Dynamic.ParentLocatorEntries[1].PlatformDataLength = NtoHl ((uint32)(2*strlen(RelativeParentVHDPath)));
+    hVHD->Dynamic.ParentLocatorEntries[1].Reserved = 0;
+    hVHD->Dynamic.ParentLocatorEntries[1].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
     ++LocatorsWritten;
     }
-memcpy (hVHD->Dynamic.ParentLocatorEntries[4].PlatformCode, "W2ku", 4);
-hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataSpace = NtoHl (BytesPerSector);
-hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataLength = NtoHl ((uint32)(2*strlen(FullParentVHDPath)));
-hVHD->Dynamic.ParentLocatorEntries[4].Reserved = 0;
-hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
-++LocatorsWritten;
-hVHD->Dynamic.TableOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
+hVHD->Dynamic.TableOffset = NtoHll (((LocatorPosition+LocatorsWritten*BytesPerSector + VHD_DATA_BLOCK_ALIGNMENT - 1)/VHD_DATA_BLOCK_ALIGNMENT)*VHD_DATA_BLOCK_ALIGNMENT);
 hVHD->Dynamic.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Dynamic, sizeof(hVHD->Dynamic)));
 hVHD->Footer.Checksum = 0;
 hVHD->Footer.DiskType = NtoHl (VHD_DT_Differencing);
@@ -3580,39 +3570,21 @@ if (WriteFilePosition (hVHD->File,
     Status = errno;
     goto Cleanup_Return;
     }
-if (hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataLength)
-    if (WriteFilePosition (hVHD->File,
-                           RelativeParentVHDPath,
-                           BytesPerSector,
-                           NULL,
-                           NtoHll (hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataOffset))) {
-        Status = errno;
-        goto Cleanup_Return;
-        }
-if (hVHD->Dynamic.ParentLocatorEntries[6].PlatformDataLength)
-    if (WriteFilePosition (hVHD->File,
-                           FullParentVHDPath,
-                           BytesPerSector,
-                           NULL,
-                           NtoHll (hVHD->Dynamic.ParentLocatorEntries[6].PlatformDataOffset))) {
-        Status = errno;
-        goto Cleanup_Return;
-        }
-if (hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataLength)
-    if (WriteFilePosition (hVHD->File,
-                           RelativeParentVHDPathUnicode,
-                           BytesPerSector,
-                           NULL,
-                           NtoHll (hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataOffset))) {
-        Status = errno;
-        goto Cleanup_Return;
-        }
-if (hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataLength)
+if (hVHD->Dynamic.ParentLocatorEntries[0].PlatformDataLength)
     if (WriteFilePosition (hVHD->File,
                            FullParentVHDPathUnicode,
                            BytesPerSector,
                            NULL,
-                           NtoHll (hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataOffset))) {
+                           NtoHll (hVHD->Dynamic.ParentLocatorEntries[0].PlatformDataOffset))) {
+        Status = errno;
+        goto Cleanup_Return;
+        }
+if (hVHD->Dynamic.ParentLocatorEntries[1].PlatformDataLength)
+    if (WriteFilePosition (hVHD->File,
+                           RelativeParentVHDPathUnicode,
+                           BytesPerSector,
+                           NULL,
+                           NtoHll (hVHD->Dynamic.ParentLocatorEntries[1].PlatformDataOffset))) {
         Status = errno;
         goto Cleanup_Return;
         }
