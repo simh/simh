@@ -36,6 +36,7 @@
 
 /* Constants */
 
+#define RAD_CHAN        CHAN_E                          /* Connected I/O controller */
 #define RAD_NUMWD       64                              /* words/sector */
 #define RAD_NUMSC       64                              /* sectors/track */
 #define RAD_NUMTR       64                              /* tracks/log unit */
@@ -69,6 +70,7 @@ DSPT rad_tplt[] = {                                     /* template */
 DEVICE rad_dev;
 t_stat rad_svc (UNIT *uptr);
 t_stat rad_reset (DEVICE *dptr);
+t_stat rad_boot (int32 unitno, DEVICE *dptr);
 t_stat rad_fill (int32 sba);
 void rad_end_op (int32 fl);
 int32 rad_adjda (int32 sba, int32 inc);
@@ -76,12 +78,13 @@ t_stat rad (uint32 fnc, uint32 inst, uint32 *dat);
 
 /* RAD data structures
 
+   rad_dib      device information block
    rad_dev      device descriptor
    rad_unit     unit descriptor
    rad_reg      register list
 */
 
-DIB rad_dib = { CHAN_E, DEV_RAD, XFR_RAD, rad_tplt, &rad };
+DIB rad_dib = { RAD_CHAN, DEV_RAD, XFR_RAD, rad_tplt, &rad };
 
 UNIT rad_unit = {
     UDATA (&rad_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
@@ -111,7 +114,7 @@ DEVICE rad_dev = {
     "RAD", &rad_unit, rad_reg, rad_mod,
     1, 8, 21, 1, 8, 24,
     NULL, NULL, &rad_reset,
-    NULL, NULL, NULL,
+    &rad_boot, NULL, NULL,
     &rad_dib, DEV_DISABLE
     };
 
@@ -317,5 +320,24 @@ rad_da = 0;
 rad_sba = 0;
 xfr_req = xfr_req & ~XFR_RAD;                           /* clr xfr req */
 sim_cancel (&rad_unit);                                 /* deactivate */
+return SCPE_OK;
+}
+
+/* Boot routine - simulate FILL console command */
+
+t_stat rad_boot (int32 unitno, DEVICE *dptr)
+{
+extern uint32 P, M[];
+
+if (unitno)                                             /* only unit 0 */
+    return SCPE_ARG;
+if (rad_dib.chan != CHAN_W)                             /* only on W channel */
+    return SCPE_IOERR;
+M[0] = 077777771;                                       /* -7B */
+M[1] = 007100000;                                       /* LDX 0 */
+M[2] = 000203226;                                       /* EOM 3226B */
+M[3] = 003200002;                                       /* WIM 2 */
+M[4] = 000100002;                                       /* BRU 2 */
+P = 1;                                                  /* start at 1 */
 return SCPE_OK;
 }

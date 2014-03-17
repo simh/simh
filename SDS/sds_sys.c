@@ -234,7 +234,7 @@ for (i = 0; i < 8; i++) {                               /* read boot */
 if ((buf[0] != 023200012) ||                            /* 2 = WIM 12,2 */
     (buf[1] != 004100002) ||                            /* 3 = BRX 2 */
     (buf[2] != 007100011) ||                            /* 4 = LDX 11 */
-    (buf[3] != 023200000) ||                            /* 5 = WIM 0,2 */
+    ((buf[3] & ~VA_MASK) != 023200000) ||               /* 5 = WIM xxxxx,2 */
     (buf[4] != 004021000) ||                            /* 6 = SKS 21000 */
     (buf[5] != 004100005))                              /* 7 = BRX 5 */
     return SCPE_FMT;
@@ -242,7 +242,7 @@ for (i = 0; i < 8; i++)                                 /* copy boot */
     M[i + 2] = buf[i];
 if (I_GETOP (buf[6]) == BRU)
     P = buf[6] & VA_MASK;
-for (i = buf[7] & VA_MASK; i <= VA_MASK; i++) {         /* load data */
+for (i = (buf[3]+buf[7]) & VA_MASK; i <= VA_MASK; i++) {/* load data */
     if ((wd = get_word (fileref, &ldr)) < 0)
         return SCPE_OK;
     M[i] = wd;
