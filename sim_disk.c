@@ -1461,11 +1461,11 @@ if ((namebuf = (char *) malloc (1 + strlen (uptr->filename))) == NULL) {
     }
 strcpy (namebuf, uptr->filename);
 if ((c = strrchr (namebuf, '/')))
-    strcpy (namebuf, c+1);
+    memcpy (namebuf, c+1, strlen(c+1)+1);
 if ((c = strrchr (namebuf, '\\')))
-    strcpy (namebuf, c+1);
+    memcpy (namebuf, c+1, strlen(c+1)+1);
 if ((c = strrchr (namebuf, ']')))
-    strcpy (namebuf, c+1);
+    memcpy (namebuf, c+1, strlen(c+1)+1);
 packid = eth_crc32(0, namebuf, strlen (namebuf));
 buf[0] = (uint16)packid;
 buf[1] = (uint16)(packid >> 16) & 0x7FFF;   /* Make sure MSB is clear */
@@ -3373,7 +3373,7 @@ if ((szFileSpec[0] != '/') || (strchr (szFileSpec, ':')))
 else
     strncpy (szFullFileSpecBuffer, szFileSpec, BufferSize);
 if ((c = strstr (szFullFileSpecBuffer, "]/")))
-    strcpy (c+1, c+2);
+    memcpy (c+1, c+2, strlen(c+2)+1);
 memset (szFullFileSpecBuffer + strlen (szFullFileSpecBuffer), 0, BufferSize - strlen (szFullFileSpecBuffer));
 #endif
 }
@@ -3386,6 +3386,8 @@ HostPathToVhdPath (const char *szHostPath,
 char *c, *d;
 
 strncpy (szVhdPath, szHostPath, VhdPathSize-1);
+if ((szVhdPath[1] == ':') && islower(szVhdPath[0]))
+    szVhdPath[0] = toupper(szVhdPath[0]);
 szVhdPath[VhdPathSize-1] = '\0';
 if ((c = strrchr (szVhdPath, ']'))) {
     *c = '\0';
@@ -3399,14 +3401,14 @@ if ((c = strrchr (szVhdPath, ']'))) {
 while ((c = strchr (szVhdPath, '/')))
     *c = '\\';
 for (c = strstr (szVhdPath, "\\.\\"); c; c = strstr (szVhdPath, "\\.\\"))
-    strcpy (c, c+2);
+    memcpy (c, c+2, strlen(c+2)+1);
 for (c = strstr (szVhdPath, "\\\\"); c; c = strstr (szVhdPath, "\\\\"))
-    strcpy (c, c+1);
+    memcpy (c, c+1, strlen(c+1)+1);
 while ((c = strstr (szVhdPath, "\\..\\"))) {
     *c = '\0';
     d = strrchr (szVhdPath, '\\');
     if (d)
-        strcpy (d, c+3);
+        memcpy (d, c+3, strlen(c+3)+1);
     else
         return d;
     }
@@ -3460,6 +3462,7 @@ char *FullParentVHDPath = NULL;
 char *RelativeParentVHDPathUnicode = NULL;
 char *FullParentVHDPathUnicode = NULL;
 char *FullVHDPath = NULL;
+char *TempPath = NULL;
 size_t i, RelativeMatch, UpDirectories, LocatorsWritten = 0;
 int64 LocatorPosition;
 
@@ -3486,14 +3489,15 @@ FullParentVHDPath = (char*) calloc (1, BytesPerSector+2);
 RelativeParentVHDPathUnicode = (char*) calloc (1, BytesPerSector+2);
 FullParentVHDPathUnicode = (char*) calloc (1, BytesPerSector+2);
 FullVHDPath = (char*) calloc (1, BytesPerSector+2);
-ExpandToFullPath (szParentVHDPath, FullParentVHDPath, BytesPerSector);
-HostPathToVhdPath (FullParentVHDPath, FullParentVHDPath, BytesPerSector);
+TempPath = (char*) calloc (1, BytesPerSector+2);
+ExpandToFullPath (szParentVHDPath, TempPath, BytesPerSector);
+HostPathToVhdPath (TempPath, FullParentVHDPath, BytesPerSector);
 for (i=0; i < strlen (FullParentVHDPath); i++)
     hVHD->Dynamic.ParentUnicodeName[i*2+1] = FullParentVHDPath[i];  /* Big Endian Unicode */
 for (i=0; i < strlen (FullParentVHDPath); i++)
     FullParentVHDPathUnicode[i*2] = FullParentVHDPath[i];           /* Little Endian Unicode */
-ExpandToFullPath (szVHDPath, FullVHDPath, BytesPerSector);
-HostPathToVhdPath (FullVHDPath, FullVHDPath, BytesPerSector);
+ExpandToFullPath (szVHDPath, TempPath, BytesPerSector);
+HostPathToVhdPath (TempPath, FullVHDPath, BytesPerSector);
 for (i=0, RelativeMatch=UpDirectories=0; i<strlen(FullVHDPath); i++)
     if (FullVHDPath[i] == '\\') {
         if (memcmp (FullVHDPath, FullParentVHDPath, i+1))
@@ -3532,6 +3536,7 @@ if (RelativeMatch) {
     ++LocatorsWritten;
     }
 hVHD->Dynamic.TableOffset = NtoHll (((LocatorPosition+LocatorsWritten*BytesPerSector + VHD_DATA_BLOCK_ALIGNMENT - 1)/VHD_DATA_BLOCK_ALIGNMENT)*VHD_DATA_BLOCK_ALIGNMENT);
+hVHD->Dynamic.Checksum = 0;
 hVHD->Dynamic.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Dynamic, sizeof(hVHD->Dynamic)));
 hVHD->Footer.Checksum = 0;
 hVHD->Footer.DiskType = NtoHl (VHD_DT_Differencing);
@@ -3595,6 +3600,7 @@ free (FullParentVHDPath);
 free (RelativeParentVHDPathUnicode);
 free (FullParentVHDPathUnicode);
 free (FullVHDPath);
+free (TempPath);
 sim_vhd_disk_close ((FILE *)hVHD);
 hVHD = NULL;
 if (Status) {
