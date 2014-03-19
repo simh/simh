@@ -1237,8 +1237,6 @@ dup_desc.dptr = DUPDPTR;                                /* Connect appropriate d
 dup_desc.uptr = dup_units+dup_desc.lines;               /* Identify polling unit */
 sim_cancel (dup_units+dup_desc.lines);                  /* stop poll */
 ndev = ((dptr->flags & DEV_DIS)? 0: dup_desc.lines );
-if (ndev)
-    sim_activate_after (dup_units+dup_desc.lines, DUP_CONNECT_POLL*1000000);
 return auto_config (dptr->name, ndev);                  /* auto config */
 }
 

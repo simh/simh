@@ -3714,7 +3714,6 @@ if (!(dptr->flags & DEV_DIS)) {
             dmc_process_master_clear(controller);
             }
         }
-    sim_activate_after (dptr->units+dptr->numunits-2, DMC_CONNECT_POLL*1000000);/* start poll */
     }
 
 return ans;
@@ -3767,8 +3766,10 @@ uptr->flags &= ~UNIT_ATT;
 for (i=attached=0; i<mp->lines; i++)
     if (dptr->units[i].flags & UNIT_ATT)
         ++attached;
-if (!attached)
+if (!attached) {
     sim_cancel (dptr->units+mp->lines);              /* stop poll on last detach */
+    sim_cancel (dptr->units+(mp->lines+1));          /* stop timer on last detach */
+    }
 free (uptr->filename);
 uptr->filename = NULL;
 return tmxr_detach_ln (lp);
