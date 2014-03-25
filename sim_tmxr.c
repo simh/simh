@@ -2024,7 +2024,7 @@ if (lp->serport) {                          /* close current serial connection *
     lp->destination = NULL;
     }
 tmxr_set_line_loopback (lp, FALSE);
-if ((lp->mp->uptr) && ((lp->uptr == NULL) || (lp->uptr == lp->mp->uptr))) {
+if ((lp->mp) && (lp->mp->uptr) && ((lp->uptr == NULL) || (lp->uptr == lp->mp->uptr))) {
     /* Revise the unit's connect string to reflect the current attachments */
     lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
     /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
