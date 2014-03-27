@@ -1191,7 +1191,8 @@ return SCPE_OK;
 
 static t_stat dup_reset (DEVICE *dptr)
 {
-int32 i, ndev;
+t_stat r;
+int32 i, ndev, attached = 0;
 
 sim_debug(DBG_TRC, dptr, "dup_reset()\n");
 
@@ -1216,8 +1217,11 @@ if ((!UNIBUS) && (dptr == &dup_dev)) {
 
 if (dup_ldsc == NULL) {                                 /* First time startup */
     dup_desc.ldsc = dup_ldsc = (TMLN *)calloc (dup_desc.lines, sizeof(*dup_ldsc));
-    for (i = 0; i < dup_desc.lines; i++)                    /* init each line */
+    for (i = 0; i < dup_desc.lines; i++) {              /* init each line */
         dup_units[i] = dup_unit_template;
+        if (dup_units[i].flags & UNIT_ATT)
+            ++attached;
+        }
     dup_units[dup_desc.lines] = dup_poll_unit_template;
     /* Initialize to standard factory Option Jumper Settings */
     for (i = 0; i < DUP_LINES; i++) {
@@ -1237,7 +1241,10 @@ dup_desc.dptr = DUPDPTR;                                /* Connect appropriate d
 dup_desc.uptr = dup_units+dup_desc.lines;               /* Identify polling unit */
 sim_cancel (dup_units+dup_desc.lines);                  /* stop poll */
 ndev = ((dptr->flags & DEV_DIS)? 0: dup_desc.lines );
-return auto_config (dptr->name, ndev);                  /* auto config */
+r = auto_config (dptr->name, ndev);                     /* auto config */
+if ((r == SCPE_OK) && (attached))
+    sim_activate_after (dup_units+dup_desc.lines, DUP_CONNECT_POLL*1000000);/* start poll */
+return r;
 }
 
 static t_stat dup_attach (UNIT *uptr, char *cptr)
