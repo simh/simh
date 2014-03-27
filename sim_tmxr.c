@@ -2265,32 +2265,26 @@ while (*tptr) {
                     }
                 }
             }
-        if (unbuffered) {
-            if (mp->buffered) {
-                mp->buffered = 0;
-                for (i = 0; i < mp->lines; i++) { /* default line buffers */
-                    lp = mp->ldsc + i;
-                    lp->rxbsz = TMXR_MAXBUF;
-                    lp->rxb = (char *)realloc(lp->rxb, lp->rxbsz);
-                    lp->rbr = (char *)realloc(lp->rbr, lp->rxbsz);
-                    lp->txbsz = TMXR_MAXBUF;
-                    lp->txb = (char *)realloc(lp->txb, lp->txbsz);
-                    lp->txbfd = lp->txbpi = lp->txbpr = 0;
-                    }
-                }
-            }
-        if (buffered[0]) {
+        if ((unbuffered) && (mp->buffered))
+            mp->buffered = 0;
+        if (buffered[0])
             mp->buffered = atoi(buffered);
-            for (i = 0; i < mp->lines; i++) { /* initialize line buffers */
-                lp = mp->ldsc + i;
+        for (i = 0; i < mp->lines; i++) { /* initialize line buffers */
+            lp = mp->ldsc + i;
+            if (mp->buffered) {
                 lp->txbsz = mp->buffered;
                 lp->txbfd = 1;
-                lp->txb = (char *)realloc(lp->txb, lp->txbsz);
-                lp->txbpi = lp->txbpr = 0;
                 lp->rxbsz = mp->buffered;
-                lp->rxb = (char *)realloc(lp->rxb, lp->rxbsz);
-                lp->rbr = (char *)realloc(lp->rbr, lp->rxbsz);
                 }
+            else {
+                lp->txbsz = TMXR_MAXBUF;
+                lp->txbfd = 0;
+                lp->rxbsz = TMXR_MAXBUF;
+                }
+            lp->txbpi = lp->txbpr = 0;
+            lp->txb = (char *)realloc(lp->txb, lp->txbsz);
+            lp->rxb = (char *)realloc(lp->rxb, lp->rxbsz);
+            lp->rbr = (char *)realloc(lp->rbr, lp->rxbsz);
             }
         if (nolog) {
             mp->logfiletmpl[0] = '\0';
@@ -2429,23 +2423,18 @@ while (*tptr) {
                 return r;
                 }
             }
-        if (unbuffered) {
-            lp->txbsz = TMXR_MAXBUF;
-            lp->txb = (char *)realloc (lp->txb, lp->txbsz);
-            lp->txbfd = lp->txbpi = lp->txbpr = 0;
-            lp->rxbsz = lp->txbsz;
-            lp->rxb = (char *)realloc(lp->rxb, lp->rxbsz);
-            lp->rbr = (char *)realloc(lp->rbr, lp->rxbsz);
+        if ((unbuffered) || (buffered[0] == '\0')) {
+            lp->rxbsz = lp->txbsz = TMXR_MAXBUF;
+            lp->txbfd = 0;
             }
-        if (buffered[0]) {
-            lp->txbsz = atoi(buffered);
+        else {
+            lp->rxbsz = lp->txbsz = atoi(buffered);
             lp->txbfd = 1;
-            lp->txb = (char *)realloc (lp->txb, lp->txbsz);
-            lp->txbpi = lp->txbpr = 0;
-            lp->rxbsz = lp->txbsz;
-            lp->rxb = (char *)realloc(lp->rxb, lp->rxbsz);
-            lp->rbr = (char *)realloc(lp->rbr, lp->rxbsz);
             }
+        lp->txbpi = lp->txbpr = 0;
+        lp->txb = (char *)realloc (lp->txb, lp->txbsz);
+        lp->rxb = (char *)realloc(lp->rxb, lp->rxbsz);
+        lp->rbr = (char *)realloc(lp->rbr, lp->rxbsz);
         if (nolog) {
             free(lp->txlogname);
             lp->txlogname = NULL;
@@ -3395,6 +3384,7 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
         free (lp->port);
         lp->port = NULL;
         }
+    lp->txbfd = 0;
     free (lp->txb);
     lp->txb = NULL;
     free (lp->rxb);
