@@ -2705,8 +2705,7 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
     char buf[32];
 
     eth_mac_fmt(&xq->var->mac, buf);     /* format ethernet mac address */
-    printf("%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
-    if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
+    sim_printf("%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     eth_close(xq->var->etherface);
     free(tptr);
     free(xq->var->etherface);

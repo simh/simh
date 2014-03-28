@@ -1514,7 +1514,7 @@ controller->control_out_operations_completed = 0;
 controller->ddcmp_control_packets_received = 0;
 controller->ddcmp_control_packets_sent = 0;
 
-printf("Statistics reset\n" );
+sim_printf("Statistics reset\n");
 
 return SCPE_OK;
 }
@@ -2568,6 +2568,15 @@ if (!buffer) {
         dmc_showstats (sim_log, controller->unit, 0, NULL);
         dmc_showddcmp (sim_log, controller->unit, 0, NULL);
         fflush (sim_log);
+        }
+    if (sim_deb) {
+        fprintf (sim_deb, "DDCMP Buffer allocation failure.\n");
+        fprintf (sim_deb, "This is a fatal error which should never happen.\n");
+        fprintf (sim_deb, "Please submit this output when you report this bug.\n");
+        dmc_showqueues (sim_deb, controller->unit, 0, NULL);
+        dmc_showstats (sim_deb, controller->unit, 0, NULL);
+        dmc_showddcmp (sim_deb, controller->unit, 0, NULL);
+        fflush (sim_deb);
         }
     return buffer;
     }
@@ -3741,9 +3750,7 @@ if (!cptr || !*cptr)
 if (!(uptr->flags & UNIT_ATTABLE))
     return SCPE_NOATT;
 if (!peer[0]) {
-    printf ("Peer must be specified before attach\n");
-    if (sim_log)
-        fprintf (sim_log, "Peer must be specified before attach\n");
+    sim_printf ("Peer must be specified before attach\n");
     return SCPE_ARG;
     }
 sprintf (attach_string, "Line=%d,Connect=%s,%s", dmc, peer, cptr);

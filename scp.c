@@ -1717,11 +1717,8 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         if (cmdp && (cmdp->message))                    /* special message handler? */
             cmdp->message (NULL, stat);                 /* let it deal with display */
         else
-            if (stat >= SCPE_BASE) {                    /* error? */
-                printf ("%s\n", sim_error_text (stat));
-                if (sim_log)
-                    fprintf (sim_log, "%s\n", sim_error_text (stat));
-                }
+            if (stat >= SCPE_BASE)                      /* error? */
+                sim_printf ("%s\n", sim_error_text (stat));
         }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
@@ -2297,6 +2294,8 @@ if ((cptr == NULL) || (strlen (cptr) == 0))
 fflush(stdout);                                         /* flush stdout */
 if (sim_log)                                            /* flush log if enabled */
     fflush (sim_log);
+if (sim_deb)                                            /* flush debug if enabled */
+    fflush (sim_deb);
 status = system (cptr);
 #if defined (VMS)
 printf ("\n");
@@ -4041,7 +4040,7 @@ if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
 sim_trim_endspc(cptr);
 if (chdir(cptr) != 0) {
-    printf("Unable to change to: %s\n", cptr);
+    sim_printf("Unable to directory change to: %s\n", cptr);
     return SCPE_IOERR & SCPE_NOMESSAGE;
     } 
 return SCPE_OK;
@@ -4087,57 +4086,37 @@ if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
     else {
         getcwd(DirName, PATH_MAX);
         }
-    printf (" Directory of %s\n\n", DirName);
-    if (sim_log)
-        fprintf (sim_log, " Directory of %s\n\n", DirName);
+    sim_printf (" Directory of %s\n\n", DirName);
     do {
         FileSize = (((t_int64)(File.nFileSizeHigh)) << 32) | File.nFileSizeLow;
         sprintf (FileName, "%s%c%s", DirName, pathsep, File.cFileName);
         stat (FileName, &filestat);
         local = localtime (&filestat.st_mtime);
-        printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
-        if (sim_log)
-            fprintf (sim_log, "%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+        sim_printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
         if (filestat.st_mode & S_IFDIR) {
             ++DirCount;
-            printf ("   <DIR>         ");
-            if (sim_log)
-                fprintf (sim_log, "   <DIR>         ");
+            sim_printf ("   <DIR>         ");
             }
         else {
             if (filestat.st_mode & S_IFREG) {
                 ++FileCount;
-                fprint_val (stdout, (t_value) FileSize, 10, 17, PV_RCOMMA);
-                if (sim_log)
-                    fprint_val (sim_log, (t_value) FileSize, 10, 17, PV_RCOMMA);
+                sim_print_val ((t_value) FileSize, 10, 17, PV_RCOMMA);
                 TotalSize += FileSize;
                 }
             else {
-                printf ("%17s", "");
-                if (sim_log)
-                    fprintf (sim_log, "%17s", "");
+                sim_printf ("%17s", "");
                 }
             }
-        printf (" %s\n", File.cFileName);
-        if (sim_log)
-            fprintf (sim_log, " %s\n", File.cFileName);
+        sim_printf (" %s\n", File.cFileName);
         } while (FindNextFile (hFind, &File));
-    printf ("%16d File(s)", FileCount);
-    fprint_val (stdout, (t_value) TotalSize, 10, 15, PV_RCOMMA);
-    printf (" bytes\n");
-    printf ("%16d Dir(s)\n", DirCount);
-    if (sim_log) {
-        fprintf (sim_log, "%16d File(s)", FileCount);
-        fprint_val (sim_log, (t_value) TotalSize, 10, 15, PV_RCOMMA);
-        fprintf (sim_log, " bytes\n");
-        fprintf (sim_log, "%16d Dir(s)\n", DirCount);
-        }
+    sim_printf ("%16d File(s)", FileCount);
+    sim_print_val ((t_value) TotalSize, 10, 15, PV_RCOMMA);
+    sim_printf (" bytes\n");
+    sim_printf ("%16d Dir(s)\n", DirCount);
     FindClose (hFind);
     }
 else {
-    printf ("Can't list files for %s\n", cptr);
-    if (sim_log)
-        fprintf (sim_log, "Can't list files for %s\n", cptr);
+    sim_printf ("Can't list files for %s\n", cptr);
     return SCPE_ARG;
     }
 return SCPE_OK;
@@ -4227,9 +4206,7 @@ if (dir) {
 #endif
 
     MatchName = 1 + strrchr (cptr, '/');
-    printf (" Directory of %s\n\n", DirName[0] ? DirName : "/");
-    if (sim_log)
-        fprintf (sim_log, " Directory of %s\n\n", DirName[0] ? DirName : "/");
+    sim_printf (" Directory of %s\n\n", DirName[0] ? DirName : "/");
 #if defined (HAVE_GLOB)
     for (i=0; i<paths.gl_pathc; i++) {
         sprintf (FileName, "%s", paths.gl_pathv[i]);
@@ -4243,51 +4220,33 @@ if (dir) {
 #endif
         stat (FileName, &filestat);
         local = localtime (&filestat.st_mtime);
-        printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
-        if (sim_log)
-            fprintf (sim_log, "%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+        sim_printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
         if (filestat.st_mode & S_IFDIR) {
             ++DirCount;
-            printf ("   <DIR>         ");
-            if (sim_log)
-                fprintf (sim_log, "   <DIR>         ");
+            sim_printf ("   <DIR>         ");
             }
         else {
             if (filestat.st_mode & S_IFREG) {
                 ++FileCount;
                 FileSize = sim_fsize_name_ex (FileName);
-                fprint_val (stdout, (t_value) FileSize, 10, 17, PV_RCOMMA);
-                if (sim_log)
-                    fprint_val (sim_log, (t_value) FileSize, 10, 17, PV_RCOMMA);
+                sim_print_val ((t_value) FileSize, 10, 17, PV_RCOMMA);
                 TotalSize += FileSize;
                 }
             else {
-                printf ("%17s", "");
-                if (sim_log)
-                    fprintf (sim_log, "%17s", "");
+                sim_printf ("%17s", "");
                 }
             }
         c = strrchr (FileName, '/');
-        printf (" %s\n", c ? c + 1 : FileName);
-        if (sim_log)
-            fprintf (sim_log, " %s\n", c ? c + 1 : FileName);
+        sim_printf (" %s\n", c ? c + 1 : FileName);
         }
     if (FileCount) {
-        printf ("%16d File(s)", FileCount);
-        fprint_val (stdout, (t_value) TotalSize, 10, 15, PV_RCOMMA);
-        printf (" bytes\n");
-        printf ("%16d Dir(s)\n", DirCount);
-        if (sim_log) {
-            fprintf (sim_log, "%16d File(s)", FileCount);
-            fprint_val (sim_log, (t_value) TotalSize, 10, 15, PV_RCOMMA);
-            fprintf (sim_log, " bytes\n");
-            fprintf (sim_log, "%16d Dir(s)\n", DirCount);
-            }
+        sim_printf ("%16d File(s)", FileCount);
+        sim_print_val ((t_value) TotalSize, 10, 15, PV_RCOMMA);
+        sim_printf (" bytes\n");
+        sim_printf ("%16d Dir(s)\n", DirCount);
         }
     else {
-        printf ("File Not Found\n");
-        if (sim_log)
-            fprintf (sim_log, "File Not Found\n");
+        sim_printf ("File Not Found\n");
         }
 #if defined (HAVE_GLOB)
     globfree (&paths);
@@ -4296,9 +4255,7 @@ if (dir) {
 #endif
     }
 else {
-    printf ("Can't list files for %s\n", cptr);
-    if (sim_log)
-        fprintf (sim_log, "Can't list files for %s\n", cptr);
+    sim_printf ("Can't list files for %s\n", cptr);
     return SCPE_ARG;
     }
 return SCPE_OK;
@@ -4569,9 +4526,7 @@ if (sim_switches & SWMASK ('R')) {                      /* read only? */
         return attach_err (uptr, SCPE_OPENERR);         /* yes, error */
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
     if (!sim_quiet) {
-        printf ("%s: unit is read only\n", sim_dname (dptr));
-        if (sim_log)
-            fprintf (sim_log, "%s: unit is read only\n", sim_dname (dptr));
+        sim_printf ("%s: unit is read only\n", sim_dname (dptr));
         }
     }
 else {
@@ -4580,9 +4535,7 @@ else {
         if (uptr->fileref == NULL)                      /* open fail? */
             return attach_err (uptr, SCPE_OPENERR);     /* yes, error */
         if (!sim_quiet) {
-            printf ("%s: creating new file\n", sim_dname (dptr));
-            if (sim_log)
-                fprintf (sim_log, "%s: creating new file\n", sim_dname (dptr));
+            sim_printf ("%s: creating new file\n", sim_dname (dptr));
             }
         }
     else {                                              /* normal */
@@ -4600,9 +4553,7 @@ else {
                     return attach_err (uptr, SCPE_OPENERR); /* yes, error */
                 uptr->flags = uptr->flags | UNIT_RO;    /* set rd only */
                 if (!sim_quiet) {
-                    printf ("%s: unit is read only\n", sim_dname (dptr));
-                    if (sim_log)
-                        fprintf (sim_log, "%s: unit is read only\n", sim_dname (dptr));
+                    sim_printf ("%s: unit is read only\n", sim_dname (dptr));
                     }
                 }
             else {                                      /* doesn't exist */
@@ -4612,9 +4563,7 @@ else {
                 if (uptr->fileref == NULL)              /* open fail? */
                     return attach_err (uptr, SCPE_OPENERR); /* yes, error */
                 if (!sim_quiet) {
-                    printf ("%s: creating new file\n", sim_dname (dptr));
-                    if (sim_log)
-                        fprintf (sim_log, "%s: creating new file\n", sim_dname (dptr));
+                    sim_printf ("%s: creating new file\n", sim_dname (dptr));
                     }
                 }
             }                                           /* end if null */
@@ -4627,9 +4576,7 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
     if (uptr->filebuf == NULL)                          /* no buffer? */
         return attach_err (uptr, SCPE_MEM);             /* error */
     if (!sim_quiet) {
-        printf ("%s: buffering file in memory\n", sim_dname (dptr));
-        if (sim_log)
-            fprintf (sim_log, "%s: buffering file in memory\n", sim_dname (dptr));
+        sim_printf ("%s: buffering file in memory\n", sim_dname (dptr));
         }
     uptr->hwmark = (uint32)sim_fread (uptr->filebuf,    /* read file */
         SZ_D (dptr), cap, uptr->fileref);
@@ -4745,9 +4692,7 @@ if (uptr->flags & UNIT_BUF) {
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
     if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {
         if (!sim_quiet) {
-            printf ("%s: writing buffer to file\n", sim_dname (dptr));
-            if (sim_log)
-                fprintf (sim_log, "%s: writing buffer to file\n", sim_dname (dptr));
+            sim_printf ("%s: writing buffer to file\n", sim_dname (dptr));
             }
         rewind (uptr->fileref);
         sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
@@ -5043,31 +4988,23 @@ if (strcmp (buf, save_vercur) == 0)                     /* version 3.5? */
 else if (strcmp (buf, save_ver32) == 0)                 /* version 3.2? */
     v32 = TRUE;
 else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
-    printf ("Invalid file version: %s\n", buf);
-    if (sim_log)
-        fprintf (sim_log, "Invalid file version: %s\n", buf);
+    sim_printf ("Invalid file version: %s\n", buf);
     return SCPE_INCOMP;
     }
 READ_S (buf);                                           /* read sim name */
 if (strcmp (buf, sim_name)) {                           /* name match? */
-    printf ("Wrong system type: %s\n", buf);
-    if (sim_log)
-        fprintf (sim_log, "Wrong system type: %s\n", buf);
+    sim_printf ("Wrong system type: %s\n", buf);
     return SCPE_INCOMP;
     }
 if (v35) {                                              /* [V3.5+] options */
     READ_S (buf);                                       /* integer size */
     if (strcmp (buf, sim_si64) != 0) {
-        printf ("Incompatible integer size, save file = %s\n", buf);
-        if (sim_log)
-            fprintf (sim_log, "Incompatible integer size, save file = %s\n", buf);
+        sim_printf ("Incompatible integer size, save file = %s\n", buf);
         return SCPE_INCOMP;
         }
     READ_S (buf);                                       /* address size */
     if (strcmp (buf, sim_sa64) != 0) {
-        printf ("Incompatible address size, save file = %s\n", buf);
-        if (sim_log)
-            fprintf (sim_log, "Incompatible address size, save file = %s\n", buf);
+        sim_printf ("Incompatible address size, save file = %s\n", buf);
         return SCPE_INCOMP;
         }
     READ_S (buf);                                       /* Ethernet */
@@ -5084,9 +5021,7 @@ for ( ;; ) {                                            /* device loop */
     if (buf[0] == 0)                                    /* last? */
         break;
     if ((dptr = find_dev (buf)) == NULL) {              /* locate device */
-        printf ("Invalid device name: %s\n", buf);
-        if (sim_log)
-            fprintf (sim_log, "Invalid device name: %s\n", buf);
+        sim_printf ("Invalid device name: %s\n", buf);
         return SCPE_INCOMP;
         }
     READ_S (buf);                                       /* [V3.0+] logical name */
@@ -5106,9 +5041,7 @@ for ( ;; ) {                                            /* device loop */
         if (unitno < 0)                                 /* end units? */
             break;
         if ((uint32) unitno >= dptr->numunits) {        /* too big? */
-            printf ("Invalid unit number: %s%d\n", sim_dname (dptr), unitno);
-            if (sim_log)
-                fprintf (sim_log, "Invalid unit number: %s%d\n", sim_dname (dptr), unitno);
+            sim_printf ("Invalid unit number: %s%d\n", sim_dname (dptr), unitno);
             return SCPE_INCOMP;
             }
         READ_I (time);                                  /* event time */
@@ -5157,9 +5090,7 @@ for ( ;; ) {                                            /* device loop */
         if (high > 0) {                                 /* [V2.5+] any memory? */
             if (((uptr->flags & (UNIT_FIX + UNIT_ATTABLE)) != UNIT_FIX) ||
                  (dptr->deposit == NULL)) {
-                printf ("Can't restore memory: %s%d\n", sim_dname (dptr), unitno);
-                if (sim_log)
-                    fprintf (sim_log, "Can't restore memory: %s%d\n", sim_dname (dptr), unitno);
+                sim_printf ("Can't restore memory: %s%d\n", sim_dname (dptr), unitno);
                 return SCPE_INCOMP;
                 }
             if (high != old_capac) {                    /* size change? */
@@ -5167,11 +5098,8 @@ for ( ;; ) {                                            /* device loop */
                 if ((dptr->flags & DEV_DYNM) &&
                     ((dptr->msize == NULL) ||
                      (dptr->msize (uptr, (int32) high, NULL, NULL) != SCPE_OK))) {
-                    printf ("Can't change memory size: %s%d\n",
-                        sim_dname (dptr), unitno);
-                    if (sim_log)
-                        fprintf (sim_log, "Can't change memory size: %s%d\n",
-                            sim_dname (dptr), unitno);
+                    sim_printf ("Can't change memory size: %s%d\n",
+                                sim_dname (dptr), unitno);
                     return SCPE_INCOMP;
                     }
                 uptr->capac = high;                     /* new memory size */
@@ -5219,28 +5147,21 @@ for ( ;; ) {                                            /* device loop */
             break;
         READ_I (depth);                                 /* [V2.10+] depth */
         if ((rptr = find_reg (buf, NULL, dptr)) == NULL) {
-            printf ("Invalid register name: %s %s\n", sim_dname (dptr), buf);
-            if (sim_log)
-                fprintf (sim_log, "Invalid register name: %s %s\n", sim_dname (dptr), buf);
+            sim_printf ("Invalid register name: %s %s\n", sim_dname (dptr), buf);
             for (us = 0; us < depth; us++) {            /* skip values */
                 READ_I (val);
                 }
             continue;
             }
         if (depth != rptr->depth) {                      /* [V2.10+] mismatch? */
-            printf ("Register depth mismatch: %s %s, file = %d, sim = %d\n",
-                sim_dname (dptr), buf, depth, rptr->depth);
-            if (sim_log)
-                fprintf (sim_log, "Register depth mismatch: %s %s, file = %d, sim = %d\n",
-                    sim_dname (dptr), buf, depth, rptr->depth);
+            sim_printf ("Register depth mismatch: %s %s, file = %d, sim = %d\n",
+                        sim_dname (dptr), buf, depth, rptr->depth);
             }
         mask = width_mask[rptr->width];                 /* get mask */
         for (us = 0; us < depth; us++) {                /* loop thru values */
             READ_I (val);                               /* read value */
             if (val > mask) {                           /* value ok? */
-                printf ("Invalid register value: %s %s\n", sim_dname (dptr), buf);
-                if (sim_log)
-                    fprintf (sim_log, "Invalid register value: %s %s\n", sim_dname (dptr), buf);
+                sim_printf ("Invalid register value: %s %s\n", sim_dname (dptr), buf);
                 }
             else if (us < rptr->depth)                  /* in range? */
                 put_rval (rptr, us, val);
@@ -5260,23 +5181,16 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
             (!stat(attnames[j], &fstat)))
             if (fstat.st_mtime > rstat.st_mtime + 30) {
                 r = SCPE_INCOMP;
-                printf ("Error Attaching %s to %s - the restore state is %d seconds older than the attach file\n", sim_dname (dptr), attnames[j], (int)(fstat.st_mtime - rstat.st_mtime));
-                printf ("restore with the -F switch to override this sanity check\n");
-                if (sim_log) {
-                    fprintf (sim_log, "Error Attaching %s to %s - the restore state is %d seconds older than the attach file\n", sim_dname (dptr), attnames[j], (int)(fstat.st_mtime - rstat.st_mtime));
-                    fprintf (sim_log, "restore with the -F switch to override this sanity check\n");
-                    }
+                sim_printf ("Error Attaching %s to %s - the restore state is %d seconds older than the attach file\n", sim_dname (dptr), attnames[j], (int)(fstat.st_mtime - rstat.st_mtime));
+                sim_printf ("restore with the -F switch to override this sanity check\n");
                 continue;
                 }
         saved_pos = attunits[j]->pos;
         sim_switches = attswitches[j];
         r = scp_attach_unit (dptr, attunits[j], attnames[j]);/* reattach unit */
         attunits[j]->pos = saved_pos;
-        if (r != SCPE_OK) {
-            printf ("Error Attaching %s to %s\n", sim_dname (dptr), attnames[j]);
-            if (sim_log)
-                fprintf (sim_log, "Error Attaching %s to %s\n", sim_dname (dptr), attnames[j]);
-            }
+        if (r != SCPE_OK)
+            sim_printf ("Error Attaching %s to %s\n", sim_dname (dptr), attnames[j]);
         }
     free (attnames[j]);
     }
@@ -5463,6 +5377,8 @@ if (unechoed_cmdline) {
 fprint_stopped (stdout, r);                         /* print msg */
 if (sim_log)                                        /* log if enabled */
     fprint_stopped (sim_log, r);
+if (sim_deb)                                        /* log if enabled */
+    fprint_stopped (sim_deb, r);
 }
 
 /* Common setup for RUN or BOOT */
@@ -7074,6 +6990,25 @@ if (fputs (dbuf, stream) == EOF)
 return SCPE_OK;
 }
 
+t_stat sim_print_val (t_value val, uint32 radix,
+    uint32 width, uint32 format)
+{
+char dbuf[MAX_WIDTH + 1];
+
+if (width > MAX_WIDTH)
+    width = MAX_WIDTH;
+sprint_val (dbuf, val, radix, width, format);
+if (fputs (dbuf, stdout) == EOF)
+    return SCPE_IOERR;
+if (sim_log && (sim_log != stdout))
+    if (fputs (dbuf, sim_log) == EOF)
+        return SCPE_IOERR;
+if (sim_deb && (sim_deb != stdout))
+    if (fputs (dbuf, sim_deb) == EOF)
+        return SCPE_IOERR;
+return SCPE_OK;
+}
+
 /* Event queue package
 
         sim_activate            add entry to event queue
@@ -7890,6 +7825,65 @@ if (sim_deb && (dptr->dctrl & dbits)) {
         fprintf(sim_deb, "\r\n");
     debug_unterm = terminate ? 0 : 1;                   /* set unterm for next */
     }
+}
+
+/* Print message to stdout, sim_log (if enabled) and sim_deb (if enabled) */
+void sim_printf (const char* fmt, ...)
+{
+char stackbuf[STACKBUFSIZE];
+int32 bufsize = sizeof(stackbuf);
+char *buf = stackbuf;
+int32 len;
+va_list arglist;
+
+while (1) {                                         /* format passed string, args */
+    va_start (arglist, fmt);
+#if defined(NO_vsnprintf)
+#if defined(HAS_vsprintf_void)
+
+/* Note, this could blow beyond the buffer, and we couldn't tell */
+/* That is a limitation of the C runtime library available on this platform */
+
+    vsprintf (buf, fmt, arglist);
+    for (len = 0; len < bufsize-1; len++)
+        if (buf[len] == 0) break;
+#else
+    len = vsprintf (buf, fmt, arglist);
+#endif                                                  /* HAS_vsprintf_void */
+#else                                                   /* NO_vsnprintf */
+#if defined(HAS_vsnprintf_void)
+    vsnprintf (buf, bufsize-1, fmt, arglist);
+    for (len = 0; len < bufsize-1; len++)
+        if (buf[len] == 0) break;
+#else
+    len = vsnprintf (buf, bufsize-1, fmt, arglist);
+#endif                                                  /* HAS_vsnprintf_void */
+#endif                                                  /* NO_vsnprintf */
+    va_end (arglist);
+
+/* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
+
+    if ((len < 0) || (len >= bufsize-1)) {
+        if (buf != stackbuf)
+            free (buf);
+        bufsize = bufsize * 2;
+        buf = (char *) malloc (bufsize);
+        if (buf == NULL)                            /* out of memory */
+            return;
+        buf[bufsize-1] = '\0';
+        continue;
+        }
+    break;
+    }
+
+printf("%s", buf);
+if (sim_log && (sim_log != stdout))
+    fprintf (sim_log, "%s", buf);
+if (sim_deb && (sim_deb != stdout))
+    fprintf (sim_deb, "%s", buf);
+
+if (buf != stackbuf)
+    free (buf);
 }
 
 /* Inline debugging - will print debug message if debug file is

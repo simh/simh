@@ -118,6 +118,7 @@ char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
 t_value strtotv (const char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
+t_stat sim_print_val (t_value val, uint32 radix, uint32 width, uint32 format);
 char *read_line (char *cptr, int32 size, FILE *stream);
 void fprint_reg_help (FILE *st, DEVICE *dptr);
 void fprint_set_help (FILE *st, DEVICE *dptr);
@@ -142,6 +143,7 @@ t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cpt
 const char *sim_error_text (t_stat stat);
 t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
+void sim_printf (const char* fmt, ...);
 void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate);
 #if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))

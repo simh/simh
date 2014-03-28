@@ -1199,7 +1199,7 @@ sim_debug(DBG_TRC, dptr, "dup_reset()\n");
 dup_desc.packet = TRUE;
 if ((UNIBUS) && (dptr == &dpv_dev)) {
     if (!(dptr->flags & DEV_DIS)) {
-        printf ("Can't enable Qbus device on Unibus system\n");
+        sim_printf ("Can't enable Qbus device on Unibus system\n");
         dptr->flags |= DEV_DIS;
         return SCPE_ARG;
         }
@@ -1208,7 +1208,7 @@ if ((UNIBUS) && (dptr == &dpv_dev)) {
 
 if ((!UNIBUS) && (dptr == &dup_dev)) {
     if (!(dptr->flags & DEV_DIS)) {
-        printf ("Can't enable Unibus device on Qbus system\n");
+        sim_printf ("Can't enable Unibus device on Qbus system\n");
         dptr->flags |= DEV_DIS;
         return SCPE_ARG;
         }

@@ -2310,9 +2310,7 @@ while (*tptr) {
                 free (mp->port);
                 mp->port = NULL;
                 }
-            printf ("Listening on port %s\n", listen);
-            if (sim_log)
-                fprintf (sim_log, "Listening on port %s\n", listen);
+            sim_printf ("Listening on port %s\n", listen);
             mp->port = (char *)realloc (mp->port, 1 + strlen (listen));
             strcpy (mp->port, listen);                      /* save port */
             mp->master = sock;                              /* save master socket */
@@ -2337,9 +2335,7 @@ while (*tptr) {
         if (loopback) {
             if (mp->lines > 1)
                 return SCPE_ARG;                            /* ambiguous */
-            printf ("Operating in loopback mode\n");
-            if (sim_log)
-                fprintf (sim_log, "Operating in loopback mode\n");
+            sim_printf ("Operating in loopback mode\n");
             for (i = 0; i < mp->lines; i++) {
                 lp = mp->ldsc + i;
                 tmxr_set_line_loopback (lp, loopback);
@@ -2452,9 +2448,7 @@ while (*tptr) {
             if (sock == INVALID_SOCKET)                     /* open error */
                 return SCPE_OPENERR;
             _mux_detach_line (lp, TRUE, FALSE);
-            printf ("Line %d Listening on port %s\n", line, listen);
-            if (sim_log)
-                fprintf (sim_log, "Line %d Listening on port %s\n", line, listen);
+            sim_printf ("Line %d Listening on port %s\n", line, listen);
             lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
             strcpy (lp->port, listen);                       /* save port */
             lp->master = sock;                              /* save master socket */
@@ -2513,9 +2507,7 @@ while (*tptr) {
             }
         if (loopback) {
             tmxr_set_line_loopback (lp, loopback);
-            printf ("Line %d operating in loopback mode\n", line);
-            if (sim_log)
-                fprintf (sim_log, "Line %d operating in loopback mode\n", line);
+            sim_printf ("Line %d operating in loopback mode\n", line);
             }
         lp->modem_control = modem_control;
         r = SCPE_OK;
@@ -2794,7 +2786,7 @@ while (sim_asynch_enabled) {
             wait_count = 0;
             if (select_errno == EINTR)
                 break;
-            fprintf (stderr, "select() returned -1, errno=%d - %s\r\n", select_errno, strerror(select_errno));
+            sim_printf ("select() returned -1, errno=%d - %s\r\n", select_errno, strerror(select_errno));
             abort();
             break;
         default:
@@ -2915,7 +2907,7 @@ while (sim_asynch_enabled) {
     pthread_mutex_lock (&sim_tmxr_poll_lock);
     switch (status) {
         case WAIT_FAILED:
-            fprintf (stderr, "WaitForMultipleObjects() Failed, LastError=%d\r\n", GetLastError());
+            sim_printf ("WaitForMultipleObjects() Failed, LastError=%d\r\n", GetLastError());
             abort();
             break;
         case WAIT_TIMEOUT:
@@ -3030,7 +3022,7 @@ while (sim_asynch_enabled) {
                        IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO,
                        &iosb, 0, 0, buf, 1, 1, term, 0, 0);
     if (status != SS$_NORMAL) {
-        fprintf (stderr, "_tmxr_serial_line_poll() - QIO Failed, Status=%d\r\n", status);
+        sim_printf ("_tmxr_serial_line_poll() - QIO Failed, Status=%d\r\n", status);
         abort();
         }
     wait_count = 0;

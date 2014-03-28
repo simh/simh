@@ -168,7 +168,7 @@ int32 mctl, ofs;
 t_bool extmem = MEMSIZE > MAXMEMSIZE;
 
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>MCTL: invalid adapter read mask, pa = %X, lnt = %d\r\n", pa, lnt);
+    sim_printf (">>MCTL: invalid adapter read mask, pa = %X, lnt = %d\r\n", pa, lnt);
     sbi_set_errcnf ();                                  /* err confirmation */
     return SCPE_OK;
     }
@@ -213,7 +213,7 @@ int32 mctl, ofs, mask;
 t_bool extmem = MEMSIZE > MAXMEMSIZE;
 
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>MCTL: invalid adapter write mask, pa = %X, lnt = %d\r\n", pa, lnt);
+    sim_printf (">>MCTL: invalid adapter write mask, pa = %X, lnt = %d\r\n", pa, lnt);
     sbi_set_errcnf ();                                  /* err confirmation */
     return SCPE_OK;
     }

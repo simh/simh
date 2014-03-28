@@ -1185,9 +1185,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     if ((dptr->flags & DEV_DISABLE) &&                  /* disable-able? */
         !(dptr->flags & DEV_DIS) &&                     /* enabled? */
         ((dptr->flags & mask) == 0)) {                  /* not allowed? */
-        printf ("Disabling %s\n", sim_dname (dptr));
-        if (sim_log)
-            fprintf (sim_log, "Disabling %s\n", sim_dname (dptr));
+        sim_printf ("Disabling %s\n", sim_dname (dptr));
         dptr->flags = dptr->flags | DEV_DIS;
         }
     }

@@ -278,7 +278,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
     ptr_set_err ();                                     /* yes, err, disc */
     if (feof (ptr_unit.fileref)) {                      /* end of file? */
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");                      /* I/O error */

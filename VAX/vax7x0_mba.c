@@ -366,7 +366,7 @@ t_stat r;
 
 mb = NEXUS_GETNEX (pa) - TR_MBA0;                       /* get MBA */
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>MBA%d: invalid adapter read mask, pa = 0x%X, lnt = %d\r\n", mb, pa, lnt);
+    sim_printf (">>MBA%d: invalid adapter read mask, pa = 0x%X, lnt = %d\r\n", mb, pa, lnt);
 #if defined(VAX_780)
     sbi_set_errcnf ();                                  /* err confirmation */
 #endif
@@ -460,7 +460,7 @@ t_bool cs1dt;
 
 mb = NEXUS_GETNEX (pa) - TR_MBA0;                       /* get MBA */
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>MBA%d: invalid adapter write mask, pa = 0x%X, lnt = %d\r\n", mb, pa, lnt);
+    sim_printf (">>MBA%d: invalid adapter write mask, pa = 0x%X, lnt = %d\r\n", mb, pa, lnt);
 #if defined(VAX_780)
     sbi_set_errcnf ();                                  /* err confirmation */
 #endif
@@ -935,11 +935,8 @@ if ((mbregR[idx] && dibp->rd &&                         /* conflict? */
     (mbregW[idx] != dibp->wr)) ||
     (mbabort[idx] && dibp->ack[0] &&
     (mbabort[idx] != dibp->ack[0]))) {
-        printf ("Massbus %s assignment conflict at %d\n",
-                sim_dname (dptr), dibp->ba);
-        if (sim_log)
-            fprintf (sim_log, "Massbus %s assignment conflict at %d\n",
-                     sim_dname (dptr), dibp->ba);
+        sim_printf ("Massbus %s assignment conflict at %d\n",
+                    sim_dname (dptr), dibp->ba);
         return SCPE_STOP;
         }
 if (dibp->rd)                                           /* set rd dispatch */

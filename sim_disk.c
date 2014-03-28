@@ -444,8 +444,7 @@ t_stat sim_disk_set_async (UNIT *uptr, int latency)
 {
 #if !defined(SIM_ASYNCH_IO)
 char *msg = "Disk: can't operate asynchronously\r\n";
-printf ("%s", msg);
-if (sim_log) fprintf (sim_log, "%s", msg);
+sim_printf ("%s", msg);
 return SCPE_NOFNC;
 #else
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -877,17 +876,13 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         return r;
         }
     if (!sim_quiet) {
-        printf ("%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
-        if (sim_log)
-            fprintf (sim_log, "%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
+        sim_printf ("%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
         }
     capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
     vhd = sim_vhd_disk_create (gbuf, ((t_offset)uptr->capac)*capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));
     if (!vhd) {
         if (!sim_quiet) {
-            printf ("%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
-            if (sim_log)
-                fprintf (sim_log, "%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
+            sim_printf ("%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
             }
         return SCPE_OPENERR;
         }
@@ -904,11 +899,8 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
             return SCPE_MEM;
             }
         for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
-            if (!sim_quiet) {
-                printf ("%s%d: Copied %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
-                if (sim_log)
-                    fprintf (sim_log, "%s%d: Copied %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
-                }
+            if (!sim_quiet)
+                sim_printf ("%s%d: Copied %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
             sects = sectors_per_buffer;
             if (lba + sects > total_sectors)
                 sects = total_sectors - lba;
@@ -925,16 +917,10 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
                 }
             }
         if (!sim_quiet) {
-            if (r == SCPE_OK) {
-                printf ("\n%s%d: Copied %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_offset)lba*sector_size)/1000000));
-                if (sim_log)
-                    fprintf (sim_log, "\n%s%d: Copied %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_offset)lba*sector_size)/1000000));
-                }
-            else {
-                printf ("\n%s%d: Error copying: %s.\n", sim_dname (dptr), (int)(uptr-dptr->units), sim_error_text (r));
-                if (sim_log)
-                    fprintf (sim_log, "\n%s%d: Error copying: %s.\n", sim_dname (dptr), (int)(uptr-dptr->units), sim_error_text (r));
-                }
+            if (r == SCPE_OK)
+                sim_printf ("\n%s%d: Copied %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_offset)lba*sector_size)/1000000));
+            else
+                sim_printf ("\n%s%d: Error copying: %s.\n", sim_dname (dptr), (int)(uptr-dptr->units), sim_error_text (r));
             }
         if ((r == SCPE_OK) && (sim_switches & SWMASK ('V'))) {
             uint8 *verify_buf = (uint8*) malloc (1024*1024);
@@ -946,11 +932,8 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
                 return SCPE_MEM;
                 }
             for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
-                if (!sim_quiet) {
-                    printf ("%s%d: Verified %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
-                    if (sim_log)
-                        fprintf (sim_log, "%s%d: Verified %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
-                    }
+                if (!sim_quiet)
+                    sim_printf ("%s%d: Verified %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
                 sects = sectors_per_buffer;
                 if (lba + sects > total_sectors)
                     sects = total_sectors - lba;
@@ -971,11 +954,8 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
                     }
                 }
             if (!sim_quiet) {
-                if (r == SCPE_OK) {
-                    printf ("\n%s%d: Verified %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_offset)lba*sector_size)/1000000));
-                    if (sim_log)
-                        fprintf (sim_log, "\n%s%d: Verified %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_offset)lba*sector_size)/1000000));
-                    }
+                if (r == SCPE_OK)
+                    sim_printf ("\n%s%d: Verified %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_offset)lba*sector_size)/1000000));
                 else {
                     t_lba i;
                     uint32 save_dctrl = dptr->dctrl;
@@ -984,9 +964,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
                     for (i = 0; i < (1024*1024/sector_size); ++i)
                         if (0 != memcmp (copy_buf+i*sector_size, verify_buf+i*sector_size, sector_size))
                             break;
-                    printf ("\n%s%d: Verification Error on lbn %d.\n", sim_dname (dptr), (int)(uptr-dptr->units), lba+i);
-                    if (sim_log)
-                        fprintf (sim_log, "\n%s%d: Verification Error on lbn %d.\n", sim_dname (dptr), (int)(uptr-dptr->units), lba+i);
+                    sim_printf ("\n%s%d: Verification Error on lbn %d.\n", sim_dname (dptr), (int)(uptr-dptr->units), lba+i);
                     dptr->dctrl = 0xFFFFFFFF;
                     sim_deb = stdout;
                     sim_disk_data_trace (uptr,   copy_buf+i*sector_size, lba+i, sector_size, "Expected", TRUE, 1);
@@ -1076,9 +1054,7 @@ if (sim_switches & SWMASK ('R')) {                      /* read only? */
         return _err_return (uptr, SCPE_OPENERR);        /* yes, error */
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
     if (!sim_quiet) {
-        printf ("%s%d: unit is read only\n", sim_dname (dptr), (int)(uptr-dptr->units));
-        if (sim_log)
-            fprintf (sim_log, "%s%d: unit is read only\n", sim_dname (dptr), (int)(uptr-dptr->units));
+        sim_printf ("%s%d: unit is read only\n", sim_dname (dptr), (int)(uptr-dptr->units));
         }
     }
 else {                                                  /* normal */
@@ -1092,7 +1068,7 @@ else {                                                  /* normal */
                 return _err_return (uptr, SCPE_OPENERR);/* yes, error */
             uptr->flags = uptr->flags | UNIT_RO;        /* set rd only */
             if (!sim_quiet)
-                printf ("%s%d: unit is read only\n", sim_dname (dptr), (int)(uptr-dptr->units));
+                sim_printf ("%s%d: unit is read only\n", sim_dname (dptr), (int)(uptr-dptr->units));
             }
         else {                                          /* doesn't exist */
             if (sim_switches & SWMASK ('E'))            /* must exist? */
@@ -1104,7 +1080,7 @@ else {                                                  /* normal */
             if (uptr->fileref == NULL)                  /* open fail? */
                 return _err_return (uptr, SCPE_OPENERR);/* yes, error */
             if (!sim_quiet)
-                printf ("%s%d: creating new file\n", sim_dname (dptr), (int)(uptr-dptr->units));
+                sim_printf ("%s%d: creating new file\n", sim_dname (dptr), (int)(uptr-dptr->units));
             created = TRUE;
             }
         }                                               /* end if null */
@@ -1162,18 +1138,11 @@ if (capac && (capac != (t_offset)-1)) {
     if (dontautosize) {
         if ((capac < (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1))) && (DKUF_F_STD != DK_GET_FMT (uptr))) {
             if (!sim_quiet) {
-                printf ("%s%d: non expandable disk %s is smaller than simulated device (", sim_dname (dptr), (int)(uptr-dptr->units), cptr);
-                fprint_val (stdout, (t_addr)(capac/ctx->capac_factor), 10, T_ADDR_W, PV_LEFT);
-                printf ("%s < ", (ctx->capac_factor == 2) ? "W" : "");
-                fprint_val (stdout, uptr->capac*((dptr->flags & DEV_SECTORS) ? 512 : 1), 10, T_ADDR_W, PV_LEFT);
-                printf ("%s)\n", (ctx->capac_factor == 2) ? "W" : "");
-                if (sim_log) {
-                    fprintf (sim_log, "%s%d: non expandable disk %s is smaller than simulated device (", sim_dname (dptr), (int)(uptr-dptr->units), cptr);
-                    fprint_val (sim_log, (t_addr)(capac/ctx->capac_factor), 10, T_ADDR_W, PV_LEFT);
-                    fprintf (sim_log, "%s < ", (ctx->capac_factor == 2) ? "W" : "");
-                    fprint_val (sim_log, uptr->capac*((dptr->flags & DEV_SECTORS) ? 512 : 1), 10, T_ADDR_W, PV_LEFT);
-                    fprintf (sim_log, "%s)\n", (ctx->capac_factor == 2) ? "W" : "");
-                    }
+                sim_printf ("%s%d: non expandable disk %s is smaller than simulated device (", sim_dname (dptr), (int)(uptr-dptr->units), cptr);
+                sim_print_val ((t_addr)(capac/ctx->capac_factor), 10, T_ADDR_W, PV_LEFT);
+                sim_printf ("%s < ", (ctx->capac_factor == 2) ? "W" : "");
+                sim_print_val (uptr->capac*((dptr->flags & DEV_SECTORS) ? 512 : 1), 10, T_ADDR_W, PV_LEFT);
+                sim_printf ("%s)\n", (ctx->capac_factor == 2) ? "W" : "");
                 }
             }
         }
@@ -2815,7 +2784,7 @@ if ((sDynamic) &&
                 }
             if (!*szParentVHDPath) {
                 Return = EINVAL;                        /* File Corrupt */
-                fprintf (stderr, "Error Invalid Parent VHD for Differencing VHD\n");
+                sim_printf ("Error Invalid Parent VHD for Differencing VHD\n");
                 }
             }
         }
@@ -3024,7 +2993,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
         ++BlocksToMerge;
         }
     if (!sim_quiet)
-        printf ("Merging %s\ninto %s\n", szVHDPath, hVHD->ParentVHDPath);
+        sim_printf ("Merging %s\ninto %s\n", szVHDPath, hVHD->ParentVHDPath);
     for (BlockNumber=NeededBlock=0; BlockNumber < NtoHl (hVHD->Dynamic.MaxTableEntries); ++BlockNumber) {
         uint32 BlockSectors = SectorsPerBlock;
 
@@ -3048,7 +3017,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
                                      SectorsPerBlock*BlockNumber))
             break;
         if (!sim_quiet)
-            printf ("Merged %dMB.  %d%% complete.\r", (int)((((float)NeededBlock)*SectorsPerBlock)*SectorSize/1000000), (int)((((float)NeededBlock)*100)/BlocksToMerge));
+            sim_printf ("Merged %dMB.  %d%% complete.\r", (int)((((float)NeededBlock)*SectorsPerBlock)*SectorSize/1000000), (int)((((float)NeededBlock)*100)/BlocksToMerge));
         hVHD->BAT[BlockNumber] = VHD_BAT_FREE_ENTRY;
         }
     if (BlockNumber < NtoHl (hVHD->Dynamic.MaxTableEntries)) {
@@ -3057,7 +3026,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
     else {
         Status = 0;
         if (!sim_quiet)
-            printf ("Merged %dMB.  100%% complete.\n", (int)((((float)NeededBlock)*SectorsPerBlock)*SectorSize/1000000));
+            sim_printf ("Merged %dMB.  100%% complete.\n", (int)((((float)NeededBlock)*SectorsPerBlock)*SectorSize/1000000));
         fclose (hVHD->File);
         hVHD->File = NULL;
         remove (szVHDPath);

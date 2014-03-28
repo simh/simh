@@ -769,14 +769,10 @@ if (r != SCPE_OK) {                                     /* error? */
     }
 if (sim_switches & SWMASK ('M')) {                      /* modem control? */
     dz_mctl = 1;
-    printf ("Modem control activated\n");
-    if (sim_log)
-        fprintf (sim_log, "Modem control activated\n");
+    sim_printf ("Modem control activated\n");
     if (sim_switches & SWMASK ('A')) {                  /* autodisconnect? */
         dz_auto = 1;
-        printf ("Auto disconnect activated\n");
-        if (sim_log)
-            fprintf (sim_log, "Auto disconnect activated\n");
+        sim_printf ("Auto disconnect activated\n");
         }
     }
 

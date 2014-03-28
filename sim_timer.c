@@ -118,12 +118,14 @@ UNIT sim_throt_unit = { UDATA (&sim_throt_svc, 0, 0) };
 #define DBG_TRC       0x004                 /* tracing */
 #define DBG_CAL       0x008                 /* calibration activities */
 #define DBG_TIM       0x010                 /* timer thread activities */
+#define DBG_THR       0x020                 /* throttle activities */
 DEBTAB sim_timer_debug[] = {
   {"TRACE",   DBG_TRC},
   {"IDLE",    DBG_IDL},
   {"QUEUE",   DBG_QUE},
   {"CALIB",   DBG_CAL},
   {"TIME",    DBG_TIM},
+  {"THROT",   DBG_THR},
   {0}
 };
 
@@ -907,15 +909,11 @@ t_stat r;
 uint32 v;
 
 if (sim_idle_rate_ms == 0) {
-    printf ("Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
-    if (sim_log)
-        fprintf (sim_log, "Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
+    sim_printf ("Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
     return SCPE_NOFNC;
     }
 if ((val != 0) && (sim_idle_rate_ms > (uint32) val)) {
-    printf ("Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
-    if (sim_log)
-        fprintf (sim_log, "Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
+    sim_printf ("Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
     return SCPE_NOFNC;
     }
 if (cptr) {
@@ -927,9 +925,7 @@ if (cptr) {
 sim_idle_enab = TRUE;
 if (sim_throt_type != SIM_THROT_NONE) {
     sim_set_throt (0, NULL);
-    printf ("Throttling disabled\n");
-    if (sim_log)
-        fprintf (sim_log, "Throttling disabled\n");
+    sim_printf ("Throttling disabled\n");
     }
 return SCPE_OK;
 }
@@ -969,9 +965,7 @@ if (arg == 0) {
     sim_throt_cancel ();
     }
 else if (sim_idle_rate_ms == 0) {
-    printf ("Throttling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
-    if (sim_log)
-        fprintf (sim_log, "Throttling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
+    sim_printf ("Throttling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
     return SCPE_NOFNC;
     }
 else {
@@ -995,9 +989,7 @@ else {
         }
     else return SCPE_ARG;
     if (sim_idle_enab) {
-        printf ("Idling disabled\n");
-        if (sim_log)
-            fprintf (sim_log, "Idling disabled\n");
+        sim_printf ("Idling disabled\n");
         sim_clr_idle (NULL, 0, NULL, NULL);
         }
     sim_throt_val = (uint32) val;
@@ -1121,8 +1113,8 @@ switch (sim_throt_state) {
                 }
             sim_throt_ms_start = sim_throt_ms_stop;
             sim_throt_state = 2;
-//            fprintf (stderr, "Throttle values a_cps = %f, d_cps = %f, wait = %d\n",
-//                a_cps, d_cps, sim_throt_wait);
+            sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Throttle values a_cps = %f, d_cps = %f, wait = %d\n", 
+                                                a_cps, d_cps, sim_throt_wait);
             }
         break;
 

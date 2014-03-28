@@ -215,9 +215,7 @@ for (i=0; i<serial_open_device_count; ++i)
 
 static void sim_error_serial (char *routine, int error)
 {
-fprintf (stderr, "Serial: %s fails with error %d\n", routine, error);
-if (sim_deb)
-    fprintf (sim_deb, "Serial: %s fails with error %d\n", routine, error);
+sim_printf ("Serial: %s fails with error %d\n", routine, error);
 return;
 }
 

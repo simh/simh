@@ -162,22 +162,14 @@ int32 i;
 for (i=0; (sock_errors[i].text) && (sock_errors[i].value != err); i++)
     ;
 
-if (sock_errors[i].value == err) {
-    printf ("Sockets: %s error %d - %s\n", emsg, err, sock_errors[i].text);
-    if (sim_log)
-        fprintf (sim_log, "Sockets: %s error %d - %s\n", emsg, err, sock_errors[i].text);
-    }
-else {
+if (sock_errors[i].value == err)
+    sim_printf ("Sockets: %s error %d - %s\n", emsg, err, sock_errors[i].text);
+else
 #if defined(_WIN32)
-    printf ("Sockets: %s error %d\n", emsg, err);
-    if (sim_log)
-        fprintf (sim_log, "Sockets: %s error %d\n", emsg, err);
+    sim_printf ("Sockets: %s error %d\n", emsg, err);
 #else
-    printf ("Sockets: %s error %d - %s\n", emsg, err, strerror(err));
-    if (sim_log)
-        fprintf (sim_log, "Sockets: %s error %d - %s\n", emsg, err, strerror(err));
+    sim_printf ("Sockets: %s error %d - %s\n", emsg, err, strerror(err));
 #endif
-    }
 if (s != INVALID_SOCKET)
     sim_close_sock (s, flg);
 return INVALID_SOCKET;
@@ -461,9 +453,7 @@ static void load_function(char* function, _func* func_ptr) {
     if (*func_ptr == 0) {
     char* msg = "Sockets: Failed to find function '%s' in %s\r\n";
 
-    printf (msg, function, lib_name);
-    if (sim_log)
-        fprintf (sim_log, msg, function, lib_name);
+    sim_printf (msg, function, lib_name);
     lib_loaded = 3;
   }
 }
@@ -482,9 +472,7 @@ int load_ws2(void) {
         /* failed to load DLL */
         char* msg  = "Sockets: Failed to load %s\r\n";
 
-        printf (msg, lib_name);
-        if (sim_log) 
-          fprintf (sim_log, msg, lib_name);
+        sim_printf (msg, lib_name);
         lib_loaded = 2;
         break;
       } else {
@@ -732,7 +720,7 @@ wVersionRequested = MAKEWORD (2, 2);
 
 err = WSAStartup (wVersionRequested, &wsaData);         /* start Winsock */ 
 if (err != 0)
-    printf ("Winsock: startup error %d\n", err);
+    sim_printf ("Winsock: startup error %d\n", err);
 #if defined(AF_INET6)
 load_ws2 ();
 #endif                                                  /* endif AF_INET6 */
