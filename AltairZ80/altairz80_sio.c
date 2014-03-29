@@ -1,6 +1,6 @@
 /*  altairz80_sio.c: MITS Altair serial I/O card
 
-    Copyright (c) 2002-2013, Peter Schorn
+    Copyright (c) 2002-2014, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),

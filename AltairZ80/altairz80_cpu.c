@@ -1,6 +1,6 @@
 /*  altairz80_cpu.c: MITS Altair CPU (8080 and Z80)
 
-    Copyright (c) 2002-2013, Peter Schorn
+    Copyright (c) 2002-2014, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -6508,7 +6508,8 @@ static t_stat cpu_show(FILE *st, UNIT *uptr, int32 val, void *desc) {
 
 static void cpu_clear(void) {
     uint32 i;
-    for (i = 0; i < MAXMEMORY; i++) M[i] = 0;
+    for (i = 0; i < MAXMEMORY; i++)
+        M[i] = 0;
     for (i = 0; i < (MAXMEMORY >> LOG2PAGESIZE); i++)
         mmu_table[i] = RAM_PAGE;
     for (i = (MEMORYSIZE >> LOG2PAGESIZE); i < (MAXMEMORY >> LOG2PAGESIZE); i++)
@@ -6852,9 +6853,14 @@ static t_stat cpu_set_memory(UNIT *uptr, int32 value, char *cptr, void *desc) {
     return SCPE_ARG;
 }
 
+t_value altairz80_pc_value (void) {
+    return (t_value)PCX;
+}
+
 /* AltairZ80 Simulator initialization */
 void altairz80_init(void) {
     cpu_clear();
+    sim_vm_pc_value = &altairz80_pc_value;
 /* altairz80_print_tables(); */
 }
 

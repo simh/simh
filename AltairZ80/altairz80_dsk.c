@@ -1,6 +1,6 @@
 /*  altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-    Copyright (c) 2002-2013, Peter Schorn
+    Copyright (c) 2002-2014, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -306,7 +306,9 @@ static t_stat dsk_reset(DEVICE *dptr) {
 }
 
 void install_ALTAIRbootROM(void) {
-    ASSURE(install_bootrom(bootrom_dsk, BOOTROM_SIZE_DSK, ALTAIR_ROM_LOW, TRUE) == SCPE_OK);
+    const t_bool result = (install_bootrom(bootrom_dsk, BOOTROM_SIZE_DSK, ALTAIR_ROM_LOW, TRUE) ==
+                           SCPE_OK);
+    assert(result);
 }
 
 /*  The boot routine modifies the boot ROM in such a way that subsequently
