@@ -1,6 +1,6 @@
 /*  altairz80_sys.c: MITS Altair system interface
 
-    Copyright (c) 2002-2013, Peter Schorn
+    Copyright (c) 2002-2014, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
     Based on work by Charles E Owen (c) 1997
     Disassembler from Marat Fayzullin ((c) 1995, 1996, 1997 - Commercial use prohibited)
+
+	03/27/14 -- MWD Add MITS Hard Disk device (mhdsk_dev)
 */
 
 #include <ctype.h>
@@ -40,6 +42,7 @@ extern DEVICE simh_device;
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
 extern DEVICE dsk_dev;
+extern DEVICE mhdsk_dev;
 extern DEVICE hdsk_dev;
 extern DEVICE net_dev;
 
@@ -100,7 +103,7 @@ int32       sim_emax        = SIM_EMAX;
 DEVICE      *sim_devices[]  = {
     /* AltairZ80 Devices */
     &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, &dsk_dev,
-    &hdsk_dev, &net_dev,
+    &mhdsk_dev, &hdsk_dev, &net_dev,
     /* Advanced Digital (ADC) Devices */
     &adcs6_dev,
     &hdc1001_dev,
