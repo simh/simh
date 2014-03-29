@@ -595,6 +595,7 @@ static int32 bootrom_hdsk[BOOTROM_SIZE_HDSK] = {
 };
 
 static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
+    t_bool installSuccessful;
     if (MEMORYSIZE < 24*KB) {
         printf("Need at least 24KB RAM to boot from hard disk.\n");
         return SCPE_ARG;
@@ -609,9 +610,9 @@ static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
         }
         install_ALTAIRbootROM();                                            /* install modified ROM */
     }
-    const t_bool result = (install_bootrom(bootrom_hdsk, BOOTROM_SIZE_HDSK, HDSK_BOOT_ADDRESS,
-                                           FALSE) == SCPE_OK);
-    assert(result);
+    installSuccessful = (install_bootrom(bootrom_hdsk, BOOTROM_SIZE_HDSK, HDSK_BOOT_ADDRESS,
+                                         FALSE) == SCPE_OK);
+    assert(installSuccessful);
     *((int32 *) sim_PC -> loc) = HDSK_BOOT_ADDRESS;
     return SCPE_OK;
 }

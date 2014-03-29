@@ -198,6 +198,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\altairz80_mhdsk.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\altairz80_net.c"
 				>
 			</File>
