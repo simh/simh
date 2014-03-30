@@ -2082,6 +2082,8 @@ while (*tptr) {
     nolog = notelnet = listennotelnet = unbuffered = loopback = FALSE;
     datagram = mp->datagram;
     packet = mp->packet;
+    if (mp->buffered)
+        sprintf(buffered, "%d", mp->buffered);
     if (line != -1)
         notelnet = listennotelnet = mp->notelnet;
     modem_control = mp->modem_control;
