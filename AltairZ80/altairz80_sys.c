@@ -363,6 +363,15 @@ void prepareInstructionMessage(const t_addr loc, const uint32 op) {
             (chiptype == CHIP_TYPE_Z80 ? MnemonicsZ80[op & 0xff] : "???"), loc);
 }
 
+/* Ensure that hex number starts with a digit when printed */
+static void printHex2(char* string, const uint32 value) {
+    sprintf(string, (value <= 0x9f ? "%02X" : "%03X"), value);
+}
+
+static void printHex4(char* string, const uint32 value) {
+    sprintf(string, (value <= 0x9fff ? "%04X" : "%05X"), value);
+}
+
 /*  Symbolic disassembler
 
     Inputs:
@@ -419,7 +428,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
     if ( (P = strchr(T, '^')) ) {
         strncpy(R, T, P - T);
         R[P - T] = '\0';
-        sprintf(H, "%02X", val[B++]);
+        printHex2(H, val[B++]);
         strcat(R, H);
         strcat(R, P + 1);
     }
@@ -434,7 +443,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
     if ( (P = strchr(R, '*')) ) {
         strncpy(S, R, P - R);
         S[P - R] = '\0';
-        sprintf(H, "%02X", val[B++]);
+        printHex2(H, val[B++]);
         strcat(S, H);
         strcat(S, P + 1);
     }
@@ -445,7 +454,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
             Offset = val[B++];
         strcat(S, Offset & 0x80 ? "-" : "+");
         J = Offset & 0x80 ? 256 - Offset : Offset;
-        sprintf(H, "%02X", J);
+        printHex2(H, J);
         strcat(S, H);
         strcat(S, P + 1);
     }
@@ -453,14 +462,14 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         strncpy(S, R, P - R);
         S[P - R] = '\0';
         Offset = val[B++];
-        sprintf(H, "%04X", (addr + 2 + (Offset & 0x80 ? (Offset - 256) : Offset)) & 0xFFFF);
+        printHex4(H, (addr + 2 + (Offset & 0x80 ? (Offset - 256) : Offset)) & 0xFFFF);
         strcat(S, H);
         strcat(S, P + 1);
     }
     else if ( (P = strchr(R, '#')) ) {
         strncpy(S, R, P - R);
         S[P - R] = '\0';
-        sprintf(H, "%04X", val[B] + 256 * val[B + 1]);
+        printHex4(H, val[B] + 256 * val[B + 1]);
         strcat(S, H);
         strcat(S, P + 1);
         B += 2;
