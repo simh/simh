@@ -1375,11 +1375,7 @@ if ((lp->sock) || (lp->serport) || (lp->loopback)) {
         incoming_state = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_DSR;
     }
 else
-    if ((lp->master) || (lp->mp && lp->mp->master) ||
-        (lp->port && lp->destination))
-        incoming_state = TMXR_MDM_DCD | TMXR_MDM_DSR;
-    else
-        incoming_state = 0;
+    incoming_state = 0;
 lp->modembits |= incoming_state;
 dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
 if (sim_deb && lp->mp && dptr) {
@@ -2082,6 +2078,8 @@ while (*tptr) {
     nolog = notelnet = listennotelnet = unbuffered = loopback = FALSE;
     datagram = mp->datagram;
     packet = mp->packet;
+    if (mp->buffered)
+        sprintf(buffered, "%d", mp->buffered);
     if (line != -1)
         notelnet = listennotelnet = mp->notelnet;
     modem_control = mp->modem_control;
