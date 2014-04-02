@@ -1380,7 +1380,7 @@ else
         incoming_state = 0;
 lp->modembits |= incoming_state;
 dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
-if (sim_deb && lp->mp && dptr) {
+if ((lp->modembits != before_modem_bits) && (sim_deb && lp->mp && dptr)) {
     sim_debug_bits (TMXR_DBG_MDM, dptr, tmxr_modem_bits, before_modem_bits, lp->modembits, FALSE);
     sim_debug (TMXR_DBG_MDM, dptr, " - Line %d - %p\n", (int)(lp-lp->mp->ldsc), lp->txb);
     }
@@ -2435,6 +2435,7 @@ while (*tptr) {
         lp->txb = (char *)realloc (lp->txb, lp->txbsz);
         lp->rxb = (char *)realloc(lp->rxb, lp->rxbsz);
         lp->rbr = (char *)realloc(lp->rbr, lp->rxbsz);
+        lp->packet = packet;
         if (nolog) {
             free(lp->txlogname);
             lp->txlogname = NULL;
@@ -2489,7 +2490,6 @@ while (*tptr) {
                     else
                         return SCPE_ARG;
                     }
-                lp->packet = packet;
                 sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, datagram, packet);
                 if (sock != INVALID_SOCKET) {
                     _mux_detach_line (lp, FALSE, TRUE);
@@ -3292,22 +3292,27 @@ else {
         TMLN *lp;
         char *attach;
 
-        fprintf(st, "Multiplexer device: %s, ", (mp->dptr ? sim_dname (mp->dptr) : ""));
-        attach = tmxr_mux_attach_string (NULL, mp);
-        fprintf(st, "attached to %s, ", attach);
-        free (attach);
+        fprintf(st, "Multiplexer device: %s", (mp->dptr ? sim_dname (mp->dptr) : ""));
         if (mp->lines > 1) {
-            tmxr_show_lines(st, NULL, 0, mp);
             fprintf(st, ", ");
+            tmxr_show_lines(st, NULL, 0, mp);
             }
-        tmxr_show_summ(st, NULL, 0, mp);
-        fprintf(st, ", sessions=%d", mp->sessions);
-        if (mp->modem_control)
-            fprintf(st, ", ModemControl=enabled");
+        if (mp->packet)
+            fprintf(st, ", Packet");
+        if (mp->datagram)
+            fprintf(st, ", UDP");
         if (mp->notelnet)
             fprintf(st, ", Telnet=disabled");
+        if (mp->modem_control)
+            fprintf(st, ", ModemControl=enabled");
         if (mp->buffered)
             fprintf(st, ", Buffered=%d", mp->buffered);
+        attach = tmxr_mux_attach_string (NULL, mp);
+        if (attach)
+            fprintf(st, ",\n    attached to %s, ", attach);
+        free (attach);
+        tmxr_show_summ(st, NULL, 0, mp);
+        fprintf(st, ", sessions=%d", mp->sessions);
         fprintf(st, "\n");
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
@@ -4153,7 +4158,7 @@ for (i = t = 0; i < mp->lines; i++)
     if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0))
         t = t + 1;
 if (mp->lines > 1)
-    fprintf (st, "%d connection%s", t, (t != 1) ? "s" : "");
+    fprintf (st, "%d current connection%s", t, (t != 1) ? "s" : "");
 else
     fprintf (st, "%s", (t == 1) ? "connected" : "disconnected");
 return SCPE_OK;
