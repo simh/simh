@@ -1375,7 +1375,11 @@ if ((lp->sock) || (lp->serport) || (lp->loopback)) {
         incoming_state = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_DSR;
     }
 else
-    incoming_state = 0;
+    if ((lp->master) || (lp->mp && lp->mp->master) ||
+        (lp->port && lp->destination))
+        incoming_state = TMXR_MDM_DSR;
+    else
+        incoming_state = 0;
 lp->modembits |= incoming_state;
 dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
 if (sim_deb && lp->mp && dptr) {
