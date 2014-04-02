@@ -60,7 +60,7 @@
 
 #define DDCMP_DBG_PXMT  TMXR_DBG_PXMT   /* Debug Transmitted Packet Header Contents */
 #define DDCMP_DBG_PRCV  TMXR_DBG_PRCV   /* Debug Received Packet Header Contents */
-#define DDCMP_DBG_PDAT  0x1000000       /* Debug Packet Data */
+#define DDCMP_DBG_PDAT  0x4000000       /* Debug Packet Data */
 
 /* Support routines */
 
