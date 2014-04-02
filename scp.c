@@ -3891,7 +3891,7 @@ if (dptr->flags & DEV_DEBUG) {
     else {
         fputs ("Debug=", st);
         for (dep = dptr->debflags; dep->name != NULL; dep++) {
-            if (dptr->dctrl & dep->mask) {
+            if ((dptr->dctrl & dep->mask) == dep->mask) {
                 if (any)
                     fputc (';', st);
                 fputs (dep->name, st);
