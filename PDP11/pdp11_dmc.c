@@ -3772,6 +3772,7 @@ int32 dmc = (int32)(uptr-dptr->units);
 TMXR *mp = (dptr == &dmc_dev) ? &dmc_desc : &dmp_desc;
 TMLN *lp = &mp->ldsc[dmc];
 int32 i, attached;
+t_stat r;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
@@ -3784,9 +3785,10 @@ if (!attached) {
     sim_cancel (dptr->units+mp->lines);              /* stop poll on last detach */
     sim_cancel (dptr->units+(mp->lines+1));          /* stop timer on last detach */
     }
+r = tmxr_detach_ln (lp);
 free (uptr->filename);
 uptr->filename = NULL;
-return tmxr_detach_ln (lp);
+return r;
 }
 
 char *dmc_description (DEVICE *dptr)

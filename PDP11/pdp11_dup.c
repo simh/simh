@@ -1275,6 +1275,7 @@ DEVICE *dptr = DUPDPTR;
 int32 dup = (int32)(uptr-dptr->units);
 TMLN *lp = &dup_ldsc[dup];
 int32 i, attached;
+t_stat r;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
@@ -1285,6 +1286,7 @@ for (i=attached=0; i<dup_desc.lines; i++)
         ++attached;
 if (!attached)
     sim_cancel (dup_units+dup_desc.lines);              /* stop poll on last detach */
+r = tmxr_detach_ln (lp);
 free (uptr->filename);
 uptr->filename = NULL;
 free (dup_rcvpacket[dup]);
@@ -1295,7 +1297,7 @@ free (dup_xmtpacket[dup]);
 dup_xmtpacket[dup] = NULL;
 dup_xmtpksize[dup] = 0;
 dup_xmtpkoffset[dup] = 0;
-return tmxr_detach_ln (lp);
+return r;
 }
 
 /* SET/SHOW SPEED processor */

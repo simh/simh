@@ -826,8 +826,6 @@ if (tptr == NULL)                                       /* no more mem? */
 
 if (mp->port)                                           /* copy port */
     sprintf (growstring(&tptr, 13 + strlen (mp->port)), "%s%s", mp->port, mp->notelnet ? ";notelnet" : "");
-if (mp->buffered)
-    sprintf (growstring(&tptr, 32), ",Buffered=%d", mp->buffered);
 if (mp->logfiletmpl[0])                                 /* logfile info */
     sprintf (growstring(&tptr, 7 + strlen (mp->logfiletmpl)), ",Log=%s", mp->logfiletmpl);
 while ((*tptr == ',') || (*tptr == ' '))
@@ -2024,19 +2022,27 @@ if (lp->serport) {                          /* close current serial connection *
     lp->destination = NULL;
     }
 tmxr_set_line_loopback (lp, FALSE);
-if ((lp->mp) && (lp->mp->uptr) && ((lp->uptr == NULL) || (lp->uptr == lp->mp->uptr))) {
-    /* Revise the unit's connect string to reflect the current attachments */
-    lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
-    /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
-    if (lp->mp->uptr->filename == NULL)
-        tmxr_detach (lp->mp, lp->mp->uptr);
-    }
 }
 
 t_stat tmxr_detach_ln (TMLN *lp)
 {
-tmxr_debug_trace_line (lp, "tmxr_detaach_ln()");
+UNIT *uptr = NULL;
+
+tmxr_debug_trace_line (lp, "tmxr_detach_ln()");
 _mux_detach_line (lp, TRUE, TRUE);
+if (lp->mp)
+    if (lp->uptr)
+        uptr = lp->uptr;
+    else
+        if (lp->mp->uptr)
+            uptr = lp->mp->uptr;
+if (uptr) {
+    /* Revise the unit's connect string to reflect the current attachments */
+    uptr->filename = tmxr_mux_attach_string (uptr->filename, lp->mp);
+    /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
+    if (uptr->filename == NULL)
+        tmxr_detach (lp->mp, uptr);
+    }
 return SCPE_OK;
 }
 
@@ -2061,7 +2067,7 @@ char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE],
 SOCKET sock;
 SERHANDLE serport;
 char *tptr = cptr;
-t_bool nolog, notelnet, listennotelnet, unbuffered, modem_control, loopback, datagram, packet;
+t_bool nolog, notelnet, listennotelnet, modem_control, loopback, datagram, packet;
 TMLN *lp;
 t_stat r = SCPE_ARG;
 
@@ -2079,7 +2085,7 @@ while (*tptr) {
     memset(buffered,    '\0', sizeof(buffered));
     memset(port,        '\0', sizeof(port));
     memset(option,      '\0', sizeof(option));
-    nolog = notelnet = listennotelnet = unbuffered = loopback = FALSE;
+    nolog = notelnet = listennotelnet = loopback = FALSE;
     datagram = mp->datagram;
     packet = mp->packet;
     if (mp->buffered)
@@ -2121,7 +2127,7 @@ while (*tptr) {
                 (0 == MATCH_CMD (gbuf, "UNBUFFERED"))) {
                 if ((NULL != cptr) && ('\0' != *cptr))
                     return SCPE_2MARG;
-                unbuffered = TRUE;
+                buffered[0] = '\0';
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "BUFFERED")) {
@@ -2267,16 +2273,12 @@ while (*tptr) {
                     }
                 }
             }
-        if ((unbuffered) && (mp->buffered))
-            mp->buffered = 0;
-        if (buffered[0])
-            mp->buffered = atoi(buffered);
         for (i = 0; i < mp->lines; i++) { /* initialize line buffers */
             lp = mp->ldsc + i;
-            if (mp->buffered) {
-                lp->txbsz = mp->buffered;
+            if (buffered[0]) {
+                lp->txbsz = atoi(buffered);
                 lp->txbfd = 1;
-                lp->rxbsz = mp->buffered;
+                lp->rxbsz = atoi(buffered);
                 }
             else {
                 lp->txbsz = TMXR_MAXBUF;
@@ -2421,7 +2423,7 @@ while (*tptr) {
                 return r;
                 }
             }
-        if ((unbuffered) || (buffered[0] == '\0')) {
+        if (buffered[0] == '\0') {
             lp->rxbsz = lp->txbsz = TMXR_MAXBUF;
             lp->txbfd = 0;
             }
@@ -3304,6 +3306,8 @@ else {
             fprintf(st, ", ModemControl=enabled");
         if (mp->notelnet)
             fprintf(st, ", Telnet=disabled");
+        if (mp->buffered)
+            fprintf(st, ", Buffered=%d", mp->buffered);
         fprintf(st, "\n");
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
