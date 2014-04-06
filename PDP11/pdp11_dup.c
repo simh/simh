@@ -454,7 +454,7 @@ DEVICE dup_dev = {
     2, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &dup_reset,
     NULL, &dup_attach, &dup_detach,
-    &dup_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS | DEV_DEBUG, 0,
+    &dup_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS | DEV_DEBUG | DEV_DONTAUTO, 0,
     dup_debug, NULL, NULL, &dup_help, dup_help_attach, &dup_desc, 
     &dup_description
     };
@@ -464,7 +464,7 @@ DEVICE dpv_dev = {
     2, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &dup_reset,
     NULL, &dup_attach, &dup_detach,
-    &dup_dib, DEV_DIS | DEV_DISABLE | DEV_QBUS | DEV_DEBUG, 0,
+    &dup_dib, DEV_DIS | DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_DONTAUTO, 0,
     dup_debug, NULL, NULL, &dup_help, dup_help_attach, &dup_desc, 
     &dup_description
     };
@@ -1461,6 +1461,7 @@ for (l=dup_desc.lines; l < newln; l++) {
     }
 dup_units[newln] = dup_poll_unit_template;
 dup_desc.lines = newln;
+dup_desc.uptr = dptr->units + newln;                /* Identify polling unit */
 dptr->numunits = newln + 1;
 return dup_reset (dptr);                            /* setup lines and auto config */
 }

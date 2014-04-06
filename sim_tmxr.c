@@ -2036,7 +2036,7 @@ if (lp->mp)
     else
         if (lp->mp->uptr)
             uptr = lp->mp->uptr;
-if (uptr) {
+if (uptr && uptr->filename) {
     /* Revise the unit's connect string to reflect the current attachments */
     uptr->filename = tmxr_mux_attach_string (uptr->filename, lp->mp);
     /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */

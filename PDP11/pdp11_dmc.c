@@ -1149,7 +1149,7 @@ DEVICE dmc_dev =
 #endif
     dmc_units, dmc_reg, dmc_mod, 3, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL, NULL, &dmc_reset, NULL, &dmc_attach, &dmc_detach,
-    &dmc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
+    &dmc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_DONTAUTO, 0, dmc_debug,
     NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description };
 
 /*
@@ -1168,13 +1168,13 @@ DEVICE dmc_dev =
 DEVICE dmp_dev =
     { "DMP", dmp_units, dmp_reg, dmp_mod, 3, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL, NULL, &dmc_reset, NULL, &dmc_attach, &dmc_detach,
-    &dmp_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
+    &dmp_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_DONTAUTO, 0, dmc_debug,
     NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmp_description };
 
 DEVICE dmv_dev =
     { "DMV", dmp_units, dmp_reg, dmv_mod, 3, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL, NULL, &dmc_reset, NULL, &dmc_attach, &dmc_detach,
-    &dmp_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG, 0, dmc_debug,
+    &dmp_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_DONTAUTO, 0, dmc_debug,
     NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmp_description };
 
 CTLR dmc_ctrls[DMC_NUMDEVICE + DMP_NUMDEVICE];
@@ -1585,6 +1585,7 @@ dptr->units[newln].ctlr = &dmc_ctrls[(dptr == &dmc_dev) ? 0 : DMC_NUMDEVICE];
 dptr->units[newln+1] = dmc_timer_unit_template;
 dptr->units[newln+1].ctlr = &dmc_ctrls[(dptr == &dmc_dev) ? 0 : DMC_NUMDEVICE];
 mp->lines = newln;
+mp->uptr = dptr->units + newln;                     /* Identify polling unit */
 return dmc_reset ((DEVICE *)desc);                  /* setup devices and auto config */
 }
 
