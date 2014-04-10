@@ -379,9 +379,7 @@ t_stat r;
 r = vax610_boot_parse (flag, ptr);                      /* parse the boot cmd */
 if (r != SCPE_OK) {                                     /* error? */
     if (r >= SCPE_BASE) {                               /* message available? */
-        printf ("%s\n", sim_error_text (r));
-        if (sim_log)
-            fprintf (sim_log, "%s\n", sim_error_text (r));
+        sim_printf ("%s\n", sim_error_text (r));
         r |= SCPE_NOMESSAGE;
         }
     return r;
@@ -504,9 +502,7 @@ if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
     (reset_all (0) != SCPE_OK) ||                       /* reset the world */
     (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
     ABORT (STOP_BOOT);                                  /* any error? */
-printf ("Rebooting...\n");
-if (sim_log)
-    fprintf (sim_log, "Rebooting...\n");
+sim_printf ("Rebooting...\n");
 return cc;
 }
 

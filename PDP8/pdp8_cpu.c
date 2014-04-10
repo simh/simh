@@ -1499,12 +1499,9 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* add devices */
         for (j = 0; j < dibp->num; j++) {               /* loop thru disp */
             if (dibp->dsp[j]) {                         /* any dispatch? */
                 if (dev_tab[dibp->dev + j]) {           /* already filled? */
-                    printf ("%s device number conflict at %02o\n",
-                            sim_dname (dptr), dibp->dev + j);
-                    if (sim_log)
-                        fprintf (sim_log, "%s device number conflict at %02o\n",
-                                 sim_dname (dptr), dibp->dev + j);
-                     return TRUE;
+                    sim_printf ("%s device number conflict at %02o\n",
+                                sim_dname (dptr), dibp->dev + j);
+                    return TRUE;
                     }
                 dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
                 }                                       /* end if dsp */

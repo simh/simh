@@ -487,7 +487,7 @@ switch (opcode) {
 
     case TD_OPDAT:
         if (td_state != TD_WRITE1) {                     /* expecting data? */
-            printf("TU58 protocol error 1\n");
+            sim_printf("TU58 protocol error 1\n");
             return;
             }
         if (td_ibptr < 2) {                              /* whole packet read? */
@@ -500,7 +500,7 @@ switch (opcode) {
 
     case TD_OPCMD:
         if (td_state != TD_IDLE) {                       /* expecting command? */
-            printf("TU58 protocol error 2\n");
+            sim_printf("TU58 protocol error 2\n");
             return;
             }
         if (td_ibptr < 2) {                              /* whole packet read? */
@@ -518,7 +518,7 @@ switch (opcode) {
                 break;
                
             case TD_CMDINI:
-                printf("Warning: TU58 command 'INIT' not implemented\n");
+                sim_printf("Warning: TU58 command 'INIT' not implemented\n");
                 break;
                
             case TD_CMDRD:
@@ -538,11 +538,11 @@ switch (opcode) {
                 break;
                
             case TD_CMDPOS:
-                printf("Warning: TU58 command 'Position' not implemented\n");
+                sim_printf("Warning: TU58 command 'Position' not implemented\n");
                 break;
                
             case TD_CMDDIA:
-                printf("Warning: TU58 command 'Diagnose' not implemented\n");
+                sim_printf("Warning: TU58 command 'Diagnose' not implemented\n");
                 break;
                
             case TD_CMDMRSP:
@@ -568,7 +568,7 @@ switch (opcode) {
 
     case TD_OPBOO:
         if (td_state != TD_IDLE) {
-            printf("TU58 protocol error 3\n");
+            sim_printf("TU58 protocol error 3\n");
             return;
             }
         if (td_ibptr < 2) {                             /* whole packet read? */

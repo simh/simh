@@ -313,16 +313,10 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
         if (!cdname) {
             cdname = "CPU";
         }
-        printf ("Device %s interrupt vector conflict with %s at ",
-                sim_dname (dptr), cdname);
-        fprint_val (stdout, (t_value) dibp->vec, DEV_RDX, 32, PV_LEFT);
-        printf ("\n");
-        if (sim_log) {
-            fprintf (sim_log, "Device %s interrupt vector conflict with %s at ",
-                     sim_dname (dptr), cdname);
-            fprint_val (sim_log, (t_value) dibp->vec, DEV_RDX, 32, PV_LEFT);
-            fprintf (sim_log, "\n");
-            }
+        sim_printf ("Device %s interrupt vector conflict with %s at ",
+                    sim_dname (dptr), cdname);
+        sim_print_val ((t_value) dibp->vec, DEV_RDX, 32, PV_LEFT);
+        sim_printf ("\n");
         return SCPE_STOP;
         }
     }
@@ -336,11 +330,8 @@ for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
         (int_ack[ilvl][ibit] != dibp->ack[i])) ||
         (int_vec[ilvl][ibit] && vec &&
         (int_vec[ilvl][ibit] != vec))) {
-        printf ("Device %s interrupt slot conflict at %d\n",
-                sim_dname (dptr), idx);
-        if (sim_log)
-            fprintf (sim_log, "Device %s interrupt slot conflict at %d\n",
-                     sim_dname (dptr), idx);
+        sim_printf ("Device %s interrupt slot conflict at %d\n",
+                    sim_dname (dptr), idx);
         return SCPE_STOP;
         }
     if (dibp->ack[i])
@@ -373,15 +364,9 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
         if (!cdname) {
             cdname = "CPU";
             }
-        printf ("Device %s address conflict with %s at ", sim_dname (dptr), cdname);
-        fprint_val (stdout, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
-        printf ("\n");
-        if (sim_log) {
-            fprintf (sim_log, "Device %s address conflict with %s at ", sim_dname (dptr),
-                cdname);
-            fprint_val (sim_log, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
-            fprintf (sim_log, "\n");
-            }
+        sim_printf ("Device %s address conflict with %s at ", sim_dname (dptr), cdname);
+        sim_print_val ((t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
+        sim_printf ("\n");
         return SCPE_STOP;
         }
     if (dibp->rd)                                       /* set rd dispatch */
@@ -812,9 +797,7 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
             dptr->flags |= DEV_DIS;
             if (sim_switches & SWMASK ('P'))
                 continue;
-            printf ("%s device not compatible with system bus\n", sim_dname(dptr));
-            if (sim_log)
-                fprintf (sim_log, "%s device not compatible with system bus\n", sim_dname(dptr));
+            sim_printf ("%s device not compatible with system bus\n", sim_dname(dptr));
             return SCPE_NOFNC;
             }
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */

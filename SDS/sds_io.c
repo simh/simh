@@ -982,11 +982,8 @@ for (i = 0; (dptr = sim_devices[i]); i++) {             /* loop thru devices */
             for (j = 0; j < tplp->num; j++) {           /* repeat as needed */
                 doff = dev + tplp->off + j;             /* get offset dnum */
                 if (dev_map[doff][ch]) {                /* slot in use? */
-                    printf ("Device number conflict, chan = %s, devno = %02o\n",
-                            chname[ch], doff);
-                    if (sim_log)
-                        fprintf (sim_log, "Device number conflict, chan = %s, dev = %02o\n",
-                                 chname[ch], doff);
+                    sim_printf ("Device number conflict, chan = %s, devno = %02o\n",
+                                chname[ch], doff);
                     return TRUE;
                     }
                 dev_map[doff][ch] = dibp->xfr;          /* set xfr flag */

@@ -1078,7 +1078,7 @@ int32 xu_command(CTLR* xu)
       break;
 
     default:            /* Unknown (unimplemented) command. */
-      printf("%s: unknown ancilliary command 0%o requested !\n", xu->dev->name, fnc);
+      sim_printf("%s: unknown ancilliary command 0%o requested !\n", xu->dev->name, fnc);
       return PCSR0_PCEI;
       break;
 
@@ -1497,8 +1497,7 @@ void xu_port_command (CTLR* xu)
     case CMD_BOOT:      /* BOOT */
       /* not implemented */
       msg = "%s: BOOT command not implemented!\n";
-      printf (msg, xu->dev->name);
-      if (sim_log) fprintf(sim_log, msg, xu->dev->name);
+      sim_printf (msg, xu->dev->name);
 
       xu->var->pcsr0 |= PCSR0_PCEI;
       break;
@@ -1660,8 +1659,7 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
     char buf[32];
 
     eth_mac_fmt(&xu->var->mac, buf);     /* format ethernet mac address */
-    printf("%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
-    if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
+    sim_printf("%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
     eth_close(xu->var->etherface);
     free(tptr);
     free(xu->var->etherface);
@@ -1760,7 +1758,7 @@ void xu_dump_rxring (CTLR* xu)
 {
   int i;
   int rrlen = xu->var->rrlen;
-  printf ("receive ring[%s]: base address: %08x  headers: %d, header size: %d, current: %d\n", xu->dev->name, xu->var->rdrb, xu->var->rrlen, xu->var->relen, xu->var->rxnext);
+  sim_printf ("receive ring[%s]: base address: %08x  headers: %d, header size: %d, current: %d\n", xu->dev->name, xu->var->rdrb, xu->var->rrlen, xu->var->relen, xu->var->rxnext);
   for (i=0; i<rrlen; i++) {
     uint16 rxhdr[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
     uint32 ba = xu->var->rdrb + (xu->var->relen * 2) * i;
@@ -1769,7 +1767,7 @@ void xu_dump_rxring (CTLR* xu)
     int len = rxhdr[0];
     uint32 addr = rxhdr[1] + ((rxhdr[2] & 3) << 16);
     if (rstatus == 0)
-      printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, rxhdr[0], rxhdr[1], rxhdr[2], rxhdr[3]);
+      sim_printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, rxhdr[0], rxhdr[1], rxhdr[2], rxhdr[3]);
   }
 }
 
@@ -1777,7 +1775,7 @@ void xu_dump_txring (CTLR* xu)
 {
   int i;
   int trlen = xu->var->trlen;
-  printf ("transmit ring[%s]: base address: %08x  headers: %d, header size: %d, current: %d\n", xu->dev->name, xu->var->tdrb, xu->var->trlen, xu->var->telen, xu->var->txnext);
+  sim_printf ("transmit ring[%s]: base address: %08x  headers: %d, header size: %d, current: %d\n", xu->dev->name, xu->var->tdrb, xu->var->trlen, xu->var->telen, xu->var->txnext);
   for (i=0; i<trlen; i++) {
     uint16 txhdr[4];
     uint32 ba = xu->var->tdrb + (xu->var->telen * 2) * i;
@@ -1786,7 +1784,7 @@ void xu_dump_txring (CTLR* xu)
     int len = txhdr[0];
     uint32 addr = txhdr[1] + ((txhdr[2] & 3) << 16);
     if (tstatus == 0)
-      printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, txhdr[0], txhdr[1], txhdr[2], txhdr[3]);
+      sim_printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, txhdr[0], txhdr[1], txhdr[2], txhdr[3]);
   }
 }
 

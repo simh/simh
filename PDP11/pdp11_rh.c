@@ -908,11 +908,8 @@ if ((mbregR[idx] && dibp->rd &&                         /* conflict? */
     (mbregW[idx] != dibp->wr)) ||
     (mbabort[idx] && dibp->ack[0] &&
     (mbabort[idx] != dibp->ack[0]))) {
-        printf ("Massbus %s assignment conflict at %d\n",
-                sim_dname (dptr), dibp->ba);
-        if (sim_log)
-            fprintf (sim_log, "Massbus %s assignment conflict at %d\n",
-                     sim_dname (dptr), dibp->ba);
+        sim_printf ("Massbus %s assignment conflict at %d\n",
+                    sim_dname (dptr), dibp->ba);
         return SCPE_STOP;
         }
 if (dibp->rd)                                           /* set rd dispatch */

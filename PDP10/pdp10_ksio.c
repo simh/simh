@@ -1548,11 +1548,8 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
         (curr->ba < (dibp->ba + dibp->lnt))) ||
         ((end >= dibp->ba) &&                           /* overlap end? */
         (end < (dibp->ba + dibp->lnt)))) {
-        printf ("Device %s address conflict at %08o\n",
-            sim_dname (dptr), dibp->ba);
-        if (sim_log)
-            fprintf (sim_log, "Device %s address conflict at %08o\n",
-                     sim_dname (dptr), dibp->ba);
+        sim_printf ("Device %s address conflict at %08o\n",
+                    sim_dname (dptr), dibp->ba);
         return TRUE;
         }
     }

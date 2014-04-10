@@ -558,7 +558,7 @@ switch (fnc) {
         break;
 
     default:
-        printf ("CS: Unknown Command: %d\n", fnc);
+        sim_printf ("CS: Unknown Command: %d\n", fnc);
     }
 }
 
@@ -1073,7 +1073,7 @@ else switch (lc_fnc) {                                  /* idle, case */
         break;
 
     default:                                            /* all others */
-        printf ("TTO3: Unknown console command: %X\n", lc_fnc);
+        sim_printf ("TTO3: Unknown console command: %X\n", lc_fnc);
         break;
         }
 return SCPE_OK;

@@ -1242,13 +1242,13 @@ if (uptr->filebuf == NULL) {                            /* can't alloc? */
     return SCPE_MEM;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
-printf ("%s%d: ", sim_dname (&dt_dev), u);
+sim_printf ("%s%d: ", sim_dname (&dt_dev), u);
 if (uptr->flags & UNIT_8FMT)
-    printf ("12b format");
+    sim_printf ("12b format");
 else if (uptr->flags & UNIT_11FMT)
-    printf ("16b format");
-else printf ("18b/36b format");
-printf (", buffering file in memory\n");
+    sim_printf ("16b format");
+else sim_printf ("18b/36b format");
+sim_printf (", buffering file in memory\n");
 uptr->io_flush = dt_flush;
 if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
@@ -1356,7 +1356,7 @@ if (sim_is_active (uptr)) {                             /* active? cancel op */
     uptr->STATE = uptr->pos = 0;
     }
 if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-    printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
+    sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
     dt_flush (uptr);
     }                                                   /* end if hwmark */
 free (uptr->filebuf);                                   /* release buf */

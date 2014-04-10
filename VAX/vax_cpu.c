@@ -3514,9 +3514,7 @@ t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_cod
 char args[CBUFSIZE];
 t_stat r;
 
-printf ("Loading boot code from %s\n", filename);
-if (sim_log)
-    fprintf (sim_log, "Loading boot code from %s\n", filename);
+sim_printf ("Loading boot code from %s\n", filename);
 if (rom)
     sprintf (args, "-R %s", filename);
 else
@@ -3527,14 +3525,10 @@ if (r != SCPE_OK) {
         FILE *f;
 
         if ((f = sim_fopen (filename, "wb"))) {
-            printf ("Saving boot code to %s\n", filename);
-            if (sim_log)
-                fprintf (sim_log, "Saving boot code to %s\n", filename);
+            sim_printf ("Saving boot code to %s\n", filename);
             sim_fwrite ((void *)builtin_code, 1, size, f);
             fclose (f);
-            printf ("Loading boot code from %s\n", filename);
-            if (sim_log)
-                fprintf (sim_log, "Loading boot code from %s\n", filename);
+            sim_printf ("Loading boot code from %s\n", filename);
             r = load_cmd (0, args);
             }
         }

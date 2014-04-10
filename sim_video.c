@@ -1521,9 +1521,7 @@ SDL_Init (SDL_INIT_VIDEO);
 SDL_CreateWindowAndRenderer (vid_width, vid_height, SDL_WINDOW_SHOWN, &vid_window, &vid_renderer);
 
 if ((vid_window == NULL) || (vid_renderer == NULL)) {
-    printf ("%s: Error Creating Video Window: %s\b", sim_dname(vid_dev), SDL_GetError());
-    if (sim_log)
-        fprintf (sim_log, "%s: Error Creating Video Window: %s\b", sim_dname(vid_dev), SDL_GetError());
+    sim_printf ("%s: Error Creating Video Window: %s\b", sim_dname(vid_dev), SDL_GetError());
     SDL_Quit ();
     return 0;
     }
@@ -1537,9 +1535,7 @@ vid_texture = SDL_CreateTexture (vid_renderer,
                                  SDL_TEXTUREACCESS_STREAMING,
                                  vid_width, vid_height);
 if (!vid_texture) {
-    printf ("%s: Error configuring Video environment: %s\b", sim_dname(vid_dev), SDL_GetError());
-    if (sim_log)
-        fprintf (sim_log, "%s: Error configuring Video environment: %s\b", sim_dname(vid_dev), SDL_GetError());
+    sim_printf ("%s: Error configuring Video environment: %s\b", sim_dname(vid_dev), SDL_GetError());
     SDL_DestroyRenderer(vid_renderer);
     vid_renderer = NULL;
     SDL_DestroyWindow(vid_window);

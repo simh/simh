@@ -186,7 +186,7 @@ void sbia_wr (int32 pa, int32 val, int32 lnt)
         break;
 
     case 1:                                             /* SBICSR */
-        printf ("sbi_csr wr: %08X\n", val);
+        sim_printf ("sbi_csr wr: %08X\n", val);
         sbi_csr = sbi_csr & SBICSR_WR;
         break;
 
@@ -350,9 +350,7 @@ if ((nexusR[idx] && dibp->rd &&                         /* conflict? */
     (nexusR[idx] != dibp->rd)) ||
     (nexusW[idx] && dibp->wr &&
     (nexusW[idx] != dibp->wr))) {
-    printf ("Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
-    if (sim_log)
-        fprintf (sim_log, "Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
+    sim_printf ("Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
     return SCPE_STOP;
     }
 if (dibp->rd)                                           /* set rd dispatch */

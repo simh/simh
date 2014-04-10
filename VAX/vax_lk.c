@@ -354,7 +354,7 @@ if (lk_rbuf[0] & 1) {                                   /* peripheral command */
             break;
 
         default:
-            printf ("lk: unknown cmd %02X\n", lk_rbuf[0]);
+            sim_printf ("lk: unknown cmd %02X\n", lk_rbuf[0]);
             break;
         }
     }

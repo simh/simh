@@ -383,7 +383,7 @@ switch (fmt) {                                          /* case fmt */
         return load_exe (fileref);
         }
 
-printf ("Can't determine load file format\n");
+sim_printf ("Can't determine load file format\n");
 return SCPE_FMT;
 }
 

@@ -1224,7 +1224,7 @@ point3(int i, int32 x1, int32 y1, int32 z1, int detect_edge)
         edge_indic &= !ONSCREEN(x1, y1);        /* second test */
         edge_flag  &=  ONSCREEN(x1, y1);        /* second test */
         edge_flag |= edge_indic;
-        if (edge_flag)
+        if (edge_flag) {
             if (edge_intr_ena) {
                 edge_xpos = x1;
                 edge_ypos = y1;
@@ -1235,12 +1235,14 @@ point3(int i, int32 x1, int32 y1, int32 z1, int detect_edge)
 #endif
             } else
                 edge_flag = 0;
+        }
     }
-    if (i && ONSCREEN(x1, y1))
+    if (i && ONSCREEN(x1, y1)) {
         if (menu)
             illum3(x1 + MENU_OFFSET, y1, z1);
         else
             illum3(x1, y1, z1);
+    }
 }
 
 #define point2(i,x,y,e) point3(i, x, y, zpos, e)
@@ -1262,7 +1264,7 @@ lpoint(int32 x, int32 y, int32 z)
 {
     int i, on = (line_type == SOLID) || stroking;       /* on for sure */
 
-    if (!on)                            /* see if in visible portion of cycle */
+    if (!on) {                          /* see if in visible portion of cycle */
         for (i = 0; i < reduce; ++i) {
             switch (line_type) {
             case LONG_DASH:
@@ -1279,10 +1281,13 @@ lpoint(int32 x, int32 y, int32 z)
                         && !(line_counter & LC3))  ||  !(line_counter & LC4))
                     on = 1;
                 break;
+            case SOLID:
+                break;
             }
 
         --line_counter;
         }
+    }
 
     if (on)
         /* convert back from actual screen pixels to emulated CRT coordinates */
@@ -1586,11 +1591,12 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
     else if ( x1 < 0 )
         code1 |= 8;
 
-    if (code0 == code1)                 /* endpoints lie in same region */
+    if (code0 == code1) {               /* endpoints lie in same region */
         if (code0 == 0)                 /* ON to ON; trivially visible */
             return -1;
         else                            /* OFF to OFF and trivially invisible */
             return 0;
+    }
 
     /* Endpoints are now known to lie in different regions. */
 
@@ -1725,21 +1731,23 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
      */
 
     if (rdx < 0) {
-        if (x0 <= 0 && x0 >= rdx)
+        if (x0 <= 0 && x0 >= rdx) {
             if (tPEd > 0) {
                 if (x0 * (long)tPEd < (long)tPEn * rdx)
                     tPEn = x0, tPEd = rdx;
             } else                      /* tPEd < 0 */
                 if (x0 * (long)tPEd > (long)tPEn * rdx)
                     tPEn = x0, tPEd = rdx;
+        }
     } else                              /* rdx > 0 */
-        if (x0 >= 0 && x0 <= rdx)
+        if (x0 >= 0 && x0 <= rdx) {
             if (tPLd > 0) {
                 if (x0 * (long)tPLd < (long)tPLn * rdx)
                     tPLn = x0, tPLd = rdx;
             } else                      /* tPLd < 0 */
                 if (x0 * (long)tPLd > (long)tPLn * rdx)
                     tPLn = x0, tPLd = rdx;
+        }
 
     /*
      * Right:   tR = NR . (PR - P0) / NR . (P1 - P0)
@@ -1775,21 +1783,23 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
     tn = x0 - CLIPXMAX;
 
     if (rdx < 0) {
-        if (tn <= 0 && tn >= rdx)
+        if (tn <= 0 && tn >= rdx) {
             if (tPLd > 0) {
                 if (tn * (long)tPLd > (long)tPLn * rdx)
                     tPLn = tn, tPLd = rdx;
             } else                      /* tPLd < 0 */
                 if (tn * (long)tPLd < (long)tPLn * rdx)
                     tPLn = tn, tPLd = rdx;
+        }
     } else                              /* rdx > 0 */
-        if (tn >= 0 && tn <= rdx)
+        if (tn >= 0 && tn <= rdx) {
             if (tPEd > 0) {
                 if (tn * (long)tPEd > (long)tPEn * rdx)
                     tPEn = tn, tPEd = rdx;
             } else                      /* tPEd < 0 */
                 if (tn * (long)tPEd < (long)tPEn * rdx)
                     tPEn = tn, tPEd = rdx;
+        }
 
     /*
      * Bottom:  tB = NB . (PB - P0) / NB . (P1 - P0)
@@ -1823,21 +1833,23 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
      */
 
     if (rdy < 0) {
-        if (y0 <= 0 && y0 >= rdy)
+        if (y0 <= 0 && y0 >= rdy) {
             if (tPEd > 0) {
                 if (y0 * (long)tPEd < (long)tPEn * rdy)
                     tPEn = y0, tPEd = rdy;
             } else                      /* tPEd < 0 */
                 if (y0 * (long)tPEd > (long)tPEn * rdy)
                     tPEn = y0, tPEd = rdy;
+            }
     } else                              /* rdy > 0 */
-        if (y0 >= 0 && y0 <= rdy)
+        if (y0 >= 0 && y0 <= rdy) {
             if (tPLd > 0) {
                 if (y0 * (long)tPLd < (long)tPLn * rdy)
                     tPLn = y0, tPLd = rdy;
             } else                      /* tPLd < 0 */
                 if (y0 * (long)tPLd > (long)tPLn * rdy)
                     tPLn = y0, tPLd = rdy;
+        }
 
     /*
      * Top:     tT = NT . (PT - P0) / NT . (P1 - P0)
@@ -1873,15 +1885,16 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
     tn = y0 - CLIPYMAX;
 
     if (rdy < 0) {
-        if (tn <= 0 && tn >= rdy)
+        if (tn <= 0 && tn >= rdy) {
             if (tPLd > 0) {
                 if (tn * (long)tPLd > (long)tPLn * rdy)
                     tPLn = tn, tPLd = rdy;
             } else                      /* tPLd < 0 */
                 if (tn * (long)tPLd < (long)tPLn * rdy)
                     tPLn = tn, tPLd = rdy;
+        }
     } else                              /* rdy > 0 */
-        if (tn >= 0 && tn <= rdy)
+        if (tn >= 0 && tn <= rdy) {
             if (tPEd > 0) {
                 if (tn * (long)tPEd > (long)tPEn * rdy)
                     tPEn = tn, tPEd = rdy;
@@ -1889,6 +1902,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (tn * (long)tPEd < (long)tPEn * rdy)
                     tPEn = tn, tPEd = rdy;
 
+        }
     /*
      *  if ( tPL < tPE )
      *          invisible
@@ -1901,7 +1915,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
      *                  invis
      */
 
-    if (tPLd > 0 && tPEd < 0 || tPLd < 0 && tPEd > 0) {
+    if (((tPLd > 0) && (tPEd < 0)) || ((tPLd < 0) && (tPEd > 0))) {
         if (tPLn * (long)tPEd > (long)tPEn * tPLd)
             return 0;                   /* invisible */
     } else
@@ -1979,11 +1993,12 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
                 i, (long)x0,(long)y0, (long)x1,(long)y1));
 
         if (dx == 0 && dy == 0) {       /* just display a point */
-            if (i)
+            if (i) {
                 if (menu)
                     illum3(x0 + MENU_OFFSET, y0, z0);
                 else
                     illum3(x0, y0, z0); /* illum3() checks ONCRT, int0_scope */
+            }
             return;
         }
     } else {
@@ -2078,11 +2093,12 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
 
     /* draw OK even when Maintenance Switch 3 is set */
     /* (but updated position registers must not be used to draw vector) */
-    if (i && int0_scope && !clip_vect)  /* clipped vector drawn by vt_cycle() */
+    if (i && int0_scope && !clip_vect) {/* clipped vector drawn by vt_cycle() */
         if (menu)
             lineTwoStep(x0 + MENU_OFFSET, y0, z0, x1 + MENU_OFFSET, y1, z1);
         else
             lineTwoStep(x0, y0, z0, x1, y1, z1);
+    }
 
     /*
      * In case of LP hit, recompute coords using "tangent register", because:
@@ -2244,7 +2260,7 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
     one = ONSCREEN(xe, ye);
     edge_indic = ons && !one;
     edge_flag  = edge_indic || (!ons && one);
-    if (edge_flag)
+    if (edge_flag) {
         if (edge_intr_ena) {            /* need to clip to viewport */
             /* XXX  edge positions aren't right; need proper clipping */
             edge_xpos = xe;
@@ -2254,6 +2270,7 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
             goto done;
         } else
             edge_flag = 0;
+    }
 
     /* XXX  for now, resort to scissoring:
                 illuminates only pixels that lie in the visible display area */
@@ -2812,15 +2829,16 @@ character(int c)
 
     edge_indic = ONSCREEN(xbase, ybase) && !ONSCREEN(xnext, ynext);
     edge_flag = edge_indic ||
-                !ONSCREEN(xbase, ybase) &&  ONSCREEN(xnext, ynext);
+                ((!ONSCREEN(xbase, ybase)) &&  ONSCREEN(xnext, ynext));
     /* (scaling cannot make spacing so large that it crosses the
         "working surface" while going from offscreen to offscreen) */
-    if (edge_flag)
+    if (edge_flag) {
         if (edge_intr_ena) {
             edge_irq = 1;
             goto space;
         } else
             edge_flag = 0;
+    }
 
     if (!ONSCREEN(xbase, ybase) || !ONSCREEN(xnext, ynext))
         goto space;
@@ -3023,13 +3041,14 @@ vt11_cycle(int us, int slowdown)
                 (long)clip_x1, (long)clip_y1, (long)clip_z1));
         if (VS60                        /* XXX  assuming VT11 doesn't display */
          && (dx != 0 || dy != 0 || dz != 0)     /* hardware skips null vects */
-         && clip_i && int0_scope)       /* show it */
+         && clip_i && int0_scope) {     /* show it */
             if (menu)
                 lineTwoStep(clip_x0 + MENU_OFFSET, clip_y0, clip_z0,
                             clip_x1 + MENU_OFFSET, clip_y1, clip_z1);
             else
                 lineTwoStep(clip_x0, clip_y0, clip_z0,
                             clip_x1, clip_y1, clip_z1);
+        }
         /*
          * In case of LP hit, recompute coords using "tangent register",
          * because:

@@ -192,7 +192,7 @@ t_stat uba_rdreg (int32 *val, int32 pa, int32 lnt)
 int32 idx, ofs;
 
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>UBA: invalid adapter read mask, pa = %X, lnt = %d\r\n", pa, lnt);
+    sim_printf (">>UBA: invalid adapter read mask, pa = %X, lnt = %d\r\n", pa, lnt);
     // **FIXME** - Set error bit?
     return SCPE_OK;
     }
@@ -243,7 +243,7 @@ t_stat uba_wrreg (int32 val, int32 pa, int32 lnt)
 int32 idx, ofs;
 
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>UBA: invalid adapter write mask, pa = %X, lnt = %d\r\n", pa, lnt);
+    sim_printf (">>UBA: invalid adapter write mask, pa = %X, lnt = %d\r\n", pa, lnt);
     // **FIXME** - Set error bit?
     return SCPE_OK;
     }
@@ -335,7 +335,7 @@ if ((lnt == L_BYTE) ||                                  /* byte? */
         iod = iod << 16;
     }
 else {
-    printf (">>UBA: invalid read mask, pa = %x, lnt = %d\n", pa, lnt);
+    sim_printf (">>UBA: invalid read mask, pa = %x, lnt = %d\n", pa, lnt);
     // **FIXME** - Set error bit?
     iod = 0;
     }
@@ -360,7 +360,7 @@ if (lnt == L_BYTE)                                      /* byte? DATOB */
 else if ((lnt == L_WORD) && ((pa & 1) == 0))            /* aligned word? */
      WriteUb (pa, val, WRITE);                          /* DATO */
 else {
-    printf (">>UBA: invalid write mask, pa = %x, lnt = %d\n", pa, lnt);
+    sim_printf (">>UBA: invalid write mask, pa = %x, lnt = %d\n", pa, lnt);
     // **FIXME** - Set error bit?
     }
 SET_IRQL;                                               /* update ints */
