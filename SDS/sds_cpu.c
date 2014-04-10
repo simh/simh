@@ -39,8 +39,9 @@
    X<0:23>              X (index) register
    OV                   overflow indicator
    P<0:13>              program counter
-   nml_mode             compatible (1) vs 940 (0) mode
-   usr_mode             user (1) vs monitor (0) mode
+   cpu_mode             SDS 930 normal (compatible) mode (0)
+                        SDS 940 monitor mode (1)
+                        SDS 940 user mode (2)
    RL1<0:23>            user map low
    RL2<0:23>            user map high
    RL4<12:23>           monitor map high
@@ -168,8 +169,7 @@ uint32 int_reqhi = 0;                                   /* highest int request *
 uint32 api_lvl = 0;                                     /* api active */
 uint32 api_lvlhi = 0;                                   /* highest api active */
 t_bool chan_req;                                        /* chan request */
-uint32 nml_mode = 1;                                    /* normal mode */
-uint32 usr_mode = 0;                                    /* user mode */
+uint32 cpu_mode = NML_MODE;                             /* normal mode */
 uint32 mon_usr_trap = 0;                                /* mon-user trap */
 uint32 EM2 = 2, EM3 = 3;                                /* extension registers */
 uint32 RL1, RL2, RL4;                                   /* relocation maps */
@@ -190,6 +190,7 @@ int32 pcq_p = 0;                                        /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
+uint32 hst_exclude = BAD_MODE;                          /* cpu_mode excluded from history */
 InstHistory *hst = NULL;                                /* instruction history */
 int32 rtc_pie = 0;                                      /* rtc pulse ie */
 int32 rtc_tps = 60;                                     /* rtc ticks/sec */
@@ -251,8 +252,7 @@ REG cpu_reg[] = {
     { ORDATA (RL1, RL1, 24) },
     { ORDATA (RL2, RL2, 24) },
     { ORDATA (RL4, RL4, 12) },
-    { FLDATA (NML, nml_mode, 0) },
-    { FLDATA (USR, usr_mode, 0) },
+    { ORDATA (MODE, cpu_mode, 2) },
     { FLDATA (MONUSR, mon_usr_trap, 0) },
     { FLDATA (ION, ion, 0) },
     { FLDATA (INTDEF, ion_defer, 0) },
@@ -402,14 +402,14 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }
         tinst = ReadP (pa);                             /* get inst */
-        save_mode = usr_mode;                           /* save mode */
-        usr_mode = 0;                                   /* switch to mon */
+        save_mode = cpu_mode;                           /* save mode */
+        cpu_mode = MON_MODE;                            /* switch to mon */
         if (hst_lnt)                                    /* record inst */
             inst_hist (tinst, P, HIST_INT);
         if (pa != VEC_RTCP) {                           /* normal intr? */
             tr = one_inst (tinst, P, save_mode);        /* exec intr inst */
             if (tr) {                                   /* stop code? */
-                usr_mode = save_mode;                   /* restore mode */
+                cpu_mode = save_mode;                   /* restore mode */
                 reason = (tr > 0)? tr: STOP_MMINT;
                 break;
                 }
@@ -418,7 +418,7 @@ while (reason == 0) {                                   /* loop until halted */
             }
         else {                                          /* clock intr */
             tr = rtc_inst (tinst);                      /* exec RTC inst */
-            usr_mode = save_mode;                       /* restore mode */
+            cpu_mode = save_mode;                       /* restore mode */
             if (tr) {                                   /* stop code? */
                 reason = (tr > 0)? tr: STOP_MMINT;
                 break;
@@ -429,14 +429,12 @@ while (reason == 0) {                                   /* loop until halted */
         }
     else {                                              /* normal instr */
         if (sim_brk_summ) {
-            uint32 btyp = SWMASK ('E');
+            static uint32 bmask[] = {SWMASK ('E') | SWMASK ('N'),
+                                     SWMASK ('E') | SWMASK ('M'),
+                                     SWMASK ('E') | SWMASK ('U')};
+            uint32 btyp;
 
-            if (nml_mode)
-                btyp = SWMASK ('E') | SWMASK ('N');
-            else
-                btyp = usr_mode ? SWMASK ('E') | SWMASK ('U')
-                                : SWMASK ('E') | SWMASK ('M');
-            btyp = sim_brk_test (P, btyp); 
+            btyp = sim_brk_test (P, bmask[cpu_mode]); 
             if (btyp) {
                 if (btyp & SWMASK ('E'))                /* unqualified breakpoint? */
                     reason = STOP_IBKPT;                /* stop simulation */
@@ -460,7 +458,7 @@ while (reason == 0) {                                   /* loop until halted */
             ion_defer = 0;                              /* clear ion */
             if (hst_lnt)
                 inst_hist (inst, save_P, HIST_XCT);
-            reason = one_inst (inst, save_P, usr_mode); /* exec inst */
+            reason = one_inst (inst, save_P, cpu_mode); /* exec inst */
             if (reason > 0) {                           /* stop code? */
                 if (reason != STOP_HALT)
                     P = save_P;
@@ -478,14 +476,14 @@ while (reason == 0) {                                   /* loop until halted */
                 reason = STOP_TRPINS;                   /* fatal err */
                 break;
                 }
-            save_mode = usr_mode;                       /* save mode */
-            usr_mode = 0;                               /* switch to mon */
+            save_mode = cpu_mode;                       /* save mode */
+            cpu_mode = MON_MODE;                        /* switch to mon */
             mon_usr_trap = 0;
             if (hst_lnt)
                 inst_hist (tinst, save_P, HIST_TRP);
             tr = one_inst (tinst, save_P, save_mode);   /* trap inst */
             if (tr) {                                   /* stop code? */
-                usr_mode = save_mode;                   /* restore mode */
+                cpu_mode = save_mode;                   /* restore mode */
                 P = save_P;                             /* restore PC */
                 reason = (tr > 0)? tr: STOP_MMTRP;
                 break;
@@ -514,26 +512,29 @@ EXU_LOOP:
 op = I_GETOP (inst);                                    /* get opcode */
 if (inst & I_POP) {                                     /* POP? */
     dat = (EM3 << 18) | (EM2 << 15) | I_IND | pc;       /* data to save */
-    if (nml_mode) {                                     /* normal mode? */
+    switch (cpu_mode)
+    {
+    case NML_MODE:
         dat = (OV << 23) | dat;                         /* ov in <0> */
         WriteP (0, dat);
-        }
-    else if (usr_mode) {                                /* user mode? */
+        break;
+    case USR_MODE:
         if (inst & I_USR) {                             /* SYSPOP? */
             dat = I_USR | (OV << 21) | dat;             /* ov in <2> */
             WriteP (0, dat);
-            usr_mode = 0;                               /* set mon mode */
+            cpu_mode = MON_MODE;                        /* set mon mode */
             }
         else {                                          /* normal POP */
             dat = (OV << 23) | dat;                     /* ov in <0> */
             if ((r = Write (0, dat)))
                 return r;
             }
-        }
-    else {                                              /* mon mode */
+        break;
+    case MON_MODE:
         dat = (OV << 21) | dat;                         /* ov in <2> */
         WriteP (0, dat);                                /* store return */
-        }
+        break;
+    }
     PCQ_ENTRY;                                          /* save PC */
     P = 0100 | op;                                      /* new PC */
     OV = 0;                                             /* clear ovflo */
@@ -589,7 +590,7 @@ switch (op) {                                           /* case on opcode */
     case EAX:
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
-        if (nml_mode || usr_mode)                       /* normal or user? */
+        if (cpu_mode != MON_MODE)                       /* normal or user? */
             X = (X & ~VA_MASK) | (va & VA_MASK);        /* only 14b */
         else X = (X & ~XVA_MASK) | (va & XVA_MASK);     /* mon, 15b */
         break;
@@ -786,7 +787,7 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case HLT:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                       /* priv inst */
             return MM_PRVINS;
         return STOP_HALT;                               /* halt CPU */
 
@@ -802,15 +803,16 @@ switch (op) {                                           /* case on opcode */
         goto EXU_LOOP;
 
    case BRU:
-        if (nml_mode && (inst & I_IND)) api_dismiss (); /* normal BRU*, dism */
+        if ((cpu_mode == NML_MODE) && (inst & I_IND))
+            api_dismiss ();                             /* normal-mode BRU*, dism */
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
         if ((r = Read (va, &dat)))                      /* get operand */
             return r;
         PCQ_ENTRY;
         P = va & VA_MASK;                               /* branch */
-        if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
-            usr_mode = 1;                               /* transition to user mode */
+        if ((va & VA_USR) && (cpu_mode == MON_MODE)) {  /* user ref from mon. mode? */
+            cpu_mode = USR_MODE;                        /* transition to user mode */
             if (mon_usr_trap)
                 return MM_MONUSR;
             }
@@ -825,8 +827,8 @@ switch (op) {                                           /* case on opcode */
                 return r;
             PCQ_ENTRY;
             P = va & VA_MASK;                           /* branch */
-            if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
-                usr_mode = 1;                               /* transition to user mode */
+            if ((va & VA_USR) && (cpu_mode == MON_MODE)) {  /* user ref from mon. mode? */
+                cpu_mode = USR_MODE;                    /* transition to user mode */
                 if (mon_usr_trap)
                     return MM_MONUSR;
                 }
@@ -837,15 +839,15 @@ switch (op) {                                           /* case on opcode */
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
         dat = (EM3 << 18) | (EM2 << 15) | pc;           /* form return word */
-        if (!nml_mode && !usr_mode)                     /* monitor mode? */
-            dat = dat | (mode << 23) | (OV << 21);
+        if (cpu_mode == MON_MODE)                       /* monitor mode? */
+            dat = dat | ((mode == USR_MODE) << 23) | (OV << 21);
         else dat = dat | (OV << 23);                    /* normal or user */
         if ((r = Write (va, dat)))                      /* write ret word */
             return r;
         PCQ_ENTRY;
         P = (va + 1) & VA_MASK;                         /* branch */
-        if ((va & VA_USR) && !nml_mode && !usr_mode) {  /* user ref from mon. mode? */
-            usr_mode = 1;                               /* transition to user mode */
+        if ((va & VA_USR) && (cpu_mode == MON_MODE)) {  /* user ref from mon. mode? */
+            cpu_mode = USR_MODE;                        /* transition to user mode */
             if (mon_usr_trap)
                 return MM_MONUSR;
             }
@@ -858,10 +860,10 @@ switch (op) {                                           /* case on opcode */
             return r;
         PCQ_ENTRY;
         P = (dat + 1) & VA_MASK;                        /* branch */
-        if (!nml_mode && !usr_mode) {                   /* monitor mode? */
+        if (cpu_mode == MON_MODE) {                     /* monitor mode? */
             OV = OV | ((dat >> 21) & 1);                /* restore OV */
             if ((va & VA_USR) | (dat & I_USR)) {        /* mode change? */
-                usr_mode = 1;
+                cpu_mode = USR_MODE;
                 if (mon_usr_trap)
                     return MM_MONUSR;
                 }
@@ -870,7 +872,7 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case BRI:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                      /* priv inst */
             return MM_PRVINS;
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
@@ -879,10 +881,10 @@ switch (op) {                                           /* case on opcode */
         api_dismiss ();                                 /* dismiss hi api */
         PCQ_ENTRY;
         P = dat & VA_MASK;                              /* branch */
-        if (!nml_mode) {                                /* monitor mode? */
+        if (cpu_mode == MON_MODE) {                     /* monitor mode? */
             OV = (dat >> 21) & 1;                       /* restore OV */
             if ((va & VA_USR) | (dat & I_USR)) {        /* mode change? */
-                usr_mode = 1;
+                cpu_mode = USR_MODE;
                 if (mon_usr_trap)
                     return MM_MONUSR;
                 }
@@ -1022,7 +1024,7 @@ switch (op) {                                           /* case on opcode */
 /* I/O instructions */
 
     case MIW: case MIY:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                       /* priv inst */
             return MM_PRVINS;
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
@@ -1035,7 +1037,7 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case WIM: case YIM:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                       /* priv inst */
             return MM_PRVINS;
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
@@ -1048,7 +1050,7 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case EOM: case EOD:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                       /* priv inst */
             return MM_PRVINS;
         if ((r = op_eomd (inst)))                       /* process inst */
             return r;
@@ -1058,7 +1060,7 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case POT:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                       /* priv inst */
             return MM_PRVINS;
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
@@ -1071,7 +1073,7 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case PIN:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                       /* priv inst */
             return MM_PRVINS;
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
@@ -1084,7 +1086,7 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case SKS:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                       /* priv inst */
             return MM_PRVINS;
         if ((r = op_sks (inst, &dat)))                  /* process inst */
             return r;
@@ -1093,7 +1095,7 @@ switch (op) {                                           /* case on opcode */
         break;
 
     default:
-        if (!nml_mode && usr_mode)                      /* priv inst */
+        if (cpu_mode == USR_MODE)                       /* priv inst */
             return MM_PRVINS;
         CRETINS;                                        /* invalid inst */
         break;
@@ -1160,7 +1162,7 @@ t_stat Read (uint32 va, uint32 *dat)
 {
 uint32 pgn, map, pa;
 
-if (nml_mode) {                                         /* normal? */
+if (cpu_mode == NML_MODE) {                             /* normal? */
     va = va & VA_MASK;                                  /* ignore user */
     if (va < 020000)                                    /* first 8K: 1 for 1 */
         pa = va;
@@ -1168,7 +1170,7 @@ if (nml_mode) {                                         /* normal? */
         pa = va + em2_dyn;
     else pa = va + em3_dyn;                             /* next 4K: ext EM3 */
     }
-else if (usr_mode || (va & VA_USR)) {                   /* user mapping? */
+else if ((cpu_mode == USR_MODE) || (va & VA_USR)) {     /* user mapping? */
     pgn = VA_GETPN (va);                                /* get page no */
     map = usr_map[pgn];                                 /* get map entry */
     if (map == MAP_PROT)                                /* prot? no access */
@@ -1192,7 +1194,7 @@ t_stat Write (uint32 va, uint32 dat)
 {
 uint32 pgn, map, pa;
 
-if (nml_mode) {                                         /* normal? */
+if (cpu_mode == NML_MODE) {                             /* normal? */
     va = va & VA_MASK;                                  /* ignore user */
     if (va < 020000)                                    /* first 8K: 1 for 1 */
         pa = va;
@@ -1200,7 +1202,7 @@ if (nml_mode) {                                         /* normal? */
         pa = va + em2_dyn;
     else pa = va + em3_dyn;                             /* next 4K: ext EM3 */
     }
-else if (usr_mode || (va & VA_USR)) {                   /* user mapping? */
+else if ((cpu_mode == USR_MODE) || (va & VA_USR)) {     /* user mapping? */
     pgn = VA_GETPN (va);                                /* get page no */
     map = usr_map[pgn];                                 /* get map entry */
     if (map & MAP_PROT) {                               /* protected page? */
@@ -1226,21 +1228,20 @@ return SCPE_OK;
 
 uint32 RelocC (int32 va, int32 sw)
 {
-uint32 nml = nml_mode, usr = usr_mode;
+uint32 mode = cpu_mode;
 uint32 pa, pgn, map;
 
 if (sw & SWMASK ('N'))                                  /* -n: normal */
-    nml = 1;
+    mode = NML_MODE;
 else if (sw & SWMASK ('X'))                             /* -x: mon */
-    nml = usr = 0;
+    mode = MON_MODE;
 else if (sw & SWMASK ('U')) {                           /* -u: user */
-    nml = 0;
-    usr = 1;
+    mode = USR_MODE;
     }
 else if (!(sw & SWMASK ('V')))                          /* -v: curr */
     return va;
 set_dyn_map ();
-if (nml) {                                              /* normal? */
+if (mode == NML_MODE) {                                 /* normal? */
     if (va < 020000)                                    /* first 8K: 1 for 1 */
         pa = va;
     else if (va < 030000)                               /* next 4K: ext EM2 */
@@ -1249,7 +1250,7 @@ if (nml) {                                              /* normal? */
     }
 else {
     pgn = VA_GETPN (va);                                /* get page no */
-    map = usr? usr_map[pgn]: mon_map[pgn];              /* get map entry */
+    map = (mode == USR_MODE)? usr_map[pgn]: mon_map[pgn]; /* get map entry */
     if (map == MAP_PROT)                                /* no access page? */
         return MAXMEMSIZE + 1;
     pa = (map & ~MAP_PROT) | (va & VA_POFF);            /* map address */
@@ -1483,8 +1484,7 @@ EM2 = 2;
 EM3 = 3;
 RL1 = RL2 = RL4 = 0;
 ion = ion_defer = 0;
-nml_mode = 1;
-usr_mode = 0;
+cpu_mode = NML_MODE;
 mon_usr_trap = 0;
 int_req = 0;
 int_reqhi = 0;
@@ -1652,10 +1652,12 @@ return SCPE_OK;
 
 void inst_hist (uint32 ir, uint32 pc, uint32 tp)
 {
+if (cpu_mode == hst_exclude)
+    return;
 hst_p = (hst_p + 1);                                    /* next entry */
 if (hst_p >= hst_lnt)
     hst_p = 0;
-hst[hst_p].typ = tp | (OV << 4);
+hst[hst_p].typ = tp | (OV << 4) | (cpu_mode << 5);
 hst[hst_p].pc = pc;
 hst[hst_p].ir = ir;
 hst[hst_p].a = A;
@@ -1682,6 +1684,14 @@ lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
 if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
     return SCPE_ARG;
 hst_p = 0;
+if (sim_switches & SWMASK('M'))
+    hst_exclude = MON_MODE;
+else if (sim_switches & SWMASK('N'))
+    hst_exclude = NML_MODE;
+else if (sim_switches & SWMASK('U'))
+    hst_exclude = USR_MODE;
+else
+    hst_exclude = BAD_MODE;
 if (hst_lnt) {
     free (hst);
     hst_lnt = 0;
@@ -1706,6 +1716,7 @@ t_stat r;
 t_value sim_eval;
 InstHistory *h;
 static char *cyc[] = { "   ", "   ", "INT", "TRP" };
+static char *modes = "NMU?";
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;
@@ -1718,13 +1729,13 @@ else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
 if (di < 0)
     di = di + hst_lnt;
-fprintf (st, "CYC PC    OV A        B        X        EA      IR\n\n");
+fprintf (st, "CYC PC    MD OV A        B        X        EA      IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
     if (h->typ) {                                       /* instruction? */
         ov = (h->typ >> 4) & 1;                         /* overflow */
-        fprintf (st, "%s %05o %o  %08o %08o %08o ", cyc[h->typ & 3],
-            h->pc, ov, h->a, h->b, h->x);
+        fprintf (st, "%s %05o %c  %o  %08o %08o %08o ", cyc[h->typ & 3],
+            h->pc, modes[(h->typ >> 5) & 3], ov, h->a, h->b, h->x);
         if (h->ea & HIST_NOEA)
             fprintf (st, "      ");
         else fprintf (st, "%05o ", h->ea);

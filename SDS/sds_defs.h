@@ -81,6 +81,13 @@
 #define SXT_EXP(x)      ((int32) (((x) & EXPS)? ((x) | ~EXPMASK): \
                         ((x) & EXPMASK)))
 
+/* CPU modes */
+
+#define NML_MODE        0
+#define MON_MODE        1
+#define USR_MODE        2
+#define BAD_MODE        3
+
 /* Memory */
 
 #define MAXMEMSIZE      (1 << 16)                       /* max memory size */

@@ -81,7 +81,7 @@ extern uint32 int_req;                                  /* int req */
 extern uint32 xfr_req;                                  /* xfer req */
 extern uint32 alert;                                    /* pin/pot alert */
 extern uint32 X, EM2, EM3, OV, ion, bpt;
-extern uint32 nml_mode, usr_mode;
+extern uint32 cpu_mode;
 extern int32 rtc_pie;
 extern int32 stop_invins, stop_invdev, stop_inviop;
 extern uint32 mon_usr_trap;
@@ -431,7 +431,7 @@ switch (mod) {
         else if (inst & 01000)                          /* alert RL2 */
             alert = POT_RL2;
         if (inst & 02000) {                             /* nml to mon */
-            nml_mode = usr_mode = 0;
+            cpu_mode = MON_MODE;
             if (inst & 00400)
                 mon_usr_trap = 1;
             }
