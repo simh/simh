@@ -180,6 +180,7 @@ t_stat wr_nop (int32 data, int32 addr, int32 access);
 t_stat uba_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat uba_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat uba_reset (DEVICE *dptr);
+static void uba_debug_dma (int32 mask, a10 pa_start, a10 pa_end);
 d10 ReadIO (a10 ea);
 void WriteIO (a10 ea, d10 val, int32 mode);
 
@@ -210,12 +211,23 @@ REG uba_reg[] = {
     { NULL }
     };
 
+#define DBG_DMA_IN  0x0001                              /* trace dma input transfers */
+#define DBG_DMA_OUT 0x0002                              /* trace dma output transfers */
+#define DBG_DMA_NXM 0x0004                              /* trace dma nxm errors */
+
+DEBTAB uba_debug[] = {
+    {"IN",   DBG_DMA_IN},
+    {"OUT",  DBG_DMA_OUT},
+    {"NXM",  DBG_DMA_NXM},
+    {0}
+    };
+
 DEVICE uba_dev = {
     "UBA", uba_unit, uba_reg, NULL,
     UBANUM, 8, UMAP_ASIZE, 1, 8, 32,
     &uba_ex, &uba_dep, &uba_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, DEV_DEBUG, 0, uba_debug
     };
 
 /* PDP-11 I/O structures */
@@ -614,6 +626,7 @@ uint32 ea, ofs, cp, np;
 int32 seg;
 a10 pa10 = ~0u;
 d10 m;
+a10 mem_pa10 = ~0u;
 
 if ((ba & ~((IO_M_UBA<<IO_V_UBA)|0017777)) == 0760000) {
     /* IOPAGE: device register read */
@@ -642,9 +655,10 @@ if (seg) {                                              /* Unaligned head */
     if (seg > bc)
         seg = bc;
     cp = UBMPAGE (ba);                                  /* Only one word, can't cross page */
-    pa10 = Map_Addr10 (ba, 1, NULL);                    /* map addr */
+    mem_pa10 = pa10 = Map_Addr10 (ba, 1, NULL);         /* map addr */
     if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
         ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA timeout */
+        sim_debug (DBG_DMA_NXM, &uba_dev, "Read Error at address %12" LL_FMT "o ba=%o, bc=%o\n", pa10, ba, bc);
         return bc;                                      /* return bc */
         }
     m = M[pa10++];
@@ -666,8 +680,10 @@ if (seg) {                                              /* Unaligned head */
     default:
         assert (FALSE);
         }
-    if (bc == 0)
+    if (bc == 0) {
+        uba_debug_dma (DBG_DMA_OUT, mem_pa10, pa10);
         return 0;
+        }
     } /* Head */
 
 /* At this point, ba is aligned.  Therefore, ea<1:0> are the tail's length */
@@ -680,9 +696,11 @@ if (seg > 0) { /* Body: Whole PDP-10 words, 4 bytes */
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);
         if (np != cp) {                         /* New (or first) page? */
-            pa10 = Map_Addr10 (ba, 1, NULL);    /* map addr */
-            if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {    /* inv map or NXM? */
+            uba_debug_dma (DBG_DMA_OUT, mem_pa10, pa10);
+            mem_pa10 = pa10 = Map_Addr10 (ba, 1, NULL);/* map addr */
+            if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {/* inv map or NXM? */
                 ubcs[1] = ubcs[1] | UBCS_TMO;   /* UBA timeout */
+                sim_debug (DBG_DMA_NXM, &uba_dev, "Read Error at address %12" LL_FMT "o ba=%o, bc=%o\n", pa10, ba, bc);
                 return (bc + seg);              /* return bc */
                 }
             cp = np;
@@ -705,9 +723,11 @@ if (bc) {
     assert (bc <= 3);
     np = UBMPAGE (ba);                          /* Only one word, last possible page crossing */
     if (np != cp) {                             /* New (or first) page? */
-        pa10 = Map_Addr10 (ba, 1, NULL);        /* map addr */
+        uba_debug_dma (DBG_DMA_OUT, mem_pa10, pa10);
+        mem_pa10 = pa10 = Map_Addr10 (ba, 1, NULL);/* map addr */
         if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {/* inv map or NXM? */
             ubcs[1] = ubcs[1] | UBCS_TMO;       /* UBA timeout */
+            sim_debug (DBG_DMA_NXM, &uba_dev, "Read Error at address %12" LL_FMT "o ba=%o, bc=%o\n", pa10, ba, bc);
             return (bc);                        /* return bc */
             }
     }
@@ -725,6 +745,7 @@ if (bc) {
         }
     }
 
+uba_debug_dma (DBG_DMA_OUT, mem_pa10, pa10);
 return 0;
 }
 
@@ -930,6 +951,7 @@ uint32 ea, ofs, cp, np;
 int32 seg, ubm = 0;
 a10 pa10 = ~0u;
 d10 m;
+a10 mem_pa10 = ~0u;
 
 if ((ba & ~((IO_M_UBA<<IO_V_UBA)|0017777)) == 0760000) {
     /* IOPAGE: device register write */
@@ -956,9 +978,11 @@ if (seg) {                                      /* Unaligned head */
     if (seg > bc)
         seg = bc;
     cp = UBMPAGE (ba);                          /* Only one word, can't cross page */
-    pa10 = Map_Addr10 (ba, 1, &ubm);            /* map addr */
+    uba_debug_dma (DBG_DMA_IN, mem_pa10, pa10);
+    mem_pa10 = pa10 = Map_Addr10 (ba, 1, &ubm); /* map addr */
     if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {    /* inv map or NXM? */
         ubcs[1] = ubcs[1] | UBCS_TMO;           /* UBA timeout */
+        sim_debug (DBG_DMA_NXM, &uba_dev, "Write Error at address %12" LL_FMT "o ba=%o, bc=%o\n", pa10, ba, bc);
         return bc;                              /* return bc */
         }
     m = M[pa10];
@@ -994,9 +1018,11 @@ if (seg > 0) {
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);
         if (np != cp) {                         /* New (or first) page? */
-            pa10 = Map_Addr10 (ba, 1, &ubm);    /* map addr */
-            if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {    /* inv map or NXM? */
+            uba_debug_dma (DBG_DMA_IN, mem_pa10, pa10);
+            mem_pa10 = pa10 = Map_Addr10 (ba, 1, &ubm);/* map addr */
+            if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {/* inv map or NXM? */
                 ubcs[1] = ubcs[1] | UBCS_TMO;   /* UBA timeout */
+                sim_debug (DBG_DMA_NXM, &uba_dev, "Write Error at address %12" LL_FMT "o ba=%o, bc=%o\n", pa10, ba, bc);
                 return (bc + seg);              /* return bc */
                 }
             cp = np;
@@ -1014,9 +1040,11 @@ if (bc) {
     assert (bc <= 3);
     np = UBMPAGE (ba);                          /* Only one word, last possible page crossing */
     if (np != cp) {                             /* New (or first) page? */
-        pa10 = Map_Addr10 (ba, 1, &ubm);        /* map addr */
+        uba_debug_dma (DBG_DMA_IN, mem_pa10, pa10);
+        mem_pa10 = pa10 = Map_Addr10 (ba, 1, &ubm);/* map addr */
         if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) { /* inv map or NXM? */
             ubcs[1] = ubcs[1] | UBCS_TMO;       /* UBA timeout */
+            sim_debug (DBG_DMA_NXM, &uba_dev, "Write Error at address %12" LL_FMT "o ba=%o, bc=%o\n", pa10, ba, bc);
             return (bc);                        /* return bc */
             }
     }
@@ -1053,6 +1081,7 @@ if (bc) {
     M[pa10] = m;
     }
 
+uba_debug_dma (DBG_DMA_IN, mem_pa10, pa10);
 return 0;
 }
 
@@ -1063,6 +1092,7 @@ int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
 uint32 ea, cp, np;
 int32 seg, ubm = 0;
 a10 pa10 = ~0u;
+a10 mem_pa10;
 
 if ((ba & ~((IO_M_UBA<<IO_V_UBA)|0017777)) == 0760000) {
     /* IOPAGE: device register write */
@@ -1101,11 +1131,14 @@ if (seg) {                                      /* Unaligned head */
         ubcs[1] = ubcs[1] | UBCS_TMO;           /* UBA timeout */
         return bc;                              /* return bc */
         }
+    mem_pa10 = pa10;
     M[pa10] = (M[pa10] & M_WORD1) | ((d10) (*buf++));
     pa10++;
 
-    if ((bc -= seg) == 0)
+    if ((bc -= seg) == 0) {
+        uba_debug_dma (DBG_DMA_IN, mem_pa10, pa10-mem_pa10);
         return 0;
+        }
     ba += seg;
     } /* Head */
 
@@ -1249,6 +1282,18 @@ if (bc) {
 return 0;
 }
 
+static void
+uba_debug_dma (int32 mask, a10 pa_start, a10 pa_end)
+{
+int32 i;
+int32 wc = (int32)(pa_end - pa_start);
+
+if ((!wc) || (!(sim_deb && (uba_dev.dctrl & mask))))
+    return;
+sim_debug (mask, &uba_dev, "DMA Address: %" LL_FMT "o of %o words\n", pa_start, wc);
+for (i=0; i<wc; i++)
+    sim_debug (mask, &uba_dev, "%12" LL_FMT "o: %" LL_FMT "o\n", pa_start+i, M[pa_start+i]);
+}
 
 /* Evaluate Unibus priority interrupts */
 
