@@ -1290,9 +1290,9 @@ int32 wc = (int32)(pa_end - pa_start);
 
 if ((!wc) || (!(sim_deb && (uba_dev.dctrl & mask))))
     return;
-sim_debug (mask, &uba_dev, "DMA Address: %" LL_FMT "o of %o words\n", pa_start, wc);
+sim_debug (mask, &uba_dev, "DMA Address: %12o of %o words\n", pa_start, wc);
 for (i=0; i<wc; i++)
-    sim_debug (mask, &uba_dev, "%12" LL_FMT "o: %" LL_FMT "o\n", pa_start+i, M[pa_start+i]);
+    sim_debug (mask, &uba_dev, "%12o: %12" LL_FMT "o\n", pa_start+i, M[pa_start+i]);
 }
 
 /* Evaluate Unibus priority interrupts */
