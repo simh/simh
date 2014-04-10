@@ -263,6 +263,7 @@ return SCPE_NXM;
 #define I_V_OPO         006                             /* opcode only */
 #define I_V_CHC         007                             /* chan cmd */
 #define I_V_CHT         010                             /* chan test */
+#define I_V_SPP         011                             /* system POP */
 #define I_NPN           (I_V_NPN << I_V_FL)
 #define I_PPO           (I_V_PPO << I_V_FL)
 #define I_IOI           (I_V_IOI << I_V_FL)
@@ -272,14 +273,38 @@ return SCPE_NXM;
 #define I_OPO           (I_V_OPO << I_V_FL)
 #define I_CHC           (I_V_CHC << I_V_FL)
 #define I_CHT           (I_V_CHT << I_V_FL)
+#define I_SPP           (I_V_SPP << I_V_FL)
 
 static const int32 masks[] = {
- 037777777, 010000000, 017700000,
- 017740000, 017700000, 017774000,
- 017700000, 017377677, 027737677
+ 037777777, 010000000, 017700000,                       /* NPN, PPO, IOI */
+ 017740000, 017700000, 017774000,                       /* MRF, REG, SHF */
+ 017700000, 017377677, 027737677,                       /* OPO, CHC, CHT */
+ 057740000                                              /* SPP           */
  };
 
-static const char *opcode[] = {
+static const char *opcode[] = {                         /* Note: syspops must preceed generic pop */
+ "WSI", "SWI", "BKPT","STO",
+ "WCD", "STI", "GCD", "SIC",
+ "ISC", "DBI", "DBO", "DWI",
+ "DWO", "LAS", "SAS", "IST",
+ "OST", "EXS", "FDV", "FMP",
+ "FSB", "FAD", "WCI", "WIO",
+ "CIO", "SKSG","SKSE","WCH",
+ "GCI", "LDP", "STP", "SBRM",
+ "SBRR","CTRL","BRS", "TCI",
+ "TCO", "BIO",
+
+ "WSI*", "SWI*", "BKPT*","STO*",
+ "WCD*", "STI*", "GCD*", "SIC*",
+ "ISC*", "DBI*", "DBO*", "DWI*",
+ "DWO*", "LAS*", "SAS*", "IST*",
+ "OST*", "EXS*", "FDV*", "FMP*",
+ "FSB*", "FAD*", "WCI*", "WIO*",
+ "CIO*", "SKSG*","SKSE*","WCH*",
+ "GCI*", "LDP*", "STP*", "SBRM*",
+ "SBRR*","CTRL*","BRS*", "TCI*",
+ "TCO*", "BIO*",
+
  "POP", "EIR", "DIR",
  "ROV", "REO", "OTO", "OVT",
  "IDT", "IET",
@@ -331,53 +356,75 @@ static const char *opcode[] = {
  };
 
 static const int32 opc_val[] = {
- 010000000+I_PPO, 000220002+I_NPN, 000220004+I_NPN,
- 002200001+I_NPN, 002200010+I_NPN, 002200100+I_NPN, 002200101+I_NPN,
- 004020002+I_NPN, 004020004+I_NPN,
- 004020040+I_NPN, 004020100+I_NPN, 004020200+I_NPN, 004020400+I_NPN,
- 004600003+I_NPN, 004600005+I_NPN, 004600012+I_NPN, 004600014+I_NPN,
- 004600060+I_NPN, 004600122+I_NPN, 004600140+I_NPN, 004600160+I_NPN,
- 024600003+I_NPN,
+ 050000000+I_SPP, 050100000+I_SPP, 053300000+I_SPP, 053400000+I_SPP,     /* WSI,  SWI,  BKPT, STO, */
+ 053500000+I_SPP, 053600000+I_SPP, 053700000+I_SPP, 054000000+I_SPP,     /* WCD,  STI,  GCD,  SIC, */
+ 054100000+I_SPP, 054200000+I_SPP, 054300000+I_SPP, 054400000+I_SPP,     /* ISC,  DBI,  DBO,  DWI, */
+ 054500000+I_SPP, 054600000+I_SPP, 054700000+I_SPP, 055000000+I_SPP,     /* DWO,  LAS,  SAS,  IST, */
+ 055100000+I_SPP, 055200000+I_SPP, 055300000+I_SPP, 055400000+I_SPP,     /* OST,  EXS,  FDV,  FMP, */
+ 055500000+I_SPP, 055600000+I_SPP, 055700000+I_SPP, 056000000+I_SPP,     /* FSB,  FAD,  WCI,  WIO, */
+ 056100000+I_SPP, 056200000+I_SPP, 056300000+I_SPP, 056400000+I_SPP,     /* CIO,  SKSG, SKSE, WCH, */
+ 056500000+I_SPP, 056600000+I_SPP, 056700000+I_SPP, 057000000+I_SPP,     /* GCI,  LDP,  STP,  SBRM,*/
+ 057100000+I_SPP, 057200000+I_SPP, 057300000+I_SPP, 057400000+I_SPP,     /* SBRR, CTRL, BRS,  TCI, */
+ 057500000+I_SPP, 057600000+I_SPP,                                       /* TCO,  BIO,             */
 
- 000000000+I_NPN, 000100000+I_MRF, 000200000+I_IOI, 000600000+I_IOI,
- 001000000+I_MRF, 001100000+I_MRF, 001200000+I_MRF, 001300000+I_MRF,
- 001400000+I_MRF, 001600000+I_MRF, 001700000+I_MRF,
- 002000000+I_OPO, 002300000+I_MRF,
- 003000000+I_MRF, 003200000+I_MRF, 003300000+I_MRF,
- 003500000+I_MRF, 003600000+I_MRF, 003700000+I_MRF,
- 004000000+I_IOI, 004100000+I_MRF, 004300000+I_MRF,
- 005000000+I_MRF, 005100000+I_MRF, 005200000+I_MRF, 005300000+I_MRF,
- 005400000+I_MRF, 005500000+I_MRF, 005600000+I_MRF, 005700000+I_MRF,
- 006000000+I_MRF, 006100000+I_MRF, 006200000+I_MRF, 006300000+I_MRF,
- 006400000+I_MRF, 006500000+I_MRF,
- 007000000+I_MRF, 007100000+I_MRF, 007200000+I_MRF, 007300000+I_MRF,
- 007400000+I_MRF, 007500000+I_MRF, 007600000+I_MRF, 007700000+I_MRF,
+ 054000000+I_SPP, 050140000+I_SPP, 053340000+I_SPP, 053440000+I_SPP,     /* WSI*,  SWI*,  BKPT*, STO*, */
+ 053540000+I_SPP, 053640000+I_SPP, 053740000+I_SPP, 054400000+I_SPP,     /* WCD*,  STI*,  GCD*,  SIC*, */
+ 054140000+I_SPP, 054240000+I_SPP, 054340000+I_SPP, 054440000+I_SPP,     /* ISC*,  DBI*,  DBO*,  DWI*, */
+ 054540000+I_SPP, 054640000+I_SPP, 054740000+I_SPP, 055400000+I_SPP,     /* DWO*,  LAS*,  SAS*,  IST*, */
+ 055140000+I_SPP, 055240000+I_SPP, 055340000+I_SPP, 055440000+I_SPP,     /* OST*,  EXS*,  FDV*,  FMP*, */
+ 055540000+I_SPP, 055640000+I_SPP, 055740000+I_SPP, 056400000+I_SPP,     /* FSB*,  FAD*,  WCI*,  WIO*, */
+ 056140000+I_SPP, 056240000+I_SPP, 056340000+I_SPP, 056440000+I_SPP,     /* CIO*,  SKSG*, SKSE*, WCH*, */
+ 056540000+I_SPP, 056640000+I_SPP, 056740000+I_SPP, 057400000+I_SPP,     /* GCI*,  LDP*,  STP*,  SBRM*,*/
+ 057140000+I_SPP, 057240000+I_SPP, 057340000+I_SPP, 057440000+I_SPP,     /* SBRR*, CTRL*, BRS*,  TCI*, */
+ 057540000+I_SPP, 057640000+I_SPP,                                       /* TCO*,  BIO*,               */
 
-                  000140000+I_MRF,
- 001040000+I_MRF, 001140000+I_MRF, 001240000+I_MRF, 001340000+I_MRF,
- 001440000+I_MRF, 001640000+I_MRF, 001740000+I_MRF,
-                  002340000+I_MRF,
- 003040000+I_MRF, 003240000+I_MRF, 003340000+I_MRF,
- 003540000+I_MRF, 003640000+I_MRF, 003740000+I_MRF,
-                  004140000+I_MRF, 004340000+I_MRF,
- 005040000+I_MRF, 005140000+I_MRF, 005240000+I_MRF, 005340000+I_MRF,
- 005440000+I_MRF, 005540000+I_MRF, 005640000+I_MRF, 005740000+I_MRF,
- 006040000+I_MRF, 006140000+I_MRF, 006240000+I_MRF, 006340000+I_MRF,
- 006440000+I_MRF, 006540000+I_MRF,
- 007040000+I_MRF, 007140000+I_MRF, 007240000+I_MRF, 007340000+I_MRF,
- 007440000+I_MRF, 007540000+I_MRF, 007640000+I_MRF, 007740000+I_MRF,
+ 010000000+I_PPO, 000220002+I_NPN, 000220004+I_NPN,                      /* POP,  EIR,  DIR,        */
+ 002200001+I_NPN, 002200010+I_NPN, 002200100+I_NPN, 002200101+I_NPN,     /* ROV,  REO,  OTO,  OVT,  */
+ 004020002+I_NPN, 004020004+I_NPN,                                       /* IDT,  IET,              */
+ 004020040+I_NPN, 004020100+I_NPN, 004020200+I_NPN, 004020400+I_NPN,     /* BPT4, BPT3, BPT2, BPT1, */
+ 004600003+I_NPN, 004600005+I_NPN, 004600012+I_NPN, 004600014+I_NPN,     /* CLAB, ABC,  BAC,  XAB,  */
+ 004600060+I_NPN, 004600122+I_NPN, 004600140+I_NPN, 004600160+I_NPN,     /* XXB,  STE,  LDE,  XEE,  */
+ 024600003+I_NPN,                                                        /* CLEAR,                  */
 
- 006600000+I_SHF, 006620000+I_SHF, 006624000+I_SHF,
- 006700000+I_SHF, 006710000+I_SHF, 006720000+I_SHF,
- 006640000+I_MRF, 006740000+I_MRF,
+ 000000000+I_NPN, 000100000+I_MRF, 000200000+I_IOI, 000600000+I_IOI,     /* HLT,  BRU,  EOM,  EOD,  */
+ 001000000+I_MRF, 001100000+I_MRF, 001200000+I_MRF, 001300000+I_MRF,     /* MIY,  BRI,  MIW,  POT,  */
+ 001400000+I_MRF, 001600000+I_MRF, 001700000+I_MRF,                      /* ETR,  MRG,  EOR,        */
+ 002000000+I_OPO, 002300000+I_MRF,                                       /* NOP,  EXU,              */
+ 003000000+I_MRF, 003200000+I_MRF, 003300000+I_MRF,                      /* YIM,  WIM,  PIN,        */
+ 003500000+I_MRF, 003600000+I_MRF, 003700000+I_MRF,                      /* STA,  STB,  STX,        */
+ 004000000+I_IOI, 004100000+I_MRF, 004300000+I_MRF,                      /* SKS,  BRX,  BRM,        */
+ 005000000+I_MRF, 005100000+I_MRF, 005200000+I_MRF, 005300000+I_MRF,     /* SKE,  BRR,  SKB,  SKN,  */
+ 005400000+I_MRF, 005500000+I_MRF, 005600000+I_MRF, 005700000+I_MRF,     /* SUB,  ADD,  SUC,  ADC,  */
+ 006000000+I_MRF, 006100000+I_MRF, 006200000+I_MRF, 006300000+I_MRF,     /* SKR,  MIN,  XMA,  ADM,  */
+ 006400000+I_MRF, 006500000+I_MRF,                                       /* MUL,  DIV,              */
+ 007000000+I_MRF, 007100000+I_MRF, 007200000+I_MRF, 007300000+I_MRF,     /* SKM,  LDX,  SKA,  SKG,  */
+ 007400000+I_MRF, 007500000+I_MRF, 007600000+I_MRF, 007700000+I_MRF,     /* SKD,  LDB,  LDA,  EAX,  */
 
- 000250000+I_CHC, 000200000+I_CHC, 000212000+I_CHC, 000214000+I_CHC,
- 004014000+I_CHT, 004011000+I_CHT, 004012000+I_CHT, 004010400+I_CHT,
+                  000140000+I_MRF,                                       /*       BRU*,             */
+ 001040000+I_MRF, 001140000+I_MRF, 001240000+I_MRF, 001340000+I_MRF,     /* MIY*, BRI*, MIW*, POT*, */
+ 001440000+I_MRF, 001640000+I_MRF, 001740000+I_MRF,                      /* ETR*, MRG*, EOR*,       */
+                  002340000+I_MRF,                                       /*       EXU*,             */
+ 003040000+I_MRF, 003240000+I_MRF, 003340000+I_MRF,                      /* YIM*, WIM*, PIN*,       */
+ 003540000+I_MRF, 003640000+I_MRF, 003740000+I_MRF,                      /* STA*, STB*, STX*,       */
+                  004140000+I_MRF, 004340000+I_MRF,                      /*       BRX*, BRM*,       */
+ 005040000+I_MRF, 005140000+I_MRF, 005240000+I_MRF, 005340000+I_MRF,     /* SKE*, BRR*, SKB*, SKN*, */
+ 005440000+I_MRF, 005540000+I_MRF, 005640000+I_MRF, 005740000+I_MRF,     /* SUB*, ADD*, SUC*, ADC*, */
+ 006040000+I_MRF, 006140000+I_MRF, 006240000+I_MRF, 006340000+I_MRF,     /* SKR*, MIN*, XMA*, ADM*, */
+ 006440000+I_MRF, 006540000+I_MRF,                                       /* MUL*, DIV*,             */
+ 007040000+I_MRF, 007140000+I_MRF, 007240000+I_MRF, 007340000+I_MRF,     /* SKM*, LDX*, SKA*, SKG*, */
+ 007440000+I_MRF, 007540000+I_MRF, 007640000+I_MRF, 007740000+I_MRF,     /* SKD*, LDB*, LDA*, EAX*, */
 
- 004600001+I_REG, 004600002+I_REG, 004600004+I_REG,
- 004600010+I_REG, 004600020+I_REG, 004600040+I_REG,
- 004600100+I_REG, 004600200+I_REG, 004600400+I_REG,
- 004601000+I_REG, 024600000+I_REG, 004600000+I_REG,
+ 006600000+I_SHF, 006620000+I_SHF, 006624000+I_SHF,                      /* RSH,  RCY,  LRSH,       */
+ 006700000+I_SHF, 006710000+I_SHF, 006720000+I_SHF,                      /* LSH,  NOD,  LCY,        */
+ 006640000+I_MRF, 006740000+I_MRF,                                       /* RSH*, LSH*,             */
+
+ 000250000+I_CHC, 000200000+I_CHC, 000212000+I_CHC, 000214000+I_CHC,     /* ALC,  DSC,  ASC,  TOP,  */
+ 004014000+I_CHT, 004011000+I_CHT, 004012000+I_CHT, 004010400+I_CHT,     /* CAT,  CET,  CZT,  CIT,  */
+
+ 004600001+I_REG, 004600002+I_REG, 004600004+I_REG,                      /* CLA,  CLB, CAB,         */
+ 004600010+I_REG, 004600020+I_REG, 004600040+I_REG,                      /* CBA,  CBX, CXB,         */
+ 004600100+I_REG, 004600200+I_REG, 004600400+I_REG,                      /* XPO,  CXA, CAX,         */
+ 004601000+I_REG, 024600000+I_REG, 004600000+I_REG,                      /* CNA,  CLX, NULL,        */
  -1
  };
 
@@ -465,6 +512,12 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             fprintf (of, "%s %-o", opcode[i], shf);
             if (tag)
                 fprintf (of, ",%-o", tag);
+            break;
+
+         case I_V_SPP:                                  /* syspop */
+            fprintf (of, "%s %-o", opcode[i], va);
+            if (tag & 2)
+                fprintf (of, ",2");
             break;
 
         case I_V_PPO:                                   /* pop */
@@ -622,6 +675,7 @@ switch (j) {                                            /* case on class */
         val[0] = val[0] | d | tag;
         break;
 
+    case I_V_SPP:                                       /* syspop */
     case I_V_MRF:                                       /* mem ref */
         cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
         d = get_uint (gbuf, 8, VA_MASK, &r);            /* virt address */
