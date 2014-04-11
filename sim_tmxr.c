@@ -2030,12 +2030,12 @@ UNIT *uptr = NULL;
 
 tmxr_debug_trace_line (lp, "tmxr_detach_ln()");
 _mux_detach_line (lp, TRUE, TRUE);
-if (lp->mp)
+if (lp->mp) {
     if (lp->uptr)
         uptr = lp->uptr;
     else
-        if (lp->mp->uptr)
-            uptr = lp->mp->uptr;
+        uptr = lp->mp->uptr;
+    }
 if (uptr && uptr->filename) {
     /* Revise the unit's connect string to reflect the current attachments */
     uptr->filename = tmxr_mux_attach_string (uptr->filename, lp->mp);
