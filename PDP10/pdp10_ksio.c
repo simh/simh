@@ -1334,9 +1334,9 @@ for (i=0; i<wc; i++)
     char bytes[80];
     d10 d = M[pa_start+i];
 
-    sprintf (octal, "%7o: %12" LL_FMT "o  ", pa_start+i, d);
-    sprintf (words, "0x%4X 0x%4X", (d&M_WORD0)>>V_WORD0, (d&M_WORD1)>>V_WORD1);
-    sprintf (bytes, "0x%2X 0x%2X 0x%2X 0x%2X", (d&M_BYTE0)>>V_BYTE0, (d&M_BYTE1)>>V_BYTE1, (d&M_BYTE2)>>V_BYTE2, (d&M_BYTE3)>>V_BYTE3);
+    sprintf (octal, "%07o: %012" LL_FMT "o  ", pa_start+i, d);
+    sprintf (words, "0x%04X 0x%04X", (int)(d&M_WORD0)>>V_WORD0, (int)(d&M_WORD1)>>V_WORD1);
+    sprintf (bytes, "0x%02X 0x%02X 0x%02X 0x%02X", (int)(d&M_BYTE0)>>V_BYTE0, (int)(d&M_BYTE1)>>V_BYTE1, (int)(d&M_BYTE2)>>V_BYTE2, (int)(d&M_BYTE3)>>V_BYTE3);
     sim_debug (mask, &uba_dev, "%s | %s | %s\n", octal, words, bytes);
     }
 }
