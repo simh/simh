@@ -1326,7 +1326,7 @@ int32 wc = (int32)(pa_end - pa_start);
 
 if ((!wc) || (!(sim_deb && (uba_dev.dctrl & mask))))
     return;
-sim_debug (mask, &uba_dev, "DMA Address: %12o of %o words\n", pa_start, wc);
+sim_debug (mask, &uba_dev, "DMA Address: %07o of %o words\n", pa_start, wc);
 for (i=0; i<wc; i++)
     {
     char octal[80];
@@ -1334,9 +1334,9 @@ for (i=0; i<wc; i++)
     char bytes[80];
     d10 d = M[pa_start+i];
 
-    sprintf (octal, "%07o: %012" LL_FMT "o  ", pa_start+i, d);
-    sprintf (words, "0x%04X 0x%04X", (int)(d&M_WORD0)>>V_WORD0, (int)(d&M_WORD1)>>V_WORD1);
-    sprintf (bytes, "0x%02X 0x%02X 0x%02X 0x%02X", (int)(d&M_BYTE0)>>V_BYTE0, (int)(d&M_BYTE1)>>V_BYTE1, (int)(d&M_BYTE2)>>V_BYTE2, (int)(d&M_BYTE3)>>V_BYTE3);
+    sprintf (octal, "%07o: %012" LL_FMT "o", pa_start+i, d);
+    sprintf (words, "0x%05X: %04X,,%04X", pa_start+i, (int)((d&~M_WORD0)>>V_WORD0), (int)((d&~M_WORD1)>>V_WORD1));
+    sprintf (bytes, "%02X %02X %02X %02X", (int)((d&~M_BYTE0)>>V_BYTE0), (int)((d&~M_BYTE1)>>V_BYTE1), (int)((d&~M_BYTE2)>>V_BYTE2), (int)((d&~M_BYTE3)>>V_BYTE3));
     sim_debug (mask, &uba_dev, "%s | %s | %s\n", octal, words, bytes);
     }
 }
