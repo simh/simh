@@ -2204,7 +2204,7 @@ void dmc_set_addr(CTLR *controller, uint32 addr)
 {
 if (dmc_is_dmc(controller) || (!(*controller->csrs->sel2 & DMP_SEL2_M_22BIT))) {
     dmc_setreg(controller, 4, addr & 0xFFFF, DBG_RGC);
-    dmc_setreg(controller, 6, (uint16)(((addr >> 2) << 14) | (*controller->csrs->sel6 & 0x3FFF)) , DBG_RGC);
+    dmc_setreg(controller, 6, (uint16)(((addr >> 16) << 14) | (*controller->csrs->sel6 & 0x3FFF)) , DBG_RGC);
     }
 else {
     dmc_setreg(controller, 4, addr & 0xFFFF, DBG_RGC);
