@@ -769,6 +769,8 @@ int32 Map_ReadW18 (uint32 ba, int32 bc, uint32 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteW18 (uint32 ba, int32 bc, uint32 *buf);
+void uba_debug_dma_in (uint32 ba, a10 pa_start, a10 pa_end);
+void uba_debug_dma_out (uint32 ba, a10 pa_start, a10 pa_end);
 
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
