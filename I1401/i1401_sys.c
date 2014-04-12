@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Mar-14    RMS     Fixed d character printout (Van Snyder)
    25-Mar-12    RMS     Fixed && -> & in test (Peter Schorn)
    20-Sep-05    RMS     Revised for new code tables
    04-Jan-05    WVS     Added address argument support
@@ -283,14 +284,12 @@ if ((flags & (NOWM | HNOP)) && (ilnt > 7))              /* cs, swm, h, nop? */
     ilnt = 7;
 else if ((op == OP_B) && (ilnt > 4) && (val[4] == BCD_BLANK))
     ilnt = 4;
-else if ((ilnt > 8) && (op != OP_NOP))                  /* cap length */
-    ilnt = 8;
 if (ilnt == 3) {                                        /* lnt = 3? */
     fprintf (of, "DSA");                                /* assume DSA */
     fprint_addr (of, val);                              /* print addr */
     return -(ilnt - 1);
     }
-if ((((flags & len_table[ilnt]) == 0) &&                /* invalid lnt, */
+if ((((flags & len_table[(ilnt > 8)? 8: ilnt]) == 0) && /* invalid lnt, */
     (op != OP_NOP)) ||                                  /* not nop? */
     (opcode[op] == NULL))                               /* or undef? */
     return dcw (of, op, val, sw);
@@ -303,7 +302,7 @@ if (ilnt > 2) {                                         /* A address? */
 	}
 if (ilnt > 5)                                           /* B address? */
     fprint_addr (of, &val[4]);
-if ((ilnt == 2) || (ilnt == 5) || (ilnt == 8))          /* d character? */
+if ((ilnt == 2) || (ilnt == 5) || (ilnt >= 8))          /* d character? */
     fprintf (of, " '%c", bcd2ascii (val[ilnt - 1], use_h));
 return -(ilnt - 1);                                     /* return # chars */
 }
