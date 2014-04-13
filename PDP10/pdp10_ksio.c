@@ -647,7 +647,7 @@ if (seg) {                                              /* Unaligned head */
     dpy_pa10 = pa10 = Map_Addr10 (ba, 1, NULL);         /* map addr */
     if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
         ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA timeout */
-        uba_debug_dma_nxm (const "Read Byte", pa10, ba, bc);
+        uba_debug_dma_nxm ("Read Byte", pa10, ba, bc);
         return bc;                                      /* return bc */
         }
     m = M[pa10++];
@@ -691,7 +691,7 @@ if (seg > 0) { /* Body: Whole PDP-10 words, 4 bytes */
             dpy_ba = ba;
             if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {/* inv map or NXM? */
                 ubcs[1] = ubcs[1] | UBCS_TMO;   /* UBA timeout */
-                uba_debug_dma_nxm (const "Read Byte", pa10, ba, bc);
+                uba_debug_dma_nxm ("Read Byte", pa10, ba, bc);
                 return (bc + seg);              /* return bc */
                 }
             cp = np;
@@ -956,6 +956,78 @@ if (bc) {
         }
     *buf++ = (uint32) ((M[pa10++] >> V_WORD0) & M_RH);
     }
+
+uba_debug_dma_out (dpy_ba, dpy_pa10, pa10);
+return 0;
+}
+
+/* Word reads returning 36-bit data
+ *
+ * Identical to 16-bit reads except that buffer is d10
+ * and masked to 36 bits.
+ */
+
+int32 Map_ReadW36 (uint32 ba, int32 bc, d10 *buf)
+{
+uint32 ea, cp, np;
+int32 seg;
+a10 pa10 = ~0u;
+int32 ub = ADDR2UBA (ba);
+uint32 dpy_ba = ba;
+a10 dpy_pa10 = ~0u;
+
+if ((ba & ~((IO_M_UBA<<IO_V_UBA)|0017777)) == 0760000) {
+    /* IOPAGE: device register read */
+    int32 csr;
+
+    if ((ba | bc) & 3)
+        ABORT (STOP_IOALIGN);
+
+    while (bc) {
+        if (UBReadIO (&csr, ba, READ) != SCPE_OK)
+            break;
+        *buf++ = (uint32)csr;
+        ba += 2;
+        bc -= 2;
+        }
+    return bc;
+    }
+
+/* Memory */
+
+if (bc == 0)
+    return 0;
+
+ba &= ~3;
+if (bc & 3)
+    ABORT (STOP_IOALIGN);
+
+cp = ~ba;
+seg = (4 - (ba & 3)) & 3;
+
+ea = ba + bc;
+seg = bc - (ea & 3);
+
+if (seg > 0) {
+    assert (((seg & 3) == 0) && (bc >= seg));
+    bc -= seg;
+    for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
+        np = UBMPAGE (ba);
+        if (np != cp) {                         /* New (or first) page? */
+            uba_debug_dma_out (dpy_ba, dpy_pa10, pa10);
+            dpy_pa10 = pa10 = Map_Addr10 (ba, ub, NULL);/* map addr */
+            dpy_ba = ba;
+            if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {/* inv map or NXM? */
+                ubcs[ub] |= UBCS_TMO;           /* UBA timeout */
+                uba_debug_dma_nxm ("Read 36b Word", pa10, ba, bc);
+                return (bc + seg);              /* return bc */
+                }
+            cp = np;
+            }
+        *buf++ = M[pa10++];                     /* Next word from -10 */
+        }
+    } /* Body */
+
 
 uba_debug_dma_out (dpy_ba, dpy_pa10, pa10);
 return 0;
@@ -1324,6 +1396,71 @@ if (bc) {
         M[pa10] = ((d10)(M_WORD18 & buf[0])) << V_WORD0;
     pa10++;
     }
+
+uba_debug_dma_in (dpy_ba, dpy_pa10, pa10);
+return 0;
+}
+
+/* Word mode writes; 36-bit data */
+
+int32 Map_WriteW36 (uint32 ba, int32 bc, a10 *buf)
+{
+uint32 ea, cp, np;
+int32 seg, ubm = 0;
+a10 pa10 = ~0u;
+uint32 dpy_ba = ba;
+a10 dpy_pa10 = ~0u;
+
+if ((ba & ~((IO_M_UBA<<IO_V_UBA)|0017777)) == 0760000)
+{ /* IOPAGE: device register write */
+
+    if ((ba | bc) & 1)
+        ABORT (STOP_IOALIGN);
+
+    while (bc) {
+        if (UBWriteIO (*buf++ & M_RH, ba, WRITE) != SCPE_OK)
+            break;
+        ba += 2;
+        bc -= 2;
+        }
+    return bc;
+}
+
+/* Memory */
+
+if (bc == 0)
+    return 0;
+
+ba &= ~3;
+if (bc & 3)
+    ABORT (STOP_IOALIGN);
+
+cp = ~ba;
+seg = (4 - (ba & 3)) & 3;
+
+ea = ba + bc;
+seg = bc - (ea & 3);
+
+if (seg > 0) {
+    assert (((seg & 3) == 0) && (bc >= seg));
+    bc -= seg;
+    for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
+        np = UBMPAGE (ba);
+        if (np != cp) {                         /* New (or first) page? */
+            uba_debug_dma_in (dpy_ba, dpy_pa10, pa10);
+            dpy_pa10 = pa10 = Map_Addr10 (ba, 1, &ubm);/* map addr */
+            dpy_ba = ba;
+            if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {/* inv map or NXM? */
+                ubcs[1] = ubcs[1] | UBCS_TMO;   /* UBA timeout */
+                uba_debug_dma_nxm ("Write 18b Word", pa10, ba, bc);
+                return (bc + seg);              /* return bc */
+                }
+            cp = np;
+            }
+        M[pa10++] = (((d10)(M_WORD18 & buf[0])) << V_WORD0) | (M_WORD18 & buf[1]);/* V_WORD1 */
+        buf += 2;
+        }
+    } /* Body */
 
 uba_debug_dma_in (dpy_ba, dpy_pa10, pa10);
 return 0;
