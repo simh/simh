@@ -380,6 +380,7 @@ extern t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 extern int32 con_halt (int32 code, int32 cc);
 
 t_stat cpu_reset (DEVICE *dptr);
+t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 t_stat cpu_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -3193,6 +3194,7 @@ mapen = 0;
 FLUSH_ISTR;                             /* init I-stream */
 if (M == NULL) {                        /* first time init? */
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
+    sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
     pcq_r = find_reg ("PCQ", NULL, dptr);
     if (pcq_r == NULL)
         return SCPE_IERR;
@@ -3203,6 +3205,27 @@ if (M == NULL) {                        /* first time init? */
     auto_config(NULL, 0);               /* do an initial auto configure */
     }
 return build_dib_tab ();
+}
+
+t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
+{
+static t_addr returns[2] = {0, 0};
+
+if (SCPE_OK != get_aval (PC, &cpu_dev, &cpu_unit))  /* get data */
+    return FALSE;
+switch (sim_eval[0])
+    {
+    case BSBB:
+    case BSBW:
+    case JSB:
+    case CALLG:
+    case CALLS:
+        returns[0] = PC + (1 - fprint_sym (stdnul, PC, sim_eval, &cpu_unit, SWMASK ('M')));
+        *ret_addrs = returns;
+        return TRUE;
+    default:
+        return FALSE;
+    }
 }
 
 /* Memory examine */
