@@ -214,6 +214,7 @@ The "!" command (execute a command on the local OS), now returns the command's e
     SHOW DEFAULT                    Show working directory
     DIR {path|file}                 Display file listing
     LS {path|file}                  Display file listing
+    NEXT                            Step across a subroutine call or step a single instruction.
 
 #### Command Processing Enhancements
 

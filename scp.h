@@ -42,8 +42,9 @@
 #define RU_RUN          0                               /* run */
 #define RU_GO           1                               /* go */
 #define RU_STEP         2                               /* step */
-#define RU_CONT         3                               /* continue */
-#define RU_BOOT         4                               /* boot */
+#define RU_NEXT         3                               /* step or step/over */
+#define RU_CONT         4                               /* continue */
+#define RU_BOOT         5                               /* boot */
 
 /* get_sim_opt parameters */
 
@@ -133,6 +134,7 @@ REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 CTAB *find_ctab (CTAB *tab, char *gbuf);
 C1TAB *find_c1tab (C1TAB *tab, char *gbuf);
 SHTAB *find_shtab (SHTAB *tab, char *gbuf);
+t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 BRKTAB *sim_brk_fnd (t_addr loc);
 uint32 sim_brk_test (t_addr bloc, uint32 btyp);
 void sim_brk_clrspc (uint32 spc);
@@ -185,10 +187,12 @@ extern struct timespec sim_deb_basetime;                /* debug base time for r
 extern UNIT *sim_clock_queue;
 extern int32 sim_is_running;
 extern char *sim_prompt;                                /* prompt string */
+extern t_value *sim_eval;
 extern volatile int32 stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
 extern uint32 sim_brk_dflt;
 extern uint32 sim_brk_summ;
+extern FILE *stdnul;
 extern t_bool sim_asynch_enabled;
 
 /* VM interface */
@@ -215,6 +219,7 @@ extern CTAB *sim_vm_cmd;
 extern void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr);
 extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
 extern t_value (*sim_vm_pc_value) (void);
+extern t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs);
 
 
 #endif

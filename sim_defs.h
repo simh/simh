@@ -223,6 +223,14 @@ typedef uint32          t_addr;
 #define HAVE_C99_STRFTIME 1
 #endif
 
+#if defined (_WIN32)
+#define NULL_DEVICE "NUL:"
+#elif defined (_VMS)
+#define NULL_DEVICE "NL:"
+#else
+#define NULL_DEVICE "/dev/null"
+#endif
+
 /* Stubs for inlining */
 
 #define SIM_INLINE
@@ -241,8 +249,8 @@ typedef uint32          t_addr;
 
 /* Breakpoint spaces definitions */
 
-#define SIM_BKPT_N_SPC  64                              /* max number spaces */
-#define SIM_BKPT_V_SPC  26                              /* location in arg */
+#define SIM_BKPT_N_SPC  16                              /* max number spaces */
+#define SIM_BKPT_V_SPC  28                              /* location in arg */
 
 /* Extended switch definitions (bits >= 26) */
 
@@ -616,7 +624,10 @@ struct sim_schtab {
 
 struct sim_brktab {
     t_addr              addr;                           /* address */
-    int32               typ;                            /* mask of types */
+    uint32              typ;                            /* mask of types */
+#define BRK_TYP_DYN_STEPOVER    (SWMASK ('Z'+1))
+#define BRK_TYP_DYN_USR         (SWMASK ('Z'+2))
+#define BRK_TYP_DYN_ALL         (BRK_TYP_DYN_USR|BRK_TYP_DYN_STEPOVER) /* Mask of All Dynamic types */
     int32               cnt;                            /* proceed count */
     char                *act;                           /* action string */
     };

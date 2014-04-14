@@ -346,6 +346,7 @@ CTAB *sim_vm_cmd = NULL;
 void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr) = NULL;
 t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr) = NULL;
 t_value (*sim_vm_pc_value) (void) = NULL;
+t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
 
 /* Prototypes */
 
@@ -392,6 +393,7 @@ char *sim_brk_getact (char *buf, int32 size);
 void sim_brk_clract (void);
 void sim_brk_npc (uint32 cnt);
 BRKTAB *sim_brk_new (t_addr loc);
+FILE *stdnul;
 
 /* Commands support routines */
 
@@ -764,6 +766,12 @@ static const char simh_help[] =
       " The STEP command (abbreviated S) resumes execution at the current PC for\n"
       " the number of instructions given by its argument.  If no argument is\n"
       " supplied, one instruction is executed.\n"
+#define HLP_NEXT        "*Commands Running_A_Simulated_Program NEXT"
+      "3NEXT\n"
+      " The NEXT command (abbreviated N) resumes execution at the current PC for\n"
+      " one instruction, attempting to execute through a subroutine calls.\n"
+      " If the next instruction to be executed is not a subroutine call,\n"
+      " one instruction is executed.\n"
 #define HLP_BOOT        "*Commands Running_A_Simulated_Program BOOT"
       "3BOOT\n"
       " The BOOT command (abbreviated BO) resets all devices and bootstraps the\n"
@@ -1416,6 +1424,7 @@ static CTAB cmd_table[] = {
     { "RUN",        &run_cmd,       RU_RUN,     HLP_RUN,        NULL, &run_cmd_message },
     { "GO",         &run_cmd,       RU_GO,      HLP_GO,         NULL, &run_cmd_message },
     { "STEP",       &run_cmd,       RU_STEP,    HLP_STEP,       NULL, &run_cmd_message },
+    { "NEXT",       &run_cmd,       RU_NEXT,    HLP_NEXT,       NULL, &run_cmd_message },
     { "CONTINUE",   &run_cmd,       RU_CONT,    HLP_CONTINUE,   NULL, &run_cmd_message },
     { "BOOT",       &run_cmd,       RU_BOOT,    HLP_BOOT,       NULL, &run_cmd_message },
     { "BREAK",      &brk_cmd,       SSH_ST,     HLP_BREAK },
@@ -1581,6 +1590,7 @@ set_prompt (0, "sim>");                                 /* start with set standa
 *cbuf = 0;                                              /* init arg buffer */
 sim_switches = 0;                                       /* init switches */
 lookswitch = TRUE;
+stdnul = fopen(NULL_DEVICE,"wb");
 for (i = 1; i < argc; i++) {                            /* loop thru args */
     if (argv[i] == NULL)                                /* paranoia */
         continue;
@@ -1731,6 +1741,7 @@ sim_set_notelnet (0, NULL);                             /* close Telnet */
 sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
 sim_cleanup_sock ();                                    /* cleanup sockets */
+fclose (stdnul);                                        /* close bit bucket file handle */
 return 0;
 }
 
@@ -5250,7 +5261,17 @@ else if (flag == RU_STEP) {                             /* step */
         }
     else sim_step = 1;
     }
+else if (flag == RU_NEXT) {                             /* next */
+    t_addr *addrs;
 
+    if ((sim_vm_is_subroutine_call) && sim_vm_is_subroutine_call(&addrs)) {
+        sim_brk_types |= BRK_TYP_DYN_STEPOVER;
+        for (i=0; addrs[i]; i++)
+            sim_brk_set (addrs[i], BRK_TYP_DYN_STEPOVER, 0, NULL);
+        }
+    else
+        sim_step = 1;
+    }
 else if (flag == RU_BOOT) {                             /* boot */
     if (*cptr == 0)                                     /* must be more */
         return SCPE_2FARG;
@@ -5329,6 +5350,7 @@ r = sim_instr();
 sim_is_running = 0;                                     /* flag idle */
 sim_stop_timer_services ();                             /* disable wall clock timing */
 sim_ttcmd ();                                           /* restore console */
+sim_brk_clrall (BRK_TYP_DYN_STEPOVER);                  /* cancel any step/over subroutine breakpoints */
 signal (SIGINT, SIG_DFL);                               /* cancel WRU */
 #ifdef SIGHUP
 signal (SIGHUP, SIG_DFL);                               /* cancel WRU */
@@ -7457,14 +7479,17 @@ if (!bp)                                                /* no, allocate */
     bp = sim_brk_new (loc);
 if (!bp)                                                /* still no? mem err */
     return SCPE_MEM;
-bp->typ = sw;                                           /* set type */
+if ((sw & BRK_TYP_DYN_ALL) && act)                      /* can't specify an action with a dynamic breakpoint */
+    return SCPE_ARG;
+bp->typ |= sw;                                          /* set type */
 bp->cnt = ncnt;                                         /* set count */
-if ((bp->act != NULL) && (act != NULL)) {               /* replace old action? */
+if ((!(sw & BRK_TYP_DYN_ALL)) &&                        /* Not Dynamic and */
+    (bp->act != NULL) && (act != NULL)) {               /* replace old action? */
     free (bp->act);                                     /* deallocate */
     bp->act = NULL;                                     /* now no action */
     }
 if ((act != NULL) && (*act != 0)) {                     /* new action? */
-    char *newp = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc buf */
+    char *newp = (char *) calloc (CBUFSIZE+1, sizeof (char)); /* alloc buf */
     if (newp == NULL)                                   /* mem err? */
         return SCPE_MEM;
     strncpy (newp, act, CBUFSIZE);                      /* copy action */
@@ -7584,7 +7609,10 @@ uint32 sim_brk_test (t_addr loc, uint32 btyp)
 BRKTAB *bp;
 uint32 spc = (btyp >> SIM_BKPT_V_SPC) & (SIM_BKPT_N_SPC - 1);
 
-if ((bp = sim_brk_fnd (loc)) && (btyp & bp->typ)) {     /* in table, type match? */
+if (sim_brk_summ & BRK_TYP_DYN_ALL)
+    btyp |= BRK_TYP_DYN_ALL;
+
+if ((bp = sim_brk_fnd (loc)) && (btyp & bp->typ)) {     /* in table, and type match? */
     if ((sim_brk_pend[spc] && (loc == sim_brk_ploc[spc])) || /* previous location? */
         (--bp->cnt > 0))                                /* count > 0? */
         return 0;
