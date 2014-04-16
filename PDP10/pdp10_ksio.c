@@ -1620,7 +1620,23 @@ int32 n = iocmap[GET_IOUBA (pa)];
 if (n < 0)
     ABORT (STOP_ILLIOC);
 if (val & UBCS_INI) {
-    reset_all (5);                                      /* start after UBA */
+    DEVICE *dptr;
+    int i;
+
+    for (i=0; (dptr = sim_devices[i]) != NULL; i++) {
+        if (dptr == &uba_dev) {
+            ++i;                                    /* start after UBA */
+            break;
+            }
+        }
+    /* Now find the devices which are attached to this UBA and reset them */
+    for (; (dptr = sim_devices[i]) != NULL; i++) {
+        DIB *dibp = (DIB *)dptr->ctxt;
+
+        if ((n == iocmap[GET_IOUBA (dibp->ba)]) &&
+            (dptr->reset != NULL))
+            dptr->reset (dptr);
+        }
     ubcs[n] = val & UBCS_DXF;
     }
 else ubcs[n] = val & UBCS_RDW;
