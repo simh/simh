@@ -1518,8 +1518,9 @@ uint32 inst;
 
 reason = Read (P, &inst);              /* get instr */
 if ((reason == SCPE_OK) &&
-    ((I_GETOP(inst) == BRM) ||         /*  if BRM or     */
-     (I_POP & inst))) {                /*  POP or SYSPOP */
+    ((I_GETOP(inst) == BRM) ||         /*  if BRM or        */
+     (I_POP & inst) ||                 /*  POP or SYSPOP or */
+     (sim_switches & SWMASK('F')))) {  /*  Force switch     */
         returns[0] = (P + 1) & VA_MASK;
         returns[1] = (P + 2) & VA_MASK;
         *ret_addrs = returns;
