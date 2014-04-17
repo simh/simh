@@ -5250,8 +5250,18 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
         return r;
     }
 
-else if (flag == RU_STEP) {                             /* step */
-   if (*cptr != 0) {                                    /* argument? */
+else if ((flag == RU_STEP) ||
+         ((flag == RU_NEXT) && !sim_vm_is_subroutine_call)) { /* step */
+    static t_bool not_implemented_message = FALSE;
+
+    flag = RU_STEP;
+    if (!not_implemented_message) {
+        printf ("This simulator does not have subroutine call detection.\nPerforming a STEP instead\n");
+        if (sim_log)
+            fprintf (sim_log, "This simulator does not have subroutine call detection.\nPerforming a STEP instead\n");
+        not_implemented_message = TRUE;
+        }
+    if (*cptr != 0) {                                   /* argument? */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
         if (*cptr != 0)                                 /* should be end */
             return SCPE_2MARG;
@@ -5264,7 +5274,7 @@ else if (flag == RU_STEP) {                             /* step */
 else if (flag == RU_NEXT) {                             /* next */
     t_addr *addrs;
 
-    if ((sim_vm_is_subroutine_call) && sim_vm_is_subroutine_call(&addrs)) {
+    if (sim_vm_is_subroutine_call(&addrs)) {
         sim_brk_types |= BRK_TYP_DYN_STEPOVER;
         for (i=0; addrs[i]; i++)
             sim_brk_set (addrs[i], BRK_TYP_DYN_STEPOVER, 0, NULL);
