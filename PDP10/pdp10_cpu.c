@@ -208,6 +208,7 @@ int32 apr_serial = -1;                                  /* CPU Serial number */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
+t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_set_serial (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -635,8 +636,6 @@ t_stat sim_instr (void)
 a10 PC;                                                 /* set by setjmp */
 int abortval = 0;                                       /* abort value */
 t_stat r;
-
-sim_vm_pc_value = &pdp10_pc_value;
 
 /* Restore register state */
 
@@ -2350,12 +2349,59 @@ if (M == NULL)
     M = (d10 *) calloc (MAXMEMSIZE, sizeof (d10));
 if (M == NULL)
     return SCPE_MEM;
+sim_vm_pc_value = &pdp10_pc_value;
+sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
+}
+
+t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
+{
+#define MAX_SUB_RETURN_SKIP 10
+static t_addr returns[MAX_SUB_RETURN_SKIP+1] = {0};
+a10 ea;
+d10 inst, indrct;
+int32 i, pflgs = 0;
+t_addr adn, max_returns = MAX_SUB_RETURN_SKIP;
+
+int32 xr, ac;
+
+if (SCPE_OK != get_aval ((saved_PC & AMASK), &cpu_dev, &cpu_unit))  /* get data */
+    return FALSE;
+inst = sim_eval[0];
+switch (GET_OP(inst))
+    {
+    case 0260:              /* PUSHJ */
+    case 0265:              /* JSP */
+    case 0266:              /* JSA */
+    case 0267:              /* JRA */
+        ac = GET_AC (inst);                     /* get AC */
+        for (indrct = inst, i = 0; i < ind_max; i++) {/* calc eff addr */
+            ea = GET_ADDR (indrct);
+            xr = GET_XR (indrct);
+            if (xr)
+                ea = (ea + ((a10) XR (xr, MM_EA))) & AMASK;
+            if (TST_IND (indrct))
+                indrct = Read (ea, MM_EA);
+            else break;
+            }
+        if (i >= ind_max)
+            return FALSE;                       /* too many ind? stop */
+        returns[0] = (saved_PC & AMASK) + (1 - fprint_sym (stdnul, (saved_PC & AMASK), sim_eval, &cpu_unit, SWMASK ('M')));
+        if (((t_addr)ea > returns[0]) && ((ea - returns[0]) < max_returns))
+            max_returns = (t_addr)(ea - returns[0]);
+        for (adn=1; adn<max_returns; adn++)
+            returns[adn] = returns[adn-1] + 1;  /* Possible skip return */
+        returns[i] = 0;                         /* Make sure the address list ends with a zero */
+        *ret_addrs = returns;
+        return TRUE;
+    default:
+        return FALSE;
+    }
 }
 
 /* Memory examine */
