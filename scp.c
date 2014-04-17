@@ -5224,6 +5224,7 @@ t_stat run_cmd (int32 flag, char *cptr)
 {
 char *tptr, gbuf[CBUFSIZE];
 uint32 i, j;
+int32 sim_next;
 int32 unitno;
 t_value pcv;
 t_stat r;
@@ -5274,6 +5275,15 @@ else if ((flag == RU_STEP) ||
 else if (flag == RU_NEXT) {                             /* next */
     t_addr *addrs;
 
+    if (*cptr != 0) {                                   /* argument? */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
+        if (*cptr != 0)                                 /* should be end */
+            return SCPE_2MARG;
+        sim_next = (int32) get_uint (gbuf, 10, INT_MAX, &r);
+        if ((r != SCPE_OK) || (sim_next <= 0))          /* error? */
+            return SCPE_ARG;
+        }
+    else sim_next = 1;
     if (sim_vm_is_subroutine_call(&addrs)) {
         sim_brk_types |= BRK_TYP_DYN_STEPOVER;
         for (i=0; addrs[i]; i++)
@@ -5355,7 +5365,44 @@ sim_throt_sched ();                                     /* set throttle */
 sim_brk_clract ();                                      /* defang actions */
 sim_rtcn_init_all ();                                   /* re-init clocks */
 sim_start_timer_services ();                            /* enable wall clock timing */
-r = sim_instr();
+
+do {
+    t_addr *addrs;
+
+    r = sim_instr();
+    if ((flag != RU_NEXT) ||                            /* done if not doing NEXT */
+        (--sim_next <=0))
+        break;
+    if (sim_step == 0) {                                /* doing a NEXT? */
+        t_addr val;
+        BRKTAB *bp;
+
+        if (r >= SCPE_BASE)                             /* done if an error occurred */
+            break;
+        if (sim_vm_pc_value)                            /* done if didn't stop at a dynamic breakpoint */
+            val = (t_addr)(*sim_vm_pc_value)();
+        else
+            val = (t_addr)get_rval (sim_PC, 0);
+        if ((!(bp = sim_brk_fnd (val))) || (!(bp->typ & BRK_TYP_DYN_STEPOVER)))
+            break;
+        sim_brk_clrall (BRK_TYP_DYN_STEPOVER);          /* cancel any step/over subroutine breakpoints */
+        }
+    else {
+        if (r != SCPE_STEP)                             /* done if step didn't complete with step expired */
+            break;
+        }
+    /* setup another next/step */
+    sim_step = 0;
+    if (sim_vm_is_subroutine_call(&addrs)) {
+        sim_brk_types |= BRK_TYP_DYN_STEPOVER;
+        for (i=0; addrs[i]; i++)
+            sim_brk_set (addrs[i], BRK_TYP_DYN_STEPOVER, 0, NULL);
+        }
+    else
+        sim_step = 1;
+    if (sim_step)                                           /* set step timer */
+        sim_activate (&sim_step_unit, sim_step);
+    } while (1);
 
 sim_is_running = 0;                                     /* flag idle */
 sim_stop_timer_services ();                             /* disable wall clock timing */
