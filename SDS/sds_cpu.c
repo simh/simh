@@ -198,6 +198,7 @@ int32 rtc_tps = 60;                                     /* rtc ticks/sec */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
+t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -438,6 +439,8 @@ while (reason == 0) {                                   /* loop until halted */
             if (btyp) {
                 if (btyp & SWMASK ('E'))                /* unqualified breakpoint? */
                     reason = STOP_IBKPT;                /* stop simulation */
+                else if (btyp & BRK_TYP_DYN_STEPOVER)   /* stepover breakpoint? */
+                    reason = STOP_DBKPT;                /* stop simulation */
                 else switch (btyp) {                    /* qualified breakpoint */
                     case SWMASK ('M'):                  /* monitor mode */
                         reason = STOP_MBKPT;            /* stop simulation */
@@ -1497,7 +1500,33 @@ if (pcq_r)
 else return SCPE_IERR;
 sim_brk_dflt = SWMASK ('E');
 sim_brk_types = SWMASK ('E') | SWMASK ('M') | SWMASK ('N') | SWMASK ('U');
+sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
 return SCPE_OK;
+}
+
+/* For Next command, determine if should use breakpoints
+   to step over a subroutine branch or POP or SYSPOP.  Return
+   TRUE if so with a list of addresses where dynamic (temporary)
+   breakpoints should be set.
+*/
+
+t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
+{
+static t_addr returns[3] = {0, 0, 0};
+t_stat reason;
+uint32 inst;
+
+reason = Read (P, &inst);              /* get instr */
+if ((reason == SCPE_OK) &&
+    ((I_GETOP(inst) == BRM) ||         /*  if BRM or     */
+     (I_POP & inst))) {                /*  POP or SYSPOP */
+        returns[0] = (P + 1) & VA_MASK;
+        returns[1] = (P + 2) & VA_MASK;
+        *ret_addrs = returns;
+        return TRUE;
+    }
+else
+    return FALSE;
 }
 
 /* Memory examine */
