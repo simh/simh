@@ -99,7 +99,8 @@ const char *sim_stop_messages[] = {
     "Runaway carriage control tape",
     "Monitor-mode Breakpoint",
     "Normal-mode Breakpoint",
-    "User-mode Breakpoint"
+    "User-mode Breakpoint",
+    "Next expired"
     };
 
 /* Character conversion tables */

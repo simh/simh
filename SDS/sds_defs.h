@@ -55,6 +55,8 @@
 #define STOP_MBKPT      15                              /* monitor-mode breakpoint */
 #define STOP_NBKPT      16                              /* normal-mode breakpoint */
 #define STOP_UBKPT      17                              /* user-mode breakpoint */
+#define STOP_DBKPT      18                              /* step-over (dynamic) breakpoint */
+
 
 /* Trap codes */
 
