@@ -847,7 +847,7 @@ if ((!sim_idle_enab)                             ||     /* idling disabled */
    When a simulator is in an instruction path (or under other conditions 
    which would indicate idling), the countdown of sim_interval will not 
    be happening at a pace which is consistent with the rate it happens 
-   when not in the ‘idle capable’ state.  The consequence of this is that 
+   when not in the 'idle capable' state.  The consequence of this is that 
    the clock calibration may produce calibrated results which vary much 
    more than they do when not in the idle able state.  Sim_idle also uses 
    the calibrated tick size to approximate an adjustment to sim_interval
@@ -858,12 +858,12 @@ if ((!sim_idle_enab)                             ||     /* idling disabled */
    To negate this effect, we set a flag (sim_idle_idled) here and the 
    sim_rtcn_calb routine checks this flag before performing an actual 
    calibration and skips calibration if the flag was set and then clears 
-   the flag.  Thus recalibration only happens if things didn’t idle.
+   the flag.  Thus recalibration only happens if things didn't idle.
 
    we also check check sim_idle_enab above so that all simulators can avoid
    directly checking sim_idle_enab before calling sim_idle so that all of 
    the bookkeeping on sim_idle_idled is done here in sim_timer where it 
-   means something, while not idling when it isn’t enabled.  
+   means something, while not idling when it isn't enabled.  
    */
 //sim_idle_idled = TRUE;                                  /* record idle attempt */
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_idle(tmr=%d, sin_cyc=%d)\n", tmr, sin_cyc);

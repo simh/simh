@@ -3679,10 +3679,10 @@ if (flag) {
     fprintf (st, "\n\t\tAsynchronous Clock support");
 #endif
     fprintf (st, "\n\tHost Platform:");
-#if defined (__clang_version__)
-    fprintf (st, "\n\t\tCompiler: clang %s", __clang_version__);
-#elif defined (__GNUC__) && defined (__VERSION__)
+#if defined (__GNUC__) && defined (__VERSION__)
     fprintf (st, "\n\t\tCompiler: GCC %s", __VERSION__);
+#elif defined (__clang_version__)
+    fprintf (st, "\n\t\tCompiler: clang %s", __clang_version__);
 #elif defined (_MSC_FULL_VER) && defined (_MSC_BUILD)
     fprintf (st, "\n\t\tCompiler: Microsoft Visual C++ %d.%02d.%05d.%02d", _MSC_FULL_VER/10000000, (_MSC_FULL_VER/100000)%100, _MSC_FULL_VER%100000, _MSC_BUILD);
 #elif defined (__DECC_VER)
@@ -5255,12 +5255,12 @@ else if ((flag == RU_STEP) ||
          ((flag == RU_NEXT) && !sim_vm_is_subroutine_call)) { /* step */
     static t_bool not_implemented_message = FALSE;
 
-    flag = RU_STEP;
-    if (!not_implemented_message) {
+    if ((!not_implemented_message) && (flag == RU_NEXT)) {
         printf ("This simulator does not have subroutine call detection.\nPerforming a STEP instead\n");
         if (sim_log)
             fprintf (sim_log, "This simulator does not have subroutine call detection.\nPerforming a STEP instead\n");
         not_implemented_message = TRUE;
+        flag = RU_STEP;
         }
     if (*cptr != 0) {                                   /* argument? */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
