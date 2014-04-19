@@ -3025,11 +3025,29 @@ set_r_display (0, MD_KER);
 return SCPE_OK;
 }
 
+static const char *cpu_next_caveats =
+"The NEXT command in the PDP11 simulator currently will enable stepping\n"
+"across subroutine calls which are initiated by the JSR instruction.\n"
+"This stepping works by dynamically establishing breakpoints at the\n"
+"10 memory addresses immediately following the instruction which initiated\n"
+"the subroutine call.  These dynamic breakpoints are automatically\n"
+"removed once the simulator returns to the sim> prompt for any reason.\n"
+"If the called routine returns somewhere other than one of these\n"
+"locations due to a trap, stack unwind or any other reason, instruction\n"
+"execution will continue until some other reason causes execution to stop.\n";
+
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
 {
 #define MAX_SUB_RETURN_SKIP 10
 static t_addr returns[MAX_SUB_RETURN_SKIP + 1] = {0};
+static t_bool caveats_displayed = FALSE;
 
+if (!caveats_displayed) {
+    caveats_displayed = TRUE;
+    printf ("%s", cpu_next_caveats);
+    if (sim_log)
+        fprintf (sim_log, "%s", cpu_next_caveats);
+    }
 if (SCPE_OK != get_aval (PC, &cpu_dev, &cpu_unit))      /* get data */
     return FALSE;
 if ((sim_eval[0] & 0177000) == 0004000) {               /* JSR */

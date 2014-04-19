@@ -3207,20 +3207,42 @@ if (M == NULL) {                        /* first time init? */
 return build_dib_tab ();
 }
 
+static const char *cpu_next_caveats =
+"The NEXT command in this VAX architecture simulator currently will\n"
+"enable stepping across subroutine calls which are initiated by the\n"
+"BSBB, BSBW, JSB, CALLG, CALLS, CHMK, CHME, CHMS, and CHMU instructions.\n"
+"This stepping works by dynamically establishing breakpoints at the\n"
+"memory address immediately following the instruction which initiated\n"
+"the subroutine call.  These dynamic breakpoints are automatically\n"
+"removed once the simulator returns to the sim> prompt for any reason.\n"
+"If the called routine returns somewhere other than one of these\n"
+"locations due to a trap, stack unwind or any other reason, instruction\n"
+"execution will continue until some other reason causes execution to stop.\n";
+
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
 {
-static t_addr returns[2] = {0, 0};
+#define MAX_SUB_RETURN_SKIP 9
+static t_addr returns[MAX_SUB_RETURN_SKIP+1] = {0};
+static t_bool caveats_displayed = FALSE;
+int i;
 
+if (!caveats_displayed) {
+    caveats_displayed = TRUE;
+    printf ("%s", cpu_next_caveats);
+    if (sim_log)
+        fprintf (sim_log, "%s", cpu_next_caveats);
+    }
 if (SCPE_OK != get_aval (PC, &cpu_dev, &cpu_unit))  /* get data */
     return FALSE;
 switch (sim_eval[0])
     {
-    case BSBB:
-    case BSBW:
-    case JSB:
-    case CALLG:
-    case CALLS:
+    case BSBB:  case BSBW:  case JSB:
+    case CALLG: case CALLS:
+    case CHMK:  case CHME:  case CHMS:  case CHMU:
         returns[0] = PC + (1 - fprint_sym (stdnul, PC, sim_eval, &cpu_unit, SWMASK ('M')));
+        for (i=1; i<MAX_SUB_RETURN_SKIP; i++)
+            returns[i] = returns[i-1] + 1;      /* Possible skip return */
+        returns[i] = 0;                         /* Make sure the address list ends with a zero */
         *ret_addrs = returns;
         return TRUE;
     default:

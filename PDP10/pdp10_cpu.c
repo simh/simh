@@ -2359,17 +2359,35 @@ sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }
 
+static const char *cpu_next_caveats =
+"The NEXT command in the PDP10 simulator currently will enable stepping\n"
+"across subroutine calls which are initiated by the PUSHJ, JSP, JSA and\n"
+"JRA instructions.  This stepping works by dynamically establishing\n"
+"breakpoints at the 10 memory addresses immediately following the\n"
+"instruction which initiated the subroutine call.  These dynamic\n"
+"breakpoints are automatically removed once the simulator returns to the\n"
+"sim> prompt for any reason. If the called routine returns somewhere\n"
+"other than one of these locations due to a trap, stack unwind or any\n"
+"other reason, instruction execution will continue until some other\n"
+"reason causes execution to stop.\n";
+
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
 {
 #define MAX_SUB_RETURN_SKIP 10
 static t_addr returns[MAX_SUB_RETURN_SKIP+1] = {0};
+static t_bool caveats_displayed = FALSE;
 a10 ea;
 d10 inst, indrct;
 int32 i, pflgs = 0;
 t_addr adn, max_returns = MAX_SUB_RETURN_SKIP;
-
 int32 xr, ac;
 
+if (!caveats_displayed) {
+    caveats_displayed = TRUE;
+    printf ("%s", cpu_next_caveats);
+    if (sim_log)
+        fprintf (sim_log, "%s", cpu_next_caveats);
+    }
 if (SCPE_OK != get_aval ((saved_PC & AMASK), &cpu_dev, &cpu_unit))  /* get data */
     return FALSE;
 inst = sim_eval[0];
@@ -2396,7 +2414,7 @@ switch (GET_OP(inst))
             max_returns = (t_addr)(ea - returns[0]);
         for (adn=1; adn<max_returns; adn++)
             returns[adn] = returns[adn-1] + 1;  /* Possible skip return */
-        returns[i] = 0;                         /* Make sure the address list ends with a zero */
+        returns[adn] = 0;                       /* Make sure the address list ends with a zero */
         *ret_addrs = returns;
         return TRUE;
     default:
