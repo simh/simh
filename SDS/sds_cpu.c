@@ -1509,25 +1509,106 @@ return SCPE_OK;
    TRUE if so with a list of addresses where dynamic (temporary)
    breakpoints should be set.
 */
+typedef enum Next_Case {      /*    Next            Next Atomic         Next Forward */
+    Next_BadOp  = 0,          /*    FALSE           FALSE               FALSE        */
+    Next_Branch,              /*    FALSE           EA                  FALSE        */
+    Next_BRM,                 /*    P+1,P+2,P+3     EA,P+1,P+2,P+3      P+1,P+2,P+3  */
+    Next_BRX,                 /*    FALSE           EA,P+1              P+1          */
+    Next_Simple,              /*    FALSE           P+1                 P+1          */
+    Next_POP,                 /*    P+1,P+2         100+OP,P+1,P+2      P+1,P+2      */
+    Next_Skip,                /*    P+1,P+2         P+1,P+2             P+1,P+2      */
+    Next_EXU                  /*      ??              ??                  ??         */
+} Next_Case;
+
+Next_Case Op_Cases[64] = {
+ Next_BadOp,    Next_Branch,    Next_Simple,    Next_BadOp,     /*  HLT BRU EOM ...  */
+ Next_BadOp,    Next_BadOp,     Next_Simple,    Next_BadOp,     /*  ... ... EOD ...  */
+ Next_Simple,   Next_Branch,    Next_Simple,    Next_Simple,    /*  MIY BRI MIW POT  */
+ Next_Simple,   Next_BadOp,     Next_Simple,    Next_Simple,    /*  ETR ... MRG EOR  */
+ Next_Simple,   Next_BadOp,     Next_Simple,    Next_EXU,       /*  NOP ... ROV EXU  */
+ Next_BadOp,    Next_BadOp,     Next_BadOp,     Next_BadOp,     /*  ... ... ... ...  */
+ Next_Simple,   Next_BadOp,     Next_Simple,    Next_Simple,    /*  YIM ... WIM PIN  */
+ Next_BadOp,    Next_Simple,    Next_Simple,    Next_Simple,    /*  ... STA STB STX  */
+ Next_Skip,     Next_BRX,       Next_BadOp,     Next_BRM,       /*  SKS BRX ... BRM  */
+ Next_BadOp,    Next_BadOp,     Next_Simple,    Next_BadOp,     /*  ... ... RCH ...  */
+ Next_Skip,     Next_Branch,    Next_Skip,      Next_Skip,      /*  SKE BRR SKB SKN  */
+ Next_Simple,   Next_Simple,    Next_Simple,    Next_Simple,    /*  SUB ADD SUC ADC  */
+ Next_Skip,     Next_Simple,    Next_Simple,    Next_Simple,    /*  SKR MIN XMA ADM  */
+ Next_Simple,   Next_Simple,    Next_Simple,    Next_Simple,    /*  MUL DIV RSH LSH  */
+ Next_Skip,     Next_Simple,    Next_Skip,      Next_Skip,      /*  SKM LDX SKA SKG  */
+ Next_Skip,     Next_Simple,    Next_Simple,    Next_Simple };  /*  SKD LDB LDA EAX  */
 
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
 {
-static t_addr returns[3] = {0, 0, 0};
-t_stat reason;
+static t_addr returns[10];
 uint32 inst;
+Next_Case op_case;
+int32 atomic, forward;
+t_addr *return_p;
+uint32 va;
+int32 exu_cnt = 0;
 
-reason = Read (P, &inst);              /* get instr */
-if ((reason == SCPE_OK) &&
-    ((I_GETOP(inst) == BRM) ||         /*  if BRM or        */
-     (I_POP & inst) ||                 /*  POP or SYSPOP or */
-     (sim_switches & SWMASK('F')))) {  /*  Force switch     */
-        returns[0] = (P + 1) & VA_MASK;
-        returns[1] = (P + 2) & VA_MASK;
-        *ret_addrs = returns;
-        return TRUE;
-    }
-else
+*ret_addrs = return_p = returns;
+atomic = sim_switches & SWMASK('A');
+forward = sim_switches & SWMASK('F');
+
+if (Read (P, &inst) != SCPE_OK)         /* get instruction */
     return FALSE;
+
+Exu_Loop:
+if (I_POP & inst)                       /* determine inst case */
+    op_case = Next_POP;
+else
+    op_case = Op_Cases[I_GETOP(inst)];
+
+switch (op_case) {
+    case Next_BadOp:
+        break;
+    case Next_BRM:  
+        *return_p++ = (P + 1) & VA_MASK;
+        *return_p++ = (P + 2) & VA_MASK;
+        *return_p++ = (P + 3) & VA_MASK;
+        /* -- fall through to Next_Branch case -- */
+    case Next_Branch:
+        if (atomic) {
+            if (Ea (inst, &va) != SCPE_OK)
+                return FALSE;
+            *return_p++ = va & VA_MASK;
+        }
+        break;
+    case Next_BRX:
+        if (atomic) {
+            if (Ea (inst, &va) != SCPE_OK)
+                return FALSE;
+            *return_p++ = va & VA_MASK;
+        }
+        /* -- fall through to Next_Simple case -- */
+    case Next_Simple:
+        if (atomic || forward)
+            *return_p++ = (P + 1) & VA_MASK;
+        break;
+    case Next_POP:  
+        if (atomic)
+            *return_p++ = 0100 + I_GETOP(inst);
+        /* -- fall through to Next_Skip case -- */
+    case Next_Skip: 
+        *return_p++ = (P + 1) & VA_MASK;
+        *return_p++ = (P + 2) & VA_MASK;
+        break;
+    case Next_EXU:                          /* execute inst at EA */
+        if (++exu_cnt > exu_lim)            /* too many? */
+            return FALSE;
+        if (Ea (inst, &va) != SCPE_OK)      /* decode eff addr */
+            return FALSE;
+        if (Read (va, &inst) != SCPE_OK)    /* get operand */
+            return FALSE;
+        goto Exu_Loop;
+    }
+if (return_p == returns)            /* if no cases added, */
+    return FALSE;                   /*  return FALSE      */
+else
+    *return_p = (t_addr)0;          /* else append terminator */
+return TRUE;                        /*  and return TRUE       */
 }
 
 /* Memory examine */
