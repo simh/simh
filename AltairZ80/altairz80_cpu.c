@@ -174,6 +174,7 @@ static t_stat chip_show             (FILE *st, UNIT *uptr, int32 val, void *desc
 static t_stat cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat cpu_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat cpu_reset(DEVICE *dptr);
+static t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 static t_stat sim_instr_mmu(void);
 static uint32 GetBYTE(register uint32 Addr);
 static void PutWORD(register uint32 Addr, const register uint32 Value);
@@ -6341,6 +6342,7 @@ static t_stat sim_instr_mmu (void) {
 
 static t_stat cpu_reset(DEVICE *dptr) {
     int32 i;
+    sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
     AF_S = AF1_S = 0;
     BC_S = DE_S = HL_S = 0;
     BC1_S = DE1_S = HL1_S = 0;
@@ -6359,6 +6361,39 @@ static t_stat cpu_reset(DEVICE *dptr) {
     else
         return SCPE_IERR;
     return SCPE_OK;
+}
+
+static t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs) {
+    static t_addr returns[2] = {0, 0};
+    if (chiptype == CHIP_TYPE_8086) {
+        switch (GetBYTE(PCX_S)) {
+            case 0x9a:  /* i86op_call_far_IMM   */
+            case 0xe8:  /* Ci86op_call_near_IMM */
+                returns[0] = PCX_S + (1 - fprint_sym (stdnul, PCX_S, sim_eval,
+                                                      &cpu_unit, SWMASK ('M')));
+                *ret_addrs = returns;
+                return TRUE;
+            default:
+                return FALSE;
+        }
+    } else { // 8080 or Z80
+        switch (GetBYTE(PC_S)) {
+            case 0xc4:  /* CALL NZ,nnnn */
+            case 0xcc:  /* CALL Z,nnnn  */
+            case 0xcd:  /* CALL nnnn    */
+            case 0xd4:  /* CALL NC,nnnn */
+            case 0xdc:  /* CALL C,nnnn  */
+            case 0xe4:  /* CALL PO,nnnn */
+            case 0xec:  /* CALL PE,nnnn */
+            case 0xf4:  /* CALL P,nnnn  */
+            case 0xfc:  /* CALL M,nnnn  */
+                returns[0] = PC_S + 3;
+                *ret_addrs = returns;
+                return TRUE;
+            default:
+                return FALSE;
+        }
+    }
 }
 
 t_stat install_bootrom(int32 bootrom[], int32 size, int32 addr, int32 makeROM) {
