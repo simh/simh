@@ -2069,8 +2069,10 @@ SERHANDLE serport;
 char *tptr = cptr;
 t_bool nolog, notelnet, listennotelnet, modem_control, loopback, datagram, packet;
 TMLN *lp;
-t_stat r = SCPE_ARG;
+t_stat r = SCPE_OK;
 
+if (*tptr == '\0')
+    return SCPE_ARG;
 for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     lp = mp->ldsc + i;
     lp->mp = mp;                                /* set the back pointer */

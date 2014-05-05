@@ -1289,10 +1289,10 @@ t_stat sim_show_cons_buff (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag,
 {
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
-if (!sim_con_tmxr.buffered)
+if (!sim_con_tmxr.ldsc->txbfd)
     fprintf (st, "Unbuffered\n");
 else
-    fprintf (st, "Buffer Size = %d\n", sim_con_tmxr.buffered);
+    fprintf (st, "Buffer Size = %d\n", sim_con_tmxr.ldsc->txbsz);
 return SCPE_OK;
 }
 
