@@ -1512,7 +1512,7 @@ return SCPE_OK;
 typedef enum Next_Case {      /*    Next            Next Atomic         Next Forward */
     Next_BadOp  = 0,          /*    FALSE           FALSE               FALSE        */
     Next_Branch,              /*    FALSE           EA                  FALSE        */
-    Next_BRM,                 /*    P+1,P+2,P+3     EA,P+1,P+2,P+3      P+1,P+2,P+3  */
+    Next_BRM,                 /*    P+1,P+2,P+3     EA+1,P+1,P+2,P+3    P+1,P+2,P+3  */
     Next_BRX,                 /*    FALSE           EA,P+1              P+1          */
     Next_Simple,              /*    FALSE           P+1                 P+1          */
     Next_POP,                 /*    P+1,P+2         100+OP,P+1,P+2      P+1,P+2      */
@@ -1556,8 +1556,12 @@ if (Read (P, &inst) != SCPE_OK)         /* get instruction */
     return FALSE;
 
 Exu_Loop:
-if (I_POP & inst)                       /* determine inst case */
-    op_case = Next_POP;
+if (I_POP & inst) {                     /* determine inst case */
+    if ((inst & ((I_M_OP << I_V_OP) | I_USR)) == 047000000)
+        op_case = Next_BRM;             /* Treat SBRM like BRM */
+    else
+        op_case = Next_POP;
+    }
 else
     op_case = Op_Cases[I_GETOP(inst)];
 
@@ -1568,7 +1572,12 @@ switch (op_case) {
         *return_p++ = (P + 1) & VA_MASK;
         *return_p++ = (P + 2) & VA_MASK;
         *return_p++ = (P + 3) & VA_MASK;
-        /* -- fall through to Next_Branch case -- */
+        if (atomic) {
+            if (Ea (inst, &va) != SCPE_OK)
+                return FALSE;
+            *return_p++ = (va + 1) & VA_MASK;
+        }
+        break;
     case Next_Branch:
         if (atomic) {
             if (Ea (inst, &va) != SCPE_OK)
