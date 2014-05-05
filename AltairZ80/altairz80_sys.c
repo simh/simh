@@ -769,6 +769,17 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
         status  =   error status
 */
 t_stat parse_sym(char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) {
+    static t_bool symbolicInputNotImplementedMessage = FALSE;
+#define NO_SYMBOLIC_INPUT_MESSAGE   "Symbolic input is not supported for the 8086.\n"
+    if (chiptype == CHIP_TYPE_8086) {
+        if (!symbolicInputNotImplementedMessage) {
+            printf(NO_SYMBOLIC_INPUT_MESSAGE);
+            if (sim_log)
+                fprintf(sim_log, NO_SYMBOLIC_INPUT_MESSAGE);
+            symbolicInputNotImplementedMessage = TRUE;
+        }
+        return SCPE_NOFNC;
+    }
     while (isspace(*cptr))
         cptr++;                 /* absorb spaces            */
     if ((sw & (SWMASK('A') | SWMASK('C'))) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */

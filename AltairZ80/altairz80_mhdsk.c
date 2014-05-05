@@ -61,6 +61,12 @@
 #define UNIT_V_DSK_WLK          (UNIT_V_UF + 0)         /* write locked  */
 #define UNIT_DSK_WLK            (1 << UNIT_V_DSK_WLK)
 
+/* Debug flags */
+#define READ_MSG                (1 << 0)
+#define WRITE_MSG               (1 << 1)
+#define VERBOSE_MSG             (1 << 2)
+extern uint32 PCX;
+
 /* boot related */
 #define BOOTROM_SIZE_MHDSK      256
 #define MHDSK_BOOT_ADDRESS      0xfc00
@@ -81,6 +87,25 @@ extern t_stat install_bootrom(int32 bootrom[], int32 size, int32 addr, int32 mak
 #define CMD_READ_UNFMT  10      // read unformatted sector
 #define CMD_FORMAT      12
 #define CMD_INITIALIZE  14
+#define CMD_MAX         (CMD_INITIALIZE + 1)
+
+static char* commandMessage[CMD_MAX] = {
+    "Seek",                     //  CMD_SEEK        0
+    "Undefined 1",              //                  1
+    "Write Sector",             //  CMD_WRITE_SEC   2
+    "Read Sector",              //  CMD_READ_SEC    3
+    "Write Buffer",             //  CMD_WRITE_BUF   4
+    "Read Buffer",              //  CMD_READ_BUF    5
+    "Read Status",              //  CMD_READ_STATUS 6
+    "Undefined 7",              //                  7
+    "Set IV Byte",              //  CMD_SET_IV_BYTE 8
+    "Undefined 9",              //                  9
+    "Read Unformatted Sector",  //  CMD_READ_UNFMT  10
+    "Undefined 11",             //                  11
+    "Format",                   //  CMD_FORMAT      12
+    "Undefined 13",             //                  13
+    "Initialize",               //  CMD_INITIALIZE  14
+};
 
 // Other disk controller bit fields
 
@@ -119,7 +144,7 @@ static uint32 cmdLowByte = 0;           // low byte of command
 
 static uint8 cstat = 0;         // command status from controller
 
-// The hard disk controller support four 256 byte disk buffers */
+// The hard disk controller supports four 256 byte disk buffers */
 
 static uint8 diskBuf1[HDSK_SECTOR_SIZE];
 static uint8 diskBuf2[HDSK_SECTOR_SIZE];
@@ -134,9 +159,10 @@ static int32 hdCstat(const int32 port, const int32 io, const int32 data);
 static int32 hdAcmd(const int32 port, const int32 io, const int32 data);
 static int32 hdCdata(const int32 port, const int32 io, const int32 data);
 static int32 hdAdata(const int32 port, const int32 io, const int32 data);
-static void doRead(void);
-static void doWrite(void);
+static void doRead(const int32 port, const int32 data, const uint32 command);
+static void doWrite(const int32 port, const int32 data, const uint32 command);
 static t_stat dsk_reset(DEVICE *dptr);
+static char* cmdTranslate(const int32 cmd);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -158,13 +184,21 @@ static MTAB dsk_mod[] = {
     { 0 }
 };
 
+/* Debug Flags */
+static DEBTAB mhdsk_dt[] = {
+    { "READ",       READ_MSG    },
+    { "WRITE",      WRITE_MSG   },
+    { "VERBOSE",    VERBOSE_MSG },
+    { NULL,         0 }
+};
+
 DEVICE mhdsk_dev = {
     "MHDSK", dsk_unit, NULL, dsk_mod,
     HDSK_NUMBER, 10, 31, 1, 8, 8,
     NULL, NULL, &dsk_reset,
     &mhdsk_boot, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    NULL, NULL, "MITS Hard Disk MHDSK"
+    mhdsk_dt, NULL, "MITS Hard Disk MHDSK"
 };
 
 static int32 bootrom_mhdsk[BOOTROM_SIZE_MHDSK] = {
@@ -199,7 +233,7 @@ static int32 bootrom_mhdsk[BOOTROM_SIZE_MHDSK] = {
     0xfc, 0xe3, 0xc3, 0xcf, 0xfd, 0xe3, 0xdb, 0x10, /* fce0-fce7 */
     0xe6, 0x02, 0xca, 0xe6, 0xfc, 0x7e, 0xe6, 0x7f, /* fce8-fcef */
     0xd3, 0x11, 0xbe, 0x23, 0xca, 0xe6, 0xfc, 0xe3, /* fcf0-fcf7 */
-    0xc9, 0x70, 0x4a, 0x01, 0x00, 0xd4, 0xb4, 0x13, /* fcf8-fcff */
+    0xc9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  /* fcf8-fcff */
 };
 
 static t_stat mhdsk_boot(int32 unitno, DEVICE *dptr) {
@@ -208,6 +242,14 @@ static t_stat mhdsk_boot(int32 unitno, DEVICE *dptr) {
     assert(installSuccessful);
     *((int32 *) sim_PC -> loc) = MHDSK_BOOT_ADDRESS;
     return SCPE_OK;
+}
+
+static char* cmdTranslate(const int32 cmd) {
+    static char result[128];
+    if ((0 <= cmd) && (cmd < CMD_MAX))
+        return commandMessage[cmd];
+    sprintf(result, "Undefined %i", cmd);
+    return result;
 }
 
 /*----------------------------------------------------------------------------------
@@ -257,6 +299,10 @@ static t_stat dsk_reset(DEVICE *dptr) {
 ---------------------------------------------------------------------------------------*/
 static int32 hdReturnReady(const int32 port, const int32 io, const int32 data)
 {
+    sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+              " IN(%02X = %s) = 0x80.\n",
+              PCX, port, (port == 0xa0 ? "CREADY" : (port == 0xa2 ? "ACSTA" :
+                                                     (port == 0xa4 ? "CDSTA" : (port == 0xa6 ? "ADSTA" : "?????")))));
     return(0x80);       // always indicate ready
 
 // output operations have no effect
@@ -273,6 +319,8 @@ static int32 hdReturnReady(const int32 port, const int32 io, const int32 data)
 -------------------------------------------------------------*/
 static int32 hdCstat(const int32 port, const int32 io, const int32 data)
 {
+    sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+              " IN(%02X = %s) = %02x.\n", PCX, port, (port == 0xa1 ? "CSTAT" : "?????"), cstat);
     return(cstat);
 
 // output operations have no effect
@@ -312,23 +360,30 @@ static int32 hdAcmd(const int32 port, const int32 io, const int32 data)
         selectedTrack = cmdLowByte + ((data & TRACK_MASKH) << TRACK_SHIFTH);
         if (selectedTrack >= HDSK_NUM_TRACKS)
             selectedTrack = HDSK_NUM_TRACKS-1;
+        sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                  " OUT(%02X = ACMD) = %02x. CMD = %s. "
+                  "Unit = %i. Buffer = %i. Selected Track = %i.\n",
+                  PCX, port, data, cmdTranslate(command), unit, buffer, selectedTrack);
     }
 
 // READ, READ UNFORMATTED or WRITE SECTOR command.
 
-    else if ((command==CMD_WRITE_SEC) || (command==CMD_READ_SEC) || (command==CMD_READ_UNFMT)) {
+    else if ((command == CMD_WRITE_SEC) || (command == CMD_READ_SEC) || (command == CMD_READ_UNFMT)) {
         selectedHead = (cmdLowByte >> HEAD_SHIFT) & HEAD_MASK;
         selectedDisk = (selectedHead >> 1) + unit * 2 ;
         selectedSector = cmdLowByte & SECTOR_MASK;
         selectedBuffer = buffer;
-        if (mhdsk_dev.units[selectedDisk].fileref == NULL)      // make sure a file is attached
+        if (mhdsk_dev.units[selectedDisk].fileref == NULL) {    // make sure a file is attached
             cstat = CSTAT_NOT_READY;
-        else {
-            if (command == CMD_WRITE_SEC)
-                doWrite();
-            else
-                doRead();
-        }
+            sim_debug(READ_MSG, &mhdsk_dev, "MHDSK%i: " ADDRESS_FORMAT
+                      " OUT(%02X = ACMD) = %02x. CMD = %s. "
+                      "Track = %i. Sector = %i. Head = %i. Buffer = %i. "
+                      "No file attached.\n", selectedDisk, PCX, port, data, cmdTranslate(command),
+                      selectedTrack, selectedSector, selectedHead, selectedBuffer);
+        } else  if (command == CMD_WRITE_SEC)
+            doWrite(port, data, command);
+        else // CMD_READ_SEC or CMD_READ_UNFMT
+            doRead(port, data, command);
     }
 
 // READ or WRITE BUFFER command. Initiates reading/loading specified buffer. 
@@ -339,26 +394,46 @@ static int32 hdAcmd(const int32 port, const int32 io, const int32 data)
         if (maxBufferIdx == 0) 
             maxBufferIdx = 256;
         bufferIdx = 0;
+        sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                  " OUT(%02X = ACMD) = %02x. "
+                  "CMD = %s. Unit = %i. Buffer = %i. Max. Buffer Index = %i.\n",
+                  PCX, port, data, cmdTranslate(command), unit, buffer, maxBufferIdx);
     }
 
 // READ STATUS command (read IV byte)
 
     else if (command == CMD_READ_STATUS) {
+        sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                  " OUT(%02X = ACMD) = %02x. CMD = %s. Unit = %i. Buffer = %i.\n",
+                  PCX, port, data, cmdTranslate(command), unit, buffer);
     }
 
 // SET IV byte command
 
     else if (command == CMD_SET_IV_BYTE) {
+        sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                  " OUT(%02X = ACMD) = %02x. CMD = %s. Unit = %i. Buffer = %i.\n",
+                  PCX, port, data, cmdTranslate(command), unit, buffer);
     }
 
 // FORMAT command
 
     else if (command == CMD_FORMAT) {
+        sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                  " OUT(%02X = ACMD) = %02x. CMD = %s. Unit = %i. Buffer = %i.\n",
+                  PCX, port, data, cmdTranslate(command), unit, buffer);
     }
 
 // INITIALIZE command
 
     else if (command == CMD_INITIALIZE) {
+        sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                  " OUT(%02X = ACMD) = %02x. MD = %s. Unit = %i. Buffer = %i.\n",
+                  PCX, port, data, cmdTranslate(command), unit, buffer);
+    } else {
+        sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                  " OUT(%02X = ACMD) = %02x. CMD = %s. Unit = %i. Buffer = %i.\n",
+                  PCX, port, data, cmdTranslate(command), unit, buffer);
     }
 
     return(0);
@@ -373,8 +448,14 @@ static int32 hdAcmd(const int32 port, const int32 io, const int32 data)
 static int32 hdCdata(const int32 port, const int32 io, const int32 data)
 {
     if (io == IO_IN) {
-        if (bufferIdx < maxBufferIdx)
-            return(diskBuf[selectedBuffer][bufferIdx++]);
+        if (bufferIdx < maxBufferIdx) {
+            const int32 result = diskBuf[selectedBuffer][bufferIdx];
+            sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                      " IN(%02X = CDATA) = %02x. Buffer = %i. Index = %i.\n",
+                      PCX, port, result, selectedBuffer, bufferIdx);
+            bufferIdx++;
+            return(result);
+        }
     }
     return(0);
 
@@ -393,8 +474,13 @@ static int32 hdAdata(const int32 port, const int32 io, const int32 data)
 {
     if (io == IO_OUT) {
         cmdLowByte = data & 0xff;
-        if (bufferIdx < maxBufferIdx)
-            diskBuf[selectedBuffer][bufferIdx++] = data;
+        if (bufferIdx < maxBufferIdx) {
+            diskBuf[selectedBuffer][bufferIdx] = data;
+            sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
+                      " OUT(%02X = ADATA) = %02x. Buffer = %i. Index = %i.\n",
+                      PCX, port, data, selectedBuffer, bufferIdx);
+            bufferIdx++;
+        }
     }
     return(0);
 }
@@ -408,7 +494,7 @@ static int32 hdAdata(const int32 port, const int32 io, const int32 data)
     Returns:    nothing (updates cstat directly)
     Comments:   
 -------------------------------------------------------------*/
-static void doRead(void)
+static void doRead(const int32 port, const int32 data, const uint32 command)
 {
     UNIT *uptr;
     uint32 fileOffset;
@@ -421,6 +507,12 @@ static void doRead(void)
         cstat = CSTAT_NOT_READY;                    /* seek error */
     else if (sim_fread(diskBuf[selectedBuffer], 1, HDSK_SECTOR_SIZE, uptr->fileref) != HDSK_SECTOR_SIZE)
         cstat = CSTAT_NOT_READY;                    /* write error */
+    sim_debug(READ_MSG, &mhdsk_dev, "MHDSK%i: " ADDRESS_FORMAT
+              " OUT(%02X = ACMD) = %02x. CMD = %s. "
+              "Track = %i. Sector = %i. Head = %i. Buffer = %i. Status = %i(%s).\n",
+              selectedDisk, PCX, port, data, cmdTranslate(command),
+              selectedTrack, selectedSector, selectedHead, selectedBuffer,
+              cstat, (cstat == 0 ? "OK" : (cstat == CSTAT_NOT_READY ? "Not Ready" : "????")));
 }
 
 
@@ -433,7 +525,7 @@ static void doRead(void)
     Returns:    nothing (updates cstat directly)
     Comments:   
 -------------------------------------------------------------*/
-static void doWrite(void)
+static void doWrite(const int32 port, const int32 data, const uint32 command)
 {
     UNIT *uptr;
     uint32 fileOffset;
@@ -445,9 +537,18 @@ static void doWrite(void)
                         HDSK_SECTOR_SIZE * selectedSector;
         if (sim_fseek(uptr->fileref, fileOffset, SEEK_SET))
             cstat = CSTAT_NOT_READY;                    /* seek error */
-        else if (sim_fwrite(diskBuf[selectedBuffer], 1, HDSK_SECTOR_SIZE, uptr->fileref) != HDSK_SECTOR_SIZE)
+        else if (sim_fwrite(diskBuf[selectedBuffer], 1, HDSK_SECTOR_SIZE, uptr->fileref) !=
+                 HDSK_SECTOR_SIZE)
             cstat = CSTAT_NOT_READY;                    /* write error */
     }
     else
         cstat = CSTAT_WRITE_PROTECT;
+    sim_debug(WRITE_MSG, &mhdsk_dev, "MHDSK%i: " ADDRESS_FORMAT
+              " OUT(%02X = ACMD) = %02x. CMD = %s. "
+              "Track = %i. Sector = %i. Head = %i. Buffer = %i. Status = %i(%s).\n",
+              selectedDisk, PCX, port, data, cmdTranslate(command),
+              selectedTrack, selectedSector, selectedHead, selectedBuffer,
+              cstat, (cstat == 0 ? "OK" :
+                      (cstat == CSTAT_NOT_READY ? "Not Ready" :
+                       (cstat == CSTAT_WRITE_PROTECT ? "Write Protected" : "????"))));
 }
