@@ -2275,12 +2275,13 @@ while (*tptr) {
                     }
                 }
             }
+        mp->buffered = atoi(buffered);
         for (i = 0; i < mp->lines; i++) { /* initialize line buffers */
             lp = mp->ldsc + i;
-            if (buffered[0]) {
-                lp->txbsz = atoi(buffered);
+            if (mp->buffered) {
+                lp->txbsz = mp->buffered;
                 lp->txbfd = 1;
-                lp->rxbsz = atoi(buffered);
+                lp->rxbsz = mp->buffered;
                 }
             else {
                 lp->txbsz = TMXR_MAXBUF;
