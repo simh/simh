@@ -3721,6 +3721,7 @@ if (!(dptr->flags & DEV_DIS)) {
             dmc_buffer_queue_init_all(controller);
             dmc_clrinint(controller);
             dmc_clroutint(controller);
+            controller->dmc_wr_delay = 0;
             for (j=0; j<dptr->numunits-1; j++) {
                 sim_cancel (&dptr->units[j]); /* stop poll */
                 if (dptr->units[j].flags & UNIT_ATT)
