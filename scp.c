@@ -2454,7 +2454,7 @@ if (label) {
         cmdp = find_cmd (gbuf);                         /* return the errorStage things to the stat will be returned */
         goto Cleanup_Return;
         }
-}
+    }
 if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
 
@@ -2498,6 +2498,7 @@ do {
                 stat = cmdp->action (cmdp->arg, cptr);  /* exec other cmd */
         }
     else stat = SCPE_UNK;                               /* bad cmd given */
+    echo = sim_do_echo;                                 /* Allow for SET VERIFY */
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
