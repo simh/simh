@@ -637,6 +637,7 @@ struct sim_brktab {
 struct sim_debtab {
     char                *name;                          /* control name */
     uint32              mask;                           /* control bit */
+    char                *desc;                          /* description */
     };
 
 #define DEBUG_PRS(d)    (sim_deb && d.dctrl)

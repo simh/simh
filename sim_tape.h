@@ -119,6 +119,12 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 
 typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
 
+/* Tape Internal Debug flags */
+
+#define MTSE_DBG_DAT   0x0400000                        /* Debug Data */
+#define MTSE_DBG_POS   0x0800000                        /* Debug Positioning activities */
+#define MTSE_DBG_STR   0x1000000                        /* Debug Tape Structure */
+
 /* Prototypes */
 
 t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit, int completion_delay);

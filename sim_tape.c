@@ -607,11 +607,13 @@ if (ctx->dptr->dctrl & reason) {
 
 t_stat sim_tape_rdlntf (UNIT *uptr, t_mtrlnt *bc)
 {
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint8 c;
 t_bool all_eof;
 uint32 f = MT_GET_FMT (uptr);
 t_mtrlnt sbc;
 t_tpclnt tpcbc;
+t_stat r = MTSE_OK;
 
 MT_CLR_PNU (uptr);
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
@@ -629,11 +631,14 @@ switch (f) {                                            /* switch on fmt */
                 }
             if (feof (uptr->fileref) || (*bc == MTR_EOM)) {     /* eof or eom? */
                 MT_SET_PNU (uptr);                      /* pos not upd */
-                return MTSE_EOM;
+                r = MTSE_EOM;
+                break;
                 }
             uptr->pos = uptr->pos + sizeof (t_mtrlnt);  /* spc over rec lnt */
-            if (*bc == MTR_TMK)                         /* tape mark? */
-                return MTSE_TMK;
+            if (*bc == MTR_TMK) {                       /* tape mark? */
+                r = MTSE_TMK;
+                break;
+                }
             if (*bc == MTR_FHGAP) {                     /* half gap? */
                 uptr->pos = uptr->pos + sizeof (t_mtrlnt) / 2;  /* half space fwd */
                 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* resync */
@@ -654,11 +659,12 @@ switch (f) {                                            /* switch on fmt */
             }
         if (feof (uptr->fileref)) {                     /* eof? */
             MT_SET_PNU (uptr);                          /* pos not upd */
-            return MTSE_EOM;
+            r = MTSE_EOM;
+            break;
             }
         uptr->pos = uptr->pos + sizeof (t_tpclnt);      /* spc over reclnt */
         if (tpcbc == TPC_TMK)                           /* tape mark? */
-            return MTSE_TMK;
+            r = MTSE_TMK;
         uptr->pos = uptr->pos + ((tpcbc + 1) & ~1);     /* spc over record */
         break;
 
@@ -683,14 +689,14 @@ switch (f) {                                            /* switch on fmt */
         sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
         uptr->pos = uptr->pos + sbc;                    /* spc over record */
         if (all_eof)                                    /* tape mark? */
-            return MTSE_TMK;
+            r = MTSE_TMK;
         break;
 
     default:
         return MTSE_FMT;
         }
-
-return MTSE_OK;
+sim_debug (MTSE_DBG_STR, ctx->dptr, "rd_lnt: st: %d, lnt: %d, pos: %d\n", r, *bc, uptr->pos);
+return r;
 }
 
 /* Read record length reverse (internal routine)
@@ -716,12 +722,14 @@ return MTSE_OK;
 
 t_stat sim_tape_rdlntr (UNIT *uptr, t_mtrlnt *bc)
 {
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint8 c;
 t_bool all_eof;
 uint32 f = MT_GET_FMT (uptr);
 t_addr ppos;
 t_mtrlnt sbc;
 t_tpclnt tpcbc;
+t_stat r = MTSE_OK;
 
 MT_CLR_PNU (uptr);
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
@@ -737,13 +745,19 @@ switch (f) {                                            /* switch on fmt */
             sbc = MTR_L (*bc);
             if (ferror (uptr->fileref))                 /* error? */
                 return sim_tape_ioerr (uptr);
-            if (feof (uptr->fileref))                   /* eof? */
-                return MTSE_EOM;
+            if (feof (uptr->fileref)) {                 /* eof? */
+                r = MTSE_EOM;
+                break;
+                }
             uptr->pos = uptr->pos - sizeof (t_mtrlnt);  /* spc over rec lnt */
-            if (*bc == MTR_EOM)                         /* eom? */
-                return MTSE_EOM;
-            if (*bc == MTR_TMK)                         /* tape mark? */
+            if (*bc == MTR_EOM) {                       /* eom? */
+                r = MTSE_EOM;
+                break;
+                }
+            if (*bc == MTR_TMK) {                       /* tape mark? */
                 return MTSE_TMK;
+                break;
+                }
             if ((*bc & MTR_M_RHGAP) == MTR_RHGAP) {     /* half gap? */
                 uptr->pos = uptr->pos + sizeof (t_mtrlnt) / 2;  /* half space rev */
                 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* resync */
@@ -753,8 +767,10 @@ switch (f) {                                            /* switch on fmt */
                     ((f == MTUF_F_STD)? ((sbc + 1) & ~1): sbc);
                 sim_fseek (uptr->fileref, uptr->pos + sizeof (t_mtrlnt), SEEK_SET);
                 }
-            else if (sim_tape_bot (uptr))               /* backed into BOT? */
-                return MTSE_BOT;
+            else if (sim_tape_bot (uptr)) {             /* backed into BOT? */
+                r = MTSE_BOT;
+                break;
+                }
         }
         while ((*bc == MTR_GAP) || (*bc == MTR_RHGAP));
         break;
@@ -766,11 +782,15 @@ switch (f) {                                            /* switch on fmt */
         *bc = tpcbc;                                    /* save rec lnt */
         if (ferror (uptr->fileref))                     /* error? */
             return sim_tape_ioerr (uptr);
-        if (feof (uptr->fileref))                       /* eof? */
-            return MTSE_EOM;
+        if (feof (uptr->fileref)) {                     /* eof? */
+            r = MTSE_EOM;
+            break;
+            }
         uptr->pos = ppos;                               /* spc over record */
-        if (*bc == MTR_TMK)                             /* tape mark? */
-            return MTSE_TMK;
+        if (*bc == MTR_TMK) {                           /* tape mark? */
+            r = MTSE_TMK;
+            break;
+            }
         sim_fseek (uptr->fileref, uptr->pos + sizeof (t_tpclnt), SEEK_SET);
         break;
 
@@ -780,8 +800,10 @@ switch (f) {                                            /* switch on fmt */
             sim_fread (&c, sizeof (uint8), 1, uptr->fileref);
             if (ferror (uptr->fileref))                 /* error? */
                 return sim_tape_ioerr (uptr);
-            if (feof (uptr->fileref))                   /* eof? */
-                return MTSE_EOM;
+            if (feof (uptr->fileref)) {                 /* eof? */
+                r = MTSE_EOM;
+                break;
+                }
             if ((c & P7B_DPAR) != P7B_EOF)
                 all_eof = 0;
             if (c & P7B_SOR)                            /* start of record? */
@@ -791,14 +813,14 @@ switch (f) {                                            /* switch on fmt */
         *bc = sbc;                                      /* save rec lnt */
         sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
         if (all_eof)                                    /* tape mark? */
-            return MTSE_TMK;
+            r = MTSE_TMK;
         break;
 
     default:
         return MTSE_FMT;
         }
-
-return MTSE_OK;
+sim_debug (MTSE_DBG_STR, ctx->dptr, "rd_lnt: st: %d, lnt: %d, pos: %d\n", r, *bc, uptr->pos);
+return r;
 }
 
 /* Read record forward
@@ -851,6 +873,7 @@ for ( ; i < rbc; i++)                                   /* fill with 0's */
     buf[i] = 0;
 if (f == MTUF_F_P7B)                                    /* p7b? strip SOR */
     buf[0] = buf[0] & P7B_DPAR;
+sim_tape_data_trace(uptr, buf, rbc, "Record Read", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
 return (MTR_F (tbc)? MTSE_RECE: MTSE_OK);
 }
 
@@ -907,6 +930,7 @@ for ( ; i < rbc; i++)                                   /* fill with 0's */
     buf[i] = 0;
 if (f == MTUF_F_P7B)                                    /* p7b? strip SOR */
     buf[0] = buf[0] & P7B_DPAR;
+sim_tape_data_trace(uptr, buf, rbc, "Record Read Reverse", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
 return (MTR_F (tbc)? MTSE_RECE: MTSE_OK);
 }
 
@@ -944,6 +968,7 @@ t_mtrlnt sbc;
 
 sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wrrecf(unit=%d, buf=%p, bc=%d)\n", uptr-ctx->dptr->units, buf, bc);
 
+sim_tape_data_trace(uptr, buf, bc, "Record Write", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
 MT_CLR_PNU (uptr);
 sbc = MTR_L (bc);
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
@@ -979,7 +1004,7 @@ switch (f) {                                            /* case on format */
         uptr->pos = uptr->pos + sbc;                    /* move tape */
         break;
         }
-
+sim_tape_data_trace(uptr, buf, sbc, "Record Written", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
 return MTSE_OK;
 }
 
@@ -996,6 +1021,8 @@ return r;
 
 t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat)
 {
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
 MT_CLR_PNU (uptr);
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return MTSE_UNATT;
@@ -1007,6 +1034,7 @@ if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
     return sim_tape_ioerr (uptr);
     }
+sim_debug (MTSE_DBG_STR, ctx->dptr, "wr_lnt: lnt: %d, pos: %d\n", dat, uptr->pos);
 uptr->pos = uptr->pos + sizeof (t_mtrlnt);              /* move tape */
 return MTSE_OK;
 }

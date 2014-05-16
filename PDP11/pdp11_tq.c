@@ -524,15 +524,19 @@ MTAB tq_mod[] = {
 #define DBG_REG  0x0004                                 /* trace read/write registers */
 #define DBG_REQ  0x0008                                 /* display transfer requests */
 #define DBG_TAP  0x0010                                 /* display sim_tape activities */
-#define DBG_DAT  0x0020                                 /* display transfer data */
+#define DBG_STR  MTSE_DBG_STR                           /* display tape structure detail */
+#define DBG_POS  MTSE_DBG_POS                           /* display position activities */
+#define DBG_DAT  MTSE_DBG_DAT                           /* display transfer data */
 
 DEBTAB tq_debug[] = {
-  {"TRACE",  DBG_TRC},
-  {"INIT",   DBG_INI},
-  {"REG",    DBG_REG},
-  {"REQ",    DBG_REQ},
-  {"TAPE",   DBG_TAP},
-  {"DATA",   DBG_DAT},
+  {"TRACE",  DBG_TRC,   "trace routine calls"},
+  {"INIT",   DBG_INI,   "display setup/init sequence info"},
+  {"REG",    DBG_REG,   "trace read/write registers"},
+  {"REQ",    DBG_REQ,   "display transfer requests"},
+  {"TAPE",   DBG_TAP,   "display sim_tape activities"},
+  {"STR",    DBG_STR,   "display tape structure detail"},
+  {"POS",    DBG_POS,   "display position activities"},
+  {"DATA",   DBG_DAT,   "display transfer data"},
   {0}
 };
 
@@ -1468,7 +1472,7 @@ switch (cmd) {                                          /* case on command */
             return SCPE_OK;
             }
         res->sts = tq_map_status (uptr, res->io_status);
-        if ((res->io_status != MTSE_OK) && (res->io_status != MTSE_BOT) && (res->io_status != MTSE_LEOT))
+        if ((res->io_status != MTSE_OK) && (res->io_status != MTSE_TMK) && (res->io_status != MTSE_BOT) && (res->io_status != MTSE_LEOT))
             return tq_mot_err (uptr, 0);                /* log, end */
         sim_debug (DBG_REQ, &tq_dev, "Position Done: mdf=0x%04X, nrec=%d, ntmk=%d, skrec=%d, sktmk=%d, skobj=%d\n", 
                             mdf, nrec, ntmk, res->skrec, res->sktmk, res->objupd);
