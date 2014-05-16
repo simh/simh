@@ -442,6 +442,8 @@ if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     if (sim_tape_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
         return SCPE_ARG;
     }
+if (MT_GET_FMT (uptr) == MTUF_F_TPC)
+    sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC tapes */
 r = attach_unit (uptr, cptr);                           /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
     return r;
@@ -1819,7 +1821,7 @@ return (uptr->capac && (uptr->pos >= uptr->capac))? TRUE: FALSE;
 
 t_bool sim_tape_wrp (UNIT *uptr)
 {
-return (uptr->flags & MTUF_WRP)? TRUE: FALSE;
+return ((uptr->flags & MTUF_WRP) || (MT_GET_FMT (uptr) == MTUF_F_TPC))? TRUE: FALSE;
 }
 
 /* Process I/O error */
