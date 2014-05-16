@@ -2782,7 +2782,7 @@ if (uptr->flags & UNIT_ATT)
 if (cptr) {
     cap = (uint32) get_uint (cptr, 10, 0xFFFFFFFF, &r);
     if ((sim_switches & SWMASK ('L')) == 0)
-        cap = cap * 1954;
+        cap = cap * ((sim_switches & SWMASK ('B')) ? 2048 : 1954);
     if ((r != SCPE_OK) || (cap < RA8U_MINC) || (cap > max))
         return SCPE_ARG;
     drv_tab[val].lbn = cap;
@@ -3158,12 +3158,15 @@ fprintf (st, "include the ability to set units write enabled or write locked, an
 fprintf (st, "the drive type to one of many disk types:\n");
 fprint_set_help (st, dptr);
 fprintf (st, "set RQn RAUSER{=n}        Set disk type to RA82 with n MB's\n");
+fprintf (st, "                          (1MB is 1000000 bytes)\n");
 fprintf (st, "set -L RQn RAUSER{=n}     Set disk type to RA82 with n LBN's\n\n");
+fprintf (st, "set -B RQn RAUSER{=n}     Set disk type to RA82 with n MB's\n");
+fprintf (st, "                          (1MB is 2048 512 byte sectors)\n\n");
 fprintf (st, "The type options can be used only when a unit is not attached to a file.\n");
 fprintf (st, "RAUSER is a \"user specified\" disk; the user can specify the size of the\n");
 fprintf (st, "disk in either MB (1000000 bytes) or logical block numbers (LBN's, 512 bytes\n");
-fprintf (st, "each).  The minimum size is 5MB; the maximum size is 2GB without extended\n");
-fprintf (st, "file support, 1TB with extended file support.\n\n");
+fprintf (st, "each), or binary MB (1024*1024 bytes).  The minimum size is 5MB; the maximum\n");
+fprintf (st, "size is 2GB without extended file support, 1TB with extended file support.\n\n");
 fprintf (st, "The %s controllers support the BOOT command.\n\n", dptr->name);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);

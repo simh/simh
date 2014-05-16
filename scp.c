@@ -3615,10 +3615,13 @@ return SCPE_OK;
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr)
 {
 t_addr kval = (uptr->flags & UNIT_BINK)? 1024: 1000;
-t_addr mval = kval * kval;
+t_addr mval;
 t_addr psize = uptr->capac;
 char scale, width;
 
+if (sim_switches & SWMASK ('B'))
+    kval = 1024;
+mval = kval * kval;
 if (dptr->flags & DEV_SECTORS) {
     kval = kval / 512;
     mval = mval / 512;
