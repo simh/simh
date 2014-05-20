@@ -150,6 +150,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
+      INCPATH:=$(shell $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '#include <...> search starts here:' | grep '^ /' | grep -v '(framework directory)' | tr -d '\n')
       ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
         INCPATH += /opt/local/include
         OS_CCDEFS += -I/opt/local/include
@@ -262,6 +263,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
   endif
   $(info lib paths are: $(LIBPATH))
+  $(info include paths are: $(INCPATH))
   find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
   find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
   ifneq (,$(call find_lib,m))
