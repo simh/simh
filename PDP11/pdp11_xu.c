@@ -235,7 +235,8 @@ DIB xub_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
                 1, IVCL (XU), 0, { &xu_int }, IOLN_XU };
 
 UNIT xub_unit[] = {
- { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }      /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xu_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) }
 };
 
 struct xu_device    xub = {
@@ -282,7 +283,7 @@ REG xub_reg[] = {
 
 DEVICE xub_dev = {
   "XUB", xub_unit, xub_reg, xu_mod,
-  1, XU_RDX, 8, 1, XU_RDX, 8,
+  2, XU_RDX, 8, 1, XU_RDX, 8,
   &xu_ex, &xu_dep, &xu_reset,
   NULL, &xu_attach, &xu_detach,
   &xub_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_ETHER,
@@ -1702,14 +1703,15 @@ t_stat xu_detach(UNIT* uptr)
   sim_debug(DBG_TRC, xu->dev, "xu_detach()\n");
 
   if (uptr->flags & UNIT_ATT) {
-    sim_cancel (uptr);                  /* stop the receiver */
-    sim_cancel (uptr+1);                /* stop the timer services */
     eth_close (xu->var->etherface);
     free(xu->var->etherface);
-    xu->var->etherface = 0;
+    xu->var->etherface = NULL;
     free(uptr->filename);
     uptr->filename = NULL;
     uptr->flags &= ~UNIT_ATT;
+    /* cancel service timers */
+    sim_cancel (uptr);                  /* stop the receiver */
+    sim_cancel (uptr+1);                /* stop the timer services */
   }
   return SCPE_OK;
 }
