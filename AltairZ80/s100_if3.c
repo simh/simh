@@ -58,11 +58,10 @@
 
 /* Debug flags */
 #define ERROR_MSG   (1 << 0)
-#define TRACE_MSG   (1 << 1)
-#define RXIRQ_MSG   (1 << 2)
-#define TXIRQ_MSG   (1 << 3)
-#define UART_MSG    (1 << 4)
-#define USER_MSG    (1 << 5)
+#define RXIRQ_MSG   (1 << 1)
+#define TXIRQ_MSG   (1 << 2)
+#define UART_MSG    (1 << 3)
+#define USER_MSG    (1 << 4)
 
 #define IF3_MAX_BOARDS    4
 
@@ -110,31 +109,35 @@ static uint8 if3_risr[IF3_MAX_BOARDS] = { 0, 0, 0, 0 };
 static uint8 if3_tisr[IF3_MAX_BOARDS] = { 0, 0, 0, 0 };
 
 static REG if3_reg[] = {
-    { HRDATA (USER,     if3_user,       3), },
-    { HRDATA (BOARD,    if3_board,      2), },
-    { BRDATA (RIMR,     &if3_rimr[0],   16, 8, 4), },
-    { BRDATA (RISR,     &if3_risr[0],   16, 8, 4), },
-    { BRDATA (TIMR,     &if3_timr[0],   16, 8, 4), },
-    { BRDATA (TISR,     &if3_tisr[0],   16, 8, 4), },
+    { HRDATAD (USER,     if3_user,       3, "IF3 user register"), },
+    { HRDATAD (BOARD,    if3_board,      2, "IF3 board register"), },
+    { BRDATAD (RIMR,     &if3_rimr[0],   16, 8, 4, "IF3 RIMR register array"), },
+    { BRDATAD (RISR,     &if3_risr[0],   16, 8, 4, "IF3 RISR register array"), },
+    { BRDATAD (TIMR,     &if3_timr[0],   16, 8, 4, "IF3 TIMR register array"), },
+    { BRDATAD (TISR,     &if3_tisr[0],   16, 8, 4, "IF3 TISR register array"), },
     { NULL }
 };
 
+#define IF3_NAME    "Compupro Interfacer 3 IF3"
+
 static MTAB if3_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,               "IOBASE",   "IOBASE",        &set_iobase, &show_iobase, NULL },
-    { UNIT_IF3_CONNECT,     UNIT_IF3_CONNECT,"INSTALLED",  "INSTALLED",   &set_if3_connect, NULL, NULL },
-    { UNIT_IF3_CONNECT,     0,               "UNINSTALLED","UNINSTALLED", &set_if3_connect, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV,    0,               "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
+    { UNIT_IF3_CONNECT,     UNIT_IF3_CONNECT,"INSTALLED",  "INSTALLED",
+        &set_if3_connect, NULL, NULL, "Installs board for unit " IF3_NAME "n"       },
+    { UNIT_IF3_CONNECT,     0,               "UNINSTALLED","UNINSTALLED",
+        &set_if3_connect, NULL, NULL, "Uninstalls board for unit " IF3_NAME "n"     },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB if3_dt[] = {
-    { "ERROR",  ERROR_MSG   },
-    { "TRACE",  TRACE_MSG   },
-    { "RXIRQ",  RXIRQ_MSG   },
-    { "TXIRQ",  TXIRQ_MSG   },
-    { "UART",   UART_MSG    },
-    { "USER",   USER_MSG    },
-    { NULL,     0           }
+    { "ERROR",  ERROR_MSG,      "Error messages"    },
+    { "RXIRQ",  RXIRQ_MSG,      "RX IRQ messages"   },
+    { "TXIRQ",  TXIRQ_MSG,      "TX IRQ messages"   },
+    { "UART",   UART_MSG,       "UART messages"     },
+    { "USER",   USER_MSG,       "User messages"     },
+    { NULL,     0                                   }
 };
 
 DEVICE if3_dev = {
@@ -143,7 +146,7 @@ DEVICE if3_dev = {
     NULL, NULL, &if3_reset,
     NULL, NULL, NULL,
     &if3_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    if3_dt, NULL, "Compupro Interfacer 3 IF3"
+    if3_dt, NULL, IF3_NAME
 };
 
 static t_stat set_if3_connect(UNIT *uptr, int32 val, char *cptr, void *desc)

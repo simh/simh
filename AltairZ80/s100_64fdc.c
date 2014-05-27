@@ -59,15 +59,10 @@
 #endif
 
 /* Debug flags */
-#define ERROR_MSG   (1 << 0)
-#define SEEK_MSG    (1 << 1)
-#define CMD_MSG     (1 << 2)
-#define RD_DATA_MSG (1 << 3)
-#define WR_DATA_MSG (1 << 4)
-#define STATUS_MSG  (1 << 5)
-#define DRIVE_MSG   (1 << 6)
-#define VERBOSE_MSG (1 << 7)
-#define IRQ_MSG     (1 << 8)
+#define STATUS_MSG  (1 << 0)
+#define DRIVE_MSG   (1 << 1)
+#define VERBOSE_MSG (1 << 2)
+#define IRQ_MSG     (1 << 3)
 
 #define CROMFDC_MAX_DRIVES  4
 #define CROMFDC_ROM_SIZE    (8 * 1024)
@@ -100,13 +95,8 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 
 static t_stat cromfdc_svc (UNIT *uptr);
 
-extern REG *sim_PC;
 extern uint32 PCX;      /* external view of PC  */
 
-#define UNIT_V_CROMFDC_WLK      (UNIT_V_UF + 0) /* write locked                             */
-#define UNIT_CROMFDC_WLK        (1 << UNIT_V_CROMFDC_WLK)
-#define UNIT_V_CROMFDC_VERBOSE  (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
-#define UNIT_CROMFDC_VERBOSE    (1 << UNIT_V_CROMFDC_VERBOSE)
 #define UNIT_V_CROMFDC_ROM      (UNIT_V_UF + 2) /* boot ROM enabled                         */
 #define UNIT_CROMFDC_ROM        (1 << UNIT_V_CROMFDC_ROM)
 #define CROMFDC_CAPACITY        (77*1*26*128)   /* Default SSSD 8" (IBM 3740) Disk Capacity */
@@ -226,40 +216,41 @@ static UNIT cromfdc_unit[] = {
 };
 
 static REG cromfdc_reg[] = {
-    { HRDATA (DIPSW,        dipswitch,             8), },
-    { DRDATA (BOOTSTRAP,    bootstrap,             2), },
-    { DRDATA (FDCTYPE,      crofdc_type,           8), },
-    { DRDATA (BOOT,         crofdc_boot,           10), },
-    { DRDATA (INHINIT,      crofdc_inh_init,       10), },
+    { HRDATAD (DIPSW,        dipswitch,             8,
+               "5-position DIP switch on 64FDC card"),                                  },
+    { DRDATAD (BOOTSTRAP,    bootstrap,             2,
+               "0 for RDOS 2.52, 1 for RDOS 3.12"),                                     },
+    { DRDATAD (FDCTYPE,      crofdc_type,           8,
+               "Controller type, either 4, 16, or 64 for Cromemco, 50 for CCS-2422"),   },
+    { DRDATAD (BOOT,         crofdc_boot,           10,
+               "BOOT jumper setting, default is auto-boot"),                            },
+    { DRDATAD (INHINIT,      crofdc_inh_init,       10,
+               "Inhibit Init (Format) switch, default is not inhibited"),               },
     { NULL }
 };
 
+#define CROMFDC_NAME    "Cromemco 4/16/64 FDC CROMFDC"
+
 static MTAB cromfdc_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",  &set_membase, &show_membase, NULL },
-    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    { UNIT_CROMFDC_WLK,     0,                      "WRTENB",   "WRTENB",   NULL  },
-    { UNIT_CROMFDC_WLK,     UNIT_CROMFDC_WLK,       "WRTLCK",   "WRTLCK",   NULL  },
+    { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
+        &set_membase, &show_membase, NULL, "Sets disk controller memory base address"   },
+    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"        },
     /* quiet, no warning messages       */
-    { UNIT_CROMFDC_VERBOSE, 0,                      "QUIET",    "QUIET",    NULL },
-    /* verbose, show warning messages   */
-    { UNIT_CROMFDC_VERBOSE, UNIT_CROMFDC_VERBOSE,   "VERBOSE",  "VERBOSE",  NULL },
-    { UNIT_CROMFDC_ROM,     0,                      "NOROM",    "NOROM",    NULL },
-    { UNIT_CROMFDC_ROM,     UNIT_CROMFDC_ROM,       "ROM",      "ROM",      NULL },
+    { UNIT_CROMFDC_ROM,     0,                      "NOROM",    "NOROM",
+        NULL, NULL, NULL, "Disables boot ROM for unit " CROMFDC_NAME "n"                },
+    { UNIT_CROMFDC_ROM,     UNIT_CROMFDC_ROM,       "ROM",      "ROM",
+        NULL, NULL, NULL, "Enables boot ROM for unit " CROMFDC_NAME "n"                 },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB cromfdc_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "DRIVE",  DRIVE_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { "IRQ",    IRQ_MSG },
-    { NULL,     0 }
+    { "STATUS",     STATUS_MSG,     "Status messages"   },
+    { "DRIVE",      DRIVE_MSG,      "Drive messages"    },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { "IRQ",        IRQ_MSG,        "IRQ messages"      },
+    { NULL,         0                                   }
 };
 
 DEVICE cromfdc_dev = {
@@ -267,8 +258,8 @@ DEVICE cromfdc_dev = {
     CROMFDC_MAX_DRIVES, 10, 31, 1, CROMFDC_MAX_DRIVES, CROMFDC_MAX_DRIVES,
     NULL, NULL, &cromfdc_reset,
     &cromfdc_boot, &wd179x_attach, &wd179x_detach,
-    &cromfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    cromfdc_dt, NULL, "Cromemco 4/16/64 FDC CROMFDC"
+    &cromfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
+    cromfdc_dt, NULL, CROMFDC_NAME
 };
 
 /* This is the CROMFDC RDOS-II ROM.

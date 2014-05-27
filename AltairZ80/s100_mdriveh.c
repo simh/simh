@@ -54,11 +54,10 @@
 #endif
 
 /* Debug flags */
-#define ERROR_MSG   (1 << 0)
-#define SEEK_MSG    (1 << 1)
-#define RD_DATA_MSG (1 << 3)
-#define WR_DATA_MSG (1 << 4)
-#define VERBOSE_MSG (1 << 7)
+#define SEEK_MSG    (1 << 0)
+#define RD_DATA_MSG (1 << 1)
+#define WR_DATA_MSG (1 << 2)
+#define VERBOSE_MSG (1 << 3)
 
 #define MDRIVEH_MAX_DRIVES    8
 
@@ -77,8 +76,6 @@ extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
-
-extern REG *sim_PC;
 
 #define UNIT_V_MDRIVEH_WLK      (UNIT_V_UF + 0) /* write locked                             */
 #define UNIT_MDRIVEH_WLK        (1 << UNIT_V_MDRIVEH_WLK)
@@ -107,25 +104,33 @@ static REG mdriveh_reg[] = {
     { NULL }
 };
 
+#define MDRIVEH_NAME    "Compupro Memory Drive MDRIVEH"
+
 static MTAB mdriveh_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    { UNIT_MDRIVEH_WLK,     0,                      "WRTENB",   "WRTENB",   NULL  },
-    { UNIT_MDRIVEH_WLK,     UNIT_MDRIVEH_WLK,       "WRTLCK",   "WRTLCK",   NULL  },
+    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
+    { UNIT_MDRIVEH_WLK,     0,                      "WRTENB",   "WRTENB",
+        NULL, NULL, NULL,
+        "Enables " MDRIVEH_NAME "n for writing"                                     },
+    { UNIT_MDRIVEH_WLK,     UNIT_MDRIVEH_WLK,       "WRTLCK",   "WRTLCK",
+        NULL, NULL, NULL,
+        "Locks " MDRIVEH_NAME "n for writing"                                       },
     /* quiet, no warning messages       */
-    { UNIT_MDRIVEH_VERBOSE, 0,                      "QUIET",    "QUIET",    NULL   },
+    { UNIT_MDRIVEH_VERBOSE, 0,                      "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " MDRIVEH_NAME "n"          },
     /* verbose, show warning messages   */
-    { UNIT_MDRIVEH_VERBOSE, UNIT_MDRIVEH_VERBOSE,   "VERBOSE",  "VERBOSE",  NULL },
+    { UNIT_MDRIVEH_VERBOSE, UNIT_MDRIVEH_VERBOSE,   "VERBOSE",  "VERBOSE",
+        NULL, NULL, NULL, "Verbose messages for unit " MDRIVEH_NAME "n"             },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB mdriveh_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { NULL,     0 }
+    { "SEEK",       SEEK_MSG,       "Seek messages"     },
+    { "READ",       RD_DATA_MSG,    "Read messages"     },
+    { "WRITE",      WR_DATA_MSG,    "Write messages"    },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { NULL,         0                                   }
 };
 
 DEVICE mdriveh_dev = {
@@ -133,8 +138,8 @@ DEVICE mdriveh_dev = {
     MDRIVEH_MAX_DRIVES, 10, 31, 1, MDRIVEH_MAX_DRIVES, MDRIVEH_MAX_DRIVES,
     NULL, NULL, &mdriveh_reset,
     NULL, NULL, NULL,
-    &mdriveh_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    mdriveh_dt, NULL, "Compupro Memory Drive MDRIVEH"
+    &mdriveh_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
+    mdriveh_dt, NULL, MDRIVEH_NAME
 };
 
 

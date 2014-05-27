@@ -59,13 +59,11 @@
 #endif
 
 /* Debug flags */
-#define ERROR_MSG   (1 << 0)
+#define STATUS_MSG  (1 << 0)
 #define SEEK_MSG    (1 << 1)
 #define CMD_MSG     (1 << 2)
 #define RD_DATA_MSG (1 << 3)
 #define WR_DATA_MSG (1 << 4)
-#define STATUS_MSG  (1 << 5)
-#define ORDERS_MSG  (1 << 7)
 
 extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -150,27 +148,32 @@ static REG mfdc_reg[] = {
     { NULL }
 };
 
+#define MDSK_NAME   "Micropolis FD Control MDSK"
+
 static MTAB mfdc_mod[] = {
-    { MTAB_XTD|MTAB_VDV,            0,                  "MEMBASE",  "MEMBASE", &set_membase, &show_membase, NULL },
-    { UNIT_MFDC_WLK,                0,                  "WRTENB",   "WRTENB", NULL  },
-    { UNIT_MFDC_WLK,                UNIT_MFDC_WLK,      "WRTLCK",   "WRTLCK", NULL  },
+    { MTAB_XTD|MTAB_VDV,            0,                  "MEMBASE",  "MEMBASE",
+        &set_membase, &show_membase, NULL, "Sets disk controller base address"  },
+    { UNIT_MFDC_WLK,                0,                  "WRTENB",   "WRTENB",
+        NULL, NULL, NULL, "Enables " MDSK_NAME "n for writing"                  },
+    { UNIT_MFDC_WLK,                UNIT_MFDC_WLK,      "WRTLCK",   "WRTLCK",
+        NULL, NULL, NULL, "Locks " MDSK_NAME "n for writing"                    },
     /* quiet, no warning messages       */
-    { UNIT_MFDC_VERBOSE,            0,                  "QUIET",    "QUIET", NULL   },
+    { UNIT_MFDC_VERBOSE,            0,                  "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " MDSK_NAME "n"         },
     /* verbose, show warning messages   */
-    { UNIT_MFDC_VERBOSE,            UNIT_MFDC_VERBOSE,  "VERBOSE",  "VERBOSE", NULL },
+    { UNIT_MFDC_VERBOSE,            UNIT_MFDC_VERBOSE,  "VERBOSE",  "VERBOSE",
+        NULL, NULL, NULL, "Verbose messages for unit " MDSK_NAME "n"            },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB mfdc_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "ORDERS", ORDERS_MSG },
-    { NULL,     0 }
+    { "STATUS", STATUS_MSG,     "Status messages"       },
+    { "SEEK",   SEEK_MSG,       "Seek activity"         },
+    { "CMD",    CMD_MSG,        "Commands"              },
+    { "READ",   RD_DATA_MSG,    "Disk read activity"    },
+    { "WRITE",  WR_DATA_MSG,    "Disk write activity"   },
+    { NULL,     0                                       }
 };
 
 DEVICE mfdc_dev = {
@@ -178,8 +181,8 @@ DEVICE mfdc_dev = {
     MFDC_MAX_DRIVES, 10, 31, 1, MFDC_MAX_DRIVES, MFDC_MAX_DRIVES,
     NULL, NULL, &mfdc_reset,
     NULL, &mfdc_attach, &mfdc_detach,
-    &mfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    mfdc_dt, NULL, "Micropolis FD Control MDSK"
+    &mfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
+    mfdc_dt, NULL, MDSK_NAME
 };
 
 /* Micropolis FD Control Boot ROM

@@ -77,30 +77,32 @@ static struct {
 static UNIT net_unit = {
     UDATA (&net_svc, UNIT_ATTABLE, 0),
     0,  /* wait, set in attach  */
-    0,  /* u3, unused			*/
-    0,  /* u4, unused			*/
+    0,  /* u3, unused           */
+    0,  /* u4, unused           */
     0,  /* u5, unused           */
     0,  /* u6, unused           */
 };
 
 static REG net_reg[] = {
-    { DRDATA (POLL,         net_unit.wait,  32)             },
+    { DRDATAD (POLL, net_unit.wait,  32, "Polling interval") },
     { NULL }
 };
 
 static MTAB net_mod[] = {
-    { UNIT_SERVER, 0,           "CLIENT", "CLIENT", &set_net}, /* machine is a client   */
-    { UNIT_SERVER, UNIT_SERVER, "SERVER", "SERVER", &set_net}, /* machine is a server   */
+    { UNIT_SERVER, 0,           "CLIENT", "CLIENT", &set_net, NULL, NULL,
+        "Sets machine to client mode"}, /* machine is a client   */
+    { UNIT_SERVER, UNIT_SERVER, "SERVER", "SERVER", &set_net, NULL, NULL,
+        "Sets machine to server mode"}, /* machine is a server   */
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB net_dt[] = {
-    { "ACCEPT", ACCEPT_MSG  },
-    { "DROP",   DROP_MSG    },
-    { "IN",     IN_MSG      },
-    { "OUT",    OUT_MSG     },
-    { NULL,     0 }
+    { "ACCEPT", ACCEPT_MSG, "Accept messages"   },
+    { "DROP",   DROP_MSG,   "Drop messages"     },
+    { "IN",     IN_MSG,     "Incoming messages" },
+    { "OUT",    OUT_MSG,    "Outgoing messages" },
+    { NULL,     0                               }
 };
 
 DEVICE net_dev = {

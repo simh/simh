@@ -31,8 +31,6 @@
 
 #include "altairz80_defs.h"
 
-#define UNIT_V_DSK_WLK      (UNIT_V_UF + 0) /* write locked                             */
-#define UNIT_DSK_WLK        (1 << UNIT_V_DSK_WLK)
 #define UNIT_V_DSK_VERBOSE  (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_DSK_VERBOSE    (1 << UNIT_V_DSK_VERBOSE)
 #define DSK_SECTSIZE        137 /* size of sector                                       */
@@ -60,7 +58,6 @@ extern uint32 PCX;
    current_disk < NUM_OF_DSK implies that the corresponding disk is attached to a file */
 static int32 current_disk                   = NUM_OF_DSK;
 static int32 warnLevelDSK                   = 3;
-static int32 warnLock       [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
 static int32 warnAttached   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
 static int32 warnDSK11                      = 0;
 
@@ -84,23 +81,29 @@ static UNIT fif_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) }
 };
 
+#define FIF_NAME    "IMSAI FIF"
+
 static REG fif_reg[] = {
-    { DRDATA (DISK,         current_disk,   4)                                          },
-    { DRDATA (DSKWL,        warnLevelDSK, 32)                                           },
-    { BRDATA (WARNLOCK,     warnLock,       10, 32, NUM_OF_DSK),    REG_CIRC + REG_RO   },
-    { BRDATA (WARNATTACHED, warnAttached,   10, 32, NUM_OF_DSK),    REG_CIRC + REG_RO   },
-    { DRDATA (WARNDSK11,    warnDSK11, 4),                          REG_RO              },
+    { DRDATAD (DISK,         current_disk,   4,
+               "Current selected disk")                                                     },
+    { DRDATAD (DSKWL,        warnLevelDSK, 32,
+               "Warn level register")                                                       },
+    { BRDATAD (WARNATTACHED, warnAttached,   10, 32, NUM_OF_DSK,
+               "Count for selection of unattached disk register array"), REG_CIRC + REG_RO  },
+    { DRDATAD (WARNDSK11,    warnDSK11, 4,
+               "Count of IN/OUT(9) on unattached disk register"), REG_RO                    },
     { NULL }
 };
 
 static MTAB fif_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0,                 "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    { UNIT_DSK_WLK,     0,                  "WRTENB",   "WRTENB",   NULL },
-    { UNIT_DSK_WLK,     UNIT_DSK_WLK,       "WRTLCK",   "WRTLCK",   NULL },
+    { MTAB_XTD|MTAB_VDV, 0,                 "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
     /* quiet, no warning messages       */
-    { UNIT_DSK_VERBOSE, 0,                  "QUIET",    "QUIET",    NULL },
+    { UNIT_DSK_VERBOSE, 0,                  "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " FIF_NAME "n"              },
     /* verbose, show warning messages   */
-    { UNIT_DSK_VERBOSE, UNIT_DSK_VERBOSE,   "VERBOSE",  "VERBOSE",  &fif_set_verbose },
+    { UNIT_DSK_VERBOSE, UNIT_DSK_VERBOSE,   "VERBOSE",  "VERBOSE",
+        &fif_set_verbose, NULL, NULL, "Verbose messages for unit " FIF_NAME "n"     },
     { 0 }
 };
 
@@ -110,15 +113,13 @@ DEVICE fif_dev = {
     NULL, NULL, &fif_reset,
     NULL, NULL, NULL,
     &fif_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, "IMSAI FIF"
+    NULL, NULL, FIF_NAME
 };
 
 static void resetDSKWarningFlags(void) {
     int32 i;
-    for (i = 0; i < NUM_OF_DSK; i++) {
-        warnLock[i]         = 0;
-        warnAttached[i]     = 0;
-    }
+    for (i = 0; i < NUM_OF_DSK; i++)
+        warnAttached[i] = 0;
     warnDSK11 = 0;
 }
 

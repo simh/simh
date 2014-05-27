@@ -59,14 +59,11 @@
 #endif
 
 /* Debug flags */
-#define ERROR_MSG   (1 << 0)
-#define SEEK_MSG    (1 << 1)
-#define CMD_MSG     (1 << 2)
-#define RD_DATA_MSG (1 << 3)
-#define WR_DATA_MSG (1 << 4)
-#define STATUS_MSG  (1 << 5)
-#define VERBOSE_MSG (1 << 7)
-#define IRQ_MSG     (1 << 8)
+#define CMD_MSG     (1 << 0)
+#define RD_DATA_MSG (1 << 1)
+#define STATUS_MSG  (1 << 2)
+#define VERBOSE_MSG (1 << 3)
+#define IRQ_MSG     (1 << 4)
 
 #define DISK1A_MAX_DRIVES    4
 
@@ -88,13 +85,8 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 
 extern void raise_ss1_interrupt(uint8 intnum);
 
-extern REG *sim_PC;
 extern uint32 PCX;      /* external view of PC  */
 
-#define UNIT_V_DISK1A_WLK       (UNIT_V_UF + 0) /* write locked                             */
-#define UNIT_DISK1A_WLK         (1 << UNIT_V_DISK1A_WLK)
-#define UNIT_V_DISK1A_VERBOSE   (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
-#define UNIT_DISK1A_VERBOSE     (1 << UNIT_V_DISK1A_VERBOSE)
 #define UNIT_V_DISK1A_ROM       (UNIT_V_UF + 2) /* boot ROM enabled                         */
 #define UNIT_DISK1A_ROM         (1 << UNIT_V_DISK1A_ROM)
 #define DISK1A_CAPACITY         (77*2*16*256)   /* Default Micropolis Disk Capacity         */
@@ -127,35 +119,32 @@ static UNIT disk1a_unit[] = {
 };
 
 static REG disk1a_reg[] = {
-    { DRDATA (BOOTSTRAP,    bootstrap,             10), },
+    { DRDATAD (BOOTSTRAP,    bootstrap,             10, "Bootstrap selector, 0 is default"), },
     { NULL }
 };
 
+#define DISK1A_NAME "Compupro Floppy Controller DISK1A"
+
 static MTAB disk1a_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",  &set_membase, &show_membase, NULL },
-    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    { UNIT_DISK1A_WLK,      0,                      "WRTENB",   "WRTENB",   NULL  },
-    { UNIT_DISK1A_WLK,      UNIT_DISK1A_WLK,        "WRTLCK",   "WRTLCK",   NULL  },
-    /* quiet, no warning messages       */
-    { UNIT_DISK1A_VERBOSE,  0,                      "QUIET",    "QUIET",    NULL },
-    /* verbose, show warning messages   */
-    { UNIT_DISK1A_VERBOSE,  UNIT_DISK1A_VERBOSE,    "VERBOSE",  "VERBOSE",  NULL },
-    { UNIT_DISK1A_ROM,      0,                      "NOROM",    "NOROM",    NULL },
-    { UNIT_DISK1A_ROM,      UNIT_DISK1A_ROM,        "ROM",      "ROM",      NULL },
+    { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
+        &set_membase, &show_membase, NULL, "Sets disk controller memory base address"   },
+    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"        },
+    { UNIT_DISK1A_ROM,      0,                      "NOROM",    "NOROM",
+        NULL, NULL, NULL, "Disables boot ROM for unit " DISK1A_NAME "n"                 },
+    { UNIT_DISK1A_ROM,      UNIT_DISK1A_ROM,        "ROM",      "ROM",
+        NULL, NULL, NULL, "Enables boot ROM for unit " DISK1A_NAME "n"                  },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB disk1a_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { "IRQ",    IRQ_MSG },
-    { NULL,     0 }
+    { "CMD",        CMD_MSG,        "Command messages"      },
+    { "RDDATA",     RD_DATA_MSG,    "Read data messages"    },
+    { "STATUS",     STATUS_MSG,     "Status messages"       },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"      },
+    { "IRQ",        IRQ_MSG,        "IRQ messages"          },
+    { NULL,         0                                       }
 };
 
 DEVICE disk1a_dev = {
@@ -163,8 +152,8 @@ DEVICE disk1a_dev = {
     DISK1A_MAX_DRIVES, 10, 31, 1, DISK1A_MAX_DRIVES, DISK1A_MAX_DRIVES,
     NULL, NULL, &disk1a_reset,
     &disk1a_boot, &disk1a_attach, &disk1a_detach,
-    &disk1a_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    disk1a_dt, NULL, "Compupro Floppy Controller DISK1A"
+    &disk1a_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 9,
+    disk1a_dt, NULL, DISK1A_NAME
 };
 
 /* This is the DISK1A Boot ROM.

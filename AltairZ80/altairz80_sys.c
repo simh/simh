@@ -26,11 +26,11 @@
     Based on work by Charles E Owen (c) 1997
     Disassembler from Marat Fayzullin ((c) 1995, 1996, 1997 - Commercial use prohibited)
 
-	03/27/14 -- MWD Add MITS Hard Disk device (mhdsk_dev)
+    03/27/14 -- MWD Add MITS Hard Disk device (mhdsk_dev)
 */
 
+#include "m68k.h"
 #include <ctype.h>
-#include "altairz80_defs.h"
 
 #define SIM_EMAX 6
 
@@ -72,10 +72,6 @@ extern DEVICE wdi2_dev;
 
 extern DEVICE scp300f_dev;
 
-#ifdef USE_FPC
-extern DEVICE fpc_dev;
-#endif /* USE_FPC */
-
 extern int32 chiptype;
 extern long disasm (unsigned char *data, char *output, int segsize, long offset);
 
@@ -98,7 +94,7 @@ t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 */
 
 char        sim_name[]      = "Altair 8800 (Z80)";
-REG         *sim_PC         = &cpu_reg[6];
+REG         *sim_PC         = &cpu_reg[CPU_INDEX_8080];
 int32       sim_emax        = SIM_EMAX;
 DEVICE      *sim_devices[]  = {
     /* AltairZ80 Devices */
@@ -380,6 +376,7 @@ static void printHex4(char* string, const uint32 value) {
         addr            =   current PC
     Outputs:
         *S              =   output text
+        return          =   length of instruction in bytes
 
     DAsm is Copyright (C) Marat Fayzullin 1995,1996,1997
         You are not allowed to distribute this software
@@ -494,7 +491,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
 t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw) {
     char disasm_result[128];
     int32 ch = val[0] & 0x7f;
-    long r;
+    long r = 1;
     unsigned char vals[SIM_EMAX];
     int32 i;
     if (sw & (SWMASK('A') | SWMASK('C'))) {
@@ -503,13 +500,26 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw) {
     }
     if (!(sw & SWMASK('M')))
         return SCPE_ARG;
-    if (chiptype == CHIP_TYPE_8086) {
-        for (i = 0; i < SIM_EMAX; i++)
-            vals[i] = val[i] & 0xff;
-        r = disasm(vals, disasm_result, 16, addr);
+    switch (chiptype) {
+        case CHIP_TYPE_8080:
+            r = DAsm(disasm_result, val, FALSE, addr);
+            break;
+
+        case CHIP_TYPE_Z80:
+            r = DAsm(disasm_result, val, TRUE, addr);
+            break;
+
+        case CHIP_TYPE_8086:
+            for (i = 0; i < SIM_EMAX; i++)
+                vals[i] = val[i] & 0xff;
+            r = disasm(vals, disasm_result, 16, addr);
+            break;
+
+        case CHIP_TYPE_M68K:
+            r = m68k_disassemble(disasm_result, addr, M68K_CPU_TYPE_68000);
+            break;
+
     }
-    else
-        r = DAsm(disasm_result, val, chiptype == CHIP_TYPE_Z80, addr);
     fprintf(of, "%s", disasm_result);
     return 1 - r;
 }
@@ -700,7 +710,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
                 return -3;              /* three additional bytes returned  */
             }
             else
-                return -1;             /* one additional byte returned     */
+                return -1;              /* one additional byte returned     */
         }
     }
 
@@ -731,7 +741,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
                 return -2;              /* two additional bytes returned    */
             }
             else
-                return -1;             /* one additional byte returned     */
+                return -1;              /* one additional byte returned     */
         }
     }
 
@@ -769,14 +779,19 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
         status  =   error status
 */
 t_stat parse_sym(char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) {
-    static t_bool symbolicInputNotImplementedMessage = FALSE;
-#define NO_SYMBOLIC_INPUT_MESSAGE   "Symbolic input is not supported for the 8086.\n"
-    if (chiptype == CHIP_TYPE_8086) {
-        if (!symbolicInputNotImplementedMessage) {
-            printf(NO_SYMBOLIC_INPUT_MESSAGE);
-            if (sim_log)
-                fprintf(sim_log, NO_SYMBOLIC_INPUT_MESSAGE);
-            symbolicInputNotImplementedMessage = TRUE;
+    static t_bool symbolicInputNotImplementedMessage8086 = FALSE;
+    static t_bool symbolicInputNotImplementedMessageM68K = FALSE;
+    if ((sw & (SWMASK('M'))) && (chiptype == CHIP_TYPE_8086)) {
+        if (!symbolicInputNotImplementedMessage8086) {
+            sim_printf("Symbolic input is not supported for the 8086.\n");
+            symbolicInputNotImplementedMessage8086 = TRUE;
+        }
+        return SCPE_NOFNC;
+    }
+    if ((sw & (SWMASK('M'))) && (chiptype == CHIP_TYPE_M68K)) {
+        if (!symbolicInputNotImplementedMessageM68K) {
+            sim_printf("Symbolic input is not supported for the M68K.\n");
+            symbolicInputNotImplementedMessageM68K = TRUE;
         }
         return SCPE_NOFNC;
     }

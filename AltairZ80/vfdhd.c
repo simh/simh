@@ -65,7 +65,6 @@
 #define RD_DATA_MSG (1 << 3)
 #define WR_DATA_MSG (1 << 4)
 #define STATUS_MSG  (1 << 5)
-#define ORDERS_MSG  (1 << 7)
 
 static void VFDHD_Command(void);
 
@@ -141,8 +140,6 @@ extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
-#define UNIT_V_VFDHD_WLK        (UNIT_V_UF + 0) /* write locked                             */
-#define UNIT_VFDHD_WLK          (1 << UNIT_V_VFDHD_WLK)
 #define UNIT_V_VFDHD_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_VFDHD_VERBOSE      (1 << UNIT_V_VFDHD_VERBOSE)
 #define VFDHD_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
@@ -166,31 +163,33 @@ static UNIT vfdhd_unit[] = {
 };
 
 static REG vfdhd_reg[] = {
-    { DRDATA (HDSIZE, hdSize, 10), },
+    { DRDATAD (HDSIZE, hdSize, 10, "Size register"), },
     { NULL }
 };
 
+#define VFDHD_NAME  "Vector Graphic FD-HD Controller VFDHD"
+
 static MTAB vfdhd_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE", &set_iobase, &show_iobase, NULL },
-    { UNIT_VFDHD_WLK,       0,                  "WRTENB",   "WRTENB", NULL  },
-    { UNIT_VFDHD_WLK,       UNIT_VFDHD_WLK,     "WRTLCK",   "WRTLCK", NULL  },
+    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
     /* quiet, no warning messages       */
-    { UNIT_VFDHD_VERBOSE,   0,                  "QUIET",    "QUIET", NULL   },
+    { UNIT_VFDHD_VERBOSE,   0,                  "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " VFDHD_NAME "n"            },
     /* verbose, show warning messages   */
-    { UNIT_VFDHD_VERBOSE,   UNIT_VFDHD_VERBOSE, "VERBOSE",  "VERBOSE", NULL },
+    { UNIT_VFDHD_VERBOSE,   UNIT_VFDHD_VERBOSE, "VERBOSE",  "VERBOSE",
+        NULL, NULL, NULL, "Verbose messages for unit " VFDHD_NAME "n"               },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB vfdhd_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "ORDERS", ORDERS_MSG },
-    { NULL,     0 }
+    { "ERROR",  ERROR_MSG,      "Error messages"    },
+    { "SEEK",   SEEK_MSG,       "Seek messages"     },
+    { "CMD",    CMD_MSG,        "Command messages"  },
+    { "READ",   RD_DATA_MSG,    "Read messages"     },
+    { "WRITE",  WR_DATA_MSG,    "Write messages"    },
+    { "STATUS", STATUS_MSG,     "Status messages"   },
+    { NULL,     0                                   }
 };
 
 DEVICE vfdhd_dev = {
@@ -199,7 +198,7 @@ DEVICE vfdhd_dev = {
     NULL, NULL, &vfdhd_reset,
     NULL, &vfdhd_attach, &vfdhd_detach,
     &vfdhd_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    vfdhd_dt, NULL, "Vector Graphic FD-HD Controller VFDHD"
+    vfdhd_dt, NULL, VFDHD_NAME
 };
 
 /* Reset routine */

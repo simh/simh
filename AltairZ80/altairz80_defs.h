@@ -26,6 +26,9 @@
     Based on work by Charles E Owen (c) 1997
 */
 
+#ifndef ALTAIRZ80_DEFS_H_
+#define ALTAIRZ80_DEFS_H_    0
+
 #include "sim_defs.h"                                       /* simulator definitions                        */
 
 #define MAXBANKSIZE             65536                       /* maximum memory size, a power of 2            */
@@ -48,10 +51,15 @@
 #define UNIT_NO_OFFSET_1        0x37                        /* LD A,<unitno>                                */
 #define UNIT_NO_OFFSET_2        0xb4                        /* LD a,80h | <unitno>                          */
 
-#define CHIP_TYPE_8080          0
-#define CHIP_TYPE_Z80           1
-#define CHIP_TYPE_8086          2
-#define MAX_CHIP_TYPE           CHIP_TYPE_8086
+#define CPU_INDEX_8080          4                           /* index of default PC register */
+
+typedef enum {
+    CHIP_TYPE_8080 = 0,
+    CHIP_TYPE_Z80,
+    CHIP_TYPE_8086,
+    CHIP_TYPE_M68K,     /* must come after 8080, Z80 and 8086 */
+    NUM_CHIP_TYPE,      /* must be last */
+} ChipType;
 
 /* simulator stop codes */
 #define STOP_HALT       0   /* HALT                                             */
@@ -81,7 +89,7 @@
 #define UNIX_PLATFORM 0
 #endif
 
-#define ADDRESS_FORMAT          "[0x%05x]"
+#define ADDRESS_FORMAT          "[0x%08x]"
 
 /* use NLP for new line printing while the simulation is running */
 #if UNIX_PLATFORM
@@ -100,3 +108,5 @@ typedef struct {
     uint32 io_base;     /* I/O Base Address */
     uint32 io_size;     /* I/O Address Space requirement */
 } PNP_INFO;
+
+#endif

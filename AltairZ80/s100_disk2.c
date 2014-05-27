@@ -118,7 +118,6 @@ static int32 nsectors     = C20MB_NSECTORS;
 static int32 sectsize     = C20MB_SECTSIZE;
 
 extern uint32 PCX;
-extern REG *sim_PC;
 extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
@@ -127,8 +126,6 @@ extern int32 selchan_dma(uint8 *buf, uint32 len);
 extern int32 find_unit_index(UNIT *uptr);
 extern void raise_ss1_interrupt(uint8 intnum);
 
-#define UNIT_V_DISK2_WLK        (UNIT_V_UF + 0) /* write locked                             */
-#define UNIT_DISK2_WLK          (1 << UNIT_V_DISK2_WLK)
 #define UNIT_V_DISK2_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_DISK2_VERBOSE      (1 << UNIT_V_DISK2_VERBOSE)
 #define DISK2_CAPACITY          (C20MB_NTRACKS*C20MB_NHEADS*C20MB_NSECTORS*C20MB_SECTSIZE)   /* Default Disk Capacity */
@@ -151,40 +148,51 @@ static UNIT disk2_unit[] = {
 };
 
 static REG disk2_reg[] = {
-    { DRDATA (NTRACKS,    ntracks,             10), },
-    { DRDATA (NHEADS,     nheads,              8), },
-    { DRDATA (NSECTORS,   nsectors,            8), },
-    { DRDATA (SECTSIZE,   sectsize,            11), },
-    { HRDATA (SEL_DRIVE,  disk2_info_data.sel_drive, 3), },
-    { HRDATA (CYL,        disk2_info_data.cyl,       8), },
-    { HRDATA (HEAD,       disk2_info_data.head,      8), },
-    { HRDATA (SECTOR,     disk2_info_data.sector,    8), },
+    { DRDATAD (NTRACKS,    ntracks,             10,
+               "Number of tracks"),                                     },
+    { DRDATAD (NHEADS,     nheads,              8,
+               "Number of heads"),                                      },
+    { DRDATAD (NSECTORS,   nsectors,            8,
+               "Number of sectors per track"),                          },
+    { DRDATAD (SECTSIZE,   sectsize,            11,
+               "Sector size not including pre/postamble"),              },
+    { HRDATAD (SEL_DRIVE,  disk2_info_data.sel_drive, 3,
+               "Currently selected drive"),                             },
+    { HRDATAD (CYL,        disk2_info_data.cyl,       8,
+               "Cylinder that the current operation is targetting"),    },
+    { HRDATAD (HEAD,       disk2_info_data.head,      8,
+               "Head that the current operation is targetting"),        },
+    { HRDATAD (SECTOR,     disk2_info_data.sector,    8,
+               "Sector that the current operation is targetting"),      },
 
     { NULL }
 };
 
+#define DISK2_NAME  "Compupro Hard Disk Controller DISK2"
+
 static MTAB disk2_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    { UNIT_DISK2_WLK,       0,                  "WRTENB",   "WRTENB",   NULL  },
-    { UNIT_DISK2_WLK,       UNIT_DISK2_WLK,     "WRTLCK",   "WRTLCK",   NULL  },
+    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
     /* quiet, no warning messages       */
-    { UNIT_DISK2_VERBOSE,   0,                  "QUIET",    "QUIET",    NULL   },
+    { UNIT_DISK2_VERBOSE,   0,                  "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " DISK2_NAME "n"            },
     /* verbose, show warning messages   */
-    { UNIT_DISK2_VERBOSE,   UNIT_DISK2_VERBOSE, "VERBOSE",  "VERBOSE",  NULL },
+    { UNIT_DISK2_VERBOSE,   UNIT_DISK2_VERBOSE, "VERBOSE",  "VERBOSE",
+        NULL, NULL, NULL, "Verbose messages for unit " DISK2_NAME "n"               },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB disk2_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "IRQ",    IRQ_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { NULL,     0 }
+    { "ERROR",      ERROR_MSG,      "Error messages"    },
+    { "SEEK",       SEEK_MSG,       "Seek messages"     },
+    { "CMD",        CMD_MSG,        "Command messages"  },
+    { "READ",       RD_DATA_MSG,    "Read messages"     },
+    { "WRITE",      WR_DATA_MSG,    "Write messages"    },
+    { "STATUS",     STATUS_MSG,     "Status messages"   },
+    { "IRQ",        IRQ_MSG,        "IRQ messages"      },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { NULL,         0                                   }
 };
 
 DEVICE disk2_dev = {
@@ -193,7 +201,7 @@ DEVICE disk2_dev = {
     NULL, NULL, &disk2_reset,
     NULL, &disk2_attach, &disk2_detach,
     &disk2_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    disk2_dt, NULL, "Compupro Hard Disk Controller DISK2"
+    disk2_dt, NULL, DISK2_NAME
 };
 
 /* Reset routine */

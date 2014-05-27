@@ -32,12 +32,12 @@
     two platters as two separate drives. Each platter has 406 cylinders
     with 24 sectors per track and 256 bytes per sector.
 
-    The disk image file starts with head 0, track 0, sector 0 (0,0,0) through 
+    The disk image file starts with head 0, track 0, sector 0 (0,0,0) through
     (0,0,23), followed by head 1, track 0, sector 0 (1,0,0) through (1,0,23).
     The pattern then repeats starting with (0,1,0).
 
-    The external hard disk is accessed through eight ports of a 4-PIO card 
-    at I/O addresses A0h-A7h. 
+    The external hard disk is accessed through eight ports of a 4-PIO card
+    at I/O addresses A0h-A7h.
 
     Written by Mike Douglas March, 2014
     Disk images provided by Martin Eberhard
@@ -54,7 +54,7 @@
 #define HDSK_NUM_TRACKS         406             /* tracks per surface */
 #define HDSK_TRACK_SIZE         (HDSK_SECTOR_SIZE * HDSK_SECTORS_PER_TRACK)
 #define HDSK_CYLINDER_SIZE      (HDSK_TRACK_SIZE * 2)
-#define HDSK_CAPACITY           (HDSK_CYLINDER_SIZE * HDSK_NUM_TRACKS)  
+#define HDSK_CAPACITY           (HDSK_CYLINDER_SIZE * HDSK_NUM_TRACKS)
 #define HDSK_NUMBER             8               /* number of hard disks */
 #define IO_IN                   0               /* I/O operation is input */
 #define IO_OUT                  1               /* I/O operation is output */
@@ -71,7 +71,7 @@ extern uint32 PCX;
 #define BOOTROM_SIZE_MHDSK      256
 #define MHDSK_BOOT_ADDRESS      0xfc00
 static t_stat mhdsk_boot(int32 unitno, DEVICE *dptr);
-extern t_stat install_bootrom(int32 bootrom[], int32 size, int32 addr, int32 makeROM);
+extern t_stat install_bootrom(const int32 bootrom[], const int32 size, const int32 addr, const int32 makeROM);
 
 // Disk controller commands are in upper nibble of command high byte.
 
@@ -115,7 +115,7 @@ static char* commandMessage[CMD_MAX] = {
 #define BUFFER_MASK     0x03    // mask - no shift needed
 
 #define TRACK_SHIFTH    8       // shift left 8 places into MSbyte
-#define TRACK_MASKH     0x01    // msb of track number 
+#define TRACK_MASKH     0x01    // msb of track number
 #define TRACK_MASKL     0xff    // entire lsb of track number
 
 #define HEAD_SHIFT      5       // shift right 5 places
@@ -178,18 +178,22 @@ static UNIT dsk_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) }};
 
+#define MHDSK_NAME  "MITS Hard Disk MHDSK"
+
 static MTAB dsk_mod[] = {
-    { UNIT_DSK_WLK,     0,                  "WRTENB",    "WRTENB",  NULL                },
-    { UNIT_DSK_WLK,     UNIT_DSK_WLK,       "WRTLCK",    "WRTLCK",  NULL                },
+    { UNIT_DSK_WLK,     0,                  "WRTENB",    "WRTENB",  NULL, NULL, NULL,
+        "Enables " MHDSK_NAME "n for writing"                 },
+    { UNIT_DSK_WLK,     UNIT_DSK_WLK,       "WRTLCK",    "WRTLCK",  NULL, NULL, NULL,
+        "Locks " MHDSK_NAME "n for writing"                },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB mhdsk_dt[] = {
-    { "READ",       READ_MSG    },
-    { "WRITE",      WRITE_MSG   },
-    { "VERBOSE",    VERBOSE_MSG },
-    { NULL,         0 }
+    { "READ",       READ_MSG,       "Read messages"     },
+    { "WRITE",      WRITE_MSG,      "Write messages"    },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { NULL,         0                                   }
 };
 
 DEVICE mhdsk_dev = {
@@ -198,41 +202,41 @@ DEVICE mhdsk_dev = {
     NULL, NULL, &dsk_reset,
     &mhdsk_boot, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    mhdsk_dt, NULL, "MITS Hard Disk MHDSK"
+    mhdsk_dt, NULL, MHDSK_NAME
 };
 
 static int32 bootrom_mhdsk[BOOTROM_SIZE_MHDSK] = {
-    0xf3, 0x31, 0x00, 0xf8, 0x21, 0x1b, 0x41, 0x2b, /* fc00-fc07 */
-    0x7c, 0xb5, 0xc2, 0x07, 0xfc, 0xe5, 0xd3, 0xa0, /* fc08-fc0f */
-    0xd3, 0xa2, 0xd3, 0xa4, 0xd3, 0xa6, 0xd3, 0xa1, /* fc10-fc17 */
-    0xd3, 0xa5, 0x2f, 0xd3, 0xa3, 0xd3, 0xa7, 0x3e, /* fc18-fc1f */
-    0x2c, 0xd3, 0xa0, 0xd3, 0xa4, 0xd3, 0xa6, 0x3e, /* fc20-fc27 */
-    0x24, 0xd3, 0xa2, 0xdb, 0xa1, 0x3e, 0x03, 0xd3, /* fc28-fc2f */
-    0x10, 0x3e, 0x11, 0xd3, 0x10, 0xcd, 0xe5, 0xfc, /* fc30-fc37 */
-    0x0d, 0x0a, 0x48, 0x44, 0x42, 0x4c, 0x20, 0x31, /* fc38-fc3f */
-    0x2e, 0x30, 0xb1, 0xcd, 0x77, 0xfc, 0x11, 0x2c, /* fc40-fc47 */
-    0x00, 0x7a, 0xbb, 0xdb, 0xa5, 0xd2, 0x54, 0xfc, /* fc48-fc4f */
-    0x6c, 0x61, 0x48, 0x47, 0x14, 0xc2, 0x49, 0xfc, /* fc50-fc57 */
-    0xcd, 0xe5, 0xfc, 0x0d, 0x0a, 0x4c, 0x4f, 0x41, /* fc58-fc5f */
-    0x44, 0x49, 0x4e, 0xc7, 0xd1, 0xd5, 0xcd, 0x77, /* fc60-fc67 */
-    0xfc, 0xdb, 0xa5, 0x12, 0x13, 0x05, 0xc2, 0x69, /* fc68-fc6f */
-    0xfc, 0x23, 0x0d, 0xc2, 0x66, 0xfc, 0xc9, 0xe5, /* fc70-fc77 */
-    0xd5, 0xc5, 0x01, 0xd0, 0xff, 0x11, 0xff, 0xff, /* fc78-fc7f */
-    0x13, 0x09, 0xda, 0x80, 0xfc, 0x7d, 0xc6, 0x30, /* fc80-fc87 */
-    0xeb, 0xfe, 0x18, 0xda, 0x90, 0xfc, 0xc6, 0x08, /* fc88-fc8f */
-    0x47, 0xcd, 0xaf, 0xfc, 0x26, 0x30, 0xdb, 0xff, /* fc90-fc97 */
-    0xe6, 0x03, 0x0f, 0x0f, 0xb0, 0xcd, 0xb0, 0xfc, /* fc98-fc9f */
-    0xdb, 0xa5, 0xdb, 0xa3, 0xaf, 0xd3, 0xa7, 0x3e, /* fca0-fca7 */
-    0x50, 0xd3, 0xa3, 0xc1, 0xd1, 0xe1, 0xc9, 0x7d, /* fca8-fcaf */
-    0xd3, 0xa7, 0xdb, 0xa1, 0xdb, 0xa3, 0xdb, 0xff, /* fcb0-fcb7 */
-    0xe6, 0x00, 0xb4, 0xd3, 0xa3, 0xdb, 0xa0, 0x07, /* fcb8-fcbf */
-    0xd2, 0xbd, 0xfc, 0xdb, 0xa1, 0xe6, 0x7f, 0xc8, /* fcc0-fcc7 */
-    0xfb, 0xf5, 0xcd, 0xe5, 0xfc, 0x0d, 0x0a, 0x4c, /* fcc8-fccf */
-    0x4f, 0x41, 0x44, 0x20, 0x45, 0x52, 0x52, 0x4f, /* fcd0-fcd7 */
-    0x52, 0xba, 0x21, 0x00, 0xfd, 0x34, 0xca, 0xde, /* fcd8-fcdf */
-    0xfc, 0xe3, 0xc3, 0xcf, 0xfd, 0xe3, 0xdb, 0x10, /* fce0-fce7 */
-    0xe6, 0x02, 0xca, 0xe6, 0xfc, 0x7e, 0xe6, 0x7f, /* fce8-fcef */
-    0xd3, 0x11, 0xbe, 0x23, 0xca, 0xe6, 0xfc, 0xe3, /* fcf0-fcf7 */
+    0xf3, 0x31, 0x00, 0xf8, 0x21, 0x1b, 0x41, 0x2b,  /* fc00-fc07 */
+    0x7c, 0xb5, 0xc2, 0x07, 0xfc, 0xe5, 0xd3, 0xa0,  /* fc08-fc0f */
+    0xd3, 0xa2, 0xd3, 0xa4, 0xd3, 0xa6, 0xd3, 0xa1,  /* fc10-fc17 */
+    0xd3, 0xa5, 0x2f, 0xd3, 0xa3, 0xd3, 0xa7, 0x3e,  /* fc18-fc1f */
+    0x2c, 0xd3, 0xa0, 0xd3, 0xa4, 0xd3, 0xa6, 0x3e,  /* fc20-fc27 */
+    0x24, 0xd3, 0xa2, 0xdb, 0xa1, 0x3e, 0x03, 0xd3,  /* fc28-fc2f */
+    0x10, 0x3e, 0x11, 0xd3, 0x10, 0xcd, 0xe5, 0xfc,  /* fc30-fc37 */
+    0x0d, 0x0a, 0x48, 0x44, 0x42, 0x4c, 0x20, 0x31,  /* fc38-fc3f */
+    0x2e, 0x30, 0xb1, 0xcd, 0x77, 0xfc, 0x11, 0x2c,  /* fc40-fc47 */
+    0x00, 0x7a, 0xbb, 0xdb, 0xa5, 0xd2, 0x54, 0xfc,  /* fc48-fc4f */
+    0x6c, 0x61, 0x48, 0x47, 0x14, 0xc2, 0x49, 0xfc,  /* fc50-fc57 */
+    0xcd, 0xe5, 0xfc, 0x0d, 0x0a, 0x4c, 0x4f, 0x41,  /* fc58-fc5f */
+    0x44, 0x49, 0x4e, 0xc7, 0xd1, 0xd5, 0xcd, 0x77,  /* fc60-fc67 */
+    0xfc, 0xdb, 0xa5, 0x12, 0x13, 0x05, 0xc2, 0x69,  /* fc68-fc6f */
+    0xfc, 0x23, 0x0d, 0xc2, 0x66, 0xfc, 0xc9, 0xe5,  /* fc70-fc77 */
+    0xd5, 0xc5, 0x01, 0xd0, 0xff, 0x11, 0xff, 0xff,  /* fc78-fc7f */
+    0x13, 0x09, 0xda, 0x80, 0xfc, 0x7d, 0xc6, 0x30,  /* fc80-fc87 */
+    0xeb, 0xfe, 0x18, 0xda, 0x90, 0xfc, 0xc6, 0x08,  /* fc88-fc8f */
+    0x47, 0xcd, 0xaf, 0xfc, 0x26, 0x30, 0xdb, 0xff,  /* fc90-fc97 */
+    0xe6, 0x03, 0x0f, 0x0f, 0xb0, 0xcd, 0xb0, 0xfc,  /* fc98-fc9f */
+    0xdb, 0xa5, 0xdb, 0xa3, 0xaf, 0xd3, 0xa7, 0x3e,  /* fca0-fca7 */
+    0x50, 0xd3, 0xa3, 0xc1, 0xd1, 0xe1, 0xc9, 0x7d,  /* fca8-fcaf */
+    0xd3, 0xa7, 0xdb, 0xa1, 0xdb, 0xa3, 0xdb, 0xff,  /* fcb0-fcb7 */
+    0xe6, 0x00, 0xb4, 0xd3, 0xa3, 0xdb, 0xa0, 0x07,  /* fcb8-fcbf */
+    0xd2, 0xbd, 0xfc, 0xdb, 0xa1, 0xe6, 0x7f, 0xc8,  /* fcc0-fcc7 */
+    0xfb, 0xf5, 0xcd, 0xe5, 0xfc, 0x0d, 0x0a, 0x4c,  /* fcc8-fccf */
+    0x4f, 0x41, 0x44, 0x20, 0x45, 0x52, 0x52, 0x4f,  /* fcd0-fcd7 */
+    0x52, 0xba, 0x21, 0x00, 0xfd, 0x34, 0xca, 0xde,  /* fcd8-fcdf */
+    0xfc, 0xe3, 0xc3, 0xcf, 0xfd, 0xe3, 0xdb, 0x10,  /* fce0-fce7 */
+    0xe6, 0x02, 0xca, 0xe6, 0xfc, 0x7e, 0xe6, 0x7f,  /* fce8-fcef */
+    0xd3, 0x11, 0xbe, 0x23, 0xca, 0xe6, 0xfc, 0xe3,  /* fcf0-fcf7 */
     0xc9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  /* fcf8-fcff */
 };
 
@@ -253,9 +257,9 @@ static char* cmdTranslate(const int32 cmd) {
 }
 
 /*----------------------------------------------------------------------------------
- 
+
  dsk_reset - install I/O handlers and initialize variables.
- 
+
  ----------------------------------------------------------------------------------*/
 
 static t_stat dsk_reset(DEVICE *dptr) {
@@ -280,7 +284,7 @@ static t_stat dsk_reset(DEVICE *dptr) {
 }
 
 /*-------------------------------------------------------------------------------------
- hdReturnReady - common I/O handler for several hard disk status ports which set 
+ hdReturnReady - common I/O handler for several hard disk status ports which set
     bit 7 when the corresponding hard disk function is ready. In the emulator,
     we're always ready for the next step, so we simply return ready all the time.
 
@@ -289,13 +293,13 @@ static t_stat dsk_reset(DEVICE *dptr) {
 
     0xA2 - ACSTA register. Accessed through the status/control register of 4-PIO
         port 1-B. Returns the "command received" status byte.
-    
-    0xA4 - CDSTA register. Accessed through the status/control register of 4-PIO 
+
+    0xA4 - CDSTA register. Accessed through the status/control register of 4-PIO
         port 2-A. Returns the "command data available" status byte.
 
-    0xA6 - ADSTA register. Accessed through the status/control register of 4-PIO 
+    0xA6 - ADSTA register. Accessed through the status/control register of 4-PIO
         port 2-B. Returns the "available to write" status byte.
-        
+
 ---------------------------------------------------------------------------------------*/
 static int32 hdReturnReady(const int32 port, const int32 io, const int32 data)
 {
@@ -305,14 +309,14 @@ static int32 hdReturnReady(const int32 port, const int32 io, const int32 data)
                                                      (port == 0xa4 ? "CDSTA" : (port == 0xa6 ? "ADSTA" : "?????")))));
     return(0x80);       // always indicate ready
 
-// output operations have no effect
+    // output operations have no effect
 }
 
 /*------------------------------------------------------------
- hdCstat (0xA1) CSTAT register. Accessed through the 
+ hdCstat (0xA1) CSTAT register. Accessed through the
     data register of 4-PIO port 1-A.
 
-    Comments:   Returns error code byte of the most recent 
+    Comments:   Returns error code byte of the most recent
                 operation. Reading this byte also clears
                 the CRDY bit, but this isn't actually done
                 in the emulation since we're always ready.
@@ -323,11 +327,11 @@ static int32 hdCstat(const int32 port, const int32 io, const int32 data)
               " IN(%02X = %s) = %02x.\n", PCX, port, (port == 0xa1 ? "CSTAT" : "?????"), cstat);
     return(cstat);
 
-// output operations have no effect
+    // output operations have no effect
 }
 
 /*------------------------------------------------------------
- hdAcmd (0xA3) ACMD register. Accessed  through the 
+ hdAcmd (0xA3) ACMD register. Accessed  through the
     data register of 4-PIO port 1-B.
 
     Comments:   The high byte of a command is written to
@@ -386,12 +390,12 @@ static int32 hdAcmd(const int32 port, const int32 io, const int32 data)
             doRead(port, data, command);
     }
 
-// READ or WRITE BUFFER command. Initiates reading/loading specified buffer. 
+// READ or WRITE BUFFER command. Initiates reading/loading specified buffer.
 
     else if ((command == CMD_WRITE_BUF) || (command == CMD_READ_BUF)) {
         selectedBuffer = buffer;
         maxBufferIdx = cmdLowByte;
-        if (maxBufferIdx == 0) 
+        if (maxBufferIdx == 0)
             maxBufferIdx = 256;
         bufferIdx = 0;
         sim_debug(VERBOSE_MSG, &mhdsk_dev, "MHDSK: " ADDRESS_FORMAT
@@ -440,9 +444,9 @@ static int32 hdAcmd(const int32 port, const int32 io, const int32 data)
 }
 
 /*------------------------------------------------------------
- hdCdata (0xA5) Cdata register. Accessed through the 
+ hdCdata (0xA5) Cdata register. Accessed through the
     data register of 4-PIO port 1-B.
-    
+
     Comments:   Returns data from the read buffer
 -------------------------------------------------------------*/
 static int32 hdCdata(const int32 port, const int32 io, const int32 data)
@@ -464,10 +468,10 @@ static int32 hdCdata(const int32 port, const int32 io, const int32 data)
 
 
 /*------------------------------------------------------------
- hdAdata (0xA7) ADATA register. Accessed through the 
+ hdAdata (0xA7) ADATA register. Accessed through the
     data register of 4-PIO port 2-B.
-    
-    Comments:   Accepts data into the current buffer 
+
+    Comments:   Accepts data into the current buffer
                 and is also the low byte of a command.
 -------------------------------------------------------------*/
 static int32 hdAdata(const int32 port, const int32 io, const int32 data)
@@ -487,21 +491,21 @@ static int32 hdAdata(const int32 port, const int32 io, const int32 data)
 
 /*--  doRead  -------------------------------------------------
     Performs read from MITS Hard Disk image file
-    
+
     Params:     nothing
     Uses:       selectedTrack, selectedHead, selectedSector
                 selectedDisk, diskBuf[], mhdsk_dev
     Returns:    nothing (updates cstat directly)
-    Comments:   
+    Comments:
 -------------------------------------------------------------*/
 static void doRead(const int32 port, const int32 data, const uint32 command)
 {
     UNIT *uptr;
     uint32 fileOffset;
-    
+
     uptr = mhdsk_dev.units + selectedDisk;
-    fileOffset = HDSK_CYLINDER_SIZE * selectedTrack + 
-                    HDSK_TRACK_SIZE * (selectedHead & 0x01) + 
+    fileOffset = HDSK_CYLINDER_SIZE * selectedTrack +
+                    HDSK_TRACK_SIZE * (selectedHead & 0x01) +
                     HDSK_SECTOR_SIZE * selectedSector;
     if (sim_fseek(uptr->fileref, fileOffset, SEEK_SET))
         cstat = CSTAT_NOT_READY;                    /* seek error */
@@ -518,23 +522,23 @@ static void doRead(const int32 port, const int32 data, const uint32 command)
 
 /*--  doWrite  ------------------------------------------------
     Performs write to MITS Hard Disk image file
-    
+
     Params:     none
     Uses:       selectedTrack, selectedHead, selectedSector
                 selectedDisk, diskBuf[], mhdsk_dev
     Returns:    nothing (updates cstat directly)
-    Comments:   
+    Comments:
 -------------------------------------------------------------*/
 static void doWrite(const int32 port, const int32 data, const uint32 command)
 {
     UNIT *uptr;
     uint32 fileOffset;
-        
+
     uptr = mhdsk_dev.units + selectedDisk;
     if (((uptr->flags) & UNIT_DSK_WLK) == 0) {          /* write enabled */
-        fileOffset = HDSK_CYLINDER_SIZE * selectedTrack + 
-                        HDSK_TRACK_SIZE * (selectedHead & 0x01) + 
-                        HDSK_SECTOR_SIZE * selectedSector;
+        fileOffset = HDSK_CYLINDER_SIZE * selectedTrack +
+        HDSK_TRACK_SIZE * (selectedHead & 0x01) +
+        HDSK_SECTOR_SIZE * selectedSector;
         if (sim_fseek(uptr->fileref, fileOffset, SEEK_SET))
             cstat = CSTAT_NOT_READY;                    /* seek error */
         else if (sim_fwrite(diskBuf[selectedBuffer], 1, HDSK_SECTOR_SIZE, uptr->fileref) !=

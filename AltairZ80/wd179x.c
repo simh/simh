@@ -208,28 +208,35 @@ static UNIT wd179x_unit[] = {
     { UDATA (&wd179x_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, WD179X_CAPACITY), 58200 }
 };
 
+#define WD179X_NAME "Western Digital FDC Core WD179X"
+
 static MTAB wd179x_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    { UNIT_WD179X_WLK,      0,                      "WRTENB",   "WRTENB",   NULL },
-    { UNIT_WD179X_WLK,      UNIT_WD179X_WLK,        "WRTLCK",   "WRTLCK",   NULL },
+    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
+    { UNIT_WD179X_WLK,      0,                      "WRTENB",   "WRTENB",
+        NULL, NULL, NULL, "Enables " WD179X_NAME "n for writing"                    },
+    { UNIT_WD179X_WLK,      UNIT_WD179X_WLK,        "WRTLCK",   "WRTLCK",
+        NULL, NULL, NULL, "Locks " WD179X_NAME "n for writing"                      },
     /* quiet, no warning messages       */
-    { UNIT_WD179X_VERBOSE,  0,                      "QUIET",    "QUIET",    NULL },
+    { UNIT_WD179X_VERBOSE,  0,                      "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " WD179X_NAME "n"           },
     /* verbose, show warning messages   */
-    { UNIT_WD179X_VERBOSE,  UNIT_WD179X_VERBOSE,    "VERBOSE",  "VERBOSE",  NULL },
+    { UNIT_WD179X_VERBOSE,  UNIT_WD179X_VERBOSE,    "VERBOSE",  "VERBOSE",
+        NULL, NULL, NULL, "Verbose messages for unit " WD179X_NAME "n"              },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB wd179x_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "FMT",    FMT_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { NULL,     0 }
+    { "ERROR",      ERROR_MSG,      "Error messages"    },
+    { "SEEK",       SEEK_MSG,       "Seek messages"     },
+    { "CMD",        CMD_MSG,        "Command messages"  },
+    { "READ",       RD_DATA_MSG,    "Read messages"     },
+    { "WRITE",      WR_DATA_MSG,    "Write messages"    },
+    { "STATUS",     STATUS_MSG,     "Status messages"   },
+    { "FMT",        FMT_MSG,        "Format messages"   },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { NULL,         0                                   }
 };
 
 DEVICE wd179x_dev = {
@@ -238,7 +245,7 @@ DEVICE wd179x_dev = {
     NULL, NULL, &wd179x_reset,
     NULL, &wd179x_attach, &wd179x_detach,
     &wd179x_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    wd179x_dt, NULL, "Western Digital FDC Core WD179X"
+    wd179x_dt, NULL, WD179X_NAME
 };
 
 /* Unit service routine */

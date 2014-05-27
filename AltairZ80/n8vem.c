@@ -55,13 +55,11 @@
 #endif
 
 /* Debug flags */
-#define ERROR_MSG   (1 << 0)
-#define PIO_MSG     (1 << 1)
-#define UART_MSG    (1 << 2)
-#define RTC_MSG     (1 << 3)
-#define MPCL_MSG    (1 << 4)
-#define ROM_MSG     (1 << 5)
-#define VERBOSE_MSG (1 << 7)
+#define PIO_MSG     (1 << 0)
+#define UART_MSG    (1 << 1)
+#define MPCL_MSG    (1 << 2)
+#define ROM_MSG     (1 << 3)
+#define VERBOSE_MSG (1 << 4)
 
 #define N8VEM_MAX_DRIVES    2
 
@@ -86,7 +84,6 @@ extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
-extern REG *sim_PC;
 extern int32 find_unit_index (UNIT *uptr);
 
 static t_stat n8vem_reset(DEVICE *n8vem_dev);
@@ -121,30 +118,38 @@ static UNIT n8vem_unit[] = {
 };
 
 static REG n8vem_reg[] = {
-    { HRDATA (SAVEROM,      save_rom,               1), },
-    { HRDATA (SAVERAM,      save_ram,               1), },
-    { HRDATA (PIO1A,        n8vem_pio1a,            8), },
-    { HRDATA (PIO1B,        n8vem_pio1b,            8), },
-    { HRDATA (PIO1C,        n8vem_pio1c,            8), },
-    { HRDATA (PIO1CTRL,     n8vem_pio1ctrl,         8), },
+    { HRDATAD (SAVEROM,      save_rom,               1,
+               "When 1, saves the ROM back to file on disk at detach time"),    },
+    { HRDATAD (SAVERAM,      save_ram,               1,
+               "When 1 save the RAM back to file on disk at detach time"),      },
+    { HRDATAD (PIO1A,        n8vem_pio1a,            8,
+               "8255 PIO1A IN Port"),                                           },
+    { HRDATAD (PIO1B,        n8vem_pio1b,            8,
+               "8255 PIO1B OUT Port"),                                          },
+    { HRDATAD (PIO1C,        n8vem_pio1c,            8,
+               "8255 PIO1C IN Port"),                                           },
+    { HRDATAD (PIO1CTRL,     n8vem_pio1ctrl,         8,
+               "8255 PIO1 Control Port"),                                       },
     { NULL }
 };
 
+#define N8VEM_NAME  "Single-Board Computer N8VEM"
+
 static MTAB n8vem_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",  &set_membase, &show_membase, NULL },
-    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
+    { MTAB_XTD|MTAB_VDV,    0,  "MEMBASE",  "MEMBASE",  &set_membase, &show_membase,
+        NULL, "Sets device base address"   },
+    { MTAB_XTD|MTAB_VDV,    0,  "IOBASE",   "IOBASE",   &set_iobase, &show_iobase,
+        NULL, "Sets device I/O address"    },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB n8vem_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "PIO",    PIO_MSG },
-    { "UART",   UART_MSG },
-    { "RTC",    RTC_MSG },
-    { "ROM",    ROM_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { NULL,     0 }
+    { "PIO",        PIO_MSG,        "PIP activity"}     ,
+    { "UART",       UART_MSG,       "UART activity"     },
+    { "ROM",        ROM_MSG,        "ROM activity"      },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { NULL,         0                                   }
 };
 
 DEVICE n8vem_dev = {
@@ -152,7 +157,7 @@ DEVICE n8vem_dev = {
     N8VEM_MAX_DRIVES, 10, 31, 1, N8VEM_MAX_DRIVES, N8VEM_MAX_DRIVES,
     NULL, NULL, &n8vem_reset,
     &n8vem_boot, &n8vem_attach, &n8vem_detach,
-    &n8vem_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    &n8vem_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
     n8vem_dt, NULL, "Single-Board Computer N8VEM"
 };
 

@@ -54,14 +54,10 @@
 #endif
 
 /* Debug flags */
-#define ERROR_MSG   (1 << 0)
-#define VERBOSE_MSG (1 << 1)
-#define DMA_MSG     (1 << 2)
+#define VERBOSE_MSG (1 << 0)
+#define DMA_MSG     (1 << 1)
 
 #define SELCHAN_MAX_DRIVES  1
-
-#define UNIT_V_SELCHAN_VERBOSE  (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
-#define UNIT_SELCHAN_VERBOSE    (1 << UNIT_V_SELCHAN_VERBOSE)
 
 typedef struct {
     PNP_INFO    pnp;    /* Plug and Play */
@@ -95,26 +91,22 @@ static UNIT selchan_unit[] = {
 };
 
 static REG selchan_reg[] = {
-    { HRDATA (DMA_MODE,    selchan_info_data.dma_mode,    8), },
-    { HRDATA (DMA_ADDR,    selchan_info_data.dma_addr,    24), },
+    { HRDATAD (DMA_MODE, selchan_info_data.dma_mode, 8,     "DMA mode register"),               },
+    { HRDATAD (DMA_ADDR, selchan_info_data.dma_addr, 24,    "DMA transfer address register"),   },
     { NULL }
 };
 
 static MTAB selchan_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    /* quiet, no warning messages       */
-    { UNIT_SELCHAN_VERBOSE, 0,                      "QUIET",    "QUIET",    NULL },
-    /* verbose, show warning messages   */
-    { UNIT_SELCHAN_VERBOSE, UNIT_SELCHAN_VERBOSE,   "VERBOSE",  "VERBOSE",  NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "IOBASE", "IOBASE", &set_iobase, &show_iobase, NULL,
+        "Sets disk controller I/O base address"                                     },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB selchan_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { "DMA",    DMA_MSG },
-    { NULL,     0 }
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { "DMA",        DMA_MSG,        "DMA messages"      },
+    { NULL,         0                                   }
 };
 
 DEVICE selchan_dev = {
@@ -122,7 +114,7 @@ DEVICE selchan_dev = {
     SELCHAN_MAX_DRIVES, 10, 31, 1, SELCHAN_MAX_DRIVES, SELCHAN_MAX_DRIVES,
     NULL, NULL, &selchan_reset,
     NULL, NULL, NULL,
-    &selchan_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    &selchan_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
     selchan_dt, NULL, "Compupro Selector Channel SELCHAN"
 };
 

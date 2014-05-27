@@ -177,47 +177,48 @@ static UNIT ss1_unit[] = {
 };
 
 static REG ss1_reg[] = {
-    { HRDATA (MPIC_IMR,   ss1_pic[MASTER_PIC].IMR,            8), },
-    { HRDATA (MPIC_IRR,   ss1_pic[MASTER_PIC].IRR,            8), },
-    { HRDATA (MPIC_ISR,   ss1_pic[MASTER_PIC].ISR,            8), },
-    { HRDATA (MPIC_OCW2,  ss1_pic[MASTER_PIC].OCW2,           8), },
-    { HRDATA (MPIC_OCW3,  ss1_pic[MASTER_PIC].OCW3,           8), },
+    { HRDATAD (MPIC_IMR,   ss1_pic[MASTER_PIC].IMR,            8, "Master IMR register"),       },
+    { HRDATAD (MPIC_IRR,   ss1_pic[MASTER_PIC].IRR,            8, "Master IRR register"),       },
+    { HRDATAD (MPIC_ISR,   ss1_pic[MASTER_PIC].ISR,            8, "Master ISR register"),       },
+    { HRDATAD (MPIC_OCW2,  ss1_pic[MASTER_PIC].OCW2,           8, "Master OCW2 register"),      },
+    { HRDATAD (MPIC_OCW3,  ss1_pic[MASTER_PIC].OCW3,           8, "Master OCW3 register"),      },
 
-    { HRDATA (SPIC_IMR,   ss1_pic[SLAVE_PIC].IMR,             8), },
-    { HRDATA (SPIC_IRR,   ss1_pic[SLAVE_PIC].IRR,             8), },
-    { HRDATA (SPIC_ISR,   ss1_pic[SLAVE_PIC].ISR,             8), },
-    { HRDATA (SPIC_OCW2,  ss1_pic[SLAVE_PIC].OCW2,            8), },
-    { HRDATA (SPIC_OCW3,  ss1_pic[SLAVE_PIC].OCW3,            8), },
+    { HRDATAD (SPIC_IMR,   ss1_pic[SLAVE_PIC].IMR,             8, "Slave IMR register"),        },
+    { HRDATAD (SPIC_IRR,   ss1_pic[SLAVE_PIC].IRR,             8, "Slave IRR register"),        },
+    { HRDATAD (SPIC_ISR,   ss1_pic[SLAVE_PIC].ISR,             8, "Slave ISR register"),        },
+    { HRDATAD (SPIC_OCW2,  ss1_pic[SLAVE_PIC].OCW2,            8, "Slave OCW2 register"),       },
+    { HRDATAD (SPIC_OCW3,  ss1_pic[SLAVE_PIC].OCW3,            8, "Slave OCW3 register"),       },
 
-    { HRDATA (T0_MODE,    ss1_tc[0].mode,                     3), },
-    { HRDATA (T0_COUNT,   ss1_tc[0].count,                    16), },
-    { HRDATA (T1_MODE,    ss1_tc[1].mode,                     3), },
-    { HRDATA (T1_COUNT,   ss1_tc[1].count,                    16), },
-    { HRDATA (T2_MODE,    ss1_tc[2].mode,                     3), },
-    { HRDATA (T2_COUNT,   ss1_tc[2].count,                    16), },
+    { HRDATAD (T0_MODE,    ss1_tc[0].mode,                     3, "Timer 0 mode register"),     },
+    { HRDATAD (T0_COUNT,   ss1_tc[0].count,                    16, "Timer 0 count register"),   },
+    { HRDATAD (T1_MODE,    ss1_tc[1].mode,                     3, "Timer 1 mode register"),     },
+    { HRDATAD (T1_COUNT,   ss1_tc[1].count,                    16, "Timer 1 count register"),   },
+    { HRDATAD (T2_MODE,    ss1_tc[2].mode,                     3, "Timer 2 mode register"),     },
+    { HRDATAD (T2_COUNT,   ss1_tc[2].count,                    16, "Timer 2 count register"),   },
 
-    { HRDATA (RTC_DIGIT,  ss1_rtc[0].digit_sel,               4), },
-    { HRDATA (RTC_FLAGS,  ss1_rtc[0].flags,                   4), },
+    { HRDATAD (RTC_DIGIT,  ss1_rtc[0].digit_sel,               4, "Digit selector register"),   },
+    { HRDATAD (RTC_FLAGS,  ss1_rtc[0].flags,                   4, "Flags register"),            },
 
     { NULL }
 };
 
 static MTAB ss1_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,              "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
+    { MTAB_XTD|MTAB_VDV,    0,              "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets system support module base address" },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB ss1_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "TRACE",  TRACE_MSG },
-    { "PIC",    PIC_MSG },
-    { "TC",     TC_MSG },
-    { "RTC",    RTC_MSG },
-    { "MATH",   MATH_MSG },
-    { "UART",   UART_MSG },
-    { "IRQ",    IRQ_MSG },
-    { NULL,     0 }
+    { "ERROR",  ERROR_MSG,  "Error messages"    },
+    { "TRACE",  TRACE_MSG,  "Trace messages"    },
+    { "PIC",    PIC_MSG,    "PIC messages"      },
+    { "TC",     TC_MSG,     "TC messages"       },
+    { "RTC",    RTC_MSG,    "RTC messages"      },
+    { "MATH",   MATH_MSG,   "Math messages"     },
+    { "UART",   UART_MSG,   "UART messages"     },
+    { "IRQ",    IRQ_MSG,    "IRQ messages"      },
+    { NULL,     0                               }
 };
 
 DEVICE ss1_dev = {

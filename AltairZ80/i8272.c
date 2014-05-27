@@ -143,8 +143,6 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 extern void PutByteDMA(const uint32 Addr, const uint32 Value);
 extern uint8 GetByteDMA(const uint32 Addr);
 
-#define UNIT_V_I8272_WLK        (UNIT_V_UF + 0) /* write locked                             */
-#define UNIT_I8272_WLK          (1 << UNIT_V_I8272_WLK)
 #define UNIT_V_I8272_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_I8272_VERBOSE      (1 << UNIT_V_I8272_VERBOSE)
 #define I8272_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
@@ -191,29 +189,32 @@ static UNIT i8272_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, I8272_CAPACITY) }
 };
 
+#define I8272_NAME  "Intel/NEC(765) FDC Core I8272"
+
 static MTAB i8272_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    { UNIT_I8272_WLK,       0,                  "WRTENB",   "WRTENB",   NULL },
-    { UNIT_I8272_WLK,       UNIT_I8272_WLK,     "WRTLCK",   "WRTLCK",   NULL },
+    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
     /* quiet, no warning messages       */
-    { UNIT_I8272_VERBOSE,   0,                  "QUIET",    "QUIET",    NULL },
+    { UNIT_I8272_VERBOSE,   0,                  "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " I8272_NAME "n"            },
     /* verbose, show warning messages   */
-    { UNIT_I8272_VERBOSE,   UNIT_I8272_VERBOSE, "VERBOSE",  "VERBOSE",  NULL },
+    { UNIT_I8272_VERBOSE,   UNIT_I8272_VERBOSE, "VERBOSE",  "VERBOSE",
+        NULL, NULL, NULL, "Verbose messages for unit " I8272_NAME "n"               },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB i8272_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "FMT",    FMT_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { "IRQ",    IRQ_MSG },
-    { NULL,     0 }
+    { "ERROR",      ERROR_MSG,      "Error messages"    },
+    { "SEEK",       SEEK_MSG,       "Seek messages"     },
+    { "CMD",        CMD_MSG,        "Command messages"  },
+    { "READ",       RD_DATA_MSG,    "Read messages"     },
+    { "WRITE",      WR_DATA_MSG,    "Write messages"    },
+    { "STATUS",     STATUS_MSG,     "Status messages"   },
+    { "FMT",        FMT_MSG,        "Format messages"   },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { "IRQ",        IRQ_MSG,        "IRQ messages"      },
+    { NULL,         0                                   }
 };
 
 DEVICE i8272_dev = {
@@ -222,7 +223,7 @@ DEVICE i8272_dev = {
     NULL, NULL, &i8272_reset,
     NULL, &i8272_attach, &i8272_detach,
     &i8272_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    i8272_dt, NULL, "Intel/NEC(765) FDC Core I8272"
+    i8272_dt, NULL, I8272_NAME
 };
 
 static uint8 I8272_Setup_Cmd(uint8 fdc_cmd);

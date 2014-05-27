@@ -54,13 +54,9 @@
 #endif
 
 /* Debug flags */
-#define ERROR_MSG   (1 << 0)
-#define PIO_MSG     (1 << 1)
-#define UART_MSG    (1 << 2)
-#define RTC_MSG     (1 << 3)
-#define ROM_MSG     (1 << 5)
-#define VERBOSE_MSG (1 << 7)
-#define IRQ_MSG     (1 << 8)
+#define UART_MSG    (1 << 0)
+#define ROM_MSG     (1 << 1)
+#define VERBOSE_MSG (1 << 2)
 
 #define SCP300F_MAX_DRIVES  1
 #define SCP300F_ROM_SIZE    (2048)
@@ -68,9 +64,6 @@
 
 #define SCP300F_IO_SIZE     (16)
 #define SCP300F_IO_MASK     (SCP300F_IO_SIZE - 1)
-
-#define UNIT_V_SCP300F_VERBOSE  (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
-#define UNIT_SCP300F_VERBOSE    (1 << UNIT_V_SCP300F_VERBOSE)
 
 typedef struct {
     PNP_INFO    pnp;    /* Plug and Play */
@@ -106,30 +99,24 @@ static UNIT scp300f_unit[] = {
 };
 
 static REG scp300f_reg[] = {
-    { HRDATA (SR,           scp300f_sr,     8), },
+    { HRDATAD (SR, scp300f_sr, 8, "Sense switch register, 0=monitor prompt, 1=disk boot"), },
     { NULL }
 };
 
 static MTAB scp300f_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",  &set_membase, &show_membase, NULL },
-    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    /* quiet, no warning messages       */
-    { UNIT_SCP300F_VERBOSE, 0,                      "QUIET",    "QUIET",    NULL },
-    /* verbose, show warning messages   */
-    { UNIT_SCP300F_VERBOSE, UNIT_SCP300F_VERBOSE,   "VERBOSE",  "VERBOSE",  NULL },
+    { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
+        &set_membase, &show_membase, NULL, "Sets support module memory base address"    },
+    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets support module I/O base address"         },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB scp300f_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "PIO",    PIO_MSG },
-    { "UART",   UART_MSG },
-    { "RTC",    RTC_MSG },
-    { "ROM",    ROM_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { "IRQ",    IRQ_MSG },
-    { NULL,     0 }
+    { "UART",       UART_MSG,       "UART messages"     },
+    { "ROM",        ROM_MSG,        "ROM messages"      },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { NULL,         0                                   }
 };
 
 
@@ -138,7 +125,7 @@ DEVICE scp300f_dev = {
     SCP300F_MAX_DRIVES, 10, 31, 1, SCP300F_MAX_DRIVES, SCP300F_MAX_DRIVES,
     NULL, NULL, &scp300f_reset,
     NULL, NULL, NULL,
-    &scp300f_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    &scp300f_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
     scp300f_dt, NULL, "SCP Support Board SCP300F"
 };
 

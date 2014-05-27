@@ -55,23 +55,21 @@
 #endif
 
 /* Debug flags */
-#define ERROR_MSG   (1 << 0)
-#define SEEK_MSG    (1 << 1)
-#define CMD_MSG     (1 << 2)
-#define RD_DATA_MSG (1 << 3)
-#define WR_DATA_MSG (1 << 4)
-#define STATUS_MSG  (1 << 5)
-#define ORDERS_MSG  (1 << 6)
-#define VERBOSE_MSG (1 << 7)
-#define RD_DATA_DETAIL_MSG  (1 << 8)
-#define WR_DATA_DETAIL_MSG  (1 << 9)
+#define ERROR_MSG           (1 << 0)
+#define SEEK_MSG            (1 << 1)
+#define CMD_MSG             (1 << 2)
+#define RD_DATA_MSG         (1 << 3)
+#define WR_DATA_MSG         (1 << 4)
+#define STATUS_MSG          (1 << 5)
+#define ORDERS_MSG          (1 << 6)
+#define RD_DATA_DETAIL_MSG  (1 << 7)
+#define WR_DATA_DETAIL_MSG  (1 << 8)
 
 extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
-extern REG *sim_PC;
 
 #define MDSAD_MAX_DRIVES        4
 #define MDSAD_SECTOR_LEN        512
@@ -156,8 +154,6 @@ static MDSAD_INFO *mdsad_info = &mdsad_info_data;
 
 static SECTOR_FORMAT sdata;
 
-#define UNIT_V_MDSAD_WLK        (UNIT_V_UF + 0) /* write locked                                 */
-#define UNIT_MDSAD_WLK          (1 << UNIT_V_MDSAD_WLK)
 #define UNIT_V_MDSAD_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages       */
 #define UNIT_MDSAD_VERBOSE      (1 << UNIT_V_MDSAD_VERBOSE)
 #define MDSAD_CAPACITY          (70*10*MDSAD_SECTOR_LEN)    /* Default North Star Disk Capacity */
@@ -232,30 +228,32 @@ static REG mdsad_reg[] = {
     { NULL }
 };
 
+#define MDSAD_NAME  "North Star Floppy Controller MDSAD"
+
 static MTAB mdsad_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",  &set_membase, &show_membase, NULL },
-    { UNIT_MDSAD_WLK,       0,                  "WRTENB",   "WRTENB",   NULL },
-    { UNIT_MDSAD_WLK,       UNIT_MDSAD_WLK,     "WRTLCK",   "WRTLCK",   NULL },
+    { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",
+        &set_membase, &show_membase, NULL, "Sets disk controller memory base address"   },
     /* quiet, no warning messages       */
-    { UNIT_MDSAD_VERBOSE,   0,                  "QUIET",    "QUIET",    NULL },
+    { UNIT_MDSAD_VERBOSE,   0,                  "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " MDSAD_NAME "n"                },
     /* verbose, show warning messages   */
-    { UNIT_MDSAD_VERBOSE,   UNIT_MDSAD_VERBOSE, "VERBOSE",  "VERBOSE",  NULL },
+    { UNIT_MDSAD_VERBOSE,   UNIT_MDSAD_VERBOSE, "VERBOSE",  "VERBOSE",
+        NULL, NULL, NULL, "Verbose messages for unit " MDSAD_NAME "n"                   },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB mdsad_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "ORDERS", ORDERS_MSG },
-    { "RDDETAIL", RD_DATA_DETAIL_MSG },
-    { "WRDETAIL", WR_DATA_DETAIL_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { NULL,     0 }
+    { "ERROR",      ERROR_MSG,          "Error messages"        },
+    { "SEEK",       SEEK_MSG,           "Seek messages"         },
+    { "CMD",        CMD_MSG,            "Command messages"      },
+    { "READ",       RD_DATA_MSG,        "Read messages"         },
+    { "WRITE",      WR_DATA_MSG,        "Write messages"        },
+    { "STATUS",     STATUS_MSG,         "Status messages"       },
+    { "ORDERS",     ORDERS_MSG,         "Orders messages"       },
+    { "RDDETAIL",   RD_DATA_DETAIL_MSG, "Read detail messages"  },
+    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messags"  },
+    { NULL,         0                                           }
 };
 
 DEVICE mdsad_dev = {

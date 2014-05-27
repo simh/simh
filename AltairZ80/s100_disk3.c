@@ -53,10 +53,9 @@
 #define CMD_MSG     (1 << 2)
 #define RD_DATA_MSG (1 << 3)
 #define WR_DATA_MSG (1 << 4)
-#define STATUS_MSG  (1 << 5)
-#define IRQ_MSG     (1 << 6)
-#define VERBOSE_MSG (1 << 7)
-#define SPECIFY_MSG (1 << 8)
+#define IRQ_MSG     (1 << 5)
+#define VERBOSE_MSG (1 << 6)
+#define SPECIFY_MSG (1 << 7)
 
 #define DISK3_MAX_DRIVES    4
 
@@ -176,7 +175,6 @@ static int32 nsectors     = C20MB_NSECTORS;
 static int32 sectsize     = C20MB_SECTSIZE;
 
 extern uint32 PCX;
-extern REG *sim_PC;
 extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
@@ -188,8 +186,6 @@ extern void raise_ss1_interrupt(uint8 intnum);
 extern void PutByteDMA(const uint32 Addr, const uint32 Value);
 extern uint8 GetByteDMA(const uint32 Addr);
 
-#define UNIT_V_DISK3_WLK        (UNIT_V_UF + 0) /* write locked                             */
-#define UNIT_DISK3_WLK          (1 << UNIT_V_DISK3_WLK)
 #define UNIT_V_DISK3_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_DISK3_VERBOSE      (1 << UNIT_V_DISK3_VERBOSE)
 #define DISK3_CAPACITY          (C20MB_NTRACKS*C20MB_NHEADS*C20MB_NSECTORS*C20MB_SECTSIZE)   /* Default Disk Capacity */
@@ -212,43 +208,56 @@ static UNIT disk3_unit[] = {
 };
 
 static REG disk3_reg[] = {
-    { DRDATA (NTRACKS,    ntracks,             10), },
-    { DRDATA (NHEADS,     nheads,              8), },
-    { DRDATA (NSECTORS,   nsectors,            8), },
-    { DRDATA (SECTSIZE,   sectsize,            11), },
-    { HRDATA (SEL_DRIVE,  disk3_info_data.sel_drive, 3), },
-    { HRDATA (MODE,       disk3_info_data.mode,       8), },
-    { HRDATA (RETRIES,    disk3_info_data.retries,    8), },
-    { HRDATA (NDRIVES,    disk3_info_data.ndrives,    8), },
-    { HRDATA (LINK_ADDR,  disk3_info_data.link_addr, 32), },
-    { HRDATA (DMA_ADDR,   disk3_info_data.dma_addr,  32), },
-    { BRDATA (IOPB,       &disk3_info_data.iopb[DISK3_IOPB_CMD],  16, 8, 16), },
+    { DRDATAD (NTRACKS,    ntracks,             10,
+               "Number of tracks"),                             },
+    { DRDATAD (NHEADS,     nheads,              8,
+               "Number of heads"),                              },
+    { DRDATAD (NSECTORS,   nsectors,            8,
+               "Number of sectors per track"),                  },
+    { DRDATAD (SECTSIZE,   sectsize,            11,
+               "Sector size not including pre/postamble"),      },
+    { HRDATAD (SEL_DRIVE,  disk3_info_data.sel_drive, 3,
+               "Currently selected drive"),                     },
+    { HRDATAD (MODE,       disk3_info_data.mode,       8,
+               "Mode (0xFF=absolute, 0x00=logical)"),           },
+    { HRDATAD (RETRIES,    disk3_info_data.retries,    8,
+               "Number of retries to attempt"),                 },
+    { HRDATAD (NDRIVES,    disk3_info_data.ndrives,    8,
+               "Number of drives attached to the controller"),  },
+    { HRDATAD (LINK_ADDR,  disk3_info_data.link_addr, 32,
+               "Link address for next IOPB"),                   },
+    { HRDATAD (DMA_ADDR,   disk3_info_data.dma_addr,  32,
+               "DMA address for the current IOPB"),             },
+    { BRDATAD (IOPB,       &disk3_info_data.iopb[DISK3_IOPB_CMD],  16, 8, 16,
+               "IOPB command register"), }                      ,
     { NULL }
 };
 
+#define DISK3_NAME  "Compupro ST-506 Disk Controller DISK3"
+
 static MTAB disk3_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    { UNIT_DISK3_WLK,       0,                  "WRTENB",   "WRTENB",   NULL  },
-    { UNIT_DISK3_WLK,       UNIT_DISK3_WLK,     "WRTLCK",   "WRTLCK",   NULL  },
+    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
     /* quiet, no warning messages       */
-    { UNIT_DISK3_VERBOSE,   0,                  "QUIET",    "QUIET",    NULL   },
+    { UNIT_DISK3_VERBOSE,   0,                  "QUIET",    "QUIET",
+        NULL, NULL, NULL, "No verbose messages for unit " DISK3_NAME "n"            },
     /* verbose, show warning messages   */
-    { UNIT_DISK3_VERBOSE,   UNIT_DISK3_VERBOSE, "VERBOSE",  "VERBOSE",  NULL },
+    { UNIT_DISK3_VERBOSE,   UNIT_DISK3_VERBOSE, "VERBOSE",  "VERBOSE",
+        NULL, NULL, NULL, "Verbose messages for unit " DISK3_NAME "n"               },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB disk3_dt[] = {
-    { "ERROR",  ERROR_MSG },
-    { "SEEK",   SEEK_MSG },
-    { "CMD",    CMD_MSG },
-    { "RDDATA", RD_DATA_MSG },
-    { "WRDATA", WR_DATA_MSG },
-    { "STATUS", STATUS_MSG },
-    { "IRQ",    IRQ_MSG },
-    { "VERBOSE",VERBOSE_MSG },
-    { "SPECIFY",SPECIFY_MSG },
-    { NULL,     0 }
+    { "ERROR",      ERROR_MSG,      "Error messages"    },
+    { "SEEK",       SEEK_MSG,       "Seek messages"     },
+    { "CMD",        CMD_MSG,        "Command messages"  },
+    { "READ",       RD_DATA_MSG,    "Read messages"     },
+    { "WRITE",      WR_DATA_MSG,     "Write messages"   },
+    { "IRQ",        IRQ_MSG,        "IRQ messages"      },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { "SPECIFY",    SPECIFY_MSG,    "Specify messages"  },
+    { NULL,         0                                   }
 };
 
 DEVICE disk3_dev = {
@@ -257,7 +266,7 @@ DEVICE disk3_dev = {
     NULL, NULL, &disk3_reset,
     NULL, &disk3_attach, &disk3_detach,
     &disk3_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    disk3_dt, NULL, "Compupro ST-506 Disk Controller DISK3"
+    disk3_dt, NULL, DISK3_NAME
 };
 
 /* Reset routine */
