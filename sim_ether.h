@@ -158,31 +158,42 @@
 #define ETH_FRAME_SIZE (ETH_MAX_PACKET+ETH_CRC_SIZE)    /* ethernet maximum frame size */
 #define ETH_MIN_JUMBO_FRAME ETH_MAX_PACKET              /* Threshold size for Jumbo Frame Processing */
 
-#define LOOPBACK_SELF_FRAME(phy_mac, msg)             \
-    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&    \
-     ((msg)[14] == 0x00) && ((msg)[15] == 0x00) &&    \
-     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&    \
-     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&    \
-     (memcmp(phy_mac, (msg),    6) == 0) &&           \
-     (memcmp(phy_mac, (msg)+6,  6) == 0) &&           \
-     (memcmp(phy_mac, (msg)+18, 6) == 0))
+#define LOOPBACK_SELF_FRAME(phy_mac, msg)                                                     \
+    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&              /* Ethernet Loopback */       \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&              /* Forward Function */        \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&              /* Next Function - Reply */   \
+     (memcmp(phy_mac, (msg),    6) == 0) &&                     /* Ethernet Destination */    \
+     (memcmp(phy_mac, (msg)+6,  6) == 0) &&                     /* Ethernet Source */         \
+     (memcmp(phy_mac, (msg)+18, 6) == 0))                       /* Forward Address */
 
-#define LOOPBACK_PHYSICAL_RESPONSE(host_phy, phy_mac, msg) \
-    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&         \
-     ((msg)[14] == 0x08) && ((msg)[15] == 0x00) &&         \
-     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&         \
-     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&         \
-     (memcmp(host_phy, (msg)+18, 6) == 0) &&               \
-     (memcmp(host_phy, (msg),    6) == 0) &&               \
-     (memcmp(phy_mac,  (msg)+6,  6) == 0))
+#define LOOPBACK_PHYSICAL_RESPONSE(dev, msg)                                                    \
+    ((dev->have_host_nic_phy_addr) &&                                                           \
+     ((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&              /* Ethernet Loopback */         \
+     ((msg)[14] == 0x08) && ((msg)[15] == 0x00) &&              /* Skipcount - 8 */             \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&              /* Last Function - Forward */   \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&              /* Function - Reply */          \
+     (memcmp(dev->host_nic_phy_hw_addr, (msg)+18, 6) == 0) &&   /* Forward Address - Host MAC */\
+     (memcmp(dev->host_nic_phy_hw_addr, (msg),    6) == 0) &&   /* Ethernet Source - Host MAC */\
+     (memcmp(dev->physical_addr,  (msg)+6,  6) == 0))           /* Ethernet Source */
 
-#define LOOPBACK_PHYSICAL_REFLECTION(host_phy, msg)  \
-    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&   \
-     ((msg)[14] == 0x00) && ((msg)[15] == 0x00) &&   \
-     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&   \
-     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&   \
-     (memcmp(host_phy, (msg)+6,  6) == 0) &&         \
-     (memcmp(host_phy, (msg)+18, 6) == 0))
+#define LOOPBACK_PHYSICAL_REFLECTION(dev, msg)                                                  \
+    ((dev->have_host_nic_phy_addr) &&                                                           \
+     ((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&              /* Ethernet Loopback */         \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&              /* Forward Function */          \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&              /* Next Function - Reply */     \
+     (memcmp(dev->host_nic_phy_hw_addr, (msg)+6,  6) == 0) &&   /* Ethernet Source - Host MAC */\
+     (memcmp(dev->host_nic_phy_hw_addr, (msg)+18, 6) == 0))     /* Forward Address - Host MAC */
+
+#define LOOPBACK_REFLECTION_TEST_PACKET(dev, msg)                                                \
+    ((dev->have_host_nic_phy_addr) &&                                                            \
+     ((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&             /* Ethernet Loopback */           \
+     ((msg)[14] == 0x00) && ((msg)[15] == 0x00) &&             /* Skipcount - 0 */               \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&             /* Forward Function */            \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&             /* Next Function - Reply */       \
+     ((msg)[00] == 0xFE) && ((msg)[01] == 0xFF) &&             /* Ethernet Destination - Reflection Test MAC */\
+     ((msg)[02] == 0xFF) && ((msg)[03] == 0xFF) &&                                               \
+     ((msg)[04] == 0xFF) && ((msg)[05] == 0xFE) &&                                               \
+     (memcmp(dev->host_nic_phy_hw_addr, (msg)+6,  6) == 0))    /* Ethernet Source - Host MAC */
 
 struct eth_packet {
   uint8   msg[ETH_FRAME_SIZE];                          /* ethernet frame (message) */
@@ -252,6 +263,7 @@ struct eth_device {
   uint32        jumbo_truncated;                        /* Giant Frames too big for capture buffer - Dropped */
   uint32        packets_sent;                           /* Total Packets Sent */
   uint32        packets_received;                       /* Total Packets Received */
+  uint32        loopback_packets_processed;             /* Total Loopback Packets Processed */
   DEVICE*       dptr;                                   /* device ethernet is attached to */
   uint32        dbit;                                   /* debugging bit */
   int           reflections;                            /* packet reflections on interface */

@@ -562,6 +562,11 @@ void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
   eth_packet_trace_ex(dev, msg, len, txt, 0, dev->dbit);
 }
 
+void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
+{
+  eth_packet_trace_ex(dev, msg, len, txt, 1     , dev->dbit);
+}
+
 char* eth_getname(int number, char* name)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
@@ -2070,12 +2075,23 @@ fprintf (st, "   sim> ATTACH %s en0\n\n", dptr->name);
 return SCPE_OK;
 }
 
+static int _eth_rand_byte()
+{
+static int rand_initialized = 0;
+
+if (!rand_initialized)
+  srand((unsigned int)sim_os_msec());
+return (rand() & 0xFF);
+}
+
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const mac)
 {
 ETH_PACK send, recv;
 t_stat status;
+uint32 i;
 int responses = 0;
+uint32 offset, function;
 char mac_string[32];
 
 eth_mac_fmt(mac, mac_string);
@@ -2144,13 +2160,19 @@ sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %
 /* build a loopback forward request packet */
 memset (&send, 0, sizeof(ETH_PACK));
 send.len = ETH_MIN_PACKET;                              /* minimum packet size */
+for (i=0; i<send.len; i++)
+  send.msg[i] = _eth_rand_byte();
 memcpy(&send.msg[0], mac, sizeof(ETH_MAC));             /* target address */
 memcpy(&send.msg[6], mac, sizeof(ETH_MAC));             /* source address */
 send.msg[12] = 0x90;                                    /* loopback packet type */
+send.msg[13] = 0;
 send.msg[14] = 0;                                       /* Offset */
+send.msg[15] = 0;
 send.msg[16] = 2;                                       /* Forward */
+send.msg[17] = 0;
 memcpy(&send.msg[18], mac, sizeof(ETH_MAC));            /* Forward Destination */
 send.msg[24] = 1;                                       /* Reply */
+send.msg[25] = 0;
 
 eth_filter(dev, 1, (ETH_MAC *)mac, 0, 0);
 
@@ -2170,14 +2192,21 @@ if (status != SCPE_OK) {
 
 sim_os_ms_sleep (300);   /* time for a conflicting host to respond */
 
+eth_packet_trace_detail (dev, send.msg, send.len, "Sent-Address-Check");
+
 /* empty the read queue and count the responses */
 do {
   memset (&recv, 0, sizeof(ETH_PACK));
   status = eth_read (dev, &recv, NULL);
+  eth_packet_trace_detail (dev, recv.msg, recv.len, "Recv-Address-Check");
+  offset = 16 + (recv.msg[14] | (recv.msg[15] << 8));
+  function = 0;
+  if ((offset+2) < recv.len)
+    function = recv.msg[offset] | (recv.msg[offset+1] << 8);
   if (((0 == memcmp(send.msg+12, recv.msg+12, 2)) &&   /* Protocol Match */
-       (0 == memcmp(send.msg,    recv.msg+6,  6)) &&   /* Source Match */
-       (0 == memcmp(send.msg+6,  recv.msg,    6))) ||  /* Destination Match */
-      (0 == memcmp(send.msg, recv.msg, 14)))           /* Packet Match (Reflection) */
+       (function == 1) &&                              /* Function is Reply */
+       (0 == memcmp(&send.msg[offset], &recv.msg[offset], send.len-offset))) || /* Content Match */
+      (0 == memcmp(send.msg, recv.msg, send.len)))     /* Packet Match (Reflection) */
     responses++;
   } while (recv.len > 0);
 
@@ -2190,7 +2219,7 @@ t_stat eth_reflect(ETH_DEV* dev)
 /* Test with an address no NIC should have. */
 /* We do this to avoid reflections from the wire, */
 /* in the event that a simulated NIC has a MAC address conflict. */
-ETH_MAC mac = {0xfe,0xff,0xff,0xff,0xff,0xfe};
+static ETH_MAC mac = {0xfe,0xff,0xff,0xff,0xff,0xfe};
 
 sim_debug(dev->dbit, dev->dptr, "Determining Reflections...\n");
 
@@ -2215,14 +2244,18 @@ if (!packet) return SCPE_ARG;
 /* make sure packet is acceptable length */
 if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
   int loopback_self_frame = LOOPBACK_SELF_FRAME(packet->msg, packet->msg);
+  int loopback_physical_response = LOOPBACK_PHYSICAL_RESPONSE(dev, packet->msg);
 
   eth_packet_trace (dev, packet->msg, packet->len, "writing");
 
   /* record sending of loopback packet (done before actual send to avoid race conditions with receiver) */
-  if (loopback_self_frame) {
-    if (dev->have_host_nic_phy_addr) {
+  if (loopback_self_frame || loopback_physical_response) {
+    /* Direct loopback responses to the host physical address since our physical address
+       may not have been learned yet. */
+    if (loopback_self_frame && dev->have_host_nic_phy_addr) {
       memcpy(&packet->msg[6],  dev->host_nic_phy_hw_addr, sizeof(ETH_MAC));
       memcpy(&packet->msg[18], dev->host_nic_phy_hw_addr, sizeof(ETH_MAC));
+      eth_packet_trace (dev, packet->msg, packet->len, "writing-fixed");
     }
 #ifdef USE_READER_THREAD
     pthread_mutex_lock (&dev->self_lock);
@@ -2772,6 +2805,65 @@ switch (IP->proto) {
   }
 }
 
+static int
+_eth_process_loopback (ETH_DEV* dev, const u_char* data, uint32 len)
+{
+int protocol = data[12] | (data[13] << 8);
+ETH_PACK  response;
+uint32 offset, function;
+
+if (protocol != 0x0090)     /* !ethernet loopback */
+  return 0;
+
+if (LOOPBACK_REFLECTION_TEST_PACKET(dev, data))
+  return 0;                 /* Ignore reflection check packet */
+
+offset   = 16 + (data[14] | (data[15] << 8));
+if (offset >= len)
+  return 0;
+function = data[offset] | (data[offset+1] << 8);
+
+if (function != 2) /*forward*/
+  return 0;
+
+/* The only packets we should be responding to are ones which 
+   we received due to them being directed to our physical MAC address, 
+   OR the Broadcast address OR to a Multicast address we're listening to 
+   (we may receive others if we're in promiscuous mode, but shouldn't 
+   respond to them) */
+if ((0 == (data[0]&1)) &&           /* Multicast or Broadcast */
+    (0 != memcmp(dev->filter_address[0], data, sizeof(ETH_MAC))))
+  return 0;
+
+/* Attempts to forward to multicast or broadcast addresses are explicitly 
+   ignored by consuming the packet and doing nothing else */
+if (data[offset+2]&1)
+  return 1;
+
+eth_packet_trace (dev, data, len, "rcvd");
+
+sim_debug(dev->dbit, dev->dptr, "_eth_process_loopback()\n");
+
+/* create forward response packet */
+memset(&response, 0, sizeof(response));
+response.len = len;
+memcpy(response.msg, data, len);
+memcpy(&response.msg[0], &response.msg[offset+2], sizeof(ETH_MAC));
+memcpy(&response.msg[6], dev->filter_address[0], sizeof(ETH_MAC));
+offset += 8 - 16; /* Account for the Ethernet Header and Offset value in this number  */
+response.msg[14] = offset & 0xFF;
+response.msg[15] = (offset >> 8) & 0xFF;
+
+/* send response packet */
+eth_write(dev, &response, NULL);
+
+eth_packet_trace(dev, response.msg, response.len, ((function == 1) ? "loopbackreply" : "loopbackforward"));
+
+++dev->loopback_packets_processed;
+
+return 1;
+}
+
 static void
 _eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data)
 {
@@ -2781,10 +2873,12 @@ int from_me = 0;
 int i;
 int bpf_used;
 
-if ((dev->have_host_nic_phy_addr) &&
-    (LOOPBACK_PHYSICAL_RESPONSE(dev->host_nic_phy_hw_addr, dev->physical_addr, data))) {
+if (LOOPBACK_PHYSICAL_RESPONSE(dev, data)) {
   u_char *datacopy = (u_char *)malloc(header->len);
 
+  /* Since we changed the outgoing loopback packet to have the physical MAC address of the
+     host's interface instead of the programmatically set physical address of this pseudo
+     device, we restore parts of the modified packet back as needed */
   memcpy(datacopy, data, header->len);
   memcpy(datacopy, dev->physical_addr, sizeof(ETH_MAC));
   memcpy(datacopy+18, dev->physical_addr, sizeof(ETH_MAC));
@@ -2832,8 +2926,7 @@ switch (dev->eth_api) {
 
 /* detect reception of loopback packet to our physical address */
 if ((LOOPBACK_SELF_FRAME(dev->physical_addr, data)) ||
-    (dev->have_host_nic_phy_addr && 
-     LOOPBACK_PHYSICAL_REFLECTION(dev->host_nic_phy_hw_addr, data))) {
+    (LOOPBACK_PHYSICAL_REFLECTION(dev, data))) {
 #ifdef USE_READER_THREAD
   pthread_mutex_lock (&dev->self_lock);
 #endif
@@ -2860,6 +2953,8 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
       ++dev->jumbo_truncated;
     return;
     }
+  if (_eth_process_loopback(dev, data, header->len))
+    return;  
 #if defined (USE_READER_THREAD)
   if (1) {
     int crc_len = 0;
@@ -3415,6 +3510,8 @@ if (dev->packets_sent)
   fprintf(st, "  Packets Sent:            %d\n", dev->packets_sent);
 if (dev->packets_received)
   fprintf(st, "  Packets Received:        %d\n", dev->packets_received);
+if (dev->loopback_packets_processed)
+  fprintf(st, "  Loopback Packets:        %d\n", dev->loopback_packets_processed);
 #if defined(USE_READER_THREAD)
 fprintf(st, "  Asynch Interrupts:       %s\n", dev->asynch_io?"Enabled":"Disabled");
 if (dev->asynch_io)
