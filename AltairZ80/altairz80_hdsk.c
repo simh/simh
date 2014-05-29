@@ -776,12 +776,14 @@ t_bool hdsk_checkParameters(void) {
 
 /* pre-condition: hdsk_checkParameters has been executed to repair any faulty parameters */
 static int32 doSeek(void) {
+    int32 hostSector;
+    int32 sectorSize;
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
     assert(uptr != NULL);
-    int32 hostSector = (dpb[uptr -> HDSK_FORMAT_TYPE].skew == NULL) ?
-        selectedSector : dpb[uptr -> HDSK_FORMAT_TYPE].skew[selectedSector];
-    int32 sectorSize = (dpb[uptr -> HDSK_FORMAT_TYPE].physicalSectorSize == 0) ?
-        uptr -> HDSK_SECTOR_SIZE : dpb[uptr -> HDSK_FORMAT_TYPE].physicalSectorSize;
+    hostSector = ((dpb[uptr -> HDSK_FORMAT_TYPE].skew == NULL) ?
+                  selectedSector : dpb[uptr -> HDSK_FORMAT_TYPE].skew[selectedSector]);
+    sectorSize = ((dpb[uptr -> HDSK_FORMAT_TYPE].physicalSectorSize == 0) ?
+                  uptr -> HDSK_SECTOR_SIZE : dpb[uptr -> HDSK_FORMAT_TYPE].physicalSectorSize);
     if (sim_fseek(uptr -> fileref,
         sectorSize * (uptr -> HDSK_SECTORS_PER_TRACK * selectedTrack + hostSector) +
               dpb[uptr -> HDSK_FORMAT_TYPE].offset, SEEK_SET)) {

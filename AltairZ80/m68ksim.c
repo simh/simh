@@ -163,7 +163,7 @@ extern UNIT cpu_unit;
 #define M68K_BOOT_SP            0xfe0000                    /* initial SP for boot  */
 
 t_stat m68k_hdsk_boot(const int32 unitno, DEVICE *dptr,
-                      const uint32 verboseMessage, const uint32 hdskNumber) {
+                      const uint32 verboseMessage, const int32 hdskNumber) {
     UNIT *uptr;
     size_t i;
     
@@ -384,7 +384,7 @@ unsigned int m68k_cpu_read_long(unsigned int address) {
         case DISK_STATUS:
             return hdsk_getStatus();
         case M68K_GET_TIME:
-            return time(NULL);
+            return (unsigned int)(time(NULL));
         default:
             break;
     }

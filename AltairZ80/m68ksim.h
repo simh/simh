@@ -49,7 +49,7 @@ void m68k_clear_memory(void);
 void m68k_CPUToView(void);
 void m68k_viewToCPU(void);
 t_stat m68k_hdsk_boot(const int32 unitno, DEVICE *dptr,
-                      const uint32 verboseMessage, const uint32 hdskNumber);
+                      const uint32 verboseMessage, const int32 hdskNumber);
 
 #define M68K_MAX_RAM        0xffffff        // highest address of 16MB of RAM
 #define M68K_MAX_RAM_LOG2   24              // 24 bit addresses
