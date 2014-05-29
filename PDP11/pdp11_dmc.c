@@ -1,7 +1,7 @@
 /* pdp11_dmc.c: DMC11/DMR11/DMP11/DMV11 Emulation
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2011, Robert M. A. Jarratt
+   Copyright (c) 2011, Robert M. A. Jarratt, Mark Pizzolato
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
    in this Software without prior written authorization from the author.
 
   ------------------------------------------------------------------------------
+
+  Written by Mark Pizzolato based on an original version by Robert Jarratt
 
   Modification history:
 
@@ -469,6 +471,7 @@ typedef struct {
     BUFFER *xmt_buffer;     /* Current Transmit Buffer */
     BUFFER *xmt_done_buffer;/* Just Completed Transmit Buffer */
     uint8 nak_reason;       /*  */
+    uint8 nak_crc_reason;   /* CRC status for current received packet */
     DDCMP_LinkState state;  /* Current State */
     t_bool TimerRunning;    /* Timer Running Flag */
     t_bool TimeRemaining;   /* Seconds remaining before timeout (when timer running) */
@@ -600,7 +603,7 @@ void ddcmp_SetAeqRESP             (CTLR *controller);
 void ddcmp_SetTequalAplus1        (CTLR *controller);
 void ddcmp_IncrementT             (CTLR *controller);
 void ddcmp_SetNAKreason3          (CTLR *controller);
-void ddcmp_SetNAKreason2          (CTLR *controller);
+void ddcmp_SetNAKReasonCRCError   (CTLR *controller);
 void ddcmp_NAKMissingPackets      (CTLR *controller);
 void ddcmp_IfTleAthenSetTeqAplus1 (CTLR *controller);
 void ddcmp_IfAltXthenStartTimer   (CTLR *controller);
@@ -668,7 +671,8 @@ DDCMP_STATETABLE DDCMP_TABLE[] = {
                        ddcmp_NUMGtRplus1},         Run,            {ddcmp_NAKMissingPackets}},
     {24, Run,         {ddcmp_ReceiveDataMsg,
                        ddcmp_NUMEqRplus1},         Run,            {ddcmp_GiveBufferToUser}},
-    {25, Run,         {ddcmp_ReceiveMessageError}, Run,            {ddcmp_SetSNAK}},
+    {25, Run,         {ddcmp_ReceiveMessageError}, Run,            {ddcmp_SetSNAK,
+                                                                    ddcmp_SetNAKReasonCRCError}},
     {26, Run,         {ddcmp_ReceiveRep,
                        ddcmp_NumEqR},              Run,            {ddcmp_SetSACK}},
     {27, Run,         {ddcmp_ReceiveRep,
@@ -822,7 +826,7 @@ DDCMP_ACTION_NAME ddcmp_Actions[] = {
     NAME(SetTequalAplus1),
     NAME(IncrementT),
     NAME(SetNAKreason3),
-    NAME(SetNAKreason2),
+    NAME(SetNAKReasonCRCError),
     NAME(NAKMissingPackets),
     NAME(IfTleAthenSetTeqAplus1),
     NAME(IfAltXthenStartTimer),
@@ -3015,9 +3019,9 @@ void ddcmp_SetNAKreason3          (CTLR *controller)
 {
 controller->link.nak_reason = 3;
 }
-void ddcmp_SetNAKreason2          (CTLR *controller)
+void ddcmp_SetNAKReasonCRCError   (CTLR *controller)
 {
-controller->link.nak_reason = 2;
+controller->link.nak_reason = controller->link.nak_crc_reason;
 }
 void ddcmp_NAKMissingPackets      (CTLR *controller)
 {
@@ -3259,11 +3263,18 @@ return (ddcmp_compare (controller->link.T, EQ, controller->link.N + 1, controlle
 }
 t_bool ddcmp_ReceiveMessageError  (CTLR *controller)
 {
-if (controller->link.rcv_pkt &&
-    ((0 != ddcmp_crc16 (0, controller->link.rcv_pkt, 8)) ||
-     ((controller->link.rcv_pkt[0] != DDCMP_ENQ) &&
-      (0 != ddcmp_crc16 (0, controller->link.rcv_pkt+8, controller->link.rcv_pkt_size-8)))))
-      return TRUE;
+if (controller->link.rcv_pkt) {
+    if (0 != ddcmp_crc16 (0, controller->link.rcv_pkt, 8)) {
+        controller->link.nak_crc_reason = 1;    /* Header CRC Error */
+        return TRUE;
+        }
+    if ((controller->link.rcv_pkt[0] != DDCMP_ENQ) &&
+        (0 != ddcmp_crc16 (0, controller->link.rcv_pkt+8, controller->link.rcv_pkt_size-8))) {
+        controller->link.nak_crc_reason = 2;    /* Data CRC Error */
+        return TRUE;
+        }
+    controller->link.nak_crc_reason = 0;        /* No CRC Error */
+    }
 return FALSE;
 }
 t_bool ddcmp_NumEqR               (CTLR *controller)
