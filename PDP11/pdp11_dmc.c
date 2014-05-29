@@ -863,6 +863,13 @@ while (*Actions)
 return buf;
 }
 
+char *ddcmp_link_state(DDCMP *link)
+{
+static char buf[512];
+
+sprintf (buf, "(R:%d,N:%d,A:%d,T:%d,X:%d,SACK:%d,SNAK:%d,SREP:%d)", link->R, link->N, link->A, link->T, link->X, link->SACK, link->SNAK, link->SREP);
+return buf;
+}
 
 DDCMP_LinkState NewState;
 DDCMP_LinkAction_Routine Actions[10];
@@ -3157,14 +3164,16 @@ t_bool ddcmp_ReceiveStack         (CTLR *controller)
 return ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) &&
         controller->link.rcv_pkt &&
         (controller->link.rcv_pkt[0] == DDCMP_ENQ) &&
-        (controller->link.rcv_pkt[1] == DDCMP_CTL_STACK));
+        (controller->link.rcv_pkt[1] == DDCMP_CTL_STACK) &&
+        (!ddcmp_ReceiveMessageError(controller)));
 }
 t_bool ddcmp_ReceiveStrt          (CTLR *controller)
 {
 return ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) &&
         controller->link.rcv_pkt &&
         (controller->link.rcv_pkt[0] == DDCMP_ENQ) &&
-        (controller->link.rcv_pkt[1] == DDCMP_CTL_STRT));
+        (controller->link.rcv_pkt[1] == DDCMP_CTL_STRT) &&
+        (!ddcmp_ReceiveMessageError(controller)));
 }
 t_bool ddcmp_TimerRunning         (CTLR *controller)
 {
@@ -3182,28 +3191,32 @@ t_bool ddcmp_ReceiveMaintMessage  (CTLR *controller)
 {
 return ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) && 
         controller->link.rcv_pkt &&
-        (controller->link.rcv_pkt[0] == DDCMP_DLE));
+        (controller->link.rcv_pkt[0] == DDCMP_DLE) && 
+        (!ddcmp_ReceiveMessageError(controller)));
 }
 t_bool ddcmp_ReceiveAck           (CTLR *controller)
 {
 return ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) &&
         controller->link.rcv_pkt &&
         (controller->link.rcv_pkt[0] == DDCMP_ENQ) &&
-        (controller->link.rcv_pkt[1] == DDCMP_CTL_ACK));
+        (controller->link.rcv_pkt[1] == DDCMP_CTL_ACK) &&
+        (!ddcmp_ReceiveMessageError(controller)));
 }
 t_bool ddcmp_ReceiveNak           (CTLR *controller)
 {
 return ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) &&
         controller->link.rcv_pkt &&
         (controller->link.rcv_pkt[0] == DDCMP_ENQ) &&
-        (controller->link.rcv_pkt[1] == DDCMP_CTL_NAK));
+        (controller->link.rcv_pkt[1] == DDCMP_CTL_NAK) &&
+        (!ddcmp_ReceiveMessageError(controller)));
 }
 t_bool ddcmp_ReceiveRep           (CTLR *controller)
 {
 return ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) &&
         controller->link.rcv_pkt &&
         (controller->link.rcv_pkt[0] == DDCMP_ENQ) &&
-        (controller->link.rcv_pkt[1] == DDCMP_CTL_REP));
+        (controller->link.rcv_pkt[1] == DDCMP_CTL_REP) &&
+        (!ddcmp_ReceiveMessageError(controller)));
 }
 t_bool ddcmp_NUMEqRplus1          (CTLR *controller)
 {
@@ -3221,7 +3234,8 @@ t_bool ddcmp_ReceiveDataMsg       (CTLR *controller)
 {
 t_bool breturn = ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) &&
                   controller->link.rcv_pkt &&
-                  (controller->link.rcv_pkt[0] == DDCMP_SOH));
+                  (controller->link.rcv_pkt[0] == DDCMP_SOH) &&
+                  (!ddcmp_ReceiveMessageError(controller)));
 if (breturn)
     return breturn;
 return breturn;
@@ -3230,7 +3244,8 @@ t_bool ddcmp_ReceiveMaintMsg      (CTLR *controller)
 {
 t_bool breturn = ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) &&
                   controller->link.rcv_pkt &&
-                  (controller->link.rcv_pkt[0] == DDCMP_DLE));
+                  (controller->link.rcv_pkt[0] == DDCMP_DLE) &&
+                  (!ddcmp_ReceiveMessageError(controller)));
 if (breturn)
     return breturn;
 return breturn;
@@ -3263,7 +3278,7 @@ return (ddcmp_compare (controller->link.T, EQ, controller->link.N + 1, controlle
 }
 t_bool ddcmp_ReceiveMessageError  (CTLR *controller)
 {
-if (controller->link.rcv_pkt) {
+if ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) && controller->link.rcv_pkt) {
     if (0 != ddcmp_crc16 (0, controller->link.rcv_pkt, 8)) {
         controller->link.nak_crc_reason = 1;    /* Header CRC Error */
         return TRUE;
@@ -3377,7 +3392,7 @@ for (table=DDCMP_TABLE; table->Conditions[0] != NULL; ++table) {
             }
         if (!match)
             continue;
-        sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - %s conditions matching for rule %d(%s), initiating actions (%s)\n", controller->device->name, controller->index, EventMask, states[table->State], table->RuleNumber, ddcmp_conditions(table->Conditions), ddcmp_actions(table->Actions));
+        sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - %s conditions matching for rule %d(%s), initiating actions (%s)%s\n", controller->device->name, controller->index, EventMask, states[table->State], table->RuleNumber, ddcmp_conditions(table->Conditions), ddcmp_actions(table->Actions), ddcmp_link_state(&controller->link));
         while (*action != NULL) {
             (*action)(controller);
             ++action;

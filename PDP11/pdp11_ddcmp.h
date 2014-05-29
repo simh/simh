@@ -215,11 +215,11 @@ if (msg[0] == DDCMP_ENQ) {
     
     if (eat <= (trollHungerLevel * 2)) {    /* Hungry? */
         if (eat <= trollHungerLevel) {      /* Eat the packet */
-            sprintf (msgbuf, "troll ate a %s control message", rx ? "RCV" : "XMT");
+            sprintf (msgbuf, "troll ate a %s control message\n", rx ? "RCV" : "XMT");
             tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
             return TRUE;
             }
-        sprintf (msgbuf, "troll bit a %s control message", rx ? "RCV" : "XMT");
+        sprintf (msgbuf, "troll bit a %s control message\n", rx ? "RCV" : "XMT");
         tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
         msg[6] ^= rx? 0114: 0154;           /* Eat the CRC */
         }
@@ -229,12 +229,12 @@ else {
 
     if (eat <= (trollHungerLevel * 3)) {    /* Hungry? */
         if (eat <= trollHungerLevel) {      /* Eat the packet */
-            sprintf (msgbuf, "troll ate a %s %s message", rx ? "RCV" : "XMT", (msg[0] == DDCMP_SOH)? "data" : "maintenance");
+            sprintf (msgbuf, "troll ate a %s %s message\n", rx ? "RCV" : "XMT", (msg[0] == DDCMP_SOH)? "data" : "maintenance");
             tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
             return TRUE;
             }
         if (eat <= (trollHungerLevel * 2)) { /* HCRC */
-            sprintf (msgbuf, "troll bit a %s %s message", rx ? "RCV" : "XMT", (msg[0] == DDCMP_SOH)? "data" : "maintenance");
+            sprintf (msgbuf, "troll bit a %s %s message\n", rx ? "RCV" : "XMT", (msg[0] == DDCMP_SOH)? "data" : "maintenance");
             tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
             msg[6] ^= rx? 0124: 0164;
             } 
