@@ -3037,6 +3037,11 @@ QH *qh = &controller->xmt_queue->hdr;
 
 while (ddcmp_compare (controller->link.rcv_pkt[DDCMP_NUM_OFFSET], GE, R, controller)) {
     BUFFER *buffer = dmc_buffer_allocate(controller);
+
+    if (NULL == buffer) {
+        sim_debug(DBG_INF, controller->device, "%s%d: No Buffers cause NAKMissingPackets to stop\n", controller->device->name, controller->index);
+        break;
+        }
     buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
     buffer->count = DDCMP_HEADER_SIZE;
     ddcmp_build_nak_packet (buffer->transfer_buffer, 2, R, DDCMP_FLAG_SELECT);

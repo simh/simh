@@ -211,7 +211,7 @@ r = rand();
 rmax = (double)RAND_MAX;
 #endif
 if (msg[0] == DDCMP_ENQ) {
-    int eat =  0 + (int) (2000.0 * (r / rmax));
+    int eat =  0 + (int) (2000.0 * (r / (rmax + 1.0)));
     
     if (eat <= (trollHungerLevel * 2)) {    /* Hungry? */
         if (eat <= trollHungerLevel) {      /* Eat the packet */
@@ -225,7 +225,7 @@ if (msg[0] == DDCMP_ENQ) {
         }
     } 
 else {
-    int eat =  0 + (int) (3000.0 * (r / rmax));
+    int eat =  0 + (int) (3000.0 * (r / (rmax + 1.0)));
 
     if (eat <= (trollHungerLevel * 3)) {    /* Hungry? */
         if (eat <= trollHungerLevel) {      /* Eat the packet */
