@@ -437,6 +437,10 @@ typedef struct {
                                When retransmitting and receiving acknowledgments 
                                asynchronously with respect to transmission, X will 
                                have some value less than or equal to N. */
+    uint8 NAKed;            /* The value of R sent in the most recent NAK message.  This
+                               is used to avoid sending additional NAKs when one has already
+                               been sent while the remaining packets in the transmit pipeline
+                               are still arriving. */
     t_bool SACK;            /* Send ACK flag.  This flag is set when either R 
                                is incremented, meaning a new sequential data 
                                message has been received which requires an ACK 
@@ -604,7 +608,7 @@ void ddcmp_SetTequalAplus1        (CTLR *controller);
 void ddcmp_IncrementT             (CTLR *controller);
 void ddcmp_SetNAKreason3          (CTLR *controller);
 void ddcmp_SetNAKReasonCRCError   (CTLR *controller);
-void ddcmp_NAKMissingPackets      (CTLR *controller);
+void ddcmp_NAKMissingPacket       (CTLR *controller);
 void ddcmp_IfTleAthenSetTeqAplus1 (CTLR *controller);
 void ddcmp_IfAltXthenStartTimer   (CTLR *controller);
 void ddcmp_IfAgeXthenStopTimer    (CTLR *controller);
@@ -668,7 +672,7 @@ DDCMP_STATETABLE DDCMP_TABLE[] = {
                                                                     ddcmp_NotifyMaintRcvd}},
     {22, Run,         {ddcmp_ReceiveStack},        Run,            {ddcmp_SetSACK}},
     {23, Run,         {ddcmp_ReceiveDataMsg,
-                       ddcmp_NUMGtRplus1},         Run,            {ddcmp_NAKMissingPackets}},
+                       ddcmp_NUMGtRplus1},         Run,            {ddcmp_NAKMissingPacket}},
     {24, Run,         {ddcmp_ReceiveDataMsg,
                        ddcmp_NUMEqRplus1},         Run,            {ddcmp_GiveBufferToUser}},
     {25, Run,         {ddcmp_ReceiveMessageError}, Run,            {ddcmp_SetSNAK,
@@ -827,7 +831,7 @@ DDCMP_ACTION_NAME ddcmp_Actions[] = {
     NAME(IncrementT),
     NAME(SetNAKreason3),
     NAME(SetNAKReasonCRCError),
-    NAME(NAKMissingPackets),
+    NAME(NAKMissingPacket),
     NAME(IfTleAthenSetTeqAplus1),
     NAME(IfAltXthenStartTimer),
     NAME(IfAgeXthenStopTimer),
@@ -867,7 +871,7 @@ char *ddcmp_link_state(DDCMP *link)
 {
 static char buf[512];
 
-sprintf (buf, "(R:%d,N:%d,A:%d,T:%d,X:%d,SACK:%d,SNAK:%d,SREP:%d)", link->R, link->N, link->A, link->T, link->X, link->SACK, link->SNAK, link->SREP);
+sprintf (buf, "(R:%d,N:%d,A:%d,T:%d,X:%d,SACK:%d,SNAK:%d,SREP:%d,NAKed:%d)", link->R, link->N, link->A, link->T, link->X, link->SACK, link->SNAK, link->SREP, link->NAKed);
 return buf;
 }
 
@@ -3030,7 +3034,7 @@ void ddcmp_SetNAKReasonCRCError   (CTLR *controller)
 {
 controller->link.nak_reason = controller->link.nak_crc_reason;
 }
-void ddcmp_NAKMissingPackets      (CTLR *controller)
+void ddcmp_NAKMissingPacket       (CTLR *controller)
 {
 uint8 R = controller->link.R;
 QH *qh = &controller->xmt_queue->hdr;
@@ -3042,12 +3046,18 @@ while (ddcmp_compare (controller->link.rcv_pkt[DDCMP_NUM_OFFSET], GE, R, control
         sim_debug(DBG_INF, controller->device, "%s%d: No Buffers cause NAKMissingPackets to stop\n", controller->device->name, controller->index);
         break;
         }
+    if (ddcmp_compare (controller->link.rcv_pkt[DDCMP_NUM_OFFSET], GE, controller->link.NAKed, controller)) {
+        sim_debug(DBG_INF, controller->device, "%s%d: NAK for prior missing packet %d already sent, still waiting\n", controller->device->name, controller->index, controller->link.NAKed);
+        break;
+        }
     buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
     buffer->count = DDCMP_HEADER_SIZE;
     ddcmp_build_nak_packet (buffer->transfer_buffer, 2, R, DDCMP_FLAG_SELECT);
+    controller->link.NAKed = R;
     R = R + 1;
     ASSURE (insqueue (&buffer->hdr, qh));
     qh = &buffer->hdr;
+    break; /* Only generate a single NAK */
     }
 dmc_ddcmp_start_transmitter (controller);
 }
@@ -3103,14 +3113,15 @@ void ddcmp_ReTransmitMessageT (CTLR *controller)
 {
 BUFFER *buffer = dmc_buffer_queue_head(controller->ack_wait_queue);
 size_t i;
+uint8 T = controller->link.T;
 
 for (i=0; i < controller->ack_wait_queue->count; ++i) {
     if ((!buffer->transfer_buffer) || 
-        ddcmp_compare (buffer->transfer_buffer[DDCMP_NUM_OFFSET], NE, controller->link.T, controller)) {
+        ddcmp_compare (buffer->transfer_buffer[DDCMP_NUM_OFFSET], NE, T, controller)) {
         buffer = (BUFFER *)buffer->hdr.next;
         continue;
         }
-    ddcmp_build_data_packet (buffer->transfer_buffer, buffer->count - (DDCMP_HEADER_SIZE + DDCMP_CRC_SIZE), DDCMP_FLAG_SELECT|DDCMP_FLAG_QSYNC, controller->link.T, controller->link.R);
+    ddcmp_build_data_packet (buffer->transfer_buffer, buffer->count - (DDCMP_HEADER_SIZE + DDCMP_CRC_SIZE), DDCMP_FLAG_SELECT|DDCMP_FLAG_QSYNC, T, controller->link.R);
     buffer = (BUFFER *)remqueue (&buffer->hdr);
     ASSURE (insqueue (&buffer->hdr, controller->xmt_queue->hdr.prev)); /* Insert at tail */
     break;
@@ -3397,7 +3408,8 @@ for (table=DDCMP_TABLE; table->Conditions[0] != NULL; ++table) {
             }
         if (!match)
             continue;
-        sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - %s conditions matching for rule %d(%s), initiating actions (%s)%s\n", controller->device->name, controller->index, EventMask, states[table->State], table->RuleNumber, ddcmp_conditions(table->Conditions), ddcmp_actions(table->Actions), ddcmp_link_state(&controller->link));
+        sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - %s conditions matching for rule %2d(%s)%s,\n"
+                                                "                                           initiating actions (%s)\n", controller->device->name, controller->index, EventMask, states[table->State], table->RuleNumber, ddcmp_conditions(table->Conditions), ddcmp_link_state(&controller->link), ddcmp_actions(table->Actions));
         while (*action != NULL) {
             (*action)(controller);
             ++action;
