@@ -379,6 +379,9 @@ if (!ddcmp_feedCorruptionTroll (lp, lp->txpb, FALSE, corruptrate)) {
        ++lp->txppoffset;
     tmxr_send_buffered_data (lp);
     }
+else {/* Packet eaten, so discard it */
+    lp->txppoffset = lp->txppsize; /* Act like all data was sent */
+    }
 return lp->conn ? SCPE_OK : SCPE_LOST;
 }
 
