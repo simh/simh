@@ -875,6 +875,18 @@ sprintf (buf, "(R:%d,N:%d,A:%d,T:%d,X:%d,SACK:%d,SNAK:%d,SREP:%d,NAKed:%d)", lin
 return buf;
 }
 
+char *controller_queue_state(CTLR *controller)
+{
+static char buf[512];
+
+sprintf (buf, "(ACKW:%d,XMT:%d,RCV:%d,CMPL:%d,FREE:%d)", controller->ack_wait_queue->count, 
+                                                         controller->xmt_queue->count, 
+                                                         controller->rcv_queue->count, 
+                                                         controller->completion_queue->count, 
+                                                         controller->free_queue->count);
+return buf;
+}
+
 DDCMP_LinkState NewState;
 DDCMP_LinkAction_Routine Actions[10];
 
@@ -2423,7 +2435,7 @@ if (dmc_is_attached(controller->unit)) {
 
     dmc_start_control_output_transfer(controller);
 
-    if (ddcmp_UserSendMessage (controller))
+    if (controller->xmt_queue->count)
         ddcmp_dispatch (controller, 0);
     if (controller->transfer_state == Idle)
         dmc_start_transfer_buffer(controller);
@@ -2615,10 +2627,10 @@ if (buffer) {
     buffer->address = address;
     buffer->count = count;
     ASSURE (insqueue (&buffer->hdr, q->hdr.prev)); /* Insert at tail */
-    sim_debug(DBG_INF, q->controller->device, "%s%d: Queued %s buffer address=0x%08x count=%d\n", q->controller->device->name, q->controller->index, q->name, address, count);
+    sim_debug(DBG_INF, q->controller->device, "%s%d: Queued %s buffer address=0x%08x count=%d %s\n", q->controller->device->name, q->controller->index, q->name, address, count, controller_queue_state(q->controller));
     }
 else {
-    sim_debug(DBG_WRN, q->controller->device, "%s%d: Failed to queue %s buffer address=0x%08x, queue full\n", q->controller->device->name, q->controller->index, q->name, address);
+    sim_debug(DBG_WRN, q->controller->device, "%s%d: Failed to queue %s buffer address=0x%08x, queue full %s\n", q->controller->device->name, q->controller->index, q->name, address, controller_queue_state(q->controller));
     // TODO: Report error here.
     }
 return buffer;
@@ -2680,11 +2692,11 @@ if ((!head) ||
 count = (uint16)head->actual_bytes_transferred;
 switch (head->type) {
     case Receive:
-        sim_debug(DBG_INF, controller->device, "%s%d: Starting data output transfer for receive, address=0x%08x, count=%d\n", controller->device->name, controller->index, head->address, count);
+        sim_debug(DBG_INF, controller->device, "%s%d: Starting data output transfer for receive, address=0x%08x, count=%d %s\n", controller->device->name, controller->index, head->address, count, controller_queue_state(controller));
         dmc_set_type_output(controller, DMC_C_TYPE_RBACC);
         break;
     case TransmitData:
-        sim_debug(DBG_INF, controller->device, "%s%d: Starting data output transfer for transmit, address=0x%08x, count=%d\n", controller->device->name, controller->index, head->address, count);
+        sim_debug(DBG_INF, controller->device, "%s%d: Starting data output transfer for transmit, address=0x%08x, count=%d %s\n", controller->device->name, controller->index, head->address, count, controller_queue_state(controller));
         dmc_set_type_output(controller, DMC_C_TYPE_XBACC);
         break;
     default:
@@ -2703,7 +2715,7 @@ BUFFER *buffer;
 if ((dmc_is_rdyo_set(controller)) ||
     (controller->transfer_state != OutputTransfer))
     return;
-sim_debug(DBG_INF, controller->device, "%s%d: Output transfer completed\n", controller->device->name, controller->index);
+sim_debug(DBG_INF, controller->device, "%s%d: Output transfer completed %s\n", controller->device->name, controller->index, controller_queue_state(controller));
 buffer = (BUFFER *)remqueue (controller->completion_queue->hdr.next);
 ASSURE (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
 controller->transmit_buffer_output_transfers_completed++;
@@ -3043,11 +3055,11 @@ while (ddcmp_compare (controller->link.rcv_pkt[DDCMP_NUM_OFFSET], GE, R, control
     BUFFER *buffer = dmc_buffer_allocate(controller);
 
     if (NULL == buffer) {
-        sim_debug(DBG_INF, controller->device, "%s%d: No Buffers cause NAKMissingPackets to stop\n", controller->device->name, controller->index);
+        sim_debug(DBG_INF, controller->device, "%s%d: No Buffers cause NAKMissingPackets to stop %s\n", controller->device->name, controller->index, controller_queue_state(controller));
         break;
         }
     if (ddcmp_compare (controller->link.rcv_pkt[DDCMP_NUM_OFFSET], GE, controller->link.NAKed, controller)) {
-        sim_debug(DBG_INF, controller->device, "%s%d: NAK for prior missing packet %d already sent, still waiting\n", controller->device->name, controller->index, controller->link.NAKed);
+        sim_debug(DBG_INF, controller->device, "%s%d: NAK for prior missing packet %d already sent, still waiting %s\n", controller->device->name, controller->index, controller->link.NAKed, controller_queue_state(controller));
         break;
         }
     buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
@@ -3384,6 +3396,7 @@ return ((controller->link.ScanningEvents & DDCMP_EVENT_XMIT_DONE) &&
 void ddcmp_dispatch(CTLR *controller, uint32 EventMask)
 {
 DDCMP_STATETABLE *table;
+int matched = 0;
 static const char *states[] = {"Halt", "IStart", "AStart", "Run", "Maintenance"};
 
 if (controller->link.Scanning) {
@@ -3408,6 +3421,7 @@ for (table=DDCMP_TABLE; table->Conditions[0] != NULL; ++table) {
             }
         if (!match)
             continue;
+        ++matched;
         sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - %s conditions matching for rule %2d(%s)%s,\n"
                                                 "                                           initiating actions (%s)\n", controller->device->name, controller->index, EventMask, states[table->State], table->RuleNumber, ddcmp_conditions(table->Conditions), ddcmp_link_state(&controller->link), ddcmp_actions(table->Actions));
         while (*action != NULL) {
@@ -3420,6 +3434,8 @@ for (table=DDCMP_TABLE; table->Conditions[0] != NULL; ++table) {
             }
         }
     }
+if (matched)
+    sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - queues: %s\n", controller->device->name, controller->index, EventMask, controller_queue_state(controller));
 controller->link.Scanning = FALSE;
 controller->link.ScanningEvents &= ~EventMask;
 if (controller->link.RecurseScan) {
@@ -3444,6 +3460,10 @@ if ((controller->link.xmt_buffer) ||        /* if Already Transmitting */
 while (buffer) {
     if (buffer->transfer_buffer[0] == 0)
         return;
+    if ((controller->link.state != Maintenance) && (buffer->transfer_buffer[DDCMP_RESP_OFFSET] != controller->link.R)) {
+        sim_debug(DBG_INF, controller->device, "%s%d: Packet RESP fixup from %d to %d %s\n", controller->device->name, controller->index, buffer->transfer_buffer[DDCMP_RESP_OFFSET], controller->link.R, controller_queue_state(controller));
+        buffer->transfer_buffer[DDCMP_RESP_OFFSET] = controller->link.R; /* Make sure that ACK or implied ACK is always up to date */
+        }
     /* Need to make sure we dynamically compute the packet CRCs since header details can change */
     r = ddcmp_tmxr_put_packet_crc_ln (controller->line, buffer->transfer_buffer, buffer->count, *controller->corruption_factor);
     if (r == SCPE_OK) {
