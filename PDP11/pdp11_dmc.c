@@ -879,10 +879,15 @@ char *controller_queue_state(CTLR *controller)
 {
 static char buf[512];
 
-sprintf (buf, "(ACKW:%d,XMT:%d,RCV:%d,CMPL:%d,FREE:%d)", controller->ack_wait_queue->count, 
+sprintf (buf, "(ACKW:%d,XMT:%d,RCV:%d,CMPL:%d,FREE:%d) TOT:%d", controller->ack_wait_queue->count, 
                                                          controller->xmt_queue->count, 
                                                          controller->rcv_queue->count, 
                                                          controller->completion_queue->count, 
+                                                         controller->free_queue->count,
+                                                         controller->ack_wait_queue->count+
+                                                         controller->xmt_queue->count+
+                                                         controller->rcv_queue->count+ 
+                                                         controller->completion_queue->count+
                                                          controller->free_queue->count);
 return buf;
 }
@@ -3060,6 +3065,7 @@ while (ddcmp_compare (controller->link.rcv_pkt[DDCMP_NUM_OFFSET], GE, R, control
         }
     if (ddcmp_compare (controller->link.rcv_pkt[DDCMP_NUM_OFFSET], GE, controller->link.NAKed, controller)) {
         sim_debug(DBG_INF, controller->device, "%s%d: NAK for prior missing packet %d already sent, still waiting %s\n", controller->device->name, controller->index, controller->link.NAKed, controller_queue_state(controller));
+        ASSURE (insqueue (&buffer->hdr, &controller->free_queue->hdr)); /* Release buffer */
         break;
         }
     buffer->transfer_buffer = (uint8 *)malloc (DDCMP_HEADER_SIZE);
