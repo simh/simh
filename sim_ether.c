@@ -365,7 +365,7 @@
 #include <ctype.h>
 #include "sim_ether.h"
 #include "sim_sock.h"
-
+#include "sim_timer.h"
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -1670,6 +1670,16 @@ while (dev->handle) {
     dev->write_requests = request->next;
     pthread_mutex_unlock (&dev->writer_lock);
 
+    if (dev->throttle_delay != ETH_THROT_DISABLED_DELAY) {
+      uint32 packet_delta_time = sim_os_msec() - dev->throttle_packet_time;
+      dev->throttle_events <<= 1;
+      dev->throttle_events += (packet_delta_time < dev->throttle_time) ? 1 : 0;
+      if ((dev->throttle_events & dev->throttle_mask) == dev->throttle_mask) {
+        sim_os_ms_sleep (dev->throttle_delay);
+        ++dev->throttle_count;
+        }
+      dev->throttle_packet_time = sim_os_msec();
+      }
     dev->write_status = _eth_write(dev, &request->packet, NULL);
 
     pthread_mutex_lock (&dev->writer_lock);
@@ -1720,6 +1730,16 @@ return SCPE_OK;
 #endif
 }
 
+t_stat eth_set_throttle (ETH_DEV* dev, uint32 time, uint32 burst, uint32 delay)
+{
+if (!dev)
+  return SCPE_IERR;
+dev->throttle_time = time;
+dev->throttle_burst = burst;
+dev->throttle_delay = delay;
+dev->throttle_mask = (1 << dev->throttle_burst) - 1;
+return SCPE_OK;
+}
 t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
 {
 int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
@@ -3516,6 +3536,8 @@ if (dev->loopback_packets_processed)
 fprintf(st, "  Asynch Interrupts:       %s\n", dev->asynch_io?"Enabled":"Disabled");
 if (dev->asynch_io)
   fprintf(st, "  Interrupt Latency:       %d uSec\n", dev->asynch_io_latency);
+if (dev->throttle_count)
+  fprintf(st, "  Throttle Delays:         %d\n", dev->throttle_count);
 fprintf(st, "  Read Queue: Count:       %d\n", dev->read_queue.count);
 fprintf(st, "  Read Queue: High:        %d\n", dev->read_queue.high);
 fprintf(st, "  Read Queue: Loss:        %d\n", dev->read_queue.loss);

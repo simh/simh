@@ -1723,7 +1723,7 @@ const char helpString[] =
     " The type of device being emulated can be changed with the following\n"
     " command:\n"
     "\n"
-    "+sim> SET %U TYPE={DMR,DMC}\n"
+    "+sim> SET %U TYPE={DMR|DMC}\n"
     "\n"
     " A SET TYPE command should be entered before the device is attached to a\n"
     " listening port.\n"

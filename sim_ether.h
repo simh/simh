@@ -268,6 +268,19 @@ struct eth_device {
   uint32        dbit;                                   /* debugging bit */
   int           reflections;                            /* packet reflections on interface */
   int           need_crc;                               /* device needs CRC (Cyclic Redundancy Check) */
+  /* Throttling control parameters: */
+  uint32        throttle_time;                          /* ms burst time window */
+#define ETH_THROT_DEFAULT_TIME 5                        /* 5ms Default burst time window */
+  uint32        throttle_burst;                         /* packets passed with throttle_time which trigger throttling */
+#define ETH_THROT_DEFAULT_BURST 4                       /* 4 Packet burst in time window */
+  uint32        throttle_delay;                         /* ms to delay when throttling.  0 disables throttling */
+#define ETH_THROT_DISABLED_DELAY 0                      /* 0 Delay disables throttling */
+#define ETH_THROT_DEFAULT_DELAY 10                      /* 10ms Delay during burst */
+  /* Throttling state variables: */
+  uint32        throttle_mask;                          /* match test for threshold detection (1 << throttle_burst) - 1 */
+  uint32        throttle_events;                        /* keeps track of packet arrival values */
+  uint32        throttle_packet_time;                   /* time last packet was transmitted */
+  uint32        throttle_count;                         /* Total Throttle Delays */
 #if defined (USE_READER_THREAD)
   int           asynch_io;                              /* Asynchronous Interrupt scheduling enabled */
   int           asynch_io_latency;                      /* instructions to delay pending interrupt */
@@ -315,6 +328,7 @@ int eth_devices   (int max, ETH_LIST* dev);             /* get ethernet devices 
 void eth_setcrc   (ETH_DEV* dev, int need_crc);         /* enable/disable CRC mode */
 t_stat eth_set_async (ETH_DEV* dev, int latency);       /* set read behavior to be async */
 t_stat eth_clr_async (ETH_DEV* dev);                    /* set read behavior to be not async */
+t_stat eth_set_throttle (ETH_DEV* dev, uint32 time, uint32 burst, uint32 delay); /* set transmit throttle parameters */
 uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len); /* Compute Ethernet Autodin II CRC for buffer */
 
 void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, char* txt); /* trace ethernet packet header+crc */

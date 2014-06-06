@@ -264,6 +264,9 @@ struct xq_device {
   uint32            coalesce_latency_ticks;             /* instructions in coalesce_latency microseconds */
   struct xq_sanity  sanity;                             /* sanity timer information */
   t_bool            lockmode;                           /* DEQNA-Lock mode */
+  uint32            throttle_time;                      /* ms burst time window */
+  uint32            throttle_burst;                     /* packets passed with throttle_time which trigger throttling */
+  uint32            throttle_delay;                     /* ms to delay when throttling.  0 disables throttling */
                                                         /*- initialized values - DO NOT MOVE */
 
                                                         /* I/O register storage */

@@ -273,6 +273,8 @@ t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat xq_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, void* desc);
@@ -312,7 +314,10 @@ struct xq_device    xqa = {
   XQ_SERVICE_INTERVAL,                      /* poll */
   0, 0,                                     /* coalesce */
   {0},                                      /* sanity */
-  0                                         /* DEQNA-Lock mode */
+  0,                                        /* DEQNA-Lock mode */
+  ETH_THROT_DEFAULT_TIME,                   /* ms throttle window */
+  ETH_THROT_DEFAULT_BURST,                  /* packet packet burst in throttle window */
+  ETH_THROT_DISABLED_DELAY                  /* throttle disabled */
   };
 
 struct xq_device    xqb = {
@@ -324,7 +329,10 @@ struct xq_device    xqb = {
   XQ_SERVICE_INTERVAL,                      /* poll */
   0, 0,                                     /* coalesce */
   {0},                                      /* sanity */
-  0                                         /* DEQNA-Lock mode */
+  0,                                        /* DEQNA-Lock mode */
+  ETH_THROT_DEFAULT_TIME,                   /* ms throttle window */
+  ETH_THROT_DEFAULT_BURST,                  /* packet packet burst in throttle window */
+  ETH_THROT_DISABLED_DELAY                  /* throttle disabled */
   };
 
 /* SIMH device structures */
@@ -402,6 +410,10 @@ REG xqa_reg[] = {
   { GRDATA ( SANT_ENAB, xqa.sanity.enabled, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SANT_QSECS, xqa.sanity.quarter_secs, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SANT_TIMR, xqa.sanity.timer, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( LOCKMODE, xqa.lockmode, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_TIME, xqa.throttle_time, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_BURST, xqa.throttle_burst, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_DELAY, xqa.throttle_delay, XQ_RDX, 32, 0), REG_HRO},
   { NULL },
 };
 
@@ -458,6 +470,10 @@ REG xqb_reg[] = {
   { GRDATA ( SANT_ENAB, xqb.sanity.enabled, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SANT_QSECS, xqb.sanity.quarter_secs, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SANT_TIMR, xqb.sanity.timer, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( LOCKMODE, xqb.lockmode, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_TIME, xqb.throttle_time, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_BURST, xqb.throttle_burst, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_DELAY, xqb.throttle_delay, XQ_RDX, 32, 0), REG_HRO},
   { NULL },
 };
 
@@ -485,6 +501,8 @@ MTAB xq_mod[] = {
 #endif
   { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "SANITY", "SANITY={ON|OFF}",
     &xq_set_sanity, &xq_show_sanity, NULL, "Sanity timer" },
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "THROTTLE", "THROTTLE=DISABLED|TIME=n{;BURST=n{;DELAY=n}}",
+    &xq_set_throttle, &xq_show_throttle, NULL, "Display transmit throttle configuration" },
   { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "DEQNALOCK", "DEQNALOCK={ON|OFF}",
     &xq_set_lockmode, &xq_show_lockmode, NULL, "DEQNA-Lock mode" },
   { MTAB_XTD|MTAB_VDV,           0, "LEDS", NULL,
@@ -493,16 +511,16 @@ MTAB xq_mod[] = {
 };
 
 DEBTAB xq_debug[] = {
-  {"TRACE",  DBG_TRC},
-  {"CSR",    DBG_CSR},
-  {"VAR",    DBG_VAR},
-  {"WARN",   DBG_WRN},
-  {"SETUP",  DBG_SET},
-  {"SANITY", DBG_SAN},
-  {"REG",    DBG_REG},
-  {"PACKET", DBG_PCK},
-  {"DATA",   DBG_DAT},
-  {"ETH",    DBG_ETH},
+  {"TRACE",  DBG_TRC,   "trace routine calls"},
+  {"CSR",    DBG_CSR,   "watch CSR"},
+  {"VAR",    DBG_VAR,   "watch VAR"},
+  {"WARN",   DBG_WRN,   "display warnings"},
+  {"SETUP",  DBG_SET,   "display setup info"},
+  {"SANITY", DBG_SAN,   "display sanity timer info"},
+  {"REG",    DBG_REG,   "trace read/write registers"},
+  {"PACKET", DBG_PCK,   "display packet headers"},
+  {"DATA",   DBG_DAT,   "display packet data"},
+  {"ETH",    DBG_ETH,   "debug ethernet device"},
   {0}
 };
 
@@ -844,6 +862,78 @@ t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc)
   else if (!strcmp(cptr, "OFF")) xq->var->sanity.enabled = 0;
   else return SCPE_ARG;
 
+  return SCPE_OK;
+}
+
+t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+
+  if (xq->var->throttle_delay == ETH_THROT_DISABLED_DELAY)
+    fprintf(st, "throttle=disabled");
+  else
+    fprintf(st, "throttle=time=%d;burst=%d;delay=%d", xq->var->throttle_time, xq->var->throttle_burst, xq->var->throttle_delay);
+  return SCPE_OK;
+}
+
+t_stat xq_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+  char tbuf[CBUFSIZE], gbuf[CBUFSIZE];
+  char *tptr = cptr;
+  uint32 newval;
+  uint32 set_time = xq->var->throttle_time;
+  uint32 set_burst = xq->var->throttle_burst;
+  uint32 set_delay = xq->var->throttle_delay;
+  t_stat r = SCPE_OK;
+
+  if (!cptr) {
+    xq->var->throttle_delay = ETH_THROT_DEFAULT_DELAY;
+    eth_set_throttle (xq->var->etherface, xq->var->throttle_time, xq->var->throttle_burst, xq->var->throttle_delay);
+    return SCPE_OK;
+    }
+
+  /* this assumes that the parameter has already been upcased */
+  if ((!strcmp (cptr, "ON")) ||
+      (!strcmp (cptr, "ENABLED")))
+    xq->var->throttle_delay = ETH_THROT_DEFAULT_DELAY;
+  else
+    if ((!strcmp (cptr, "OFF")) ||
+        (!strcmp (cptr, "DISABLED")))
+      xq->var->throttle_delay = ETH_THROT_DISABLED_DELAY;
+    else {
+      if (set_delay == ETH_THROT_DISABLED_DELAY)
+        set_delay = ETH_THROT_DEFAULT_DELAY;
+      while (*tptr) {
+        tptr = get_glyph_nc (tptr, tbuf, ';');
+        cptr = tbuf;
+        cptr = get_glyph (cptr, gbuf, '=');
+        if ((NULL == cptr) || ('\0' == *cptr))
+          return SCPE_ARG;
+        newval = (uint32)get_uint (cptr, 10, 100, &r);
+        if (r != SCPE_OK)
+          return SCPE_ARG;
+        if (!MATCH_CMD(gbuf, "TIME")) {
+          set_time = newval;
+          }
+        else
+          if (!MATCH_CMD(gbuf, "BURST")) {
+            if (newval > 30)
+               return SCPE_ARG;
+            set_burst = newval;
+            }
+          else
+            if (!MATCH_CMD(gbuf, "DELAY")) {
+              set_delay = newval;
+              }
+            else
+              return SCPE_ARG;
+        }
+      xq->var->throttle_time = set_time;
+      xq->var->throttle_burst = set_burst;
+      xq->var->throttle_delay = set_delay;
+      }
+  eth_set_throttle (xq->var->etherface, xq->var->throttle_time, xq->var->throttle_burst, xq->var->throttle_delay);
   return SCPE_OK;
 }
 
@@ -2688,6 +2778,7 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
     xq->var->etherface = NULL;
     return status;
   }
+  eth_set_throttle (xq->var->etherface, xq->var->throttle_time, xq->var->throttle_burst, xq->var->throttle_delay);
   if (xq->var->poll == 0) {
     status = eth_set_async(xq->var->etherface, xq->var->coalesce_latency_ticks);
     if (status != SCPE_OK) {
@@ -2978,52 +3069,239 @@ return SCPE_NOFNC;
 
 t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "DELQA-T/DELQA/DEQNA Qbus Ethernet Controllers\n\n");
-fprintf (st, "The simulator implements two DELQA-T/DELQA/DEQNA Qbus Ethernet controllers\n");
-fprintf (st, "(XQ, XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow\n");
-fprintf (st, "control of the MAC address, the controller type, the sanity timer and\n");
-fprintf (st, "for the DELQA and DELQA-T devices a DEQNA-Lock mode.\n\n");
-fprint_set_help (st, dptr);
-fprintf (st, "\nConfigured options and controller state can be displayed with:\n\n");
-fprint_show_help (st, dptr);
-fprintf (st, "\nMAC address octets must be delimited by dashes, colons or periods.\n");
-fprintf (st, "The controller defaults to 08-00-2B-AA-BB-CC, which should be sufficient if\n");
-fprintf (st, "there is only one SIMH DELQA-T/DELQA/DEQNA controller on your LAN.  Two cards\n");
-fprintf (st, "with the same MAC address will see each other's packets, resulting in a serious\n");
-fprintf (st, "mess.\n\n");
-fprintf (st, "The DELQA-T type/mode is better and faster but may not be usable by older or\n");
-fprintf (st, "non-DEC OS's.  Also, be aware that DEQNA type is not supported on some more\n");
-fprintf (st, "recent OS's. DEQNA-LOCK mode behaves exactly like a DEQNA, except for the\n");
-fprintf (st, "operation of the VAR and MOP processing.\n\n");
-fprintf (st, "The SANITY command change or display the INITIALIZATION sanity timer (DEQNA\n");
-fprintf (st, "jumper W3/DELQA switch S4).  The INITIALIZATION sanity timer has a default\n");
-fprintf (st, "timeout of 4 minutes, and cannot be turned off, just reset.  The normal sanity\n");
-fprintf (st, "timer can be set by operating system software regardless of the state of this\n");
-fprintf (st, "switch.  Note that only the DEQNA (or the DELQA in DEQNA-LOCK mode (=DEQNA))\n");
-fprintf (st, "supports the sanity timer -- it is ignored by a DELQA in Normal mode, which\n");
-fprintf (st, "uses switch S4 for a different purpose.\n\n");
-#if defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO)
-fprintf (st, "The POLL command change or display the service polling timer.  Scheduled\n");
-fprintf (st, "service polling is unnecessary and inefficient when asynchronous I/O is\n");
-fprintf (st, "available, therefore the default setting is disabled.\n");
-#else /* !(defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO)) */
-fprintf (st, "The POLL command change or display the service polling timer.  The polling\n");
-fprintf (st, "timer is calibrated to run the service thread on each simulated system clock\n");
-fprintf (st, "tick.  This should be sufficient for most situations, however if desired more\n");
-fprintf (st, "frequent polling can be specified.  Polling too frequent can seriously impact\n");
-fprintf (st, "the simulator's ability to execute instructions efficiently.\n");
-#endif /* defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO) */
-fprintf (st, "\nTo access the network, the simulated Ethernet controller must be attached to a\n");
-fprintf (st, "real Ethernet interface.\n\n");
-eth_attach_help(st, dptr, uptr, flag, cptr);
+const char helpString[] =
+ /* The '*'s in the next line represent the standard text width of a help line */
+     /****************************************************************************/
+//  " The %1s is a communication subsystem which consists of a microprocessor\n"
+    " The DELQA-T/DELQA/DEQNA Qbus devices interface the %S processors\n"
+    " to an Ethernet Local Area Network (LAN).\n"
+    "\n"
 #ifdef VM_PDP11
-fprintf (st, "On PDP-11 simulators, the XQ device is bootable.\n\n");
+    " The controllers are compatible with both 18- and 22-bit Qbus backplanes.\n"
+    "\n"
 #endif
-fprintf (st, "One final note: because of its asynchronous nature, the XQ controller is not\n");
-fprintf (st, "limited to the network speed of the real DELQA-T/DELQA/DEQNA controllers, nor\n");
-fprintf (st, "the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet (100\n");
-fprintf (st, "Mbit/sec) card, and \"Feel the Power!\" :-)\n");
-return SCPE_OK;
+    " The simulator implements two DELQA-T/DELQA/DEQNA Qbus Ethernet controllers\n"
+    " (XQ, XQB).  Initially, XQ is enabled, and XQB is disabled.\n"
+    "1 Hardware Description\n"
+    " The %D conforms to the Ethernet 2.0 specification performing the\n"
+    " data link layer functions, and part of the physical layer functions.\n"
+    "2 Models\n"
+    "3 DEQNA\n"
+    " A M7504 Qbus Module.  The DELQA module is a dual-height module which\n"
+    " plugs directly into the Qbus backplane.\n"
+    "3 DELQA\n"
+    " A M7516 Qbus Module.  The DELQA module is a dual-height module which\n"
+    " plugs directly into the Qbus backplane.\n"
+    "3 DELQA-T\n"
+    " A M7516-YM Qbus Module.  The DELQA-T, also known as the DELQA-PLUS,\n"
+    " is a dual-height module which plugs directly into the Qbus backplane.\n"
+    "\n"
+    " The DELQA-T device has an extended register programming interface\n"
+    " which is more efficient than the initial DEQNA and DELQA model.\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device.  These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various SET and ATTACH commands\n"
+     /****************************************************************************/
+    "2 $Set commands\n"
+    "3 MAC\n"
+    " The MAC address of the controller is the Hardware MAC address which on\n"
+    " real hardware is uniquely assigned by the factory.  Each LAN device on a\n"
+    " network must have unique MAC addresses for proper operation.\n"
+    "\n"
+    "+sim> SET %D MAC=<mac-address>\n"
+    "\n"
+    " A Valid MAC address is comprised of 6 pairs of hex digits delimited by\n"
+    " dashes, colons or period characters.\n"
+    "\n"
+    " The default MAC address for the XQ device is 08-00-2B-AA-BB-CC.  The\n"
+    " default MAC address for the XQB device is 08-00-2B-BB-CC-DD.\n"
+    "\n"
+    " The SET MAC command must be done before the %D device is attached to a\n"
+    " network.\n"
+    "3 Type\n"
+    " The type of device being emulated can be changed with the following\n"
+    " command:\n"
+    "\n"
+    "+sim> SET %D TYPE={DEQNA|DELQA|DELQA-T}\n"
+    "\n"
+    " A SET TYPE command should be entered before the device is attached.\n"
+     /****************************************************************************/
+    "3 SANITY\n"
+    " The sanity timer exists to make sure that the simulated operating system\n"
+    " software is up and running.  The sanity timer is also known as the host\n"
+    " inactivity timer.\n"
+    " The timer is reset by the operating system device driver interacting with\n"
+    " the device.  If the timer expires, the device negates the Qbus DCOK signal\n"
+    " which causes the system to reboot.\n"
+    "\n"
+    " The initial state of the sanity timer on real DEQNA hardware is configured\n"
+    " with the switch W4 and is switch S4 on DELQA boards.  The SET %D SANITY\n"
+    " command exists to reflect the setting of this switch.\n"
+    "3 DEQNALOCK\n"
+    " Setting DEQNALock mode causes a DELQA or DELQA-T device to behaves exactly\n"
+    " like a DEQNA, except for the operation of the VAR and MOP processing.\n"
+    "3 POLL\n"
+#if defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO)
+    " The SET %D POLL command changes the service polling timer.  Scheduled\n"
+    " service polling is unnecessary and inefficient when asynchronous I/O is\n"
+    " available, therefore the default setting is disabled.\n"
+#else /* !(defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO)) */
+    " The SET %D POLL command changes the service polling timer.  The polling\n"
+    " timer is calibrated to run the service thread on each simulated system clock\n"
+    " tick.  This should be sufficient for most situations, however if desired more\n"
+    " frequent polling can be specified.  Polling too frequent can seriously impact\n"
+    " the simulator's ability to execute instructions efficiently.\n"
+#endif /* defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO) */
+     /****************************************************************************/
+    "3 THROTTLE\n"
+    " The faster network operation of a simulated DELQA-T/DELQA/DEQNA device\n"
+    " might be too fast to interact with real PDP11 or VAX systems running on\n"
+    " the same LAN.\n"
+    " Traffic from the simulated device can easily push the real hardware\n"
+    " harder than it ever would have seen historically.  The net result can\n"
+    " be excessive packet loss due to various over-run conditions.  To support\n"
+    " interoperation of simulated systems with legacy hardware, the simulated\n"
+    " system can explictly be configured to throttle back the traffic it puts\n"
+    " on the wire.\n"
+    "\n"
+    " Throttling is configured with the SET XQ THROTTLE commands:\n"
+    "\n"
+    "+sim> SET XQ THROTTLE=DISABLE\n"
+    "+sim> SET XQ THROTTLE=ON\n"
+    "+sim> SET XQ THROTTLE=TIME=n;BURST=p;DELAY=t\n"
+    "\n"
+    " TIME specifies the number of milliseconds between successive packet\n"
+    " transmissions which will trigger throttling.\n"
+    " BURST specifies the number of successive packets which each are less than\n"
+    " the TIME gap that will cause a delay in sending subsequent packets.\n"
+    " DELAY specifies the number of milliseconds which a throttled packet will\n"
+    " be delayed prior to its transmission.\n"
+    "\n"
+     /****************************************************************************/
+    "2 Attach\n"
+    " The device must be attached to a LAN device to communicate with systems\n"
+    " on that LAN\n"
+    "\n"
+    "+sim> SHOW %D ETH\n"
+    "+ETH devices:\n"
+#if defined(_WIN32)
+    "+ eth0   \\Device\\NPF_{A6F81789-B849-4220-B09B-19760D401A38} (Local Area Connection)\n"
+    "+ eth1   udp:sourceport:remotehost:remoteport               (Integrated UDP bridge support)\n"
+    "+sim> ATTACH %D eth0\n"
+#else
+    "+ eth0   en0      (No description available)\n"
+    "+ eth1   tap:tapN (Integrated Tun/Tap support)\n"
+    "+ eth2   udp:sourceport:remotehost:remoteport               (Integrated UDP bridge support)\n"
+    "+sim> ATTACH %D eth0\n"
+    "+sim> ATTACH %D en0\n"
+#endif
+    "+sim> ATTACH %D udp:1234:remote.host.com:1234\n"
+    "\n"
+    "2 Examples\n"
+    " To configure two simulators to talk to each other use the following\n"
+    " example:\n"
+    " \n"
+    " Machine 1\n"
+    "+sim> SET %D ENABLE\n"
+    "+sim> SET %D PEER=LOCALHOST:2222\n"
+    "+sim> ATTACH %D 1111\n"
+    " \n"
+    " Machine 2\n"
+    "+sim> SET %D ENABLE\n"
+    "+sim> SET %U PEER=LOCALHOST:1111\n"
+    "+sim> ATTACH %U 2222\n"
+    "\n"
+    "1 Monitoring\n"
+    " The %D device configuration and state can be displayed with one of the\n"
+    " available show commands.\n"
+    "2 $Show commands\n"
+    "3 LEDs\n"
+    " The %D devices have on-board LEDS which are used by the operating system,\n"
+    " boot code, and diagnostics to indicate the state of the device.  The LED\n"
+    " state is visible with the SHOW %D LEDS command.\n"
+    "1 Boot Support\n"
+#ifdef VM_PDP11
+    " The %D device is bootable using the on-board ROM code in the PDP-11\n"
+    " simulator.\n"
+#else
+    " The %D device is bootable via the processor boot ROM on all MicroVAX\n"
+    " systems.\n"
+#endif
+    "1 Debugging\n"
+    " The simulator has a number of debug options, these are:\n"
+    "\n"
+    "++TRACE   Shows detailed routine calls.\n"
+    "++CSR     Shows activities affecting the CSR.\n"
+    "++VAR     Shows activities affecting the VAR.\n"
+    "++WARN    Shows warnings.\n"
+    "++SETUP   Shows setup info.\n"
+    "++SANITY  Shows sanity timer info.\n"
+    "++REG     Shows all device register programatic read/write activity\n"
+    "++PACKET  Shows packet headers.\n"
+    "++DATA    Shows packet data.\n"
+    "++ETH     Shows ethernet device details.\n"
+    "\n"
+    " To get a full trace use\n"
+    "\n"
+    "+sim> SET %D DEBUG\n"
+    "\n"
+     /****************************************************************************/
+    "1 Dependencies\n"
+#if defined(_WIN32)
+    " The WinPcap package must be installed in order to enable\n"
+    " communication with other computers on the local LAN.\n"
+    "\n"
+    " The WinPcap package is available from http://www.winpcap.org/\n"
+#else
+    " To build simulators with the ability to communicate to other computers\n"
+    " on the local LAN, the libpcap development package must be installed on\n"
+    " the system which builds the simulator.\n"
+    "\n"
+#if defined(__APPLE__)
+#else
+#if defined(__linux__)
+#else
+#endif
+#endif
+#endif
+    "1 Privileges Required\n"
+#if defined(_WIN32)
+    " Windows systems can attach the simulated %D device to the local LAN\n"
+    " network interface without any special privileges as long as the\n"
+    " WinPcap package has been previously installed on the host system.\n"
+#else
+#endif
+    "1 Host Computer Communications\n"
+#if defined(_WIN32)
+    " On Windows using the WinPcap interface, the simulated %D device\n"
+    " can be used to communicate with the host computer on the same LAN\n"
+    " which it is attached to.\n"
+#else
+#endif
+     /****************************************************************************/
+    "1 Performance\n"
+    " On modern host systems and networks, the simulated DEQNA/DELQA/DELQA-T\n"
+    " device can easily move data at more than 20Mbits per second.\n"
+    " Real DEQNA/DELQA hardware rarely exceeded more than 1.5Mbits/second\n"
+    "\n"
+    " Due to this significant speed mismatch, there can be issues when\n"
+    " simulated systems attempt to communicate with real PDP11 and VAX systems\n"
+    " on the LAN.  See SET %D THROTTLE to help accommodate such communications.\n"
+    "1 Related Devices\n"
+    " The %D can facilitate communication with other simh simulators which\n"
+    " have emulated Ethernet devices available as well as real systems that\n"
+    " are directly connected to the LAN.\n"
+    "\n"
+    " The other simulated Ethernet devices include:\n"
+    "\n"
+    "++DEUNA/DELUA  Unibus PDP11 and VAX simulators\n"
+    "\n"
+    ;
+return scp_help (st, dptr, uptr, flag, helpString, cptr);
 }
 
 char *xq_description (DEVICE *dptr)

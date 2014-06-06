@@ -119,6 +119,9 @@ struct xu_device {
   ETH_PCALLBACK     wcallback;                          /* write callback routine */
   ETH_MAC           mac;                                /* MAC address */
   enum xu_type      type;                               /* controller type */
+  uint32            throttle_time;                      /* ms burst time window */
+  uint32            throttle_burst;                     /* packets passed with throttle_time which trigger throttling */
+  uint32            throttle_delay;                     /* ms to delay when throttling.  0 disables throttling */
                                                         /*- initialized values - DO NOT MOVE */
 
                                                         /* I/O register storage */

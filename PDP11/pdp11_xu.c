@@ -115,6 +115,8 @@ t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xu_set_stats  (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xu_set_type (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat xu_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc);
 int32 xu_int (void);
 t_stat xu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat xu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -145,7 +147,10 @@ struct xu_device    xua = {
   xua_read_callback,                        /* read callback routine */
   xua_write_callback,                       /* write callback routine */
   {0x08, 0x00, 0x2B, 0xCC, 0xDD, 0xEE},     /* mac */
-  XU_T_DELUA                                /* type */
+  XU_T_DELUA,                               /* type */
+  ETH_THROT_DEFAULT_TIME,                   /* ms throttle window */
+  ETH_THROT_DEFAULT_BURST,                  /* packet packet burst in throttle window */
+  ETH_THROT_DISABLED_DELAY                  /* throttle disabled */
   };
 
 MTAB xu_mod[] = {
@@ -172,6 +177,8 @@ MTAB xu_mod[] = {
     NULL, &xu_show_filters, NULL, "Display MAC addresses which will be received" },
   { MTAB_XTD|MTAB_VDV, 0, "TYPE", "TYPE={DEUNA|DELUA}",
     &xu_set_type, &xu_show_type, NULL, "Display the controller type" },
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "THROTTLE", "THROTTLE=DISABLED|TIME=n{;BURST=n{;DELAY=n}}",
+    &xu_set_throttle, &xu_show_throttle, NULL, "Display transmit throttle configuration" },
   { 0 },
 };
 
@@ -208,6 +215,9 @@ REG xua_reg[] = {
   { BRDATA ( TXHDR,   xua.txhdr,    XU_RDX, 16, 4), REG_HRO},
   { GRDATA ( BA,      xua_dib.ba,   XU_RDX, 32, 0), REG_HRO},
   { GRDATA ( VECTOR,  xua_dib.vec,  XU_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_TIME, xua.throttle_time, XU_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_BURST, xua.throttle_burst, XU_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_DELAY, xua.throttle_delay, XU_RDX, 32, 0), REG_HRO},
   { NULL }  };
 
 DEBTAB xu_debug[] = {
@@ -243,7 +253,10 @@ struct xu_device    xub = {
   xub_read_callback,                        /* read callback routine */
   xub_write_callback,                       /* write callback routine */
   {0x08, 0x00, 0x2B, 0xDD, 0xEE, 0xFF},     /* mac */
-  XU_T_DELUA                                /* type */
+  XU_T_DELUA,                               /* type */
+  ETH_THROT_DEFAULT_TIME,                   /* ms throttle window */
+  ETH_THROT_DEFAULT_BURST,                  /* packet packet burst in throttle window */
+  ETH_THROT_DISABLED_DELAY                  /* throttle disabled */
   };
 
 REG xub_reg[] = {
@@ -279,6 +292,9 @@ REG xub_reg[] = {
   { BRDATA ( TXHDR,   xub.txhdr,    XU_RDX, 16, 4), REG_HRO},
   { GRDATA ( BA,      xub_dib.ba,   XU_RDX, 32, 0), REG_HRO},
   { GRDATA ( VECTOR,  xub_dib.vec,  XU_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_TIME, xub.throttle_time, XU_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_BURST, xub.throttle_burst, XU_RDX, 32, 0), REG_HRO},
+  { GRDATA ( THR_DELAY, xub.throttle_delay, XU_RDX, 32, 0), REG_HRO},
   { NULL }  };
 
 DEVICE xub_dev = {
@@ -437,6 +453,78 @@ t_stat xu_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
   else if (!strcmp(cptr, "DELUA"))      xu->var->type = XU_T_DELUA;
   else return SCPE_ARG;
 
+  return SCPE_OK;
+}
+
+t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+  CTLR* xu = xu_unit2ctlr(uptr);
+
+  if (xu->var->throttle_delay == ETH_THROT_DISABLED_DELAY)
+    fprintf(st, "throttle=disabled");
+  else
+    fprintf(st, "throttle=time=%d;burst=%d;delay=%d", xu->var->throttle_time, xu->var->throttle_burst, xu->var->throttle_delay);
+  return SCPE_OK;
+}
+
+t_stat xu_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+  CTLR* xu = xu_unit2ctlr(uptr);
+  char tbuf[CBUFSIZE], gbuf[CBUFSIZE];
+  char *tptr = cptr;
+  uint32 newval;
+  uint32 set_time = xu->var->throttle_time;
+  uint32 set_burst = xu->var->throttle_burst;
+  uint32 set_delay = xu->var->throttle_delay;
+  t_stat r = SCPE_OK;
+
+  if (!cptr) {
+    xu->var->throttle_delay = ETH_THROT_DEFAULT_DELAY;
+    eth_set_throttle (xu->var->etherface, xu->var->throttle_time, xu->var->throttle_burst, xu->var->throttle_delay);
+    return SCPE_OK;
+    }
+
+  /* this assumes that the parameter has already been upcased */
+  if ((!strcmp (cptr, "ON")) ||
+      (!strcmp (cptr, "ENABLED")))
+    xu->var->throttle_delay = ETH_THROT_DEFAULT_DELAY;
+  else
+    if ((!strcmp (cptr, "OFF")) ||
+        (!strcmp (cptr, "DISABLED")))
+      xu->var->throttle_delay = ETH_THROT_DISABLED_DELAY;
+    else {
+      if (set_delay == ETH_THROT_DISABLED_DELAY)
+        set_delay = ETH_THROT_DEFAULT_DELAY;
+      while (*tptr) {
+        tptr = get_glyph_nc (tptr, tbuf, ';');
+        cptr = tbuf;
+        cptr = get_glyph (cptr, gbuf, '=');
+        if ((NULL == cptr) || ('\0' == *cptr))
+          return SCPE_ARG;
+        newval = (uint32)get_uint (cptr, 10, 100, &r);
+        if (r != SCPE_OK)
+          return SCPE_ARG;
+        if (!MATCH_CMD(gbuf, "TIME")) {
+          set_time = newval;
+          }
+        else
+          if (!MATCH_CMD(gbuf, "BURST")) {
+            if (newval > 30)
+               return SCPE_ARG;
+            set_burst = newval;
+            }
+          else
+            if (!MATCH_CMD(gbuf, "DELAY")) {
+              set_delay = newval;
+              }
+            else
+              return SCPE_ARG;
+        }
+      xu->var->throttle_time = set_time;
+      xu->var->throttle_burst = set_burst;
+      xu->var->throttle_delay = set_delay;
+      }
+  eth_set_throttle (xu->var->etherface, xu->var->throttle_time, xu->var->throttle_burst, xu->var->throttle_delay);
   return SCPE_OK;
 }
 
@@ -1656,6 +1744,7 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
     xu->var->etherface = 0;
     return status;
   }
+  eth_set_throttle (xu->var->etherface, xu->var->throttle_time, xu->var->throttle_burst, xu->var->throttle_delay);
   if (SCPE_OK != eth_check_address_conflict (xu->var->etherface, &xu->var->mac)) {
     char buf[32];
 
@@ -1808,7 +1897,7 @@ fprintf (st, "real Ethernet interface.\n\n");
 eth_attach_help(st, dptr, uptr, flag, cptr);
 fprintf (st, "One final note: because of its asynchronous nature, the XU controller is not\n");
 fprintf (st, "limited to the ~1.5Mbit/sec of the real DEUNA/DELUA controllers, nor the\n");
-fprintf (st, "10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet (100 Mbit/sec)\n");
+fprintf (st, "10Mbit/sec of a standard Ethernet.  Attach it to a Fast or Gigabit Ethernet\n");
 fprintf (st, "card, and \"Feel the Power!\" :-)\n");
 return SCPE_OK;
 }
