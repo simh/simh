@@ -1654,7 +1654,7 @@ while (dev->handle) {
 #endif
       if (do_select) {
         select_fd = dev->fd_handle;
-#if !defined (_WIN32)
+#if !defined (_WIN32) && defined(HAVE_PCAP_NETWORK)
         if (dev->eth_api == ETH_API_PCAP)
           select_fd = pcap_get_selectable_fd((pcap_t *)dev->handle);
 #endif
@@ -1775,7 +1775,7 @@ if (bufsz < ETH_MAX_JUMBO_FRAME)
 *fd_handle = 0;
 
 /* attempt to connect device */
-memset(errbuf, 0, sizeof(errbuf));
+memset(errbuf, 0, PCAP_ERRBUF_SIZE);
 if (0 == strncmp("tap:", savname, 4)) {
   int  tun = -1;    /* TUN/TAP Socket */
   int  on = 1;
@@ -1798,7 +1798,7 @@ if (0 == strncmp("tap:", savname, 4)) {
     /* Send interface requests to TUN/TAP driver. */
     if (ioctl(tun, TUNSETIFF, &ifr) >= 0) {
       if (ioctl(tun, FIONBIO, &on)) {
-        strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+        strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
         close(tun);
         }
       else {
@@ -1807,10 +1807,10 @@ if (0 == strncmp("tap:", savname, 4)) {
         }
       }
     else
-      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+      strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
     }
   else
-    strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+    strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
 #elif defined(HAVE_BSDTUNTAP) && defined(HAVE_TAP_NETWORK)
   if (1) {
     char dev_name[64] = "";
@@ -1820,7 +1820,7 @@ if (0 == strncmp("tap:", savname, 4)) {
 
     if ((tun = open(dev_name, O_RDWR)) >= 0) {
       if (ioctl(tun, FIONBIO, &on)) {
-        strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+        strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
         close(tun);
         }
       else {
@@ -1839,7 +1839,7 @@ if (0 == strncmp("tap:", savname, 4)) {
           if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
             ifr.ifr_flags |= IFF_UP;
             if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
-              strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+              strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
               close(tun);
               }
             }
@@ -1849,10 +1849,10 @@ if (0 == strncmp("tap:", savname, 4)) {
 #endif
       }
     else
-      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+      strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
   }
 #else
-  strncpy(errbuf, "No support for tap: devices", sizeof(errbuf)-1);
+  strncpy(errbuf, "No support for tap: devices", PCAP_ERRBUF_SIZE-1);
 #endif /* !defined(__linux) && !defined(HAVE_BSDTUNTAP) */
   if (0 == errbuf[0]) {
     *eth_api = ETH_API_TAP;
@@ -1870,13 +1870,13 @@ else
       return SCPE_OPENERR;
       }
     if (!(*handle = (void*) vde_open(savname+4, "simh", &voa)))
-      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+      strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
     else {
       *eth_api = ETH_API_VDE;
       *fd_handle = vde_datafd((VDECONN*)(*handle));
       }
 #else
-    strncpy(errbuf, "No support for vde: network devices", sizeof(errbuf)-1);
+    strncpy(errbuf, "No support for vde: network devices", PCAP_ERRBUF_SIZE-1);
 #endif /* defined(HAVE_VDE_NETWORK) */
     }
   else {
@@ -1945,7 +1945,7 @@ else
 #endif /* defined (__APPLE__) */
 #endif /* !defined (USE_READER_THREAD) */
 #else
-      strncpy (errbuf, "Unknown or unsupported network device", sizeof(errbuf)-1);
+      strncpy (errbuf, "Unknown or unsupported network device", PCAP_ERRBUF_SIZE-1);
 #endif /* defined(HAVE_PCAP_NETWORK) */
       }
     }
@@ -2329,7 +2329,6 @@ _eth_error(ETH_DEV* dev, const char* where)
 char msg[64];
 char *netname = "";
 time_t now;
-BOOL time_to_reset = FALSE;
 
 time(&now);
 sim_printf ("%s", asctime(localtime(&now)));
@@ -2352,9 +2351,11 @@ switch (dev->eth_api) {
   }
 sprintf(msg, "%s(%s): ", where, netname);
 switch (dev->eth_api) {
+#if defined(HAVE_PCAP_NETWORK)
   case ETH_API_PCAP:
       sim_printf ("%s%s\n", msg, pcap_geterr ((pcap_t*)dev->handle));
       break;
+#endif
   default:
       sim_err_sock (INVALID_SOCKET, msg, 0);
       break;
