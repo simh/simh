@@ -237,12 +237,14 @@ struct eth_device {
   char*         name;                                   /* name of ethernet device */
   void*         handle;                                 /* handle of implementation-specific device */
   SOCKET        fd_handle;                              /* fd to kernel device (where needed) */
+  char*         bpf_filter;                             /* bpf filter currently in effect */
   int           eth_api;                                /* Designator for which API is being used to move packets */
-#define ETH_API_PCAP 0                                  /* Pcap API in use */
-#define ETH_API_TAP  1                                  /* tun/tap API in use */
-#define ETH_API_VDE  2                                  /* VDE API in use */
-#define ETH_API_UDP  3                                  /* UDP API in use */
-#define ETH_API_NAT  4                                  /* NAT (SLiRP) API in use */
+#define ETH_API_NONE 0                                  /* No API in use yet */
+#define ETH_API_PCAP 1                                  /* Pcap API in use */
+#define ETH_API_TAP  2                                  /* tun/tap API in use */
+#define ETH_API_VDE  3                                  /* VDE API in use */
+#define ETH_API_UDP  4                                  /* UDP API in use */
+#define ETH_API_NAT  5                                  /* NAT (SLiRP) API in use */
   ETH_PCALLBACK read_callback;                          /* read callback function */
   ETH_PCALLBACK write_callback;                         /* write callback function */
   ETH_PACK*     read_packet;                            /* read packet */
@@ -264,6 +266,13 @@ struct eth_device {
   uint32        packets_sent;                           /* Total Packets Sent */
   uint32        packets_received;                       /* Total Packets Received */
   uint32        loopback_packets_processed;             /* Total Loopback Packets Processed */
+  uint32        transmit_packet_errors;                 /* Total Send Packet Errors */
+  uint32        receive_packet_errors;                  /* Total Read Packet Errors */
+  int32         error_waiting_threads;                  /* Count of threads currently waiting after an error */
+  BOOL          error_needs_reset;                      /* Flag indicating to force reset */
+#define ETH_ERROR_REOPEN_THRESHOLD 10                   /* Attempt ReOpen after 20 send/receive errors */
+#define ETH_ERROR_REOPEN_PAUSE 4                        /* Seconds to pause between closing and reopening LAN */
+  uint32        error_reopen_count;                     /* Count of ReOpen Attempts */
   DEVICE*       dptr;                                   /* device ethernet is attached to */
   uint32        dbit;                                   /* debugging bit */
   int           reflections;                            /* packet reflections on interface */
