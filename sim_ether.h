@@ -269,7 +269,7 @@ struct eth_device {
   uint32        transmit_packet_errors;                 /* Total Send Packet Errors */
   uint32        receive_packet_errors;                  /* Total Read Packet Errors */
   int32         error_waiting_threads;                  /* Count of threads currently waiting after an error */
-  BOOL          error_needs_reset;                      /* Flag indicating to force reset */
+  ETH_BOOL      error_needs_reset;                      /* Flag indicating to force reset */
 #define ETH_ERROR_REOPEN_THRESHOLD 10                   /* Attempt ReOpen after 20 send/receive errors */
 #define ETH_ERROR_REOPEN_PAUSE 4                        /* Seconds to pause between closing and reopening LAN */
   uint32        error_reopen_count;                     /* Count of ReOpen Attempts */
