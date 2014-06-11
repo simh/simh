@@ -36,7 +36,10 @@
 
 patch   date            module(s) and fix(es)
 
-  1     tbd             h316_stddev.c:
+  1     tbd             sim_console.h, sim_console.c:
+                        - added tab stop routines
+  
+                        h316_stddev.c:
                         - fixed TTY output behavior (Bob Armstrong)
 
                         h316_sys.c:
@@ -45,6 +48,28 @@ patch   date            module(s) and fix(es)
   
                         i1401_lp.c:
                         - fixed printer chain selection
+
+                        1401_sys.c
+                        - fixed d character printout (Van Snyder)
+
+                        1620_cd.c:
+                        - fixed WA card punch translations (Bob Armstrong)
+                        - fixed end of line processing on read (Bob Armstrong)
+
+                        1620_cpu.c:
+                        - fixed several bugs in add and compare (Bob Armstrong)
+                        - fixed handling of P field in K instruction (Bob Armstrong)
+
+                        i1620_lp.c:
+                        - fixed DN wraparound (Bob Armstrong)
+                        - fixed test on VFU 10 (Bob Armstrong)
+
+                        i1620_pt.c:
+                        - fixed translation of paper tape code X0C
+                        - fixed DN wraparound (Bob Armstrong)
+
+                        i1620_tty.c:
+                        - fixed DN wraparound (Bob Armstrong)
 
                         id_pas.c:
                         - poll PAS immediately after attach to pick up connect
@@ -69,6 +94,7 @@ patch   date            module(s) and fix(es)
                         pdp11_cpu.c:
                         - MMR1 does not track PC changes (Johnny Billquist)
                         - added cpu_set_boot
+                        - fixed bug in CSM (John Dundas)
 
                         pdp11_cpumod.c:
                         - fixed model change to set memory size as last step
@@ -137,6 +163,15 @@ patch   date            module(s) and fix(es)
 
                         pdp8_ttx.c:
                         - poll TTIX immediately after attach to pick up connect (Mark Pizzolato)
+
+                        vax_mmu.c:
+                        - revised unaligned handling to allow model-specific non-memory routines
+
+                        vax_io.c:
+                        - added support for unaligned IO space references
+
+                        vax_sysdev.c:
+                        - added support for unaligned register space references
 
                         vax780_defs.h, vaxmod_defs.h:
                         - fixed base address for RQB, RQC, RQD

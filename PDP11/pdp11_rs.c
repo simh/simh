@@ -686,7 +686,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rs_boot (int32 unitno, DEVICE *dptr)
 {
-size_t i;
+int32 i;
 extern uint16 *M;
 UNIT *uptr = rs_dev.units + unitno;
 

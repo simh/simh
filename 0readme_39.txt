@@ -71,7 +71,9 @@ Stable and working; runs available software.
 
 3.4 PDP-10 [KS-10 only]
 
-Stable and working; runs available software.
+Stable and working; runs available software. The version on GitHub has extra
+networking support that allows it to participate in a DECnet/ANF emulated
+network.
 
 3.5 PDP-11
 
@@ -113,7 +115,7 @@ Stable and working; runs available software.
 
 3.13 IBM 1620
 
-Hand debug only. No software for it has been found or tested.
+Runs diagnostics.
 
 3.14 IBM 7094
 
@@ -136,7 +138,8 @@ Dave Bryan.
 
 3.18 Honeywell 316/516
 
-Stable and working; runs available software.
+Stable and working; runs available software. IMP emulation is available
+in the GitHub version.
 
 3.19 GRI-909/99
 
@@ -144,7 +147,8 @@ Hand debug only. No software for it has been found or tested.
 
 3.20 SDS-940
 
-Hand debug only, and a few diagnostics.
+Hand debug only, and a few diagnostics. The version on GitHub has
+received substantial additional debugging and is under development.
 
 3.21 LGP-30
 
