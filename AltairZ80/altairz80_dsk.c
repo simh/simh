@@ -108,9 +108,12 @@
 
 	----------------------------------------------------------
 
-	5/22/2014 - Updated by Mike Douglas to support the Altair Mini-Disk.
+	5/22/2014 - Updated by Mike Douglas to support the Altair Minidisk.
 				This disk uses 35 (vs 70) tracks of 16 (vs 32) sectors 
 				of 137 bytes each.
+	6/30/2014 - When the disk is an Altair Minidisk, load the head as 
+				soon as the disk is enabled, and ignore the head
+				unload command (both like the real hardware). 
 */
 
 #include "altairz80_defs.h"
@@ -529,9 +532,15 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
     else {
         current_sector[current_disk]    = 0xff; /* reset internal counters */
         current_byte[current_disk]      = 0xff;
-        current_flag[current_disk]      = data & 0x80   ?   0       /* disable drive                            */ :
-        (current_track[current_disk] == 0           ?   0x5a    /* enable: head move true, track 0 if there */ :
-         0x1a);  /* enable: head move true                   */
+		if (data & 0x80)                            /* disable drive? */
+			current_flag[current_disk] = 0;         /* yes, clear all flags */
+		else {                                      /* enable drive */
+			current_flag[current_disk] = 0x1a;      /* move head true */
+			if (current_track[current_disk] == 0)   /* track 0? */
+				current_flag[current_disk] |= 0x40; /* yes, set track 0 true as well */
+			if (sectors_per_track[current_disk] == MINI_DISK_SECT)  /* drive enable loads head for Minidisk */
+				current_flag[current_disk] |= 0x84;  
+		}
     }
     return 0;   /* ignored since OUT */
 }
@@ -618,7 +627,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
         current_flag[current_disk] |= 0x80;         /* turn on 'read data available'    */
     }
 
-    if (data & 0x08) {                              /* head unload                      */
+    if ((data & 0x08) && (sectors_per_track[current_disk] != MINI_DISK_SECT)) { /* head unload */
         current_flag[current_disk]      &= 0xfb;    /* turn off 'head loaded'   bit     */
         current_flag[current_disk]      &= 0x7f;    /* turn off 'read data available'   */
         current_sector[current_disk]    = 0xff;
