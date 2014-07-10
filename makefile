@@ -621,7 +621,22 @@ else
       GIT_COMMIT_ID=$(shell for /F "tokens=3" %%i in ("$(shell findstr /C:"define SIM_GIT_COMMIT_ID" sim_rev.h)") do echo %%i)
     endif
   endif
-endif
+  ifneq (windows-build,$(shell if exist ..\windows-build\README.md echo windows-build))
+    $(info ***********************************************************************)
+    $(info ***********************************************************************)
+    $(info **  This build is operating without the required windows-build       **)
+    $(info **  components and therefore will produce less than optimal          **)
+    $(info **  simulator operation and features.                                **)
+    $(info **  Download the file:                                               **)
+    $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
+    $(info **  Refer to the file:                                               **)
+    $(info **  "Visual Studio Projects\0ReadMe_Projects.txt" for where to place **)
+    $(info **  the 'windows-build' folder extracted from that zip file.         **)
+    $(info ***********************************************************************)
+    $(info ***********************************************************************)
+    $(info .)
+  endif
+endif # Win32 (via MinGW)
 ifneq (,$(GIT_COMMIT_ID))
   CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=$(GIT_COMMIT_ID)
 endif
@@ -1064,9 +1079,29 @@ SSEMD = SSEM
 SSEM = ${SSEMD}/ssem_cpu.c ${SSEMD}/ssem_sys.c
 SSEM_OPT = -I ${SSEMD}
 
+###
+### Unsupported/Incomplete simulators
+###
+
+SIGMAD = sigma
+SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
+	${SIGMAD}/sigma_coc.c ${SIGMAD}/sigma_dk.c ${SIGMAD}/sigma_dp.c \
+	${SIGMAD}/sigma_fp.c ${SIGMAD}/sigma_io.c ${SIGMAD}/sigma_lp.c \
+	${SIGMAD}/sigma_map.c ${SIGMAD}/sigma_mt.c ${SIGMAD}/sigma_pt.c \
+    ${SIGMAD}/sigma_rad.c ${SIGMAD}/sigma_rtc.c ${SIGMAD}/sigma_tt.c
+SIGMA_OPT = -I ${SIGMAD}
+
+ALPHAD = alpha
+ALPHA = ${ALPHAD}/alpha_500au_syslist.c ${ALPHAD}/alpha_cpu.c \
+    ${ALPHAD}/alpha_ev5_cons.c ${ALPHAD}/alpha_ev5_pal.c \
+    ${ALPHAD}/alpha_ev5_tlb.c ${ALPHAD}/alpha_fpi.c \
+    ${ALPHAD}/alpha_fpv.c ${ALPHAD}/alpha_io.c \
+    ${ALPHAD}/alpha_mmu.c ${ALPHAD}/alpha_sys.c
+ALPHA_OPT = -I ${ALPHAD} -DUSE_ADDR64 -DUSE_INT64
+
 
 #
-# Build everything
+# Build everything (not the unsupported/incomplete simulators)
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
@@ -1333,4 +1368,16 @@ ssem : ${BIN}ssem${EXE}
 ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+sigma : ${BIN}sigma${EXE}
+
+${BIN}sigma${EXE} : ${SIGMA} ${SIM}
+	${MKDIRBIN}
+	${CC} ${SIGMA} ${SIM} ${SIGMA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+alpha : ${BIN}alpha${EXE}
+
+${BIN}alpha${EXE} : ${ALPHA} ${SIM}
+	${MKDIRBIN}
+	${CC} ${ALPHA} ${SIM} ${ALPHA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 

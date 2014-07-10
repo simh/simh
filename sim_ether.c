@@ -858,6 +858,8 @@ t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cpt
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const mac)
   {return SCPE_NOFNC;}
+t_stat eth_set_throttle (ETH_DEV* dev, uint32 time, uint32 burst, uint32 delay)
+  {return SCPE_NOFNC;}
 t_stat eth_set_async (ETH_DEV *dev, int latency)
   {return SCPE_NOFNC;}
 t_stat eth_clr_async (ETH_DEV *dev)
