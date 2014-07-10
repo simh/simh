@@ -1785,7 +1785,7 @@ t_stat cpu_fprint_one_inst (FILE *st, uint32 ir, t_uint64 pc, t_uint64 ra, t_uin
 uint32 op;
 t_value sim_val;
 
-static const h_fmt[64] = {
+static const int h_fmt[64] = {
     0,     0,     0,     0,     0,     0,     0,     0,
     H_MRF, H_MRF, H_MRF, H_MRF, H_MRF, H_MRF, H_MRF, H_MRF,
     H_IOP, H_IOP, H_IOP, H_IOP, H_FOP, H_FOP, H_FOP, H_FOP,

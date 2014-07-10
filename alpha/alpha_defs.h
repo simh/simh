@@ -35,7 +35,7 @@
 #include <setjmp.h>
 
 #if defined (__GNUC__)
-#define INLINE inline
+#define INLINE
 #else
 #define INLINE
 #endif

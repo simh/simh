@@ -132,7 +132,7 @@ t_stat mtr_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_attach (UNIT *uptr, char *cptr);
 t_stat mt_detach (UNIT *uptr);
-t_stat mt_flush_buf (uptr);
+t_stat mt_flush_buf (UNIT *uptr);
 t_stat mt_map_err (UNIT *uptr, t_stat r);
 int32 mt_clr_int (uint32 dva);
 void mt_set_rwi (uint32 un);
@@ -639,6 +639,7 @@ t_stat mt_detach (UNIT* uptr)
 {
 uint32 un = uptr - mt_dev.units;
 
+if (!(uptr->flags & UNIT_ATTABLE)) return SCPE_NOATT;
 uptr->UST = 0;
 sim_cancel (uptr + MT_REW);
 return sim_tape_detach (uptr);

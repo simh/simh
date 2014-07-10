@@ -105,6 +105,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VAX8600", "VAX8600.vcproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SSEM", "SSEM.vcproj", "{48DA6BA8-23E1-4F0D-959C-48C8576494DA}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "alpha", "alpha.vcproj", "{14C5D369-E4A1-4DA2-B23C-B49367874F7B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sigma", "sigma.vcproj", "{7DDB6DF6-3837-4DE3-80D7-63181195021F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -259,6 +263,14 @@ Global
 		{48DA6BA8-23E1-4F0D-959C-48C8576494DA}.Debug|Win32.Build.0 = Debug|Win32
 		{48DA6BA8-23E1-4F0D-959C-48C8576494DA}.Release|Win32.ActiveCfg = Release|Win32
 		{48DA6BA8-23E1-4F0D-959C-48C8576494DA}.Release|Win32.Build.0 = Release|Win32
+		{14C5D369-E4A1-4DA2-B23C-B49367874F7B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{14C5D369-E4A1-4DA2-B23C-B49367874F7B}.Debug|Win32.Build.0 = Debug|Win32
+		{14C5D369-E4A1-4DA2-B23C-B49367874F7B}.Release|Win32.ActiveCfg = Release|Win32
+		{14C5D369-E4A1-4DA2-B23C-B49367874F7B}.Release|Win32.Build.0 = Release|Win32
+		{7DDB6DF6-3837-4DE3-80D7-63181195021F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7DDB6DF6-3837-4DE3-80D7-63181195021F}.Debug|Win32.Build.0 = Debug|Win32
+		{7DDB6DF6-3837-4DE3-80D7-63181195021F}.Release|Win32.ActiveCfg = Release|Win32
+		{7DDB6DF6-3837-4DE3-80D7-63181195021F}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
