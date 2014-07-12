@@ -2590,6 +2590,15 @@ for ( ;; ) {
         else if (cpu_unit.flags & UNIT_CONH)            /* halt to console? */
             cc = con_halt (CON_HLTINS, cc);             /* enter firmware */
         else {
+            /* allow potentially pending console output to */
+            /* be displayed before dropping back to scp */
+            if (sim_interval <= SERIAL_OUT_WAIT) {
+                sim_interval -= SERIAL_OUT_WAIT;
+                temp = sim_process_event ();
+                if (temp)
+                    ABORT (temp);
+                SET_IRQL;                               /* update interrupts */
+                }
             ABORT (STOP_HALT);                          /* halt to simulator */
             }
 
