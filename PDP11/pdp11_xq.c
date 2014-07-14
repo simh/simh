@@ -2088,7 +2088,7 @@ void xqb_read_callback(int status)
 
 void xq_sw_reset(CTLR* xq)
 {
-  const uint16 set_bits = XQ_CSR_XL | XQ_CSR_RL;
+  uint16 set_bits = XQ_CSR_XL | XQ_CSR_RL;
   int i;
 
   sim_debug(DBG_TRC, xq->dev, "xq_sw_reset()\n");
@@ -2099,6 +2099,11 @@ void xq_sw_reset(CTLR* xq)
     xq->var->mode = XQ_T_DELQA;
     xq->var->iba = xq->var->srr = 0;
   }
+
+  /* Old DEQNA firmware also enabled interrupts and */
+  /* the Ultrix 1.X driver counts on that behavior */  
+  if ((xq->var->type == XQ_T_DEQNA) && xq->dib->vec && (ULTRIX1X))
+    set_bits |= XQ_CSR_IE;
 
   /* reset csr bits */
   xq_csr_set_clr(xq, set_bits, (uint16) ~set_bits);

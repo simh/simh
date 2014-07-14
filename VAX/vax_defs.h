@@ -719,10 +719,11 @@ enum opcodes {
             if (((uint32) s1) < ((uint32) s2)) cc = cc | CC_C
 
 #define VAX_IDLE_VMS        0x01
-#define VAX_IDLE_ULT        0x02
-#define VAX_IDLE_ULTOLD     0x04
-#define VAX_IDLE_QUAD       0x08
-#define VAX_IDLE_BSDNEW     0x10
+#define VAX_IDLE_ULT        0x02    /* Ultrix more recent versions */
+#define VAX_IDLE_ULTOLD     0x04    /* Ultrix older versions */
+#define VAX_IDLE_ULT1X      0x08    /* Ultrix 1.x */
+#define VAX_IDLE_QUAD       0x10
+#define VAX_IDLE_BSDNEW     0x20
 extern uint32 cpu_idle_mask;                            /* idle mask */
 void cpu_idle (void);
 

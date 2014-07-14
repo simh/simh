@@ -2541,6 +2541,11 @@ for ( ;; ) {
         temp = op_ffs (r, op1);                         /* find first 1 */
         WRITE_L (op0 + temp);                           /* store result */
         cc = r? 0: CC_Z;                                /* set cc's */
+        if ((cc == CC_Z) &&                             /* No set bits found? */
+            (cpu_idle_mask & VAX_IDLE_ULT1X) &&         /* running Ultrix 1.X" */
+            (PSL_GETIPL (PSL) == 0x0) &&                /*  at IPL 0? */
+            (fault_PC & 0x80000000))                    /* in system space? */
+            cpu_idle();                                 /* idle loop */
         break;
 
     case FFC:
@@ -3527,11 +3532,12 @@ static struct os_idle os_tab[] = {
     { "NETBSD", VAX_IDLE_BSDNEW },
     { "ULTRIX", VAX_IDLE_ULT },
     { "ULTRIXOLD", VAX_IDLE_ULTOLD },
+    { "ULTRIX-1.X", VAX_IDLE_ULT1X },
     { "OPENBSDOLD", VAX_IDLE_QUAD },
     { "OPENBSD", VAX_IDLE_BSDNEW },
     { "QUASIJARUS", VAX_IDLE_QUAD },
     { "32V", VAX_IDLE_QUAD },
-    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_QUAD|VAX_IDLE_BSDNEW },
+    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_ULT1X|VAX_IDLE_QUAD|VAX_IDLE_BSDNEW },
     { NULL, 0 }
     };
 
