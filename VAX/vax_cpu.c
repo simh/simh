@@ -2544,7 +2544,8 @@ for ( ;; ) {
         if ((cc == CC_Z) &&                             /* No set bits found? */
             (cpu_idle_mask & VAX_IDLE_ULT1X) &&         /* running Ultrix 1.X" */
             (PSL_GETIPL (PSL) == 0x0) &&                /*  at IPL 0? */
-            (fault_PC & 0x80000000))                    /* in system space? */
+            (fault_PC & 0x80000000) &&                  /*  in system space? */
+            ((fault_PC & 0x7fffffff) < 0x3000))         /*  in low system space? */
             cpu_idle();                                 /* idle loop */
         break;
 
