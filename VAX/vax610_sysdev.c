@@ -497,8 +497,7 @@ return cc;
 
 int32 con_halt (int32 code, int32 cc)
 {
-if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
-    (vax610_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
+if ((vax610_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
     (reset_all (0) != SCPE_OK) ||                       /* reset the world */
     (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
     ABORT (STOP_BOOT);                                  /* any error? */
