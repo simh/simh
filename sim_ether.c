@@ -1651,15 +1651,17 @@ while (dev->handle) {
     if (status < 0) {
       ++dev->receive_packet_errors;
       _eth_error (dev, "_eth_reader");
+      if (dev->handle) { /* Still attached? */
 #if defined (_WIN32)
-      hWait = (dev->eth_api == ETH_API_PCAP) ? pcap_getevent ((pcap_t*)dev->handle) : NULL;
+        hWait = (dev->eth_api == ETH_API_PCAP) ? pcap_getevent ((pcap_t*)dev->handle) : NULL;
 #endif
-      if (do_select) {
-        select_fd = dev->fd_handle;
+        if (do_select) {
+          select_fd = dev->fd_handle;
 #if !defined (_WIN32) && defined(HAVE_PCAP_NETWORK)
-        if (dev->eth_api == ETH_API_PCAP)
-          select_fd = pcap_get_selectable_fd((pcap_t *)dev->handle);
+          if (dev->eth_api == ETH_API_PCAP)
+            select_fd = pcap_get_selectable_fd((pcap_t *)dev->handle);
 #endif
+          }
         }
       }
     }
