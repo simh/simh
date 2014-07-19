@@ -10,6 +10,7 @@
 #   AIX
 #   Windows (MinGW & cygwin)
 #   Linux x86 targeting Android (using agcc script)
+#   Haiku x86 (with gcc4)
 #
 # Android targeted builds should invoke GNU make with GCC=agcc on
 # the command line.
@@ -207,25 +208,33 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
                 OS_LDFLAGS += -L/opt/freeware/lib
               endif
             else
-              ifeq (,$(findstring NetBSD,$(OSTYPE)))
-                ifneq (no ldconfig,$(findstring no ldconfig,$(shell which ldconfig 2>&1)))
-                  LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
-                endif
-                ifneq (,$(LDSEARCH))
-                  LIBPATH := $(LDSEARCH)
-                else
-                  ifeq (,$(strip $(LPATH)))
-                    $(info *** Warning ***)
-                    $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
-                    $(info *** Warning *** determined.  This should be resolved before you can expect)
-                    $(info *** Warning *** to have fully working simulators.)
-                    $(info *** Warning ***)
-                    $(info *** Warning *** You can specify your library paths via the LPATH environment)
-                    $(info *** Warning *** variable.)
-                    $(info *** Warning ***)
+              ifneq (,$(findstring Haiku,$(OSTYPE)))
+                HAIKU_ARCH=$(shell getarch)
+                INCPATH := $(shell findpaths -e -a $(HAIKU_ARCH) B_FIND_PATH_HEADERS_DIRECTORY)
+                INCPATH += $(shell findpaths -e B_FIND_PATH_HEADERS_DIRECTORY posix)
+                LIBPATH := $(shell findpaths -e -a $(HAIKU_ARCH) B_FIND_PATH_DEVELOP_LIB_DIRECTORY)
+                OS_LDFLAGS += -lnetwork
+              else
+                ifeq (,$(findstring NetBSD,$(OSTYPE)))
+                  ifneq (no ldconfig,$(findstring no ldconfig,$(shell which ldconfig 2>&1)))
+                    LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+                  endif
+                  ifneq (,$(LDSEARCH))
+                    LIBPATH := $(LDSEARCH)
                   else
-                    LIBPATH = $(subst :, ,$(LPATH))
-                    OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
+                    ifeq (,$(strip $(LPATH)))
+                      $(info *** Warning ***)
+                      $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
+                      $(info *** Warning *** determined.  This should be resolved before you can expect)
+                      $(info *** Warning *** to have fully working simulators.)
+                      $(info *** Warning ***)
+                      $(info *** Warning *** You can specify your library paths via the LPATH environment)
+                      $(info *** Warning *** variable.)
+                      $(info *** Warning ***)
+                    else
+                      LIBPATH = $(subst :, ,$(LPATH))
+                      OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
+                    endif
                   endif
                 endif
               endif
@@ -298,6 +307,14 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         endif
         OS_LDFLAGS += -lpthread
         $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
+      else
+        ifneq (,$(findstring Haiku,$(OSTYPE)))
+          OS_CCDEFS += -DUSE_READER_THREAD
+          ifeq (,$(NOASYNCH))
+            OS_CCDEFS += -DSIM_ASYNCH_IO 
+          endif
+          $(info using libpthread: $(call find_include,pthread))
+        endif
       endif
       LIBEXT = $(LIBEXTSAVE)        
     endif
@@ -308,7 +325,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_LDFLAGS += -ldl
       $(info using libdl: $(call find_lib,dl) $(call find_include,dlfcn))
     else
-      ifneq (,$(findstring BSD,$(OSTYPE))$(findstring AIX,$(OSTYPE)))
+      ifneq (,$(findstring BSD,$(OSTYPE))$(findstring AIX,$(OSTYPE))$(findstring Haiku,$(OSTYPE)))
         OS_CCDEFS += -DHAVE_DLOPEN=so
         $(info using libdl: $(call find_include,dlfcn))
       else
