@@ -775,7 +775,8 @@ if (fl == -1)
 sta = fcntl (sock, F_SETFL, fl | O_NONBLOCK);           /* set nonblock */
 if (sta == -1)
     return SOCKET_ERROR;
-#if !defined (macintosh) && !defined (__EMX__)          /* Unix only */
+#if !defined (macintosh) && !defined (__EMX__) && \
+    !defined (__HAIKU__)                                /* Unix only */
 sta = fcntl (sock, F_SETOWN, getpid());                 /* set ownership */
 if (sta == -1)
     return SOCKET_ERROR;
@@ -1029,7 +1030,8 @@ int32 sta, err;
 #if defined (macintosh) || defined (__linux) || defined (__linux__) || \
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
-    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED))
+    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED)) || \
+    defined (__HAIKU__)
 socklen_t size;
 #elif defined (_WIN32) || defined (__EMX__) || \
      (defined (__ALPHA) && defined (__unix__)) || \
@@ -1087,7 +1089,8 @@ struct sockaddr_storage peername;
 #if defined (macintosh) || defined (__linux) || defined (__linux__) || \
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
-    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED))
+    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED)) || \
+    defined (__HAIKU__)
 socklen_t peernamesize = (socklen_t)sizeof(peername);
 #elif defined (_WIN32) || defined (__EMX__) || \
      (defined (__ALPHA) && defined (__unix__)) || \
@@ -1121,7 +1124,8 @@ static int32 _sim_getaddrname (struct sockaddr *addr, size_t addrsize, char *hos
 #if defined (macintosh) || defined (__linux) || defined (__linux__) || \
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
-    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED))
+    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED)) || \
+    defined (__HAIKU__)
 socklen_t size = (socklen_t)addrsize;
 #elif defined (_WIN32) || defined (__EMX__) || \
      (defined (__ALPHA) && defined (__unix__)) || \
@@ -1154,7 +1158,8 @@ struct sockaddr_storage sockname, peername;
 #if defined (macintosh) || defined (__linux) || defined (__linux__) || \
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
-    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED))
+    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED)) || \
+    defined (__HAIKU__)
 socklen_t socknamesize = (socklen_t)sizeof(sockname);
 socklen_t peernamesize = (socklen_t)sizeof(peername);
 #elif defined (_WIN32) || defined (__EMX__) || \
