@@ -126,6 +126,10 @@
 #include "sim_serial.h"
 #include "sim_timer.h"
 #include <ctype.h>
+ 
+#ifdef __HAIKU__
+#define nice(n) ({})
+#endif
 
 /* Forward Declaraations of Platform specific routines */
 
