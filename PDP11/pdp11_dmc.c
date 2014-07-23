@@ -879,16 +879,17 @@ char *controller_queue_state(CTLR *controller)
 {
 static char buf[512];
 
-sprintf (buf, "(ACKW:%d,XMT:%d,RCV:%d,CMPL:%d,FREE:%d) TOT:%d", controller->ack_wait_queue->count, 
-                                                         controller->xmt_queue->count, 
-                                                         controller->rcv_queue->count, 
-                                                         controller->completion_queue->count, 
-                                                         controller->free_queue->count,
-                                                         controller->ack_wait_queue->count+
-                                                         controller->xmt_queue->count+
-                                                         controller->rcv_queue->count+ 
-                                                         controller->completion_queue->count+
-                                                         controller->free_queue->count);
+sprintf (buf, "(ACKW:%d,XMT:%d,RCV:%d,CMPL:%d,FREE:%d) TOT:%d", 
+                    (int)controller->ack_wait_queue->count, 
+                    (int)controller->xmt_queue->count, 
+                    (int)controller->rcv_queue->count, 
+                    (int)controller->completion_queue->count, 
+                    (int)controller->free_queue->count,
+                    (int)controller->ack_wait_queue->count+
+                    (int)controller->xmt_queue->count+
+                    (int)controller->rcv_queue->count+ 
+                    (int)controller->completion_queue->count+
+                    (int)controller->free_queue->count);
 return buf;
 }
 
@@ -3440,8 +3441,9 @@ for (table=DDCMP_TABLE; table->Conditions[0] != NULL; ++table) {
             }
         }
     }
-if (matched)
+if (matched) {
     sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - queues: %s\n", controller->device->name, controller->index, EventMask, controller_queue_state(controller));
+    }
 controller->link.Scanning = FALSE;
 controller->link.ScanningEvents &= ~EventMask;
 if (controller->link.RecurseScan) {
