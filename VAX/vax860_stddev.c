@@ -55,8 +55,8 @@
 #define TXCS_V_TEN      16                              /* Transmitter en */
 #define TXCS_M_TEN      0xF
 #define TXCS_TEN        (TXCS_M_TEN << TXCS_V_TEN)
-#define TXCS_RD         (CSR_DONE + CSR_IE + TXCS_TEN + TXCS_IDC)  /* terminal output */
-#define TXCS_WR         (CSR_IE + TXCS_TEN)
+#define TXCS_RD         (CSR_DONE + CSR_IE + TXCS_TEN + TXCS_IDC + TXCS_WMN)  /* Readable bits */
+#define TXCS_WR         (CSR_IE)		        /* Writeable bits */
 #define ID_CT           0                               /* console terminal */
 #define ID_RS           1                               /* remote services */
 #define ID_EMM          2                               /* environmental monitoring module */
@@ -493,13 +493,16 @@ return (tto_csr & TXCS_RD);
 
 void txcs_wr (int32 data)
 {
-tto_csr = (tto_csr & ~TXCS_WR) | (data & TXCS_WR);
-if (data & TXCS_WMN)                                    /* updating mask? */
-    tto_update_int ();
-if ((data & CSR_IE) == 0)
+tto_csr = (tto_csr & ~TXCS_WR) | (data & TXCS_WR);          /* Write new bits. */
+if (data & TXCS_WMN) {                                      /* Updating enable mask? */
+    tto_csr = (tto_csr & ~TXCS_TEN) | (data & TXCS_TEN);    /* Yes. Modify enable mask. */
+    tto_update_int ();                                      /* This can change interrupt requests... */
+    }
+if ((tto_csr & CSR_IE) == 0)
     tto_int = 0;
-else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-    tto_int = 1;
+else
+    if ((tto_csr & CSR_DONE) == CSR_DONE)
+        tto_int = 1;
 return;
 }
 
