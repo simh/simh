@@ -73,6 +73,7 @@
 #include "pdp10_defs.h"
 #include <setjmp.h>
 #include <assert.h>
+#include <ctype.h>
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
