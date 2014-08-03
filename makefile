@@ -77,7 +77,7 @@ else
 endif
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq ($(GCC),)
-    ifneq (has-gcc,$(shell if which -s gcc; then echo has-gcc; fi))
+    ifeq (,$(shell which gcc 2>/dev/null))
       $(info *** Warning *** Using local cc since gcc isn't available locally.)
       $(info *** Warning *** You may need to install gcc to build working simulators.)
       GCC = cc
