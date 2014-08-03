@@ -77,7 +77,13 @@ else
 endif
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq ($(GCC),)
-    GCC = gcc
+    ifneq (has-gcc,$(shell if which -s gcc; then echo has-gcc; fi))
+      $(info *** Warning *** Using local cc since gcc isn't available locally.)
+      $(info *** Warning *** You may need to install gcc to build working simulators.)
+      GCC = cc
+    else
+      GCC = gcc
+    endif
   endif
   OSTYPE = $(shell uname)
   # OSNAME is used in messages to indicate the source of libpcap components
