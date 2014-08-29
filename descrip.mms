@@ -1846,7 +1846,7 @@ $(BIN_DIR)SSEM-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(SSEM_LIB)
         $! Building The $(BIN_DIR)SSEM-$(ARCH).EXE Simulator.
         $!
         $ $(CC)$(SSEM_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SDS-$(ARCH).EXE -
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SSEM-$(ARCH).EXE -
                  $(BLD_DIR)SCP.OBJ,$(SDS_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
