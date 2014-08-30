@@ -484,7 +484,10 @@ nonop = inst & 077777;
 if (sw & SWMASK ('A')) {                                /* SDS internal ASCII? */
     for (i = 16; i >= 0; i -= 8) {
         ch = (inst >> i) & 0377;                        /* map printable chars     */
-        ch = ch <= 0137 ? ch += 040 : '.';              /* from int. to ext. ASCII */
+        if (ch <= 0137)
+             ch += 040;                                 /* from int. to ext. ASCII */
+        else
+             ch = '.';                                  /* or indicate not displayable */
         fprintf (of, "%c", ch);
         }
     return SCPE_OK;
