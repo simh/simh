@@ -3821,20 +3821,25 @@ while (sects) {
                               NULL,
                               BlockOffset))
             goto Fatal_IO_Error;
-        /* Write just the aligned sector which contains the updated BAT entry */
-        BATUpdateBufferAddress = (uint8 *)hVHD->BAT - (size_t)NtoHll(hVHD->Dynamic.TableOffset) +
-            (size_t)((((size_t)&hVHD->BAT[BlockNumber+1]) - (size_t)hVHD->BAT + (size_t)NtoHll(hVHD->Dynamic.TableOffset)) & ~(VHD_DATA_BLOCK_ALIGNMENT-1));
+        /* Since a large VHD can have a pretty large BAT, and we've only changed one longword bat entry
+           in the current BAT, we write just the aligned sector which contains the updated BAT entry */
+        BATUpdateBufferAddress = (uint8 *)hVHD->BAT - (size_t)NtoHll(hVHD->Dynamic.TableOffset) + 
+            (size_t)((((size_t)&hVHD->BAT[BlockNumber]) - (size_t)hVHD->BAT + (size_t)NtoHll(hVHD->Dynamic.TableOffset)) & ~(VHD_DATA_BLOCK_ALIGNMENT-1));
+        /* If the starting of the BAT isn't on a VHD_DATA_BLOCK_ALIGNMENT boundary and we've just updated 
+           a BAT entry early in the array, the buffer computed address might be before the start of the
+           BAT table.  If so, only write the BAT data needed */
         if (BATUpdateBufferAddress < (uint8 *)hVHD->BAT) {
             BATUpdateBufferAddress = (uint8 *)hVHD->BAT;
-            BATUpdateBufferSize = (((((size_t)&hVHD->BAT[BlockNumber+1]) - (size_t)hVHD->BAT) + 511)/512)*512;
+            BATUpdateBufferSize = (uint32)((((size_t)&hVHD->BAT[BlockNumber]) - (size_t)hVHD->BAT) + 512) & ~511;
             BATUpdateStorageAddress = NtoHll(hVHD->Dynamic.TableOffset);
             }
         else {
             BATUpdateBufferSize = VHD_DATA_BLOCK_ALIGNMENT;
             BATUpdateStorageAddress = NtoHll(hVHD->Dynamic.TableOffset) + BATUpdateBufferAddress - ((uint8 *)hVHD->BAT);
             }
+        /* If the total BAT is smaller than one VHD_DATA_BLOCK_ALIGNMENT, then be sure to only write out the BAT data */
         if ((size_t)(BATUpdateBufferAddress - (uint8 *)hVHD->BAT + BATUpdateBufferSize) > 512*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries) + 511)/512))
-            BATUpdateBufferSize = 512*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries) + 511)/512) - (BATUpdateBufferAddress - ((uint8 *)hVHD->BAT));
+            BATUpdateBufferSize = (uint32)(512*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries) + 511)/512) - (BATUpdateBufferAddress - ((uint8 *)hVHD->BAT)));
         if (WriteFilePosition(hVHD->File,
                               BATUpdateBufferAddress,
                               BATUpdateBufferSize,
