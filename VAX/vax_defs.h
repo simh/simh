@@ -724,6 +724,7 @@ enum opcodes {
 #define VAX_IDLE_ULT1X      0x08    /* Ultrix 1.x */
 #define VAX_IDLE_QUAD       0x10
 #define VAX_IDLE_BSDNEW     0x20
+#define VAX_IDLE_SYSV       0x40
 extern uint32 cpu_idle_mask;                            /* idle mask */
 void cpu_idle (void);
 
