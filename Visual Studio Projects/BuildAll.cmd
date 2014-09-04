@@ -72,7 +72,7 @@ if not exist ..\.git\hooks\post-commit copy git-hooks\post* ..\.git\hooks\ > NUL
 pushd ..
 git checkout -q master
 git fetch -q origin master
-git log -1 --pretty="%H" >.git-commit-id
+git log -1 "--pretty=%%H" >.git-commit-id
 popd
 for /F %%i in (..\.git-commit-id) do set GIT_COMMIT_ID=%%i
 for /F "tokens=3 delims=/" %%i in ("%DATE%") do set D_YYYY=%%i
