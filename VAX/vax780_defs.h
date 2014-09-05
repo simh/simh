@@ -140,9 +140,9 @@
 
 #define ML_PXBR_TEST(r) if (((((uint32)(r)) & 0x80000000) == 0) || \
                             ((((uint32)(r)) & 0x40000003) != 0)) RSVD_OPND_FAULT
-#define ML_SBR_TEST(r)  if ((((uint32)(r)) & 0xC0000003) != 0) RSVD_OPND_FAULT
+#define ML_SBR_TEST(r)  if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
-/* 780 microcode patch 78 - only test xCBB<1:0> = 0 */
+/* 780 microcode patch 78 - test xCBB<1:0> = 0 */
 
 #define ML_PA_TEST(r)   if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 

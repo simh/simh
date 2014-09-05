@@ -100,21 +100,21 @@
 
 /* 780 microcode patch 37 - only test LR<23:0> for appropriate length */
 
-#define ML_LR_TEST(r)   if ((uint32)((r) & 0xFFFFFF) > 0x200000) RSVD_OPND_FAULT
+#define ML_LR_TEST(r)   if (((uint32)((r) & 0xFFFFFF)) > 0x200000) RSVD_OPND_FAULT
 
-/* 780 microcode patch 38 - only test PxBR<31>=1 and xBR<1:0> = 0 */
+/* 780 microcode patch 38 - only test PxBR<31>=1, PxBR<30> = 0, and xBR<1:0> = 0 */
 
-#define ML_PXBR_TEST(r) if ((((r) & 0x80000000) == 0) || \
-                            ((r) & 0x00000003)) RSVD_OPND_FAULT
-#define ML_SBR_TEST(r)  if ((r) & 0x00000003) RSVD_OPND_FAULT
+#define ML_PXBR_TEST(r) if (((((uint32)(r)) & 0x80000000) == 0) || \
+                            ((((uint32)(r)) & 0x40000003) != 0)) RSVD_OPND_FAULT
+#define ML_SBR_TEST(r)  if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
-/* 780 microcode patch 78 - only test xCBB<1:0> = 0 */
+/* 780 microcode patch 78 - test xCBB<1:0> = 0 */
 
-#define ML_PA_TEST(r)   if ((r) & 0x00000003) RSVD_OPND_FAULT
+#define ML_PA_TEST(r)   if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
 #define LP_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
-#define LP_MBZ84_TEST(r) if ((r) & 0xF8C00000) RSVD_OPND_FAULT
-#define LP_MBZ92_TEST(r) if ((r) & 0x7FC00000) RSVD_OPND_FAULT
+#define LP_MBZ84_TEST(r) if ((((uint32)(r)) & 0xF8C00000) != 0) RSVD_OPND_FAULT
+#define LP_MBZ92_TEST(r) if ((((uint32)(r)) & 0x7FC00000) != 0) RSVD_OPND_FAULT
 
 /* Memory */
 
