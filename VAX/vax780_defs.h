@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2013, Robert M Supnik
+   Copyright (c) 2004-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Sep-14    RMS     Fixed SBR test (found by Mark Pizzolato)
    29-Nov-13    RMS     Added system-specific unaligned routines
    12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
    05-Nov-11    RMS     Added VEC_QMODE definition
@@ -133,9 +134,9 @@
 
 #define ML_PXBR_TEST(r) if (((((uint32)(r)) & 0x80000000) == 0) || \
                             ((((uint32)(r)) & 0x40000003) != 0)) RSVD_OPND_FAULT
-#define ML_SBR_TEST(r)  if ((((uint32)(r)) & 0xC0000003) != 0) RSVD_OPND_FAULT
+#define ML_SBR_TEST(r)  if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
-/* 780 microcode patch 78 - only test xCBB<1:0> = 0 */
+/* 780 microcode patch 78 - test xCBB<1:0> = 0 */
 
 #define ML_PA_TEST(r)   if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
