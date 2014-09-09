@@ -103,7 +103,7 @@
     X = Not used
     Sector number = binary of the sector number currently under the
                                     head, 0-31.
-    T = Sector True, is a 1 when the sector is positioned to read or
+    T = Sector True, is a 0 when the sector is positioned to read or
             write.
 
 	----------------------------------------------------------
@@ -111,9 +111,23 @@
 	5/22/2014 - Updated by Mike Douglas to support the Altair Minidisk.
 				This disk uses 35 (vs 70) tracks of 16 (vs 32) sectors 
 				of 137 bytes each.
+
 	6/30/2014 - When the disk is an Altair Minidisk, load the head as 
 				soon as the disk is enabled, and ignore the head
 				unload command (both like the real hardware). 
+
+	7/13/2014 - This code previously returned zero when the sector position
+				register was read with the head not loaded. This zero looks
+				like an asserted "Sector True" flag for sector zero. The real
+				hardware returns 0xff in this case. The same problem occurs
+				when the drive is deselected - the sector position register
+				returned zero instead of 0xff. These have been corrected.
+
+	7/13/2014	Some software for the Altair skips a sector by verifying
+				that "Sector True" goes false. Previously, this code
+				returned "Sector True" every time the sector register 
+				was read. Now the flag alternates true and false on
+				subsequent reads of the sector register. 
 */
 
 #include "altairz80_defs.h"
@@ -187,6 +201,7 @@ static int32 warnDSK10                      = 0;
 static int32 warnDSK11                      = 0;
 static int32 warnDSK12                      = 0;
 static int8 dskbuf[DSK_SECTSIZE];                       /* data Buffer                                  */
+static int32 sector_true					= 0;		/* sector true flag for sector register read    */
 
 const static int32 alt_bootrom_dsk[BOOTROM_SIZE_DSK] = {  // boot ROM for mini disk support
     0x21, 0x13, 0xff, 0x11, 0x00, 0x4c, 0x0e, 0xe3, /* ff00-ff07 */
@@ -556,7 +571,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
                       " Attempt of %s 0x09 on unattached disk - ignored.\n",
                       current_disk, PCX, selectInOut(io));
         }
-        return 0;               /* no drive selected - can do nothing */
+        return 0xff;               /* no drive selected - can do nothing */
     }
 
     /* now current_disk < NUM_OF_DSK */
@@ -566,20 +581,23 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
             in9_message = TRUE;
             sim_debug(SECTOR_STUCK_MSG, &dsk_dev,
                       "DSK%i: " ADDRESS_FORMAT " Looping on sector find.\n",
-                   current_disk, PCX);
+                      current_disk, PCX);
         }
         sim_debug(IN_MSG, &dsk_dev, "DSK%i: " ADDRESS_FORMAT " IN 0x09\n", current_disk, PCX);
         if (dirty)  /* implies that current_disk < NUM_OF_DSK */
             writebuf();
         if (current_flag[current_disk] & 0x04) {    /* head loaded? */
-            current_sector[current_disk]++;
-            if (current_sector[current_disk] >= sectors_per_track[current_disk])
-                current_sector[current_disk] = 0;
-            current_byte[current_disk] = 0xff;
-            return (((current_sector[current_disk] << 1) & 0x3e)    /* return 'sector true' bit = 0 (true) */
-                    | 0xc0);                                            /* set on 'unused' bits */
+			sector_true ^= 1;						/* return sector true every other entry */
+			if (sector_true == 0) {					/* true when zero */
+                current_sector[current_disk]++;
+                if (current_sector[current_disk] >= sectors_per_track[current_disk])
+                    current_sector[current_disk] = 0;
+                current_byte[current_disk] = 0xff;
+			}
+            return (((current_sector[current_disk] << 1) & 0x3e)    /* return sector number and...) */
+                    | 0xc0 | sector_true);                          /* sector true, and set 'unused' bits */
         } else
-            return 0;                                               /* head not loaded - return 0 */
+            return 0xff;                                            /* head not loaded - return 0xff */
     }
 
     in9_count = 0;

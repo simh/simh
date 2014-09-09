@@ -72,7 +72,7 @@ uint8 *URLContents(const char *URL, uint32 *length) {
     char *result;
     strncat(str, URL, RESULT_BUFFER_LENGTH - strlen(RESULT_LEAD_IN) - strlen(RESULT_LEAD_OUT) - 1);
     strcat(str, RESULT_LEAD_OUT);
-    result = (char*)malloc(strlen(str));
+    result = (char*)malloc(strlen(str) + 1);
     strcpy(result, str);
     *length = strlen(str);
     return (uint8*)result;
