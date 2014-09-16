@@ -27,6 +27,8 @@
    11-Jun-2013  MB      First version
 */
 
+#if defined(USE_SIM_VIDEO)
+
 #include "sim_video.h"
 
 t_bool vid_active = FALSE;
@@ -1685,3 +1687,5 @@ return SCPE_OK;
 
 
 #endif
+
+#endif /* USE_SIM_VIDEO */

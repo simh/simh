@@ -221,7 +221,9 @@
 #include "sim_tape.h"
 #include "sim_ether.h"
 #include "sim_serial.h"
+#if defined (USE_SIM_VIDEO)
 #include "sim_video.h"
+#endif
 #include "sim_sock.h"
 #include <signal.h>
 #include <ctype.h>

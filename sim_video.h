@@ -30,6 +30,10 @@
 #ifndef _SIM_VIDEO_H_
 #define _SIM_VIDEO_H_     0
 
+#if !defined(USE_SIM_VIDEO)
+#error This simulator MUST be compiled with USE_SIM_VIDEO defined
+#else
+
 #include "sim_defs.h"
 
 #define SIM_KEYPRESS_DOWN      0                        /* key states */
@@ -190,5 +194,7 @@ extern t_bool vid_mouse_b3;                             /* mouse button 3 state 
 #define SIM_VID_DBG_MOUSE   0x01000000
 #define SIM_VID_DBG_KEY     0x02000000
 #define SIM_VID_DBG_VIDEO   0x04000000
+
+#endif /* USE_SIM_VIDEO */
 
 #endif
