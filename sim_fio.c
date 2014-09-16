@@ -362,3 +362,22 @@ int sim_fseek (FILE *st, t_addr offset, int whence)
 {
 return sim_fseeko (st, (t_offset)offset, whence);
 }
+
+int sim_set_fsize (FILE *fptr, t_addr size)
+{
+return sim_set_fsizeo (fptr, (t_offset)size);
+}
+
+#if defined(_WIN32)
+#include <io.h>
+int sim_set_fsizeo (FILE *fptr, t_offset size)
+{
+return _chsize_s(_fileno(fptr), (__int64)size);
+}
+#else /* !defined(_WIN32) */
+#include <unistd.h>
+int sim_set_fsizeo (FILE *fptr, t_offset size)
+{
+return ftruncate(fileno(fptr), (off_t)size);
+}
+#endif
