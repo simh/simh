@@ -1696,7 +1696,6 @@ else if (*argv[0]) {                                    /* sim name arg? */
     }
 
 stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag */
-
 while (stat != SCPE_EXIT) {                             /* in case exit */
     if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf))))   /* pending action? */
         printf ("%s%s\n", sim_prompt, cptr);            /* echo */
@@ -7906,7 +7905,7 @@ for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition
 void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate)
 {
-if (sim_deb && (dptr->dctrl & dbits)) {
+if (sim_deb && dptr && (dptr->dctrl & dbits)) {
     if (!debug_unterm)
         fprintf(sim_deb, "%s", sim_debug_prefix(dbits, dptr));                      /* print prefix if required */
     fprint_fields (sim_deb, (t_value)before, (t_value)after, bitdefs); /* print xlation, transition */
@@ -7965,7 +7964,17 @@ while (1) {                                         /* format passed string, arg
     break;
     }
 
-printf("%s", buf);
+if (sim_is_running) {
+    char *c, *remnant = buf;
+
+    while ((c = strchr(remnant, '\n'))) {
+        printf("%.*s\r\n", (int)(c-remnant), remnant);
+        remnant = c + 1;
+        }
+    printf("%s", remnant);
+    }
+else
+    printf("%s", buf);
 if (sim_log && (sim_log != stdout))
     fprintf (sim_log, "%s", buf);
 if (sim_deb && (sim_deb != stdout))
@@ -7986,7 +7995,7 @@ if (buf != stackbuf)
 
 void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...)
 {
-if (sim_deb && (dptr->dctrl & dbits)) {
+if (sim_deb && dptr && (dptr->dctrl & dbits)) {
 
     char stackbuf[STACKBUFSIZE];
     int32 bufsize = sizeof(stackbuf);
