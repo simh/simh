@@ -768,7 +768,7 @@ LDFLAGS := $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
 	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c sim_serial.c \
-	sim_video.c
+	sim_video.c sim_imd.c
 
 DISPLAYD = display
 ifeq ($(WIN32),)
@@ -1057,13 +1057,13 @@ ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
 	${ALTAIRZ80D}/s100_fif.c ${ALTAIRZ80D}/s100_mdriveh.c \
 	${ALTAIRZ80D}/s100_mdsad.c ${ALTAIRZ80D}/s100_selchan.c \
 	${ALTAIRZ80D}/s100_ss1.c ${ALTAIRZ80D}/s100_64fdc.c \
-	${ALTAIRZ80D}/s100_scp300f.c ${ALTAIRZ80D}/sim_imd.c \
+	${ALTAIRZ80D}/s100_scp300f.c \
 	${ALTAIRZ80D}/wd179x.c ${ALTAIRZ80D}/s100_hdc1001.c \
 	${ALTAIRZ80D}/s100_if3.c ${ALTAIRZ80D}/s100_adcs6.c \
 	${ALTAIRZ80D}/m68kcpu.c ${ALTAIRZ80D}/m68kdasm.c \
 	${ALTAIRZ80D}/m68kopac.c ${ALTAIRZ80D}/m68kopdm.c \
 	${ALTAIRZ80D}/m68kopnz.c ${ALTAIRZ80D}/m68kops.c ${ALTAIRZ80D}/m68ksim.c
-ALTAIRZ80_OPT = -I ${ALTAIRZ80D}
+ALTAIRZ80_OPT = -I ${ALTAIRZ80D} -DUSE_SIM_IMD
 
 
 GRID = GRI

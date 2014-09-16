@@ -42,7 +42,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="./;../;../AltairZ80/"
-				PreprocessorDefinitions="NO_INLINE;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
+				PreprocessorDefinitions="USE_SIM_IMD;NO_INLINE;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -121,7 +121,7 @@
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
 				AdditionalIncludeDirectories="./;../;../AltairZ80/"
-				PreprocessorDefinitions="NO_INLINE;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
+				PreprocessorDefinitions="USE_SIM_IMD;NO_INLINE;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -202,41 +202,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68kcpu.c"
-				>
-			</File>
-            
-			<File
-				RelativePath="..\AltairZ80\m68kdasm.c"
-				>
-			</File>
-            
-			<File
-				RelativePath="..\AltairZ80\m68kopac.c"
-				>
-			</File>
-            
-			<File
-				RelativePath="..\AltairZ80\m68kopdm.c"
-				>
-			</File>
-            
-			<File
-				RelativePath="..\AltairZ80\m68kopnz.c"
-				>
-			</File>
-            
-			<File
-				RelativePath="..\AltairZ80\m68kops.c"
-				>
-			</File>
-            
-			<File
-				RelativePath="..\AltairZ80\m68ksim.c"
-				>
-			</File>
-            
-			<File
 				RelativePath="..\AltairZ80\altairz80_net.c"
 				>
 			</File>
@@ -274,6 +239,34 @@
 			</File>
 			<File
 				RelativePath="..\AltairZ80\insnsd.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68kcpu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68kdasm.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68kopac.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68kopdm.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68kopnz.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68kops.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68ksim.c"
 				>
 			</File>
 			<File
@@ -357,7 +350,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\sim_imd.c"
+				RelativePath="..\sim_imd.c"
 				>
 			</File>
 			<File
@@ -419,6 +412,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_fio.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_imd.h"
 				>
 			</File>
 			<File

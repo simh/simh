@@ -301,6 +301,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
     sim_debug(myDisk->debugmask, myDisk->device, "Processed %d sectors\n", TotalSectorCount);
 
     for(i=0;i<myDisk->ntracks;i++) {
+        uint8 j;
         sim_debug(myDisk->verbosedebugmask, myDisk->device, "Track %02d: ", i);
         for(j=0;j<imd.nsects;j++) {
             sim_debug(myDisk->verbosedebugmask, myDisk->device, "0x%06x ", myDisk->track[i][0].sectorOffsetMap[j]);
