@@ -46,34 +46,10 @@
                     Cylinder maps in the .IMD image file (AGN)
 */
 
+#if defined(USE_SIM_IMD)
+
 #include "sim_defs.h"
 #include "sim_imd.h"
-#include <fcntl.h>
-#ifdef _WIN32
-#include <io.h>     /* for _chsize() */
-#else
-#include <unistd.h>
-#endif
-/* #define DBG_MSG */
-
-#ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
-#else
-#define DBG_PRINT(args)
-#endif
-
-/* use NLP for new line printing while the simulation is running */
-#if defined (__linux) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__)
-#define UNIX_PLATFORM 1
-#else
-#define UNIX_PLATFORM 0
-#endif
-
-#if UNIX_PLATFORM
-#define NLP "\r\n"
-#else
-#define NLP "\n"
-#endif
 
 #if (defined (__MWERKS__) && defined (macintosh)) || defined(__DECC)
 #define __FUNCTION__ __FILE__
@@ -87,12 +63,15 @@ static t_stat diskFormat(DISK_INFO *myDisk);
  * call, will be ready for sector read/write. The result is the corresponding
  * DISK_INFO or NULL if an error occurred.
  */
-DISK_INFO *diskOpen(FILE *fileref, uint32 isVerbose)
+DISK_INFO *diskOpenEx(FILE *fileref, uint32 isVerbose, DEVICE *device, uint32 debugmask, uint32 verbosedebugmask)
 {
     DISK_INFO *myDisk = NULL;
 
     myDisk = (DISK_INFO *)malloc(sizeof(DISK_INFO));
     myDisk->file = fileref;
+    myDisk->device = device;
+    myDisk->debugmask = debugmask;
+    myDisk->verbosedebugmask = verbosedebugmask;
 
     if (diskParse(myDisk, isVerbose) != SCPE_OK) {
         free(myDisk);
@@ -100,6 +79,11 @@ DISK_INFO *diskOpen(FILE *fileref, uint32 isVerbose)
     }
 
     return myDisk;
+}
+
+DISK_INFO *diskOpen(FILE *fileref, uint32 isVerbose)
+{
+    return diskOpenEx(fileref, isVerbose, NULL, 0, 0);
 }
 
 /* Scans the IMD file for the comment string, and returns it in comment buffer.
@@ -163,19 +147,19 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
     }
 
     if(isVerbose)
-        printf("%s" NLP, comment);
+        sim_printf("%s\n", comment);
 
     myDisk->nsides = 1;
     myDisk->ntracks = 0;
     myDisk->flags = 0;      /* Make sure all flags are clear. */
 
     if(feof(myDisk->file)) {
-        printf("SIM_IMD: Disk image is blank, it must be formatted." NLP);
+        sim_printf("SIM_IMD: Disk image is blank, it must be formatted.\n");
         return (SCPE_OPENERR);
     }
 
     do {
-        DBG_PRINT(("start of track %d at file offset %ld" NLP, myDisk->ntracks, ftell(myDisk->file)));
+        sim_debug(myDisk->debugmask, myDisk->device, "start of track %d at file offset %ld\n", myDisk->ntracks, ftell(myDisk->file));
 
         sim_fread(&imd, 1, 5, myDisk->file);
         if (feof(myDisk->file))
@@ -184,11 +168,11 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         sectorHeadwithFlags = imd.head; /*AGN save the head and flags */
         imd.head &= 1 ; /*AGN mask out flag bits to head 0 or 1 */
 
-        DBG_PRINT(("Track %d:" NLP, myDisk->ntracks));
-        DBG_PRINT(("\tMode=%d, Cyl=%d, Head=%d(%d), #sectors=%d, sectsize=%d (%d bytes)" NLP, imd.mode, imd.cyl, sectorHeadwithFlags, imd.head, imd.nsects, imd.sectsize, sectorSize));
+        sim_debug(myDisk->debugmask, myDisk->device, "Track %d:\n", myDisk->ntracks);
+        sim_debug(myDisk->debugmask, myDisk->device, "\tMode=%d, Cyl=%d, Head=%d(%d), #sectors=%d, sectsize=%d (%d bytes)\n", imd.mode, imd.cyl, sectorHeadwithFlags, imd.head, imd.nsects, imd.sectsize, sectorSize);
 
         if (!headerOk(imd)) {
-            printf("SIM_IMD: Corrupt header." NLP);
+            sim_printf("SIM_IMD: Corrupt header.\n");
             return (SCPE_OPENERR);
         }
 
@@ -201,29 +185,29 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         myDisk->track[imd.cyl][imd.head].sectsize = sectorSize;
 
         if (sim_fread(sectorMap, 1, imd.nsects, myDisk->file) != imd.nsects) {
-            printf("SIM_IMD: Corrupt file [Sector Map]." NLP);
+            sim_printf("SIM_IMD: Corrupt file [Sector Map].\n");
             return (SCPE_OPENERR);
         }
         myDisk->track[imd.cyl][imd.head].start_sector = imd.nsects;
-        DBG_PRINT(("\tSector Map: "));
+        sim_debug(myDisk->debugmask, myDisk->device, "\tSector Map: ");
         for(i=0;i<imd.nsects;i++) {
-            DBG_PRINT(("%d ", sectorMap[i]));
+            sim_debug(myDisk->debugmask, myDisk->device, "%d ", sectorMap[i]);
             if(sectorMap[i] < myDisk->track[imd.cyl][imd.head].start_sector) {
                 myDisk->track[imd.cyl][imd.head].start_sector = sectorMap[i];
             }
         }
-        DBG_PRINT((", Start Sector=%d", myDisk->track[imd.cyl][imd.head].start_sector));
+        sim_debug(myDisk->debugmask, myDisk->device, ", Start Sector=%d", myDisk->track[imd.cyl][imd.head].start_sector);
 
         if(sectorHeadwithFlags & IMD_FLAG_SECT_HEAD_MAP) {
             if (sim_fread(sectorHeadMap, 1, imd.nsects, myDisk->file) != imd.nsects) {
-                printf("SIM_IMD: Corrupt file [Sector Head Map]." NLP);
+                sim_printf("SIM_IMD: Corrupt file [Sector Head Map].\n");
                 return (SCPE_OPENERR);
             }
-            DBG_PRINT(("\tSector Head Map: "));
+            sim_debug(myDisk->debugmask, myDisk->device, "\tSector Head Map: ");
             for(i=0;i<imd.nsects;i++) {
-                DBG_PRINT(("%d ", sectorHeadMap[i]));
+                sim_debug(myDisk->debugmask, myDisk->device, "%d ", sectorHeadMap[i]);
             }
-            DBG_PRINT(("" NLP));
+            sim_debug(myDisk->debugmask, myDisk->device, "\n");
         } else {
             /* Default Head is physical head for each sector */
             for(i=0;i<imd.nsects;i++) {
@@ -233,14 +217,14 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
 
         if(sectorHeadwithFlags & IMD_FLAG_SECT_CYL_MAP) {
             if (sim_fread(sectorCylMap, 1, imd.nsects, myDisk->file) != imd.nsects) {
-                printf("SIM_IMD: Corrupt file [Sector Cyl Map]." NLP);
+                sim_printf("SIM_IMD: Corrupt file [Sector Cyl Map].\n");
                 return (SCPE_OPENERR);
             }
-            DBG_PRINT(("\tSector Cyl Map: "));
+            sim_debug(myDisk->debugmask, myDisk->device, "\tSector Cyl Map: ");
             for(i=0;i<imd.nsects;i++) {
-                DBG_PRINT(("%d ", sectorCylMap[i]));
+                sim_debug(myDisk->debugmask, myDisk->device, "%d ", sectorCylMap[i]);
             }
-            DBG_PRINT((NLP));
+            sim_debug(myDisk->debugmask, myDisk->device, "\n");
         } else {
             /* Default Cyl Map is physical cylinder for each sector */
             for(i=0;i<imd.nsects;i++) {
@@ -248,7 +232,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
             }
         }
 
-        DBG_PRINT((NLP "Sector data at offset 0x%08lx" NLP, ftell(myDisk->file)));
+        sim_debug(myDisk->debugmask, myDisk->device, "\nSector data at offset 0x%08lx\n", ftell(myDisk->file));
 
         /* Build the table with location 0 being the start sector. */
         start_sect = myDisk->track[imd.cyl][imd.head].start_sector;
@@ -256,7 +240,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         /* Now read each sector */
         for(i=0;i<imd.nsects;i++) {
             TotalSectorCount++;
-            DBG_PRINT(("Sector Phys: %d/Logical: %d: %d bytes: ", i, sectorMap[i], sectorSize));
+            sim_debug(myDisk->debugmask, myDisk->device, "Sector Phys: %d/Logical: %d: %d bytes: ", i, sectorMap[i], sectorSize);
             sectRecordType = fgetc(myDisk->file);
             /* AGN Logical head mapping */
             myDisk->track[imd.cyl][imd.head].logicalHead[i] = sectorHeadMap[i];
@@ -267,7 +251,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
                     if (sectorMap[i]-start_sect < MAX_SPT)
                         myDisk->track[imd.cyl][imd.head].sectorOffsetMap[sectorMap[i]-start_sect] = 0xBADBAD;
                     else {
-                        printf("SIM_IMD: ERROR: Illegal sector offset %d" NLP, sectorMap[i]-start_sect);
+                        sim_printf("SIM_IMD: ERROR: Illegal sector offset %d\n", sectorMap[i]-start_sect);
                         return (SCPE_OPENERR);
                     }
                     break;
@@ -275,13 +259,13 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
                 case SECT_RECORD_NORM_DAM:      /* Normal Data with deleted address mark */
                 case SECT_RECORD_NORM_ERR:      /* Normal Data with read error */
                 case SECT_RECORD_NORM_DAM_ERR:  /* Normal Data with deleted address mark with read error */
-/*                  DBG_PRINT(("Uncompressed Data" NLP)); */
+/*                  sim_debug(myDisk->debugmask, myDisk->device, "Uncompressed Data\n"); */
                     if (sectorMap[i]-start_sect < MAX_SPT) {
                         myDisk->track[imd.cyl][imd.head].sectorOffsetMap[sectorMap[i]-start_sect] = ftell(myDisk->file);
                         sim_fseek(myDisk->file, sectorSize, SEEK_CUR);
                     }
                     else {
-                        printf("SIM_IMD: ERROR: Illegal sector offset %d" NLP, sectorMap[i]-start_sect);
+                        sim_printf("SIM_IMD: ERROR: Illegal sector offset %d\n", sectorMap[i]-start_sect);
                         return (SCPE_OPENERR);
                     }
                     break;
@@ -292,41 +276,39 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
                     if (sectorMap[i]-start_sect < MAX_SPT) {
                         myDisk->track[imd.cyl][imd.head].sectorOffsetMap[sectorMap[i]-start_sect] = ftell(myDisk->file);
                         myDisk->flags |= FD_FLAG_WRITELOCK; /* Write-protect the disk if any sectors are compressed. */
-#ifdef VERBOSE_DEBUG
-                        DBG_PRINT(("Compressed Data = 0x%02x" NLP, fgetc(myDisk->file)));
-#else
-                        fgetc(myDisk->file);
-#endif
+                        if (1) {
+                            uint8 cdata = fgetc(myDisk->file);
+
+                            sim_debug(myDisk->debugmask, myDisk->device, "Compressed Data = 0x%02x\n", cdata);
+                            }
                     }
                     else {
-                        printf("SIM_IMD: ERROR: Illegal sector offset %d" NLP, sectorMap[i]-start_sect);
+                        sim_printf("SIM_IMD: ERROR: Illegal sector offset %d\n", sectorMap[i]-start_sect);
                         return (SCPE_OPENERR);
                     }
                     break;
                 default:
-                    printf("SIM_IMD: ERROR: unrecognized sector record type %d" NLP, sectRecordType);
+                    sim_printf("SIM_IMD: ERROR: unrecognized sector record type %d\n", sectRecordType);
                     return (SCPE_OPENERR);
                     break;
             }
-            DBG_PRINT((NLP));
+            sim_debug(myDisk->debugmask, myDisk->device, "\n");
         }
 
         myDisk->ntracks++;
     } while (!feof(myDisk->file));
 
-    DBG_PRINT(("Processed %d sectors" NLP, TotalSectorCount));
+    sim_debug(myDisk->debugmask, myDisk->device, "Processed %d sectors\n", TotalSectorCount);
 
-#ifdef VERBOSE_DEBUG
     for(i=0;i<myDisk->ntracks;i++) {
-        DBG_PRINT(("Track %02d: ", i));
+        sim_debug(myDisk->verbosedebugmask, myDisk->device, "Track %02d: ", i);
         for(j=0;j<imd.nsects;j++) {
-            DBG_PRINT(("0x%06x ", myDisk->track[i][0].sectorOffsetMap[j]));
+            sim_debug(myDisk->verbosedebugmask, myDisk->device, "0x%06x ", myDisk->track[i][0].sectorOffsetMap[j]);
         }
-        DBG_PRINT((NLP));
+        sim_debug(myDisk->verbosedebugmask, myDisk->device, "\n");
     }
-#endif
     if(myDisk->flags & FD_FLAG_WRITELOCK) {
-        printf("Disk write-protected because the image contains compressed sectors. Use IMDU to uncompress." NLP);
+        sim_printf("Disk write-protected because the image contains compressed sectors. Use IMDU to uncompress.\n");
     }
 
     return SCPE_OK;
@@ -370,7 +352,7 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
     }
 
     if(sim_fsize(fileref) != 0) {
-        printf("SIM_IMD: Disk image already has data, do you want to overwrite it? ");
+        sim_printf("SIM_IMD: Disk image already has data, do you want to overwrite it? ");
         answer = getchar();
 
         if((answer != 'y') && (answer != 'Y')) {
@@ -379,15 +361,15 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
     }
 
     if((curptr = comment = calloc(1, MAX_COMMENT_LEN)) == 0) {
-        printf("Memory allocation failure.\n");
+        sim_printf("Memory allocation failure.\n");
         return (SCPE_MEM);
     }
 
-    printf("SIM_IMD: Enter a comment for this disk.\n"
-           "SIM_IMD: Terminate with a '.' on an otherwise blank line.\n");
+    sim_printf("SIM_IMD: Enter a comment for this disk.\n"
+               "SIM_IMD: Terminate with a '.' on an otherwise blank line.\n");
     remaining = MAX_COMMENT_LEN;
     do {
-        printf("IMD> ");
+        sim_printf("IMD> ");
         result = fgets(curptr, remaining - 3, stdin);
         if ((result == NULL) || (strcmp(curptr, ".\n") == 0)) {
             remaining = 0;
@@ -407,14 +389,10 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
     rewind(fileref);
 
     /* Erase the contents of the IMD file in case we are overwriting an existing image. */
-#ifdef _WIN32 /* This might work under UNIX and/or VMS since this POSIX, but I haven't tried it. */
-    _chsize(_fileno(fileref), ftell (fileref));
-#else
-    if (ftruncate(fileno(fileref), ftell (fileref)) == -1) {
-        printf("SIM_IMD: Error overwriting disk image.\n");
+    if (sim_set_fsize(fileref, (t_addr)ftell (fileref)) == -1) {
+        sim_printf("SIM_IMD: Error overwriting disk image.\n");
         return(SCPE_OPENERR);
     }
-#endif
 
     fprintf(fileref, "IMD SIMH %s %s\n", __DATE__, __TIME__);
     fputs(comment, fileref);
@@ -425,12 +403,12 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
     fflush(fileref);
 
     if((myDisk = diskOpen(fileref, 0)) == NULL) {
-        printf("SIM_IMD: Error opening disk for format.\n");
+        sim_printf("SIM_IMD: Error opening disk for format.\n");
         return(SCPE_OPENERR);
     }
 
     if(diskFormat(myDisk) != SCPE_OK) {
-        printf("SIM_IMD: error formatting disk.\n");
+        sim_printf("SIM_IMD: error formatting disk.\n");
     }
 
     return diskClose(&myDisk);
@@ -443,18 +421,18 @@ static t_stat diskFormat(DISK_INFO *myDisk)
     uint8 sector_map[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26};
     uint32 flags;
 
-    printf("SIM_IMD: Formatting disk in IBM 3740 SS/SD Format.\n");
+    sim_printf("SIM_IMD: Formatting disk in IBM 3740 SS/SD Format.\n");
 
     for(i=0;i<77;i++) {
         if((trackWrite(myDisk, i, 0, 26, 128, sector_map, IMD_MODE_500K_FM, 0xE5, &flags)) != 0) {
-            printf("SIM_IMD: Error formatting track %d\n", i);
+            sim_printf("SIM_IMD: Error formatting track %d\n", i);
             return SCPE_IOERR;
         } else {
             putchar('.');
         }
     }
 
-    printf("\nSIM_IMD: Format Complete.\n");
+    sim_printf("\nSIM_IMD: Format Complete.\n");
 
     return SCPE_OK;
 }
@@ -491,7 +469,7 @@ t_stat sectSeek(DISK_INFO *myDisk,
     }
 
     if(myDisk->track[Cyl][Head].nsects == 0) {
-        DBG_PRINT(("%s: invalid track/head" NLP, __FUNCTION__));
+        sim_debug(myDisk->debugmask, myDisk->device, "%s: invalid track/head\n", __FUNCTION__);
         return(SCPE_IOERR);
     }
 
@@ -526,13 +504,13 @@ t_stat sectRead(DISK_INFO *myDisk,
     }
 
     if(Sector > myDisk->track[Cyl][Head].nsects) {
-        DBG_PRINT(("%s: invalid sector" NLP, __FUNCTION__));
+        sim_debug(myDisk->debugmask, myDisk->device, "%s: invalid sector\n", __FUNCTION__);
         *flags |= IMD_DISK_IO_ERROR_GENERAL;
         return(SCPE_IOERR);
     }
 
     if(buflen < myDisk->track[Cyl][Head].sectsize) {
-        printf("%s: Reading C:%d/H:%d/S:%d, len=%d: user buffer too short, need %d" NLP, __FUNCTION__, Cyl, Head, Sector, buflen, myDisk->track[Cyl][Head].sectsize);
+        sim_printf("%s: Reading C:%d/H:%d/S:%d, len=%d: user buffer too short, need %d\n", __FUNCTION__, Cyl, Head, Sector, buflen, myDisk->track[Cyl][Head].sectsize);
         *flags |= IMD_DISK_IO_ERROR_GENERAL;
         return(SCPE_IOERR);
     }
@@ -541,7 +519,7 @@ t_stat sectRead(DISK_INFO *myDisk,
 
     sectorFileOffset = myDisk->track[Cyl][Head].sectorOffsetMap[Sector-start_sect];
 
-    DBG_PRINT(("Reading C:%d/H:%d/S:%d, len=%d, offset=0x%08x" NLP, Cyl, Head, Sector, buflen, sectorFileOffset));
+    sim_debug(myDisk->debugmask, myDisk->device, "Reading C:%d/H:%d/S:%d, len=%d, offset=0x%08x\n", Cyl, Head, Sector, buflen, sectorFileOffset);
 
     sim_fseek(myDisk->file, sectorFileOffset-1, SEEK_SET);
 
@@ -556,9 +534,9 @@ t_stat sectRead(DISK_INFO *myDisk,
         case SECT_RECORD_NORM:          /* Normal Data */
         case SECT_RECORD_NORM_DAM:      /* Normal Data with deleted address mark */
 
-/*          DBG_PRINT(("Uncompressed Data" NLP)); */
+/*          sim_debug(myDisk->debugmask, myDisk->device, "Uncompressed Data\n"); */
             if (sim_fread(buf, 1, myDisk->track[Cyl][Head].sectsize, myDisk->file) != myDisk->track[Cyl][Head].sectsize) {
-                printf("SIM_IMD[%s]: sim_fread error for SECT_RECORD_NORM_DAM." NLP, __FUNCTION__);
+                sim_printf("SIM_IMD[%s]: sim_fread error for SECT_RECORD_NORM_DAM.\n", __FUNCTION__);
             }
             *readlen = myDisk->track[Cyl][Head].sectsize;
             break;
@@ -567,13 +545,13 @@ t_stat sectRead(DISK_INFO *myDisk,
             *flags |= IMD_DISK_IO_ERROR_CRC;
         case SECT_RECORD_NORM_COMP:     /* Compressed Normal Data */
         case SECT_RECORD_NORM_DAM_COMP: /* Compressed Normal Data with deleted address mark */
-/*          DBG_PRINT(("Compressed Data" NLP)); */
+/*          sim_debug(myDisk->debugmask, myDisk->device, "Compressed Data\n"); */
             memset(buf, fgetc(myDisk->file), myDisk->track[Cyl][Head].sectsize);
             *readlen = myDisk->track[Cyl][Head].sectsize;
             *flags |= IMD_DISK_IO_COMPRESSED;
             break;
         default:
-            printf("ERROR: unrecognized sector record type %d" NLP, sectRecordType);
+            sim_printf("ERROR: unrecognized sector record type %d\n", sectRecordType);
             break;
     }
 
@@ -606,7 +584,7 @@ t_stat sectWrite(DISK_INFO *myDisk,
     uint8 start_sect;
     *writelen = 0;
 
-    DBG_PRINT(("Writing C:%d/H:%d/S:%d, len=%d" NLP, Cyl, Head, Sector, buflen));
+    sim_debug(myDisk->debugmask, myDisk->device, "Writing C:%d/H:%d/S:%d, len=%d\n", Cyl, Head, Sector, buflen);
 
     /* Check parameters */
     if(myDisk == NULL) {
@@ -620,20 +598,20 @@ t_stat sectWrite(DISK_INFO *myDisk,
     }
 
     if(Sector > myDisk->track[Cyl][Head].nsects) {
-        DBG_PRINT(("%s: invalid sector" NLP, __FUNCTION__));
+        sim_debug(myDisk->debugmask, myDisk->device, "%s: invalid sector\n", __FUNCTION__);
         *flags = IMD_DISK_IO_ERROR_GENERAL;
         return(SCPE_IOERR);
     }
 
     if(myDisk->flags & FD_FLAG_WRITELOCK) {
-        printf("Disk write-protected because the image contains compressed sectors. Use IMDU to uncompress." NLP);
+        sim_printf("Disk write-protected because the image contains compressed sectors. Use IMDU to uncompress.\n");
         *flags = IMD_DISK_IO_ERROR_WPROT;
         return(SCPE_IOERR);
     }
 
     if(buflen < myDisk->track[Cyl][Head].sectsize) {
-        printf("%s: user buffer too short [buflen %i < sectsize %i]" NLP,
-            __FUNCTION__, buflen, myDisk->track[Cyl][Head].sectsize);
+        sim_printf("%s: user buffer too short [buflen %i < sectsize %i]\n",
+                   __FUNCTION__, buflen, myDisk->track[Cyl][Head].sectsize);
         *flags = IMD_DISK_IO_ERROR_GENERAL;
         return(SCPE_IOERR);
     }
@@ -707,14 +685,14 @@ t_stat trackWrite(DISK_INFO *myDisk,
     }
 
     if(myDisk->flags & FD_FLAG_WRITELOCK) {
-        printf("Disk write-protected, cannot format tracks." NLP);
+        sim_printf("Disk write-protected, cannot format tracks.\n");
         *flags |= IMD_DISK_IO_ERROR_WPROT;
         return(SCPE_IOERR);
     }
 
     fileref = myDisk->file;
 
-    DBG_PRINT(("Formatting C:%d/H:%d/N:%d, len=%d, Fill=0x%02x" NLP, Cyl, Head, numSectors, sectorLen, fillbyte));
+    sim_debug(myDisk->debugmask, myDisk->device, "Formatting C:%d/H:%d/N:%d, len=%d, Fill=0x%02x\n", Cyl, Head, numSectors, sectorLen, fillbyte);
 
     /* Truncate the IMD file when formatting Cyl 0, Head 0 */
     if((Cyl == 0) && (Head == 0))
@@ -723,15 +701,11 @@ t_stat trackWrite(DISK_INFO *myDisk,
         commentParse(myDisk, NULL, 0);
 
         /* Truncate the IMD file after the comment field. */
-#ifdef _WIN32 /* This might work under UNIX and/or VMS since this POSIX, but I haven't tried it. */
-        _chsize(_fileno(fileref), ftell (fileref));
-#else
-        if (ftruncate(fileno(fileref), ftell (fileref)) == -1) {
-            printf("Disk truncation failed." NLP);
+        if (sim_set_fsize(fileref, (t_addr)ftell (fileref)) == -1) {
+            sim_printf("Disk truncation failed.\n");
             *flags |= IMD_DISK_IO_ERROR_GENERAL;
             return(SCPE_IOERR);
         }
-#endif
         /* Flush and re-parse the IMD file. */
         fflush(fileref);
         diskParse(myDisk, 0);
@@ -739,7 +713,7 @@ t_stat trackWrite(DISK_INFO *myDisk,
 
     /* Check to make sure the Cyl / Head is not already formatted. */
     if(sectSeek(myDisk, Cyl, Head) == 0) {
-        printf("SIM_IMD: ERROR: Not Formatting C:%d/H:%d, track already exists." NLP, Cyl, Head);
+        sim_printf("SIM_IMD: ERROR: Not Formatting C:%d/H:%d, track already exists.\n", Cyl, Head);
         *flags |= IMD_DISK_IO_ERROR_GENERAL;
         return(SCPE_IOERR);
     }
@@ -786,17 +760,22 @@ t_stat trackWrite(DISK_INFO *myDisk,
 t_stat assignDiskType(UNIT *uptr) {
     t_stat result = SCPE_OK;
     char header[4];
+    t_offset pos = sim_ftell(uptr->fileref);
+
+    sim_fseek(uptr->fileref, (t_addr)0, SEEK_SET);
     if (fgets(header, 4, uptr->fileref) == NULL)
         uptr->u3 = IMAGE_TYPE_DSK;
     else if (strncmp(header, "IMD", 3) == 0)
         uptr->u3 = IMAGE_TYPE_IMD;
     else if(strncmp(header, "CPT", 3) == 0) {
-        printf("CPT images not yet supported.\n");
+        sim_printf("CPT images not yet supported.\n");
         uptr->u3 = IMAGE_TYPE_CPT;
         result = SCPE_OPENERR;
     }
     else
         uptr->u3 = IMAGE_TYPE_DSK;
+    sim_fseeko(uptr->fileref, pos, SEEK_SET);
     return result;
 }
 
+#endif /* USE_SIM_IMD */

@@ -41,6 +41,15 @@
  *                                                                       *
  *************************************************************************/
 
+#ifndef SIM_IMD_H_
+#define SIM_IMD_H_     0
+
+#if !defined(USE_SIM_IMD)
+#error This simulator must be compiled with USE_SIM_IMD defined
+#else
+
+#include "sim_defs.h"
+
 typedef struct {
     uint8 mode;
     uint8 cyl;
@@ -104,10 +113,14 @@ typedef struct {
     uint32 ntracks;
     uint8 nsides;
     uint8 flags;
+    DEVICE *device;
+    uint32 debugmask;
+    uint32 verbosedebugmask;
     TRACK_INFO track[MAX_CYL][MAX_HEAD];
 } DISK_INFO;
 
 extern DISK_INFO *diskOpen(FILE *fileref, uint32 isVerbose);
+extern DISK_INFO *diskOpenEx(FILE *fileref, uint32 isVerbose, DEVICE *device, uint32 debugmask, uint32 verbosedebugmask);
 extern t_stat diskClose(DISK_INFO **myDisk);
 extern t_stat diskCreate(FILE *fileref, char *ctlr_comment);
 extern uint32 imdGetSides(DISK_INFO *myDisk);
@@ -126,3 +139,7 @@ extern t_stat trackWrite(DISK_INFO *myDisk,
                uint8 fillbyte,
                uint32 *flags);
 extern t_stat assignDiskType(UNIT *uptr);
+
+#endif /* USE_SIM_IMD */
+
+#endif
