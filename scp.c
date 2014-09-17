@@ -8080,6 +8080,47 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
 return;
 }
 
+void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason)
+{
+
+if (sim_deb && (dptr->dctrl & reason)) {
+    sim_debug (reason, dptr, "%s %s %slen: %08X\n", sim_uname(uptr), txt, position, len);
+    if (data && len) {
+        size_t i, same, group, sidx, oidx;
+        char outbuf[80], strbuf[18];
+        static char hex[] = "0123456789ABCDEF";
+
+        for (i=same=0; i<len; i += 16) {
+            if ((i > 0) && (0 == memcmp (&data[i], &data[i-16], 16))) {
+                ++same;
+                continue;
+                }
+            if (same > 0) {
+                sim_debug (reason, dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
+                same = 0;
+                }
+            group = (((len - i) > 16) ? 16 : (len - i));
+            for (sidx=oidx=0; sidx<group; ++sidx) {
+                outbuf[oidx++] = ' ';
+                outbuf[oidx++] = hex[(data[i+sidx]>>4)&0xf];
+                outbuf[oidx++] = hex[data[i+sidx]&0xf];
+                if (isprint (data[i+sidx]))
+                    strbuf[sidx] = data[i+sidx];
+                else
+                    strbuf[sidx] = '.';
+                }
+            outbuf[oidx] = '\0';
+            strbuf[sidx] = '\0';
+            sim_debug (reason, dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
+            }
+        if (same > 0) {
+            sim_debug (reason, dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            }
+        }
+    }
+}
+
+
 /* Hierarchical help presentation
  *
  * Device help can be presented hierarchically by calling

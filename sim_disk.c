@@ -1455,40 +1455,11 @@ void sim_disk_data_trace(UNIT *uptr, const uint8 *data, size_t lba, size_t len, 
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
-if (ctx->dptr->dctrl & reason) {
-    sim_debug (reason, ctx->dptr, "%s%d %s lbn: %08X len: %08X\n", ctx->dptr->name, (int)(uptr-ctx->dptr->units), txt, lba, len);
-    if (detail) {
-        size_t i, same, group, sidx, oidx;
-        char outbuf[80], strbuf[18];
-        static char hex[] = "0123456789ABCDEF";
+if (sim_deb && (ctx->dptr->dctrl & reason)) {
+    char pos[32];
 
-        for (i=same=0; i<len; i += 16) {
-            if ((i > 0) && (0 == memcmp (&data[i], &data[i-16], 16))) {
-                ++same;
-                continue;
-                }
-            if (same > 0) {
-                sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
-                same = 0;
-                }
-            group = (((len - i) > 16) ? 16 : (len - i));
-            for (sidx=oidx=0; sidx<group; ++sidx) {
-                outbuf[oidx++] = ' ';
-                outbuf[oidx++] = hex[(data[i+sidx]>>4)&0xf];
-                outbuf[oidx++] = hex[data[i+sidx]&0xf];
-                if (isprint (data[i+sidx]))
-                    strbuf[sidx] = data[i+sidx];
-                else
-                    strbuf[sidx] = '.';
-                }
-            outbuf[oidx] = '\0';
-            strbuf[sidx] = '\0';
-            sim_debug (reason, ctx->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
-            }
-        if (same > 0) {
-            sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
-            }
-        }
+    sprintf (pos, "lbn: %08X ", lba);
+    sim_data_trace(ctx->dptr, uptr, (detail ? data : NULL), pos, len, txt, reason);
     }
 }
 

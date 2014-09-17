@@ -549,41 +549,8 @@ void sim_tape_data_trace(UNIT *uptr, const uint8 *data, size_t len, const char* 
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
-if (ctx->dptr->dctrl & reason) {
-    sim_debug (reason, ctx->dptr, "%s%d %s len: %08X\n", ctx->dptr->name, uptr-ctx->dptr->units, txt, len);
-    if (detail) {
-        size_t i, same, group, sidx, oidx;
-        char outbuf[80], strbuf[18];
-        static char hex[] = "0123456789ABCDEF";
-
-        for (i=same=0; i<len; i += 16) {
-            if ((i > 0) && (0 == memcmp (&data[i], &data[i-16], 16))) {
-                ++same;
-                continue;
-                }
-            if (same > 0) {
-                sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
-                same = 0;
-                }
-            group = (((len - i) > 16) ? 16 : (len - i));
-            for (sidx=oidx=0; sidx<group; ++sidx) {
-                outbuf[oidx++] = ' ';
-                outbuf[oidx++] = hex[(data[i+sidx]>>4)&0xf];
-                outbuf[oidx++] = hex[data[i+sidx]&0xf];
-                if (isprint (data[i+sidx]))
-                    strbuf[sidx] = data[i+sidx];
-                else
-                    strbuf[sidx] = '.';
-                }
-            outbuf[oidx] = '\0';
-            strbuf[sidx] = '\0';
-            sim_debug (reason, ctx->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
-            }
-        if (same > 0) {
-            sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
-            }
-        }
-    }
+if (sim_deb && (ctx->dptr->dctrl & reason))
+    sim_data_trace(ctx->dptr, uptr, (detail ? data : NULL), "", len, txt, reason);
 }
 
 /* Read record length forward (internal routine)

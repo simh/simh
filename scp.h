@@ -146,6 +146,7 @@ const char *sim_error_text (t_stat stat);
 t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
 void sim_printf (const char* fmt, ...);
+void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason);
 void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate);
 #if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))
