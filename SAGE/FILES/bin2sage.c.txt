@@ -1,0 +1,95 @@
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+#define CRLF "\r\n"
+
+#define BASE 0xfe0000
+#define RECLEN 32
+
+void putS0(FILE* out, const char* header)
+{
+  int i, csum, c;
+  int len = strlen(header);
+  fprintf(out, "S0%02X0000", 2 + len + 1);
+  csum = 0;
+  for (i=0; i<len; i++) {
+    c = ((int)header[i]) & 0xff;
+    csum += c;
+    fprintf(out, "%02X", c);
+  }
+  fprintf(out, "%02X" CRLF, (~csum) & 0xff);
+}
+
+void putS8(FILE* out,int start)
+{
+  int csum = 4 + ((BASE>>16) & 0xff) + ((BASE>>8) & 0xff) + (BASE & 0xff);
+  fprintf(out, "S804%06X%02X" CRLF, BASE & 0xffffff, (~csum) &0xff);
+}
+
+void putS2(FILE* out, int addr, unsigned char* data, int n)
+{
+  int i, csum, c;
+
+  fprintf(out, "S2%02X%06X", 3 + n + 1, addr & 0xffffff);
+  csum = 3 + n + 1 + ((addr>>16) & 0xff) + ((addr>>8) & 0xff) + (addr & 0xff);
+
+  for (i=0; i<n; i++) {
+    c = data[i] & 0xff;
+    fprintf(out, "%02X", c);
+    csum += c;
+  }
+  fprintf(out, "%02X" CRLF, (~csum) & 0xff);
+}
+
+int main(int argc, char* argv[]) 
+{
+  FILE *e,*out;
+  int c,i;
+  unsigned char eprombuf[65536];
+  int size;
+
+
+  if (argc != 3) {
+    fprintf(stderr,
+	    "Convert a 16bit EPROM file into EXORMACS format, compatible to SIMH SAGE.\n"
+	    "Usage: %s eprom.dat output.dat\n\n", argv[0]);
+    exit(1);
+  }
+
+  e = fopen(argv[1], "rb");
+  out =  fopen(argv[2], "wb");
+
+  if (!e) {
+    fprintf(stderr, "Could not open %s\n", argv[1]);
+    exit(1);
+  }
+  if (!out) {
+    fprintf(stderr, "Could not open %s\n", argv[2]);
+    exit(1);
+  }
+  
+  size = 0;
+  do {
+    if ((c = fgetc(e)) == EOF) break;
+    eprombuf[size++] = c;
+  } while (!feof(e));
+  printf("%s: Size = %d\n", argv[2], size);
+  fclose(e);
+
+  for (i=0; i<size; i+=2) {
+    c = eprombuf[i+1];
+    eprombuf[i+1] = eprombuf[i];
+    eprombuf[i] = c;
+  }
+
+  putS0(out, argv[2]);
+  i = 0;
+  for (i=0; i<size; i += RECLEN) {
+    putS2(out, BASE+i, eprombuf+i, RECLEN);
+  }
+  putS8(out, BASE);
+  fclose(out);
+  exit(0);
+}
+

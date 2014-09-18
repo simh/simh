@@ -1,0 +1,45 @@
+;set cpu debug=int
+;set cpu debug=exc
+;set cpu debug=ctrace
+;set cpu debug=btrace
+set cpu 512k
+set cpu nostop
+set debug debug.log
+;set debug stdout
+;break fe1ad6
+;break 7bd08
+;break 7def2
+;break 8d8
+;break 794
+;break 78076
+;break 75612
+;break 77ef4
+;break 75618
+;break 73518
+;break 7353a
+
+;set timer1 debug=read
+;set timer1 debug=write
+;set timer2 debug=read
+;set timer2 debug=write
+;set pic debug=read
+;set pic debug=write
+;set pic debug=irqin
+;set pic debug=irqout
+;set fd debug=verbose
+;set fd debug=cmd
+;set fd debug=seek
+;set fd debug=imd
+;set fd debug=irq
+;set fd debug=state
+;set fd debug=status
+;set fd debug=rddata
+;set fd debug=wrdata
+;set lp debug=rdc
+;set lp debug=rdb
+;set dip debug=wrc
+;set cons debug=read
+;set cons debug=write
+;set cons debug=irq
+att fd0 cpm68k12.imd
+boot cpu

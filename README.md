@@ -20,6 +20,10 @@
 
 #### Updated HP2100 simulator from Dave Bryan.
 
+#### Beta Sigma 5, 6 & 7 simulator from Bob Supnik
+
+#### Beta SAGE-II and PDQ-3 simulators from Holger Veit
+
 ### New Host Platform support - HP-UX and AIX
 
 ### New Functionality

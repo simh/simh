@@ -1097,7 +1097,6 @@ TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
       ${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
 TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
 
-
 SSEMD = SSEM
 SSEM = ${SSEMD}/ssem_cpu.c ${SSEMD}/ssem_sys.c
 SSEM_OPT = -I ${SSEMD}
@@ -1121,6 +1120,19 @@ ALPHA = ${ALPHAD}/alpha_500au_syslist.c ${ALPHAD}/alpha_cpu.c \
     ${ALPHAD}/alpha_fpv.c ${ALPHAD}/alpha_io.c \
     ${ALPHAD}/alpha_mmu.c ${ALPHAD}/alpha_sys.c
 ALPHA_OPT = -I ${ALPHAD} -DUSE_ADDR64 -DUSE_INT64
+
+SAGED = SAGE
+SAGE = ${SAGED}/sage_cpu.c ${SAGED}/sage_sys.c ${SAGED}/sage_stddev.c \
+    ${SAGED}/sage_cons.c ${SAGED}/sage_fd.c ${SAGED}/sage_lp.c \
+    ${SAGED}/m68k_cpu.c ${SAGED}/m68k_mem.c ${SAGED}/m68k_scp.c \
+    ${SAGED}/m68k_parse.tab.c ${SAGED}/m68k_sys.c \
+    ${SAGED}/i8251.c ${SAGED}/i8253.c ${SAGED}/i8255.c ${SAGED}/i8259.c ${SAGED}/i8272.c 
+SAGE_OPT = -I ${SAGED} -DHAVE_INT64 -DUSE_SIM_IMD
+
+PDQ3D = PDQ-3
+PDQ3 = ${PDQ3D}/pdq3_cpu.c ${PDQ3D}/pdq3_sys.c ${PDQ3D}/pdq3_stddev.c \
+    ${PDQ3D}/pdq3_mem.c ${PDQ3D}/pdq3_debug.c ${PDQ3D}/pdq3_fdc.c 
+PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
 
 
 #
@@ -1403,4 +1415,16 @@ alpha : ${BIN}alpha${EXE}
 ${BIN}alpha${EXE} : ${ALPHA} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ALPHA} ${SIM} ${ALPHA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+sage : ${BIN}sage${EXE}
+
+${BIN}sage${EXE} : ${SAGE} ${SIM}
+	${MKDIRBIN}
+	${CC} ${SAGE} ${SIM} ${SAGE_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+pdq3 : ${BIN}pdq3${EXE}
+
+${BIN}pdq3${EXE} : ${PDQ3} ${SIM}
+	${MKDIRBIN}
+	${CC} ${PDQ3} ${SIM} ${PDQ3_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 

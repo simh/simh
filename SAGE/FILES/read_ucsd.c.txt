@@ -1,0 +1,105 @@
+#include <stdio.h>
+
+struct dir0 {
+  unsigned short dfirstblk;
+  unsigned short dflastblk;
+  unsigned short dfkind;
+  char length;
+  char dvid[7];
+  unsigned short deovblk;
+  unsigned short dnumfiles;
+  unsigned short dloadtime;
+  unsigned short dlastboot;
+  unsigned short padding;
+};
+struct dirn {
+  unsigned short dfirstblk;
+  unsigned short dflastblk;
+  unsigned short dfkind;
+  char length;
+  char dtid[15];
+  unsigned short dlastbyte;
+  unsigned short daccess;
+};
+
+unsigned short swap(unsigned short x) {
+  union u {
+    unsigned short x;
+    unsigned char c[2];
+  } u;
+  unsigned char s;
+  u.x = x;
+  s = u.c[0];
+  u.c[0] = u.c[1];
+  u.c[1] = s;
+  return u.x;
+}
+
+
+int main(int argc, char* argv[])
+{
+  char name[17];
+  char cbuf[512];
+  char buf[512*4];
+  FILE* in,*out;
+  int i,n,k;
+  int b,e,l;
+  struct dir0* dir0;
+  struct dirn* dirn;
+
+  if (argc != 2) {
+    fprintf(stderr,"Usage: %s diskimage.bin\n",argv[0]);
+    exit (1);
+  }
+
+  if ((in=fopen(argv[1],"rb"))==NULL) {
+    fprintf(stderr,"Can't read %s\n",argv[1]);
+    exit(2);
+  }
+
+  /* read boot block (two sectors) */
+  printf("Extract boot record\n");
+  fread(buf,2,512,in);
+  out = fopen("bootrec.bin","wb");
+  fwrite(buf,2,512,out);
+  fclose(out);
+
+  /* read directory records */
+  fread(buf,4,512,in);
+  dir0 = (struct dir0*)buf;
+  dirn = (struct dirn*)(buf+26);
+  printf("Directory:\n");
+  printf("  firstblock=%d\n",swap(dir0->dfirstblk));
+  printf("  lastblock=%d\n",swap(dir0->dflastblk));
+  printf("  volumeid=");
+  for (i=0; i<dir0->length; i++) printf("%c",dir0->dvid[i]);
+  putchar('\n');
+  printf("  lastblock=%d\n",swap(dir0->deovblk));
+  printf("  numfiles=%d\n",swap(dir0->dnumfiles));
+
+  for (n=0; n<swap(dir0->dnumfiles); n++) {
+    if (dirn[n].dfkind) {
+      printf("\nFile=");
+      for (i=0; i<dirn[n].length; i++) printf("%c",dirn[n].dtid[i]);
+      putchar('\n');
+      b = swap(dirn[n].dfirstblk);
+      e = swap(dirn[n].dflastblk);
+      l = swap(dirn[n].dlastbyte);
+      printf("  firstblock=%d\n",b);
+      printf("  lastblock=%d\n",e);
+      printf("  filetype=0x%04x\n",swap(dirn[n].dfkind));
+      printf("  lastbyte=%d\n",l);
+      memset(name,0,17);
+      strncpy(name,dirn[n].dtid,dirn[n].length);
+      out = fopen(name,"wb");
+      fseek(in,b*512,0);
+      for (k=0; k<(e-b)-1; k++) {
+	fread(cbuf,1,512,in);
+	fwrite(cbuf,1,512,out);
+      }
+      fread(cbuf,1,l,in);
+      fwrite(cbuf,1,l,out);
+      fclose(out);
+    }	
+  }
+}

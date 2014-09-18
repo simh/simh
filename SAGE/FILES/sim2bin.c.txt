@@ -1,0 +1,29 @@
+#include <stdlib.h>
+#include <stdio.h>
+
+int main(int argc,char* argv[])
+{
+	FILE *in,*out;
+	unsigned int n,i;
+	unsigned int c[16];
+	char buf[101];
+
+	if (argc != 3) {
+		fprintf(stderr,"Usage:\n\t%s txtfile binfile\n",argv[0]);
+		exit(1);
+	}
+	
+	in = fopen(argv[1],"r");
+	out = fopen(argv[2],"wb");
+	
+	while (!feof(in)) {
+		fgets(buf,100,in);
+		sscanf(buf,"%x: %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x",
+			&n,c,c+1,c+2,c+3,c+4,c+5,c+6,c+7,
+			c+8,c+9,c+10,c+11,c+12,c+13,c+14,c+15);
+		for (i=0; i<16; i++) fputc(c[i]&0xff,out);
+	}
+	fclose(out);
+	fclose(in);
+	exit(0);
+}

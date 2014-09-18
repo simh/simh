@@ -1,0 +1,138 @@
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+typedef unsigned char u_char;
+typedef unsigned short u_short;
+
+typedef struct direntry {
+	unsigned char une[12];
+#define d_user une[0]
+#define d_name une[1]
+#define d_ext  une[9]
+	u_short d_fext;
+	u_char d_fill;
+	u_char d_last;
+	u_short d_blks[8];
+} DIR;
+
+#define UNUSED 0xE5
+
+#define DIROFFSET 0x2000
+#define DIRBLKS   16
+#define BLKSTART  (DIROFFSET+DIRBLKS*128) 
+#define CLSTSIZE  2048
+
+typedef struct fileentry {
+	char f_name[30];
+	u_short f_fext;
+	u_char f_last;
+	u_short f_blks[200];
+} FENTRY;
+
+void makename(char* name, DIR* dir)
+{
+	int i;
+	char *p = name;
+	for (i=0; i<8; i++) {
+		if ((&dir->d_name)[i]==' ') break;
+		*p++ = (&dir->d_name)[i];
+	}
+	*p++ = '.';
+	for (i=0; i<3; i++) {
+		if ((&dir->d_ext)[i]==' ') break;
+		*p++ = (&dir->d_ext)[i];
+	}
+	*p = 0;
+}
+
+FENTRY* lookup(char* name, FENTRY* files)
+{
+	FENTRY* nul=0, *p = files;
+	int i;
+		
+	for (i = 0; i<64; i++) {
+		if (p->f_name[0]==0) {
+			if (nul==0) nul = p;
+		} else {
+			if (!strcmp(p->f_name,name)) {
+				return p;
+			}
+		}
+		p++;
+	}
+	if (nul==0) {
+		printf("File table full!\n");
+		exit(1);
+	}
+	return nul;
+}
+
+int main(int argc,char* argv[])
+{
+	FILE *in,*out;
+	unsigned char cpmbuf[2048];
+	int i,k,n,s,ls;
+	char name[30];
+	FENTRY files[64], *fe;
+	DIR* dir;
+	
+	if (argc != 2) {
+		fprintf(stderr,"Usage: %s cpmdisk.bin\n",argv[0]);
+		exit(1);
+	}
+	
+	for (i=0; i<64; i++) {
+		files[i].f_name[0] = 0;
+		files[i].f_fext = 0;
+		files[i].f_last = 0;
+		memset(files[i].f_blks,0,sizeof(u_short)*200);
+	}
+	
+	in = fopen(argv[1],"rb");
+	if (!in) { 
+		perror("open file"); 
+		exit(1);
+	}
+	fseek(in,DIROFFSET,0);
+	for (i=0; i<DIRBLKS; i++) {
+		fread(cpmbuf,sizeof(DIR),4,in);
+		for (k=0; k<4; k++) {
+			dir = (DIR*)(cpmbuf+k*sizeof(DIR));
+			if (dir->d_user == UNUSED) continue;
+			makename(name,dir);
+			fe = lookup(name,files);
+			strcpy(fe->f_name,name);
+			if (dir->d_fext >= fe->f_fext) {
+				fe->f_fext = dir->d_fext;
+				fe->f_last = dir->d_last;
+			}
+			for (n=0; n<8; n++) {
+				fe->f_blks[dir->d_fext*8+n] = dir->d_blks[n];
+			}
+		}
+	}
+	
+	for (i=0; i<64; i++) {
+		if (!files[i].f_name[0]) continue;
+		printf("File %s: (last=%d)\n",files[i].f_name,files[i].f_last%16);
+		FILE* out = fopen(files[i].f_name,"wb");
+
+
+
+		for (k=0; k<199; k++) {
+			n = files[i].f_blks[k];
+			if (n==0) break;
+			fseek(in,BLKSTART+CLSTSIZE*(n-1),0);
+			fread(cpmbuf,1,2048,in);
+			ls = files[i].f_last % 16;
+			if (!ls) ls = 16;
+			s = files[i].f_blks[k+1]==0 ? ls*128 : CLSTSIZE;
+			fwrite(cpmbuf,1,s,out);
+			printf("%d ",files[i].f_blks[k]);
+		}
+		printf("\n");
+		fclose(out);
+	}
+	exit(0);
+}
