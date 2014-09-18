@@ -1458,7 +1458,7 @@ struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 if (sim_deb && (ctx->dptr->dctrl & reason)) {
     char pos[32];
 
-    sprintf (pos, "lbn: %08X ", lba);
+    sprintf (pos, "lbn: %08X ", (unsigned int)lba);
     sim_data_trace(ctx->dptr, uptr, (detail ? data : NULL), pos, len, txt, reason);
     }
 }
