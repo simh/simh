@@ -161,24 +161,24 @@ static t_stat sage_mem(t_addr addr,uint8** mem)
 {
 	t_addr a;
 //	printf("Try to access %x\n",addr); fflush(stdout);
-	if (rom_enable && addr >= 0 && addr < MAX_ROMSIZE) { /* boot rom mapped to zero page */
+	if (rom_enable && (addr < MAX_ROMSIZE)) { /* boot rom mapped to zero page */
 		*mem = ROM+addr;
 		return SCPE_OK;
 	}
-	a = addr - 0xfe0000;	/* boot rom at normal ROM page */
-	if (a >= 0 && a < MAX_ROMSIZE) {
+	a = addr - 0xfe0000;	        /* boot rom at normal ROM page */
+	if (a < MAX_ROMSIZE) {
 		rom_enable = FALSE;
 		*mem = ROM+a;
 		return SCPE_OK;
 	}
 	a = addr - 0xffc0fe;
-	if (a >= 0 && a < 2) {	/* boot rom diagnostic address: black hole */
+	if (a < 2) {	                /* boot rom diagnostic address: black hole */
 		ioemul[0] = ioemul[1] = 0;
 		*mem = ioemul+a;
 		return SCPE_OK;
 	}
 	a = addr - 0xff0000;
-	if (a >= 0 && a < 0x10000) {
+	if (a < 0x10000) {
 		*mem = ioemul;
 		return SCPE_OK;
 	}
