@@ -22,7 +22,9 @@ rem  are also performed.  These include:
 rem       - confirming that if the current source is a clone of the simh
 rem         git repository, then then git hooks which manage making the
 rem         git commit hash available during builds are properly installed
-rem         in the repository hooks directory.
+rem         in the repository hooks directory.  When the githooks are installed
+rem         the current commit id is generated if git.exe is available in the
+rem         current path.
 rem       - performing the activities which make the git repository commit id
 rem         available in an include file during compiles.
 rem
@@ -93,9 +95,20 @@ echo ** Installing git hooks in newly cloned repository **
 echo *****************************************************
 echo *****************************************************
 copy git-hooks\post* ..\.git\hooks\
+call :WhereInPath git.exe > NUL 2>&1
+if %ERRORLEVEL% neq 0 goto _done_hooks
+pushd ..
+git log -1 "--pretty=%%H" >.git-commit-id
+popd
 :_done_hooks
 
 :_SetId
+rem
+rem A race condition exists while creating the .git-commit-id.h file.
+rem This race can happen during a parallel build, especially at the
+rem beginning of a build where 2 projects can start execution a 
+rem almost the same time.
+rem
 SET GIT_COMMIT_ID=
 if not exist ..\.git-commit-id goto _NoId
 for /F %%i in (..\.git-commit-id) do SET GIT_COMMIT_ID=%%i
@@ -104,6 +117,14 @@ SET OLD_GIT_COMMIT_ID=
 if not exist .git-commit-id.h echo.>.git-commit-id.h
 for /F "tokens=3" %%i in (.git-commit-id.h) do SET OLD_GIT_COMMIT_ID=%%i
 if "%GIT_COMMIT_ID%" equ "%OLD_GIT_COMMIT_ID%" goto _IdGood
+echo Generating updated .git-commit-id.h containing id %GIT_COMMIT_ID%
 echo #define SIM_GIT_COMMIT_ID %GIT_COMMIT_ID% >.git-commit-id.h
+if errorlevel 1 echo Retrying...
+if errorlevel 1 goto _SetId
 :_IdGood
 :_done_id
+goto :EOF
+
+:WhereInPath
+if "%~$PATH:1" NEQ "" exit /B 0
+exit /B 1
