@@ -357,7 +357,8 @@ t_stat wd179x_attach(UNIT *uptr, char *cptr)
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if (uptr->flags & UNIT_WD179X_VERBOSE)
             printf("--------------------------------------------------------\n");
-        wd179x_info->drive[i].imd = diskOpen(uptr->fileref, uptr->flags & UNIT_WD179X_VERBOSE);
+        wd179x_info->drive[i].imd = diskOpenEx(uptr->fileref, uptr->flags & UNIT_WD179X_VERBOSE,
+                                               &wd179x_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_WD179X_VERBOSE)
             printf("\n");
         if (wd179x_info->drive[i].imd == NULL) {

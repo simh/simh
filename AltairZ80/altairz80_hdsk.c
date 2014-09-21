@@ -444,7 +444,9 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
             detach_unit(uptr);
             return SCPE_OPENERR;
         }
-        hdsk_imd[thisUnitIndex] = diskOpen(uptr -> fileref, sim_deb && (hdsk_dev.dctrl & VERBOSE_MSG));
+        hdsk_imd[thisUnitIndex] = diskOpenEx(uptr -> fileref,
+                                             sim_deb && (hdsk_dev.dctrl & VERBOSE_MSG),
+                                             &hdsk_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (hdsk_imd[thisUnitIndex] == NULL)
             return SCPE_IOERR;
         verifyDiskInfo(hdsk_imd[thisUnitIndex], '0' + thisUnitIndex);

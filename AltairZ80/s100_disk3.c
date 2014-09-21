@@ -348,7 +348,8 @@ static t_stat disk3_attach(UNIT *uptr, char *cptr)
 
         if (uptr->flags & UNIT_DISK3_VERBOSE)
             printf("--------------------------------------------------------\n");
-        disk3_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_DISK3_VERBOSE));
+        disk3_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_DISK3_VERBOSE),
+                                              &disk3_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_DISK3_VERBOSE)
             printf("\n");
     } else {

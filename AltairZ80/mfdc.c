@@ -64,6 +64,7 @@
 #define CMD_MSG     (1 << 2)
 #define RD_DATA_MSG (1 << 3)
 #define WR_DATA_MSG (1 << 4)
+#define VERBOSE_MSG (1 << 5)
 
 extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -173,6 +174,7 @@ static DEBTAB mfdc_dt[] = {
     { "CMD",    CMD_MSG,        "Commands"              },
     { "READ",   RD_DATA_MSG,    "Disk read activity"    },
     { "WRITE",  WR_DATA_MSG,    "Disk write activity"   },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
     { NULL,     0                                       }
 };
 
@@ -274,7 +276,8 @@ static t_stat mfdc_attach(UNIT *uptr, char *cptr)
 
         if (uptr->flags & UNIT_MFDC_VERBOSE)
             printf("--------------------------------------------------------\n");
-        mfdc_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_MFDC_VERBOSE));
+        mfdc_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_MFDC_VERBOSE),
+                                             &mfdc_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_MFDC_VERBOSE)
             printf("\n");
     } else {

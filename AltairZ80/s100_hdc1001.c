@@ -242,7 +242,8 @@ static t_stat hdc1001_attach(UNIT *uptr, char *cptr)
 
         if (uptr->flags & UNIT_HDC1001_VERBOSE)
             printf("--------------------------------------------------------\n");
-        hdc1001_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_HDC1001_VERBOSE));
+        hdc1001_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_HDC1001_VERBOSE),
+                                                &hdc1001_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_HDC1001_VERBOSE)
             printf("\n");
     } else {
