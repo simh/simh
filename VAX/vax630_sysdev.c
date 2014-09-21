@@ -1053,7 +1053,7 @@ return SCPE_OK;
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-#if defined(HAVE_LIBSDL)
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 char gbuf[CBUFSIZE];
 
 if ((cptr == NULL) || (!*cptr))
