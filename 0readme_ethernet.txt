@@ -325,8 +325,9 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
     binaries will run on any system whether or not libpcap is installed.  If 
     you want to force direct libpcap linking during a build you do so by 
     typing 'make USE_NETWORK=1'.  You must build with gcc to do this.  There 
-    is no observable benefit to statically linking against libpcap and as 
-    such support for this ia deprecated and will be removed in the future.
+    is no observable benefit to statically linking against libpcap.  Support
+    for statically linking libpcap ia deprecated on all platforms except
+    Linux and OS X where it has already been removed.
     
  4. Some platforms (HP-UX in particular) may not have vendor supplied libpcap 
     components available and installed with the operating system.  The packages

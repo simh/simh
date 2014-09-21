@@ -7,7 +7,7 @@ rem run with networking support when the WinPcap environment
 rem is installed on the running system.
 rem
 rem Individual simulator sources are in .\simulator_name
-rem Individual simulator executables are to .\bin
+rem Individual simulator executables are to .\BIN
 rem
 rem If needed, define the path for the MINGW bin directory.
 rem (this should already be set if MINGW was installed correctly)
