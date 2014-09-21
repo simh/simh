@@ -31,6 +31,8 @@
    11-Jun-2013  MB      First version
 */
 
+#if !defined(VAX_620)
+
 #include "vax_defs.h"
 #include "sim_video.h"
 #include "vax_2681.h"
@@ -897,3 +899,5 @@ char *vc_description (DEVICE *dptr)
 {
 return "VCB01 Monochrome Graphics Adapter";
 }
+
+#endif /* !VAX_620 */
