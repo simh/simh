@@ -327,7 +327,8 @@ t_stat i8272_attach(UNIT *uptr, char *cptr)
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if (uptr->flags & UNIT_I8272_VERBOSE)
             printf("--------------------------------------------------------\n");
-        i8272_info->drive[i].imd = diskOpen(uptr->fileref, uptr->flags & UNIT_I8272_VERBOSE);
+        i8272_info->drive[i].imd = diskOpenEx(uptr->fileref, uptr->flags & UNIT_I8272_VERBOSE,
+                                              &i8272_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_I8272_VERBOSE)
             printf("\n");
         if (i8272_info->drive[i].imd == NULL) {

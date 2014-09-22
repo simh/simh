@@ -281,7 +281,8 @@ static t_stat disk2_attach(UNIT *uptr, char *cptr)
 
         if (uptr->flags & UNIT_DISK2_VERBOSE)
             printf("--------------------------------------------------------\n");
-        disk2_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_DISK2_VERBOSE));
+        disk2_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_DISK2_VERBOSE),
+                                              &disk2_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_DISK2_VERBOSE)
             printf("\n");
     } else {

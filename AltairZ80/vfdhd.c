@@ -65,6 +65,7 @@
 #define RD_DATA_MSG (1 << 3)
 #define WR_DATA_MSG (1 << 4)
 #define STATUS_MSG  (1 << 5)
+#define VERBOSE_MSG (1 << 6)
 
 static void VFDHD_Command(void);
 
@@ -183,13 +184,14 @@ static MTAB vfdhd_mod[] = {
 
 /* Debug Flags */
 static DEBTAB vfdhd_dt[] = {
-    { "ERROR",  ERROR_MSG,      "Error messages"    },
-    { "SEEK",   SEEK_MSG,       "Seek messages"     },
-    { "CMD",    CMD_MSG,        "Command messages"  },
-    { "READ",   RD_DATA_MSG,    "Read messages"     },
-    { "WRITE",  WR_DATA_MSG,    "Write messages"    },
-    { "STATUS", STATUS_MSG,     "Status messages"   },
-    { NULL,     0                                   }
+    { "ERROR",      ERROR_MSG,      "Error messages"    },
+    { "SEEK",       SEEK_MSG,       "Seek messages"     },
+    { "CMD",        CMD_MSG,        "Command messages"  },
+    { "READ",       RD_DATA_MSG,    "Read messages"     },
+    { "WRITE",      WR_DATA_MSG,    "Write messages"    },
+    { "STATUS",     STATUS_MSG,     "Status messages"   },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { NULL,         0                                   }
 };
 
 DEVICE vfdhd_dev = {
@@ -267,7 +269,8 @@ static t_stat vfdhd_attach(UNIT *uptr, char *cptr)
 
         if (uptr->flags & UNIT_VFDHD_VERBOSE)
             printf("--------------------------------------------------------\n");
-        vfdhd_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_VFDHD_VERBOSE));
+        vfdhd_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_VFDHD_VERBOSE),
+                                              &vfdhd_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_VFDHD_VERBOSE)
             printf("\n");
     } else {
