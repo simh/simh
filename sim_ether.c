@@ -672,6 +672,7 @@ void eth_zero(ETH_DEV* dev)
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
 
+#if defined (USE_NETWORK) || defined (USE_SHARED)
 static void _eth_add_to_open_list (ETH_DEV* dev)
 {
 eth_open_devices = (ETH_DEV**)realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
@@ -690,6 +691,7 @@ for (i=0; i<eth_open_device_count; ++i)
         break;
         }
 }
+#endif
 
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
