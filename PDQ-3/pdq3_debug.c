@@ -27,7 +27,8 @@
    20130421 hv initial version
    20130928 hv fix problem with callstack when S_Start_P patches MSCW
    20131012 hv view calltree returned incorrect segment of caller
-*/
+   20141003 hv compiler suggested warnings (vc++2013, gcc)
+   */
 #include "pdq3_defs.h"
 
 static uint8 *opdebug = NULL;
@@ -225,10 +226,11 @@ typedef struct _seginfo {
 SEGINFO* seghash[SEGHASHSIZE];
 #define SEGHASHFUNC(i) (i % SEGHASHSIZE)
 
-void dbg_segtrackinit() {
+t_stat dbg_segtrackinit() {
   int i;
   for (i=0; i<SEGHASHSIZE; i++)
     seghash[i] = NULL;
+  return SCPE_OK;
 }
 
 static SEGINFO* new_seginfo(SEGINFO* next, uint16 base) {
@@ -274,10 +276,11 @@ typedef struct _aliases {
 #define ALIASHASHSIZE 97
 static ALIASES* aliases[ALIASHASHSIZE];
 
-static void dbg_initaliases() {
+static t_stat dbg_aliasesinit() {
   int i;
   for (i=0; i<ALIASHASHSIZE; i++)
     aliases[i] = NULL;
+  return SCPE_OK;
 }
 
 static int aliashash(const char* key) {
@@ -293,7 +296,7 @@ static ALIASES* find_alias(const char* key, int* idx) {
   char gbuf[CBUFSIZE], gbuf2[CBUFSIZE];
 
   get_glyph(key, gbuf, 0);
-  *idx = aliashash(key);
+  *idx = aliashash(gbuf);
   a = aliases[*idx];
   if (a) get_glyph(a->key, gbuf2, 0);
   while (a && strcmp(gbuf2,gbuf)) {
@@ -416,12 +419,12 @@ t_stat dbg_calltree(FILE* fd) {
   }
   
   fprintf(fd,"Calltree:\nCurrently in %s at %04x:%04x\n",
-          find_procname(p), reg_segb, reg_ipc);
+    find_procname(p), reg_segb, reg_ipc);
   lastp = p;
   p = p->next;
   while (p) {
     fprintf(fd," at %04x:%04x called by %s (%04x:%04x)\n",
-            lastp->segb, lastp->instipc, find_procname(p), p->segb, p->instipc);
+        lastp->segb, lastp->instipc, find_procname(p), p->segb, p->instipc);
     lastp = p;
     p = p->next;
   }
@@ -435,6 +438,8 @@ t_stat dbg_calltree(FILE* fd) {
 t_stat dbg_init() {
   dbg_opdbginit();
   dbg_segtrackinit();
+  dbg_aliasesinit();
+  
   return SCPE_OK;
 }
 

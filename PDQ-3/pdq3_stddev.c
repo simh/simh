@@ -25,9 +25,11 @@
    other dealings in this Software without prior written authorization from
    Robert M Supnik and Holger Veit.
    
+   2013xxxx hv initial version
    20130902 hv added telnet multiplexer code
    20131020 hv fixed CON interrupt handling
    20131103 hv connect CON_ATTACH logic with DSR, so that DSR is set if tcp connect
+   20141003 hv compiler suggested warnings (vc++2013, gcc)
 */
 #include "pdq3_defs.h"
 #include <ctype.h>
@@ -348,6 +350,8 @@ static int set_parity(int c, int odd)
   if (!odd) c ^= 0x80;
   return c;
 }
+#if 0
+// currently unused
 static int get_parity(int c, int even)
 {
   int i, p = 0;
@@ -356,6 +360,7 @@ static int get_parity(int c, int even)
   if (even) p ^= 1;
   return p;
 }
+#endif
 
 // functions from memory handler to read and write a char
 // note: the usart is connected to inverted data lines,
@@ -372,7 +377,7 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
   data = (~data) & 0xff;
   switch (ioaddr & 0x0003) {
   case 0: /* CTRL1 */
-    con_ctrl1 = data;
+    con_ctrl1 = data & 0xff;
     if (!RCVENABLED()) { /* disable receiver */
       clrbit(con_status,CONS_FE|CONS_PE|CONS_OE|CONS_DR);
       sim_cancel(poll);
@@ -391,7 +396,7 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
     }
     break;
   case 1:
-    con_ctrl2 = data;
+    con_ctrl2 = data & 0xff;
     break;
   case 2:
     // ignore this here - DLE register
@@ -406,7 +411,7 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
       break;
     case CONC2_CLEN8: data &= 0xff; break;
     }
-    con_xmit = data;
+    con_xmit = data & 0xff;
     term->buf = data;
     clrbit(con_status,CONS_THRE);
     if (XMITENABLED())

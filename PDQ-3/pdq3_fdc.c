@@ -23,6 +23,9 @@
    Except as contained in this notice, the names of Robert M Supnik and Holger Veit 
    shall not be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik and Holger Veit.
+
+   2013xxxx hv initial version
+   20141003 hv compiler suggested warnings (vc++2013, gcc)
 */
 #include "pdq3_defs.h"
 #include "sim_imd.h"
@@ -158,7 +161,6 @@ extern UNIT cpu_unit;
 
 /* forwards */
 t_stat fdc_svc (UNIT *uptr);
-t_stat fdc_boot(int32 unitnum, DEVICE *dptr);
 t_stat fdc_reset (DEVICE *uptr);
 t_stat fdc_attach(UNIT *uptr, char *cptr);
 t_stat fdc_detach(UNIT *uptr);
@@ -263,7 +265,7 @@ DEVICE fdc_dev = {
 
 /* boot unit - not available through BOOT FDC cmd, use BOOT CPU instead */
 t_stat fdc_boot(int32 unitnum, DEVICE *dptr) {
-  if (unitnum < 0 || ((uint32)unitnum > dptr->numunits))
+  if (unitnum < 0 || (uint32)unitnum > dptr->numunits)
     return SCPE_NXUN;
 //  printf("BOOT FDC%d\n",unitnum);
   return fdc_autoload(unitnum);
@@ -427,10 +429,9 @@ static t_bool dma_abort(t_bool fromfinish) {
     sim_debug(DBG_FD_DMA, & fdc_dev, DBG_PCFORMAT2 "AUTOLOAD finished by end-of-track (DMA aborted)\n", DBG_PC);
     cpu_finishAutoload();
     dma_isautoload = FALSE;
-  } else
-    if (!fromfinish) {
-      sim_debug(DBG_FD_DMA, & fdc_dev, DBG_PCFORMAT2 "Aborted transfer\n", DBG_PC);
-    }
+  } else if (!fromfinish) {
+    sim_debug(DBG_FD_DMA, & fdc_dev, DBG_PCFORMAT2 "Aborted transfer\n", DBG_PC);
+  }
   return FALSE;
 }
 
@@ -522,7 +523,7 @@ static t_bool dma_transfer_from_ram(uint8 *buf, int bufsize) {
       dma_interrupt(DMA_CTRL_TOIE);
       return FALSE; /* write fault */
     }
-    buf[i] = data;
+    buf[i] = data & 0xff;
     _reg_dma_cnt++;
     if (_reg_dma_cnt == 0) /* all data done? */
       break;
@@ -930,7 +931,7 @@ static t_stat fdc_docmd(uint16 data) {
 }
 
 void dma_docmd(uint16 data) {
-  reg_dma_ctrl = data;
+  reg_dma_ctrl = data & 0xff;
   reg_dma_status &= 0x8f;
   reg_dma_status |= (reg_dma_ctrl & 0x70);
   
@@ -941,10 +942,8 @@ void dma_docmd(uint16 data) {
 /* setup FDC/DMA to read first track into low memory */
 t_stat fdc_autoload(int unitnum) {
   int unitbit = 1 << unitnum;
-
   sim_debug(DBG_FD_CMD, &fdc_dev, DBG_PCFORMAT2 "Autoload Unit=%d\n", DBG_PC, unitnum);
   dma_isautoload = TRUE;
-
 
   /* note: this is partly in microcode/ROM. The DMA cntrlr itself does not set the
    * FDC register for multi_read */
@@ -996,22 +995,22 @@ t_stat fdc_write(t_addr ioaddr, uint16 data) {
     reg_dma_status = data & 0x8f;
     break;
   case 0x0a: /* count low */
-    reg_dma_cntl = data;
+    reg_dma_cntl = data & 0xff;
     break;
   case 0x0b: /* count high */
-    reg_dma_cnth = data;
+    reg_dma_cnth = data & 0xff;
     break;
   case 0x0c: /* addr low */
-    reg_dma_addrl = data;
+    reg_dma_addrl = data & 0xff;
     break;
   case 0x0d: /* addr high */
-    reg_dma_addrh = data;
+    reg_dma_addrh = data & 0xff;
     break;
   case 0x0e: /* addr ext */
     reg_dma_addre = data & 0x03;
     break;
   case 0x0f: /* ID register */
-    reg_dma_id = data;
+    reg_dma_id = data & 0xff;
     break;
   }
   _reg_dma_cnt = (reg_dma_cnth << 8) | reg_dma_cntl;
@@ -1148,7 +1147,7 @@ t_stat pdq3_diskCreate(FILE *fileref, char *ctlr_comment) {
 }
 
 t_stat pdq3_diskFormat(DISK_INFO *myDisk) {
-    uint8 i;
+    uint8 i = 0;
     uint8 sector_map[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26};
     uint32 flags;
 
@@ -1156,7 +1155,7 @@ t_stat pdq3_diskFormat(DISK_INFO *myDisk) {
 
     /* format first track as 26 sectors with 128 bytes */
     if((trackWrite(myDisk, 0, 0, 26, 128, sector_map, IMD_MODE_500K_FM, 0xE5, &flags)) != 0) {
-      printf("PDQ3_IMD: Error formatting track 0\n");
+      printf("PDQ3_IMD: Error formatting track %d\n", i);
       return SCPE_IOERR;
     }    
     putchar('.');

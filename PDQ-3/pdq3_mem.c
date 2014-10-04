@@ -113,7 +113,6 @@ t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc) {
   DEVICE* dptr;
   DEVCTXT* ctxt;
   IOINFO* ioi;
-  t_bool first = TRUE;
   if (!cptr) return SCPE_ARG;
   if (!uptr) return SCPE_IERR;
   if ((dptr = find_dev_from_unit(uptr)) == 0) return SCPE_IERR;
@@ -130,7 +129,6 @@ t_stat set_iovec(UNIT *uptr, int32 val, char *cptr, void *desc) {
   DEVICE* dptr;
   DEVCTXT* ctxt;
   IOINFO* ioi;
-  t_bool first = TRUE;
   if (!cptr) return SCPE_ARG;
   if (!uptr) return SCPE_IERR;
   if ((dptr = find_dev_from_unit(uptr)) == 0) return SCPE_IERR;
@@ -166,7 +164,6 @@ t_stat set_ioprio(UNIT *uptr, int32 val, char *cptr, void *desc) {
   DEVICE* dptr;
   DEVCTXT* ctxt;
   IOINFO* ioi;
-  t_bool first = TRUE;
   if (!cptr) return SCPE_ARG;
   if (!uptr) return SCPE_IERR;
   if ((dptr = find_dev_from_unit(uptr)) == 0) return SCPE_IERR;

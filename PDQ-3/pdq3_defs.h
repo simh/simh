@@ -25,6 +25,7 @@
    in this Software without prior written authorization from Robert M Supnik and Holger Veit.
    
    20131103 hv INT_CONR/CONT assignments incorrect in docs, must be swapped
+   20141003 hv recommended warnings from VC++ and gcc added
 */
 #ifndef _PDQ3_DEFS_H_
 #define _PDQ3_DEFS_H_ 0
@@ -191,7 +192,12 @@
 #define DBG_PC2        reg_segb,reg_ipc
 
 /* calibration timers */
-#define TMR_CONPOLL 0
+#define TMR_CONPOLL 1
+
+/* IDLE timer. This is supposed to run at 100 Hz; the CPU runs at
+ * 1.25MHz, i.e. the interval is 12500. */
+#define TMR_IDLE 0
+#define TMR_IDLECNT 12500
 
 /* console sio data rates */
 #define CON_POLLUNIT 0
@@ -371,6 +377,7 @@ extern t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int
 extern t_stat con_read(t_addr ioaddr, uint16 *data);
 extern t_stat con_write(t_addr ioaddr, uint16 data);
 extern t_stat con_binit();
+extern t_stat fdc_boot(int32 unitnum, DEVICE *dptr);
 extern t_stat fdc_read(t_addr ioaddr, uint16 *data);
 extern t_stat fdc_write(t_addr ioaddr, uint16 data);
 extern t_stat fdc_autoload();

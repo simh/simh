@@ -41,10 +41,11 @@
    20131110 hv A really hard one: INT 3 (RCV CONSOLE) incremented waiter sema, because
                interrupt changed reg_intpending within a WAIT. Need to latch interrupt before
                execution and process afterwards
+   20141003 hv compiler suggested warnings (vc++2013, gcc)
 */
 
 #include "pdq3_defs.h"
-
+#include <math.h>
 
 /* some simulator publics */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
@@ -140,14 +141,14 @@ REG cpu_reg[] = {
   { NULL }
 };
 MTAB cpu_mod[] = {
-  { UNIT_MSIZE,         0,              NULL,           "32K",     &cpu_set_size,       NULL },
-  { UNIT_MSIZE,         1,              NULL,           "64K",     &cpu_set_size,       NULL },
-  { UNIT_PASEXC,        UNIT_PASEXC,    "halt on EXC",  "EXC",     &cpu_set_flag,       NULL },
-  { UNIT_PASEXC,        0,              "no EXC",       NULL,      NULL,                NULL },
-  { MTAB_XTD|MTAB_VDV,  UNIT_PASEXC,    NULL,           "NOEXC",   &cpu_set_noflag,     NULL },
-  { MTAB_XTD|MTAB_VDV,  0,              "IOBASE",       "IOBASE",  NULL,                &show_iobase },
-  { MTAB_XTD|MTAB_VDV,  0,              "VECTOR",       "VECTOR",  NULL,                &show_iovec },
-  { MTAB_XTD|MTAB_VDV,  0,              "PRIO",         "PRIO",    NULL,                &show_ioprio },
+  { UNIT_MSIZE,                  0,          NULL,     "32K",   &cpu_set_size,         NULL },
+  { UNIT_MSIZE,                  1,          NULL,     "64K",   &cpu_set_size,         NULL },
+  { UNIT_PASEXC,       UNIT_PASEXC, "halt on EXC",     "EXC",   &cpu_set_flag,         NULL },
+  { UNIT_PASEXC,                 0,      "no EXC",      NULL,            NULL,         NULL },
+  { MTAB_XTD|MTAB_VDV, UNIT_PASEXC,          NULL,   "NOEXC", &cpu_set_noflag,         NULL },
+  { MTAB_XTD|MTAB_VDV,           0,      "IOBASE",  "IOBASE",            NULL, &show_iobase },
+  { MTAB_XTD|MTAB_VDV,           0,      "VECTOR",  "VECTOR",            NULL,  &show_iovec },
+  { MTAB_XTD|MTAB_VDV,           0,        "PRIO",    "PRIO",            NULL, &show_ioprio },
   { 0 }
 };
 
@@ -323,7 +324,7 @@ t_stat cpu_boot(int32 unitnum, DEVICE *dptr) {
     cpu_setRegs(ctp, ssv, rq);
   } else {
     /* autoload the 1st track into meory at reg_dmabase */
-    if ((rc = fdc_dev.boot(0, &fdc_dev)) != SCPE_OK) return rc;
+    if ((rc = fdc_boot(0, &fdc_dev)) != SCPE_OK) return rc;
   } 
   return SCPE_OK;
 }
@@ -495,8 +496,6 @@ void cpu_assertInt(int level, t_bool tf) {
 }
 
 t_stat cpu_raiseInt(int level) {
-  uint16 vector = int_vectors[level];
-  
   if (level > 15) {
     printf("Implementation error: raiseInt with level>15! Need fix\n");
     exit(1);
@@ -562,10 +561,10 @@ static t_stat cpu_processInt() {
  * instruction interpreter
  ************************************************************************************/
 
-static uint16 UB() {
+static uint8 UB() {
   uint16 val;
   ReadB(reg_segb, reg_ipc++, &val, DBG_CPU_FETCH);
-  return val;
+  return val & 0xff;
 }
 static uint16 W() {
   uint16 high, data;
@@ -610,10 +609,10 @@ static void Putb(t_addr base, t_addr idx, uint16 val) {
   WriteB(base, idx, val, DBG_CPU_WRITE);
 }
 
-static uint16 Getb(t_addr addr,t_addr idx) {
+static uint8 Getb(t_addr addr,t_addr idx) {
   uint16 val;
   ReadB(addr, idx, &val, DBG_CPU_READ);
-  return val;
+  return val & 0xff;
 }
 
 static uint16 TraverseMSstat(uint16 db) {
@@ -699,9 +698,9 @@ static uint16 GetSIB(uint8 segno) {
 }
 
 /* do a CXG instruction into segment SEGNO to procedure procno */
-static float DoCXG(uint16 segno, uint16 procno) {
+static void DoCXG(uint8 segno, uint8 procno) {
   uint16 ptbl;
-  uint16 osegno = GetSegno(); /* obtain segment of caller to be set into MSCW */
+  uint8 osegno = (uint8)GetSegno(); /* obtain segment of caller to be set into MSCW */
   uint16 osegb = reg_segb;
   
 //  printf("CXG: seg=%d proc=%d, osegno=%d\n",segno,procno,osegno);
@@ -710,7 +709,7 @@ static float DoCXG(uint16 segno, uint16 procno) {
   
 //  printf("CXG: ptbl=%x, reg_segb=%x\n",ptbl,reg_segb);
   reg_ipc = createMSCW(ptbl, procno, reg_bp, osegno, osegb); /* call new segment */
-  return 63.2;
+  sim_interval -= 63; /* actually 63.2 */
 }
 
 static t_stat Raise(uint16 err) {
@@ -729,7 +728,7 @@ static t_stat Raise(uint16 err) {
   /* call OS trap handler
    * Note: if an exception occurs in boot loader (CHK instruction for CPU serial),
    * this goes to nirvana because HALTUNIT is not yet linked correctly */
-  sim_interval -= DoCXG(2,2);
+  DoCXG(2,2);
   return SCPE_OK;
 }
 
@@ -791,7 +790,7 @@ static t_stat taskswitch6() {
   uint16 vector, sem;
   int level;
   t_stat rc = SCPE_OK;
-  int kbdc;
+//  int kbdc;
   sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "Taskswitch6: ctp=$%04x rq=$%04x\n",DBG_PC, reg_ctp, reg_rq);
 
   while (reg_rq == NIL) { /* no task ready to run? */
@@ -804,15 +803,19 @@ static t_stat taskswitch6() {
       sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "Taskswitch6: SIGNAL sem=$%04x\n",DBG_PC, sem);
       rc = DoSIGNAL(sem);
       return rc;
-    } else {      
+    } else {
+#if 0     
       kbdc = sim_poll_kbd(); /* check keyboard */
       if (kbdc == SCPE_STOP) return kbdc; /* handle CTRL-E */
       /* process timer */
       if (sim_interval <= 0) {
-        if ((rc = sim_process_event()))
+        if ((rc = sim_process_event()) != SCPE_OK)
           return rc;
       }
-      sim_interval -= 3.6; /* NOP cycle */
+    sim_interval -= 4; /* actually 3.6, NOP cycle */
+#else
+      sim_idle(TMR_IDLE, TRUE);
+#endif
     }
   }
 
@@ -861,7 +864,7 @@ static t_stat DoSIGNAL(uint16 sem) {
       sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "SIGNAL: reg_rq=$%x, reg_ctp=$%x\n", DBG_PC, reg_rq, reg_ctp);
       
       if (reg_ctp == NIL) { /* no current task (marker for int processing */
-        sim_interval -= 134.8; /* consume time */
+        sim_interval -= 135; /* actually 134.8, consume time */
         return taskswitch6(); /* and switch task */
       }
       if (Getb(reg_ctp+OFFB_PRIOR,0) < Getb(qtask+OFFB_PRIOR,0)) { /* is qtask higher prio than current task? */
@@ -870,7 +873,7 @@ static t_stat DoSIGNAL(uint16 sem) {
       } else {
         /* else: nothing is waiting on this semaphore, discard argument, and continue */
         reg_sp++;
-        sim_interval -= 52.0;
+        sim_interval -= 52; /* correct: 52.0 */
       }
       return rc;
     }
@@ -879,18 +882,18 @@ static t_stat DoSIGNAL(uint16 sem) {
   sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "SIGNAL: Sem=$%x(count=%d): increment\n",DBG_PC, sem, count);
   Put(sem+OFF_SEMCOUNT,count+1);
   if (reg_ctp == NIL) { /* if no active task, get one from ready queue */
-    sim_interval -= 134.8;
+    sim_interval -= 135; /* actually 134.8 */
     return taskswitch6(); 
   }
   reg_sp++;
-  sim_interval -= 18.0;
+  sim_interval -= 18; /* correct: 18.0 */
   return rc;
 }
 
-static float DoWAIT(uint16 sem) {
+static t_stat DoWAIT(uint16 sem) {
   uint16 qhead; 
   uint16 wqaddr = sem + OFF_SEMWAITQ;
-  t_stat rc = SCPE_OK;
+  t_stat rc;
 
   uint16 count = Get(sem + OFF_SEMCOUNT); /* get count of semaphore */
   sim_debug(DBG_CPU_CONC, &cpu_dev, DBG_PCFORMAT1 "WAIT: Sem=$%04x(count=%d)\n",DBG_PC,sem, count);
@@ -902,33 +905,35 @@ static float DoWAIT(uint16 sem) {
 //    sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "WAIT: new qhead=%x\n",DBG_PC, qhead);
     
     rc = taskswitch5(); /* save context in TIB, and switch to new task from ready queue */
-    sim_interval -= 90.8;
+    sim_interval -= 91; /* actually 90.8 */
     sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "WAIT: DONE, switch to newTIB=$%04x\n",DBG_PC, reg_ctp);
     return rc;
   } else {
     sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "WAIT: Sem=$%04x(count=%d): decrement\n", DBG_PC, sem, count);
     Put(sem+OFF_SEMCOUNT,count-1);
   }
-  sim_interval -= 11.6;
+  sim_interval -= 12; /* actually 11.6 */
   sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "WAIT: DONE, continue\n",DBG_PC);
-  return rc;
+  return SCPE_OK;
 }
 
-static uint16 HiByte(uint16 reg) {
+static uint8 HiByte(uint16 reg) {
   return (reg>>8) & 0xff;
 }
 
-static uint16 LoByte(uint16 reg) {
+static uint8 LoByte(uint16 reg) {
   return reg & 0xff;
 }
 
 static t_stat DoInstr(void) {
   t_stat rc = SCPE_OK;
-  uint16 opcode, ub1, db, b, ub2, src, dst, inx, len0, len1, hi,lo;
-  uint16 t1, t2, t3, t4, t5, min1, max1, ptbl, procno, osegb;
+  uint16 opcode, db, b, src, dst, inx, len0, len1, hi,lo;
+  uint16 t1, t2, t3, t4, t5, min1, max1, ptbl, osegb;
   int16 ts1, ts2, w;
-  uint8 segno, osegno;
-  float tf1, tf2, cyc = 0.0;
+  uint8 ub1, ub2;
+  uint8 segno, osegno, procno;
+  float tf1, tf2;
+  double cyc = 0.0;
   int i;
 
   /* set PCX: current instr in progress */
@@ -1069,7 +1074,7 @@ static t_stat DoInstr(void) {
     cyc = 12.0;
     break;
   case 0xc8: /* STB */
-    ub1 = Pop(); /* index */ b = Pop(); /* byteaddr */
+    ub1 = Pop() & 0xff; /* index */ b = Pop(); /* byteaddr */
     Putb(Pop(), b, ub1);
     cyc = 13.6;
     break;
@@ -1092,7 +1097,7 @@ static t_stat DoInstr(void) {
     cyc = 9.6;
     break;
   case 0xd7: /* IXA */
-    t1 = Pop(); Push(Pop() + t1*B());
+    b = B(); t1 = Pop(); Push(Pop() + t1*b);
     cyc = 9.6 + b/16384.*46.4;
     break;
   case 0xd8: /* IXP */
@@ -1214,15 +1219,15 @@ static t_stat DoInstr(void) {
   case 0xbe: /* TNC */
     tf1 = PopF();
     PushS((int16)tf1);
-    cyc = tf1 ? (abs(tf1)<0.5 ? 15.6 : 37.4) : 12.4; /* approximate */
+    cyc = tf1 ? (fabs(tf1)<0.5 ? 15.6 : 37.4) : 12.4; /* approximate */
     break;
   case 0xbf: /* RND */
     tf1 = PopF();
     PushS((int16)(tf1+0.5)); 
-    cyc = tf1 ? (abs(tf1)<0.5 ? 15.6 : 37.4) : 12.4; /* approximate */
+    cyc = tf1 ? (fabs(tf1)<0.5 ? 15.6 : 37.4) : 12.4; /* approximate */
     break;
   case 0xe3: /* ABR */
-    PushF(abs(PopF()));
+    PushF((float)fabs(PopF()));
     cyc = 5.2;
     break;
   case 0xe4: /* NGR */
@@ -1545,7 +1550,7 @@ static t_stat DoInstr(void) {
     break;
   case 0x94: /* CXG */
     ub1 = UB(); ub2 = UB();
-    cyc = DoCXG(ub1, ub2);
+    DoCXG(ub1, ub2);
     break;
   case 0x95: /* CXI */
     segno = UB(); db = DB(); procno = UB();
@@ -1596,7 +1601,7 @@ static t_stat DoInstr(void) {
     break;
   case 0xdf: /* WAIT */
     t1 = Pop();
-    rc = DoWAIT(t1); break;
+    DoWAIT(t1); break;
   case 0x9d: /* LPR */
     w = Tos();
     cyc = 0.0;
@@ -1630,12 +1635,12 @@ static t_stat DoInstr(void) {
     } else if (w >= 1) {
       cyc = 54.8;
       switch (w) {
-        case OFF_SP: reg_sp = t1; break;
-        case OFF_MP: reg_mp = t1; break;
-        case OFF_BP: reg_bp = t1; break;
-        case OFF_IPC: reg_ipc = t1; break;
-        case OFF_SEGB: reg_segb = t1; break;
-        default: Put(reg_ctp + w, t1); break;
+      case OFF_SP: reg_sp = t1; break;
+      case OFF_MP: reg_mp = t1; break;
+      case OFF_BP: reg_bp = t1; break;
+      case OFF_IPC: reg_ipc = t1; break;
+      case OFF_SEGB: reg_segb = t1; break;
+      default: Put(reg_ctp + w, t1); break;
       }
     }
     if (w >= -1)
@@ -1676,6 +1681,11 @@ static t_stat DoInstr(void) {
 t_stat sim_instr(void)
 {
   t_stat rc = SCPE_OK;
+  
+  /* mandatory idling */
+  sim_rtcn_init(TMR_IDLECNT, TMR_IDLE);
+  sim_set_idle(&cpu_unit, 10, NULL, NULL);
+
   while (rc == SCPE_OK) {
 
     /* set PCX of instruction in progress */
@@ -1683,7 +1693,7 @@ t_stat sim_instr(void)
 
     /* process timer */
     if (sim_interval <= 0) {
-      if ((rc = sim_process_event()))
+      if ((rc = sim_process_event()) != SCPE_OK)
         break;
     }
 
@@ -1697,10 +1707,15 @@ t_stat sim_instr(void)
      * handle time by NOP cycles
      */
     if (reg_ctp != NIL) {
-      if ((rc = DoInstr())) break;
-    } else {
+      if ((rc = DoInstr()) != SCPE_OK) break;
+    }
+    else {
+#if 0
       /* waste time by doing a NOP */
-      sim_interval -= 3.6;
+      sim_interval -= 4; /* actually 3.6 */
+#else
+      sim_idle(TMR_IDLE, TRUE);
+#endif
     }
 
     /* process interrupts 
@@ -1710,7 +1725,7 @@ t_stat sim_instr(void)
     if (cpu_isIntEnabled()) {
       reg_intpending |= reg_intlatch;
       if (reg_intpending) {
-        if ((rc = cpu_processInt())) {
+        if ((rc = cpu_processInt()) != SCPE_OK) {
           printf("processint returns %d\n",rc); fflush(stdout);
           break;
         }

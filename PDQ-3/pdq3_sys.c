@@ -28,18 +28,17 @@
    20130907 hv added VIEWSEG command
    20130925 hv added CALL and NAME command
    20130927 hv wrong disassembly of LDC instr
+   20141003 hv compiler suggested warnings (vc++2013, gcc)
 */
 #include "pdq3_defs.h"
 #include <ctype.h>
 
-static int disass(t_addr addr);
 t_stat parse_sym_m (char *cptr, t_value *val, int32 sw);
 void pdq3_vm_init (void);
 static t_stat pdq3_cmd_exstack(int32 arg, char *buf);
 static t_stat pdq3_cmd_exmscw(int32 arg, char *buf);
 static t_stat pdq3_cmd_extib(int32 arg, char *buf);
 static t_stat pdq3_cmd_exseg(int32 arg, char *buf);
-static t_stat pdq3_cmd_calcea(int32 arg, char *buf);
 static t_stat pdq3_cmd_calltree(int32 arg, char *buf);
 static t_stat pdq3_cmd_namealias(int32 arg, char *buf);
 
@@ -51,7 +50,6 @@ extern DEVICE tim_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern uint16 reg_pc;
-
 
 /* SCP data structures and interface routines
    sim_name             simulator name string
@@ -541,7 +539,6 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
   T_FLCVT t;
   int ch;
   
-  t_bool hexdec = (sw & SWMASK('H')) ? TRUE : FALSE;
   if (sw & SWMASK('M') && !ADDR_ISWORD(addr)) {
     return fprint_sym_m(of, addr, val, uptr, sw);
   }
@@ -570,11 +567,11 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     if (ADDR_ISWORD(addr)) {
       fprint_val(of, val[0], cpu_dev.dradix, 16, PV_RZRO);
       off = ADDR_OFF(addr);
-      if (off > (reg_bp+MSCW_SZ-1)) 
+      if (off > (t_addr)(reg_bp+MSCW_SZ-1)) 
         fprintf(of," (GLOBAL+%d)", off - reg_bp - MSCW_SZ + 1);
-      else if (off >= reg_mp && off <= (reg_mp+OFFB_MSSEG)) 
+      else if (off >= reg_mp && off <= (t_addr)(reg_mp+OFFB_MSSEG)) 
         fprintf(of," (MP+%d)", off - reg_mp);
-      else if (off > (reg_mp+MSCW_SZ-1)) 
+      else if (off > (t_addr)(reg_mp+MSCW_SZ-1)) 
         fprintf(of," (LOCAL+%d)", off - reg_mp - MSCW_SZ + 1);
       else if (off >= reg_sp && off < reg_spupr) 
         fprintf(of," (SP+%d)", off - reg_sp);
