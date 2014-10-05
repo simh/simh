@@ -1194,7 +1194,8 @@ while (*cptr != 0) {                                    /* do all mods */
         r = tmxr_attach (&sim_con_tmxr, &sim_con_unit, gbuf);/* open master socket */
         if (r == SCPE_OK)
             sim_activate_after(&sim_con_unit, 1000000); /* check for connection in 1 second */
-        return r;
+        else
+            return r;
         }
     }
 return SCPE_OK;
