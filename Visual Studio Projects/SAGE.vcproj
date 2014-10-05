@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="sage"
+	Name="SAGE"
 	ProjectGUID="{9D0DAC36-2C75-41CD-905C-93B2F5ADF9E2}"
-	RootNamespace="sage"
+	RootNamespace="SAGE"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="131072"
 	>
@@ -19,7 +19,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\sage\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -34,9 +34,6 @@
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
-			/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
 			/>
 			<Tool
 				Name="VCMIDLTool"
@@ -102,7 +99,7 @@
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\sage\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -117,9 +114,6 @@
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
-			/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
 			/>
 			<Tool
 				Name="VCMIDLTool"

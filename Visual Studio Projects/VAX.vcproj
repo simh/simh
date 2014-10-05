@@ -19,7 +19,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\VAX\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -66,11 +66,9 @@
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
 				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\VAX.exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
 				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(OutDir)\VAX.pdb"
 				SubSystem="1"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
@@ -96,14 +94,14 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				Description="Copy result to legacy binary name (VAX.exe)"
+				Description="Copy result to Model based binary name (MicroVAX3900.exe)"
 				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; "
 			/>
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\VAX\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -155,7 +153,6 @@
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
 				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\VAX.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
 				GenerateDebugInformation="false"
@@ -187,7 +184,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				Description="Copy result to legacy binary name (VAX.exe)"
+				Description="Copy result to Model based binary name (MicroVAX3900.exe)"
 				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; "
 			/>
 		</Configuration>

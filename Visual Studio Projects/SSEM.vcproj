@@ -19,7 +19,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\SSEM\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -63,10 +63,8 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\ssem.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(OutDir)\ssem.pdb"
 				SubSystem="1"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
@@ -97,7 +95,7 @@
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\SSEM\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -142,7 +140,6 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\ssem.exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="false"
 				SubSystem="1"

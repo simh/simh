@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="Altair"
+	Name="ALTAIR"
 	ProjectGUID="{1C602310-C406-4446-85C3-E5AE0E836120}"
-	RootNamespace="Altair"
+	RootNamespace="ALTAIR"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="131072"
 	>
@@ -19,7 +19,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\ALTAIR\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -99,7 +99,7 @@
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\ALTAIR\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
