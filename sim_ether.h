@@ -206,6 +206,9 @@ struct eth_packet {
 
 struct eth_item {
   int                 type;                             /* receive (0=setup, 1=loopback, 2=normal) */
+#define ETH_ITM_SETUP    0
+#define ETH_ITM_LOOPBACK 1
+#define ETH_ITM_NORMAL   2
   struct eth_packet   packet;
 };
 

@@ -619,12 +619,14 @@ void xu_read_callback(CTLR* xu, int status)
   if (DBG_PCK & xu->dev->dctrl)
       eth_packet_trace_ex(xu->var->etherface, xu->var->read_buffer.msg, xu->var->read_buffer.len, "xu-recvd", DBG_DAT & xu->dev->dctrl, DBG_PCK);
 
+  xu->var->read_buffer.used = 0;  /* none processed yet */
+
   /* process any packets locally that can be */
   status = xu_process_local (xu, &xu->var->read_buffer);
 
   /* add packet to read queue */
   if (status != SCPE_OK)
-    ethq_insert(&xu->var->ReadQ, 2, &xu->var->read_buffer, 0);
+    ethq_insert(&xu->var->ReadQ, ETH_ITM_NORMAL, &xu->var->read_buffer, 0);
 }
 
 void xua_read_callback(int status)
@@ -1425,7 +1427,7 @@ void xu_process_transmit(CTLR* xu)
       /* are we in internal loopback mode ? */
       if ((xu->var->mode & MODE_LOOP) && (xu->var->mode & MODE_INTL)) {
         /* just put packet in  receive buffer */
-        ethq_insert (&xu->var->ReadQ, 1, &xu->var->write_buffer, 0);
+        ethq_insert (&xu->var->ReadQ, ETH_ITM_LOOPBACK, &xu->var->write_buffer, 0);
       } else {
         /* transmit packet synchronously - write callback sets status */
         wstatus = eth_write(xu->var->etherface, &xu->var->write_buffer, xu->var->wcallback);

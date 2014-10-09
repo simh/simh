@@ -3168,7 +3168,7 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
     eth_packet_trace (dev, data, len, "rcvqd");
 
     pthread_mutex_lock (&dev->lock);
-    ethq_insert_data(&dev->read_queue, 2, data, 0, len, crc_len, crc_data, 0);
+    ethq_insert_data(&dev->read_queue, ETH_ITM_NORMAL, data, 0, len, crc_len, crc_data, 0);
     ++dev->packets_received;
     pthread_mutex_unlock (&dev->lock);
     free(moved_data);

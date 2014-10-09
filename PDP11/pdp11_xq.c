@@ -1162,7 +1162,7 @@ t_stat xq_process_rbdl(CTLR* xq)
          the physical layer (sim_ether) won't deliver any short packets 
          via eth_read, so the only short packets which get here are loopback
          packets sent by the host diagnostics (OR short setup packets) */
-      if ((item->type == 2) && (rbl < ETH_MIN_PACKET)) {
+      if ((item->type == ETH_ITM_NORMAL) && (rbl < ETH_MIN_PACKET)) {
         xq->var->stats.runt += 1;
         sim_debug(DBG_WRN, xq->dev, "Runt detected, size = %d\n", rbl);
         /* pad runts with zeros up to minimum size - this allows "legal" (size - 60)
@@ -1172,7 +1172,7 @@ t_stat xq_process_rbdl(CTLR* xq)
       };
 
       /* adjust oversized non-loopback packets */
-      if ((item->type != 1) && (rbl > ETH_FRAME_SIZE)) {
+      if ((item->type != ETH_ITM_LOOPBACK) && (rbl > ETH_FRAME_SIZE)) {
         xq->var->stats.giant += 1;
         sim_debug(DBG_WRN, xq->dev, "Giant detected, size=%d\n", rbl);
         /* trim giants down to maximum size - no documentation on how to handle the data loss */
@@ -1197,7 +1197,7 @@ t_stat xq_process_rbdl(CTLR* xq)
 
     xq->var->rbdl_buf[4] = 0;
     switch (item->type) {
-      case 0: /* setup packet */
+      case ETH_ITM_SETUP: /* setup packet */
         xq->var->stats.setup += 1;
         xq->var->rbdl_buf[4] = 0x2700;      /* set esetup and RBL 10:8 */
         if (xq->var->type == XQ_T_DEQNA) {  /* Strange DEQNA behavior */
@@ -1209,7 +1209,7 @@ t_stat xq_process_rbdl(CTLR* xq)
           }
         }
         break;
-      case 1: /* loopback packet */
+      case ETH_ITM_LOOPBACK: /* loopback packet */
         xq->var->stats.loop += 1;
         xq->var->rbdl_buf[4] = XQ_RST_LASTNOERR;
         if (xq->var->type == XQ_T_DEQNA)
@@ -1220,7 +1220,7 @@ t_stat xq_process_rbdl(CTLR* xq)
         if (xq->var->csr & XQ_CSR_EL)
             xq->var->rbdl_buf[4] |= XQ_RST_ESETUP;/* loopback flag */
         break;
-      case 2: /* normal packet */
+      case ETH_ITM_NORMAL: /* normal packet */
         rbl -= 60;    /* keeps max packet size in 11 bits */
         xq->var->rbdl_buf[4] = (rbl & 0x0700); /* high bits of rbl */
         xq->var->rbdl_buf[4] |= 0x00f8;        /* set reserved bits to 1 */
@@ -1236,8 +1236,8 @@ t_stat xq_process_rbdl(CTLR* xq)
       xq->var->ReadQ.loss = 0;                  /* reset loss counter */
       }
     if (((~xq->var->csr & XQ_CSR_EL) &&
-         ((rbl + ((item->type == 2) ? 60 : 0)) > ETH_MAX_PACKET)) ||
-        ((xq->var->csr & XQ_CSR_EL) && (item->type == 1) && 
+         ((rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0)) > ETH_MAX_PACKET)) ||
+        ((xq->var->csr & XQ_CSR_EL) && (item->type == ETH_ITM_LOOPBACK) && 
          (rbl >= XQ_LONG_PACKET)))
       xq->var->rbdl_buf[4] |= XQ_RST_LASTERR;   /* set Error bit (LONG) */
 
@@ -1245,7 +1245,8 @@ t_stat xq_process_rbdl(CTLR* xq)
     wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
     if (wstatus) return xq_nxm_error(xq);
 
-    sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", xq->var->rbdl_ba, address, b_length, rbl + ((item->type == 2) ? 60 : 0), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
+    sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", 
+        xq->var->rbdl_ba, address, b_length, rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
 
     /* remove packet from queue */
     if (item->packet.used >= item->packet.len) {
@@ -1748,7 +1749,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       rbuf = &item->packet.msg[used];
     } else {
       /* adjust non loopback runt packets */
-      if ((item->type != 1) && (rbl < ETH_MIN_PACKET)) {
+      if ((item->type != ETH_ITM_LOOPBACK) && (rbl < ETH_MIN_PACKET)) {
         xq->var->stats.runt += 1;
         sim_debug(DBG_WRN, xq->dev, "Runt detected, size = %d\n", rbl);
         /* pad runts with zeros up to minimum size - this allows "legal" (size - 60)
@@ -1758,7 +1759,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       };
 
       /* adjust oversized non-loopback packets */
-      if ((item->type != 1) && (rbl > ETH_FRAME_SIZE)) {
+      if ((item->type != ETH_ITM_LOOPBACK) && (rbl > ETH_FRAME_SIZE)) {
         xq->var->stats.giant += 1;
         sim_debug(DBG_WRN, xq->dev, "Giant detected, size=%d\n", rbl);
         /* trim giants down to maximum size - no documentation on how to handle the data loss */
@@ -2062,8 +2063,9 @@ void xq_read_callback(CTLR* xq, int status)
   if (DBG_PCK & xq->dev->dctrl)
     eth_packet_trace_ex(xq->var->etherface, xq->var->read_buffer.msg, xq->var->read_buffer.len, "xq-recvd", DBG_DAT & xq->dev->dctrl, DBG_PCK);
 
-  if ((xq->var->csr & XQ_CSR_RE) || (xq->var->mode == XQ_T_DELQA_PLUS)) { /* receiver enabled */
+  xq->var->read_buffer.used = 0;  /* none processed yet */
 
+  if ((xq->var->csr & XQ_CSR_RE) || (xq->var->mode == XQ_T_DELQA_PLUS)) { /* receiver enabled */
     /* process any packets locally that can be */
     t_stat status = xq_process_local (xq, &xq->var->read_buffer);
 
