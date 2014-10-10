@@ -392,7 +392,6 @@ t_stat sim_brk_clrall (int32 sw);
 t_stat sim_brk_show (FILE *st, t_addr loc, int32 sw);
 t_stat sim_brk_showall (FILE *st, int32 sw);
 char *sim_brk_getact (char *buf, int32 size);
-void sim_brk_clract (void);
 void sim_brk_npc (uint32 cnt);
 BRKTAB *sim_brk_new (t_addr loc);
 FILE *stdnul;
@@ -469,6 +468,7 @@ uint32 sim_brk_summ = 0;
 uint32 sim_brk_types = 0;
 uint32 sim_brk_dflt = 0;
 char *sim_brk_act[MAX_DO_NEST_LVL];
+char *sim_brk_act_buf[MAX_DO_NEST_LVL];
 BRKTAB *sim_brk_tab = NULL;
 int32 sim_brk_ent = 0;
 int32 sim_brk_lnt = 0;
@@ -2548,9 +2548,9 @@ do {
         (stat != SCPE_OK) &&
         (stat != SCPE_STEP)) {
         if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
-            sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][stat];
+            sim_brk_setact (sim_on_actions[sim_do_depth][stat]);
         else
-            sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][0];
+            sim_brk_setact (sim_on_actions[sim_do_depth][0]);
         }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
@@ -7460,7 +7460,7 @@ sim_brk_tab = (BRKTAB *) calloc (sim_brk_lnt, sizeof (BRKTAB));
 if (sim_brk_tab == NULL)
     return SCPE_MEM;
 sim_brk_ent = sim_brk_ins = 0;
-sim_brk_act[sim_do_depth] = NULL;
+sim_brk_clract ();
 sim_brk_npc (0);
 return SCPE_OK;
 }
@@ -7681,7 +7681,7 @@ if ((bp = sim_brk_fnd (loc)) && (btyp & bp->typ)) {     /* in table, and type ma
     bp->cnt = 0;                                        /* reset count */
     sim_brk_ploc[spc] = loc;                            /* save location */
     sim_brk_pend[spc] = TRUE;                           /* don't do twice */
-    sim_brk_act[sim_do_depth] = bp->act;                /* set up actions */
+    sim_brk_setact (bp->act);                           /* set up actions */
     return (btyp & bp->typ);
     }
 sim_brk_pend[spc] = FALSE;
@@ -7699,8 +7699,9 @@ if (sim_brk_act[sim_do_depth] == NULL)                  /* any action? */
     return NULL;
 while (isspace (*sim_brk_act[sim_do_depth]))            /* skip spaces */
     sim_brk_act[sim_do_depth]++;
-if (*sim_brk_act[sim_do_depth] == 0)                    /* now empty? */
-    return (sim_brk_act[sim_do_depth] = NULL);
+if (*sim_brk_act[sim_do_depth] == 0) {                  /* now empty? */
+    return sim_brk_clract ();
+    }
 if ((ep = strchr (sim_brk_act[sim_do_depth], ';'))) {   /* cmd delimiter? */
     lnt = ep - sim_brk_act[sim_do_depth];               /* cmd length */
     memcpy (buf, sim_brk_act[sim_do_depth], lnt + 1);   /* copy with ; */
@@ -7709,16 +7710,26 @@ if ((ep = strchr (sim_brk_act[sim_do_depth], ';'))) {   /* cmd delimiter? */
     }
 else {
     strncpy (buf, sim_brk_act[sim_do_depth], size);     /* copy action */
-    sim_brk_act[sim_do_depth] = NULL;                   /* no more */
+    sim_brk_clract ();                                  /* no more */
     }
 return buf;
 }
 
 /* Clear pending actions */
 
-void sim_brk_clract (void)
+char *sim_brk_clract (void)
 {
-sim_brk_act[sim_do_depth] = NULL;
+free (sim_brk_act_buf[sim_do_depth]);
+return sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth] = NULL;
+}
+
+/* Set up pending actions */
+
+void sim_brk_setact (const char *action)
+{
+sim_brk_act_buf[sim_do_depth] = realloc (sim_brk_act_buf[sim_do_depth], strlen (action) + 1);
+strcpy (sim_brk_act_buf[sim_do_depth], action);
+sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth];
 }
 
 /* New PC */
