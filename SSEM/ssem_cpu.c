@@ -88,10 +88,6 @@ uint32 C[MEMSIZE] = { 0, 0 };    /* C[0] current instruction */
                                 /* C[1] present instruction */
 uint32 Staticisor = 0;
 
-extern int32 sim_interval;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern int32 sim_step;
-
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);

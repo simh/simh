@@ -58,7 +58,6 @@
 extern uint16 dev_ext_int, dev_ext_enb; // current IRQ and IEN bit vectors
 extern int32 PC;                        // current PC (for debug messages)
 extern int32 stop_inst;                 // needed by IOBADFNC()
-extern int32 sim_switches;              // option bitmap for ATTACH/DETACH
 extern uint16 M[];                      // main memory (for DMC access)
 
 // Forward declarations ...

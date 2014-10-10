@@ -781,8 +781,5 @@ t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat auto_config (char *name, int32 num);
 
-/* Global data */
-
-extern t_bool sim_idle_enab;
 
 #endif

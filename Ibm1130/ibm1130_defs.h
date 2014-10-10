@@ -70,7 +70,6 @@ extern int32  int_lamps;					/* accumulated version of int_req - gives lamp pers
 extern int32  int_mask;						/* current active interrupt mask (ipl sensitive) */
 extern int32  mem_mask;
 extern int32  cpu_dsw;						/* CPU device status word */
-extern int32  sim_int_char;					/* interrupt character */
 extern int32  con_dsw;						/* has program stop and int run bits */
 extern t_bool running;
 extern t_bool power;

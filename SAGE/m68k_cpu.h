@@ -53,7 +53,6 @@ extern REG m68kcpu_reg[];
 #define DBG_CPU_BTRACE		(1 << 4)
 #define DBG_CPU_CUSTOM1		(1 << 5)	/* reserved for custom debugging */
 #define DBG_CPU_CUSTOM2		(1 << 6)	/* reserved for custom debugging */
-extern FILE* sim_deb;
 extern DEBTAB m68kcpu_dt[];
 #if DBG_MSG==1
 #define IFDEBUG(flag,func) if ((m68kcpu_dev->dctrl & flag) && sim_deb) { (void)(func); fflush(sim_deb); }

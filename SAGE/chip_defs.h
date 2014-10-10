@@ -54,7 +54,6 @@
 
 /* generic debug tracing support */
 #if DBG_MSG==1
-extern FILE* sim_deb;
 
 #define ADDRESS_FORMAT		"[0x%08x]"	
 #if UNIX_PLATFORM

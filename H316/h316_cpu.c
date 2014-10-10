@@ -296,7 +296,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 
-extern int32 sim_int_char;
 extern DEVICE *sim_devices[];
 
 t_bool devtab_init (void);

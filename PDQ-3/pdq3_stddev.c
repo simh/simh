@@ -35,7 +35,6 @@
 #include <ctype.h>
 
 extern UNIT cpu_unit;
-extern int32 sim_switches;
 extern UNIT con_unit[];
 
 static t_stat con_termsvc(UNIT *uptr);

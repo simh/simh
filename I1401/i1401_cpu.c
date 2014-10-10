@@ -521,7 +521,6 @@ static const int32 mtf_mod[] = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 int32 IS, ilnt, flags;
 int32 op, xa, t, wm, ioind, dev, unit;
 int32 a, b, i, k, asave, bsave;

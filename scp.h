@@ -195,6 +195,8 @@ extern volatile int32 stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
 extern uint32 sim_brk_dflt;
 extern uint32 sim_brk_summ;
+extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
+extern t_addr sim_brk_ploc[SIM_BKPT_N_SPC];
 extern FILE *stdnul;
 extern t_bool sim_asynch_enabled;
 

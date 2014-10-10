@@ -1940,8 +1940,6 @@ void PutByteDMA(const uint32 Addr, const uint32 Value) {
     2) it returns MASK_BRK if a breakpoint is found but should be ignored
 */
 static int32 sim_brk_lookup (const t_addr loc, const int32 btyp) {
-    extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
-    extern t_addr sim_brk_ploc[SIM_BKPT_N_SPC];
     BRKTAB *bp;
     if ((bp = sim_brk_fnd (loc)) &&                         /* entry in table?  */
         (btyp & bp -> typ) &&                               /* type match?      */
@@ -2050,7 +2048,6 @@ void setClockFrequency(const uint32 Value) {
 }
 
 static t_stat sim_instr_mmu (void) {
-    extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
     extern int32 timerInterrupt;
     extern int32 timerInterruptHandler;
     extern int32 keyboardInterrupt;

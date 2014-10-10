@@ -305,7 +305,6 @@ extern void rxcs_wr (int32 dat);
 extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void ioreset_wr (int32 dat);
-extern uint32 sim_os_msec();
 extern void cpu_idle (void);
 
 /* ROM data structures

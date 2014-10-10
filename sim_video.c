@@ -42,8 +42,6 @@ t_bool vid_mouse_b3 = FALSE;
 #include <SDL.h>
 #include <SDL_thread.h>
 
-extern int32 sim_is_running;
-
 #define EVENT_REDRAW    1                               /* redraw event for SDL */
 #define EVENT_CLOSE     2                               /* close event for SDL */
 #define MAX_EVENTS      20                              /* max events in queue */

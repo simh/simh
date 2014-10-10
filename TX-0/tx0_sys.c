@@ -58,7 +58,6 @@ extern int32 M[];
 extern int32 PC;
 extern int32 ascii_to_flexo[], flexo_to_ascii[];
 extern int32 sc_map[];
-extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 

@@ -1155,7 +1155,6 @@ clock_gettime(CLOCK_REALTIME, &now);
 return _timespec_to_double (&now);
 }
 
-extern int32 sim_is_running;
 extern UNIT * volatile sim_wallclock_queue;
 extern UNIT * volatile sim_wallclock_entry;
 

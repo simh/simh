@@ -29,7 +29,6 @@
 
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern int32 sim_switches;
 extern uint32 pal_type;
 
 t_stat fprint_sym_m (FILE *of, t_addr addr, uint32 inst);
