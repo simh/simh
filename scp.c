@@ -7727,9 +7727,13 @@ return sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth] = NULL;
 
 void sim_brk_setact (const char *action)
 {
-sim_brk_act_buf[sim_do_depth] = realloc (sim_brk_act_buf[sim_do_depth], strlen (action) + 1);
-strcpy (sim_brk_act_buf[sim_do_depth], action);
-sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth];
+if (action) {
+    sim_brk_act_buf[sim_do_depth] = realloc (sim_brk_act_buf[sim_do_depth], strlen (action) + 1);
+    strcpy (sim_brk_act_buf[sim_do_depth], action);
+    sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth];
+    }
+else
+    sim_brk_clract ();
 }
 
 /* New PC */
