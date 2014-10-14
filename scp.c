@@ -375,6 +375,8 @@ t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_break (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_send (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_expect (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
 t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag);
 t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flg, int32 *toks);
@@ -400,7 +402,7 @@ FILE *stdnul;
 
 SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value val, SCHTAB *schptr);
-static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote);
+static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char);
 int32 get_switches (char *cptr);
 char *get_sim_sw (char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
@@ -438,6 +440,7 @@ t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 void fprint_fields (FILE *stream, t_value before, t_value after, BITFIELD* bitdefs);
 t_stat step_svc (UNIT *ptr);
+t_stat expect_svc (UNIT *ptr);
 t_stat shift_args (char *do_arg[], size_t arg_count);
 t_stat set_on (int32 flag, char *cptr);
 t_stat set_verify (int32 flag, char *cptr);
@@ -507,6 +510,7 @@ static t_stat sim_last_cmd_stat;                        /* Command Status */
 static SCHTAB sim_stab;
 
 static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0)  };
+static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0)  };
 #if defined USE_INT64
 static const char *sim_si64 = "64b data";
 #else
@@ -572,6 +576,7 @@ const struct scp_error {
          {"AFAIL",   "Assertion failed"},
          {"INVREM",  "Invalid remote console command"},
          {"NOTATT",  "Not attached"},
+         {"EXPECT",  "Expect matched"},
     };
 
 const size_t size_map[] = { sizeof (int8),
@@ -1112,6 +1117,8 @@ static const char simh_help[] =
 #define HLP_SHOW_MULTIPLEXER    "*Commands SHOW"
 #define HLP_SHOW_CLOCKS         "*Commands SHOW"
 #define HLP_SHOW_ON             "*Commands SHOW"
+#define HLP_SHOW_SEND           "*Commands SHOW"
+#define HLP_SHOW_EXPECT         "*Commands SHOW"
 #define HLP_HELP                "*Commands HELP"
        /***************** 80 character line width template *************************/
       "2HELP\n"
@@ -1364,6 +1371,80 @@ ASSERT		failure have several different actions:
       " If there is no argument, ECHO prints a blank line on the console.  This\n"
       " may be used to provide spacing in the console display or log.\n"
        /***************** 80 character line width template *************************/
+#define HLP_SEND        "*Commands Executing_Command_Files Injecting_Console_Input"
+       /***************** 80 character line width template *************************/
+      "3Injecting Console Input\n"
+      " The SEND command provides a way to insert input into the console device of\n"
+      " a simulated system as if it was entered by a user.\n\n"
+      "++SEND {delay=nn,}\"<string>\"      send input string into console\n\n"
+      " The string argument must be delimited by quote characters.  Quotes may\n"
+      " be either single or double but the opening and closing quote characters\n"
+      " must match.  Data in the string may contain escaped character strings.\n\n"
+      " The SEND command can also insert input into any serial device on a\n"
+      " simulated system as if it was entered by a user.\n\n"
+      "++SEND <dev>:line {delay=nn,}\"<string>\"\n\n"
+      "4Delay\n"
+      " Specifies a positive integer representing a minimal instruction delay\n"
+      " before and between characdters being sent.  The value specified in a delay\n"
+      " argument persists across SEND commands.  The delay parameter can be set by\n"
+      " itself with SEND DELAY=n\n"
+      "4Escaping String Data\n"
+      " The following character escapes are explicitly supported:\n"
+      "  ++\\r  Sends the ASCII Carriage Return character (Decimal value 13)\n"
+      "  ++\\n  Sends the ASCII Linefeed character (Decimal value 10)\n"
+      "  ++\\f  Sends the ASCII Formfeed character (Decimal value 12)\n"
+      "  ++\\t  Sends the ASCII Horizontal Tab character (Decimal value 9)\n"
+      "  ++\\v  Sends the ASCII Vertical Tab character (Decimal value 11)\n"
+      "  ++\\b  Sends the ASCII Backspace character (Decimal value 8)\n"
+      "  ++\\\\  Sends the ASCII Backslash character (Decimal value 92)\n"
+      "  ++\\'  Sends the ASCII Single Quote character (Decimal value 39)\n"
+      "  ++\\\"  Sends the ASCII Double Quote character (Decimal value 34)\n"
+      "  ++\\?  Sends the ASCII Question Mark character (Decimal value 63)\n"
+      "  ++\\e  Sends the ASCII Escape character (Decimal value 27)\n"
+      " as well as octal character values of the form:\n"
+      "  ++\\n{n{n}} where each n is an octal digit (0-7)\n"
+      " and hext character values of the form:\n"
+      "  ++\\xh{h} where each h is a hex digit (0-9A-Fa-f)\n"
+       /***************** 80 character line width template *************************/
+#define HLP_EXPECT      "*Commands Executing_Command_Files Reacting_To_Console_Output"
+       /***************** 80 character line width template *************************/
+      "3Reacting To Console Output\n"
+      " The EXPECT command provides a way to stop execution and take actions\n"
+      " when specific output has been generated by the simulated system.\n"
+      " a simulated system as if it was entered by a user.\n\n"
+      "++EXPECT {dev:line} \"<string>\" {actioncommand {; actioncommand}...}\n\n"
+      " The string argument must be delimited by quote characters.  Quotes may\n"
+      " be either single or double but the opening and closing quote characters\n"
+      " must match.  Data in the string may contain escaped character strings.\n"
+       /***************** 80 character line width template *************************/
+      "4Switches\n"
+      " Switches can be used to influence the behavior of EXPECT rules\n\n"
+      "5-p\n"
+      " EXPECT rules default to be one shot activities.  That is a rule is\n"
+      " automatically removed when it matches unless it is designated as a\n"
+      " persistent rule by using a -p switch when the rule is defined.\n"
+      "5-c\n"
+      " If an expect rule is defined with the -c switch, it will cause all\n"
+      " pending expect rules on the current device to be cleared when the rule\n"
+      " matches data in the device output stream.\n"
+      "4Escaping String Data\n"
+      " The following character escapes are explicitly supported:\n"
+      "  ++\\r  Sends the ASCII Carriage Return character (Decimal value 13)\n"
+      "  ++\\n  Sends the ASCII Linefeed character (Decimal value 10)\n"
+      "  ++\\f  Sends the ASCII Formfeed character (Decimal value 12)\n"
+      "  ++\\t  Sends the ASCII Horizontal Tab character (Decimal value 9)\n"
+      "  ++\\v  Sends the ASCII Vertical Tab character (Decimal value 11)\n"
+      "  ++\\b  Sends the ASCII Backspace character (Decimal value 8)\n"
+      "  ++\\\\  Sends the ASCII Backslash character (Decimal value 92)\n"
+      "  ++\\'  Sends the ASCII Single Quote character (Decimal value 39)\n"
+      "  ++\\\"  Sends the ASCII Double Quote character (Decimal value 34)\n"
+      "  ++\\?  Sends the ASCII Question Mark character (Decimal value 63)\n"
+      "  ++\\e  Sends the ASCII Escape character (Decimal value 27)\n"
+      " as well as octal character values of the form:\n"
+      "  ++\\n{n{n}} where each n is an octal digit (0-7)\n"
+      " and hext character values of the form:\n"
+      "  ++\\xh{h} where each h is a hex digit (0-9A-Fa-f)\n"
+       /***************** 80 character line width template *************************/
 #define HLP_ASSERT      "*Commands Executing_Command_Files Testing_Simulator_State"
       "3Testing Simulator State\n"
       " The ASSERT command tests a simulator state condition and halts command\n"
@@ -1459,6 +1540,9 @@ static CTAB cmd_table[] = {
     { "IGNORE",     &noop_cmd,      0,          HLP_IGNORE },
     { "ECHO",       &echo_cmd,      0,          HLP_ECHO },
     { "ASSERT",     &assert_cmd,    0,          HLP_ASSERT },
+    { "SEND",       &send_cmd,      0,          HLP_SEND },
+    { "EXPECT",     &expect_cmd,    1,          HLP_EXPECT },
+    { "NOEXPECT",   &expect_cmd,    0,          HLP_EXPECT },
     { "!",          &spawn_cmd,     0,          HLP_SPAWN },
     { "HELP",       &help_cmd,      0,          HLP_HELP },
     { NULL, NULL, 0 }
@@ -1536,6 +1620,8 @@ static SHTAB show_glob_tab[] = {
     { "MULTIPLEXER",    &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
     { "MUX",            &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
     { "CLOCKS",         &sim_show_timers,           0, HLP_SHOW_CLOCKS },
+    { "SEND",           &sim_show_send,             0, HLP_SHOW_SEND },
+    { "EXPECT",         &sim_show_expect,           0, HLP_SHOW_EXPECT },
     { "ON",             &show_on,                   0, HLP_SHOW_ON },
     { NULL,             NULL,                       0 }
     };
@@ -1755,7 +1841,7 @@ char gbuf[CBUFSIZE];
 if ((!cptr) || (*cptr == '\0'))
     return SCPE_ARG;
 
-cptr = get_glyph_nc (cptr, gbuf, '"');                  /* get quote delimted token */
+cptr = get_glyph_nc (cptr, gbuf, '"');                  /* get quote delimited token */
 if (gbuf[0] == '\0') {                                  /* Token started with quote */
     gbuf[sizeof (gbuf)-1] = '\0';
     strncpy (gbuf, cptr, sizeof (gbuf)-1);
@@ -2472,11 +2558,8 @@ do {
         }
     if (*cptr == 0)                                     /* ignore blank */
         continue;
-    if (echo) {                                         /* echo if -v */
-        printf("%s> %s\n", do_position(), cptr);
-        if (sim_log)
-            fprintf (sim_log, "%s> %s\n", do_position(), cptr);
-        }
+    if (echo)                                           /* echo if -v */
+        sim_printf("%s> %s\n", do_position(), cptr);
     if (*cptr == ':')                                   /* ignore label */
         continue;
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -2528,20 +2611,15 @@ do {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
             !stat_nomessage &&                          /* and not suppressing messages */
             !(cmdp && cmdp->message)) {                 /* and not handling them specially */
-            printf("%s> %s\n", do_position(), ocptr);
-            if (sim_log)
-                fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
+            sim_printf("%s> %s\n", do_position(), ocptr);
             }
         }
     if (!stat_nomessage) {                              /* report error if not suppressed */
         if (cmdp && cmdp->message)                      /* special message handler */
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
         else
-            if (stat >= SCPE_BASE) {                    /* report error if not suppressed */
-                printf ("%s\n", sim_error_text (stat));
-                if (sim_log)
-                    fprintf (sim_log, "%s\n", sim_error_text (stat));
-                }
+            if (stat >= SCPE_BASE)                      /* report error if not suppressed */
+                sim_printf ("%s\n", sim_error_text (stat));
         }
     if (staying &&
         (sim_on_check[sim_do_depth]) && 
@@ -2903,6 +2981,141 @@ if (test_search (val, &sim_stab))                       /* test condition */
 return SCPE_AFAIL;                                      /* condition fails */
 }
 
+/* Send command
+
+   Syntax: SEND {Delay=n},"string-to-send"
+
+   Delay  - is a positive integer representing a minimal instruction delay 
+            before and between characters being sent.  The value specified
+            in a delay argument persists across SEND commands.  The delay
+            parameter can be set by itself with SEND DELAY=n,""
+   String - must be quoted.  Quotes may be either single or double but the
+            opening anc closing quote characters must match.  Within quotes 
+            C style character escapes are allowed.  
+            The following character escapes are explicitly supported:
+        \r  Sends the ASCII Carriage Return character (Decimal value 13)
+        \n  Sends the ASCII Linefeed character (Decimal value 10)
+        \f  Sends the ASCII Formfeed character (Decimal value 12)
+        \t  Sends the ASCII Horizontal Tab character (Decimal value 9)
+        \v  Sends the ASCII Vertical Tab character (Decimal value 11)
+        \b  Sends the ASCII Backspace character (Decimal value 8)
+        \\  Sends the ASCII Backslash character (Decimal value 92)
+        \'  Sends the ASCII Single Quote character (Decimal value 39)
+        \"  Sends the ASCII Double Quote character (Decimal value 34)
+        \?  Sends the ASCII Question Mark character (Decimal value 63)
+        \e  Sends the ASCII Escape character (Decimal value 27)
+     as well as octal character values of the form:
+        \n{n{n}} where each n is an octal digit (0-7)
+     and hext character values of the form:
+        \xh{h} where each h is a hex digit (0-9A-Fa-f)
+   */
+
+t_stat send_cmd (int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE], *gptr = gbuf, *tptr;
+uint8 dbuf[CBUFSIZE], *dptr = dbuf;
+uint32 dsize = 0;
+uint32 delay = 0;
+t_stat r;
+SEND *snd;
+
+tptr = get_glyph (cptr, gbuf, ',');
+if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+    r = tmxr_locate_line_send (gbuf, &snd);
+    if (r != SCPE_OK)
+        return r;
+    tptr = get_glyph (tptr, gbuf, ',');
+    }
+else
+    snd = sim_cons_get_send ();
+
+if ((!strncmp(gbuf, "DELAY=", 6)) && (gbuf[6])) {
+    delay = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
+    if (r != SCPE_OK)
+        return SCPE_ARG;
+    cptr = tptr;
+    }
+if (*cptr) {
+    if ((*cptr != '"') && (*cptr != '\''))
+        return SCPE_ARG;            /* String must be quote delimited */
+    cptr = get_glyph_quoted (cptr, gbuf, 0);
+    if (*cptr != '\0')
+        return SCPE_2MARG;          /* No more arguments */
+
+    if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize))
+        return SCPE_ARG;
+    }
+if ((dsize == 0) && (delay == 0))
+    return SCPE_2FARG;
+return sim_send_input (snd, dbuf, dsize, delay);
+}
+
+t_stat sim_show_send (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE], *tptr;
+t_stat r;
+SEND *snd;
+
+tptr = get_glyph (cptr, gbuf, ',');
+if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+    r = tmxr_locate_line_send (gbuf, &snd);
+    if (r != SCPE_OK)
+        return r;
+    cptr = tptr;
+    }
+else
+    snd = sim_cons_get_send ();
+if (*cptr)
+    return SCPE_2MARG;
+return sim_show_send_input (st, snd);
+}
+
+t_stat expect_cmd (int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE], *tptr;
+t_stat r;
+EXPECT *exp;
+
+tptr = get_glyph (cptr, gbuf, ',');
+if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+    r = tmxr_locate_line_expect (gbuf, &exp);
+    if (r != SCPE_OK)
+        return r;
+    cptr = tptr;
+    }
+else
+    exp = sim_cons_get_expect ();
+if (flag)
+    return sim_set_expect (exp, cptr);
+else
+    return sim_set_noexpect (exp, cptr);
+}
+
+t_stat sim_show_expect (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE], *tptr;
+t_stat r;
+EXPECT *exp;
+
+tptr = get_glyph (cptr, gbuf, ',');
+if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+    r = tmxr_locate_line_expect (gbuf, &exp);
+    if (r != SCPE_OK)
+        return r;
+    cptr = tptr;
+    }
+else
+    exp = sim_cons_get_expect ();
+if (*cptr && (*cptr != '"') && (*cptr != '\''))
+    return SCPE_ARG;            /* String must be quote delimited */
+tptr = get_glyph_quoted (cptr, gbuf, 0);
+if (*tptr != '\0')
+    return SCPE_2MARG;          /* No more arguments */
+if (*cptr && (cptr[strlen(cptr)-1] != '"') && (cptr[strlen(cptr)-1] != '\''))
+    return SCPE_ARG;            /* String must be quote delimited */
+return sim_exp_show (st, exp, gbuf);
+}
+
 
 /* Goto command */
 
@@ -2933,9 +3146,7 @@ while (1) {
         sim_brk_clract ();                              /* goto defangs current actions */
         sim_do_echo = saved_do_echo;                    /* restore echo mode */
         if (sim_do_echo)                                /* echo if -v */
-            printf("%s> %s\n", do_position(), cbuf);
-        if (sim_do_echo && sim_log)
-            fprintf (sim_log, "%s> %s\n", do_position(), cbuf);
+            sim_printf("%s> %s\n", do_position(), cbuf);
         return SCPE_OK;
         }
     }
@@ -3804,12 +4015,17 @@ else {
     for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
         if (uptr == &sim_step_unit)
             fprintf (st, "  Step timer");
-        else if ((dptr = find_dev_from_unit (uptr)) != NULL) {
-            fprintf (st, "  %s", sim_dname (dptr));
-            if (dptr->numunits > 1)
-                fprintf (st, " unit %d", (int32) (uptr - dptr->units));
-            }
-        else fprintf (st, "  Unknown");
+        else
+            if (uptr == &sim_expect_unit)
+                fprintf (st, "  Expect fired");
+            else
+                if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+                    fprintf (st, "  %s", sim_dname (dptr));
+                    if (dptr->numunits > 1)
+                        fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+                    }
+                else
+                    fprintf (st, "  Unknown");
         fprintf (st, " at %d\n", accum + uptr->time);
         accum = accum + uptr->time;
         }
@@ -5261,9 +5477,7 @@ else if ((flag == RU_STEP) ||
     static t_bool not_implemented_message = FALSE;
 
     if ((!not_implemented_message) && (flag == RU_NEXT)) {
-        printf ("This simulator does not have subroutine call detection.\nPerforming a STEP instead\n");
-        if (sim_log)
-            fprintf (sim_log, "This simulator does not have subroutine call detection.\nPerforming a STEP instead\n");
+        sim_printf ("This simulator does not have subroutine call detection.\nPerforming a STEP instead\n");
         not_implemented_message = TRUE;
         flag = RU_STEP;
         }
@@ -5453,11 +5667,8 @@ run_cmd_message (const char *unechoed_cmdline, t_stat r)
 #if defined (VMS)
 printf ("\n");
 #endif
-if (unechoed_cmdline) {
-    printf("%s> %s\n", do_position(), unechoed_cmdline);
-    if (sim_log)
-        fprintf (sim_log, "%s> %s\n", do_position(), unechoed_cmdline);
-    }
+if (unechoed_cmdline)
+    sim_printf("%s> %s\n", do_position(), unechoed_cmdline);
 fprint_stopped (stdout, r);                         /* print msg */
 if (sim_log)                                        /* log if enabled */
     fprint_stopped (sim_log, r);
@@ -5529,6 +5740,14 @@ return;
 t_stat step_svc (UNIT *uptr)
 {
 return SCPE_STEP;
+}
+
+/* Unit service to facilitate expect matching to stop simulation.
+   Return expect SCP code, will cause simulation to stop */
+
+t_stat expect_svc (UNIT *uptr)
+{
+return SCPE_EXPECT | (sim_do_echo ? 0 : SCPE_NOMESSAGE);
 }
 
 /* Cancel scheduled step service */
@@ -6273,9 +6492,7 @@ while (isspace (*cptr))                                 /* trim leading spc */
     cptr++;
 if (*cptr == ';') {                                     /* ignore comment */
     if (sim_do_echo)                                    /* echo comments if -v */
-        printf("%s> %s\n", do_position(), cptr);
-    if (sim_do_echo && sim_log)
-        fprintf (sim_log, "%s> %s\n", do_position(), cptr);
+        sim_printf("%s> %s\n", do_position(), cptr);
     *cptr = 0;
     }
 
@@ -6293,26 +6510,36 @@ return cptr;
    get_glyph_gen        get next glyph (general case)
 
    Inputs:
-        iptr    =       pointer to input string
-        optr    =       pointer to output string
-        mchar   =       optional end of glyph character
-        uc      =       TRUE for convert to upper case (_gen only)
-        quote   =       TRUE to allow quote enclosing values (_gen only)
+        iptr        =   pointer to input string
+        optr        =   pointer to output string
+        mchar       =   optional end of glyph character
+        uc          =   TRUE for convert to upper case (_gen only)
+        quote       =   TRUE to allow quote enclosing values (_gen only)
+        escape_char =   optional escape character within quoted strings (_gen only)
+
    Outputs
-        result  =       pointer to next character in input string
+        result      =   pointer to next character in input string
 */
 
-static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote)
+static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char)
 {
 t_bool quoting = FALSE;
+t_bool escaping = FALSE;
 char quote_char = 0;
 
 while ((*iptr != 0) && 
        ((quote && quoting) || ((isspace (*iptr) == 0) && (*iptr != mchar)))) {
     if (quote) {
         if (quoting) {
-            if (*iptr == quote_char)
-                quoting = FALSE;
+            if (!escaping) {
+                if (*iptr == escape_char)
+                    escaping = TRUE;
+                else
+                    if (*iptr == quote_char)
+                        quoting = FALSE;
+                }
+            else
+                escaping = FALSE;
             }
         else {
             if ((*iptr == '"') || (*iptr == '\'')) {
@@ -6336,17 +6563,17 @@ return iptr;
 
 char *get_glyph (const char *iptr, char *optr, char mchar)
 {
-return (char *)get_glyph_gen (iptr, optr, mchar, TRUE, FALSE);
+return (char *)get_glyph_gen (iptr, optr, mchar, TRUE, FALSE, 0);
 }
 
 char *get_glyph_nc (const char *iptr, char *optr, char mchar)
 {
-return (char *)get_glyph_gen (iptr, optr, mchar, FALSE, FALSE);
+return (char *)get_glyph_gen (iptr, optr, mchar, FALSE, FALSE, 0);
 }
 
 char *get_glyph_quoted (const char *iptr, char *optr, char mchar)
 {
-return (char *)get_glyph_gen (iptr, optr, mchar, FALSE, TRUE);
+return (char *)get_glyph_gen (iptr, optr, mchar, FALSE, TRUE, '\\');
 }
 
 /* Trim trailing spaces from a string
@@ -6400,7 +6627,7 @@ return FALSE;
         val     =       value
 */
 
-t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status)
+t_value get_uint (const char *cptr, uint32 radix, t_value max, t_stat *status)
 {
 t_value val;
 char *tptr;
@@ -6471,6 +6698,236 @@ if (term && (*tptr++ != term))
     return NULL;
 return tptr;
 }
+
+/* sim_decode_quoted_string
+
+   Inputs:
+        iptr        =   pointer to input string
+        optr        =   pointer to output buffer
+                        the output buffer must be allocated by the caller 
+                        and to avoid overrunat it must be at least as big 
+                        as the input string.
+
+   Outputs
+        result      =   status of decode SCPE_OK when good, SCPE_ARG otherwise
+        osize       =   size of the data in the optr buffer
+
+   The input string must be quoted.  Quotes may be either single or 
+   double but the opening anc closing quote characters must match.  
+   Within quotes C style character escapes are allowed.  
+
+   The following character escapes are explicitly supported:
+        \r  ASCII Carriage Return character (Decimal value 13)
+        \n  ASCII Linefeed character (Decimal value 10)
+        \f  ASCII Formfeed character (Decimal value 12)
+        \t  ASCII Horizontal Tab character (Decimal value 9)
+        \v  ASCII Vertical Tab character (Decimal value 11)
+        \b  ASCII Backspace character (Decimal value 8)
+        \\  ASCII Backslash character (Decimal value 92)
+        \'  ASCII Single Quote character (Decimal value 39)
+        \"  ASCII Double Quote character (Decimal value 34)
+        \?  ASCII Question Mark character (Decimal value 63)
+        \e  ASCII Escape character (Decimal value 27)
+     as well as octal character values of the form:
+        \n{n{n}} where each n is an octal digit (0-7)
+     and hext character values of the form:
+        \xh{h} where each h is a hex digit (0-9A-Fa-f)
+        
+*/
+
+t_stat sim_decode_quoted_string (const char *iptr, uint8 *optr, uint32 *osize)
+{
+char quote_char;
+uint8 *ostart = optr;
+
+*osize = 0;
+if ((strlen(iptr) == 1) || 
+    ((iptr[strlen(iptr)-1] != '"') && (iptr[strlen(iptr)-1] != '\'')))
+    return SCPE_ARG;            /* String must be quote delimited */
+quote_char = *iptr++;           /* Save quote character */
+while (iptr[1]) {               /* Skip trailing quote */
+    if (*iptr != '\\') {
+        if (*iptr == quote_char)
+            return SCPE_ARG;    /* Imbedded quotes must be escaped */
+        *(optr++) = (uint8)(*(iptr++));
+        continue;
+        }
+    ++iptr; /* Skip backslash */
+    switch (*iptr) {
+        case 'r':   /* ASCII Carriage Return character (Decimal value 13) */
+            *(optr++) = 13; ++iptr;
+            break;
+        case 'n':   /* ASCII Linefeed character (Decimal value 10) */
+            *(optr++) = 10; ++iptr;
+            break;
+        case 'f':   /* ASCII Formfeed character (Decimal value 12) */
+            *(optr++) = 12; ++iptr;
+            break;
+        case 't':   /* ASCII Horizontal Tab character (Decimal value 9) */
+            *(optr++) = 9; ++iptr;
+            break;
+        case 'v':   /* ASCII Vertical Tab character (Decimal value 11) */
+            *(optr++) = 11; ++iptr;
+            break;
+        case 'b':   /* ASCII Backspace character (Decimal value 8) */
+            *(optr++) = 8; ++iptr;
+            break;
+        case '\\':   /* ASCII Backslash character (Decimal value 92) */
+            *(optr++) = 92; ++iptr;
+            break;
+        case 'e':   /* ASCII Escape character (Decimal value 27) */
+            *(optr++) = 27; ++iptr;
+            break;
+        case '\'':   /* ASCII Single Quote character (Decimal value 39) */
+            *(optr++) = 39; ++iptr;
+            break;
+        case '"':   /* ASCII Double Quote character (Decimal value 34) */
+            *(optr++) = 34; ++iptr;
+            break;
+        case '?':   /* ASCII Question Mark character (Decimal value 63) */
+            *(optr++) = 63; ++iptr;
+            break;
+        case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
+            *optr = *(iptr++) - '0';
+            if ((*iptr >= '0') && (*iptr <= '7'))
+                *optr = ((*optr)<<3) + (*(iptr++) - '0');
+            if ((*iptr >= '0') && (*iptr <= '7'))
+                *optr = ((*optr)<<3) + (*(iptr++) - '0');
+            ++optr;
+            break;
+        case 'x':
+            if (1) {
+                static char *hex_digits = "0123456789ABCDEF";
+                const char *c;
+
+                ++iptr;
+                *optr = 0;
+                c = strchr (hex_digits, toupper(*iptr));
+                if (c) {
+                    *optr = ((*optr)<<4) + (uint8)(c-hex_digits);
+                    ++iptr;
+                    }
+                c = strchr (hex_digits, toupper(*iptr));
+                if (c) {
+                    *optr = ((*optr)<<4) + (uint8)(c-hex_digits);
+                    ++iptr;
+                    }
+                ++optr;
+                }
+            break;
+        default:
+            return SCPE_ARG;    /* Invalid escape */
+        }
+    }
+*optr = '\0';
+*osize = (uint32)(optr-ostart);
+return SCPE_OK;
+}
+
+/* sim_decode_quoted_string
+
+   Inputs:
+        iptr        =   pointer to input string
+        optr        =   pointer to output buffer
+                        the output buffer must be allocated by the caller 
+                        and to avoid overrunat it must be at least as big 
+                        as the input string.
+
+   Outputs
+        result      =   status of decode SCPE_OK when good, SCPE_ARG otherwise
+        osize       =   size of the data in the optr buffer
+
+   The input string must be quoted.  Quotes may be either single or 
+   double but the opening anc closing quote characters must match.  
+   Within quotes C style character escapes are allowed.  
+
+   The following character escapes are explicitly supported:
+        \r  ASCII Carriage Return character (Decimal value 13)
+        \n  ASCII Linefeed character (Decimal value 10)
+        \f  ASCII Formfeed character (Decimal value 12)
+        \t  ASCII Horizontal Tab character (Decimal value 9)
+        \v  ASCII Vertical Tab character (Decimal value 11)
+        \b  ASCII Backspace character (Decimal value 8)
+        \\  ASCII Backslash character (Decimal value 92)
+        \'  ASCII Single Quote character (Decimal value 39)
+        \"  ASCII Double Quote character (Decimal value 34)
+        \?  ASCII Question Mark character (Decimal value 63)
+        \e  ASCII Escape character (Decimal value 27)
+     as well as octal character values of the form:
+        \n{n{n}} where each n is an octal digit (0-7)
+     and hext character values of the form:
+        \xh{h} where each h is a hex digit (0-9A-Fa-f)
+        
+*/
+
+char *sim_encode_quoted_string (const uint8 *iptr, uint32 size)
+{
+uint32 i;
+t_bool double_quote_found = FALSE;
+t_bool single_quote_found = FALSE;
+char quote = '"';
+char *tptr, *optr;
+
+optr = malloc (4*size + 3);
+if (optr == NULL)
+    return NULL;
+tptr = optr;
+for (i=0; i<size; i++)
+    switch ((char)iptr[i]) {
+        case '"':
+            double_quote_found = TRUE;
+            break;
+        case '\'':
+            single_quote_found = TRUE;
+            break;
+        }
+if (double_quote_found && (!single_quote_found))
+    quote = '\'';
+*tptr++ = quote;
+while (size--) {
+    switch (*iptr) {
+        case '\r':  *tptr++ = '\\'; *tptr++ = 'r'; break;
+        case '\n':
+            *tptr++ = '\\'; *tptr++ = 'n'; break;
+        case '\f':
+            *tptr++ = '\\'; *tptr++ = 'f'; break;
+        case '\t':
+            *tptr++ = '\\'; *tptr++ = 't'; break;
+        case '\v':
+            *tptr++ = '\\'; *tptr++ = 'v'; break;
+        case '\b':
+            *tptr++ = '\\'; *tptr++ = 'b'; break;
+        case '\\':
+            *tptr++ = '\\'; *tptr++ = '\\'; break;
+        case '"':
+        case '\'':
+            if (quote == *iptr)
+                *tptr++ = '\\';
+        default:
+            if (isprint (*iptr))
+                *tptr++ = *iptr;
+            else {
+                sprintf (tptr, "\\%03o", *iptr);
+                tptr += 4;
+                }
+            break;
+        }
+    ++iptr;
+    }
+*tptr++ = quote;
+*tptr++ = '\0';
+return optr;
+}
+
+void fprint_buffer_string (FILE *st, const uint8 *buf, uint32 size)
+{
+char *string;
+
+string = sim_encode_quoted_string (buf, size);
+fprintf (st, "%s", string);
+free (string);
+}
+
 
 /* Find_device          find device matching input string
 
@@ -7536,13 +7993,13 @@ BRKTAB *bp;
 if (sw == 0) sw = sim_brk_dflt;
 if ((sim_brk_types & sw) == 0)
     return SCPE_NOFNC;
+if ((sw & BRK_TYP_DYN_ALL) && act)                      /* can't specify an action with a dynamic breakpoint */
+    return SCPE_ARG;
 bp = sim_brk_fnd (loc);                                 /* present? */
 if (!bp)                                                /* no, allocate */
     bp = sim_brk_new (loc);
 if (!bp)                                                /* still no? mem err */
     return SCPE_MEM;
-if ((sw & BRK_TYP_DYN_ALL) && act)                      /* can't specify an action with a dynamic breakpoint */
-    return SCPE_ARG;
 bp->typ |= sw;                                          /* set type */
 bp->cnt = ncnt;                                         /* set count */
 if ((!(sw & BRK_TYP_DYN_ALL)) &&                        /* Not Dynamic and */
@@ -7761,6 +8218,363 @@ if (spc < SIM_BKPT_N_SPC) {
     }
 return;
 }
+
+/* Expect package.  This code provides a mechanism to stop and control simulator
+   execution based on traffic coming out of simulated ports and as well as a means
+   to inject data into those ports.  It can conceptually viewed as a string 
+   breakpoint package.
+
+   Expect rules are stored in tables associated with each port which can use this
+   facility.  An expect rule consists of a four entry structure:
+
+        match                   the expect match string
+        size                    the number of bytes in the match string
+        cnt                     number of iterations before match is declared
+        action                  command string to be executed when match occurs
+
+   An expect rule is contained in an expect match context structure.
+
+        rules                   the match rules
+        size                    the count of match rules
+        buf                     the buffer of output data which has produced
+        buf_ins                 the buffer insertion point for the next output data
+        buf_size                the buffer size
+
+   The package contains the following public routines:
+
+        sim_set_expect          expect command parser and intializer
+        sim_set_noexpect        noexpect command parser
+        sim_exp_init            initialize an expect context
+        sim_exp_set             set or add an expect rule
+        sim_exp_clr             clear or delete an expect rule
+        sim_exp_clrall          clear all expect rules
+        sim_exp_show            show an expect rule
+        sim_exp_showall         show all expect rules
+        sim_exp_check           test for rule match
+*/
+
+/*   Initialize an expect context. */
+
+t_stat sim_exp_init (EXPECT *exp)
+{
+memset (exp, 0, sizeof(*exp));
+return SCPE_OK;
+}
+
+/* Set expect */
+
+t_stat sim_set_expect (EXPECT *exp, char *cptr)
+{
+char gbuf[CBUFSIZE], *c1ptr;
+int32 cnt = 0;
+
+if ((cptr == NULL) || (*cptr == 0))
+    return SCPE_2FARG;
+if (*cptr == '[') {
+    cnt = (int32) strtotv (cptr + 1, &c1ptr, 10);
+    if ((cptr == c1ptr) || (*c1ptr != ']'))
+        return SCPE_ARG;
+    cptr = c1ptr + 1;
+    while (isspace(*cptr))
+        ++cptr;
+    }
+if ((*cptr != '"') && (*cptr != '\''))
+    return SCPE_ARG;                                    /* Expect string must be quote delimited */
+cptr = get_glyph_quoted (cptr, gbuf, 0);
+return sim_exp_set (exp, gbuf, cnt, sim_switches, cptr);
+}
+
+/* Clear expect */
+
+t_stat sim_set_noexpect (EXPECT *exp, char *cptr)
+{
+if (!cptr || !*cptr)
+    return sim_exp_clrall (exp);                    /* clear all rules */
+return sim_exp_clr (exp, cptr);                     /* clear one rule */
+}
+
+/* Search for an expect rule in an expect context */
+
+EXPTAB *sim_exp_fnd (EXPECT *exp, const char *match)
+{
+int32 i;
+uint8 *match_buf;
+uint32 match_size;
+
+if (!exp->rules)
+    return NULL;
+match_buf = (uint8 *)malloc (strlen (match) + 1);
+if (!match_buf)
+    return NULL;
+if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
+    free (match_buf);
+    return NULL;
+    }
+for (i=0; i<exp->size; i++)
+    if ((match_size == exp->rules[i].size) && 
+        (0 == memcmp (exp->rules[i].match, match_buf, match_size))) {
+        free (match_buf);
+        return &exp->rules[i];
+        }
+free (match_buf);
+return NULL;
+}
+
+/* Add an expecct rule */
+
+EXPTAB *sim_exp_new (EXPECT *exp, const char *match)
+{
+uint8 *match_buf;
+uint32 match_size;
+EXPTAB *ep;
+int32 i;
+
+ep = sim_exp_fnd (exp, match);
+if (ep)
+    return ep;
+match_buf = (uint8 *)malloc (strlen (match) + 1);
+if (!match_buf)
+    return NULL;
+if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
+    free (match_buf);
+    return NULL;
+    }
+exp->rules = (EXPTAB *) realloc (exp->rules, sizeof (*exp->rules)*(exp->size + 1));
+ep = &exp->rules[exp->size];
+exp->size += 1;
+memset (ep, 0, sizeof(*ep));
+ep->match = match_buf;
+ep->size = match_size;
+/* Make sure that the production buffer is large enough to detect a match for all rules */
+for (i=0; i<exp->size; i++) {
+    if (exp->rules[i].size > exp->buf_size) {
+        free (exp->buf);
+        exp->buf = (uint8 *)calloc (exp->rules[i].size, sizeof(*exp->buf));
+        exp->buf_size = exp->rules[i].size;
+        exp->buf_ins = 0;
+        }
+    }
+return ep;
+}
+
+/* Set a expect rule */
+
+t_stat sim_exp_set (EXPECT *exp, const char *match, int32 cnt, int32 switches, char *act)
+{
+EXPTAB *ep;
+uint8 *match_buf;
+uint32 match_size;
+
+/* Validate the match string */
+match_buf = (uint8 *)malloc (strlen (match) + 1);
+if (!match_buf)
+    return SCPE_MEM;
+if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
+    free (match_buf);
+    return SCPE_ARG;
+    }
+free (match_buf);
+ep = sim_exp_fnd (exp, match);                          /* present? */
+if (!ep)                                                /* no, allocate */
+    ep = sim_exp_new (exp, match);
+if (!ep)                                                /* still no? mem err */
+    return SCPE_MEM;
+ep->cnt = cnt;                                          /* set proceed count */
+ep->switches = switches;                                /* set switches */
+if (ep->act) {                                          /* replace old action? */
+    free (ep->act);                                     /* deallocate */
+    ep->act = NULL;                                     /* now no action */
+    }
+if (act) while (isspace(*act)) ++act;                   /* skip leading spaces in action string */
+if ((act != NULL) && (*act != 0)) {                     /* new action? */
+    char *newp = (char *) calloc (strlen (act)+1, sizeof (*act)); /* alloc buf */
+    if (newp == NULL)                                   /* mem err? */
+        return SCPE_MEM;
+    strcpy (newp, act);                                 /* copy action */
+    ep->act = newp;                                     /* set pointer */
+    }
+return SCPE_OK;
+}
+
+/* Clear (delete) an expect rule */
+
+t_stat sim_exp_clr_tab (EXPECT *exp, EXPTAB *ep)
+{
+int32 i;
+
+if (!ep)                                                /* not there? ok */
+    return SCPE_OK;
+free (ep->match);                                       /* deallocate match string */
+free (ep->act);                                         /* deallocate action */
+for (i=ep-exp->rules; i<exp->size; i++)                 /* shuffle up remaining rules */
+    exp->rules[i] = exp->rules[i+1];
+exp->size -= 1;                                         /* decrement count */
+if (exp->size == 0) {                                   /* No rules left? */
+    free (exp->rules);
+    exp->rules = NULL;
+    }
+return SCPE_OK;
+}
+
+t_stat sim_exp_clr (EXPECT *exp, const char *match)
+{
+return sim_exp_clr_tab (exp, sim_exp_fnd (exp, match));
+}
+
+/* Clear all expect rules */
+
+t_stat sim_exp_clrall (EXPECT *exp)
+{
+int32 i;
+
+for (i=0; i<exp->size; i++) {
+    free (exp->rules[i].match);                         /* deallocate match string */
+    free (exp->rules[i].act);                           /* deallocate action */
+    }
+free (exp->rules);
+exp->rules = NULL;
+exp->size = 0;
+free (exp->buf);
+exp->buf = NULL;
+exp->buf_size = 0;
+return SCPE_OK;
+}
+
+/* Show an expect rule */
+
+t_stat sim_exp_show_tab (FILE *st, EXPECT *exp, EXPTAB *ep)
+{
+if (!ep)
+    return SCPE_OK;
+fprintf (st, "EXPECT ");
+fprint_buffer_string (st, ep->match, ep->size);
+if (ep->cnt > 0)
+    fprintf (st, " [%d]", ep->cnt);
+if (ep->act)
+    fprintf (st, " %s", ep->act);
+fprintf (st, "\n");
+return SCPE_OK;
+}
+
+t_stat sim_exp_show (FILE *st, EXPECT *exp, const char *match)
+{
+EXPTAB *ep = sim_exp_fnd (exp, match);
+
+if (!*match)
+    return sim_exp_showall (st, exp);
+if (!ep)
+    return SCPE_ARG;
+return sim_exp_show_tab (st, exp, ep);
+}
+
+/* Show all expect rules */
+
+t_stat sim_exp_showall (FILE *st, EXPECT *exp)
+{
+int32 i;
+
+for (i=0; i < exp->size; i++)
+    sim_exp_show_tab (st, exp, &exp->rules[i]);
+return SCPE_OK;
+}
+
+/* Test for expect match */
+
+t_stat sim_exp_check (EXPECT *exp, uint8 data)
+{
+int32 i;
+EXPTAB *ep;
+
+if ((!exp) || (!exp->rules))                            /* Anying to check? */
+    return SCPE_OK;
+
+exp->buf[exp->buf_ins++] = data;                        /* Save new data */
+
+for (i=0; i < exp->size; i++) {
+    ep = &exp->rules[i];
+    if (exp->buf_ins < ep->size) {
+        if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins))
+            continue;
+        if (memcmp (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->match, ep->size-exp->buf_ins))
+            continue;
+        break;
+        }
+    else {
+        if (memcmp (&exp->buf[exp->buf_ins-ep->size], ep->match, ep->size))
+            continue;
+        break;
+        }
+    }
+if (exp->buf_ins == exp->buf_size)                      /* At end of match buffer? */
+    exp->buf_ins = 0;                                   /* wrap around to beginning */
+if (i != exp->size) {                                   /* Found? */
+    if (ep->cnt > 0)
+        ep->cnt -= 1;
+    else {
+        sim_brk_setact (ep->act);                       /* set up actions */
+        if (!(ep->switches & EXP_TYP_PERSIST))          /* One shot expect rule? */
+            sim_exp_clr_tab (exp, ep);                  /* delete it */
+        if (ep->switches & EXP_TYP_CLEARALL)            /* One shot expect rule? */
+            sim_exp_clrall (exp);                       /* delete all rules */
+        sim_activate (&sim_expect_unit, 0);             /* schedule simulation stop asap */
+        }
+    }
+return SCPE_OK;
+}
+
+/* Queue input data for sending */
+
+t_stat sim_send_input (SEND *snd, uint8 *data, size_t size, uint32 delay)
+{
+if (snd->extoff != 0) {
+    if ((snd->insoff-snd->extoff) > 0)
+        memmove(snd->buffer, snd->buffer+snd->extoff, snd->insoff-snd->extoff);
+    snd->insoff -= snd->extoff;
+    snd->extoff -= 0;
+    }
+if (snd->insoff+size > snd->bufsize) {
+    snd->bufsize = snd->insoff+size;
+    snd->buffer = realloc(snd->buffer, snd->bufsize);
+    }
+memcpy(snd->buffer+snd->insoff, data, size);
+snd->insoff += size;
+if (delay)
+    snd->delay = delay;
+snd->next_time = sim_gtime() + snd->delay;
+return SCPE_OK;
+}
+
+/* Display console Queued input data status */
+
+t_stat sim_show_send_input (FILE *st, SEND *snd)
+{
+if (snd->extoff < snd->insoff) {
+    fprintf (st, "%d bytes of pending input Data:\n    ", snd->insoff-snd->extoff);
+    fprint_buffer_string (st, snd->buffer+snd->extoff, snd->insoff-snd->extoff);
+    fprintf (st, "\n");
+    }
+else
+    fprintf (st, "No Pending Input Data\n");
+fprintf (st, "Pending Input Delay=%d instructions per character\n", snd->delay);
+return SCPE_OK;
+}
+
+/* Poll for Queued input data */
+
+t_bool sim_send_poll_data (SEND *snd, t_stat *stat)
+{
+if (snd && (snd->extoff < snd->insoff)) {               /* pending input characters available? */
+    if (sim_gtime() < snd->next_time)                   /* too soon? */
+        *stat = SCPE_OK;
+    else {
+        *stat = snd->buffer[snd->extoff++] | SCPE_KFLAG;/* get one */
+        snd->next_time = sim_gtime() + snd->delay;
+        }
+    return TRUE;
+    }
+return FALSE;
+}
+
 
 /* Message Text */
 

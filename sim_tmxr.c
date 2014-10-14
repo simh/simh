@@ -1530,15 +1530,17 @@ uint32 tmp;
 
 tmxr_debug_trace_line (lp, "tmxr_getc_ln()");
 if (lp->conn && lp->rcve) {                             /* conn & enb? */
-    j = lp->rxbpi - lp->rxbpr;                          /* # input chrs */
-    if (j) {                                            /* any? */
-        tmp = lp->rxb[lp->rxbpr];                       /* get char */
-        val = TMXR_VALID | (tmp & 0377);                /* valid + chr */
-        if (lp->rbr[lp->rxbpr]) {                       /* break? */
-            lp->rbr[lp->rxbpr] = 0;                     /* clear status */
-            val = val | SCPE_BREAK;                     /* indicate to caller */
+    if (!sim_send_poll_data (&lp->send, &val)) {        /* injected input characters available? */
+        j = lp->rxbpi - lp->rxbpr;                      /* # input chrs */
+        if (j) {                                        /* any? */
+            tmp = lp->rxb[lp->rxbpr];                   /* get char */
+            val = TMXR_VALID | (tmp & 0377);            /* valid + chr */
+            if (lp->rbr[lp->rxbpr]) {                   /* break? */
+                lp->rbr[lp->rxbpr] = 0;                 /* clear status */
+                val = val | SCPE_BREAK;                 /* indicate to caller */
+                }
+            lp->rxbpr = lp->rxbpr + 1;                  /* adv pointer */
             }
-        lp->rxbpr = lp->rxbpr + 1;                      /* adv pointer */
         }
     }                                                   /* end if conn */
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
@@ -1816,6 +1818,7 @@ if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ 
         lp->xmte = 0;                                   /* disable line */
     if (lp->txlog)                                      /* log if available */
         fputc (chr, lp->txlog);
+    sim_exp_check (&lp->expect, chr);                   /* process expect rules as needed */
     return SCPE_OK;                                     /* char sent */
     }
 ++lp->txdrp; lp->xmte = 0;                              /* no room, dsbl line */
@@ -3198,6 +3201,9 @@ for (i=0; i<tmxr_open_device_count; ++i)
 if (!found) {
     tmxr_open_devices = (TMXR **)realloc(tmxr_open_devices, (tmxr_open_device_count+1)*sizeof(*tmxr_open_devices));
     tmxr_open_devices[tmxr_open_device_count++] = mux;
+    for (i=0; i<mux->lines; i++)
+        if (0 == mux->ldsc[i].send.delay)
+            mux->ldsc[i].send.delay = SEND_DEFAULT_DELAY;
     }
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 pthread_mutex_unlock (&sim_tmxr_poll_lock);
@@ -3224,6 +3230,46 @@ for (i=0; i<tmxr_open_device_count; ++i)
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 pthread_mutex_unlock (&sim_tmxr_poll_lock);
 #endif
+}
+
+static t_stat _tmxr_locate_line_send_expect (const char *cptr, SEND **snd, EXPECT **exp)
+{
+char gbuf[CBUFSIZE];
+DEVICE *dptr;
+int i;
+t_stat r;
+
+if (snd)
+    *snd = NULL;
+if (exp)
+    *exp = NULL;
+cptr = get_glyph(cptr, gbuf, ':');
+dptr = find_dev (gbuf);                 /* device match? */
+if (!dptr)
+    return SCPE_ARG;
+
+for (i=0; i<tmxr_open_device_count; ++i)
+    if (tmxr_open_devices[i]->dptr == dptr) {
+        int line = (int)get_uint (cptr, 10, tmxr_open_devices[i]->lines, &r);
+        if (r != SCPE_OK)
+            return r;
+        if (snd)
+            *snd = &tmxr_open_devices[i]->ldsc[line].send;
+        if (exp)
+            *exp = &tmxr_open_devices[i]->ldsc[line].expect;
+        return SCPE_OK;
+        }
+return SCPE_ARG;
+}
+
+t_stat tmxr_locate_line_send (const char *cptr, SEND **snd)
+{
+return _tmxr_locate_line_send_expect (cptr, snd, NULL);
+}
+
+t_stat tmxr_locate_line_expect (const char *cptr, EXPECT **exp)
+{
+return _tmxr_locate_line_send_expect (cptr, NULL, exp);
 }
 
 t_stat tmxr_change_async (void)
@@ -3812,6 +3858,10 @@ if (lp->modem_control) {
 
 if ((lp->serport == 0) && (lp->sock) && (!lp->datagram))
     fprintf (st, " %s\n", (lp->notelnet) ? "Telnet disabled (RAW data)" : "Telnet protocol");
+if (lp->send.buffer)
+    sim_show_send_input (st, &lp->send);
+if (lp->expect.buf)
+    sim_exp_showall (st, &lp->expect);
 if (lp->txlog)
     fprintf (st, " Logging to %s\n", lp->txlogname);
 return;

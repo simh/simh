@@ -103,7 +103,10 @@
    sim_show_cons_log            show console log
    sim_tt_inpcvt                convert input character per mode
    sim_tt_outcvt                convert output character per mode
-
+   sim_cons_get_send            get console send structure address
+   sim_cons_get_expect          get console expect structure address
+   sim_show_cons_send_input     show pending input data
+   sim_show_cons_expect         show expect rules and state
    sim_ttinit                   called once to get initial terminal state
    sim_ttrun                    called to put terminal into run state
    sim_ttcmd                    called to return terminal to command state
@@ -160,6 +163,9 @@ int32 sim_del_char = '\b';                              /* delete character */
 #else
 int32 sim_del_char = 0177;
 #endif
+SEND sim_con_send = {SEND_DEFAULT_DELAY};
+EXPECT sim_con_expect;
+
 static t_stat sim_con_poll_svc (UNIT *uptr);                /* console connection poll routine */
 static t_stat sim_con_reset (DEVICE *dptr);                 /* console reset routine */
 UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, 0, 0)  };   /* console connection unit */
@@ -247,6 +253,8 @@ static SHTAB show_con_tab[] = {
     { "TELNET", &sim_show_telnet, 0 },
     { "DEBUG", &sim_show_cons_debug, 0 },
     { "BUFFERED", &sim_show_cons_buff, 0 },
+    { "EXPECT", &sim_show_cons_expect, 0 },
+    { "INPUT", &sim_show_cons_send_input, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -295,7 +303,7 @@ while (*cptr != 0) {                                    /* do all mods */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
     if ((ctptr = find_ctab (set_con_tab, gbuf))) {      /* match? */
-        r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
+        r = ctptr->action (ctptr->arg, cvptr);      /* do the rest */
         if (r != SCPE_OK)
             return r;
         }
@@ -1369,6 +1377,13 @@ if (sim_con_ldsc.serport == 0)                  /* ignore if already closed */
 return tmxr_close_master (&sim_con_tmxr);               /* close master socket */
 }
 
+/* Show the console expect rules and state */
+
+t_stat sim_show_cons_expect (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
+{
+return sim_exp_show (st, &sim_con_expect, cptr);
+}
+
 /* Log File Open/Close/Show Support */
 
 /* Open log file */
@@ -1511,12 +1526,35 @@ for (i = 0; i < sec; i++) {                             /* loop */
 return SCPE_TTMO;                                       /* timed out */
 }
 
+/* Get Send object address for console */
+
+SEND *sim_cons_get_send (void)
+{
+return &sim_con_send;
+}
+
+/* Get Expect object address for console */
+
+EXPECT *sim_cons_get_expect (void)
+{
+return &sim_con_expect;
+}
+
+/* Display console Queued input data status */
+
+t_stat sim_show_cons_send_input (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+return sim_show_send_input (st, &sim_con_send);
+}
+
 /* Poll for character */
 
 t_stat sim_poll_kbd (void)
 {
 int32 c;
 
+if (sim_send_poll_data (&sim_con_send, &c))             /* injected input characters available? */
+    return c;
 c = sim_os_poll_kbd ();                                 /* get character */
 if ((c == SCPE_STOP) ||                                 /* ^E or not Telnet? */
     ((sim_con_tmxr.master == 0) &&                      /*       and not serial? */
@@ -1540,6 +1578,7 @@ return SCPE_OK;
 
 t_stat sim_putchar (int32 c)
 {
+sim_exp_check (&sim_con_expect, c);
 if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
     if (sim_log)                                        /* log file? */
@@ -1563,6 +1602,7 @@ t_stat sim_putchar_s (int32 c)
 {
 t_stat r;
 
+sim_exp_check (&sim_con_expect, c);
 if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
     if (sim_log)                                        /* log file? */

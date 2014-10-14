@@ -161,6 +161,8 @@ struct tmln {
     UNIT                *uptr;                          /* input polling unit (default to mp->uptr) */
     UNIT                *o_uptr;                        /* output polling unit (default to lp->uptr)*/
     DEVICE              *dptr;                          /* line specific device */
+    EXPECT              expect;                         /* Expect rules */
+    SEND                send;                           /* Send input state */
     };
 
 struct tmxr {
@@ -238,6 +240,8 @@ t_stat tmxr_activate (UNIT *uptr, int32 interval);
 t_stat tmxr_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval);
 t_stat tmxr_change_async (void);
+t_stat tmxr_locate_line_send (const char *dev_line, SEND **snd);
+t_stat tmxr_locate_line_expect (const char *dev_line, EXPECT **exp);
 t_stat tmxr_startup (void);
 t_stat tmxr_shutdown (void);
 t_stat tmxr_start_poll (void);

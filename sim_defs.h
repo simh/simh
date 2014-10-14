@@ -313,8 +313,9 @@ typedef uint32          t_addr;
 #define SCPE_AFAIL      (SCPE_BASE + 42)                /* assert failed */
 #define SCPE_INVREM     (SCPE_BASE + 43)                /* invalid remote console command */
 #define SCPE_NOTATT     (SCPE_BASE + 44)                /* not attached */
+#define SCPE_EXPECT     (SCPE_BASE + 45)                /* expect matched */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 45)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 46)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x1000                          /* tti data flag */
 #define SCPE_BREAK      0x2000                          /* tti break flag */
 #define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
@@ -632,6 +633,40 @@ struct sim_brktab {
     char                *act;                           /* action string */
     };
 
+/* Expect rule */
+
+struct sim_exptab {
+    uint8               *match;                         /* match string */
+    uint32              size;                           /* match string size */
+    int32               cnt;                            /* proceed count */
+    int32               switches;                       /* flags */
+#define EXP_TYP_PERSIST         (SWMASK ('P'))      /* rule persists after match, default is once a rule matches, it is removed */
+#define EXP_TYP_CLEARALL        (SWMASK ('C'))      /* clear all rules after matching this rule, default is to once a rule matches, it is removed */
+    char                *act;                           /* action string */
+    };
+
+/* Expect Context */
+
+struct sim_expect {
+    struct sim_exptab *rules;                           /* match rules */
+    int32 size;                                         /* count of match rules */
+    uint8 *buf;                                         /* buffer of output data which has produced */
+    uint32 buf_ins;                                     /* buffer insertion point for the next output data */
+    uint32 buf_size;                                    /* buffer size */
+    };
+
+/* Send Context */
+
+struct sim_send {
+    uint32 delay;                                       /* instruction delay before/between sent data */
+#define SEND_DEFAULT_DELAY  1000                        /* default delay instruction count */
+    double next_time;                                   /* execution time when next data can be sent */
+    uint8 *buffer;                                      /* buffer */
+    size_t bufsize;                                     /* buffer size */
+    int32 insoff;                                       /* insert offset */
+    int32 extoff;                                       /* extra offset */
+    };
+
 /* Debug table */
 
 struct sim_debtab {
@@ -745,6 +780,9 @@ typedef struct sim_shtab SHTAB;
 typedef struct sim_mtab MTAB;
 typedef struct sim_schtab SCHTAB;
 typedef struct sim_brktab BRKTAB;
+typedef struct sim_exptab EXPTAB;
+typedef struct sim_expect EXPECT;
+typedef struct sim_send SEND;
 typedef struct sim_debtab DEBTAB;
 typedef struct sim_fileref FILEREF;
 typedef struct sim_bitfield BITFIELD;
