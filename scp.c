@@ -8229,6 +8229,7 @@ return;
 
         match                   the expect match string
         size                    the number of bytes in the match string
+        match_pattern           the expect match string in display format
         cnt                     number of iterations before match is declared
         action                  command string to be executed when match occurs
 
@@ -8345,6 +8346,8 @@ exp->size += 1;
 memset (ep, 0, sizeof(*ep));
 ep->match = match_buf;
 ep->size = match_size;
+ep->match_pattern = (char *)malloc (strlen (match) + 1);
+strcpy (ep->match_pattern, match);
 /* Make sure that the production buffer is large enough to detect a match for all rules */
 for (i=0; i<exp->size; i++) {
     if (exp->rules[i].size > exp->buf_size) {
@@ -8405,6 +8408,7 @@ int32 i;
 if (!ep)                                                /* not there? ok */
     return SCPE_OK;
 free (ep->match);                                       /* deallocate match string */
+free (ep->match_pattern);                               /* deallocate the display format match string */
 free (ep->act);                                         /* deallocate action */
 for (i=ep-exp->rules; i<exp->size; i++)                 /* shuffle up remaining rules */
     exp->rules[i] = exp->rules[i+1];
@@ -8429,6 +8433,7 @@ int32 i;
 
 for (i=0; i<exp->size; i++) {
     free (exp->rules[i].match);                         /* deallocate match string */
+    free (exp->rules[i].match_pattern);                 /* deallocate display format match string */
     free (exp->rules[i].act);                           /* deallocate action */
     }
 free (exp->rules);
@@ -8508,9 +8513,19 @@ for (i=0; i < exp->size; i++) {
 if (exp->buf_ins == exp->buf_size)                      /* At end of match buffer? */
     exp->buf_ins = 0;                                   /* wrap around to beginning */
 if (i != exp->size) {                                   /* Found? */
-    if (ep->cnt > 0)
+    sim_debug (exp->dbit, exp->dptr, "Matched expect pattern: %s\n", ep->match_pattern);
+    if (ep->cnt > 0) {
         ep->cnt -= 1;
+        sim_debug (exp->dbit, exp->dptr, "Waiting for %d more match%s before stopping\n", 
+                                         ep->cnt, (ep->cnt == 1) ? "" : "es");
+        }
     else {
+        if (ep->act && *ep->act) {
+            sim_debug (exp->dbit, exp->dptr, "Initiating actions: %s\n", ep->act);
+            }
+        else {
+            sim_debug (exp->dbit, exp->dptr, "No actions specified, stopping...\n");
+            }
         sim_brk_setact (ep->act);                       /* set up actions */
         if (!(ep->switches & EXP_TYP_PERSIST))          /* One shot expect rule? */
             sim_exp_clr_tab (exp, ep);                  /* delete it */
@@ -8527,10 +8542,10 @@ return SCPE_OK;
 t_stat sim_send_input (SEND *snd, uint8 *data, size_t size, uint32 delay)
 {
 if (snd->extoff != 0) {
-    if ((snd->insoff-snd->extoff) > 0)
+    if (snd->insoff-snd->extoff > 0)
         memmove(snd->buffer, snd->buffer+snd->extoff, snd->insoff-snd->extoff);
     snd->insoff -= snd->extoff;
-    snd->extoff -= 0;
+    snd->extoff -= snd->extoff;
     }
 if (snd->insoff+size > snd->bufsize) {
     snd->bufsize = snd->insoff+size;
@@ -8564,11 +8579,18 @@ return SCPE_OK;
 t_bool sim_send_poll_data (SEND *snd, t_stat *stat)
 {
 if (snd && (snd->extoff < snd->insoff)) {               /* pending input characters available? */
-    if (sim_gtime() < snd->next_time)                   /* too soon? */
+    if (sim_gtime() < snd->next_time) {                 /* too soon? */
         *stat = SCPE_OK;
+        sim_debug (snd->dbit, snd->dptr, "Too soon to inject next byte\n");
+        }
     else {
+        char dstr[8] = "";
+
         *stat = snd->buffer[snd->extoff++] | SCPE_KFLAG;/* get one */
         snd->next_time = sim_gtime() + snd->delay;
+        if (isgraph(*stat & 0xFF) || ((*stat & 0xFF) == ' '))
+            sprintf (dstr, " '%c'", *stat & 0xFF);
+        sim_debug (snd->dbit, snd->dptr, "Byte value: 0x%02X%s injected\n", *stat & 0xFF, dstr);
         }
     return TRUE;
     }

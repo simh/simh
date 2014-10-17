@@ -163,8 +163,6 @@ int32 sim_del_char = '\b';                              /* delete character */
 #else
 int32 sim_del_char = 0177;
 #endif
-SEND sim_con_send = {SEND_DEFAULT_DELAY};
-EXPECT sim_con_expect;
 
 static t_stat sim_con_poll_svc (UNIT *uptr);                /* console connection poll routine */
 static t_stat sim_con_reset (DEVICE *dptr);                 /* console reset routine */
@@ -175,6 +173,8 @@ UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, 0, 0)  };   /* console connectio
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 #define DBG_RET  TMXR_DBG_RET                           /* display Returned Received Data */
 #define DBG_ASY  TMXR_DBG_ASY                           /* asynchronous thread activity */
+#define DBG_EXP  0x00000001                             /* Expect match activity */
+#define DBG_SND  0x00000002                             /* Send (Inject) data activity */
 
 static DEBTAB sim_con_debug[] = {
   {"TRC",    DBG_TRC},
@@ -182,6 +182,8 @@ static DEBTAB sim_con_debug[] = {
   {"RCV",    DBG_RCV},
   {"RET",    DBG_RET},
   {"ASY",    DBG_ASY},
+  {"EXP",    DBG_EXP},
+  {"SND",    DBG_SND},
   {0}
 };
 
@@ -196,6 +198,10 @@ DEVICE sim_con_telnet = {
     NULL, DEV_DEBUG, 0, sim_con_debug};
 TMLN sim_con_ldsc = { 0 };                                          /* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console line mux */
+
+
+SEND sim_con_send = {SEND_DEFAULT_DELAY, &sim_con_telnet, DBG_SND};
+EXPECT sim_con_expect = {&sim_con_telnet, DBG_EXP};
 
 /* Unit service for console connection polling */
 

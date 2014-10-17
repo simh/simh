@@ -638,6 +638,7 @@ struct sim_brktab {
 struct sim_exptab {
     uint8               *match;                         /* match string */
     uint32              size;                           /* match string size */
+    char                *match_pattern;                 /* match pattern for format */
     int32               cnt;                            /* proceed count */
     int32               switches;                       /* flags */
 #define EXP_TYP_PERSIST         (SWMASK ('P'))      /* rule persists after match, default is once a rule matches, it is removed */
@@ -648,6 +649,8 @@ struct sim_exptab {
 /* Expect Context */
 
 struct sim_expect {
+    struct sim_device *dptr;                            /* Device (for Debug) */
+    uint32 dbit;                                        /* Debugging Bit */
     struct sim_exptab *rules;                           /* match rules */
     int32 size;                                         /* count of match rules */
     uint8 *buf;                                         /* buffer of output data which has produced */
@@ -659,6 +662,8 @@ struct sim_expect {
 
 struct sim_send {
     uint32 delay;                                       /* instruction delay before/between sent data */
+    struct sim_device *dptr;                            /* Device (for Debug) */
+    uint32 dbit;                                        /* Debugging Bit */
 #define SEND_DEFAULT_DELAY  1000                        /* default delay instruction count */
     double next_time;                                   /* execution time when next data can be sent */
     uint8 *buffer;                                      /* buffer */
