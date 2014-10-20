@@ -3025,6 +3025,7 @@ char gbuf[CBUFSIZE], *gptr = gbuf, *tptr;
 uint8 dbuf[CBUFSIZE], *dptr = dbuf;
 uint32 dsize = 0;
 uint32 delay = 0;
+uint32 after = 0;
 t_stat r;
 SEND *snd;
 
@@ -3039,13 +3040,30 @@ if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
 else
     snd = sim_cons_get_send ();
 
-if ((!strncmp(gbuf, "DELAY=", 6)) && (gbuf[6])) {
-    delay = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
-    if (r != SCPE_OK) {
-        sim_printf ("Invalid Delay Value\n");
-        return SCPE_ARG|SCPE_NOMESSAGE;
+while (*cptr) {
+    if ((!strncmp(gbuf, "DELAY=", 6)) && (gbuf[6])) {
+        delay = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
+        if (r != SCPE_OK) {
+            sim_printf ("Invalid Delay Value\n");
+            return SCPE_ARG|SCPE_NOMESSAGE;
+            }
+        cptr = tptr;
+        tptr = get_glyph (cptr, gbuf, ',');
+        continue;
         }
-    cptr = tptr;
+    if ((!strncmp(gbuf, "AFTER=", 6)) && (gbuf[6])) {
+        after = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
+        if (r != SCPE_OK) {
+            sim_printf ("Invalid Delay Value\n");
+            return SCPE_ARG|SCPE_NOMESSAGE;
+            }
+        cptr = tptr;
+        tptr = get_glyph (cptr, gbuf, ',');
+        continue;
+        }
+    if ((*cptr == '"') || (*cptr == '\''))
+        break;
+    return SCPE_ARG;
     }
 if (*cptr) {
     if ((*cptr != '"') && (*cptr != '\'')) {
@@ -3063,7 +3081,7 @@ if (*cptr) {
     }
 if ((dsize == 0) && (delay == 0))
     return SCPE_2FARG;
-return sim_send_input (snd, dbuf, dsize, delay);
+return sim_send_input (snd, dbuf, dsize, after, delay);
 }
 
 t_stat sim_show_send (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
@@ -5605,7 +5623,6 @@ fflush(stdout);                                         /* flush stdout */
 if (sim_log)                                            /* flush log if enabled */
     fflush (sim_log);
 sim_throt_sched ();                                     /* set throttle */
-sim_brk_clract ();                                      /* defang actions */
 sim_rtcn_init_all ();                                   /* re-init clocks */
 sim_start_timer_services ();                            /* enable wall clock timing */
 
@@ -5620,7 +5637,7 @@ do {
         t_addr val;
         BRKTAB *bp;
 
-        if (r >= SCPE_BASE)                             /* done if an error occurred */
+        if (SCPE_BARE_STATUS(r) >= SCPE_BASE)           /* done if an error occurred */
             break;
         if (sim_vm_pc_value)                            /* done if didn't stop at a dynamic breakpoint */
             val = (t_addr)(*sim_vm_pc_value)();
@@ -5680,7 +5697,7 @@ sim_cancel (&sim_step_unit);                            /* cancel step timer */
 sim_throt_cancel ();                                    /* cancel throttle */
 AIO_UPDATE_QUEUE;
 UPDATE_SIM_TIME;                                        /* update sim time */
-return r;
+return r | ((sim_switches & SWMASK ('Q')) ? SCPE_NOMESSAGE : 0);
 }
 
 /* run command message handler */
@@ -8290,18 +8307,31 @@ return SCPE_OK;
 
 t_stat sim_set_expect (EXPECT *exp, char *cptr)
 {
-char gbuf[CBUFSIZE], *c1ptr;
+char gbuf[CBUFSIZE], *gptr = gbuf, *tptr, *c1ptr;
+uint32 after = exp->after;
 int32 cnt = 0;
+t_stat r;
 
 if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
 if (*cptr == '[') {
     cnt = (int32) strtotv (cptr + 1, &c1ptr, 10);
-    if ((cptr == c1ptr) || (*c1ptr != ']'))
-        return SCPE_ARG;
+    if ((cptr == c1ptr) || (*c1ptr != ']')) {
+        sim_printf ("Invalid Repeat count specification\n");
+        return SCPE_ARG|SCPE_NOMESSAGE;
+        }
     cptr = c1ptr + 1;
     while (isspace(*cptr))
         ++cptr;
+    }
+tptr = get_glyph (cptr, gbuf, ',');
+if ((!strncmp(gbuf, "HALTAFTER=", 10)) && (gbuf[10])) {
+    after = (uint32)get_uint (&gbuf[10], 10, 100000000, &r);
+    if (r != SCPE_OK) {
+        sim_printf ("Invalid Halt After Value\n");
+        return SCPE_ARG|SCPE_NOMESSAGE;
+        }
+    cptr = tptr;
     }
 if ((*cptr != '"') && (*cptr != '\'')) {
     sim_printf ("String must be quote delimited\n");
@@ -8310,7 +8340,7 @@ if ((*cptr != '"') && (*cptr != '\'')) {
 cptr = get_glyph_quoted (cptr, gbuf, 0);
 if (*cptr != '\0')
     return SCPE_2MARG;                  /* No more arguments */
-return sim_exp_set (exp, gbuf, cnt, sim_switches, cptr);
+return sim_exp_set (exp, gbuf, cnt, after, sim_switches, cptr);
 }
 
 /* Clear expect */
@@ -8398,7 +8428,7 @@ return SCPE_OK;
 
 /* Set/Add an expect rule */
 
-t_stat sim_exp_set (EXPECT *exp, const char *match, int32 cnt, int32 switches, char *act)
+t_stat sim_exp_set (EXPECT *exp, const char *match, int32 cnt, uint32 after, int32 switches, char *act)
 {
 EXPTAB *ep;
 uint8 *match_buf;
@@ -8450,6 +8480,7 @@ if (ep)                                                 /* no, allocate */
 exp->rules = (EXPTAB *) realloc (exp->rules, sizeof (*exp->rules)*(exp->size + 1));
 ep = &exp->rules[exp->size];
 exp->size += 1;
+exp->after = after;                                     /* set halt after value */
 memset (ep, 0, sizeof(*ep));
 ep->match_pattern = (char *)malloc (strlen (match) + 1);
 strcpy (ep->match_pattern, match);
@@ -8529,6 +8560,8 @@ if (exp->buf_size) {
     fprintf (st, "Match Buffer Size: %d\n", exp->buf_size);
     fprintf (st, "Buffer Insert Offset: %d\n", exp->buf_ins);
     }
+if (exp->after)
+    fprintf (st, "Halt After: %d instructions\n", exp->after);
 if (!*match)
     return sim_exp_showall (st, exp);
 if (!ep)
@@ -8645,7 +8678,7 @@ if (i != exp->size) {                                   /* Found? */
             sim_exp_clr_tab (exp, ep);                  /* delete it */
         if (ep->switches & EXP_TYP_CLEARALL)            /* One shot expect rule? */
             sim_exp_clrall (exp);                       /* delete all rules */
-        sim_activate (&sim_expect_unit, 0);             /* schedule simulation stop asap */
+        sim_activate (&sim_expect_unit, exp->after);    /* schedule simulation stop when indicated */
         }
     }
 return SCPE_OK;
@@ -8653,7 +8686,7 @@ return SCPE_OK;
 
 /* Queue input data for sending */
 
-t_stat sim_send_input (SEND *snd, uint8 *data, size_t size, uint32 delay)
+t_stat sim_send_input (SEND *snd, uint8 *data, size_t size, uint32 after, uint32 delay)
 {
 if (snd->extoff != 0) {
     if (snd->insoff-snd->extoff > 0)
@@ -8669,7 +8702,11 @@ memcpy(snd->buffer+snd->insoff, data, size);
 snd->insoff += size;
 if (delay)
     snd->delay = delay;
-snd->next_time = sim_gtime() + snd->delay;
+if (after)
+    snd->after = after;
+if (snd->after == 0)
+    snd->after = snd->delay;
+snd->next_time = sim_gtime() + snd->after;
 return SCPE_OK;
 }
 
@@ -8684,7 +8721,9 @@ if (snd->extoff < snd->insoff) {
     }
 else
     fprintf (st, "No Pending Input Data\n");
-fprintf (st, "Pending Input Delay=%d instructions per character\n", snd->delay);
+if ((snd->next_time - sim_gtime()) > 0)
+    fprintf (st, "Minimum of %d instructions befor sending first character\n", (int)(snd->next_time - sim_gtime()));
+fprintf (st, "Minimum of %d instructions between characters\n", (int)snd->delay);
 return SCPE_OK;
 }
 

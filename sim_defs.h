@@ -664,27 +664,29 @@ struct sim_exptab {
 /* Expect Context */
 
 struct sim_expect {
-    struct sim_device *dptr;                            /* Device (for Debug) */
-    uint32 dbit;                                        /* Debugging Bit */
-    struct sim_exptab *rules;                           /* match rules */
-    int32 size;                                         /* count of match rules */
-    uint8 *buf;                                         /* buffer of output data which has produced */
-    uint32 buf_ins;                                     /* buffer insertion point for the next output data */
-    uint32 buf_size;                                    /* buffer size */
+    struct sim_device   *dptr;                          /* Device (for Debug) */
+    uint32              dbit;                           /* Debugging Bit */
+    struct sim_exptab   *rules;                         /* match rules */
+    int32               size;                           /* count of match rules */
+    uint32              after;                          /* delay before halting */
+    uint8               *buf;                           /* buffer of output data which has produced */
+    uint32              buf_ins;                        /* buffer insertion point for the next output data */
+    uint32              buf_size;                       /* buffer size */
     };
 
 /* Send Context */
 
 struct sim_send {
-    uint32 delay;                                       /* instruction delay before/between sent data */
-    struct sim_device *dptr;                            /* Device (for Debug) */
-    uint32 dbit;                                        /* Debugging Bit */
+    uint32              delay;                          /* instruction delay between sent data */
 #define SEND_DEFAULT_DELAY  1000                        /* default delay instruction count */
-    double next_time;                                   /* execution time when next data can be sent */
-    uint8 *buffer;                                      /* buffer */
-    size_t bufsize;                                     /* buffer size */
-    int32 insoff;                                       /* insert offset */
-    int32 extoff;                                       /* extra offset */
+    struct sim_device   *dptr;                          /* Device (for Debug) */
+    uint32              dbit;                           /* Debugging Bit */
+    uint32              after;                          /* instruction delay before sending any data */
+    double              next_time;                      /* execution time when next data can be sent */
+    uint8               *buffer;                        /* buffer */
+    size_t              bufsize;                        /* buffer size */
+    int32               insoff;                         /* insert offset */
+    int32               extoff;                         /* extra offset */
     };
 
 /* Debug table */
