@@ -319,6 +319,23 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       LIBEXT = $(LIBEXTSAVE)        
     endif
   endif
+  # Find available RegEx library.  Prefer libpcreposix.
+  ifneq (,$(call find_include,pcreposix))
+    ifneq (,$(call find_lib,pcreposix))
+      OS_CCDEFS += -DHAVE_PCREPOSIX_H
+      OS_LDFLAGS += -lpcreposix
+      $(info using libpcreposix: $(call find_lib,pcreposix) $(call find_include,pcreposix))
+    endif
+  else
+    # If libpcreposix isn't available, fall back to the local regex.h 
+    # Presume that the local regex support is available in the C runtime 
+    # without a specific reference to a library.  This may not be true on
+    # some platforms.
+    ifneq (,$(call find_include,regex))
+      OS_CCDEFS += -DHAVE_REGEX_H
+      $(info using regex: $(call find_include,regex))
+    endif
+  endif
   ifneq (,$(call find_include,dlfcn))
     ifneq (,$(call find_lib,dl))
       OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)

@@ -121,6 +121,17 @@
 #include <process.h>
 #endif
 
+#ifdef USE_REGEX
+#undef USE_REGEX
+#endif
+#if defined(HAVE_PCREPOSIX_H)
+#include <pcreposix.h>
+#define USE_REGEX 1
+#elif defined(HAVE_REGEX_H)
+#include <regex.h>
+#define USE_REGEX 1
+#endif
+
 /* avoid macro names collisions */
 #ifdef MAX
 #undef MAX
@@ -643,6 +654,10 @@ struct sim_exptab {
     int32               switches;                       /* flags */
 #define EXP_TYP_PERSIST         (SWMASK ('P'))      /* rule persists after match, default is once a rule matches, it is removed */
 #define EXP_TYP_CLEARALL        (SWMASK ('C'))      /* clear all rules after matching this rule, default is to once a rule matches, it is removed */
+#define EXP_TYP_REGEX           (SWMASK ('R'))      /* rule pattern is a regular expression */
+#if defined(USE_REGEX)
+    regex_t             regex;                          /* compiled regular expression */
+#endif
     char                *act;                           /* action string */
     };
 

@@ -242,6 +242,8 @@
 #include <dlfcn.h>
 #endif
 
+#define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
+
 #define EX_D            0                               /* deposit */
 #define EX_E            1                               /* examine */
 #define EX_I            2                               /* interactive */
@@ -1656,6 +1658,13 @@ r = putenv(envstr);
 #endif
 return r;
 }
+
+static
+int unsetenv(const char *envname)
+{
+setenv(envname, "", 1);
+return 0;
+}
 #endif
 
 
@@ -2728,7 +2737,7 @@ for (; *ip && (op < oend); ) {
         }
     else 
         if ((*ip == '%') && 
-            (isalnum(ip[1]) || (ip[1] == '*'))) {       /* sub? */
+            (isalnum(ip[1]) || (ip[1] == '*') || (ip[1] == '_'))) {       /* sub? */
             if ((ip[1] >= '0') && (ip[1] <= ('9'))) {   /* %n = sub */
                 ap = do_arg[ip[1] - '0'];
                 for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
@@ -3019,6 +3028,7 @@ uint32 delay = 0;
 t_stat r;
 SEND *snd;
 
+GET_SWITCHES (cptr);                                    /* get switches */
 tptr = get_glyph (cptr, gbuf, ',');
 if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
     r = tmxr_locate_line_send (gbuf, &snd);
@@ -3031,19 +3041,25 @@ else
 
 if ((!strncmp(gbuf, "DELAY=", 6)) && (gbuf[6])) {
     delay = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
-    if (r != SCPE_OK)
-        return SCPE_ARG;
+    if (r != SCPE_OK) {
+        sim_printf ("Invalid Delay Value\n");
+        return SCPE_ARG|SCPE_NOMESSAGE;
+        }
     cptr = tptr;
     }
 if (*cptr) {
-    if ((*cptr != '"') && (*cptr != '\''))
-        return SCPE_ARG;            /* String must be quote delimited */
+    if ((*cptr != '"') && (*cptr != '\'')) {
+        sim_printf ("String must be quote delimited\n");
+        return SCPE_ARG|SCPE_NOMESSAGE;
+        }
     cptr = get_glyph_quoted (cptr, gbuf, 0);
     if (*cptr != '\0')
-        return SCPE_2MARG;          /* No more arguments */
+        return SCPE_2MARG;                  /* No more arguments */
 
-    if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize))
-        return SCPE_ARG;
+    if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize)) {
+        sim_printf ("Invalid String\n");
+        return SCPE_ARG|SCPE_NOMESSAGE;
+        }
     }
 if ((dsize == 0) && (delay == 0))
     return SCPE_2FARG;
@@ -3076,6 +3092,7 @@ char gbuf[CBUFSIZE], *tptr;
 t_stat r;
 EXPECT *exp;
 
+GET_SWITCHES (cptr);                                    /* get switches */
 tptr = get_glyph (cptr, gbuf, ',');
 if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
     r = tmxr_locate_line_expect (gbuf, &exp);
@@ -3919,7 +3936,14 @@ if (flag) {
 #if defined (USE_SIM_VIDEO)
     fprintf (st, "\n\t\tSDL Video support: %s", vid_version());
 #endif
-    fprintf (st, "\n\t\tOS clock tick size: %dms", os_tick_size);
+#if defined (HAVE_PCREPOSIX_H)
+    fprintf (st, "\n\t\tPCRE RegEx support for EXPECT commands");
+#elif defined (HAVE_REGEX_H)
+    fprintf (st, "\n\t\tRegEx support for EXPECT commands");
+#else
+    fprintf (st, "\n\t\tNo RegEx support for EXPECT commands");
+#endif
+    fprintf (st, "\n\t\tOS clock tick size (time taken by msleep(1)): %dms", os_tick_size);
 #if defined(__VMS)
     if (1) {
         char *arch = 
@@ -8279,9 +8303,13 @@ if (*cptr == '[') {
     while (isspace(*cptr))
         ++cptr;
     }
-if ((*cptr != '"') && (*cptr != '\''))
-    return SCPE_ARG;                                    /* Expect string must be quote delimited */
+if ((*cptr != '"') && (*cptr != '\'')) {
+    sim_printf ("String must be quote delimited\n");
+    return SCPE_ARG|SCPE_NOMESSAGE;
+    }
 cptr = get_glyph_quoted (cptr, gbuf, 0);
+if (*cptr != '\0')
+    return SCPE_2MARG;                  /* No more arguments */
 return sim_exp_set (exp, gbuf, cnt, sim_switches, cptr);
 }
 
@@ -8289,8 +8317,17 @@ return sim_exp_set (exp, gbuf, cnt, sim_switches, cptr);
 
 t_stat sim_set_noexpect (EXPECT *exp, char *cptr)
 {
+char gbuf[CBUFSIZE];
+
 if (!cptr || !*cptr)
     return sim_exp_clrall (exp);                    /* clear all rules */
+if ((*cptr != '"') && (*cptr != '\'')) {
+    sim_printf ("String must be quote delimited\n");
+    return SCPE_ARG|SCPE_NOMESSAGE;
+    }
+cptr = get_glyph_quoted (cptr, gbuf, 0);
+if (*cptr != '\0')
+    return SCPE_2MARG;                              /* No more arguments */
 return sim_exp_clr (exp, cptr);                     /* clear one rule */
 }
 
@@ -8299,104 +8336,13 @@ return sim_exp_clr (exp, cptr);                     /* clear one rule */
 EXPTAB *sim_exp_fnd (EXPECT *exp, const char *match)
 {
 int32 i;
-uint8 *match_buf;
-uint32 match_size;
 
 if (!exp->rules)
     return NULL;
-match_buf = (uint8 *)malloc (strlen (match) + 1);
-if (!match_buf)
-    return NULL;
-if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
-    free (match_buf);
-    return NULL;
-    }
 for (i=0; i<exp->size; i++)
-    if ((match_size == exp->rules[i].size) && 
-        (0 == memcmp (exp->rules[i].match, match_buf, match_size))) {
-        free (match_buf);
+    if (!strcmp (exp->rules[i].match_pattern, match))
         return &exp->rules[i];
-        }
-free (match_buf);
 return NULL;
-}
-
-/* Add an expecct rule */
-
-EXPTAB *sim_exp_new (EXPECT *exp, const char *match)
-{
-uint8 *match_buf;
-uint32 match_size;
-EXPTAB *ep;
-int32 i;
-
-ep = sim_exp_fnd (exp, match);
-if (ep)
-    return ep;
-match_buf = (uint8 *)malloc (strlen (match) + 1);
-if (!match_buf)
-    return NULL;
-if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
-    free (match_buf);
-    return NULL;
-    }
-exp->rules = (EXPTAB *) realloc (exp->rules, sizeof (*exp->rules)*(exp->size + 1));
-ep = &exp->rules[exp->size];
-exp->size += 1;
-memset (ep, 0, sizeof(*ep));
-ep->match = match_buf;
-ep->size = match_size;
-ep->match_pattern = (char *)malloc (strlen (match) + 1);
-strcpy (ep->match_pattern, match);
-/* Make sure that the production buffer is large enough to detect a match for all rules */
-for (i=0; i<exp->size; i++) {
-    if (exp->rules[i].size > exp->buf_size) {
-        free (exp->buf);
-        exp->buf = (uint8 *)calloc (exp->rules[i].size, sizeof(*exp->buf));
-        exp->buf_size = exp->rules[i].size;
-        exp->buf_ins = 0;
-        }
-    }
-return ep;
-}
-
-/* Set a expect rule */
-
-t_stat sim_exp_set (EXPECT *exp, const char *match, int32 cnt, int32 switches, char *act)
-{
-EXPTAB *ep;
-uint8 *match_buf;
-uint32 match_size;
-
-/* Validate the match string */
-match_buf = (uint8 *)malloc (strlen (match) + 1);
-if (!match_buf)
-    return SCPE_MEM;
-if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
-    free (match_buf);
-    return SCPE_ARG;
-    }
-free (match_buf);
-ep = sim_exp_fnd (exp, match);                          /* present? */
-if (!ep)                                                /* no, allocate */
-    ep = sim_exp_new (exp, match);
-if (!ep)                                                /* still no? mem err */
-    return SCPE_MEM;
-ep->cnt = cnt;                                          /* set proceed count */
-ep->switches = switches;                                /* set switches */
-if (ep->act) {                                          /* replace old action? */
-    free (ep->act);                                     /* deallocate */
-    ep->act = NULL;                                     /* now no action */
-    }
-if (act) while (isspace(*act)) ++act;                   /* skip leading spaces in action string */
-if ((act != NULL) && (*act != 0)) {                     /* new action? */
-    char *newp = (char *) calloc (strlen (act)+1, sizeof (*act)); /* alloc buf */
-    if (newp == NULL)                                   /* mem err? */
-        return SCPE_MEM;
-    strcpy (newp, act);                                 /* copy action */
-    ep->act = newp;                                     /* set pointer */
-    }
-return SCPE_OK;
 }
 
 /* Clear (delete) an expect rule */
@@ -8410,6 +8356,10 @@ if (!ep)                                                /* not there? ok */
 free (ep->match);                                       /* deallocate match string */
 free (ep->match_pattern);                               /* deallocate the display format match string */
 free (ep->act);                                         /* deallocate action */
+#if defined(USE_REGEX)
+if (ep->switches & EXP_TYP_REGEX)
+    regfree (&ep->regex);                               /* release compiled regex */
+#endif
 for (i=ep-exp->rules; i<exp->size; i++)                 /* shuffle up remaining rules */
     exp->rules[i] = exp->rules[i+1];
 exp->size -= 1;                                         /* decrement count */
@@ -8442,6 +8392,110 @@ exp->size = 0;
 free (exp->buf);
 exp->buf = NULL;
 exp->buf_size = 0;
+exp->buf_ins = 0;
+return SCPE_OK;
+}
+
+/* Set/Add an expect rule */
+
+t_stat sim_exp_set (EXPECT *exp, const char *match, int32 cnt, int32 switches, char *act)
+{
+EXPTAB *ep;
+uint8 *match_buf;
+uint32 match_size;
+int i;
+
+/* Validate the match string */
+match_buf = (uint8 *)calloc (strlen (match) + 1, 1);
+if (!match_buf)
+    return SCPE_MEM;
+if (switches & EXP_TYP_REGEX) {
+#if !defined (USE_REGEX)
+    free (match_buf);
+    sim_printf ("RegEx support not available\n");
+    return SCPE_ARG|SCPE_NOMESSAGE;                     /* RegEx not available */
+    }
+#else   /* USE_REGEX */
+    int res;
+    regex_t re;
+
+    memset (&re, 0, sizeof(re));
+    memcpy (match_buf, match+1, strlen(match)-2);       /* extract string without surrounding quotes */
+    match_buf[strlen(match)-2] = '\0';
+    res = regcomp (&re, (char *)match_buf, REG_EXTENDED);
+    if (res) {
+        size_t err_size = regerror (res, &re, NULL, 0);
+        char *err_buf = calloc (err_size+1, 1);
+
+        regerror (res, &re, err_buf, err_size);
+        sim_printf ("Regular Expression Error: %s\n", err_buf);
+        free (err_buf);
+        free (match_buf);
+        return SCPE_ARG|SCPE_NOMESSAGE;
+        }
+    sim_debug (exp->dbit, exp->dptr, "Expect Regular Expression: \"%s\" has %d sub expressions\n", match_buf, (int)re.re_nsub);
+    regfree (&re);
+    }
+#endif
+else {
+    if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
+        free (match_buf);
+        return SCPE_ARG;
+        }
+    }
+free (match_buf);
+ep = sim_exp_fnd (exp, match);                          /* present? */
+if (ep)                                                 /* no, allocate */
+    sim_exp_clr_tab (exp, ep);                          /* clear it */
+exp->rules = (EXPTAB *) realloc (exp->rules, sizeof (*exp->rules)*(exp->size + 1));
+ep = &exp->rules[exp->size];
+exp->size += 1;
+memset (ep, 0, sizeof(*ep));
+ep->match_pattern = (char *)malloc (strlen (match) + 1);
+strcpy (ep->match_pattern, match);
+ep->cnt = cnt;                                          /* set proceed count */
+ep->switches = switches;                                /* set switches */
+match_buf = (uint8 *)calloc (strlen (match) + 1, 1);
+if (!match_buf) {
+    sim_exp_clr_tab (exp, ep);                          /* clear it */
+    return SCPE_MEM;
+    }
+if (switches & EXP_TYP_REGEX) {
+#if defined(USE_REGEX)
+    memcpy (match_buf, match+1, strlen(match)-2);      /* extract string without surrounding quotes */
+    match_buf[strlen(match)-2] = '\0';
+    regcomp (&ep->regex, (char *)match_buf, REG_EXTENDED);
+#endif
+    free (match_buf);
+    match_buf = NULL;
+    }
+else {
+    sim_decode_quoted_string (match, match_buf, &match_size);
+    ep->match = match_buf;
+    ep->size = match_size;
+    }
+ep->match_pattern = (char *)malloc (strlen (match) + 1);
+strcpy (ep->match_pattern, match);
+if (ep->act) {                                          /* replace old action? */
+    free (ep->act);                                     /* deallocate */
+    ep->act = NULL;                                     /* now no action */
+    }
+if (act) while (isspace(*act)) ++act;                   /* skip leading spaces in action string */
+if ((act != NULL) && (*act != 0)) {                     /* new action? */
+    char *newp = (char *) calloc (strlen (act)+1, sizeof (*act)); /* alloc buf */
+    if (newp == NULL)                                   /* mem err? */
+        return SCPE_MEM;
+    strcpy (newp, act);                                 /* copy action */
+    ep->act = newp;                                     /* set pointer */
+    }
+/* Make sure that the production buffer is large enough to detect a match for all rules */
+for (i=0; i<exp->size; i++) {
+    uint32 compare_size = (exp->rules[i].switches & EXP_TYP_REGEX) ? MAX(10 * strlen(ep->match_pattern), 1024) : exp->rules[i].size;
+    if (compare_size > exp->buf_size) {
+        exp->buf = (uint8 *)realloc (exp->buf, compare_size*sizeof(*exp->buf));
+        exp->buf_size = compare_size;
+        }
+    }
 return SCPE_OK;
 }
 
@@ -8451,8 +8505,14 @@ t_stat sim_exp_show_tab (FILE *st, EXPECT *exp, EXPTAB *ep)
 {
 if (!ep)
     return SCPE_OK;
-fprintf (st, "EXPECT ");
-fprint_buffer_string (st, ep->match, ep->size);
+fprintf (st, "EXPECT");
+if (ep->switches & EXP_TYP_PERSIST)
+    fprintf (st, " -p");
+if (ep->switches & EXP_TYP_CLEARALL)
+    fprintf (st, " -c");
+if (ep->switches & EXP_TYP_REGEX)
+    fprintf (st, " -r");
+fprintf (st, " %s", ep->match_pattern);
 if (ep->cnt > 0)
     fprintf (st, " [%d]", ep->cnt);
 if (ep->act)
@@ -8465,6 +8525,10 @@ t_stat sim_exp_show (FILE *st, EXPECT *exp, const char *match)
 {
 EXPTAB *ep = sim_exp_fnd (exp, match);
 
+if (exp->buf_size) {
+    fprintf (st, "Match Buffer Size: %d\n", exp->buf_size);
+    fprintf (st, "Buffer Insert Offset: %d\n", exp->buf_ins);
+    }
 if (!*match)
     return sim_exp_showall (st, exp);
 if (!ep)
@@ -8489,6 +8553,7 @@ t_stat sim_exp_check (EXPECT *exp, uint8 data)
 {
 int32 i;
 EXPTAB *ep;
+int regex_checks = 0;
 
 if ((!exp) || (!exp->rules))                            /* Anying to check? */
     return SCPE_OK;
@@ -8497,23 +8562,72 @@ exp->buf[exp->buf_ins++] = data;                        /* Save new data */
 
 for (i=0; i < exp->size; i++) {
     ep = &exp->rules[i];
-    if (exp->buf_ins < ep->size) {
-        if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins))
-            continue;
-        if (memcmp (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->match, ep->size-exp->buf_ins))
-            continue;
-        break;
+    if (ep->switches & EXP_TYP_REGEX) {
+#if defined (USE_REGEX)
+        regmatch_t *matches;
+        static size_t sim_exp_match_sub_count = 0;
+
+        ++regex_checks;
+        matches = calloc ((ep->regex.re_nsub + 1), sizeof(*matches));
+        exp->buf[exp->buf_ins] = '\0';
+        if (!regexec (&ep->regex, (char *)exp->buf, ep->regex.re_nsub + 1, matches, 0)) {
+            size_t j;
+            char *buf = malloc (1 + exp->buf_ins);
+
+
+            for (j=0; j<ep->regex.re_nsub + 1; j++) {
+                char env_name[32];
+
+                sprintf (env_name, "_EXPECT_MATCH_GROUP_%d", (int)j);
+                memcpy (buf, &exp->buf[matches[j].rm_so], matches[j].rm_eo-matches[j].rm_so);
+                buf[matches[j].rm_eo-matches[j].rm_so] = '\0';
+                setenv (env_name, buf, 1);      /* Make the match and substrings available as environment variables */
+                sim_debug (exp->dbit, exp->dptr, "%s=%s\n", env_name, buf);
+                }
+            for (; j<sim_exp_match_sub_count; j++) {
+                char env_name[32];
+
+                sprintf (env_name, "_EXPECT_MATCH_GROUP_%d", (int)j);
+                setenv (env_name, "", 1);      /* Remove previous extra environment variables */
+                }
+            sim_exp_match_sub_count = ep->regex.re_nsub;
+            free (matches);
+            free (buf);
+            break;
+            }
+        free (matches);
+#endif
         }
     else {
-        if (memcmp (&exp->buf[exp->buf_ins-ep->size], ep->match, ep->size))
-            continue;
-        break;
+        if (exp->buf_ins < ep->size) {
+            if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins))
+                continue;
+            if (memcmp (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->match, ep->size-exp->buf_ins))
+                continue;
+            break;
+            }
+        else {
+            if (memcmp (&exp->buf[exp->buf_ins-ep->size], ep->match, ep->size))
+                continue;
+            break;
+            }
         }
     }
-if (exp->buf_ins == exp->buf_size)                      /* At end of match buffer? */
-    exp->buf_ins = 0;                                   /* wrap around to beginning */
+if (exp->buf_ins == exp->buf_size) {                    /* At end of match buffer? */
+    if (regex_checks) {
+        /* When processing regular expressions, let the match buffer fill 
+           up and then shuffle the buffer contents down by half the buffer size
+           so that the regular expression has a single contiguous buffer to 
+           match against instead of the wrapping buffer which is used otherwise */
+        memmove (exp->buf, &exp->buf[exp->buf_size/2], exp->buf_size-(exp->buf_size/2));
+        exp->buf_ins -= exp->buf_size/2;
+        }
+    else
+        exp->buf_ins = 0;                               /* wrap around to beginning */
+    }
 if (i != exp->size) {                                   /* Found? */
     sim_debug (exp->dbit, exp->dptr, "Matched expect pattern: %s\n", ep->match_pattern);
+    setenv ("_EXPECT_MATCH_PATTERN", ep->match_pattern, 1);   /* Make the match detail available as an environment variable */
     if (ep->cnt > 0) {
         ep->cnt -= 1;
         sim_debug (exp->dbit, exp->dptr, "Waiting for %d more match%s before stopping\n", 

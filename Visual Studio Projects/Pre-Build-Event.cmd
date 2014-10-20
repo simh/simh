@@ -6,16 +6,18 @@ rem  performed.
 rem
 rem  The optional activities are invoked by passing parameters to this 
 rem  procedure.  The parameters are:
-rem     ROM    To run the BuildROMs program prior to executing a project
-rem            build.  This program verifies that the include files containing
-rem            ROM images are consistent with the ROM images from which they
-rem            are derived.
-rem     BUILD  To validate that the required dependent libraries and include
-rem            files are available in the directory ..\..\windows-build\
-rem            These libraries currently include winpcap and pthreads and 
-rem            optionally SDL.
-rem     LIBSDL To validate that the required dependent SDL libraries and include
-rem            files are available in the directory ..\..\windows-build\
+rem     ROM     To run the BuildROMs program prior to executing a project
+rem             build.  This program verifies that the include files containing
+rem             ROM images are consistent with the ROM images from which they
+rem             are derived.
+rem     BUILD   To validate that the required dependent libraries and include
+rem             files are available in the directory ..\..\windows-build\
+rem             These libraries currently include winpcap and pthreads and 
+rem             optionally SDL and LIBPCRE.
+rem     LIBSDL  To validate that the required dependent SDL libraries and include
+rem             files are available in the directory ..\..\windows-build\
+rem     LIBPCRE To validate that the required dependent PCRE libraries and include
+rem             files are available in the directory ..\..\windows-build\
 rem
 rem  In addition to the optional activities mentioned above, other activities
 rem  are also performed.  These include:
@@ -33,14 +35,20 @@ rem
 :_next_arg
 if "%1" == "" goto _done_args
 set _arg=
-if /I "%1" == "ROM"    set _arg=ROM
-if /I "%1" == "BUILD"  set _arg=BUILD
-if /I "%1" == "LIBSDL" set _arg=LIBSDL
-if "%_arg%" == ""      echo *** warning *** unknown parameter %0
-if not "%_arg%" == ""  set _X_%_arg%=%_arg%
+if /I "%1" == "ROM"     set _arg=ROM
+if /I "%1" == "BUILD"   set _arg=BUILD
+if /I "%1" == "LIBSDL"  set _arg=LIBSDL
+if /I "%1" == "LIBPCRE" set _arg=LIBPCRE
+if "%_arg%" == ""       echo *** warning *** unknown parameter %0
+if not "%_arg%" == ""   set _X_%_arg%=%_arg%
 shift
 goto _next_arg
 :_done_args
+rem some arguments implicitly require BUILD to also be set to have 
+rem any meaning.  These are LIBSDL and LIBPCRE
+if not "%_X_LIBSDL%"  == "" set _X_BUILD=BUILD
+if not "%_X_LIBPCRE%" == "" set _X_BUILD=BUILD
+
 
 :_do_rom
 if "%_X_ROM%" == "" goto _done_rom
@@ -74,9 +82,13 @@ if exist ../../windows-build-windows-build goto _notice3
 :_check_files
 if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice1
 if not exist ../../windows-build/pthreads/pthread.h goto _notice1
-if "%_X_LIBSDL%" == "" goto _done_build
+if "%_X_LIBSDL%" == "" goto _done_libsdl
 if not exist ../../windows-build/libSDL/SDL2-2.0.0/include/SDL.h goto _notice2
 if not exist "../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)/Lib/x86/dxguid.lib" goto _notice2
+:_done_libsdl
+if "%_X_LIBPCRE%" == "" goto _done_libpcre
+if not exist ../../windows-build/PCRE/include/pcreposix.h goto _notice2
+:_done_libpcre
 goto _done_build
 :_notice1
 echo *****************************************************
