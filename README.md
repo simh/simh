@@ -169,6 +169,17 @@ ASSERT		failure have several different actions:
 Other related changes/extensions:
 The "!" command (execute a command on the local OS), now returns the command's exit status as the status from the "!" command.  This allows ON conditions to handle error status responses from OS commands and act as desired.
 
+#### Scriptable interactions with running simulators.
+
+The EXPECT command now exists to provide a means of reacting to simulator output and the SEND command exists to inject data into programs running within a simulator.
+
+    EXPECT {HALTAFTER=n,}"\r\nPassword: "
+    SEND {AFTER=n,}{DELAY=m,}"mypassword\r"
+    
+    or
+    
+    EXPECT {HALTAFTER=n,}"\r\nPassword: " SEND {AFTER=n,}{DELAY=m,}"mypassword\r"; GO
+    
 
 #### Help
 
@@ -219,6 +230,8 @@ The "!" command (execute a command on the local OS), now returns the command's e
     DIR {path|file}                 Display file listing
     LS {path|file}                  Display file listing
     NEXT                            Step across a subroutine call or step a single instruction.
+    EXPECT                          React to output produced by a simulated system
+    SEND                            Inject input to a simulated system's console
 
 #### Command Processing Enhancements
 
