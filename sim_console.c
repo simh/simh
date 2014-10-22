@@ -514,15 +514,22 @@ static t_stat x_help_cmd (int32 flag, char *cptr)
 {
 CTAB *cmdp, *cmdph;
 
-if (*cptr)
-    return help_cmd (flag, cptr);
-sim_printf ("Remote Console Commands:\r\n");
+if (*cptr) {
+    int32 saved_switches = sim_switches;
+    t_stat r;
+
+    sim_switches |= SWMASK ('F');
+    r = help_cmd (flag, cptr);
+    sim_switches = saved_switches;
+    return r;
+    }
+sim_printf ("Help is available for the following Remote Console commands:\r\n");
 for (cmdp=allowed_remote_cmds; cmdp->name != NULL; ++cmdp) {
     cmdph = find_cmd (cmdp->name);
-    if (cmdph && cmdph->help) {
-        sim_printf ("%s\r\n", cmdph->help);
-        }
+    if (cmdph && cmdph->help)
+        sim_printf ("    %s\r\n", cmdp->name);
     }
+sim_printf ("Enter \"HELP cmd\" for detailed help on a command\r\n");
 return SCPE_OK;
 }
 
