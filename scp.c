@@ -1434,7 +1434,7 @@ ASSERT		failure have several different actions:
       " evaluation processing is done on each output character, rules matching\n"
       " is not specifically line oriented.  If line oriented matching is desired\n"
       " then rules should be defined which contain the simulated system's line\n"
-      " ending character sequence (i.e. \"\r\n\").\n"
+      " ending character sequence (i.e. \"\\r\\n\").\n"
       " Once data has matched any expect rule, that data is no longer eligible\n"
       " to match other expect rules which may already be defined.\n"
       " Data which is output prior to the definition of an expect rule is not\n"
@@ -1517,22 +1517,21 @@ ASSERT		failure have several different actions:
       " HaltAfter parameter has been set.\n"
       /***************** 80 character line width template *************************/
 #define HLP_ASSERT      "*Commands Executing_Command_Files Testing_Simulator_State"
+#define HLP_IF          "*Commands Executing_Command_Files Testing_Simulator_State"
       "3Testing Simulator State\n"
+      " There are two ways for a command file to examine simulator state and\n"
+      " then take action based on that state:\n"
+      "4ASSERT\n"
       " The ASSERT command tests a simulator state condition and halts command\n"
       " file execution if the condition is false:\n\n"
-      "++ASSERT {<dev>} <reg>{<logical-op><value>}<conditional-op><value>\n\n"
-      " If <dev> is not specified, CPU is assumed.  <reg> is a register (scalar\n"
-      " or subscripted) belonging to the indicated device.  The <conditional-op>\n"
-      " and optional <logical-op> are the same as those used for \"search\n"
-      " specifiers\" by the EXAMINE and DEPOSIT commands.  The <value>s are\n"
-      " expressed in the radix specified for <reg>, not in the radix for the\n"
-      " device.\n\n"
-      " If the <logical-op> and <value> are specified, the target register value\n"
-      " is first altered as indicated.  The result is then compared to the\n"
-      " <value> via the <conditional-op>.  If the result is false, an\n"
-      " \"Assertion failed\" message is printed, and any running command file\n"
-      " is aborted.  Otherwise, the command has no effect.\n\n"
-      "4Examples:\n"
+      "++ASSERT <Simulator State Expressions>\n\n"
+      " If the indicated expression evaluates to false, the command completes\n"
+      " with an AFAIL condition.  By default, when a command file encounters a\n"
+      " command which returns the AFAIL condition, it will exit the running\n"
+      " command file with the AFAIL status to the calling command file.  This\n"
+      " behavior can be changed with the ON command as well as switches to the\n"
+      " invoking DO command.\n\n"
+      "5Examples:\n"
       " A command file might be used to bootstrap an operating system that\n"
       " halts after the initial load from disk.  The ASSERT command is then\n"
       " used to confirm that the load completed successfully by examining the\n"
@@ -1551,6 +1550,66 @@ ASSERT		failure have several different actions:
       " be echoed, the command file will be aborted with an \"Assertion failed\"\n"
       " message.  Otherwise, the command file will continue to bring up the\n"
       " operating system.\n"
+      "4IF\n"
+      " The IF command tests a simulator state condition and executes additional\n"
+      " commands if the condition is true:\n\n"
+      "++IF <Simulator State Expressions> commandtoprocess{; additionalcommandtoprocess}...\n\n"
+      "5Examples:\n"
+      " A command file might be used to bootstrap an operating system that\n"
+      " halts after the initial load from disk.  The ASSERT command is then\n"
+      " used to confirm that the load completed successfully by examining the\n"
+      " CPU's \"A\" register for the expected value:\n\n"
+      "++; OS bootstrap command file\n"
+      "++;\n"
+      "++ATTACH DS0 os.disk\n"
+      "++BOOT DS\n"
+      "++; A register contains error code; 0 = good boot\n"
+      "++IF NOT A=0 echo Boot failed - Failure Code; EX A; exit AFAIL\n"
+      "++ATTACH MT0 sys.tape\n"
+      "++ATTACH MT1 user.tape\n"
+      "++RUN\n\n"
+       /***************** 80 character line width template *************************/
+      " In the example, if the A register is not 0, the message \"Boot failed -\n"
+      " Failure Code:\" command will be displayed, the contents of the A register\n"
+      " will be displayed and the command file will be aborted with an \"Assertion\n"
+      " failed\" message.  Otherwise, the command file will continue to bring up\n"
+      " the operating system.\n"
+      "4Conditional Expressions\n"
+      " The IF and ASSERT commands evaluate two different forms of conditional\n"
+      " expressions.:\n\n"
+      "5Simulator State Expressions\n"
+      " The values of simulator registers can be evaluated with:\n\n"
+      "++{NOT} {<dev>} <reg>{<logical-op><value>}<conditional-op><value>\n\n"
+      " If <dev> is not specified, CPU is assumed.  <reg> is a register (scalar\n"
+      " or subscripted) belonging to the indicated device.  The <conditional-op>\n"
+      " and optional <logical-op> are the same as those used for \"search\n"
+      " specifiers\" by the EXAMINE and DEPOSIT commands.  The <value>s are\n"
+      " expressed in the radix specified for <reg>, not in the radix for the\n"
+      " device.\n\n"
+      " If the <logical-op> and <value> are specified, the target register value\n"
+      " is first altered as indicated.  The result is then compared to the\n"
+      " <value> via the <conditional-op>.  If the result is true, the additional\n"
+      " command(s) are executed before proceeding to the next line in the command\n"
+      " file.  Otherwise, the next command in the command file is processed.\n\n"
+      "5String Comparison Expressions\n"
+      " String Values can be compared with:\n"
+      "++{-i} {NOT} \"<string1>\" <compare-op> \"<string2>\"\n\n"
+      " The -i switch, if present, causes comparisons to be case insensitive\n"
+      " <string1> and <string2> are quoted string values which may have\n"
+      " environment variables substituted as desired.\n"
+      " compare-op may be one of:\n\n"
+      "++==  - equal\n"
+      "++EQU - equal\n"
+      "++!=  - not equal\n"
+      "++NEQ - not equal\n"
+      "++<   - less than\n"
+      "++LSS - less than\n"
+      "++<=  - less than or equal\n"
+      "++LEQ - less than or equal\n"
+      "++>   - greater than\n"
+      "++GTR - greater than\n"
+      "++>=  - greater than or equal\n"
+      "++GEQ - greater than or equal\n"
        /***************** 80 character line width template *************************/
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
@@ -1607,10 +1666,11 @@ static CTAB cmd_table[] = {
     { "SHIFT",      &shift_cmd,     0,          HLP_SHIFT },
     { "CALL",       &call_cmd,      0,          HLP_CALL },
     { "ON",         &on_cmd,        0,          HLP_ON },
+    { "IF",         &assert_cmd,    0,          HLP_IF },
     { "PROCEED",    &noop_cmd,      0,          HLP_PROCEED },
     { "IGNORE",     &noop_cmd,      0,          HLP_IGNORE },
     { "ECHO",       &echo_cmd,      0,          HLP_ECHO },
-    { "ASSERT",     &assert_cmd,    0,          HLP_ASSERT },
+    { "ASSERT",     &assert_cmd,    1,          HLP_ASSERT },
     { "SEND",       &send_cmd,      0,          HLP_SEND },
     { "EXPECT",     &expect_cmd,    1,          HLP_EXPECT },
     { "NOEXPECT",   &expect_cmd,    0,          HLP_EXPECT },
@@ -2978,7 +3038,7 @@ for (; *ip && (op < oend); ) {
             }
         else
             if (ip == istart) {                         /* at beginning of input? */
-                get_glyph (instr, gbuf, 0);             /* substitute initial token */
+                get_glyph (istart, gbuf, 0);            /* substitute initial token */
                 ap = getenv(gbuf);                      /* if it is an environment variable name */
                 if (!ap) {                              /* nope? */
                     *op++ = *ip++;                      /* press on with literal character */
@@ -3007,56 +3067,156 @@ return SCPE_OK;
 }
 
 /* Assert command
+   If command
 
-   Syntax: ASSERT {<dev>} <reg>{<logical-op><value>}<conditional-op><value>
+   Syntax: ASSERT {NOT} {<dev>} <reg>{<logical-op><value>}<conditional-op><value>
+   Syntax: IF {NOT} {<dev>} <reg>{<logical-op><value>}<conditional-op><value> commandtoprocess{; additionalcommandtoprocess}...
 
-   If <dev> is not specified, CPU is assumed.  <value> is expressed in the radix
-   specified for <reg>.  <logical-op> and <conditional-op> are the same as that
-   allowed for examine and deposit search specifications. */
+       If NOT is specified, the resulting expression value is inverted.
+       If <dev> is not specified, sim_dflt_dev (CPU) is assumed.  
+       <value> is expressed in the radix specified for <reg>.  
+       <logical-op> and <conditional-op> are the same as that
+       allowed for examine and deposit search specifications.
 
+   Syntax: ASSERT {-i} {NOT} "<string1>" <compare-op> "<string2>"
+   Syntax: IF {-i} {NOT} "<string1>" <compare-op> "<string2>" commandtoprocess{; additionalcommandtoprocess}...
+
+       If -i is specified, the comparisons are done in a case insensitive manner.
+       If NOT is specified, the resulting expression value is inverted.
+       "<string1>" and "<string2>" are quote delimited strings which include 
+       expansion references to environment variables in the simulator.
+       <compare-op> can be any one of:
+            ==  - equal
+            EQU - equal
+            !=  - not equal
+            NEQ - not equal
+            <   - less than
+            LSS - less than
+            <=  - less than or equal
+            LEQ - less than or equal
+            >   - greater than
+            GTR - greater than
+            >=  - greater than or equal
+            GEQ - greater than or equal
+*/
 t_stat assert_cmd (int32 flag, char *cptr)
 {
-char gbuf[CBUFSIZE], *gptr, *tptr;
+char gbuf[CBUFSIZE], *gptr, *tptr, gbuf2[CBUFSIZE];
 REG *rptr;
 uint32 idx;
 t_value val;
 t_stat r;
+t_bool not = FALSE;
+t_bool result;
 
 cptr = get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, cptr, &r);  /* get sw, default */
 sim_stab.boolop = -1;                                   /* no relational op dflt */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
-cptr = get_glyph (cptr, gbuf, 0);                       /* get register */
-rptr = find_reg (gbuf, &gptr, sim_dfdev);               /* parse register */
-if (!rptr)                                              /* not there */
-    return SCPE_NXREG;
-if (*gptr == '[') {                                     /* subscript? */
-    if (rptr->depth <= 1)                               /* array register? */
-        return SCPE_ARG;
-    idx = (uint32) strtotv (++gptr, &tptr, 10);         /* convert index */
-    if ((gptr == tptr) || (*tptr++ != ']'))
-        return SCPE_ARG;
-    gptr = tptr;                                        /* update */
+tptr = get_glyph (cptr, gbuf, 0);                       /* get token */
+if (!strcmp (gbuf, "NOT")) {                            /* Conditional Inversion? */
+    not = TRUE;                                         /* remember that, and */
+    cptr = tptr;
     }
-else idx = 0;                                           /* not array */
-if (idx >= rptr->depth)                                 /* validate subscript */
-    return SCPE_SUB;
-if (*gptr != 0)                                         /* more? must be search */
-    get_glyph (gptr, gbuf, 0);
+if (*cptr == '"') {                                     /* quoted string comparison? */
+    char op[CBUFSIZE];
+    static struct {
+        char *op;
+        int aval;
+        int bval;
+        t_bool invert;
+        } *optr, compare_ops[] =
+        {
+            {"==",   0,  0, FALSE},
+            {"EQU",  0,  0, FALSE},
+            {"!=",   0,  0, TRUE},
+            {"NEQ",  0,  0, TRUE},
+            {"<",   -1, -1, FALSE},
+            {"LSS", -1, -1, FALSE},
+            {"<=",   0, -1, FALSE},
+            {"LEQ",  0, -1, FALSE},
+            {">",    1,  1, FALSE},
+            {"GTR",  1,  1, FALSE},
+            {">=",   0,  1, FALSE},
+            {"GEQ",  0,  1, FALSE},
+            {NULL}};
+
+    tptr = (char *)get_glyph_gen (cptr, gbuf, '=', (sim_switches & SWMASK ('I')), TRUE, '\\');/* get first string */
+    if (!*tptr)
+        return SCPE_2FARG;
+    cptr += strlen (gbuf);
+    while (isspace (*cptr))                             /* skip spaces */
+        ++cptr;
+    get_glyph (cptr, op, '"');
+    for (optr = compare_ops; optr->op; optr++)
+        if (0 == strcmp (op, optr->op))
+            break;
+    if (!optr->op) {
+        sim_printf ("Invalid operator: %s\n", op);
+        return SCPE_ARG|SCPE_NOMESSAGE;
+        }
+    cptr += strlen (op);
+    while (isspace (*cptr))                             /* skip spaces */
+        ++cptr;
+    cptr = (char *)get_glyph_gen (cptr, gbuf2, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');/* get second string */
+    if (*cptr) {                                        /* more? */
+        if (flag)                                       /* ASSERT has no more args */
+            return SCPE_2MARG;
+        }
+    else {
+        if (!flag)                                      
+            return SCPE_2FARG;                          /* IF needs actions! */
+        }
+    result = strcmp (gbuf, gbuf2);
+    result = ((result == optr->aval) || (result == optr->bval));
+    if (optr->invert)
+        result = !result;
+    }
 else {
-    if (*cptr == 0)                                     /* must be more */
+    cptr = get_glyph (cptr, gbuf, 0);                   /* get register */
+    rptr = find_reg (gbuf, &gptr, sim_dfdev);           /* parse register */
+    if (!rptr)                                          /* not there */
+        return SCPE_NXREG;
+    if (*gptr == '[') {                                 /* subscript? */
+        if (rptr->depth <= 1)                           /* array register? */
+            return SCPE_ARG;
+        idx = (uint32) strtotv (++gptr, &tptr, 10);     /* convert index */
+        if ((gptr == tptr) || (*tptr++ != ']'))
+            return SCPE_ARG;
+        gptr = tptr;                                    /* update */
+        }
+    else idx = 0;                                       /* not array */
+    if (idx >= rptr->depth)                             /* validate subscript */
+        return SCPE_SUB;
+    if (*gptr != 0)                                     /* more? must be search */
+        get_glyph (gptr, gbuf, 0);
+    else {
+        if (*cptr == 0)                                 /* must be more */
             return SCPE_2FARG;
-    cptr = get_glyph (cptr, gbuf, 0);                   /* get search cond */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get search cond */
+        }
+    if (*cptr) {                                        /* more? */
+        if (flag)                                       /* ASSERT has no more args */
+            return SCPE_2MARG;
+        }
+    else {
+        if (!flag)                                      
+            return SCPE_2FARG;                          /* IF needs actions! */
+        }
+    if (!get_search (gbuf, rptr->radix, &sim_stab) ||   /* parse condition */
+        (sim_stab.boolop == -1))                        /* relational op reqd */
+        return SCPE_MISVAL;
+    val = get_rval (rptr, idx);                         /* get register value */
+    result = test_search (val, &sim_stab);              /* test condition */
     }
-if (*cptr != 0)                                         /* must be done */
-    return SCPE_2MARG;
-if (!get_search (gbuf, rptr->radix, &sim_stab) ||       /* parse condition */
-    (sim_stab.boolop == -1))                            /* relational op reqd */
-    return SCPE_MISVAL;
-val = get_rval (rptr, idx);                             /* get register value */
-if (test_search (val, &sim_stab))                       /* test condition */
-    return SCPE_OK;
-return SCPE_AFAIL;                                      /* condition fails */
+if (not ^ result) {
+    if (!flag)
+        sim_brk_setact (cptr);                          /* set up IF actions */
+    }
+else
+    if (flag)
+        return SCPE_AFAIL;                              /* return assert status */
+return SCPE_OK;
 }
 
 /* Send command
