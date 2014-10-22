@@ -1609,7 +1609,11 @@ ASSERT		failure have several different actions:
       "++>   - greater than\n"
       "++GTR - greater than\n"
       "++>=  - greater than or equal\n"
-      "++GEQ - greater than or equal\n"
+      "++GEQ - greater than or equal\n\n"
+      " Comparisons are generic.  This means that if both string1 and string2 are\n"
+      " comprised of all numeric digits, then the strings are converted to numbers\n"
+      " and a numeric comparison is performed. For example: \"+1\" EQU "1" will be
+      " true.\n"
        /***************** 80 character line width template *************************/
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
@@ -3066,6 +3070,24 @@ for (i=1; i<arg_count-1; ++i)
 return SCPE_OK;
 }
 
+static
+int sim_cmp_string (const char *s1, const char *s2)
+{
+long int v1, v2;
+char *ep1, *ep2;
+
+v1 = strtol(s1+1, &ep1, 0);
+v2 = strtol(s2+1, &ep2, 0);
+if ((ep1 != s1 + strlen (s1) - 1) ||
+    (ep2 != s2 + strlen (s2) - 1))
+    return strcmp (s1, s2);
+if (v1 == v2)
+    return 0;
+if (v1 < v2)
+    return -1;
+return 1;
+}
+
 /* Assert command
    If command
 
@@ -3167,7 +3189,7 @@ if (*cptr == '"') {                                     /* quoted string compari
         if (!flag)                                      
             return SCPE_2FARG;                          /* IF needs actions! */
         }
-    result = strcmp (gbuf, gbuf2);
+    result = sim_cmp_string (gbuf, gbuf2);
     result = ((result == optr->aval) || (result == optr->bval));
     if (optr->invert)
         result = !result;
