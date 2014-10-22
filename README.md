@@ -223,6 +223,7 @@ The EXPECT command now exists to provide a means of reacting to simulator output
     SHIFT                           Slide argument parameters %1 thru %9 left 1
     NOOP                            A no-op command
     ON                              Establish or cancel an ON condition dispatch
+    IF                              Test some simulator state and conditionally execute commands
     CD                              Change working directory
     SET DEFAULT                     Change working directory
     PWD                             Show working directory

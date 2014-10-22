@@ -1612,7 +1612,7 @@ ASSERT		failure have several different actions:
       "++GEQ - greater than or equal\n\n"
       " Comparisons are generic.  This means that if both string1 and string2 are\n"
       " comprised of all numeric digits, then the strings are converted to numbers\n"
-      " and a numeric comparison is performed. For example: \"+1\" EQU "1" will be
+      " and a numeric comparison is performed. For example: \"+1\" EQU \"1\" will be\n"
       " true.\n"
        /***************** 80 character line width template *************************/
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
@@ -2425,34 +2425,24 @@ if (*cptr) {
                 int i;
 
                 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
-                    if (dptr->help) {
-                        fprintf (stdout, "h{elp} %-17s display help for device %s\n", dptr->name, dptr->name);
-                        if (sim_log)
-                            fprintf (sim_log, "h{elp} %-17s display help for device %s\n", dptr->name, dptr->name);
-                        }
+                    if (dptr->help)
+                        sim_printf ("h{elp} %-17s display help for device %s\n", dptr->name, dptr->name);
                     if (dptr->attach_help || 
                         (DEV_TYPE(dptr) == DEV_MUX) ||
                         (DEV_TYPE(dptr) == DEV_DISK) ||
                         (DEV_TYPE(dptr) == DEV_TAPE)) {
-                        fprintf (stdout, "h{elp} %s ATTACH\t display help for device %s ATTACH command\n", dptr->name, dptr->name);
-                        if (sim_log)
-                            fprintf (sim_log, "h{elp} %s ATTACH\t display help for device %s ATTACH command\n", dptr->name, dptr->name);
+                        sim_printf ("h{elp} %s ATTACH\t display help for device %s ATTACH command\n", dptr->name, dptr->name);
                         }
                     if (dptr->registers) {
-                        if (dptr->registers->name != NULL) {
-                            fprintf (stdout, "h{elp} %s REGISTERS\t display help for device %s register variables\n", dptr->name, dptr->name);
-                            if (sim_log)
-                                fprintf (sim_log, "h{elp} %s REGISTERS\t display help for device %s register variables\n", dptr->name, dptr->name);
-                            }
+                        if (dptr->registers->name != NULL)
+                            sim_printf ("h{elp} %s REGISTERS\t display help for device %s register variables\n", dptr->name, dptr->name);
                         }
                     if (dptr->modifiers) {
                         MTAB *mptr;
 
                         for (mptr = dptr->modifiers; mptr->pstring != NULL; mptr++) {
                             if (mptr->help) {
-                                fprintf (stdout, "h{elp} %s SET\t\t display help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
-                                if (sim_log)
-                                    fprintf (sim_log, "h{elp} %s SET\t\t display help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
+                                sim_printf ("h{elp} %s SET\t\t display help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
                                 break;
                                 }
                             }
@@ -2474,18 +2464,12 @@ if (*cptr) {
 
             for (cmdpa=cmd_table; cmdpa->name != NULL; cmdpa++)
                 if ((cmdpa->action == cmdp->action) && (cmdpa->help)) {
-                    fprintf (stdout, "%s is an alias for the %s command:\n%s", 
+                    sim_printf ("%s is an alias for the %s command:\n%s", 
                                 cmdp->name, cmdpa->name, cmdpa->help);
-                    if (sim_log)
-                        fprintf (sim_log, "%s is an alias for the %s command.\n%s", 
-                                    cmdp->name, cmdpa->name, cmdpa->help);
                     break;
                     }
-            if (cmdpa->name == NULL) {              /* not found? */
-                fprintf (stdout, "No help available for the %s command\n", cmdp->name);
-                if (sim_log)
-                    fprintf (sim_log, "No help available for the %s command\n", cmdp->name);
-                }
+            if (cmdpa->name == NULL)                /* not found? */
+                sim_printf ("No help available for the %s command\n", cmdp->name);
             }
         }
     else { 
@@ -2498,11 +2482,8 @@ if (*cptr) {
             dptr = find_dev (gbuf);
             if (dptr == NULL)
                 return SCPE_ARG;
-            if (dptr->flags & DEV_DISABLE) {
-                fprintf (stdout, "Device %s is currently disabled\n", dptr->name);
-                if (sim_log)
-                    fprintf (sim_log, "Device %s is currently disabled\n", dptr->name);
-                }
+            if (dptr->flags & DEV_DISABLE)
+                sim_printf ("Device %s is currently disabled\n", dptr->name);
             }
         r = help_dev_help (stdout, dptr, uptr, flag, cptr);
         if (sim_log)
@@ -2548,11 +2529,7 @@ return status;
 
 t_stat echo_cmd (int32 flag, char *cptr)
 {
-puts (cptr);
-if (sim_log)
-    fprintf (sim_log, "%s\n", cptr);
-if (sim_deb)
-    fprintf (sim_deb, "\n%s\n", cptr);
+sim_printf ("%s\n", cptr);
 return SCPE_OK;
 }
 
