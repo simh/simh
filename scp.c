@@ -5605,14 +5605,11 @@ for ( ;; ) {                                            /* device loop */
                     return SCPE_INCOMP;
                     }
                 uptr->capac = high;                     /* new memory size */
-                printf ("Memory size changed: %s%d = ", sim_dname (dptr), unitno);
+                sim_printf ("Memory size changed: %s%d = ", sim_dname (dptr), unitno);
                 fprint_capac (stdout, dptr, uptr);
-                printf ("\n");
-                if (sim_log) {
-                    fprintf (sim_log, "Memory size changed: %s%d = ", sim_dname (dptr), unitno);
+                if (sim_log)
                     fprint_capac (sim_log, dptr, uptr);
-                    fprintf (sim_log, "\n");
-                    }
+                sim_printf ("\n");
                 }
             sz = SZ_D (dptr);                           /* allocate buffer */
             if ((mbuf = calloc (SRBSIZ, sz)) == NULL)
@@ -6648,16 +6645,14 @@ if ((r = parse_sym (cptr, 0, dptr->units, sim_eval, sim_switches)) > 0) {
     }
 lim = 1 - r;
 for (i = a = 0; a < lim; ) {
-    printf ("%d:\t", a);
+    sim_printf ("%d:\t", a);
     if ((r = fprint_sym (stdout, a, &sim_eval[i], dptr->units, sim_switches)) > 0)
         r = fprint_val (stdout, sim_eval[i], rdx, dptr->dwidth, PV_RZRO);
-    printf ("\n");
     if (sim_log) {
-        fprintf (sim_log, "%d\t", i);
         if ((r = fprint_sym (sim_log, a, &sim_eval[i], dptr->units, sim_switches)) > 0)
             r = fprint_val (sim_log, sim_eval[i], rdx, dptr->dwidth, PV_RZRO);
-        fprintf (sim_log, "\n");
         }
+    sim_printf ("\n");
     if (r < 0)
         a = a + 1 - r;
     else a = a + dptr->aincr;

@@ -1652,21 +1652,15 @@ return SCPE_OK;
 t_bool set_chanmap (DEVICE *dptr, DIB *dibp, uint32 dno, uint32 chan)
 {
   if ((chan < DMC_V_DMC1) && (chan >= dma_nch)) {
-    printf ("%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);
-    if (sim_log)
-      fprintf (sim_log, "%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);
+    sim_printf ("%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);
     return TRUE;
   }
   if ((chan >= DMC_V_DMC1) && !(cpu_unit.flags & UNIT_DMC)) {
-    printf ("%s configured for DMC, option disabled\n", sim_dname (dptr));
-    if (sim_log)
-      fprintf (sim_log, "%s configured for DMC, option disabled\n", sim_dname (dptr));
+    sim_printf ("%s configured for DMC, option disabled\n", sim_dname (dptr));
     return TRUE;
   }
   if (chan_map[chan]) {                           /* channel conflict? */
-   printf ("%s DMA/DMC channel conflict, devno = %02o\n", sim_dname (dptr), dno);
-   if (sim_log)
-     fprintf (sim_log, "%s DMA/DMC channel conflict, devno = %02o\n", sim_dname (dptr), dno);
+   sim_printf ("%s DMA/DMC channel conflict, devno = %02o\n", sim_dname (dptr), dno);
    return TRUE;
   }
   chan_map[chan] = dno;                           /* channel back map */
@@ -1690,11 +1684,8 @@ for (i = 0; (dptr = sim_devices[i]); i++) {             /* loop thru devices */
     dno = dibp->dev;                                    /* device number */
     for (j = 0; j < dibp->num; j++) {                   /* repeat for slots */
         if (iotab[dno + j]) {                           /* conflict? */
-            printf ("%s device number conflict, devno = %02o\n",
-                    sim_dname (dptr), dno + j);
-            if (sim_log)
-                fprintf (sim_log, "%s device number conflict, devno = %02o\n",
-                         sim_dname (dptr), dno + j);
+            sim_printf ("%s device number conflict, devno = %02o\n",
+                        sim_dname (dptr), dno + j);
             return TRUE;
             }
         iotab[dno + j] = dibp->io;                      /* set I/O routine */
@@ -1706,9 +1697,7 @@ for (i = 0; (dptr = sim_devices[i]); i++) {             /* loop thru devices */
         if (set_chanmap(dptr, dibp, dno, dibp->chan2-1)) return TRUE;
       // [RLA] If the device uses extended interrupts, check that they're enabled.
       if ((dibp->inum != INT_V_NONE) && (dibp->inum >= INT_V_EXTD) && (ext_ints == 0)) {
-        printf ("%s uses extended interrupts but that option is disabled\n", sim_dname (dptr));
-        if (sim_log)
-          fprintf (sim_log, "%s uses extended interrupts but that option is disabled\n", sim_dname (dptr));
+        sim_printf ("%s uses extended interrupts but that option is disabled\n", sim_dname (dptr));
         return TRUE;
       }
     }                                                   /* end for */

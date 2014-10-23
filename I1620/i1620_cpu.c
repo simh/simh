@@ -2108,9 +2108,7 @@ return SCPE_OK;
 t_stat cpu_set_opt1 (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (cpu_unit.flags & IF_MII) {
-    printf ("Feature is standard on 1620 Model 2\n");
-    if (sim_log)
-        fprintf (sim_log, "Feature is standard on 1620 Model 2\n");
+    sim_printf ("Feature is standard on 1620 Model 2\n");
     return SCPE_NOFNC;
     }
 return SCPE_OK;
@@ -2121,9 +2119,7 @@ return SCPE_OK;
 t_stat cpu_set_opt2 (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (!(cpu_unit.flags & IF_MII)) {
-    printf ("Feature is not available on 1620 Model 1\n");
-    if (sim_log)
-        fprintf (sim_log, "Feature is not available on 1620 Model 1\n");
+    sim_printf ("Feature is not available on 1620 Model 1\n");
     return SCPE_NOFNC;
     }
 return SCPE_OK;

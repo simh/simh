@@ -2384,9 +2384,7 @@ int32 xr, ac;
 
 if (!caveats_displayed) {
     caveats_displayed = TRUE;
-    printf ("%s", cpu_next_caveats);
-    if (sim_log)
-        fprintf (sim_log, "%s", cpu_next_caveats);
+    sim_printf ("%s", cpu_next_caveats);
     }
 if (SCPE_OK != get_aval ((saved_PC & AMASK), &cpu_dev, &cpu_unit))  /* get data */
     return FALSE;

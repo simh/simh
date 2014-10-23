@@ -1290,26 +1290,17 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         if ((ch >= chan_num) ||
             (dev >= CHAN_N_DEV) ||
             (dio >= DIO_N_MOD)) {
-            printf ("%s: invalid device address, chan = %d, dev = %X, dio = %X\n",
-                sim_dname (dptr), ch, DVA_GETDEV (dibp->dva), dio);
-            if (sim_log)
-                fprintf (sim_log, "%s: invalid device address, chan = %d, dev = %X, dio = %X\n",
+            sim_printf ("%s: invalid device address, chan = %d, dev = %X, dio = %X\n",
                     sim_dname (dptr), ch, DVA_GETDEV (dibp->dva), dio);
             return SCPE_STOP;
             }
         if ((dibp->disp != NULL) && (chan[ch].disp[dev] != NULL)) {
-            printf ("%s: device address conflict, chan = %d, dev = %X\n",
-                sim_dname (dptr), ch, DVA_GETDEV (dibp->dva));
-            if (sim_log)
-                fprintf (sim_log, "%s: device address conflict, chan = %d, dev = %X\n",
+            sim_printf ("%s: device address conflict, chan = %d, dev = %X\n",
                     sim_dname (dptr), ch, DVA_GETDEV (dibp->dva));
             return SCPE_STOP;
             }
         if ((dibp->dio_disp != NULL) && (dio_disp[dio] != NULL)) {
-            printf ("%s: direct I/O address conflict, dio = %X\n",
-                sim_dname (dptr), dio);
-            if (sim_log)
-                fprintf (sim_log, "%s: direct I/O address conflict, dio = %X\n",
+            sim_printf ("%s: direct I/O address conflict, dio = %X\n",
                     sim_dname (dptr), dio);
             return SCPE_STOP;
             }

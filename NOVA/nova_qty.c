@@ -489,13 +489,11 @@ t_stat qty_attach( UNIT * unitp, char * cptr )
     if ( sim_switches & SWMASK('M') )                   /* modem control? */
         {
         qty_mdm = 1;
-        printf( "Modem control activated\n" ) ;
-        if ( sim_log ) fprintf( sim_log, "Modem control activated\n" ) ;
+        sim_printf( "Modem control activated\n" ) ;
         if ( sim_switches & SWMASK ('A') )              /* autodisconnect? */
             {
             qty_auto = 1 ;
-            printf( "Auto disconnect activated\n" ) ;
-            if ( sim_log ) fprintf( sim_log, "Auto disconnect activated\n" ) ;
+            sim_printf( "Auto disconnect activated\n" ) ;
             }
         }
     qty_polls = 0 ;

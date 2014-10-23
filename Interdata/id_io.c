@@ -359,11 +359,8 @@ if (newmax < sch_max) {                                 /* reducing? */
     for (i = 0; (dptr = sim_devices[i]); i++) {           /* loop thru dev */
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp && (dibp->sch >= (int32) newmax)) {    /* dev using chan? */
-            printf ("Device %02X uses channel %d\n",
+            sim_printf ("Device %02X uses channel %d\n",
                     dibp->dno, dibp->sch);
-            if (sim_log)
-                fprintf (sim_log, "Device %02X uses channel %d\n",
-                         dibp->dno, dibp->sch);
             return SCPE_OK;
             }
         }
@@ -643,9 +640,7 @@ for (i = 0; (dptr = sim_devices[i]); i++) {               /* loop thru devices *
         dmsk = 1u << (t & 0x1F);                        /* bit to test */
         doff = t / 32;                                  /* word to test */
         if (dmap[doff] & dmsk) {                        /* in use? */
-            printf ("Device number conflict, devno = %02X\n", t);
-            if (sim_log)
-                fprintf (sim_log, "Device number conflict, devno = %02X\n", t);
+            sim_printf ("Device number conflict, devno = %02X\n", t);
             return TRUE;
             }
         dmap[doff] = dmap[doff] | dmsk;
