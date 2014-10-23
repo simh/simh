@@ -148,6 +148,7 @@ void sim_brk_setact (const char *action);
 t_stat sim_send_input (SEND *snd, uint8 *data, size_t size, uint32 after, uint32 delay);
 t_stat sim_show_send_input (FILE *st, SEND *snd);
 t_bool sim_send_poll_data (SEND *snd, t_stat *stat);
+t_stat sim_send_clear (SEND *snd);
 t_stat sim_set_expect (EXPECT *exp, char *cptr);
 t_stat sim_set_noexpect (EXPECT *exp, char *cptr);
 t_stat sim_exp_set (EXPECT *exp, const char *match, int32 cnt, uint32 after, int32 switches, char *act);

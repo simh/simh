@@ -7088,22 +7088,22 @@ while (iptr[1]) {               /* Skip trailing quote */
 return SCPE_OK;
 }
 
-/* sim_decode_quoted_string
+/* sim_encode_quoted_string
 
    Inputs:
-        iptr        =   pointer to input string
+        iptr        =   pointer to input buffer
+        size        =   number of bytes of data in the buffer
+
+   Outputs
         optr        =   pointer to output buffer
                         the output buffer must be allocated by the caller 
                         and to avoid overrunat it must be at least as big 
                         as the input string.
+                        the output buffer must be freed by the caller
 
-   Outputs
-        result      =   status of decode SCPE_OK when good, SCPE_ARG otherwise
-        osize       =   size of the data in the optr buffer
-
-   The input string must be quoted.  Quotes may be either single or 
-   double but the opening anc closing quote characters must match.  
-   Within quotes C style character escapes are allowed.  
+   The input data will be encoded into a simply printable form.
+   Control and other non-printable data will be escaped using the
+   following rules:
 
    The following character escapes are explicitly supported:
         \r  ASCII Carriage Return character (Decimal value 13)
@@ -8943,6 +8943,14 @@ if (after)
 if (snd->after == 0)
     snd->after = snd->delay;
 snd->next_time = sim_gtime() + snd->after;
+return SCPE_OK;
+}
+
+/* Cancel Queued input data */
+t_stat sim_send_clear (SEND *snd)
+{
+snd->insoff = 0;
+snd->extoff = 0;
 return SCPE_OK;
 }
 

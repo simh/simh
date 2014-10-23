@@ -149,6 +149,12 @@ static t_stat sim_set_rem_telnet (int32 flag, char *cptr);
 static t_stat sim_set_rem_connections (int32 flag, char *cptr);
 static t_stat sim_set_rem_timeout (int32 flag, char *cptr);
 
+/* Deprecated CONSOLE HALT, CONSOLE RESPONSE and CONSOLE DELAY support */
+static t_stat sim_set_halt (int32 flag, char *cptr);
+static t_stat sim_set_response (int32 flag, char *cptr);
+static t_stat sim_set_delay (int32 flag, char *cptr);
+
+
 #define KMAP_WRU        0
 #define KMAP_BRK        1
 #define KMAP_DEL        2
@@ -239,6 +245,12 @@ static CTAB set_con_tab[] = {
     { "NOLOG", &sim_set_logoff, 0 },
     { "DEBUG", &sim_set_debon, 0 },
     { "NODEBUG", &sim_set_deboff, 0 },
+#define CMD_WANTSTR     0100000
+    { "HALT", &sim_set_halt, 1 | CMD_WANTSTR },
+    { "NOHALT", &sim_set_halt, 0 },
+    { "DELAY", &sim_set_delay, 0 },
+    { "RESPONSE", &sim_set_response, 1 | CMD_WANTSTR },
+    { "NORESPONSE", &sim_set_response, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -260,7 +272,10 @@ static SHTAB show_con_tab[] = {
     { "DEBUG", &sim_show_cons_debug, 0 },
     { "BUFFERED", &sim_show_cons_buff, 0 },
     { "EXPECT", &sim_show_cons_expect, 0 },
+    { "HALT", &sim_show_cons_expect, 0 },
     { "INPUT", &sim_show_cons_send_input, 0 },
+    { "RESPONSE", &sim_show_cons_send_input, 0 },
+    { "DELAY", &sim_show_cons_expect, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -2701,3 +2716,102 @@ return SCPE_OK;
 }
 
 #endif
+
+/* Decode a string.
+
+   A string containing encoded control characters is decoded into the equivalent
+   character string.  Escape targets @, A-Z, and [\]^_ form control characters
+   000-037.
+*/
+#define ESC_CHAR '~'
+
+static void decode (char *decoded, const char *encoded)
+{
+char c;
+
+while (c = *decoded++ = *encoded++)                     /* copy the character */
+    if (c == ESC_CHAR)                                  /* does it start an escape? */
+        if (isalpha (*encoded) ||                       /* is next character "A-Z" or "a-z"? */
+            *encoded == '@' ||                          /*   or "@"? */
+            *encoded >= '[' && *encoded <= '_')         /*   or "[\]^_"? */
+
+            *(decoded - 1) = *encoded++ & 037;          /* convert back to control character */
+
+        else if (*encoded == '\0' ||                    /* single escape character at EOL? */
+                 *encoded++ != ESC_CHAR)                /*   or not followed by another escape? */
+            decoded--;                                  /* drop the encoding */
+return;
+}
+
+/* Set console halt */
+
+static t_stat sim_set_halt (int32 flag, char *cptr)
+{
+if (flag == 0)                                              /* no halt? */
+    sim_exp_clrall (&sim_con_expect);                       /* disable halt checks */
+else {
+    char *mbuf;
+    char *mbuf2;
+
+    if (cptr == NULL || *cptr == 0)                         /* no match string? */
+        return SCPE_2FARG;                                  /* need an argument */
+
+    sim_exp_clrall (&sim_con_expect);                       /* make sure that none currently exist */
+
+    mbuf = (char *)malloc (1 + strlen (cptr));
+    decode (mbuf, cptr);                                    /* save decoded match string */
+
+    mbuf2 = (char *)malloc (3 + strlen(cptr));
+    sprintf (mbuf2, "%s%s%s", (sim_switches & SWMASK ('A')) ? "\n" : "",
+                              mbuf, 
+                              (sim_switches & SWMASK ('I')) ? "" : "\n");
+    free (mbuf);
+    mbuf = sim_encode_quoted_string (mbuf2, strlen (mbuf2));
+    sim_exp_set (&sim_con_expect, mbuf, 0, sim_con_expect.after, 0, NULL);
+    free (mbuf);
+    free (mbuf2);
+    }
+
+return SCPE_OK;
+}
+
+
+/* Set console response */
+
+static t_stat sim_set_response (int32 flag, char *cptr)
+{
+if (flag == 0)                                          /* no response? */
+    sim_send_clear (&sim_con_send);
+else {
+    uint8 *rbuf;
+
+    if (cptr == NULL || *cptr == 0)
+        return SCPE_2FARG;                              /* need arg */
+
+    rbuf = (uint8 *)malloc (1 + strlen(cptr));
+
+    decode ((char *)rbuf, cptr);                        /* decod string */
+    sim_send_input (&sim_con_send, rbuf, strlen(rbuf), 0, 0); /* queue it for output */
+    free (rbuf);
+    }
+
+return SCPE_OK;
+}
+
+/* Set console delay */
+
+static t_stat sim_set_delay (int32 flag, char *cptr)
+{
+int32 val;
+t_stat r;
+
+if (cptr == NULL || *cptr == 0)                         /* no argument string? */
+    return SCPE_2FARG;                                  /* need an argument */
+
+val = (int32) get_uint (cptr, 10, INT_MAX, &r);         /* parse the argument */
+
+if (r == SCPE_OK)                                       /* parse OK? */
+    sim_con_expect.after = val;                         /* save the delay value */
+
+return r;
+}
