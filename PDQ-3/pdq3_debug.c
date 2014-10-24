@@ -197,7 +197,7 @@ t_stat dbg_dump_segtbl(FILE* fd) {
   t_stat rc;
   
   if (reg_ssv < 0x2030 || reg_ssv > 0xf000) {
-    printf("Cannot list segments in bootloader: incomplete tables\n");
+    sim_printf("Cannot list segments in bootloader: incomplete tables\n");
     return SCPE_NXM;
   }
 

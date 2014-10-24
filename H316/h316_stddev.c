@@ -395,7 +395,7 @@ else {
     if ((c = getc (uptr->fileref)) == EOF) {            /* read byte */
         if (feof (uptr->fileref)) {
             if (ptr_stopioe)
-                printf ("PTR end of file\n");
+                sim_printf ("PTR end of file\n");
             else return SCPE_OK;
             }
         else perror ("PTR I/O error");
@@ -686,7 +686,7 @@ else if ((ruptr->flags & UNIT_ATT) &&                   /* TTR attached */
             if (feof (ruptr->fileref)) {                /* EOF? */
                 ruptr->STA &= ~RUNNING;                 /* stop reader */
                 if (ttr_stopioe)
-                    printf ("TTR end of file\n");
+                    sim_printf ("TTR end of file\n");
                 else return SCPE_OK;
                 }
             else perror ("TTR I/O error");

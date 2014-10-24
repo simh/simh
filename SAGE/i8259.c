@@ -64,7 +64,7 @@ t_stat i8259_write(I8259* chip,int addr,uint32 value)
 		switch (chip->state) {
 		default:
 		case 0: /* after reset */
-			printf("PIC: write addr=1 without initialization\n");
+			sim_printf("PIC: write addr=1 without initialization\n");
 			return SCPE_IOERR;
 		case 1: /* expect ICW2 */
 			TRACE_PRINT2(DBG_PIC_WR,"WR ICW2: addr=%d data=0x%x",addr,value);
@@ -73,7 +73,7 @@ t_stat i8259_write(I8259* chip,int addr,uint32 value)
 				chip->state = (chip->icw1 & I8259_ICW1_IC4) ? 4 : 5;
 			} else {
 				/* attempt to program cascade mode */
-				printf("PIC: attempt to program chip for cascade mode - not wired for this!\n");
+				sim_printf("PIC: attempt to program chip for cascade mode - not wired for this!\n");
 				chip->state = 0;
 				return SCPE_IOERR;
 			}
@@ -82,15 +82,15 @@ t_stat i8259_write(I8259* chip,int addr,uint32 value)
 			TRACE_PRINT2(DBG_PIC_WR,"WR ICW4 addr=%d data=0x%x",addr,value);
 			chip->icw4 = value;
 			if (chip->icw4 & I8259_ICW4_AEOI) {
-				printf("PIC: attempt to program chip for AEOI mode - not wired for this!\n");
+				sim_printf("PIC: attempt to program chip for AEOI mode - not wired for this!\n");
 				return SCPE_IOERR;
 			}
 			if (chip->icw4 & I8259_ICW4_BUF) {
-				printf("PIC: attempt to program chip for buffered mode - not wired for this!\n");
+				sim_printf("PIC: attempt to program chip for buffered mode - not wired for this!\n");
 				return SCPE_IOERR;
 			}
 			if (chip->icw4 & I8259_ICW4_SFNM) {
-				printf("PIC: attempt to program chip for spc nested mode - not wired for this!\n");
+				sim_printf("PIC: attempt to program chip for spc nested mode - not wired for this!\n");
 				return SCPE_IOERR;
 			}
 			chip->state = 5;
@@ -115,7 +115,7 @@ t_stat i8259_write(I8259* chip,int addr,uint32 value)
 			if (value & I8259_OCW3) { /* ocw3 */
 				TRACE_PRINT2(DBG_PIC_WR,"WR OCW3 addr=%d data=0x%x",addr,value);
 				if (value & I8259_OCW3_ESMM) {
-					printf("PIC: ESMM not yet supported\n");
+					sim_printf("PIC: ESMM not yet supported\n");
 					return STOP_IMPL;
 				}
 				if (value & I8259_OCW3_POLL) {
@@ -148,7 +148,7 @@ t_stat i8259_write(I8259* chip,int addr,uint32 value)
 					break;
 				case 0x80: /* rotate in autoeoi (set) */
 				case 0x00: /* rotate in autoeoi (clear) */
-					printf("PIC: AEOI not supported\n");
+					sim_printf("PIC: AEOI not supported\n");
 					return SCPE_IOERR;
 				case 0xc0: /* set prio */
 					chip->prio = value & 7;

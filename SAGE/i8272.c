@@ -230,14 +230,14 @@ t_stat i8272_attach(UNIT *uptr, char *cptr)
     if(uptr->capac > 0) {
         fgets(header, 4, uptr->fileref);
         if(strncmp(header, "IMD", 3)) {
-            printf("I8272: Only IMD disk images are supported\n");
+            sim_printf("I8272: Only IMD disk images are supported\n");
             chip->drive[i].uptr = NULL;
             return SCPE_OPENERR;
         }
     } else {
         /* create a disk image file in IMD format. */
         if (diskCreate(uptr->fileref, "$Id: i8272.c 1999 2008-07-22 04:25:28Z hharte $") != SCPE_OK) {
-            printf("I8272: Failed to create IMD disk.\n");
+            sim_printf("I8272: Failed to create IMD disk.\n");
             chip->drive[i].uptr = NULL;
             return SCPE_OPENERR;
         }
@@ -247,19 +247,19 @@ t_stat i8272_attach(UNIT *uptr, char *cptr)
     uptr->u3 = IMAGE_TYPE_IMD;
 
     if (uptr->flags & UNIT_I8272_VERBOSE) {
-        printf("I8272%d: attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("I8272%d: attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
     }
 
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if (uptr->flags & UNIT_I8272_VERBOSE)
-            printf("--------------------------------------------------------\n");
+            sim_printf("--------------------------------------------------------\n");
         chip->drive[i].imd = diskOpenEx(uptr->fileref, uptr->flags & UNIT_I8272_VERBOSE, dptr, DBG_FD_IMD, 0);
         if (uptr->flags & UNIT_I8272_VERBOSE)
-            printf("\n");
+            sim_printf("\n");
         if (chip->drive[i].imd == NULL) {
-            printf("I8272: IMD disk corrupt.\n");
+            sim_printf("I8272: IMD disk corrupt.\n");
             chip->drive[i].uptr = NULL;
             return SCPE_OPENERR;
         }
@@ -443,7 +443,7 @@ static t_stat i8272_secread(I8272* chip)
 		dip->track, chip->fdc_head, chip->fdc_sector, chip->fdc_secsz));
 
 	if (dip->imd == NULL) {
-		printf(".imd is NULL!" NLP);
+		sim_printf(".imd is NULL!" NLP);
 		return SCPE_STOP;
 	}
 	
@@ -479,7 +479,7 @@ t_stat i8272_read(I8272* chip,int addr,uint32* value)
 	t_stat rc;
 	I8272_DRIVE_INFO* dip;
 	if ((dip = &chip->drive[chip->fdc_curdrv]) == NULL) {
-		printf("i8272_read: chip->drive returns NULL, fdc_curdrv=%d\n",chip->fdc_curdrv); 
+		sim_printf("i8272_read: chip->drive returns NULL, fdc_curdrv=%d\n",chip->fdc_curdrv); 
 		return SCPE_IERR;
 	}
 
@@ -504,7 +504,7 @@ t_stat i8272_read(I8272* chip,int addr,uint32* value)
 			*value &= ~I8272_MSR_FDC_BUSY;
 			break;
 		default:
-			printf("Default case in i8272_read(FDC_MSR): state=%d\n",chip->fdc_state);
+			sim_printf("Default case in i8272_read(FDC_MSR): state=%d\n",chip->fdc_state);
 			return SCPE_IERR;
 		}            
 		TRACE_PRINT1(DBG_FD_STATUS,"RD FDC MSR = 0x%02x",*value);
@@ -551,7 +551,7 @@ t_stat i8272_read(I8272* chip,int addr,uint32* value)
 				return SCPE_OK;
 			
 			default:
-				printf("Default case in i8272_read(FDC_DATA): state=%d\n",chip->fdc_state);
+				sim_printf("Default case in i8272_read(FDC_DATA): state=%d\n",chip->fdc_state);
 				return SCPE_IERR;
 			}
 		}
@@ -763,7 +763,7 @@ static t_stat i8272_sensedrive(I8272* chip)
 	t_bool track0;
 	
     if ((dip = i8272_select_drive(chip,chip->cmd[1])) == NULL) {
-    	printf("i8272_sensedrive: i8272_select_drive returns 0\n");
+    	sim_printf("i8272_sensedrive: i8272_select_drive returns 0\n");
     	st3 = DRIVE_STATUS_FAULT;
     	track0 = FALSE;
     } else {
@@ -929,7 +929,7 @@ t_stat i8272_write(I8272* chip, int addr, uint32 value)
 	uint8 cmd;
 	I8272_DRIVE_INFO* dip;
 	if ((dip = &chip->drive[chip->fdc_curdrv]) == NULL) {
-    	printf("i8272_write: chip->drive returns 0 fdc_curdrv=%d\n",chip->fdc_curdrv);
+    	sim_printf("i8272_write: chip->drive returns 0 fdc_curdrv=%d\n",chip->fdc_curdrv);
 		return SCPE_IERR;
 	}
 
@@ -1008,7 +1008,7 @@ t_stat i8272_write(I8272* chip, int addr, uint32 value)
                 	return i8272_format(chip);
 
                 case I8272_READ_TRACK:
-                    printf("I8272: " ADDRESS_FORMAT " Read a track (untested.)" NLP, PCX);
+                    sim_printf("I8272: " ADDRESS_FORMAT " Read a track (untested.)" NLP, PCX);
                     chip->fdc_sector = 1; /* Read entire track from sector 1...eot */
                 case I8272_READ_DATA:
                 case I8272_READ_DELETED_DATA:

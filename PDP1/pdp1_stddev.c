@@ -343,7 +343,7 @@ if (temp == EOF) {                                      /* end of file? */
         ptr_wait = ioh = 0;
     if (feof (uptr->fileref)) {
         if ((cpls & CPLS_PTR) || ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");

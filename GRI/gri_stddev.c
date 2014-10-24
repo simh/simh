@@ -343,7 +343,7 @@ if ((hsr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
 if ((temp = getc (hsr_unit.fileref)) == EOF) {          /* read char */
     if (feof (hsr_unit.fileref)) {                      /* err or eof? */
         if (hsr_stopioe)
-            printf ("HSR end of file\n");
+            sim_printf ("HSR end of file\n");
         else return SCPE_OK;
         }
     else perror ("HSR I/O error");

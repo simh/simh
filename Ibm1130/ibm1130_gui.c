@@ -112,7 +112,7 @@ extern UNIT prt_unit;
 	void   stuff_cmd (char *cmd) 				  				{}
 	t_bool stuff_and_wait (char *cmd, int timeout, int delay)	{return FALSE;}
 	char  *read_cmdline (char *ptr, int size, FILE *stream)		{return read_line(ptr, size, stream);}
-	void   remark_cmd (char *remark)			  				sim_printf("%s\n", remark)
+    void   remark_cmd (char *remark)			  				{sim_printf("%s\n", remark);}
 #else
 
 t_stat console_reset (DEVICE *dptr)

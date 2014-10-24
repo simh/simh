@@ -859,7 +859,7 @@ for (i = 0, curr = 0; i < INTG_MAX; i++) {              /* loop thru groups */
                 return NO_INT;                          /* no pending intr */
                 }
             }
-        printf ("%%int eval consistency error = %X\r\n", t);
+        sim_printf ("%%int eval consistency error = %X\r\n", t);
         int_req[curr] = 0;                              /* "impossible" */
         }
     if (curr == INT_GETGRP (int_hiact))                 /* at active group? */
@@ -868,7 +868,7 @@ for (i = 0, curr = 0; i < INTG_MAX; i++) {              /* loop thru groups */
     if (curr == 0)                                      /* end of list? */
         return NO_INT;                                  /* no pending intr */
     }
-printf ("%%int eval consistency error, list end not found\r\n");
+sim_printf ("%%int eval consistency error, list end not found\r\n");
 return NO_INT;
 }
 
@@ -886,7 +886,7 @@ for (i = 0, curr = 0; i < INTG_MAX; i++) {              /* loop thru groups */
     if (curr == 0)                                      /* end of list? */
         return FALSE;                                   /* no int possible */
     }
-printf ("%%int possible consistency error, list end not found\r\n");
+sim_printf ("%%int possible consistency error, list end not found\r\n");
 return FALSE;
 }
 
@@ -922,14 +922,14 @@ for (i = 0, curr = 0; i < INTG_MAX; i++) {              /* loop thru groups */
             if (t & mask)                               /* req active? */
                 return INTV (curr, j);                  /* return int num */
             }
-        printf ("%%int actv consistency error = %X\r\n", t);
+        sim_printf ("%%int actv consistency error = %X\r\n", t);
         int_req[curr] = 0;                              /* "impossible" */
         }
     curr = int_lnk[curr];                               /* next group */
     if (curr == 0)                                      /* end of list? */
         return NO_INT;                                  /* no pending interupt */
     }
-printf ("%%int actv consistency error, list end not found\r\n");
+sim_printf ("%%int actv consistency error, list end not found\r\n");
 return NO_INT;
 }
 
@@ -944,7 +944,7 @@ if (hireq >= NO_INT)                                    /* none pending? */
 grp = INT_GETGRP (hireq);                               /* get grp, bit */
 bit = INT_GETBIT (hireq);
 if (bit >= int_tab[grp].nbits) {                        /* validate bit */
-    printf ("%%int ack consistency error, hireq=%X\r\n", hireq);
+    sim_printf ("%%int ack consistency error, hireq=%X\r\n", hireq);
     return 0;
     }
 mask = 1u << (int_tab[grp].nbits - bit - 1);
@@ -952,7 +952,7 @@ int_arm[grp] &= ~mask;                                  /* clear armed */
 int_hiact = hireq;                                      /* now active */
 int_hireq = io_eval_int ();                             /* paranoia */
 if (int_hireq != NO_INT)
-    printf ("%%int ack consistency error, post iack req=%X\r\n", int_hireq);
+    sim_printf ("%%int ack consistency error, post iack req=%X\r\n", int_hireq);
 return int_tab[grp].vecbase + bit;
 }
 
@@ -966,7 +966,7 @@ if (hiact < NO_INT) {                                   /* intr active? */
     grp = INT_GETGRP (hiact);                           /* get grp, bit */
     bit = INT_GETBIT (hiact);
     if (bit >= int_tab[grp].nbits) {                    /* validate bit */
-        printf ("%%int release consistency error, hiact=%X\r\n", hiact);
+        sim_printf ("%%int release consistency error, hiact=%X\r\n", hiact);
         return 0;
         }
     mask = 1u << (int_tab[grp].nbits - bit - 1);
@@ -997,7 +997,7 @@ if (inum < NO_INT) {                                    /* valid? */
     grp = INT_GETGRP (inum);                            /* get grp, bit */
     bit = INT_GETBIT (inum);
     if (bit >= int_tab[grp].nbits) {                    /* validate bit */
-        printf ("%%intreq set/clear consistency error, inum=%X\r\n", inum);
+        sim_printf ("%%intreq set/clear consistency error, inum=%X\r\n", inum);
         return;
         }
     mask = 1u << (int_tab[grp].nbits - bit - 1);
@@ -1018,7 +1018,7 @@ if (inum < NO_INT) {                                    /* valid? */
     grp = INT_GETGRP (inum);                            /* get grp, bit */
     bit = INT_GETBIT (inum);
     if (bit >= int_tab[grp].nbits) {                    /* validate bit */
-        printf ("%%intarm set/clear consistency error, inum=%X\r\n", inum);
+        sim_printf ("%%intarm set/clear consistency error, inum=%X\r\n", inum);
         return;
         }
     mask = 1u << (int_tab[grp].nbits - bit - 1);

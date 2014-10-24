@@ -320,7 +320,7 @@ int32 petr (int32 inst, int32 dev, int32 dat)
         do {
             result = petr_svc(&petr_unit);
             if (result != SCPE_OK) {
-                printf("PETR: Read error\n");
+                sim_printf("PETR: Read error\n");
                 break;
             }
         } while ((petr_unit.buf & 0100) == 0);  /* NOTE: Lines without seventh hole are ignored by PETR. */
@@ -436,7 +436,7 @@ t_stat petr_boot (int32 unitno, DEVICE *dptr)
             case 03:    /* Storage (opr x) */
                 MBR = petr(3,0,0);  /* Read three characters from tape. */
                 TRACE_PRINT(petr_dev, ERROR_MSG, ("READIN: sto @%06o = %06o\n", MAR, MBR));
-                printf("[%06o] = %06o\n", MAR, MBR);
+                sim_printf("[%06o] = %06o\n", MAR, MBR);
                 break;
             case 02:    /* Transfer Control (trn x) Start Execution */
                 PC = MAR;
@@ -482,7 +482,7 @@ t_stat petr_boot (int32 unitno, DEVICE *dptr)
 
 		la = (~la) & 0177777;
 
-		printf("First Address=%06o, Last Address=%06o\n", fa, la);
+		sim_printf("First Address=%06o, Last Address=%06o\n", fa, la);
 
 		for(addr = fa; addr <= la; addr++) {
 			tdata = petr(3,0,0);  /* Read three characters from tape. */
@@ -501,7 +501,7 @@ t_stat petr_boot (int32 unitno, DEVICE *dptr)
 			reason = SCPE_FMT;
 		}
 
-		printf("Block %d: Calculated checksum=%06o, real checksum=%06o, %s\n", blkcnt, chksum, tdata, chksum == tdata ? "OK" : "BAD Checksum!");
+		sim_printf("Block %d: Calculated checksum=%06o, real checksum=%06o, %s\n", blkcnt, chksum, tdata, chksum == tdata ? "OK" : "BAD Checksum!");
 		blkcnt++;
 	}
 

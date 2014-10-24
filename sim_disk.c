@@ -1796,7 +1796,7 @@ if (DeviceIoControl((HANDLE)Disk,                      /* handle to volume */
                      (DWORD) sizeof(Device),           /* size of output buffer */
                      (LPDWORD) &IoctlReturnSize,       /* number of bytes returned */
                      (LPOVERLAPPED) NULL))             /* OVERLAPPED structure */
-     printf ("Device OK - Type: %s, Number: %d\n", _device_type_name (Device.DeviceType), (int)Device.DeviceNumber);
+     sim_printf ("Device OK - Type: %s, Number: %d\n", _device_type_name (Device.DeviceType), (int)Device.DeviceNumber);
 
 if (sector_size)
     *sector_size = 512;
@@ -1871,7 +1871,7 @@ if (1) {
     }
 #endif
 if (removable && *removable)
-    printf ("Removable Device\n");
+    sim_printf ("Removable Device\n");
 return SCPE_OK;
 }
 

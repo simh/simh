@@ -236,7 +236,7 @@ static void AdjustRefCount(uint8 segno, int incr) {
   uint16 sib = GetSIB(segno);
   uint16 ref = Get(sib + OFF_SEGREFS);
   Put(sib + OFF_SEGREFS,  ref + incr);
-  //printf("ref(%x) %s = %d\n",segno,incr>0 ? "increment":"decrement", ref+incr);  
+  //sim_printf("ref(%x) %s = %d\n",segno,incr>0 ? "increment":"decrement", ref+incr);  
 }
 
 /* save CPU regs into TIB */
@@ -310,13 +310,13 @@ static t_stat rom_ignore(t_addr ea, uint16 data) {
 t_stat cpu_boot(int32 unitnum, DEVICE *dptr) {
   t_stat rc;
   uint16 ctp, ssv, rq;
-  printf("BOOT CPU\n");
+  sim_printf("BOOT CPU\n");
   cpu_reset(dptr);
   dbg_init();
 
   /* boot from external ROM? */
   if (reg_fc68 != 0) {
-//    printf("Booting from HDT ROM\n");
+//    sim_printf("Booting from HDT ROM\n");
     /* cf. WD9593_PasIII_OSRef_Jul82.pdf */
     Read(reg_fc68, 0, &ctp, DBG_NONE);
     Read(reg_fc68, 1, &ssv, DBG_NONE);
@@ -343,7 +343,7 @@ void cpu_finishAutoload() {
 
 /* CPU reset */
 t_stat cpu_reset (DEVICE *dptr) {
-  printf("CPU RESET\n");
+  sim_printf("CPU RESET\n");
   sim_brk_types = SWMASK('E')|SWMASK('R')|SWMASK('W');
   sim_brk_dflt = SWMASK('E');
   
@@ -368,10 +368,10 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw) {
   if (seg==0) seg = NIL;
   addr = MAKE_BADDR(seg,off);
 
-//  printf("Examine: addr=%x seg=%x off=%x\n",addr,seg,off);
-//  printf("sw=%x, isword=%d\n",sw, ADDR_ISWORD(addr));
+//  sim_printf("Examine: addr=%x seg=%x off=%x\n",addr,seg,off);
+//  sim_printf("sw=%x, isword=%d\n",sw, ADDR_ISWORD(addr));
   if (ADDR_ISWORD(addr) || (sw & SWMASK('W'))) {
-//                        printf("addr=%x seg=%x off=%x\n",addr,seg,off);
+//                        sim_printf("addr=%x seg=%x off=%x\n",addr,seg,off);
     if (off >= memorysize ||
         ReadEx(off, 0, &data) != SCPE_OK) return SCPE_IOERR;
   } else if (!ADDR_ISWORD(addr) || (sw & SWMASK('B'))) {
@@ -427,7 +427,7 @@ static t_stat ssr_write(t_addr ioaddr, uint16 data) {
     sim_debug(DBG_CPU_INT2, &cpu_dev, DBG_PCFORMAT1 "Acknowledge INTVL\n", DBG_PC);
  }
   if (isbitset(data,SSR_BIT3))
-    printf("Warning: Attempt to set SSR bit 3\n");
+    sim_printf("Warning: Attempt to set SSR bit 3\n");
   if (isbitset(data,SSR_PWRF)) {
     clrbit(reg_ssr,SSR_PWRF);
     sim_debug(DBG_CPU_INT2, &cpu_dev, DBG_PCFORMAT1 "Acknowledge PWRF\n", DBG_PC);
@@ -449,7 +449,7 @@ static t_stat ssr_write(t_addr ioaddr, uint16 data) {
 static t_stat ses_read(t_addr ioaddr, uint16 *data)
 {
   *data = reg_ses;
-//  printf("ses is %x\n",reg_ses);
+//  sim_printf("ses is %x\n",reg_ses);
   return SCPE_OK;
 }
 
@@ -497,7 +497,7 @@ void cpu_assertInt(int level, t_bool tf) {
 
 t_stat cpu_raiseInt(int level) {
   if (level > 15) {
-    printf("Implementation error: raiseInt with level>15! Need fix\n");
+    sim_printf("Implementation error: raiseInt with level>15! Need fix\n");
     exit(1);
   }
   
@@ -661,14 +661,14 @@ static float PopF() {
   T_FLCVT t;
   t.i[1] = Pop();
   t.i[0] = Pop();
-//  printf("POPF: %.6e\n",t.f);
+//  sim_printf("POPF: %.6e\n",t.f);
   return t.f;
 };
 
 static void PushF(float f) {
   T_FLCVT t;
   t.f = f;
-//  printf("PUSHF: %.6e\n",t.f);
+//  sim_printf("PUSHF: %.6e\n",t.f);
   Push(t.i[0]);
   Push(t.i[1]);
 }
@@ -703,11 +703,11 @@ static void DoCXG(uint8 segno, uint8 procno) {
   uint8 osegno = (uint8)GetSegno(); /* obtain segment of caller to be set into MSCW */
   uint16 osegb = reg_segb;
   
-//  printf("CXG: seg=%d proc=%d, osegno=%d\n",segno,procno,osegno);
+//  sim_printf("CXG: seg=%d proc=%d, osegno=%d\n",segno,procno,osegno);
   ptbl = SetSEGB(segno); /* get ptbl of new segment */
   AdjustRefCount(segno,1);
   
-//  printf("CXG: ptbl=%x, reg_segb=%x\n",ptbl,reg_segb);
+//  sim_printf("CXG: ptbl=%x, reg_segb=%x\n",ptbl,reg_segb);
   reg_ipc = createMSCW(ptbl, procno, reg_bp, osegno, osegb); /* call new segment */
   sim_interval -= 63; /* actually 63.2 */
 }
@@ -744,10 +744,10 @@ static uint16 createMSCW(uint16 ptbl, uint8 procno, uint16 stat, uint8 segno, ui
   uint16 procstart = Get(ptbl - procno); /* word index into segment */
   uint16 datasz = Get(reg_segb + procstart); /* word index */
   dbg_segtrack(reg_segb);
-//  printf("createMSCW: ptbl=%x procno=%d stat=%x segno=%x\n",ptbl,procno,stat,segno);
+//  sim_printf("createMSCW: ptbl=%x procno=%d stat=%x segno=%x\n",ptbl,procno,stat,segno);
   
   if (reg_sp < reg_splow || (datasz+MSCW_SZ) > (reg_sp-reg_splow)) { /* verify enough space on stack */
-//    printf("Stk overflow in mscw: sp=%x spl=%x ds=%d dsm=%d sp-spl=%d\n",reg_sp,reg_splow,datasz,datasz+MSCW_SZ, reg_sp-reg_splow);
+//    sim_printf("Stk overflow in mscw: sp=%x spl=%x ds=%d dsm=%d sp-spl=%d\n",reg_sp,reg_splow,datasz,datasz+MSCW_SZ, reg_sp-reg_splow);
     Raise(PASERROR_STKOVFL); return reg_ipc;
   }
   reg_sp = reg_sp - MSCW_SZ - datasz; /* allocate space on stack for local data and MSCW */
@@ -1626,10 +1626,10 @@ static t_stat DoInstr(void) {
     } else if (w == -2) {
       reg_ssv = t1;
     } else if (w == -1) { 
-//      printf("SPR Taskswitch reg_ctp=%x\n",t1);
+//      sim_printf("SPR Taskswitch reg_ctp=%x\n",t1);
       reg_rq = t1;
       taskswitch5();
-//      printf("SPR Taskswitch done reg_ctp=%x reg_rq=%x\n",reg_ctp,reg_rq);
+//      sim_printf("SPR Taskswitch done reg_ctp=%x reg_rq=%x\n",reg_ctp,reg_rq);
       cyc = 53.2;
       break; /* mustn't fall through reg_sp +=2 */
     } else if (w >= 1) {
@@ -1726,7 +1726,7 @@ t_stat sim_instr(void)
       reg_intpending |= reg_intlatch;
       if (reg_intpending) {
         if ((rc = cpu_processInt()) != SCPE_OK) {
-          printf("processint returns %d\n",rc); fflush(stdout);
+          sim_printf("processint returns %d\n",rc); fflush(stdout);
           break;
         }
       }

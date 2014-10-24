@@ -164,10 +164,10 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
 if ((temp = getc (ptr_unit.fileref)) == EOF) {
     if (feof (ptr_unit.fileref)) {
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_printf ("PTR I/O error: %d\n", errno);
     clearerr (ptr_unit.fileref);
     return SCPE_IOERR;
     }

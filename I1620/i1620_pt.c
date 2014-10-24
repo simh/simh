@@ -332,8 +332,9 @@ do {
     if ((temp = getc (ptr_unit.fileref)) == EOF) {      /* read char */
         ind[IN_RDCHK] = 1;                              /* err, rd chk */
         if (feof (ptr_unit.fileref))
-            printf ("PTR end of file\n");
-        else perror ("PTR I/O error");
+            sim_printf ("PTR end of file\n");
+        else
+            sim_printf ("PTR I/O error: %d\n", errno);
         clearerr (ptr_unit.fileref);
         return SCPE_IOERR;
         }

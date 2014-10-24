@@ -426,16 +426,16 @@ void tx0_dump_regs(char *desc)
 
     /* Check regs sanity */
     if (AC > DMASK) {
-        printf("Error: AC > DMASK\n");
+        sim_printf("Error: AC > DMASK\n");
     }
     if (MBR > DMASK) {
-        printf("Error: MBR > DMASK\n");
+        sim_printf("Error: MBR > DMASK\n");
     }
     if (LR > DMASK) {
-        printf("Error: LR > DMASK\n");
+        sim_printf("Error: LR > DMASK\n");
     }
     if (!MEM_ADDR_OK(MAR)) {
-        printf("Error: MAR > %06o\n", MEMSIZE);
+        sim_printf("Error: MAR > %06o\n", MEMSIZE);
     }
 
 }
@@ -812,7 +812,7 @@ t_stat sim_instr (void)
                         char *tape_cmd[] = {"Backspace Tape", "Read/Select Tape", "Rewind Tape", "Write/Select Tape" };
 
                         TRACE_PRINT(ERROR_MSG, ("[%06o] TODO: SEL (magtape)\n", PC-1));
-                        printf("Device %d: CLRA=%d, BINDEC=%d: %s\n", device, CLRA, BINDEC, tape_cmd[tape_ord]);
+                        sim_printf("Device %d: CLRA=%d, BINDEC=%d: %s\n", device, CLRA, BINDEC, tape_cmd[tape_ord]);
                     }
                     break;
                 case IOS_RPF: /* These are used for Magtape control. */
@@ -1108,13 +1108,13 @@ t_stat cpu_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 t_stat cpu_set_ext (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-    printf("Set CPU Extended Mode\n");
+    sim_printf("Set CPU Extended Mode\n");
     return SCPE_OK;
 }
 
 t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-    printf("Set CPU Non-Extended Mode\n");
+    sim_printf("Set CPU Non-Extended Mode\n");
     return SCPE_OK;
 }
 
@@ -1231,7 +1231,7 @@ t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
         }
     }
 
-    printf("%d words %s [%06o - %06o].\n", j - lo, flag ? "dumped" : "loaded", lo, j-1);
+    sim_printf("%d words %s [%06o - %06o].\n", j - lo, flag ? "dumped" : "loaded", lo, j-1);
 
     return SCPE_OK;
 }
@@ -1314,7 +1314,7 @@ t_stat sim_opr_orig(int32 op)
         int32 rbuf;
         rbuf = tti(0,0,0);
         TRACE_PRINT(IOS_MSG, ("TTI: character received='%c'\n", rbuf &077));
-        printf("TTI: character received='%c'\n", rbuf &077);
+        sim_printf("TTI: character received='%c'\n", rbuf &077);
         LR &= 0266666; /* Clear bits 0,2,5,8,...,17 */
 
         LR |= SIGN; /* Set bit 0, character available. */

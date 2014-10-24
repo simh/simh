@@ -594,7 +594,7 @@ switch (opcode) {
         break;
 
     default:
-        //printf("TU58: Unknown opcode %d\n", opcode);
+        //sim_printf("TU58: Unknown opcode %d\n", opcode);
         break;
     }
 }

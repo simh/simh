@@ -756,7 +756,7 @@ static int32 normtab[7] = { 1, 2, 4, 8, 16, 32, 63 };
 extern a10 pager_PC;
 
 if (a->fhi & FP_UCRY) {                                 /* carry set? */
-    printf ("%%PDP-10 FP: carry bit set at normalization, PC = %o\n", pager_PC);
+    sim_printf ("%%PDP-10 FP: carry bit set at normalization, PC = %o\n", pager_PC);
     a->flo = (a->flo >> 1) | ((a->fhi & 1) << 63);      /* try to recover */
     a->fhi = a->fhi >> 1;                               /* but root cause */
     a->exp = a->exp + 1;                                /* should be fixed! */

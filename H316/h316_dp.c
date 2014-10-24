@@ -1002,7 +1002,7 @@ else {
     if (nr <= 0)
         return SCPE_ARG;
     }
-printf ("Proposed format: records/track = %d, record size = %d\n", nr, nw);
+sim_printf ("Proposed format: records/track = %d, record size = %d\n", nr, nw);
 if (!get_yn ("Formatting will destroy all data on this disk; proceed? [N]", FALSE))
     return SCPE_OK;
 for (c = cntr = 0; c < dp_tab[dp_ctype].cyl; c++) {
@@ -1021,7 +1021,7 @@ for (c = cntr = 0; c < dp_tab[dp_ctype].cyl; c++) {
             return r;
         }
     }
-printf ("Formatting complete\n");
+sim_printf ("Formatting complete\n");
 return SCPE_OK;
 }
 

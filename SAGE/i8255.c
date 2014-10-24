@@ -32,7 +32,7 @@
 
 static t_stat i8255_error(const char* err)
 {
-	printf("I8255: Missing method '%s'\n",err);
+	sim_printf("I8255: Missing method '%s'\n",err);
 	return STOP_IMPL;
 }
 

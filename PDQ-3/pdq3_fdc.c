@@ -267,7 +267,7 @@ DEVICE fdc_dev = {
 t_stat fdc_boot(int32 unitnum, DEVICE *dptr) {
   if (unitnum < 0 || (uint32)unitnum > dptr->numunits)
     return SCPE_NXUN;
-//  printf("BOOT FDC%d\n",unitnum);
+//  sim_printf("BOOT FDC%d\n",unitnum);
   return fdc_autoload(unitnum);
 }
 
@@ -288,14 +288,14 @@ t_stat fdc_attach(UNIT *uptr, char *cptr) {
   if (uptr->capac > 0) {
     fgets(header, 4, uptr->fileref);
     if (strncmp(header, "IMD", 3) != 0) {
-      printf("FDC: Only IMD disk images are supported\n");
+      sim_printf("FDC: Only IMD disk images are supported\n");
       fdc_drv[i].dr_unit = NULL;
       return SCPE_OPENERR;
     }
   } else {
     /* create a disk image file in IMD format. */
     if (pdq3_diskCreate(uptr->fileref, "SIMH pdq3_fdc created") != SCPE_OK) {
-      printf("FDC: Failed to create IMD disk.\n");
+      sim_printf("FDC: Failed to create IMD disk.\n");
       fdc_drv[i].dr_unit = NULL;
       return SCPE_OPENERR;
     }
@@ -305,7 +305,7 @@ t_stat fdc_attach(UNIT *uptr, char *cptr) {
     DBG_PC, cptr, uptr->capac);
   fdc_drv[i].dr_imd = diskOpenEx(uptr->fileref, isbitset(uptr->flags,UNIT_FDC_VERBOSE), &fdc_dev, DBG_FD_IMD, DBG_FD_IMD2);
   if (fdc_drv[i].dr_imd == NULL) {
-    printf("FDC: IMD disk corrupt.\n");
+    sim_printf("FDC: IMD disk corrupt.\n");
     fdc_drv[i].dr_unit = NULL;
     return SCPE_OPENERR;
   }
@@ -476,11 +476,11 @@ static t_bool dma_transfer_to_ram(uint8 *buf, int bufsize) {
   }
   
   if (isbitclr(reg_dma_ctrl,DMA_CTRL_IOM))
-    printf("Warning: wrong IOM direction for DMA transfer to RAM\n");
+    sim_printf("Warning: wrong IOM direction for DMA transfer to RAM\n");
   
   for (i=0; i<bufsize; i++) {
     data = buf[i];
-//    printf("addr=%04x data=%02x\n",_reg_dma_addr, data);
+//    sim_printf("addr=%04x data=%02x\n",_reg_dma_addr, data);
     
     if (WriteB(0, _reg_dma_addr++, data, FALSE) != SCPE_OK) {
       (void)dma_abort(FALSE);
@@ -514,7 +514,7 @@ static t_bool dma_transfer_from_ram(uint8 *buf, int bufsize) {
     DBG_PC, _reg_dma_addr/2, (_reg_dma_addr + xfersz - 1)/2);
 
   if (isbitset(reg_dma_ctrl,DMA_CTRL_IOM))
-    printf("Warning: wrong IOM direction for DMA transfer from RAM\n");
+    sim_printf("Warning: wrong IOM direction for DMA transfer from RAM\n");
   
   for (i=0; i<bufsize; i++) {
     if (ReadB(0, _reg_dma_addr++, &data, FALSE)) {
@@ -737,7 +737,7 @@ t_stat fdc_svc(UNIT *uptr) {
       return fdc_restartmulti(curdrv,FDC_WAIT_WRITENEXT);
     break;
   default:
-    printf("fdc_svc: Fix me - command not yet implemented: cmd=0x%x\n", reg_fdc_cmd);
+    sim_printf("fdc_svc: Fix me - command not yet implemented: cmd=0x%x\n", reg_fdc_cmd);
   }
        
   clrbit(reg_fdc_status,FDC_ST1_BUSY);
@@ -773,7 +773,7 @@ t_stat fdc_binit() {
 t_stat fdc_reset (DEVICE *dptr) {
   int i;
   DEVCTXT* ctxt = (DEVCTXT*)dptr->ctxt;
-//  printf("RESET FDC\n");
+//  sim_printf("RESET FDC\n");
 
   if (dptr->flags & DEV_DIS)
     del_ioh(ctxt->ioi);
@@ -904,7 +904,7 @@ static t_stat fdc_docmd(uint16 data) {
 
   /* type III commands */ 
   default:
-    printf("fdc_docmd: Fix me - command not yet implemented: cmd=0x%x\n", reg_fdc_cmd);
+    sim_printf("fdc_docmd: Fix me - command not yet implemented: cmd=0x%x\n", reg_fdc_cmd);
     setbit(reg_fdc_status, FDC_ST2_BUSY);
     return SCPE_NOFNC;
     
@@ -991,7 +991,7 @@ t_stat fdc_write(t_addr ioaddr, uint16 data) {
     break;
   case 9: /* dma status */
     if (isbitset(reg_dma_status,DMA_ST_BUSY))
-      printf("Warning: DMA: write status while BUSY\n");
+      sim_printf("Warning: DMA: write status while BUSY\n");
     reg_dma_status = data & 0x8f;
     break;
   case 0x0a: /* count low */
@@ -1088,7 +1088,7 @@ t_stat pdq3_diskCreate(FILE *fileref, char *ctlr_comment) {
     }
 
     if(sim_fsize(fileref) != 0) {
-        printf("PDQ3_IMD: Disk image already has data, do you want to overwrite it? ");
+        sim_printf("PDQ3_IMD: Disk image already has data, do you want to overwrite it? ");
         answer = getchar();
 
         if((answer != 'y') && (answer != 'Y')) {
@@ -1097,15 +1097,15 @@ t_stat pdq3_diskCreate(FILE *fileref, char *ctlr_comment) {
     }
 
     if((curptr = comment = calloc(1, MAX_COMMENT_LEN)) == 0) {
-        printf("PDQ3_IMD: Memory allocation failure.\n");
+        sim_printf("PDQ3_IMD: Memory allocation failure.\n");
         return (SCPE_MEM);
     }
 
-    printf("PDQ3_IMD: Enter a comment for this disk.\n"
+    sim_printf("PDQ3_IMD: Enter a comment for this disk.\n"
            "PDQ3_IMD: Terminate with a '.' on an otherwise blank line.\n");
     remaining = MAX_COMMENT_LEN;
     do {
-        printf("IMD> ");
+        sim_printf("IMD> ");
         fgets(curptr, remaining - 3, stdin);
         if (strcmp(curptr, ".\n") == 0) {
             remaining = 0;
@@ -1135,12 +1135,12 @@ t_stat pdq3_diskCreate(FILE *fileref, char *ctlr_comment) {
     fflush(fileref);
 
     if((myDisk = diskOpen(fileref, 0)) == NULL) {
-        printf("PDQ3_IMD: Error opening disk for format.\n");
+        sim_printf("PDQ3_IMD: Error opening disk for format.\n");
         return(SCPE_OPENERR);
     }
 
     if(pdq3_diskFormat(myDisk) != SCPE_OK) {
-        printf("PDQ3_IMD: error formatting disk.\n");
+        sim_printf("PDQ3_IMD: error formatting disk.\n");
     }
 
     return diskClose(&myDisk);
@@ -1151,25 +1151,25 @@ t_stat pdq3_diskFormat(DISK_INFO *myDisk) {
     uint8 sector_map[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26};
     uint32 flags;
 
-    printf("PDQ3_IMD: Formatting disk in PDQ3 format.\n");
+    sim_printf("PDQ3_IMD: Formatting disk in PDQ3 format.\n");
 
     /* format first track as 26 sectors with 128 bytes */
     if((trackWrite(myDisk, 0, 0, 26, 128, sector_map, IMD_MODE_500K_FM, 0xE5, &flags)) != 0) {
-      printf("PDQ3_IMD: Error formatting track %d\n", i);
+      sim_printf("PDQ3_IMD: Error formatting track %d\n", i);
       return SCPE_IOERR;
     }    
-    putchar('.');
+    sim_printf(".");
 
     /* format the remaining tracks as 26 sectors with 256 bytes */
     for(i=1;i<77;i++) {
         if((trackWrite(myDisk, i, 0, 26, 256, sector_map, IMD_MODE_500K_MFM, 0xE5, &flags)) != 0) {
-            printf("PDQ3_IMD: Error formatting track %d\n", i);
+            sim_printf("PDQ3_IMD: Error formatting track %d\n", i);
             return SCPE_IOERR;
         } else {
             putchar('.');
         }
     }
 
-    printf("\nPDQ3_IMD: Format Complete.\n");
+    sim_printf("\nPDQ3_IMD: Format Complete.\n");
     return SCPE_OK;
 }

@@ -60,7 +60,7 @@ t_stat i8251_write(I8251* chip,int port,uint32 value)
 		TRACE_PRINT1(DBG_UART_WR,"WR DATA = 0x%02x",chip->obuf);
 		if (chip->init==3) { /* is fully initialized */
 			if ((chip->mode & I8251_MODE_BAUD)==I8251_MODE_SYNC) {
-				printf("i8251: sync mode not implemented\n");
+				sim_printf("i8251: sync mode not implemented\n");
 				return STOP_IMPL;
 			}
 			if (chip->cmd & I8251_CMD_TXEN) {
@@ -93,7 +93,7 @@ t_stat i8251_write(I8251* chip,int port,uint32 value)
 			chip->cmd = value;
 			TRACE_PRINT1(DBG_UART_WR,"WR CMD = 0x%02x",value);
 			if (value & I8251_CMD_EH) {
-				printf("i8251: hunt mode not implemented\n");
+				sim_printf("i8251: hunt mode not implemented\n");
 				return STOP_IMPL;
 			}
 			if (value & I8251_CMD_IR)
@@ -101,7 +101,7 @@ t_stat i8251_write(I8251* chip,int port,uint32 value)
 			if (value & I8251_CMD_ER)
 				chip->status &= ~(I8251_ST_FE|I8251_ST_OE|I8251_ST_PE);
 			if (value & I8251_CMD_SBRK)
-				printf("i8251: BREAK sent\n");
+				sim_printf("i8251: BREAK sent\n");
 			if (value & I8251_CMD_RXE) {
 				sim_activate(chip->in,chip->in->wait);
 			} else {
