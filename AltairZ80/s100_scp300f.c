@@ -48,7 +48,7 @@
 #endif
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -142,12 +142,12 @@ static t_stat scp300f_reset(DEVICE *dptr)
     } else {
         /* Connect SCP300F at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &scp300fdev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
         /* Connect SCP300F Memory (512K RAM, 1MB FLASH) */
         if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &scp300f_mem, FALSE) != 0) {
-            printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
+            sim_printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
             return SCPE_ARG;
         }
 

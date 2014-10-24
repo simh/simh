@@ -1513,7 +1513,7 @@ void div_word(PC_ENV *m, uint16 s)
     }
     div = dvd / dvs;
     mod = dvd % dvs;
-/*    printf("dvd=%x dvs=%x -> div=%x mod=%x\n",dvd, dvs,div, mod);*/
+/*    sim_printf("dvd=%x dvs=%x -> div=%x mod=%x\n",dvd, dvs,div, mod);*/
     if (abs(div) > 0xffff)
     {
        i86_intr_raise(m,0);

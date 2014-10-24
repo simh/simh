@@ -965,7 +965,7 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
     if ((result == 1) && (cptr[n] == 0)) {
         old = lookupPortInfo(sip.port, &position);
         if (old.port == -1) {
-            printf("No mapping for port 0x%02x exists - cannot remove.\n", sip.port);
+            sim_printf("No mapping for port 0x%02x exists - cannot remove.\n", sip.port);
             return SCPE_ARG;
         }
         do {
@@ -974,7 +974,7 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
         } while (port_table[position].port != -1);
         sim_map_resource(sip.port, 1, RESOURCE_TYPE_IO, &nulldev, FALSE);
         if (sio_unit.flags & UNIT_SIO_VERBOSE) {
-            printf("Removing mapping for port 0x%02x.\n\t", sip.port);
+            sim_printf("Removing mapping for port 0x%02x.\n\t", sip.port);
             show_sio_port_info(stdout, old);
         }
         return SCPE_OK;
@@ -991,29 +991,29 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
     if (result != SCPE_OK)
         return result;
     if (sip.port != (sip.port & 0xff)) {
-        printf("Truncating port 0x%x to 0x%02x.\n", sip.port, sip.port & 0xff);
+        sim_printf("Truncating port 0x%x to 0x%02x.\n", sip.port, sip.port & 0xff);
         sip.port &= 0xff;
     }
     old = lookupPortInfo(sip.port, &position);
     if (old.port == sip.port) {
         if (sio_unit.flags & UNIT_SIO_VERBOSE) {
-            printf("Replacing mapping for port 0x%02x.\n\t", sip.port);
+            sim_printf("Replacing mapping for port 0x%02x.\n\t", sip.port);
             show_sio_port_info(stdout, old);
-            printf("-> ");
+            sim_printf("-> ");
             show_sio_port_info(stdout, sip);
             if (equalSIP(sip, old))
-                printf("[identical]");
+                sim_printf("[identical]");
         }
     }
     else {
         port_table[position + 1] = old;
         if (sio_unit.flags & UNIT_SIO_VERBOSE) {
-            printf("Adding mapping for port 0x%02x.\n\t", sip.port);
+            sim_printf("Adding mapping for port 0x%02x.\n\t", sip.port);
             show_sio_port_info(stdout, sip);
         }
     }
     if (sio_unit.flags & UNIT_SIO_VERBOSE)
-        printf("\n");
+        sim_printf("\n");
     port_table[position] = sip;
     sim_map_resource(sip.port, 1, RESOURCE_TYPE_IO, (sip.hasOUT ||
         ((sip.sio_can_read == 0) && (sip.sio_cannot_read == 0) &&
@@ -1744,7 +1744,7 @@ static int32 simh_out(const int32 port, const int32 data) {
 
                 case printTimeCmd:  /* print time */
                     if (rtc_avail)
-                        printf("SIMH: " ADDRESS_FORMAT " Current time in milliseconds = %d." NLP, PCX, sim_os_msec());
+                        sim_printf("SIMH: " ADDRESS_FORMAT " Current time in milliseconds = %d." NLP, PCX, sim_os_msec());
                     else
                         warnNoRealTimeClock();
                     break;
@@ -1754,7 +1754,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         if (markTimeSP < TIMER_STACK_LIMIT)
                             markTime[markTimeSP++] = sim_os_msec();
                         else
-                            printf("SIMH: " ADDRESS_FORMAT " Timer stack overflow." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer stack overflow." NLP, PCX);
                         else
                             warnNoRealTimeClock();
                     break;
@@ -1763,10 +1763,10 @@ static int32 simh_out(const int32 port, const int32 data) {
                     if (rtc_avail)
                         if (markTimeSP > 0) {
                             uint32 delta = sim_os_msec() - markTime[--markTimeSP];
-                            printf("SIMH: " ADDRESS_FORMAT " Timer stopped. Elapsed time in milliseconds = %d." NLP, PCX, delta);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer stopped. Elapsed time in milliseconds = %d." NLP, PCX, delta);
                         }
                         else
-                            printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
                         else
                             warnNoRealTimeClock();
                     break;
@@ -1852,10 +1852,10 @@ static int32 simh_out(const int32 port, const int32 data) {
                     if (rtc_avail)
                         if (markTimeSP > 0) {
                             uint32 delta = sim_os_msec() - markTime[markTimeSP - 1];
-                            printf("SIMH: " ADDRESS_FORMAT " Timer running. Elapsed in milliseconds = %d." NLP, PCX, delta);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer running. Elapsed in milliseconds = %d." NLP, PCX, delta);
                         }
                         else
-                            printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
                         else
                             warnNoRealTimeClock();
                     break;

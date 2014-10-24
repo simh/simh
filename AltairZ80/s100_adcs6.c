@@ -44,7 +44,6 @@
  *************************************************************************/
 
 /*#define DBG_MSG */
-#define DBG_MSG
 #include "altairz80_defs.h"
 
 #if defined (_WIN32)
@@ -55,7 +54,7 @@
 #include "wd179x.h"
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -384,7 +383,7 @@ static t_stat adcs6_svc (UNIT *uptr)
 
     adcs6_info->rtc ++;
 
-    printf("Timer IRQ\n");
+    sim_printf("Timer IRQ\n");
     adcs6_info->ipend |= ADCS6_IRQ_TIMER3;
 
 /*  sim_activate (adcs6_unit, adcs6_unit->wait); */ /* requeue! */
@@ -412,7 +411,7 @@ static t_stat adcs6_reset(DEVICE *dptr)
         if (adcs6_hasProperty(UNIT_ADCS6_ROM)) {
             sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: ROM Enabled.\n");
             if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &adcs6rom, FALSE) != 0) {
-                printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+                sim_printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
                 return SCPE_ARG;
             }
             adcs6_info->rom_disabled = FALSE;
@@ -423,7 +422,7 @@ static t_stat adcs6_reset(DEVICE *dptr)
 
         /* Connect ADCS6 FDC Synchronization / Drive / Density Register */
         if(sim_map_resource(0x14, 0x01, RESOURCE_TYPE_IO, &adcs6_control, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 /*#define ADCS6 */
@@ -431,19 +430,19 @@ static t_stat adcs6_reset(DEVICE *dptr)
         /* Connect ADCS6 Interrupt, and Aux Disk Registers */
 
         if(sim_map_resource(0x10, 0x04, RESOURCE_TYPE_IO, &adcs6_dma, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect ADCS6 Timer Registers */
         if(sim_map_resource(0x04, 0x08, RESOURCE_TYPE_IO, &adcs6_timer, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 #endif
         /* Connect ADCS6 Memory Management / Bank Select Register */
         if(sim_map_resource(0x15, 0x7, RESOURCE_TYPE_IO, &adcs6_banksel, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }

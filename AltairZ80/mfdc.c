@@ -53,7 +53,7 @@
 #endif
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -224,7 +224,7 @@ static t_stat mfdc_reset(DEVICE *dptr)
             mfdc_info->drive[i].uptr = &mfdc_dev.units[i];
         }
         if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &mdskdev, FALSE) != 0) {
-            printf("%s: error mapping resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
+            sim_printf("%s: error mapping resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
             dptr->flags |= DEV_DIS;
             return SCPE_ARG;
         }
@@ -263,23 +263,23 @@ static t_stat mfdc_attach(UNIT *uptr, char *cptr)
     }
 
     if (uptr->flags & UNIT_MFDC_VERBOSE)
-        printf("MDSK%d, attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("MDSK%d, attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
 
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if(uptr->capac < 318000) {
-            printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
+            sim_printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
             mfdc_detach(uptr);
             return SCPE_OPENERR;
         }
 
         if (uptr->flags & UNIT_MFDC_VERBOSE)
-            printf("--------------------------------------------------------\n");
+            sim_printf("--------------------------------------------------------\n");
         mfdc_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_MFDC_VERBOSE),
                                              &mfdc_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_MFDC_VERBOSE)
-            printf("\n");
+            sim_printf("\n");
     } else {
         mfdc_info->drive[i].imd = NULL;
     }
@@ -353,7 +353,7 @@ static int32 mdskdev(const int32 Addr, const int32 rw, const int32 data)
             if(rw == 0) {   /* Read boot ROM */
                 return(mfdc_rom[Addr & 0xFF]);
             } else {
-                printf("MFDC: Attempt to write to boot ROM." NLP);
+                sim_printf("MFDC: Attempt to write to boot ROM." NLP);
                 return (-1);
             }
             break;
@@ -445,7 +445,7 @@ static uint8 MFDC_Read(const uint32 Addr)
 
                 if (!(pDrive->uptr->flags & UNIT_ATT)) {
                     if (pDrive->uptr->flags & UNIT_MFDC_VERBOSE)
-                        printf("MFDC: " ADDRESS_FORMAT " MDSK%i not attached." NLP, PCX,
+                        sim_printf("MFDC: " ADDRESS_FORMAT " MDSK%i not attached." NLP, PCX,
                             mfdc_info->sel_drive);
                     return 0x00;
                 }
@@ -454,9 +454,9 @@ static uint8 MFDC_Read(const uint32 Addr)
                 {
                     case IMAGE_TYPE_IMD:
                         if(pDrive->imd == NULL) {
-                            printf(".imd is NULL!" NLP);
+                            sim_printf(".imd is NULL!" NLP);
                         }
-/*                      printf("%s: Read: imd=%p" NLP, __FUNCTION__, pDrive->imd); */
+/*                      sim_printf("%s: Read: imd=%p" NLP, __FUNCTION__, pDrive->imd); */
                         sectRead(pDrive->imd,
                             pDrive->track,
                             mfdc_info->head,
@@ -468,7 +468,7 @@ static uint8 MFDC_Read(const uint32 Addr)
                         break;
                     case IMAGE_TYPE_DSK:
                         if(pDrive->uptr->fileref == NULL) {
-                            printf(".fileref is NULL!" NLP);
+                            sim_printf(".fileref is NULL!" NLP);
                         } else {
                             sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
@@ -478,18 +478,18 @@ static uint8 MFDC_Read(const uint32 Addr)
                             rtn = sim_fread(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
                             if (rtn != 256)
 #endif /* USE_VGI */
-                                printf("%s: sim_fread error. Result = %d." NLP, __FUNCTION__, rtn);
+                                sim_printf("%s: sim_fread error. Result = %d." NLP, __FUNCTION__, rtn);
                         }
                         break;
                     case IMAGE_TYPE_CPT:
-                        printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                        sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
                         break;
                     default:
-                        printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                        sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
                         break;
                 }
 
-/*              printf("%d/%d @%04x Len=%04x" NLP, sdata.u.header[0], sdata.u.header[1], sdata.u.header[9]<<8|sdata.u.header[8], sdata.u.header[11]<<8|sdata.u.header[10]); */
+/*              sim_printf("%d/%d @%04x Len=%04x" NLP, sdata.u.header[0], sdata.u.header[1], sdata.u.header[9]<<8|sdata.u.header[8], sdata.u.header[11]<<8|sdata.u.header[10]); */
 
                 adc(0,0); /* clear Carry bit */
                 checksum = 0;
@@ -537,7 +537,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
         case 3:
 /*          DBG_PRINT(("MFDC: " ADDRESS_FORMAT " WR Data" NLP, PCX)); */
             if(mfdc_info->wr_latch == 0) {
-                printf("MFDC: " ADDRESS_FORMAT " Error, attempt to write data when write latch is not set." NLP, PCX);
+                sim_printf("MFDC: " ADDRESS_FORMAT " Error, attempt to write data when write latch is not set." NLP, PCX);
             } else {
 #ifdef USE_VGI
                 sec_offset = (pDrive->track * MFDC_SECTOR_LEN * 16) + \
@@ -566,7 +566,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
 
                     if (!(pDrive->uptr->flags & UNIT_ATT)) {
                         if (pDrive->uptr->flags & UNIT_MFDC_VERBOSE)
-                            printf("MFDC: " ADDRESS_FORMAT " MDSK%i not attached." NLP, PCX,
+                            sim_printf("MFDC: " ADDRESS_FORMAT " MDSK%i not attached." NLP, PCX,
                                 mfdc_info->sel_drive);
                         return 0x00;
                     }
@@ -575,7 +575,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                     {
                         case IMAGE_TYPE_IMD:
                             if(pDrive->imd == NULL) {
-                                printf(".imd is NULL!" NLP);
+                                sim_printf(".imd is NULL!" NLP);
                             }
                             sectWrite(pDrive->imd,
                                 pDrive->track,
@@ -588,7 +588,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                             break;
                         case IMAGE_TYPE_DSK:
                             if(pDrive->uptr->fileref == NULL) {
-                                printf(".fileref is NULL!" NLP);
+                                sim_printf(".fileref is NULL!" NLP);
                             } else {
                                 sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
@@ -599,10 +599,10 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                             }
                             break;
                         case IMAGE_TYPE_CPT:
-                            printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                            sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
                             break;
                         default:
-                            printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                            sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
                             break;
                     }
                 }

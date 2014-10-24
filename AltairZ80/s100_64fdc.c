@@ -53,7 +53,7 @@
 #include "wd179x.h"
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -191,7 +191,7 @@ static uint8 ipend_to_rst_opcode(uint8 ipend)
     active_intr = cromfdc_info->imask & cromfdc_info->ipend;
 
     for(i=1;i != 0;i <<= 1) {
-/*      printf("%d: %d" NLP, i, active_intr & i); */
+/*      sim_printf("%d: %d" NLP, i, active_intr & i); */
         if (active_intr & i) {
             return(cromfdc_irq_table[j]);
         }
@@ -1487,38 +1487,38 @@ static t_stat cromfdc_reset(DEVICE *dptr)
         if (cromfdc_hasProperty(UNIT_CROMFDC_ROM)) {
             sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: ROM Enabled.\n");
             if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &cromfdcrom, FALSE) != 0) {
-                printf("%s: error mapping MEM resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+                sim_printf("%s: error mapping MEM resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
                 return SCPE_ARG;
             }
         } else
             sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: ROM Disabled.\n");
         /* Connect CROMFDC Interrupt, and Aux Disk Registers */
         if(sim_map_resource(0x03, 0x02, RESOURCE_TYPE_IO, &cromfdc_ext, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect CROMFDC Timer Registers */
         if(sim_map_resource(0x05, 0x05, RESOURCE_TYPE_IO, &cromfdc_timer, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect CROMFDC Disk Flags and Control Register */
         if(sim_map_resource(0x34, 0x01, RESOURCE_TYPE_IO, &cromfdc_control, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect CROMFDC Bank Select Register */
         if(sim_map_resource(0x40, 0x1, RESOURCE_TYPE_IO, &cromfdc_banksel, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect CCS 2810 UART Status Register (needed by MOSS 2.2 Monitor */
         if(sim_map_resource(0x26, 0x01, RESOURCE_TYPE_IO, &ccs2810_uart_status, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         } else {
             sim_debug(VERBOSE_MSG, &cromfdc_dev, "Mapped CCS2810 UART Status at 0x26\n");
@@ -1534,7 +1534,7 @@ static t_stat cromfdc_reset(DEVICE *dptr)
 static t_stat cromfdc_boot(int32 unitno, DEVICE *dptr)
 {
     if((crofdc_type != 4) && (crofdc_type != 16) && (crofdc_type != 64) && (crofdc_type != 50)) {
-        printf("Invalid fdc_type: %d, must be 4, 16, or 64 (or 50 for CCS2422.)" NLP, crofdc_type);
+        sim_printf("Invalid fdc_type: %d, must be 4, 16, or 64 (or 50 for CCS2422.)" NLP, crofdc_type);
         return SCPE_ARG;
     }
 
@@ -1645,7 +1645,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
                     break;
             }
 
-/*          printf("CCS2422FDC: " ADDRESS_FORMAT " Read STATUS1=0x%02x" NLP, PCX, result); */
+/*          sim_printf("CCS2422FDC: " ADDRESS_FORMAT " Read STATUS1=0x%02x" NLP, PCX, result); */
         }
         sim_debug(STATUS_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
                   " Read DISK FLAGS, Port 0x%02x Result 0x%02x\n", PCX, port, result);
@@ -1675,13 +1675,13 @@ static int32 cromfdc_ext(const int32 port, const int32 io, const int32 data)
                 }
 #if 0   /* hharte - nothing implemented for these */
                 if((data & CROMFDC_AUX_EJECT) == 0) {
-                    printf("CROMFDC: Eject" NLP);
+                    sim_printf("CROMFDC: Eject" NLP);
                 }
                 if((data & CROMFDC_AUX_SEL_OVERRIDE) == 0) {
-                    printf("CROMFDC: Sel Override" NLP);
+                    sim_printf("CROMFDC: Sel Override" NLP);
                 }
                 if((data & CROMFDC_AUX_CTRL_OUT) == 0) {
-                    printf("CROMFDC: Ctrl Out" NLP);
+                    sim_printf("CROMFDC: Ctrl Out" NLP);
                 }
 #endif /* 0 */
                 if(crofdc_type < 64) {

@@ -53,7 +53,7 @@
 /* #define DBG_MSG */
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -213,7 +213,7 @@ static t_stat vfdhd_reset(DEVICE *dptr)
     } else {
         /* Connect MFDC at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &vfdhddev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }
@@ -256,23 +256,23 @@ static t_stat vfdhd_attach(UNIT *uptr, char *cptr)
     }
 
     if (uptr->flags & UNIT_VFDHD_VERBOSE)
-        printf("VFDHD%d: attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("VFDHD%d: attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
 
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if(uptr->capac < 318000) {
-            printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
+            sim_printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
             vfdhd_detach(uptr);
             return SCPE_OPENERR;
         }
 
         if (uptr->flags & UNIT_VFDHD_VERBOSE)
-            printf("--------------------------------------------------------\n");
+            sim_printf("--------------------------------------------------------\n");
         vfdhd_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_VFDHD_VERBOSE),
                                               &vfdhd_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_VFDHD_VERBOSE)
-            printf("\n");
+            sim_printf("\n");
     } else {
         vfdhd_info->drive[i].imd = NULL;
     }
@@ -288,17 +288,17 @@ static t_stat vfdhd_attach(UNIT *uptr, char *cptr)
             vfdhd_info->drive[i].ntracks  = 153;    /* number of tracks */
             vfdhd_info->drive[i].nheads   = 6;      /* number of heads */
             vfdhd_info->hdsk_type = 1;
-            printf("10MB\n");
+            sim_printf("10MB\n");
         } else if (hdSize == 5) {
             vfdhd_info->drive[i].ntracks  = 153;    /* number of tracks */
             vfdhd_info->drive[i].nheads   = 4;      /* number of heads */
             vfdhd_info->hdsk_type = 0;
-            printf("5MB\n");
+            sim_printf("5MB\n");
         } else {
             vfdhd_info->drive[i].ntracks  = 512;    /* number of tracks */
             vfdhd_info->drive[i].nheads   = 8;      /* number of heads */
             vfdhd_info->hdsk_type = 1;
-            printf("32MB\n");
+            sim_printf("32MB\n");
         }
 
         vfdhd_info->drive[i].nheads   = 4;      /* number of heads */
@@ -551,9 +551,9 @@ static void VFDHD_Command(void)
         {
             case IMAGE_TYPE_IMD:
                 if(pDrive->imd == NULL) {
-                    printf(".imd is NULL!" NLP);
+                    sim_printf(".imd is NULL!" NLP);
                 }
-                printf("%s: Read: imd=%p" NLP, __FUNCTION__, pDrive->imd);
+                sim_printf("%s: Read: imd=%p" NLP, __FUNCTION__, pDrive->imd);
                 sectRead(pDrive->imd,
                     pDrive->track,
                     vfdhd_info->head,
@@ -576,7 +576,7 @@ static void VFDHD_Command(void)
                 break;
             case IMAGE_TYPE_DSK:
                 if(pDrive->uptr->fileref == NULL) {
-                    printf(".fileref is NULL!" NLP);
+                    sim_printf(".fileref is NULL!" NLP);
                 } else {
                     sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
                     rtn = sim_fread(&sdata.u.sync, 1, 274, /*VFDHD_SECTOR_LEN,*/ (pDrive->uptr)->fileref);
@@ -595,10 +595,10 @@ static void VFDHD_Command(void)
                 }
                 break;
             case IMAGE_TYPE_CPT:
-                printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
                 break;
             default:
-                printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
                 break;
         }
 
@@ -620,7 +620,7 @@ static void VFDHD_Command(void)
         {
             case IMAGE_TYPE_IMD:
                 if(pDrive->imd == NULL) {
-                    printf(".imd is NULL!" NLP);
+                    sim_printf(".imd is NULL!" NLP);
                 }
                 sectWrite(pDrive->imd,
                     pDrive->track,
@@ -633,7 +633,7 @@ static void VFDHD_Command(void)
                 break;
             case IMAGE_TYPE_DSK:
                 if(pDrive->uptr->fileref == NULL) {
-                    printf(".fileref is NULL!" NLP);
+                    sim_printf(".fileref is NULL!" NLP);
                 } else {
                     DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR drive=%d, track=%d, head=%d, sector=%d" NLP,
                         PCX,
@@ -650,10 +650,10 @@ static void VFDHD_Command(void)
                 }
                 break;
             case IMAGE_TYPE_CPT:
-                printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
                 break;
             default:
-                printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
                 break;
         }
     }

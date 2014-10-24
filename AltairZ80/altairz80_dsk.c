@@ -438,7 +438,7 @@ static t_stat dsk_boot(int32 unitno, DEVICE *dptr) {
             bootrom_dsk[UNIT_NO_OFFSET_2] = 0x80 | (unitno & 0xff);    /* LD a,80h | <unitno>  */
         }
         else { /* Attempt to modify non LD A,<> instructions is refused. */
-            printf("Incorrect boot ROM offsets detected.\n");
+                sim_printf("Incorrect boot ROM offsets detected.\n");
             return SCPE_IERR;
         }
         install_ALTAIRbootROM();                                         /* install modified ROM */

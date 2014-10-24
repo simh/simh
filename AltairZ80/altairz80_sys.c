@@ -756,7 +756,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
             if (at > -129)
                 val[2] = (int8) (at);
             else {
-                printf("Offset expected.\n");
+                sim_printf("Offset expected.\n");
                 return SCPE_ARG;
             }
             val[3] = op;
@@ -833,7 +833,7 @@ t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc)
         return SCPE_ARG;
 
     if (dptr->flags & DEV_DIS) {
-        printf("device not enabled yet.\n");
+        sim_printf("device not enabled yet.\n");
         pnp->mem_base = newba & ~(pnp->mem_size-1);
     } else {
         dptr->flags |= DEV_DIS;
@@ -893,7 +893,7 @@ t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc)
         return SCPE_ARG;
 
     if (dptr->flags & DEV_DIS) {
-        printf("device not enabled yet.\n");
+        sim_printf("device not enabled yet.\n");
         pnp->io_base = newba & ~(pnp->io_size-1);
     } else {
         dptr->flags |= DEV_DIS;

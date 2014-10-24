@@ -44,7 +44,7 @@
 #include "altairz80_defs.h"
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -126,7 +126,7 @@ static t_stat fw2_attach(UNIT *uptr, char *cptr)
     for(i = 0; i < FW2_MAX_BOARDS; i++) {
         if(&fw2_dev.units[i] == uptr) {
             if(uptr->flags & UNIT_FW2_VERBOSE) {
-                printf("Attaching unit %d at %04x\n", i, baseaddr);
+                sim_printf("Attaching unit %d at %04x\n", i, baseaddr);
             }
             break;
         }
@@ -137,17 +137,17 @@ static t_stat fw2_attach(UNIT *uptr, char *cptr)
     fw2_info[i]->uptr->u3 = baseaddr;
 
     if(sim_map_resource(baseaddr, FW2_CAPACITY, RESOURCE_TYPE_MEMORY, &fw2dev, FALSE) != 0) {
-        printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, baseaddr);
+        sim_printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, baseaddr);
         return SCPE_ARG;
     }
 
     if(sim_map_resource(0x00, 1, RESOURCE_TYPE_IO, &sio0s, FALSE) != 0) {
-        printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, 0x00);
+        sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, 0x00);
         return SCPE_ARG;
     }
 
     if(sim_map_resource(0x01, 1, RESOURCE_TYPE_IO, &sio0d, FALSE) != 0) {
-        printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, 0x01);
+        sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, 0x01);
         return SCPE_ARG;
     }
 
@@ -197,7 +197,7 @@ static t_stat get_base_address(char *cptr, uint32 *baseaddr)
     uint32 b;
     sscanf(cptr, "%x", &b);
     if(b & (FW2_CAPACITY-1)) {
-        printf("FWII must be on a %d-byte boundary.\n", FW2_CAPACITY);
+        sim_printf("FWII must be on a %d-byte boundary.\n", FW2_CAPACITY);
         return SCPE_ARG;
     }
     *baseaddr = b & ~(FW2_CAPACITY-1);

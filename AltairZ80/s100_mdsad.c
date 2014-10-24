@@ -49,7 +49,7 @@
 #endif
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -277,7 +277,7 @@ static t_stat mdsad_reset(DEVICE *dptr)
         /* Connect MDSAD at base address */
         if(sim_map_resource(pnp->mem_base, pnp->mem_size,
             RESOURCE_TYPE_MEMORY, &mdsaddev, FALSE) != 0) {
-            printf("%s: error mapping resource at 0x%04x\n",
+            sim_printf("%s: error mapping resource at 0x%04x\n",
                 __FUNCTION__, pnp->mem_base);
             dptr->flags |= DEV_DIS;
             return SCPE_ARG;
@@ -320,7 +320,7 @@ static t_stat mdsad_attach(UNIT *uptr, char *cptr)
     if(uptr->capac > 0) {
         char *rtn = fgets(header, 4, uptr->fileref);
         if((rtn != NULL) && (strncmp(header, "CPT", 3) == 0)) {
-            printf("CPT images not yet supported\n");
+            sim_printf("CPT images not yet supported\n");
             uptr->u3 = IMAGE_TYPE_CPT;
             mdsad_detach(uptr);
             return SCPE_OPENERR;
@@ -330,7 +330,7 @@ static t_stat mdsad_attach(UNIT *uptr, char *cptr)
     }
 
     if (uptr->flags & UNIT_MDSAD_VERBOSE)
-        printf("MDSAD%d, attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("MDSAD%d, attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
 
@@ -415,13 +415,13 @@ static uint8 mdsad_rom[] = {
 
 static void showdata(int32 isRead) {
     int32 i;
-    printf("MDSAD: " ADDRESS_FORMAT " %s Sector =" NLP "\t", PCX, isRead ? "Read" : "Write");
+    sim_printf("MDSAD: " ADDRESS_FORMAT " %s Sector =" NLP "\t", PCX, isRead ? "Read" : "Write");
     for(i=0; i < MDSAD_SECTOR_LEN; i++) {
-        printf("%02X ", sdata.u.data[i]);
+        sim_printf("%02X ", sdata.u.data[i]);
         if(((i+1) & 0xf) == 0)
-            printf(NLP "\t");
+            sim_printf(NLP "\t");
     }
-    printf(NLP);
+    sim_printf(NLP);
 }
 
 static int checksum;
@@ -489,7 +489,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                 {
                     case IMAGE_TYPE_DSK:
                         if(pDrive->uptr->fileref == NULL) {
-                            printf(".fileref is NULL!" NLP);
+                            sim_printf(".fileref is NULL!" NLP);
                         } else {
                             sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
                             sim_fwrite(sdata.u.data, 1, MDSAD_SECTOR_LEN,
@@ -497,10 +497,10 @@ static uint8 MDSAD_Read(const uint32 Addr)
                         }
                         break;
                     case IMAGE_TYPE_CPT:
-                        printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                        sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
                         break;
                     default:
-                        printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                        sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
                         break;
                 }
             }
@@ -720,7 +720,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                             {
                                 case IMAGE_TYPE_DSK:
                                     if(pDrive->uptr->fileref == NULL) {
-                                        printf(".fileref is NULL!" NLP);
+                                        sim_printf(".fileref is NULL!" NLP);
                                     } else {
                                         sim_fseek((pDrive->uptr)->fileref,
                                             sec_offset, SEEK_SET);
@@ -733,11 +733,11 @@ static uint8 MDSAD_Read(const uint32 Addr)
                                     }
                                     break;
                                 case IMAGE_TYPE_CPT:
-                                    printf("%s: CPT Format not supported"
+                                    sim_printf("%s: CPT Format not supported"
                                         NLP, __FUNCTION__);
                                     break;
                                 default:
-                                    printf("%s: Unknown image Format"
+                                    sim_printf("%s: Unknown image Format"
                                         NLP, __FUNCTION__);
                                     break;
                             }

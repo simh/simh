@@ -4287,7 +4287,7 @@ static void i86op_jump_byte_IMM(PC_ENV *m)
    int8 offset;
    uint16 target;
    offset = (int8) fetch_byte_imm(m);             /* CHECK */
-/*   printf("jump byte imm offset=%d\n",offset);*/
+/*   sim_printf("jump byte imm offset=%d\n",offset);*/
    target = (int16) m->R_IP + offset;
    m->R_IP = target;
    DECODE_CLEAR_SEGOVR(m);

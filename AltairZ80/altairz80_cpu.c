@@ -1463,9 +1463,9 @@ static void altairz80_print_tables(void) {
     for (i = 0; i < 256; i++) {
         v =     ((i & 1)        + ((i & 2) >> 1)    + ((i & 4) >> 2)    + ((i & 8) >> 3) +
                 ((i & 16) >> 4) + ((i & 32) >> 5)   + ((i & 64) >> 6)   + ((i & 128) >> 7)) % 2 ? 0 : 4;
-        printf("%1d,", v);
+        sim_printf("%1d,", v);
         if ( ((i+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1474,9 +1474,9 @@ static void altairz80_print_tables(void) {
     uint32 temp, v;
     for (temp = 0; temp <= 256; temp++) {
         v = (temp & 0xa8) | (((temp & 0xff) == 0) << 6) | (((temp & 0xf) == 0) << 4);
-        printf("%3d,", v);
+        sim_printf("%3d,", v);
         if ( ((temp+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1485,9 +1485,9 @@ static void altairz80_print_tables(void) {
     uint32 temp, v;
     for (temp = 0; temp < 256; temp++) {
         v = (temp & 0xa8) | (((temp & 0xff) == 0) << 6) | (((temp & 0xf) == 0xf) << 4) | 2;
-        printf("%3d,", v);
+        sim_printf("%3d,", v);
         if ( ((temp+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1496,9 +1496,9 @@ static void altairz80_print_tables(void) {
     uint32 cbits, v;
     for (cbits = 0; cbits < 512; cbits++) {
         v = (cbits & 0x10) | ((cbits >> 8) & 1);
-        printf("%2d,", v);
+        sim_printf("%2d,", v);
         if ( ((cbits+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1507,9 +1507,9 @@ static void altairz80_print_tables(void) {
     uint32 cbits, v;
     for (cbits = 0; cbits < 512; cbits++) {
         v = (cbits & 0x10) | ((cbits >> 8) & 1) | ((cbits & 0xff) << 8) | (cbits & 0xa8) | (((cbits & 0xff) == 0) << 6);
-        printf("0x%04x,", v);
+        sim_printf("0x%04x,", v);
         if ( ((cbits+1) & 0x7) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1518,9 +1518,9 @@ static void altairz80_print_tables(void) {
     uint32 cbits, v;
     for (cbits = 0; cbits < 512; cbits++) {
         v = (cbits & 0x10) | ((cbits >> 8) & 1) | (cbits & 0x28);
-        printf("%2d,", v);
+        sim_printf("%2d,", v);
         if ( ((cbits+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1529,9 +1529,9 @@ static void altairz80_print_tables(void) {
     uint32 cbits, v;
     for (cbits = 0; cbits < 512; cbits++) {
         v = (cbits & 0x10) | ((cbits >> 8) & 1) | 2;
-        printf("%2d,", v);
+        sim_printf("%2d,", v);
         if ( ((cbits+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1541,9 +1541,9 @@ static void altairz80_print_tables(void) {
     for (temp = 0; temp < 256; temp++) {
         sum = temp >> 1;
         v = ((temp & 1) << 15) | (sum << 8) | (sum & 0x28) | (temp & 1);
-        printf("0x%04x,", v);
+        sim_printf("0x%04x,", v);
         if ( ((temp+1) & 0x7) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1553,9 +1553,9 @@ static void altairz80_print_tables(void) {
     for (temp = 0; temp < 256; temp++) {
         sum = temp >> 1;
         v = (sum << 8) | (sum & 0x28) | (temp & 1);
-        printf("0x%04x,", v);
+        sim_printf("0x%04x,", v);
         if ( ((temp+1) & 0x7) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1564,9 +1564,9 @@ static void altairz80_print_tables(void) {
     uint32 sum, v;
     for (sum = 0; sum < 512; sum++) {
         v = ((sum & 0xff) << 8) | (sum & 0xa8) | (((sum & 0xff) == 0) << 6);
-        printf("0x%04x,", v);
+        sim_printf("0x%04x,", v);
         if ( ((sum+1) & 0x7) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1575,9 +1575,9 @@ static void altairz80_print_tables(void) {
     uint32 sum, v;
     for (sum = 0; sum < 256; sum++) {
         v = ((sum & 0xff) << 8) | (sum & 0xa8) | (((sum & 0xff) == 0) << 6) | 2;
-        printf("0x%04x,", v);
+        sim_printf("0x%04x,", v);
         if ( ((sum+1) & 0x7) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1586,9 +1586,9 @@ static void altairz80_print_tables(void) {
     uint32 sum, v;
     for (sum = 0; sum < 256; sum++) {
         v = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | 0x10 | parityTable[sum];
-        printf("0x%04x,", v);
+        sim_printf("0x%04x,", v);
         if ( ((sum+1) & 0x7) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1597,9 +1597,9 @@ static void altairz80_print_tables(void) {
     uint32 sum, v;
     for (sum = 0; sum < 256; sum++) {
         v = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | parityTable[sum];
-        printf("0x%04x,", v);
+        sim_printf("0x%04x,", v);
         if ( ((sum+1) & 0x7) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1608,9 +1608,9 @@ static void altairz80_print_tables(void) {
     uint32 temp, v;
     for (temp = 0; temp < 256; temp++) {
         v = (temp & 0xa8) | (((temp & 0xff) == 0) << 6) | PARITY(temp);
-        printf("%3d,", v);
+        sim_printf("%3d,", v);
         if ( ((temp+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1620,9 +1620,9 @@ static void altairz80_print_tables(void) {
     for (temp = 0; temp < 256; temp++) {
         v = (temp & 0xa8) | (((temp & 0xff) == 0) << 6) |
             (((temp & 0xf) == 0) << 4) | ((temp == 0x80) << 2);
-        printf("%3d,", v);
+        sim_printf("%3d,", v);
         if ( ((temp+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1632,9 +1632,9 @@ static void altairz80_print_tables(void) {
     for (temp = 0; temp < 256; temp++) {
         v = (temp & 0xa8) | (((temp & 0xff) == 0) << 6) |
             (((temp & 0xf) == 0xf) << 4) | ((temp == 0x7f) << 2) | 2;
-        printf("%3d,", v);
+        sim_printf("%3d,", v);
         if ( ((temp+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1644,9 +1644,9 @@ static void altairz80_print_tables(void) {
     for (cbits = 0; cbits < 512; cbits++) {
         v = (cbits & 0x10) | (((cbits >> 6) ^ (cbits >> 5)) & 4) |
             ((cbits >> 8) & 1);
-        printf("%2d,", v);
+        sim_printf("%2d,", v);
         if ( ((cbits+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1656,9 +1656,9 @@ static void altairz80_print_tables(void) {
     for (cbits = 0; cbits < 512; cbits++) {
         v = (cbits & 0x10) | (((cbits >> 6) ^ (cbits >> 5)) & 4) |
             ((cbits >> 8) & 1) | (cbits & 0xa8);
-        printf("%3d,", v);
+        sim_printf("%3d,", v);
         if ( ((cbits+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1667,9 +1667,9 @@ static void altairz80_print_tables(void) {
     uint32 cbits, v;
     for (cbits = 0; cbits < 512; cbits++) {
         v = (((cbits >> 6) ^ (cbits >> 5)) & 4) | (cbits & 0x10) | 2 | ((cbits >> 8) & 1);
-        printf("%2d,", v);
+        sim_printf("%2d,", v);
         if ( ((cbits+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1679,9 +1679,9 @@ static void altairz80_print_tables(void) {
     for (cbits = 0; cbits < 512; cbits++) {
         v = (((cbits >> 6) ^ (cbits >> 5)) & 4) | (cbits & 0x10) | 2 | ((cbits >> 8) & 1) |
             (cbits & 0xa8);
-        printf("%3d,", v);
+        sim_printf("%3d,", v);
         if ( ((cbits+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1690,9 +1690,9 @@ static void altairz80_print_tables(void) {
     uint32 temp, v;
     for (temp = 0; temp < 256; temp++) {
         v = (((temp & 0x0f) != 0) << 4) | ((temp == 0x80) << 2) | 2 | (temp != 0);
-        printf("%2d,", v);
+        sim_printf("%2d,", v);
         if ( ((temp+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1701,9 +1701,9 @@ static void altairz80_print_tables(void) {
     uint32 acu, v;
     for (acu = 0; acu < 256; acu++) {
         v = (acu << 8) | (acu & 0xa8) | (((acu & 0xff) == 0) << 6) | parityTable[acu];
-        printf("0x%04x,", v);
+        sim_printf("0x%04x,", v);
         if ( ((acu+1) & 0x7) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1712,9 +1712,9 @@ static void altairz80_print_tables(void) {
     uint32 sum, v;
     for (sum = 0; sum < 256; sum++) {
         v = (sum & 0x80) | (((sum & 0xff) == 0) << 6);
-        printf("%3d,", v);
+        sim_printf("%3d,", v);
         if ( ((sum+1) & 0xf) == 0) {
-            printf("\n");
+            sim_printf("\n");
         }
     }
 */
@@ -1759,7 +1759,7 @@ uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                 addr |= bankSelect << MAXBANKSIZELOG2;
             page = addr >> LOG2PAGESIZE;
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("%s memory 0x%05x, handler=%p\n", unmap ? "Unmapping" : "  Mapping",
+                sim_printf("%s memory 0x%05x, handler=%p\n", unmap ? "Unmapping" : "  Mapping",
                     addr, routine);
             if (unmap) {
                 if (mmu_table[page].routine == routine) {   /* unmap only if it was mapped */
@@ -1782,17 +1782,17 @@ uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
             if (unmap) {
                 if (dev_table[i & 0xff].routine == routine) {
                     if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                        printf("Unmapping  IO %04x, handler=%p\n", i, routine);
+                        sim_printf("Unmapping  IO %04x, handler=%p\n", i, routine);
                     dev_table[i & 0xff].routine = &nulldev;
                 }
             }
             else {
                 if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                    printf("  Mapping  IO %04x, handler=%p\n", i, routine);
+                    sim_printf("  Mapping  IO %04x, handler=%p\n", i, routine);
                 dev_table[i & 0xff].routine = routine;
             }
     } else {
-        printf("%s: cannot map unknown resource type %d\n", __FUNCTION__, resource_type);
+        sim_printf("%s: cannot map unknown resource type %d\n", __FUNCTION__, resource_type);
         return -1;
     }
     return 0;
@@ -1812,9 +1812,9 @@ static void PutBYTE(register uint32 Addr, const register uint32 Value) {
         m.routine(Addr, 1, Value);
     else if (cpu_unit.flags & UNIT_CPU_VERBOSE) {
         if (m.isEmpty)
-            printf("CPU: " ADDRESS_FORMAT " Attempt to write to non existing memory " ADDRESS_FORMAT "." NLP, PCX, Addr);
+            sim_printf("CPU: " ADDRESS_FORMAT " Attempt to write to non existing memory " ADDRESS_FORMAT "." NLP, PCX, Addr);
         else
-            printf("CPU: " ADDRESS_FORMAT " Attempt to write to ROM " ADDRESS_FORMAT "." NLP, PCX, Addr);
+            sim_printf("CPU: " ADDRESS_FORMAT " Attempt to write to ROM " ADDRESS_FORMAT "." NLP, PCX, Addr);
     }
 }
 
@@ -1830,9 +1830,9 @@ void PutBYTEExtended(register uint32 Addr, const register uint32 Value) {
         m.routine(Addr, 1, Value);
     else if (cpu_unit.flags & UNIT_CPU_VERBOSE) {
         if (m.isEmpty)
-            printf("CPU: " ADDRESS_FORMAT " Attempt to write to non existing memory " ADDRESS_FORMAT "." NLP, PCX, Addr);
+            sim_printf("CPU: " ADDRESS_FORMAT " Attempt to write to non existing memory " ADDRESS_FORMAT "." NLP, PCX, Addr);
         else
-            printf("CPU: " ADDRESS_FORMAT " Attempt to write to ROM " ADDRESS_FORMAT "." NLP, PCX, Addr);
+            sim_printf("CPU: " ADDRESS_FORMAT " Attempt to write to ROM " ADDRESS_FORMAT "." NLP, PCX, Addr);
     }
 }
 
@@ -1855,7 +1855,7 @@ static uint32 GetBYTE(register uint32 Addr) {
         return m.routine(Addr, 0, 0); /* memory mapped I/O */
     if (m.isEmpty) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-            printf("CPU: " ADDRESS_FORMAT " Attempt to read from non existing memory " ADDRESS_FORMAT "." NLP, PCX, Addr);
+            sim_printf("CPU: " ADDRESS_FORMAT " Attempt to read from non existing memory " ADDRESS_FORMAT "." NLP, PCX, Addr);
         return 0xff;
     }
     return M[Addr]; /* ROM */
@@ -1873,7 +1873,7 @@ uint32 GetBYTEExtended(register uint32 Addr) {
         return m.routine(Addr, 0, 0);
     if (m.isEmpty) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-            printf("CPU: " ADDRESS_FORMAT " Attempt to read from non existing memory " ADDRESS_FORMAT "." NLP, PCX, Addr);
+            sim_printf("CPU: " ADDRESS_FORMAT " Attempt to read from non existing memory " ADDRESS_FORMAT "." NLP, PCX, Addr);
         return 0xff;
     }
     return M[Addr];
@@ -6810,16 +6810,16 @@ static t_stat cpu_set_noaltairrom(UNIT *uptr, int32 value, char *cptr, void *des
 
 static t_stat cpu_set_nommu(UNIT *uptr, int32 value, char *cptr, void *desc) {
     if (chiptype == CHIP_TYPE_8086) {
-        printf("Cannot switch off MMU for 8086 CPU.\n");
+        sim_printf("Cannot switch off MMU for 8086 CPU.\n");
         return SCPE_ARG;
     }
     if (cpu_unit.flags & UNIT_CPU_BANKED) {
-        printf("Cannot switch off MMU for banked memory.\n");
+        sim_printf("Cannot switch off MMU for banked memory.\n");
         return SCPE_ARG;
     }
     if (((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80)) &&
             (MEMORYSIZE < MAXBANKSIZE)) {
-        printf("Cannot switch off MMU when memory is %iKB < %iKB.\n",
+        sim_printf("Cannot switch off MMU when memory is %iKB < %iKB.\n",
             MEMORYSIZE >> KBLOG2, MAXBANKSIZE >> KBLOG2);
         return SCPE_ARG;
     }
@@ -6835,7 +6835,7 @@ static t_stat cpu_set_banked(UNIT *uptr, int32 value, char *cptr, void *desc) {
         cpu_clear();
     }
     else if (chiptype == CHIP_TYPE_8086) {
-        printf("Cannot use banked memory for 8086 CPU.\n");
+        sim_printf("Cannot use banked memory for 8086 CPU.\n");
         return SCPE_ARG;
     }
     return SCPE_OK;
@@ -6855,13 +6855,13 @@ static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
         switch(ramtype) {
             case 1:
                 if (data & 0x40) {
-                    printf("HRAM: Parity %s" NLP, data & 1 ? "ON" : "OFF");
+                    sim_printf("HRAM: Parity %s" NLP, data & 1 ? "ON" : "OFF");
                 } else {
-                    printf("HRAM BANKSEL=%02x" NLP, data);
+                    sim_printf("HRAM BANKSEL=%02x" NLP, data);
                 }
                 break;
             case 2:
-/*              printf("VRAM BANKSEL=%02x" NLP, data);*/
+/*              sim_printf("VRAM BANKSEL=%02x" NLP, data);*/
                 switch(data & 0xFF) {
                     case 0x01:
 /*                  case 0x41:      // OASIS uses this for some reason? */
@@ -6890,12 +6890,12 @@ static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
                         setBankSelect(7);
                         break;
                     default:
-/*                      printf("Invalid bank select 0x%02x for VRAM" NLP, data);*/
+/*                      sim_printf("Invalid bank select 0x%02x for VRAM" NLP, data);*/
                         break;
                 }
                 break;
             case 3:
-/*                printf(ADDRESS_FORMAT " CRAM BANKSEL=%02x" NLP, PCX, data); */
+/*                sim_printf(ADDRESS_FORMAT " CRAM BANKSEL=%02x" NLP, PCX, data); */
                 switch(data & 0x7F) {
                     case 0x01:
                         setBankSelect(0);
@@ -6922,7 +6922,7 @@ static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
 /*                        setBankSelect(7); */
 /*                        break; */
                     default:
-                        printf("Invalid bank select 0x%02x for CRAM" NLP, data);
+                        sim_printf("Invalid bank select 0x%02x for CRAM" NLP, data);
                         break;
                 }
 
@@ -6988,27 +6988,27 @@ static int32 switchcpu_io(const int32 port, const int32 io, const int32 data) {
             case CHIP_TYPE_8080:
             case CHIP_TYPE_Z80:
                 if (cpu_unit.flags & UNIT_CPU_VERBOSE) {
-                    printf("CPU: " ADDRESS_FORMAT " SWITCH(port=%02x) to 8086" NLP, PCX, port);
+                    sim_printf("CPU: " ADDRESS_FORMAT " SWITCH(port=%02x) to 8086" NLP, PCX, port);
                 }
                 new_chiptype = CHIP_TYPE_8086;
                 switch_cpu_now = FALSE; /* hharte */
                 break;
             case CHIP_TYPE_8086:
                 if (cpu_unit.flags & UNIT_CPU_VERBOSE) {
-                    printf("CPU: " ADDRESS_FORMAT " SWITCH(port=%02x) to 8085/Z80" NLP, PCX, port);
+                    sim_printf("CPU: " ADDRESS_FORMAT " SWITCH(port=%02x) to 8085/Z80" NLP, PCX, port);
                 }
                 new_chiptype = CHIP_TYPE_Z80;
                 switch_cpu_now = FALSE; /* hharte */
                 break;
             default:
-                printf("%s: invalid chiptype: %d\n", __FUNCTION__, chiptype);
+                sim_printf("%s: invalid chiptype: %d\n", __FUNCTION__, chiptype);
                 break;
         }
 
         cpu_set_chiptype_short(new_chiptype);
         return(0xFF); /* Return High-Z Data */
     } else {
-        printf("%s: Set EXT_ADDR=%02x\n", __FUNCTION__, data);
+        sim_printf("%s: Set EXT_ADDR=%02x\n", __FUNCTION__, data);
     }
     return 0;
 }
@@ -7026,7 +7026,7 @@ static t_stat cpu_set_switcher(UNIT *uptr, int32 value, char *cptr, void *desc) 
     switcherPort &= 0xff;
     safe = dev_table[switcherPort];
     if (sim_map_resource(switcherPort, 1, RESOURCE_TYPE_IO, &switchcpu_io, FALSE)) {
-        printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, switcherPort);
+        sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, switcherPort);
         return SCPE_ARG;
     }
     oldSwitcherDevice = safe;
@@ -7035,7 +7035,7 @@ static t_stat cpu_set_switcher(UNIT *uptr, int32 value, char *cptr, void *desc) 
 
 static t_stat cpu_reset_switcher(UNIT *uptr, int32 value, char *cptr, void *desc) {
     if (sim_map_resource(switcherPort, 1, RESOURCE_TYPE_IO, oldSwitcherDevice.routine, FALSE)) {
-        printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, switcherPort);
+        sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, switcherPort);
         return SCPE_ARG;
     }
     return SCPE_OK;
@@ -7045,53 +7045,53 @@ static t_stat cpu_set_ramtype(UNIT *uptr, int32 value, char *cptr, void *desc) {
 
     if (value == ramtype) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-            printf("RAM Selection unchanged\n");
+            sim_printf("RAM Selection unchanged\n");
         return SCPE_OK;
     }
 
     switch(ramtype) {
         case 1:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("Unmapping NorthStar HRAM\n");
+                sim_printf("Unmapping NorthStar HRAM\n");
             sim_map_resource(0xC0, 1, RESOURCE_TYPE_IO, &bankseldev, TRUE);
             break;
         case 2:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("Unmapping Vector RAM\n");
+                sim_printf("Unmapping Vector RAM\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, TRUE);
             break;
         case 3:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("Unmapping Cromemco RAM\n");
+                sim_printf("Unmapping Cromemco RAM\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, TRUE);
             break;
         case 0:
         default:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("Unmapping AltairZ80 RAM\n");
+                sim_printf("Unmapping AltairZ80 RAM\n");
             break;
     }
 
     switch(value) {
         case 1:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("NorthStar HRAM Selected\n");
+                sim_printf("NorthStar HRAM Selected\n");
             sim_map_resource(0xC0, 1, RESOURCE_TYPE_IO, &bankseldev, FALSE);
             break;
         case 2:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("Vector RAM Selected\n");
+                sim_printf("Vector RAM Selected\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, FALSE);
             break;
         case 3:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("Cromemco RAM Selected\n");
+                sim_printf("Cromemco RAM Selected\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, FALSE);
             break;
         case 0:
         default:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("AltairZ80 RAM Selected\n");
+                sim_printf("AltairZ80 RAM Selected\n");
             break;
     }
 
@@ -7104,7 +7104,7 @@ static t_stat set_size(uint32 size) {
     uint32 maxsize;
     if (chiptype == CHIP_TYPE_M68K) {   // ignore for M68K
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-            printf("Setting memory size to %ikB ignored for M68K.\n", size);
+            sim_printf("Setting memory size to %ikB ignored for M68K.\n", size);
         return SCPE_OK;
     }
     maxsize = (((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80)) &&
@@ -7177,7 +7177,7 @@ static t_stat sim_load_m68k(FILE *fileref, char *cptr, char *fnam, int flag) {
             if (putc(m68k_cpu_read_byte(j), fileref) == EOF)
                 return SCPE_IOERR;
         }
-        printf("%d byte%s dumped [%x - %x] to %s.\n", PLURAL(hi + 1 - lo), lo, hi, fnam);
+        sim_printf("%d byte%s dumped [%x - %x] to %s.\n", PLURAL(hi + 1 - lo), lo, hi, fnam);
     } else {
         if (*cptr == 0)
             addr = m68k_registers[M68K_REG_PC];
@@ -7192,7 +7192,7 @@ static t_stat sim_load_m68k(FILE *fileref, char *cptr, char *fnam, int flag) {
             m68k_cpu_write_byte(addr++, i);
             cnt++;
         }
-        printf("%d byte%s [%d page%s] loaded at %x.\n",
+        sim_printf("%d byte%s [%d page%s] loaded at %x.\n",
                PLURAL(cnt), PLURAL((cnt + 0xff) >> 8), org);
     }
     return SCPE_OK;
@@ -7215,7 +7215,7 @@ t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
             if (putc(GetBYTEExtended(j), fileref) == EOF)
                 return SCPE_IOERR;
         }
-        printf("%d byte%s dumped [%x - %x] to %s.\n", PLURAL(hi + 1 - lo), lo, hi, fnam);
+        sim_printf("%d byte%s dumped [%x - %x] to %s.\n", PLURAL(hi + 1 - lo), lo, hi, fnam);
     }
     else {
         if (*cptr == 0)
@@ -7257,10 +7257,10 @@ t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
             addr++;
             cnt++;
         } /* end while */
-        printf("%d byte%s [%d page%s] loaded at %x%s.\n", PLURAL(cnt),
+        sim_printf("%d byte%s [%d page%s] loaded at %x%s.\n", PLURAL(cnt),
             PLURAL((cnt + 0xff) >> 8), org, makeROM ? " [ROM]" : "");
         if (pagesModified)
-            printf("Warning: %d page%s modified.\n", PLURAL(pagesModified));
+            sim_printf("Warning: %d page%s modified.\n", PLURAL(pagesModified));
     }
     return SCPE_OK;
 }
@@ -7271,7 +7271,7 @@ void cpu_raise_interrupt(uint32 irq) {
     if (chiptype == CHIP_TYPE_8086) {
         cpu8086_intr(irq);
     } else if (cpu_unit.flags & UNIT_CPU_VERBOSE) {
-        printf("Interrupts not fully supported for chiptype: %s\n",
+        sim_printf("Interrupts not fully supported for chiptype: %s\n",
                (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
     }
 }

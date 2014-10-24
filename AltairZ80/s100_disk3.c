@@ -279,7 +279,7 @@ static t_stat disk3_reset(DEVICE *dptr)
     } else {
         /* Connect DISK3 at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &disk3dev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }
@@ -335,23 +335,23 @@ static t_stat disk3_attach(UNIT *uptr, char *cptr)
     }
 
     if (uptr->flags & UNIT_DISK3_VERBOSE)
-        printf("DISK3%d, attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("DISK3%d, attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
 
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if(uptr->capac < 318000) {
-            printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
+            sim_printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
             disk3_detach(uptr);
             return SCPE_OPENERR;
         }
 
         if (uptr->flags & UNIT_DISK3_VERBOSE)
-            printf("--------------------------------------------------------\n");
+            sim_printf("--------------------------------------------------------\n");
         disk3_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_DISK3_VERBOSE),
                                               &disk3_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_DISK3_VERBOSE)
-            printf("\n");
+            sim_printf("\n");
     } else {
         disk3_info->drive[i].imd = NULL;
     }
@@ -378,7 +378,7 @@ static t_stat disk3_detach(UNIT *uptr)
     pDrive->ready = 0;
 
     if (uptr->flags & UNIT_DISK3_VERBOSE)
-        printf("Detach DISK3%d\n", i);
+        sim_printf("Detach DISK3%d\n", i);
 
     r = detach_unit(uptr);  /* detach unit */
     if ( r != SCPE_OK)

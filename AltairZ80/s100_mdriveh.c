@@ -48,7 +48,7 @@
 #endif
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -154,7 +154,7 @@ static t_stat mdriveh_reset(DEVICE *dptr)
     } else {
         /* Connect MDRIVEH at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &mdrivehdev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }
@@ -163,21 +163,21 @@ static t_stat mdriveh_reset(DEVICE *dptr)
         mdriveh_info->uptr[i] = dptr->units[i];
         if((dptr->flags & DEV_DIS) || (dptr->units[i].flags & UNIT_DIS)) {
             if (dptr->units[i].flags & UNIT_MDRIVEH_VERBOSE)
-                printf("MDRIVEH: Unit %d disabled", i);
+                sim_printf("MDRIVEH: Unit %d disabled", i);
             if(mdriveh_info->storage[i] != NULL) {
                 if (dptr->units[i].flags & UNIT_MDRIVEH_VERBOSE)
-                    printf(", freed 0x%p\n", mdriveh_info->storage[i]);
+                    sim_printf(", freed 0x%p\n", mdriveh_info->storage[i]);
                 free(mdriveh_info->storage[i]);
                 mdriveh_info->storage[i] = NULL;
             } else if (dptr->units[i].flags & UNIT_MDRIVEH_VERBOSE) {
-                printf(".\n");
+                sim_printf(".\n");
             }
         } else {
             if(mdriveh_info->storage[i] == NULL) {
                 mdriveh_info->storage[i] = calloc(1, 524288);
             }
             if (dptr->units[i].flags & UNIT_MDRIVEH_VERBOSE)
-                printf("MDRIVEH: Unit %d enabled, 512K at 0x%p\n", i, mdriveh_info->storage[i]);
+                sim_printf("MDRIVEH: Unit %d enabled, 512K at 0x%p\n", i, mdriveh_info->storage[i]);
         }
     }
 

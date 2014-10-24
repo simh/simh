@@ -53,7 +53,7 @@
 #include "i8272.h"
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -725,13 +725,13 @@ static t_stat disk1a_reset(DEVICE *dptr)
         /* Connect DISK1A ROM at base address */
         if (disk1a_hasProperty(UNIT_DISK1A_ROM))
             if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &disk1arom, FALSE) != 0) {
-                printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
+                sim_printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
                 return SCPE_ARG;
             }
 
         /* Connect DISK1A at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &disk1adev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }

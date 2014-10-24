@@ -372,7 +372,7 @@ static t_stat hdsk_reset(DEVICE *dptr)  {
     } else {
         /* Connect HDSK at base address */
         if (sim_map_resource(pnp -> io_base, pnp -> io_size, RESOURCE_TYPE_IO, &hdsk_io, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp -> mem_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp -> mem_base);
             dptr -> flags |= DEV_DIS;
             return SCPE_ARG;
         }
@@ -402,23 +402,23 @@ static void assignFormat(UNIT *uptr) {
 static void verifyDiskInfo(const DISK_INFO *info, const char unitChar) {
     uint32 track, head;
     if (info->ntracks < 1)
-        printf("HDSK%c (IMD): WARNING: Number of tracks is 0.\n", unitChar);
+        sim_printf("HDSK%c (IMD): WARNING: Number of tracks is 0.\n", unitChar);
     if (info->nsides < 1) {
-        printf("HDSK%c (IMD): WARNING: Number of sides is 0.\n", unitChar);
+        sim_printf("HDSK%c (IMD): WARNING: Number of sides is 0.\n", unitChar);
         return;
     }
     for (track = 0; track < info->ntracks / info->nsides; track++)
         for (head = 0; head < info->nsides; head++) {
             if (info->track[track][head].nsects != info->track[1][0].nsects)
-                printf("HDSK%c (IMD): WARNING: For track %i and head %i expected number of sectors "
+                sim_printf("HDSK%c (IMD): WARNING: For track %i and head %i expected number of sectors "
                        "%i but got %i.\n", unitChar, track, head,
                        info->track[1][0].nsects, info->track[track][head].nsects);
             if (info->track[track][head].sectsize != info->track[1][0].sectsize)
-                printf("HDSK%c (IMD): WARNING: For track %i and head %i expected sector size "
+                sim_printf("HDSK%c (IMD): WARNING: For track %i and head %i expected sector size "
                        "%i but got %i.\n", unitChar, track, head,
                        info->track[1][0].sectsize, info->track[track][head].sectsize);
             if (info->track[track][head].start_sector != info->track[1][0].start_sector)
-                printf("HDSK%c (IMD): WARNING: For track %i and head %i expected start sector "
+                sim_printf("HDSK%c (IMD): WARNING: For track %i and head %i expected start sector "
                        "%i but got %i.\n", unitChar, track, head,
                        info->track[1][0].start_sector, info->track[track][head].start_sector);
         }
@@ -440,7 +440,7 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
     if (is_imd(uptr)) {
         if ((sim_fsize(uptr -> fileref) == 0) &&
             (diskCreate(uptr -> fileref, "$Id: SIMH hdsk.c $") != SCPE_OK)) {
-            printf("HDSK%c (IMD): Failed to create IMD disk.\n", unitChar);
+            sim_printf("HDSK%c (IMD): Failed to create IMD disk.\n", unitChar);
             detach_unit(uptr);
             return SCPE_OPENERR;
         }
@@ -459,10 +459,10 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
         assignFormat(uptr);
         if (uptr -> HDSK_FORMAT_TYPE == -1) {           /* Case 1: no disk parameter block found*/
             uptr -> HDSK_FORMAT_TYPE = 0;
-            printf("HDSK%c (IMD): WARNING: Unsupported disk capacity, assuming HDSK type "
+            sim_printf("HDSK%c (IMD): WARNING: Unsupported disk capacity, assuming HDSK type "
                    "with capacity %iKB.\n", unitChar, uptr -> capac / 1000);
             uptr -> flags |= UNIT_HDSK_WLK;
-            printf("HDSK%c (IMD): WARNING: Forcing WRTLCK.\n", unitChar);
+            sim_printf("HDSK%c (IMD): WARNING: Forcing WRTLCK.\n", unitChar);
         }
         return SCPE_OK;
     }
@@ -483,14 +483,14 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
     /* Step 3: Set number of sectors per track and sector size                                      */
     if (uptr -> HDSK_FORMAT_TYPE == -1) {                 /* Case 1: no disk parameter block found  */
         uptr -> HDSK_FORMAT_TYPE = 0;
-        printf("HDSK%c: WARNING: Unsupported disk capacity, assuming HDSK type with capacity %iKB.\n",
+        sim_printf("HDSK%c: WARNING: Unsupported disk capacity, assuming HDSK type with capacity %iKB.\n",
                unitChar, uptr -> capac / 1000);
         uptr -> flags |= UNIT_HDSK_WLK;
-        printf("HDSK%c: WARNING: Forcing WRTLCK.\n", unitChar);
+        sim_printf("HDSK%c: WARNING: Forcing WRTLCK.\n", unitChar);
         /* check whether capacity corresponds to setting of tracks, sectors per track and sector size   */
         if (uptr -> capac != (uint32)(uptr -> HDSK_NUMBER_OF_TRACKS *
                                       uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE)) {
-            printf("HDSK%c: WARNING: Fixing geometry.\n", unitChar);
+            sim_printf("HDSK%c: WARNING: Fixing geometry.\n", unitChar);
             if (uptr -> HDSK_SECTORS_PER_TRACK == 0)
                 uptr -> HDSK_SECTORS_PER_TRACK = 32;
             if (uptr -> HDSK_SECTOR_SIZE == 0)
@@ -545,7 +545,7 @@ static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
     if (uptr == NULL)
         return SCPE_IERR;
     if (((uptr -> flags) & UNIT_ATT) == 0) {
-        printf("Cannot set geometry for not attached unit %i.\n", find_unit_index(uptr));
+        sim_printf("Cannot set geometry for not attached unit %i.\n", find_unit_index(uptr));
         return SCPE_ARG;
     }
     result = sscanf(cptr, "%d/%d/%d%n", &numberOfTracks, &numberOfSectors, &sectorSize, &n);
@@ -584,7 +584,7 @@ static t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc) {
     if (sscanf(cptr, "%" QUOTE2(DPB_NAME_LENGTH) "s", fmtname) == 0)
         return SCPE_ARG;
     if (((uptr -> flags) & UNIT_ATT) == 0) {
-        printf("Cannot set format for not attached unit %i.\n", find_unit_index(uptr));
+        sim_printf("Cannot set format for not attached unit %i.\n", find_unit_index(uptr));
         return SCPE_ARG;
     }
     for (i = 0; dpb[i].capac != 0; i++) {
@@ -653,7 +653,7 @@ static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
     if (chiptype == CHIP_TYPE_M68K)
         return m68k_hdsk_boot(unitno, dptr, VERBOSE_MSG, HDSK_NUMBER);
     if (MEMORYSIZE < 24 * KB) {
-        printf("Need at least 24KB RAM to boot from hard disk.\n");
+        sim_printf("Need at least 24KB RAM to boot from hard disk.\n");
         return SCPE_ARG;
     }
     if (cpu_unit.flags & (UNIT_CPU_ALTAIRROM | UNIT_CPU_BANKED)) {
@@ -661,7 +661,7 @@ static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
         if (bootrom_dsk[UNIT_NO_OFFSET_1 - 1] == LDA_INSTRUCTION)
             bootrom_dsk[UNIT_NO_OFFSET_1] = (unitno + NUM_OF_DSK) & 0xff;   /* LD A,<unitno> */
         else { /* Attempt to modify non LD A,<> instructions is refused. */
-            printf("Incorrect boot ROM offset detected.\n");
+            sim_printf("Incorrect boot ROM offset detected.\n");
             return SCPE_IERR;
         }
         install_ALTAIRbootROM();                                            /* install modified ROM */
