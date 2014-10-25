@@ -100,6 +100,7 @@ t_stat _sim_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat sim_cancel (UNIT *uptr);
 t_bool sim_is_active (UNIT *uptr);
 int32 sim_activate_time (UNIT *uptr);
+t_stat sim_run_boot_prep (void);
 double sim_gtime (void);
 uint32 sim_grtime (void);
 int32 sim_qcount (void);

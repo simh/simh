@@ -430,7 +430,6 @@ t_stat detach_all (int32 start_device, t_bool shutdown);
 t_stat assign_device (DEVICE *dptr, char *cptr);
 t_stat deassign_device (DEVICE *dptr);
 t_stat ssh_break_one (FILE *st, int32 flg, t_addr lo, int32 cnt, char *aptr);
-t_stat run_boot_prep (void);
 t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     REG *lowr, REG *highr, uint32 lows, uint32 highs);
 t_stat ex_reg (FILE *ofile, t_value val, int32 flag, REG *rptr, uint32 idx);
@@ -5706,6 +5705,9 @@ return r;
    co[nt]               start simulation
    s[tep] [step limit]  start simulation for 'limit' instructions
    b[oot] device        bootstrap from device and start simulation
+
+   switches:
+    -Q                  quiet return status
 */
 
 t_stat run_cmd (int32 flag, char *cptr)
@@ -5735,7 +5737,7 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
         put_rval (sim_PC, 0, pcv);
         }
     if ((flag == RU_RUN) &&                             /* run? */
-        ((r = run_boot_prep ()) != SCPE_OK))            /* reset sim */
+        ((r = sim_run_boot_prep ()) != SCPE_OK))        /* reset sim */
         return r;
     }
 
@@ -5797,7 +5799,7 @@ else if (flag == RU_BOOT) {                             /* boot */
         !(uptr->flags & UNIT_ATT))
         return SCPE_UNATT;
     unitno = (int32) (uptr - dptr->units);              /* recover unit# */
-    if ((r = run_boot_prep ()) != SCPE_OK)              /* reset sim */
+    if ((r = sim_run_boot_prep ()) != SCPE_OK)          /* reset sim */
         return r;
     if ((r = dptr->boot (unitno, dptr)) != SCPE_OK)     /* boot device */
         return r;
@@ -5805,6 +5807,9 @@ else if (flag == RU_BOOT) {                             /* boot */
 
 else if (flag != RU_CONT)                               /* must be cont */
     return SCPE_IERR;
+
+if (sim_switches & SIM_SW_HIDE)                         /* Setup only for Remote Console Mode */
+    return SCPE_OK;
 
 for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
     for (j = 0; j < dptr->numunits; j++) {              /* seq devices */
@@ -5944,7 +5949,7 @@ if (sim_deb)                                        /* log if enabled */
 
 /* Common setup for RUN or BOOT */
 
-t_stat run_boot_prep (void)
+t_stat sim_run_boot_prep (void)
 {
 UNIT *uptr;
 
@@ -8561,8 +8566,7 @@ if ((*cptr != '"') && (*cptr != '\'')) {
     return SCPE_ARG|SCPE_NOMESSAGE;
     }
 cptr = get_glyph_quoted (cptr, gbuf, 0);
-if (*cptr != '\0')
-    return SCPE_2MARG;                  /* No more arguments */
+
 return sim_exp_set (exp, gbuf, cnt, (after ? after : exp->after), sim_switches, cptr);
 }
 
@@ -8581,7 +8585,7 @@ if ((*cptr != '"') && (*cptr != '\'')) {
 cptr = get_glyph_quoted (cptr, gbuf, 0);
 if (*cptr != '\0')
     return SCPE_2MARG;                              /* No more arguments */
-return sim_exp_clr (exp, cptr);                     /* clear one rule */
+return sim_exp_clr (exp, gbuf);                     /* clear one rule */
 }
 
 /* Search for an expect rule in an expect context */
@@ -8754,7 +8758,7 @@ if ((act != NULL) && (*act != 0)) {                     /* new action? */
 for (i=0; i<exp->size; i++) {
     uint32 compare_size = (exp->rules[i].switches & EXP_TYP_REGEX) ? MAX(10 * strlen(ep->match_pattern), 1024) : exp->rules[i].size;
     if (compare_size > exp->buf_size) {
-        exp->buf = (uint8 *)realloc (exp->buf, compare_size*sizeof(*exp->buf));
+        exp->buf = (uint8 *)realloc (exp->buf, compare_size+1); /* Extra byte to null terminate regex compares */
         exp->buf_size = compare_size;
         }
     }
@@ -8836,7 +8840,13 @@ for (i=0; i < exp->size; i++) {
         ++regex_checks;
         matches = calloc ((ep->regex.re_nsub + 1), sizeof(*matches));
         exp->buf[exp->buf_ins] = '\0';
-        if (!regexec (&ep->regex, (char *)exp->buf, ep->regex.re_nsub + 1, matches, REG_NOTBOL|REG_NOTEOL)) {
+        if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
+            char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
+            sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
+            sim_debug (exp->dbit, exp->dptr, "Against Match Rule: %s\n", ep->match_pattern);
+            free (estr);
+            }
+        if (!regexec (&ep->regex, (char *)exp->buf, ep->regex.re_nsub + 1, matches, REG_NOTBOL)) {
             size_t j;
             char *buf = malloc (1 + exp->buf_ins);
 
@@ -8888,9 +8898,12 @@ if (exp->buf_ins == exp->buf_size) {                    /* At end of match buffe
            used when no regular expression rules are in effect */
         memmove (exp->buf, &exp->buf[exp->buf_size/2], exp->buf_size-(exp->buf_size/2));
         exp->buf_ins -= exp->buf_size/2;
+        sim_debug (exp->dbit, exp->dptr, "Buffer Full - sliding the last %d bytes to start of buffer new insert at: %d\n", (exp->buf_size/2), exp->buf_ins);
         }
-    else
+    else {
         exp->buf_ins = 0;                               /* wrap around to beginning */
+        sim_debug (exp->dbit, exp->dptr, "Buffer wrapping\n");
+        }
     }
 if (i != exp->size) {                                   /* Found? */
     sim_debug (exp->dbit, exp->dptr, "Matched expect pattern: %s\n", ep->match_pattern);
