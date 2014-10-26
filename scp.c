@@ -244,9 +244,8 @@
 
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
 
-#define EX_D            0                               /* deposit */
-#define EX_E            1                               /* examine */
-#define EX_I            2                               /* interactive */
+/* search logical and boolean ops */
+
 #define SCH_OR          0                               /* search logicals */
 #define SCH_AND         1
 #define SCH_XOR         2
@@ -258,9 +257,6 @@
 #define SCH_NE          5
 #define SCH_GE          6
 #define SCH_LE          7
-#define SSH_ST          0                               /* set */
-#define SSH_SH          1                               /* show */
-#define SSH_CL          2                               /* clear */
 
 #define MAX_DO_NEST_LVL 20                              /* DO cmd nesting level */
 #define SRBSIZ          1024                            /* save/restore buffer */
@@ -1997,7 +1993,7 @@ return SCPE_OK;
 
 /* Find command routine */
 
-CTAB *find_cmd (char *gbuf)
+CTAB *find_cmd (const char *gbuf)
 {
 CTAB *cmdp = NULL;
 
@@ -3766,7 +3762,7 @@ return SCPE_OK;                                         /* done all */
 
 /* Match CTAB/CTAB1 name */
 
-CTAB *find_ctab (CTAB *tab, char *gbuf)
+CTAB *find_ctab (CTAB *tab, const char *gbuf)
 {
 for (; tab->name != NULL; tab++) {
     if (MATCH_CMD (gbuf, tab->name) == 0)
@@ -3775,7 +3771,7 @@ for (; tab->name != NULL; tab++) {
 return NULL;
 }
 
-C1TAB *find_c1tab (C1TAB *tab, char *gbuf)
+C1TAB *find_c1tab (C1TAB *tab, const char *gbuf)
 {
 for (; tab->name != NULL; tab++) {
     if (MATCH_CMD (gbuf, tab->name) == 0)
@@ -3989,7 +3985,7 @@ while (*cptr != 0) {                                    /* do all mods */
 return SCPE_OK;
 }
 
-SHTAB *find_shtab (SHTAB *tab, char *gbuf)
+SHTAB *find_shtab (SHTAB *tab, const char *gbuf)
 {
 for (; tab->name != NULL; tab++) {
     if (MATCH_CMD (gbuf, tab->name) == 0)
@@ -7207,7 +7203,7 @@ free (string);
         result  =       pointer to device
 */
 
-DEVICE *find_dev (char *cptr)
+DEVICE *find_dev (const char *cptr)
 {
 int32 i;
 DEVICE *dptr;
@@ -7238,10 +7234,11 @@ return NULL;
 
 */
 
-DEVICE *find_unit (char *cptr, UNIT **uptr)
+DEVICE *find_unit (const char *cptr, UNIT **uptr)
 {
 uint32 i, u;
-char *nptr, *tptr;
+char *nptr;
+const char *tptr;
 t_stat r;
 DEVICE *dptr;
 
@@ -7380,9 +7377,9 @@ return srptr;
         *optr   =       pointer to next character in input string
 */
 
-REG *find_reg (char *cptr, char **optr, DEVICE *dptr)
+REG *find_reg (const char *cptr, const char **optr, DEVICE *dptr)
 {
-char *tptr;
+const char *tptr;
 REG *rptr;
 size_t slnt;
 

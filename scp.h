@@ -46,6 +46,18 @@
 #define RU_CONT         4                               /* continue */
 #define RU_BOOT         5                               /* boot */
 
+/* exdep_cmd parameters */
+
+#define EX_D            0                               /* deposit */
+#define EX_E            1                               /* examine */
+#define EX_I            2                               /* interactive */
+
+/* brk_cmd parameters */
+
+#define SSH_ST          0                               /* set */
+#define SSH_SH          1                               /* show */
+#define SSH_CL          2                               /* clear */
+
 /* get_sim_opt parameters */
 
 #define CMD_OPT_SW      001                             /* switches */
@@ -130,16 +142,16 @@ char *read_line (char *cptr, int32 size, FILE *stream);
 void fprint_reg_help (FILE *st, DEVICE *dptr);
 void fprint_set_help (FILE *st, DEVICE *dptr);
 void fprint_show_help (FILE *st, DEVICE *dptr);
-CTAB *find_cmd (char *gbuf);
-DEVICE *find_dev (char *ptr);
-DEVICE *find_unit (char *ptr, UNIT **uptr);
+CTAB *find_cmd (const char *gbuf);
+DEVICE *find_dev (const char *ptr);
+DEVICE *find_unit (const char *ptr, UNIT **uptr);
 DEVICE *find_dev_from_unit (UNIT *uptr);
 t_stat sim_register_internal_device (DEVICE *dptr);
 void sim_sub_args (char *in_str, size_t in_str_size, char *do_arg[]);
-REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
-CTAB *find_ctab (CTAB *tab, char *gbuf);
-C1TAB *find_c1tab (C1TAB *tab, char *gbuf);
-SHTAB *find_shtab (SHTAB *tab, char *gbuf);
+REG *find_reg (const char *ptr, const char **optr, DEVICE *dptr);
+CTAB *find_ctab (CTAB *tab, const char *gbuf);
+C1TAB *find_c1tab (C1TAB *tab, const char *gbuf);
+SHTAB *find_shtab (SHTAB *tab, const char *gbuf);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 BRKTAB *sim_brk_fnd (t_addr loc);
 uint32 sim_brk_test (t_addr bloc, uint32 btyp);

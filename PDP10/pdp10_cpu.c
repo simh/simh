@@ -2464,7 +2464,6 @@ return SCPE_OK;
 
 void set_ac_display (d10 *acbase)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 int i;
 

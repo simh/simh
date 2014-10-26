@@ -2331,7 +2331,6 @@ return SCPE_OK;
 
 void set_r_display (uint32 *rbase)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 int32 i;
 

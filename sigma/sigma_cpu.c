@@ -2661,7 +2661,6 @@ return SCPE_OK;
 
 void set_rf_display (uint32 *rfbase)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 uint32 i;
 
