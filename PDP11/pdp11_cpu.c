@@ -731,6 +731,14 @@ while (reason == 0)  {
 
     AIO_CHECK_EVENT;
     if (sim_interval <= 0) {                            /* intv cnt expired? */
+        /* Make sure all intermediate state is visible in simh registers */
+        PSW = get_PSW ();
+        for (i = 0; i < 6; i++)
+            REGFILE[i][rs] = R[i];
+        STACKFILE[cm] = SP;
+        saved_PC = PC & 0177777;
+        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
+        set_r_display (rs, cm);
         reason = sim_process_event ();                  /* process events */
         trap_req = calc_ints (ipl, trap_req);           /* recalc int req */
         continue;
@@ -3133,7 +3141,6 @@ return iopageW ((int32) val, addr, WRITEC);
 
 void set_r_display (int32 rs, int32 cm)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 int32 i;
 

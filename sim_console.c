@@ -148,6 +148,7 @@ static t_bool sim_os_ttisatty (void);
 static t_stat sim_set_rem_telnet (int32 flag, char *cptr);
 static t_stat sim_set_rem_connections (int32 flag, char *cptr);
 static t_stat sim_set_rem_timeout (int32 flag, char *cptr);
+static t_stat sim_set_rem_master (int32 flag, char *cptr);
 
 /* Deprecated CONSOLE HALT, CONSOLE RESPONSE and CONSOLE DELAY support */
 static t_stat sim_set_halt (int32 flag, char *cptr);
@@ -259,6 +260,8 @@ static CTAB set_rem_con_tab[] = {
     { "TELNET", &sim_set_rem_telnet, 1 },
     { "NOTELNET", &sim_set_rem_telnet, 0 },
     { "TIMEOUT", &sim_set_rem_timeout, 0 },
+    { "MASTER", &sim_set_rem_master, 1 },
+    { "NOMASTER", &sim_set_rem_master, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -385,9 +388,14 @@ static char **sim_rem_buf = NULL;
 static t_bool *sim_rem_single_mode = NULL;  /* per line command mode (single command or must continue) */
 static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* remote console line mux */
 static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
+static uint32 *sim_rem_read_timeouts = NULL;/* per line read timeout (default from sim_rem_read_timeout) */
+static int32 sim_rem_active_number = -1;    /* -1 - not active, >= 0 is index of active console */
 static int32 sim_rem_step_line = -1;        /* step in progress on line # */
 static t_bool sim_log_temp = FALSE;         /* temporary log file active */
 static char sim_rem_con_temp_name[PATH_MAX+1];
+static int32 sim_rem_master_mode = 0;       /* Master Mode Enabled Flag */
+static t_offset sim_rem_cmd_log_start = 0;  /* Log File saved position */
+
 
 /* SET REMOTE CONSOLE command */
 
@@ -423,6 +431,11 @@ TMLN *lp;
 
 if (*cptr != 0)
     return SCPE_NOPARAM;
+if (sim_rem_active_number >= 0)
+    if (sim_rem_master_mode && (sim_rem_active_number == 0))
+        fprintf (st, "Running from Master Mode Remote Console Connection\n");
+    else
+        fprintf (st, "Running from Remote Console Connection %d\n", sim_rem_active_number);
 if (sim_rem_con_tmxr.lines > 1)
     fprintf (st, "Remote Console Input Connections from %d sources are supported concurrently\n", sim_rem_con_tmxr.lines);
 if (sim_rem_read_timeout)
@@ -439,6 +452,11 @@ for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
     if (connections == 1)
         fprintf (st, "Remote Console Connections:\n");
     tmxr_fconns (st, lp, i);
+    if (sim_rem_read_timeouts[i] != sim_rem_read_timeout)
+        if (sim_rem_read_timeouts[i])
+            fprintf (st, "Remote Console Input on connection %d automatically continues after %d seconds\n", i, sim_rem_read_timeouts[i]);
+        else
+            fprintf (st, "Remote Console Input on connection %d does not continue automatically\n", i);
     }
 return SCPE_OK;
 }
@@ -457,7 +475,8 @@ if (c >= 0) {                                           /* poll connect */
     sim_activate_after(uptr+1, 1000000);                /* start data poll after 1 second */
     lp->rcve = 1;                                       /* rcv enabled */
     sim_rem_buf_ptr[c] = 0;                             /* start with empty command buffer */
-    sim_rem_single_mode[c] = FALSE;                     /* in single command mode */
+    sim_rem_single_mode[c] = TRUE;                      /* start in single command mode */
+    sim_rem_read_timeouts[c] = sim_rem_read_timeout;    /* Start with default timeout */
     if (isprint(sim_int_char&0xFF))
         sprintf(wru_name, "'%c'", sim_int_char&0xFF);
     else
@@ -467,7 +486,11 @@ if (c >= 0) {                                           /* poll connect */
             sprintf(wru_name, "'\\%03o'", sim_int_char&0xFF);
     tmxr_linemsgf (lp, "%s Remote Console\r\n"
                        "Enter single commands or to enter multiple command mode enter the %s character\r\n"
-                       "Simulator Running...", sim_name, wru_name);
+                       "%s",
+                       sim_name, wru_name, 
+                       ((sim_rem_master_mode && (c == 0)) ? "Master Mode Session\r\n" : "Simulator Running..."));
+    if (sim_rem_master_mode && (c == 0))                /* Master Mode session? */
+        sim_rem_single_mode[c] = FALSE;                 /*  start in multi-command mode */
     tmxr_send_buffered_data (lp);                       /* flush buffered data */
     }
 sim_activate_after(uptr, 1000000);                      /* check again in 1 second */
@@ -486,11 +509,13 @@ static t_stat x_step_cmd (int32 flag, char *cptr)
 return SCPE_IERR;           /* This routine should never be called */
 }
 
+static t_stat x_run_cmd (int32 flag, char *cptr)
+{
+return SCPE_IERR;           /* This routine should never be called */
+}
+
 static t_stat x_help_cmd (int32 flag, char *cptr);
 
-#define EX_D            0                               /* deposit */
-#define EX_E            1                               /* examine */
-#define EX_I            2                               /* interactive */
 static CTAB allowed_remote_cmds[] = {
     { "EXAMINE",  &exdep_cmd,      EX_E },
     { "IEXAMINE", &exdep_cmd, EX_E+EX_I },
@@ -510,6 +535,35 @@ static CTAB allowed_remote_cmds[] = {
     { "SET",      &set_cmd,           0 },
     { "SHOW",     &show_cmd,          0 },
     { "HELP",     &x_help_cmd,        0 },
+    { NULL,       NULL }
+    };
+
+static CTAB allowed_master_remote_cmds[] = {
+    { "EXAMINE",  &exdep_cmd,      EX_E },
+    { "IEXAMINE", &exdep_cmd, EX_E+EX_I },
+    { "DEPOSIT",  &exdep_cmd,      EX_D },
+    { "EVALUATE", &eval_cmd,          0 },
+    { "ATTACH",   &attach_cmd,        0 },
+    { "DETACH",   &detach_cmd,        0 },
+    { "ASSIGN",   &assign_cmd,        0 },
+    { "DEASSIGN", &deassign_cmd,      0 },
+    { "CONTINUE", &x_continue_cmd,    0 },
+    { "STEP",     &x_step_cmd,        0 },
+    { "PWD",      &pwd_cmd,           0 },
+    { "SAVE",     &save_cmd,          0 },
+    { "CD",       &set_default_cmd,   0 },
+    { "DIR",      &dir_cmd,           0 },
+    { "LS",       &dir_cmd,           0 },
+    { "ECHO",     &echo_cmd,          0 },
+    { "SET",      &set_cmd,           0 },
+    { "SHOW",     &show_cmd,          0 },
+    { "HELP",     &x_help_cmd,        0 },
+    { "EXIT",     &exit_cmd,          0 },
+    { "RUN",      &x_run_cmd,    RU_RUN },
+    { "GO",       &x_run_cmd,     RU_GO },
+    { "BOOT",     &x_run_cmd,   RU_BOOT },
+    { "BREAK",    &brk_cmd,      SSH_ST },
+    { "NOBREAK",  &brk_cmd,      SSH_CL },
     { NULL,       NULL }
     };
 
@@ -548,22 +602,59 @@ sim_printf ("Enter \"HELP cmd\" for detailed help on a command\r\n");
 return SCPE_OK;
 }
 
+static t_stat _sim_rem_message (const char *cmd, t_stat stat)
+{
+CTAB *cmdp = NULL;
+t_stat stat_nomessage = stat & SCPE_NOMESSAGE;  /* extract possible message supression flag */
+
+cmdp = find_cmd (cmd);
+stat = SCPE_BARE_STATUS(stat);              /* remove possible flag */
+if (cmdp && (cmdp->message))                /* special message handler? */
+    cmdp->message (NULL, stat);             /* let it deal with display */
+else
+    if (stat >= SCPE_BASE)                  /* error? */
+        sim_printf ("%s\r\n", sim_error_text (stat));
+return stat;
+}
+
+static void _sim_rem_log_out (TMLN *lp)
+{
+char cbuf[4*CBUFSIZE];
+
+if (sim_log) {
+    fflush (sim_log);
+    sim_fseeko (sim_log, sim_rem_cmd_log_start, SEEK_SET);
+    cbuf[sizeof(cbuf)-1] = '\0';
+    while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
+        int32 unwritten;
+
+        tmxr_linemsgf (lp, "%s", cbuf);
+        do {
+            unwritten = tmxr_send_buffered_data (lp);
+            if (unwritten == lp->txbsz)
+                sim_os_ms_sleep (100);
+            } while (unwritten == lp->txbsz);
+        }
+    }
+}
+
 /* Unit service for remote console data polling */
 
 t_stat sim_rem_con_data_svc (UNIT *uptr)
 {
 int32 i, j, c = 0;
-t_stat stat, stat_nomessage;
+t_stat stat = SCPE_OK;
 t_bool stepping = FALSE;
 int32 steps = 1;
 t_bool was_stepping = (sim_rem_step_line != -1);
+#define master_session (sim_rem_master_mode && (i == 0))
 t_bool got_command;
 t_bool close_session = FALSE;
 TMLN *lp;
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *argv[1] = {NULL};
 CTAB *cmdp = NULL;
+CTAB *basecmdp = NULL;
 uint32 read_start_time = 0;
-t_offset cmd_log_start;
 
 tmxr_poll_rx (&sim_rem_con_tmxr);                      /* poll input */
 for (i=(was_stepping ? sim_rem_step_line : 0); 
@@ -572,49 +663,53 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
     lp = &sim_rem_con_tmxr.ldsc[i];
     if (!lp->conn)
         continue;
-    if (was_stepping) {
-        sim_rem_step_line = -1;                     /* Done with step */
-        stat = SCPE_STEP;
-        cmdp = find_cmd ("STEP");
-        stat_nomessage = stat & SCPE_NOMESSAGE;     /* extract possible message supression flag */
-        stat = SCPE_BARE_STATUS(stat);              /* remove possible flag */
-        if (!stat_nomessage) {                      /* displaying message status? */
-            fflush (sim_log);
-            cmd_log_start = sim_ftell (sim_log);
-            if (cmdp && (cmdp->message))            /* special message handler? */
-                cmdp->message (NULL, stat);         /* let it deal with display */
-            else
-                if (stat >= SCPE_BASE)              /* error? */
-                    sim_printf ("%s\r\n", sim_error_text (stat));
-            fflush (sim_log);
-            sim_fseeko (sim_log, cmd_log_start, SEEK_SET);
-            cbuf[sizeof(cbuf)-1] = '\0';
-            while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
-                tmxr_linemsgf (lp, "%s", cbuf);
-                tmxr_send_buffered_data (lp);
-                }
+    if ((was_stepping) ||
+        (master_session && !sim_rem_single_mode[i])) {
+        if (was_stepping) {
+            sim_rem_step_line = -1;                     /* Done with step */
+            stat = SCPE_STEP;
+            _sim_rem_message ("STEP", stat);
             }
+        else {
+            sim_is_running = 0;
+            sim_stop_timer_services ();
+            for (j=0; j < sim_rem_con_tmxr.lines; j++) {
+                TMLN *lpj = &sim_rem_con_tmxr.ldsc[j];
+                if ((i == j) || (!lpj->conn))
+                    continue;
+                tmxr_linemsgf (lpj, "\nRemote Master Console(%s) Entering Commands\n", lp->ipad);
+                tmxr_send_buffered_data (lpj);              /* flush any buffered data */
+                }
+            lp = &sim_rem_con_tmxr.ldsc[i];
+            }
+        _sim_rem_log_out (lp);
         }
     else {
         c = tmxr_getc_ln (lp);
         if (!(TMXR_VALID & c))
             continue;
         c = c & ~TMXR_VALID;
-        if (!sim_rem_single_mode[i]) {
+        if (sim_rem_single_mode[i]) {
             if (c == sim_int_char) {                /* ^E (the interrupt character) must start continue mode console interaction */
+                sim_rem_single_mode[i] = FALSE;     /* enter multi command mode */
                 sim_is_running = 0;
                 sim_stop_timer_services ();
+                stat = SCPE_STOP;
+                _sim_rem_message ("RUN", stat);
+                _sim_rem_log_out (lp);
                 for (j=0; j < sim_rem_con_tmxr.lines; j++) {
-                    lp = &sim_rem_con_tmxr.ldsc[j];
-                    if ((i == j) || (!lp->conn))
+                    TMLN *lpj = &sim_rem_con_tmxr.ldsc[j];
+                    if ((i == j) || (!lpj->conn))
                         continue;
-                    tmxr_linemsgf (lp, "\nRemote Console(%s) Entering Commands\n", lp->ipad);
-                    tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                    tmxr_linemsgf (lpj, "\nRemote Console %d(%s) Entering Commands\n", i, lp->ipad);
+                    tmxr_send_buffered_data (lpj);           /* flush any buffered data */
                     }
                 lp = &sim_rem_con_tmxr.ldsc[i];
                 tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
-                if (sim_rem_read_timeout)
-                    tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeout);
+                if (sim_rem_read_timeouts[i])
+                    tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeouts[i]);
+                    tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
+                    tmxr_send_buffered_data (lp);           /* flush any buffered data */
                 }
             else {
                 if ((c == '\n') ||  /* Ignore bare LF between commands (Microsoft Telnet bug) */
@@ -626,14 +721,18 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     tmxr_reset_ln (lp);
                     continue;
                     }
-                sim_rem_single_mode[i] = TRUE;
-                tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
-                tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                if (sim_rem_buf_ptr[i] == 0) {
+                    /* we just picked up the first character on a command line */
+                    tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
+                    tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                    }
                 }
             }
         }
     got_command = FALSE;
     while (1) {
+        if (stat == SCPE_EXIT)
+            return stat|SCPE_NOMESSAGE;
         if (!sim_rem_single_mode[i]) {
             read_start_time = sim_os_msec();
             tmxr_linemsg (lp, sim_prompt);
@@ -644,8 +743,8 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                 c = tmxr_getc_ln (lp);
                 if (!(TMXR_VALID & c)) {
                     tmxr_send_buffered_data (lp);   /* flush any buffered data */
-                    if (sim_rem_read_timeout &&
-                        ((sim_os_msec() - read_start_time)/1000 >= sim_rem_read_timeout)) {
+                    if (sim_rem_read_timeouts[i] &&
+                        ((sim_os_msec() - read_start_time)/1000 >= sim_rem_read_timeouts[i])) {
                         while (sim_rem_buf_ptr[i] > 0) { /* Erase current input line */
                             tmxr_linemsg (lp, "\b \b");
                             --sim_rem_buf_ptr[i];
@@ -752,6 +851,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         cptr = cbuf;
         cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
         sim_switches = 0;                                   /* init switches */
+        sim_rem_active_number = i;
         if (!sim_log) {                                     /* Not currently logging? */
             int32 save_quiet = sim_quiet;
 
@@ -761,11 +861,12 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             sim_quiet = save_quiet;
             sim_log_temp = TRUE;
             }
-        cmd_log_start = sim_ftell (sim_log);
-        if (!find_cmd (gbuf))                               /* validate command */
+        sim_rem_cmd_log_start = sim_ftell (sim_log);
+        basecmdp = find_cmd (gbuf);                         /* validate basic command */
+        if (basecmdp == NULL)
             stat = SCPE_UNK;
         else {
-            if ((cmdp = find_ctab (sim_rem_single_mode[i] ? allowed_single_remote_cmds : allowed_remote_cmds, gbuf))) {/* lookup command */
+            if ((cmdp = find_ctab (sim_rem_single_mode[i] ? allowed_single_remote_cmds : (master_session ? allowed_master_remote_cmds : allowed_remote_cmds), gbuf))) {/* lookup command */
                 if (cmdp->action == &x_continue_cmd)
                     stat = SCPE_OK;
                 else {
@@ -787,39 +888,33 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                         else
                             cmdp = NULL;
                         }
-                    else
-                        stat = cmdp->action (cmdp->arg, cptr);
+                    else {
+                        if (cmdp->action == &x_run_cmd) {
+                            sim_switches |= SIM_SW_HIDE;            /* Request Setup only */
+                            stat = basecmdp->action (cmdp->arg, cptr);
+                            sim_switches &= ~SIM_SW_HIDE;           /* Done with Setup only mode */
+                            if (stat == SCPE_OK) {
+                                /* switch to CONTINUE after x_run_cmd() did RUN setup */
+                                cmdp = find_ctab (allowed_master_remote_cmds, "CONTINUE");
+                                }
+                            }
+                        else
+                            stat = cmdp->action (cmdp->arg, cptr);
+                        }
                     }
                 }
             else
                 stat = SCPE_INVREM;
             }
-        stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
-        stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
-        if (!stat_nomessage) {                              /* displaying message status? */
-            if (cmdp && (cmdp->message))                    /* special message handler? */
-                cmdp->message (NULL, stat);                 /* let it deal with display */
-            else
-                if (stat >= SCPE_BASE)                      /* error? */
-                    sim_printf ("%s\r\n", sim_error_text (stat));
-            }
-        fflush (sim_log);
-        sim_fseeko (sim_log, cmd_log_start, SEEK_SET);
-        cbuf[sizeof(cbuf)-1] = '\0';
-        while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
-            int32 unwritten;
-
-            tmxr_linemsgf (lp, "%s", cbuf);
-            do {
-                unwritten = tmxr_send_buffered_data (lp);
-                if (unwritten == lp->txbsz)
-                    sim_os_ms_sleep (100);
-                } while (unwritten == lp->txbsz);
-            }
+        sim_rem_active_number = -1;
+        if (stat != SCPE_OK)
+            stat = _sim_rem_message (gbuf, stat);
+        _sim_rem_log_out (lp);
         if ((cmdp && (cmdp->action == &x_continue_cmd)) ||
             (sim_rem_single_mode[i])) {
             sim_rem_step_line = -1;                 /* Not stepping */
-            if (sim_log_temp) {                     /* If we setup a temporary log, clean it now  */
+            if (sim_log_temp &&                     /* If we setup a temporary log, clean it now  */
+                (!sim_rem_master_mode)) {
                 int32 save_quiet = sim_quiet;
 
                 sim_quiet = 1;
@@ -828,20 +923,29 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                 remove (sim_rem_con_temp_name);
                 sim_log_temp = FALSE;
                 }
+            else {
+                fflush (sim_log);
+                sim_rem_cmd_log_start = sim_ftell (sim_log);
+                }
             if (!sim_rem_single_mode[i]) {
                 tmxr_linemsg (lp, "Simulator Running...");
                 tmxr_send_buffered_data (lp);
                 for (j=0; j < sim_rem_con_tmxr.lines; j++) {
-                    lp = &sim_rem_con_tmxr.ldsc[j];
-                    if ((i == j) || (!lp->conn))
+                    TMLN *lpj = &sim_rem_con_tmxr.ldsc[j];
+                    if ((i == j) || (!lpj->conn))
                         continue;
-                    tmxr_linemsg (lp, "Simulator Running...");
-                    tmxr_send_buffered_data (lp);
+                    tmxr_linemsg (lpj, "Simulator Running...");
+                    tmxr_send_buffered_data (lpj);
                     }
                 sim_is_running = 1;
                 sim_start_timer_services ();
                 }
-            sim_rem_single_mode[i] = FALSE;
+            if (cmdp && (cmdp->action == &x_continue_cmd))
+                sim_rem_single_mode[i] = TRUE;
+            else {
+                tmxr_linemsgf (lp, "%s", sim_prompt);
+                tmxr_send_buffered_data (lp);
+                }
             break;
             }
         if (cmdp && (cmdp->action == &x_step_cmd)) {
@@ -899,7 +1003,7 @@ else {
             sim_rem_buf[i] = NULL;
             sim_rem_buf_size[i] = 0;
             sim_rem_buf_ptr[i] = 0;
-            sim_rem_single_mode[i] = FALSE;
+            sim_rem_single_mode[i] = TRUE;
             }
         }
     }
@@ -932,6 +1036,8 @@ sim_rem_buf_ptr = (int32 *)realloc (sim_rem_buf_ptr, sizeof(*sim_rem_buf_ptr)*li
 memset (sim_rem_buf_ptr, 0, sizeof(*sim_rem_buf_ptr)*lines);
 sim_rem_single_mode = (t_bool *)realloc (sim_rem_single_mode, sizeof(*sim_rem_single_mode)*lines);
 memset (sim_rem_single_mode, 0, sizeof(*sim_rem_single_mode)*lines);
+sim_rem_read_timeouts = (t_bool *)realloc (sim_rem_read_timeouts, sizeof(*sim_rem_read_timeouts)*lines);
+memset (sim_rem_read_timeouts, 0, sizeof(*sim_rem_read_timeouts)*lines);
 return SCPE_OK;
 }
 
@@ -945,8 +1051,68 @@ if (cptr == NULL)
 timeout = (int32) get_uint (cptr, 10, 3600, &r);
 if (r != SCPE_OK)
     return r;
-sim_rem_read_timeout = timeout;
+if (sim_rem_active_number >= 0)
+    sim_rem_read_timeouts[sim_rem_active_number] = timeout;
+else
+    sim_rem_read_timeout = timeout;
 return SCPE_OK;
+}
+
+/* Enable or disable Remote Console master mode */
+/* In master mode, ... explain */
+
+static t_stat sim_set_rem_master (int32 flag, char *cptr)
+{
+t_stat stat = SCPE_OK;
+
+if (cptr && *cptr)
+    return SCPE_2MARG;
+
+if (sim_rem_active_number > 0) {
+    sim_printf ("Can't change Remote Console mode from Remote Console\n");
+    return SCPE_INVREM;
+    }
+
+if (sim_rem_con_tmxr.master || (!flag))         /* Remote Console Enabled? */
+    sim_rem_master_mode = flag;
+else {
+    sim_printf ("Can't enable Remote Console Master mode with Remote Console disabled\n");
+    return SCPE_INVREM;
+    }
+
+if (sim_rem_master_mode) {
+    t_stat stat_nomessage;
+
+    if ((!sim_con_ldsc.serport) &&
+        (sim_con_tmxr.master == 0)) {
+        sim_printf ("Console port must be Telnet or Serial with Master Remote Console\r\n");
+        return SCPE_IERR|SCPE_NOMESSAGE;
+        }
+    sim_printf ("Command input now processed on Master Remote Console Session\n");
+    stat = sim_run_boot_prep ();
+    while (sim_rem_master_mode) {
+        sim_rem_single_mode[0] = FALSE;
+        sim_cancel (&sim_rem_con_unit[1]);
+        sim_activate (&sim_rem_con_unit[1], -1);
+        stat = run_cmd (RU_GO, "");
+        stat_nomessage = stat & SCPE_NOMESSAGE;     /* extract possible message supression flag */
+        stat = _sim_rem_message ("RUN", stat);
+        if (stat == SCPE_EXIT)
+            sim_rem_master_mode = FALSE;
+        }
+    if (sim_log_temp) {                                     /* If we setup a temporary log, clean it now  */
+        int32 save_quiet = sim_quiet;
+
+        sim_quiet = 1;
+        sim_set_logoff (0, NULL);
+        sim_quiet = save_quiet;
+        remove (sim_rem_con_temp_name);
+        sim_log_temp = FALSE;
+        }
+    stat |= stat_nomessage;
+    }
+
+return stat;
 }
 
 /* Set keyboard map */
@@ -1471,12 +1637,35 @@ if (!ref)
 return ref->name;
 }
 
-/* Check connection before executing */
+/* Check connection before executing 
+   (including a remote console which may be required in master mode) */
 
 t_stat sim_check_console (int32 sec)
 {
-int32 c, i;
+int32 c, trys = 0;
 
+if (sim_rem_master_mode) {
+    if ((!sim_con_ldsc.serport) &&
+        (sim_con_tmxr.master == 0)) {
+        sim_printf ("Console port must be Telnet or Serial with Master Remote Console\r\n");
+        return SCPE_IERR|SCPE_NOMESSAGE;
+        }
+    for (;trys < sec; ++trys) {
+        sim_rem_con_poll_svc (&sim_rem_con_unit[0]);
+        if (sim_rem_con_tmxr.ldsc[0].conn)
+            break;
+        if ((trys % 10) == 0) {                         /* Status every 10 sec */
+            sim_printf ("Waiting for Remote Console connection\r\n");
+            fflush (stdout);
+            if (sim_log)                                /* log file? */
+                fflush (sim_log);
+            }
+        sim_os_sleep (1);                               /* wait 1 second */
+        }
+    }
+if (trys == sec) {
+    return SCPE_TTMO;                                   /* timed out */
+    }
 if (sim_con_ldsc.serport)
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0) 
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
@@ -1495,10 +1684,10 @@ if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered
         return SCPE_OK;
         }
     }
-for (i = 0; i < sec; i++) {                             /* loop */
+for (; trys < sec; trys++) {                            /* loop */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {          /* poll connect */
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
-        if (i) {                                        /* if delayed */
+        if (trys) {                                     /* if delayed */
             sim_printf ("Running\r\n");                 /* print transition */
             fflush (stdout);
             if (sim_log)                                /* log file? */
@@ -1509,7 +1698,7 @@ for (i = 0; i < sec; i++) {                             /* loop */
     c = sim_os_poll_kbd ();                             /* check for stop char */
     if ((c == SCPE_STOP) || stop_cpu)
         return SCPE_STOP;
-    if ((i % 10) == 0) {                                /* Status every 10 sec */
+    if ((trys % 10) == 0) {                             /* Status every 10 sec */
         sim_printf ("Waiting for console Telnet connection\r\n");
         fflush (stdout);
         if (sim_log)                                    /* log file? */
@@ -1549,18 +1738,20 @@ int32 c;
 
 if (sim_send_poll_data (&sim_con_send, &c))             /* injected input characters available? */
     return c;
-c = sim_os_poll_kbd ();                                 /* get character */
-if ((c == SCPE_STOP) ||                                 /* ^E or not Telnet? */
-    ((sim_con_tmxr.master == 0) &&                      /*       and not serial? */
-     (sim_con_ldsc.serport == 0)))
-    return c;                                           /* in-window */
-if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */
-    if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
-        return SCPE_LOST;                               /* connection lost */
-    if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
-        sim_con_ldsc.rcve = 1;                          /* rcv enabled */
-    else                                                /* fall through to poll reception */
-        return SCPE_OK;                                 /* unconnected and buffered - nothing to receive */
+if (!sim_rem_master_mode) {
+    c = sim_os_poll_kbd ();                                 /* get character */
+    if ((c == SCPE_STOP) ||                                 /* ^E or not Telnet? */
+        ((sim_con_tmxr.master == 0) &&                      /*       and not serial? */
+         (sim_con_ldsc.serport == 0)))
+        return c;                                           /* in-window */
+    if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */
+        if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
+            return SCPE_LOST;                               /* connection lost */
+        if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
+            sim_con_ldsc.rcve = 1;                          /* rcv enabled */
+        else                                                /* fall through to poll reception */
+            return SCPE_OK;                                 /* unconnected and buffered - nothing to receive */
+        }
     }
 tmxr_poll_rx (&sim_con_tmxr);                           /* poll for input */
 if ((c = tmxr_getc_ln (&sim_con_ldsc)))                 /* any char? */ 
@@ -1579,8 +1770,6 @@ if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
         fputc (c, sim_log);
     return sim_os_putchar (c);                          /* in-window version */
     }
-if (sim_log && !sim_con_ldsc.txlog)                     /* log file, but no line log? */
-    fputc (c, sim_log);
 if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
     if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
         return SCPE_LOST;                               /* connection lost */
@@ -1603,8 +1792,6 @@ if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
         fputc (c, sim_log);
     return sim_os_putchar (c);                          /* in-window version */
     }
-if (sim_log && !sim_con_ldsc.txlog)                     /* log file, but no line log? */
-    fputc (c, sim_log);
 if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
     if (!sim_con_ldsc.txbfd)                            /* non-buffered Telnet connection? */
         return SCPE_LOST;                               /* lost */

@@ -716,6 +716,11 @@ pager_tc = FALSE;                                       /* not in trap cycle */
 pflgs = 0;                                              /* not in PXCT */
 xct_cnt = 0;                                            /* count XCT's */
 if (sim_interval <= 0) {                                /* check clock queue */
+    /* make sure all useful state is in simh registers while processing events */
+    saved_PC = pager_PC & AMASK;                        /* failing instr PC */
+    set_ac_display (ac_cur);                            /* set up AC display */
+    pcq_r->qptr = pcq_p;                                /* update pc q ptr */
+
     if ((i = sim_process_event ()))                     /* error?  stop sim */
         ABORT (i);
     if (fe_xct)
