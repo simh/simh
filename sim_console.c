@@ -705,15 +705,18 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     tmxr_send_buffered_data (lpj);           /* flush any buffered data */
                     }
                 lp = &sim_rem_con_tmxr.ldsc[i];
-                tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
-                if (sim_rem_read_timeouts[i])
+                if (!master_session)
+                    tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
+                if (sim_rem_read_timeouts[i]) {
                     tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeouts[i]);
                     tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
                     tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                    }
                 }
             else {
-                if ((c == '\n') ||  /* Ignore bare LF between commands (Microsoft Telnet bug) */
-                    (c == '\r'))    /* Ignore empty commands */
+                if ((sim_rem_buf_ptr[i] == 0) && /* At beginning of input line */
+                    ((c == '\n') ||   /* Ignore bare LF between commands (Microsoft Telnet bug) */
+                     (c == '\r')))    /* Ignore empty commands */
                     continue;
                 if ((c == '\004') || (c == '\032')) { /* EOF character (^D or ^Z) ? */
                     tmxr_linemsgf (lp, "\r\nGoodbye\r\n");
@@ -758,7 +761,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                         got_command = TRUE;
                         break;
                         }
-                    sim_os_ms_sleep (100);
+                    sim_os_ms_sleep (50);
                     tmxr_poll_rx (&sim_rem_con_tmxr);/* poll input */
                     continue;
                     }
@@ -943,8 +946,10 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             if (cmdp && (cmdp->action == &x_continue_cmd))
                 sim_rem_single_mode[i] = TRUE;
             else {
-                tmxr_linemsgf (lp, "%s", sim_prompt);
-                tmxr_send_buffered_data (lp);
+                if (!sim_rem_single_mode[i]) {
+                    tmxr_linemsgf (lp, "%s", sim_prompt);
+                    tmxr_send_buffered_data (lp);
+                    }
                 }
             break;
             }
