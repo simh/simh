@@ -3262,6 +3262,7 @@ if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
     r = tmxr_locate_line_send (gbuf, &snd);
     if (r != SCPE_OK)
         return r;
+    cptr = tptr;
     tptr = get_glyph (tptr, gbuf, ',');
     }
 else
