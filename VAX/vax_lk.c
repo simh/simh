@@ -168,7 +168,7 @@ int32 lk_shptr = 0;                                     /* send buf head ptr */
 int32 lk_stptr = 0;                                     /* send buf tail ptr */
 uint8 lk_rbuf[10];                                      /* receive buffer */
 int32 lk_rbuf_p = 0;                                    /* receive buffer ptr */
-int32 lk_mode[15];                                      /* mode of each key group */
+int32 lk_mode[16];                                      /* mode of each key group */
 
 DEVICE lk_dev;
 t_stat lk_wr (uint8 c);
