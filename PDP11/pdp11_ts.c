@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ts           TS11/TSV05 magtape
 
+   27-Oct-14    RMS     Fixed bug in read forward with byte swap
    23-Oct-13    RMS     Revised for new boot setup routine
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
@@ -584,7 +585,7 @@ msgxs0 = msgxs0 | XS0_MOT;                              /* tape has moved */
 if (cmdhdr & CMD_SWP) {                                 /* swapped? */
     for (i = 0; i < wbc; i++) {                         /* copy buffer */
         wa = tsba ^ 1;                                  /* apply OPP */
-        if (Map_WriteB (tsba, 1, &tsxb[i])) {           /* store byte, nxm? */
+        if (Map_WriteB (wa, 1, &tsxb[i])) {             /* store byte, nxm? */
             tssr = ts_updtssr (tssr | TSSR_NXM);        /* set error */
             return (XTC (XS0_RLS, TC4));
             }
@@ -620,7 +621,7 @@ if (st != MTSE_OK)                                      /* error? */
     return ts_map_status (st);
 if (fc == 0)                                            /* byte count */
     fc = 0200000;
-tsba = (cmdadh << 16) | cmdadl + fc;                    /* buf addr */
+tsba = ((cmdadh << 16) | cmdadl) + fc;                  /* buf addr */
 wbc = (tbc > fc)? fc: tbc;                              /* cap buf size */
 msgxs0 = msgxs0 | XS0_MOT;                              /* tape has moved */
 for (i = wbc; i > 0; i--) {                             /* copy buffer */
