@@ -1211,7 +1211,7 @@ cpu_get_switches(void)
 t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
     uint32 word;
     t_addr j, lo, hi, sz, sz_words;
-    char *result;
+    const char *result;
 
     if (flag) { /* Dump to file. */
         result = get_range(NULL, cptr, &lo, &hi, 8, 0xFFFF, 0);

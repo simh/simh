@@ -345,7 +345,7 @@ static uint8 load_rom[] = {
 t_stat pt_dump (FILE *of, char *cptr, char *fnam)
 {
 uint32 i, lo, hi, cs;
-char *tptr;
+const char *tptr;
 extern DEVICE cpu_dev;
 
 if ((cptr == NULL) || (*cptr == 0))

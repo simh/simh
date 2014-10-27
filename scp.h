@@ -130,12 +130,12 @@ char *get_glyph (const char *iptr, char *optr, char mchar);
 char *get_glyph_nc (const char *iptr, char *optr, char mchar);
 char *get_glyph_quoted (const char *iptr, char *optr, char mchar);
 t_value get_uint (const char *cptr, uint32 radix, t_value max, t_stat *status);
-char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
+const char *get_range (DEVICE *dptr, const char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
 t_stat sim_decode_quoted_string (const char *iptr, uint8 *optr, uint32 *osize);
 char *sim_encode_quoted_string (const uint8 *iptr, uint32 size);
 void fprint_buffer_string (FILE *st, const uint8 *buf, uint32 size);
-t_value strtotv (const char *cptr, char **endptr, uint32 radix);
+t_value strtotv (const char *cptr, const char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 t_stat sim_print_val (t_value val, uint32 radix, uint32 width, uint32 format);
 char *read_line (char *cptr, int32 size, FILE *stream);

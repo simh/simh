@@ -7168,7 +7168,7 @@ static t_stat sim_load_m68k(FILE *fileref, char *cptr, char *fnam, int flag) {
     int32 i;
     t_addr j, lo, hi;
     uint32 addr, org, cnt = 0;
-    char* result;
+    const char* result;
     if (flag ) {
         result = get_range(NULL, cptr, &lo, &hi, 16, M68K_MAX_RAM, 0);
         if (result == NULL)
@@ -7202,7 +7202,7 @@ t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
     int32 i;
     uint32 addr, cnt = 0, org, pagesModified = 0, makeROM = FALSE;
     t_addr j, lo, hi;
-    char *result;
+    const char *result;
     MDEV m;
     char gbuf[CBUFSIZE];
     if (chiptype == CHIP_TYPE_M68K)

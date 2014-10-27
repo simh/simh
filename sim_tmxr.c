@@ -4087,8 +4087,8 @@ tptr = cptr + strlen (cptr);                            /* append a semicolon */
 *tptr++ = ';';                                          /*   to the command string */
 *tptr = '\0';                                           /*   to make parsing easier for get_range */
 
-while (*cptr) {                                                 /* parse command string */
-    cptr = get_range (NULL, cptr, &low, &high, 10, max, ';');   /* get a line range */
+while (*cptr) {                                         /* parse command string */
+    cptr = (char *)get_range (NULL, cptr, &low, &high, 10, max, ';');/* get a line range */
 
     if (cptr == NULL) {                                 /* parsing error? */
         result = SCPE_ARG;                              /* "Invalid argument" error */

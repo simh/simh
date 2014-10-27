@@ -781,7 +781,7 @@ t_value get_opnd (char *cptr, t_stat *status)
 {
 int32 sign = 0;
 t_value val, xr = 0, ind = 0;
-char *tptr;
+const char *tptr;
 
 *status = SCPE_ARG;                                     /* assume fail */
 if (*cptr == '@') {
@@ -799,14 +799,14 @@ if (val > 0777777)
     return 0;
 if (sign)
     val = (~val + 1) & 0777777;
-cptr = tptr;
+cptr = (char *)tptr;
 if (*cptr == '(') {
     cptr++;
     xr = strtotv (cptr, &tptr, 8);
     if ((cptr == tptr) || (*tptr != ')') ||
         (xr > AC_NUM) || (xr == 0))
         return 0;
-    cptr = ++tptr;
+    cptr = (char *)++tptr;
     }
 if (*cptr == 0)
     *status = SCPE_OK;

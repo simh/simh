@@ -406,14 +406,13 @@ char *get_sim_sw (char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_value get_rval (REG *rptr, uint32 idx);
 void put_rval (REG *rptr, uint32 idx, t_value val);
-t_value strtotv (const char *inptr, char **endptr, uint32 radix);
 void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
 void fprint_sep (FILE *st, int32 *tokens);
 char *read_line (char *ptr, int32 size, FILE *stream);
-char *read_line_p (char *prompt, char *ptr, int32 size, FILE *stream);
-REG *find_reg_glob (char *ptr, char **optr, DEVICE **gdptr);
+char *read_line_p (const char *prompt, char *ptr, int32 size, FILE *stream);
+REG *find_reg_glob (const char *ptr, const char **optr, DEVICE **gdptr);
 char *sim_trim_endspc (char *cptr);
 
 /* Forward references */
@@ -2088,7 +2087,7 @@ t_bool found = FALSE;
 t_bool all_unique = TRUE;
 size_t max_namelen = 0;
 DEVICE *tdptr;
-char *tptr;
+const char *tptr;
 char *namebuf;
 char rangebuf[32];
 
@@ -3095,7 +3094,8 @@ return 1;
 */
 t_stat assert_cmd (int32 flag, char *cptr)
 {
-char gbuf[CBUFSIZE], *gptr, *tptr, gbuf2[CBUFSIZE];
+char gbuf[CBUFSIZE], gbuf2[CBUFSIZE];
+const char *tptr, *gptr;
 REG *rptr;
 uint32 idx;
 t_value val;
@@ -3110,7 +3110,7 @@ if (*cptr == 0)                                         /* must be more */
 tptr = get_glyph (cptr, gbuf, 0);                       /* get token */
 if (!strcmp (gbuf, "NOT")) {                            /* Conditional Inversion? */
     not = TRUE;                                         /* remember that, and */
-    cptr = tptr;
+    cptr = (char *)tptr;
     }
 if (*cptr == '"') {                                     /* quoted string comparison? */
     char op[CBUFSIZE];
@@ -4771,7 +4771,8 @@ return ssh_break (NULL, cptr, flg);                     /* call common code */
 
 t_stat ssh_break (FILE *st, char *cptr, int32 flg)
 {
-char gbuf[CBUFSIZE], *tptr, *t1ptr, *aptr;
+char gbuf[CBUFSIZE], *aptr;
+const char *tptr, *t1ptr;
 DEVICE *dptr = sim_dflt_dev;
 UNIT *uptr = dptr->units;
 t_stat r;
@@ -5709,7 +5710,8 @@ return r;
 
 t_stat run_cmd (int32 flag, char *cptr)
 {
-char *tptr, gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE];
+const char *tptr;
 uint32 i, j;
 int32 sim_next;
 int32 unitno;
@@ -5726,7 +5728,7 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
         if (*cptr != 0)                                 /* should be end */
             return SCPE_2MARG;
         if (sim_vm_parse_addr)                          /* address parser? */
-            pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
+            pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, (char **)&tptr);
         else pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
         if ((tptr == gbuf) || (*tptr != 0) ||           /* error? */
             (pcv > width_mask[sim_PC->width]))
@@ -6057,7 +6059,9 @@ return;
 
 t_stat exdep_cmd (int32 flag, char *cptr)
 {
-char gbuf[CBUFSIZE], *gptr, *tptr = NULL;
+char gbuf[CBUFSIZE];
+const char *gptr;
+const char *tptr = NULL;
 int32 opt;
 t_addr low, high;
 t_stat reason;
@@ -6693,7 +6697,7 @@ return read_line_p (NULL, cptr, size, stream);
                         NULL if EOF
 */
 
-char *read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
+char *read_line_p (const char *prompt, char *cptr, int32 size, FILE *stream)
 {
 char *tptr;
 #if defined(HAVE_DLOPEN)
@@ -6896,7 +6900,7 @@ return FALSE;
 t_value get_uint (const char *cptr, uint32 radix, t_value max, t_stat *status)
 {
 t_value val;
-char *tptr;
+const char *tptr;
 
 *status = SCPE_OK;
 val = strtotv (cptr, &tptr, radix);
@@ -6925,10 +6929,10 @@ return val;
                         NULL if error
 */
 
-char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
+const char *get_range (DEVICE *dptr, const char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term)
 {
-char *tptr;
+const char *tptr;
 
 if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) { /* ALL? */
     tptr = cptr + strlen ("ALL");
@@ -6937,14 +6941,14 @@ if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) { /* ALL? */
     }
 else {
     if (dptr && sim_vm_parse_addr)                      /* get low */
-        *lo = sim_vm_parse_addr (dptr, cptr, &tptr);
+        *lo = sim_vm_parse_addr (dptr, (char *)cptr, (char **)&tptr);
     else *lo = (t_addr) strtotv (cptr, &tptr, rdx);
     if (cptr == tptr)                                   /* error? */
             return NULL;
     if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
         cptr = tptr + 1;
         if (dptr && sim_vm_parse_addr)                  /* get high */
-            *hi = sim_vm_parse_addr (dptr, cptr, &tptr);
+            *hi = sim_vm_parse_addr (dptr, (char *)cptr, (char **)&tptr);
         else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
         if (cptr == tptr)
             return NULL;
@@ -7346,7 +7350,7 @@ return (dptr->flags & DEV_DIS? TRUE: FALSE);
         *gdptr  =       pointer to device where found
 */
 
-REG *find_reg_glob (char *cptr, char **optr, DEVICE **gdptr)
+REG *find_reg_glob (const char *cptr, const char **optr, DEVICE **gdptr)
 {
 int32 i;
 DEVICE *dptr;
@@ -7569,7 +7573,7 @@ SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr)
 int32 c, logop, cmpop;
 t_value logval, cmpval;
 const char *sptr;
-char *tptr;
+const char *tptr;
 const char logstr[] = "|&^", cmpstr[] = "=!><";
 
 logval = cmpval = 0;
@@ -7581,7 +7585,7 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
         logval = strtotv (cptr, &tptr, radix);
         if (cptr == tptr)
             return NULL;
-        cptr = tptr;
+        cptr = (char *)tptr;
         }
     else if ((sptr = strchr (cmpstr, c))) {             /* check for boolop */
         cmpop = (int32)(sptr - cmpstr);
@@ -7592,7 +7596,7 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
         cmpval = strtotv (cptr, &tptr, radix);
         if (cptr == tptr)
             return NULL;
-        cptr = tptr;
+        cptr = (char *)tptr;
         }
     else return NULL;
     }                                                   /* end for */
@@ -7673,7 +7677,7 @@ return 0;
    On an error, the endptr will equal the inptr.
 */
 
-t_value strtotv (const char *inptr, char **endptr, uint32 radix)
+t_value strtotv (const char *inptr, const char **endptr, uint32 radix)
 {
 int32 nodigit;
 t_value val;
@@ -8533,7 +8537,8 @@ return SCPE_OK;
 
 t_stat sim_set_expect (EXPECT *exp, char *cptr)
 {
-char gbuf[CBUFSIZE], *gptr = gbuf, *tptr, *c1ptr;
+char gbuf[CBUFSIZE], *gptr = gbuf, *tptr;
+const char *c1ptr;
 uint32 after = exp->after;
 int32 cnt = 0;
 t_stat r;
@@ -8546,7 +8551,7 @@ if (*cptr == '[') {
         sim_printf ("Invalid Repeat count specification\n");
         return SCPE_ARG|SCPE_NOMESSAGE;
         }
-    cptr = c1ptr + 1;
+    cptr = (char *)(c1ptr + 1);
     while (isspace(*cptr))
         ++cptr;
     }

@@ -1434,7 +1434,7 @@ for (i = 15; i >= 0; i--) {                             /* chk named reg */
     }
 if (*cptr++ != 'R')                                     /* look for R */
     return NULL;
-regnum = strtotv (cptr, &tptr, 10);                     /* look for reg # */
+regnum = strtotv (cptr, (const char **)&tptr, 10);                     /* look for reg # */
 if ((cptr == tptr) || (regnum > 15))
     return NULL;
 *rn = (int32) regnum;

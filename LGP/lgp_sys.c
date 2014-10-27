@@ -239,14 +239,14 @@ t_addr ad, ea;
 if ((dptr == sim_devices[0]) &&
     ((sim_switches & SWMASK ('T')) ||
     ((cpu_unit.flags & UNIT_TTSS_D) && !(sim_switches & SWMASK ('N'))))) {
-    ad = (t_addr) strtotv (cptr, tptr, 10);
+    ad = (t_addr) strtotv (cptr, (const char **)tptr, 10);
     if (((ad / 100) >= NTK_30) || ((ad % 100) >= NSC_30)) {
         *tptr = cptr;
         return 0;
         }
     ea = ((ad / 100) * NSC_30) | (ad % 100);
     }
-else ea = (t_addr) strtotv (cptr, tptr, dptr->aradix);
+else ea = (t_addr) strtotv (cptr, (const char **)tptr, dptr->aradix);
 return ea;
 }
 

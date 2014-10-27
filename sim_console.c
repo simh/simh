@@ -431,11 +431,12 @@ TMLN *lp;
 
 if (*cptr != 0)
     return SCPE_NOPARAM;
-if (sim_rem_active_number >= 0)
+if (sim_rem_active_number >= 0) {
     if (sim_rem_master_mode && (sim_rem_active_number == 0))
         fprintf (st, "Running from Master Mode Remote Console Connection\n");
     else
         fprintf (st, "Running from Remote Console Connection %d\n", sim_rem_active_number);
+    }
 if (sim_rem_con_tmxr.lines > 1)
     fprintf (st, "Remote Console Input Connections from %d sources are supported concurrently\n", sim_rem_con_tmxr.lines);
 if (sim_rem_read_timeout)
@@ -452,11 +453,12 @@ for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
     if (connections == 1)
         fprintf (st, "Remote Console Connections:\n");
     tmxr_fconns (st, lp, i);
-    if (sim_rem_read_timeouts[i] != sim_rem_read_timeout)
+    if (sim_rem_read_timeouts[i] != sim_rem_read_timeout) {
         if (sim_rem_read_timeouts[i])
             fprintf (st, "Remote Console Input on connection %d automatically continues after %d seconds\n", i, sim_rem_read_timeouts[i]);
         else
             fprintf (st, "Remote Console Input on connection %d does not continue automatically\n", i);
+        }
     }
 return SCPE_OK;
 }
@@ -1041,7 +1043,7 @@ sim_rem_buf_ptr = (int32 *)realloc (sim_rem_buf_ptr, sizeof(*sim_rem_buf_ptr)*li
 memset (sim_rem_buf_ptr, 0, sizeof(*sim_rem_buf_ptr)*lines);
 sim_rem_single_mode = (t_bool *)realloc (sim_rem_single_mode, sizeof(*sim_rem_single_mode)*lines);
 memset (sim_rem_single_mode, 0, sizeof(*sim_rem_single_mode)*lines);
-sim_rem_read_timeouts = (t_bool *)realloc (sim_rem_read_timeouts, sizeof(*sim_rem_read_timeouts)*lines);
+sim_rem_read_timeouts = (uint32 *)realloc (sim_rem_read_timeouts, sizeof(*sim_rem_read_timeouts)*lines);
 memset (sim_rem_read_timeouts, 0, sizeof(*sim_rem_read_timeouts)*lines);
 return SCPE_OK;
 }
@@ -2921,17 +2923,19 @@ static void decode (char *decoded, const char *encoded)
 {
 char c;
 
-while (c = *decoded++ = *encoded++)                     /* copy the character */
-    if (c == ESC_CHAR)                                  /* does it start an escape? */
-        if (isalpha (*encoded) ||                       /* is next character "A-Z" or "a-z"? */
-            *encoded == '@' ||                          /*   or "@"? */
-            *encoded >= '[' && *encoded <= '_')         /*   or "[\]^_"? */
+while ((c = *decoded++ = *encoded++))                   /* copy the character */
+    if (c == ESC_CHAR) {                                /* does it start an escape? */
+        if ((isalpha (*encoded)) ||                     /* is next character "A-Z" or "a-z"? */
+            (*encoded == '@') ||                        /*   or "@"? */
+            ((*encoded >= '[') && (*encoded <= '_')))   /*   or "[\]^_"? */
 
             *(decoded - 1) = *encoded++ & 037;          /* convert back to control character */
-
-        else if (*encoded == '\0' ||                    /* single escape character at EOL? */
-                 *encoded++ != ESC_CHAR)                /*   or not followed by another escape? */
-            decoded--;                                  /* drop the encoding */
+        else {
+            if ((*encoded == '\0') ||                   /* single escape character at EOL? */
+                 (*encoded++ != ESC_CHAR))              /*   or not followed by another escape? */
+                decoded--;                              /* drop the encoding */
+            }
+        }
 return;
 }
 
@@ -2958,7 +2962,7 @@ else {
                               mbuf, 
                               (sim_switches & SWMASK ('I')) ? "" : "\n");
     free (mbuf);
-    mbuf = sim_encode_quoted_string (mbuf2, strlen (mbuf2));
+    mbuf = sim_encode_quoted_string ((uint8 *)mbuf2, strlen (mbuf2));
     sim_exp_set (&sim_con_expect, mbuf, 0, sim_con_expect.after, 0, NULL);
     free (mbuf);
     free (mbuf2);
@@ -2983,7 +2987,7 @@ else {
     rbuf = (uint8 *)malloc (1 + strlen(cptr));
 
     decode ((char *)rbuf, cptr);                        /* decod string */
-    sim_send_input (&sim_con_send, rbuf, strlen(rbuf), 0, 0); /* queue it for output */
+    sim_send_input (&sim_con_send, rbuf, strlen((char *)rbuf), 0, 0); /* queue it for output */
     free (rbuf);
     }
 

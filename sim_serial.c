@@ -471,7 +471,7 @@ _serial_remove_from_open_list (port);
 t_stat sim_config_serial  (SERHANDLE port, const char *sconfig)
 {
 const char *pptr;
-char *sptr, *tptr;
+const char *sptr, *tptr;
 SERCONFIG config = { 0 };
 t_bool arg_error = FALSE;
 t_stat r;
