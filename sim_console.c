@@ -652,7 +652,6 @@ t_stat stat = SCPE_OK;
 t_bool stepping = FALSE;
 int32 steps = 1;
 t_bool was_stepping = (sim_rem_step_line != -1);
-#define master_session (sim_rem_master_mode && (i == 0))
 t_bool got_command;
 t_bool close_session = FALSE;
 TMLN *lp;
@@ -665,6 +664,8 @@ tmxr_poll_rx (&sim_rem_con_tmxr);                      /* poll input */
 for (i=(was_stepping ? sim_rem_step_line : 0); 
      (i < sim_rem_con_tmxr.lines) && (!stepping); 
      i++) {
+    t_bool master_session = (sim_rem_master_mode && (i == 0));
+
     lp = &sim_rem_con_tmxr.ldsc[i];
     if (!lp->conn)
         continue;
@@ -918,6 +919,10 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         if (stat != SCPE_OK)
             stat = _sim_rem_message (gbuf, stat);
         _sim_rem_log_out (lp);
+        if (master_session && !sim_rem_master_mode) {
+            sim_rem_single_mode[i] = TRUE;
+            return SCPE_STOP;
+            }
         if ((cmdp && (cmdp->action == &x_continue_cmd)) ||
             (sim_rem_single_mode[i])) {
             sim_rem_step_line = -1;                 /* Not stepping */
