@@ -3085,7 +3085,7 @@ return FALSE;
 
 void cpu_set_boot (int32 pc)
 {
-saved_PC = pc;
+saved_PC = PC = pc;
 PSW = 000340;
 return;
 }
