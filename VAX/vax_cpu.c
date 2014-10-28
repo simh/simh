@@ -554,7 +554,7 @@ return buf;
 
 t_stat sim_instr (void)
 {
-volatile int32 opc, cc;                                 /* used by setjmp */
+volatile int32 opc = 0, cc;                             /* used by setjmp */
 volatile int32 acc;                                     /* set by setjmp */
 int abortval;
 t_stat r;

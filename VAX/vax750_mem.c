@@ -234,7 +234,6 @@ return "Memory controller";
 
 t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
-uint32 memsize = (uint32)(MEMSIZE>>10);
 uint32 baseaddr = 0;
 struct {
     uint32 capacity;

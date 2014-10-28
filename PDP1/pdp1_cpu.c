@@ -1606,7 +1606,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 mc = 0;
 uint32 i;
 
-if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
+if ((val <= 0) || (((size_t)val) > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
 for (i = val; i < MEMSIZE; i++)
     mc = mc | M[i];

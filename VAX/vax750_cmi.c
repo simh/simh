@@ -515,8 +515,7 @@ return;
 
 int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
-int32 acc, err;
-err = (GET_TRAP (trpirq) << 4) | (pme << 3) | ASTLVL;   /* error word */
+int32 acc;
 if (p1 == MCHK_BPE)                                     /* bus error? */
     cc = intexc (SCB_MCHK, cc, 0, IE_EXC);              /* take normal exception */
 else

@@ -615,12 +615,11 @@ return SCPE_OK;
 
 t_stat rp_wr (int32 data, int32 PA, int32 access)
 {
-int32 cs1f, drv, dtype, i, j;
+int32 cs1f, drv, i, j;
 UNIT *uptr;
 
 cs1f = 0;                                               /* no int on cs1 upd */
 drv = GET_UNIT (rpcs2);                                 /* get current unit */
-dtype = GET_DTYPE (rp_unit[drv].flags);                 /* get drive type */
 uptr = rp_dev.units + drv;                              /* get unit */
 j = (PA >> 1) & 037;                                    /* get reg offset */
 if (reg_in_drive[j] && (rp_unit[drv].flags & UNIT_DIS)) { /* nx disk */

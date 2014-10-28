@@ -374,10 +374,10 @@ t_offset capac = ((t_offset)uptr->capac)*((dptr->flags & DEV_SECTORS) ? 512 : 1)
 if (ctx->capac_factor == 2)
     cap_units = "W";
 if (capac) {
-    if (capac >= (t_addr) 1000000)
-        fprintf (st, "capacity=%dM%s", (uint32) (capac / ((t_addr) 1000000)), cap_units);
+    if (capac >= (t_offset) 1000000)
+        fprintf (st, "capacity=%dM%s", (uint32) (capac / ((t_offset) 1000000)), cap_units);
     else if (uptr->capac >= (t_addr) 1000)
-        fprintf (st, "capacity=%dK%s", (uint32) (capac / ((t_addr) 1000)), cap_units);
+        fprintf (st, "capacity=%dK%s", (uint32) (capac / ((t_offset) 1000)), cap_units);
     else fprintf (st, "capacity=%d%s", (uint32) capac, cap_units);
     }
 else fprintf (st, "undefined capacity");

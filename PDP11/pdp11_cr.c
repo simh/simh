@@ -1426,7 +1426,7 @@ t_stat cr_reset (   DEVICE  *dptr    )
         fprintf (sim_deb, "cr_reset\n");
 
     if (!translation_help) {
-        int i;
+        size_t i;
         const char trans_hlp[] = "TRANSLATION={";
         size_t size = sizeof(trans_hlp) +1;
 
@@ -1729,7 +1729,7 @@ t_stat cr_set_trans (   UNIT    *uptr,
                         char    *cptr,
                         void    *desc    )
 {
-    int    i;
+    size_t  i;
 
     if (!cptr)
         return (SCPE_MISVAL);
@@ -1750,7 +1750,8 @@ t_stat cr_show_trans (  FILE    *st,
                         int32   val,
                         void    *desc    )
 {
-    int i;
+    size_t i;
+
     for (i = 1; i < NTRANS; i++ )
         if (transcodes[i].table == codeTbl) {
             fprintf (st, "translation=%s", transcodes[i].name);

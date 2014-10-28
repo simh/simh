@@ -1063,7 +1063,7 @@ t_stat sim_instr (void)
 				if (src2 == 0) {
 					V = 1;							/* divide by zero just sets overflow, ACC & EXT are undefined */
 				}
-				else if (src2 == -1 && src == 0x80000000) {
+				else if ((src2 == -1) && ((uint32)src == 0x80000000)) {
 					V = 1;							/* another special case: max negative int / -1 also overflows */
 				}
 				else {

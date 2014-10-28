@@ -630,7 +630,7 @@ static int32 loop_read (TMLN *lp, char *buf, int32 bufsize)
 if (lp->datagram) {
     int32 pktsize;
 
-    if (lp->lpbcnt < sizeof(pktsize))
+    if (lp->lpbcnt < (int32)sizeof(pktsize))
         return 0;
     if ((sizeof(pktsize) != loop_read_ex (lp, (char *)&pktsize, sizeof(pktsize))) ||
         (pktsize > bufsize))

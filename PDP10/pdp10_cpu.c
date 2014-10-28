@@ -2385,7 +2385,7 @@ a10 ea;
 d10 inst, indrct;
 int32 i, pflgs = 0;
 t_addr adn, max_returns = MAX_SUB_RETURN_SKIP;
-int32 xr, ac;
+int32 xr;
 
 if (!caveats_displayed) {
     caveats_displayed = TRUE;
@@ -2400,7 +2400,6 @@ switch (GET_OP(inst))
     case 0265:              /* JSP */
     case 0266:              /* JSA */
     case 0267:              /* JRA */
-        ac = GET_AC (inst);                     /* get AC */
         for (indrct = inst, i = 0; i < ind_max; i++) {/* calc eff addr */
             ea = GET_ADDR (indrct);
             xr = GET_XR (indrct);

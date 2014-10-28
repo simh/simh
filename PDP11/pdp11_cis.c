@@ -203,97 +203,98 @@ extern int32 calc_ints (int32 nipl, int32 trq);
 /* Table of instruction operands */
 
 static int32 opntab[128][MAXOPN] = {
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 000 - 007 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 010 - 017 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* LD2R */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0,                                         /* MOVC */
-    0, 0, 0, 0,                                         /* MOVRC */
-    0, 0, 0, 0,                                         /* MOVTC */
-                0, 0, 0, 0,                             /* 033 */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 034 - 037 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0,                                         /* LOCC */
-    0, 0, 0, 0,                                         /* SKPC */
-    0, 0, 0, 0,                                         /* SCANC */
-    0, 0, 0, 0,                                         /* SPANC */
-    0, 0, 0, 0,                                         /* CMPC */
-    0, 0, 0, 0,                                         /* MATC */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 046 - 047 */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* ADDN */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* SUBN */
-    R0_DESC, R2_DESC, 0, 0,                             /* CMPN */
-    R0_DESC, 0, 0, 0,                                   /* CVTNL */
-    R0_DESC, R2_DESC, 0, 0,                             /* CVTPN */
-    R0_DESC, R2_DESC, 0, 0,                             /* CVTNP */
-    R0_DESC, R2_DESC, R4_ARG, 0,                        /* ASHN */
-    R0_DESC, 0, 0, 0,                                   /* CVTLN */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* LD3R */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* ADDP */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* SUBP */
-    R0_DESC, R2_DESC, 0, 0,                             /* CMPP */
-    R0_DESC, 0, 0, 0,                                   /* CVTPL */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* MULP */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* DIVP */
-    R0_DESC, R2_DESC, R4_ARG, 0,                        /* ASHP */
-    R0_DESC, 0, 0, 0,                                   /* CVTLP */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 100 - 107 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 110 - 117 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 120 - 127 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* MOVCI */
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* MOVRCI */
-    IN_DESC, IN_DESC, IN_ARG, IN_ARG,                   /* MOVTCI */
-                0, 0, 0, 0,                             /* 133 */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 134 - 137 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    IN_DESC, IN_ARG, 0, 0,                              /* LOCCI */
-    IN_DESC, IN_ARG, 0, 0,                              /* SKPCI */
-    IN_DESC, IN_DESC, 0, 0,                             /* SCANCI */
-    IN_DESC, IN_DESC, 0, 0,                             /* SPANCI */
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* CMPCI */
-    IN_DESC, IN_DESC, 0, 0,                             /* MATCI */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 146 - 147 */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* ADDNI */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* SUBNI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CMPNI */
-    IN_DESC, IN_ARG, 0, 0,                              /* CVTNLI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CVTPNI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CVTNPI */
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* ASHNI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CVTLNI */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 160 - 167 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* ADDPI */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* SUBPI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CMPPI */
-    IN_DESC, IN_ARG, 0, 0,                              /* CVTPLI */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* MULPI */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* DIVPI */
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* ASHPI */
-    IN_DESC, IN_DESC, 0, 0                              /* CVTLPI */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 000 - 007 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 010 - 017 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* LD2R */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0},                                       /* MOVC */
+    {0, 0, 0, 0},                                       /* MOVRC */
+    {0, 0, 0, 0},                                       /* MOVTC */
+                  {0, 0, 0, 0},                         /* 033 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 034 - 037 */ 
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0},                                       /* LOCC */
+    {0, 0, 0, 0},                                       /* SKPC */
+    {0, 0, 0, 0},                                       /* SCANC */
+    {0, 0, 0, 0},                                       /* SPANC */
+    {0, 0, 0, 0},                                       /* CMPC */
+    {0, 0, 0, 0},                                       /* MATC */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 046 - 047 */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* ADDN */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* SUBN */
+    {R0_DESC, R2_DESC, 0, 0},                           /* CMPN */
+    {R0_DESC, 0, 0, 0},                                 /* CVTNL */
+    {R0_DESC, R2_DESC, 0, 0},                           /* CVTPN */
+    {R0_DESC, R2_DESC, 0, 0},                           /* CVTNP */
+    {R0_DESC, R2_DESC, R4_ARG, 0},                      /* ASHN */
+    {R0_DESC, 0, 0, 0},                                 /* CVTLN */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* LD3R */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* ADDP */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* SUBP */
+    {R0_DESC, R2_DESC, 0, 0},                           /* CMPP */
+    {R0_DESC, 0, 0, 0},                                 /* CVTPL */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* MULP */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* DIVP */
+    {R0_DESC, R2_DESC, R4_ARG, 0},                      /* ASHP */
+    {R0_DESC, 0, 0, 0},                                 /* CVTLP */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 100 - 107 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 110 - 117 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 120 - 127 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* MOVCI */
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* MOVRCI */
+    {IN_DESC, IN_DESC, IN_ARG, IN_ARG},                 /* MOVTCI */
+                  {0, 0, 0, 0},                         /* 133 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 134 - 137 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {IN_DESC, IN_ARG, 0, 0},                            /* LOCCI */
+    {IN_DESC, IN_ARG, 0, 0},                            /* SKPCI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* SCANCI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* SPANCI */
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* CMPCI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* MATCI */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 146 - 147 */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* ADDNI */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* SUBNI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CMPNI */
+    {IN_DESC, IN_ARG, 0, 0},                            /* CVTNLI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CVTPNI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CVTNPI */
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* ASHNI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CVTLNI */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 160 - 167 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* ADDPI */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* SUBPI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CMPPI */
+    {IN_DESC, IN_ARG, 0, 0},                            /* CVTPLI */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* MULPI */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* DIVPI */
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* ASHPI */
+    {IN_DESC, IN_DESC, 0, 0}                            /* CVTLPI */
     };
+
 
 /* ASCII to overpunch table: sign is <7>, digit is <4:0> */
 

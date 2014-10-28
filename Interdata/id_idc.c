@@ -503,7 +503,6 @@ t_stat idc_svc (UNIT *uptr)
 int32 diff;
 uint32 f, u = uptr - idc_dev.units;                     /* get unit number */
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
-uint32 t;
 t_stat r;
 
 if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
@@ -579,7 +578,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
             if ((r = idc_rds (uptr)))                   /* read sec, err? */
                 return r;
             idc_1st = 0;
-            t = sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY); /* write mem */
+            sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY); /* write mem */
             if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;

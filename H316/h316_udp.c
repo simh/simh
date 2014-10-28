@@ -179,8 +179,8 @@ typedef struct _UDP_PACKET UDP_PACKET;
 #define UDP_HEADER_LEN  (2*sizeof(uint32) + sizeof(uint16))
 
 // Locals ...
-UDP_LINK udp_links[MAXLINKS] = {0};             // data for every active connection
-TMLN udp_lines[MAXLINKS] = { 0 };               // line descriptors
+UDP_LINK udp_links[MAXLINKS] = { {0} };         // data for every active connection
+TMLN udp_lines[MAXLINKS] = { {0} };             // line descriptors
 TMXR udp_tmxr = { MAXLINKS, NULL, 0, udp_lines};// datagram mux
 
 int32 udp_find_free_link (void)
@@ -402,7 +402,7 @@ int32 udp_receive (DEVICE *dptr, int32 link, uint16 *pdata, uint16 maxbuf)
 
   while ((pktlen = udp_receive_packet(link, &pkt)) > 0) {
     // First do some header checks for a valid UDP packet ...
-    if (pktlen < UDP_HEADER_LEN) {
+    if (((size_t)pktlen) < UDP_HEADER_LEN) {
       sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet w/o header (length=%d)\n", link, pktlen);
       continue;
     }

@@ -3244,8 +3244,8 @@ return SCPE_OK;
 
 t_stat send_cmd (int32 flag, char *cptr)
 {
-char gbuf[CBUFSIZE], *gptr = gbuf, *tptr;
-uint8 dbuf[CBUFSIZE], *dptr = dbuf;
+char gbuf[CBUFSIZE], *tptr;
+uint8 dbuf[CBUFSIZE];
 uint32 dsize = 0;
 uint32 delay = 0;
 uint32 after = 0;
@@ -4696,14 +4696,16 @@ if (dir) {
 #endif
     t_offset FileSize, TotalSize = 0;
     int DirCount = 0, FileCount = 0;
-    char FileName[PATH_MAX + 1], *MatchName;
+    char FileName[PATH_MAX + 1];
+#if defined (HAVE_FNMATCH)
+    char *MatchName = 1 + strrchr (cptr, '/');;
+#endif
     char *c;
     struct tm *local;
 #if defined (HAVE_GLOB)
-    int i;
+    size_t i;
 #endif
 
-    MatchName = 1 + strrchr (cptr, '/');
     sim_printf (" Directory of %s\n\n", DirName[0] ? DirName : "/");
 #if defined (HAVE_GLOB)
     for (i=0; i<paths.gl_pathc; i++) {
@@ -8537,7 +8539,7 @@ return SCPE_OK;
 
 t_stat sim_set_expect (EXPECT *exp, char *cptr)
 {
-char gbuf[CBUFSIZE], *gptr = gbuf, *tptr;
+char gbuf[CBUFSIZE], *tptr;
 const char *c1ptr;
 uint32 after = exp->after;
 int32 cnt = 0;

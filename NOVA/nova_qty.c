@@ -133,7 +133,7 @@ int32   qty_auto    = 0 ;                               /*  QTY auto disconnect 
 int32   qty_polls   = 0 ;                               /*  total 'qty_svc' polls       */
 
 
-TMLN    qty_ldsc[ QTY_MAX ] = { 0 } ;                   /*  QTY line descriptors        */
+TMLN    qty_ldsc[ QTY_MAX ] = { {0} } ;                 /*  QTY line descriptors        */
 TMXR    qty_desc    = { QTY_MAX, 0, 0, qty_ldsc } ;     /*  mux descriptor      */
 int32   qty_status[ QTY_MAX ] = { 0 } ;                 /*  QTY line status             */
                                                         /*  (must be at least 32 bits)  */

@@ -392,7 +392,6 @@ t_stat dp_svc (UNIT *uptr)
 uint32 u = uptr - dp_dev.units;                         /* get unit number */
 int32 cyl = uptr->CYL;                                  /* get cylinder */
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
-uint32 t;
 t_stat r;
 
 if (uptr->STD & STD_MOV) {                              /* seek? */
@@ -421,7 +420,7 @@ switch (dp_cmd & 0x7) {                                 /* case on func */
             if ((r = dp_rds (uptr)))                    /* read sec, err? */
                 return r;
             dp_1st = 0;
-            t = sch_wrmem (dp_dib.sch, dpxb, DP_NUMBY); /* write to memory */
+            sch_wrmem (dp_dib.sch, dpxb, DP_NUMBY);     /* write to memory */
             if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */       
                 sim_activate (uptr, dp_rtime);          /* reschedule */
                 return SCPE_OK;

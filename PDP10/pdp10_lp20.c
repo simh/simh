@@ -1110,7 +1110,7 @@ while (!feof(vfile)) {
     c = fscanf (vfile, " %u:", &line);
     if (c == EOF)
         break;
-    if ((c < 1) || (line < 0) || (line  >= (sizeof (davfu)/sizeof davfu[0])))
+    if ((c < 1) || (line < 0) || (((size_t)line)  >= (sizeof (davfu)/sizeof davfu[0])))
         goto fmt_err;
     if (line+1 > dvlnt)
         dvlnt = line+1;

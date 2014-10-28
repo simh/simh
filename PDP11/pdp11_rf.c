@@ -563,7 +563,7 @@ text3 =
 "\n"
 " RF11 data files are buffered in memory; therefore, end of file and OS\n"
 " I/O errors cannot occur.\n";
-fprintf (st, "%s", text2);
+fprintf (st, "%s", text3);
 return SCPE_OK;
 }
 

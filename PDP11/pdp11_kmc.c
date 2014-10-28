@@ -1998,7 +1998,7 @@ static void kdp_receive(int32 dupidx, int count) {
     UNIT *rxup;
     UNUSED_ARG (count);
 
-    assert ((dupidx >= 0) && (dupidx < DIM(dupState)));
+    assert ((dupidx >= 0) && (((size_t)dupidx) < DIM(dupState)));
     d = &dupState[dupidx];
     assert (dupidx == d->dupidx);
     k = d->kmc;

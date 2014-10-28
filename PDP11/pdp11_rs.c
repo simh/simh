@@ -200,21 +200,21 @@ char *rs_description (DEVICE *dptr);
 DIB rs_dib = { MBA_RS, 0, &rs_mbrd, &rs_mbwr, 0, 0, 0, { &rs_abort } };
 
 UNIT rs_unit[] = {
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) }
     };
 
@@ -330,7 +330,6 @@ return SCPE_OK;
 
 t_stat rs_mbwr (int32 data, int32 ofs, int32 drv)
 {
-int32 dtype;
 UNIT *uptr;
 
 uptr = rs_dev.units + drv;                              /* get unit */
@@ -341,7 +340,6 @@ if ((ofs != RS_AS_OF) && sim_is_active (uptr)) {        /* unit busy? */
     rs_update_ds (0, drv);
     return SCPE_OK;
     }
-dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 ofs = ofs & MBA_RMASK;                                  /* mask offset */
 
 switch (ofs) {                                          /* decode PA<5:1> */
@@ -382,7 +380,7 @@ return SCPE_OK;
 
 t_stat rs_go (int32 drv)
 {
-int32 fnc, dtype, t;
+int32 fnc, t;
 UNIT *uptr;
 
 fnc = GET_FNC (rscs1[drv]);                             /* get function */
@@ -391,7 +389,6 @@ if (DEBUG_PRS (rs_dev))
              drv, rs_fname[fnc], rsds[drv], rsda[drv], rser[drv]);
 uptr = rs_dev.units + drv;                              /* get unit */
 rs_clr_as (AS_U0 << drv);                               /* clear attention */
-dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 if ((fnc != FNC_DCLR) && (rsds[drv] & DS_ERR)) {        /* err & ~clear? */
     rs_set_er (ER_ILF, drv);                            /* not allowed */
     rs_update_ds (DS_ATA, drv);                         /* set attention */

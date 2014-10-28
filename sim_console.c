@@ -611,11 +611,14 @@ t_stat stat_nomessage = stat & SCPE_NOMESSAGE;  /* extract possible message supr
 
 cmdp = find_cmd (cmd);
 stat = SCPE_BARE_STATUS(stat);              /* remove possible flag */
-if (cmdp && (cmdp->message))                /* special message handler? */
-    cmdp->message (NULL, stat);             /* let it deal with display */
-else
-    if (stat >= SCPE_BASE)                  /* error? */
-        sim_printf ("%s\r\n", sim_error_text (stat));
+if (!stat_nomessage) {
+    if (cmdp && (cmdp->message))                /* special message handler? */
+        cmdp->message (NULL, stat);             /* let it deal with display */
+    else {
+        if (stat >= SCPE_BASE)                  /* error? */
+            sim_printf ("%s\r\n", sim_error_text (stat));
+        }
+    }
 return stat;
 }
 

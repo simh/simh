@@ -586,7 +586,7 @@ static struct {
 	char *name;
 } phase[] = {
 #   include "dmsr2v12phases.h"
-	0xFFFF, ""
+    {0xFFFF, ""}
 };
 
 #pragma pack(2)
@@ -597,7 +597,7 @@ struct tag_slet {
 	int16	nwords;
 	int16	sector;
 } slet[MAXSLET] = {
-#   include "dmsr2v12slet.h"		/* without RPG, use this info until overwritten by actual data from disk */
+#include "dmsr2v12slet.h"		/* without RPG, use this info until overwritten by actual data from disk */
 };
 
 #pragma pack()

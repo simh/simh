@@ -198,11 +198,11 @@ static struct tag_ccpunches {							/* list of rows and punches on tape */
 	int row, channels;
 }
 ccpunches[] = {
-      2, CC_CHANNEL_1,									/* channel  1 = top of form */
-	 62, CC_CHANNEL_12									/* channel 12 = bottom of form */
+    { 2, CC_CHANNEL_1},								/* channel  1 = top of form */
+    {62, CC_CHANNEL_12}								/* channel 12 = bottom of form */
 },
 cccgi[] = {
-      2, CC_CHANNEL_1									/* channel  1 = top of form; no bottom of form */
+    {2, CC_CHANNEL_1}								/* channel  1 = top of form; no bottom of form */
 };
 
 #include "ibm1130_prtwheel.h"
@@ -505,7 +505,8 @@ static t_stat prt1132_svc (UNIT *uptr)
 
 void save_1403_prt_line (int32 addr)
 {
-	int i, j, r, ch, even = TRUE;
+	size_t j;
+	int i, r, ch, even = TRUE;
 	unsigned char ebcdic;
 	int32 wd;
 
@@ -671,7 +672,7 @@ static t_stat delete_cmd (int32 flag, char *cptr)
 static t_stat prt_reset (DEVICE *dptr)
 {
 	UNIT *uptr = &prt_unit[0];
-	int i;
+	size_t i;
 
 /* add a DELETE filename command so we can be sure to have clean listings */
 	register_cmd("DELETE", &delete_cmd, 0, "del{ete} filename        remove file\n");
