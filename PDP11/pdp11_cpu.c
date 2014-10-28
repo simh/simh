@@ -739,7 +739,21 @@ while (reason == 0)  {
         saved_PC = PC & 0177777;
         pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         set_r_display (rs, cm);
+
         reason = sim_process_event ();                  /* process events */
+
+        /* restore simh register contents into running variables */
+        PC = saved_PC;
+        put_PSW (PSW, 0);                               /* set PSW, call calc_xs */
+        for (i = 0; i < 6; i++)
+            R[i] = REGFILE[i][rs];
+        SP = STACKFILE[cm];
+        isenable = calc_is (cm);
+        dsenable = calc_ds (cm);
+        put_PIRQ (PIRQ);                                /* rewrite PIRQ */
+        STKLIM = STKLIM & STKLIM_RW;                    /* clean up STKLIM */
+        MMR0 = MMR0 | MMR0_IC;                          /* usually on */
+
         trap_req = calc_ints (ipl, trap_req);           /* recalc int req */
         continue;
         }                                               /* end if sim_interval */
@@ -3085,7 +3099,7 @@ return FALSE;
 
 void cpu_set_boot (int32 pc)
 {
-saved_PC = PC = pc;
+saved_PC = pc;
 PSW = 000340;
 return;
 }
