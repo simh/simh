@@ -346,7 +346,7 @@ int32 i;
 if (s2sel) uptr = &stack_unit[0];                       /* stacker 1? */
 else uptr = &stack_unit[0];                             /* then default */
 if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_OK;    /* attached? */
-for (i = 0; i < CDR_WIDTH; i++) rbuf[i] = ebcdic_to_ascii[rbuf[i]];
+for (i = 0; (size_t)i < CDR_WIDTH; i++) rbuf[i] = ebcdic_to_ascii[rbuf[i]];
 for (i = CDR_WIDTH - 1; (i >= 0) && (rbuf[i] == ' '); i--) rbuf[i] = 0;
 rbuf[CDR_WIDTH] = 0;                                    /* null at end */
 fputs (rbuf, uptr -> fileref);                          /* write card */
