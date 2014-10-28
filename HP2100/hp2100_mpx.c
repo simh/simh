@@ -1,6 +1,6 @@
 /* hp2100_mpx.c: HP 12792C eight-channel asynchronous multiplexer simulator
 
-   Copyright (c) 2008-2012, J. David Bryan
+   Copyright (c) 2008-2013, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MPX          12792C 8-channel multiplexer card
 
+   10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
    28-Dec-12    JDB     Allow direct attach to the poll unit only when restoring
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Removed DEV_NET to allow restoration of listening port
@@ -752,7 +753,8 @@ DEVICE mpx_dev = {
     NULL,                                   /* logical device name */
     NULL,                                   /* help routine */
     NULL,                                   /* help attach routine*/
-    (void*)&mpx_desc };                     /* help context */
+    (void *) &mpx_desc                      /* help context */
+    };
 
 
 /* I/O signal handler.

@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CNTLR_TYPE cast to ms_settype

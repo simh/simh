@@ -24,6 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    18-Mar-13    JDB     Added declarations for the MP abort handler and CPU registers
+   14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    03-Jan-10    RMS     Changed declarations of mp_control, mp_mefvv, for VMS compiler
    15-Jul-08    JDB     Rearranged declarations with hp2100_cpu.c and hp2100_defs.h
    26-Jun-08    JDB     Added mp_control to CPU state externals

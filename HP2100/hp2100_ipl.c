@@ -25,6 +25,7 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   12-Dec-12    MP      Revised ipl_attach for new socket API
    25-Oct-12    JDB     Removed DEV_NET to allow restoration of listening ports
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -126,7 +127,8 @@ DEBTAB ipl_deb [] = {
     { "CMDS", DEB_CMDS },
     { "CPU",  DEB_CPU },
     { "XFER", DEB_XFER },
-    { NULL, 0 }  };
+    { NULL, 0 }
+    };
 
 /* Common structures */
 
@@ -571,36 +573,49 @@ return SCPE_OK;
 t_stat ipl_attach (UNIT *uptr, char *cptr)
 {
 SOCKET newsock;
-uint32 i, t, oldf;
-char host[CBUFSIZE], port[CBUFSIZE], hostport[2*CBUFSIZE+3];
+uint32 i, t;
+char host [CBUFSIZE], port [CBUFSIZE], hostport [2 * CBUFSIZE + 3];
 char *tptr = NULL;
 t_stat r;
+t_bool is_active;
 
-oldf = uptr->flags;
-if (oldf & UNIT_ATT)
-    ipl_detach (uptr);
-if ((sim_switches & SWMASK ('C')) ||
-    ((sim_switches & SIM_SW_REST) && (oldf & UNIT_ACTV))) {
-        r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL);
-        if ((r != SCPE_OK) || (port[0] == '\0'))
-            return SCPE_ARG;
-        sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host[0] ? ":" : "", port);
-        newsock = sim_connect_sock (hostport, NULL, NULL);
-        if (newsock == INVALID_SOCKET)
-            return SCPE_IOERR;
-        printf ("Connecting to %s\n", hostport);
-        if (sim_log)
-            fprintf (sim_log,
-                "Connecting to %s\n", hostport);
-        uptr->flags = uptr->flags | UNIT_ACTV;
-        uptr->LSOCKET = 0;
-        uptr->DSOCKET = newsock;
-        }
+is_active = (uptr->flags & UNIT_ACTV) == UNIT_ACTV;     /* is the connection active? */
+
+if (uptr->flags & UNIT_ATT)                             /* if IPL is currently attached, */
+    ipl_detach (uptr);                                  /*   detach it first */
+
+if ((sim_switches & SWMASK ('C')) ||                    /* connecting? */
+  ((sim_switches & SIM_SW_REST) && is_active)) {        /*   or restoring an active connection? */
+    r = sim_parse_addr (cptr, host,                     /* parse the host and port */
+                        sizeof (host), "localhost",     /*   from the parameter string */
+                        port, sizeof (port),
+                        NULL, NULL);
+
+    if ((r != SCPE_OK) || (port [0] == '\0'))           /* parse error or missing port number? */
+        return SCPE_ARG;                                /* complain to the user */
+
+    sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host [0] ? ":" : "", port);
+
+    newsock = sim_connect_sock (hostport, NULL, NULL);
+
+    if (newsock == INVALID_SOCKET)
+        return SCPE_IOERR;
+
+    printf ("Connecting to %s\n", hostport);
+
+    if (sim_log)
+        fprintf (sim_log, "Connecting to %s\n", hostport);
+
+    uptr->flags = uptr->flags | UNIT_ACTV;
+    uptr->LSOCKET = 0;
+    uptr->DSOCKET = newsock;
+    }
+
 else {
     r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
     if (r != SCPE_OK)
         return SCPE_ARG;
-    sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host[0] ? ":" : "", port);
+    sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host [0] ? ":" : "", port);
     newsock = sim_master_sock (hostport, &r);
     if (r != SCPE_OK)
         return r;

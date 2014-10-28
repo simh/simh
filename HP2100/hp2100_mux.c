@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002-2012, Robert M Supnik
+   Copyright (c) 2002-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MUX,MUXL,MUXM        12920A terminal multiplexor
 
+   10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Removed DEV_NET to allow restoration of listening port
    28-Mar-11    JDB     Tidied up signal handling
@@ -441,7 +442,8 @@ DEVICE muxl_dev = {
     NULL,                                   /* logical device name */
     NULL,                                   /* help routine */
     NULL,                                   /* help attach routine*/
-    NULL };                                 /* help context */
+    NULL                                    /* help context */
+    };
 
 
 /* MUXU data structures
@@ -522,7 +524,8 @@ DEVICE muxu_dev = {
     NULL,                                   /* logical device name */
     NULL,                                   /* help routine */
     NULL,                                   /* help attach routine*/
-    (void*)&mux_desc };                     /* help context */
+    (void *) &mux_desc                      /* help context */
+    };
 
 
 /* MUXC data structures.
@@ -584,7 +587,8 @@ DEVICE muxc_dev = {
     NULL,                                   /* logical device name */
     NULL,                                   /* help routine */
     NULL,                                   /* help attach routine*/
-    NULL };                                 /* help context */
+    NULL                                    /* help context */
+    };
 
 
 /* Lower data card I/O signal handler.

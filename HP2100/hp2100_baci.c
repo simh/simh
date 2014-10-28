@@ -1,6 +1,6 @@
 /* hp2100_baci.c: HP 12966A buffered asynchronous communications interface simulator
 
-   Copyright (c) 2007-2012, J. David Bryan
+   Copyright (c) 2007-2013, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    BACI         12966A BACI card
 
+   10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Removed DEV_NET to allow restoration of listening port
    28-Mar-11    JDB     Tidied up signal handling
@@ -510,7 +511,8 @@ DEVICE baci_dev = {
     NULL,                                   /* logical device name */
     NULL,                                   /* help routine */
     NULL,                                   /* help attach routine*/
-    (void*)&baci_desc };                    /* help context */
+    (void *) &baci_desc                     /* help context */
+    };
 
 
 /* I/O signal handler.

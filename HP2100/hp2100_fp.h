@@ -1,6 +1,6 @@
 /* hp2100_fp.h: HP 2100/21MX floating point definitions
 
-   Copyright (c) 2002-2006, Robert M. Supnik
+   Copyright (c) 2002-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    01-Dec-06    JDB     Reworked FFP helpers for 1000-F support, deleted f_pwr2
    26-Sep-06    JDB     Moved from hp2100_fp.c to simplify extensions
 */

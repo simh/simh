@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    18-Mar-13    JDB     Added "-Wdangling-else" to the suppression pragmas
+                        Removed redundant extern declarations
+   14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    14-Dec-12    JDB     Added "-Wbitwise-op-parentheses" to the suppression pragmas
    12-May-12    JDB     Added pragmas to suppress logical operator precedence warnings
    10-Feb-12    JDB     Added hp_setsc, hp_showsc functions to support SC modifier

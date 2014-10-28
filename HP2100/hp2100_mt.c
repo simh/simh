@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MT           12559A 3030 nine track magnetic tape
 
+   10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
    09-May-12    JDB     Separated assignments from conditional expressions
    25-Mar-12    JDB     Removed redundant MTAB_VUN from "format" MTAB entry
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC

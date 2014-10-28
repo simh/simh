@@ -1,6 +1,6 @@
 /* hp_disclib.c: HP MAC/ICD disc controller simulator library
 
-   Copyright (c) 2011-2012, J. David Bryan
+   Copyright (c) 2011-2014, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   27-Oct-14    JDB     Corrected the relative movement calculation in start_seek
    20-Dec-12    JDB     sim_is_active() now returns t_bool
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    07-May-12    JDB     Corrected end-of-track delay time logic
@@ -2216,7 +2217,7 @@ if (target_cylinder >= drive_props [model].cylinders) { /* is the cylinder out o
     }
 
 else {                                                  /* the cylinder value is OK */
-    delta = abs (uptr->CYL - target_cylinder);          /* calculate the relative movement */
+    delta = abs (uptr->CYL - (int32) target_cylinder);  /* calculate the relative movement */
     uptr->CYL = target_cylinder;                        /*   and move the positioner */
 
     if ((cvptr->head >= drive_props [model].heads)          /* if the head */
