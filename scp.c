@@ -3653,7 +3653,7 @@ C1TAB *ctbr = NULL, *glbr;
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
-cptr = get_glyph (cptr, gbuf, 0);                       /* get glob/dev/unit */
+cptr = get_glyph (svptr = cptr, gbuf, 0);               /* get glob/dev/unit */
 
 if ((dptr = find_dev (gbuf))) {                         /* device match? */
     uptr = dptr->units;                                 /* first unit */
@@ -3673,16 +3673,19 @@ else if ((gcmdp = find_ctab (set_glob_tab, gbuf))) {    /* global? */
     return gcmdp->action (gcmdp->arg, cptr);            /* do the rest */
     }
 else {
-    if (sim_dflt_dev->modifiers)
+    if (sim_dflt_dev->modifiers) {
+        if ((cvptr = strchr (gbuf, '=')))               /* = value? */
+            *cvptr++ = 0;
         for (mptr = sim_dflt_dev->modifiers; mptr->mask != 0; mptr++) {
             if (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)) {
                 dptr = sim_dflt_dev;
-                cptr -= strlen (gbuf) + 1;
+                cptr = svptr;
                 while (isspace(*cptr))
                     ++cptr;
                 break;
                 }
             }
+        }
     if (!dptr)
         return SCPE_NXDEV;                              /* no match */
     lvl = MTAB_VDV;                                     /* device match */
@@ -3764,6 +3767,8 @@ return SCPE_OK;                                         /* done all */
 
 CTAB *find_ctab (CTAB *tab, const char *gbuf)
 {
+if (!tab)
+    return NULL;
 for (; tab->name != NULL; tab++) {
     if (MATCH_CMD (gbuf, tab->name) == 0)
         return tab;
@@ -3773,6 +3778,8 @@ return NULL;
 
 C1TAB *find_c1tab (C1TAB *tab, const char *gbuf)
 {
+if (!tab)
+    return NULL;
 for (; tab->name != NULL; tab++) {
     if (MATCH_CMD (gbuf, tab->name) == 0)
         return tab;
@@ -3899,7 +3906,7 @@ return r;
 t_stat show_cmd_fi (FILE *ofile, int32 flag, char *cptr)
 {
 uint32 lvl = 0xFFFFFFFF;
-char gbuf[CBUFSIZE], *cvptr;
+char gbuf[CBUFSIZE], *cvptr, *svptr;
 DEVICE *dptr;
 UNIT *uptr;
 MTAB *mptr;
@@ -3908,7 +3915,7 @@ SHTAB *shtb = NULL, *shptr;
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
-cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
+cptr = get_glyph (svptr = cptr, gbuf, 0);               /* get next glyph */
 
 if ((dptr = find_dev (gbuf))) {                         /* device match? */
     uptr = dptr->units;                                 /* first unit */
@@ -3930,19 +3937,22 @@ else if ((shptr = find_shtab (show_glob_tab, gbuf))) {  /* global? */
     return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
     }
 else {
-    if (sim_dflt_dev->modifiers)
+    if (sim_dflt_dev->modifiers) {
+        if ((cvptr = strchr (gbuf, '=')))               /* = value? */
+            *cvptr++ = 0;
         for (mptr = sim_dflt_dev->modifiers; mptr->mask != 0; mptr++) {
             if ((((mptr->mask & MTAB_VDV) == MTAB_VDV) &&
                  (mptr->pstring && (MATCH_CMD (gbuf, mptr->pstring) == 0))) ||
                 (!(mptr->mask & MTAB_VDV) && (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)))) {
                 dptr = sim_dflt_dev;
                 lvl = MTAB_VDV;                         /* device match */
-                cptr -= strlen (gbuf) + 1;
+                cptr = svptr;
                 while (isspace(*cptr))
                     ++cptr;
                 break;
                 }
             }
+        }
     if (!dptr)
         return SCPE_NXDEV;                              /* no match */
     }
@@ -3987,6 +3997,8 @@ return SCPE_OK;
 
 SHTAB *find_shtab (SHTAB *tab, const char *gbuf)
 {
+if (!tab)
+    return NULL;
 for (; tab->name != NULL; tab++) {
     if (MATCH_CMD (gbuf, tab->name) == 0)
         return tab;
