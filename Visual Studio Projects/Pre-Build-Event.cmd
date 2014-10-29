@@ -75,8 +75,8 @@ rem top level directory named as it existed in the zip file.
 rem We rename that top level directory.  If a previous one already
 rem exists, that will be an older version, so we try to remove 
 rem that one first.
-if exist ../../windows-build rmdir /s /q ../../windows-build
-ren /Y ../../windows-build-windows-build windows-build
+if exist ..\..\windows-build rmdir /s /q ..\..\windows-build
+ren ..\..\windows-build-windows-build windows-build
 if errorlevel 1 goto _notice3
 if exist ../../windows-build-windows-build goto _notice3
 :_check_files
