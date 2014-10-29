@@ -8841,38 +8841,52 @@ t_stat sim_exp_check (EXPECT *exp, uint8 data)
 int32 i;
 EXPTAB *ep;
 int regex_checks = 0;
+char *tstr = NULL;
 
 if ((!exp) || (!exp->rules))                            /* Anying to check? */
     return SCPE_OK;
 
 exp->buf[exp->buf_ins++] = data;                        /* Save new data */
+exp->buf[exp->buf_ins] = '\0';                          /* Nul terminate for RegEx match */
 
 for (i=0; i < exp->size; i++) {
     ep = &exp->rules[i];
     if (ep->switches & EXP_TYP_REGEX) {
 #if defined (USE_REGEX)
         regmatch_t *matches;
+        char *cbuf = (char *)exp->buf;
         static size_t sim_exp_match_sub_count = 0;
 
+        if (tstr)
+            cbuf = tstr;
+        else {
+            if (strlen (exp->buf) != exp->buf_ins) { /* Nul characters in buffer? */
+                size_t off;
+                tstr = malloc (exp->buf_ins + 1);
+
+                tstr[0] = '\0';
+                for (off=0; off < exp->buf_ins; off += 1 + strlen (&exp->buf[off]))
+                    strcpy (&tstr[strlen (tstr)], &exp->buf[off]);
+                cbuf = tstr;
+                }
+            }
         ++regex_checks;
         matches = calloc ((ep->regex.re_nsub + 1), sizeof(*matches));
-        exp->buf[exp->buf_ins] = '\0';
         if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
             char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
             sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
-            sim_debug (exp->dbit, exp->dptr, "Against Match Rule: %s\n", ep->match_pattern);
+            sim_debug (exp->dbit, exp->dptr, "Against RegEx Match Rule: %s\n", ep->match_pattern);
             free (estr);
             }
-        if (!regexec (&ep->regex, (char *)exp->buf, ep->regex.re_nsub + 1, matches, REG_NOTBOL)) {
+        if (!regexec (&ep->regex, cbuf, ep->regex.re_nsub + 1, matches, REG_NOTBOL)) {
             size_t j;
             char *buf = malloc (1 + exp->buf_ins);
-
 
             for (j=0; j<ep->regex.re_nsub + 1; j++) {
                 char env_name[32];
 
                 sprintf (env_name, "_EXPECT_MATCH_GROUP_%d", (int)j);
-                memcpy (buf, &exp->buf[matches[j].rm_so], matches[j].rm_eo-matches[j].rm_so);
+                memcpy (buf, &cbuf[matches[j].rm_so], matches[j].rm_eo-matches[j].rm_so);
                 buf[matches[j].rm_eo-matches[j].rm_so] = '\0';
                 setenv (env_name, buf, 1);      /* Make the match and substrings available as environment variables */
                 sim_debug (exp->dbit, exp->dptr, "%s=%s\n", env_name, buf);
@@ -8947,6 +8961,7 @@ if (i != exp->size) {                                   /* Found? */
     /* Matched data is no longer available for future matching */
     exp->buf_ins = 0;
     }
+free (tstr);
 return SCPE_OK;
 }
 
