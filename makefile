@@ -804,6 +804,11 @@ ifeq ($(WIN32),)
     DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/x11.c
     DISPLAYVT = ${DISPLAYD}/vt11.c
     DISPLAY_OPT = -DUSE_DISPLAY -I/usr/X11/include -lXt -lX11 -lm
+    ifneq (3,$(GCC_MAJOR_VERSION))
+      ifneq (,$(findstring -Wdeprecated-declarations,$(shell $(GCC_WARNINGS_CMD))))
+        DISPLAY_OPT += -Wno-deprecated-declarations
+      endif
+    endif
   else
     DISPLAYL = 
     DISPLAYVT =
