@@ -66,14 +66,21 @@ ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
     VIDEO_USEFUL = true
+    DISPLAY_USEFUL = true
   endif
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
     NETWORK_USEFUL = true
     VIDEO_USEFUL = true
+    DISPLAY_USEFUL = true
     BUILD_MULTIPLE = s
     BUILD_SINGLE := all $(BUILD_SINGLE)
+  else
+    ifneq (,$(or $(or $(findstring pdp1,$(MAKECMDGOALS)),$(findstring pdp11,$(MAKECMDGOALS))),$(findstring tx-0,$(MAKECMDGOALS))))
+      DISPLAY_USEFUL = true
+      $(info DISPLAY USEFUL SET)
+    endif
   endif
 endif
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
@@ -393,6 +400,27 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info *** Info *** operating system distribution and rebuild your simulator to)
       $(info *** Info *** enable this extra functionality.)
       $(info *** Info ***)
+    endif
+  endif
+  ifneq (,$(DISPLAY_USEFUL))
+    ifeq (,$(WIN32))
+      ifneq (,$(call find_include,X11/Intrinsic))
+        ifneq (,$(call find_lib,Xt))
+          DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/x11.c
+          DISPLAYVT = ${DISPLAYD}/vt11.c
+          DISPLAY_OPT += -DUSE_DISPLAY -I$(dir $(call find_include,X11/Intrinsic))/include -lXt -lX11 -lm
+          $(info using display: $(call find_lib,Xt) $(call find_include,X11/Intrinsic))
+        endif
+        ifneq (,$(GCC_WARNINGS_CMD)$(CLANG_VERSION))
+          ifneq (,$(CLANG_VERSION)$(findstring -Wdeprecated-declarations,$(shell $(GCC_WARNINGS_CMD))))
+            DISPLAY_OPT += -Wno-deprecated-declarations
+          endif
+        endif
+      endif
+    else
+      DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/win32.c
+      DISPLAYVT = ${DISPLAYD}/vt11.c
+      DISPLAY_OPT = -DUSE_DISPLAY -lgdi32
     endif
   endif
   ifneq (,$(NETWORK_USEFUL))
@@ -799,26 +827,6 @@ SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
 	sim_video.c sim_imd.c
 
 DISPLAYD = display
-ifeq ($(WIN32),)
-  ifeq (x11,$(shell if $(TEST) -e /usr/include/X11/Intrinsic.h ; then echo x11; fi))
-    DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/x11.c
-    DISPLAYVT = ${DISPLAYD}/vt11.c
-    DISPLAY_OPT = -DUSE_DISPLAY -I/usr/X11/include -lXt -lX11 -lm
-    ifneq (,$(GCC_WARNINGS_CMD)$(CLANG_VERSION))
-      ifneq (,$(CLANG_VERSION)$(findstring -Wdeprecated-declarations,$(shell $(GCC_WARNINGS_CMD))))
-        DISPLAY_OPT += -Wno-deprecated-declarations
-      endif
-    endif
-  else
-    DISPLAYL = 
-    DISPLAYVT =
-    DISPLAY_OPT = 
-  endif
-else
-  DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/win32.c
-  DISPLAYVT = ${DISPLAYD}/vt11.c
-  DISPLAY_OPT = -DUSE_DISPLAY -lgdi32
-endif  
   
 #
 # Emulator source files and compile time options
