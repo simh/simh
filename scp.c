@@ -8860,13 +8860,13 @@ for (i=0; i < exp->size; i++) {
         if (tstr)
             cbuf = tstr;
         else {
-            if (strlen (exp->buf) != exp->buf_ins) { /* Nul characters in buffer? */
+            if (strlen ((char *)exp->buf) != exp->buf_ins) { /* Nul characters in buffer? */
                 size_t off;
                 tstr = malloc (exp->buf_ins + 1);
 
                 tstr[0] = '\0';
-                for (off=0; off < exp->buf_ins; off += 1 + strlen (&exp->buf[off]))
-                    strcpy (&tstr[strlen (tstr)], &exp->buf[off]);
+                for (off=0; off < exp->buf_ins; off += 1 + strlen ((char *)&exp->buf[off]))
+                    strcpy (&tstr[strlen (tstr)], (char *)&exp->buf[off]);
                 cbuf = tstr;
                 }
             }
