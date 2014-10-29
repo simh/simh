@@ -79,7 +79,6 @@ else
   else
     ifneq (,$(or $(or $(findstring pdp1,$(MAKECMDGOALS)),$(findstring pdp11,$(MAKECMDGOALS))),$(findstring tx-0,$(MAKECMDGOALS))))
       DISPLAY_USEFUL = true
-      $(info DISPLAY USEFUL SET)
     endif
   endif
 endif
