@@ -1,5 +1,9 @@
+;**** some possible debugging options
 ;set debug debug.log
-set debug stdout
+;set debug stdout
+
+;**** debugging of FDC
+;**** read/write operations, attach&detach, FDC service, IMD handling, DMA/verbose, FDC cmds
 ;set fdc debug=read
 ;set fdc debug=write
 ;set fdc debug=verbose
@@ -8,6 +12,9 @@ set debug stdout
 ;set fdc debug=dma
 ;set fdc debug=dmavb
 ;set fdc debug=cmd
+
+;**** debugging of CPU: exceptions, tracing, memory read/write
+;**** opcode fetch, stack push/pull, concurrency 
 ;set cpu exc
 ;set cpu debug=int
 ;set cpu debug=trace
@@ -16,18 +23,36 @@ set debug stdout
 ;set cpu debug=fetch
 ;set cpu debug=stack
 ;set cpu debug=conc
-;set con debug=svc
+
+;**** debugging of console: read/write to registers
 ;set con debug=read
 ;set con debug=write
+
+;**** debugging of timer: read/write, service
 ;set tim debug=read
 ;set tim debug=write
 ;set tim debug=svc
 
-att con 8000
+;**** you should attach a telnet terminal emulator to PDQ-3 console
+;**** to avoid mess with SIMH's control panel
+set console telnet=8000
 
+;**** you might remote control SIMH's control panel
+;set remote telnet=7000,telnet=buffered
+
+;**** you need a boot disk
 att fdc0 master.imd
+
+;**** make this write protected currently while emulator is still being debugged
 set fdc0 wrtlck
+
+;**** disable the second FDC
 set fdc1 disable
+
+;************************************************************************
+;**** The following is pure f***ing magic - you must have the source code
+;**** and a commented object dump of boot loader, SYSTEM.PASCAL, SYSTEM.DRIVERS etc.
+; otherwise you won't understand where I had checkpoints for debugging.
 
 ; HDT boot
 ;break f418:368
@@ -112,14 +137,22 @@ set fdc1 disable
 
 ;break d488:ed0
 
+;****
+;**** end of PFM section
+;************************************************************************
 
-
+;**** load the boot PROM code for HD support
 load hdt/CPU_C5.BIN
+;
+;**** set the INIT bit of SSR
 dep _ssr 80
 dep _ses 80
 
-
+;**** load some symbolic names for debuging (not needed in production)
 do names.sim
-boot cpu
-set debug stdout
 
+;**** run
+boot cpu
+
+;**** reset debug mode to normal when boot fails.
+set debug stdout

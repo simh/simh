@@ -39,8 +39,6 @@ extern UNIT con_unit[];
 
 static t_stat con_termsvc(UNIT *uptr);
 static t_stat con_pollsvc(UNIT *uptr);
-static t_stat con_attach(UNIT*, char*);
-static t_stat con_detach(UNIT*);
 static t_stat con_reset(DEVICE* dptr);
 
 static t_stat tim_reset(DEVICE *dptr);
@@ -87,27 +85,6 @@ static uint8 con_xmit;
 static uint8 con_rcv;
 
 /************************************************************************************************
- * Utilities
- ***********************************************************************************************/
-t_stat mux_attach(UNIT* uptr, char* cptr, SERMUX* mux) {
-  t_stat rc;
-  mux->desc.ldsc = &mux->ldsc;
-  if ((rc = tmxr_attach(&mux->desc, uptr, cptr)) == SCPE_OK) {
-    mux->poll->wait = mux->pfirst;
-    sim_activate(mux->poll, mux->poll->wait);
-  }
-  return rc;  
-}
-
-t_stat mux_detach(UNIT* uptr, SERMUX* mux) {
-  t_stat rc = tmxr_detach(&mux->desc, uptr);
-  mux->ldsc.rcve = 0;
-  sim_cancel(mux->poll);
-  sim_cancel(mux->term);
-  return rc;
-}
-
-/************************************************************************************************
  * Onboard Console
  ***********************************************************************************************/
 
@@ -125,6 +102,8 @@ UNIT con_unit[] = {
   { UDATA (&con_pollsvc, UNIT_ATTABLE, 0), CON_POLLRATE, },
   { UDATA (&con_termsvc, UNIT_IDLE, 0), CON_TERMRATE, }
 };
+static UNIT* con_tti = &con_unit[0]; /* shorthand for console input and output units */
+static UNIT* con_tto = &con_unit[1];
 
 REG con_reg[] = {
     { HRDATA (CTRL1,  con_ctrl1, 8) },
@@ -147,16 +126,6 @@ DEBTAB con_dflags[] = {
   { 0, 0 }
 };
 
-SERMUX con_mux[1] = {
-  { CON_POLLFIRST,      /*pfirst*/
-    CON_POLLRATE,       /*prate*/
-    { 0 },              /*ldsc*/
-    { 1,0,0,0 },        /*desc*/
-    &con_unit[1],       /*term*/
-    &con_unit[0]        /*poll*/
-  }
-};
-
 DEVICE con_dev = {
     "CON",      /*name*/
     con_unit, /*units*/
@@ -172,9 +141,9 @@ DEVICE con_dev = {
     NULL,       /*deposit*/
     &con_reset, /*reset*/
     NULL,       /*boot*/
-    con_attach, /*attach*/
-    con_detach, /*detach*/
-    &con_ctxt,   /*ctxt*/
+    NULL,       /*attach*/
+    NULL,       /*detach*/
+    &con_ctxt,  /*ctxt*/
     DEV_DEBUG|DEV_DISABLE,  /*flags*/
     0,          /*dctrl*/
     con_dflags, /*debflags*/
@@ -184,10 +153,8 @@ DEVICE con_dev = {
 
 /* bus reset handler */
 t_stat con_binit() {
-  SERMUX *mux = &con_mux[0];
-
   con_status = CONS_THRE;
-  if (mux->ldsc.conn) setbit(con_status, CONS_DSR);
+  setbit(con_status, CONS_DSR);
   
   con_ctrl1 = 0; /* no echo, receiver disabled, transmitter disabled */
   con_ctrl2 = 0; /* ASYNC mode, 8bits, Clock 1X */
@@ -199,37 +166,33 @@ t_stat con_binit() {
 /* common handlers */
 static t_stat con_reset(DEVICE* dptr)
 {
-  int32 wait;  
-  SERMUX * mux = &con_mux[0];
-  UNIT *term = mux->term;
-  UNIT *poll = mux->poll;
   DEVCTXT* ctxt = (DEVCTXT*)dptr->ctxt;
+  int32 wait = con_tti->wait = CON_POLLRATE;
 
-  wait = poll->wait = CON_POLLWAIT;
   sim_rtcn_init (wait, TMR_CONPOLL); /* init poll timer */
-  
-  sim_cancel(term);
+
+  sim_cancel(con_tto); /* disable output service */
   
   /* register/deregister I/O handlers */
   if (dptr->flags & DEV_DIS) {
     del_ioh(ctxt->ioi);
   } else {
     add_ioh(ctxt->ioi);
-    poll->buf = 0;
-    sim_activate (poll, wait);
+    con_tti->buf = 0;
+    sim_activate (con_tti, wait);
   }
   return con_binit();
 }
 
 t_stat con_attach(UNIT* uptr, char* cptr) {
   setbit(con_status, CONS_DSR|CONS_DSC);
-  return mux_attach(uptr, cptr, &con_mux[0]);
+  return SCPE_OK;
 }
 
 t_stat con_detach(UNIT* uptr) {
   clrbit(con_status, CONS_DSR);
   setbit(con_status, CONS_DSC);
-  return mux_detach(uptr, &con_mux[0]);
+  return SCPE_OK;
 }
 
 #define XMITENABLED() (isbitset(con_ctrl1,CONC1_RTS))
@@ -262,79 +225,46 @@ t_stat con_detach(UNIT* uptr) {
 
 /* Terminal output service */
 t_stat con_termsvc (UNIT *uptr) {
-  SERMUX *mux = &con_mux[0];
-  t_bool isnetwork = (mux->poll->flags & UNIT_ATT);
-  t_stat rc;
-  int ch = uptr->buf & 0xff;
-  
-//  sim_debug(DBG_CON_SVC, &con_dev, "termsvc: isnetwork=%d\n",isnetwork);
-  /* TODO? sim_tt_outcvt */
-  
+  t_stat rc = SCPE_OK;
+
+  int ch = sim_tt_outcvt(uptr->buf, TT_GET_MODE(uptr->flags));
   if (XMITENABLED()) { /* tranmitter enabled */
-    /* attached to a telnet port? */
-//    printf("*** Emit: %02x ***\n",uptr->buf & 0xff);
-    if (isnetwork) {
-      if ((rc=tmxr_putc_ln(&mux->ldsc, ch)) != SCPE_OK) {
-        sim_activate(uptr, uptr->wait);
-        return SCPE_OK;
-      } else
-        tmxr_poll_tx(&mux->desc);
-    } else {
-      if ((rc=sim_putchar_s(ch)) != SCPE_OK) {
-        sim_activate(uptr, uptr->wait);
-        return rc==SCPE_STALL ? SCPE_OK : rc;
+    if (ch >= 0) {
+      if ((rc = sim_putchar_s(ch)) != SCPE_OK) {
+        sim_activate(uptr, uptr->wait);   /* did not emit char, reschedule termsvc */
+        return rc == SCPE_STALL ? SCPE_OK : rc;
       }
     }
-    setbit(con_status,CONS_THRE); /* set transmitter holding reg empty */
-    cpu_assertInt(INT_CONT, TRUE); /* generate an interrupt because of DRQO */
   }
+  uptr->pos = uptr->pos + 1;
+  setbit(con_status, CONS_THRE); /* set transmitter holding reg empty */
+  cpu_assertInt(INT_CONT, TRUE); /* generate an interrupt because of DRQO */
   return SCPE_OK;
 }
 
 /* Terminal input service */
 t_stat con_pollsvc(UNIT *uptr) {
-  int32 c, kbdc;
-  SERMUX *mux = &con_mux[0];
-  t_bool isnetwork = (mux->poll->flags & UNIT_ATT);
+  int32 ch;
 
-  uptr->wait = sim_rtcn_calb(mux->prate, TMR_CONPOLL); /* calibrate timer */
-  sim_activate (uptr, uptr->wait); /* restart polling */
+  uptr->wait = sim_rtcn_calb(CON_TPS, TMR_CONPOLL); /* calibrate timer */
+  sim_activate(uptr, uptr->wait); /* restart polling */
 
-  kbdc = sim_poll_kbd(); /* check keyboard */
-  if (kbdc == SCPE_STOP) return kbdc; /* handle CTRL-E */
-
-  /* network-redirected input? */
-  if (isnetwork) {
-    if (tmxr_poll_conn(&mux->desc) >= 0) /* incoming connection */
-      mux->ldsc.rcve = 1;
-    tmxr_poll_rx(&mux->desc); /* poll for input */
-    if (!tmxr_rqln(&mux->ldsc)) return SCPE_OK;
-    /* input ready */
-    c = tmxr_getc_ln(&mux->ldsc);
-    if ((c & TMXR_VALID) == 0) return SCPE_OK;
-  } else {
-    c = kbdc; /* use char polled from keyboard */
-    if (c < SCPE_KFLAG) return c; /* ignore data if not valid */
-  }
-
-  c = sim_tt_inpcvt(c, TT_GET_MODE(uptr->flags));
-  uptr->buf = c & 0xff;
+  if ((ch = sim_poll_kbd()) < SCPE_KFLAG) /* check keyboard */
+    return ch;
+  uptr->buf = (ch & SCPE_BREAK) ? 0 : sim_tt_inpcvt(ch, TT_GET_MODE(uptr->flags));
   uptr->pos = uptr->pos + 1;
 
   if (RCVENABLED()) { /* receiver enabled? */
     if (RCVFULL()) /* handle data overrun */
-      setbit(con_status,CONS_OE);
-  
-    con_rcv = c & 0xff; /* put in receiver register */
-    setbit(con_status,CONS_DR); /* notify: data received */
+      setbit(con_status, CONS_OE);
+
+    con_rcv = ch & 0xff; /* put in receiver register */
+    setbit(con_status, CONS_DR); /* notify: data received */
     cpu_assertInt(INT_CONR, TRUE); /* generate interrupt because of DRQI */
 
     if (isbitset(con_ctrl1, CONC1_ECHO)) { /* echo? XXX handle in telnet handler? */
       /* XXX use direct send here, not sending via con_termsvc */
-      if (isnetwork)
-        tmxr_putc_ln(&mux->ldsc, c);
-      else
-        sim_putchar_s(c);
+      sim_putchar_s(ch);
     }
   }
   return SCPE_OK;
@@ -368,9 +298,6 @@ static int get_parity(int c, int even)
 // The logic in here uses the positive logic conventions as
 // described in the WD1931 data sheet, not the ones in the PDQ-3_Hardware_Users_Manual
 t_stat con_write(t_addr ioaddr, uint16 data) {
-  SERMUX * mux = &con_mux[0];
-  UNIT *term = mux->term;
-  UNIT *poll = mux->poll;
 
   /* note usart has inverted bus, so all data is inverted */
   data = (~data) & 0xff;
@@ -379,9 +306,9 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
     con_ctrl1 = data & 0xff;
     if (!RCVENABLED()) { /* disable receiver */
       clrbit(con_status,CONS_FE|CONS_PE|CONS_OE|CONS_DR);
-      sim_cancel(poll);
+      sim_cancel(con_tti);
     } else {
-      sim_activate(poll, poll->wait); /* start poll service, will raise interrupt if buffer full */
+      sim_activate(con_tti, con_tti->wait); /* start poll service, will raise interrupt if buffer full */
     }
     if (!XMITENABLED()) { /* disable transmitter */
       /* will drain current pending xmit service. RTS output is assumed to become inactive
@@ -390,7 +317,7 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
       if (XMITEMPTY()) {
       } else {
         /* some char in THR, start service to emit */
-        sim_activate(term, term->wait);
+        sim_activate(con_tto, con_tto->wait);
       }
     }
     break;
@@ -411,10 +338,10 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
     case CONC2_CLEN8: data &= 0xff; break;
     }
     con_xmit = data & 0xff;
-    term->buf = data;
+    con_tto->buf = data;
     clrbit(con_status,CONS_THRE);
     if (XMITENABLED())
-      sim_activate(term,term->wait);
+      sim_activate(con_tto, con_tto->wait);
   }
 //  RCVINTR();
   XMITINTR();
@@ -425,8 +352,6 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
 }
 
 t_stat con_read(t_addr ioaddr, uint16 *data) {
-  SERMUX *mux = &con_mux[0];
-  
   switch (ioaddr & 0x0003) {
   case 0: /* CTRL1 */
     *data = con_ctrl1;
@@ -435,8 +360,9 @@ t_stat con_read(t_addr ioaddr, uint16 *data) {
     *data = con_ctrl2;
     break;
   case 2:
-    if (mux->ldsc.conn) setbit(con_status, CONS_DSR);
-    else clrbit(con_status, CONS_DSR);
+    /* XXX find out whether terminal is attached to console? */
+    setbit(con_status, CONS_DSR);
+//    else clrbit(con_status, CONS_DSR);
     *data = con_status;
     clrbit(con_status,CONS_DSC); /* acknowledge change in DSR/DCD */
     break;
@@ -569,19 +495,19 @@ t_stat tim_write(t_addr ioaddr, uint16 data)
     sim_debug(DBG_TIM_WRITE, &tim_dev, DBG_PCFORMAT0 "Timer%d: mode=%d\n",
               DBG_PC, n, (data >> 1) & 7);
     if (n == 3) {
-      printf("Unimplemented: Mode=0xc0\n");
+      sim_printf("Unimplemented: Mode=0xc0\n");
       return STOP_IMPL;
     }
     if (data & 0x01) {
-      printf("Unimplemented: BCD mode: timer=%d\n",n);
+      sim_printf("Unimplemented: BCD mode: timer=%d\n",n);
       return STOP_IMPL;
     }
     if (!( (data & 0x0e)==0x00 || (data & 0x0e)==0x04)) {
-      printf("Unimplemented: Mode not 0 or 2: timer=%d\n",n);
+      sim_printf("Unimplemented: Mode not 0 or 2: timer=%d\n",n);
       return STOP_IMPL;
     }
     if ((data & 0x30) != 0x30) {
-      printf("Unimplemented: not 16 bit load: timer=%d\n",n);
+      sim_printf("Unimplemented: not 16 bit load: timer=%d\n",n);
       return STOP_IMPL;
     }
     tim[n].mode = data;

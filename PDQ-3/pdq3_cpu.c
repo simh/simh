@@ -310,7 +310,7 @@ static t_stat rom_ignore(t_addr ea, uint16 data) {
 t_stat cpu_boot(int32 unitnum, DEVICE *dptr) {
   t_stat rc;
   uint16 ctp, ssv, rq;
-  sim_printf("BOOT CPU\n");
+//  sim_printf("BOOT CPU\n");
   cpu_reset(dptr);
   dbg_init();
 
@@ -343,7 +343,7 @@ void cpu_finishAutoload() {
 
 /* CPU reset */
 t_stat cpu_reset (DEVICE *dptr) {
-  sim_printf("CPU RESET\n");
+//  sim_printf("CPU RESET\n");
   sim_brk_types = SWMASK('E')|SWMASK('R')|SWMASK('W');
   sim_brk_dflt = SWMASK('E');
   
@@ -709,7 +709,7 @@ static void DoCXG(uint8 segno, uint8 procno) {
   
 //  sim_printf("CXG: ptbl=%x, reg_segb=%x\n",ptbl,reg_segb);
   reg_ipc = createMSCW(ptbl, procno, reg_bp, osegno, osegb); /* call new segment */
-  sim_interval -= 63; /* actually 63.2 */
+  sim_interval--;
 }
 
 static t_stat Raise(uint16 err) {
@@ -788,7 +788,7 @@ static uint16 enque(uint16 qhead, uint16 qtask) {
 /* perform a task switch. If no task ready to run, wait for an interrupt */
 static t_stat taskswitch6() {
   uint16 vector, sem;
-  int level;
+  int level, kbdc;
   t_stat rc = SCPE_OK;
 //  int kbdc;
   sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "Taskswitch6: ctp=$%04x rq=$%04x\n",DBG_PC, reg_ctp, reg_rq);
@@ -804,7 +804,6 @@ static t_stat taskswitch6() {
       rc = DoSIGNAL(sem);
       return rc;
     } else {
-#if 0     
       kbdc = sim_poll_kbd(); /* check keyboard */
       if (kbdc == SCPE_STOP) return kbdc; /* handle CTRL-E */
       /* process timer */
@@ -812,10 +811,7 @@ static t_stat taskswitch6() {
         if ((rc = sim_process_event()) != SCPE_OK)
           return rc;
       }
-    sim_interval -= 4; /* actually 3.6, NOP cycle */
-#else
       sim_idle(TMR_IDLE, TRUE);
-#endif
     }
   }
 
@@ -864,7 +860,7 @@ static t_stat DoSIGNAL(uint16 sem) {
       sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "SIGNAL: reg_rq=$%x, reg_ctp=$%x\n", DBG_PC, reg_rq, reg_ctp);
       
       if (reg_ctp == NIL) { /* no current task (marker for int processing */
-        sim_interval -= 135; /* actually 134.8, consume time */
+        sim_interval--; /* consume time */
         return taskswitch6(); /* and switch task */
       }
       if (Getb(reg_ctp+OFFB_PRIOR,0) < Getb(qtask+OFFB_PRIOR,0)) { /* is qtask higher prio than current task? */
@@ -873,7 +869,7 @@ static t_stat DoSIGNAL(uint16 sem) {
       } else {
         /* else: nothing is waiting on this semaphore, discard argument, and continue */
         reg_sp++;
-        sim_interval -= 52; /* correct: 52.0 */
+        sim_interval--;
       }
       return rc;
     }
@@ -882,11 +878,11 @@ static t_stat DoSIGNAL(uint16 sem) {
   sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "SIGNAL: Sem=$%x(count=%d): increment\n",DBG_PC, sem, count);
   Put(sem+OFF_SEMCOUNT,count+1);
   if (reg_ctp == NIL) { /* if no active task, get one from ready queue */
-    sim_interval -= 135; /* actually 134.8 */
+    sim_interval--;
     return taskswitch6(); 
   }
   reg_sp++;
-  sim_interval -= 18; /* correct: 18.0 */
+  sim_interval--;
   return rc;
 }
 
@@ -905,14 +901,14 @@ static t_stat DoWAIT(uint16 sem) {
 //    sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "WAIT: new qhead=%x\n",DBG_PC, qhead);
     
     rc = taskswitch5(); /* save context in TIB, and switch to new task from ready queue */
-    sim_interval -= 91; /* actually 90.8 */
+    sim_interval--;
     sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "WAIT: DONE, switch to newTIB=$%04x\n",DBG_PC, reg_ctp);
     return rc;
   } else {
     sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "WAIT: Sem=$%04x(count=%d): decrement\n", DBG_PC, sem, count);
     Put(sem+OFF_SEMCOUNT,count-1);
   }
-  sim_interval -= 12; /* actually 11.6 */
+  sim_interval--;
   sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "WAIT: DONE, continue\n",DBG_PC);
   return SCPE_OK;
 }
@@ -933,7 +929,6 @@ static t_stat DoInstr(void) {
   uint8 ub1, ub2;
   uint8 segno, osegno, procno;
   float tf1, tf2;
-  double cyc = 0.0;
   int i;
 
   /* set PCX: current instr in progress */
@@ -959,229 +954,179 @@ static t_stat DoInstr(void) {
   case 0x18: case 0x19: case 0x1a: case 0x1b: case 0x1c: case 0x1d: case 0x1e: case 0x1f:
     /* SLDCi */
     Push(opcode & 0x1f);
-    cyc = 2.8;
     break;
   case 0x98: /* LDCN */
     Push(NIL);
-    cyc = 6.4;
     break;
   case 0x80: /* LDCB */
     Push(UB());
-    cyc = 5.6;
     break;
   case 0x81: /* LDCI */
     Push(W());
-    cyc = 8.4;
     break;
   case 0x82: /* LCA */
     Push(reg_segb + B());
-    cyc = 8.0;
     break;
   case 0x20: case 0x21: case 0x22: case 0x23: case 0x24: case 0x25: case 0x26: case 0x27:
   case 0x28: case 0x29: case 0x2a: case 0x2b: case 0x2c: case 0x2d: case 0x2e: case 0x2f:
     /* SLDLi */
     Push(Get(reg_mp + MSCW_SZ + (opcode & 0x0f)));
-    cyc = 6.4;
     break;
   case 0x87: /* LDL */
     Push(Get(reg_mp + MSCW_SZ -1 + B()));
-    cyc = 9.6;
     break;
   case 0x84: /* LLA */
     Push(reg_mp + MSCW_SZ -1 + B());
-    cyc = 7.6;
     break;
   case 0xa4: /* STL */
     Put(reg_mp + MSCW_SZ -1 + B(), Pop());
-    cyc = 9.6;
     break;
   case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37:
   case 0x38: case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d: case 0x3e: case 0x3f:
     /* SLDOi */
     Push(Get(reg_bp + MSCW_SZ + (opcode & 0x0f)));
-    cyc = 7.2;
     break;
   case 0x85: /* LDO */
     Push(Get(reg_bp + MSCW_SZ -1 + B()));
-    cyc = 10.0;
     break;
   case 0x86: /* LAO */
     Push(reg_bp + MSCW_SZ -1 + B()); 
-    cyc = 8.0;
     break;
   case 0xa5: /* SRO */
     Put(reg_bp + MSCW_SZ -1 + B(),Pop());
-    cyc = 13.2;
     break;
   case 0x89: /* LOD */
-    db = DB();
-    reg_lm = TraverseMSstat(db);
+    reg_lm = TraverseMSstat(DB());
     Push(Get(reg_lm + MSCW_SZ -1 + B()));
-    cyc = 17.2 + 3.2*db;
     break;
   case 0x88: /* LDA */
-    db = DB();
-    reg_lm = TraverseMSstat(db);
+    reg_lm = TraverseMSstat(DB());
     Push(reg_lm + MSCW_SZ -1 + B()); 
-    cyc = 15.2 + 3.2*db;
     break;
   case 0xa6: /* STR */
-    db = DB();
-    reg_lm = TraverseMSstat(db);
+    reg_lm = TraverseMSstat(DB());
     Put(reg_lm + MSCW_SZ -1 + B(),Pop());
-    cyc = 16.8 * 3.2*db;
     break;
   case 0xc4: /* STO */
     t1 = Pop(); Put(Pop(),t1);
-    cyc = 8.0;
     break;
   case 0x9a: /* LDE */
     t2 = GetSegbase(UB()); Push(Get(t2 + B()));
-    cyc = 26.8;
     break;
   case 0x9b: /* LAE */
     ub1 = UB();
     Push(GetSegbase(ub1) + B());
-    cyc = 24.8;
     break;
   case 0xd9: /* STE */
     ub1 = UB();
     Put(GetSegbase(ub1) + B(), Pop());
-    cyc = 26.0;
     break;
   case 0x83: /* LDC */
     b = B(); ub1 = UB();
     src = reg_segb + b + ub1;
     for (i=1; i<=ub1; i++) Put(reg_sp-i,Get(src-i));
     reg_sp -= ub1; 
-    cyc = 18.0 + 4.0*ub1;
     break;
   case 0xd0: /* LDM */
     ub1 = UB(); src = Pop() + ub1;
     for (i=1; i<=ub1; i++) Put(reg_sp-i,Get(src-i));
     reg_sp -= ub1;
-    cyc = 10.4 + 6.0*ub1;
     break;
   case 0x8e: /* STM */
     ub1 = UB(); dst = Get(reg_sp+ub1);
     for (i=0; i<=(ub1-1); i++) Put(dst+i,Pick(i));
     reg_sp += (ub1+1);
-    cyc = 12.4 + 6.0*ub1;
     break;
   case 0xa7: /* LDB */
     b = Pop(); 
     Push(Getb(Pop(), b));
-    cyc = 12.0;
     break;
   case 0xc8: /* STB */
     ub1 = Pop() & 0xff; /* index */ b = Pop(); /* byteaddr */
     Putb(Pop(), b, ub1);
-    cyc = 13.6;
     break;
   case 0xc5: /* MOV */
     b = B(); src = Pop(); dst = Pop();
     for (i=0; i<=(b-1); i++) Put(dst+i,Get(src+i));
-    cyc = 13.2 + 6.0*b;
     break;
   case 0x78: case 0x79: case 0x7a: case 0x7b: case 0x7c: case 0x7d: case 0x7e: case 0x7f:
     /* SINDi */
     Push(Get(Pop() + (opcode & 0x07)));
-    cyc = 8.4;
     break;
   case 0xe6: /* IND */
     Push(Get(Pop() + B()));
-    cyc = 12.4;
     break;
   case 0xe7: /* INC */
     Push(Pop() + B());
-    cyc = 9.6;
     break;
   case 0xd7: /* IXA */
     b = B(); t1 = Pop(); Push(Pop() + t1*b);
-    cyc = 9.6 + b/16384.*46.4;
     break;
   case 0xd8: /* IXP */
     ub1 = UB(); ub2 = UB(); inx = Pop();
     Push(Pop() + inx / ub1);
     Push(ub2); Push((inx % ub1) * ub2);
-    cyc = 35.6; /* inaccurate */
     break;
   case 0xc9: /* LDP */
     t1 = Pop(); /*start*/ t2 = Pop(); /*nbits*/
     /* Bogus warning: WD9693_PasIII_OSref_Jul82 is wrong here:
      * (sp+2) is an address not a value, so must be dereferenced first */
     Push((Get(Pop() /*addr*/) & GetMask(t1,t2)) >> t1);
-    cyc = 18.4 + 2.0*(t1+t2);
     break;
   case 0xca: /* STP */
     t4 = Pop(); /*data*/ t1 = Pop(); /*start*/ t2 = Pop(); /*nbits*/
     t3 = Pop(); /*addr*/ t5 = Get(t3);
     clrbit(t5,GetMask(t1,t2)); t4 = (t4 & masks[t2]) << t1;
     Put(t3, t5 | t4);
-    cyc = 20.4 + 2.0*t2 + 2.8*t1;
     break;
   case 0xa1: /* LAND */
     Push(Pop() & Pop());
-    cyc = 8.0;
     break;
   case 0xa0: /* LOR */
     Push(Pop() | Pop());
-    cyc = 8.0;
     break;
   case 0xe5: /* LNOT */
     Push(~Pop());
-    cyc = 5.2;
     break;
   case 0x9f: /* BNOT */
     Push((~Pop()) & 1);
-    cyc = 6.0;
     break;
   case 0xb4: /* LEUSW */
     t1 = Pop(); t2 = Pop() <= t1 ? 1 : 0;
     Push(t2);
-    cyc = t2 ? 9.6 : 10.4;
     break;
   case 0xb5: /* GEUSW */
     t1 = Pop(); t2 = Pop() >= t1 ? 1 : 0;
     Push(t2);
-    cyc = t2 ? 9.6 : 10.4;
     break;
   case 0xe0: /* ABI */
     ts1 = PopS();
     PushS(ts1 < 0 ? -ts1 : ts1);
-    cyc = ts1 < 0 ? 6.0 : 4.8;
     break;
   case 0xe1: /* NGI */
     PushS(-PopS());
-    cyc = 5.2;
     break;
   case 0xe2: /* DUP1 */
     Push(Tos());
-    cyc = 5.2;
     break;
   case 0xa2: /* ADI */
     PushS(PopS() + Pop()); 
-    cyc = 8.0;
     break;
   case 0xa3: /* SBI */
     ts1 = PopS(); PushS(PopS() - ts1); 
-    cyc = 8.0;
     break;
   case 0x8c: /* MPI */
     PushS(Pop() * Pop()); 
-    cyc = 28.0; /* average */
     break;
   case 0x8d: /* DVI */
     ts1 = PopS(); if (ts1 == 0) { Raise(PASERROR_DIVZERO); break; }
     ts2 = PopS() / ts1;
     PushS(ts2);
-    cyc = ts2 == 0 ? 8.4 : (ts2 > 0 ? 89.2 : 91.2);
     break;
   case 0x8f: /* MODI */
     ts1 = PopS(); if (ts1 <= 0) { Raise(PASERROR_DIVZERO); /* XXX */ break; }
     ts2 = Pop() % ts1;
     PushS(ts2); 
-    cyc = ts2 == 0 ? 8.4 : (ts2 > 0 ? 89.2 : 91.2);
     break;
   case 0xcb: /* CHK */
     t1 = Tos(); t2 = Pick(1); t3 = Pick(2);
@@ -1189,102 +1134,81 @@ static t_stat DoInstr(void) {
       reg_sp += 2;
     else 
       Raise(PASERROR_VALRANGE);
-    cyc = 14.4;
     break;
   case 0xb0: /* EQUI */
     t1 = PopS()==PopS() ? 1 : 0;
     Push(t1);
-    cyc = t1 ? 9.6 : 10.4;
     break;
   case 0xb1: /* NEQI */
     t1 = PopS()==PopS() ? 0 : 1;
     Push(t1);
-    cyc = t1 ? 9.6 : 10.4;
     break;
   case 0xb2: /* LEQI */
     ts1 = PopS(); t2 = PopS() <= ts1 ? 1 : 0;
     Push(t2);
-    cyc = t2 ? 10.4 : 11.2;
     break;
   case 0xb3: /* GEQI */
     ts1 = PopS(); t2 = PopS() >= ts1 ? 1 : 0;
     Push(t2);
-    cyc = t2 ? 10.4 : 11.2;
     break;
   case 0xcc: /* FLT */
     t1 = PopS();
     PushF((float)t1); 
-    cyc = t1 ? 30.8 : 10.8;
     break;
   case 0xbe: /* TNC */
     tf1 = PopF();
     PushS((int16)tf1);
-    cyc = tf1 ? (fabs(tf1)<0.5 ? 15.6 : 37.4) : 12.4; /* approximate */
     break;
   case 0xbf: /* RND */
     tf1 = PopF();
     PushS((int16)(tf1+0.5)); 
-    cyc = tf1 ? (fabs(tf1)<0.5 ? 15.6 : 37.4) : 12.4; /* approximate */
     break;
   case 0xe3: /* ABR */
     PushF((float)fabs(PopF()));
-    cyc = 5.2;
     break;
   case 0xe4: /* NGR */
     PushF(-PopF());
-    cyc = 5.2;
     break;
   case 0xc0: /* ADR */
     tf1 = PopF();
     PushF(tf1 + PopF());
-    cyc = tf1 ? 106.8 : 18.8; /* average */
     break;
   case 0xc1: /* SBR */
     tf1 = PopF(); PushF(PopF() - tf1);
-    cyc = tf1 ? 110.0 : 19.2; /* average */
     break;
   case 0xc2: /* MPR */
     tf1 = PopF();
     PushF(tf1 * PopF());
-    cyc = tf1 ? 168.6 : 26.4; /* average */
     break;
   case 0xc3: /* DVR */
     tf1 = PopF(); if (tf1 == 0) { Raise(PASERROR_DIVZERO); break; }
     tf2 = PopF();
     PushF(tf2 / tf1);
-    cyc = tf2 ? 217.2 : 32.4; /* average */
     break;
   case 0xcd: /* EQUREAL */
     tf1 = PopF();
     t1 = tf1==PopF() ? 1 : 0;
     Push(t1);
-    cyc = t1 ? 16.4 : (tf1 ? 18.4 : 14.8); /* average */
     break;
   case 0xce: /* LEQREAL */
     tf1 = PopF(); tf2 = PopF();
     t1 = tf2 <= tf1 ? 1 : 0;
     Push(t1);
-    cyc = tf1==tf2 ? 16.4 : (tf1 < tf2 ? 18.2 : 19.4); /* average */
     break;  
   case 0xcf: /* GEQREAL */
     tf1 = PopF(); tf2 = PopF();
     Push(tf2 >= tf1 ? 1 : 0);
-    cyc = tf1==tf2 ? 16.4 : 18.2; /* average */
     break;
   case 0xc6: /* DUP2 */
     Push(Pick(1)); Push(Pick(1)); 
-    cyc = 12.0;
     break;
   case 0xc7: /* ADJ */
     ub1 = UB(); len0 = Tos(); src = reg_sp+1; dst = reg_sp + len0 - ub1 +1;
-    cyc = 14.4;
     if (len0 > ub1) {
       for (i=1; i<=ub1; i++) Put(dst + ub1 -i, Get(src + ub1 - i));
-      cyc = 13.6 + 6.8*ub1;
     } else {
       for (i=0; i<len0; i++) Put(dst + i, Get(src + i));
       for (i=len0; i<ub1; i++) Put(dst+i,0);
-      cyc = 16.4 + 5.6*len0 + 2.8*(ub1-len0);
     }
     reg_sp += (len0-ub1+1);
     break;
@@ -1294,7 +1218,6 @@ static t_stat DoInstr(void) {
     if (hi <= (BSET_SZ-1) && lo <= (BSET_SZ-1)) {
       if (lo > hi) {
         reg_sp++; Put(reg_sp,0);
-        cyc = 18.0;
       } else {
         len0 = hi / WORD_SZ +1;
         reg_sp -= (len0-1); Put(reg_sp,len0);
@@ -1309,7 +1232,6 @@ static t_stat DoInstr(void) {
             Put(t2, src);
           }
         }
-        cyc = t1==1 ? 80.4 : (t1==2 ? 83.2 : (45.6 + 3.6*hi/WORD_SZ + 2.0*((hi+lo)%WORD_SZ))); /*approx*/
       }
     } else
       Raise(PASERROR_VALRANGE);
@@ -1319,7 +1241,6 @@ static t_stat DoInstr(void) {
     t2 = (0 <= ts1 && ts1 <= (len0*WORD_SZ -1)) ? GetBit(reg_sp+1, ts1) : 0;
     Put(reg_sp + len0 + 1,t2);
     reg_sp += (len0+1);
-    cyc = t2 ? (22.8 + len0 % WORD_SZ) : 18.4;
     break;
   case 0xdb: /* UNI */
     len0 = Tos(); len1 = Pick(len0 + 1);
@@ -1329,14 +1250,12 @@ static t_stat DoInstr(void) {
       src = reg_sp + 1; dst = reg_sp + len0 + 2;
       for (i=0; i<len0; i++) Put(dst+i, Get(dst+i) | Get(src+i));
       reg_sp += (len0+1);
-      cyc = len0==0 ? 6.6 : (12.4 + 7.2*len0);
     } else {
       src = reg_sp + len0 + 2; dst = reg_sp + 1;
       for (i=0; i<len1; i++) Put(dst+i, Get(dst+i) | Get(src+i));
       src = reg_sp + len0; dst = reg_sp + len0 + len1 + 1;
       for (i=0; i<= len0; i++) Put(dst-i, Get(src-i));
       reg_sp += (len1+1);
-      cyc = len1==0 ? (22.4 + 6.8*len0) : (24.0 + 14.0*len0 + 6.8*(len1-len0));
     }
     break;
   case 0xdc: /* INT */
@@ -1345,21 +1264,17 @@ static t_stat DoInstr(void) {
     len0 = Tos(); len1 = Pick(len0 + 1);
     if (len0==0) {
       reg_sp += (len1+1); Put(reg_sp,0);
-      cyc = len1 ? 12.0 : 11.6;
     } else if (len1==0) {
       reg_sp += (len0+1);
-      cyc = len0 ? 11.6 : 12.0;
     } else if (len1 > len0) {
       src = reg_sp+1; dst = reg_sp+len0 + 2;
       for (i=0; i<len0; i++) Put(dst+i,Get(dst+i) & Get(src+i));
       for (i=len0; i<len1; i++) Put(dst+i,0);
       reg_sp += (len0+1);
-      cyc = 15.2 + 7.2*len0;
     } else {      
       dst = reg_sp+ len0 + 2; src = reg_sp +1;
       for (i=0; i<len1; i++) Put(dst+i,Get(dst+i) & Get(src+i));
       reg_sp += (len0+1);
-      cyc = 15.2 + 7.2*len0 + 2.8*(len1-len0);
     }
     break;
   case 0xdd: /* DIF */
@@ -1368,20 +1283,16 @@ static t_stat DoInstr(void) {
      * src and dst are not addresses on stack (^p) but addresses OF stack */
     if (len0==0) {
       reg_sp++;
-      cyc = 6.0;
     } else if (len1==0) {
       reg_sp += (len0+1);
-      cyc = 12.0;
     } else if (len1 > len0) {
       src = reg_sp + 1; dst = reg_sp + len0 + 2;
       for (i=0; i<len0; i++) Put(dst+i, Get(dst+i) & ~Get(src+i));
       reg_sp += (len0+1);
-      cyc = 14.0 + 7.2*len0;
     } else {
       dst = reg_sp + len0 + 2; src = reg_sp + 1;
       for (i=0; i<len1; i++) Put(dst+i,Get(dst+i) & ~Get(src+i));
       reg_sp += (len0+1);
-      cyc = 13.6 + 7.2*len1;
     }
     break;
   case 0xb6: /* EQUPWR */
@@ -1406,7 +1317,6 @@ static t_stat DoInstr(void) {
       }      
     }
     reg_sp += (len0+len1+1); Put(reg_sp,(i >= max1 ? 1 : 0));
-    cyc = 16.0 + 7.6*min1 + 4.0*max1; /* inaccurate */
     break;
   case 0xb7: /* LEQPWR */
     len0 = Tos(); len1 = Pick(len0 + 1); i=0;
@@ -1425,7 +1335,6 @@ static t_stat DoInstr(void) {
       } 
     } else i = max1;
     reg_sp += (len0+len1+1); Put(reg_sp,(i >= max1 ? 1 : 0));
-    cyc = 16.0 + 8.4*min1 + 4.0*max1; /* inaccurate */
     break;
   case 0xb8: /* GEQPWR */
     len0 = Tos(); len1 = Pick(len0 + 1); i=0;
@@ -1444,88 +1353,64 @@ static t_stat DoInstr(void) {
       } 
     } else i = max1;
     reg_sp += (len0+len1+1); Put(reg_sp,(i >= max1 ? 1 : 0));
-    cyc = 21.6 + 8.4*min1 + 4.0*max1; /* inaccurate */
     break;
   case 0xb9: /* EQUBYT */
     b = B(); src = Pop(); dst = Pop(); i = 0;
     while (i < b && Getb(src,i) == Getb(dst,i)) i++;
     t1 = i >= b ? 1 : 0;
     Push(t1);
-    cyc = t1 ? (19.2 + 5.1*b) : (11.4 + 5.1*i); /* inaccurate */
     break;
   case 0xba: /* LEQBYT */
     b = B(); src = Pop(); dst = Pop(); i = 0;
     while (i < b && Getb(src,i) <= Getb(dst,i)) i++;
     Push(i >= b ? 1 : 0);
-    cyc = 18.4 + 10.4*b; /* inaccurate */
     break;
   case 0xbb: /* GEQBYT */
     b = B(); src = Pop(); dst = Pop(); i = 0;
     while (i < b && Getb(src,i) >= Getb(dst,i)) i++;
     Push(i >= b ? 1 : 0);
-    cyc = 18.4 + 10.4*b; /* inaccurate */
     break;
   case 0x8a: /* UJP */
     b = SB(); reg_ipc += b;
-    cyc = 12.4;
     break;
   case 0xd4: /* FJP */
     b = SB(); t1 = Pop();
-    cyc = 10.8;
-    if ((t1 & 1)==0) {
+    if ((t1 & 1)==0)
       reg_ipc += b;
-      cyc += 6.0;
-    }
     break;
   case 0xd2: /* EFJ */
     b = SB(); t1 = Pop(); t2 = Pop();
-    cyc = 11.8;
-    if (t2 != t1) {
+    if (t2 != t1)
       reg_ipc += b;
-      cyc += 7.4;
-    }
     break;
   case 0xd3: /* NFJ */
     b = SB(); t1 = Pop(); t2 = Pop();
-    cyc = 12.0;
-    if (t2 == t1) {
+    if (t2 == t1)
       reg_ipc += b;
-      cyc += 7.2;
-    }
     break;
   case 0x8b: /* UJPL */
     w = W(); reg_ipc += w;
-    cyc = 12.8;
     break;
   case 0xd5: /* FJPL */
     w = W(); t1 = Pop();
-    cyc = 10.0;
-    if ((t1 & 1)== 0) {
+    if ((t1 & 1)== 0)
       reg_ipc += w;
-      cyc += 8.8;
-    }
     break;
   case 0xd6: /* XJP */
     b = B(); t1 = Pop();
     t2 = Get(reg_segb + b);
-    if (t2 <= t1 && Get(reg_segb + b + 1) >= t1) {
+    if (t2 <= t1 && Get(reg_segb + b + 1) >= t1)
       reg_ipc += Get(reg_segb + b + 2 + (t1-t2));
-      cyc = 32.0;
-    } else {
-      cyc = t1 < t2 ? 29.2 : 34.0;
-    }
     break;
   case 0x90: /* CPL */
     procno = UB();
     ptbl = GetPtbl();
     reg_ipc = createMSCW(ptbl, procno, reg_mp, 0, reg_segb);
-    cyc = 45.6;
     break;
   case 0x91: /* CPG */
     procno = UB();
     ptbl = GetPtbl();
     reg_ipc = createMSCW(ptbl, procno, reg_bp, 0, reg_segb);
-    cyc = 44.8;
     break;
   case 0x92: /* CPI */
     db = DB(); procno = UB();
@@ -1537,7 +1422,6 @@ static t_stat DoInstr(void) {
     for (i=1; i<= db; i++)
         reg_lm = Get(reg_lm+OFF_MSSTAT);
     Put(reg_mp+OFF_MSSTAT,reg_lm); /* fix stat link */
-    cyc = 53.6 + 3.2*db;
     break;
   case 0x93: /* CXL */
     segno = UB(); procno = UB();
@@ -1546,7 +1430,6 @@ static t_stat DoInstr(void) {
     ptbl = SetSEGB(segno);
     AdjustRefCount(segno, 1);
     reg_ipc = createMSCW(ptbl, procno, reg_mp, osegno, osegb);
-    cyc = 64.4;
     break;
   case 0x94: /* CXG */
     ub1 = UB(); ub2 = UB();
@@ -1562,7 +1445,6 @@ static t_stat DoInstr(void) {
     reg_lm = reg_mp;
     for (i=1; i<= db; i++) reg_lm = Get(reg_lm+OFF_MSSTAT);  
     Put(reg_mp+OFF_MSSTAT,reg_lm); /* fix stat link */
-    cyc = 73.2 + 3.2*db;
     break;
   case 0x97: /* CPF */
     t1 = Pop(); reg_lm = Pop();
@@ -1573,7 +1455,6 @@ static t_stat DoInstr(void) {
     ptbl = SetSEGB(segno);
     AdjustRefCount(segno, 1);
     reg_ipc = createMSCW(ptbl, procno, reg_lm, osegno, osegb);
-    cyc = 75.6;
     break;
   case 0x96: /* RPU */
     dbg_procleave();
@@ -1587,13 +1468,11 @@ static t_stat DoInstr(void) {
       (void)SetSEGB(segno);
     }
     reg_sp += (b + MSCW_SZ);
-    cyc = 26.0;
     break;
   case 0x99: /* LSL */
     db = DB(); reg_lm = reg_mp;
     for (i=1; i<= db; i++) reg_lm = Get(reg_lm+OFF_MSSTAT);
     Push(reg_lm);
-    cyc = 12.4 + 3.2*db;
     break;
   case 0xde: /* SIGNAL */
     t1 = Pick(0);
@@ -1604,12 +1483,8 @@ static t_stat DoInstr(void) {
     DoWAIT(t1); break;
   case 0x9d: /* LPR */
     w = Tos();
-    cyc = 0.0;
-    if (w >= 0) {
+    if (w >= 0)
       save_to_tib(); 
-      cyc = 55.2;
-    } else
-      cyc = 8.4;
     if (w == -3) Put(reg_sp, reg_rq);
     else if (w == -2) Put(reg_sp, reg_ssv);
     else if (w == -1) Put(reg_sp, reg_ctp);
@@ -1620,7 +1495,6 @@ static t_stat DoInstr(void) {
     w = (int16)Pick(1);
     if (w >= -1)
       save_to_tib();
-    cyc = 8.4;
     if (w == -3) {
       reg_rq = t1;
     } else if (w == -2) {
@@ -1630,10 +1504,8 @@ static t_stat DoInstr(void) {
       reg_rq = t1;
       taskswitch5();
 //      sim_printf("SPR Taskswitch done reg_ctp=%x reg_rq=%x\n",reg_ctp,reg_rq);
-      cyc = 53.2;
       break; /* mustn't fall through reg_sp +=2 */
     } else if (w >= 1) {
-      cyc = 54.8;
       switch (w) {
       case OFF_SP: reg_sp = t1; break;
       case OFF_MP: reg_mp = t1; break;
@@ -1649,17 +1521,14 @@ static t_stat DoInstr(void) {
     break;
   case 0x9e: /* BPT */
     Raise(PASERROR_USERBRK);
-    cyc = 0; /* added in Raise() -> DoCXG() */
     return STOP_BPT;
 //    break;
   case 0x9c: /* NOP */
-    cyc = 3.6;
     break;
   case 0xbd: /* SWAP */
     t1 = Tos();
     Put(reg_sp, Pick(1));
     Put(reg_sp+1, t1);
-    cyc = 12.4;
     break;
   default:
 //    Raise(PASERROR_UNIMPL);
@@ -1673,7 +1542,7 @@ static t_stat DoInstr(void) {
   if (dbg_check(opcode, DEBUG_POST)) return STOP_DBGPOST;
 
   /* count cycles */
-  sim_interval -= (int)(cyc+0.5);
+  sim_interval--;
 
   return SCPE_OK;
 }
@@ -1710,12 +1579,7 @@ t_stat sim_instr(void)
       if ((rc = DoInstr()) != SCPE_OK) break;
     }
     else {
-#if 0
-      /* waste time by doing a NOP */
-      sim_interval -= 4; /* actually 3.6 */
-#else
       sim_idle(TMR_IDLE, TRUE);
-#endif
     }
 
     /* process interrupts 

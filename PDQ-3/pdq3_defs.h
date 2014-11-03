@@ -204,9 +204,8 @@
 #define CON_TERMUNIT 1
 #define CON_POLLFIRST 1 /* immediate */
 #define CON_POLLRATE 100
-#define CON_POLLWAIT 12500
-//#define CON_TERMRATE 1300
-#define CON_TERMRATE 300
+#define CON_TPS 100
+#define CON_TERMRATE 100
 
 /* floppy size */
 #define FDC_MAX_TRACKS  77
@@ -323,18 +322,6 @@ typedef union flcvt {
   float f;
   uint16 i[2];
 } T_FLCVT;
-
-/* wrapper structure for terminal multiplexer,
-   pointer to pointer stored in device->ctxt */
-typedef struct {
-  int pfirst, prate; /* pollrate first time, later */
-  TMLN ldsc;
-  TMXR desc;
-  UNIT* term;
-  UNIT* poll;
-} SERMUX;
-extern t_stat mux_attach(UNIT*, char*, SERMUX*);
-extern t_stat mux_detach(UNIT*, SERMUX*);
 
 /* externals */
 extern DEVICE cpu_dev;

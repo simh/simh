@@ -191,12 +191,12 @@ static t_stat pdq3_cmd_exstack(int32 arg, char *buf)
   int i;
   int n = buf[0] ? atol(buf) : 0;
   if (n < 0) n = 0;
-  printf("SP: $%04x LOW: $%04x UPR: $%04x\n",
+  sim_printf("SP: $%04x LOW: $%04x UPR: $%04x\n",
               reg_sp, reg_splow, reg_spupr);
   for (i=n; i>=0; i--) {
     if ((rc=Read(reg_sp+i, 0, &data, 0)) != SCPE_OK) continue;
-    if (i==0) printf("  TOS: "); else printf("  %3d: ",i);
-    printf("%04x ($%04x)\n", data, reg_sp+i);
+    if (i==0) sim_printf("  TOS: "); else sim_printf("  %3d: ",i);
+    sim_printf("%04x ($%04x)\n", data, reg_sp+i);
   }
   return SCPE_OK;
 }
