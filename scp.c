@@ -242,7 +242,9 @@
 #include <dlfcn.h>
 #endif
 
+#ifndef MAX
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
+#endif
 
 /* search logical and boolean ops */
 
