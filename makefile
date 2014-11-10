@@ -216,6 +216,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             else
               ifneq (,$(findstring Haiku,$(OSTYPE)))
                 HAIKU_ARCH=$(shell getarch)
+                ifeq ($(HAIKU_ARCH),)
+                  $(error Missing getarch command, your Haiku release is probably too old)
+                endif
+                ifeq ($(HAIKU_ARCH),x86_gcc2)
+                  $(error Unsupported arch x86_gcc2. Run setarch x86 and retry)
+                endif
                 INCPATH := $(shell findpaths -e -a $(HAIKU_ARCH) B_FIND_PATH_HEADERS_DIRECTORY)
                 INCPATH += $(shell findpaths -e B_FIND_PATH_HEADERS_DIRECTORY posix)
                 LIBPATH := $(shell findpaths -e -a $(HAIKU_ARCH) B_FIND_PATH_DEVELOP_LIB_DIRECTORY)
