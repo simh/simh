@@ -293,6 +293,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   $(info include paths are: $(INCPATH))
   find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
   find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
+  need_search = $(strip $(shell ld -l$(1) /dev/null 2>&1 | grep $(1) | sed s/$(1)//))
+  LD_SEARCH_NEEDED := $(call need_search,ZzzzzzzZ)
   ifneq (,$(call find_lib,m))
     OS_LDFLAGS += -lm
     $(info using libm: $(call find_lib,m))
@@ -337,6 +339,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_CCDEFS += -DHAVE_PCREPOSIX_H
       OS_LDFLAGS += -lpcreposix
       $(info using libpcreposix: $(call find_lib,pcreposix) $(call find_include,pcreposix))
+      ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcreposix))
+        OS_LDFLAGS += -L$(dir $(call find_lib,pcreposix))
+      endif
     endif
   else
     # If libpcreposix isn't available, fall back to the local regex.h 
