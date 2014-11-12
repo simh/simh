@@ -585,8 +585,8 @@ static void VFDHD_Command(void)
                     }
 
                     memset(&sdata.u.preamble, 0, 40);
-                    memset(&sdata.u.ecc, 0, 5); /* Clear out the ECC and ECC Valid bytes */
-                    sdata.u.ecc_valid = 0xAA;
+                    memset(&sdata.u.ecc, 0, 4); /* Clear out the ECC bytes  */
+                    sdata.u.ecc_valid = 0xAA;   /* Set the ECC Valid byte   */
                     for(vfdhd_info->datacount = 0; sdata.raw[vfdhd_info->datacount] == 0x00; vfdhd_info->datacount++) {
                     }
 
