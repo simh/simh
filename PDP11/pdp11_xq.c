@@ -1236,7 +1236,7 @@ t_stat xq_process_rbdl(CTLR* xq)
       xq->var->ReadQ.loss = 0;                  /* reset loss counter */
       }
     if (((~xq->var->csr & XQ_CSR_EL) &&
-         ((rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0)) > ETH_MAX_PACKET)) ||
+         (((uint16)((rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0)))) > ETH_MAX_PACKET)) ||
         ((xq->var->csr & XQ_CSR_EL) && (item->type == ETH_ITM_LOOPBACK) && 
          (rbl >= XQ_LONG_PACKET)))
       xq->var->rbdl_buf[4] |= XQ_RST_LASTERR;   /* set Error bit (LONG) */
@@ -1246,7 +1246,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     if (wstatus) return xq_nxm_error(xq);
 
     sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", 
-        xq->var->rbdl_ba, address, b_length, rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
+        xq->var->rbdl_ba, address, b_length, (int)((uint16)(rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0))), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
 
     /* remove packet from queue */
     if (item->packet.used >= item->packet.len) {
