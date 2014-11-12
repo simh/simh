@@ -1182,7 +1182,7 @@ int32 xu_command(CTLR* xu)
 void xu_process_receive(CTLR* xu)
 {
   uint32 segb, ba;
-  int slen, wlen, off = 0;
+  int slen, wlen;
   t_stat rstatus, wstatus;
   ETH_ITEM* item = 0;
   int state = xu->var->pcsr1 & PCSR1_STATE;
@@ -1226,6 +1226,9 @@ void xu_process_receive(CTLR* xu)
     slen = xu->var->rxhdr[0];
     segb = xu->var->rxhdr[1] + ((xu->var->rxhdr[2] & 3) << 16);
 
+    /* Initially clear status bits which are conditionally set below */
+    xu->var->rxhdr[2] &= ~(RXR_FRAM|RXR_OFLO|RXR_CRC|RXR_STF|RXR_ENF);
+
     /* get first packet from receive queue */
     if (!item) {
       item = &xu->var->ReadQ.item[xu->var->ReadQ.head];
@@ -1254,10 +1257,8 @@ void xu_process_receive(CTLR* xu)
     }
 
     /* is this the start of frame? */
-    if (item->packet.used == 0) {
+    if (item->packet.used == 0)
       xu->var->rxhdr[2] |= RXR_STF;
-      off = 0;
-    }
 
     /* figure out chained packet size */
     wlen = item->packet.crc_len - item->packet.used;
@@ -1265,7 +1266,7 @@ void xu_process_receive(CTLR* xu)
       wlen = slen;
 
     /* transfer chained packet to host buffer */
-    wstatus = Map_WriteB (segb, wlen, &item->packet.msg[off]);
+    wstatus = Map_WriteB (segb, wlen, &item->packet.msg[item->packet.used]);
     if (wstatus) {
       /* error during write */
       xu->var->stat |= STAT_ERRS | STAT_MERR | STAT_TMOT | STAT_RRNG;
@@ -1275,34 +1276,35 @@ void xu_process_receive(CTLR* xu)
 
     /* update chained counts */
     item->packet.used += wlen;
-    off += wlen;
 
-    /* Is this the end-of-frame? */
-    if (item->packet.used == item->packet.crc_len) {
+    /*
+     * Fill in the Received Message Length field.
+     * The documenation notes that the DEUNA actually performs
+     * a full CRC check on the data buffer, and adds this CRC
+     * value to the data, in the last 4 bytes.  The question
+     * is: does MLEN include these 4 bytes, or not???  --FvK
+     *
+     * A quick look at the RSX Process Software driver shows
+     * that the CRC byte count(4) is added to MLEN, but does
+     * not show if the DEUNA/DELUA actually transfers the
+     * CRC bytes to the host buffers, since the driver never
+     * tries to use them. However, since the host max buffer
+     * size is only 1514, not 1518, I doubt the CRC is actually
+     * transferred in normal mode. Maybe CRC is transferred
+     * and used in Loopback mode.. -- DTH
+     *
+     * The VMS XEDRIVER indicates that CRC is transferred as
+     * part of the packet, and is included in the MLEN count. -- DTH
+     */
+    xu->var->rxhdr[3] &= ~RXR_MLEN;
+    xu->var->rxhdr[3] |= wlen;
+
+    /* Is this the end-of-frame? OR is buffer chaining disabled? */
+    if ((item->packet.used == item->packet.crc_len) ||
+        (xu->var->mode & MODE_DRDC)) {
       /* mark end-of-frame */
       xu->var->rxhdr[2] |= RXR_ENF;
 
-      /*
-       * Fill in the Received Message Length field.
-       * The documenation notes that the DEUNA actually performs
-       * a full CRC check on the data buffer, and adds this CRC
-       * value to the data, in the last 4 bytes.  The question
-       * is: does MLEN include these 4 bytes, or not???  --FvK
-       *
-       * A quick look at the RSX Process Software driver shows
-       * that the CRC byte count(4) is added to MLEN, but does
-       * not show if the DEUNA/DELUA actually transfers the
-       * CRC bytes to the host buffers, since the driver never
-       * tries to use them. However, since the host max buffer
-       * size is only 1514, not 1518, I doubt the CRC is actually
-       * transferred in normal mode. Maybe CRC is transferred
-       * and used in Loopback mode.. -- DTH
-       *
-       * The VMS XEDRIVER indicates that CRC is transferred as
-       * part of the packet, and is included in the MLEN count. -- DTH
-       */
-      xu->var->rxhdr[3] &= ~RXR_MLEN;
-      xu->var->rxhdr[3] |= (item->packet.crc_len);
       if (xu->var->mode & MODE_DRDC) /* data chaining disabled */
         xu->var->rxhdr[3] |= RXR_NCHN;
 
