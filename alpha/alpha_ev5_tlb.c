@@ -538,7 +538,7 @@ t_addr lo, hi;
 uint32 lnt;
 TLBENT *tlbp;
 DEVICE *dptr;
-char *cptr = (char *) desc;
+const char *cptr = (char *) desc;
 
 lnt = (val)? DTLB_SIZE: ITLB_SIZE;
 dptr = find_dev_from_unit (uptr);
