@@ -508,6 +508,7 @@ lp_cctl = ptr;
 lp_cctp = 0;
 for (rpt = 0; rpt < lp_cctl; rpt++)
     lp_cct[rpt] = cctbuf[rpt];
+fclose (cfile);
 return SCPE_OK;
 }
 
