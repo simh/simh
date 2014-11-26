@@ -274,7 +274,7 @@ static t_stat ReadICache(t_addr tpc)
 	/* 68000/08/10 do not like unaligned access */
 	if (cputype < 3 && (tpc & 1)) return STOP_ERRADR;
 	
-	for (i=CACHE_SIZE; i>=0; i--) {
+	for (i=CACHE_SIZE-1; i>=0; i--) {
 		cache_line[i] = *mem--; 
 	}
 //	for (i=0; i<16; i++) printf("icache[%d]=0x%08x\n",i,cache_line[i]);
