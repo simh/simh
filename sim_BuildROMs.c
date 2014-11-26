@@ -185,6 +185,7 @@ else
 printf ("The ROMs array entry for this new ROM image file should look something like:\n");
 printf ("{\"%s\",    \"%s\",     %d,  0x%08X, \"%s\"}\n",
         rom_filename, include_filename, (int)(statb.st_size), checksum, array_name);
+free (ROMData);
 return 1;
 }
 
@@ -259,7 +260,7 @@ if ((expected_checksum != 0) && (checksum != expected_checksum)) {
     printf ("This can happen if the file was transferred or unpacked incorrectly\n");
     printf ("and in the process tried to convert line endings rather than passing\n");
     printf ("the file's contents unmodified\n");
-    fclose (rFile);
+    free (ROMData);
     return -1;
     }
 /*
@@ -287,6 +288,7 @@ if (0 == sim_read_ROM_include(include_filename,
 
 if (NULL == (iFile = fopen (include_filename, "w"))) {
     printf ("Error Opening '%s' for output: %s\n", include_filename, strerror(errno));
+    free (ROMData);
     return -1;
     }
 load_filename = strrchr (rom_filename, '/');
