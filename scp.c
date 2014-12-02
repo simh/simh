@@ -329,7 +329,7 @@ pthread_t sim_asynch_main_threadid;
 UNIT * volatile sim_asynch_queue;
 UNIT * volatile sim_wallclock_queue;
 UNIT * volatile sim_wallclock_entry;
-UNIT * volatile sim_clock_cosched_queue;
+UNIT * volatile sim_clock_cosched_queue[SIM_NTIMERS];
 t_bool sim_asynch_enabled = TRUE;
 int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
@@ -4310,40 +4310,8 @@ else {
         accum = accum + uptr->time;
         }
     }
+sim_show_clock_queues (st, dnotused, unotused, flag, cptr);
 #if defined (SIM_ASYNCH_IO)
-pthread_mutex_lock (&sim_timer_lock);
-if (sim_wallclock_queue == QUEUE_LIST_END)
-    fprintf (st, "%s wall clock event queue empty, time = %.0f\n",
-             sim_name, sim_time);
-else {
-    fprintf (st, "%s wall clock event queue status, time = %.0f\n",
-             sim_name, sim_time);
-    for (uptr = sim_wallclock_queue; uptr != QUEUE_LIST_END; uptr = uptr->a_next) {
-        if ((dptr = find_dev_from_unit (uptr)) != NULL) {
-            fprintf (st, "  %s", sim_dname (dptr));
-            if (dptr->numunits > 1)
-                fprintf (st, " unit %d", (int32) (uptr - dptr->units));
-            }
-        else fprintf (st, "  Unknown");
-        fprintf (st, " after ");
-        fprint_val (st, (t_value)uptr->a_usec_delay, 10, 0, PV_RCOMMA);
-        fprintf (st, " usec\n");
-        }
-    }
-if (sim_clock_cosched_queue != QUEUE_LIST_END) {
-    fprintf (st, "%s clock (%s) co-schedule event queue status, time = %.0f\n",
-             sim_name, sim_uname(sim_clock_unit), sim_time);
-    for (uptr = sim_clock_cosched_queue; uptr != QUEUE_LIST_END; uptr = uptr->a_next) {
-        if ((dptr = find_dev_from_unit (uptr)) != NULL) {
-            fprintf (st, "  %s", sim_dname (dptr));
-            if (dptr->numunits > 1)
-                fprintf (st, " unit %d", (int32) (uptr - dptr->units));
-            }
-        else fprintf (st, "  Unknown");
-        fprintf (st, "\n");
-        }
-    }
-pthread_mutex_unlock (&sim_timer_lock);
 pthread_mutex_lock (&sim_asynch_lock);
 fprintf (st, "asynchronous pending event queue\n");
 if (sim_asynch_queue == QUEUE_LIST_END)

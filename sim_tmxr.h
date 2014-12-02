@@ -239,6 +239,7 @@ t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, ch
 t_stat tmxr_activate (UNIT *uptr, int32 interval);
 t_stat tmxr_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval);
+t_stat tmxr_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval);
 t_stat tmxr_change_async (void);
 t_stat tmxr_locate_line_send (const char *dev_line, SEND **snd);
 t_stat tmxr_locate_line_expect (const char *dev_line, EXPECT **exp);
@@ -262,6 +263,7 @@ extern FILE *sim_deb;                                   /* debug file */
 #define sim_activate tmxr_activate
 #define sim_activate_after tmxr_activate_after
 #define sim_clock_coschedule tmxr_clock_coschedule 
+#define sim_clock_coschedule_tmr tmxr_clock_coschedule_tmr
 #endif
 #else
 #define tmxr_attach(mp, uptr, cptr) tmxr_attach_ex(mp, uptr, cptr, FALSE)

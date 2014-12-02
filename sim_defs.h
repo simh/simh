@@ -844,7 +844,6 @@ extern pthread_t sim_asynch_main_threadid;
 extern UNIT * volatile sim_asynch_queue;
 extern UNIT * volatile sim_wallclock_queue;
 extern UNIT * volatile sim_wallclock_entry;
-extern UNIT * volatile sim_clock_cosched_queue;
 extern volatile t_bool sim_idle_wait;
 extern int32 sim_asynch_check;
 extern int32 sim_asynch_latency;
@@ -920,21 +919,24 @@ extern int32 sim_asynch_inst_latency;
             if ((uptr)->a_next == NULL)                           \
                 (uptr)->a_due_time = (uptr)->a_usec_delay = 0;    \
             else {                                                \
-                if ((uptr) == sim_clock_cosched_queue) {          \
-                    sim_clock_cosched_queue = (uptr)->a_next;     \
-                    (uptr)->a_next = NULL;                        \
-                    }                                             \
-                else                                              \
-                    for (cptr = sim_clock_cosched_queue;          \
-                        (cptr != QUEUE_LIST_END);                 \
-                        cptr = cptr->a_next)                      \
-                        if (cptr->a_next == (uptr)) {             \
-                            cptr->a_next = (uptr)->a_next;        \
-                            (uptr)->a_next = NULL;                \
-                            break;                                \
-                            }                                     \
-                if ((uptr)->a_next == NULL) {                     \
-                    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Clock Coscheduling Event for %s\n", sim_uname(uptr));\
+                int tmr;                                          \
+                for (tmr=0; tmr<SIM_NTIMERS; tmr++) {             \
+                    if ((uptr) == sim_clock_cosched_queue[tmr]) { \
+                        sim_clock_cosched_queue[tmr] = (uptr)->a_next; \
+                        (uptr)->a_next = NULL;                    \
+                        }                                         \
+                    else                                          \
+                        for (cptr = sim_clock_cosched_queue[tmr]; \
+                            (cptr != QUEUE_LIST_END);             \
+                            cptr = cptr->a_next)                  \
+                            if (cptr->a_next == (uptr)) {         \
+                                cptr->a_next = (uptr)->a_next;    \
+                                (uptr)->a_next = NULL;            \
+                                break;                            \
+                                }                                 \
+                    if ((uptr)->a_next == NULL) {                 \
+                        sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Clock Coscheduling Event for %s\n", sim_uname(uptr));\
+                        }                                         \
                     }                                             \
                 }                                                 \
             while (sim_timer_event_canceled) {                    \
@@ -1087,6 +1089,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_QUEUE_MODE "Lock free asynchronous event queue access"
 #define AIO_INIT                                                  \
     if (1) {                                                      \
+      int tmr;                                                    \
       sim_asynch_main_threadid = pthread_self();                  \
       /* Empty list/list end uses the point value (void *)1.      \
          This allows NULL in an entry's a_next pointer to         \
@@ -1094,7 +1097,8 @@ extern int32 sim_asynch_inst_latency;
       sim_asynch_queue = QUEUE_LIST_END;                          \
       sim_wallclock_queue = QUEUE_LIST_END;                       \
       sim_wallclock_entry = NULL;                                 \
-      sim_clock_cosched_queue = QUEUE_LIST_END;                   \
+      for (tmr=0; tmr<SIM_NTIMERS; tmr++)                         \
+          sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;          \
       }                                                           \
     else                                                          \
       (void)0

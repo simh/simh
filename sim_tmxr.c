@@ -3514,14 +3514,19 @@ return _sim_activate_after (uptr, usecs_walltime);
 
 t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval)
 {
+return tmxr_clock_coschedule_tmr (uptr, 0, interval);
+}
+
+t_stat tmxr_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
+{
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
-    return sim_clock_coschedule (uptr, interval);
+    return sim_clock_coschedule (uptr, tmr, interval);
     }
 return SCPE_OK;
 #else
-return sim_clock_coschedule (uptr, interval);
+return sim_clock_coschedule_tmr (uptr, tmr, interval);
 #endif
 }
 

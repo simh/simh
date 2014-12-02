@@ -91,11 +91,13 @@ void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct time
 double sim_timenow_double (void);
 #endif
 int32 sim_rtcn_init (int32 time, int32 tmr);
+int32 sim_rtcn_init_unit (UNIT *uptr, int32 time, int32 tmr);
 void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
 t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
+t_stat sim_show_clock_queues (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_bool sim_idle (uint32 tmr, t_bool sin_cyc);
 t_stat sim_set_throt (int32 arg, char *cptr);
 t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr);
@@ -114,12 +116,12 @@ t_stat sim_timer_change_asynch (void);
 t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
 t_stat sim_register_clock_unit (UNIT *uptr);
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
+t_stat sim_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval);
 double sim_timer_inst_per_sec (void);
 uint32 sim_timer_idle_capable (uint32 *hoat_tick_ms);
 
 extern t_bool sim_idle_enab;                        /* idle enabled flag */
 extern volatile t_bool sim_idle_wait;               /* idle waiting flag */
-extern UNIT *sim_clock_unit;
 extern t_bool sim_asynch_timer;
 extern DEVICE sim_timer_dev;
 
