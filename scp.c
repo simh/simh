@@ -3217,12 +3217,16 @@ return SCPE_OK;
 
 /* Send command
 
-   Syntax: SEND {Delay=n},"string-to-send"
+   Syntax: SEND {After=m},{Delay=n},"string-to-send"
 
+   After  - is a positive integer representing a number of instruction delay 
+            before the initial characters is sent.  The value specified
+            in a after argument persists across SEND commands.  The after
+            parameter can be set by itself with SEND AFTER=n
    Delay  - is a positive integer representing a minimal instruction delay 
             before and between characters being sent.  The value specified
             in a delay argument persists across SEND commands.  The delay
-            parameter can be set by itself with SEND DELAY=n,""
+            parameter can be set by itself with SEND DELAY=n
    String - must be quoted.  Quotes may be either single or double but the
             opening anc closing quote characters must match.  Within quotes 
             C style character escapes are allowed.  
@@ -8781,8 +8785,12 @@ t_stat sim_exp_show (FILE *st, EXPECT *exp, const char *match)
 EXPTAB *ep = sim_exp_fnd (exp, match);
 
 if (exp->buf_size) {
+    char *bstr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
+
     fprintf (st, "Match Buffer Size: %d\n", exp->buf_size);
     fprintf (st, "Buffer Insert Offset: %d\n", exp->buf_ins);
+    fprintf (st, "Buffer Contents: %s\n", bstr);
+    free (bstr);
     }
 if (exp->after)
     fprintf (st, "Halt After: %d instructions\n", exp->after);
@@ -8877,13 +8885,40 @@ for (i=0; i < exp->size; i++) {
         }
     else {
         if (exp->buf_ins < ep->size) {
+            if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
+                char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
+                char *mstr = sim_encode_quoted_string (&ep->match[ep->size-exp->buf_ins], exp->buf_ins);
+
+                sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
+                sim_debug (exp->dbit, exp->dptr, "Against Match Data: %s\n", mstr);
+                free (estr);
+                free (mstr);
+                }
             if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins))
                 continue;
+            if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
+                char *estr = sim_encode_quoted_string (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->size-exp->buf_ins);
+                char *mstr = sim_encode_quoted_string (ep->match, ep->size-exp->buf_ins);
+
+                sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
+                sim_debug (exp->dbit, exp->dptr, "Against Match Data: %s\n", mstr);
+                free (estr);
+                free (mstr);
+                }
             if (memcmp (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->match, ep->size-exp->buf_ins))
                 continue;
             break;
             }
         else {
+            if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
+                char *estr = sim_encode_quoted_string (&exp->buf[exp->buf_ins-ep->size], ep->size);
+                char *mstr = sim_encode_quoted_string (ep->match, ep->size);
+
+                sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
+                sim_debug (exp->dbit, exp->dptr, "Against Match Data: %s\n", mstr);
+                free (estr);
+                free (mstr);
+                }
             if (memcmp (&exp->buf[exp->buf_ins-ep->size], ep->match, ep->size))
                 continue;
             break;
@@ -8922,10 +8957,12 @@ if (i != exp->size) {                                   /* Found? */
             sim_debug (exp->dbit, exp->dptr, "No actions specified, stopping...\n");
             }
         sim_brk_setact (ep->act);                       /* set up actions */
-        if (!(ep->switches & EXP_TYP_PERSIST))          /* One shot expect rule? */
-            sim_exp_clr_tab (exp, ep);                  /* delete it */
         if (ep->switches & EXP_TYP_CLEARALL)            /* One shot expect rule? */
             sim_exp_clrall (exp);                       /* delete all rules */
+        else {
+            if (!(ep->switches & EXP_TYP_PERSIST))      /* One shot expect rule? */
+                sim_exp_clr_tab (exp, ep);              /* delete it */
+            }
         sim_activate (&sim_expect_unit, exp->after);    /* schedule simulation stop when indicated */
         }
     /* Matched data is no longer available for future matching */
