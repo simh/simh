@@ -2933,6 +2933,10 @@ for (; *ip && (op < oend); ) {
                         strftime (rbuf, sizeof(rbuf), "%y", tmnow);
                         ap = rbuf;
                         }
+                    else if (!strcmp ("DATE_YC", gbuf)) {/* Century (year/100) */
+                        sprintf (rbuf, "%d", (tmnow->tm_year + 1900)/100);
+                        ap = rbuf;
+                        }
                     else if (!strcmp ("DATE_MM", gbuf)) {/* Month number (01-12) */
                         strftime (rbuf, sizeof(rbuf), "%m", tmnow);
                         ap = rbuf;
