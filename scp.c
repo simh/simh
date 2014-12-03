@@ -3280,7 +3280,7 @@ while (*cptr) {
     if ((!strncmp(gbuf, "AFTER=", 6)) && (gbuf[6])) {
         after = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
         if (r != SCPE_OK) {
-            sim_printf ("Invalid Delay Value\n");
+            sim_printf ("Invalid After Value\n");
             return SCPE_ARG|SCPE_NOMESSAGE;
             }
         cptr = tptr;
@@ -3305,7 +3305,7 @@ if (*cptr) {
         return SCPE_ARG|SCPE_NOMESSAGE;
         }
     }
-if ((dsize == 0) && (delay == 0))
+if ((dsize == 0) && (delay == 0) && (after == 0))
     return SCPE_2FARG;
 return sim_send_input (snd, dbuf, dsize, after, delay);
 }
