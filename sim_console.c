@@ -327,7 +327,7 @@ while (*cptr != 0) {                                    /* do all mods */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
     if ((ctptr = find_ctab (set_con_tab, gbuf))) {      /* match? */
-        r = ctptr->action (ctptr->arg, cvptr);      /* do the rest */
+        r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
         if (r != SCPE_OK)
             return r;
         }
@@ -898,6 +898,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                             cmdp = NULL;
                         }
                     else {
+                        sim_ttcmd ();                               /* restore console */
                         if (cmdp->action == &x_run_cmd) {
                             sim_switches |= SIM_SW_HIDE;            /* Request Setup only */
                             stat = basecmdp->action (cmdp->arg, cptr);
@@ -909,6 +910,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                             }
                         else
                             stat = cmdp->action (cmdp->arg, cptr);
+                        sim_ttrun ();                               /* set console mode */
                         }
                     }
                 }
@@ -1373,7 +1375,7 @@ while (*cptr != 0) {                                    /* do all mods */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
     if ((ctptr = find_ctab (set_con_telnet_tab, gbuf))) { /* match? */
-        r = ctptr->action (ctptr->arg, cvptr);      /* do the rest */
+        r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
         if (r != SCPE_OK)
             return r;
         }
