@@ -255,6 +255,13 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
               LIBPATH += /usr/pkg/lib
               INCPATH += /usr/pkg/include
               OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
+              OS_CCDEFS += -I/usr/pkg/include
+            endif
+            ifeq (X11R7,$(shell if $(TEST) -d /usr/X11R7/lib; then echo X11R7; fi))
+              LIBPATH += /usr/X11R7/lib
+              INCPATH += /usr/X11R7/include
+              OS_LDFLAGS += -L/X11R7/pkg/lib -R/usr/X11R7/lib
+              OS_CCDEFS += -I/usr/X11R7/include
             endif
             ifeq (/usr/local/lib,$(findstring /usr/local/lib,$(LIBPATH)))
               INCPATH += /usr/local/include
@@ -381,28 +388,28 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifneq (,$(VIDEO_USEFUL))
     ifneq (,$(call find_include,SDL2/SDL))
       ifneq (,$(call find_lib,SDL2))
-        OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL2/SDL))
-        OS_LDFLAGS += -lSDL2
+        VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL2/SDL))
+        VIDEO_LDFLAGS += -lSDL2
         VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
         $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
         ifeq (Darwin,$(OSTYPE))
-          OS_LDFLAGS += -lobjc -framework cocoa
+          VIDEO_LDFLAGS += -lobjc -framework cocoa
         endif
       endif
     else
       ifneq (,$(call find_include,SDL/SDL))
         ifneq (,$(call find_lib,SDL))
-          OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
-          OS_LDFLAGS += -lSDL
+          VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
+          VIDEO_LDFLAGS += -lSDL
           VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
           $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
           ifeq (Darwin,$(OSTYPE))
-            OS_LDFLAGS += -lobjc -framework cocoa
+            VIDEO_LDFLAGS += -lobjc -framework cocoa
           endif
         endif
       endif
     endif
-    ifeq (,$(findstring HAVE_LIBSDL,$(OS_CCDEFS)))
+    ifeq (,$(findstring HAVE_LIBSDL,$(VIDEO_CCDEFS)))
       $(info *** Info ***)
       $(info *** Info *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
       $(info *** Info *** functionality if video support were available on your system.)
@@ -676,8 +683,8 @@ else
   endif
   ifneq (,$(VIDEO_USEFUL))
     ifeq (libSDL,$(shell if exist ..\windows-build\libSDL\SDL2-2.0.0\include\SDL.h echo libSDL))
-      OS_CCDEFS += -DHAVE_LIBSDL -I..\windows-build\libSDL\SDL2-2.0.0\include
-      OS_LDFLAGS += -lSDL2 -L..\windows-build\libSDL\SDL2-2.0.0\lib
+      VIDEO_CCDEFS += -DHAVE_LIBSDL -I..\windows-build\libSDL\SDL2-2.0.0\include
+      VIDEO_LDFLAGS  += -lSDL2 -L..\windows-build\libSDL\SDL2-2.0.0\lib
       VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
     else
       $(info ***********************************************************************)
@@ -914,7 +921,7 @@ VAX610 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_io_lib.c
-VAX610_OPT = -DVM_VAX -DVAX_610 -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+VAX610_OPT = -DVM_VAX -DVAX_610 -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS}
 
 VAX630 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c ${VAXD}/vax_cmode.c \
@@ -927,7 +934,7 @@ VAX630 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_io_lib.c
 VAX620_OPT = -DVM_VAX -DVAX_620 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
-VAX630_OPT = -DVM_VAX -DVAX_630 -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+VAX630_OPT = -DVM_VAX -DVAX_630 -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS}
 
 
 VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
