@@ -1489,7 +1489,7 @@ t_bool tmxr_get_line_halfduplex (TMLN *lp)
 return (lp->halfduplex != FALSE);
 }
 
-t_stat tmxr_set_config_line (TMLN *lp, char *config)
+t_stat tmxr_set_config_line (TMLN *lp, const char *config)
 {
 t_stat r;
 
@@ -3715,7 +3715,7 @@ return SCPE_NOFNC;
 
 /* Write a message directly to a socket */
 
-void tmxr_msg (SOCKET sock, char *msg)
+void tmxr_msg (SOCKET sock, const char *msg)
 {
 if ((sock) && (sock != INVALID_SOCKET))
     sim_write_sock (sock, msg, (int32)strlen (msg));
@@ -3725,7 +3725,7 @@ return;
 
 /* Write a message to a line */
 
-void tmxr_linemsg (TMLN *lp, char *msg)
+void tmxr_linemsg (TMLN *lp, const char *msg)
 {
 int32 len;
 

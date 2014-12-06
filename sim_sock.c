@@ -1218,7 +1218,7 @@ if (rbytes == SOCKET_ERROR) {
 return rbytes;
 }
 
-int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes)
+int32 sim_write_sock (SOCKET sock, const char *msg, int32 nbytes)
 {
 int32 err, sbytes = send (sock, msg, nbytes, 0);
 
