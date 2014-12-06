@@ -6752,7 +6752,7 @@ for (tptr = cptr; tptr < (cptr + size); tptr++) {       /* remove cr or nl */
     }
 while (isspace (*cptr))                                 /* trim leading spc */
     cptr++;
-if (*cptr == ';') {                                     /* ignore comment */
+if ((*cptr == ';') || (*cptr == '#')) {                 /* ignore comment */
     if (sim_do_echo)                                    /* echo comments if -v */
         sim_printf("%s> %s\n", do_position(), cptr);
     *cptr = 0;
