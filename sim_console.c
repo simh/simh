@@ -2751,7 +2751,7 @@ return sim_ttcmd ();
 
 static t_bool sim_os_ttisatty (void)
 {
-return isatty (0);
+return isatty (fileno (stdin));
 }
 
 static t_stat sim_os_poll_kbd (void)
