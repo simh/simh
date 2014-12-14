@@ -366,13 +366,29 @@ MTAB ts_mod[] = {
     { 0 }
     };
 
+/* debugging bitmaps */
+#define DBG_REG  0x0001                                 /* display read/write register access */
+#define DBG_REQ  0x0002                                 /* display transfer requests */
+#define DBG_TAP  MTSE_DBG_STR                           /* display sim_tape and tape structure detail */
+#define DBG_POS  MTSE_DBG_POS                           /* display position activities */
+#define DBG_DAT  MTSE_DBG_DAT                           /* display transfer data */
+
+DEBTAB ts_debug[] = {
+  {"REG",    DBG_REG,   "display read/write register access"},
+  {"REQ",    DBG_REQ,   "display transfer requests"},
+  {"TAPE",   DBG_TAP,   "display sim_tape and tape structure detail"},
+  {"POS",    DBG_POS,   "display position activities"},
+  {"DATA",   DBG_DAT,   "display transfer data"},
+  {0}
+};
+
 DEVICE ts_dev = {
     "TS", &ts_unit, ts_reg, ts_mod,
     1, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &ts_reset,
     &ts_boot, &ts_attach, &ts_detach,
     &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE, 0,
-    NULL, NULL, NULL, &ts_help, NULL, NULL, 
+    ts_debug, NULL, NULL, &ts_help, NULL, NULL, 
     &ts_description
     };
 
@@ -394,12 +410,16 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
         break;
         }
 
+sim_debug(DBG_REG, &ts_dev, "ts_rd(PA=0x%08X [%s], access=%d): 0x%04X\n", PA, ((PA >> 1) & 01) ? "TSBA" : "TSSR", access, *data);
+
 return SCPE_OK;
 }
 
 t_stat ts_wr (int32 data, int32 PA, int32 access)
 {
 int32 i, t;
+
+sim_debug(DBG_REG, &ts_dev, "ts_wr(PA=0x%08X [%s], access=%d): 0x%04X\n", PA, ((PA >> 1) & 01) ? "TSDB" : "TSSR", access, data);
 
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
@@ -745,12 +765,8 @@ if (!(cmdhdr & CMD_ACK)) {                              /* no acknowledge? */
     }
 fnc = GET_FNC (cmdhdr);                                 /* get fnc+mode */
 mod = GET_MOD (cmdhdr);
-if (DEBUG_PRS (ts_dev)) {
-    fprintf (sim_deb, ">>TS: cmd=%s, mod=%o, buf=%o, lnt=%d, pos=",
-        fnc_name[fnc], mod, cmdadl, cmdlnt);
-    fprint_val (sim_deb, ts_unit.pos, 10, T_ADDR_W, PV_LEFT);
-    fprintf (sim_deb, "\n");
-    }
+sim_debug (DBG_REQ, &ts_dev, ">>STRT: cmd=%s, mod=%o, buf=%o, lnt=%d, pos=%" T_ADDR_FMT "u\n",
+        fnc_name[fnc], mod, cmdadl, cmdlnt, ts_unit.pos);
 if ((fnc != FNC_WCHR) && (tssr & TSSR_NBA)) {           /* ~wr chr & nba? */
     ts_endcmd (TC3, 0, 0);                              /* error */
     return SCPE_OK;
@@ -1031,12 +1047,8 @@ tssr = ts_updtssr (tssr | tc | TSSR_SSR | (tc? TSSR_SC: 0));
 if (cmdhdr & CMD_IE)
     SET_INT (TS);
 ts_ownm = 0; ts_ownc = 0;
-if (DEBUG_PRS (ts_dev)) {
-    fprintf (sim_deb, ">>TS: sta=%o, tc=%o, rfc=%d, pos=",
-        msgxs0, GET_TC (tssr), msgrfc);
-    fprint_val (sim_deb, ts_unit.pos, 10, T_ADDR_W, PV_LEFT);
-    fprintf (sim_deb, "\n");
-    }
+sim_debug (DBG_REQ, &ts_dev, ">>CMPL: sta=%o, tc=%o, rfc=%d, pos=%" T_ADDR_FMT "u\n",
+                        msgxs0, GET_TC (tssr), msgrfc, ts_unit.pos);
 return;
 }
 
