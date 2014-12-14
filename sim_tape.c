@@ -662,7 +662,7 @@ switch (f) {                                            /* switch on fmt */
     default:
         return MTSE_FMT;
         }
-sim_debug (MTSE_DBG_STR, ctx->dptr, "rd_lnt: st: %d, lnt: %d, pos: %d\n", r, *bc, uptr->pos);
+sim_debug (MTSE_DBG_STR, ctx->dptr, "rd_lnt: st: %d, lnt: %d, pos: %" T_ADDR_FMT "u\n", r, *bc, uptr->pos);
 return r;
 }
 
@@ -786,7 +786,7 @@ switch (f) {                                            /* switch on fmt */
     default:
         return MTSE_FMT;
         }
-sim_debug (MTSE_DBG_STR, ctx->dptr, "rd_lnt: st: %d, lnt: %d, pos: %d\n", r, *bc, uptr->pos);
+sim_debug (MTSE_DBG_STR, ctx->dptr, "rd_lnt: st: %d, lnt: %d, pos: %" T_ADDR_FMT "u\n", r, *bc, uptr->pos);
 return r;
 }
 
@@ -1001,7 +1001,7 @@ if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
     return sim_tape_ioerr (uptr);
     }
-sim_debug (MTSE_DBG_STR, ctx->dptr, "wr_lnt: lnt: %d, pos: %d\n", dat, uptr->pos);
+sim_debug (MTSE_DBG_STR, ctx->dptr, "wr_lnt: lnt: %d, pos: %" T_ADDR_FMT "u\n", dat, uptr->pos);
 uptr->pos = uptr->pos + sizeof (t_mtrlnt);              /* move tape */
 return MTSE_OK;
 }

@@ -203,9 +203,11 @@ typedef uint32          t_value;
 #if defined (USE_INT64) && defined (USE_ADDR64)         /* 64b address */
 typedef t_uint64        t_addr;
 #define T_ADDR_W        64
+#define T_ADDR_FMT      LL_FMT
 #else                                                   /* 32b address */
 typedef uint32          t_addr;
 #define T_ADDR_W        32
+#define T_ADDR_FMT      ""
 #endif                                                  /* end 64b address */
 
 #if defined (_WIN32)
@@ -698,10 +700,12 @@ struct sim_debtab {
     char                *desc;                          /* description */
     };
 
+/* Deprecated Debug macros.  Use sim_debug() */
+
 #define DEBUG_PRS(d)    (sim_deb && d.dctrl)
 #define DEBUG_PRD(d)    (sim_deb && d->dctrl)
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
-#define DEBUG_PRJ(d,m)  (sim_deb && (d->dctrl & (m)))
+#define DEBUG_PRJ(d,m)  (sim_deb && ((d)->dctrl & (m)))
 
 #define SIM_DBG_EVENT       0x10000
 #define SIM_DBG_ACTIVATE    0x20000
