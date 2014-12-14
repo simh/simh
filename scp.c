@@ -1796,22 +1796,28 @@ return 0;
 }
 #endif
 
+t_stat process_stdin_commands (t_stat stat, char *argv[]);
 
 /* Main command loop */
 
 int main (int argc, char *argv[])
 {
-char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *cptr2;
+char cbuf[4*CBUFSIZE], *cptr, *cptr2;
 char nbuf[PATH_MAX + 7];
+char **targv = NULL;
 int32 i, sw;
 t_bool lookswitch;
-t_stat stat, stat_nomessage;
-CTAB *cmdp;
+t_stat stat;
 
 #if defined (__MWERKS__) && defined (macintosh)
 argc = ccommand (&argv);
 #endif
 
+/* Make sure that argv has at least 10 elements and that it ends in a NULL pointer */
+targv = calloc (1+MAX(10, argc), sizeof(*targv));
+for (i=0; i<argc; i++)
+    targv[i] = argv[i];
+argv = targv;
 set_prompt (0, "sim>");                                 /* start with set standard prompt */
 *cbuf = 0;                                              /* init arg buffer */
 sim_switches = 0;                                       /* init switches */
@@ -1921,6 +1927,26 @@ else if (*argv[0]) {                                    /* sim name arg? */
         }
     }
 
+stat = process_stdin_commands (SCPE_BARE_STATUS(stat), argv);
+
+detach_all (0, TRUE);                                   /* close files */
+sim_set_deboff (0, NULL);                               /* close debug */
+sim_set_logoff (0, NULL);                               /* close log */
+sim_set_notelnet (0, NULL);                             /* close Telnet */
+sim_ttclose ();                                         /* close console */
+AIO_CLEANUP;                                            /* Asynch I/O */
+sim_cleanup_sock ();                                    /* cleanup sockets */
+fclose (stdnul);                                        /* close bit bucket file handle */
+free (targv);                                           /* release any argv copy that was made */
+return 0;
+}
+
+t_stat process_stdin_commands (t_stat stat, char *argv[])
+{
+char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr;
+t_stat stat_nomessage;
+CTAB *cmdp;
+
 stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag */
 while (stat != SCPE_EXIT) {                             /* in case exit */
     if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf))))   /* pending action? */
@@ -1958,16 +1984,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     }                                                   /* end while */
-
-detach_all (0, TRUE);                                   /* close files */
-sim_set_deboff (0, NULL);                               /* close debug */
-sim_set_logoff (0, NULL);                               /* close log */
-sim_set_notelnet (0, NULL);                             /* close Telnet */
-sim_ttclose ();                                         /* close console */
-AIO_CLEANUP;                                            /* Asynch I/O */
-sim_cleanup_sock ();                                    /* cleanup sockets */
-fclose (stdnul);                                        /* close bit bucket file handle */
-return 0;
+return stat;
 }
 
 /* Set prompt routine */
@@ -2570,7 +2587,7 @@ return cbuf;
 
 t_stat do_cmd_label (int32 flag, char *fcptr, char *label)
 {
-char *cptr, cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
+char *cptr, cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[11];
 FILE *fpin;
 CTAB *cmdp = NULL;
 int32 echo, nargs, errabort, i;
@@ -2593,6 +2610,7 @@ sim_on_inherit =(sim_switches & SWMASK ('O')) || sim_on_inherit; /* -o means inh
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
 
 c = fcptr;
+do_arg[10] = NULL;                                      /* make sure the argument list always ends with a NULL */
 for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
     while (isspace (*c))                                /* skip blanks */
         c++;
@@ -9095,7 +9113,7 @@ return SCPE_OK;
 /* Debug printout routines, from Dave Hittner */
 
 const char* debug_bstates = "01_^";
-char debug_line_prefix[256];
+AIO_TLS char debug_line_prefix[256];
 int32 debug_unterm  = 0;
 
 /* Finds debug phrase matching bitmask from from device DEBTAB table */
