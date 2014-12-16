@@ -5950,7 +5950,7 @@ printf ("\n");
 if (unechoed_cmdline)
     sim_printf("%s> %s\n", do_position(), unechoed_cmdline);
 fprint_stopped (stdout, r);                         /* print msg */
-if (sim_log && (sim_log != stdout)))                /* log if enabled */
+if (sim_log && (sim_log != stdout))                 /* log if enabled */
     fprint_stopped (sim_log, r);
 if (sim_deb && (sim_deb != stdout))                 /* log if enabled */
     fprint_stopped (sim_deb, r);
@@ -5986,10 +5986,10 @@ if (v >= SCPE_BASE)
 else
     fprintf (st, "\n%s, %s: ", sim_stop_messages[v], pc->name);
 pcval = get_rval (pc, 0);
-if (sim_vm_fprint_addr)
-    sim_vm_fprint_addr (st, dptr, (t_addr) pcval);
-else fprint_val (st, pcval, pc->radix, pc->width,
-    pc->flags & REG_FMT);
+if ((pc->flags & REG_VMAD) && sim_vm_fprint_addr)       /* if reg wants VM-specific printer */
+    sim_vm_fprint_addr (st, dptr, (t_addr) pcval);      /*   call it to print the PC address */
+else fprint_val (st, pcval, pc->radix, pc->width,       /* otherwise, print as a numeric value */
+    pc->flags & REG_FMT);                               /*   with the radix and formatting specified */
 if ((dptr != NULL) && (dptr->examine != NULL)) {
     for (i = 0; i < sim_emax; i++)
         sim_eval[i] = 0;
