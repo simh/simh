@@ -5950,9 +5950,9 @@ printf ("\n");
 if (unechoed_cmdline)
     sim_printf("%s> %s\n", do_position(), unechoed_cmdline);
 fprint_stopped (stdout, r);                         /* print msg */
-if (sim_log)                                        /* log if enabled */
+if (sim_log && (sim_log != stdout)))                /* log if enabled */
     fprint_stopped (sim_log, r);
-if (sim_deb)                                        /* log if enabled */
+if (sim_deb && (sim_deb != stdout))                 /* log if enabled */
     fprint_stopped (sim_deb, r);
 }
 
