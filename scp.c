@@ -3999,15 +3999,13 @@ if (*cptr == 0) {                                       /* now eol? */
         show_device (ofile, dptr, 0):
         show_unit (ofile, dptr, uptr, -1);
     }
-if (dptr->modifiers == NULL)                            /* any modifiers? */
-    return SCPE_NOPARAM;
 GET_SWITCHES (cptr);                                    /* get more switches */
 
 while (*cptr != 0) {                                    /* do all mods */
     cptr = get_glyph (cptr, gbuf, ',');                 /* get modifier */
     if ((cvptr = strchr (gbuf, '=')))                   /* = value? */
         *cvptr++ = 0;
-    for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
+    for (mptr = dptr->modifiers; mptr && (mptr->mask != 0); mptr++) {
         if (((mptr->mask & MTAB_XTD)?                   /* right level? */
             ((mptr->mask & lvl) == lvl): (MTAB_VUN & lvl)) &&
             ((mptr->disp && mptr->pstring &&            /* named disp? */
@@ -4023,10 +4021,18 @@ while (*cptr != 0) {                                    /* do all mods */
             break;
             }                                           /* end if */
         }                                               /* end for */
-    if (mptr->mask == 0) {                              /* no match? */
-        if (shtb && (shptr = find_shtab (shtb, gbuf)))          /* global match? */
-            shptr->action (ofile, dptr, uptr, shptr->arg, cptr);
-        else return SCPE_ARG;
+    if (!mptr || (mptr->mask == 0)) {                   /* no match? */
+        if (shtb && (shptr = find_shtab (shtb, gbuf))) {/* global match? */
+            t_stat r;
+
+            r = shptr->action (ofile, dptr, uptr, shptr->arg, cptr);
+            if (r != SCPE_OK)
+                return r;
+            }
+        else if (!dptr->modifiers)                      /* no modifiers? */
+            return SCPE_NOPARAM;
+        else
+            return SCPE_NXPAR;
         }                                               /* end if */
     }                                                   /* end while */
 return SCPE_OK;
