@@ -349,6 +349,7 @@ void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr) = NULL;
 t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr) = NULL;
 t_value (*sim_vm_pc_value) (void) = NULL;
 t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
+t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason) = NULL;
 
 /* Prototypes */
 
@@ -5987,7 +5988,12 @@ for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = sim_clock_queue) {
 return reset_all (0);
 }
 
-/* Print stopped message */
+/* Print stopped message 
+ * For VM stops, if a VM-specific "sim_vm_fprint_stopped" pointer is defined,
+ * call the indicated routine to print additional information after the message
+ * and before the PC value is printed.  If the routine returns FALSE, skip
+ * printing the PC and its related instruction.
+ */
 
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr)
 {
@@ -5996,10 +6002,20 @@ t_stat r = 0;
 t_addr k;
 t_value pcval;
 
-if (v >= SCPE_BASE)
-    fprintf (st, "\n%s, %s: ", sim_error_text (v), pc->name);
-else
-    fprintf (st, "\n%s, %s: ", sim_stop_messages[v], pc->name);
+fputc ('\n', st);                                       /* start on a new line */
+
+if (v >= SCPE_BASE)                                     /* SCP error? */
+    fputs (sim_error_text (v), st);                     /* print it from the SCP list */
+else {                                                  /* VM error */
+    fputs (sim_stop_messages [v], st);                  /* print the VM-specific message */
+
+    if ((sim_vm_fprint_stopped != NULL) &&              /* if a VM-specific stop handler is defined */
+        (!sim_vm_fprint_stopped (st, v)))               /*   call it; if it returned FALSE, */
+        return;                                         /*     we're done */
+    }
+
+fprintf (st, ", %s: ", pc->name);                       /* print the name of the PC register */
+
 pcval = get_rval (pc, 0);
 if ((pc->flags & REG_VMAD) && sim_vm_fprint_addr)       /* if reg wants VM-specific printer */
     sim_vm_fprint_addr (st, dptr, (t_addr) pcval);      /*   call it to print the PC address */
@@ -6009,7 +6025,7 @@ if ((dptr != NULL) && (dptr->examine != NULL)) {
     for (i = 0; i < sim_emax; i++)
         sim_eval[i] = 0;
     for (i = 0, k = (t_addr) pcval; i < sim_emax; i++, k = k + dptr->aincr) {
-        if ((r = dptr->examine (&sim_eval[i], k, dptr->units, SWMASK ('V'))) != SCPE_OK)
+        if ((r = dptr->examine (&sim_eval[i], k, dptr->units, SWMASK ('V')|SIM_SW_STOP)) != SCPE_OK)
             break;
         }
     if ((r == SCPE_OK) || (i > 0)) {
