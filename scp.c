@@ -860,6 +860,9 @@ static const char simh_help[] =
       " as paper-tape readers, and devices with write lock switches, such as disks\n"
       " and tapes, support read only operation; other devices do not.  If a file is\n"
       " attached read only, its contents can be examined but not modified.\n"
+      "5-q\n"
+      " If the -q switch is specified when creating a new file (-n) or opening one\n"
+      " read only (-r), the message announcing this fact is suppressed.\n"
       "5-f\n"
       " For simulated magnetic tapes, the ATTACH command can specify the format of\n"
       " the attached tape image file:\n\n"
@@ -5040,7 +5043,7 @@ if (sim_switches & SWMASK ('R')) {                      /* read only? */
     if (uptr->fileref == NULL)                          /* open fail? */
         return attach_err (uptr, SCPE_OPENERR);         /* yes, error */
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
-    if (!sim_quiet) {
+    if (!sim_quiet && !(sim_switches & SWMASK ('Q'))) {
         sim_printf ("%s: unit is read only\n", sim_dname (dptr));
         }
     }
@@ -5049,7 +5052,7 @@ else {
         uptr->fileref = sim_fopen (cptr, "wb+");        /* open new file */
         if (uptr->fileref == NULL)                      /* open fail? */
             return attach_err (uptr, SCPE_OPENERR);     /* yes, error */
-        if (!sim_quiet) {
+        if (!sim_quiet && !(sim_switches & SWMASK ('Q'))) {
             sim_printf ("%s: creating new file\n", sim_dname (dptr));
             }
         }
