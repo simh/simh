@@ -1612,7 +1612,10 @@ else {
         return SCPE_MEM;
     get_glyph_nc (filename, gbuf, 0);                   /* reparse */
     strncpy ((*pref)->name, gbuf, sizeof((*pref)->name)-1);
-    *pf = sim_fopen (gbuf, (binary ? "a+b" : "a+"));    /* open file */
+    if (sim_switches & SWMASK ('N'))                    /* if a new log file is requested */
+        *pf = sim_fopen (gbuf, (binary ? "w+b" : "w+"));/*   then open an empty file */
+    else                                                /* otherwise */
+        *pf = sim_fopen (gbuf, (binary ? "a+b" : "a+"));/*   append to an existing file */
     if (*pf == NULL) {                                  /* error? */
         free (*pref);
         *pref = NULL;
