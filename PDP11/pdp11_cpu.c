@@ -832,11 +832,7 @@ while (reason == 0)  {
     if (tbit)
         setTRAP (TRAP_TRC);
     if (wait_state) {                                   /* wait state? */
-        if (sim_idle_enab)                              /* idle enabled? */
-            sim_idle (TMR_CLK, TRUE);
-        else if (wait_enable)                           /* old style idle? */
-            sim_interval = 0;                           /* force check */
-        else sim_interval = sim_interval - 1;           /* count cycle */
+        sim_idle (TMR_CLK, TRUE);
         continue;
         }
 
