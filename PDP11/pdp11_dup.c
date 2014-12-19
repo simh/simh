@@ -340,11 +340,11 @@ DIB dup_dib = {
 };
 
 static UNIT dup_unit_template = {
-    UDATA (&dup_svc, UNIT_ATTABLE, 0), 
+    UDATA (&dup_svc, UNIT_ATTABLE|UNIT_IDLE, 0), 
     };
 
 static UNIT dup_poll_unit_template = {
-    UDATA (&dup_poll_svc, UNIT_DIS, 0), 
+    UDATA (&dup_poll_svc, UNIT_DIS|UNIT_IDLE, 0), 
     };
 
 static UNIT dup_units[DUP_LINES+1];    /* One unit per line and a polling unit */

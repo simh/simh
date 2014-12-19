@@ -712,13 +712,13 @@ static t_stat kmc_reset(DEVICE* dptr) {
                 memset (&rx_units[i][k], 0, sizeof tx_units[0][0]);
 
                 tx_units[i][k].action = &kmc_txService;
-                tx_units[i][k].flags = 0;
+                tx_units[i][k].flags = UNIT_IDLE;
                 tx_units[i][k].capac = 0;
                 tx_units[i][k].unit_kmc = k;
                 tx_units[i][k].unit_line = i;
 
                 rx_units[i][k].action = &kmc_rxService;
-                rx_units[i][k].flags = 0;
+                rx_units[i][k].flags = UNIT_IDLE;
                 rx_units[i][k].capac = 0;
                 rx_units[i][k].unit_kmc = k;
                 rx_units[i][k].unit_line = i;
@@ -728,7 +728,7 @@ static t_stat kmc_reset(DEVICE* dptr) {
 
         if (sim_switches & SWMASK ('P'))
             gflags &= ~FLG_INIT;
-
+    
         if (!(gflags & FLG_INIT)) { /* Power-up reset */
             sel0 = 0x00aa;
             sel2 = 0xa5a5;

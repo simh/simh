@@ -986,9 +986,9 @@ DEBTAB dmc_debug[] = {
 
 UNIT dmc_units[DMC_NUMDEVICE+2];            /* One per device plus an I/O polling unit and a timing unit */
 
-UNIT dmc_unit_template = { UDATA (&dmc_svc, UNIT_ATTABLE, 0) };
-UNIT dmc_poll_unit_template = { UDATA (&dmc_poll_svc, UNIT_DIS, 0) };
-UNIT dmc_timer_unit_template = { UDATA (&dmc_timer_svc, UNIT_DIS, 0) };
+UNIT dmc_unit_template = { UDATA (&dmc_svc, UNIT_ATTABLE|UNIT_IDLE, 0) };
+UNIT dmc_poll_unit_template = { UDATA (&dmc_poll_svc, UNIT_DIS|UNIT_IDLE, 0) };
+UNIT dmc_timer_unit_template = { UDATA (&dmc_timer_svc, UNIT_DIS|UNIT_IDLE, 0) };
 
 UNIT dmp_units[DMP_NUMDEVICE+2];            /* One per device plus an I/O polling unit and a timing unit */
 
@@ -2458,7 +2458,7 @@ if (dmc_is_attached(controller->unit)) {
     if ((controller->completion_queue->count) ||    /* if completion queue not empty? */
         (controller->control_out)             ||    /*    or pending control outs? */
         (controller->transfer_state != Idle))       /*    or registers are busy */
-        sim_activate (uptr, tmxr_poll);             /* wake up periodically until these don't exist */
+        sim_clock_coschedule (uptr, tmxr_poll);     /* wake up periodically until these don't exist */
     }
 
 return SCPE_OK;
@@ -2479,7 +2479,7 @@ if (dmc >= 0) {                                 /* new connection? */
     dmc_get_modem (controller);
     sim_debug(DBG_MDM, dptr, "dmc_poll_svc(dmc=%d) - Connection State Change to UP(ON)\n", dmc);
     ddcmp_dispatch (controller, 0);
-    sim_activate (controller->unit, tmxr_poll);     /* be sure to wake up soon to continue processing */
+    sim_clock_coschedule (controller->unit, tmxr_poll); /* be sure to wake up soon to continue processing */
     }
 tmxr_poll_rx (mp);
 tmxr_poll_tx (mp);
@@ -2499,7 +2499,7 @@ for (dmc=active=attached=0; dmc < mp->lines; dmc++) {
         (!(new_modem & DMC_SEL4_M_CAR))) {
         sim_debug(DBG_MDM, controller->device, "dmc_poll_svc(dmc=%d) - Connection State Change to %s\n", dmc, (new_modem & DMC_SEL4_M_CAR) ? "UP(ON)" : "DOWN(OFF)");
         ddcmp_dispatch (controller, 0);
-        sim_activate (controller->unit, tmxr_poll);     /* wake up soon to finish processing */
+        sim_clock_coschedule (controller->unit, tmxr_poll); /* wake up soon to finish processing */
         }
     if ((lp->xmte && tmxr_tpbusyln(lp)) || 
         (lp->xmte && controller->link.xmt_buffer) ||
