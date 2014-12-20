@@ -253,6 +253,7 @@ extern void (*sim_vm_post) (t_bool from_scp);
 extern CTAB *sim_vm_cmd;
 extern void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr);
 extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
+extern t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason);
 extern t_value (*sim_vm_pc_value) (void);
 extern t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs);
 
