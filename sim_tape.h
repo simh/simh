@@ -41,6 +41,7 @@ typedef uint32          t_mtrlnt;                       /* magtape rec lnt */
 #define MTR_TMK         0x00000000                      /* tape mark */
 #define MTR_EOM         0xFFFFFFFF                      /* end of medium */
 #define MTR_GAP         0xFFFFFFFE                      /* primary gap */
+#define MTR_RRGAP       0xFFFFFFFF                      /* reverse read half gap */
 #define MTR_FHGAP       0xFFFEFFFF                      /* fwd half gap (overwrite) */
 #define MTR_RHGAP       0xFFFF0000                      /* rev half gap (overwrite) */
 #define MTR_M_RHGAP     (~0x000080FF)                   /* range mask for rev gap */
@@ -103,6 +104,25 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTPOS_V_DLE     4
 #define MTPOS_M_DLE     (1u << MTPOS_V_DLE)            /* Detect LEOT */
 
+/* Tape density values */
+
+#define MT_DENS_NONE    0                               /* density not set */
+#define MT_DENS_200     1                               /* 200 bpi NRZI */
+#define MT_DENS_556     2                               /* 556 bpi NRZI */
+#define MT_DENS_800     3                               /* 800 bpi NRZI */
+#define MT_DENS_1600    4                               /* 1600 bpi PE */
+#define MT_DENS_6250    5                               /* 6250 bpi GCR */
+
+#define MTVF_DENS_MASK  (((1u << UNIT_S_DF_TAPE) - 1) << UNIT_V_DF_TAPE)
+#define MT_DENS(f)      (((f) & MTVF_DENS_MASK) >> UNIT_V_DF_TAPE)
+
+#define MT_NONE_VALID   (1u << MT_DENS_NONE)            /* density not set is valid */
+#define MT_200_VALID    (1u << MT_DENS_200)             /* 200 bpi is valid */
+#define MT_556_VALID    (1u << MT_DENS_556)             /* 556 bpi is valid */
+#define MT_800_VALID    (1u << MT_DENS_800)             /* 800 bpi is valid */
+#define MT_1600_VALID   (1u << MT_DENS_1600)            /* 1600 bpi is valid */
+#define MT_6250_VALID   (1u << MT_DENS_6250)            /* 6250 bpi is valid */
+
 /* Return status codes */
 
 #define MTSE_OK         0                               /* no error */
@@ -116,6 +136,7 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTSE_RECE       8                               /* error in record */
 #define MTSE_WRP        9                               /* write protected */
 #define MTSE_LEOT       10                              /* Logical End Of Tape */
+#define MTSE_RUNAWAY    11                              /* tape runaway */
 
 typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
 
@@ -143,8 +164,8 @@ t_stat sim_tape_wreom (UNIT *uptr);
 t_stat sim_tape_wreom_a (UNIT *uptr, TAPE_PCALLBACK callback);
 t_stat sim_tape_wreomrw (UNIT *uptr);
 t_stat sim_tape_wreomrw_a (UNIT *uptr, TAPE_PCALLBACK callback);
-t_stat sim_tape_wrgap (UNIT *uptr, uint32 gaplen, uint32 bpi);
-t_stat sim_tape_wrgap_a (UNIT *uptr, uint32 gaplen, uint32 bpi, TAPE_PCALLBACK callback);
+t_stat sim_tape_wrgap (UNIT *uptr, uint32 gaplen);
+t_stat sim_tape_wrgap_a (UNIT *uptr, uint32 gaplen, TAPE_PCALLBACK callback);
 t_stat sim_tape_sprecf (UNIT *uptr, t_mtrlnt *bc);
 t_stat sim_tape_sprecf_a (UNIT *uptr, t_mtrlnt *bc, TAPE_PCALLBACK callback);
 t_stat sim_tape_sprecsf (UNIT *uptr, uint32 count, uint32 *skipped);
@@ -173,6 +194,8 @@ t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat sim_tape_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sim_tape_set_dens (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat sim_tape_show_dens (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat sim_tape_set_asynch (UNIT *uptr, int latency);
 t_stat sim_tape_clr_asynch (UNIT *uptr);
 void sim_tape_data_trace (UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason);

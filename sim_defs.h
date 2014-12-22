@@ -530,6 +530,8 @@ struct sim_unit {
 #define UNIT_ATTMULT    0000001         /* Allow multiple attach commands */
 #define UNIT_TM_POLL    0000002         /* TMXR Polling unit */
 #define UNIT_NO_FIO     0000004         /* fileref is NOT a FILE * */
+#define UNIT_V_DF_TAPE  3               /* Bit offset for Tape Density reservation */
+#define UNIT_S_DF_TAPE  3               /* Bits Reserved for Tape Density */
 
 struct sim_bitfield {
     char            *name;                              /* field name */
