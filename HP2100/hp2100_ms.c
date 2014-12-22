@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2013, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   11-Dec-14    JDB     Updated for new erase gap API, added CRCC/LRCC support
    10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -92,8 +93,8 @@
 #define UST             u4                              /* unit status */
 #define REEL            u5                              /* tape reel size */
 
-#define BPI_13181       800                             /* 800 bpi for 13181 cntlr */
-#define BPI_13183       1600                            /* 1600 bpi for 13183 cntlr */
+#define BPI_13181       MT_DENS_800                     /* 800 bpi for 13181 cntlr */
+#define BPI_13183       MT_DENS_1600                    /* 1600 bpi for 13183 cntlr */
 #define GAP_13181       48                              /* gap is 4.8 inches for 13181 cntlr */
 #define GAP_13183       30                              /* gap is 3.0 inches for 13183 cntlr */
 #define TCAP            (300 * 12 * 800)                /* 300 ft capacity at 800 bpi */
@@ -186,6 +187,8 @@ struct {
 int32 msd_buf = 0;                                      /* data buffer */
 uint8 msxb[DBSIZE] = { 0 };                             /* data buffer */
 t_mtrlnt ms_ptr = 0, ms_max = 0;                        /* buffer ptrs */
+t_bool ms_crc = FALSE;                                  /* buffer ready for CRC calc */
+
 
 /* Hardware timing at 45 IPS                  13181                  13183
    (based on 1580 instr/msec)          instr   msec    SCP   instr    msec    SCP
@@ -244,6 +247,7 @@ t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc);
 void ms_config_timing (void);
 char *ms_cmd_name (uint32 cmd);
 t_stat ms_clear (void);
+static uint32 calc_crc_lrc (uint8 *buffer, t_mtrlnt length);
 
 
 /* MSD data structures
@@ -385,6 +389,7 @@ DEVICE msc_dev = {
 
 uint32 msdio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
+uint32   check;
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
@@ -410,6 +415,12 @@ while (working_set) {
             break;
 
         case ioIOI:                                     /* I/O data input */
+            if (ms_crc) {                               /* ready for CRC? */
+                check = calc_crc_lrc (msxb, ms_max);    /* calculate CRCC and LRCC */
+                msd_buf = check >> 8 & 0177400          /* position CRCC in upper byte */
+                            | check & 0377;             /*   and LRCC in lower byte */
+                }
+
             stat_data = IORETURN (SCPE_OK, msd_buf);    /* merge in return status */
             break;
 
@@ -429,6 +440,7 @@ while (working_set) {
             break;
 
         case ioSTC:                                     /* set control flip-flop */
+            ms_crc = FALSE;                             /* reset CRC ready */
             msd.control = SET;
             break;
 
@@ -821,8 +833,12 @@ switch (uptr->FNC) {                                    /* case on function */
             msc_sta = msc_sta | STA_ODD;
         else msc_sta = msc_sta & ~STA_ODD;
         sim_activate (uptr, msc_itime);                 /* sched IRG */
-        if (uptr->FNC == FNC_RFF) msc_1st = 1;          /* diagnostic? */
-        else uptr->FNC |= FNC_CMPL;                     /* set completion */
+        if (uptr->FNC == FNC_RFF)                       /* diagnostic? */
+            msc_1st = 1;                                /* restart */
+        else {
+            uptr->FNC |= FNC_CMPL;                      /* set completion */
+            ms_crc = TRUE;                              /*   and CRC ready */
+            }
         return SCPE_OK;
 
     case FNC_RFF | FNC_CMPL:                            /* diagnostic read completion */
@@ -870,6 +886,8 @@ switch (uptr->FNC) {                                    /* case on function */
             }
         sim_activate (uptr, msc_itime);                 /* sched IRG */
         uptr->FNC |= FNC_CMPL;                          /* set completion */
+        ms_max = ms_ptr;                                /* indicate buffer complete */
+        ms_crc = TRUE;                                  /*   and CRC may be generated */
         return SCPE_OK;
 
     case FNC_WC | FNC_CMPL:                             /* write completion */
@@ -900,9 +918,8 @@ t_stat ms_write_gap (UNIT *uptr)
 {
 t_stat st;
 uint32 gap_len = ms_ctype ? GAP_13183 : GAP_13181;      /* establish gap length */
-uint32 tape_bpi = ms_ctype ? BPI_13183 : BPI_13181;     /* establish nominal bpi */
 
-st = sim_tape_wrgap (uptr, gap_len, tape_bpi);          /* write gap */
+st = sim_tape_wrgap (uptr, gap_len);                    /* write gap */
 
 if (st != MTSE_OK)
     return ms_map_err (uptr, st);                       /* map error if failure */
@@ -1027,6 +1044,11 @@ for (i = 0; i < MS_NUMDR; i++) {
     sim_tape_reset (uptr);
     sim_cancel (uptr);
     uptr->UST = 0;
+
+    if (sim_switches & SWMASK ('P'))                    /* if this is an initialization reset */
+        sim_tape_set_dens (uptr,                        /*   then tell the tape library the density in use */
+                           ms_ctype ? BPI_13183 : BPI_13181,
+                           NULL, NULL);
     }
 
 return SCPE_OK;
@@ -1104,6 +1126,10 @@ for (i = 0; i < MS_NUMDR; i++) {
     }
 ms_ctype = (CNTLR_TYPE) val;
 ms_config_timing ();                                    /* update for new type */
+
+sim_tape_set_dens (uptr, ms_ctype ? BPI_13183 : BPI_13181,  /* tell the tape library the density in use */
+                   NULL, NULL);
+
 return SCPE_OK;
 }
 
@@ -1285,4 +1311,53 @@ if (ibl_copy (ms_rom, dev)) return SCPE_IERR;           /* copy boot to memory *
 SR = (SR & IBL_OPT) | IBL_MS | (dev << IBL_V_DEV);      /* set SR */
 if ((sim_switches & SWMASK ('S')) && AR) SR = SR | 1;   /* skip? */
 return SCPE_OK;
+}
+
+/* Calculate tape record CRC and LRC characters */
+
+#define E               0400                            /* parity bit for odd parity */
+#define O               0000                            /* parity bit for odd parity */
+
+static const uint16 odd_parity [256] = {                /* parity table */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 000-017 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 020-037 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 040-067 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 060-077 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 100-117 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 120-137 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 140-157 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 160-177 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 200-217 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 220-237 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 240-267 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 260-277 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 300-317 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 320-337 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 340-357 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E      /* 360-377 */
+    };
+
+static uint32 calc_crc_lrc (uint8 *buffer, t_mtrlnt length)
+{
+uint32 i;
+uint16 byte, crc, lrc;
+
+lrc = crc = 0;
+
+for (i = 0; i < length; i++) {
+    byte = odd_parity [buffer [i]] | buffer [i];
+
+    crc = crc ^ byte;
+    lrc = lrc ^ byte;
+
+    if (crc & 1)
+        crc = crc >> 1 ^ 0474;
+    else
+        crc = crc >> 1;
+    }
+
+crc = crc ^ 0727;
+lrc = lrc ^ crc;
+
+return (uint32) crc << 16 | lrc;
 }
