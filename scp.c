@@ -507,6 +507,8 @@ static char *sim_do_label[MAX_DO_NEST_LVL+1];
 static t_stat sim_last_cmd_stat;                        /* Command Status */
 
 static SCHTAB sim_stab;
+static t_value sim_last_ex_value;                       /* Most recent EXAMINE value */
+static uint32 sim_last_ex_radix = 0xFFFFFFFF;           /* Most recent EXAMINE radix */
 
 static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0)  };
 static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0)  };
@@ -1587,12 +1589,15 @@ ASSERT		failure have several different actions:
       " The values of simulator registers can be evaluated with:\n\n"
       "++{NOT} {<dev>} <reg>{<logical-op><value>}<conditional-op><value>\n\n"
       " If <dev> is not specified, CPU is assumed.  <reg> is a register (scalar\n"
-      " or subscripted) belonging to the indicated device.  The <conditional-op>\n"
-      " and optional <logical-op> are the same as those used for \"search\n"
-      " specifiers\" by the EXAMINE and DEPOSIT commands.  The <value>s are\n"
-      " expressed in the radix specified for <reg>, not in the radix for the\n"
-      " device.\n\n"
-      " If the <logical-op> and <value> are specified, the target register value\n"
+      " or subscripted) belonging to the indicated device.  The special register\n"
+      " name \"$\" represents the value displayed by the most recent EXAMINE\n"
+      " command.  If the special register name is used, the radix used for the\n"
+      " <value>s is the radix used in the most recent EXAMINE command.\n\n"
+      " The <conditional-op> and optional <logical-op> are the same as those used\n"
+      " for \"search specifiers\" by the EXAMINE and DEPOSIT commands.\n\n"
+      " The <value>s are expressed in the radix specified for <reg>, not in the\n"
+      " radix for the device.\n\n"
+      " If the <logical-op> and <value> are specified, the specified register value\n"
       " is first altered as indicated.  The result is then compared to the\n"
       " <value> via the <conditional-op>.  If the result is true, the additional\n"
       " command(s) are executed before proceeding to the next line in the command\n"
@@ -3132,6 +3137,7 @@ char gbuf[CBUFSIZE], gbuf2[CBUFSIZE];
 const char *tptr, *gptr;
 REG *rptr;
 uint32 idx;
+uint32 rdx;
 t_value val;
 t_stat r;
 t_bool not = FALSE;
@@ -3203,19 +3209,29 @@ if (*cptr == '"') {                                     /* quoted string compari
 else {
     cptr = get_glyph (cptr, gbuf, 0);                   /* get register */
     rptr = find_reg (gbuf, &gptr, sim_dfdev);           /* parse register */
-    if (!rptr)                                          /* not there */
-        return SCPE_NXREG;
-    if (*gptr == '[') {                                 /* subscript? */
-        if (rptr->depth <= 1)                           /* array register? */
-            return SCPE_ARG;
-        idx = (uint32) strtotv (++gptr, &tptr, 10);     /* convert index */
-        if ((gptr == tptr) || (*tptr++ != ']'))
-            return SCPE_ARG;
-        gptr = tptr;                                    /* update */
+    if (rptr) {
+        if (*gptr == '[') {                             /* subscript? */
+            if (rptr->depth <= 1)                       /* array register? */
+                return SCPE_ARG;
+            idx = (uint32) strtotv (++gptr, &tptr, 10); /* convert index */
+            if ((gptr == tptr) || (*tptr++ != ']'))
+                return SCPE_ARG;
+            gptr = tptr;                                /* update */
+            }
+        else idx = 0;                                   /* not array */
+        if (idx >= rptr->depth)                         /* validate subscript */
+            return SCPE_SUB;
+        val = get_rval (rptr, idx);                     /* get register value */
+        rdx = rptr->radix;                              /* and radix */
         }
-    else idx = 0;                                       /* not array */
-    if (idx >= rptr->depth)                             /* validate subscript */
-        return SCPE_SUB;
+    else {                                              /* not a register name */
+        if ((gbuf[0] != '$') ||
+            (sim_last_ex_radix == 0xFFFFFFFF))
+            return SCPE_NXREG;
+        val = sim_last_ex_value;                        /* use most recent EXAMINE value */
+        rdx = sim_last_ex_radix;                        /* and radix */
+        gptr = &gbuf[1];
+        }
     if (*gptr != 0)                                     /* more? must be search */
         get_glyph (gptr, gbuf, 0);
     else {
@@ -3231,10 +3247,9 @@ else {
         if (!flag)                                      
             return SCPE_2FARG;                          /* IF needs actions! */
         }
-    if (!get_search (gbuf, rptr->radix, &sim_stab) ||   /* parse condition */
+    if (!get_search (gbuf, rdx, &sim_stab) ||           /* parse condition */
         (sim_stab.boolop == -1))                        /* relational op reqd */
         return SCPE_MISVAL;
-    val = get_rval (rptr, idx);                         /* get register value */
     result = test_search (val, &sim_stab);              /* test condition */
     }
 if (not ^ result) {
@@ -6302,7 +6317,7 @@ return SCPE_OK;
 
 t_stat ex_reg (FILE *ofile, t_value val, int32 flag, REG *rptr, uint32 idx)
 {
-int32 rdx;
+uint32 rdx;
 
 if (rptr == NULL)
     return SCPE_IERR;
@@ -6312,6 +6327,8 @@ else fprintf (ofile, "%s:\t", rptr->name);
 if (!(flag & EX_E))
     return SCPE_OK;
 GET_RADIX (rdx, rptr->radix);
+sim_last_ex_value = val;
+sim_last_ex_radix = rdx;
 if ((rptr->flags & REG_VMAD) && sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, sim_dflt_dev, (t_addr) val);
 else if (!(rptr->flags & REG_VMIO) ||
