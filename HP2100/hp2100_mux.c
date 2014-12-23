@@ -137,7 +137,6 @@
 #include <ctype.h>
 
 #include "hp2100_defs.h"
-#include "sim_sock.h"
 #include "sim_tmxr.h"
 
 

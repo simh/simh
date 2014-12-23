@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2012-12-28
+                             Last update: 2014-12-19
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6389,5 +6389,357 @@
 
      RESOLUTION:  Modify "clk_reset" (hp2100_stddev.c) to allocate the logical
      name during a power-on reset.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+251. PROBLEM:  Constants required for exdep_cmd and brk_cmd aren't in scp.h.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  The scp.h header file exports the exdep_cmd and brk_cmd
+     functions, but the constants that must be passed in the "flag" parameters
+     for proper operation are not present.  The run_cmd function also requires
+     constants for the "flag" parameter, but these are present.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Move the EX_D, EX_E, EX_I, SSH_ST, SSH_CL, and SSH_SH
+     constants from scp.c to scp.h.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+252. PROBLEM:  Stop calls VM-provided address printer for PC without REG_VMAD.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  For a simulator stop, sim_vm_fprint_addr (if defined) is
+     called to print the value of the program counter, regardless of whether or
+     not the register was defined with REG_VMAD.  However, displaying the PC
+     value with "examine" calls sim_vm_fprint_addr only if the REG_VMAD flag is
+     present.  The displayed value of the PC should be the same in both cases.
+
+     CAUSE:  The call to sim_vm_fprint_addr in fprint_stopped_gen is not
+     conditional on the PC register having the REG_VMAD flag.
+
+     RESOLUTION:  Modify "fprint_stopped_gen" (scp.c) to require REG_VMAD before
+     calling the VM-specific address printer for the program counter value.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+253. PROBLEM:  Cannot show radix, etc. for a device that has no modifiers.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  The default data radix for a device may be set with the SET
+     <dev> OCT|DEC|HEX command.  However, if the device does not have a modifier
+     table, SHOW <dev> RADIX is rejected with "No settable parameters".
+
+     The same problem occurs for SHOW <dev> DEBUG and SHOW <dev> NAMES.  For a
+     device that provides debug printouts, SHOW <dev> MOD will list "DEBUG,
+     NODEBUG" among the modifiers, and the SHOW <dev> DEBUG command will display
+     the current debug status.  However, if the device does not contain a
+     modifier table, SHOW <dev> MOD and SHOW <dev> DEBUG will report "No
+     settable parameters", even though SET <dev> DEBUG is accepted and works as
+     expected.  For such a device, SHOW MOD will show "DEBUG, NODEBUG" as
+     acceptable modifiers.
+
+     CAUSE:  The "show_cmd_fi" routine checks for a modifier table and returns
+     an error without checking for global actions.
+
+     RESOLUTION:  Modify "show_cmd_fi" (scp.c) to continue to process global
+     actions if the modifier table is not defined.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+254. PROBLEM:  SET and SHOW responses for invalid entry are inconsistent.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  Entering SET <dev> <mod> where <mod> is not defined in the
+     device's modifier table displays "Non-existent parameter."  Entering SHOW
+     with the same parameters displays "Invalid argument."
+
+     Similarly, entering SET <dev> DEBUG for a device that does not have
+     debugging capability displays "Command not allowed."  Entering SHOW with
+     the same parameters displays nothing.
+
+     In both cases, the messages displayed should be the same for the same
+     error.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Modify "show_cmd_fi" (scp.c) to return the same status codes
+     as "set_cmd" does.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+255. ENHANCEMENT:  Add a "-N" (new file) option to the SET CONSOLE LOG and SET
+     CONSOLE DEBUG commands.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  These commands normally append to their respective log files.
+     If the user wants to recreate the log file instead, it must be deleted
+     first with OS-specific commands.  Adding a "-N" option to perform the
+     delete removes commands dependent on a specific OS.
+
+     RESOLUTION:  Modify "sim_set_logon" and "sim_set_debon" (sim_console.c) to
+     check for a "-N" option and to open for writing instead of appending if
+     detected.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+256. ENHANCEMENT: Add tape runaway support to the simulator tape library.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  The ANSI specifications for NRZI, PE, and GCR tape recording
+     mandate a maximum length of 25 feet for erase gaps.  Currently, an erase
+     gap of any length is ignored when reading or spacing.  To allow detection
+     of non-compliant tape images, the simulator tape library is enhanced to
+     halt positioning and return tape runaway status if a gap of 25 feet or more
+     is encountered.
+
+     Runaway detection is enabled by calling the tape library to set the tape
+     density in bits per inch.  If this call is not made, erase gaps present in
+     a tape image are effectively ignored.  Also, with the addition of a
+     separate "set density" call, it is no longer necessary to supply the
+     density when writing erase gaps.
+
+     RESOLUTION:  Modify "sim_tape_rdlntf" and "sim_tape_rdlntr" (sim_tape.c) to
+     detect tape runaway, and add a new MTSE_RUNAWAY status to sim_tape.h.  Add
+     new "sim_tape_set_dens" and "sim_tape_show_dens" functions to set and show
+     the bits per inch for a unit, respectively, and eliminate the "bpi"
+     parameter to "sim_tape_wrgap" in preference to using the density
+     established by a previous "sim_tape_set_dens" call.  Add named constants
+     to "sim_tape.h" that specify the density.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+257. ENHANCEMENT:  Improve performance when reading or spacing over erase gaps.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  Performance when reading or spacing over erase gaps is poor,
+     especially in the reverse direction.  Currently, each 4-byte gap marker is
+     read individually, and in the reverse direction, each read is preceded by a
+     seek to move the file pointer backward.  This combination causes stream
+     cache invalidation and a physical disc access for each gap marker.  As a
+     single gap consists of over 1000 markers, performance is far worse than if
+     a gap was read as a block.
+
+     RESOLUTION:  Modify "sim_tape_rdlntf" and "sim_tape_rdlntr" (sim_tape.c) to
+     buffer reads of gap markers.  Using a 128-element buffer, performance
+     improves about thirty-fold.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+258. PROBLEM:  Writing an end-of-medium positions the tape image after the mark.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  The "sim_tape_wreom" simulator tape library function writes
+     an end-of-medium marker on the tape image.  The intent is to erase the
+     remainder of the tape.  The "SIMH Magtape Representation and Handling"
+     document states that the tape position is not updated by this function.
+     However, the function leaves the tape positioned after the marker.
+
+     A subsequent read would stop at the EOM marker.  However, writing a new
+     marker over that one would then allow reading of the data following the EOM
+     that supposedly had been erased by the original "sim_tape_wreom" call.
+
+     CAUSE:  The tape position is updated by the internal "sim_tape_wrdata" call
+     that is used to write the EOM marker, but it is not reset afterward by the
+     function.
+
+     RESOLUTION:  Modify "sim_tape_wreom" (sim_tape.c) to reset the tape
+     position to point at the EOM marker before returning.  This prevents
+     reading past an EOM marker, and a subsequent write will overwrite the
+     marker rather than embed it between data records.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+259. PROBLEM:  Reading through an erase gap in reverse may return EOM status.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  A reverse read or spacing operation through an erase gap may
+     return end-of-medium status.  Reading or spacing forward through the same
+     gap works properly.
+
+     CAUSE:  Writing an erase gap over existing records may produce a gap that
+     is longer than requested.  This occurs when truncating the last record to
+     be overlaid by the gap would leave a record that is shorter than the
+     minimum size allowed (eight bytes for the length words plus two bytes for
+     the data).  In this case, the gap is lengthened to overlay the entire
+     record.  If the new gap size is not evenly divisible by four, a half-gap is
+     metadata marker of value 0xFFFF added to the beginning of the gap.
+
+     If a gap that begins with a half-gap marker is written immediately after
+     a previous gap, the "seam" between gaps will contain the bytes FE FF FF FF
+     ( FF FF ) FE FF FF FF....  Reading forward across this seam will yield a
+     metadata value of 0xFFFEFFFF, which is recognized and handled by seeking
+     two bytes back to resynchronize reading.  However, reading in reverse will
+     yield the value 0xFFFFFFFF, which is interpreted as end-of-medium.
+
+     RESOLUTION:  Modify "sim_tape_rdlntr" (sim_tape.c) to recognize 0xFFFFFFFF
+     as a half-gap marker and resynchronize in response.  End of medium cannot
+     occur when reading in reverse, as it is impossible to position the tape
+     image beyond an EOM marker.  Therefore, any 0xFFFFFFFF value encountered
+     must be a half-gap "seam" originating as above.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+260. PROBLEM:  sim_tape_wrgap fails when format is changed from SIMH format.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  The HP 2100 magnetic tape simulator supports erase gaps and
+     calls sim_tape_wrgap when commanded to write a gap.  However, if a tape
+     format other than SIMH format is selected, the call fails with MTSE_FMT.
+
+     CAUSE:  Erase gaps are not supported in formats other than SIMH, but the
+     call should not fail.  Instead, the call should be a "no-operation" if the
+     underlying format does not support gaps.
+
+     RESOLUTION:  Modify "sim_tape_wrgap" (sim_tape.c) to return MTSE_OK with no
+     action performed if a tape format other than SIMH is selected.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+261. PROBLEM:  The magnetic tape format of an attached unit may be changed.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  The magnetic tape library supports several tape image
+     formats.  The format to use may be specified either by an "ATTACH -F"
+     command or by a "SET <unit> FORMAT" command.  The latter calls the
+     "sim_tape_set_fmt" function, which allows the format of a file currently
+     attached to be changed.  However, the format is an intrinsic property of
+     the tape image file, so changing it once the file has been attached makes
+     no sense.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Modify "sim_tape_set_fmt" (sim_tape.c) to return an error
+     (SCPE_ALATT, "Unit already attached") if the unit is attached.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+262. ENHANCEMENT:  Add CRCC and LRCC support to the HP 2100 MS simulation.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  The HP 2100 MS device simulates the HP 7970 B/E magnetic tape
+     drives.  The 7970B uses NRZI format, and its associated controller supports
+     returning the cyclic redundancy check character and longitudinal redundancy
+     check character (CRCC and LRCC) to the CPU.  Typically, these are used only
+     by the controller diagnostic, but support is easy to add.
+
+     RESOLUTION:  Modify "hp2100_ms.c" to add a function that calculates CRCC
+     and LRCC for reads and writes, and call that function when the CPU requests
+     that the controller deliver the values.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+263. ENHANCEMENT:  Allow the VM to print simulator stop message information in
+     lieu of, or in addition to, the default message.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  The current implementation of "run_cmd" in scp.c calls
+     "fprint_stopped_gen" (via "fprint_stopped") to print the message associated
+     with the "sim_instr" return status.  Messages associated with VM stops must
+     be provided to the SCP via the "sim_stop_messages" array.
+
+     "fprint_stopped_gen" prints the status message in a rigid format: the
+     message string, a comma, the program counter register name, a colon, the
+     current PC value, and the instruction at that address in symbolic format.
+     For example:
+
+       HALT instruction, P: 24713 (LDA 1)
+
+     Only the message string is under the control of the VM.  If additional
+     information is needed, it can only be added before the first comma.
+
+     The HP2100 simulator does this for halt instructions, which contain device
+     select code and flag hold/clear bit fields that, in practice, are used to
+     communicate to the operator the significance of the particular halt
+     encountered, rather than to affect the device interface:
+
+       HALT instruction 102077, P: 24713 (LDA 1)
+
+     To implement this, the simulator must define the message as a variable and
+     then copy the formatted octal value into the buffer at the appropriate
+     location before returning from "sim_instr".
+
+     However, if the VM wants to display a different register value, e.g.:
+
+       Self test #13 complete, STAT: 000020
+
+     ...this cannot be done without also displaying the program counter, which
+     may be irrelevant for the given stop condition.
+
+     RESOLUTION:  Modify "fprint_stopped_gen" (scp.c) to check a VM-specific
+     simulation stop printer pointer ("sim_vm_fprint_stopped") that is
+     initialized to NULL and can be overridden by the VM, and, if overridden,
+     call it after printing the message string and before printing the program
+     counter.  If the VM printer returns TRUE, print the comma and the program
+     counter as before. If the VM routine returns FALSE, print just the
+     terminating newline.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+264. ENHANCEMENT:  Indicate that "examine" is being called for a simulator stop.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  As part of the simulator stop message, the fprint_stopped_gen
+     routine prints the instruction pointed to by the program counter.  In
+     addition to the "M" (mnemonic) switch, it passes the SIM_SW_STOP flag to
+     the fprint_sym routine to indicate that it is being called for a simulator
+     stop.  This allows the VM-defined routine to take any action specifically
+     appropriate to the stop.
+
+     To get the instruction value, fprint_stopped_gen calls the CPU's "examine"
+     routine and passes the program counter value as the address.  However,
+     interpretation of addresses may differ, depending on context.  For example,
+     a given address may be relative to a code, data, or stack space pointer.
+     To attempt to address this, the "examine" call includes the "V" (virtual)
+     switch.  However, "virtual" (and the associated "-v" command line switch)
+     may have a different meaning assigned by a given VM.  What is needed is an
+     unequivocal indication that a machine instruction value is being retrieved.
+
+     RESOLUTION:  Modify "fprint_stopped_gen" (scp.c) to pass SIM_SW_STOP to
+     "examine" as well as "fprint_sym", so that these routines have unambiguous
+     indications that they are being called in the context of a simulator stop.
 
      STATUS:  Fixed in version 4.0-0.

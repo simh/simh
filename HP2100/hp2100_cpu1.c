@@ -1,6 +1,6 @@
 /* hp2100_cpu1.c: HP 2100/1000 EAU simulator and UIG dispatcher
 
-   Copyright (c) 2005-2012, Robert M. Supnik
+   Copyright (c) 2005-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU1         Extended arithmetic and optional microcode dispatchers
 
+   05-Apr-14    JDB     Corrected typo in comments for cpu_ops
    09-May-12    JDB     Separated assignments from conditional expressions
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Moved option-present tests to UIG dispatchers
@@ -666,7 +667,7 @@ return;
                                                            ...
                                                         I  DEC 0
 
-     OP_DAB  Double integer constant in A/B registers      DLD J    Value of J
+     OP_JAB  Double integer constant in A/B registers      DLD J    Value of J
                                                           [inst]
                                                            ...
                                                         J  DEC 0,0

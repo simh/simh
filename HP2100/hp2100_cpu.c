@@ -30,6 +30,7 @@
    DCPC1,DCPC2  12897B dual channel port controller
 
    18-Mar-13    JDB     Removed redundant extern declarations
+   05-Feb-13    JDB     HLT instruction handler now relies on sim_vm_fprint_stopped
    09-May-12    JDB     Separated assignments from conditional expressions
    13-Jan-12    JDB     Minor speedup in "is_mapped"
                         Added casts to cpu_mod, dmasio, dmapio, cpu_reset, dma_reset
@@ -563,7 +564,6 @@ uint16 dms_map[MAP_NUM * MAP_LNT] = { 0 };              /* dms maps */
 
 /* External data */
 
-extern char halt_msg [];                                /* halt message */
 extern DIB clk_dib;                                     /* CLK DIB for idle check */
 extern const BOOT_ROM ptr_rom, dq_rom, ms_rom, ds_rom;  /* boot ROMs for cpu_boot routine */
 
@@ -1987,9 +1987,7 @@ else if (sop == soMIX)                                  /* MIA/B instruction? */
     ABREG [ab] = ABREG [ab] | iodata;                   /* merge returned data */
 
 else if (sop == soHLT) {                                /* HLT instruction? */
-    const int32 len = strlen (halt_msg);                /* find end msg */
-    sprintf (&halt_msg[len - 6], "%06o", ir);           /* add the halt */
-    return STOP_HALT;
+    return STOP_HALT;                                   /* return halt status */
     }
 
 if (iostat == SCPE_OK)                                  /* normal status? */
@@ -3465,6 +3463,7 @@ if (M == NULL) {                                        /* initial call after st
         cpu_set_ldr (NULL, FALSE, NULL, NULL);          /* disable loader (was enabled) */
         SR = 0;                                         /* clear S */
         sim_vm_post = &hp_post_cmd;                     /* set cmd post proc */
+        sim_vm_fprint_stopped = &hp_fprint_stopped;     /* set sim stop printer */
         sim_brk_types = ALL_BKPTS;                      /* register allowed breakpoint types */
         }
     }
@@ -3579,7 +3578,8 @@ return;
 /* VM command post-processor
 
    Update T register to contents of memory addressed by M register
-   if M register has changed. */
+   if M register has changed.
+*/
 
 void hp_post_cmd (t_bool from_scp)
 {

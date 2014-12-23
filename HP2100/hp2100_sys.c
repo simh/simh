@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Feb-13    JDB     Added hp_fprint_stopped to handle HLT instruction message
    18-Mar-13    JDB     Moved CPU state variable declarations to hp2100_cpu.h
    09-May-12    JDB     Quieted warnings for assignments in conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -94,8 +95,6 @@ extern DEVICE da_dev, dc_dev;
 
 char sim_name[] = "HP 2100";
 
-char halt_msg[] = "HALT instruction xxxxxx";
-
 REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 3;
@@ -129,7 +128,7 @@ const char *sim_stop_messages[] = {
     "Unknown error",
     "Unimplemented instruction",
     "Non-existent I/O device",
-    halt_msg,
+    "HALT instruction",
     "Breakpoint",
     "Indirect address loop",
     "Indirect address interrupt (should not happen!)",
@@ -137,6 +136,40 @@ const char *sim_stop_messages[] = {
     "Device/unit offline",
     "Device/unit powered off"
     };
+
+
+/* Print additional information for simulator stops.
+
+   The HP 21xx/1000 halt instruction ("HLT") opcode includes select code and
+   device flag hold/clear bit fields.  In practice, these are not used to affect
+   the device interface; rather, they communicate to the operator the
+   significance of the particular halt encountered.
+
+   Under simulation, the halt opcode must be communicated to the user as part of
+   the stop message.  To so do, we define a sim_vm_fprint_stopped handler that
+   is called for all VM stops.  When called for a STOP_HALT, the halt message
+   has been printed, and we add the opcode value in the T register before
+   returning TRUE, so that SCP will add the program counter value.  For example:
+
+     HALT instruction 102077, P: 00101 (NOP)
+
+   Reasons other than STOP_HALT need no additional information.
+
+   Implementation notes:
+
+    1. The octal halt instruction will always be of the form 10x0xx.  We take
+       advantage of this to request 19 bits printed with leading spaces.  This
+       adds a leading space to separate the value from the message.
+*/
+
+t_bool hp_fprint_stopped (FILE *st, t_stat reason)
+{
+if (reason == STOP_HALT)
+    fprint_val (st, TR, 8, 19, PV_RSPC);
+
+return TRUE;
+}
+
 
 /* Binary loader
 

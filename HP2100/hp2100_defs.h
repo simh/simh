@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2013, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Dec-14    JDB     Added "-Wunused-const-variable" to the suppression pragmas
+   05-Feb-13    JDB     Added declaration for hp_fprint_stopped
    18-Mar-13    JDB     Added "-Wdangling-else" to the suppression pragmas
                         Removed redundant extern declarations
    14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
@@ -85,6 +87,7 @@
 #pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
 #pragma GCC diagnostic ignored "-Wbitwise-op-parentheses"
 #pragma GCC diagnostic ignored "-Wdangling-else"
+#pragma GCC diagnostic ignored "-Wunused-const-variable"
 #endif
 
 
@@ -469,6 +472,7 @@ extern t_stat      hp_setsc   (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat      hp_setdev  (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_bool      hp_fprint_stopped (FILE *st, t_stat reason);
 
 /* Device-specific functions */
 
