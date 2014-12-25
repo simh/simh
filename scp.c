@@ -401,8 +401,9 @@ FILE *stdnul;
 
 /* Commands support routines */
 
-SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr);
-int32 test_search (t_value val, SCHTAB *schptr);
+SCHTAB *get_rsearch (char *cptr, int32 radix, SCHTAB *schptr);
+SCHTAB *get_asearch (char *cptr, int32 radix, SCHTAB *schptr);
+int32 test_search (t_value *val, SCHTAB *schptr);
 static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char);
 int32 get_switches (char *cptr);
 char *get_sim_sw (char *cptr);
@@ -459,7 +460,8 @@ UNIT *sim_clock_queue = QUEUE_LIST_END;
 int32 sim_interval = 0;
 int32 sim_switches = 0;
 FILE *sim_ofile = NULL;
-SCHTAB *sim_schptr = FALSE;
+SCHTAB *sim_schrptr = FALSE;
+SCHTAB *sim_schaptr = FALSE;
 DEVICE *sim_dfdev = NULL;
 UNIT *sim_dfunit = NULL;
 DEVICE **sim_internal_devices = NULL;
@@ -506,7 +508,8 @@ static char *sim_do_label[MAX_DO_NEST_LVL+1];
 
 static t_stat sim_last_cmd_stat;                        /* Command Status */
 
-static SCHTAB sim_stab;
+static SCHTAB sim_stabr;                                /* Register search specifier */
+static SCHTAB sim_staba;                                /* Memory search specifier */
 
 static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0)  };
 static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0)  };
@@ -1585,13 +1588,15 @@ ASSERT		failure have several different actions:
       " expressions.:\n\n"
       "5Simulator State Expressions\n"
       " The values of simulator registers can be evaluated with:\n\n"
-      "++{NOT} {<dev>} <reg>{<logical-op><value>}<conditional-op><value>\n\n"
+      "++{NOT} {<dev>} <reg>|<addr>{<logical-op><value>}<conditional-op><value>\n\n"
       " If <dev> is not specified, CPU is assumed.  <reg> is a register (scalar\n"
-      " or subscripted) belonging to the indicated device.  The <conditional-op>\n"
+      " or subscripted) belonging to the indicated device.  <addr> is an address\n"
+      " in the address space of the indicated device.  The <conditional-op>\n"
       " and optional <logical-op> are the same as those used for \"search\n"
       " specifiers\" by the EXAMINE and DEPOSIT commands.  The <value>s are\n"
       " expressed in the radix specified for <reg>, not in the radix for the\n"
-      " device.\n\n"
+      " device when referencing a register and when an address is referenced\n"
+      " the device radix is used as the default.\n\n"
       " If the <logical-op> and <value> are specified, the target register value\n"
       " is first altered as indicated.  The result is then compared to the\n"
       " <value> via the <conditional-op>.  If the result is true, the additional\n"
@@ -3136,9 +3141,11 @@ t_value val;
 t_stat r;
 t_bool not = FALSE;
 t_bool result;
+t_addr addr;
+t_stat reason;
 
 cptr = get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, cptr, &r);  /* get sw, default */
-sim_stab.boolop = -1;                                   /* no relational op dflt */
+sim_stabr.boolop = sim_staba.boolop = -1;               /* no relational op dflt */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 tptr = get_glyph (cptr, gbuf, 0);                       /* get token */
@@ -3203,19 +3210,26 @@ if (*cptr == '"') {                                     /* quoted string compari
 else {
     cptr = get_glyph (cptr, gbuf, 0);                   /* get register */
     rptr = find_reg (gbuf, &gptr, sim_dfdev);           /* parse register */
-    if (!rptr)                                          /* not there */
-        return SCPE_NXREG;
-    if (*gptr == '[') {                                 /* subscript? */
-        if (rptr->depth <= 1)                           /* array register? */
-            return SCPE_ARG;
-        idx = (uint32) strtotv (++gptr, &tptr, 10);     /* convert index */
-        if ((gptr == tptr) || (*tptr++ != ']'))
-            return SCPE_ARG;
-        gptr = tptr;                                    /* update */
+    if (rptr) {                                         /* got register? */
+        if (*gptr == '[') {                             /* subscript? */
+            if (rptr->depth <= 1)                       /* array register? */
+                return SCPE_ARG;
+            idx = (uint32) strtotv (++gptr, &tptr, 10); /* convert index */
+            if ((gptr == tptr) || (*tptr++ != ']'))
+                return SCPE_ARG;
+            gptr = tptr;                                /* update */
+            }
+        else idx = 0;                                   /* not array */
+        if (idx >= rptr->depth)                         /* validate subscript */
+            return SCPE_SUB;
         }
-    else idx = 0;                                       /* not array */
-    if (idx >= rptr->depth)                             /* validate subscript */
-        return SCPE_SUB;
+    else {                                              /* not reg, check for memory */
+        if (sim_dfdev && sim_vm_parse_addr)             /* get addr */
+            addr = sim_vm_parse_addr (sim_dfdev, (char *)gbuf, (char **)&gptr);
+        else addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev->dradix);
+        if (gbuf == gptr)                               /* error? */
+            return SCPE_NXREG;
+        }
     if (*gptr != 0)                                     /* more? must be search */
         get_glyph (gptr, gbuf, 0);
     else {
@@ -3231,11 +3245,22 @@ else {
         if (!flag)                                      
             return SCPE_2FARG;                          /* IF needs actions! */
         }
-    if (!get_search (gbuf, rptr->radix, &sim_stab) ||   /* parse condition */
-        (sim_stab.boolop == -1))                        /* relational op reqd */
-        return SCPE_MISVAL;
-    val = get_rval (rptr, idx);                         /* get register value */
-    result = test_search (val, &sim_stab);              /* test condition */
+    if (rptr) {                                         /* Handle register case */
+        if (!get_rsearch (gbuf, rptr->radix, &sim_stabr) ||  /* parse condition */
+            (sim_stabr.boolop == -1))                   /* relational op reqd */
+            return SCPE_MISVAL;
+        val = get_rval (rptr, idx);                     /* get register value */
+        result = test_search (&val, &sim_stabr);        /* test condition */
+        }
+    else {                                              /* Handle memory case */
+        if (!get_asearch (gbuf, sim_dfdev->dradix, &sim_staba) ||  /* parse condition */
+            (sim_staba.boolop == -1))                    /* relational op reqd */
+            return SCPE_MISVAL;
+        reason = get_aval (addr, sim_dfdev, sim_dfunit);/* get data */
+        if (reason != SCPE_OK)                          /* return if error */
+            return reason;
+        result = test_search (sim_eval, &sim_staba);    /* test condition */
+        }
     }
 if (not ^ result) {
     if (!flag)
@@ -6136,7 +6161,7 @@ for (gptr = gbuf, reason = SCPE_OK;
             return SCPE_NXREG;
         for (highr = lowr; highr->name != NULL; highr++) ;
         sim_switches = sim_switches | SIM_SW_HIDE;
-        reason = exdep_reg_loop (ofile, sim_schptr, flag, cptr,
+        reason = exdep_reg_loop (ofile, sim_schrptr, flag, cptr,
             lowr, --highr, 0, 0);
         continue;
         }
@@ -6163,7 +6188,7 @@ for (gptr = gbuf, reason = SCPE_OK;
             }
         if (*tptr && (*tptr++ != ','))
             return SCPE_ARG;
-        reason = exdep_reg_loop (ofile, sim_schptr, flag, cptr,
+        reason = exdep_reg_loop (ofile, sim_schrptr, flag, cptr,
             lowr, highr, (uint32) low, (uint32) high);
         continue;
         }
@@ -6175,7 +6200,7 @@ for (gptr = gbuf, reason = SCPE_OK;
         return SCPE_ARG;
     if (*tptr && (*tptr++ != ','))
         return SCPE_ARG;
-    reason = exdep_addr_loop (ofile, sim_schptr, flag, cptr, low, high,
+    reason = exdep_addr_loop (ofile, sim_schaptr, flag, cptr, low, high,
         sim_dfdev, sim_dfunit);
     }                                                   /* end for */
 if (sim_ofile)                                          /* close output file */
@@ -6210,7 +6235,7 @@ for (rptr = lowr; rptr <= highr; rptr++) {
         if (idx >= rptr->depth)
             return SCPE_SUB;
         val = get_rval (rptr, idx);
-        if (schptr && !test_search (val, schptr))
+        if (schptr && !test_search (&val, schptr))
             continue;
         if (flag == EX_E) {
             if ((idx > lows) && (val == last_val))
@@ -6266,7 +6291,7 @@ for (i = low; i <= high; ) {                            /* all paths must incr!!
     reason = get_aval (i, dptr, uptr);                  /* get data */
     if (reason != SCPE_OK)                              /* return if error */
         return reason;
-    if (schptr && !test_search (sim_eval[0], schptr))
+    if (schptr && !test_search (sim_eval, schptr))
         i = i + dptr->aincr;                            /* sch fails, incr */
     else {                                              /* no sch or success */
         if (flag != EX_D) {                             /* ex, ie, or id? */
@@ -7513,11 +7538,20 @@ UNIT *tuptr;
 
 sim_switches = 0;                                       /* no switches */
 sim_ofile = NULL;                                       /* no output file */
-sim_schptr = NULL;                                      /* no search */
-sim_stab.logic = SCH_OR;                                /* default search params */
-sim_stab.boolop = SCH_GE;
-sim_stab.mask = 0;
-sim_stab.comp = 0;
+sim_schrptr = NULL;                                     /* no search */
+sim_schaptr = NULL;                                     /* no search */
+sim_stabr.logic = sim_staba.logic = SCH_OR;             /* default search params */
+sim_stabr.boolop = sim_staba.boolop = SCH_GE;
+sim_stabr.count = 1;
+sim_stabr.mask = realloc (sim_stabr.mask, sim_emax * sizeof(*sim_stabr.mask));
+memset (sim_stabr.mask, 0, sim_emax * sizeof(*sim_stabr.mask));
+sim_stabr.comp = realloc (sim_stabr.comp, sim_emax * sizeof(*sim_stabr.comp));
+memset (sim_stabr.comp, 0, sim_emax * sizeof(*sim_stabr.comp));
+sim_staba.count = sim_emax;
+sim_staba.mask = realloc (sim_staba.mask, sim_emax * sizeof(*sim_staba.mask));
+memset (sim_staba.mask, 0, sim_emax * sizeof(*sim_staba.mask));
+sim_staba.comp = realloc (sim_staba.comp, sim_emax * sizeof(*sim_staba.comp));
+memset (sim_staba.comp, 0, sim_emax * sizeof(*sim_staba.comp));
 sim_dfdev = sim_dflt_dev;
 sim_dfunit = sim_dfdev->units;
 sim_opt_out = 0;                                        /* no options yet */
@@ -7530,7 +7564,7 @@ while (*cptr) {                                         /* loop through modifier
             *st = SCPE_ARG;
             return NULL;
             }
-        cptr = get_glyph_nc (cptr + 1, gbuf, 0);
+        cptr = get_glyph (cptr + 1, gbuf, 0);
         sim_ofile = sim_fopen (gbuf, "a");              /* open for append */
         if (sim_ofile == NULL) {                        /* open failed? */
             *st = SCPE_OPENERR;
@@ -7548,8 +7582,9 @@ while (*cptr) {                                         /* loop through modifier
         sim_switches = sim_switches | t;                /* or in new switches */
         }
     else if ((opt & CMD_OPT_SCH) &&                     /* if allowed, */
-        get_search (gbuf, sim_dfdev->dradix, &sim_stab)) { /* try for search */
-        sim_schptr = &sim_stab;                         /* set search */
+        get_rsearch (gbuf, sim_dfdev->dradix, &sim_stabr)) { /* try for search */
+        sim_schrptr = &sim_stabr;                       /* set search */
+        sim_schaptr = get_asearch (gbuf, sim_dfdev->dradix, &sim_staba);/* populate memory version of the same expression */
         sim_opt_out |= CMD_OPT_SCH;                     /* got search */
         }
     else if ((opt & CMD_OPT_DFT) &&                     /* default allowed? */
@@ -7598,7 +7633,7 @@ if (pptr) {                                             /* any? */
 return pptr;
 }
 
-/* Get search specification
+/* Get register search specification
 
    Inputs:
         cptr    =       pointer to input string
@@ -7609,7 +7644,7 @@ return pptr;
                         schptr if valid search specification
 */
 
-SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr)
+SCHTAB *get_rsearch (char *cptr, int32 radix, SCHTAB *schptr)
 {
 int32 c, logop, cmpop;
 t_value logval, cmpval;
@@ -7643,10 +7678,86 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
     }                                                   /* end for */
 if (logop >= 0) {
     schptr->logic = logop;
+    schptr->mask[0] = logval;
+    }
+if (cmpop >= 0) {
+    schptr->boolop = cmpop;
+    schptr->comp[0] = cmpval;
+    }
+schptr->count = 1;
+return schptr;
+}
+
+/* Get memory search specification
+
+   Inputs:
+        cptr    =       pointer to input string
+        radix   =       radix for numbers
+        schptr =        pointer to search table
+   Outputs:
+        return =        NULL if error
+                        schptr if valid search specification
+*/
+
+SCHTAB *get_asearch (char *cptr, int32 radix, SCHTAB *schptr)
+{
+int32 c, logop, cmpop;
+t_value *logval, *cmpval;
+t_stat reason;
+const char *sptr;
+char gbuf[CBUFSIZE];
+const char logstr[] = "|&^", cmpstr[] = "=!><";
+
+if (*cptr == 0)                                         /* check for clause */
+    return NULL;
+logval = calloc (sim_emax, sizeof(*logval));
+cmpval = calloc (sim_emax, sizeof(*cmpval));
+for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
+    if ((sptr = strchr (logstr, c))) {                  /* check for mask */
+        logop = (int32)(sptr - logstr);
+        cptr = get_glyph (cptr, gbuf, 0);
+        reason = parse_sym (gbuf, 0, sim_dfunit, logval, sim_switches);
+        if (reason > 0) {
+            free (logval);
+            free (cmpval);
+            return NULL;
+            }
+        }
+    else if ((sptr = strchr (cmpstr, c))) {             /* check for boolop */
+        cmpop = (int32)(sptr - cmpstr);
+        if (*cptr == '=') {
+            cmpop = cmpop + strlen (cmpstr);
+            cptr++;
+            }
+        cptr = get_glyph (cptr, gbuf, 0);
+        reason = parse_sym (gbuf, 0, sim_dfunit, cmpval, sim_switches);
+        if (reason > 0) {
+            free (logval);
+            free (cmpval);
+            return NULL;
+            }
+        }
+    else {
+        free (logval);
+        free (cmpval);
+        return NULL;
+        }
+    }                                                   /* end for */
+if (schptr->count != (1 - reason)) {
+    schptr->count = 1 - reason;
+    free (schptr->mask);
+    schptr->mask = calloc (sim_emax, sizeof(*schptr->mask));
+    free (schptr->comp);
+    schptr->comp = calloc (sim_emax, sizeof(*schptr->comp));
+    }
+if (logop >= 0) {
+    schptr->logic = logop;
+    free (schptr->mask);
     schptr->mask = logval;
     }
 if (cmpop >= 0) {
     schptr->boolop = cmpop;
+    free (schptr->comp);
     schptr->comp = cmpval;
     }
 return schptr;
@@ -7655,53 +7766,86 @@ return schptr;
 /* Test value against search specification
 
    Inputs:
-        val     =       value to test
+        val    =        value list to test
         schptr =        pointer to search table
    Outputs:
         return =        1 if value passes search criteria, 0 if not
 */
 
-int32 test_search (t_value val, SCHTAB *schptr)
+int32 test_search (t_value *values, SCHTAB *schptr)
 {
-if (schptr == NULL) return 0;
+t_value *val = NULL;
+int32 i, updown;
+int32 ret = 0;
 
-switch (schptr->logic) {                                /* case on logical */
+if (schptr == NULL)
+    return ret;
 
-    case SCH_OR:
-        val = val | schptr->mask;
-        break;
+val = malloc (schptr->count * sizeof (*values));
 
-    case SCH_AND:
-        val = val & schptr->mask;
-        break;
+for (i=0; i<(int32)schptr->count; i++) {
+    val[i] = values[i];
+    switch (schptr->logic) {                            /* case on logical */
 
-    case SCH_XOR:
-        val = val ^ schptr->mask;
-        break;
+        case SCH_OR:
+            val[i] = val[i] | schptr->mask[i];
+            break;
+
+        case SCH_AND:
+            val[i] = val[i] & schptr->mask[i];
+            break;
+
+        case SCH_XOR:
+            val[i] = val[i] ^ schptr->mask[i];
+            break;
+            }
+    }
+
+ret = 1;
+if (1) {    /* Little Endian VM */
+    updown = -1;
+    i=schptr->count-1;
+    }
+else {      /* Big Endian VM */
+    updown = 1;
+    i=0;
+    }
+for (; (i>=0) && (i<(int32)schptr->count) && ret; i += updown) {
+    switch (schptr->boolop) {                           /* case on comparison */
+
+        case SCH_E: case SCH_EE:
+            if (val[i] != schptr->comp[i])
+                ret = 0;
+            break;
+
+        case SCH_N: case SCH_NE:
+            if (val[i] != schptr->comp[i])
+                ret = 0;
+            break;
+
+        case SCH_G:
+            if (val[i] <= schptr->comp[i])
+                ret = 0;
+            break;
+
+        case SCH_GE:
+            if (val[i] < schptr->comp[i])
+                ret = 0;
+            break;
+
+        case SCH_L:
+            if (val[i] >= schptr->comp[i])
+                ret = 0;
+            break;
+
+        case SCH_LE:
+            if (val[i] > schptr->comp[i])
+                ret = 0;
+            break;
         }
-
-switch (schptr->boolop) {                                       /* case on comparison */
-
-    case SCH_E: case SCH_EE:
-        return (val == schptr->comp);
-
-    case SCH_N: case SCH_NE:
-        return (val != schptr->comp);
-
-    case SCH_G:
-        return (val > schptr->comp);
-
-    case SCH_GE:
-        return (val >= schptr->comp);
-
-    case SCH_L:
-        return (val < schptr->comp);
-
-    case SCH_LE:
-        return (val <= schptr->comp);
-        }
-
-return 0;
+    }
+free (val);
+return ret;
 }
 
 /* Radix independent input/output package

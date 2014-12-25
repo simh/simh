@@ -632,8 +632,9 @@ struct sim_mtab {
 struct sim_schtab {
     int32               logic;                          /* logical operator */
     int32               boolop;                         /* boolean operator */
-    t_value             mask;                           /* mask for logical */
-    t_value             comp;                           /* comparison for boolean */
+    uint32              count;                          /* value count in mask and comp arrays */
+    t_value             *mask;                          /* mask for logical */
+    t_value             *comp;                          /* comparison for boolean */
     };
 
 /* Breakpoint table */
