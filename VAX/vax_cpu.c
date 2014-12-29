@@ -3185,7 +3185,7 @@ return j;
 
 void cpu_idle (void)
 {
-sim_activate_abs (&cpu_unit, 0);
+sim_activate (&cpu_unit, 0);
 return;
 }
 
@@ -3193,7 +3193,7 @@ return;
 
 t_stat cpu_idle_svc (UNIT *uptr)
 {
-sim_idle (TMR_CLK, FALSE);
+sim_idle (TMR_CLK, TRUE);
 return SCPE_OK;
 }
 

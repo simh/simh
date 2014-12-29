@@ -34,8 +34,6 @@
 #include "vax_defs.h"
 #include <ctype.h>
 
-extern UNIT cpu_unit;
-
 /* Symbol tables */
 /* Warning: for literals, the class number MUST equal the field width!! */
 
