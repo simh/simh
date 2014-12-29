@@ -401,8 +401,8 @@ FILE *stdnul;
 
 /* Commands support routines */
 
-SCHTAB *get_rsearch (char *cptr, int32 radix, SCHTAB *schptr);
-SCHTAB *get_asearch (char *cptr, int32 radix, SCHTAB *schptr);
+SCHTAB *get_rsearch (const char *cptr, int32 radix, SCHTAB *schptr);
+SCHTAB *get_asearch (const char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value *val, SCHTAB *schptr);
 static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char);
 int32 get_switches (char *cptr);
@@ -7644,7 +7644,7 @@ return pptr;
                         schptr if valid search specification
 */
 
-SCHTAB *get_rsearch (char *cptr, int32 radix, SCHTAB *schptr)
+SCHTAB *get_rsearch (const char *cptr, int32 radix, SCHTAB *schptr)
 {
 int32 c, logop, cmpop;
 t_value logval, cmpval;
@@ -7676,6 +7676,12 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
         }
     else return NULL;
     }                                                   /* end for */
+if (schptr->count != 1) {
+    free (schptr->mask);
+    schptr->mask = calloc (sim_emax, sizeof(*schptr->mask));
+    free (schptr->comp);
+    schptr->comp = calloc (sim_emax, sizeof(*schptr->comp));
+    }
 if (logop >= 0) {
     schptr->logic = logop;
     schptr->mask[0] = logval;
@@ -7699,11 +7705,12 @@ return schptr;
                         schptr if valid search specification
 */
 
-SCHTAB *get_asearch (char *cptr, int32 radix, SCHTAB *schptr)
+SCHTAB *get_asearch (const char *cptr, int32 radix, SCHTAB *schptr)
 {
 int32 c, logop, cmpop;
 t_value *logval, *cmpval;
 t_stat reason;
+const char *ocptr = cptr;
 const char *sptr;
 char gbuf[CBUFSIZE];
 const char logstr[] = "|&^", cmpstr[] = "=!><";
@@ -7720,7 +7727,7 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
         if (reason > 0) {
             free (logval);
             free (cmpval);
-            return NULL;
+            return get_rsearch (ocptr, radix, schptr);
             }
         }
     else if ((sptr = strchr (cmpstr, c))) {             /* check for boolop */
@@ -7734,7 +7741,7 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
         if (reason > 0) {
             free (logval);
             free (cmpval);
-            return NULL;
+            return get_rsearch (ocptr, radix, schptr);
             }
         }
     else {
