@@ -1301,6 +1301,11 @@ char saved_debug_filename[CBUFSIZE];
 if (sim_deb == NULL)                                    /* no debug? */
     return SCPE_OK;
 
+if (sim_deb == sim_log) {                               /* debug is log */
+    fflush (sim_deb);                                   /* fflush is the best we can do */
+    return SCPE_OK;
+    }
+
 strcpy (saved_debug_filename, sim_logfile_name (sim_deb, sim_deb_ref));
 
 sim_quiet = 1;
@@ -1636,8 +1641,10 @@ t_stat sim_close_logfile (FILEREF **pref)
 if (NULL == *pref)
     return SCPE_OK;
 (*pref)->refcount = (*pref)->refcount  - 1;
-if ((*pref)->refcount > 0)
+if ((*pref)->refcount > 0) {
+    *pref = NULL;
     return SCPE_OK;
+    }
 fclose ((*pref)->file);
 free (*pref);
 *pref = NULL;
