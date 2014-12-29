@@ -5993,7 +5993,7 @@ if (unechoed_cmdline)
 fprint_stopped (stdout, r);                         /* print msg */
 if (sim_log && (sim_log != stdout))                 /* log if enabled */
     fprint_stopped (sim_log, r);
-if (sim_deb && (sim_deb != stdout))                 /* log if enabled */
+if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))/* debug if enabled */
     fprint_stopped (sim_deb, r);
 }
 
@@ -9476,7 +9476,7 @@ else
     printf("%s", buf);
 if (sim_log && (sim_log != stdout))
     fprintf (sim_log, "%s", buf);
-if (sim_deb && (sim_deb != stdout))
+if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
     fprintf (sim_deb, "%s", buf);
 
 if (buf != stackbuf)
