@@ -233,7 +233,7 @@ char *skip_spaces (char *p)
 			p += 3;
 			continue;
 		}
-		if (*p == ' ' || *p == '\t') {
+		if (*p == ' ' || *p == '\t' || *p == '\r') {
 			++p;
 			continue;
 		}
