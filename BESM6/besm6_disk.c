@@ -204,11 +204,11 @@ t_stat disk_attach (UNIT *u, char *cptr)
 
             for (blkno = 0; blkno < DISK_TOTBLK; ++blkno) {
                 control[0] = SET_CONVOL((t_value)(2*blkno) << 36, CONVOL_NUMBER);
-                fwrite(control, sizeof(t_value), 4, u->fileref);
+                sim_fwrite(control, sizeof(t_value), 4, u->fileref);
                 control[0] = SET_CONVOL((t_value)(2*blkno+1) << 36, CONVOL_NUMBER);
-                fwrite(control, sizeof(t_value), 4, u->fileref);
+                sim_fwrite(control, sizeof(t_value), 4, u->fileref);
                 for (word = 0; word < 02000; ++word) {
-                    fwrite(control+2, sizeof(t_value), 1, u->fileref);
+                    sim_fwrite(control+2, sizeof(t_value), 1, u->fileref);
                 }
             }
             return SCPE_OK;
