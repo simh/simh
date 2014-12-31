@@ -5978,7 +5978,7 @@ run_cmd_message (const char *unechoed_cmdline, t_stat r)
 #if defined (VMS)
 printf ("\n");
 #endif
-if (unechoed_cmdline)
+if (unechoed_cmdline && (r >= SCPE_BASE) && (r != SCPE_STEP) && (r != SCPE_STOP) && (r != SCPE_EXPECT))
     sim_printf("%s> %s\n", do_position(), unechoed_cmdline);
 fprint_stopped (stdout, r);                         /* print msg */
 if (sim_log && (sim_log != stdout))                 /* log if enabled */
