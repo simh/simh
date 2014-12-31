@@ -466,6 +466,10 @@
 				RelativePath="..\VAX\vax_defs.h"
 				>
 			</File>
+			<File
+				RelativePath="..\VAX\vax_mmu.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"

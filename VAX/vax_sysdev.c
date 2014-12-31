@@ -233,9 +233,6 @@ int32 ssc_adsm[2] = { 0 };                              /* addr strobes */
 int32 ssc_adsk[2] = { 0 };
 int32 cdg_dat[CDASIZE >> 2];                            /* cache data */
 static uint32 rom_delay = 0;
-static const int32 insert[4] = {
-    0x00000000, 0x000000FF, 0x0000FFFF, 0x00FFFFFF
-    };
 
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);

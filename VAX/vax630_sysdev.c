@@ -149,9 +149,6 @@ int32 ka_mser = 0;                                      /* KA630 mem sys err */
 int32 ka_cear = 0;                                      /* KA630 cpu err */
 int32 ka_dear = 0;                                      /* KA630 dma err */
 static uint32 rom_delay = 0;
-static const int32 insert[4] = {
-    0x00000000, 0x000000FF, 0x0000FFFF, 0x00FFFFFF
-    };
 t_bool ka_diag_full = FALSE;
 t_bool ka_hltenab = TRUE;                               /* Halt Enable / Autoboot flag */
 

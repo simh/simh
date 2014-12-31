@@ -153,10 +153,10 @@
 				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
 				GenerateDebugInformation="false"
 				SubSystem="1"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
 				StackReserveSize="10485760"
 				StackCommitSize="10485760"
+				OptimizeReferences="2"
+				EnableCOMDATFolding="2"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
@@ -458,6 +458,10 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_mmu.h"
 				>
 			</File>
 		</Filter>

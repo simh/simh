@@ -587,7 +587,7 @@ return;
         longword of data
 */
 
-int32 ReadReg (int32 pa, int32 lnt)
+int32 ReadReg (uint32 pa, int32 lnt)
 {
 int32 val;
 
@@ -610,7 +610,7 @@ return 0;
         none
 */
 
-void WriteReg (int32 pa, int32 val, int32 lnt)
+void WriteReg (uint32 pa, int32 val, int32 lnt)
 {
 if (ADDR_IS_SBIA (pa)) {                                /* SBI adapter space? */
     sbia_wr (pa, val, lnt);

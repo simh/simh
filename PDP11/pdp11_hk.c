@@ -68,8 +68,6 @@
 extern uint32 cpu_opt;
 #endif
 
-extern uint16 *M;
-
 #define HK_NUMDR        8                               /* #drives */
 #define HK_NUMCY6       411                             /* cyl/drive */
 #define HK_NUMCY7       815                             /* cyl/drive */
@@ -1568,6 +1566,8 @@ return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);
 }
 
 #if defined (VM_PDP11)
+
+extern uint16 *M;
 
 /* Device bootstrap - does not clear CSR when done */
 
