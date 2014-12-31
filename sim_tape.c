@@ -884,8 +884,9 @@ switch (f) {                                            /* the read method depen
                     break;
                     }
 
-                else if (uptr->pos < bufcap * sizeof (t_mtrlnt))    /* if less than a full buffer remains */
-                    bufcap = (uint32)(uptr->pos / sizeof (t_mtrlnt));/*   then reduce the capacity accordingly */
+                else if (uptr->pos < sizeof (buffer))   /* if less than a full buffer remains */
+                    bufcap = (uint32) uptr->pos         /*   then reduce the capacity accordingly */
+                               / sizeof (t_mtrlnt);
 
                 sim_fseek (uptr->fileref,                           /* seek back to the location */
                            uptr->pos - bufcap * sizeof (t_mtrlnt),  /*   corresponding to the start */
