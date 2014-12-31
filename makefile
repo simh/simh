@@ -1171,8 +1171,6 @@ BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
 	${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
 	${BESM6D}/besm6_punch.c
 
-FORMATDISK = ${BESM6D}/formatdisk.c
-
 ifeq (,${VIDEO_LDFLAGS})
 	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
 else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
@@ -1486,15 +1484,11 @@ ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-besm6 : ${BIN}besm6${EXE} ${BIN}formatdisk${EXE}
+besm6 : ${BIN}besm6${EXE}
 
 ${BIN}besm6${EXE} : ${BESM6} ${SIM}
 	${MKDIRBIN}
 	${CC} ${BESM6} ${SIM} ${BESM6_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-${BIN}formatdisk${EXE} : ${FORMATDISK}
-	${MKDIRBIN}
-	${CC} ${FORMATDISK} ${BESM6_OPT} $(CC_OUTSPEC)
 
 sigma : ${BIN}sigma${EXE}
 

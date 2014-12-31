@@ -28,6 +28,7 @@
  * authorization from Leonid Broukhis and Serge Vakulenko.
  */
 #include "besm6_defs.h"
+#include <ctype.h>
 
 /*
  * Управляющее слово обмена с магнитным диском.
@@ -47,6 +48,11 @@
  * Диспак доволен.
  */
 #define STATUS_GOOD     014000400
+
+/*
+ * Total size of a disk in blocks, including hidden blocks
+ */
+#define DISK_TOTBLK     01767
 
 /*
  * Параметры обмена с внешним устройством.
@@ -160,10 +166,57 @@ t_stat disk_reset (DEVICE *dptr)
 t_stat disk_attach (UNIT *u, char *cptr)
 {
     t_stat s;
+    int32 saved_switches = sim_switches;
+    sim_switches |= SWMASK ('E');
 
-    s = attach_unit (u, cptr);
-    if (s != SCPE_OK)
-        return s;
+    while (1) {
+        s = attach_unit (u, cptr);
+        if ((s == SCPE_OK) && (sim_switches & SWMASK ('N'))) {
+            t_value control[4];  /* block (zone) number, key, userid, checksum */
+            int diskno, blkno, word;
+            char *pos;
+            /* Using the rightmost sequence of digits within the filename
+             * as a volume number, e.g. "/var/tmp/besm6/2052.bin" -> 2052
+             */
+            pos = cptr + strlen(cptr);
+            while (pos > cptr && !isdigit(*--pos));
+            while (pos > cptr && isdigit(*pos)) --pos;
+            if (!isdigit(*pos)) ++pos;
+            diskno = atoi(pos);
+            if (diskno < 2048 || diskno > 4095) {
+                if (diskno == 0)
+                    sim_printf ("%s: filename must contain volume number 2048..4095\n", sim_uname(u));
+                else
+                    sim_printf ("%s: disk volume %d from filename %s invalid (must be 2048..4095)\n",
+                                sim_uname (u), diskno, cptr);
+                /* unlink (cptr); ??? */
+                return SCPE_ARG;
+            }
+            if (!sim_quiet && !(sim_switches & SWMASK ('Q')))
+                sim_printf ("%s: formatting disk volume %d\n", sim_uname (u), diskno);
+
+            control[1] = SET_CONVOL(0, CONVOL_NUMBER);
+            control[2] = SET_CONVOL(0, CONVOL_NUMBER);
+            control[3] = SET_CONVOL(0, CONVOL_NUMBER);
+
+            control[1] |= 01370707LL << 24;    /* Magic mark */
+            control[1] |= diskno << 12;
+
+            for (blkno = 0; blkno < DISK_TOTBLK; ++blkno) {
+                control[0] = SET_CONVOL((t_value)(2*blkno) << 36, CONVOL_NUMBER);
+                fwrite(control, sizeof(t_value), 4, u->fileref);
+                control[0] = SET_CONVOL((t_value)(2*blkno+1) << 36, CONVOL_NUMBER);
+                fwrite(control, sizeof(t_value), 4, u->fileref);
+                for (word = 0; word < 02000; ++word) {
+                    fwrite(control+2, sizeof(t_value), 1, u->fileref);
+                }
+            }
+            return SCPE_OK;
+        }
+        if (saved_switches & SWMASK ('E'))
+            return s;
+        sim_switches |= SWMASK ('N');
+    }
     return SCPE_OK;
 }
 

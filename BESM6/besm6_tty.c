@@ -617,7 +617,7 @@ void tt_print()
  */
 static int unicode_to_koi7 (unsigned val)
 {
-    if ('_' <= val) return val;
+    if (val <= '_') return val;
     else if ('a' <= val && val <= 'z') return val + 'Z' - 'z';
     else switch (val) {
         case 0x007f:              return 0x7f;
