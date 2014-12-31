@@ -504,6 +504,7 @@ int32 sim_do_depth = 0;
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
 static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+1];
 static char sim_do_filename[MAX_DO_NEST_LVL+1][CBUFSIZE];
+static char *sim_do_ocptr[MAX_DO_NEST_LVL+1];
 static char *sim_do_label[MAX_DO_NEST_LVL+1];
 
 static t_stat sim_last_cmd_stat;                        /* Command Status */
@@ -1980,6 +1981,8 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     sim_sub_args (cbuf, sizeof(cbuf), argv);
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
+    if (sim_deb && (sim_deb != sim_log))
+        fprintf (sim_deb, "%s%s\n", sim_prompt, cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
     sim_switches = 0;                                   /* init switches */
     if ((cmdp = find_cmd (gbuf)))                       /* lookup command */
@@ -2612,7 +2615,6 @@ int32 saved_sim_do_echo = sim_do_echo,
       saved_sim_quiet = sim_quiet;
 t_bool staying;
 t_stat stat, stat_nomessage;
-char *ocptr;
 
 stat = SCPE_OK;
 staying = TRUE;
@@ -2694,9 +2696,9 @@ if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
 
 do {
-    ocptr = cptr = sim_brk_getact (cbuf, sizeof(cbuf)); /* get bkpt action */
-    if (!ocptr) {                                       /* no pending action? */
-        ocptr = cptr = read_line (cbuf, sizeof(cbuf), fpin);/* get cmd line */
+    sim_do_ocptr[sim_do_depth] = cptr = sim_brk_getact (cbuf, sizeof(cbuf)); /* get bkpt action */
+    if (!sim_do_ocptr[sim_do_depth]) {                  /* no pending action? */
+        sim_do_ocptr[sim_do_depth] = cptr = read_line (cbuf, sizeof(cbuf), fpin);/* get cmd line */
         sim_goto_line[sim_do_depth] += 1;
         }
     sim_sub_args (cbuf, sizeof(cbuf), do_arg);          /* substitute args */
@@ -2759,12 +2761,12 @@ do {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
             !stat_nomessage &&                          /* and not suppressing messages */
             !(cmdp && cmdp->message)) {                 /* and not handling them specially */
-            sim_printf("%s> %s\n", do_position(), ocptr);
+            sim_printf("%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
             }
         }
     if (!stat_nomessage) {                              /* report error if not suppressed */
         if (cmdp && cmdp->message)                      /* special message handler */
-            cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
+            cmdp->message ((!echo && !sim_quiet) ? sim_do_ocptr[sim_do_depth] : NULL, stat);
         else
             if (stat >= SCPE_BASE)                      /* report error if not suppressed */
                 sim_printf ("%s\n", sim_error_text (stat));
@@ -3186,10 +3188,8 @@ if (*cptr == '"') {                                     /* quoted string compari
     for (optr = compare_ops; optr->op; optr++)
         if (0 == strcmp (op, optr->op))
             break;
-    if (!optr->op) {
-        sim_printf ("Invalid operator: %s\n", op);
-        return SCPE_ARG|SCPE_NOMESSAGE;
-        }
+    if (!optr->op)
+        return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
     cptr += strlen (op);
     while (isspace (*cptr))                             /* skip spaces */
         ++cptr;
@@ -3330,20 +3330,16 @@ else
 while (*cptr) {
     if ((!strncmp(gbuf, "DELAY=", 6)) && (gbuf[6])) {
         delay = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
-        if (r != SCPE_OK) {
-            sim_printf ("Invalid Delay Value\n");
-            return SCPE_ARG|SCPE_NOMESSAGE;
-            }
+        if (r != SCPE_OK)
+            return sim_messagef (SCPE_ARG, "Invalid Delay Value\n");
         cptr = tptr;
         tptr = get_glyph (cptr, gbuf, ',');
         continue;
         }
     if ((!strncmp(gbuf, "AFTER=", 6)) && (gbuf[6])) {
         after = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
-        if (r != SCPE_OK) {
-            sim_printf ("Invalid After Value\n");
-            return SCPE_ARG|SCPE_NOMESSAGE;
-            }
+        if (r != SCPE_OK)
+            return sim_messagef (SCPE_ARG, "Invalid After Value\n");
         cptr = tptr;
         tptr = get_glyph (cptr, gbuf, ',');
         continue;
@@ -3353,18 +3349,14 @@ while (*cptr) {
     return SCPE_ARG;
     }
 if (*cptr) {
-    if ((*cptr != '"') && (*cptr != '\'')) {
-        sim_printf ("String must be quote delimited\n");
-        return SCPE_ARG|SCPE_NOMESSAGE;
-        }
+    if ((*cptr != '"') && (*cptr != '\''))
+        return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
     cptr = get_glyph_quoted (cptr, gbuf, 0);
     if (*cptr != '\0')
         return SCPE_2MARG;                  /* No more arguments */
 
-    if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize)) {
-        sim_printf ("Invalid String\n");
-        return SCPE_ARG|SCPE_NOMESSAGE;
-        }
+    if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize))
+        return sim_messagef (SCPE_ARG, "Invalid String\n");
     }
 if ((dsize == 0) && (delay == 0) && (after == 0))
     return SCPE_2FARG;
@@ -4586,10 +4578,8 @@ if (sim_is_running)
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
 sim_trim_endspc(cptr);
-if (chdir(cptr) != 0) {
-    sim_printf("Unable to directory change to: %s\n", cptr);
-    return SCPE_IOERR & SCPE_NOMESSAGE;
-    } 
+if (chdir(cptr) != 0)
+    return sim_messagef(SCPE_IOERR, "Unable to directory change to: %s\n", cptr);
 return SCPE_OK;
 }
 
@@ -8739,10 +8729,8 @@ if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
 if (*cptr == '[') {
     cnt = (int32) strtotv (cptr + 1, &c1ptr, 10);
-    if ((cptr == c1ptr) || (*c1ptr != ']')) {
-        sim_printf ("Invalid Repeat count specification\n");
-        return SCPE_ARG|SCPE_NOMESSAGE;
-        }
+    if ((cptr == c1ptr) || (*c1ptr != ']'))
+        return sim_messagef (SCPE_ARG, "Invalid Repeat count specification\n");
     cptr = (char *)(c1ptr + 1);
     while (isspace(*cptr))
         ++cptr;
@@ -8750,16 +8738,12 @@ if (*cptr == '[') {
 tptr = get_glyph (cptr, gbuf, ',');
 if ((!strncmp(gbuf, "HALTAFTER=", 10)) && (gbuf[10])) {
     after = (uint32)get_uint (&gbuf[10], 10, 100000000, &r);
-    if (r != SCPE_OK) {
-        sim_printf ("Invalid Halt After Value\n");
-        return SCPE_ARG|SCPE_NOMESSAGE;
-        }
+    if (r != SCPE_OK)
+        return sim_messagef (SCPE_ARG, "Invalid Halt After Value\n");
     cptr = tptr;
     }
-if ((*cptr != '"') && (*cptr != '\'')) {
-    sim_printf ("String must be quote delimited\n");
-    return SCPE_ARG|SCPE_NOMESSAGE;
-    }
+if ((*cptr != '"') && (*cptr != '\''))
+    return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
 cptr = get_glyph_quoted (cptr, gbuf, 0);
 
 return sim_exp_set (exp, gbuf, cnt, (after ? after : exp->after), sim_switches, cptr);
@@ -8773,10 +8757,8 @@ char gbuf[CBUFSIZE];
 
 if (!cptr || !*cptr)
     return sim_exp_clrall (exp);                    /* clear all rules */
-if ((*cptr != '"') && (*cptr != '\'')) {
-    sim_printf ("String must be quote delimited\n");
-    return SCPE_ARG|SCPE_NOMESSAGE;
-    }
+if ((*cptr != '"') && (*cptr != '\''))
+    return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
 cptr = get_glyph_quoted (cptr, gbuf, 0);
 if (*cptr != '\0')
     return SCPE_2MARG;                              /* No more arguments */
@@ -8864,8 +8846,7 @@ if (!match_buf)
 if (switches & EXP_TYP_REGEX) {
 #if !defined (USE_REGEX)
     free (match_buf);
-    sim_printf ("RegEx support not available\n");
-    return SCPE_ARG|SCPE_NOMESSAGE;                     /* RegEx not available */
+    return sim_messagef (SCPE_ARG, "RegEx support not available\n");
     }
 #else   /* USE_REGEX */
     int res;
@@ -8880,7 +8861,7 @@ if (switches & EXP_TYP_REGEX) {
         char *err_buf = calloc (err_size+1, 1);
 
         regerror (res, &re, err_buf, err_size);
-        sim_printf ("Regular Expression Error: %s\n", err_buf);
+        sim_messagef (SCPE_ARG, "Regular Expression Error: %s\n", err_buf);
         free (err_buf);
         free (match_buf);
         return SCPE_ARG|SCPE_NOMESSAGE;
@@ -8891,22 +8872,20 @@ if (switches & EXP_TYP_REGEX) {
 #endif
 else {
     if (switches & EXP_TYP_REGEX_I) {
-        sim_printf ("Case independed matching is only valid for RegEx expect rules\n");
-        return SCPE_ARG|SCPE_NOMESSAGE;
+        free (match_buf);
+        return sim_messagef (SCPE_ARG, "Case independed matching is only valid for RegEx expect rules\n");
         }
     if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
         free (match_buf);
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid quoted string\n");
         }
     }
 free (match_buf);
 ep = sim_exp_fnd (exp, match);                          /* present? */
 if (ep)                                                 /* no, allocate */
     sim_exp_clr_tab (exp, ep);                          /* clear it */
-if (after && exp->size) {
-    sim_printf ("Multiple concurrent EXPECT rules aren't valid when a HALTAFTER parameter is non-zero\n");
-    return SCPE_ARG|SCPE_NOMESSAGE;
-    }
+if (after && exp->size)
+    return sim_messagef (SCPE_ARG, "Multiple concurrent EXPECT rules aren't valid when a HALTAFTER parameter is non-zero\n");
 exp->rules = (EXPTAB *) realloc (exp->rules, sizeof (*exp->rules)*(exp->size + 1));
 ep = &exp->rules[exp->size];
 exp->size += 1;
@@ -9488,6 +9467,87 @@ if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
 
 if (buf != stackbuf)
     free (buf);
+}
+
+/* Print command result message to stdout, sim_log (if enabled) and sim_deb (if enabled) */
+t_stat sim_messagef (t_stat stat, const char* fmt, ...)
+{
+char stackbuf[STACKBUFSIZE];
+int32 bufsize = sizeof(stackbuf);
+char *buf = stackbuf;
+int32 len;
+va_list arglist;
+t_bool inhibit_message = (!sim_show_message || (stat & SCPE_NOMESSAGE));
+
+while (1) {                                         /* format passed string, args */
+    va_start (arglist, fmt);
+#if defined(NO_vsnprintf)
+#if defined(HAS_vsprintf_void)
+
+/* Note, this could blow beyond the buffer, and we couldn't tell */
+/* That is a limitation of the C runtime library available on this platform */
+
+    vsprintf (buf, fmt, arglist);
+    for (len = 0; len < bufsize-1; len++)
+        if (buf[len] == 0) break;
+#else
+    len = vsprintf (buf, fmt, arglist);
+#endif                                                  /* HAS_vsprintf_void */
+#else                                                   /* NO_vsnprintf */
+#if defined(HAS_vsnprintf_void)
+    vsnprintf (buf, bufsize-1, fmt, arglist);
+    for (len = 0; len < bufsize-1; len++)
+        if (buf[len] == 0) break;
+#else
+    len = vsnprintf (buf, bufsize-1, fmt, arglist);
+#endif                                                  /* HAS_vsnprintf_void */
+#endif                                                  /* NO_vsnprintf */
+    va_end (arglist);
+
+/* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
+
+    if ((len < 0) || (len >= bufsize-1)) {
+        if (buf != stackbuf)
+            free (buf);
+        bufsize = bufsize * 2;
+        buf = (char *) malloc (bufsize);
+        if (buf == NULL)                            /* out of memory */
+            return SCPE_MEM;
+        buf[bufsize-1] = '\0';
+        continue;
+        }
+    break;
+    }
+
+if (sim_do_ocptr[sim_do_depth]) {
+    if (!sim_do_echo && !sim_quiet && !inhibit_message)
+        sim_printf("%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
+    else {
+        if (sim_deb)                        /* Always put context in debug output */
+            fprintf (sim_deb, "%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
+        }
+    }
+if (sim_is_running && !inhibit_message) {
+    char *c, *remnant = buf;
+
+    while ((c = strchr(remnant, '\n'))) {
+        printf("%.*s\r\n", (int)(c-remnant), remnant);
+        remnant = c + 1;
+        }
+    printf("%s", remnant);
+    }
+else {
+    if (!inhibit_message)
+        printf("%s", buf);
+    }
+if (sim_log && (sim_log != stdout) && !inhibit_message)
+    fprintf (sim_log, "%s", buf);
+if (sim_deb && (((sim_deb != stdout) && (sim_deb != sim_log)) || inhibit_message))/* Always display messages in debug output */
+    fprintf (sim_deb, "%s", buf);
+
+if (buf != stackbuf)
+    free (buf);
+return stat | SCPE_NOMESSAGE;
 }
 
 /* Inline debugging - will print debug message if debug file is
