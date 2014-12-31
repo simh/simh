@@ -569,22 +569,6 @@ void besm6_draw_panel ()
         longjmp (cpu_halt, SCPE_STOP);
 }
 
-#if !defined(__WIN32__) &&                              \
-    !(defined(__MWERKS__) && !defined(__BEOS__)) &&     \
-    !defined(__MACOS__) && !defined(__MACOSX__) &&      \
-    !defined(__SYMBIAN32__) && !defined(QWS)
-#undef main
-
-/*
- * Вот так всё непросто.
- */
-int main (int argc, char *argv[])
-{
-    extern int SDL_main (int, char**);
-
-    return SDL_main (argc, argv);
-}
-#endif
 #endif /* SDL_MAJOR_VERSION */
 
 #else /* HAVE_LIBSDL */
