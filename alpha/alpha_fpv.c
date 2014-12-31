@@ -209,7 +209,7 @@ t_uint64 vax_cvtif (t_uint64 val, uint32 ir, uint32 dp)
 UFP a;
 
 if (val == 0) return 0;                                 /* 0? return +0 */
-if (val < 0) {                                          /* < 0? */
+if ((val & Q_SIGN) != 0) {                              /* < 0? */
     a.sign = 1;                                         /* set sign */
     val = NEG_Q (val);                                  /* |val| */
     }

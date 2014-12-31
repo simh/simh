@@ -716,7 +716,8 @@ t_uint64 bra, df, db;
 uint32 i, k, lit8, fl;
 int32 reg;
 t_stat r;
-char *tptr, gbuf[CBUFSIZE];
+const char *tptr;
+char gbuf[CBUFSIZE];
 
 if ((r = parse_pal_hwre (cptr, inst)) < 0) return r;    /* PAL hardware? */
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */

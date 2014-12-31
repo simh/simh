@@ -54,6 +54,7 @@ FILE *sim_fopen (const char *file, const char *mode);
 int sim_fseek (FILE *st, t_addr offset, int whence);
 int sim_fseeko (FILE *st, t_offset offset, int whence);
 int sim_set_fsize (FILE *fptr, t_addr size);
+int sim_set_fifo_nonblock (FILE *fptr);
 size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr);
 size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 uint32 sim_fsize (FILE *fptr);

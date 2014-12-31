@@ -904,7 +904,8 @@ t_stat parse_pal_hwre (char *cptr, t_value *inst)
 {
 uint32 i, d, val = 0;
 int32 reg;
-char *tptr, gbuf[CBUFSIZE];
+const char *tptr;
+char gbuf[CBUFSIZE];
 t_stat r;
 
 cptr = get_glyph (cptr, gbuf, '/');

@@ -393,7 +393,7 @@ while (reason == 0) {
         }
 
     if (sim_interval <= 0) {                            /* chk clock queue */
-        if (reason = sim_process_event ()) break;
+        if ((reason = sim_process_event ())) break;
         intr_summ = pal_eval_intr (1);                  /* eval interrupts */
         }
 
@@ -1433,7 +1433,7 @@ while (reason == 0) {
 
         case 0x39:                                      /* MINSW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i = i++) {
+            for (i = 0, res = 0; i < 8; i++) {
                 s1 = SEXT_W_Q (R[ra] >> (i << 4));
                 s2 = SEXT_W_Q (rbv >> (i << 4));
                 res = res | (((s1 <= s2)? R[ra]: rbv) & word_mask[i]);
@@ -1451,7 +1451,7 @@ while (reason == 0) {
 
         case 0x3B:                                      /* MINUW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i = i++) {
+            for (i = 0, res = 0; i < 8; i++) {
                 s64 = R[ra] & word_mask[i];
                 t64 = rbv & word_mask[i];
                 res = res | ((s64 <= t64)? s64: t64);
@@ -1469,7 +1469,7 @@ while (reason == 0) {
 
         case 0x3D:                                      /* MAXUW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i = i++) {
+            for (i = 0, res = 0; i < 8; i++) {
                 s64 = R[ra] & word_mask[i];
                 t64 = rbv & word_mask[i];
                 res = res | ((s64 >= t64)? s64: t64);
@@ -1487,7 +1487,7 @@ while (reason == 0) {
 
         case 0x3F:                                      /* MAXSW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i = i++) {
+            for (i = 0, res = 0; i < 8; i++) {
                 s1 = SEXT_W_Q (R[ra] >> (i << 4));
                 s2 = SEXT_W_Q (rbv >> (i << 4));
                 res = res | (((s1 >= s2)? R[ra]: rbv) & word_mask[i]);
@@ -1834,7 +1834,7 @@ return SCPE_OK;
 
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-uint32 k, di, lnt;
+int32 k, di, lnt;
 char *cptr = (char *) desc;
 t_stat r;
 InstHistory *h;

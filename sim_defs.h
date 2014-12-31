@@ -246,7 +246,13 @@ typedef uint32          t_addr;
 
 /* Stubs for inlining */
 
-#define SIM_INLINE
+#if defined(_MSC_VER)
+#define SIM_INLINE _inline
+#elif defined(__GNUC__)
+#define SIM_INLINE inline
+#else
+#define SIM_INLINE 
+#endif
 
 /* System independent definitions */
 
