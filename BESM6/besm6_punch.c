@@ -28,7 +28,6 @@
  */
 #include "besm6_defs.h"
 #include <sys/stat.h>
-#include <sys/fcntl.h>
 
 t_stat fs_event (UNIT *u);
 t_stat uvvk_event (UNIT *u);
@@ -125,13 +124,7 @@ t_stat fs_attach (UNIT *u, char *cptr)
     s = attach_unit (u, cptr);
     if (s != SCPE_OK)
         return s;
-    struct stat stbuf;
-    fstat (fileno(u->fileref), &stbuf);
-    isfifo[num] = (stbuf.st_mode & S_IFIFO) != 0;
-    if (isfifo[num]) {
-        int flags = fcntl(fileno(u->fileref), F_GETFL, 0);
-        fcntl(fileno(u->fileref), F_SETFL, flags | O_NONBLOCK);
-    }
+    isfifo[num] = (0 == sim_set_fifo_nonblock (u->fileref));
     ENB_RDY(FS1_READY >> num);
     return SCPE_OK;
 }

@@ -1175,10 +1175,12 @@ FORMATDISK = ${BESM6D}/formatdisk.c
 
 ifeq (,${VIDEO_LDFLAGS})
 	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
-else ifneq (,$(and $(findstring,SDL2,${VIDEO_LDFLAGS})),$(and($(find_include, SDL2/SDL_ttf),$(find_lib,SDL2_ttf))))
+else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
 	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
-else ifneq (,$(and $(find_include, SDL/SDL_ttf),$(find_lib,SDL_ttf)))
+else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
 	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+else
+	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
 endif
 
 ###

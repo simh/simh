@@ -24,7 +24,6 @@
  */
 #include "besm6_defs.h"
 #include <math.h>
-#include <unistd.h>
 
 const char *opname_short_bemsh [64] = {
     "зп",  "зпм", "рег", "счм", "сл",  "вч",  "вчоб","вчаб",
@@ -188,7 +187,7 @@ t_value ieee_to_besm6 (double d)
     d = frexp (d, &exponent);
     /* 0.5 <= d < 1.0 */
     d = ldexp (d, 40);
-    word = d;
+    word = (t_value)d;
     if (d - word >= 0.5)
         word += 1;                      /* Округление. */
     if (exponent < -64)
@@ -207,6 +206,7 @@ t_value ieee_to_besm6 (double d)
 double besm6_to_ieee (t_value word)
 {
     double mantissa;
+    int exponent;
 
     /* Убираем свертку */
     word &= BITS48;
@@ -214,9 +214,9 @@ double besm6_to_ieee (t_value word)
     /* Сдвигаем так, чтобы знак мантиссы пришелся на знак целого;
      * таким образом, mantissa равно исходной мантиссе, умноженной на 2**63.
      */
-    mantissa = (t_int64) word << (64 - 48 + 7);
+    mantissa = (double)(((t_int64) word) << (64 - 48 + 7));
 
-    int exponent = word >> 41;
+    exponent = word >> 41;
 
     /* Порядок смещен вверх на 64, и мантиссу нужно скорректировать */
     return ldexp (mantissa, exponent - 64 - 63);
@@ -472,7 +472,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     if (sw & SWMASK ('M')) {                        /* symbolic decode? */
         if (sw & SIM_SW_STOP && addr == PC && !(RUU & RUU_RIGHT_INSTR))
             fprintf (of, "-> ");
-        besm6_fprint_cmd (of, cmd >> 24);
+        besm6_fprint_cmd (of, (uint32)(cmd >> 24));
         if (sw & SIM_SW_STOP)                   /* stop point */
             fprintf (of, ", ");
         else
@@ -638,7 +638,7 @@ t_stat besm6_load (FILE *input)
         case 0:                 /* EOF */
             return SCPE_OK;
         case ':':               /* address */
-            addr = word;
+            addr = (int)word;
             break;
         case '=':               /* word */
             if (addr < 010)
@@ -655,7 +655,7 @@ t_stat besm6_load (FILE *input)
             ++addr;
             break;
         case '@':               /* start address */
-            PC = word;
+            PC = (uint32)word;
             break;
         }
         if (addr > MEMSIZE)
@@ -686,7 +686,7 @@ t_stat besm6_dump (FILE *of, char *fnam)
         last_addr = addr;
         if (IS_INSN (word)) {
             fprintf (of, "к ");
-            besm6_fprint_cmd (of, word >> 24);
+            besm6_fprint_cmd (of, (uint32)(word >> 24));
             fprintf (of, ", ");
             besm6_fprint_cmd (of, word & BITS(24));
             fprintf (of, "\t\t; %05o - ", addr);

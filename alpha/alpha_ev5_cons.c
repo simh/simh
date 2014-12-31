@@ -133,7 +133,7 @@ if ((dtlb_spage & SPEN_43) && (VPN_GETSP43 (vpn) == 2))
     return (va & SP43_MASK);                            /* 43b superpage? */
 if ((dtlb_spage & SPEN_32) && (VPN_GETSP32 (vpn) == 0x1FFE))
     return (va & SP32_MASK);                            /* 32b superpage? */
-if (tlbp = dtlb_lookup (vpn))                           /* try TLB */
+if ((tlbp = dtlb_lookup (vpn)))                         /* try TLB */
     return PHYS_ADDR (tlbp->pfn, va);                   /* found it */
 if (ev5_mcsr & MCSR_NT) exc = cons_find_pte_nt (va, &pte64);
 else exc = cons_find_pte_srm (va, &pte64);

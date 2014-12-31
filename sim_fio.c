@@ -369,10 +369,35 @@ int sim_set_fsize (FILE *fptr, t_addr size)
 {
 return _chsize(_fileno(fptr), (long)size);
 }
+
+int sim_set_fifo_nonblock (FILE *fptr)
+{
+return -1;
+}
+
 #else /* !defined(_WIN32) */
 #include <unistd.h>
 int sim_set_fsize (FILE *fptr, t_addr size)
 {
 return ftruncate(fileno(fptr), (off_t)size);
 }
+
+#include <sys/stat.h>
+#include <fcntl.h>
+
+int sim_set_fifo_nonblock (FILE *fptr)
+{
+struct stat stbuf;
+
+if (!fptr || fstat (fileno(fptr), &stbuf))
+    return -1;
+#if defined(S_IFIFO) && defined(O_NONBLOCK)
+if ((stbuf.st_mode & S_IFIFO)) {
+    int flags = fcntl(fileno(fptr), F_GETFL, 0);
+    return fcntl(fileno(fptr), F_SETFL, flags | O_NONBLOCK);
+    }
+#endif
+return -1;
+}
+
 #endif
