@@ -121,8 +121,10 @@ enum {
 /*
  * Считаем, что моделируеммая машина имеет опорную частоту 10 МГц.
  */
-#define USEC    10              /* одна микросекунда - десять тактов */
+#define USEC    1               /* одна микросекунда - десять тактов */
 #define MSEC    (1000*USEC)     /* одна миллисекунда */
+#define CLK_TPS   250           /* Fast Clock Ticks Per Second (every 4ms) */
+#define CLK_DELAY 4000          /* Uncalibrated instructions per clock tick */
 
 extern UNIT cpu_unit;
 extern t_value memory [MEMSIZE];

@@ -519,7 +519,7 @@ void disk_ctl (int ctlr, uint32 cmd)
         }
 
         /* Ждём события от устройства. */
-        sim_activate (u, 20*USEC);      /* Ускорим для отладки. */
+        sim_activate_after (u, 20*USEC);      /* Ускорим для отладки. */
 
     } else if (cmd & BBIT(11)) {
         /* Выбора номера устройства и занесение в регистр маски КМД.
@@ -614,7 +614,7 @@ void disk_ctl (int ctlr, uint32 cmd)
             disk_read_header (u);
 
             /* Ждём события от устройства. */
-            sim_activate (u, 20*USEC);      /* Ускорим для отладки. */
+            sim_activate_after (u, 20*USEC);      /* Ускорим для отладки. */
             break;
         case 010: /* гашение PC */
 #if 0

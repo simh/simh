@@ -159,7 +159,7 @@ void printer_control (int num, uint32 cmd)
         dev->feed = LINEFEED_SYNC;
         READY &= ~(PRN1_LINEFEED >> num);
         if (dev->rampup)
-            sim_activate (u, dev->rampup);
+            sim_activate_after (u, dev->rampup);
         dev->rampup = 0;
         break;
     case 10:        /* motor and ribbon off */
@@ -208,7 +208,7 @@ t_stat printer_event (UNIT *u)
         GRP |= GRP_PRN1_SYNC >> num;
         ++dev->curchar;
         /* For next char */
-        sim_activate (u, 1400*USEC);
+        sim_activate_after (u, 1400*USEC);
         if (dev->feed && --dev->feed == 0) {
             READY |= PRN1_LINEFEED >> num;
         }
@@ -219,7 +219,7 @@ t_stat printer_event (UNIT *u)
         if (printer_dev.dctrl)
             besm6_debug(">>> АЦПУ%d 'ноль'", num);
         /* For first sync after "zero" */
-        sim_activate (u, 1000*USEC);
+        sim_activate_after (u, 1000*USEC);
     }
     return SCPE_OK;
 }
@@ -334,9 +334,9 @@ offset_gost_write (int num, FILE *fout)
  */
 int printer_is_idle ()
 {
-    if ((printer_unit[0].flags & UNIT_ATT) && acpu[0].rampup == 0)
+    if (sim_is_active(&printer_unit[0]))
         return 0;
-    if ((printer_unit[1].flags & UNIT_ATT) && acpu[1].rampup == 0)
+    if (sim_is_active(&printer_unit[1]))
         return 0;
     return 1;
 }

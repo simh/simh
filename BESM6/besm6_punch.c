@@ -27,7 +27,6 @@
  * authorization from Leonid Broukhis and Serge Vakulenko.
  */
 #include "besm6_defs.h"
-#include <sys/stat.h>
 
 t_stat fs_event (UNIT *u);
 t_stat uvvk_event (UNIT *u);
@@ -169,7 +168,7 @@ void fs_control (int num, uint32 cmd)
         if (fs_state[num] == FS_IDLE)
             besm6_debug("<<< ФС1500-%d протяжка без мотора", num);
         else if (fs_state[num] != FS_TAIL) {
-            sim_activate (u, FS_RATE);
+            sim_activate_after (u, FS_RATE);
             bytecnt++;
         } else {
             if (! isfifo[num]) {

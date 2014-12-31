@@ -53,18 +53,15 @@
 #include "besm6_defs.h"
 #include <math.h>
 #include <float.h>
-#include <unistd.h>
-#include <signal.h>
-#include <sys/time.h>
 #include <time.h>
 
-#undef SOFT_CLOCK
 
 t_value memory [MEMSIZE];
 uint32 PC, RK, Aex, M [NREGS], RAU, RUU;
 t_value ACC, RMR, GRP, MGRP;
 uint32 PRP, MPRP;
 uint32 READY, READY2; /* ready flags of various devices */
+int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
 
 extern const char *scp_errors[];
 
@@ -133,6 +130,8 @@ REG cpu_reg[] = {
 };
 
 MTAB cpu_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Display idle detection mode" },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL,  "Disables idle detection" },
     { 0 }
 };
 
@@ -312,33 +311,6 @@ t_stat cpu_deposit (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 }
 
 /*
- * Функция вызывается каждые 4 миллисекунды реального времени.
- */
-static void cpu_sigalarm (int signum)
-{
-    static unsigned counter;
-
-    ++counter;
-
-#ifndef SOFT_CLOCK
-    /* В 9-й части частота таймера 250 Гц (4 мс). */
-    GRP |= GRP_TIMER;
-
-    /* Медленный таймер: должен быть 16 Гц.
-     * Но от него почему-то зависит вывод на терминалы,
-     * поэтому ускорим. */
-    if ((counter & 3) == 0) {
-        GRP |= GRP_SLOW_CLK;
-    }
-#endif
-
-    /* Перерисовка панели каждые 64 миллисекунды. */
-    if ((counter & 15) == 0) {
-        redraw_panel = 1;
-    }
-}
-
-/*
  * Reset routine
  */
 t_stat cpu_reset (DEVICE *dptr)
@@ -367,19 +339,6 @@ t_stat cpu_reset (DEVICE *dptr)
     sim_brk_types = SWMASK ('E') | SWMASK('R') | SWMASK('W');
     sim_brk_dflt = SWMASK ('E');
 
-    struct itimerval itv;
-
-    /* Чтобы ход часов в ДИСПАКе соответствал реальному времени,
-     * используем сигналы от системного таймера. */
-    signal (SIGALRM, cpu_sigalarm);
-    itv.it_interval.tv_sec = 0;
-    itv.it_interval.tv_usec = 4000;
-    itv.it_value.tv_sec = 0;
-    itv.it_value.tv_usec = 4000;
-    if (setitimer (ITIMER_REAL, &itv, 0) < 0) {
-        perror ("setitimer");
-        return SCPE_TIMER;
-    }
     return SCPE_OK;
 }
 
@@ -807,9 +766,9 @@ void cpu_one_inst ()
     corr_stack = 0;
     word = mmu_fetch (PC);
     if (RUU & RUU_RIGHT_INSTR)
-        RK = word;              /* get right instruction */
+        RK = (uint32)word;      /* get right instruction */
     else
-        RK = word >> 24;        /* get left instruction */
+        RK = (uint32)(word >> 24);/* get left instruction */
 
     RK &= BITS(24);
 
@@ -1475,11 +1434,7 @@ void cpu_one_inst ()
 
         /* Если периферия простаивает, освобождаем процессор
          * до следующего тика таймера. */
-        if (vt_is_idle() &&
-            printer_is_idle() && fs_is_idle()) {
-            check_initial_setup ();
-            pause ();
-        }
+        sim_idle (0, TRUE);
     }
 }
 
@@ -1739,43 +1694,56 @@ t_stat sim_instr (void)
     }
 }
 
-t_stat slow_clk (UNIT * this)
-{
-    /*besm6_debug ("*** таймер 80 мсек");*/
-    GRP |= GRP_SLOW_CLK;
-    return sim_activate (this, MSEC*125/2);
-}
-
 /*
  * В 9-й части частота таймера 250 Гц (4 мс),
  * в жизни - 50 Гц (20 мс).
  */
 t_stat fast_clk (UNIT * this)
 {
+    static unsigned counter;
+
+    ++counter;
+
     /*besm6_debug ("*** таймер 20 мсек");*/
     GRP |= GRP_TIMER;
-    return sim_activate (this, 20*MSEC);
+
+    /* Медленный таймер: должен быть 16 Гц.
+     * Но от него почему-то зависит вывод на терминалы,
+     * поэтому ускорим. */
+    if ((counter & 3) == 0) {
+    /*besm6_debug ("*** таймер 80 мсек");*/
+        GRP |= GRP_SLOW_CLK;
+    }
+
+    /* Перерисовка панели каждые 64 миллисекунды. */
+    if ((counter & 15) == 0) {
+        redraw_panel = 1;
+    }
+
+    tmr_poll = sim_rtcn_calb (CLK_TPS, 0);              /* calibrate clock */
+    return sim_activate_after (this, 1000000/CLK_TPS);  /* reactivate unit */
 }
 
 UNIT clocks[] = {
-    { UDATA(slow_clk, 0, 0) },      /* 10 р, 16 Гц */
-    { UDATA(fast_clk, 0, 0) },      /* 40 р, 50 Гц */
+    { UDATA(fast_clk, 0, 0), CLK_DELAY },   /* 40 р, 50 Гц */
 };
 
 t_stat clk_reset (DEVICE * dev)
 {
+    sim_register_clock_unit (&clocks[0]);
+
     /* Схема автозапуска включается по нереализованной кнопке "МР" */
-#ifdef SOFT_CLOCK
-    sim_activate (&clocks[0], MSEC*125/2);
-    return sim_activate (&clocks[1], 20*MSEC);
-#else
+
+    if (!sim_is_running) {                                  /* RESET (not IORESET)? */
+        tmr_poll = sim_rtcn_init (clocks[0].wait, 0);       /* init timer */
+        sim_activate (&clocks[0], tmr_poll);                /* activate unit */
+        }
     return SCPE_OK;
-#endif
 }
 
 DEVICE clock_dev = {
     "CLK", clocks, NULL, NULL,
-    2, 0, 0, 0, 0, 0,
+    1, 0, 0, 0, 0, 0,
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL, NULL,
     DEV_DEBUG
