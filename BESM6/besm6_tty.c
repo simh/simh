@@ -166,6 +166,8 @@ t_stat tty_reset (DEVICE *dptr)
 /* 19 р ГРП, 300 Гц */
 t_stat vt_clk (UNIT * this)
 {
+    int num;
+
     /* Телетайпы работают на 10 бод */
     static int clk_divider = 1<<29;
     GRP |= MGRP & BBIT(19);
@@ -184,7 +186,7 @@ t_stat vt_clk (UNIT * this)
     }
 
     /* Есть новые сетевые подключения? */
-    int num = tmxr_poll_conn (&tty_desc);
+    num = tmxr_poll_conn (&tty_desc);
     if (num > 0 && num <= LINES_MAX) {
         char buf [80];
         TMLN *t = &tty_line [num];

@@ -54,9 +54,7 @@
 #include <math.h>
 #include <float.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <signal.h>
-#include <sys/stat.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -769,11 +767,12 @@ void check_initial_setup ()
         pult[5] = 1 << 21;
         GRP |= GRP_PANEL_REQ;
     } else {
+        struct tm * d;
+
         /* Яч. ГОД обновляем самостоятельно */
         time_t t;
         t_value date;
         time(&t);
-        struct tm * d;
         d = localtime(&t);
         ++d->tm_mon;
         date = (t_value) (d->tm_mday / 10) << 33 |
@@ -803,9 +802,10 @@ void check_initial_setup ()
 void cpu_one_inst ()
 {
     int reg, opcode, addr, nextpc, next_mod;
+    t_value word;
 
     corr_stack = 0;
-    t_value word = mmu_fetch (PC);
+    word = mmu_fetch (PC);
     if (RUU & RUU_RIGHT_INSTR)
         RK = word;              /* get right instruction */
     else

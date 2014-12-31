@@ -139,7 +139,7 @@ t_stat mmu_reset (DEVICE *dptr)
 {
     int i;
     for (i = 0; i < 8; ++i) {
-        BRZ[i] = BAZ[i] = RP[i] = 0;
+        BRZ[i] = RP[i] = BAZ[i] = 0;
     }
     TABST = 0;
     OLDEST = 0;
@@ -209,12 +209,13 @@ void mmu_protection_check (int addr)
 
 void mmu_flush (int idx)
 {
+    int waddr = BAZ[idx];
+
     if (! BAZ[idx]) {
         /* Был пуст после сброса или выталкивания */
         return;
     }
     /* Вычисляем физический адрес выталкиваемого БРЗ */
-    int waddr = BAZ[idx];
     waddr = (waddr > 0100000) ? (waddr - 0100000) :
         (waddr & 01777) | (TLB[waddr >> 10] << 10);
     memory[waddr] = BRZ[idx];
@@ -626,7 +627,7 @@ void mmu_setprotection (int idx, t_value val)
     /* Разряды сумматора, записываемые в регистр защиты - 21-28 */
     int mask = 0xff << (idx * 8);
     val = ((val >> 20) & 0xff) << (idx * 8);
-    RZ = (RZ & ~mask) | val;
+    RZ = (uint32)((RZ & ~mask) | val);
 }
 
 void mmu_setcache (int idx, t_value val)
