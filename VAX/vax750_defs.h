@@ -388,22 +388,6 @@ typedef struct {
 #define BOOT_CI         32
 #define BOOT_TD         64
 
-/* Function prototypes for virtual memory interface */
-
-int32 Read (uint32 va, int32 lnt, int32 acc);
-void Write (uint32 va, int32 val, int32 lnt, int32 acc);
-
-/* Function prototypes for physical memory interface (inlined) */
-
-SIM_INLINE int32 ReadB (uint32 pa);
-SIM_INLINE int32 ReadW (uint32 pa);
-SIM_INLINE int32 ReadL (uint32 pa);
-SIM_INLINE int32 ReadLP (uint32 pa);
-SIM_INLINE void WriteB (uint32 pa, int32 val);
-SIM_INLINE void WriteW (uint32 pa, int32 val);
-SIM_INLINE void WriteL (uint32 pa, int32 val);
-void WriteLP (uint32 pa, int32 val);
-
 /* Function prototypes for I/O */
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
@@ -434,5 +418,9 @@ void sbi_set_errcnf (void);
 #define WriteRegU(p,v,l)    WriteReg (p, v, l)
 
 #include "pdp11_io_lib.h"
+
+/* Function prototypes for virtual and physical memory interface (inlined) */
+
+#include "vax_mmu.h"
 
 #endif

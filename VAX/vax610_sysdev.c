@@ -60,9 +60,6 @@ extern DEVICE vc_dev, lk_dev, vs_dev;
 int32 conisp, conpc, conpsl;                            /* console reg */
 int32 sys_model = 0;                                    /* MicroVAX or VAXstation */
 char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
-static const int32 insert[4] = {
-    0x00000000, 0x000000FF, 0x0000FFFF, 0x00FFFFFF
-    };
 
 static struct boot_dev boot_tab[] = {
     { "RQ",  "DUA", 0x00415544 },                       /* DUAn */
