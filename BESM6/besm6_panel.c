@@ -32,7 +32,6 @@
 
 #include "besm6_defs.h"
 #include <stdlib.h>
-#include <ftw.h>
 
 /*
  * Use a 640x480 window with 32 bit pixels.
@@ -44,13 +43,11 @@
 #define STEPX           14
 #define STEPY           16
 
-#define FONTNAME        "LucidaSansRegular.ttf"
-#define FONTPATH1       "/usr/share/fonts"
-#define FONTPATH2       "/usr/lib/jvm"
-#define FONTPATH3       "/System/Library/Frameworks/JavaVM.framework/Versions"
-
 #include <SDL.h>
 #include <SDL_ttf.h>
+
+#define _QUOTE(x) #x
+#define QUOTE(x) _QUOTE(x)
 
 /* Data and functions that don't depend on SDL version */
 static char *font_path;
@@ -338,22 +335,6 @@ static void draw_brz_static (int top)
 }
 
 /*
- * Поиск файла шрифта по имени.
- */
-static int probe_font (const char *path, const struct stat *st, int flag)
-{
-    const char *p;
-
-    if (flag != FTW_F)
-        return 0;
-    p = path + strlen (path) - strlen (FONTNAME);
-    if (p < path || strcmp (p, FONTNAME) != 0)
-        return 0;
-    font_path = strdup (path);
-    return 1;
-}
-
-/*
  * Закрываем графическое окно.
  */
 void besm6_close_panel ()
@@ -409,22 +390,12 @@ static void init_panel ()
         exit (1);
     }
 
-    /* Find font file */
-    if (ftw (FONTPATH1, probe_font, 255) <= 0 &&
-        ftw (FONTPATH2, probe_font, 255) <= 0 &&
-        ftw (FONTPATH3, probe_font, 255) <= 0) {
-        fprintf(stderr, "SDL: couldn't find font %s in directory %s\n",
-                FONTNAME, FONTPATH1);
-        besm6_close_panel();
-        exit (1);
-    }
-
     /* Open the font file with the requested point size */
-    font_big = TTF_OpenFont (font_path, 16);
-    font_small = TTF_OpenFont (font_path, 9);
+    font_big = TTF_OpenFont (QUOTE(FONTFILE), 16);
+    font_small = TTF_OpenFont (QUOTE(FONTFILE), 9);
     if (! font_big || ! font_small) {
         fprintf(stderr, "SDL: couldn't load font %s: %s\n",
-                font_path, SDL_GetError());
+                QUOTE(FONTFILE), SDL_GetError());
         besm6_close_panel();
         exit (1);
     }
