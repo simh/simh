@@ -1171,14 +1171,19 @@ BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
 	${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
 	${BESM6D}/besm6_punch.c
 
-ifeq (,${VIDEO_LDFLAGS})
+ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}))
+    ifneq (,$(and ${VIDEO_LDFLAGS}, $(findstring besm6,$(MAKECMDGOALS))))
+        $(info ***)
+        $(info *** BESM-6 video not used: please specify a font file with FONTFILE=pathname to enable the panel display)
+        $(info ***)
+    endif
 	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
 else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
     $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
-	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+	BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
 else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
     $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
-	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+	BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
 else
 	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
 endif
