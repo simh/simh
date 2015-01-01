@@ -346,8 +346,8 @@ void drum (int ctlr, uint32 cmd)
     /* Ждём события от устройства.
      * Согласно данным из книжки Мазного Г.Л.,
      * даём 20 мсек на обмен, или 200 тыс.тактов. */
-    /*sim_activate_after (u, 20*MSEC);*/
-    sim_activate_after (u, 20*USEC);      /* Ускорим для отладки. */
+    /*sim_activate (u, 20*MSEC);*/
+    sim_activate (u, 20*USEC);      /* Ускорим для отладки. */
 }
 
 /*

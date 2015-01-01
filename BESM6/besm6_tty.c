@@ -161,7 +161,8 @@ t_stat tty_reset (DEVICE *dptr)
     /* Готовность устройства в READY2 инверсная, а устройство всегда готово */
     /* Провоцируем передачу */
     PRP |= CONS_CAN_PRINT[0] | CONS_CAN_PRINT[1];
-    return sim_clock_coschedule (tty_unit, 5*tmr_poll);
+    return sim_activate (tty_unit, 1000*MSEC/300);
+    // return sim_clock_coschedule (tty_unit, 5*tmr_poll);
 }
 
 /* 19 р ГРП, 300 Гц */
@@ -224,7 +225,8 @@ t_stat vt_clk (UNIT * this)
     /* Опрашиваем сокеты на передачу. */
     tmxr_poll_tx (&tty_desc);
 
-    return sim_clock_coschedule (this, 5*tmr_poll);
+    return sim_activate (tty_unit, 1000*MSEC/300);
+    // return sim_clock_coschedule (this, 5*tmr_poll);
 }
 
 t_stat tty_setmode (UNIT *u, int32 val, char *cptr, void *desc)

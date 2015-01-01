@@ -168,7 +168,7 @@ void fs_control (int num, uint32 cmd)
         if (fs_state[num] == FS_IDLE)
             besm6_debug("<<< ФС1500-%d протяжка без мотора", num);
         else if (fs_state[num] != FS_TAIL) {
-            sim_activate_after (u, FS_RATE);
+            sim_activate (u, FS_RATE);
             bytecnt++;
         } else {
             if (! isfifo[num]) {

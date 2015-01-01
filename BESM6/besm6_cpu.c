@@ -1434,7 +1434,11 @@ void cpu_one_inst ()
 
         /* Если периферия простаивает, освобождаем процессор
          * до следующего тика таймера. */
-        sim_idle (0, TRUE);
+        if (vt_is_idle() &&
+            printer_is_idle() && fs_is_idle()) {
+          check_initial_setup ();
+          sim_idle (0, TRUE);
+        }
     }
 }
 
