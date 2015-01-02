@@ -1769,9 +1769,12 @@ if (sim_send_poll_data (&sim_con_send, &c))             /* injected input charac
     return c;
 if (!sim_rem_master_mode) {
     c = sim_os_poll_kbd ();                                 /* get character */
-    if ((c == SCPE_STOP) ||                                 /* ^E or not Telnet? */
-        ((sim_con_tmxr.master == 0) &&                      /*       and not serial? */
-         (sim_con_ldsc.serport == 0)))
+    if (c == SCPE_STOP) {                                   /* ^E */
+        stop_cpu = 1;                                       /* Force a stop (which is picked up by sim_process_event */
+        return SCPE_OK;
+        }
+    if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
+        (sim_con_ldsc.serport == 0))                        /* and not serial? */
         return c;                                           /* in-window */
     if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */
         if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
