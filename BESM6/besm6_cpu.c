@@ -1494,7 +1494,6 @@ t_stat sim_instr (void)
 
     /* Restore register state */
     PC = PC & BITS(15);                             /* mask PC */
-    sim_cancel_step ();                             /* defang SCP step */
     mmu_setup ();                                   /* copy RP to TLB */
 
     /* An internal interrupt or user intervention */
@@ -1688,13 +1687,7 @@ t_stat sim_instr (void)
             redraw_panel = 0;
         }
 
-        if (delay < 1)
-            delay = 1;
-        sim_interval -= delay;                  /* count down delay */
-        if (sim_step && (--sim_step <= 0)) {    /* do step count */
-            besm6_draw_panel();
-            return SCPE_STOP;
-        }
+        sim_interval -= 1;                      /* count down instructions */
     }
 }
 
@@ -1729,7 +1722,7 @@ t_stat fast_clk (UNIT * this)
 }
 
 UNIT clocks[] = {
-    { UDATA(fast_clk, 0, 0), CLK_DELAY },   /* 40 р, 50 Гц */
+    { UDATA(fast_clk, UNIT_IDLE, 0), CLK_DELAY },   /* 40 р, 50 Гц */
 };
 
 t_stat clk_reset (DEVICE * dev)
