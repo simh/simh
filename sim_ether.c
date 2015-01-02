@@ -1934,7 +1934,7 @@ else
 #if !defined (USE_READER_THREAD)
 #ifdef USE_SETNONBLOCK
 /* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
-      if (pcap_setnonblock (dev->handle, 1, errbuf) == -1) {
+      if (pcap_setnonblock (*handle, 1, errbuf) == -1) {
         sim_printf ("Eth: Failed to set non-blocking: %s\r\n", errbuf);
         }
 #endif
@@ -1946,7 +1946,7 @@ else
          * the tcpdump mailinglist: http://seclists.org/tcpdump/2010/q1/110
          */
         int v = 1;
-        ioctl(pcap_fileno(dev->handle), BIOCIMMEDIATE, &v);
+        ioctl(pcap_fileno(*handle), BIOCIMMEDIATE, &v);
         }
 #endif /* defined (__APPLE__) */
 #endif /* !defined (USE_READER_THREAD) */
