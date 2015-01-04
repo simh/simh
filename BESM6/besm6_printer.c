@@ -52,8 +52,6 @@ struct acpu_t {
     unsigned char line[128][MAX_STRIKES];
 } acpu[2];
 
-int acpu_isatty[2];
-
 #define PRN1_NOT_READY (1<<19)
 #define PRN2_NOT_READY (1<<18)
 
@@ -115,12 +113,6 @@ t_stat printer_attach (UNIT *u, char *cptr)
     s = attach_unit (u, cptr);
     if (s != SCPE_OK)
         return s;
-
-    acpu_isatty[num] = !strcmp(cptr, "/dev/tty");
-    if (!acpu_isatty[num]) {
-        /* Write UTF-8 tag: zero width no-break space. */
-        fputs ("\xEF\xBB\xBF", u->fileref);
-    }
 
     READY &= ~(PRN1_NOT_READY >> num);
     return SCPE_OK;
@@ -320,9 +312,6 @@ offset_gost_write (int num, FILE *fout)
             gost_putc (dev->line[p][s] - 1, fout);
         }
     }
-
-    if (acpu_isatty[num])
-        fputc('\r', fout);
 
     fputc ('\n', fout);
     memset(dev->line, 0, sizeof (dev->line));
