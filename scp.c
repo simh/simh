@@ -2629,7 +2629,7 @@ errabort = sim_switches & SWMASK ('E');                 /* -e means abort on err
 c = fcptr;
 do_arg[10] = NULL;                                      /* make sure the argument list always ends with a NULL */
 for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
-    while (isspace (*c))                                /* skip blanks */
+    while (sim_isspace (*c))                                /* skip blanks */
         c++;
     if (*c == 0)                                        /* all done? */
         do_arg [nargs++] = NULL;                        /* null argument */
@@ -2638,7 +2638,7 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
             quote = *c++;
         else quote = 0;
         do_arg[nargs++] = c;                            /* save start */
-        while (*c && (quote ? (*c != quote) : !isspace (*c)))
+        while (*c && (quote ? (*c != quote) : !sim_isspace (*c)))
             c++;
         if (*c)                                         /* term at quote/spc */
             *c++ = 0;
@@ -2867,7 +2867,7 @@ tmnow = localtime(&now);
 tmpbuf = (char *)malloc(instr_size);
 op = tmpbuf;
 oend = tmpbuf + instr_size - 2;
-while (isspace (*ip))                                   /* skip leading spaces */
+while (sim_isspace (*ip))                                   /* skip leading spaces */
     *op++ = *ip++;
 istart = ip;
 for (; *ip && (op < oend); ) {
@@ -3182,7 +3182,7 @@ if (*cptr == '"') {                                     /* quoted string compari
     if (!*tptr)
         return SCPE_2FARG;
     cptr += strlen (gbuf);
-    while (isspace (*cptr))                             /* skip spaces */
+    while (sim_isspace (*cptr))                             /* skip spaces */
         ++cptr;
     get_glyph (cptr, op, '"');
     for (optr = compare_ops; optr->op; optr++)
@@ -3191,7 +3191,7 @@ if (*cptr == '"') {                                     /* quoted string compari
     if (!optr->op)
         return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
     cptr += strlen (op);
-    while (isspace (*cptr))                             /* skip spaces */
+    while (sim_isspace (*cptr))                             /* skip spaces */
         ++cptr;
     cptr = (char *)get_glyph_gen (cptr, gbuf2, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');/* get second string */
     if (*cptr) {                                        /* more? */
@@ -3454,7 +3454,7 @@ while (1) {
     if (*cptr == 0) continue;                           /* ignore blank */
     if (*cptr != ':') continue;                         /* ignore non-labels */
     ++cptr;                                             /* skip : */
-    while (isspace (*cptr)) ++cptr;                     /* skip blanks */
+    while (sim_isspace (*cptr)) ++cptr;                     /* skip blanks */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get label glyph */
     if (0 == strcmp(gbuf, gbuf1)) {
         sim_brk_clract ();                              /* goto defangs current actions */
@@ -3735,7 +3735,7 @@ else {
             if (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)) {
                 dptr = sim_dflt_dev;
                 cptr = svptr;
-                while (isspace(*cptr))
+                while (sim_isspace(*cptr))
                     ++cptr;
                 break;
                 }
@@ -4002,7 +4002,7 @@ else {
                 dptr = sim_dflt_dev;
                 lvl = MTAB_VDV;                         /* device match */
                 cptr = svptr;
-                while (isspace(*cptr))
+                while (sim_isspace(*cptr))
                     ++cptr;
                 break;
                 }
@@ -4685,7 +4685,7 @@ if (*cptr == '\0')
     cptr = "./*";
 strcpy (WildName, cptr);
 cptr = WildName;
-while (strlen(WildName) && isspace(WildName[strlen(WildName)-1]))
+while (strlen(WildName) && sim_isspace(WildName[strlen(WildName)-1]))
     WildName[strlen(WildName)-1] = '\0';
 if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
     strcat (WildName, "/*");
@@ -4697,7 +4697,7 @@ if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../"
 #endif
     strcat (WholeName, "/");
     strcat (WholeName, cptr);
-    while (strlen(WholeName) && isspace(WholeName[strlen(WholeName)-1]))
+    while (strlen(WholeName) && sim_isspace(WholeName[strlen(WholeName)-1]))
         WholeName[strlen(WholeName)-1] = '\0';
     }
 while ((c = strstr (WholeName, "/./")))
@@ -6814,7 +6814,9 @@ for (tptr = cptr; tptr < (cptr + size); tptr++) {       /* remove cr or nl */
         break;
         }
     }
-while (isspace (*cptr))                                 /* trim leading spc */
+if (0 == memcmp (cptr, "\xEF\xBB\xBF", 3))              /* Skip/ignore UTF8_BOM */
+    memmove (cptr, cptr + 3, strlen (cptr + 3));
+while (sim_isspace (*cptr))                                 /* trim leading spc */
     cptr++;
 if ((*cptr == ';') || (*cptr == '#')) {                 /* ignore comment */
     if (sim_do_echo)                                    /* echo comments if -v */
@@ -6854,7 +6856,7 @@ t_bool escaping = FALSE;
 char quote_char = 0;
 
 while ((*iptr != 0) && 
-       ((quote && quoting) || ((isspace (*iptr) == 0) && (*iptr != mchar)))) {
+       ((quote && quoting) || ((sim_isspace (*iptr) == 0) && (*iptr != mchar)))) {
     if (quote) {
         if (quoting) {
             if (!escaping) {
@@ -6882,7 +6884,7 @@ while ((*iptr != 0) &&
 *optr = 0;
 if (mchar && (*iptr == mchar))                          /* skip terminator */
     iptr++;
-while (isspace (*iptr))                                 /* absorb spaces */
+while (sim_isspace (*iptr))                                 /* absorb spaces */
     iptr++;
 return iptr;
 }
@@ -6915,9 +6917,14 @@ char *sim_trim_endspc (char *cptr)
 char *tptr;
 
 tptr = cptr + strlen (cptr);
-while ((--tptr >= cptr) && isspace (*tptr))
+while ((--tptr >= cptr) && sim_isspace (*tptr))
     *tptr = 0;
 return cptr;
+}
+
+int sim_isspace (char c)
+{
+return isspace ((unsigned char)c);
 }
 
 /* get_yn               yes/no question
@@ -6963,7 +6970,7 @@ val = strtotv (cptr, &tptr, radix);
 if ((cptr == tptr) || (val > max))
     *status = SCPE_ARG;
 else {
-    while (isspace (*tptr)) tptr++;
+    while (sim_isspace (*tptr)) tptr++;
     if (*tptr != 0)
         *status = SCPE_ARG;
     }
@@ -7477,7 +7484,7 @@ int32 sw;
 if (*cptr != '-')
     return 0;
 sw = 0;
-for (cptr++; (isspace (*cptr) == 0) && (*cptr != 0); cptr++) {
+for (cptr++; (sim_isspace (*cptr) == 0) && (*cptr != 0); cptr++) {
     if (isalpha (*cptr) == 0)
         return -1;
     sw = sw | SWMASK (toupper (*cptr));
@@ -7868,7 +7875,7 @@ uint32 c, digit;
 *endptr = (char *)inptr;                                /* assume fails */
 if ((radix < 2) || (radix > 36))
     return 0;
-while (isspace (*inptr))                                /* bypass white space */
+while (sim_isspace (*inptr))                                /* bypass white space */
     inptr++;
 val = 0;
 nodigit = 1;
@@ -8607,7 +8614,7 @@ size_t lnt;
 
 if (sim_brk_act[sim_do_depth] == NULL)                  /* any action? */
     return NULL;
-while (isspace (*sim_brk_act[sim_do_depth]))            /* skip spaces */
+while (sim_isspace (*sim_brk_act[sim_do_depth]))            /* skip spaces */
     sim_brk_act[sim_do_depth]++;
 if (*sim_brk_act[sim_do_depth] == 0) {                  /* now empty? */
     return sim_brk_clract ();
@@ -8732,7 +8739,7 @@ if (*cptr == '[') {
     if ((cptr == c1ptr) || (*c1ptr != ']'))
         return sim_messagef (SCPE_ARG, "Invalid Repeat count specification\n");
     cptr = (char *)(c1ptr + 1);
-    while (isspace(*cptr))
+    while (sim_isspace(*cptr))
         ++cptr;
     }
 tptr = get_glyph (cptr, gbuf, ',');
@@ -8920,7 +8927,7 @@ if (ep->act) {                                          /* replace old action? *
     free (ep->act);                                     /* deallocate */
     ep->act = NULL;                                     /* now no action */
     }
-if (act) while (isspace(*act)) ++act;                   /* skip leading spaces in action string */
+if (act) while (sim_isspace(*act)) ++act;                   /* skip leading spaces in action string */
 if ((act != NULL) && (*act != 0)) {                     /* new action? */
     char *newp = (char *) calloc (strlen (act)+1, sizeof (*act)); /* alloc buf */
     if (newp == NULL)                                   /* mem err? */
@@ -9803,7 +9810,7 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
         const char *start;
 
         help_where.line++;
-        if (isspace (*htext) || *htext == '+') {/* Topic text, indented topic text */
+        if (sim_isspace (*htext) || *htext == '+') {/* Topic text, indented topic text */
             if (excluded) {                     /* Excluded topic text */
                 while (*htext && *htext != '\n')
                     htext++;
@@ -9820,7 +9827,7 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
                     htext++;
                     }
                 }
-            while (*htext && *htext != '\n' && isspace (*htext))
+            while (*htext && *htext != '\n' && sim_isspace (*htext))
                 htext++;
             if (!*htext)                        /* Empty after removing leading spaces */
                 break;
@@ -9922,7 +9929,7 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
                     FAIL (SCPE_ARG, Level not contiguous, htext); /* E.g. 1 3, not reasonable */
                     }
                 }
-            while (*htext && (*htext != '\n') && isspace (*htext))
+            while (*htext && (*htext != '\n') && sim_isspace (*htext))
                 htext++;
             if (!*htext || (*htext == '\n')) {  /* Name missing */
                 FAIL (SCPE_ARG, Missing topic name, htext);

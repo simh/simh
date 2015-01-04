@@ -125,6 +125,7 @@ t_stat reset_all_p (uint32 start_device);
 char *sim_dname (DEVICE *dptr);
 char *sim_uname (UNIT *dptr);
 t_stat get_yn (char *ques, t_stat deflt);
+int sim_isspace (char c);
 char *get_sim_opt (int32 opt, char *cptr, t_stat *st);
 char *get_glyph (const char *iptr, char *optr, char mchar);
 char *get_glyph_nc (const char *iptr, char *optr, char mchar);
