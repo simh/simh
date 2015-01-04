@@ -172,7 +172,7 @@ t_stat vt_clk (UNIT * this)
 
     /* Телетайпы работают на 10 бод */
     static int clk_divider = 1<<29;
-    GRP |= MGRP & BBIT(19);
+    GRP |= MGRP & GRP_SERIAL;
 
     /* Опрашиваем сокеты на приём. */
     tmxr_poll_rx (&tty_desc);
@@ -1137,7 +1137,6 @@ void vt_receive()
             }
             if (tty_typed[num] < 0) {
                 /* TODO: обработать исключение от "неоператорского" терминала */
-//                sim_interval = 0;
                 break;
             }
             if (tty_typed[num] <= 0177) {
@@ -1148,7 +1147,7 @@ void vt_receive()
                 tty_instate[num] = 1;
                 TTY_IN |= mask;         /* start bit */
                 GRP |= GRP_TTY_START;   /* не используется ? */
-                MGRP |= BBIT(19);       /* для терминалов по методу МГУ */
+                MGRP |= GRP_SERIAL;       /* для терминалов по методу МГУ */
                 vt_receiving |= mask;
             }
             break;

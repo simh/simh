@@ -127,6 +127,7 @@ enum {
 #define CLK_DELAY 4000          /* Uncalibrated instructions per clock tick */
 
 extern UNIT cpu_unit;
+extern UNIT tty_unit[];
 extern t_value memory [MEMSIZE];
 extern t_value pult [8];
 extern uint32 PC, RAU, RUU;
@@ -398,6 +399,7 @@ t_value besm6_unpack (t_value val, t_value mask);
 #define GRP_CHAN5_FREE  00000000400000000LL     /* 27 */
 #define GRP_CHAN6_FREE  00000000200000000LL     /* 26 */
 #define GRP_CHAN7_FREE  00000000100000000LL     /* 25 */
+#define GRP_SERIAL      00000000001000000LL     /* 19 */
 #define GRP_WATCHDOG    00000000000002000LL     /* 11 */
 #define GRP_SLOW_CLK    00000000000001000LL     /* 10 */
 /* Внутренние: */
