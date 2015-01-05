@@ -2878,7 +2878,7 @@ for (; *ip && (op < oend); ) {
         }
     else 
         if ((*ip == '%') && 
-            (isalnum(ip[1]) || (ip[1] == '*') || (ip[1] == '_'))) {       /* sub? */
+            (sim_isalnum(ip[1]) || (ip[1] == '*') || (ip[1] == '_'))) {/* sub? */
             if ((ip[1] >= '0') && (ip[1] <= ('9'))) {   /* %n = sub */
                 ap = do_arg[ip[1] - '0'];
                 for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
@@ -3182,7 +3182,7 @@ if (*cptr == '"') {                                     /* quoted string compari
     if (!*tptr)
         return SCPE_2FARG;
     cptr += strlen (gbuf);
-    while (sim_isspace (*cptr))                             /* skip spaces */
+    while (sim_isspace (*cptr))                         /* skip spaces */
         ++cptr;
     get_glyph (cptr, op, '"');
     for (optr = compare_ops; optr->op; optr++)
@@ -3191,7 +3191,7 @@ if (*cptr == '"') {                                     /* quoted string compari
     if (!optr->op)
         return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
     cptr += strlen (op);
-    while (sim_isspace (*cptr))                             /* skip spaces */
+    while (sim_isspace (*cptr))                         /* skip spaces */
         ++cptr;
     cptr = (char *)get_glyph_gen (cptr, gbuf2, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');/* get second string */
     if (*cptr) {                                        /* more? */
@@ -3317,7 +3317,7 @@ SEND *snd;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 tptr = get_glyph (cptr, gbuf, ',');
-if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+if (sim_isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
     r = tmxr_locate_line_send (gbuf, &snd);
     if (r != SCPE_OK)
         return r;
@@ -3370,7 +3370,7 @@ t_stat r;
 SEND *snd;
 
 tptr = get_glyph (cptr, gbuf, ',');
-if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+if (sim_isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
     r = tmxr_locate_line_send (gbuf, &snd);
     if (r != SCPE_OK)
         return r;
@@ -3391,7 +3391,7 @@ EXPECT *exp;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 tptr = get_glyph (cptr, gbuf, ',');
-if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+if (sim_isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
     r = tmxr_locate_line_expect (gbuf, &exp);
     if (r != SCPE_OK)
         return r;
@@ -3412,7 +3412,7 @@ t_stat r;
 EXPECT *exp;
 
 tptr = get_glyph (cptr, gbuf, ',');
-if (isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+if (sim_isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
     r = tmxr_locate_line_expect (gbuf, &exp);
     if (r != SCPE_OK)
         return r;
@@ -3454,7 +3454,7 @@ while (1) {
     if (*cptr == 0) continue;                           /* ignore blank */
     if (*cptr != ':') continue;                         /* ignore non-labels */
     ++cptr;                                             /* skip : */
-    while (sim_isspace (*cptr)) ++cptr;                     /* skip blanks */
+    while (sim_isspace (*cptr)) ++cptr;                 /* skip blanks */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get label glyph */
     if (0 == strcmp(gbuf, gbuf1)) {
         sim_brk_clract ();                              /* goto defangs current actions */
@@ -6816,7 +6816,7 @@ for (tptr = cptr; tptr < (cptr + size); tptr++) {       /* remove cr or nl */
     }
 if (0 == memcmp (cptr, "\xEF\xBB\xBF", 3))              /* Skip/ignore UTF8_BOM */
     memmove (cptr, cptr + 3, strlen (cptr + 3));
-while (sim_isspace (*cptr))                                 /* trim leading spc */
+while (sim_isspace (*cptr))                             /* trim leading spc */
     cptr++;
 if ((*cptr == ';') || (*cptr == '#')) {                 /* ignore comment */
     if (sim_do_echo)                                    /* echo comments if -v */
@@ -6876,7 +6876,7 @@ while ((*iptr != 0) &&
                 }
             }
         }
-    if (islower (*iptr) && uc)
+    if (sim_islower (*iptr) && uc)
         *optr = (char)toupper (*iptr);
     else *optr = *iptr;
     iptr++; optr++;
@@ -6884,7 +6884,7 @@ while ((*iptr != 0) &&
 *optr = 0;
 if (mchar && (*iptr == mchar))                          /* skip terminator */
     iptr++;
-while (sim_isspace (*iptr))                                 /* absorb spaces */
+while (sim_isspace (*iptr))                             /* absorb spaces */
     iptr++;
 return iptr;
 }
@@ -6925,6 +6925,36 @@ return cptr;
 int sim_isspace (char c)
 {
 return isspace ((unsigned char)c);
+}
+
+int sim_islower (char c)
+{
+return islower ((unsigned char)c);
+}
+
+int sim_isalpha (char c)
+{
+return isalpha ((unsigned char)c);
+}
+
+int sim_isprint (char c)
+{
+return isprint ((unsigned char)c);
+}
+
+int sim_isdigit (char c)
+{
+return isdigit ((unsigned char)c);
+}
+
+int sim_isgraph (char c)
+{
+return isgraph ((unsigned char)c);
+}
+
+int sim_isalnum (char c)
+{
+return isalnum ((unsigned char)c);
 }
 
 /* get_yn               yes/no question
@@ -7237,7 +7267,7 @@ while (size--) {
             if (quote == *iptr)
                 *tptr++ = '\\';
         default:
-            if (isprint (*iptr))
+            if (sim_isprint (*iptr))
                 *tptr++ = *iptr;
             else {
                 sprintf (tptr, "\\%03o", *iptr);
@@ -7326,7 +7356,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
          ((nptr = dptr->lname) &&
           (strncmp (cptr, nptr, strlen (nptr)) == 0)))) {
         tptr = cptr + strlen (nptr);
-        if (isdigit (*tptr)) {
+        if (sim_isdigit (*tptr)) {
             if (qdisable (dptr))                        /* disabled? */
                 return NULL;
             u = (uint32) get_uint (tptr, 10, dptr->numunits - 1, &r);
@@ -7455,7 +7485,7 @@ if ((cptr == NULL) || (dptr == NULL) || (dptr->registers == NULL))
 tptr = cptr;
 do {
     tptr++;
-    } while (isalnum (*tptr) || (*tptr == '*') || (*tptr == '_') || (*tptr == '.'));
+    } while (sim_isalnum (*tptr) || (*tptr == '*') || (*tptr == '_') || (*tptr == '.'));
 slnt = tptr - cptr;
 for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
     if ((slnt == strlen (rptr->name)) &&
@@ -7485,7 +7515,7 @@ if (*cptr != '-')
     return 0;
 sw = 0;
 for (cptr++; (sim_isspace (*cptr) == 0) && (*cptr != 0); cptr++) {
-    if (isalpha (*cptr) == 0)
+    if (sim_isalpha (*cptr) == 0)
         return -1;
     sw = sw | SWMASK (toupper (*cptr));
     }
@@ -7879,10 +7909,10 @@ while (sim_isspace (*inptr))                                /* bypass white spac
     inptr++;
 val = 0;
 nodigit = 1;
-for (c = *inptr; isalnum(c); c = *++inptr) {            /* loop through char */
-    if (islower (c))
+for (c = *inptr; sim_isalnum(c); c = *++inptr) {        /* loop through char */
+    if (sim_islower (c))
         c = toupper (c);
-    if (isdigit (c))                                    /* digit? */
+    if (sim_isdigit (c))                                /* digit? */
         digit = c - (uint32) '0';
     else if (radix <= 10)                               /* stop if not expected */
         break;
@@ -9227,7 +9257,7 @@ if (snd && (snd->extoff < snd->insoff)) {               /* pending input charact
 
         *stat = snd->buffer[snd->extoff++] | SCPE_KFLAG;/* get one */
         snd->next_time = sim_gtime() + snd->delay;
-        if (isgraph(*stat & 0xFF) || ((*stat & 0xFF) == ' '))
+        if (sim_isgraph(*stat & 0xFF) || ((*stat & 0xFF) == ' '))
             sprintf (dstr, " '%c'", *stat & 0xFF);
         sim_debug (snd->dbit, snd->dptr, "Byte value: 0x%02X%s injected\n", *stat & 0xFF, dstr);
         }
@@ -9675,7 +9705,7 @@ if (sim_deb && (dptr->dctrl & reason)) {
                 outbuf[oidx++] = ' ';
                 outbuf[oidx++] = hex[(data[i+sidx]>>4)&0xf];
                 outbuf[oidx++] = hex[data[i+sidx]&0xf];
-                if (isprint (data[i+sidx]))
+                if (sim_isprint (data[i+sidx]))
                     strbuf[sidx] = data[i+sidx];
                 else
                     strbuf[sidx] = '.';
@@ -9859,9 +9889,9 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
                             appendText (topic, "+", 1);
                             break;
                         default:                    /* Check for vararg # */
-                            if (isdigit (*htext)) {
+                            if (sim_isdigit (*htext)) {
                                 n = 0;
-                                while (isdigit (*htext))
+                                while (sim_isdigit (*htext))
                                     n += (n * 10) + (*htext++ - '0');
                                 if (( *htext != 'H' && *htext != 's') ||
                                     n == 0 || n >= VSMAX)
@@ -9908,14 +9938,14 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
                 }
             continue;
             } /* topic text line */
-        if (isdigit (*htext)) {                 /* Topic heading */
+        if (sim_isdigit (*htext)) {             /* Topic heading */
             TOPIC **children;
             TOPIC *newt;
             char nbuf[100];
 
             n = 0;
             start = htext;
-            while (isdigit (*htext))
+            while (sim_isdigit (*htext))
                 n += (n * 10) + (*htext++ - '0');
             if ((htext == start) || !n) {
                 FAIL (SCPE_ARG, Invalid topic heading, htext);
@@ -9944,7 +9974,7 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
             if (*start == '?') {                /* Conditional topic? */
                 size_t n = 0;
                 start++;
-                while (isdigit (*start))        /* Get param # */
+                while (sim_isdigit (*start))    /* Get param # */
                     n += (n * 10) + (*start++ - '0');
                 if (!*start || *start == '\n'|| n == 0 || n >= VSMAX)
                     FAIL (SCPE_ARG, Invalid parameter number, start);
