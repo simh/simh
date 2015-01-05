@@ -3,15 +3,28 @@
  *
  * Copyright (c) 2009, Leo Broukhis
  * Copyright (c) 2009, Serge Vakulenko
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.
- *
- * You can redistribute this program and/or modify it under the terms of
- * the GNU General Public License as published by the Free Software Foundation;
- * either version 2 of the License, or (at your discretion) any later version.
- * See the accompanying file "COPYING" for more details.
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
+ * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * OR OTHER DEALINGS IN THE SOFTWARE.
+
+ * Except as contained in this notice, the name of Leonid Broukhis or
+ * Serge Vakulenko shall not be used in advertising or otherwise to promote
+ * the sale, use or other dealings in this Software without prior written
+ * authorization from Leonid Broukhis and Serge Vakulenko.
  */
 
 #include "besm6_defs.h"
@@ -19,10 +32,10 @@
 #include "sim_tmxr.h"
 #include <time.h>
 
-#define TTY_MAX         24              /* Количество последовательных терминалов */
-#define LINES_MAX       TTY_MAX + 2     /* Включая параллельные интерфейсы "Консулов" */
+#define TTY_MAX         24              /* Serial TTY lines */
+#define LINES_MAX       TTY_MAX + 2     /* Including parallel "Consul" typewriters */
 /*
- * Согласно таблице в http://ru.wikipedia.org/wiki/МТК-2
+ * According to a table in http://ru.wikipedia.org/wiki/МТК-2
  */
 char * rus[] = { 0, "Т", "\r", "О", " ", "Х", "Н", "М", "\n", "Л", "Р", "Г", "И", "П", "Ц", "Ж",
                  "Е", "З", "Д", "Б", "С", "Ы", "Ф", "Ь", "А", "В", "Й", 0, "У", "Я", "К", 0 };
@@ -38,7 +51,7 @@ char ** reg = 0;
 
 char *  process (int sym)
 {
-    /* Требуется инверсия */
+    /* Inversion is required for Baudot TTYs */
     sym ^= 31;
     switch (sym) {
     case 0:
@@ -56,7 +69,7 @@ char *  process (int sym)
     return "";
 }
 
-/* Только для последовательных линий */
+/* For serial lines */
 int tty_active [TTY_MAX+1], tty_sym [TTY_MAX+1];
 int tty_typed [TTY_MAX+1], tty_instate [TTY_MAX+1];
 time_t tty_last_time [TTY_MAX+1];
@@ -74,7 +87,7 @@ uint32 CONSUL_IN[2];
 uint32 CONS_CAN_PRINT[2] = { 01000, 00400 };
 uint32 CONS_HAS_INPUT[2] = { 04000, 02000 };
 
-/* Буфера командных строк для режима telnet. */
+/* Command line buffers for TELNET mode. */
 char vt_cbuf [CBUFSIZE] [LINES_MAX+1];
 char *vt_cptr [LINES_MAX+1];
 
@@ -121,13 +134,13 @@ REG tty_reg[] = {
 };
 
 /*
- * Дескрипторы линий для мультиплексора TMXR.
- * Поле .conn содержит номер сокета и означает занятую линию.
- * Для локальных терминалов делаем .conn = 1.
- * Чтобы нумерация линий совпадала с нумерацией терминалов
- * (с единицы), нулевую линию держим занятой (.conn = 1).
- * Поле .rcve устанавливается в 1 для сетевых соединений.
- * Для локальных терминалов оно равно 0.
+ * Line descriptors for the TMXR multiplexor.
+ * The .conn field contains the socket number and denotes a used line.
+ * For local terminals, .conn = 1.
+ * To match line indexes with TTY numbers (1-based),
+ * line 0 is kept used (.conn = 1).
+ * The .rcve field is set to 1 for network connections.
+ * For local connections, it is 0.
  */
 TMLN tty_line [LINES_MAX+1];
 TMXR tty_desc = { LINES_MAX+1, 0, 0, tty_line };        /* mux descriptor */
@@ -158,23 +171,24 @@ t_stat tty_reset (DEVICE *dptr)
     reg = rus;
     vt_idle = 1;
     tty_line[0].conn = 1;                   /* faked, always busy */
-    /* Готовность устройства в READY2 инверсная, а устройство всегда готово */
-    /* Провоцируем передачу */
+    /* In the READY2 register the ready flag for typewriters is inverted (0 means ready),
+     * and the device is always ready. */
+    /* Forcing a ready interrupt. */
     PRP |= CONS_CAN_PRINT[0] | CONS_CAN_PRINT[1];
     //return sim_activate_after (tty_unit, 1000*MSEC/300);
     return sim_clock_coschedule (tty_unit, tmr_poll);
 }
 
-/* 19 р ГРП, 300 Гц */
+/* Bit 19 of GRP, should be 300 Hz */
 t_stat vt_clk (UNIT * this)
 {
     int num;
 
-    /* Телетайпы работают на 10 бод */
+    /* Baudot TTYs work at 10 baud */
     static int clk_divider = 1<<29;
     GRP |= MGRP & GRP_SERIAL;
 
-    /* Опрашиваем сокеты на приём. */
+    /* Polling receiving from sockets */
     tmxr_poll_rx (&tty_desc);
 
     vt_print();
@@ -183,16 +197,16 @@ t_stat vt_clk (UNIT * this)
 
     if (! (clk_divider >>= 1)) {
         tt_print();
-        /* Прием не реализован */
+        /* Input from Baudot TTYs not implemented */
         clk_divider = 1<<29;
     }
 
-    /* Есть новые сетевые подключения? */
+    /* Are there any new network connections? */
     num = tmxr_poll_conn (&tty_desc);
     if (num > 0 && num <= LINES_MAX) {
         char buf [80];
         TMLN *t = &tty_line [num];
-        besm6_debug ("*** tty%d: новое подключение от %s",
+        besm6_debug ("*** tty%d: a new connection from %s",
                      num, t->ipad);
         t->rcve = 1;
         tty_unit[num].flags &= ~TTY_STATE_MASK;
@@ -218,14 +232,17 @@ t_stat vt_clk (UNIT * this)
                  t->ipad);
         tmxr_linemsg (t, buf);
 
-        /* Ввод ^C, чтобы получить приглашение. */
+        /* Entering ^C (ETX) to get a prompt. */
         t->rxb [t->rxbpi++] = '\3';
     }
 
-    /* Опрашиваем сокеты на передачу. */
+    /* Polling sockets for transmission. */
     tmxr_poll_tx (&tty_desc);
 
-    // return sim_activate_after (tty_unit, 1000*MSEC/300);
+    /* We'll get a guaranteed interrupt rate of 250 Hz (wallclock)
+     * plus additional interrupts during the idle loop for speedup
+     * (see besm6_cpu.c).
+     */
     return sim_clock_coschedule (this, tmr_poll);
 }
 
@@ -280,10 +297,9 @@ t_stat tty_setmode (UNIT *u, int32 val, char *cptr, void *desc)
 }
 
 /*
- * Разрешение подключения к терминалам через telnet.
- * Делается командой:
- *      attach tty <порт>
- * Здесь <порт> - номер порта telnet, например 4199.
+ * Allowing telnet connections is done with
+ *      attach tty <port>
+ * Where <port> is the port number for telnet, e.g. 4199.
  */
 t_stat tty_attach (UNIT *u, char *cptr)
 {
@@ -291,39 +307,40 @@ t_stat tty_attach (UNIT *u, char *cptr)
     int r, m, n;
 
     if (*cptr >= '0' && *cptr <= '9') {
-        /* Сохраняем и восстанавливаем все .conn,
-         * так как tmxr_attach() их обнуляет. */
+        /* Saving and restoring all .conn,
+         * because tmxr_attach() zeroes them. */
         for (m=0, n=1; n<=LINES_MAX; ++n)
             if (tty_line[n].conn)
                 m |= 1 << (LINES_MAX-n);
-        /* Неважно, какой номер порта указывать в команде задания
-         * порта telnet. Можно tty, можно tty1 - без разницы. */
+        /* The unit number is ignored for the port assignment */
         r = tmxr_attach (&tty_desc, &tty_unit[0], cptr);
         for (n=1; n<=LINES_MAX; ++n)
             if (m >> (LINES_MAX-n) & 1)
                 tty_line[n].conn = 1;
         return r;
     }
-    if (strcmp (cptr, "/dev/tty") == 0) {
-        /* Консоль. */
+
+    if (strcmp (cptr, "console") == 0) {
+        /* Attaching SIMH console to a particular terminal. */
         u->flags &= ~TTY_STATE_MASK;
         u->flags |= TTY_VT340_STATE;
         tty_line[num].conn = 1;
         tty_line[num].rcve = 0;
         if (num <= TTY_MAX)
             vt_mask |= 1 << (TTY_MAX - num);
-        besm6_debug ("*** консоль на T%03o", num);
+        besm6_debug ("*** console on T%03o", num);
         return 0;
     }
-    if (strcmp (cptr, "/dev/null") == 0) {
-        /* Запрещаем терминал. */
+    /* Disallowing future connections to a line */
+    if (strcmp (cptr, "none") == 0) {
+        /* Marking the TTY as unusable. */
         tty_line[num].conn = 1;
         tty_line[num].rcve = 0;
         if (num <= TTY_MAX) {
             vt_mask &= ~(1 << (TTY_MAX - num));
             tt_mask &= ~(1 << (TTY_MAX - num));
         }
-        besm6_debug ("*** отключение терминала T%03o", num);
+        besm6_debug ("*** turning off T%03o", num);
         return 0;
     }
     return SCPE_ALATT;
@@ -335,20 +352,20 @@ t_stat tty_detach (UNIT *u)
 }
 
 /*
- * Управление терминалами.
- * set ttyN unicode     - выбор кодировки UTF-8
- * set ttyN jcuken      - выбор кодировки КОИ-7, раскладка йцукен
- * set ttyN qwerty      - выбор кодировки КОИ-7, раскладка яверты
- * set ttyN off         - отключение
- * set ttyN tt          - установка типа терминала "Телетайп"
- * set ttyN vt          - установка типа терминала "Видеотон-340"
- * set ttyN consul      - установка типа терминала "Consul-254"
- * set ttyN destrbs     - "стирающий" backspace
- * set ttyN authbs      - классический backspace
- * set tty disconnect=N - принудительное завершение сеанса telnet
- * show tty             - просмотр режимов терминалов
- * show tty connections - просмотр IP-адресов и времени соединений
- * show tty statistics  - просмотр счетчиков переданных и принятых байтов
+ * TTY control:
+ * set ttyN unicode     - selecting UTF-8 encoding
+ * set ttyN jcuken      - selecting KOI-7 encoding, JCUKEN layout
+ * set ttyN qwerty      - selecting KOI-7 encoding, QWERTY layout
+ * set ttyN off         - disconnecting a line
+ * set ttyN tt          - a Baudot TTY
+ * set ttyN vt          - a Videoton-340 terminal
+ * set ttyN consul      - a "Consul-254" typewriter
+ * set ttyN destrbs     - destructive (erasing) backspace
+ * set ttyN authbs      - authentic backspace (cursor left)
+ * set tty disconnect=N - forceful termination of a telnet connection
+ * show tty             - showing modes and types
+ * show tty connections - showing IP-addresses and connection times
+ * show tty statistics  - showing TX/RX byte counts
  */
 MTAB tty_mod[] = {
     { TTY_CHARSET_MASK, TTY_UNICODE_CHARSET, "UTF-8 input",
@@ -393,13 +410,13 @@ DEVICE tty_dev = {
 
 void tty_send (uint32 mask)
 {
-    /* besm6_debug ("*** телетайпы: передача %08o", mask); */
+    /* besm6_debug ("*** TTY: transmit %08o", mask); */
 
     TTY_OUT = mask;
 }
 
 /*
- * Выдача символа на терминал с указанным номером.
+ * Sending a character to a terminal with the given number.
  */
 void vt_putc (int num, int c)
 {
@@ -408,38 +425,29 @@ void vt_putc (int num, int c)
     if (! t->conn)
         return;
     if (t->rcve) {
-        /* Передача через telnet. */
+        /* A telnet connection. */
         tmxr_putc_ln (t, c);
     } else {
-        /* Вывод на консоль. */
-        if (t->txlog) {                 /* log if available */
-            fputc (c, t->txlog);
-            if (c == '\n')
-                fflush (t->txlog);
-        }
-        fputc (c, stdout);
-        fflush (stdout);
+        /* Console output. */
+        sim_putchar(c);
     }
 }
 
 /*
- * Выдача строки на терминал с указанным номером.
+ * Sending a string to a terminal with the given number.
  */
-void vt_puts (int num, const char *s)
+void vt_puts (int num, const unsigned char *s)
 {
     TMLN *t = &tty_line [num];
 
     if (! t->conn)
         return;
     if (t->rcve) {
-        /* Передача через telnet. */
+        /* A telnet connection. */
         tmxr_linemsg (t, (char*) s);
     } else {
-        /* Вывод на консоль. */
-        if (t->txlog)                   /* log if available */
-            fputs (s, t->txlog);
-        fputs (s, stdout);
-        fflush (stdout);
+        /* Console output. */
+        while (*s) sim_putchar(*s++);
     }
 }
 
@@ -450,6 +458,7 @@ const char * koi7_rus_to_unicode [32] = {
     "Ь", "Ы", "З", "Ш", "Э", "Щ", "Ч", "\0x7f",
 };
 
+/* Videoton-340 employed single byte control codes rather than ESC sequences. */
 void vt_send(int num, uint32 sym, int destructive_bs)
 {
     if (sym < 0x60) {
@@ -473,7 +482,7 @@ void vt_send(int num, uint32 sym, int destructive_bs)
             /* Left */
             vt_puts (num, "\033[");
             if (destructive_bs) {
-                /* Стираем предыдущий символ. */
+                /* Erasing the previous char. */
                 vt_puts (num, "D \033[");
             }
             sym = 'D';
@@ -481,37 +490,35 @@ void vt_send(int num, uint32 sym, int destructive_bs)
         case '\v':
         case '\033':
         case '\0':
-            /* Выдаём управляющий символ. */
+            /* Sending the actual char */
             break;
         case '\037':
-            /* Очистка экрана */
+            /* Clear screen */
             vt_puts (num, "\033[H\033[");
             sym = 'J';
             break;
         case '\n':
-            /* На VDT-340 также возвращал курсор в 1-ю позицию */
+            /* Also does carriage return */
             vt_putc (num, '\r');
             sym = '\n';
             break;
         case '\f':
-            /* Сообщение ERR при нажатии некоторых управляющих
-             * клавиш выдается с использованием reverse wraparound.
-             */
+            /* Home */
             vt_puts(num, "\033[");
             sym = 'H';
             break;
         case '\r':
         case '\003':
-            /* Неотображаемые символы */
+            /* Not displayed */
             sym = 0;
             break;
         default:
             if (sym < ' ') {
-                /* Нефункциональные ctrl-символы были видны в половинной яркости */
+                /* Other control chars were displayed as dimmed. */
                 vt_puts (num, "\033[2m");
                 vt_putc (num, sym | 0x40);
                 vt_puts (num, "\033[");
-                /* Завершаем ESC-последовательность */
+                /* Terminating the ESC sequence */
                 sym = 'm';
             }
         }
@@ -522,7 +529,7 @@ void vt_send(int num, uint32 sym, int destructive_bs)
 }
 
 /*
- * Обработка выдачи на все подключенные терминалы.
+ * Handling output to all connected terminals.
  */
 void vt_print()
 {
@@ -569,8 +576,7 @@ void vt_print()
     vt_idle = 0;
 }
 
-/* Ввод с телетайпа не реализован; вывод работает только при использовании
- * модельного времени.
+/* Input from Baudot TTYs not implemented. Output may require some additional work.
  */
 void tt_print()
 {
@@ -615,8 +621,8 @@ void tt_print()
 }
 
 /*
- * Перекодировка из Unicode в КОИ-7.
- * Если нет соответствия, возвращает -1.
+ * Converting from Unicode to KOI-7.
+ * Returns -1 if unsuccessful.
  */
 static int unicode_to_koi7 (unsigned val)
 {
@@ -820,7 +826,7 @@ static t_stat cmd_help (int32 num, char *cptr)
     if (! cptr)
         return SCPE_INVSW;
     if (! *cptr) {
-        /* Список всех команд. */
+        /* Listing all commands. */
         tmxr_linemsg (t, "Commands may be abbreviated.  Commands are:\r\n\r\n");
         for (c=cmd_table; c && c->name; c++)
             if (c->help)
@@ -833,13 +839,13 @@ static t_stat cmd_help (int32 num, char *cptr)
     c = lookup_cmd (gbuf);
     if (! c)
         return SCPE_ARG;
-    /* Описание конкретной команды. */
+    /* Describing a command. */
     tmxr_linemsg (t, c->help);
     return SCPE_OK;
 }
 
 /*
- * Выполнение командной строки.
+ * Executing a command.
  */
 void vt_cmd_exec (int num)
 {
@@ -867,7 +873,7 @@ void vt_cmd_exec (int num)
 }
 
 /*
- * Режим управляющей командной строки.
+ * Command line interface mode.
  */
 void vt_cmd_loop (int num, int c)
 {
@@ -882,11 +888,11 @@ void vt_cmd_loop (int num, int c)
     case '\n':
         tmxr_linemsg (t, "\r\n");
         if (*cptr <= cbuf) {
-            /* Пустая строка - возврат в обычный режим. */
+            /* An empty line - returning to terminal emulation. */
             tty_unit[num].flags &= ~TTY_CMDLINE_MASK;
             break;
         }
-        /* Выполнение. */
+        /* Executing. */
         **cptr = 0;
         vt_cmd_exec (num);
         tmxr_linemsg (t, "sim>");
@@ -894,7 +900,7 @@ void vt_cmd_loop (int num, int c)
         break;
     case '\b':
     case 0177:
-        /* Стирание предыдущего символа. */
+        /* Backspace. */
         if (*cptr <= cbuf)
             break;
         tmxr_linemsg (t, "\b \b");
@@ -905,7 +911,7 @@ void vt_cmd_loop (int num, int c)
         }
         break;
     case 'U' & 037:
-        /* Стирание всей строки. */
+        /* Erase line. */
         erase_line:     while (*cptr > cbuf) {
             --*cptr;
             if (! (**cptr & 0x80))
@@ -917,14 +923,14 @@ void vt_cmd_loop (int num, int c)
         if (tmxr_getc_ln (t) != '[' + TMXR_VALID)
             break;
         switch (tmxr_getc_ln (t) - TMXR_VALID) {
-        case 'A': /* стрелка вверх */
+        case 'A': /* Up arrow */
             if (*cptr <= cbuf) {
                 *cptr = cbuf + strlen (cbuf);
                 if (*cptr > cbuf)
                     tmxr_linemsg (t, cbuf);
             }
             break;
-        case 'B': /* стрелка вниз */
+        case 'B': /* Down arrow */
             goto erase_line;
         }
         break;
@@ -938,9 +944,8 @@ void vt_cmd_loop (int num, int c)
 }
 
 /*
- * Ввод символа с терминала с указанным номером.
- * Если нет приёма, возвращает -1.
- * В случае прерывания возвращает 0400 (только для консоли).
+ * Getting a char from a terminal with the given number.
+ * Returns -1 if there is no char to input.
  */
 int vt_getc (int num)
 {
@@ -952,7 +957,7 @@ int vt_getc (int num)
     if (! t->conn) {
         /* Пользователь отключился. */
         if (t->ipad) {
-            besm6_debug ("*** tty%d: отключение %s",
+            besm6_debug ("*** tty%d: disconnecting %s",
                          num, 
                          t->ipad);
             t->ipad = NULL;
@@ -962,18 +967,18 @@ int vt_getc (int num)
         return -1;
     }
     if (t->rcve) {
-        /* Приём через telnet. */
+        /* A telnet line. */
         c = tmxr_getc_ln (t);
         if (! (c & TMXR_VALID)) {
             now = time (0);
             if (now > tty_last_time[num] + 5*60) {
                 ++tty_idle_count[num];
                 if (tty_idle_count[num] > 3) {
-                    tmxr_linemsg (t, "\r\nКОНЕЦ СЕАНСА\r\n");
+                    tmxr_linemsg (t, "\r\nSIMH: END OF SESSION\r\n");
                     tmxr_reset_ln (t);
                     return -1;
                 }
-                tmxr_linemsg (t, "\r\nНЕ СПАТЬ!\r\n");
+                tmxr_linemsg (t, "\r\nSIMH: WAKE UP!\r\n");
                 tty_last_time[num] = now;
             }
             return -1;
@@ -982,23 +987,23 @@ int vt_getc (int num)
         tty_last_time[num] = time (0);
 
         if (tty_unit[num].flags & TTY_CMDLINE_MASK) {
-            /* Продолжение режима управляющей командной строки. */
+            /* Continuing CLI mode. */
             vt_cmd_loop (num, c & 0377);
             return -1;
         }
         if ((c & 0377) == sim_int_char) {
-            /* Вход в режим управляющей командной строки. */
+            /* Entering CLI mode. */
             tty_unit[num].flags |= TTY_CMDLINE_MASK;
             tmxr_linemsg (t, "sim>");
             vt_cptr[num] = vt_cbuf[num];
             return -1;
         }
     } else {
-        /* Ввод с клавиатуры. */
+        /* Console (keyboard) input. */
         c = sim_poll_kbd();
         if (c == SCPE_STOP) {
-            return 0400;            /* прерывание */
-            }
+            stop_cpu = 1;   /* just in case */ 
+        }
         if (! (c & SCPE_KFLAG))
             return -1;
     }
@@ -1006,11 +1011,9 @@ int vt_getc (int num)
 }
 
 /*
- * Ввод символа с клавиатуры.
- * Перекодировка из UTF-8 в КОИ-7.
- * Полученный символ находится в диапазоне 0..0177.
- * Если нет ввода, возвращает -1.
- * В случае прерывания (^E) возвращает 0400.
+ * Reading UTF-8, returning KOI-7.
+ * The resulting char is in the range 0..0177.
+ * If no input, returns -1.
  */
 static int vt_kbd_input_unicode (int num)
 {
@@ -1043,9 +1046,9 @@ static int vt_kbd_input_unicode (int num)
 }
 
 /*
- * Альтернативный вариант ввода, не требующий переключения на русскую клавиатуру.
- * Символы "точка" и "запятая" вводятся через shift, "больше-меньше" - "тильда-гравис".
- * "точка с запятой" - "закр. фиг. скобка", "апостроф" - "верт. черта".
+ * Alternatively, entering Cyrillics can be done without switching keyboard layouts.
+ * Period and comma are entered with shift, less-than and greater-than are mapped to tilde-grave.
+ * Semicolon is }, quote is |.
  */
 static int vt_kbd_input_koi7 (int num)
 {
@@ -1108,7 +1111,7 @@ int odd_parity(unsigned char c)
 }
 
 /*
- * Обработка ввода со всех подключенных терминалов.
+ * Handling input from all connected terminals.
  */
 void vt_receive()
 {
@@ -1136,18 +1139,20 @@ void vt_receive()
                 break;
             }
             if (tty_typed[num] < 0) {
-                /* TODO: обработать исключение от "неоператорского" терминала */
                 break;
             }
             if (tty_typed[num] <= 0177) {
                 if (tty_typed[num] == '\r' || tty_typed[num] == '\n')
-                    tty_typed[num] = 3;     /* ^C - конец строки */
+                    tty_typed[num] = 3;     /* ETX is used as Enter */
                 if (tty_typed[num] == '\177')
                     tty_typed[num] = '\b';  /* ASCII DEL -> BS */
                 tty_instate[num] = 1;
                 TTY_IN |= mask;         /* start bit */
-                GRP |= GRP_TTY_START;   /* не используется ? */
-                MGRP |= GRP_SERIAL;       /* для терминалов по методу МГУ */
+                GRP |= GRP_TTY_START;   /* not used ? */
+                /* auto-enabling the interrupt just in case
+                 * (seems to be unneeded as the interrupt is never disabled)
+                 */
+                MGRP |= GRP_SERIAL;       
                 vt_receiving |= mask;
             }
             break;
@@ -1176,7 +1181,8 @@ void vt_receive()
 }
 
 /*
- * Выясняем, остановлены ли терминалы. Нужно для входа в "спящий" режим.
+ * Checking if all terminals are idle. 
+ * SIMH should not enter idle mode until they are.
  */
 int vt_is_idle ()
 {
@@ -1185,7 +1191,7 @@ int vt_is_idle ()
 
 int tty_query ()
 {
-    /*      besm6_debug ("*** телетайпы: приём");*/
+    /*      besm6_debug ("*** TTY: query");*/
     return TTY_IN;
 }
 

@@ -1429,8 +1429,7 @@ void cpu_one_inst ()
     if (RUU == 047 && PC == 04440 && RK == 067704440) {
         /* Если периферия простаивает, освобождаем процессор
          * до следующего тика таймера. */
-        if (vt_is_idle() &&
-            printer_is_idle() && fs_is_idle()) {
+        if (vt_is_idle()) {
           check_initial_setup ();
           sim_idle (0, TRUE);
         } else if (sim_activate_time(tty_unit) > 1000*MSEC/300) {
