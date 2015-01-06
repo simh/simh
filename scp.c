@@ -399,7 +399,7 @@ void sim_brk_npc (uint32 cnt);
 BRKTAB *sim_brk_new (t_addr loc);
 FILE *stdnul;
 
-/* Commands support routines */
+/* Command support routines */
 
 SCHTAB *get_rsearch (const char *cptr, int32 radix, SCHTAB *schptr);
 SCHTAB *get_asearch (const char *cptr, int32 radix, SCHTAB *schptr);
@@ -453,6 +453,8 @@ void int_handler (int signal);
 t_stat set_prompt (int32 flag, char *cptr);
 t_stat sim_set_asynch (int32 flag, char *cptr);
 t_stat sim_set_environment (int32 flag, char *cptr);
+static char *get_dbg_verb (uint32 dbits, DEVICE* dptr);
+
 /* Global data */
 
 DEVICE *sim_dflt_dev = NULL;
@@ -3912,7 +3914,7 @@ DEBTAB *dep;
 if ((dptr->flags & DEV_DEBUG) == 0)
     return SCPE_NOFNC;
 if (cptr == NULL) {                                     /* no arguments? */
-    dptr->dctrl = flag;                                 /* disable/enable w/o table */
+    dptr->dctrl = flag ? (dptr->debflags ? flag : 0xFFFFFFFF) : 0;/* disable/enable w/o table */
     if (flag && dptr->debflags) {                       /* enable with table? */
         for (dep = dptr->debflags; dep->name != NULL; dep++)
             dptr->dctrl = dptr->dctrl | dep->mask;      /* set all */
@@ -9014,6 +9016,8 @@ if (exp->buf_size) {
     }
 if (exp->after)
     fprintf (st, "Halt After: %d instructions\n", exp->after);
+if (exp->dptr && exp->dbit)
+    fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(exp->dptr), exp->dptr->debflags ? get_dbg_verb (exp->dbit, exp->dptr) : "");
 if (!*match)
     return sim_exp_showall (st, exp);
 if (!ep)
@@ -9240,6 +9244,8 @@ else
 if ((snd->next_time - sim_gtime()) > 0)
     fprintf (st, "Minimum of %d instructions befor sending first character\n", (int)(snd->next_time - sim_gtime()));
 fprintf (st, "Minimum of %d instructions between characters\n", (int)snd->delay);
+if (snd->dptr && snd->dbit)
+    fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr) : "");
 return SCPE_OK;
 }
 
@@ -9316,10 +9322,10 @@ int32 debug_unterm  = 0;
 
 /* Finds debug phrase matching bitmask from from device DEBTAB table */
 
-static char* get_dbg_verb (uint32 dbits, DEVICE* dptr)
+static char *get_dbg_verb (uint32 dbits, DEVICE* dptr)
 {
-static char* debtab_none    = "DEBTAB_ISNULL";
-static char* debtab_nomatch = "DEBTAB_NOMATCH";
+static char *debtab_none    = "DEBTAB_ISNULL";
+static char *debtab_nomatch = "DEBTAB_NOMATCH";
 int32 offset = 0;
 
 if (dptr->debflags == 0)
