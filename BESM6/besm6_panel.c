@@ -28,6 +28,16 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from Leonid Broukhis and Serge Vakulenko.
  */
+
+#if defined (HAVE_LIBSDL)
+#if !defined (FONTFILE)
+#include "besm6_panel_font.h"
+#endif /* !defined (FONTFILE) */
+#if !defined (FONTFILE)
+#undef HAVE_LIBSDL
+#endif /* !defined (FONTFILE) */
+#endif /* defined (HAVE_LIBSDL) */
+
 #ifdef HAVE_LIBSDL
 
 #include "besm6_defs.h"
@@ -50,7 +60,6 @@
 #define QUOTE(x) _QUOTE(x)
 
 /* Data and functions that don't depend on SDL version */
-static char *font_path;
 static TTF_Font *font_big;
 static TTF_Font *font_small;
 static SDL_Color foreground;
@@ -99,13 +108,14 @@ static void render_utf8 (TTF_Font *font, int x, int y, int halign, char *message
 static SDL_Surface *sprite_from_data (int width, int height,
                                       const unsigned char *data)
 {
-    SDL_Surface *sprite, *optimized;
-    unsigned *s, r, g, b, y, x;
+    SDL_Surface *sprite;
+    unsigned *s, r, g, b;
+    int y, x;
 
     sprite = SDL_CreateRGBSurface (SDL_SWSURFACE,
                                    width, height, DEPTH, 0, 0, 0, 0);
     /*
-      optimized = SDL_DisplayFormat (sprite);
+      SDL_Surface *optimized = SDL_DisplayFormat (sprite);
       SDL_FreeSurface (sprite);
       sprite = optimized;
     */
@@ -337,7 +347,7 @@ static void draw_brz_static (int top)
 /*
  * Закрываем графическое окно.
  */
-void besm6_close_panel ()
+void besm6_close_panel (void)
 {
     if (! screen)
         return;
@@ -356,7 +366,7 @@ static SDL_Texture *sdlTexture;
 /*
  * Начальная инициализация графического окна и шрифтов.
  */
-static void init_panel ()
+static void init_panel (void)
 {
     if (sim_switches & SWMASK('Q'))
         return;
@@ -430,8 +440,10 @@ void (*sim_vm_init)() = init_panel;
 /*
  * Обновляем графическое окно.
  */
-void besm6_draw_panel ()
+void besm6_draw_panel (void)
 {
+    SDL_Event event;
+
     if (! screen)
         return;
 
@@ -448,7 +460,6 @@ void besm6_draw_panel ()
     SDL_RenderPresent (sdlRenderer);
 
     /* Exit SIMH when window closed.*/
-    SDL_Event event;
     if (SDL_PollEvent (&event) && event.type == SDL_QUIT)
         longjmp (cpu_halt, SCPE_STOP);
 }
@@ -458,7 +469,7 @@ void besm6_draw_panel ()
 /*
  * Начальная инициализация графического окна и шрифтов.
  */
-static void init_panel ()
+static void init_panel (void)
 {
     if (sim_switches & SWMASK('Q'))
         return;
@@ -484,22 +495,12 @@ static void init_panel ()
         exit (1);
     }
 
-    /* Find font file */
-    if (ftw (FONTPATH1, probe_font, 255) <= 0 &&
-        ftw (FONTPATH2, probe_font, 255) <= 0 &&
-        ftw (FONTPATH3, probe_font, 255) <= 0) {
-        fprintf(stderr, "SDL: couldn't find font %s in directory %s\n",
-                FONTNAME, FONTPATH1);
-        besm6_close_panel();
-        exit (1);
-    }
-
     /* Open the font file with the requested point size */
-    font_big = TTF_OpenFont (font_path, 16);
-    font_small = TTF_OpenFont (font_path, 9);
+    font_big = TTF_OpenFont (QUOTE(FONTFILE), 16);
+    font_small = TTF_OpenFont (QUOTE(FONTFILE), 9);
     if (! font_big || ! font_small) {
         fprintf(stderr, "SDL: couldn't load font %s: %s\n",
-                FONTNAME, TTF_GetError());
+                QUOTE(FONTFILE), TTF_GetError());
         besm6_close_panel();
         exit (1);
     }
@@ -543,7 +544,7 @@ void besm6_draw_panel ()
 #endif /* SDL_MAJOR_VERSION */
 
 #else /* HAVE_LIBSDL */
-void besm6_draw_panel ()
+void besm6_draw_panel (void)
 {
 }
 #endif /* HAVE_LIBSDL */

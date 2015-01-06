@@ -1167,25 +1167,41 @@ SSEM_OPT = -I ${SSEMD}
 
 BESM6D = BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
-	${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
-	${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
-	${BESM6D}/besm6_punch.c
+        ${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
+        ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
+        ${BESM6D}/besm6_punch.c
 
-ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}))
-    ifneq (,$(and ${VIDEO_LDFLAGS}, $(findstring besm6,$(MAKECMDGOALS))))
-        $(info ***)
-        $(info *** BESM-6 video not used: please specify a font file with FONTFILE=pathname to enable the panel display)
-        $(info ***)
+ifneq (,${VIDEO_LDFLAGS})
+    ifeq (,${FONTFILE})
+        FONTPATH += /usr/share/fonts /usr/share/fonts/truetype /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions
+        FONTNAME += LucidaSansRegular.ttf FreeSans.ttf
+        $(info font paths are: $(FONTPATH))
+        $(info font names are: $(FONTNAME))
+        find_fontfile = $(strip $(firstword $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/$(1))$(wildcard $(dir)/*/$(1))$(wildcard $(dir)/*/*/$(1))$(wildcard $(dir)/*/*/*/$(1)))))
+        find_font = $(strip $(firstword $(foreach font,$(strip $(FONTNAME)),$(call find_fontfile,$(font)))))
+        ifneq (,$(call find_font))
+            FONTFILE=$(call find_font)
+        else
+            $(info ***)
+            $(info *** BESM-6 video panel disabled.)
+            $(info *** To enable the panel display please specify one of:)
+            $(info ***          a font path with FONTNAME=path)
+            $(info ***          a font name with FONTNAME=fontname.ttf)
+            $(info ***          a font file with FONTFILE=path/fontname.ttf)
+            $(info ***)
+        endif
     endif
-	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+endif
+ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}))
+    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
 else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
     $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
-	BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
 else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
     $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
-	BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
 else
-	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
 endif
 
 ###
