@@ -8713,7 +8713,7 @@ return;
    breakpoint package.
 
    Expect rules are stored in tables associated with each port which can use this
-   facility.  An expect rule consists of a four entry structure:
+   facility.  An expect rule consists of a five entry structure:
 
         match                   the expect match string
         size                    the number of bytes in the match string
@@ -8721,11 +8721,11 @@ return;
         cnt                     number of iterations before match is declared
         action                  command string to be executed when match occurs
 
-   An expect rule is contained in an expect match context structure.
+   All active expect rules are contained in an expect match context structure.
 
         rules                   the match rules
         size                    the count of match rules
-        buf                     the buffer of output data which has produced
+        buf                     the buffer of output data which has been produced
         buf_ins                 the buffer insertion point for the next output data
         buf_size                the buffer size
 
@@ -8829,9 +8829,9 @@ free (ep->act);                                         /* deallocate action */
 if (ep->switches & EXP_TYP_REGEX)
     regfree (&ep->regex);                               /* release compiled regex */
 #endif
+exp->size -= 1;                                         /* decrement count */
 for (i=ep-exp->rules; i<exp->size; i++)                 /* shuffle up remaining rules */
     exp->rules[i] = exp->rules[i+1];
-exp->size -= 1;                                         /* decrement count */
 if (exp->size == 0) {                                   /* No rules left? */
     free (exp->rules);
     exp->rules = NULL;
@@ -9070,7 +9070,7 @@ for (i=0; i < exp->size; i++) {
             }
         ++regex_checks;
         matches = calloc ((ep->regex.re_nsub + 1), sizeof(*matches));
-        if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
+        if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
             char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
             sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
             sim_debug (exp->dbit, exp->dptr, "Against RegEx Match Rule: %s\n", ep->match_pattern);
@@ -9105,7 +9105,7 @@ for (i=0; i < exp->size; i++) {
         }
     else {
         if (exp->buf_ins < ep->size) {
-            if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
+            if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
                 char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
                 char *mstr = sim_encode_quoted_string (&ep->match[ep->size-exp->buf_ins], exp->buf_ins);
 
@@ -9116,7 +9116,7 @@ for (i=0; i < exp->size; i++) {
                 }
             if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins))
                 continue;
-            if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
+            if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
                 char *estr = sim_encode_quoted_string (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->size-exp->buf_ins);
                 char *mstr = sim_encode_quoted_string (ep->match, ep->size-exp->buf_ins);
 
@@ -9130,7 +9130,7 @@ for (i=0; i < exp->size; i++) {
             break;
             }
         else {
-            if (sim_deb && (exp->dptr->dctrl & exp->dbit)) {
+            if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
                 char *estr = sim_encode_quoted_string (&exp->buf[exp->buf_ins-ep->size], ep->size);
                 char *mstr = sim_encode_quoted_string (ep->match, ep->size);
 
@@ -9177,7 +9177,7 @@ if (i != exp->size) {                                   /* Found? */
             sim_debug (exp->dbit, exp->dptr, "No actions specified, stopping...\n");
             }
         sim_brk_setact (ep->act);                       /* set up actions */
-        if (ep->switches & EXP_TYP_CLEARALL)            /* One shot expect rule? */
+        if (ep->switches & EXP_TYP_CLEARALL)            /* Clear-all expect rule? */
             sim_exp_clrall (exp);                       /* delete all rules */
         else {
             if (!(ep->switches & EXP_TYP_PERSIST))      /* One shot expect rule? */
