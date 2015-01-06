@@ -279,11 +279,6 @@ int fs_read(int num) {
     return FS[num];
 }
 
-int fs_is_idle (void)
-{
-    return fs_state[0] == FS_IDLE && fs_state[1] == FS_IDLE;
-}
-
 unsigned char
 unicode_to_gost (unsigned short val)
 {

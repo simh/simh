@@ -128,6 +128,7 @@ enum {
 
 extern UNIT cpu_unit;
 extern UNIT tty_unit[];
+extern UNIT clocks[];
 extern t_value memory [MEMSIZE];
 extern t_value pult [8];
 extern uint32 PC, RAU, RUU;
@@ -326,7 +327,6 @@ int disk_errors (void);
  */
 void printer_control (int num, uint32 cmd);
 void printer_hammer (int num, int pos, uint32 mask);
-int printer_is_idle (void);
 
 /*
  * Терминалы (телетайпы, видеотоны, "Консулы").
@@ -344,7 +344,6 @@ int vt_is_idle (void);
  */
 void fs_control (int num, uint32 cmd);
 int fs_read (int num);
-int fs_is_idle (void);
 
 /*
  * Отладочная выдача.

@@ -238,12 +238,19 @@ t_stat vt_clk (UNIT * this)
 
     /* Polling sockets for transmission. */
     tmxr_poll_tx (&tty_desc);
-
-    /* We'll get a guaranteed interrupt rate of 250 Hz (wallclock)
-     * plus additional interrupts during the idle loop for speedup
-     * (see besm6_cpu.c).
+    /* If the TTY system is not idle, schedule the next interrupt
+     * by instruction count using the target interrupt rate of 300 Hz;
+     * otherwise we can wait for a roughly equivalent wallclock time period,
+     * e.g. until the next 250 Hz wallclock interrupt, but making sure 
+     * that the model time interval between GRP_SERIAL interrupts 
+     * is never less than expected.
+     * Using sim_activate_after() would be more straightforward (no need for a check
+     * as the host is faster than the target), but likely less efficient for idling.
      */
-    return sim_clock_coschedule (this, tmr_poll);
+    if (vt_is_idle() && sim_activate_time(clocks) > 1000*MSEC/300)
+        return sim_clock_coschedule (this, tmr_poll);
+    else
+        return sim_activate(this, 1000*MSEC/300);
 }
 
 t_stat tty_setmode (UNIT *u, int32 val, char *cptr, void *desc)

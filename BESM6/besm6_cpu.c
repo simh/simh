@@ -708,6 +708,12 @@ void check_initial_setup ()
     /* 7 р. яч. ЗАНЯТА - разр любые приказы */
     const t_value ALL_REQS_ENABLED = 1 << 6;
 
+    if (!vt_is_idle()) {
+        /* Avoid sending setup requests while the OS
+         * is still printing boot-up messages.
+         */
+        return;
+    }
     if ((memory[TAKEN] & SETUP_REQS_ENABLED) == 0 ||
         (memory[TAKEN] & ALL_REQS_ENABLED) != 0 ||
         (MGRP & GRP_PANEL_REQ) == 0) {
@@ -1427,15 +1433,8 @@ void cpu_one_inst ()
 
     /* Не находимся ли мы в цикле "ЖДУ" диспака? */
     if (RUU == 047 && PC == 04440 && RK == 067704440) {
-        /* Если периферия простаивает, освобождаем процессор
-         * до следующего тика таймера. */
-        if (vt_is_idle()) {
-          check_initial_setup ();
-          sim_idle (0, TRUE);
-        } else if (sim_activate_time(tty_unit) > 1000*MSEC/300) {
-            /* Insert a TTY interrupt if a regular one is too far away */
-            sim_activate_abs(tty_unit, 0);
-        }
+        check_initial_setup ();
+        sim_idle(0, TRUE);
     }
 }
 
