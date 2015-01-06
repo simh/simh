@@ -6924,37 +6924,37 @@ return cptr;
 
 int sim_isspace (char c)
 {
-return isspace ((unsigned char)c);
+return (c & 0x80) ? 0 : isspace (c);
 }
 
 int sim_islower (char c)
 {
-return islower ((unsigned char)c);
+return (c & 0x80) ? 0 : islower (c);
 }
 
 int sim_isalpha (char c)
 {
-return isalpha ((unsigned char)c);
+return (c & 0x80) ? 0 : isalpha (c);
 }
 
 int sim_isprint (char c)
 {
-return isprint ((unsigned char)c);
+return (c & 0x80) ? 0 : isprint (c);
 }
 
 int sim_isdigit (char c)
 {
-return isdigit ((unsigned char)c);
+return (c & 0x80) ? 0 : isdigit (c);
 }
 
 int sim_isgraph (char c)
 {
-return isgraph ((unsigned char)c);
+return (c & 0x80) ? 0 : isgraph (c);
 }
 
 int sim_isalnum (char c)
 {
-return isalnum ((unsigned char)c);
+return (c & 0x80) ? 0 : isalnum (c);
 }
 
 /* get_yn               yes/no question
@@ -7105,6 +7105,7 @@ uint8 *ostart = optr;
 
 *osize = 0;
 if ((strlen(iptr) == 1) || 
+    (iptr[0] != iptr[strlen(iptr)-1]) ||
     ((iptr[strlen(iptr)-1] != '"') && (iptr[strlen(iptr)-1] != '\'')))
     return SCPE_ARG;            /* String must be quote delimited */
 quote_char = *iptr++;           /* Save quote character */
@@ -7195,9 +7196,6 @@ return SCPE_OK;
 
    Outputs
         optr        =   pointer to output buffer
-                        the output buffer must be allocated by the caller 
-                        and to avoid overrunat it must be at least as big 
-                        as the input string.
                         the output buffer must be freed by the caller
 
    The input data will be encoded into a simply printable form.
@@ -8912,6 +8910,7 @@ else {
         free (match_buf);
         return sim_messagef (SCPE_ARG, "Case independed matching is only valid for RegEx expect rules\n");
         }
+    sim_data_trace(exp->dptr, exp->dptr->units, (uint8 *)match, "", strlen(match)+1, "Expect Match String", exp->dbit);
     if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
         free (match_buf);
         return sim_messagef (SCPE_ARG, "Invalid quoted string\n");
@@ -8947,6 +8946,7 @@ if (switches & EXP_TYP_REGEX) {
     match_buf = NULL;
     }
 else {
+    sim_data_trace(exp->dptr, exp->dptr->units, (uint8 *)match, "", strlen(match)+1, "Expect Match String", exp->dbit);
     sim_decode_quoted_string (match, match_buf, &match_size);
     ep->match = match_buf;
     ep->size = match_size;
