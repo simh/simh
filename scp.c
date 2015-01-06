@@ -9017,7 +9017,7 @@ if (exp->buf_size) {
 if (exp->after)
     fprintf (st, "Halt After: %d instructions\n", exp->after);
 if (exp->dptr && exp->dbit)
-    fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(exp->dptr), exp->dptr->debflags ? get_dbg_verb (exp->dbit, exp->dptr) : "");
+    fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(exp->dptr), exp->dptr->debflags ? "=" : "", exp->dptr->debflags ? get_dbg_verb (exp->dbit, exp->dptr) : "");
 if (!*match)
     return sim_exp_showall (st, exp);
 if (!ep)
@@ -9251,7 +9251,7 @@ if ((snd->next_time - sim_gtime()) > 0)
     fprintf (st, "Minimum of %d instructions befor sending first character\n", (int)(snd->next_time - sim_gtime()));
 fprintf (st, "Minimum of %d instructions between characters\n", (int)snd->delay);
 if (snd->dptr && snd->dbit)
-    fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr) : "");
+    fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? "=" : "", snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr) : "");
 return SCPE_OK;
 }
 
