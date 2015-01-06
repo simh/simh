@@ -1983,7 +1983,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     sim_sub_args (cbuf, sizeof(cbuf), argv);
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
-    if (sim_deb && (sim_deb != sim_log))
+    if (sim_deb && (sim_deb != sim_log) && (sim_deb != stdout))
         fprintf (sim_deb, "%s%s\n", sim_prompt, cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
     sim_switches = 0;                                   /* init switches */
@@ -8967,12 +8967,12 @@ if ((act != NULL) && (*act != 0)) {                     /* new action? */
     strcpy (newp, act);                                 /* copy action */
     ep->act = newp;                                     /* set pointer */
     }
-/* Make sure that the production buffer is large enough to detect a match for all rules */
+/* Make sure that the production buffer is large enough to detect a match for all rules including a NUL termination byte */
 for (i=0; i<exp->size; i++) {
     uint32 compare_size = (exp->rules[i].switches & EXP_TYP_REGEX) ? MAX(10 * strlen(ep->match_pattern), 1024) : exp->rules[i].size;
-    if (compare_size > exp->buf_size) {
-        exp->buf = (uint8 *)realloc (exp->buf, compare_size+1); /* Extra byte to null terminate regex compares */
-        exp->buf_size = compare_size;
+    if (compare_size >= exp->buf_size) {
+        exp->buf = (uint8 *)realloc (exp->buf, compare_size + 2); /* Extra byte to null terminate regex compares */
+        exp->buf_size = compare_size + 1;
         }
     }
 return SCPE_OK;
@@ -9108,23 +9108,29 @@ for (i=0; i < exp->size; i++) {
 #endif
         }
     else {
-        if (exp->buf_ins < ep->size) {
-            if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
-                char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
-                char *mstr = sim_encode_quoted_string (&ep->match[ep->size-exp->buf_ins], exp->buf_ins);
+        if (exp->buf_ins < ep->size) {                          /* Match stradle end of buffer */
+            /* 
+             * First compare the newly deposited data at the beginning 
+             * of buffer with the end of the match string
+             */
+            if (exp->buf_ins) {
+                if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
+                    char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
+                    char *mstr = sim_encode_quoted_string (&ep->match[ep->size-exp->buf_ins], exp->buf_ins);
 
-                sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
-                sim_debug (exp->dbit, exp->dptr, "Against Match Data: %s\n", mstr);
-                free (estr);
-                free (mstr);
+                    sim_debug (exp->dbit, exp->dptr, "Checking String[0:%d]: %s\n", exp->buf_ins, estr);
+                    sim_debug (exp->dbit, exp->dptr, "Against Match Data: %s\n", mstr);
+                    free (estr);
+                    free (mstr);
+                    }
+                if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins))
+                    continue;
                 }
-            if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins))
-                continue;
             if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
                 char *estr = sim_encode_quoted_string (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->size-exp->buf_ins);
                 char *mstr = sim_encode_quoted_string (ep->match, ep->size-exp->buf_ins);
 
-                sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
+                sim_debug (exp->dbit, exp->dptr, "Checking String[%d:%d]: %s\n", exp->buf_size-(ep->size-exp->buf_ins), ep->size-exp->buf_ins, estr);
                 sim_debug (exp->dbit, exp->dptr, "Against Match Data: %s\n", mstr);
                 free (estr);
                 free (mstr);
@@ -9138,7 +9144,7 @@ for (i=0; i < exp->size; i++) {
                 char *estr = sim_encode_quoted_string (&exp->buf[exp->buf_ins-ep->size], ep->size);
                 char *mstr = sim_encode_quoted_string (ep->match, ep->size);
 
-                sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
+                sim_debug (exp->dbit, exp->dptr, "Checking String[%d:%d]: %s\n", exp->buf_ins-ep->size, ep->size, estr);
                 sim_debug (exp->dbit, exp->dptr, "Against Match Data: %s\n", mstr);
                 free (estr);
                 free (mstr);
