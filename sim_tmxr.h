@@ -75,6 +75,8 @@ typedef int SERHANDLE;
 #define TMXR_DBG_TRC    0x0400000                        /* Debug trace routine calls */
 #define TMXR_DBG_PXMT   0x0800000                        /* Debug Transmit Packet Data */
 #define TMXR_DBG_PRCV   0x1000000                        /* Debug Received Packet Data */
+#define TMXR_DBG_EXP    0x2000000                        /* Debug Expect Activities */
+#define TMXR_DBG_SEND   0x4000000                        /* Debug Send Activities */
 
 /* Modem Control Bits */
 

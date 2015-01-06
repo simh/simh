@@ -3289,6 +3289,7 @@ return SCPE_OK;
 t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, char *cptr, t_bool async)
 {
 t_stat r;
+int32 i;
 
 r = tmxr_open_master (mp, cptr);                        /* open master socket */
 if (r != SCPE_OK)                                       /* error? */
@@ -3312,6 +3313,14 @@ uptr->dynflags |= TMUF_NOASYNCH;                        /* tag as no asynch */
 if (mp->dptr == NULL)                                   /* has device been set? */
     mp->dptr = find_dev_from_unit (uptr);               /* no, so set device now */
 
+if (mp->dptr) {
+    for (i=0; i<mp->lines; i++) {
+        mp->ldsc[i].expect.dptr = mp->dptr;
+        mp->ldsc[i].expect.dbit = TMXR_DBG_EXP;
+        mp->ldsc[i].send.dptr = mp->dptr;
+        mp->ldsc[i].send.dbit = TMXR_DBG_SEND;
+        }
+    }
 tmxr_add_to_open_list (mp);
 return SCPE_OK;
 }
