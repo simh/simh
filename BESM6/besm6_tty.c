@@ -303,9 +303,14 @@ t_stat tty_setmode (UNIT *u, int32 val, char *cptr, void *desc)
 t_stat tty_attach (UNIT *u, char *cptr)
 {
     int num = u - tty_unit;
+    char gbuf[CBUFSIZE];
     int r, m, n;
 
-    if (*cptr >= '0' && *cptr <= '9') {
+    /* All arguments but the magic word "console" are passed
+     * to tmxr_attach().
+     */
+    get_glyph (cptr, gbuf, 0);
+    if (strcmp (gbuf, "CONSOLE")) {
         /* Saving and restoring all .conn,
          * because tmxr_attach() zeroes them. */
         for (m=0, n=1; n<=LINES_MAX; ++n)
@@ -317,9 +322,7 @@ t_stat tty_attach (UNIT *u, char *cptr)
             if (m >> (LINES_MAX-n) & 1)
                 tty_line[n].conn = 1;
         return r;
-    }
-
-    if (strcmp (cptr, "console") == 0) {
+    } else {
         /* Attaching SIMH console to a particular terminal. */
         u->flags &= ~TTY_STATE_MASK;
         u->flags |= TTY_VT340_STATE;
@@ -331,7 +334,7 @@ t_stat tty_attach (UNIT *u, char *cptr)
         return 0;
     }
     /* Disallowing future connections to a line */
-    if (strcmp (cptr, "none") == 0) {
+    if (strcmp (gbuf, "NONE") == 0) {
         /* Marking the TTY as unusable. */
         tty_line[num].conn = 1;
         tty_line[num].rcve = 0;
