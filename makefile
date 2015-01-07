@@ -68,7 +68,7 @@ ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS
     VIDEO_USEFUL = true
     DISPLAY_USEFUL = true
   endif
-else ifeq ($(MAKECMDGOALS),besm6)
+else ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
   VIDEO_USEFUL = true
 else
   ifeq ($(MAKECMDGOALS),)
@@ -300,8 +300,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   $(info lib paths are: $(LIBPATH))
   $(info include paths are: $(INCPATH))
-  find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
-  find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
+  find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
+  find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
   need_search = $(strip $(shell ld -l$(1) /dev/null 2>&1 | grep $(1) | sed s/$(1)//))
   LD_SEARCH_NEEDED := $(call need_search,ZzzzzzzZ)
   ifneq (,$(call find_lib,m))
@@ -1173,17 +1173,19 @@ BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
 
 ifneq (,${VIDEO_LDFLAGS})
     ifeq (,${FONTFILE})
-        FONTPATH += /usr/share/fonts /usr/share/fonts/truetype /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions
+        FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions
+        FONTPATH := $(dir $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/.)))
         FONTNAME += LucidaSansRegular.ttf FreeSans.ttf
         $(info font paths are: $(FONTPATH))
         $(info font names are: $(FONTNAME))
         find_fontfile = $(strip $(firstword $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/$(1))$(wildcard $(dir)/*/$(1))$(wildcard $(dir)/*/*/$(1))$(wildcard $(dir)/*/*/*/$(1)))))
-        find_font = $(strip $(firstword $(foreach font,$(strip $(FONTNAME)),$(call find_fontfile,$(font)))))
+        find_font = $(abspath $(strip $(firstword $(foreach font,$(strip $(FONTNAME)),$(call find_fontfile,$(font))))))
         ifneq (,$(call find_font))
             FONTFILE=$(call find_font)
         else
             $(info ***)
-            $(info *** BESM-6 video panel disabled.)
+            $(info *** No font file available, BESM-6 video panel disabled.)
+            $(info ***)
             $(info *** To enable the panel display please specify one of:)
             $(info ***          a font path with FONTNAME=path)
             $(info ***          a font name with FONTNAME=fontname.ttf)

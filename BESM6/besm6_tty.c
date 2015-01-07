@@ -443,7 +443,7 @@ void vt_putc (int num, int c)
 /*
  * Sending a string to a terminal with the given number.
  */
-void vt_puts (int num, const unsigned char *s)
+void vt_puts (int num, const char *s)
 {
     TMLN *t = &tty_line [num];
 
