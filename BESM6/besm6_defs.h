@@ -334,6 +334,7 @@ void printer_hammer (int num, int pos, uint32 mask);
 void tty_send (uint32 mask);
 int tty_query (void);
 void vt_print (void);
+void tt_print (void);
 void vt_receive (void);
 void consul_print (int num, uint32 cmd);
 uint32 consul_read (int num);

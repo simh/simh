@@ -1175,7 +1175,7 @@ ifneq (,${VIDEO_LDFLAGS})
     ifeq (,${FONTFILE})
         FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions
         FONTPATH := $(dir $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/.)))
-        FONTNAME += LucidaSansRegular.ttf FreeSans.ttf
+        FONTNAME += DejaVuSans.ttf LucidaSansRegular.ttf FreeSans.ttf
         $(info font paths are: $(FONTPATH))
         $(info font names are: $(FONTNAME))
         find_fontfile = $(strip $(firstword $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/$(1))$(wildcard $(dir)/*/$(1))$(wildcard $(dir)/*/*/$(1))$(wildcard $(dir)/*/*/*/$(1)))))

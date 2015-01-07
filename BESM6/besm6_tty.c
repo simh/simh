@@ -184,8 +184,6 @@ t_stat vt_clk (UNIT * this)
 {
     int num;
 
-    /* Baudot TTYs work at 10 baud */
-    static int clk_divider = 1<<29;
     GRP |= MGRP & GRP_SERIAL;
 
     /* Polling receiving from sockets */
@@ -194,12 +192,6 @@ t_stat vt_clk (UNIT * this)
     vt_print();
     vt_receive();
     consul_receive();
-
-    if (! (clk_divider >>= 1)) {
-        tt_print();
-        /* Input from Baudot TTYs not implemented */
-        clk_divider = 1<<29;
-    }
 
     /* Are there any new network connections? */
     num = tmxr_poll_conn (&tty_desc);

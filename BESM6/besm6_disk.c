@@ -213,7 +213,9 @@ t_stat disk_attach (UNIT *u, char *cptr)
             }
             return SCPE_OK;
         }
-        if (saved_switches & SWMASK ('E'))
+        if (s == SCPE_OK ||
+            (saved_switches & SWMASK ('E')) ||
+            (sim_switches & SWMASK('N')))
             return s;
         sim_switches |= SWMASK ('N');
     }

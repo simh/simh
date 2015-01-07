@@ -1694,8 +1694,10 @@ t_stat sim_instr (void)
 t_stat fast_clk (UNIT * this)
 {
     static unsigned counter;
+    static unsigned tty_counter;
 
     ++counter;
+    ++tty_counter;
 
     /*besm6_debug ("*** таймер 20 мсек");*/
     GRP |= GRP_TIMER;
@@ -1711,6 +1713,14 @@ t_stat fast_clk (UNIT * this)
     /* Перерисовка панели каждые 64 миллисекунды. */
     if ((counter & 15) == 0) {
         redraw_panel = 1;
+    }
+
+    /* Baudot TTYs are synchronised to the main timer rather than the
+     * serial line clock. Their baud rate is 50. 
+     */
+    if (tty_counter == CLK_TPS/50) {
+        tt_print();
+        tty_counter = 0;
     }
 
     tmr_poll = sim_rtcn_calb (CLK_TPS, 0);              /* calibrate clock */
