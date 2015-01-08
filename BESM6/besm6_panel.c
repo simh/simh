@@ -79,9 +79,9 @@ static const int regnum[] = {
 static SDL_Surface *screen;
 
 /*
- * Рисование текста в кодировке UTF-8, с антиалиасингом.
- * Параметр halign задаёт выравнивание по горизонтали.
- * Цвета заданы глобальными переменными foreground и background.
+ * Drawing antialiased text in UTF-8 encoding.
+ * The halign parameter controls horizontal alignment.
+ * Foreground/background colors are taken from global variables.
  */
 static void render_utf8 (TTF_Font *font, int x, int y, int halign, char *message)
 {
@@ -134,7 +134,7 @@ static SDL_Surface *sprite_from_data (int width, int height,
 }
 
 /*
- * Рисуем неонку.
+ * Drawing a neon light.
  */
 static void draw_lamp (int left, int top, int on)
 {
@@ -189,7 +189,7 @@ static void draw_lamp (int left, int top, int on)
 }
 
 /*
- * Отрисовка лампочек БРЗ.
+ * Drawing index (modifier) registers. They form two groups.
  */
 static void draw_modifiers_periodic (int group, int left, int top)
 {
@@ -208,7 +208,7 @@ static void draw_modifiers_periodic (int group, int left, int top)
 }
 
 /*
- * Отрисовка лампочек ГРП и МГРП.
+ * Drawing the main interrupt register and its mask.
  */
 static void draw_grp_periodic (int top)
 {
@@ -227,7 +227,7 @@ static void draw_grp_periodic (int top)
 }
 
 /*
- * Отрисовка лампочек БРЗ.
+ * Drawing the data cache registers.
  */
 static void draw_brz_periodic (int top)
 {
@@ -246,7 +246,7 @@ static void draw_brz_periodic (int top)
 }
 
 /*
- * Отрисовка статичной части регистров-модификаторов.
+ * Drawing the static part of the modifier register area.
  */
 static void draw_modifiers_static (int group, int left, int top)
 {
@@ -257,7 +257,7 @@ static void draw_modifiers_static (int group, int left, int top)
     background = black;
     foreground = cyan;
 
-    /* Оттеняем группы разрядов. */
+    /* Visually separating groups of bits */
     color = grey.r << 16 | grey.g << 8 | grey.b;
     for (x=3; x<15; x+=3) {
         area.x = left + 74 + x*STEPX;
@@ -266,14 +266,14 @@ static void draw_modifiers_static (int group, int left, int top)
         area.h = 8*STEPY + 2;
         SDL_FillRect (screen, &area, color);
     }
-    /* Названия регистров. */
+    /* Register names */
     for (y=0; y<8; ++y) {
         reg = regnum [y + group*8];
         sprintf (message, "М%2o", reg);
         render_utf8 (font_big, left, top + 24 + y*STEPY, 1, message);
         old_M [reg] = ~0;
     }
-    /* Номера битов. */
+    /* Bit numbers */
     for (x=0; x<15; ++x) {
         sprintf (message, "%d", 15-x);
         render_utf8 (font_small, left+82 + x*STEPX,
@@ -282,7 +282,7 @@ static void draw_modifiers_static (int group, int left, int top)
 }
 
 /*
- * Отрисовка статичной части регистров ГРП и МГРП.
+ * Drawing the static part of the interrupt register area.
  */
 static void draw_grp_static (int top)
 {
@@ -293,7 +293,7 @@ static void draw_grp_static (int top)
     background = black;
     foreground = cyan;
 
-    /* Оттеняем группы разрядов. */
+    /* Visually separating groups of bits */
     color = grey.r << 16 | grey.g << 8 | grey.b;
     for (x=3; x<48; x+=3) {
         area.x = 98 + x*STEPX;
@@ -302,12 +302,12 @@ static void draw_grp_static (int top)
         area.h = 2*STEPY + 2;
         SDL_FillRect (screen, &area, color);
     }
-    /* Названия регистров. */
+    /* Register names */
     for (y=0; y<2; ++y) {
         render_utf8 (font_big, 24, top + 24 + y*STEPY, 1, y ? "МГРП" : "ГРП");
         old_GRP[y] = ~0;
     }
-    /* Номера битов. */
+    /* Bit numbers */
     for (x=0; x<48; ++x) {
         sprintf (message, "%d", 48-x);
         render_utf8 (font_small, 106 + x*STEPX,
@@ -316,7 +316,7 @@ static void draw_grp_static (int top)
 }
 
 /*
- * Отрисовка статичной части регистров БРЗ.
+ * Drawing the static part of the cache register area
  */
 static void draw_brz_static (int top)
 {
@@ -327,7 +327,7 @@ static void draw_brz_static (int top)
     background = black;
     foreground = cyan;
 
-    /* Оттеняем группы разрядов. */
+    /* Visually separating groups of bits */
     color = grey.r << 16 | grey.g << 8 | grey.b;
     for (x=3; x<48; x+=3) {
         area.x = 98 + x*STEPX;
@@ -336,7 +336,7 @@ static void draw_brz_static (int top)
         area.h = 8*STEPY + 2;
         SDL_FillRect (screen, &area, color);
     }
-    /* Названия регистров. */
+    /* Register names */
     for (y=7; y>=0; --y) {
         sprintf (message, "БРЗ %d", 7-y);
         render_utf8 (font_big, 24, top + 24 + y*STEPY, 1, message);
@@ -345,7 +345,7 @@ static void draw_brz_static (int top)
 }
 
 /*
- * Закрываем графическое окно.
+ * Closing the graphical window.
  */
 void besm6_close_panel (void)
 {
@@ -364,7 +364,7 @@ static SDL_Texture *sdlTexture;
 
 
 /*
- * Начальная инициализация графического окна и шрифтов.
+ * Initializing of the graphical window and the fonts.
  */
 static void init_panel (void)
 {
@@ -422,7 +422,7 @@ static void init_panel (void)
                                    SDL_TEXTUREACCESS_STATIC,
                                    WIDTH, HEIGHT);
 
-    /* Отрисовка статичной части панели БЭСМ-6. */
+    /* Drawing the static part of the BESM-6 panel */
     draw_modifiers_static (0, 24, 10);
     draw_modifiers_static (1, 400, 10);
     draw_grp_static (180);
@@ -438,7 +438,7 @@ static void init_panel (void)
 void (*sim_vm_init)() = init_panel;
 
 /*
- * Обновляем графическое окно.
+ * Refreshing the window.
  */
 void besm6_draw_panel (void)
 {
@@ -447,7 +447,7 @@ void besm6_draw_panel (void)
     if (! screen)
         return;
 
-    /* Периодическая отрисовка: мигание лампочек. */
+    /* Do the blinkenlights */
     draw_modifiers_periodic (0, 24, 10);
     draw_modifiers_periodic (1, 400, 10);
     draw_grp_periodic (180);
@@ -467,7 +467,7 @@ void besm6_draw_panel (void)
 #else
 
 /*
- * Начальная инициализация графического окна и шрифтов.
+ * Initializing of the graphical window and the fonts.
  */
 static void init_panel (void)
 {
@@ -506,7 +506,7 @@ static void init_panel (void)
     }
     atexit (besm6_close_panel);
 
-    /* Отрисовка статичной части панели БЭСМ-6. */
+    /* Drawing the static part of the BESM-6 panel */
     draw_modifiers_static (0, 24, 10);
     draw_modifiers_static (1, 400, 10);
     draw_grp_static (180);
@@ -519,14 +519,14 @@ static void init_panel (void)
 void (*sim_vm_init)() = init_panel;
 
 /*
- * Обновляем графическое окно.
+ * Refreshing the window
  */
 void besm6_draw_panel ()
 {
     if (! screen)
         return;
 
-    /* Периодическая отрисовка: мигание лампочек. */
+    /* Do the blinkenlights */
     draw_modifiers_periodic (0, 24, 10);
     draw_modifiers_periodic (1, 400, 10);
     draw_grp_periodic (180);
