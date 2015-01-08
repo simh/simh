@@ -144,8 +144,8 @@ typedef enum {
 #define GET_UPPER(w)    (uint8) (((w) & UPPER_BYTE) >> BYTE_SHIFT)
 #define GET_LOWER(w)    (uint8) ((w) & LOWER_BYTE)
 
-#define SET_UPPER(b)    ((b) << BYTE_SHIFT)
-#define SET_LOWER(b)    (b)
+#define SET_UPPER(b)    (uint16) ((b) << BYTE_SHIFT)
+#define SET_LOWER(b)    (uint16) (b)
 #define SET_BOTH(b)     (SET_UPPER (b) | SET_LOWER (b))
 
 typedef enum {

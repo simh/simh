@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002-2013, Robert M Supnik
+   Copyright (c) 2002-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MUX,MUXL,MUXM        12920A terminal multiplexor
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Removed DEV_NET to allow restoration of listening port
@@ -711,7 +712,7 @@ while (working_set) {
             if (muxl_obuf & OTL_TX) {                               /* transmit? */
                 if (ln < MUX_LINES) {                               /* line valid? */
                     if (muxl_obuf & OTL_P) {                        /* parameter? */
-                        mux_xpar[ln] = muxl_obuf;                   /* store param value */
+                        mux_xpar[ln] = (uint16) muxl_obuf;          /* store param value */
                         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
                             fprintf (sim_deb,
                                 ">>MUXl cmds: [STC%s] Transmit channel %d parameter %06o stored\n",
@@ -723,7 +724,7 @@ while (working_set) {
                             muxl_obuf =                             /* add parity bit */
                                 muxl_obuf & ~OTL_PAR |
                                 XMT_PAR(muxl_obuf);
-                        mux_xbuf[ln] = muxl_obuf;                   /* load buffer */
+                        mux_xbuf[ln] = (uint16) muxl_obuf;          /* load buffer */
 
                         if (sim_is_active (&muxl_unit[ln])) {       /* still working? */
                             mux_sta[ln] = mux_sta[ln] | LIU_LOST;   /* char lost */
@@ -748,7 +749,7 @@ while (working_set) {
             else                                                    /* receive */
                 if (ln < (MUX_LINES + MUX_ILINES)) {                /* line valid? */
                     if (muxl_obuf & OTL_P) {                        /* parameter? */
-                        mux_rpar[ln] = muxl_obuf;                   /* store param value */
+                        mux_rpar[ln] = (uint16) muxl_obuf;          /* store param value */
                         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
                             fprintf (sim_deb,
                                 ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o stored\n",
@@ -889,11 +890,11 @@ while (working_set) {
             break;
 
 
-        case ioIOI:                                                 /* I/O data input */
-            data = LIC_MBO | PUT_CCH (muxc_chan) |                  /* mbo, chan num */
-                   LIC_TSTI (muxc_chan) |                           /* I2, I1 */
-                   (muxc_ota[muxc_chan] & (OTC_ES2 | OTC_ES1)) |    /* ES2, ES1 */
-                   (muxc_lia[muxc_chan] & (LIC_S2 | LIC_S1));       /* S2, S1 */
+        case ioIOI:                                                         /* I/O data input */
+            data = (uint16) (LIC_MBO | PUT_CCH (muxc_chan) |                /* mbo, chan num */
+                             LIC_TSTI (muxc_chan) |                         /* I2, I1 */
+                             (muxc_ota[muxc_chan] & (OTC_ES2 | OTC_ES1)) |  /* ES2, ES1 */
+                             (muxc_lia[muxc_chan] & (LIC_S2 | LIC_S1)));    /* S2, S1 */
 
             if (DEBUG_PRI (muxu_dev, DEB_CPU))
                 fprintf (sim_deb, ">>MUXc cpu:  [LIx%s] Status = %06o, channel = %d\n",
@@ -1148,7 +1149,7 @@ else {                                                  /* normal */
             tmxr_poll_tx (&mux_desc);                   /* poll xmt */
             }
         }
-    mux_rbuf[ln] = c;                                   /* save char */
+    mux_rbuf[ln] = (uint16) c;                          /* save char */
     }
 
 mux_rchp[ln] = 1;                                       /* char pending */
@@ -1269,7 +1270,7 @@ for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {
     else {
         if (mux_rchp[i]) mux_sta[i] = mux_sta[i] | LIU_LOST;
         mux_rchp[i] = 1;
-        mux_rbuf[i] = c;
+        mux_rbuf[i] = (uint16) c;
         }
     }
 return;
@@ -1278,7 +1279,7 @@ return;
 
 /* Reset an individual line */
 
-void mux_reset_ln (int32 i)
+static void mux_reset_ln (int32 i)
 {
 mux_rbuf[i] = mux_xbuf[i] = 0;                          /* clear state */
 mux_rpar[i] = mux_xpar[i] = 0;

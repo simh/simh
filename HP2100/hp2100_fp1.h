@@ -1,6 +1,6 @@
 /* hp2100_fp1.h: HP 2100/1000 multiple-precision floating point definitions
 
-   Copyright (c) 2005-2013, J. David Bryan
+   Copyright (c) 2005-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   24-Dec-14    JDB     Changed fp_ucom return from uint32 to uint16
    14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    16-Oct-06    JDB     Generalized FP calling sequences for F-Series
    12-Oct-06    JDB     Altered x_trun for F-Series FFP compatibility
@@ -46,7 +47,7 @@ OP     fp_accum  (const OP *operand, OPSIZE precision);
 uint32 fp_pack   (OP *result, OP mantissa, int32 exponent, OPSIZE precision);
 uint32 fp_nrpack (OP *result, OP mantissa, int32 exponent, OPSIZE precision);
 uint32 fp_unpack (OP *mantissa, int32 *exponent, OP packed, OPSIZE precision);
-uint32 fp_ucom   (OP *mantissa, OPSIZE precision);
+uint16 fp_ucom   (OP *mantissa, OPSIZE precision);
 uint32 fp_pcom   (OP *packed, OPSIZE precision);
 uint32 fp_trun   (OP *result, OP source, OPSIZE precision);
 uint32 fp_cvt    (OP *result, OPSIZE source_precision, OPSIZE dest_precision);

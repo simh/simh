@@ -1,6 +1,6 @@
 /* hp2100_cpu.h: HP 2100 CPU definitions
 
-   Copyright (c) 2005-2013, Robert M. Supnik
+   Copyright (c) 2005-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Mar-13    JDB     Added declarations for the MP abort handler and CPU registers
    14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    03-Jan-10    RMS     Changed declarations of mp_control, mp_mefvv, for VMS compiler
@@ -177,7 +178,7 @@
 
 #define PCQ_SIZE        64                              /* must be 2**n */
 #define PCQ_MASK        (PCQ_SIZE - 1)
-#define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = err_PC
+#define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = (uint16) err_PC
 
 /* Memory reference instructions */
 

@@ -1,6 +1,6 @@
 /* hp2100_cpu3.c: HP 2100/1000 FFP/DBI instructions
 
-   Copyright (c) 2005-2008, J. David Bryan
+   Copyright (c) 2005-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU3         Fast FORTRAN and Double Integer instructions
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    09-May-12    JDB     Separated assignments from conditional expressions
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
@@ -478,8 +479,8 @@ switch (entry) {                                        /* decode IR<4:0> */
             WriteW (da++, MA);                          /* put addr into formal */
             }
 
-        AR = ra;                                        /* return address */
-        BR = da;                                        /* addr of 1st unused formal */
+        AR = (uint16) ra;                               /* return address */
+        BR = (uint16) da;                               /* addr of 1st unused formal */
         break;
 
     case 024:                                           /* .ENTP 105224 (OP_A) */
@@ -518,8 +519,8 @@ switch (entry) {                                        /* decode IR<4:0> */
             BR = (BR + 1) & VAMASK;                     /* incr address */
             op[0].word = op[0].word - 1;                /* decr count */
             if (op[0].word && intrq) {                  /* more and intr? */
-                AR = sa;                                /* restore A */
-                BR = sb;                                /* restore B */
+                AR = (uint16) sa;                       /* restore A */
+                BR = (uint16) sb;                       /* restore B */
                 PC = err_PC;                            /* restart instruction */
                 break;
                 }
@@ -725,10 +726,10 @@ switch (entry) {                                        /* decode IR<3:0> */
                     t = (rh << 16) | (rl & 0xFFFF);     /* combine partials */
                 }
 
-            if (O)
-                t = ~SIGN32;                            /* if overflow, rtn max pos */
-            else if (sign)
-                t = ~t + 1;                             /* if result neg, 2s compl */
+            if (O)                                      /* if overflow occurred */
+                t = ~SIGN32;                            /*   then return the largest positive number */
+            else if (sign)                              /* otherwise if the result is negative */
+                t = ~t + 1;                             /*   then return the twos complement (set if O = 0 above) */
 
 #endif                                                  /* end of int64 support */
 

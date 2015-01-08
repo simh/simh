@@ -23,7 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   15-Dec-14    JDB     Added "-Wunused-const-variable" to the suppression pragmas
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy, more IBL constants
+   28-Dec-14    JDB     Changed suppression from #pragma GCC to #pragma clang
    05-Feb-13    JDB     Added declaration for hp_fprint_stopped
    18-Mar-13    JDB     Added "-Wdangling-else" to the suppression pragmas
                         Removed redundant extern declarations
@@ -79,15 +80,18 @@
 #include "sim_defs.h"                                   /* simulator defns */
 
 
-/* Required to quell clang precedence warnings */
+/* The following pragmas quell clang warnings that are on by default but should
+   not be, in my opinion.  They warn about the use of perfectly valid code and
+   require the addition of redundant parentheses and braces to silence them.
+   Rather than clutter up the code with scores of extra symbols that, in my
+   view, make the code harder to read and maintain, I elect to suppress these
+   warnings.
+*/
 
-#if defined (__GNUC__)
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
-#pragma GCC diagnostic ignored "-Wbitwise-op-parentheses"
-#pragma GCC diagnostic ignored "-Wdangling-else"
-#pragma GCC diagnostic ignored "-Wunused-const-variable"
+#if defined (__clang__)
+#pragma clang diagnostic ignored "-Wlogical-op-parentheses"
+#pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
+#pragma clang diagnostic ignored "-Wdangling-else"
 #endif
 
 
@@ -217,6 +221,12 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define IBL_MASK        (IBL_LNT - 1)                   /* boot length mask */
 #define IBL_DPC         (IBL_LNT - 2)                   /* DMA ctrl word */
 #define IBL_END         (IBL_LNT - 1)                   /* last location */
+
+#define IBL_S_CLR       0000000                         /* ibl_copy mask to clear the S register */
+#define IBL_S_NOCLR     0177777                         /* ibl_copy mask to preserve the S register */
+#define IBL_S_NOSET     0000000                         /* ibl_copy mask to preserve the S register */
+
+#define IBL_SET_SC(s)   ((s) << IBL_V_DEV)              /* position the select code in the S register */
 
 typedef uint16 BOOT_ROM [IBL_LNT];                      /* boot ROM data */
 
@@ -457,12 +467,11 @@ struct dib {                                            /* Device information bl
 
 /* CPU state */
 
-extern uint32 SR;                                       /* S register (for IBL) */
 extern uint32 dev_prl [2], dev_irq [2], dev_srq [2];    /* I/O signal vectors */
 
 /* CPU functions */
 
-extern t_stat ibl_copy       (const BOOT_ROM rom, int32 dev);
+extern t_stat ibl_copy       (const BOOT_ROM rom, int32 dev, uint32 sr_clear, uint32 sr_set);
 extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
 
 /* System functions */

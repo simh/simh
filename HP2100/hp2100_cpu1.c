@@ -25,6 +25,7 @@
 
    CPU1         Extended arithmetic and optional microcode dispatchers
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    05-Apr-14    JDB     Corrected typo in comments for cpu_ops
    09-May-12    JDB     Separated assignments from conditional expressions
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
@@ -768,11 +769,11 @@ for (i = 0; i < OP_N_F; i++) {
             break;
 
         case OP_VAR:                                    /* inline variable operand */
-            (*op++).word = PC;                          /* get pointer to variable */
+            (*op++).word = (uint16) PC;                 /* get pointer to variable */
             break;
 
         case OP_ADR:                                    /* inline address operand */
-            (*op++).word = MA;                          /* get address */
+            (*op++).word = (uint16) MA;                 /* get address (set by "resolve" above) */
             break;
 
         case OP_ADK:                                    /* address of int constant */

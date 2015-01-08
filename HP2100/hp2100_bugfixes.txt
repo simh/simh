@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2014-12-19
+                             Last update: 2015-01-03
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6741,5 +6741,51 @@
      RESOLUTION:  Modify "fprint_stopped_gen" (scp.c) to pass SIM_SW_STOP to
      "examine" as well as "fprint_sym", so that these routines have unambiguous
      indications that they are being called in the context of a simulator stop.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+265. PROBLEM:  Compiling the HP simulator for 64-bit addressing produces many
+     conversion warnings.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  Compiling the simulator and defining USE_INT64 and USE_ADDR64
+     with implicit conversion warnings enabled reveals a number of places where
+     assumptions were made that addresses would always be 32 bits.  This is a
+     reasonable assumption, as there are no devices (CPU or peripherals) that
+     can handle gigabyte addressing.  Still, many of these assumptions are not
+     necessary, and some future peripheral simulator may exceed this limit.
+
+     CAUSE:  Future expansion to 64-bit addressing was not envisioned.
+
+     RESOLUTION:  Modify source files to ensure that "t_addr" and "t_value"
+     types are used instead of "uint32" and "int32" types where addressing and
+     data values may be 64 bits.  Also ensure that valid conversions to smaller
+     sizes use explicit casts.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+266. PROBLEM:  BOOT devices require a duplicate S-register declaration.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  All of the peripheral devices that support the BOOT command
+     set the select code and other parameters into the S register during the
+     boot process.  This direct register access requires an external declaration
+     that duplicates the one in the full CPU declarations file (hp2100_cpu.h).
+     A better method that avoids the duplicate declaration would be for the
+     "ibl_copy" routine to modify the S register on behalf of the caller.
+
+     CAUSE:  Poor original implementation.
+
+     RESOLUTION:  Modify "ibl_copy" (hp2100_cpu.c) to take two additional
+     parameters that clear and set bits, respectively, in the S register on
+     behalf of the caller.  Modify the boot routines for the CPU, DA, DP, DQ,
+     DR, DS, IPL, MS, and PTR devices to use the new parameters instead of
+     modifying the S register directly.
 
      STATUS:  Fixed in version 4.0-0.

@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2013, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MT           12559A 3030 nine track magnetic tape
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
    09-May-12    JDB     Separated assignments from conditional expressions
    25-Mar-12    JDB     Removed redundant MTAB_VUN from "format" MTAB entry
@@ -552,7 +553,7 @@ switch (mtc_fnc) {                                      /* case on function */
         if (mtc_1st) mtc_1st = 0;                       /* no xfr on first */
         else {
             if (mt_ptr < DBSIZE) {                      /* room in buffer? */
-                mtxb[mt_ptr++] = mtc_unit.buf;
+                mtxb[mt_ptr++] = (uint8) mtc_unit.buf;
                 mtc_sta = mtc_sta & ~STA_BOT;           /* clear BOT */
                 }
             else mtc_sta = mtc_sta | STA_PAR;

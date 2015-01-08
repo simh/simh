@@ -1,6 +1,6 @@
 /* hp2100_cpu.c: HP 21xx/1000 CPU simulator
 
-   Copyright (c) 1993-2013, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,9 @@
    DMA1,DMA2    12607B/12578A/12895A direct memory access controller
    DCPC1,DCPC2  12897B dual channel port controller
 
+   31-Dec-14    JDB     Corrected devdisp data parameters
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Mar-13    JDB     Removed redundant extern declarations
    05-Feb-13    JDB     HLT instruction handler now relies on sim_vm_fprint_stopped
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -1697,7 +1700,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
                 skip = 1;
             }                                           /* end if ~RSS */
 
-        ABREG[absel] = t;                               /* store result */
+        ABREG[absel] = (uint16) t;                      /* store result */
         PC = (PC + skip) & VAMASK;                      /* add in skip */
         break;                                          /* end if alter/skip */
 
@@ -1713,8 +1716,8 @@ while (reason == SCPE_OK) {                             /* loop until halted */
         if ((IR & 000010) && ((t & 1) == 0))            /* SLx */
             PC = (PC + 1) & VAMASK;
 
-        ABREG[absel] = shift (t, IR & 00020, IR);       /* do second shift */
-        break;                                          /* end if shift */
+        ABREG[absel] = (uint16) shift (t, IR & 00020, IR);  /* do second shift */
+        break;                                              /* end if shift */
 
 /* I/O instructions */
 
@@ -1971,7 +1974,7 @@ if ((sop == soFLG) && clf)                              /* CLF instruction? */
 else if (clf)                                           /* CLF with another instruction? */
     signal_set = signal_set | ioCLF;                    /* add CLF signal */
 
-ioreturn = devdisp (dev, signal_set, IORETURN (SCPE_OK, iodata));   /* dispatch I/O signal */
+ioreturn = devdisp (dev, signal_set, iodata);           /* dispatch I/O signal */
 
 iostat = IOSTATUS (ioreturn);                           /* extract status */
 iodata = IODATA (ioreturn);                             /* extract return data value */
@@ -2494,13 +2497,13 @@ return (MAP_GETPAG (mpr) | VA_GETOFF (va));             /* return mapped address
    used for restoration.
 */
 
-static uint32 dms_cons (uint32 va, int32 sw)
+static uint32 dms_cons (t_addr va, int32 sw)
 {
 uint32 map_sel;
 
 if ((dms_enb == 0) ||                                   /* DMS off? */
     (sw & (SWMASK ('N') | SIM_SW_REST)))                /* no mapping rqst or save/rest? */
-    return va;                                          /* use physical address */
+    return (uint32) va;                                 /* use physical address */
 
 else if (sw & SWMASK ('S'))
     map_sel = SMAP;
@@ -2518,13 +2521,13 @@ else                                                    /* dflt to log addr, cur
     map_sel = dms_ump;
 
 if (va >= VASIZE)                                       /* virtual, must be 15b */
-    return MEMSIZE;
+    return (uint32) MEMSIZE;
 
 else if (dms_enb)                                       /* DMS on? go thru map */
-    return dms (va, map_sel, NOPROT);
+    return dms ((uint32) va, map_sel, NOPROT);
 
 else                                                    /* else return virtual */
-    return va;
+    return (uint32) va;
 }
 
 
@@ -2754,7 +2757,7 @@ while (working_set) {
             E = 1;                                      /* set E register */
 
             if (UNIT_CPU_FAMILY == UNIT_FAMILY_1000) {  /* 1000 series? */
-                memset (M, 0, MEMSIZE * 2);             /* zero allocated memory */
+                memset (M, 0, (uint32) MEMSIZE * 2);    /* zero allocated memory */
                 MR = 0077777;                           /* set M register */
                 PC = 0100000;                           /* set P register */
                 }
@@ -3081,7 +3084,7 @@ while (working_set) {
             else if (UNIT_CPU_TYPE == UNIT_TYPE_211X)   /* 2115/2116? */
                 data = dma [ch].cw3 & 0037777;          /* only 14-bit count */
             else                                        /* other models */
-                data = dma [ch].cw3;                    /* rest use full value */
+                data = (uint16) dma [ch].cw3;           /* rest use full value */
 
             stat_data = IORETURN (SCPE_OK, data);       /* merge status and remaining word count */
             break;
@@ -3364,8 +3367,7 @@ else {                                                  /* last cycle */
     }
 
 if (input) {                                            /* input cycle? */
-    ioresult = devdisp (dev, signals,                   /* do I/O input */
-                        IORETURN (SCPE_OK, 0));
+    ioresult = devdisp (dev, signals, 0);               /* do I/O input */
 
     status = IOSTATUS (ioresult);                       /* get cycle status */
 
@@ -3374,8 +3376,8 @@ if (input) {                                            /* input cycle? */
 
         if (bytes) {                                    /* byte packing? */
             if (even) {                                 /* second byte? */
-                data = (dma [ch].packer << 8) |         /* merge stored byte */
-                         (data & DMASK8);
+                data = (uint16) (dma [ch].packer << 8)  /* merge stored byte */
+                         | (data & DMASK8);
                 WriteIO (MA, data, map);                /* store word data */
                 }
             else                                        /* first byte */
@@ -3403,8 +3405,7 @@ else {                                                  /* output cycle */
     else                                                /* no byte packing */
         data = ReadIO (MA, map);                        /* read word data */
 
-    ioresult = devdisp (dev, signals,                   /* do I/O output */
-                        IORETURN (SCPE_OK, data));
+    ioresult = devdisp (dev, signals, data);            /* do I/O output */
 
     status = IOSTATUS (ioresult);                       /* get cycle status */
     }
@@ -3670,7 +3671,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 new_size, char *cptr, void *desc)
 int32 mc = 0;
 uint32 i;
 uint32 model = CPU_MODEL_INDEX;                         /* current CPU model index */
-uint32 old_size = MEMSIZE;                              /* current memory size */
+uint32 old_size = (uint32) MEMSIZE;                     /* current memory size */
 
 if ((uint32) new_size > cpu_features[model].maxmem)
     return SCPE_NOFNC;                                  /* mem size unsupported */
@@ -3689,10 +3690,10 @@ if (!(sim_switches & SWMASK ('F'))) {                   /* force truncation? */
 if (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX) {              /* 21xx CPU? */
     cpu_set_ldr (uptr, FALSE, NULL, NULL);              /* save loader to shadow RAM */
     MEMSIZE = new_size;                                 /* set new memory size */
-    fwanxm = MEMSIZE - IBL_LNT;                         /* reserve memory for loader */
+    fwanxm = (uint32) MEMSIZE - IBL_LNT;                /* reserve memory for loader */
     }
 else                                                    /* loader unsupported */
-    fwanxm = MEMSIZE = new_size;                        /* set new memory size */
+    MEMSIZE = fwanxm = new_size;                        /* set new memory size */
 
 for (i = fwanxm; i < old_size; i++)                     /* zero non-existent memory */
     M[i] = 0;
@@ -3779,15 +3780,15 @@ if ((MEMSIZE == 0) ||                                   /* current mem size not 
     (MEMSIZE > cpu_features[new_index].maxmem))         /* current mem size too large? */
     new_memsize = cpu_features[new_index].maxmem;       /* set it to max supported */
 else
-    new_memsize = MEMSIZE;                              /* or leave it unchanged */
+    new_memsize = (uint32) MEMSIZE;                     /* or leave it unchanged */
 
 result = cpu_set_size (uptr, new_memsize, NULL, NULL);  /* set memory size */
 
 if (result == SCPE_OK)                                  /* memory change OK? */
     if (new_family == UNIT_FAMILY_21XX)                 /* 21xx CPU? */
-        fwanxm = MEMSIZE - IBL_LNT;                     /* reserve memory for loader */
+        fwanxm = (uint32) MEMSIZE - IBL_LNT;            /* reserve memory for loader */
     else
-        fwanxm = MEMSIZE;                               /* loader reserved only for 21xx */
+        fwanxm = (uint32) MEMSIZE;                      /* loader reserved only for 21xx */
 
 return result;
 }
@@ -3914,7 +3915,7 @@ if ((UNIT_CPU_FAMILY != UNIT_FAMILY_21XX) ||            /* valid only for 21xx *
     return SCPE_NOFNC;
 
 if (is_enabled && (enable == 0)) {                      /* disable loader? */
-    fwanxm = MEMSIZE - IBL_LNT;                         /* decrease available memory */
+    fwanxm = (uint32) MEMSIZE - IBL_LNT;                /* decrease available memory */
     for (i = 0; i < IBL_LNT; i++) {                     /* copy loader */
         loader[i] = M[fwanxm + i];                      /* from memory */
         M[fwanxm + i] = 0;                              /* and zero location */
@@ -3924,7 +3925,7 @@ if (is_enabled && (enable == 0)) {                      /* disable loader? */
 else if ((!is_enabled) && (enable == 1)) {              /* enable loader? */
     for (i = 0; i < IBL_LNT; i++)                       /* copy loader */
         M[fwanxm + i] = loader[i];                      /* to memory */
-    fwanxm = MEMSIZE;                                   /* increase available memory */
+    fwanxm = (uint32) MEMSIZE;                          /* increase available memory */
     }
 
 return SCPE_OK;
@@ -3963,19 +3964,19 @@ if (dev < 010)
 switch (sel) {
 
     case 0:                                             /* PTR boot */
-        ibl_copy (ptr_rom, dev);
+        ibl_copy (ptr_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);
         break;
 
     case 1:                                             /* DP/DQ boot */
-        ibl_copy (dq_rom, dev);
+        ibl_copy (dq_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);
         break;
 
     case 2:                                             /* MS boot */
-        ibl_copy (ms_rom, dev);
+        ibl_copy (ms_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);
         break;
 
     case 3:                                             /* DS boot */
-        ibl_copy (ds_rom, dev);
+        ibl_copy (ds_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);
         break;
         }
 
@@ -3988,14 +3989,14 @@ return SCPE_OK;
    - Use memory size to set the initial PC and base of the boot area
    - Copy boot ROM to memory, updating I/O instructions
    - Place 2s complement of boot base in last location
+   - Modify S register as indicated
 
    Notes:
-   - SR settings are done by the caller
    - Boot ROMs must be assembled with a device code of 10 (10 and 11 for
      devices requiring two codes)
 */
 
-t_stat ibl_copy (const BOOT_ROM rom, int32 dev)
+t_stat ibl_copy (const BOOT_ROM rom, int32 dev, uint32 sr_clear, uint32 sr_set)
 {
 int32 i;
 uint16 wd;
@@ -4021,5 +4022,8 @@ for (i = 0; i < IBL_LNT; i++) {                         /* copy bootstrap */
 
 M[PC + IBL_DPC] = (M[PC + IBL_DPC] + (dev - 010)) & DMASK;  /* patch DMA ctrl */
 M[PC + IBL_END] = (~PC + 1) & DMASK;                        /* fill in start of boot */
+
+SR = (SR & sr_clear) | sr_set;                          /* modify the S register as indicated */
+
 return SCPE_OK;
 }

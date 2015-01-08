@@ -26,6 +26,9 @@
    MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
+                        Added casts for explicit downward conversions
    11-Dec-14    JDB     Updated for new erase gap API, added CRCC/LRCC support
    10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -528,10 +531,10 @@ while (working_set) {
 
 
         case ioIOI:                                     /* I/O data input */
-            data = msc_sta & ~STA_DYN;                  /* get card status */
+            data = (uint16) (msc_sta & ~STA_DYN);       /* get card status */
 
             if ((uptr->flags & UNIT_OFFLINE) == 0) {    /* online? */
-                data = data | uptr->UST;                /* add unit status */
+                data = data | (uint16) uptr->UST;       /* add unit status */
 
                 if (sim_tape_bot (uptr))                /* BOT? */
                     data = data | STA_BOT;
@@ -551,7 +554,7 @@ while (working_set) {
                 data = data | STA_TBSY | STA_LOCAL;
 
             if (ms_ctype == A13183)                     /* 13183A? */
-                data = data | STA_PE | (msc_usl << STA_V_SEL);
+                data = data | STA_PE | (uint16) (msc_usl << STA_V_SEL);
 
             if (DEBUG_PRI (msc_dev, DEB_CPU))
                 fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", data);
@@ -644,7 +647,7 @@ while (working_set) {
                     if (DEBUG_PRI (msc_dev, DEB_CMDS))
                         fprintf (sim_deb,
                             ">>MSC STC: Unit %d command %03o (%s) scheduled, "
-                            "pos = %d, time = %d\n",
+                            "pos = %" T_ADDR_FMT "d, time = %d\n",
                             msc_usl, uptr->FNC, ms_cmd_name (uptr->FNC),
                             uptr->pos, sched_time);
                     }
@@ -741,9 +744,10 @@ switch (uptr->FNC) {                                    /* case on function */
             fprintf (sim_deb,
                 ">>MSC svc: Unit %d wrote gap\n",
                 unum);
-        if ((r = ms_write_gap (uptr)) ||                /* write tape gap; error? */
-            (uptr->FNC != FNC_GFM))                     /* not GFM? */
-            break;                                      /* bail out now */
+        r = ms_write_gap (uptr);                        /* write tape gap*/
+
+        if (r || (uptr->FNC != FNC_GFM))                /* if error or not GFM */
+            break;                                      /*   then bail out now */
                                                         /* else drop into WFM */
     case FNC_WFM:                                       /* write file mark */
         if ((ms_timing == 0) && sim_tape_bot (uptr)) {  /* realistic timing + BOT? */
@@ -862,7 +866,7 @@ switch (uptr->FNC) {                                    /* case on function */
             }
         else {                                          /* not 1st, next char */
             if (ms_ptr < DBSIZE) {                      /* room in buffer? */
-                msxb[ms_ptr] = msd_buf >> 8;            /* store 2 char */
+                msxb[ms_ptr] = (uint8) (msd_buf >> 8);  /* store 2 char */
                 msxb[ms_ptr + 1] = msd_buf & 0377;
                 ms_ptr = ms_ptr + 2;
                 }
@@ -1303,13 +1307,18 @@ const BOOT_ROM ms_rom = {
 
 t_stat msc_boot (int32 unitno, DEVICE *dptr)
 {
-int32 dev;
+const int32 dev = msd_dib.select_code;                  /* get data chan device no */
 
-if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
-dev = msd_dib.select_code;                              /* get data chan dev */
-if (ibl_copy (ms_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
-SR = (SR & IBL_OPT) | IBL_MS | (dev << IBL_V_DEV);      /* set SR */
-if ((sim_switches & SWMASK ('S')) && AR) SR = SR | 1;   /* skip? */
+if (unitno != 0)                                        /* boot supported on drive unit 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
+
+if (ibl_copy (ms_rom, dev, IBL_OPT,                     /* copy the boot ROM to memory and configure */
+              IBL_MS | IBL_SET_SC (dev)))               /*   the S register accordingly */   
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+
+if ((sim_switches & SWMASK ('S')) && AR)                /* if -S is specified and the A register is non-zero */
+    SR = SR | 1;                                        /*   then set to skip to the file number in A */
+
 return SCPE_OK;
 }
 

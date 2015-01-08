@@ -1,7 +1,7 @@
 /* hp2100_dq.c: HP 2100 12565A disk simulator
 
    Copyright (c) 1993-2006, Bill McDermith
-   Copyright (c) 2004-2012 J. David Bryan
+   Copyright (c) 2004-2014 J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
 
    DQ           12565A 2883 disk system
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Dec-12    MP      Now calls sim_activate_time to get remaining seek time
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -786,12 +788,12 @@ switch (uptr->FNC) {                                    /* case function */
                 break;
                 }
             }
-        dqxb[dq_ptr++] = dqd_wval? dqd_obuf: 0;         /* store word/fill */
-        dqd_wval = 0;                                   /* clr data valid */
-        if (dq_ptr >= DQ_NUMWD) {                       /* buffer full? */
-            da = GETDA (dqc_rarc, dqc_rarh, dqc_rars);  /* calc disk addr */
-            dqc_rars = (dqc_rars + 1) % DQ_NUMSC;       /* incr sector */
-            if (dqc_rars == 0)                          /* wrap? incr head */
+        dqxb[dq_ptr++] = dqd_wval ? (uint16) dqd_obuf : 0;  /* store word/fill */
+        dqd_wval = 0;                                       /* clr data valid */
+        if (dq_ptr >= DQ_NUMWD) {                           /* buffer full? */
+            da = GETDA (dqc_rarc, dqc_rarh, dqc_rars);      /* calc disk addr */
+            dqc_rars = (dqc_rars + 1) % DQ_NUMSC;           /* incr sector */
+            if (dqc_rars == 0)                              /* wrap? incr head */
                 dqc_uhed[drv] = dqc_rarh = dqc_rarh + 1;
             err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
             if (err)
@@ -962,11 +964,14 @@ const BOOT_ROM dq_rom = {
 
 t_stat dqc_boot (int32 unitno, DEVICE *dptr)
 {
-int32 dev;
+const int32 dev = dqd_dib.select_code;                  /* data chan select code */
 
-if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
-dev = dqd_dib.select_code;                              /* get data chan dev */
-if (ibl_copy (dq_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
-SR = (SR & IBL_OPT) | IBL_DQ | (dev << IBL_V_DEV);      /* set SR */
-return SCPE_OK;
+if (unitno != 0)                                        /* boot supported on drive unit 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
+
+if (ibl_copy (dq_rom, dev, IBL_OPT,                     /* copy the boot ROM to memory and configure */
+              IBL_DQ | IBL_SET_SC (dev)))               /*   the S register accordingly */
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+else
+    return SCPE_OK;
 }

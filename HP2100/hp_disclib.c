@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    27-Oct-14    JDB     Corrected the relative movement calculation in start_seek
    20-Dec-12    JDB     sim_is_active() now returns t_bool
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
@@ -311,8 +312,8 @@
 #define GET_HEAD(p)     (((p) >> DL_V_HEAD) & DL_M_HEAD)
 #define GET_SECTOR(p)   (((p) >> DL_V_SECTOR) & DL_M_SECTOR)
 
-#define SET_HEAD(c)     (((c)->head & DL_M_HEAD) << DL_V_HEAD)
-#define SET_SECTOR(c)   (((c)->sector & DL_M_SECTOR) << DL_V_SECTOR)
+#define SET_HEAD(c)     (uint16) (((c)->head & DL_M_HEAD) << DL_V_HEAD)
+#define SET_SECTOR(c)   (uint16) (((c)->sector & DL_M_SECTOR) << DL_V_SECTOR)
 
 
 /* Drive properties table.
@@ -831,8 +832,8 @@ switch (cvptr->opcode) {                                /* dispatch the command 
 
 
     case Request_Status:
-        cvptr->buffer [0] =                             /* set the Status-1 value */
-          cvptr->spd_unit | SET_S1STAT (cvptr->status); /*   into the buffer */
+        cvptr->buffer [0] = (uint16) (cvptr->spd_unit           /* set the Status-1 value */
+                              | SET_S1STAT (cvptr->status));    /*   into the buffer */
 
         if (cvptr->type == MAC)                         /* is this a MAC controller? */
             if (unit > unit_limit)                      /* if the unit number is invalid */
@@ -876,8 +877,8 @@ switch (cvptr->opcode) {                                /* dispatch the command 
 
 
     case Request_Syndrome:
-        cvptr->buffer [0] =                             /* return the Status-1 value in buffer 0 */
-          cvptr->spd_unit | SET_S1STAT (cvptr->status);
+        cvptr->buffer [0] = (uint16) (cvptr->spd_unit           /* return the Status-1 value */
+                              | SET_S1STAT (cvptr->status));    /*   in buffer 0 */
 
         set_address (cvptr, 1);                         /* return the CHS values in buffer 1-2 */
 
@@ -2289,8 +2290,12 @@ return SCPE_IOERR;                                      /* return an I/O error t
 
 static void set_address (CVPTR cvptr, uint32 index)
 {
-cvptr->buffer [index] = cvptr->cylinder + (cvptr->eoc == SET ? 1 : 0);  /* update the cylinder if EOC is set */
-cvptr->buffer [index + 1] = SET_HEAD (cvptr) | SET_SECTOR (cvptr);      /* merge the head and sector */
+cvptr->buffer [index] = (uint16) cvptr->cylinder            /* update the cylinder if EOC is set */
+                          + (cvptr->eoc == SET ? 1 : 0);
+
+cvptr->buffer [index + 1] = SET_HEAD (cvptr)                /* merge the head and sector */
+                              | SET_SECTOR (cvptr);  
+
 return;
 }
 
@@ -2361,8 +2366,8 @@ uint32 model;
 if (uptr == NULL)                                       /* if the unit is invalid */
     return DL_S2ERR | DL_S2NR;                          /*   then it does not respond */
 
-model = GET_MODEL (uptr->flags);                        /* get the drive model */
-status = drive_props [model].type | uptr->STAT;         /* start with the drive type and unit status */
+model = GET_MODEL (uptr->flags);                            /* get the drive model */
+status = (uint16) (drive_props [model].type | uptr->STAT);  /* start with the drive type and unit status */
 
 if (uptr->flags & UNIT_WPROT)                           /* is the write protect switch set? */
     status |= DL_S2RO;                                  /* set the Protected status bit */

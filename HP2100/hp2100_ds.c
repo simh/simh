@@ -1,7 +1,7 @@
 /* hp2100_ds.c: HP 13037D/13175D disc controller/interface simulator
 
    Copyright (c) 2004-2012, Robert M. Supnik
-   Copyright (c) 2012-2013  J. David Bryan
+   Copyright (c) 2012-2014  J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
 
    DS           13037D/13175D disc controller/interface
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
    18-Mar-13    JDB     Fixed poll_drives definition to match declaration
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    29-Mar-12    JDB     Rewritten to use the MAC/ICD disc controller library
@@ -1165,16 +1167,15 @@ const BOOT_ROM ds_rom = {
 
 t_stat ds_boot (int32 unitno, DEVICE *dptr)
 {
-if (unitno != 0)                                            /* boot supported on drive unit 0 only */
-    return SCPE_NOFNC;                                      /* report "Command not allowed" if attempted */
+if (unitno != 0)                                        /* boot supported on drive unit 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
 
-if (ibl_copy (ds_rom, ds_dib.select_code))                  /* copy the boot ROM to memory and configure */
-    return SCPE_IERR;                                       /* return an internal error if the copy failed */
-
-SR = SR & (IBL_OPT | IBL_DS_HEAD)                           /* set S to a reasonable value */
-  | IBL_DS | IBL_MAN | (ds_dib.select_code << IBL_V_DEV);   /*   before boot execution */
-
-return SCPE_OK;
+if (ibl_copy (ds_rom, ds_dib.select_code,               /* copy the boot ROM to memory and configure */
+              IBL_OPT | IBL_DS_HEAD,                    /*   the S register accordingly */
+              IBL_DS | IBL_MAN | IBL_SET_SC (ds_dib.select_code)))
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+else
+    return SCPE_OK;
 }
 
 
@@ -1282,7 +1283,7 @@ if (uptr) {                                             /* did the command start
         if (unit > DL_MAXDRIVE)
             fputs ("Controller ", sim_deb);
         else
-            fprintf (sim_deb, "Unit %d position %d ", unit, uptr->pos);
+            fprintf (sim_deb, "Unit %d position %" T_ADDR_FMT "d ", unit, uptr->pos);
 
         fprintf (sim_deb, "%s command initiated\n",
                  dl_opcode_name (MAC, mac_cntlr.opcode));

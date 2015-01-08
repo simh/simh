@@ -1,6 +1,6 @@
 /* hp2100_di.c: HP 12821A HP-IB Disc Interface simulator
 
-   Copyright (c) 2010-2012, J. David Bryan
+   Copyright (c) 2010-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    DI           12821A Disc Interface
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+                        Removed redundant global declarations
    13-Feb-12    JDB     First release
    15-Dec-11    JDB     Added dummy DC device for diagnostics
    09-Oct-10    JDB     Created DI simulation
@@ -190,24 +192,6 @@ typedef enum {
 
 DI_STATE di [card_count];                               /* per-card state */
 
-
-/* Disc interface global VM routines */
-
-IOHANDLER di_io;
-t_stat    di_reset (DEVICE *dptr);
-
-/* Disc interface global SCP routines */
-
-t_stat di_set_address  (UNIT *uptr, int32 value, char  *cptr, void *desc);
-t_stat di_show_address (FILE *st,   UNIT  *uptr, int32 value, void *desc);
-t_stat di_set_cable    (UNIT *uptr, int32 value, char  *cptr, void *desc);
-t_stat di_show_cable   (FILE *st,   UNIT  *uptr, int32 value, void *desc);
-
-/* Disc interface global bus routines */
-
-t_bool di_bus_source    (CARD_ID card, uint8 data);
-void   di_bus_control   (CARD_ID card, uint32 unit, uint8 assert, uint8 deny);
-void   di_poll_response (CARD_ID card, uint32 unit, FLIP_FLOP response);
 
 /* Disc interface local bus routines */
 
@@ -831,7 +815,7 @@ DEVICE *dptr = (DEVICE *) desc;
 if (cptr == NULL)                                           /* if the address is not given */
     return SCPE_ARG;                                        /*   report a missing argument */
 
-new_address = get_uint (cptr, 10, 7, &status);              /* parse the address value */
+new_address = (uint32) get_uint (cptr, 10, 7, &status);     /* parse the address value */
 
 if (status == SCPE_OK) {                                    /* is the parse OK? */
     if (value)                                              /* are we setting the card address? */
@@ -1868,11 +1852,11 @@ if (di_card->cntl_register & CNTL_TALK)                 /* is the card talking? 
         if (di_card->cntl_register & CNTL_CIC)          /* is the card the controller in charge? */
             di_card->bus_cntl =                         /* assert or deny the ATN bus line */
               di_card->bus_cntl & ~BUS_ATN              /*   from the ATN tag value */
-              | (tag & TAG_ATN) >> BUS_SHIFT;
+              | (uint8) ((tag & TAG_ATN) >> BUS_SHIFT);
 
         di_card->bus_cntl =                             /* assert or deny the EOI bus line */
           di_card->bus_cntl & ~BUS_EOI                  /*   from the EOI tag value */
-          | (tag & TAG_EOI) >> BUS_SHIFT;
+          | (uint8) ((tag & TAG_EOI) >> BUS_SHIFT);
         }
 
 return (uint16) data;                                   /* return the data value */
