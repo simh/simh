@@ -68,6 +68,8 @@ ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS
     VIDEO_USEFUL = true
     DISPLAY_USEFUL = true
   endif
+else ifeq ($(MAKECMDGOALS),besm6)
+  VIDEO_USEFUL = true
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
@@ -1160,6 +1162,33 @@ SSEM = ${SSEMD}/ssem_cpu.c ${SSEMD}/ssem_sys.c
 SSEM_OPT = -I ${SSEMD}
 
 ###
+### Experimental simulators
+###
+
+BESM6D = BESM6
+BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
+	${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
+	${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
+	${BESM6D}/besm6_punch.c
+
+ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}))
+    ifneq (,$(and ${VIDEO_LDFLAGS}, $(findstring besm6,$(MAKECMDGOALS))))
+        $(info ***)
+        $(info *** BESM-6 video not used: please specify a font file with FONTFILE=pathname to enable the panel display)
+        $(info ***)
+    endif
+	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
+    $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
+	BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
+    $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
+	BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+else
+	BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+endif
+
+###
 ### Unsupported/Incomplete simulators
 ###
 
@@ -1461,6 +1490,12 @@ ssem : ${BIN}ssem${EXE}
 ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+besm6 : ${BIN}besm6${EXE}
+
+${BIN}besm6${EXE} : ${BESM6} ${SIM}
+	${MKDIRBIN}
+	${CC} ${BESM6} ${SIM} ${BESM6_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 sigma : ${BIN}sigma${EXE}
 

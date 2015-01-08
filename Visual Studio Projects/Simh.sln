@@ -113,6 +113,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SAGE", "SAGE.vcproj", "{9D0
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PDQ3", "PDQ3.vcproj", "{D4F5761A-B543-40ED-9892-12A0255C2B6D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BESM6", "BESM6.vcproj", "{A8D46C10-8F3F-47CA-AD5F-E3BB7C4A3678}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -283,6 +285,10 @@ Global
 		{D4F5761A-B543-40ED-9892-12A0255C2B6D}.Debug|Win32.Build.0 = Debug|Win32
 		{D4F5761A-B543-40ED-9892-12A0255C2B6D}.Release|Win32.ActiveCfg = Release|Win32
 		{D4F5761A-B543-40ED-9892-12A0255C2B6D}.Release|Win32.Build.0 = Release|Win32
+		{A8D46C10-8F3F-47CA-AD5F-E3BB7C4A3678}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A8D46C10-8F3F-47CA-AD5F-E3BB7C4A3678}.Debug|Win32.Build.0 = Debug|Win32
+		{A8D46C10-8F3F-47CA-AD5F-E3BB7C4A3678}.Release|Win32.ActiveCfg = Release|Win32
+		{A8D46C10-8F3F-47CA-AD5F-E3BB7C4A3678}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
