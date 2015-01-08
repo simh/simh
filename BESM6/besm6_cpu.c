@@ -80,6 +80,7 @@ jmp_buf cpu_halt;
 t_stat cpu_examine (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_deposit (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
+t_stat cpu_req (UNIT *u, int32 val, char *cptr, void *desc);
 
 /*
  * CPU data structures
@@ -131,7 +132,8 @@ REG cpu_reg[] = {
 
 MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Display idle detection mode" },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL,  "Disables idle detection" },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL,           NULL,  "Disables idle detection" },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "REQ",    &cpu_req,      NULL,           NULL,  "Sends a request interrupt" },
     { 0 }
 };
 
@@ -339,6 +341,15 @@ t_stat cpu_reset (DEVICE *dptr)
     sim_brk_types = SWMASK ('E') | SWMASK('R') | SWMASK('W');
     sim_brk_dflt = SWMASK ('E');
 
+    return SCPE_OK;
+}
+
+/*
+ * Request routine
+ */
+t_stat cpu_req (UNIT *u, int32 val, char *cptr, void *desc)
+{
+    GRP |= GRP_PANEL_REQ;
     return SCPE_OK;
 }
 

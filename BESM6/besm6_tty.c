@@ -306,10 +306,22 @@ t_stat tty_attach (UNIT *u, char *cptr)
     char gbuf[CBUFSIZE];
     int r, m, n;
 
-    /* All arguments but the magic word "console" are passed
+    /* All arguments but the magic words "console" and "none" are passed
      * to tmxr_attach().
      */
     get_glyph (cptr, gbuf, 0);
+    /* Disallowing future connections to a line */
+    if (strcmp (gbuf, "NONE") == 0) {
+        /* Marking the TTY as unusable. */
+        tty_line[num].conn = 1;
+        tty_line[num].rcve = 0;
+        if (num <= TTY_MAX) {
+            vt_mask &= ~(1 << (TTY_MAX - num));
+            tt_mask &= ~(1 << (TTY_MAX - num));
+        }
+        besm6_debug ("*** turning off T%03o", num);
+        return SCPE_OK;
+    }
     if (strcmp (gbuf, "CONSOLE")) {
         /* Saving and restoring all .conn,
          * because tmxr_attach() zeroes them. */
@@ -331,19 +343,7 @@ t_stat tty_attach (UNIT *u, char *cptr)
         if (num <= TTY_MAX)
             vt_mask |= 1 << (TTY_MAX - num);
         besm6_debug ("*** console on T%03o", num);
-        return 0;
-    }
-    /* Disallowing future connections to a line */
-    if (strcmp (gbuf, "NONE") == 0) {
-        /* Marking the TTY as unusable. */
-        tty_line[num].conn = 1;
-        tty_line[num].rcve = 0;
-        if (num <= TTY_MAX) {
-            vt_mask &= ~(1 << (TTY_MAX - num));
-            tt_mask &= ~(1 << (TTY_MAX - num));
-        }
-        besm6_debug ("*** turning off T%03o", num);
-        return 0;
+        return SCPE_OK;
     }
     return SCPE_ALATT;
 }
