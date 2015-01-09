@@ -4,6 +4,8 @@
 
 ### New Simulators
 
+#### Leonid Broukhis and Serge Vakulenko have implemented a simulator for the Soviet mainframe BESM-6 computer.
+
 #### Matt Burke has implemented new VAX model simulators:
     VAX/11 730
     VAX/11 750
