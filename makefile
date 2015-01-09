@@ -68,6 +68,8 @@ ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS
     VIDEO_USEFUL = true
     DISPLAY_USEFUL = true
   endif
+else ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
+  VIDEO_USEFUL = true
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
@@ -298,8 +300,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   $(info lib paths are: $(LIBPATH))
   $(info include paths are: $(INCPATH))
-  find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
-  find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
+  find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
+  find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
   need_search = $(strip $(shell ld -l$(1) /dev/null 2>&1 | grep $(1) | sed s/$(1)//))
   LD_SEARCH_NEEDED := $(call need_search,ZzzzzzzZ)
   ifneq (,$(call find_lib,m))
@@ -1160,6 +1162,53 @@ SSEM = ${SSEMD}/ssem_cpu.c ${SSEMD}/ssem_sys.c
 SSEM_OPT = -I ${SSEMD}
 
 ###
+### Experimental simulators
+###
+
+BESM6D = BESM6
+BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
+        ${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
+        ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
+        ${BESM6D}/besm6_punch.c
+
+ifneq (,${VIDEO_LDFLAGS})
+    ifeq (,${FONTFILE})
+        FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions
+        FONTPATH := $(dir $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/.)))
+        FONTNAME += DejaVuSans.ttf LucidaSansRegular.ttf FreeSans.ttf AppleGothic.ttf
+        $(info font paths are: $(FONTPATH))
+        $(info font names are: $(FONTNAME))
+        find_fontfile = $(strip $(firstword $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/$(1))$(wildcard $(dir)/*/$(1))$(wildcard $(dir)/*/*/$(1))$(wildcard $(dir)/*/*/*/$(1)))))
+        find_font = $(abspath $(strip $(firstword $(foreach font,$(strip $(FONTNAME)),$(call find_fontfile,$(font))))))
+        ifneq (,$(call find_font))
+            FONTFILE=$(call find_font)
+        else
+            $(info ***)
+            $(info *** No font file available, BESM-6 video panel disabled.)
+            $(info ***)
+            $(info *** To enable the panel display please specify one of:)
+            $(info ***          a font path with FONTNAME=path)
+            $(info ***          a font name with FONTNAME=fontname.ttf)
+            $(info ***          a font file with FONTFILE=path/fontname.ttf)
+            $(info ***)
+        endif
+    endif
+endif
+ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}))
+    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
+    $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
+    $(info ***)
+    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
+    $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
+    $(info ***)
+    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+else
+    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+endif
+
+###
 ### Unsupported/Incomplete simulators
 ###
 
@@ -1461,6 +1510,12 @@ ssem : ${BIN}ssem${EXE}
 ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+besm6 : ${BIN}besm6${EXE}
+
+${BIN}besm6${EXE} : ${BESM6} ${SIM}
+	${MKDIRBIN}
+	${CC} ${BESM6} ${SIM} ${BESM6_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 sigma : ${BIN}sigma${EXE}
 
