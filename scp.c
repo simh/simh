@@ -778,6 +778,9 @@ static const char simh_help[] =
       " The STEP command (abbreviated S) resumes execution at the current PC for\n"
       " the number of instructions given by its argument.  If no argument is\n"
       " supplied, one instruction is executed.\n"
+      "4Switches\n"
+      " If the STEP command is invoked with the -T switch, the step command will\n"
+      " cause execution to run for microseconds rather than instructions.\n"
 #define HLP_NEXT        "*Commands Running_A_Simulated_Program NEXT"
       "3NEXT\n"
       " The NEXT command (abbreviated N) resumes execution at the current PC for\n"
@@ -1390,13 +1393,13 @@ ASSERT		failure have several different actions:
       "3Injecting Console Input\n"
       " The SEND command provides a way to insert input into the console device of\n"
       " a simulated system as if it was entered by a user.\n\n"
-      "++SEND {after=nn,}{delay=nn,}\"<string>\"\n\n"
+      "++SEND {-t} {after=nn,}{delay=nn,}\"<string>\"\n\n"
       " The string argument must be delimited by quote characters.  Quotes may\n"
       " be either single or double but the opening and closing quote characters\n"
       " must match.  Data in the string may contain escaped character strings.\n\n"
       " The SEND command can also insert input into any serial device on a\n"
       " simulated system as if it was entered by a user.\n\n"
-      "++SEND <dev>:line {after=nn,}{delay=nn,}\"<string>\"\n\n"
+      "++SEND {-t} <dev>:line {after=nn,}{delay=nn,}\"<string>\"\n\n"
       "4Delay\n"
       " Specifies a positive integer representing a minimal instruction delay\n"
       " between characters being sent.  The value specified in a delay\n"
@@ -1431,6 +1434,11 @@ ASSERT		failure have several different actions:
       "++\\n{n{n}} where each n is an octal digit (0-7)\n"
       " and hext character values of the form:\n"
       "++\\xh{h} where each h is a hex digit (0-9A-Fa-f)\n"
+      "4Switches\n"
+      " Switches can be used to influence the behavior of SEND commands\n\n"
+      "5-t\n"
+      " The -t switch indicates that the Delay and After values are in\n"
+      " units of microseconds rather than instructions.\n"
        /***************** 80 character line width template *************************/
 #define HLP_EXPECT      "*Commands Executing_Command_Files Reacting_To_Console_Output"
        /***************** 80 character line width template *************************/
@@ -1486,6 +1494,9 @@ ASSERT		failure have several different actions:
       " If a regular expression expect rule is defined with the -i switch,\n"
       " character matching for that expression will be case independent.\n"
       " The -i switch is only valid for regular expression expect rules.\n"
+      "5-t\n"
+      " The -t switch indicates that the value specified by the HaltAfter\n"
+      " parameter are in units of microseconds rather than instructions.\n"
       "4Determining Which Output Matched\n"
       " When an expect rule matches data in the output stream, the rule which\n"
       " matched is recorded in the environment variable _EXPECT_MATCH_PATTERN.\n"
@@ -5749,6 +5760,8 @@ return r;
 
    switches:
     -Q                  quiet return status
+    -T                  (only for step), causes the step limit to 
+                        be a number of microseconds to run for            
 */
 
 t_stat run_cmd (int32 flag, char *cptr)
@@ -5801,6 +5814,8 @@ else if ((flag == RU_STEP) ||
             return SCPE_ARG;
         }
     else sim_step = 1;
+    if ((flag == RU_STEP) && (sim_switches & SWMASK ('T')))
+        sim_step = (int32)((sim_timer_inst_per_sec ()*sim_step)/1000000.0);
     }
 else if (flag == RU_NEXT) {                             /* next */
     t_addr *addrs;
@@ -9193,7 +9208,10 @@ if (i != exp->size) {                                   /* Found? */
             if (!(ep->switches & EXP_TYP_PERSIST))      /* One shot expect rule? */
                 sim_exp_clr_tab (exp, ep);              /* delete it */
             }
-        sim_activate (&sim_expect_unit, exp->after);    /* schedule simulation stop when indicated */
+        sim_activate (&sim_expect_unit,                 /* schedule simulation stop when indicated */
+                      (ep->switches & EXP_TYP_TIME) ?  
+                            (int32)((sim_timer_inst_per_sec ()*exp->after)/1000000.0) : 
+                            exp->after);
         }
     /* Matched data is no longer available for future matching */
     exp->buf_ins = 0;
@@ -9219,9 +9237,9 @@ if (snd->insoff+size > snd->bufsize) {
 memcpy(snd->buffer+snd->insoff, data, size);
 snd->insoff += size;
 if (delay)
-    snd->delay = delay;
+    snd->delay = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*delay)/1000000.0) : delay;
 if (after)
-    snd->after = after;
+    snd->after = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*after)/1000000.0) : after;
 if (snd->after == 0)
     snd->after = snd->delay;
 snd->next_time = sim_gtime() + snd->after;
@@ -9248,8 +9266,15 @@ if (snd->extoff < snd->insoff) {
 else
     fprintf (st, "No Pending Input Data\n");
 if ((snd->next_time - sim_gtime()) > 0)
-    fprintf (st, "Minimum of %d instructions befor sending first character\n", (int)(snd->next_time - sim_gtime()));
-fprintf (st, "Minimum of %d instructions between characters\n", (int)snd->delay);
+    if ((snd->next_time - sim_gtime()) > (sim_timer_inst_per_sec()/1000000.0))
+        fprintf (st, "Minimum of %d instructions (%d microseconds) befor sending first character\n", (int)(snd->next_time - sim_gtime()),
+                                                        (int)((snd->next_time - sim_gtime())/(sim_timer_inst_per_sec()/1000000.0)));
+    else
+        fprintf (st, "Minimum of %d instructions befor sending first character\n", (int)(snd->next_time - sim_gtime()));
+if (snd->delay > (sim_timer_inst_per_sec()/1000000.0))
+    fprintf (st, "Minimum of %d instructions (%d microseconds) between characters\n", (int)snd->delay, (int)(snd->delay/(sim_timer_inst_per_sec()/1000000.0)));
+else
+    fprintf (st, "Minimum of %d instructions between characters\n", (int)snd->delay);
 if (snd->dptr && snd->dbit)
     fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? "=" : "", snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr) : "");
 return SCPE_OK;

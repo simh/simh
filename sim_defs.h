@@ -667,6 +667,7 @@ struct sim_exptab {
 #define EXP_TYP_CLEARALL        (SWMASK ('C'))      /* clear all rules after matching this rule, default is to once a rule matches, it is removed */
 #define EXP_TYP_REGEX           (SWMASK ('R'))      /* rule pattern is a regular expression */
 #define EXP_TYP_REGEX_I         (SWMASK ('I'))      /* regular expression pattern matching should be case independent */
+#define EXP_TYP_TIME            (SWMASK ('T'))      /* halt delay is in microseconds instead of instructions */
 #if defined(USE_REGEX)
     regex_t             regex;                          /* compiled regular expression */
 #endif
@@ -1228,7 +1229,6 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_QUEUE_MODE "Lock based asynchronous event queue access"
 #define AIO_INIT                                                  \
     if (1) {                                                      \
-      int tmr;                                                    \
       pthread_mutexattr_t attr;                                   \
                                                                   \
       pthread_mutexattr_init (&attr);                             \
@@ -1242,8 +1242,7 @@ extern int32 sim_asynch_inst_latency;
       sim_asynch_queue = QUEUE_LIST_END;                          \
       sim_wallclock_queue = QUEUE_LIST_END;                       \
       sim_wallclock_entry = NULL;                                 \
-      for (tmr=0; tmr<SIM_NTIMERS; tmr++)                         \
-          sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;          \
+      sim_clock_cosched_queue = QUEUE_LIST_END;                   \
       }                                                           \
     else                                                          \
       (void)0
