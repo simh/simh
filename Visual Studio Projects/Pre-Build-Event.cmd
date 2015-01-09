@@ -35,19 +35,25 @@ rem
 :_next_arg
 if "%1" == "" goto _done_args
 set _arg=
-if /I "%1" == "ROM"     set _arg=ROM
-if /I "%1" == "BUILD"   set _arg=BUILD
-if /I "%1" == "LIBSDL"  set _arg=LIBSDL
-if /I "%1" == "LIBPCRE" set _arg=LIBPCRE
-if "%_arg%" == ""       echo *** warning *** unknown parameter %0
-if not "%_arg%" == ""   set _X_%_arg%=%_arg%
+if /I "%1" == "ROM"      set _arg=ROM
+if /I "%1" == "BUILD"    set _arg=BUILD
+if /I "%1" == "LIBSDL"   set _arg=LIBSDL
+if /I "%1" == "LIBPCRE"  set _arg=LIBPCRE
+if /I "%1" == "FINDFONT" set _arg=FINDFONT
+if "%_arg%" == ""        echo *** warning *** unknown parameter %1
+if /I "%1" == "FINDFONT" set _X_FontName=%2
+if /I "%1" == "FINDFONT" set _X_FontIncludeName=%3
+if /I "%_arg%" == "FINDFONT" shift
+if /I "%_arg%" == "FINDFONT" shift
+if not "%_arg%" == ""    set _X_%_arg%=%_arg%
 shift
 goto _next_arg
 :_done_args
 rem some arguments implicitly require BUILD to also be set to have 
-rem any meaning.  These are LIBSDL and LIBPCRE
-if not "%_X_LIBSDL%"  == "" set _X_BUILD=BUILD
-if not "%_X_LIBPCRE%" == "" set _X_BUILD=BUILD
+rem any meaning.  These are LIBSDL, LIBPCRE and FINDFONT
+if not "%_X_FINDFONT%"  == "" set _X_BUILD=BUILD
+if not "%_X_LIBSDL%"    == "" set _X_BUILD=BUILD
+if not "%_X_LIBPCRE%"   == "" set _X_BUILD=BUILD
 
 
 :_do_rom
@@ -89,6 +95,23 @@ if not exist "../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)/Lib/x
 if "%_X_LIBPCRE%" == "" goto _done_libpcre
 if not exist ../../windows-build/PCRE/include/pcreposix.h goto _notice2
 :_done_libpcre
+if "%_X_FINDFONT%" == "" goto _done_findfont
+if not exist ../../windows-build/libSDL/SDL2_ttf-2.0.12/SDL_ttf.h goto _notice2
+if "%_X_FontName%" == "" goto _done_findfont
+echo. >%_X_FontIncludeName%.temp
+set FONTFILE=%windir%\Fonts\%_X_FontName%
+if not exist "%FONTFILE%" echo Can't find font %_X_FontName%
+if not exist "%FONTFILE%" goto _done_findfont
+set FONTFILE=%FONTFILE:\=/%
+echo #define FONTFILE %FONTFILE% >>%_X_FontIncludeName%.temp
+if not exist %_X_FontIncludeName% goto _found_font
+fc %_X_FontIncludeName%.temp %_X_FontIncludeName% >NUL
+if NOT ERRORLEVEL 1 goto _done_findfont
+:_found_font
+echo Found: %FONTFILE%
+move /Y %_X_FontIncludeName%.temp %_X_FontIncludeName% >NUL
+:_done_findfont
+if exist %_X_FontIncludeName%.temp del %_X_FontIncludeName%.temp
 goto _done_build
 :_notice1
 echo *****************************************************
