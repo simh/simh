@@ -70,6 +70,7 @@ ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS
   endif
 else ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
   VIDEO_USEFUL = true
+  BESM6_BUILD = true
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
@@ -84,6 +85,8 @@ else
     endif
   endif
 endif
+find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
+find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq ($(GCC),)
     ifeq (,$(shell which gcc 2>/dev/null))
@@ -153,7 +156,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OS_CCDEFS = -D_GNU_SOURCE
     ifeq (,$(NOASYNCH))
       OS_CCDEFS += -DSIM_ASYNCH_IO 
-     endif
+    endif
     OS_LDFLAGS = -lm
   else # Non-Android Builds
     INCPATH:=/usr/include
@@ -300,8 +303,6 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   $(info lib paths are: $(LIBPATH))
   $(info include paths are: $(INCPATH))
-  find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
-  find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
   need_search = $(strip $(shell ld -l$(1) /dev/null 2>&1 | grep $(1) | sed s/$(1)//))
   LD_SEARCH_NEEDED := $(call need_search,ZzzzzzzZ)
   ifneq (,$(call find_lib,m))
@@ -645,11 +646,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
 else
   #Win32 Environments (via MinGW32)
-  GCC = gcc
-  ifeq (XP,$(findstring XP,$(shell ver)))
-    GCC_Path := C:\MinGW\bin\
-  else
-    GCC_Path := $(dir $(shell where gcc.exe))
+  GCC := gcc
+  GCC_Path := C:\MinGW\bin
+  ifeq (where,$(shell if exist "%windir%\system32\where.exe" echo where))
+    GCC_Path := $(dir $(shell where $(GCC)))
   endif
   ifeq (rename-build-support,$(shell if exist ..\windows-build-windows-build echo rename-build-support))
     FIXED_BUILD := $(shell move ..\windows-build-windows-build ..\windows-build >NUL)
@@ -657,36 +657,42 @@ else
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
   LTO_EXCLUDE_VERSIONS = 4.5.2
-  ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
-    PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
+  INCPATH = $(abspath $(GCC_Path)\..\include)
+  LIBPATH = $(abspath $(GCC_Path)\..\lib)
+  $(info lib paths are: $(LIBPATH))
+  $(info include paths are: $(INCPATH))
+  # Give preference to any MinGW provided threading (if available)
+  ifneq (,$(call find_include,pthread))
+    PTHREADS_CCDEFS = -DUSE_READER_THREAD
     ifeq (,$(NOASYNCH))
       PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
     endif
-    PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
+    PTHREADS_LDFLAGS = -lpthread
   else
-    ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
-      PTHREADS_CCDEFS = -DUSE_READER_THREAD
+    ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
+      PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -D_POSIX_C_SOURCE -I../windows-build/pthreads/Pre-built.2/include
       ifeq (,$(NOASYNCH))
         PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
       endif
-      PTHREADS_LDFLAGS = -lpthread
+      PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
     endif
   endif
   ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
     NETWORK_LDFLAGS =
-    NETWORK_OPT = -DUSE_SHARED -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk
+    NETWORK_OPT = -DUSE_SHARED -I../windows-build/winpcap/Wpdpack/include
     NETWORK_FEATURES = - dynamic networking support using windows-build provided libpcap components
   else
-    ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
+    ifneq (,$(call find_include,pcap))
       NETWORK_LDFLAGS =
-      NETWORK_OPT = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
+      NETWORK_OPT = -DUSE_SHARED
       NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
     endif
   endif
   ifneq (,$(VIDEO_USEFUL))
-    ifeq (libSDL,$(shell if exist ..\windows-build\libSDL\SDL2-2.0.0\include\SDL.h echo libSDL))
-      VIDEO_CCDEFS += -DHAVE_LIBSDL -I..\windows-build\libSDL\SDL2-2.0.0\include
-      VIDEO_LDFLAGS  += -lSDL2 -L..\windows-build\libSDL\SDL2-2.0.0\lib
+    SDL_INCLUDE = $(word 1,$(shell dir /b /s ..\windows-build\libSDL\SDL.h))
+    ifeq (SDL.h,$(findstring SDL.h,$(SDL_INCLUDE)))
+      VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(abspath $(dir $(SDL_INCLUDE)))
+      VIDEO_LDFLAGS  += -lSDL2 -L$(abspath $(dir $(SDL_INCLUDE))\..\lib)
       VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
     else
       $(info ***********************************************************************)
@@ -1171,11 +1177,11 @@ BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
         ${BESM6D}/besm6_punch.c
 
-ifneq (,${VIDEO_LDFLAGS})
+ifneq (,$(and ${VIDEO_LDFLAGS}, $(BESM6_BUILD)))
     ifeq (,${FONTFILE})
-        FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions
+        FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions C:/Windows/Fonts
         FONTPATH := $(dir $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/.)))
-        FONTNAME += DejaVuSans.ttf LucidaSansRegular.ttf FreeSans.ttf AppleGothic.ttf
+        FONTNAME += DejaVuSans.ttf LucidaSansRegular.ttf FreeSans.ttf AppleGothic.ttf tahoma.ttf
         $(info font paths are: $(FONTPATH))
         $(info font names are: $(FONTNAME))
         find_fontfile = $(strip $(firstword $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/$(1))$(wildcard $(dir)/*/$(1))$(wildcard $(dir)/*/*/$(1))$(wildcard $(dir)/*/*/*/$(1)))))
