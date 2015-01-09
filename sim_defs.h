@@ -1228,6 +1228,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_QUEUE_MODE "Lock based asynchronous event queue access"
 #define AIO_INIT                                                  \
     if (1) {                                                      \
+      int tmr;                                                    \
       pthread_mutexattr_t attr;                                   \
                                                                   \
       pthread_mutexattr_init (&attr);                             \
@@ -1241,7 +1242,8 @@ extern int32 sim_asynch_inst_latency;
       sim_asynch_queue = QUEUE_LIST_END;                          \
       sim_wallclock_queue = QUEUE_LIST_END;                       \
       sim_wallclock_entry = NULL;                                 \
-      sim_clock_cosched_queue = QUEUE_LIST_END;                   \
+      for (tmr=0; tmr<SIM_NTIMERS; tmr++)                         \
+          sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;          \
       }                                                           \
     else                                                          \
       (void)0
