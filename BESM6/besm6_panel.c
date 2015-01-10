@@ -347,13 +347,14 @@ static void draw_brz_static (int top)
 /*
  * Closing the graphical window.
  */
-void besm6_close_panel (void)
+t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
 {
     if (! screen)
-        return;
+        return SCPE_NOTATT;
     TTF_Quit();
     SDL_Quit();
     screen = 0;
+    return SCPE_OK;
 }
 
 #if SDL_MAJOR_VERSION == 2
@@ -366,25 +367,22 @@ static SDL_Texture *sdlTexture;
 /*
  * Initializing of the graphical window and the fonts.
  */
-static void init_panel (void)
+t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
 {
-    if (sim_switches & SWMASK('Q'))
-        return;
-
+    if (screen)
+        return SCPE_ALATT;
     /* Initialize SDL subsystems - in this case, only video. */
     if (SDL_Init (SDL_INIT_VIDEO) < 0) {
-        fprintf (stderr, "SDL: unable to init: %s\n",
-                 SDL_GetError ());
-        exit (1);
+        return sim_messagef (SCPE_OPENERR, "SDL: unable to init: %s\n",
+                             SDL_GetError ());
     }
     sdlWindow = SDL_CreateWindow ("BESM-6 panel",
                                   SDL_WINDOWPOS_UNDEFINED,
                                   SDL_WINDOWPOS_UNDEFINED,
                                   WIDTH, HEIGHT, 0 /* regular window */);
     if (! sdlWindow) {
-        fprintf (stderr, "SDL: unable to set %dx%dx%d mode: %s\n",
-                 WIDTH, HEIGHT, DEPTH, SDL_GetError ());
-        exit (1);
+        return sim_messagef (SCPE_OPENERR, "SDL: unable to set %dx%dx%d mode: %s\n",
+                             WIDTH, HEIGHT, DEPTH, SDL_GetError ());
     }
 
     sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
@@ -394,22 +392,21 @@ static void init_panel (void)
 
     /* Initialize the TTF library */
     if (TTF_Init() < 0) {
-        fprintf (stderr, "SDL: couldn't initialize TTF: %s\n",
-                 SDL_GetError());
+        t_stat ret = sim_messagef(SCPE_OPENERR, "SDL: couldn't initialize TTF: %s\n",
+                                  SDL_GetError());
         SDL_Quit();
-        exit (1);
+        return ret;
     }
 
     /* Open the font file with the requested point size */
     font_big = TTF_OpenFont (QUOTE(FONTFILE), 16);
     font_small = TTF_OpenFont (QUOTE(FONTFILE), 9);
     if (! font_big || ! font_small) {
-        fprintf(stderr, "SDL: couldn't load font %s: %s\n",
-                QUOTE(FONTFILE), SDL_GetError());
-        besm6_close_panel();
-        exit (1);
+        t_stat ret = sim_messagef(SCPE_OPENERR, "SDL: couldn't load font %s: %s\n",
+                                  QUOTE(FONTFILE), SDL_GetError());
+        besm6_close_panel(u, val, cptr, desc);
+        return ret;
     }
-    atexit (besm6_close_panel);
 
     screen = SDL_CreateRGBSurface(0, WIDTH, HEIGHT, 32,
                                   0x00FF0000,
@@ -428,14 +425,14 @@ static void init_panel (void)
     draw_grp_static (180);
     draw_brz_static (230);
 
+    besm6_draw_panel();
+
     /* Tell SDL to update the whole screen */
     SDL_UpdateTexture(sdlTexture, NULL, screen->pixels, screen->pitch);
     SDL_RenderClear(sdlRenderer);
     SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
     SDL_RenderPresent (sdlRenderer);
 }
-
-void (*sim_vm_init)() = init_panel;
 
 /*
  * Refreshing the window.
@@ -459,9 +456,9 @@ void besm6_draw_panel (void)
     SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
     SDL_RenderPresent (sdlRenderer);
 
-    /* Exit SIMH when window closed.*/
+    /* Close the panel window */
     if (SDL_PollEvent (&event) && event.type == SDL_QUIT)
-        longjmp (cpu_halt, SCPE_STOP);
+        besm6_close_panel(&cpu_unit, 0, NULL, NULL);
 }
 
 #else
@@ -469,42 +466,38 @@ void besm6_draw_panel (void)
 /*
  * Initializing of the graphical window and the fonts.
  */
-static void init_panel (void)
+t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
 {
-    if (sim_switches & SWMASK('Q'))
-        return;
-
+    if (screen)
+        return SCPE_ALATT;
     /* Initialize SDL subsystems - in this case, only video. */
     if (SDL_Init (SDL_INIT_VIDEO) < 0) {
-        fprintf (stderr, "SDL: unable to init: %s\n",
-                 SDL_GetError ());
-        exit (1);
+        return sim_messagef (SCPE_OPENERR, "SDL: unable to init: %s\n",
+                             SDL_GetError ());
     }
     screen = SDL_SetVideoMode (WIDTH, HEIGHT, DEPTH, SDL_SWSURFACE);
     if (! screen) {
-        fprintf (stderr, "SDL: unable to set %dx%dx%d mode: %s\n",
-                 WIDTH, HEIGHT, DEPTH, SDL_GetError ());
-        exit (1);
+        return sim_messagef (SCPE_OPENERR, "SDL: unable to set %dx%dx%d mode: %s\n",
+                             WIDTH, HEIGHT, DEPTH, SDL_GetError ());
     }
 
     /* Initialize the TTF library */
     if (TTF_Init() < 0) {
-        fprintf (stderr, "SDL: couldn't initialize TTF: %s\n",
-                 SDL_GetError());
+        t_stat ret = sim_messagef(SCPE_OPENERR, "SDL: couldn't initialize TTF: %s\n",
+                                  SDL_GetError());
         SDL_Quit();
-        exit (1);
+        return ret;
     }
 
     /* Open the font file with the requested point size */
     font_big = TTF_OpenFont (QUOTE(FONTFILE), 16);
     font_small = TTF_OpenFont (QUOTE(FONTFILE), 9);
     if (! font_big || ! font_small) {
-        fprintf(stderr, "SDL: couldn't load font %s: %s\n",
-                QUOTE(FONTFILE), TTF_GetError());
-        besm6_close_panel();
-        exit (1);
+        t_stat ret = sim_messagef(SCPE_OPENERR, "SDL: couldn't load font %s: %s\n",
+                                  QUOTE(FONTFILE), SDL_GetError());
+        besm6_close_panel(u, val, cptr, desc);
+        return ret;
     }
-    atexit (besm6_close_panel);
 
     /* Drawing the static part of the BESM-6 panel */
     draw_modifiers_static (0, 24, 10);
@@ -512,17 +505,18 @@ static void init_panel (void)
     draw_grp_static (180);
     draw_brz_static (230);
 
+    besm6_draw_panel();
+
     /* Tell SDL to update the whole screen */
     SDL_UpdateRect (screen, 0, 0, WIDTH, HEIGHT);
 }
-
-void (*sim_vm_init)() = init_panel;
 
 /*
  * Refreshing the window
  */
 void besm6_draw_panel ()
 {
+    SDL_Event event;
     if (! screen)
         return;
 
@@ -535,10 +529,9 @@ void besm6_draw_panel ()
     /* Tell SDL to update the whole screen */
     SDL_UpdateRect (screen, 0, 0, WIDTH, HEIGHT);
 
-    /* Exit SIMH when window closed.*/
-    SDL_Event event;
+    /* Close the panel window */
     if (SDL_PollEvent (&event) && event.type == SDL_QUIT)
-        longjmp (cpu_halt, SCPE_STOP);
+        besm6_close_panel(&cpu_unit, 0, NULL, NULL);
 }
 
 #endif /* SDL_MAJOR_VERSION */

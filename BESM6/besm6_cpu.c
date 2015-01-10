@@ -134,6 +134,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Display idle detection mode" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL,           NULL,  "Disables idle detection" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "REQ",    &cpu_req,      NULL,           NULL,  "Sends a request interrupt" },
+    { MTAB_XTD|MTAB_VDV, 0, "PANEL", "PANEL", &besm6_init_panel, NULL,         NULL, "Displays graphical panel" },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPANEL", &besm6_close_panel, NULL,         NULL, "Closes graphical panel" },
     { 0 }
 };
 
