@@ -36,6 +36,10 @@
 
 #define INLINE
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 /* Configuration */
 
 #define INITMEMSIZE     (1 << 24)                       /* !!debug!! */

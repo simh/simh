@@ -42,6 +42,10 @@
 
 #include "sim_defs.h"
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 /* Simulator stop codes */
 #define STOP_RSRV       1                               /* must be 1 */
 #define STOP_HALT       2                               /* HALT */

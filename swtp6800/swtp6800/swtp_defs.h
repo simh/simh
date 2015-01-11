@@ -27,6 +27,10 @@ Copyright (c) 2005-2012, William Beech
 #include <ctype.h>
 #include "sim_defs.h"                   // simulator defs
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 /* Memory */
 
 #define MAXMEMSIZE	65536		// max memory size

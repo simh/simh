@@ -79,6 +79,10 @@
 
 #include "sim_defs.h"                                   /* simulator defns */
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 
 /* The following pragmas quell clang warnings that are on by default but should
    not be, in my opinion.  They warn about the use of perfectly valid code and
