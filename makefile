@@ -758,7 +758,7 @@ else
     endif
     ifeq (pcre,$(shell if exist ..\windows-build\PCRE\include\pcre.h echo pcre))
       OS_CCDEFS += -DHAVE_PCREPOSIX_H -I$(abspath ../windows-build/PCRE/include)
-      OS_LDFLAGS += -lpcreposix -lpcre -lpcrecpp -L../windows-build/PCRE/lib/
+      OS_LDFLAGS += -lpcreposix -lpcre -L../windows-build/PCRE/lib/
       $(info using libpcreposix: $(abspath ../windows-build/PCRE/lib/pcreposix.a) $(abspath ../windows-build/PCRE/include/pcreposix.h))
     endif
   endif
