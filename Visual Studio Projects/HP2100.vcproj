@@ -358,7 +358,7 @@
 				>
 			</File>
 			<File
-				RelativePath="hp2100_defs.h"
+				RelativePath="..\HP2100\hp2100_defs.h"
 				>
 			</File>
 			<File
