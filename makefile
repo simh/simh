@@ -647,18 +647,19 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
 else
   #Win32 Environments (via MinGW32)
   GCC := gcc
-  GCC_Path := C:\MinGW\bin
-  ifeq (where,$(shell if exist "%windir%\system32\where.exe" echo where))
-    GCC_Path := $(dir $(shell where $(GCC)))
-  endif
+  GCC_Path := $(abspath $(dir $(word 1,$(wildcard $(addsuffix /$(GCC).exe,$(subst ;, ,$(PATH)))))))
   ifeq (rename-build-support,$(shell if exist ..\windows-build-windows-build echo rename-build-support))
+    REMOVE_OLD_BUILD := $(shell if exist ..\windows-build rmdir/s/q ..\windows-build)
     FIXED_BUILD := $(shell move ..\windows-build-windows-build ..\windows-build >NUL)
   endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
   LTO_EXCLUDE_VERSIONS = 4.5.2
-  INCPATH = $(abspath $(GCC_Path)\..\include)
-  LIBPATH = $(abspath $(GCC_Path)\..\lib)
+  ifeq (,$(PATH_SEPARATOR))
+    PATH_SEPARATOR := ;
+  endif
+  INCPATH = $(abspath $(wildcard $(GCC_Path)\..\include $(subst $(PATH_SEPARATOR), ,$(CPATH))  $(subst $(PATH_SEPARATOR), ,$(C_INCLUDE_PATH))))
+  LIBPATH = $(abspath $(wildcard $(GCC_Path)\..\lib $(subst :, ,$(LIBRARY_PATH))))
   $(info lib paths are: $(LIBPATH))
   $(info include paths are: $(INCPATH))
   # Give preference to any MinGW provided threading (if available)
@@ -701,9 +702,8 @@ else
       $(info **  However, the required files to achieve this can't be found on    **)
       $(info **  this system.  Download the file:                                 **)
       $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
-      $(info **  Refer to the file:                                               **)
-      $(info **  "Visual Studio Projects\0ReadMe_Projects.txt" for where to place **)
-      $(info **  the 'windows-build' folder extracted from that zip file.         **)
+      $(info **  Extract the windows-build-windows-build folder it contains to    **)
+      $(info **  $(abspath ..\)                                                   **)
       $(info ***********************************************************************)
       $(info ***********************************************************************)
       $(info .)
@@ -733,12 +733,34 @@ else
     $(info **  simulator operation and features.                                **)
     $(info **  Download the file:                                               **)
     $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
-    $(info **  Refer to the file:                                               **)
-    $(info **  "Visual Studio Projects\0ReadMe_Projects.txt" for where to place **)
-    $(info **  the 'windows-build' folder extracted from that zip file.         **)
+    $(info **  Extract the windows-build-windows-build folder it contains to    **)
+    $(info **  $(abspath ..\)                                                   **)
     $(info ***********************************************************************)
     $(info ***********************************************************************)
     $(info .)
+  else
+    # Version check on windows-build
+    ifneq (,$(shell findstr LIBSTL_TTF ..\windows-build\Windows-Build_Versions.txt))
+      $(info .)
+      $(info windows-build components at: $(abspath ..\windows-build)
+      $(info .)
+      $(info ***********************************************************************)
+      $(info ***********************************************************************)
+      $(info **  This currently available windows-build components are out of     **)
+      $(info **  date.  For the most functional and stable features you shoud     **)
+      $(info **  Download the file:                                               **)
+      $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
+      $(info **  Extract the windows-build-windows-build folder it contains to    **)
+      $(info **  $(abspath ..\)                                                   **)
+      $(info ***********************************************************************)
+      $(info ***********************************************************************)
+      $(info .)
+    endif
+    ifeq (pcre,$(shell if exist ..\windows-build\PCRE\include\pcre.h echo pcre))
+      OS_CCDEFS += -DHAVE_PCREPOSIX_H -I$(abspath ../windows-build/PCRE/include)
+      OS_LDFLAGS += -lpcreposix -lpcre -lpcrecpp -L../windows-build/PCRE/lib/
+      $(info using libpcreposix: $(abspath ../windows-build/PCRE/lib/pcreposix.a) $(abspath ../windows-build/PCRE/include/pcreposix.h))
+    endif
   endif
 endif # Win32 (via MinGW)
 ifneq (,$(GIT_COMMIT_ID))
