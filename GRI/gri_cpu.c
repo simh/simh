@@ -434,11 +434,11 @@ while (reason == 0) {                                   /* loop until halted */
         for (i = 15; i >= 0; i--) {
             if ((t >> i) & 1)
                 break;
-			}
+            }
         if ((i < 0) || ((vec = vec_map[i]) < 0)) {      /* undefined? */
             reason = STOP_ILLINT;                       /* stop */
             break;
-			}
+            }
         dev_done = dev_done & ~INT_ON;                  /* int off */
         M[vec] = SC;                                    /* save SC */
         SC = vec + 1;                                   /* new SC */

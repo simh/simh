@@ -657,7 +657,7 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     sim_interval = sim_interval - 1;
 
@@ -1635,7 +1635,7 @@ do {
             if (DEV_ACC (dev)) {                        /* dev exist? */
                 by = ReadB ((vec + CCB16_IOC) & VAMASK);/* read OC byte */
                 dev_tab[dev] (dev, IO_OC, by);          /* send to dev */
-				}
+                }
             break;                                      /* and exit */
             }
         }

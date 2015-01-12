@@ -28,7 +28,7 @@
    28-Apr-07    RMS     Removed clock initialization
    27-Oct-06    RMS     Added idle support
                         Removed separate PASLA clock
-   09-Mar-06	RMS     Added 8 register bank support for 8/32
+   09-Mar-06    RMS     Added 8 register bank support for 8/32
    06-Feb-06    RMS     Fixed bug in DH (Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -2285,7 +2285,7 @@ if ((sw & SWMASK ('V')) && (PSW & PSW_REL)) {
     int32 cc = RelocT (addr, MAC_BASE, P, &addr);
     if (cc & (CC_C | CC_V))
         return SCPE_NXM;
-	}
+    }
 if (addr >= MEMSIZE)
     return SCPE_NXM;
 if (vptr != NULL)
@@ -2301,7 +2301,7 @@ if ((sw & SWMASK ('V')) && (PSW & PSW_REL)) {
     int32 cc = RelocT (addr, MAC_BASE, P, &addr);
     if (cc & (CC_C | CC_V))
         return SCPE_NXM;
-	}
+    }
 if (addr >= MEMSIZE)
     return SCPE_NXM;
 IOWriteH (addr, val);

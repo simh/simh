@@ -181,8 +181,8 @@ typedef struct {
 #define INST_M_TAG      07
 #define INST_V_ADDR     0
 #define INST_M_ADDR     077777
-#define INST_V_4B		0
-#define INST_M_4B		017
+#define INST_V_4B       0
+#define INST_M_4B       017
 
 #define GET_OPD(x)      ((uint32) (((x) >> INST_V_OPD) & INST_M_OPD))
 #define GET_DEC(x)      ((uint32) (((x) >> INST_V_DEC) & INST_M_DEC))

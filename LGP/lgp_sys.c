@@ -293,7 +293,7 @@ if (uptr && (uptr != &cpu_unit))                        /* must be CPU */
     return SCPE_ARG;
 if ((sw & SWMASK ('M')) &&                              /* symbolic decode? */
     ((inst & ~(SIGN|I_OP|I_EA)) == 0)) {
-	op = I_GETOP (inst);
+    op = I_GETOP (inst);
     ea = I_GETEA (inst);
     if (inst & SIGN)
         fputc ('-', of);

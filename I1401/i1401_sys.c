@@ -299,7 +299,7 @@ if (ilnt > 2) {                                         /* A address? */
         fprintf (of, " %%%c%c", bcd2ascii (val[2], use_h),
             bcd2ascii (val[3], sw));
     else fprint_addr (of, &val[1]);
-	}
+    }
 if (ilnt > 5)                                           /* B address? */
     fprint_addr (of, &val[4]);
 if ((ilnt == 2) || (ilnt == 5) || (ilnt >= 8))          /* d character? */
@@ -383,7 +383,7 @@ if ((sw & SWMASK ('C')) || (sw & SWMASK ('S')) || (*cptr == wmch) ||
                 wm_seen = 0;
                 }
             else val[i++] = t;
-			}
+            }
         if ((i == 0) || wm_seen)
             return SCPE_ARG;
         return -(i - 1);

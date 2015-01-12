@@ -560,7 +560,7 @@ if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
             }
         }                                               /* end else p1 */
     return SCPE_OK;                                     /* end if drv */
-	}
+    }
 
 switch (uptr->FNC & CMC_MASK) {                         /* case on func */
 
@@ -692,7 +692,7 @@ uint32 hd, sc, sa;
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
-	idc_done (STC_DTE);									/* error, done */
+    idc_done (STC_DTE);                                 /* error, done */
     return TRUE;
     }
 if ((uptr->flags & UNIT_WPRT) && (uptr->FNC == CMC_WR)) {

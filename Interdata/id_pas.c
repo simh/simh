@@ -527,7 +527,7 @@ if (newln < PAS_ENAB) {
         if (pas_ldsc[i].conn) {
             tmxr_linemsg (&pas_ldsc[i], "\r\nOperator disconnected line\r\n");
             tmxr_reset_ln (&pas_ldsc[i]);               /* reset line */
-			}
+            }
         pasl_unit[i].flags = pasl_unit[i].flags | UNIT_DIS;
         pas_reset_ln (i);
         }

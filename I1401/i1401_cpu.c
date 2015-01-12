@@ -36,7 +36,7 @@
    22-May-06    RMS     Fixed format error in CPU history (Peter Schorn)
    06-Mar-06    RMS     Fixed bug in divide (Van Snyder)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
-   01-Sep-05	RMS     Removed error stops in MCE
+   01-Sep-05    RMS     Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET
                         (Ralph Reinke)

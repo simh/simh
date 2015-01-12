@@ -496,9 +496,9 @@ uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
 
 if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not attached? */
     ((uptr->flags & UNIT_WPRT) && (dp_cmd == CMC_WR))) {
-	dp_done (STC_DTE);									/* error, done */
-	return TRUE;
-	}
+        dp_done (STC_DTE);                              /* error, done */
+        return TRUE;
+        }
 hd = GET_SRF (dp_hdsc);                                 /* get head */
 sc = GET_SEC (dp_hdsc);                                 /* get sector */
 if (dp_cyl != (uint32) uptr->CYL) {                     /* wrong cylinder? */
