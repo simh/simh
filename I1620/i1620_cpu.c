@@ -495,7 +495,7 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     sim_interval = sim_interval - 1;
 
@@ -880,7 +880,7 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_OVERFL;
         if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {  /* ~z, ~c, ~sign chg? */
             BRANCH (PAR);                               /* branch */
-			}
+            }
         break;
 
     case OP_BCXM:
@@ -894,7 +894,7 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_OVERFL;
         if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {  /* ~z, ~c, ~sign chg? */
             BRANCH (PAR);                               /* branch */
-			}
+            }
         break;
 
 /* Branch and select - P is valid */
@@ -920,7 +920,7 @@ while (reason == 0) {                                   /* loop until halted */
         default:
             reason = STOP_INVSEL;                       /* undefined */
             break;
-			}
+            }
         BRANCH (PAR);
         break;
 
@@ -1395,7 +1395,7 @@ if (comp && !cry && !ind[IN_EZ]) {                      /* recomp needed? */
     if (sto) {                                          /* storing? */
         for (cry = 0, dp = dsv; dp != d; ) {            /* rescan */
             dst = M[dp] & DIGIT;                        /* get dst digit */
-            dst = (dp == dsv)? (10 - dst): (9 - dst);	/* 10 or 9s comp */
+            dst = (dp == dsv)? (10 - dst): (9 - dst);   /* 10 or 9s comp */
             res = add_one_digit (0, dst, &cry);         /* "add" */
             M[dp] = (M[dp] & FLAG) | res;               /* store */
             MM (dp);                                    /* decr dst addr */

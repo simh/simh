@@ -326,7 +326,7 @@ int32 t;
 
 do {
     t = sim_poll_kbd ();                                /* get character */
-	} while ((t == SCPE_OK) || (t & SCPE_BREAK));       /* ignore break */
+    } while ((t == SCPE_OK) || (t & SCPE_BREAK));       /* ignore break */
 if (t < SCPE_KFLAG)                                     /* error? */
     return t;
 *c = t & 0177;                                          /* store character */
