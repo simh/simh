@@ -65,16 +65,27 @@ int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
 
 extern const char *scp_errors[];
 
-/* нехранящие биты ГРП должны сбрасываться путем обнуления тех регистров,
- * сборкой которых они являются
+/* Wired (non-registered) bits of interrupt registers (GRP and PRP)
+ * cannot be cleared by writing to the GRP and must be cleared by clearing
+ * the registers generating the corresponding interrupts.
  */
-#define GRP_WIRED_BITS 01400743700000000LL
+#define GRP_WIRED_BITS (GRP_DRUM1_FREE | GRP_DRUM2_FREE |\
+                        GRP_CHAN3_DONE | GRP_CHAN4_DONE |\
+                        GRP_CHAN5_DONE | GRP_CHAN6_DONE |\
+                        GRP_CHAN3_FREE | GRP_CHAN4_FREE |\
+                        GRP_CHAN5_FREE | GRP_CHAN6_FREE |\
+                        GRP_CHAN7_FREE )
 
-#define PRP_WIRED_BITS 0770000
+/* So far irrelevant as none of the devices -
+ * punchcard I/O and punchtape output - had been implemented.
+ */
+#define PRP_WIRED_BITS (PRP_UVVK1_END | PRP_UVVK2_END |\
+                        PRP_PCARD1_CHECK | PRP_PCARD2_CHECK |\
+                        PRP_PCARD1_PUNCH | PRP_PCARD2_PUNCH |\
+                        PRP_PTAPE1_PUNCH | PRP_PTAPE2_PUNCH )
 
 int corr_stack;
 int redraw_panel;
-uint32 delay;
 jmp_buf cpu_halt;
 
 t_stat cpu_examine (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
@@ -94,13 +105,13 @@ t_stat cpu_req (UNIT *u, int32 val, char *cptr, void *desc);
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX, MEMSIZE) };
 
 REG cpu_reg[] = {
-    { "СчАС",  &PC,             8, 15, 0, 1 },          /* счётчик адреса команды */
-    { "РК",    &RK,               8, 24, 0, 1 },          /* регистр выполняемой команды */
-    { "Аисп",  &Aex,    8, 15, 0, 1 },          /* исполнительный адрес */
-    { "СМ",    &ACC,      8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* сумматор */
-    { "РМР",   &RMR,     8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* регистр младших разрядов */
-    { "РАУ",   &RAU,     2, 6,  0, 1 },          /* режимы АУ */
-    { "М1",    &M[1],      8, 15, 0, 1 },          /* регистры-модификаторы */
+    { "СчАС",  &PC,        8, 15, 0, 1 }, /* счётчик адреса команды */
+    { "РК",    &RK,        8, 24, 0, 1 }, /* регистр выполняемой команды */
+    { "Аисп",  &Aex,       8, 15, 0, 1 }, /* исполнительный адрес */
+    { "СМ",    &ACC,       8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* сумматор */
+    { "РМР",   &RMR,       8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* регистр младших разрядов */
+    { "РАУ",   &RAU,       2, 6,  0, 1 }, /* режимы АУ */
+    { "М1",    &M[1],      8, 15, 0, 1 }, /* регистры-модификаторы */
     { "М2",    &M[2],      8, 15, 0, 1 },
     { "М3",    &M[3],      8, 15, 0, 1 },
     { "М4",    &M[4],      8, 15, 0, 1 },
@@ -114,24 +125,24 @@ REG cpu_reg[] = {
     { "М14",   &M[014],    8, 15, 0, 1 },
     { "М15",   &M[015],    8, 15, 0, 1 },
     { "М16",   &M[016],    8, 15, 0, 1 },
-    { "М17",   &M[017],    8, 15, 0, 1 },          /* указатель магазина */
-    { "М20",   &M[020],    8, 15, 0, 1 },          /* MOD - модификатор адреса */
-    { "М21",   &M[021],    8, 15, 0, 1 },          /* PSW - режимы УУ */
-    { "М27",   &M[027],    8, 15, 0, 1 },          /* SPSW - упрятывание режимов УУ */
-    { "М32",   &M[032],    8, 15, 0, 1 },          /* ERET - адрес возврата из экстракода */
-    { "М33",   &M[033],    8, 15, 0, 1 },          /* IRET - адрес возврата из прерывания */
-    { "М34",   &M[034],    8, 16, 0, 1 },          /* IBP - адрес прерывания по выполнению */
-    { "М35",   &M[035],    8, 16, 0, 1 },          /* DWP - адрес прерывания по чтению/записи */
-    { "РУУ",   &RUU,     2, 9,  0, 1 },          /* ПКП, ПКЛ, РежЭ, РежПр, ПрИК, БРО, ПрК */
-    { "ГРП",   &GRP,     8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* главный регистр прерываний */
-    { "МГРП",  &MGRP,   8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* маска ГРП */
-    { "ПРП",   &PRP,     8, 24, 0, 1 },          /* периферийный регистр прерываний */
-    { "МПРП",  &MPRP,   8, 24, 0, 1 },          /* маска ПРП */
+    { "М17",   &M[017],    8, 15, 0, 1 }, /* указатель магазина */
+    { "М20",   &M[020],    8, 15, 0, 1 }, /* MOD - модификатор адреса */
+    { "М21",   &M[021],    8, 15, 0, 1 }, /* PSW - режимы УУ */
+    { "М27",   &M[027],    8, 15, 0, 1 }, /* SPSW - упрятывание режимов УУ */
+    { "М32",   &M[032],    8, 15, 0, 1 }, /* ERET - адрес возврата из экстракода */
+    { "М33",   &M[033],    8, 15, 0, 1 }, /* IRET - адрес возврата из прерывания */
+    { "М34",   &M[034],    8, 16, 0, 1 }, /* IBP - адрес прерывания по выполнению */
+    { "М35",   &M[035],    8, 16, 0, 1 }, /* DWP - адрес прерывания по чтению/записи */
+    { "РУУ",   &RUU,       2, 9,  0, 1 }, /* ПКП, ПКЛ, РежЭ, РежПр, ПрИК, БРО, ПрК */
+    { "ГРП",   &GRP,       8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* главный регистр прерываний */
+    { "МГРП",  &MGRP,      8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* маска ГРП */
+    { "ПРП",   &PRP,       8, 24, 0, 1 }, /* периферийный регистр прерываний */
+    { "МПРП",  &MPRP,      8, 24, 0, 1 }, /* маска ПРП */
     { 0 }
 };
 
 MTAB cpu_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Display idle detection mode" },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Enables idle detection mode" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL,           NULL,  "Disables idle detection" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "REQ",    &cpu_req,      NULL,           NULL,  "Sends a request interrupt" },
     { MTAB_XTD|MTAB_VDV, 0, "PANEL", "PANEL", &besm6_init_panel, NULL,         NULL, "Displays graphical panel" },
@@ -148,16 +159,16 @@ DEVICE cpu_dev = {
 };
 
 /*
- * REG: псевдоустройство, содержащее латинские синонимы всех регистров.
+ * REG: A pseudo-device containing Latin synonyms of all CPU registers.
  */
 REG reg_reg[] = {
-    { "PC",    &PC,         8, 15, 0, 1 },          /* счётчик адреса команды */
-    { "RK",    &RK,         8, 24, 0, 1 },          /* регистр выполняемой команды */
-    { "Aex",   &Aex,        8, 15, 0, 1 },          /* исполнительный адрес */
-    { "ACC",   &ACC,        8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* сумматор */
-    { "RMR",   &RMR,        8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* регистр младших разрядов */
-    { "RAU",   &RAU,        2, 6,  0, 1 },          /* режимы АУ */
-    { "M1",    &M[1],       8, 15, 0, 1 },          /* регистры-модификаторы */
+    { "PC",    &PC,         8, 15, 0, 1 },          /* program counter */
+    { "RK",    &RK,         8, 24, 0, 1 },          /* instruction register */
+    { "Aex",   &Aex,        8, 15, 0, 1 },          /* effective address */
+    { "ACC",   &ACC,        8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* accumulator */
+    { "RMR",   &RMR,        8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* LSB register */
+    { "RAU",   &RAU,        2, 6,  0, 1 },          /* ALU modes */
+    { "M1",    &M[1],       8, 15, 0, 1 },          /* index (modifier) registers */
     { "M2",    &M[2],       8, 15, 0, 1 },
     { "M3",    &M[3],       8, 15, 0, 1 },
     { "M4",    &M[4],       8, 15, 0, 1 },
@@ -171,19 +182,19 @@ REG reg_reg[] = {
     { "M14",   &M[014],     8, 15, 0, 1 },
     { "M15",   &M[015],     8, 15, 0, 1 },
     { "M16",   &M[016],     8, 15, 0, 1 },
-    { "M17",   &M[017],     8, 15, 0, 1 },          /* указатель магазина */
-    { "M20",   &M[020],     8, 15, 0, 1 },          /* MOD - модификатор адреса */
-    { "M21",   &M[021],     8, 15, 0, 1 },          /* PSW - режимы УУ */
-    { "M27",   &M[027],     8, 15, 0, 1 },          /* SPSW - упрятывание режимов УУ */
-    { "M32",   &M[032],     8, 15, 0, 1 },          /* ERET - адрес возврата из экстракода */
-    { "M33",   &M[033],     8, 15, 0, 1 },          /* IRET - адрес возврата из прерывания */
-    { "M34",   &M[034],     8, 16, 0, 1 },          /* IBP - адрес прерывания по выполнению */
-    { "M35",   &M[035],     8, 16, 0, 1 },          /* DWP - адрес прерывания по чтению/записи */
-    { "RUU",   &RUU,        2, 9,  0, 1 },          /* ПКП, ПКЛ, РежЭ, РежПр, ПрИК, БРО, ПрК */
-    { "GRP",   &GRP,        8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* главный регистр прерываний */
-    { "MGRP",  &MGRP,       8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* маска ГРП */
-    { "PRP",   &PRP,        8, 24, 0, 1 },          /* периферийный регистр прерываний */
-    { "MPRP",  &MPRP,       8, 24, 0, 1 },          /* маска ПРП */
+    { "M17",   &M[017],     8, 15, 0, 1 },          /* also the stack pointer */
+    { "M20",   &M[020],     8, 15, 0, 1 },          /* MOD - address modifier register */
+    { "M21",   &M[021],     8, 15, 0, 1 },          /* PSW - CU modes */
+    { "M27",   &M[027],     8, 15, 0, 1 },          /* SPSW - saved CU modes */
+    { "M32",   &M[032],     8, 15, 0, 1 },          /* ERET - extracode return address */
+    { "M33",   &M[033],     8, 15, 0, 1 },          /* IRET - interrupt return address */
+    { "M34",   &M[034],     8, 16, 0, 1 },          /* IBP - instruction bkpt address */
+    { "M35",   &M[035],     8, 16, 0, 1 },          /* DWP - watchpoint address */
+    { "RUU",   &RUU,        2, 9,  0, 1 },          /* execution modes  */
+    { "GRP",   &GRP,        8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* main interrupt reg */
+    { "MGRP",  &MGRP,       8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* mask of the above  */
+    { "PRP",   &PRP,        8, 24, 0, 1 },          /* peripheral interrupt reg */
+    { "MPRP",  &MPRP,       8, 24, 0, 1 },          /* mask of the above*/
 
     { "BRZ0",  &BRZ[0],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
     { "BRZ1",  &BRZ[1],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
@@ -245,7 +256,7 @@ char sim_name[] = "БЭСМ-6";
 
 REG *sim_PC = &cpu_reg[0];
 
-int32 sim_emax = 1;     /* максимальное количество слов в машинной команде */
+int32 sim_emax = 1;     /* max number of addressable units per instruction */
 
 DEVICE *sim_devices[] = {
     &cpu_dev,
@@ -261,27 +272,27 @@ DEVICE *sim_devices[] = {
 };
 
 const char *sim_stop_messages[] = {
-    "Неизвестная ошибка",                          /* Unknown error */
-    "Останов",                                       /* STOP */
-    "Точка останова",                          /* Emulator breakpoint */
-    "Точка останова по считыванию",                        /* Emulator read watchpoint */
-    "Точка останова по записи",                        /* Emulator write watchpoint */
-    "Выход за пределы памяти",                  /* Run out end of memory */
-    "Запрещенная команда",                                /* Invalid instruction */
-    "Контроль команды",                              /* A data-tagged word fetched */
-    "Команда в чужом листе",                      /* Paging error during fetch */
-    "Число в чужом листе",                          /* Paging error during load/store */
-    "Контроль числа МОЗУ",                         /* RAM parity error */
-    "Контроль числа БРЗ",                           /* Write cache parity error */
-    "Переполнение АУ",                                /* Arith. overflow */
-    "Деление на нуль",                         /* Division by zero or denorm */
-    "Двойное внутреннее прерывание",             /* SIMH: Double internal interrupt */
-    "Чтение неформатированного барабана",           /* Reading unformatted drum */
-    "Чтение неформатированного диска",         /* Reading unformatted disk */
-    "Останов по КРА",                           /* Hardware breakpoint */
-    "Останов по считыванию",                     /* Load watchpoint */
-    "Останов по записи",                             /* Store watchpoint */
-    "Не реализовано",                          /* Unimplemented I/O or special reg. access */
+    "Неизвестная ошибка",                 /* Unknown error */
+    "Останов",                            /* STOP */
+    "Точка останова",                     /* Emulator breakpoint */
+    "Точка останова по считыванию",       /* Emulator read watchpoint */
+    "Точка останова по записи",           /* Emulator write watchpoint */
+    "Выход за пределы памяти",            /* Run out end of memory */
+    "Запрещенная команда",                /* Invalid instruction */
+    "Контроль команды",                   /* A data-tagged word fetched */
+    "Команда в чужом листе",              /* Paging error during fetch */
+    "Число в чужом листе",                /* Paging error during load/store */
+    "Контроль числа МОЗУ",                /* RAM parity error */
+    "Контроль числа БРЗ",                 /* Write cache parity error */
+    "Переполнение АУ",                    /* Arith. overflow */
+    "Деление на нуль",                    /* Division by zero or denorm */
+    "Двойное внутреннее прерывание",      /* SIMH: Double internal interrupt */
+    "Чтение неформатированного барабана", /* Reading unformatted drum */
+    "Чтение неформатированного диска",    /* Reading unformatted disk */
+    "Останов по КРА",                     /* Hardware breakpoint */
+    "Останов по считыванию",              /* Load watchpoint */
+    "Останов по записи",                  /* Store watchpoint */
+    "Не реализовано",                     /* Unimplemented I/O or special reg. access */
 };
 
 /*
@@ -328,7 +339,7 @@ t_stat cpu_reset (DEVICE *dptr)
     for (i=0; i<NREGS; ++i)
         M[i] = 0;
 
-    /* Устройства ввода с перфокарт не готовы */
+    /* Punchcard readers not yet implemented thus not ready */
     READY2 |= 042000000;
 
     /* Регистр 17: БлП, БлЗ, ПОП, ПОК, БлПр */
@@ -435,8 +446,8 @@ static void cmd_002 ()
         MGRP = ACC;
         break;
     case 037:
-        /* Гашение главного регистра прерываний */
-        /* нехранящие биты невозможно погасить */
+        /* Clearing the main interrupt register: */
+        /* it is impossible to clear wired (stateless) bits this way */
         GRP &= ACC | GRP_WIRED_BITS;
         break;
     case 64: case 65: case 66: case 67: case 68: case 69: case 70: case 71:
@@ -471,8 +482,7 @@ static void cmd_002 ()
         break;
     default:
         if ((Aex & 0340) == 0140) {
-            /* TODO: управление блокировкой схемы
-             * автоматического запуска */
+            /* TODO: watchdog reset mechanism */
             longjmp (cpu_halt, STOP_UNIMPLEMENTED);
         }
         /* Неиспользуемые адреса */
@@ -493,8 +503,13 @@ static void cmd_033 ()
 #endif
     switch (Aex & 04177) {
     case 0:
-        /* Точно неизвестно, что это такое, но драйвер МД
-         * иногда выдает команду "увв 0". */
+        /* 
+         * Using an I/O control instruction with Aex == 0
+         * after issuing a 033 instruction with a non-zero Aex 
+         * to send data to a device was required
+         * for some devices (e.g. printers) according to the docs.
+         * What is the exact purpose is unclear (timing, power, ???)
+         */
         break;
     case 1: case 2:
         /* Управление обменом с магнитными барабанами */
@@ -562,7 +577,7 @@ static void cmd_033 ()
         tty_send ((uint32) ACC & BITS(24));
         break;
     case 0141:
-        /* TODO: управление разметкой магнитной ленты */
+        /* TODO: formatting magnetic tape */
         longjmp (cpu_halt, STOP_UNIMPLEMENTED);
         break;
     case 0142:
@@ -570,11 +585,12 @@ static void cmd_033 ()
         longjmp (cpu_halt, STOP_UNIMPLEMENTED);
         break;
     case 0147:
-        /* Запись в регистр управления электропитанием, */
-        /* не оказывает видимого эффекта на выполнение */
+        /* Writing to the power supply control register
+         * does not have any observable effect
+         */
         break;
     case 0150: case 0151:
-        /* TODO: управление вводом с перфокарт */
+        /* TODO: reading from punchcards */
         longjmp (cpu_halt, STOP_UNIMPLEMENTED);
         break;
     case 0153:
@@ -727,10 +743,9 @@ void check_initial_setup ()
          */
         return;
     }
-    if ((memory[TAKEN] & SETUP_REQS_ENABLED) == 0 ||
-        (memory[TAKEN] & ALL_REQS_ENABLED) != 0 ||
-        (MGRP & GRP_PANEL_REQ) == 0) {
-        /* Слишком рано, или уже не надо, или невовремя */
+    if ((memory[TAKEN] & SETUP_REQS_ENABLED) == 0 || /* not ready for setup */
+        (memory[TAKEN] & ALL_REQS_ENABLED) != 0 ||   /* all done */
+        (MGRP & GRP_PANEL_REQ) == 0) {               /* not at the moment */
         return;
     }
 
@@ -774,13 +789,21 @@ void check_initial_setup ()
 
 /*
  * Execute one instruction, placed on address PC:RUU_RIGHT_INSTR.
- * Increment delay. When stopped, perform a longjmp to cpu_halt,
+ * When stopped, perform a longjmp to cpu_halt,
  * sending a stop code.
  */
 void cpu_one_inst ()
 {
     int reg, opcode, addr, nextpc, next_mod;
     t_value word;
+
+    /*
+     * Instruction execution time in 100 ns ticks; not really used
+     * as the amortized 1 MIPS instruction rate is assumed.
+     * The assignments of MEAN_TIME(x,y) to the delay variable
+     * are kept as a reference.
+     */
+    uint32 delay;
 
     corr_stack = 0;
     word = mmu_fetch (PC);
@@ -1668,7 +1691,11 @@ t_stat sim_instr (void)
             }
         }
 
-        if (PC > BITS(15)) {                    /* выход за пределы памяти */
+        if (PC > BITS(15) && IS_SUPERVISOR(RUU)) {
+          /* 
+           * Runaway instruction execution in supervisor mode
+           * warrants attention.
+           */
             besm6_draw_panel();
             return STOP_RUNOUT;             /* stop simulation */
         }
@@ -1680,7 +1707,8 @@ t_stat sim_instr (void)
         }
 
         if (PRP & MPRP) {
-            /* регистр хранящий, сбрасывается программно */
+            /* There are interrupts pending in the peripheral
+             * interrupt register */
             GRP |= GRP_SLAVE;
         }
 
@@ -1701,8 +1729,10 @@ t_stat sim_instr (void)
 }
 
 /*
- * В 9-й части частота таймера 250 Гц (4 мс),
- * в жизни - 50 Гц (20 мс).
+ * A 250 Hz clock as per the original documentation,
+ * and matching the available software binaries.
+ * Some installations used 50 Hz with a modified OS
+ * for a better user time/system time ratio.
  */
 t_stat fast_clk (UNIT * this)
 {
@@ -1712,18 +1742,17 @@ t_stat fast_clk (UNIT * this)
     ++counter;
     ++tty_counter;
 
-    /*besm6_debug ("*** таймер 20 мсек");*/
     GRP |= GRP_TIMER;
 
-    /* Медленный таймер: должен быть 16 Гц.
-     * Но от него почему-то зависит вывод на терминалы,
-     * поэтому ускорим. */
-    if ((counter & 3) == 0) {
-    /*besm6_debug ("*** таймер 80 мсек");*/
+    if ((counter & 15) == 0) {
+        /* 
+         * The OS used the (undocumented, later addition) slow clock interrupt to initiate servicing
+         * terminal I/O. Its frequency was reportedly 16 Hz; 64 ms is a good enough approximation.
+         */
         GRP |= GRP_SLOW_CLK;
     }
 
-    /* Перерисовка панели каждые 64 миллисекунды. */
+    /* Requesting panel redraw every 64 ms. */
     if ((counter & 15) == 0) {
         redraw_panel = 1;
     }
@@ -1741,7 +1770,7 @@ t_stat fast_clk (UNIT * this)
 }
 
 UNIT clocks[] = {
-    { UDATA(fast_clk, UNIT_IDLE, 0), CLK_DELAY },   /* 40 р, 50 Гц */
+    { UDATA(fast_clk, UNIT_IDLE, 0), CLK_DELAY },   /* Bit 40 of the GRP, 250 Hz */
 };
 
 t_stat clk_reset (DEVICE * dev)

@@ -97,6 +97,8 @@ t_stat vt_clk(UNIT *);
 extern char *get_sim_sw (char *cptr);
 extern int32 tmr_poll;                              /* calibrated clock timer poll */
 
+int attached_console;
+
 UNIT tty_unit [] = {
     { UDATA (vt_clk, UNIT_DIS|UNIT_IDLE, 0) },       /* fake unit, clock */
     { UDATA (NULL, UNIT_SEQ, 0) },
@@ -228,6 +230,19 @@ t_stat vt_clk (UNIT * this)
         t->rxb [t->rxbpi++] = '\3';
     }
 
+    /*
+     * It the operator console is remote, we still need to probe the local keyboard
+     * for a WRU, say, 10 times a second.
+     */
+    if (!attached_console) {
+        static int divider;
+        if (++divider == CLK_TPS/10) {
+            divider == 0;
+            if (SCPE_STOP == sim_poll_kbd())
+                stop_cpu = 1;
+        }
+    }
+
     /* Polling sockets for transmission. */
     tmxr_poll_tx (&tty_desc);
     /* If the TTY system is not idle, schedule the next interrupt
@@ -343,6 +358,7 @@ t_stat tty_attach (UNIT *u, char *cptr)
         if (num <= TTY_MAX)
             vt_mask |= 1 << (TTY_MAX - num);
         besm6_debug ("*** console on T%03o", num);
+        attached_console = 1;
         return SCPE_OK;
     }
     return SCPE_ALATT;

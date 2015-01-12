@@ -114,19 +114,15 @@ enum {
                                  ((x) >> 48) == CONVOL_NUMBER)
 
 /*
- * Вычисление правдоподобного времени выполнения команды,
- * зная количество тактов в УУ и среднее в АУ.
- * Предполагаем, что в 50% случаев происходит совмещение
- * выполнения, поэтому суммируем большее и половину
- * от меньшего значения.
+ * An attempt to approximate instruction execution times.
+ * The arguments number of clock ticks spent on an instruction
+ * in the ALU and in the CU; the computed result assumes
+ * a 50% overlap in execution.
  */
 #define MEAN_TIME(x,y)  (x>y ? x+y/2 : x/2+y)
 
-/*
- * Считаем, что моделируеммая машина имеет опорную частоту 10 МГц.
- */
-#define USEC    1              /* одна микросекунда - десять тактов */
-#define MSEC    (1000*USEC)     /* одна миллисекунда */
+#define USEC    1               /* 1 microsecond */
+#define MSEC    (1000*USEC)     /* 1 millisecond */
 #define CLK_TPS   250           /* Fast Clock Ticks Per Second (every 4ms) */
 #define CLK_DELAY 4000          /* Uncalibrated instructions per clock tick */
 
@@ -135,6 +131,7 @@ extern UNIT tty_unit[];
 extern UNIT clocks[];
 extern t_value memory [MEMSIZE];
 extern t_value pult [8];
+
 extern uint32 PC, RAU, RUU;
 extern uint32 M[NREGS];
 extern t_value BRZ[8], RP[8], GRP, MGRP;
@@ -379,14 +376,15 @@ t_value besm6_pack (t_value val, t_value mask);
 t_value besm6_unpack (t_value val, t_value mask);
 
 /*
- * Разряды главного регистра прерываний (ГРП)
- * Внешние:
+ * Bits of the main interrupt register ГРП (GRP)
+ * External:
  */
 #define GRP_PRN1_SYNC   04000000000000000LL     /* 48 */
 #define GRP_PRN2_SYNC   02000000000000000LL     /* 47 */
 #define GRP_DRUM1_FREE  01000000000000000LL     /* 46 */
 #define GRP_DRUM2_FREE  00400000000000000LL     /* 45 */
-#define GRP_VNIIEM      00300000000000000LL     /* 44-43, placeholder */
+#define GRP_UVVK1_SYNC  00200000000000000LL     /* 44 */
+#define GRP_UVVK2_SYNC  00100000000000000LL     /* 43 */
 #define GRP_FS1_SYNC    00040000000000000LL     /* 42 */
 #define GRP_FS2_SYNC    00020000000000000LL     /* 41 */
 #define GRP_TIMER       00010000000000000LL     /* 40 */
@@ -405,10 +403,10 @@ t_value besm6_unpack (t_value val, t_value mask);
 #define GRP_CHAN5_FREE  00000000400000000LL     /* 27 */
 #define GRP_CHAN6_FREE  00000000200000000LL     /* 26 */
 #define GRP_CHAN7_FREE  00000000100000000LL     /* 25 */
-#define GRP_SERIAL      00000000001000000LL     /* 19 */
+#define GRP_SERIAL      00000000001000000LL     /* 19, nonstandard */
 #define GRP_WATCHDOG    00000000000002000LL     /* 11 */
-#define GRP_SLOW_CLK    00000000000001000LL     /* 10 */
-/* Внутренние: */
+#define GRP_SLOW_CLK    00000000000001000LL     /* 10, nonstandard */
+/* Internal: */
 #define GRP_DIVZERO     00000000034000000LL     /* 23-21 */
 #define GRP_OVERFLOW    00000000014000000LL     /* 22-21 */
 #define GRP_CHECK       00000000004000000LL     /* 21 */
@@ -425,6 +423,23 @@ t_value besm6_unpack (t_value val, t_value mask);
 
 #define GRP_SET_BLOCK(x,m)      (((x) & ~GRP_BLOCK_MASK) | ((m) & GRP_BLOCK_MASK))
 #define GRP_SET_PAGE(x,m)       (((x) & ~GRP_PAGE_MASK) | (((m)<<4) & GRP_PAGE_MASK))
+
+/*
+ * Bits of the peripheral interrupt register ПРП (PRP)
+ */
+#define PRP_UVVK1_END     010000000             /* 22 */
+#define PRP_UVVK2_END     004000000             /* 21 */
+#define PRP_PCARD1_CHECK  002000000             /* 20 */
+#define PRP_PCARD2_CHECK  001000000             /* 19 */
+#define PRP_PCARD1_PUNCH  000400000             /* 18 */
+#define PRP_PCARD2_PUNCH  000200000             /* 17 */
+#define PRP_PTAPE1_PUNCH  000100000             /* 16 */
+#define PRP_PTAPE2_PUNCH  000040000             /* 15 */
+                                                /* 14-13 unused */
+#define PRP_CONS1_INPUT   000004000             /* 12 */
+#define PRP_CONS2_INPUT   000002000             /* 11 */
+#define PRP_CONS1_DONE    000001000             /* 10 */
+#define PRP_CONS2_DONE    000000400             /* 9 */
 
 /* Номер блока ОЗУ или номер страницы, вызвавших прерывание */
 extern uint32 iintr_data;

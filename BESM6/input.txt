@@ -1,6 +1,6 @@
 ШИФР 419999 ЗС5^
 EEВ1А3
-*NAME PRIME NUMBERS
+*NAME PRIME NUMBERS
 *     The ^L char before *NAME is important
 *     NO LIST	Disable source listing by removing spaces between * and NO
 *NO LOAD LIST	Enable loader listing by adding 5 spaces between * and NO
@@ -50,4 +50,4 @@ c------ Printing every 1000th prime number
 *EXECUTE
 *     The ^L char after *END FILE is important
 *END FILE
-ЕКОНЕЦ
+ЕКОНЕЦ

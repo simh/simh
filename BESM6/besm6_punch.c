@@ -89,6 +89,7 @@ DEVICE fs_dev = {
 enum {
     FS_IDLE,
     FS_STARTING,
+    FS_BINARY,
     FS_RUNNING,
     FS_IMAGE,
     FS_IMAGE_LAST = FS_IMAGE + CARD_LEN - 1,
@@ -99,6 +100,8 @@ enum {
     FS_ENDA3_LAST = FS_ENDA3 + CARD_LEN - 1,
     FS_TAIL,
 } fs_state[2];
+
+int fs_textmode[2];
 
 /*
  * Reset routine
@@ -116,10 +119,16 @@ t_stat fs_reset (DEVICE *dptr)
     return SCPE_OK;
 }
 
+/*
+ * Attaches a raw binary file by default,
+ * with a -t switch attaches a prepared text file in UTF-8.
+ */
 t_stat fs_attach (UNIT *u, char *cptr)
 {
     t_stat s;
     int num = u - fs_unit;
+    fs_textmode[num] = sim_switches & SWMASK('T');
+    sim_switches &= ~SWMASK('T');
     s = attach_unit (u, cptr);
     if (s != SCPE_OK)
         return s;
@@ -186,6 +195,20 @@ void fs_control (int num, uint32 cmd)
 }
 
 unsigned char unicode_to_gost (unsigned short val);
+
+/*
+ * The UPP code is the GOST 10859 code with odd parity.
+ * UPP stood for "unit for preparation of punchards".
+ */
+static unsigned char unicode_to_upp (unsigned short ch) {
+    unsigned char ret;
+    ch = ret = unicode_to_gost (ch);
+    ch = (ch & 0x55) + ((ch >> 1) & 0x55);
+    ch = (ch & 0x33) + ((ch >> 2) & 0x33);
+    ch = (ch & 0x0F) + ((ch >> 4) & 0x0F);
+    return (ch & 1) ? ret : ret | 0x80;
+}
+
 static int utf8_getc (FILE *fin);
 
 /*
@@ -194,64 +217,66 @@ static int utf8_getc (FILE *fin);
  */
 t_stat fs_event (UNIT *u)
 {
+    static int cnt;
     int num = u - fs_unit;
   again:
     if (fs_state[num] == FS_STARTING) {
-        /* По первому прерыванию после запуска двигателя ничего не читаем */
+        /* The first interrupt after starting the motor is dummy,
+         * no need to read anything from the attached file.
+         */
         FS[num] = 0;
-        fs_state[num] = FS_RUNNING;
-    } else if (fs_state[num] == FS_RUNNING) {
-        int ch;
-        /* переводы строк игнорируются */
-        while ((ch = utf8_getc (u->fileref)) == '\n');
+        cnt = 0;
+        fs_state[num] = fs_textmode[num] ? FS_RUNNING : FS_BINARY;
+    } else if (fs_state[num] == FS_BINARY) {
+        int ch = getc (u->fileref);
         if (ch < 0) {
-            /* хвост ленты без пробивок */
             FS[num] = 0;
             fs_state[num] = FS_TAIL;
-        } else if (ch == '\f') {
+        } else {
+            FS[num] = ch;
+        }
+    } else if (fs_state[num] == FS_RUNNING) {
+        int ch;
+        /* Line separators are ignored in running text mode */
+        do ch = utf8_getc (u->fileref); while (ch == '\n' || ch == '\r');
+        if (ch < 0) {
+            /* the tail end of the tape has no holes */
+            FS[num] = 0;
+            fs_state[num] = FS_TAIL;
+        } else if (ch == (']' & 037)) {
+            /* Switching from running text mode to "virtual punchcard" mode and back
+             * is done with an ASCII GS (group separator) symbol ctrl-].
+             */
             fs_state[num] = FS_IMAGE;
             goto again;
         } else {
-            ch = FS[num] = unicode_to_gost (ch);
-            ch = (ch & 0x55) + ((ch >> 1) & 0x55);
-            ch = (ch & 0x33) + ((ch >> 2) & 0x33);
-            ch = (ch & 0x0F) + ((ch >> 4) & 0x0F);
-            if (ch & 1); else FS[num] |= 0x80;
+            FS[num] = unicode_to_upp (ch);
         }
     } else if (FS_IMAGE <= fs_state[num] && fs_state[num] <= FS_IMAGE_LAST) {
         int ch = utf8_getc (u->fileref);
         if (ch < 0) {
-            /* обрыв ленты */
+            /* premature end of tape */
             FS[num] = 0;
             fs_state[num] = FS_TAIL;
+        } else if (ch == '\r') {
+            /* always ignored */
+            goto again;
         } else if (ch == '\n') {
-            /* идем дополнять образ карты нулевыми байтами */
+            /* Start returning zero bytes up to the end of the current "virtual punchard" */
             fs_state[num] = FS_FILLUP + (fs_state[num] - FS_IMAGE);
             goto again;
-        } else if (ch == '\f') {
+        } else if (ch == (']' & 037)) {
             if (fs_state[num] != FS_IMAGE)
                 besm6_debug("<<< ENDA3 requested mid-card?");
             fs_state[num] = FS_ENDA3;
             goto again;
         } else {
-            ch = FS[num] = unicode_to_gost (ch);
-            ch = (ch & 0x55) + ((ch >> 1) & 0x55);
-            ch = (ch & 0x33) + ((ch >> 2) & 0x33);
-            ch = (ch & 0x0F) + ((ch >> 4) & 0x0F);
-            if (ch & 1); else FS[num] |= 0x80;
-            ++fs_state[num];
+            FS[num] = unicode_to_upp (ch);
+            if (++fs_state[num] == FS_TOOLONG) {
+                /* If a line is too long (> 120 chars), start the next "virtual punchcard" */
+                fs_state[num] = FS_IMAGE;
+            }
         }
-    } else if (fs_state[num] == FS_TOOLONG) {
-        /* дочитываем до конца строки */
-        int ch;
-        besm6_debug("<<< too long???");
-        while ((ch = utf8_getc (u->fileref)) != '\n' && ch >= 0);
-        if (ch < 0) {
-            /* хвост ленты без пробивок */
-            FS[num] = 0;
-            fs_state[num] = FS_TAIL;
-        } else
-            goto again;
     } else if (FS_FILLUP <= fs_state[num] && fs_state[num] <= FS_FILLUP_LAST) {
         FS[num] = 0;
         if (++fs_state[num] == FS_ENDA3) {
@@ -278,15 +303,21 @@ int fs_read(int num) {
         
     return FS[num];
 }
-
+/*
+ * Unlike the OS which uses GOST overline (approximated by ^) as a line separator
+ * in running text mode, the BESM-ALGOL programming system used a nonprintable
+ * character (0174) from the unused part of the codetable to allow compressing multiple
+ * source lines on a punchcard. To specify that character,
+ * we use ASCII RS (record separator) symbol ctrl-^.
+ */
 unsigned char
 unicode_to_gost (unsigned short val)
 {
     static const unsigned char tab0 [256] = {
         /* 00 - 07 */   017,    017,    017,    017,    017,    017,    017,    017,
-        /* 08 - 0f */   017,    017,    0214,   017,    017,    0174,   017,    017,
+        /* 08 - 0f */   017,    017,    0214,   017,    017,    017,    017,    017,
         /* 10 - 17 */   017,    017,    017,    017,    017,    017,    017,    017,
-        /* 18 - 1f */   017,    017,    017,    017,    017,    017,    017,    017,
+        /* 18 - 1f */   017,    017,    017,    017,    017,    017,    0174,   017,
         /*  !"#$%&' */  0017,   0133,   0134,   0034,   0127,   0126,   0121,   0033,
         /* ()*+,-./ */  0022,   0023,   0031,   0012,   0015,   0013,   0016,   0014,
         /* 01234567 */  0000,   0001,   0002,   0003,   0004,   0005,   0006,   0007,
@@ -411,6 +442,11 @@ unicode_to_gost (unsigned short val)
         case 0x64: return 0116;
         case 0x65: return 0117;
         case 0x83: return 0122;
+        }
+        break;
+    case 0x23:
+        switch ((unsigned char) val) {
+        case 0xe8: return 0020;
         }
         break;
     case 0x25:
