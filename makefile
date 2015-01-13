@@ -87,6 +87,17 @@ else
 endif
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
+ifneq ($(findstring Windows,$(OS)),)
+  ifeq ($(findstring .exe,$(SHELL))),.exe)
+    # MinGW
+    WIN32 := 1
+  else # Msys or cygwin
+    ifeq (MINGW,$(findstring MINGW,$(shell uname)))
+      $(info *** This makefile can not be used with the Msys bash shell)
+      $(error *** Use build_mingw.bat $(MAKECMDGOALS) from a Windows command prompt)
+    endif
+  endif
+endif
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq ($(GCC),)
     ifeq (,$(shell which gcc 2>/dev/null))
