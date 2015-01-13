@@ -207,6 +207,7 @@ extern jmp_buf save_env;
 extern int32 p1;
 extern int32 MSER;
 extern int32 tmr_poll;
+extern DEVICE vc_dev, lk_dev, vs_dev;
 
 uint32 *rom = NULL;                                     /* boot ROM */
 uint32 *nvr = NULL;                                     /* non-volatile mem */
@@ -1814,12 +1815,37 @@ return "system devices";
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
+char gbuf[CBUFSIZE];
+
 if ((cptr == NULL) || (!*cptr))
     return SCPE_ARG;
-if (MATCH_CMD(cptr, "VAXSERVER") == 0)
+cptr = get_glyph (cptr, gbuf, 0);
+if (MATCH_CMD(cptr, "VAXSERVER") == 0) {
     sys_model = 0;
-else if (MATCH_CMD(cptr, "MICROVAX") == 0)
+    strcpy (sim_name, "VAXServer 3900 (KA655)");
+    }
+else if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
     sys_model = 1;
+    strcpy (sim_name, "MicroVAX 3900 (KA655)");
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+    vc_dev.flags = vc_dev.flags | DEV_DIS;               /* disable QVSS */
+    lk_dev.flags = lk_dev.flags | DEV_DIS;               /* disable keyboard */
+    vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
+    reset_all (0);                                       /* reset everything */
+#endif
+    }
+else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+    strcpy (sim_name, "VAXStation 3900 (KA655)");
+    sys_model = 1;
+    vc_dev.flags = vc_dev.flags & ~DEV_DIS;              /* enable QVSS */
+    lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
+    vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
+    reset_all (0);                                       /* reset everything */
+#else
+    return SCPE_ARG;
+#endif
+    }
 else
     return SCPE_ARG;
 return SCPE_OK;

@@ -220,6 +220,17 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define CQMSIZE         (1u << CQMAWIDTH)               /* Qmem length */
 #define CQMAMASK        (CQMSIZE - 1)                   /* Qmem addr mask */
 #define CQMBASE         0x30000000                      /* Qmem base */
+#define ADDR_IS_CQM(x)  ((((uint32) (x)) >= CQMBASE) && \
+                        (((uint32) (x)) < (CQMBASE + CQMSIZE)))
+
+/* QVSS memory space */
+
+#define QVMAWIDTH       18                              /* QVSS mem addr width */
+#define QVMSIZE         (1u << QVMAWIDTH)               /* QVSS mem length */
+#define QVMAMASK        (QVMSIZE - 1)                   /* QVSS mem addr mask */
+#define QVMBASE         (CQMBASE + CQMSIZE - QVMSIZE)   /* QVSS mem base - end of Qbus memory space */
+#define ADDR_IS_QVM(x)  ((((uint32) (x)) >= QVMBASE) && \
+                        (((uint32) (x)) < (QVMBASE + QVMSIZE)))
 
 /* Machine specific reserved operand tests (all NOPs) */
 
@@ -330,8 +341,9 @@ typedef struct {
 #define INT_V_VHTX      18 
 #define INT_V_QDSS      19                              /* QDSS */
 #define INT_V_CR        20
-#define INT_V_DMCRX     21                              /* DMC11 */
-#define INT_V_DMCTX     22
+#define INT_V_QVSS      21                              /* QVSS */
+#define INT_V_DMCRX     22                              /* DMC11 */
+#define INT_V_DMCTX     23
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -355,6 +367,7 @@ typedef struct {
 #define INT_VHTX        (1u << INT_V_VHTX)
 #define INT_QDSS        (1u << INT_V_QDSS)
 #define INT_CR          (1u << INT_V_CR)
+#define INT_QVSS        (1u << INT_V_QVSS)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 
@@ -380,6 +393,7 @@ typedef struct {
 #define IPL_VHTX        (0x14 - IPL_HMIN)
 #define IPL_QDSS        (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
+#define IPL_QVSS        (0x14 - IPL_HMIN)
 #define IPL_DMCRX       (0x14 - IPL_HMIN)
 #define IPL_DMCTX       (0x14 - IPL_HMIN)
 

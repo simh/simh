@@ -118,6 +118,9 @@ extern int32 PSL, SISR, trpirq, mem_err, crd_err, hlt_pin;
 extern int32 p1;
 extern int32 ssc_bto;
 extern jmp_buf save_env;
+extern int32 vc_mem_rd (int32 pa);
+extern void vc_mem_wr (int32 pa, int32 val, int32 lnt);
+extern uint32 *vc_buf;
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
 t_stat dbl_wr (int32 data, int32 addr, int32 access);
@@ -583,6 +586,7 @@ return;
    May give master or slave error, depending on where the failure occurs
 */
 
+
 int32 cqmem_rd (int32 pa)
 {
 int32 qa = pa & CQMAMASK;                               /* Qbus addr */
@@ -590,6 +594,8 @@ uint32 ma;
 
 if (qba_map_addr (qa, &ma))                             /* map addr */
     return M[ma >> 2];
+if (ADDR_IS_QVM(pa) && vc_buf)                          /* QVSS memory? */
+    return vc_mem_rd (pa);
 MACH_CHECK (MCHK_READ);                                 /* err? mcheck */
 return 0;
 }
@@ -608,7 +614,12 @@ if (qba_map_addr (qa, &ma)) {                           /* map addr */
         }
     M[ma >> 2] = val;
     }
-else mem_err = 1;
+else {
+    if (ADDR_IS_QVM(pa) && vc_buf)                      /* QVSS Memory */
+        vc_mem_wr (pa, val, lnt);
+    else
+        mem_err = 1;
+    }
 return;
 }
 

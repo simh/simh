@@ -27,7 +27,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd LIBPCRE ROM BUILD LIBPCRE"
+				CommandLine="Pre-Build-Event.cmd LIBPCRE ROM BUILD LIBSDL"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -41,8 +41,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/PCRE/include&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_PCREPOSIX_H;PCRE_STATIC"
+				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/include&quot;;&quot;../../windows-build/PCRE/include&quot;"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;USE_SIM_VIDEO;HAVE_LIBSDL;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
 				KeepComments="false"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="0"
@@ -65,9 +65,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wsock32.lib winmm.lib pcrestaticd.lib pcreposixstaticd.lib "
+				AdditionalDependencies="wsock32.lib winmm.lib SDL2-StaticD.lib dxguid.lib Imm32.lib Version.lib pcrestaticd.lib pcreposixstaticd.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
+				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/lib/&quot;;&quot;../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)\Lib\x86&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				StackReserveSize="10485760"
@@ -111,7 +111,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd LIBPCRE ROM BUILD LIBPCRE"
+				CommandLine="Pre-Build-Event.cmd LIBPCRE ROM BUILD LIBSDL"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -130,8 +130,8 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/PCRE/include&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_PCREPOSIX_H;PCRE_STATIC"
+				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/include&quot;;&quot;../../windows-build/PCRE/include&quot;"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;USE_SIM_VIDEO;HAVE_LIBSDL;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
 				KeepComments="false"
 				StringPooling="true"
 				RuntimeLibrary="0"
@@ -154,9 +154,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wsock32.lib winmm.lib pcreposixstatic.lib pcrestatic.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib SDL2-Static.lib dxguid.lib Imm32.lib Version.lib pcreposixstatic.lib pcrestatic.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
+				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/lib/&quot;;&quot;../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)\Lib\x86&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
 				GenerateDebugInformation="false"
 				SubSystem="1"
 				StackReserveSize="10485760"
@@ -301,6 +301,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_video.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_2681.c"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax_cis.c"
 				>
 			</File>
@@ -322,6 +330,10 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax_io.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_lk.c"
 				>
 			</File>
 			<File
@@ -350,6 +362,14 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax_syslist.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_vc.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_vs.c"
 				>
 			</File>
 		</Filter>
@@ -427,6 +447,14 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_video.h"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_2681.h"
 				>
 			</File>
 			<File
