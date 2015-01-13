@@ -87,8 +87,10 @@ else
 endif
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
+$(info OS=$(OS))
 ifneq ($(findstring Windows,$(OS)),)
-  ifeq ($(findstring .exe,$(SHELL))),.exe)
+  $(info SHELL=$(SHELL))
+  ifeq ($(findstring .exe,$(SHELL)),.exe)
     # MinGW
     WIN32 := 1
   else # Msys or cygwin
