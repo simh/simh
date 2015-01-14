@@ -34,6 +34,8 @@
 t_bool vid_active = FALSE;
 int32 vid_mouse_xrel = 0;
 int32 vid_mouse_yrel = 0;
+int32 vid_cursor_x;
+int32 vid_cursor_y;
 t_bool vid_mouse_b1 = FALSE;
 t_bool vid_mouse_b2 = FALSE;
 t_bool vid_mouse_b3 = FALSE;
@@ -591,8 +593,6 @@ if (SDL_SemWait (vid_key_events.sem) == 0) {
 void vid_mouse_move (SDL_MouseMotionEvent *event)
 {
 SDL_Event dummy_event;
-int32 cx;
-int32 cy;
 SIM_MOUSE_EVENT ev;
 
 if (!vid_mouse_captured)
@@ -602,11 +602,9 @@ if ((event->x == 0) ||
     (event->y == 0) ||
     (event->x == (vid_width - 1)) ||
     (event->y == (vid_height - 1))) {                   /* reached edge of window? */
-    cx = vid_width / 2;
-    cy = vid_height / 2;
-    SDL_WarpMouse (cx, cy);                             /* back to centre */
     SDL_PumpEvents ();
     while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTIONMASK)) {};
+    SDL_WarpMouse (vid_cursor_x, vid_cursor_y);         /* sync position */
     }
 if (!sim_is_running)
     return;
@@ -635,8 +633,6 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
 void vid_mouse_button (SDL_MouseButtonEvent *event)
 {
 SDL_Event dummy_event;
-int32 cx;
-int32 cy;
 SIM_MOUSE_EVENT ev;
 t_bool state;
 
@@ -646,11 +642,9 @@ if (!vid_mouse_captured) {
         sim_debug (SIM_VID_DBG_KEY, vid_dev, "vid_mouse_button() - Cursor Captured\n");
         SDL_WM_GrabInput (SDL_GRAB_ON);                     /* lock cursor to window */
         SDL_ShowCursor (SDL_DISABLE);                       /* hide cursor */
-        cx = vid_width / 2;
-        cy = vid_height / 2;
-        SDL_WarpMouse (cx, cy);                             /* move cursor to centre of window */
         SDL_PumpEvents ();
         while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTIONMASK)) {};
+        SDL_WarpMouse (vid_cursor_x, vid_cursor_y);         /* sync position */
         vid_mouse_captured = TRUE;
         }
     return;
@@ -915,19 +909,30 @@ return SCPE_EOF;
 void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf)
 {
 int32 i;
+SDL_Rect vid_dst;
 uint32 *pixels;
 int pitch;
 
-SDL_LockTexture(vid_texture, NULL, (void *)&pixels, &pitch);
+vid_dst.x = x;
+vid_dst.y = y;
+vid_dst.w = w;
+vid_dst.h = h;
 
-for (i = y; i < (y + h); i++)
-    memcpy (pixels + (i * vid_width) + x, buf, (size_t)w*sizeof(*pixels));
+SDL_LockTexture(vid_texture, &vid_dst, (void *)&pixels, &pitch);
+
+sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
+
+for (i = y; i < (y + h); i++, pixels = (uint32 *)(((uint8 *)pixels) + pitch), buf = (uint32 *)(((uint8 *)buf) + w))
+    memcpy (pixels, buf, (size_t)w*sizeof(*pixels));
+
 SDL_UnlockTexture(vid_texture);
 }
 
 void vid_refresh (void)
 {
 SDL_Event user_event;
+
+sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_refresh() - Queing Refresh Event\n");
 
 user_event.type = SDL_USEREVENT;
 user_event.user.code = EVENT_REDRAW;
@@ -1308,8 +1313,6 @@ if (SDL_SemWait (vid_key_events.sem) == 0) {
 void vid_mouse_move (SDL_MouseMotionEvent *event)
 {
 SDL_Event dummy_event;
-int32 cx;
-int32 cy;
 SIM_MOUSE_EVENT ev;
 
 if (!vid_mouse_captured)
@@ -1319,11 +1322,9 @@ if ((event->x == 0) ||
     (event->y == 0) ||
     (event->x == (vid_width - 1)) ||
     (event->y == (vid_height - 1))) {                   /* reached edge of window? */
-    cx = vid_width / 2;
-    cy = vid_height / 2;
-    SDL_WarpMouseInWindow (NULL, cx, cy);               /* back to centre */
     SDL_PumpEvents ();
     while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION)) {};
+    SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);/* sync position */
     }
 if (!sim_is_running)
     return;
@@ -1333,7 +1334,7 @@ vid_mouse_b1 = (event->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? TRUE : FALSE;
 vid_mouse_b2 = (event->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? TRUE : FALSE;
 vid_mouse_b3 = (event->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? TRUE : FALSE;
 if (SDL_SemWait (vid_mouse_events.sem) == 0) {
-    sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: (%d,%d)\n", event->xrel, event->yrel);
+    sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: pos:(%d,%d) rel:(%d,%d) - Count: %d vid_mouse_rel:(%d,%d)\n", event->x, event->y, event->xrel, event->yrel, vid_mouse_events.count, vid_mouse_xrel, vid_mouse_yrel);
     if (vid_mouse_events.count < MAX_EVENTS) {
         ev.x_rel = event->xrel;
         ev.y_rel = (-event->yrel);
@@ -1352,8 +1353,6 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
 void vid_mouse_button (SDL_MouseButtonEvent *event)
 {
 SDL_Event dummy_event;
-int32 cx;
-int32 cy;
 SIM_MOUSE_EVENT ev;
 t_bool state;
 
@@ -1362,11 +1361,9 @@ if (!vid_mouse_captured) {
         (event->button == SDL_BUTTON_LEFT)) {               /* left click and cursor not captured? */
         sim_debug (SIM_VID_DBG_KEY, vid_dev, "vid_mouse_button() - Cursor Captured\n");
         SDL_SetRelativeMouseMode(SDL_TRUE);                 /* lock cursor to window, hide cursor */
-        cx = vid_width / 2;
-        cy = vid_height / 2;
-        SDL_WarpMouseInWindow (NULL, cx, cy);               /* back to centre */
         SDL_PumpEvents ();
         while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION)) {};
+        SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);/* sync position */
         vid_mouse_captured = TRUE;
         }
     return;
@@ -1412,7 +1409,8 @@ vid_dst.w = vid_width;
 vid_dst.h = vid_height;
 
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Video Update Event: \n");
-SDL_RenderClear(vid_renderer);
+if (sim_deb)
+    fflush (sim_deb);
 SDL_RenderCopy(vid_renderer, vid_texture, NULL, NULL);
 SDL_RenderPresent(vid_renderer);
 }

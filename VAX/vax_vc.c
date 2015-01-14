@@ -760,8 +760,8 @@ else if ((vc_cur_x != CUR_X) || (vc_cur_f != CUR_F)) {  /* moved (X) or mask cha
     vc_invalidate (CUR_Y, (CUR_Y + 16));                /* invalidate new pos */
     }
 
-vc_cur_x = CUR_X;                                       /* store cursor data */
-vc_cur_y = CUR_Y;
+vid_cursor_x = vc_cur_x = CUR_X;                        /* store cursor data */
+vid_cursor_y = vc_cur_y = CUR_Y;
 vc_cur_v = CUR_V;
 vc_cur_f = CUR_F;
 

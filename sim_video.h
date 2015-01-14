@@ -190,6 +190,8 @@ extern int32 vid_mouse_yrel;                            /* mouse cumulative y re
 extern t_bool vid_mouse_b1;                             /* mouse button 1 state */
 extern t_bool vid_mouse_b2;                             /* mouse button 2 state */
 extern t_bool vid_mouse_b3;                             /* mouse button 3 state */
+extern int32 vid_cursor_x;                              /* cursor x position (set by calling code) */
+extern int32 vid_cursor_y;                              /* cursor y position (set by calling code) */
 
 #define SIM_VID_DBG_MOUSE   0x01000000
 #define SIM_VID_DBG_KEY     0x02000000
