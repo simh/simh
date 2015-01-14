@@ -9265,12 +9265,13 @@ if (snd->extoff < snd->insoff) {
     }
 else
     fprintf (st, "No Pending Input Data\n");
-if ((snd->next_time - sim_gtime()) > 0)
+if ((snd->next_time - sim_gtime()) > 0) {
     if ((snd->next_time - sim_gtime()) > (sim_timer_inst_per_sec()/1000000.0))
-        fprintf (st, "Minimum of %d instructions (%d microseconds) befor sending first character\n", (int)(snd->next_time - sim_gtime()),
+        fprintf (st, "Minimum of %d instructions (%d microseconds) before sending first character\n", (int)(snd->next_time - sim_gtime()),
                                                         (int)((snd->next_time - sim_gtime())/(sim_timer_inst_per_sec()/1000000.0)));
     else
-        fprintf (st, "Minimum of %d instructions befor sending first character\n", (int)(snd->next_time - sim_gtime()));
+        fprintf (st, "Minimum of %d instructions before sending first character\n", (int)(snd->next_time - sim_gtime()));
+    }
 if (snd->delay > (sim_timer_inst_per_sec()/1000000.0))
     fprintf (st, "Minimum of %d instructions (%d microseconds) between characters\n", (int)snd->delay, (int)(snd->delay/(sim_timer_inst_per_sec()/1000000.0)));
 else
