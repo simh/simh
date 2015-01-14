@@ -656,14 +656,14 @@ t_stat besm6_load (FILE *input)
             break;
         case '=':               /* word */
             if (addr < 010)
-                pult [addr] = SET_CONVOL (word, CONVOL_NUMBER);
+                pult [0][addr] = SET_CONVOL (word, CONVOL_NUMBER);
             else
                 memory [addr] = SET_CONVOL (word, CONVOL_NUMBER);
             ++addr;
             break;
         case '*':               /* instruction */
             if (addr < 010)
-                pult [addr] = SET_CONVOL (word, CONVOL_INSN);
+                pult [0][addr] = SET_CONVOL (word, CONVOL_INSN);
             else
                 memory [addr] = SET_CONVOL (word, CONVOL_INSN);
             ++addr;
@@ -689,7 +689,7 @@ t_stat besm6_dump (FILE *of, char *fnam)
     fprintf (of, "; %s\n", fnam);
     for (addr=1; addr<MEMSIZE; ++addr) {
         if (addr < 010)
-            word = pult [addr];
+            word = pult [0][addr];
         else
             word = memory [addr];
         if (word == 0)

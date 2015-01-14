@@ -92,6 +92,9 @@ t_stat cpu_examine (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_deposit (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_req (UNIT *u, int32 val, char *cptr, void *desc);
+t_stat cpu_set_pult (UNIT *u, int32 val, char *cptr, void *desc);
+t_stat cpu_show_pult (FILE *st, struct sim_unit *up, int32 v, void *dp);
+
 
 /*
  * CPU data structures
@@ -147,6 +150,7 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, NULL, "REQ",    &cpu_req,      NULL,           NULL,  "Sends a request interrupt" },
     { MTAB_XTD|MTAB_VDV, 0, "PANEL", "PANEL", &besm6_init_panel, NULL,         NULL, "Displays graphical panel" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPANEL", &besm6_close_panel, NULL,         NULL, "Closes graphical panel" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALO, 0, "PULT", "PULT",    &cpu_set_pult, &cpu_show_pult, NULL, "Selects a hardwired program or switch reg." },
     { 0 }
 };
 
@@ -222,13 +226,13 @@ REG reg_reg[] = {
     { "RP6",   &RP[6],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
     { "RP7",   &RP[7],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
     { "RZ",    &RZ,         8, 32, 0, 1 },
-    { "FP1",   &pult[1],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP2",   &pult[2],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP3",   &pult[3],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP4",   &pult[4],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP5",   &pult[5],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP6",   &pult[6],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP7",   &pult[7],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
+    { "FP1",   &pult[0][1],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
+    { "FP2",   &pult[0][2],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
+    { "FP3",   &pult[0][3],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
+    { "FP4",   &pult[0][4],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
+    { "FP5",   &pult[0][5],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
+    { "FP6",   &pult[0][6],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
+    { "FP7",   &pult[0][7],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
     { 0 }
 };
 
@@ -303,9 +307,15 @@ t_stat cpu_examine (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
     if (addr >= MEMSIZE)
         return SCPE_NXM;
     if (vptr) {
-        if (addr < 010)
-            *vptr = pult [addr];
-        else
+        if (addr < 010) {
+            if ((pult[pult_packet_switch][0] >> addr) & 1) {
+                /* hardwired */
+                *vptr = pult[pult_packet_switch][addr];
+            } else {
+                /* from switch regs */
+                *vptr = pult[0][addr];
+            }
+        } else
             *vptr = memory [addr];
     }
     return SCPE_OK;
@@ -318,9 +328,12 @@ t_stat cpu_deposit (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
     if (addr >= MEMSIZE)
         return SCPE_NXM;
-    if (addr < 010)
-        pult [addr] = SET_CONVOL (val, CONVOL_INSN);
-    else
+    if (addr < 010) {
+        /* Deposited values for the switch register address range
+         * always go to switch registers.
+         */
+        pult [0][addr] = SET_CONVOL (val, CONVOL_INSN);
+    } else
         memory [addr] = SET_CONVOL (val, CONVOL_INSN);
     return SCPE_OK;
 }
@@ -351,8 +364,12 @@ t_stat cpu_reset (DEVICE *dptr)
         SPSW_INTR_DISABLE;
 
     GRP = MGRP = 0;
+    PC = 1;                     /* "reset cpu; go" should start from 1  */
+
     sim_brk_types = SWMASK ('E') | SWMASK('R') | SWMASK('W');
     sim_brk_dflt = SWMASK ('E');
+
+    besm6_draw_panel(1);
 
     return SCPE_OK;
 }
@@ -363,6 +380,31 @@ t_stat cpu_reset (DEVICE *dptr)
 t_stat cpu_req (UNIT *u, int32 val, char *cptr, void *desc)
 {
     GRP |= GRP_PANEL_REQ;
+    return SCPE_OK;
+}
+
+/*
+ * Hardwired program selector validation
+ */
+t_stat cpu_set_pult (UNIT *u, int32 val, char *cptr, void *desc)
+{
+    int sw;
+    if (cptr) sw = atoi(cptr); else sw = 0;
+    if (sw >= 0 && sw <= 10) {
+        pult_packet_switch = sw;
+        if (sw) 
+            sim_printf("Pult packet switch set to hardwired program %d\n", sw);
+        else
+            sim_printf("Pult packet switch set to switch registers\n");
+        return SCPE_OK;
+    }
+    printf("Illegal value %s\n", cptr);
+    return SCPE_ARG;
+}
+
+t_stat cpu_show_pult (FILE *st, struct sim_unit *up, int32 v, void *dp)
+{
+    sim_printf("Pult packet switch position is %d\n", pult_packet_switch);
     return SCPE_OK;
 }
 
@@ -755,9 +797,9 @@ void check_initial_setup ()
     /* Номер смены в 22-24 рр. МГРП: если еще не установлен, установить */
     if (((memory[MGRP_COPY] >> 21) & 3) == 0) {
         /* приказ СМЕ: ТР6 = 010, ТР4 = 1, 22-24 р ТР5 - #смены */
-        pult[6] = 010;
-        pult[4] = 1;
-        pult[5] = 1 << 21;
+        pult[0][6] = 010;
+        pult[0][4] = 1;
+        pult[0][5] = 1 << 21;
         GRP |= GRP_PANEL_REQ;
     } else {
         struct tm * d;
@@ -777,9 +819,9 @@ void check_initial_setup ()
             (memory[YEAR] & 7);
         memory[YEAR] = SET_CONVOL (date, CONVOL_NUMBER);
         /* приказ ВРЕ: ТР6 = 016, ТР5 = 9-14 р.-часы, 1-8 р.-минуты */
-        pult[6] = 016;
-        pult[4] = 0;
-        pult[5] = (d->tm_hour / 10) << 12 |
+        pult[0][6] = 016;
+        pult[0][4] = 0;
+        pult[0][5] = (d->tm_hour / 10) << 12 |
             (d->tm_hour % 10) << 8 |
             (d->tm_min / 10) << 4 |
             (d->tm_min % 10);
@@ -1551,7 +1593,7 @@ t_stat sim_instr (void)
          */
         switch (r) {
         default:
-        ret:                    besm6_draw_panel();
+        ret:                    besm6_draw_panel(1);
             return r;
         case STOP_RWATCH:
         case STOP_WWATCH:
@@ -1678,7 +1720,7 @@ t_stat sim_instr (void)
     }
 
     if (iintr > 1) {
-        besm6_draw_panel();
+        besm6_draw_panel(1);
         return STOP_DOUBLE_INTR;
     }
     /* Main instruction fetch/decode loop */
@@ -1686,7 +1728,7 @@ t_stat sim_instr (void)
         if (sim_interval <= 0) {                /* check clock queue */
             r = sim_process_event ();
             if (r) {
-                besm6_draw_panel();
+                besm6_draw_panel(1);
                 return r;
             }
         }
@@ -1696,13 +1738,13 @@ t_stat sim_instr (void)
            * Runaway instruction execution in supervisor mode
            * warrants attention.
            */
-            besm6_draw_panel();
+            besm6_draw_panel(1);
             return STOP_RUNOUT;             /* stop simulation */
         }
 
         if (sim_brk_summ & SWMASK('E') &&       /* breakpoint? */
             sim_brk_test (PC, SWMASK ('E'))) {
-            besm6_draw_panel();
+            besm6_draw_panel(1);
             return STOP_IBKPT;              /* stop simulation */
         }
 
@@ -1720,7 +1762,8 @@ t_stat sim_instr (void)
         cpu_one_inst ();                        /* one instr */
         iintr = 0;
         if (redraw_panel) {
-            besm6_draw_panel();
+            /* Periodic panel redraw is not forcing */
+            besm6_draw_panel(0);
             redraw_panel = 0;
         }
 
@@ -1746,14 +1789,18 @@ t_stat fast_clk (UNIT * this)
 
     if ((counter & 15) == 0) {
         /* 
-         * The OS used the (undocumented, later addition) slow clock interrupt to initiate servicing
-         * terminal I/O. Its frequency was reportedly 16 Hz; 64 ms is a good enough approximation.
+         * The OS used the (undocumented, later addition) 
+         * slow clock interrupt to initiate servicing
+         * terminal I/O. Its frequency was reportedly 16 Hz;
+         * 64 ms is a good enough approximation. It can be sped up
+         * for faster console response (16 ms might be a good choice).
          */
         GRP |= GRP_SLOW_CLK;
     }
 
-    /* Requesting panel redraw every 64 ms. */
-    if ((counter & 15) == 0) {
+    /* Requesting a panel sample every 32 ms
+     * (a redraw actually happens at every other sample). */
+    if ((counter & 7) == 0) {
         redraw_panel = 1;
     }
 

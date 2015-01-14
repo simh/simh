@@ -70,11 +70,21 @@ static const SDL_Color cyan  = { 0,   128, 128 };
 static const SDL_Color grey  = { 64,  64,  64  };
 static t_value old_BRZ [8], old_GRP [2];
 static t_value old_M [NREGS];
+static char M_lamps[NREGS][15], BRZ_lamps[8][48], GRP_lamps[2][48];
 
 static const int regnum[] = {
     013, 012, 011, 010, 7, 6, 5, 4,
     027, 016, 015, 014, 3, 2, 1, 020,
 };
+
+/* The lights can be of 3 brightness levels, averaging
+ * 2 samples. Drawing can be done in decay mode
+ * (a one-sample glitch == a half-bright light for 2 frames)
+ * or in PWM mode (a one-sample glitch = a half-bright light
+ * for 1 frame).
+ * PWM mode is used, 'act' toggles between 0 and 1.
+ */
+static int act;
 
 static SDL_Surface *screen;
 
@@ -170,22 +180,32 @@ static void draw_lamp (int left, int top, int on)
         "\0\0\0\25\5\5A\21\21h\32\32c\30\30c\30\30h\32\32A\21\21\25\5\5\0\0\0\0\0"
         "\0\0\0\0\0\0\0\0\0\0\0\0\0\14\2\2\14\2\2\14\2\2\14\2\2\0\0\0\0\0\0\0\0\0"
         "\0\0\0";
-    static SDL_Surface *sprite_on, *sprite_off;
-    SDL_Rect area;
 
-    if (! sprite_on) {
-        sprite_on = sprite_from_data (lamp_width, lamp_height,
-                                      lamp_on);
-    }
-    if (! sprite_off) {
-        sprite_off = sprite_from_data (lamp_width, lamp_height,
+    static unsigned char lamp_mid [sizeof(lamp_on)];
+    static SDL_Surface * sprites[3];
+    SDL_Rect area;
+    int i;
+
+    if (! sprites[0]) {
+        sprites[0] = sprite_from_data (lamp_width, lamp_height,
                                        lamp_off);
     }
+    if (!sprites[1]) {
+        for (i = 0; i < sizeof(lamp_mid); ++i)
+            lamp_mid[i] = (lamp_on[i] + lamp_off[i] + 1) / 2;
+        sprites[1] = sprite_from_data (lamp_width, lamp_height,
+                                       lamp_mid);
+    }
+    if (! sprites[2]) {
+        sprites[2] = sprite_from_data (lamp_width, lamp_height,
+                                       lamp_on);
+    }
+
     area.x = left;
     area.y = top;
     area.w = lamp_width;
     area.h = lamp_height;
-    SDL_BlitSurface (on ? sprite_on : sprite_off, 0, screen, &area);
+    SDL_BlitSurface (sprites[on], 0, screen, &area);
 }
 
 /*
@@ -193,16 +213,20 @@ static void draw_lamp (int left, int top, int on)
  */
 static void draw_modifiers_periodic (int group, int left, int top)
 {
-    int x, y, reg, val;
+    int x, y, reg, val, anded, ored;
 
     for (y=0; y<8; ++y) {
         reg = regnum [y + group*8];
         val = M [reg];
-        if (val == old_M [reg])
-            continue;
+        anded = old_M [reg] & val;
+        ored = old_M [reg] | val;
         old_M [reg] = val;
-        for (x=0; x<15; ++x) {
-            draw_lamp (left+76 + x*STEPX, top+28 + y*STEPY, val >> (14-x) & 1);
+        for (x=0; act && x<15; ++x) {
+            int new_lamp = anded >> (14-x) & 1 ? 2 : ored >> (14-x) & 1 ? 1 : 0;
+            if (new_lamp != M_lamps[reg][x]) {
+                draw_lamp (left+76 + x*STEPX, top+28 + y*STEPY, new_lamp);
+                M_lamps[reg][x] = new_lamp;
+            }
         }
     }
 }
@@ -213,15 +237,19 @@ static void draw_modifiers_periodic (int group, int left, int top)
 static void draw_grp_periodic (int top)
 {
     int x, y;
-    t_value val;
+    t_value val, anded, ored;
 
     for (y=0; y<2; ++y) {
         val = y ? MGRP : GRP;
-        if (val == old_GRP [y])
-            continue;
+        anded = old_GRP [y] & val;
+        ored = old_GRP [y] | val;
         old_GRP [y] = val;
-        for (x=0; x<48; ++x) {
-            draw_lamp (100 + x*STEPX, top+28 + y*STEPY, val >> (47-x) & 1);
+        for (x=0; act && x<48; ++x) {
+            int new_lamp = anded >> (47-x) & 1 ? 2 : ored >> (47-x) & 1 ? 1 : 0;
+            if (new_lamp != GRP_lamps[y][x]) {
+                draw_lamp (100 + x*STEPX, top+28 + y*STEPY, new_lamp);
+                GRP_lamps[y][x] = new_lamp;
+            }
         }
     }
 }
@@ -232,15 +260,19 @@ static void draw_grp_periodic (int top)
 static void draw_brz_periodic (int top)
 {
     int x, y;
-    t_value val;
+    t_value val, anded, ored;
 
     for (y=0; y<8; ++y) {
         val = BRZ [7-y];
-        if (val == old_BRZ [7-y])
-            continue;
+        anded = old_BRZ [7-y] & val;
+        ored = old_BRZ [7-y] | val;
         old_BRZ [7-y] = val;
-        for (x=0; x<48; ++x) {
-            draw_lamp (100 + x*STEPX, top+28 + y*STEPY, val >> (47-x) & 1);
+        for (x=0; act && x<48; ++x) {
+            int new_lamp = anded >> (47-x) & 1 ? 2 : ored >> (47-x) & 1 ? 1 : 0;
+            if (new_lamp != BRZ_lamps[y][x]) {
+                    draw_lamp (100 + x*STEPX, top+28 + y*STEPY, new_lamp);
+                BRZ_lamps[y][x] = new_lamp;
+            }
         }
     }
 }
@@ -425,7 +457,11 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
     draw_grp_static (180);
     draw_brz_static (230);
 
-    besm6_draw_panel();
+    /* Make sure all lights are updated */
+    memset(M_lamps, ~0, sizeof(M_lamps));
+    memset(BRZ_lamps, ~0, sizeof(BRZ_lamps));
+    memset(GRP_lamps, ~0, sizeof(GRP_lamps));
+    besm6_draw_panel(1);
 
     /* Tell SDL to update the whole screen */
     SDL_UpdateTexture(sdlTexture, NULL, screen->pixels, screen->pitch);
@@ -437,18 +473,29 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
 /*
  * Refreshing the window.
  */
-void besm6_draw_panel (void)
+void besm6_draw_panel (int force)
 {
     SDL_Event event;
 
     if (! screen)
         return;
 
+    if (force) {
+        /* When the CPU is stopped */
+        act = 1;
+        besm6_draw_panel(0);
+        act = 1;
+        besm6_draw_panel(0);
+        return;
+    }
+
     /* Do the blinkenlights */
     draw_modifiers_periodic (0, 24, 10);
     draw_modifiers_periodic (1, 400, 10);
     draw_grp_periodic (180);
     draw_brz_periodic (230);
+
+    act = !act;
 
     /* Tell SDL to update the whole screen */
     SDL_UpdateTexture(sdlTexture, NULL, screen->pixels, screen->pitch);
@@ -505,7 +552,11 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
     draw_grp_static (180);
     draw_brz_static (230);
 
-    besm6_draw_panel();
+    /* Make sure all lights are updated */
+    memset(M_lamps, ~0, sizeof(M_lamps));
+    memset(BRZ_lamps, ~0, sizeof(BRZ_lamps));
+    memset(GRP_lamps, ~0, sizeof(GRP_lamps));
+    besm6_draw_panel(1);
 
     /* Tell SDL to update the whole screen */
     SDL_UpdateRect (screen, 0, 0, WIDTH, HEIGHT);
@@ -514,11 +565,20 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
 /*
  * Refreshing the window
  */
-void besm6_draw_panel ()
+void besm6_draw_panel (int force)
 {
     SDL_Event event;
     if (! screen)
         return;
+
+    if (force) {
+        /* When the CPU is stopped */
+        act = 1;
+        besm6_draw_panel(0);
+        act = 1;
+        besm6_draw_panel(0);
+        return;
+    }
 
     /* Do the blinkenlights */
     draw_modifiers_periodic (0, 24, 10);
@@ -537,7 +597,7 @@ void besm6_draw_panel ()
 #endif /* SDL_MAJOR_VERSION */
 
 #else /* HAVE_LIBSDL */
-void besm6_draw_panel (void)
+void besm6_draw_panel (int force)
 {
 }
 #endif /* HAVE_LIBSDL */

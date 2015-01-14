@@ -130,7 +130,8 @@ extern UNIT cpu_unit;
 extern UNIT tty_unit[];
 extern UNIT clocks[];
 extern t_value memory [MEMSIZE];
-extern t_value pult [8];
+extern t_value pult [11][8];
+extern unsigned pult_packet_switch; /* selector of hardwired programs */
 
 extern uint32 PC, RAU, RUU;
 extern uint32 M[NREGS];
@@ -356,7 +357,7 @@ void besm6_log_cont (const char *fmt, ...);
 void besm6_debug (const char *fmt, ...);
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
                    UNIT *uptr, int32 sw);
-void besm6_draw_panel (void);
+void besm6_draw_panel (int force);
 t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc);
 t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc);
  

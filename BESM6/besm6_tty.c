@@ -237,7 +237,7 @@ t_stat vt_clk (UNIT * this)
     if (!attached_console) {
         static int divider;
         if (++divider == CLK_TPS/10) {
-            divider == 0;
+            divider = 0;
             if (SCPE_STOP == sim_poll_kbd())
                 stop_cpu = 1;
         }
