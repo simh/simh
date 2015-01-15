@@ -29,6 +29,7 @@
  * authorization from Leonid Broukhis and Serge Vakulenko.
  */
 
+#include "besm6_defs.h"
 #if defined (HAVE_LIBSDL)
 #if !defined (FONTFILE)
 #include "besm6_panel_font.h"
@@ -39,8 +40,6 @@
 #endif /* defined (HAVE_LIBSDL) */
 
 #ifdef HAVE_LIBSDL
-
-#include "besm6_defs.h"
 #include <stdlib.h>
 
 /*
@@ -389,6 +388,15 @@ t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
     return SCPE_OK;
 }
 
+t_stat besm6_show_panel (FILE *st, struct sim_unit *up, int32 v, void *dp)
+{
+    if (screen)
+        fprintf(st, "Panel displayed");
+    else
+        fprintf(st, "Panel closed");
+    return SCPE_OK;
+}
+
 #if SDL_MAJOR_VERSION == 2
 
 static SDL_Window *sdlWindow;
@@ -468,6 +476,7 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
     SDL_RenderClear(sdlRenderer);
     SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
     SDL_RenderPresent (sdlRenderer);
+    return SCPE_OK;
 }
 
 /*
@@ -560,6 +569,7 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
 
     /* Tell SDL to update the whole screen */
     SDL_UpdateRect (screen, 0, 0, WIDTH, HEIGHT);
+    return SCPE_OK;
 }
 
 /*
@@ -597,6 +607,20 @@ void besm6_draw_panel (int force)
 #endif /* SDL_MAJOR_VERSION */
 
 #else /* HAVE_LIBSDL */
+t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
+{
+    return sim_messagef(SCPE_OPENERR, "Need SDL and SDLttf libraries");
+}
+
+t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
+{
+    return SCPE_NOTATT;
+}
+
+t_stat besm6_show_panel (FILE *st, struct sim_unit *up, int32 v, void *dp)
+{
+}
+
 void besm6_draw_panel (int force)
 {
 }

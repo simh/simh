@@ -148,7 +148,7 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Enables idle detection mode" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL,           NULL,  "Disables idle detection" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "REQ",    &cpu_req,      NULL,           NULL,  "Sends a request interrupt" },
-    { MTAB_XTD|MTAB_VDV, 0, "PANEL", "PANEL", &besm6_init_panel, NULL,         NULL, "Displays graphical panel" },
+    { MTAB_XTD|MTAB_VDV, 0, "PANEL", "PANEL", &besm6_init_panel, &besm6_show_panel,         NULL, "Displays graphical panel" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPANEL", &besm6_close_panel, NULL,         NULL, "Closes graphical panel" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALO, 0, "PULT", "PULT",    &cpu_set_pult, &cpu_show_pult, NULL, "Selects a hardwired program or switch reg." },
     { 0 }
@@ -364,7 +364,8 @@ t_stat cpu_reset (DEVICE *dptr)
         SPSW_INTR_DISABLE;
 
     GRP = MGRP = 0;
-    PC = 1;                     /* "reset cpu; go" should start from 1  */
+    // Disabled due to a conflict with loading
+    // PC = 1;                 /* "reset cpu; go" should start from 1  */
 
     sim_brk_types = SWMASK ('E') | SWMASK('R') | SWMASK('W');
     sim_brk_dflt = SWMASK ('E');
@@ -404,7 +405,7 @@ t_stat cpu_set_pult (UNIT *u, int32 val, char *cptr, void *desc)
 
 t_stat cpu_show_pult (FILE *st, struct sim_unit *up, int32 v, void *dp)
 {
-    sim_printf("Pult packet switch position is %d\n", pult_packet_switch);
+    fprintf(st, "Pult packet switch position is %d", pult_packet_switch);
     return SCPE_OK;
 }
 

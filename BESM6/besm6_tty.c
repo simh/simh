@@ -1228,7 +1228,7 @@ void consul_print (int dev_num, uint32 cmd)
         besm6_debug(">>> CONSUL%o: Native charset not implemented", line_num);
         break;
     }
-    // PRP |= CONS_CAN_PRINT[dev_num];
+    PRP |= CONS_CAN_PRINT[dev_num];
     vt_idle = 0;
 }
 
