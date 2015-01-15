@@ -283,6 +283,8 @@ if (lgp21_sov) {                                        /* stop sense pending? *
 
 do {
     if (sim_interval <= 0) {                            /* check clock queue */
+        /* make sure all useful state is in simh registers while processing events */
+        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         if ((r = sim_process_event ()))
             break;
         }

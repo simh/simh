@@ -659,6 +659,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
         }
 
     if (sim_interval <= 0) {                            /* intv cnt expired? */
+        /* make sure all useful state is in simh registers while processing events */
+        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         if ((reason = sim_process_event ()))            /* process events */
             break;
         chtr_pend = chtr_eval (NULL);                   /* eval chan traps */

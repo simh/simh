@@ -546,6 +546,8 @@ reason = 0;
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
+        /* Make sure all intermediate state is visible in simh registers */
+        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         if ((reason = sim_process_event ()))
             break;
         sbs_lvl = sbs_eval ();                          /* eval sbs system */

@@ -428,6 +428,9 @@ reason = 0;
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
+        /* make sure all useful state is in simh registers while processing events */
+        saved_PC = PC;
+        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         if ( (reason = sim_process_event ()) )
             break;
         }

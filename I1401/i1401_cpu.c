@@ -550,6 +550,12 @@ while (reason == 0) {                                   /* loop until halted */
 
     saved_IS = IS;                                      /* commit prev instr */
     if (sim_interval <= 0) {                            /* check clock queue */
+        /* make sure all useful state is in simh registers while processing events */
+        as_err = ADDR_ERR (AS);                         /* get addr err flags */
+        bs_err = ADDR_ERR (BS);
+        AS = AS & ADDRMASK;                             /* clean addresses */
+        BS = BS & ADDRMASK;
+        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         if ((reason = sim_process_event ()))
             break;
         }
