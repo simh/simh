@@ -1844,12 +1844,27 @@ int32 sim_tt_inpcvt (int32 c, uint32 mode)
 uint32 md = mode & TTUF_M_MODE;
 
 if (md != TTUF_MODE_8B) {
+    uint32 par_bit = 0;
+    uint32 par_mode = (mode >> TTUF_W_MODE) & TTUF_M_PAR;
+    static int32 nibble_even_parity = 0x699600;   /* bit array indicating the even parity for each index (offset by 8) */
+
     c = c & 0177;
     if (md == TTUF_MODE_UC) {
         if (islower (c))
             c = toupper (c);
         if (mode & TTUF_KSR)
             c = c | 0200;
+        }
+    switch (par_mode) {
+        case TTUF_PAR_EVEN:
+            c |= (((nibble_even_parity >> ((c & 0xF) + 1)) ^ (nibble_even_parity >> (((c >> 4) & 0xF) + 1))) & 0x80);
+            break;
+        case TTUF_PAR_ODD:
+            c |= ((~((nibble_even_parity >> ((c & 0xF) + 1)) ^ (nibble_even_parity >> (((c >> 4) & 0xF) + 1)))) & 0x80);
+            break;
+        case TTUF_PAR_MARK:
+            c = c | 0x80;
+            break;
         }
     }
 else c = c & 0377;

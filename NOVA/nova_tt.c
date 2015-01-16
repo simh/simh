@@ -43,7 +43,6 @@
     - TTO output is always masked to 7 bits in this rev
     - TTO "Dasher" attribute sends '\b' to console instead of '\031'
     - TTO may be disabled
-    - TTI input is always masked to 7 bits in this rev
     - TTI "Dasher" attribute swaps <CR> and <LF>
     - TTI may not be disabled
 */
@@ -51,7 +50,7 @@
 #include "nova_defs.h"
 #include "sim_tmxr.h"
 
-#define UNIT_V_DASHER   (UNIT_V_UF + 0)                 /* Dasher mode */
+#define UNIT_V_DASHER   (TTUF_V_UF)                 /* Dasher mode */
 #define UNIT_DASHER     (1 << UNIT_V_DASHER)
 
 extern int32 int_req, dev_busy, dev_done, dev_disable;
@@ -63,6 +62,7 @@ t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ttx_setpar (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* TTI data structures
 
@@ -90,6 +90,10 @@ REG tti_reg[] = {
 MTAB ttx_mod[] = {
     { UNIT_DASHER, 0, "ANSI", "ANSI", &ttx_setmod },
     { UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx_setmod },
+    { TT_PAR, TT_PAR_EVEN,  "Even Parity", "EVEN",  &ttx_setpar },
+    { TT_PAR, TT_PAR_ODD,   "Odd Parity",  "ODD",   &ttx_setpar },
+    { TT_PAR, TT_PAR_MARK,  "Mark Parity", "MARK",  &ttx_setpar },
+    { TT_PAR, TT_PAR_SPACE, "No Parity",   "NONE",  &ttx_setpar },
     { 0 }
     } ;
 
@@ -176,6 +180,7 @@ if (tti_unit.flags & UNIT_DASHER) {
     else if (tti_unit.buf == '\n')
         tti_unit.buf = '\r' ;                           /* Dasher: nl -> cr */
     }
+tti_unit.buf = sim_tt_inpcvt (tti_unit.buf, TT_GET_MODE (uptr->flags));
 DEV_CLR_BUSY( INT_TTI ) ;
 DEV_SET_DONE( INT_TTI ) ;
 DEV_UPDATE_INTR ;
@@ -260,5 +265,12 @@ t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~UNIT_DASHER) | val;
 tto_unit.flags = (tto_unit.flags & ~UNIT_DASHER) | val;
+return SCPE_OK;
+}
+
+t_stat ttx_setpar (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+tti_unit.flags = (tti_unit.flags & ~TT_PAR) | val;
+tto_unit.flags = (tto_unit.flags & ~TT_PAR) | val;
 return SCPE_OK;
 }

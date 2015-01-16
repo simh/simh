@@ -41,16 +41,31 @@
 #define  TTUF_MODE_8B   1
 #define  TTUF_MODE_UC   2
 #define  TTUF_MODE_7P   3
-#define  TTUF_KSR       (1u << TTUF_W_MODE)
 #define TTUF_M_MODE     ((1u << TTUF_W_MODE) - 1)
-#define TTUF_V_UF       (TTUF_V_MODE + TTUF_W_MODE)
+#define TTUF_V_PAR      (TTUF_V_MODE + TTUF_W_MODE)
+#define TTUF_W_PAR      2
+#define  TTUF_PAR_SPACE 0
+#define  TTUF_PAR_MARK  1
+#define  TTUF_PAR_EVEN  2
+#define  TTUF_PAR_ODD   3
+#define TTUF_M_PAR      ((1u << TTUF_W_PAR) - 1)
+#define  TTUF_KSR       (1u << (TTUF_W_MODE + TTUF_W_PAR))
+#define TTUF_V_UF       (TTUF_V_MODE + TTUF_W_MODE + TTUF_W_PAR)
 #define TT_MODE         (TTUF_M_MODE << TTUF_V_MODE)
 #define  TT_MODE_7B     (TTUF_MODE_7B << TTUF_V_MODE)
 #define  TT_MODE_8B     (TTUF_MODE_8B << TTUF_V_MODE)
 #define  TT_MODE_UC     (TTUF_MODE_UC << TTUF_V_MODE)
 #define  TT_MODE_7P     (TTUF_MODE_7P << TTUF_V_MODE)
 #define  TT_MODE_KSR    (TT_MODE_UC)
-#define TT_GET_MODE(x)  (((x) >> TTUF_V_MODE) & TTUF_M_MODE)
+/* 7 bit modes allow for an 8th bit parity mode */
+#define TT_PAR          (TTUF_M_PAR << TTUF_V_PAR)
+#define  TT_PAR_SPACE   (TTUF_PAR_SPACE << TTUF_V_PAR)
+#define  TT_PAR_MARK    (TTUF_PAR_MARK  << TTUF_V_PAR)
+#define  TT_PAR_EVEN    (TTUF_PAR_EVEN  << TTUF_V_PAR)
+#define  TT_PAR_ODD     (TTUF_PAR_ODD   << TTUF_V_PAR)
+/* TT_GET_MODE returns both the TT_MODE and TT_PAR fields 
+   since they together are passed into sim_tt_inpcvt() */
+#define TT_GET_MODE(x)  (((x) >> TTUF_V_MODE) & (TTUF_M_MODE | (TTUF_M_PAR << TTUF_W_MODE)))
 
 t_stat sim_set_console (int32 flag, char *cptr);
 t_stat sim_set_remote_console (int32 flag, char *cptr);
