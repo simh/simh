@@ -918,14 +918,9 @@ vid_dst.y = y;
 vid_dst.w = w;
 vid_dst.h = h;
 
-SDL_LockTexture(vid_texture, &vid_dst, (void *)&pixels, &pitch);
-
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
 
-for (i = y; i < (y + h); i++, pixels = (uint32 *)(((uint8 *)pixels) + pitch), buf = (uint32 *)(((uint8 *)buf) + w))
-    memcpy (pixels, buf, (size_t)w*sizeof(*pixels));
-
-SDL_UnlockTexture(vid_texture);
+SDL_UpdateTexture(vid_texture, &vid_dst, buf, w*sizeof(*buf));
 }
 
 void vid_refresh (void)
@@ -1411,6 +1406,7 @@ vid_dst.h = vid_height;
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Video Update Event: \n");
 if (sim_deb)
     fflush (sim_deb);
+SDL_RenderClear(vid_renderer);
 SDL_RenderCopy(vid_renderer, vid_texture, NULL, NULL);
 SDL_RenderPresent(vid_renderer);
 }
@@ -1524,6 +1520,7 @@ if ((vid_window == NULL) || (vid_renderer == NULL)) {
     return 0;
     }
 
+SDL_SetWindowTitle (vid_window, sim_name);
 SDL_SetRenderDrawColor (vid_renderer, 0, 0, 0, 255);
 SDL_RenderClear (vid_renderer);
 SDL_RenderPresent (vid_renderer);
