@@ -908,10 +908,7 @@ return SCPE_EOF;
 
 void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf)
 {
-int32 i;
 SDL_Rect vid_dst;
-uint32 *pixels;
-int pitch;
 
 vid_dst.x = x;
 vid_dst.y = y;
@@ -927,7 +924,7 @@ void vid_refresh (void)
 {
 SDL_Event user_event;
 
-sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_refresh() - Queing Refresh Event\n");
+sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_refresh() - Queueing Refresh Event\n");
 
 user_event.type = SDL_USEREVENT;
 user_event.user.code = EVENT_REDRAW;
@@ -1496,6 +1493,9 @@ if (!initialized) {
     /* Drag and drop events */
     eventtypes[SDL_DROPFILE] = "DROPFILE"; /**< The system requests a file open */
 
+    /* Render events */
+    eventtypes[SDL_RENDER_TARGETS_RESET] = "RENDER_TARGETS_RESET"; /**< The render targets have been reset */
+
     /** Events ::SDL_USEREVENT through ::SDL_LASTEVENT are for your use,
      *  and should be allocated with SDL_RegisterEvents()
      */
@@ -1566,8 +1566,15 @@ while (vid_active) {
                 /* EVENT_REDRAW to update the display */
                 /* EVENT_CLOSE  to wake up this thread and let */
                 /*              it notice vid_active has changed */
-                if (event.user.code == EVENT_REDRAW)
+                if (event.user.code == EVENT_REDRAW) {
+                    SDL_Event dummy_event;
+
                     vid_update ();
+                    /* Only do a single video update between waiting for events */
+                    while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_USEREVENT, SDL_USEREVENT)) {
+                        sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_thread() - Ignored extra REDRAW Event\n");
+                        }
+                    }
                 break;
 
             default:
