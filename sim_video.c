@@ -917,7 +917,9 @@ vid_dst.h = h;
 
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
 
-SDL_UpdateTexture(vid_texture, &vid_dst, buf, w*sizeof(*buf));
+if (SDL_UpdateTexture(vid_texture, &vid_dst, buf, w*sizeof(*buf))) {
+    sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw() - SDL_UpdateTexture error: %s\n", SDL_GetError());
+    }
 }
 
 void vid_refresh (void)
@@ -931,7 +933,9 @@ user_event.user.code = EVENT_REDRAW;
 user_event.user.data1 = NULL;
 user_event.user.data2 = NULL;
 
-SDL_PushEvent (&user_event);
+if (SDL_PushEvent (&user_event) < 0) {
+    sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_refresh() SDL_PushEvent error: %s\n", SDL_GetError());
+    }
 }
 
 int vid_map_key (int key)
@@ -1320,6 +1324,15 @@ if ((event->x == 0) ||
     }
 if (!sim_is_running)
     return;
+while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION)) {
+    /* Coalesce motion activity to avoid thrashing */
+    event->xrel += ((SDL_MouseMotionEvent *)&dummy_event)->xrel;
+    event->yrel += ((SDL_MouseMotionEvent *)&dummy_event)->yrel;
+    event->x = ((SDL_MouseMotionEvent *)&dummy_event)->x;
+    event->y = ((SDL_MouseMotionEvent *)&dummy_event)->y;
+    sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: Additional Event Coalesced:(%d,%d) rel:(%d,%d)\n", ((SDL_MouseMotionEvent *)&dummy_event)->x, ((SDL_MouseMotionEvent *)&dummy_event)->y, ((SDL_MouseMotionEvent *)&dummy_event)->xrel, ((SDL_MouseMotionEvent *)&dummy_event)->yrel, vid_mouse_events.count, vid_mouse_xrel, vid_mouse_yrel);
+    };
+SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);/* sync position */
 vid_mouse_xrel += event->xrel;                          /* update cumulative x rel */
 vid_mouse_yrel -= event->yrel;                          /* update cumulative y rel */
 vid_mouse_b1 = (event->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? TRUE : FALSE;
@@ -1387,7 +1400,9 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
         if (vid_mouse_events.tail == MAX_EVENTS)
             vid_mouse_events.tail = 0;
         }
-    SDL_SemPost (vid_mouse_events.sem);
+    if (SDL_SemPost (vid_mouse_events.sem)) {
+        sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Button Event: SDL_SemPost error: %s\n", SDL_GetError());
+        }
     }
 }
 
@@ -1403,9 +1418,13 @@ vid_dst.h = vid_height;
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Video Update Event: \n");
 if (sim_deb)
     fflush (sim_deb);
-SDL_RenderClear(vid_renderer);
-SDL_RenderCopy(vid_renderer, vid_texture, NULL, NULL);
-SDL_RenderPresent(vid_renderer);
+if (SDL_RenderClear (vid_renderer)) {
+    sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Video Update Event: SDL_RenderClear error: %s\n", SDL_GetError());
+    }
+if (SDL_RenderCopy (vid_renderer, vid_texture, NULL, NULL)) {
+    sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Video Update Event: SDL_RenderCopy error: %s\n", SDL_GetError());
+    }
+SDL_RenderPresent (vid_renderer);
 }
 
 int vid_thread (void* arg)
@@ -1544,7 +1563,8 @@ SDL_StopTextInput ();
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Started\n");
 
 while (vid_active) {
-    if (SDL_WaitEvent (&event)) {
+    int status = SDL_WaitEvent (&event);
+    if (status == 1) {
         switch (event.type) {
 
             case SDL_KEYDOWN:
@@ -1582,6 +1602,10 @@ while (vid_active) {
                 break;
             }
         }
+    else
+        if (status < 0) {
+            sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - SDL_WaitEvent error: %s\n", SDL_GetError());
+            }
     }
 SDL_DestroyTexture(vid_texture);
 vid_texture = NULL;
