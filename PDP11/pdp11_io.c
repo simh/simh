@@ -50,6 +50,9 @@
 */
 
 #include "pdp11_defs.h"
+#ifdef OPCON
+#include "opcon.h"
+#endif
 
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
@@ -243,6 +246,10 @@ int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 alim, lim, ma;
 
+#ifdef OPCON
+oc_master(FALSE);
+#endif
+
 if (ba >= IOPAGEBASE) {
     int32 value;
 
@@ -253,6 +260,10 @@ if (ba >= IOPAGEBASE) {
         ba++;
         bc--;
         }
+#ifdef OPCON
+oc_master(TRUE);
+#endif
+
     return bc;
     }
 ba = ba & BUSMASK;                                      /* trim address */
@@ -261,11 +272,22 @@ if (cpu_bme) {                                          /* map enabled? */
     for ( ; ba < lim; ba++) {                           /* by bytes */
         ma = Map_Addr (ba);                             /* map addr */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
+#ifdef OPCON
+          {
+            oc_master(TRUE);
             return (lim - ba);
+          }
+#else
+            return (lim - ba);
+#endif
+        
         if (ma & 1)                                     /* get byte */
             *buf++ = (M[ma >> 1] >> 8) & 0377;
         else *buf++ = M[ma >> 1] & 0377;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
     return 0;
     }
 else {                                                  /* physical */
@@ -273,12 +295,23 @@ else {                                                  /* physical */
         alim = lim;
     else if (ADDR_IS_MEM (ba))                          /* no, strt ok? */
         alim = cpu_memsize;
+#ifdef OPCON
+    else {
+        oc_master(TRUE);
+        return bc;                                     /* no, err */
+        }
+#else
     else return bc;                                     /* no, err */
+#endif
+
     for ( ; ba < alim; ba++) {                          /* by bytes */
         if (ba & 1)
             *buf++ = (M[ba >> 1] >> 8) & 0377;          /* get byte */
         else *buf++ = M[ba >> 1] & 0377;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
     return (lim - alim);
     }
 }
@@ -287,10 +320,22 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 alim, lim, ma;
 
+#ifdef OPCON
+oc_master(FALSE);
+#endif
+
 if (ba >= IOPAGEBASE) {
     int32 value;
     if ((ba & 1) || (bc & 1))
+#ifdef OPCON
+        {
+        oc_master(TRUE);
         return bc;
+        }
+#else
+        return bc;
+#endif
+
     while (bc) {
         if (iopageR( &value, ba, READ) != SCPE_OK)
             break;
@@ -298,6 +343,9 @@ if (ba >= IOPAGEBASE) {
         ba += 2;
         bc -= 2;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
     return bc;
     }
 ba = (ba & BUSMASK) & ~01;                              /* trim, align addr */
@@ -306,9 +354,19 @@ if (cpu_bme) {                                          /* map enabled? */
     for (; ba < lim; ba = ba + 2) {                     /* by words */
         ma = Map_Addr (ba);                             /* map addr */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
+#ifdef OPCON
+            {
+            oc_master(TRUE);
             return (lim - ba);
+            }
+#else
+            return (lim - ba);
+#endif
         *buf++ = M[ma >> 1];
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
     return 0;
     }
 else {                                                  /* physical */
@@ -320,13 +378,24 @@ else {                                                  /* physical */
     for ( ; ba < alim; ba = ba + 2) {                   /* by words */
         *buf++ = M[ba >> 1];
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
+
     return (lim - alim);
     }
+#ifdef OPCON
+oc_master(TRUE);
+#endif
 }
 
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 alim, lim, ma;
+
+#ifdef OPCON
+oc_master(FALSE);
+#endif
 
 if (ba >= IOPAGEBASE) {
     while (bc) {
@@ -335,6 +404,10 @@ if (ba >= IOPAGEBASE) {
         ba++;
         bc--;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
+
     return bc;
 }
 ba = ba & BUSMASK;                                      /* trim address */
@@ -343,11 +416,21 @@ if (cpu_bme) {                                          /* map enabled? */
     for ( ; ba < lim; ba++) {                           /* by bytes */
         ma = Map_Addr (ba);                             /* map addr */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
+#ifdef OPCON
+            {
+            oc_master(TRUE);
             return (lim - ba);
+            }
+#else
+            return (lim - ba);
+#endif
         if (ma & 1) M[ma >> 1] = (M[ma >> 1] & 0377) |
             ((uint16) *buf++ << 8);
         else M[ma >> 1] = (M[ma >> 1] & ~0377) | *buf++;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
     return 0;
     }
 else {                                                  /* physical */
@@ -355,12 +438,23 @@ else {                                                  /* physical */
         alim = lim;
     else if (ADDR_IS_MEM (ba))                          /* no, strt ok? */
         alim = cpu_memsize;
+#ifdef OPCON
+    else {
+        oc_master(TRUE);
+        return bc;                                     /* no, err */
+        }
+#else
     else return bc;                                     /* no, err */
+#endif
     for ( ; ba < alim; ba++) {                          /* by bytes */
         if (ba & 1)
             M[ba >> 1] = (M[ba >> 1] & 0377) | ((uint16) *buf++ << 8);
         else M[ba >> 1] = (M[ba >> 1] & ~0377) | *buf++;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
+
     return (lim - alim);
     }
 }
@@ -369,15 +463,29 @@ int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 alim, lim, ma;
 
+#ifdef OPCON
+oc_master(FALSE);
+#endif
+
 if (ba >= IOPAGEBASE) {
     if ((ba & 1) || (bc & 1))
+#ifdef OPCON
+        {
+        oc_master(TRUE);
         return bc;
+        }
+#else
+        return bc;
+#endif
     while (bc) {
         if (iopageW( ((int32) *buf++) & 0xffff, ba, WRITE) != SCPE_OK)
             break;
         ba += 2;
         bc -= 2;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
     return bc;
 }
 ba = (ba & BUSMASK) & ~01;                              /* trim, align addr */
@@ -386,9 +494,19 @@ if (cpu_bme) {                                          /* map enabled? */
     for (; ba < lim; ba = ba + 2) {                     /* by words */
         ma = Map_Addr (ba);                             /* map addr */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
+#ifdef OPCON
+            {
+            oc_master(TRUE);
             return (lim - ba);
+            }
+#else
+            return (lim - ba);
+#endif
         M[ma >> 1] = *buf++;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
     return 0;
     }
 else {                                                  /* physical */
@@ -396,12 +514,25 @@ else {                                                  /* physical */
         alim = lim;
     else if (ADDR_IS_MEM (ba))                          /* no, strt ok? */
         alim = cpu_memsize;
+#ifdef OPCON
+    else {
+        oc_master(TRUE);
+        return bc;                                     /* no, err */
+        }
+#else
     else return bc;                                     /* no, err */
+#endif
     for ( ; ba < alim; ba = ba + 2) {                   /* by words */
         M[ba >> 1] = *buf++;
         }
+#ifdef OPCON
+    oc_master(TRUE);
+#endif
     return (lim - alim);
     }
+#ifdef OPCON
+oc_master(TRUE);
+#endif
 }
 
 /* Build tables from device list */

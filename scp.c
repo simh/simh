@@ -242,6 +242,10 @@
 #include <dlfcn.h>
 #endif
 
+#ifdef OPCON
+#include "PDP11/opcon.h"
+#endif
+
 #ifndef MAX
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
 #endif
@@ -498,7 +502,11 @@ struct timespec sim_deb_basetime;                       /* debug timestamp relat
 char *sim_prompt = NULL;                                /* prompt string */
 static FILE *sim_gotofile;                              /* the currently open do file */
 static int32 sim_goto_line[MAX_DO_NEST_LVL+1];          /* the current line number in the currently open do file */
+#ifdef OPCON
+int32 sim_do_echo = 0;                                  /* the echo status of the currently open do file */
+#else
 static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
+#endif
 static int32 sim_show_message = 1;                      /* the message display status of the currently open do file */
 static int32 sim_on_inherit = 0;                        /* the inherit status of on state and conditions when executing do files */
 int32 sim_do_depth = 0;
@@ -1643,6 +1651,29 @@ ASSERT		failure have several different actions:
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
       " EXIT (synonyms QUIT and BYE) returns control to the operating system.\n"
+#ifdef OPCON
+#define HLP_SHOW_OC     "*Commands SHOW"
+      "2HELP\n"
+      "+h{elp}                      type this message\n"
+      "+h{elp} <command>            type help for command\n"
+      "+h{elp} <dev>                type help for device\n"
+      "+h{elp} <dev> registers      type help for device register variables\n"
+      "+h{elp} <dev> attach         type help for device specific ATTACH command\n"
+      "+h{elp} <dev> set            type help for device specific SET commands\n"
+      "+h{elp} <dev> show           type help for device specific SHOW commands\n"
+      "+h{elp} <dev> <command>      type help for device specific <command> command\n"
+       /***************** 80 character line width template *************************/
+      "2Altering The Simulated Configuration\n"
+      " In most simulators, the SET <device> DISABLED command removes the\n"
+      " specified device from the configuration.  A DISABLED device is invisible\n"
+      " to running programs.  The device can still be RESET, but it cannot be\n"
+      " ATTAChed, DETACHed, or BOOTed.  SET <device> ENABLED restores a disabled\n"
+      " device to a configuration.\n\n"
+      " Most multi-unit devices allow units to be enabled or disabled:\n\n"
+      "++SET <unit> ENABLED\n"
+      "++SET <unit> DISABLED\n\n"
+      " When a unit is disabled, it will not be displayed by SHOW DEVICE.\n\n"
+#endif
 #define HLP_SPAWN       "*Commands Executing_System_Commands"
       "2Executing System Commands\n"
       " The simulator can execute operating system commands with the ! (spawn)\n"
@@ -1984,7 +2015,11 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         printf ("%s", sim_prompt);                      /* prompt */
         cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
         }
+#ifdef OPCON
+    else cptr = oc_read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
+#else
     else cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
+#endif
     if (cptr == NULL) {                                 /* EOF? */
         if (sim_ttisatty()) continue;                   /* ignore tty EOF */
         else break;                                     /* otherwise exit */
@@ -2608,7 +2643,11 @@ t_stat do_cmd (int32 flag, char *fcptr)
 return do_cmd_label (flag, fcptr, NULL);
 }
 
+#ifdef OPCON
+char *do_position(void)
+#else
 static char *do_position(void)
+#endif
 {
 static char cbuf[CBUFSIZE];
 
@@ -5778,7 +5817,11 @@ UNIT *uptr;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 sim_step = 0;
+#ifdef OPCON
+if (((flag == RU_RUN) || (flag == RU_GO)) && oc_halt_status() == FALSE){ /* run or go */
+#else
 if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
+#endif
     if (*cptr != 0) {                                   /* argument? */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
         if (*cptr != 0)                                 /* should be end */
@@ -5837,7 +5880,11 @@ else if (flag == RU_NEXT) {                             /* next */
     else
         sim_step = 1;
     }
+#ifdef OPCON
+else if (flag == RU_BOOT && oc_halt_status() == FALSE) {/* boot */
+#else
 else if (flag == RU_BOOT) {                             /* boot */
+#endif
     if (*cptr == 0)                                     /* must be more */
         return SCPE_2FARG;
     cptr = get_glyph (cptr, gbuf, 0);                   /* get next glyph */
@@ -5862,7 +5909,11 @@ else if (flag == RU_BOOT) {                             /* boot */
         return r;
     }
 
+#ifdef OPCON
+else if ((flag != RU_CONT) && (oc_halt_status() == FALSE)) /* must be cont */
+#else
 else if (flag != RU_CONT)                               /* must be cont */
+#endif
     return SCPE_IERR;
 
 if (sim_switches & SIM_SW_HIDE)                         /* Setup only for Remote Console Mode */
@@ -5916,7 +5967,51 @@ sim_start_timer_services ();                            /* enable wall clock tim
 do {
     t_addr *addrs;
 
+#ifdef OPCON
+        /* Set RUN light on or off, other leds too, depending on model */
+if (oc_halt_status() == TRUE) {
+  r = SCPE_STOP;
+  oc_toggle_clear();
+  switch (cpu_model) {
+    case MOD_1105: oc_port1(FSTS_RUN, 0);
+                   break;
+    case MOD_1120: oc_port1(FSTS_RUN, 0);
+                   break;
+    case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 1);
+                   oc_port1(FSTS_RUN, 0);
+                   break;
+    case MOD_1145: oc_port1(FSTS_RUN, 0);
+                   oc_port1(FSTS_1145_PAUSE, 1);
+                   break;
+    case MOD_1170: oc_port1(FSTS_RUN, 0);
+                   oc_port1(FSTS_1170_PAUSE, 1);
+                   break;
+    default      : break;
+    }
+  }
+else  {
+  switch (cpu_model) {
+    case MOD_1105: oc_port1(FSTS_RUN, 1);
+                   break;
+    case MOD_1120: oc_port1(FSTS_RUN, 1);
+                   break;
+    case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 0);
+                   oc_port1(FSTS_RUN, 1);
+                   break;
+    case MOD_1145: oc_port1(FSTS_RUN, 1);
+                   oc_port1(FSTS_1145_PAUSE, 0);
+                   break;
+    case MOD_1170: oc_port1(FSTS_RUN, 1);
+                   oc_port1(FSTS_1170_PAUSE, 0);
+                   break;
+    default      : break;
+    }
+  r = sim_instr();
+  }
+#else
     r = sim_instr();
+#endif
+
     if ((flag != RU_NEXT) ||                            /* done if not doing NEXT */
         (--sim_next <=0))
         break;
@@ -6430,7 +6525,11 @@ if ((cptr == NULL) || (rptr == NULL))
 if (rptr->flags & REG_RO)
     return SCPE_RO;
 if (flag & EX_I) {
+#ifdef OPCON
+    cptr = oc_read_line_p (NULL, gbuf, sizeof(gbuf), stdin);
+#else
     cptr = read_line (gbuf, sizeof(gbuf), stdin);
+#endif
     if (sim_log)
         fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
@@ -6648,7 +6747,11 @@ char gbuf[CBUFSIZE];
 if (dptr == NULL)
     return SCPE_IERR;
 if (flag & EX_I) {
+#ifdef OPCON
+    cptr = oc_read_line_p (NULL, gbuf, sizeof(gbuf), stdin);
+#else
     cptr = read_line (gbuf, sizeof(gbuf), stdin);
+#endif
     if (sim_log)
         fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
