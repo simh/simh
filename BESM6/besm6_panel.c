@@ -382,6 +382,8 @@ t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
 {
     if (! screen)
         return SCPE_NOTATT;
+    if (font_big) TTF_CloseFont(font_big);
+    if (font_small) TTF_CloseFont(font_small);
     TTF_Quit();
     SDL_Quit();
     screen = 0;
