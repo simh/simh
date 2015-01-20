@@ -55,7 +55,7 @@
 
 #define I_GETDEV3(x)    ((((x) & 020046000) != 020046000)? ((x) & DEV_MASK): DEV_MASK)
 
-#define TST_XFR(d,c)    (xfr_req && dev_map[d][c])
+#define TST_XFR(d,c)    (xfr_req & dev_map[d][c])
 #define SET_XFR(d,c)    xfr_req = xfr_req | dev_map[d][c]
 #define CLR_XFR(d,c)    xfr_req = xfr_req & ~dev_map[d][c]
 #define INV_DEV(d,c)    (dev_dsp[d][c] == NULL)
