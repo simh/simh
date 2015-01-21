@@ -20,7 +20,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -45,12 +45,12 @@
 /*
  * Use a 640x480 window with 32 bit pixels.
  */
-#define WIDTH           800
-#define HEIGHT          400
-#define DEPTH           32
+#define WIDTH   800
+#define HEIGHT  400
+#define DEPTH   32
 
-#define STEPX           14
-#define STEPY           16
+#define STEPX   14
+#define STEPY   16
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -404,7 +404,6 @@ t_stat besm6_show_panel (FILE *st, struct sim_unit *up, int32 v, void *dp)
 static SDL_Window *sdlWindow;
 static SDL_Renderer *sdlRenderer;
 static SDL_Texture *sdlTexture;
-
 
 /*
  * Initializing of the graphical window and the fonts.

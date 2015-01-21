@@ -19,7 +19,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -559,7 +559,7 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
  * Форматы строк:
  * п 76543                     - адрес пуска
  * в 12345                     - адрес ввода
- * ч -123.45e+6                        - вещественное число
+ * ч -123.45e+6                - вещественное число
  * с 0123 4567 0123 4567       - восьмеричное слово
  * к 00 22 00000 00 010 0000   - команды
  */

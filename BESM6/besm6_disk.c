@@ -22,9 +22,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
- * Except as contained in this notice, the name of Leonid Broukhis or 
- * Serge Vakulenko shall not be used in advertising or otherwise to promote 
- * the sale, use or other dealings in this Software without prior written 
+ * Except as contained in this notice, the name of Leonid Broukhis or
+ * Serge Vakulenko shall not be used in advertising or otherwise to promote
+ * the sale, use or other dealings in this Software without prior written
  * authorization from Leonid Broukhis and Serge Vakulenko.
  */
 #include "besm6_defs.h"
@@ -33,14 +33,14 @@
 /*
  * Управляющее слово обмена с магнитным диском.
  */
-#define DISK_BLOCK             0740000000       /* номер блока памяти - 27-24 рр */
-#define DISK_READ_SYSDATA       004000000       /* считывание только служебных слов */
-#define DISK_PAGE_MODE          001000000       /* обмен целой страницей */
-#define DISK_READ               000400000       /* чтение с диска в память */
-#define DISK_PAGE               000370000       /* номер страницы памяти */
-#define DISK_HALFPAGE           000004000       /* выбор половины листа */
-#define DISK_UNIT               000001600       /* номер устройства */
-#define DISK_HALFZONE           000000001       /* выбор половины зоны */
+#define DISK_BLOCK         0740000000   /* номер блока памяти - 27-24 рр */
+#define DISK_READ_SYSDATA   004000000   /* считывание только служебных слов */
+#define DISK_PAGE_MODE      001000000   /* обмен целой страницей */
+#define DISK_READ           000400000   /* чтение с диска в память */
+#define DISK_PAGE           000370000   /* номер страницы памяти */
+#define DISK_HALFPAGE       000004000   /* выбор половины листа */
+#define DISK_UNIT           000001600   /* номер устройства */
+#define DISK_HALFZONE       000000001   /* выбор половины зоны */
 
 /*
  * "Хороший" статус чтения/записи.
@@ -70,8 +70,8 @@ typedef struct {
     t_value *sysdata;               /* Буфер системных данных */
 } KMD;
 
-static KMD controller [2];              /* Две стойки КМД */
-int disk_fail;                          /* Маска ошибок по направлениям */
+static KMD controller [2];          /* Две стойки КМД */
+int disk_fail;                      /* Маска ошибок по направлениям */
 
 t_stat disk_event (UNIT *u);
 
@@ -102,19 +102,19 @@ UNIT disk_unit [16] = {
 };
 
 REG disk_reg[] = {
-    { "КУС_0",   &controller[0].op,      8, 24, 0, 1 },
-    { "УСТР_0", &controller[0].dev,     8, 3, 0, 1 },
-    { "ЗОНА_0", &controller[0].zone,    8, 10,  0, 1 },
-    { "ДОРОЖКА_0",   &controller[0].track,   8, 2,  0, 1 },
-    { "МОЗУ_0", &controller[0].memory,  8, 20, 0, 1 },
-    { "РС_0",     &controller[0].status,  8, 24, 0, 1 },
-    { "КУС_1",   &controller[1].op,      8, 24, 0, 1 },
-    { "УСТР_1", &controller[1].dev,     8, 3, 0, 1 },
-    { "ЗОНА_1", &controller[1].zone,    8, 10,  0, 1 },
-    { "ДОРОЖКА_1",   &controller[1].track,   8, 2,  0, 1 },
-    { "МОЗУ_1", &controller[1].memory,  8, 20, 0, 1 },
-    { "РС_1",     &controller[1].status,  8, 24, 0, 1 },
-    { "ОШ",               &disk_fail,             8, 6, 0, 1 },
+    { "КУС_0",      &controller[0].op,      8, 24, 0, 1 },
+    { "УСТР_0",     &controller[0].dev,     8, 3,  0, 1 },
+    { "ЗОНА_0",     &controller[0].zone,    8, 10, 0, 1 },
+    { "ДОРОЖКА_0",  &controller[0].track,   8, 2,  0, 1 },
+    { "МОЗУ_0",     &controller[0].memory,  8, 20, 0, 1 },
+    { "РС_0",       &controller[0].status,  8, 24, 0, 1 },
+    { "КУС_1",      &controller[1].op,      8, 24, 0, 1 },
+    { "УСТР_1",     &controller[1].dev,     8, 3,  0, 1 },
+    { "ЗОНА_1",     &controller[1].zone,    8, 10, 0, 1 },
+    { "ДОРОЖКА_1",  &controller[1].track,   8, 2,  0, 1 },
+    { "МОЗУ_1",     &controller[1].memory,  8, 20, 0, 1 },
+    { "РС_1",       &controller[1].status,  8, 24, 0, 1 },
+    { "ОШ",         &disk_fail,             8, 6,  0, 1 },
     { 0 }
 };
 
@@ -233,9 +233,10 @@ t_value spread (t_value val)
     int i, j;
     t_value res = 0;
 
-    for (i = 0; i < 5; i++) for (j = 0; j < 9; j++)
-                                if (val & (1LL<<(i+j*5)))
-                                    res |= 1LL << (i*9+j);
+    for (i = 0; i < 5; i++)
+        for (j = 0; j < 9; j++)
+            if (val & (1LL<<(i+j*5)))
+                res |= 1LL << (i*9+j);
     return res & BITS48;
 }
 
@@ -378,9 +379,10 @@ t_value collect (t_value val)
     int i, j;
     t_value res = 0;
 
-    for (i = 0; i < 5; i++) for (j = 0; j < 9; j++)
-                                if (val & (1LL<<(i*9+j)))
-                                    res |= 1LL << (i+j*5);
+    for (i = 0; i < 5; i++)
+        for (j = 0; j < 9; j++)
+            if (val & (1LL<<(i*9+j)))
+                res |= 1LL << (i+j*5);
     return res & BITS48;
 }
 

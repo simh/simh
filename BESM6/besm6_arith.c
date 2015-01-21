@@ -18,7 +18,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -31,7 +31,7 @@
 
 typedef struct {
     t_uint64 mantissa;
-    unsigned exponent;              /* offset by 64 */
+    unsigned exponent;                  /* offset by 64 */
 } alureg_t;                             /* ALU register type */
 
 static alureg_t toalu (t_value val)
@@ -260,7 +260,7 @@ void besm6_add (t_value val, int negate_acc, int negate_val)
 #define INT64(x) ((x) & BIT41 ? (-1LL << 40) | (x) : x)
 static alureg_t nrdiv (alureg_t n, alureg_t d)
 {
-    t_int64 nn, dd, q, res; 
+    t_int64 nn, dd, q, res;
     alureg_t quot;
 
     /* to compensate for potential normalization to the right  */

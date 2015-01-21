@@ -18,7 +18,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -45,13 +45,13 @@ char line[2][128];
 /* #define NEGATIVE_RDY */
 
 #ifndef NEGATIVE_RDY
-#define ENB_RDY SET_RDY
-#define DIS_RDY CLR_RDY
-#define IS_RDY  ISSET_RDY
+#   define ENB_RDY      SET_RDY
+#   define DIS_RDY      CLR_RDY
+#   define IS_RDY       ISSET_RDY
 #else
-#define ENB_RDY CLR_RDY
-#define DIS_RDY SET_RDY
-#define IS_RDY ISCLR_RDY
+#   define ENB_RDY      CLR_RDY
+#   define DIS_RDY      SET_RDY
+#   define IS_RDY       ISCLR_RDY
 #endif
 
 #define SET_RDY(x)      do READY |= x; while (0)
@@ -300,9 +300,10 @@ t_stat fs_event (UNIT *u)
 int fs_read(int num) {
     if (fs_dev.dctrl)
         besm6_debug("<<< ФС1500-%d: байт %03o", num, FS[num]);
-        
+
     return FS[num];
 }
+
 /*
  * Unlike the OS which uses GOST overline (approximated by ^) as a line separator
  * in running text mode, the BESM-ALGOL programming system used a nonprintable

@@ -19,7 +19,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -72,7 +72,7 @@ t_value pult[11][8] = {
 /* Switch registers */
     { 0 },
 /* Hardwired program 1, a simple CU test */
-    { 0376, 
+    { 0376,
       SET_CONVOL(01240000007100002LL, CONVOL_INSN),   /* 1: vtm (2), vjm 2(1) */
       SET_CONVOL(00657777712577777LL, CONVOL_INSN),   /* 2: utm -1(1), utm -1(2) */
       SET_CONVOL(00444000317400007LL, CONVOL_INSN),   /* 3: mtj 3(1), vzm 7(3) */
@@ -95,7 +95,7 @@ t_value pult[11][8] = {
       SET_CONVOL(00737777703000001LL, CONVOL_INSN)  /* 6: stop -1(1), uj 1 */
     },
 /* Hardwired program 3, RAM read test to use after program 2, arx/atx applies */
-    { 0176, 
+    { 0176,
       SET_CONVOL(00770000306400012LL, CONVOL_INSN), /* 1: vlm 3(1), vtm 12(1) */
       SET_CONVOL(00010000000000010LL, CONVOL_INSN), /* 2: xta 0, atx 10 */
       SET_CONVOL(00010001000130007LL, CONVOL_INSN), /* 3: xta 10, arx 7 */
@@ -152,53 +152,53 @@ t_value pult[11][8] = {
 /* Hardwired program 10, magtape read */
     { 0176,
     },
-};      
+};
 
 REG mmu_reg[] = {
-    { "БРЗ0",  &BRZ[0],  8, 50, 0, 1, NULL, NULL, REG_VMIO},     /* Буферные регистры записи */
-    { "БРЗ1",  &BRZ[1],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ2",  &BRZ[2],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ3",  &BRZ[3],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ4",  &BRZ[4],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ5",  &BRZ[5],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ6",  &BRZ[6],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ7",  &BRZ[7],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БАЗ0",  &BAZ[0],  8, 16, 0, 1 },          /* Буферные адреса записи */
-    { "БАЗ1",  &BAZ[1],  8, 16, 0, 1 },
-    { "БАЗ2",  &BAZ[2],  8, 16, 0, 1 },
-    { "БАЗ3",  &BAZ[3],  8, 16, 0, 1 },
-    { "БАЗ4",  &BAZ[4],  8, 16, 0, 1 },
-    { "БАЗ5",  &BAZ[5],  8, 16, 0, 1 },
-    { "БАЗ6",  &BAZ[6],  8, 16, 0, 1 },
-    { "БАЗ7",  &BAZ[7],  8, 16, 0, 1 },
-    { "ТАБСТ", &TABST, 8, 28, 0, 1, NULL, NULL, REG_HIDDEN },/* Таблица старшинства БРЗ */
-    { "ЗпТР",  &FLUSH,  8,  4, 0, 1, NULL, NULL, REG_HIDDEN },/* Признак выталкивания БРЗ */
-    { "Старш", &OLDEST,        8,  3, 0, 1 },          /* Номер вытолкнутого БРЗ */
-    { "РП0",   &RP[0],    8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* Регистры приписки, по 12 бит */
-    { "РП1",   &RP[1],    8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП2",   &RP[2],    8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП3",   &RP[3],    8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП4",   &RP[4],    8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП5",   &RP[5],    8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП6",   &RP[6],    8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП7",   &RP[7],    8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РЗ",    &RZ,               8, 32, 0, 1 },          /* Регистр защиты */
-    { "ТР1",   &pult[0][1],  8, 50, 0, 1, NULL, NULL, REG_VMIO},     /* Тумблерные регистры */
-    { "ТР2",   &pult[0][2],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР3",   &pult[0][3],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР4",   &pult[0][4],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР5",   &pult[0][5],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР6",   &pult[0][6],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР7",   &pult[0][7],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРС0",  &BRS[0],  8, 50, 0, 1, NULL, NULL, REG_VMIO}, /* Буферные регистры слов */
-    { "БРС1",  &BRS[1],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРС2",  &BRS[2],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРС3",  &BRS[3],  8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БАС0",  &BAS[0],  8, 16, 0, 1 },          /* Буферные адреса слов */
-    { "БАС1",  &BAS[1],  8, 16, 0, 1 },
-    { "БАС2",  &BAS[2],  8, 16, 0, 1 },
-    { "БАС3",  &BAS[3],  8, 16, 0, 1 },
-    { "БРСст", &BRSLRU,        8,  6, 0, 1, NULL, NULL, REG_HIDDEN},
+    { "БРЗ0",  &BRZ[0],     8, 50, 0, 1, NULL, NULL, REG_VMIO}, /* Буферные регистры записи */
+    { "БРЗ1",  &BRZ[1],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРЗ2",  &BRZ[2],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРЗ3",  &BRZ[3],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРЗ4",  &BRZ[4],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРЗ5",  &BRZ[5],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРЗ6",  &BRZ[6],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРЗ7",  &BRZ[7],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БАЗ0",  &BAZ[0],     8, 16, 0, 1 },                      /* Буферные адреса записи */
+    { "БАЗ1",  &BAZ[1],     8, 16, 0, 1 },
+    { "БАЗ2",  &BAZ[2],     8, 16, 0, 1 },
+    { "БАЗ3",  &BAZ[3],     8, 16, 0, 1 },
+    { "БАЗ4",  &BAZ[4],     8, 16, 0, 1 },
+    { "БАЗ5",  &BAZ[5],     8, 16, 0, 1 },
+    { "БАЗ6",  &BAZ[6],     8, 16, 0, 1 },
+    { "БАЗ7",  &BAZ[7],     8, 16, 0, 1 },
+    { "ТАБСТ", &TABST,      8, 28, 0, 1, NULL, NULL, REG_HIDDEN },/* Таблица старшинства БРЗ */
+    { "ЗпТР",  &FLUSH,      8,  4, 0, 1, NULL, NULL, REG_HIDDEN },/* Признак выталкивания БРЗ */
+    { "Старш", &OLDEST,     8,  3, 0, 1 },                      /* Номер вытолкнутого БРЗ */
+    { "РП0",   &RP[0],      8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* Регистры приписки, по 12 бит */
+    { "РП1",   &RP[1],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
+    { "РП2",   &RP[2],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
+    { "РП3",   &RP[3],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
+    { "РП4",   &RP[4],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
+    { "РП5",   &RP[5],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
+    { "РП6",   &RP[6],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
+    { "РП7",   &RP[7],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
+    { "РЗ",    &RZ,         8, 32, 0, 1 },                      /* Регистр защиты */
+    { "ТР1",   &pult[0][1], 8, 50, 0, 1, NULL, NULL, REG_VMIO}, /* Тумблерные регистры */
+    { "ТР2",   &pult[0][2], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "ТР3",   &pult[0][3], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "ТР4",   &pult[0][4], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "ТР5",   &pult[0][5], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "ТР6",   &pult[0][6], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "ТР7",   &pult[0][7], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРС0",  &BRS[0],     8, 50, 0, 1, NULL, NULL, REG_VMIO}, /* Буферные регистры слов */
+    { "БРС1",  &BRS[1],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРС2",  &BRS[2],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БРС3",  &BRS[3],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
+    { "БАС0",  &BAS[0],     8, 16, 0, 1 },                      /* Буферные адреса слов */
+    { "БАС1",  &BAS[1],     8, 16, 0, 1 },
+    { "БАС2",  &BAS[2],     8, 16, 0, 1 },
+    { "БАС3",  &BAS[3],     8, 16, 0, 1 },
+    { "БРСст", &BRSLRU,     8,  6, 0, 1, NULL, NULL, REG_HIDDEN},
     { 0 }
 };
 
@@ -206,7 +206,7 @@ REG mmu_reg[] = {
 
 MTAB mmu_mod[] = {
     { 1, 0, "NOCACHE", "NOCACHE" },
-    { 1, 1, "CACHE", "CACHE" },
+    { 1, 1, "CACHE",   "CACHE" },
     { 0 }
 };
 

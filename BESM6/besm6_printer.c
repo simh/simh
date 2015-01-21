@@ -18,7 +18,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -52,20 +52,20 @@ struct acpu_t {
     unsigned char line[128][MAX_STRIKES];
 } acpu[2];
 
-#define PRN1_NOT_READY (1<<19)
-#define PRN2_NOT_READY (1<<18)
+#define PRN1_NOT_READY  (1<<19)
+#define PRN2_NOT_READY  (1<<18)
 
 /* 1 = можно пользоваться молоточками, 0 - бумага в процессе протяжки */
-#define PRN1_LINEFEED (1<<23)
-#define PRN2_LINEFEED (1<<22)
+#define PRN1_LINEFEED   (1<<23)
+#define PRN2_LINEFEED   (1<<22)
 
 #define SLOW_START      100*MSEC
 #define FAST_START      1*MSEC
 #define LINEFEED_SYNC   1       /* Чтобы быстрее печатало; в жизни 20-25 мс/1.4 мс ~= 17 */
 
 REG printer_reg[] = {
-    { "Готов", &READY, 2,  2, 18, 1 },
-    { "Прогон",       &READY, 2,  2, 22, 1 },
+    { "Готов",  &READY, 2,  2, 18, 1 },
+    { "Прогон", &READY, 2,  2, 22, 1 },
     { 0 }
 };
 
