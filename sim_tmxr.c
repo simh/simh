@@ -415,6 +415,11 @@
 #define TNS_CRPAD       005                             /* CR padding */
 #define TNS_DO          006                             /* DO request pending rejection */
 
+/* Telnet Option Sent Flags */
+
+#define TNOS_DONT       001                             /* Don't has been sent */
+#define TNOS_WONT       002                             /* Won't has been sent */
+
 static BITFIELD tmxr_modem_bits[] = {
   BIT(DTR),                                 /* Data Terminal Ready */
   BIT(RTS),                                 /* Request To Send     */
@@ -1032,6 +1037,8 @@ if (mp->master) {
             if (!lp->notelnet) {
                 sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
                 tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                lp->telnet_sent_opts = (uint8 *)realloc (lp->telnet_sent_opts, 256);
+                memset (lp->telnet_sent_opts, 0, 256);
                 }
             tmxr_report_connection (mp, lp);
             lp->cnms = sim_os_msec ();                  /* time of connection */
@@ -1217,6 +1224,8 @@ if (lp->serport) {
 else                                                    /* Telnet connection */
     if (lp->sock) {
         sim_close_sock (lp->sock, 0);                   /* close socket */
+        free (lp->telnet_sent_opts);
+        lp->telnet_sent_opts = NULL;
         lp->sock = 0;
         lp->conn = FALSE;
         lp->cnms = 0;
@@ -1718,7 +1727,51 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                     tmxr_rmvrc (lp, j);                 /* remove char */
                     break;
 
-                case TNS_WILL: case TNS_WONT:           /* IAC+WILL/WONT prev */
+                case TNS_WILL:                          /* IAC+WILL prev */
+                    if ((tmp == TN_STATUS) || 
+                        (tmp == TN_TIMING) || 
+                        (tmp == TN_NAOCRD) || 
+                        (tmp == TN_NAOHTS) || 
+                        (tmp == TN_NAOHTD) || 
+                        (tmp == TN_NAOFFD) || 
+                        (tmp == TN_NAOVTS) || 
+                        (tmp == TN_NAOVTD) || 
+                        (tmp == TN_NAOLFD) || 
+                        (tmp == TN_EXTEND) || 
+                        (tmp == TN_LOGOUT) || 
+                        (tmp == TN_BM)     || 
+                        (tmp == TN_DET)    || 
+                        (tmp == TN_SENDLO) || 
+                        (tmp == TN_TERMTY) || 
+                        (tmp == TN_ENDREC) || 
+                        (tmp == TN_TUID)   || 
+                        (tmp == TN_OUTMRK) || 
+                        (tmp == TN_TTYLOC) || 
+                        (tmp == TN_3270)   || 
+                        (tmp == TN_X3PAD)  || 
+                        (tmp == TN_NAWS)   || 
+                        (tmp == TN_TERMSP) || 
+                        (tmp == TN_TOGFLO) || 
+                        (tmp == TN_XDISPL) || 
+                        (tmp == TN_ENVIRO) || 
+                        (tmp == TN_AUTH)   || 
+                        (tmp == TN_ENCRYP) || 
+                        (tmp == TN_NEWENV) || 
+                        (tmp == TN_TN3270) || 
+                        (tmp == TN_CHARST) || 
+                        (tmp == TN_COMPRT) || 
+                        (tmp == TN_KERMIT)) {
+                        /* Reject (DONT) these 'uninteresting' options only one time to avoid loops */
+                        if (0 == (lp->telnet_sent_opts[tmp] & TNOS_DONT)) {
+                            lp->notelnet = TRUE;                /* Temporarily disable so */
+                            tmxr_putc_ln (lp, TN_IAC);          /* IAC gets injected bare */
+                            lp->notelnet = FALSE;
+                            tmxr_putc_ln (lp, TN_DONT); 
+                            tmxr_putc_ln (lp, tmp); 
+                            lp->telnet_sent_opts[tmp] |= TNOS_DONT;/* Record DONT sent */
+                            }
+                        }
+                case TNS_WONT:           /* IAC+WILL/WONT prev */
                     if (tmp == TN_BIN) {                /* BIN? */
                         if (lp->tsta == TNS_WILL) {
                             lp->dstb = 0;
@@ -1753,6 +1806,49 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                     break;
 
                 case TNS_DO:                            /* pending DO request */
+                    if ((tmp == TN_STATUS) || 
+                        (tmp == TN_TIMING) || 
+                        (tmp == TN_NAOCRD) || 
+                        (tmp == TN_NAOHTS) || 
+                        (tmp == TN_NAOHTD) || 
+                        (tmp == TN_NAOFFD) || 
+                        (tmp == TN_NAOVTS) || 
+                        (tmp == TN_NAOVTD) || 
+                        (tmp == TN_NAOLFD) || 
+                        (tmp == TN_EXTEND) || 
+                        (tmp == TN_LOGOUT) || 
+                        (tmp == TN_BM)     || 
+                        (tmp == TN_DET)    || 
+                        (tmp == TN_SENDLO) || 
+                        (tmp == TN_TERMTY) || 
+                        (tmp == TN_ENDREC) || 
+                        (tmp == TN_TUID)   || 
+                        (tmp == TN_OUTMRK) || 
+                        (tmp == TN_TTYLOC) || 
+                        (tmp == TN_3270)   || 
+                        (tmp == TN_X3PAD)  || 
+                        (tmp == TN_NAWS)   || 
+                        (tmp == TN_TERMSP) || 
+                        (tmp == TN_TOGFLO) || 
+                        (tmp == TN_XDISPL) || 
+                        (tmp == TN_ENVIRO) || 
+                        (tmp == TN_AUTH)   || 
+                        (tmp == TN_ENCRYP) || 
+                        (tmp == TN_NEWENV) || 
+                        (tmp == TN_TN3270) || 
+                        (tmp == TN_CHARST) || 
+                        (tmp == TN_COMPRT) || 
+                        (tmp == TN_KERMIT)) {
+                        /* Reject (WONT) these 'uninteresting' options only one time to avoid loops */
+                        if (0 == (lp->telnet_sent_opts[tmp] & TNOS_WONT)) {
+                            lp->notelnet = TRUE;                /* Temporarily disable so */
+                            tmxr_putc_ln (lp, TN_IAC);          /* IAC gets injected bare */
+                            lp->notelnet = FALSE;
+                            tmxr_putc_ln (lp, TN_WONT); 
+                            tmxr_putc_ln (lp, tmp); 
+                            lp->telnet_sent_opts[tmp] |= TNOS_WONT;/* Record WONT sent */
+                            }
+                        }
                 case TNS_SKIP: default:                 /* skip char */
                     tmxr_rmvrc (lp, j);                 /* remove char */
                     lp->tsta = TNS_NORM;                /* next normal */
