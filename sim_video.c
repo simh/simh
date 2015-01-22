@@ -1513,8 +1513,12 @@ if (!initialized) {
     eventtypes[SDL_DROPFILE] = "DROPFILE"; /**< The system requests a file open */
 
     /* Render events */
+#if defined(SDL_RENDER_TARGETS_RESET)
     eventtypes[SDL_RENDER_TARGETS_RESET] = "RENDER_TARGETS_RESET"; /**< The render targets have been reset */
-
+#endif
+#if defined(SDL_RENDER_DEVICE_RESET)
+    eventtypes[SDL_RENDER_DEVICE_RESET] = "SDL_RENDER_DEVICE_RESET"; /**< The render device has been reset */
+#endif
     /** Events ::SDL_USEREVENT through ::SDL_LASTEVENT are for your use,
      *  and should be allocated with SDL_RegisterEvents()
      */
