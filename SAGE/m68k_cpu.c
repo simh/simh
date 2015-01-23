@@ -269,7 +269,7 @@ static t_stat ReadICache(t_addr tpc)
 	t_stat rc;
 	uint8* mem;
 
-	ASSERT_OKRET(Mem((tpc+CACHE_SIZE)&addrmask,&mem));
+	ASSERT_OKRET(Mem((tpc+CACHE_SIZE-1)&addrmask,&mem));
 	
 	/* 68000/08/10 do not like unaligned access */
 	if (cputype < 3 && (tpc & 1)) return STOP_ERRADR;
