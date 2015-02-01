@@ -294,7 +294,7 @@ return SCPE_NXM;
 #define I_V_MRF         003                             /* memory reference */
 #define I_V_REG         004                             /* register change */
 #define I_V_SHF         005                             /* shift */
-#define I_V_OPO         006                             /* opcode only */
+#define I_V_OPO         006                             /* operand optional */
 #define I_V_CHC         007                             /* chan cmd */
 #define I_V_CHT         010                             /* chan test */
 #define I_V_SPP         011                             /* system POP */
@@ -312,7 +312,7 @@ return SCPE_NXM;
 static const int32 masks[] = {
  037777777, 010000000, 017700000,                       /* NPN, PPO, IOI */
  017740000, 017700000, 017774000,                       /* MRF, REG, SHF */
- 017700000, 017377677, 027737677,                       /* OPO, CHC, CHT */
+ 017740000, 017377677, 027737677,                       /* OPO, CHC, CHT */
  057740000                                              /* SPP           */
  };
 
@@ -364,7 +364,7 @@ static const char *opcode[] = {                         /* Note: syspops must pr
          "BRU*",
  "MIY*", "BRI*", "MIW*", "POT*",
  "ETR*", "MRG*", "EOR*",
-         "EXU*",
+ "NOP*", "EXU*",
  "YIM*", "WIM*", "PIN*",
  "STA*", "STB*", "STX*",
          "BRX*", "BRM*",
@@ -437,7 +437,7 @@ static const int32 opc_val[] = {
                   000140000+I_MRF,                                       /*       BRU*,             */
  001040000+I_MRF, 001140000+I_MRF, 001240000+I_MRF, 001340000+I_MRF,     /* MIY*, BRI*, MIW*, POT*, */
  001440000+I_MRF, 001640000+I_MRF, 001740000+I_MRF,                      /* ETR*, MRG*, EOR*,       */
-                  002340000+I_MRF,                                       /*       EXU*,             */
+ 002040000+I_OPO, 002340000+I_MRF,                                       /* NOP*, EXU*,             */
  003040000+I_MRF, 003240000+I_MRF, 003340000+I_MRF,                      /* YIM*, WIM*, PIN*,       */
  003540000+I_MRF, 003640000+I_MRF, 003740000+I_MRF,                      /* STA*, STB*, STX*,       */
                   004140000+I_MRF, 004340000+I_MRF,                      /*       BRX*, BRM*,       */
@@ -560,8 +560,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
 
         switch (j) {                                    /* case on class */
 
-        case I_V_NPN:                                   /* no operands */
-        case I_V_OPO:                                   /* opcode only */
+        case I_V_NPN:                                   /* no operand */
             fprintf (of, "%s", opcode[i]);              /* opcode */
             break;
 
@@ -588,6 +587,13 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             if (tag)
                 fprintf (of, ",%-o", tag);
             break;
+
+        case I_V_OPO:                                   /* operand optional */
+            if (!tag && !va)
+            {
+                fprintf (of, "%s", opcode[i]);          /* opcode only */
+                break;
+            }                                           /* or fall through to MRF */
 
         case I_V_MRF:                                   /* mem ref */
             fprintf (of, "%s %-o", opcode[i], va);
@@ -704,7 +710,7 @@ j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
 switch (j) {                                            /* case on class */
 
-    case I_V_NPN: case I_V_OPO:                         /* opcode only */
+    case I_V_NPN:                                       /* no operand */
         break;
 
     case I_V_SHF:                                       /* shift */
@@ -732,9 +738,12 @@ switch (j) {                                            /* case on class */
         val[0] = val[0] | d | tag;
         break;
 
+    case I_V_OPO:                                       /* operand optional */
     case I_V_SPP:                                       /* syspop */
     case I_V_MRF:                                       /* mem ref */
         cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        if (gbuf[0]=='\0' && j==I_V_OPO)                /* operand optional */
+            break;
         d = get_uint (gbuf, 8, VA_MASK, &r);            /* virt address */
         if (r != SCPE_OK)
             return SCPE_ARG;
