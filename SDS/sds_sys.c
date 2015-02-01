@@ -45,6 +45,7 @@ extern DEVICE mt_dev;
 extern DEVICE mux_dev, muxl_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
+extern uint32 cpu_mode;
 extern uint32 M[MAXMEMSIZE];
 
 /* SCP data structures and interface routines
@@ -103,9 +104,9 @@ const char *sim_stop_messages[] = {
     "Next expired"
     };
 
-/* Character conversion tables */
+/* SDS 930 character conversion tables. Per 930 Ref Man Appendix A */
 
-const int8 sds_to_ascii[64] = {
+const int8 sds930_to_ascii[64] = {
     '0', '1', '2', '3', '4', '5', '6', '7',
     '8', '9', ' ', '=', '\'', ':', '>', '%',            /* 17 = check mark */
     '+', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
@@ -116,8 +117,8 @@ const int8 sds_to_ascii[64] = {
     'Y', 'Z', '?', ',', '(', '~', '\\', '#'             /* 72 = rec mark */
      };                                                 /* 75 = squiggle, 77 = del */
 
-const int8 ascii_to_sds[128] = {
-     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,             /* 0 - 37 */
+const int8 ascii_to_sds930[128] = {
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,             /* 00 - 37 */
     032, 072,  -1,  -1,  -1, 052,  -1,  -1,
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
@@ -129,10 +130,42 @@ const int8 ascii_to_sds[128] = {
     030, 031, 041, 042, 043, 044, 045, 046,
     047, 050, 051, 062, 063, 064, 065, 066,
     067, 070, 071, 035, 076, 055, 057, 060,
-    000, 021, 022, 023, 024, 025, 026, 027,             /* 140 - 177 */
-    030, 031, 041, 042, 043, 044, 045, 046,
+     -1, 021, 022, 023, 024, 025, 026, 027,             /* 140 - 177 */
+    030, 031, 041, 042, 043, 044, 045, 046,             /* fold lower case to upper */
     047, 050, 051, 062, 063, 064, 065, 066,
     067, 070, 071,  -1,  -1,  -1,  -1,  -1
+    };
+
+/* SDS 940 character conversion tables. Per 940 Ref Man Appendix A */
+
+const int8 sds940_to_ascii[64] = {
+    ' ', '!', '"', '#', '$', '%', '&', '\'',            /* 00 - 17 */
+    '(', ')', '*', '+', ',', '-', '.', '/',
+    '0', '1', '2', '3', '4', '5', '6', '7',             /* 20 - 37 */
+    '8', '9', ':', ';', '<', '=', '>', '?',
+    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G',             /* 40 - 57 */
+    'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',             /* 60 - 77 */
+    'X', 'Y', 'Z', '[', '\\', ']', '^', '_'
+     };
+
+const int8 ascii_to_sds940[128] = {
+     -1, 141, 142, 143, 144, 145, 146, 147,             /* 00 - 37 */
+     -1, 151, 152, 153, 154, 155,  -1,  -1,             
+     -1, 161, 162, 163, 164, 165, 166, 167,
+    170, 171, 172,  -1,  -1,  -1,  -1,  -1,
+    000, 001, 002, 003, 004, 005, 006, 007,             /* 40 - 77 */
+    010, 011, 012, 013, 014, 015, 016, 017,
+    020, 021, 022, 023, 024, 025, 026, 027,
+    030, 031, 032, 033, 034, 035, 036, 037,
+    040, 041, 042, 043, 044, 045, 046, 047,             /* 100 - 137 */
+    050, 051, 052, 053, 054, 055, 056, 057,
+    060, 061, 062, 063, 064, 065, 066, 067,
+    070, 071, 072, 073, 074, 075, 076, 077,
+     -1, 041, 042, 043, 044, 045, 046, 047,             /* 140 - 177 */
+    050, 051, 052, 053, 054, 055, 056, 057,             /* fold lower case to upper */
+    060, 061, 062, 063, 064, 065, 066, 067,
+    070, 071, 072,  -1,  -1,  -1,  -1,  -1
     };
 
 const int8 odd_par[64] = {
@@ -261,7 +294,7 @@ return SCPE_NXM;
 #define I_V_MRF         003                             /* memory reference */
 #define I_V_REG         004                             /* register change */
 #define I_V_SHF         005                             /* shift */
-#define I_V_OPO         006                             /* opcode only */
+#define I_V_OPO         006                             /* operand optional */
 #define I_V_CHC         007                             /* chan cmd */
 #define I_V_CHT         010                             /* chan test */
 #define I_V_SPP         011                             /* system POP */
@@ -279,7 +312,7 @@ return SCPE_NXM;
 static const int32 masks[] = {
  037777777, 010000000, 017700000,                       /* NPN, PPO, IOI */
  017740000, 017700000, 017774000,                       /* MRF, REG, SHF */
- 017700000, 017377677, 027737677,                       /* OPO, CHC, CHT */
+ 017740000, 017377677, 027737677,                       /* OPO, CHC, CHT */
  057740000                                              /* SPP           */
  };
 
@@ -331,7 +364,7 @@ static const char *opcode[] = {                         /* Note: syspops must pr
          "BRU*",
  "MIY*", "BRI*", "MIW*", "POT*",
  "ETR*", "MRG*", "EOR*",
-         "EXU*",
+ "NOP*", "EXU*",
  "YIM*", "WIM*", "PIN*",
  "STA*", "STB*", "STX*",
          "BRX*", "BRM*",
@@ -404,7 +437,7 @@ static const int32 opc_val[] = {
                   000140000+I_MRF,                                       /*       BRU*,             */
  001040000+I_MRF, 001140000+I_MRF, 001240000+I_MRF, 001340000+I_MRF,     /* MIY*, BRI*, MIW*, POT*, */
  001440000+I_MRF, 001640000+I_MRF, 001740000+I_MRF,                      /* ETR*, MRG*, EOR*,       */
-                  002340000+I_MRF,                                       /*       EXU*,             */
+ 002040000+I_OPO, 002340000+I_MRF,                                       /* NOP*, EXU*,             */
  003040000+I_MRF, 003240000+I_MRF, 003340000+I_MRF,                      /* YIM*, WIM*, PIN*,       */
  003540000+I_MRF, 003640000+I_MRF, 003740000+I_MRF,                      /* STA*, STB*, STX*,       */
                   004140000+I_MRF, 004340000+I_MRF,                      /*       BRX*, BRM*,       */
@@ -456,6 +489,26 @@ for (i = sp = 0; opc_val[i] >= 0; i++) {                /* loop thru ops */
 return;
 }
 
+/* Convert from SDS internal character code to ASCII depending upon cpu mode. */
+int8 sds_to_ascii(int8 ch)
+{
+  ch &= 077;
+  if (cpu_mode == NML_MODE)
+    return sds930_to_ascii[ch];
+  else
+    return sds940_to_ascii[ch];
+}
+
+/* Convert from ASCII to SDS internal character code depending upon cpu mode. */
+int8 ascii_to_sds(int8 ch)
+{
+  ch &= 0177;
+  if (cpu_mode == NML_MODE)
+    return ascii_to_sds930[ch];
+  else
+    return ascii_to_sds940[ch];
+}
+
 /* Symbolic decode
 
    Inputs:
@@ -494,7 +547,7 @@ if (sw & SWMASK ('A')) {                                /* SDS internal ASCII? *
     }
 if (sw & SWMASK ('C')) {                                /* six-bit character? */
     for (i = 18; i >= 0; i -= 6)
-        fprintf (of, "%c", sds_to_ascii[(inst >> i) & 077]);
+        fprintf (of, "%c", sds_to_ascii(inst >> i));
     return SCPE_OK;
     }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
@@ -507,8 +560,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
 
         switch (j) {                                    /* case on class */
 
-        case I_V_NPN:                                   /* no operands */
-        case I_V_OPO:                                   /* opcode only */
+        case I_V_NPN:                                   /* no operand */
             fprintf (of, "%s", opcode[i]);              /* opcode */
             break;
 
@@ -535,6 +587,13 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             if (tag)
                 fprintf (of, ",%-o", tag);
             break;
+
+        case I_V_OPO:                                   /* operand optional */
+            if (!tag && !va)
+            {
+                fprintf (of, "%s", opcode[i]);          /* opcode only */
+                break;
+            }                                           /* or fall through to MRF */
 
         case I_V_MRF:                                   /* mem ref */
             fprintf (of, "%s %-o", opcode[i], va);
@@ -634,7 +693,7 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* string of 6-bit char
     for (i = j = 0, val[0] = 0; i < 4; i++) {
         if (cptr[i] == 0)                               /* latch str end */
             j = 1;
-        k = ascii_to_sds[cptr[i] & 0177];               /* cvt char */
+        k = ascii_to_sds(cptr[i]);                      /* cvt char */
         if (j || (k < 0))                               /* bad, end? spc */
             k = 0;
         val[0] = (val[0] << 6) | k;
@@ -651,7 +710,7 @@ j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
 switch (j) {                                            /* case on class */
 
-    case I_V_NPN: case I_V_OPO:                         /* opcode only */
+    case I_V_NPN:                                       /* no operand */
         break;
 
     case I_V_SHF:                                       /* shift */
@@ -679,9 +738,12 @@ switch (j) {                                            /* case on class */
         val[0] = val[0] | d | tag;
         break;
 
+    case I_V_OPO:                                       /* operand optional */
     case I_V_SPP:                                       /* syspop */
     case I_V_MRF:                                       /* mem ref */
         cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        if (gbuf[0]=='\0' && j==I_V_OPO)                /* operand optional */
+            break;
         d = get_uint (gbuf, 8, VA_MASK, &r);            /* virt address */
         if (r != SCPE_OK)
             return SCPE_ARG;

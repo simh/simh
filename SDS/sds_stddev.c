@@ -64,9 +64,8 @@ t_stat tti_reset (DEVICE *dptr);
 t_stat tto (uint32 fnc, uint32 inst, uint32 *dat);
 t_stat tto_svc (UNIT *uptr);
 t_stat tto_reset (DEVICE *dptr);
-
-extern const int8 ascii_to_sds[128];
-extern const int8 sds_to_ascii[64];
+int8 ascii_to_sds(int8 ch);
+int8 sds_to_ascii(int8 ch);
 extern const int8 odd_par[64];
 
 /* PTR data structures
@@ -506,8 +505,8 @@ if (temp & SCPE_BREAK)                                  /* ignore break */
     return SCPE_OK;
 temp = temp & 0177;
 tti_unit.pos = tti_unit.pos + 1;
-if (ascii_to_sds[temp] >= 0) {
-    tti_unit.buf = ascii_to_sds[temp];                  /* internal rep */
+if (ascii_to_sds(temp) >= 0) {
+    tti_unit.buf = ascii_to_sds(temp);                  /* internal rep */
     sim_putchar (temp);                                 /* echo */
     if (temp == '\r')                                   /* lf after cr */
         sim_putchar ('\n');
@@ -590,7 +589,7 @@ else if (uptr->buf == TT_BS)
     asc = '\b';
 else if (uptr->buf == TT_TB)
     asc = '\t';
-else asc = sds_to_ascii[uptr->buf];                     /* translate */
+else asc = sds_to_ascii(uptr->buf);                     /* translate */
 if ((r = sim_putchar_s (asc)) != SCPE_OK) {             /* output; error? */
     sim_activate (uptr, uptr->wait);                    /* retry */
     return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
