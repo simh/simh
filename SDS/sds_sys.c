@@ -45,6 +45,7 @@ extern DEVICE mt_dev;
 extern DEVICE mux_dev, muxl_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
+extern uint32 cpu_mode;
 extern uint32 M[MAXMEMSIZE];
 
 /* SCP data structures and interface routines
@@ -103,9 +104,9 @@ const char *sim_stop_messages[] = {
     "Next expired"
     };
 
-/* Character conversion tables */
+/* SDS 930 character conversion tables. Per 930 Ref Man Appendix A */
 
-const int8 sds_to_ascii[64] = {
+const int8 sds930_to_ascii[64] = {
     '0', '1', '2', '3', '4', '5', '6', '7',
     '8', '9', ' ', '=', '\'', ':', '>', '%',            /* 17 = check mark */
     '+', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
@@ -116,8 +117,8 @@ const int8 sds_to_ascii[64] = {
     'Y', 'Z', '?', ',', '(', '~', '\\', '#'             /* 72 = rec mark */
      };                                                 /* 75 = squiggle, 77 = del */
 
-const int8 ascii_to_sds[128] = {
-     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,             /* 0 - 37 */
+const int8 ascii_to_sds930[128] = {
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,             /* 00 - 37 */
     032, 072,  -1,  -1,  -1, 052,  -1,  -1,
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
@@ -129,10 +130,42 @@ const int8 ascii_to_sds[128] = {
     030, 031, 041, 042, 043, 044, 045, 046,
     047, 050, 051, 062, 063, 064, 065, 066,
     067, 070, 071, 035, 076, 055, 057, 060,
-    000, 021, 022, 023, 024, 025, 026, 027,             /* 140 - 177 */
-    030, 031, 041, 042, 043, 044, 045, 046,
+     -1, 021, 022, 023, 024, 025, 026, 027,             /* 140 - 177 */
+    030, 031, 041, 042, 043, 044, 045, 046,             /* fold lower case to upper */
     047, 050, 051, 062, 063, 064, 065, 066,
     067, 070, 071,  -1,  -1,  -1,  -1,  -1
+    };
+
+/* SDS 940 character conversion tables. Per 940 Ref Man Appendix A */
+
+const int8 sds940_to_ascii[64] = {
+    ' ', '!', '"', '#', '$', '%', '&', '\'',            /* 00 - 17 */
+    '(', ')', '*', '+', ',', '-', '.', '/',
+    '0', '1', '2', '3', '4', '5', '6', '7',             /* 20 - 37 */
+    '8', '9', ':', ';', '<', '=', '>', '?',
+    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G',             /* 40 - 57 */
+    'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',             /* 60 - 77 */
+    'X', 'Y', 'Z', '[', '\\', ']', '^', '_'
+     };
+
+const int8 ascii_to_sds940[128] = {
+     -1, 141, 142, 143, 144, 145, 146, 147,             /* 00 - 37 */
+     -1, 151, 152, 153, 154, 155,  -1,  -1,             
+     -1, 161, 162, 163, 164, 165, 166, 167,
+    170, 171, 172,  -1,  -1,  -1,  -1,  -1,
+    000, 001, 002, 003, 004, 005, 006, 007,             /* 40 - 77 */
+    010, 011, 012, 013, 014, 015, 016, 017,
+    020, 021, 022, 023, 024, 025, 026, 027,
+    030, 031, 032, 033, 034, 035, 036, 037,
+    040, 041, 042, 043, 044, 045, 046, 047,             /* 100 - 137 */
+    050, 051, 052, 053, 054, 055, 056, 057,
+    060, 061, 062, 063, 064, 065, 066, 067,
+    070, 071, 072, 073, 074, 075, 076, 077,
+     -1, 041, 042, 043, 044, 045, 046, 047,             /* 140 - 177 */
+    050, 051, 052, 053, 054, 055, 056, 057,             /* fold lower case to upper */
+    060, 061, 062, 063, 064, 065, 066, 067,
+    070, 071, 072,  -1,  -1,  -1,  -1,  -1
     };
 
 const int8 odd_par[64] = {
@@ -456,6 +489,26 @@ for (i = sp = 0; opc_val[i] >= 0; i++) {                /* loop thru ops */
 return;
 }
 
+/* Convert from SDS internal character code to ASCII depending upon cpu mode. */
+int8 sds_to_ascii(int8 ch)
+{
+  ch &= 077;
+  if (cpu_mode == NML_MODE)
+    return sds930_to_ascii[ch];
+  else
+    return sds940_to_ascii[ch];
+}
+
+/* Convert from ASCII to SDS internal character code depending upon cpu mode. */
+int8 ascii_to_sds(int8 ch)
+{
+  ch &= 0177;
+  if (cpu_mode == NML_MODE)
+    return ascii_to_sds930[ch];
+  else
+    return ascii_to_sds940[ch];
+}
+
 /* Symbolic decode
 
    Inputs:
@@ -494,7 +547,7 @@ if (sw & SWMASK ('A')) {                                /* SDS internal ASCII? *
     }
 if (sw & SWMASK ('C')) {                                /* six-bit character? */
     for (i = 18; i >= 0; i -= 6)
-        fprintf (of, "%c", sds_to_ascii[(inst >> i) & 077]);
+        fprintf (of, "%c", sds_to_ascii(inst >> i));
     return SCPE_OK;
     }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
@@ -634,7 +687,7 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* string of 6-bit char
     for (i = j = 0, val[0] = 0; i < 4; i++) {
         if (cptr[i] == 0)                               /* latch str end */
             j = 1;
-        k = ascii_to_sds[cptr[i] & 0177];               /* cvt char */
+        k = ascii_to_sds(cptr[i]);                      /* cvt char */
         if (j || (k < 0))                               /* bad, end? spc */
             k = 0;
         val[0] = (val[0] << 6) | k;
