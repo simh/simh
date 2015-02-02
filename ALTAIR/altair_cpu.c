@@ -25,6 +25,7 @@
 
    cpu          8080 CPU
 
+   02-Feb-15    RSB     Fixed initialization of "uninstalled" memory
    19-Mar-12    RMS     Fixed data type for breakpoint variables
    08-Oct-02    RMS     Tied off spurious compiler warnings
 
@@ -67,7 +68,7 @@
 
    3. Non-existent memory.  On the 8080, reads to non-existent memory
       return 0377, and writes are ignored.  In the simulator, the
-      largest possible memory is instantiated and initialized to zero.
+      largest possible memory is instantiated and initialized to 0377.
       Thus, only writes need be checked against actual memory size.
 
    4. Adding I/O devices.  These modules must be modified:
@@ -1175,7 +1176,7 @@ for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0377;
 return SCPE_OK;
 }
 
