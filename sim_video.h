@@ -201,6 +201,10 @@ void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set 
 #define SIM_VID_DBG_KEY     0x04000000
 #define SIM_VID_DBG_VIDEO   0x08000000
 
+#if HAVE_LIBSDL
+#include <SDL.h>
+#endif /* HAVE_LIBSDL */
+
 #endif /* USE_SIM_VIDEO */
 
 #endif

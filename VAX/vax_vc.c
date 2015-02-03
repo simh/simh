@@ -236,6 +236,7 @@ t_stat vc_rd (int32 *data, int32 PA, int32 access);
 t_stat vc_wr (int32 data, int32 PA, int32 access);
 t_stat vc_svc (UNIT *uptr);
 t_stat vc_reset (DEVICE *dptr);
+t_stat vc_detach (UNIT *dptr);
 t_stat vc_set_enable (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat vc_set_capture (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat vc_show_capture (FILE* st, UNIT* uptr, int32 val, void* desc);
@@ -341,7 +342,7 @@ DEVICE vc_dev = {
     "QVSS", &vc_unit, vc_reg, vc_mod,
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &vc_reset,
-    NULL, NULL, NULL,
+    NULL, NULL, &vc_detach,
     &vc_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG, 0,
     vc_debug, NULL, NULL, &vc_help, NULL, NULL, 
     &vc_description
@@ -1030,6 +1031,15 @@ if (!vid_active)  {
     }
 sim_activate_abs (&vc_unit, tmxr_poll);
 return auto_config (NULL, 0);                           /* run autoconfig */
+}
+
+t_stat vc_detach (UNIT *uptr)
+{
+if ((vc_dev.flags & DEV_DIS) == 0) {
+    vc_dev.flags |= DEV_DIS;
+    vc_reset(&vc_dev);
+    }
+return SCPE_OK;
 }
 
 t_stat vc_set_enable (UNIT *uptr, int32 val, char *cptr, void *desc)
