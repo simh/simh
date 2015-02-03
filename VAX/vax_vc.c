@@ -40,17 +40,17 @@
 /* CSR - control/status register */
 
 BITFIELD vc_csr_bits[] = {
-    BIT(MOD),                           /* Monitor size */
-#define CSR_V_MDO 0
-#define CSR_MOD     (1<<CSR_V_MDO)
+    BIT(MOD),                           /* Monitor size (1 -> VR260(19"), 0 -> (15") */
+#define CSR_V_MOD 0
+#define CSR_MOD     (1<<CSR_V_MOD)
     BITNCF(1),                          /* unused */
-    BIT(VID),                           /* Video output en */
+    BIT(VID),                           /* Video output Enable */
 #define CSR_V_VID     2
 #define CSR_VID     (1<<CSR_V_VID)
     BIT(FNC),                           /* Cursor function */
 #define CSR_V_FNC     3
 #define CSR_FNC     (1<<CSR_V_FNC)
-    BIT(VRB),                           /* Video readback en */
+    BIT(VRB),                           /* Video readback Enable */
 #define CSR_V_VRB     4
 #define CSR_VRB     (1<<CSR_V_VRB)
     BIT(TST),                           /* Test bit */
@@ -187,7 +187,7 @@ BITFIELD vc_ic_mode_bits[] = {
                          (vc_crtc[CRTC_MSCN] + 1)) + \
                          vc_crtc[CRTC_CSCS])            /* cursor Y */
 #define CUR_V            ((vc_crtc[CRTC_CSCS] & 0x20) == 0) /* cursor visible */
-#define CUR_F            (vc_csr & CSR_FNC)             /* cursor function */
+#define CUR_F            (vc_csr & CSR_FNC)             /* cursor function (0->AND, 1->OR) */
 
 #define VSYNC_TIME      8000                            /* vertical sync interval */
 
@@ -217,15 +217,18 @@ uint32 vc_csr = 0;                                      /* Control/status */
 uint32 vc_curx = 0;                                     /* Cursor X-position */
 uint32 vc_cur_x = 0;                                    /* Last cursor X-position */
 uint32 vc_cur_y = 0;                                    /* Last cursor Y-position */
-uint32 vc_cur_f = 0;                                    /* Last cursor function */
+uint32 vc_cur_f = 0;                                    /* Last cursor function (0->AND, 1->OR) */
 t_bool vc_cur_v = FALSE;                                /* Last cursor visible */
+t_bool vc_cur_new_data = FALSE;                         /* New Cursor image data */
+t_bool vc_input_captured = FALSE;                       /* Mouse and Keyboard input captured in video window */
 uint32 vc_mpos = 0;                                     /* Mouse position */
 uint32 vc_crtc[CRTC_SIZE];                              /* CRTC registers */
 uint32 vc_crtc_p = 0;                                   /* CRTC pointer */
 uint32 vc_icdr = 0;                                     /* Interrupt controller data */
 uint32 vc_icsr = 0;                                     /* Interrupt controller status */
-uint32 vc_map[1024];                                    /* Scanline map */
+uint32 *vc_map;                                         /* Scanline map */
 uint32 *vc_buf = NULL;                                  /* Video memory */
+uint32 *vc_lines = NULL;                                /* Video Display Lines */
 uint8 vc_cur[256];                                      /* Cursor image */
 
 DEVICE vc_dev;
@@ -234,6 +237,8 @@ t_stat vc_wr (int32 data, int32 PA, int32 access);
 t_stat vc_svc (UNIT *uptr);
 t_stat vc_reset (DEVICE *dptr);
 t_stat vc_set_enable (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat vc_set_capture (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat vc_show_capture (FILE* st, UNIT* uptr, int32 val, void* desc);
 void vc_setint (int32 src);
 int32 vc_inta (void);
 void vc_clrint (int32 src);
@@ -255,9 +260,12 @@ DIB vc_dib = {
     2, IVCL (QVSS), VEC_AUTO, { &vc_inta, &vc_inta }
     };
 
-/* Debugging Bisim_tmaps */
+/* Debugging Bitmaps */
 
 #define DBG_REG         0x0100                          /* register activity */
+#define DBG_CRTC        0x0200                          /* crtc register activity */
+#define DBG_CURSOR      0x0400                          /* Cursor content, function and visibility activity */
+#define DBG_SCANL       0x0800                          /* Scanline map activity */
 #define DBG_INT0        0x0001                          /* interrupt 0 */
 #define DBG_INT1        0x0002                          /* interrupt 1 */
 #define DBG_INT2        0x0004                          /* interrupt 2 */
@@ -270,6 +278,9 @@ DIB vc_dib = {
 
 DEBTAB vc_debug[] = {
     {"REG",     DBG_REG},
+    {"CRTC",    DBG_CRTC},
+    {"CURSOR",  DBG_CURSOR},
+    {"SCANL",   DBG_SCANL},
     {"DUART",   DBG_INT0},
     {"VSYNC",   DBG_INT1},
     {"MOUSE",   DBG_INT2},
@@ -280,6 +291,7 @@ DEBTAB vc_debug[] = {
     {"SPARE",   DBG_INT7},
     {"INT",     DBG_INT0|DBG_INT1|DBG_INT2|DBG_INT3|DBG_INT4|DBG_INT5|DBG_INT6|DBG_INT7},
     {"VMOUSE",  SIM_VID_DBG_MOUSE},
+    {"VCURSOR", SIM_VID_DBG_CURSOR},
     {"VKEY",    SIM_VID_DBG_KEY},
     {"VVIDEO",  SIM_VID_DBG_VIDEO},
     {0}
@@ -302,7 +314,6 @@ REG vc_reg[] = {
     { BRDATA   (VEC,   vc_intc.vec, 16, 32, 8) },
     { BRDATAD  (CRTC,      vc_crtc, 16, 8, CRTC_SIZE, "CRTC registers") },
     { HRDATAD  (CRTCP,   vc_crtc_p,  8, "CRTC pointer") },
-    { BRDATAD  (MAP,        vc_map, 16, 16, 1024, "Scanline map") },
     { NULL }
     };
 
@@ -311,8 +322,14 @@ MTAB vc_mod[] = {
         &vc_set_enable, NULL, NULL, "Enable VCB01 (QVSS)" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLE",
         &vc_set_enable, NULL, NULL, "Disable VCB01 (QVSS)" },
-    { MTAB_XTD|MTAB_VDV, 0, "RELEASEKEY", NULL,
-        NULL, &vid_show_release_key, NULL, "Display the window focus release key" },
+    { MTAB_XTD|MTAB_VDV, TRUE, NULL, "CAPTURE",
+        &vc_set_capture, &vc_show_capture, NULL, "Enable Captured Input Mode" },
+    { MTAB_XTD|MTAB_VDV, FALSE, NULL, "NOCAPTURE",
+        &vc_set_capture, NULL, NULL, "Disable Captured Input Mode" },
+    { MTAB_XTD|MTAB_VDV, TRUE, "OSCURSOR", NULL,
+        NULL, &vc_show_capture, NULL, "Display Input Capture mode" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "VIDEO", NULL,
+        NULL, &vid_show_video, NULL, "Display the host system video capabilities" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
@@ -371,6 +388,30 @@ char *vc_regnames[] = {
     "",             /* +62 spare */
 };
 
+char *vc_crtc_regnames[] = {
+    "HTOT",         /* Horizontal Total The total number of character times in a line, minus 1 */
+    "HDSP",         /* Horizontal Displayed The total number of displayed characters in a line. */
+    "HPOS",         /* HSYNC Position Defines the number of character times until HSYNC (horizontal sync). */
+    "HVWD",         /* HSYNC/VSYNC Widths Four bits each are used to define the HSYNC
+                       pulse width and the VSYNC (vertical sync) pulse width. */
+    "VTOT",         /* Vertical Total Total number of character rows on the screen, minus 1. */
+    "VTOA",         /* Vertical Total Adjust The number of scan lines to complete the screen. */
+    "VDSP",         /* Vertical Displayed The number of character rows displayed. */
+    "VPOS",         /* VSYNC Position The number of character rows until VSYNC. */
+    "MODE",         /* Mode Controls addressing, interlace, and cursor. */
+    "MSCN",         /* Maximum Scan Line The number of scan lines in a character row, minus 1. */
+    "CSCS",         /* Cursor Scan Start Defines the scan line at which the cursor starts. */
+    "CSCE",         /* Cursor Scan End Defines where the cursor ends. */
+    "SAH",          /* Start Address High Defines the RAM location where video refresh */
+    "SAL",          /* Start Address Low begins. */
+    "CAH",          /* Cursor Address High Defines the cursor position in RAM. */
+    "CAL",          /* Cursor Address Low */
+    "LPPL",         /* Light Pen Position High Contains the position of the light pen. */
+    "LPPH",         /* Light Pen Position Low */
+    "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"
+};
+
+
 t_stat vc_rd (int32 *data, int32 PA, int32 access)
 {
 uint32 rg = (PA >> 1) & 0x1F;
@@ -393,6 +434,7 @@ switch (rg) {
 
     case 4:                                             /* CRTC addr ptr */
         *data = vc_crtc_p;
+        sim_debug (DBG_CRTC, &vc_dev, "CRTC-Addr Read: %d - %s\n", vc_crtc_p, vc_crtc_regnames[vc_crtc_p & CRTCP_REG]);
         break;
 
     case 5:                                             /* CRTC data */
@@ -400,6 +442,7 @@ switch (rg) {
         *data = vc_crtc[crtc_rg];
         if ((crtc_rg == CRTC_LPPL) || (crtc_rg == CRTC_LPPH))
             vc_crtc_p &= ~CRTCP_LPF;                   /* Clear light pen full */
+        sim_debug (DBG_CRTC, &vc_dev, "CRTC-Data:%s[%d] Read: 0x%x\n", vc_crtc_regnames[crtc_rg], crtc_rg, *data);
         break;
 
     case 6:                                             /* ICDR */
@@ -461,6 +504,7 @@ t_stat vc_wr (int32 data, int32 PA, int32 access)
 {
 uint32 rg = (PA >> 1) & 0x1F;
 uint32 crtc_rg;
+uint32 old_data;
 
 sim_debug (DBG_REG, &vc_dev, "vc_wr(%s) data=0x%04X\n", vc_regnames[(PA >> 1) & 0x1F], data);
 switch (rg) {
@@ -470,11 +514,17 @@ switch (rg) {
             sim_cancel (&vc_unit);                      /* reactivate with short delay */
             sim_activate (&vc_unit, VSYNC_TIME);        /* in case software checks for vsync */
             }
+        old_data = vc_csr;
         vc_csr = (vc_csr & ~CSR_RW) | (data & CSR_RW);
+        if ((vc_csr ^ old_data) & CSR_FNC) {
+            sim_debug (DBG_CURSOR, &vc_dev, "Cursor Function changed to: %s\n", CUR_F ? "OR" : "AND");
+            }
         break;
 
     case 1:                                             /* Cursor X */
         vc_curx = data;
+        sim_debug (SIM_VID_DBG_MOUSE, &vc_dev, "Cursor-X set: %d\n", vc_curx);
+        vid_set_cursor_position (CUR_X, CUR_Y);
         break;
 
     case 2:                                             /* Mouse position */
@@ -482,11 +532,30 @@ switch (rg) {
 
     case 4:                                             /* CRTC addr ptr */
         vc_crtc_p = (vc_crtc_p & ~CRTCP_RW) | (data & CRTCP_RW);
+        sim_debug (DBG_CRTC, &vc_dev, "CRTC-Addr Set: %d - %s\n", vc_crtc_p, vc_crtc_regnames[vc_crtc_p & CRTCP_REG]);
         break;
 
     case 5:                                             /* CRTC data */
         crtc_rg = vc_crtc_p & CRTCP_REG;
+        old_data = vc_crtc[crtc_rg];
         vc_crtc[crtc_rg] = data & BMASK;
+        sim_debug (DBG_CRTC, &vc_dev, "CRTC-Data:%s[%d] Set: 0x%x\n", vc_crtc_regnames[crtc_rg], crtc_rg, vc_crtc[crtc_rg]);
+        if (crtc_rg == CRTC_CAH) {
+            sim_debug (SIM_VID_DBG_MOUSE, &vc_dev, "Cursor-Y-High set (%d). Y value: %d\n", vc_crtc[crtc_rg], CUR_Y);
+            vid_set_cursor_position (CUR_X, CUR_Y);
+            }
+        if (crtc_rg == CRTC_CAL) {
+            sim_debug (SIM_VID_DBG_MOUSE, &vc_dev, "Cursor-Y-Low set (%d). Y value: %d\n", vc_crtc[crtc_rg], CUR_Y);
+            }
+        if (crtc_rg == CRTC_MSCN) {
+            sim_debug (SIM_VID_DBG_MOUSE, &vc_dev, "Maximum Scan Line set (%d). Y value: %d\n", vc_crtc[crtc_rg], CUR_Y);
+            }
+        if (crtc_rg == CRTC_CSCS) {
+            if (0x20 & (old_data ^ vc_crtc[crtc_rg])) {
+                sim_debug (DBG_CURSOR, &vc_dev, "Visibility Changed to: %s\n", CUR_V ? "Visible" : "Invisible");
+                }
+            sim_debug (SIM_VID_DBG_MOUSE, &vc_dev, "CSCS set (%d). Y value: %d\n", vc_crtc[crtc_rg], CUR_Y);
+            }
         break;
 
     case 6:                                             /* ICDR */
@@ -622,8 +691,18 @@ else nval = (uint32)val;
 
 if (rg >= 0xFFF8) {                                     /* cursor image */
     idx = (pa << 3) & 0xFF;                             /* get byte index */
+    if (sim_deb) {
+        char binary[40];
+        int32 i;
+
+        for (i=0; i<8*lnt; i++)
+            binary[i] = '0' + ((val & (1 << i)) != 0);
+        binary[i] = '\0';
+        sim_debug (DBG_CURSOR, &vc_dev, "Cursor Data at 0x%X set to 0x%0*X - %s\n", rg, 2*lnt, val, binary);
+        }
     for (i = 0; i < (lnt << 3); i++)
         vc_cur[idx++] = (val >> i) & 1;                 /* 1bpp to 8bpp */
+    vc_cur_new_data = TRUE;
     }
 else if (rg >= 0xFE00) {                                /* scanline map */
     if (vc_buf[rg] != nval) {
@@ -631,6 +710,7 @@ else if (rg >= 0xFE00) {                                /* scanline map */
         sc = (scrln & 1) ? 16 : 0;                      /* odd line? (upper word) */
         bufln = (nval >> sc) & 0x7FF;                   /* buffer line */
         vc_map[scrln] = bufln;                          /* update map */
+        sim_debug (DBG_SCANL, &vc_dev, "Scan Line 0x%X set to 0x%X\n", scrln, bufln);
 
         if (lnt > L_WORD) {                             /* remapping 2 lines? */
             scrln++;                                    /* next screen line */
@@ -642,7 +722,7 @@ else if (rg >= 0xFE00) {                                /* scanline map */
 bufln = rg / 32;
 for (scrln = 0; scrln < 1024; scrln++) {
     if ((vc_map[scrln] & 0x7FF) == bufln) {
-        vc_map[scrln] = vc_map[scrln] & ~VCMAP_VLD;     /* invalidate map */
+        vc_map[scrln] &= ~VCMAP_VLD;                    /* invalidate map */
         }
     }
 vc_buf[rg] = nval;
@@ -651,8 +731,47 @@ vc_buf[rg] = nval;
 static SIM_INLINE void vc_invalidate (uint32 y1, uint32 y2)
 {
 uint32 ln;
+
+if ((!vc_input_captured) && (!(vc_dev.dctrl & DBG_CURSOR)))
+    return;
 for (ln = y1; ln < y2; ln++)
-    vc_map[ln] = vc_map[ln] & ~VCMAP_VLD;               /* invalidate map entry */
+    vc_map[ln] &= ~VCMAP_VLD;                           /* invalidate map entry */
+}
+
+static void vc_set_vid_cursor (t_bool visible, int func, uint8 *cur_bits)
+{
+uint8 data[2*16];
+uint8 mask[2*16];
+int i, d, m;
+
+sim_debug (DBG_CURSOR, &vc_dev, "vc_set_vid_cursor(%s, %s)\n", visible ? "Visible" : "Invisible", func ? "OR" : "AND");
+memset (data, 0, sizeof(data));
+memset (mask, 0, sizeof(mask));
+for (i=0; i<16*16; i++) {
+    if (func) {     /* OR */
+        if (cur_bits[i]) { 
+            /* White */
+            d = 0; m = 1;
+            }
+        else {
+            /* Transparent */
+            d = 0; m = 0;
+            }
+        }
+    else {          /* AND */
+        if (cur_bits[i]) { 
+            /* Black */
+            d = 1; m = 1;
+            }
+        else {
+            /* Transparent */
+            d = 0; m = 0;
+            }
+        }
+    data[i>>3] |= d<<(7-(i&7));
+    mask[i>>3] |= m<<(7-(i&7));
+    }
+vid_set_cursor (visible, 16, 16, data, mask);
 }
 
 void vc_checkint (void)
@@ -738,7 +857,7 @@ return 0;                                               /* no intr req */
 t_stat vc_svc (UNIT *uptr)
 {
 t_bool updated = FALSE;                                 /* flag for refresh */
-uint32 line[1024];
+uint32 line;
 uint32 ln, col, off;
 int32 xpos, ypos, dx, dy;
 uint8 *cur;
@@ -756,19 +875,30 @@ else if (vc_cur_y != CUR_Y) {                           /* moved (Y)? */
     vc_invalidate (CUR_Y, (CUR_Y + 16));                /* invalidate new pos */
     vc_invalidate (vc_cur_y, (vc_cur_y + 16));          /* invalidate old pos */
     }
-else if ((vc_cur_x != CUR_X) || (vc_cur_f != CUR_F)) {  /* moved (X) or mask changed? */
+else if ((vc_cur_x != CUR_X) ||                         /* moved (X)? or */
+         (vc_cur_f != CUR_F) ||                         /* mask changed? or */
+         (vc_cur_new_data)) {                           /* cursor image changed? */
     vc_invalidate (CUR_Y, (CUR_Y + 16));                /* invalidate new pos */
     }
 
-vid_cursor_x = vc_cur_x = CUR_X;                        /* store cursor data */
-vid_cursor_y = vc_cur_y = CUR_Y;
+if ((!vc_input_captured) &&                             /* OS cursor? AND*/
+    ((vc_cur_f != CUR_F) ||                             /* (mask changed? OR */
+     (vc_cur_new_data) ||                               /*  cursor image changed? OR) */
+     (vc_cur_v != CUR_V))) {                            /*  visibility changed?) */
+    vc_set_vid_cursor (CUR_V, CUR_F, vc_cur);
+    }
+
+vc_cur_x = CUR_X;                                       /* store cursor data */
+vc_cur_y = CUR_Y;
+vid_set_cursor_position (vc_cur_x, vc_cur_y);
 vc_cur_v = CUR_V;
 vc_cur_f = CUR_F;
+vc_cur_new_data = FALSE;
 
 xpos = vc_mpos & 0xFF;                                  /* get current mouse position */
 ypos = (vc_mpos >> 8) & 0xFF;
 dx = vid_mouse_xrel;                                    /* get relative movement */
-dy = vid_mouse_yrel;
+dy = -vid_mouse_yrel;
 if (dx > VC_MOVE_MAX)                                   /* limit movement */
     dx = VC_MOVE_MAX;
 else if (dx < -VC_MOVE_MAX)
@@ -780,8 +910,8 @@ else if (dy < -VC_MOVE_MAX)
 xpos += dx;                                             /* add to counters */
 ypos += dy;
 vc_mpos = ((ypos & 0xFF) << 8) | (xpos & 0xFF);         /* update register */
-vid_mouse_xrel = 0;                                     /* reset counters for next poll */
-vid_mouse_yrel = 0;
+vid_mouse_xrel -= dx;                                   /* reset counters for next poll */
+vid_mouse_yrel += dy;
 
 vc_csr |= (CSR_MSA | CSR_MSB | CSR_MSC);                /* reset button states */
 if (vid_mouse_b3)                                       /* set new button states */
@@ -791,28 +921,36 @@ if (vid_mouse_b2)
 if (vid_mouse_b1)
     vc_csr &= ~CSR_MSC;
 
+line = 0;
 for (ln = 0; ln < VC_YSIZE; ln++) {
     if ((vc_map[ln] & VCMAP_VLD) == 0) {                /* line invalid? */
-        off = vc_map[ln] * 32;                          /* get video buf offet */
-        for (col = 0; col < 1024; col++)  
-            line[col] = vid_mono_palette[(vc_buf[off + (col >> 5)] >> (col & 0x1F)) & 1];
+        off = vc_map[ln] * 32;                          /* get video buf offset */
+        for (col = 0; col < VC_XSIZE; col++)  
+            vc_lines[line*VC_XSIZE + col] = vid_mono_palette[(vc_buf[off + (col >> 5)] >> (col & 0x1F)) & 1];
                                                         /* 1bpp to 32bpp */
-        if (CUR_V) {                                    /* cursor visible? */
+        if (CUR_V &&                                    /* cursor visible && need to draw cursor? */
+            (vc_input_captured || (vc_dev.dctrl & DBG_CURSOR))) {
             if ((ln >= CUR_Y) && (ln < (CUR_Y + 16))) { /* cursor on this line? */
                 cur = &vc_cur[((ln - CUR_Y) << 4)];     /* get image base */
                 for (col = 0; col < 16; col++) {
-                    if ((CUR_X + col) >= 1024)          /* Part of cursor off screen? */
+                    if ((CUR_X + col) >= VC_XSIZE)      /* Part of cursor off screen? */
                         continue;                       /* Skip */
                     if (CUR_F)                          /* mask function */
-                        line[CUR_X + col] = vid_mono_palette[(line[CUR_X + col] == vid_mono_palette[1]) | (cur[col] & 1)];
+                        vc_lines[line*VC_XSIZE + CUR_X + col] = vid_mono_palette[(vc_lines[line*VC_XSIZE + CUR_X + col] == vid_mono_palette[1]) | (cur[col] & 1)];
                     else
-                        line[CUR_X + col] = vid_mono_palette[(line[CUR_X + col] == vid_mono_palette[1]) & (~cur[col] & 1)];
+                        vc_lines[line*VC_XSIZE + CUR_X + col] = vid_mono_palette[(vc_lines[line*VC_XSIZE + CUR_X + col] == vid_mono_palette[1]) & (~cur[col] & 1)];
                     }
                 }
             }
-        vid_draw (0, ln, 1024, 1, &line[0]);            /* update line */
+        vc_map[ln] |= VCMAP_VLD;                        /* set valid */
+        if ((ln == (VC_YSIZE-1)) ||                     /* if end of window OR */
+            (vc_map[ln+1] & VCMAP_VLD)) {               /* next is already valid? */
+            vid_draw (0, ln-line, VC_XSIZE, line+1, (uint32*)vc_lines); /* update region */
+            line = 0;
+            }
+        else
+            line++;
         updated = TRUE;
-        vc_map[ln] = vc_map[ln] | VCMAP_VLD;            /* set valid */
         }
     }
 
@@ -854,11 +992,15 @@ vc_crtc_p = (CRTCP_LPF | CRTCP_VB);
 if (dptr->flags & DEV_DIS) {
     free (vc_buf);
     vc_buf = NULL;
+    free (vc_lines);
+    vc_lines = NULL;
+    free (vc_map);
+    vc_map = NULL;
     return vid_close ();
     }
 
 if (!vid_active)  {
-    r = vid_open (dptr, VC_XSIZE, VC_YSIZE);            /* display size */
+    r = vid_open (dptr, VC_XSIZE, VC_YSIZE, vc_input_captured ? SIM_VID_INPUTCAPTURED : 0);/* display size & capture mode */
     if (r != SCPE_OK)
         return r;
     vc_buf = (uint32 *) calloc (VC_MEMSIZE, sizeof (uint32));
@@ -866,10 +1008,24 @@ if (!vid_active)  {
         vid_close ();
         return SCPE_MEM;
         }
+    vc_lines = (uint32 *) calloc (VC_XSIZE*VC_YSIZE, sizeof (uint32));
+    if (vc_lines == NULL) {
+        free (vc_buf);
+        vid_close ();
+        return SCPE_MEM;
+        }
+    vc_map = (uint32 *) calloc (VC_XSIZE, sizeof (uint32));
+    if (vc_map == NULL) {
+        free (vc_lines);
+        vc_lines = NULL;
+        free (vc_buf);
+        vid_close ();
+        return SCPE_MEM;
+        }
     sim_printf ("QVSS Display Created.  ");
-    vid_show_release_key (stdout, NULL, 0, NULL);
+    vc_show_capture (stdout, NULL, 0, NULL);
     if (sim_log)
-        vid_show_release_key (sim_log, NULL, 0, NULL);
+        vc_show_capture (sim_log, NULL, 0, NULL);
     sim_printf ("\n");
     }
 sim_activate_abs (&vc_unit, tmxr_poll);
@@ -879,6 +1035,25 @@ return auto_config (NULL, 0);                           /* run autoconfig */
 t_stat vc_set_enable (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 return cpu_set_model (NULL, 0, (val ? "VAXSTATION" : "MICROVAX"), NULL);
+}
+
+t_stat vc_set_capture (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (vid_active)
+    return sim_messagef (SCPE_ALATT, "Capture Mode Can't be changed with device enabled\n");
+vc_input_captured = val;
+return SCPE_OK;
+}
+
+t_stat vc_show_capture (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+if (vc_input_captured) {
+    fprintf (st, "Captured Input Mode, ");
+    vid_show_release_key (st, uptr, val, desc);
+    }
+else
+    fprintf (st, "Uncaptured Input Mode");
+return SCPE_OK;
 }
 
 t_stat vc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)

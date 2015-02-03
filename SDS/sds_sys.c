@@ -94,7 +94,7 @@ const char *sim_stop_messages[] = {
     "Nested EXU's exceed limit",
     "Memory management trap during interrupt",
     "Memory management trap during trap",
-    "Trap instruction not BRM",
+    "Trap instruction not BRM or BRU",
     "RTC instruction not MIN or SKR",
     "Interrupt vector zero",
     "Runaway carriage control tape",
