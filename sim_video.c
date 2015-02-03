@@ -45,10 +45,27 @@ char vid_release_key[64] = "Ctrl-Right-Shift";
 #include <SDL.h>
 #include <SDL_thread.h>
 
+/* 
+    Some platforms (OS X), require that ALL input event processing be 
+    performed by the main thread of the process.
+
+    To satisfy this requirement, we leverage the SDL_MAIN functionality 
+    which does:
+    
+             #defines main SDL_main
+     
+     and we define the main() entry point here.  Locally, we run the 
+     application's SDL_main in a separate thread, and while that thread
+     is running, the main thread performs event handling and dispatch.
+     
+ */
+
 #define EVENT_REDRAW    1                               /* redraw event for SDL */
 #define EVENT_CLOSE     2                               /* close event for SDL */
 #define EVENT_CURSOR    3                               /* new cursor for SDL */
 #define EVENT_WARP      4                               /* warp mouse position for SDL */
+#define EVENT_OPEN      5                               /* vid_open request */
+#define EVENT_EXIT      6                               /* program exit */
 #define MAX_EVENTS      20                              /* max events in queue */
 
 typedef struct {
@@ -68,6 +85,7 @@ typedef struct {
     } MOUSE_EVENT_QUEUE;
 
 int vid_thread (void* arg);
+int vid_video_events (void);
 
 /* 
    libSDL and libSDL2 have significantly different APIs.  
@@ -79,6 +97,7 @@ int vid_thread (void* arg);
    in one place.
 
  */
+
 
 t_bool vid_mouse_captured;
 int32 vid_flags;                                        /* Open Flags */
@@ -96,8 +115,8 @@ SDL_Renderer *vid_renderer;
 SDL_Window *vid_window;                                 /* window handle */
 uint32 vid_windowID;
 #endif
-SDL_Thread *vid_thread_handle;                          /* event thread handle */
-SDL_Cursor *vid_cursor;                                 /* current cursor */
+SDL_Thread *vid_thread_handle = NULL;                   /* event thread handle */
+SDL_Cursor *vid_cursor = NULL;                          /* current cursor */
 t_bool vid_cursor_visible = FALSE;                      /* cursor visibility state */
 uint32 vid_mono_palette[2];                             /* Monochrome Color Map */
 SDL_Color vid_colors[256];
@@ -105,10 +124,117 @@ KEY_EVENT_QUEUE vid_key_events;                         /* keyboard events */
 MOUSE_EVENT_QUEUE vid_mouse_events;                     /* mouse events */
 DEVICE *vid_dev;
 
+#if defined (SDL_MAIN_AVAILABLE)
+#if defined (main)
+#undef main
+#endif
+
+static int main_argc;
+static char **main_argv;
+static SDL_Thread *vid_main_thread_handle;
+
+int main_thread (void *arg)
+{
+SDL_Event user_event;
+int stat;
+
+stat = SDL_main (main_argc, main_argv);
+user_event.type = SDL_USEREVENT;
+user_event.user.code = EVENT_EXIT;
+user_event.user.data1 = NULL;
+user_event.user.data2 = NULL;
+SDL_PushEvent (&user_event);
+return stat;
+}
+
+int main (int argc, char *argv[])
+{
+SDL_Event event;
+int status;
+
+main_argc = argc;
+main_argv = argv;
+
+#if SDL_MAJOR_VERSION == 1
+vid_main_thread_handle = SDL_CreateThread (main_thread , NULL);
+#else
+vid_main_thread_handle = SDL_CreateThread (main_thread , "simh-main-thread", NULL);
+#endif
+while (1) {
+    int status = SDL_WaitEvent (&event);
+    if (status == 1) {
+        if (event.type == SDL_USEREVENT) {
+            if (event.user.code == EVENT_EXIT)
+                break;
+            if (event.user.code == EVENT_OPEN)
+                vid_video_events ();
+            else {
+                sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
+                break;
+                }
+            }
+        else {
+            sim_printf ("main(): Ignoring unexpected event: %d\n", event.type);
+            }
+        }
+    else {
+        if (status < 0)
+            sim_printf ("main() - SDL_WaitEvent error: %s\n", SDL_GetError());
+        }
+    }
+SDL_WaitThread (vid_main_thread_handle, &status);
+return status;
+}
+
+static t_stat vid_create_window ()
+{
+int wait_count = 0;
+SDL_Event user_event;
+
+vid_ready = FALSE;
+user_event.type = SDL_USEREVENT;
+user_event.user.code = EVENT_OPEN;
+user_event.user.data1 = NULL;
+user_event.user.data2 = NULL;
+SDL_PushEvent (&user_event);
+
+while ((!vid_ready) && (++wait_count < 20))
+    sim_os_ms_sleep (100);
+if (!vid_ready) {
+    vid_close ();
+    return SCPE_OPENERR;
+    }
+return SCPE_OK;
+}
+#else
+static int vid_create_window ()
+{
+int wait_count = 0;
+
+#if SDL_MAJOR_VERSION == 1
+vid_thread_handle = SDL_CreateThread (vid_thread, NULL);
+#else
+vid_thread_handle = SDL_CreateThread (vid_thread, "vid-thread", NULL);
+#endif
+if (vid_thread_handle == NULL) {
+    vid_close ();
+    return SCPE_OPENERR;
+    }
+while ((!vid_ready) && (++wait_count < 20))
+    sim_os_ms_sleep (100);
+if (!vid_ready) {
+    vid_close ();
+    return SCPE_OPENERR;
+    }
+return SCPE_OK;
+}
+#endif
+
 t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int flags)
 {
 if (!vid_active) {
     int wait_count = 0;
+    t_stat stat;
 
     vid_flags = flags;
     vid_active = TRUE;
@@ -130,22 +256,9 @@ if (!vid_active) {
 
     vid_dev = dptr;
 
-    vid_ready = FALSE;
-#if SDL_MAJOR_VERSION == 1
-    vid_thread_handle = SDL_CreateThread (vid_thread, NULL);
-#else
-    vid_thread_handle = SDL_CreateThread (vid_thread, "vid-thread", NULL);
-#endif
-    if (vid_thread_handle == NULL) {
-        vid_close ();
-        return SCPE_OPENERR;
-        }
-    while ((!vid_ready) && (++wait_count < 20))
-        sim_os_ms_sleep (100);
-    if (!vid_ready) {
-        vid_close ();
-        return SCPE_OPENERR;
-        }
+    stat = vid_create_window ();
+    if (stat != SCPE_OK)
+        return stat;
 
     sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_open() - Success\n");
     }
@@ -154,12 +267,12 @@ return SCPE_OK;
 
 t_stat vid_close (void)
 {
-SDL_Event user_event;
-int status;
-
 if (vid_active) {
+    SDL_Event user_event;
+    int status;
+
     vid_active = FALSE;
-    if (vid_thread_handle) {
+    if (vid_ready) {
         sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_close()\n");
         user_event.type = SDL_USEREVENT;
         user_event.user.code = EVENT_CLOSE;
@@ -167,10 +280,14 @@ if (vid_active) {
         user_event.user.data2 = NULL;
 
         SDL_PushEvent (&user_event);
-        SDL_WaitThread (vid_thread_handle, &status);
-        vid_thread_handle = NULL;
+        if (vid_thread_handle) {
+            SDL_WaitThread (vid_thread_handle, &status);
+            vid_thread_handle = NULL;
+            }
         vid_dev = NULL;
         }
+    while (vid_ready)
+        sim_os_ms_sleep (10);
     if (vid_mouse_events.sem) {
         SDL_DestroySemaphore(vid_mouse_events.sem);
         vid_mouse_events.sem = NULL;
@@ -987,7 +1104,7 @@ SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);
 SDL_PumpEvents ();
 }
 
-int vid_thread (void* arg)
+int vid_video_events (void)
 {
 SDL_Event event;
 #if SDL_MAJOR_VERSION == 1
@@ -1156,8 +1273,6 @@ vid_mono_palette[1] = 0xFFFFFFFF;                               /* White */
 memset (&vid_key_state, 0, sizeof(vid_key_state));
 
 #if SDL_MAJOR_VERSION == 1
-SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE);
-
 vid_window = SDL_SetVideoMode (vid_width, vid_height, 8, 0);
 
 SDL_EnableKeyRepeat (SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
@@ -1168,14 +1283,10 @@ else
     vid_image = SDL_CreateRGBSurface (SDL_SWSURFACE, vid_width, vid_height, 32, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
 
 #else
-SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
-
-SDL_Init (SDL_INIT_VIDEO);
-
 SDL_CreateWindowAndRenderer (vid_width, vid_height, SDL_WINDOW_SHOWN, &vid_window, &vid_renderer);
 
 if ((vid_window == NULL) || (vid_renderer == NULL)) {
-    sim_printf ("%s: Error Creating Video Window: %s\b", sim_dname(vid_dev), SDL_GetError());
+    sim_printf ("%s: Error Creating Video Window: %s\n", sim_dname(vid_dev), SDL_GetError());
     SDL_Quit ();
     return 0;
     }
@@ -1189,7 +1300,7 @@ vid_texture = SDL_CreateTexture (vid_renderer,
                                  SDL_TEXTUREACCESS_STREAMING,
                                  vid_width, vid_height);
 if (!vid_texture) {
-    sim_printf ("%s: Error configuring Video environment: %s\b", sim_dname(vid_dev), SDL_GetError());
+    sim_printf ("%s: Error configuring Video environment: %s\n", sim_dname(vid_dev), SDL_GetError());
     SDL_DestroyRenderer(vid_renderer);
     vid_renderer = NULL;
     SDL_DestroyWindow(vid_window);
@@ -1266,7 +1377,7 @@ while (vid_active) {
                 /* EVENT_WARP   to warp the cursor position */
                 /* EVENT_CLOSE  to wake up this thread and let */
                 /*              it notice vid_active has changed */
-                while (event.user.code) {
+                while (vid_active && event.user.code) {
                     if (event.user.code == EVENT_REDRAW) {
                         vid_update ();
                         event.user.code = 0;    /* Mark as done */
@@ -1296,6 +1407,9 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
                     if (event.user.code == EVENT_CLOSE) {
                         event.user.code = 0;    /* Mark as done */
                         }
+                    if (event.user.code != 0) {
+                        sim_printf ("vid_thread(): Unexpected user event code: %d\n", event.user.code);
+                        }
                     }
                 break;
 
@@ -1309,6 +1423,7 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
             sim_printf ("%s: vid_thread() - SDL_WaitEvent error: %s\n", sim_dname(vid_dev), SDL_GetError());
         }
     }
+vid_ready = FALSE;
 if (vid_cursor) {
     SDL_FreeCursor (vid_cursor);
     vid_cursor = NULL;
@@ -1321,8 +1436,21 @@ vid_renderer = NULL;
 SDL_DestroyWindow(vid_window);
 #endif /* SDL_MAJOR_VERSION != 1 */
 vid_window = NULL;
-SDL_Quit ();
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE|SIM_VID_DBG_CURSOR, vid_dev, "vid_thread() - Exiting\n");
+return 0;
+}
+
+int vid_thread (void *arg)
+{
+#if SDL_MAJOR_VERSION == 1
+SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE);
+#else
+SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
+
+SDL_Init (SDL_INIT_VIDEO);
+#endif
+vid_video_events ();
+SDL_Quit ();
 return 0;
 }
 
@@ -1370,8 +1498,11 @@ t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
 int i;
 
 fprintf (st, "Video support using SDL: %s\n", vid_version());
-if (!vid_active)
+if (!vid_active) {
+#if !defined (SDL_MAIN_AVAILABLE)
     SDL_Init(SDL_INIT_VIDEO);
+#endif
+    }
 else {
     fprintf (st, "  Currently Active Video Window: (%d by %d pixels)\n", vid_width, vid_height);
     fprintf (st, "  ");
@@ -1538,8 +1669,10 @@ if (1) {
         }
     }
 #endif /* SDL_MAJOR_VERSION != 1 */
+#if !defined (SDL_MAIN_AVAILABLE)
 if (!vid_active)
     SDL_Quit();
+#endif
 return SCPE_OK;
 }
 
