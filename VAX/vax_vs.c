@@ -140,7 +140,7 @@ switch (vs_state) {
     case VSXXX_SEND:
     case VSXXX_TEST:
         *c = vs_buf[vs_bptr++];
-        sim_debug (DBG_SERIAL, &vs_dev, "mouse -> vax: %02X\n", *c);
+        sim_debug (DBG_SERIAL, &vs_dev, "mouse -> vax: 0x%02X\n", *c);
         if (vs_bptr == vs_datalen) {
             vs_state = VSXXX_IDLE;
             }
@@ -197,16 +197,27 @@ return SCPE_OK;
 void vs_sendupd (void)
 {
 vs_buf[0] = RPT_SYNC;
-vs_buf[0] |= (((vs_x >= 0) ? 1 : 0) << 4);              /* sign bits */
-vs_buf[0] |= (((vs_y >= 0) ? 1 : 0) << 3);
+vs_buf[0] |= (((vs_x >  0) ? 1 : 0) << 4);              /* sign bits */
+vs_buf[0] |= (((vs_y >= 0) ? 0 : 1) << 3);
 vs_buf[0] |= (((vs_l) ? 1 : 0) << 2);                   /* button states */
 vs_buf[0] |= (((vs_m) ? 1 : 0) << 1);
 vs_buf[0] |= ((vs_r) ? 1 : 0);
-vs_buf[1] = (abs(vs_x)) & 0x7F;                         /* motion */
-vs_buf[2] = (abs(vs_y)) & 0x7F;
+vs_buf[1] = (abs(vs_x) > 0x3F) ? 0x3F : abs(vs_x);      /* motion (limited to 63 pixels in any direction) */
+if (vs_x > 0)
+    vs_x -= vs_buf[1];
+else
+    vs_x += vs_buf[1];
+vs_buf[2] = (abs(vs_y) > 0x3F) ? 0x3F : abs(vs_y);
+if (vs_y > 0)
+    vs_y -= vs_buf[2];
+else
+    vs_y += vs_buf[2];
 vs_bptr = 0;
 vs_state = VSXXX_SEND;
 vs_datalen = 3;
+sim_debug (DBG_SERIAL, &vs_dev, "mouse motion queued for delivery: Motion:(%s%d,%s%d), Buttons:(%s,%s,%s) Remnant skipped:(%d,%d)\n",
+           (vs_buf[0]&0x10) ? "s" : "", vs_buf[1], (vs_buf[0]&0x08) ? "s" : "", vs_buf[2], (vs_buf[0]&0x04) ? "L" : "l", (vs_buf[0]&0x02) ? "M" : "m", (vs_buf[0]&0x01) ? "R" : "r", vs_x, vs_y);
+vs_x = vs_y = 0;
 }
 
 void vs_poll (void)
@@ -216,6 +227,9 @@ SIM_MOUSE_EVENT ev;
 if (vid_poll_mouse (&ev) != SCPE_OK)
     return;
 if (vs_state == VSXXX_IDLE) {
+    if ((ev.x_rel == 0) && (ev.y_rel == 0) &&
+        (vs_l == ev.b1_state) && (vs_m == ev.b2_state) && (vs_r == ev.b3_state))
+        return;
     vs_x = ev.x_rel;
     vs_y = ev.y_rel;
     vs_l = ev.b1_state;
