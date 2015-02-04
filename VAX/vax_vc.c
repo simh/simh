@@ -266,7 +266,8 @@ DIB vc_dib = {
 #define DBG_REG         0x0100                          /* register activity */
 #define DBG_CRTC        0x0200                          /* crtc register activity */
 #define DBG_CURSOR      0x0400                          /* Cursor content, function and visibility activity */
-#define DBG_SCANL       0x0800                          /* Scanline map activity */
+#define DBG_TCURSOR     0x0800                          /* Cursor content, function and visibility activity */
+#define DBG_SCANL       0x1000                          /* Scanline map activity */
 #define DBG_INT0        0x0001                          /* interrupt 0 */
 #define DBG_INT1        0x0002                          /* interrupt 1 */
 #define DBG_INT2        0x0004                          /* interrupt 2 */
@@ -281,6 +282,7 @@ DEBTAB vc_debug[] = {
     {"REG",     DBG_REG},
     {"CRTC",    DBG_CRTC},
     {"CURSOR",  DBG_CURSOR},
+    {"TCURSOR", DBG_TCURSOR},
     {"SCANL",   DBG_SCANL},
     {"DUART",   DBG_INT0},
     {"VSYNC",   DBG_INT1},
@@ -772,6 +774,19 @@ for (i=0; i<16*16; i++) {
     data[i>>3] |= d<<(7-(i&7));
     mask[i>>3] |= m<<(7-(i&7));
     }
+if ((vc_dev.dctrl & DBG_CURSOR) && (vc_dev.dctrl & DBG_TCURSOR)) {
+    /* box the cursor image */
+    for (i=0; i<16*16; i++) {
+        if ((0 == i>>4) || (0xF == i>>4) || (0 == (i&0xF)) || (0xF == (i&0xF))) {
+            data[i>>3] |= 1<<(7-(i&7));
+            mask[i>>3] |= 1<<(7-(i&7));
+            }
+        if ((1 == i>>4) || (0xE == i>>4) || (1 == (i&0xF)) || (0xE == (i&0xF))) {
+            data[i>>3] &= ~(1<<(7-(i&7)));
+            mask[i>>3] |= 1<<(7-(i&7));
+            }
+        }
+    }
 vid_set_cursor (visible, 16, 16, data, mask);
 }
 
@@ -858,7 +873,7 @@ return 0;                                               /* no intr req */
 t_stat vc_svc (UNIT *uptr)
 {
 t_bool updated = FALSE;                                 /* flag for refresh */
-uint32 line;
+uint32 lines;
 uint32 ln, col, off;
 int32 xpos, ypos, dx, dy;
 uint8 *cur;
@@ -922,12 +937,12 @@ if (vid_mouse_b2)
 if (vid_mouse_b1)
     vc_csr &= ~CSR_MSC;
 
-line = 0;
+lines = 0;
 for (ln = 0; ln < VC_YSIZE; ln++) {
     if ((vc_map[ln] & VCMAP_VLD) == 0) {                /* line invalid? */
         off = vc_map[ln] * 32;                          /* get video buf offset */
         for (col = 0; col < VC_XSIZE; col++)  
-            vc_lines[line*VC_XSIZE + col] = vid_mono_palette[(vc_buf[off + (col >> 5)] >> (col & 0x1F)) & 1];
+            vc_lines[ln*VC_XSIZE + col] = vid_mono_palette[(vc_buf[off + (col >> 5)] >> (col & 0x1F)) & 1];
                                                         /* 1bpp to 32bpp */
         if (CUR_V &&                                    /* cursor visible && need to draw cursor? */
             (vc_input_captured || (vc_dev.dctrl & DBG_CURSOR))) {
@@ -937,20 +952,20 @@ for (ln = 0; ln < VC_YSIZE; ln++) {
                     if ((CUR_X + col) >= VC_XSIZE)      /* Part of cursor off screen? */
                         continue;                       /* Skip */
                     if (CUR_F)                          /* mask function */
-                        vc_lines[line*VC_XSIZE + CUR_X + col] = vid_mono_palette[(vc_lines[line*VC_XSIZE + CUR_X + col] == vid_mono_palette[1]) | (cur[col] & 1)];
+                        vc_lines[ln*VC_XSIZE + CUR_X + col] = vid_mono_palette[(vc_lines[ln*VC_XSIZE + CUR_X + col] == vid_mono_palette[1]) | (cur[col] & 1)];
                     else
-                        vc_lines[line*VC_XSIZE + CUR_X + col] = vid_mono_palette[(vc_lines[line*VC_XSIZE + CUR_X + col] == vid_mono_palette[1]) & (~cur[col] & 1)];
+                        vc_lines[ln*VC_XSIZE + CUR_X + col] = vid_mono_palette[(vc_lines[ln*VC_XSIZE + CUR_X + col] == vid_mono_palette[1]) & (~cur[col] & 1)];
                     }
                 }
             }
         vc_map[ln] |= VCMAP_VLD;                        /* set valid */
         if ((ln == (VC_YSIZE-1)) ||                     /* if end of window OR */
             (vc_map[ln+1] & VCMAP_VLD)) {               /* next is already valid? */
-            vid_draw (0, ln-line, VC_XSIZE, line+1, (uint32*)vc_lines); /* update region */
-            line = 0;
+            vid_draw (0, ln-lines, VC_XSIZE, lines+1, vc_lines+(ln-lines)*VC_XSIZE); /* update region */
+            lines = 0;
             }
         else
-            line++;
+            lines++;
         updated = TRUE;
         }
     }
