@@ -418,7 +418,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
           $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
           ifeq (Darwin,$(OSTYPE))
-            VIDEO_LDFLAGS += -lobjc -framework cocoa
+            VIDEO_LDFLAGS += -lobjc -framework cocoa -DSDL_MAIN_AVAILABLE
           endif
         endif
       endif
