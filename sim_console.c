@@ -715,7 +715,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
                 if (sim_rem_read_timeouts[i]) {
                     tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeouts[i]);
-                    tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
+                    tmxr_linemsgf (lp, "\r\n");
                     tmxr_send_buffered_data (lp);           /* flush any buffered data */
                     }
                 }
