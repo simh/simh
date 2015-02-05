@@ -969,7 +969,7 @@ switch (op) {                                           /* case on opcode */
 /* Overflow instruction */
 
     case OVF:
-        if ((inst & 0100) & OV)
+        if ((inst & 0100) && !OV)
             P = (P + 1) & VA_MASK;
         if (inst & 0001)
             OV = 0;
