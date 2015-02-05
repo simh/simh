@@ -1128,6 +1128,7 @@ SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);
 SDL_PumpEvents ();
 }
 
+#if SDL_MAJOR_VERSION != 1
 void vid_draw_region (SDL_UserEvent *event)
 {
 SDL_Rect *vid_dst = (SDL_Rect *)event->data1;
@@ -1141,6 +1142,7 @@ if (SDL_UpdateTexture(vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf)))
 free (vid_dst);
 event->data1 = NULL;
 }
+#endif
 
 int vid_video_events (void)
 {
@@ -1447,10 +1449,12 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
                     if (event.user.code == EVENT_CLOSE) {
                         event.user.code = 0;    /* Mark as done */
                         }
+#if SDL_MAJOR_VERSION != 1
                     if (event.user.code == EVENT_DRAW) {
                         vid_draw_region ((SDL_UserEvent*)&event);
                         event.user.code = 0;    /* Mark as done */
                         }
+#endif
                     if (event.user.code == EVENT_SHOW) {
                         vid_show_video_event ();
                         event.user.code = 0;    /* Mark as done */
