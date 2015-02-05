@@ -64,8 +64,10 @@ char vid_release_key[64] = "Ctrl-Right-Shift";
 #define EVENT_CLOSE     2                               /* close event for SDL */
 #define EVENT_CURSOR    3                               /* new cursor for SDL */
 #define EVENT_WARP      4                               /* warp mouse position for SDL */
-#define EVENT_OPEN      5                               /* vid_open request */
-#define EVENT_EXIT      6                               /* program exit */
+#define EVENT_DRAW      5                               /* draw/blit region for SDL */
+#define EVENT_SHOW      6                               /* show SDL capabilities */
+#define EVENT_OPEN      7                               /* vid_open request */
+#define EVENT_EXIT      8                               /* program exit */
 #define MAX_EVENTS      20                              /* max events in queue */
 
 typedef struct {
@@ -86,6 +88,7 @@ typedef struct {
 
 int vid_thread (void* arg);
 int vid_video_events (void);
+void vid_show_video_event (void);
 
 /* 
    libSDL and libSDL2 have significantly different APIs.  
@@ -156,10 +159,17 @@ main_argc = argc;
 main_argv = argv;
 
 #if SDL_MAJOR_VERSION == 1
+SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE);
+
 vid_main_thread_handle = SDL_CreateThread (main_thread , NULL);
 #else
-vid_main_thread_handle = SDL_CreateThread (main_thread , "simh-main-thread", NULL);
+SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
+
+SDL_Init (SDL_INIT_VIDEO);
+
+vid_main_thread_handle = SDL_CreateThread (main_thread , "simh-main", NULL);
 #endif
+
 while (1) {
     int status = SDL_WaitEvent (&event);
     if (status == 1) {
@@ -169,12 +179,16 @@ while (1) {
             if (event.user.code == EVENT_OPEN)
                 vid_video_events ();
             else {
-                sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
-                break;
+                if (event.user.code == EVENT_SHOW)
+                    vid_show_video_event ();
+                else {
+                    sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
+                    break;
+                    }
                 }
             }
         else {
-            sim_printf ("main(): Ignoring unexpected event: %d\n", event.type);
+//          sim_printf ("main(): Ignoring unexpected event: %d\n", event.type);
             }
         }
     else {
@@ -183,6 +197,7 @@ while (1) {
         }
     }
 SDL_WaitThread (vid_main_thread_handle, &status);
+SDL_Quit ();
 return status;
 }
 
@@ -361,17 +376,21 @@ pixels = (uint32 *)vid_image->pixels;
 for (i = 0; i < h; i++)
     memcpy (pixels + ((i + y) * vid_width) + x, buf + w*i, w*sizeof(*pixels));
 #else
-SDL_Rect vid_dst;
-
-vid_dst.x = x;
-vid_dst.y = y;
-vid_dst.w = w;
-vid_dst.h = h;
+SDL_Event user_event;
+SDL_Rect *vid_dst;
 
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
 
-if (SDL_UpdateTexture(vid_texture, &vid_dst, buf, w*sizeof(*buf)))
-    sim_printf ("%s: vid_draw() - SDL_UpdateTexture error: %s\n", sim_dname(vid_dev), SDL_GetError());
+vid_dst = (SDL_Rect *)malloc (sizeof(*vid_dst));
+vid_dst->x = x;
+vid_dst->y = y;
+vid_dst->w = w;
+vid_dst->h = h;
+user_event.type = SDL_USEREVENT;
+user_event.user.code = EVENT_DRAW;
+user_event.user.data1 = (void *)vid_dst;
+user_event.user.data2 = (void *)buf;
+SDL_PushEvent (&user_event);
 #endif
 }
 
@@ -1104,6 +1123,20 @@ SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);
 SDL_PumpEvents ();
 }
 
+void vid_draw_region (SDL_UserEvent *event)
+{
+SDL_Rect *vid_dst = (SDL_Rect *)event->data1;
+uint32 *buf = (uint32 *)event->data2;
+
+sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Draw Region Event: (%d,%d,%d,%d)\n", vid_dst->x, vid_dst->x, vid_dst->w, vid_dst->h);
+
+if (SDL_UpdateTexture(vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf)))
+    sim_printf ("%s: vid_draw() - SDL_UpdateTexture error: %s\n", sim_dname(vid_dev), SDL_GetError());
+
+free (vid_dst);
+event->data1 = NULL;
+}
+
 int vid_video_events (void)
 {
 SDL_Event event;
@@ -1371,8 +1404,10 @@ while (vid_active) {
                 break;
 #endif
             case SDL_USEREVENT:
-                /* There are 4 user events generated */
+                /* There are 6 user events generated */
                 /* EVENT_REDRAW to update the display */
+                /* EVENT_DRAW   to update a region in the display texture */
+                /* EVENT_SHOW   to display the current SDL video capabilities */
                 /* EVENT_CURSOR to change the current cursor */
                 /* EVENT_WARP   to warp the cursor position */
                 /* EVENT_CLOSE  to wake up this thread and let */
@@ -1405,6 +1440,14 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
                         event.user.code = 0;    /* Mark as done */
                         }
                     if (event.user.code == EVENT_CLOSE) {
+                        event.user.code = 0;    /* Mark as done */
+                        }
+                    if (event.user.code == EVENT_DRAW) {
+                        vid_draw_region ((SDL_UserEvent*)&event);
+                        event.user.code = 0;    /* Mark as done */
+                        }
+                    if (event.user.code == EVENT_SHOW) {
+                        vid_show_video_event ();
                         event.user.code = 0;    /* Mark as done */
                         }
                     if (event.user.code != 0) {
@@ -1493,11 +1536,14 @@ if (vid_flags & SIM_VID_INPUTCAPTURED)
 return SCPE_OK;
 }
 
-t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
+static t_stat _vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
 int i;
 
 fprintf (st, "Video support using SDL: %s\n", vid_version());
+#if defined (SDL_MAIN_AVAILABLE)
+fprintf (st, "  SDL Events being processed on the main process thread\n");
+#endif
 if (!vid_active) {
 #if !defined (SDL_MAIN_AVAILABLE)
     SDL_Init(SDL_INIT_VIDEO);
@@ -1676,6 +1722,41 @@ if (!vid_active)
 return SCPE_OK;
 }
 
+static t_stat _show_stat;
+static FILE *_show_st;
+static UNIT *_show_uptr;
+static int32 _show_val;
+static void *_show_desc;
+
+void vid_show_video_event (void)
+{
+_show_stat = _vid_show_video (_show_st, _show_uptr, _show_val, _show_desc);
+}
+
+t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+SDL_Event user_event;
+
+_show_stat = -1;
+_show_st = st;
+_show_uptr = uptr;
+_show_val = val;
+_show_desc = desc;
+
+user_event.type = SDL_USEREVENT;
+user_event.user.code = EVENT_SHOW;
+user_event.user.data1 = NULL;
+user_event.user.data2 = NULL;
+#if defined (SDL_MAIN_AVAILABLE)
+SDL_PushEvent (&user_event);
+#else
+vid_show_video_event ();
+#endif
+while (_show_stat == -1)
+    SDL_Delay (20);
+return _show_stat;
+}
+
 #else
 
 /* Non-implemented versions */
@@ -1703,6 +1784,16 @@ return SCPE_EOF;
 }
 
 void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf)
+{
+return;
+}
+
+t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask)
+{
+return SCPE_NOFNC;
+}
+
+void vid_set_cursor_position (int32 x, int32 y)
 {
 return;
 }
