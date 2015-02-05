@@ -2793,7 +2793,9 @@ status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
 if (sim_brk_char && (buf[0] == sim_brk_char))
     return SCPE_BREAK;
-else return (buf[0] | SCPE_KFLAG);
+if (sim_int_char && (buf[0] == sim_int_char))
+    return SCPE_STOP;
+return (buf[0] | SCPE_KFLAG);
 }
 
 static t_bool sim_os_poll_kbd_ready (int ms_timeout)
@@ -2921,7 +2923,9 @@ status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
 if (sim_brk_char && (buf[0] == sim_brk_char))
     return SCPE_BREAK;
-else return (buf[0] | SCPE_KFLAG);
+if (sim_int_char && (buf[0] == sim_int_char))
+    return SCPE_STOP;
+return (buf[0] | SCPE_KFLAG);
 }
 
 static t_bool sim_os_poll_kbd_ready (int ms_timeout)
