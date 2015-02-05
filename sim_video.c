@@ -1788,6 +1788,16 @@ void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf)
 return;
 }
 
+t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask)
+{
+return SCPE_NOFNC;
+}
+
+void vid_set_cursor_position (int32 x, int32 y)
+{
+return;
+}
+
 void vid_refresh (void)
 {
 return;
