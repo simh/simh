@@ -175,7 +175,7 @@ while (1) {
                 }
             }
         else {
-            sim_printf ("main(): Ignoring unexpected event: %d\n", event.type);
+//          sim_printf ("main(): Ignoring unexpected event: %d\n", event.type);
             }
         }
     else {
