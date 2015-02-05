@@ -2843,7 +2843,11 @@ runtty = cmdtty;
 runtty.c_lflag = runtty.c_lflag & ~(ECHO | ICANON);     /* no echo or edit */
 runtty.c_oflag = runtty.c_oflag & ~OPOST;               /* no output edit */
 runtty.c_iflag = runtty.c_iflag & ~ICRNL;               /* no cr conversion */
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver SIGINT to main thread when enabled */
+#else
 runtty.c_cc[VINTR] = sim_int_char;                      /* interrupt */
+#endif
 runtty.c_cc[VQUIT] = 0;                                 /* no quit */
 runtty.c_cc[VERASE] = 0;
 runtty.c_cc[VKILL] = 0;
@@ -2879,7 +2883,11 @@ static t_stat sim_os_ttrun (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver SIGINT to main thread when enabled */
+#else
 runtty.c_cc[VINTR] = sim_int_char;                      /* in case changed */
+#endif
 if (tcsetattr (0, TCSAFLUSH, &runtty) < 0)
     return SCPE_TTIERR;
 if (prior_norm) {                                       /* at normal pri? */
