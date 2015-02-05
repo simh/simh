@@ -41,6 +41,11 @@ t_bool vid_mouse_b2 = FALSE;
 t_bool vid_mouse_b3 = FALSE;
 char vid_release_key[64] = "Ctrl-Right-Shift";
 
+t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc)
+{
+return vid_show_video (st, uptr, val, desc);
+}
+
 #if defined(HAVE_LIBSDL)
 #include <SDL.h>
 #include <SDL_thread.h>
