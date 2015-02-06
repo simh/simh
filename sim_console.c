@@ -520,7 +520,6 @@ static t_stat x_help_cmd (int32 flag, char *cptr);
 
 static CTAB allowed_remote_cmds[] = {
     { "EXAMINE",  &exdep_cmd,      EX_E },
-    { "IEXAMINE", &exdep_cmd, EX_E+EX_I },
     { "DEPOSIT",  &exdep_cmd,      EX_D },
     { "EVALUATE", &eval_cmd,          0 },
     { "ATTACH",   &attach_cmd,        0 },
@@ -542,7 +541,6 @@ static CTAB allowed_remote_cmds[] = {
 
 static CTAB allowed_master_remote_cmds[] = {
     { "EXAMINE",  &exdep_cmd,      EX_E },
-    { "IEXAMINE", &exdep_cmd, EX_E+EX_I },
     { "DEPOSIT",  &exdep_cmd,      EX_D },
     { "EVALUATE", &eval_cmd,          0 },
     { "ATTACH",   &attach_cmd,        0 },
@@ -572,6 +570,8 @@ static CTAB allowed_master_remote_cmds[] = {
 static CTAB allowed_single_remote_cmds[] = {
     { "ATTACH",   &attach_cmd,        0 },
     { "DETACH",   &detach_cmd,        0 },
+    { "EXAMINE",  &exdep_cmd,      EX_E },
+    { "EVALUATE", &eval_cmd,          0 },
     { "PWD",      &pwd_cmd,           0 },
     { "DIR",      &dir_cmd,           0 },
     { "LS",       &dir_cmd,           0 },
