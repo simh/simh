@@ -1015,7 +1015,14 @@ if ((sta == SOCKET_ERROR) &&
     (WSAGetLastError () != WSAEWOULDBLOCK) &&
     (WSAGetLastError () != WSAEINPROGRESS))
     return sim_err_sock (newsock, "connect", 1);
+if (!datagram) {
+    int keepalive = 1;
 
+    /* enable TCP Keep Alives */
+    sta = setsockopt (newsock, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
+    if (sta == -1) 
+        return sim_err_sock (newsock, "setsockopt KEEPALIVE", 1);
+    }
 return newsock;                                         /* got it! */
 }
 
@@ -1027,6 +1034,7 @@ return sim_accept_conn_ex (master, connectaddr, FALSE);
 SOCKET sim_accept_conn_ex (SOCKET master, char **connectaddr, t_bool nodelay)
 {
 int32 sta, err;
+int keepalive = 1;
 #if defined (macintosh) || defined (__linux) || defined (__linux__) || \
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
@@ -1075,6 +1083,11 @@ if (nodelay) {
     if (sta == SOCKET_ERROR)                               /* setsockopt error? */
         return sim_err_sock (newsock, "setnodelay", 0);
     }
+
+/* enable TCP Keep Alives */
+sta = setsockopt (newsock, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
+if (sta == -1) 
+    return sim_err_sock (newsock, "setsockopt KEEPALIVE", 1);
 
 return newsock;
 }
