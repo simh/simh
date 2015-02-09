@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Jan-15    RMS     Fixed treatment of overflow (Ken Shirriff)
    08-Oct-12    RMS     Clear storage and branch preserves B register (Van Snyder)
    19-Mar-11    RMS     Reverted multiple tape indicator implementation
    20-Jan-11    RMS     Fixed branch on EOT indicator per hardware (Van Snyder)
@@ -38,8 +39,7 @@
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    01-Sep-05	RMS     Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET
-                        (Ralph Reinke)
+   02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET (Ralph Reinke)
    14-Nov-04    WVS     Added column binary support, debug support
    06-Nov-04    RMS     Added instruction history
    12-Jul-03    RMS     Moved ASCII/BCD tables to included file
@@ -963,9 +963,11 @@ CHECK_LENGTH:
         M[BS] = b;                                      /* store result */
         MM (BS);
         if (b & WM) {                                   /* b wm? done */
-            if (qsign && (carry == 0))                  /* compl, no carry? */
+            if ((qsign != 0) && (carry == 0))           /* eff sub and no carry? */
                 M[bsave] = WM + ((b & ZONE) ^ ABIT) + sum_table[10 - t];
-            break;
+            if ((qsign == 0) && (carry != 0))           /* eff add and carry */
+                 ind[IN_OVF] = 1;                       /* overflow */
+             break;
             }
         do {
             if (a & WM)                                 /* A WM? char = 0 */
@@ -981,7 +983,8 @@ CHECK_LENGTH:
             if ((b & WM) && (qsign == 0)) {             /* last, no recomp? */
                 M[BS] = WM + sum_table[t] +             /* zone add */
                     (((a & ZONE) + b + (carry? ABIT: 0)) & ZONE);
-                ind[IN_OVF] = carry;                    /* ovflo if carry */
+                if (carry != 0)                         /* carry out? */
+                    ind[IN_OVF] = 1;                    /* ovflo if carry */
                 }
             else M[BS] = (b & WM) + sum_table[t];       /* normal add */
             MM (BS);
