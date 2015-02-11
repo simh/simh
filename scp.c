@@ -558,7 +558,7 @@ const struct scp_error {
          {"NOPARAM", "No settable parameters"},
          {"ALATT",   "Unit already attached"},
          {"TIMER",   "Hardware timer error"},
-         {"SIGERR",  "SIGINT handler setup error"},
+         {"SIGERR",  "Signal handler setup error"},
          {"TTYERR",  "Console terminal setup error"},
          {"SUB",     "Subscript out of range"},
          {"NOFNC",   "Command not allowed"},
@@ -1280,7 +1280,7 @@ static const char simh_help[] =
       "5 TIMER\n"
       " Hardware timer error\n"
       "5 SIGERR\n"
-      " SIGINT handler setup error\n"
+      " Signal handler setup error\n"
       "5 TTYERR\n"
       " Console terminal setup error\n"
       "5 NOFNC\n"
