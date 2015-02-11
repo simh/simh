@@ -15,13 +15,13 @@
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   MARK PIZZOLATO BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
    Except as contained in this notice, the name of Mark Pizzolato shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from Mark Pizzolato.
 
    15-Jan-15    MP      Initial implementation
 
@@ -38,12 +38,11 @@
 extern "C" {
 #endif
 
+#include <stdlib.h>
+
 typedef enum {
-    Idle,
-    InputTransfer,
-    OutputTransfer,
-    Halted,
-    Running
+    Halt,
+    Run
     } OperationalState;
 
 typedef struct sim_frontpanel PANEL;
@@ -61,7 +60,6 @@ sim_panel_stop_simulator (PANEL *panel);
 int
 sim_panel_add_register (PANEL *panel,
                         const char *name,
-                        int radix,
                         size_t size,
                         void *addr);
 
@@ -78,14 +76,20 @@ int
 sim_panel_exec_halt (PANEL *panel);
 
 int
+sim_panel_exec_boot (PANEL *panel, const char *device);
+
+int
 sim_panel_exec_run (PANEL *panel);
 
 int
 sim_panel_exec_step (PANEL *panel);
 
+OperationalState
+sim_panel_get_state (PANEL *panel);
+
 const char *sim_panel_get_error (void);
 void sim_panel_clear_error (void);
-int sim_panel_set_error (const char *fmt, ...);
+void sim_panel_set_error (const char *fmt, ...);
 
 
 #ifdef  __cplusplus
