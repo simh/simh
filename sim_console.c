@@ -732,8 +732,12 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     }
                 if (sim_rem_buf_ptr[i] == 0) {
                     /* we just picked up the first character on a command line */
-                    tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
-                    tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                    if (!master_session)
+                        tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
+                    else
+                        tmxr_linemsgf (lp, "\r\n%s", sim_is_running ? "SIM> " : "sim> ");
+                    if (!tmxr_input_pending_ln (lp))
+                        tmxr_send_buffered_data (lp);   /* flush any buffered data */
                     }
                 }
             }
@@ -744,8 +748,12 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             return stat|SCPE_NOMESSAGE;
         if (!sim_rem_single_mode[i]) {
             read_start_time = sim_os_msec();
-            tmxr_linemsg (lp, sim_prompt);
-            tmxr_send_buffered_data (lp);           /* flush any buffered data */
+            if (master_session)
+                tmxr_linemsg (lp, "sim> ");
+            else
+                tmxr_linemsg (lp, sim_prompt);
+            if (!tmxr_input_pending_ln (lp))
+                tmxr_send_buffered_data (lp);       /* flush any buffered data */
             }
         do {
             if (!sim_rem_single_mode[i]) {
@@ -832,8 +840,14 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                         got_command = TRUE;                 /* command too long */
                     break;
                 }
-            } while ((!got_command) && (!sim_rem_single_mode[i]));
-        tmxr_send_buffered_data (lp);           /* flush any buffered data */
+            c = 0;
+            if ((!got_command) && (sim_rem_single_mode[i]) && (tmxr_input_pending_ln (lp))) {
+                c = tmxr_getc_ln (lp);
+                c = c & ~TMXR_VALID;
+                }
+            } while ((!got_command) && ((!sim_rem_single_mode[i]) || c));
+        if (!tmxr_input_pending_ln (lp))
+            tmxr_send_buffered_data (lp);       /* flush any buffered data */
         if ((sim_rem_single_mode[i]) && !got_command) {
             break;
             }
@@ -856,6 +870,8 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             else
                 continue;
             }
+        while (isspace(cbuf[0]))
+            memmove (cbuf, cbuf+1, strlen(cbuf+1)+1);       /* skip leading whitespace */
         sim_sub_args (cbuf, sizeof(cbuf), argv);
         cptr = cbuf;
         cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -872,8 +888,12 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             }
         sim_rem_cmd_log_start = sim_ftell (sim_log);
         basecmdp = find_cmd (gbuf);                         /* validate basic command */
-        if (basecmdp == NULL)
-            stat = SCPE_UNK;
+        if (basecmdp == NULL) {
+            if ((gbuf[0] == ';') || (gbuf[0] == '#'))       /* ignore comment */
+                stat = SCPE_OK;
+            else
+                stat = SCPE_UNK;
+            }
         else {
             if ((cmdp = find_ctab (sim_rem_single_mode[i] ? allowed_single_remote_cmds : (master_session ? allowed_master_remote_cmds : allowed_remote_cmds), gbuf))) {/* lookup command */
                 if (cmdp->action == &x_continue_cmd)
@@ -959,7 +979,10 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                 sim_rem_single_mode[i] = TRUE;
             else {
                 if (!sim_rem_single_mode[i]) {
-                    tmxr_linemsgf (lp, "%s", sim_prompt);
+                    if (master_session)
+                        tmxr_linemsgf (lp, "%s", "sim> ");
+                    else
+                        tmxr_linemsgf (lp, "%s", sim_prompt);
                     tmxr_send_buffered_data (lp);
                     }
                 }
@@ -1076,7 +1099,12 @@ return SCPE_OK;
 }
 
 /* Enable or disable Remote Console master mode */
-/* In master mode, ... explain */
+
+/* In master mode, commands are subsequently processed from the
+   primary/initial (master mode) remote console session.  Commands
+   are processed from that source until that source disables master
+   mode or the simulator exits 
+ */
 
 static t_stat sim_set_rem_master (int32 flag, char *cptr)
 {
