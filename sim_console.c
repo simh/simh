@@ -394,6 +394,7 @@ static int32 sim_rem_step_line = -1;        /* step in progress on line # */
 static t_bool sim_log_temp = FALSE;         /* temporary log file active */
 static char sim_rem_con_temp_name[PATH_MAX+1];
 static int32 sim_rem_master_mode = 0;       /* Master Mode Enabled Flag */
+static t_bool sim_rem_master_was_connected = FALSE; /* Master Mode has been connected */
 static t_offset sim_rem_cmd_log_start = 0;  /* Log File saved position */
 
 
@@ -666,6 +667,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
      i++) {
     t_bool master_session = (sim_rem_master_mode && (i == 0));
 
+    sim_rem_master_was_connected |= master_session;    /* Remember if master ever connected */
     lp = &sim_rem_con_tmxr.ldsc[i];
     if (!lp->conn)
         continue;
@@ -1000,6 +1002,8 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         sim_rem_single_mode[i] = FALSE;
         }
     }
+if (sim_rem_master_was_connected && !sim_rem_con_tmxr.ldsc[0].sock) /* Master Connection lost? */
+    return SCPE_EXIT;
 if (stepping)
     sim_activate(uptr, steps);                  /* check again after 'steps' instructions */
 else
@@ -1156,6 +1160,8 @@ if (sim_rem_master_mode) {
         }
     stat |= stat_nomessage;
     }
+else
+    sim_rem_master_was_connected = FALSE;
 
 return stat;
 }
