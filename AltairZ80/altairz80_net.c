@@ -152,7 +152,6 @@ static t_stat net_reset(DEVICE *dptr) {
 static t_stat net_attach(UNIT *uptr, char *cptr) {
     uint32 i;
     char host[CBUFSIZE], port[CBUFSIZE];
-    t_stat r;
 
     if (sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), "3000", NULL))
         return SCPE_ARG;

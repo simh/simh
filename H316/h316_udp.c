@@ -215,7 +215,7 @@ t_stat udp_parse_remote (int32 link, char *premote)
   // yourself!!  In both cases, "w.x.y.z" is a dotted IP for the remote machine
   // and "name.domain.com" is its name (which will be looked up to get the IP).
   // If the host name/IP is omitted then it defaults to "localhost".
-  char *end;  int32 lport, rport; t_stat ret;
+  char *end;  int32 lport, rport;
   char host[64], port[16];
   if (*premote == '\0') return SCPE_2FARG;
   memset (udp_links[link].lport, 0, sizeof(udp_links[link].lport));
