@@ -1906,7 +1906,7 @@ else
         sim_printf ("Eth: Must specify different udp localhost ports\r\n");
         return SCPE_OPENERR;
         }
-      *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, TRUE, FALSE);
+      *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, SIM_SOCK_OPT_DATAGRAM);
       if (INVALID_SOCKET == *fd_handle)
           return SCPE_OPENERR;
       *eth_api = ETH_API_UDP;
@@ -2101,7 +2101,7 @@ switch (eth_api) {
     break;
 #endif
   case ETH_API_UDP:
-    sim_close_sock(pcap_fd, TRUE);
+    sim_close_sock(pcap_fd);
     break;
 #ifdef USE_SLIRP_NETWORK
   case ETH_API_NAT:
@@ -2363,7 +2363,7 @@ switch (dev->eth_api) {
       break;
 #endif
   default:
-      sim_err_sock (INVALID_SOCKET, msg, 0);
+      sim_err_sock (INVALID_SOCKET, msg);
       break;
   }
 #ifdef USE_READER_THREAD

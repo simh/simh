@@ -305,7 +305,7 @@ static void sca_socket_error (void)
 
 	if (sca_sock != INVALID_SOCKET) {
 		/* close socket, prepare to listen again if in listen mode. It's a "master" socket if it was an outgoing connection */
-		sim_close_sock(sca_sock, (sca_unit.flags & UNIT_LISTEN) == 0);
+		sim_close_sock(sca_sock);
 		sca_sock = INVALID_SOCKET;
 
 		if (sca_unit.filename != NULL)								/* reset filename string in unit record */
@@ -460,9 +460,8 @@ static t_stat sca_attach (UNIT *uptr, char *cptr)
 		detach_unit(&sca_unit);
 
 	if (do_listen) {							/* if listen mode, string specifies port number (only; otherwise it's a dummy argument) */
-        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL);
-        if (r != SCPE_OK)
-            return r;
+        if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL))
+            return SCPE_ARG;
         if ((0 == strcmp(port, cptr)) && (0 == strcmp(port, "dummy")))
             strcpy(port, SCA_DEFAULT_PORT);
 
@@ -491,9 +490,8 @@ static t_stat sca_attach (UNIT *uptr, char *cptr)
 		if (! *cptr)
 			return SCPE_2FARG;
 
-        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL);
-        if (r != SCPE_OK)
-            return r;
+        if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL))
+            return SCPE_ARG;
         if ((0 == strcmp(cptr, port)) && (0 == strcmp(host, ""))) {
             strcpy(host, port);
             strcpy(port, SCA_DEFAULT_PORT);
@@ -518,7 +516,7 @@ static t_stat sca_attach (UNIT *uptr, char *cptr)
 			SETBIT(sca_dsw, SCA_DSW_READY);
 		}
 		else {                                  /* sca_sock appears in "error" set -- connect failed */
-			sim_close_sock(sca_sock, TRUE);
+			sim_close_sock(sca_sock);
 			sca_sock = INVALID_SOCKET;
 			return SCPE_OPENERR;
 		}
@@ -559,11 +557,11 @@ static t_stat sca_detach (UNIT *uptr)
 	CLRBIT(sca_dsw, SCA_DSW_READY);				/* indicate offline */
 
 	if (sca_sock != INVALID_SOCKET) {			/* close connected socket */
-		sim_close_sock(sca_sock, (sca_unit.flags & UNIT_LISTEN) == 0);
+		sim_close_sock(sca_sock);
 		sca_sock = INVALID_SOCKET;
 	}
 	if (sca_lsock != INVALID_SOCKET) {			/* close listening socket */
-		sim_close_sock(sca_lsock, TRUE);
+		sim_close_sock(sca_lsock);
 		sca_lsock = INVALID_SOCKET;
 	}
 	

@@ -235,8 +235,8 @@ t_stat udp_parse_remote (int32 link, char *premote)
     premote = end+1;
   }
 
-  ret = sim_parse_addr (premote, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL);
-  if (ret != SCPE_OK) return SCPE_ARG;
+  if (sim_parse_addr (premote, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL))
+    return SCPE_ARG;
   sprintf (udp_links[link].rhostport, "%s:%s", host, port);
   if (udp_links[link].lport[0] == '\0')
     strcpy (udp_links[link].lport, port);
