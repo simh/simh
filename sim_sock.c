@@ -1014,11 +1014,11 @@ sta = connect (newsock, result->ai_addr, result->ai_addrlen);
 p_freeaddrinfo (result);
 if (sta == SOCKET_ERROR) {
     if (opt_flags & SIM_SOCK_OPT_BLOCKING) {
-        if ((sta == WSAETIMEDOUT)    ||                        /* expected errors after a connect failure */
-            (sta == WSAEHOSTUNREACH) ||
-            (sta == WSAECONNREFUSED) ||
-            (sta == WSAECONNABORTED) ||
-            (sta == WSAECONNRESET)) {
+        if ((WSAGetLastError () == WSAETIMEDOUT)    ||                        /* expected errors after a connect failure */
+            (WSAGetLastError () == WSAEHOSTUNREACH) ||
+            (WSAGetLastError () == WSAECONNREFUSED) ||
+            (WSAGetLastError () == WSAECONNABORTED) ||
+            (WSAGetLastError () == WSAECONNRESET)) {
             sim_close_sock (newsock);
             newsock = INVALID_SOCKET;
             }
