@@ -620,6 +620,7 @@ t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
 
 t_stat besm6_show_panel (FILE *st, struct sim_unit *up, int32 v, void *dp)
 {
+    return SCPE_NOTATT;
 }
 
 void besm6_draw_panel (int force)

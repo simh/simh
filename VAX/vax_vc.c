@@ -1097,4 +1097,6 @@ char *vc_description (DEVICE *dptr)
 return "VCB01 Monochrome Graphics Adapter";
 }
 
-#endif /* !VAX_620 */
+#else /* defined(VAX_620) */
+static char *dummy_declaration = "Something to compile";
+#endif /* !defined(VAX_620) */

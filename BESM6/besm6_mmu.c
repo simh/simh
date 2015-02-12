@@ -56,7 +56,7 @@ uint32 BRSLRU;
 t_value RP[8];
 uint32 TLB[32];
 
-unsigned iintr_data;    /* protected page number or parity check location */
+uint32 iintr_data;    /* protected page number or parity check location */
 
 /* There were several hardwired configurations of registers
  * corresponding to up to 7 first words of the memory space, selected by

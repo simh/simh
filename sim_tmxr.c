@@ -1539,7 +1539,8 @@ return (lp->rxbpi - lp->rxbpr);
 
 int32 tmxr_getc_ln (TMLN *lp)
 {
-int32 j, val = 0;
+int32 j; 
+t_stat val = 0;
 uint32 tmp;
 
 tmxr_debug_trace_line (lp, "tmxr_getc_ln()");

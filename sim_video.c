@@ -1818,13 +1818,13 @@ while (_show_stat == -1)
 return _show_stat;
 }
 
-#else
+#else /* !defined(HAVE_LIBSDL) */
 
 /* Non-implemented versions */
 
 uint32 vid_mono_palette[2];                             /* Monochrome Color Map */
 
-t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int32 flags)
+t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int flags)
 {
 return SCPE_NOFNC;
 }
@@ -1886,6 +1886,8 @@ fprintf (st, "video support unavailable");
 return SCPE_OK;
 }
 
-#endif
+#endif /* defined(HAVE_LIBSDL) */
 
-#endif /* USE_SIM_VIDEO */
+#else /* !defined(USE_SIM_VIDEO) */
+static char *dummy_declaration = "Something to compile";
+#endif /* defined(USE_SIM_VIDEO) */

@@ -829,4 +829,6 @@ switch (mode) {
     }            
 }
 
-#endif /* !VAX_620 */
+#else /* defined(VAX_620) */
+static char *dummy_declaration = "Something to compile";
+#endif /* !defined(VAX_620) */
