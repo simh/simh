@@ -243,7 +243,7 @@ PANEL *p = NULL;
 FILE *f = NULL;
 struct stat statb;
 char *buf = NULL;
-int port;
+int port, i;
 char hostport[64];
 union {int i; char c[sizeof (int)]; } end_test;
 
@@ -269,17 +269,8 @@ for (port=1024; port < 2048; port++) {
         break;
     
     }
-if (stat (sim_path, &statb) < 0) {
-    sim_panel_set_error ("Can't stat simulator '%s': %s", sim_path, strerror(errno));
-    goto Error_Return;
-    }
 if (stat (sim_config, &statb) < 0) {
     sim_panel_set_error ("Can't stat simulator configuration '%s': %s", sim_config, strerror(errno));
-    goto Error_Return;
-    }
-f = fopen (sim_config, "rb");
-if (NULL == f) {
-    sim_panel_set_error ("Can't open simulator configuration '%s': %s", sim_config, strerror(errno));
     goto Error_Return;
     }
 buf = (char *)_panel_malloc (statb.st_size+1);
@@ -325,55 +316,55 @@ fprintf (f, "# Simulator Path: %s\n", p->path);
 fprintf (f, "%s\n", buf);
 free (buf);
 buf = NULL;
-fprintf (f, "set remote telnet=%s\n", hostport);
+fprintf (f, "set remote -u telnet=%s\n", hostport);
 fprintf (f, "set remote master\n");
 fclose (f);
 f = NULL;
 if (1) {
 #if defined(_WIN32)
-    char cmd[1024];
+    char cmd[2048];
+    PROCESS_INFORMATION ProcessInfo;
+    STARTUPINFO StartupInfo;
 
     sprintf(cmd, "%s%s%s %s%s%s", strchr (p->path, ' ') ? "\"" : "", p->path, strchr (p->path, ' ') ? "\"" : "", strchr (p->temp_config, ' ') ? "\"" : "", p->temp_config, strchr (p->temp_config, ' ') ? "\"" : "");
-    if (1) {
-        PROCESS_INFORMATION ProcessInfo;
-        STARTUPINFO StartupInfo;
 
-        memset (&ProcessInfo, 0, sizeof(ProcessInfo));
-        memset (&StartupInfo, 0, sizeof(StartupInfo));
-        StartupInfo.dwFlags = STARTF_USESTDHANDLES;
-        StartupInfo.hStdInput = INVALID_HANDLE_VALUE;
-        StartupInfo.hStdOutput = INVALID_HANDLE_VALUE;
-        StartupInfo.hStdError = INVALID_HANDLE_VALUE;
-        if (CreateProcessA(p->path, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &StartupInfo, &ProcessInfo)) {
-            CloseHandle (ProcessInfo.hThread);
-            p->hProcess = ProcessInfo.hProcess;
-            Sleep (500);
-            }
-        else { /* Creation Problem */
-            sim_panel_set_error ("CreateProcess Error: %d", GetLastError());
-            goto Error_Return;
-            }
+    memset (&ProcessInfo, 0, sizeof(ProcessInfo));
+    memset (&StartupInfo, 0, sizeof(StartupInfo));
+    StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    StartupInfo.hStdInput = INVALID_HANDLE_VALUE;
+    StartupInfo.hStdOutput = INVALID_HANDLE_VALUE;
+    StartupInfo.hStdError = INVALID_HANDLE_VALUE;
+    if (CreateProcessA(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &StartupInfo, &ProcessInfo)) {
+        CloseHandle (ProcessInfo.hThread);
+        p->hProcess = ProcessInfo.hProcess;
+        }
+    else { /* Creation Problem */
+        sim_panel_set_error ("CreateProcess Error: %d", GetLastError());
+        goto Error_Return;
         }
 #else
     p->pidProcess = fork();
     if (p->pidProcess == 0) {
-        close (0);
-        close (1);
-        close (2);
-        if (execl (p->path, p->path, p->temp_config, NULL)) {
+        close (0); close (1); close (2); /* make sure not to pass the open standard handles */
+        if (execlp (p->path, p->path, p->temp_config, NULL, NULL)) {
             perror ("execl");
             exit(errno);
             }
         }
     if (p->pidProcess < 0) {
         p->pidProcess = 0;
-        sim_panel_set_error ("vfork() Error: %s", strerror(errno));
+        sim_panel_set_error ("fork() Error: %s", strerror(errno));
         goto Error_Return;
         }
-    msleep (500);
 #endif
     }
-p->sock = sim_connect_sock_ex (NULL, hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
+for (i=0; i<5; i++) {
+    p->sock = sim_connect_sock_ex (NULL, hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
+    if (p->sock == INVALID_SOCKET)
+        msleep (100);
+    else
+        break;
+    }
 if (p->sock == INVALID_SOCKET) {
     sim_panel_set_error ("Can't connect to simulator Remote Console on port %s", hostport);
     goto Error_Return;
