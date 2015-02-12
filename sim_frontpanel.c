@@ -31,6 +31,10 @@
 
 */
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 #include "sim_frontpanel.h"
 
 #include <stdio.h>
@@ -54,10 +58,6 @@
 #include <sys/wait.h>
 #endif
 
-#ifdef  __cplusplus
-extern "C" {
-#endif
-
 #include "sim_sock.h"
 
 typedef struct {
@@ -66,38 +66,47 @@ typedef struct {
     size_t size;
     } REG;
 
-struct sim_frontpanel {
-    char                *path;
-    char                *config;
-    char                *temp_config;
-    char                hostport[64];
-    SOCKET              sock;
-    int                 reg_count;
-    REG                 *regs;
-    OperationalState    State;
-    pthread_mutex_t     lock;
-    pthread_t           io_thread;
-    int                 io_thread_running;
-    pthread_mutex_t     io_lock;
-    pthread_mutex_t     io_send_lock;
-    pthread_cond_t      io_done;
-    pthread_cond_t      startup_cond;
+struct PANEL {
+    PANEL                   *parent;        /* Device Panels can have parent panels */
+    char                    *name;          /* simulator path or device name */
+    char                    *config;
+    char                    *temp_config;
+    char                    hostport[64];
+    size_t                  device_count;
+    PANEL                   **devices;
+    SOCKET                  sock;
+    int                     reg_count;
+    REG                     *regs;
+    char                    *reg_query;
+    size_t                  reg_query_size;
+    OperationalState        State;
+    pthread_mutex_t         lock;
+    pthread_t               io_thread;
+    int                     io_thread_running;
+    pthread_mutex_t         io_lock;
+    pthread_mutex_t         io_send_lock;
+    int                     io_waiting;
+    pthread_cond_t          io_done;
+    pthread_cond_t          startup_cond;
     PANEL_DISPLAY_PCALLBACK callback;
-    pthread_t           callback_thread;
-    int                 callback_thread_running;
-    void                *callback_context;
-    int                 callbacks_per_second;
+    pthread_t               callback_thread;
+    int                     callback_thread_running;
+    void                    *callback_context;
+    int                     callbacks_per_second;
 #if defined(_WIN32)
-    HANDLE              hProcess;
+    HANDLE                  hProcess;
 #else
-    pid_t               pidProcess;
+    pid_t                   pidProcess;
 #endif
     };
 
-static char *sim_prompt = "sim> ";
+static const char *sim_prompt = "sim> ";
+static const char *register_get_echo = "# REGISTERS-DONE";
+static const char *command_done_echo = "# COMMAND-DONE";
 static int little_endian;
 static void *_panel_reader(void *arg);
 static void *_panel_callback(void *arg);
+static void sim_panel_set_error (const char *fmt, ...);
 
 #define TN_IAC          0xFFu /* -1 */                  /* protocol delim */
 #define TN_DONT         0xFEu /* -2 */                  /* dont */
@@ -155,21 +164,25 @@ return sent;
 }
 
 static int
-_panel_sendf (PANEL *p, const char *fmt, ...);
+_panel_sendf (PANEL *p, int wait_for_completion, const char *fmt, ...);
 
 static int
-_panel_register_query_string (PANEL *panel, char **buf, int *buf_size)
+_panel_register_query_string (PANEL *panel, char **buf, size_t *buf_size)
 {
-int i, buf_data, buf_needed = 0;
+int i;
+size_t buf_data, buf_needed = 0;
 
+pthread_mutex_lock (&panel->io_lock);
 for (i=0; i<panel->reg_count; i++)
     buf_needed += 7 + strlen (panel->regs[i].name);
-buf_needed += 20; /* # REGISTERS-DONE */
+buf_needed += 10 + strlen (register_get_echo); /* # REGISTERS-DONE */
 if (buf_needed > *buf_size) {
     free (*buf);
     *buf = (char *)_panel_malloc (buf_needed);
-    if (!*buf)
+    if (!*buf) {
+        pthread_mutex_unlock (&panel->io_lock);
         return -1;
+        }
     *buf_size = buf_needed;
     }
 buf_data = 0;
@@ -185,12 +198,15 @@ for (i=0; i<panel->reg_count; i++) {
     sprintf (*buf + buf_data, "%s%s", (i>0) ? "," : "", panel->regs[i].name);
     buf_data += strlen (*buf + buf_data);
     }
-sprintf (*buf + buf_data, "\r");
+strcpy (*buf + buf_data, "\r");
 buf_data += strlen (*buf + buf_data);
 #endif
-sprintf (*buf + buf_data, "# REGISTERS-DONE\r");
+strcpy (*buf + buf_data, register_get_echo);
+buf_data += strlen (*buf + buf_data);
+strcpy (*buf + buf_data, "\r");
 buf_data += strlen (*buf + buf_data);
 *buf_size = buf_data;
+pthread_mutex_unlock (&panel->io_lock);
 return 0;
 }
 
@@ -201,14 +217,14 @@ static void
 _panel_cleanup (void)
 {
 while (panel_count)
-    sim_panel_stop_simulator (*panels);
+    sim_panel_destroy (*panels);
 }
 
 static void
 _panel_register_panel (PANEL *p)
 {
 ++panel_count;
-panels = realloc (panels, sizeof(*panels)*panel_count);
+panels = (PANEL **)realloc (panels, sizeof(*panels)*panel_count);
 panels[panel_count-1] = p;
 if (panel_count == 1)
     atexit (&_panel_cleanup);
@@ -237,7 +253,8 @@ for (i=0; i<panel_count; i++) {
 
 PANEL *
 sim_panel_start_simulator (const char *sim_path,
-                           const char *sim_config)
+                           const char *sim_config,
+                           size_t device_panel_count)
 {
 PANEL *p = NULL;
 FILE *f = NULL;
@@ -282,10 +299,10 @@ if (p == NULL)
     goto Error_Return;
 memset (p, 0, sizeof(*p));
 p->sock = INVALID_SOCKET;
-p->path = (char *)_panel_malloc (strlen (sim_path) + 1);
-if (p->path == NULL)
+p->name = (char *)_panel_malloc (strlen (sim_path) + 1);
+if (p->name == NULL)
     goto Error_Return;
-strcpy (p->path, sim_path);
+strcpy (p->name, sim_path);
 p->config = (char *)_panel_malloc (strlen (sim_config) + 1);
 if (p->config == NULL)
     goto Error_Return;
@@ -312,11 +329,13 @@ if (f == NULL) {
     }
 fprintf (f, "# Temporary FrontPanel generated simh configuration file\n");
 fprintf (f, "# Original Configuration File: %s\n", p->config);
-fprintf (f, "# Simulator Path: %s\n", p->path);
+fprintf (f, "# Simulator Path: %s\n", sim_path);
 fprintf (f, "%s\n", buf);
 free (buf);
 buf = NULL;
 fprintf (f, "set remote -u telnet=%s\n", hostport);
+if (device_panel_count)
+    fprintf (f, "set remote connections=%d\n", (int)device_panel_count+1);
 fprintf (f, "set remote master\n");
 fclose (f);
 f = NULL;
@@ -326,7 +345,7 @@ if (1) {
     PROCESS_INFORMATION ProcessInfo;
     STARTUPINFO StartupInfo;
 
-    sprintf(cmd, "%s%s%s %s%s%s", strchr (p->path, ' ') ? "\"" : "", p->path, strchr (p->path, ' ') ? "\"" : "", strchr (p->temp_config, ' ') ? "\"" : "", p->temp_config, strchr (p->temp_config, ' ') ? "\"" : "");
+    sprintf(cmd, "%s%s%s %s%s%s", strchr (sim_path, ' ') ? "\"" : "", sim_path, strchr (sim_path, ' ') ? "\"" : "", strchr (p->temp_config, ' ') ? "\"" : "", p->temp_config, strchr (p->temp_config, ' ') ? "\"" : "");
 
     memset (&ProcessInfo, 0, sizeof(ProcessInfo));
     memset (&StartupInfo, 0, sizeof(StartupInfo));
@@ -346,7 +365,7 @@ if (1) {
     p->pidProcess = fork();
     if (p->pidProcess == 0) {
         close (0); close (1); close (2); /* make sure not to pass the open standard handles */
-        if (execlp (p->path, p->path, p->temp_config, NULL, NULL)) {
+        if (execlp (sim_path, sim_path, p->temp_config, NULL, NULL)) {
             perror ("execl");
             exit(errno);
             }
@@ -369,6 +388,7 @@ if (p->sock == INVALID_SOCKET) {
     sim_panel_set_error ("Can't connect to simulator Remote Console on port %s", hostport);
     goto Error_Return;
     }
+strcpy (p->hostport, hostport);
 if (1) {
     pthread_attr_t attr;
 
@@ -390,6 +410,13 @@ if (sizeof(mantra) != _panel_send (p, (char *)mantra, sizeof(mantra))) {
     sim_panel_set_error ("Error sending Telnet mantra (options): %s", sim_get_err_sock ("send"));
     goto Error_Return;
     }
+if (device_panel_count) {
+    p->devices = (PANEL **)_panel_malloc (device_panel_count*sizeof(*p->devices));
+    if (p->devices == NULL)
+        goto Error_Return;
+    memset (p->devices, 0, device_panel_count*sizeof(*p->devices));
+    p->device_count = device_panel_count;
+    }
 _panel_register_panel (p);
 return p;
 
@@ -398,18 +425,94 @@ if (f)
     fclose (f);
 if (buf)
     free (buf);
-sim_panel_stop_simulator (p);
+sim_panel_destroy (p);
+return NULL;
+}
+
+PANEL *
+sim_panel_add_device_panel (PANEL *simulator_panel,
+                            const char *device_name)
+{
+size_t i, device_num;
+PANEL *p = NULL;
+
+if (!simulator_panel) {
+    sim_panel_set_error ("Invalid Panel");
+    return NULL;
+    }
+for (device_num=0; device_num < simulator_panel->device_count; ++device_num)
+    if (simulator_panel->devices[device_num] == NULL)
+        break;
+if (device_num == simulator_panel->device_count) {
+    sim_panel_set_error ("No free panel devices slots available %s simulator.  All %d slots are used.", simulator_panel->name, (int)simulator_panel->device_count);
+    return NULL;
+    }
+p = (PANEL *)_panel_malloc (sizeof(*p));
+if (p == NULL)
+    goto Error_Return;
+memset (p, 0, sizeof(*p));
+p->parent = simulator_panel;
+p->sock = INVALID_SOCKET;
+for (i=0; i<5; i++) {
+    p->sock = sim_connect_sock_ex (NULL, simulator_panel->hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
+    if (p->sock == INVALID_SOCKET)
+        msleep (100);
+    else
+        break;
+    }
+if (p->sock == INVALID_SOCKET) {
+    sim_panel_set_error ("Can't connect to simulator Remote Console on port %s", simulator_panel->hostport);
+    goto Error_Return;
+    }
+strcpy (p->hostport, simulator_panel->hostport);
+if (1) {
+    pthread_attr_t attr;
+
+    pthread_mutex_init (&p->io_lock, NULL);
+    pthread_mutex_init (&p->io_send_lock, NULL);
+    pthread_cond_init (&p->io_done, NULL);
+    pthread_cond_init (&p->startup_cond, NULL);
+    pthread_attr_init(&attr);
+    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_mutex_lock (&p->io_lock);
+    pthread_create (&p->io_thread, &attr, _panel_reader, (void *)p);
+    pthread_attr_destroy(&attr);
+    while (!p->io_thread_running)
+        pthread_cond_wait (&p->startup_cond, &p->io_lock); /* Wait for thread to stabilize */
+    pthread_mutex_unlock (&p->io_lock);
+    pthread_cond_destroy (&p->startup_cond);
+    }
+if (sizeof(mantra) != _panel_send (p, (char *)mantra, sizeof(mantra))) {
+    sim_panel_set_error ("Error sending Telnet mantra (options): %s", sim_get_err_sock ("send"));
+    goto Error_Return;
+    }
+simulator_panel->devices[device_num] = p;
+_panel_register_panel (p);
+return p;
+
+Error_Return:
+sim_panel_destroy (p);
 return NULL;
 }
 
 int
-sim_panel_stop_simulator (PANEL *panel)
+sim_panel_destroy (PANEL *panel)
 {
 REG *reg;
 
 if (panel) {
+    if (panel->devices) {
+        size_t i;
+
+        for (i=0; i<panel->device_count; i++) {
+            if (panel->devices[i])
+                sim_panel_destroy (panel->devices[i]);
+            }
+        free (panel->devices);
+        panel->devices = NULL;
+        }
     _panel_deregister_panel (panel);
-    free (panel->path);
+    free (panel->name);
     free (panel->config);
     if (panel->sock != INVALID_SOCKET) {
         SOCKET sock = panel->sock;
@@ -458,19 +561,18 @@ if (panel) {
         reg++;
         }
     free (panel->regs);
+    free (panel->reg_query);
+    sim_cleanup_sock ();
+    free (panel);
     }
-sim_cleanup_sock ();
-free (panel);
 return 0;
 }
 
 OperationalState
 sim_panel_get_state (PANEL *panel)
 {
-if (!panel) {
-    sim_panel_set_error ("Invalid Panel");
-    return -1;
-    }
+if (!panel)
+    return Halt;
 return panel->State;
 }
 
@@ -489,6 +591,7 @@ if (!panel) {
 regs = (REG *)_panel_malloc ((1 + panel->reg_count)*sizeof(*regs));
 if (regs == NULL)
     return -1;
+pthread_mutex_lock (&panel->io_lock);
 memcpy (regs, panel->regs, panel->reg_count*sizeof(*regs));
 reg = &regs[panel->reg_count];
 memset (reg, 0, sizeof(*regs));
@@ -503,15 +606,16 @@ reg->size = size;
 ++panel->reg_count;
 free (panel->regs);
 panel->regs = regs;
+pthread_mutex_unlock (&panel->io_lock);
+/* Now build the register query string for the whole register list */
+if (_panel_register_query_string (panel, &panel->reg_query, &panel->reg_query_size))
+    return -1;
 return 0;
 }
 
 int
 sim_panel_get_registers (PANEL *panel)
 {
-char *buf = NULL;
-int buf_data;
-
 if (!panel) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
@@ -520,13 +624,18 @@ if (panel->callback) {
     sim_panel_set_error ("Callback provides register data");
     return -1;
     }
-buf_data = 0;
-if (_panel_register_query_string (panel, &buf, &buf_data))
+if (!panel->reg_count) {
+    sim_panel_set_error ("No registers specified");
     return -1;
+    }
 pthread_mutex_lock (&panel->io_lock);
-if (buf_data != _panel_send (panel, buf, buf_data))
+if (panel->reg_query_size != _panel_send (panel, panel->reg_query, panel->reg_query_size)) {
+    pthread_mutex_unlock (&panel->io_lock);
     return -1;
-pthread_cond_wait (&panel->io_done, &panel->io_lock);
+    }
+panel->io_waiting = 1;
+while (panel->io_waiting)
+    pthread_cond_wait (&panel->io_done, &panel->io_lock);
 pthread_mutex_unlock (&panel->io_lock);
 return 0;
 }
@@ -592,7 +701,7 @@ if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
     }
-if (_panel_sendf (panel, "BOOT %s\r", device))
+if (_panel_sendf (panel, 0, "BOOT %s\r", device))
     return -1;
 panel->State = Run;
 return 0;
@@ -609,7 +718,7 @@ if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
     }
-if (5 != _panel_send (panel, "CONT\r", 5))
+if (_panel_sendf (panel, 0, "CONT\r", 5))
     return -1;
 panel->State = Run;
 return 0;
@@ -630,6 +739,24 @@ if (panel->State == Run) {
 if (5 != _panel_send (panel, "STEP\r", 5))
     return -1;
 panel->State = Run;
+return 0;
+}
+
+int
+sim_panel_set_register_value (PANEL *panel,
+                              const char *name,
+                              const char *value)
+{
+if (!panel) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->callback) {
+    sim_panel_set_error ("Callback provides register data");
+    return -1;
+    }
+if (_panel_sendf (panel, 1, "D %s %s", name, value))
+    return -1;
 return 0;
 }
 
@@ -689,17 +816,27 @@ while (p->sock != INVALID_SOCKET) {
                 }
             }
         else {
-            if (!strcmp (s + strlen (sim_prompt), "# REGISTERS-DONE"))
+            if (!strcmp (s + strlen (sim_prompt), register_get_echo)) {
                 if (p->callback) {
                     p->callback (p, p->callback_context);
                     }
                 else {
                     pthread_mutex_lock (&p->io_lock);
+                    p->io_waiting = 0;
                     pthread_cond_signal (&p->io_done);
                     pthread_mutex_unlock (&p->io_lock);
                     }
+                }
             else {
-                /* Non Register Data Found (echo of EXAMINE or other commands) */
+                if (!strcmp (s + strlen (sim_prompt), command_done_echo)) {
+                    pthread_mutex_lock (&p->io_lock);
+                    p->io_waiting = 0;
+                    pthread_cond_signal (&p->io_done);
+                    pthread_mutex_unlock (&p->io_lock);
+                    }
+                else {
+                    /* Non Register Data Found (echo of EXAMINE or other commands) */
+                    }
                 }
             }
         s = eol;
@@ -730,7 +867,7 @@ PANEL *p = (PANEL*)arg;
 int sched_policy;
 struct sched_param sched_priority;
 char *buf = NULL;
-int buf_data = 0;
+size_t buf_data = 0;
 unsigned int callback_count = 0;
 
 /* 
@@ -750,8 +887,9 @@ while ((p->sock != INVALID_SOCKET) &&
     pthread_mutex_unlock (&p->io_lock);
 
     ++callback_count;
-    if (1 == callback_count%rate)
+    if (1 == callback_count%rate) {
         _panel_register_query_string (p, &buf, &buf_data);
+        }
     msleep (1000/rate);
     if ((p->State == Run) || (0 == callback_count%(5*rate)))
         if (buf_data != _panel_send (p, buf, buf_data)) {
@@ -785,7 +923,7 @@ sim_panel_error_bufsize = 0;
 #define vsnprintf _vsnprintf
 #endif
 
-void sim_panel_set_error (const char *fmt, ...)
+static void sim_panel_set_error (const char *fmt, ...)
 {
 va_list arglist;
 int len;
@@ -793,8 +931,8 @@ int len;
 if (sim_panel_error_bufsize == 0) {
     sim_panel_error_bufsize = 2048;
     sim_panel_error_buf = (char *) malloc (sim_panel_error_bufsize);
-    if (sim_panel_error_buf == NULL) {          /* out of memory */
-        sim_panel_error_buf = "sim_panel_set_error(): Out of Memory\n";
+    if (sim_panel_error_buf == NULL) {
+        sim_panel_error_buf = (char *)"sim_panel_set_error(): Out of Memory\n";
         sim_panel_error_bufsize = 0;
         return;
         }
@@ -814,8 +952,8 @@ while (1) {                                         /* format passed string, arg
         while ((int)sim_panel_error_bufsize < len + 1)
             sim_panel_error_bufsize = sim_panel_error_bufsize * 2;
         sim_panel_error_buf = (char *) malloc (sim_panel_error_bufsize);
-        if (sim_panel_error_buf == NULL) {          /* out of memory */
-            sim_panel_error_buf = "sim_panel_set_error(): Out of Memory\n";
+        if (sim_panel_error_buf == NULL) {
+            sim_panel_error_buf = (char *)"sim_panel_set_error(): Out of Memory\n";
             sim_panel_error_bufsize = 0;
             return;
             }
@@ -829,12 +967,13 @@ return;
 }
 
 static int
-_panel_sendf (PANEL *p, const char *fmt, ...)
+_panel_sendf (PANEL *p, int wait_for_completion, const char *fmt, ...)
 {
 char stackbuf[1024];
 int bufsize = sizeof(stackbuf);
 char *buf = stackbuf;
 int len;
+int post_fix_len = wait_for_completion ? 5 + strlen (command_done_echo): 1;
 va_list arglist;
 int ret;
 
@@ -845,12 +984,12 @@ while (1) {                                         /* format passed string, arg
 
 /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
 
-    if ((len < 0) || (len >= bufsize-1)) {
+    if ((len < 0) || ((len + post_fix_len) >= bufsize-1)) {
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
         buf = (char *) _panel_malloc (bufsize);
-        if (buf == NULL)                            /* out of memory */
+        if (buf == NULL)
             return -1;
         buf[bufsize-1] = '\0';
         continue;
@@ -858,7 +997,24 @@ while (1) {                                         /* format passed string, arg
     break;
     }
 
+strcat (buf, "\r");                     /* Make sure command line is terminated */
+
+if (wait_for_completion) {
+    strcat (buf, command_done_echo);
+    strcat (buf, "\r");
+    pthread_mutex_lock (&p->io_lock);
+    }
+
 ret = (strlen (buf) == _panel_send (p, buf, strlen (buf))) ? 0 : -1;
+
+if (wait_for_completion) {
+    if (!ret) {                                     /* Sent OK? */
+        p->io_waiting = 1;
+        while (p->io_waiting)
+            pthread_cond_wait (&p->io_done, &p->io_lock); /* Wait for completion */
+        }
+    pthread_mutex_unlock (&p->io_lock);
+    }
 
 if (buf != stackbuf)
     free (buf);

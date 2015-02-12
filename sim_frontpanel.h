@@ -40,22 +40,19 @@ extern "C" {
 
 #include <stdlib.h>
 
-typedef enum {
-    Halt,
-    Run
-    } OperationalState;
-
-typedef struct sim_frontpanel PANEL;
-
-typedef void (*PANEL_DISPLAY_PCALLBACK)(PANEL *panel, 
-                                        void *context);
+typedef struct PANEL PANEL;
 
 PANEL *
 sim_panel_start_simulator (const char *sim_path,
-                           const char *sim_config);
+                           const char *sim_config,
+                           size_t device_panel_count);
+
+PANEL *
+sim_panel_add_device_panel (PANEL *simulator_panel,
+                            const char *device_name);
 
 int
-sim_panel_stop_simulator (PANEL *panel);
+sim_panel_destroy (PANEL *panel);
 
 int
 sim_panel_add_register (PANEL *panel,
@@ -65,6 +62,9 @@ sim_panel_add_register (PANEL *panel,
 
 int
 sim_panel_get_registers (PANEL *panel);
+
+typedef void (*PANEL_DISPLAY_PCALLBACK)(PANEL *panel, 
+                                        void *context);
 
 int
 sim_panel_set_display_callback (PANEL *panel, 
@@ -84,12 +84,21 @@ sim_panel_exec_run (PANEL *panel);
 int
 sim_panel_exec_step (PANEL *panel);
 
+int
+sim_panel_set_register_value (PANEL *panel,
+                              const char *name,
+                              const char *value);
+
+typedef enum {
+    Halt,
+    Run
+    } OperationalState;
+
 OperationalState
 sim_panel_get_state (PANEL *panel);
 
 const char *sim_panel_get_error (void);
 void sim_panel_clear_error (void);
-void sim_panel_set_error (const char *fmt, ...);
 
 
 #ifdef  __cplusplus

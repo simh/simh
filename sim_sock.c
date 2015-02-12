@@ -42,6 +42,10 @@
    02-Sep-01    RMS     Fixed UNIX bugs found by Mirian Lennox and Tom Markson
 */
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 #include "sim_sock.h"
 #include <signal.h>
 #include <stdio.h>
@@ -127,7 +131,7 @@ return;
 
 static struct sock_errors {
     int value;
-    char *text;
+    const char *text;
     } sock_errors[] = {
         {WSAEWOULDBLOCK,  "Operation would block"},
         {WSAENAMETOOLONG, "File name too long"},
@@ -694,7 +698,7 @@ return 0;
 */
 int sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, char *localport, size_t localport_len, const char *default_port)
 {
-char *hostp;
+const char *hostp;
 
 if ((localport != NULL) && (localport_len != 0))
     memset (localport, 0, localport_len);
@@ -1258,3 +1262,7 @@ closesocket (sock);
 }
 
 #endif                                                  /* end else !implemented */
+
+#ifdef  __cplusplus
+}
+#endif
