@@ -28,6 +28,10 @@
 
 ### New Host Platform support - HP-UX and AIX
 
+### Simulator Front Panel API
+
+The sim_frontpanel API provides a programatic interface to start and control any simulator without any special additions to the simulator code.
+
 ### New Functionality
 
 #### Remote Console Facility
