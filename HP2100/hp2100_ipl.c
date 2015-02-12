@@ -613,8 +613,7 @@ if ((sim_switches & SWMASK ('C')) ||                    /* connecting? */
     }
 
 else {
-    r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
-    if (r != SCPE_OK)
+    if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL))
         return SCPE_ARG;
     sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host [0] ? ":" : "", port);
     newsock = sim_master_sock (hostport, &r);
@@ -662,12 +661,12 @@ if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
 
 if (uptr->flags & UNIT_ACTV)
-    sim_close_sock (uptr->DSOCKET, 1);
+    sim_close_sock (uptr->DSOCKET);
 
 else {
     if (uptr->flags & UNIT_ESTB)                        /* if established, */
-        sim_close_sock (uptr->DSOCKET, 0);              /* close data socket */
-    sim_close_sock (uptr->LSOCKET, 1);                  /* closen listen socket */
+        sim_close_sock (uptr->DSOCKET);                 /* close data socket */
+    sim_close_sock (uptr->LSOCKET);                     /* closen listen socket */
     }
 
 free (uptr->filename);                                  /* free string */
@@ -689,7 +688,7 @@ if (((uptr->flags & UNIT_ATT) == 0) ||
     (uptr->flags & UNIT_ACTV) ||
     ((uptr->flags & UNIT_ESTB) == 0))
     return SCPE_NOFNC;
-sim_close_sock (uptr->DSOCKET, 0);
+sim_close_sock (uptr->DSOCKET);
 uptr->DSOCKET = 0;
 uptr->flags = uptr->flags & ~UNIT_ESTB;
 return SCPE_OK;

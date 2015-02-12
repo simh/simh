@@ -418,7 +418,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
           $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
           ifeq (Darwin,$(OSTYPE))
-            VIDEO_LDFLAGS += -lobjc -framework cocoa
+            VIDEO_LDFLAGS += -lobjc -framework cocoa -DSDL_MAIN_AVAILABLE
           endif
         endif
       endif
@@ -1580,4 +1580,12 @@ pdq3 : ${BIN}pdq3${EXE}
 ${BIN}pdq3${EXE} : ${PDQ3} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDQ3} ${SIM} ${PDQ3_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+# Front Panel API Demo/Test program
+
+frontpaneltest : ${BIN}frontpaneltest${EXE}
+
+${BIN}frontpaneltest${EXE} : frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c
+	${MKDIRBIN}
+	${CC} frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c $(CC_OUTSPEC) ${LDFLAGS}
 

@@ -1258,20 +1258,18 @@ t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc)
 DEVICE *dptr = (UNIBUS) ? ((&dmc_dev == find_dev_from_unit(uptr)) ? &dmc_dev : &dmp_dev) : &dmv_dev;
 int32 dmc = (int32)(uptr-dptr->units);
 char *peer = ((dptr == &dmc_dev)? &dmc_peer[dmc][0] : &dmp_peer[dmc][0]);
-t_stat status = SCPE_OK;
 char host[CBUFSIZE], port[CBUFSIZE];
 
 if ((!cptr) || (!*cptr))
     return SCPE_ARG;
 if (dmc_is_attached(uptr))
     return SCPE_ALATT;
-status = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
-if (status != SCPE_OK)
-    return status;
+if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL))
+    return SCPE_ARG;
 if (host[0] == '\0')
     return SCPE_ARG;
 strncpy(peer, cptr, CBUFSIZE-1);
-return status;
+return SCPE_OK;
 }
 
 t_stat dmc_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc)

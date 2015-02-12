@@ -394,6 +394,7 @@ static int32 sim_rem_step_line = -1;        /* step in progress on line # */
 static t_bool sim_log_temp = FALSE;         /* temporary log file active */
 static char sim_rem_con_temp_name[PATH_MAX+1];
 static int32 sim_rem_master_mode = 0;       /* Master Mode Enabled Flag */
+static t_bool sim_rem_master_was_connected = FALSE; /* Master Mode has been connected */
 static t_offset sim_rem_cmd_log_start = 0;  /* Log File saved position */
 
 
@@ -520,7 +521,6 @@ static t_stat x_help_cmd (int32 flag, char *cptr);
 
 static CTAB allowed_remote_cmds[] = {
     { "EXAMINE",  &exdep_cmd,      EX_E },
-    { "IEXAMINE", &exdep_cmd, EX_E+EX_I },
     { "DEPOSIT",  &exdep_cmd,      EX_D },
     { "EVALUATE", &eval_cmd,          0 },
     { "ATTACH",   &attach_cmd,        0 },
@@ -542,7 +542,6 @@ static CTAB allowed_remote_cmds[] = {
 
 static CTAB allowed_master_remote_cmds[] = {
     { "EXAMINE",  &exdep_cmd,      EX_E },
-    { "IEXAMINE", &exdep_cmd, EX_E+EX_I },
     { "DEPOSIT",  &exdep_cmd,      EX_D },
     { "EVALUATE", &eval_cmd,          0 },
     { "ATTACH",   &attach_cmd,        0 },
@@ -572,6 +571,8 @@ static CTAB allowed_master_remote_cmds[] = {
 static CTAB allowed_single_remote_cmds[] = {
     { "ATTACH",   &attach_cmd,        0 },
     { "DETACH",   &detach_cmd,        0 },
+    { "EXAMINE",  &exdep_cmd,      EX_E },
+    { "EVALUATE", &eval_cmd,          0 },
     { "PWD",      &pwd_cmd,           0 },
     { "DIR",      &dir_cmd,           0 },
     { "LS",       &dir_cmd,           0 },
@@ -666,6 +667,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
      i++) {
     t_bool master_session = (sim_rem_master_mode && (i == 0));
 
+    sim_rem_master_was_connected |= master_session;    /* Remember if master ever connected */
     lp = &sim_rem_con_tmxr.ldsc[i];
     if (!lp->conn)
         continue;
@@ -715,7 +717,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
                 if (sim_rem_read_timeouts[i]) {
                     tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeouts[i]);
-                    tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
+                    tmxr_linemsgf (lp, "\r\n");
                     tmxr_send_buffered_data (lp);           /* flush any buffered data */
                     }
                 }
@@ -732,8 +734,12 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     }
                 if (sim_rem_buf_ptr[i] == 0) {
                     /* we just picked up the first character on a command line */
-                    tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
-                    tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                    if (!master_session)
+                        tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
+                    else
+                        tmxr_linemsgf (lp, "\r\n%s", sim_is_running ? "SIM> " : "sim> ");
+                    if (!tmxr_input_pending_ln (lp))
+                        tmxr_send_buffered_data (lp);   /* flush any buffered data */
                     }
                 }
             }
@@ -744,8 +750,12 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             return stat|SCPE_NOMESSAGE;
         if (!sim_rem_single_mode[i]) {
             read_start_time = sim_os_msec();
-            tmxr_linemsg (lp, sim_prompt);
-            tmxr_send_buffered_data (lp);           /* flush any buffered data */
+            if (master_session)
+                tmxr_linemsg (lp, "sim> ");
+            else
+                tmxr_linemsg (lp, sim_prompt);
+            if (!tmxr_input_pending_ln (lp))
+                tmxr_send_buffered_data (lp);       /* flush any buffered data */
             }
         do {
             if (!sim_rem_single_mode[i]) {
@@ -832,8 +842,14 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                         got_command = TRUE;                 /* command too long */
                     break;
                 }
-            } while ((!got_command) && (!sim_rem_single_mode[i]));
-        tmxr_send_buffered_data (lp);           /* flush any buffered data */
+            c = 0;
+            if ((!got_command) && (sim_rem_single_mode[i]) && (tmxr_input_pending_ln (lp))) {
+                c = tmxr_getc_ln (lp);
+                c = c & ~TMXR_VALID;
+                }
+            } while ((!got_command) && ((!sim_rem_single_mode[i]) || c));
+        if (!tmxr_input_pending_ln (lp))
+            tmxr_send_buffered_data (lp);       /* flush any buffered data */
         if ((sim_rem_single_mode[i]) && !got_command) {
             break;
             }
@@ -856,6 +872,8 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             else
                 continue;
             }
+        while (isspace(cbuf[0]))
+            memmove (cbuf, cbuf+1, strlen(cbuf+1)+1);       /* skip leading whitespace */
         sim_sub_args (cbuf, sizeof(cbuf), argv);
         cptr = cbuf;
         cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -872,8 +890,12 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             }
         sim_rem_cmd_log_start = sim_ftell (sim_log);
         basecmdp = find_cmd (gbuf);                         /* validate basic command */
-        if (basecmdp == NULL)
-            stat = SCPE_UNK;
+        if (basecmdp == NULL) {
+            if ((gbuf[0] == ';') || (gbuf[0] == '#'))       /* ignore comment */
+                stat = SCPE_OK;
+            else
+                stat = SCPE_UNK;
+            }
         else {
             if ((cmdp = find_ctab (sim_rem_single_mode[i] ? allowed_single_remote_cmds : (master_session ? allowed_master_remote_cmds : allowed_remote_cmds), gbuf))) {/* lookup command */
                 if (cmdp->action == &x_continue_cmd)
@@ -959,7 +981,10 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                 sim_rem_single_mode[i] = TRUE;
             else {
                 if (!sim_rem_single_mode[i]) {
-                    tmxr_linemsgf (lp, "%s", sim_prompt);
+                    if (master_session)
+                        tmxr_linemsgf (lp, "%s", "sim> ");
+                    else
+                        tmxr_linemsgf (lp, "%s", sim_prompt);
                     tmxr_send_buffered_data (lp);
                     }
                 }
@@ -977,6 +1002,8 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         sim_rem_single_mode[i] = FALSE;
         }
     }
+if (sim_rem_master_was_connected && !sim_rem_con_tmxr.ldsc[0].sock) /* Master Connection lost? */
+    return SCPE_EXIT;
 if (stepping)
     sim_activate(uptr, steps);                  /* check again after 'steps' instructions */
 else
@@ -1076,7 +1103,12 @@ return SCPE_OK;
 }
 
 /* Enable or disable Remote Console master mode */
-/* In master mode, ... explain */
+
+/* In master mode, commands are subsequently processed from the
+   primary/initial (master mode) remote console session.  Commands
+   are processed from that source until that source disables master
+   mode or the simulator exits 
+ */
 
 static t_stat sim_set_rem_master (int32 flag, char *cptr)
 {
@@ -1128,6 +1160,8 @@ if (sim_rem_master_mode) {
         }
     stat |= stat_nomessage;
     }
+else
+    sim_rem_master_was_connected = FALSE;
 
 return stat;
 }
@@ -2793,7 +2827,9 @@ status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
 if (sim_brk_char && (buf[0] == sim_brk_char))
     return SCPE_BREAK;
-else return (buf[0] | SCPE_KFLAG);
+if (sim_int_char && (buf[0] == sim_int_char))
+    return SCPE_STOP;
+return (buf[0] | SCPE_KFLAG);
 }
 
 static t_bool sim_os_poll_kbd_ready (int ms_timeout)
@@ -2841,7 +2877,11 @@ runtty = cmdtty;
 runtty.c_lflag = runtty.c_lflag & ~(ECHO | ICANON);     /* no echo or edit */
 runtty.c_oflag = runtty.c_oflag & ~OPOST;               /* no output edit */
 runtty.c_iflag = runtty.c_iflag & ~ICRNL;               /* no cr conversion */
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver SIGINT to main thread when enabled */
+#else
 runtty.c_cc[VINTR] = sim_int_char;                      /* interrupt */
+#endif
 runtty.c_cc[VQUIT] = 0;                                 /* no quit */
 runtty.c_cc[VERASE] = 0;
 runtty.c_cc[VKILL] = 0;
@@ -2877,7 +2917,11 @@ static t_stat sim_os_ttrun (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver SIGINT to main thread when enabled */
+#else
 runtty.c_cc[VINTR] = sim_int_char;                      /* in case changed */
+#endif
 if (tcsetattr (0, TCSAFLUSH, &runtty) < 0)
     return SCPE_TTIERR;
 if (prior_norm) {                                       /* at normal pri? */
@@ -2921,7 +2965,9 @@ status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
 if (sim_brk_char && (buf[0] == sim_brk_char))
     return SCPE_BREAK;
-else return (buf[0] | SCPE_KFLAG);
+if (sim_int_char && (buf[0] == sim_int_char))
+    return SCPE_STOP;
+return (buf[0] | SCPE_KFLAG);
 }
 
 static t_bool sim_os_poll_kbd_ready (int ms_timeout)

@@ -558,7 +558,7 @@ const struct scp_error {
          {"NOPARAM", "No settable parameters"},
          {"ALATT",   "Unit already attached"},
          {"TIMER",   "Hardware timer error"},
-         {"SIGERR",  "SIGINT handler setup error"},
+         {"SIGERR",  "Signal handler setup error"},
          {"TTYERR",  "Console terminal setup error"},
          {"SUB",     "Subscript out of range"},
          {"NOFNC",   "Command not allowed"},
@@ -1107,6 +1107,9 @@ static const char simh_help[] =
       "+sh{ow} ethernet             show ethernet devices\n"
       "+sh{ow} serial               show serial devices\n"
       "+sh{ow} multiplexer          show open multiplexer devices\n"
+#if defined(USE_SIM_VIDEO)
+      "+sh{ow} video                show video capabilities\n"
+#endif
       "+sh{ow} clocks               show calibrated timers\n"
       "+sh{ow} throttle             show throttle info\n"
       "+sh{ow} on                   show on condition actions\n"
@@ -1132,6 +1135,7 @@ static const char simh_help[] =
 #define HLP_SHOW_ETHERNET       "*Commands SHOW"
 #define HLP_SHOW_SERIAL         "*Commands SHOW"
 #define HLP_SHOW_MULTIPLEXER    "*Commands SHOW"
+#define HLP_SHOW_VIDEO          "*Commands SHOW"
 #define HLP_SHOW_CLOCKS         "*Commands SHOW"
 #define HLP_SHOW_ON             "*Commands SHOW"
 #define HLP_SHOW_SEND           "*Commands SHOW"
@@ -1276,7 +1280,7 @@ static const char simh_help[] =
       "5 TIMER\n"
       " Hardware timer error\n"
       "5 SIGERR\n"
-      " SIGINT handler setup error\n"
+      " Signal handler setup error\n"
       "5 TTYERR\n"
       " Console terminal setup error\n"
       "5 NOFNC\n"
@@ -1779,6 +1783,9 @@ static SHTAB show_glob_tab[] = {
     { "SERIAL",         &sim_show_serial,           0, HLP_SHOW_SERIAL },
     { "MULTIPLEXER",    &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
     { "MUX",            &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
+#if defined(USE_SIM_VIDEO)
+    { "VIDEO",          &vid_show,                  0, HLP_SHOW_VIDEO },
+#endif
     { "CLOCKS",         &sim_show_timers,           0, HLP_SHOW_CLOCKS },
     { "SEND",           &sim_show_send,             0, HLP_SHOW_SEND },
     { "EXPECT",         &sim_show_expect,           0, HLP_SHOW_EXPECT },

@@ -41,7 +41,12 @@ t_bool vid_mouse_b2 = FALSE;
 t_bool vid_mouse_b3 = FALSE;
 char vid_release_key[64] = "Ctrl-Right-Shift";
 
-#if HAVE_LIBSDL
+t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc)
+{
+return vid_show_video (st, uptr, val, desc);
+}
+
+#if defined(HAVE_LIBSDL)
 #include <SDL.h>
 #include <SDL_thread.h>
 
@@ -1123,6 +1128,7 @@ SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);
 SDL_PumpEvents ();
 }
 
+#if SDL_MAJOR_VERSION != 1
 void vid_draw_region (SDL_UserEvent *event)
 {
 SDL_Rect *vid_dst = (SDL_Rect *)event->data1;
@@ -1136,6 +1142,7 @@ if (SDL_UpdateTexture(vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf)))
 free (vid_dst);
 event->data1 = NULL;
 }
+#endif
 
 int vid_video_events (void)
 {
@@ -1442,10 +1449,12 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
                     if (event.user.code == EVENT_CLOSE) {
                         event.user.code = 0;    /* Mark as done */
                         }
+#if SDL_MAJOR_VERSION != 1
                     if (event.user.code == EVENT_DRAW) {
                         vid_draw_region ((SDL_UserEvent*)&event);
                         event.user.code = 0;    /* Mark as done */
                         }
+#endif
                     if (event.user.code == EVENT_SHOW) {
                         vid_show_video_event ();
                         event.user.code = 0;    /* Mark as done */
@@ -1669,34 +1678,84 @@ if (vid_active) {
     }
 if (1) {
     static char *hints[] = {
+#if defined (SDL_HINT_FRAMEBUFFER_ACCELERATION)
                 SDL_HINT_FRAMEBUFFER_ACCELERATION   ,
+#endif
+#if defined (SDL_HINT_RENDER_DRIVER)
                 SDL_HINT_RENDER_DRIVER              ,
+#endif
+#if defined (SDL_HINT_RENDER_OPENGL_SHADERS)
                 SDL_HINT_RENDER_OPENGL_SHADERS      ,
+#endif
+#if defined (SDL_HINT_RENDER_DIRECT3D_THREADSAFE)
                 SDL_HINT_RENDER_DIRECT3D_THREADSAFE ,
+#endif
 #if defined (SDL_HINT_RENDER_DIRECT3D11_DEBUG)
                 SDL_HINT_RENDER_DIRECT3D11_DEBUG    ,
 #endif
+#if defined (SDL_HINT_RENDER_SCALE_QUALITY)
                 SDL_HINT_RENDER_SCALE_QUALITY       ,
+#endif
+#if defined (SDL_HINT_RENDER_VSYNC)
                 SDL_HINT_RENDER_VSYNC               ,
+#endif
+#if defined (SDL_HINT_VIDEO_ALLOW_SCREENSAVER)
                 SDL_HINT_VIDEO_ALLOW_SCREENSAVER    ,
+#endif
+#if defined (SDL_HINT_VIDEO_X11_XVIDMODE)
                 SDL_HINT_VIDEO_X11_XVIDMODE         ,
+#endif
+#if defined (SDL_HINT_VIDEO_X11_XINERAMA)
                 SDL_HINT_VIDEO_X11_XINERAMA         ,
+#endif
+#if defined (SDL_HINT_VIDEO_X11_XRANDR)
                 SDL_HINT_VIDEO_X11_XRANDR           ,
+#endif
+#if defined (SDL_HINT_GRAB_KEYBOARD)
                 SDL_HINT_GRAB_KEYBOARD              ,
+#endif
+#if defined (SDL_HINT_MOUSE_RELATIVE_MODE_WARP)
                 SDL_HINT_MOUSE_RELATIVE_MODE_WARP    ,
+#endif
+#if defined (SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS)
                 SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS   ,
+#endif
+#if defined (SDL_HINT_IDLE_TIMER_DISABLED)
                 SDL_HINT_IDLE_TIMER_DISABLED ,
+#endif
+#if defined (SDL_HINT_ORIENTATIONS)
                 SDL_HINT_ORIENTATIONS ,
+#endif
+#if defined (SDL_HINT_ACCELEROMETER_AS_JOYSTICK)
                 SDL_HINT_ACCELEROMETER_AS_JOYSTICK ,
+#endif
+#if defined (SDL_HINT_XINPUT_ENABLED)
                 SDL_HINT_XINPUT_ENABLED ,
+#endif
+#if defined (SDL_HINT_GAMECONTROLLERCONFIG)
                 SDL_HINT_GAMECONTROLLERCONFIG ,
+#endif
+#if defined (SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS)
                 SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS ,
+#endif
+#if defined (SDL_HINT_ALLOW_TOPMOST)
                 SDL_HINT_ALLOW_TOPMOST ,
+#endif
+#if defined (SDL_HINT_TIMER_RESOLUTION)
                 SDL_HINT_TIMER_RESOLUTION ,
+#endif
+#if defined (SDL_HINT_VIDEO_HIGHDPI_DISABLED)
                 SDL_HINT_VIDEO_HIGHDPI_DISABLED ,
+#endif
+#if defined (SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK)
                 SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK ,
+#endif
+#if defined (SDL_HINT_VIDEO_WIN_D3DCOMPILER)
                 SDL_HINT_VIDEO_WIN_D3DCOMPILER              ,
+#endif
+#if defined (SDL_HINT_VIDEO_WINDOW_SHARE_PIXEL_FORMAT)
                 SDL_HINT_VIDEO_WINDOW_SHARE_PIXEL_FORMAT    ,
+#endif
 #if defined (SDL_HINT_WINRT_PRIVACY_POLICY_URL)
                 SDL_HINT_WINRT_PRIVACY_POLICY_URL ,
 #endif
@@ -1706,7 +1765,9 @@ if (1) {
 #if defined (SDL_HINT_WINRT_HANDLE_BACK_BUTTON)
                 SDL_HINT_WINRT_HANDLE_BACK_BUTTON ,
 #endif
+#if defined (SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES)
                 SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES,
+#endif
                 NULL};
     fprintf (st, "  Currently Active SDL Hints:\n");
     for (i=0; hints[i]; i++) {

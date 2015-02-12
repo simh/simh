@@ -75,7 +75,6 @@
 extern int32 PSL;                                       /* PSL */
 extern int32 fault_PC;                                  /* fault PC */
 extern int32 int_req[IPL_HLVL];
-uint32 cpu_idle_mask;                                   /* idle mask (OS type) */
 #define ULTRIX1X ((cpu_idle_mask&VAX_IDLE_ULT1X) && ((cpu_idle_mask & ~VAX_IDLE_ULT1X) == 0))
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"

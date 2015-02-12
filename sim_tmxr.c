@@ -998,7 +998,7 @@ mp->last_poll_time = poll_time;
 /* Check for a pending Telnet/tcp connection */
 
 if (mp->master) {
-    newsock = sim_accept_conn_ex (mp->master, &address, mp->packet);/* poll connect */
+    newsock = sim_accept_conn_ex (mp->master, &address, (mp->packet ? SIM_SOCK_OPT_NODELAY : 0));/* poll connect */
 
     if (newsock != INVALID_SOCKET) {                    /* got a live one? */
         sprintf (msg, "tmxr_poll_conn() - Connection from %s", address);
@@ -1024,7 +1024,7 @@ if (mp->master) {
         if (i >= mp->lines) {                           /* all busy? */
             tmxr_msg (newsock, "All connections busy\r\n");
             tmxr_debug_connect (mp, "tmxr_poll_conn() - All connections busy");
-            sim_close_sock (newsock, 0);
+            sim_close_sock (newsock);
             free (address);
             }
         else {
@@ -1105,7 +1105,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 break;
             case 1:
                 if (lp->master) {                                   /* Check for a pending Telnet/tcp connection */
-                    while (INVALID_SOCKET != (newsock = sim_accept_conn_ex (lp->master, &address, lp->packet))) {/* got a live one? */
+                    while (INVALID_SOCKET != (newsock = sim_accept_conn_ex (lp->master, &address, (lp->packet ? SIM_SOCK_OPT_NODELAY : 0)))) {/* got a live one? */
                         char *sockname, *peername;
 
                         sim_getnames_sock (newsock, &sockname, &peername);
@@ -1122,14 +1122,14 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                                 tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
                                 sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
                                 tmxr_debug_connect_line (lp, msg);
-                                sim_close_sock (newsock, 0);
+                                sim_close_sock (newsock);
                                 free (address);
                                 continue;                           /* Try for another connection */
                                 }
                             if (lp->connecting) {
                                 sprintf (msg, "tmxr_poll_conn() - aborting outgoing line connection attempt to: %s", lp->destination);
                                 tmxr_debug_connect_line (lp, msg);
-                                sim_close_sock (lp->connecting, 0); /* abort our as yet unconnnected socket */
+                                sim_close_sock (lp->connecting);    /* abort our as yet unconnnected socket */
                                 lp->connecting = 0;
                                 }
                             }
@@ -1150,14 +1150,14 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                             else {
                                 tmxr_msg (newsock, "Line connection not available\r\n");
                                 tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection not available");
-                                sim_close_sock (newsock, 0);
+                                sim_close_sock (newsock);
                                 free (address);
                                 }
                             }
                         else {
                             tmxr_msg (newsock, "Line connection busy\r\n");
                             tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection busy");
-                            sim_close_sock (newsock, 0);
+                            sim_close_sock (newsock);
                             free (address);
                             }
                         }
@@ -1171,7 +1171,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
         (!lp->modem_control || (lp->modembits & TMXR_MDM_DTR))) {
         sprintf (msg, "tmxr_poll_conn() - establishing outgoing connection to: %s", lp->destination);
         tmxr_debug_connect_line (lp, msg);
-        lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, lp->datagram, lp->mp->packet);
+        lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, (lp->datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (lp->mp->packet ? SIM_SOCK_OPT_NODELAY : 0));
         }
 
     }
@@ -1223,7 +1223,7 @@ if (lp->serport) {
     }
 else                                                    /* Telnet connection */
     if (lp->sock) {
-        sim_close_sock (lp->sock, 0);                   /* close socket */
+        sim_close_sock (lp->sock);                      /* close socket */
         free (lp->telnet_sent_opts);
         lp->telnet_sent_opts = NULL;
         lp->sock = 0;
@@ -1235,13 +1235,13 @@ free(lp->ipad);
 lp->ipad = NULL;
 if ((lp->destination) && (!lp->serport)) {
     if (lp->connecting) {
-        sim_close_sock (lp->connecting, 0);
+        sim_close_sock (lp->connecting);
         lp->connecting = 0;
         }
     if ((!lp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
         sprintf (msg, "tmxr_reset_ln_ex() - connecting to %s", lp->destination);
         tmxr_debug_connect_line (lp, msg);
-        lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, lp->datagram, lp->mp->packet);
+        lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, (lp->datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (lp->mp->packet ? SIM_SOCK_OPT_NODELAY : 0));
         }
     }
 tmxr_init_line (lp);                                /* initialize line state */
@@ -1418,7 +1418,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
 
                 sprintf (msg, "tmxr_set_get_modem_bits() - establishing outgoing connection to: %s", lp->destination);
                 tmxr_debug_connect_line (lp, msg);
-                lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, lp->datagram, lp->mp->packet);
+                lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, (lp->datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (lp->mp->packet ? SIM_SOCK_OPT_NODELAY : 0));
                 }
             }
         }
@@ -1531,6 +1531,11 @@ return r;
        receive break status associated with the character is cleared, and
        SCPE_BREAK is ORed into the return value.
 */
+
+int32 tmxr_input_pending_ln (TMLN *lp)
+{
+return (lp->rxbpi - lp->rxbpr);
+}
 
 int32 tmxr_getc_ln (TMLN *lp)
 {
@@ -2092,7 +2097,7 @@ return (0 != (lp->txppsize - lp->txppoffset));
 static void _mux_detach_line (TMLN *lp, t_bool close_listener, t_bool close_connecting)
 {
 if (close_listener && lp->master) {
-    sim_close_sock (lp->master, 1);
+    sim_close_sock (lp->master);
     lp->master = 0;
     free (lp->port);
     lp->port = NULL;
@@ -2208,7 +2213,7 @@ while (*tptr) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
                 nextline = (int32) get_uint (cptr, 10, mp->lines-1, &r);
-                if (r != SCPE_OK)
+                if (r)
                     return SCPE_ARG;
                 break;
                 }
@@ -2236,7 +2241,7 @@ while (*tptr) {
                     strcpy (buffered, "32768");
                 else {
                     i = (int32) get_uint (cptr, 10, 1024*1024, &r);
-                    if ((r != SCPE_OK) || (i == 0))
+                    if (r || (i == 0))
                         return SCPE_ARG;
                     sprintf(buffered, "%d", i);
                     }
@@ -2305,9 +2310,9 @@ while (*tptr) {
                             else
                                 return SCPE_ARG;
                         }
-                    sock = sim_connect_sock_ex (NULL, hostport, "localhost", NULL, datagram, packet);
+                    sock = sim_connect_sock_ex (NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
                     if (sock != INVALID_SOCKET)
-                        sim_close_sock (sock, 0);
+                        sim_close_sock (sock);
                     else
                         return SCPE_ARG;
                     cptr = hostport;
@@ -2316,7 +2321,7 @@ while (*tptr) {
                 continue;
                 }
             cptr = get_glyph (gbuf, port, ';');
-            if (SCPE_OK != sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL, NULL))
+            if (sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL, NULL))
                 return SCPE_ARG;
             if (cptr) {
                 get_glyph (cptr, cptr, 0);                  /* upcase this string */
@@ -2332,11 +2337,11 @@ while (*tptr) {
             }
         cptr = get_glyph_nc (cptr, port, ';');
         sock = sim_master_sock (port, &r);                      /* make master socket to validate port */
-        if (r != SCPE_OK)
-            return r;
+        if (r)
+            return SCPE_ARG;
         if (sock == INVALID_SOCKET)                             /* open error */
             return SCPE_OPENERR;
-        sim_close_sock (sock, 1);
+        sim_close_sock (sock);
         sim_os_ms_sleep (2);                                    /* let the close finish (required on some platforms) */
         strcpy (listen, port);
         cptr = get_glyph (cptr, option, ';');
@@ -2406,12 +2411,12 @@ while (*tptr) {
             }
         if ((listen[0]) && (!datagram)) {
             sock = sim_master_sock (listen, &r);            /* make master socket */
-            if (r != SCPE_OK)
-                return r;
+            if (r)
+                return SCPE_ARG;
             if (sock == INVALID_SOCKET)                     /* open error */
                 return SCPE_OPENERR;
             if (mp->port) {                                 /* close prior listener */
-                sim_close_sock (mp->master, 1);
+                sim_close_sock (mp->master);
                 mp->master = 0;
                 free (mp->port);
                 mp->port = NULL;
@@ -2455,7 +2460,7 @@ while (*tptr) {
             if (serport != INVALID_HANDLE) {
                 _mux_detach_line (lp, TRUE, TRUE);
                 if (lp->mp && lp->mp->master) {             /* if existing listener, close it */
-                    sim_close_sock (lp->mp->master, 1);
+                    sim_close_sock (lp->mp->master);
                     lp->mp->master = 0;
                     free (lp->mp->port);
                     lp->mp->port = NULL;
@@ -2486,7 +2491,7 @@ while (*tptr) {
                         return SCPE_ARG;
                     }
                 lp->packet = packet;
-                sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, datagram, packet);
+                sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
                 if (sock != INVALID_SOCKET) {
                     _mux_detach_line (lp, FALSE, TRUE);
                     lp->destination = (char *)malloc(1+strlen(destination));
@@ -2498,7 +2503,7 @@ while (*tptr) {
                         strcpy (lp->ipad, lp->destination);
                         }
                     else
-                        sim_close_sock (sock, FALSE);
+                        sim_close_sock (sock);
                     lp->notelnet = notelnet;
                     tmxr_init_line (lp);                    /* init the line state */
                     return SCPE_OK;
@@ -2550,8 +2555,8 @@ while (*tptr) {
             if ((mp->lines == 1) && (mp->master))           /* single line mux can have either line specific OR mux listener but NOT both */
                 return SCPE_ARG;
             sock = sim_master_sock (listen, &r);            /* make master socket */
-            if (r != SCPE_OK)
-                return r;
+            if (r)
+                return SCPE_ARG;
             if (sock == INVALID_SOCKET)                     /* open error */
                 return SCPE_OPENERR;
             _mux_detach_line (lp, TRUE, FALSE);
@@ -2592,7 +2597,7 @@ while (*tptr) {
                     else
                         return SCPE_ARG;
                     }
-                sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, datagram, packet);
+                sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
                 if (sock != INVALID_SOCKET) {
                     _mux_detach_line (lp, FALSE, TRUE);
                     lp->destination = (char *)malloc(1+strlen(destination));
@@ -2603,7 +2608,7 @@ while (*tptr) {
                         strcpy (lp->ipad, lp->destination);
                         }
                     else
-                        sim_close_sock (sock, FALSE);
+                        sim_close_sock (sock);
                     lp->notelnet = notelnet;
                     tmxr_init_line (lp);                    /* init the line state */
                     }
@@ -3536,7 +3541,7 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
         lp->conn = FALSE;
         }
     if (lp->master) {
-        sim_close_sock (lp->master, 1);                 /* close master socket */
+        sim_close_sock (lp->master);                    /* close master socket */
         lp->master = 0;
         free (lp->port);
         lp->port = NULL;
@@ -3552,7 +3557,7 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
     }
 
 if (mp->master)
-    sim_close_sock (mp->master, 1);                     /* close master socket */
+    sim_close_sock (mp->master);                        /* close master socket */
 mp->master = 0;
 free (mp->port);
 mp->port = NULL;

@@ -186,6 +186,7 @@ t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data,
 t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc);
 
 extern t_bool vid_active;
 extern uint32 vid_mono_palette[2];

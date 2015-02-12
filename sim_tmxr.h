@@ -191,6 +191,7 @@ struct tmxr {
 int32 tmxr_poll_conn (TMXR *mp);
 t_stat tmxr_reset_ln (TMLN *lp);
 t_stat tmxr_detach_ln (TMLN *lp);
+int32 tmxr_input_pending_ln (TMLN *lp);
 int32 tmxr_getc_ln (TMLN *lp);
 t_stat tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, size_t *psize);
 t_stat tmxr_get_packet_ln_ex (TMLN *lp, const uint8 **pbuf, size_t *psize, uint8 frame_byte);
