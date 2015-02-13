@@ -3643,7 +3643,7 @@ return sim_clock_coschedule_tmr (uptr, tmr, interval);
 
 /* Generic Multiplexer attach help */
 
-t_stat tmxr_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tmxr_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 TMXR *mux = (TMXR *)dptr->help_ctx;
 t_bool single_line = FALSE;               /* default to Multi-Line help */
@@ -4374,7 +4374,7 @@ return SCPE_OK;
 
 static struct {
     u_char value;
-    char *name;
+    const char *name;
     } tn_chars[] =
     {
         {TN_IAC,    "TN_IAC"},                /* protocol delim */

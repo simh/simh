@@ -170,7 +170,6 @@ uint8 lk_rbuf[10];                                      /* receive buffer */
 int32 lk_rbuf_p = 0;                                    /* receive buffer ptr */
 int32 lk_mode[16];                                      /* mode of each key group */
 
-DEVICE lk_dev;
 t_stat lk_wr (uint8 c);
 t_stat lk_rd (uint8 *c);
 t_stat lk_reset (DEVICE *dptr);
@@ -830,5 +829,5 @@ switch (mode) {
 }
 
 #else /* defined(VAX_620) */
-static char *dummy_declaration = "Something to compile";
+static const char *dummy_declaration = "Something to compile";
 #endif /* !defined(VAX_620) */

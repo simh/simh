@@ -123,9 +123,9 @@ static t_stat dup_set_W5 (UNIT* uptr, int32 val, char* cptr, void* desc);
 static t_stat dup_show_W5 (FILE* st, UNIT* uptr, int32 val, void* desc);
 static t_stat dup_set_W6 (UNIT* uptr, int32 val, char* cptr, void* desc);
 static t_stat dup_show_W6 (FILE* st, UNIT* uptr, int32 val, void* desc);
-static t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-static t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-static char *dup_description (DEVICE *dptr);
+static t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+static t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+static const char *dup_description (DEVICE *dptr);
 
 /* RXCSR - 16XXX0 - receiver control/status register */
 
@@ -472,9 +472,9 @@ DEVICE dpv_dev = {
 #define DUPDPTR ((UNIBUS) ? &dup_dev : &dpv_dev)
 
 /* Register names for Debug tracing */
-static char *dup_rd_regs[] =
+static const char *dup_rd_regs[] =
     {"RXCSR ", "RXDBUF", "TXCSR ", "TXDBUF" };
-static char *dup_wr_regs[] = 
+static const char *dup_wr_regs[] = 
     {"RXCSR ", "PARCSR", "TXCSR ", "TXDBUF"};
 
 
@@ -1466,7 +1466,7 @@ dptr->numunits = newln + 1;
 return dup_reset (dptr);                            /* setup lines and auto config */
 }
 
-static t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char helpString[] =
  /* The '*'s in the next line represent the standard text width of a help line */
@@ -1650,12 +1650,12 @@ sprintf (connectpoll, "%d", DUP_CONNECT_POLL);
 return scp_help (st, dptr, uptr, flag, helpString, cptr, busname, devcount, connectpoll);
 }
 
-static t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 return dup_help (st, dptr, uptr, flag, DUP_HLP_ATTACH);
 }
 
-static char *dup_description (DEVICE *dptr)
+static const char *dup_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "DUP11 bit synchronous interface" :
                   "DPV11 bit synchronous interface";

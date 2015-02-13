@@ -278,7 +278,7 @@ t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp)
 int32 i, idx, vec, hivec, ilvl, ibit;
 DEVICE *cdptr;
 size_t j;
-char *cdname;
+const char *cdname;
 
 if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
     return SCPE_IERR;
@@ -533,7 +533,7 @@ return SCPE_OK;
 
 
 typedef struct {
-    char        *dnam[AUTO_MAXC];
+    const char  *dnam[AUTO_MAXC];
     int32       numc;
     int32       numv;
     uint32      amod;
@@ -750,7 +750,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
 #define DEV_NEXUS 0
 #endif
 #endif
-t_stat auto_config (char *name, int32 nctrl)
+t_stat auto_config (const char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
 uint32 vec = VEC_Q + AUTO_VECBASE;

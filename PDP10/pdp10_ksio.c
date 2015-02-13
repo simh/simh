@@ -2212,7 +2212,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
 #define DEV_NEXUS 0
 #endif
 #endif
-t_stat auto_config (char *name, int32 nctrl)
+t_stat auto_config (const char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
 uint32 vec = VEC_Q + AUTO_VECBASE;

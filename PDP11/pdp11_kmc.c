@@ -494,8 +494,8 @@ static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, void *desc);
 static t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v, void *dp);
 
 static t_stat kmc_help (FILE *st, struct sim_device *dptr,
-                        struct sim_unit *uptr, int32 flag, char *cptr); 
-static char *kmc_description (DEVICE *dptr);
+                        struct sim_unit *uptr, int32 flag, const char *cptr); 
+static const char *kmc_description (DEVICE *dptr);
 
 /* Global data */
 
@@ -2942,7 +2942,7 @@ t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v,  void *dp) {
  */
 
 static t_stat kmc_help (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag, char *cptr) {
+                         struct sim_unit *uptr, int32 flag, const char *cptr) {
     const char *const text =
 " The KMC11-A is a general purpose microprocessor that is used in\n"
 " several DEC products.  The KDP is an emulation of one of those\n"
@@ -3071,6 +3071,6 @@ static t_stat kmc_help (FILE *st, struct sim_device *dptr,
 /* Description of this device.
  * Conventionally last function in the file.
  */
-static char *kmc_description (DEVICE *dptr) {
+static const char *kmc_description (DEVICE *dptr) {
     return "KMC11-A Synchronous line controller supporting only COMM IOP/DUP microcode";
 }

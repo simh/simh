@@ -278,9 +278,9 @@ t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat dz_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *dz_description (DEVICE *dptr);
+t_stat dz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat dz_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *dz_description (DEVICE *dptr);
 
 /* DZ data structures
 
@@ -360,9 +360,9 @@ DEVICE dz_dev = {
     };
 
 /* Register names for Debug tracing */
-static char *dz_rd_regs[] =
+static const char *dz_rd_regs[] =
     {"CSR ", "RBUF", "TCR ", "MSR " };
-static char *dz_wr_regs[] = 
+static const char *dz_wr_regs[] = 
     {"CSR ", "LPR ", "TCR ", "TDR "};
 
 /* IO dispatch routines, I/O addresses 177601x0 - 177601x7 */
@@ -742,7 +742,7 @@ int32 i, ndev;
 sim_debug(DBG_TRC, dptr, "dz_reset()\n");
 
 if (dz_ldsc == NULL)
-    dz_desc.ldsc = dz_ldsc = calloc (dz_desc.lines, sizeof(*dz_ldsc));
+    dz_desc.ldsc = dz_ldsc = (TMLN *)calloc (dz_desc.lines, sizeof(*dz_ldsc));
 for (i = 0; i < dz_desc.lines/DZ_LINES; i++)            /* init muxes */
     dz_clear (i, TRUE);
 dz_rxi = dz_txi = 0;                                    /* clr master int */
@@ -831,7 +831,7 @@ if (newln < dz_desc.lines) {
         }
     }
 dz_dib.lnt = (newln / DZ_LINES) * IOLN_DZ;              /* set length */
-dz_desc.ldsc = dz_ldsc = realloc(dz_ldsc, newln*sizeof(*dz_ldsc));
+dz_desc.ldsc = dz_ldsc = (TMLN *)realloc(dz_ldsc, newln*sizeof(*dz_ldsc));
 if (dz_desc.lines < newln)
     memset (dz_ldsc + dz_desc.lines, 0, sizeof(*dz_ldsc)*(newln-dz_desc.lines));
 dz_desc.lines = newln;
@@ -887,9 +887,9 @@ for (i = 0; i < dz_desc.lines; i++) {
 return SCPE_OK;
 }
 
-t_stat dz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat dz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-char *devtype = (UNIBUS) ? "DZ11" : "DZV11";
+const char *devtype = (UNIBUS) ? "DZ11" : "DZV11";
 
 fprintf (st, "%s Terminal Multiplexer (DZ)\n\n", devtype);
 fprintf (st, "The %s is a %d line terminal multiplexor.  Up to %d %s's (%d lines) are\n", devtype, DZ_LINES, MAX_DZ_MUXES, devtype, DZ_LINES*MAX_DZ_MUXES);
@@ -928,9 +928,9 @@ dz_help_attach (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-t_stat dz_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat dz_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-char *devtype = (UNIBUS) ? "DZ11" : "DZV11";
+const char *devtype = (UNIBUS) ? "DZ11" : "DZV11";
 
 tmxr_attach_help (st, dptr, uptr, flag, cptr);
 fprintf (st, "The terminal lines perform input and output through Telnet sessions connected\n");
@@ -946,7 +946,7 @@ fprintf (st, "status.\n\n");
 return SCPE_OK;
 }
 
-char *dz_description (DEVICE *dptr)
+const char *dz_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "DZ11 8-line terminal multiplexer" : "DZV11 4-line terminal multiplexer";
 }

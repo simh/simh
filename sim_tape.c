@@ -97,7 +97,7 @@
 #endif
 
 struct sim_tape_fmt {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     int32               uflags;                         /* unit flags */
     t_addr              bot;                            /* bot test */
     };
@@ -533,7 +533,7 @@ uptr->io_flush = NULL;
 return SCPE_OK;
 }
 
-t_stat sim_tape_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat sim_tape_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "%s Tape Attach Help\n\n", dptr->name);
 if (0 == (uptr-dptr->units)) {

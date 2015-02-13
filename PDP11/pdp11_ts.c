@@ -285,7 +285,6 @@ int32 ts_bcmd = 0;                                      /* boot cmd */
 int32 ts_time = 10;                                     /* record latency */
 static uint16 cpy_buf[MAX_PLNT];                        /* copy buffer */
 
-DEVICE ts_dev;
 t_stat ts_rd (int32 *data, int32 PA, int32 access);
 t_stat ts_wr (int32 data, int32 PA, int32 access);
 t_stat ts_svc (UNIT *uptr);
@@ -298,8 +297,8 @@ int32 ts_updxs0 (int32 t);
 void ts_cmpendcmd (int32 s0, int32 s1);
 void ts_endcmd (int32 ssf, int32 xs0f, int32 msg);
 int32 ts_map_status (t_stat st);
-t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *ts_description (DEVICE *dptr);
+t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *ts_description (DEVICE *dptr);
 
 /* TS data structures
 
@@ -1191,7 +1190,7 @@ return SCPE_NOFNC;
 }
 #endif
 
-t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "TS11 Magnetic Tape (TS)\n\n");
 fprint_set_help (st, dptr);
@@ -1212,7 +1211,7 @@ sim_tape_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-char *ts_description (DEVICE *dptr)
+const char *ts_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "TS11 magnetic tape controller" :
                   "TSV11/TSV05 magnetic tape controller ";

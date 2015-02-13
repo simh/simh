@@ -72,7 +72,6 @@ t_bool vs_m = 0;                                        /* Middle button state *
 t_bool vs_r = 0;                                        /* Right button state */
 uint8 vs_buf[10];
 
-DEVICE vs_dev;
 t_stat vs_wr (uint8 c);
 t_stat vs_rd (uint8 *c);
 t_stat vs_reset (DEVICE *dptr);
@@ -241,5 +240,5 @@ if (vs_state == VSXXX_IDLE) {
 }
 
 #else /* defined(VAX_620) */
-static char *dummy_declaration = "Something to compile";
+static const char *dummy_declaration = "Something to compile";
 #endif /* !defined(VAX_620) */

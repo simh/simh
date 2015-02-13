@@ -779,7 +779,7 @@ t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat auto_config (char *name, int32 num);
+t_stat auto_config (const char *name, int32 num);
 
 
 #endif

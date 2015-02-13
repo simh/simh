@@ -302,8 +302,8 @@ int32 xq_int (void);
 void xq_csr_set_clr(CTLR* xq, uint16 set_bits, uint16 clear_bits);
 void xq_show_debug_bdl(CTLR* xq, uint32 bdl_ba);
 t_stat xq_boot (int32 unitno, DEVICE *dptr);
-t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *xq_description (DEVICE *dptr);
+t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *xq_description (DEVICE *dptr);
 
 struct xq_device    xqa = {
   xqa_read_callback,                        /* read callback routine */
@@ -709,7 +709,7 @@ t_stat xq_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
 
 t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
-  char* fmt = "  %-15s%d\n";
+  const char* fmt = "  %-15s%d\n";
   CTLR* xq = xq_unit2ctlr(uptr);
 
   fprintf(st, "XQ Ethernet statistics:\n");
@@ -1499,7 +1499,7 @@ t_stat xq_process_xbdl(CTLR* xq)
 
     /* add to transmit buffer, making sure it's not too big */
     if ((xq->var->write_buffer.len + b_length) > sizeof(xq->var->write_buffer.msg)) {
-      xq->var->write_buffer.oversize = realloc (xq->var->write_buffer.oversize, xq->var->write_buffer.len + b_length);
+      xq->var->write_buffer.oversize = (uint8*)realloc (xq->var->write_buffer.oversize, xq->var->write_buffer.len + b_length);
       if (xq->var->write_buffer.len <= sizeof(xq->var->write_buffer.msg))
         memcpy (xq->var->write_buffer.oversize, xq->var->write_buffer.msg, xq->var->write_buffer.len);
       }
@@ -1865,7 +1865,7 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
 
     /* add to transmit buffer, accomodating it if it is too big */
     if ((xq->var->write_buffer.len + b_length) > sizeof(xq->var->write_buffer.msg)) {
-      xq->var->write_buffer.oversize = realloc (xq->var->write_buffer.oversize, xq->var->write_buffer.len + b_length);
+      xq->var->write_buffer.oversize = (uint8*)realloc (xq->var->write_buffer.oversize, xq->var->write_buffer.len + b_length);
       if (xq->var->write_buffer.len <= sizeof(xq->var->write_buffer.msg))
         memcpy (xq->var->write_buffer.oversize, xq->var->write_buffer.msg, xq->var->write_buffer.len);
       }
@@ -3074,7 +3074,7 @@ return SCPE_NOFNC;
 #endif
 }
 
-t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char helpString[] =
  /* The '*'s in the next line represent the standard text width of a help line */
@@ -3311,7 +3311,7 @@ const char helpString[] =
 return scp_help (st, dptr, uptr, flag, helpString, cptr);
 }
 
-char *xq_description (DEVICE *dptr)
+const char *xq_description (DEVICE *dptr)
 {
 return (dptr == &xq_dev) ? "DELQA/DEQNA Ethernet controller"
                          : "Second DELQA/DEQNA Ethernet controller";

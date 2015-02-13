@@ -215,14 +215,14 @@ t_stat tmr_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
-char *tti_description (DEVICE *dptr);
-char *tto_description (DEVICE *dptr);
-char *clk_description (DEVICE *dptr);
-char *tmr_description (DEVICE *dptr);
-char *td_description (DEVICE *dptr);
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+const char *tti_description (DEVICE *dptr);
+const char *tto_description (DEVICE *dptr);
+const char *clk_description (DEVICE *dptr);
+const char *tmr_description (DEVICE *dptr);
+const char *td_description (DEVICE *dptr);
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat clk_attach (UNIT *uptr, char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
@@ -697,7 +697,7 @@ sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Input (TTI)\n\n");
 fprintf (st, "The terminal input (TTI) polls the console keyboard for input.\n\n");
@@ -707,7 +707,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tti_description (DEVICE *dptr)
+const char *tti_description (DEVICE *dptr)
 {
 return "console terminal input";
 }
@@ -745,7 +745,7 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Output (TTO)\n\n");
 fprintf (st, "The terminal output (TTO) writes to the simulator console.\n\n");
@@ -755,7 +755,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tto_description (DEVICE *dptr)
+const char *tto_description (DEVICE *dptr)
 {
 return "console terminal output";
 }
@@ -922,7 +922,7 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
 return SCPE_OK;
 }
 
-t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Real-Time Clock (%s)\n\n", dptr->name);
 fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
@@ -953,7 +953,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *clk_description (DEVICE *dptr)
+const char *clk_description (DEVICE *dptr)
 {
 return "time of year clock";
 }
@@ -1000,7 +1000,7 @@ todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
 }
 
-char *tmr_description (DEVICE *dptr)
+const char *tmr_description (DEVICE *dptr)
 {
 return "interval timer";
 }
@@ -1284,7 +1284,7 @@ sim_cancel (&td_dev.units[1]);
 return SCPE_OK;
 }
 
-char *td_description (DEVICE *dptr)
+const char *td_description (DEVICE *dptr)
 {
 return "Console TU58 cartridge";
 }

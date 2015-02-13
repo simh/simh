@@ -389,7 +389,7 @@ extern int32 int_req[IPL_HLVL];
 #define    BLOW_STOP        (3)                         /* shutting down */
 
 /* Card Reader state */
-static char     *cardFormat = "unknown";
+static const char *cardFormat = "unknown";
 static t_bool   (*readRtn)(UNIT *, int16 *, char *, char *);
 static char     ascii_code[4096];                       /* 2^12 possible values */
 static int      currCol;                                /* current column when reading */
@@ -440,7 +440,6 @@ static int32    cddb = 0;                               /* data, 2nd status */
 static int32    cddbs = 0;                              /* second status bits (or with cddb) */
 
 /* forward references */
-DEVICE cr_dev;
 static void setupCardFile (UNIT *, int32);
 t_stat cr_rd (int32 *, int32, int32);
 t_stat cr_wr (int32, int32, int32);
@@ -460,8 +459,8 @@ t_stat cr_set_eof (UNIT *, int32, char *, void *);
 t_stat cr_show_eof (FILE *, UNIT *, int32, void *);
 t_stat cr_set_trans (UNIT *, int32, char*, void *);
 t_stat cr_show_trans (FILE *, UNIT *, int32, void *);
-static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *cr_description (DEVICE *dptr);
+static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *cr_description (DEVICE *dptr);
 
 
 /* CR data structures
@@ -1796,7 +1795,7 @@ if (bits)
 return;
 }
 
-static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 char devtype[MAXDESCRIP];
 int32 crtypes;
@@ -1939,7 +1938,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *cr_description (DEVICE *dptr)
+const char *cr_description (DEVICE *dptr)
 {
   /* Not thread-safe, but malloc() would be leak. */
   static char desc[MAXDESCRIP+sizeof(" card reader")-1] = "";

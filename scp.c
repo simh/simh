@@ -453,7 +453,7 @@ void int_handler (int signal);
 t_stat set_prompt (int32 flag, char *cptr);
 t_stat sim_set_asynch (int32 flag, char *cptr);
 t_stat sim_set_environment (int32 flag, char *cptr);
-static char *get_dbg_verb (uint32 dbits, DEVICE* dptr);
+static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr);
 
 /* Global data */
 
@@ -533,8 +533,8 @@ const char save_vercur[] = "V3.5";
 const char save_ver32[] = "V3.2";
 const char save_ver30[] = "V3.0";
 const struct scp_error {
-    char *code;
-    char *message;
+    const char *code;
+    const char *message;
     } scp_errors[1+SCPE_MAX_ERR-SCPE_BASE] =
         {{"NXM",     "Address space exceeded"},
          {"UNATT",   "Unit not attached"},
@@ -1850,7 +1850,7 @@ argc = ccommand (&argv);
 #endif
 
 /* Make sure that argv has at least 10 elements and that it ends in a NULL pointer */
-targv = calloc (1+MAX(10, argc), sizeof(*targv));
+targv = (char **)calloc (1+MAX(10, argc), sizeof(*targv));
 for (i=0; i<argc; i++)
     targv[i] = argv[i];
 argv = targv;
@@ -2092,7 +2092,7 @@ for (cmdp = sim_vm_cmd; cmdp && (cmdp->name != NULL); cmdp++) {
     if (cmdp->help) {
         if (cmd_cnt >= cmd_size) {
             cmd_size += 20;
-            hlp_cmdp = realloc (hlp_cmdp, sizeof(*hlp_cmdp)*cmd_size);
+            hlp_cmdp = (CTAB **)realloc (hlp_cmdp, sizeof(*hlp_cmdp)*cmd_size);
             }
         hlp_cmdp[cmd_cnt] = cmdp;
         ++cmd_cnt;
@@ -2104,7 +2104,7 @@ for (cmdp = cmd_table; cmdp && (cmdp->name != NULL); cmdp++) {
     if (cmdp->help && (!sim_vm_cmd || !find_ctab (sim_vm_cmd, cmdp->name))) {
         if (cmd_cnt >= cmd_size) {
             cmd_size += 20;
-            hlp_cmdp = realloc (hlp_cmdp, sizeof(*hlp_cmdp)*cmd_size);
+            hlp_cmdp = (CTAB **)realloc (hlp_cmdp, sizeof(*hlp_cmdp)*cmd_size);
             }
         hlp_cmdp[cmd_cnt] = cmdp;
         ++cmd_cnt;
@@ -3178,7 +3178,7 @@ if (!strcmp (gbuf, "NOT")) {                            /* Conditional Inversion
 if (*cptr == '"') {                                     /* quoted string comparison? */
     char op[CBUFSIZE];
     static struct {
-        char *op;
+        const char *op;
         int aval;
         int bval;
         t_bool invert;
@@ -5343,14 +5343,14 @@ return SCPE_OK;
 
 /* Get device display name */
 
-char *sim_dname (DEVICE *dptr)
+const char *sim_dname (DEVICE *dptr)
 {
 return (dptr->lname? dptr->lname: dptr->name);
 }
 
 /* Get unit display name */
 
-char *sim_uname (UNIT *uptr)
+const char *sim_uname (UNIT *uptr)
 {
 DEVICE *d = find_dev_from_unit(uptr);
 static AIO_TLS char uname[CBUFSIZE];
@@ -6984,13 +6984,13 @@ return (c & 0x80) ? 0 : isalnum (c);
 /* get_yn               yes/no question
 
    Inputs:
-        cptr    =       pointer to question
+        ques    =       pointer to question
         deflt   =       default answer
    Outputs:
         result  =       true if yes, false if no
 */
 
-t_stat get_yn (char *ques, t_stat deflt)
+t_stat get_yn (const char *ques, t_stat deflt)
 {
 char cbuf[CBUFSIZE], *cptr;
 
@@ -7185,7 +7185,7 @@ while (iptr[1]) {               /* Skip trailing quote */
             break;
         case 'x':
             if (1) {
-                static char *hex_digits = "0123456789ABCDEF";
+                static const char *hex_digits = "0123456789ABCDEF";
                 const char *c;
 
                 ++iptr;
@@ -7253,7 +7253,7 @@ t_bool single_quote_found = FALSE;
 char quote = '"';
 char *tptr, *optr;
 
-optr = malloc (4*size + 3);
+optr = (char *)malloc (4*size + 3);
 if (optr == NULL)
     return NULL;
 tptr = optr;
@@ -7356,7 +7356,7 @@ return NULL;
 DEVICE *find_unit (const char *cptr, UNIT **uptr)
 {
 uint32 i, u;
-char *nptr;
+const char *nptr;
 const char *tptr;
 t_stat r;
 DEVICE *dptr;
@@ -7592,14 +7592,14 @@ sim_schaptr = NULL;                                     /* no search */
 sim_stabr.logic = sim_staba.logic = SCH_OR;             /* default search params */
 sim_stabr.boolop = sim_staba.boolop = SCH_GE;
 sim_stabr.count = 1;
-sim_stabr.mask = realloc (sim_stabr.mask, sim_emax * sizeof(*sim_stabr.mask));
+sim_stabr.mask = (t_value *)realloc (sim_stabr.mask, sim_emax * sizeof(*sim_stabr.mask));
 memset (sim_stabr.mask, 0, sim_emax * sizeof(*sim_stabr.mask));
-sim_stabr.comp = realloc (sim_stabr.comp, sim_emax * sizeof(*sim_stabr.comp));
+sim_stabr.comp = (t_value *)realloc (sim_stabr.comp, sim_emax * sizeof(*sim_stabr.comp));
 memset (sim_stabr.comp, 0, sim_emax * sizeof(*sim_stabr.comp));
 sim_staba.count = sim_emax;
-sim_staba.mask = realloc (sim_staba.mask, sim_emax * sizeof(*sim_staba.mask));
+sim_staba.mask = (t_value *)realloc (sim_staba.mask, sim_emax * sizeof(*sim_staba.mask));
 memset (sim_staba.mask, 0, sim_emax * sizeof(*sim_staba.mask));
-sim_staba.comp = realloc (sim_staba.comp, sim_emax * sizeof(*sim_staba.comp));
+sim_staba.comp = (t_value *)realloc (sim_staba.comp, sim_emax * sizeof(*sim_staba.comp));
 memset (sim_staba.comp, 0, sim_emax * sizeof(*sim_staba.comp));
 sim_dfdev = sim_dflt_dev;
 sim_dfunit = sim_dfdev->units;
@@ -7658,9 +7658,10 @@ return cptr;
         cp      =       pointer to final '.' if match, NULL if not
 */
 
-char *match_ext (char *fnam, char *ext)
+char *match_ext (char *fnam, const char *ext)
 {
-char *pptr, *fptr, *eptr;
+char *pptr, *fptr;
+const char *eptr;
 
 if ((fnam == NULL) || (ext == NULL))                    /* bad arguments? */
      return NULL;
@@ -7727,9 +7728,9 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
     }                                                   /* end for */
 if (schptr->count != 1) {
     free (schptr->mask);
-    schptr->mask = calloc (sim_emax, sizeof(*schptr->mask));
+    schptr->mask = (t_value *)calloc (sim_emax, sizeof(*schptr->mask));
     free (schptr->comp);
-    schptr->comp = calloc (sim_emax, sizeof(*schptr->comp));
+    schptr->comp = (t_value *)calloc (sim_emax, sizeof(*schptr->comp));
     }
 if (logop >= 0) {
     schptr->logic = logop;
@@ -7766,8 +7767,8 @@ const char logstr[] = "|&^", cmpstr[] = "=!><";
 
 if (*cptr == 0)                                         /* check for clause */
     return NULL;
-logval = calloc (sim_emax, sizeof(*logval));
-cmpval = calloc (sim_emax, sizeof(*cmpval));
+logval = (t_value *)calloc (sim_emax, sizeof(*logval));
+cmpval = (t_value *)calloc (sim_emax, sizeof(*cmpval));
 for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
     if ((sptr = strchr (logstr, c))) {                  /* check for mask */
         logop = (int32)(sptr - logstr);
@@ -7802,9 +7803,9 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
 if (schptr->count != (1 - reason)) {
     schptr->count = 1 - reason;
     free (schptr->mask);
-    schptr->mask = calloc (sim_emax, sizeof(*schptr->mask));
+    schptr->mask = (t_value *)calloc (sim_emax, sizeof(*schptr->mask));
     free (schptr->comp);
-    schptr->comp = calloc (sim_emax, sizeof(*schptr->comp));
+    schptr->comp = (t_value *)calloc (sim_emax, sizeof(*schptr->comp));
     }
 if (logop >= 0) {
     schptr->logic = logop;
@@ -7837,7 +7838,7 @@ int32 ret = 0;
 if (schptr == NULL)
     return ret;
 
-val = malloc (schptr->count * sizeof (*values));
+val = (t_value *)malloc (schptr->count * sizeof (*values));
 
 for (i=0; i<(int32)schptr->count; i++) {
     val[i] = values[i];
@@ -8697,7 +8698,7 @@ return sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth] = NULL;
 void sim_brk_setact (const char *action)
 {
 if (action) {
-    sim_brk_act_buf[sim_do_depth] = realloc (sim_brk_act_buf[sim_do_depth], strlen (action) + 1);
+    sim_brk_act_buf[sim_do_depth] = (char *)realloc (sim_brk_act_buf[sim_do_depth], strlen (action) + 1);
     strcpy (sim_brk_act_buf[sim_do_depth], action);
     sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth];
     }
@@ -8917,7 +8918,7 @@ if (switches & EXP_TYP_REGEX) {
     res = regcomp (&re, (char *)match_buf, REG_EXTENDED | ((switches & EXP_TYP_REGEX_I) ? REG_ICASE : 0));
     if (res) {
         size_t err_size = regerror (res, &re, NULL, 0);
-        char *err_buf = calloc (err_size+1, 1);
+        char *err_buf = (char *)calloc (err_size+1, 1);
 
         regerror (res, &re, err_buf, err_size);
         sim_messagef (SCPE_ARG, "Regular Expression Error: %s\n", err_buf);
@@ -9086,7 +9087,7 @@ for (i=0; i < exp->size; i++) {
         else {
             if (strlen ((char *)exp->buf) != exp->buf_ins) { /* Nul characters in buffer? */
                 size_t off;
-                tstr = malloc (exp->buf_ins + 1);
+                tstr = (char *)malloc (exp->buf_ins + 1);
 
                 tstr[0] = '\0';
                 for (off=0; off < exp->buf_ins; off += 1 + strlen ((char *)&exp->buf[off]))
@@ -9095,7 +9096,7 @@ for (i=0; i < exp->size; i++) {
                 }
             }
         ++regex_checks;
-        matches = calloc ((ep->regex.re_nsub + 1), sizeof(*matches));
+        matches = (regmatch_t *)calloc ((ep->regex.re_nsub + 1), sizeof(*matches));
         if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
             char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
             sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
@@ -9104,7 +9105,7 @@ for (i=0; i < exp->size; i++) {
             }
         if (!regexec (&ep->regex, cbuf, ep->regex.re_nsub + 1, matches, REG_NOTBOL)) {
             size_t j;
-            char *buf = malloc (1 + exp->buf_ins);
+            char *buf = (char *)malloc (1 + exp->buf_ins);
 
             for (j=0; j<ep->regex.re_nsub + 1; j++) {
                 char env_name[32];
@@ -9239,7 +9240,7 @@ if (snd->extoff != 0) {
     }
 if (snd->insoff+size > snd->bufsize) {
     snd->bufsize = snd->insoff+size;
-    snd->buffer = realloc(snd->buffer, snd->bufsize);
+    snd->buffer = (uint8 *)realloc(snd->buffer, snd->bufsize);
     }
 memcpy(snd->buffer+snd->insoff, data, size);
 snd->insoff += size;
@@ -9361,10 +9362,10 @@ int32 debug_unterm  = 0;
 
 /* Finds debug phrase matching bitmask from from device DEBTAB table */
 
-static char *get_dbg_verb (uint32 dbits, DEVICE* dptr)
+static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr)
 {
-static char *debtab_none    = "DEBTAB_ISNULL";
-static char *debtab_nomatch = "DEBTAB_NOMATCH";
+static const char *debtab_none    = "DEBTAB_ISNULL";
+static const char *debtab_nomatch = "DEBTAB_NOMATCH";
 int32 offset = 0;
 
 if (dptr->debflags == 0)
@@ -9384,7 +9385,7 @@ return debtab_nomatch;
 
 static const char *sim_debug_prefix (uint32 dbits, DEVICE* dptr)
 {
-char* debug_type = get_dbg_verb (dbits, dptr);
+const char* debug_type = get_dbg_verb (dbits, dptr);
 char tim_t[32] = "";
 char tim_a[32] = "";
 char pc_s[64] = "";
@@ -9442,7 +9443,7 @@ for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition
         fprintf(stream, "%s%c ", bitdefs[i].name, debug_bstates[off]);
         }
     else {
-        char *delta = "";
+        const char *delta = "";
 
         mask = 0xFFFFFFFF >> (32-bitdefs[i].width);
         value = (uint32)((after >> bitdefs[i].offset) & mask);
@@ -10279,7 +10280,7 @@ TOPIC *topic = &top;
 int failed;
 size_t match;
 size_t i;
-char *p;
+const char *p;
 t_bool flat_help = FALSE;
 char cbuf [CBUFSIZE], gbuf[CBUFSIZE];
 
@@ -10539,7 +10540,7 @@ fp = sim_fopen (helpfile, "r");
 if (fp == NULL) {
     if (sim_argv && *sim_argv[0]) {
         char fbuf[(4*PATH_MAX)+1]; /* PATH_MAX is ridiculously small on some platforms */
-        char *d = NULL;
+        const char *d = NULL;
 
         /* Try to find a path from argv[0].  This won't always
          * work (one reason files are probably not a good idea),

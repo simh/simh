@@ -151,7 +151,7 @@ static struct sock_errors {
     };
 
 
-char *sim_get_err_sock (const char *emsg)
+const char *sim_get_err_sock (const char *emsg)
 {
 int err = WSAGetLastError ();
 int i;

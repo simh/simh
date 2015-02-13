@@ -267,7 +267,7 @@
 /* Data tables */
 
 struct cpu_table {
-    char                *name;                          /* model name */
+    const char          *name;                          /* model name */
     uint32              std;                            /* standard flags */
     uint32              opt;                            /* set/clear flags */
     uint32              maxm;                           /* max memory */

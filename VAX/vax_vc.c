@@ -231,7 +231,6 @@ uint32 *vc_buf = NULL;                                  /* Video memory */
 uint32 *vc_lines = NULL;                                /* Video Display Lines */
 uint8 vc_cur[256];                                      /* Cursor image */
 
-DEVICE vc_dev;
 t_stat vc_rd (int32 *data, int32 PA, int32 access);
 t_stat vc_wr (int32 data, int32 PA, int32 access);
 t_stat vc_svc (UNIT *uptr);
@@ -244,8 +243,8 @@ void vc_setint (int32 src);
 int32 vc_inta (void);
 void vc_clrint (int32 src);
 void vc_uart_int (uint32 set);
-t_stat vc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *vc_description (DEVICE *dptr);
+t_stat vc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *vc_description (DEVICE *dptr);
 
 
 /* QVSS data structures
@@ -355,7 +354,7 @@ UART2681 vc_uart = {
     { { &lk_wr, &lk_rd }, { &vs_wr, &vs_rd } }
     };
 
-char *vc_regnames[] = {
+const char *vc_regnames[] = {
     "CSR",          /* +0 */
     "CUR-X",        /* +2 */
     "MPOS",         /* +4 */
@@ -391,7 +390,7 @@ char *vc_regnames[] = {
     "",             /* +62 spare */
 };
 
-char *vc_crtc_regnames[] = {
+const char *vc_crtc_regnames[] = {
     "HTOT",         /* Horizontal Total The total number of character times in a line, minus 1 */
     "HDSP",         /* Horizontal Displayed The total number of displayed characters in a line. */
     "HPOS",         /* HSYNC Position Defines the number of character times until HSYNC (horizontal sync). */
@@ -1081,7 +1080,7 @@ else
 return SCPE_OK;
 }
 
-t_stat vc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat vc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "VCB01 Monochrome Video Subsystem (%s)\n\n", dptr->name);
 fprintf (st, "Use the Control-Right-Shift key combination to regain focus from the simulated\n");
@@ -1092,11 +1091,11 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *vc_description (DEVICE *dptr)
+const char *vc_description (DEVICE *dptr)
 {
 return "VCB01 Monochrome Graphics Adapter";
 }
 
 #else /* defined(VAX_620) */
-static char *dummy_declaration = "Something to compile";
+static const char *dummy_declaration = "Something to compile";
 #endif /* !defined(VAX_620) */

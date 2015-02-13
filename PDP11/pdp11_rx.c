@@ -126,7 +126,6 @@ uint8 rx_buf[RX_NUMBY] = { 0 };                         /* sector buffer */
 int32 rx_bptr = 0;                                      /* buffer pointer */
 int32 rx_enb = 1;                                       /* device enable */
 
-DEVICE rx_dev;
 t_stat rx_rd (int32 *data, int32 PA, int32 access);
 t_stat rx_wr (int32 data, int32 PA, int32 access);
 t_stat rx_svc (UNIT *uptr);

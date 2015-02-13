@@ -292,7 +292,7 @@ static char *HostPathToVhdPath (const char *szHostPath, char *szVhdPath, size_t 
 static char *VhdPathToHostPath (const char *szVhdPath, char *szHostPath, size_t HostPathSize);
 
 struct sim_disk_fmt {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     int32               uflags;                         /* unit flags */
     int32               fmtval;                         /* Format type value */
     t_stat              (*impl_fnc)(void);              /* Implemented Test Function */
@@ -367,7 +367,7 @@ return SCPE_OK;
 t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-char *cap_units = "B";
+const char *cap_units = "B";
 DEVICE *dptr = find_dev_from_unit (uptr);
 t_offset capac = ((t_offset)uptr->capac)*((dptr->flags & DEV_SECTORS) ? 512 : 1);
 
@@ -1215,7 +1215,7 @@ if (close_function (fileref) == EOF)
 return SCPE_OK;
 }
 
-t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "%s Disk Attach Help\n\n", dptr->name);
 
@@ -1443,7 +1443,7 @@ for (i = 4; i < wds; i++)
     buf[i] = 0177777u;
 da = (uptr->capac*((dptr->flags & DEV_SECTORS) ? 512 : 1)) - (sec * wds);
 for (i = 0; (i < sec) && (i < 10); i++, da += wds)
-    if (sim_disk_wrsect (uptr, (t_lba)(da/wds), (void *)buf, NULL, 1)) {
+    if (sim_disk_wrsect (uptr, (t_lba)(da/wds), (uint8 *)buf, NULL, 1)) {
         free (buf);
         return SCPE_IOERR;
         }

@@ -511,7 +511,7 @@ void eth_setcrc(ETH_DEV* dev, int need_crc)
   dev->need_crc = need_crc;
 }
 
-void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int detail, uint32 reason)
+void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, const char* txt, int detail, uint32 reason)
 {
   if (dev->dptr->dctrl & reason) {
     char src[20];
@@ -557,12 +557,12 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int
   }
 }
 
-void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
+void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, const char* txt)
 {
   eth_packet_trace_ex(dev, msg, len, txt, 0, dev->dbit);
 }
 
-void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
+void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, const char* txt)
 {
   eth_packet_trace_ex(dev, msg, len, txt, 1     , dev->dbit);
 }
@@ -851,7 +851,7 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
   {return SCPE_NOFNC;}
-t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
   {
   fprintf (st, "%s attach help\n\n", dptr->name);
   fprintf (st, "This simulator was not built with ethernet device support\n");
@@ -958,7 +958,7 @@ static HINSTANCE hLib = 0;                      /* handle to DLL */
 static void *hLib = 0;                      /* handle to Library */
 #endif
 static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
-static char* lib_name =
+static const char* lib_name =
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
 #elif defined(__APPLE__)
@@ -968,7 +968,7 @@ static char* lib_name =
 #define __STR(tok) __STR_QUOTE(tok)
                           "libpcap." __STR(HAVE_DLOPEN);
 #endif
-static char* no_pcap = 
+static const char* no_pcap = 
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap load failure";
 #else
@@ -1003,7 +1003,7 @@ static char*   (*p_pcap_lib_version) (void);
 /* load function pointer from DLL */
 typedef int (*_func)();
 
-static void load_function(char* function, _func* func_ptr) {
+static void load_function(const char* function, _func* func_ptr) {
 #ifdef _WIN32
     *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
 #else
@@ -1441,7 +1441,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
     char command[1024];
     FILE *f;
     int i;
-    char *patterns[] = {
+    const char *patterns[] = {
         "grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
         "egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
         NULL};
@@ -2160,7 +2160,7 @@ _eth_remove_from_open_list (dev);
 return SCPE_OK;
 }
 
-t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "%s attach help\n\n", dptr->name);
 fprintf (st, "   sim> SHOW ETHERNET\n");
@@ -2333,7 +2333,7 @@ static void
 _eth_error(ETH_DEV* dev, const char* where)
 {
 char msg[64];
-char *netname = "";
+const char *netname = "";
 time_t now;
 
 time(&now);
@@ -3490,21 +3490,21 @@ if (dev->eth_api == ETH_API_PCAP) {
   if (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0)
     bpf_netmask = 0;
   /* compile filter string */
-  if ((status = pcap_compile(dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
-    sprintf(errbuf, "%s", pcap_geterr(dev->handle));
+  if ((status = pcap_compile((pcap_t*)dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
+    sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
     sim_printf("Eth: pcap_compile error: %s\r\n", errbuf);
     /* show erroneous BPF string */
     sim_printf ("Eth: BPF string is: |%s|\r\n", buf);
     }
   else {
     /* apply compiled filter string */
-    if ((status = pcap_setfilter(dev->handle, &bpf)) < 0) {
-      sprintf(errbuf, "%s", pcap_geterr(dev->handle));
+    if ((status = pcap_setfilter((pcap_t*)dev->handle, &bpf)) < 0) {
+      sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
       sim_printf("Eth: pcap_setfilter error: %s\r\n", errbuf);
       }
     else {
       /* Save BPF filter string */
-      dev->bpf_filter = realloc(dev->bpf_filter, 1 + strlen(buf));
+      dev->bpf_filter = (char *)realloc(dev->bpf_filter, 1 + strlen(buf));
       strcpy (dev->bpf_filter, buf);
 #ifdef USE_SETNONBLOCK
       /* set file non-blocking */

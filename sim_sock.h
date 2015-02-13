@@ -126,7 +126,7 @@ int sim_check_conn (SOCKET sock, int rd);
 int sim_read_sock (SOCKET sock, char *buf, int nbytes);
 int sim_write_sock (SOCKET sock, const char *msg, int nbytes);
 void sim_close_sock (SOCKET sock);
-char *sim_get_err_sock (const char *emsg);
+const char *sim_get_err_sock (const char *emsg);
 SOCKET sim_err_sock (SOCKET sock, const char *emsg);
 int sim_getnames_sock (SOCKET sock, char **socknamebuf, char **peernamebuf);
 void sim_init_sock (void);

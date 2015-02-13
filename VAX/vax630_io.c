@@ -90,8 +90,8 @@ t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc);
-t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *qba_description (DEVICE *dptr);
+t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *qba_description (DEVICE *dptr);
 
 /* Qbus adapter data structures
 
@@ -746,7 +746,7 @@ fprintf (of, "Invalid argument\n");
 return SCPE_OK;
 }
 
-t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Qbus Adapter (QBA)\n\n");
 fprintf (st, "The Qbus adapter (QBA) simulates the CQBIC Qbus adapter chip.\n");
@@ -760,7 +760,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *qba_description (DEVICE *dptr)
+const char *qba_description (DEVICE *dptr)
 {
 return "Qbus adapter";
 }

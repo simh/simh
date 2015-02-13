@@ -240,7 +240,6 @@ int32 rl_rwait = 10;                                    /* rotate wait */
 int32 rl_stopioe = 1;                                   /* stop on error */
 
 /* forward references */
-DEVICE rl_dev;
 t_stat rl_rd (int32 *data, int32 PA, int32 access);
 t_stat rl_wr (int32 data, int32 PA, int32 access);
 t_stat rl_svc (UNIT *uptr);
@@ -261,8 +260,8 @@ t_stat rl_show_dstate (FILE *, UNIT *, int32, void *);
 t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc);
 #endif
 t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rl_description (DEVICE *dptr);
+t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rl_description (DEVICE *dptr);
 
 /* RL11 data structures
 
@@ -1147,7 +1146,7 @@ t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc)
 /* SHOW RL will display the controller type */
 t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-    char    *s = "RLV12";
+    const char *s = "RLV12";
 
     if (UNIBUS)
         s = "RL11";
@@ -1231,7 +1230,7 @@ return SCPE_NOFNC;
 
 #endif
 
-t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "RL11/RL01/RL02 Cartridge Disk (RL)\n\n");
 fprintf (st, "RL11 options include the ability to set units write enabled or write locked,\n");
@@ -1254,7 +1253,7 @@ fprintf (st, "    OS I/O error  x          report error and stop\n");
 return SCPE_OK;
 }
 
-char *rl_description (DEVICE *dptr)
+const char *rl_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "RL11/RL01(2) cartridge disk controller" :
                   "RLV12/RL01(2) cartridge disk controller";
