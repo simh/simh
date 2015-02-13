@@ -559,11 +559,7 @@ static void cmd_033 ()
     switch (Aex & 04177) {
     case 0:
         /*
-         * Using an I/O control instruction with Aex == 0
-         * after issuing a 033 instruction with a non-zero Aex
-         * to send data to a device was required
-         * for some devices (e.g. printers) according to the docs.
-         * What is the exact purpose is unclear (timing, power, ???)
+         * Releasing the drum printer solenoids. No effect on simulation.
          */
         break;
     case 1: case 2:
@@ -1761,6 +1757,12 @@ t_stat sim_instr (void)
             return STOP_IBKPT;                  /* stop simulation */
         }
 
+        if (redraw_panel) {
+            /* Periodic panel redraw is not forcing */
+            besm6_draw_panel(0);
+            redraw_panel = 0;
+        }
+
         if (PRP & MPRP) {
             /* There are interrupts pending in the peripheral
              * interrupt register */
@@ -1774,11 +1776,6 @@ t_stat sim_instr (void)
         }
         cpu_one_inst ();                        /* one instr */
         iintr = 0;
-        if (redraw_panel) {
-            /* Periodic panel redraw is not forcing */
-            besm6_draw_panel(0);
-            redraw_panel = 0;
-        }
 
         sim_interval -= 1;                      /* count down instructions */
     }
