@@ -159,7 +159,7 @@ void printer_control (int num, uint32 cmd)
     case 2:         /* ribbon off */
         dev->rampup = cmd == 2 ? FAST_START : SLOW_START;
         sim_cancel (u);
-	fflush (u->fileref);
+        fflush (u->fileref);
         break;
     }
 }

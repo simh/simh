@@ -344,9 +344,9 @@ t_stat cpu_deposit (t_value val, t_addr addr, UNIT *uptr, int32 sw)
         /* Deposited values for the switch register address range
          * always go to switch registers.
          */
-        pult [0][addr] = SET_CONVOL (val, CONVOL_INSN);
+        pult [0][addr] = SET_PARITY (val, PARITY_INSN);
     } else
-        memory [addr] = SET_CONVOL (val, CONVOL_INSN);
+        memory [addr] = SET_PARITY (val, PARITY_INSN);
     return SCPE_OK;
 }
 
@@ -518,13 +518,13 @@ static void cmd_002 ()
         else
             RUU &= ~RUU_AVOST_DISABLE;
         if (Aex & 2)
-            RUU |= RUU_CONVOL_RIGHT;
+            RUU |= RUU_PARITY_RIGHT;
         else
-            RUU &= ~RUU_CONVOL_RIGHT;
+            RUU &= ~RUU_PARITY_RIGHT;
         if (Aex & 4)
-            RUU |= RUU_CONVOL_LEFT;
+            RUU |= RUU_PARITY_LEFT;
         else
-            RUU &= ~RUU_CONVOL_LEFT;
+            RUU &= ~RUU_PARITY_LEFT;
         break;
     case 0200: case 0201: case 0202: case 0203:
     case 0204: case 0205: case 0206: case 0207:
@@ -826,7 +826,7 @@ void check_initial_setup ()
             (d->tm_year % 10) << 20 |
             ((d->tm_year / 10) % 10) << 16 |
             (memory[YEAR] & 7);
-        memory[YEAR] = SET_CONVOL (date, CONVOL_NUMBER);
+        memory[YEAR] = SET_PARITY (date, PARITY_NUMBER);
         /* приказ ВРЕ: ТР6 = 016, ТР5 = 9-14 р.-часы, 1-8 р.-минуты */
         pult[0][6] = 016;
         pult[0][4] = 0;

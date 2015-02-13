@@ -259,7 +259,7 @@ void drum_read_sector (UNIT *u)
 static void clear_memory (t_value *p, int nwords)
 {
     while (nwords-- > 0)
-        *p++ = SET_CONVOL (0, CONVOL_NUMBER);
+        *p++ = SET_PARITY (0, PARITY_NUMBER);
 }
 
 /*

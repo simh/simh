@@ -106,12 +106,12 @@ enum {
  * 11 - числовая свертка
  * В памяти биты свертки имитируют четность полуслов.
  */
-#define CONVOL_INSN             1
-#define CONVOL_NUMBER           2
-#define SET_CONVOL(x, c)        (((x) & BITS48) | (((c) & 3LL) << 48))
-#define IS_INSN(x)              (((x) >> 48) == CONVOL_INSN)
-#define IS_NUMBER(x)            (((x) >> 48) == CONVOL_INSN ||  \
-                                 ((x) >> 48) == CONVOL_NUMBER)
+#define PARITY_INSN             1
+#define PARITY_NUMBER           2
+#define SET_PARITY(x, c)        (((x) & BITS48) | (((c) & 3LL) << 48))
+#define IS_INSN(x)              (((x) >> 48) == PARITY_INSN)
+#define IS_NUMBER(x)            (((x) >> 48) == PARITY_INSN ||  \
+                                 ((x) >> 48) == PARITY_NUMBER)
 
 /*
  * An attempt to approximate instruction execution times.
@@ -170,8 +170,8 @@ extern jmp_buf cpu_halt;
 /*
  * Искусственный регистр режимов УУ, в реальной машине отсутствует.
  */
-#define RUU_CONVOL_RIGHT        000001  /* ПКП - признак контроля правой половины */
-#define RUU_CONVOL_LEFT         000002  /* ПКЛ - признак контроля левой половины */
+#define RUU_PARITY_RIGHT        000001  /* ПКП - признак контроля правой половины */
+#define RUU_PARITY_LEFT         000002  /* ПКЛ - признак контроля левой половины */
 #define RUU_EXTRACODE           000004  /* РежЭ - режим экстракода */
 #define RUU_INTERRUPT           000010  /* РежПр - режим прерывания */
 #define RUU_MOD_RK              000020  /* ПрИК - модификация регистром М[16] */
