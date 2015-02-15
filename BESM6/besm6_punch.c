@@ -217,7 +217,6 @@ static int utf8_getc (FILE *fin);
  */
 t_stat fs_event (UNIT *u)
 {
-    static int cnt;
     int num = u - fs_unit;
   again:
     if (fs_state[num] == FS_STARTING) {
@@ -225,7 +224,6 @@ t_stat fs_event (UNIT *u)
          * no need to read anything from the attached file.
          */
         FS[num] = 0;
-        cnt = 0;
         fs_state[num] = fs_textmode[num] ? FS_RUNNING : FS_BINARY;
     } else if (fs_state[num] == FS_BINARY) {
         int ch = getc (u->fileref);

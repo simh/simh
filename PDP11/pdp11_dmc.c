@@ -311,7 +311,7 @@ typedef struct queuehdr QH;
 
 typedef struct buffer_queue {
     QH hdr;                             /* Forward/Back Buffer pointers */
-    char * name;                        /* Queue name */
+    const char * name;                  /* Queue name */
     size_t size;                        /* Maximum number of entries (0 means no limit) */
     size_t count;                       /* Current Used Count */
     struct dmc_controller *controller;  /* back pointer to the containing controller */
@@ -929,10 +929,10 @@ t_stat dmc_showqueues (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setconnectpoll (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showconnectpoll (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_showddcmp (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *dmc_description (DEVICE *dptr);
-char *dmp_description (DEVICE *dptr);
+t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *dmc_description (DEVICE *dptr);
+const char *dmp_description (DEVICE *dptr);
 int dmc_is_attached (UNIT* uptr);
 int dmc_is_dmc (CTLR *controller);
 int dmc_is_rqi_set (CTLR *controller);
@@ -949,7 +949,7 @@ void dmc_clr_modem_dtr (CTLR *controller);
 void dmc_process_command (CTLR *controller);
 t_bool dmc_buffer_fill_receive_buffers (CTLR *controller);
 void dmc_start_transfer_buffer (CTLR *controller);
-void dmc_buffer_queue_init (CTLR *controller, BUFFER_QUEUE *q, char *name, size_t size, BUFFER *buffers);
+void dmc_buffer_queue_init (CTLR *controller, BUFFER_QUEUE *q, const char *name, size_t size, BUFFER *buffers);
 void dmc_buffer_queue_init_all (CTLR *controller);
 BUFFER *dmc_buffer_queue_head (BUFFER_QUEUE *q);
 BUFFER *dmc_buffer_allocate (CTLR *controller);
@@ -1653,7 +1653,7 @@ fprintf(st, "   TimeRemaining: %d\n", controller->link.TimeRemaining);
 return SCPE_OK;
 }
 
-t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char helpString[] =
  /* The '*'s in the next line represent the standard text width of a help line */
@@ -1850,7 +1850,7 @@ sprintf (connectpoll, "%d", DMC_CONNECT_POLL);
 return scp_help (st, dptr, uptr, flag, helpString, cptr, devname, devcount, connectpoll);
 }
 
-t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 return dmc_help (st, dptr, uptr, flag, DMC_HLP_ATTACH);
 }
@@ -1918,11 +1918,11 @@ ans &= mask;
 return ans;
 }
 
-void dmc_dumpregsel0(CTLR *controller, int trace_level, char * prefix, uint16 data)
+void dmc_dumpregsel0(CTLR *controller, int trace_level, const char * prefix, uint16 data)
 {
-char *type_str = "";
+const char *type_str = "";
 uint16 type = dmc_bitfld(data, DMC_SEL0_V_ITYPE, DMC_SEL0_S_ITYPE);
-static char *dmc_types[] = {"XMT BA/CC", "CNTL IN", "HALT", "BASE IN", "RCV BA/CC", "?????",  "?????", "?????"};
+static const char *dmc_types[] = {"XMT BA/CC", "CNTL IN", "HALT", "BASE IN", "RCV BA/CC", "?????",  "?????", "?????"};
 
 if (dmc_is_dmc(controller)) {
     if (dmc_is_rqi_set(controller)) {
@@ -1965,11 +1965,11 @@ else {
     }
 }
 
-void dmc_dumpregsel2(CTLR *controller, int trace_level, char *prefix, uint16 data)
+void dmc_dumpregsel2(CTLR *controller, int trace_level, const char *prefix, uint16 data)
 {
-char *type_str = "";
+const char *type_str = "";
 uint16 type = dmc_bitfld(data, DMC_SEL2_V_CODE, DMC_SEL2_S_CODE);
-static char *dmc_types[] = {"XMT BA/CC OUT", "CNTL OUT", "?????", "?????", "RCV BA/CC OUT", "?????",  "?????", "?????"};
+static const char *dmc_types[] = {"XMT BA/CC OUT", "CNTL OUT", "?????", "?????", "RCV BA/CC OUT", "?????",  "?????", "?????"};
 
 type_str = dmc_types[type];
 
@@ -1989,7 +1989,7 @@ sim_debug(
     );
 }
 
-void dmc_dumpregsel4(CTLR *controller, int trace_level, char *prefix, uint16 data)
+void dmc_dumpregsel4(CTLR *controller, int trace_level, const char *prefix, uint16 data)
 {
 if (dmc_is_rdyi_set(controller)) {
     sim_debug(
@@ -2019,7 +2019,7 @@ else {
     }
 }
 
-void dmc_dumpregsel6(CTLR *controller, int trace_level, char *prefix, uint16 data)
+void dmc_dumpregsel6(CTLR *controller, int trace_level, const char *prefix, uint16 data)
 {
 if (dmc_is_rdyi_set(controller)) {
     sim_debug(
@@ -2043,7 +2043,7 @@ else {
     }
 }
 
-void dmc_dumpregsel10(CTLR *controller, int trace_level, char *prefix, uint16 data)
+void dmc_dumpregsel10(CTLR *controller, int trace_level, const char *prefix, uint16 data)
 {
 sim_debug(
     trace_level,
@@ -2090,7 +2090,7 @@ return ans;
 
 void dmc_setreg(CTLR *controller, int reg, uint16 data, int ctx)
 {
-char *trace = "Setting";
+const char *trace = "Setting";
 
 switch (dmc_getsel(reg)) {
     case 00:
@@ -2554,7 +2554,7 @@ if (active)
 return SCPE_OK;
 }
 
-void dmc_buffer_queue_init(CTLR *controller, BUFFER_QUEUE *q, char *name, size_t size, BUFFER *buffers)
+void dmc_buffer_queue_init(CTLR *controller, BUFFER_QUEUE *q, const char *name, size_t size, BUFFER *buffers)
 {
 q->name = name;
 initqueue (&q->hdr, q, size, buffers, sizeof(*buffers));
@@ -2642,7 +2642,7 @@ return ((q->hdr.next == &q->hdr) ? NULL : (BUFFER *)q->hdr.next);
 
 void dmc_queue_control_out(CTLR *controller, uint16 sel6)
 {
-CONTROL_OUT *control = calloc(1, sizeof(*control));
+CONTROL_OUT *control = (CONTROL_OUT *)calloc(1, sizeof(*control));
 CONTROL_OUT *last = NULL;
 
 control->sel6 = sel6;
@@ -2811,8 +2811,8 @@ else {  /* DMP */
 
         if (controller->transfer_type == DMP_C_TYPE_MODE) {
             uint16 mode = sel6 & DMP_TYPE_INPUT_MASK;
-            char * duplex = (mode & 1) ? "Full-Duplex" : "Half-Duplex";
-            char * config;
+            const char * duplex = (mode & 1) ? "Full-Duplex" : "Half-Duplex";
+            const char * config;
 
             if (mode & 4)
                 config = "Point-to-point";
@@ -3856,7 +3856,7 @@ uptr->filename = NULL;
 return r;
 }
 
-char *dmc_description (DEVICE *dptr)
+const char *dmc_description (DEVICE *dptr)
 {
 #if defined (VM_PDP10)
 return "DMR11 Synchronous network controller";
@@ -3865,7 +3865,7 @@ return "DMC11 Synchronous network controller";
 #endif
 }
 
-char *dmp_description (DEVICE *dptr)
+const char *dmp_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "DMP11 Synchronous network controller"
                 : "DMV11 Synchronous network controller";

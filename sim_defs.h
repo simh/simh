@@ -376,7 +376,7 @@ typedef uint32          t_addr;
 /* Device data structure */
 
 struct sim_device {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     struct sim_unit     *units;                         /* units */
     struct sim_reg      *registers;                     /* registers */
     struct sim_mtab     *modifiers;                     /* modifiers */
@@ -404,13 +404,13 @@ struct sim_device {
                                                         /* mem size routine */
     char                *lname;                         /* logical name */
     t_stat              (*help)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr); 
+                            struct sim_unit *uptr, int32 flag, const char *cptr); 
                                                         /* help */
     t_stat              (*attach_help)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr);
+                            struct sim_unit *uptr, int32 flag, const char *cptr);
                                                         /* attach help */
     void *help_ctx;                                     /* Context available to help routines */
-    char                *(*description)(struct sim_device *dptr);
+    const char          *(*description)(struct sim_device *dptr);
                                                         /* Device Description */
     };
 
@@ -540,7 +540,7 @@ struct sim_unit {
 #define UNIT_S_DF_TAPE  3               /* Bits Reserved for Tape Density */
 
 struct sim_bitfield {
-    char            *name;                              /* field name */
+    const char      *name;                              /* field name */
     uint32          offset;                             /* starting bit */
     uint32          width;                              /* width */
     const char      **valuenames;                       /* map of values to strings */
@@ -550,13 +550,13 @@ struct sim_bitfield {
 /* Register data structure */
 
 struct sim_reg {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     void                *loc;                           /* location */
     uint32              radix;                          /* radix */
     uint32              width;                          /* width */
     uint32              offset;                         /* starting bit */
     uint32              depth;                          /* save depth */
-    char                *desc;                          /* description */
+    const char          *desc;                          /* description */
     struct sim_bitfield *fields;                        /* bit fields */
     uint32              flags;                          /* flags */
     uint32              qptr;                           /* circ q ptr */
@@ -576,7 +576,7 @@ struct sim_reg {
 /* Command tables, base and alternate formats */
 
 struct sim_ctab {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     t_stat              (*action)(int32 flag, char *cptr);
                                                         /* action routine */
     int32               arg;                            /* argument */
@@ -587,19 +587,19 @@ struct sim_ctab {
     };
 
 struct sim_c1tab {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     t_stat              (*action)(struct sim_device *dptr, struct sim_unit *uptr,
                             int32 flag, char *cptr);    /* action routine */
     int32               arg;                            /* argument */
-    char                *help;                          /* help string */
+    const char          *help;                          /* help string */
     };
 
 struct sim_shtab {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     t_stat              (*action)(FILE *st, struct sim_device *dptr,
                             struct sim_unit *uptr, int32 flag, char *cptr);
     int32               arg;                            /* argument */
-    char                *help;                          /* help string */
+    const char          *help;                          /* help string */
     };
 
 /* Modifier table - only extended entries have disp, reg, or flags */
@@ -607,8 +607,8 @@ struct sim_shtab {
 struct sim_mtab {
     uint32              mask;                           /* mask */
     uint32              match;                          /* match */
-    char                *pstring;                       /* print string */
-    char                *mstring;                       /* match string */
+    const char          *pstring;                       /* print string */
+    const char          *mstring;                       /* match string */
     t_stat              (*valid)(struct sim_unit *up, int32 v, char *cp, void *dp);
                                                         /* validation routine */
     t_stat              (*disp)(FILE *st, struct sim_unit *up, int32 v, void *dp);
@@ -616,7 +616,7 @@ struct sim_mtab {
     void                *desc;                          /* value descriptor */
                                                         /* REG * if MTAB_VAL */
                                                         /* int * if not */
-    char                *help;                          /* help string */
+    const char          *help;                          /* help string */
     };
 
 
@@ -705,9 +705,9 @@ struct sim_send {
 /* Debug table */
 
 struct sim_debtab {
-    char                *name;                          /* control name */
+    const char          *name;                          /* control name */
     uint32              mask;                           /* control bit */
-    char                *desc;                          /* description */
+    const char          *desc;                          /* description */
     };
 
 /* Deprecated Debug macros.  Use sim_debug() */
@@ -835,7 +835,7 @@ typedef struct sim_bitfield BITFIELD;
 /* This replaces any references to "assert()" which should never be invoked */
 /* with an expression which causes side effects (i.e. must be executed for */
 /* the program to work correctly) */
-#define ASSURE(_Expression) if (!(_Expression)) {char *_exp = #_Expression; char *_file = __FILE__;                                 \
+#define ASSURE(_Expression) if (!(_Expression)) {const char *_exp = #_Expression; const char *_file = __FILE__;                                 \
                                                  fprintf(stderr, "%s failed at %s line %d\n", _exp, _file, __LINE__);               \
                                                  if (sim_log) fprintf(sim_log, "%s failed at %s line %d\n", _exp, _file, __LINE__); \
                                                  if (sim_deb) fprintf(sim_deb, "%s failed at %s line %d\n", _exp, _file, __LINE__); \

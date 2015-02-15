@@ -848,7 +848,7 @@ fprintf (st, "VAX 11/%s", (sys_model ? "785" : "780"));
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Initial memory size is 8MB.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");

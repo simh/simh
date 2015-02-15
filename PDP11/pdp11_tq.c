@@ -233,7 +233,7 @@ struct drvtyp {
     uint16      cver;
     uint16      fver;
     uint16      uver;
-    char        *name;
+    const char  *name;
     };
 
 static struct drvtyp drv_tab[] = {
@@ -309,7 +309,7 @@ static uint32 tq_cmf[64] = {
     0, 0, 0, 0, 0, 0, 0, 0
     };  
 
-static char *tq_cmdname[] = {
+static const char *tq_cmdname[] = {
     "",                                                 /*  0 */
     "ABO",                                              /*  1 b: abort */
     "GCS",                                              /*  2 b: get command status */
@@ -342,8 +342,6 @@ static char *tq_cmdname[] = {
 
 /* Forward references */
 
-DEVICE tq_dev;
-
 t_stat tq_rd (int32 *data, int32 PA, int32 access);
 t_stat tq_wr (int32 data, int32 PA, int32 access);
 int32 tq_inta (void);
@@ -358,8 +356,8 @@ t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *tq_description (DEVICE *dptr);
+static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *tq_description (DEVICE *dptr);
 
 t_bool tq_step4 (void);
 t_bool tq_mscp (uint16 pkt, t_bool q);
@@ -2392,9 +2390,9 @@ fprintf (st, "%s (%dMB)", drv_tab[tq_typ].name, (uint32) (drv_tab[tq_typ].cap >>
 return SCPE_OK;
 }
 
-static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-char *devtype = UNIBUS ? "TUK50" : "TQK50";
+const char *devtype = UNIBUS ? "TUK50" : "TQK50";
 
 fprintf (st, "%s (TQ)\n\n", tq_description (dptr));
 fprintf (st, "The TQ controller simulates the %s TMSCP disk controller.  TQ options\n", devtype);
@@ -2413,7 +2411,7 @@ sim_tape_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-char *tq_description (DEVICE *dptr)
+const char *tq_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "TUK50 TMSCP magnetic tape controller" :
                   "TQK50 TMSCP magnetic tape controller";

@@ -45,14 +45,14 @@
 #else
 #include <unistd.h>
 #endif
-char *sim_path = 
+const char *sim_path = 
 #if defined(_WIN32)
             "vax.exe";
 #else
             "vax";
 #endif
 
-char *sim_config = 
+const char *sim_config = 
             "VAX-PANEL.ini";
 
 /* Registers visible on the Front Panel */
@@ -62,7 +62,7 @@ static void
 DisplayCallback (PANEL *panel, void *context)
 {
 char buf1[100], buf2[100], buf3[100];
-static char *states[] = {"Halt", "Run "};
+static const char *states[] = {"Halt", "Run "};
 
 buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = 0;
 sprintf (buf1, "%s PC: %08X   SP: %08X   AP: %08X   FP: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP);
@@ -122,7 +122,7 @@ return;
 int
 main (int argc, char **argv)
 {
-PANEL *panel;
+PANEL *panel, *tape;
 FILE *f;
 
 /* Create pseudo config file for a test */
@@ -138,10 +138,18 @@ if ((f = fopen (sim_config, "w"))) {
 InitDisplay();
 signal (SIGINT, halt_handler);
 panel = sim_panel_start_simulator (sim_path,
-                                   sim_config);
+                                   sim_config,
+                                   2);
 
 if (!panel) {
     printf ("Error starting simulator: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+
+tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
+
+if (!tape) {
+    printf ("Error adding tape device to simulator: %s\n", sim_panel_get_error());
     goto Done;
     }
 
@@ -263,7 +271,7 @@ while (1) {
     }
 
 Done:
-sim_panel_stop_simulator (panel);
+sim_panel_destroy (panel);
 
 /* Get rid of pseudo config file created above */
 remove (sim_config);

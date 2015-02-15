@@ -656,16 +656,16 @@ t_stat besm6_load (FILE *input)
             break;
         case '=':               /* word */
             if (addr < 010)
-                pult [0][addr] = SET_CONVOL (word, CONVOL_NUMBER);
+                pult [0][addr] = SET_PARITY (word, PARITY_NUMBER);
             else
-                memory [addr] = SET_CONVOL (word, CONVOL_NUMBER);
+                memory [addr] = SET_PARITY (word, PARITY_NUMBER);
             ++addr;
             break;
         case '*':               /* instruction */
             if (addr < 010)
-                pult [0][addr] = SET_CONVOL (word, CONVOL_INSN);
+                pult [0][addr] = SET_PARITY (word, PARITY_INSN);
             else
-                memory [addr] = SET_CONVOL (word, CONVOL_INSN);
+                memory [addr] = SET_PARITY (word, PARITY_INSN);
             ++addr;
             break;
         case '@':               /* start address */

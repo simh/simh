@@ -46,11 +46,13 @@
  * Use a 640x480 window with 32 bit pixels.
  */
 #define WIDTH   800
-#define HEIGHT  400
+#define HEIGHT  450
 #define DEPTH   32
 
 #define STEPX   14
 #define STEPY   16
+#define TEXTW   76
+#define HEADER  28
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -68,8 +70,9 @@ static const SDL_Color black = { 0,   0,   0   };
 static const SDL_Color cyan  = { 0,   128, 128 };
 static const SDL_Color grey  = { 64,  64,  64  };
 static t_value old_BRZ [8], old_GRP [2];
-static t_value old_M [NREGS];
-static char M_lamps[NREGS][15], BRZ_lamps[8][48], GRP_lamps[2][48];
+static uint32 old_M [NREGS], old_PRP [2], old_PC;
+static char M_lamps[NREGS][15], BRZ_lamps[8][48],
+    GRP_lamps[2][48], PRP_lamps[2][24], PC_lamps[16];
 
 static const int regnum[] = {
     013, 012, 011, 010, 7, 6, 5, 4,
@@ -207,25 +210,47 @@ static void draw_lamp (int left, int top, int on)
     SDL_BlitSurface (sprites[on], 0, screen, &area);
 }
 
+static void draw_a_modifier (int reg, int hpos, int vpos) {
+    int x, val, anded, ored;
+    val = M [reg];
+    anded = old_M [reg] & val;
+    ored = old_M [reg] | val;
+    old_M [reg] = val;
+    for (x=0; act && x<15; ++x) {
+        int new_lamp = anded >> (14-x) & 1 ? 2 : ored >> (14-x) & 1 ? 1 : 0;
+        if (new_lamp != M_lamps[reg][x]) {
+            draw_lamp (hpos + x*STEPX, vpos, new_lamp);
+            M_lamps[reg][x] = new_lamp;
+        }
+    }
+}
+
 /*
  * Drawing index (modifier) registers. They form two groups.
  */
 static void draw_modifiers_periodic (int group, int left, int top)
 {
-    int x, y, reg, val, anded, ored;
+    int y, reg;
 
     for (y=0; y<8; ++y) {
         reg = regnum [y + group*8];
-        val = M [reg];
-        anded = old_M [reg] & val;
-        ored = old_M [reg] | val;
-        old_M [reg] = val;
-        for (x=0; act && x<15; ++x) {
-            int new_lamp = anded >> (14-x) & 1 ? 2 : ored >> (14-x) & 1 ? 1 : 0;
-            if (new_lamp != M_lamps[reg][x]) {
-                draw_lamp (left+76 + x*STEPX, top+28 + y*STEPY, new_lamp);
-                M_lamps[reg][x] = new_lamp;
-            }
+        draw_a_modifier (reg, left + TEXTW, top + HEADER + y*STEPY);
+    }
+}
+
+static void draw_full_word (t_value val, t_value * old, char * lamps,
+                            int hpos, int vpos)
+{
+    int x;
+    t_value anded, ored;
+    anded = *old & val;
+    ored = *old | val;
+    *old = val;
+    for (x=0; act && x<48; ++x) {
+        int new_lamp = anded >> (47-x) & 1 ? 2 : ored >> (47-x) & 1 ? 1 : 0;
+        if (new_lamp != lamps[x]) {
+            draw_lamp (hpos + x*STEPX, vpos, new_lamp);
+            lamps[x] = new_lamp;
         }
     }
 }
@@ -233,46 +258,90 @@ static void draw_modifiers_periodic (int group, int left, int top)
 /*
  * Drawing the main interrupt register and its mask.
  */
-static void draw_grp_periodic (int top)
+static void draw_grp_periodic (int left, int top)
 {
-    int x, y;
-    t_value val, anded, ored;
+    draw_full_word (GRP, &old_GRP[0], GRP_lamps[0], left + TEXTW, top+HEADER);
+    draw_full_word (MGRP, &old_GRP[1], GRP_lamps[1], left + TEXTW, top+HEADER+STEPY);
+}
 
-    for (y=0; y<2; ++y) {
-        val = y ? MGRP : GRP;
-        anded = old_GRP [y] & val;
-        ored = old_GRP [y] | val;
-        old_GRP [y] = val;
-        for (x=0; act && x<48; ++x) {
-            int new_lamp = anded >> (47-x) & 1 ? 2 : ored >> (47-x) & 1 ? 1 : 0;
-            if (new_lamp != GRP_lamps[y][x]) {
-                draw_lamp (100 + x*STEPX, top+28 + y*STEPY, new_lamp);
-                GRP_lamps[y][x] = new_lamp;
-            }
+static void draw_partial_word (uint32 val, int bits, uint32 * old,
+                               char * lamps, int hpos, int vpos)
+{
+    int x;
+    uint32 anded, ored;
+    anded = *old & val;
+    ored = *old | val;
+    *old = val;
+    --bits;
+    for (x=0; act && x<=bits; ++x) {
+        int new_lamp = anded >> (bits-x) & 1 ? 2 :
+            ored >> (bits-x) & 1 ? 1 : 0;
+        if (new_lamp != lamps[x]) {
+            draw_lamp (hpos + x*STEPX, vpos, new_lamp);
+            lamps[x] = new_lamp;
         }
     }
+}
+
+static void draw_counters_periodic (int left, int top)
+{
+    draw_a_modifier(017, left+TEXTW+STEPX, top+HEADER);
+    /* The MSB of the displayed PC is the supervisor mode tag */
+    draw_partial_word(IS_SUPERVISOR(RUU) ? PC | BBIT(16) : PC, 16,
+                      &old_PC, PC_lamps, left+TEXTW, top+HEADER+STEPY);
+}
+
+/*
+ * Drawing the peripheral interrupt register and its mask.
+ */
+static void draw_prp_periodic (int left, int top)
+{
+    draw_partial_word(PRP, 24, &old_PRP[0], PRP_lamps[0], left+TEXTW, top+HEADER);
+    draw_partial_word(MPRP, 24, &old_PRP[1], PRP_lamps[1], left+TEXTW, top+HEADER+STEPY);
 }
 
 /*
  * Drawing the data cache registers.
  */
-static void draw_brz_periodic (int top)
+static void draw_brz_periodic (int left, int top)
 {
-    int x, y;
-    t_value val, anded, ored;
+    int y;
 
     for (y=0; y<8; ++y) {
-        val = BRZ [7-y];
-        anded = old_BRZ [7-y] & val;
-        ored = old_BRZ [7-y] | val;
-        old_BRZ [7-y] = val;
-        for (x=0; act && x<48; ++x) {
-            int new_lamp = anded >> (47-x) & 1 ? 2 : ored >> (47-x) & 1 ? 1 : 0;
-            if (new_lamp != BRZ_lamps[y][x]) {
-                    draw_lamp (100 + x*STEPX, top+28 + y*STEPY, new_lamp);
-                BRZ_lamps[y][x] = new_lamp;
-            }
-        }
+        draw_full_word (BRZ[7-y], &old_BRZ[7-y], BRZ_lamps[y],
+                        left+TEXTW, top+HEADER+y*STEPY);
+    }
+}
+
+/*
+ * Visually separating groups of bits.
+ */
+static void draw_separators (int left, int top, int startbit, int step, int totbits, int rows)
+{
+    int x, color;
+    SDL_Rect area;
+
+    color = grey.r << 16 | grey.g << 8 | grey.b;
+    for (x=startbit; x<totbits; x+=step) {
+        area.x = left + TEXTW-2 + x*STEPX;
+        area.y = top + HEADER-2;
+        area.w = 2;
+        area.h = rows*STEPY + 2;
+        SDL_FillRect (screen, &area, color);
+    }
+}
+
+/*
+ * Drawing weaving bit numbers.
+ */
+static void draw_bit_numbers (int left, int top, int totbits)
+{
+    char message [16];
+    int x;
+    for (x=0; x<totbits; ++x) {
+        sprintf (message, "%d", totbits-x);
+        render_utf8 (font_small, left+TEXTW+(STEPX/2-1) + x*STEPX,
+                     (x & 1) ? top+4 : top+10, 0, message);
     }
 }
 
@@ -281,98 +350,80 @@ static void draw_brz_periodic (int top)
  */
 static void draw_modifiers_static (int group, int left, int top)
 {
-    int x, y, color, reg;
-    char message [40];
-    SDL_Rect area;
+    int y, reg;
+    char message [16];
 
-    background = black;
-    foreground = cyan;
+    draw_separators (left, top, 3, 3, 15, 8);
 
-    /* Visually separating groups of bits */
-    color = grey.r << 16 | grey.g << 8 | grey.b;
-    for (x=3; x<15; x+=3) {
-        area.x = left + 74 + x*STEPX;
-        area.y = top + 26;
-        area.w = 2;
-        area.h = 8*STEPY + 2;
-        SDL_FillRect (screen, &area, color);
-    }
     /* Register names */
     for (y=0; y<8; ++y) {
         reg = regnum [y + group*8];
         sprintf (message, "М%2o", reg);
-        render_utf8 (font_big, left, top + 24 + y*STEPY, 1, message);
-        old_M [reg] = ~0;
+        render_utf8 (font_big, left, top + HEADER-4 + y*STEPY, 1, message);
     }
-    /* Bit numbers */
-    for (x=0; x<15; ++x) {
-        sprintf (message, "%d", 15-x);
-        render_utf8 (font_small, left+82 + x*STEPX,
-                     (x & 1) ? top+4 : top+10, 0, message);
-    }
+
+    draw_bit_numbers (left, top, 15);
 }
 
 /*
  * Drawing the static part of the interrupt register area.
  */
-static void draw_grp_static (int top)
+static void draw_grp_static (int left, int top)
 {
-    int x, y, color;
-    char message [40];
-    SDL_Rect area;
+    draw_separators (left, top, 3, 3, 48, 2);
 
-    background = black;
-    foreground = cyan;
-
-    /* Visually separating groups of bits */
-    color = grey.r << 16 | grey.g << 8 | grey.b;
-    for (x=3; x<48; x+=3) {
-        area.x = 98 + x*STEPX;
-        area.y = top + 26;
-        area.w = 2;
-        area.h = 2*STEPY + 2;
-        SDL_FillRect (screen, &area, color);
-    }
     /* Register names */
-    for (y=0; y<2; ++y) {
-        render_utf8 (font_big, 24, top + 24 + y*STEPY, 1, y ? "МГРП" : "ГРП");
-        old_GRP[y] = ~0;
-    }
-    /* Bit numbers */
-    for (x=0; x<48; ++x) {
-        sprintf (message, "%d", 48-x);
-        render_utf8 (font_small, 106 + x*STEPX,
-                     (x & 1) ? top+10 : top+4, 0, message);
-    }
+    render_utf8 (font_big, left, top + HEADER-4, 1, "ГРП");
+    render_utf8 (font_big, left, top + HEADER-4 + STEPY, 1, "МГРП");
+
+    draw_bit_numbers (left, top, 48);
+}
+
+/*
+ * Drawing the static part of the interrupt register area.
+ */
+static void draw_prp_static (int left, int top)
+{
+    draw_separators (left, top, 3, 3, 24, 2);
+
+    /* Register names */
+    render_utf8 (font_big, left, top + HEADER-4, 1, "ПРП");
+    render_utf8 (font_big, left, top + HEADER-4 + STEPY, 1, "МПРП");
+
+    draw_bit_numbers (left, top, 24);
+}
+
+/*
+ * Drawing the static part of PC and SP (M17) area.
+ */
+static void draw_counters_static (int left, int top)
+{
+    draw_separators (left, top, 1, 3, 16, 2);
+
+    /* Register names */
+    render_utf8 (font_big, left, top + HEADER-4, 1, "СчМ");
+    render_utf8 (font_big, left, top + HEADER-4 + STEPY, 1, "СчАС");
+
+    draw_bit_numbers (left, top, 16);
 }
 
 /*
  * Drawing the static part of the cache register area
  */
-static void draw_brz_static (int top)
+static void draw_brz_static (int left, int top)
 {
-    int x, y, color;
+    int y;
     char message [40];
-    SDL_Rect area;
 
-    background = black;
-    foreground = cyan;
+    draw_separators (left, top, 3, 3, 48, 8);
 
-    /* Visually separating groups of bits */
-    color = grey.r << 16 | grey.g << 8 | grey.b;
-    for (x=3; x<48; x+=3) {
-        area.x = 98 + x*STEPX;
-        area.y = top + 26;
-        area.w = 2;
-        area.h = 8*STEPY + 2;
-        SDL_FillRect (screen, &area, color);
-    }
     /* Register names */
     for (y=7; y>=0; --y) {
         sprintf (message, "БРЗ %d", 7-y);
-        render_utf8 (font_big, 24, top + 24 + y*STEPY, 1, message);
-        old_BRZ[y] = ~0;
+        render_utf8 (font_big, left, top + HEADER-4 + y*STEPY, 1, message);
     }
+
+    /* Using bit numbers above GRP */
 }
 
 /*
@@ -439,6 +490,10 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
         return ret;
     }
 
+    /* Font colors */
+    background = black;
+    foreground = cyan;
+
     /* Open the font file with the requested point size */
     font_big = TTF_OpenFont (QUOTE(FONTFILE), 16);
     font_small = TTF_OpenFont (QUOTE(FONTFILE), 9);
@@ -463,13 +518,17 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
     /* Drawing the static part of the BESM-6 panel */
     draw_modifiers_static (0, 24, 10);
     draw_modifiers_static (1, 400, 10);
-    draw_grp_static (180);
-    draw_brz_static (230);
+    draw_prp_static (24, 170);
+    draw_counters_static (24+32*STEPX, 170);
+    draw_grp_static (24, 230);
+    draw_brz_static (24, 280);
 
     /* Make sure all lights are updated */
     memset(M_lamps, ~0, sizeof(M_lamps));
     memset(BRZ_lamps, ~0, sizeof(BRZ_lamps));
     memset(GRP_lamps, ~0, sizeof(GRP_lamps));
+    memset(PRP_lamps, ~0, sizeof(PRP_lamps));
+    memset(PC_lamps, ~0, sizeof(PC_lamps));
     besm6_draw_panel(1);
 
     /* Tell SDL to update the whole screen */
@@ -502,8 +561,10 @@ void besm6_draw_panel (int force)
     /* Do the blinkenlights */
     draw_modifiers_periodic (0, 24, 10);
     draw_modifiers_periodic (1, 400, 10);
-    draw_grp_periodic (180);
-    draw_brz_periodic (230);
+    draw_counters_periodic (24+32*STEPX, 170);
+    draw_prp_periodic (24, 170);
+    draw_grp_periodic (24, 230);
+    draw_brz_periodic (24, 280);
 
     act = !act;
 
@@ -556,16 +617,23 @@ t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
         return ret;
     }
 
+    /* Font colors */
+    background = black;
+    foreground = cyan;
+
     /* Drawing the static part of the BESM-6 panel */
     draw_modifiers_static (0, 24, 10);
     draw_modifiers_static (1, 400, 10);
-    draw_grp_static (180);
-    draw_brz_static (230);
+    draw_prp_static (24, 170);
+    draw_counters_static (472, 170);
+    draw_grp_static (24, 230);
+    draw_brz_static (24, 280);
 
     /* Make sure all lights are updated */
     memset(M_lamps, ~0, sizeof(M_lamps));
     memset(BRZ_lamps, ~0, sizeof(BRZ_lamps));
     memset(GRP_lamps, ~0, sizeof(GRP_lamps));
+    memset(PRP_lamps, ~0, sizeof(PRP_lamps));
     besm6_draw_panel(1);
 
     /* Tell SDL to update the whole screen */
@@ -594,8 +662,10 @@ void besm6_draw_panel (int force)
     /* Do the blinkenlights */
     draw_modifiers_periodic (0, 24, 10);
     draw_modifiers_periodic (1, 400, 10);
-    draw_grp_periodic (180);
-    draw_brz_periodic (230);
+    draw_counters_periodic (472, 170);
+    draw_prp_periodic (24, 170);
+    draw_grp_periodic (24, 230);
+    draw_brz_periodic (24, 280);
 
     /* Tell SDL to update the whole screen */
     SDL_UpdateRect (screen, 0, 0, WIDTH, HEIGHT);
@@ -620,6 +690,7 @@ t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
 
 t_stat besm6_show_panel (FILE *st, struct sim_unit *up, int32 v, void *dp)
 {
+    return SCPE_NOTATT;
 }
 
 void besm6_draw_panel (int force)

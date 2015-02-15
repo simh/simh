@@ -195,17 +195,17 @@ t_stat disk_attach (UNIT *u, char *cptr)
             if (!sim_quiet && !(sim_switches & SWMASK ('Q')))
                 sim_printf ("%s: formatting disk volume %d\n", sim_uname (u), diskno);
 
-            control[1] = SET_CONVOL(0, CONVOL_NUMBER);
-            control[2] = SET_CONVOL(0, CONVOL_NUMBER);
-            control[3] = SET_CONVOL(0, CONVOL_NUMBER);
+            control[1] = SET_PARITY(0, PARITY_NUMBER);
+            control[2] = SET_PARITY(0, PARITY_NUMBER);
+            control[3] = SET_PARITY(0, PARITY_NUMBER);
 
             control[1] |= 01370707LL << 24;    /* Magic mark */
             control[1] |= diskno << 12;
 
             for (blkno = 0; blkno < DISK_TOTBLK; ++blkno) {
-                control[0] = SET_CONVOL((t_value)(2*blkno) << 36, CONVOL_NUMBER);
+                control[0] = SET_PARITY((t_value)(2*blkno) << 36, PARITY_NUMBER);
                 sim_fwrite(control, sizeof(t_value), 4, u->fileref);
-                control[0] = SET_CONVOL((t_value)(2*blkno+1) << 36, CONVOL_NUMBER);
+                control[0] = SET_PARITY((t_value)(2*blkno+1) << 36, PARITY_NUMBER);
                 sim_fwrite(control, sizeof(t_value), 4, u->fileref);
                 for (word = 0; word < 02000; ++word) {
                     sim_fwrite(control+2, sizeof(t_value), 1, u->fileref);
@@ -446,7 +446,7 @@ void disk_read_header (UNIT *u)
 
     /* Кодируем гребенку. */
     for (i=0; i<4; i++)
-        sysdata[i] = SET_CONVOL (collect (sysdata[i]), CONVOL_NUMBER);
+        sysdata[i] = SET_PARITY (collect (sysdata[i]), PARITY_NUMBER);
 }
 
 /*

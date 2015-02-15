@@ -157,18 +157,18 @@ t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
 t_stat rom_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rom_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rom_description (DEVICE *dptr);
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rom_description (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
-t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat nvr_attach (UNIT *uptr, char *cptr);
 t_stat nvr_detach (UNIT *uptr);
-char *nvr_description (DEVICE *dptr);
+const char *nvr_description (DEVICE *dptr);
 t_stat sysd_reset (DEVICE *dptr);
-t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *sysd_description (DEVICE *dptr);
+t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *sysd_description (DEVICE *dptr);
 
 int32 rom_rd (int32 pa);
 int32 nvr_rd (int32 pa);
@@ -416,7 +416,7 @@ if (rom == NULL)
 return SCPE_OK;
 }
 
-t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Read-only memory (ROM)\n\n");
 fprintf (st, "The boot ROM consists of a single unit, simulating the 64KB boot ROM.  It has\n");
@@ -440,7 +440,7 @@ fprintf (st, "    SET CPU DIAG=FULL       Run full diagnostics\n\n");
 return SCPE_OK;
 }
 
-char *rom_description (DEVICE *dptr)
+const char *rom_description (DEVICE *dptr)
 {
 return "read-only memory";
 }
@@ -530,7 +530,7 @@ if (nvr == NULL)
 return SCPE_OK;
 }
 
-t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Non-volatile Memory (NVR)\n\n");
 fprintf (st, "The NVR simulates %d bytes of battery-backed up memory.\n", NVRSIZE);
@@ -585,7 +585,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {
 return r;
 }
 
-char *nvr_description (DEVICE *dptr)
+const char *nvr_description (DEVICE *dptr)
 {
 return "non-volatile memory";
 }
@@ -1035,7 +1035,7 @@ sim_vm_cmd = vax630_cmd;
 return SCPE_OK;
 }
 
-char *sysd_description (DEVICE *dptr)
+const char *sysd_description (DEVICE *dptr)
 {
 return "system devices";
 }
@@ -1090,7 +1090,7 @@ fprintf (st, (sys_model ? "VAXstation II" : "MicroVAX II"));
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Initial memory size is 16MB.\n\n");
 fprintf (st, "The CPU supports the BOOT command and is the only VAX device to do so.  Note\n");

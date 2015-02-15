@@ -1183,9 +1183,9 @@ static char *eventtypes[] = {
     ""
     };
 #else
-static char *eventtypes[SDL_LASTEVENT];
+static const char *eventtypes[SDL_LASTEVENT];
 #endif
-static char *windoweventtypes[256];
+static const char *windoweventtypes[256];
 static t_bool initialized = FALSE;
 
 if (!initialized) {
@@ -1604,7 +1604,7 @@ for (i = 0; i < SDL_GetNumRenderDrivers(); ++i) {
         }
     else {
         uint32 j, k;
-        static struct {uint32 format; char *name;} PixelFormats[] = {
+        static struct {uint32 format; const char *name;} PixelFormats[] = {
             {SDL_PIXELFORMAT_INDEX1LSB,     "Index1LSB"},
             {SDL_PIXELFORMAT_INDEX1MSB,     "Index1MSB"},
             {SDL_PIXELFORMAT_INDEX4LSB,     "Index4LSB"},
@@ -1677,7 +1677,7 @@ if (vid_active) {
     fprintf (st, "  Currently Active Renderer: %s\n", info.name);
     }
 if (1) {
-    static char *hints[] = {
+    static const char *hints[] = {
 #if defined (SDL_HINT_FRAMEBUFFER_ACCELERATION)
                 SDL_HINT_FRAMEBUFFER_ACCELERATION   ,
 #endif
@@ -1818,13 +1818,13 @@ while (_show_stat == -1)
 return _show_stat;
 }
 
-#else
+#else /* !defined(HAVE_LIBSDL) */
 
 /* Non-implemented versions */
 
 uint32 vid_mono_palette[2];                             /* Monochrome Color Map */
 
-t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int32 flags)
+t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int flags)
 {
 return SCPE_NOFNC;
 }
@@ -1886,6 +1886,8 @@ fprintf (st, "video support unavailable");
 return SCPE_OK;
 }
 
-#endif
+#endif /* defined(HAVE_LIBSDL) */
 
-#endif /* USE_SIM_VIDEO */
+#else /* !defined(USE_SIM_VIDEO) */
+static const char *dummy_declaration = "Something to compile";
+#endif /* defined(USE_SIM_VIDEO) */

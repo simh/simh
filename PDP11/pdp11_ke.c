@@ -65,13 +65,12 @@ uint32 ke_MQ = 0;
 uint32 ke_SC = 0;
 uint32 ke_SR = 0;
 
-DEVICE ke_dev;
 t_stat ke_rd (int32 *data, int32 PA, int32 access);
 t_stat ke_wr (int32 data, int32 PA, int32 access);
 t_stat ke_reset (DEVICE *dptr);
 uint32 ke_set_SR (void);
-t_stat ke_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *ke_description (DEVICE *dptr);
+t_stat ke_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *ke_description (DEVICE *dptr);
 
 #define IOLN_KE         020
 
@@ -353,7 +352,7 @@ ke_MQ = 0;
 return auto_config(0, 0);
 }
 
-t_stat ke_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat ke_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
@@ -377,7 +376,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *ke_description (DEVICE *dptr)
+const char *ke_description (DEVICE *dptr)
 {
 return "KE11-A extended arithmetic element";
 }

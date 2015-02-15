@@ -537,7 +537,7 @@ struct drvtyp {
     int32       size;                                   /* #blocks */
     int32       devtype;                                /* device type */
     int32       ctrl;                                   /* ctrl type */
-    char        *name;                                  /* device type name */
+    const char  *name;                                  /* device type name */
     };
 
 static struct drvtyp drv_tab[] = {
@@ -583,8 +583,8 @@ t_stat rp_go (int32 drv);
 t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 rp_abort (void);
-t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rp_description (DEVICE *dptr);
+t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rp_description (DEVICE *dptr);
 
 
 /* RP data structures
@@ -716,7 +716,7 @@ DEVICE rp_dev = {
     &rp_description
     };
 
-char *rp_regnam[] = 
+const char *rp_regnam[] = 
     {
     "RP_CS1",    /* 0 */
     "RP_DS",     /* 1 */
@@ -1189,13 +1189,13 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
                 awc = (wc + (RP_NUMWD - 1)) & ~(RP_NUMWD - 1);
                 for (i = wc; i < awc; i++)              /* fill buf */
                     rpxb[drv][i] = 0;
-                sim_disk_data_trace (uptr, (void *)rpxb[drv], da/RP_NUMWD, awc, "sim_disk_wrsect-WR", DBG_DAT & dptr->dctrl, DBG_REQ);
-                sim_disk_wrsect_a (uptr, da/RP_NUMWD, (void *)rpxb[drv], NULL, awc/RP_NUMWD, rp_io_complete);
+                sim_disk_data_trace (uptr, (uint8 *)rpxb[drv], da/RP_NUMWD, awc, "sim_disk_wrsect-WR", DBG_DAT & dptr->dctrl, DBG_REQ);
+                sim_disk_wrsect_a (uptr, da/RP_NUMWD, (uint8 *)rpxb[drv], NULL, awc/RP_NUMWD, rp_io_complete);
                 return SCPE_OK;
                 }                                       /* end if wr */
             else {                                      /* read or wchk */
                 awc = (wc + (RP_NUMWD - 1)) & ~(RP_NUMWD - 1);
-                sim_disk_rdsect_a (uptr, da/RP_NUMWD, (void *)rpxb[drv], (t_seccnt*)&uptr->sectsread, awc/RP_NUMWD, rp_io_complete);
+                sim_disk_rdsect_a (uptr, da/RP_NUMWD, (uint8 *)rpxb[drv], (t_seccnt*)&uptr->sectsread, awc/RP_NUMWD, rp_io_complete);
                 return SCPE_OK;
                 }                                       /* end if read */
 
@@ -1493,7 +1493,7 @@ return SCPE_NOFNC;
 
 #endif
 
-t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "RP04/05/06/07, RM02/03/05/80 Disk Pack Drives (RP)\n\n");
 fprintf (st, "The RP controller implements the Massbus family of large disk drives.  RP\n");
@@ -1518,7 +1518,7 @@ sim_disk_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-char *rp_description (DEVICE *dptr)
+const char *rp_description (DEVICE *dptr)
 {
 return "RP04/05/06/07 RM02/03/05/80 Massbus disk controller";
 }

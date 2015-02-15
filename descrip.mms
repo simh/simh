@@ -9,14 +9,16 @@
 # the SIMH package for OpenVMS using DEC C v6.0-001(AXP), v6.5-001(AXP),
 # HP C V7.3-009-48GBT (AXP), HP C V7.2-001 (IA64) and v6.4-005(VAX).
 #
-# Notes:  On VAX, the PDP-10, Eclipse and IBM 7094 simulators will not be 
-#         built due to the fact that INT64 is required for these simulators.
+# Notes:  On VAX, the PDP-10, Eclipse, IBM 7094 and BESM6 simulators will
+#         not be built due to the fact that INT64 is required for these 
+#         simulators.
 #
 # This build script will accept the following build options.
 #
 #            ALL             Just Build "Everything".
 #            ALTAIR          Just Build The MITS Altair.
 #            ALTAIRZ80       Just Build The MITS Altair Z80.
+#            BESM6           Just Build The BESM-6.
 #            ECLIPSE         Just Build The Data General Eclipse.
 #            GRI             Just Build The GRI Corporation GRI-909.
 #            LGP             Just Build The Royal-McBee LGP-30.
@@ -627,6 +629,18 @@ SWTP6800MP_A2_SOURCE = $(SWTP6800MP_A2_COMMON)mp-a2.c,$(SWTP6800MP_A2_COMMON)m68
 	$(SWTP6800MP_A2_COMMON)mp-8m.c,$(SWTP6800MP_A2_COMMON)i2716.c
 SWTP6800MP_A2_OPTIONS = /INCL=($(SIMH_DIR),$(SWTP6800MP_A2_DIR))/DEF=($(CC_DEFS))
 
+
+#
+# BESM6
+#
+BESM6_DIR = SYS$DISK:[.BESM6]
+BESM6_LIB = $(LIB_DIR)BESM6-$(ARCH).OLB
+BESM6_SOURCE = $(BESM6_DIR)BESM6_CPU.C,$(BESM6_DIR)BESM6_SYS.C,$(BESM6_DIR)BESM6_MMU.C,\
+	$(BESM6_DIR)BESM6_ARITH.C,$(BESM6_DIR)BESM6_DISK.C,$(BESM6_DIR)BESM6_DRUM.C,\
+	$(BESM6_DIR)BESM6_TTY.C,$(BESM6_DIR)BESM6_PANEL.C,$(BESM6_DIR)BESM6_PRINTER.C,\
+	$(BESM6_DIR)BESM6_PUNCH.C
+BESM6_OPTIONS = /INCL=($(SIMH_DIR),$(BESM6_DIR))/DEF=($(CC_DEFS),"USE_INT64=1")
+
 #
 # Digital Equipment VAX 3900 Simulator Definitions.
 #
@@ -889,7 +903,7 @@ I7094_OPTIONS = /INCL=($(SIMH_DIR),$(I7094_DIR))/DEF=($(CC_DEFS))
 ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
       ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 \
       VAX MICROVAX3900 MICROVAX1 RTVAX1000 MICROVAX2 VAX730 VAX750 VAX780 VAX8600 \
-      SDS I7094 SWTP6800MP-A SWTP6800MP-A2 SSEM
+      SDS I7094 SWTP6800MP-A SWTP6800MP-A2 SSEM BESM6
         $! No further actions necessary
 .ELSE
 #
@@ -1308,6 +1322,17 @@ $(SWTP6800MP_A2_LIB) : $(SWTP6800MP_A2_SOURCE)
         $! Building The $(SWTP_LIB) Library.
         $!
         $ $(CC)$(SWTP6800MP_A2_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(BESM6_LIB) : $(BESM6_SOURCE)
+        $!
+        $! Building The $(BESM6_LIB) Library.
+        $!
+        $ $(CC)$(BESM6_OPTIONS) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
@@ -1876,6 +1901,18 @@ $(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(SWTP6800M
         $ $(CC)$(SWTP6800MP_A2_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(SWTP6800MP_A2_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+BESM6 : $(BIN_DIR)BESM6-$(ARCH).EXE
+        $! BESM6 done
+
+$(BIN_DIR)BESM6-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(BESM6_LIB)
+        $!
+        $! Building The $(BIN_DIR)BESM6-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(BESM6_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)BESM6-$(ARCH).EXE -
+                 $(BLD_DIR)SCP.OBJ,$(BESM6_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 VAX : MICROVAX3900

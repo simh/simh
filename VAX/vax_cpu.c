@@ -395,7 +395,7 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
-char *cpu_description (DEVICE *dptr);
+const char *cpu_description (DEVICE *dptr);
 int32 cpu_get_vsw (int32 sw);
 static SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
@@ -534,7 +534,7 @@ fprintf (st, "model=");
 return cpu_print_model (st);
 }
 
-char *cpu_description (DEVICE *dptr)
+const char *cpu_description (DEVICE *dptr)
 {
 static char buf[80];
 uint32 min_mem = 4096, max_mem = 0;
@@ -3523,7 +3523,7 @@ return more;
 }
 
 struct os_idle {
-    char        *name;
+    const char        *name;
     uint32      mask;
     };
 
@@ -3598,7 +3598,7 @@ if (r != SCPE_OK) {
 return SCPE_OK;
 }
 
-t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "The ");cpu_print_model (st);fprintf (st, " CPU help\n\n");
 fprintf (st, "CPU options include the size of main memory.\n\n");

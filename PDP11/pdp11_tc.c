@@ -289,7 +289,6 @@ int32 dt_substate = 0;
 int32 dt_logblk = 0;
 int32 dt_stopoffr = 0;
 
-DEVICE dt_dev;
 t_stat dt_rd (int32 *data, int32 PA, int32 access);
 t_stat dt_wr (int32 data, int32 PA, int32 access);
 t_stat dt_svc (UNIT *uptr);
@@ -309,8 +308,8 @@ void dt_stopunit (UNIT *uptr);
 int32 dt_comobv (int32 val);
 int32 dt_csum (UNIT *uptr, int32 blk);
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
-t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *dt_description (DEVICE *dptr);
+t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *dt_description (DEVICE *dptr);
 
 /* DT data structures
 
@@ -1367,7 +1366,7 @@ uptr->capac = DT_CAPAC;                                 /* default size */
 return detach_unit (uptr);
 }
 
-t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *text2;
 const char *const text =
@@ -1515,7 +1514,7 @@ fprintf (st, "%s", text2);
 return SCPE_OK;
 }
 
-char *dt_description (DEVICE *dptr)
+const char *dt_description (DEVICE *dptr)
 {
 return "TC11/TU56 DECtape controller";
 }

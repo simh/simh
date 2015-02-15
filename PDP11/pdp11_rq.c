@@ -695,7 +695,7 @@ struct drvtyp {
     uint16      mod;                                    /* MSCP model */
     int32       med;                                    /* MSCP media */
     int32       flgs;                                   /* flags */
-    char        *name;                                  /* name */
+    const char  *name;                                  /* name */
     };
 
 #define RQ_DRV(d) \
@@ -734,7 +734,7 @@ static struct drvtyp drv_tab[] = {
 struct ctlrtyp {
     uint32      uqpm;                                   /* port model */
     uint16      model;                                  /* controller model */
-    char        *name;                                  /* name */
+    const char  *name;                                  /* name */
     };
 
 #define RQ_CTLR(d) \
@@ -802,7 +802,7 @@ DEBTAB rq_debug[] = {
   {0}
 };
 
-static char *rq_cmdname[] = {
+static const char *rq_cmdname[] = {
     "",                                                 /*  0 */
     "ABO",                                              /*  1 b: abort */
     "GCS",                                              /*  2 b: get command status */
@@ -833,8 +833,6 @@ static char *rq_cmdname[] = {
     "AVA",                                              /* 64 b: unit now avail */
     };
 
-DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
-
 t_stat rq_rd (int32 *data, int32 PA, int32 access);
 t_stat rq_wr (int32 data, int32 PA, int32 access);
 t_stat rq_svc (UNIT *uptr);
@@ -852,8 +850,8 @@ t_stat rq_show_ctype (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat rq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rq_description (DEVICE *dptr);
+t_stat rq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rq_description (DEVICE *dptr);
 
 t_bool rq_step4 (MSC *cp);
 t_bool rq_mscp (MSC *cp, uint16 pkt, t_bool q);
@@ -2166,23 +2164,23 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
     if (cmd == OP_ERS) {                                /* erase? */
         wwc = ((tbc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
         memset (uptr->rqxb, 0, wwc * sizeof(uint16));   /* clr buf */
-        sim_disk_data_trace(uptr, uptr->rqxb, bl, wwc << 1, "sim_disk_wrsect-ERS", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
-        err = sim_disk_wrsect_a (uptr, bl, uptr->rqxb, NULL, (wwc << 1) / RQ_NUMBY, rq_io_complete);
+        sim_disk_data_trace(uptr, (uint8 *)uptr->rqxb, bl, wwc << 1, "sim_disk_wrsect-ERS", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
+        err = sim_disk_wrsect_a (uptr, bl, (uint8 *)uptr->rqxb, NULL, (wwc << 1) / RQ_NUMBY, rq_io_complete);
         }
 
     else if (cmd == OP_WR) {                            /* write? */
-        t = rq_readw (ba, tbc, ma, uptr->rqxb);         /* fetch buffer */
+        t = rq_readw (ba, tbc, ma, (uint16 *)uptr->rqxb);/* fetch buffer */
         if ((abc = tbc - t)) {                          /* any xfer? */
             wwc = ((abc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
             for (i = (abc >> 1); i < wwc; i++)
                 ((uint16 *)(uptr->rqxb))[i] = 0;
-            sim_disk_data_trace(uptr, uptr->rqxb, bl, wwc << 1, "sim_disk_wrsect-WR", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
-            err = sim_disk_wrsect_a (uptr, bl, uptr->rqxb, NULL, (wwc << 1) / RQ_NUMBY, rq_io_complete);
+            sim_disk_data_trace(uptr, (uint8 *)uptr->rqxb, bl, wwc << 1, "sim_disk_wrsect-WR", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
+            err = sim_disk_wrsect_a (uptr, bl, (uint8 *)uptr->rqxb, NULL, (wwc << 1) / RQ_NUMBY, rq_io_complete);
             }
         }
 
     else {  /* OP_RD & OP_CMP */
-        err = sim_disk_rdsect_a (uptr, bl, uptr->rqxb, NULL, (tbc + RQ_NUMBY - 1) / RQ_NUMBY, rq_io_complete);
+        err = sim_disk_rdsect_a (uptr, bl, (uint8 *)uptr->rqxb, NULL, (tbc + RQ_NUMBY - 1) / RQ_NUMBY, rq_io_complete);
         }                                               /* end else read */
     return SCPE_OK;                                     /* done for now until callback */    
     }
@@ -2193,7 +2191,7 @@ else { /* Bottom End (After I/O processing) */
         }
 
     else if (cmd == OP_WR) {                            /* write? */
-        t = rq_readw (ba, tbc, ma, uptr->rqxb);         /* fetch buffer */
+        t = rq_readw (ba, tbc, ma, (uint16 *)uptr->rqxb);/* fetch buffer */
         abc = tbc - t;                                  /* any xfer? */
         if (t) {                                        /* nxm? */
             PUTP32 (pkt, RW_WBCL, bc - abc);            /* adj bc */
@@ -2205,9 +2203,9 @@ else { /* Bottom End (After I/O processing) */
         }
 
     else {
-        sim_disk_data_trace(uptr, uptr->rqxb, bl, tbc, "sim_disk_rdsect", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
+        sim_disk_data_trace(uptr, (uint8 *)uptr->rqxb, bl, tbc, "sim_disk_rdsect", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
         if ((cmd == OP_RD) && !err) {                   /* read? */
-            if ((t = rq_writew (ba, tbc, ma, uptr->rqxb))) {/* store, nxm? */
+            if ((t = rq_writew (ba, tbc, ma, (uint16 *)uptr->rqxb))) {/* store, nxm? */
                 PUTP32 (pkt, RW_WBCL, bc - (tbc - t));  /* adj bc */
                 PUTP32 (pkt, RW_WBAL, ba + (tbc - t));  /* adj ba */
                 if (rq_hbe (cp, uptr))                  /* post err log */
@@ -3147,7 +3145,7 @@ if (val & RQ_SH_UN) {
 return SCPE_OK;
 }
 
-t_stat rq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "UDA50 MSCP Disk Controller (%s)\n\n", dptr->name);
 fprintf (st, "The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.\n");
@@ -3184,7 +3182,7 @@ sim_disk_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-char *rq_description (DEVICE *dptr)
+const char *rq_description (DEVICE *dptr)
 {
 static char buf[80];
 

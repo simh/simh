@@ -1797,9 +1797,9 @@ return sim_show_send_input (st, &sim_con_send);
 
 t_stat sim_poll_kbd (void)
 {
-int32 c;
+t_stat c;
 
-if (sim_send_poll_data (&sim_con_send, &c))             /* injected input characters available? */
+if (sim_send_poll_data (&sim_con_send, &c))                 /* injected input characters available? */
     return c;
 if (!sim_rem_master_mode) {
     c = sim_os_poll_kbd ();                                 /* get character */
@@ -1819,8 +1819,8 @@ if (!sim_rem_master_mode) {
             return SCPE_OK;                                 /* unconnected and buffered - nothing to receive */
         }
     }
-tmxr_poll_rx (&sim_con_tmxr);                           /* poll for input */
-if ((c = tmxr_getc_ln (&sim_con_ldsc)))                 /* any char? */ 
+tmxr_poll_rx (&sim_con_tmxr);                               /* poll for input */
+if ((c = (t_stat)tmxr_getc_ln (&sim_con_ldsc)))             /* any char? */ 
     return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
 return SCPE_OK;
 }

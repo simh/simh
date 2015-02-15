@@ -56,7 +56,7 @@ uint32 BRSLRU;
 t_value RP[8];
 uint32 TLB[32];
 
-unsigned iintr_data;    /* protected page number or parity check location */
+uint32 iintr_data;    /* protected page number or parity check location */
 
 /* There were several hardwired configurations of registers
  * corresponding to up to 7 first words of the memory space, selected by
@@ -73,13 +73,13 @@ t_value pult[11][8] = {
     { 0 },
 /* Hardwired program 1, a simple CU test */
     { 0376,
-      SET_CONVOL(01240000007100002LL, CONVOL_INSN),   /* 1: vtm (2), vjm 2(1) */
-      SET_CONVOL(00657777712577777LL, CONVOL_INSN),   /* 2: utm -1(1), utm -1(2) */
-      SET_CONVOL(00444000317400007LL, CONVOL_INSN),   /* 3: mtj 3(1), vzm 7(3) */
-      SET_CONVOL(01045000317500007LL, CONVOL_INSN),   /* 4: j+m 3(2), v1m 7(3)*/
-      SET_CONVOL(00650000107700002LL, CONVOL_INSN),   /* 5: utm 1(1), vlm 2(1) */
-      SET_CONVOL(01257777713400001LL, CONVOL_INSN),   /* 6: utm -1(2), vzm 1(2) */
-      SET_CONVOL(00330000003000001LL, CONVOL_INSN)    /* 7: stop, uj 1 */
+      SET_PARITY(01240000007100002LL, PARITY_INSN),   /* 1: vtm (2), vjm 2(1) */
+      SET_PARITY(00657777712577777LL, PARITY_INSN),   /* 2: utm -1(1), utm -1(2) */
+      SET_PARITY(00444000317400007LL, PARITY_INSN),   /* 3: mtj 3(1), vzm 7(3) */
+      SET_PARITY(01045000317500007LL, PARITY_INSN),   /* 4: j+m 3(2), v1m 7(3)*/
+      SET_PARITY(00650000107700002LL, PARITY_INSN),   /* 5: utm 1(1), vlm 2(1) */
+      SET_PARITY(01257777713400001LL, PARITY_INSN),   /* 6: utm -1(2), vzm 1(2) */
+      SET_PARITY(00330000003000001LL, PARITY_INSN)    /* 7: stop, uj 1 */
     },
 /* Hardwired program 2, RAM write test. The "arx" insn (cyclic add)
  * in word 3 could be changed to "atx" insn (load) to use a constant
@@ -87,52 +87,52 @@ t_value pult[11][8] = {
  * The bit pattern to use is taken from switch register 7.
  */
     { 0176,
-      SET_CONVOL(00770000306400012LL, CONVOL_INSN), /* 1: vlm 3(1), vtm 12(1) */
-      SET_CONVOL(00010000000000010LL, CONVOL_INSN), /* 2: xta 0, atx 10 */
-      SET_CONVOL(00010001000130007LL, CONVOL_INSN), /* 3: xta 10, arx 7 */
-      SET_CONVOL(00500777700000010LL, CONVOL_INSN), /* 4: atx -1(1), atx 10 */
-      SET_CONVOL(00512777702600001LL, CONVOL_INSN), /* 5: aex -1(1), uza 1 */
-      SET_CONVOL(00737777703000001LL, CONVOL_INSN)  /* 6: stop -1(1), uj 1 */
+      SET_PARITY(00770000306400012LL, PARITY_INSN), /* 1: vlm 3(1), vtm 12(1) */
+      SET_PARITY(00010000000000010LL, PARITY_INSN), /* 2: xta 0, atx 10 */
+      SET_PARITY(00010001000130007LL, PARITY_INSN), /* 3: xta 10, arx 7 */
+      SET_PARITY(00500777700000010LL, PARITY_INSN), /* 4: atx -1(1), atx 10 */
+      SET_PARITY(00512777702600001LL, PARITY_INSN), /* 5: aex -1(1), uza 1 */
+      SET_PARITY(00737777703000001LL, PARITY_INSN)  /* 6: stop -1(1), uj 1 */
     },
 /* Hardwired program 3, RAM read test to use after program 2, arx/atx applies */
     { 0176,
-      SET_CONVOL(00770000306400012LL, CONVOL_INSN), /* 1: vlm 3(1), vtm 12(1) */
-      SET_CONVOL(00010000000000010LL, CONVOL_INSN), /* 2: xta 0, atx 10 */
-      SET_CONVOL(00010001000130007LL, CONVOL_INSN), /* 3: xta 10, arx 7 */
-      SET_CONVOL(00000000000000010LL, CONVOL_INSN), /* 4: atx 0, atx 10 */
-      SET_CONVOL(00512777702600001LL, CONVOL_INSN), /* 5: aex -1(1), uza 1 */
-      SET_CONVOL(00737777703000001LL, CONVOL_INSN)  /* 6: stop -1(1), uj 1 */
+      SET_PARITY(00770000306400012LL, PARITY_INSN), /* 1: vlm 3(1), vtm 12(1) */
+      SET_PARITY(00010000000000010LL, PARITY_INSN), /* 2: xta 0, atx 10 */
+      SET_PARITY(00010001000130007LL, PARITY_INSN), /* 3: xta 10, arx 7 */
+      SET_PARITY(00000000000000010LL, PARITY_INSN), /* 4: atx 0, atx 10 */
+      SET_PARITY(00512777702600001LL, PARITY_INSN), /* 5: aex -1(1), uza 1 */
+      SET_PARITY(00737777703000001LL, PARITY_INSN)  /* 6: stop -1(1), uj 1 */
     },
 /* Hardwired program 4, RAM write-read test to use after program 2, arx/atx applies */
     { 0176,
-      SET_CONVOL(00640001200100011LL, CONVOL_INSN), /* 1: vtm 12(1), xta 11 */
-      SET_CONVOL(00000001005127777LL, CONVOL_INSN), /* 2: atx 10, aex -1(1) */
-      SET_CONVOL(00260000407377777LL, CONVOL_INSN), /* 3: uza 4, stop -1(1) */
-      SET_CONVOL(00010001000130007LL, CONVOL_INSN), /* 4: xta 10, arx 7 */
-      SET_CONVOL(00500777707700002LL, CONVOL_INSN), /* 5: atx -1(1), vlm 2(1) */
-      SET_CONVOL(00300000100000000LL, CONVOL_INSN)  /* 6: uj 1 */
+      SET_PARITY(00640001200100011LL, PARITY_INSN), /* 1: vtm 12(1), xta 11 */
+      SET_PARITY(00000001005127777LL, PARITY_INSN), /* 2: atx 10, aex -1(1) */
+      SET_PARITY(00260000407377777LL, PARITY_INSN), /* 3: uza 4, stop -1(1) */
+      SET_PARITY(00010001000130007LL, PARITY_INSN), /* 4: xta 10, arx 7 */
+      SET_PARITY(00500777707700002LL, PARITY_INSN), /* 5: atx -1(1), vlm 2(1) */
+      SET_PARITY(00300000100000000LL, PARITY_INSN)  /* 6: uj 1 */
     },
 /* Hardwired program 5, ALU test; switch reg 7 should contain a
    normalized f. p. value, e.g. 1.0 = 4050 0000 0000 0000 */
     { 0176,
-      SET_CONVOL(00004000700000011LL, CONVOL_INSN), /* 1: a+x 7, atx 11 */
-      SET_CONVOL(00025001100000010LL, CONVOL_INSN), /* 2: e-x 11, atx 10 */
-      SET_CONVOL(00017001000160010LL, CONVOL_INSN), /* 3: a*x 10, a/x 10 */
-      SET_CONVOL(00005001000340145LL, CONVOL_INSN), /* 4: a-x 10, e+n 145 */
-      SET_CONVOL(00270000603300000LL, CONVOL_INSN), /* 5: u1a 6, stop */
-      SET_CONVOL(00010001103000001LL, CONVOL_INSN)  /* 6: xta 11, uj 1*/
+      SET_PARITY(00004000700000011LL, PARITY_INSN), /* 1: a+x 7, atx 11 */
+      SET_PARITY(00025001100000010LL, PARITY_INSN), /* 2: e-x 11, atx 10 */
+      SET_PARITY(00017001000160010LL, PARITY_INSN), /* 3: a*x 10, a/x 10 */
+      SET_PARITY(00005001000340145LL, PARITY_INSN), /* 4: a-x 10, e+n 145 */
+      SET_PARITY(00270000603300000LL, PARITY_INSN), /* 5: u1a 6, stop */
+      SET_PARITY(00010001103000001LL, PARITY_INSN)  /* 6: xta 11, uj 1*/
     },
 /* Hardwired program 6, reading from punch tape (originally) or a disk (rework);
  * various bit groups not hardwired, marked [] (TODO). Disk operation is encoded.
  */
     { 0376,
-      SET_CONVOL(00640000300100006LL, CONVOL_INSN), /* 1: vtm [3](1), xta 6 */
-      SET_CONVOL(00433002004330020LL, CONVOL_INSN), /* 2: ext 20(1), ext 20(1) */
-      SET_CONVOL(00036015204330020LL, CONVOL_INSN), /* 3: asn 152, ext 20(1) */
-      SET_CONVOL(00010000704330000LL, CONVOL_INSN), /* 4: xta 7, ext (1) */
-      SET_CONVOL(00036014404330020LL, CONVOL_INSN), /* 5: asn 144, ext 20(1) */
-      SET_CONVOL(00330000000002401LL, CONVOL_INSN), /* 6: stop, =24[01] */
-      SET_CONVOL(04000000001400000LL, CONVOL_NUMBER) /* 7: bits 37-47 not hardwired */
+      SET_PARITY(00640000300100006LL, PARITY_INSN), /* 1: vtm [3](1), xta 6 */
+      SET_PARITY(00433002004330020LL, PARITY_INSN), /* 2: ext 20(1), ext 20(1) */
+      SET_PARITY(00036015204330020LL, PARITY_INSN), /* 3: asn 152, ext 20(1) */
+      SET_PARITY(00010000704330000LL, PARITY_INSN), /* 4: xta 7, ext (1) */
+      SET_PARITY(00036014404330020LL, PARITY_INSN), /* 5: asn 144, ext 20(1) */
+      SET_PARITY(00330000000002401LL, PARITY_INSN), /* 6: stop, =24[01] */
+      SET_PARITY(04000000001400000LL, PARITY_NUMBER) /* 7: bits 37-47 not hardwired */
     },
 /* Hardwired program 7, RAM peek/poke, bits 1-15 of word 1 not hardwired (TODO) */
     { 0176,
@@ -142,12 +142,12 @@ t_value pult[11][8] = {
     },
 /* Hardwired program 9, drum I/O */
     { 0176,
-      SET_CONVOL(00647774100100007LL, CONVOL_INSN), /* 1: vtm -31(1), xta 7 */
-      SET_CONVOL(00033000212460000LL, CONVOL_INSN), /* 2: ext 2, vtm 60000(2) */
-      SET_CONVOL(00040000013700003LL, CONVOL_INSN), /* 3: ati, vlm 3(2) */
-      SET_CONVOL(00013000607700002LL, CONVOL_INSN), /* 4: arx 6, vlm 2(1) */
-      SET_CONVOL(00330000103000005LL, CONVOL_INSN), /* 5: stop 1, uj 5 */
-      SET_CONVOL(00000000000010001LL, CONVOL_NUMBER) /* 6: =10001 */
+      SET_PARITY(00647774100100007LL, PARITY_INSN), /* 1: vtm -31(1), xta 7 */
+      SET_PARITY(00033000212460000LL, PARITY_INSN), /* 2: ext 2, vtm 60000(2) */
+      SET_PARITY(00040000013700003LL, PARITY_INSN), /* 3: ati, vlm 3(2) */
+      SET_PARITY(00013000607700002LL, PARITY_INSN), /* 4: arx 6, vlm 2(1) */
+      SET_PARITY(00330000103000005LL, PARITY_INSN), /* 5: stop 1, uj 5 */
+      SET_PARITY(00000000000010001LL, PARITY_NUMBER) /* 6: =10001 */
     },
 /* Hardwired program 10, magtape read */
     { 0176,
@@ -425,7 +425,7 @@ void mmu_store (int addr, t_value val)
         if (addr > 0100000 && addr < 0100010)
             return;
 
-        BRZ[faked] = SET_CONVOL (val, RUU ^ CONVOL_INSN);
+        BRZ[faked] = SET_PARITY (val, RUU ^ PARITY_INSN);
         BAZ[faked] = addr;
         mmu_flush (faked);
         return;
@@ -440,7 +440,7 @@ void mmu_store (int addr, t_value val)
 
     matching = mmu_match(addr, OLDEST);
 
-    BRZ[matching] = SET_CONVOL (val, RUU ^ CONVOL_INSN);
+    BRZ[matching] = SET_PARITY (val, RUU ^ PARITY_INSN);
     BAZ[matching] = addr;
     set_wins (matching);
 
@@ -738,7 +738,7 @@ void mmu_setprotection (int idx, t_value val)
 
 void mmu_setcache (int idx, t_value val)
 {
-    BRZ[idx] = SET_CONVOL (val, RUU ^ CONVOL_INSN);
+    BRZ[idx] = SET_PARITY (val, RUU ^ PARITY_INSN);
 }
 
 t_value mmu_getcache (int idx)

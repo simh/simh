@@ -130,8 +130,8 @@ void xu_process_receive(CTLR* xu);
 void xu_dump_rxring(CTLR* xu);
 void xu_dump_txring(CTLR* xu);
 t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *xu_description (DEVICE *dptr);
+t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *xu_description (DEVICE *dptr);
 
 #define IOLN_XU        010
 
@@ -395,7 +395,7 @@ t_stat xu_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
 
 t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
-  char* fmt = "  %-26s%d\n";
+  const char* fmt = "  %-26s%d\n";
   CTLR* xu = xu_unit2ctlr(uptr);
   struct xu_stats* stats = &xu->var->stats;
 
@@ -873,7 +873,7 @@ int32 xu_command(CTLR* xu)
   uint16* mac_w = (uint16*) xu->var->mac;
   static const ETH_MAC zeros = {0,0,0,0,0,0};
   static const ETH_MAC mcast_load_server = {0xAB, 0x00, 0x00, 0x01, 0x00, 0x00};
-  static char* command[] = {
+  static const char* command[] = {
       "NO-OP",
       "Start Microaddress",
       "Read Default Physical Address",
@@ -1499,10 +1499,9 @@ void xu_process_transmit(CTLR* xu)
 
 void xu_port_command (CTLR* xu)
 {
-  char* msg;
   int command = xu->var->pcsr0 & PCSR0_PCMD;
   int state = xu->var->pcsr1 & PCSR1_STATE;
-  static char* commands[] = {
+  static const char* commands[] = {
       "NO-OP",
       "GET PCBB",
       "GET CMD",
@@ -1589,8 +1588,7 @@ void xu_port_command (CTLR* xu)
 
     case CMD_BOOT:      /* BOOT */
       /* not implemented */
-      msg = "%s: BOOT command not implemented!\n";
-      sim_printf (msg, xu->dev->name);
+      sim_printf ("%s: BOOT command not implemented!\n", xu->dev->name);
 
       xu->var->pcsr0 |= PCSR0_PCEI;
       break;
@@ -1883,7 +1881,7 @@ void xu_dump_txring (CTLR* xu)
   }
 }
 
-t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "DELUA/DEUNA Unibus Ethernet Controllers (XU, XUB)\n\n");
 fprintf (st, "The simulator implements two DELUA/DEUNA Unibus Ethernet controllers (XU, XUB).\n");
@@ -1906,7 +1904,7 @@ fprintf (st, "card, and \"Feel the Power!\" :-)\n");
 return SCPE_OK;
 }
 
-char *xu_description (DEVICE *dptr)
+const char *xu_description (DEVICE *dptr)
 {
 return "DEUNA/DELUA Ethernet controller";
 }

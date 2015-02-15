@@ -141,8 +141,8 @@ void dco_clr_int (int32 ln);
 void dco_set_int (int32 ln);
 int32 dco_iack (void);
 void dcx_reset_ln (int32 ln);
-t_stat dcx_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *dcx_description (DEVICE *dptr);
+t_stat dcx_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *dcx_description (DEVICE *dptr);
 
 /* DCI data structures
 
@@ -632,7 +632,7 @@ dci_dib.lnt = newln * 010;                             /* upd IO page lnt */
 return auto_config (dci_dev.name, newln);              /* auto config */
 }
 
-t_stat dcx_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat dcx_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "DC11 Additional Terminal Interfaces (DCI/DCO)\n\n");
 fprintf (st, "For very early system programs, the PDP-11 simulator supports up to sixteen\n");
@@ -677,7 +677,7 @@ fprintf (st, "are lost when the simulator shuts down or DCI is detached.\n");
 return SCPE_OK;
 }
 
-char *dcx_description (DEVICE *dptr)
+const char *dcx_description (DEVICE *dptr)
 {
 return (dptr == &dci_dev) ? "DC11 asynchronous line interface - receiver" 
                           : "DC11 asynchronous line interface - transmitter";

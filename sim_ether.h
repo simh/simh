@@ -320,7 +320,7 @@ typedef struct eth_device  ETH_DEV;
 t_stat eth_open   (ETH_DEV* dev, char* name,            /* open ethernet interface */
                    DEVICE* dptr, uint32 dbit);
 t_stat eth_close  (ETH_DEV* dev);                       /* close ethernet interface */
-t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,      /* write sychronous packet; */
                    ETH_PCALLBACK routine);              /*  callback when done */
 int eth_read      (ETH_DEV* dev, ETH_PACK* packet,      /* read single packet; */
@@ -343,8 +343,8 @@ t_stat eth_clr_async (ETH_DEV* dev);                    /* set read behavior to 
 t_stat eth_set_throttle (ETH_DEV* dev, uint32 time, uint32 burst, uint32 delay); /* set transmit throttle parameters */
 uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len); /* Compute Ethernet Autodin II CRC for buffer */
 
-void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, char* txt); /* trace ethernet packet header+crc */
-void eth_packet_trace_ex (ETH_DEV* dev, const uint8 *msg, int len, char* txt, int detail, uint32 reason); /* trace ethernet packet */
+void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, const char* txt); /* trace ethernet packet header+crc */
+void eth_packet_trace_ex (ETH_DEV* dev, const uint8 *msg, int len, const char* txt, int detail, uint32 reason); /* trace ethernet packet */
 t_stat eth_show (FILE* st, UNIT* uptr,                  /* show ethernet devices */
                  int32 val, void* desc);
 t_stat eth_show_devices (FILE* st, DEVICE *dptr,        /* show ethernet devices */

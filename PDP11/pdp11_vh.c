@@ -345,9 +345,9 @@ static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-static char *vh_description (DEVICE *dptr);
+static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+static const char *vh_description (DEVICE *dptr);
 
 /* SIMH I/O Structures */
 
@@ -464,13 +464,13 @@ DEVICE vh_dev = {
 };
 
 /* Register names for Debug tracing */
-static char *vh_rd_dhv_regs[] =
+static const char *vh_rd_dhv_regs[] =
     {"CSR   ", "RBUF  ", "LPR   ", "STAT  ", "LNCTRL", "TBFAD1", "TBFAD2", "TBFCNT" };
-static char *vh_wr_dhv_regs[] =
+static const char *vh_wr_dhv_regs[] =
     {"CSR   ", "TXCHAR", "LPR   ", "STAT  ", "LNCTRL", "TBFAD1", "TBFAD2", "TBFCNT" };
-static char *vh_rd_dhu_regs[] =
+static const char *vh_rd_dhu_regs[] =
     {"CSR   ", "RBUF  ", "LPR   ", "FIFOSZ", "LNCTRL", "TBFAD1", "TBFAD2", "TBFCNT" };
-static char *vh_wr_dhu_regs[] =
+static const char *vh_wr_dhu_regs[] =
     {"CSR   ", "RXTIMR", "LPR   ", "FIFODT", "LNCTRL", "TBFAD1", "TBFAD2", "TBFCNT" };
 
 /* Interrupt routines */
@@ -1557,9 +1557,9 @@ for (i = 0; i < vh_desc.lines; i++) {
 return SCPE_OK;
 }
 
-static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
+const char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
 
 fprintf (st, "%s Terminal Multiplexer (%s)\n\n", devtype, dptr->name);
 fprintf (st, "The %s is an %d-line terminal multiplexer for %s systems.  Up to %d %s's\n", devtype, VH_LINES, (UNIBUS) ? "Unibus" : "Qbus", VH_MUXES, devtype);
@@ -1612,15 +1612,15 @@ vh_help_attach (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
+const char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
 
 fprintf (st, "%s %s Terminal Multiplexer Attach Help\n\n", devtype, dptr->name);
 return tmxr_attach_help (st, dptr, uptr, 1, cptr);
 }
 
-static char *vh_description (DEVICE *dptr)
+static const char *vh_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "DH11 16-line Terminal Multiplexer" : "DHQ11 8-line Terminal Multiplexer";
 }
