@@ -72,6 +72,7 @@
 #define WSAEAFNOSUPPORT EAFNOSUPPORT
 #endif
 #define WSAEACCES       EACCES
+#define WSAEINTR        EINTR
 #define INVALID_SOCKET  ((SOCKET)-1) 
 #define SOCKET_ERROR    -1
 #include <sys/types.h>                                  /* for fcntl, getpid */
