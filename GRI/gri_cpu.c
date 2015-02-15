@@ -417,9 +417,6 @@ ao_update ();                                           /* update AO */
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        /* make sure all useful state is in simh registers while processing events */
-        ao_update ();                                   /* update AO */
-        scq_r->qptr = scq_p;                            /* update sc q ptr */
         if ((reason = sim_process_event ()))
             break;
         }
