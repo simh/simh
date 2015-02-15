@@ -908,6 +908,8 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
         strcpy (cbuf, sim_rem_buf[i]);
         sim_rem_buf_ptr[i] = 0;
         sim_rem_buf[i][sim_rem_buf_ptr[i]] = '\0';
+        while (isspace(cbuf[0]))
+            memmove (cbuf, cbuf+1, strlen(cbuf+1)+1);   /* skip leading whitespace */
         if (cbuf[0] == '\0') {
             if (sim_rem_single_mode[i]) {
                 sim_rem_single_mode[i] = FALSE;
@@ -916,8 +918,6 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             else
                 continue;
             }
-        while (isspace(cbuf[0]))
-            memmove (cbuf, cbuf+1, strlen(cbuf+1)+1);   /* skip leading whitespace */
         strcpy (sim_rem_command_buf, cbuf);
         sim_sub_args (cbuf, sizeof(cbuf), argv);
         cptr = cbuf;
@@ -936,8 +936,13 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
         sim_rem_cmd_log_start = sim_ftell (sim_log);
         basecmdp = find_cmd (gbuf);                     /* validate basic command */
         if (basecmdp == NULL) {
-            if ((gbuf[0] == ';') || (gbuf[0] == '#'))   /* ignore comment */
-                stat = SCPE_OK;
+            if ((gbuf[0] == ';') || (gbuf[0] == '#')) { /* ignore comment */
+                sim_rem_cmd_active_line = i;
+                was_active_command = TRUE;
+                sim_rem_active_command = &allowed_single_remote_cmds[0];/* Dummy */
+                i = i - 1;
+                break;
+                }
             else
                 stat = SCPE_UNK;
             }
