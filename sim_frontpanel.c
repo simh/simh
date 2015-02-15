@@ -47,18 +47,32 @@ extern "C" {
 #include <signal.h>
 #include <pthread.h>
 
+#include "sim_sock.h"
+
 #if defined(_WIN32)
 #include <process.h>
+#include <windows.h>
 #define sleep(n) Sleep(n*1000)
 #define msleep(n) Sleep(n)
 #define strtoull _strtoui64
+#define CLOCK_REALTIME 0
+int clock_gettime(int clk_id, struct timespec *tp)
+{
+unsigned long long now, unixbase;
+
+unixbase = 116444736;
+unixbase *= 1000000000;
+GetSystemTimeAsFileTime((FILETIME*)&now);
+now -= unixbase;
+tp->tv_sec = (long)(now/10000000);
+tp->tv_nsec = (now%10000000)*100;
+return 0;
+}
 #else
 #include <unistd.h>
 #define msleep(n) usleep(1000*n)
 #include <sys/wait.h>
 #endif
-
-#include "sim_sock.h"
 
 typedef struct {
     char *name;
@@ -93,6 +107,8 @@ struct PANEL {
     int                     callback_thread_running;
     void                    *callback_context;
     int                     callbacks_per_second;
+    int                     debug;
+    FILE                    *Debug;
 #if defined(_WIN32)
     HANDLE                  hProcess;
 #else
@@ -108,6 +124,7 @@ static void *_panel_reader(void *arg);
 static void *_panel_callback(void *arg);
 static void sim_panel_set_error (const char *fmt, ...);
 
+
 #define TN_IAC          0xFFu /* -1 */                  /* protocol delim */
 #define TN_DONT         0xFEu /* -2 */                  /* dont */
 #define TN_DO           0xFDu /* -3 */                  /* do */
@@ -117,6 +134,8 @@ static void sim_panel_set_error (const char *fmt, ...);
 #define TN_BIN            0                             /* bin */
 #define TN_ECHO           1                             /* echo */
 #define TN_SGA            3                             /* sga */
+#define TN_CR           015                             /* carriage return */
+#define TN_LF           012                             /* line feed */
 #define TN_LINE          34                             /* line mode */
 
 static unsigned char mantra[] = {
@@ -126,6 +145,111 @@ static unsigned char mantra[] = {
     TN_IAC, TN_WILL, TN_BIN,
     TN_IAC, TN_DO, TN_BIN
     };
+
+static void _panel_debug (PANEL *p, int dbits, const char *fmt, const char *buf, int bufsize, ...)
+{
+if (p && p->Debug && (dbits & p->debug)) {
+    int i;
+    struct timespec time_now;
+    va_list arglist;
+
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    fprintf(p->Debug, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
+    
+    va_start (arglist, bufsize);
+    vfprintf (p->Debug, fmt, arglist);
+    va_end (arglist);
+
+    
+    for (i=0; i<bufsize; ++i) {
+        switch ((unsigned char)buf[i]) {
+            case TN_CR:
+                fprintf(p->Debug, "_TN_CR_");
+                break;
+            case TN_LF:
+                fprintf(p->Debug, "_TN_LF_");
+                break;
+            case TN_IAC:
+                fprintf(p->Debug, "_TN_IAC_");
+                switch ((unsigned char)buf[i+1]) {
+                    case TN_IAC:
+                        fprintf(p->Debug, "_TN_IAC_"); ++i;
+                        break;
+                    case TN_DONT:
+                        fprintf(p->Debug, "_TN_DONT_"); ++i;
+                        break;
+                    case TN_DO:
+                        fprintf(p->Debug, "_TN_DO_"); ++i;
+                        break;
+                    case TN_WONT:
+                        fprintf(p->Debug, "_TN_WONT_"); ++i;
+                        break;
+                    case TN_WILL:
+                        fprintf(p->Debug, "_TN_WILL_"); ++i;
+                        break;
+                    default:
+                        fprintf(p->Debug, "_0x%02X_", (unsigned char)buf[i+1]); ++i;
+                        break;
+                    }
+                switch ((unsigned char)buf[i+1]) {
+                    case TN_BIN:
+                        fprintf(p->Debug, "_TN_BIN_"); ++i;
+                        break;
+                    case TN_ECHO:
+                        fprintf(p->Debug, "_TN_ECHO_"); ++i;
+                        break;
+                    case TN_SGA:
+                        fprintf(p->Debug, "_TN_SGA_"); ++i;
+                        break;
+                    case TN_LINE:
+                        fprintf(p->Debug, "_TN_LINE_"); ++i;
+                        break;
+                    default:
+                        fprintf(p->Debug, "_0x%02X_", (unsigned char)buf[i+1]); ++i;
+                        break;
+                    }
+                    break;
+            default:
+                if (isprint((u_char)buf[i]))
+                    fprintf(p->Debug, "%c", buf[i]);
+                else {
+                    fprintf(p->Debug, "_");
+                    if ((buf[i] >= 1) && (buf[i] <= 26))
+                        fprintf(p->Debug, "^%c", 'A' + buf[i] - 1);
+                    else
+                        fprintf(p->Debug, "\\%03o", (u_char)buf[i]);
+                    fprintf(p->Debug, "_");
+                    }
+                break;
+            }
+        }
+    fprintf(p->Debug, "\n");
+    }
+}
+
+void
+sim_panel_set_debug_file (PANEL *panel, const char *debug_file)
+{
+if (!panel)
+    return;
+panel->Debug = fopen(debug_file, "w");
+}
+
+void
+sim_panel_set_debug_mode (PANEL *panel, int debug_bits)
+{
+if (panel)
+    panel->debug = debug_bits;
+}
+
+void
+sim_panel_flush_debug (PANEL *panel)
+{
+if (!panel)
+    return;
+if (panel->Debug)
+    fflush (panel->Debug);
+}
 
 
 static void *
@@ -155,6 +279,7 @@ while (len) {
         pthread_mutex_unlock (&p->io_send_lock);
         return bsent;
         }
+    _panel_debug (p, DBG_XMT, "Sent:", msg, bsent);
     len -= bsent;
     msg += bsent;
     sent += bsent;
@@ -257,7 +382,8 @@ sim_panel_start_simulator (const char *sim_path,
                            size_t device_panel_count)
 {
 PANEL *p = NULL;
-FILE *f = NULL;
+FILE *fIn = NULL;
+FILE *fOut = NULL;
 struct stat statb;
 char *buf = NULL;
 int port, i;
@@ -307,38 +433,36 @@ p->config = (char *)_panel_malloc (strlen (sim_config) + 1);
 if (p->config == NULL)
     goto Error_Return;
 strcpy (p->config, sim_config);
-f = fopen (sim_config, "rb");
-if (f == NULL) {
+fIn = fopen (sim_config, "r");
+if (fIn == NULL) {
     sim_panel_set_error ("Can't open configuration file '%s': %s", sim_config, strerror(errno));
     goto Error_Return;
     }
-if (statb.st_size != fread (buf, 1, statb.st_size, f)) {
-    sim_panel_set_error ("Can't read complete configuration file '%s': %s", sim_config, strerror(errno));
-    goto Error_Return;
-    }
-fclose (f);
-f = NULL;
 p->temp_config = (char *)_panel_malloc (strlen (sim_config) + 40);
 if (p->temp_config == NULL)
     goto Error_Return;
 sprintf (p->temp_config, "%s-Panel-%d", sim_config, getpid());
-f = fopen (p->temp_config, "w");
-if (f == NULL) {
+fOut = fopen (p->temp_config, "w");
+if (fOut == NULL) {
     sim_panel_set_error ("Can't create temporary configuration file '%s': %s", p->temp_config, strerror(errno));
     goto Error_Return;
     }
-fprintf (f, "# Temporary FrontPanel generated simh configuration file\n");
-fprintf (f, "# Original Configuration File: %s\n", p->config);
-fprintf (f, "# Simulator Path: %s\n", sim_path);
-fprintf (f, "%s\n", buf);
+fprintf (fOut, "# Temporary FrontPanel generated simh configuration file\n");
+fprintf (fOut, "# Original Configuration File: %s\n", p->config);
+fprintf (fOut, "# Simulator Path: %s\n", sim_path);
+while (fgets (buf, statb.st_size, fIn))
+    fputs (buf, fOut);
 free (buf);
 buf = NULL;
-fprintf (f, "set remote -u telnet=%s\n", hostport);
+fclose (fIn);
+fIn = NULL;
+fprintf (fOut, "set remote notelnet\n");
 if (device_panel_count)
-    fprintf (f, "set remote connections=%d\n", (int)device_panel_count+1);
-fprintf (f, "set remote master\n");
-fclose (f);
-f = NULL;
+    fprintf (fOut, "set remote connections=%d\n", (int)device_panel_count+1);
+fprintf (fOut, "set remote -u telnet=%s\n", hostport);
+fprintf (fOut, "set remote master\n");
+fclose (fOut);
+fOut = NULL;
 if (1) {
 #if defined(_WIN32)
     char cmd[2048];
@@ -421,8 +545,12 @@ _panel_register_panel (p);
 return p;
 
 Error_Return:
-if (f)
-    fclose (f);
+if (fIn)
+    fclose (fIn);
+if (fOut) {
+    fclose (fOut);
+    remove (p->temp_config);
+    }
 if (buf)
     free (buf);
 sim_panel_destroy (p);
@@ -501,6 +629,7 @@ sim_panel_destroy (PANEL *panel)
 REG *reg;
 
 if (panel) {
+    _panel_debug (panel, DBG_XMT|DBG_RCV, "Closing Panel %s\n", NULL, 0, panel->name);
     if (panel->devices) {
         size_t i;
 
@@ -786,8 +915,12 @@ while (p->sock != INVALID_SOCKET) {
 
     pthread_mutex_unlock (&p->io_lock);
     new_data = sim_read_sock (p->sock, &buf[buf_data], sizeof(buf)-(buf_data+1));
-    if (new_data <= 0)
+    if (new_data <= 0) {
+        sim_panel_set_error ("%s", sim_get_err_sock("Unexpected socket read"));
+        _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
         break;
+        }
+    _panel_debug (p, DBG_RCV, "Received:", &buf[buf_data], new_data);
     buf_data += new_data;
     buf[buf_data] = '\0';
     s = buf;
@@ -849,11 +982,16 @@ while (p->sock != INVALID_SOCKET) {
         }
     memmove (buf, s, strlen (s)+1);
     buf_data = strlen (buf);
-    if (!strcmp("Simulator Running", buf)) {
+    if (!strcmp("Simulator Running...", buf)) {
         p->State = Run;
         buf_data = 0;
         buf[0] = '\0';
         }
+    }
+if (p->io_waiting) {
+    _panel_debug (p, DBG_RCV, "Receive: restarting waiting thread while exiting", NULL, 0);
+    p->io_waiting = 0;
+    pthread_cond_signal (&p->io_done);
     }
 p->io_thread_running = 0;
 pthread_mutex_unlock (&p->io_lock);

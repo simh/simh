@@ -100,6 +100,17 @@ sim_panel_get_state (PANEL *panel);
 const char *sim_panel_get_error (void);
 void sim_panel_clear_error (void);
 
+void
+sim_panel_set_debug_file (PANEL *panel, const char *debug_file);
+
+#define DBG_XMT         1   /* Transmit Data */
+#define DBG_RCV         2   /* Receive Data */
+
+void
+sim_panel_set_debug_mode (PANEL *panel, int debug_bits);
+
+void
+sim_panel_flush_debug (PANEL *panel);
 
 #ifdef  __cplusplus
 }
