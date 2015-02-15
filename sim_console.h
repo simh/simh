@@ -69,6 +69,7 @@
 
 t_stat sim_set_console (int32 flag, char *cptr);
 t_stat sim_set_remote_console (int32 flag, char *cptr);
+void sim_remote_process_command (void);
 t_stat sim_set_kmap (int32 flag, char *cptr);
 t_stat sim_set_telnet (int32 flag, char *cptr);
 t_stat sim_set_notelnet (int32 flag, char *cptr);
