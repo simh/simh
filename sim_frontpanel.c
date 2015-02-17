@@ -269,6 +269,7 @@ int sent = 0;
 
 if (p->sock == INVALID_SOCKET) {
     sim_panel_set_error ("Invalid Socket for write");
+    p->State = Error;
     return -1;
     }
 pthread_mutex_lock (&p->io_send_lock);
@@ -276,6 +277,7 @@ while (len) {
     int bsent = sim_write_sock (p->sock, msg, len);
     if (bsent < 0) {
         sim_panel_set_error ("%s", sim_get_err_sock("Error writing to socket"));
+        p->State = Error;
         pthread_mutex_unlock (&p->io_send_lock);
         return bsent;
         }
@@ -305,6 +307,7 @@ if (buf_needed > *buf_size) {
     free (*buf);
     *buf = (char *)_panel_malloc (buf_needed);
     if (!*buf) {
+        panel->State = Error;
         pthread_mutex_unlock (&panel->io_lock);
         return -1;
         }
@@ -640,6 +643,7 @@ if (panel) {
         free (panel->devices);
         panel->devices = NULL;
         }
+
     _panel_deregister_panel (panel);
     free (panel->name);
     free (panel->config);
@@ -713,19 +717,22 @@ sim_panel_add_register (PANEL *panel,
 {
 REG *regs, *reg;
 
-if (!panel) {
+if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
-regs = (REG *)_panel_malloc ((1 + panel->reg_count)*sizeof(*regs));
-if (regs == NULL)
+regs = (REG *)_panel_malloc ((1 + panel->reg_count)*sizeof(*regs)); 
+if (regs == NULL) {
+    panel->State = Error;
     return -1;
+    }
 pthread_mutex_lock (&panel->io_lock);
 memcpy (regs, panel->regs, panel->reg_count*sizeof(*regs));
 reg = &regs[panel->reg_count];
 memset (reg, 0, sizeof(*regs));
 reg->name = (char *)_panel_malloc (1 + strlen (name));
 if (reg->name == NULL) {
+    panel->State = Error;
     free (regs);
     return -1;
     }
@@ -745,7 +752,7 @@ return 0;
 int
 sim_panel_get_registers (PANEL *panel)
 {
-if (!panel) {
+if ((!panel) || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
@@ -808,7 +815,7 @@ return 0;
 int
 sim_panel_exec_halt (PANEL *panel)
 {
-if (!panel) {
+if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
@@ -822,7 +829,7 @@ return 0;
 int
 sim_panel_exec_boot (PANEL *panel, const char *device)
 {
-if (!panel) {
+if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
@@ -839,7 +846,7 @@ return 0;
 int
 sim_panel_exec_run (PANEL *panel)
 {
-if (!panel) {
+if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
@@ -856,7 +863,7 @@ return 0;
 int
 sim_panel_exec_step (PANEL *panel)
 {
-if (!panel) {
+if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
@@ -876,7 +883,7 @@ sim_panel_set_register_value (PANEL *panel,
                               const char *name,
                               const char *value)
 {
-if (!panel) {
+if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
@@ -909,7 +916,8 @@ pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 pthread_mutex_lock (&p->io_lock);
 p->io_thread_running = 1;
 pthread_cond_signal (&p->startup_cond);   /* Signal we're ready to go */
-while (p->sock != INVALID_SOCKET) {
+while ((p->sock != INVALID_SOCKET) &&
+       (p->State != Error)) {
     int new_data;
     char *s, *e, *eol;
 
@@ -918,6 +926,7 @@ while (p->sock != INVALID_SOCKET) {
     if (new_data <= 0) {
         sim_panel_set_error ("%s", sim_get_err_sock("Unexpected socket read"));
         _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
+        p->State = Error;
         break;
         }
     _panel_debug (p, DBG_RCV, "Received:", &buf[buf_data], new_data);
@@ -1020,12 +1029,13 @@ pthread_mutex_lock (&p->io_lock);
 p->callback_thread_running = 1;
 pthread_cond_signal (&p->startup_cond);   /* Signal we're ready to go */
 while ((p->sock != INVALID_SOCKET) && 
-       (p->callbacks_per_second)) {
+       (p->callbacks_per_second) &&
+       (p->State != Error)) {
     int rate = p->callbacks_per_second;
     pthread_mutex_unlock (&p->io_lock);
 
     ++callback_count;
-    if (1 == callback_count%rate) {
+    if (1 == callback_count%rate) {     /* once a second update the query string */
         _panel_register_query_string (p, &buf, &buf_data);
         }
     msleep (1000/rate);
