@@ -384,8 +384,9 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_interval <= 0) {                            /* event queue? */
         /* make sure all useful state is in simh registers while processing events */
         pcq_r->qptr = pcq_p;                            /* update pc q ptr */
-        if ((reason = sim_process_event ()))            /* process */
-            break;
+        if ((reason = sim_process_event ()) != SCPE_OK) /* process */
+            if (reason != SCPE_IOERR)                   /* let ints handle I/O error */
+                break;
         int_reqhi = api_findreq ();                     /* recalc int req */
         chan_req = chan_testact ();                     /* recalc chan act */
         }
