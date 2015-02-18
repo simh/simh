@@ -42,7 +42,7 @@
 extern uint32 xfr_req;
 extern int32 stop_invins, stop_invdev, stop_inviop;
 int32 ptr_sor = 0;                                      /* start of rec */
-int32 ptr_stopioe = 1;                                  /* stop on err */
+int32 ptr_stopioe = 0;                                  /* no stop on err */
 int32 ptp_ldr = 0;                                      /* no leader */
 int32 ptp_stopioe = 1;
 DSPT std_tplt[] = { { 1, 0 }, { 0, 0 }  };              /* template */
