@@ -68,11 +68,43 @@ tp->tv_sec = (long)(now/10000000);
 tp->tv_nsec = (now%10000000)*100;
 return 0;
 }
-#else
+#else /* NOT _WIN32 */
 #include <unistd.h>
 #define msleep(n) usleep(1000*n)
 #include <sys/wait.h>
+#if defined (__APPLE__)
+#define HAVE_STRUCT_TIMESPEC 1   /* OSX defined the structure but doesn't tell us */
 #endif
+
+/* on HP-UX, CLOCK_REALTIME is enum, not preprocessor define */
+#if !defined(CLOCK_REALTIME) && !defined(__hpux)
+#define CLOCK_REALTIME 1
+#define NEED_CLOCK_GETTIME 1
+#if !defined(HAVE_STRUCT_TIMESPEC)
+#define HAVE_STRUCT_TIMESPEC 1
+#if !defined(_TIMESPEC_DEFINED)
+#define _TIMESPEC_DEFINED
+struct timespec {
+    long   tv_sec;
+    long   tv_nsec;
+};
+#endif /* _TIMESPEC_DEFINED */
+#endif /* HAVE_STRUCT_TIMESPEC */
+#if defined(NEED_CLOCK_GETTIME)
+int clock_gettime(int clk_id, struct timespec *tp)
+{
+struct timeval cur;
+struct timezone foo;
+
+gettimeofday (&cur, &foo);
+tp->tv_sec = cur.tv_sec;
+tp->tv_nsec = cur.tv_usec*1000;
+return 0;
+}
+#endif /* defined(NEED_CLOCK_GETTIME) */
+#endif /* !defined(CLOCK_REALTIME) && !defined(__hpux) */
+
+#endif /* NOT _WIN32 */
 
 typedef struct {
     char *name;
