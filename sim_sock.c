@@ -1232,7 +1232,8 @@ if (rbytes == SOCKET_ERROR) {
         (err != WSAEHOSTUNREACH) &&
         (err != WSAECONNREFUSED) &&
         (err != WSAECONNABORTED) &&
-        (err != WSAECONNRESET))
+        (err != WSAECONNRESET) &&
+        (err != WSAEINTR))                              /* or a close of a blocking read */
         sim_err_sock (INVALID_SOCKET, "read");
     return -1;
     }

@@ -111,27 +111,34 @@ printf ("^C to Halt, Commands: BOOT, CONT, EXIT\n");
 }
 
 volatile int halt_cpu = 0;
+PANEL *panel, *tape;
 
 void halt_handler (int sig)
 {
 signal (SIGINT, halt_handler);      /* Re-establish handler for some platforms that implement ONESHOT signal dispatch */
 halt_cpu = 1;
+sim_panel_flush_debug (panel);
 return;
 }
 
 int
 main (int argc, char **argv)
 {
-PANEL *panel, *tape;
 FILE *f;
 
 /* Create pseudo config file for a test */
 if ((f = fopen (sim_config, "w"))) {
+#if defined(PANEL_DEBUG)
+    fprintf (f, "set debug -n -a simulator.dbg\n");
+    fprintf (f, "set cpu conhalt\n");
+    fprintf (f, "set remote telnet=2226\n");
+    fprintf (f, "set rem-con debug=XMT;RCV\n");
+    fprintf (f, "set remote notelnet\n");
+#endif /* defined(PANEL_DEBUG) */
     fprintf (f, "set cpu autoboot\n");
     fprintf (f, "set cpu 64\n");
-    fprintf (f, "set cpu conhalt\n");
     fprintf (f, "set console telnet=buffered\n");
-    fprintf (f, "set console telnet=1923\n");
+    fprintf (f, "set console telnet=1927\n");
     fclose (f);
     }
 
@@ -145,6 +152,11 @@ if (!panel) {
     printf ("Error starting simulator: %s\n", sim_panel_get_error());
     goto Done;
     }
+
+#if defined(PANEL_DEBUG)
+sim_panel_set_debug_file (panel, "frontpanel.dbg");
+sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV);
+#endif /* defined(PANEL_DEBUG) */
 
 tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
 
@@ -250,16 +262,18 @@ while (1) {
             if (sim_panel_exec_boot (panel, cmd + 4))
                 break;
             }
-        if (!strcmp("STEP", cmd)) {
+        else if (!strcmp("STEP", cmd)) {
             if (sim_panel_exec_step (panel))
                 break;
             }
-        if (!strcmp("CONT", cmd)) {
+        else if (!strcmp("CONT", cmd)) {
             if (sim_panel_exec_run (panel))
                 break;
             }
-        if (!strcmp("EXIT", cmd))
+        else if (!strcmp("EXIT", cmd))
             goto Done;
+        else
+            printf ("Huh? %s\r\n", cmd);
         }
     while (sim_panel_get_state (panel) == Run) {
         usleep (100);

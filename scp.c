@@ -5923,7 +5923,12 @@ sim_start_timer_services ();                            /* enable wall clock tim
 do {
     t_addr *addrs;
 
-    r = sim_instr();
+    while (1) {
+        r = sim_instr();
+        if (r != SCPE_REMOTE)
+            break;
+        sim_remote_process_command ();                  /* Process the command and resume processing */
+        }
     if ((flag != RU_NEXT) ||                            /* done if not doing NEXT */
         (--sim_next <=0))
         break;
