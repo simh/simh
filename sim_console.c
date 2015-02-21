@@ -639,11 +639,13 @@ if (sim_log) {
     cbuf[sizeof(cbuf)-1] = '\0';
     while (fgets (cbuf, sizeof(cbuf)-1, sim_log))
         tmxr_linemsgf (lp, "%s", cbuf);
-    do {
-        unwritten = tmxr_send_buffered_data (lp);
-        if (unwritten == lp->txbsz)
-            sim_os_ms_sleep (100);
-        } while (unwritten == lp->txbsz);
+    if (!tmxr_input_pending_ln (lp)) {
+        do {
+            unwritten = tmxr_send_buffered_data (lp);
+            if (unwritten == lp->txbsz)
+                sim_os_ms_sleep (100);
+            } while (unwritten == lp->txbsz);
+        }
     }
 }
 
