@@ -131,6 +131,7 @@ struct PANEL {
     int                     io_thread_running;
     pthread_mutex_t         io_lock;
     pthread_mutex_t         io_send_lock;
+    int                     io_reg_query_pending;
     int                     io_waiting;
     pthread_cond_t          io_done;
     pthread_cond_t          startup_cond;
@@ -313,7 +314,7 @@ while (len) {
         pthread_mutex_unlock (&p->io_send_lock);
         return bsent;
         }
-    _panel_debug (p, DBG_XMT, "Sent:", msg, bsent);
+    _panel_debug (p, DBG_XMT, "Sent %d bytes: ", msg, bsent, bsent);
     len -= bsent;
     msg += bsent;
     sent += bsent;
@@ -801,6 +802,7 @@ if (panel->reg_query_size != _panel_send (panel, panel->reg_query, panel->reg_qu
     pthread_mutex_unlock (&panel->io_lock);
     return -1;
     }
+++panel->io_reg_query_pending;
 panel->io_waiting = 1;
 while (panel->io_waiting)
     pthread_cond_wait (&panel->io_done, &panel->io_lock);
@@ -961,7 +963,7 @@ while ((p->sock != INVALID_SOCKET) &&
         p->State = Error;
         break;
         }
-    _panel_debug (p, DBG_RCV, "Received:", &buf[buf_data], new_data);
+    _panel_debug (p, DBG_RCV, "Received %d bytes: ", &buf[buf_data], new_data, new_data);
     buf_data += new_data;
     buf[buf_data] = '\0';
     s = buf;
@@ -991,11 +993,13 @@ while ((p->sock != INVALID_SOCKET) &&
             }
         else {
             if (!strcmp (s + strlen (sim_prompt), register_get_echo)) {
+                pthread_mutex_lock (&p->io_lock);
+                --p->io_reg_query_pending;
                 if (p->callback) {
+                    pthread_mutex_unlock (&p->io_lock);
                     p->callback (p, p->callback_context);
                     }
                 else {
-                    pthread_mutex_lock (&p->io_lock);
                     p->io_waiting = 0;
                     pthread_cond_signal (&p->io_done);
                     pthread_mutex_unlock (&p->io_lock);
@@ -1071,11 +1075,17 @@ while ((p->sock != INVALID_SOCKET) &&
         _panel_register_query_string (p, &buf, &buf_data);
         }
     msleep (1000/rate);
-    if ((p->State == Run) || (0 == callback_count%(5*rate)))
+    pthread_mutex_lock (&p->io_lock);
+    if (((p->State == Run) || (0 == callback_count%(5*rate))) &&
+        (p->io_reg_query_pending == 0)) {
+        ++p->io_reg_query_pending;
+        pthread_mutex_unlock (&p->io_lock);
         if (buf_data != _panel_send (p, buf, buf_data)) {
+            pthread_mutex_lock (&p->io_lock);
             break;
             }
-    pthread_mutex_lock (&p->io_lock);
+        pthread_mutex_lock (&p->io_lock);
+        }
     }
 p->callback_thread_running = 0;
 pthread_mutex_unlock (&p->io_lock);
