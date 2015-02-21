@@ -91,7 +91,7 @@ uint32 rom_lw[MCTL_NUM][ROMSIZE >> 2];
 extern UNIT cpu_unit;
 
 t_stat mctl_reset (DEVICE *dptr);
-char *mctl_description (DEVICE *dptr);
+const char *mctl_description (DEVICE *dptr);
 t_stat mctl_rdreg (int32 *val, int32 pa, int32 mode);
 t_stat mctl_wrreg (int32 val, int32 pa, int32 mode);
 
@@ -283,7 +283,7 @@ for (i = 0; i < MCTL_NUM; i++) {
 return SCPE_OK;
 }
 
-char *mctl_description (DEVICE *dptr)
+const char *mctl_description (DEVICE *dptr)
 {
 static char buf[64];
 

@@ -40,7 +40,7 @@ extern jmp_buf save_env;
 
 int32 eval_int (void);
 t_stat qba_reset (DEVICE *dptr);
-char *qba_description (DEVICE *dptr);
+const char *qba_description (DEVICE *dptr);
 
 /* Qbus adapter data structures
 
@@ -338,7 +338,7 @@ for (i = 0; i < IPL_HLVL; i++)
 return SCPE_OK;
 }
 
-char *qba_description (DEVICE *dptr)
+const char *qba_description (DEVICE *dptr)
 {
 return "Qbus adapter";
 }

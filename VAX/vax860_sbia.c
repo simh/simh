@@ -92,7 +92,7 @@ extern int32 fault_PC;                                  /* fault PC */
 extern UNIT cpu_unit;
 
 t_stat sbia_reset (DEVICE *dptr);
-char *sbia_description (DEVICE *dptr);
+const char *sbia_description (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
 t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
@@ -302,7 +302,7 @@ sbi_csr = SBICSR_SCOEN | SBICSR_SCIEN;
 return SCPE_OK;
 }
 
-char *sbia_description (DEVICE *dptr)
+const char *sbia_description (DEVICE *dptr)
 {
 return "SBI adapter";
 }

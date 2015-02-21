@@ -222,10 +222,10 @@ t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 t_stat clk_attach (UNIT *uptr, char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
-char *tmr_description (DEVICE *dptr);
+const char *tmr_description (DEVICE *dptr);
 t_stat td_svc (UNIT *uptr);
 t_stat td_reset (DEVICE *dptr);
-char *td_description (DEVICE *dptr);
+const char *td_description (DEVICE *dptr);
 int32 icr_rd (t_bool interp);
 void tmr_incr (uint32 inc);
 void tmr_sched (void);
@@ -998,7 +998,7 @@ todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
 }
 
-char *tmr_description (DEVICE *dptr)
+const char *tmr_description (DEVICE *dptr)
 {
 return "interval timer";
 }
@@ -1279,7 +1279,7 @@ sim_cancel (&td_unit);
 return SCPE_OK;
 }
 
-char *td_description (DEVICE *dptr)
+const char *td_description (DEVICE *dptr)
 {
 return "Console TU58 cartridge";
 }

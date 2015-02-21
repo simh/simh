@@ -139,7 +139,7 @@ extern jmp_buf save_env;
 extern int32 p1;
 
 t_stat sbi_reset (DEVICE *dptr);
-char *sbi_description (DEVICE *dptr);
+const char *sbi_description (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
 void uba_eval_int (void);
 t_stat vax780_boot (int32 flag, char *ptr);
@@ -739,7 +739,7 @@ sim_vm_cmd = vax780_cmd;
 return SCPE_OK;
 }
 
-char *sbi_description (DEVICE *dptr)
+const char *sbi_description (DEVICE *dptr)
 {
 return "Synchronous Backplane Interconnect";
 }
