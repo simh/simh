@@ -462,6 +462,7 @@ UNIT *sim_clock_queue = QUEUE_LIST_END;
 int32 sim_interval = 0;
 int32 sim_switches = 0;
 FILE *sim_ofile = NULL;
+TMLN *sim_oline = NULL;
 SCHTAB *sim_schrptr = FALSE;
 SCHTAB *sim_schaptr = FALSE;
 DEVICE *sim_dfdev = NULL;
@@ -6266,7 +6267,7 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                         return reason;
                     }
                 else
-                    fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                    Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
                 }
             last_val = val;
             val_start = idx;
@@ -6289,7 +6290,7 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                 return reason;
             }
         else
-            fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
+            Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
         }
     }
 return SCPE_OK;
@@ -6351,8 +6352,8 @@ int32 rdx;
 if (rptr == NULL)
     return SCPE_IERR;
 if (rptr->depth > 1)
-    fprintf (ofile, "%s[%d]:\t", rptr->name, idx);
-else fprintf (ofile, "%s:\t", rptr->name);
+    Fprintf (ofile, "%s[%d]:\t", rptr->name, idx);
+else Fprintf (ofile, "%s:\t", rptr->name);
 if (!(flag & EX_E))
     return SCPE_OK;
 GET_RADIX (rdx, rptr->radix);
@@ -6362,13 +6363,13 @@ else if (!(rptr->flags & REG_VMIO) ||
     (fprint_sym (ofile, rdx, &val, NULL, sim_switches | SIM_SW_REG) > 0)) {
         fprint_val (ofile, val, rdx, rptr->width, rptr->flags & REG_FMT);
         if (rptr->fields) {
-            fprintf (ofile, "\t");
+            Fprintf (ofile, "\t");
             fprint_fields (ofile, val, val, rptr->fields);
             }
         }
 if (flag & EX_I)
-    fprintf (ofile, "\t");
-else fprintf (ofile, "\n");
+    Fprintf (ofile, "\t");
+else Fprintf (ofile, "\n");
 return SCPE_OK;
 }
 
@@ -6552,7 +6553,7 @@ int32 rdx;
 if (sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, dptr, addr);
 else fprint_val (ofile, addr, dptr->aradix, dptr->awidth, PV_LEFT);
-fprintf (ofile, ":\t");
+Fprintf (ofile, ":\t");
 if (!(flag & EX_E))
     return (1 - dptr->aincr);
 
@@ -6562,8 +6563,8 @@ if ((reason = fprint_sym (ofile, addr, sim_eval, uptr, sim_switches)) > 0) {
     reason = 1 - dptr->aincr;
     }
 if (flag & EX_I)
-    fprintf (ofile, "\t");
-else fprintf (ofile, "\n");
+    Fprintf (ofile, "\t");
+else Fprintf (ofile, "\n");
 return reason;
 }
 
@@ -8044,7 +8045,7 @@ if (!stream)
 if (width > MAX_WIDTH)
     width = MAX_WIDTH;
 sprint_val (dbuf, val, radix, width, format);
-if (fputs (dbuf, stream) == EOF)
+if (Fprintf (stream, "%s", dbuf) < 0)
     return SCPE_IOERR;
 return SCPE_OK;
 }
@@ -9445,7 +9446,7 @@ for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition
         continue;
     if ((bitdefs[i].width == 1) && (bitdefs[i].valuenames == NULL)) {
         int off = ((after >> bitdefs[i].offset) & 1) + (((before ^ after) >> bitdefs[i].offset) & 1) * 2;
-        fprintf(stream, "%s%c ", bitdefs[i].name, debug_bstates[off]);
+        Fprintf(stream, "%s%c ", bitdefs[i].name, debug_bstates[off]);
         }
     else {
         const char *delta = "";
@@ -9458,15 +9459,15 @@ for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition
         if (value > beforevalue)
             delta = "^";
         if (bitdefs[i].valuenames)
-            fprintf(stream, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
+            Fprintf(stream, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
         else
             if (bitdefs[i].format) {
-                fprintf(stream, "%s=%s", bitdefs[i].name, delta);
-                fprintf(stream, bitdefs[i].format, value);
-                fprintf(stream, " ");
+                Fprintf(stream, "%s=%s", bitdefs[i].name, delta);
+                Fprintf(stream, bitdefs[i].format, value);
+                Fprintf(stream, " ");
                 }
             else
-                fprintf(stream, "%s=%s0x%X ", bitdefs[i].name, delta, value);
+                Fprintf(stream, "%s=%s0x%X ", bitdefs[i].name, delta, value);
         }
     }
 }
@@ -9770,6 +9771,20 @@ if (sim_deb && (dptr->dctrl & reason)) {
             }
         }
     }
+}
+
+int Fprintf (FILE *f, const char* fmt, ...)
+{
+int ret = 0;
+va_list args;
+
+va_start (args, fmt);
+if (sim_oline)
+    tmxr_linemsgvf (sim_oline, fmt, args);
+else
+    ret = vfprintf (f, fmt, args);
+va_end (args);
+return ret;
 }
 
 

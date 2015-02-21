@@ -143,6 +143,7 @@ t_stat sim_decode_quoted_string (const char *iptr, uint8 *optr, uint32 *osize);
 char *sim_encode_quoted_string (const uint8 *iptr, uint32 size);
 void fprint_buffer_string (FILE *st, const uint8 *buf, uint32 size);
 t_value strtotv (const char *cptr, const char **endptr, uint32 radix);
+int Fprintf (FILE *f, const char* fmt, ...);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 t_stat sim_print_val (t_value val, uint32 radix, uint32 width, uint32 format);
 char *read_line (char *cptr, int32 size, FILE *stream);
