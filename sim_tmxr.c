@@ -3850,15 +3850,22 @@ return;
 
 void tmxr_linemsgf (TMLN *lp, const char *fmt, ...)
 {
+va_list arglist;
+
+va_start (arglist, fmt);
+tmxr_linemsgvf (lp, fmt, arglist);
+va_end (arglist);
+}
+
+void tmxr_linemsgvf (TMLN *lp, const char *fmt, va_list arglist)
+{
 char stackbuf[STACKBUFSIZE];
 int32 bufsize = sizeof(stackbuf);
 char *buf = stackbuf;
-va_list arglist;
 int32 i, len;
 
 buf[bufsize-1] = '\0';
 while (1) {                                         /* format passed string, args */
-    va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
 #if defined(HAS_vsprintf_void)
 
@@ -3880,7 +3887,6 @@ while (1) {                                         /* format passed string, arg
     len = vsnprintf (buf, bufsize-1, fmt, arglist);
 #endif                                                  /* HAS_vsnprintf_void */
 #endif                                                  /* NO_vsnprintf */
-    va_end (arglist);
 
 /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
 

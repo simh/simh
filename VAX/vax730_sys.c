@@ -81,7 +81,7 @@ extern jmp_buf save_env;
 extern int32 p1;
 
 t_stat sysb_reset (DEVICE *dptr);
-char *sysb_description (DEVICE *dptr);
+const char *sysb_description (DEVICE *dptr);
 t_stat vax730_boot (int32 flag, char *ptr);
 t_stat vax730_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
@@ -580,7 +580,7 @@ sim_vm_cmd = vax730_cmd;
 return SCPE_OK;
 }
 
-char *sysb_description (DEVICE *dptr)
+const char *sysb_description (DEVICE *dptr)
 {
 return "system bus controller";
 }

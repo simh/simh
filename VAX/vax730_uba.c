@@ -97,7 +97,7 @@ extern UNIT cpu_unit;
 extern int32 p1;
 
 t_stat uba_reset (DEVICE *dptr);
-char *uba_description (DEVICE *dptr);
+const char *uba_description (DEVICE *dptr);
 t_stat uba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_rdreg (int32 *val, int32 pa, int32 mode);
@@ -665,7 +665,7 @@ fprintf (of, "Invalid argument\n");
 return SCPE_OK;
 }
 
-char *uba_description (DEVICE *dptr)
+const char *uba_description (DEVICE *dptr)
 {
 return "Unibus adapter";
 }

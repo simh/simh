@@ -418,6 +418,10 @@ t_stat parse_instruction_word (char *cptr, t_value *val)
 /*
  * Печать машинной инструкции с мнемоникой.
  */
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 void besm6_fprint_cmd (FILE *of, uint32 cmd)
 {
     int reg, opcode, addr;

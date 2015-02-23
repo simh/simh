@@ -95,7 +95,7 @@ extern int32 fault_PC;                                  /* fault PC */
 extern int32 mem_err;
 
 t_stat uba_reset (DEVICE *dptr);
-char *uba_description (DEVICE *dptr);
+const char *uba_description (DEVICE *dptr);
 t_stat uba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_rdreg (int32 *val, int32 pa, int32 mode);
@@ -634,7 +634,7 @@ uba_csr3 = 0;
 return SCPE_OK;
 }
 
-char *uba_description (DEVICE *dptr)
+const char *uba_description (DEVICE *dptr)
 {
 return "Unibus adapter";
 }

@@ -74,7 +74,7 @@ uint32 mcsr2 = 0;
 t_stat mctl_reset (DEVICE *dptr);
 t_stat mctl_rdreg (int32 *val, int32 pa, int32 mode);
 t_stat mctl_wrreg (int32 val, int32 pa, int32 mode);
-char *mctl_description (DEVICE *dptr);
+const char *mctl_description (DEVICE *dptr);
 
 /* MCTLx data structures
 
@@ -192,7 +192,7 @@ mcsr2 = MEM_BOARD_MASK(MEMSIZE, MEM_SIZE_64K) | MCSR2_CS;     /* Use 64k chips *
 return SCPE_OK;
 }
 
-char *mctl_description (DEVICE *dptr)
+const char *mctl_description (DEVICE *dptr)
 {
 return "memory controller";
 }

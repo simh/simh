@@ -69,7 +69,7 @@ static struct boot_dev boot_tab[] = {
     };
 
 t_stat sysd_reset (DEVICE *dptr);
-char *sysd_description (DEVICE *dptr);
+const char *sysd_description (DEVICE *dptr);
 t_stat vax610_boot (int32 flag, char *ptr);
 t_stat vax610_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
@@ -524,7 +524,7 @@ sim_vm_cmd = vax610_cmd;
 return SCPE_OK;
 }
 
-char *sysd_description (DEVICE *dptr)
+const char *sysd_description (DEVICE *dptr)
 {
 return "system devices";
 }

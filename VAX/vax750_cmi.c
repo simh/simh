@@ -101,7 +101,7 @@ extern jmp_buf save_env;
 extern int32 p1;
 
 t_stat cmi_reset (DEVICE *dptr);
-char *cmi_description (DEVICE *dptr);
+const char *cmi_description (DEVICE *dptr);
 void cmi_set_tmo (void);
 t_stat vax750_boot (int32 flag, char *ptr);
 t_stat vax750_boot_parse (int32 flag, char *ptr);
@@ -666,7 +666,7 @@ cmi_cadr = 0;
 return SCPE_OK;
 }
 
-char *cmi_description (DEVICE *dptr)
+const char *cmi_description (DEVICE *dptr)
 {
 return "CPU/Memory interconnect";
 }

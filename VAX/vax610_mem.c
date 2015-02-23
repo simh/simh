@@ -43,7 +43,7 @@ int32 mctl_count = 0;
 t_stat mctl_rd (int32 *data, int32 PA, int32 access);
 t_stat mctl_wr (int32 data, int32 PA, int32 access);
 t_stat mctl_reset (DEVICE *dptr);
-char *mctl_description (DEVICE *dptr);
+const char *mctl_description (DEVICE *dptr);
 
 /* MCTL data structures
 
@@ -107,7 +107,7 @@ mctl_count = (int32)(MEMSIZE >> 18);                    /* memory controllers en
 return SCPE_OK;
 }
 
-char *mctl_description (DEVICE *dptr)
+const char *mctl_description (DEVICE *dptr)
 {
 return "memory controller";
 }

@@ -97,7 +97,7 @@ t_stat vt_show_hspace(FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat vt_set_vspace(UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat vt_show_vspace(FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat vt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *vt_description (DEVICE *dptr);
+const char *vt_description (DEVICE *dptr);
 
 /* VT11/VS60 data structures
 
@@ -404,7 +404,7 @@ vt_fetch(uint32 addr, vt11word *wp)
     return 1;                           /* used to set "time_out" flag */
 }
 
-char *vt_description (DEVICE *dptr)
+const char *vt_description (DEVICE *dptr)
 {
 return (VS60) ? "VS60 Display processor"
               : "VT11 Display processor";
