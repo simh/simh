@@ -132,7 +132,9 @@ if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!str
 /* Create pseudo config file for a test */
 if ((f = fopen (sim_config, "w"))) {
     if (debug) {
+        fprintf (f, "set verbose\n");
         fprintf (f, "set debug -n -a simulator.dbg\n");
+        fprintf (f, "set log debug\n");
         fprintf (f, "set cpu conhalt\n");
         fprintf (f, "set remote telnet=2226\n");
         fprintf (f, "set rem-con debug=XMT;RCV\n");
