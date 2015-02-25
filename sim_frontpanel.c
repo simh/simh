@@ -566,7 +566,7 @@ if (1) {
         }
 #endif
     }
-for (i=0; i<5; i++) {
+for (i=0; i<100; i++) {          /* Allow up to 10 seconds waiting for simulator to start up */
     p->sock = sim_connect_sock_ex (NULL, hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
     if (p->sock == INVALID_SOCKET)
         msleep (100);
