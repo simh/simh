@@ -59,7 +59,7 @@ const char *sim_config =
 unsigned int PC, SP, FP, AP, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11;
 
 static void
-DisplayCallback (PANEL *panel, void *context)
+DisplayCallback (PANEL *panel, unsigned long long simulation_time, void *context)
 {
 char buf1[100], buf2[100], buf3[100];
 static const char *states[] = {"Halt", "Run "};
@@ -139,6 +139,15 @@ if ((f = fopen (sim_config, "w"))) {
     fprintf (f, "set cpu 64\n");
     fprintf (f, "set console telnet=buffered\n");
     fprintf (f, "set console telnet=1927\n");
+    /* Start a terminal emulator for the console port */
+#if defined(_WIN32)
+    fprintf (f, "set env PATH=%%PATH%%;%%ProgramFiles%%\\PuTTY;%%ProgramFiles(x86)%%\\PuTTY\n");
+    fprintf (f, "! start PuTTY telnet://localhost:1927\n");
+#elif defined(__linux) || defined(__linux__)
+    fprintf (f, "! xterm -e 'telnet localhost 1927' &\n");
+#elif defined(__APPLE__)
+    fprintf (f, "! osascript -e 'tell application \"Terminal\" to do script \"telnet localhost 1927; exit\"'\n");
+#endif
     fclose (f);
     }
 
@@ -165,80 +174,84 @@ if (!tape) {
     goto Done;
     }
 
-if (sim_panel_add_register (panel, "PC",  sizeof(PC), &PC)) {
+if (!sim_panel_add_register (panel, "ZPC",  NULL, sizeof(PC), &PC)) {
+    printf ("Unexpecdted success adding non-existent register 'ZPC'\n");
+    goto Done;
+    }
+if (sim_panel_add_register (panel, "PC",  NULL, sizeof(PC), &PC)) {
     printf ("Error adding register 'PC': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "SP",  sizeof(SP), &SP)) {
+if (sim_panel_add_register (panel, "SP",  NULL, sizeof(SP), &SP)) {
     printf ("Error adding register 'SP': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "FP",  sizeof(FP), &FP)) {
+if (sim_panel_add_register (panel, "FP",  "CPU", sizeof(FP), &FP)) {
     printf ("Error adding register 'FP': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "AP",  sizeof(SP), &AP)) {
+if (sim_panel_add_register (panel, "AP",  NULL, sizeof(SP), &AP)) {
     printf ("Error adding register 'AP': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R0",  sizeof(R0), &R0)) {
+if (sim_panel_add_register (panel, "R0",  NULL, sizeof(R0), &R0)) {
     printf ("Error adding register 'R0': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R1",  sizeof(R1), &R1)) {
+if (sim_panel_add_register (panel, "R1",  NULL, sizeof(R1), &R1)) {
     printf ("Error adding register 'R1': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R2",  sizeof(R2), &R2)) {
+if (sim_panel_add_register (panel, "R2",  NULL, sizeof(R2), &R2)) {
     printf ("Error adding register 'R2': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R3",  sizeof(R3), &R3)) {
+if (sim_panel_add_register (panel, "R3",  NULL, sizeof(R3), &R3)) {
     printf ("Error adding register 'R3': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R4",  sizeof(R4), &R4)) {
+if (sim_panel_add_register (panel, "R4",  NULL, sizeof(R4), &R4)) {
     printf ("Error adding register 'R4': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R5",  sizeof(R5), &R5)) {
+if (sim_panel_add_register (panel, "R5",  NULL, sizeof(R5), &R5)) {
     printf ("Error adding register 'R5': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R6",  sizeof(R6), &R6)) {
+if (sim_panel_add_register (panel, "R6",  NULL, sizeof(R6), &R6)) {
     printf ("Error adding register 'R6': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R7",  sizeof(R7), &R7)) {
+if (sim_panel_add_register (panel, "R7",  NULL, sizeof(R7), &R7)) {
     printf ("Error adding register 'R7': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R8",  sizeof(R8), &R8)) {
+if (sim_panel_add_register (panel, "R8",  NULL, sizeof(R8), &R8)) {
     printf ("Error adding register 'R8': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R9",  sizeof(R9), &R9)) {
+if (sim_panel_add_register (panel, "R9",  NULL, sizeof(R9), &R9)) {
     printf ("Error adding register 'R9': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R10",  sizeof(R10), &R10)) {
+if (sim_panel_add_register (panel, "R10",  NULL, sizeof(R10), &R10)) {
     printf ("Error adding register 'R10': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "R11",  sizeof(R11), &R11)) {
+if (sim_panel_add_register (panel, "R11",  NULL, sizeof(R11), &R11)) {
     printf ("Error adding register 'R11': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_get_registers (panel)) {
+if (sim_panel_get_registers (panel, NULL)) {
     printf ("Error getting register data: %s\n", sim_panel_get_error());
     goto Done;
     }
-DisplayCallback (panel, NULL);
+DisplayCallback (panel, 0ll, NULL);
 if (sim_panel_set_display_callback (panel, &DisplayCallback, NULL, 5)) {
     printf ("Error setting automatic display callback: %s\n", sim_panel_get_error());
     goto Done;
     }
-if (!sim_panel_get_registers (panel)) {
+if (!sim_panel_get_registers (panel, NULL)) {
     printf ("Unexpected success getting register data: %s\n", sim_panel_get_error());
     goto Done;
     }
