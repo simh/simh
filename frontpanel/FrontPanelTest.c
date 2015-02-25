@@ -125,16 +125,19 @@ int
 main (int argc, char **argv)
 {
 FILE *f;
+int debug = 0;
 
+if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!strcmp("-debug", argv[1]))))
+    debug = 1;
 /* Create pseudo config file for a test */
 if ((f = fopen (sim_config, "w"))) {
-#if defined(PANEL_DEBUG)
-    fprintf (f, "set debug -n -a simulator.dbg\n");
-    fprintf (f, "set cpu conhalt\n");
-    fprintf (f, "set remote telnet=2226\n");
-    fprintf (f, "set rem-con debug=XMT;RCV\n");
-    fprintf (f, "set remote notelnet\n");
-#endif /* defined(PANEL_DEBUG) */
+    if (debug) {
+        fprintf (f, "set debug -n -a simulator.dbg\n");
+        fprintf (f, "set cpu conhalt\n");
+        fprintf (f, "set remote telnet=2226\n");
+        fprintf (f, "set rem-con debug=XMT;RCV\n");
+        fprintf (f, "set remote notelnet\n");
+        }
     fprintf (f, "set cpu autoboot\n");
     fprintf (f, "set cpu 64\n");
     fprintf (f, "set console telnet=buffered\n");
@@ -162,10 +165,10 @@ if (!panel) {
     goto Done;
     }
 
-#if defined(PANEL_DEBUG)
-sim_panel_set_debug_file (panel, "frontpanel.dbg");
-sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV);
-#endif /* defined(PANEL_DEBUG) */
+if (debug) {
+    sim_panel_set_debug_file (panel, "frontpanel.dbg");
+    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV);
+    }
 
 tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
 
