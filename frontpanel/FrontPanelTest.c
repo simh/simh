@@ -143,7 +143,7 @@ if ((f = fopen (sim_config, "w"))) {
     fprintf (f, "set cpu autoboot\n");
     fprintf (f, "set cpu 64\n");
     fprintf (f, "set console telnet=buffered\n");
-    fprintf (f, "set console telnet=1927\n");
+    fprintf (f, "set console -u telnet=1927\n");
     /* Start a terminal emulator for the console port */
 #if defined(_WIN32)
     fprintf (f, "set env PATH=%%PATH%%;%%ProgramFiles%%\\PuTTY;%%ProgramFiles(x86)%%\\PuTTY\n");
