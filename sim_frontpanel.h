@@ -82,6 +82,12 @@ sim_panel_start_simulator (const char *sim_path,
                            const char *sim_config,
                            size_t device_panel_count);
 
+PANEL *
+sim_panel_start_simulator_debug (const char *sim_path,
+                                 const char *sim_config,
+                                 size_t device_panel_count,
+                                 const char *debug_file);
+
 /**
 
     sim_panel_add_device_panel - creates a sub panel associated 
