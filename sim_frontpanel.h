@@ -49,9 +49,13 @@ extern "C" {
 
 #include <stdlib.h>
 
+#if !defined(__VAX)         /* Supported platform */
+
+#define SIM_FRONTPANEL_VERSION   1
+
 /**
 
-    sim_panel_start_simulator       A starts a simulatir with a particular 
+    sim_panel_start_simulator       A starts a simulator with a particular 
                                     configuration
 
         sim_path            the path to the simulator binary
@@ -114,18 +118,22 @@ sim_panel_destroy (PANEL *panel);
    The registers that a particular frontpanel application mught need 
    access to are described by the application by calling: 
    
-   sim_pabel_add_register
+   sim_panel_add_register
 
-        name        the name the simulator knows this register by
-        size        the size (in local storage) of the buffer which will
-                    receive the data in the simulator's register
-        addr        a pointer to the location of the buffer which will 
-                    be loaded with the data in the simulator's register
+        name         the name the simulator knows this register by
+        device_name  the device this register is part of.  Defaults to
+                     the device of the panel (in a device panel) or the
+                     default device in the simulator (usually the CPU).
+        size         the size (in local storage) of the buffer which will
+                     receive the data in the simulator's register
+        addr         a pointer to the location of the buffer which will 
+                     be loaded with the data in the simulator's register
 
  */
 int
 sim_panel_add_register (PANEL *panel,
                         const char *name,
+                        const char *device_name,
                         size_t size,
                         void *addr);
 
@@ -150,13 +158,14 @@ sim_panel_add_register (PANEL *panel,
 
  */
 int
-sim_panel_get_registers (PANEL *panel);
+sim_panel_get_registers (PANEL *panel, unsigned long long *simulation_time);
 
 /**
 
 
  */
 typedef void (*PANEL_DISPLAY_PCALLBACK)(PANEL *panel, 
+                                        unsigned long long simulation_time,
                                         void *context);
 
 int
@@ -249,6 +258,8 @@ sim_panel_set_debug_mode (PANEL *panel, int debug_bits);
 
 void
 sim_panel_flush_debug (PANEL *panel);
+
+#endif /* !defined(__VAX) */
 
 #ifdef  __cplusplus
 }

@@ -225,6 +225,7 @@
 #include "sim_video.h"
 #endif
 #include "sim_sock.h"
+#include "sim_frontpanel.h"
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
@@ -1733,9 +1734,9 @@ static CTAB set_glob_tab[] = {
     { "ON",         &set_on,                    1, HLP_SET_ON },
     { "NOON",       &set_on,                    0, HLP_SET_ON },
     { "VERIFY",     &set_verify,                1, HLP_SET_VERIFY },
-    { "VEBOSE",     &set_verify,                1, HLP_SET_VERIFY },
+    { "VERBOSE",    &set_verify,                1, HLP_SET_VERIFY },
     { "NOVERIFY",   &set_verify,                0, HLP_SET_VERIFY },
-    { "NOVEBOSE",   &set_verify,                0, HLP_SET_VERIFY },
+    { "NOVERBOSE",  &set_verify,                0, HLP_SET_VERIFY },
     { "MESSAGE",    &set_message,               1, HLP_SET_MESSAGE },
     { "NOMESSAGE",  &set_message,               0, HLP_SET_MESSAGE },
     { "QUIET",      &set_quiet,                 1, HLP_SET_QUIET },
@@ -4247,6 +4248,9 @@ if (flag) {
 #if defined (SIM_ASYNCH_CLOCKS)
     fprintf (st, "\n\t\tAsynchronous Clock support");
 #endif
+#if defined (SIM_FRONTPANEL_VERSION)
+    fprintf (st, "\n\t\tFrontPanel API Version %d", SIM_FRONTPANEL_VERSION);
+#endif
     fprintf (st, "\n\tHost Platform:");
 #if defined (__GNUC__) && defined (__VERSION__)
     fprintf (st, "\n\t\tCompiler: GCC %s", __VERSION__);
@@ -4418,7 +4422,7 @@ t_stat show_time (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
-fprintf (st, "Time:\t%.0f\n", sim_time);
+fprintf (st, "Time:\t%.0f\n", sim_gtime());
 return SCPE_OK;
 }
 
