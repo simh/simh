@@ -11,14 +11,14 @@ to the simh directory.
 
 For Example, the directory structure should look like:
 
-    .../simh/simhv38-2-rc1/VAX/vax_cpu.c
-    .../simh/simhv38-2-rc1/scp.c
-    .../simh/simhv38-2-rc1/Visual Studio Projects/simh.sln
-    .../simh/simhv38-2-rc1/Visual Studio Projects/VAX.vcproj
-    .../simh/simhv38-2-rc1/BIN/Nt/Win32-Release/vax.exe
+    .../simh/sim-master/VAX/vax_cpu.c
+    .../simh/sim-master/scp.c
+    .../simh/sim-master/Visual Studio Projects/simh.sln
+    .../simh/sim-master/Visual Studio Projects/VAX.vcproj
+    .../simh/sim-master/BIN/Nt/Win32-Release/vax.exe
     .../simh/windows-build/pthreads/pthread.h
     .../simh/windows-build/winpcap/WpdPack/Include/pcap.h
-    .../simh/windows-build/libSDL/SDL2-2.0.0/include/SDL.h
+    .../simh/windows-build/libSDL/SDL2-2.0.3/include/SDL.h
 
 The contents of the windows-build directory can be downloaded from:
 
@@ -45,6 +45,10 @@ both network and asynchronous I/O.
 
 To build any of the supported simulators you should open the simh.sln file 
 in this directory.
+
+The installer for Visual Studio 2008 SP1 is available from:
+
+http://download.microsoft.com/download/E/8/E/E8EEB394-7F42-4963-A2D8-29559B738298/VS2008ExpressWithSP1ENUX1504728.iso
 
 If you are using a version of Visual Studio beyond Visual Studio 2008, then 
 your later version of Visual Studio will automatically convert the Visual 

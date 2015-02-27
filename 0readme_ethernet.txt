@@ -207,11 +207,11 @@ Building on Windows:
  
  For Example, the directory structure should look like:
 
-    .../simh/simhv38-2-rc1/VAX/vax_cpu.c
-    .../simh/simhv38-2-rc1/scp.c
-    .../simh/simhv38-2-rc1/Visual Studio Projects/simh.sln
-    .../simh/simhv38-2-rc1/Visual Studio Projects/VAX.vcproj
-    .../simh/simhv38-2-rc1/BIN/Nt/Win32-Release/vax.exe
+    .../simh/simh-master/VAX/vax_cpu.c
+    .../simh/simh-master/scp.c
+    .../simh/simh-master/Visual Studio Projects/simh.sln
+    .../simh/simh-master/Visual Studio Projects/VAX.vcproj
+    .../simh/simh-master/BIN/Nt/Win32-Release/vax.exe
     .../simh/windows-build/pthreads/pthread.h
     .../simh/windows-build/winpcap/WpdPack/Include/pcap.h
 
