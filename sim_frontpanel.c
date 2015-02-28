@@ -992,6 +992,10 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
+if (panel->parent) {
+    sim_panel_set_error ("Can't HALT simulator from device front panel");
+    return -1;
+    }
 if (panel->State == Run) {
     if (1 != _panel_send (panel, "\005", 1))
         return -1;
@@ -1004,6 +1008,10 @@ sim_panel_exec_boot (PANEL *panel, const char *device)
 {
 if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->parent) {
+    sim_panel_set_error ("Can't BOOT simulator from device front panel");
     return -1;
     }
 if (panel->State == Run) {
@@ -1023,6 +1031,10 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
+if (panel->parent) {
+    sim_panel_set_error ("Can't CONT simulator from device front panel");
+    return -1;
+    }
 if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
@@ -1038,6 +1050,10 @@ sim_panel_exec_step (PANEL *panel)
 {
 if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->parent) {
+    sim_panel_set_error ("Can't STEP simulator from device front panel");
     return -1;
     }
 if (panel->State == Run) {
