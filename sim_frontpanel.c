@@ -188,84 +188,98 @@ static unsigned char mantra[] = {
     TN_IAC, TN_DO, TN_BIN
     };
 
+static void *
+_panel_malloc (size_t size)
+{
+void *p = malloc (size);
+
+if (p == NULL)
+    sim_panel_set_error ("Out of Memory");
+return p;
+}
+
 static void _panel_debug (PANEL *p, int dbits, const char *fmt, const char *buf, int bufsize, ...)
 {
 if (p && p->Debug && (dbits & p->debug)) {
     int i;
     struct timespec time_now;
     va_list arglist;
+    char timestamp[32];
+    size_t obufsize = 10240 + 8*bufsize;
+    char *obuf = (char *)_panel_malloc (obufsize);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
-    fprintf(p->Debug, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
+    sprintf (timestamp, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
     
     va_start (arglist, bufsize);
-    vfprintf (p->Debug, fmt, arglist);
+    vsnprintf (obuf, obufsize - 1, fmt, arglist);
     va_end (arglist);
 
     
     for (i=0; i<bufsize; ++i) {
         switch ((unsigned char)buf[i]) {
             case TN_CR:
-                fprintf(p->Debug, "_TN_CR_");
+                sprintf (&obuf[strlen (obuf)], "_TN_CR_");
                 break;
             case TN_LF:
-                fprintf(p->Debug, "_TN_LF_");
+                sprintf (&obuf[strlen (obuf)], "_TN_LF_");
                 break;
             case TN_IAC:
-                fprintf(p->Debug, "_TN_IAC_");
+                sprintf (&obuf[strlen (obuf)], "_TN_IAC_");
                 switch ((unsigned char)buf[i+1]) {
                     case TN_IAC:
-                        fprintf(p->Debug, "_TN_IAC_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_IAC_"); ++i;
                         break;
                     case TN_DONT:
-                        fprintf(p->Debug, "_TN_DONT_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_DONT_"); ++i;
                         break;
                     case TN_DO:
-                        fprintf(p->Debug, "_TN_DO_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_DO_"); ++i;
                         break;
                     case TN_WONT:
-                        fprintf(p->Debug, "_TN_WONT_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_WONT_"); ++i;
                         break;
                     case TN_WILL:
-                        fprintf(p->Debug, "_TN_WILL_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_WILL_"); ++i;
                         break;
                     default:
-                        fprintf(p->Debug, "_0x%02X_", (unsigned char)buf[i+1]); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_0x%02X_", (unsigned char)buf[i+1]); ++i;
                         break;
                     }
                 switch ((unsigned char)buf[i+1]) {
                     case TN_BIN:
-                        fprintf(p->Debug, "_TN_BIN_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_BIN_"); ++i;
                         break;
                     case TN_ECHO:
-                        fprintf(p->Debug, "_TN_ECHO_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_ECHO_"); ++i;
                         break;
                     case TN_SGA:
-                        fprintf(p->Debug, "_TN_SGA_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_SGA_"); ++i;
                         break;
                     case TN_LINE:
-                        fprintf(p->Debug, "_TN_LINE_"); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_TN_LINE_"); ++i;
                         break;
                     default:
-                        fprintf(p->Debug, "_0x%02X_", (unsigned char)buf[i+1]); ++i;
+                        sprintf (&obuf[strlen (obuf)], "_0x%02X_", (unsigned char)buf[i+1]); ++i;
                         break;
                     }
                     break;
             default:
                 if (isprint((u_char)buf[i]))
-                    fprintf(p->Debug, "%c", buf[i]);
+                    sprintf (&obuf[strlen (obuf)], "%c", buf[i]);
                 else {
-                    fprintf(p->Debug, "_");
+                    sprintf (&obuf[strlen (obuf)], "_");
                     if ((buf[i] >= 1) && (buf[i] <= 26))
-                        fprintf(p->Debug, "^%c", 'A' + buf[i] - 1);
+                        sprintf (&obuf[strlen (obuf)], "^%c", 'A' + buf[i] - 1);
                     else
-                        fprintf(p->Debug, "\\%03o", (u_char)buf[i]);
-                    fprintf(p->Debug, "_");
+                        sprintf (&obuf[strlen (obuf)], "\\%03o", (u_char)buf[i]);
+                    sprintf (&obuf[strlen (obuf)], "_");
                     }
                 break;
             }
         }
-    fprintf(p->Debug, "\n");
+    fprintf(p->Debug, "%s%s\n", timestamp, obuf);
+    free (obuf);
     }
 }
 
@@ -293,16 +307,6 @@ if (panel->Debug)
     fflush (panel->Debug);
 }
 
-
-static void *
-_panel_malloc (size_t size)
-{
-void *p = malloc (size);
-
-if (p == NULL)
-    sim_panel_set_error ("Out of Memory");
-return p;
-}
 
 static int
 _panel_send (PANEL *p, const char *msg, int len)
@@ -441,94 +445,125 @@ for (i=0; i<panel_count; i++) {
 }
 
 
-PANEL *
-sim_panel_start_simulator (const char *sim_path,
-                           const char *sim_config,
-                           size_t device_panel_count)
+static PANEL *
+_sim_panel_create (const char *sim_path,
+                   const char *sim_config,
+                   size_t device_panel_count,
+                   PANEL *simulator_panel,
+                   const char *device_name,
+                   const char *debug_file)
 {
 PANEL *p = NULL;
 FILE *fIn = NULL;
 FILE *fOut = NULL;
 struct stat statb;
 char *buf = NULL;
-int port, i;
+int port;
+size_t i, device_num;
 char hostport[64];
 union {int i; char c[sizeof (int)]; } end_test;
 
-end_test.i = 1;                             /* test endian-ness */
-little_endian = (end_test.c[0] != 0);
-sim_init_sock ();
-for (port=1024; port < 2048; port++) {
-    SOCKET sock;
-
-    sprintf (hostport, "%d", port);
-    sock = sim_connect_sock_ex (NULL, hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
-    if (sock != INVALID_SOCKET) {
-        int sta = 0;
-        while (!sta) {
-            msleep (10);
-            sta = sim_check_conn (sock, 1);
-            }
-        sim_close_sock (sock);
-        if (sta == -1)
+if (simulator_panel) {
+    for (device_num=0; device_num < simulator_panel->device_count; ++device_num)
+        if (simulator_panel->devices[device_num] == NULL)
             break;
+    if (device_num == simulator_panel->device_count) {
+        sim_panel_set_error ("No free panel devices slots available %s simulator.  All %d slots are used.", simulator_panel->path, (int)simulator_panel->device_count);
+        return NULL;
         }
-    else
-        break;
-    
+    p = (PANEL *)_panel_malloc (sizeof(*p));
+    if (p == NULL)
+        goto Error_Return;
+    memset (p, 0, sizeof(*p));
+    p->device_name = (char *)_panel_malloc (1 + strlen (device_name));
+    if (p->device_name == NULL)
+        goto Error_Return;
+    strcpy (p->device_name, device_name);
+    p->parent = simulator_panel;
+    strcpy (p->hostport, simulator_panel->hostport);
+    p->sock = INVALID_SOCKET;
     }
-if (stat (sim_config, &statb) < 0) {
-    sim_panel_set_error ("Can't stat simulator configuration '%s': %s", sim_config, strerror(errno));
-    goto Error_Return;
+else {
+    end_test.i = 1;                             /* test endian-ness */
+    little_endian = (end_test.c[0] != 0);
+    sim_init_sock ();
+    for (port=1024; port < 2048; port++) {
+        SOCKET sock;
+
+        sprintf (hostport, "%d", port);
+        sock = sim_connect_sock_ex (NULL, hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
+        if (sock != INVALID_SOCKET) {
+            int sta = 0;
+            while (!sta) {
+                msleep (10);
+                sta = sim_check_conn (sock, 1);
+                }
+            sim_close_sock (sock);
+            if (sta == -1)
+                break;
+            }
+        else
+            break;
+        
+        }
+    if (stat (sim_config, &statb) < 0) {
+        sim_panel_set_error ("Can't stat simulator configuration '%s': %s", sim_config, strerror(errno));
+        goto Error_Return;
+        }
+    buf = (char *)_panel_malloc (statb.st_size+1);
+    if (buf == NULL)
+        goto Error_Return;
+    buf[statb.st_size] = '\0';
+    p = (PANEL *)_panel_malloc (sizeof(*p));
+    if (p == NULL)
+        goto Error_Return;
+    memset (p, 0, sizeof(*p));
+    p->sock = INVALID_SOCKET;
+    p->path = (char *)_panel_malloc (strlen (sim_path) + 1);
+    if (p->path == NULL)
+        goto Error_Return;
+    strcpy (p->path, sim_path);
+    p->config = (char *)_panel_malloc (strlen (sim_config) + 1);
+    if (p->config == NULL)
+        goto Error_Return;
+    strcpy (p->config, sim_config);
+    fIn = fopen (sim_config, "r");
+    if (fIn == NULL) {
+        sim_panel_set_error ("Can't open configuration file '%s': %s", sim_config, strerror(errno));
+        goto Error_Return;
+        }
+    p->temp_config = (char *)_panel_malloc (strlen (sim_config) + 40);
+    if (p->temp_config == NULL)
+        goto Error_Return;
+    sprintf (p->temp_config, "%s-Panel-%d", sim_config, getpid());
+    fOut = fopen (p->temp_config, "w");
+    if (fOut == NULL) {
+        sim_panel_set_error ("Can't create temporary configuration file '%s': %s", p->temp_config, strerror(errno));
+        goto Error_Return;
+        }
+    fprintf (fOut, "# Temporary FrontPanel generated simh configuration file\n");
+    fprintf (fOut, "# Original Configuration File: %s\n", p->config);
+    fprintf (fOut, "# Simulator Path: %s\n", sim_path);
+    while (fgets (buf, statb.st_size, fIn))
+        fputs (buf, fOut);
+    free (buf);
+    buf = NULL;
+    fclose (fIn);
+    fIn = NULL;
+    fprintf (fOut, "set remote notelnet\n");
+    if (device_panel_count)
+        fprintf (fOut, "set remote connections=%d\n", (int)device_panel_count+1);
+    fprintf (fOut, "set remote -u telnet=%s\n", hostport);
+    fprintf (fOut, "set remote master\n");
+    fclose (fOut);
+    fOut = NULL;
     }
-buf = (char *)_panel_malloc (statb.st_size+1);
-if (buf == NULL)
-    goto Error_Return;
-buf[statb.st_size] = '\0';
-p = (PANEL *)_panel_malloc (sizeof(*p));
-if (p == NULL)
-    goto Error_Return;
-memset (p, 0, sizeof(*p));
-p->sock = INVALID_SOCKET;
-p->path = (char *)_panel_malloc (strlen (sim_path) + 1);
-if (p->path == NULL)
-    goto Error_Return;
-strcpy (p->path, sim_path);
-p->config = (char *)_panel_malloc (strlen (sim_config) + 1);
-if (p->config == NULL)
-    goto Error_Return;
-strcpy (p->config, sim_config);
-fIn = fopen (sim_config, "r");
-if (fIn == NULL) {
-    sim_panel_set_error ("Can't open configuration file '%s': %s", sim_config, strerror(errno));
-    goto Error_Return;
+if (debug_file) {
+    sim_panel_set_debug_file (p, debug_file);
+    sim_panel_set_debug_mode (p, DBG_XMT|DBG_RCV);
+    _panel_debug (p, DBG_XMT|DBG_RCV, "Creating Simulator Process %s\n", NULL, 0, sim_path);
     }
-p->temp_config = (char *)_panel_malloc (strlen (sim_config) + 40);
-if (p->temp_config == NULL)
-    goto Error_Return;
-sprintf (p->temp_config, "%s-Panel-%d", sim_config, getpid());
-fOut = fopen (p->temp_config, "w");
-if (fOut == NULL) {
-    sim_panel_set_error ("Can't create temporary configuration file '%s': %s", p->temp_config, strerror(errno));
-    goto Error_Return;
-    }
-fprintf (fOut, "# Temporary FrontPanel generated simh configuration file\n");
-fprintf (fOut, "# Original Configuration File: %s\n", p->config);
-fprintf (fOut, "# Simulator Path: %s\n", sim_path);
-while (fgets (buf, statb.st_size, fIn))
-    fputs (buf, fOut);
-free (buf);
-buf = NULL;
-fclose (fIn);
-fIn = NULL;
-fprintf (fOut, "set remote notelnet\n");
-if (device_panel_count)
-    fprintf (fOut, "set remote connections=%d\n", (int)device_panel_count+1);
-fprintf (fOut, "set remote -u telnet=%s\n", hostport);
-fprintf (fOut, "set remote master\n");
-fclose (fOut);
-fOut = NULL;
-if (1) {
+if (!simulator_panel) {
 #if defined(_WIN32)
     char cmd[2048];
     PROCESS_INFORMATION ProcessInfo;
@@ -553,7 +588,8 @@ if (1) {
 #else
     p->pidProcess = fork();
     if (p->pidProcess == 0) {
-        close (0); close (1); close (2); /* make sure not to pass the open standard handles */
+        close (0); close (1); close (2);        /* make sure not to pass the open standard handles */
+        dup (dup (open ("/dev/null", O_RDWR))); /* open standard handles to /dev/null */
         if (execlp (sim_path, sim_path, p->temp_config, NULL, NULL)) {
             perror ("execl");
             exit(errno);
@@ -565,26 +601,39 @@ if (1) {
         goto Error_Return;
         }
 #endif
+    strcpy (p->hostport, hostport);
     }
 for (i=0; i<100; i++) {          /* Allow up to 10 seconds waiting for simulator to start up */
-    p->sock = sim_connect_sock_ex (NULL, hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
+    p->sock = sim_connect_sock_ex (NULL, p->hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
     if (p->sock == INVALID_SOCKET)
         msleep (100);
     else
         break;
     }
 if (p->sock == INVALID_SOCKET) {
-    sim_panel_set_error ("Can't connect to simulator Remote Console on port %s", hostport);
+    if (simulator_panel) {
+        sim_panel_set_error ("Can't connect to simulator Remote Console on port %s", p->hostport);
+        }
+    else {
+        if (stat (sim_path, &statb) < 0)
+            sim_panel_set_error ("Can't stat simulator '%s': %s", sim_path, strerror(errno));
+        else
+            sim_panel_set_error ("Can't connect to simulator Remote Console on port %s", p->hostport);
+        }
     goto Error_Return;
     }
-strcpy (p->hostport, hostport);
+_panel_debug (p, DBG_XMT|DBG_RCV, "Connected to simulator at %s after %dms\n", NULL, 0, p->hostport, i*100);
+pthread_mutex_init (&p->io_lock, NULL);
+pthread_mutex_init (&p->io_send_lock, NULL);
+pthread_cond_init (&p->io_done, NULL);
+pthread_cond_init (&p->startup_cond, NULL);
+if (sizeof(mantra) != _panel_send (p, (char *)mantra, sizeof(mantra))) {
+    sim_panel_set_error ("Error sending Telnet mantra (options): %s", sim_get_err_sock ("send"));
+    goto Error_Return;
+    }
 if (1) {
     pthread_attr_t attr;
 
-    pthread_mutex_init (&p->io_lock, NULL);
-    pthread_mutex_init (&p->io_send_lock, NULL);
-    pthread_cond_init (&p->io_done, NULL);
-    pthread_cond_init (&p->startup_cond, NULL);
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_mutex_lock (&p->io_lock);
@@ -595,31 +644,30 @@ if (1) {
     pthread_mutex_unlock (&p->io_lock);
     pthread_cond_destroy (&p->startup_cond);
     }
-if (sizeof(mantra) != _panel_send (p, (char *)mantra, sizeof(mantra))) {
-    sim_panel_set_error ("Error sending Telnet mantra (options): %s", sim_get_err_sock ("send"));
-    goto Error_Return;
+if (simulator_panel) {
+    simulator_panel->devices[device_num] = p;
     }
-if (device_panel_count) {
-    p->devices = (PANEL **)_panel_malloc (device_panel_count*sizeof(*p->devices));
-    if (p->devices == NULL)
+else {
+    if (device_panel_count) {
+        p->devices = (PANEL **)_panel_malloc (device_panel_count*sizeof(*p->devices));
+        if (p->devices == NULL)
+            goto Error_Return;
+        memset (p->devices, 0, device_panel_count*sizeof(*p->devices));
+        p->device_count = device_panel_count;
+        }
+    /* Validate sim_frontpanel API version */
+    if (_panel_sendf (p, 1, &p->simulator_version, "SHOW VERSION\r"))
         goto Error_Return;
-    memset (p->devices, 0, device_panel_count*sizeof(*p->devices));
-    p->device_count = device_panel_count;
-    }
-msleep (1000);
-/* Validate existence of requested register */
-if (_panel_sendf (p, 1, &p->simulator_version, "SHOW VERSION\r")) {
-    goto Error_Return;
-    }
-if (1) {
-    int api_version = 0;
-    char *c = strstr (p->simulator_version, "FrontPanel API Version");
+    if (1) {
+        int api_version = 0;
+        char *c = strstr (p->simulator_version, "FrontPanel API Version");
 
-    if ((!c) ||
-        (1 != sscanf (c, "FrontPanel API Version %d", &api_version)) ||
-        (api_version != SIM_FRONTPANEL_VERSION)) {
-        sim_panel_set_error ("Inconsistent sim_frontpanel API version %d in simulator.  Version %d needed.-", api_version, SIM_FRONTPANEL_VERSION);
-        goto Error_Return;
+        if ((!c) ||
+            (1 != sscanf (c, "FrontPanel API Version %d", &api_version)) ||
+            (api_version != SIM_FRONTPANEL_VERSION)) {
+            sim_panel_set_error ("Inconsistent sim_frontpanel API version %d in simulator.  Version %d needed.-", api_version, SIM_FRONTPANEL_VERSION);
+            goto Error_Return;
+            }
         }
     }
 _panel_register_panel (p);
@@ -634,78 +682,48 @@ if (fOut) {
     }
 if (buf)
     free (buf);
-sim_panel_destroy (p);
+if (1) {
+    const char *err = sim_panel_get_error();
+    char *errbuf = (char *)_panel_malloc (1 + strlen (err));
+
+    strcpy (errbuf, err);               /* preserve error info while closing */
+    sim_panel_destroy (p);
+    sim_panel_set_error ("%s", errbuf);
+    free (errbuf);
+    }
 return NULL;
+}
+
+PANEL *
+sim_panel_start_simulator_debug (const char *sim_path,
+                                 const char *sim_config,
+                                 size_t device_panel_count,
+                                 const char *debug_file)
+{
+return _sim_panel_create (sim_path, sim_config, device_panel_count, NULL, NULL, debug_file);
+}
+
+PANEL *
+sim_panel_start_simulator (const char *sim_path,
+                           const char *sim_config,
+                           size_t device_panel_count)
+{
+return sim_panel_start_simulator_debug (sim_path, sim_config, device_panel_count, NULL);
+}
+
+PANEL *
+sim_panel_add_device_panel_debug (PANEL *simulator_panel,
+                                  const char *device_name,
+                                  const char *debug_file)
+{
+return _sim_panel_create (NULL, NULL, 0, simulator_panel, device_name, debug_file);
 }
 
 PANEL *
 sim_panel_add_device_panel (PANEL *simulator_panel,
                             const char *device_name)
 {
-size_t i, device_num;
-PANEL *p = NULL;
-
-if (!simulator_panel) {
-    sim_panel_set_error ("Invalid Panel");
-    return NULL;
-    }
-for (device_num=0; device_num < simulator_panel->device_count; ++device_num)
-    if (simulator_panel->devices[device_num] == NULL)
-        break;
-if (device_num == simulator_panel->device_count) {
-    sim_panel_set_error ("No free panel devices slots available %s simulator.  All %d slots are used.", simulator_panel->path, (int)simulator_panel->device_count);
-    return NULL;
-    }
-p = (PANEL *)_panel_malloc (sizeof(*p));
-if (p == NULL)
-    goto Error_Return;
-memset (p, 0, sizeof(*p));
-p->device_name = (char *)_panel_malloc (1 + strlen (device_name));
-if (p->device_name == NULL)
-    goto Error_Return;
-strcpy (p->device_name, device_name);
-p->parent = simulator_panel;
-p->sock = INVALID_SOCKET;
-for (i=0; i<5; i++) {
-    p->sock = sim_connect_sock_ex (NULL, simulator_panel->hostport, NULL, NULL, SIM_SOCK_OPT_NODELAY | SIM_SOCK_OPT_BLOCKING);
-    if (p->sock == INVALID_SOCKET)
-        msleep (100);
-    else
-        break;
-    }
-if (p->sock == INVALID_SOCKET) {
-    sim_panel_set_error ("Can't connect to simulator Remote Console on port %s", simulator_panel->hostport);
-    goto Error_Return;
-    }
-strcpy (p->hostport, simulator_panel->hostport);
-if (1) {
-    pthread_attr_t attr;
-
-    pthread_mutex_init (&p->io_lock, NULL);
-    pthread_mutex_init (&p->io_send_lock, NULL);
-    pthread_cond_init (&p->io_done, NULL);
-    pthread_cond_init (&p->startup_cond, NULL);
-    pthread_attr_init(&attr);
-    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-    pthread_mutex_lock (&p->io_lock);
-    pthread_create (&p->io_thread, &attr, _panel_reader, (void *)p);
-    pthread_attr_destroy(&attr);
-    while (!p->io_thread_running)
-        pthread_cond_wait (&p->startup_cond, &p->io_lock); /* Wait for thread to stabilize */
-    pthread_mutex_unlock (&p->io_lock);
-    pthread_cond_destroy (&p->startup_cond);
-    }
-if (sizeof(mantra) != _panel_send (p, (char *)mantra, sizeof(mantra))) {
-    sim_panel_set_error ("Error sending Telnet mantra (options): %s", sim_get_err_sock ("send"));
-    goto Error_Return;
-    }
-simulator_panel->devices[device_num] = p;
-_panel_register_panel (p);
-return p;
-
-Error_Return:
-sim_panel_destroy (p);
-return NULL;
+return sim_panel_add_device_panel_debug (simulator_panel, device_name, NULL);
 }
 
 int
@@ -974,6 +992,10 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
+if (panel->parent) {
+    sim_panel_set_error ("Can't HALT simulator from device front panel");
+    return -1;
+    }
 if (panel->State == Run) {
     if (1 != _panel_send (panel, "\005", 1))
         return -1;
@@ -986,6 +1008,10 @@ sim_panel_exec_boot (PANEL *panel, const char *device)
 {
 if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->parent) {
+    sim_panel_set_error ("Can't BOOT simulator from device front panel");
     return -1;
     }
 if (panel->State == Run) {
@@ -1005,6 +1031,10 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
+if (panel->parent) {
+    sim_panel_set_error ("Can't CONT simulator from device front panel");
+    return -1;
+    }
 if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
@@ -1020,6 +1050,10 @@ sim_panel_exec_step (PANEL *panel)
 {
 if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->parent) {
+    sim_panel_set_error ("Can't STEP simulator from device front panel");
     return -1;
     }
 if (panel->State == Run) {
@@ -1069,6 +1103,28 @@ pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
 pthread_mutex_lock (&p->io_lock);
+if (!p->parent) {
+    while (1) {
+        int new_data = sim_read_sock (p->sock, &buf[buf_data], sizeof(buf)-(buf_data+1));
+
+        if (new_data <= 0) {
+            sim_panel_set_error ("%s", sim_get_err_sock("Unexpected socket read"));
+            _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
+            p->State = Error;
+            break;
+            }
+        _panel_debug (p, DBG_RCV, "Startup receive of %d bytes: ", &buf[buf_data], new_data, new_data);
+        buf_data += new_data;
+        buf[buf_data] = '\0';
+        if ((size_t)buf_data < strlen (sim_prompt))
+            continue;
+        if (!strcmp (sim_prompt, &buf[buf_data - strlen (sim_prompt)])) {
+            memmove (buf, &buf[buf_data - strlen (sim_prompt)], strlen (sim_prompt) + 1);
+            buf_data = strlen (sim_prompt);
+            break;
+            }
+        }
+    }
 p->io_thread_running = 1;
 pthread_cond_signal (&p->startup_cond);   /* Signal we're ready to go */
 while ((p->sock != INVALID_SOCKET) &&

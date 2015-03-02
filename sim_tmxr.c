@@ -3906,7 +3906,7 @@ while (1) {                                         /* format passed string, arg
 /* Output the formatted data expanding newlines where they exist */
 
 for (i = 0; i < len; ++i) {
-    if ('\n' == buf[i]) {
+    if (('\n' == buf[i]) && ((i == 0) || ('\r' != buf[i-1]))) {
         while (SCPE_STALL == tmxr_putc_ln (lp, '\r'))
             if (lp->txbsz == tmxr_send_buffered_data (lp))
                 sim_os_ms_sleep (10);

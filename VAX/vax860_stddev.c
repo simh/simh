@@ -91,6 +91,7 @@
 
 #define LC_V_FNC        0                               /* logical console function */
 #define LC_M_FNC        0xFF
+#define  LC_FNCBT       0x2                             /* boot cpu */
 #define  LC_FNCCW       0x3                             /* clear warm start flag */
 #define  LC_FNCCS       0x4                             /* clear cold start flag */
 #define  LC_FNCMV       0x12                            /* microcode version */
@@ -338,6 +339,7 @@ MTAB tto_mod[] = {
     { 0 }
     };
 
+
 DEVICE tto_dev = {
     "TTO", tto_unit, tto_reg, tto_mod,
     4, 10, 31, 1, 16, 8,
@@ -514,7 +516,8 @@ if ((dest >= ID_CT) && (dest <= ID_LC)) {               /* valid line? */
     tto_int = 0;                                        /* clear int */
     tto_unit[dest].buf = data & WMASK;
     tto_unit[dest].RDY = 0;
-    sim_activate (&tto_unit[dest], tto_unit[dest].wait);/* activate unit */
+    sim_activate (&tto_unit[dest], 
+                  ((dest == ID_LC) && (data == LC_FNCBT)) ? 0 : tto_unit[dest].wait);/* activate unit */
     }
 return;
 }
@@ -1034,6 +1037,10 @@ if (lc_bptr > 0)                                        /* cmd in prog? */
 
 else switch (lc_fnc) {                                  /* idle, case */
 
+    case LC_FNCBT:                                      /* boot cpu */
+        con_halt (0, 0);                                /* set up reboot */
+        break;
+        
     case LC_FNCCW:                                      /* clear warm start flag */
         break;
         

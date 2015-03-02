@@ -58,12 +58,23 @@ const char *sim_config =
 /* Registers visible on the Front Panel */
 unsigned int PC, SP, FP, AP, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11;
 
+int update_display = 1;
+
 static void
 DisplayCallback (PANEL *panel, unsigned long long simulation_time, void *context)
+{
+update_display = 1;
+}
+
+static void
+DisplayRegisters (PANEL *panel)
 {
 char buf1[100], buf2[100], buf3[100];
 static const char *states[] = {"Halt", "Run "};
 
+if (!update_display)
+    return;
+update_display = 0;
 buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = 0;
 sprintf (buf1, "%s PC: %08X   SP: %08X   AP: %08X   FP: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP);
 sprintf (buf2, "R0:%08X  R1:%08X  R2:%08X  R3:%08X   R4:%08X   R5:%08X\r\n", R0, R1, R2, R3, R4, R5);
@@ -133,8 +144,8 @@ if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!str
 if ((f = fopen (sim_config, "w"))) {
     if (debug) {
         fprintf (f, "set verbose\n");
-        fprintf (f, "set debug -n -a simulator.dbg\n");
-        fprintf (f, "set log debug\n");
+        fprintf (f, "set log simulator.dbg\n");
+        fprintf (f, "set debug -n -a log\n");
         fprintf (f, "set cpu conhalt\n");
         fprintf (f, "set remote telnet=2226\n");
         fprintf (f, "set rem-con debug=XMT;RCV\n");
@@ -149,7 +160,7 @@ if ((f = fopen (sim_config, "w"))) {
     fprintf (f, "set env PATH=%%PATH%%;%%ProgramFiles%%\\PuTTY;%%ProgramFiles(x86)%%\\PuTTY\n");
     fprintf (f, "! start PuTTY telnet://localhost:1927\n");
 #elif defined(__linux) || defined(__linux__)
-    fprintf (f, "! xterm -e 'telnet localhost 1927' &\n");
+    fprintf (f, "! nohup xterm -e 'telnet localhost 1927' &\n");
 #elif defined(__APPLE__)
     fprintf (f, "! osascript -e 'tell application \"Terminal\" to do script \"telnet localhost 1927; exit\"'\n");
 #endif
@@ -158,9 +169,10 @@ if ((f = fopen (sim_config, "w"))) {
 
 InitDisplay();
 signal (SIGINT, halt_handler);
-panel = sim_panel_start_simulator (sim_path,
-                                   sim_config,
-                                   2);
+panel = sim_panel_start_simulator_debug (sim_path,
+                                         sim_config,
+                                         2,
+                                         debug? "frontpanel.dbg" : NULL);
 
 if (!panel) {
     printf ("Error starting simulator: %s\n", sim_panel_get_error());
@@ -168,7 +180,6 @@ if (!panel) {
     }
 
 if (debug) {
-    sim_panel_set_debug_file (panel, "frontpanel.dbg");
     sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV);
     }
 
@@ -251,7 +262,6 @@ if (sim_panel_get_registers (panel, NULL)) {
     printf ("Error getting register data: %s\n", sim_panel_get_error());
     goto Done;
     }
-DisplayCallback (panel, 0ll, NULL);
 if (sim_panel_set_display_callback (panel, &DisplayCallback, NULL, 5)) {
     printf ("Error setting automatic display callback: %s\n", sim_panel_get_error());
     goto Done;
@@ -265,6 +275,7 @@ while (1) {
     char cmd[512];
 
     while (sim_panel_get_state (panel) == Halt) {
+        DisplayRegisters (panel);
         printf ("SIM> ");
         if (!fgets (cmd, sizeof(cmd)-1, stdin))
             break;
@@ -295,6 +306,8 @@ while (1) {
         }
     while (sim_panel_get_state (panel) == Run) {
         usleep (100);
+        if (update_display)
+            DisplayRegisters(panel);
         if (halt_cpu) {
             halt_cpu = 0;
             sim_panel_exec_halt (panel);
