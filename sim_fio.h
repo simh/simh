@@ -64,6 +64,9 @@ t_offset sim_fsize_ex (FILE *fptr);
 t_offset sim_fsize_name_ex (char *fname);
 void sim_buf_swap_data (void *bptr, size_t size, size_t count);
 void sim_buf_copy_swapped (void *dptr, void *bptr, size_t size, size_t count);
+typedef struct SHMEM SHMEM;
+t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr);
+void sim_shmem_close (SHMEM *shmem);
 
 extern t_bool sim_taddr_64;         /* t_addr is > 32b and Large File Support available */
 extern t_bool sim_toffset_64;       /* Large File (>2GB) file I/O support */
