@@ -366,12 +366,11 @@ return SCPE_OK;
 
 t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 const char *cap_units = "B";
 DEVICE *dptr = find_dev_from_unit (uptr);
 t_offset capac = ((t_offset)uptr->capac)*((dptr->flags & DEV_SECTORS) ? 512 : 1);
 
-if (ctx->capac_factor == 2)
+if ((dptr->dwidth / dptr->aincr) == 16)
     cap_units = "W";
 if (capac) {
     if (capac >= (t_offset) 1000000)
