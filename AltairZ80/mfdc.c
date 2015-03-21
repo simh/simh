@@ -499,7 +499,14 @@ static uint8 MFDC_Read(const uint32 Addr)
                     checksum = adc(checksum, sdata.raw[i]);
                 }
 
-                sdata.u.checksum = checksum & 0xFF;
+#ifndef USE_VGI
+                /* VGI has the checksum in the data read from the disk image,
+                 * so inserting the computed version of the checksum is not
+                 * necessary. MZOS computes the checksum differently than all
+                 * other VG software, so this allows MZOS disks to work
+                 */
+                sdata.u.checksum = checksum & 0xFF; 
+#endif
 /*              DBG_PRINT(("Checksum=%x" NLP, sdata.u.checksum)); */
                 mfdc_info->read_in_progress = TRUE;
             }
