@@ -75,6 +75,7 @@ extern int32 int_req[IPL_HLVL];
 extern uint32 cpu_type;
 
 int32 tti_csr = 0;                                      /* control/status */
+uint32 tti_buftime;                                     /* time input character arrived */
 int32 tto_csr = 0;                                      /* control/status */
 int32 clk_csr = 0;                                      /* control/status */
 int32 clk_tps = 60;                                     /* ticks/second */
@@ -293,11 +294,16 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
+
+if ((tti_csr & CSR_DONE) &&                             /* input still pending and < 500ms? */
+    ((sim_os_msec () - tti_buftime) < 500))
+     return SCPE_OK;
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
     uptr->buf = 0;
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+tti_buftime = sim_os_msec ();
 uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
 if (tti_csr & CSR_IE)
