@@ -9505,26 +9505,10 @@ va_list arglist;
 while (1) {                                         /* format passed string, args */
     va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
-#if defined(HAS_vsprintf_void)
-
-/* Note, this could blow beyond the buffer, and we couldn't tell */
-/* That is a limitation of the C runtime library available on this platform */
-
-    vsprintf (buf, fmt, arglist);
-    for (len = 0; len < bufsize-1; len++)
-        if (buf[len] == 0) break;
-#else
     len = vsprintf (buf, fmt, arglist);
-#endif                                                  /* HAS_vsprintf_void */
-#else                                                   /* NO_vsnprintf */
-#if defined(HAS_vsnprintf_void)
-    vsnprintf (buf, bufsize-1, fmt, arglist);
-    for (len = 0; len < bufsize-1; len++)
-        if (buf[len] == 0) break;
-#else
+#else                                               /* !defined(NO_vsnprintf) */
     len = vsnprintf (buf, bufsize-1, fmt, arglist);
-#endif                                                  /* HAS_vsnprintf_void */
-#endif                                                  /* NO_vsnprintf */
+#endif                                              /* NO_vsnprintf */
     va_end (arglist);
 
 /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
@@ -9546,7 +9530,10 @@ if (sim_is_running) {
     char *c, *remnant = buf;
 
     while ((c = strchr(remnant, '\n'))) {
-        printf("%.*s\r\n", (int)(c-remnant), remnant);
+        if ((c != buf) && (*(c - 1) != '\r'))
+            printf("%.*s\r\n", (int)(c-remnant), remnant);
+        else
+            printf("%.*s\n", (int)(c-remnant), remnant);
         remnant = c + 1;
         }
     printf("%s", remnant);
@@ -9575,26 +9562,10 @@ t_bool inhibit_message = (!sim_show_message || (stat & SCPE_NOMESSAGE));
 while (1) {                                         /* format passed string, args */
     va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
-#if defined(HAS_vsprintf_void)
-
-/* Note, this could blow beyond the buffer, and we couldn't tell */
-/* That is a limitation of the C runtime library available on this platform */
-
-    vsprintf (buf, fmt, arglist);
-    for (len = 0; len < bufsize-1; len++)
-        if (buf[len] == 0) break;
-#else
     len = vsprintf (buf, fmt, arglist);
-#endif                                                  /* HAS_vsprintf_void */
-#else                                                   /* NO_vsnprintf */
-#if defined(HAS_vsnprintf_void)
-    vsnprintf (buf, bufsize-1, fmt, arglist);
-    for (len = 0; len < bufsize-1; len++)
-        if (buf[len] == 0) break;
-#else
+#else                                               /* !defined(NO_vsnprintf) */
     len = vsnprintf (buf, bufsize-1, fmt, arglist);
-#endif                                                  /* HAS_vsnprintf_void */
-#endif                                                  /* NO_vsnprintf */
+#endif                                              /* NO_vsnprintf */
     va_end (arglist);
 
 /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
@@ -9624,7 +9595,10 @@ if (sim_is_running && !inhibit_message) {
     char *c, *remnant = buf;
 
     while ((c = strchr(remnant, '\n'))) {
-        printf("%.*s\r\n", (int)(c-remnant), remnant);
+        if ((c != buf) && (*(c - 1) != '\r'))
+            printf("%.*s\r\n", (int)(c-remnant), remnant);
+        else
+            printf("%.*s\n", (int)(c-remnant), remnant);
         remnant = c + 1;
         }
     printf("%s", remnant);
@@ -9668,25 +9642,9 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
     while (1) {                                         /* format passed string, args */
         va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
-#if defined(HAS_vsprintf_void)
-
-/* Note, this could blow beyond the buffer, and we couldn't tell */
-/* That is a limitation of the C runtime library available on this platform */
-
-        vsprintf (buf, fmt, arglist);
-        for (len = 0; len < bufsize-1; len++)
-            if (buf[len] == 0) break;
-#else
         len = vsprintf (buf, fmt, arglist);
-#endif                                                  /* HAS_vsprintf_void */
-#else                                                   /* NO_vsnprintf */
-#if defined(HAS_vsnprintf_void)
-        vsnprintf (buf, bufsize-1, fmt, arglist);
-        for (len = 0; len < bufsize-1; len++)
-            if (buf[len] == 0) break;
-#else
+#else                                                   /* !defined(NO_vsnprintf) */
         len = vsnprintf (buf, bufsize-1, fmt, arglist);
-#endif                                                  /* HAS_vsnprintf_void */
 #endif                                                  /* NO_vsnprintf */
         va_end (arglist);
 
