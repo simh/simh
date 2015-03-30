@@ -3878,6 +3878,8 @@ while (1) {                                         /* format passed string, arg
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
+        if (bufsize < len + 2)
+            bufsize = len + 2;
         buf = (char *) malloc (bufsize);
         if (buf == NULL)                            /* out of memory */
             return;

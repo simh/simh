@@ -687,7 +687,7 @@ static const char simh_help[] =
       "++                       array\n"
       "++register1-register2    all the registers starting at register1\n"
       "++                       up to and including register2\n"
-      "++address				the specified location\n"
+      "++address                the specified location\n"
       "++address1-address2      all locations starting at address1 up to\n"
       "++                       and including address2\n"
       "++address/length         all location starting at address up to\n"
@@ -697,12 +697,12 @@ static const char simh_help[] =
       "3Switches\n"
       " Switches can be used to control the format of display information:\n\n"
        /***************** 80 character line width template *************************/
-      "++-a					display as ASCII\n"
-      "++-c					display as character string\n"
-      "++-m					display as instruction mnemonics\n"
-      "++-o					display as octal\n"
-      "++-d					display as decimal\n"
-      "++-h					display as hexadecimal\n\n"
+      "++-a                 display as ASCII\n"
+      "++-c                 display as character string\n"
+      "++-m                 display as instruction mnemonics\n"
+      "++-o                 display as octal\n"
+      "++-d                 display as decimal\n"
+      "++-h                 display as hexadecimal\n\n"
       " The simulators typically accept symbolic input (see documentation with each\n"
       " simulator).\n\n"
       "3Examples\n"
@@ -714,10 +714,10 @@ static const char simh_help[] =
       "++                       of locations 40:50 that are >1000\n"
       "++ex rx0 50060           examine 50060, RX unit 0\n"
       "++ex rx sbuf[3-6]        examine SBUF[3] to SBUF[6] in RX\n"
-      "++de all 0				set main memory to 0\n"
-      "++de &77>0 0				set all addresses whose low order\n"
+      "++de all 0               set main memory to 0\n"
+      "++de &77>0 0             set all addresses whose low order\n"
       "++                       bits are non-zero to 0\n"
-      "++ex -m @memdump.txt 0-7777	dump memory to file\n\n"
+      "++ex -m @memdump.txt 0-7777  dump memory to file\n\n"
       " Note: to terminate an interactive command, simply type a bad value\n"
       "       (eg, XYZ) when input is requested.\n"
 #define HLP_EVALUATE    "*Commands Evaluating_Instructions"
@@ -1376,8 +1376,8 @@ Error traps can be taken for any command which returns a status other than SCPE_
 ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL.  These values can be indicated by name or by their internal numeric value (not recommended).
 
 Interactions with ASSERT command and "DO -e":
-DO -e		is equivalent to SET ON, which by itself it equivalent to "SET ON; ON ERROR RETURN".
-ASSERT		failure have several different actions:
+DO -e       is equivalent to SET ON, which by itself it equivalent to "SET ON; ON ERROR RETURN".
+ASSERT      failure have several different actions:
        If error trapping is not enabled then AFAIL causes exit from the current do command file.
        If error trapping is enabled and an explicit "ON AFAIL" action is defined, then the specified action is performed.
        If error trapping is enabled and no "ON AFAIL" action is defined, then an AFAIL causes exit from the current do command file.
@@ -9517,6 +9517,8 @@ while (1) {                                         /* format passed string, arg
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
+        if (bufsize < len + 2)
+            bufsize = len + 2;
         buf = (char *) malloc (bufsize);
         if (buf == NULL)                            /* out of memory */
             return;
@@ -9574,6 +9576,8 @@ while (1) {                                         /* format passed string, arg
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
+        if (bufsize < len + 2)
+            bufsize = len + 2;
         buf = (char *) malloc (bufsize);
         if (buf == NULL)                            /* out of memory */
             return SCPE_MEM;
@@ -9654,6 +9658,8 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
             if (buf != stackbuf)
                 free (buf);
             bufsize = bufsize * 2;
+            if (bufsize < len + 2)
+                bufsize = len + 2;
             buf = (char *) malloc (bufsize);
             if (buf == NULL)                            /* out of memory */
                 return;
