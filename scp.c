@@ -528,10 +528,12 @@ static const char *sim_sa64 = "64b addresses";
 #else
 static const char *sim_sa64 = "32b addresses";
 #endif
+const char *sim_savename = sim_name;      /* Simulator Name used in SAVE/RESTORE images */
 
 /* Tables and strings */
 
-const char save_vercur[] = "V3.5";
+const char save_vercur[] = "V4.0";
+const char save_ver35[] = "V3.5";
 const char save_ver32[] = "V3.2";
 const char save_ver30[] = "V3.0";
 const struct scp_error {
@@ -5406,7 +5408,7 @@ REG *rptr;
 
 fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
     save_vercur,                                        /* [V2.5] save format */
-    sim_name,                                           /* sim name */
+    sim_savename,                                       /* sim name */
     sim_si64, sim_sa64, eth_capabilities(),             /* [V3.5] options */
     sim_time);                                          /* [V3.2] sim time */
 WRITE_I (sim_rtime);                                    /* [V2.6] sim rel time */
@@ -5533,7 +5535,7 @@ t_addr k, high, old_capac;
 t_value val, mask;
 t_stat r;
 size_t sz;
-t_bool v35, v32;
+t_bool v40, v35, v32;
 DEVICE *dptr;
 UNIT *uptr;
 REG *rptr;
@@ -5547,8 +5549,10 @@ t_bool force_restore = sim_switches & SWMASK ('F');
 
 fstat (fileno (rfile), &rstat);
 READ_S (buf);                                           /* [V2.5+] read version */
-v35 = v32 = FALSE;
-if (strcmp (buf, save_vercur) == 0)                     /* version 3.5? */
+v40 = v35 = v32 = FALSE;
+if (strcmp (buf, save_vercur) == 0)                     /* version 4.0? */
+    v40 = v35 = v32 = TRUE;
+if (strcmp (buf, save_ver35) == 0)                      /* version 3.5? */
     v35 = v32 = TRUE;
 else if (strcmp (buf, save_ver32) == 0)                 /* version 3.2? */
     v32 = TRUE;
@@ -5557,7 +5561,7 @@ else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
     return SCPE_INCOMP;
     }
 READ_S (buf);                                           /* read sim name */
-if (strcmp (buf, sim_name)) {                           /* name match? */
+if (strcmp (buf, sim_savename)) {                       /* name match? */
     sim_printf ("Wrong system type: %s\n", buf);
     return SCPE_INCOMP;
     }
@@ -5619,7 +5623,9 @@ for ( ;; ) {                                            /* device loop */
         READ_I (uptr->u5);                              /* [V3.0+] more dev spec */
         READ_I (uptr->u6);
         READ_I (flg);                                   /* [V2.10+] unit flags */
-        READ_I (uptr->dynflags);
+        if (v40) {                                      /* [V4.0+] dynflags */
+            READ_I (uptr->dynflags);
+            }
         old_capac = uptr->capac;                        /* save current capacity */
         if (v35) {                                      /* [V3.5+] capacity */
             READ_I (uptr->capac);

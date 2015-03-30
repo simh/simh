@@ -31,9 +31,21 @@
 
 #if defined(VAX_620)
 char sim_name[] = "rtVAX1000 (KA620)";
+
+void vax_init(void)
+{
+sim_savename = "rtVAX1000 (KA620)";
+}
 #else
 char sim_name[32] = "MicroVAX II (KA630)";
+
+void vax_init(void)
+{
+sim_savename = "MicroVAX II (KA630)";
+}
 #endif
+
+void (*sim_vm_init) (void) = &vax_init;
 
 extern DEVICE cpu_dev;
 extern DEVICE tlb_dev;
