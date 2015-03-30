@@ -904,12 +904,11 @@ if (p1 & 0x80)                                          /* mref? set v/p */
     p1 = p1 + mchk_ref;
 p2 = mchk_va + 4;                                       /* save vap */
 st = 0;
+cc = intexc (SCB_MCHK, cc, 0, IE_EXC);                  /* take normal exception */
 if (p1 & 0x80) {                                        /* mref? */
-    cc = intexc (SCB_MCHK, cc, 0, IE_EXC);              /* take normal exception */
     if (!(ka_mser & MSER_CQPE) && !(ka_mser & MSER_CLPE))
         ka_mser |= MSER_NXM;
-}
-else cc = intexc (SCB_MCHK, cc, 0, IE_SVE);             /* take severe exception */
+    }
 acc = ACC_MASK (KERN);                                  /* in kernel mode */
 in_ie = 1;
 SP = SP - 16;                                           /* push 4 words */
