@@ -162,7 +162,7 @@ REG unixpal_reg[] = {
     { HRDATA (IPL, unix_ipl, 3) },
     { HRDATA (CM, unix_cm, 0) },
     { NULL }
-	};
+    };
 
 DEVICE unixpal_dev = {
     "UNIXPAL", &unixpal_unit, unixpal_reg, NULL,
@@ -170,7 +170,7 @@ DEVICE unixpal_dev = {
     NULL, NULL, &pal_proc_reset_unix,
     NULL, NULL, NULL,
     NULL, DEV_DIS
-	};
+    };
 
 /* Unix interrupt evaluator - returns IPL of highest priority interrupt */
 

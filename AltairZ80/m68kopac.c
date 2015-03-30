@@ -6425,10 +6425,10 @@ void m68k_op_bfffo_32_d(void)
         width = ((width-1) & 31) + 1;
 
         data = ROL_32(data, offset);
-		FLAG_N = (uint)(NFLAG_32(data));
+        FLAG_N = (uint)(NFLAG_32(data));
         data >>= 32 - width;
 
-		FLAG_Z = (uint)data;
+        FLAG_Z = (uint)data;
         FLAG_V = VFLAG_CLEAR;
         FLAG_C = CFLAG_CLEAR;
 
@@ -6833,8 +6833,8 @@ void m68k_op_bfins_32_d(void)
         mask = ROR_32(mask, offset);
 
         insert = MASK_OUT_ABOVE_32(insert << (32 - width));
-		FLAG_N = (uint)(NFLAG_32(insert));
-		FLAG_Z = (uint)insert;
+        FLAG_N = (uint)(NFLAG_32(insert));
+        FLAG_Z = (uint)insert;
         insert = ROR_32(insert, offset);
 
         FLAG_V = VFLAG_CLEAR;

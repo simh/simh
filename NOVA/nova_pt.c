@@ -45,10 +45,10 @@ Notes:
 
 #include "nova_defs.h"
 
-extern	int32	int_req, dev_busy, dev_done, dev_disable ;
-extern	int32	SR ;
+extern  int32   int_req, dev_busy, dev_done, dev_disable ;
+extern  int32   SR ;
 
-extern	t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
+extern  t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
 
 
 int32 ptr_stopioe = 0, ptp_stopioe = 0;                 /* stop on error */
@@ -62,7 +62,7 @@ t_stat ptp_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 
 
-	/*  7 or 8 bit data mask support for either device  */
+    /*  7 or 8 bit data mask support for either device  */
 
 #define UNIT_V_8B   (UNIT_V_UF + 0)                     /* 8b output */
 #define UNIT_8B     (1 << UNIT_V_8B)

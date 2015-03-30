@@ -370,7 +370,7 @@ if (sw & SWMASK ('C')) {                                /* char format? */
         if (sw & SWMASK ('A'))
             fprintf (of, FMTASC (c & 0x7F));
         else fprint_ebcdic (of, c);
-		}
+        }
     return 0;                                           /* return # chars */
     }
 if (sw & SWMASK ('A')) {                                /* ASCII? */

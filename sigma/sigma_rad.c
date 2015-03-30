@@ -59,8 +59,8 @@
 #define RADA_M_TK3      0x3FF
 #define RADA_V_SC3      0
 #define RADA_M_SC3      0xF
-#define RADA_GETTK(x)	(((x) >> rad_tab[rad_model].tk_v) & rad_tab[rad_model].tk_m)
-#define RADA_GETSC(x)	(((x) >> rad_tab[rad_model].sc_v) & rad_tab[rad_model].sc_m)
+#define RADA_GETTK(x)   (((x) >> rad_tab[rad_model].tk_v) & rad_tab[rad_model].tk_m)
+#define RADA_GETSC(x)   (((x) >> rad_tab[rad_model].sc_v) & rad_tab[rad_model].sc_m)
 
 /* Address bad flag */
 

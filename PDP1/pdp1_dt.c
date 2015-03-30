@@ -374,7 +374,7 @@ if (pulse == 003) {                                     /* MSE */
         dt_deselect (dtsa);
     dtsa = (dtsa & ~DTA_UNIT) | (dat & DTA_UNIT);
     dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);
-	}
+    }
 if (pulse == 004) {                                     /* MLC */
     dtsa = (dtsa & ~DTA_RW) | (dat & DTA_RW);           /* load dtsa */
     dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);
@@ -616,7 +616,7 @@ switch (fnc) {                                          /* case function */
 if ((fnc == FNC_WRIT) || (fnc == FNC_WALL)) {           /* write function? */
     dtsb = dtsb | DTB_DTF;                              /* set data flag */
     DT_UPDINT;
-	}
+    }
 sim_activate (uptr, ABS (newpos - ((int32) uptr->pos)) * dt_ltime);
 return;
 }
@@ -678,13 +678,13 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
-	uptr->STATE = uptr->pos = 0;
-	unum = (int32) (uptr - dt_dev.units);
-	if (unum == DTA_GETUNIT (dtsa))						/* if selected, */
-		dt_seterr (uptr, DTB_SEL);						/* error */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel? */
+    uptr->STATE = uptr->pos = 0;
+    unum = (int32) (uptr - dt_dev.units);
+    if (unum == DTA_GETUNIT (dtsa))                     /* if selected, */
+        dt_seterr (uptr, DTB_SEL);                      /* error */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -1078,7 +1078,7 @@ if (sim_is_active (uptr)) {
     if ((u == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
         dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
         DT_UPDINT;
-		}
+        }
     uptr->STATE = uptr->pos = 0;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */

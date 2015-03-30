@@ -724,7 +724,7 @@ switch (op) {
             PSW1 = ((PSW1 & ~PSW1_FPC) |                /* set ctrls */
                 ((opnd & PSW1_M_FPC) << PSW1_V_FPC)) &
                 ~cpu_tab[cpu_model].psw1_mbz;           /* clear mbz */
-	    break;
+        break;
 
     case OP_LCF:                                        /* load cc, flt */
         if ((tr = Ea (IR, &bva, VR, BY)) != 0)          /* get eff addr */
@@ -1118,7 +1118,7 @@ switch (op) {
         res = R[rn] | opnd;
         CC34_W (res);                                   /* set CC's */
         R[rn] = res;                                    /* store */
-	break;
+        break;
 
     case OP_EOR:                                        /* xor */
         if ((tr = Ea (IR, &bva, VR, WD)) != 0)          /* get eff addr */
@@ -1128,7 +1128,7 @@ switch (op) {
         res = R[rn] ^ opnd;
         CC34_W (res);                                   /* set CC's */
         R[rn] = res;                                    /* store */
-	break;
+        break;
 
 /* Compares */
 
@@ -1137,7 +1137,7 @@ switch (op) {
             return tr;
         opnd = SEXT_LIT_W (opnd) & WMASK;               /* sext to 32b */
         CC234_CMP (R[rn], opnd);                        /* set CC's */
-	    break;
+        break;
 
     case OP_CB:                                         /* compare byte */
         if ((tr = Ea (IR, &bva, VR, BY)) != 0)          /* get eff addr */

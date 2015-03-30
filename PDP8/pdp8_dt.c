@@ -682,13 +682,13 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
-	uptr->STATE = uptr->pos = 0;
-	unum = (int32) (uptr - dt_dev.units);
-	if (unum == DTA_GETUNIT (dtsa))						/* if selected, */
-		dt_seterr (uptr, DTB_SEL);						/* error */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel? */
+    uptr->STATE = uptr->pos = 0;
+    unum = (int32) (uptr - dt_dev.units);
+    if (unum == DTA_GETUNIT (dtsa))                     /* if selected, */
+        dt_seterr (uptr, DTB_SEL);                      /* error */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -796,7 +796,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (dtsb & DTB_DTF) {                       /* DTF set? */
                 dt_seterr (uptr, DTB_TIM);              /* timing error */
                 return SCPE_OK;
-				}
+                }
             if (DEBUG_PRI (dt_dev, LOG_RW) ||
                (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
                 fprintf (sim_deb, ">>DT%d: reading block %d %s%s\n",
@@ -950,7 +950,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (dtsb & DTB_DTF) {                       /* DTF set? */
                 dt_seterr (uptr, DTB_TIM);              /* timing error */
                 return SCPE_OK;
-				}
+                }
             relpos = DT_LIN2OF (uptr->pos, uptr);       /* cur pos in blk */
             M[DT_WC] = (M[DT_WC] + 1) & 07777;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & 07777;
@@ -965,7 +965,7 @@ switch (fnc) {                                          /* at speed, check fnc *
                 fbuf[ba] = dat;                         /* write word */
                 if (ba >= uptr->hwmark)
                     uptr->hwmark = ba + 1;
-				}
+                }
                                                         /* ignore hdr */
             sim_activate (uptr, DT_WSIZE * dt_ltime);
             if (M[DT_WC] == 0)

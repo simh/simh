@@ -56,7 +56,7 @@
 #endif
 
 /* Simulator stop codes */
-	
+
 #define STOP_RSRV       1                               /* must be 1 */
 #define STOP_HALT       2                               /* HALT */
 #define STOP_IBKPT      3                               /* breakpoint */
@@ -284,7 +284,7 @@ typedef struct {
 #define INT_ION         (1 << INT_V_ION)
 #define INT_DEV         ((1 << INT_V_STK) - 1)          /* device ints */
 #define INT_PENDING     INT_ION+INT_NO_ION_PENDING
-#define	INT_TRAP	(1 << INT_V_TRAP)
+#define INT_TRAP        (1 << INT_V_TRAP)
 
 /* PI disable bits */
 

@@ -256,12 +256,12 @@
 #define UNIT_V_MDV      (UNIT_V_UF + 0)                 /* MDV present */
 #define UNIT_V_STK      (UNIT_V_UF + 1)                 /* stack instr */
 #define UNIT_V_BYT      (UNIT_V_UF + 2)                 /* byte instr */
-#define	UNIT_V_64KW     (UNIT_V_UF + 3)                 /* 64KW mem support */
+#define UNIT_V_64KW     (UNIT_V_UF + 3)                 /* 64KW mem support */
 #define UNIT_V_MSIZE    (UNIT_V_UF + 4)                 /* dummy mask */
 #define UNIT_MDV        (1 << UNIT_V_MDV)
 #define UNIT_STK        (1 << UNIT_V_STK)
 #define UNIT_BYT        (1 << UNIT_V_BYT)
-#define	UNIT_64KW       (1 << UNIT_V_64KW)
+#define UNIT_64KW       (1 << UNIT_V_64KW)
 #define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
 #define UNIT_IOPT       (UNIT_MDV | UNIT_STK | UNIT_BYT | UNIT_64KW)
 #define UNIT_NOVA3      (UNIT_MDV | UNIT_STK)
@@ -476,7 +476,7 @@ while (reason == 0) {                                   /* loop until halted */
     IR = M[PC];                                         /* fetch instr */
     if ( hist_cnt )
         {
-        hist_save( PC, IR ) ;			                /*  PC, int_req unchanged */
+        hist_save( PC, IR ) ;                           /*  PC, int_req unchanged */
         }
 
     INCREMENT_PC ;
@@ -1202,11 +1202,11 @@ return SCPE_OK;
  *    - The Binary Loader was in turn used to load tapes in the usual DG 'absolute binary' format.
  */
 
-#define BOOT_START	00000
-#define BOOT_LEN	(sizeof(boot_rom) / sizeof(int32))
+#define BOOT_START  00000
+#define BOOT_LEN    (sizeof(boot_rom) / sizeof(int32))
 
 static const int32 boot_rom[] = {
-    0062677,                    /*	IORST           ;reset all I/O  */
+    0062677,                    /*  IORST           ;reset all I/O  */
     0060477,                    /*      READS 0         ;read SR into AC0 */
     0024026,                    /*      LDA 1,C77       ;get dev mask */
     0107400,                    /*      AND 0,1         ;isolate dev code */
@@ -1352,7 +1352,7 @@ if ( (r != SCPE_OK) || (lnt && (lnt < HIST_MIN)) )
     }
 hist_p = 0;
 if ( hist_cnt )
-    	{
+    {
     free( hist ) ;
     hist_cnt = 0 ;
     hist = NULL ;

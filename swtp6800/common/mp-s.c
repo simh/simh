@@ -43,9 +43,9 @@
     +---+---+---+---+---+---+---+---+
 
     RXF - A 1 in this bit position means a character has been received
-    	  on the data port and is ready to be read.
+          on the data port and is ready to be read.
     TXE - A 1 in this bit means the port is ready to receive a character
-    	  on the data port and transmit it out over the serial line.
+          on the data port and transmit it out over the serial line.
  
     A read to the data port gets the buffered character, a write
     to the data port writes the character to the device.
@@ -266,12 +266,12 @@ int32 sio0d(int32 io, int32 data)
             }
             if ((odata = getc(ptr_unit.fileref)) == EOF) { // end of file?
 //              printf("Got EOF\n");
-                ptr_unit.u3 &= 0xFE;    // clear RXF flag	
+                ptr_unit.u3 &= 0xFE;    // clear RXF flag
                 return (odata = 0);     // no data
             }
 //          printf("Returning new %02X\n", odata);
             ptr_unit.pos++;             // step character count
-            ptr_unit.u3 &= 0xFE;        // clear RXF flag	
+            ptr_unit.u3 &= 0xFE;        // clear RXF flag
             return (odata & 0xFF);      // return character
         } else {
             sio_unit.u3 &= 0xFE;        // clear RXF flag
@@ -312,10 +312,10 @@ int32 sio0d(int32 io, int32 data)
     return (odata = 0);
 }
 
-/*	because each port appears at 2 addresses and this fact is used
-	to determine if it is a MP-C or MP-S repeatedly in the SWTBUG
-	monitor, this code assures that reads of the high ports return
-	the same data as was read the last time on the low ports.
+/*  because each port appears at 2 addresses and this fact is used
+    to determine if it is a MP-C or MP-S repeatedly in the SWTBUG
+    monitor, this code assures that reads of the high ports return
+    the same data as was read the last time on the low ports.
 */
 
 int32 sio1s(int32 io, int32 data)

@@ -718,14 +718,14 @@ if (sw & SWMASK ('C')) {                                /* character? */
     for (i = 30; i >= 0; i = i - 6) {
         c = (int32) ((inst >> i) & 077);
         fprintf (of, "%c", SIXTOASC (c));
-		}    
+        }    
     return SCPE_OK;
     }
 if (sw & SWMASK ('P')) {                                /* packed? */
     for (i = 29; i >= 0; i = i - 7) {
         c = (int32) ((inst >> i) & 0177);
         fprintf (of, FMTASC (c));
-		}
+        }
     return SCPE_OK;
     }
 if (!(sw & SWMASK ('M')))

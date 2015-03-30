@@ -14,11 +14,11 @@
  * variables returns value??
  *
  * macro addressing: labels defined during macro are local use only????
- *	spacewar expects this??? (is it wrong?)
+ *  spacewar expects this??? (is it wrong?)
  *
  * self-feeding lines: \n legal anywhere \t is
- *	read next token into "token" buffer -- avoid saving "line"?
- *	remove crocks from "define"
+ *  read next token into "token" buffer -- avoid saving "line"?
+ *  remove crocks from "define"
  * list title (first line of file) should not be parsed as source?
  * incorrect listing for bare "start"
  * list only 4 digits for address column
@@ -36,9 +36,9 @@
  * Program:  MACRO1
  * File:     macro1.c
  * Author:   Gary A. Messenbrink <gary@netcom.com> (macro8)
- *	MACRO7 modifications: Bob Supnik <bob.supnik@ljo.dec.com>
- *	MACRO1 modifications: Bob Supnik <bob.supnik@ljo.dec.com>
- *	slashed to be more like real MACRO like by Phil Budne <phil@ultimate.com>
+ *  MACRO7 modifications: Bob Supnik <bob.supnik@ljo.dec.com>
+ *  MACRO1 modifications: Bob Supnik <bob.supnik@ljo.dec.com>
+ *  slashed to be more like real MACRO like by Phil Budne <phil@ultimate.com>
  *
  * Purpose:  A 2 pass PDP-1 assembler
  *
@@ -59,61 +59,61 @@
  *    along with the line number, column number and error message as well as
  *    marking the error in the listing file.
  *    The following file name extensions are used:
- *	 .mac	 source code (input)
- *	 .lst	 assembly listing (output)
- *	 .rim	 assembly output in DEC's rim format (output)
- *	 .prm	 permanent symbol table in form suitable for reading after
- *		 the EXPUNGE pseudo-op.
- *	 .sym	 "symbol punch" tape (for DDT, or reloading into macro)
+ *   .mac    source code (input)
+ *   .lst    assembly listing (output)
+ *   .rim    assembly output in DEC's rim format (output)
+ *   .prm    permanent symbol table in form suitable for reading after
+ *       the EXPUNGE pseudo-op.
+ *   .sym    "symbol punch" tape (for DDT, or reloading into macro)
  *
  * OPTIONS
  *    -d   Dump the symbol table at end of assembly
  *    -p   Generate a file with the permanent symbols in it.
- *	   (To get the current symbol table, assemble a file than has only
- *	    START in it.)
+ *     (To get the current symbol table, assemble a file than has only
+ *      START in it.)
  *    -x   Generate a cross-reference (concordance) of user symbols.
  *    -r   Output a tape using only RIM format (else output block loader)
  *    -s   Output a symbol dump tape (loader + loader blocks)
  *    -S file
- *	   Read a symbol tape back in
+ *     Read a symbol tape back in
  *
  * DIAGNOSTICS
  *    Assembler error diagnostics are output to an error file and inserted
  *    in the listing file.  Each line in the error file has the form
  *
- *	 <filename>:<line>:<col> : error:  <message> at Loc = <loc>
+ *   <filename>:<line>:<col> : error:  <message> at Loc = <loc>
  *
  *    An example error message is:
  *
- *	 bintst.7:17:9 : error:  undefined symbol "UNDEF" at Loc = 07616
+ *   bintst.7:17:9 : error:  undefined symbol "UNDEF" at Loc = 07616
  *
  *    The error diagnostics put in the listing start with a two character
- *    error code (if appropriate) and a short message.	A carat '^' is
+ *    error code (if appropriate) and a short message.  A carat '^' is
  *    placed under the item in error if appropriate.
  *    An example error message is:
  *
- *	    17 07616 3000	   DAC	   UNDEF
- *	 UD undefined			   ^
- *	    18 07617 1777	   TAD	I  DUMMY
+ *      17 07616 3000      DAC     UNDEF
+ *   UD undefined              ^
+ *      18 07617 1777      TAD  I  DUMMY
  *
  *    Undefined symbols are marked in the symbol table listing by prepending
  *    a '?' to the symbol.  Redefined symbols are marked in the symbol table
  *    listing by prepending a '#' to the symbol.  Examples are:
  *
- *	 #REDEF	  04567
- *	  SWITCH  07612
- *	 ?UNDEF	  00000
+ *   #REDEF   04567
+ *    SWITCH  07612
+ *   ?UNDEF   00000
  *
  *    Refer to the code for the diagnostic messages generated.
  *
  * REFERENCES:
  *    This assembler is based on the pal assember by:
- *	 Douglas Jones <jones@cs.uiowa.edu> and
- *	 Rich Coon <coon@convexw.convex.com>
+ *   Douglas Jones <jones@cs.uiowa.edu> and
+ *   Rich Coon <coon@convexw.convex.com>
  *
  * COPYRIGHT NOTICE:
  *    This is free software.  There is no fee for using it.  You may make
- *    any changes that you wish and also give it away.	If you can make
+ *    any changes that you wish and also give it away.  If you can make
  *    a commercial product out of it, fine, but do not put any limits on
  *    the purchaser's right to do the same.  If you improve it or fix any
  *    bugs, it would be nice if you told me and offered me a copy of the
@@ -121,7 +121,7 @@
  *
  *
  * Amendments Record:
- *  Version  Date    by	  Comments
+ *  Version  Date    by   Comments
  *  ------- -------  ---  ---------------------------------------------------
  *    v1.0  12Apr96  GAM  Original
  *    v1.1  18Nov96  GAM  Permanent symbol table initialization error.
@@ -132,11 +132,11 @@
  *    v2.2  10Dec96  GAM  Added FLTG psuedo-op (floating point constants).
  *    v2.3   2Feb97  GAM  Fixed paging problem in cross reference output.
  *    v3.0  14Feb97  RMS  MACRO8X features.
- *    	    ?	     RMS  MACRO7
- *    	    ?	     RMS  MACRO1 released w/ lispswre
- *    	    ?	     RMS  MACRO1 released w/ tools
- *    	    ?	     RMS  MACRO1 released w/ ddt1
- *    	    2003     PLB  major reworking
+ *          ?        RMS  MACRO7
+ *          ?        RMS  MACRO1 released w/ lispswre
+ *          ?        RMS  MACRO1 released w/ tools
+ *          ?        RMS  MACRO1 released w/ ddt1
+ *          2003     PLB  major reworking
  */
 
 
@@ -146,18 +146,18 @@
 #include <string.h>
 
 #define LINELEN              96
-#define LIST_LINES_PER_PAGE  60		/* Includes 3 line page header. */
+#define LIST_LINES_PER_PAGE  60     /* Includes 3 line page header. */
 #define NAMELEN             128
 #define SYMBOL_COLUMNS        5
 #define SYMLEN                7
-/*#define SYMSIG	      4		/* EXP: significant chars in a symbol */
+/*#define SYMSIG          4     /* EXP: significant chars in a symbol */
 #define SYMBOL_TABLE_SIZE  8192
 #define MAC_MAX_ARGS         20
 #define MAC_MAX_LENGTH     8192
-#define MAC_TABLE_LENGTH   1024		/* Must be <= 4096. */
+#define MAC_TABLE_LENGTH   1024     /* Must be <= 4096. */
 
-#define MAX_LITERALS	   1000
-#define MAX_CONSTANTS	     10		/* max number of "constants" blocks  */
+#define MAX_LITERALS       1000
+#define MAX_CONSTANTS        10     /* max number of "constants" blocks  */
 
 #define XREF_COLUMNS          8
 
@@ -181,14 +181,14 @@
 /* (true) if the stated condtion is met. */
 /* Use these to test attributes.  The proper bits are extracted and then */
 /* tested. */
-#define M_DEFINED(s)	(((s) & DEFINED) == DEFINED)
-#define M_DUPLICATE(s)	(((s) & DUPLICATE) == DUPLICATE)
-#define M_FIXED(s)	(((s) & FIXED) == FIXED)
-#define M_LABEL(s)	(((s) & LABEL) == LABEL)
-#define M_PSEUDO(s)	(((s) & PSEUDO) == PSEUDO)
-#define M_EPSEUDO(s)	(((s) & EPSEUDO) == EPSEUDO)
-#define M_MACRO(s)	(((s) & MACRO) == MACRO)
-#define M_NOTRDEF(s)	(((s) & NOTRDEF) != 0)
+#define M_DEFINED(s)    (((s) & DEFINED) == DEFINED)
+#define M_DUPLICATE(s)  (((s) & DUPLICATE) == DUPLICATE)
+#define M_FIXED(s)  (((s) & FIXED) == FIXED)
+#define M_LABEL(s)  (((s) & LABEL) == LABEL)
+#define M_PSEUDO(s) (((s) & PSEUDO) == PSEUDO)
+#define M_EPSEUDO(s)    (((s) & EPSEUDO) == EPSEUDO)
+#define M_MACRO(s)  (((s) & MACRO) == MACRO)
+#define M_NOTRDEF(s)    (((s) & NOTRDEF) != 0)
 
 typedef unsigned char BOOL;
 typedef unsigned char BYTE;
@@ -305,10 +305,10 @@ void    flushLoader( void );
 void    readLine( void );
 void    saveError( char *mesg, WORD32 cc );
 void    topOfForm( char *title, char *sub_title );
-void	constants(void);
-void	variables(void);
-void	eob(void);
-void	dump_symbols(void);
+void    constants(void);
+void    variables(void);
+void    eob(void);
+void    dump_symbols(void);
 
 /*----------------------------------------------------------------------------*/
 
@@ -316,19 +316,19 @@ void	dump_symbols(void);
 /* table on startup */
 SYM_T pseudos[] =
 {
-  { PSEUDO,  "consta",	CONSTANTS },
-  { PSEUDO,  "define",	DEFINE  },	/* Define macro. */
-  { PSEUDO,  "repeat",	REPEAT  },
-  { PSEUDO,  "start",	START   },	/* Set starting address. */
-  { PSEUDO,  "variab",	VARIABLES },
-  { PSEUDO,  "text",	TEXT	},
-  { PSEUDO,  "noinpu",	NOINPUT	},
-  { PSEUDO,  "expung",	EXPUNGE	},
+  { PSEUDO,  "consta",  CONSTANTS },
+  { PSEUDO,  "define",  DEFINE  },  /* Define macro. */
+  { PSEUDO,  "repeat",  REPEAT  },
+  { PSEUDO,  "start",   START   },  /* Set starting address. */
+  { PSEUDO,  "variab",  VARIABLES },
+  { PSEUDO,  "text",    TEXT    },
+  { PSEUDO,  "noinpu",  NOINPUT },
+  { PSEUDO,  "expung",  EXPUNGE },
 /* the following can appear in expressions: */
-  { EPSEUDO, "charac",	CHAR    },
-  { EPSEUDO, "decima",	DECIMAL },	/* base 10. */
-  { EPSEUDO, "flexo",	FLEX    },
-  { EPSEUDO, "octal",	OCTAL   },	/* Read literal constants in base 8. */
+  { EPSEUDO, "charac",  CHAR    },
+  { EPSEUDO, "decima",  DECIMAL },  /* base 10. */
+  { EPSEUDO, "flexo",   FLEX    },
+  { EPSEUDO, "octal",   OCTAL   },  /* Read literal constants in base 8. */
 };
 
 /* Symbol Table */
@@ -357,12 +357,12 @@ SYM_T permanent_symbols[] =
   { DEFFIX, "sad",    0500000 },
   { DEFFIX, "sas",    0520000 },
   { DEFFIX, "mul",    0540000 },
-  { DEFFIX, "mus",    0540000 },	/* for spacewar */
+  { DEFFIX, "mus",    0540000 },    /* for spacewar */
   { DEFFIX, "div",    0560000 },
-  { DEFFIX, "dis",    0560000 },	/* for spacewar */
+  { DEFFIX, "dis",    0560000 },    /* for spacewar */
   { DEFFIX, "jmp",    0600000 },
   { DEFFIX, "jsp",    0620000 },
-  { DEFFIX, "skip",   0640000 },	/* for spacewar */
+  { DEFFIX, "skip",   0640000 },    /* for spacewar */
   { DEFFIX, "cal",    0160000 },
   { DEFFIX, "jda",    0170000 },
   { DEFFIX, "i",      0010000 },
@@ -423,18 +423,18 @@ SYM_T permanent_symbols[] =
   { DEFFIX, "ppb",    0730006 },
   { DEFFIX, "tyo",    0730003 },
   { DEFFIX, "tyi",    0720004 },
-  { DEFFIX, "dpy",    0730007 },	/* for spacewar, munching squares! */
+  { DEFFIX, "dpy",    0730007 },    /* for spacewar, munching squares! */
   { DEFFIX, "lsm",    0720054 },
   { DEFFIX, "esm",    0720055 },
   { DEFFIX, "cbs",    0720056 },
   { DEFFIX, "lem",    0720074 },
   { DEFFIX, "eem",    0724074 },
   { DEFFIX, "cks",    0720033 },
-};					/* End-of-Symbols for Permanent Symbol Table */
+};                  /* End-of-Symbols for Permanent Symbol Table */
 
 /* Global variables */
-SYM_T *symtab;				/* Symbol Table */
-int    symbol_top;			/* Number of entries in symbol table. */
+SYM_T *symtab;              /* Symbol Table */
+int    symbol_top;          /* Number of entries in symbol table. */
 
 #define LOADERBASE 07751
 
@@ -446,33 +446,33 @@ int    symbol_top;			/* Number of entries in symbol table. */
 #define LOADER_EN1 (LOADERBASE+026)
 
 WORD32 loader[] = {
-    0730002,				/* in,	rpb */
-    0320000+LOADER_A,			/* 	dio a */
-    0100000+LOADER_A,			/* 	xct a */
-    0320000+LOADER_CK,			/* 	dio ck */
-    0730002,				/* 	rpb */
-    0320000+LOADER_EN1,			/* 	dio en1 */
-    0730002,				/* b,	rpb */
-    0000000,				/* a,	xx */
-    0210000+LOADER_A,			/* 	lac i a */
-    0400000+LOADER_CK,			/* 	add ck */
-    0240000+LOADER_CK,			/* 	dac ck */
-    0440000+LOADER_A,			/* 	idx a */
-    0520000+LOADER_EN1,			/* 	sas en1 */
-    0600000+LOADER_B,			/* 	jmp b */
-    0200000+LOADER_CK,			/* 	lac ck */
-    0400000+LOADER_EN1,			/* 	add en1 */
-    0730002,				/* 	rpb */
-    0320000+LOADER_CK,			/* 	dio ck */
-    0520000+LOADER_CK,			/* 	sas ck */
-    0760400,				/*	hlt */
-    0600000+LOADER_IN			/* 	jmp in */
-					/* ck,  0 */
-					/* en1, 0 */
+    0730002,                /* in,  rpb */
+    0320000+LOADER_A,           /*  dio a */
+    0100000+LOADER_A,           /*  xct a */
+    0320000+LOADER_CK,          /*  dio ck */
+    0730002,                    /*  rpb */
+    0320000+LOADER_EN1,         /*  dio en1 */
+    0730002,                /* b,   rpb */
+    0000000,                /* a,   xx */
+    0210000+LOADER_A,           /*  lac i a */
+    0400000+LOADER_CK,          /*  add ck */
+    0240000+LOADER_CK,          /*  dac ck */
+    0440000+LOADER_A,           /*  idx a */
+    0520000+LOADER_EN1,         /*  sas en1 */
+    0600000+LOADER_B,           /*  jmp b */
+    0200000+LOADER_CK,          /*  lac ck */
+    0400000+LOADER_EN1,         /*  add en1 */
+    0730002,                    /*  rpb */
+    0320000+LOADER_CK,          /*  dio ck */
+    0520000+LOADER_CK,              /*  sas ck */
+    0760400,                    /*  hlt */
+    0600000+LOADER_IN           /*  jmp in */
+                    /* ck,  0 */
+                    /* en1, 0 */
 };
 
-#define LOADERBUFSIZE 0100		/* <=0100, power of 2*/
-#define LOADERBUFMASK (LOADERBUFSIZE-1)	/* for block alignment */
+#define LOADERBUFSIZE 0100      /* <=0100, power of 2*/
+#define LOADERBUFMASK (LOADERBUFSIZE-1) /* for block alignment */
 
 WORD32 loaderbuf[LOADERBUFSIZE];
 WORD32 loaderbufcount;
@@ -480,7 +480,7 @@ WORD32 loaderbufstart;
 
 /*----------------------------------------------------------------------------*/
 
-WORD32 *xreftab;			/* Start of the concordance table. */
+WORD32 *xreftab;            /* Start of the concordance table. */
 
 ERRSAVE_T error_list[20];
 int     save_error_count;
@@ -513,7 +513,7 @@ char   s_xref[]     = "Cross Reference";
 /*      RD  ReDefintion of a symbol */
 /*      ST  Symbol Table full */
 /*      UA  Undefined Address (undefined symbol) */
-/*	VR  Value Required */
+/*  VR  Value Required */
 /*      ZE  Zero Page Exceeded (see above, or out of space) */
 EMSG_T  duplicate_label     = { "DT duplicate",  "duplicate label" };
 EMSG_T  illegal_blank       = { "IC illegal blank", "illegal blank" };
@@ -569,7 +569,7 @@ char    objectpathname[NAMELEN];
 char   *pathname;
 char    permpathname[NAMELEN];
 
-WORD32  mac_count;			/* Total macros defined. */
+WORD32  mac_count;          /* Total macros defined. */
 
 /*
  * malloced macro bodies, indexed by sym->val dummies are evaluated at
@@ -578,110 +578,110 @@ WORD32  mac_count;			/* Total macros defined. */
  * list here and move symbols to "macinv"
  */
 struct macdef {
-    int nargs;				/* number of args */
-    SYM_T args[MAC_MAX_ARGS+1];		/* symbol for each and one for "r" */
-    char body[1];			/* malloc'ed accordingly */
+    int nargs;              /* number of args */
+    SYM_T args[MAC_MAX_ARGS+1];     /* symbol for each and one for "r" */
+    char body[1];           /* malloc'ed accordingly */
 } *mac_defs[MAC_TABLE_LENGTH];
 
-struct macinv {				/* current macro invocation */
-    char    mac_line[LINELEN];		/* Saved macro invocation line. */
-    WORD32  mac_cc;			/* Saved cc after macro invocation. */
-    char   *mac_ptr;			/* Pointer to macro body, NULL if no macro. */
-    struct macdef *defn;		/* pointer to definition for dummies */
-    struct macinv *prev;		/* previous invocation in stack */
-} *curmacro;				/* macro stack */
+struct macinv {             /* current macro invocation */
+    char    mac_line[LINELEN];      /* Saved macro invocation line. */
+    WORD32  mac_cc;         /* Saved cc after macro invocation. */
+    char   *mac_ptr;            /* Pointer to macro body, NULL if no macro. */
+    struct macdef *defn;        /* pointer to definition for dummies */
+    struct macinv *prev;        /* previous invocation in stack */
+} *curmacro;                /* macro stack */
 
-int	nrepeats;			/* count of nested repeats */
+int nrepeats;           /* count of nested repeats */
 
 int     list_lineno;
 int     list_pageno;
 char    list_title[LINELEN];
-BOOL    list_title_set;			/* Set if TITLE pseudo-op used. */
-char    line[LINELEN];			/* Input line. */
-int     lineno;				/* Current line number. */
-int     page_lineno;			/* print line number on current page. */
-WORD32  listed;				/* Listed flag. */
+BOOL    list_title_set;         /* Set if TITLE pseudo-op used. */
+char    line[LINELEN];          /* Input line. */
+int     lineno;             /* Current line number. */
+int     page_lineno;            /* print line number on current page. */
+WORD32  listed;             /* Listed flag. */
 WORD32  listedsave;
 
-WORD32  cc;				/* Column Counter (char position in line). */
-WORD32  clc;				/* Location counter */
-BOOL    end_of_input;			/* End of all input files. */
-int     errors;				/* Number of errors found so far. */
-BOOL    error_in_line;			/* TRUE if error on current line. */
-int     errors_pass_1;			/* Number of errors on pass 1. */
-int     filix_curr;			/* Index in argv to current input file. */
-int     filix_start;			/* Start of input files in argv. */
-int	lexstartprev;			/* Where previous lexeme started. */
-int	lextermprev;			/* Where previous lexeme ended. */
-int	lexstart;			/* Index of current lexeme on line. */
-int	lexterm;			/* Index of character after current lexeme. */
-int	overbar;			/* next saw an overbar in last token */
+WORD32  cc;             /* Column Counter (char position in line). */
+WORD32  clc;                /* Location counter */
+BOOL    end_of_input;           /* End of all input files. */
+int     errors;             /* Number of errors found so far. */
+BOOL    error_in_line;          /* TRUE if error on current line. */
+int     errors_pass_1;          /* Number of errors on pass 1. */
+int     filix_curr;         /* Index in argv to current input file. */
+int     filix_start;            /* Start of input files in argv. */
+int lexstartprev;           /* Where previous lexeme started. */
+int lextermprev;            /* Where previous lexeme ended. */
+int lexstart;           /* Index of current lexeme on line. */
+int lexterm;            /* Index of character after current lexeme. */
+int overbar;            /* next saw an overbar in last token */
 
-int	nconst;				/* number of "constants" blocks */
-int	lit_count[MAX_CONSTANTS];	/* # of lits in each block in pass 1 */
-WORD32  lit_loc[MAX_CONSTANTS];		/* Base of literal blocks */
+int nconst;             /* number of "constants" blocks */
+int lit_count[MAX_CONSTANTS];   /* # of lits in each block in pass 1 */
+WORD32  lit_loc[MAX_CONSTANTS];     /* Base of literal blocks */
 
-int	noinput;			/* don't punch loader */
+int noinput;            /* don't punch loader */
 
-int	nvars;				/* number of variables */
-WORD32	vars_addr;			/* address of "variables" */
-WORD32	vars_end;			/* end of "variables" */
+int nvars;              /* number of variables */
+WORD32  vars_addr;          /* address of "variables" */
+WORD32  vars_end;           /* end of "variables" */
 
 /* pass 2 only; */
-int	nlit;				/* number of literals in litter[] */
-WORD32	litter[MAX_LITERALS];		/* literals */
+int nlit;               /* number of literals in litter[] */
+WORD32  litter[MAX_LITERALS];       /* literals */
 
-WORD32  maxcc;				/* Current line length. */
-BOOL    nomac_exp;			/* No macro expansion */
-WORD32  pass;				/* Number of current pass. */
+WORD32  maxcc;              /* Current line length. */
+BOOL    nomac_exp;          /* No macro expansion */
+WORD32  pass;               /* Number of current pass. */
 BOOL    print_permanent_symbols;
-WORD32  radix;				/* Default number radix. */
-BOOL    rim_mode;			/* RIM mode output. */
-BOOL    sym_dump;			/* punch symbol tape */
-int     save_argc;			/* Saved argc. */
-char   **save_argv;			/* Saved *argv[]. */
-WORD32  start_addr;			/* Saved start address. */
-BOOL    symtab_print;			/* Print symbol table flag */
+WORD32  radix;              /* Default number radix. */
+BOOL    rim_mode;           /* RIM mode output. */
+BOOL    sym_dump;           /* punch symbol tape */
+int     save_argc;          /* Saved argc. */
+char   **save_argv;         /* Saved *argv[]. */
+WORD32  start_addr;         /* Saved start address. */
+BOOL    symtab_print;           /* Print symbol table flag */
 BOOL    xref;
 
 SYM_T   sym_undefined = { UNDEFINED, "", 0 };/* Symbol Table Terminator */
 
 /* initial data from SIMH v3.0 pdp1_stddev.c (different encoding of UC/LC) */
-#define UC 0100				/* Upper case */
+#define UC 0100             /* Upper case */
 #define LC 0200
 #define CHARBITS 077
-#define BC LC|UC			/* both case bits */
-#define BAD 014				/* unused concise code */
+#define BC LC|UC            /* both case bits */
+#define BAD 014             /* unused concise code */
 
 unsigned char ascii_to_fiodec[128] = {
-	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,
-	BC|075,	BC|036,	BAD,	BAD,	BAD,	BC|077,	BAD,	BAD,
-	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,
-	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,	BAD,
-	BC|000,	UC|005,	UC|001,	UC|004,	BAD,	BAD,	UC|006,	UC|002,
-	LC|057,	LC|055,	UC|073,	UC|054,	LC|033,	LC|054,	LC|073,	LC|021,
-	LC|020,	LC|001,	LC|002,	LC|003,	LC|004,	LC|005,	LC|006,	LC|007,
-	LC|010,	LC|011,	BAD,	BAD,	UC|007,	UC|033,	UC|010,	UC|021,
-	LC|040,	UC|061,	UC|062,	UC|063,	UC|064,	UC|065,	UC|066,	UC|067,
-	UC|070,	UC|071,	UC|041,	UC|042,	UC|043,	UC|044,	UC|045,	UC|046,
-	UC|047,	UC|050,	UC|051,	UC|022,	UC|023,	UC|024,	UC|025,	UC|026,
-	UC|027,	UC|030,	UC|031,	UC|057,	LC|056,	UC|055,	UC|011,	UC|040,
-	UC|020,	LC|061,	LC|062,	LC|063,	LC|064,	LC|065,	LC|066,	LC|067,
-	LC|070,	LC|071,	LC|041,	LC|042,	LC|043,	LC|044,	LC|045,	LC|046,
-	LC|047,	LC|050,	LC|051,	LC|022,	LC|023,	LC|024,	LC|025,	LC|026,
-	LC|027,	LC|030,	LC|031,	BAD,	UC|056,	BAD,	UC|003,	BC|075
+    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,
+    BC|075, BC|036, BAD,    BAD,    BAD,    BC|077, BAD,    BAD,
+    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,
+    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,    BAD,
+    BC|000, UC|005, UC|001, UC|004, BAD,    BAD,    UC|006, UC|002,
+    LC|057, LC|055, UC|073, UC|054, LC|033, LC|054, LC|073, LC|021,
+    LC|020, LC|001, LC|002, LC|003, LC|004, LC|005, LC|006, LC|007,
+    LC|010, LC|011, BAD,    BAD,    UC|007, UC|033, UC|010, UC|021,
+    LC|040, UC|061, UC|062, UC|063, UC|064, UC|065, UC|066, UC|067,
+    UC|070, UC|071, UC|041, UC|042, UC|043, UC|044, UC|045, UC|046,
+    UC|047, UC|050, UC|051, UC|022, UC|023, UC|024, UC|025, UC|026,
+    UC|027, UC|030, UC|031, UC|057, LC|056, UC|055, UC|011, UC|040,
+    UC|020, LC|061, LC|062, LC|063, LC|064, LC|065, LC|066, LC|067,
+    LC|070, LC|071, LC|041, LC|042, LC|043, LC|044, LC|045, LC|046,
+    LC|047, LC|050, LC|051, LC|022, LC|023, LC|024, LC|025, LC|026,
+    LC|027, LC|030, LC|031, BAD,    UC|056, BAD,    UC|003, BC|075
 };
 
 /* for symbol punch tape conversion only!! */
 char fiodec_to_ascii[64] = {
-	0, '1', '2', '3', '4', '5', '6', '7',
-	'8', '9', 0, 0, 0, 0, 0, 0,
-	'0', 0, 's', 't', 'u', 'v', 'w', 'x',
-	'y', 'z', 0, 0, 0, 0, 0, 0,
-	0, 'j', 'k', 'l', 'm', 'n', 'o', 'p',
-	'q', 'r', 0, 0, 0, 0, 0, 0,
-	0, 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-	'h', 'i', 0, 0, 0, 0, 0, 0 };
+    0, '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 0, 0, 0, 0, 0, 0,
+    '0', 0, 's', 't', 'u', 'v', 'w', 'x',
+    'y', 'z', 0, 0, 0, 0, 0, 0,
+    0, 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+    'q', 'r', 0, 0, 0, 0, 0, 0,
+    0, 'a', 'b', 'c', 'd', 'e', 'f', 'g',
+    'h', 'i', 0, 0, 0, 0, 0, 0 };
 
 /* used at startup & for expunge */
 void
@@ -705,7 +705,7 @@ main( int argc, char *argv[] )
     /* Set the default values for global symbols. */
     print_permanent_symbols = FALSE;
     nomac_exp = TRUE;
-    rim_mode = FALSE;			/* default to loader tapes */
+    rim_mode = FALSE;           /* default to loader tapes */
     sym_dump = FALSE;
     noinput = FALSE;
 
@@ -722,26 +722,26 @@ main( int argc, char *argv[] )
      * installing the permanent symbols.
      */
     errorfile = stderr;
-    pass = 0;				/* required for symbol table init */
+    pass = 0;               /* required for symbol table init */
     symtab = (SYM_T *) malloc( sizeof( SYM_T ) * SYMBOL_TABLE_SIZE );
 
     if( symtab == NULL ) {
-	fprintf( stderr, "Could not allocate memory for symbol table.\n");
-	exit( -1 );
+    fprintf( stderr, "Could not allocate memory for symbol table.\n");
+    exit( -1 );
     }
 
     init_symtab();
 
     /* Enter the pseudo-ops into the symbol table */
     for( ix = 0; ix < DIM( pseudos ); ix++ )
-	defineSymbol( pseudos[ix].name, pseudos[ix].val, pseudos[ix].type, 0 );
+    defineSymbol( pseudos[ix].name, pseudos[ix].val, pseudos[ix].type, 0 );
 
     /* Enter the predefined symbols into the table. */
     /* Also make them part of the permanent symbol table. */
     for( ix = 0; ix < DIM( permanent_symbols ); ix++ )
-	defineSymbol( permanent_symbols[ix].name,
-		      permanent_symbols[ix].val,
-		      permanent_symbols[ix].type, 0 );
+    defineSymbol( permanent_symbols[ix].name,
+              permanent_symbols[ix].val,
+              permanent_symbols[ix].type, 0 );
 
     /* Get the options and pathnames */
     getArgs( argc, argv );
@@ -761,26 +761,26 @@ main( int argc, char *argv[] )
     /* XXX punch title into tape! */
     punchLeader( 0 );
     if (!rim_mode) {
-	punchLoader();
-	punchLeader(5);
+    punchLoader();
+    punchLeader(5);
     }
 
     if (nlit > 0)
-	constants();			/* implied "constants"? */
+    constants();            /* implied "constants"? */
 
     /* Do pass two of the assembly */
     errors = 0;
     save_error_count = 0;
 
     if( xref ) {
-	/* Get the amount of space that will be required for the concordance */
-	for( space = 0, ix = 0; ix < symbol_top; ix++ ) {
-	    symtab[ix].xref_index = space; /* Index into concordance table. */
-	    space += symtab[ix].xref_count + 1;
-	    symtab[ix].xref_count = 0;	/* Clear the count for pass 2. */
-	}
-	/* Allocate & clear the necessary space. */
-	xreftab = (WORD32 *) calloc( space, sizeof( WORD32 ));
+    /* Get the amount of space that will be required for the concordance */
+    for( space = 0, ix = 0; ix < symbol_top; ix++ ) {
+        symtab[ix].xref_index = space; /* Index into concordance table. */
+        space += symtab[ix].xref_count + 1;
+        symtab[ix].xref_count = 0;  /* Clear the count for pass 2. */
+    }
+    /* Allocate & clear the necessary space. */
+    xreftab = (WORD32 *) calloc( space, sizeof( WORD32 ));
     }
     pass = 2;
     onePass();
@@ -795,33 +795,33 @@ main( int argc, char *argv[] )
 
     /* Display value of error counter. */
     if( errors == 0 ) {
-	fprintf( listfile, "\n      %s %s %s\n", s_no, s_errors, s_detected );
+    fprintf( listfile, "\n      %s %s %s\n", s_no, s_errors, s_detected );
     }
     else {
-	fprintf( errorfile, "\n      %d %s %s\n", errors, s_detected,
-		 ( errors == 1 ? s_error : s_errors ));
-	fprintf( listfile, "\n      %d %s %s\n", errors, s_detected,
-		 ( errors == 1 ? s_error : s_errors ));
+    fprintf( errorfile, "\n      %d %s %s\n", errors, s_detected,
+         ( errors == 1 ? s_error : s_errors ));
+    fprintf( listfile, "\n      %d %s %s\n", errors, s_detected,
+         ( errors == 1 ? s_error : s_errors ));
     }
 
     if( symtab_print )
-	printSymbolTable();
+    printSymbolTable();
 
     if( print_permanent_symbols )
-	printPermanentSymbolTable();
+    printPermanentSymbolTable();
 
     if( xref )
-	printCrossReference();
+    printCrossReference();
 
     fclose( objectfile );
     fclose( listfile );
     if( errors == 0 && errors_pass_1 == 0 ) {
-	/* after closing objectfile -- we reuse the FILE *!! */
-	if (sym_dump)
-	    dump_symbols();
+    /* after closing objectfile -- we reuse the FILE *!! */
+    if (sym_dump)
+        dump_symbols();
     }
     else
-	remove( objectpathname );
+    remove( objectpathname );
 
     return( errors != 0 );
 } /* main() */
@@ -835,14 +835,14 @@ getw(FILE *f)
 
     w = 0;
     for (i = 0; i < 3;) {
-	c = getc(f);
-	if (c == -1)
-	    return -1;
-	if (c & 0200) {			/* ignore if ch8 not punched */
-	    w <<= 6;
-	    w |= c & 077;
-	    i++;
-	}
+    c = getc(f);
+    if (c == -1)
+        return -1;
+    if (c & 0200) {         /* ignore if ch8 not punched */
+        w <<= 6;
+        w |= c & 077;
+        i++;
+    }
     }
     return w;
 }
@@ -859,10 +859,10 @@ permute(WORD32 name)
 {
     WORD32 temp;
 
-    temp = name & 0202020;		/* get zone bits */
+    temp = name & 0202020;      /* get zone bits */
     temp = ((temp << 1) & 0777777) | ((temp >> 17) & 1); /* rotate left */
-    name ^= temp;			/* flip zone bits */
-    name ^= 0400000;			/* toggle sign */
+    name ^= temp;           /* flip zone bits */
+    name ^= 0400000;            /* toggle sign */
     return name;
 }
 
@@ -887,74 +887,74 @@ read_symbols(char *fname)
 
     f = fopen(fname, "rb");
     if (!f) {
-	perror(fname);
-	exit(1);
+    perror(fname);
+    exit(1);
     }
 
     /* skip loader */
     for (;;) {
-	WORD32 w;
+    WORD32 w;
 
-	w = getw(f);
-	if (w == -1)
-	    goto err;			/* XXX complain? */
-	if ((w & OP_CODE) == JMP)
-	    break;
-	if ((w & OP_CODE) != DIO)
-	    goto err;			/* XXX complain? */
-	w = getw(f);
-	if (w == -1)
-	    goto err;			/* XXX complain? */
+    w = getw(f);
+    if (w == -1)
+        goto err;           /* XXX complain? */
+    if ((w & OP_CODE) == JMP)
+        break;
+    if ((w & OP_CODE) != DIO)
+        goto err;           /* XXX complain? */
+    w = getw(f);
+    if (w == -1)
+        goto err;           /* XXX complain? */
     }
 
 
     /* XXX should push block reader down into a co-routine */
     for (;;) {
-	WORD32 start, end, sum;
+    WORD32 start, end, sum;
 
-	start = getw(f);
-	if ((start & OP_CODE) == JMP) {
-	    fclose(f);
-	    return;
-	}
+    start = getw(f);
+    if ((start & OP_CODE) == JMP) {
+        fclose(f);
+        return;
+    }
 
-	if (start == -1 || (start & OP_CODE) != DIO)
-	    goto err;
+    if (start == -1 || (start & OP_CODE) != DIO)
+        goto err;
 
-	end = getw(f);
-	if (end == -1 || (end & OP_CODE) != DIO)
-	    goto err;			/* XXX complain? */
+    end = getw(f);
+    if (end == -1 || (end & OP_CODE) != DIO)
+        goto err;           /* XXX complain? */
 
-	sum = start + end;
-	while (start < end) {
-	    WORD32 sym, val;
-	    sym = getw(f);
-	    if (sym == -1)
-		goto err;
-	    sum += sym;
-	    start++;
-	    /* XXX handle block boundaries? */
-	    if (start >= end)
-		goto err;
-	    val = getw(f);
-	    if (val == -1)
-		goto err;
-	    /*printf("%06o %06o\n", sym, val);*/
-	    addsym(sym, val);
-	    sum += val;
-	    start++;
-	}
-	start = getw(f);		/* eat checksum XXX verify? */
-	if (start == -1)
-	    goto err;
-	/* roll over all the overflows at once */
-	if (sum & ~0777777) {
-	    sum = (sum & 0777777) + (sum >> 18);
-	    if (sum & 01000000)			/* one more time */
-		sum++;
-	}
-	if (start != sum)
-	    goto err;
+    sum = start + end;
+    while (start < end) {
+        WORD32 sym, val;
+        sym = getw(f);
+        if (sym == -1)
+        goto err;
+        sum += sym;
+        start++;
+        /* XXX handle block boundaries? */
+        if (start >= end)
+        goto err;
+        val = getw(f);
+        if (val == -1)
+        goto err;
+        /*printf("%06o %06o\n", sym, val);*/
+        addsym(sym, val);
+        sum += val;
+        start++;
+    }
+    start = getw(f);        /* eat checksum XXX verify? */
+    if (start == -1)
+        goto err;
+    /* roll over all the overflows at once */
+    if (sum & ~0777777) {
+        sum = (sum & 0777777) + (sum >> 18);
+        if (sum & 01000000)         /* one more time */
+        sum++;
+    }
+    if (start != sum)
+        goto err;
     }
 err:
     fprintf(stderr, "error reading symbol file %s\n", fname);
@@ -990,12 +990,12 @@ void getArgs( int argc, char *argv[] )
           break;
 
         case 'r':
-          rim_mode = TRUE;		/* punch pure rim-mode tapes */
+          rim_mode = TRUE;      /* punch pure rim-mode tapes */
           break;
 
-	case 's':
-	  sym_dump = TRUE;
-	  break;
+    case 's':
+      sym_dump = TRUE;
+      break;
 
         case 'm':
           nomac_exp = FALSE;
@@ -1009,10 +1009,10 @@ void getArgs( int argc, char *argv[] )
           xref = TRUE;
           break;
 
-	case 'S':
-	  if (ix <= argc)
-	      read_symbols(argv[ix++]);
-	  break;
+    case 'S':
+      if (ix <= argc)
+          read_symbols(argv[ix++]);
+      break;
 
         default:
           fprintf( stderr, "%s: unknown flag: %s\n", argv[0], argv[ix] );
@@ -1022,7 +1022,7 @@ void getArgs( int argc, char *argv[] )
           fprintf( stderr, " -r -- output RIM format file\n" );
           fprintf( stderr, " -s -- output symbol punch tape to file\n" ); 
           fprintf( stderr, " -S file -- read symbol punch tape\n" );
-	  fprintf( stderr, " -x -- output cross reference to file\n" );
+      fprintf( stderr, " -x -- output cross reference to file\n" );
           fflush( stderr );
           exit( -1 );
         } /* end switch */
@@ -1091,7 +1091,7 @@ void getArgs( int argc, char *argv[] )
 
   /* Extract the filename from the path. */
   if( isalpha( pathname[0] ) && pathname[1] == ':' && pathname[2] != '\\' )
-      pathname[1] = '\\';		/* MS-DOS style pathname */
+      pathname[1] = '\\';       /* MS-DOS style pathname */
 
   jx = len - 1;
   while( pathname[jx] != '/' && pathname[jx] != '\\' && jx >= 0 )
@@ -1109,56 +1109,56 @@ invokeMacro(int index)
 
     mdp = mac_defs[index];
     if (mdp == NULL || mdp->body[0] == '\0')
-	return 0;
+    return 0;
 
     /* Find arguments. */
     while (ISBLANK(line[lexstart]))
-	next(0);
+    next(0);
 
     mip = calloc(1, sizeof(struct macinv));
     if (!mip) {
-	fprintf(stderr, "could not allocate memory for macro invocation\n");
-	exit(1);
+    fprintf(stderr, "could not allocate memory for macro invocation\n");
+    exit(1);
     }
     mip->defn = mdp;
 
     /* evaluate args, saving values in SYM_T entries in defn.
      * (cannot have recursive macros)
      */
-    mdp->args[0].val = clc;		/* r is location at start */
+    mdp->args[0].val = clc;     /* r is location at start */
     for( jx = 1; !ISDONE(line[lexstart]) && jx <= MAC_MAX_ARGS; ) {
-	WORD32 val;
+    WORD32 val;
 
-	next(0);
-	if (ISDONE(line[lexstart]))
-	    break;
+    next(0);
+    if (ISDONE(line[lexstart]))
+        break;
 
-	if (line[lexstart] == ',')
-	    next(0);
+    if (line[lexstart] == ',')
+        next(0);
 
-	while( ISBLANK( line[lexstart] ))
-	    next(0);
+    while( ISBLANK( line[lexstart] ))
+        next(0);
 
-	if (ISDONE(line[lexstart]))
-	    break;
+    if (ISDONE(line[lexstart]))
+        break;
 
-	val = getExprs();
+    val = getExprs();
 
-	/* ignore excess values silently? */
-	if (jx <= mdp->nargs)
-	    mdp->args[jx].val = val;
-	jx++;
+    /* ignore excess values silently? */
+    if (jx <= mdp->nargs)
+        mdp->args[jx].val = val;
+    jx++;
     } /* end for */
 
     /* XXX complain if too few actuals? -- nah */
     while (jx <= mdp->nargs)
-	mdp->args[jx++].val = 0;
+    mdp->args[jx++].val = 0;
 
-    strcpy(mip->mac_line, line);	/* save line */
-    mip->mac_cc = cc;			/* save position in line */
+    strcpy(mip->mac_line, line);    /* save line */
+    mip->mac_cc = cc;           /* save position in line */
     mip->mac_ptr = mdp->body;
-    mip->prev = curmacro;		/* push the old entry */
-    curmacro = mip;			/* step up to the plate! */
+    mip->prev = curmacro;       /* push the old entry */
+    curmacro = mip;         /* step up to the plate! */
     return 1;
 }
 
@@ -1166,168 +1166,168 @@ invokeMacro(int index)
 void
 processLine() {
     if (!list_title_set) {
-	char *cp;
+    char *cp;
 
-	/* assert(sizeof(title) >= sizeof(line)); */
-	strcpy(list_title, line);
+    /* assert(sizeof(title) >= sizeof(line)); */
+    strcpy(list_title, line);
 
-	if ((cp = strchr(list_title, '\n')))
-	    *cp = '\0';
+    if ((cp = strchr(list_title, '\n')))
+        *cp = '\0';
 
-	if (list_title[0]) {
-	    list_title_set = TRUE;
-	    fprintf(stderr, "%s - pass %d\n", list_title, pass );
-	    /* XXX punch title into tape  banner (until an '@' seen) */
-	}
-	return;
+    if (list_title[0]) {
+        list_title_set = TRUE;
+        fprintf(stderr, "%s - pass %d\n", list_title, pass );
+        /* XXX punch title into tape  banner (until an '@' seen) */
+    }
+    return;
     }
 
     for (;;) {
-	int jx;
-	SYM_T evalue;
+    int jx;
+    SYM_T evalue;
 
-	next(0);
-	if( end_of_input )
-	    return;
+    next(0);
+    if( end_of_input )
+        return;
 
-	if( ISEND( line[lexstart] )) {
-	    if (line[lexstart] != '\t')
-		return;
-	    continue;
-	}
-	if (line[lexstart] == '/')	/* comment? */
-	    return;			/* done */
+    if( ISEND( line[lexstart] )) {
+        if (line[lexstart] != '\t')
+        return;
+        continue;
+    }
+    if (line[lexstart] == '/')  /* comment? */
+        return;         /* done */
 
-	/* look ahead for 'exp/' */
-	/* skip until whitespace or terminator */
-	for( jx = lexstart; jx < maxcc; jx++ )
-	    if( ISBLANK(line[jx]) || ISDONE(line[jx]))
-		break;
-	if( line[jx] == '/') {		/* EXP/ set location */
-	    WORD32  newclc;
+    /* look ahead for 'exp/' */
+    /* skip until whitespace or terminator */
+    for( jx = lexstart; jx < maxcc; jx++ )
+        if( ISBLANK(line[jx]) || ISDONE(line[jx]))
+        break;
+    if( line[jx] == '/') {      /* EXP/ set location */
+        WORD32  newclc;
 
-	    newclc = getExprs();
+        newclc = getExprs();
 
-	    /* Do not change Current Location Counter if an error occurred. */
-	    if( !error_in_line )
-		clc = newclc;
+        /* Do not change Current Location Counter if an error occurred. */
+        if( !error_in_line )
+        clc = newclc;
 
-	    printLine( line, newclc, 0, LINE_LOC );
-	    cc = jx + 1;
-	    next(0);			/* discard slash */
-	    continue;
-	}
+        printLine( line, newclc, 0, LINE_LOC );
+        cc = jx + 1;
+        next(0);            /* discard slash */
+        continue;
+    }
 
-	switch( line[lexterm] ) {
-	case ',':
-	    if( isLexSymbol()) {
-		WORD32 val;
-		SYM_T *sym;
-		char name[SYMLEN];
+    switch( line[lexterm] ) {
+    case ',':
+        if( isLexSymbol()) {
+        WORD32 val;
+        SYM_T *sym;
+        char name[SYMLEN];
 
-		/* Use lookup so symbol will not be counted as reference. */
-		sym = lookup(lexemeToName(name, lexstart, lexterm), UNDEFINED);
+        /* Use lookup so symbol will not be counted as reference. */
+        sym = lookup(lexemeToName(name, lexstart, lexterm), UNDEFINED);
 
-		if (curmacro) {
-		    /* relative during macro expansion!! */
-		    val = clc - curmacro->defn->args[0].val;
-		}
-		else
-		    val = clc;
+        if (curmacro) {
+            /* relative during macro expansion!! */
+            val = clc - curmacro->defn->args[0].val;
+        }
+        else
+            val = clc;
 
-		if( M_DEFINED( sym->type )) {
-		    if( sym->val != val && pass == 2 )
-			errorSymbol( &duplicate_label, sym->name, lexstart );
-		    sym->type |= DUPLICATE;	/* XXX never used! */
-		}
-		/* Must call define on pass 2 to generate concordance. */
-		defineLexeme( lexstart, lexterm, val, LABEL );
-	    }
-	    else if (isdigit(line[lexstart])) {	/* constant, */
-		int i;
-		WORD32 val = 0;
+        if( M_DEFINED( sym->type )) {
+            if( sym->val != val && pass == 2 )
+            errorSymbol( &duplicate_label, sym->name, lexstart );
+            sym->type |= DUPLICATE; /* XXX never used! */
+        }
+        /* Must call define on pass 2 to generate concordance. */
+        defineLexeme( lexstart, lexterm, val, LABEL );
+        }
+        else if (isdigit(line[lexstart])) { /* constant, */
+        int i;
+        WORD32 val = 0;
 
-		for( i = lexstart; i < lexterm; i++ ) {
-		    if( isdigit( line[i] )) {
-			int digit;
-			digit = line[i] - '0';
-			if( digit >= radix ) {
-			    errorLexeme( &number_not_radix, i );
-			    val = 0;
-			    break;
-			}
-			val = val * radix + digit;
-		    }
-		    else {
-			errorLexeme( &not_a_number, lexstart );
-			val = 0;
-			break;
-		    }
-		}
-		if (i == lexterm) {
-		    if( clc != val && pass == 2 )
-			errorLexeme( &duplicate_label, lexstart); /* XXX */
-		}
-	    }
-	    else
-		errorLexeme( &label_syntax, lexstart );
-	    next(0);			/* skip comma */
-	    continue;
+        for( i = lexstart; i < lexterm; i++ ) {
+            if( isdigit( line[i] )) {
+            int digit;
+            digit = line[i] - '0';
+            if( digit >= radix ) {
+                errorLexeme( &number_not_radix, i );
+                val = 0;
+                break;
+            }
+            val = val * radix + digit;
+            }
+            else {
+            errorLexeme( &not_a_number, lexstart );
+            val = 0;
+            break;
+            }
+        }
+        if (i == lexterm) {
+            if( clc != val && pass == 2 )
+            errorLexeme( &duplicate_label, lexstart); /* XXX */
+        }
+        }
+        else
+        errorLexeme( &label_syntax, lexstart );
+        next(0);            /* skip comma */
+        continue;
 
-	case '=':
-	    if( isLexSymbol()) {
-		WORD32 start, term, val;
+    case '=':
+        if( isLexSymbol()) {
+        WORD32 start, term, val;
 
-		start = lexstart;
-		term = lexterm;
-		next(0);		/* skip symbol */
-		next(0);		/* skip trailing = */
-		val = getExprs();
-		defineLexeme( start, term, val, DEFINED );
-		printLine( line, 0, val, LINE_VAL );
-	    }
-	    else {
-		errorLexeme( &symbol_syntax, lexstartprev );
-		next(0);		/* skip symbol */
-		next(0);		/* skip trailing = */
-		getExprs();		/* skip expression */
-	    }
-	    continue;
-	} /* switch on terminator */
+        start = lexstart;
+        term = lexterm;
+        next(0);        /* skip symbol */
+        next(0);        /* skip trailing = */
+        val = getExprs();
+        defineLexeme( start, term, val, DEFINED );
+        printLine( line, 0, val, LINE_VAL );
+        }
+        else {
+        errorLexeme( &symbol_syntax, lexstartprev );
+        next(0);        /* skip symbol */
+        next(0);        /* skip trailing = */
+        getExprs();     /* skip expression */
+        }
+        continue;
+    } /* switch on terminator */
 
-	if( isLexSymbol()) {
-	    SYM_T  *sym;
-	    WORD32  val;
+    if( isLexSymbol()) {
+        SYM_T  *sym;
+        WORD32  val;
 
-	    sym = evalSymbol();
-	    val = sym->val;
-	    if( M_MACRO(sym->type)) {
-		if (!invokeMacro(val))
-		    next(0);		/* bad defn? or body is empty! */
-		continue;
-	    } /* macro invocation */
-	    else if( M_PSEUDO(sym->type)) {	/* NO EPSEUDOs */
-		pseudo( (PSEUDO_T)val & 0777777 );
-		continue;
-	    } /* pseudo */
-	} /* macro, or non-char pseudo */
+        sym = evalSymbol();
+        val = sym->val;
+        if( M_MACRO(sym->type)) {
+        if (!invokeMacro(val))
+            next(0);        /* bad defn? or body is empty! */
+        continue;
+        } /* macro invocation */
+        else if( M_PSEUDO(sym->type)) { /* NO EPSEUDOs */
+        pseudo( (PSEUDO_T)val & 0777777 );
+        continue;
+        } /* pseudo */
+    } /* macro, or non-char pseudo */
 
-	evalue = getExpr();
-	if (evalue.type != PSEUDO) {	/* not a  bare pseudo-op? */
-	    if (line[lexstart] == ',') {	/* EXP, */
-		if(evalue.val != clc && pass == 2 )
-		    errorLexeme( &duplicate_label, lexstart); /* XXX */
-	    }
-	    else if (line[lexstart] == '/') {	/* EXP/ */
-		clc = evalue.val;
-		printLine( line, clc, 0, LINE_LOC );
-		next(0);
-	    }
-	    else {
-		punchOutObject( clc, evalue.val & 0777777); /* punch it! */
-		incrementClc();
-	    }
-	}
+    evalue = getExpr();
+    if (evalue.type != PSEUDO) {    /* not a  bare pseudo-op? */
+        if (line[lexstart] == ',') {    /* EXP, */
+        if(evalue.val != clc && pass == 2 )
+            errorLexeme( &duplicate_label, lexstart); /* XXX */
+        }
+        else if (line[lexstart] == '/') {   /* EXP/ */
+        clc = evalue.val;
+        printLine( line, clc, 0, LINE_LOC );
+        next(0);
+        }
+        else {
+        punchOutObject( clc, evalue.val & 0777777); /* punch it! */
+        incrementClc();
+        }
+    }
     } /* forever */
 }
 
@@ -1336,51 +1336,51 @@ processLine() {
 void onePass() {
     int     ix;
 
-    clc = 4;				/* Default location is 4 */
-    start_addr = 0;			/* No starting address. */
-    nconst = 0;				/* No constant blocks seen */
-    nvars = 0;				/* No variables seen */
+    clc = 4;                /* Default location is 4 */
+    start_addr = 0;         /* No starting address. */
+    nconst = 0;             /* No constant blocks seen */
+    nvars = 0;              /* No variables seen */
 
-    while (curmacro) {			/* pop macro stack */
-	struct macinv *mp;
+    while (curmacro) {          /* pop macro stack */
+    struct macinv *mp;
 
-	mp = curmacro->prev;
-	free(curmacro);
-	curmacro = mp;
+    mp = curmacro->prev;
+    free(curmacro);
+    curmacro = mp;
     }
 
     for( ix = 0; ix < mac_count; ix++) {
-	if (mac_defs[ix])
-	    free( mac_defs[ix] );
-	mac_defs[ix] = NULL;
+    if (mac_defs[ix])
+        free( mac_defs[ix] );
+    mac_defs[ix] = NULL;
     }
-    mac_count = 0;			/* No macros defined. */
+    mac_count = 0;          /* No macros defined. */
 
     listed = TRUE;
     lineno = 0;
     list_pageno = 0;
     list_lineno = 0;
     list_title_set = FALSE;
-    page_lineno = LIST_LINES_PER_PAGE;	/* Force top of page for new titles. */
-    radix = 8;				/* Initial radix is octal (base 8). */
+    page_lineno = LIST_LINES_PER_PAGE;  /* Force top of page for new titles. */
+    radix = 8;              /* Initial radix is octal (base 8). */
 
     /* Now open the first input file. */
     end_of_input = FALSE;
-    filix_curr = filix_start;		/* Initialize pointer to input files. */
+    filix_curr = filix_start;       /* Initialize pointer to input files. */
     if(( infile = fopen( save_argv[filix_curr], "r" )) == NULL ) {
-	fprintf( stderr, "%s: cannot open \"%s\"\n", save_argv[0],
-		save_argv[filix_curr] );
-	exit( -1 );
+    fprintf( stderr, "%s: cannot open \"%s\"\n", save_argv[0],
+        save_argv[filix_curr] );
+    exit( -1 );
     }
 
     for (;;) {
-	readLine();
-	if (end_of_input) {
-	    eob();
-	    fclose( infile );
-	    return;
-	}
-	processLine();
+    readLine();
+    if (end_of_input) {
+        eob();
+        fclose( infile );
+        return;
+    }
+    processLine();
     } /* forever */
 } /* onePass */
 
@@ -1393,7 +1393,7 @@ WORD32 getExprs()
 
     sym = getExpr();
     if (sym.type == PSEUDO)
-	errorMessage( &value_required, lexstart ); /* XXX wrong pointer? */
+    errorMessage( &value_required, lexstart ); /* XXX wrong pointer? */
 
     return sym.val & 0777777;
 } /* getExprs */
@@ -1409,89 +1409,89 @@ SYM_T getExpr()
     /* previous operator from the next, if any. */
 
     for (;;) {
-	int space;
-	/*
-	 * falling out of switch breaks loop and returns from routine
-	 * so if you want to keep going, you must "continue"!!
-	 */
-	space = FALSE;
-	switch( line[lexstart] ) {
-	case ' ':
-	    space = TRUE;
-	    /* fall */
-	case '+':			/* add */
-	    next(1);			/* skip operator */
-	    if (space && ISEND(line[lexstart]))	/* tollerate a trailing space */
-		return sym;
-	    sym.val += eval().val;	/* XXX look at type? */
-	    sym.type = DEFINED;
-	    if( sym.val >= 01000000 )
-		sym.val = ( sym.val + 1 ) & 0777777;
-	    continue;
+    int space;
+    /*
+     * falling out of switch breaks loop and returns from routine
+     * so if you want to keep going, you must "continue"!!
+     */
+    space = FALSE;
+    switch( line[lexstart] ) {
+    case ' ':
+        space = TRUE;
+        /* fall */
+    case '+':           /* add */
+        next(1);            /* skip operator */
+        if (space && ISEND(line[lexstart])) /* tollerate a trailing space */
+        return sym;
+        sym.val += eval().val;  /* XXX look at type? */
+        sym.type = DEFINED;
+        if( sym.val >= 01000000 )
+        sym.val = ( sym.val + 1 ) & 0777777;
+        continue;
 
-	case '-':			/* subtract */
-	    next(1);			/* skip over the operator */
-	    sym.val += eval().val ^ 0777777; /* XXX look at type? */
-	    sym.type = DEFINED;
-	    if( sym.val >= 01000000 )
-		sym.val = ( sym.val + 1 ) & 0777777;
-	    continue;
+    case '-':           /* subtract */
+        next(1);            /* skip over the operator */
+        sym.val += eval().val ^ 0777777; /* XXX look at type? */
+        sym.type = DEFINED;
+        if( sym.val >= 01000000 )
+        sym.val = ( sym.val + 1 ) & 0777777;
+        continue;
 
-	case '*':			/* multiply */
-	    next(1);			/* skip over the operator */
-	    sym.val *= eval().val;
-	    sym.type = DEFINED;
-	    if( sym.val >= 01000000 )
-		sym.val = ( sym.val + 1 ) & 0777777;
-	    continue;
+    case '*':           /* multiply */
+        next(1);            /* skip over the operator */
+        sym.val *= eval().val;
+        sym.type = DEFINED;
+        if( sym.val >= 01000000 )
+        sym.val = ( sym.val + 1 ) & 0777777;
+        continue;
 
 #if 0
-	case '%':			/* divide !??? */
-	    /*
-	     * neither '%' nor the divide symbol appear in FIO-DEC,
-	     * does any known program use such an operator?
-	     * Easily confused for "MOD", which is how C uses '%'!
-	     */
-	    next(1);
-	    sym.val /= eval().val;
-	    sym.type = DEFINED;
-	    continue;
+    case '%':           /* divide !??? */
+        /*
+         * neither '%' nor the divide symbol appear in FIO-DEC,
+         * does any known program use such an operator?
+         * Easily confused for "MOD", which is how C uses '%'!
+         */
+        next(1);
+        sym.val /= eval().val;
+        sym.type = DEFINED;
+        continue;
 #endif
 
-	case '&':			/* and */
-	    next(1);			/* skip over the operator */
-	    sym.val &= eval().val;
-	    sym.type = DEFINED;
-	    continue;
+    case '&':           /* and */
+        next(1);            /* skip over the operator */
+        sym.val &= eval().val;
+        sym.type = DEFINED;
+        continue;
 
-	case '!':			/* or */
-	    next(1);			/* skip over the operator */
-	    sym.val |= eval().val;
-	    sym.type = DEFINED;
-	    continue;
+    case '!':           /* or */
+        next(1);            /* skip over the operator */
+        sym.val |= eval().val;
+        sym.type = DEFINED;
+        continue;
 
-	case '/':
-	case ')':
-	case ']':
-	case ':':
-	case ',':
-	    break;
+    case '/':
+    case ')':
+    case ']':
+    case ':':
+    case ',':
+        break;
 
-	case '=':
-	    errorMessage( &illegal_equals, lexstart );
-	    moveToEndOfLine();
-	    sym.val = 0;
-	    break;
+    case '=':
+        errorMessage( &illegal_equals, lexstart );
+        moveToEndOfLine();
+        sym.val = 0;
+        break;
 
-	default:
-	    if (!ISEND(line[lexstart])) {
-		errorMessage( &illegal_expression, lexstart );
-		moveToEndOfLine();
-		sym.val = 0;
-		break;
-	    }
-	} /* switch */
-	break;				/* break loop!! */
+    default:
+        if (!ISEND(line[lexstart])) {
+        errorMessage( &illegal_expression, lexstart );
+        moveToEndOfLine();
+        sym.val = 0;
+        break;
+        }
+    } /* switch */
+    break;              /* break loop!! */
     } /* "forever" */
     return( sym );
 } /* getExpr */
@@ -1506,52 +1506,52 @@ nextfiodec(int *ccase, int delim)
     unsigned char c;
 
     for (;;) {
-	if (cc >= maxcc) {
-	    if (delim == -1)
-		return -1;
+    if (cc >= maxcc) {
+        if (delim == -1)
+        return -1;
 
-	    /* XXX MUST NOT BE IN A REPEAT!! */
-	    readLine();			/* danger will robinson! */
-	    if (end_of_input)
-		return -1;
-	}
-	c = line[cc];
-	switch (c) {
-	case '\n':
-	    c = '\r';
-	    break;
-	case '\r':
-	    continue;
-	}
-	break;
+        /* XXX MUST NOT BE IN A REPEAT!! */
+        readLine();         /* danger will robinson! */
+        if (end_of_input)
+        return -1;
+    }
+    c = line[cc];
+    switch (c) {
+    case '\n':
+        c = '\r';
+        break;
+    case '\r':
+        continue;
+    }
+    break;
     }
 
     if (delim != -1 && c == delim) {
-	if (*ccase == LC) {
-	    cc++;			/* eat delim */
-	    return -1;
-	}
-	*ccase = LC;
-	return CONCISE_LC;		/* shift down first */
+    if (*ccase == LC) {
+        cc++;           /* eat delim */
+        return -1;
+    }
+    *ccase = LC;
+    return CONCISE_LC;      /* shift down first */
     }
 
-    if (c > 0177) {			/* non-ascii */
-	errorMessage( &illegal_character, cc );
-	c = 0;				/* space?! */
+    if (c > 0177) {         /* non-ascii */
+    errorMessage( &illegal_character, cc );
+    c = 0;              /* space?! */
     }
 
     c = ascii_to_fiodec[c&0177];
     if (c == BAD) {
-	errorMessage( &illegal_character, cc );
-	c = 0;				/* space?! */
+    errorMessage( &illegal_character, cc );
+    c = 0;              /* space?! */
     }
 
-    if (!(c & *ccase)) {		/* char not in current case? */
-	*ccase ^= BC;			/* switch case */
-	if (*ccase == LC)
-	    return CONCISE_LC;		/* shift down */
-	else
-	    return CONCISE_UC;		/* shift up */
+    if (!(c & *ccase)) {        /* char not in current case? */
+    *ccase ^= BC;           /* switch case */
+    if (*ccase == LC)
+        return CONCISE_LC;      /* shift down */
+    else
+        return CONCISE_UC;      /* shift up */
     }
     cc++;
     return c & CHARBITS;
@@ -1569,48 +1569,48 @@ WORD32 flex()
     int shift;
     int ccase;
 
-    if (line[lexstart] == ' ')		/* always? */
-	next(0);
+    if (line[lexstart] == ' ')      /* always? */
+    next(0);
 
     /* original version appears to take next 3 characters,
      * REGARDLESS of what they are (tab, newline, space?)!
      */
     w = 0;
-    ccase = LC;				/* current case */
+    ccase = LC;             /* current case */
     for (shift = 12; shift >= 0; shift -= 6) {
-	unsigned char c;
-	if( lexstart >= maxcc )
-	    break;
+    unsigned char c;
+    if( lexstart >= maxcc )
+        break;
 
-	c = line[lexstart];
-	if (c == '\t' || c == '\n') {
-	    if (ccase == LC)
-		break;
-	    c = CONCISE_LC;			/* shift down first */
-	}
-	else {
-	    if (c > 0177) {		/* non-ascii */
-		errorMessage( &illegal_character, lexstart );
-		c = 0;
-	    }
+    c = line[lexstart];
+    if (c == '\t' || c == '\n') {
+        if (ccase == LC)
+        break;
+        c = CONCISE_LC;         /* shift down first */
+    }
+    else {
+        if (c > 0177) {     /* non-ascii */
+        errorMessage( &illegal_character, lexstart );
+        c = 0;
+        }
 
-	    c = ascii_to_fiodec[c&0177];
-	    if (c == BAD) {
-		errorMessage( &illegal_character, lexstart );
-		c = 0;
-	    }
+        c = ascii_to_fiodec[c&0177];
+        if (c == BAD) {
+        errorMessage( &illegal_character, lexstart );
+        c = 0;
+        }
 
-	    if (!(c & ccase)) {		/* char not in current case? */
-		ccase ^= BC;		/* switch case */
-		if (ccase == LC)
-		    c = CONCISE_LC;	/* shift down */
-		else
-		    c = CONCISE_UC;		/* shift up */
-	    }
-	    else
-		lexstart++;
-	}
-	w |= (c & CHARBITS) << shift;
+        if (!(c & ccase)) {     /* char not in current case? */
+        ccase ^= BC;        /* switch case */
+        if (ccase == LC)
+            c = CONCISE_LC; /* shift down */
+        else
+            c = CONCISE_UC;     /* shift up */
+        }
+        else
+        lexstart++;
+    }
+    w |= (c & CHARBITS) << shift;
     }
     /* error to get here w/ case == UC? nah. shift down could be next */
     return w;
@@ -1626,31 +1626,31 @@ WORD32 getChar()
     unsigned char c, pos;
 
     if( cc >= maxcc )
-	return 0;			/* XXX error? */
+    return 0;           /* XXX error? */
     pos = line[cc++];
     if (pos != 'l' && pos != 'm' && pos != 'r') {
-	errorMessage( &illegal_character, lexstart );
-	return 0;
+    errorMessage( &illegal_character, lexstart );
+    return 0;
     }
 
     if( cc >= maxcc )
-	return 0;			/* XXX error? */
+    return 0;           /* XXX error? */
 
     c = line[cc++];
     if (c > 0177) {
-	errorMessage( &illegal_character, lexstart );
-	c = 0;
+    errorMessage( &illegal_character, lexstart );
+    c = 0;
     }
 
     c = ascii_to_fiodec[c];
     if (c == BAD) {
-	errorMessage( &illegal_character, lexstart );
-	c = 0;
+    errorMessage( &illegal_character, lexstart );
+    c = 0;
     }
 
-    if (!(c & LC)) {			/* upper case only char? */
-	c = CONCISE_UC;			/* take a shift up */
-	cc--;				/* and leave char for next luser */
+    if (!(c & LC)) {            /* upper case only char? */
+    c = CONCISE_UC;         /* take a shift up */
+    cc--;               /* and leave char for next luser */
     }
 
     c &= CHARBITS;
@@ -1691,27 +1691,27 @@ SYM_T eval2()
       switch (sym->val) {
       case DECIMAL:
         radix = 10;
-	sym_eval.type = PSEUDO;
-	sym_eval.val = 0;		/* has zero as a value! */
-	break;
+    sym_eval.type = PSEUDO;
+    sym_eval.val = 0;       /* has zero as a value! */
+    break;
       case OCTAL:
         radix = 8;
-	sym_eval.type = PSEUDO;
-	sym_eval.val = 0;		/* has zero as a value */
-	break;
+    sym_eval.type = PSEUDO;
+    sym_eval.val = 0;       /* has zero as a value */
+    break;
       case FLEX:
-	next(1);			/* skip keyword */
-	sym_eval.val = flex();
-	break;
+    next(1);            /* skip keyword */
+    sym_eval.val = flex();
+    break;
       case CHAR:
-	next(1);			/* skip keyword */
-	sym_eval.val = getChar();
-	break;
+    next(1);            /* skip keyword */
+    sym_eval.val = getChar();
+    break;
       default:
         errorSymbol( &value_required, sym->name, lexstart );
         sym_eval.type = sym->type;
-	sym_eval.val = 0;
-	break;
+    sym_eval.val = 0;
+    break;
       }
       next(1);
       return( sym_eval );
@@ -1737,20 +1737,20 @@ SYM_T eval2()
     from = lexstart;
     val = 0;
     while( from < lexterm ) {
-	if( isdigit( line[from] )) {
-	    digit = line[from++] - '0';
-	    if( digit >= radix ) {
-		errorLexeme( &number_not_radix, from - 1 );
-		val = 0;
-		break;
-	    }
-	    val = val * radix + digit;
-	}
-	else {
-	    errorLexeme( &not_a_number, lexstart );
-	    val = 0;
-	    break;
-	}
+    if( isdigit( line[from] )) {
+        digit = line[from++] - '0';
+        if( digit >= radix ) {
+        errorLexeme( &number_not_radix, from - 1 );
+        val = 0;
+        break;
+        }
+        val = val * radix + digit;
+    }
+    else {
+        errorLexeme( &not_a_number, lexstart );
+        val = 0;
+        break;
+    }
     }
     next(1);
     sym_eval.val = val;
@@ -1758,37 +1758,37 @@ SYM_T eval2()
   } /* digit */
   else {
     switch( line[lexstart] ) {
-    case '.':				/* Value of Current Location Counter */
-	val = clc;
-	next(1);
-	break;
-    case '(':				/* Generate literal */
-	next(1);			/* Skip paren */
-	val = getExprs();		/* recurse */
-	if( line[lexstart] == ')' )
-	    next(1);			/* Skip end paren */
-	sym_eval.val = literal(val);
-	return sym_eval;
-    case '[':				/* parens!! */
-	next(1);
-	sym_eval.val = getExprs();	/* mutual recursion */
-	if( line[lexstart] == ']' )
-	    next(1);			/* Skip close bracket */
-	else
-	    errorMessage( &illegal_character, lexstart );
-	return sym_eval;
+    case '.':               /* Value of Current Location Counter */
+    val = clc;
+    next(1);
+    break;
+    case '(':               /* Generate literal */
+    next(1);            /* Skip paren */
+    val = getExprs();       /* recurse */
+    if( line[lexstart] == ')' )
+        next(1);            /* Skip end paren */
+    sym_eval.val = literal(val);
+    return sym_eval;
+    case '[':               /* parens!! */
+    next(1);
+    sym_eval.val = getExprs();  /* mutual recursion */
+    if( line[lexstart] == ']' )
+        next(1);            /* Skip close bracket */
+    else
+        errorMessage( &illegal_character, lexstart );
+    return sym_eval;
     default:
-	switch( line[lexstart] ) {
-	case '=':
-	    errorMessage( &illegal_equals, lexstart );
-	    moveToEndOfLine();
-	    break;
-	default:
-	    errorMessage( &illegal_character, lexstart );
-	    break;
-	} /* error switch */
-	val = 0;				/* On error, set value to zero. */
-	next(1);				/* Go past illegal character. */
+    switch( line[lexstart] ) {
+    case '=':
+        errorMessage( &illegal_equals, lexstart );
+        moveToEndOfLine();
+        break;
+    default:
+        errorMessage( &illegal_character, lexstart );
+        break;
+    } /* error switch */
+    val = 0;                /* On error, set value to zero. */
+    next(1);                /* Go past illegal character. */
     } /* switch on first char */
   } /* not symbol or number */
   sym_eval.val = val;
@@ -1800,16 +1800,16 @@ SYM_T eval() {
     SYM_T sym;
 
     switch (line[lexstart]) {
-    case '-':				/* unary - */
-	next(1);
-	sym = eval2();			/* skip op */
-	sym.val ^= 0777777;
-	break;
-    case '+':				/* unary + */
-	next(1);			/* skip op */
-	/* fall */
+    case '-':               /* unary - */
+    next(1);
+    sym = eval2();          /* skip op */
+    sym.val ^= 0777777;
+    break;
+    case '+':               /* unary + */
+    next(1);            /* skip op */
+    /* fall */
     default:
-	sym = eval2();
+    sym = eval2();
     }
     return sym;
 }
@@ -1835,80 +1835,80 @@ void readLine()
 
     /* XXX panic if nrepeats > 0 (if self-feeding, do the backup here?) */
 
-    listLine();				/* List previous line if needed. */
-    error_in_line = FALSE;		/* No error in line. */
+    listLine();             /* List previous line if needed. */
+    error_in_line = FALSE;      /* No error in line. */
 
     if(curmacro && *curmacro->mac_ptr == '\0') { /* end of macro? */
-	struct macinv *mp;
+    struct macinv *mp;
 
-	listed = TRUE;			/* Already listed. */
+    listed = TRUE;          /* Already listed. */
 
-	/* Restore invoking line. */
-	strcpy(line, curmacro->mac_line);
-	cc = lexstartprev = curmacro->mac_cc; /* Restore cc. */
-	maxcc = strlen( line );		/* Restore maxcc. */
+    /* Restore invoking line. */
+    strcpy(line, curmacro->mac_line);
+    cc = lexstartprev = curmacro->mac_cc; /* Restore cc. */
+    maxcc = strlen( line );     /* Restore maxcc. */
 
-	mp = curmacro->prev;		/* pop stack */
-	free(curmacro);
-	curmacro = mp;
+    mp = curmacro->prev;        /* pop stack */
+    free(curmacro);
+    curmacro = mp;
 
-	return;
+    return;
     } /* end of macro */
 
-    cc = 0;				/* Initialize column counter. */
+    cc = 0;             /* Initialize column counter. */
     lexstartprev = 0;
-    if( curmacro ) {			/* Inside macro? */
-	char mc;
+    if( curmacro ) {            /* Inside macro? */
+    char mc;
 
-	maxcc = 0;
-	do {
+    maxcc = 0;
+    do {
 
-	    mc = *curmacro->mac_ptr++;	/* Next character. */
-	    /* watch for overflow? how could it?? */
-	    line[maxcc++] = mc;
-	} while( !ISEND( mc ));		/* note: terminates on tab?! */
-	line[maxcc] = '\0';
-	listed = nomac_exp;
-	return;
+        mc = *curmacro->mac_ptr++;  /* Next character. */
+        /* watch for overflow? how could it?? */
+        line[maxcc++] = mc;
+    } while( !ISEND( mc ));     /* note: terminates on tab?! */
+    line[maxcc] = '\0';
+    listed = nomac_exp;
+    return;
     } /* inside macro */
 
-    lineno++;				/* Count lines read. */
-    listed = FALSE;			/* Mark as not listed. */
+    lineno++;               /* Count lines read. */
+    listed = FALSE;         /* Mark as not listed. */
  READ_LINE:
     if(( fgets( inpline, LINELEN - 1, infile )) == NULL ) {
-	filix_curr++;			/* Advance to next file. */
-	if( filix_curr < save_argc ) {	/* More files? */
-	    fclose( infile );
-	    if(( infile = fopen( save_argv[filix_curr], "r" )) == NULL ) {
-		fprintf( stderr, "%s: cannot open \"%s\"\n", save_argv[0],
-			save_argv[filix_curr] );
-		exit( -1 );
-	    }
-	    list_title_set = FALSE;
-	    goto READ_LINE;
-	}
-	else
-	    end_of_input = TRUE;
+    filix_curr++;           /* Advance to next file. */
+    if( filix_curr < save_argc ) {  /* More files? */
+        fclose( infile );
+        if(( infile = fopen( save_argv[filix_curr], "r" )) == NULL ) {
+        fprintf( stderr, "%s: cannot open \"%s\"\n", save_argv[0],
+            save_argv[filix_curr] );
+        exit( -1 );
+        }
+        list_title_set = FALSE;
+        goto READ_LINE;
+    }
+    else
+        end_of_input = TRUE;
     } /* fgets failed */
 
     ffseen = FALSE;
     for( ix = 0, iy = 0; inpline[ix] != '\0'; ix++ ) {
-	if( inpline[ix] == '\f' ) {
-	    if( !ffseen && list_title_set ) topOfForm( list_title, NULL );
-	    ffseen = TRUE;
-	}
-	else
-	    line[iy++] = inpline[ix];
+    if( inpline[ix] == '\f' ) {
+        if( !ffseen && list_title_set ) topOfForm( list_title, NULL );
+        ffseen = TRUE;
+    }
+    else
+        line[iy++] = inpline[ix];
     }
     line[iy] = '\0';
 
     /* If the line is terminated by CR-LF, remove, the CR. */
     if( line[iy - 2] == '\r' ) {
-	iy--;
-	line[iy - 1] = line[iy - 0];
-	line[iy] = '\0';
+    iy--;
+    line[iy - 1] = line[iy - 0];
+    line[iy] = '\0';
     }
-    maxcc = iy;				/* Save the current line length. */
+    maxcc = iy;             /* Save the current line length. */
 } /* readLine */
 
 
@@ -2110,10 +2110,10 @@ punchLoader() {
     int i;
 
     if (noinput)
-	return;
+    return;
 
     for (i = 0; i < DIM(loader); i++)
-	punchLocObjectRIM(LOADERBASE+i, loader[i]);
+    punchLocObjectRIM(LOADERBASE+i, loader[i]);
     punchTriplet( JMP | LOADERBASE );
 }
 
@@ -2131,19 +2131,19 @@ flushLoader() {
     int i;
 
     if (loaderbufcount == 0)
-	return;
+    return;
 
     sum = 0;
     PW( DIO | loaderbufstart );
     PW( DIO | loaderbufstart + loaderbufcount );
     for (i = 0; i < loaderbufcount; i++)
-	PW( loaderbuf[i] );
+    PW( loaderbuf[i] );
 
     /* roll over all the overflows at once */
     if (sum & ~0777777)
-	sum = (sum & 0777777) + (sum >> 18);
-    if (sum & 01000000)			/* one more time */
-	sum++;
+    sum = (sum & 0777777) + (sum >> 18);
+    if (sum & 01000000)         /* one more time */
+    sum++;
     PW( sum );
 
     punchLeader(5);
@@ -2153,16 +2153,16 @@ flushLoader() {
 void punchLocObject( WORD32 loc, WORD32 val )
 {
     if (!rim_mode) {
-	if ((loc & LOADERBUFMASK) == 0 || /* full/force alignment */
-	    loaderbufcount > 0 &&
-	    loc != loaderbufstart + loaderbufcount) /* disjoint */
-	    flushLoader();
-	if (loaderbufcount == 0)
-	    loaderbufstart = loc;
-	loaderbuf[loaderbufcount++] = val;
+    if ((loc & LOADERBUFMASK) == 0 || /* full/force alignment */
+        loaderbufcount > 0 &&
+        loc != loaderbufstart + loaderbufcount) /* disjoint */
+        flushLoader();
+    if (loaderbufcount == 0)
+        loaderbufstart = loc;
+    loaderbuf[loaderbufcount++] = val;
     }
     else
-	punchLocObjectRIM( loc, val );
+    punchLocObjectRIM( loc, val );
 }
 
 /*  Function:  literal */
@@ -2173,16 +2173,16 @@ literal( WORD32 value )
     int i;
 
     if (nconst >= MAX_CONSTANTS) {
-	fprintf(stderr, "too many 'constants'; increase MAX_CONSTANTS\n");
-	exit(1);
+    fprintf(stderr, "too many 'constants'; increase MAX_CONSTANTS\n");
+    exit(1);
     }
 
     if (pass == 1) {
-	if (++lit_count[nconst] == MAX_LITERALS) {
-	    fprintf(stderr, "too many literals; increase MAX_LITERALS\n");
-	    exit(1);
-	}
-	return lit_count[nconst];
+    if (++lit_count[nconst] == MAX_LITERALS) {
+        fprintf(stderr, "too many literals; increase MAX_LITERALS\n");
+        exit(1);
+    }
+    return lit_count[nconst];
     }
 
 #if 1
@@ -2191,14 +2191,14 @@ literal( WORD32 value )
      * (but "middle" constants blocks can't shrink)
      */
     for (i = 0; i < nlit; i++)
-	if (litter[i] == value)
-	    return lit_loc[nconst] + i;
+    if (litter[i] == value)
+        return lit_loc[nconst] + i;
 #endif
 
     /* paranoia */
     if (nlit == MAX_LITERALS) {
-	fprintf(stderr, "too many literals; increase MAX_LITERALS\n");
-	exit(1);
+    fprintf(stderr, "too many literals; increase MAX_LITERALS\n");
+    exit(1);
     }
 
     /* not found, save it */
@@ -2221,30 +2221,30 @@ void printSymbolTable()
 
     symbol_lines = 0;
     for (ix = 0, sym = symtab; ix < symbol_top; ix++, sym++) {
-	if (M_FIXED(sym->type) || M_PSEUDO(sym->type) ||
-	    M_MACRO(sym->type) || M_EPSEUDO(sym->type))
-	    continue;
+    if (M_FIXED(sym->type) || M_PSEUDO(sym->type) ||
+        M_MACRO(sym->type) || M_EPSEUDO(sym->type))
+        continue;
 
-	if (symbol_lines == 0) {
-	    topOfForm( list_title, s_symtable );
-	    symbol_lines = LIST_LINES_PER_PAGE;
-	}
+    if (symbol_lines == 0) {
+        topOfForm( list_title, s_symtable );
+        symbol_lines = LIST_LINES_PER_PAGE;
+    }
 
-	switch( sym->type & ( DEFINED | REDEFINED )) {
-	case UNDEFINED:
-	    mark = '?';
-	    break;
+    switch( sym->type & ( DEFINED | REDEFINED )) {
+    case UNDEFINED:
+        mark = '?';
+        break;
 
-	case REDEFINED:
-	    mark = '#';
-	    break;
+    case REDEFINED:
+        mark = '#';
+        break;
 
-	default:
-	    mark = ' ';
-	    break;
-	}
-	fprintf( listfile, "%c%-6.6s %6.6o\n", mark, sym->name, sym->val );
-	symbol_lines--;
+    default:
+        mark = ' ';
+        break;
+    }
+    fprintf( listfile, "%c%-6.6s %6.6o\n", mark, sym->name, sym->val );
+    symbol_lines--;
     }
 } /* printSymbolTable */
 
@@ -2259,7 +2259,7 @@ void printPermanentSymbolTable()
 
     if(( permfile = fopen( permpathname, "w" )) == NULL )
     {
-	exit( 2 );
+    exit( 2 );
     }
 
     fprintf( permfile, "/ PERMANENT SYMBOL TABLE\n/\n" );
@@ -2267,10 +2267,10 @@ void printPermanentSymbolTable()
 
     for( ix = 0; ix < symbol_top; ix++ )
     {
-	int type = symtab[ix].type;
-	if( M_FIXED(type) && !M_PSEUDO(type) && !M_EPSEUDO(type) )
-	    fprintf( permfile, "\t%s=%o\n",
-		     symtab[ix].name, symtab[ix].val );
+    int type = symtab[ix].type;
+    if( M_FIXED(type) && !M_PSEUDO(type) && !M_EPSEUDO(type) )
+        fprintf( permfile, "\t%s=%o\n",
+             symtab[ix].name, symtab[ix].val );
     }
     fclose( permfile );
 } /* printPermanentSymbolTable */
@@ -2294,48 +2294,48 @@ void printCrossReference()
     list_lineno = 0;
 
     for( ix = 0, sym = symtab; ix < symbol_top; ix++, sym++ ) {
-	if (M_FIXED(sym->type) && xreftab[sym->xref_index] == 0)
-	    continue;
-	list_lineno++;
-	page_lineno++;
-	if( page_lineno >= LIST_LINES_PER_PAGE )
-	    topOfForm( list_title, s_xref );
+    if (M_FIXED(sym->type) && xreftab[sym->xref_index] == 0)
+        continue;
+    list_lineno++;
+    page_lineno++;
+    if( page_lineno >= LIST_LINES_PER_PAGE )
+        topOfForm( list_title, s_xref );
 
-	fprintf( listfile, "%5d", list_lineno );
+    fprintf( listfile, "%5d", list_lineno );
 
-	/* Get reference count & index into concordance table for this symbol */
-	xc_refcount = sym->xref_count;
-	xc_index = sym->xref_index;
-	/* Determine how to label symbol on concordance. */
-	/* XXX flag variables? */
-	switch( sym->type & ( DEFINED | REDEFINED )) {
-	case UNDEFINED:
-	    fprintf( listfile, " U         ");
-	    break;
+    /* Get reference count & index into concordance table for this symbol */
+    xc_refcount = sym->xref_count;
+    xc_index = sym->xref_index;
+    /* Determine how to label symbol on concordance. */
+    /* XXX flag variables? */
+    switch( sym->type & ( DEFINED | REDEFINED )) {
+    case UNDEFINED:
+        fprintf( listfile, " U         ");
+        break;
 
-	case REDEFINED:
-	    fprintf( listfile, " M  %5d  ", xreftab[xc_index] );
-	    break;
+    case REDEFINED:
+        fprintf( listfile, " M  %5d  ", xreftab[xc_index] );
+        break;
 
-	default:
-	    fprintf( listfile, " A  %5d  ", xreftab[xc_index] );
-	    break;
-	}
-	fprintf( listfile, "%-6.6s  ", sym->name );
+    default:
+        fprintf( listfile, " A  %5d  ", xreftab[xc_index] );
+        break;
+    }
+    fprintf( listfile, "%-6.6s  ", sym->name );
 
-	/* Output the references, 8 numbers per line after symbol name. */
-	for( xc_cols = 0, xc = 1; xc < xc_refcount + 1; xc++, xc_cols++ ) {
-	    if( xc_cols >= XREF_COLUMNS ) {
-		xc_cols = 0;
-		page_lineno++;
-		if( page_lineno >= LIST_LINES_PER_PAGE )
-		    topOfForm( list_title, s_xref);
-		list_lineno++;
-		fprintf( listfile, "\n%5d%-19s", list_lineno, " " );
-	    }
-	    fprintf( listfile, "  %5d", xreftab[xc_index + xc] );
-	}
-	fprintf( listfile, "\n" );
+    /* Output the references, 8 numbers per line after symbol name. */
+    for( xc_cols = 0, xc = 1; xc < xc_refcount + 1; xc++, xc_cols++ ) {
+        if( xc_cols >= XREF_COLUMNS ) {
+        xc_cols = 0;
+        page_lineno++;
+        if( page_lineno >= LIST_LINES_PER_PAGE )
+            topOfForm( list_title, s_xref);
+        list_lineno++;
+        fprintf( listfile, "\n%5d%-19s", list_lineno, " " );
+        }
+        fprintf( listfile, "  %5d", xreftab[xc_index + xc] );
+    }
+    fprintf( listfile, "\n" );
     } /* for */
 } /* printCrossReference */
 
@@ -2351,11 +2351,11 @@ void topOfForm( char *title, char *sub_title )
     sprintf( temp, "%s %d", s_page, list_pageno );
 
     if (!listfile)
-	return;
+    return;
 
     /* Output a top of form if not the first page of the listing. */
     if( list_pageno > 1 )
-	fprintf( listfile, "\f" );
+    fprintf( listfile, "\f" );
 
     fprintf( listfile, "\n      %-63s %10s\n", title, temp );
 
@@ -2363,13 +2363,13 @@ void topOfForm( char *title, char *sub_title )
     page_lineno = 1;
     if( sub_title != NULL )
     {
-	fprintf( listfile, "%80s\n", sub_title );
-	page_lineno++;
+    fprintf( listfile, "%80s\n", sub_title );
+    page_lineno++;
     }
     else
     {
-	fprintf( listfile, "\n" );
-	page_lineno++;
+    fprintf( listfile, "\n" );
+    page_lineno++;
     }
     fprintf( listfile, "\n" );
     page_lineno++;
@@ -2384,10 +2384,10 @@ char *lexemeToName( char *name, WORD32 from, WORD32 term )
 
     to = 0;
     while( from < term && to < SYMLEN-1) {
-	char c = line[from++];
-	if (ISOVERBAR(c))
-	    continue;
-	name[to++] = c;
+    char c = line[from++];
+    if (ISOVERBAR(c))
+        continue;
+    name[to++] = c;
     }
     name[to] = '\0';
 
@@ -2397,7 +2397,7 @@ char *lexemeToName( char *name, WORD32 from, WORD32 term )
 /*  Function:  defineLexeme */
 /*  Synopsis:  Put lexeme into symbol table with a value. */
 SYM_T *defineLexeme( WORD32  start,     /* start of lexeme being defined. */
-		     WORD32  term,	/* end+1 of lexeme being defined. */
+             WORD32  term,  /* end+1 of lexeme being defined. */
                      WORD32  val,       /* value of lexeme being defined. */
                      SYMTYP  type )     /* how symbol is being defined. */
 {
@@ -2418,35 +2418,35 @@ SYM_T *defineSymbol( char *name, WORD32 val, SYMTYP type, WORD32 start )
 
     if( strlen( name ) < 1 )
     {
-	return( &sym_undefined );		/* Protect against non-existent names. */
+    return( &sym_undefined );       /* Protect against non-existent names. */
     }
     sym = lookup( name, type );
-    xref_count = 0;			/* Set concordance for normal defintion. */
+    xref_count = 0;         /* Set concordance for normal defintion. */
 
     if( M_DEFINED( sym->type ) && sym->val != val && M_NOTRDEF( sym -> type ))
     {
-	if( pass == 2 )
-	{
-	    errorSymbol( &redefined_symbol, sym->name, start );
-	    type = type | REDEFINED;
-	    sym->xref_count++;		/* Referenced symbol, count it. */
-	    xref_count = sym->xref_count;
-	    /* moved inside "if pass2" -plb 10/2/03 allow redefinition
-	     * of predefined symbols during pass1
-	     */
-	    return ( sym );
-	}
+    if( pass == 2 )
+    {
+        errorSymbol( &redefined_symbol, sym->name, start );
+        type = type | REDEFINED;
+        sym->xref_count++;      /* Referenced symbol, count it. */
+        xref_count = sym->xref_count;
+        /* moved inside "if pass2" -plb 10/2/03 allow redefinition
+         * of predefined symbols during pass1
+         */
+        return ( sym );
+    }
     }
 
     if( pass == 2 && xref )
     {
-	/* Put the definition line number in the concordance table. */
-	/* Defined symbols are not counted as references. */
-	if (sym->xref_index >= 0) {	/* beware macro dummies */
-	    xreftab[sym->xref_index] = lineno;
-	    /* Put the line number in the concordance table. */
-	    xreftab[sym->xref_index + xref_count] = lineno;
-	}
+    /* Put the definition line number in the concordance table. */
+    /* Defined symbols are not counted as references. */
+    if (sym->xref_index >= 0) { /* beware macro dummies */
+        xreftab[sym->xref_index] = lineno;
+        /* Put the line number in the concordance table. */
+        xreftab[sym->xref_index + xref_count] = lineno;
+    }
     }
 
     /* Now set the value and the type. */
@@ -2461,64 +2461,64 @@ SYM_T *defineSymbol( char *name, WORD32 val, SYMTYP type, WORD32 start )
 /*             table as undefined.  Return address of symbol in table. */
 SYM_T *lookup( char *name, int type )
 {
-    int ix;				/* Insertion index */
-    int lx;				/* Left index */
-    int rx;				/* Right index */
-    SYM_T *best;			/* best match */
+    int ix;             /* Insertion index */
+    int lx;             /* Left index */
+    int rx;             /* Right index */
+    SYM_T *best;            /* best match */
     SYM_T *sym;
 
     /* YIKES!  Search dummies (and "R") before anything else!! */
     if (curmacro && curmacro->defn) {
-	struct macdef *mdp = curmacro->defn;
-	int i;
+    struct macdef *mdp = curmacro->defn;
+    int i;
 
-	for (i = 0, sym = mdp->args; i <= mdp->nargs; i++, sym++)
-	    if (strcmp(name, sym->name) == 0)
-		return sym;
+    for (i = 0, sym = mdp->args; i <= mdp->nargs; i++, sym++)
+        if (strcmp(name, sym->name) == 0)
+        return sym;
     }
 
     lx = 0;
     rx = symbol_top - 1;
     best = NULL;
     while (lx <= rx) {
-	int mx = (lx + rx) / 2;		/* Find center of search area. */
-	int compare;
+    int mx = (lx + rx) / 2;     /* Find center of search area. */
+    int compare;
 
-	sym = symtab + mx;
+    sym = symtab + mx;
 
-	compare = strcmp(name, sym->name);
-	if (compare < 0)
-	    rx = mx - 1;
-	else if (compare > 0)
-	    lx = mx + 1;
-	else {				/* match */
-	    if (overbar && !M_DEFINED(sym->type) && pass == 2) {
-		sym->type = DEFINED;
-		sym->val = vars_addr++;
-		nvars++;
-	    }
-	    return sym;			/* return exact match */
-	} /* match */
+    compare = strcmp(name, sym->name);
+    if (compare < 0)
+        rx = mx - 1;
+    else if (compare > 0)
+        lx = mx + 1;
+    else {              /* match */
+        if (overbar && !M_DEFINED(sym->type) && pass == 2) {
+        sym->type = DEFINED;
+        sym->val = vars_addr++;
+        nvars++;
+        }
+        return sym;         /* return exact match */
+    } /* match */
 
-	/* save best non-exact match; MACRO returns last defined n-x match! */
-	if ((M_PSEUDO(sym->type)||M_EPSEUDO(sym->type)||M_MACRO(sym->type)) &&
-	    strncmp(name, sym->name, 3) == 0)
-	    best = sym;
+    /* save best non-exact match; MACRO returns last defined n-x match! */
+    if ((M_PSEUDO(sym->type)||M_EPSEUDO(sym->type)||M_MACRO(sym->type)) &&
+        strncmp(name, sym->name, 3) == 0)
+        best = sym;
     } /* while */
 
     /* return best match (pseudo or macro) if any for lookups (not defns) */
     if (best && type == UNDEFINED)
-	return best;
+    return best;
 
     /* Must put symbol in table if index is negative. */
-    ix = lx;				/* insertion point */
+    ix = lx;                /* insertion point */
     if( symbol_top + 1 >= SYMBOL_TABLE_SIZE ) {
-	errorSymbol( &symbol_table_full, name, lexstart );
-	exit( 1 );
+    errorSymbol( &symbol_table_full, name, lexstart );
+    exit( 1 );
     }
 
     for( rx = symbol_top; rx >= ix; rx-- )
-	symtab[rx + 1] = symtab[rx];
+    symtab[rx + 1] = symtab[rx];
 
     symbol_top++;
 
@@ -2529,10 +2529,10 @@ SYM_T *lookup( char *name, int type )
     sym->val  = 0;
     sym->xref_count = 0;
     if( xref && pass == 2 && sym->xref_index >= 0)
-	xreftab[sym->xref_index] = 0;
+    xreftab[sym->xref_index] = 0;
 
     if (overbar)
-	nvars++;
+    nvars++;
 
     return sym;
 } /* lookup */
@@ -2554,12 +2554,12 @@ SYM_T *evalSymbol()
 
     sym = lookup( lexemeToName( name, lexstart, lexterm ), UNDEFINED);
 
-    sym->xref_count++;			/* Count the number of references to symbol. */
+    sym->xref_count++;          /* Count the number of references to symbol. */
 
     if( xref && pass == 2 && sym->xref_index >= 0)
     {
-	/* Put the line number in the concordance table. */
-	xreftab[sym->xref_index + sym->xref_count] = lineno;
+    /* Put the line number in the concordance table. */
+    xreftab[sym->xref_index + sym->xref_count] = lineno;
     }
 
     return( sym );
@@ -2570,7 +2570,7 @@ SYM_T *evalSymbol()
 /*  Synopsis:  Move the parser input to the end of the current input line. */
 void moveToEndOfLine()
 {
-    while( !ISEND( line[cc] )) cc++;	/* XXX wrong! will stop on a tab! */
+    while( !ISEND( line[cc] )) cc++;    /* XXX wrong! will stop on a tab! */
     lexstart = cc;
     lexterm = cc;
     lexstartprev = lexstart;
@@ -2587,28 +2587,28 @@ next(int op) {
 
     c = line[cc];
     if (c == ' ') {
-	/* eat spaces */
-	do {
-	    c = line[++cc];
-	} while (c == ' ');
-	if (op)				/* looking for operators? */
-	    cc--;			/* return one */
+    /* eat spaces */
+    do {
+        c = line[++cc];
+    } while (c == ' ');
+    if (op)             /* looking for operators? */
+        cc--;           /* return one */
     }
 
     overbar = 0;
     lexstart = cc;
     c = line[cc];
     if( isalnum(c) || ISOVERBAR(c)) {
-	if (ISOVERBAR(c))
-	    overbar = 1;
-	do {
-	    c = line[++cc];
-	    if (ISOVERBAR(c))
-		overbar = 1;
-	} while (isalnum(c) || ISOVERBAR(c));
+    if (ISOVERBAR(c))
+        overbar = 1;
+    do {
+        c = line[++cc];
+        if (ISOVERBAR(c))
+        overbar = 1;
+    } while (isalnum(c) || ISOVERBAR(c));
     }
-    else if(!ISDONE(c) || c == '\t')	/* not end of line, or comment */
-	cc++;				/* advance past all punctuation */
+    else if(!ISDONE(c) || c == '\t')    /* not end of line, or comment */
+    cc++;               /* advance past all punctuation */
     lexterm = cc;
 } /* next */
 
@@ -2618,8 +2618,8 @@ BOOL isLexSymbol()
 
     /* XXX alpha within first 4? 3?? */
     for( ix = lexstart; ix < lexterm; ix++ )
-	if(isalpha(line[ix]))
-	    return TRUE;			/* any position will do! */
+    if(isalpha(line[ix]))
+        return TRUE;            /* any position will do! */
     return FALSE;
 } /* isLexSymbol */
 
@@ -2644,35 +2644,35 @@ BOOL isLexSymbol()
 
 void
 defineMacro() {
-    int lexstartsave;			/* point to macro name */
-    int index;				/* point to error char */
-    int error;				/* error boolean */
+    int lexstartsave;           /* point to macro name */
+    int index;              /* point to error char */
+    int error;              /* error boolean */
     int i;
     int count;
     WORD32  length;
     WORD32  value;
     char    termin[SYMLEN];
-    char    args[MAC_MAX_ARGS][SYMLEN];	/* macro & arg names */
+    char    args[MAC_MAX_ARGS][SYMLEN]; /* macro & arg names */
     char    body[MAC_MAX_LENGTH + 1];
     struct macdef *mdp;
     SYM_T *sym;
 
     if (nrepeats) {
-	/* we can call readLine, so throw up hands now */
-	errorLexeme( &define_in_repeat, lexstartprev );
-	return;
+    /* we can call readLine, so throw up hands now */
+    errorLexeme( &define_in_repeat, lexstartprev );
+    return;
     }
 
     while (line[lexstart] == ' ' || line[lexstart] == '\t')
-	next(0);
+    next(0);
 
     /* not a tab or space */
-    if (ISEND(line[lexstart])) {	/* newline or EOS? */
-	/* crock; next token should invisibly skip over line boundaries? */
-	readLine();
-	next(0);
-	while (line[lexstart] == ' ' || line[lexstart] == '\t')
-	    next(0);
+    if (ISEND(line[lexstart])) {    /* newline or EOS? */
+    /* crock; next token should invisibly skip over line boundaries? */
+    readLine();
+    next(0);
+    while (line[lexstart] == ' ' || line[lexstart] == '\t')
+        next(0);
     }
 
     /* XXX pick up macro name out here */
@@ -2682,74 +2682,74 @@ defineMacro() {
     error = FALSE;
     lexstartsave = lexstart;
     while (!ISDONE(line[lexstart]) && count < MAC_MAX_ARGS) {
-	if (!isalnum(line[lexstart]) && index == 0)
-	    index = lexstart;		/* error pointer */
-	lexemeToName( args[count++], lexstart, lexterm );
-	/* XXX error if NOT a comma (& not first dummy) ? */
-	if (line[lexterm] == ',')
-	    next(0);			/* eat the comma */
-	next(0);
-	if (line[lexstart] == ' ')
-	    next(0);
+    if (!isalnum(line[lexstart]) && index == 0)
+        index = lexstart;       /* error pointer */
+    lexemeToName( args[count++], lexstart, lexterm );
+    /* XXX error if NOT a comma (& not first dummy) ? */
+    if (line[lexterm] == ',')
+        next(0);            /* eat the comma */
+    next(0);
+    if (line[lexstart] == ' ')
+        next(0);
     }
-    if( count == 0 ) {			/* No macro name. */
-	errorMessage( &no_macro_name, lexstartsave );
-	error = TRUE;
+    if( count == 0 ) {          /* No macro name. */
+    errorMessage( &no_macro_name, lexstartsave );
+    error = TRUE;
     }
-    else if( index ) {			/* Bad argument name. */
-	errorMessage( &bad_dummy_arg, index );
-	error = TRUE;
+    else if( index ) {          /* Bad argument name. */
+    errorMessage( &bad_dummy_arg, index );
+    error = TRUE;
     }
     else if( mac_count >= MAC_TABLE_LENGTH ) {
-	errorMessage( &macro_table_full, lexstartsave );
-	error = TRUE;
+    errorMessage( &macro_table_full, lexstartsave );
+    error = TRUE;
     }
     else {
-	value = mac_count++;		/* sym value is index into mac */
-	defineSymbol( args[0], value, MACRO, lexstartsave );
+    value = mac_count++;        /* sym value is index into mac */
+    defineSymbol( args[0], value, MACRO, lexstartsave );
     }
 
     for( length = 0;; ) {
-	readLine();
-	if (end_of_input)
-	    break;
-	next(0);
-	while (line[lexstart] == ' ' || line[lexstart] == '\t')
-	    next(0);
+    readLine();
+    if (end_of_input)
+        break;
+    next(0);
+    while (line[lexstart] == ' ' || line[lexstart] == '\t')
+        next(0);
 
-	lexemeToName( termin, lexstart, lexterm ); /* just look at line? */
-	if (strncmp( termin, "term", 4 ) == 0)
-	    break;
+    lexemeToName( termin, lexstart, lexterm ); /* just look at line? */
+    if (strncmp( termin, "term", 4 ) == 0)
+        break;
 
-	if (!error) {
-	    int ll = strlen(line);
-	    int allblank = FALSE;
+    if (!error) {
+        int ll = strlen(line);
+        int allblank = FALSE;
 
-	    /* don't save blank lines! */
-	    for( i = 0; i < ll && allblank; i++ )
-		if(!ISBLANK(line[i]))
-		    allblank = FALSE;
+        /* don't save blank lines! */
+        for( i = 0; i < ll && allblank; i++ )
+        if(!ISBLANK(line[i]))
+            allblank = FALSE;
 
-	    if (allblank)			/* nothing but air? */
-		continue;			/* skip it! */
+        if (allblank)           /* nothing but air? */
+        continue;           /* skip it! */
 
-	    if ((length + ll + 1) >= MAC_MAX_LENGTH ) {
-		errorMessage (&macro_too_long, lexstart );
-		error = TRUE;
-		continue;
-	    }
+        if ((length + ll + 1) >= MAC_MAX_LENGTH ) {
+        errorMessage (&macro_too_long, lexstart );
+        error = TRUE;
+        continue;
+        }
 
-	    strcpy(body+length, line);
-	    length += ll;
-	}
+        strcpy(body+length, line);
+        length += ll;
+    }
     } /* for */
     if( error )
-	return;
+    return;
 
     mdp = calloc(1, sizeof(struct macdef) + length);
     if (mdp == NULL) {
-	fprintf(stderr, "error allocating memory for macro definition\n");
-	exit(1);
+    fprintf(stderr, "error allocating memory for macro definition\n");
+    exit(1);
     }
     mac_defs[value] = mdp;
 
@@ -2766,14 +2766,14 @@ defineMacro() {
     sym->type = DEFINED;
     strcpy(sym->name, "R");
     sym->val = 0;
-    sym->xref_index = -1;		/* ??? allow xref? */
+    sym->xref_index = -1;       /* ??? allow xref? */
     sym++;
 
     for (i = 1; i <= mdp->nargs; i++, sym++) {
-	sym->type = DEFINED;
-	strcpy(sym->name, args[i]);
-	sym->val = 0;
-	sym->xref_index = -1;		/* don't xref!! */
+    sym->type = DEFINED;
+    strcpy(sym->name, args[i]);
+    sym->val = 0;
+    sym->xref_index = -1;       /* don't xref!! */
     }
 } /* defineMacro */
 
@@ -2783,11 +2783,11 @@ variables() {
     /* XXX error if "variables" already seen (in this pass) */
     /* XXX error if different address on pass 2 */
     if (pass == 2)
-	printLine( line, clc, 0, LINE_LOC );
+    printLine( line, clc, 0, LINE_LOC );
     vars_addr = clc;
     vars_end = clc = (clc + nvars) & ADDRESS_FIELD;
     if (pass == 2)
-	printLine( line, clc, 0, LINE_LOC);
+    printLine( line, clc, 0, LINE_LOC);
 }
 
 /* TEXT pseudo-op */
@@ -2800,30 +2800,30 @@ text(void)
     int ccase;
     /* XXX error in repeat!! */
     do {
-	if (cc == maxcc) {
-	    /* XXX EOL before delim found!!! */
-	    fprintf(stderr, "FIX ME!\n");
-	    return;
-	}
-	delim = line[cc++];
-    } while (delim == ' ');		/* others? NL */
+    if (cc == maxcc) {
+        /* XXX EOL before delim found!!! */
+        fprintf(stderr, "FIX ME!\n");
+        return;
+    }
+    delim = line[cc++];
+    } while (delim == ' ');     /* others? NL */
 
     w = count = 0;
     ccase = LC;
     for (;;) {
-	int c = nextfiodec(&ccase, delim);
-	if (c == -1)
-	    break;
-	w |= c << ((2-count)*6);
-	if (++count == 3) {
-	    punchOutObject(clc, w);	/* punch it! */
-	    incrementClc();
-	    count = w = 0;
-	}
+    int c = nextfiodec(&ccase, delim);
+    if (c == -1)
+        break;
+    w |= c << ((2-count)*6);
+    if (++count == 3) {
+        punchOutObject(clc, w); /* punch it! */
+        incrementClc();
+        count = w = 0;
+    }
     }
     if (count > 0) {
-	punchOutObject(clc, w);		/* punch remainder */
-	incrementClc();
+    punchOutObject(clc, w);     /* punch remainder */
+    incrementClc();
     }
 }
 
@@ -2835,27 +2835,27 @@ constants(void) {
     /* XXX illegal inside macro (curmacro != NULL) */
 
     if (pass == 1) {
-	lit_loc[nconst] = clc;
+    lit_loc[nconst] = clc;
 
-	/* just use addition?! */
-	for (i = 0; i < lit_count[nconst]; i++)
-	    incrementClc();
+    /* just use addition?! */
+    for (i = 0; i < lit_count[nconst]; i++)
+        incrementClc();
 
-	nconst++;
-	return;
+    nconst++;
+    return;
     }
 
     /* pass 2: */
     /* XXX complain if clc != lit_base[nconst]? */
 
     for (i = 0; i < lit_count[nconst]; i++) {
-	if (i < nlit)
-	    punchOutObject( clc, litter[i] & 0777777); /* punch it! */
-	incrementClc();
+    if (i < nlit)
+        punchOutObject( clc, litter[i] & 0777777); /* punch it! */
+    incrementClc();
     }
 
     nconst++;
-    nlit = 0;				/* litter[] now empty */
+    nlit = 0;               /* litter[] now empty */
 } /* constants */
 
 
@@ -2869,85 +2869,85 @@ BOOL pseudo( PSEUDO_T val )
 
     switch( (PSEUDO_T) val ) {
     case CONSTANTS:
-	next(0);			/* Skip symbol */
-	constants();
-	break;
+    next(0);            /* Skip symbol */
+    constants();
+    break;
 
     case VARIABLES:
-	next(0);			/* Skip symbol */
-	variables();
-	break;
+    next(0);            /* Skip symbol */
+    variables();
+    break;
 
     case DEFINE:
-	next(0);			/* Skip symbol */
-	defineMacro();
-	return FALSE;
-	break;
+    next(0);            /* Skip symbol */
+    defineMacro();
+    return FALSE;
+    break;
 
     case REPEAT:
-	next(0);			/* Skip symbol */
+    next(0);            /* Skip symbol */
 
-	/* NOTE!! constant followed by SPACE picked up as expression!! */
-	count = getExprs() & ADDRESS_FIELD;
-	/* XXX error if sign bit set? */
+    /* NOTE!! constant followed by SPACE picked up as expression!! */
+    count = getExprs() & ADDRESS_FIELD;
+    /* XXX error if sign bit set? */
 
-	/* allow comma, but do not require */
-	if( line[lexstart] == ',')
-	    next(0);
+    /* allow comma, but do not require */
+    if( line[lexstart] == ',')
+        next(0);
 
-	nrepeats++;
-	repeatstart = lexstart;		/* save line start */
-	while (count-- > 0) {
-	    cc = repeatstart;		/* reset input pointer */
-	    processLine();		/* recurse! */
-	}
-	cc = maxcc;
-	nrepeats--;
+    nrepeats++;
+    repeatstart = lexstart;     /* save line start */
+    while (count-- > 0) {
+        cc = repeatstart;       /* reset input pointer */
+        processLine();      /* recurse! */
+    }
+    cc = maxcc;
+    nrepeats--;
 
-	return FALSE;
-	break;
+    return FALSE;
+    break;
 
     case START:
-	next(0);			/* Skip symbol */
-	/* XXX illegal in macro or repeat */
-	flushLoader();
-	if (!ISDONE(line[lexstart])) {
-	    if (line[lexstart] == ' ')
-		next(0);
-	    start_addr = getExprs() & ADDRESS_FIELD;
-	    next(0);
-	    printLine( line, 0, start_addr, LINE_VAL );
-	    /* MACRO punches 4" of leader */
-	    punchTriplet(JMP | start_addr);
-	    /* MACRO punches 24" of leader? */
-	}
-	/*
-	 * handle multiple tapes concatenated into one file!!
-	 * have command line option?? treat "start" as EOF??
-	 */
-	list_title_set = FALSE;
-	return FALSE;
+    next(0);            /* Skip symbol */
+    /* XXX illegal in macro or repeat */
+    flushLoader();
+    if (!ISDONE(line[lexstart])) {
+        if (line[lexstart] == ' ')
+        next(0);
+        start_addr = getExprs() & ADDRESS_FIELD;
+        next(0);
+        printLine( line, 0, start_addr, LINE_VAL );
+        /* MACRO punches 4" of leader */
+        punchTriplet(JMP | start_addr);
+        /* MACRO punches 24" of leader? */
+    }
+    /*
+     * handle multiple tapes concatenated into one file!!
+     * have command line option?? treat "start" as EOF??
+     */
+    list_title_set = FALSE;
+    return FALSE;
 
     case TEXT:
-	/* NOTE!! no next()! */
-	text();
-	break;
+    /* NOTE!! no next()! */
+    text();
+    break;
 
     case NOINPUT:
-	next(0);			/* Skip symbol */
-	noinput = TRUE;
-	break;
+    next(0);            /* Skip symbol */
+    noinput = TRUE;
+    break;
 
     case EXPUNGE:
-	next(0);			/* Skip symbol */
-	if (pass == 1)
-	    init_symtab();
-	break;
+    next(0);            /* Skip symbol */
+    if (pass == 1)
+        init_symtab();
+    break;
 
     default:
-	break;
+    break;
     } /* end switch for pseudo-ops */
-    return TRUE;			/* keep scanning */
+    return TRUE;            /* keep scanning */
 } /* pseudo */
 
 
@@ -2974,7 +2974,7 @@ void errorSymbol( EMSG_T *mesg, char *name, WORD32 col )
     errors++;
     sprintf( linecol, ":%d:%d", lineno, col + 1 );
     fprintf( errorfile, "%s%-9s : error:  %s \"%s\" at Loc = %5.5o\n",
-	    filename, linecol, mesg->file, s, clc );
+        filename, linecol, mesg->file, s, clc );
     saveError( mesg->list, col );
   }
   error_in_line = TRUE;
@@ -2992,7 +2992,7 @@ void errorMessage( EMSG_T *mesg, WORD32 col )
     errors++;
     sprintf( linecol, ":%d:%d", lineno, col + 1 );
     fprintf( errorfile, "%s%-9s : error:  %s at Loc = %5.5o\n",
-	    filename, linecol, mesg->file, clc );
+        filename, linecol, mesg->file, clc );
     saveError( mesg->list, col );
   }
   error_in_line = TRUE;
@@ -3025,8 +3025,8 @@ dump_symbols(void) {
 
     objectfile = fopen( sympathname, "wb" );
     if (!objectfile) {
-	perror(sympathname);
-	return;
+    perror(sympathname);
+    return;
     }
 
     punchLeader(0);
@@ -3037,32 +3037,32 @@ dump_symbols(void) {
     addr = 05000;
 
     for( ix = 0; ix < symbol_top; ix++ ) {
-	int i, type;
-	WORD32 name;
+    int i, type;
+    WORD32 name;
 
-	type = symtab[ix].type;
-	if (M_FIXED(type) || M_PSEUDO(type) || M_MACRO(type))
-	    continue;
+    type = symtab[ix].type;
+    if (M_FIXED(type) || M_PSEUDO(type) || M_MACRO(type))
+        continue;
 
-	name = 0;
-	for (i = 0; i < 3; i++) {
-	    char c;
+    name = 0;
+    for (i = 0; i < 3; i++) {
+        char c;
 
-	    c = symtab[ix].name[i];
-	    /* XXX leave on NUL? */
+        c = symtab[ix].name[i];
+        /* XXX leave on NUL? */
 
-	    c = ascii_to_fiodec[tolower(c) & 0177];
-	    /* XXX check for BAD entries? */
+        c = ascii_to_fiodec[tolower(c) & 0177];
+        /* XXX check for BAD entries? */
 
-	    /* XXX OR in val<<(3-i)*6?? */
-	    name <<= 6;
-	    name |= c & CHARBITS;
-	}
-	punchLocObject(addr++, permute(name));
-	punchLocObject(addr++, symtab[ix].val);
+        /* XXX OR in val<<(3-i)*6?? */
+        name <<= 6;
+        name |= c & CHARBITS;
+    }
+    punchLocObject(addr++, permute(name));
+    punchLocObject(addr++, symtab[ix].val);
     }
     flushLoader();
-    punchTriplet( JMP );		/* ??? */
+    punchTriplet( JMP );        /* ??? */
     punchLeader(0);
     fclose(objectfile);
 }

@@ -60,7 +60,7 @@
 
 #define UNIT_V_DTYPE    (UNIT_V_UF + 0)                 /* disk type */
 #define RS03_DTYPE       (0)
-#define RS04_DTYPE	     (1)
+#define RS04_DTYPE       (1)
 #define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
 #define UNIT_V_WLK      (UNIT_V_UF + 2)                 /* write lock */
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)

@@ -46,12 +46,12 @@ extern DEVICE dsk_dev;
 
 /* SCP data structures
 
-   sim_name		simulator name string
-   sim_PC		pointer to saved PC register descriptor
-   sim_emax		number of words needed for examine
-   sim_devices		array of pointers to simulated devices
-   sim_stop_messages	array of pointers to stop messages
-   sim_load		binary loader
+   sim_name             simulator name string
+   sim_PC               pointer to saved PC register descriptor
+   sim_emax             number of words needed for examine
+   sim_devices          array of pointers to simulated devices
+   sim_stop_messages    array of pointers to stop messages
+   sim_load             binary loader
 */
 
 char sim_name[] = "SWTP 6800, V2, MP-A2 CPU Board";

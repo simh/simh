@@ -967,9 +967,9 @@ if (fnc_rdy[fnc] && sim_is_active (uptr))               /* need inactive? */
 if (fnc_cyl[fnc] &&                                     /* need valid cyl */
    ((GET_CY (hkdc) >= HK_CYL (uptr)) ||                 /* bad cylinder */
     (GET_SF (hkda) >= HK_NUMSF))) {                     /* bad surface */
-	hk_err (CS1_ERR|CS1_DONE, 0, ER_SKI|ER_IAE, drv);   /* set err, no op */
-	return;
-	}
+    hk_err (CS1_ERR|CS1_DONE, 0, ER_SKI|ER_IAE, drv);   /* set err, no op */
+    return;
+    }
 
 
 hkcs1 = (hkcs1 | CS1_GO) & ~CS1_DONE;                   /* set go, clear done */

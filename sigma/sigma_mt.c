@@ -489,7 +489,7 @@ switch (st) {
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
         chan_set_chf (mt_dib.dva, CHF_XMDE);
         chan_uen (mt_dib.dva);                          /* force uend */
-	    return SCPE_IOERR;
+        return SCPE_IOERR;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */

@@ -1372,7 +1372,7 @@ while (reason == 0) {
             if (!(arch_mask & AMASK_CIX)) ABORT (EXC_RSVI);
             for (res = 0; rbv != 0; res++) {
                 rbv = rbv & ~(rbv & NEG_Q (rbv));
-				}
+                }
             break;
 
         case 0x31:                                      /* PERR */
