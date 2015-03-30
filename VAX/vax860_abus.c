@@ -633,6 +633,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 int32 acc;
 int32 mstat1, mstat2, mear, ebcs, merg, ehmsts;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 mstat1 = (MSTAT1_CPRD << MSTAT1_V_CYC);                 /* MBOX Status 1 */
 mstat2 = MSTAT2_NXM;                                    /* MBOX Status 2 */
 mear = mchk_va;                                         /* Memory error address */

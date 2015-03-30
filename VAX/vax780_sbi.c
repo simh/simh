@@ -585,6 +585,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 acc, err;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 err = (GET_TRAP (trpirq) << 4) | (pme << 3) | ASTLVL;   /* error word */
 cc = intexc (SCB_MCHK, cc, 0, IE_SVE);                  /* take exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */

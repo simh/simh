@@ -437,6 +437,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 acc, nxm;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 nxm = ((p1 == MCHK_NXM) || (p1 == MCHK_IIA) || (p1 == MCHK_IUA));
 if (nxm)
     cc = intexc (SCB_MCHK, cc, 0, IE_EXC);              /* take normal exception */
