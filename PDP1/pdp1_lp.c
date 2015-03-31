@@ -115,7 +115,7 @@ if ((inst & 07000) == 01000) {                          /* fill buf */
         lpt_buf[i] = lpt_trans[(dat >> 12) & 077];
         lpt_buf[i + 1] = lpt_trans[(dat >> 6) & 077];
         lpt_buf[i + 2] = lpt_trans[dat & 077];
-		}
+        }
     lpt_bptr = (lpt_bptr + 1) & BPTR_MASK;
     return dat;
     }

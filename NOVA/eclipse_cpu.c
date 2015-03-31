@@ -3,7 +3,7 @@
    Modified from the original NOVA simulator by Robert Supnik.
 
    Copyright (c) 1998-2012, Charles E Owen
-   Portions Copyright (c) 1993-2002, Robert M Supnik
+   Portions Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
 
    cpu          Eclipse central processor
 
+   30-Mar-15    RMS     Fixed typo in DIVS
    25-Mar-12    RMS     Fixed declarations (Mark Pizzolato)
    07-Jun-06    RMS     Fixed bug in DIVS (Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
@@ -1659,7 +1660,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         continue;
     }
     if (IR == 0157710) {                                /* DIVS: Signed Divide */
-        if ((AC[0] == 0) ||
+        if ((AC[2] == 0) ||
             ((AC[0] == 0100000) && (AC[1] == 0) && (AC[2] == 0177777)))
             C = 0200000;
         else {

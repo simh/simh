@@ -628,8 +628,8 @@ typedef struct pdp_dib DIB;
                     /* VT simulation is sequential, so only
                        one interrupt is posted at a time. */
 #define INT_V_VTLP      13  /* XXX - Manual says VTLP, VTST have opposite */
-#define INT_V_VTST      14  /* XXX	   precedence, but that breaks LUNAR! */
-                            /* XXX  How this happens is an utter mystery. */
+#define INT_V_VTST      14  /* XXX   precedence, but that breaks LUNAR! */
+                            /* XXX   How this happens is an utter mystery. */
 #define INT_V_VTCH      15
 #define INT_V_VTNM      16
 #define INT_V_LK        17

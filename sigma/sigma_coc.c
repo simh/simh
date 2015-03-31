@@ -59,17 +59,17 @@
 
 /* DIO address */
 
-#define MUXDIO_V_FNC	0                               /* function */
-#define MUXDIO_M_FNC	0xF
-#define MUXDIO_V_COC	4                               /* ctlr num */
-#define MUXDIO_M_COC	0xF
+#define MUXDIO_V_FNC    0                               /* function */
+#define MUXDIO_M_FNC    0xF
+#define MUXDIO_V_COC    4                               /* ctlr num */
+#define MUXDIO_M_COC    0xF
 #define MUXDIO_GETFNC(x) (((x) >> MUXDIO_V_FNC) & MUXDIO_M_FNC)
 #define MUXDIO_GETCOC(x) (((x) >> MUXDIO_V_COC) & MUXDIO_M_COC)
 
-#define MUXDAT_V_LIN	0                               /* line num */
-#define MUXDAT_M_LIN	(MUX_LINES - 1)
-#define MUXDAT_V_CHR	8                               /* output char */
-#define MUXDAT_M_CHR	0xFF
+#define MUXDAT_V_LIN    0                               /* line num */
+#define MUXDAT_M_LIN    (MUX_LINES - 1)
+#define MUXDAT_V_CHR    8                               /* output char */
+#define MUXDAT_M_CHR    0xFF
 #define MUXDAT_GETLIN(x) (((x) >> MUXDAT_V_LIN) & MUXDAT_M_LIN)
 #define MUXDAT_GETCHR(x) (((x) >> MUXDAT_V_CHR) & MUXDAT_M_CHR)
 

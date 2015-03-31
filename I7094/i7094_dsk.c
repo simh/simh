@@ -1189,7 +1189,7 @@ for (a = 0, ctss = TRUE; a < dsk_tab[dtyp].accpm; a++) {
                 fprintf (st, "Invalid record length %d, unit = %d, access = %d, track = %d, record = %d\n",
                     rlnt, u, a, t, rec);
                 return SCPE_OK;
-				}
+                }
             if (rlnt > maxrsz)
                 maxrsz = rlnt;
             if (rlnt < minrsz)

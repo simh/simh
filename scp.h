@@ -229,6 +229,7 @@ extern struct timespec sim_deb_basetime;                /* debug base time for r
 extern UNIT *sim_clock_queue;
 extern int32 sim_is_running;
 extern char *sim_prompt;                                /* prompt string */
+extern const char *sim_savename;                        /* Simulator Name used in Save/Restore files */
 extern t_value *sim_eval;
 extern volatile int32 stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
@@ -265,6 +266,5 @@ extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
 extern t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason);
 extern t_value (*sim_vm_pc_value) (void);
 extern t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs);
-
 
 #endif

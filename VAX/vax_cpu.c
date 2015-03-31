@@ -640,11 +640,6 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
         break;
 
     case SCB_MCHK:                                      /* machine check */
-/* The ka630 and ka620 CPU ROMs use double machine checks to size memory */
-#if !defined(VAX_620) && !defined(VAX_630)
-        if (in_ie)                                      /* in exc? panic */
-            ABORT (STOP_INIE);
-#endif
         cc = machine_check (p1, opc, cc, delta);        /* system specific */
         in_ie = 0;
         GET_CUR;                                        /* PSL<cur> changed */

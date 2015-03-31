@@ -217,9 +217,9 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         sim_activate (&ptp_unit, ptp_unit.wait);        /* activate unit */
         return AC;
 
-	default:
-		return (stop_inst << IOT_V_REASON) + AC;
-		}                                               /* end switch */
+    default:
+        return (stop_inst << IOT_V_REASON) + AC;
+        }                                               /* end switch */
 }
 
 /* Unit service */

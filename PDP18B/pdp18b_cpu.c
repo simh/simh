@@ -727,7 +727,7 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
     if (!usmd_defer)                                    /* no IOT? load usmd */
         usmd = usmd_buf;
     else usmd_defer = 0;                                /* cancel defer */
@@ -2051,15 +2051,15 @@ if (MMR & MM_RDIS)                                      /* reloc disabled? */
 else if ((MMR & MM_SH) &&                               /* shared enabled and */
     (ma >= g_base[gmode]) &&                            /* >= shared base and */
     (ma < (g_base[gmode] + slr_lnt[slr]))) {            /* < shared end? */
-	if (ma & 017400) {									/* ESAS? */
-		if ((rc == REL_W) && (MMR & MM_WP)) {			/* write and protected? */
-			prvn = trap_pending = 1;					/* set flag, trap */
-			return -1;
-			}
-		pa = (((MMR & MM_SBR_MASK) << 8) + ma) & DMASK; /* ESAS reloc */
-		}
-	else pa = RR + (ma & 0377);							/* no, ISAS reloc */
-	}
+    if (ma & 017400) {                                  /* ESAS? */
+        if ((rc == REL_W) && (MMR & MM_WP)) {           /* write and protected? */
+            prvn = trap_pending = 1;                    /* set flag, trap */
+            return -1;
+            }
+        pa = (((MMR & MM_SBR_MASK) << 8) + ma) & DMASK; /* ESAS reloc */
+        }
+    else pa = RR + (ma & 0377);                         /* no, ISAS reloc */
+    }
 else {
     if (ma > (BR | 0377)) {                             /* normal reloc, viol? */
         if (rc != REL_C)                                /* set flag, trap */
@@ -2248,7 +2248,7 @@ static const uint8 std_dev[] =
 for (i = 0; i < DEV_MAX; i++) {                         /* clr tables */
     dev_tab[i] = NULL;
     dev_iors[i] = NULL;
-	}
+    }
 for (i = 0; i < ((uint32) sizeof (std_dev)); i++)       /* std entries */
     dev_tab[std_dev[i]] = &bad_dev;
 for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices */

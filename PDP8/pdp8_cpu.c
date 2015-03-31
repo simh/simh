@@ -357,7 +357,7 @@ while (reason == 0) {                                   /* loop until halted */
         sim_brk_test (MA, (1u << SIM_BKPT_V_SPC) | SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     IR = M[MA];                                         /* fetch instruction */
     if (sim_brk_summ && 

@@ -56,7 +56,7 @@
 #define TXCS_M_TEN      0xF
 #define TXCS_TEN        (TXCS_M_TEN << TXCS_V_TEN)
 #define TXCS_RD         (CSR_DONE + CSR_IE + TXCS_TEN + TXCS_IDC + TXCS_WMN)  /* Readable bits */
-#define TXCS_WR         (CSR_IE)		        /* Writeable bits */
+#define TXCS_WR         (CSR_IE)                        /* Writeable bits */
 #define ID_CT           0                               /* console terminal */
 #define ID_RS           1                               /* remote services */
 #define ID_EMM          2                               /* environmental monitoring module */

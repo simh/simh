@@ -477,6 +477,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 p2, acc;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 p2 = mchk_va + 4;                                       /* save vap */
 cc = intexc (SCB_MCHK, cc, 0, IE_EXC);                  /* take exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */

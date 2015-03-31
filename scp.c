@@ -528,10 +528,12 @@ static const char *sim_sa64 = "64b addresses";
 #else
 static const char *sim_sa64 = "32b addresses";
 #endif
+const char *sim_savename = sim_name;      /* Simulator Name used in SAVE/RESTORE images */
 
 /* Tables and strings */
 
-const char save_vercur[] = "V3.5";
+const char save_vercur[] = "V4.0";
+const char save_ver35[] = "V3.5";
 const char save_ver32[] = "V3.2";
 const char save_ver30[] = "V3.0";
 const struct scp_error {
@@ -687,7 +689,7 @@ static const char simh_help[] =
       "++                       array\n"
       "++register1-register2    all the registers starting at register1\n"
       "++                       up to and including register2\n"
-      "++address				the specified location\n"
+      "++address                the specified location\n"
       "++address1-address2      all locations starting at address1 up to\n"
       "++                       and including address2\n"
       "++address/length         all location starting at address up to\n"
@@ -697,12 +699,12 @@ static const char simh_help[] =
       "3Switches\n"
       " Switches can be used to control the format of display information:\n\n"
        /***************** 80 character line width template *************************/
-      "++-a					display as ASCII\n"
-      "++-c					display as character string\n"
-      "++-m					display as instruction mnemonics\n"
-      "++-o					display as octal\n"
-      "++-d					display as decimal\n"
-      "++-h					display as hexadecimal\n\n"
+      "++-a                 display as ASCII\n"
+      "++-c                 display as character string\n"
+      "++-m                 display as instruction mnemonics\n"
+      "++-o                 display as octal\n"
+      "++-d                 display as decimal\n"
+      "++-h                 display as hexadecimal\n\n"
       " The simulators typically accept symbolic input (see documentation with each\n"
       " simulator).\n\n"
       "3Examples\n"
@@ -714,10 +716,10 @@ static const char simh_help[] =
       "++                       of locations 40:50 that are >1000\n"
       "++ex rx0 50060           examine 50060, RX unit 0\n"
       "++ex rx sbuf[3-6]        examine SBUF[3] to SBUF[6] in RX\n"
-      "++de all 0				set main memory to 0\n"
-      "++de &77>0 0				set all addresses whose low order\n"
+      "++de all 0               set main memory to 0\n"
+      "++de &77>0 0             set all addresses whose low order\n"
       "++                       bits are non-zero to 0\n"
-      "++ex -m @memdump.txt 0-7777	dump memory to file\n\n"
+      "++ex -m @memdump.txt 0-7777  dump memory to file\n\n"
       " Note: to terminate an interactive command, simply type a bad value\n"
       "       (eg, XYZ) when input is requested.\n"
 #define HLP_EVALUATE    "*Commands Evaluating_Instructions"
@@ -1376,8 +1378,8 @@ Error traps can be taken for any command which returns a status other than SCPE_
 ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL.  These values can be indicated by name or by their internal numeric value (not recommended).
 
 Interactions with ASSERT command and "DO -e":
-DO -e		is equivalent to SET ON, which by itself it equivalent to "SET ON; ON ERROR RETURN".
-ASSERT		failure have several different actions:
+DO -e       is equivalent to SET ON, which by itself it equivalent to "SET ON; ON ERROR RETURN".
+ASSERT      failure have several different actions:
        If error trapping is not enabled then AFAIL causes exit from the current do command file.
        If error trapping is enabled and an explicit "ON AFAIL" action is defined, then the specified action is performed.
        If error trapping is enabled and no "ON AFAIL" action is defined, then an AFAIL causes exit from the current do command file.
@@ -5406,7 +5408,7 @@ REG *rptr;
 
 fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
     save_vercur,                                        /* [V2.5] save format */
-    sim_name,                                           /* sim name */
+    sim_savename,                                       /* sim name */
     sim_si64, sim_sa64, eth_capabilities(),             /* [V3.5] options */
     sim_time);                                          /* [V3.2] sim time */
 WRITE_I (sim_rtime);                                    /* [V2.6] sim rel time */
@@ -5533,7 +5535,7 @@ t_addr k, high, old_capac;
 t_value val, mask;
 t_stat r;
 size_t sz;
-t_bool v35, v32;
+t_bool v40, v35, v32;
 DEVICE *dptr;
 UNIT *uptr;
 REG *rptr;
@@ -5547,8 +5549,10 @@ t_bool force_restore = sim_switches & SWMASK ('F');
 
 fstat (fileno (rfile), &rstat);
 READ_S (buf);                                           /* [V2.5+] read version */
-v35 = v32 = FALSE;
-if (strcmp (buf, save_vercur) == 0)                     /* version 3.5? */
+v40 = v35 = v32 = FALSE;
+if (strcmp (buf, save_vercur) == 0)                     /* version 4.0? */
+    v40 = v35 = v32 = TRUE;
+if (strcmp (buf, save_ver35) == 0)                      /* version 3.5? */
     v35 = v32 = TRUE;
 else if (strcmp (buf, save_ver32) == 0)                 /* version 3.2? */
     v32 = TRUE;
@@ -5557,7 +5561,7 @@ else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
     return SCPE_INCOMP;
     }
 READ_S (buf);                                           /* read sim name */
-if (strcmp (buf, sim_name)) {                           /* name match? */
+if (strcmp (buf, sim_savename)) {                       /* name match? */
     sim_printf ("Wrong system type: %s\n", buf);
     return SCPE_INCOMP;
     }
@@ -5619,7 +5623,9 @@ for ( ;; ) {                                            /* device loop */
         READ_I (uptr->u5);                              /* [V3.0+] more dev spec */
         READ_I (uptr->u6);
         READ_I (flg);                                   /* [V2.10+] unit flags */
-        READ_I (uptr->dynflags);
+        if (v40) {                                      /* [V4.0+] dynflags */
+            READ_I (uptr->dynflags);
+            }
         old_capac = uptr->capac;                        /* save current capacity */
         if (v35) {                                      /* [V3.5+] capacity */
             READ_I (uptr->capac);
@@ -9505,26 +9511,10 @@ va_list arglist;
 while (1) {                                         /* format passed string, args */
     va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
-#if defined(HAS_vsprintf_void)
-
-/* Note, this could blow beyond the buffer, and we couldn't tell */
-/* That is a limitation of the C runtime library available on this platform */
-
-    vsprintf (buf, fmt, arglist);
-    for (len = 0; len < bufsize-1; len++)
-        if (buf[len] == 0) break;
-#else
     len = vsprintf (buf, fmt, arglist);
-#endif                                                  /* HAS_vsprintf_void */
-#else                                                   /* NO_vsnprintf */
-#if defined(HAS_vsnprintf_void)
-    vsnprintf (buf, bufsize-1, fmt, arglist);
-    for (len = 0; len < bufsize-1; len++)
-        if (buf[len] == 0) break;
-#else
+#else                                               /* !defined(NO_vsnprintf) */
     len = vsnprintf (buf, bufsize-1, fmt, arglist);
-#endif                                                  /* HAS_vsnprintf_void */
-#endif                                                  /* NO_vsnprintf */
+#endif                                              /* NO_vsnprintf */
     va_end (arglist);
 
 /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
@@ -9533,6 +9523,8 @@ while (1) {                                         /* format passed string, arg
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
+        if (bufsize < len + 2)
+            bufsize = len + 2;
         buf = (char *) malloc (bufsize);
         if (buf == NULL)                            /* out of memory */
             return;
@@ -9546,7 +9538,10 @@ if (sim_is_running) {
     char *c, *remnant = buf;
 
     while ((c = strchr(remnant, '\n'))) {
-        printf("%.*s\r\n", (int)(c-remnant), remnant);
+        if ((c != buf) && (*(c - 1) != '\r'))
+            printf("%.*s\r\n", (int)(c-remnant), remnant);
+        else
+            printf("%.*s\n", (int)(c-remnant), remnant);
         remnant = c + 1;
         }
     printf("%s", remnant);
@@ -9575,26 +9570,10 @@ t_bool inhibit_message = (!sim_show_message || (stat & SCPE_NOMESSAGE));
 while (1) {                                         /* format passed string, args */
     va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
-#if defined(HAS_vsprintf_void)
-
-/* Note, this could blow beyond the buffer, and we couldn't tell */
-/* That is a limitation of the C runtime library available on this platform */
-
-    vsprintf (buf, fmt, arglist);
-    for (len = 0; len < bufsize-1; len++)
-        if (buf[len] == 0) break;
-#else
     len = vsprintf (buf, fmt, arglist);
-#endif                                                  /* HAS_vsprintf_void */
-#else                                                   /* NO_vsnprintf */
-#if defined(HAS_vsnprintf_void)
-    vsnprintf (buf, bufsize-1, fmt, arglist);
-    for (len = 0; len < bufsize-1; len++)
-        if (buf[len] == 0) break;
-#else
+#else                                               /* !defined(NO_vsnprintf) */
     len = vsnprintf (buf, bufsize-1, fmt, arglist);
-#endif                                                  /* HAS_vsnprintf_void */
-#endif                                                  /* NO_vsnprintf */
+#endif                                              /* NO_vsnprintf */
     va_end (arglist);
 
 /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
@@ -9603,6 +9582,8 @@ while (1) {                                         /* format passed string, arg
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
+        if (bufsize < len + 2)
+            bufsize = len + 2;
         buf = (char *) malloc (bufsize);
         if (buf == NULL)                            /* out of memory */
             return SCPE_MEM;
@@ -9624,7 +9605,10 @@ if (sim_is_running && !inhibit_message) {
     char *c, *remnant = buf;
 
     while ((c = strchr(remnant, '\n'))) {
-        printf("%.*s\r\n", (int)(c-remnant), remnant);
+        if ((c != buf) && (*(c - 1) != '\r'))
+            printf("%.*s\r\n", (int)(c-remnant), remnant);
+        else
+            printf("%.*s\n", (int)(c-remnant), remnant);
         remnant = c + 1;
         }
     printf("%s", remnant);
@@ -9668,25 +9652,9 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
     while (1) {                                         /* format passed string, args */
         va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
-#if defined(HAS_vsprintf_void)
-
-/* Note, this could blow beyond the buffer, and we couldn't tell */
-/* That is a limitation of the C runtime library available on this platform */
-
-        vsprintf (buf, fmt, arglist);
-        for (len = 0; len < bufsize-1; len++)
-            if (buf[len] == 0) break;
-#else
         len = vsprintf (buf, fmt, arglist);
-#endif                                                  /* HAS_vsprintf_void */
-#else                                                   /* NO_vsnprintf */
-#if defined(HAS_vsnprintf_void)
-        vsnprintf (buf, bufsize-1, fmt, arglist);
-        for (len = 0; len < bufsize-1; len++)
-            if (buf[len] == 0) break;
-#else
+#else                                                   /* !defined(NO_vsnprintf) */
         len = vsnprintf (buf, bufsize-1, fmt, arglist);
-#endif                                                  /* HAS_vsnprintf_void */
 #endif                                                  /* NO_vsnprintf */
         va_end (arglist);
 
@@ -9696,6 +9664,8 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
             if (buf != stackbuf)
                 free (buf);
             bufsize = bufsize * 2;
+            if (bufsize < len + 2)
+                bufsize = len + 2;
             buf = (char *) malloc (bufsize);
             if (buf == NULL)                            /* out of memory */
                 return;

@@ -35,50 +35,50 @@ static t_stat sagehd_detach(UNIT* uptr);
 
 
 UNIT sagehd_unit[] = {
-	{ UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_DISABLE | UNIT_ROABLE, 0) },
-	{ UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) },
-	{ UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) },
-	{ UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) }
+    { UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_DISABLE | UNIT_ROABLE, 0) },
+    { UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) },
+    { UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) },
+    { UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) }
 };
 
 REG sagehd_reg[] = {
-	{ NULL }
+    { NULL }
 };
 
 /*
 static MTAB sagehd_mod[] = {
-	{ NULL }
+    { NULL }
 };
 */
 DEVICE sagehd_dev = {
-	"HD", sagehd_unit, sagehd_reg, /*sagehd_mod*/NULL,
-	4, 16, 32, 2, 16, 16,
-	NULL, NULL, &sagehd_reset,
-	&sagehd_boot, &sagehd_attach, &sagehd_detach,
-	NULL, DEV_DISABLE|DEV_DIS, 0,
-	NULL, NULL, NULL
+    "HD", sagehd_unit, sagehd_reg, /*sagehd_mod*/NULL,
+    4, 16, 32, 2, 16, 16,
+    NULL, NULL, &sagehd_reset,
+    &sagehd_boot, &sagehd_attach, &sagehd_detach,
+    NULL, DEV_DISABLE|DEV_DIS, 0,
+    NULL, NULL, NULL
 };
 
 static t_stat sagehd_reset(DEVICE* dptr) 
 {
-	printf("sagehd_reset\n");
-	return SCPE_OK;
+    printf("sagehd_reset\n");
+    return SCPE_OK;
 }
 
 static t_stat sagehd_boot(int32 unit_num,DEVICE* dptr)
 {
-	printf("sagehd_boot\n");
-	return SCPE_OK;
+    printf("sagehd_boot\n");
+    return SCPE_OK;
 }
 
 static t_stat sagehd_attach(UNIT* uptr, char* file)
 {
-	printf("sagehd_attach\n");
-	return SCPE_OK;
+    printf("sagehd_attach\n");
+    return SCPE_OK;
 }
 
 static t_stat sagehd_detach(UNIT* uptr)
 {
-	printf("sagehd_detach\n");
-	return SCPE_OK;
+    printf("sagehd_detach\n");
+    return SCPE_OK;
 }

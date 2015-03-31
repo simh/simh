@@ -1643,6 +1643,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 i, st1, st2, p2, hsir, acc;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 if (p1 & 0x80)                                          /* mref? set v/p */
     p1 = p1 + mchk_ref;
 p2 = mchk_va + 4;                                       /* save vap */

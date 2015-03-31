@@ -32,75 +32,75 @@
 
 static t_stat i8255_error(const char* err)
 {
-	sim_printf("I8255: Missing method '%s'\n",err);
-	return STOP_IMPL;
+    sim_printf("I8255: Missing method '%s'\n",err);
+    return STOP_IMPL;
 }
 
 t_stat i8255_io(IOHANDLER* ioh,uint32* value,uint32 rw,uint32 mask)
 {
-	int port = ioh->offset;
-	I8255* chip = (I8255*)ioh->ctxt;
-	if (rw==MEM_WRITE) {
-		return chip->write ? chip->write(chip,port,*value) : i8255_error("write");
-	} else {
-		return chip->read ? chip->read(chip,port,value) : i8255_error("read");
-	}
+    int port = ioh->offset;
+    I8255* chip = (I8255*)ioh->ctxt;
+    if (rw==MEM_WRITE) {
+        return chip->write ? chip->write(chip,port,*value) : i8255_error("write");
+    } else {
+        return chip->read ? chip->read(chip,port,value) : i8255_error("read");
+    }
 }
 
 t_stat i8255_read(I8255* chip,int port,uint32* data)
 {
-	t_stat rc;
-	switch (port) {
-	case 0:
-		if (chip->calla && (rc=(*chip->calla)(chip,0)) != SCPE_OK) return rc;
-		*data = chip->porta;
-		return SCPE_OK;
-	case 1:
-		if (chip->callb && (rc=(*chip->callb)(chip,0)) != SCPE_OK) return rc;
-		*data = chip->portb;
-		return SCPE_OK;
-	case 2:
-		if (chip->callc && (rc=(*chip->callc)(chip,0)) != SCPE_OK) return rc;
-		*data = chip->portc;
-		return SCPE_OK;
-	case 3:
-		*data = 0xff; /* undefined */
-		return SCPE_OK;
-	default:
-		return SCPE_IERR;
-	}
+    t_stat rc;
+    switch (port) {
+    case 0:
+        if (chip->calla && (rc=(*chip->calla)(chip,0)) != SCPE_OK) return rc;
+        *data = chip->porta;
+        return SCPE_OK;
+    case 1:
+        if (chip->callb && (rc=(*chip->callb)(chip,0)) != SCPE_OK) return rc;
+        *data = chip->portb;
+        return SCPE_OK;
+    case 2:
+        if (chip->callc && (rc=(*chip->callc)(chip,0)) != SCPE_OK) return rc;
+        *data = chip->portc;
+        return SCPE_OK;
+    case 3:
+        *data = 0xff; /* undefined */
+        return SCPE_OK;
+    default:
+        return SCPE_IERR;
+    }
 }
 
 t_stat i8255_write(I8255* chip,int port,uint32 data)
 {
-	t_stat rc;
-	uint32 bit;
-	switch(port) {
-	case 0: /*port a*/
-		chip->last_porta = chip->porta;
-		chip->porta = data;
-		return chip->calla ? (*chip->calla)(chip,1) : SCPE_OK;
-	case 1: /*port b*/
-		chip->last_portb = chip->portb;
-		return chip->callb ? (*chip->callb)(chip,1) : SCPE_OK;
-	case 2:
-		chip->last_portc = chip->portc;
-		chip->portc = data & 0xff;
-		return chip->callc ? (*chip->callc)(chip,1) : SCPE_OK;
-	case 3:
-		if (data & 0x80) { /* mode set mode */
-			if (chip->ckmode && (rc=chip->ckmode(chip,data))) return rc;
-			chip->ctrl = data & 0x7f;
-			return SCPE_OK;
-		} else { /* bit set mode */
-			chip->last_portc = chip->portc;
-			bit = 1 << ((data & 0x0e)>>1);
-			TRACE_PRINT2(DBG_PP_WRC,"WR PORTC %s bit=%x",data&1 ? "SET": "CLR",bit);
-			if (data & 1) chip->portc |= bit; else chip->portc &= ~bit;
-			chip->portc &= 0xff;
-			return chip->callc ? (*chip->callc)(chip,1) : SCPE_OK;
-		}
-	default:
-		return SCPE_IERR;
-	}
+    t_stat rc;
+    uint32 bit;
+    switch(port) {
+    case 0: /*port a*/
+        chip->last_porta = chip->porta;
+        chip->porta = data;
+        return chip->calla ? (*chip->calla)(chip,1) : SCPE_OK;
+    case 1: /*port b*/
+        chip->last_portb = chip->portb;
+        return chip->callb ? (*chip->callb)(chip,1) : SCPE_OK;
+    case 2:
+        chip->last_portc = chip->portc;
+        chip->portc = data & 0xff;
+        return chip->callc ? (*chip->callc)(chip,1) : SCPE_OK;
+    case 3:
+        if (data & 0x80) { /* mode set mode */
+            if (chip->ckmode && (rc=chip->ckmode(chip,data))) return rc;
+            chip->ctrl = data & 0x7f;
+            return SCPE_OK;
+        } else { /* bit set mode */
+            chip->last_portc = chip->portc;
+            bit = 1 << ((data & 0x0e)>>1);
+            TRACE_PRINT2(DBG_PP_WRC,"WR PORTC %s bit=%x",data&1 ? "SET": "CLR",bit);
+            if (data & 1) chip->portc |= bit; else chip->portc &= ~bit;
+            chip->portc &= 0xff;
+            return chip->callc ? (*chip->callc)(chip,1) : SCPE_OK;
+        }
+    default:
+        return SCPE_IERR;
+    }
 }

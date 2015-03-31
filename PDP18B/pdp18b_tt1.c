@@ -259,7 +259,7 @@ if (ttix_done) {
     }
 else {
     CLR_INT (TTI1);
-	}
+    }
 return;
 }
 
@@ -438,7 +438,7 @@ if (newln < ttx_lines) {
         if (ttx_ldsc[i].conn) {
             tmxr_linemsg (&ttx_ldsc[i], "\r\nOperator disconnected line\r\n");
             tmxr_reset_ln (&ttx_ldsc[i]);               /* reset line */
-			}
+            }
         ttox_unit[i].flags = ttox_unit[i].flags | UNIT_DIS;
         ttx_reset_ln (i);
         }

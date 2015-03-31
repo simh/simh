@@ -132,8 +132,8 @@ uint32 sign = FPR_GETSIGN (op)? S_SIGN: 0;
 uint32 frac = ((uint32) (op >> S_V_FRAC)) & M32;
 uint32 exp = FPR_GETEXP (op);
 
-if (exp == FPR_NAN) exp = S_NAN;			            /* inf or NaN? */
-else if (exp != 0) exp = exp + S_BIAS - T_BIAS;		    /* non-zero? */	
+if (exp == FPR_NAN) exp = S_NAN;                        /* inf or NaN? */
+else if (exp != 0) exp = exp + S_BIAS - T_BIAS;         /* non-zero? */
 exp = (exp & S_M_EXP) << S_V_EXP;
 return (t_uint64) (sign | exp | (frac & ~(S_SIGN|S_EXP)));
 }
@@ -631,8 +631,8 @@ static const int32 expmin[2] = { T_BIAS - S_BIAS, 0 };
 t_uint64 rndadd, rndbits, res;
 uint32 rndm;
 
-if (r->frac == 0)										/* result 0? */
-	return ((t_uint64) r->sign << FPR_V_SIGN);
+if (r->frac == 0)                                       /* result 0? */
+    return ((t_uint64) r->sign << FPR_V_SIGN);
 rndm = I_GETFRND (ir);                                  /* inst round mode */
 if (rndm == I_FRND_D) rndm = FPCR_GETFRND (fpcr);       /* dynamic? use FPCR */
 rndbits = r->frac & infrnd[dp];                         /* isolate round bits */

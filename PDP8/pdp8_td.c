@@ -375,16 +375,16 @@ if (new_mving && !prev_mving) {                         /* start from stop? */
 
 if ((prev_mving && !new_mving) ||                       /* stop from moving? */
     (prev_dir != new_dir)) {                            /* dir chg while moving? */
-	if (uptr->STATE >= STA_ACC) {						/* not stopping? */
-		if (td_setpos (uptr))				            /* update pos */
+    if (uptr->STATE >= STA_ACC) {                       /* not stopping? */
+        if (td_setpos (uptr))                           /* update pos */
             return TRUE;
-		sim_cancel (uptr);								/* stop current */
-		sim_activate (uptr, td_dctime);					/* schedule decel */
-		uptr->STATE = STA_DEC | prev_dir;				/* set status */
-		td_slf = td_qlf = td_qlctr = 0;					/* clear state */
-		}
-	return FALSE;
-	}
+        sim_cancel (uptr);                              /* stop current */
+        sim_activate (uptr, td_dctime);                 /* schedule decel */
+        uptr->STATE = STA_DEC | prev_dir;               /* set status */
+        td_slf = td_qlf = td_qlctr = 0;                 /* clear state */
+        }
+    return FALSE;
+    }
 
 return FALSE;   
 }
@@ -445,10 +445,10 @@ if (uptr->STATE & STA_DIR)                              /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel */
-	sim_cancel (uptr);									/* no timing pulses */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel */
+    sim_cancel (uptr);                                  /* no timing pulses */
+    return TRUE;
+    }
 return FALSE;
 }
 

@@ -1918,8 +1918,8 @@ t_stat m6800_reset (DEVICE *dptr)
 
 
 /* This is the dumper/loader. This command uses the -h to signify a
-	hex dump/load vice a binary one.  If no address is given to load, it 
-	takes the address from the hex record or the current PC for binary.
+    hex dump/load vice a binary one.  If no address is given to load, it 
+    takes the address from the hex record or the current PC for binary.
 */
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
