@@ -534,6 +534,7 @@ const char *sim_savename = sim_name;      /* Simulator Name used in SAVE/RESTORE
 /* Tables and strings */
 
 const char save_vercur[] = "V4.0";
+const char save_ver40[] = "V4.0";
 const char save_ver35[] = "V3.5";
 const char save_ver32[] = "V3.2";
 const char save_ver30[] = "V3.0";
@@ -5409,6 +5410,8 @@ REG *rptr;
 
 #define WRITE_I(xx) sim_fwrite (&(xx), sizeof (xx), 1, sfile)
 
+/* Don't make changes below without also changing save_vercur above */
+
 fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
     save_vercur,                                        /* [V2.5] save format */
     sim_savename,                                       /* sim name */
@@ -5553,7 +5556,7 @@ t_bool force_restore = sim_switches & SWMASK ('F');
 fstat (fileno (rfile), &rstat);
 READ_S (buf);                                           /* [V2.5+] read version */
 v40 = v35 = v32 = FALSE;
-if (strcmp (buf, save_vercur) == 0)                     /* version 4.0? */
+if (strcmp (buf, save_ver40) == 0)                      /* version 4.0? */
     v40 = v35 = v32 = TRUE;
 if (strcmp (buf, save_ver35) == 0)                      /* version 3.5? */
     v35 = v32 = TRUE;
