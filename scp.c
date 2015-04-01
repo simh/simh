@@ -491,6 +491,7 @@ static int32 noqueue_time;
 volatile int32 stop_cpu = 0;
 static char **sim_argv;
 t_value *sim_eval = NULL;
+t_value sim_last_val;
 FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
@@ -696,6 +697,8 @@ static const char simh_help[] =
       "++                       but not including address+length\n"
       "++STATE                  all registers in the device\n"
       "++ALL                    all locations in the unit\n"
+      "++$                      the last value displayed by an EXAMINE command\n"
+      "                         interpreted as an address\n"
       "3Switches\n"
       " Switches can be used to control the format of display information:\n\n"
        /***************** 80 character line width template *************************/
@@ -6279,7 +6282,7 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                 else
                     Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
                 }
-            last_val = val;
+            sim_last_val = last_val = val;
             val_start = idx;
             reason = ex_reg (ofile, val, flag, rptr, idx);
             if (reason != SCPE_OK)
@@ -6637,7 +6640,7 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
                 }
             }
         }
-    sim_eval[i] = sim_eval[i] & mask;
+    sim_last_val = sim_eval[i] = sim_eval[i] & mask;
     }
 if ((reason != SCPE_OK) && (i == 0))
     return reason;
@@ -7067,35 +7070,42 @@ const char *get_range (DEVICE *dptr, const char *cptr, t_addr *lo, t_addr *hi,
 {
 const char *tptr;
 
-if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) { /* ALL? */
+if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) {    /* ALL? */
     tptr = cptr + strlen ("ALL");
     *lo = 0;
     *hi = max;
     }
 else {
-    if (dptr && sim_vm_parse_addr)                      /* get low */
-        *lo = sim_vm_parse_addr (dptr, (char *)cptr, (char **)&tptr);
-    else *lo = (t_addr) strtotv (cptr, &tptr, rdx);
-    if (cptr == tptr)                                   /* error? */
-            return NULL;
-    if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
-        cptr = tptr + 1;
-        if (dptr && sim_vm_parse_addr)                  /* get high */
-            *hi = sim_vm_parse_addr (dptr, (char *)cptr, (char **)&tptr);
-        else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
-        if (cptr == tptr)
-            return NULL;
-        if (*lo > *hi)
-            return NULL;
+    if (strncmp (cptr, "$", strlen ("$")) == 0) {           /* $? */
+        tptr = cptr + strlen ("$");
+        *hi = *lo = (t_addr)sim_last_val;
         }
-    else if (*tptr == '/') {                            /* relative? */
-        cptr = tptr + 1;
-        *hi = (t_addr) strtotv (cptr, &tptr, rdx);      /* get high */
-        if ((cptr == tptr) || (*hi == 0))
-            return NULL;
-        *hi = *lo + *hi - 1;
+    else {
+        if (dptr && sim_vm_parse_addr)                      /* get low */
+            *lo = sim_vm_parse_addr (dptr, (char *)cptr, (char **)&tptr);
+        else
+            *lo = (t_addr) strtotv (cptr, &tptr, rdx);
+        if (cptr == tptr)                                   /* error? */
+                return NULL;
+        if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
+            cptr = tptr + 1;
+            if (dptr && sim_vm_parse_addr)                  /* get high */
+                *hi = sim_vm_parse_addr (dptr, (char *)cptr, (char **)&tptr);
+            else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
+            if (cptr == tptr)
+                return NULL;
+            if (*lo > *hi)
+                return NULL;
+            }
+        else if (*tptr == '/') {                            /* relative? */
+            cptr = tptr + 1;
+            *hi = (t_addr) strtotv (cptr, &tptr, rdx);      /* get high */
+            if ((cptr == tptr) || (*hi == 0))
+                return NULL;
+            *hi = *lo + *hi - 1;
+            }
+        else *hi = *lo;
         }
-    else *hi = *lo;
     }
 if (term && (*tptr++ != term))
     return NULL;
