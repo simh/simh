@@ -780,7 +780,7 @@ else {
     }
 for (i = 0; i < rpt; i++)
     fputc (lppdat, lp20_unit.fileref); 
-lp20_unit.pos = ftell (lp20_unit.fileref);
+lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
 lpcolc = lpcolc + rpt;
 return r;
 }
@@ -816,7 +816,7 @@ for (i = 0; i < cnt; i++) {                             /* print 'n' newlines; e
             } /* At TOF */
         } /* update pointer */
     }
-lp20_unit.pos = ftell (lp20_unit.fileref);
+lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
 if (stoppc)                                            /* Crossed one or more TOFs? */
     return FALSE;
 
@@ -841,7 +841,7 @@ for (i = 0; i < dvlnt; i++) {                           /* search DAVFU */
         if (lpcolc)                                     /* TOF, need newline? */
             lp20_adv (1, FALSE);
         fputc ('\f', lp20_unit.fileref);                /* print form feed */
-        lp20_unit.pos = ftell (lp20_unit.fileref);
+        lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
         lppagc = (lppagc - 1) & PAGC_MASK;              /* decr page cntr */
         if (lppagc != 0)
             return TRUE;
