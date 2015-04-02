@@ -155,6 +155,8 @@ if ((size == 0) || (count == 0))                        /* check arguments */
 if (sim_end || (size == sizeof (char)))                 /* le or byte? */
     return fwrite (bptr, size, count, fptr);            /* done */
 sim_flip = (unsigned char *)malloc(FLIP_SIZE);
+if (!sim_flip)
+    return 0;
 nelem = FLIP_SIZE / size;                               /* elements in buffer */
 nbuf = count / nelem;                                   /* number buffers */
 lcnt = count % nelem;                                   /* count in last buf */
