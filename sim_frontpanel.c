@@ -24,6 +24,7 @@
    in this Software without prior written authorization from Mark Pizzolato.
 
    05-Feb-15    MP      Initial implementation
+   01-Apr-15    MP      Added register indirect, mem_examine and mem_deposit
 
    This module provides interface between a front panel application and a simh
    simulator.  Facilities provide ways to gather information from and to 
@@ -111,6 +112,7 @@ typedef struct {
     char *device_name;
     void *addr;
     size_t size;
+    int indirect;
     } REG;
 
 struct PANEL {
@@ -148,6 +150,7 @@ struct PANEL {
     int                     callbacks_per_second;
     int                     debug;
     char                    *simulator_version;
+    int                     radix;
     FILE                    *Debug;
 #if defined(_WIN32)
     HANDLE                  hProcess;
@@ -160,6 +163,7 @@ static const char *sim_prompt = "sim> ";
 static const char *register_get_prefix = "show time";
 static const char *register_get_echo = "# REGISTERS-DONE";
 static const char *register_dev_echo = "# REGISTERS-FOR-DEVICE:";
+static const char *register_ind_echo = "# REGISTER-INDIRECT:";
 static const char *command_done_echo = "# COMMAND-DONE";
 static int little_endian;
 static void *_panel_reader(void *arg);
@@ -347,8 +351,11 @@ char *dev;
 
 pthread_mutex_lock (&panel->io_lock);
 buf_needed = 2 + strlen (register_get_prefix);  /* SHOW TIME */
-for (i=0; i<panel->reg_count; i++)
+for (i=0; i<panel->reg_count; i++) {
     buf_needed += 9 + strlen (panel->regs[i].name) + (panel->regs[i].device_name ? strlen (panel->regs[i].device_name) : 0);
+    if (panel->regs[i].indirect)
+        buf_needed += 12 + strlen (register_ind_echo) + strlen (panel->regs[i].name);
+    }
 buf_needed += 10 + strlen (register_get_echo); /* # REGISTERS-DONE */
 if (buf_needed > *buf_size) {
     free (*buf);
@@ -367,6 +374,8 @@ dev = "";
 for (i=j=0; i<panel->reg_count; i++) {
     char *reg_dev = panel->regs[i].device_name ? panel->regs[i].device_name : "";
 
+    if (panel->regs[i].indirect)
+        continue;
     if (strcmp (dev, reg_dev)) {/* devices are different */
         char *tbuf;
 
@@ -393,8 +402,18 @@ for (i=j=0; i<panel->reg_count; i++) {
     ++j;
     buf_data += strlen (*buf + buf_data);
     }
-strcpy (*buf + buf_data, "\r");
-buf_data += strlen (*buf + buf_data);
+if (buf_data && ((*buf)[buf_data-1] != '\r')) {
+    strcpy (*buf + buf_data, "\r");
+    buf_data += strlen (*buf + buf_data);
+    }
+for (i=j=0; i<panel->reg_count; i++) {
+    char *reg_dev = panel->regs[i].device_name ? panel->regs[i].device_name : "";
+
+    if (!panel->regs[i].indirect)
+        continue;
+    sprintf (*buf + buf_data, "%s%s\rE -H %s %s,$\r", register_ind_echo, panel->regs[i].name, reg_dev, panel->regs[i].name);
+    buf_data += strlen (*buf + buf_data);
+    }
 strcpy (*buf + buf_data, register_get_echo);
 buf_data += strlen (*buf + buf_data);
 strcpy (*buf + buf_data, "\r");
@@ -618,7 +637,7 @@ if (p->sock == INVALID_SOCKET) {
         if (stat (sim_path, &statb) < 0)
             sim_panel_set_error ("Can't stat simulator '%s': %s", sim_path, strerror(errno));
         else
-            sim_panel_set_error ("Can't connect to simulator Remote Console on port %s", p->hostport);
+            sim_panel_set_error ("Can't connect to the %s simulator Remote Console on port %s, the simulator process may not have started or the simulator binary can't be found", sim_path, p->hostport);
         }
     goto Error_Return;
     }
@@ -666,6 +685,20 @@ else {
             (1 != sscanf (c, "FrontPanel API Version %d", &api_version)) ||
             (api_version != SIM_FRONTPANEL_VERSION)) {
             sim_panel_set_error ("Inconsistent sim_frontpanel API version %d in simulator.  Version %d needed.-", api_version, SIM_FRONTPANEL_VERSION);
+            goto Error_Return;
+            }
+        }
+    if (1) {
+        char *radix = NULL;
+
+        if (_panel_sendf (p, 1, &radix, "SHOW %s RADIX\r", p->device_name ? p->device_name : "")) {
+            free (radix);
+            goto Error_Return;
+            }
+        sscanf (radix, "Radix=%d", &p->radix);
+        free (radix);
+        if ((p->radix != 16) && (p->radix != 8)) {
+            sim_panel_set_error ("Unsupported Radix: %d%s%s.", p->radix, p->device_name ? " on device " : "", p->device_name ? p->device_name : "");
             goto Error_Return;
             }
         }
@@ -813,12 +846,13 @@ if (!panel)
 return panel->State;
 }
 
-int
-sim_panel_add_register (PANEL *panel,
-                        const char *name,
-                        const char *device_name,
-                        size_t size,
-                        void *addr)
+static int
+_panel_add_register (PANEL *panel,
+                     const char *name,
+                     const char *device_name,
+                     size_t size,
+                     void *addr,
+                     int indirect)
 {
 REG *regs, *reg;
 char *response = NULL;
@@ -844,6 +878,7 @@ if (reg->name == NULL) {
     return -1;
     }
 strcpy (reg->name, name);
+reg->indirect = indirect;
 for (i=0; i<strlen (reg->name); i++) {
     if (islower (reg->name[i]))
         reg->name[i] = toupper (reg->name[i]);
@@ -877,7 +912,7 @@ for (i=0; i<panel->reg_count; i++) {
         }
     sprintf (t1, "%s %s", regs[i].device_name ? regs[i].device_name : "", regs[i].name);
     sprintf (t2, "%s %s", reg->device_name ? reg->device_name : "", reg->name);
-    if (!strcmp (t1, t2)) {
+    if ((!strcmp (t1, t2)) && (reg->indirect == regs[i].indirect)) {
         sim_panel_set_error ("Duplicate Register Declaration");
         free (t1);
         free (t2);
@@ -917,6 +952,26 @@ pthread_mutex_unlock (&panel->io_lock);
 if (_panel_register_query_string (panel, &panel->reg_query, &panel->reg_query_size))
     return -1;
 return 0;
+}
+
+int
+sim_panel_add_register (PANEL *panel,
+                        const char *name,
+                        const char *device_name,
+                        size_t size,
+                        void *addr)
+{
+return _panel_add_register (panel, name, device_name, size, addr, 0);
+}
+
+int
+sim_panel_add_register_indirect (PANEL *panel,
+                                 const char *name,
+                                 const char *device_name,
+                                 size_t size,
+                                 void *addr)
+{
+return _panel_add_register (panel, name, device_name, size, addr, 1);
 }
 
 int
@@ -1067,6 +1122,201 @@ panel->State = Run;
 return 0;
 }
 
+/**
+
+   sim_panel_gen_examine
+
+        name_or_addr the name the simulator knows this register by
+        size         the size (in local storage) of the buffer which will
+                     receive the data returned when examining the simulator
+        value        a pointer to the buffer which will be loaded with the
+                     data returned when examining the simulator
+ */
+
+int
+sim_panel_gen_examine (PANEL *panel, 
+                       const char *name_or_addr,
+                       size_t size,
+                       void *value)
+{
+char *response = NULL, *c;
+unsigned long long data = 0;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+if (_panel_sendf (panel, 1, &response, "EXAMINE -H %s", name_or_addr)) {
+    free (response);
+    return -1;
+    }
+c = strchr (response, ':');
+if (!c) {
+    sim_panel_set_error (response);
+    free (response);
+    return -1;
+    }
+data = strtoull (c + 1, NULL, 16);
+if (little_endian)
+    memcpy (value, &data, size);
+else
+    memcpy (value, ((char *)&data) + sizeof(data)-size, size);
+free (response);
+return 0;
+}
+
+/**
+
+   sim_panel_gen_deposit
+
+        name_or_addr the name the simulator knows this register by
+        size         the size (in local storage) of the buffer which
+                     contains the data to be deposited into the simulator
+        value        a pointer to the buffer which contains the data to 
+                     be deposited into the simulator
+ */
+
+int
+sim_panel_gen_deposit (PANEL *panel, 
+                       const char *name_or_addr,
+                       size_t size,
+                       const void *value)
+{
+unsigned long long data = 0;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+if (little_endian)
+    memcpy (&data, value, size);
+else
+    memcpy (((char *)&data) + sizeof(data)-size, value, size);
+if (_panel_sendf (panel, 1, NULL, "DEPOSIT -H %s %llx", name_or_addr, data))
+    return -1;
+return 0;
+}
+
+/**
+
+   sim_panel_mem_examine
+
+        addr_size    the size (in local storage) of the buffer which 
+                     contains the memory address of the data to be examined
+                     in the simulator
+        addr         a pointer to the buffer containing the memory address
+                     of the data to be examined in the simulator
+        value_size   the size (in local storage) of the buffer which will
+                     receive the data returned when examining the simulator
+        value        a pointer to the buffer which will be loaded with the
+                     data returned when examining the simulator
+ */
+
+int
+sim_panel_mem_examine (PANEL *panel, 
+                       size_t addr_size,
+                       const void *addr,
+                       size_t value_size,
+                       void *value)
+{
+char *response = NULL, *c;
+unsigned long long data = 0, address = 0;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+if (little_endian)
+    memcpy (&address, addr, addr_size);
+else
+    memcpy (((char *)&address) + sizeof(address)-addr_size, addr, addr_size);
+if (_panel_sendf (panel, 1, &response, (panel->radix == 16) ? "EXAMINE -H %llx" : "EXAMINE -H %llo", address)) {
+    free (response);
+    return -1;
+    }
+c = strchr (response, ':');
+if (!c) {
+    sim_panel_set_error (response);
+    free (response);
+    return -1;
+    }
+data = strtoull (c + 1, NULL, 16);
+if (little_endian)
+    memcpy (value, &data, value_size);
+else
+    memcpy (value, ((char *)&data) + sizeof(data)-value_size, value_size);
+free (response);
+return 0;
+}
+
+/**
+
+   sim_panel_mem_deposit
+
+        addr_size    the size (in local storage) of the buffer which 
+                     contains the memory address of the data to be deposited
+                     into the simulator
+        addr         a pointer to the buffer containing the memory address
+                     of the data to be deposited into the simulator
+        value_size   the size (in local storage) of the buffer which will
+                     contains the data to be deposited into the simulator
+        value        a pointer to the buffer which contains the data to be
+                     deposited into the simulator
+ */
+
+ int
+sim_panel_mem_deposit (PANEL *panel, 
+                       size_t addr_size,
+                       const void *addr,
+                       size_t value_size,
+                       const void *value)
+{
+unsigned long long data = 0, address = 0;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+if (little_endian) {
+    memcpy (&data, value, value_size);
+    memcpy (&address, addr, addr_size);
+    }
+else {
+    memcpy (((char *)&data) + sizeof(data)-value_size, value, value_size);
+    memcpy (((char *)&address) + sizeof(address)-addr_size, addr, addr_size);
+    }
+if (_panel_sendf (panel, 1, NULL, (panel->radix == 16) ? "DEPOSIT -H %llx %llx" : "DEPOSIT -H %llo %llx", address, data))
+    return -1;
+return 0;
+}
+
+/**
+   sim_panel_set_register_value
+
+        name        the name of a simulator register or a memory address
+                    which is to receive a new value
+        value       the new value in character string form.  The string 
+                    must be in the native/natural radix that the simulator 
+                    uses when referencing that register
+
+ */
+
 int
 sim_panel_set_register_value (PANEL *panel,
                               const char *name,
@@ -1076,8 +1326,8 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
-if (panel->callback) {
-    sim_panel_set_error ("Callback provides register data");
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
     return -1;
     }
 if (_panel_sendf (panel, 1, NULL, "DEPOSIT %s %s", name, value))
@@ -1089,6 +1339,7 @@ static void *
 _panel_reader(void *arg)
 {
 PANEL *p = (PANEL*)arg;
+REG *r = NULL;
 int sched_policy;
 struct sched_param sched_priority;
 char buf[4096];
@@ -1154,6 +1405,37 @@ while ((p->sock != INVALID_SOCKET) &&
             *e++ = '\0';
             if (!strcmp("Time", s)) {
                 p->simulation_time = strtoull (e, NULL, 10);
+                s = eol;
+                while (isspace(0xFF & (*s)))
+                    ++s;
+                continue;
+                }
+            if (!strncmp (s + strlen (sim_prompt), register_ind_echo, strlen (register_ind_echo) - 1)) {
+                e = s + strlen (sim_prompt) + strlen (register_ind_echo);
+                r = NULL;
+                for (i=0; i<p->reg_count; i++) {
+                    if (p->regs[i].indirect && (!strcmp(p->regs[i].name, e))) {
+                        r = &p->regs[i];
+                        break;
+                        }
+                    }
+                s = eol;
+                while (isspace(0xFF & (*s)))
+                    ++s;
+                if (r)
+                    continue;
+                }
+            if (r) {
+                if (strcmp (s, r->name)) {
+                    unsigned long long data;
+
+                    data = strtoull (e, NULL, 16);
+                    if (little_endian)
+                        memcpy (p->regs[i].addr, &data, p->regs[i].size);
+                    else
+                        memcpy (p->regs[i].addr, ((char *)&data) + sizeof(data)-p->regs[i].size, p->regs[i].size);
+                    r = NULL;
+                    }
                 s = eol;
                 while (isspace(0xFF & (*s)))
                     ++s;
@@ -1385,6 +1667,8 @@ while (1) {                                         /* format passed string, arg
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
+        if (bufsize < len + 2)
+            bufsize = len + 2;
         buf = (char *) _panel_malloc (bufsize);
         if (buf == NULL)
             return -1;

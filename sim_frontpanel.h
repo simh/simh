@@ -24,6 +24,7 @@
    in this Software without prior written authorization from Mark Pizzolato.
 
    15-Jan-15    MP      Initial implementation
+   01-Apr-15    MP      Added register indirect, mem_examine and mem_deposit
 
    This module defines interface between a front panel application and a simh
    simulator.  Facilities provide ways to gather information from and to 
@@ -125,6 +126,8 @@ sim_panel_destroy (PANEL *panel);
    access to are described by the application by calling: 
    
    sim_panel_add_register
+and
+   sim_panel_add_register_indirect
 
         name         the name the simulator knows this register by
         device_name  the device this register is part of.  Defaults to
@@ -143,6 +146,12 @@ sim_panel_add_register (PANEL *panel,
                         size_t size,
                         void *addr);
 
+int
+sim_panel_add_register_indirect (PANEL *panel,
+                                 const char *name,
+                                 const char *device_name,
+                                 size_t size,
+                                 void *addr);
 /**
 
     A panel application has a choice of two different methods of getting 
@@ -205,10 +214,102 @@ int
 sim_panel_exec_step (PANEL *panel);
 
 /**
+
+    When a front panel application needs to change or access
+    memory or a register one of the following routines should 
+    be called:  
+    
+    sim_panel_gen_examine        - Examine register or memory
+    sim_panel_gen_deposit        - Deposit to register or memory
+    sim_panel_mem_examine        - Examine memory location
+    sim_panel_mem_deposit        - Deposit to memory location
+    sim_panel_set_register_value - 
+
+ */
+
+
+/**
+
+   sim_panel_gen_examine
+
+        name_or_addr the name the simulator knows this register by
+        size         the size (in local storage) of the buffer which will
+                     receive the data returned when examining the simulator
+        value        a pointer to the buffer which will be loaded with the
+                     data returned when examining the simulator
+ */
+
+int
+sim_panel_gen_examine (PANEL *panel, 
+                       const char *name_or_addr,
+                       size_t size,
+                       void *value);
+/**
+
+   sim_panel_gen_deposit
+
+        name_or_addr the name the simulator knows this register by
+        size         the size (in local storage) of the buffer which
+                     contains the data to be deposited into the simulator
+        value        a pointer to the buffer which contains the data to 
+                     be deposited into the simulator
+ */
+
+int
+sim_panel_gen_deposit (PANEL *panel, 
+                       const char *name_or_addr,
+                       size_t size,
+                       const void *value);
+
+/**
+
+   sim_panel_mem_examine
+
+        addr_size    the size (in local storage) of the buffer which 
+                     contains the memory address of the data to be examined
+                     in the simulator
+        addr         a pointer to the buffer containing the memory address
+                     of the data to be examined in the simulator
+        value_size   the size (in local storage) of the buffer which will
+                     receive the data returned when examining the simulator
+        value        a pointer to the buffer which will be loaded with the
+                     data returned when examining the simulator
+ */
+
+int
+sim_panel_mem_examine (PANEL *panel, 
+                       size_t addr_size,
+                       const void *addr,
+                       size_t value_size,
+                       void *value);
+
+/**
+
+   sim_panel_mem_deposit
+
+        addr_size    the size (in local storage) of the buffer which 
+                     contains the memory address of the data to be deposited
+                     into the simulator
+        addr         a pointer to the buffer containing the memory address
+                     of the data to be deposited into the simulator
+        value_size   the size (in local storage) of the buffer which will
+                     contains the data to be deposited into the simulator
+        value        a pointer to the buffer which contains the data to be
+                     deposited into the simulator
+ */
+
+int
+sim_panel_mem_deposit (PANEL *panel, 
+                       size_t addr_size,
+                       const void *addr,
+                       size_t value_size,
+                       const void *value);
+
+/**
    sim_panel_set_register_value
 
-        name        the name of a simulator register which is to receive 
-                    a new value
+        name        the name of a simulator register or a memory address
+                    which is to receive a new value
         value       the new value in character string form.  The string 
                     must be in the native/natural radix that the simulator 
                     uses when referencing that register

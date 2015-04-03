@@ -56,7 +56,7 @@ const char *sim_config =
             "VAX-PANEL.ini";
 
 /* Registers visible on the Front Panel */
-unsigned int PC, SP, FP, AP, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11;
+unsigned int PC, SP, FP, AP, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, atPC;
 
 int update_display = 1;
 
@@ -76,7 +76,7 @@ if (!update_display)
     return;
 update_display = 0;
 buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = 0;
-sprintf (buf1, "%s PC: %08X   SP: %08X   AP: %08X   FP: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP);
+sprintf (buf1, "%s PC: %08X   SP: %08X   AP: %08X   FP: %08X  @PC: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP, atPC);
 sprintf (buf2, "R0:%08X  R1:%08X  R2:%08X  R3:%08X   R4:%08X   R5:%08X\r\n", R0, R1, R2, R3, R4, R5);
 sprintf (buf3, "R6:%08X  R7:%08X  R8:%08X  R9:%08X  R10:%08X  R11:%08X\r\n", R6, R7, R8, R9, R10, R11);
 #if defined(_WIN32)
@@ -198,6 +198,10 @@ if (sim_panel_add_register (panel, "PC",  NULL, sizeof(PC), &PC)) {
     printf ("Error adding register 'PC': %s\n", sim_panel_get_error());
     goto Done;
     }
+if (sim_panel_add_register_indirect (panel, "PC",  NULL, sizeof(atPC), &atPC)) {
+    printf ("Error adding register indirect 'PC': %s\n", sim_panel_get_error());
+    goto Done;
+    }
 if (sim_panel_add_register (panel, "SP",  NULL, sizeof(SP), &SP)) {
     printf ("Error adding register 'SP': %s\n", sim_panel_get_error());
     goto Done;
@@ -257,6 +261,41 @@ if (sim_panel_add_register (panel, "R10",  NULL, sizeof(R10), &R10)) {
 if (sim_panel_add_register (panel, "R11",  NULL, sizeof(R11), &R11)) {
     printf ("Error adding register 'R11': %s\n", sim_panel_get_error());
     goto Done;
+    }
+if (sim_panel_get_registers (panel, NULL)) {
+    printf ("Error getting register data: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (1) {
+    long deadbeef = 0xdeadbeef, beefdead = 0xbeefdead, addr200 = 0x00000200, beefdata;
+
+    if (sim_panel_set_register_value (panel, "R0", "DEADBEEF")) {
+        printf ("Error setting R0 to DEADBEEF: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_gen_deposit (panel, "R1", sizeof(deadbeef), &deadbeef)) {
+        printf ("Error setting R1 to DEADBEEF: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_mem_deposit (panel, sizeof(addr200), &addr200, sizeof(deadbeef), &deadbeef)) {
+        printf ("Error setting 00000200 to DEADBEEF: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    beefdata = 0;
+    if (sim_panel_gen_examine (panel, "200", sizeof(beefdata), &beefdata)) {
+        printf ("Error getting contents of memory location 200: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    beefdata = 0;
+    if (sim_panel_mem_examine (panel, sizeof (addr200), &addr200, sizeof (beefdata), &beefdata)) {
+        printf ("Error getting contents of memory location 200: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    beefdata = 0;
+    if (!sim_panel_gen_examine (panel, "20000000", sizeof(beefdata), &beefdata)) {
+        printf ("Unexpected success getting contents of memory location 20000000: %s\n", sim_panel_get_error());
+        goto Done;
+        }
     }
 if (sim_panel_get_registers (panel, NULL)) {
     printf ("Error getting register data: %s\n", sim_panel_get_error());
