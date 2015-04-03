@@ -4036,8 +4036,12 @@ else {
                 }
             }
         }
-    if (!dptr)
-        return SCPE_NXDEV;                              /* no match */
+    if (!dptr) {
+        if ((shptr = find_shtab (show_dev_tab, gbuf)))  /* global match? */
+            return shptr->action (ofile, sim_dflt_dev, uptr, shptr->arg, cptr);
+        else
+            return SCPE_NXDEV;                          /* no match */
+        }
     }
 
 if (*cptr == 0) {                                       /* now eol? */
