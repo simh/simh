@@ -5402,7 +5402,7 @@ t_stat sim_save (FILE *sfile)
 {
 void *mbuf;
 int32 l, t;
-uint32 i, j;
+uint32 i, j, device_count;
 t_addr k, high;
 t_value val;
 t_stat r;
@@ -5423,7 +5423,14 @@ fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
     sim_time);                                          /* [V3.2] sim time */
 WRITE_I (sim_rtime);                                    /* [V2.6] sim rel time */
 
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
+for (device_count = 0; sim_devices[device_count]; device_count++);/* count devices */
+for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru devices */
+    if (i < device_count)
+        dptr = sim_devices[i];
+    else
+        dptr = sim_internal_devices[i - device_count];
+    if (dptr->flags & DEV_NOSAVE)
+        continue;
     fputs (dptr->name, sfile);                          /* device name */
     fputc ('\n', sfile);
     if (dptr->lname)                                    /* [V3.0] logical name */

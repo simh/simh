@@ -873,7 +873,7 @@ DEVICE sim_timer_dev = {
     "TIMER", sim_timer_units, sim_timer_reg, sim_timer_mod, 
     SIM_NTIMERS+1, 0, 0, 0, 0, 0, 
     NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_DEBUG, 0, sim_timer_debug};
+    NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
 
 
 /* sim_idle - idle simulator until next event or for specified interval

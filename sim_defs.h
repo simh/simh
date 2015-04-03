@@ -426,6 +426,7 @@ struct sim_device {
 #define DEV_V_SECTORS   7                               /* Unit Capacity is in 512byte sectors */
 #define DEV_V_DONTAUTO  8                               /* Do not auto detach already attached units */
 #define DEV_V_FLATHELP  9                               /* Use traditional (unstructured) help */
+#define DEV_V_NOSAVE    10                              /* Don't save device state */
 #define DEV_V_UF_31     12                              /* user flags, V3.1 */
 #define DEV_V_UF        16                              /* user flags */
 #define DEV_V_RSV       31                              /* reserved */
@@ -437,6 +438,7 @@ struct sim_device {
 #define DEV_SECTORS     (1 << DEV_V_SECTORS)            /* capacity is 512 byte sectors */
 #define DEV_DONTAUTO    (1 << DEV_V_DONTAUTO)           /* Do not auto detach already attached units */
 #define DEV_FLATHELP    (1 << DEV_V_FLATHELP)           /* Use traditional (unstructured) help */
+#define DEV_NOSAVE      (1 << DEV_V_NOSAVE)             /* Don't save device state */
 #define DEV_NET         0                               /* Deprecated - meaningless */
 
 
