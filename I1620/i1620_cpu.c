@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   28-Mar-15    RMS     Revised to use sim_printf
    26-Mar-15    RMS     Separated compare from add/sub flows (Tom McBride)
                         Removed ADD_SIGNC return from add/sub flows
    10-Dec-13    RMS     Fixed several bugs in add and compare (Bob Armstrong)
