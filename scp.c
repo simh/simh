@@ -9583,7 +9583,10 @@ if (buf != stackbuf)
 
 void sim_perror (const char *msg)
 {
-sim_printf ("%s: %s\n", msg, strerror (errno));
+int saved_errno = errno;
+
+perror (msg);
+sim_printf ("%s: %s\n", msg, strerror (saved_errno));
 }
 
 /* Print command result message to stdout, sim_log (if enabled) and sim_deb (if enabled) */

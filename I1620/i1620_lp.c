@@ -264,7 +264,7 @@ if (lpt_bptr) {                                         /* any line? */
     lpt_buf_init ();                                    /* reinit buf */
     if (ferror (lpt_unit.fileref)) {                    /* error? */
         ind[IN_PRCHK] = ind[IN_WRCHK] = 1;              /* wr, pri check */
-        sim_printf ("LPT I/O error: %s", strerror (errno));
+        sim_perror ("LPT I/O error");
         clearerr (lpt_unit.fileref);
         return SCPE_IOERR;
         }
@@ -315,7 +315,7 @@ ind[IN_PRCH9] = CHP (9, cct[cct_ptr]) != 0;             /* set indicators */
 ind[IN_PRCH12] = CHP (12, cct[cct_ptr]) != 0;
 if (ferror (lpt_unit.fileref)) {                        /* error? */
     ind[IN_PRCHK] = ind[IN_WRCHK] = 1;                  /* wr, pri check */
-    sim_printf ("LPT I/O error: %s", strerror (errno));
+    sim_perror ("LPT I/O error");
     clearerr (lpt_unit.fileref);
     return SCPE_IOERR;
     }

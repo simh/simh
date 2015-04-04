@@ -1349,13 +1349,16 @@ return SCPE_OK;
 
 t_stat sim_disk_perror (UNIT *uptr, const char *msg)
 {
+int saved_errno = errno;
+
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
     case DKUF_F_VHD:                                    /* VHD format */
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
-        sim_printf ("%s %s: %s\n", sim_uname(uptr), msg, strerror(errno));
+        perror (msg);
+        sim_printf ("%s %s: %s\n", sim_uname(uptr), msg, strerror(saved_errno));
     default:
         ;
     }

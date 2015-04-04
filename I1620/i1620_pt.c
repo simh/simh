@@ -334,7 +334,7 @@ do {
         if (feof (ptr_unit.fileref))
             sim_printf ("PTR end of file\n");
         else
-            sim_printf ("PTR I/O error: %s", strerror (errno));
+            sim_perror ("PTR I/O error");;
         clearerr (ptr_unit.fileref);
         return SCPE_IOERR;
         }
@@ -490,7 +490,7 @@ if ((ptp_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
     }
 if (putc (c, ptp_unit.fileref) == EOF) {                /* write char */
     ind[IN_WRCHK] = 1;                                  /* error? */
-    sim_printf ("PTP I/O error: %s", strerror (errno));
+    sim_perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;
     }

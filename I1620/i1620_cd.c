@@ -350,7 +350,7 @@ if (feof (cdr_unit.fileref))                            /* eof? */
     return STOP_NOCD;
 if (ferror (cdr_unit.fileref)) {                        /* error? */
     ind[IN_RDCHK] = 1;                                  /* set read check */
-    sim_printf ("CDR I/O error: %s", strerror (errno));
+    sim_perror ("CDR I/O error");
     clearerr (cdr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -533,7 +533,7 @@ fputs (cdp_buf, cdp_unit.fileref);                      /* write card */
 cdp_unit.pos = ftell (cdp_unit.fileref);                /* count char */
 if (ferror (cdp_unit.fileref)) {                        /* error? */
     ind[IN_WRCHK] = 1;
-    sim_printf ("CDR I/O error: %s", strerror (errno));
+    sim_perror ("CDR I/O error");
     clearerr (cdp_unit.fileref);
     return SCPE_IOERR;
     }
