@@ -240,7 +240,7 @@ else {
 }
 lines = lflag = 0;                                      /* clear cc action */
 if (ferror (lpt_unit.fileref)) {                        /* error? */
-    perror ("Line printer I/O error");
+    sim_perror ("Line printer I/O error");
     clearerr (lpt_unit.fileref);
     lpterror = 1;
 }

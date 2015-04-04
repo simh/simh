@@ -185,7 +185,7 @@ if (lp62_spc) {                                         /* space? */
     fputs (lp62_cc[lp62_spc & 07], uptr->fileref);      /* print cctl */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -200,7 +200,7 @@ else {
     fputs (lp62_buf, uptr->fileref);                    /* print buffer */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* test error */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -427,7 +427,7 @@ if ((lp647_iot & 020) == 0) {                           /* print? */
     fputs (pbuf, uptr->fileref);                        /* print buffer */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         lp647_bp = 0;
         return SCPE_IOERR;
@@ -438,7 +438,7 @@ if (lp647_iot & 060) {                                  /* space? */
     fputs (lp647_cc[lp647_iot & 07], uptr->fileref);    /* write cctl */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -610,7 +610,7 @@ if ((c == 0) || (c == 0177))                            /* skip NULL, DEL */
 fputc (c, uptr->fileref);                               /* print char */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("LPT I/O error");
+    sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -824,7 +824,7 @@ for (more = 1; more != 0; ) {                           /* loop until ctrl */
             fputs (ctrl[c[i]], uptr->fileref);          /* space */
             uptr->pos = ftell (uptr->fileref);
             if (ferror (uptr->fileref)) {               /* error? */
-                perror ("LPT I/O error");
+                sim_perror ("LPT I/O error");
                 clearerr (uptr->fileref);
                 lp15_bp = 0;
                 lp15_updsta (STA_DON | STA_ALM);

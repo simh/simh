@@ -227,7 +227,7 @@ switch (cdr_sta) {                                      /* case on state */
         if (feof (uptr->fileref))                       /* eof? */
             return ch6_err_disc (CH_A, U_CDR, CHF_EOF); /* set EOF, disc */
         if (ferror (uptr->fileref)) {                   /* error? */
-            perror ("CDR I/O error");
+            sim_perror ("CDR I/O error");
             clearerr (uptr->fileref);
             return SCPE_IOERR;                          /* stop */
             }
@@ -456,7 +456,7 @@ cdp_cbuf[i++] = 0;                                      /* append nul */
 fputs (cdp_cbuf, uptr->fileref);                        /* write card */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("CDP I/O error");
+    sim_perror ("CDP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

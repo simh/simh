@@ -234,7 +234,7 @@ static t_stat sagelp_output(UNIT *uptr)
     if ((u39.portc & U39C_STROBE)==0) { /* strobe presented */
         fputc (uptr->buf & 0177, uptr->fileref);    /* put out char */
         if (ferror (uptr->fileref)) {
-            perror ("LP I/O error");
+            sim_perror ("LP I/O error");
             clearerr (uptr->fileref);
             return SCPE_IOERR;
         }

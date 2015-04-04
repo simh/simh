@@ -5272,7 +5272,7 @@ if (uptr->flags & UNIT_BUF) {
         rewind (uptr->fileref);
         sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
         if (ferror (uptr->fileref))
-            perror ("I/O error");
+            sim_printf ("%s: I/O error - %s", sim_dname (dptr), strerror (errno));
         }
     if (uptr->flags & UNIT_MUSTBUF) {                   /* dyn alloc? */
         free (uptr->filebuf);                           /* free buf */
@@ -9579,6 +9579,11 @@ if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
 
 if (buf != stackbuf)
     free (buf);
+}
+
+void sim_perror (const char *msg)
+{
+sim_printf ("%s: %s\n", msg, strerror (errno));
 }
 
 /* Print command result message to stdout, sim_log (if enabled) and sim_deb (if enabled) */

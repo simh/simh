@@ -1528,7 +1528,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
             fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */
                      uptr->hwmark, uptr->fileref);
     if (ferror (uptr->fileref))
-        perror ("I/O error");
+        sim_perror ("I/O error");
     }
 uptr->WRITTEN = FALSE;                                  /* no longer dirty */
 }

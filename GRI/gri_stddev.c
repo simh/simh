@@ -347,7 +347,7 @@ if ((temp = getc (hsr_unit.fileref)) == EOF) {          /* read char */
             sim_printf ("HSR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("HSR I/O error");
+    else sim_perror ("HSR I/O error");
     clearerr (hsr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -363,7 +363,7 @@ dev_done = dev_done | INT_HSP;                          /* set ready */
 if ((hsp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (hsp_stopioe, SCPE_UNATT);
 if (putc (hsp_unit.buf, hsp_unit.fileref) == EOF) {     /* write char */
-    perror ("HSP I/O error");                           /* error? */
+    sim_perror ("HSP I/O error");                           /* error? */
     clearerr (hsp_unit.fileref);
     return SCPE_IOERR;
     }

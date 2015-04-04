@@ -432,7 +432,7 @@ rp_busy = 0;                                            /* clear busy */
 rp_updsta (STA_DON, 0);                                 /* set done */
 
 if (err != 0) {                                         /* error? */
-    perror ("RP I/O error");
+    sim_perror ("RP I/O error");
     clearerr (uptr->fileref);
     return IORETURN (rp_stopioe, SCPE_IOERR);
     }

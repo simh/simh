@@ -1112,7 +1112,7 @@ if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
     else fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */
         uptr->hwmark, uptr->fileref);
     if (ferror (uptr->fileref))
-        perror ("I/O error");
+        sim_perror ("I/O error");
     }                                                   /* end if hwmark */
 free (uptr->filebuf);                                   /* release buf */
 uptr->flags = uptr->flags & ~UNIT_BUF;                  /* clear buf flag */

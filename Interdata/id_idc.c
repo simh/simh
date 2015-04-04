@@ -657,7 +657,7 @@ uint32 i;
 
 i = fxread (idcxb, sizeof (uint8), IDC_NUMBY, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("IDC I/O error");
+    sim_perror ("IDC I/O error");
     clearerr (uptr->fileref);
     idc_done (STC_DTE);
     return SCPE_IOERR;
@@ -675,7 +675,7 @@ for ( ; idc_bptr < IDC_NUMBY; idc_bptr++)
     idcxb[idc_bptr] = idc_db;                           /* fill with last */
 fxwrite (idcxb, sizeof (uint8), IDC_NUMBY, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("IDC I/O error");
+    sim_perror ("IDC I/O error");
     clearerr (uptr->fileref);
     idc_done (STC_DTE);
     return SCPE_IOERR;

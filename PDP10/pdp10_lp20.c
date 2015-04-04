@@ -734,7 +734,7 @@ if (lpbc)                                               /* intr, but not done */
     update_lpcs (CSA_MBZ);
 else update_lpcs (CSA_DONE);                            /* intr and done */
 if ((fnc == FNC_PR) && ferror (lp20_unit.fileref)) {
-    perror ("LP I/O error");
+    sim_perror ("LP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

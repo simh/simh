@@ -186,7 +186,7 @@ switch (pt_cmd) {                                       /* case on state */
                 break;
                 }
             else {                                      /* real error */
-                perror ("PTR I/O error");
+                sim_perror ("PTR I/O error");
                 clearerr (uptr->fileref);
                 chan_set_chf (pt_dib.dva, CHF_XMDE);    /* data error */
                 return pt_chan_err (SCPE_IOERR);        /* force uend */
@@ -212,7 +212,7 @@ switch (pt_cmd) {                                       /* case on state */
         if (CHS_IFERR (st))                             /* channel error? */
             return pt_chan_err (st);
         if (putc (c, pt_unit[PTP].fileref) == EOF) {
-            perror ("PTP I/O error");
+            sim_perror ("PTP I/O error");
             clearerr (pt_unit[PTP].fileref);
             chan_set_chf (pt_dib.dva, CHF_XMDE);        /* data error */
             return pt_chan_err (SCPE_IOERR);            /* force uend */

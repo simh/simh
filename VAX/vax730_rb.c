@@ -592,7 +592,7 @@ rbda = rbda + ((wc + (RB_NUMWD(uptr) - 1)) / RB_NUMWD(uptr));
 rb_set_done (0);
 
 if (err != 0) {                                         /* error? */
-    perror ("RB I/O error");
+    sim_perror ("RB I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

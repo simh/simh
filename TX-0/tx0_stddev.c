@@ -366,7 +366,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* attached? */
                 ios = 0;
                 return SCPE_IOERR;
         }
-        else perror ("PETR I/O error");
+        else sim_perror ("PETR I/O error");
         clearerr (uptr->fileref);
         ios = 0;
         return SCPE_IOERR;
@@ -533,7 +533,7 @@ t_stat ptp_svc (UNIT *uptr)
     if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
         return SCPE_UNATT;
     if (putc (uptr->buf, uptr->fileref) == EOF) {           /* I/O error? */
-        perror ("PTP I/O error");
+        sim_perror ("PTP I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }

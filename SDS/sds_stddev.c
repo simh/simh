@@ -280,7 +280,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
             sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");                      /* I/O error */
+    else sim_perror ("PTR I/O error");                      /* I/O error */
     clearerr (ptr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -414,7 +414,7 @@ if ((ptp_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
     }
 if (putc (dat, ptp_unit.fileref) == EOF) {              /* I/O error? */
     ptp_set_err ();                                     /* yes, disc, err */
-    perror ("PTP I/O error");                           /* print msg */
+    sim_perror ("PTP I/O error");                           /* print msg */
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;
     }

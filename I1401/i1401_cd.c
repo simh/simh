@@ -295,7 +295,7 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
 fputs (cdr_buf, uptr->fileref);                         /* write card */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("Card stacker I/O error");
+    sim_perror ("Card stacker I/O error");
     clearerr (uptr->fileref);
     if (iochk)
         return SCPE_IOERR;
@@ -375,7 +375,7 @@ fputs (cdp_buf, uptr->fileref);                         /* output card */
 fputc ('\n', uptr->fileref);                            /* plus new line */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("Card punch I/O error");
+    sim_perror ("Card punch I/O error");
     clearerr (uptr->fileref);
     if (iochk)
         return SCPE_IOERR;
@@ -413,7 +413,7 @@ if (feof (cdr_unit.fileref))                            /* eof? */
     return STOP_NOCD;
 if (ferror (cdr_unit.fileref)) {                        /* error? */
     ind[IN_READ] = 1;  
-    perror ("Card reader I/O error");
+    sim_perror ("Card reader I/O error");
     clearerr (cdr_unit.fileref);
     if (iochk)
         return SCPE_IOERR;

@@ -246,7 +246,7 @@ if ((lpt_unit.flags & UNIT_ATT) != 0) {                 /* attached? */
     fputs (buf, lpt_unit.fileref);                      /* print string */
     if (ferror (lpt_unit.fileref)) {                    /* error? */
         ind[IN_LPT] = 1;
-        perror ("Line printer I/O error");
+        sim_perror ("Line printer I/O error");
         clearerr (lpt_unit.fileref);
         if (iochk)
             return SCPE_IOERR;

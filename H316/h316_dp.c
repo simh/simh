@@ -793,7 +793,7 @@ l = fxread (buf, sizeof (uint16), DP_TRKLEN, uptr->fileref);
 for ( ; l < DP_TRKLEN; l++)
     buf[l] = 0;
 if (ferror (uptr->fileref)) {
-    perror ("DP I/O error");
+    sim_perror ("DP I/O error");
     clearerr (uptr->fileref);
     dp_done (1, STA_UNSER);
     return SCPE_IOERR;
@@ -810,7 +810,7 @@ uint32 da = ((c * dp_tab[dp_ctype].surf) + h) * DP_TRKLEN;
 fseek (uptr->fileref, da * sizeof (uint16), SEEK_SET);
 fxwrite (buf, sizeof (uint16), DP_TRKLEN, uptr->fileref);
 if (ferror (uptr->fileref)) {
-    perror ("DP I/O error");
+    sim_perror ("DP I/O error");
     clearerr (uptr->fileref);
     dp_done (1, STA_UNSER);
     return SCPE_IOERR;

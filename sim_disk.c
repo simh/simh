@@ -1355,7 +1355,7 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
     case DKUF_F_VHD:                                    /* VHD format */
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
-        perror (msg);
+        sim_printf ("%s %s: %s\n", sim_uname(uptr), msg, strerror(errno));
     default:
         ;
     }

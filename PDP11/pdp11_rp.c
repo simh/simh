@@ -1252,7 +1252,7 @@ else { /* Bottom End (After I/O processing) */
                 rp_set_er (ER1_PAR, drv);               /* set drive error */
                 mba_set_exc (dibp->ba);                 /* set exception */
                 rp_update_ds (DS_ATA, drv);
-                perror ("RP I/O error");
+                sim_perror ("RP I/O error");
                 return SCPE_IOERR;
                 }
 

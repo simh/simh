@@ -398,7 +398,7 @@ else {
                 sim_printf ("PTR end of file\n");
             else return SCPE_OK;
             }
-        else perror ("PTR I/O error");
+        else sim_perror ("PTR I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -559,7 +559,7 @@ if (uptr->flags & UNIT_ASC) {                           /* ASCII? */
     }
 else c = uptr->buf & 0377;                              /* no, binary */
 if (putc (c, uptr->fileref) == EOF) {                   /* output byte */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -689,7 +689,7 @@ else if ((ruptr->flags & UNIT_ATT) &&                   /* TTR attached */
                     sim_printf ("TTR end of file\n");
                 else return SCPE_OK;
                 }
-            else perror ("TTR I/O error");
+            else sim_perror ("TTR I/O error");
             clearerr (ruptr->fileref);
             return SCPE_IOERR;
             }
@@ -799,7 +799,7 @@ if ((puptr->flags & UNIT_ATT) &&                        /* TTP attached */
             }
         else p = c;                                     /* untouched */
         if (putc (p, puptr->fileref) == EOF) {          /* output byte */
-            perror ("TTP I/O error");
+            sim_perror ("TTP I/O error");
             clearerr (puptr->fileref);
             return SCPE_IOERR;
             }

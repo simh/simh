@@ -139,7 +139,7 @@ DEV_UPDATE_INTR ;
 if ((plt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (plt_stopioe, SCPE_UNATT);
 if (putc (plt_unit.buf, plt_unit.fileref) == EOF) {
-    perror ("PLT I/O error");
+    sim_perror ("PLT I/O error");
     clearerr (plt_unit.fileref);
     return SCPE_IOERR;
     }

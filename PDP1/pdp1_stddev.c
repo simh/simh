@@ -347,7 +347,7 @@ if (temp == EOF) {                                      /* end of file? */
             sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_perror ("PTR I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -510,7 +510,7 @@ dev_req_int (ptp_sbs);                                  /* req interrupt */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (uptr->buf, uptr->fileref) == EOF) {           /* I/O error? */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

@@ -245,7 +245,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {
             sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_perror ("PTR I/O error");
     clearerr (ptr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -341,7 +341,7 @@ if (ptp_csr & CSR_IE)
 if ((ptp_unit.flags & UNIT_ATT) == 0)
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;
     }

@@ -662,7 +662,7 @@ static t_stat delete_cmd (int32 flag, char *cptr)
 	status = remove(gbuf);						/* delete the file */
 
 	if (status != 0 && errno != ENOENT)			/* print message if failed and file exists */
-		perror(gbuf);
+		sim_perror(gbuf);
 
 	return SCPE_OK;
 }

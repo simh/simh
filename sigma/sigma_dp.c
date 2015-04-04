@@ -1081,7 +1081,7 @@ t_stat dp_ioerr (UNIT *uptr)
 uint32 cidx = uptr->UCTX;
 uint32 dva = dp_dib[cidx].dva;
 
-perror ("DP I/O error");
+sim_perror ("DP I/O error");
 clearerr (uptr->fileref);
 dp_ctx[cidx].dp_flags |= DPF_DPE;                       /* set DPE flag */
 chan_set_chf (dva, CHF_XMDE);

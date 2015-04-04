@@ -953,7 +953,7 @@ if (GET_SECT (uptr->TRK) >= RL_NUMSC)
 rl_set_done (0);
 
 if (err != 0) {                                         /* error? */
-    perror ("RL I/O error");
+    sim_perror ("RL I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

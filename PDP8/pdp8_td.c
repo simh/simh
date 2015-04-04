@@ -893,7 +893,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
             }                                           /* end loop buf */
         }                                               /* end else */
     if (ferror (uptr->fileref))
-        perror ("I/O error");
+        sim_perror ("I/O error");
     }
 uptr->WRITTEN = FALSE;                                  /* no longer dirty */
 }

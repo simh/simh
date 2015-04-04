@@ -576,7 +576,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
             sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_perror ("PTR I/O error");
     clearerr (ptr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -918,7 +918,7 @@ if (ptp_unit.flags & UNIT_PASCII) {                     /* ASCII mode? */
     }
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {     /* I/O error? */
     ptp_err = 1;                                        /* set error */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;
     }

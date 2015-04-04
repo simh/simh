@@ -816,7 +816,7 @@ if (cso_csr & CSR_IE)
 if ((cso_unit.flags & UNIT_ATT) == 0)
     return SCPE_OK;
 if (putc (cso_unit.buf, cso_unit.fileref) == EOF) {
-    perror ("CSO I/O error");
+    sim_perror ("CSO I/O error");
     clearerr (cso_unit.fileref);
     return SCPE_IOERR;
     }

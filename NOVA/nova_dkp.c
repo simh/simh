@@ -930,7 +930,7 @@ do  {
             }
 
     if (err != 0) {
-        perror ("DKP I/O error");
+        sim_perror ("DKP I/O error");
         clearerr (uptr->fileref);
         rval = SCPE_IOERR;
         break ;

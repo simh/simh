@@ -767,7 +767,7 @@ rkda = (rkda & RKDA_DRIVE) | (track << RKDA_V_TRACK) | (sect << RKDA_V_SECT);
 rk_set_done (0);
 
 if (err != 0) {                                         /* error? */
-    perror ("RK I/O error");
+    sim_perror ("RK I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

@@ -1704,7 +1704,7 @@ static t_stat cpu_attach (UNIT *uptr, char *cptr)
 			return SCPE_ARG;
 		}
 		if ((fd = fopen(mapfile, "r")) == NULL) {
-			perror(mapfile);
+			sim_perror(mapfile);
 			return SCPE_OPENERR;
 		}
 
