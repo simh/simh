@@ -25,6 +25,9 @@
 
    05-Feb-15    MP      Initial implementation
    01-Apr-15    MP      Added register indirect, mem_examine and mem_deposit
+   03-Apr-15    MP      Added logic to pass simulator startup messages in
+                        panel error text if the connection to the simulator
+                        shuts down while it is starting.
 
    This module provides interface between a front panel application and a simh
    simulator.  Facilities provide ways to gather information from and to 
@@ -574,6 +577,7 @@ else {
         fprintf (fOut, "set remote connections=%d\n", (int)device_panel_count+1);
     fprintf (fOut, "set remote -u telnet=%s\n", hostport);
     fprintf (fOut, "set remote master\n");
+    fprintf (fOut, "exit\n");
     fclose (fOut);
     fOut = NULL;
     }
@@ -656,6 +660,7 @@ if (1) {
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_mutex_lock (&p->io_lock);
+    p->io_thread_running = 0;
     pthread_create (&p->io_thread, &attr, _panel_reader, (void *)p);
     pthread_attr_destroy(&attr);
     while (!p->io_thread_running)
@@ -674,6 +679,8 @@ else {
         memset (p->devices, 0, device_panel_count*sizeof(*p->devices));
         p->device_count = device_panel_count;
         }
+    if (p->State == Error)
+        goto Error_Return;
     /* Validate sim_frontpanel API version */
     if (_panel_sendf (p, 1, &p->simulator_version, "SHOW VERSION\r"))
         goto Error_Return;
@@ -832,6 +839,8 @@ if (panel) {
     free (panel->reg_query);
     free (panel->io_response);
     free (panel->simulator_version);
+    if (panel->Debug)
+        fclose (panel->Debug);
     sim_cleanup_sock ();
     free (panel);
     }
@@ -1353,13 +1362,14 @@ pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
+buf[buf_data] = '\0';
 pthread_mutex_lock (&p->io_lock);
 if (!p->parent) {
     while (1) {
         int new_data = sim_read_sock (p->sock, &buf[buf_data], sizeof(buf)-(buf_data+1));
 
         if (new_data <= 0) {
-            sim_panel_set_error ("%s", sim_get_err_sock("Unexpected socket read"));
+            sim_panel_set_error ("%s after reading %d bytes: %s", sim_get_err_sock("Unexpected socket read"), buf_data, buf);
             _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
             p->State = Error;
             break;
@@ -1367,6 +1377,10 @@ if (!p->parent) {
         _panel_debug (p, DBG_RCV, "Startup receive of %d bytes: ", &buf[buf_data], new_data, new_data);
         buf_data += new_data;
         buf[buf_data] = '\0';
+        if (!memcmp (mantra, buf, sizeof (mantra))) {   /* strip initial telnet mantra from input stream */
+            memmove (buf, buf + sizeof (mantra), 1 + buf_data - sizeof (mantra));
+            buf_data -= sizeof (mantra);
+            }
         if ((size_t)buf_data < strlen (sim_prompt))
             continue;
         if (!strcmp (sim_prompt, &buf[buf_data - strlen (sim_prompt)])) {
@@ -1377,7 +1391,10 @@ if (!p->parent) {
         }
     }
 p->io_thread_running = 1;
+pthread_mutex_unlock (&p->io_lock);
 pthread_cond_signal (&p->startup_cond);   /* Signal we're ready to go */
+msleep (100);
+pthread_mutex_lock (&p->io_lock);
 while ((p->sock != INVALID_SOCKET) &&
        (p->State != Error)) {
     int new_data;
@@ -1486,7 +1503,7 @@ while ((p->sock != INVALID_SOCKET) &&
                 /* Non Register Data Found (echo of EXAMINE or other commands and/or command output) */
                 if (p->io_waiting) {
                     char *t;
-                    if (p->io_response_data + strlen (s) + 2 > p->io_response_size) {
+                    if (p->io_response_data + strlen (s) + 3 > p->io_response_size) {
                         t = (char *)_panel_malloc (p->io_response_data + strlen (s) + 3);
                         if (t == NULL) {
                             _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
@@ -1500,8 +1517,9 @@ while ((p->sock != INVALID_SOCKET) &&
                         p->io_response_size = p->io_response_data + strlen (s) + 3;
                         }
                     strcpy (p->io_response + p->io_response_data, s);
-                    strcat (p->io_response, "\r\n");
-                    p->io_response_data += strlen(s) + 2;
+                    p->io_response_data += strlen(s);
+                    strcpy (p->io_response + p->io_response_data, "\r\n");
+                    p->io_response_data += 2;
                     }
                 }
             pthread_mutex_unlock (&p->io_lock);

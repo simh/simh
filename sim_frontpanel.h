@@ -25,6 +25,9 @@
 
    15-Jan-15    MP      Initial implementation
    01-Apr-15    MP      Added register indirect, mem_examine and mem_deposit
+   03-Apr-15    MP      Added logic to pass simulator startup messages in
+                        panel error text if the connection to the simulator
+                        shuts down while it is starting.
 
    This module defines interface between a front panel application and a simh
    simulator.  Facilities provide ways to gather information from and to 

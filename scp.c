@@ -383,7 +383,6 @@ t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
 t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag);
 t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flg, int32 *toks);
 t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr, char *cptr, int32 flag);
-t_stat sim_check_console (int32 sec);
 t_stat sim_save (FILE *sfile);
 t_stat sim_rest (FILE *rfile);
 
