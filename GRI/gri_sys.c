@@ -1,6 +1,6 @@
 /* gri_sys.c: GRI-909 simulator interface
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

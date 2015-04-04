@@ -1,6 +1,6 @@
 /* pdp1_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dt           Type 550/555 DECtape
 
+   28-Mar-15    RMS     Revised to use sim_printf
    21-Dec-06    RMS     Added 16-channel SBS support
    23-Jun-06    RMS     Fixed conflict in ATTACH switches
                         Revised header format

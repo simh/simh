@@ -264,7 +264,7 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
         default:
             break;
     }                       
-    printf (">>CRD non-existent function %d\n", op);
+    sim_printf (">>CRD non-existent function %d\n", op);
     return SCPE_OK;                     
 }
 

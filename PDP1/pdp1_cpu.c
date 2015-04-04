@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-1 central processor
 
+   27-Mar-15    RMS     Backported changed from GitHub master
    21-Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
    30-May-07    RMS     Fixed typo in SBS clear (Norm Lastovica)
    28-Dec-06    RMS     Added 16-channel SBS support, PDP-1D support
@@ -1703,15 +1704,14 @@ return SCPE_OK;
 
 #ifdef USE_DISPLAY
 /* set "test switches"; from display code */
-void
-cpu_set_switches(unsigned long bits)
+
+void cpu_set_switches(unsigned long bits)
 {
 /* just what we want; smaller CPUs might want to shift down? */
 TW = bits;
 }
 
-unsigned long
-cpu_get_switches(void)
+unsigned long cpu_get_switches(void)
 {
 return TW;
 }

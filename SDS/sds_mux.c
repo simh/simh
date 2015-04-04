@@ -113,7 +113,7 @@ uint32 mux_tps = 100;                                   /* polls/second */
 uint32 mux_scan = 0;                                    /* scanner */
 uint32 mux_slck = 0;                                    /* scanner locked */
 
-TMLN mux_ldsc[MUX_LINES] = { {0} };                       /* line descriptors */
+TMLN mux_ldsc[MUX_LINES] = { {0} };                     /* line descriptors */
 TMXR mux_desc = { MUX_LINES, 0, 0, mux_ldsc };          /* mux descriptor */
 
 t_stat mux (uint32 fnc, uint32 inst, uint32 *dat);

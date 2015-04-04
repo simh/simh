@@ -1,6 +1,6 @@
 /* pdp1_sys.c: PDP-1 simulator interface
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Mar-15    RMS     Backported changes from GitHub master
    03-Jan-07    RMS     Fixed bugs in block loader, char input
    21-Dec-06    RMS     Added 16-channel sequence break support, PDP-1D support
    06-Apr-04    RMS     Fixed bug in binary loader (found by Mark Crispin)
