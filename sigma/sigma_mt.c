@@ -639,7 +639,8 @@ t_stat mt_detach (UNIT* uptr)
 {
 uint32 un = uptr - mt_dev.units;
 
-if (!(uptr->flags & UNIT_ATTABLE)) return SCPE_NOATT;
+if (!(uptr->flags & UNIT_ATTABLE))
+    return SCPE_NOATT;
 uptr->UST = 0;
 sim_cancel (uptr + MT_REW);
 return sim_tape_detach (uptr);
