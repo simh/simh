@@ -164,7 +164,7 @@ while ((i = getc (fileref)) != EOF) {
     addr++;
     cnt++;
 }                                                       /* end while */
-printf ("%d Bytes loaded.\n", cnt);
+sim_printf ("%d Bytes loaded.\n", cnt);
 return (SCPE_OK);
 }
 

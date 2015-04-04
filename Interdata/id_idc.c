@@ -578,7 +578,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
             if ((r = idc_rds (uptr)))                   /* read sec, err? */
                 return r;
             idc_1st = 0;
-            sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY); /* write mem */
+            sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY);  /* write mem */
             if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;

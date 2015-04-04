@@ -1,6 +1,6 @@
 /* nova_qty.c: NOVA multiplexor (QTY/ALM) simulator
 
-   Copyright (c) 2000-2008, Robert M. Supnik
+   Copyright (c) 2000-2015, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,7 +26,9 @@
 
    qty          multiplexor: QTY = 4060, ALM = 42xx
 
-   04-Jul-07    BKR     fixed QTY output line number calculation (affected higher line numbers),
+   28-Mar-15    RMS     Revised to use sim_printf
+   14-Mar-12    RMS     Fixed dangling else clauses
+   04-Jul-07    BKR     Fixed QTY output line number calculation (affected higher line numbers),
    25-Mar-04    RMS     Updated for V3.2
    12-Jan-04    BKR     Initial release
                         includes both original DG "quad" multiplexor (QTY)
@@ -626,7 +628,7 @@ t_stat qty_common_svc( DIB * dibp, UNIT * unitp )
 
     sim_activate( unitp, tmxr_poll ) ;                  /*  restart the bubble machine          */
     return ( SCPE_OK ) ;
-    }   /*  end of 'qty_common_svc'  */
+    }                                                   /*  end of 'qty_common_svc'  */
 
 
     /*--------------------------------------------------------------*/
@@ -636,7 +638,7 @@ t_stat qty_common_svc( DIB * dibp, UNIT * unitp )
 t_stat qty_svc( UNIT * uptr )
     {
     return ( qty_common_svc(&qty_dib,uptr) ) ;
-    }   /*  end of 'qty_svc'  */
+    }                                                   /*  end of 'qty_svc'  */
 
 
     /*--------------------------------------------------------------*/
@@ -996,13 +998,13 @@ int32 alm( int32 pulse, int32 code, int32 AC )
                 /*  get modem section status  */
                 if ( qty_ldsc[ alm_line ].xmte )
                     {
-                    iodata = 0035 ;                         /*  set CD, CTS, DSR, MDM flags  */
+                    iodata = 0035 ;                     /*  set CD, CTS, DSR, MDM flags  */
                     }
                 }
             else
                 {
                 /*  get receiver section status  */
-                iodata = 0 ;                                /*  receiver error status - no errors by default  */
+                iodata = 0 ;                            /*  receiver error status - no errors by default  */
                 }
             }
         break ;

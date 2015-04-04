@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          Nova central processor
 
+   17-Mar-13    RMS     Added clarifying brances to IND_STEP macro (Dave Bryan)
    04-Jul-07    BKR     DEV_SET/CLR macros now used,
                         support for non-existant devices added
                         CPU bootstrap code warning: high-speed devices may not boot properly,
@@ -387,7 +388,6 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, (24 * 1024), NULL, "24K", &cpu_set_size },
     { UNIT_MSIZE, (28 * 1024), NULL, "28K", &cpu_set_size },
     { UNIT_MSIZE, (32 * 1024), NULL, "32K", &cpu_set_size },
-
     { UNIT_MSIZE, (36 * 1024), NULL, "36K", &cpu_set_size },
     { UNIT_MSIZE, (40 * 1024), NULL, "40K", &cpu_set_size },
     { UNIT_MSIZE, (44 * 1024), NULL, "44K", &cpu_set_size },
@@ -1206,7 +1206,7 @@ return SCPE_OK;
 #define BOOT_LEN    (sizeof(boot_rom) / sizeof(int32))
 
 static const int32 boot_rom[] = {
-    0062677,                    /*  IORST           ;reset all I/O  */
+    0062677,                    /*      IORST           ;reset all I/O  */
     0060477,                    /*      READS 0         ;read SR into AC0 */
     0024026,                    /*      LDA 1,C77       ;get dev mask */
     0107400,                    /*      AND 0,1         ;isolate dev code */

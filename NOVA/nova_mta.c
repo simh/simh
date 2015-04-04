@@ -149,12 +149,12 @@
 #define STA_MON         (STA_REW | STA_BOT | STA_WLK | STA_RDY | \
                          STA_PEM)                       /* set status chg */
 
-extern  uint16  M[];
-extern  UNIT    cpu_unit;
-extern  int32   int_req, dev_busy, dev_done, dev_disable;
-extern  int32   SR, AMASK;
+extern uint16 M[];
+extern UNIT cpu_unit;
+extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 SR, AMASK;
 
-extern  t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
+extern t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
 
 
 int32 mta_ma = 0;                                       /* memory address */
@@ -496,7 +496,7 @@ if (change) {
 /*  if (mta_ep) {                                     *//* if polling */
 /*      u = uptr - mta_dev.units;                     *//* unit num */
 /*      mta_sta = (mta_sta & ~STA_UNIT) | (u << STA_V_UNIT); */
-/*      set polling interupt...                       */
+/*      set polling interupt...                         */
 /*      }                                               */
     mta_sta = mta_sta | STA_CHG;                        /* flag change */
     }
@@ -642,4 +642,4 @@ t_stat mta_boot (int32 unitno, DEVICE *dptr)
     cpu_boot( unitno, dptr ) ;
     SR = 0100000 + DEV_MTA ;
     return ( SCPE_OK );
-    }   /*  end of 'mta_boot'  */
+    }                                                   /*  end of 'mta_boot'  */

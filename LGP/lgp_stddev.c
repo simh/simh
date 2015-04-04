@@ -501,7 +501,7 @@ do {
     if ((ch = getc (uptr->fileref)) == EOF) {           /* read char */
         if (feof (uptr->fileref)) {                     /* err or eof? */
             if (stop)
-                printf ("Reader end of file\n");
+                sim_printf ("Reader end of file\n");
             else return SCPE_OK;
             }
         else perror ("Reader I/O error");
@@ -516,7 +516,7 @@ do {
         if ((d1 == EOF) || (d2 == EOF)) {               /* error? */
             if (feof (uptr->fileref)) {                 /* eof? */
                 if (stop)
-                    printf ("Reader end of file\n");
+                    sim_printf ("Reader end of file\n");
                 else return SCPE_OK;
                 }
             else perror ("Reader I/O error");
