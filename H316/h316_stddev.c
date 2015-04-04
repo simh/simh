@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2013, Robert M. Supnik
+   Copyright (c) 1999-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@
 
    10-Sep-13    RMS     Fixed several bugs in the TTY logic
                         Added SET file type commands to PTR/PTP
-    3-Jul-13    RLA     compatibility changes for extended interrupts
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    23-May-13    RLA     Move the SMK/OTK to h316_cpu (where it belongs!)
                         Allow the CLK device to be disabled
    09-Jun-07    RMS     Fixed bug in clock increment (Theo Engel)

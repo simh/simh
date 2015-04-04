@@ -1,6 +1,6 @@
 /* h316_dp.c: Honeywell 4623, 4651, 4720 disk simulator
 
-   Copyright (c) 2003-2012, Robert M. Supnik
+   Copyright (c) 2003-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@
                 4651 disk subsystem
                 4720 disk subsystem
 
-    3-Jul-13    RLA     compatibility changes for extended interrupts
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    04-Sep-05    RMS     Fixed missing return (Peter Schorn)
    15-Jul-05    RMS     Fixed bug in attach routine

@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2011, Robert M. Supnik
+   Copyright (c) 1999-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -276,9 +276,9 @@ int32 sc = 0;                                           /* shift count */
 int32 ss[4];                                            /* sense switches */
 int32 dev_int = 0;                                      /* dev ready */
 int32 dev_enb = 0;                                      /* dev enable */
-uint32 ext_ints = 0;            // [RLA] 16 if extended interrupts enabled
-uint16 dev_ext_int = 0;         // [RLA] extended interrupt request bitmap
-uint16 dev_ext_enb = 0;         // [RLA] extended interrupt enable bitmap
+uint32 ext_ints = 0;                                    // [RLA] 16 if extended interrupts enabled
+uint16 dev_ext_int = 0;                                 // [RLA] extended interrupt request bitmap
+uint16 dev_ext_enb = 0;                                 // [RLA] extended interrupt enable bitmap
 int32 ind_max = 8;                                      /* iadr nest limit */
 int32 stop_inst = 1;                                    /* stop on ill inst */
 int32 stop_dev = 2;                                     /* stop on ill dev */
@@ -405,10 +405,10 @@ t_stat sim_instr (void)
 {
 int32 AR, BR, MB, Y, t1, t2, t3, skip, dev;
 uint32 ut;
-t_bool iack;       // [RLA] TRUE if an interrupt was taken this cycle
+t_bool iack;                                            // [RLA] TRUE if an interrupt was taken this cycle
 t_stat reason;
 t_stat Ea (int32 inst, int32 *addr);
-t_stat Write (int32 addr, int32 val);   // [RLA] Write() can now cause a break
+t_stat Write (int32 addr, int32 val);                   // [RLA] Write() can now cause a break
 int32 Add16 (int32 val1, int32 val2);
 int32 Add31 (int32 val1, int32 val2);
 int32 Operate (int32 MB, int32 AR);
@@ -508,14 +508,17 @@ if (chan_req) {                                         /* channel request? */
 /* Interrupts */
 
 //[RLA] Todo - add WDT interrupts ????
+
 iack = FALSE;
 if ((dev_int & (INT_PEND|INT_NMI|dev_enb)) > INT_PEND) { // [RLA] check for standard interrupt
-    MB = cpu_interrupt(M_INT);  iack = TRUE;
-  }
-else if (   ((dev_ext_int & dev_ext_enb) != 0)           // [RLA] check for extended interrupt
-         && ((dev_int & INT_PEND) == INT_PEND) ) {
-    MB = cpu_ext_interrupt();  iack = TRUE;
-  }
+    MB = cpu_interrupt(M_INT);
+    iack = TRUE;
+    }
+else if (((dev_ext_int & dev_ext_enb) != 0)             // [RLA] check for extended interrupt
+      && ((dev_int & INT_PEND) == INT_PEND)) {
+    MB = cpu_ext_interrupt ();
+    iack = TRUE;
+    }
 
 /* Instruction fetch */
 
@@ -542,7 +545,7 @@ if (hst_lnt) {                                          /* instr hist? */
     hst[hst_p].ar = AR;
     hst[hst_p].br = BR;
     hst[hst_p].xr = XR;
-    hst[hst_p].iack = iack;     // [RLA] record if interrupt taken
+    hst[hst_p].iack = iack;                             // [RLA] record if interrupt taken
     }
 
 /* Memory reference instructions */
@@ -578,9 +581,11 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
     case 004: case 024: case 044: case 064:             /* STA */
         if ((reason = Ea (MB, &Y)))                     /* eff addr */
             break;
-        if ((reason = Write(Y, AR))) break;             /* [RLA] store A */
+        if ((reason = Write(Y, AR)))
+            break;                                      /* [RLA] store A */
         if (dp) {                                       /* double prec? */
-            if ((reason = Write(Y | 1, BR))) break;     /* [RLA] store B */
+            if ((reason = Write(Y | 1, BR)))
+                break;                                  /* [RLA] store B */
             sc = 0;
             }
         break;
@@ -621,7 +626,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         if ((reason = Ea (MB, &Y)))                     /* eff addr */
             break;
         MB = NEWA (Read (Y), PC);                       /* merge old PC */
-        if ((reason = Write(Y, MB))) break;             // [RLA] 
+        if ((reason = Write(Y, MB)))
+            break;                                      // [RLA] 
         PCQ_ENTRY;
         PC = NEWA (PC, Y + 1);                          /* set new PC */
         break;
@@ -640,7 +646,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         if ((reason = Ea (MB, &Y)))                     /* eff addr */
             break;
         MB = (Read (Y) + 1) & DMASK;                    /* incr, rewrite */
-        if ((reason = Write(Y, MB))) break;             // [RLA]
+        if ((reason = Write(Y, MB)))
+            break;                                      // [RLA]
         if (MB == 0)                                    /* skip if zero */
             PC = NEWA (PC, PC + 1);
         break;
@@ -649,14 +656,16 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         if ((reason = Ea (MB, &Y)))                     /* eff addr */
             break;
         MB = Read (Y);
-        if ((reason = Write(Y, AR))) break;             /* [RLA] A to mem */
+        if ((reason = Write(Y, AR)))
+            break;                                      /* [RLA] A to mem */
         AR = MB;                                        /* mem to A */
         break;
 
     case 015: case 055:                                 /* STX */
         if ((reason = Ea (MB & ~IDX, &Y)))              /* eff addr */
             break;
-        if ((reason = Write(Y, XR))) break;             /* [RLA] store XR */
+        if ((reason = Write(Y, XR)))
+            break;                                      /* [RLA] store XR */
         break;
 
     case 035: case 075:                                 /* LDX */
@@ -730,7 +739,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         if ((dev == 020) || (dev == 024))
           t2 = sim_ota_2024(ioOTA, I_GETFNC (MB), AR, dev);
         else
-          t2 = iotab[dev] (ioOTA, I_GETFNC (MB), AR, dev);
+        t2 = iotab[dev] (ioOTA, I_GETFNC (MB), AR, dev);
         reason = t2 >> IOT_V_REASON;
         if (t2 & IOT_SKIP)                              /* skip? */
             PC = NEWA (PC, PC + 1);
@@ -1092,16 +1101,16 @@ return SCPE_OK;
 
 t_stat Write (int32 addr, int32 val)
 {
-  // [RLA] Write() now checks for address breaks ...
-  if (((addr == 0) || (addr >= 020)) && MEM_ADDR_OK (addr))
+// [RLA] Write() now checks for address breaks ...
+if (((addr == 0) || (addr >= 020)) && MEM_ADDR_OK (addr))
     M[addr] = val;
-  if (addr == M_XR)                                      /* write XR loc? */
+if (addr == M_XR)                                       /* write XR loc? */
     XR = val;
-  // [RLA] Implement "break on memory write" ...
-  if (sim_brk_summ && sim_brk_test (addr, SWMASK ('W')))
-    return STOP_IBKPT;
-  else
-    return SCPE_OK;
+    // [RLA] Implement "break on memory write" ...
+    if (sim_brk_summ && sim_brk_test (addr, SWMASK ('W')))
+        return STOP_IBKPT;
+    else
+        return SCPE_OK;
 }
 
 /* Add */
@@ -1127,11 +1136,14 @@ return r;
 }
 
 // [RLA] Standard (fixed vector) interrupt action ...
-int32 cpu_interrupt (int32 vec) {
-  pme = ext;                                          /* save extend */
-  if (cpu_unit.flags & UNIT_EXT) ext = 1;             /* ext opt? extend on */
-  dev_int = dev_int & ~INT_ON;                        /* intr off */
-  return 0120000 | vec;                               /* inst = JST* vector */
+
+int32 cpu_interrupt (int32 vec)
+{
+pme = ext;                                              /* save extend */
+if (cpu_unit.flags & UNIT_EXT)
+    ext = 1;                                            /* ext opt? extend on */
+dev_int = dev_int & ~INT_ON;                            /* intr off */
+return 0120000 | vec;                                   /* inst = JST* vector */
 }
 
 // [RLA] Extended (priority) interrupt action ...
@@ -1191,11 +1203,6 @@ int32 sim_ota_2024 (int32 inst, int32 fnc, int32 dat, int32 dev)
   // flags (single or double precision HSA, extended addressing mode,
   // the carry flag, etc).  
   //
-  //   The original simh implementation handled the regular SMK and OTK
-  // as special cases in the CLK device.  Why the CLK device???  Because
-  // it also uses device code 20!  Shame - these have nothing to do with
-  // the clock!
-  //
   //   This routine implements these special OTKs as part of the CPU. 
   // That allows us to implement the extra interrupt masks needed by the
   // IMP, and it also allows the CLK device to be disabled without losing
@@ -1204,15 +1211,20 @@ int32 sim_ota_2024 (int32 inst, int32 fnc, int32 dat, int32 dev)
   // needs it to be disabled. 
   
   // Although OTA 24 is reserved nothing we currently simulate uses it!
-  if (dev == 024) return IOBADFNC (dat);
+
+  if (dev == 024)
+      return IOBADFNC (dat);
   
   // Device code 20...
   switch (fnc) {
     case 000:  // SMK 020 - set standard interrupt mask
-      dev_enb = dat;  break;
+      dev_enb = dat;
+      break;
     case 001:  // SMK 120 - set extended interrupt mask #1
-      if (ext_ints < 16) return IOBADFNC(dat);
-      dev_ext_enb = dat;  break;
+      if (ext_ints < 16)
+          return IOBADFNC(dat);
+      dev_ext_enb = dat;
+      break;
     case 002:  // SMK 220 - set extended interrupt mask #2
     case 003:  // SMK 320 - set extended interrupt mask #3
       return IOBADFNC(dat);
@@ -1647,8 +1659,8 @@ return SCPE_OK;
 }
 
 /* Set up I/O dispatch and channel maps */
-
 // [RLA] Check for DMC conflicts (on both DMC channels!) ...
+
 t_bool set_chanmap (DEVICE *dptr, DIB *dibp, uint32 dno, uint32 chan)
 {
   if ((chan < DMC_V_DMC1) && (chan >= dma_nch)) {
@@ -1685,21 +1697,23 @@ for (i = 0; (dptr = sim_devices[i]); i++) {             /* loop thru devices */
     for (j = 0; j < dibp->num; j++) {                   /* repeat for slots */
         if (iotab[dno + j]) {                           /* conflict? */
             sim_printf ("%s device number conflict, devno = %02o\n",
-                        sim_dname (dptr), dno + j);
+                         sim_dname (dptr), dno + j);
             return TRUE;
             }
         iotab[dno + j] = dibp->io;                      /* set I/O routine */
         }                                               /* end for */
-      // [RLA] set up the channel map
-      if (dibp->chan  != 0)
-        if (set_chanmap(dptr, dibp, dno, dibp->chan-1)) return TRUE;
-      if (dibp->chan2 != 0)
-        if (set_chanmap(dptr, dibp, dno, dibp->chan2-1)) return TRUE;
-      // [RLA] If the device uses extended interrupts, check that they're enabled.
-      if ((dibp->inum != INT_V_NONE) && (dibp->inum >= INT_V_EXTD) && (ext_ints == 0)) {
+    // [RLA] set up the channel map
+    if (dibp->chan  != 0)
+        if (set_chanmap(dptr, dibp, dno, dibp->chan-1))
+            return TRUE;
+    if (dibp->chan2 != 0)
+        if (set_chanmap(dptr, dibp, dno, dibp->chan2-1))
+            return TRUE;
+    // [RLA] If the device uses extended interrupts, check that they're enabled.
+    if ((dibp->inum != INT_V_NONE) && (dibp->inum >= INT_V_EXTD) && (ext_ints == 0)) {
         sim_printf ("%s uses extended interrupts but that option is disabled\n", sim_dname (dptr));
         return TRUE;
-      }
+        }
     }                                                   /* end for */
 for (i = 0; i < DEV_MAX; i++) {                         /* fill in blanks */
     if (iotab[i] == NULL)
