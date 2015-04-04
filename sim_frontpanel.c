@@ -28,6 +28,8 @@
    03-Apr-15    MP      Added logic to pass simulator startup messages in
                         panel error text if the connection to the simulator
                         shuts down while it is starting.
+   04-Apr-15    MP      Added mount and dismount routines to connect and 
+                        disconnect removable media
 
    This module provides interface between a front panel application and a simh
    simulator.  Facilities provide ways to gather information from and to 
@@ -1344,6 +1346,83 @@ if (_panel_sendf (panel, 1, NULL, "DEPOSIT %s %s", name, value))
 return 0;
 }
 
+/**
+   sim_panel_mount
+
+        device      the name of a simulator device/unit
+        switches    any switches appropriate for the desire attach
+        path        the path on the local system to be attached
+
+ */
+int
+sim_panel_mount (PANEL *panel,
+                 const char *device,
+                 const char *switches,
+                 const char *path)
+{
+char *response = NULL, *status = NULL;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (_panel_sendf (panel, 1, &response, "ATTACH %s %s %s", switches, device, path)) {
+    free (response);
+    return -1;
+    }
+if (_panel_sendf (panel, 1, &status, "ECHO %%STATUS%%")) {
+    free (response);
+    free (status);
+    return -1;
+    }
+if (!status || (strcmp (status, "00000000\r\n"))) {
+    sim_panel_set_error (response);
+    free (response);
+    free (status);
+    return -1;
+    }
+free (response);
+free (status);
+return 0;
+}
+
+/**
+   sim_panel_dismount
+
+        device      the name of a simulator device/unit
+
+ */
+int
+sim_panel_dismount (PANEL *panel,
+                    const char *device)
+{
+char *response = NULL, *status = NULL;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (_panel_sendf (panel, 1, &response, "DETACH %s", device)) {
+    free (response);
+    return -1;
+    }
+if (_panel_sendf (panel, 1, &status, "ECHO %%STATUS%%")) {
+    free (response);
+    free (status);
+    return -1;
+    }
+if (!status || (strcmp (status, "00000000\r\n"))) {
+    sim_panel_set_error (response);
+    free (response);
+    free (status);
+    return -1;
+    }
+free (response);
+free (status);
+return 0;
+}
+
+
 static void *
 _panel_reader(void *arg)
 {
@@ -1705,6 +1784,7 @@ if (wait_for_completion) {
     strcat (buf, command_done_echo);
     strcat (buf, "\r");
     pthread_mutex_lock (&p->io_lock);
+    p->io_response_data = 0;
     }
 
 ret = (strlen (buf) == _panel_send (p, buf, strlen (buf))) ? 0 : -1;
@@ -1723,6 +1803,7 @@ if (wait_for_completion) {
                 memcpy (*response, p->io_response, p->io_response_data + 1);
             }
         p->io_response_data = 0;
+        p->io_response[0] = '\0';
         }
     pthread_mutex_unlock (&p->io_lock);
     }

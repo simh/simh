@@ -490,7 +490,7 @@ static int32 noqueue_time;
 volatile int32 stop_cpu = 0;
 static char **sim_argv;
 t_value *sim_eval = NULL;
-t_value sim_last_val;
+static t_value sim_last_val;
 FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
@@ -503,7 +503,7 @@ static int32 sim_goto_line[MAX_DO_NEST_LVL+1];          /* the current line numb
 static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
 static int32 sim_show_message = 1;                      /* the message display status of the currently open do file */
 static int32 sim_on_inherit = 0;                        /* the inherit status of on state and conditions when executing do files */
-int32 sim_do_depth = 0;
+static int32 sim_do_depth = 0;
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
 static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+1];
@@ -511,7 +511,7 @@ static char sim_do_filename[MAX_DO_NEST_LVL+1][CBUFSIZE];
 static char *sim_do_ocptr[MAX_DO_NEST_LVL+1];
 static char *sim_do_label[MAX_DO_NEST_LVL+1];
 
-static t_stat sim_last_cmd_stat;                        /* Command Status */
+t_stat sim_last_cmd_stat;                               /* Command Status */
 
 static SCHTAB sim_stabr;                                /* Register search specifier */
 static SCHTAB sim_staba;                                /* Memory search specifier */
@@ -7026,8 +7026,9 @@ t_stat get_yn (const char *ques, t_stat deflt)
 {
 char cbuf[CBUFSIZE], *cptr;
 
-printf ("%s ", ques);
-cptr = read_line (cbuf, sizeof(cbuf), stdin);
+if (sim_rem_cmd_active_line != -1)
+    return deflt;
+cptr = read_line_p (ques, cbuf, sizeof(cbuf), stdin);
 if ((cptr == NULL) || (*cptr == 0))
     return deflt;
 if ((*cptr == 'Y') || (*cptr == 'y'))

@@ -411,7 +411,7 @@ static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* r
 static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
 static uint32 *sim_rem_read_timeouts = NULL;/* per line read timeout (default from sim_rem_read_timeout) */
 static int32 sim_rem_active_number = -1;    /* -1 - not active, >= 0 is index of active console */
-static int32 sim_rem_cmd_active_line = -1;  /* step in progress on line # */
+int32 sim_rem_cmd_active_line = -1;         /* step in progress on line # */
 static CTAB *sim_rem_active_command = NULL; /* active command */
 static char *sim_rem_command_buf;           /* active command buffer */
 static t_bool sim_log_temp = FALSE;         /* temporary log file active */
@@ -688,6 +688,7 @@ sim_ttcmd ();                                   /* restore console */
 stat = sim_rem_active_command->action (sim_rem_active_command->arg, cptr);/* execute command */
 if (stat != SCPE_OK)
     stat = _sim_rem_message (gbuf, stat);       /* display results */
+sim_last_cmd_stat = SCPE_BARE_STATUS(stat);
 sim_ttrun ();                                   /* set console mode */
 sim_cancel (&sim_rem_con_unit[1]);              /* force immediate activation of sim_rem_con_data_svc */
 sim_activate (&sim_rem_con_unit[1], -1);

@@ -28,6 +28,8 @@
    03-Apr-15    MP      Added logic to pass simulator startup messages in
                         panel error text if the connection to the simulator
                         shuts down while it is starting.
+   04-Apr-15    MP      Added mount and dismount routines to connect and 
+                        disconnect removable media
 
    This module defines interface between a front panel application and a simh
    simulator.  Facilities provide ways to gather information from and to 
@@ -322,6 +324,42 @@ int
 sim_panel_set_register_value (PANEL *panel,
                               const char *name,
                               const char *value);
+
+/**
+
+    When a front panel application may needs to change the media
+    in a simulated removable media device one of the following 
+    routines should be called:
+
+    sim_panel_mount    - mounts the indicated media file on a device
+    sim_panel_dismount - dismounts the currently mounted media file 
+                         from a device
+
+ */
+
+/**
+   sim_panel_mount
+
+        device      the name of a simulator device/unit
+        switches    any switches appropriate for the desire attach
+        path        the path on the local system to be attached
+
+ */
+int
+sim_panel_mount (PANEL *panel,
+                 const char *device,
+                 const char *switches,
+                 const char *path);
+
+/**
+   sim_panel_dismount
+
+        device      the name of a simulator device/unit
+
+ */
+int
+sim_panel_dismount (PANEL *panel,
+                    const char *device);
 
 
 typedef enum {

@@ -221,6 +221,7 @@ extern int32 sim_interval;
 extern int32 sim_switches;
 extern int32 sim_quiet;
 extern int32 sim_step;
+extern t_stat sim_last_cmd_stat;                        /* Command Status */
 extern FILE *sim_log;                                   /* log file */
 extern FILEREF *sim_log_ref;                            /* log file file reference */
 extern FILE *sim_deb;                                   /* debug file */

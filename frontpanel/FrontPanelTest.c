@@ -309,6 +309,20 @@ if (!sim_panel_get_registers (panel, NULL)) {
     printf ("Unexpected success getting register data: %s\n", sim_panel_get_error());
     goto Done;
     }
+sim_panel_clear_error ();
+if (!sim_panel_dismount (panel, "RL0")) {
+    printf ("Unexpected success while dismounting media file from non mounted RL0: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_mount (panel, "RL0", "-N", "TEST-RL.DSK")) {
+    printf ("Error while mounting media file TEST-RL.DSK on RL0: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_dismount (panel, "RL0")) {
+    printf ("Error while dismounting media file from RL0: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+remove ("TEST-RL.DSK");
 while (1) {
     size_t i;
     char cmd[512];
