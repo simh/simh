@@ -5258,7 +5258,7 @@ if (!(uptr->flags & UNIT_ATT)) {                        /* not attached? */
     if (sim_switches & SIM_SW_REST)                     /* restoring? */
         return SCPE_OK;                                 /* allow detach */
     else
-        return SCPE_NOATT;                              /* complain */
+        return SCPE_NOTATT;                             /* complain */
     }
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_OK;
