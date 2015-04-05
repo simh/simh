@@ -1,6 +1,6 @@
 /*  mp-a2.c: SWTP MP-A2 M6800 CPU simulator
 
-    Copyright (c) 2011, William Beech
+    Copyright (c) 2011-2012, William Beech
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),

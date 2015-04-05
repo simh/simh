@@ -1,6 +1,6 @@
 /*  dc4.c: SWTP DC-4 FDC Simulator
 
-    Copyright (c) 2005-2011, William A. Beech
+    Copyright (c) 2005-2012, William A. Beech
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
