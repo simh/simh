@@ -42,6 +42,11 @@
 #include <stdio.h>
 #include "swtp_defs.h"
 
+
+#if !defined(DONT_USE_INTERNAL_ROM)
+#include "swtp_swtbug_bin.h"
+#endif /* DONT_USE_INTERNAL_ROM */
+
 #define UNIT_V_MSIZE    (UNIT_V_UF)     /* ROM Size */
 #define UNIT_MSIZE      (0x7 << UNIT_V_MSIZE)
 #define UNIT_NONE       (0 << UNIT_V_MSIZE) /* No EPROM */
@@ -61,8 +66,12 @@ int32 BOOTROM_get_mbyte(int32 offset);
 
 /* SIMH Standard I/O Data Structures */
 
-UNIT BOOTROM_unit = { UDATA (NULL, 
-                           UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO, 0),
+UNIT BOOTROM_unit = {
+#if defined(DONT_USE_INTERNAL_ROM)
+                      UDATA (NULL, UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO, 0),
+#else /* !defined(DONT_USE_INTERNAL_ROM) */
+                      UDATA (NULL, UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO+((BOOT_CODE_SIZE>>9)<<UNIT_V_MSIZE), BOOT_CODE_SIZE),
+#endif
                     KBD_POLL_WAIT };
 
 MTAB BOOTROM_mod[] = {
@@ -117,6 +126,8 @@ DEVICE BOOTROM_dev = {
 t_stat BOOTROM_attach (UNIT *uptr, char *cptr)
 {
     t_stat r;
+    t_addr image_size, capac;
+    int i;
 
     if (BOOTROM_dev.dctrl & DEBUG_flow)
         printf("BOOTROM_attach: cptr=%s\n", cptr);
@@ -125,6 +136,14 @@ t_stat BOOTROM_attach (UNIT *uptr, char *cptr)
             printf("BOOTROM_attach: Error\n");
         return r;
     }
+    image_size = (t_addr)sim_fsize_ex (BOOTROM_unit.fileref);
+    for (capac = 0x200, i=1; capac < image_size; capac <<= 1, i++);
+    if (i > (UNIT_2764>>UNIT_V_MSIZE)) {
+        detach_unit (uptr);
+        return SCPE_ARG;
+        }
+    uptr->flags &= ~UNIT_MSIZE;
+    uptr->flags |= (i << UNIT_V_MSIZE);
     if (BOOTROM_dev.dctrl & DEBUG_flow)
         printf("BOOTROM_attach: Done\n");
     return (BOOTROM_reset (NULL));
@@ -179,13 +198,21 @@ t_stat BOOTROM_reset (DEVICE *dptr)
 //    printf("   EPROM: Initializing [%04X-%04XH]\n", 
 //        0xE000, 0xE000 + BOOTROM_unit.capac - 1);
     if (BOOTROM_unit.filebuf == NULL) { /* no buffer allocated */
-        BOOTROM_unit.filebuf = malloc(BOOTROM_unit.capac); /* allocate EPROM buffer */
+        BOOTROM_unit.filebuf = calloc(1, BOOTROM_unit.capac); /* allocate EPROM buffer */
         if (BOOTROM_unit.filebuf == NULL) {
             if (BOOTROM_dev.dctrl & DEBUG_flow)
                 printf("BOOTROM_reset: Malloc error\n");
             return SCPE_MEM;
         }
     }
+#if !defined(DONT_USE_INTERNAL_ROM)
+    if (!BOOTROM_unit.filename) {
+        if (BOOTROM_unit.capac < BOOT_CODE_SIZE)
+            return SCPE_ARG;
+        memcpy (BOOTROM_unit.filebuf, BOOT_CODE_ARRAY, BOOT_CODE_SIZE);
+        return SCPE_OK;
+        }
+#endif
     fp = fopen(BOOTROM_unit.filename, "rb"); /* open EPROM file */
     if (fp == NULL) {
         printf("\tUnable to open ROM file %s\n",BOOTROM_unit.filename);
@@ -222,6 +249,11 @@ int32 BOOTROM_get_mbyte(int32 offset)
     }
     if (BOOTROM_dev.dctrl & DEBUG_read)
         printf("BOOTROM_get_mbyte: offset=%04X\n", offset);
+    if ((t_addr)offset > BOOTROM_unit.capac) {
+        if (BOOTROM_dev.dctrl & DEBUG_read)
+            printf("BOOTROM_get_mbyte: EPROM reference beyond ROM size\n");
+        return 0xFF;
+    }
     val = *((uint8 *)(BOOTROM_unit.filebuf) + offset) & 0xFF;
     if (BOOTROM_dev.dctrl & DEBUG_read)
         printf("BOOTROM_get_mbyte: Normal val=%02X\n", val);
