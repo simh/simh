@@ -5421,6 +5421,15 @@ fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
     sim_si64, sim_sa64, eth_capabilities(),             /* [V3.5] options */
     sim_time);                                          /* [V3.2] sim time */
 WRITE_I (sim_rtime);                                    /* [V2.6] sim rel time */
+#if defined(SIM_GIT_COMMIT_ID)
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+fprintf (sfile, "git commit id: %8.8s\n", S_xstr(SIM_GIT_COMMIT_ID));
+#undef S_str
+#undef S_xstr
+#else
+fprintf (sfile, "git commit id: unknown\n");
+#endif
 
 for (device_count = 0; sim_devices[device_count]; device_count++);/* count devices */
 for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru devices */
@@ -5568,7 +5577,7 @@ READ_S (buf);                                           /* [V2.5+] read version 
 v40 = v35 = v32 = FALSE;
 if (strcmp (buf, save_ver40) == 0)                      /* version 4.0? */
     v40 = v35 = v32 = TRUE;
-if (strcmp (buf, save_ver35) == 0)                      /* version 3.5? */
+else if (strcmp (buf, save_ver35) == 0)                 /* version 3.5? */
     v35 = v32 = TRUE;
 else if (strcmp (buf, save_ver32) == 0)                 /* version 3.2? */
     v32 = TRUE;
@@ -5600,6 +5609,19 @@ if (v32) {                                              /* [V3.2+] time as strin
     }
 else READ_I (sim_time);                                 /* sim time */
 READ_I (sim_rtime);                                     /* [V2.6+] sim rel time */
+if (v40) {
+    READ_S (buf);                                       /* read git commit id */
+#if defined(SIM_GIT_COMMIT_ID)
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+    if ((memcmp (buf, "git commit id: " S_xstr(SIM_GIT_COMMIT_ID), 23)) && 
+        (!sim_quiet)) {
+        sim_printf ("warning - different simulator git versions.\nSaved commit id: %8.8s, Running commit id: %8.8s", buf + 15, S_xstr(SIM_GIT_COMMIT_ID));
+        }
+#undef S_str
+#undef S_xstr
+#endif
+    }
 detach_all (0, 0);                                      /* Detach everything to start from a consistent state */
 for ( ;; ) {                                            /* device loop */
     READ_S (buf);                                       /* read device name */
