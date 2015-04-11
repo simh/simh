@@ -27,8 +27,6 @@
    11-Jun-2013  MB      First version
 */
 
-#if defined(USE_SIM_VIDEO)
-
 #include "sim_video.h"
 
 t_bool vid_active = FALSE;
@@ -39,6 +37,9 @@ int32 vid_cursor_y;
 t_bool vid_mouse_b1 = FALSE;
 t_bool vid_mouse_b2 = FALSE;
 t_bool vid_mouse_b3 = FALSE;
+
+#if defined(USE_SIM_VIDEO)
+
 char vid_release_key[64] = "Ctrl-Right-Shift";
 
 t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc)
@@ -1818,8 +1819,9 @@ while (_show_stat == -1)
 return _show_stat;
 }
 
-#else /* !defined(HAVE_LIBSDL) */
+#endif /* defined(HAVE_LIBSDL) */
 
+#else /* !defined(USE_SIM_VIDEO) */
 /* Non-implemented versions */
 
 uint32 vid_mono_palette[2];                             /* Monochrome Color Map */
@@ -1885,9 +1887,4 @@ t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
 fprintf (st, "video support unavailable");
 return SCPE_OK;
 }
-
-#endif /* defined(HAVE_LIBSDL) */
-
-#else /* !defined(USE_SIM_VIDEO) */
-static const char *dummy_declaration = "Something to compile";
 #endif /* defined(USE_SIM_VIDEO) */
