@@ -1,0 +1,201 @@
+/*  iEPROM.c: Intel EPROM simulator for 8-bit SBCs
+
+    Copyright (c) 2010, William A. Beech
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+    Except as contained in this notice, the name of William A. Beech shall not be
+    used in advertising or otherwise to promote the sale, use or other dealings
+    in this Software without prior written authorization from William A. Beech.
+
+    These functions support a simulated i2732 EPROM device on an iSBC.  This 
+    allows the attachment of the device to a binary file containing the EPROM
+    code.
+
+    Unit will support a single 2708, 2716, 2732 and 2764 EPROM type.
+
+    ?? ??? 10 - Original file.
+    16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+*/
+
+#include "system_defs.h"
+
+#define SET_XACK(VAL)       (xack = VAL)
+
+/* function prototypes */
+
+t_stat EPROM_attach (UNIT *uptr, char *cptr);
+t_stat EPROM_reset (DEVICE *dptr, int32 size);
+int32 EPROM_get_mbyte(int32 addr);
+
+extern UNIT i8255_unit;
+extern uint8 xack;                         /* XACK signal */
+
+/* SIMH EPROM Standard I/O Data Structures */
+
+UNIT EPROM_unit = {
+    UDATA (NULL, UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO, 0), 0
+};
+
+DEBTAB EPROM_debug[] = {
+    { "ALL", DEBUG_all },
+    { "FLOW", DEBUG_flow },
+    { "READ", DEBUG_read },
+    { "WRITE", DEBUG_write },
+    { "XACK", DEBUG_xack },
+    { "LEV1", DEBUG_level1 },
+    { "LEV2", DEBUG_level2 },
+    { NULL }
+};
+
+DEVICE EPROM_dev = {
+    "EPROM",            //name
+    &EPROM_unit,        //units
+    NULL,               //registers
+    NULL,               //modifiers
+    1,                  //numunits
+    16,                 //aradix
+    32,                 //awidth
+    1,                  //aincr
+    16,                 //dradix
+    8,                  //dwidth
+    NULL,               //examine
+    NULL,               //deposit
+//    &EPROM_reset,       //reset
+    NULL,       //reset
+    NULL,               //boot
+    &EPROM_attach,      //attach
+    NULL,               //detach
+    NULL,               //ctxt
+    DEV_DEBUG,          //flags
+    0,                  //dctrl
+    EPROM_debug,        //debflags
+    NULL,               //msize
+    NULL                //lname
+};
+
+/* global variables */
+
+/* EPROM functions */
+
+/* EPROM attach  */
+
+t_stat EPROM_attach (UNIT *uptr, char *cptr)
+{
+    int j, c;
+    FILE *fp;
+    t_stat r;
+
+    if (EPROM_dev.dctrl & DEBUG_flow)
+        printf("EPROM_attach: cptr=%s\n", cptr);
+    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
+        if (EPROM_dev.dctrl & DEBUG_flow)
+            printf("EPROM_attach: Error\n");
+        return r;
+    }
+    if (EPROM_dev.dctrl & DEBUG_read)
+        printf("\tAllocate buffer\n");
+    if (EPROM_unit.filebuf == NULL) {   /* no buffer allocated */
+        EPROM_unit.filebuf = malloc(EPROM_unit.capac); /* allocate EPROM buffer */
+        if (EPROM_unit.filebuf == NULL) {
+            if (EPROM_dev.dctrl & DEBUG_flow)
+                printf("EPROM_attach: Malloc error\n");
+            return SCPE_MEM;
+        }
+    }
+    if (EPROM_dev.dctrl & DEBUG_read)
+        printf("\tOpen file %s\n", EPROM_unit.filename);
+    fp = fopen(EPROM_unit.filename, "rb"); /* open EPROM file */
+    if (fp == NULL) {
+        printf("EPROM: Unable to open ROM file %s\n", EPROM_unit.filename);
+        printf("\tNo ROM image loaded!!!\n");
+        return SCPE_OK;
+    }
+    if (EPROM_dev.dctrl & DEBUG_read)
+        printf("\tRead file\n");
+    j = 0;                              /* load EPROM file */
+    c = fgetc(fp);
+    while (c != EOF) {
+        *(uint8 *)(EPROM_unit.filebuf + j++) = c & 0xFF;
+        c = fgetc(fp);
+        if (j >= EPROM_unit.capac) {
+            printf("\tImage is too large - Load truncated!!!\n");
+            break;
+        }
+    }
+    if (EPROM_dev.dctrl & DEBUG_read)
+        printf("\tClose file\n");
+    fclose(fp);
+    printf("EPROM: %d bytes of ROM image %s loaded\n", j, EPROM_unit.filename);
+    if (EPROM_dev.dctrl & DEBUG_flow)
+        printf("EPROM_attach: Done\n");
+    return SCPE_OK;
+}
+
+/* EPROM reset */
+
+t_stat EPROM_reset (DEVICE *dptr, int32 size)
+{
+    t_stat r;
+
+//    if (EPROM_dev.dctrl & DEBUG_flow)   /* entry message */
+        printf("   EPROM_reset: base=0000 size=%04X\n", size);
+    if ((EPROM_unit.flags & UNIT_ATT) == 0) { /* if unattached */
+        EPROM_unit.capac = size;           /* set EPROM size to 0 */
+        if (EPROM_dev.dctrl & DEBUG_flow) /* exit message */
+            printf("Done1\n");
+//        printf("   EPROM: Available [%04X-%04XH]\n", 
+//            0, EPROM_unit.capac - 1);
+        return SCPE_OK;
+        }
+    if ((EPROM_unit.flags & UNIT_ATT) == 0) {
+        printf("EPROM: No file attached\n");
+    }
+    if (EPROM_dev.dctrl & DEBUG_flow)   /* exit message */
+        printf("Done2\n");
+    return SCPE_OK;
+}
+
+/*  get a byte from memory */
+
+int32 EPROM_get_mbyte(int32 addr)
+{
+    int32 val;
+
+    if (i8255_unit.u6 & 0x01) {         /* EPROM enabled */
+        if (EPROM_dev.dctrl & DEBUG_read)
+            printf("EPROM_get_mbyte: addr=%04X\n", addr);
+        if ((addr >= 0) && (addr < EPROM_unit.capac)) {
+            SET_XACK(1);                /* good memory address */
+            if (EPROM_dev.dctrl & DEBUG_xack)
+                printf("EPROM_get_mbyte: Set XACK for %04X\n", addr); 
+            val = *(uint8 *)(EPROM_unit.filebuf + addr);
+            if (EPROM_dev.dctrl & DEBUG_read)
+                printf(" val=%04X\n", val);
+            return (val & 0xFF);
+        }
+        if (EPROM_dev.dctrl & DEBUG_read)
+            printf(" EPROM Disabled\n");
+        return 0xFF;
+    }
+    if (EPROM_dev.dctrl & DEBUG_read)
+        printf(" Out of range\n");
+    return 0xFF;
+}
+
+/* end of iEPROM.c */
