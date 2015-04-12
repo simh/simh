@@ -751,9 +751,13 @@ else
     $(info .)
   else
     # Version check on windows-build
-    ifneq (,$(shell findstr LIBSTL_TTF ..\windows-build\Windows-Build_Versions.txt))
+    WINDOWS_BUILD = $(shell findstr WINDOWS-BUILD ..\windows-build\Windows-Build_Versions.txt)
+    ifeq (,$(WINDOWS_BUILD))
+      WINDOWS_BUILD = 00000000
+    endif
+    ifneq (,$(shell if 20150412 GTR $(WINDOWS_BUILD) echo old-windows-build))
       $(info .)
-      $(info windows-build components at: $(abspath ..\windows-build)
+      $(info windows-build components at: $(abspath ..\windows-build))
       $(info .)
       $(info ***********************************************************************)
       $(info ***********************************************************************)
@@ -768,7 +772,7 @@ else
       $(info .)
     endif
     ifeq (pcre,$(shell if exist ..\windows-build\PCRE\include\pcre.h echo pcre))
-      OS_CCDEFS += -DHAVE_PCREPOSIX_H -I$(abspath ../windows-build/PCRE/include)
+      OS_CCDEFS += -DHAVE_PCREPOSIX_H -DPCRE_STATIC -I$(abspath ../windows-build/PCRE/include)
       OS_LDFLAGS += -lpcreposix -lpcre -L../windows-build/PCRE/lib/
       $(info using libpcreposix: $(abspath ../windows-build/PCRE/lib/pcreposix.a) $(abspath ../windows-build/PCRE/include/pcreposix.h))
     endif
