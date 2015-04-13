@@ -38,16 +38,15 @@ t_bool vid_mouse_b1 = FALSE;
 t_bool vid_mouse_b2 = FALSE;
 t_bool vid_mouse_b3 = FALSE;
 
-#if defined(USE_SIM_VIDEO)
-
-char vid_release_key[64] = "Ctrl-Right-Shift";
-
 t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc)
 {
 return vid_show_video (st, uptr, val, desc);
 }
 
-#if defined(HAVE_LIBSDL)
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+
+char vid_release_key[64] = "Ctrl-Right-Shift";
+
 #include <SDL.h>
 #include <SDL_thread.h>
 
@@ -1819,9 +1818,7 @@ while (_show_stat == -1)
 return _show_stat;
 }
 
-#endif /* defined(HAVE_LIBSDL) */
-
-#else /* !defined(USE_SIM_VIDEO) */
+#else /* !(defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)) */
 /* Non-implemented versions */
 
 uint32 vid_mono_palette[2];                             /* Monochrome Color Map */
