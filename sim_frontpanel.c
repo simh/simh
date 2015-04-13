@@ -1482,6 +1482,7 @@ while ((p->sock != INVALID_SOCKET) &&
     pthread_mutex_unlock (&p->io_lock);
     new_data = sim_read_sock (p->sock, &buf[buf_data], sizeof(buf)-(buf_data+1));
     if (new_data <= 0) {
+        pthread_mutex_lock (&p->io_lock);
         sim_panel_set_error ("%s", sim_get_err_sock("Unexpected socket read"));
         _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
         p->State = Error;
@@ -1491,9 +1492,11 @@ while ((p->sock != INVALID_SOCKET) &&
     buf_data += new_data;
     buf[buf_data] = '\0';
     s = buf;
-    while ((eol = strchr (s, '\r'))) {
+    while ((eol = strchr (s, '\n'))) {
         /* Line to process */
         *eol++ = '\0';
+        while ((*s) && (s[strlen(s)-1] == '\r'))
+            s[strlen(s)-1] = '\0';
         e = strchr (s, ':');
         if (e) {
             size_t i;
@@ -1582,6 +1585,7 @@ while ((p->sock != INVALID_SOCKET) &&
                 /* Non Register Data Found (echo of EXAMINE or other commands and/or command output) */
                 if (p->io_waiting) {
                     char *t;
+
                     if (p->io_response_data + strlen (s) + 3 > p->io_response_size) {
                         t = (char *)_panel_malloc (p->io_response_data + strlen (s) + 3);
                         if (t == NULL) {
@@ -1649,11 +1653,15 @@ pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
 pthread_mutex_lock (&p->io_lock);
 p->callback_thread_running = 1;
+pthread_mutex_unlock (&p->io_lock);
 pthread_cond_signal (&p->startup_cond);   /* Signal we're ready to go */
+msleep (100);
+pthread_mutex_lock (&p->io_lock);
 while ((p->sock != INVALID_SOCKET) && 
        (p->callbacks_per_second) &&
        (p->State != Error)) {
     int rate = p->callbacks_per_second;
+
     pthread_mutex_unlock (&p->io_lock);
 
     ++callback_count;
@@ -1662,7 +1670,7 @@ while ((p->sock != INVALID_SOCKET) &&
         }
     msleep (1000/rate);
     pthread_mutex_lock (&p->io_lock);
-    if (((p->State == Run) || (0 == callback_count%(5*rate))) &&
+    if (((p->State == Run) || ((p->State == Halt) && (0 == callback_count%(5*rate)))) &&
         (p->io_reg_query_pending == 0)) {
         ++p->io_reg_query_pending;
         pthread_mutex_unlock (&p->io_lock);
@@ -1672,6 +1680,8 @@ while ((p->sock != INVALID_SOCKET) &&
             }
         pthread_mutex_lock (&p->io_lock);
         }
+    else
+        _panel_debug (p, DBG_XMT, "Waiting for prior register query completion", NULL, 0);
     }
 p->callback_thread_running = 0;
 pthread_mutex_unlock (&p->io_lock);
@@ -1764,8 +1774,8 @@ while (1) {                                         /* format passed string, arg
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
-        if (bufsize < len + 2)
-            bufsize = len + 2;
+        if (bufsize < (len + post_fix_len + 2))
+            bufsize = len + post_fix_len + 2;
         buf = (char *) _panel_malloc (bufsize);
         if (buf == NULL)
             return -1;

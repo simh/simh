@@ -55,7 +55,7 @@ extern "C" {
 
 #include <stdlib.h>
 
-#if !defined(__VAX)         /* Supported platform */
+#if !defined(__VAX)         /* Unsupported platform */
 
 #define SIM_FRONTPANEL_VERSION   1
 
@@ -171,10 +171,14 @@ sim_panel_add_register_indirect (PANEL *panel,
            the current register state at the desired rate.
 
 
-   Note 1: The buffers described in a panel's register set will be dynamically
-           revised as soon as data is available from the simulator.  The 
-           callback routine merely serves as a notification that a complete 
-           register set has arrived.
+   Note 1: The buffers described in a panel's register set will be 
+           dynamically revised as soon as data is available from the 
+           simulator.  The callback routine merely serves as a notification 
+           that a complete register set has arrived.
+   Note 2: The callback routine should, in general, not run for a long time
+           or frontpanel interactions with the simulator may be disrupted.  
+           Setting a flag, signaling an event or posting a message are 
+           reasonable activities to perform in a callback routine.
 
  */
 int
@@ -228,7 +232,8 @@ sim_panel_exec_step (PANEL *panel);
     sim_panel_gen_deposit        - Deposit to register or memory
     sim_panel_mem_examine        - Examine memory location
     sim_panel_mem_deposit        - Deposit to memory location
-    sim_panel_set_register_value - 
+    sim_panel_set_register_value - Deposit to a register or memory 
+                                   location
 
  */
 
@@ -377,6 +382,8 @@ sim_panel_get_state (PANEL *panel);
 
     All APIs routines which return an int return 0 for 
     success and -1 for an error.  
+
+    An API which returns an error (-1), will not change the panel state.
     
     sim_panel_get_error     - the details of the most recent error
     sim_panel_clear_error   - clears the error buffer
