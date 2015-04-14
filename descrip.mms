@@ -1308,7 +1308,7 @@ $(SSEM_LIB) : $(SSEM_SOURCE)
 
 $(SWTP6800MP_A_LIB) : $(SWTP6800MP_A_SOURCE)
         $!
-        $! Building The $(SWTP_LIB) Library.
+        $! Building The $(SWTP6800MP_A_LIB) Library.
         $!
         $ $(CC)$(SWTP6800MP_A_OPTIONS) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
@@ -1319,7 +1319,7 @@ $(SWTP6800MP_A_LIB) : $(SWTP6800MP_A_SOURCE)
 
 $(SWTP6800MP_A2_LIB) : $(SWTP6800MP_A2_SOURCE)
         $!
-        $! Building The $(SWTP_LIB) Library.
+        $! Building The $(SWTP6800MP_A2_LIB) Library.
         $!
         $ $(CC)$(SWTP6800MP_A2_OPTIONS) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
