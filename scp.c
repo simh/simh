@@ -759,7 +759,13 @@ static const char simh_help[] =
       " The RESTORE command (abbreviation REST, alternately GET) restores a\n"
       " previously saved simulator state:\n\n"
       "++RESTORE <filename>\n"
-      "3Notes:\n"
+      "4Switches\n"
+      " Switches can influence the output and behavior of the RESTORE command\n\n"
+      "++-Q      Suppresses version warning messages\n"
+      "++-D      Suppress detaching and attaching devices during a restore\n"
+      "++-F      Overrides the related file timestamp validation check\n"
+      "\n"
+      "4Notes:\n"
       " 1) SAVE file format compresses zeroes to minimize file size.\n"
       " 2) The simulator can't restore active incoming telnet sessions to\n"
       " multiplexer devices, but the listening ports will be restored across a\n"
@@ -5565,8 +5571,11 @@ DEVICE *dptr;
 UNIT *uptr;
 REG *rptr;
 struct stat rstat;
-t_bool force_restore = sim_switches & SWMASK ('F');
+t_bool force_restore = ((sim_switches & SWMASK ('F')) != 0);
+t_bool dont_detach_attach = ((sim_switches & SWMASK ('D')) != 0);
+t_bool suppress_warning = ((sim_switches & SWMASK ('Q')) != 0);
 
+sim_switches &= ~(SWMASK ('F') | SWMASK ('D') | SWMASK ('Q'));  /* remove digested switches */
 #define READ_S(xx) if (read_line ((xx), sizeof(xx), rfile) == NULL) \
     return SCPE_IOERR;
 #define READ_I(xx) if (sim_fread (&xx, sizeof (xx), 1, rfile) == 0) \
@@ -5584,6 +5593,10 @@ else if (strcmp (buf, save_ver32) == 0)                 /* version 3.2? */
 else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
     sim_printf ("Invalid file version: %s\n", buf);
     return SCPE_INCOMP;
+    }
+if ((strcmp (buf, save_ver40) != 0) && (!sim_quiet) && (!suppress_warning)) {
+    sim_printf ("warning - attempting to restore a saved simulator image in %s image format.\n", buf);
+    sim_printf ("restore with the -Q switch to suppress this warning message\n");
     }
 READ_S (buf);                                           /* read sim name */
 if (strcmp (buf, sim_savename)) {                       /* name match? */
@@ -5615,14 +5628,16 @@ if (v40) {
 #define S_xstr(a) S_str(a)
 #define S_str(a) #a
     if ((memcmp (buf, "git commit id: " S_xstr(SIM_GIT_COMMIT_ID), 23)) && 
-        (!sim_quiet)) {
-        sim_printf ("warning - different simulator git versions.\nSaved commit id: %8.8s, Running commit id: %8.8s", buf + 15, S_xstr(SIM_GIT_COMMIT_ID));
+        (!sim_quiet) && (!suppress_warning)) {
+        sim_printf ("warning - different simulator git versions.\nSaved commit id: %8.8s, Running commit id: %8.8s\n", buf + 15, S_xstr(SIM_GIT_COMMIT_ID));
+        sim_printf ("restore with the -Q switch to suppress this warning message\n");
         }
 #undef S_str
 #undef S_xstr
 #endif
     }
-detach_all (0, 0);                                      /* Detach everything to start from a consistent state */
+if (!dont_detach_attach)
+    detach_all (0, 0);                                  /* Detach everything to start from a consistent state */
 for ( ;; ) {                                            /* device loop */
     READ_S (buf);                                       /* read device name */
     if (buf[0] == 0)                                    /* last? */
@@ -5778,7 +5793,7 @@ for ( ;; ) {                                            /* device loop */
    units which were originally attached.  Some of these attach operations 
    may depend on the state of the device (in registers) to work correctly */
 for (j=0, r = SCPE_OK; j<attcnt; j++) {
-    if (r == SCPE_OK) {
+    if ((r == SCPE_OK) && (!dont_detach_attach)) {
         struct stat fstat;
         t_addr saved_pos;
 
