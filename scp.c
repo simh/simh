@@ -6328,9 +6328,14 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                     reason = ex_reg (ofile, val, flag, rptr, idx-1);
                     if (reason != SCPE_OK)
                         return reason;
+                    if (sim_log && (ofile == stdout))
+                        ex_reg (sim_log, val, flag, rptr, idx-1);
                     }
-                else
+                else {
                     Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                    if (sim_log && (ofile == stdout))
+                        Fprintf (sim_log, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                    }
                 }
             sim_last_val = last_val = val;
             val_start = idx;
@@ -6351,9 +6356,14 @@ for (rptr = lowr; rptr <= highr; rptr++) {
             reason = ex_reg (ofile, val, flag, rptr, highs);
             if (reason != SCPE_OK)
                 return reason;
+            if (sim_log && (ofile == stdout))
+                ex_reg (sim_log, val, flag, rptr, highs);
             }
-        else
+        else {
             Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
+            if (sim_log && (ofile == stdout))
+                Fprintf (sim_log, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
+            }
         }
     }
 return SCPE_OK;

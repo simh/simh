@@ -56,7 +56,8 @@ const char *sim_config =
             "VAX-PANEL.ini";
 
 /* Registers visible on the Front Panel */
-unsigned int PC, SP, FP, AP, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, atPC;
+unsigned int PC, SP, FP, AP, PSL, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, atPC;
+unsigned int PCQ[32];
 
 int update_display = 1;
 
@@ -69,7 +70,7 @@ update_display = 1;
 static void
 DisplayRegisters (PANEL *panel)
 {
-char buf1[100], buf2[100], buf3[100];
+char buf1[100], buf2[100], buf3[100], buf4[100];
 static const char *states[] = {"Halt", "Run "};
 
 if (!update_display)
@@ -77,8 +78,9 @@ if (!update_display)
 update_display = 0;
 buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = 0;
 sprintf (buf1, "%s PC: %08X   SP: %08X   AP: %08X   FP: %08X  @PC: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP, atPC);
-sprintf (buf2, "R0:%08X  R1:%08X  R2:%08X  R3:%08X   R4:%08X   R5:%08X\r\n", R0, R1, R2, R3, R4, R5);
-sprintf (buf3, "R6:%08X  R7:%08X  R8:%08X  R9:%08X  R10:%08X  R11:%08X\r\n", R6, R7, R8, R9, R10, R11);
+sprintf (buf2, "PSL: %08X %s\r\n", PSL, "");
+sprintf (buf3, "R0:%08X  R1:%08X  R2:%08X  R3:%08X   R4:%08X   R5:%08X\r\n", R0, R1, R2, R3, R4, R5);
+sprintf (buf4, "R6:%08X  R7:%08X  R8:%08X  R9:%08X  R10:%08X  R11:%08X\r\n", R6, R7, R8, R9, R10, R11);
 #if defined(_WIN32)
 if (1) {
     static HANDLE out = NULL;
@@ -93,6 +95,7 @@ if (1) {
     WriteConsoleA(out, buf1, strlen(buf1), &written, NULL);
     WriteConsoleA(out, buf2, strlen(buf2), &written, NULL);
     WriteConsoleA(out, buf3, strlen(buf3), &written, NULL);
+    WriteConsoleA(out, buf4, strlen(buf4), &written, NULL);
     SetConsoleCursorPosition (out, info.dwCursorPosition);
     }
 #else
@@ -103,6 +106,7 @@ printf (CSI "H");   /* Position to Top of Screen (1,1) */
 printf ("%s", buf1);
 printf ("%s", buf2);
 printf ("%s", buf3);
+printf ("%s", buf4);
 printf (CSI "s");   /* Restore Cursor Position */
 printf ("\r\n");
 #endif
@@ -117,7 +121,7 @@ system ("cls");
 printf (CSI "H");   /* Position to Top of Screen (1,1) */
 printf (CSI "2J");  /* Clear Screen */
 #endif
-printf ("\n\n\n");
+printf ("\n\n\n\n");
 printf ("^C to Halt, Commands: BOOT, CONT, EXIT\n");
 }
 
@@ -190,8 +194,12 @@ if (!tape) {
     goto Done;
     }
 
+if (sim_panel_add_register_array (panel, "PCQ",  NULL, sizeof(PCQ)/sizeof(PCQ[0]), sizeof(PCQ[0]), &PCQ)) {
+    printf ("Error adding register array 'PCQ': %s\n", sim_panel_get_error());
+    goto Done;
+    }
 if (!sim_panel_add_register (panel, "ZPC",  NULL, sizeof(PC), &PC)) {
-    printf ("Unexpecdted success adding non-existent register 'ZPC'\n");
+    printf ("Unexpected success adding non-existent register 'ZPC'\n");
     goto Done;
     }
 if (sim_panel_add_register (panel, "PC",  NULL, sizeof(PC), &PC)) {
@@ -260,6 +268,10 @@ if (sim_panel_add_register (panel, "R10",  NULL, sizeof(R10), &R10)) {
     }
 if (sim_panel_add_register (panel, "R11",  NULL, sizeof(R11), &R11)) {
     printf ("Error adding register 'R11': %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_add_register (panel, "PSL",  NULL, sizeof(PSL), &PSL)) {
+    printf ("Error adding register 'PSL': %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_get_registers (panel, NULL)) {

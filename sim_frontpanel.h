@@ -131,6 +131,7 @@ sim_panel_destroy (PANEL *panel);
    access to are described by the application by calling: 
    
    sim_panel_add_register
+   sim_panel_add_register_array
 and
    sim_panel_add_register_indirect
 
@@ -138,6 +139,7 @@ and
         device_name  the device this register is part of.  Defaults to
                      the device of the panel (in a device panel) or the
                      default device in the simulator (usually the CPU).
+        element_count number of elements in the register array
         size         the size (in local storage) of the buffer which will
                      receive the data in the simulator's register
         addr         a pointer to the location of the buffer which will 
@@ -150,6 +152,14 @@ sim_panel_add_register (PANEL *panel,
                         const char *device_name,
                         size_t size,
                         void *addr);
+
+int
+sim_panel_add_register_array (PANEL *panel,
+                              const char *name,
+                              const char *device_name,
+                              size_t element_count,
+                              size_t size,
+                              void *addr);
 
 int
 sim_panel_add_register_indirect (PANEL *panel,

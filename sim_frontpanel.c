@@ -118,6 +118,7 @@ typedef struct {
     void *addr;
     size_t size;
     int indirect;
+    size_t element_count;
     } REG;
 
 struct PANEL {
@@ -134,6 +135,7 @@ struct PANEL {
     REG                     *regs;
     char                    *reg_query;
     size_t                  reg_query_size;
+    unsigned long long      array_element_data;
     OperationalState        State;
     unsigned long long      simulation_time;
     pthread_mutex_t         lock;
@@ -358,6 +360,8 @@ pthread_mutex_lock (&panel->io_lock);
 buf_needed = 2 + strlen (register_get_prefix);  /* SHOW TIME */
 for (i=0; i<panel->reg_count; i++) {
     buf_needed += 9 + strlen (panel->regs[i].name) + (panel->regs[i].device_name ? strlen (panel->regs[i].device_name) : 0);
+    if (panel->regs[i].element_count > 0)
+        buf_needed += 4 + 6 /* 6 digit register array index */;
     if (panel->regs[i].indirect)
         buf_needed += 12 + strlen (register_ind_echo) + strlen (panel->regs[i].name);
     }
@@ -400,10 +404,18 @@ for (i=j=0; i<panel->reg_count; i++) {
         j = 0;
         *buf_size = buf_needed;
         }
-    if (j == 0)
-        sprintf (*buf + buf_data, "E -H %s %s", dev, panel->regs[i].name);
-    else
-        sprintf (*buf + buf_data, ",%s", panel->regs[i].name);
+    if (panel->regs[i].element_count == 0) {
+        if (j == 0)
+            sprintf (*buf + buf_data, "E -H %s %s", dev, panel->regs[i].name);
+        else
+            sprintf (*buf + buf_data, ",%s", panel->regs[i].name);
+        }
+    else {
+        if (j == 0)
+            sprintf (*buf + buf_data, "E -H %s %s[0:%d]", dev, panel->regs[i].name, panel->regs[i].element_count-1);
+        else
+            sprintf (*buf + buf_data, ",%s[0:%d]", panel->regs[i].name, panel->regs[i].element_count-1);
+        }
     ++j;
     buf_data += strlen (*buf + buf_data);
     }
@@ -863,7 +875,8 @@ _panel_add_register (PANEL *panel,
                      const char *device_name,
                      size_t size,
                      void *addr,
-                     int indirect)
+                     int indirect,
+                     size_t element_count)
 {
 REG *regs, *reg;
 char *response = NULL;
@@ -937,9 +950,10 @@ for (i=0; i<panel->reg_count; i++) {
     }
 reg->addr = addr;
 reg->size = size;
+reg->element_count = element_count;
 pthread_mutex_unlock (&panel->io_lock);
-/* Validate existence of requested register */
-if (_panel_sendf (panel, 1, &response, "EXAMINE %s %s\r", device_name? device_name : "", name)) {
+/* Validate existence of requested register/array */
+if (_panel_sendf (panel, 1, &response, "EXAMINE %s %s%s\r", device_name? device_name : "", name, (element_count > 0) ? "[0]" : "")) {
     free (reg->name);
     free (reg->device_name);
     free (regs);
@@ -954,6 +968,23 @@ if (!strcmp ("Invalid argument\r\n", response)) {
     return -1;
     }
 free (response);
+if (element_count > 0) {
+    if (_panel_sendf (panel, 1, &response, "EXAMINE %s %s[%d]\r", device_name? device_name : "", name, element_count-1)) {
+        free (reg->name);
+        free (reg->device_name);
+        free (regs);
+        return -1;
+        }
+    if (!strcmp ("Subscript out of range\r\n", response)) {
+        sim_panel_set_error ("Invalid Register Array Dimension: %s %s[%d]", device_name? device_name : "", name, element_count-1);
+        free (response);
+        free (reg->name);
+        free (reg->device_name);
+        free (regs);
+        return -1;
+        }
+    free (response);
+    }
 pthread_mutex_lock (&panel->io_lock);
 ++panel->reg_count;
 free (panel->regs);
@@ -972,8 +1003,20 @@ sim_panel_add_register (PANEL *panel,
                         size_t size,
                         void *addr)
 {
-return _panel_add_register (panel, name, device_name, size, addr, 0);
+return _panel_add_register (panel, name, device_name, size, addr, 0, 0);
 }
+
+int
+sim_panel_add_register_array (PANEL *panel,
+                              const char *name,
+                              const char *device_name,
+                              size_t element_count,
+                              size_t size,
+                              void *addr)
+{
+return _panel_add_register (panel, name, device_name, size, addr, 0, element_count);
+}
+
 
 int
 sim_panel_add_register_indirect (PANEL *panel,
@@ -982,7 +1025,7 @@ sim_panel_add_register_indirect (PANEL *panel,
                                  size_t size,
                                  void *addr)
 {
-return _panel_add_register (panel, name, device_name, size, addr, 1);
+return _panel_add_register (panel, name, device_name, size, addr, 1, 0);
 }
 
 int
@@ -1541,15 +1584,40 @@ while ((p->sock != INVALID_SOCKET) &&
                 continue;
                 }
             for (i=0; i<p->reg_count; i++) {
-                if (!strcmp(p->regs[i].name, s)) {
-                    unsigned long long data;
+                if (p->regs[i].element_count == 0) {
+                    if (!strcmp(p->regs[i].name, s)) {
+                        unsigned long long data;
 
-                    data = strtoull (e, NULL, 16);
-                    if (little_endian)
-                        memcpy (p->regs[i].addr, &data, p->regs[i].size);
-                    else
-                        memcpy (p->regs[i].addr, ((char *)&data) + sizeof(data)-p->regs[i].size, p->regs[i].size);
-                    break;
+                        data = strtoull (e, NULL, 16);
+                        if (little_endian)
+                            memcpy (p->regs[i].addr, &data, p->regs[i].size);
+                        else
+                            memcpy (p->regs[i].addr, ((char *)&data) + sizeof(data)-p->regs[i].size, p->regs[i].size);
+                        break;
+                        }
+                    }
+                else {
+                    size_t name_len = strlen (p->regs[i].name);
+
+                    if ((0 == memcmp (p->regs[i].name, s, name_len), s) &&
+                        (s[name_len] == '[')) {
+                        size_t array_index = (size_t)atoi (s + name_len + 1);
+                        size_t end_index = array_index;
+                        char *end = strchr (s + name_len + 1, '[');
+
+                        if (end)
+                            end_index = (size_t)atoi (end + 1);
+                        if (strcmp (e, " same as above")) 
+                            p->array_element_data = strtoull (e, NULL, 16);
+                        while (array_index <= end_index) {
+                            if (little_endian)
+                                memcpy ((char *)(p->regs[i].addr) + (array_index * p->regs[i].size), &p->array_element_data, p->regs[i].size);
+                            else
+                                memcpy ((char *)(p->regs[i].addr) + (array_index * p->regs[i].size), ((char *)&p->array_element_data) + sizeof(p->array_element_data)-p->regs[i].size, p->regs[i].size);
+                            ++array_index;
+                            }
+                        break;
+                        }
                     }
                 }
             if (i != p->reg_count) {
