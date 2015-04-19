@@ -5574,6 +5574,7 @@ struct stat rstat;
 t_bool force_restore = ((sim_switches & SWMASK ('F')) != 0);
 t_bool dont_detach_attach = ((sim_switches & SWMASK ('D')) != 0);
 t_bool suppress_warning = ((sim_switches & SWMASK ('Q')) != 0);
+t_bool warned = FALSE;
 
 sim_switches &= ~(SWMASK ('F') | SWMASK ('D') | SWMASK ('Q'));  /* remove digested switches */
 #define READ_S(xx) if (read_line ((xx), sizeof(xx), rfile) == NULL) \
@@ -5596,7 +5597,7 @@ else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
     }
 if ((strcmp (buf, save_ver40) != 0) && (!sim_quiet) && (!suppress_warning)) {
     sim_printf ("warning - attempting to restore a saved simulator image in %s image format.\n", buf);
-    sim_printf ("restore with the -Q switch to suppress this warning message\n");
+    warned = TRUE;
     }
 READ_S (buf);                                           /* read sim name */
 if (strcmp (buf, sim_savename)) {                       /* name match? */
@@ -5630,7 +5631,7 @@ if (v40) {
     if ((memcmp (buf, "git commit id: " S_xstr(SIM_GIT_COMMIT_ID), 23)) && 
         (!sim_quiet) && (!suppress_warning)) {
         sim_printf ("warning - different simulator git versions.\nSaved commit id: %8.8s, Running commit id: %8.8s\n", buf + 15, S_xstr(SIM_GIT_COMMIT_ID));
-        sim_printf ("restore with the -Q switch to suppress this warning message\n");
+        warned = TRUE;
         }
 #undef S_str
 #undef S_xstr
@@ -5638,6 +5639,21 @@ if (v40) {
     }
 if (!dont_detach_attach)
     detach_all (0, 0);                                  /* Detach everything to start from a consistent state */
+else {
+    if (!suppress_warning) {
+        uint32 i, j;
+
+        for (i = 0; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
+            for (j = 0; j < dptr->numunits; j++) {      /* loop thru units */
+                uptr = (dptr->units) + j;
+                if (uptr->flags & UNIT_ATT) {           /* attached? */
+                    sim_printf ("warning - leaving %s attached to '%s'\n", sim_uname (uptr), uptr->filename);
+                    warned = TRUE;
+                    }
+                }
+            }
+        }
+    }
 for ( ;; ) {                                            /* device loop */
     READ_S (buf);                                       /* read device name */
     if (buf[0] == 0)                                    /* last? */
@@ -5689,7 +5705,8 @@ for ( ;; ) {                                            /* device loop */
         uptr->flags = (uptr->flags & ~UNIT_RFLAGS) |
             (flg & UNIT_RFLAGS);                        /* restore */
         READ_S (buf);                                   /* attached file */
-        if (uptr->flags & UNIT_ATT) {                   /* unit currently attached? */
+        if ((uptr->flags & UNIT_ATT) &&                 /* unit currently attached? */
+            (!dont_detach_attach)) {
             r = scp_detach_unit (dptr, uptr);           /* detach it */
             if (r != SCPE_OK)
                 return r;
@@ -5813,11 +5830,26 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
         if (r != SCPE_OK)
             sim_printf ("Error Attaching %s to %s\n", sim_dname (dptr), attnames[j]);
         }
+    else {
+        if ((r == SCPE_OK) && (dont_detach_attach)) {
+            if ((!suppress_warning) && 
+                ((!attunits[j]->filename) || (strcmp (attunits[j]->filename, attnames[j]) != 0))) {
+                warned = TRUE;
+                sim_printf ("warning - %s was attached to '%s'", sim_uname (attunits[j]), attnames[j]);
+                if (attunits[j]->filename)
+                    sim_printf (", now attached to '%s'\n", attunits[j]->filename);
+                else
+                    sim_printf (", now unattached\n");
+                }
+            }
+        }
     free (attnames[j]);
     }
 free (attnames);
 free (attunits);
 free (attswitches);
+if (warned)
+    sim_printf ("restore with the -Q switch to suppress warning messages\n");
 return r;
 }
 
@@ -6332,9 +6364,16 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                         ex_reg (sim_log, val, flag, rptr, idx-1);
                     }
                 else {
-                    Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
-                    if (sim_log && (ofile == stdout))
-                        Fprintf (sim_log, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                    if (val_start+1 != idx-1) {
+                        Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                        if (sim_log && (ofile == stdout))
+                            Fprintf (sim_log, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                        }
+                    else {
+                        Fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
+                        if (sim_log && (ofile == stdout))
+                            Fprintf (sim_log, "%s[%d]: same as above\n", rptr->name, val_start+1);
+                        }
                     }
                 }
             sim_last_val = last_val = val;
@@ -6360,9 +6399,16 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                 ex_reg (sim_log, val, flag, rptr, highs);
             }
         else {
-            Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
-            if (sim_log && (ofile == stdout))
-                Fprintf (sim_log, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
+            if (val_start+1 != highs) {
+                Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
+                if (sim_log && (ofile == stdout))
+                    Fprintf (sim_log, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
+                }
+            else {
+                Fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
+                if (sim_log && (ofile == stdout))
+                    Fprintf (sim_log, "%s[%d]: same as above\n", rptr->name, val_start+1);
+                }
             }
         }
     }
