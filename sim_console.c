@@ -129,6 +129,9 @@
 #include "sim_serial.h"
 #include "sim_timer.h"
 #include <ctype.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
  
 #ifdef __HAIKU__
 #define nice(n) ({})
@@ -2470,7 +2473,9 @@ if ((std_input) &&                                      /* If Not Background pro
     return SCPE_TTYERR;
 if (sim_log) {
     fflush (sim_log);
+#ifndef _WIN32_WCE	/* POSIX IO in Windows CE is always in binary mode */
     _setmode (_fileno (sim_log), _O_BINARY);
+#endif
     }
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
@@ -2480,7 +2485,9 @@ static t_stat sim_os_ttcmd (void)
 {
 if (sim_log) {
     fflush (sim_log);
+#ifndef _WIN32_WCE
     _setmode (_fileno (sim_log), _O_TEXT);
+#endif
     }
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 if ((std_input) &&                                      /* If Not Background process? */

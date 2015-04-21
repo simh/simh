@@ -1820,7 +1820,7 @@ static SHTAB show_unit_tab[] = {
     };
 
 
-#if defined(_WIN32) || defined(__hpux)
+#if (defined(_WIN32) && !defined _WIN32_WCE) || defined(__hpux)
 static
 int setenv(const char *envname, const char *envval, int overwrite)
 {
@@ -4628,7 +4628,7 @@ t_stat pwd_cmd (int32 flg, char *cptr)
 return show_cmd (0, "DEFAULT");
 }
 
-#if defined (_WIN32)
+#if defined (_WIN32) && !defined _WIN32_WCE
 
 t_stat dir_cmd (int32 flg, char *cptr)
 {

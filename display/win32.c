@@ -53,8 +53,8 @@
 #define PIX_SIZE 1
 #endif
 
-#define APP_CLASS "XYAppClass"
-#define APP_MENU "XYAppMenu"            /* ?? */
+#define APP_CLASS L"XYAppClass"
+#define APP_MENU L"XYAppMenu"            /* ?? */
 
 /*
  * light pen location
@@ -218,7 +218,7 @@ ws_loop(void (*func)(void *), void *arg)
 /* worker for display init */
 static void
 ws_init2(void) {
-    WNDCLASS wc;
+    WNDCLASSW wc;
     int h, w;
 
 #ifdef SWITCH_CURSORS
@@ -236,8 +236,8 @@ ws_init2(void) {
     wc.style            = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
                         /* also CS_NOCLOSE? CS_SAVEBITS? */
 
-    wc.hInstance        = static_inst = GetModuleHandleA(0);
-    wc.hIcon            = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hInstance        = static_inst = GetModuleHandleW(NULL);
+    wc.hIcon            = LoadIconW(NULL, IDI_APPLICATION);
 #ifdef SWITCH_CURSORS
     wc.hCursor          = NULL;
 #else
@@ -263,15 +263,15 @@ ws_init2(void) {
     h = (ypixels*PIX_SIZE)+32;
     /* XXX -- above values work with XP; Phil had +10,+30 */
 
-    static_wh = CreateWindow(APP_CLASS,         /* registered class name */
-                             window_name,       /* window name */
-                             WS_OVERLAPPED,     /* style */
-                             CW_USEDEFAULT, CW_USEDEFAULT, /* X,Y */
-                             w, h,
-                             NULL,              /* HWND hWndParent */
-                             NULL,              /* HMENU hMenu */
-                             static_inst,       /* application instance */
-                             NULL);             /* lpParam */
+    static_wh = CreateWindowW(APP_CLASS,         /* registered class name */
+                              window_name,       /* window name */
+                              WS_OVERLAPPED,     /* style */
+                              CW_USEDEFAULT, CW_USEDEFAULT, /* X,Y */
+                              w, h,
+                              NULL,              /* HWND hWndParent */
+                              NULL,              /* HMENU hMenu */
+                              static_inst,       /* application instance */
+                              NULL);             /* lpParam */
 
     ShowWindow(static_wh, SW_SHOW);
     UpdateWindow(static_wh);

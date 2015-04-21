@@ -529,14 +529,16 @@ int ports = 0;
 HKEY hSERIALCOMM;
 
 memset(list, 0, max*sizeof(*list));
-if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_QUERY_VALUE, &hSERIALCOMM) == ERROR_SUCCESS) {
+if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_QUERY_VALUE, &hSERIALCOMM) == ERROR_SUCCESS) {
     DWORD dwIndex = 0;
     DWORD dwType;
     DWORD dwValueNameSize = sizeof(list[ports].desc);
     DWORD dwDataSize = sizeof(list[ports].name);
+	wchar_t buffer[sizeof list[ports].desc];
 
     /* Enumerate all the values underneath HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\SERIALCOMM */
-    while (RegEnumValueA(hSERIALCOMM, dwIndex, list[ports].desc, &dwValueNameSize, NULL, &dwType, (BYTE *)list[ports].name, &dwDataSize) == ERROR_SUCCESS) {
+    while (RegEnumValueW(hSERIALCOMM, dwIndex, buffer, &dwValueNameSize, NULL, &dwType, (BYTE *)list[ports].name, &dwDataSize) == ERROR_SUCCESS) {
+		wcstombs(list[ports].desc, buffer, dwValueNameSize);
         /* String values with non-zero size are the interesting ones */
         if ((dwType == REG_SZ) && (dwDataSize > 0)) {
             if (ports < max)
@@ -583,6 +585,10 @@ return ports;
 
 static SERHANDLE sim_open_os_serial (char *name)
 {
+#ifdef _WIN32_WCE
+	sim_error_serial("sim_open_os_serial", ERROR_CALL_NOT_IMPLEMENTED);
+	return INVALID_HANDLE;
+#else
 SERHANDLE port;
 DCB dcb;
 COMMCONFIG commdefault;
@@ -652,6 +658,7 @@ if (!SetCommTimeouts (port, &cto)) {                    /* configure port timeou
     }
 
 return port;                                            /* return port handle on success */
+#endif
 }
 
 
