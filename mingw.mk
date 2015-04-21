@@ -1,4 +1,5 @@
 # This makefile is for corss-compiling simh to Windows on POSIX platforms
+# If you are running Windows now, run build_mingw.bat
 
 ifndef GCC
 GCC = i586-mingw32msvc-gcc
@@ -8,11 +9,15 @@ WCE = true
 endif
 endif
 
+export CONSOLE=1
+
+ifneq (,$(DISPLAY_USEFUL))
 DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/win32.c
 DISPLAYVT = ${DISPLAYD}/vt11.c
 DISPLAY_OPT = -DUSE_DISPLAY
 ifndef WCE
-DISPLAY_OPT = -lgdi32
+DISPLAY_OPT += -lgdi32
+endif
 endif
 
 GCC_VERSION = $(word 3,$(shell $(CC) --version))
@@ -57,6 +62,8 @@ endif
 OS_CCDEFS += -fms-extensions $(PTHREADS_CCDEFS)
 OS_LDFLAGS += -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
 
+EXE = .exe
+
 
 ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
  MKDIRBIN = mkdir -p BIN
@@ -78,14 +85,14 @@ ifneq ($(DEBUG),)
   CFLAGS_O = -O0
   BUILD_FEATURES = - debugging support
 else
-  CFLAGS_O = -O2
+  CFLAGS_O = -O1
 endif
 
 
 ifneq ($(DONT_USE_ROMS),)
   ROMS_OPT = -DDONT_USE_INTERNAL_ROM
 else
-  BUILD_ROMS = ${BIN}BuildROMs${EXE}
+  BUILD_ROMS = ${BIN}BuildROMs
 endif
 ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD

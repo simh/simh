@@ -863,7 +863,12 @@ endif
 ifneq ($(DONT_USE_ROMS),)
   ROMS_OPT = -DDONT_USE_INTERNAL_ROM
 else
-  BUILD_ROMS = ${BIN}BuildROMs${EXE}
+  #BUILD_ROMS = ${BIN}BuildROMs${EXE}
+  ifeq ($(WIN32),1)
+    BUILD_ROMS = ${BIN}BuildROMs.exe
+  else
+    BUILD_ROMS = ${BIN}BuildROMs
+  endif
 endif
 ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
