@@ -222,7 +222,7 @@ typedef uint32          t_addr;
 #define STACKBUFSIZE 2048
 #endif
 
-#if defined (_WIN32) /* Actually, a GCC issue */
+#if defined (_WIN32) && !defined _WIN32_WCE	 /* Actually, a GCC issue */
 #define LL_FMT "I64"
 #else
 #define LL_FMT "ll"
@@ -867,7 +867,7 @@ extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
 
 /* Thread local storage */
-#if defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux) && !defined(__OpenBSD__) && !defined(_AIX)
+#if defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux) && !defined(__OpenBSD__) && !defined(_AIX) && !defined(_WIN32_WCE)
 #define AIO_TLS __thread
 #elif defined(_MSC_VER)
 #define AIO_TLS __declspec(thread)

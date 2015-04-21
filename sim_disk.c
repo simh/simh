@@ -1541,12 +1541,13 @@ if ((dwStatus >= ERROR_INVALID_STARTING_CODESEG) && (dwStatus <= ERROR_INFLOOP_I
     }
 errno = EINVAL;
 }
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined _WIN32_WCE
 #include <ddk/ntddstor.h>
 #include <ddk/ntdddisk.h>
-#else
-#include <winioctl.h>
 #endif
+//#else
+#include <winioctl.h>
+//#endif
 struct _device_type {
     int32 Type;
     char *desc;
@@ -1784,6 +1785,7 @@ if (Removable) {
 return TRUE;
 }
 
+#ifndef _WIN32_WCE
 static t_stat sim_os_disk_info_raw (FILE *Disk, uint32 *sector_size, uint32 *removable)
 {
 DWORD IoctlReturnSize;
@@ -1876,6 +1878,7 @@ if (removable && *removable)
     sim_printf ("Removable Device\n");
 return SCPE_OK;
 }
+#endif
 
 static t_stat sim_os_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects)
 {

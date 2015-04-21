@@ -279,7 +279,11 @@ return (t_offset)(ftell (st));
 int sim_fseeko (FILE *st, t_offset offset, int whence)
 {
 fpos_t fileaddr;
+#ifdef _WIN32_WCE
+struct stat statb;
+#else
 struct _stati64 statb;
+#endif
 
 switch (whence) {
 
@@ -288,7 +292,11 @@ switch (whence) {
         break;
 
     case SEEK_END:
-        if (_fstati64 (_fileno (st), &statb))
+#ifdef _WIN32_WCE
+		if(fstat(fileno(st), &statb) < 0)
+#else
+        if (_fstati64(_fileno (st), &statb) < 0)
+#endif
             return (-1);
         fileaddr = statb.st_size + offset;
         break;

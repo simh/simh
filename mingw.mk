@@ -20,7 +20,7 @@ DISPLAY_OPT += -lgdi32
 endif
 endif
 
-GCC_VERSION = $(word 3,$(shell $(CC) --version))
+GCC_VERSION = $(word 3,$(shell $(GCC) --version))
 COMPILER_NAME = GCC Version: $(GCC_VERSION)
 
 TEST = test
@@ -60,7 +60,12 @@ endif
 
 
 OS_CCDEFS += -fms-extensions $(PTHREADS_CCDEFS)
-OS_LDFLAGS += -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
+OS_LDFLAGS += -lm $(PTHREADS_LDFLAGS)
+ifdef WCE
+OS_LDFLAGS += -lc -lws2 -lmmtimer
+else
+OS_LDFLAGS += -lwsock32 -lwinmm
+endif
 
 EXE = .exe
 
