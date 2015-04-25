@@ -661,250 +661,250 @@ int32 sim_instr (void)
         switch (IR) {
 
         /* 8085 instructions only */
-            case 0x20:                  /* RIM */
-                if (i8080_unit.flags & UNIT_8085) { /* 8085 */
-                    A = IM;
-                } else {                /* 8080 */
-                    reason = STOP_OPCODE;
-                    PC--;
-                }
-                break;
-
-            case 0x30:                  /* SIM */
-                if (i8080_unit.flags & UNIT_8085) { /* 8085 */
-                    if (A & MSE) {
-                        IM &= 0xF8;
-                        IM |= A & 0x07;
-                    }
-                    if (A & I75) {      /* reset RST 7.5 FF */
-                    }
-                } else {                /* 8080 */
-                    reason = STOP_OPCODE;
-                    PC--;
-                }
-                break;
-
-        /* Logical instructions */
-
-            case 0xFE:                  /* CPI */
-                DAR = A;
-                DAR -= fetch_byte(1);
-//                DAR &= BYTE_R;
-                setarith(DAR);
-                break;
-
-            case 0xE6:                  /* ANI */
-                A &= fetch_byte(1);
-                setlogical(A);
-                break;
-
-            case 0xEE:                  /* XRI */
-                A ^= fetch_byte(1);
-//                DAR &= BYTE_R;
-                setlogical(A);
-                break;
-
-            case 0xF6:                  /* ORI */
-                A |= fetch_byte(1);
-                setlogical(A);
-                break;
-
-            /* Jump instructions */
-
-            case 0xC3:                  /* JMP */
-                PC = fetch_word();
-                break;
-
-            case 0xE9:                  /* PCHL */
-                PC = HL;
-                break;
-
-            case 0xCD:                  /* CALL */
-                adr = fetch_word();
-                push_word(PC);
-                PC = adr;
-                break;
-
-            case 0xC9:                  /* RET */
-                PC = pop_word();
-                break;
-
-            /* Data Transfer Group */
-
-            case 0x32:                  /* STA */
-                DAR = fetch_word();
-                DAR &= WORD_R;
-                put_mbyte(DAR, A);
-                break;
-
-            case 0x3A:                  /* LDA */
-                DAR = fetch_word();
-                DAR &= WORD_R;
-                A = get_mbyte(DAR);
-                break;
-
-            case 0x22:                  /* SHLD */
-                DAR = fetch_word();
-                DAR &= WORD_R;
-                put_mword(DAR, HL);
-                break;
-
-            case 0x2A:                  /* LHLD */
-                DAR = fetch_word();
-                DAR &= WORD_R;
-                HL = get_mword(DAR);
-                break;
-
-            case 0xEB:                  /* XCHG */
-                DAR = HL;
-                HL = DE;
-                HL &= WORD_R;
-                DE = DAR;
-                DE &= WORD_R;
-                break;
-
-            /* Arithmetic Group */
-
-            case 0xC6:                  /* ADI */
-                A += fetch_byte(1);
-                setarith(A);
-                A &= BYTE_R;
-                break;
-
-            case 0xCE:                  /* ACI */
-                A += fetch_byte(1);
-                if (GET_FLAG(CF))
-                    A++;
-                setarith(A);
-                A &= BYTE_R;
-                break;
-
-            case 0xD6:                  /* SUI */
-                A -= fetch_byte(1);
-                setarith(A);
-                A &= BYTE_R;
-                break;
-
-            case 0xDE:                  /* SBI */
-                A -= fetch_byte(1);
-                if (GET_FLAG(CF))
-                    A--;
-                setarith(A);
-                A &= BYTE_R;
-                break;
-
-            case 0x27:                  /* DAA */
-                DAR = A & 0x0F;
-                if (DAR > 9 || GET_FLAG(AF)) {
-                    DAR += 6;
-                    A &= 0xF0;
-                    A |= DAR & 0x0F;
-                    COND_SET_FLAG(DAR & 0x10, AF);
-                }
-                DAR = (A >> 4) & 0x0F;
-                if (DAR > 9 || GET_FLAG(AF)) {
-                    DAR += 6;
-                    if (GET_FLAG(AF)) DAR++;
-                    A &= 0x0F;
-                    A |= (DAR << 4);
-                }
-                COND_SET_FLAG(DAR & 0x10, CF);
-                COND_SET_FLAG(A & 0x80, SF);
-                COND_SET_FLAG((A & 0xFF) == 0, ZF);
-                parity(A);
-                break;
-
-            case 0x07:                  /* RLC */
-                COND_SET_FLAG(A & 0x80, CF);
-                A = (A << 1) & 0xFF;
-                if (GET_FLAG(CF))
-                    A |= 0x01;
-                A &= BYTE_R;
-                break;
-
-            case 0x0F:                  /* RRC */
-                COND_SET_FLAG(A & 0x01, CF);
-                A = (A >> 1) & 0xFF;
-                if (GET_FLAG(CF))
-                    A |= 0x80;
-                A &= BYTE_R;
-                break;
-
-            case 0x17:                  /* RAL */
-                DAR = GET_FLAG(CF);
-                COND_SET_FLAG(A & 0x80, CF);
-                A = (A << 1) & 0xFF;
-                if (DAR)
-                    A |= 0x01;
-                A &= BYTE_R;
-                break;
-
-            case 0x1F:                  /* RAR */
-                DAR = GET_FLAG(CF);
-                COND_SET_FLAG(A & 0x01, CF);
-                A = (A >> 1) & 0xFF;
-                if (DAR)
-                    A |= 0x80;
-                A &= BYTE_R;
-                break;
-
-            case 0x2F:                  /* CMA */
-                A = ~A;
-                A &= BYTE_R;
-                break;
-
-            case 0x3F:                  /* CMC */
-                TOGGLE_FLAG(CF);
-                break;
-
-            case 0x37:                  /* STC */
-                SET_FLAG(CF);
-                break;
-
-            /* Stack, I/O & Machine Control Group */
-
-            case 0x00:                  /* NOP */
-                break;
-
-            case 0xE3:                  /* XTHL */
-                DAR = pop_word();
-                push_word(HL);
-                HL = DAR;
-                HL &= WORD_R;
-                break;
-
-            case 0xF9:                  /* SPHL */
-                SP = HL;
-                break;
-
-            case 0xFB:                  /* EI */
-                IM |= IE;
-//                printf("\nEI: pc=%04X", PC - 1);
-                break;
-
-            case 0xF3:                  /* DI */
-                IM &= ~IE;
-//                printf("\nDI: pc=%04X", PC - 1);
-                break;
-
-            case 0xDB:                  /* IN */
-                DAR = fetch_byte(1);
-                A = dev_table[DAR].routine(0, 0);
-                A &= BYTE_R;
-                break;
-
-            case 0xD3:                  /* OUT */
-                DAR = fetch_byte(1);
-                dev_table[DAR].routine(1, A);
-                break;
-
-            default:                    /* undefined opcode */ 
-                if (i8080_unit.flags & UNIT_OPSTOP) {
-                    reason = STOP_OPCODE;
-                    PC--;
-                }
-                break;
+        case 0x20:                  /* RIM */
+            if (i8080_unit.flags & UNIT_8085) { /* 8085 */
+                A = IM;
+            } else {                /* 8080 */
+                reason = STOP_OPCODE;
+                PC--;
             }
+            break;
+
+        case 0x30:                  /* SIM */
+            if (i8080_unit.flags & UNIT_8085) { /* 8085 */
+                if (A & MSE) {
+                    IM &= 0xF8;
+                    IM |= A & 0x07;
+                }
+                if (A & I75) {      /* reset RST 7.5 FF */
+                }
+            } else {                /* 8080 */
+                reason = STOP_OPCODE;
+                PC--;
+            }
+            break;
+
+    /* Logical instructions */
+
+        case 0xFE:                  /* CPI */
+            DAR = A;
+            DAR -= fetch_byte(1);
+//                DAR &= BYTE_R;
+            setarith(DAR);
+            break;
+
+        case 0xE6:                  /* ANI */
+            A &= fetch_byte(1);
+            setlogical(A);
+            break;
+
+        case 0xEE:                  /* XRI */
+            A ^= fetch_byte(1);
+//                DAR &= BYTE_R;
+            setlogical(A);
+            break;
+
+        case 0xF6:                  /* ORI */
+            A |= fetch_byte(1);
+            setlogical(A);
+            break;
+
+        /* Jump instructions */
+
+        case 0xC3:                  /* JMP */
+            PC = fetch_word();
+            break;
+
+        case 0xE9:                  /* PCHL */
+            PC = HL;
+            break;
+
+        case 0xCD:                  /* CALL */
+            adr = fetch_word();
+            push_word(PC);
+            PC = adr;
+            break;
+
+        case 0xC9:                  /* RET */
+            PC = pop_word();
+            break;
+
+        /* Data Transfer Group */
+
+        case 0x32:                  /* STA */
+            DAR = fetch_word();
+            DAR &= WORD_R;
+            put_mbyte(DAR, A);
+            break;
+
+        case 0x3A:                  /* LDA */
+            DAR = fetch_word();
+            DAR &= WORD_R;
+            A = get_mbyte(DAR);
+            break;
+
+        case 0x22:                  /* SHLD */
+            DAR = fetch_word();
+            DAR &= WORD_R;
+            put_mword(DAR, HL);
+            break;
+
+        case 0x2A:                  /* LHLD */
+            DAR = fetch_word();
+            DAR &= WORD_R;
+            HL = get_mword(DAR);
+            break;
+
+        case 0xEB:                  /* XCHG */
+            DAR = HL;
+            HL = DE;
+            HL &= WORD_R;
+            DE = DAR;
+            DE &= WORD_R;
+            break;
+
+        /* Arithmetic Group */
+
+        case 0xC6:                  /* ADI */
+            A += fetch_byte(1);
+            setarith(A);
+            A &= BYTE_R;
+            break;
+
+        case 0xCE:                  /* ACI */
+            A += fetch_byte(1);
+            if (GET_FLAG(CF))
+                A++;
+            setarith(A);
+            A &= BYTE_R;
+            break;
+
+        case 0xD6:                  /* SUI */
+            A -= fetch_byte(1);
+            setarith(A);
+            A &= BYTE_R;
+            break;
+
+        case 0xDE:                  /* SBI */
+            A -= fetch_byte(1);
+            if (GET_FLAG(CF))
+                A--;
+            setarith(A);
+            A &= BYTE_R;
+            break;
+
+        case 0x27:                  /* DAA */
+            DAR = A & 0x0F;
+            if (DAR > 9 || GET_FLAG(AF)) {
+                DAR += 6;
+                A &= 0xF0;
+                A |= DAR & 0x0F;
+                COND_SET_FLAG(DAR & 0x10, AF);
+            }
+            DAR = (A >> 4) & 0x0F;
+            if (DAR > 9 || GET_FLAG(AF)) {
+                DAR += 6;
+                if (GET_FLAG(AF)) DAR++;
+                A &= 0x0F;
+                A |= (DAR << 4);
+            }
+            COND_SET_FLAG(DAR & 0x10, CF);
+            COND_SET_FLAG(A & 0x80, SF);
+            COND_SET_FLAG((A & 0xFF) == 0, ZF);
+            parity(A);
+            break;
+
+        case 0x07:                  /* RLC */
+            COND_SET_FLAG(A & 0x80, CF);
+            A = (A << 1) & 0xFF;
+            if (GET_FLAG(CF))
+                A |= 0x01;
+            A &= BYTE_R;
+            break;
+
+        case 0x0F:                  /* RRC */
+            COND_SET_FLAG(A & 0x01, CF);
+            A = (A >> 1) & 0xFF;
+            if (GET_FLAG(CF))
+                A |= 0x80;
+            A &= BYTE_R;
+            break;
+
+        case 0x17:                  /* RAL */
+            DAR = GET_FLAG(CF);
+            COND_SET_FLAG(A & 0x80, CF);
+            A = (A << 1) & 0xFF;
+            if (DAR)
+                A |= 0x01;
+            A &= BYTE_R;
+            break;
+
+        case 0x1F:                  /* RAR */
+            DAR = GET_FLAG(CF);
+            COND_SET_FLAG(A & 0x01, CF);
+            A = (A >> 1) & 0xFF;
+            if (DAR)
+                A |= 0x80;
+            A &= BYTE_R;
+            break;
+
+        case 0x2F:                  /* CMA */
+            A = ~A;
+            A &= BYTE_R;
+            break;
+
+        case 0x3F:                  /* CMC */
+            TOGGLE_FLAG(CF);
+            break;
+
+        case 0x37:                  /* STC */
+            SET_FLAG(CF);
+            break;
+
+        /* Stack, I/O & Machine Control Group */
+
+        case 0x00:                  /* NOP */
+            break;
+
+        case 0xE3:                  /* XTHL */
+            DAR = pop_word();
+            push_word(HL);
+            HL = DAR;
+            HL &= WORD_R;
+            break;
+
+        case 0xF9:                  /* SPHL */
+            SP = HL;
+            break;
+
+        case 0xFB:                  /* EI */
+            IM |= IE;
+//                printf("\nEI: pc=%04X", PC - 1);
+            break;
+
+        case 0xF3:                  /* DI */
+            IM &= ~IE;
+//                printf("\nDI: pc=%04X", PC - 1);
+            break;
+
+        case 0xDB:                  /* IN */
+            DAR = fetch_byte(1);
+            A = dev_table[DAR].routine(0, 0);
+            A &= BYTE_R;
+            break;
+
+        case 0xD3:                  /* OUT */
+            DAR = fetch_byte(1);
+            dev_table[DAR].routine(1, A);
+            break;
+
+        default:                    /* undefined opcode */ 
+            if (i8080_unit.flags & UNIT_OPSTOP) {
+                reason = STOP_OPCODE;
+                PC--;
+            }
+            break;
+        }
 loop_end:
         if (GET_XACK(1) == 0) {         /* no XACK for instruction fetch */
             reason = STOP_XACK;
@@ -941,12 +941,12 @@ int32 fetch_byte(int32 flag)
     val = get_mbyte(PC) & 0xFF;         /* fetch byte */
     if (i8080_dev.dctrl & DEBUG_asm || uptr->flags & UNIT_TRACE) {  /* display source code */
         switch (flag) {
-            case 0:                     /* opcode fetch */
-                printf("OP=%02X        %04X %s", val,  PC, opcode[val]);
-                break;
-            case 1:                     /* byte operand fetch */
-                printf("0%02XH", val);
-                break;
+        case 0:                     /* opcode fetch */
+            printf("OP=%02X        %04X %s", val,  PC, opcode[val]);
+            break;
+        case 1:                     /* byte operand fetch */
+            printf("0%02XH", val);
+            break;
         }
     }
     PC = (PC + 1) & ADDRMASK;           /* increment PC */
@@ -993,32 +993,32 @@ uint16 pop_word(void)
 int32 cond(int32 con)
 {
     switch (con) {
-        case 0:                         /* NZ */
-            if (GET_FLAG(ZF) == 0) return 1;
-            break;
-        case 1:                         /* Z */
-            if (GET_FLAG(ZF)) return 1;
-            break;
-        case 2:                         /* NC */
-            if (GET_FLAG(CF) == 0) return 1;
-            break;
-        case 3:                         /* C */
-            if (GET_FLAG(CF)) return 1;
-            break;
-        case 4:                         /* PO */
-            if (GET_FLAG(PF) == 0) return 1;
-            break;
-        case 5:                         /* PE */
-            if (GET_FLAG(PF)) return 1;
-            break;
-        case 6:                         /* P */
-            if (GET_FLAG(SF) == 0) return 1;
-            break;
-        case 7:                         /* M */
-            if (GET_FLAG(SF)) return 1;
-            break;
-        default:
-            break;
+    case 0:                         /* NZ */
+        if (GET_FLAG(ZF) == 0) return 1;
+        break;
+    case 1:                         /* Z */
+        if (GET_FLAG(ZF)) return 1;
+        break;
+    case 2:                         /* NC */
+        if (GET_FLAG(CF) == 0) return 1;
+        break;
+    case 3:                         /* C */
+        if (GET_FLAG(CF)) return 1;
+        break;
+    case 4:                         /* PO */
+        if (GET_FLAG(PF) == 0) return 1;
+        break;
+    case 5:                         /* PE */
+        if (GET_FLAG(PF)) return 1;
+        break;
+    case 6:                         /* P */
+        if (GET_FLAG(SF) == 0) return 1;
+        break;
+    case 7:                         /* M */
+        if (GET_FLAG(SF)) return 1;
+        break;
+    default:
+        break;
     }
     return 0;
 }
@@ -1086,26 +1086,26 @@ void setinc(int32 reg)
 int32 getreg(int32 reg)
 {
     switch (reg) {
-        case 0:                         /* reg B */
- //           printf("reg=%04X BC=%04X ret=%04X\n",
- //               reg, BC, (BC >>8) & 0xff);
-            return ((BC >>8) & BYTE_R);
-        case 1:                         /* reg C */
-            return (BC & BYTE_R);
-        case 2:                         /* reg D */
-            return ((DE >>8) & BYTE_R);
-        case 3:                         /* reg E */
-            return (DE & BYTE_R);
-        case 4:                         /* reg H */
-            return ((HL >>8) & BYTE_R);
-        case 5:                         /* reg L */
-            return (HL & BYTE_R);
-        case 6:                         /* reg M */
-            return (get_mbyte(HL));
-        case 7:                         /* reg A */
-            return (A);
-        default:
-            break;
+    case 0:                         /* reg B */
+//           printf("reg=%04X BC=%04X ret=%04X\n",
+//               reg, BC, (BC >>8) & 0xff);
+        return ((BC >>8) & BYTE_R);
+    case 1:                         /* reg C */
+        return (BC & BYTE_R);
+    case 2:                         /* reg D */
+        return ((DE >>8) & BYTE_R);
+    case 3:                         /* reg E */
+        return (DE & BYTE_R);
+    case 4:                         /* reg H */
+        return ((HL >>8) & BYTE_R);
+    case 5:                         /* reg L */
+        return (HL & BYTE_R);
+    case 6:                         /* reg M */
+        return (get_mbyte(HL));
+    case 7:                         /* reg A */
+        return (A);
+    default:
+        break;
     }
     return 0;
 }
@@ -1114,39 +1114,39 @@ int32 getreg(int32 reg)
 void putreg(int32 reg, int32 val)
 {
     switch (reg) {
-        case 0:                         /* reg B */
+    case 0:                         /* reg B */
 //            printf("reg=%04X val=%04X\n", reg, val);
-            BC = BC & BYTE_R;
+        BC = BC & BYTE_R;
 //            printf("BC&0x00ff=%04X val<<8=%04X\n", BC, val<<8);
-            BC = BC | (val <<8);
-            break;
-        case 1:                         /* reg C */
-            BC = BC & 0xFF00;
-            BC = BC | val;
-            break;
-        case 2:                         /* reg D */
-            DE = DE & BYTE_R;
-            DE = DE | (val <<8);
-            break;
-        case 3:                         /* reg E */
-            DE = DE & 0xFF00;
-            DE = DE | val;
-            break;
-        case 4:                         /* reg H */
-            HL = HL & BYTE_R;
-            HL = HL | (val <<8);
-            break;
-        case 5:                         /* reg L */
-            HL = HL & 0xFF00;
-            HL = HL | val;
-            break;
-        case 6:                         /* reg M */
-            put_mbyte(HL, val);
-            break;
-        case 7:                         /* reg A */
-            A = val & BYTE_R;
-        default:
-            break;
+        BC = BC | (val <<8);
+        break;
+    case 1:                         /* reg C */
+        BC = BC & 0xFF00;
+        BC = BC | val;
+        break;
+    case 2:                         /* reg D */
+        DE = DE & BYTE_R;
+        DE = DE | (val <<8);
+        break;
+    case 3:                         /* reg E */
+        DE = DE & 0xFF00;
+        DE = DE | val;
+        break;
+    case 4:                         /* reg H */
+        HL = HL & BYTE_R;
+        HL = HL | (val <<8);
+        break;
+    case 5:                         /* reg L */
+        HL = HL & 0xFF00;
+        HL = HL | val;
+        break;
+    case 6:                         /* reg M */
+        put_mbyte(HL, val);
+        break;
+    case 7:                         /* reg A */
+        A = val & BYTE_R;
+    default:
+        break;
     }
 }
 
@@ -1154,16 +1154,16 @@ void putreg(int32 reg, int32 val)
 int32 getpair(int32 reg)
 {
     switch (reg) {
-        case 0:                         /* reg BC */
-            return (BC);
-        case 1:                         /* reg DE */
-            return (DE);
-        case 2:                         /* reg HL */
-            return (HL);
-        case 3:                         /* reg SP */
-            return (SP);
-        default:
-            break;
+    case 0:                         /* reg BC */
+        return (BC);
+    case 1:                         /* reg DE */
+        return (DE);
+    case 2:                         /* reg HL */
+        return (HL);
+    case 3:                         /* reg SP */
+        return (SP);
+    default:
+        break;
     }
     return 0;
 }
@@ -1175,17 +1175,17 @@ int32 getpush(int32 reg)
     int32 stat;
 
     switch (reg) {
-        case 0:                         /* reg BC */
-            return (BC);
-        case 1:                         /* reg DE */
-            return (DE);
-        case 2:                         /* reg HL */
-            return (HL);
-        case 3:                         /* reg (A << 8) | PSW */
-            stat = A << 8 | PSW;
-            return (stat);
-        default:
-            break;
+    case 0:                         /* reg BC */
+        return (BC);
+    case 1:                         /* reg DE */
+        return (DE);
+    case 2:                         /* reg HL */
+        return (HL);
+    case 3:                         /* reg (A << 8) | PSW */
+        stat = A << 8 | PSW;
+        return (stat);
+    default:
+        break;
     }
     return 0;
 }
@@ -1196,21 +1196,21 @@ int32 getpush(int32 reg)
 void putpush(int32 reg, int32 data)
 {
     switch (reg) {
-        case 0:                         /* reg BC */
-            BC = data;
-            break;
-        case 1:                         /* reg DE */
-            DE = data;
-            break;
-        case 2:                         /* reg HL */
-            HL = data;
-            break;
-        case 3:                         /* reg (A << 8) | PSW */
-            A = (data >> 8) & BYTE_R;
-            PSW = data & BYTE_R;
-            break;
-        default:
-            break;
+    case 0:                         /* reg BC */
+        BC = data;
+        break;
+    case 1:                         /* reg DE */
+        DE = data;
+        break;
+    case 2:                         /* reg HL */
+        HL = data;
+        break;
+    case 3:                         /* reg (A << 8) | PSW */
+        A = (data >> 8) & BYTE_R;
+        PSW = data & BYTE_R;
+        break;
+    default:
+        break;
     }
 }
 
@@ -1219,20 +1219,20 @@ void putpush(int32 reg, int32 data)
 void putpair(int32 reg, int32 val)
 {
     switch (reg) {
-        case 0:                         /* reg BC */
-            BC = val;
-            break;
-        case 1:                         /* reg DE */
-            DE = val;
-            break;
-        case 2:                         /* reg HL */
-            HL = val;
-            break;
-        case 3:                         /* reg SP */
-            SP = val;
-            break;
-        default:
-            break;
+    case 0:                         /* reg BC */
+        BC = val;
+        break;
+    case 1:                         /* reg DE */
+        DE = val;
+        break;
+    case 2:                         /* reg HL */
+        HL = val;
+        break;
+    case 3:                         /* reg SP */
+        SP = val;
+        break;
+    default:
+        break;
     }
 }
 

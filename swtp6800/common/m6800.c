@@ -2,70 +2,75 @@
 
    Copyright (c) 2005-2012, William Beech
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a
+       copy of this software and associated documentation files (the "Software"),
+       to deal in the Software without restriction, including without limitation
+       the rights to use, copy, modify, merge, publish, distribute, sublicense,
+       and/or sell copies of the Software, and to permit persons to whom the
+       Software is furnished to do so, subject to the following conditions:
 
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in
+       all copies or substantial portions of the Software.
 
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+       IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+       FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+       WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+       IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+       CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of William A. Beech shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from William A. Beech.
+       Except as contained in this notice, the name of William A. Beech shall not
+       be used in advertising or otherwise to promote the sale, use or other dealings
+       in this Software without prior written authorization from William A. Beech.
 
-   cpu                  Motorola M6800 CPU
+    MODIFICATIONS:
 
-   The register state for the M6800 CPU is:
+        23 Apr 15 -- Modified to use simh_debug
 
-   A<0:7>               Accumulator A
-   B<0:7>               Accumulator B
-   IX<0:15>             Index Register
-   CCR<0:7>             Condition Code Register
-       HF                   half-carry flag
-       IF                   interrupt flag
-       NF                   negative flag
-       ZF                   zero flag
-       VF                   overflow flag
-       CF                   carry flag
-   PC<0:15>             program counter
-   SP<0:15>             Stack Pointer
+    NOTES:
+       cpu                  Motorola M6800 CPU
 
-   The M6800 is an 8-bit CPU, which uses 16-bit registers to address
-   up to 64KB of memory.
+       The register state for the M6800 CPU is:
 
-   The 72 basic instructions come in 1, 2, and 3-byte flavors.
+       A<0:7>               Accumulator A
+       B<0:7>               Accumulator B
+       IX<0:15>             Index Register
+       CCR<0:7>             Condition Code Register
+           HF                   half-carry flag
+           IF                   interrupt flag
+           NF                   negative flag
+           ZF                   zero flag
+           VF                   overflow flag
+           CF                   carry flag
+       PC<0:15>             program counter
+       SP<0:15>             Stack Pointer
 
-   This routine is the instruction decode routine for the M6800.
-   It is called from the CPU board simulator to execute
-   instructions in simulated memory, starting at the simulated PC.
-   It runs until 'reason' is set non-zero.
+       The M6800 is an 8-bit CPU, which uses 16-bit registers to address
+       up to 64KB of memory.
 
-   General notes:
+       The 72 basic instructions come in 1, 2, and 3-byte flavors.
 
-   1. Reasons to stop.  The simulator can be stopped by:
+       This routine is the instruction decode routine for the M6800.
+       It is called from the CPU board simulator to execute
+       instructions in simulated memory, starting at the simulated PC.
+       It runs until 'reason' is set non-zero.
 
-        WAI instruction
-        I/O error in I/O simulator
-        Invalid OP code (if ITRAP is set on CPU)
-        Invalid mamory address (if MTRAP is set on CPU)
+       General notes:
 
-   2. Interrupts.
-      There are 4 types of interrupt, and in effect they do a 
-      hardware CALL instruction to one of 4 possible high memory addresses.
+       1. Reasons to stop.  The simulator can be stopped by:
 
-   3. Non-existent memory.  
-        On the SWTP 6800, reads to non-existent memory
-        return 0FFH, and writes are ignored.
+            WAI instruction
+            I/O error in I/O simulator
+            Invalid OP code (if ITRAP is set on CPU)
+            Invalid mamory address (if MTRAP is set on CPU)
+
+       2. Interrupts.
+          There are 4 types of interrupt, and in effect they do a 
+          hardware CALL instruction to one of 4 possible high memory addresses.
+
+       3. Non-existent memory.  
+            On the SWTP 6800, reads to non-existent memory
+            return 0FFH, and writes are ignored.
 */
 
 #include <stdio.h>
@@ -1734,15 +1739,13 @@ int32 fetch_byte(int32 flag)
     uint8 val;
 
     val = CPU_BD_get_mbyte(PC) & 0xFF;   /* fetch byte */
-    if (m6800_dev.dctrl & DEBUG_asm) {  /* display source code */
-        switch (flag) {
-            case 0:                     /* opcode fetch */
-                printf("\n%04X %s", PC, opcode[val]);
-                break;
-            case 1:                     /* byte operand fetch */
-                printf("0%02XH", val);
-                break;
-        }
+    switch (flag) {
+        case 0:                     /* opcode fetch */
+            sim_debug (DEBUG_asm, &m6800_dev, "%04X %s\n", PC, opcode[val]);
+            break;
+        case 1:                     /* byte operand fetch */
+            sim_debug (DEBUG_asm, &m6800_dev, "0%02XH\n", val);
+            break;
     }
     PC = (PC + 1) & ADDRMASK;           /* increment PC */
     return val;
@@ -1755,8 +1758,7 @@ int32 fetch_word(void)
 
     val = CPU_BD_get_mbyte(PC) << 8;     /* fetch high byte */
     val |= CPU_BD_get_mbyte(PC + 1) & 0xFF; /* fetch low byte */
-    if (m6800_dev.dctrl & DEBUG_asm)
-        printf("0%04XH", val);
+    sim_debug (DEBUG_asm, &m6800_dev, "0%04XH", val);
     PC = (PC + 2) & ADDRMASK;           /* increment PC */
     return val;
 }

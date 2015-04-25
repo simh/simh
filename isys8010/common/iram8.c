@@ -2,31 +2,36 @@
 
     Copyright (c) 2011, William A. Beech
 
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
+        Permission is hereby granted, free of charge, to any person obtaining a
+        copy of this software and associated documentation files (the "Software"),
+        to deal in the Software without restriction, including without limitation
+        the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        and/or sell copies of the Software, and to permit persons to whom the
+        Software is furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
+        The above copyright notice and this permission notice shall be included in
+        all copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-    WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+        IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+        CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the name of William A. Beech shall not be
-    used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from William A. Beech.
+        Except as contained in this notice, the name of William A. Beech shall not be
+        used in advertising or otherwise to promote the sale, use or other dealings
+        in this Software without prior written authorization from William A. Beech.
 
-    These functions support a simulated i8111 or 8102 RAM device on an iSBC.
+    MODIFICATIONS:
 
-    ?? ??? 11 - Original file.
-    16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+        ?? ??? 11 - Original file.
+        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+        24 Apr 15 -- Modified to use simh_debug
+
+    NOTES:
+
+        These functions support a simulated i8111 or i8102 RAM devices on an iSBC-80/XX.
 */
 
 #include "system_defs.h"
@@ -92,8 +97,7 @@ DEVICE RAM_dev = {
 
 t_stat RAM_reset (DEVICE *dptr, int32 base, int32 size)
 {
-//    if (RAM_dev.dctrl & DEBUG_flow)
-        printf("   RAM_reset: base=%04X size=%04X\n", base, size-1);
+    sim_debug (DEBUG_flow, &RAM_dev, "   RAM_reset: base=%04X size=%04X\n", base, size-1);
     if (RAM_unit.capac == 0) {          /* if undefined */
         RAM_unit.capac = size;
         RAM_unit.u3 = base;
@@ -101,16 +105,14 @@ t_stat RAM_reset (DEVICE *dptr, int32 base, int32 size)
     if (RAM_unit.filebuf == NULL) {     /* no buffer allocated */
         RAM_unit.filebuf = malloc(RAM_unit.capac);
         if (RAM_unit.filebuf == NULL) {
-            if (RAM_dev.dctrl & DEBUG_flow)
-                printf("RAM_set_size: Malloc error\n");
+            sim_debug (DEBUG_flow, &RAM_dev, "RAM_set_size: Malloc error\n");
             return SCPE_MEM;
         }
     }
 //    printf("   RAM: Available [%04X-%04XH]\n", 
 //        RAM_unit.u3,
 //        RAM_unit.u3 + RAM_unit.capac - 1);
-    if (RAM_dev.dctrl & DEBUG_flow)
-        printf("RAM_reset: Done\n");
+    sim_debug (DEBUG_flow, &RAM_dev, "RAM_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -121,23 +123,18 @@ int32 RAM_get_mbyte(int32 addr)
     int32 val;
 
     if (i8255_unit.u6 & 0x02) {         /* enable RAM */
-        if (RAM_dev.dctrl & DEBUG_read)
-            printf("RAM_get_mbyte: addr=%04X\n", addr);
+        sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
         if ((addr >= RAM_unit.u3) && (addr < (RAM_unit.u3 + RAM_unit.capac))) {
             SET_XACK(1);                /* good memory address */
-            if (RAM_dev.dctrl & DEBUG_xack)
-                printf("RAM_get_mbyte: Set XACK for %04X\n", addr); 
+            sim_debug (DEBUG_xack, &RAM_dev, "RAM_get_mbyte: Set XACK for %04X\n", addr); 
             val = *(uint8 *)(RAM_unit.filebuf + (addr - RAM_unit.u3));
-            if (RAM_dev.dctrl & DEBUG_read)
-                printf(" val=%04X\n", val);
+            sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
             return (val & 0xFF);
         }
-        if (RAM_dev.dctrl & DEBUG_read)
-            printf(" RAM disabled\n");
+        sim_debug (DEBUG_read, &RAM_dev, " RAM disabled\n");
         return 0xFF;
     }
-    if (RAM_dev.dctrl & DEBUG_read)
-        printf(" Out of range\n");
+    sim_debug (DEBUG_read, &RAM_dev, " Out of range\n");
     return 0xFF;
 }
 
@@ -145,24 +142,19 @@ int32 RAM_get_mbyte(int32 addr)
 
 void RAM_put_mbyte(int32 addr, int32 val)
 {
-    if (i8255_unit.u6 & 0x02) {         /* enable RAM */
-        if (RAM_dev.dctrl & DEBUG_write)
-            printf("RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
+    if (i8255_unit.u5 & 0x02) {         /* enable RAM */
+        sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
         if ((addr >= RAM_unit.u3) && (addr < RAM_unit.u3 + RAM_unit.capac)) {
             SET_XACK(1);                /* good memory address */
-            if (RAM_dev.dctrl & DEBUG_xack)
-                printf("RAM_put_mbyte: Set XACK for %04X\n", addr); 
+            sim_debug (DEBUG_xack, &RAM_dev, "RAM_put_mbyte: Set XACK for %04X\n", addr);  
             *(uint8 *)(RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
-            if (RAM_dev.dctrl & DEBUG_write)
-                printf("\n");
+            sim_debug (DEBUG_write, &RAM_dev, "\n");
             return;
         }
-        if (RAM_dev.dctrl & DEBUG_write)
-            printf(" RAM disabled\n");
+        sim_debug (DEBUG_write, &RAM_dev, " RAM disabled\n");
         return;
     }
-    if (RAM_dev.dctrl & DEBUG_write)
-        printf(" Out of range\n");
+    sim_debug (DEBUG_write, &RAM_dev, " Out of range\n");
 }
 
 /* end of iRAM8.c */

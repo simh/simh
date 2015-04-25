@@ -1194,6 +1194,7 @@ SDS = ${SDSD}/sds_cpu.c ${SDSD}/sds_drm.c ${SDSD}/sds_dsk.c ${SDSD}/sds_io.c \
 	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c
 SDS_OPT = -I ${SDSD}
 
+
 SWTP6800D = swtp6800/swtp6800
 SWTP6800C = swtp6800/common
 SWTP6800MP-A = ${SWTP6800C}/mp-a.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
@@ -1204,10 +1205,22 @@ SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
 	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c
 SWTP6800_OPT = -I ${SWTP6800D}
 
+
+ISYS8010D = isys8010/isys8010
+ISYS8010C = isys8010/common
+ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
+	${ISYS8010C}/i8251.c ${ISYS8010C}/i8255.c \
+	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
+	${ISYS8010C}/multibus.c	${ISYS8010C}/isbc80-10.c	\
+	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc208.c
+ISYS8010_OPT = -I ${ISYS8010D}
+
+
 TX0D = TX-0
 TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
       ${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
 TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
+
 
 SSEMD = SSEM
 SSEM = ${SSEMD}/ssem_cpu.c ${SSEMD}/ssem_sys.c
@@ -1301,7 +1314,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
-	swtp6800mp-a swtp6800mp-a2 tx-0 ssem
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010
 
 all : ${ALL}
 
@@ -1550,6 +1563,13 @@ swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+
+isys8010: ${BIN}isys8010${EXE}
+
+${BIN}isys8010${EXE} : ${ISYS8010} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${ISYS8010} ${SIM} ${ISYS8010_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 tx-0 : ${BIN}tx-0${EXE}
 

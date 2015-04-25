@@ -1,4 +1,4 @@
-/*  system_80_10_sys.c: multibus system interface
+/*  sys-8010_sys.c: multibus system interface
 
     Copyright (c) 2010, William A. Beech
 

@@ -2,33 +2,37 @@
 
     Copyright (c) 2011, William A. Beech
 
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
+        Permission is hereby granted, free of charge, to any person obtaining a
+        copy of this software and associated documentation files (the "Software"),
+        to deal in the Software without restriction, including without limitation
+        the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        and/or sell copies of the Software, and to permit persons to whom the
+        Software is furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
+        The above copyright notice and this permission notice shall be included in
+        all copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-    WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+        IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+        CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the name of William A. Beech shall not be
-    used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from William A. Beech.
+        Except as contained in this notice, the name of William A. Beech shall not be
+        used in advertising or otherwise to promote the sale, use or other dealings
+        in this Software without prior written authorization from William A. Beech.
 
-    These functions support a simulated isbc016, isbc032, isbc048 and isbc064
-    memory card on an Intel multibus system.
-    
-    ?? ??? 11 - Original file.
-    16 Dec 12 - Modified to use system_80_10.cfg file to set base and size.
-    
+    MODIFICATIONS:
+
+        ?? ??? 11 - Original file.
+        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+        24 Apr 15 -- Modified to use simh_debug
+
+    NOTES:
+
+        These functions support a simulated isbc016, isbc032, isbc048 and isbc064
+        memory card on an Intel multibus system.
 */
 
 #include "system_defs.h"
@@ -93,8 +97,7 @@ DEVICE isbc064_dev = {
 
 t_stat isbc064_reset (DEVICE *dptr)
 {
-    if (isbc064_dev.dctrl & DEBUG_flow)
-        printf("isbc064_reset: ");
+    sim_debug (DEBUG_flow, &isbc064_dev, "isbc064_reset: ");
     if ((isbc064_dev.flags & DEV_DIS) == 0) {
         isbc064_unit.capac = SBC064_SIZE;
         isbc064_unit.u3 = SBC064_BASE;
@@ -105,13 +108,11 @@ t_stat isbc064_reset (DEVICE *dptr)
     if (isbc064_unit.filebuf == NULL) {
         isbc064_unit.filebuf = malloc(isbc064_unit.capac);
         if (isbc064_unit.filebuf == NULL) {
-            if (isbc064_dev.dctrl & DEBUG_flow)
-                printf("isbc064_reset: Malloc error\n");
+            sim_debug (DEBUG_flow, &isbc064_dev, "isbc064_reset: Malloc error\n");
             return SCPE_MEM;
         }
     }
-    if (isbc064_dev.dctrl & DEBUG_flow)
-        printf("isbc064_reset: Done\n");
+    sim_debug (DEBUG_flow, &isbc064_dev, "isbc064_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -125,26 +126,20 @@ int32 isbc064_get_mbyte(int32 addr)
     if ((isbc064_dev.flags & DEV_DIS) == 0) {
         org = isbc064_unit.u3;
         len = isbc064_unit.capac;
-        if (isbc064_dev.dctrl & DEBUG_read)
-            printf("isbc064_get_mbyte: addr=%04X", addr);
-        if (isbc064_dev.dctrl & DEBUG_read)
-            printf("isbc064_put_mbyte: org=%04X, len=%04X\n", org, len);
+        sim_debug (DEBUG_read, &isbc064_dev, "isbc064_get_mbyte: addr=%04X", addr);
+        sim_debug (DEBUG_read, &isbc064_dev, "isbc064_get_mbyte: org=%04X, len=%04X\n", org, len);
         if ((addr >= org) && (addr < (org + len))) {
             SET_XACK(1);                /* good memory address */
-            if (isbc064_dev.dctrl & DEBUG_xack)
-                printf("isbc064_get_mbyte: Set XACK for %04X\n", addr); 
+            sim_debug (DEBUG_xack, &isbc064_dev, "isbc064_get_mbyte: Set XACK for %04X\n", addr); 
             val = *(uint8 *)(isbc064_unit.filebuf + (addr - org));
-            if (isbc064_dev.dctrl & DEBUG_read)
-                printf(" val=%04X\n", val);
+            sim_debug (DEBUG_read, &isbc064_dev, " val=%04X\n", val);
             return (val & 0xFF);
         } else {
-            if (isbc064_dev.dctrl & DEBUG_read)
-                printf(" Out of range\n");
+            sim_debug (DEBUG_read, &isbc064_dev, " Out of range\n");
             return 0xFF;    /* multibus has active high pullups */
         }
     }
-    if (isbc064_dev.dctrl & DEBUG_read)
-        printf(" Disabled\n");
+    sim_debug (DEBUG_read, &isbc064_dev, " Disabled\n");
     return 0xFF;        /* multibus has active high pullups */
 }
 
@@ -169,26 +164,20 @@ void isbc064_put_mbyte(int32 addr, int32 val)
     if ((isbc064_dev.flags & DEV_DIS) == 0) {
         org = isbc064_unit.u3;
         len = isbc064_unit.capac;
-        if (isbc064_dev.dctrl & DEBUG_write)
-            printf("isbc064_put_mbyte: addr=%04X, val=%02X\n", addr, val);
-        if (isbc064_dev.dctrl & DEBUG_write)
-            printf("isbc064_put_mbyte: org=%04X, len=%04X\n", org, len);
+        sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: addr=%04X, val=%02X\n", addr, val);
+        sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: org=%04X, len=%04X\n", org, len);
         if ((addr >= org) && (addr < (org + len))) {
             SET_XACK(1);                /* good memory address */
-            if (isbc064_dev.dctrl & DEBUG_xack)
-                printf("isbc064_put_mbyte: Set XACK for %04X\n", addr); 
+            sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Set XACK for %04X\n", addr); 
             *(uint8 *)(isbc064_unit.filebuf + (addr - org)) = val & 0xFF;
-            if (isbc064_dev.dctrl & DEBUG_xack)
-                printf("isbc064_put_mbyte: Return\n"); 
+            sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Return\n"); 
             return;
         } else {
-            if (isbc064_dev.dctrl & DEBUG_write)
-                printf(" Out of range\n");
+            sim_debug (DEBUG_write, &isbc064_dev, " Out of range\n");
             return;
         }
     }
-    if (isbc064_dev.dctrl & DEBUG_write)
-        printf("isbc064_put_mbyte: Disabled\n");
+    sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Disabled\n");
 }
 
 /*  put a word into memory */
