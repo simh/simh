@@ -215,9 +215,11 @@ t_stat sim_instr_m68k(void) {
     while (TRUE) {
         if (sim_interval <= 0) {                            /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_poll_kbd()) == SCPE_STOP)     /* poll on platforms without reliable
-                                                             signalling             */
+            /* poll on platforms without reliable signalling */
+            if ((sim_poll_kbd() == SCPE_OK) && stop_cpu) {
+                reason = SCPE_STOP;
                 break;
+            }
 #endif
             if ((reason = sim_process_event()))
                 break;
