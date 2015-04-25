@@ -2100,10 +2100,7 @@ static t_stat sim_instr_mmu (void) {
         if (sim_interval <= 0) {            /* check clock queue    */
 #if !UNIX_PLATFORM
             /* poll on platforms without reliable signalling */
-            if ((sim_poll_kbd() == SCPE_OK) && stop_cpu) {
-                reason = SCPE_STOP;
-                break;
-            }
+            sim_poll_kbd(); /* following sim_process_event will check for stop */
 #endif
             if ((reason = sim_process_event()))
                 break;
