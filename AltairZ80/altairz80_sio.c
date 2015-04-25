@@ -736,12 +736,11 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
         if (sio_unit.u3)                                    /* character available?                     */
             return spi.sio_can_read | spi.sio_can_write;
         ch = sim_poll_kbd();                                /* no, try to get a character               */
-        if (ch) {                                           /* character available?                     */
-            if (ch == SCPE_STOP) {                          /* stop CPU in case ^E (default) was typed  */
-                stop_cpu = TRUE;
+        if ((ch == SCPE_OK) && stop_cpu) {
                 sim_interval = 0;                           /* detect stop condition as soon as possible*/
                 return spi.sio_cannot_read | spi.sio_can_write; /* do not consume stop character        */
             }
+        if (ch) {                                           /* character available?                     */
             sio_unit.u3 = TRUE;                             /* indicate character available             */
             sio_unit.buf = ch;                              /* store character in buffer                */
             return spi.sio_can_read | spi.sio_can_write;
@@ -1363,11 +1362,18 @@ static time_t mkCPM3Origin(void) {
         3 BCD byte: MM
         4 BCD byte: SS                              */
 static void setClockCPM3(void) {
-    ClockCPM3Delta = mkCPM3Origin()                                                                 +
+    struct tm targetDate;
+    const time_t targetSeconds = mkCPM3Origin()                                                                 +
     (GetBYTEWrapper(setClockCPM3Adr) + GetBYTEWrapper(setClockCPM3Adr + 1) * 256) * SECONDS_PER_DAY +
     fromBCD(GetBYTEWrapper(setClockCPM3Adr + 2)) * SECONDS_PER_HOUR                                 +
     fromBCD(GetBYTEWrapper(setClockCPM3Adr + 3)) * SECONDS_PER_MINUTE                               +
-    fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4)) - time(NULL);
+    fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4));
+    // compute target year, month and day and replace hour, minute and second fields
+    targetDate = *localtime(&targetSeconds);
+    targetDate.tm_hour = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 2));
+    targetDate.tm_min = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 3));
+    targetDate.tm_sec = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4));
+    ClockCPM3Delta = mktime(&targetDate) - time(NULL);
 }
 
 static int32 simh_in(const int32 port) {
