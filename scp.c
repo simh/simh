@@ -8264,7 +8264,8 @@ do {
     AIO_EVENT_COMPLETE(uptr, reason);
     } while ((reason == SCPE_OK) && 
              (sim_interval <= 0) && 
-             (sim_clock_queue != QUEUE_LIST_END));
+             (sim_clock_queue != QUEUE_LIST_END) &&
+             (!stop_cpu));
 
 if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
@@ -8273,6 +8274,8 @@ if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
 else
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Queue Complete New Interval = %d(%s)\n", sim_interval, sim_uname(sim_clock_queue));
 
+if ((reason == SCPE_OK) && stop_cpu)
+    reason = SCPE_STOP;
 return reason;
 }
 
