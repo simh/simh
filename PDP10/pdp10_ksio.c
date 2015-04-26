@@ -1997,6 +1997,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {0017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
     { { "PTP" },         1,  1,  0, 0, 
         {0017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
+    { { "XU", "XUB" },   1,  1,  8, 4, 
+        {014510}, {0120} },                              /* DEUNA */
     { { "DUP" },         1,  2,  0, 0, 
         {0000300}, {0570} },                             /* DUP11 bit sync - fx CSR, fx VEC */
     { { "KDP" },         1,  2,  0, 0, 

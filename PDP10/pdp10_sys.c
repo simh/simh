@@ -55,6 +55,7 @@ extern DEVICE dz_dev;
 extern DEVICE ry_dev;
 extern DEVICE cr_dev;
 extern DEVICE lp20_dev;
+extern DEVICE xu_dev;
 extern DEVICE dup_dev;
 extern DEVICE kmc_dev;
 extern DEVICE dmc_dev;
@@ -93,6 +94,7 @@ DEVICE *sim_devices[] = {
     &rp_dev,
     &tu_dev,
     &dz_dev,
+    &xu_dev,
     &dup_dev,
     &kmc_dev,
     &dmc_dev,
