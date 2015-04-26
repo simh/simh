@@ -2047,6 +2047,24 @@ void setClockFrequency(const uint32 Value) {
     clockHasChanged = TRUE;
 }
 
+
+#if !UNIX_PLATFORM
+
+/* Poll for CPU stop when user presses sim_int_char. Must be followed by sim_process_event */
+
+#define INITIAL_POLL_COUNTER    1000
+
+void pollForCPUStop(void) {
+    static uint32 pollCounter = INITIAL_POLL_COUNTER;
+    if (--pollCounter <= 0) {
+        pollCounter = INITIAL_POLL_COUNTER;
+        sim_poll_kbd(); /* the following sim_process_event will check for stop */
+    }
+}
+
+#endif
+
+
 static t_stat sim_instr_mmu (void) {
     extern int32 timerInterrupt;
     extern int32 timerInterruptHandler;
@@ -2099,8 +2117,8 @@ static t_stat sim_instr_mmu (void) {
     while (switch_cpu_now == TRUE) {        /* loop until halted    */
         if (sim_interval <= 0) {            /* check clock queue    */
 #if !UNIX_PLATFORM
-            /* poll on platforms without reliable signalling */
-            sim_poll_kbd(); /* following sim_process_event will check for stop */
+            /* poll on platforms without reliable signalling but not too often */
+            pollForCPUStop(); /* following sim_process_event will check for stop */
 #endif
             if ((reason = sim_process_event()))
                 break;
