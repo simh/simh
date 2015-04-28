@@ -29,7 +29,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include "isys8010.cfg"                 /* Intel System 80/10 configuration */
+#include "isys8010_cfg.h"               /* Intel System 80/10 configuration */
 #include "sim_defs.h"		        /* simulator defns */
 
 /* multibus interrupt definitions */
