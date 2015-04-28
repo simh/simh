@@ -176,6 +176,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
+    INCPATH:=$(shell $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
@@ -276,7 +277,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             ifeq (X11R7,$(shell if $(TEST) -d /usr/X11R7/lib; then echo X11R7; fi))
               LIBPATH += /usr/X11R7/lib
               INCPATH += /usr/X11R7/include
-              OS_LDFLAGS += -L/X11R7/pkg/lib -R/usr/X11R7/lib
+              OS_LDFLAGS += -L/usr/X11R7/lib -R/usr/X11R7/lib
               OS_CCDEFS += -I/usr/X11R7/include
             endif
             ifeq (/usr/local/lib,$(findstring /usr/local/lib,$(LIBPATH)))
@@ -397,6 +398,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   else
     ifneq (,$(call find_include,fnmatch))
       OS_CCDEFS += -DHAVE_FNMATCH    
+    endif
+  endif
+  ifneq (,$(call find_include,sys/mman))
+    ifneq (,$(shell grep shm_open $(call find_include,sys/mman)))
+      OS_CCDEFS += -DHAVE_SHM_OPEN
+      $(info using mman: $(call find_include,sys/mman))
     endif
   endif
   ifneq (,$(VIDEO_USEFUL))

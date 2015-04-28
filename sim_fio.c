@@ -459,6 +459,7 @@ struct SHMEM {
 
 t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr)
 {
+#ifdef HAVE_SHM_OPEN
 *shmem = (SHMEM *)calloc (1, sizeof(**shmem));
 
 *addr = NULL;
@@ -499,6 +500,9 @@ if ((*shmem)->shm_base == MAP_FAILED) {
     }
 *addr = (*shmem)->shm_base;
 return SCPE_OK;
+#else
+return SCPE_NOFNC;
+#endif
 }
 
 void sim_shmem_close (SHMEM *shmem)
