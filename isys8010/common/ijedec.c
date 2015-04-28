@@ -96,16 +96,16 @@
 
 #define JEDEC_NUM       4
 
-#define UNIT_V_DMODE	(UNIT_V_UF)	    /* data bus mode */
+#define UNIT_V_DMODE    (UNIT_V_UF)         /* data bus mode */
 #define UNIT_DMODE      (1 << UNIT_V_DMODE)
 #define UNIT_V_MSIZE    (UNIT_V_UF+1)       /* Memory Size */
 #define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
-#define UNIT_NONE	0		    /* No device */
-#define UNIT_8KROM	1		    /* 8KB ROM */
-#define UNIT_16KROM	2		    /* 16KB ROM */
-#define UNIT_32KROM	3		    /* 32KB ROM */
-#define UNIT_8KRAM	4		    /* 8KB RAM */
-#define UNIT_32KRAM	5		    /* 32KB RAM */
+#define UNIT_NONE       0                   /* No device */
+#define UNIT_8KROM      1                   /* 8KB ROM */
+#define UNIT_16KROM     2                   /* 16KB ROM */
+#define UNIT_32KROM     3                   /* 32KB ROM */
+#define UNIT_8KRAM      4                   /* 8KB RAM */
+#define UNIT_32KRAM     5                   /* 32KB RAM */
 
 #define RAM             0x00000001
 #define D16BIT          0x00000002
@@ -239,9 +239,9 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             uptr->capac = 0;
             uptr->u5 &= ~RAM;               /* ROM */
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
-                uptr->u3 = 0;		    /* base address */
+                uptr->u3 = 0;               /* base address */
                 printf("JEDEC site size set to 8KB\n");
-                for (i = 0; i < JEDEC_NUM-1; i++) {	/* clear all units but last unit */
+                for (i = 0; i < JEDEC_NUM-1; i++) {     /* clear all units but last unit */
                     uptr1 = JEDEC_dev.units + i;
                     uptr1->capac = 0;
                 }
@@ -255,7 +255,7 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
                 uptr->u3 = basadr + (uptr->capac * uptr->u6); /* base address */
                 printf("JEDEC site size set to 8KB\n");
-                for (i = 0; i < JEDEC_NUM-1; i++) {	/* clear all units but last unit */
+                for (i = 0; i < JEDEC_NUM-1; i++) {     /* clear all units but last unit */
                     uptr1 = JEDEC_dev.units + i;
                     uptr1->capac = 0;
                 }
@@ -274,7 +274,7 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
                 uptr->u3 = basadr + (uptr->capac * uptr->u6); /* base address */
                 printf("JEDEC site size set to 16KB\n");
-                for (i = 0; i < JEDEC_NUM-1; i++) {	/* clear all units but last unit */
+                for (i = 0; i < JEDEC_NUM-1; i++) {     /* clear all units but last unit */
                     uptr1 = JEDEC_dev.units + i;
                     uptr1->capac = 0;
                 }
@@ -312,9 +312,9 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
                 if (uptr1->capac != uptr->capac) {
                     uptr->capac = 0;
                     printf("JEDEC site size precludes use of this device\n");
-		} else {
+                } else {
                     uptr->u5 |= RAM;         /* RAM */
-		}
+                }
             }
             break;
         case UNIT_32KRAM:
@@ -325,9 +325,9 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
                 if (uptr1->capac != uptr->capac) {
                     uptr->capac = 0;
                     printf("JEDEC site size precludes use of this device\n");
-		} else {
+                } else {
                     uptr->u5 |= RAM;         /* RAM */
-		}
+                }
             }
             break;
         default:
@@ -335,7 +335,7 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
                 printf("\tJEDEC_set_size: Error\n");
             return SCPE_ARG;
     }
-    if (JEDEC_buf[uptr->u6]) {	            /* any change requires a new buffer */
+    if (JEDEC_buf[uptr->u6]) {              /* any change requires a new buffer */
         free (JEDEC_buf[uptr->u6]);
         JEDEC_buf[uptr->u6] = NULL;
     }

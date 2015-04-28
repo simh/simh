@@ -32,16 +32,16 @@
 #include "system_defs.h"
 
 /* set the base I/O address for the 8259 */
-#define	I8259_BASE		0xD8
+#define I8259_BASE              0xD8
 
 /* set the base I/O address for the first 8255 */
-#define	I8255_BASE_0	0xE4
+#define I8255_BASE_0    0xE4
 
 /* set the base I/O address for the second 8255 */
-#define	I8255_BASE_1	0xE8
+#define I8255_BASE_1    0xE8
 
 /* set the base I/O address for the 8251 */
-#define	I8251_BASE		0xEC
+#define I8251_BASE              0xEC
 
 /* set the base and size for the EPROM on the iSBC 80/20 */
 #define ROM_SIZE        0x1000
@@ -86,12 +86,12 @@ t_stat SBC_reset (DEVICE *dptr)
 {    
     printf("Initializing iSBC-80/20\n");
     i8080_reset(NULL);
-	i8259_reset(NULL, I8259_BASE);
-	i8255_reset(NULL, I8255_BASE_0);
-	i8255_reset(NULL, I8255_BASE_1);
-	i8251_reset(NULL, I8251_BASE);
-	EPROM_reset(NULL, ROM_SIZE);
-	RAM_reset(NULL, RAM_BASE, RAM_SIZE);
+        i8259_reset(NULL, I8259_BASE);
+        i8255_reset(NULL, I8255_BASE_0);
+        i8255_reset(NULL, I8255_BASE_1);
+        i8251_reset(NULL, I8251_BASE);
+        EPROM_reset(NULL, ROM_SIZE);
+        RAM_reset(NULL, RAM_BASE, RAM_SIZE);
     return SCPE_OK;
 }
 

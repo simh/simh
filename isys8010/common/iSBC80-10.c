@@ -37,16 +37,16 @@
 #include "system_defs.h"
 
 /* set the base I/O address for the first 8255 */
-#define	I8255_BASE_0	0xE4
+#define I8255_BASE_0    0xE4
 
 /* set the base I/O address for the second 8255 */
-#define	I8255_BASE_1	0xE8
+#define I8255_BASE_1    0xE8
 
 /* set the base I/O address for the 8251 */
-#define	I8251_BASE	0xEC
+#define I8251_BASE      0xEC
 
 /* set the base and size for the EPROM on the iSBC 80/10 */
-#define	ROM_SIZE        0x1000
+#define ROM_SIZE        0x1000
 
 /* set the base and size for the RAM on the iSBC 80/10 */
 #define RAM_BASE        0x3C00

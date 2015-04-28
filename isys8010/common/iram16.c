@@ -36,10 +36,10 @@
 
 #include "multibus_defs.h"
 
-#define UNIT_V_RSIZE    (UNIT_V_UF)			/* RAM Size */
+#define UNIT_V_RSIZE    (UNIT_V_UF)                     /* RAM Size */
 #define UNIT_RSIZE      (0x1 << UNIT_V_RSIZE)
-#define UNIT_NONE		(0)		        /* No unit */
-#define UNIT_16K		(1)		        /* 16KB */
+#define UNIT_NONE               (0)                     /* No unit */
+#define UNIT_16K                (1)                     /* 16KB */
 
 /* function prototypes */
 
@@ -84,7 +84,7 @@ DEVICE RAM_dev = {
     NULL,               //deposit 
     &RAM_reset,         //reset
     NULL,               //boot
-    NULL,		//attach 
+    NULL,               //attach 
     NULL,               //detach
     NULL,               //ctxt                
     DEV_DEBUG,          //flags 
@@ -96,7 +96,7 @@ DEVICE RAM_dev = {
 
 /* global variables */
 
-uint8 *RAM_buf = NULL;				        /* RAM buffer pointer */
+uint8 *RAM_buf = NULL;                                  /* RAM buffer pointer */
 
 /* RAM functions */
 
@@ -111,16 +111,16 @@ t_stat RAM_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             printf("RAM_set_size: Size error\n");
         return SCPE_ARG;
     }
-    RAM_unit.capac = 0x4000 * val;		        /* set size */	
-    RAM_unit.u3 = 0x0000;			        /* base is 0 */
-    RAM_unit.u4 = val;				        /* save val */
-    if (RAM_buf) {				        /* if changed, allocate new buffer */
+    RAM_unit.capac = 0x4000 * val;                      /* set size */  
+    RAM_unit.u3 = 0x0000;                               /* base is 0 */
+    RAM_unit.u4 = val;                                  /* save val */
+    if (RAM_buf) {                                      /* if changed, allocate new buffer */
         free (RAM_buf);
         RAM_buf = NULL;
     }
     if (RAM_dev.dctrl & DEBUG_flow)
         printf("RAM_set_size: Done\n");
-    return (RAM_reset (NULL));				/* force reset after reconfig */
+    return (RAM_reset (NULL));                          /* force reset after reconfig */
 }
 
 /* RAM reset */
@@ -132,7 +132,7 @@ t_stat RAM_reset (DEVICE *dptr)
 
     if (RAM_dev.dctrl & DEBUG_flow)
         printf("RAM_reset: \n");
-    if (RAM_unit.capac == 0) {				/* if undefined */
+    if (RAM_unit.capac == 0) {                          /* if undefined */
         printf("   RAM: defaulted for 16KB\n");
         printf("      \"set RAM 16KB\"\n");
         RAM_unit.capac = 0x4000;
@@ -142,7 +142,7 @@ t_stat RAM_reset (DEVICE *dptr)
     printf("   RAM: Initializing [%04X-%04XH]\n", 
         RAM_unit.u3,
         RAM_unit.u3 + RAM_unit.capac - 1);
-    if (RAM_buf == NULL) {				/* no buffer allocated */
+    if (RAM_buf == NULL) {                              /* no buffer allocated */
         RAM_buf = malloc(RAM_unit.capac);
         if (RAM_buf == NULL) { 
             if (RAM_dev.dctrl & DEBUG_flow)
