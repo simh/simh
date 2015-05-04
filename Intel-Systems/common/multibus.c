@@ -127,10 +127,10 @@ t_stat multibus_svc(UNIT *uptr)
         case INT_1:
             set_cpuint(INT_R);
             clr_irq(SBC208_INT);    /***** bad, bad, bad! */
-//            printf("multibus_svc: mbirq=%04X int_req=%04X\n", mbirq, int_req);
+//            sim_printf("multibus_svc: mbirq=%04X int_req=%04X\n", mbirq, int_req);
             break;
         default:
-//            printf("multibus_svc: default mbirq=%04X\n", mbirq);
+//            sim_printf("multibus_svc: default mbirq=%04X\n", mbirq);
             break;
     }
     sim_activate (&multibus_unit, multibus_unit.wait); /* continue poll */
@@ -143,7 +143,7 @@ t_stat multibus_reset(DEVICE *dptr)
     SBC_reset(NULL); 
     isbc064_reset(NULL); 
     isbc208_reset(NULL); 
-    printf("   Multibus: Reset\n");
+    sim_printf("   Multibus: Reset\n");
     sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
     return SCPE_OK;
 }
@@ -151,13 +151,13 @@ t_stat multibus_reset(DEVICE *dptr)
 void set_irq(int32 int_num)
 {
     mbirq |= int_num;
-//    printf("set_irq: int_num=%04X mbirq=%04X\n", int_num, mbirq);
+//    sim_printf("set_irq: int_num=%04X mbirq=%04X\n", int_num, mbirq);
 }
 
 void clr_irq(int32 int_num)
 {
     mbirq &= ~int_num;
-//    printf("clr_irq: int_num=%04X mbirq=%04X\n", int_num, mbirq);
+//    sim_printf("clr_irq: int_num=%04X mbirq=%04X\n", int_num, mbirq);
 }
 
 /* This is the I/O configuration table.  There are 256 possible
@@ -246,9 +246,9 @@ int32 nulldev(int32 flag, int32 data)
 int32 reg_dev(int32 (*routine)(), int32 port)
 {
     if (dev_table[port].routine != &nulldev) {  /* port already assigned */
-//        printf("Multibus: I/O Port %02X is already assigned\n", port);
+//        sim_printf("Multibus: I/O Port %02X is already assigned\n", port);
     } else {
-//        printf("Port %02X is assigned\n", port);
+//        sim_printf("Port %02X is assigned\n", port);
         dev_table[port].routine = routine;
     }
 }
@@ -258,7 +258,7 @@ int32 reg_dev(int32 (*routine)(), int32 port)
 int32 multibus_get_mbyte(int32 addr)
 {
     SET_XACK(0);                        /* set no XACK */
-//    printf("multibus_get_mbyte: Cleared XACK for %04X\n", addr); 
+//    sim_printf("multibus_get_mbyte: Cleared XACK for %04X\n", addr); 
     return isbc064_get_mbyte(addr);
 }
 
@@ -278,9 +278,9 @@ int32 multibus_get_mword(int32 addr)
 void multibus_put_mbyte(int32 addr, int32 val)
 {
     SET_XACK(0);                        /* set no XACK */
-//    printf("multibus_put_mbyte: Cleared XACK for %04X\n", addr); 
+//    sim_printf("multibus_put_mbyte: Cleared XACK for %04X\n", addr); 
     isbc064_put_mbyte(addr, val);
-//    printf("multibus_put_mbyte: Done XACK=%dX\n", XACK); 
+//    sim_printf("multibus_put_mbyte: Done XACK=%dX\n", XACK); 
 }
 
 /*  put a word to memory */

@@ -193,14 +193,14 @@ t_stat JEDEC_attach (UNIT *uptr, char *cptr)
     t_stat r;
 
     if (JEDEC_dev.dctrl & DEBUG_flow)
-        printf("\tJEDEC_attach: Entered with cptr=%s\n", cptr);
+        sim_printf("\tJEDEC_attach: Entered with cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
         if (JEDEC_dev.dctrl & DEBUG_flow)
-            printf("\tJEDEC_attach: Error\n");
+            sim_printf("\tJEDEC_attach: Error\n");
         return r;
     }
     if (JEDEC_dev.dctrl & DEBUG_flow)
-        printf("\tJEDEC_attach: Done\n");
+        sim_printf("\tJEDEC_attach: Done\n");
     return (JEDEC_reset (NULL));
 }
 
@@ -211,7 +211,7 @@ t_stat JEDEC_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
     UNIT *uptr1;
 
     if (JEDEC_dev.dctrl & DEBUG_flow)
-        printf("\tJEDEC_set_mode: Entered with val=%08XH, unit=%d\n", val, uptr->u6);
+        sim_printf("\tJEDEC_set_mode: Entered with val=%08XH, unit=%d\n", val, uptr->u6);
     uptr1 = JEDEC_dev.units + JEDEC_NUM - 1; /* top unit holds this configuration */
     if (val) {                              /* 16-bit mode */
         uptr1->u5 |= D16BIT;
@@ -219,8 +219,8 @@ t_stat JEDEC_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
         uptr1->u5 &= ~D16BIT;
     }
     if (JEDEC_dev.dctrl & DEBUG_flow)
-        printf("JEDEC%d->u5=%08XH\n", JEDEC_NUM - 1, uptr1->u5);
-        printf("\tJEDEC_set_mode: Done\n");
+        sim_printf("JEDEC%d->u5=%08XH\n", JEDEC_NUM - 1, uptr1->u5);
+        sim_printf("\tJEDEC_set_mode: Done\n");
 }
 
 /* JEDEC set type = none, 8krom, 16krom, 32krom, 8kram or 32kram */
@@ -231,7 +231,7 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
     UNIT *uptr1;
 
     if (JEDEC_dev.dctrl & DEBUG_flow)
-        printf("\tJEDEC_set_size: Entered with val=%d, unit=%d\n", val, uptr->u6);
+        sim_printf("\tJEDEC_set_size: Entered with val=%d, unit=%d\n", val, uptr->u6);
     uptr1 = JEDEC_dev.units + JEDEC_NUM - 1; /* top unit holds u5 configuration */
     uptr->u4 = val;
     switch(val) {
@@ -240,7 +240,7 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             uptr->u5 &= ~RAM;               /* ROM */
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
                 uptr->u3 = 0;               /* base address */
-                printf("JEDEC site size set to 8KB\n");
+                sim_printf("JEDEC site size set to 8KB\n");
                 for (i = 0; i < JEDEC_NUM-1; i++) {     /* clear all units but last unit */
                     uptr1 = JEDEC_dev.units + i;
                     uptr1->capac = 0;
@@ -251,10 +251,10 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             uptr->capac = 0x2000;
             uptr1->u5 &= ~RAM;               /* ROM */
             basadr = 0x100000 - (uptr->capac * JEDEC_NUM);
-            printf("JEDEC site base address = %06XH\n", basadr);
+            sim_printf("JEDEC site base address = %06XH\n", basadr);
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
                 uptr->u3 = basadr + (uptr->capac * uptr->u6); /* base address */
-                printf("JEDEC site size set to 8KB\n");
+                sim_printf("JEDEC site size set to 8KB\n");
                 for (i = 0; i < JEDEC_NUM-1; i++) {     /* clear all units but last unit */
                     uptr1 = JEDEC_dev.units + i;
                     uptr1->capac = 0;
@@ -262,7 +262,7 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             } else {
                 if (uptr1->capac != uptr->capac) {
                     uptr->capac = 0;
-                    printf("JEDEC site size precludes use of this device\n");
+                    sim_printf("JEDEC site size precludes use of this device\n");
                 }
             }
             break;
@@ -270,10 +270,10 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             uptr->capac = 0x4000;
             uptr1->u5 &= ~RAM;               /* ROM */
             basadr = 0x100000 - (uptr->capac * JEDEC_NUM);
-            printf("JEDEC site base address = %06XH\n", basadr);
+            sim_printf("JEDEC site base address = %06XH\n", basadr);
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
                 uptr->u3 = basadr + (uptr->capac * uptr->u6); /* base address */
-                printf("JEDEC site size set to 16KB\n");
+                sim_printf("JEDEC site size set to 16KB\n");
                 for (i = 0; i < JEDEC_NUM-1; i++) {     /* clear all units but last unit */
                     uptr1 = JEDEC_dev.units + i;
                     uptr1->capac = 0;
@@ -281,7 +281,7 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             } else {
                 if (uptr1->capac != uptr->capac) {
                     uptr->capac = 0;
-                    printf("JEDEC site size precludes use of this device\n");
+                    sim_printf("JEDEC site size precludes use of this device\n");
                 }
             }
             break;
@@ -289,10 +289,10 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             uptr->capac = 0x8000;
             uptr1->u5 &= ~RAM;               /* ROM */
             basadr = 0x100000 - (uptr->capac * JEDEC_NUM);
-            printf("JEDEC site base address = %06XH\n", basadr);
+            sim_printf("JEDEC site base address = %06XH\n", basadr);
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
                 uptr->u3 = basadr + (uptr->capac * uptr->u6); /* base address */
-                printf("JEDEC site size set to 32KB\n");
+                sim_printf("JEDEC site size set to 32KB\n");
                 for (i = 0; i < JEDEC_NUM-1; i++) {        /* clear all units but last unit */
                     uptr1 = JEDEC_dev.units + i;
                     uptr1->capac = 0;
@@ -300,18 +300,18 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             } else {
                 if (uptr1->capac != uptr->capac) {
                     uptr->capac = 0;
-                    printf("JEDEC site size precludes use of this device\n");
+                    sim_printf("JEDEC site size precludes use of this device\n");
                 }
             }
             break;
         case UNIT_8KRAM:
             uptr->capac = 0x2000;
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
-                printf("JEDEC%d cannot be SRAM\n", uptr->u6);
+                sim_printf("JEDEC%d cannot be SRAM\n", uptr->u6);
             } else {
                 if (uptr1->capac != uptr->capac) {
                     uptr->capac = 0;
-                    printf("JEDEC site size precludes use of this device\n");
+                    sim_printf("JEDEC site size precludes use of this device\n");
                 } else {
                     uptr->u5 |= RAM;         /* RAM */
                 }
@@ -320,11 +320,11 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
         case UNIT_32KRAM:
             uptr->capac = 0x8000;
             if (uptr->u6 == JEDEC_NUM - 1) {/* top unit ? */
-                printf("JEDEC%d cannot be SRAM\n", uptr->u6);
+                sim_printf("JEDEC%d cannot be SRAM\n", uptr->u6);
             } else {
                 if (uptr1->capac != uptr->capac) {
                     uptr->capac = 0;
-                    printf("JEDEC site size precludes use of this device\n");
+                    sim_printf("JEDEC site size precludes use of this device\n");
                 } else {
                     uptr->u5 |= RAM;         /* RAM */
                 }
@@ -332,7 +332,7 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             break;
         default:
             if (JEDEC_dev.dctrl & DEBUG_flow)
-                printf("\tJEDEC_set_size: Error\n");
+                sim_printf("\tJEDEC_set_size: Error\n");
             return SCPE_ARG;
     }
     if (JEDEC_buf[uptr->u6]) {              /* any change requires a new buffer */
@@ -340,14 +340,14 @@ t_stat JEDEC_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
         JEDEC_buf[uptr->u6] = NULL;
     }
     if (JEDEC_dev.dctrl & DEBUG_flow) {
-        printf("\tJEDEC%d->capac=%04XH\n", uptr->u6, uptr->capac);
-        printf("\tJEDEC%d->u3[Base addr]=%06XH\n", uptr->u6, uptr->u3);
-        printf("\tJEDEC%d->u4[val]=%06XH\n", uptr->u6, uptr->u4);
-        printf("\tJEDEC%d->u5[Flags]=%06XH\n", uptr->u6, uptr->u5);
-        printf("\tJEDEC%d->u6[unit #]=%06XH\n", uptr->u6, uptr->u6);
+        sim_printf("\tJEDEC%d->capac=%04XH\n", uptr->u6, uptr->capac);
+        sim_printf("\tJEDEC%d->u3[Base addr]=%06XH\n", uptr->u6, uptr->u3);
+        sim_printf("\tJEDEC%d->u4[val]=%06XH\n", uptr->u6, uptr->u4);
+        sim_printf("\tJEDEC%d->u5[Flags]=%06XH\n", uptr->u6, uptr->u5);
+        sim_printf("\tJEDEC%d->u6[unit #]=%06XH\n", uptr->u6, uptr->u6);
         uptr1 = JEDEC_dev.units + JEDEC_NUM - 1; /* top unit holds u5 configuration */
-        printf("\tJEDEC%d->u5[Flags]=%06XH\n", JEDEC_NUM - 1, uptr1->u5);
-        printf("\tJEDEC_set_size: Done\n");
+        sim_printf("\tJEDEC%d->u5[Flags]=%06XH\n", JEDEC_NUM - 1, uptr1->u5);
+        sim_printf("\tJEDEC_set_size: Done\n");
     }
     return SCPE_OK;
 }
@@ -363,14 +363,14 @@ t_stat JEDEC_reset (DEVICE *dptr)
     static int flag = 1;
 
     if (JEDEC_dev.dctrl & DEBUG_flow)
-        printf("\tJEDEC_reset: Entered\n");
+        sim_printf("\tJEDEC_reset: Entered\n");
     for (i = 0; i < JEDEC_NUM; i++) {       /* handle all umits */
         uptr = JEDEC_dev.units + i;
         if (uptr->capac == 0) {             /* if not configured */
-            printf("   JEDEC%d: Not configured\n", i);
+            sim_printf("   JEDEC%d: Not configured\n", i);
             if (flag) {
-                printf("      ALL: \"set JEDEC3 None | 8krom | 16krom | 32krom | 8kram | 32kram\"\n");
-                printf("      EPROM: \"att JEDEC3 <filename>\"\n");
+                sim_printf("      ALL: \"set JEDEC3 None | 8krom | 16krom | 32krom | 8kram | 32kram\"\n");
+                sim_printf("      EPROM: \"att JEDEC3 <filename>\"\n");
                 flag = 0;
             }
             uptr->capac = 0;
@@ -381,7 +381,7 @@ t_stat JEDEC_reset (DEVICE *dptr)
             uptr->u6 = i;                   /* unit number - only set here! */
         }
         if (uptr->capac) {                  /* if configured */
-            printf("   JEDEC%d: Initializing %2XKB %s [%04X-%04XH]\n", 
+            sim_printf("   JEDEC%d: Initializing %2XKB %s [%04X-%04XH]\n", 
                 i,
                 uptr->capac / 0x400,
                 uptr->u5 ? "Ram" : "Rom",
@@ -391,15 +391,15 @@ t_stat JEDEC_reset (DEVICE *dptr)
                 JEDEC_buf[uptr->u6] = malloc(uptr->capac);
                 if (JEDEC_buf[uptr->u6] == NULL) {
                     if (JEDEC_dev.dctrl & DEBUG_flow)
-                        printf("\tJEDEC_reset: Malloc error\n");
+                        sim_printf("\tJEDEC_reset: Malloc error\n");
                     return SCPE_MEM;
                 }
             }
             if ((uptr->u5 & 0x0001) == 0) { /* ROM - load file */
                 fp = fopen(uptr->filename, "rb");
                 if (fp == NULL) {
-                    printf("\tUnable to open ROM file %s\n", uptr->filename);
-                    printf("\tNo ROM image loaded!!!\n");
+                    sim_printf("\tUnable to open ROM file %s\n", uptr->filename);
+                    sim_printf("\tNo ROM image loaded!!!\n");
                 } else {
                     j = 0;
                     c = fgetc(fp);
@@ -407,18 +407,18 @@ t_stat JEDEC_reset (DEVICE *dptr)
                         *(JEDEC_buf[uptr->u6] + j++) = c & 0xFF;
                         c = fgetc(fp);
                         if (j >= JEDEC_unit[uptr->u6].capac) {
-                            printf("\tImage is too large - Load truncated!!!\n");
+                            sim_printf("\tImage is too large - Load truncated!!!\n");
                             break;
                         }
                     }
                     fclose(fp);
-                    printf("\t%d bytes of ROM image %s loaded\n", j, uptr->filename);
+                    sim_printf("\t%d bytes of ROM image %s loaded\n", j, uptr->filename);
                 }
             }
         }
     }
     if (JEDEC_dev.dctrl & DEBUG_flow)
-        printf("\tJEDEC_reset: Done\n");
+        sim_printf("\tJEDEC_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -436,22 +436,22 @@ int32 JEDEC_get_mbyte(int32 addr)
     UNIT *uptr;
 
     if (JEDEC_dev.dctrl & DEBUG_read)
-        printf("\tJEDEC_get_mbyte: Entered\n");
+        sim_printf("\tJEDEC_get_mbyte: Entered\n");
     for (i = 0; i < JEDEC_NUM; i++) {       /* test all umits for address */
         uptr = JEDEC_dev.units + i;
         org = uptr->u3;
         len = uptr->capac - 1;
         if ((addr >= org) && (addr <= org + len)) {
             if (JEDEC_dev.dctrl & DEBUG_read)
-                printf("\tJEDEC%d Addr=%06XH Org=%06XH Len=%06XH\n", i, addr, org, len);
+                sim_printf("\tJEDEC%d Addr=%06XH Org=%06XH Len=%06XH\n", i, addr, org, len);
             val = *(JEDEC_buf[uptr->u6] + (addr - org));
             if (JEDEC_dev.dctrl & DEBUG_read)
-                printf("\tJEDEC_get_mbyte: Exit with [%0XH]\n", val & 0xFF);
+                sim_printf("\tJEDEC_get_mbyte: Exit with [%0XH]\n", val & 0xFF);
             return (val & 0xFF);
         }
     }
     if (JEDEC_dev.dctrl & DEBUG_read)
-        printf("\tJEDEC_get_mbyte: Exit - Out of range\n", addr);
+        sim_printf("\tJEDEC_get_mbyte: Exit - Out of range\n", addr);
     return 0xFF;
 }
 
@@ -463,24 +463,24 @@ void JEDEC_put_mbyte(int32 addr, int32 val)
     UNIT *uptr;
 
     if (JEDEC_dev.dctrl & DEBUG_write)
-        printf("\tJEDEC_put_mbyte: Entered\n");
+        sim_printf("\tJEDEC_put_mbyte: Entered\n");
     for (i = 0; i < JEDEC_NUM; i++) {       /* test all umits for address */
         uptr = JEDEC_dev.units + i;
         org = uptr->u3;
         len = uptr->capac - 1;
         if ((addr >= org) && (addr < org + len)) {
             if (JEDEC_dev.dctrl & DEBUG_write)
-                printf("\tJEDEC%d Org=%06XH Len=%06XH\n", i, org, len);
+                sim_printf("\tJEDEC%d Org=%06XH Len=%06XH\n", i, org, len);
             if (uptr->u5 & RAM) {           /* can't write to ROM */
                 *(JEDEC_buf[uptr->u6] + (addr - org)) = val & 0xFF;
                 if (JEDEC_dev.dctrl & DEBUG_write)
-                    printf("\tJEDEC_put_mbyte: Exit with [%06XH]=%02XH\n", addr, val);
+                    sim_printf("\tJEDEC_put_mbyte: Exit with [%06XH]=%02XH\n", addr, val);
             } else
-                printf("\tJEDEC_put_mbyte: Write to ROM ignored\n");
+                sim_printf("\tJEDEC_put_mbyte: Write to ROM ignored\n");
         }
     }
     if (JEDEC_dev.dctrl & DEBUG_write)
-        printf("\tJEDEC_put_mbyte: Exit - Out of range\n");
+        sim_printf("\tJEDEC_put_mbyte: Exit - Out of range\n");
 }
 
 /* end of iJEDEC.c */

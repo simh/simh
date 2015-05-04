@@ -186,9 +186,9 @@ int32 i8255s0(int32 io, int32 data)
     } else {                            /* write status port */
         if (data & 0x80) {              /* mode instruction */
             i8255_unit[0].u3 = data;
-            printf("8255-0: Mode Instruction=%02X\n", data);
+            sim_printf("8255-0: Mode Instruction=%02X\n", data);
             if (data & 0x64)
-                printf("   Mode 1 and 2 not yet implemented\n");
+                sim_printf("   Mode 1 and 2 not yet implemented\n");
         } else {                        /* bit set */
             bit = (data & 0x0E) >> 1;   /* get bit number */
             if (data & 0x01) {          /* set bit */
@@ -207,7 +207,7 @@ int32 i8255a0(int32 io, int32 data)
         return (i8255_unit[0].u4);
     } else {                            /* write data port */
         i8255_unit[0].u4 = data;
-        printf("8255-0: Port A = %02X\n", data);
+        sim_printf("8255-0: Port A = %02X\n", data);
     }
     return 0;
 }
@@ -218,7 +218,7 @@ int32 i8255b0(int32 io, int32 data)
         return (i8255_unit[0].u5);
     } else {                            /* write data port */
         i8255_unit[0].u5 = data;
-        printf("8255-0: Port B = %02X\n", data);
+        sim_printf("8255-0: Port B = %02X\n", data);
     }
     return 0;
 }
@@ -229,7 +229,7 @@ int32 i8255c0(int32 io, int32 data)
         return (i8255_unit[0].u6);
     } else {                            /* write data port */
         i8255_unit[0].u6 = data;
-        printf("8255-0: Port C = %02X\n", data);
+        sim_printf("8255-0: Port C = %02X\n", data);
     }
     return 0;
 }
@@ -243,9 +243,9 @@ int32 i8255s1(int32 io, int32 data)
     } else {                            /* write status port */
         if (data & 0x80) {              /* mode instruction */
             i8255_unit[1].u3 = data;
-            printf("8255-1: Mode Instruction=%02X\n", data);
+            sim_printf("8255-1: Mode Instruction=%02X\n", data);
             if (data & 0x64)
-                printf("   Mode 1 and 2 not yet implemented\n");
+                sim_printf("   Mode 1 and 2 not yet implemented\n");
         } else {                        /* bit set */
             bit = (data & 0x0E) >> 1;   /* get bit number */
             if (data & 0x01) {          /* set bit */
@@ -264,7 +264,7 @@ int32 i8255a1(int32 io, int32 data)
         return (i8255_unit[1].u4);
     } else {                            /* write data port */
         i8255_unit[1].u4 = data;
-        printf("8255-1: Port A = %02X\n", data);
+        sim_printf("8255-1: Port A = %02X\n", data);
     }
     return 0;
 }
@@ -275,7 +275,7 @@ int32 i8255b1(int32 io, int32 data)
         return (i8255_unit[1].u5);
     } else {                            /* write data port */
         i8255_unit[1].u5 = data;
-        printf("8255-1: Port B = %02X\n", data);
+        sim_printf("8255-1: Port B = %02X\n", data);
     }
     return 0;
 }
@@ -286,7 +286,7 @@ int32 i8255c1(int32 io, int32 data)
         return (i8255_unit[1].u6);
     } else {                            /* write data port */
         i8255_unit[1].u6 = data;
-        printf("8255-1: Port C = %02X\n", data);
+        sim_printf("8255-1: Port C = %02X\n", data);
     }
     return 0;
 }
@@ -300,9 +300,9 @@ int32 i8255s2(int32 io, int32 data)
     } else {                            /* write status port */
         if (data & 0x80) {              /* mode instruction */
             i8255_unit[2].u3 = data;
-            printf("8255-2: Mode Instruction=%02X\n", data);
+            sim_printf("8255-2: Mode Instruction=%02X\n", data);
             if (data & 0x64)
-                printf("   Mode 1 and 2 not yet implemented\n");
+                sim_printf("   Mode 1 and 2 not yet implemented\n");
         } else {                        /* bit set */
             bit = (data & 0x0E) >> 1;   /* get bit number */
             if (data & 0x01) {          /* set bit */
@@ -321,7 +321,7 @@ int32 i8255a2(int32 io, int32 data)
         return (i8255_unit[2].u4);
     } else {                            /* write data port */
         i8255_unit[2].u4 = data;
-        printf("8255-2: Port A = %02X\n", data);
+        sim_printf("8255-2: Port A = %02X\n", data);
     }
     return 0;
 }
@@ -332,7 +332,7 @@ int32 i8255b2(int32 io, int32 data)
         return (i8255_unit[2].u5);
     } else {                            /* write data port */
         i8255_unit[2].u5 = data;
-        printf("8255-2: Port B = %02X\n", data);
+        sim_printf("8255-2: Port B = %02X\n", data);
     }
     return 0;
 }
@@ -343,7 +343,7 @@ int32 i8255c2(int32 io, int32 data)
         return (i8255_unit[2].u6);
     } else {                            /* write data port */
         i8255_unit[2].u6 = data;
-        printf("8255-2: Port C = %02X\n", data);
+        sim_printf("8255-2: Port C = %02X\n", data);
     }
     return 0;
 }
@@ -357,9 +357,9 @@ int32 i8255s3(int32 io, int32 data)
     } else {                            /* write status port */
         if (data & 0x80) {              /* mode instruction */
             i8255_unit[3].u3 = data;
-            printf("8255-3: Mode Instruction=%02X\n", data);
+            sim_printf("8255-3: Mode Instruction=%02X\n", data);
             if (data & 0x64)
-                printf("\n   Mode 1 and 2 not yet implemented\n");
+                sim_printf("\n   Mode 1 and 2 not yet implemented\n");
         } else {                        /* bit set */
             bit = (data & 0x0E) >> 1;   /* get bit number */
             if (data & 0x01) {          /* set bit */
@@ -378,7 +378,7 @@ int32 i8255a3(int32 io, int32 data)
         return (i8255_unit[3].u4);
     } else {                            /* write data port */
         i8255_unit[3].u4 = data;
-        printf("8255-3: Port A = %02X\n", data);
+        sim_printf("8255-3: Port A = %02X\n", data);
     }
     return 0;
 }
@@ -389,7 +389,7 @@ int32 i8255b3(int32 io, int32 data)
         return (i8255_unit[3].u5);
     } else {                            /* write data port */
         i8255_unit[3].u5 = data;
-        printf("8255-3: Port B = %02X\n", data);
+        sim_printf("8255-3: Port B = %02X\n", data);
     }
     return 0;
 }
@@ -400,7 +400,7 @@ int32 i8255c3(int32 io, int32 data)
         return (i8255_unit[3].u6);
     } else {                            /* write data port */
         i8255_unit[3].u6 = data;
-        printf("8255-3: Port C = %02X\n", data);
+        sim_printf("8255-3: Port C = %02X\n", data);
     }
     return 0;
 }
@@ -419,7 +419,7 @@ t_stat i8255_reset (DEVICE *dptr, int32 base)
         i8255_unit[0].u4 = 0xFF; /* Port A */
         i8255_unit[0].u5 = 0xFF; /* Port B */
         i8255_unit[0].u6 = 0xFF; /* Port C */
-        printf("   8255-0: Reset\n");
+        sim_printf("   8255-0: Reset\n");
         break;
     case 1:
         reg_dev(i8255a1, base); 
@@ -430,7 +430,7 @@ t_stat i8255_reset (DEVICE *dptr, int32 base)
         i8255_unit[1].u4 = 0xFF; /* Port A */
         i8255_unit[1].u5 = 0xFF; /* Port B */
         i8255_unit[1].u6 = 0xFF; /* Port C */
-        printf("   8255-1: Reset\n");
+        sim_printf("   8255-1: Reset\n");
         break;
     case 2:
         reg_dev(i8255a2, base); 
@@ -441,7 +441,7 @@ t_stat i8255_reset (DEVICE *dptr, int32 base)
         i8255_unit[2].u4 = 0xFF; /* Port A */
         i8255_unit[2].u5 = 0xFF; /* Port B */
         i8255_unit[2].u6 = 0xFF; /* Port C */
-        printf("   8255-2: Reset\n");
+        sim_printf("   8255-2: Reset\n");
         break;
     case 3:
         reg_dev(i8255a3, base); 
@@ -452,12 +452,12 @@ t_stat i8255_reset (DEVICE *dptr, int32 base)
         i8255_unit[3].u4 = 0xFF; /* Port A */
         i8255_unit[3].u5 = 0xFF; /* Port B */
         i8255_unit[3].u6 = 0xFF; /* Port C */
-        printf("   8255-3: Reset\n");
+        sim_printf("   8255-3: Reset\n");
         break;
     default:
-        printf("   8255: Bad device\n");
+        sim_printf("   8255: Bad device\n");
     }
-    printf("   8255-%d: Registered at %02X\n", i8255_cnt, base);
+    sim_printf("   8255-%d: Registered at %02X\n", i8255_cnt, base);
     i8255_cnt++;
     return SCPE_OK;
 }

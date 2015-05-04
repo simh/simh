@@ -239,7 +239,7 @@ t_stat i8274_reset (DEVICE *dptr)
 {
     wr0a = wr1a = wr2a = wr3a = wr4a = wr5a = wr6a = wr7a = rr0a = rr1a = rr2a = 0;
     wr0b = wr1b = wr2b = wr3b = wr4b = wr5b = wr6b = wr7b = rr0b = rr1b = rr2b = 0;
-    printf("   8274 Reset\n");
+    sim_printf("   8274 Reset\n");
     return SCPE_OK;
 }
 
@@ -274,7 +274,7 @@ int32 i8274As(int32 io, int32 data)
                 if ((wr0a & 0x38) == 0x18) { /* channel reset */
                     wr0a = wr1a = wr2a = wr3a = wr4a = wr5a = 0;
                     wr6a = wr7a = rr0a = rr1a = rr2a = 0;
-                    printf("8274 Channel A reset\n");
+                    sim_printf("8274 Channel A reset\n");
                 }
                 break;
             case 1:                     /* wr1a */
@@ -299,7 +299,7 @@ int32 i8274As(int32 io, int32 data)
                 wr7a = data;
                 break;
         }
-        printf("8274 Command WR%dA=%02X\n", wr0a & 0x7, data);
+        sim_printf("8274 Command WR%dA=%02X\n", wr0a & 0x7, data);
         return 0;
     }
 }
@@ -323,13 +323,13 @@ int32 i8274Bs(int32 io, int32 data)
         return i8274_unit.u3;
     } else {                                /* write status port */
         if (data == 0x40) {                 /* reset port! */
-            printf("8274 Reset\n");
+            sim_printf("8274 Reset\n");
         } else if (i8274_unit.u6) {
             i8274_unit.u5 = data;
-            printf("8274 Command Instruction=%02X\n", data);
+            sim_printf("8274 Command Instruction=%02X\n", data);
         } else {
             i8274_unit.u4 = data;
-            printf("8274 Mode Instruction=%02X\n", data);
+            sim_printf("8274 Mode Instruction=%02X\n", data);
             i8274_unit.u6++;
         }
         return (0);

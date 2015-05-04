@@ -684,7 +684,7 @@ t_stat isbc208_svc (UNIT *uptr)
         sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: Entered execution phase\n");
         switch (cmd) {
         case READ:                  /* 0x06 */
-//                printf("READ-e: fddst=%02X", fddst[uptr->u6]);
+//                sim_printf("READ-e: fddst=%02X", fddst[uptr->u6]);
             h = i8272_w3;           // h = 0 or 1 
             hed = i8272_w3 << 2;    // hed = 0 or 4 [h << 2] 
             sec = i8272_w4;         // sector number (1-XX)
@@ -693,7 +693,7 @@ t_stat isbc208_svc (UNIT *uptr)
             ssize = 128 << secn;    // size of sector (bytes)
             bpt = ssize * spt;      // bytes/track
             bpc = bpt * 2;          // bytes/cylinder
-//                printf(" d=%d h=%d c=%d s=%d\n", drv, h, cyl, sec);
+//                sim_printf(" d=%d h=%d c=%d s=%d\n", drv, h, cyl, sec);
             sim_debug (DEBUG_flow, &isbc208_dev, 
                 "isbc208_svc: FDC read: h=%d, hed=%d, sec=%d, secn=%d, spt=%d, ssize=%04X, bpt=%04X, bpc=%04X\n",
                     h, hed, sec, secn, spt, ssize, bpt, bpc);
@@ -736,10 +736,10 @@ t_stat isbc208_svc (UNIT *uptr)
             i8272_msr |= (RQM + DIO + CB); /* enter result phase */
             rsp = wsp = 0;          /* reset indexes */
             set_irq(SBC208_INT);    /* set interrupt */
-//                printf("READ-x: fddst=%02X\n", fddst[uptr->u6]);
+//                sim_printf("READ-x: fddst=%02X\n", fddst[uptr->u6]);
             break;
         case WRITE:                 /* 0x05 */
-//                printf("WRITE-e: fddst=%02X\n", fddst[uptr->u6]);
+//                sim_printf("WRITE-e: fddst=%02X\n", fddst[uptr->u6]);
             h = i8272_w3;           // h = 0 or 1 
             hed = i8272_w3 << 2;    // hed = 0 or 4 [h << 2] 
             sec = i8272_w4;         // sector number (1-XX)
@@ -766,9 +766,9 @@ t_stat isbc208_svc (UNIT *uptr)
 //                    i8272_r1 = NW;      // set not writable in ST1
 //                    i8272_r3 = fddst[uptr->u6] + WP;
 //                    i8272_msr |= (RQM + DIO + CB); /* enter result phase */
-//                    printf("\nWrite Protected fddst[%d]=%02X\n", uptr->u6, fddst[uptr->u6]); 
+//                    sim_printf("\nWrite Protected fddst[%d]=%02X\n", uptr->u6, fddst[uptr->u6]); 
 //                    if (isbc208_dev.dctrl & DEBUG_flow)
-//                        printf("isbc208_svc: FDC write: Write Protected\n"); 
+//                        sim_printf("isbc208_svc: FDC write: Write Protected\n"); 
             } else {                // get image addr for this d, h, c, s    
                 imgadr = (cyl * bpc) + (h * bpt) + ((sec - 1) * ssize);
                 sim_debug (DEBUG_flow, &isbc208_dev, 
@@ -796,7 +796,7 @@ t_stat isbc208_svc (UNIT *uptr)
             }
             rsp = wsp = 0;          /* reset indexes */
             set_irq(SBC208_INT);    /* set interrupt */
-//                printf("WRITE-x: fddst=%02X\n", fddst[uptr->u6]);
+//                sim_printf("WRITE-x: fddst=%02X\n", fddst[uptr->u6]);
             break;
         case FMTTRK:                /* 0x0D */
             if ((fddst[uptr->u6] & RDY) == 0) {
@@ -834,7 +834,7 @@ t_stat isbc208_svc (UNIT *uptr)
             rsp = wsp = 0;          /* reset indexes */
             break;
         case HOME:                  /* 0x07 */
-//                printf("HOME-e: fddst=%02X\n", fddst[uptr->u6]);
+//                sim_printf("HOME-e: fddst=%02X\n", fddst[uptr->u6]);
             sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC home: disk=%d fddst=%02X\n",
                 drv, fddst[uptr->u6]);
             if ((fddst[uptr->u6] & RDY) == 0) {
@@ -852,14 +852,14 @@ t_stat isbc208_svc (UNIT *uptr)
             i8272_msr |= RQM;       /* enter COMMAND phase */
             rsp = wsp = 0;          /* reset indexes */
             set_irq(SBC208_INT);    /* set interrupt */
-//                printf("HOME-x: fddst=%02X\n", fddst[uptr->u6]);
+//                sim_printf("HOME-x: fddst=%02X\n", fddst[uptr->u6]);
             break;
         case SPEC:                  /* 0x03 */
             fddst[0] |= TS;         //*** bad, bad, bad!
             fddst[1] |= TS;
             fddst[2] |= TS;
             fddst[3] |= TS;
-//                printf("SPEC-e: fddst[%d]=%02X\n", uptr->u6, fddst[uptr->u6]);
+//                sim_printf("SPEC-e: fddst[%d]=%02X\n", uptr->u6, fddst[uptr->u6]);
             sim_debug (DEBUG_flow, &isbc208_dev, 
                 "isbc208_svc: FDC specify SRT=%d ms HUT=%d ms HLT=%d ms \n", 
                     16 - (drv >> 4), 16 * (drv & 0x0f), i8272_w2 & 0xfe);
@@ -870,7 +870,7 @@ t_stat isbc208_svc (UNIT *uptr)
             i8272_msr = 0;          // force 0 for now, where does 0x07 come from?
             i8272_msr |= RQM;       /* enter command phase */
             rsp = wsp = 0;          /* reset indexes */
-//                printf("SPEC-x: fddst[%d]=%02X\n", uptr->u6, fddst[uptr->u6]);
+//                sim_printf("SPEC-x: fddst[%d]=%02X\n", uptr->u6, fddst[uptr->u6]);
             break;
         case READID:                /* 0x0A */
             if ((fddst[uptr->u6] & RDY) == 0) {
@@ -891,7 +891,7 @@ t_stat isbc208_svc (UNIT *uptr)
             rsp = wsp = 0;          /* reset indexes */
             break;
         case SEEK:                  /* 0x0F */
-//                printf("SEEK-e: fddst=%02X\n", fddst[uptr->u6]);
+//                sim_printf("SEEK-e: fddst=%02X\n", fddst[uptr->u6]);
             sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC seek: disk=%d cyl=%d fddst=%02X\n",
                 drv, i8272_w2, fddst[uptr->u6]);
             if ((fddst[uptr->u6] & RDY) == 0) { /* Not ready? */
@@ -918,7 +918,7 @@ t_stat isbc208_svc (UNIT *uptr)
             i8272_msr |= RQM;       /* enter command phase */
             rsp = wsp = 0;          /* reset indexes */
 //                set_irq(SBC208_INT);    /* set interrupt */
-//                printf("SEEK-x: fddst=%02X\n", fddst[uptr->u6]);
+//                sim_printf("SEEK-x: fddst=%02X\n", fddst[uptr->u6]);
             break;
         default:
             i8272_msr &= ~(RQM + DIO + CB); /* execution phase done*/
@@ -1096,14 +1096,14 @@ void isbc208_reset1 (void)
     UNIT *uptr;
     static int flag = 1;
 
-    if (flag) printf("iSBC 208: Initializing\n");
+    if (flag) sim_printf("iSBC 208: Initializing\n");
     for (i = 0; i < FDD_NUM; i++) {     /* handle all units */
         uptr = isbc208_dev.units + i;
         if (uptr->capac == 0) {         /* if not configured */
-//            printf("   SBC208%d: Not configured\n", i);
+//            sim_printf("   SBC208%d: Not configured\n", i);
 //            if (flag) {
-//                printf("      ALL: \"set isbc208 en\"\n");
-//                printf("      EPROM: \"att isbc2080 <filename>\"\n");
+//                sim_printf("      ALL: \"set isbc208 en\"\n");
+//                sim_printf("      EPROM: \"att isbc2080 <filename>\"\n");
 //                flag = 0;
 //            }
             uptr->capac = 0;            /* initialize unit */
@@ -1116,7 +1116,7 @@ void isbc208_reset1 (void)
             sim_activate (&isbc208_unit[uptr->u6], isbc208_unit[uptr->u6].wait);
         } else {
             fddst[i] = RDY + WP + T0 + i; /* initial attach drive status */
-//            printf("   SBC208%d: Configured, Attached to %s\n", i, uptr->filename);
+//            sim_printf("   SBC208%d: Configured, Attached to %s\n", i, uptr->filename);
         }
     }
     i8237_r8 = 0;                       /* status */
@@ -1128,8 +1128,8 @@ void isbc208_reset1 (void)
     rsp = wsp = 0;                      /* reset indexes */
     cmd = 0;                            /* clear command */
     if (flag) {
-        printf("   8237 Reset\n");
-        printf("   8272 Reset\n");
+        sim_printf("   8237 Reset\n");
+        sim_printf("   8272 Reset\n");
     }
     flag = 0;
 }
@@ -1145,22 +1145,22 @@ t_stat isbc208_attach (UNIT *uptr, char *cptr)
 
     sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_attach: Entered with cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
-        printf("   isbc208_attach: Attach error\n");
+        sim_printf("   isbc208_attach: Attach error\n");
         return r;
     }
     fp = fopen(uptr->filename, "rb");
     if (fp == NULL) {
-        printf("   Unable to open disk img file %s\n", uptr->filename);
-        printf("   No disk image loaded!!!\n");
+        sim_printf("   Unable to open disk img file %s\n", uptr->filename);
+        sim_printf("   No disk image loaded!!!\n");
     } else {
-        printf("iSBC 208: Attach\n");
+        sim_printf("iSBC 208: Attach\n");
         fseek(fp, 0, SEEK_END);         /* size disk image */
         flen = ftell(fp);
         fseek(fp, 0, SEEK_SET);
         if (isbc208_buf[uptr->u6] == NULL) { /* no buffer allocated */
             isbc208_buf[uptr->u6] = malloc(flen);
             if (isbc208_buf[uptr->u6] == NULL) {
-                printf("   iSBC208_attach: Malloc error\n");
+                sim_printf("   iSBC208_attach: Malloc error\n");
                 return SCPE_MEM;
             }
         }
@@ -1189,7 +1189,7 @@ t_stat isbc208_attach (UNIT *uptr, char *cptr)
             maxcyl[uptr->u6] = 80;
             fddst[uptr->u6] |= TS;      // two sided
         }
-        printf("   Drive-%d: %d bytes of disk image %s loaded, fddst=%02X\n", 
+        sim_printf("   Drive-%d: %d bytes of disk image %s loaded, fddst=%02X\n", 
             uptr->u6, i, uptr->filename, fddst[uptr->u6]);
     }
     sim_debug (DEBUG_flow, &isbc208_dev, "   iSBC208_attach: Done\n");
@@ -1211,7 +1211,7 @@ t_stat isbc208_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
         fddst[uptr->u6] &= ~WP;
         uptr->flags &= ~val;
     }
-//    printf("fddst[%d]=%02XH uptr->flags=%08X\n", uptr->u6, fddst[uptr->u6], uptr->flags);
+//    sim_printf("fddst[%d]=%02XH uptr->flags=%08X\n", uptr->u6, fddst[uptr->u6], uptr->flags);
     sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_set_mode: Done\n");
     return SCPE_OK;
 }

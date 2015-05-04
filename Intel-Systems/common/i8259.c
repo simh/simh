@@ -140,11 +140,11 @@ int32 i8259a0(int32 io, int32 data)
                                         i8259_ocw3[0] = data;
                                         break;
                                 default:
-                                        printf("8259b-0: OCW Error %02X\n", data);
+                                        sim_printf("8259b-0: OCW Error %02X\n", data);
                                         break;
                         }
                 }
-        printf("8259a-0: data = %02X\n", data);
+        sim_printf("8259a-0: data = %02X\n", data);
                 icw_num0++;                                             /* step ICW number */
     }
         i8259_dump(0);
@@ -168,10 +168,10 @@ int32 i8259b0(int32 io, int32 data)
                                         if (i8259_icw1[0] & 0x01)
                                                 i8259_icw4[0] = data;
                                         else
-                                                printf("8259b-0: ICW4 not enabled - data=%02X\n", data);
+                                                sim_printf("8259b-0: ICW4 not enabled - data=%02X\n", data);
                                         break;
                                 default:
-                                        printf("8259b-0: ICW Error %02X\n", data);
+                                        sim_printf("8259b-0: ICW Error %02X\n", data);
                                         break;
                         }
                         icw_num0++;
@@ -209,11 +209,11 @@ int32 i8259a1(int32 io, int32 data)
                                         i8259_ocw3[1] = data;
                                         break;
                                 default:
-                                        printf("8259b-1: OCW Error %02X\n", data);
+                                        sim_printf("8259b-1: OCW Error %02X\n", data);
                                         break;
                         }
                 }
-        printf("8259a-1: data = %02X\n", data);
+        sim_printf("8259a-1: data = %02X\n", data);
                 icw_num1++;                                             /* step ICW number */
     }
         i8259_dump(1);
@@ -237,10 +237,10 @@ int32 i8259b1(int32 io, int32 data)
                                         if (i8259_icw1[1] & 0x01)
                                                 i8259_icw4[1] = data;
                                         else
-                                                printf("8259b-1: ICW4 not enabled - data=%02X\n", data);
+                                                sim_printf("8259b-1: ICW4 not enabled - data=%02X\n", data);
                                         break;
                                 default:
-                                        printf("8259b-1: ICW Error %02X\n", data);
+                                        sim_printf("8259b-1: ICW Error %02X\n", data);
                                         break;
                         }
                         icw_num1++;
@@ -254,17 +254,17 @@ int32 i8259b1(int32 io, int32 data)
 
 void i8259_dump(int32 dev)
 {
-        printf("Device %d\n", dev);
-        printf("   IRR = %02X\n", i8259_unit[dev].u3);
-        printf("   ISR = %02X\n", i8259_unit[dev].u4);
-        printf("   IMR = %02X\n", i8259_unit[dev].u5);
-        printf("   ICW1 = %02X\n", i8259_icw1[dev]);
-        printf("   ICW2 = %02X\n", i8259_icw2[dev]);
-        printf("   ICW3 = %02X\n", i8259_icw3[dev]);
-        printf("   ICW4 = %02X\n", i8259_icw4[dev]);
-        printf("   OCW1 = %02X\n", i8259_ocw1[dev]);
-        printf("   OCW2 = %02X\n", i8259_ocw2[dev]);
-        printf("   OCW3 = %02X\n", i8259_ocw3[dev]);
+        sim_printf("Device %d\n", dev);
+        sim_printf("   IRR = %02X\n", i8259_unit[dev].u3);
+        sim_printf("   ISR = %02X\n", i8259_unit[dev].u4);
+        sim_printf("   IMR = %02X\n", i8259_unit[dev].u5);
+        sim_printf("   ICW1 = %02X\n", i8259_icw1[dev]);
+        sim_printf("   ICW2 = %02X\n", i8259_icw2[dev]);
+        sim_printf("   ICW3 = %02X\n", i8259_icw3[dev]);
+        sim_printf("   ICW4 = %02X\n", i8259_icw4[dev]);
+        sim_printf("   OCW1 = %02X\n", i8259_ocw1[dev]);
+        sim_printf("   OCW2 = %02X\n", i8259_ocw2[dev]);
+        sim_printf("   OCW3 = %02X\n", i8259_ocw3[dev]);
 }
 
 /* Reset routine */
@@ -280,7 +280,7 @@ t_stat i8259_reset (DEVICE *dptr, int32 base)
                         i8259_unit[0].u3 = 0x00; /* IRR */
                         i8259_unit[0].u4 = 0x00; /* ISR */
                         i8259_unit[0].u5 = 0x00; /* IMR */
-                        printf("   8259-0: Reset\n");
+                        sim_printf("   8259-0: Reset\n");
                         break;
                 case 1:
                         reg_dev(i8259a1, base); 
@@ -290,13 +290,13 @@ t_stat i8259_reset (DEVICE *dptr, int32 base)
                         i8259_unit[1].u3 = 0x00; /* IRR */
                         i8259_unit[1].u4 = 0x00; /* ISR */
                         i8259_unit[1].u5 = 0x00; /* IMR */
-                        printf("   8259-1: Reset\n");
+                        sim_printf("   8259-1: Reset\n");
                         break;
                 default:
-                        printf("   8259: Bad device\n");
+                        sim_printf("   8259: Bad device\n");
                         break;
         }
-    printf("   8259-%d: Registered at %02X\n", i8259_cnt, base);
+    sim_printf("   8259-%d: Registered at %02X\n", i8259_cnt, base);
         i8259_cnt++;
     return SCPE_OK;
 }

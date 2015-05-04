@@ -338,7 +338,7 @@ int32 sim_instr (void)
 //        }
         if (i8008_dev.dctrl & DEBUG_reg) {
             dumpregs();
-            printf("\n");
+            sim_printf("\n");
         }
 
         if (sim_interval <= 0) {        /* check clock queue */
@@ -348,14 +348,14 @@ int32 sim_instr (void)
         sim_interval--;                 /* countdown clock */
 
         if (int_req > 0) {              /* interrupt? */
-//            printf("\ni8008: int_req=%04X", int_req);
+//            sim_printf("\ni8008: int_req=%04X", int_req);
             ;
         } else {                    /* 8008 */
             if (IE) {          /* enabled? */
                 push_word(PC);      /* do an RST 7 */
                 PC = 0x0038;
                 int_req &= ~INT_R;
-//                    printf("\ni8008: int_req=%04X", int_req);
+//                    sim_printf("\ni8008: int_req=%04X", int_req);
             }
         }                               /* end interrupt */
 
@@ -369,7 +369,7 @@ int32 sim_instr (void)
 
         if (uptr->flags & UNIT_TRACE) {
             dumpregs();
-            printf("\n");
+            sim_printf("\n");
         }
         IR = OP = fetch_byte(0);        /* instruction fetch */
 
@@ -1690,9 +1690,9 @@ uint32 fetch_m(void)
 /* dump the registers */
 void dumpregs(void)
 {
-    printf("  A=%02X B=%02X C=%02X D=%04X E=%02X H=%04X L=%02X\n",
+    sim_printf("  A=%02X B=%02X C=%02X D=%04X E=%02X H=%04X L=%02X\n",
     A, B, C, D, E, H, L);
-    printf("    CF=%d ZF=%d SF=%d PF=%d\n",
+    sim_printf("    CF=%d ZF=%d SF=%d PF=%d\n",
         CF, ZF, SF, PF);
 }
 
@@ -1705,10 +1705,10 @@ int32 fetch_byte(int32 flag)
     if (i8008_dev.dctrl & DEBUG_asm || uptr->flags & UNIT_TRACE) {  /* display source code */
         switch (flag) {
             case 0:                     /* opcode fetch */
-                printf("OP=%02X        %04X %s", val,  PC, opcode[val]);
+                sim_printf("OP=%02X        %04X %s", val,  PC, opcode[val]);
                 break;
             case 1:                     /* byte operand fetch */
-                printf("0%02XH", val);
+                sim_printf("0%02XH", val);
                 break;
         }
     }
@@ -1725,7 +1725,7 @@ int32 fetch_word(void)
     val = get_mbyte(PC) & BYTE_R;       /* fetch low byte */
     val |= get_mbyte(PC + 1) << 8;      /* fetch high byte */
     if (i8008_dev.dctrl & DEBUG_asm || uptr->flags & UNIT_TRACE)   /* display source code */
-        printf("0%04XH", val);
+        sim_printf("0%04XH", val);
     PC = (PC + 2) & ADDRMASK;           /* increment PC */
     val &= WORD_R14;
     return val;
@@ -1825,7 +1825,7 @@ t_stat i8008_reset (DEVICE *dptr)
     for (i = 0; i < 7; i++)
         stack_frame[i] = 0;
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
-    printf("   8008: Reset\n");
+    sim_printf("   8008: Reset\n");
     return SCPE_OK;
 }
 
@@ -1866,7 +1866,7 @@ int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
         addr++;
         cnt++;
     }                                   /* end while */
-    printf ("%d Bytes loaded.\n", cnt);
+    sim_printf ("%d Bytes loaded.\n", cnt);
     return (SCPE_OK);
 }
 

@@ -203,7 +203,7 @@ t_stat i8251_reset (DEVICE *dptr, int32 base)
     reg_dev(i8251d, base + 2); 
     reg_dev(i8251s, base + 3); 
     i8251_reset1();
-    printf("   8251: Registered at %02X\n", base);
+    sim_printf("   8251: Registered at %02X\n", base);
     sim_activate (&i8251_unit, i8251_unit.wait); /* activate unit */
     return SCPE_OK;
 }
@@ -214,18 +214,18 @@ t_stat i8251_reset (DEVICE *dptr, int32 base)
 
 int32 i8251s(int32 io, int32 data)
 {
-//    printf("\nio=%d data=%04X\n", io, data);
+//    sim_printf("\nio=%d data=%04X\n", io, data);
     if (io == 0) {                      /* read status port */
         return i8251_unit.u3;
     } else {                            /* write status port */
         if (i8251_unit.u6) {            /* if mode, set cmd */
             i8251_unit.u5 = data;
-            printf("8251: Command Instruction=%02X\n", data);
+            sim_printf("8251: Command Instruction=%02X\n", data);
             if (data & SD)              /* reset port! */
                 i8251_reset1();
         } else {                        /* set mode */
             i8251_unit.u4 = data;
-            printf("8251: Mode Instruction=%02X\n", data);
+            sim_printf("8251: Mode Instruction=%02X\n", data);
             i8251_unit.u6 = 1;          /* set cmd received */
         }
         return (0);
@@ -251,7 +251,7 @@ void i8251_reset1(void)
     i8251_unit.u6 = 0;
     i8251_unit.buf = 0;
     i8251_unit.pos = 0;
-    printf("   8251: Reset\n");
+    sim_printf("   8251: Reset\n");
 }
 
 /* end of i8251.c */

@@ -101,7 +101,7 @@ t_stat isbc064_reset (DEVICE *dptr)
     if ((isbc064_dev.flags & DEV_DIS) == 0) {
         isbc064_unit.capac = SBC064_SIZE;
         isbc064_unit.u3 = SBC064_BASE;
-        printf("iSBC 064: Available[%04X-%04XH]\n", 
+        sim_printf("iSBC 064: Available[%04X-%04XH]\n", 
             isbc064_unit.u3,
             isbc064_unit.u3 + isbc064_unit.capac - 1);
     }

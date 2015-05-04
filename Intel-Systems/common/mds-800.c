@@ -79,7 +79,7 @@ extern t_stat RAM_reset (DEVICE *dptr, int32 base, int32 size);
 
 t_stat SBC_reset (DEVICE *dptr)
 {    
-    printf("Initializing iSBC-80/10:\n");
+    sim_printf("Initializing iSBC-80/10:\n");
     i8080_reset (NULL);
     i8255_reset (NULL, I8255_BASE_0);
     i8255_reset (NULL, I8255_BASE_1);
@@ -122,7 +122,7 @@ void put_mbyte(int32 addr, int32 val)
 {
     /* if local EPROM handle it */
     if ((i8255_unit.u5 & 0x01) && (addr >= EPROM_unit.u3) && (addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
-        printf("Write to R/O memory address %04X - ignored\n", addr);
+        sim_printf("Write to R/O memory address %04X - ignored\n", addr);
         return;
     } /* if local RAM handle it */
     if ((i8255_unit.u5 & 0x02) && (addr >= RAM_unit.u3) && (addr <= (RAM_unit.u3 + RAM_unit.capac))) {

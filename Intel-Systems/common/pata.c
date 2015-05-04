@@ -127,9 +127,9 @@ int32 patas(int32 io, int32 data)
     } else {                            /* write status port */
         if (data & 0x80) {              /* mode instruction */
             pata_unit[0].u3 = data;
-            printf("PATA: 8255 Mode Instruction=%02X\n", data);
+            sim_printf("PATA: 8255 Mode Instruction=%02X\n", data);
             if (data & 0x64)
-                printf("   Mode 1 and 2 not yet implemented\n");
+                sim_printf("   Mode 1 and 2 not yet implemented\n");
         } else {                        /* bit set */
             bit = (data & 0x0E) >> 1;   /* get bit number */
             if (data & 0x01) {          /* set bit */
@@ -148,7 +148,7 @@ int32 pataa(int32 io, int32 data)
         return (pata_unit[0].u4);
     } else {                            /* write data port */
         pata_unit[0].u4 = data;
-        printf("PATA: 8255 Port A = %02X\n", data);
+        sim_printf("PATA: 8255 Port A = %02X\n", data);
     }
     return 0;
 }
@@ -159,7 +159,7 @@ int32 patab(int32 io, int32 data)
         return (pata_unit[0].u5);
     } else {                            /* write data port */
         pata_unit[0].u5 = data;
-        printf("PATA: 8255 Port B = %02X\n", data);
+        sim_printf("PATA: 8255 Port B = %02X\n", data);
     }
     return 0;
 }
@@ -170,7 +170,7 @@ int32 patac(int32 io, int32 data)
         return (pata_unit[0].u6);
     } else {                            /* write data port */
         pata_unit[0].u6 = data;
-        printf("PATA: 8255 Port C = %02X\n", data);
+        sim_printf("PATA: 8255 Port C = %02X\n", data);
     }
     return 0;
 }
@@ -187,7 +187,7 @@ t_stat pata_reset (DEVICE *dptr, int32 base)
     reg_dev(patab, base + 1); 
     reg_dev(patac, base + 2); 
     reg_dev(patas, base + 3); 
-    printf("   PATA: Reset\n");
+    sim_printf("   PATA: Reset\n");
     return SCPE_OK;
 }
 

@@ -394,9 +394,9 @@ int32 sim_instr (void)
     uptr = i8080_dev.units;
     if (i8080_dev.dctrl & DEBUG_flow) { 
         if (uptr->flags & UNIT_8085)
-            printf("CPU = 8085\n");
+            sim_printf("CPU = 8085\n");
         else
-            printf("CPU = 8080\n");
+            sim_printf("CPU = 8080\n");
     }
     /* Main instruction fetch/decode loop */
 
@@ -408,7 +408,7 @@ int32 sim_instr (void)
 //        }
         if (i8080_dev.dctrl & DEBUG_reg) {
             dumpregs();
-            printf("\n");
+            sim_printf("\n");
         }
 
         if (sim_interval <= 0) {        /* check clock queue */
@@ -418,7 +418,7 @@ int32 sim_instr (void)
         sim_interval--;                 /* countdown clock */
 
         if (int_req > 0) {              /* interrupt? */
-//            printf("\ni8080: int_req=%04X IM=%04X", int_req, IM);
+//            sim_printf("\ni8080: int_req=%04X IM=%04X", int_req, IM);
             if (uptr->flags & UNIT_8085) { /* 8085 */
                 if (int_req & ITRAP) {  /* int */
                     push_word(PC);
@@ -448,7 +448,7 @@ int32 sim_instr (void)
                     push_word(PC);      /* do an RST 7 */
                     PC = 0x0038;
                     int_req &= ~INT_R;
-//                    printf("\ni8080: int_req=%04X", int_req);
+//                    sim_printf("\ni8080: int_req=%04X", int_req);
                 }
             }
         }                               /* end interrupt */
@@ -466,13 +466,13 @@ int32 sim_instr (void)
 
         if (uptr->flags & UNIT_TRACE) {
             dumpregs();
-            printf("\n");
+            sim_printf("\n");
         }
         IR = OP = fetch_byte(0);        /* instruction fetch */
 
         if (GET_XACK(1) == 0) {         /* no XACK for instruction fetch */
             reason = STOP_XACK;
-            printf("Stopped for XACK-1 PC=%04X\n", --PC);
+            sim_printf("Stopped for XACK-1 PC=%04X\n", --PC);
             continue;
         }
 
@@ -879,12 +879,12 @@ int32 sim_instr (void)
 
         case 0xFB:                  /* EI */
             IM |= IE;
-//                printf("\nEI: pc=%04X", PC - 1);
+//                sim_printf("\nEI: pc=%04X", PC - 1);
             break;
 
         case 0xF3:                  /* DI */
             IM &= ~IE;
-//                printf("\nDI: pc=%04X", PC - 1);
+//                sim_printf("\nDI: pc=%04X", PC - 1);
             break;
 
         case 0xDB:                  /* IN */
@@ -908,7 +908,7 @@ int32 sim_instr (void)
 loop_end:
         if (GET_XACK(1) == 0) {         /* no XACK for instruction fetch */
             reason = STOP_XACK;
-            printf("Stopped for XACK-2 PC=%04X\n", --PC);
+            sim_printf("Stopped for XACK-2 PC=%04X\n", --PC);
             continue;
         }
 
@@ -924,9 +924,9 @@ loop_end:
 /* dump the registers */
 void dumpregs(void)
 {
-    printf("  A=%02X BC=%04X DE=%04X HL=%04X SP=%04X IM=%02X XACK=%d\n",
+    sim_printf("  A=%02X BC=%04X DE=%04X HL=%04X SP=%04X IM=%02X XACK=%d\n",
     A, BC, DE, HL, SP, IM, xack);
-    printf("    CF=%d ZF=%d AF=%d SF=%d PF=%d\n", 
+    sim_printf("    CF=%d ZF=%d AF=%d SF=%d PF=%d\n", 
     GET_FLAG(CF) ? 1 : 0,
     GET_FLAG(ZF) ? 1 : 0,
     GET_FLAG(AF) ? 1 : 0,
@@ -942,10 +942,10 @@ int32 fetch_byte(int32 flag)
     if (i8080_dev.dctrl & DEBUG_asm || uptr->flags & UNIT_TRACE) {  /* display source code */
         switch (flag) {
         case 0:                     /* opcode fetch */
-            printf("OP=%02X        %04X %s", val,  PC, opcode[val]);
+            sim_printf("OP=%02X        %04X %s", val,  PC, opcode[val]);
             break;
         case 1:                     /* byte operand fetch */
-            printf("0%02XH", val);
+            sim_printf("0%02XH", val);
             break;
         }
     }
@@ -962,7 +962,7 @@ int32 fetch_word(void)
     val = get_mbyte(PC) & BYTE_R;       /* fetch low byte */
     val |= get_mbyte(PC + 1) << 8;      /* fetch high byte */
     if (i8080_dev.dctrl & DEBUG_asm || uptr->flags & UNIT_TRACE)   /* display source code */
-        printf("0%04XH", val);
+        sim_printf("0%04XH", val);
     PC = (PC + 2) & ADDRMASK;           /* increment PC */
     val &= WORD_R;
     return val;
@@ -1087,7 +1087,7 @@ int32 getreg(int32 reg)
 {
     switch (reg) {
     case 0:                         /* reg B */
-//           printf("reg=%04X BC=%04X ret=%04X\n",
+//           sim_printf("reg=%04X BC=%04X ret=%04X\n",
 //               reg, BC, (BC >>8) & 0xff);
         return ((BC >>8) & BYTE_R);
     case 1:                         /* reg C */
@@ -1115,9 +1115,9 @@ void putreg(int32 reg, int32 val)
 {
     switch (reg) {
     case 0:                         /* reg B */
-//            printf("reg=%04X val=%04X\n", reg, val);
+//            sim_printf("reg=%04X val=%04X\n", reg, val);
         BC = BC & BYTE_R;
-//            printf("BC&0x00ff=%04X val<<8=%04X\n", BC, val<<8);
+//            sim_printf("BC&0x00ff=%04X val<<8=%04X\n", BC, val<<8);
         BC = BC | (val <<8);
         break;
     case 1:                         /* reg C */
@@ -1247,7 +1247,7 @@ t_stat i8080_reset (DEVICE *dptr)
     int_req = 0;
     IM = 0;
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
-    printf("   8080: Reset\n");
+    sim_printf("   8080: Reset\n");
 //    fpd = fopen("trace.txt", "w");
     return SCPE_OK;
 }
@@ -1289,7 +1289,7 @@ int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
         addr++;
         cnt++;
     }                                   /* end while */
-    printf ("%d Bytes loaded.\n", cnt);
+    sim_printf ("%d Bytes loaded.\n", cnt);
     return (SCPE_OK);
 }
 

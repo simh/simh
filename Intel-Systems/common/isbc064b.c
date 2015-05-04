@@ -110,10 +110,10 @@ t_stat isbc064_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
     uint32 i;
 
     if (isbc064_dev.dctrl & DEBUG_flow)
-        printf("isbc064_set_size: val=%04X\n", val);
+        sim_printf("isbc064_set_size: val=%04X\n", val);
     if ((val <= 0) || (val > MAXMEMSIZE)) {
         if (isbc064_dev.dctrl & DEBUG_flow)
-            printf("isbc064_set_size: Memory size error\n");
+            sim_printf("isbc064_set_size: Memory size error\n");
         return SCPE_ARG;
     }
     isbc064_unit.capac = val;
@@ -126,7 +126,7 @@ t_stat isbc064_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
         MB_buf = NULL;
     }
     if (isbc064_dev.dctrl & DEBUG_flow)
-        printf("isbc064_set_size: Done\n");
+        sim_printf("isbc064_set_size: Done\n");
     return SCPE_OK;
 }
 
@@ -135,10 +135,10 @@ t_stat isbc064_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 t_stat isbc064_set_base (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
     if (isbc064_dev.dctrl & DEBUG_flow)
-        printf("isbc064_set_base: val=%04X\n", val);
+        sim_printf("isbc064_set_base: val=%04X\n", val);
     if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0)) {
         if (isbc064_dev.dctrl & DEBUG_flow)
-            printf("isbc064_set_base: Base address error\n");
+            sim_printf("isbc064_set_base: Base address error\n");
         return SCPE_ARG;
     }
     isbc064_unit.u3 = val;
@@ -147,7 +147,7 @@ t_stat isbc064_set_base (UNIT *uptr, int32 val, char *cptr, void *desc)
         MB_buf = NULL;
     }
     if (isbc064_dev.dctrl & DEBUG_flow)
-        printf("isbc064_set_base: Done\n");
+        sim_printf("isbc064_set_base: Done\n");
     return (isbc064_reset (NULL));
 }
 
@@ -156,22 +156,22 @@ t_stat isbc064_set_base (UNIT *uptr, int32 val, char *cptr, void *desc)
 t_stat isbc064_reset (DEVICE *dptr)
 {
     if (isbc064_dev.dctrl & DEBUG_flow)
-        printf("isbc064_reset: \n");
+        sim_printf("isbc064_reset: \n");
     if ((isbc064_dev.flags & DEV_DIS) == 0) {
-        printf("Initializing %s [%04X-%04XH]\n", "iSBC-064", 
+        sim_printf("Initializing %s [%04X-%04XH]\n", "iSBC-064", 
             isbc064_unit.u3,
             isbc064_unit.u3 + isbc064_unit.capac - 1);
         if (MB_buf == NULL) {
             MB_buf = malloc(isbc064_unit.capac);
             if (MB_buf == NULL) {
                 if (isbc064_dev.dctrl & DEBUG_flow)
-                    printf("isbc064_reset: Malloc error\n");
+                    sim_printf("isbc064_reset: Malloc error\n");
                 return SCPE_MEM;
             }
         }
     }
     if (isbc064_dev.dctrl & DEBUG_flow)
-        printf("isbc064_reset: Done\n");
+        sim_printf("isbc064_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -190,20 +190,20 @@ int32 isbc064_get_mbyte(int32 addr)
         org = isbc064_unit.u3;
         len = isbc064_unit.capac - 1;
         if (isbc064_dev.dctrl & DEBUG_read)
-            printf("isbc064_get_mbyte: addr=%04X", addr);
+            sim_printf("isbc064_get_mbyte: addr=%04X", addr);
         if ((addr >= org) && (addr <= org + len)) {
             val = *(MB_buf + (addr - org));
             if (isbc064_dev.dctrl & DEBUG_read)
-                printf(" val=%04X\n", val);
+                sim_printf(" val=%04X\n", val);
             return (val & 0xFF);
         } else {
             if (isbc064_dev.dctrl & DEBUG_read)
-                printf(" Out of range\n");
+                sim_printf(" Out of range\n");
             return 0xFF;    /* multibus has active high pullups */
         }
     }
     if (isbc064_dev.dctrl & DEBUG_read)
-        printf(" Disabled\n");
+        sim_printf(" Disabled\n");
     return 0xFF;        /* multibus has active high pullups */
 }
 
@@ -229,20 +229,20 @@ void isbc064_put_mbyte(int32 addr, int32 val)
         org = isbc064_unit.u3;
         len = isbc064_unit.capac - 1;
         if (isbc064_dev.dctrl & DEBUG_write)
-            printf("isbc064_put_mbyte: addr=%04X, val=%02X", addr, val);
+            sim_printf("isbc064_put_mbyte: addr=%04X, val=%02X", addr, val);
         if ((addr >= org) && (addr < org + len)) {
             *(MB_buf + (addr - org)) = val & 0xFF;
             if (isbc064_dev.dctrl & DEBUG_write)
-                printf("\n");
+                sim_printf("\n");
             return;
         } else {
             if (isbc064_dev.dctrl & DEBUG_write)
-                printf(" Out of range\n");
+                sim_printf(" Out of range\n");
             return;
         }
     }
     if (isbc064_dev.dctrl & DEBUG_write)
-        printf("isbc064_put_mbyte: Disabled\n");
+        sim_printf("isbc064_put_mbyte: Disabled\n");
 }
 
 /*  put a word into memory */

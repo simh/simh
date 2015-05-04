@@ -109,7 +109,7 @@ t_stat RAM_reset (DEVICE *dptr, int32 base, int32 size)
             return SCPE_MEM;
         }
     }
-//    printf("   RAM: Available [%04X-%04XH]\n", 
+//    sim_printf("   RAM: Available [%04X-%04XH]\n", 
 //        RAM_unit.u3,
 //        RAM_unit.u3 + RAM_unit.capac - 1);
     sim_debug (DEBUG_flow, &RAM_dev, "RAM_reset: Done\n");

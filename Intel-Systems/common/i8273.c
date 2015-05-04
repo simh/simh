@@ -201,7 +201,7 @@ t_stat i8273_reset (DEVICE *dptr)
     rr0 = 0;                            /* status register */
     rr1 = 0;                            /* error register */
     rr2 = 0;                            /* read interrupt vector */
-    printf("   8273 Reset\n");
+    sim_printf("   8273 Reset\n");
     return SCPE_OK;
 }
 
@@ -226,13 +226,13 @@ int32 i8273s(int32 io, int32 data)
             i8273_unit.u6 = 0;
             i8273_unit.buf = 0;
             i8273_unit.pos = 0;
-            printf("8273 Reset\n");
+            sim_printf("8273 Reset\n");
         } else if (i8273_unit.u6) {
             i8273_unit.u5 = data;
-            printf("8273 Command Instruction=%02X\n", data);
+            sim_printf("8273 Command Instruction=%02X\n", data);
         } else {
             i8273_unit.u4 = data;
-            printf("8273 Mode Instruction=%02X\n", data);
+            sim_printf("8273 Mode Instruction=%02X\n", data);
             i8273_unit.u6++;
         }
         return (0);

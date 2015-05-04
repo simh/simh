@@ -122,8 +122,8 @@ t_stat EPROM_attach (UNIT *uptr, char *cptr)
     sim_debug (DEBUG_read, &EPROM_dev, "\tOpen file %s\n", EPROM_unit.filename);
     fp = fopen(EPROM_unit.filename, "rb"); /* open EPROM file */
     if (fp == NULL) {
-        printf("EPROM: Unable to open ROM file %s\n", EPROM_unit.filename);
-        printf("\tNo ROM image loaded!!!\n");
+        sim_printf("EPROM: Unable to open ROM file %s\n", EPROM_unit.filename);
+        sim_printf("\tNo ROM image loaded!!!\n");
         return SCPE_OK;
     }
     sim_debug (DEBUG_read, &EPROM_dev, "\tRead file\n");
@@ -133,13 +133,13 @@ t_stat EPROM_attach (UNIT *uptr, char *cptr)
         *(uint8 *)(EPROM_unit.filebuf + j++) = c & 0xFF;
         c = fgetc(fp);
         if (j >= EPROM_unit.capac) {
-            printf("\tImage is too large - Load truncated!!!\n");
+            sim_printf("\tImage is too large - Load truncated!!!\n");
             break;
         }
     }
     sim_debug (DEBUG_read, &EPROM_dev, "\tClose file\n");
     fclose(fp);
-    printf("EPROM: %d bytes of ROM image %s loaded\n", j, EPROM_unit.filename);
+    sim_printf("EPROM: %d bytes of ROM image %s loaded\n", j, EPROM_unit.filename);
     sim_debug (DEBUG_flow, &EPROM_dev, "EPROM_attach: Done\n");
     return SCPE_OK;
 }
@@ -154,12 +154,12 @@ t_stat EPROM_reset (DEVICE *dptr, int32 size)
     if ((EPROM_unit.flags & UNIT_ATT) == 0) { /* if unattached */
         EPROM_unit.capac = size;           /* set EPROM size to 0 */
         sim_debug (DEBUG_flow, &EPROM_dev, "Done1\n");
-//        printf("   EPROM: Available [%04X-%04XH]\n", 
+//        sim_printf("   EPROM: Available [%04X-%04XH]\n", 
 //            0, EPROM_unit.capac - 1);
         return SCPE_OK;
         }
     if ((EPROM_unit.flags & UNIT_ATT) == 0) {
-        printf("EPROM: No file attached\n");
+        sim_printf("EPROM: No file attached\n");
     }
     sim_debug (DEBUG_flow, &EPROM_dev, "Done2\n");
     return SCPE_OK;

@@ -576,12 +576,12 @@ int32 sim_instr (void)
 
     while (reason == 0) {               /* loop until halted */
         if (i8088_dev.dctrl & DEBUG_asm) 
-            printf("\n");
+            sim_printf("\n");
         if (i8088_dev.dctrl & DEBUG_reg) {
-            printf("Regs: AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X IP=%04X\n",
+            sim_printf("Regs: AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X IP=%04X\n",
                 AX, BX, CX, DX, SP, BP, SI, DI, IP);
-            printf("Segs: CS=%04X DS=%04X ES=%04X SS=%04X ", CS, DS, ES, SS);
-            printf("Flags: %04X\n", PSW);
+            sim_printf("Segs: CS=%04X DS=%04X ES=%04X SS=%04X ", CS, DS, ES, SS);
+            sim_printf("Flags: %04X\n", PSW);
         }
 
         if (sim_interval <= 0) {        /* check clock queue */
@@ -3163,11 +3163,11 @@ int32 fetch_byte(int32 flag)
     if (i8088_dev.dctrl & DEBUG_asm) {  /* display source code */
         switch (flag) {
             case 0:                     /* opcode fetch */
-//                printf("%04X:%04X %s", CS, IP, opcode[val]);
-                printf("%04X:%04X %02X", CS, IP, val);
+//                sim_printf("%04X:%04X %s", CS, IP, opcode[val]);
+                sim_printf("%04X:%04X %02X", CS, IP, val);
                 break;
             case 1:                     /* byte operand fetch */
-                printf(" %02X", val);
+                sim_printf(" %02X", val);
                 break;
         }
     }
@@ -3182,8 +3182,8 @@ int32 fetch_word(void)
     val = get_smbyte(SEG_CS, IP) & 0xFF; /* fetch low byte */
     val |= get_smbyte(SEG_CS, IP + 1) << 8; /* fetch high byte */
     if (i8088_dev.dctrl & DEBUG_asm)
-//        printf("0%04XH", val);
-        printf(" %04X", val);
+//        sim_printf("0%04XH", val);
+        sim_printf(" %04X", val);
     IP = INC_IP2;                       /* increment IP */
     return val;
 }
@@ -3428,7 +3428,7 @@ uint32 get_ea(uint32 mrr)
             break;
     }
     if (i8088_dev.dctrl & DEBUG_level1) 
-        printf("get_ea: MRR=%02X MOD=%02X REG=%02X R/M=%02X DISP=%04X EA=%04X\n",
+        sim_printf("get_ea: MRR=%02X MOD=%02X REG=%02X R/M=%02X DISP=%04X EA=%04X\n",
             mrr, MOD, REG, RM, DISP, EA);
     return EA;
 }
@@ -4510,7 +4510,7 @@ int32 get_smbyte(int32 segreg, int32 addr)
 
     abs_addr = addr + (get_rword(segreg) << 4);
     val = get_mbyte(abs_addr);
-//    printf("get_smbyte: seg=%04X addr=%04X abs_addr=%08X get_mbyte=%02X\n",
+//    sim_printf("get_smbyte: seg=%04X addr=%04X abs_addr=%08X get_mbyte=%02X\n",
 //        get_rword(segreg), addr, abs_addr, val);
     return val;
 }
@@ -4556,7 +4556,7 @@ t_stat i8088_reset (DEVICE *dptr)
     saved_PC = 0;
     int_req = 0;
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
-    printf("   8088 Reset\n");
+    sim_printf("   8088 Reset\n");
     return SCPE_OK;
 }
 
@@ -4597,7 +4597,7 @@ int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
         addr++;
         cnt++;
     }                                                       /* end while */
-    printf ("%d Bytes loaded.\n", cnt);
+    sim_printf ("%d Bytes loaded.\n", cnt);
     return (SCPE_OK);
 }
 

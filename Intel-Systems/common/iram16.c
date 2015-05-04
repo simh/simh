@@ -105,10 +105,10 @@ uint8 *RAM_buf = NULL;                                  /* RAM buffer pointer */
 t_stat RAM_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
     if (RAM_dev.dctrl & DEBUG_flow)
-        printf("RAM_set_size: val=%d\n", val);
+        sim_printf("RAM_set_size: val=%d\n", val);
     if ((val < UNIT_NONE) || (val > UNIT_16K)) {
         if (RAM_dev.dctrl & DEBUG_flow)
-            printf("RAM_set_size: Size error\n");
+            sim_printf("RAM_set_size: Size error\n");
         return SCPE_ARG;
     }
     RAM_unit.capac = 0x4000 * val;                      /* set size */  
@@ -119,7 +119,7 @@ t_stat RAM_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
         RAM_buf = NULL;
     }
     if (RAM_dev.dctrl & DEBUG_flow)
-        printf("RAM_set_size: Done\n");
+        sim_printf("RAM_set_size: Done\n");
     return (RAM_reset (NULL));                          /* force reset after reconfig */
 }
 
@@ -131,27 +131,27 @@ t_stat RAM_reset (DEVICE *dptr)
     FILE *fp;
 
     if (RAM_dev.dctrl & DEBUG_flow)
-        printf("RAM_reset: \n");
+        sim_printf("RAM_reset: \n");
     if (RAM_unit.capac == 0) {                          /* if undefined */
-        printf("   RAM: defaulted for 16KB\n");
-        printf("      \"set RAM 16KB\"\n");
+        sim_printf("   RAM: defaulted for 16KB\n");
+        sim_printf("      \"set RAM 16KB\"\n");
         RAM_unit.capac = 0x4000;
         RAM_unit.u3 = 0;
         RAM_unit.u4 = 1;
     }
-    printf("   RAM: Initializing [%04X-%04XH]\n", 
+    sim_printf("   RAM: Initializing [%04X-%04XH]\n", 
         RAM_unit.u3,
         RAM_unit.u3 + RAM_unit.capac - 1);
     if (RAM_buf == NULL) {                              /* no buffer allocated */
         RAM_buf = malloc(RAM_unit.capac);
         if (RAM_buf == NULL) { 
             if (RAM_dev.dctrl & DEBUG_flow)
-                printf("RAM_reset: Malloc error\n");
+                sim_printf("RAM_reset: Malloc error\n");
             return SCPE_MEM;
         }
     }
     if (RAM_dev.dctrl & DEBUG_flow)
-        printf("RAM_reset: Done\n");
+        sim_printf("RAM_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -168,15 +168,15 @@ int32 RAM_get_mbyte(int32 addr)
     org = RAM_unit.u3;
     len = RAM_unit.capac - 1;
     if (RAM_dev.dctrl & DEBUG_read)
-        printf("RAM_get_mbyte: addr=%04X", addr);
+        sim_printf("RAM_get_mbyte: addr=%04X", addr);
     if ((addr >= org) && (addr <= org + len)) {
         val = *(RAM_buf + (addr - org));
         if (RAM_dev.dctrl & DEBUG_read)
-            printf(" val=%04X\n", val);
+            sim_printf(" val=%04X\n", val);
         return (val & 0xFF);
     }
     if (RAM_dev.dctrl & DEBUG_read)
-        printf(" Out of range\n", addr);
+        sim_printf(" Out of range\n", addr);
     return 0xFF;
 }
 
@@ -189,15 +189,15 @@ void RAM_put_mbyte(int32 addr, int32 val)
     org = RAM_unit.u3;
     len = RAM_unit.capac - 1;
     if (RAM_dev.dctrl & DEBUG_write)
-        printf("RAM_put_mbyte: addr=%04X, val=%02X", addr, val);
+        sim_printf("RAM_put_mbyte: addr=%04X, val=%02X", addr, val);
     if ((addr >= org) && (addr < org + len)) {
         *(RAM_buf + (addr - org)) = val & 0xFF;
         if (RAM_dev.dctrl & DEBUG_write)
-            printf("\n");
+            sim_printf("\n");
         return;
     }
     if (RAM_dev.dctrl & DEBUG_write)
-        printf(" Out of range\n", val);
+        sim_printf(" Out of range\n", val);
 }
 
 /* end of iram.c */
