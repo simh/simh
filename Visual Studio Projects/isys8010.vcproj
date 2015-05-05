@@ -211,6 +211,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Intel-Systems\common\iram8.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Intel-Systems\common\isbc064.c"
 				>
 			</File>

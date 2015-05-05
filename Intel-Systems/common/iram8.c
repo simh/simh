@@ -122,19 +122,19 @@ int32 RAM_get_mbyte(int32 addr)
 {
     int32 val;
 
-    if (i8255_unit.u6 & 0x02) {         /* enable RAM */
+    if (i8255_unit.u5 & 0x02) {         /* enable RAM */
         sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
-        if ((addr >= RAM_unit.u3) && (addr < (RAM_unit.u3 + RAM_unit.capac))) {
+        if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
             SET_XACK(1);                /* good memory address */
             sim_debug (DEBUG_xack, &RAM_dev, "RAM_get_mbyte: Set XACK for %04X\n", addr); 
-            val = *(uint8 *)(RAM_unit.filebuf + (addr - RAM_unit.u3));
+            val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
             sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
             return (val & 0xFF);
         }
-        sim_debug (DEBUG_read, &RAM_dev, " RAM disabled\n");
+        sim_debug (DEBUG_read, &RAM_dev, " Out of range\n");
         return 0xFF;
     }
-    sim_debug (DEBUG_read, &RAM_dev, " Out of range\n");
+    sim_debug (DEBUG_read, &RAM_dev, " RAM disabled\n");
     return 0xFF;
 }
 
@@ -144,17 +144,17 @@ void RAM_put_mbyte(int32 addr, int32 val)
 {
     if (i8255_unit.u5 & 0x02) {         /* enable RAM */
         sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
-        if ((addr >= RAM_unit.u3) && (addr < RAM_unit.u3 + RAM_unit.capac)) {
+        if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
             SET_XACK(1);                /* good memory address */
             sim_debug (DEBUG_xack, &RAM_dev, "RAM_put_mbyte: Set XACK for %04X\n", addr);  
-            *(uint8 *)(RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
+            *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
             sim_debug (DEBUG_write, &RAM_dev, "\n");
             return;
         }
-        sim_debug (DEBUG_write, &RAM_dev, " RAM disabled\n");
+        sim_debug (DEBUG_write, &RAM_dev, " Out of range\n");
         return;
     }
-    sim_debug (DEBUG_write, &RAM_dev, " Out of range\n");
+    sim_debug (DEBUG_write, &RAM_dev, " RAM disabled\n");
 }
 
 /* end of iRAM8.c */

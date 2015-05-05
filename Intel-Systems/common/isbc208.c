@@ -675,7 +675,8 @@ DEVICE isbc208_dev = {
 
 t_stat isbc208_svc (UNIT *uptr)
 {
-    int32 i, imgadr, data;
+    uint32 i;
+    int32 imgadr, data;
     int c;
     int32 bpt, bpc;
     FILE *fp;
@@ -1055,8 +1056,8 @@ int32 isbc208_r11(int32 io, int32 data)
                 i8272_msr = CB + hed + drv; /* command phase all others done */
             break;
         }
-        return 0;
     }
+    return 0;
 }
 
 /* Reset routine */
@@ -1200,8 +1201,6 @@ t_stat isbc208_attach (UNIT *uptr, char *cptr)
 
 t_stat isbc208_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-    UNIT *uptr1;
-
     sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_set_mode: Entered with val=%08XH uptr->flags=%08X\n", 
         val, uptr->flags);
     if (val & UNIT_WPMODE) {            /* write protect */

@@ -386,7 +386,7 @@ void set_cpuint(int32 int_num)
 int32 sim_instr (void)
 {
     extern int32 sim_interval;
-    uint32 IR, OP, DAR, reason, hi, lo, i, adr;
+    uint32 IR, OP, DAR, reason, adr;
 
     PC = saved_PC & WORD_R;             /* load local PC */
     reason = 0;
@@ -1436,3 +1436,5 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
     val[2] = (r >> 8) & 0xFF;
     return (-2);
 }
+
+/* end of i8080.c */

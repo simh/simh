@@ -98,14 +98,16 @@ t_stat SBC_reset (DEVICE *dptr)
 
 int32 get_mbyte(int32 addr)
 {
-    int32 val, org, len;
-
     /* if local EPROM handle it */
-    if ((i8255_unit.u5 & 0x01) && (addr >= EPROM_unit.u3) && (addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
-        return EPROM_get_mbyte(addr);
+	if (i8255_unit.u5 & 0x01) {
+		if ((addr >= EPROM_unit.u3) && ((uint16)addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
+			return EPROM_get_mbyte(addr);
+		}
     } /* if local RAM handle it */
-    if ((i8255_unit.u5 & 0x02) && (addr >= RAM_unit.u3) && (addr < (RAM_unit.u3 + RAM_unit.capac))) {
-        return RAM_get_mbyte(addr);
+	if (i8255_unit.u5 & 0x02) {
+		if ((addr >= RAM_unit.u3) && ((uint16)addr < (RAM_unit.u3 + RAM_unit.capac))) {
+			return RAM_get_mbyte(addr);
+		}
     } /* otherwise, try the multibus */
     return multibus_get_mbyte(addr);
 }
@@ -126,11 +128,11 @@ int32 get_mword(int32 addr)
 void put_mbyte(int32 addr, int32 val)
 {
     /* if local EPROM handle it */
-    if ((i8255_unit.u5 & 0x01) && (addr >= EPROM_unit.u3) && (addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
+    if ((i8255_unit.u5 & 0x01) && (addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
         sim_printf("Write to R/O memory address %04X - ignored\n", addr);
         return;
     } /* if local RAM handle it */
-    if ((i8255_unit.u5 & 0x02) && (addr >= RAM_unit.u3) && (addr <= (RAM_unit.u3 + RAM_unit.capac))) {
+    if ((i8255_unit.u5 & 0x02) && (addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
         RAM_put_mbyte(addr, val);
         return;
     } /* otherwise, try the multibus */

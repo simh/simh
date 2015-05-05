@@ -134,6 +134,7 @@ t_stat multibus_svc(UNIT *uptr)
             break;
     }
     sim_activate (&multibus_unit, multibus_unit.wait); /* continue poll */
+    return SCPE_OK;
 }
 
 /* Reset routine */
@@ -251,6 +252,7 @@ int32 reg_dev(int32 (*routine)(), int32 port)
 //        sim_printf("Port %02X is assigned\n", port);
         dev_table[port].routine = routine;
     }
+	return 0;
 }
 
 /*  get a byte from memory */

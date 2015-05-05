@@ -46,10 +46,10 @@
 
 t_stat EPROM_attach (UNIT *uptr, char *cptr);
 t_stat EPROM_reset (DEVICE *dptr, int32 size);
-int32 EPROM_get_mbyte(int32 addr);
+int32 EPROM_get_mbyte(uint32 addr);
 
 extern UNIT i8255_unit;
-extern uint8 xack;                         /* XACK signal */
+extern uint8 xack;						/* XACK signal */
 
 /* SIMH EPROM Standard I/O Data Structures */
 
@@ -82,7 +82,7 @@ DEVICE EPROM_dev = {
     NULL,               //examine
     NULL,               //deposit
 //    &EPROM_reset,       //reset
-    NULL,       //reset
+    NULL,				//reset
     NULL,               //boot
     &EPROM_attach,      //attach
     NULL,               //detach
@@ -102,7 +102,8 @@ DEVICE EPROM_dev = {
 
 t_stat EPROM_attach (UNIT *uptr, char *cptr)
 {
-    int j, c;
+    uint16 j;
+    int c;
     FILE *fp;
     t_stat r;
 
@@ -130,7 +131,7 @@ t_stat EPROM_attach (UNIT *uptr, char *cptr)
     j = 0;                              /* load EPROM file */
     c = fgetc(fp);
     while (c != EOF) {
-        *(uint8 *)(EPROM_unit.filebuf + j++) = c & 0xFF;
+        *((uint8 *)EPROM_unit.filebuf + j++) = c & 0xFF;
         c = fgetc(fp);
         if (j >= EPROM_unit.capac) {
             sim_printf("\tImage is too large - Load truncated!!!\n");
@@ -148,8 +149,6 @@ t_stat EPROM_attach (UNIT *uptr, char *cptr)
 
 t_stat EPROM_reset (DEVICE *dptr, int32 size)
 {
-    t_stat r;
-
 //    sim_debug (DEBUG_flow, &EPROM_dev, "   EPROM_reset: base=0000 size=%04X\n", size);
     if ((EPROM_unit.flags & UNIT_ATT) == 0) { /* if unattached */
         EPROM_unit.capac = size;           /* set EPROM size to 0 */
@@ -167,7 +166,7 @@ t_stat EPROM_reset (DEVICE *dptr, int32 size)
 
 /*  get a byte from memory */
 
-int32 EPROM_get_mbyte(int32 addr)
+int32 EPROM_get_mbyte(uint32 addr)
 {
     int32 val;
 
@@ -176,14 +175,14 @@ int32 EPROM_get_mbyte(int32 addr)
         if ((addr >= 0) && (addr < EPROM_unit.capac)) {
             SET_XACK(1);                /* good memory address */
             sim_debug (DEBUG_xack, &EPROM_dev, "EPROM_get_mbyte: Set XACK for %04X\n", addr); 
-            val = *(uint8 *)(EPROM_unit.filebuf + addr);
+            val = *((uint8 *)EPROM_unit.filebuf + addr);
             sim_debug (DEBUG_read, &EPROM_dev, " val=%04X\n", val);
             return (val & 0xFF);
         }
-        sim_debug (DEBUG_read, &EPROM_dev, " EPROM Disabled\n");
+        sim_debug (DEBUG_read, &EPROM_dev, " Out of range\n");
         return 0xFF;
     }
-    sim_debug (DEBUG_read, &EPROM_dev, " Out of range\n");
+    sim_debug (DEBUG_read, &EPROM_dev, " EPROM Disabled\n");
     return 0xFF;
 }
 

@@ -106,7 +106,7 @@ t_stat isbc064_reset (DEVICE *dptr)
             isbc064_unit.u3 + isbc064_unit.capac - 1);
     }
     if (isbc064_unit.filebuf == NULL) {
-        isbc064_unit.filebuf = malloc(isbc064_unit.capac);
+        isbc064_unit.filebuf = (uint8 *)malloc(isbc064_unit.capac);
         if (isbc064_unit.filebuf == NULL) {
             sim_debug (DEBUG_flow, &isbc064_dev, "isbc064_reset: Malloc error\n");
             return SCPE_MEM;
@@ -131,7 +131,7 @@ int32 isbc064_get_mbyte(int32 addr)
         if ((addr >= org) && (addr < (org + len))) {
             SET_XACK(1);                /* good memory address */
             sim_debug (DEBUG_xack, &isbc064_dev, "isbc064_get_mbyte: Set XACK for %04X\n", addr); 
-            val = *(uint8 *)(isbc064_unit.filebuf + (addr - org));
+            val = *((uint8 *)isbc064_unit.filebuf + (addr - org));
             sim_debug (DEBUG_read, &isbc064_dev, " val=%04X\n", val);
             return (val & 0xFF);
         } else {
@@ -169,7 +169,7 @@ void isbc064_put_mbyte(int32 addr, int32 val)
         if ((addr >= org) && (addr < (org + len))) {
             SET_XACK(1);                /* good memory address */
             sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Set XACK for %04X\n", addr); 
-            *(uint8 *)(isbc064_unit.filebuf + (addr - org)) = val & 0xFF;
+            *((uint8 *)isbc064_unit.filebuf + (addr - org)) = val & 0xFF;
             sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Return\n"); 
             return;
         } else {
