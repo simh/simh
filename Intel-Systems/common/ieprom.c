@@ -172,7 +172,7 @@ int32 EPROM_get_mbyte(uint32 addr)
 
     if (i8255_unit.u5 & 0x01) {         /* EPROM enabled */
         sim_debug (DEBUG_read, &EPROM_dev, "EPROM_get_mbyte: addr=%04X\n", addr);
-        if ((addr >= 0) && (addr < EPROM_unit.capac)) {
+        if (addr < EPROM_unit.capac) {
             SET_XACK(1);                /* good memory address */
             sim_debug (DEBUG_xack, &EPROM_dev, "EPROM_get_mbyte: Set XACK for %04X\n", addr); 
             val = *((uint8 *)EPROM_unit.filebuf + addr);

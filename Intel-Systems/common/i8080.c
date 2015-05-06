@@ -412,7 +412,7 @@ int32 sim_instr (void)
         }
 
         if (sim_interval <= 0) {        /* check clock queue */
-            if (reason = sim_process_event())
+            if ((reason = sim_process_event()))
                 break;
         }
         sim_interval--;                 /* countdown clock */
@@ -1329,7 +1329,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
         if (strchr(opcode[inst], ' ') != NULL)
             fprintf (of, ",");
         else fprintf (of, " ");
-        fprintf (of, "%h", val[1]);
+        fprintf (of, "%02X", val[1]);
     }
     if (oplen[inst] == 3) {
         adr = val[1] & 0xFF;
@@ -1337,7 +1337,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
         if (strchr(opcode[inst], ' ') != NULL)
             fprintf (of, ",");
         else fprintf (of, " ");
-        fprintf (of, "%h", adr);
+        fprintf (of, "%04X", adr);
     }
     return -(oplen[inst] - 1);
 }
