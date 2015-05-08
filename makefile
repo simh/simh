@@ -1216,6 +1216,16 @@ ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 ISYS8010_OPT = -I ${ISYS8010D}
 
 
+ISYS8020D = Intel-Systems/isys8020
+ISYS8020C = Intel-Systems/common
+ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
+	${ISYS8020C}/i8251.c ${ISYS8020C}/i8255.c \
+	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
+	${ISYS8020C}/multibus.c	${ISYS8020C}/isbc80-20.c	\
+	${ISYS8020C}/isbc064.c ${ISYS8020C}/isbc208.c
+ISYS8020_OPT = -I ${ISYS8020D}
+
+
 TX0D = TX-0
 TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
       ${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
@@ -1314,7 +1324,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
-	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020
 
 all : ${ALL}
 
@@ -1570,6 +1580,12 @@ isys8010: ${BIN}isys8010${EXE}
 ${BIN}isys8010${EXE} : ${ISYS8010} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8010} ${SIM} ${ISYS8010_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+isys8020: ${BIN}isys8020${EXE}
+
+${BIN}isys8020${EXE} : ${ISYS8020} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${ISYS8020} ${SIM} ${ISYS8020_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 tx-0 : ${BIN}tx-0${EXE}
 
