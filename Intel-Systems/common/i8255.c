@@ -70,29 +70,29 @@
         A read to the data ports gets the current port value, a write
         to the data ports writes the character to the device.  
 
-        *** Need to modify so that multiple devices can be registered and
-        used.
-        
+        This program up to 4 i8255 devices.  It handles 2 i8255 devices
+        on the iSBC 80/10 SBC.  Other devices could be on other multibus
+        boards in the simulated system.
 */
 
 #include "system_defs.h"                /* system header in system dir */
-#define i8255_DEV    4                    /* number of devices */
+#define i8255_DEV    4                  /* number of devices */
 
 /* function prototypes */
 
-int32 i8255s0(int32 io, int32 data);
+int32 i8255s0(int32 io, int32 data);    /* i8255 0 */
 int32 i8255a0(int32 io, int32 data);
 int32 i8255b0(int32 io, int32 data);
 int32 i8255c0(int32 io, int32 data);
-int32 i8255s1(int32 io, int32 data);
+int32 i8255s1(int32 io, int32 data);    /* i8255 1 */
 int32 i8255a1(int32 io, int32 data);
 int32 i8255b1(int32 io, int32 data);
 int32 i8255c1(int32 io, int32 data);
-int32 i8255s2(int32 io, int32 data);
+int32 i8255s2(int32 io, int32 data);    /* i8255 2 */
 int32 i8255a2(int32 io, int32 data);
 int32 i8255b2(int32 io, int32 data);
 int32 i8255c2(int32 io, int32 data);
-int32 i8255s3(int32 io, int32 data);
+int32 i8255s3(int32 io, int32 data);    /* i8255 3 */
 int32 i8255a3(int32 io, int32 data);
 int32 i8255b3(int32 io, int32 data);
 int32 i8255c3(int32 io, int32 data);
@@ -110,10 +110,10 @@ uint8 i8255_base[i8255_DEV];
 /* i8255 Standard I/O Data Structures */
 
 UNIT i8255_unit[] = {
-    { UDATA (0, 0, 0) },
-    { UDATA (0, 0, 0) },
-    { UDATA (0, 0, 0) },
-    { UDATA (0, 0, 0) }
+    { UDATA (0, 0, 0) },                /* i8255 0 */
+    { UDATA (0, 0, 0) },                /* i8255 1 */
+    { UDATA (0, 0, 0) },                /* i8255 2 */
+    { UDATA (0, 0, 0) }                 /* i8255 3 */ 
 };
 
 DEBTAB i8255_debug[] = {
@@ -128,19 +128,19 @@ DEBTAB i8255_debug[] = {
 };
 
 REG i8255_reg[] = {
-    { HRDATA (CONTROL0, i8255_unit[0].u3, 8) },
+    { HRDATA (CONTROL0, i8255_unit[0].u3, 8) }, /* i8255 0 */
     { HRDATA (PORTA0, i8255_unit[0].u4, 8) },
     { HRDATA (PORTB0, i8255_unit[0].u5, 8) },
     { HRDATA (PORTC0, i8255_unit[0].u6, 8) },
-    { HRDATA (CONTROL1, i8255_unit[1].u3, 8) },
+    { HRDATA (CONTROL1, i8255_unit[1].u3, 8) }, /* i8255 1 */
     { HRDATA (PORTA1, i8255_unit[1].u4, 8) },
     { HRDATA (PORTB1, i8255_unit[1].u5, 8) },
     { HRDATA (PORTC1, i8255_unit[1].u6, 8) },
-    { HRDATA (CONTROL1, i8255_unit[2].u3, 8) },
+    { HRDATA (CONTROL1, i8255_unit[2].u3, 8) }, /* i8255 2 */
     { HRDATA (PORTA1, i8255_unit[2].u4, 8) },
     { HRDATA (PORTB1, i8255_unit[2].u5, 8) },
     { HRDATA (PORTC1, i8255_unit[2].u6, 8) },
-    { HRDATA (CONTROL1, i8255_unit[3].u3, 8) },
+    { HRDATA (CONTROL1, i8255_unit[3].u3, 8) }, /* i8255 3 */
     { HRDATA (PORTA1, i8255_unit[3].u4, 8) },
     { HRDATA (PORTB1, i8255_unit[3].u5, 8) },
     { HRDATA (PORTC1, i8255_unit[3].u6, 8) },
@@ -176,6 +176,8 @@ DEVICE i8255_dev = {
 /*  I/O instruction handlers, called from the CPU module when an
     IN or OUT instruction is issued.
 */
+
+/* i8255 0 functions */
 
 int32 i8255s0(int32 io, int32 data)
 {
@@ -234,6 +236,8 @@ int32 i8255c0(int32 io, int32 data)
     return 0;
 }
 
+/* i8255 1 functions */
+
 int32 i8255s1(int32 io, int32 data)
 {
     int32 bit;
@@ -291,6 +295,8 @@ int32 i8255c1(int32 io, int32 data)
     return 0;
 }
 
+/* i8255 2 functions */
+
 int32 i8255s2(int32 io, int32 data)
 {
     int32 bit;
@@ -347,6 +353,8 @@ int32 i8255c2(int32 io, int32 data)
     }
     return 0;
 }
+
+/* i8255 3 functions */
 
 int32 i8255s3(int32 io, int32 data)
 {
