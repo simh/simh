@@ -70,9 +70,9 @@
         A read to the data ports gets the current port value, a write
         to the data ports writes the character to the device.  
 
-        This program up to 4 i8255 devices.  It handles 2 i8255 devices
-        on the iSBC 80/10 SBC.  Other devices could be on other multibus
-        boards in the simulated system.
+        This program simulates up to 4 i8255 devices.  It handles 2 i8255 
+        devices on the iSBC 80/10 SBC.  Other devices could be on other 
+        multibus boards in the simulated system.
 */
 
 #include "system_defs.h"                /* system header in system dir */
