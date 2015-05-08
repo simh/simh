@@ -1211,7 +1211,7 @@ ISYS8010C = Intel-Systems/common
 ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 	${ISYS8010C}/i8251.c ${ISYS8010C}/i8255.c \
 	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
-	${ISYS8010C}/multibus.c	${ISYS8010C}/isbc80-10.c	\
+	${ISYS8010C}/multibus.c ${ISYS8010C}/isbc80-10.c	\
 	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc208.c
 ISYS8010_OPT = -I ${ISYS8010D}
 
@@ -1221,8 +1221,9 @@ ISYS8020C = Intel-Systems/common
 ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
 	${ISYS8020C}/i8251.c ${ISYS8020C}/i8255.c \
 	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
-	${ISYS8020C}/multibus.c	${ISYS8020C}/isbc80-20.c	\
-	${ISYS8020C}/isbc064.c ${ISYS8020C}/isbc208.c
+	${ISYS8020C}/multibus.c ${ISYS8020C}/isbc80-20.c	\
+	${ISYS8020C}/isbc064.c ${ISYS8020C}/isbc208.c \
+	${ISYS8020C}/i8259.c
 ISYS8020_OPT = -I ${ISYS8020D}
 
 
