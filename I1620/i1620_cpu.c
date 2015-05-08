@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   07-May-15    RMS     Added missing TFL instruction (Tom McBride)
    28-Mar-15    RMS     Revised to use sim_printf
    26-Mar-15    RMS     Separated compare from add/sub flows (Tom McBride)
                         Removed ADD_SIGNC return from add/sub flows
@@ -567,6 +568,12 @@ while (reason == 0) {                                   /* loop until halted */
     case OP_TF:
     case OP_TFM:
         reason = xmt_field (PAR, QAR, 1);               /* xmit field */
+        break;
+
+/* Transmit floating - P,Q are valid */
+
+    case OP_TFL:
+        reason = xmt_field (PAR, QAR, 3);               /* xmit field */
         break;
 
 /* Transmit record - P,Q are valid */
