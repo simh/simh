@@ -124,8 +124,6 @@ DEVICE i8259_dev = {
 
 int32 i8259a0(int32 io, int32 data)
 {
-    int32 bit;
-
     if (io == 0) {                      /* read data port */
         if ((i8259_ocw3[0] & 0x03) == 0x02)
             return (i8259_unit[0].u3);  /* IRR */
@@ -161,8 +159,6 @@ int32 i8259a0(int32 io, int32 data)
 
 int32 i8259a1(int32 io, int32 data)
 {
-    int32 bit;
-
     if (io == 0) {                      /* read data port */
         if ((i8259_ocw3[1] & 0x03) == 0x02)
             return (i8259_unit[1].u3);  /* IRR */
