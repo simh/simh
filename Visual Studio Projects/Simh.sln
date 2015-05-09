@@ -117,6 +117,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BESM6", "BESM6.vcproj", "{A
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isys8010", "isys8010.vcproj", "{2FB5B6EE-796F-429F-980E-14E822837105}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isys8020", "isys8020.vcproj", "{9BBA76FE-45DD-4902-9421-BEA3EC2DCDB0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -295,6 +297,10 @@ Global
 		{2FB5B6EE-796F-429F-980E-14E822837105}.Debug|Win32.Build.0 = Debug|Win32
 		{2FB5B6EE-796F-429F-980E-14E822837105}.Release|Win32.ActiveCfg = Release|Win32
 		{2FB5B6EE-796F-429F-980E-14E822837105}.Release|Win32.Build.0 = Release|Win32
+		{9BBA76FE-45DD-4902-9421-BEA3EC2DCDB0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9BBA76FE-45DD-4902-9421-BEA3EC2DCDB0}.Debug|Win32.Build.0 = Debug|Win32
+		{9BBA76FE-45DD-4902-9421-BEA3EC2DCDB0}.Release|Win32.ActiveCfg = Release|Win32
+		{9BBA76FE-45DD-4902-9421-BEA3EC2DCDB0}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
