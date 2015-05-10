@@ -258,7 +258,7 @@ struct rqpkt {
    RD52 17      8       512     8       1       4*8     60480
    RD32 17      6       820     6       1       4*8     83204
 x  RD33 17      7       1170    ?       ?       ?       138565
-   RD53 17      7       1024    7       1       5*8     138672
+   RD53 17      8       1024    8       1       5*8     138672
    RD54 17      15      1225    15      1       7*8     311200
 
    The simulator also supports larger drives that only existed

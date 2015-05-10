@@ -431,7 +431,6 @@ typedef struct {
 #define BOOT_HK         1                               /* for VMB */
 #define BOOT_RL         2
 #define BOOT_UDA        17
-#define BOOT_TK         18
 #define BOOT_CS         64
 
 /* Function prototypes for I/O */

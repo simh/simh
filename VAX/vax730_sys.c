@@ -63,7 +63,6 @@ static struct boot_dev boot_tab[] = {
     { "RQB", BOOT_UDA, 1 << 24 },
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
-    { "TQ", BOOT_TK, 1 << 24 },
     { "TD", BOOT_TD, 0 },
     { "RB", BOOT_RB, 0 },
     { NULL }

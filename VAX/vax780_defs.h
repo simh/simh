@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2013, Robert M Supnik
+   Copyright (c) 2004-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Mar-15    RMS     Added model specific IPR max
+   16-Dec-14    RMS     Removed TQ boot code (780 VMB doesn't support tape boot)
+   05-Sep-14    RMS     Fixed SBR test (found by Mark Pizzolato)
    29-Nov-13    RMS     Added system-specific unaligned routines
    12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
    05-Nov-11    RMS     Added VEC_QMODE definition
@@ -398,7 +401,6 @@ typedef struct {
 #define BOOT_HK         1                               /* for VMB */
 #define BOOT_RL         2
 #define BOOT_UDA        17
-#define BOOT_TK         18
 #define BOOT_CS         64
 
 /* Function prototypes for I/O */

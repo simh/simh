@@ -1,6 +1,6 @@
 /* vax780_sbi.c: VAX 11/780 SBI
 
-   Copyright (c) 2004-2011, Robert M Supnik
+   Copyright (c) 2004-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,9 @@
 
    sbi                  bus controller
 
-   21-Mar-2011  RMS     Added autoreboot capability (Mark Pizzalato)
+   29-Mar-2015  RMS     Added in-exception test to machine check
+   16-Dec-2014  RMS     Removed TQ boot entry (VMB doesn't support tape boot)
+   21-Mar-2011  RMS     Added autoreboot capability (Mark Pizzolato)
    04-Feb-2011  MP      Added RQB, RQC, and RQD as bootable controllers
    31-May-2008  RMS     Fixed machine_check calling sequence (Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
@@ -122,7 +124,6 @@ static struct boot_dev boot_tab[] = {
     { "RQB", BOOT_UDA, 1 << 24 },
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
-    { "TQ", BOOT_TK, 1 << 24 },
     { "CS", BOOT_CS, 0 },
     { NULL }
     };

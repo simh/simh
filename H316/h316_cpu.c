@@ -296,8 +296,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 
-extern DEVICE *sim_devices[];
-
 t_bool devtab_init (void);
 int32 dmaio (int32 inst, int32 fnc, int32 dat, int32 dev);
 int32 undio (int32 inst, int32 fnc, int32 dat, int32 dev);
