@@ -96,8 +96,6 @@
 #include "pdp8_defs.h"
 
 extern int32 int_req;
-extern int32 sim_switches;
-extern int32 sim_interval;
 extern uint16 M[];
 extern int32 stop_inst;
 extern UNIT cpu_unit;

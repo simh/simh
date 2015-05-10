@@ -148,7 +148,6 @@
                         ((double) RC_NUMWD)))
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 extern int32 R[];
 
 static uint32   rc_la = 0;                              /* look-ahead */
@@ -165,7 +164,6 @@ static uint32   rc_stopioe = 1;                         /* stop on error */
 
 /* forward references */
 
-DEVICE rc_dev;
 static t_stat rc_rd (int32 *, int32, int32);
 static t_stat rc_wr (int32, int32, int32);
 static t_stat rc_svc (UNIT *);
@@ -438,7 +436,7 @@ static uint32 sectorCRC (const uint16 *data)
 
 static t_stat rc_svc (UNIT *uptr)
 {
-    uint32      ma, da, t, u_old, u_new, last_da;
+    uint32      ma, da, t, u_old, u_new, last_da = 0;
     uint16      dat;
     uint16      *fbuf = (uint16 *) uptr->filebuf;
 

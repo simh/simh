@@ -58,7 +58,7 @@ uint32 ttix_done = 0;                                   /* input flags */
 uint32 ttox_done = 0;                                   /* output flags */
 uint8 ttix_buf[TTX_MAXL] = { 0 };                       /* input buffers */
 uint8 ttox_buf[TTX_MAXL] = { 0 };                       /* output buffers */
-TMLN ttx_ldsc[TTX_MAXL] = { 0 };                        /* line descriptors */
+TMLN ttx_ldsc[TTX_MAXL] = { {0} };                      /* line descriptors */
 TMXR ttx_desc = { 1, 0, 0, ttx_ldsc };                  /* mux descriptor */
 #define ttx_lines ttx_desc.lines                        /* current number of lines */
 
@@ -129,7 +129,7 @@ DEVICE tti1_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &ttx_reset,
     NULL, &ttx_attach, &ttx_detach,
-    &ttix_dib, DEV_NET | DEV_DISABLE
+    &ttix_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* TTOx data structures
@@ -223,7 +223,7 @@ if (ln >= 0)                                            /* got one? rcv enab */
 tmxr_poll_rx (&ttx_desc);                               /* poll for input */
 for (ln = 0; ln < TTX_MAXL; ln++) {                     /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
-        if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {      /* get char */
+        if ((temp = tmxr_getc_ln (&ttx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
                 c = 0;
             else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags) | TTUF_KSR);
@@ -259,7 +259,7 @@ if (ttix_done) {
     }
 else {
     CLR_INT (TTI1);
-	}
+    }
 return;
 }
 
@@ -438,7 +438,7 @@ if (newln < ttx_lines) {
         if (ttx_ldsc[i].conn) {
             tmxr_linemsg (&ttx_ldsc[i], "\r\nOperator disconnected line\r\n");
             tmxr_reset_ln (&ttx_ldsc[i]);               /* reset line */
-			}
+            }
         ttox_unit[i].flags = ttox_unit[i].flags | UNIT_DIS;
         ttx_reset_ln (i);
         }

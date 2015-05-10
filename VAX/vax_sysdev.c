@@ -30,6 +30,7 @@
    nvr          non-volatile ROM (no registers)
    csi          console storage input
    cso          console storage output
+   cmctl        memory controller
    sysd         system devices (SSC miscellany)
 
    20-Dec-13    RMS     Added unaligned register space access routines
@@ -187,7 +188,6 @@ extern UNIT cpu_unit;
 extern UNIT clk_unit;
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
 extern int32 MSER;
 extern int32 tmr_poll;
 
@@ -925,7 +925,7 @@ return;
 struct reglink {                                        /* register linkage */
     uint32      low;                                    /* low addr */
     uint32      high;                                   /* high addr */
-    t_stat      (*read)(int32 pa);                      /* read routine */
+    int32       (*read)(int32 pa);                      /* read routine */
     void        (*write)(int32 pa, int32 val, int32 lnt); /* write routine */
     };
 
@@ -1529,6 +1529,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 i, st1, st2, p2, hsir, acc;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 if (p1 & 0x80)                                          /* mref? set v/p */
     p1 = p1 + mchk_ref;
 p2 = mchk_va + 4;                                       /* save vap */
@@ -1579,8 +1581,6 @@ return 0;                                               /* new cc = 0 */
 
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
-extern t_stat load_cmd (int32 flag, char *cptr);
-extern FILE *sim_log;
 t_stat r;
 
 PC = ROMBASE;
@@ -1590,9 +1590,7 @@ conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL)
     return SCPE_IERR;
 if (*rom == 0) {                                        /* no boot? */
-    printf ("Loading boot code from ka655x.bin\n");
-    if (sim_log)
-        fprintf (sim_log, "Loading boot code from ka655x.bin\n");
+    sim_printf ("Loading boot code from ka655x.bin\n");
     r = load_cmd (0, "-R ka655x.bin");
     if (r != SCPE_OK)
         return r;

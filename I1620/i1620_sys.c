@@ -1,6 +1,6 @@
 /* i1620_sys.c: IBM 1620 simulator interface
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -39,7 +39,7 @@ extern DEVICE dp_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint8 M[MAXMEMSIZE];
-extern char cdr_to_alp[128], alp_to_cdp[256];
+extern int8 cdr_to_alp[128], alp_to_cdp[256];
 
 /* SCP data structures and interface routines
 
@@ -474,7 +474,8 @@ return SCPE_OK;
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, qv, opfl, last;
-char t, la, *fptr, gbuf[CBUFSIZE];
+char la, *fptr, gbuf[CBUFSIZE];
+int8 t;
 
 while (isspace (*cptr))                                 /* absorb spaces */
     cptr++;

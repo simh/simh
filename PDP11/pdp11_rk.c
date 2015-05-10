@@ -433,9 +433,9 @@ if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not att or busy? */
     }
 if ((rkcs & RKCS_FMT) &&                                /* format and */
     (func != RKCS_READ) && (func != RKCS_WRITE)) {      /* not read or write? */
-	rk_set_done (RKER_PGE);
-	return;
-	}
+    rk_set_done (RKER_PGE);
+    return;
+    }
 if ((func == RKCS_WRITE) &&                             /* write and locked? */
     (uptr->flags & UNIT_WPRT)) {
     rk_set_done (RKER_WLK);
@@ -539,7 +539,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                     wc = i;                             /* trim transfer */
                     break;
                     }
-                rkxb[i] = ((cda / RK_NUMWD) / (RK_NUMSF * RK_NUMSC)) << RKDA_V_CYL;
+                rkxb[i] = (uint16)(((cda / RK_NUMWD) / (RK_NUMSF * RK_NUMSC)) << RKDA_V_CYL);
                 cda = cda + RK_NUMWD;                   /* next sector */
                 }                                       /* end for wc */
             }                                           /* end if format */
@@ -550,13 +550,13 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                 rkxb[i] = 0;
             }
         if (rkcs & RKCS_INH) {                          /* incr inhibit? */
-            if (t = Map_WriteW (ma, 2, &rkxb[wc - 1])) { /* store last */
+            if ((t = Map_WriteW (ma, 2, &rkxb[wc - 1]))) {/* store last */
                 rker = rker | RKER_NXM;                 /* NXM? set flag */
                 wc = 0;                                 /* no transfer */
                 }
             }
         else {                                          /* normal store */
-            if (t = Map_WriteW (ma, wc << 1, rkxb)) {   /* store buf */
+            if ((t = Map_WriteW (ma, wc << 1, rkxb))) { /* store buf */
                 rker = rker | RKER_NXM;                 /* NXM? set flag */
                 wc = wc - t;                            /* adj wd cnt */
                 }
@@ -565,7 +565,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
 
     case RKCS_WRITE:                                    /* write */
         if (rkcs & RKCS_INH) {                          /* incr inhibit? */
-            if (t = Map_ReadW (ma, 2, &comp)) {         /* get 1st word */
+            if ((t = Map_ReadW (ma, 2, &comp))) {       /* get 1st word */
                 rker = rker | RKER_NXM;                 /* NXM? set flag */
                 wc = 0;                                 /* no transfer */
                 }
@@ -573,7 +573,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                 rkxb[i] = comp;
             }
         else {                                          /* normal fetch */
-            if (t = Map_ReadW (ma, wc << 1, rkxb)) {    /* get buf */
+            if ((t = Map_ReadW (ma, wc << 1, rkxb))) {  /* get buf */
                 rker = rker | RKER_NXM;                 /* NXM? set flg */
                 wc = wc - t;                            /* adj wd cnt */
                 }
@@ -589,7 +589,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
 
     case RKCS_WCHK:                                     /* write check */
         i = fxread (rkxb, sizeof (int16), wc, uptr->fileref);
-        if (err = ferror (uptr->fileref)) {             /* read error? */
+        if ((err = ferror (uptr->fileref))) {           /* read error? */
             wc = 0;                                     /* no transfer */
             break;
             }
@@ -653,7 +653,7 @@ if (error != 0) {
         rkcs = rkcs | RKCS_ERR;
     if (rker & RKER_HARD)
         rkcs = rkcs | RKCS_HERR;
-	}
+    }
 if (rkcs & CSR_IE) {                                    /* int enable? */
     rkintq = rkintq | RK_CTLI;                          /* set ctrl int */
     SET_INT (RK);                                       /* request int */
@@ -680,8 +680,9 @@ int32 i;
 for (i = 0; i <= RK_NUMDR; i++) {                       /* loop thru intq */
     if (rkintq & (1u << i)) {                           /* bit i set? */
         rkintq = rkintq & ~(1u << i);                   /* clear bit i */
-        if (rkintq)                                     /* queue next */
+        if (rkintq) {                                   /* queue next */
             SET_INT (RK);
+            }
         rkds = (rkds & ~RKDS_ID) |                      /* id drive */
             (((i == 0)? last_drv: i - 1) << RKDS_V_ID);
         return rk_dib.vec;                              /* return vector */
@@ -751,7 +752,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rk_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

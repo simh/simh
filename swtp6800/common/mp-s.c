@@ -1,4 +1,4 @@
-/*  mp-s.c: SWTP MP-S serial I/O card emulator
+/*  mp-s.c: SWTP MP-S serial I/O card simulator
 
     Copyright (c) 2005-2011, William Beech
 
@@ -43,9 +43,9 @@
     +---+---+---+---+---+---+---+---+
 
     RXF - A 1 in this bit position means a character has been received
-    	  on the data port and is ready to be read.
+          on the data port and is ready to be read.
     TXE - A 1 in this bit means the port is ready to receive a character
-    	  on the data port and transmit it out over the serial line.
+          on the data port and transmit it out over the serial line.
  
     A read to the data port gets the buffered character, a write
     to the data port writes the character to the device.
@@ -145,7 +145,7 @@ DEVICE ptp_dev = {
 
 /* console input service routine */
 
-int32 sio_svc (UNIT *uptr)
+t_stat sio_svc (UNIT *uptr)
 {
     int32 temp;
 
@@ -161,7 +161,7 @@ int32 sio_svc (UNIT *uptr)
 
 /* paper tape reader input service routine */
 
-int32 ptr_svc (UNIT *uptr)
+t_stat ptr_svc (UNIT *uptr)
 {
     int32 temp;
 
@@ -177,40 +177,41 @@ int32 ptr_svc (UNIT *uptr)
 
 /* paper tape punch output service routine */
 
-int32 ptp_svc (UNIT *uptr)
+t_stat ptp_svc (UNIT *uptr)
 {
     return SCPE_OK;
 }
 
 /* Reset console */
 
-int32 sio_reset (DEVICE *dptr)
+t_stat sio_reset (DEVICE *dptr)
 {
     sio_unit.buf = 0;                   // Data buffer
     sio_unit.u3 = 0x02;                 // Status buffer
+    sio_unit.wait = 10000;
     sim_activate (&sio_unit, sio_unit.wait); // activate unit
     return SCPE_OK;
 }
 
 /* Reset paper tape reader */
 
-int32 ptr_reset (DEVICE *dptr)
+t_stat ptr_reset (DEVICE *dptr)
 {
     ptr_unit.buf = 0;
     ptr_unit.u3 = 0x02;
-    sim_activate (&ptr_unit, ptr_unit.wait); // activate unit
-//    sim_cancel (&ptr_unit);             // deactivate unit
+//    sim_activate (&ptr_unit, ptr_unit.wait); // activate unit
+    sim_cancel (&ptr_unit);             // deactivate unit
     return SCPE_OK;
 }
 
 /* Reset paper tape punch */
 
-int32 ptp_reset (DEVICE *dptr)
+t_stat ptp_reset (DEVICE *dptr)
 {
     ptp_unit.buf = 0;
     ptp_unit.u3 = 0x02;
-    sim_activate (&ptp_unit, ptp_unit.wait); // activate unit
-//    sim_cancel (&ptp_unit);             // deactivate unit
+//    sim_activate (&ptp_unit, ptp_unit.wait); // activate unit
+    sim_cancel (&ptp_unit);             // deactivate unit
     return SCPE_OK;
 }
 
@@ -265,12 +266,12 @@ int32 sio0d(int32 io, int32 data)
             }
             if ((odata = getc(ptr_unit.fileref)) == EOF) { // end of file?
 //              printf("Got EOF\n");
-                ptr_unit.u3 &= 0xFE;    // clear RXF flag	
+                ptr_unit.u3 &= 0xFE;    // clear RXF flag    
                 return (odata = 0);     // no data
             }
 //          printf("Returning new %02X\n", odata);
             ptr_unit.pos++;             // step character count
-            ptr_unit.u3 &= 0xFE;        // clear RXF flag	
+            ptr_unit.u3 &= 0xFE;        // clear RXF flag    
             return (odata & 0xFF);      // return character
         } else {
             sio_unit.u3 &= 0xFE;        // clear RXF flag
@@ -311,10 +312,10 @@ int32 sio0d(int32 io, int32 data)
     return (odata = 0);
 }
 
-/*	because each port appears at 2 addresses and this fact is used
-	to determine if it is a MP-C or MP-S repeatedly in the SWTBUG
-	monitor, this code assures that reads of the high ports return
-	the same data as was read the last time on the low ports.
+/*  Because each port appears at 2 addresses and this fact is used
+    to determine if it is a MP-C or MP-S repeatedly in the SWTBUG
+    monitor, this code assures that reads of the high ports return
+    the same data as was read the last time on the low ports.
 */
 
 int32 sio1s(int32 io, int32 data)

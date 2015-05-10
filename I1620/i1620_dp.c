@@ -1,6 +1,6 @@
 /* i1620_dp.c: IBM 1311 disk simulator
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

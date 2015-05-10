@@ -1,6 +1,6 @@
 /* hp2100_cpu2.c: HP 2100/1000 FP/DMS/EIG/IOP instructions
 
-   Copyright (c) 2005-2008, Robert M. Supnik
+   Copyright (c) 2005-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    CPU2         Floating-point, dynamic mapping, extended, and I/O processor
                 instructions
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   09-May-12    JDB     Separated assignments from conditional expressions
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    05-Aug-08    JDB     Updated mp_dms_jmp calling sequence
@@ -117,9 +119,12 @@ uint32 entry;
 
 entry = (IR >> 4) & 017;                                /* mask to entry point */
 
-if (op_fp[entry] != OP_N)
-    if (reason = cpu_ops (op_fp[entry], op, intrq))     /* get instruction operands */
-        return reason;
+if (op_fp [entry] != OP_N) {
+    reason = cpu_ops (op_fp [entry], op, intrq);        /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<7:4> */
 
@@ -243,9 +248,12 @@ uint32 i, t, mapi, mapj;
 absel = (IR & I_AB)? 1: 0;                              /* get A/B select */
 entry = IR & 037;                                       /* mask to entry point */
 
-if (op_dms[entry] != OP_N)
-    if (reason = cpu_ops (op_dms[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_dms [entry] != OP_N) {
+    reason = cpu_ops (op_dms [entry], op, intrq);       /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<3:0> */
 
@@ -461,11 +469,11 @@ switch (entry) {                                        /* decode IR<3:0> */
         break;
 
     case 030:                                           /* RSA, RSB 10x730 (OP_N) */
-        ABREG[absel] = dms_upd_sr ();                   /* save stat */
+        ABREG[absel] = (uint16) dms_upd_sr ();          /* save stat */
         break;
 
     case 031:                                           /* RVA, RVB 10x731 (OP_N) */
-        ABREG[absel] = dms_upd_vr (err_PC);             /* return updated violation register */
+        ABREG[absel] = (uint16) dms_upd_vr (err_PC);    /* return updated violation register */
         break;
 
     case 032:                                           /* DJP 105732 (OP_A) */
@@ -609,9 +617,12 @@ int32 sop1, sop2;
 absel = (IR & I_AB)? 1: 0;                              /* get A/B select */
 entry = IR & 037;                                       /* mask to entry point */
 
-if (op_eig[entry] != OP_N)
-    if (reason = cpu_ops (op_eig[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_eig [entry] != OP_N) {
+    reason = cpu_ops (op_eig [entry], op, intrq);       /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<4:0> */
 
@@ -636,7 +647,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 004:                                           /* CXA, CXB 10x744 (OP_N) */
-        ABREG[absel] = XR;                              /* copy from XR */
+        ABREG[absel] = (uint16) XR;                     /* copy from XR */
         break;
 
     case 005:                                           /* LDX 105745 (OP_K)*/
@@ -653,7 +664,7 @@ switch (entry) {                                        /* decode IR<4:0> */
     case 007:                                           /* XAX, XBX 10x747 (OP_N) */
         t = XR;                                         /* exchange XR */
         XR = ABREG[absel];
-        ABREG[absel] = t;
+        ABREG[absel] = (uint16) t;
         break;
 
     case 010:                                           /* SAY, SBY 10x750 (OP_A) */
@@ -675,7 +686,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 014:                                           /* CYA, CYB 10x754 (OP_N) */
-        ABREG[absel] = YR;                              /* copy from YR */
+        ABREG[absel] = (uint16) YR;                     /* copy from YR */
         break;
 
     case 015:                                           /* LDY 105755 (OP_K) */
@@ -692,7 +703,7 @@ switch (entry) {                                        /* decode IR<4:0> */
     case 017:                                           /* XAY, XBY 10x757 (OP_N) */
         t = YR;                                         /* exchange YR */
         YR = ABREG[absel];
-        ABREG[absel] = t;
+        ABREG[absel] = (uint16) t;
         break;
 
 /* EIG module 2 */
@@ -988,9 +999,12 @@ else if (entry <= 057)                                  /* IR = 10x440-457? */
 
 entry = entry - 060;                                    /* offset 10x460-477 */
 
-if (op_iop[entry] != OP_N)
-    if (reason = cpu_ops (op_iop[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_iop [entry] != OP_N) {
+    reason = cpu_ops (op_iop [entry], op, intrq);       /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<5:0> */
 
@@ -1017,7 +1031,7 @@ switch (entry) {                                        /* decode IR<5:0> */
         break;
 
     case 002:                                           /* READF 105462 (OP_N) */
-        AR = iop_sp;                                    /* copy stk ptr */
+        AR = (uint16) iop_sp;                           /* copy stk ptr */
         break;
 
     case 003:                                           /* INS 105463 (OP_N) */

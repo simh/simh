@@ -1,6 +1,6 @@
 /* h316_lp.c: Honeywell 316/516 line printer
 
-   Copyright (c) 1999-2008, Robert M. Supnik
+   Copyright (c) 1999-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    09-Jun-07    RMS     Fixed lost last print line (Theo Engel)
    19-Jan-06    RMS     Added UNIT_TEXT flag
    03-Apr-06    RMS     Fixed bug in blanks backscanning (Theo Engel)
@@ -105,7 +106,7 @@ t_stat lpt_reset (DEVICE *dptr);
    lpt_reg      LPT register list
 */
 
-DIB lpt_dib = { LPT, IOBUS, 1, &lptio };
+DIB lpt_dib = { LPT, 1, IOBUS, IOBUS, INT_V_LPT, INT_V_NONE, &lptio, 0 };
 
 UNIT lpt_unit = { UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0) };
 

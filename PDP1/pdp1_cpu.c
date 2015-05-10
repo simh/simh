@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-1 central processor
 
+   27-Mar-15    RMS     Backported changed from GitHub master
    21-Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
    30-May-07    RMS     Fixed typo in SBS clear (Norm Lastovica)
    28-Dec-06    RMS     Added 16-channel SBS support, PDP-1D support
@@ -32,6 +33,7 @@
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    09-Nov-04    RMS     Added instruction history
+   08-Feb-04    PLB     Added display device spacewar/test switches
    07-Sep-03    RMS     Added additional explanation on I/O simulation
    01-Sep-03    RMS     Added address switches for hardware readin
    23-Jul-03    RMS     Revised to detect I/O wait hang
@@ -335,10 +337,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* inst history */
 
-extern UNIT *sim_clock_queue;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
@@ -364,6 +362,10 @@ extern int32 dt (int32 inst, int32 dev, int32 dat);
 extern int32 drm (int32 inst, int32 dev, int32 dat);
 extern int32 clk (int32 inst, int32 dev, int32 dat);
 extern int32 dcs (int32 inst, int32 dev, int32 dat);
+#ifdef USE_DISPLAY
+extern int32 dpy (int32 inst, int32 dev, int32 dat, int32 dat2);
+extern int32 spacewar (int32 inst, int32 dev, int32 dat);
+#endif
 
 const int32 sc_map[512] = {
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,     /* 00000xxxx */
@@ -503,7 +505,6 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 int32 IR, op, i, t, xct_count;
 int32 sign, signd, v, sbs_lvl, byno;
 int32 dev, pulse, io_data, sc, skip;
@@ -546,7 +547,7 @@ reason = 0;
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         sbs_lvl = sbs_eval ();                          /* eval sbs system */
         }
@@ -610,25 +611,25 @@ while (reason == 0) {                                   /* loop until halted */
 /* Logical, load, store instructions */
 
     case 001:                                           /* AND */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         AC = AC & MB;
         break;
 
     case 002:                                           /* IOR */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         AC = AC | MB;
         break;
 
     case 003:                                           /* XOR */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         AC = AC ^ MB;
         break;
@@ -638,9 +639,9 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_XCT;
             break;
             }
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         xct_count = xct_count + 1;                      /* count XCT's */
         IR = MB;                                        /* get instruction */
@@ -648,9 +649,9 @@ while (reason == 0) {                                   /* loop until halted */
 
     case 005:                                           /* LCH */
         if (cpu_unit.flags & UNIT_1D) {                 /* PDP-1D? */
-            if (reason = Ea_ch (IR, &byno))             /* MA <- eff addr */
+            if ((reason = Ea_ch (IR, &byno)))           /* MA <- eff addr */
                 break;
-            if (reason = Read ())                       /* MB <- data */
+            if ((reason = Read ()))                     /* MB <- data */
                 break;
             AC = (MB << byt_shf[byno]) & 0770000;       /* extract byte */
             }
@@ -659,9 +660,9 @@ while (reason == 0) {                                   /* loop until halted */
 
     case 006:                                           /* DCH */
         if (cpu_unit.flags & UNIT_1D) {                 /* PDP-1D? */
-            if (reason = Ea_ch (IR, &byno))             /* MA <- eff addr */
+            if ((reason = Ea_ch (IR, &byno)))           /* MA <- eff addr */
                 break;
-            if (reason = Read ())                       /* MB <- data */
+            if ((reason = Read ()))                     /* MB <- data */
                 break;
             MB = (MB & ~(0770000 >> byt_shf[byno])) |   /* insert byte */
                 ((AC & 0770000) >> byt_shf[byno]);
@@ -683,55 +684,55 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
     case 010:                                           /* LAC */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         AC = MB;
         break;
 
     case 011:                                           /* LIO */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         IO = MB;
         break;
 
     case 012:                                           /* DAC */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
         MB = AC;
         reason = Write ();
         break;
 
     case 013:                                           /* DAP */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         MB = (AC & DAMASK) | (MB & ~DAMASK);
         reason = Write ();
         break;
 
     case 014:                                           /* DIP */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         MB = (AC & ~DAMASK) | (MB & DAMASK);
         reason = Write ();
         break;
 
     case 015:                                           /* DIO */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
         MB = IO;
         reason = Write ();
         break;
 
     case 016:                                           /* DZM */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
         MB = 0;
         reason = Write ();
@@ -755,9 +756,9 @@ while (reason == 0) {                                   /* loop until halted */
 
     case 017:                                           /* TAD */
         if (cpu_unit.flags & UNIT_1D) {                 /* PDP-1D? */
-            if (reason = Ea (IR))                       /* MA <- eff addr */
+            if ((reason = Ea (IR)))                     /* MA <- eff addr */
                 break;
-            if (reason = Read ())                       /* MB <- data */
+            if ((reason = Read ()))                     /* MB <- data */
                 break;
             AC = AC + MB + ((PF & PF_L)? 1: 0);         /* AC + opnd + L */
             if (AC > DMASK)                             /* carry? set L */
@@ -769,9 +770,9 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
     case 020:                                           /* ADD */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         t = AC;
         AC = AC + MB;
@@ -784,9 +785,9 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
     case 021:                                           /* SUB */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         t = AC ^ DMASK;                                 /* complement AC */
         AC = t + MB;                                    /* -AC + MB */
@@ -798,9 +799,9 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
     case 022:                                           /* IDX */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         AC = MB + 1;
         if (AC >= DMASK)
@@ -810,9 +811,9 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
     case 023:                                           /* ISP */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         AC = MB + 1;
         if (AC >= DMASK)
@@ -824,18 +825,18 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
     case 024:                                           /* SAD */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         if (AC != MB)
             PC = INCR_ADDR (PC);
         break;
 
     case 025:                                           /* SAS */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         if (AC == MB)
             PC = INCR_ADDR (PC);
@@ -863,7 +864,7 @@ while (reason == 0) {                                   /* loop until halted */
                 hst[hst_p].ea = PC;
             }
         else {                                          /* normal JMP */
-            if (reason = Ea (IR))                       /* MA <- eff addr */
+            if ((reason = Ea (IR)))                     /* MA <- eff addr */
                 break;
             PCQ_ENTRY;
             PC = MA;
@@ -871,7 +872,7 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
     case 031:                                           /* JSP */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
         AC = EPC_WORD;
         PCQ_ENTRY;
@@ -889,9 +890,9 @@ while (reason == 0) {                                   /* loop until halted */
 */   
 
     case 026:                                           /* MUL */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         if (cpu_unit.flags & UNIT_MDV) {                /* hardware? */
             sign = AC ^ MB;                             /* result sign */
@@ -919,9 +920,9 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
     case 027:                                           /* DIV */
-        if (reason = Ea (IR))                           /* MA <- eff addr */
+        if ((reason = Ea (IR)))                         /* MA <- eff addr */
             break;
-        if (reason = Read ())                           /* MB <- data */
+        if ((reason = Read ()))                         /* MB <- data */
             break;
         if (cpu_unit.flags & UNIT_MDV) {                /* hardware */
             sign = AC ^ MB;                             /* result sign */
@@ -1208,6 +1209,11 @@ while (reason == 0) {                                   /* loop until halted */
             io_data = ptp (IR, dev, IO);
             break;
 
+#ifdef USE_DISPLAY
+        case 007:                                       /* display */
+            io_data = dpy (IR, dev, IO, AC);
+            break;
+#endif
         case 010:                                       /* leave ring mode */
             if (cpu_unit.flags & UNIT_1D)
                 PF = PF & ~PF_RNG;
@@ -1217,7 +1223,12 @@ while (reason == 0) {                                   /* loop until halted */
         case 011:                                       /* enter ring mode */
             if (cpu_unit.flags & UNIT_1D)
                 PF = PF | PF_RNG;
-            else reason = stop_inst;
+            else
+#ifdef USE_DISPLAY
+                io_data = spacewar (IR, dev, IO);
+#else
+                reason = stop_inst;
+#endif
             break;
 
        case 022:                                        /* data comm sys */
@@ -1362,13 +1373,13 @@ t_stat r;
 MA = (PC & EPCMASK) | (IR & DAMASK);                    /* direct address */
 if (IR & IA) {                                          /* indirect addr? */
     if (extm) {                                         /* extend? */
-        if (r = Read ())                                /* read; err? */
+        if ((r = Read ()))                              /* read; err? */
             return r;
         MA = MB & AMASK;                                /* one level */
         }
     else {                                              /* multi-level */
         for (i = 0; i < ind_max; i++) {                 /* count indirects */
-            if (r = Read ())                            /* get ind word */
+            if ((r = Read ()))                          /* get ind word */
                 return r;
             MA = (PC & EPCMASK) | (MB & DAMASK);
             if ((MB & IA) == 0)
@@ -1392,12 +1403,12 @@ t_stat r;
 
 MA = (PC & EPCMASK) | (IR & DAMASK);                    /* direct address */
 if (extm) {                                             /* extend? */
-    if (r = Read ())                                    /* read; err? */
+    if ((r = Read ()))                                  /* read; err? */
         return r;
     }
 else {                                                  /* multi-level */
     for (i = 0; i < ind_max; i++) {                     /* count indirects */
-        if (r = Read ())                                /* get ind word */
+        if ((r = Read ()))                              /* get ind word */
             return r;
         if ((MB & IA) == 0)
             break;
@@ -1596,7 +1607,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 mc = 0;
 uint32 i;
 
-if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
+if ((val <= 0) || (((size_t)val) > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
 for (i = val; i < MEMSIZE; i++)
     mc = mc | M[i];
@@ -1656,8 +1667,6 @@ char *cptr = (char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;
@@ -1692,3 +1701,18 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
     }                                                   /* end for */
 return SCPE_OK;
 }
+
+#ifdef USE_DISPLAY
+/* set "test switches"; from display code */
+
+void cpu_set_switches(unsigned long bits)
+{
+/* just what we want; smaller CPUs might want to shift down? */
+TW = bits;
+}
+
+unsigned long cpu_get_switches(void)
+{
+return TW;
+}
+#endif

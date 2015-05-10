@@ -1,6 +1,6 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disk simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,10 @@
    DP           12557A 2871 disk subsystem
                 13210A 7900 disk subsystem
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   18-Dec-12    MP      Now calls sim_activate_time to get remaining seek time
+   09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CNTLR_TYPE cast to dp_settype
    28-Mar-11    JDB     Tidied up signal handling
@@ -190,7 +194,7 @@
 #define STA_PROT        0002000                         /* protected (13210) */
 #define STA_SKI         0001000                         /* incomplete NI (u) */
 #define STA_SKE         0000400                         /* seek error */
-/*                      0000200                         /* unused */
+/*                      0000200                            (unused) */
 #define STA_NRDY        0000100                         /* not ready (d) */
 #define STA_EOC         0000040                         /* end of cylinder */
 #define STA_AER         0000020                         /* addr error */
@@ -573,7 +577,8 @@ while (working_set) {
             data = 0;
 
             for (i = 0; i < DP_NUMDRV; i++)             /* form attention register value */
-                if (dpc_sta[i] & STA_ATN) data = data | (1 << i);
+                if (dpc_sta[i] & STA_ATN)
+                    data = data | (uint16) (1 << i);
 
             stat_data = IORETURN (SCPE_OK, data);       /* merge in return status */
             break;
@@ -694,7 +699,8 @@ void dp_goc (int32 fnc, int32 drv, int32 time)
 {
 int32 t;
 
-if (t = sim_is_active (&dpc_unit[drv])) {               /* still seeking? */
+t = sim_activate_time (&dpc_unit[drv]);
+if (t) {                                                /* still seeking? */
     sim_cancel (&dpc_unit[drv]);                        /* stop seek */
     dpc_sta[drv] = dpc_sta[drv] & ~STA_BSY;             /* clear busy */
     time = time + t;                                    /* include seek time */
@@ -906,10 +912,13 @@ switch (uptr->FNC) {                                    /* case function */
                 dpc_rarh = dpc_rarh ^ 1;                /* incr head */
                 dpc_eoc = ((dpc_rarh & 1) == 0);        /* calc eoc */
                 }
-            if (err = fseek (uptr->fileref, da * sizeof (int16),
-                SEEK_SET)) break;
+            err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+            if (err)                                    /* error? */
+                 break;
             fxread (dpxb, sizeof (int16), DP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref)) break;
+            err = ferror (uptr->fileref);
+            if (err)                                    /* error? */
+                 break;
             }
         dpd_ibuf = dpxb[dp_ptr++];                      /* get word */
         if (dp_ptr >= DP_NUMWD) {                       /* end of sector? */
@@ -944,7 +953,7 @@ switch (uptr->FNC) {                                    /* case function */
                 break;                                  /* done */
                 }
             }
-        dpxb[dp_ptr++] = dpd_wval? dpd_obuf: 0;         /* store word/fill */
+        dpxb[dp_ptr++] = dpd_wval ? (uint16) dpd_obuf : 0;  /* store word/fill */
         dpd_wval = 0;                                   /* clr data valid */
         if (dp_ptr >= DP_NUMWD) {                       /* buffer full? */
             da = GETDA (dpc_rarc, dpc_rarh, dpc_rars);  /* calc disk addr */
@@ -953,10 +962,13 @@ switch (uptr->FNC) {                                    /* case function */
                 dpc_rarh = dpc_rarh ^ 1;                /* incr head */
                 dpc_eoc = ((dpc_rarh & 1) == 0);        /* calc eoc */
                 }
-            if (err = fseek (uptr->fileref, da * sizeof (int16),
-                SEEK_SET)) break;
+            err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+            if (err)                                    /* error? */
+                 break;
             fxwrite (dpxb, sizeof (int16), DP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref)) break;    /* error? */
+            err = ferror (uptr->fileref);
+            if (err)                                    /* error? */
+                 break;
             dp_ptr = 0;                                 /* next sector */
             }
         if (dpd.command && dpd_xfer)                    /* dch on, xfer? */
@@ -1172,12 +1184,15 @@ const BOOT_ROM dp_rom = {
 
 t_stat dpc_boot (int32 unitno, DEVICE *dptr)
 {
-int32 dev;
+const int32 dev = dpd_dib.select_code;                  /* data chan select code */
 
-if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
-dev = dpd_dib.select_code;                              /* get data chan dev */
-if (ibl_copy (dp_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
-SR = (SR & IBL_OPT) | IBL_DP | (dev << IBL_V_DEV);      /* set SR */
-if (sim_switches & SWMASK ('R')) SR = SR | IBL_DP_REM;  /* boot from removable? */
-return SCPE_OK;
+if (unitno != 0)                                        /* boot supported on drive unit 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
+
+if (ibl_copy (dp_rom, dev, IBL_OPT,                     /* copy the boot ROM to memory and configure */
+              IBL_DP | IBL_SET_SC (dev)                 /*   the S register accordingly */
+                | (sim_switches & SWMASK ('R') ? IBL_DP_REM : 0)))
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+else
+    return SCPE_OK;
 }

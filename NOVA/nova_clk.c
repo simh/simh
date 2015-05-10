@@ -140,7 +140,7 @@ if ( DEV_IS_BUSY(INT_CLK) )
     DEV_UPDATE_INTR ;
     }
 t = sim_rtc_calb (clk_tps[clk_sel]);                    /* calibrate delay */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
+sim_activate_after (uptr, 1000000/clk_tps[clk_sel]);    /* reactivate unit */
 if (clk_adj[clk_sel] > 0)                               /* clk >= 60Hz? */
     tmxr_poll = t * clk_adj[clk_sel];                   /* poll is longer */
 else
@@ -153,6 +153,7 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 clk_sel = 0;
 DEV_CLR_BUSY( INT_CLK ) ;
 DEV_CLR_DONE( INT_CLK ) ;

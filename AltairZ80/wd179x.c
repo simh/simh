@@ -42,6 +42,7 @@
 /*#define DBG_MSG */
 
 #include "altairz80_defs.h"
+#include <assert.h>
 
 #if defined (_WIN32)
 #include <windows.h>
@@ -514,12 +515,12 @@ uint8 WD179X_Read(const uint32 Addr)
                             /* Compute Sector Size */
                             wd179x_info->fdc_sec_len = floorlog2(
                                 pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].sectsize) - 7;
-                            if((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
+                            if(wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN) { /* Error calculating N or N too large */
                                 sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
                                 wd179x_info->fdc_sec_len = 0;
                                 return cData;
                             }
-
+                            assert(wd179x_info->fdc_sec_len >= 0); // convince static analyzer that << is ok
                             wd179x_info->fdc_sector ++;
                             sim_debug(RD_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT " MULTI_READ_REC, T:%d/S:%d/N:%d, %s, len=%d\n", wd179x_info->sel_drive, PCX, pDrive->track, wd179x_info->fdc_head, wd179x_info->fdc_sector, wd179x_info->ddens ? "DD" : "SD", 128 << wd179x_info->fdc_sec_len);
 
@@ -703,7 +704,7 @@ static uint8 Do1793Command(uint8 cCommand)
             /* Compute Sector Size */
             wd179x_info->fdc_sec_len = floorlog2(
                 pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].sectsize) - 7;
-            if((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
+            if(wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN) { /* Error calculating N or N too large */
                 sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
                           " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
                 wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;       /* Sector not found */
@@ -712,7 +713,8 @@ static uint8 Do1793Command(uint8 cCommand)
                 wd179x_info->drq = 0;
                 wd179x_info->fdc_sec_len = 0;
                 return 0xFF;
-            }
+            };
+            assert(wd179x_info->fdc_sec_len >= 0); // convince static analyzer that << is ok
 
             wd179x_info->fdc_multiple = (cCommand & 0x10) ? TRUE : FALSE;
             sim_debug(RD_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
@@ -766,7 +768,7 @@ static uint8 Do1793Command(uint8 cCommand)
             /* Compute Sector Size */
             wd179x_info->fdc_sec_len = floorlog2(
                 pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].sectsize) - 7;
-            if((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
+            if(wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN) { /* Error calculating N or N too large */
                 sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
                           " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
                 wd179x_info->fdc_sec_len = 0;
@@ -798,7 +800,7 @@ static uint8 Do1793Command(uint8 cCommand)
             /* Compute Sector Size */
             wd179x_info->fdc_sec_len = floorlog2(
                 pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].sectsize) - 7;
-            if((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
+            if(wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN) { /* Error calculating N or N too large */
                 sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
                           " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
                 wd179x_info->fdc_sec_len = 0;
@@ -1080,7 +1082,7 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
                             wd179x_info->fdc_dataindex++;
                         } else {
                             wd179x_info->fdc_sec_len = floorlog2(wd179x_info->fdc_dataindex) - 7;
-                            if((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
+                            if(wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN) { /* Error calculating N or N too large */
                                 sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
                                           " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
                                 wd179x_info->fdc_sec_len = 0;

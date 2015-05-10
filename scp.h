@@ -1,6 +1,6 @@
 /* scp.h: simulator control program headers
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,13 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-Dec-14    JDB     [4.0] Moved sim_load and sim_emax declarations from scp.c
+   14-Dec-14    JDB     [4.0] Added sim_activate_time
+                        [4.0] Changed sim_is_active to return t_bool
+                        [4.0] Added data externals
+   02-Jul-14    JDB     [4.0] Added sim_error_text
+   26-Feb-13    JDB     [4.0] Moved EX_* and SSH_* constants from scp.c
+   05-Dec-10    MP      Added macro invocation of sim_debug 
    09-Aug-06    JDB     Added assign_device and deassign_device
    14-Jul-06    RMS     Added sim_activate_abs
    06-Jan-06    RMS     Added fprint_stopped_gen
@@ -33,8 +40,8 @@
    02-Jan-04    RMS     Split out from SCP
 */
 
-#ifndef _SIM_SCP_H_
-#define _SIM_SCP_H_     0
+#ifndef SIM_SCP_H_
+#define SIM_SCP_H_     0
 
 /* run_cmd parameters */
 
@@ -43,6 +50,18 @@
 #define RU_STEP         2                               /* step */
 #define RU_CONT         3                               /* continue */
 #define RU_BOOT         4                               /* boot */
+
+/* exdep_cmd parameters */
+
+#define EX_D            0                               /* deposit */
+#define EX_E            1                               /* examine */
+#define EX_I            2                               /* interactive */
+
+/* brk_cmd parameters */
+
+#define SSH_ST          0                               /* set */
+#define SSH_SH          1                               /* show */
+#define SSH_CL          2                               /* clear */
 
 /* get_sim_opt parameters */
 
@@ -79,8 +98,10 @@ t_stat echo_cmd (int32 flag, char *ptr);
 t_stat sim_process_event (void);
 t_stat sim_activate (UNIT *uptr, int32 interval);
 t_stat sim_activate_abs (UNIT *uptr, int32 interval);
+const char *sim_error_text (t_stat stat);
 t_stat sim_cancel (UNIT *uptr);
-int32 sim_is_active (UNIT *uptr);
+t_bool sim_is_active (UNIT *uptr);
+int32 sim_activate_time (UNIT *uptr);
 double sim_gtime (void);
 uint32 sim_grtime (void);
 int32 sim_qcount (void);
@@ -118,5 +139,67 @@ void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
     uint16 before, uint16 after, int terminate);
 void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
+void sim_printf (const char *fmt, ...);
+
+/* Global data */
+
+extern DEVICE *sim_dflt_dev;
+extern int32 sim_interval;
+extern int32 sim_switches;
+extern int32 sim_quiet;
+extern int32 sim_step;
+extern FILE *sim_log;                                   /* log file */
+extern FILE *sim_deb;                                   /* debug file */
+extern UNIT *sim_clock_queue;
+extern int32 sim_is_running;
+extern t_value *sim_eval;
+extern volatile int32 stop_cpu;
+extern uint32 sim_brk_types;                            /* breakpoint info */
+extern uint32 sim_brk_dflt;
+extern uint32 sim_brk_summ;
+
+/* VM interface */
+
+extern char sim_name[];
+extern DEVICE *sim_devices[];
+extern REG *sim_PC;
+extern const char *sim_stop_messages[];
+extern t_stat sim_instr (void);
+extern t_stat sim_load (FILE *ptr, char *cptr, char *fnam, int flag);
+extern int32 sim_emax;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+    UNIT *uptr, int32 sw);
+extern t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val,
+    int32 sw);
+
+/* The per-simulator init routine is a weak global that defaults to NULL
+   The other per-simulator pointers can be overrriden by the init routine */
+
+extern void (*sim_vm_init) (void);
+extern char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream);
+extern void (*sim_vm_post) (t_bool from_scp);
+extern CTAB *sim_vm_cmd;
+extern void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr);
+extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
+extern t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason);
+
+/* vsnprintf hassles for various compilers - missing in old DEC C */
+
+#if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__CRTL_VER <= 70311000))
+
+#define VSNPRINTF(a,b,c,d)      vsprintf (a, c, d)
+#define STACKBUFSIZE            16384
+
+#else
+
+#define VSNPRINTF(a,b,c,d)      vsnprintf (a, b, c, d)
+#define STACKBUFSIZE            2048
+
+#endif
+
+/* V4 compatibility */
+
+#define sim_activate_time(u)    sim_is_active (u)
+void sim_perror (char *msg);
 
 #endif

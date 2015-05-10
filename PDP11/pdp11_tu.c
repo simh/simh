@@ -240,9 +240,6 @@ static char *tu_fname[CS1_N_FNC] = {
     "WRITE", "31", "32", "33", "READF", "35", "36" "READR"
     };
 
-extern int32 sim_switches;
-extern FILE *sim_deb;
-
 t_stat tu_mbrd (int32 *data, int32 PA, int32 fmtr);
 t_stat tu_mbwr (int32 data, int32 PA, int32 fmtr);
 t_stat tu_svc (UNIT *uptr);
@@ -648,7 +645,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_SPACEF:                                    /* space forward */
         do {
             tufc = (tufc + 1) & 0177777;                /* incr fc */
-            if (st = sim_tape_sprecf (uptr, &tbc)) {    /* space rec fwd, err? */
+            if ((st = sim_tape_sprecf (uptr, &tbc))) {  /* space rec fwd, err? */
                 r = tu_map_err (drv, st, 0);            /* map error */
                 break;
                 }
@@ -661,7 +658,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_SPACER:                                    /* space reverse */
         do {
             tufc = (tufc + 1) & 0177777;                /* incr wc */
-            if (st = sim_tape_sprecr (uptr, &tbc)) {    /* space rec rev, err? */
+            if ((st = sim_tape_sprecr (uptr, &tbc))) {  /* space rec rev, err? */
                 r = tu_map_err (drv, st, 0);            /* map error */
                 break;
                 }
@@ -672,7 +669,7 @@ switch (fnc) {                                          /* case on function */
         break;
 
     case FNC_WREOF:                                     /* write end of file */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = tu_map_err (drv, st, 0);                /* map error */
         break;
 
@@ -688,7 +685,7 @@ switch (fnc) {                                          /* case on function */
         tufc = 0;                                       /* clear frame count */
         if ((uptr->UDENS == TC_1600) && sim_tape_bot (uptr))
             tufs = tufs | FS_ID;                        /* PE BOT? ID burst */
-        if (st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR)) { /* read fwd */
+        if ((st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR))) {/* read fwd */
             if (st == MTSE_TMK)                         /* tmk also sets FCE */
                 tu_set_er (ER_FCE);
             r = tu_map_err (drv, st, 1);                /* map error */
@@ -737,10 +734,10 @@ switch (fnc) {                                          /* case on function */
             for (i = j = 0; j < xbc; j = j + 1) {
                 xbuf[i++] = wbuf[j] & 0377;
                 xbuf[i++] = (wbuf[j] >> 8) & 0377;
-				}
+                }
             tbc = xbc;
             }
-        if (st = sim_tape_wrrecf (uptr, xbuf, tbc))     /* write rec, err? */
+        if ((st = sim_tape_wrrecf (uptr, xbuf, tbc)))   /* write rec, err? */
             r = tu_map_err (drv, st, 1);                /* map error */
         else {
             tufc = (tufc + tbc) & 0177777;
@@ -752,7 +749,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_READR:                                     /* read reverse */
     case FNC_WCHKR:                                     /* wcheck = read */
         tufc = 0;                                       /* clear frame count */
-        if (st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR)) { /* read rev */
+        if ((st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR))) {/* read rev */
             if (st == MTSE_TMK)                         /* tmk also sets FCE */
                 tu_set_er (ER_FCE);
             r = tu_map_err (drv, st, 1);                /* map error */
@@ -794,7 +791,7 @@ if (DEBUG_PRS (tu_dev)) {
     fprintf (sim_deb, ">>TU%d DONE: fnc=%s, fc=%06o, fs=%06o, er=%06o, pos=",
              drv, tu_fname[fnc], tufc, tufs, tuer);
     fprint_val (sim_deb, uptr->pos, 10, T_ADDR_W, PV_LEFT);
-    fprintf (sim_deb, "\n");
+    fprintf (sim_deb, ", r=%d\n", r);
     }
 return SCPE_OK;
 }
@@ -1037,7 +1034,7 @@ static const uint16 boot_rom[] = {
 
 t_stat tu_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)

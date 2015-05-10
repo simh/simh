@@ -58,7 +58,6 @@ int32 ptr_stopioe = 0;                                  /* stop on error */
 int32 ptp_csr = 0;                                      /* control/status */
 int32 ptp_stopioe = 0;                                  /* stop on error */
 
-DEVICE ptr_dev, ptp_dev;
 t_stat ptr_rd (int32 *data, int32 PA, int32 access);
 t_stat ptr_wr (int32 data, int32 PA, int32 access);
 t_stat ptr_svc (UNIT *uptr);
@@ -100,7 +99,8 @@ REG ptr_reg[] = {
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptr_stopioe, 0) },
-    { FLDATA (DEVDIS, ptr_dev.flags, DEV_V_DIS), REG_HRO },
+    { GRDATA  (DEVADDR,   ptr_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,   ptr_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -146,6 +146,8 @@ REG ptp_reg[] = {
     { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { GRDATA  (DEVADDR,   ptp_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,   ptp_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -226,7 +228,7 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)
 if ((temp = getc (ptr_unit.fileref)) == EOF) {
     if (feof (ptr_unit.fileref)) {
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");

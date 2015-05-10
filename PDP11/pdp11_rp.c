@@ -29,7 +29,7 @@
    08-Dec-12    RMS     UNLOAD shouldn't set ATTN (Mark Pizzolato)
    17-May-07    RMS     CS1 DVA resides in device, not MBA
    21-Nov-05    RMS     Enable/disable device also enables/disables Massbus adapter
-   12-Nov-05	RMS     Fixed DriveClear, does not clear disk address
+   12-Nov-05    RMS     Fixed DriveClear, does not clear disk address
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    18-Mar-05    RMS     Added attached test to detach routine
    12-Sep-04    RMS     Cloned from pdp11_rp.c
@@ -348,7 +348,7 @@ uint16 rper3[RP_NUMDR] = { 0 };                         /* error status 3 */
 uint16 rpec1[RP_NUMDR] = { 0 };                         /* ECC correction 1 */
 uint16 rpec2[RP_NUMDR] = { 0 };                         /* ECC correction 2 */
 int32 rp_stopioe = 1;                                   /* stop on error */
-int32 rp_swait = 10;                                    /* seek time */
+int32 rp_swait = 26;                                    /* seek time */
 int32 rp_rwait = 10;                                    /* rotate time */
 static const char *rp_fname[CS1_N_FNC] = {
     "NOP", "UNLD", "SEEK", "RECAL", "DCLR", "RLS", "OFFS", "RETN",
@@ -356,8 +356,6 @@ static const char *rp_fname[CS1_N_FNC] = {
     "20", "21", "22", "23", "WRCHK", "25", "26", "27",
     "WRITE", "WRHDR", "32", "33", "READ", "RDHDR", "36", "37"
     };
-
-extern FILE *sim_deb;
 
 t_stat rp_mbrd (int32 *data, int32 ofs, int32 drv);
 t_stat rp_mbwr (int32 data, int32 ofs, int32 drv);

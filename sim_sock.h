@@ -40,8 +40,8 @@
    16-Sep-01    RMS     Added Macintosh support from Peter Schorn
 */
 
-#ifndef _SIM_SOCK_H_
-#define _SIM_SOCK_H_    0
+#ifndef SIM_SOCK_H_
+#define SIM_SOCK_H_     0
 
 #if defined (_WIN32)                                    /* Windows */
 #undef INT_PTR                                          /* hack, hack */

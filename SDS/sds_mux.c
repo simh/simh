@@ -50,10 +50,11 @@
 #define MUX_SCANMAX     (MUX_LINES * MUX_FLAGS)         /* flags to scan */
 #define MUX_SCANMASK    (MUX_SCANMAX - 1)
 #define MUX_INIT_POLL   8000
-#define MUXL_WAIT       500
+#define MUXL_WAIT       250
 #define MUX_SETFLG(l,x) mux_flags[((l) * MUX_FLAGS) + (x)] = 1
 #define MUX_SETINT(x)   int_req = int_req | (INT_MUXR >> (x))
 #define MUX_CLRINT(x)   int_req = int_req & ~(INT_MUXR >> (x))
+#define MUX_CHKINT(x)   (int_req & (INT_MUXR >> (x)))
 
 /* PIN/POT */
 
@@ -112,7 +113,7 @@ uint32 mux_tps = 100;                                   /* polls/second */
 uint32 mux_scan = 0;                                    /* scanner */
 uint32 mux_slck = 0;                                    /* scanner locked */
 
-TMLN mux_ldsc[MUX_LINES] = { 0 };                       /* line descriptors */
+TMLN mux_ldsc[MUX_LINES] = { {0} };                     /* line descriptors */
 TMXR mux_desc = { MUX_LINES, 0, 0, mux_ldsc };          /* mux descriptor */
 
 t_stat mux (uint32 fnc, uint32 inst, uint32 *dat);
@@ -169,7 +170,7 @@ DEVICE mux_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &mux_reset,
     NULL, &mux_attach, &mux_detach,
-    &mux_dib, DEV_NET | DEV_DISABLE
+    &mux_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* MUXL data structures
@@ -274,7 +275,7 @@ switch (fnc) {
                 ((inst & SKS_DSR) && !(mux_sta[ln] & MUX_SDSR)))
                 *dat = 0;                               /* no skip if fail */
             }
-        else CRETINS;   
+        else CRETINS;
 
     default:
         return SCPE_IERR;
@@ -290,6 +291,8 @@ t_stat pin_mux (uint32 num, uint32 *dat)
 uint32 ln = mux_scan >> 2;
 uint32 flag = mux_scan & MUX_FLAGMASK;
 
+if (!mux_slck)                                          /* scanner must be locked */
+    return SCPE_IERR;
 mux_scan = mux_scan & MUX_SCANMASK;                     /* mask scan */
 mux_flags[mux_scan] = 0;                                /* clear flag */
 if (flag == MUX_FRCV) {                                 /* rcv event? */
@@ -333,6 +336,12 @@ else {                                                  /* enabled */
     else mux_sta[ln] = mux_sta[ln] & ~MUX_SXIE;
     mux_sta[ln] = mux_sta[ln] | MUX_SLNE;               /* line is enabled */
     mux_ldsc[ln].rcve = 1;
+    if ((*dat & POT_NOX) &&                             /* if no transmit char && */
+        (mux_sta[ln] & MUX_SXIE) &&                     /* line enabled && */
+        !sim_is_active (&muxl_unit[ln])) {              /* tx buffer empty */
+        MUX_SETFLG (ln, MUX_FXMT);                      /* then set flag to request */
+        mux_scan_next ();                               /* a tx interrupt */
+        }
     }
 return SCPE_OK;
 }
@@ -363,7 +372,7 @@ if (ln >= 0) {                                          /* got one? */
 tmxr_poll_rx (&mux_desc);                               /* poll for input */
 for (ln = 0; ln < MUX_NUMLIN; ln++) {                   /* loop thru lines */
     if (mux_ldsc[ln].conn) {                            /* connected? */
-        if (c = tmxr_getc_ln (&mux_ldsc[ln])) {         /* get char */
+        if ((c = tmxr_getc_ln (&mux_ldsc[ln]))) {       /* get char */
             if (mux_sta[ln] & MUX_SCHP)                 /* already got one? */
                 mux_sta[ln] = mux_sta[ln] | MUX_SOVR;   /* overrun */
             else mux_sta[ln] = mux_sta[ln] | MUX_SCHP;  /* char pending */
@@ -407,7 +416,23 @@ if (mux_sta[ln] & MUX_SXIE) {
 return SCPE_OK;
 }
 
-/* Kick scanner */
+/* Kick scanner
+*
+* Per 940 Ref Man:
+*   If more than one raised flag is encountered by the scanner, only
+*   the one of highest priority will result in an interrupt. The others
+*   will be ignored until the scanner has completed scanning all other
+*   channels. The receive flag will be given highest priority, followed
+*   by the transmit flag, the carrier-on flag, and the carrier-off flag.
+*
+* To implement, advance mux_scan to last flag of current channel (by
+* merging MUX_FLAGMASK) so scan loop commences with receive flag of next
+* channel.
+*
+* When two or more channels are active, do not queue an interrupt
+* request if the same interrupt is already requesting.  To do so will
+* cause an interrupt to be lost.
+*/
 
 void mux_scan_next (void)
 {
@@ -415,9 +440,12 @@ int32 i;
 
 if (mux_slck)                                           /* locked? */
     return;
+mux_scan |= MUX_FLAGMASK;                               /* last flag of current ch.     */
+                                                        /*  will be Rx flag of next ch. */
 for (i = 0; i < MUX_SCANMAX; i++) {                     /* scan flags */
     mux_scan = (mux_scan + 1) & MUX_SCANMASK;           /* next flag */
-    if (mux_flags[mux_scan]) {                          /* flag set? */
+    if (mux_flags[mux_scan] &&                          /* flag set */
+        !MUX_CHKINT (mux_scan & MUX_FLAGMASK)) {        /*  and not requesting int? */
         mux_slck = 1;                                   /* lock scanner */
         MUX_SETINT (mux_scan & MUX_FLAGMASK);           /* request int */
         return;

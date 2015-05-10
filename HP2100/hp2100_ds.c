@@ -1,7 +1,7 @@
 /* hp2100_ds.c: HP 13037D/13175D disc controller/interface simulator
 
    Copyright (c) 2004-2012, Robert M. Supnik
-   Copyright (c) 2012       J. David Bryan
+   Copyright (c) 2012-2014  J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,10 @@
 
    DS           13037D/13175D disc controller/interface
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
+   18-Mar-13    JDB     Fixed poll_drives definition to match declaration
+   24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    29-Mar-12    JDB     Rewritten to use the MAC/ICD disc controller library
                         ioIOO now notifies controller service of parameter output
    14-Feb-12    JDB     Corrected SRQ generation and FIFO under/overrun detection
@@ -705,10 +709,10 @@ result = dl_service_drive (&mac_cntlr, uptr);           /* service the drive */
 if ((CNTLR_PHASE) uptr->PHASE == data_phase)            /* is the drive in the data phase? */
     switch ((CNTLR_OPCODE) uptr->OP) {                  /* dispatch the current operation */
 
-        case read:                                      /* read operations */
-        case read_full_sector:
-        case read_with_offset:
-        case read_without_verify:
+        case Read:                                      /* read operations */
+        case Read_Full_Sector:
+        case Read_With_Offset:
+        case Read_Without_Verify:
             if (mac_cntlr.length == 0 || ds.edt == SET) {   /* is the data phase complete? */
                 mac_cntlr.eod = ds.edt;                     /* set EOD if DCPC is done */
                 uptr->PHASE = end_phase;                    /* set the end phase */
@@ -729,9 +733,9 @@ if ((CNTLR_PHASE) uptr->PHASE == data_phase)            /* is the drive in the d
             break;
 
 
-        case write:                                     /* write operations */
-        case write_full_sector:
-        case initialize:
+        case Write:                                     /* write operations */
+        case Write_Full_Sector:
+        case Initialize:
             if (entry_phase == start_phase) {           /* is this the phase transition? */
                 ds.srq = SET;                           /* start the DCPC transfer */
                 ds_io (&ds_dib, ioSIR, 0);              /*   and recalculate the interrupts */
@@ -850,19 +854,19 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
     case end_phase:                                     /*   start and end on the same phase */
         switch (opcode) {                               /* dispatch the current operation */
 
-            case request_status:
-            case request_sector_address:
-            case address_record:
-            case request_syndrome:
-            case load_tio_register:
-            case request_disc_address:
-            case end:
+            case Request_Status:
+            case Request_Sector_Address:
+            case Address_Record:
+            case Request_Syndrome:
+            case Load_TIO_Register:
+            case Request_Disc_Address:
+            case End:
                 break;                                  /* complete the operation without setting the flag */
 
 
-            case clear:
-            case set_file_mask:
-            case wakeup:
+            case Clear:
+            case Set_File_Mask:
+            case Wakeup:
                 ds_io (&ds_dib, ioENF, 0);              /* complete the operation and set the flag */
                 break;
 
@@ -877,11 +881,11 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
     case data_phase:
         switch (opcode) {                               /* dispatch the current operation */
 
-            case seek:                                  /* operations that accept parameters */
-            case verify:
-            case address_record:
-            case read_with_offset:
-            case load_tio_register:
+            case Seek:                                  /* operations that accept parameters */
+            case Verify:
+            case Address_Record:
+            case Read_With_Offset:
+            case Load_TIO_Register:
                 buffer [mac_cntlr.index++] = fifo_unload ();    /* unload the next word from the FIFO */
                 mac_cntlr.length--;                             /* count it */
 
@@ -891,7 +895,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
                 else {                                          /* all parameters have been received */
                     uptr->PHASE = end_phase;                    /* set the end phase */
 
-                    if (opcode == read_with_offset)             /* a Read With Offset command sets the flag */
+                    if (opcode == Read_With_Offset)             /* a Read With Offset command sets the flag */
                         ds_io (&ds_dib, ioENF, 0);              /*   to indicate that offsetting is complete */
 
                     start_command ();                           /* the command is now ready to execute */
@@ -899,10 +903,10 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
                 break;
 
 
-            case request_status:                        /* operations that supply parameters */
-            case request_sector_address:
-            case request_syndrome:
-            case request_disc_address:
+            case Request_Status:                        /* operations that supply parameters */
+            case Request_Sector_Address:
+            case Request_Syndrome:
+            case Request_Disc_Address:
                 if (mac_cntlr.length) {                         /* are there more words to return? */
                     fifo_load (buffer [mac_cntlr.index++]);     /* load the next word into the FIFO */
                     mac_cntlr.length--;                         /* count it */
@@ -1163,16 +1167,15 @@ const BOOT_ROM ds_rom = {
 
 t_stat ds_boot (int32 unitno, DEVICE *dptr)
 {
-if (unitno != 0)                                            /* boot supported on drive unit 0 only */
-    return SCPE_NOFNC;                                      /* report "Command not allowed" if attempted */
+if (unitno != 0)                                        /* boot supported on drive unit 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
 
-if (ibl_copy (ds_rom, ds_dib.select_code))                  /* copy the boot ROM to memory and configure */
-    return SCPE_IERR;                                       /* return an internal error if the copy failed */
-
-SR = SR & (IBL_OPT | IBL_DS_HEAD)                           /* set S to a reasonable value */
-  | IBL_DS | IBL_MAN | (ds_dib.select_code << IBL_V_DEV);   /*   before boot execution */
-
-return SCPE_OK;
+if (ibl_copy (ds_rom, ds_dib.select_code,               /* copy the boot ROM to memory and configure */
+              IBL_OPT | IBL_DS_HEAD,                    /*   the S register accordingly */
+              IBL_DS | IBL_MAN | IBL_SET_SC (ds_dib.select_code)))
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+else
+    return SCPE_OK;
 }
 
 
@@ -1258,7 +1261,7 @@ unit = GET_S1UNIT (mac_cntlr.spd_unit);                 /* get the (prepared) un
 if (unit <= DL_MAXDRIVE)                                /* is the unit number valid? */
     drive_command = (CNTLR_OPCODE) ds_unit [unit].OP;   /* get the opcode from the unit that will be used */
 else                                                    /* the unit is invalid, so the command will not start */
-    drive_command = end;                                /*   but the compiler doesn't know this! */
+    drive_command = End;                                /*   but the compiler doesn't know this! */
 
 uptr = dl_start_command (&mac_cntlr, ds_unit, DL_MAXDRIVE); /* ask the controller to start the command */
 
@@ -1280,7 +1283,7 @@ if (uptr) {                                             /* did the command start
         if (unit > DL_MAXDRIVE)
             fputs ("Controller ", sim_deb);
         else
-            fprintf (sim_deb, "Unit %d position %d ", unit, uptr->pos);
+            fprintf (sim_deb, "Unit %d position %" T_ADDR_FMT "d ", unit, uptr->pos);
 
         fprintf (sim_deb, "%s command initiated\n",
                  dl_opcode_name (MAC, mac_cntlr.opcode));
@@ -1336,7 +1339,7 @@ return;
    sets the flag to notify the CPU.
 */
 
-void poll_drives (void)
+static void poll_drives (void)
 {
 if (mac_cntlr.state == cntlr_idle && ds.control == SET)     /* is the controller idle and interrupts are allowed? */
     if (dl_poll_drives (&mac_cntlr, ds_unit, DL_MAXDRIVE))  /* poll the drives; was Attention seen? */

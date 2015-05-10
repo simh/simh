@@ -1,6 +1,6 @@
 /*  altairz80_sio.c: MITS Altair serial I/O card
 
-    Copyright (c) 2002-2011, Peter Schorn
+    Copyright (c) 2002-2012, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -1559,7 +1559,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                 }
             }
             break;
-            
+
         case setClockZSDOSCmd:
             if (setClockZSDOSPos == 0) {
                 setClockZSDOSAdr = data;
@@ -1571,7 +1571,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                 setClockZSDOSPos = lastCommand = 0;
             }
             break;
-            
+
         case setClockCPM3Cmd:
             if (setClockCPM3Pos == 0) {
                 setClockCPM3Adr = data;
@@ -1583,7 +1583,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                 setClockCPM3Pos = lastCommand = 0;
             }
             break;
-            
+
         case setCPUClockFrequency:
             if (setClockFrequencyPos == 0) {
                 newClockFrequency = data;
@@ -1594,7 +1594,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                 setClockFrequencyPos = lastCommand = 0;
             }
             break;
-            
+
         case setBankSelectCmd:
             if (cpu_unit.flags & UNIT_CPU_BANKED)
                 setBankSelect(data & BANKMASK);
@@ -1604,7 +1604,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                           PCX, data & 3);
             lastCommand = 0;
             break;
-            
+
         case setTimerDeltaCmd:
             if (setTimerDeltaPos == 0) {
                 timerDelta          = data;
@@ -1621,7 +1621,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                 }
             }
             break;
-            
+
         case setTimerInterruptAdrCmd:
             if (setTimerInterruptAdrPos == 0) {
                 timerInterruptHandler       = data;
@@ -1632,21 +1632,21 @@ static int32 simh_out(const int32 port, const int32 data) {
                 setTimerInterruptAdrPos = lastCommand = 0;
             }
             break;
-            
+
         default: /* lastCommand not yet set */
             sim_debug(CMD_MSG, &simh_device, "SIMH: " ADDRESS_FORMAT
                       " CMD(0x%02x) <- %i (0x%02x, '%s')\n",
                       PCX, port, data, data,
                       (0 <= data) && (data < kSimhPseudoDeviceCommands) ?
                       cmdNames[data] : "Unknown command");
-            
+
             lastCommand = data;
             switch(data) {
                 case readURLCmd:
                     urlPointer = 0;
                     isInReadPhase = FALSE;
                     break;
-                    
+
                 case getHostFilenamesCmd:
 #if UNIX_PLATFORM
                     if (!globValid) {
@@ -1681,18 +1681,18 @@ static int32 simh_out(const int32 port, const int32 data) {
                     }
 #endif
                     break;
-                    
+
                 case SIMHSleepCmd:
                     do_SIMH_sleep();
                     break;
-                    
+
                 case printTimeCmd:  /* print time */
                     if (rtc_avail)
                         printf("SIMH: " ADDRESS_FORMAT " Current time in milliseconds = %d." NLP, PCX, sim_os_msec());
                     else
                         warnNoRealTimeClock();
                     break;
-                    
+
                 case startTimerCmd: /* create a new timer on top of stack */
                     if (rtc_avail)
                         if (markTimeSP < TIMER_STACK_LIMIT)
@@ -1702,7 +1702,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         else
                             warnNoRealTimeClock();
                     break;
-                    
+
                 case stopTimerCmd:  /* stop timer on top of stack and show time difference */
                     if (rtc_avail)
                         if (markTimeSP > 0) {
@@ -1714,23 +1714,23 @@ static int32 simh_out(const int32 port, const int32 data) {
                         else
                             warnNoRealTimeClock();
                     break;
-                    
+
                 case resetPTRCmd:   /* reset ptr device */
                     ptr_reset(&ptr_dev);
                     break;
-                    
+
                 case attachPTRCmd:  /* attach ptr to the file with name at beginning of CP/M command line */
                     attachCPM(&ptr_unit);
                     break;
-                    
+
                 case detachPTRCmd:  /* detach ptr */
                     detach_unit(&ptr_unit);
                     break;
-                    
+
                 case getSIMHVersionCmd:
                     versionPos = 0;
                     break;
-                    
+
                 case getClockZSDOSCmd:
                     time(&now);
                     now += ClockZSDOSDelta;
@@ -1738,11 +1738,11 @@ static int32 simh_out(const int32 port, const int32 data) {
                     currentTimeValid = TRUE;
                     getClockZSDOSPos = 0;
                     break;
-                    
+
                 case setClockZSDOSCmd:
                     setClockZSDOSPos = 0;
                     break;
-                    
+
                 case getClockCPM3Cmd:
                     time(&now);
                     now += ClockCPM3Delta;
@@ -1751,29 +1751,29 @@ static int32 simh_out(const int32 port, const int32 data) {
                     daysCPM3SinceOrg = (int32) ((now - mkCPM3Origin()) / SECONDS_PER_DAY);
                     getClockCPM3Pos = 0;
                     break;
-                    
+
                 case setClockCPM3Cmd:
                     setClockCPM3Pos = 0;
                     break;
-                    
+
                 case getCommonCmd:
                     getCommonPos = 0;
                     break;
-                    
+
                 case getCPUClockFrequency:
                     getClockFrequencyPos = 0;
                     break;
-                    
+
                 case setCPUClockFrequency:
                     setClockFrequencyPos = 0;
                     break;
-                    
+
                 case getBankSelectCmd:
                 case setBankSelectCmd:
                 case hasBankedMemoryCmd:
                 case getHostOSPathSeparatorCmd:
                     break;
-                    
+
                 case resetSIMHInterfaceCmd:
                     markTimeSP  = 0;
                     lastCommand = 0;
@@ -1791,7 +1791,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                     }
 #endif
                     break;
-                    
+
                 case showTimerCmd:  /* show time difference to timer on top of stack */
                     if (rtc_avail)
                         if (markTimeSP > 0) {
@@ -1803,52 +1803,52 @@ static int32 simh_out(const int32 port, const int32 data) {
                         else
                             warnNoRealTimeClock();
                     break;
-                    
+
                 case attachPTPCmd:  /* attach ptp to the file with name at beginning of CP/M command line */
                     attachCPM(&ptp_unit);
                     break;
-                    
+
                 case detachPTPCmd:  /* detach ptp */
                     detach_unit(&ptp_unit);
                     break;
-                    
+
                 case setZ80CPUCmd:
                     chiptype = CHIP_TYPE_Z80;
                     break;
-                    
+
                 case set8080CPUCmd:
                     chiptype = CHIP_TYPE_8080;
                     break;
-                    
+
                 case startTimerInterruptsCmd:
                     if (simh_dev_set_timeron(NULL, 0, NULL, NULL) == SCPE_OK) {
                         timerInterrupt = FALSE;
                         simh_unit.flags |= UNIT_SIMH_TIMERON;
                     }
                     break;
-                    
+
                 case stopTimerInterruptsCmd:
                     simh_unit.flags &= ~UNIT_SIMH_TIMERON;
                     simh_dev_set_timeroff(NULL, 0, NULL, NULL);
                     break;
-                    
+
                 case setTimerDeltaCmd:
                     setTimerDeltaPos = 0;
                     break;
-                    
+
                 case setTimerInterruptAdrCmd:
                     setTimerInterruptAdrPos = 0;
                     break;
-                    
+
                 case resetStopWatchCmd:
                     stopWatchNow = rtc_avail ? sim_os_msec() : 0;
                     break;
-                    
+
                 case readStopWatchCmd:
                     getStopWatchDeltaPos = 0;
                     stopWatchDelta = rtc_avail ? sim_os_msec() - stopWatchNow : 0;
                     break;
-                    
+
                 default:
                     sim_debug(CMD_MSG, &simh_device, "SIMH: " ADDRESS_FORMAT
                               " Unknown command (%i) to SIMH pseudo device on port %03xh ignored.\n",

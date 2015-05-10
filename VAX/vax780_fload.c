@@ -68,10 +68,10 @@
 /* RT11 directory entry offsets */
 
 #define DE_STATUS       0                               /* status (odd byte) */
-#define	 TENTAT          001                            /* tentative */
-#define	 EMPTY           002
-#define	 PERM            004
-#define	 ENDSEG          010                            /* end of segment */
+#define  TENTAT          001                            /* tentative */
+#define  EMPTY           002
+#define  PERM            004
+#define  ENDSEG          010                            /* end of segment */
 #define DE_NAME         1                               /* file name */
 #define DE_FLNT         4                               /* file length */
 #define DE_SIZE         7                               /* entry size in words */
@@ -88,7 +88,7 @@ uint32 rtfile_find (uint32 block, uint32 sector);
 
 /* FLOAD file_name {file_origin} */
 
-t_stat vax780_fload (int flag, char *cptr)
+t_stat vax780_fload (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
 uint16 file_name[3], blkbuf[BLK_SIZE];

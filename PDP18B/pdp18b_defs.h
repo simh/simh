@@ -50,8 +50,8 @@
    Al Kossow and Max Burnet in making documentation and software available.
 */
 
-#ifndef _PDP18B_DEFS_H_
-#define _PDP18B_DEFS_H_ 0
+#ifndef PDP18B_DEFS_H_
+#define PDP18B_DEFS_H_ 0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

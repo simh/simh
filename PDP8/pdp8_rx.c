@@ -735,8 +735,7 @@ static const uint16 boot2_rom[] = {
 
 t_stat rx_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
-extern int32 saved_PC;
+size_t i;
 extern uint16 M[];
 
 if (rx_dib.dev != DEV_RX)                               /* only std devno */

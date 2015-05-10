@@ -1,6 +1,6 @@
 /* vax780_stddev.c: VAX 11/780 standard I/O devices
 
-   Copyright (c) 1998-2012, Robert M Supnik
+   Copyright (c) 1998-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    todr         TODR clock
    tmr          interval timer
 
+   03-Apr-15    RMS     TODR only increments if != 0
    18-Apr-12    RMS     Revised to use clock coscheduling
    21-Mar-11    RMS     Added reboot capability
    17-Aug-08    RMS     Resync TODR on any clock reset
@@ -188,7 +189,6 @@ int32 fl_bptr = 0;                                      /* buffer pointer */
 
 uint8 comm_region[COMM_LNT] = { 0 };                    /* comm region */
 
-extern int32 sim_switches;
 extern jmp_buf save_env;
 
 t_stat tti_svc (UNIT *uptr);
@@ -218,7 +218,7 @@ extern int32 con_halt (int32 code, int32 cc);
    tti_reg      TTI register list
 */
 
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_8B, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), SERIAL_IN_WAIT };
 
 REG tti_reg[] = {
     { HRDATA (RXDB, tti_buf, 16) },
@@ -378,7 +378,7 @@ return (tti_csr & RXCS_RD);
 void rxcs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0)
-    tto_int = 0;
+    tti_int = 0;
 else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
     tti_int = 1;
 tti_csr = (tti_csr & ~RXCS_WR) | (data & RXCS_WR);
@@ -389,9 +389,12 @@ int32 rxdb_rd (void)
 {
 int32 t = tti_buf;                                      /* char + error */
 
-tti_csr = tti_csr & ~CSR_DONE;                          /* clr done */
-tti_buf = tti_buf & BMASK;                              /* clr errors */
-tti_int = 0;
+if (tti_csr & CSR_DONE) {                               /* Input pending ? */
+    tti_csr = tti_csr & ~CSR_DONE;                      /* clr done */
+    tti_buf = tti_buf & BMASK;                          /* clr errors */
+    tti_int = 0;
+    sim_activate_abs (&tti_unit, tti_unit.wait);        /* check soon for more input */
+    }
 return t;
 }
 
@@ -558,7 +561,7 @@ if (interp || (tmr_iccs & TMR_CSR_RUN)) {               /* interp, running? */
 return tmr_icr;
 }
 
-int32 nicr_rd ()
+int32 nicr_rd (void)
 {
 return tmr_nicr;
 }
@@ -573,9 +576,10 @@ tmr_nicr = val;
 t_stat clk_svc (UNIT *uptr)
 {
 tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
-sim_activate (&clk_unit, tmr_poll);                     /* reactivate unit */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
-todr_reg = todr_reg + 1;                                /* incr TODR */
+if (todr_reg)                                           /* not zero? */
+    todr_reg = todr_reg + 1;                            /* incr TODR */
 if ((tmr_iccs & TMR_CSR_RUN) && tmr_use_100hz)          /* timer on, std intvl? */
     tmr_incr (TMR_INC);                                 /* do timer service */
 return SCPE_OK;
@@ -645,6 +649,7 @@ return (t? t - 1: wait);
 
 t_stat clk_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 tmr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);      /* init 100Hz timer */
 sim_activate (&clk_unit, tmr_poll);                     /* activate 100Hz unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */

@@ -49,7 +49,7 @@ uint8 dcs_buf[DCS_LINES];                               /* line bufffers */
 extern int32 iosta, stop_inst;
 extern int32 tmxr_poll;
 
-TMLN dcs_ldsc[DCS_LINES] = { 0 };                       /* line descriptors */
+TMLN dcs_ldsc[DCS_LINES] = { {0} };                     /* line descriptors */
 TMXR dcs_desc = { DCS_LINES, 0, 0, dcs_ldsc };          /* mux descriptor */
 
 t_stat dcsi_svc (UNIT *uptr);
@@ -102,7 +102,7 @@ DEVICE dcs_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &dcs_reset,
     NULL, &dcs_attach, &dcs_detach,
-    NULL, DEV_NET | DEV_DISABLE | DEV_DIS
+    NULL, DEV_MUX | DEV_DISABLE | DEV_DIS
     };
 
 /* DCSL data structures
@@ -173,7 +173,7 @@ DEVICE dcsl_dev = {
     DCS_LINES, 10, 31, 1, 8, 8,
     NULL, NULL, &dcs_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DIS
+    NULL, DEV_DIS | DEV_MUX
     };
 
 /* DCS IOT routine */
@@ -252,7 +252,7 @@ if (ln >= 0) {                                          /* got one? */
 tmxr_poll_rx (&dcs_desc);                               /* poll for input */
 for (ln = 0; ln < DCS_NUMLIN; ln++) {                   /* loop thru lines */
     if (dcs_ldsc[ln].conn) {                            /* connected? */
-        if (c = tmxr_getc_ln (&dcs_ldsc[ln])) {         /* get char */
+        if ((c = tmxr_getc_ln (&dcs_ldsc[ln]))) {       /* get char */
             if (c & SCPE_BREAK)                         /* break? */
                 c = 0;
             else c = sim_tt_inpcvt (c, TT_GET_MODE (dcsl_unit[ln].flags)|TTUF_KSR);

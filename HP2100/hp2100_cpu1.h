@@ -1,6 +1,6 @@
 /* hp2100_cpu1.h: HP 2100/1000 firmware dispatcher definitions
 
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2013, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+   18-Mar-13    JDB     Added externs for microcode helper functions
+   14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    11-Sep-08    JDB     Moved microcode function prototypes here
    30-Apr-08    JDB     Corrected OP_AFF to OP_AAFF for SIGNAL/1000
                         Removed unused operand patterns
@@ -33,8 +35,8 @@
    26-Sep-06    JDB     Split from hp2100_cpu1.c
 */
 
-#ifndef _HP2100_CPU1_H_
-#define _HP2100_CPU1_H_
+#ifndef HP2100_CPU1_H_
+#define HP2100_CPU1_H_
 
 
 /* Register print encoding */
@@ -305,11 +307,17 @@ extern t_stat cpu_signal (uint32 IR, uint32 intrq);                 /* [7] SIGNA
 
 /* Microcode helper functions */
 
-OP     ReadOp  (uint32 va, OPSIZE precision);               /* generalized operand read */
-void   WriteOp (uint32 va, OP operand, OPSIZE precision);   /* generalized operand write */
-t_stat cpu_ops (OP_PAT pattern, OPS op, uint32 irq);        /* operand processor */
+extern OP     ReadOp  (uint32 va, OPSIZE precision);               /* generalized operand read */
+extern void   WriteOp (uint32 va, OP operand, OPSIZE precision);   /* generalized operand write */
+extern t_stat cpu_ops (OP_PAT pattern, OPS op, uint32 irq);        /* operand processor */
 
-void fprint_ops (OP_PAT pattern, OPS op);                   /* debug print operands */
-void fprint_regs (char *caption, uint32 regs, uint32 base); /* debug print CPU registers */
+extern void fprint_ops  (OP_PAT pattern, OPS op);                  /* debug print operands */
+extern void fprint_regs (char *caption, uint32 regs, uint32 base); /* debug print CPU registers */
+
+/* implemented in hp2100_cpu5.c (RTE-IV EMA functions) */
+
+extern t_stat cpu_ema_eres (uint32 *rtn, uint32 dtbl, uint32 atbl, t_bool debug);
+extern t_stat cpu_ema_eseg (uint32 *rtn, uint32 ir, uint32 tbl, t_bool debug);
+extern t_stat cpu_ema_vset (uint32 *rtn, OPS op, t_bool debug);
 
 #endif

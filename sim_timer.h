@@ -1,6 +1,6 @@
 /* sim_timer.h: simulator timer library headers
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Dec-14    JDB     [4.0] Added data externals
    28-Apr-07    RMS     Added sim_rtc_init_all
    17-Oct-06    RMS     Added idle support
    02-Jan-04    RMS     Split out from SCP
@@ -56,17 +57,26 @@ void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
+t_stat sim_activate_after (UNIT *uptr, int32 usec_delay);
 t_bool sim_idle (uint32 tmr, t_bool sin_cyc);
 t_stat sim_set_throt (int32 arg, char *cptr);
 t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr);
 t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat sim_clr_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
 void sim_throt_sched (void);
 void sim_throt_cancel (void);
 uint32 sim_os_msec (void);
 void sim_os_sleep (unsigned int sec);
 uint32 sim_os_ms_sleep (unsigned int msec);
 uint32 sim_os_ms_sleep_init (void);
+
+extern t_bool sim_idle_enab;                           /* idle enabled flag */
+extern volatile t_bool sim_idle_wait;                  /* idle waiting flag */
+
+/* v4 compatibility */
+
+t_stat sim_register_clock_unit (UNIT *uptr);
 
 #endif

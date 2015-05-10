@@ -27,7 +27,7 @@
    22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
                         (Mark Pizzolato)
    12-Nov-06    RMS     Fixed operand order in EIS instructions (W.F.J. Mueller)
-   27-Sep-05	RMS     Fixed warnings compiling with 64b addresses
+   27-Sep-05    RMS     Fixed warnings compiling with 64b addresses
    15-Sep-04    RMS     Cloned from pdp11_sys.c
 */
 
@@ -464,7 +464,7 @@ return tptr;
 
 t_stat get_spec (char *cptr, int32 addr, int32 n1, int32 *sptr, int32 *dptr)
 {
-int32 reg, indir, pflag, disp;
+int32 reg, indir, pflag, disp = 0;
 
 indir = 0;                                              /* no indirect */
 pflag = 0;
@@ -686,6 +686,6 @@ if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
 for (i = j = 0; i < 3; i++, j = j + 2) {
     bytes[j] = val[i] & BMASK;
     bytes[j + 1] = (val[i] >> 8) & BMASK;
-	}
+    }
 return ((2 * (n1 + n2)) - 1);
 }

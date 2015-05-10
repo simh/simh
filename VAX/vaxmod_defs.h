@@ -1,6 +1,6 @@
 /* vaxmod_defs.h: VAX model-specific definitions file
 
-   Copyright (c) 1998-2013, Robert M Supnik
+   Copyright (c) 1998-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Mar-15    RMS     Added model-specific IPR max
    20-Dec-13    RMS     Added prototypes for unaligned IO and register handling
    12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
    11-Dec-11    RMS     Moved all Qbus devices to BR4; deleted RP definitions
@@ -71,8 +72,8 @@
 #undef FULL_VAX
 #endif
 
-#ifndef _VAXMOD_DEFS_H_
-#define _VAXMOD_DEFS_H_ 1
+#ifndef VAXMOD_DEFS_H_
+#define VAXMOD_DEFS_H_ 1
 
 /* Microcode constructs */
 
@@ -98,6 +99,7 @@
 #define MT_CONPC        42
 #define MT_CONPSL       43
 #define MT_IORESET      55
+#define MT_MAX          63                              /* last valid IPR */
 
 /* Memory system error register */
 

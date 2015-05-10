@@ -241,11 +241,11 @@ static const int32 boot_rom[] = {
     0706101,                        /* DRSF             ; wait for done */
     0602003,                        /* JMP .-1 */
     0600000                         /* JMP 0            ; enter boot */
-	};
+    };
 
 t_stat drm_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 PC;
 
 if (drm_dib.dev != DEV_DRM)                             /* non-std addr? */

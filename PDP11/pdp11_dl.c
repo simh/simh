@@ -88,7 +88,7 @@ uint32 dli_ireq[2] = { 0, 0};
 uint16 dlo_csr[DLX_LINES] = { 0 };                      /* control/status */
 uint8 dlo_buf[DLX_LINES] = { 0 };
 uint32 dlo_ireq = 0;
-TMLN dlx_ldsc[DLX_LINES] = { 0 };                       /* line descriptors */
+TMLN dlx_ldsc[DLX_LINES] = { {0} };                     /* line descriptors */
 TMXR dlx_desc = { DLX_LINES, 0, 0, dlx_ldsc };          /* mux descriptor */
 
 t_stat dlx_rd (int32 *data, int32 PA, int32 access);
@@ -120,11 +120,12 @@ DIB dli_dib = {
     2, IVCL (DLI), VEC_DLI, { &dli_iack, &dlo_iack }
     };
 
-UNIT dli_unit = { UDATA (&dli_svc, 0, 0), KBD_POLL_WAIT };
+UNIT dli_unit = { UDATA (&dli_svc, 0, 0), SERIAL_IN_WAIT };
 
 REG dli_reg[] = {
     { BRDATA (BUF, dli_buf, DEV_RDX, 16, DLX_LINES) },
     { BRDATA (CSR, dli_csr, DEV_RDX, 16, DLX_LINES) },
+    { DRDATA (TIME, dli_unit.wait,  24), PV_LEFT },
     { GRDATA (IREQ, dli_ireq[DLI_RCI], DEV_RDX, DLX_LINES, 0) },
     { GRDATA (DSI, dli_ireq[DLI_DSI], DEV_RDX, DLX_LINES, 0) },
     { DRDATA (LINES, dlx_desc.lines, 6), REG_HRO },
@@ -240,6 +241,7 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
         *data = dli_buf[ln] & DLIBUF_RD;
         dli_csr[ln] &= ~CSR_DONE;                       /* clr rcv done */
         dli_clr_int (ln, DLI_RCI);                      /* clr rcv int req */
+        sim_activate_abs (&dli_unit, dli_unit.wait);
         return SCPE_OK;
 
     case 02:                                            /* tto csr */
@@ -347,7 +349,7 @@ if (ln >= 0) {                                          /* got one? rcv enb */
 tmxr_poll_rx (&dlx_desc);                               /* poll for input */
 for (ln = 0; ln < DLX_LINES; ln++) {                    /* loop thru lines */
     if (dlx_ldsc[ln].conn) {                            /* connected? */
-        if (temp = tmxr_getc_ln (&dlx_ldsc[ln])) {      /* get char */
+        if ((temp = tmxr_getc_ln (&dlx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
                 c = DLIBUF_ERR|DLIBUF_RBRK;
             else c = sim_tt_inpcvt (temp, TT_GET_MODE (dlo_unit[ln].flags));
@@ -356,7 +358,7 @@ for (ln = 0; ln < DLX_LINES; ln++) {                    /* loop thru lines */
             else dli_csr[ln] |= CSR_DONE;
             if (dli_csr[ln] & CSR_IE)
                 dli_set_int (ln, DLI_RCI);
-            dli_buf[ln] = c;
+            dli_buf[ln] = (uint16)c;
             }
         }
     else if (dlo_unit[ln].flags & DLX_MDM) {            /* discpnn & modem? */

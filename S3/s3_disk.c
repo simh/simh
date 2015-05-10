@@ -298,7 +298,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                                     addr++;
                                 }
 
-                                if ((sect == 55) ) {    /* HJS MODS */
+                                if (sect == 55) {       /* HJS MODS */
                                     S = sect;
                                     N = nsects - i - 2;
                                     if (N > -1) diskerr[disk] |= 0x0020; /* end of cyl. */
@@ -349,7 +349,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                                     diskerr[disk] |= 0x0800;
                                     break;
                                 }   
-                                if ((sect == 55) ) {    /* HJS MODS */
+                                if (sect == 55) {       /* HJS MODS */
                                     S = sect;
                                     N = nsects - i - 2;
                                     if (N > -1) diskerr[disk] |= 0x0020; /* end of cyl. */
@@ -392,7 +392,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                                     diskerr[disk] |= 0x0400;
                                     break;
                                 }   
-                                if ((sect == 55) ) {    /* HJS MODS */
+                                if (sect == 55) {   /* HJS MODS */
                                     S = sect;
                                     N = nsects - i - 2;
                                     if (N > -1) diskerr[disk] |= 0x0020; /* end of cyl. */
@@ -434,7 +434,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                                     diskerr[disk] |= 0x0400;
                                     break;
                                 }   
-                                if ((sect == 55) ) {
+                                if (sect == 55) {
                                     S = sect;
                                     N = nsects - i - 2;
                                     if (N > 0) diskerr[disk] |= 0x0020;
@@ -486,7 +486,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                             found[disk] = 1;
                         if (res == data)
                             break;
-                        if ((sect == 55) ) {            /* HJS MODS */
+                        if (sect == 55) {               /* HJS MODS */
                             S = sect;
                             N = nsects - i - 2;
                             if (N > -1) diskerr[disk] |= 0x0020; /* end of cyl. */
@@ -610,7 +610,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
         default:
             break;
     }
-    printf (">>DSK%d non-existent function %d\n", disk, op);
+    sim_printf (">>DSK%d non-existent function %d\n", disk, op);
     return SCPE_OK;                     
 }
 

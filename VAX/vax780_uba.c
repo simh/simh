@@ -179,11 +179,8 @@ int32 autcon_enb = 1;                                   /* autoconfig enable */
 extern int32 trpirq;
 extern int32 autcon_enb;
 extern jmp_buf save_env;
-extern DEVICE *sim_devices[];
 extern UNIT cpu_unit;
 extern uint32 nexus_req[NEXUS_HLVL];
-extern int32 sim_switches;
-extern FILE *sim_log, *sim_deb;
 
 t_stat uba_svc (UNIT *uptr);
 t_stat uba_reset (DEVICE *dptr);
@@ -303,7 +300,7 @@ t_stat uba_rdreg (int32 *val, int32 pa, int32 lnt)
 int32 idx, ofs;
 
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>UBA: invalid adapter read mask, pa = %X, lnt = %d\r\n", pa, lnt);
+    sim_printf (">>UBA: invalid adapter read mask, pa = %X, lnt = %d\r\n", pa, lnt);
     sbi_set_errcnf ();                                  /* err confirmation */
     return SCPE_OK;
     }
@@ -392,7 +389,7 @@ t_stat uba_wrreg (int32 val, int32 pa, int32 lnt)
 int32 idx, ofs, old_cr;
 
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>UBA: invalid adapter write mask, pa = %X, lnt = %d\r\n", pa, lnt);
+    sim_printf (">>UBA: invalid adapter write mask, pa = %X, lnt = %d\r\n", pa, lnt);
     sbi_set_errcnf ();                                  /* err confirmation */
     return SCPE_OK;
     }
@@ -525,7 +522,7 @@ if ((lnt == L_BYTE) ||                                  /* byte? */
         iod = iod << 16;
     }
 else {
-    printf (">>UBA: invalid read mask, pa = %x, lnt = %d\n", pa, lnt);
+    sim_printf (">>UBA: invalid read mask, pa = %x, lnt = %d\n", pa, lnt);
     sbi_set_errcnf ();                                  /* err confirmation */
     iod = 0;
     }
@@ -550,7 +547,7 @@ if (lnt == L_BYTE)                                      /* byte? DATOB */
 else if ((lnt == L_WORD) && ((pa & 1) == 0))            /* aligned word? */
      WriteUb (pa, val, WRITE);                          /* DATO */
 else {
-    printf (">>UBA: invalid write mask, pa = %x, lnt = %d\n", pa, lnt);
+    sim_printf (">>UBA: invalid write mask, pa = %x, lnt = %d\n", pa, lnt);
     sbi_set_errcnf ();                                  /* err confirmation */
     }
 SET_IRQL;                                               /* update ints */

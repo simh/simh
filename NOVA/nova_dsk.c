@@ -298,7 +298,7 @@ static const int32 boot_rom[] = {
 
 t_stat dsk_boot (int32 unitno, DEVICE *dptr)
 {
-int32   i;
+size_t i;
 
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = (uint16) boot_rom[i];
 saved_PC = BOOT_START;

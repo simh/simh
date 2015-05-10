@@ -240,8 +240,6 @@ static struct drvtyp drv_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
-extern FILE *sim_deb;
-extern uint32 sim_taddr_64;
 
 uint8 *tqxb = NULL;                                     /* xfer buffer */
 uint32 tq_sa = 0;                                       /* status, addr */

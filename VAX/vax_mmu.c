@@ -581,7 +581,7 @@ return;
 
 void zap_tb (int stb)
 {
-int32 i;
+size_t i;
 
 for (i = 0; i < VA_TBSIZE; i++) {
     ptlb[i].tag = ptlb[i].pte = -1;
@@ -622,7 +622,7 @@ return FALSE;
 t_stat tlb_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 tlbn = uptr - tlb_unit;
-int32 idx = (uint32) addr >> 1;
+uint32 idx = (uint32) addr >> 1;
 
 if (idx >= VA_TBSIZE)
     return SCPE_NXM;
@@ -637,7 +637,7 @@ return SCPE_OK;
 t_stat tlb_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 tlbn = uptr - tlb_unit;
-int32 idx = (uint32) addr >> 1;
+uint32 idx = (uint32) addr >> 1;
 
 if (idx >= VA_TBSIZE)
     return SCPE_NXM;
@@ -656,7 +656,7 @@ return SCPE_OK;
 
 t_stat tlb_reset (DEVICE *dptr)
 {
-int32 i;
+size_t i;
 
 for (i = 0; i < VA_TBSIZE; i++)
     stlb[i].tag = ptlb[i].tag = stlb[i].pte = ptlb[i].pte = -1;

@@ -32,19 +32,19 @@
     The floppy controller is interfaced to the CPU by use of 5 memory 
     addreses.  These are SS-30 slot numbers 5 and 6 (0x8014-0x801B).
 
-    Address 	Mode	Function
-    -------		----	--------
+    Address       Mode    Function
+    -------       ----    --------
 
-    0x8014		Read	Returns FDC interrupt status
-    0x8014		Write	Selects the drive/head/motor control
-    0x8018		Read	Returns status of FDC
-    0x8018		Write	FDC command register
-    0x8019		Read	Returns FDC track register
-    0x8019		Write	Set FDC track register
-    0x801A		Read	Returns FDC sector register
-    0x801A		Write	Set FDC sector register
-    0x801B		Read	Read data
-    0x801B		Write	Write data
+    0x8014        Read    Returns FDC interrupt status
+    0x8014        Write   Selects the drive/head/motor control
+    0x8018        Read    Returns status of FDC
+    0x8018        Write   FDC command register
+    0x8019        Read    Returns FDC track register
+    0x8019        Write   Set FDC track register
+    0x801A        Read    Returns FDC sector register
+    0x801A        Write   Set FDC sector register
+    0x801B        Read    Read data
+    0x801B        Write   Write data
 
     Drive Select Read (0x8014):
 
@@ -181,28 +181,28 @@
 
     A FLEX disk is defined as follows:
 
-    Track	Sector	Use
-    0		1	Boot sector
-    0		2	Boot sector (cont)
-    0		3	Unused
-    0		4	System Identity Record (explained below)
-    0		5	Unused
-    0		6-last	Directory - 10 entries/sector (explained below)
-    1		1	First available data sector
-    last-1	last	Last available data sector
+    Track    Sector     Use
+    0        1          Boot sector
+    0        2          Boot sector (cont)
+    0        3          Unused
+    0        4          System Identity Record (explained below)
+    0        5          Unused
+    0        6-last     Directory - 10 entries/sector (explained below)
+    1        1          First available data sector
+    last-1   last       Last available data sector
 
     System Identity Record
 
-    Byte	Use
-    0x00        Two bytes of zeroes (Clears forward link)
-    0x10	Volume name in ASCII(11 bytes)
-    0x1B	Volume number in binary (2 bytes)
-    0x1D	Address of first free data sector (Track-Sector) (2 bytes)
-    0x1F	Address of last free data sector (Track-Sector) (2 bytes)
-    0x21	Total number of data sectors in binary (2 bytes)
-    0x23	Current date (Month-Day-Year) in binary
-    0x26	Highest track number on disk in binary (byte)
-    0x27	Highest sector number on a track in binary (byte)
+    Byte    Use
+    0x00    Two bytes of zeroes (Clears forward link)
+    0x10    Volume name in ASCII(11 bytes)
+    0x1B    Volume number in binary (2 bytes)
+    0x1D    Address of first free data sector (Track-Sector) (2 bytes)
+    0x1F    Address of last free data sector (Track-Sector) (2 bytes)
+    0x21    Total number of data sectors in binary (2 bytes)
+    0x23    Current date (Month-Day-Year) in binary
+    0x26    Highest track number on disk in binary (byte)
+    0x27    Highest sector number on a track in binary (byte)
 
     The following unit registers are used by this controller emulation:
 
@@ -224,7 +224,7 @@
 
 /* emulate a SS FLEX disk with 72 sectors and 80 tracks */
 
-#define	NUM_DISK        4               /* standard 1797 maximum */
+#define    NUM_DISK     4               /* standard 1797 maximum */
 #define SECT_SIZE       256             /* standard FLEX sector */
 #define NUM_SECT        72              /* sectors/track */
 #define TRAK_SIZE       (SECT_SIZE * NUM_SECT) /* trk size (bytes) */
@@ -240,10 +240,10 @@
 
 /* 1797 status bits */
 
-#define	BUSY            0x01
-#define	DRQ             0x02
-#define	WRPROT          0x40
-#define	NOTRDY          0x80
+#define    BUSY         0x01
+#define    DRQ          0x02
+#define    WRPROT       0x40
+#define    NOTRDY       0x80
 
 /* function prototypes */
 
@@ -368,7 +368,6 @@ t_stat dsk_reset (DEVICE *dptr)
 int32 fdcdrv(int32 io, int32 data)
 {
     static long pos;
-    char buf[128];
 
     if (io) {                           /* write to DC-4 drive register */
         if (dsk_dev.dctrl & DEBUG_write)
@@ -390,13 +389,13 @@ int32 fdcdrv(int32 io, int32 data)
         pos = 0x200;                    /* Read in SIR */
         if (dsk_dev.dctrl & DEBUG_read)
             printf("\nfdcdrv: Read pos = %ld ($%04X)", pos, (unsigned int) pos);
-        sim_fseek(dsk_unit[cur_dsk].fileref, pos, 0); /* seek to offset */
+        sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
         sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
         dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
         dsk_unit[cur_dsk].pos = 0;      /* clear counter */
-        spt = *(uint8 *)(dsk_unit[cur_dsk].filebuf + MAXSEC) & 0xFF;
+        spt = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + MAXSEC) & 0xFF;
         heds = 0;
-        cpd = *(uint8 *)(dsk_unit[cur_dsk].filebuf + MAXCYL) & 0xFF;
+        cpd = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + MAXCYL) & 0xFF;
         trksiz = spt * SECSIZ;
         dsksiz = trksiz * cpd;
         if (dsk_dev.dctrl & DEBUG_read)
@@ -436,7 +435,7 @@ int32 fdccmd(int32 io, int32 data)
                 pos += SECSIZ * (dsk_unit[cur_dsk].u5 - 1);
                 if (dsk_dev.dctrl & DEBUG_read)
                     printf("\nfdccmd: Read pos = %ld ($%08X)", pos, (unsigned int) pos);
-                sim_fseek(dsk_unit[cur_dsk].fileref, pos, 0); /* seek to offset */
+                sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
                 sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
                 dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
                 dsk_unit[cur_dsk].pos = 0; /* clear counter */
@@ -445,14 +444,14 @@ int32 fdccmd(int32 io, int32 data)
                 if (dsk_dev.dctrl & DEBUG_write)
                     printf("\nfdccmd: Write of disk %d, track %d, sector %d",
                         cur_dsk, dsk_unit[cur_dsk].u4, dsk_unit[cur_dsk].u5);
-                if (dsk_unit[cur_dsk].u3 & WRPROT) {	
+                if (dsk_unit[cur_dsk].u3 & WRPROT) {    
                     printf("\nfdccmd: Drive %d is write-protected", cur_dsk);
                 } else {
                     pos = trksiz * dsk_unit[cur_dsk].u4; /* calculate file offset */
                     pos += SECSIZ * (dsk_unit[cur_dsk].u5 - 1);
                     if (dsk_dev.dctrl & DEBUG_write)
                         printf("\nfdccmd: Write pos = %ld ($%08X)", pos, (unsigned int) pos);
-                    sim_fseek(dsk_unit[cur_dsk].fileref, pos, 0); /* seek to offset */
+                    sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
                     wrt_flag = 1;           /* set write flag */
                     dsk_unit[cur_dsk].u3 |= BUSY | DRQ;/* set DRQ & BUSY */
                     dsk_unit[cur_dsk].pos = 0; /* clear counter */
@@ -503,8 +502,7 @@ int32 fdctrk(int32 io, int32 data)
         dsk_unit[cur_dsk].u4 = data & 0xFF;
         if (dsk_dev.dctrl & DEBUG_read)
             printf("\nfdctrk: Drive %d track set to %d", cur_dsk, dsk_unit[cur_dsk].u4);
-    } else
-        ;
+    }
     if (dsk_dev.dctrl & DEBUG_write)
         printf("\nfdctrk: Drive %d track read as %d", cur_dsk, dsk_unit[cur_dsk].u4);
     return dsk_unit[cur_dsk].u4;
@@ -520,8 +518,7 @@ int32 fdcsec(int32 io, int32 data)
             dsk_unit[cur_dsk].u5 = 1;
         if (dsk_dev.dctrl & DEBUG_write)
             printf("\nfdcsec: Drive %d sector set to %d", cur_dsk, dsk_unit[cur_dsk].u5);
-    } else
-            ;
+    }
     if (dsk_dev.dctrl & DEBUG_read)
         printf("\nfdcsec: Drive %d sector read as %d", cur_dsk, dsk_unit[cur_dsk].u5);
     return dsk_unit[cur_dsk].u5;
@@ -538,7 +535,7 @@ int32 fdcdata(int32 io, int32 data)
         if (dsk_unit[cur_dsk].pos < SECSIZ) { /* copy bytes to buffer */
             if (dsk_dev.dctrl & DEBUG_write)
                 printf("\nfdcdata: Writing byte %d of %02X", dsk_unit[cur_dsk].pos, data);
-            *(uint8 *)(dsk_unit[cur_dsk].filebuf + dsk_unit[cur_dsk].pos) = data; /* byte into buffer */
+            *((uint8 *)(dsk_unit[cur_dsk].filebuf) + dsk_unit[cur_dsk].pos) = data; /* byte into buffer */
             dsk_unit[cur_dsk].pos++;    /* step counter */
             if (dsk_unit[cur_dsk].pos == SECSIZ) {
                 dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ);
@@ -552,18 +549,18 @@ int32 fdcdata(int32 io, int32 data)
         }
         return 0;
     } else {                            /* read byte from fdc */
-    if (dsk_unit[cur_dsk].pos < SECSIZ) { /* copy bytes from buffer */
-        if (dsk_dev.dctrl & DEBUG_read)
-            printf("\nfdcdata: Reading byte %d u3=%02X", dsk_unit[cur_dsk].pos, dsk_unit[cur_dsk].u3);
-        val = *(uint8 *)(dsk_unit[cur_dsk].filebuf + dsk_unit[cur_dsk].pos) & 0xFF;
-        dsk_unit[cur_dsk].pos++;        /* step counter */
-        if (dsk_unit[cur_dsk].pos == SECSIZ) { /* done? */
-            dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ); /* clear flags */
-            if (dsk_dev.dctrl & DEBUG_write)
-                printf("\nfdcdata: Sector read complete");
-        }
-        return val;
-    } else
+        if (dsk_unit[cur_dsk].pos < SECSIZ) { /* copy bytes from buffer */
+            if (dsk_dev.dctrl & DEBUG_read)
+                printf("\nfdcdata: Reading byte %d u3=%02X", dsk_unit[cur_dsk].pos, dsk_unit[cur_dsk].u3);
+            val = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + dsk_unit[cur_dsk].pos) & 0xFF;
+            dsk_unit[cur_dsk].pos++;        /* step counter */
+            if (dsk_unit[cur_dsk].pos == SECSIZ) { /* done? */
+                dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ); /* clear flags */
+                if (dsk_dev.dctrl & DEBUG_write)
+                    printf("\nfdcdata: Sector read complete");
+            }
+            return val;
+        } else
         return 0;
     }
 }

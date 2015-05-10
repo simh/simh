@@ -40,7 +40,6 @@
 #define SET_EOR         2                               /* print, set eor */
 #define SET_SPC         4                               /* space */
 
-extern char sds_to_ascii[64];
 extern uint32 xfr_req;
 extern int32 stop_invins, stop_invdev, stop_inviop;
 int32 lpt_spc = 0;                                      /* space instr */
@@ -69,6 +68,7 @@ t_stat lpt_status (UNIT *uptr);
 t_stat lpt_bufout (UNIT *uptr);
 void lpt_end_op (int32 fl);
 t_stat lpt (uint32 fnc, uint32 inst, uint32 *dat);
+int8 sds_to_ascii(int8 c);
 
 /* LPT data structures
 
@@ -177,12 +177,12 @@ switch (fnc) {                                          /* case function */
         t = I_GETSKCND (inst);                          /* sks cond */
         if (((t == 020) && (!CHP (7, lpt_cct[lpt_ccp]))) || /* 14062: !ch 7 */
             ((t == 010) && (lpt_unit.flags & UNIT_ATT)) ||  /* 12062: !online */
-            (t == 004) && !lpt_err)                     /* 11062: !err */
+            ((t == 004) && !lpt_err))                   /* 11062: !err */
             *dat = 1;
         break;
 
     case IO_WRITE:                                      /* write */
-        asc = sds_to_ascii[(*dat) & 077];               /* convert data */
+        asc = sds_to_ascii(*dat);                       /* convert data */
         xfr_req = xfr_req & ~XFR_LPT;                   /* clr xfr flag */
         if (lpt_bptr < LPT_WIDTH)                       /* store data */
             lpt_buf[lpt_bptr++] = asc;

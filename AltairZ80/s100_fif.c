@@ -2,7 +2,7 @@
 
     IMSAI FIF Disk Controller by Ernie Price
 
-    Based on altairz80_dsk.c, Copyright (c) 2002-2011, Peter Schorn
+    Based on altairz80_dsk.c, Copyright (c) 2002-2012, Peter Schorn
 
     Plug-n-Play added by Howard M. Harte
 
@@ -131,7 +131,7 @@ static t_stat fif_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc) {
 static int32 hasVerbose(void) {
     int32 i;
     for (i = 0; i < NUM_OF_DSK; i++) {
-        if (((fif_dev.units + i) -> flags) & UNIT_DSK_VERBOSE) {
+        if (((fif_dev.units + i)->flags) & UNIT_DSK_VERBOSE) {
             return TRUE;
         }
     }
@@ -219,7 +219,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
         }
         return 0;               /* no drive selected - can do nothing */
     }
-    current_disk_flags = (fif_dev.units + current_disk) -> flags;
+    current_disk_flags = (fif_dev.units + current_disk)->flags;
     if ((current_disk_flags & UNIT_ATT) == 0) { /* nothing attached? */
         if ( (current_disk_flags & UNIT_DSK_VERBOSE) && (warnAttached[current_disk] < warnLevelDSK) ) {
             warnAttached[current_disk]++;

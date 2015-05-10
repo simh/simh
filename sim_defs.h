@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Dec-14    JDB     [4.0] Added T_ADDR_FMT
+   14-Dec-14    JDB     [4.0] Extended sim_device for compatibility
+   04-Nov-14    JDB     [4.0] Added UNIT.dynflags field for tape density support
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Added inlining support
    28-Jun-07    RMS     Added IA64 VMS support (from Norm Lastovica)
@@ -157,10 +160,18 @@ typedef uint32          t_value;
 #if defined (USE_INT64) && defined (USE_ADDR64)         /* 64b address */
 typedef t_uint64        t_addr;
 #define T_ADDR_W        64
+#define T_ADDR_FMT      LL_FMT
 #else                                                   /* 32b address */
 typedef uint32          t_addr;
 #define T_ADDR_W        32
+#define T_ADDR_FMT      ""
 #endif                                                  /* end 64b address */
+
+#if defined (_WIN32)
+#define LL_FMT "I64"
+#else
+#define LL_FMT "ll"
+#endif
 
 /* Stubs for inlining */
 
@@ -300,6 +311,10 @@ struct sim_device {
     t_stat              (*msize)(struct sim_unit *up, int32 v, char *cp, void *dp);
                                                         /* mem size routine */
     char                *lname;                         /* logical name */
+    void                *help;                          /* (4.0 dummy) help routine */
+    void                *attach_help;                   /* (4.0 dummy) help attach routine*/
+    void                *help_context;                  /* (4.0 dummy) help context */
+    void                *description;                   /* (4.0 dummy) description */
     };
 
 /* Device flags */
@@ -323,6 +338,12 @@ struct sim_device {
 #define DEV_RAW         (1 << DEV_V_RAW)
 #define DEV_RAWONLY     (1 << DEV_V_RAWONLY)
 
+#define DEV_DISK        0                               /* (4.0 dummy) */
+#define DEV_TAPE        0                               /* (4.0 dummy) */
+#define DEV_MUX         (DEV_NET)                       /* (4.0 dummy) */
+#define DEV_DISPLAY     0                               /* (4.0 dummy) */
+#define DEV_ETHER       0                               /* (4.0 dummy) */
+
 #define DEV_UFMASK_31   (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF_31) - 1))
 #define DEV_UFMASK      (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF) - 1))
 #define DEV_RFLAGS      (DEV_UFMASK|DEV_DIS)            /* restored flags */
@@ -345,6 +366,7 @@ struct sim_unit {
     uint32              hwmark;                         /* high water mark */
     int32               time;                           /* time out */
     uint32              flags;                          /* flags */
+    uint32              dynflags;                       /* dynamic flags */
     t_addr              capac;                          /* capacity */
     t_addr              pos;                            /* file position */
     int32               buf;                            /* buffer */
@@ -353,6 +375,8 @@ struct sim_unit {
     int32               u4;                             /* device specific */
     int32               u5;                             /* device specific */
     int32               u6;                             /* device specific */
+    void                *up7;                           /* (4.0 dummy) */
+    void                *up8;                           /* (4.0 dummy) */
     };
 
 /* Unit flags */
@@ -380,6 +404,13 @@ struct sim_unit {
 #define UNIT_UFMASK_31  (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF_31) - 1))
 #define UNIT_UFMASK     (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
 #define UNIT_RFLAGS     (UNIT_UFMASK|UNIT_DIS)          /* restored flags */
+
+/* Unit dynamic flags (dynflags) (from 4.0) */
+
+/* These flags are only set dynamically */
+
+#define UNIT_V_DF_TAPE  3               /* Bit offset for Tape Density reservation */
+#define UNIT_W_DF_TAPE  3               /* Bits Reserved for Tape Density */
 
 /* Register data structure */
 
@@ -445,6 +476,7 @@ struct sim_mtab {
     void                *desc;                          /* value descriptor */
                                                         /* REG * if MTAB_VAL */
                                                         /* int * if not */
+    void                *help;                          /* (4.0 dummy) */
     };
 
 #define MTAB_XTD        (1u << UNIT_V_RSV)              /* ext entry flag */
@@ -487,7 +519,7 @@ struct sim_debtab {
 
 /* The following macros define structure contents */
 
-#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),(cap),0,0
+#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),0,(cap),0,0
 
 #if defined (__STDC__) || defined (_WIN32)
 #define ORDATA(nm,loc,wd) #nm, &(loc), 8, (wd), 0, 1
@@ -528,5 +560,45 @@ typedef struct sim_debtab DEBTAB;
 #include "sim_console.h"
 #include "sim_timer.h"
 #include "sim_fio.h"
+
+/* V4 compatibility definitions */
+
+#if defined (__STDC__) || defined (_WIN32)
+#define ORDATAD(nm,loc,wd,desc) #nm, &(loc), 8, (wd), 0, 1
+#define DRDATAD(nm,loc,wd,desc) #nm, &(loc), 10, (wd), 0, 1
+#define HRDATAD(nm,loc,wd,desc) #nm, &(loc), 16, (wd), 0, 1
+#define FLDATAD(nm,loc,pos,desc) #nm, &(loc), 2, 1, (pos), 1
+#define GRDATAD(nm,loc,rdx,wd,pos,desc) #nm, &(loc), (rdx), (wd), (pos), 1
+#define BRDATAD(nm,loc,rdx,wd,dep,desc) #nm, (loc), (rdx), (wd), 0, (dep)
+#define URDATAD(nm,loc,rdx,wd,off,dep,fl,desc) \
+        #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
+#define ORDATADF(nm,loc,wd,desc) #nm, &(loc), 8, (wd), 0, 1
+#define DRDATADF(nm,loc,wd,desc) #nm, &(loc), 10, (wd), 0, 1
+#define HRDATADF(nm,loc,wd,desc) #nm, &(loc), 16, (wd), 0, 1
+#define FLDATADF(nm,loc,pos,desc) #nm, &(loc), 2, 1, (pos), 1
+#define GRDATADF(nm,loc,rdx,wd,pos,desc) #nm, &(loc), (rdx), (wd), (pos), 1
+#define BRDATADF(nm,loc,rdx,wd,dep,desc) #nm, (loc), (rdx), (wd), 0, (dep)
+#define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc) \
+        #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
+#else
+#define ORDATAD(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
+#define DRDATAD(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
+#define HRDATAD(nm,loc,wd) "nm", &(loc), 16, (wd), 0, 1
+#define FLDATAD(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1
+#define GRDATAD(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1
+#define BRDATAD(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
+#define URDATAD(nm,loc,rdx,wd,off,dep,fl) \
+    "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
+#define ORDATADF(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
+#define DRDATADF(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
+#define HRDATADF(nm,loc,wd) "nm", &(loc), 16, (wd), 0, 1
+#define FLDATADF(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1
+#define GRDATADF(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1
+#define BRDATADF(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
+#define URDATADF(nm,loc,rdx,wd,off,dep,fl) \
+    "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
+#endif
+
+#define INT64_C(x)  (x)
 
 #endif

@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2012, Robert M Supnik
+   Copyright (c) 1998-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Mar-15    RMS     Added model-specific IPR max
    15-Mar-12    RMS     Fixed potential integer overflow in LDPCTX (Mark Pizzolato)
    25-Nov-11    RMS     Added VEC_QBUS test in interrupt handler
    23-Mar-11    RMS     Revised idle design (Mark Pizzolato)
@@ -99,9 +100,7 @@ extern int32 fault_PC;
 extern int32 pcq[PCQ_SIZE];
 extern int32 pcq_p;
 extern int32 in_ie;
-extern int32 sim_interval;
 extern int32 ibcnt, ppc;
-extern FILE *sim_deb;
 extern DEVICE cpu_dev;
 
 extern int32 Test (uint32 va, int32 acc, int32 *status);
@@ -1445,7 +1444,7 @@ int32 cc;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
-if (prn > 63)                                           /* reg# > 63? fault */
+if (prn > MT_MAX)                                       /* reg# > max? fault */
     RSVD_OPND_FAULT;
 CC_IIZZ_L (val);                                        /* set cc's */
 switch (prn) {                                          /* case on reg # */
@@ -1572,7 +1571,7 @@ int32 val;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
-if (prn > 63)                                           /* reg# > 63? fault */
+if (prn > MT_MAX)                                       /* reg# > max? fault */
     RSVD_OPND_FAULT;
 switch (prn) {                                          /* case on reg# */
 

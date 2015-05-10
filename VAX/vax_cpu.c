@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2012, Robert M Supnik
+   Copyright (c) 1998-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   29-Mar-15    RMS     Moved in-exception test to model-specific machine checks
    20-Sep-11    MP      Fixed idle conditions for various versions of Ultrix, 
                         Quasijarus-4.3BSD, NetBSD and OpenBSD.
                         Note: Since NetBSD and OpenBSD are still actively 
@@ -308,12 +309,6 @@ const uint32 align[4] = {
 
 /* External and forward references */
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern int32 sim_switches;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
-
 extern t_stat build_dib_tab (void);
 extern UNIT rom_unit, nvr_unit;
 extern int32 op_ashq (int32 *opnd, int32 *rh, int32 *flg);
@@ -508,7 +503,7 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-volatile int32 opc, cc;                                 /* used by setjmp */
+volatile int32 opc = 0, cc;                             /* used by setjmp */
 volatile int32 acc;                                     /* set by setjmp */
 int abortval;
 t_stat r;
@@ -594,8 +589,6 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
         break;
 
     case SCB_MCHK:                                      /* machine check */
-        if (in_ie)                                      /* in exc? panic */
-            ABORT (STOP_INIE);
         cc = machine_check (p1, opc, cc, delta);        /* system specific */
         in_ie = 0;
         GET_CUR;                                        /* PSL<cur> changed */
@@ -642,7 +635,7 @@ for ( ;; ) {
 */
 
     if (trpirq) {                                       /* trap or interrupt? */
-        if (temp = GET_TRAP (trpirq)) {                 /* trap? */
+        if ((temp = GET_TRAP (trpirq))) {               /* trap? */
             cc = intexc (SCB_ARITH, cc, 0, IE_EXC);     /* take, clear trap */
             GET_CUR;                                    /* set cur mode */
             in_ie = 1;
@@ -650,7 +643,7 @@ for ( ;; ) {
             SP = SP - 4;
             in_ie = 0;
             }
-        else if (temp = GET_IRQL (trpirq)) {            /* interrupt? */
+        else if ((temp = GET_IRQL (trpirq))) {          /* interrupt? */
             int32 vec;
             if (temp == IPL_HLTPIN) {                   /* console halt? */
                 hlt_pin = 0;                            /* clear intr */
@@ -1462,7 +1455,7 @@ for ( ;; ) {
 
                 default:
                     RSVD_ADDR_FAULT;                    /* end case idxspec */
-					}
+                    }
 
                 switch (disp & (DR_ACMASK|DR_SPFLAG|DR_LNMASK)) { /* case acc+lnt */
                 case VB:
@@ -1948,7 +1941,8 @@ for ( ;; ) {
             temp = CC_V;
             SET_TRAP (TRAP_DIVZRO);
             }
-        else if ((op0 == LMASK) && (op1 == LSIGN)) {    /* overflow? */
+        else if ((((uint32)op0) == LMASK) && 
+                 (((uint32)op1) == LSIGN)) {            /* overflow? */
             r = op1;
             temp = CC_V;
             INTOV;
@@ -2187,6 +2181,7 @@ for ( ;; ) {
             BRANCHB (brdisp);
             if (((PSL & PSL_IS) != 0) &&                /* on IS? */
                 (PSL_GETIPL (PSL) == 0x1F) &&           /* at IPL 31 */
+                (mapen == 0) &&                         /* Running from ROM */
                 (fault_PC == 0x2004361B))               /* Boot ROM Character Prompt */
                 cpu_idle();
             }
@@ -2934,7 +2929,7 @@ for ( ;; ) {
         if (op7 < 0) {
             Read (op8, L_BYTE, WA);
             Read ((op8 + 7) & LMASK, L_BYTE, WA);
-			}
+            }
         if (op5 >= 0)
             R[op5] = temp;
         else Write (op6, temp, L_LONG, WA);
@@ -2950,7 +2945,7 @@ for ( ;; ) {
         if (op7 < 0) {
             Read (op8, L_BYTE, WA);
             Read ((op8 + 7) & LMASK, L_BYTE, WA);
-			}
+            }
         if (op5 >= 0)
             R[op5] = temp;
         else Write (op6, temp, L_LONG, WA);
@@ -3131,8 +3126,7 @@ return;
 
 t_stat cpu_idle_svc (UNIT *uptr)
 {
-if (sim_idle_enab)
-    sim_idle (TMR_CLK, FALSE);
+sim_idle (TMR_CLK, TRUE);
 return SCPE_OK;
 }
 
@@ -3212,7 +3206,7 @@ return SCPE_NXM;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-uint32 i, clim;
+uint32 i, clim, uval = (uint32)val;
 uint32 *nM = NULL;
 
 if ((val <= 0) || (val > MAXMEMSIZE_X))
@@ -3221,15 +3215,16 @@ for (i = val; i < MEMSIZE; i = i + 4)
     mc = mc | M[i >> 2];
 if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
     return SCPE_OK;
-nM = (uint32 *) calloc (val >> 2, sizeof (uint32));
+nM = (uint32 *) calloc (uval >> 2, sizeof (uint32));
 if (nM == NULL)
     return SCPE_MEM;
-clim = (uint32) ((((uint32) val) < MEMSIZE)? val: MEMSIZE);
+clim = (uint32)((uval < MEMSIZE)? uval: MEMSIZE);
 for (i = 0; i < clim; i = i + 4)
     nM[i >> 2] = M[i >> 2];
 free (M);
 M = nM;
-MEMSIZE = val; 
+MEMSIZE = uval; 
+reset_all (0);
 return SCPE_OK;
 }
 
@@ -3326,8 +3321,6 @@ t_stat r;
 InstHistory *h;
 extern const char *opcode[];
 extern t_value *sim_eval;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

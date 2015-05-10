@@ -96,7 +96,7 @@
 /* Drive status, ^ = dynamic, * = in unit status */
 
 #define STD_WRP         0x80                            /* ^write prot */
-/*                      0x40                            /* unused */
+/*                      0x40                          *//* unused */
 #define STD_ACH         0x20                            /* alt chan busy NI */
 #define STD_UNS         0x10                            /* *unsafe */
 #define STD_NRDY        0x08                            /* ^not ready */
@@ -503,7 +503,6 @@ t_stat idc_svc (UNIT *uptr)
 int32 diff;
 uint32 f, u = uptr - idc_dev.units;                     /* get unit number */
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
-uint32 t;
 t_stat r;
 
 if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
@@ -561,7 +560,7 @@ if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
             }
         }                                               /* end else p1 */
     return SCPE_OK;                                     /* end if drv */
-	}
+    }
 
 switch (uptr->FNC & CMC_MASK) {                         /* case on func */
 
@@ -576,10 +575,10 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
         if (sch_actv (idc_dib.sch, idc_dib.dno)) {      /* sch transfer? */
             if (idc_dter (uptr, idc_1st))               /* dte? done */
                 return SCPE_OK;
-            if (r = idc_rds (uptr))                     /* read sec, err? */
+            if ((r = idc_rds (uptr)))                   /* read sec, err? */
                 return r;
             idc_1st = 0;
-            t = sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY); /* write mem */
+            sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY);  /* write mem */
             if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;
@@ -595,7 +594,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
                 return SCPE_OK;
             idc_bptr = sch_rdmem (idc_dib.sch, idcxb, IDC_NUMBY); /* read mem */
             idc_db = idcxb[idc_bptr - 1];               /* last byte */
-            if (r = idc_wds (uptr))                     /* write sec, err? */
+            if ((r = idc_wds (uptr)))                   /* write sec, err? */
                 return r;
             idc_1st = 0;
             if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
@@ -693,7 +692,7 @@ uint32 hd, sc, sa;
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
-	idc_done (STC_DTE);									/* error, done */
+    idc_done (STC_DTE);                                 /* error, done */
     return TRUE;
     }
 if ((uptr->flags & UNIT_WPRT) && (uptr->FNC == CMC_WR)) {

@@ -1,7 +1,7 @@
 /* hp2100_cpu7.c: HP 1000 VIS and SIGNAL/1000 microcode
 
    Copyright (c) 2008, Holger Veit
-   Copyright (c) 2006-2012, J. David Bryan
+   Copyright (c) 2006-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
 
    CPU7         Vector Instruction Set and SIGNAL firmware
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   18-Mar-13    JDB     Moved EMA helper declarations to hp2100_cpu1.h
+   09-May-12    JDB     Separated assignments from conditional expressions
    06-Feb-12    JDB     Corrected "opsize" parameter type in vis_abs
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
@@ -122,11 +125,6 @@ static const OP zero   = { { 0, 0, 0, 0, 0 } };          /* DEC 0.0D0 */
     - VIS Microcode Source (12824-18059, revision 3).
 */
 
-/* implemented in hp2100_cpu5.c (RTE-IV EMA functions) */
-extern t_stat cpu_ema_eres(uint32* rtn,uint32 dtbl,uint32 atbl, t_bool debug);
-extern t_stat cpu_ema_eseg(uint32* rtn,uint32 ir,uint32 tbl, t_bool debug);
-extern t_stat cpu_ema_vset(uint32* rtn,OPS op, t_bool debug);
-
 static const OP_PAT op_vis[16] = {
   OP_N,    OP_AAKAKAKK,OP_AKAKK, OP_AAKK,                /*  .VECT  VPIV   VABS   VSUM   */
   OP_AAKK, OP_AAKAKK,  OP_AAKK,  OP_AAKK,                /*  VNRM   VDOT   VMAX   VMAB   */
@@ -153,7 +151,7 @@ int16 ix1 = INT16(op[2].word) * delta;
 uint32 v2addr = op[3].word;
 int16 ix2 = INT16(op[4].word) * delta;
 int16 i, n = INT16(op[5].word);
-uint32 fpuop = (subcode & 060) | (opsize==fp_f ? 0 : 2);
+uint16 fpuop = (uint16) (subcode & 060) | (opsize==fp_f ? 0 : 2);
 
 if (n <= 0) return;
 for (i=0; i<n; i++) {
@@ -177,7 +175,7 @@ int32 ix2 = INT16(op[3].word) * delta;
 uint32 v3addr = op[4].word;
 int32 ix3 = INT16(op[5].word) * delta;
 int16 i, n = INT16(op[6].word);
-uint32 fpuop = (subcode & 060) | (opsize==fp_f ? 0 : 2);
+uint16 fpuop = (uint16) (subcode & 060) | (opsize==fp_f ? 0 : 2);
 
 if (n <= 0) return;
 for (i=0; i<n; i++) {
@@ -208,7 +206,7 @@ uint32 v1addr = op[1].word;
 int16 ix1 = INT16(op[2].word) * delta;
 int16 n = INT16(op[3].word);
 int16 i,mxmn,sign;
-int32 subop = 020 | (opsize==fp_f ? 0 : 2);
+uint16 subop = 020 | (opsize==fp_f ? 0 : 2);
 
 if (n <= 0) return;
 mxmn = 0;                                                /* index of maxmin element */
@@ -291,7 +289,7 @@ out->fpk[1] = (in.fpk[1] & 0177400) | (in.fpk[3] & 0377);
 
 static void vis_vsmnm(OPS op,OPSIZE opsize,t_bool doabs)
 {
-uint32 fpuop;
+uint16 fpuop;
 OP v1,sumnrm = zero;
 int16 delta = opsize==fp_f ? 2 : 4;
 uint32 saddr = op[0].word;
@@ -383,16 +381,18 @@ if (entry==0) {                                          /* retrieve sub opcode 
         subcode = AR;                                    /*   for reentry */
     PC = (PC + 1) & VAMASK;                              /* bump to real argument list */
     pattern = (subcode & 0400) ? OP_AAKAKK : OP_AKAKAKK; /* scalar or vector operation */
-}
+    }
 
-if (pattern != OP_N)
+if (pattern != OP_N) {
     if (op_ftnret[entry]) {                              /* most VIS instrs ignore RTN addr */
         ret = ReadOp(PC, in_s);
         rtn = rtn1 = ret.word;                           /* but save it just in case */
         PC = (PC + 1) & VAMASK;                          /* move to next argument */
+        }
+    reason = cpu_ops (pattern, op, intrq);               /* get instruction operands */
+    if (reason != SCPE_OK)                               /* evaluation failed? */
+        return reason;                                   /* return reason for failure */
     }
-    if (reason = cpu_ops (pattern, op, intrq))           /* get instruction operands */
-        return reason;
 
 if (debug) {                                             /* debugging? */
     fprintf (sim_deb, ">>CPU VIS: IR = %06o/%06o (",     /* print preamble and IR */
@@ -537,7 +537,7 @@ static const OP_PAT op_signal[16] = {
   };
 
 /* complex addition helper */
-static void sig_caddsub(uint32 addsub,OPS op)
+static void sig_caddsub(uint16 addsub,OPS op)
 {
 OP a,b,c,d,p1,p2;
 
@@ -618,7 +618,7 @@ WriteOp(im+rev, v1i, fp_f);
 }
 
 /* helper for PRSCR/UNSCR */
-static OP sig_scadd(uint32 oper,t_bool addh, OP a, OP b)
+static OP sig_scadd(uint16 oper,t_bool addh, OP a, OP b)
 {
 OP r;
 static const OP plus_half = { { 0040000, 0000000 } };   /* DEC +0.5 */
@@ -652,9 +652,11 @@ t_bool debug = DEBUG_PRI (cpu_dev, DEB_SIG);
 
 entry = IR & 017;                                  /* mask to entry point */
 
-if (op_signal[entry] != OP_N)
-    if (reason = cpu_ops (op_signal[entry], op, intrq)) /* get instruction operands */
-        return reason;
+if (op_signal [entry] != OP_N) {
+    reason = cpu_ops (op_signal [entry], op, intrq);    /* get instruction operands */
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 if (debug) {                                             /* debugging? */
     fprintf (sim_deb, ">>CPU SIG: IR = %06o (", IR);     /* print preamble and IR */

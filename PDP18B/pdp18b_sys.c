@@ -345,8 +345,6 @@ return SCPE_OK;
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-extern int32 sim_switches;
-
 if (flag != 0)
     return SCPE_NOFNC;
 if (sim_switches & SWMASK ('S'))                        /* RIM format? */
@@ -1009,7 +1007,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             break;
 
         case I_V_OPR:                                   /* operate */
-            if (sp = (inst & 03730))
+            if ((sp = (inst & 03730)))
                 fprintf (of, "%s", opcode[i]);
             fprint_opr (of, inst & 014047, I_V_OPR, sp);
             break;

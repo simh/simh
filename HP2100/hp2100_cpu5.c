@@ -1,7 +1,7 @@
 /* hp2100_cpu5.c: HP 1000 RTE-6/VM VMA and RTE-IV EMA instructions
 
    Copyright (c) 2007-2008, Holger Veit
-   Copyright (c) 2006-2012, J. David Bryan
+   Copyright (c) 2006-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
 
    CPU5         RTE-6/VM and RTE-IV firmware option instructions
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   17-Dec-12    JDB     Fixed cpu_vma_mapte to return FALSE if not a VMA program
+   09-May-12    JDB     Separated assignments from conditional expressions
    23-Mar-12    JDB     Added sign extension for dim count in "cpu_ema_resolve"
    28-Dec-11    JDB     Eliminated unused variable in "cpu_ema_vset"
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
@@ -332,8 +335,13 @@ uint32 dispatch = ReadIO(vswp,UMAP) & 01777;        /* get fresh dispatch flag *
 t_bool swapflag = TRUE;
 
 if (dispatch == 0) {                                /* not yet set */
-    idext = ReadIO(idx,UMAP);                       /* go into IDsegment extent */
-    if (idext != 0) {                               /* is ema/vma program? */
+    idext = ReadIO(idx,UMAP);                       /* go into ID segment extent */
+    if (idext == 0) {                               /* is ema/vma program? */
+        swapflag = FALSE;                           /* no, so mark PTE as invalid */
+        *ptepg = (uint32) -1;                       /*   and return an invalid page number */
+        }
+
+    else {                                          /* is an EMA/VMA program */
         dispatch = ReadWA(idext+1) & 01777;         /* get 1st ema page: new vswp */
         WriteIO(vswp,dispatch,UMAP);                /* move into $VSWP */
         idext2 = ReadWA(idext+2);                   /* get swap bit */
@@ -346,7 +354,7 @@ if (dispatch) {                                     /* some page is defined */
     *ptepg = dispatch;                              /* return PTEPG# for later */
     }
 
-return swapflag;                                    /* true for swap bit set */
+return swapflag;                                    /* true for valid PTE */
 }
 
 /*  .LBP
@@ -382,8 +390,11 @@ if (debug)
 O = 0;                                              /* clear overflow */
 if (ptr & 0x80000000) {                             /* is it a local reference? */
     ptrl = ptr & VAMASK;
-    if ((ptr&I_IA) && (reason = vma_resolve (ReadW (ptrl), &ptrl, debug)))
-        return reason;                              /* yes, resolve indirect ref */
+    if (ptr&I_IA) {
+        reason = vma_resolve (ReadW (ptrl), &ptrl, debug);
+        if (reason)
+            return reason;                          /* yes, resolve indirect ref */
+        }
     BR = ptrl & VAMASK;                             /* address is local */
     AR = (ptr >> 16) & DMASK;
     if (debug)
@@ -411,7 +422,7 @@ if (!p30)                                           /* matched suit for 1st page
  * must be in idx 0 of PTE */
 if (pgidx==01777) {                                 /* suit switch situation */
     pgidx = 0;                                      /* select correct idx 0 */
-    suit = pagid+1;                                 /* suit needs increment */
+    suit = (uint16) (pagid + 1);                    /* suit needs increment */
     if (suit==0) {                                  /* is it page 65536? */
         offset += 02000;                            /* adjust to 2nd page */
         suit = NILPAGE;
@@ -440,8 +451,8 @@ else {
         return cpu_vma_fault(pagid+1,page31,31,ptepg,faultab,faultpc,debug);
     }
 
-AR = pagid;                                         /* return pagid in A */
-BR = page30+offset;                                 /* mapped address in B */
+AR = (uint16) pagid;                                    /* return pagid in A */
+BR = (uint16) (page30 + offset);                        /* mapped address in B */
 if (debug)
     fprintf(sim_deb,">>CPU VMA: cpu_vma_lbp: map done AR=%06o BR=%o6o\n",AR,BR);
 return SCPE_OK;
@@ -605,7 +616,8 @@ if (ndim == 0) {                                    /* no dimensions:  */
 accu = 0;
 while (ndim-- > 0) {
     MA = ReadW(atbl++);                             /* get addr of subscript */
-    if ((reason = resolve (MA, &MA, intrq)))        /* and resolve it */
+    reason = resolve (MA, &MA, intrq);              /* and resolve it */
+    if (reason)
         return reason;
     din = ReadOp(MA,ij);                            /* get actual subscript value */
     ax = ij==in_d ? INT32(din.dword) : INT16(din.word);
@@ -640,6 +652,7 @@ t_stat cpu_rte_vma (uint32 IR, uint32 intrq)
 t_stat reason = SCPE_OK;
 OPS op;
 OP_PAT pattern;
+uint16 t16;
 uint32 entry,t32,ndim;
 uint32 dtbl,atbl;                                   /* descriptor table ptr, actual args ptr */
 OP dop0,dop1;
@@ -649,9 +662,11 @@ t_bool debug = DEBUG_PRI (cpu_dev, DEB_VMA);
 entry = IR & 017;                                   /* mask to entry point */
 pattern = op_vma[entry];                            /* get operand pattern */
 
-if (pattern != OP_N)
-    if (reason = cpu_ops (pattern, op, intrq))      /* get instruction operands */
-        return reason;
+if (pattern != OP_N) {
+    reason = cpu_ops (pattern, op, intrq);              /* get instruction operands */
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 if (debug) {                                            /* debugging? */
     fprintf (sim_deb, ">>CPU VMA: IR = %06o (", IR);    /* print preamble and IR */
@@ -682,9 +697,9 @@ switch (entry) {                                    /* decode IR<3:0> */
         break;
 
     case 003:                                       /* [swap] 105243 (OP_N) */
-        t32 = AR;                                   /* swap A and B registers */
+        t16 = AR;                                   /* swap A and B registers */
         AR = BR;
-        BR = t32;
+        BR = t16;
         break;
 
     case 004:                                       /* [---] 105244 (OP_N) */
@@ -709,10 +724,12 @@ switch (entry) {                                    /* decode IR<3:0> */
     case 010:                                       /* .IMAP 105250 (OP_A) */
         dtbl = op[0].word;
         atbl = PC;
-        if ((reason = cpu_vma_ijmar(in_s,dtbl,atbl,&ndim,intrq,debug)))   /* calc the virt address to AB */
+        reason = cpu_vma_ijmar(in_s,dtbl,atbl,&ndim,intrq,debug);   /* calc the virt address to AB */
+        if (reason)
             return reason;
         t32 = (AR << 16) | (BR & DMASK);
-        if ((reason = cpu_vma_lbp(t32,0,PC-2,intrq,debug)))
+        reason = cpu_vma_lbp(t32,0,PC-2,intrq,debug);
+        if (reason)
             return reason;
         if (PC==pcsave)
             PC = (PC+ndim) & VAMASK;                /* adjust PC: skip ndim subscript words */
@@ -727,10 +744,12 @@ switch (entry) {                                    /* decode IR<3:0> */
     case 012:                                       /* .JMAP 105252 (OP_A) */
         dtbl = op[0].word;
         atbl = PC;
-        if ((reason = cpu_vma_ijmar(in_d,dtbl,atbl,&ndim,intrq,debug)))   /* calc the virtual address to AB */
+        reason = cpu_vma_ijmar(in_d,dtbl,atbl,&ndim,intrq,debug);   /* calc the virtual address to AB */
+        if (reason)
             return reason;
         t32 = (AR << 16) | (BR & DMASK);
-        if ((reason = cpu_vma_lbp(t32,0,PC-2,intrq,debug)))
+        reason = cpu_vma_lbp(t32,0,PC-2,intrq,debug);
+        if (reason)
             return reason;
         if (PC==pcsave)
             PC = (PC + ndim) & VAMASK;              /* adjust PC: skip ndim subscript dword ptr */
@@ -1017,7 +1036,7 @@ YR = ReadW(MA);
 WriteW(vout++, MA); vin++;                              /* copy address of N */
 
 if (imax==0) goto easy;                                 /* easy case */
-AR = k / imax; AR++;                                    /* calculate K/IMAX */
+AR = (uint16) (k / imax); AR++;                         /* calculate K/IMAX */
 if (negflag) goto hard;                                 /* had a negative index? */
 if (YR > AR) goto hard;
 
@@ -1183,7 +1202,7 @@ if ((idext0 & 0100000) ||                               /* was nonstd MSEG? */
     e->npgs = msnum==e->msegno ? lastpgs : e->msegsz;   /* for last MSEG, only map available pgs */
     if (!cpu_ema_mmap01(e)) return FALSE;               /* map npgs pages at ipgs */
 }
-BR = e->mseg + e->msoff;                                /* return address of element */
+BR = (uint16) (e->mseg + e->msoff);                     /* return address of element */
 return TRUE;                                            /* and everything done */
 }
 
@@ -1237,7 +1256,7 @@ if (npgs < e->msegsz) {
     e->mseg = mseg;                                     /* logical stat of MSEG */
     if (!cpu_ema_emat(e)) goto em16;                    /* do a std mapping */
 } else {
-    BR = mseg + e->offs;                                /* logical start of buffer */
+    BR = (uint16) (mseg + e->offs);                     /* logical start of buffer */
     e->npgs = bufpgs;                                   /* S5 # pgs required */
     e->ipgs = e->pgoff;                                 /* S6 page offset to reqd pg */
     if (!cpu_ema_mmap02(e)) goto em16;                  /* do nonstd mapping */
@@ -1316,7 +1335,7 @@ if (xidex) {                                            /* is EMA declared? */
         idext0 = ReadWA(xidex+0) | 0100000;             /* set NS flag in id extension */
         WriteIO(xidex+0, idext0, SMAP);                 /* save back value */
         AR = 0;                                         /* was successful */
-        BR = mseg + offs;                               /* calculate log address */
+        BR = (uint16) (mseg + offs);                    /* calculate log address */
         (*rtn)++;                                       /* return via good exit */
         return SCPE_OK;
     }
@@ -1339,7 +1358,7 @@ while (ndim > 0) {
     if (sum & 0xffff8000) goto em15;                    /* overflow? */
     ndim--;
 }
-BR = abase + sum;                                       /* add displacement */
+BR = (uint16) (abase + sum);                            /* add displacement */
 (*rtn)++;                                               /* return via good exit */
 return SCPE_OK;
 
@@ -1360,9 +1379,11 @@ t_bool debug = DEBUG_PRI (cpu_dev, DEB_EMA);
 entry = IR & 017;                                       /* mask to entry point */
 pattern = op_ema[entry];                                /* get operand pattern */
 
-if (pattern != OP_N)
-    if (reason = cpu_ops (pattern, op, intrq))          /* get instruction operands */
-        return reason;
+if (pattern != OP_N) {
+    reason = cpu_ops (pattern, op, intrq);              /* get instruction operands */
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 if (debug) {                                            /* debugging? */
     fprintf (sim_deb, ">>CPU EMA: PC = %06o, IR = %06o (", err_PC,IR);    /* print preamble and IR */

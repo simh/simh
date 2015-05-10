@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,11 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Dec-14    JDB     Added casts to t_addr and t_value for 64-bit compatibility
+                        Made local routines static
+   05-Feb-13    JDB     Added hp_fprint_stopped to handle HLT instruction message
+   18-Mar-13    JDB     Moved CPU state variable declarations to hp2100_cpu.h
+   09-May-12    JDB     Quieted warnings for assignments in conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added hp_setsc, hp_showsc functions to support SC modifier
    15-Dec-11    JDB     Added DA and dummy DC devices
@@ -60,9 +65,6 @@
 #include "hp2100_cpu.h"
 #include <ctype.h>
 
-extern DEVICE cpu_dev;
-extern UNIT   cpu_unit;
-extern REG    cpu_reg[];
 
 extern DEVICE mp_dev;
 extern DEVICE dma1_dev, dma2_dev;
@@ -94,8 +96,6 @@ extern DEVICE da_dev, dc_dev;
 */
 
 char sim_name[] = "HP 2100";
-
-char halt_msg[] = "HALT instruction xxxxxx";
 
 REG *sim_PC = &cpu_reg[0];
 
@@ -130,7 +130,7 @@ const char *sim_stop_messages[] = {
     "Unknown error",
     "Unimplemented instruction",
     "Non-existent I/O device",
-    halt_msg,
+    "HALT instruction",
     "Breakpoint",
     "Indirect address loop",
     "Indirect address interrupt (should not happen!)",
@@ -138,6 +138,40 @@ const char *sim_stop_messages[] = {
     "Device/unit offline",
     "Device/unit powered off"
     };
+
+
+/* Print additional information for simulator stops.
+
+   The HP 21xx/1000 halt instruction ("HLT") opcode includes select code and
+   device flag hold/clear bit fields.  In practice, these are not used to affect
+   the device interface; rather, they communicate to the operator the
+   significance of the particular halt encountered.
+
+   Under simulation, the halt opcode must be communicated to the user as part of
+   the stop message.  To so do, we define a sim_vm_fprint_stopped handler that
+   is called for all VM stops.  When called for a STOP_HALT, the halt message
+   has been printed, and we add the opcode value in the T register before
+   returning TRUE, so that SCP will add the program counter value.  For example:
+
+     HALT instruction 102077, P: 00101 (NOP)
+
+   Reasons other than STOP_HALT need no additional information.
+
+   Implementation notes:
+
+    1. The octal halt instruction will always be of the form 10x0xx.  We take
+       advantage of this to request 19 bits printed with leading spaces.  This
+       adds a leading space to separate the value from the message.
+*/
+
+t_bool hp_fprint_stopped (FILE *st, t_stat reason)
+{
+if (reason == STOP_HALT)
+    fprint_val (st, TR, 8, 19, PV_RSPC);
+
+return TRUE;
+}
+
 
 /* Binary loader
 
@@ -154,7 +188,7 @@ const char *sim_stop_messages[] = {
    The checksum includes the origin but not the count.
 */
 
-int32 fgetw (FILE *fileref)
+static int32 fgetw (FILE *fileref)
 {
 int c1, c2;
 
@@ -403,7 +437,7 @@ int32 cflag, cm, i, j, inst, disp;
 uint32 irq;
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-inst = val[0];
+inst = (int32) val[0];
 if (sw & SWMASK ('A')) {                                /* ASCII? */
     if (inst > 0377) return SCPE_ARG;
     fprintf (of, FMTASC (inst & 0177));
@@ -428,7 +462,7 @@ if (sw & SIM_SW_STOP) {                                 /* simulator stop? */
 
     if (irq && (!ion_defer || !calc_defer())) {         /* pending interrupt and not deferred? */
         addr = irq;                                     /* set display address to trap cell */
-        inst = val[0] = ReadIO (irq, SMAP);             /* load trap cell instruction */
+        val[0] = inst = ReadIO (irq, SMAP);             /* load trap cell instruction */
         val[1] = ReadIO (irq + 1, SMAP);                /*   might be multi-word */
         val[2] = ReadIO (irq + 2, SMAP);                /*   although it's unlikely */
         fprintf (of, "IAK %2o: ", irq);                 /* report acknowledged interrupt */
@@ -453,8 +487,10 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             disp = inst & I_DISP;                       /* displacement */
             fprintf (of, "%s ", opcode[i]);             /* opcode */
             if (inst & I_CP) {                          /* current page? */
-                if (cflag) fprintf (of, "%-o", (addr & I_PAGENO) | disp);
-                else fprintf (of, "C %-o", disp);
+                if (cflag)
+                    fprintf (of, "%-o", ((uint32) addr & I_PAGENO) | disp);
+                else
+                    fprintf (of, "C %-o", disp);
                 }
             else fprintf (of, "%-o", disp);             /* page zero */
             if (inst & I_IA) fprintf (of, ",I");
@@ -480,7 +516,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             break;
 
         case I_V_EMR:                                   /* extended mem ref */
-            fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
+            fprintf (of, "%s %-o", opcode[i], (uint32) val[1] & VAMASK);
             if (val[1] & I_IA) fprintf (of, ",I");
             return -1;                                  /* extra word */
 
@@ -494,14 +530,14 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             break;
 
         case I_V_EGZ:                                   /* ext grp 1 op + 0 */
-            fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
+            fprintf (of, "%s %-o", opcode[i], (uint32) val[1] & VAMASK);
             if (val[1] & I_IA) fprintf (of, ",I");
             return -2;                                  /* extra words */
 
         case I_V_EG2:                                   /* ext grp 2 op */
-            fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
+            fprintf (of, "%s %-o", opcode[i], (uint32) val[1] & VAMASK);
             if (val[1] & I_IA) fprintf (of, ",I");
-            fprintf (of, " %-o", val[2] & VAMASK);
+            fprintf (of, " %-o", (uint32) val[2] & VAMASK);
             if (val[2] & I_IA) fprintf (of, ",I");
             return -2;                                  /* extra words */
 
@@ -537,14 +573,14 @@ return SCPE_ARG;
                         -1 if error
 */
 
-int32 get_addr (char *cptr)
+static int32 get_addr (char *cptr)
 {
 int32 d;
 t_stat r;
 char gbuf[CBUFSIZE];
 
 cptr = get_glyph (cptr, gbuf, ',');                     /* get next field */
-d = get_uint (gbuf, 8, VAMASK, &r);                     /* construe as addr */
+d = (int32) get_uint (gbuf, 8, VAMASK, &r);             /* construe as addr */
 if (r != SCPE_OK) return -1;
 if (*cptr != 0) {                                       /* more? */
     cptr = get_glyph (cptr, gbuf, 0);                   /* look for indirect */
@@ -608,12 +644,15 @@ if (opcode[i]) {                                        /* found opcode? */
 
     case I_V_MRF:                                       /* mem ref */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next field */
-        if (k = (strcmp (gbuf, "C") == 0)) {            /* C specified? */
+        k = strcmp (gbuf, "C");
+        if (k == 0) {                                   /* C specified? */
             val[0] = val[0] | I_CP;
             cptr = get_glyph (cptr, gbuf, 0);
             }
-        else if (k = (strcmp (gbuf, "Z") == 0)) {       /* Z specified? */
-            cptr = get_glyph (cptr, gbuf, ',');
+        else {
+            k = strcmp (gbuf, "Z");
+            if (k == 0)                                 /* Z specified? */
+                cptr = get_glyph (cptr, gbuf, ',');
             }
         if ((d = get_addr (gbuf)) < 0) return SCPE_ARG;
         if ((d & VAMASK) <= I_DISP) val[0] = val[0] | d;
@@ -624,7 +663,7 @@ if (opcode[i]) {                                        /* found opcode? */
 
     case I_V_ESH:                                       /* extended shift */
         cptr = get_glyph (cptr, gbuf, 0);
-        d = get_uint (gbuf, 10, 16, &r);
+        d = (int32) get_uint (gbuf, 10, 16, &r);
         if ((r != SCPE_OK) || (d == 0)) return SCPE_ARG;
         val[0] = val[0] | (d & 017);
         break;
@@ -638,7 +677,7 @@ if (opcode[i]) {                                        /* found opcode? */
 
     case I_V_IO1:                                       /* IOT + optional C */
         cptr = get_glyph (cptr, gbuf, ',');             /* get device */
-        d = get_uint (gbuf, 8, I_DEVMASK, &r);
+        d = (int32) get_uint (gbuf, 8, I_DEVMASK, &r);
         if (r != SCPE_OK) return SCPE_ARG;
         val[0] = val[0] | d;
         if (*cptr != 0) {
@@ -650,7 +689,7 @@ if (opcode[i]) {                                        /* found opcode? */
 
     case I_V_IO2:                                       /* IOT */
         cptr = get_glyph (cptr, gbuf, 0);               /* get device */
-        d = get_uint (gbuf, 8, I_DEVMASK, &r);
+        d = (int32) get_uint (gbuf, 8, I_DEVMASK, &r);
         if (r != SCPE_OK) return SCPE_ARG;
         val[0] = val[0] | d;
         break;
@@ -793,7 +832,7 @@ dibptr = (DIB *) dptr->ctxt;
 if (dibptr == NULL)
     return SCPE_IERR;
 
-newdev = get_uint (cptr, 8, I_DEVMASK - num, &r);
+newdev = (int32) get_uint (cptr, 8, I_DEVMASK - num, &r);
 
 if (r != SCPE_OK)
     return r;

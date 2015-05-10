@@ -690,8 +690,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
-extern int32 saved_PC;
+size_t i;
 
 if (unitno)                                             /* only unit 0 */
     return SCPE_ARG;

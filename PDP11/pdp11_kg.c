@@ -95,7 +95,6 @@
 #endif
 #include "pdp11_defs.h"
 
-extern FILE *sim_deb;
 extern REG cpu_reg[];
 extern int32 R[];
 
@@ -459,7 +458,7 @@ static void do_poly (int unit, t_bool step)
 
 static t_stat set_units (UNIT *u, int32 val, char *s, void *desc)
 {
-    int32       i, units;
+    uint32      i, units;
     t_stat      stat;
 
     if (s == NULL)
@@ -467,6 +466,10 @@ static t_stat set_units (UNIT *u, int32 val, char *s, void *desc)
     units = get_uint (s, 10, KG_UNITS, &stat);
     if (stat != SCPE_OK)
         return (stat);
+    if (units == 0)
+        return SCPE_ARG;
+    if (units == kg_dev.numunits)
+        return SCPE_OK;
     for (i = 0; i < KG_UNITS; i++) {
         if (i < units)
             kg_unit[i].flags &= ~UNIT_DIS;
@@ -474,5 +477,6 @@ static t_stat set_units (UNIT *u, int32 val, char *s, void *desc)
             kg_unit[i].flags |= UNIT_DIS;
     }
     kg_dev.numunits = units;
+    kg_reset (&kg_dev);
     return (SCPE_OK);
 }

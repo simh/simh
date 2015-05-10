@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tti,tto      KL8E terminal input/output
 
+   27-Mar-15    RMS     Backported Dave Gesswein's fix to prevent data loss
    18-Apr-12    RMS     Revised to use clock coscheduling
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    18-Oct-06    RMS     Synced keyboard to clock
@@ -45,7 +46,7 @@
 #include <ctype.h>
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
-extern int32 tmxr_poll, sim_is_running;
+extern int32 tmxr_poll;
 
 int32 tti (int32 IR, int32 AC);
 int32 tto (int32 IR, int32 AC);
@@ -163,6 +164,7 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
     case 6:                                             /* KRB */
         dev_done = dev_done & ~INT_TTI;                 /* clear flag */
         int_req = int_req & ~INT_TTI;
+        sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll)); /* check soon for more input */
         return (tti_unit.buf);                          /* return buffer */
 
     default:
@@ -178,6 +180,8 @@ int32 c;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
                                                         /* continue poll */
+if (dev_done & INT_TTI)                                 /* prior character still pending? */
+    return SCPE_OK;
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */

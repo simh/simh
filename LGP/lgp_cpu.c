@@ -147,11 +147,6 @@ int16 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern int32 sim_step;
-
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
@@ -288,7 +283,7 @@ if (lgp21_sov) {                                        /* stop sense pending? *
 
 do {
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (r = sim_process_event ())
+        if ((r = sim_process_event ()))
             break;
         }
 
@@ -308,7 +303,7 @@ do {
     PC = (PC + 1) & AMASK;                              /* increment PC */
     sim_interval = sim_interval - 1;
 
-    if (r = cpu_one_inst (oPC, IR)) {                   /* one instr; error? */
+    if ((r = cpu_one_inst (oPC, IR))) {                 /* one instr; error? */
         if (r == STOP_STALL) {                          /* stall? */
             PC = oPC;                                   /* back up PC */
             delay = r = 0;                              /* no delay */
@@ -744,7 +739,7 @@ if (cptr) {
 else inst = IR;
 while ((r = cpu_one_inst (PC, inst)) == STOP_STALL) {
     sim_interval = 0;
-    if (r = sim_process_event ())
+    if ((r = sim_process_event ()))
         return r;
     }
 return r;

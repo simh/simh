@@ -37,7 +37,7 @@
    22-May-06    RMS     Fixed format error in CPU history (Peter Schorn)
    06-Mar-06    RMS     Fixed bug in divide (Van Snyder)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
-   01-Sep-05	RMS     Removed error stops in MCE
+   01-Sep-05    RMS     Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET (Ralph Reinke)
    14-Nov-04    WVS     Added column binary support, debug support
@@ -206,11 +206,7 @@ int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 t_bool conv_old = 0;                                    /* old conversions */
 
-extern int32 sim_int_char;
 extern int32 sim_emax;
-extern t_value *sim_eval;
-extern FILE *sim_deb;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -238,8 +234,6 @@ extern t_stat inq_io (int32 flag, int32 mod);
 extern t_stat mt_io (int32 unit, int32 flag, int32 mod);
 extern t_stat dp_io (int32 fnc, int32 flag, int32 mod);
 extern t_stat mt_func (int32 unit, int32 flag, int32 mod);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
 /* CPU data structures
 
@@ -526,7 +520,6 @@ static const int32 mtf_mod[] = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 int32 IS, ilnt, flags;
 int32 op, xa, t, wm, ioind, dev, unit;
 int32 a, b, i, k, asave, bsave;
@@ -1919,8 +1912,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[MAX_L + 1];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

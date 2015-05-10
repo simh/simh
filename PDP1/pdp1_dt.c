@@ -1,6 +1,6 @@
 /* pdp1_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dt           Type 550/555 DECtape
 
+   28-Mar-15    RMS     Revised to use sim_printf
    21-Dec-06    RMS     Added 16-channel SBS support
    23-Jun-06    RMS     Fixed conflict in ATTACH switches
                         Revised header format
@@ -250,9 +251,6 @@
 extern int32 M[];
 extern int32 stop_inst;
 extern UNIT cpu_unit;
-extern int32 sim_switches;
-extern int32 sim_is_running;
-extern FILE *sim_deb;
 
 int32 dtsa = 0;                                         /* status A */
 int32 dtsb = 0;                                         /* status B */
@@ -377,7 +375,7 @@ if (pulse == 003) {                                     /* MSE */
         dt_deselect (dtsa);
     dtsa = (dtsa & ~DTA_UNIT) | (dat & DTA_UNIT);
     dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);
-	}
+    }
 if (pulse == 004) {                                     /* MLC */
     dtsa = (dtsa & ~DTA_RW) | (dat & DTA_RW);           /* load dtsa */
     dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);
@@ -619,7 +617,7 @@ switch (fnc) {                                          /* case function */
 if ((fnc == FNC_WRIT) || (fnc == FNC_WALL)) {           /* write function? */
     dtsb = dtsb | DTB_DTF;                              /* set data flag */
     DT_UPDINT;
-	}
+    }
 sim_activate (uptr, ABS (newpos - ((int32) uptr->pos)) * dt_ltime);
 return;
 }
@@ -681,13 +679,13 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
-	uptr->STATE = uptr->pos = 0;
-	unum = (int32) (uptr - dt_dev.units);
-	if (unum == DTA_GETUNIT (dtsa))						/* if selected, */
-		dt_seterr (uptr, DTB_SEL);						/* error */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel? */
+    uptr->STATE = uptr->pos = 0;
+    unum = (int32) (uptr - dt_dev.units);
+    if (unum == DTA_GETUNIT (dtsa))                     /* if selected, */
+        dt_seterr (uptr, DTB_SEL);                      /* error */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -1014,13 +1012,13 @@ if (uptr->filebuf == NULL) {                            /* can't alloc? */
     return SCPE_MEM;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
-printf ("%s%d: ", sim_dname (&dt_dev), u);
+sim_printf ("%s%d: ", sim_dname (&dt_dev), u);
 if (uptr->flags & UNIT_8FMT)
-    printf ("12b format");
+    sim_printf ("12b format");
 else if (uptr->flags & UNIT_11FMT)
-    printf ("16b format");
-else printf ("18b/36b format");
-printf (", buffering file in memory\n");
+    sim_printf ("16b format");
+else sim_printf ("18b/36b format");
+sim_printf (", buffering file in memory\n");
 if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);
@@ -1081,12 +1079,12 @@ if (sim_is_active (uptr)) {
     if ((u == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
         dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
         DT_UPDINT;
-		}
+        }
     uptr->STATE = uptr->pos = 0;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
 if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-    printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
+    sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
     rewind (uptr->fileref);                             /* start of file */
     if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
         for (ba = 0; ba < uptr->hwmark; ) {             /* loop thru file */

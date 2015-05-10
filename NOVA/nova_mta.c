@@ -139,22 +139,22 @@
 #define STA_PEM         0000001                         /* *PE mode */
 
 #define STA_EFLGS1      (STA_DLT | STA_ILL | STA_DAE | STA_EOT | \
-						 STA_EOF | STA_BOT | STA_BAT | STA_ODD)
+                         STA_EOF | STA_BOT | STA_BAT | STA_ODD)
 #define STA_EFLGS2      (STA_FGP | STA_CDL | STA_BDS | STA_OVS | \
-						 STA_CRC | STA_FPR | STA_FPR)   /* set error 2 */
+                         STA_CRC | STA_FPR | STA_FPR)   /* set error 2 */
 #define STA_CLR         ((020 << 16) | 0010000)         /* always clear */
 #define STA_SET         (STA_HDN | STA_9TK)             /* always set */
 #define STA_DYN         (STA_REW | STA_EOT | STA_EOF | STA_BOT | \
-						 STA_WLK | STA_RDY | STA_PEM)   /* kept in USTAT */
+                         STA_WLK | STA_RDY | STA_PEM)   /* kept in USTAT */
 #define STA_MON         (STA_REW | STA_BOT | STA_WLK | STA_RDY | \
-						 STA_PEM)                       /* set status chg */
+                         STA_PEM)                       /* set status chg */
 
-extern	uint16	M[];
-extern	UNIT	cpu_unit;
-extern	int32	int_req, dev_busy, dev_done, dev_disable;
-extern	int32	SR, AMASK;
+extern uint16 M[];
+extern UNIT cpu_unit;
+extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 SR, AMASK;
 
-extern	t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
+extern t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
 
 
 int32 mta_ma = 0;                                       /* memory address */
@@ -236,7 +236,7 @@ DEVICE mta_dev = {
     MTA_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mta_reset,
     &mta_boot, &mta_attach, &mta_detach,
-    &mta_dib, DEV_DISABLE
+    &mta_dib, DEV_DISABLE | DEV_TAPE
     };
 
 /* IOT routine */
@@ -363,9 +363,9 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     }
 else switch (c) {                                       /* case on command */
 
-	case CU_CMODE:                                      /* controller mode */
-		mta_ep = mta_cu & CU_EP;
-		break;
+    case CU_CMODE:                                      /* controller mode */
+        mta_ep = mta_cu & CU_EP;
+        break;
 
     case CU_DMODE:                                      /* drive mode */
         if (!sim_tape_bot (uptr))                       /* must be BOT */
@@ -412,7 +412,7 @@ else switch (c) {                                       /* case on command */
             mtxb[p++] = M[pa] & 0377;
             mta_ma = (mta_ma + 1) & AMASK;
             }
-        if (st = sim_tape_wrrecf (uptr, mtxb, tbc)) {   /* write rec, err? */
+        if ((st = sim_tape_wrrecf (uptr, mtxb, tbc))) { /* write rec, err? */
             r = mta_map_err (uptr, st);                 /* map error */
             mta_ma = (mta_ma - wc) & AMASK;             /* restore wc */
             }
@@ -421,7 +421,7 @@ else switch (c) {                                       /* case on command */
         break;
 
     case CU_WREOF:                                      /* write eof */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = mta_map_err (uptr, st);                 /* map error */
         else mta_upddsta (uptr, uptr->USTAT | STA_EOF | STA_RDY);
         break;
@@ -435,7 +435,7 @@ else switch (c) {                                       /* case on command */
     case CU_SPACEF:                                     /* space forward */
         do {
             mta_wc = (mta_wc + 1) & DMASK;              /* incr wc */
-            if (st = sim_tape_sprecf (uptr, &tbc)) {    /* space rec fwd, err? */
+            if ((st = sim_tape_sprecf (uptr, &tbc))) {  /* space rec fwd, err? */
                 r = mta_map_err (uptr, st);             /* map error */
                 break;
                 }
@@ -447,7 +447,7 @@ else switch (c) {                                       /* case on command */
     case CU_SPACER:                                     /* space reverse */
         do {
             mta_wc = (mta_wc + 1) & DMASK;              /* incr wc */
-            if (st = sim_tape_sprecr (uptr, &tbc)) {    /* space rec rev, err? */
+            if ((st = sim_tape_sprecr (uptr, &tbc))) {  /* space rec rev, err? */
                 r = mta_map_err (uptr, st);             /* map error */
                 break;
                 }
@@ -493,10 +493,10 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* offline? */
 change = (uptr->USTAT ^ newsta) & STA_MON;              /* changes? */
 uptr->USTAT = newsta & STA_DYN;                         /* update status */
 if (change) {
-/*  if (mta_ep) {                                       /* if polling */
-/*      u = uptr - mta_dev.units;                       /* unit num */
-/*      mta_sta = (mta_sta & ~STA_UNIT) | (u << STA_V_UNIT);
-/*      set polling interupt...
+/*  if (mta_ep) {                                     *//* if polling */
+/*      u = uptr - mta_dev.units;                     *//* unit num */
+/*      mta_sta = (mta_sta & ~STA_UNIT) | (u << STA_V_UNIT); */
+/*      set polling interupt...                         */
 /*      }                                               */
     mta_sta = mta_sta | STA_CHG;                        /* flag change */
     }
@@ -577,9 +577,9 @@ for (u = 0; u < MTA_NUMDR; u++) {                       /* loop thru units */
     sim_tape_reset (uptr);                              /* clear pos flag */
     sim_cancel (uptr);                                  /* cancel activity */
     if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_RDY |
-		(uptr->USTAT & STA_PEM) |
-		(sim_tape_wrp (uptr)? STA_WLK: 0) |
-		(sim_tape_bot (uptr)? STA_BOT: 0);
+        (uptr->USTAT & STA_PEM) |
+        (sim_tape_wrp (uptr)? STA_WLK: 0) |
+        (sim_tape_bot (uptr)? STA_BOT: 0);
     else uptr->USTAT = 0;
     }
 mta_updcsta (&mta_unit[0]);                             /* update status */
@@ -629,17 +629,17 @@ return SCPE_OK;
 /*  Boot routine  */
 
 t_stat mta_boot (int32 unitno, DEVICE *dptr)
-	{
-	sim_tape_rewind( &mta_unit[unitno] ) ;
-	/*
-	use common rewind/reset code
-		device reset
-		rewind 'tape' file
-		device
-		unit
-		controller
-	 */
-	cpu_boot( unitno, dptr ) ;
-	SR = 0100000 + DEV_MTA ;
-	return ( SCPE_OK );
-	}	/*  end of 'mta_boot'  */
+    {
+    sim_tape_rewind( &mta_unit[unitno] ) ;
+    /*
+    use common rewind/reset code
+        device reset
+        rewind 'tape' file
+        device
+        unit
+        controller
+     */
+    cpu_boot( unitno, dptr ) ;
+    SR = 0100000 + DEV_MTA ;
+    return ( SCPE_OK );
+    }                                                   /*  end of 'mta_boot'  */

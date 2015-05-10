@@ -88,20 +88,20 @@
 /* Macros to handle the flags in the CCR */
 #define CCR_ALWAYS_ON       (0xC0)        /* for 6800 */
 #define CCR_MSK (HF|IF|NF|ZF|VF|CF)
-#define TOGGLE_FLAG(FLAG)   (CCR ^= FLAG)
-#define SET_FLAG(FLAG)      (CCR |= FLAG)
-#define CLR_FLAG(FLAG)      (CCR &= ~FLAG)
-#define GET_FLAG(FLAG)      (CCR & FLAG)
+#define TOGGLE_FLAG(FLAG)   (CCR ^= (FLAG))
+#define SET_FLAG(FLAG)      (CCR |= (FLAG))
+#define CLR_FLAG(FLAG)      (CCR &= ~(FLAG))
+#define GET_FLAG(FLAG)      (CCR & (FLAG))
 #define COND_SET_FLAG(COND,FLAG) \
     if (COND) SET_FLAG(FLAG); else CLR_FLAG(FLAG)
 #define COND_SET_FLAG_N(VAR) \
-    if (VAR & 0x80) SET_FLAG(NF); else CLR_FLAG(NF)
+    if ((VAR) & 0x80) SET_FLAG(NF); else CLR_FLAG(NF)
 #define COND_SET_FLAG_Z(VAR) \
-    if (VAR == 0) SET_FLAG(ZF); else CLR_FLAG(ZF)
+    if ((VAR) == 0) SET_FLAG(ZF); else CLR_FLAG(ZF)
 #define COND_SET_FLAG_H(VAR) \
-    if (VAR & 0x10) SET_FLAG(HF); else CLR_FLAG(HF)
+    if ((VAR) & 0x10) SET_FLAG(HF); else CLR_FLAG(HF)
 #define COND_SET_FLAG_C(VAR) \
-    if (VAR & 0x100) SET_FLAG(CF); else CLR_FLAG(CF)
+    if ((VAR) & 0x100) SET_FLAG(CF); else CLR_FLAG(CF)
 #define COND_SET_FLAG_V(COND) \
     if (COND) SET_FLAG(VF); else CLR_FLAG(VF)
 
@@ -118,9 +118,6 @@ int32 INTE = 0;                         /* Interrupt Enable */
 int32 int_req = 0;                      /* Interrupt request */
 
 int32 mem_fault = 0;                    /* memory fault flag */
-
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 /* function prototypes */
 
@@ -151,7 +148,6 @@ extern void CPU_BD_put_mbyte(int32 addr, int32 val);
 extern void CPU_BD_put_mword(int32 addr, int32 val);
 extern int32 CPU_BD_get_mbyte(int32 addr);
 extern int32 CPU_BD_get_mword(int32 addr);
-extern int32 sim_switches;
 
 /* CPU data structures
 
@@ -303,9 +299,8 @@ int32 oplen[256] = {
 3,3,3,0,3,3,3,3,3,3,3,3,0,0,3,3
 };
 
-int32 sim_instr (void)
+t_stat sim_instr (void)
 {
-    extern int32 sim_interval;
     int32 IR, OP, DAR, reason, hi, lo, op1;
 
     PC = saved_PC & ADDRMASK;           /* load local PC */
@@ -316,7 +311,7 @@ int32 sim_instr (void)
     while (reason == 0) {               /* loop until halted */
 //    dump_regs1();
         if (sim_interval <= 0)          /* check clock queue */
-            if (reason = sim_process_event ()) 
+            if ((reason = sim_process_event ()))
                 break;
             if (mem_fault) {            /* memory fault? */
                 mem_fault = 0;          /* reset fault flag */
@@ -408,7 +403,7 @@ int32 sim_instr (void)
                     DAR += 6;
                     A &= 0xF0;
                     A |= (DAR & 0x0F);
-                        COND_SET_FLAG(DAR & 0x10,CF);
+                    COND_SET_FLAG(DAR & 0x10,CF);
                 }
                 DAR = (A >> 4) & 0x0F;
                 if (DAR > 9 || get_flag(CF)) {
@@ -1890,18 +1885,18 @@ int32 get_flag(int32 flg)
 
 void condevalVa(int32 op1, int32 op2)
 {
-    if (get_flag(CF))
-        COND_SET_FLAG_V(((op1 & 0x80) && (op2 & 0x80)) || (
-            (op1 & 0x80 == 0) && (op2 & 0x80 == 0)));
+    if (get_flag(CF)) {
+        COND_SET_FLAG_V((op1 & op2 & 0x80) || (((op1 | op2) & 0x80) == 0));
+    }
 }
 
 /* test and set V for subtraction */
 
 void condevalVs(int32 op1, int32 op2)
 {
-    if (get_flag(CF))
-        COND_SET_FLAG_V(((op1 & 0x80) && (op2 & 0x80 == 0)) || 
-            ((op1 & 0x80 == 0) && (op2 & 0x80)));
+    if (get_flag(CF)) {
+        COND_SET_FLAG_V(op1 & op2 & 0x80);
+    }
 }
 
 /* calls from the simulator */
@@ -1923,11 +1918,11 @@ t_stat m6800_reset (DEVICE *dptr)
 
 
 /* This is the dumper/loader. This command uses the -h to signify a
-	hex dump/load vice a binary one.  If no address is given to load, it 
-	takes the address from the hex record or the current PC for binary.
+   hex dump/load vice a binary one.  If no address is given to load, it 
+   takes the address from the hex record or the current PC for binary.
 */
 
-int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
     int32 i, addr = 0, cnt = 0;
 
@@ -1955,7 +1950,7 @@ int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
         for M6800
 */
 
-int32 fprint_sym (FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw)
+t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 {
     int32 i, inst, inst1;
 
@@ -2010,7 +2005,7 @@ int32 fprint_sym (FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw)
         status  =   error status
 */
 
-int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
+t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     return (-2);
 }

@@ -1,6 +1,6 @@
 /*  altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-    Copyright (c) 2002-2011, Peter Schorn
+    Copyright (c) 2002-2012, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -330,7 +330,7 @@ static t_stat dsk_boot(int32 unitno, DEVICE *dptr) {
 }
 
 static int32 dskseek(const UNIT *xptr) {
-    return sim_fseek(xptr -> fileref, DSK_TRACSIZE * current_track[current_disk] +
+    return sim_fseek(xptr->fileref, DSK_TRACSIZE * current_track[current_disk] +
         DSK_SECTSIZE * current_sector[current_disk], SEEK_SET);
 }
 
@@ -342,7 +342,7 @@ static void writebuf(void) {
     while (i < DSK_SECTSIZE)
         dskbuf[i++] = 0;
     uptr = dsk_dev.units + current_disk;
-    if (((uptr -> flags) & UNIT_DSK_WLK) == 0) { /* write enabled */
+    if (((uptr->flags) & UNIT_DSK_WLK) == 0) { /* write enabled */
         sim_debug(WRITE_MSG, &dsk_dev,
                   "DSK%i: " ADDRESS_FORMAT " OUT 0x0a (WRITE) D%d T%d S%d\n",
                   current_disk, PCX, current_disk,
@@ -353,7 +353,7 @@ static void writebuf(void) {
                       current_disk, PCX, current_disk,
                       current_track[current_disk], current_sector[current_disk]);
         }
-        rtn = sim_fwrite(dskbuf, 1, DSK_SECTSIZE, uptr -> fileref);
+        rtn = sim_fwrite(dskbuf, 1, DSK_SECTSIZE, uptr->fileref);
         if (rtn != DSK_SECTSIZE) {
             sim_debug(VERBOSE_MSG, &dsk_dev,
                       "DSK%i: " ADDRESS_FORMAT " sim_fwrite failed T%d S%d Return=%d\n",
@@ -414,7 +414,7 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
         writebuf();
     sim_debug(OUT_MSG, &dsk_dev, "DSK%i: " ADDRESS_FORMAT " OUT 0x08: %x\n", current_disk, PCX, data);
     current_disk = data & NUM_OF_DSK_MASK; /* 0 <= current_disk < NUM_OF_DSK */
-    current_disk_flags = (dsk_dev.units + current_disk) -> flags;
+    current_disk_flags = (dsk_dev.units + current_disk)->flags;
     if ((current_disk_flags & UNIT_ATT) == 0) { /* nothing attached? */
         if ( (dsk_dev.dctrl & VERBOSE_MSG) && (warnAttached[current_disk] < warnLevelDSK) ) {
             warnAttached[current_disk]++;
@@ -482,6 +482,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
                       "DSK%i: " ADDRESS_FORMAT " Unnecessary step in.\n",
                    current_disk, PCX);
         current_track[current_disk]++;
+        current_flag[current_disk] &= 0xbf;        /* mwd 1/29/13: track zero now false */
         if (current_track[current_disk] > (tracks[current_disk] - 1))
             current_track[current_disk] = (tracks[current_disk] - 1);
         if (dirty)          /* implies that current_disk < NUM_OF_DSK   */
@@ -568,7 +569,7 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
                               current_track[current_disk], current_sector[current_disk]);
                 }
             }
-            rtn = sim_fread(dskbuf, 1, DSK_SECTSIZE, uptr -> fileref);
+            rtn = sim_fread(dskbuf, 1, DSK_SECTSIZE, uptr->fileref);
             if (rtn != DSK_SECTSIZE) {
                 if ((dsk_dev.dctrl & VERBOSE_MSG) && (warnDSK12 < warnLevelDSK)) {
                     warnDSK12++;

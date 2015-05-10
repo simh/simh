@@ -38,13 +38,13 @@
 /* KE11A I/O address offsets 0177300 - 0177316 */
 
 #define KE_DIV          000                             /* divide */
-#define KE_AC	        002                             /* accumulator */
-#define KE_MQ	        004                             /* MQ */
-#define KE_MUL	        006                             /* multiply */
-#define KE_SC	        010                             /* step counter */
-#define KE_NOR	        012                             /* normalize */
-#define KE_LSH	        014                             /* logical shift */
-#define KE_ASH	        016                             /* arithmetic shift */
+#define KE_AC           002                             /* accumulator */
+#define KE_MQ           004                             /* MQ */
+#define KE_MUL          006                             /* multiply */
+#define KE_SC           010                             /* step counter */
+#define KE_NOR          012                             /* normalize */
+#define KE_LSH          014                             /* logical shift */
+#define KE_ASH          016                             /* arithmetic shift */
 
 /* Status register */
 
@@ -65,7 +65,6 @@ uint32 ke_MQ = 0;
 uint32 ke_SC = 0;
 uint32 ke_SR = 0;
 
-DEVICE ke_dev;
 t_stat ke_rd (int32 *data, int32 PA, int32 access);
 t_stat ke_wr (int32 data, int32 PA, int32 access);
 t_stat ke_reset (DEVICE *dptr);
@@ -74,7 +73,7 @@ uint32 ke_set_SR (void);
 DIB ke_dib = { IOBA_KE, IOLN_KE, &ke_rd, &ke_wr, 0 };
 
 UNIT ke_unit = {
-	UDATA (NULL, UNIT_DISABLE, 0)
+    UDATA (NULL, UNIT_DISABLE, 0)
     };
 
 REG ke_reg[] = {
@@ -235,9 +234,9 @@ switch (PA & 017) {                                     /* decode PA<3:0> */
 
     case KE_NOR:                                        /* normalize */
         for (ke_SC = 0; ke_SC < 31; ke_SC++) {          /* max 31 shifts */
-	        if (((ke_AC == 0140000) && (ke_MQ == 0)) || /* special case? */
+            if (((ke_AC == 0140000) && (ke_MQ == 0)) || /* special case? */
                 (GET_SIGN_W (ke_AC ^ (ke_AC << 1))))    /* AC<15> != AC<14>? */
-	            break;
+                break;
             ke_AC = ((ke_AC << 1) | (ke_MQ >> 15)) & DMASK;
             ke_MQ = (ke_MQ << 1) & DMASK;
             }
@@ -252,7 +251,7 @@ switch (PA & 017) {                                     /* decode PA<3:0> */
         data = data & 077;                              /* 6b shift count */
         if (data != 0) {
             t32 = (ke_AC << 16) | ke_MQ;                /* 32b operand */
-            if (sign = GET_SIGN_W (ke_AC))              /* sext operand */
+            if ((sign = GET_SIGN_W (ke_AC)))            /* sext operand */
                 t32 = t32 | ~017777777777;
             if (data < 32) {                            /* [1,31] - left */
                 sout = (t32 >> (32 - data)) | (-sign << data);
@@ -282,7 +281,7 @@ switch (PA & 017) {                                     /* decode PA<3:0> */
         data = data & 077;                              /* 6b shift count */
         if (data != 0) {
             t32 = (ke_AC << 16) | ke_MQ;                /* 32b operand */
-            if (sign = GET_SIGN_W (ke_AC))              /* sext operand */
+            if ((sign = GET_SIGN_W (ke_AC)))            /* sext operand */
                 t32 = t32 | ~017777777777;
             if (data < 32) {                            /* [1,31] - left */
                 sout = (t32 >> (31 - data)) | (-sign << data);

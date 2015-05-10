@@ -26,6 +26,8 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   07-May-15    RMS     Added missing TFL instruction (Tom McBride)
+   28-Mar-15    RMS     Revised to use sim_printf
    26-Mar-15    RMS     Separated compare from add/sub flows (Tom McBride)
                         Removed ADD_SIGNC return from add/sub flows
    10-Dec-13    RMS     Fixed several bugs in add and compare (Bob Armstrong)
@@ -134,11 +136,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 uint8 ind[NUM_IND] = { 0 };                             /* indicators */
-
-extern int32 sim_int_char;
-extern int32 sim_interval;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern FILE *sim_log;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -496,14 +493,14 @@ while (reason == 0) {                                   /* loop until halted */
 
     saved_PC = PC;                                      /* commit prev instr */
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         }
 
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     sim_interval = sim_interval - 1;
 
@@ -571,6 +568,12 @@ while (reason == 0) {                                   /* loop until halted */
     case OP_TF:
     case OP_TFM:
         reason = xmt_field (PAR, QAR, 1);               /* xmit field */
+        break;
+
+/* Transmit floating - P,Q are valid */
+
+    case OP_TFL:
+        reason = xmt_field (PAR, QAR, 3);               /* xmit field */
         break;
 
 /* Transmit record - P,Q are valid */
@@ -888,7 +891,7 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_OVERFL;
         if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {  /* ~z, ~c, ~sign chg? */
             BRANCH (PAR);                               /* branch */
-			}
+            }
         break;
 
     case OP_BCXM:
@@ -902,7 +905,7 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_OVERFL;
         if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {  /* ~z, ~c, ~sign chg? */
             BRANCH (PAR);                               /* branch */
-			}
+            }
         break;
 
 /* Branch and select - P is valid */
@@ -928,7 +931,7 @@ while (reason == 0) {                                   /* loop until halted */
         default:
             reason = STOP_INVSEL;                       /* undefined */
             break;
-			}
+            }
         BRANCH (PAR);
         break;
 
@@ -1391,7 +1394,7 @@ if (comp && !cry && !ind[IN_EZ]) {                      /* recomp needed? */
     ind[IN_HP] = ind[IN_HP] ^ 1;                        /* flip indicator */
     for (cry = 0, dp = dsv; dp != d; ) {                /* rescan */
         dst = M[dp] & DIGIT;                            /* get dst digit */
-        dst = (dp == dsv)? (10 - dst): (9 - dst);	/* 10 or 9s comp */
+        dst = (dp == dsv)? (10 - dst): (9 - dst);       /* 10 or 9s comp */
         res = add_one_digit (0, dst, &cry);             /* "add" */
         M[dp] = (M[dp] & FLAG) | res;                   /* store */
         MM (dp);                                        /* decr dst addr */
@@ -2170,9 +2173,7 @@ return SCPE_OK;
 t_stat cpu_set_opt1 (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (cpu_unit.flags & IF_MII) {
-    printf ("Feature is standard on 1620 Model 2\n");
-    if (sim_log)
-        fprintf (sim_log, "Feature is standard on 1620 Model 2\n");
+    sim_printf ("Feature is standard on 1620 Model 2\n");
     return SCPE_NOFNC;
     }
 return SCPE_OK;
@@ -2183,9 +2184,7 @@ return SCPE_OK;
 t_stat cpu_set_opt2 (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (!(cpu_unit.flags & IF_MII)) {
-    printf ("Feature is not available on 1620 Model 1\n");
-    if (sim_log)
-        fprintf (sim_log, "Feature is not available on 1620 Model 1\n");
+    sim_printf ("Feature is not available on 1620 Model 1\n");
     return SCPE_NOFNC;
     }
 return SCPE_OK;

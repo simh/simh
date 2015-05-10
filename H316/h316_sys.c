@@ -1,6 +1,6 @@
 /* h316_sys.c: Honeywell 316/516 simulator interface
 
-   Copyright (c) 1999-2013, Robert M Supnik
+   Copyright (c) 1999-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    15-Sep-13    RMS     Added device name support for IO instructions
                         Fixed handling of OTK
+   21-May-13    RLA     Add IMP/TIP devices
    01-Dec-04    RMS     Fixed fprint_opr calling sequence
    24-Oct-03    RMS     Added DMA/DMC support
    17-Sep-01    RMS     Removed multiconsole support
@@ -43,9 +44,13 @@ extern DEVICE clk_dev;
 extern DEVICE dp_dev;
 extern DEVICE fhd_dev;
 extern DEVICE mt_dev;
+#ifdef VM_IMPTIP
+extern DEVICE rtc_dev, wdt_dev, imp_dev;
+extern DEVICE mi1_dev, mi2_dev, mi3_dev, mi4_dev, mi5_dev;
+extern DEVICE hi1_dev, hi2_dev, hi3_dev, hi4_dev;
+#endif
 extern REG cpu_reg[];
 extern uint16 M[];
-extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 
@@ -67,12 +72,19 @@ DEVICE *sim_devices[] = {
     &cpu_dev,
     &ptr_dev,
     &ptp_dev,
-    &tty_dev,
     &lpt_dev,
-    &clk_dev,
-    &dp_dev,
-    &fhd_dev,
+    &tty_dev,
     &mt_dev,
+    &clk_dev,
+    &fhd_dev,
+    &dp_dev,
+#ifdef VM_IMPTIP
+    &wdt_dev,
+    &rtc_dev,
+    &imp_dev,
+    &mi1_dev, &mi2_dev, &mi3_dev, &mi4_dev, &mi5_dev,
+    &hi1_dev, &hi2_dev, &hi3_dev, &hi4_dev,
+#endif
     NULL
     };
 
@@ -398,11 +410,11 @@ switch (j) {                                            /* case on class */
 
     case I_V_MRF: case I_V_MRX:                         /* mem ref */
         cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
-        if (k = (strcmp (gbuf, "C") == 0)) {            /* C specified? */
+        if ((k = (strcmp (gbuf, "C") == 0))) {          /* C specified? */
             val[0] = val[0] | SC;
             cptr = get_glyph (cptr, gbuf, 0);
             }
-        else if (k = (strcmp (gbuf, "Z") == 0)) {       /* Z specified? */
+        else if ((k = (strcmp (gbuf, "Z") == 0))) {     /* Z specified? */
             cptr = get_glyph (cptr, gbuf, ',');
             }
         d = get_uint (gbuf, 8, X_AMASK, &r);            /* construe as addr */

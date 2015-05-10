@@ -118,9 +118,6 @@ extern int32 PSL, SISR, trpirq, mem_err, crd_err, hlt_pin;
 extern int32 p1;
 extern int32 ssc_bto;
 extern jmp_buf save_env;
-extern int32 sim_switches;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
 t_stat dbl_wr (int32 data, int32 addr, int32 access);
@@ -476,7 +473,7 @@ if (lnt < L_LONG) {
     int32 t = cqbic_rd (pa);
     nval = ((val & mask) << sc) | (t & ~(mask << sc));
     val = val << sc;
-	}
+    }
 else nval = val;
 switch (rg) {
 
@@ -723,7 +720,7 @@ if ((ba | bc) & 03) {                                   /* check alignment */
             if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
                 return (bc - i);
             }
-        *buf = ReadB (ma);
+        *buf = (uint8)ReadB (ma);
         ma = ma + 1;
         }
     }
@@ -757,7 +754,7 @@ if ((ba | bc) & 03) {                                   /* check alignment */
             if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
                 return (bc - i);
             }
-        *buf = ReadW (ma);
+        *buf = (uint16)ReadW (ma);
         ma = ma + 2;
         }
     }
@@ -883,7 +880,7 @@ init_ubus_tab ();                                       /* init bus tables */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
-        if (r = build_ubus_tab (dptr, dibp))            /* add to bus tab */
+        if ((r = build_ubus_tab (dptr, dibp)))          /* add to bus tab */
             return r;
         }                                               /* end if enabled */
     }                                                   /* end for */

@@ -1,6 +1,6 @@
 /* nova_qty.c: NOVA multiplexor (QTY/ALM) simulator
 
-   Copyright (c) 2000-2013, Robert M. Supnik
+   Copyright (c) 2000-2015, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    qty          multiplexor: QTY = 4060, ALM = 42xx
 
+   28-Mar-15    RMS     Revised to use sim_printf
    14-Mar-12    RMS     Fixed dangling else clauses
    04-Jul-07    BKR     Fixed QTY output line number calculation (affected higher line numbers),
    25-Mar-04    RMS     Updated for V3.2
@@ -106,8 +107,6 @@
 
 
 extern int32    int_req, dev_busy, dev_done, dev_disable ;
-extern int32    sim_switches ;
-extern FILE *   sim_log ;
 extern int32    tmxr_poll ;                             /* calibrated delay */
 
 t_stat  qty_setnl   ( UNIT * uptr, int32 val, char * cptr, void * desc ) ;
@@ -136,7 +135,7 @@ int32   qty_auto    = 0 ;                               /*  QTY auto disconnect 
 int32   qty_polls   = 0 ;                               /*  total 'qty_svc' polls       */
 
 
-TMLN    qty_ldsc[ QTY_MAX ] = { 0 } ;                   /*  QTY line descriptors        */
+TMLN    qty_ldsc[ QTY_MAX ] = { {0} } ;                 /*  QTY line descriptors        */
 TMXR    qty_desc    = { QTY_MAX, 0, 0, qty_ldsc } ;     /*  mux descriptor      */
 int32   qty_status[ QTY_MAX ] = { 0 } ;                 /*  QTY line status             */
                                                         /*  (must be at least 32 bits)  */
@@ -194,7 +193,7 @@ DEVICE  qty_dev =
         1, 10, 31, 1, 8, 8,
         NULL, NULL, &qty_reset,
         NULL, &qty_attach, &qty_detach,
-        &qty_dib, (DEV_DISABLE | DEV_DIS | DEV_NET)
+        &qty_dib, (DEV_DISABLE | DEV_DIS | DEV_MUX)
         };
 
 #define DG_RETURN( status, data )   (int32)(((status) << IOT_V_REASON) | ((data) & 0x0FFFF) )
@@ -223,7 +222,7 @@ DEVICE  qty_dev =
 #define QTY_LINE_RX_CHAR( line )    (qty_status[ (line) ] & QTY_S_DMASK)
 #define QTY_UNIT_ACTIVE( unitp )    ( (unitp)->conn )
 
-#define QTY_LINE_BITS( line, bits ) qty_status[ (line) ] & bits
+#define QTY_LINE_BITS( line, bits ) (qty_status[ (line) ] & bits)
 
 #define QTY_LINE_SET_BIT(   line, bit )  qty_status[ (line) ] |=  (bit)  ;
 #define QTY_LINE_CLEAR_BIT( line, bit )  qty_status[ (line) ] &= ~(bit)  ;
@@ -492,13 +491,11 @@ t_stat qty_attach( UNIT * unitp, char * cptr )
     if ( sim_switches & SWMASK('M') )                   /* modem control? */
         {
         qty_mdm = 1;
-        printf( "Modem control activated\n" ) ;
-        if ( sim_log ) fprintf( sim_log, "Modem control activated\n" ) ;
+        sim_printf( "Modem control activated\n" ) ;
         if ( sim_switches & SWMASK ('A') )              /* autodisconnect? */
             {
             qty_auto = 1 ;
-            printf( "Auto disconnect activated\n" ) ;
-            if ( sim_log ) fprintf( sim_log, "Auto disconnect activated\n" ) ;
+            sim_printf( "Auto disconnect activated\n" ) ;
             }
         }
     qty_polls = 0 ;
@@ -608,14 +605,17 @@ t_stat qty_common_svc( DIB * dibp, UNIT * unitp )
         {
         if ( newln >= qty_max )
             {
-            return SCPE_IERR;                           /*  WTF - sanity check failed, over?  */
+            return SCPE_IERR;                               /*  WTF - sanity check failed, over?  */
             }
-        line = newln ;                                  /*  handle modem control  */
-        tmlnp =&qty_ldsc[ line ] ;
-        tmlnp->rcve = tmlnp->xmte = 1 ;
-        /*  do QTY_LINE_ bit fiddling and state machine
-         *  manipulation with modem control signals
-         */
+        else
+            {
+            line = newln ;                                  /*  handle modem control  */
+            tmlnp =&qty_ldsc[ line ] ;
+            tmlnp->rcve = tmlnp->xmte = 1 ;
+            /*  do QTY_LINE_ bit fiddling and state machine
+             *  manipulation with modem control signals
+             */
+            }
         }
 
     tmxr_poll_rx( &qty_desc ) ;                         /*  poll input                          */

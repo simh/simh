@@ -177,7 +177,7 @@ extern uint16 *M;
 #define CS2_MBZ         (CS2_CLR)
 #define CS2_RW          0000037
 #define CS2_ERR         (CS2_UFE | CS2_MDS | CS2_PGE | CS2_NEM | \
-						 CS2_NED | CS2_PE | CS2_WCE | CS2_DLT )
+                         CS2_NED | CS2_PE | CS2_WCE | CS2_DLT )
 #define GET_UNIT(x)     (((x) >> CS2_V_UNIT) & CS2_M_UNIT)
 
 /* HKDS - 177452 - drive status ^ = calculated dynamically */
@@ -328,7 +328,6 @@ extern uint16 *M;
 #define HKDEB_RWR       004                             /* reg writes */
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint16 *hkxb = NULL;                                    /* xfer buffer */
 int32 hkcs1 = 0;                                        /* control/status 1 */
@@ -362,7 +361,6 @@ static const char* reg_name[] = {
  "HKDC", "spare", "HKDB", "HKMR",
  "HKEC1", "HKEC2", "HKMR2", "HKMR3" };
 
-DEVICE hk_dev;
 t_stat hk_rd (int32 *data, int32 PA, int32 access);
 t_stat hk_wr (int32 data, int32 PA, int32 access);
 t_stat hk_svc (UNIT *uptr);
@@ -587,10 +585,8 @@ return SCPE_OK;
 t_stat hk_wr (int32 data, int32 PA, int32 access)
 {
 int32 drv, i, j;
-UNIT *uptr;
 
 drv = GET_UNIT (hkcs2);                                 /* get current unit */
-uptr = hk_dev.units + drv;                              /* get unit */
 j = (PA >> 1) & 017;                                    /* get reg offset */
 if (reg_in_drive[j] && (hk_unit[drv].flags & UNIT_DIS)) { /* nx disk */
     hk_err (CS1_ERR|CS1_DONE, CS2_NED, 0, drv);         /* set err, stop op */
@@ -742,9 +738,9 @@ if (fnc_rdy[fnc] && sim_is_active (uptr))               /* need inactive? */
 if (fnc_cyl[fnc] &&                                     /* need valid cyl */
    ((GET_CY (hkdc) >= HK_CYL (uptr)) ||                 /* bad cylinder */
     (GET_SF (hkda) >= HK_NUMSF))) {                     /* bad surface */
-	hk_err (CS1_ERR|CS1_DONE, 0, ER_SKI|ER_IAE, drv);   /* set err, no op */
-	return;
-	}
+    hk_err (CS1_ERR|CS1_DONE, 0, ER_SKI|ER_IAE, drv);   /* set err, no op */
+    return;
+    }
 
 hkcs1 = (hkcs1 | CS1_GO) & ~CS1_DONE;                   /* set go, clear done */
 hkci = hkdi = hkei = 0;                                 /* clear all intr */
@@ -1366,7 +1362,7 @@ static const uint16 boot_rom[] = {
 
 t_stat hk_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

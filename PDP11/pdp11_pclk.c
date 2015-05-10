@@ -136,7 +136,6 @@ uint32 pclk_ctr = 0;                                    /* counter */
 static uint32 rate[4] = { 100000, 10000, 60, 10 };      /* ticks per second */
 static uint32 xtim[4] = { 10, 100, 16667, 100000 };     /* nominal time delay */
 
-DEVICE pclk_dev;
 t_stat pclk_rd (int32 *data, int32 PA, int32 access);
 t_stat pclk_wr (int32 data, int32 PA, int32 access);
 t_stat pclk_svc (UNIT *uptr);

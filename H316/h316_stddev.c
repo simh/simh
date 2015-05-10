@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2013, Robert M. Supnik
+   Copyright (c) 1999-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,9 @@
 
    10-Sep-13    RMS     Fixed several bugs in the TTY logic
                         Added SET file type commands to PTR/PTP
+   03-Jul-13    RLA     compatibility changes for extended interrupts
+   23-May-13    RLA     Move the SMK/OTK to h316_cpu (where it belongs!)
+                        Allow the CLK device to be disabled
    09-Jun-07    RMS     Fixed bug in clock increment (Theo Engel)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    03-Apr-06    RMS     Fixed bugs in punch state handling (Theo Engel)
@@ -106,7 +109,6 @@ extern int32 PC;
 extern int32 stop_inst;
 extern int32 C, dp, ext, extoff_pending, sc;
 extern int32 dev_int, dev_enb;
-extern int32 sim_switches;
 extern UNIT cpu_unit;
 
 uint32 ptr_motion = 0;                                  /* read motion */
@@ -158,7 +160,7 @@ t_stat ttp_write (int32 c);
    ptr_reg      PTR register list
 */
 
-DIB ptr_dib = { PTR, IOBUS, 1, &ptrio };
+DIB ptr_dib = { PTR, 1, IOBUS, IOBUS, INT_V_PTR, INT_V_NONE, &ptrio, 0 };
 
 UNIT ptr_unit = {
     UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
@@ -203,7 +205,7 @@ DEVICE ptr_dev = {
    ptp_reg      PTP register list
 */
 
-DIB ptp_dib = { PTP, IOBUS, 1, &ptpio };
+DIB ptp_dib = { PTP, 1, IOBUS, IOBUS, INT_V_PTP, INT_V_NONE, &ptpio, 0 };
 
 UNIT ptp_unit = {
     UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
@@ -243,7 +245,7 @@ DEVICE ptp_dev = {
 #define TTR     2
 #define TTP     3
 
-DIB tty_dib = { TTY, IOBUS, 1, &ttyio };
+DIB tty_dib = { TTY, 1, IOBUS, IOBUS, INT_V_TTY, INT_V_NONE, &ttyio, 0 };
 
 UNIT tty_unit[] = {
     { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT },
@@ -308,7 +310,7 @@ DEVICE tty_dev = {
    clk_reg      CLK register list
 */
 
-DIB clk_dib = { CLK_KEYS, IOBUS, 1, &clkio };
+DIB clk_dib = { CLK_KEYS, 1, IOBUS, IOBUS, INT_V_CLK, INT_V_NONE, &clkio, 0 };
 
 UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 16000 };
 
@@ -335,7 +337,7 @@ DEVICE clk_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
-    &clk_dib, 0
+    &clk_dib, /* [RLA] */ DEV_DISABLE
     };
 
 /* Paper tape reader: IO routine */
@@ -392,7 +394,7 @@ else {
     if ((c = getc (uptr->fileref)) == EOF) {            /* read byte */
         if (feof (uptr->fileref)) {
             if (ptr_stopioe)
-                printf ("PTR end of file\n");
+                sim_printf ("PTR end of file\n");
             else return SCPE_OK;
             }
         else perror ("PTR I/O error");
@@ -421,7 +423,7 @@ t_stat r;
 
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not tti,tto */
     return SCPE_NOFNC;
-if (r = attach_unit (uptr, cptr))
+if ((r = attach_unit (uptr, cptr)))
     return r;
 if (sim_switches & SWMASK ('A'))                        /* -a? ASCII */
     uptr->flags |= UNIT_ASC;
@@ -483,7 +485,7 @@ static const int32 pboot[] = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 
 for (i = 0; i < PBOOT_SIZE; i++)                        /* copy bootstrap */
     M[PBOOT_START + i] = pboot[i];
@@ -597,7 +599,7 @@ switch (inst) {                                         /* case on opcode */
             tty_busy = 0;
             tty_mode = 0;                               /* mode is input */
             tty_2nd = 0;
-/*          sim_cancel (&tty_unit[TTO]);                /* cancel output */
+/*          sim_cancel (&tty_unit[TTO]);              *//* cancel output */
             }
         CLR_INT (INT_TTY);                              /* clear intr */
         break;
@@ -682,7 +684,7 @@ else if ((ruptr->flags & UNIT_ATT) &&                   /* TTR attached */
             if (feof (ruptr->fileref)) {                /* EOF? */
                 ruptr->STA &= ~RUNNING;                 /* stop reader */
                 if (ttr_stopioe)
-                    printf ("TTR end of file\n");
+                    sim_printf ("TTR end of file\n");
                 else return SCPE_OK;
                 }
             else perror ("TTR I/O error");
@@ -891,32 +893,28 @@ switch (inst) {                                         /* case on opcode */
             if (!TST_INTREQ (INT_CLK))
                 return IOSKIP (dat);
             }
-        else if ((fnc & 007) == 002) {                  /* mem parity? */
-            if (((fnc == 002) && !TST_INT (INT_MPE)) ||
-                ((fnc == 012) && TST_INT (INT_MPE)))
-                return IOSKIP (dat);
-            }
+        // [RLA]  I'm not sure where this comes from - I can't find any H316
+        // [RLA] documentation that supports this.  According to my manual,
+        // [RLA] skip on memory parity error (SPS) is opcode 101200 and skip
+        // [RLA] on no parity error (SPN) is 100200.  Neither of these look
+        // [RLA] like an SKS to device 20.  
+        //
+        // [RLA]   In any case this code can't stay here since the clock can
+        // [RLA] now be disabled.  It'll have to move to h316_cpu.c no matter
+        // [RLA] how it's supposed to work.
+        //
+        // [RLA] else if ((fnc & 007) == 002) {             /* mem parity? */
+        // [RLA]     if (((fnc == 002) && !TST_INT (INT_MPE)) ||
+        // [RLA]         ((fnc == 012) && TST_INT (INT_MPE)))
+        // [RLA]         return IOSKIP (dat);
+        // [RLA]     }
         else return IOBADFNC (dat);                     /* invalid fnc */
         break;
 
     case ioOTA:                                         /* OTA */
-        if (fnc == 000)                                 /* SMK */
-            dev_enb = dat;
-        else if (fnc == 010) {                          /* OTK */
-            C = (dat >> 15) & 1;                        /* set C */
-            if (cpu_unit.flags & UNIT_HSA)              /* HSA included? */
-                dp = (dat >> 14) & 1;                   /* set dp */
-            if (cpu_unit.flags & UNIT_EXT) {            /* ext opt? */
-                if (dat & 020000) {                     /* ext set? */
-                    ext = 1;                            /* yes, set */
-                    extoff_pending = 0;
-                    }
-                else extoff_pending = 1;                /* no, clr later */
-                }
-            sc = dat & 037;                             /* set sc */
-            }
-        else return IOBADFNC (dat);
-        break;
+        // [RLA]   This case never gets here - OTA with device 20 is the SMK or
+        // [RLA] OTK instructions, and those are handled directly in h316_cpu.c
+        return IOBADFNC (dat);
         }
 
 return dat;
@@ -930,7 +928,8 @@ t_stat clk_svc (UNIT *uptr)
 M[M_CLK] = (M[M_CLK] + 1) & DMASK;                      /* increment mem ctr */
 if (M[M_CLK] == 0)                                      /* = 0? set flag */
     SET_INT (INT_CLK);
-sim_activate (&clk_unit, sim_rtc_calb (clk_tps));       /* reactivate */
+sim_rtc_calb (clk_tps);                                 /* recalibrate */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 return SCPE_OK;
 }
 
@@ -938,6 +937,7 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 CLR_INT (INT_CLK);                                      /* clear ready, enb */
 CLR_ENB (INT_CLK);
 sim_cancel (&clk_unit);                                 /* deactivate unit */

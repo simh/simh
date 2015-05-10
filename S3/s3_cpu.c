@@ -382,8 +382,6 @@ int32 saved_PC;                                         /* Saved (old) PC) */
 int32 debug_reg = 0;                                    /* set for debug/trace */
 int32 debug_flag = 0;                                   /* 1 when trace.log open */
 FILE *trace;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -396,9 +394,6 @@ extern int32 lpt (int32 op, int32 m, int32 n, int32 data);
 extern int32 dsk1 (int32 op, int32 m, int32 n, int32 data);
 extern int32 dsk2 (int32 op, int32 m, int32 n, int32 data);
 extern int32 cpu (int32 op, int32 m, int32 n, int32 data);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
-    UNIT *uptr, int32 sw);
 int32 nulldev (int32 opcode, int32 m, int32 n, int32 data);
 int32 add_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
 int32 subtract_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
@@ -507,7 +502,6 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 register int32 PC, IR;
 int32 i, j, carry, zero, op1, op2;
 int32 opcode = 0, qbyte = 0, rbyte = 0;
@@ -615,12 +609,12 @@ if (opaddr == 0xf0) {                                   /* Is it command format?
             if (qbyte & 0x01) display[2][3] = '|' ;
             if (rbyte & 0x01) display[2][7] = '|' ;
                                                         /* Print display segment array */
-            printf("\n\r");
+            sim_printf("\n");
             for (i = 0; i < 3; i++) {
                 for (j = 0; j < 9; j++) {
-                    printf ("%c", display[i][j]);
+                    sim_printf ("%c", display[i][j]);
                 }
-                printf ("\n\r");
+                sim_printf ("\n");
             }
             reason = STOP_HALT;
             break;
@@ -1321,7 +1315,7 @@ int32 PutMem(int32 addr, int32 data)
 
 /* Check the condition register against the qbyte and return 1 if true */
 
-int32 condition(int32 qbyte)
+static int32 condition(int32 qbyte)
 {
     int32 r = 0, t, q;
     t = (qbyte & 0xf0) >> 4;
@@ -1351,7 +1345,7 @@ return (r);
    condition register initial state in parameter 3
 */   
 
-int32 compare(int32 byte1, int32 byte2, int32 cond)
+static int32 compare(int32 byte1, int32 byte2, int32 cond)
 {
     int32 r;
     

@@ -48,7 +48,6 @@ extern uint32 A;
 extern uint32 inp_strt, inp_done;
 extern uint32 out_strt, out_done;
 extern UNIT cpu_unit;
-extern int32 sim_switches;
 
 t_stat tti_svc (UNIT *uptr);
 t_stat ttr_svc (UNIT *uptr);
@@ -394,7 +393,7 @@ t_stat ttr_svc (UNIT *uptr)
 {
 t_stat r;
 
-if (r = read_reader (uptr, ttr_stopioe, (int32 *) &tti_buf))
+if ((r = read_reader (uptr, ttr_stopioe, (int32 *) &tti_buf)))
     return r;
 if (!(uptr->flags & UNIT_NOCS) &&                       /* cstop enable? */
     (tti_buf == FLEX_CSTOP))                            /* cond stop? */
@@ -415,7 +414,7 @@ t_stat ptr_svc (UNIT *uptr)
 {
 t_stat r;
 
-if (r = read_reader (uptr, ptr_stopioe, &uptr->buf))
+if ((r = read_reader (uptr, ptr_stopioe, &uptr->buf)))
     return r;
 if (uptr->buf == FLEX_CSTOP)                            /* cond stop? */
     inp_done = 1;
@@ -502,7 +501,7 @@ do {
     if ((ch = getc (uptr->fileref)) == EOF) {           /* read char */
         if (feof (uptr->fileref)) {                     /* err or eof? */
             if (stop)
-                printf ("Reader end of file\n");
+                sim_printf ("Reader end of file\n");
             else return SCPE_OK;
             }
         else perror ("Reader I/O error");
@@ -517,7 +516,7 @@ do {
         if ((d1 == EOF) || (d2 == EOF)) {               /* error? */
             if (feof (uptr->fileref)) {                 /* eof? */
                 if (stop)
-                    printf ("Reader end of file\n");
+                    sim_printf ("Reader end of file\n");
                 else return SCPE_OK;
                 }
             else perror ("Reader I/O error");
@@ -548,7 +547,7 @@ else {
         ch = '\b';
     else ch = flex_to_ascii[flex | (tto_uc << 6)];      /* cvt flex to ascii */
     if (ch > 0) {                                       /* legit? */
-        if (r = sim_putchar_s (ch))                     /* write char */
+        if ((r = sim_putchar_s (ch)))                   /* write char */
             return r;
         tto_unit[0].pos = tto_unit[0].pos + 1;
         if (flex == FLEX_CR) {                          /* cr? */

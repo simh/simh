@@ -85,13 +85,11 @@ static int32 clk_tps_map[4] = { 60, 60, 50, 800 };
 
 extern uint16 *M;
 extern int32 R[8];
-extern DEVICE cpu_dev, *sim_devices[];
+extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
-extern FILE *sim_log;
 extern int32 STKLIM, PIRQ;
 extern uint32 cpu_model, cpu_type, cpu_opt;
 extern int32 clk_fie, clk_fnxm, clk_tps, clk_default;
-extern int32 sim_switches;
 
 t_stat CPU24_rd (int32 *data, int32 addr, int32 access);
 t_stat CPU24_wr (int32 data, int32 addr, int32 access);
@@ -1076,7 +1074,7 @@ t_stat r;
 for (i = 0; cnf_tab[i].dib != NULL; i++) {              /* loop thru config tab */
     if (((cnf_tab[i].cpum == 0) || (cpu_type & cnf_tab[i].cpum)) &&
         ((cnf_tab[i].optm == 0) || (cpu_opt & cnf_tab[i].optm))) {
-        if (r = build_ubus_tab (&cpu_dev, cnf_tab[i].dib)) /* add to dispatch tab */
+        if ((r = build_ubus_tab (&cpu_dev, cnf_tab[i].dib)))/* add to dispatch tab */
              return r;
         }
     }
@@ -1160,7 +1158,7 @@ if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
 nM = (uint16 *) calloc (val >> 1, sizeof (uint16));
 if (nM == NULL)
     return SCPE_MEM;
-clim = (((t_addr) val) < MEMSIZE)? val: MEMSIZE;
+clim = (((t_addr) val) < MEMSIZE)? (uint32)val: MEMSIZE;
 for (i = 0; i < clim; i = i + 2)
     nM[i >> 1] = M[i >> 1];
 free (M);
@@ -1187,9 +1185,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     if ((dptr->flags & DEV_DISABLE) &&                  /* disable-able? */
         !(dptr->flags & DEV_DIS) &&                     /* enabled? */
         ((dptr->flags & mask) == 0)) {                  /* not allowed? */
-        printf ("Disabling %s\n", sim_dname (dptr));
-        if (sim_log)
-            fprintf (sim_log, "Disabling %s\n", sim_dname (dptr));
+        sim_printf ("Disabling %s\n", sim_dname (dptr));
         dptr->flags = dptr->flags | DEV_DIS;
         }
     }

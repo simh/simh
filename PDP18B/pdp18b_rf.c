@@ -101,11 +101,11 @@
 
 #define RFS_CLR         0000170                         /* always clear */
 #define RFS_EFLGS       (RFS_HDW | RFS_APE | RFS_MXF | RFS_WCE | \
-						 RFS_DPE | RFS_WLO | RFS_NED )  /* error flags */
+                         RFS_DPE | RFS_WLO | RFS_NED )  /* error flags */
 #define RFS_FR          (RFS_FNC|RFS_IE)
 #define GET_FNC(x)      (((x) >> RFS_V_FNC) & RFS_M_FNC)
 #define GET_POS(x)      ((int) fmod (sim_gtime () / ((double) (x)), \
-						((double) RF_NUMWD)))
+                        ((double) RF_NUMWD)))
 #define RF_BUSY         (sim_is_active (&rf_unit))
 
 extern int32 M[];
@@ -295,7 +295,7 @@ do {
             break;
             }
         else {                                          /* not locked */
-            fbuf[rf_da] = M[pa];						/* write word */
+            fbuf[rf_da] = M[pa];                        /* write word */
             if (((uint32) rf_da) >= uptr->hwmark)
                 uptr->hwmark = rf_da + 1;
             }

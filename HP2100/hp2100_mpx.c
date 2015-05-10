@@ -1,6 +1,6 @@
 /* hp2100_mpx.c: HP 12792C eight-channel asynchronous multiplexer simulator
 
-   Copyright (c) 2008-2012, J. David Bryan
+   Copyright (c) 2008-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,11 @@
 
    MPX          12792C 8-channel multiplexer card
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
+   28-Dec-12    JDB     Allow direct attach to the poll unit only when restoring
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+                        Removed DEV_NET to allow restoration of listening port
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
@@ -139,7 +143,6 @@
 #include <ctype.h>
 
 #include "hp2100_defs.h"
-#include "sim_sock.h"
 #include "sim_tmxr.h"
 
 
@@ -545,7 +548,7 @@ typedef enum { get, put } BUF_SELECT;                   /* buffer selector */
 static const char *const io_op [] = { "read",           /* operation names */
                                       "write" };
 
-static const uint32 buf_size [] = { RD_BUF_SIZE,        /* buffer sizes */
+static const uint16 buf_size [] = { RD_BUF_SIZE,        /* buffer sizes */
                                     WR_BUF_SIZE };
 
 static uint32 emptying_flags [2];                       /* buffer emptying flags [IO_OPER] */
@@ -579,7 +582,7 @@ static void   buf_remove (IO_OPER rw, uint32 port);
 static void   buf_term   (IO_OPER rw, uint32 port, uint8 header);
 static void   buf_free   (IO_OPER rw, uint32 port);
 static void   buf_cancel (IO_OPER rw, uint32 port, BUF_SELECT which);
-static uint32 buf_len    (IO_OPER rw, uint32 port, BUF_SELECT which);
+static uint16 buf_len    (IO_OPER rw, uint32 port, BUF_SELECT which);
 static uint32 buf_avail  (IO_OPER rw, uint32 port);
 
 
@@ -743,11 +746,15 @@ DEVICE mpx_dev = {
     &mpx_attach,                            /* attach routine */
     &mpx_detach,                            /* detach routine */
     &mpx_dib,                               /* device information block */
-    DEV_DEBUG | DEV_DISABLE,                /* device flags */
+    DEV_DEBUG | DEV_DISABLE | DEV_MUX,      /* device flags */
     0,                                      /* debug control flags */
     mpx_deb,                                /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    (void *) &mpx_desc                      /* help context */
+    };
 
 
 /* I/O signal handler.
@@ -1095,8 +1102,8 @@ switch (mpx_cmd) {
             case UI_RDBUF_AVAIL:                                /* read buffer notification */
                 mpx_flags [mpx_port] &= ~FL_HAVEBUF;            /* clear flag */
 
-                mpx_ibuf = buf_get (ioread, mpx_port) << 8 |    /* get header value and position */
-                           buf_len (ioread, mpx_port, get);     /*   and include buffer length */
+                mpx_ibuf = (uint16) (buf_get (ioread, mpx_port) << 8 |  /* get header value and position */
+                                     buf_len (ioread, mpx_port, get));  /*   and include buffer length */
 
                 if (mpx_flags [mpx_port] & FL_RDOVFLOW) {       /* did a buffer overflow? */
                     mpx_ibuf = mpx_ibuf | RS_OVERFLOW;          /* report it */
@@ -1178,9 +1185,9 @@ switch (mpx_cmd) {
     case CMD_SET_KEY:                                   /* set port key and configuration */
         port = GET_PORT (mpx_param);                    /* get target port number */
         mpx_key [port] = (uint8) mpx_portkey;           /* set port key */
-        mpx_config [port] = mpx_param;                  /* set port configuration word */
+        mpx_config [port] = (uint16) mpx_param;         /* set port configuration word */
 
-        svc_time = service_time (mpx_param);            /* get service time for baud rate */
+        svc_time = service_time (mpx_config [port]);    /* get service time for baud rate */
 
         if (svc_time)                                   /* want to change? */
             mpx_unit [port].wait = svc_time;            /* set service time */
@@ -1193,7 +1200,7 @@ switch (mpx_cmd) {
         port = key_to_port (mpx_portkey);               /* get port */
 
         if (port >= 0)                                  /* port defined? */
-            mpx_rcvtype [port] = mpx_param;             /* save port receive type */
+            mpx_rcvtype [port] = (uint16) mpx_param;    /* save port receive type */
         break;
 
 
@@ -1201,7 +1208,7 @@ switch (mpx_cmd) {
         port = key_to_port (mpx_portkey);               /* get port */
 
         if (port >= 0)                                  /* port defined? */
-            mpx_charcnt [port] = mpx_param;             /* save port character count */
+            mpx_charcnt [port] = (uint16) mpx_param;    /* save port character count */
         break;
 
 
@@ -1372,13 +1379,13 @@ switch (mpx_state) {                                                /* dispatch 
     case idle:                                                      /* controller idle */
         set_flag = FALSE;                                           /* assume no UI */
 
-        if (mpx_uicode) {                                           /* unacknowledged UI? */
-            if (mpx_uien == TRUE) {                                 /* interrupts enabled? */
-                mpx_port = GET_UIPORT (mpx_uicode);                 /* get port number */
-                mpx_portkey = mpx_key [mpx_port];                   /* get port key */
-                mpx_ibuf = mpx_uicode & UI_REASON | mpx_portkey;    /* report UI reason and port key */
-                set_flag = TRUE;                                    /* reissue host interrupt */
-                mpx_uien = FALSE;                                   /* disable UI */
+        if (mpx_uicode) {                                                   /* unacknowledged UI? */
+            if (mpx_uien == TRUE) {                                         /* interrupts enabled? */
+                mpx_port = GET_UIPORT (mpx_uicode);                         /* get port number */
+                mpx_portkey = mpx_key [mpx_port];                           /* get port key */
+                mpx_ibuf = (uint16) (mpx_uicode & UI_REASON | mpx_portkey); /* report UI reason and port key */
+                set_flag = TRUE;                                            /* reissue host interrupt */
+                mpx_uien = FALSE;                                           /* disable UI */
 
                 if (DEBUG_PRI (mpx_dev, DEB_CMDS))
                     fprintf (sim_deb, ">>MPX cmds: Port %d key %d unsolicited interrupt reissued, "
@@ -1409,12 +1416,12 @@ switch (mpx_state) {                                                /* dispatch 
                         else if (mpx_flags [i] & FL_HAVEBUF)        /* have a read buffer ready? */
                             mpx_uicode = UI_RDBUF_AVAIL;            /* set UI reason */
 
-                        if (mpx_uicode) {                           /* UI to send? */
-                            mpx_port = i;                           /* set port number for Acknowledge */
-                            mpx_ibuf = mpx_uicode | mpx_portkey;    /* merge UI reason and port key */
-                            mpx_uicode = mpx_uicode | mpx_port;     /* save UI reason and port */
-                            set_flag = TRUE;                        /* interrupt host */
-                            mpx_uien = FALSE;                       /* disable UI */
+                        if (mpx_uicode) {                                   /* UI to send? */
+                            mpx_port = i;                                   /* set port number for Acknowledge */
+                            mpx_ibuf = (uint16) (mpx_uicode | mpx_portkey); /* merge UI reason and port key */
+                            mpx_uicode = mpx_uicode | mpx_port;             /* save UI reason and port */
+                            set_flag = TRUE;                                /* interrupt host */
+                            mpx_uien = FALSE;                               /* disable UI */
 
                             if (DEBUG_PRI (mpx_dev, DEB_CMDS))
                                 fprintf (sim_deb, ">>MPX cmds: Port %d key %d unsolicited interrupt generated, "
@@ -1492,8 +1499,8 @@ switch (mpx_state) {                                                /* dispatch 
                         buf_put (iowrite, mpx_port, LF);            /* add LF to buffer */
                         }
 
-                    buf_term (iowrite, mpx_port, mpx_param  >> 8);  /* terminate buffer */
-                    mpx_iolen = -1;                                 /* mark as done */
+                    buf_term (iowrite, mpx_port, (uint8) (mpx_param  >> 8));    /* terminate buffer */
+                    mpx_iolen = -1;                                             /* mark as done */
                     }
 
                 if (DEBUG_PRI (mpx_dev, DEB_CMDS) &&
@@ -1535,7 +1542,7 @@ switch (mpx_state) {                                                /* dispatch 
                         if (i)                                      /* high or low byte? */
                             mpx_ibuf = mpx_ibuf | ch;               /* low byte */
                         else
-                            mpx_ibuf = ch << 8;                     /* high byte */
+                            mpx_ibuf = (uint16) (ch << 8);          /* high byte */
 
                         mpx_iolen = mpx_iolen - 1;                  /* drop count */
                         }
@@ -1727,8 +1734,11 @@ while (xmit_loop && (buf_len (iowrite, port, get) > 0)) {   /* character availab
 
 /* Reception service */
 
-while (recv_loop &&                                         /* OK to process? */
-       (chx = tmxr_getc_ln (&mpx_ldsc [port]))) {           /*   and new char available? */
+while (recv_loop) {                                         /* OK to process? */
+    chx = tmxr_getc_ln (&mpx_ldsc [port]);                  /* get a new character */
+
+    if (chx == 0)                                           /* if there are no more characters available */
+        break;                                              /*   then quit the reception loop */
 
     if (chx & SCPE_BREAK) {                                 /* break detected? */
         mpx_flags [port] |= FL_BREAK;                       /* set break status */
@@ -1742,7 +1752,7 @@ while (recv_loop &&                                         /* OK to process? */
         continue;                                           /* discard NUL that accompanied BREAK */
         }
 
-    ch = chx & data_mask;                                   /* mask to bits per char */
+    ch = (uint8) (chx & data_mask);                         /* mask to bits per char */
 
     if ((ch == XOFF) &&                                     /* XOFF? */
         (mpx_flowcntl [port] & FC_XONXOFF)) {               /*   and handshaking enabled? */
@@ -1816,7 +1826,7 @@ while (recv_loop &&                                         /* OK to process? */
                 }
 
         if (uptr->flags & UNIT_CAPSLOCK)                    /* caps lock mode? */
-            ch = toupper (ch);                              /* convert to upper case if lower */
+            ch = (uint8) toupper (ch);                      /* convert to upper case if lower */
 
         if (rt & RT_ENAB_ECHO)                              /* echo enabled? */
             tmxr_putc_ln (&mpx_ldsc [port], ch);            /* echo the char */
@@ -1884,7 +1894,7 @@ while (recv_loop &&                                         /* OK to process? */
                 buf_remove (ioread, port);                  /* back out dummy char leaving header */
                 }
 
-            buf_term (ioread, port, mpx_param >> 8);        /* terminate buffer and set header */
+            buf_term (ioread, port, (uint8) (mpx_param >> 8));  /* terminate buffer and set header */
 
             if (buf_avail (ioread, port) == 1)              /* first read buffer? */
                 mpx_flags [port] |= FL_HAVEBUF;             /* indicate availability */
@@ -1914,7 +1924,7 @@ if (fast_binary_read) {                                     /* fast binary read 
                 }
 
             else                                            /* first character */
-                mpx_ibuf = (chx & DMASK8) << 8;             /* put in top half of word */
+                mpx_ibuf = (uint16) ((chx & DMASK8) << 8);  /* put in top half of word */
 
             mpx_flags [0] ^= FL_WANTBUF;                    /* toggle byte flag */
             }
@@ -2057,6 +2067,9 @@ return SCPE_OK;
    unit is not allowed, so we first enable the unit, then attach it, then
    disable it again.  Attachment is reported by the "mpx_status" routine below.
 
+   A direct attach to the poll unit is only allowed when restoring a previously
+   saved session.
+   
    The Telnet poll service routine is synchronized with the other input polling
    devices in the simulator to facilitate idling.
 */
@@ -2065,16 +2078,17 @@ t_stat mpx_attach (UNIT *uptr, char *cptr)
 {
 t_stat status = SCPE_OK;
 
-if (uptr != mpx_unit)                                   /* not unit 0? */
-    return SCPE_NOATT;                                  /* can't attach */
+if (uptr != mpx_unit                                        /* not unit 0? */
+  && (uptr != &mpx_poll || !(sim_switches & SIM_SW_REST)))  /*   and not restoring the poll unit? */
+    return SCPE_NOATT;                                      /* can't attach */
 
-mpx_poll.flags = mpx_poll.flags & ~UNIT_DIS;            /* enable unit */
-status = tmxr_attach (&mpx_desc, &mpx_poll, cptr);      /* attach to socket */
-mpx_poll.flags = mpx_poll.flags | UNIT_DIS;             /* disable unit */
+mpx_poll.flags = mpx_poll.flags & ~UNIT_DIS;                /* enable unit */
+status = tmxr_attach (&mpx_desc, &mpx_poll, cptr);          /* attach to socket */
+mpx_poll.flags = mpx_poll.flags | UNIT_DIS;                 /* disable unit */
 
 if (status == SCPE_OK) {
-    mpx_poll.wait = POLL_FIRST;                         /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);            /* start poll immediately */
+    mpx_poll.wait = POLL_FIRST;                             /* set up poll */
+    sim_activate (&mpx_poll, mpx_poll.wait);                /* start poll immediately */
     }
 return status;
 }
@@ -2209,7 +2223,7 @@ for (i = 0; i < MPX_PORTS; i++) {                       /* clear per-line variab
     if (i == 0)                                         /* default port configurations */
         mpx_config [0] = SK_PWRUP_0;                    /* port 0 is separate from 1-7 */
     else
-        mpx_config [i] = SK_PWRUP_1 | i;
+        mpx_config [i] = (uint16) (SK_PWRUP_1 | i);
 
     mpx_rcvtype [i] = RT_PWRUP;                         /* power on config for echoplex */
     mpx_charcnt [i] = 0;                                /* default character count */
@@ -2648,9 +2662,9 @@ return;
    length for the allocated header.
 */
 
-static uint32 buf_len (IO_OPER rw, uint32 port, BUF_SELECT which)
+static uint16 buf_len (IO_OPER rw, uint32 port, BUF_SELECT which)
 {
-int32 length;
+int16 length;
 
 if (which == put)
     length = mpx_put [port] [rw] - mpx_sep [port] [rw] -        /* calculate length */

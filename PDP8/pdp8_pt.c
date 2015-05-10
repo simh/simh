@@ -164,7 +164,7 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
 if ((temp = getc (ptr_unit.fileref)) == EOF) {
     if (feof (ptr_unit.fileref)) {
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");
@@ -217,9 +217,9 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         sim_activate (&ptp_unit, ptp_unit.wait);        /* activate unit */
         return AC;
 
-	default:
-		return (stop_inst << IOT_V_REASON) + AC;
-		}                                               /* end switch */
+    default:
+        return (stop_inst << IOT_V_REASON) + AC;
+        }                                               /* end switch */
 }
 
 /* Unit service */
@@ -279,8 +279,7 @@ static const uint16 boot_rom[] = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
-extern int32 saved_PC;
+size_t i;
 extern uint16 M[];
 
 if (ptr_dib.dev != DEV_PTR)                             /* only std devno */

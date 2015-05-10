@@ -153,7 +153,7 @@ int32 oplen[256] = {
    load starts at the current value of the PC.
 */
 
-int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 i, addr = 0, cnt = 0;
 
@@ -164,7 +164,7 @@ while ((i = getc (fileref)) != EOF) {
     addr++;
     cnt++;
 }                                                       /* end while */
-printf ("%d Bytes loaded.\n", cnt);
+sim_printf ("%d Bytes loaded.\n", cnt);
 return (SCPE_OK);
 }
 
@@ -180,7 +180,7 @@ return (SCPE_OK);
         status  =       error code
 */
 
-int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
+t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
 int32 cflag, c1, c2, inst, adr;
@@ -229,7 +229,7 @@ return -(oplen[inst] - 1);
         status  =       error status
 */
 
-int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
+t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, i = 0, j, r;
 char gbuf[CBUFSIZE];

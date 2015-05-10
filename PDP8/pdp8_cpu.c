@@ -241,12 +241,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
-extern t_bool sim_idle_enab;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -346,7 +340,7 @@ reason = 0;
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         }
 
@@ -360,12 +354,18 @@ while (reason == 0) {                                   /* loop until halted */
         }
 
     MA = IF | PC;                                       /* form PC */
-    if (sim_brk_summ && sim_brk_test (MA, SWMASK ('E'))) { /* breakpoint? */
+    if (sim_brk_summ && 
+        sim_brk_test (MA, (1u << SIM_BKPT_V_SPC) | SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     IR = M[MA];                                         /* fetch instruction */
+    if (sim_brk_summ && 
+        sim_brk_test (IR, (2u << SIM_BKPT_V_SPC) | SWMASK ('I'))) { /* breakpoint? */
+        reason = STOP_OPBKPT;                            /* stop simulation */
+        break;
+        }
     PC = (PC + 1) & 07777;                              /* increment PC */
     int_req = int_req | INT_NO_ION_PENDING;             /* clear ION delay */
     sim_interval = sim_interval - 1;
@@ -1371,7 +1371,8 @@ pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
 else return SCPE_IERR;
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
+sim_brk_types = SWMASK ('E') | SWMASK('I');
+sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }
 
@@ -1499,12 +1500,9 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* add devices */
         for (j = 0; j < dibp->num; j++) {               /* loop thru disp */
             if (dibp->dsp[j]) {                         /* any dispatch? */
                 if (dev_tab[dibp->dev + j]) {           /* already filled? */
-                    printf ("%s device number conflict at %02o\n",
-                            sim_dname (dptr), dibp->dev + j);
-                    if (sim_log)
-                        fprintf (sim_log, "%s device number conflict at %02o\n",
-                                 sim_dname (dptr), dibp->dev + j);
-                     return TRUE;
+                    sim_printf ("%s device number conflict at %02o\n",
+                                sim_dname (dptr), dibp->dev + j);
+                    return TRUE;
                     }
                 dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
                 }                                       /* end if dsp */
@@ -1554,8 +1552,6 @@ char *cptr = (char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

@@ -1,6 +1,6 @@
 /* h316_fhd.c: H316/516 fixed head simulator
 
-   Copyright (c) 2003-2013, Robert M. Supnik
+   Copyright (c) 2003-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    fhd          516-4400 fixed head disk
 
-   03-Sep-13    RMS     Added explicit cast on void * pointer
+   03-Sep-13    RMS     Added explicit void * cast
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
@@ -114,7 +115,7 @@ uint32 fhd_csword (uint32 cs, uint32 ch);
    fhd_reg      register list
 */
 
-DIB fhd_dib = { FHD, IOBUS, 1, &fhdio };
+DIB fhd_dib = { FHD, 1, IOBUS, IOBUS, INT_V_FHD, INT_V_NONE, &fhdio, 0 };
 
 UNIT fhd_unit = { 
     UDATA (&fhd_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,

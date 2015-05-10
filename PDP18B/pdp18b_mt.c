@@ -127,7 +127,6 @@
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 int32 mt_cu = 0;                                        /* command/unit */
 int32 mt_sta = 0;                                       /* status register */
@@ -199,7 +198,7 @@ DEVICE mt_dev = {
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     NULL, &mt_attach, &mt_detach,
-    &mt_dib, DEV_DISABLE | DEV_DEBUG
+    &mt_dib, DEV_DISABLE | DEV_DEBUG | DEV_TAPE
     };
 
 /* IOT routine */
@@ -353,7 +352,7 @@ switch (f) {                                            /* case on function */
                 mtxb[p++] = M[xma] & 0377;
                 }
             }                                           /* end for */
-        if (st = sim_tape_wrrecf (uptr, mtxb, tbc))     /* write rec, err? */
+        if ((st = sim_tape_wrrecf (uptr, mtxb, tbc)))   /* write rec, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         else {
             M[MT_CA] = (M[MT_CA] + wc) & DMASK;         /* advance mem addr */
@@ -363,7 +362,7 @@ switch (f) {                                            /* case on function */
         break;
 
     case FN_WREOF:
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         else uptr->USTAT = STA_EOF;
         mt_cu = mt_cu & ~CU_ERASE;                      /* clear erase flag */
@@ -372,7 +371,7 @@ switch (f) {                                            /* case on function */
     case FN_SPACEF:                                     /* space forward */
         do {
             M[MT_WC] = (M[MT_WC] + 1) & DMASK;          /* inc WC */
-            if (st = sim_tape_sprecf (uptr, &tbc)) {    /* space rec fwd, err? */
+            if ((st = sim_tape_sprecf (uptr, &tbc))) {  /* space rec fwd, err? */
                 r = mt_map_err (uptr, st);              /* map error */
                 break;
                 }
@@ -382,7 +381,7 @@ switch (f) {                                            /* case on function */
     case FN_SPACER:                                     /* space reverse */
         do {
             M[MT_WC] = (M[MT_WC] + 1) & DMASK;          /* inc WC */
-            if (st = sim_tape_sprecr (uptr, &tbc)) {    /* space rec rev, err? */
+            if ((st = sim_tape_sprecr (uptr, &tbc))) {  /* space rec rev, err? */
                 r = mt_map_err (uptr, st);              /* map error */
                 break;
                 }

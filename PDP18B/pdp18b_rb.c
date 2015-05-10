@@ -204,9 +204,9 @@ int32 s = rb_set_bcd (bcd_s);                           /* bin sector */
 
 if ((t >= RB_NUMTR) || (t < 0) ||                       /* invalid? */
     (s >= RB_NUMSC) || (s < 0)) {
-	rb_updsta (RBS_ILA);								/* error */
-	return old_da;										/* don't change */
-	}
+    rb_updsta (RBS_ILA);                                /* error */
+    return old_da;                                      /* don't change */
+    }
 else return (((t * RB_NUMSC) + s) * RB_NUMWD);          /* new da */
 }
 

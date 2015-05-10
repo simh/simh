@@ -54,7 +54,7 @@ t_stat plt_svc (UNIT *uptr);
 t_stat plt_reset (DEVICE *dptr);
 
 
-	/*  7 or 8 bit data mask support for either device  */
+/* 7 or 8 bit data mask support for either device  */
 
 #define UNIT_V_8B   (UNIT_V_UF + 0)                     /* 8b output */
 #define UNIT_8B     (1 << UNIT_V_8B)

@@ -75,8 +75,8 @@
    10-Feb-01    RMS     Added DECtape support
 */
 
-#ifndef _PDP11_DEFS_H
-#define _PDP11_DEFS_H   0
+#ifndef PDP11_DEFS_H
+#define PDP11_DEFS_H   0
 
 #ifndef VM_PDP11
 #define VM_PDP11        0
@@ -537,8 +537,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_UBM        (UBM_LNT_LW * sizeof (int32))
 #define IOBA_RS         (IOPAGEBASE + 012040)           /* RHC: RS03/RS04 */
 #define IOLN_RS         040
-#define	IOBA_KG         (IOPAGEBASE + 010700)           /* KG11-A */
-#define	IOLN_KG         006
+#define IOBA_KG         (IOPAGEBASE + 010700)           /* KG11-A */
+#define IOLN_KG         006
 #define IOBA_RQ         (IOPAGEBASE + 012150)           /* RQDX3 */
 #define IOLN_RQ         004
 #define IOBA_SUP        (IOPAGEBASE + 012200)           /* supervisor APR's */

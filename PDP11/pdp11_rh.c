@@ -165,9 +165,6 @@ extern int32 cpu_bme;
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
 extern t_addr cpu_memsize;
-extern FILE *sim_deb;
-extern FILE *sim_log;
-extern int32 sim_switches;
 
 t_stat mba_reset (DEVICE *dptr);
 t_stat mba_rd (int32 *val, int32 pa, int32 access);
@@ -182,7 +179,7 @@ void mba_clr_int (uint32 mb);
 void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb);
 void mba_set_cs2 (uint32 flg, uint32 mb);
 int32 mba_map_pa (int32 pa, int32 *ofs);
-DEVICE mba0_dev, mba1_dev;
+
 
 extern uint32 Map_Addr (uint32 ba);
 
@@ -839,11 +836,15 @@ return SCPE_OK;
 
 void mba_set_enbdis (uint32 mb, t_bool dis)
 {
+t_bool orig;
 if (mb >= MBA_NUM)                                      /* valid MBA? */
     return;
+orig = mba_dev[mb].flags & DEV_DIS;
 if (dis)
     mba_dev[mb].flags |= DEV_DIS;
 else mba_dev[mb].flags &= ~DEV_DIS;
+if (orig ^ dis)
+    mba_reset (&mba_dev[mb]);                           /* reset on change */
 return;
 }
 
@@ -894,11 +895,8 @@ if ((mbregR[idx] && dibp->rd &&                         /* conflict? */
     (mbregW[idx] != dibp->wr)) ||
     (mbabort[idx] && dibp->ack[0] &&
     (mbabort[idx] != dibp->ack[0]))) {
-        printf ("Massbus %s assignment conflict at %d\n",
-                sim_dname (dptr), dibp->ba);
-        if (sim_log)
-            fprintf (sim_log, "Massbus %s assignment conflict at %d\n",
-                     sim_dname (dptr), dibp->ba);
+        sim_printf ("Massbus %s assignment conflict at %d\n",
+                    sim_dname (dptr), dibp->ba);
         return SCPE_STOP;
         }
 if (dibp->rd)                                           /* set rd dispatch */

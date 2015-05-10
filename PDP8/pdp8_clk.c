@@ -44,8 +44,6 @@ extern int32 int_req, int_enable, dev_done, stop_inst;
 int32 clk_tps = 60;                                     /* ticks/second */
 int32 tmxr_poll = 16000;                                /* term mux poll */
 
-extern int32 sim_is_running;
-
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
@@ -148,8 +146,8 @@ int32 t;
 dev_done = dev_done | INT_CLK;                          /* set done */
 int_req = INT_UPDATE;                                   /* update interrupts */
 t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
 tmxr_poll = t;                                          /* set mux poll */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 return SCPE_OK;
 }
 
@@ -169,6 +167,7 @@ t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
 
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 dev_done = dev_done & ~INT_CLK;                         /* clear done, int */
 int_req = int_req & ~INT_CLK;
 int_enable = int_enable & ~INT_CLK;                     /* clear enable */

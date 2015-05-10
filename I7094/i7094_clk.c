@@ -74,7 +74,8 @@ if ((clk_dev.flags & DEV_DIS) == 0) {                   /* clock enabled? */
     WriteP (CLK_CTR, ctr);
     if (ctr == 0)                                       /* overflow? req trap */
         chtr_clk = 1;
-    sim_activate (uptr, sim_rtcn_calb (CLK_TPS, TMR_CLK)); /* reactivate unit */
+    sim_rtcn_calb (CLK_TPS, TMR_CLK);                   /* calibrate clock */
+    sim_activate_after (uptr, 1000000/CLK_TPS);         /* reactivate unit */
     }
 return SCPE_OK;
 }

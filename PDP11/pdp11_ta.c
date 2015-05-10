@@ -109,7 +109,6 @@
 #define UST_GAP         01                              /* last op hit gap */
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint32 ta_cs = 0;                                       /* control/status */
 uint32 ta_idb = 0;                                      /* input data buf */
@@ -126,7 +125,6 @@ static uint8 ta_fnc_tab[TACS_M_FNC + 1] = {
     OP_REV       , OP_FWD,        OP_FWD, 0
     };
 
-DEVICE ta_dev;
 t_stat ta_rd (int32 *data, int32 PA, int32 access);
 t_stat ta_wr (int32 data, int32 PA, int32 access);
 t_stat ta_svc (UNIT *uptr);
@@ -393,7 +391,7 @@ switch (uptr->FNC) {                                    /* case on function */
         else {
             if ((ta_bptr < TA_MAXFR) &&                 /* room in buf? */
                 ((uptr->pos + ta_bptr) < uptr->capac))  /* room on tape? */
-                ta_xb[ta_bptr++] = ta_odb;              /* store char */
+                ta_xb[ta_bptr++] = (uint8)ta_odb;       /* store char */
             ta_set_tr ();                               /* set tra req */
             sim_activate (uptr, ta_ctime);              /* sched next char */
             }
@@ -401,13 +399,13 @@ switch (uptr->FNC) {                                    /* case on function */
 
     case TACS_WRITE|TACS_3RD:                           /* write CRC */
         if (ta_bptr) {                                  /* anything to write? */
-           if (st = sim_tape_wrrecf (uptr, ta_xb, ta_bptr)) /* write, err? */
+           if ((st = sim_tape_wrrecf (uptr, ta_xb, ta_bptr)))/* write, err? */
                r = ta_map_err (uptr, st);               /* map error */
            }
         break;                                          /* op done */
 
     case TACS_WFG:                                      /* write file gap */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = ta_map_err (uptr, st);                  /* map error */
         break;
 
@@ -417,7 +415,7 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     case TACS_SRB:                                      /* space rev blk */
-        if (st = sim_tape_sprecr (uptr, &tbc))          /* space rev, err? */
+        if ((st = sim_tape_sprecr (uptr, &tbc)))        /* space rev, err? */
             r = ta_map_err (uptr, st);                  /* map error */
          break;
 
@@ -429,7 +427,7 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     case TACS_SFB:                                      /* space fwd blk */
-        if (st = sim_tape_sprecf (uptr, &tbc))          /* space rev, err? */
+        if ((st = sim_tape_sprecf (uptr, &tbc)))        /* space rev, err? */
             r = ta_map_err (uptr, st);                  /* map error */
         ta_cs |= TACS_CRC;                              /* CRC sets, no err */
         break;
@@ -655,7 +653,7 @@ static const uint16 boot_rom[] = {
 
 t_stat ta_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)

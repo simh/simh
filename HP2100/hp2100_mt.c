@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    MT           12559A 3030 nine track magnetic tape
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
+   09-May-12    JDB     Separated assignments from conditional expressions
    25-Mar-12    JDB     Removed redundant MTAB_VUN from "format" MTAB entry
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
@@ -233,7 +236,7 @@ DEVICE mtc_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     NULL, &mtc_attach, &mtc_detach,
-    &mtc_dib, DEV_DISABLE | DEV_DIS
+    &mtc_dib, DEV_DISABLE | DEV_DIS | DEV_TAPE
     };
 
 
@@ -495,7 +498,8 @@ switch (mtc_fnc) {                                      /* case on function */
         return sim_tape_detach (uptr);                  /* don't set cch flg */
 
     case FNC_WFM:                                       /* write file mark */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        st = sim_tape_wrtmk (uptr);                     /* write tmk */
+        if (st != MTSE_OK)                              /* error? */
             r = mt_map_err (uptr, st);                  /* map error */
         mtc_sta = STA_EOF;                              /* set EOF status */
         break;
@@ -504,12 +508,14 @@ switch (mtc_fnc) {                                      /* case on function */
         break;
 
     case FNC_FSR:                                       /* space forward */
-        if (st = sim_tape_sprecf (uptr, &tbc))          /* space rec fwd, err? */
+        st = sim_tape_sprecf (uptr, &tbc);              /* space rec fwd */
+        if (st != MTSE_OK)                              /* error? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;
 
     case FNC_BSR:                                       /* space reverse */
-        if (st = sim_tape_sprecr (uptr, &tbc))          /* space rec rev, err? */
+        st = sim_tape_sprecr (uptr, &tbc);              /* space rec rev */
+        if (st != MTSE_OK)                              /* error? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;
 
@@ -547,7 +553,7 @@ switch (mtc_fnc) {                                      /* case on function */
         if (mtc_1st) mtc_1st = 0;                       /* no xfr on first */
         else {
             if (mt_ptr < DBSIZE) {                      /* room in buffer? */
-                mtxb[mt_ptr++] = mtc_unit.buf;
+                mtxb[mt_ptr++] = (uint8) mtc_unit.buf;
                 mtc_sta = mtc_sta & ~STA_BOT;           /* clear BOT */
                 }
             else mtc_sta = mtc_sta | STA_PAR;
@@ -558,7 +564,8 @@ switch (mtc_fnc) {                                      /* case on function */
             return SCPE_OK;
             }
         if (mt_ptr) {                                   /* write buffer */
-            if (st = sim_tape_wrrecf (uptr, mtxb, mt_ptr)) {    /* write, err? */
+            st = sim_tape_wrrecf (uptr, mtxb, mt_ptr);  /* write */
+            if (st != MTSE_OK) {                        /* error? */
                 r = mt_map_err (uptr, st);              /* map error */
                 break;                                  /* done */
                 }
@@ -627,7 +634,8 @@ t_stat st;
 
 if (sim_is_active (&mtc_unit) &&                        /* write in prog? */
     (mtc_fnc == FNC_WC) && (mt_ptr > 0)) {              /* yes, bad rec */
-    if (st = sim_tape_wrrecf (&mtc_unit, mtxb, mt_ptr | MTR_ERF))
+    st = sim_tape_wrrecf (&mtc_unit, mtxb, mt_ptr | MTR_ERF);
+    if (st != MTSE_OK)
         mt_map_err (&mtc_unit, st);
     }
 

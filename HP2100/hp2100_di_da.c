@@ -1,6 +1,6 @@
 /* hp2100_di_da.c: HP 12821A HP-IB Disc Interface simulator for Amigo disc drives
 
-   Copyright (c) 2011-2012, J. David Bryan
+   Copyright (c) 2011-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,11 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
+                        Removed redundant global declarations
+   24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
+   07-May-12    JDB     Cancel the intersector delay if an untalk is received
    29-Mar-12    JDB     First release
    04-Nov-11    JDB     Created DA device
 
@@ -460,20 +465,13 @@ static CNTLR_VARS icd_cntlr [DA_UNITS] =                /* ICD controllers: */
 
 /* Amigo disc global VM routines */
 
-t_stat da_service (UNIT   *uptr);
 t_stat da_reset   (DEVICE *dptr);
 t_stat da_attach  (UNIT   *uptr, char *cptr);
 t_stat da_detach  (UNIT   *uptr);
-t_stat da_boot    (int32  unitno, DEVICE *dptr);
 
 /* Amigo disc global SCP routines */
 
 t_stat da_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
-
-/* Amigo disc global bus routines */
-
-t_bool da_bus_accept  (uint32  unit, uint8  data);
-void   da_bus_respond (CARD_ID card, uint32 unit, uint8 new_cntl);
 
 /* Amigo disc local utility routines */
 
@@ -756,7 +754,7 @@ switch (if_state [unit]) {                                  /* dispatch the inte
             case disc_command:                              /* execute a disc command */
                 result = dl_service_drive (cvptr, uptr);    /* service the disc unit */
 
-                if (cvptr->opcode == clear)                 /* is this a Clear command? */
+                if (cvptr->opcode == Clear)                 /* is this a Clear command? */
                     if_dsj [unit] = 2;                      /* indicate that the self test is complete */
 
                 if (cvptr->state != cntlr_busy) {           /* has the controller stopped? */
@@ -856,7 +854,7 @@ switch (if_state [unit]) {                                  /* dispatch the inte
                     if (cvptr->length == 0 || cvptr->eod == SET) {  /* is the data phase complete? */
                         uptr->PHASE = end_phase;                    /* set the end phase */
 
-                        if (cvptr->opcode == request_status)    /* is it a Request Status command? */
+                        if (cvptr->opcode == Request_Status)    /* is it a Request Status command? */
                             if_dsj [unit] = 0;                  /* clear the DSJ value */
 
                         if_state [unit] = command_exec;         /* set to execute the command */
@@ -980,7 +978,7 @@ if (result == SCPE_IERR && DEBUG_PRI (da_dev, DEB_RWSC)) {  /* did an internal e
 
 if (if_state [unit] == idle) {                              /* is the command now complete? */
     if (if_command [unit] == disc_command) {                /* did a disc command complete? */
-        if (cvptr->opcode != end)                           /* yes; if the command was not End, */
+        if (cvptr->opcode != End)                           /* yes; if the command was not End, */
             di_poll_response (da, unit, SET);               /*   then enable PPR */
 
         if (DEBUG_PRI (da_dev, DEB_RWSC))
@@ -1212,13 +1210,12 @@ t_stat da_boot (int32 unitno, DEVICE *dptr)
 if (GET_BUSADR (da_unit [unitno].flags) != 0)               /* booting is supported on bus address 0 only */
     return SCPE_NOFNC;                                      /* report "Command not allowed" if attempted */
 
-if (ibl_copy (da_rom, da_dib.select_code))                  /* copy the boot ROM to memory and configure */
-    return SCPE_IERR;                                       /* return an internal error if the copy failed */
-
-SR = SR & (IBL_OPT | IBL_DS_HEAD)                           /* set S to a reasonable value */
-  | IBL_DS | IBL_MAN | (da_dib.select_code << IBL_V_DEV);   /*   before boot execution */
-
-return SCPE_OK;
+if (ibl_copy (da_rom, da_dib.select_code,               /* copy the boot ROM to memory and configure */
+              IBL_OPT | IBL_DS_HEAD,                    /*   the S register accordingly */
+              IBL_DS | IBL_MAN | IBL_SET_SC (da_dib.select_code)))
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+else
+    return SCPE_OK;
 }
 
 
@@ -1266,7 +1263,7 @@ result = dl_load_unload (&icd_cntlr [unit], uptr, load);    /* load or unload th
 if (result == SCPE_OK && ! load) {                          /* was the unload successful? */
     icd_cntlr [unit].status = drive_attention;              /* set Drive Attention status */
 
-    if (uptr->OP == end)                                    /* is the controller in idle state 2? */
+    if (uptr->OP == End)                                    /* is the controller in idle state 2? */
         di_poll_response (da, unit, SET);                   /* enable PPR */
     }
 
@@ -1789,7 +1786,7 @@ if (da_unit [unit].wait > 0)                            /* was service requested
 
 if (initiated && DEBUG_PRI (da_dev, DEB_RWSC))
     if (if_command [unit] == disc_command)
-        fprintf (sim_deb, ">>DA rwsc: Unit %d position %d %s disc command initiated\n",
+        fprintf (sim_deb, ">>DA rwsc: Unit %d position %" T_ADDR_FMT "d %s disc command initiated\n",
                  unit, da_unit [unit].pos, dl_opcode_name (ICD, icd_cntlr [unit].opcode));
     else
         fprintf (sim_deb, ">>DA rwsc: Unit %d %s command initiated\n",
@@ -1962,6 +1959,11 @@ return;
 
     2. There is no need to test if we are processing a disc command, as the
        controller would not be busy otherwise.
+
+    3. If an auto-seek will be needed to continue the read, but the seek will
+       fail, then an extra delay is inserted before the service call to start
+       the next sector.  Once an Untalk is received, this delay is no longer
+       needed, so it is cancelled before rescheduling the service routine.
 */
 
 static void complete_read (uint32 unit)
@@ -1974,7 +1976,9 @@ if ((if_state [unit] == command_exec                        /* is a command exec
 
     if_state [unit] = command_exec;                         /* set to execute */
     da_unit [unit].PHASE = end_phase;                       /*   the completion phase */
-    da_unit [unit].wait = icd_cntlr [unit].data_time;       /* ensure that the controller will finish */
+
+    sim_cancel (&da_unit [unit]);                           /* cancel the EOT delay */
+    da_unit [unit].wait = icd_cntlr [unit].data_time;       /* reschedule for completion */
     }
 
 return;

@@ -88,7 +88,6 @@ t_stat cd_attach (UNIT *uptr, char *cptr);
 t_stat cd_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 char colbin_to_bcd (uint32 cb);
 
-extern int32 sim_switches;
 extern uint32 PC;
 extern uint32 ind_ioc;
 extern char bcd_to_ascii_a[64];
@@ -292,11 +291,11 @@ return SCPE_OK;
 #define BOOT_SIZE       (sizeof (boot_rom) / sizeof (t_uint64))
 
 static const t_uint64 boot_rom[] = {
-    00762000001000 + U_CDR,                             /* RDSA CDR */
-    00544000000000 + BOOT_START + 4,                    /* LCHA *+3 */
-    00544000000000,                                     /* LCHA 0 */
-    00021000000001,                                     /* TTR 1 */
-    05000030000000,                                     /* IOCT 3,,0 */
+    INT64_C(00762000001000) + U_CDR,                    /* RDSA CDR */
+    INT64_C(00544000000000) + BOOT_START + 4,           /* LCHA *+3 */
+    INT64_C(00544000000000),                            /* LCHA 0 */
+    INT64_C(00021000000001),                            /* TTR 1 */
+    INT64_C(05000030000000),                            /* IOCT 3,,0 */
     };
 
 t_stat cdr_boot (int32 unitno, DEVICE *dptr)

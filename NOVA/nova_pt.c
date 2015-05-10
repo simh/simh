@@ -1,6 +1,6 @@
 /* nova_pt.c: NOVA paper tape read/punch simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    ptr          paper tape reader
    ptp          paper tape punch
 
+   28-Mar-15    RMS     Revised to use sim_printf
    04-Jul-07    BKR     added PTR and PTP device DISABLE capability,
                         added 7B/8B support PTR and PTP (default is 8B),
                         DEV_SET/CLR macros now used,
@@ -45,10 +46,10 @@ Notes:
 
 #include "nova_defs.h"
 
-extern	int32	int_req, dev_busy, dev_done, dev_disable ;
-extern	int32	SR ;
+extern int32 int_req, dev_busy, dev_done, dev_disable ;
+extern int32 SR ;
 
-extern	t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
+extern t_stat cpu_boot(int32 unitno, DEVICE * dptr ) ;
 
 
 int32 ptr_stopioe = 0, ptp_stopioe = 0;                 /* stop on error */
@@ -62,7 +63,7 @@ t_stat ptp_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 
 
-	/*  7 or 8 bit data mask support for either device  */
+/* 7 or 8 bit data mask support for either device  */
 
 #define UNIT_V_8B   (UNIT_V_UF + 0)                     /* 8b output */
 #define UNIT_8B     (1 << UNIT_V_8B)
@@ -193,7 +194,7 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
 if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
     if (feof (ptr_unit.fileref)) {
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");

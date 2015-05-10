@@ -27,8 +27,8 @@
    30-Aug-05    RMS     Added additional 11/60 registers
 */
 
-#ifndef _PDP11_CPUMOD_H_
-#define _PDP11_CPUMOD_H_        0
+#ifndef PDP11_CPUMOD_H_
+#define PDP11_CPUMOD_H_        0
 
 #define SOP_1103        (BUS_Q)
 #define OPT_1103        (OPT_EIS|OPT_FIS)

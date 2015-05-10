@@ -139,7 +139,6 @@ static struct drvtyp drv_tab[] = {
     };
 
 extern uint32 int_req[INTSZ], int_enb[INTSZ];
-extern FILE *sim_deb;
 
 uint8 dpxb[DP_NUMBY];                                   /* xfer buffer */
 uint32 dp_bptr = 0;                                     /* buffer ptr */
@@ -393,7 +392,6 @@ t_stat dp_svc (UNIT *uptr)
 uint32 u = uptr - dp_dev.units;                         /* get unit number */
 int32 cyl = uptr->CYL;                                  /* get cylinder */
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
-uint32 t;
 t_stat r;
 
 if (uptr->STD & STD_MOV) {                              /* seek? */
@@ -419,10 +417,10 @@ switch (dp_cmd & 0x7) {                                 /* case on func */
         if (sch_actv (dp_dib.sch, dp_dib.dno)) {        /* sch transfer? */
             if (dp_dter (uptr, dp_1st))                 /* check xfr err */
                 return SCPE_OK;
-            if (r = dp_rds (uptr))                      /* read sec, err? */
+            if ((r = dp_rds (uptr)))                    /* read sec, err? */
                 return r;
             dp_1st = 0;
-            t = sch_wrmem (dp_dib.sch, dpxb, DP_NUMBY); /* write to memory */
+            sch_wrmem (dp_dib.sch, dpxb, DP_NUMBY);     /* write to memory */
             if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */       
                 sim_activate (uptr, dp_rtime);          /* reschedule */
                 return SCPE_OK;
@@ -438,7 +436,7 @@ switch (dp_cmd & 0x7) {                                 /* case on func */
                 return SCPE_OK;
             dp_bptr = sch_rdmem (dp_dib.sch, dpxb, DP_NUMBY); /* read from mem */
             dp_db = dpxb[dp_bptr - 1];                  /* last byte */
-            if (r = dp_wds (uptr))                      /* write sec, err? */
+            if ((r = dp_wds (uptr)))                    /* write sec, err? */
                 return r;
             dp_1st = 0;
             if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */       
@@ -498,9 +496,9 @@ uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
 
 if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not attached? */
     ((uptr->flags & UNIT_WPRT) && (dp_cmd == CMC_WR))) {
-	dp_done (STC_DTE);									/* error, done */
-	return TRUE;
-	}
+    dp_done (STC_DTE);                                  /* error, done */
+    return TRUE;
+    }
 hd = GET_SRF (dp_hdsc);                                 /* get head */
 sc = GET_SEC (dp_hdsc);                                 /* get sector */
 if (dp_cyl != (uint32) uptr->CYL) {                     /* wrong cylinder? */

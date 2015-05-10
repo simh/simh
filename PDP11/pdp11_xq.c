@@ -323,7 +323,7 @@ struct xq_device    xqb = {
 
 /* SIMH device structures */
 DIB xqa_dib = { IOBA_XQ, IOLN_XQ, &xq_rd, &xq_wr,
-		1, IVCL (XQ), 0, { &xq_int } };
+        1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqa_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
@@ -379,7 +379,7 @@ REG xqa_reg[] = {
 };
 
 DIB xqb_dib = { IOBA_XQB, IOLN_XQB, &xq_rd, &xq_wr,
-		1, IVCL (XQ), 0, { &xq_int } };
+        1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqb_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
@@ -435,10 +435,10 @@ REG xqb_reg[] = {
 };
 
 MTAB xq_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
-		NULL, &show_addr, NULL },
-	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-		NULL, &show_vec, NULL },
+    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
+        NULL, &show_addr, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+        NULL, &show_vec, NULL },
   { MTAB_XTD | MTAB_VDV, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xq_setmac, &xq_showmac, NULL },
   { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "ETH", "ETH",
@@ -1342,7 +1342,7 @@ t_stat xq_process_xbdl(CTLR* xq)
         else {
           if (xq->var->coalesce_latency == 0)
             xq_svc(&xq->unit[0]);        /* service any received data */
-	  }
+      }
         sim_debug(DBG_WRN, xq->dev, "XBDL completed processing write\n");
 
       } /* loopback/non-loopback */

@@ -26,7 +26,8 @@
    rf           RF11 fixed head disk
 
    23-Oct-13    RMS     Revised for new boot setup routine
-   03-Sep-13    RMS     Added WC to debug printout
+   03-Sep-13    RMS     Added explicit void * cast
+                        Added WC to debug printout
    19-Mar-12    RMS     Fixed bug in updating mem addr extension (Peter Schorn)
    25-Dec-06    RMS     Fixed bug in unit mask (John Dundas)
    26-Jun-06    RMS     Cloned from RF08 simulator
@@ -112,7 +113,6 @@
 
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint32 rf_cs = 0;                                       /* status register */
 uint32 rf_cma = 0;
@@ -126,7 +126,6 @@ uint32 rf_time = 10;                                    /* inter-word time */
 uint32 rf_burst = 1;                                    /* burst mode flag */
 uint32 rf_stopioe = 1;                                  /* stop on error */
 
-DEVICE rf_dev;
 t_stat rf_rd (int32 *data, int32 PA, int32 access);
 t_stat rf_wr (int32 data, int32 PA, int32 access);
 int32 rf_inta (void);
@@ -367,7 +366,7 @@ do {
                 update_rfcs (0, RFDAE_NXM);
                 break;
                 }
-            fbuf[da] = dat;						       /* write word */
+            fbuf[da] = dat;                            /* write word */
             rf_dbr = dat;
             if (da >= uptr->hwmark)
                 uptr->hwmark = da + 1;
@@ -463,7 +462,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rf_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

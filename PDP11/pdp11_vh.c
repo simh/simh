@@ -34,6 +34,7 @@
                         of lines available to be 8, 16, 24, or 32.
                         Fixed performance issue avoiding redundant polling
    03-Jan-10    JAD     Eliminate gcc warnings
+   24-Nov-08    JDB     Removed tmxr_send_buffered_data declaration (now in sim_tmxr.h)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
@@ -82,7 +83,6 @@ extern int32    int_req[IPL_HLVL];
 extern uint32    cpu_opt;
 #endif
 
-#include "sim_sock.h"
 #include "sim_tmxr.h"
 
 /* imports from pdp11_stddev.c: */
@@ -713,7 +713,7 @@ static void vh_getc (   int32   vh  )
     uint32  i, c;
     TMLX    *lp;
 
-    for (i = 0; i < VH_LINES; i++) {
+    for (i = 0; i < (uint32)VH_LINES; i++) {
         lp = &vh_parm[(vh * VH_LINES) + i];
         while ((c = tmxr_getc_ln (lp->tmln)) != 0) {
             if (c & SCPE_BREAK) {

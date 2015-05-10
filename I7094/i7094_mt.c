@@ -72,7 +72,6 @@ static const char *tape_stat[] = {
 extern uint32 PC;
 extern uint32 cpu_model;
 extern uint32 ind_ioc;
-extern FILE *sim_deb;
 extern const char *sel_name[];
 
 t_stat mt_chsel (uint32 ch, uint32 sel, uint32 unit);
@@ -368,7 +367,7 @@ DEVICE mt_dev[NUM_CHAN] = {
     MT_NUMDR + 1, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     &mt_boot, &mt_attach, &sim_tape_detach,
-    &mt_dib, DEV_DEBUG
+    &mt_dib, DEV_DEBUG | DEV_TAPE
     },
     {
     "MTB", mtb_unit, mtb_reg, mt_mod,
@@ -564,7 +563,7 @@ switch (uptr->UST) {                                    /* case on state */
             bc = chrono_rd (xb, MT_MAXFR);              /* read clock */
         else {                                          /* real tape */
             r = sim_tape_rdrecf (uptr, xb, &bc, MT_MAXFR); /* read record */
-            if (r = mt_map_err (uptr, r))               /* map status */
+            if ((r = mt_map_err (uptr, r)))             /* map status */
                 return r;
             if (mt_unit[ch] == 0)                       /* disconnected? */
                 return SCPE_OK;
@@ -736,7 +735,7 @@ if (mt_bptr[ch]) {                                      /* any data? */
     if (xb == NULL)
         return SCPE_IERR;
     r = sim_tape_wrrecf (uptr, xb, mt_bptr[ch]);        /* write record */
-    if (r = mt_map_err (uptr, r))                       /* map error */
+    if ((r = mt_map_err (uptr, r)))                     /* map error */
         return r;
     }
 uptr->UST = CHSL_WRS|CHSL_3RD;                          /* next state */
@@ -845,11 +844,11 @@ return sim_tape_attach (uptr, cptr);
 #define BOOT_START      01000
 
 static const t_uint64 boot_rom[5] = {
-    0076200000000 + U_MTBIN - 1,                        /* RDS MT_binary */
-    0054000000000 + BOOT_START + 4,                     /* RCHA *+3 */
-    0054400000000,                                      /* LCHA 0 */
-    0002100000001,                                      /* TTR 1 */
-    0500003000000,                                      /* IOCT 0,,3 */
+    INT64_C(0076200000000) + U_MTBIN - 1,               /* RDS MT_binary */
+    INT64_C(0054000000000) + BOOT_START + 4,            /* RCHA *+3 */
+    INT64_C(0054400000000),                             /* LCHA 0 */
+    INT64_C(0002100000001),                             /* TTR 1 */
+    INT64_C(0500003000000),                             /* IOCT 0,,3 */
     };
 
 t_stat mt_boot (int32 unitno, DEVICE *dptr)

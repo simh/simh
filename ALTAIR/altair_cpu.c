@@ -25,6 +25,7 @@
 
    cpu          8080 CPU
 
+   02-Feb-15    RSB     Fixed initialization of "uninstalled" memory
    19-Mar-12    RMS     Fixed data type for breakpoint variables
    08-Oct-02    RMS     Tied off spurious compiler warnings
 
@@ -67,7 +68,7 @@
 
    3. Non-existent memory.  On the 8080, reads to non-existent memory
       return 0377, and writes are ignored.  In the simulator, the
-      largest possible memory is instantiated and initialized to zero.
+      largest possible memory is instantiated and initialized to 0377.
       Thus, only writes need be checked against actual memory size.
 
    4. Adding I/O devices.  These modules must be modified:
@@ -106,9 +107,6 @@ int32 int_req = 0;                                      /* Interrupt request */
 int32 chip = 0;                                         /* 0 = 8080 chip, 1 = z80 chip */
 
 int32 PCX;                                              /* External view of PC */
-
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 /* function prototypes */
 
@@ -300,9 +298,8 @@ DEVICE cpu_dev = {
     NULL, NULL, NULL
 };
 
-int32 sim_instr (void)
+t_stat sim_instr (void)
 {
-    extern int32 sim_interval;
     int32 PC, IR, OP, DAR, reason, hi, lo, carry, i;
 
     PC = saved_PC & ADDRMASK;                           /* load local PC */
@@ -313,7 +310,7 @@ int32 sim_instr (void)
 
     while (reason == 0) {                               /* loop until halted */
         if (sim_interval <= 0) {                        /* check clock queue */
-            if (reason = sim_process_event ()) break;
+            if ((reason = sim_process_event ())) break;
         }
 
         if (int_req > 0) {                              /* interrupt? */
@@ -366,7 +363,7 @@ int32 sim_instr (void)
         if ((OP & 0xCF) == 0x01) {                      /* LXI */
             DAR = M[PC] & 0x00ff;
             PC++;
-            DAR = DAR | (M[PC] <<8) & 0xFF00;;
+            DAR = DAR | ((M[PC] <<8) & 0xFF00);
             putpair((OP >> 4) & 0x03, DAR);
             PC++;
             continue;
@@ -1177,7 +1174,7 @@ for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0377;
 return SCPE_OK;
 }
 

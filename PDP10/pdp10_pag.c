@@ -429,7 +429,7 @@ else {                                                  /* TOPS-20 paging */
     int32 pmi, vpn, xpte;
     int32 flg, t;
     t_bool stop;
-    a10 pa, csta;
+    a10 pa, csta = 0;
     d10 ptr, cste;
     d10 acc = PTE_T20_W | PTE_T20_C;                    /* init access bits */
 
@@ -762,7 +762,7 @@ t_bool wrcstm (a10 ea, int32 prv)
 {
 cstm = Read (ea, prv);
 if ((cpu_unit.flags & UNIT_T20) && (ea == 040127))
-    cstm = 0770000000000;
+    cstm = INT64_C(0770000000000);
 return FALSE;
 }
 

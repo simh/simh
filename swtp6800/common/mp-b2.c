@@ -76,7 +76,7 @@ address is here, 'nulldev' means no device is available
 */
 
 struct idev {
-        int32 (*routine)();
+        int32 (*routine)(int32, int32);
 };
 
 struct idev dev_table[32] = {
@@ -214,7 +214,10 @@ int32 MB_get_mbyte(int32 addr)
             } else
                 return 0xFF;
         case 0x8000:
-            val = (dev_table[addr - 0x8000].routine(0, 0)) & 0xFF;
+            if (addr < 0x8020)
+                val = (dev_table[addr - 0x8000].routine(0, 0)) & 0xFF;
+            else
+                val = 0xFF;
             if (MB_dev.dctrl & DEBUG_read)
                 printf("MB_get_mbyte: I/O addr=%04X val=%02X\n", addr, val);
             return val;
@@ -290,7 +293,8 @@ void MB_put_mbyte(int32 addr, int32 val)
                 return;
             }
         case 0x8000:
-            dev_table[addr - 0x8000].routine(1, val);
+            if (addr < 0x8020)
+                dev_table[addr - 0x8000].routine(1, val);
             return;
         case 0xA000:
         case 0xB000:
@@ -320,3 +324,4 @@ void MB_put_mword(int32 addr, int32 val)
 }
 
 /* end of mp-b2.c */
+

@@ -170,14 +170,12 @@ typedef struct {
     uint32              val[DSTRLNT];
     } DSTR;
 
-static DSTR Dstr0 = { 0, 0, 0, 0, 0 };
+static DSTR Dstr0 = { 0, {0, 0, 0, 0} };
 
 extern int32 isenable, dsenable;
 extern int32 N, Z, V, C, fpd, ipl;
 extern int32 R[8], trap_req;
-extern int32 sim_interval;
 extern uint32 cpu_type;
-extern FILE *sim_deb;
 
 int32 ReadDstr (int32 *dscr, DSTR *dec, int32 flag);
 void WriteDstr (int32 *dscr, DSTR *dec, int32 flag);
@@ -205,96 +203,96 @@ extern int32 calc_ints (int32 nipl, int32 trq);
 /* Table of instruction operands */
 
 static int32 opntab[128][MAXOPN] = {
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 000 - 007 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 010 - 017 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* LD2R */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0,                                         /* MOVC */
-    0, 0, 0, 0,                                         /* MOVRC */
-    0, 0, 0, 0,                                         /* MOVTC */
-                0, 0, 0, 0,                             /* 033 */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 034 - 037 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0,                                         /* LOCC */
-    0, 0, 0, 0,                                         /* SKPC */
-    0, 0, 0, 0,                                         /* SCANC */
-    0, 0, 0, 0,                                         /* SPANC */
-    0, 0, 0, 0,                                         /* CMPC */
-    0, 0, 0, 0,                                         /* MATC */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 046 - 047 */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* ADDN */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* SUBN */
-    R0_DESC, R2_DESC, 0, 0,                             /* CMPN */
-    R0_DESC, 0, 0, 0,                                   /* CVTNL */
-    R0_DESC, R2_DESC, 0, 0,                             /* CVTPN */
-    R0_DESC, R2_DESC, 0, 0,                             /* CVTNP */
-    R0_DESC, R2_DESC, R4_ARG, 0,                        /* ASHN */
-    R0_DESC, 0, 0, 0,                                   /* CVTLN */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* LD3R */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* ADDP */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* SUBP */
-    R0_DESC, R2_DESC, 0, 0,                             /* CMPP */
-    R0_DESC, 0, 0, 0,                                   /* CVTPL */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* MULP */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* DIVP */
-    R0_DESC, R2_DESC, R4_ARG, 0,                        /* ASHP */
-    R0_DESC, 0, 0, 0,                                   /* CVTLP */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 100 - 107 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 110 - 117 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 120 - 127 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* MOVCI */
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* MOVRCI */
-    IN_DESC, IN_DESC, IN_ARG, IN_ARG,                   /* MOVTCI */
-                0, 0, 0, 0,                             /* 133 */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 134 - 137 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    IN_DESC, IN_ARG, 0, 0,                              /* LOCCI */
-    IN_DESC, IN_ARG, 0, 0,                              /* SKPCI */
-    IN_DESC, IN_DESC, 0, 0,                             /* SCANCI */
-    IN_DESC, IN_DESC, 0, 0,                             /* SPANCI */
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* CMPCI */
-    IN_DESC, IN_DESC, 0, 0,                             /* MATCI */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 146 - 147 */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* ADDNI */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* SUBNI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CMPNI */
-    IN_DESC, IN_ARG, 0, 0,                              /* CVTNLI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CVTPNI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CVTNPI */
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* ASHNI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CVTLNI */
-    0, 0, 0, 0, 0, 0, 0, 0,                             /* 160 - 167 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* ADDPI */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* SUBPI */
-    IN_DESC, IN_DESC, 0, 0,                             /* CMPPI */
-    IN_DESC, IN_ARG, 0, 0,                              /* CVTPLI */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* MULPI */
-    IN_DESC, IN_DESC, IN_DESC, 0,                       /* DIVPI */
-    IN_DESC, IN_DESC, IN_ARG, 0,                        /* ASHPI */
-    IN_DESC, IN_DESC, 0, 0                              /* CVTLPI */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 000 - 007 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 010 - 017 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* LD2R */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0},                                       /* MOVC */
+    {0, 0, 0, 0},                                       /* MOVRC */
+    {0, 0, 0, 0},                                       /* MOVTC */
+                  {0, 0, 0, 0},                         /* 033 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 034 - 037 */ 
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0},                                       /* LOCC */
+    {0, 0, 0, 0},                                       /* SKPC */
+    {0, 0, 0, 0},                                       /* SCANC */
+    {0, 0, 0, 0},                                       /* SPANC */
+    {0, 0, 0, 0},                                       /* CMPC */
+    {0, 0, 0, 0},                                       /* MATC */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 046 - 047 */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* ADDN */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* SUBN */
+    {R0_DESC, R2_DESC, 0, 0},                           /* CMPN */
+    {R0_DESC, 0, 0, 0},                                 /* CVTNL */
+    {R0_DESC, R2_DESC, 0, 0},                           /* CVTPN */
+    {R0_DESC, R2_DESC, 0, 0},                           /* CVTNP */
+    {R0_DESC, R2_DESC, R4_ARG, 0},                      /* ASHN */
+    {R0_DESC, 0, 0, 0},                                 /* CVTLN */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* LD3R */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* ADDP */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* SUBP */
+    {R0_DESC, R2_DESC, 0, 0},                           /* CMPP */
+    {R0_DESC, 0, 0, 0},                                 /* CVTPL */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* MULP */
+    {R0_DESC, R2_DESC, R4_DESC, 0},                     /* DIVP */
+    {R0_DESC, R2_DESC, R4_ARG, 0},                      /* ASHP */
+    {R0_DESC, 0, 0, 0},                                 /* CVTLP */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 100 - 107 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 110 - 117 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 120 - 127 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* MOVCI */
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* MOVRCI */
+    {IN_DESC, IN_DESC, IN_ARG, IN_ARG},                 /* MOVTCI */
+                  {0, 0, 0, 0},                         /* 133 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 134 - 137 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {IN_DESC, IN_ARG, 0, 0},                            /* LOCCI */
+    {IN_DESC, IN_ARG, 0, 0},                            /* SKPCI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* SCANCI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* SPANCI */
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* CMPCI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* MATCI */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 146 - 147 */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* ADDNI */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* SUBNI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CMPNI */
+    {IN_DESC, IN_ARG, 0, 0},                            /* CVTNLI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CVTPNI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CVTNPI */
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* ASHNI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CVTLNI */
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 160 - 167 */
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {0, 0, 0, 0}, {0, 0, 0, 0},
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* ADDPI */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* SUBPI */
+    {IN_DESC, IN_DESC, 0, 0},                           /* CMPPI */
+    {IN_DESC, IN_ARG, 0, 0},                            /* CVTPLI */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* MULPI */
+    {IN_DESC, IN_DESC, IN_DESC, 0},                     /* DIVPI */
+    {IN_DESC, IN_DESC, IN_ARG, 0},                      /* ASHPI */
+    {IN_DESC, IN_DESC, 0, 0}                            /* CVTLPI */
     };
 
 /* ASCII to overpunch table: sign is <7>, digit is <4:0> */
@@ -321,13 +319,11 @@ static int32 overbin[128] = {
 /* Overpunch to ASCII table: indexed by sign and digit */
 
 static int32 binover[2][16] = {
-    '{', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I',
-    '0', '0', '0', '0', '0', '0',
-    '}', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
-    '0', '0', '0', '0', '0', '0'
+    {'{', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I',
+     '0', '0', '0', '0', '0', '0'},
+    {'}', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
+     '0', '0', '0', '0', '0', '0'}
     };
-
-static unsigned char movbuf[65536];
 
 /* CIS emulator */
 
@@ -342,7 +338,7 @@ uint32 nc, digit, result;
 t_stat st;
 static DSTR accum, src1, src2, dst;
 static DSTR mptable[10];
-static DSTR Dstr1 = { 0, 0x10, 0, 0, 0 };
+static DSTR Dstr1 = { 0, {0x10, 0, 0, 0} };
 
 old_PC = (PC - 2) & 0177777;                            /* original PC */
 op = IR & 0177;                                         /* IR <6:0> */
@@ -1134,7 +1130,7 @@ switch (op) {                                           /* case on opcode */
         result = (A2ADR << 16) | A2LNT;                 /* op in VAX format */
     CVTLx:
         dst = Dstr0;                                    /* clear result */
-        if (dst.sign = GET_SIGN_L (result))
+        if ((dst.sign = GET_SIGN_L (result)))
             result = (~result + 1) & 0xFFFFFFFF;
         for (i = 1; (i < (DSTRLNT * 8)) && result; i++) {
             digit = result % 10;
@@ -1178,7 +1174,7 @@ return SCPE_OK;
 
 int32 ReadDstr (int32 *dscr, DSTR *src, int32 flag)
 {
-int32 c, i, end, lnt, type, t;
+int32 c, i, end, lnt, type, t = 0;
 
 *src = Dstr0;                                           /* clear result */
 type = GET_DTYP (dscr[0]);                              /* get type */
@@ -1267,7 +1263,7 @@ for (i = 0; i < DSTRLNT; i++) {                         /* loop thru value */
         mask = 0xFFFFFFFF;
     if (dst->val[i] & mask)                             /* test for ovflo */
         V = 1;
-    if (dst->val[i] = dst->val[i] & ~mask)              /* test nz */
+    if ((dst->val[i] = dst->val[i] & ~mask))            /* test nz */
         Z = 0;
     }
 dst->sign = dst->sign & ~unsignedtab[type] & ~(Z & ~V);
@@ -1523,7 +1519,7 @@ uint32 NibbleRshift (DSTR *dsrc, int32 sc, uint32 cin)
 {
 int32 i, s, nc;
 
-if (s = sc * 4) {
+if ((s = sc * 4)) {
     for (i = DSTRMAX; i >= 0; i--) {
         nc = (dsrc->val[i] << (32 - s)) & 0xFFFFFFFF;
         dsrc->val[i] = ((dsrc->val[i] >> s) |
@@ -1548,7 +1544,7 @@ int32 i, s;
 uint32 nc, cin;
 
 cin = 0;
-if (s = sc * 4) {
+if ((s = sc * 4)) {
     for (i = 0; i < DSTRLNT; i++) {
         nc = dsrc->val[i] >> (32 - s);
         dsrc->val[i] = ((dsrc->val[i] << s) | cin) & 0xFFFFFFFF;

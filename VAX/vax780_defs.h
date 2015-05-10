@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2014, Robert M Supnik
+   Copyright (c) 2004-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Mar-15    RMS     Added model specific IPR max
+   16-Dec-14    RMS     Removed TQ boot code (780 VMB doesn't support tape boot)
    05-Sep-14    RMS     Fixed SBR test (found by Mark Pizzolato)
    29-Nov-13    RMS     Added system-specific unaligned routines
    12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
@@ -53,8 +55,8 @@
 #define FULL_VAX        1
 #endif
 
-#ifndef _VAX_780_DEFS_H_
-#define _VAX_780_DEFS_H_        1
+#ifndef VAX_780_DEFS_H_
+#define VAX_780_DEFS_H_        1
 
 /* Microcode constructs */
 
@@ -123,6 +125,7 @@
 #define MT_SBITA        53                              /* SBI timeout addr */
 #define MT_SBIQC        54                              /* SBI timeout clear */
 #define MT_MBRK         60                              /* microbreak */
+#define MT_MAX          63                              /* last valid IPR */
 
 /* Machine specific reserved operand tests */
 
@@ -226,7 +229,7 @@
 
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        8                               /* lines per DZV mux */
-#define VH_MUXES        4                               /* max # of DHQ muxes */
+#define VH_MUXES        4                               /* max # of DHU muxes */
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
@@ -410,7 +413,6 @@ typedef struct {
 #define BOOT_HK         1                               /* for VMB */
 #define BOOT_RL         2
 #define BOOT_UDA        17
-#define BOOT_TK         18
 
 /* Function prototypes for virtual memory interface */
 

@@ -89,7 +89,7 @@ int32 used, incr;
 
 if (clk_dev.flags & DEV_DIS)                            /* disabled? */
     return (stop_inst << IOT_V_REASON) | dat;           /* illegal inst */
-used = tmxr_poll - (sim_is_active (&clk_unit) - 1);
+used = tmxr_poll - (sim_activate_time (&clk_unit) - 1);
 incr = (used * CLK_CNTS) / tmxr_poll;
 return clk_cntr + incr;
 }
@@ -101,7 +101,7 @@ t_stat clk_svc (UNIT *uptr)
 if (clk_dev.flags & DEV_DIS)                            /* disabled? */
     return SCPE_OK;
 tmxr_poll = sim_rtcn_calb (CLK_TPS, TMR_CLK);           /* calibrate clock */
-sim_activate (&clk_unit, tmxr_poll);                    /* reactivate unit */
+sim_activate_after (uptr, 1000000/CLK_TPS);             /* reactivate unit */
 clk_cntr = clk_cntr + CLK_CNTS;                         /* incr counter */
 if ((clk_cntr % CLK_C32MS) == 0)                        /* 32ms interval? */
     dev_req_int (clk32ms_sbs);                          /* req intr */
@@ -118,6 +118,7 @@ t_stat clk_reset (DEVICE *dptr)
 {
 if (clk_dev.flags & DEV_DIS) sim_cancel (&clk_unit);    /* disabled? */
 else {
+    sim_register_clock_unit (&clk_unit);                /* declare clock unit */
     tmxr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);
     sim_activate_abs (&clk_unit, tmxr_poll);            /* activate unit */
     }

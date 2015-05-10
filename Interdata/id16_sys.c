@@ -352,9 +352,8 @@ return -1;
 
 t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val)
 {
-uint32 i, j, inst, r1, r2, ea, vp;
+uint32 i, j, inst, r1, r2, ea;
 
-vp = 0;
 inst = val[0];                                          /* first 16b */
 ea = val[1];                                            /* second 16b */
 for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
@@ -570,7 +569,7 @@ return -1;
 t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val)
 {
 uint32 i, j, t, df, db, inst;
-int32 st, r1, r2;
+int32 r1, r2;
 t_stat r;
 char *tptr, gbuf[CBUFSIZE];
 
@@ -627,7 +626,6 @@ switch (j) {                                            /* case on class */
         r = get_addr (gbuf, &tptr, &t, addr);           /* get addr */
         if ((r != SCPE_OK) || (t & 1) || *tptr)         /* error if odd */
             return SCPE_ARG;
-        st = t;                                         /* signed version */
         db = (addr - t) & 0x1F;                         /* back displ */
         df = (t - addr) & 0x1F;                         /* fwd displ */
         if ((t == ((addr - db) & VAMASK16)) &&          /* back work and */

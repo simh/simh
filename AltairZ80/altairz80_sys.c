@@ -1,6 +1,6 @@
 /*  altairz80_sys.c: MITS Altair system interface
 
-    Copyright (c) 2002-2011, Peter Schorn
+    Copyright (c) 2002-2012, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -138,13 +138,13 @@ const char *sim_stop_messages[] = {
 static char *const Mnemonics8080[] = {
 /*  0/8             1/9             2/A             3/B             4/C             5/D             6/E             7/F                         */
     "NOP",          "LXI B,#h",     "STAX B",       "INX B",        "INR B",        "DCR B",        "MVI B,*h",     "RLC",          /*  00-07   */
-    "DB 09h",       "DAD B",        "LDAX B",       "DCX B",        "INR C",        "DCR C",        "MVI C,*h",     "RRC",          /*  08-0f   */
-    "DB 10h",       "LXI D,#h",     "STAX D",       "INX D",        "INR D",        "DCR D",        "MVI D,*h",     "RAL",          /*  10-17   */
-    "DB 18h",       "DAD D",        "LDAX D",       "DCX D",        "INR E",        "DCR E",        "MVI E,*h",     "RAR",          /*  18-1f   */
-    "DB 20h",       "LXI H,#h",     "SHLD #h",      "INX H",        "INR H",        "DCR H",        "MVI H,*h",     "DAA",          /*  20-27   */
-    "DB 28h",       "DAD H",        "LHLD #h",      "DCX H",        "INR L",        "DCR L",        "MVI L,*h",     "CMA",          /*  28-2f   */
-    "DB 30h",       "LXI SP,#h",    "STA #h",       "INX SP",       "INR M",        "DCR M",        "MVI M,*h",     "STC",          /*  30-37   */
-    "DB 38h",       "DAD SP",       "LDA #h",       "DCX SP",       "INR A",        "DCR A",        "MVI A,*h",     "CMC",          /*  38-3f   */
+    "_NOP",         "DAD B",        "LDAX B",       "DCX B",        "INR C",        "DCR C",        "MVI C,*h",     "RRC",          /*  08-0f   */
+    "_NOP",         "LXI D,#h",     "STAX D",       "INX D",        "INR D",        "DCR D",        "MVI D,*h",     "RAL",          /*  10-17   */
+    "_NOP",         "DAD D",        "LDAX D",       "DCX D",        "INR E",        "DCR E",        "MVI E,*h",     "RAR",          /*  18-1f   */
+    "_NOP",         "LXI H,#h",     "SHLD #h",      "INX H",        "INR H",        "DCR H",        "MVI H,*h",     "DAA",          /*  20-27   */
+    "_NOP",         "DAD H",        "LHLD #h",      "DCX H",        "INR L",        "DCR L",        "MVI L,*h",     "CMA",          /*  28-2f   */
+    "_NOP",         "LXI SP,#h",    "STA #h",       "INX SP",       "INR M",        "DCR M",        "MVI M,*h",     "STC",          /*  30-37   */
+    "_NOP",         "DAD SP",       "LDA #h",       "DCX SP",       "INR A",        "DCR A",        "MVI A,*h",     "CMC",          /*  38-3f   */
     "MOV B,B",      "MOV B,C",      "MOV B,D",      "MOV B,E",      "MOV B,H",      "MOV B,L",      "MOV B,M",      "MOV B,A",      /*  40-47   */
     "MOV C,B",      "MOV C,C",      "MOV C,D",      "MOV C,E",      "MOV C,H",      "MOV C,L",      "MOV C,M",      "MOV C,A",      /*  48-4f   */
     "MOV D,B",      "MOV D,C",      "MOV D,D",      "MOV D,E",      "MOV D,H",      "MOV D,L",      "MOV D,M",      "MOV D,A",      /*  50-57   */
@@ -162,13 +162,13 @@ static char *const Mnemonics8080[] = {
     "ORA B",        "ORA C",        "ORA D",        "ORA E",        "ORA H",        "ORA L",        "ORA M",        "ORA A",        /*  b0-b7   */
     "CMP B",        "CMP C",        "CMP D",        "CMP E",        "CMP H",        "CMP L",        "CMP M",        "CMP A",        /*  b8-bf   */
     "RNZ",          "POP B",        "JNZ #h",       "JMP #h",       "CNZ #h",       "PUSH B",       "ADI *h",       "RST 0",        /*  c0-c7   */
-    "RZ",           "RET",          "JZ #h",        "DB CBh",       "CZ #h",        "CALL #h",      "ACI *h",       "RST 1",        /*  c8-cf   */
+    "RZ",           "RET",          "JZ #h",        "_JMP #h",      "CZ #h",        "CALL #h",      "ACI *h",       "RST 1",        /*  c8-cf   */
     "RNC",          "POP D",        "JNC #h",       "OUT *h",       "CNC #h",       "PUSH D",       "SUI *h",       "RST 2",        /*  d0-d7   */
-    "RC",           "DB D9h",       "JC #h",        "IN *h",        "CC #h",        "DB DDh",       "SBI *h",       "RST 3",        /*  d8-df   */
+    "RC",           "_RET",         "JC #h",        "IN *h",        "CC #h",        "_CALL #h",     "SBI *h",       "RST 3",        /*  d8-df   */
     "RPO",          "POP H",        "JPO #h",       "XTHL",         "CPO #h",       "PUSH H",       "ANI *h",       "RST 4",        /*  e0-e7   */
-    "RPE",          "PCHL",         "JPE #h",       "XCHG",         "CPE #h",       "DB EDh",       "XRI *h",       "RST 5",        /*  e8-ef   */
+    "RPE",          "PCHL",         "JPE #h",       "XCHG",         "CPE #h",       "_CALL #h",     "XRI *h",       "RST 5",        /*  e8-ef   */
     "RP",           "POP PSW",      "JP #h",        "DI",           "CP #h",        "PUSH PSW",     "ORI *h",       "RST 6",        /*  f0-f7   */
-    "RM",           "SPHL",         "JM #h",        "EI",           "CM #h",        "DB FDh",       "CPI *h",       "RST 7"         /*  f8-ff   */
+    "RM",           "SPHL",         "JM #h",        "EI",           "CM #h",        "_CALL #h",     "CPI *h",       "RST 7"         /*  f8-ff   */
 };
 
 static char *const MnemonicsZ80[256] = {

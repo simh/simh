@@ -1,6 +1,6 @@
 /* gri_cpu.c: GRI-909 CPU simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -186,10 +186,6 @@ uint32 stop_opr = 1;                                    /* stop ill operator */
 int16 scq[SCQ_SIZE] = { 0 };                            /* PC queue */
 int32 scq_p = 0;                                        /* PC queue ptr */
 REG *scq_r = NULL;                                      /* PC queue reg ptr */
-
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -421,7 +417,7 @@ ao_update ();                                           /* update AO */
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         }
 
@@ -438,11 +434,11 @@ while (reason == 0) {                                   /* loop until halted */
         for (i = 15; i >= 0; i--) {
             if ((t >> i) & 1)
                 break;
-			}
+            }
         if ((i < 0) || ((vec = vec_map[i]) < 0)) {      /* undefined? */
             reason = STOP_ILLINT;                       /* stop */
             break;
-			}
+            }
         dev_done = dev_done & ~INT_ON;                  /* int off */
         M[vec] = SC;                                    /* save SC */
         SC = vec + 1;                                   /* new SC */

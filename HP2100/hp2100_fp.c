@@ -1,6 +1,6 @@
 /* hp2100_fp.c: HP 2100 floating point instructions
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Jan-15    JDB     Made the utility routines static
    21-Jan-08    JDB     Corrected fp_unpack mantissa high-word return
                         (from Mark Pizzolato)
    01-Dec-06    JDB     Reworked FFP helpers for 1000-F support, deleted f_pwr2
@@ -124,11 +125,12 @@ struct ufp {                                            /* unpacked fp */
 
 #define FR_NEG(v)       ((~(v) + 1) & DMASK32)
 
-uint32 UnpackFP (struct ufp *fop, uint32 opnd);
-void NegFP (struct ufp *fop);
-void NormFP (struct ufp *fop);
-uint32 PackFP (struct ufp *fop);
-uint32 StoreFP (struct ufp *fop);
+/* Utility routines */
+
+static uint32 UnpackFP (struct ufp *fop, uint32 opnd);
+static void NormFP (struct ufp *fop);
+static uint32 PackFP (struct ufp *fop);
+static uint32 StoreFP (struct ufp *fop);
 
 /* Floating to integer conversion */
 
@@ -240,7 +242,7 @@ return StoreFP (&res);                                  /* store */
 
 /* Floating point divide - reverse engineered from diagnostic */
 
-uint32 divx (uint32 ba, uint32 dvr, uint32 *rem)
+static uint32 divx (uint32 ba, uint32 dvr, uint32 *rem)
 {
 int32 sdvd = 0, sdvr = 0;
 uint32 q, r;
@@ -295,7 +297,7 @@ return StoreFP (&quo);                                  /* store result */
 
 /* Unpack operand */
 
-uint32 UnpackFP (struct ufp *fop, uint32 opnd)
+static uint32 UnpackFP (struct ufp *fop, uint32 opnd)
 {
 fop->fr = opnd & FP_FR;                                 /* get frac */
 fop->exp = FP_GETEXP (opnd);                            /* get exp */
@@ -305,7 +307,7 @@ return FP_GETSIGN (opnd);                               /* return sign */
 
 /* Normalize unpacked floating point number */
 
-void NormFP (struct ufp *fop)
+static void NormFP (struct ufp *fop)
 {
 if (fop->fr) {                                          /* any fraction? */
     uint32 test = (fop->fr >> 1) & FP_NORM;
@@ -320,7 +322,7 @@ return;
 
 /* Pack fp number */
 
-uint32 PackFP (struct ufp *fop)
+static uint32 PackFP (struct ufp *fop)
 {
 return (fop->fr & FP_FR) |                              /* merge frac */
        ((fop->exp & FP_M_EXP) << FP_V_EXP) |            /* and exp */
@@ -329,7 +331,7 @@ return (fop->fr & FP_FR) |                              /* merge frac */
 
 /* Round fp number, store, generate overflow */
 
-uint32 StoreFP (struct ufp *fop)
+static uint32 StoreFP (struct ufp *fop)
 {
 uint32 sign, svfr, hi, ov = 0;
 

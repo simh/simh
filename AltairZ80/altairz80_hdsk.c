@@ -1,6 +1,6 @@
 /*  altairz80_hdsk.c: simulated hard disk device to increase capacity
 
-    Copyright (c) 2002-2011, Peter Schorn
+    Copyright (c) 2002-2012, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
 
 #include "altairz80_defs.h"
 #include <assert.h>
+#include "sim_imd.h"
 
 /* Debug flags */
 #define READ_MSG    (1 << 0)
@@ -43,6 +44,9 @@ static t_stat show_format(FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat hdsk_reset(DEVICE *dptr);
 static t_stat hdsk_attach(UNIT *uptr, char *cptr);
 static t_stat hdsk_detach(UNIT *uptr);
+static uint32 is_imd(const UNIT *uptr);
+static void assignFormat(UNIT *uptr);
+static void verifyDiskInfo(const DISK_INFO info, const char unitChar);
 
 #define UNIT_V_HDSK_WLK         (UNIT_V_UF + 0) /* write locked                             */
 #define UNIT_HDSK_WLK           (1 << UNIT_V_HDSK_WLK)
@@ -68,6 +72,7 @@ static t_stat hdsk_detach(UNIT *uptr);
 extern uint32 PCX;
 extern REG *sim_PC;
 extern UNIT cpu_unit;
+extern FILE *sim_deb;
 
 extern void install_ALTAIRbootROM(void);
 extern void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
@@ -118,6 +123,7 @@ typedef struct {
 #define SPT16   16
 #define SPT32   32
 #define SPT26   26
+#define SPT52   52
 
 static HDSK_INFO hdsk_info_data = { { 0x0000, 0, 0xFD, 1 } };
 
@@ -126,18 +132,18 @@ static int32 standard8[SPT26]           = { 0,  6,  12, 18, 24, 4,  10, 16,
                                             19, 25, 5,  11, 17, 23, 3,  9,
                                             15, 21                          };
 
-static int32 appple_ii_DOS[SPT16]       = { 0,  6,  12, 3,  9,  15, 14, 5,
+static int32 apple_ii_DOS[SPT16]       = { 0,  6,  12, 3,  9,  15, 14, 5,
                                             11, 2,  8,  7,  13, 4,  10, 1   };
 
-static int32 appple_ii_DOS2[SPT32]      = { 0,  1,  12, 13, 24, 25, 6,  7,
+static int32 apple_ii_DOS2[SPT32]      = { 0,  1,  12, 13, 24, 25, 6,  7,
                                             18, 19, 30, 31, 28, 29, 10, 11,
                                             22, 23, 4,  5,  16, 17, 14, 15,
                                             26, 27, 8,  9,  20, 21, 2,  3   };
 
-static int32 appple_ii_PRODOS[SPT16]    = { 0,  9,  3,  12, 6,  15, 1,  10,
+static int32 apple_ii_PRODOS[SPT16]    = { 0,  9,  3,  12, 6,  15, 1,  10,
                                             4,  13, 7,  8,  2,  11, 5,  14  };
 
-static int32 appple_ii_PRODOS2[SPT32]   = { 0,  1,  18, 19, 6,  7,  24, 25,
+static int32 apple_ii_PRODOS2[SPT32]   = { 0,  1,  18, 19, 6,  7,  24, 25,
                                             12, 13, 30, 31, 2,  3,  20, 21,
                                             8,  9,  26, 27, 14, 15, 16, 17,
                                             4,  5,  22, 23, 10, 11, 28, 29  };
@@ -197,23 +203,64 @@ static DPB dpb[] = {
     { "SSSD8S",  256256,        SPT26,  0x03,   0x07,   0x00,   242,    0x003F,
         0xC0,   0x00,   0x0000, 0x0002, 0x00,   0x00,   0,      0,  standard8 },        /* Standard 8" SS SD with skew  */
 
+    { "SSDD8",  512512,         SPT52,  0x04,   0x0F,   0x01,   242,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x01,   0x01,   0,      0,  NULL },             /* Standard 8" SS DD            */
+    
+    { "SSDD8S", 512512,         SPT52,  0x04,   0x0F,   0x01,   242,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x01,   0x01,   0,      0,  standard8 },        /* Standard 8" SS DD with skew  */
+    
+    { "DSDD8",  1025024,        SPT52,  0x04,   0x0F,   0x00,   493,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x01,   0x01,   0,      0,  NULL },             /* Standard 8" DS DD            */
+    
+    { "DSDD8S", 1025024,        SPT52,  0x04,   0x0F,   0x00,   493,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x01,   0x01,   0,      0,  NULL },             /* Standard 8" DS DD with skew  */
+    
+    {"512SSDD8",591360,         60,     0x04,   0x0F,   0x00,   280,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* Standard 8" SS DD with 512 byte sectors  */
+    
+    {"512DSDD8",1182720,        60,     0x04,   0x0F,   0x00,   569,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* Standard 8" DS DD with 512 byte sectors  */
+ 
+#if 0
+    /* CP/M 3 BIOS currently does not support physical sector size 1024 */
+    {"1024SSDD8",630784,        64,     0x04,   0x0F,   0x00,   299,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x03,   0x07,   0,      0,  NULL },             /* Standard 8" SS DD with 1024 byte sectors  */
+    
+    {"1024DSDD8",1261568,       64,     0x04,   0x0F,   0x00,   607,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x03,   0x07,   0,      0,  NULL },             /* Standard 8" DS DD with 1024 byte sectors  */
+#endif
+    
     { "APPLE-DO",143360,        SPT32,  0x03,   0x07,   0x00,   127,    0x003F,
-        0xC0,   0x00,   0x0000, 0x0003, 0x01,   0x01,   0,      0,  appple_ii_DOS },    /* Apple II DOS 3.3             */
+        0xC0,   0x00,   0x0000, 0x0003, 0x01,   0x01,   0,      0,  apple_ii_DOS },     /* Apple II DOS 3.3             */
 
     { "APPLE-PO",143360,        SPT32,  0x03,   0x07,   0x00,   127,    0x003F,
-        0xC0,   0x00,   0x0000, 0x0003, 0x01,   0x01,   0,      0,  appple_ii_PRODOS }, /* Apple II PRODOS              */
+        0xC0,   0x00,   0x0000, 0x0003, 0x01,   0x01,   0,      0,  apple_ii_PRODOS },  /* Apple II PRODOS              */
 
     { "APPLE-D2",143360,        SPT32,  0x03,   0x07,   0x00,   127,    0x003F,
-        0xC0,   0x00,   0x0000, 0x0003, 0x00,   0x00,   0,      0,  appple_ii_DOS2 },    /* Apple II DOS 3.3, deblocked */
+        0xC0,   0x00,   0x0000, 0x0003, 0x00,   0x00,   0,      0,  apple_ii_DOS2 },    /* Apple II DOS 3.3, deblocked */
 
     { "APPLE-P2",143360,        SPT32,  0x03,   0x07,   0x00,   127,    0x003F,
-        0xC0,   0x00,   0x0000, 0x0003, 0x00,   0x00,   0,      0,  appple_ii_PRODOS2 }, /* Apple II PRODOS, deblocked  */
+        0xC0,   0x00,   0x0000, 0x0003, 0x00,   0x00,   0,      0,  apple_ii_PRODOS2 }, /* Apple II PRODOS, deblocked  */
 
     { "MITS",   337568,         SPT32,  0x03,   0x07,   0x00,   254,    0x00FF,
         0xFF,   0x00,   0x0000, 0x0006, 0x00,   0x00,   137,    3,  mits },             /* MITS Altair original         */
 
     { "MITS2",  1113536,        SPT32,  0x04,   0x0F,   0x00,   0x1EF,  0x00FF,
         0xF0,   0x00,   0x0000, 0x0006, 0x00,   0x00,   137,    3,  mits },             /* MITS Altair original, extra  */
+
+    /*
+     dw     40              ;#128 byte records/track
+     db     4,0fh           ;block shift mask (2K)
+     db     1               ;extent  mask
+     dw     194             ;maximun  block number
+     dw     127             ;max number of dir entry - 1
+     db     0C0H,00h        ;alloc vector for directory
+     dw     0020h           ;checksum size
+     dw     2               ;offset for sys tracks
+     db     2,3             ;physical sector shift (512 sector)
+     */
+    { "V1050",  409600,             40, 0x04,   0x0F,   0x01,   194,    0x007F,
+        0xC0,   0x00,   0x0000, 0x0002, 0x02,   0x03,   0,      0, NULL },              /* Visual Technology Visual 1050, http://www.metabarn.com/v1050/index.html  */
 
     { "", 0 }
 };
@@ -228,6 +275,7 @@ static UNIT hdsk_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) }
 };
+static DISK_INFO* hdsk_imd[HDSK_NUMBER];
 
 static REG hdsk_reg[] = {
     { DRDATA (HDCMD,        hdskLastCommand,        32),    REG_RO  },
@@ -268,9 +316,9 @@ DEVICE hdsk_dev = {
 /* Reset routine */
 static t_stat hdsk_reset(DEVICE *dptr)  {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
-    if (dptr->flags & DEV_DIS) {
+    if (dptr->flags & DEV_DIS)
         sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &hdsk_io, TRUE);
-    } else {
+    else {
         /* Connect HDSK at base address */
         if (sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &hdsk_io, FALSE) != 0) {
             printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
@@ -281,83 +329,156 @@ static t_stat hdsk_reset(DEVICE *dptr)  {
     return SCPE_OK;
 }
 
-/* Attach routine */
-static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
-    t_stat r;
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#endif
+static uint32 is_imd(const UNIT *uptr) {
+    return ((uptr != NULL) && (uptr->filename != NULL) && (strlen(uptr->filename) > 3) &&
+            (strcasecmp(".IMD", uptr->filename + strlen(uptr->filename) - 4) == 0));
+}
+
+static void assignFormat(UNIT *uptr) {
     uint32 i;
-    char unitChar;
-
-    r = attach_unit(uptr, cptr);                        /* attach unit                          */
-    if ( r != SCPE_OK)                                  /* error?                               */
-        return r;
-
-    /* Step 1: Determine capacity of this disk                                                  */
-    uptr -> capac = sim_fsize(uptr -> fileref);         /* the file length is a good indication */
-    if (uptr -> capac == 0) {                           /* file does not exist or has length 0  */
-        uptr -> capac = uptr -> HDSK_NUMBER_OF_TRACKS *
-            uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE;
-        if (uptr -> capac == 0)
-            uptr -> capac = HDSK_CAPACITY;
-    }                                                   /* post condition: uptr -> capac > 0    */
-    assert(uptr -> capac);
-
-    /* Step 2: Determine format based on disk capacity                                          */
-    uptr -> HDSK_FORMAT_TYPE = -1;                      /* default to unknown format type       */
-    for (i = 0; dpb[i].capac != 0; i++) {               /* find disk parameter block            */
-        if (dpb[i].capac == uptr -> capac) {            /* found if correct capacity            */
-            uptr -> HDSK_FORMAT_TYPE = i;
+    uptr->HDSK_FORMAT_TYPE = -1;            /* default to unknown format type       */
+    for (i = 0; dpb[i].capac != 0; i++) {   /* find disk parameter block            */
+        if (dpb[i].capac == uptr->capac) {  /* found if correct capacity            */
+            uptr->HDSK_FORMAT_TYPE = i;
             break;
         }
     }
+}
 
+static void verifyDiskInfo(const DISK_INFO info, const char unitChar) {
+    uint32 track, head;
+    if (info.ntracks < 1)
+        printf("HDSK%c (IMD): WARNING: Number of tracks is 0.\n", unitChar);
+    if (info.nsides < 1) {
+        printf("HDSK%c (IMD): WARNING: Number of sides is 0.\n", unitChar);
+        return;
+    }
+    for (track = 0; track < info.ntracks / info.nsides; track++)
+        for (head = 0; head < info.nsides; head++) {
+            if (info.track[track][head].nsects != info.track[1][0].nsects)
+                printf("HDSK%c (IMD): WARNING: For track %i and head %i expected number of sectors "
+                       "%i but got %i.\n", unitChar, track, head,
+                       info.track[1][0].nsects, info.track[track][head].nsects);
+            if (info.track[track][head].sectsize != info.track[1][0].sectsize)
+                printf("HDSK%c (IMD): WARNING: For track %i and head %i expected sector size "
+                       "%i but got %i.\n", unitChar, track, head,
+                       info.track[1][0].sectsize, info.track[track][head].sectsize);
+            if (info.track[track][head].start_sector != info.track[1][0].start_sector)
+                printf("HDSK%c (IMD): WARNING: For track %i and head %i expected start sector "
+                       "%i but got %i.\n", unitChar, track, head,
+                       info.track[1][0].start_sector, info.track[track][head].start_sector);
+        }
+}
+
+/* Attach routine */
+static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
+    int32 thisUnitIndex;
+    char unitChar;
+    const t_stat r = attach_unit(uptr, cptr);           /* attach unit                          */
+    if (r != SCPE_OK)                                   /* error?                               */
+        return r;
+    
+    assert(uptr != NULL);
+    thisUnitIndex = find_unit_index(uptr);
+    unitChar = '0' + thisUnitIndex;
+    assert((0 <= thisUnitIndex) && (thisUnitIndex < HDSK_NUMBER));
+    
+    if (is_imd(uptr)) {
+        if ((sim_fsize(uptr->fileref) == 0) &&
+            (diskCreate(uptr->fileref, "$Id: SIMH hdsk.c $") != SCPE_OK)) {
+            printf("HDSK%c (IMD): Failed to create IMD disk.\n", unitChar);
+            detach_unit(uptr);
+            return SCPE_OPENERR;
+        }
+        hdsk_imd[thisUnitIndex] = diskOpen(uptr->fileref, sim_deb && (hdsk_dev.dctrl & VERBOSE_MSG));
+        if (hdsk_imd[thisUnitIndex] == NULL)
+            return SCPE_IOERR;
+        verifyDiskInfo(*hdsk_imd[thisUnitIndex], '0' + thisUnitIndex);
+        uptr->HDSK_NUMBER_OF_TRACKS = hdsk_imd[thisUnitIndex]->ntracks;
+        uptr->HDSK_SECTORS_PER_TRACK = hdsk_imd[thisUnitIndex]->track[1][0].nsects;
+        uptr->HDSK_SECTOR_SIZE = hdsk_imd[thisUnitIndex]->track[1][0].sectsize;
+        uptr->capac = ((uptr->HDSK_NUMBER_OF_TRACKS) *
+                         (uptr->HDSK_SECTORS_PER_TRACK) *
+                         (uptr->HDSK_SECTOR_SIZE));
+        assignFormat(uptr);
+        if (uptr->HDSK_FORMAT_TYPE == -1) {           /* Case 1: no disk parameter block found*/
+            uptr->HDSK_FORMAT_TYPE = 0;
+            printf("HDSK%c (IMD): WARNING: Unsupported disk capacity, assuming HDSK type "
+                   "with capacity %iKB.\n", unitChar, uptr->capac / 1000);
+            uptr->flags |= UNIT_HDSK_WLK;
+            printf("HDSK%c (IMD): WARNING: Forcing WRTLCK.\n", unitChar);
+        }
+        return SCPE_OK;
+    }
+    
+    /* Step 1: Determine capacity of this disk                                                  */
+    uptr->capac = sim_fsize(uptr->fileref);             /* the file length is a good indication */
+    if (uptr->capac == 0) {                             /* file does not exist or has length 0  */
+        uptr->capac = (uptr->HDSK_NUMBER_OF_TRACKS *
+                         uptr->HDSK_SECTORS_PER_TRACK * uptr->HDSK_SECTOR_SIZE);
+        if (uptr->capac == 0)
+            uptr->capac = HDSK_CAPACITY;
+    }                                                   /* post condition: uptr->capac > 0      */
+    assert(uptr->capac);
+    
+    /* Step 2: Determine format based on disk capacity                                          */
+    assignFormat(uptr);
+    
     /* Step 3: Set number of sectors per track and sector size                                  */
-    if (uptr -> HDSK_FORMAT_TYPE == -1) {               /* Case 1: no disk parameter block found*/
-        for (i = 0; i < hdsk_dev.numunits; i++)         /* find affected unit number            */
-            if (&hdsk_unit[i] == uptr)
-                break;                                  /* found                                */
-        unitChar = '0' + i;
-        uptr -> HDSK_FORMAT_TYPE = 0;
+    if (uptr->HDSK_FORMAT_TYPE == -1) {                 /* Case 1: no disk parameter block found*/
+        uptr->HDSK_FORMAT_TYPE = 0;
         printf("HDSK%c: WARNING: Unsupported disk capacity, assuming HDSK type with capacity %iKB.\n",
-            unitChar, uptr -> capac / 1000);
-        uptr -> flags |= UNIT_HDSK_WLK;
+               unitChar, uptr->capac / 1000);
+        uptr->flags |= UNIT_HDSK_WLK;
         printf("HDSK%c: WARNING: Forcing WRTLCK.\n", unitChar);
         /* check whether capacity corresponds to setting of tracks, sectors per track and sector size   */
-        if (uptr -> capac != (uint32)(uptr -> HDSK_NUMBER_OF_TRACKS *
-                uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE)) {
+        if (uptr->capac != (uint32)(uptr->HDSK_NUMBER_OF_TRACKS *
+                                      uptr->HDSK_SECTORS_PER_TRACK * uptr->HDSK_SECTOR_SIZE)) {
             printf("HDSK%c: WARNING: Fixing geometry.\n", unitChar);
-            if (uptr -> HDSK_SECTORS_PER_TRACK == 0)
-                uptr -> HDSK_SECTORS_PER_TRACK = 32;
-            if (uptr -> HDSK_SECTOR_SIZE == 0)
-                uptr -> HDSK_SECTOR_SIZE = 128;
+            if (uptr->HDSK_SECTORS_PER_TRACK == 0)
+                uptr->HDSK_SECTORS_PER_TRACK = 32;
+            if (uptr->HDSK_SECTOR_SIZE == 0)
+                uptr->HDSK_SECTOR_SIZE = 128;
         }
     }
     else {  /* Case 2: disk parameter block found                                               */
-        uptr -> HDSK_SECTORS_PER_TRACK  = dpb[uptr -> HDSK_FORMAT_TYPE].spt >> dpb[uptr -> HDSK_FORMAT_TYPE].psh;
-        uptr -> HDSK_SECTOR_SIZE        = (128 << dpb[uptr -> HDSK_FORMAT_TYPE].psh);
+        uptr->HDSK_SECTORS_PER_TRACK  = dpb[uptr->HDSK_FORMAT_TYPE].spt >> dpb[uptr->HDSK_FORMAT_TYPE].psh;
+        uptr->HDSK_SECTOR_SIZE        = (128 << dpb[uptr->HDSK_FORMAT_TYPE].psh);
     }
-    assert((uptr -> HDSK_SECTORS_PER_TRACK) && (uptr -> HDSK_SECTOR_SIZE) && (uptr -> HDSK_FORMAT_TYPE >= 0));
-
+    assert((uptr->HDSK_SECTORS_PER_TRACK) && (uptr->HDSK_SECTOR_SIZE) && (uptr->HDSK_FORMAT_TYPE >= 0));
+    
     /* Step 4: Number of tracks is smallest number to accomodate capacity                       */
-    uptr -> HDSK_NUMBER_OF_TRACKS = (uptr -> capac + uptr -> HDSK_SECTORS_PER_TRACK *
-        uptr -> HDSK_SECTOR_SIZE - 1) / (uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE);
-    assert( ( (t_addr) ((uptr -> HDSK_NUMBER_OF_TRACKS - 1) * uptr -> HDSK_SECTORS_PER_TRACK *
-        uptr -> HDSK_SECTOR_SIZE) < uptr -> capac) &&
-        (uptr -> capac <= (t_addr) (uptr -> HDSK_NUMBER_OF_TRACKS *
-        uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE) ) );
-
+    uptr->HDSK_NUMBER_OF_TRACKS = (uptr->capac + uptr->HDSK_SECTORS_PER_TRACK *
+                                     uptr->HDSK_SECTOR_SIZE - 1) / (uptr->HDSK_SECTORS_PER_TRACK * uptr->HDSK_SECTOR_SIZE);
+    assert( ( (t_addr) ((uptr->HDSK_NUMBER_OF_TRACKS - 1) * uptr->HDSK_SECTORS_PER_TRACK *
+                        uptr->HDSK_SECTOR_SIZE) < uptr->capac) &&
+           (uptr->capac <= (t_addr) (uptr->HDSK_NUMBER_OF_TRACKS *
+                                       uptr->HDSK_SECTORS_PER_TRACK * uptr->HDSK_SECTOR_SIZE) ) );
+    
     return SCPE_OK;
 }
 
 static t_stat hdsk_detach(UNIT *uptr) {
     t_stat result;
+    int32 unitIndex;
     if (uptr == NULL)
         return SCPE_IERR;
+    if (is_imd(uptr)) {
+        unitIndex = find_unit_index(uptr);
+        if (unitIndex == -1)
+            return SCPE_IERR;
+        assert((0 <= unitIndex) && (unitIndex < HDSK_NUMBER));
+        diskClose(&hdsk_imd[unitIndex]);
+    }
     result = detach_unit(uptr);
-    uptr -> capac = HDSK_CAPACITY;
-    uptr -> HDSK_FORMAT_TYPE = 0;
-    uptr -> HDSK_SECTOR_SIZE = 0;
-    uptr -> HDSK_SECTORS_PER_TRACK = 0;
-    uptr -> HDSK_NUMBER_OF_TRACKS = 0;
+    uptr->capac = HDSK_CAPACITY;
+    uptr->HDSK_FORMAT_TYPE = 0;
+    uptr->HDSK_SECTOR_SIZE = 0;
+    uptr->HDSK_SECTORS_PER_TRACK = 0;
+    uptr->HDSK_NUMBER_OF_TRACKS = 0;
     return result;
 }
 
@@ -370,7 +491,7 @@ static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
         return SCPE_ARG;
     if (uptr == NULL)
         return SCPE_IERR;
-    if (((uptr -> flags) & UNIT_ATT) == 0) {
+    if (((uptr->flags) & UNIT_ATT) == 0) {
         printf("Cannot set geometry for not attached unit %i.\n", find_unit_index(uptr));
         return SCPE_ARG;
     }
@@ -380,10 +501,10 @@ static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
         if ((result != 3) || (result == EOF) || (cptr[n] != 0))
             return SCPE_ARG;
     }
-    uptr -> HDSK_NUMBER_OF_TRACKS     = numberOfTracks;
-    uptr -> HDSK_SECTORS_PER_TRACK    = numberOfSectors;
-    uptr -> HDSK_SECTOR_SIZE          = sectorSize;
-    uptr -> capac                     = numberOfTracks * numberOfSectors * sectorSize;
+    uptr->HDSK_NUMBER_OF_TRACKS     = numberOfTracks;
+    uptr->HDSK_SECTORS_PER_TRACK    = numberOfSectors;
+    uptr->HDSK_SECTOR_SIZE          = sectorSize;
+    uptr->capac                     = numberOfTracks * numberOfSectors * sectorSize;
     return SCPE_OK;
 }
 
@@ -391,8 +512,8 @@ static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
 static t_stat show_geom(FILE *st, UNIT *uptr, int32 val, void *desc) {
     if (uptr == NULL)
         return SCPE_IERR;
-    fprintf(st, "T:%d/N:%d/S:%d", uptr -> HDSK_NUMBER_OF_TRACKS,
-        uptr -> HDSK_SECTORS_PER_TRACK, uptr -> HDSK_SECTOR_SIZE);
+    fprintf(st, "T:%d/N:%d/S:%d", uptr->HDSK_NUMBER_OF_TRACKS,
+        uptr->HDSK_SECTORS_PER_TRACK, uptr->HDSK_SECTOR_SIZE);
     return SCPE_OK;
 }
 
@@ -409,21 +530,21 @@ static t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc) {
         return SCPE_IERR;
     if (sscanf(cptr, "%" QUOTE2(DPB_NAME_LENGTH) "s", fmtname) == 0)
         return SCPE_ARG;
-    if (((uptr -> flags) & UNIT_ATT) == 0) {
+    if (((uptr->flags) & UNIT_ATT) == 0) {
         printf("Cannot set format for not attached unit %i.\n", find_unit_index(uptr));
         return SCPE_ARG;
     }
     for (i = 0; dpb[i].capac != 0; i++) {
         if (strncmp(fmtname, dpb[i].name, strlen(fmtname)) == 0) {
-            uptr -> HDSK_FORMAT_TYPE = i;
-            uptr -> capac = dpb[i].capac; /* Set capacity */
+            uptr->HDSK_FORMAT_TYPE = i;
+            uptr->capac = dpb[i].capac; /* Set capacity */
 
             /* Configure physical disk geometry */
-            uptr -> HDSK_SECTOR_SIZE          = (128 << dpb[uptr -> HDSK_FORMAT_TYPE].psh);
-            uptr -> HDSK_SECTORS_PER_TRACK    = dpb[uptr -> HDSK_FORMAT_TYPE].spt >> dpb[uptr -> HDSK_FORMAT_TYPE].psh;
-            uptr -> HDSK_NUMBER_OF_TRACKS     = (uptr -> capac +
-                uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE - 1) /
-                (uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE);
+            uptr->HDSK_SECTOR_SIZE          = (128 << dpb[uptr->HDSK_FORMAT_TYPE].psh);
+            uptr->HDSK_SECTORS_PER_TRACK    = dpb[uptr->HDSK_FORMAT_TYPE].spt >> dpb[uptr->HDSK_FORMAT_TYPE].psh;
+            uptr->HDSK_NUMBER_OF_TRACKS     = (uptr->capac +
+                uptr->HDSK_SECTORS_PER_TRACK * uptr->HDSK_SECTOR_SIZE - 1) /
+                (uptr->HDSK_SECTORS_PER_TRACK * uptr->HDSK_SECTOR_SIZE);
 
             return SCPE_OK;
         }
@@ -435,7 +556,7 @@ static t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc) {
 static t_stat show_format(FILE *st, UNIT *uptr, int32 val, void *desc) {
     if (uptr == NULL)
         return SCPE_IERR;
-    fprintf(st, "%s", dpb[uptr -> HDSK_FORMAT_TYPE].name);
+    fprintf(st, "%s", dpb[uptr->HDSK_FORMAT_TYPE].name);
     return SCPE_OK;
 }
 
@@ -559,40 +680,40 @@ static int32 checkParameters(void) {
                   " Disk %i is not attached.\n", selectedDisk, PCX, selectedDisk);
         return FALSE; /* cannot read or write */
     }
-    if ((selectedSector < 0) || (selectedSector >= uptr -> HDSK_SECTORS_PER_TRACK)) {
+    if ((selectedSector < 0) || (selectedSector >= uptr->HDSK_SECTORS_PER_TRACK)) {
         sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d: " ADDRESS_FORMAT
                   " Constraint violation 0 <= Sector=%02d < %d, will use sector 0 instead.\n",
-                  selectedDisk, PCX, selectedSector, uptr -> HDSK_SECTORS_PER_TRACK);
+                  selectedDisk, PCX, selectedSector, uptr->HDSK_SECTORS_PER_TRACK);
         selectedSector = 0;
     }
-    if ((selectedTrack < 0) || (selectedTrack >= uptr -> HDSK_NUMBER_OF_TRACKS)) {
+    if ((selectedTrack < 0) || (selectedTrack >= uptr->HDSK_NUMBER_OF_TRACKS)) {
         sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d: " ADDRESS_FORMAT
                   " Constraint violation 0 <= Track=%04d < %04d, will use track 0 instead.\n",
-                  selectedDisk, PCX, selectedTrack, uptr -> HDSK_NUMBER_OF_TRACKS);
+                  selectedDisk, PCX, selectedTrack, uptr->HDSK_NUMBER_OF_TRACKS);
         selectedTrack = 0;
     }
     selectedDMA &= ADDRMASK;
     if (hdskLastCommand == HDSK_READ)
         sim_debug(READ_MSG, &hdsk_dev, "HDSK%d " ADDRESS_FORMAT
                   " Read Track=%04d Sector=%02d Len=%04d DMA=%04x\n",
-               selectedDisk, PCX, selectedTrack, selectedSector, uptr -> HDSK_SECTOR_SIZE, selectedDMA);
+               selectedDisk, PCX, selectedTrack, selectedSector, uptr->HDSK_SECTOR_SIZE, selectedDMA);
     if (hdskLastCommand == HDSK_WRITE)
         sim_debug(WRITE_MSG, &hdsk_dev, "HDSK%d " ADDRESS_FORMAT
                   " Write Track=%04d Sector=%02d Len=%04d DMA=%04x\n",
-               selectedDisk, PCX, selectedTrack, selectedSector, uptr -> HDSK_SECTOR_SIZE, selectedDMA);
+               selectedDisk, PCX, selectedTrack, selectedSector, uptr->HDSK_SECTOR_SIZE, selectedDMA);
     return TRUE;
 }
 
 /* pre-condition: checkParameters has been executed to repair any faulty parameters */
 static int32 doSeek(void) {
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
-    int32 hostSector = (dpb[uptr -> HDSK_FORMAT_TYPE].skew == NULL) ?
-        selectedSector : dpb[uptr -> HDSK_FORMAT_TYPE].skew[selectedSector];
-    int32 sectorSize = (dpb[uptr -> HDSK_FORMAT_TYPE].physicalSectorSize == 0) ?
-        uptr -> HDSK_SECTOR_SIZE : dpb[uptr -> HDSK_FORMAT_TYPE].physicalSectorSize;
-    if (sim_fseek(uptr -> fileref,
-        sectorSize * (uptr -> HDSK_SECTORS_PER_TRACK * selectedTrack + hostSector) +
-              dpb[uptr -> HDSK_FORMAT_TYPE].offset, SEEK_SET)) {
+    int32 hostSector = (dpb[uptr->HDSK_FORMAT_TYPE].skew == NULL) ?
+        selectedSector : dpb[uptr->HDSK_FORMAT_TYPE].skew[selectedSector];
+    int32 sectorSize = (dpb[uptr->HDSK_FORMAT_TYPE].physicalSectorSize == 0) ?
+        uptr->HDSK_SECTOR_SIZE : dpb[uptr->HDSK_FORMAT_TYPE].physicalSectorSize;
+    if (sim_fseek(uptr->fileref,
+        sectorSize * (uptr->HDSK_SECTORS_PER_TRACK * selectedTrack + hostSector) +
+              dpb[uptr->HDSK_FORMAT_TYPE].offset, SEEK_SET)) {
         sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d: " ADDRESS_FORMAT
                   " Could not access Sector=%02d[=%02d] Track=%04d.\n",
                   selectedDisk, PCX, selectedSector, hostSector, selectedTrack);
@@ -601,24 +722,59 @@ static int32 doSeek(void) {
     return CPM_OK;
 }
 
-uint8 hdskbuf[HDSK_MAX_SECTOR_SIZE] = { 0 };    /* data buffer  */
+static uint8 hdskbuf[HDSK_MAX_SECTOR_SIZE] = { 0 };    /* data buffer  */
 
 /* pre-condition: checkParameters has been executed to repair any faulty parameters */
 static int32 doRead(void) {
     int32 i;
+    t_stat result;
+    DISK_INFO *thisDisk;
+    int32 hostSector;
+    int32 sectorSize;
+    uint32 flags;
+    uint32 readlen;
+    uint32 cylinder;
+    uint32 head;
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
-    if (doSeek())
-        return CPM_ERROR;
-
-    if (sim_fread(hdskbuf, 1, uptr -> HDSK_SECTOR_SIZE, uptr -> fileref) != (size_t)(uptr -> HDSK_SECTOR_SIZE)) {
-        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++)
-            hdskbuf[i] = CPM_EMPTY;
-        sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d: " ADDRESS_FORMAT
-                  " Could not read Sector=%02d Track=%04d.\n",
-                  selectedDisk, PCX, selectedSector, selectedTrack);
-        return CPM_OK; /* allows the creation of empty hard disks */
+    if (is_imd(uptr)) {
+        thisDisk = hdsk_imd[selectedDisk];
+        hostSector = ((dpb[uptr->HDSK_FORMAT_TYPE].skew == NULL) ?
+                      selectedSector : dpb[uptr->HDSK_FORMAT_TYPE].skew[selectedSector]) + thisDisk->track[1][0].start_sector;
+        sectorSize = ((dpb[uptr->HDSK_FORMAT_TYPE].physicalSectorSize == 0) ?
+                      uptr->HDSK_SECTOR_SIZE :
+                      dpb[uptr->HDSK_FORMAT_TYPE].physicalSectorSize);
+        flags = 0;
+        readlen = 0;
+        cylinder = selectedTrack;
+        head = 0;
+        if (cylinder >= thisDisk->ntracks / thisDisk->nsides) {
+            head = 1;
+            cylinder -= thisDisk->ntracks / thisDisk->nsides;
+        }
+        result = sectRead(thisDisk, cylinder, head, hostSector, hdskbuf, sectorSize,
+                          &flags, &readlen);
+        if (result != SCPE_OK) {
+            for (i = 0; i < uptr->HDSK_SECTOR_SIZE; i++)
+                hdskbuf[i] = CPM_EMPTY;
+            sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d (IMD): " ADDRESS_FORMAT
+                      " . Could not read Sector=%02d Track=%04d.\n",
+                      selectedDisk, PCX, selectedSector, selectedTrack);
+            return CPM_ERROR;
+        }
+    } else {
+        if (doSeek())
+            return CPM_ERROR;
+        
+        if (sim_fread(hdskbuf, 1, uptr->HDSK_SECTOR_SIZE, uptr->fileref) != (size_t)(uptr->HDSK_SECTOR_SIZE)) {
+            for (i = 0; i < uptr->HDSK_SECTOR_SIZE; i++)
+                hdskbuf[i] = CPM_EMPTY;
+            sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d: " ADDRESS_FORMAT
+                      " Could not read Sector=%02d Track=%04d.\n",
+                      selectedDisk, PCX, selectedSector, selectedTrack);
+            return CPM_OK; /* allows the creation of empty hard disks */
+        }
     }
-    for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++)
+    for (i = 0; i < uptr->HDSK_SECTOR_SIZE; i++)
         PutBYTEWrapper(selectedDMA + i, hdskbuf[i]);
     return CPM_OK;
 }
@@ -626,19 +782,54 @@ static int32 doRead(void) {
 /* pre-condition: checkParameters has been executed to repair any faulty parameters */
 static int32 doWrite(void) {
     int32 i;
+    t_stat result;
+    DISK_INFO *thisDisk;
+    int32 hostSector;
+    int32 sectorSize;
+    uint32 flags;
+    uint32 writelen;
+    uint32 cylinder;
+    uint32 head;
     size_t rtn;
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
-    if (((uptr -> flags) & UNIT_HDSK_WLK) == 0) { /* write enabled */
-        if (doSeek())
-            return CPM_ERROR;
-        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++)
-            hdskbuf[i] = GetBYTEWrapper(selectedDMA + i);
-        rtn = sim_fwrite(hdskbuf, 1, uptr -> HDSK_SECTOR_SIZE, uptr -> fileref);
-        if (rtn != (size_t)(uptr -> HDSK_SECTOR_SIZE)) {
-            sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d: " ADDRESS_FORMAT
-                      " Could not write Sector=%02d Track=%04d Result=%zd.\n",
-                      selectedDisk, PCX, selectedSector, selectedTrack, rtn);
-            return CPM_ERROR;
+    if (((uptr->flags) & UNIT_HDSK_WLK) == 0) { /* write enabled */
+        if (is_imd(uptr)) {
+            for (i = 0; i < uptr->HDSK_SECTOR_SIZE; i++)
+                hdskbuf[i] = GetBYTEWrapper(selectedDMA + i);
+            thisDisk = hdsk_imd[selectedDisk];
+            hostSector = ((dpb[uptr->HDSK_FORMAT_TYPE].skew == NULL) ?
+                          selectedSector : dpb[uptr->HDSK_FORMAT_TYPE].skew[selectedSector]) + thisDisk->track[1][0].start_sector;
+            sectorSize = ((dpb[uptr->HDSK_FORMAT_TYPE].physicalSectorSize == 0) ?
+                          uptr->HDSK_SECTOR_SIZE :
+                          dpb[uptr->HDSK_FORMAT_TYPE].physicalSectorSize);
+            flags = 0;
+            writelen = 0;
+            cylinder = selectedTrack;
+            head = 0;
+            if (cylinder >= thisDisk->ntracks / thisDisk->nsides) {
+                head = 1;
+                cylinder -= thisDisk->ntracks / thisDisk->nsides;
+            }
+            result = sectWrite(thisDisk, cylinder, head, hostSector, hdskbuf,
+                               sectorSize, &flags, &writelen);
+            if (result != SCPE_OK) {
+                sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d (IMD): " ADDRESS_FORMAT
+                          " . Could not write Sector=%02d Track=%04d.\n",
+                          selectedDisk, PCX, selectedSector, selectedTrack);
+                return CPM_ERROR;
+            }
+        } else {
+            if (doSeek())
+                return CPM_ERROR;
+            for (i = 0; i < uptr->HDSK_SECTOR_SIZE; i++)
+                hdskbuf[i] = GetBYTEWrapper(selectedDMA + i);
+            rtn = sim_fwrite(hdskbuf, 1, uptr->HDSK_SECTOR_SIZE, uptr->fileref);
+            if (rtn != (size_t)(uptr->HDSK_SECTOR_SIZE)) {
+                sim_debug(VERBOSE_MSG, &hdsk_dev, "HDSK%d: " ADDRESS_FORMAT
+                          " Could not write Sector=%02d Track=%04d Result=%zd.\n",
+                          selectedDisk, PCX, selectedSector, selectedTrack, rtn);
+                return CPM_ERROR;
+            }
         }
     }
     else {
@@ -682,10 +873,10 @@ static int32 hdsk_out(const int32 port, const int32 data) {
             parameterCount = 0;
             thisDisk = (0 <= data) && (data < HDSK_NUMBER) ? data : 0;
             uptr = &hdsk_dev.units[thisDisk];
-            if ((uptr -> flags) & UNIT_ATT) {
-                current = dpb[uptr -> HDSK_FORMAT_TYPE];
-                parameterBlock[17] = uptr -> HDSK_SECTOR_SIZE & 0xff;
-                parameterBlock[18] = (uptr -> HDSK_SECTOR_SIZE >> 8) & 0xff;
+            if ((uptr->flags) & UNIT_ATT) {
+                current = dpb[uptr->HDSK_FORMAT_TYPE];
+                parameterBlock[17] = uptr->HDSK_SECTOR_SIZE & 0xff;
+                parameterBlock[18] = (uptr->HDSK_SECTOR_SIZE >> 8) & 0xff;
             }
             else {
                 current = dpb[0];

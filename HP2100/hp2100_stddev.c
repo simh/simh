@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,8 +26,13 @@
    PTR          12597A-002 paper tape reader interface
    PTP          12597A-005 paper tape punch interface
    TTY          12531C buffered teleprinter interface
-   CLK          12539C time base generator
+   TBG          12539C time base generator
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   28-Dec-12    JDB     Allocate the TBG logical name during power-on reset
+   18-Dec-12    MP      Now calls sim_activate_time to get remaining poll time
+   09-May-12    JDB     Separated assignments from conditional expressions
    12-Feb-12    JDB     Add TBG as a logical name for the CLK device
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
@@ -96,7 +101,7 @@
    idle time.  The console poll is guaranteed to run, as the TTY device cannot
    be disabled.
 
-   The clock (time base generator) autocalibrates.  If the CLK is set to a ten
+   The clock (time base generator) autocalibrates.  If the TBG is set to a ten
    millisecond period (e.g., as under RTE), it is synchronized to the console
    poll.  Otherwise (e.g., as under DOS or TSB, which use 100 millisecond
    periods), it runs asynchronously.  If the specified clock frequency is below
@@ -391,7 +396,7 @@ DEVICE clk_dev = {
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
     &clk_dib, DEV_DISABLE,
-    0, NULL, NULL, "TBG"
+    0, NULL, NULL, NULL
     };
 
 
@@ -607,12 +612,13 @@ const BOOT_ROM ptr_rom = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 dev;
+const int32 dev = ptr_dib.select_code;                  /* get device no */
 
-dev = ptr_dib.select_code;                              /* get device no */
-if (ibl_copy (ptr_rom, dev)) return SCPE_IERR;          /* copy boot to memory */
-SR = (SR & IBL_OPT) | IBL_PTR | (dev << IBL_V_DEV);     /* set SR */
-return SCPE_OK;
+if (ibl_copy (ptr_rom, dev, IBL_OPT,                    /* copy the boot ROM to memory and configure */
+              IBL_PTR | IBL_SET_SC (dev)))              /*   the S register accordingly */
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+else
+    return SCPE_OK;
 }
 
 
@@ -774,7 +780,7 @@ while (working_set) {
 
 
         case ioIOI:                                     /* I/O data input */
-            data = tty_buf;
+            data = (uint16) tty_buf;
 
             if (!(tty_mode & TM_KBD) && sim_is_active (&tty_unit[TTO]))
                 data = data | TP_BUSY;
@@ -942,7 +948,9 @@ t_stat r;
 if (tty_mode & TM_PRI) {                                /* printing? */
     c = sim_tt_outcvt (c, TT_GET_MODE (tty_unit[TTO].flags));
     if (c >= 0) {                                       /* valid? */
-        if (r = sim_putchar_s (c)) return r;            /* output char */
+        r = sim_putchar_s (c);                          /* output char */
+        if (r != SCPE_OK)
+            return r;
         tty_unit[TTO].pos = tty_unit[TTO].pos + 1;
         }
     }
@@ -1018,7 +1026,7 @@ int32 sync_poll (POLLMODE poll_mode)
 int32 poll_time;
 
     if (poll_mode == INITIAL) {
-        poll_time = sim_is_active (&tty_unit[TTI]);
+        poll_time = sim_activate_time (&tty_unit[TTI]);
 
         if (poll_time)
             return poll_time;
@@ -1114,7 +1122,7 @@ while (working_set) {
 
                 if ((clk_unit.flags & UNIT_DIAG) == 0)          /* calibrated? */
                     if (clk_select == 2)                        /* 10 msec. interval? */
-                        clk_tick = sync_poll (INITIAL);         /* sync  poll */
+                        clk_tick = sync_poll (INITIAL);         /* sync poll */
                     else
                         sim_rtcn_init (clk_tick, TMR_CLK);      /* initialize timer */
 
@@ -1187,6 +1195,9 @@ if (sim_switches & SWMASK ('P')) {                      /* initialization reset?
     clk_error = 0;                                      /* clear error */
     clk_select = 0;                                     /* clear select */
     clk_ctr = 0;                                        /* clear counter */
+
+    if (clk_dev.lname == NULL)                          /* logical name unassigned? */
+        clk_dev.lname = strdup ("TBG");                 /* allocate and initialize the name */
     }
 
 IOPRESET (&clk_dib);                                    /* PRESET device (does not use PON) */

@@ -40,7 +40,7 @@
                         SET RLn ONLINE/OFFLINE
                         SET RL RLV11/RLV12 (PDP-11 only)
                         SET RL DEBUG/NODEBUG
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    30-Sep-04    RMS     Revised Unibus interface
@@ -176,7 +176,7 @@ extern UNIT cpu_unit;
 #define  RLCS_WRITE     (5)
 #define  RLCS_READ      (6)
 #define  RLCS_RNOHDR    (7)
-#define	 RLCS_SPECIAL   (8)                             /* internal function, drive state */
+#define  RLCS_SPECIAL   (8)                             /* internal function, drive state */
 #define RLCS_V_FUNC     (1)
 #define RLCS_M_MEX      (03)                            /* memory extension */
 #define RLCS_V_MEX      (4)
@@ -228,20 +228,18 @@ extern UNIT cpu_unit;
 #define RLBAE_IMP       (0000077)                       /* implemented */
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint16 *rlxb = NULL;                                    /* xfer buffer */
 int32 rlcs = 0;                                         /* control/status */
 int32 rlba = 0;                                         /* memory address */
 int32 rlbae = 0;                                        /* mem addr extension */
 int32 rlda = 0;                                         /* disk addr */
-int32 rlmp = 0, rlmp1 = 0, rlmp2 = 0;                   /* mp register queue */
+uint16 rlmp = 0, rlmp1 = 0, rlmp2 = 0;                  /* mp register queue */
 int32 rl_swait = 10;                                    /* seek wait */
 int32 rl_rwait = 10;                                    /* rotate wait */
 int32 rl_stopioe = 1;                                   /* stop on error */
 
 /* forward references */
-DEVICE rl_dev;
 t_stat rl_rd (int32 *data, int32 PA, int32 access);
 t_stat rl_wr (int32 data, int32 PA, int32 access);
 t_stat rl_svc (UNIT *uptr);
@@ -358,11 +356,11 @@ static const char * const state[] = {
 
 /* I/O dispatch routines, I/O addresses 17774400 - 17774411
 
-   17774400	RLCS    read/write
-   17774402	RLBA    read/write
-   17774404	RLDA    read/write
-   17774406	RLMP    read/write
-   17774410	RLBAE   read/write
+   17774400 RLCS    read/write
+   17774402 RLBA    read/write
+   17774404 RLDA    read/write
+   17774406 RLMP    read/write
+   17774410 RLBAE   read/write
 */
 
 t_stat rl_rd (int32 *data, int32 PA, int32 access)
@@ -372,7 +370,7 @@ UNIT *uptr;
 switch ((PA >> 1) & 07) {                               /* decode PA<2:1> */
 
     case 0:                                             /* RLCS */
-	rlcs = (rlcs & ~RLCS_MEX) | ((rlbae & RLCS_M_MEX) << RLCS_V_MEX);
+    rlcs = (rlcs & ~RLCS_MEX) | ((rlbae & RLCS_M_MEX) << RLCS_V_MEX);
 /*
 The DRDY signal is sent by the selected drive to indicate that it
 is ready to read or write or seek.  It is sent when the heads are
@@ -490,7 +488,7 @@ bit is cleared by software.  If set, check for interrupts and return.
             if (newc != curr)
             uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_SEEK; /* move the positioner */
 /* TBD: if a head switch, sector should be RL_NUMSC/2? */
-            uptr->TRK = (newc << RLDA_V_CYL) |		/* put on track */
+            uptr->TRK = (newc << RLDA_V_CYL) |      /* put on track */
                 ((rlda & RLDA_SK_HD)? RLDA_HD1: RLDA_HD0);
 /*
 Real timing:
@@ -519,7 +517,7 @@ max 17ms for 1 track seek w/head switch
             if (rlda & RLDA_GS_CLR)                 /* reset errors? */
                 uptr->STAT &= ~RLDS_ERR;
                 /* develop drive state */
-            rlmp = uptr->STAT | (uptr->TRK & RLDS_HD);
+            rlmp = (uint16)(uptr->STAT | (uptr->TRK & RLDS_HD));
             if (uptr->flags & UNIT_RL02)
                 rlmp |= RLDS_RL02;
             if (uptr->flags & UNIT_WPRT)
@@ -582,7 +580,7 @@ says, bit 0 can be written and read (as 1) on an RLV12 (verified
     case 3:                                             /* RLMP */
         if (access == WRITEB)
             data = (PA & 1)? (rlmp & 0377) | (data << 8): (rlmp & ~0377) | data;
-        rlmp = rlmp1 = rlmp2 = data;
+        rlmp = rlmp1 = rlmp2 = (uint16)data;
         if (DEBUG_PRS (rl_dev))
             fprintf (sim_deb, ">>RL wr: RLMP %06o\n", rlmp);
         break;
@@ -605,7 +603,7 @@ return SCPE_OK;
 }
 
 /* CRC16 as implemented by the DEC 9401 chip */
-static uint32 calcCRC (const int wc, const uint16 *data)
+static uint16 calcCRC (const int wc, const uint16 *data)
 {
     uint32  crc, j, d;
     int32   i;
@@ -620,7 +618,7 @@ static uint32 calcCRC (const int wc, const uint16 *data)
             d >>= 1;
         }
     }
-    return (crc);
+    return (uint16)crc;
 }
 
 /*
@@ -674,12 +672,12 @@ static void rlv_maint (void)
     rlba = ma & RLBA_IMP;                               /* lower 16b */
 
     /* 4: check the CRC of (DAR + 3) */
-    w = rlda;
+    w = (uint16)rlda;
     rlxb[0] = calcCRC (1, &w);                          /* calculate CRC */
     rlda = (rlda & ~0377) | ((rlda + 1) & 0377);
 
     /* 5: check the CRC of (DAR + 4) */
-    w = rlda;
+    w = (uint16)rlda;
     rlxb[1] = calcCRC (1, &w);                          /* calculate CRC */
     rlda = (rlda & ~0377) | ((rlda + 1) & 0377);
 
@@ -759,7 +757,7 @@ was removed in a later ECO.
             uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_BRUSH;
         } else {
             uptr->STAT |= RLDS_BHO;
-			uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_HLOAD;
+            uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_HLOAD;
         }
         sim_activate (uptr, 200 * rl_swait);
         break;
@@ -787,7 +785,7 @@ Initiated by depressing the Run (LOAD) switch.
 */
     case RLDS_UNL:      /* unload pressed, heads unloaded, spin down */
         uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_DOWN;
-        uptr->STAT &= ~RLDS_HDO;	/* retract heads */
+        uptr->STAT &= ~RLDS_HDO;    /* retract heads */
         /* actual time is ~30 seconds */
         sim_activate (uptr, 200 * rl_swait);
         break;
@@ -843,7 +841,7 @@ if (uptr->FNC == RLCS_RNOHDR) {
 } else {
     /* bad cyl or sector? */
     if (((uptr->TRK & RLDA_CYL) != (rlda & RLDA_CYL)) || (GET_SECT (rlda) >= RL_NUMSC)) {
-        rl_set_done (RLCS_ERR | RLCS_HDE | RLCS_INCMP);	/* wrong cylinder? */
+        rl_set_done (RLCS_ERR | RLCS_HDE | RLCS_INCMP); /* wrong cylinder? */
         return (SCPE_OK);
         }
     da = GET_DA (rlda) * RL_NUMWD;                      /* get disk addr */
@@ -1094,7 +1092,7 @@ t_stat rl_show_dstate (FILE *st, UNIT *uptr, int32 val, void *desc)
         (uptr->STAT & RLDS_WGE) ? '1' : '0',
         (uptr->STAT & RLDS_SPE) ? '1' : '0');
     if (uptr->flags & UNIT_ATT) {
-        if ((cnt = sim_is_active (uptr)) != 0)
+        if ((cnt = sim_activate_time (uptr)) != 0)
             fprintf (st, "FNC: %d, %d\n", uptr->FNC, cnt);
         else
             fputs ("FNC: none\n", st);
@@ -1124,8 +1122,8 @@ t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc)
 /* SHOW RL will display the controller type */
 t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-    char    *s = "RLV12";
-	
+    const char *s = "RLV12";
+
     if (UNIBUS)
         s = "RL11";
     else if (rl_dev.flags & DEV_RLV11)
@@ -1188,7 +1186,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)

@@ -104,7 +104,7 @@ uint8 pas_xarm[PAS_LINES];                              /* xmt int armed */
 uint8 pas_rchp[PAS_LINES];                              /* rcvr chr pend */
 uint8 pas_tplte[PAS_LINES * 2 + 1];                     /* template */
 
-TMLN pas_ldsc[PAS_LINES] = { 0 };                       /* line descriptors */
+TMLN pas_ldsc[PAS_LINES] = { {0} };                     /* line descriptors */
 TMXR pas_desc = { 8, 0, 0, pas_ldsc };                  /* mux descriptor */
 #define PAS_ENAB        pas_desc.lines
 
@@ -166,7 +166,7 @@ DEVICE pas_dev = {
     1, 10, 31, 1, 16, 8,
     &tmxr_ex, &tmxr_dep, &pas_reset,
     NULL, &pas_attach, &pas_detach,
-    &pas_dib, DEV_NET | DEV_DISABLE
+    &pas_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* PASL data structures
@@ -335,7 +335,7 @@ if (ln >= 0) {                                          /* got one? */
 tmxr_poll_rx (&pas_desc);                               /* poll for input */
 for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */
     if (pas_ldsc[ln].conn) {                            /* connected? */
-        if (c = tmxr_getc_ln (&pas_ldsc[ln])) {         /* any char? */
+        if ((c = tmxr_getc_ln (&pas_ldsc[ln]))) {       /* any char? */
             pas_sta[ln] = pas_sta[ln] & ~(STA_FR | STA_PF);
             if (pas_rchp[ln])
                 pas_sta[ln] = pas_sta[ln] | STA_OVR;
@@ -527,7 +527,7 @@ if (newln < PAS_ENAB) {
         if (pas_ldsc[i].conn) {
             tmxr_linemsg (&pas_ldsc[i], "\r\nOperator disconnected line\r\n");
             tmxr_reset_ln (&pas_ldsc[i]);               /* reset line */
-			}
+            }
         pasl_unit[i].flags = pasl_unit[i].flags | UNIT_DIS;
         pas_reset_ln (i);
         }

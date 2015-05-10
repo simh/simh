@@ -1,6 +1,6 @@
 /* vax780_sbi.c: VAX 11/780 SBI
 
-   Copyright (c) 2004-2011, Robert M Supnik
+   Copyright (c) 2004-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,10 @@
 
    sbi                  bus controller
 
+   29-Mar-2015  RMS     Added in-exception test to machine check
+   16-Dec-2014  RMS     Removed TQ boot entry (VMB doesn't support tape boot)
    21-Mar-2011  RMS     Added autoreboot capability (Mark Pizzalato)
+   04-Feb-2011  MP      Added RQB, RQC, and RQD as bootable controllers
    31-May-2008  RMS     Fixed machine_check calling sequence (Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
    28-May-2008  RMS     Inlined physical memory routines
@@ -111,7 +114,9 @@ static struct boot_dev boot_tab[] = {
     { "HK", BOOT_HK, 0 },
     { "RL", BOOT_RL, 0 },
     { "RQ", BOOT_UDA, 1 << 24 },
-    { "TQ", BOOT_TK, 1 << 24 },
+    { "RQB", BOOT_UDA, 1 << 24 },
+    { "RQC", BOOT_UDA, 1 << 24 },
+    { "RQD", BOOT_UDA, 1 << 24 },
     { NULL }
     };
 
@@ -125,10 +130,6 @@ extern int32 crd_err, mem_err, hlt_pin;
 extern int32 tmr_int, tti_int, tto_int;
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
-extern CTAB *sim_vm_cmd;
 
 t_stat sbi_reset (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
@@ -137,7 +138,7 @@ t_stat vax780_boot (int32 flag, char *ptr);
 t_stat vax780_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 
-extern t_stat vax780_fload (int flag, char *cptr);
+extern t_stat vax780_fload (int32 flag, char *cptr);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
@@ -488,7 +489,7 @@ return;
         longword of data
 */
 
-int32 ReadReg (int32 pa, int32 lnt)
+int32 ReadReg (uint32 pa, int32 lnt)
 {
 int32 nexus, val;
 
@@ -515,7 +516,7 @@ return 0;
         none
 */
 
-void WriteReg (int32 pa, int32 val, int32 lnt)
+void WriteReg (uint32 pa, int32 val, int32 lnt)
 {
 int32 nexus;
 
@@ -571,6 +572,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 acc, err;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 err = (GET_TRAP (trpirq) << 4) | (pme << 3) | ASTLVL;   /* error word */
 cc = intexc (SCB_MCHK, cc, 0, IE_SVE);                  /* take exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */
@@ -601,9 +604,7 @@ if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
     (reset_all (0) != SCPE_OK) ||                       /* reset the world */
     (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
     ABORT (STOP_BOOT);                                  /* any error? */
-printf ("Rebooting...\n");
-if (sim_log)
-    fprintf (sim_log, "Rebooting...\n");
+sim_printf ("Rebooting...\n");
 return cc;
 }
 
@@ -637,8 +638,10 @@ UNIT *uptr;
 DIB *dibp;
 t_stat r;
 
+if (!ptr || !*ptr)
+    return SCPE_2FARG;
 regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
-if (slptr = strchr (gbuf, '/')) {                       /* found slash? */
+if ((slptr = strchr (gbuf, '/'))) {                     /* found slash? */
     regptr = strchr (ptr, '/');                         /* locate orig */
     *slptr = 0;                                         /* zero in string */
     }
@@ -686,9 +689,7 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
 
-printf ("Loading boot code from vmb.exe\n");
-if (sim_log)
-    fprintf (sim_log, "Loading boot code from vmb.exe\n");
+sim_printf ("Loading boot code from vmb.exe\n");
 r = load_cmd (0, "-O vmb.exe 200");
 if (r != SCPE_OK)
     return r;
@@ -756,9 +757,7 @@ if ((nexusR[idx] && dibp->rd &&                         /* conflict? */
     (nexusR[idx] != dibp->rd)) ||
     (nexusW[idx] && dibp->wr &&
     (nexusW[idx] != dibp->wr))) {
-    printf ("Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
-    if (sim_log)
-        fprintf (sim_log, "Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
+    sim_printf ("Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
     return SCPE_STOP;
     }
 if (dibp->rd)                                           /* set rd dispatch */
@@ -784,15 +783,15 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
         if (dptr->flags & DEV_NEXUS) {                  /* Nexus? */
-            if (r = build_nexus_tab (dptr, dibp))       /* add to dispatch table */
+            if ((r = build_nexus_tab (dptr, dibp)))     /* add to dispatch table */
                 return r;
             }
         else if (dptr->flags & DEV_MBUS) {              /* Massbus? */
-            if (r = build_mbus_tab (dptr, dibp))
+            if ((r = build_mbus_tab (dptr, dibp)))
                 return r;
             }
         else {                                          /* no, Unibus device */
-            if (r = build_ubus_tab (dptr, dibp))        /* add to dispatch tab */
+            if ((r = build_ubus_tab (dptr, dibp)))      /* add to dispatch tab */
                 return r;
             }                                           /* end else */
         }                                               /* end if enabled */

@@ -40,8 +40,8 @@
    30-Apr-02    RMS     Added CLR_TRAPS macro
 */
 
-#ifndef _VAX_DEFS_H
-#define _VAX_DEFS_H     0
+#ifndef VAX_DEFS_H
+#define VAX_DEFS_H     0
 
 #ifndef VM_VAX
 #define VM_VAX          0
@@ -473,7 +473,7 @@
 #define PR_PACV         2                               /* pte ACV (780) */
 #define PR_PLNV         3                               /* pte len viol */
 #define PR_TNV          4                               /* TNV */
-/* #define PR_TB        5                               /* impossible */
+/* #define PR_TB        5                             *//* impossible */
 #define PR_PTNV         6                               /* pte TNV */
 #define PR_OK           7                               /* ok */
 #define MM_PARAM(w,p)   (((w)? 4: 0) | ((p) & 3))       /* fault param */

@@ -56,7 +56,6 @@ extern int32 int_req[IPL_HLVL];
 int32 lpt_csr = 0;                                      /* control/status */
 int32 lpt_stopioe = 0;                                  /* stop on error */
 
-DEVICE lpt_dev;
 t_stat lpt_rd (int32 *data, int32 PA, int32 access);
 t_stat lpt_wr (int32 data, int32 PA, int32 access);
 t_stat lpt_svc (UNIT *uptr);

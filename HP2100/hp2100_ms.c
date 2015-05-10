@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,12 @@
    MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
+                        Added casts for explicit downward conversions
+   11-Dec-14    JDB     Updated for new erase gap API, added CRCC/LRCC support
+   10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
+   09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CNTLR_TYPE cast to ms_settype
    28-Mar-11    JDB     Tidied up signal handling
@@ -90,8 +96,8 @@
 #define UST             u4                              /* unit status */
 #define REEL            u5                              /* tape reel size */
 
-#define BPI_13181       800                             /* 800 bpi for 13181 cntlr */
-#define BPI_13183       1600                            /* 1600 bpi for 13183 cntlr */
+#define BPI_13181       MT_DENS_800                     /* 800 bpi for 13181 cntlr */
+#define BPI_13183       MT_DENS_1600                    /* 1600 bpi for 13183 cntlr */
 #define GAP_13181       48                              /* gap is 4.8 inches for 13181 cntlr */
 #define GAP_13183       30                              /* gap is 3.0 inches for 13183 cntlr */
 #define TCAP            (300 * 12 * 800)                /* 300 ft capacity at 800 bpi */
@@ -184,6 +190,8 @@ struct {
 int32 msd_buf = 0;                                      /* data buffer */
 uint8 msxb[DBSIZE] = { 0 };                             /* data buffer */
 t_mtrlnt ms_ptr = 0, ms_max = 0;                        /* buffer ptrs */
+t_bool ms_crc = FALSE;                                  /* buffer ready for CRC calc */
+
 
 /* Hardware timing at 45 IPS                  13181                  13183
    (based on 1580 instr/msec)          instr   msec    SCP   instr    msec    SCP
@@ -242,6 +250,7 @@ t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc);
 void ms_config_timing (void);
 char *ms_cmd_name (uint32 cmd);
 t_stat ms_clear (void);
+static uint32 calc_crc_lrc (uint8 *buffer, t_mtrlnt length);
 
 
 /* MSD data structures
@@ -374,7 +383,7 @@ DEVICE msc_dev = {
     MS_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &msc_reset,
     &msc_boot, &msc_attach, &msc_detach,
-    &msc_dib, DEV_DISABLE | DEV_DEBUG,
+    &msc_dib, DEV_DISABLE | DEV_DEBUG | DEV_TAPE,
     0, msc_deb, NULL, NULL
     };
 
@@ -383,6 +392,7 @@ DEVICE msc_dev = {
 
 uint32 msdio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
+uint32   check;
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
@@ -408,6 +418,12 @@ while (working_set) {
             break;
 
         case ioIOI:                                     /* I/O data input */
+            if (ms_crc) {                               /* ready for CRC? */
+                check = calc_crc_lrc (msxb, ms_max);    /* calculate CRCC and LRCC */
+                msd_buf = check >> 8 & 0177400          /* position CRCC in upper byte */
+                            | check & 0377;             /*   and LRCC in lower byte */
+                }
+
             stat_data = IORETURN (SCPE_OK, msd_buf);    /* merge in return status */
             break;
 
@@ -427,6 +443,7 @@ while (working_set) {
             break;
 
         case ioSTC:                                     /* set control flip-flop */
+            ms_crc = FALSE;                             /* reset CRC ready */
             msd.control = SET;
             break;
 
@@ -514,10 +531,10 @@ while (working_set) {
 
 
         case ioIOI:                                     /* I/O data input */
-            data = msc_sta & ~STA_DYN;                  /* get card status */
+            data = (uint16) (msc_sta & ~STA_DYN);       /* get card status */
 
             if ((uptr->flags & UNIT_OFFLINE) == 0) {    /* online? */
-                data = data | uptr->UST;                /* add unit status */
+                data = data | (uint16) uptr->UST;       /* add unit status */
 
                 if (sim_tape_bot (uptr))                /* BOT? */
                     data = data | STA_BOT;
@@ -537,7 +554,7 @@ while (working_set) {
                 data = data | STA_TBSY | STA_LOCAL;
 
             if (ms_ctype == A13183)                     /* 13183A? */
-                data = data | STA_PE | (msc_usl << STA_V_SEL);
+                data = data | STA_PE | (uint16) (msc_usl << STA_V_SEL);
 
             if (DEBUG_PRI (msc_dev, DEB_CPU))
                 fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", data);
@@ -630,7 +647,7 @@ while (working_set) {
                     if (DEBUG_PRI (msc_dev, DEB_CMDS))
                         fprintf (sim_deb,
                             ">>MSC STC: Unit %d command %03o (%s) scheduled, "
-                            "pos = %d, time = %d\n",
+                            "pos = %" T_ADDR_FMT "d, time = %d\n",
                             msc_usl, uptr->FNC, ms_cmd_name (uptr->FNC),
                             uptr->pos, sched_time);
                     }
@@ -727,9 +744,10 @@ switch (uptr->FNC) {                                    /* case on function */
             fprintf (sim_deb,
                 ">>MSC svc: Unit %d wrote gap\n",
                 unum);
-        if ((r = ms_write_gap (uptr)) ||                /* write tape gap; error? */
-            (uptr->FNC != FNC_GFM))                     /* not GFM? */
-            break;                                      /* bail out now */
+        r = ms_write_gap (uptr);                        /* write tape gap*/
+
+        if (r || (uptr->FNC != FNC_GFM))                /* if error or not GFM */
+            break;                                      /*   then bail out now */
                                                         /* else drop into WFM */
     case FNC_WFM:                                       /* write file mark */
         if ((ms_timing == 0) && sim_tape_bot (uptr)) {  /* realistic timing + BOT? */
@@ -737,7 +755,8 @@ switch (uptr->FNC) {                                    /* case on function */
                 fprintf (sim_deb,
                     ">>MSC svc: Unit %d wrote initial gap\n",
                     unum);
-            if (st = ms_write_gap (uptr)) {             /* write initial gap; error? */
+            st = ms_write_gap (uptr);                   /* write initial gap*/
+            if (st != MTSE_OK) {                        /* error? */
                 r = ms_map_err (uptr, st);              /* map error */
                 break;                                  /* terminate operation */
                 }
@@ -747,13 +766,15 @@ switch (uptr->FNC) {                                    /* case on function */
             fprintf (sim_deb,
                 ">>MSC svc: Unit %d wrote file mark\n",
                 unum);
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        st = sim_tape_wrtmk (uptr);                     /* write tmk */
+        if (st != MTSE_OK)                              /* error? */
             r = ms_map_err (uptr, st);                  /* map error */
         msc_sta = STA_EOF;                              /* set EOF status */
         break;
 
     case FNC_FSR:                                       /* space forward */
-        if (st = sim_tape_sprecf (uptr, &tbc))          /* space rec fwd, err? */
+        st = sim_tape_sprecf (uptr, &tbc);              /* space rec fwd */
+        if (st != MTSE_OK)                              /* error? */
             r = ms_map_err (uptr, st);                  /* map error */
         if (tbc & 1)
             msc_sta = msc_sta | STA_ODD;
@@ -761,7 +782,8 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     case FNC_BSR:                                       /* space reverse */
-        if (st = sim_tape_sprecr (uptr, &tbc))          /* space rec rev, err? */
+        st = sim_tape_sprecr (uptr, &tbc);              /* space rec rev*/
+        if (st != MTSE_OK)                              /* error? */
             r = ms_map_err (uptr, st);                  /* map error */
         if (tbc & 1)
             msc_sta = msc_sta | STA_ODD;
@@ -815,8 +837,12 @@ switch (uptr->FNC) {                                    /* case on function */
             msc_sta = msc_sta | STA_ODD;
         else msc_sta = msc_sta & ~STA_ODD;
         sim_activate (uptr, msc_itime);                 /* sched IRG */
-        if (uptr->FNC == FNC_RFF) msc_1st = 1;          /* diagnostic? */
-        else uptr->FNC |= FNC_CMPL;                     /* set completion */
+        if (uptr->FNC == FNC_RFF)                       /* diagnostic? */
+            msc_1st = 1;                                /* restart */
+        else {
+            uptr->FNC |= FNC_CMPL;                      /* set completion */
+            ms_crc = TRUE;                              /*   and CRC ready */
+            }
         return SCPE_OK;
 
     case FNC_RFF | FNC_CMPL:                            /* diagnostic read completion */
@@ -831,7 +857,8 @@ switch (uptr->FNC) {                                    /* case on function */
                     fprintf (sim_deb,
                         ">>MSC svc: Unit %d wrote initial gap\n",
                         unum);
-                if (st = ms_write_gap (uptr)) {         /* write initial gap; error? */
+                st = ms_write_gap (uptr);               /* write initial gap */
+                if (st != MTSE_OK) {                    /* error? */
                     r = ms_map_err (uptr, st);          /* map error */
                     break;                              /* terminate operation */
                     }
@@ -839,7 +866,7 @@ switch (uptr->FNC) {                                    /* case on function */
             }
         else {                                          /* not 1st, next char */
             if (ms_ptr < DBSIZE) {                      /* room in buffer? */
-                msxb[ms_ptr] = msd_buf >> 8;            /* store 2 char */
+                msxb[ms_ptr] = (uint8) (msd_buf >> 8);  /* store 2 char */
                 msxb[ms_ptr + 1] = msd_buf & 0377;
                 ms_ptr = ms_ptr + 2;
                 }
@@ -855,13 +882,16 @@ switch (uptr->FNC) {                                    /* case on function */
                 fprintf (sim_deb,
                     ">>MSC svc: Unit %d wrote %d word record\n",
                     unum, ms_ptr / 2);
-            if (st = sim_tape_wrrecf (uptr, msxb, ms_ptr)) {    /* write, err? */
+            st = sim_tape_wrrecf (uptr, msxb, ms_ptr);  /* write */
+            if (st != MTSE_OK) {
                 r = ms_map_err (uptr, st);              /* map error */
                 break;
                 }
             }
         sim_activate (uptr, msc_itime);                 /* sched IRG */
         uptr->FNC |= FNC_CMPL;                          /* set completion */
+        ms_max = ms_ptr;                                /* indicate buffer complete */
+        ms_crc = TRUE;                                  /*   and CRC may be generated */
         return SCPE_OK;
 
     case FNC_WC | FNC_CMPL:                             /* write completion */
@@ -892,9 +922,10 @@ t_stat ms_write_gap (UNIT *uptr)
 {
 t_stat st;
 uint32 gap_len = ms_ctype ? GAP_13183 : GAP_13181;      /* establish gap length */
-uint32 tape_bpi = ms_ctype ? BPI_13183 : BPI_13181;     /* establish nominal bpi */
 
-if (st = sim_tape_wrgap (uptr, gap_len, tape_bpi))      /* write gap */
+st = sim_tape_wrgap (uptr, gap_len);                    /* write gap */
+
+if (st != MTSE_OK)
     return ms_map_err (uptr, st);                       /* map error if failure */
 else
     return SCPE_OK;
@@ -974,7 +1005,9 @@ for (i = 0; i < MS_NUMDR; i++) {                        /* look for write in pro
             fprintf (sim_deb,
                 ">>MSC rws: Unit %d wrote %d word partial record\n", i, ms_ptr / 2);
 
-        if (st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF))
+        st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF);
+
+        if (st != MTSE_OK)
             ms_map_err (uptr, st);                      /* discard any error */
 
         ms_ptr = 0;                                     /* clear partial */
@@ -1015,6 +1048,11 @@ for (i = 0; i < MS_NUMDR; i++) {
     sim_tape_reset (uptr);
     sim_cancel (uptr);
     uptr->UST = 0;
+
+    if (sim_switches & SWMASK ('P'))                    /* if this is an initialization reset */
+        sim_tape_set_dens (uptr,                        /*   then tell the tape library the density in use */
+                           ms_ctype ? BPI_13183 : BPI_13181,
+                           NULL, NULL);
     }
 
 return SCPE_OK;
@@ -1092,6 +1130,10 @@ for (i = 0; i < MS_NUMDR; i++) {
     }
 ms_ctype = (CNTLR_TYPE) val;
 ms_config_timing ();                                    /* update for new type */
+
+sim_tape_set_dens (uptr, ms_ctype ? BPI_13183 : BPI_13181,  /* tell the tape library the density in use */
+                   NULL, NULL);
+
 return SCPE_OK;
 }
 
@@ -1265,12 +1307,66 @@ const BOOT_ROM ms_rom = {
 
 t_stat msc_boot (int32 unitno, DEVICE *dptr)
 {
-int32 dev;
+const int32 dev = msd_dib.select_code;                  /* get data chan device no */
 
-if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
-dev = msd_dib.select_code;                              /* get data chan dev */
-if (ibl_copy (ms_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
-SR = (SR & IBL_OPT) | IBL_MS | (dev << IBL_V_DEV);      /* set SR */
-if ((sim_switches & SWMASK ('S')) && AR) SR = SR | 1;   /* skip? */
+if (unitno != 0)                                        /* boot supported on drive unit 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
+
+if (ibl_copy (ms_rom, dev, IBL_OPT,                     /* copy the boot ROM to memory and configure */
+              IBL_MS | IBL_SET_SC (dev)))               /*   the S register accordingly */   
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+
+if ((sim_switches & SWMASK ('S')) && AR)                /* if -S is specified and the A register is non-zero */
+    SR = SR | 1;                                        /*   then set to skip to the file number in A */
+
 return SCPE_OK;
+}
+
+/* Calculate tape record CRC and LRC characters */
+
+#define E               0400                            /* parity bit for odd parity */
+#define O               0000                            /* parity bit for odd parity */
+
+static const uint16 odd_parity [256] = {                /* parity table */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 000-017 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 020-037 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 040-067 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 060-077 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 100-117 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 120-137 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 140-157 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 160-177 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 200-217 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 220-237 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 240-267 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 260-277 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 300-317 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 320-337 */
+    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 340-357 */
+    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E      /* 360-377 */
+    };
+
+static uint32 calc_crc_lrc (uint8 *buffer, t_mtrlnt length)
+{
+uint32 i;
+uint16 byte, crc, lrc;
+
+lrc = crc = 0;
+
+for (i = 0; i < length; i++) {
+    byte = odd_parity [buffer [i]] | buffer [i];
+
+    crc = crc ^ byte;
+    lrc = lrc ^ byte;
+
+    if (crc & 1)
+        crc = crc >> 1 ^ 0474;
+    else
+        crc = crc >> 1;
+    }
+
+crc = crc ^ 0727;
+lrc = lrc ^ crc;
+
+return (uint32) crc << 16 | lrc;
 }

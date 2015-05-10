@@ -126,7 +126,6 @@ uint8 rx_buf[RX_NUMBY] = { 0 };                         /* sector buffer */
 int32 rx_bptr = 0;                                      /* buffer pointer */
 int32 rx_enb = 1;                                       /* device enable */
 
-DEVICE rx_dev;
 t_stat rx_rd (int32 *data, int32 PA, int32 access);
 t_stat rx_wr (int32 data, int32 PA, int32 access);
 t_stat rx_svc (UNIT *uptr);
@@ -351,7 +350,7 @@ switch (rx_state) {                                     /* case on state */
         break;
 
     case FILL:                                          /* fill buffer */
-        rx_buf[rx_bptr] = rx_dbr;                       /* write next */
+        rx_buf[rx_bptr] = (uint8)rx_dbr;                /* write next */
         rx_bptr = rx_bptr + 1;
         if (rx_bptr < RX_NUMBY)                         /* more? set xfer */
             rx_csr = rx_csr | RXCS_TR;
@@ -524,7 +523,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rx_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)

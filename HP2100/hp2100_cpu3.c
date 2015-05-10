@@ -1,6 +1,6 @@
 /* hp2100_cpu3.c: HP 2100/1000 FFP/DBI instructions
 
-   Copyright (c) 2005-2008, J. David Bryan
+   Copyright (c) 2005-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    CPU3         Fast FORTRAN and Double Integer instructions
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   09-May-12    JDB     Separated assignments from conditional expressions
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    05-Aug-08    JDB     Updated mp_dms_jmp calling sequence
@@ -185,17 +187,23 @@ int32 i;
 entry = IR & 037;                                       /* mask to entry point */
 
 if (UNIT_CPU_MODEL != UNIT_1000_F) {                    /* 2100/M/E-Series? */
-    if (op_ffp_e[entry] != OP_N)
-        if (reason = cpu_ops (op_ffp_e[entry], op, intrq))  /* get instruction operands */
-            return reason;
+    if (op_ffp_e [entry] != OP_N) {
+        reason = cpu_ops (op_ffp_e [entry], op, intrq); /* get instruction operands */
+
+        if (reason != SCPE_OK)                          /* evaluation failed? */
+            return reason;                              /* return reason for failure */
+        }
     }
 
 #if defined (HAVE_INT64)                                /* int64 support available */
 
 else {                                                  /* F-Series */
-    if (op_ffp_f[entry] != OP_N)
-        if (reason = cpu_ops (op_ffp_f[entry], op, intrq))  /* get instruction operands */
-            return reason;
+    if (op_ffp_f [entry] != OP_N) {
+        reason = cpu_ops (op_ffp_f [entry], op, intrq); /* get instruction operands */
+
+        if (reason != SCPE_OK)                          /* evaluation failed? */
+            return reason;                              /* return reason for failure */
+        }
 
     switch (entry) {                                    /* decode IR<4:0> */
 
@@ -417,7 +425,8 @@ switch (entry) {                                        /* decode IR<4:0> */
             sa = op[0].word - 1;
 
         da = ReadW (sa);                                /* get jump target */
-        if (reason = resolve (da, &MA, intrq)) {        /* resolve indirects */
+        reason = resolve (da, &MA, intrq);              /* resolve indirects */
+        if (reason != SCPE_OK) {                        /* resolution failed? */
             PC = err_PC;                                /* irq restarts instruction */
             break;
             }
@@ -435,7 +444,8 @@ switch (entry) {                                        /* decode IR<4:0> */
             op[1].word = op[1].word +                   /* compute element offset */
                          (op[2].word - 1) * op[3].word;
         else {                                          /* 3-dim access */
-            if (reason = cpu_ops (OP_KK, op2, intrq)) { /* get 1st, 2nd ranges */
+            reason = cpu_ops (OP_KK, op2, intrq);       /* get 1st, 2nd ranges */
+            if (reason != SCPE_OK) {                    /* evaluation failed? */
                 PC = err_PC;                            /* irq restarts instruction */
                 break;
                 }
@@ -461,15 +471,16 @@ switch (entry) {                                        /* decode IR<4:0> */
 
         for (j = 0; j < sc; j++) {
             MA = ReadW (sa++);                          /* get addr of actual */
-            if (reason = resolve (MA, &MA, intrq)) {    /* resolve indirect */
+            reason = resolve (MA, &MA, intrq);          /* resolve indirect */
+            if (reason != SCPE_OK) {                    /* resolution failed? */
                 PC = err_PC;                            /* irq restarts instruction */
                 break;
                 }
             WriteW (da++, MA);                          /* put addr into formal */
             }
 
-        AR = ra;                                        /* return address */
-        BR = da;                                        /* addr of 1st unused formal */
+        AR = (uint16) ra;                               /* return address */
+        BR = (uint16) da;                               /* addr of 1st unused formal */
         break;
 
     case 024:                                           /* .ENTP 105224 (OP_A) */
@@ -508,8 +519,8 @@ switch (entry) {                                        /* decode IR<4:0> */
             BR = (BR + 1) & VAMASK;                     /* incr address */
             op[0].word = op[0].word - 1;                /* decr count */
             if (op[0].word && intrq) {                  /* more and intr? */
-                AR = sa;                                /* restore A */
-                BR = sb;                                /* restore B */
+                AR = (uint16) sa;                       /* restore A */
+                BR = (uint16) sb;                       /* restore B */
                 PC = err_PC;                            /* restart instruction */
                 break;
                 }
@@ -643,9 +654,11 @@ t_stat reason = SCPE_OK;
 
 entry = IR & 017;                                       /* mask to entry point */
 
-if (op_dbi[entry] != OP_N)
-    if (reason = cpu_ops (op_dbi[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_dbi[entry] != OP_N) {
+    reason = cpu_ops (op_dbi [entry], op, intrq);       /* get instruction operands */
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<3:0> */
 
@@ -713,10 +726,10 @@ switch (entry) {                                        /* decode IR<3:0> */
                     t = (rh << 16) | (rl & 0xFFFF);     /* combine partials */
                 }
 
-            if (O)
-                t = ~SIGN32;                            /* if overflow, rtn max pos */
-            else if (sign)
-                t = ~t + 1;                             /* if result neg, 2s compl */
+            if (O)                                      /* if overflow occurred */
+                t = ~SIGN32;                            /*   then return the largest positive number */
+            else if (sign)                              /* otherwise if the result is negative */
+                t = ~t + 1;                             /*   then return the twos complement (set if O = 0 above) */
 
 #endif                                                  /* end of int64 support */
 

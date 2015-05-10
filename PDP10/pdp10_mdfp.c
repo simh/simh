@@ -119,14 +119,14 @@ typedef struct {                                        /* unpacked fp number */
 #define FP_BIAS         0200                            /* exponent bias */
 #define FP_N_FHI        27                              /* # of hi frac bits */
 #define FP_V_FHI        0                               /* must be zero */
-#define FP_M_FHI        0000777777777
+#define FP_M_FHI        INT64_C(0000777777777)
 #define FP_N_EXP        8                               /* # of exp bits */
 #define FP_V_EXP        (FP_V_FHI + FP_N_FHI)
 #define FP_M_EXP        0377
 #define FP_V_SIGN       (FP_V_EXP + FP_N_EXP)           /* sign */
 #define FP_N_FLO        35                              /* # of lo frac bits */
 #define FP_V_FLO        0                               /* must be zero */
-#define FP_M_FLO        0377777777777
+#define FP_M_FLO        INT64_C(0377777777777)
 #define GET_FPSIGN(x)   ((int32) (((x) >> FP_V_SIGN) & 1))
 #define GET_FPEXP(x)    ((int32) (((x) >> FP_V_EXP) & FP_M_EXP))
 #define GET_FPHI(x)     ((x) & FP_M_FHI)
@@ -141,14 +141,14 @@ typedef struct {                                        /* unpacked fp number */
 #define FP_V_URNDS      (FP_V_UFHI - 1)                 /* sp round bit */
 #define FP_V_UCRY       (FP_V_UFHI + FP_N_FHI)          /* <63> */
 #define FP_V_UNORM      (FP_V_UCRY - 1)                 /* normalized bit */
-#define FP_UFHI         0x7FFFFFF000000000
-#define FP_UFLO         0x0000000FFFFFFFFE
-#define FP_UFRAC        0x7FFFFFFFFFFFFFFE
-#define FP_URNDD        0x0000000000000001
-#define FP_URNDS        0x0000000800000000
-#define FP_UNORM        0x4000000000000000
-#define FP_UCRY         0x8000000000000000
-#define FP_ONES         0xFFFFFFFFFFFFFFFF
+#define FP_UFHI         INT64_C(0x7FFFFFF000000000)
+#define FP_UFLO         INT64_C(0x0000000FFFFFFFFE)
+#define FP_UFRAC        INT64_C(0x7FFFFFFFFFFFFFFE)
+#define FP_URNDD        INT64_C(0x0000000000000001)
+#define FP_URNDS        INT64_C(0x0000000800000000)
+#define FP_UNORM        INT64_C(0x4000000000000000)
+#define FP_UCRY         INT64_C(0x8000000000000000)
+#define FP_ONES         INT64_C(0xFFFFFFFFFFFFFFFF)
 
 #define UNEG(x)         ((~x) + 1)
 #define DUNEG(x)        x.flo = UNEG (x.flo); x.fhi = ~x.fhi + (x.flo == 0)
@@ -493,7 +493,7 @@ if (a.fhi >= 2 * b.fhi) {                               /* will divide work? */
     SETF (F_AOV | F_DCK | F_FOV | F_T1);
     return FALSE;
     }
-if (savhi = a.fhi) {                                    /* dvd = 0? quo = 0 */
+if ((savhi = a.fhi)) {                                  /* dvd = 0? quo = 0 */
     a.sign = a.sign ^ b.sign;                           /* result sign */
     a.exp = a.exp - b.exp + FP_BIAS + 1;                /* result exponent */
     a.fhi = a.fhi / (b.fhi >> (FP_N_FHI + 1));          /* do divide */
@@ -728,7 +728,7 @@ if (r->sign) {
             r->fhi = r->fhi | FP_UCRY;
         else {
             r->exp = r->exp + 1;
-            r->fhi = FP_UCRY | FP_UNORM;
+            r->fhi = (t_uint64)(FP_UCRY | FP_UNORM);
             }
         }
     else {                                              /* abs frac */
@@ -756,7 +756,7 @@ static int32 normtab[7] = { 1, 2, 4, 8, 16, 32, 63 };
 extern a10 pager_PC;
 
 if (a->fhi & FP_UCRY) {                                 /* carry set? */
-    printf ("%%PDP-10 FP: carry bit set at normalization, PC = %o\n", pager_PC);
+    sim_printf ("%%PDP-10 FP: carry bit set at normalization, PC = %o\n", pager_PC);
     a->flo = (a->flo >> 1) | ((a->fhi & 1) << 63);      /* try to recover */
     a->fhi = a->fhi >> 1;                               /* but root cause */
     a->exp = a->exp + 1;                                /* should be fixed! */
@@ -803,7 +803,7 @@ if (r->sign) {                                          /* negate? */
     if (fdvneg) {                                       /* fdvr special? */
         val[1] = ~val[1] & MMASK;                       /* 1's comp */
         val[0] = ~val[0] & DMASK;
-		}
+        }
     else {                                              /* 2's comp */
         DMOVN (val);
         }

@@ -669,12 +669,11 @@ return -3;
 
 t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val)
 {
-uint32 i, j, df, db, t, inst, vp;
+uint32 i, j, df, db, t, inst;
 int32 st, r1, r2, rx2;
 t_stat r;
 char *tptr, gbuf[CBUFSIZE];
 
-vp = 0;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL)

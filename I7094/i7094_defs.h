@@ -33,8 +33,8 @@
 
 */
 
-#ifndef _I7094_DEFS_H_
-#define _I7094_DEFS_H_  0
+#ifndef I7094_DEFS_H_
+#define I7094_DEFS_H_  0
 
 #include "sim_defs.h"                                   /* simulator defns */
 
@@ -124,25 +124,25 @@ typedef struct {
 
 /* Integer */
 
-#define DMASK           0777777777777                   /* data mask */
-#define SIGN            0400000000000                   /* sign */
-#define MMASK           0377777777777                   /* magnitude mask */
-#define LMASK           0777777000000                   /* left mask */
-#define RMASK           0000000777777                   /* right mask */
-#define PMASK           0700000000000                   /* prefix */
-#define XMASK           0077777000000                   /* decrement */
-#define TMASK           0000000700000                   /* tag */
-#define AMASK           0000000077777                   /* address */
-#define SCMASK          0000000000377                   /* shift count mask */
-#define B1              0200000000000                   /* bit 1 */
-#define B9              0000400000000                   /* bit 9 */
+#define DMASK           INT64_C(0777777777777)          /* data mask */
+#define SIGN            INT64_C(0400000000000)          /* sign */
+#define MMASK           INT64_C(0377777777777)          /* magnitude mask */
+#define LMASK           INT64_C(0777777000000)          /* left mask */
+#define RMASK           INT64_C(0000000777777)          /* right mask */
+#define PMASK           INT64_C(0700000000000)          /* prefix */
+#define XMASK           INT64_C(0077777000000)          /* decrement */
+#define TMASK           INT64_C(0000000700000)          /* tag */
+#define AMASK           INT64_C(0000000077777)          /* address */
+#define SCMASK          INT64_C(0000000000377)          /* shift count mask */
+#define B1              INT64_C(0200000000000)          /* bit 1 */
+#define B9              INT64_C(0000400000000)          /* bit 9 */
 
 /* Accumulator is actually 38b wide */
 
-#define AC_S            02000000000000                  /* sign */
-#define AC_Q            01000000000000                  /* Q */
-#define AC_P            00400000000000                  /* P */
-#define AC_MMASK        01777777777777                  /* Q+P+magnitude */
+#define AC_S            INT64_C(02000000000000)         /* sign */
+#define AC_Q            INT64_C(01000000000000)         /* Q */
+#define AC_P            INT64_C(00400000000000)         /* P */
+#define AC_MMASK        INT64_C(01777777777777)         /* Q+P+magnitude */
 
 /* Floating point */
 
@@ -159,8 +159,8 @@ typedef struct {
 
 /* Instruction format */
 
-#define INST_T_DEC      0300000000000                   /* if nz, takes decr */
-#define INST_T_CXR1     0000000100000                   /* if nz, update XR1 */
+#define INST_T_DEC      INT64_C(0300000000000)          /* if nz, takes decr */
+#define INST_T_CXR1     INT64_C(0000000100000)          /* if nz, update XR1 */
 #define INST_V_OPD      33                              /* decrement opcode */
 #define INST_M_OPD      07
 #define INST_V_DEC      18                              /* decrement */
@@ -177,8 +177,8 @@ typedef struct {
 #define INST_M_TAG      07
 #define INST_V_ADDR     0
 #define INST_M_ADDR     077777
-#define INST_V_4B		0
-#define INST_M_4B		017
+#define INST_V_4B        0
+#define INST_M_4B        017
 
 #define GET_OPD(x)      ((uint32) (((x) >> INST_V_OPD) & INST_M_OPD))
 #define GET_DEC(x)      ((uint32) (((x) >> INST_V_DEC) & INST_M_DEC))
@@ -419,8 +419,8 @@ typedef struct {
 #define CHF_V_LCC       30                              /* loop ctrl counter */
 #define CHF_M_LCC       077
 
-#define CHF_CLR_7909    07775000177                     /* 7909 clear flags */
-#define CHF_SDC_7909    07777600000                     /* 7909 SDC flags */
+#define CHF_CLR_7909    INT64_C(07775000177)            /* 7909 clear flags */
+#define CHF_SDC_7909    INT64_C(07777600000)            /* 7909 SDC flags */
 
 /* Channel characteristics (in dev.flags) */
 

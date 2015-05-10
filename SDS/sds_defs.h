@@ -1,4 +1,4 @@
-/* sds_defs.h: SDS 940 simulator definitions 
+/* sds_defs.h: SDS 940 simulator definitions
 
    Copyright (c) 2001-2010, Robert M. Supnik
 
@@ -27,8 +27,8 @@
    25-Apr-03    RMS     Revised for extended file support
 */
 
-#ifndef _SDS_DEFS_H_
-#define _SDS_DEFS_H_    0
+#ifndef SDS_DEFS_H_
+#define SDS_DEFS_H_    0
 
 #include "sim_defs.h"                                   /* simulator defns */
 
@@ -48,10 +48,15 @@
 #define STOP_EXULIM     8                               /* EXU limit */
 #define STOP_MMINT      9                               /* mm in intr */
 #define STOP_MMTRP      10                              /* mm in trap */
-#define STOP_TRPINS     11                              /* trap inst not BRM */
-#define STOP_RTCINS     12                              /* rtc inst not MIN/SKR */
+#define STOP_TRPINS     11                              /* trap inst not BRM or BRU */
+#define STOP_RTCINS     12                              /* rtc inst not MIN or SKR */
 #define STOP_ILLVEC     13                              /* zero vector */
 #define STOP_CCT        14                              /* runaway CCT */
+#define STOP_MBKPT      15                              /* monitor-mode breakpoint */
+#define STOP_NBKPT      16                              /* normal-mode breakpoint */
+#define STOP_UBKPT      17                              /* user-mode breakpoint */
+#define STOP_DBKPT      18                              /* step-over (dynamic) breakpoint */
+
 
 /* Trap codes */
 
@@ -77,6 +82,13 @@
                         ((x) & DMASK)))
 #define SXT_EXP(x)      ((int32) (((x) & EXPS)? ((x) | ~EXPMASK): \
                         ((x) & EXPMASK)))
+
+/* CPU modes */
+
+#define NML_MODE        0
+#define MON_MODE        1
+#define USR_MODE        2
+#define BAD_MODE        3
 
 /* Memory */
 

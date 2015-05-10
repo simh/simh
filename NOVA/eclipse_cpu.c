@@ -3,7 +3,7 @@
    Modified from the original NOVA simulator by Robert Supnik.
 
    Copyright (c) 1998-2012, Charles E Owen
-   Portions Copyright (c) 1993-2002, Robert M Supnik
+   Portions Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
 
    cpu          Eclipse central processor
 
+   30-Mar-15    RMS     Fixed typo in DIVS
    25-Mar-12    RMS     Fixed declarations (Mark Pizzolato)
    07-Jun-06    RMS     Fixed bug in DIVS (Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
@@ -495,9 +496,6 @@ FILE *Trace;
 
 
 t_stat reason;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern DEVICE *sim_devices[];
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -515,9 +513,6 @@ int32 GetMap(int32 addr);
 int32 PutMap(int32 addr, int32 data);
 int32 Debug_Entry(int32 PC, int32 inst, int32 inst2, int32 AC0, int32 AC1, int32 AC2, int32 AC3, int32 flags);
 t_stat build_devtab (void);
-
-extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 /* CPU data structures
 
@@ -699,7 +694,6 @@ DEVICE pit_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 register int32 PC, IR, i, t, MA, j, k, tac;
 register uint32 mddata, uAC0, uAC1, uAC2, uAC3;
 int16 sAC0, sAC1, sAC2;
@@ -744,7 +738,7 @@ if (MapInit == 0) {
 
 while (reason == 0) {                                   /* loop until halted */
 if (sim_interval <= 0) {                                /* check clock queue */
-    if (reason = sim_process_event ()) 
+    if ((reason = sim_process_event ())) 
         break;
 }
 
@@ -1666,7 +1660,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         continue;
     }
     if (IR == 0157710) {                                /* DIVS: Signed Divide */
-        if ((AC[0] == 0) ||
+        if ((AC[2] == 0) ||
             ((AC[0] == 0100000) && (AC[1] == 0) && (AC[2] == 0177777)))
             C = 0200000;
         else {
@@ -5932,7 +5926,7 @@ static const int32 boot_rom[] = {
 
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];

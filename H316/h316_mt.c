@@ -25,6 +25,7 @@
 
    mt           516-4100 seven track magnetic tape
 
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    09-Jun-07    RMS     Fixed bug in write without stop (Theo Engel)
    16-Feb-06    RMS     Added tape capacity checking
@@ -119,7 +120,7 @@ void mt_wrwd (UNIT *uptr, uint32 dat);
    mt_mod       MT modifier list
 */
 
-DIB mt_dib = { MT, IOBUS, MT_NUMDR, &mtio };
+DIB mt_dib = { MT, MT_NUMDR, IOBUS, IOBUS, INT_V_MT, INT_V_NONE, &mtio, 0 };
 
 UNIT mt_unit[] = {
     { UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) },
@@ -371,17 +372,17 @@ switch (uptr->FNC) {                                    /* case on function */
         return SCPE_OK;
 
     case FNC_WEOF:                                      /* write file mark */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;                                          /* sched end motion */
 
     case FNC_FSR:                                       /* space fwd rec */
-        if (st = sim_tape_sprecf (uptr, &tbc))          /* space fwd, err? */
+        if ((st = sim_tape_sprecf (uptr, &tbc)))        /* space fwd, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;                                          /* sched end motion */
 
     case FNC_BSR:                                       /* space rev rec */
-        if (st = sim_tape_sprecr (uptr, &tbc))          /* space rev, err? */
+        if ((st = sim_tape_sprecr (uptr, &tbc)))        /* space rev, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;                                          /* sched end motion */
 
@@ -455,7 +456,7 @@ switch (uptr->FNC) {                                    /* case on function */
                 mt_wrwd (uptr, mt_buf);
             else mt_rdy = 0;                            /* rdy must be clr */
             if (mt_ptr) {                               /* any data? */
-                if (st = sim_tape_wrrecf (uptr, mtxb, mt_ptr))  /* write, err? */
+                if ((st = sim_tape_wrrecf (uptr, mtxb, mt_ptr)))/* write, err? */
                     r = mt_map_err (uptr, st);          /* map error */
                 }
             break;                                      /* sched end motion */

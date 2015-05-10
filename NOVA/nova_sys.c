@@ -79,9 +79,6 @@ extern int32 MapStat;
 
 #endif
 
-extern int32 sim_switches;
-
-
 /* SCP data structures
 
    sim_name             simulator name string
@@ -179,11 +176,11 @@ internal state machine:
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-int32	data, csum, count, state, i;
-int32	origin;
-int	pos ;
-int	block_start ;
-int	done ;
+int32 data, csum, count, state, i;
+int32 origin;
+int pos ;
+int block_start ;
+int done ;
 
 if ((*cptr != 0) || (flag != 0))
     return ( SCPE_ARG ) ;
@@ -226,11 +223,11 @@ for ( pos = 0 ; (! done) && ((i=getc(fileref)) != EOF) ; ++pos )
                 /*  do any auto-start check or inhibit check  */
                 saved_PC = (origin & 077777) ;              /*  0B0 = auto-start program    */
                                                             /*  1B0 = do not auto start */
-                state	= 0 ;                               /*  indicate okay state */
-                done	= 1 ;                               /*  we're done! */
+                state = 0 ;                                 /*  indicate okay state */
+                done = 1 ;                                  /*  we're done! */
                 if ( ! (origin & 0x8000) )
                     {
-                    printf( "auto start @ %05o \n", (origin & 0x7FFF) ) ;
+                    sim_printf( "auto start @ %05o \n", (origin & 0x7FFF) ) ;
                     }
                 break ;
                 }
@@ -278,8 +275,8 @@ for ( pos = 0 ; (! done) && ((i=getc(fileref)) != EOF) ; ++pos )
             if (count == 0) {
                 if ( csum )
                     {
-                    printf( "checksum error: block start at %d [0x%x] \n", block_start, block_start ) ;
-                    printf( "calculated: 0%o [0x%4x]\n", csum, csum ) ;
+                    sim_printf( "checksum error: block start at %d [0x%x] \n", block_start, block_start ) ;
+                    sim_printf( "calculated: 0%o [0x%4x]\n", csum, csum ) ;
                     if ( ! (sim_switches & SWMASK('I')) )
                         return SCPE_CSUM;
                     }

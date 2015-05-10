@@ -168,7 +168,7 @@ DEVICE mt_dev = {
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     &mt_boot, &mt_attach, NULL,
-    &mt_dib, DEV_DISABLE
+    &mt_dib, DEV_DISABLE | DEV_TAPE
     };
 
 /* Mag tape routine
@@ -235,14 +235,14 @@ switch (fnc) {                                          /* case function */
     case IO_DISC:                                       /* disconnect */
         sim_cancel (uptr);                              /* no more xfr's */
         if (inst & DEV_OUT) {                           /* write? */
-            if (r = mt_wrend (inst))                    /* end record */
+            if ((r = mt_wrend (inst)))                  /* end record */
                 return r;
             }
         break;
 
     case IO_WREOR:                                      /* write eor */
         chan_set_flag (mt_dib.chan, CHF_EOR);           /* set eor flg */
-        if (r = mt_wrend (inst))                        /* end record */
+        if ((r = mt_wrend (inst)))                      /* end record */
             return r;
         mt_gap = 1;                                     /* in gap */
         sim_activate (uptr, mt_gtime);                  /* start timer */        

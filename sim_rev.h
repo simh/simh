@@ -28,15 +28,63 @@
 #define _SIM_REV_H_     0
 
 #define SIM_MAJOR       3
-#define SIM_MINOR       9
+#define SIM_MINOR       10
 #define SIM_PATCH       0
 #define SIM_DELTA       0
+
+/* V3.10 revision history
+
+   V3.10 backports an enormous number of modules and features from
+   the SimH 4.x master branch, as well as some unique new features.
+   The revision history will be restarted with patch level 1.
+
+patch   date            module(s) and fix(es)
+
+  0     tbd             scp.c and supporting libraries
+                        - added sim_printf
+                        - added v4 compatibility macros
+
+                        All simulator families
+                        - revised to use sim_printf
+
+                        Eclipse/Nova
+                        - fixed bug in Eclipse signed divide
+                        - revised to use sim_printf
+
+                        H316
+                        - numerous fixes from Bob Armstrong
+
+                        HP2100
+                        - latest version from Dave Bryan
+
+                        i1401
+                        - read cards from and print to the console window
+
+                        i1620
+                        - numerous fixes from Tom McBride and Bob Armstrong
+
+                        PDP8
+                        - added multi-segment loader and new breakpoints
+                          from Dave Gesswein
+
+                        PDP10
+                        - numerous fixes from Tim Litt
+
+                        PDP11
+                        - fixes to CR11
+
+                        SDS
+                        - bug fixes from ???
+
+                        VAX
+                        - minor modularization improvements per 4.X
+*/
 
 /* V3.9 revision history
 
 patch   date            module(s) and fix(es)
 
-  1     tbd             sim_console.h, sim_console.c:
+  1     not released    sim_console.h, sim_console.c:
                         - added tab stop routines
   
                         h316_stddev.c:
@@ -46,6 +94,9 @@ patch   date            module(s) and fix(es)
                         - added symbolic names for IO devices
                         - fixed handling of SMK and OTK
   
+                        i1401_cpu.c:
+                        - fixed treatment of overflow (Ken Shirriff)
+
                         i1401_lp.c:
                         - fixed printer chain selection
 
@@ -57,8 +108,12 @@ patch   date            module(s) and fix(es)
                         - fixed end of line processing on read (Bob Armstrong)
 
                         1620_cpu.c:
+                        - fixed compare flows (Tom McBride)
                         - fixed several bugs in add and compare (Bob Armstrong)
                         - fixed handling of P field in K instruction (Bob Armstrong)
+
+                        1620_fp.c:
+                        - revised for simplified add_field
 
                         i1620_lp.c:
                         - fixed DN wraparound (Bob Armstrong)
@@ -174,10 +229,15 @@ patch   date            module(s) and fix(es)
                         - added support for unaligned register space references
 
                         vax780_defs.h, vaxmod_defs.h:
+                        - removed boot code for TQ (tape boot not supported)
                         - fixed base address for RQB, RQC, RQD
+                        - reverted broken MBZ test for 11/780
 
                         vax780_mba.c:
                         - block interrupt if data transfer in progress (Mark Pizzolato)
+
+                        vax780_sbi.c:
+                        - removed boot table entry for TQ (tape boot not supported)
 
 
   0     01-May-2012     scp.c:
@@ -352,7 +412,7 @@ patch   date            module(s) and fix(es)
 
                         pdp11_io.c:
                         - fixed Qbus interrupts to treat all IO devices (except clock) as BR4
-			            - fixed order of int_internal (Jordi Guillaumes i Pons)
+                        - fixed order of int_internal (Jordi Guillaumes i Pons)
 
                         ppd11_rf.c
                         - fixed bug in updating mem addr extension (Peter Schorn)
@@ -380,6 +440,7 @@ patch   date            module(s) and fix(es)
                         
                         pdp11_ts.c:
                         - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
+                        - fixed bug in read forward byte swapped (Mark Pizzolato)
 
                         pdp11_tu.c:
                         - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)

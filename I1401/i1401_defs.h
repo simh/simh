@@ -39,8 +39,8 @@
    in answering questions, gathering source material, and debugging.
 */
 
-#ifndef _I1401_DEFS_H_
-#define _I1401_DEFS_H_  0
+#ifndef I1401_DEFS_H_
+#define I1401_DEFS_H_  0
 
 #include "sim_defs.h"
 

@@ -44,7 +44,6 @@ extern DEVICE lpt_dev;
 extern DEVICE clk_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE rl_dev;
-extern DEVICE ry_dev;
 extern DEVICE ts_dev;
 extern DEVICE tq_dev;
 extern DEVICE dz_dev;
@@ -52,7 +51,6 @@ extern DEVICE csi_dev, cso_dev;
 extern DEVICE xq_dev, xqb_dev;
 extern DEVICE vh_dev;
 
-extern int32 sim_switches;
 extern void WriteB (uint32 pa, int32 val);
 extern void rom_wr_B (int32 pa, int32 val);
 extern UNIT cpu_unit;
@@ -78,7 +76,6 @@ DEVICE *sim_devices[] = {
     &rqb_dev,
     &rqc_dev,
     &rqd_dev,
-    &ry_dev,
     &ts_dev,
     &tq_dev,
     &xq_dev,

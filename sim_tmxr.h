@@ -1,6 +1,6 @@
 /* sim_tmxr.h: terminal multiplexor definitions
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   14-Dec-14    JDB     [4.0] Added include of "sim_sock.h" for SOCKET, etc.
    20-Nov-08    RMS     Added three new standardized SHOW routines
    27-May-08    JDB     Added lnorder to TMXR structure,
                         added tmxr_set_lnorder and tmxr_set_lnorder
@@ -40,8 +41,10 @@
                         added tmxr_rqln, tmxr_tqln
 */
 
-#ifndef _SIM_TMXR_H_
-#define _SIM_TMXR_H_    0
+#ifndef SIM_TMXR_H_
+#define SIM_TMXR_H_     0
+
+#include "sim_sock.h"
 
 #define TMXR_V_VALID    15
 #define TMXR_VALID      (1 << TMXR_V_VALID)

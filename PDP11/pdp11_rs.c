@@ -60,7 +60,7 @@
 
 #define UNIT_V_DTYPE    (UNIT_V_UF + 0)                 /* disk type */
 #define RS03_DTYPE       (0)
-#define RS04_DTYPE	     (1)
+#define RS04_DTYPE         (1)
 #define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
 #define UNIT_V_WLK      (UNIT_V_UF + 2)                 /* write lock */
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
@@ -172,8 +172,6 @@ static const char *rs_fname[CS1_N_FNC] = {
     "20", "21", "22", "23", "WRCHK", "25", "26", "27",
     "WRITE", "31", "32", "33", "READ", "35", "36", "37"
     };
-
-extern FILE *sim_deb;
 
 t_stat rs_mbrd (int32 *data, int32 ofs, int32 drv);
 t_stat rs_mbwr (int32 data, int32 ofs, int32 drv);
@@ -328,7 +326,6 @@ return SCPE_OK;
 
 t_stat rs_mbwr (int32 data, int32 ofs, int32 drv)
 {
-int32 dtype;
 UNIT *uptr;
 
 uptr = rs_dev.units + drv;                              /* get unit */
@@ -339,7 +336,6 @@ if ((ofs != RS_AS_OF) && sim_is_active (uptr)) {        /* unit busy? */
     rs_update_ds (0, drv);
     return SCPE_OK;
     }
-dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 ofs = ofs & MBA_RMASK;                                  /* mask offset */
 
 switch (ofs) {                                          /* decode PA<5:1> */
@@ -351,7 +347,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
         break;  
 
     case RS_DA_OF:                                      /* RSDA */
-        rsda[drv] = data;
+        rsda[drv] = (uint16)data;
         break;
 
     case RS_AS_OF:                                      /* RSAS */
@@ -359,7 +355,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
         break;
 
     case RS_MR_OF:                                      /* RSMR */
-        rsmr[drv] = data;
+        rsmr[drv] = (uint16)data;
         break;
 
     case RS_ER_OF:                                      /* RSER */
@@ -380,7 +376,7 @@ return SCPE_OK;
 
 t_stat rs_go (int32 drv)
 {
-int32 fnc, dtype, t;
+int32 fnc, t;
 UNIT *uptr;
 
 fnc = GET_FNC (rscs1[drv]);                             /* get function */
@@ -389,7 +385,6 @@ if (DEBUG_PRS (rs_dev))
              drv, rs_fname[fnc], rsds[drv], rsda[drv], rser[drv]);
 uptr = rs_dev.units + drv;                              /* get unit */
 rs_clr_as (AS_U0 << drv);                               /* clear attention */
-dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 if ((fnc != FNC_DCLR) && (rsds[drv] & DS_ERR)) {        /* err & ~clear? */
     rs_set_er (ER_ILF, drv);                            /* not allowed */
     rs_update_ds (DS_ATA, drv);                         /* set attention */
@@ -513,7 +508,7 @@ switch (fnc) {                                          /* case on function */
         da = da + wc + (RS_NUMWD (dtype) - 1);
         if (da >= RS_SIZE (dtype))
             rsds[drv] = rsds[drv] | DS_LST;
-        rsda[drv] = da / RS_NUMWD (dtype);
+        rsda[drv] = (uint16)(da / RS_NUMWD (dtype));
         mba_set_don (rs_dib.ba);                        /* set done */
         rs_update_ds (0, drv);                          /* update ds */
         break;
@@ -630,7 +625,6 @@ return SCPE_OK;
 t_stat rs_detach (UNIT *uptr)
 {
 int32 drv;
-extern int32 sim_is_running;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
@@ -686,9 +680,8 @@ static const uint16 boot_rom[] = {
 
 t_stat rs_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern uint16 *M;
-UNIT *uptr = rs_dev.units + unitno;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

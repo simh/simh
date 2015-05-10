@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-4/7/9/15 central processor
 
+   28-Mar-15    RMS     Revised to use sim_printf
    28-Apr-07    RMS     Removed clock initialization
    26-Dec-06    RMS     Fixed boundary test in KT15/XVM (Andrew Warkentin)
    30-Oct-06    RMS     Added idle and infinite loop detection
@@ -379,13 +380,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 
-extern int32 sim_int_char;
-extern int32 sim_interval;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
-
 t_bool build_dev_tab (void);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -604,7 +598,7 @@ while (reason == 0) {                                   /* loop until halted */
     int32 link_init, fill;
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         api_int = api_eval (&int_pend);                 /* eval API */
         }
@@ -734,7 +728,7 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
     if (!usmd_defer)                                    /* no IOT? load usmd */
         usmd = usmd_buf;
     else usmd_defer = 0;                                /* cancel defer */
@@ -2058,15 +2052,15 @@ if (MMR & MM_RDIS)                                      /* reloc disabled? */
 else if ((MMR & MM_SH) &&                               /* shared enabled and */
     (ma >= g_base[gmode]) &&                            /* >= shared base and */
     (ma < (g_base[gmode] + slr_lnt[slr]))) {            /* < shared end? */
-	if (ma & 017400) {									/* ESAS? */
-		if ((rc == REL_W) && (MMR & MM_WP)) {			/* write and protected? */
-			prvn = trap_pending = 1;					/* set flag, trap */
-			return -1;
-			}
-		pa = (((MMR & MM_SBR_MASK) << 8) + ma) & DMASK; /* ESAS reloc */
-		}
-	else pa = RR + (ma & 0377);							/* no, ISAS reloc */
-	}
+    if (ma & 017400) {                                  /* ESAS? */
+        if ((rc == REL_W) && (MMR & MM_WP)) {           /* write and protected? */
+            prvn = trap_pending = 1;                    /* set flag, trap */
+            return -1;
+            }
+        pa = (((MMR & MM_SBR_MASK) << 8) + ma) & DMASK; /* ESAS reloc */
+        }
+    else pa = RR + (ma & 0377);                         /* no, ISAS reloc */
+    }
 else {
     if (ma > (BR | 0377)) {                             /* normal reloc, viol? */
         if (rc != REL_C)                                /* set flag, trap */
@@ -2255,10 +2249,10 @@ static const uint8 std_dev[] =
 for (i = 0; i < DEV_MAX; i++) {                         /* clr tables */
     dev_tab[i] = NULL;
     dev_iors[i] = NULL;
-	}
+    }
 for (i = 0; i < ((uint32) sizeof (std_dev)); i++)       /* std entries */
     dev_tab[std_dev[i]] = &bad_dev;
-for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices */
+for (i = p = 0; (dptr = sim_devices[i]) != NULL; i++) { /* add devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* enabled? */
         if (dibp->iors)                                 /* if IORS, add */
@@ -2266,11 +2260,8 @@ for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices *
         for (j = 0; j < dibp->num; j++) {               /* loop thru disp */
             if (dibp->dsp[j]) {                         /* any dispatch? */
                 if (dev_tab[dibp->dev + j]) {           /* already filled? */
-                    printf ("%s device number conflict at %02o\n",
+                    sim_printf ("%s device number conflict at %02o\n",
                             sim_dname (dptr), dibp->dev + j);
-                    if (sim_log)
-                        fprintf (sim_log, "%s device number conflict at %02o\n",
-                                 sim_dname (dptr), dibp->dev + j);
                     return TRUE;
                     }
                 dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
@@ -2321,8 +2312,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[2];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

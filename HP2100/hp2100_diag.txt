@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2012-03-30
+                             Last update: 2014-12-18
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -2481,7 +2481,7 @@ CONFIGURATION:  sim> detach MSC0
 
                 HALT instruction 102074
 
-                sim> deposit S 000217
+                sim> deposit S 000017
                 sim> reset
                 sim> go
 
@@ -2605,10 +2605,9 @@ TEST REPORT:    7970-13181 DIAG.
 
 TEST RESULT:    Partially passed.
 
-TEST NOTES:     Test 23 verifies the LRCC and CRCC values obtained from the
-                interface.  These features are not simulated.  (Setting bit 7 of
-                the S register during configuration eliminates most LRCC/CRCC
-                checks but does not inhibit test 23.)
+TEST NOTES:     Test 23 performs a reverse record read to verify the CRCC and
+                LRCC values obtained from the record.  This feature is not
+                simulated.
 
                 If test 34 is selected manually, E065 WRITE ERROR will occur.
                 This is due to the implementation of the tape simulation

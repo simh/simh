@@ -44,9 +44,9 @@ extern REG cpu_reg[];
 extern unsigned char M[];
 extern int32 saved_PC, IAR[];
 extern unsigned char ebcdic_to_ascii[];
-char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype);
+char *parse_addr(char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype);
 
-int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
+int32 printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw);
 
 /* SCP data structures
@@ -122,81 +122,81 @@ const char *sim_stop_messages[] = {
 
 int32 nopcode = 75;
 struct opdef opcode[75] = {
-    "HPL",  0x00,0,0,0,                                 /* Halt Program Level */
-    "A",    0x06,0,1,3,                                 /* Add to Register: A R,AADD */
-    "ST",   0x04,0,1,3,                                 /* Store Register */
-    "L",    0x05,0,1,3,                                 /* Load Register */
-    "LA",   0x02,0,1,1,                                 /* Load Address */
-    "ZAZ",  0x04,0,2,2,                                 /* Zero and Add Zoned */
-    "AZ",   0x06,0,2,2,                                 /* Add Zoned Decimal */
-    "SZ",   0x07,0,2,2,                                 /* Subtract Zoned Decimal */
-    "ALC",  0x0E,0,2,2,                                 /* Add Logical:  ALC BADD,AADD,LEN */
-    "SLC",  0x0F,0,2,2,                                 /* Sub Logical:  SLC BADD,AADD,LEN */
-    "MVC",  0x0C,0,2,2,                                 /* Move Chars MVX BADD,AADD,LEN */
-    "ED",   0x0A,0,2,2,                                 /* Edit: ED BADD,AADD,LEN */
-    "ITC",  0x0B,0,2,2,                                 /* Insert Chars: ITC BADD,AADD,LEN */
-    "CLC",  0x0D,0,2,2,                                 /* Compare Logical: CLC BADD,AADD,LEN */
-    "MVI",  0x0C,0,3,3,                                 /* Move Immediate */
-    "SBN",  0x0A,0,3,3,                                 /* Set Bits On */
-    "SBF",  0x0B,0,3,3,                                 /* Set Bits Off */
-    "CLI",  0x0D,0,3,3,                                 /* Compare Immediate */
-    "TBN",  0x08,0,3,3,                                 /* Test Bits On */
-    "TBF",  0x09,0,3,3,                                 /* Test Bits Off */
-    "APL",  0x01,0,4,0,                                 /* Advance Program Level */
-    "SIO",  0x03,0,5,0,                                 /* Start I/O */
-    "SNS",  0x00,0,6,3,                                 /* Sense I/O */
-    "LIO",  0x01,0,6,3,                                 /* Load I/O */
-    "TIO",  0x01,0,6,1,                                 /* Test I/O */
-    "J",    0x02,0,7,0,                                 /* Jump Unconditional */
-    "J",    0x02,0x87,7,0,                              /* Alternate J */
-    "JH",   0x02,132,7,0,                               /* Jump if High */
-    "JL",   0x02,130,7,0,                               /* Jump if Low */
-    "JE",   0x02,129,7,0,                               /* Jump if Equal */
-    "JNH",  0x02,4,7,0,                                 /* Jump if Not High */
-    "JNL",  0x02,2,7,0,                                 /* Jump if Not Low */
-    "JNE",  0x02,1,7,0,                                 /* Jump if Not Equal */
-    "JOZ",  0x02,136,7,0,                               /* Jump if Overflow Zoned */
-    "JOL",  0x02,160,7,0,                               /* Jump if Overflow Logical */
-    "JNOZ", 0x02,8,7,0,                                 /* Jump if No Overflow Zoned */
-    "JNOL", 0x02,32,7,0,                                /* Jump if No Overflow Logical */
-    "JT",   0x02,16,7,0,                                /* Jump if True */
-    "JF",   0x02,144,7,0,                               /* Jump if False */
-    "JP",   0x02,132,7,0,                               /* Jump if Plus */
-    "JM",   0x02,130,7,0,                               /* Jump if Minus */
-    "JZ",   0x02,129,7,0,                               /* Jump if Zero */
-    "JNP",  0x02,4,7,0,                                 /* Jump if Not Plus */
-    "JNM",  0x02,2,7,0,                                 /* Jump if Not Minus */
-    "JNZ",  0x02,1,7,0,                                 /* Jump if Not Zero */
-    "NOPJ", 0x02,0x80,7,0,                              /* Never Jump - NOP */
-    "B",    0x00,0x00,8,1,                              /* Branch Unconditional */
-    "B",    0x00,0x87,8,1,                              /* Alternate B */
-    "BH",   0x00,0x84,8,1,                              /* Branch if High */
-    "BL",   0x00,0x82,8,1,                              /* Branch if Low */
-    "BE",   0x00,0x81,8,1,                              /* Branch if Equal */
-    "BNH",  0x00,0x04,8,1,                              /* Branch if Not High */
-    "BNL",  0x00,0x02,8,1,                              /* Branch if Not Low */
-    "BNE",  0x00,0x01,8,1,                              /* Branch if Not Equal */
-    "BOZ",  0x00,0x88,8,1,                              /* Branch if Overflow Zoned */
-    "BOL",  0x00,0xA0,8,1,                              /* Branch if Overflow Logical */
-    "BNOZ", 0x00,0x08,8,1,                              /* Branch if No Overflow Zoned */
-    "BNOL", 0x00,0x20,8,1,                              /* Branch if No Overflow Logical */
-    "BT",   0x00,0x10,8,1,                              /* Branch if True */
-    "BF",   0x00,0x90,8,1,                              /* Branch if False */
-    "BP",   0x00,0x84,8,1,                              /* Branch if Plus */
-    "BM",   0x00,0x82,8,1,                              /* Branch if Minus */
-    "BZ",   0x00,0x81,8,1,                              /* Branch if Zero */
-    "BNP",  0x00,0x04,8,1,                              /* Branch if Not Plus */
-    "BNM",  0x00,0x02,8,1,                              /* Branch if Not Minus */
-    "BNZ",  0x00,0x01,8,1,                              /* Branch if Not Zero */
-    "NOPB", 0x00,0x80,8,1,                              /* Never Branch - NOP */
-    "MZZ",  0x08,0,9,2,                                 /* Move Zone to Zone */
-    "MNZ",  0x08,1,9,2,                                 /* Move Numeric to Zone */
-    "MZN",  0x08,2,9,2,                                 /* Move Zone to Numeric */
-    "MNN",  0x08,3,9,2,                                 /* Move Numeric to Numeric */
-    "MVX",  0x08,0,2,2,                                 /* Move Hex: MVX BADD,AADD,CODE */
-    "JC",   0x02,0,3,0,                                 /* Jump on Specified Condition bits */
-    "BC",   0x00,0,3,1,                                 /* Branch on Specified Condition */
-    "***",  0x00,0,0,0
+    {"HPL",  0x00,0,0,0},                                /** Halt Program Level */
+    {"A",    0x06,0,1,3},                                /** Add to Register: A R,AADD */
+    {"ST",   0x04,0,1,3},                                /** Store Register */
+    {"L",    0x05,0,1,3},                                /** Load Register */
+    {"LA",   0x02,0,1,1},                                /** Load Address */
+    {"ZAZ",  0x04,0,2,2},                                /** Zero and Add Zoned */
+    {"AZ",   0x06,0,2,2},                                /** Add Zoned Decimal */
+    {"SZ",   0x07,0,2,2},                                /** Subtract Zoned Decimal */
+    {"ALC",  0x0E,0,2,2},                                /** Add Logical:  ALC BADD,AADD,LEN */
+    {"SLC",  0x0F,0,2,2},                                /** Sub Logical:  SLC BADD,AADD,LEN */
+    {"MVC",  0x0C,0,2,2},                                /** Move Chars MVX BADD,AADD,LEN */
+    {"ED",   0x0A,0,2,2},                                /** Edit: ED BADD,AADD,LEN */
+    {"ITC",  0x0B,0,2,2},                                /** Insert Chars: ITC BADD,AADD,LEN */
+    {"CLC",  0x0D,0,2,2},                                /** Compare Logical: CLC BADD,AADD,LEN */
+    {"MVI",  0x0C,0,3,3},                                /** Move Immediate */
+    {"SBN",  0x0A,0,3,3},                                /** Set Bits On */
+    {"SBF",  0x0B,0,3,3},                                /** Set Bits Off */
+    {"CLI",  0x0D,0,3,3},                                /** Compare Immediate */
+    {"TBN",  0x08,0,3,3},                                /** Test Bits On */
+    {"TBF",  0x09,0,3,3},                                /** Test Bits Off */
+    {"APL",  0x01,0,4,0},                                /** Advance Program Level */
+    {"SIO",  0x03,0,5,0},                                /** Start I/O */
+    {"SNS",  0x00,0,6,3},                                /** Sense I/O */
+    {"LIO",  0x01,0,6,3},                                /** Load I/O */
+    {"TIO",  0x01,0,6,1},                                /** Test I/O */
+    {"J",    0x02,0,7,0},                                /** Jump Unconditional */
+    {"J",    0x02,0x87,7,0},                             /* Alternate J */
+    {"JH",   0x02,132,7,0},                              /* Jump if High */
+    {"JL",   0x02,130,7,0},                              /* Jump if Low */
+    {"JE",   0x02,129,7,0},                              /* Jump if Equal */
+    {"JNH",  0x02,4,7,0},                                /** Jump if Not High */
+    {"JNL",  0x02,2,7,0},                                /** Jump if Not Low */
+    {"JNE",  0x02,1,7,0},                                /** Jump if Not Equal */
+    {"JOZ",  0x02,136,7,0},                              /* Jump if Overflow Zoned */
+    {"JOL",  0x02,160,7,0},                              /* Jump if Overflow Logical */
+    {"JNOZ", 0x02,8,7,0},                                /** Jump if No Overflow Zoned */
+    {"JNOL", 0x02,32,7,0},                               /* Jump if No Overflow Logical */
+    {"JT",   0x02,16,7,0},                               /* Jump if True */
+    {"JF",   0x02,144,7,0},                              /* Jump if False */
+    {"JP",   0x02,132,7,0},                              /* Jump if Plus */
+    {"JM",   0x02,130,7,0},                              /* Jump if Minus */
+    {"JZ",   0x02,129,7,0},                              /* Jump if Zero */
+    {"JNP",  0x02,4,7,0},                                /** Jump if Not Plus */
+    {"JNM",  0x02,2,7,0},                                /** Jump if Not Minus */
+    {"JNZ",  0x02,1,7,0},                                /** Jump if Not Zero */
+    {"NOPJ", 0x02,0x80,7,0},                              /* Never Jump - NOP */
+    {"B",    0x00,0x00,8,1},                              /* Branch Unconditional */
+    {"B",    0x00,0x87,8,1},                              /* Alternate B */
+    {"BH",   0x00,0x84,8,1},                              /* Branch if High */
+    {"BL",   0x00,0x82,8,1},                              /* Branch if Low */
+    {"BE",   0x00,0x81,8,1},                              /* Branch if Equal */
+    {"BNH",  0x00,0x04,8,1},                              /* Branch if Not High */
+    {"BNL",  0x00,0x02,8,1},                              /* Branch if Not Low */
+    {"BNE",  0x00,0x01,8,1},                              /* Branch if Not Equal */
+    {"BOZ",  0x00,0x88,8,1},                              /* Branch if Overflow Zoned */
+    {"BOL",  0x00,0xA0,8,1},                              /* Branch if Overflow Logical */
+    {"BNOZ", 0x00,0x08,8,1},                              /* Branch if No Overflow Zoned */
+    {"BNOL", 0x00,0x20,8,1},                              /* Branch if No Overflow Logical */
+    {"BT",   0x00,0x10,8,1},                              /* Branch if True */
+    {"BF",   0x00,0x90,8,1},                              /* Branch if False */
+    {"BP",   0x00,0x84,8,1},                              /* Branch if Plus */
+    {"BM",   0x00,0x82,8,1},                              /* Branch if Minus */
+    {"BZ",   0x00,0x81,8,1},                              /* Branch if Zero */
+    {"BNP",  0x00,0x04,8,1},                              /* Branch if Not Plus */
+    {"BNM",  0x00,0x02,8,1},                              /* Branch if Not Minus */
+    {"BNZ",  0x00,0x01,8,1},                              /* Branch if Not Zero */
+    {"NOPB", 0x00,0x80,8,1},                              /* Never Branch - NOP */
+    {"MZZ",  0x08,0,9,2},                                /** Move Zone to Zone */
+    {"MNZ",  0x08,1,9,2},                                /** Move Numeric to Zone */
+    {"MZN",  0x08,2,9,2},                                /** Move Zone to Numeric */
+    {"MNN",  0x08,3,9,2},                                /** Move Numeric to Numeric */
+    {"MVX",  0x08,0,2,2},                                /** Move Hex: MVX BADD,AADD,CODE */
+    {"JC",   0x02,0,3,0},                                /** Jump on Specified Condition bits */
+    {"BC",   0x00,0,3,1},                                /** Branch on Specified Condition */
+    {"***",  0x00,0,0,0}
 };
 
 int32 regcode[15] = {   0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01,
@@ -225,7 +225,7 @@ char regname[15][8] =  {    "(P2IAR)",
    load starts at the current value of the P1IAR.
 */
 
-int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 i, addr = 0, cnt = 0;
 
@@ -252,7 +252,7 @@ return (SCPE_OK);
         status  =       error code
 */
 
-int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
+t_stat fprint_sym (FILE *of, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw)
 {
     int32 r;
@@ -267,16 +267,15 @@ int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
     return (r);
 }
 
-int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
+t_stat printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw)
 {
-int32 cflag, c1, c2, group, len1, len2, inst, aaddr, baddr;
+int32 c1, c2, group, len1, len2, inst, aaddr, baddr;
 int32 oplen, groupno, i, j, vpos, qbyte, da, m, n;
 char bld[128], bldaddr[32], boperand[32], aoperand[32];
 int32 blk[16], blt[16];
 int32 blkadd;
 
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
 c1 = val[0] & 0xff;
 if (sw & SWMASK ('A')) {
     for (i = 0; i < 16; i++) {
@@ -502,7 +501,7 @@ return -(oplen - 1);
         status  =       error status
 */
 
-int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
+t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, i = 0, j, r, oplen, addtyp, saveaddr, vptr;
 char gbuf[CBUFSIZE];
@@ -924,7 +923,7 @@ switch (opcode[j].form) {                               /* Get operands based on
 return (-(oplen-1));
 }
 
-char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype)
+char *parse_addr(char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype)
 {
 int32 nybble = 0;
 char temp[32];

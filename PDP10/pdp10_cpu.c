@@ -151,6 +151,10 @@ typedef struct {
     d10         ac;
     } InstHistory;
 
+extern a10 fe_xct;                                      /* Front-end forced XCT */
+extern DEVICE pag_dev;
+extern t_stat pag_reset (DEVICE *dptr);
+
 d10 *M = NULL;                                          /* memory */
 d10 acs[AC_NBLK * AC_NUM] = { 0 };                      /* AC blocks */
 d10 *ac_cur, *ac_prv;                                   /* AC cur, prv (dyn) */
@@ -197,10 +201,7 @@ jmp_buf save_env;
 int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
-
-extern int32 sim_int_char;
-extern int32 sim_interval;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+int32 apr_serial = -1;                                  /* CPU Serial number */
 
 /* Forward and external declarations */
 
@@ -209,6 +210,9 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_serial (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_serial (FILE *st, UNIT *uptr, int32 val, void *desc);
+
 d10 adjsp (d10 val, a10 ea);
 void ibp (a10 ea, int32 pflgs);
 d10 ldb (a10 ea, int32 pflgs);
@@ -332,7 +336,7 @@ extern t_stat tim_set_mod (UNIT *uptr, int32 val, char *cptr, void *desc);
    cpu_mod      CPU modifier list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX, MAXMEMSIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
     { ORDATA (PC, saved_PC, VASIZE) },
@@ -404,6 +408,7 @@ MTAB cpu_mod[] = {
       NULL, &show_iospace },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
+    { MTAB_XTD|MTAB_VDV, 0, "SERIAL", "SERIAL", &cpu_set_serial, &cpu_show_serial },
     { 0 }
     };
 
@@ -432,16 +437,16 @@ const int32 pi_m2lvl[128] = {
  };
 
 const d10 bytemask[64] = { 0,
- 01, 03, 07, 017, 037, 077,
- 0177, 0377, 0777, 01777, 03777, 07777,
- 017777, 037777, 077777,
- 0177777, 0377777, 0777777,
- 01777777, 03777777, 07777777,
- 017777777, 037777777, 077777777,
- 0177777777, 0377777777, 0777777777,
- 01777777777, 03777777777, 07777777777,
- 017777777777, 037777777777, 077777777777,
- 0177777777777, 0377777777777, 0777777777777,
+ INT64_C(01), INT64_C(03), INT64_C(07), INT64_C(017), INT64_C(037), INT64_C(077),
+ INT64_C(0177), INT64_C(0377), INT64_C(0777), INT64_C(01777), INT64_C(03777), INT64_C(07777),
+ INT64_C(017777), INT64_C(037777), INT64_C(077777),
+ INT64_C(0177777), INT64_C(0377777), INT64_C(0777777),
+ INT64_C(01777777), INT64_C(03777777), INT64_C(07777777),
+ INT64_C(017777777), INT64_C(037777777), INT64_C(077777777),
+ INT64_C(0177777777), INT64_C(0377777777), INT64_C(0777777777),
+ INT64_C(01777777777), INT64_C(03777777777), INT64_C(07777777777),
+ INT64_C(017777777777), INT64_C(037777777777), INT64_C(077777777777),
+ INT64_C(0177777777777), INT64_C(0377777777777), INT64_C(0777777777777),
  ONES, ONES, ONES, ONES, ONES, ONES, ONES, ONES, ONES,
  ONES, ONES, ONES, ONES, ONES, ONES, ONES, ONES, ONES,
  ONES, ONES, ONES, ONES, ONES, ONES, ONES, ONES, ONES
@@ -620,6 +625,11 @@ static t_stat jrst_tab[16] = {
 #define POPF            if (LRZ (AC(ac)) == RMASK) SETF (F_T2)
 #define DMOVNF          if (rs[1] == 0) { MOVNF (rs[0]); }
 
+t_value pdp10_pc_value (void)
+{
+return (t_value)pager_PC;
+}
+
 t_stat sim_instr (void)
 {
 a10 PC;                                                 /* set by setjmp */
@@ -705,21 +715,56 @@ pager_tc = FALSE;                                       /* not in trap cycle */
 pflgs = 0;                                              /* not in PXCT */
 xct_cnt = 0;                                            /* count XCT's */
 if (sim_interval <= 0) {                                /* check clock queue */
-    if (i = sim_process_event ())                       /* error?  stop sim */
+    /* make sure all useful state is in simh registers while processing events */
+    saved_PC = pager_PC & AMASK;                        /* failing instr PC */
+    set_ac_display (ac_cur);                            /* set up AC display */
+    pcq_r->qptr = pcq_p;                                /* update pc q ptr */
+
+    if ((i = sim_process_event ()))                     /* error?  stop sim */
         ABORT (i);
+    if (fe_xct)
+        qintr = -1;
+    else
     pi_eval ();                                         /* eval pi system */
     }
 
 /* PI interrupt (Unibus or system flags).
    On the KS10, only JSR and XPCW are allowed as interrupt instructions.
    Because of exec mode addressing, and unconditional processing of flags,
-   they are explicitly emulated here.
+   they are explicitly emulated here.  Note that the KS microcode does not
+   perform an EA calc on interrupt instructions, which this emulation does.
+   This is an implementation restriction of the KS.  The KS does not restrict
+   the CONSOLE EXECUTE function which is merged into this path in SimH.  
+
+   On a keep-alive failure, the console (fe) forces the CPU 'XCT' the 
+   instruction at exec 71.  This is close enough to an interrupt that it is
+   treated as one here.  TOPS-10 and TOPS-20 use JSR or XPCW, which are 
+   really the only sensible instructions, as diagnosing a KAF requires the
+   PC/FLAGS of the fault.
+   On a reload-request from the OS, the fe loads the bootstrap code and sets
+   saved_PC.  Here, the CPU is partially reset and redirected.  (Preserving
+   PC history, among other things.)  The FE has already reset IO.
 */
 
 if (qintr) {
     int32 vec, uba;
     pager_pi = TRUE;                                    /* flag in pi seq */
-    if (vec = pi_ub_vec (qintr, &uba)) {                /* Unibus interrupt? */
+    if (fe_xct) {                                       /* Console forced execute? */
+        qintr = 0;
+        if (fe_xct == 1) {                              /* Forced reload */
+            PC = saved_PC;                              /* Bootstrap PC */
+            pager_pi = FALSE;
+            ebr = ubr = 0;                              /* Exec mode, paging & PI off */
+            pag_reset (&pag_dev);
+            pi_on = pi_enb = pi_act= pi_prq =
+                apr_enb = apr_flg = apr_lvl = its_1pr = 0;
+            rlog = 0;
+            set_newflags (0, FALSE);
+            fe_xct = 0;
+            continue;
+        }
+        inst = ReadE(fe_xct);                           /* Exec address of instruction */
+    } else if ((vec = pi_ub_vec (qintr, &uba))) {       /* Unibus interrupt? */
         mb = ReadP (epta + EPT_UBIT + uba);             /* get dispatch table */
         if (mb == 0)                                    /* invalid? stop */
             ABORT (STOP_ZERINT);
@@ -735,23 +780,35 @@ if (qintr) {
         its_1pr = 0;                                    /* clear 1-proc */
         }
     if (op == OP_JSR) {                                 /* JSR? */
-        ea = calc_ea (inst, MM_CUR);                    /* calc ea, cur mode */
-        WriteE (ea, FLPC);                              /* save flags+PC, exec */
-        JUMP (INCA (ea));                               /* PC = ea + 1 */
+        d10 flpc = FLPC;
+
         set_newflags (0, FALSE);                        /* set new flags */
+        ea = calc_ea (inst, MM_CUR);                    /* calc ea, cur mode */
+        WriteE (ea, flpc);                              /* save flags+PC, exec */
+        JUMP (INCA (ea));                               /* PC = ea + 1 */
         }
     else if ((op == OP_JRST) && (ac == AC_XPCW)) {      /* XPCW? */
+        d10 flz = XWD (flags, 0);
+
+        set_newflags (0, FALSE);                        /* set exec flags */
         ea = calc_ea (inst, MM_CUR);                    /* calc ea, cur mode */
-        WriteE (ea, XWD (flags, 0));                    /* write flags, exec */
+        WriteE (ea, flz);                               /* write flags, exec */
         WriteE (ADDA (ea, 1), PC);                      /* write PC, exec */
         rs[0] = ReadE (ADDA (ea, 2));                   /* read new flags */
         rs[1] = ReadE (ADDA (ea, 3));                   /* read new PC */
         JUMP (rs[1]);                                   /* set new PC */
         set_newflags (rs[0], FALSE);                    /* set new flags */
         }
-    else ABORT (STOP_ILLINT);                           /* invalid instr */
+    else {
+        fe_xct = 0;
+        ABORT (STOP_ILLINT);                            /* invalid instr */
+        }
+    if (fe_xct)
+        fe_xct = 0;
+    else {
     pi_act = pi_act | pi_l2bit[qintr];                  /* set level active */
     pi_eval ();                                         /* eval pi system */
+        }
     pager_pi = FALSE;                                   /* end of sequence */
     if (sim_interval)                                   /* charge for instr */
         sim_interval--;
@@ -865,8 +922,8 @@ case 0037:  Write (040, UUOWORD, MM_CUR);               /* store op, ac, ea */
 
 /* Floating point, bytes, multiple precision (0100 - 0177) */
 
-/* case 0100:   MUUO                                    /* UJEN */
-/* case 0101:   MUUO                                    /* unassigned */
+/* case 0100:   MUUO                                  *//* UJEN */
+/* case 0101:   MUUO                                  *//* unassigned */
 case 0102:  if (Q_ITS && !TSTF (F_USR)) {               /* GFAD (KL), XCTRI (ITS) */
                 inst = Read (ea, MM_OPND);
                 pflgs = pflgs | ac;
@@ -879,10 +936,10 @@ case 0103:  if (Q_ITS && !TSTF (F_USR)) {               /* GFSB (KL), XCTR (ITS)
                 goto XCT;
                 }
             goto MUUO;
-/* case 0104:   MUUO                                    /* JSYS (T20) */
+/* case 0104:   MUUO                                  *//* JSYS (T20) */
 case 0105:  AC(ac) = adjsp (AC(ac), ea); break;         /* ADJSP */
-/* case 0106:   MUUO                                    /* GFMP (KL)*/
-/* case 0107:   MUUO                                    /* GFDV (KL) */
+/* case 0106:   MUUO                                  *//* GFMP (KL)*/
+/* case 0107:   MUUO                                  *//* GFDV (KL) */
 case 0110:  RD2; dfad (ac, rs, 0); break;               /* DFAD */
 case 0111:  RD2; dfad (ac, rs, 1); break;               /* DFSB */
 case 0112:  RD2; dfmp (ac, rs); break;                  /* DFMP */
@@ -909,8 +966,8 @@ case 0124:  G2AC; WR2; break;                           /* DMOVEM */
 case 0125:  G2AC; DMOVN (rs); WR2; DMOVNF; break;       /* DMOVNM */
 case 0126:  RD; fix (ac, mb, 1); break;                 /* FIXR */
 case 0127:  RD; AC(ac) = fltr (mb); break;              /* FLTR */
-/* case 0130:   MUUO                                    /* UFA */
-/* case 0131:   MUUO                                    /* DFN */
+/* case 0130:   MUUO                                  *//* UFA */
+/* case 0131:   MUUO                                  *//* DFN */
 case 0132:  AC(ac) = fsc (AC(ac), ea); break;           /* FSC */
 case 0133:  if (!ac)                                    /* IBP */
                 ibp (ea, pflgs);
@@ -920,7 +977,7 @@ case 0135:  LDB; break;                                 /* LDB */
 case 0136:  CIBP; DPB; CLRF (F_FPD); break;             /* IDBP */
 case 0137:  DPB; break;                                 /* DPB */
 case 0140:  RD; AC(ac) = FAD (mb); break;               /* FAD */
-/* case 0141:   MUUO                                    /* FADL */
+/* case 0141:   MUUO                                  *//* FADL */
 case 0142:  RM; mb = FAD (mb); WR; break;               /* FADM */
 case 0143:  RM; AC(ac) = FAD (mb); WRAC; break;         /* FADB */
 case 0144:  RD; AC(ac) = FADR (mb); break;              /* FADR */
@@ -928,7 +985,7 @@ case 0145:  AC(ac) = FADR (IMS); break;                 /* FADRI */
 case 0146:  RM; mb = FADR (mb); WR; break;              /* FADRM */
 case 0147:  RM; AC(ac) = FADR (mb); WRAC; break;        /* FADRB */
 case 0150:  RD; AC(ac) = FSB (mb); break;               /* FSB */
-/* case 0151:   MUUO                                    /* FSBL */
+/* case 0151:   MUUO                                  *//* FSBL */
 case 0152:  RM; mb = FSB (mb); WR; break;               /* FSBM */
 case 0153:  RM; AC(ac) = FSB (mb); WRAC; break;         /* FSBB */
 case 0154:  RD; AC(ac) = FSBR (mb); break;              /* FSBR */
@@ -936,7 +993,7 @@ case 0155:  AC(ac) = FSBR (IMS);  break;                /* FSBRI */
 case 0156:  RM; mb = FSBR (mb); WR; break;              /* FSBRM */
 case 0157:  RM; AC(ac) = FSBR (mb); WRAC; break;        /* FSBRB */
 case 0160:  RD; AC(ac) = FMP (mb); break;               /* FMP */
-/* case 0161:   MUUO                                    /* FMPL */
+/* case 0161:   MUUO                                  *//* FMPL */
 case 0162:  RM; mb = FMP (mb); WR; break;               /* FMPM */
 case 0163:  RM; AC(ac) = FMP (mb); WRAC; break;         /* FMPB */
 case 0164:  RD; AC(ac) = FMPR (mb); break;              /* FMPR */
@@ -944,7 +1001,7 @@ case 0165:  AC(ac) = FMPR (IMS); break;                 /* FMPRI */
 case 0166:  RM; mb = FMPR (mb); WR; break;              /* FMPRM */
 case 0167:  RM; AC(ac) = FMPR (mb); WRAC; break;        /* FMPRB */
 case 0170:  RD; if (FDV (mb)) S1AC; break;              /* FDV */
-/* case 0171:   MUUO                                    /* FDVL */
+/* case 0171:   MUUO                                  *//* FDVL */
 case 0172:  RM; if (FDV (mb)) WR1; break;               /* FDVM */
 case 0173:  RM; if (FDV (mb)) { S1AC; WRAC; } break;    /* FDVB */
 case 0174:  RD; if (FDVR (mb)) S1AC; break;             /* FDVR */
@@ -1008,7 +1065,7 @@ case 0250:  RM; WRAC; AC(ac) = mb; break;               /* EXCH */
 case 0251:  blt (ac, ea, pflgs); break;                 /* BLT */
 case 0252:  AOBAC; if (TGE (AC(ac))) JUMP (ea); break;  /* AOBJP */
 case 0253:  AOBAC; if (TL (AC(ac))) JUMP (ea); break;   /* AOBJN */
-/* case 0254:   /* shown later                          /* JRST */
+/* case 0254: *//* shown later                        *//* JRST */
 case 0255:  if (flags & (ac << 14)) {                   /* JFCL */
                 JUMP (ea);
                 CLRF (ac << 14);
@@ -1972,10 +2029,10 @@ return;
 
 /* I/O block transfers - byte to Unibus (0) and Unibus to byte (1) */
 
-#define BYTE1           0776000000000
-#define BYTE2           0001774000000
-#define BYTE3           0000003770000
-#define BYTE4           0000000007760
+#define BYTE1           INT64_C(0776000000000)
+#define BYTE2           INT64_C(0001774000000)
+#define BYTE3           INT64_C(0000003770000)
+#define BYTE4           INT64_C(0000000007760)
 /* unused               0000000000017 */
 
 void bltu (int32 ac, a10 ea, int32 pflgs, int dir)
@@ -2019,7 +2076,7 @@ int32 test_int (void)
 int32 t;
 
 if (sim_interval <= 0) {                                /* check queue */
-    if (t = sim_process_event ())                       /* IO event? */
+    if ((t = sim_process_event ()))                     /* IO event? */
         return t;
     if (pi_eval ())                                     /* interrupt? */
         return (INTERRUPT);
@@ -2108,7 +2165,14 @@ return;
 
 t_bool aprid (a10 ea, int32 prv)
 {
-Write (ea, (Q_ITS)? UC_AIDITS: UC_AIDDEC, prv);
+d10 value = (Q_ITS)? UC_AIDITS: UC_AIDDEC;
+
+if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) )
+    value |= (Q_ITS)? UC_SERITS: UC_SERDEC;
+else
+    value |= apr_serial;
+
+Write (ea, value, prv);
 return FALSE;
 }
 
@@ -2341,7 +2405,6 @@ return SCPE_OK;
 
 void set_ac_display (d10 *acbase)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 int i;
 
@@ -2393,8 +2456,6 @@ char *cptr = (char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;
@@ -2423,5 +2484,36 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */
     }                                                   /* end for */
+return SCPE_OK;
+}
+
+/* Set serial */
+
+t_stat cpu_set_serial (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 lnt;
+t_stat r;
+
+if (cptr == NULL) {
+    apr_serial = -1;
+    return SCPE_OK;
+    }
+lnt = (int32) get_uint (cptr, 10, 077777, &r);
+if ((r != SCPE_OK) || (lnt <= 0) || (!Q_ITS && lnt < 4096))
+    return SCPE_ARG;
+apr_serial = lnt & 077777;
+return SCPE_OK;
+}
+
+/* Show serial */
+
+t_stat cpu_show_serial (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "Serial: " );
+if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) ) {
+    fprintf (st, "%d (default)", (Q_ITS)? UC_SERITS: UC_SERDEC);
+    return SCPE_OK;
+    }
+fprintf (st, "%d", apr_serial);
 return SCPE_OK;
 }

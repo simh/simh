@@ -36,8 +36,6 @@
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
-extern FILE *sim_log;
-extern DEVICE *sim_devices[];
 extern int32 autcon_enb;
 extern int32 int_vec[IPL_HLVL][32];
 extern int32 (*int_ack[IPL_HLVL][32])(void);
@@ -104,6 +102,7 @@ t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
+uint32 radix = DEV_RDX;
 
 if (uptr == NULL)
     return SCPE_IERR;
@@ -113,11 +112,25 @@ if (dptr == NULL)
 dibp = (DIB *) dptr->ctxt;
 if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE))
     return SCPE_IERR;
+if (sim_switches & SWMASK ('H'))
+    radix = 16;
+if (sim_switches & SWMASK ('O'))
+    radix = 8;
 fprintf (st, "address=");
 fprint_val (st, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
+if (radix != DEV_RDX) {
+    fprintf (st, "(");
+    fprint_val (st, (t_value) dibp->ba, radix, 32, PV_LEFT);
+    fprintf (st, ")");
+    }
 if (dibp->lnt > 1) {
     fprintf (st, "-");
     fprint_val (st, (t_value) dibp->ba + dibp->lnt - 1, DEV_RDX, 32, PV_LEFT);
+    if (radix != DEV_RDX) {
+        fprintf (st, "(");
+        fprint_val (st, (t_value) dibp->ba + dibp->lnt - 1, radix, 32, PV_LEFT);
+        fprintf (st, ")");
+        }
     }
 if (dptr->flags & DEV_FLTA)
     fprintf (st, "*");
@@ -177,7 +190,7 @@ t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
-uint32 vec, numvec;
+uint32 vec, numvec, radix = DEV_RDX;
 
 if (uptr == NULL)
     return SCPE_IERR;
@@ -187,6 +200,10 @@ if (dptr == NULL)
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL)
     return SCPE_IERR;
+if (sim_switches & SWMASK ('H'))
+    radix = 16;
+if (sim_switches & SWMASK ('O'))
+    radix = 8;
 vec = dibp->vec;
 if (arg)
     numvec = arg;
@@ -196,9 +213,19 @@ if (vec == 0)
 else {
     fprintf (st, "vector=");
     fprint_val (st, (t_value) vec, DEV_RDX, 16, PV_LEFT);
+    if (radix != DEV_RDX) {
+        fprintf (st, "(");
+        fprint_val (st, (t_value) vec, radix, 16, PV_LEFT);
+        fprintf (st, ")");
+        }
     if (numvec > 1) {
         fprintf (st, "-");
         fprint_val (st, (t_value) vec + (4 * (numvec - 1)), DEV_RDX, 16, PV_LEFT);
+        if (radix != DEV_RDX) {
+            fprintf (st, "(");
+            fprint_val (st, (t_value) vec + (4 * (numvec - 1)), radix, 16, PV_LEFT);
+            fprintf (st, ")");
+            }
         }
     }
 return SCPE_OK;
@@ -219,7 +246,7 @@ return show_vec (st, uptr, ((mp->lines * 2) / arg), desc);
 
 void init_ubus_tab (void)
 {
-int32 i, j;
+size_t i, j;
 
 for (i = 0; i < IPL_HLVL; i++) {                        /* clear intr tab */
     for (j = 0; j < 32; j++) {
@@ -254,11 +281,8 @@ for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
         (int_ack[ilvl][ibit] != dibp->ack[i])) ||
         (int_vec[ilvl][ibit] && vec &&
         (int_vec[ilvl][ibit] != vec))) {
-        printf ("Device %s interrupt slot conflict at %d\n",
-                sim_dname (dptr), idx);
-        if (sim_log)
-            fprintf (sim_log, "Device %s interrupt slot conflict at %d\n",
-                     sim_dname (dptr), idx);
+        sim_printf ("Device %s interrupt slot conflict at %d\n",
+                    sim_dname (dptr), idx);
         return SCPE_STOP;
         }
     if (dibp->ack[i])

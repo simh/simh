@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    PT08/KL8JA terminal input/output
 
+   27-Mar-15    RMS     Backported Dave Gesswein's fix to prevent data loss
    11-Oct-13    RMS     Poll TTIX immediately to pick up initial connect (Mark Pizzolato)
    18-Apr-12    RMS     Revised to use clock coscheduling
    19-Nov-08    RMS     Revised for common TMXR show routines
@@ -62,12 +63,12 @@
 #define TTX_GETLN(x)    (((x) >> 4) & TTX_MASK)
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
-extern int32 tmxr_poll, sim_is_running;
+extern int32 tmxr_poll;
 
 uint8 ttix_buf[TTX_LINES] = { 0 };                      /* input buffers */
 uint8 ttox_buf[TTX_LINES] = { 0 };                      /* output buffers */
 int32 ttx_tps = 100;                                    /* polls per second */
-TMLN ttx_ldsc[TTX_LINES] = { 0 };                       /* line descriptors */
+TMLN ttx_ldsc[TTX_LINES] = { {0} };                     /* line descriptors */
 TMXR ttx_desc = { TTX_LINES, 0, 0, ttx_ldsc };          /* mux descriptor */
 
 DEVICE ttix_dev, ttox_dev;
@@ -195,6 +196,7 @@ switch (pulse) {                                        /* case IR<9:11> */
     case 2:                                             /* KCC */
         dev_done = dev_done & ~itti;                    /* clear flag */
         int_req = int_req & ~itti;
+        sim_activate_abs (&ttix_unit, ttix_unit.wait);  /* check soon for more input */
         return 0;                                       /* clear AC */
 
     case 4:                                             /* KRS */
@@ -210,6 +212,7 @@ switch (pulse) {                                        /* case IR<9:11> */
     case 6:                                             /* KRB */
         dev_done = dev_done & ~itti;                    /* clear flag */
         int_req = int_req & ~itti;
+        sim_activate_abs (&ttix_unit, ttix_unit.wait);  /* check soon for more input */
         return ttix_buf[ln];                            /* return buf */
 
     default:
@@ -234,7 +237,9 @@ if (ln >= 0)                                            /* got one? rcv enb*/
 tmxr_poll_rx (&ttx_desc);                               /* poll for input */
 for (ln = 0; ln < TTX_LINES; ln++) {                    /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
-        if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {      /* get char */
+        if (dev_done & (INT_TTI1 << ln))                /* Last character still pending? */
+            continue;
+        if ((temp = tmxr_getc_ln (&ttx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
                 c = 0;
             else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags));

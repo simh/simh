@@ -45,8 +45,8 @@
    and Bill Haygood in resolving questions about the PDP-8
 */
 
-#ifndef _PDP8_DEFS_H_
-#define _PDP8_DEFS_H_   0
+#ifndef PDP8_DEFS_H_
+#define PDP8_DEFS_H_   0
 
 #include "sim_defs.h"                                   /* simulator defns */
 
@@ -59,9 +59,10 @@
 #define STOP_RSRV       1                               /* must be 1 */
 #define STOP_HALT       2                               /* HALT */
 #define STOP_IBKPT      3                               /* breakpoint */
-#define STOP_NOTSTD     4                               /* non-std devno */
-#define STOP_DTOFF      5                               /* DECtape off reel */
-#define STOP_LOOP       6                               /* infinite loop */
+#define STOP_OPBKPT     4                               /* Opcode/Instruction breakpoint */
+#define STOP_NOTSTD     5                               /* non-std devno */
+#define STOP_DTOFF      6                               /* DECtape off reel */
+#define STOP_LOOP       7                               /* infinite loop */
 
 /* Memory */
 

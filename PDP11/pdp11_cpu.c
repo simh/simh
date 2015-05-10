@@ -256,10 +256,8 @@ typedef struct {
 
 /* Global state */
 
-extern FILE *sim_log;
-
 uint16 *M = NULL;                                       /* memory */
-int32 REGFILE[6][2] = { 0 };                            /* R0-R5, two sets */
+int32 REGFILE[6][2] = { {0} };                          /* R0-R5, two sets */
 int32 STACKFILE[4] = { 0 };                             /* SP, four modes */
 int32 saved_PC = 0;                                     /* program counter */
 int32 R[8] = { 0 };                                     /* working registers */
@@ -276,7 +274,7 @@ int32 trap_req = 0;                                     /* trap requests */
 int32 int_req[IPL_HLVL] = { 0 };                        /* interrupt requests */
 int32 PIRQ = 0;                                         /* programmed int req */
 int32 STKLIM = 0;                                       /* stack limit */
-fpac_t FR[6] = { 0 };                                   /* fp accumulators */
+fpac_t FR[6] = { {0} };                                 /* fp accumulators */
 int32 FPS = 0;                                          /* fp status */
 int32 FEC = 0;                                          /* fp exception code */
 int32 FEA = 0;                                          /* fp exception addr */
@@ -307,12 +305,6 @@ int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };  /* dspace enables */
 t_addr cpu_memsize = INIMEMSIZE;                        /* last mem addr */
 
 extern int32 CPUERR, MAINT;
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern int32 sim_switches;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
-extern DEVICE *sim_devices[];
 extern CPUTAB cpu_tab[];
 
 /* Function declarations */
@@ -609,6 +601,7 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size},
     { UNIT_MSIZE, 786432, NULL, "768K", &cpu_set_size},
     { UNIT_MSIZE, 1048576, NULL, "1024K", &cpu_set_size},
+    { UNIT_MSIZE, 1572864, NULL, "1536K", &cpu_set_size},
     { UNIT_MSIZE, 2097152, NULL, "2048K", &cpu_set_size},
     { UNIT_MSIZE, 3145728, NULL, "3072K", &cpu_set_size},
     { UNIT_MSIZE, 4186112, NULL, "4096K", &cpu_set_size},
@@ -736,7 +729,7 @@ while (reason == 0)  {
 
     if (trap_req) {                                     /* check traps, ints */
         trapea = 0;                                     /* assume srch fails */
-        if (t = trap_req & TRAP_ALL) {                  /* if a trap */
+        if ((t = trap_req & TRAP_ALL)) {                /* if a trap */
             for (trapnum = 0; trapnum < TRAP_V_MAX; trapnum++) {
                 if ((t >> trapnum) & 1) {               /* trap set? */
                     trapea = trap_vec[trapnum];         /* get vec, clr */
@@ -808,11 +801,7 @@ while (reason == 0)  {
     if (tbit)
         setTRAP (TRAP_TRC);
     if (wait_state) {                                   /* wait state? */
-        if (sim_idle_enab)                              /* idle enabled? */
-            sim_idle (TMR_CLK, TRUE);
-        else if (wait_enable)                           /* old style idle? */
-            sim_interval = 0;                           /* force check */
-        else sim_interval = sim_interval - 1;           /* count cycle */
+        sim_idle (TMR_CLK, TRUE);
         continue;
         }
 
@@ -1251,7 +1240,7 @@ while (reason == 0)  {
                     else dst = R[dstspec];
                     }
                 else {
-                    i = ((cm == pm) && (cm == MD_USR))? calc_ds (pm): calc_is (pm);
+                    i = ((cm == pm) && (cm == MD_USR))? (int32)calc_ds (pm): (int32)calc_is (pm);
                     dst = ReadW ((GeteaW (dstspec) & 0177777) | i);
                     }
                 N = GET_SIGN_W (dst);
@@ -1513,7 +1502,7 @@ while (reason == 0)  {
                 Z = V = C = 1;                          /* N = 0, Z = 1 */
                 break;
                 }
-            if ((src == 020000000000) && (src2 == 0177777)) {
+            if ((((uint32)src) == 020000000000) && (src2 == 0177777)) {
                 V = 1;                                  /* J11,11/70 compat */
                 N = Z = C = 0;                          /* N = Z = 0 */
                 break;
@@ -3082,7 +3071,6 @@ return iopageW ((int32) val, addr, WRITEC);
 
 void set_r_display (int32 rs, int32 cm)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 int32 i;
 
@@ -3135,8 +3123,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[HIST_ILNT];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

@@ -204,7 +204,7 @@ if ((temp = getc (uptr->fileref)) == EOF) {             /* error? */
     if (feof (uptr->fileref)) {                         /* eof? */
         pt_sta = pt_sta | STA_DU;                       /* set DU */
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");

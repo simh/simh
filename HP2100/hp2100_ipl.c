@@ -1,6 +1,12 @@
+/*******************************************************************************
+ *                                                                             *
+ *  WARNING: THE 4.0 VERSION OF THIS FILE IS DIFFERENT (SOCKET API CHANGED)!!! *
+ *                                                                             *
+ *******************************************************************************/
+
 /* hp2100_ipl.c: HP 2000 interprocessor link simulator
 
-   Copyright (c) 2002-2012, Robert M Supnik
+   Copyright (c) 2002-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +31,9 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   25-Oct-12    JDB     Removed DEV_NET to allow restoration of listening ports
+   09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CARD_INDEX casts to dib.card_index
    07-Apr-11    JDB     A failed STC may now be retried
@@ -124,7 +133,8 @@ DEBTAB ipl_deb [] = {
     { "CMDS", DEB_CMDS },
     { "CPU",  DEB_CPU },
     { "XFER", DEB_XFER },
-    { NULL, 0 }  };
+    { NULL, 0 }
+    };
 
 /* Common structures */
 
@@ -187,7 +197,7 @@ DEVICE ipli_dev = {
     1, 10, 31, 1, 16, 16,
     &tmxr_ex, &tmxr_dep, &ipl_reset,
     &ipl_boot, &ipl_attach, &ipl_detach,
-    &ipli_dib, DEV_NET | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
+    &ipli_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG,
     0, ipl_deb, NULL, NULL
     };
 
@@ -216,7 +226,7 @@ DEVICE iplo_dev = {
     1, 10, 31, 1, 16, 16,
     &tmxr_ex, &tmxr_dep, &ipl_reset,
     &ipl_boot, &ipl_attach, &ipl_detach,
-    &iplo_dib, DEV_NET | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
+    &iplo_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG,
     0, ipl_deb, NULL, NULL
     };
 
@@ -623,14 +633,15 @@ uptr->filename = tptr;                                  /* save */
 sim_activate (uptr, POLL_FIRST);                        /* activate first poll "immediately" */
 if (sim_switches & SWMASK ('W')) {                      /* wait? */
     for (i = 0; i < 30; i++) {                          /* check for 30 sec */
-        if (t = ipl_check_conn (uptr))                  /* established? */
+        t = ipl_check_conn (uptr);
+        if (t)                                          /* established? */
             break;
         if ((i % 10) == 0)                              /* status every 10 sec */
             printf ("Waiting for connnection\n");
         sim_os_sleep (1);                               /* sleep 1 sec */
         }
-    if (t)
-        printf ("Connection established\n");
+    if (t)                                              /* if connected (set by "ipl_check_conn" above) */
+        printf ("Connection established\n");            /*   then report */
     }
 return SCPE_OK;
 }
@@ -771,8 +782,10 @@ t_stat ipl_boot (int32 unitno, DEVICE *dptr)
 const int32 devi = ipli_dib.select_code;
 const int32 devp = ptr_dib.select_code;
 
-ibl_copy (ipl_rom, devi);                               /* copy bootstrap to memory */
-SR = (devi << IBL_V_DEV) | devp;                        /* set SR */
+if (ibl_copy (ipl_rom, devi, IBL_S_CLR,                 /* copy the boot ROM to memory and configure */
+              IBL_SET_SC (devi) | devp))                /*   the S register accordingly */   
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+
 WritePW (PC + MAX_BASE, (~PC + 1) & DMASK);             /* fix ups */
 WritePW (PC + IPL_PNTR, ipl_rom [IPL_PNTR] | PC);
 WritePW (PC + PTR_PNTR, ipl_rom [PTR_PNTR] | PC);

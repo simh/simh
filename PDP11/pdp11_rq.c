@@ -224,7 +224,7 @@ struct rqpkt {
    RD52 17      8       512     8       1       4*8     60480
    RD32 17      6       820     6       1       4*8     83204
 x  RD33 17      7       1170    ?       ?       ?       138565
-   RD53 17      7       1024    7       1       5*8     138672
+   RD53 17      8       1024    8       1       5*8     138672
    RD54 17      15      1225    15      1       7*8     311200
 
    The simulator also supports larger drives that only existed
@@ -565,9 +565,6 @@ static struct drvtyp drv_tab[] = {
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
-extern uint32 sim_taddr_64;
-extern int32 sim_switches;
 
 uint16 *rqxb = NULL;                                    /* xfer buffer */
 int32 rq_itime = 200;                                   /* init time, except */
@@ -1207,7 +1204,7 @@ if (cp->csta < CST_UP) {                                /* still init? */
             if ((cp->saw & SA_S4H_LF)
                 && cp->perr) rq_plf (cp, cp->perr);
             cp->perr = 0;
-			}
+            }
         break;
         }                                               /* end switch */  
                       
@@ -1424,9 +1421,9 @@ if ((uptr = rq_getucb (cp, lu)) &&                      /* valid lu? */
     (tpkt = uptr->cpkt) &&                              /* queued pkt? */
     (GETP32 (tpkt, CMD_REFL) == ref) &&                 /* match ref? */
     (GETP (tpkt, CMD_OPC, OPC) >= OP_ACC)) {            /* rd/wr cmd? */
-	cp->pak[pkt].d[GCS_STSL] = cp->pak[tpkt].d[RW_WBCL];
-	cp->pak[pkt].d[GCS_STSH] = cp->pak[tpkt].d[RW_WBCH];
-	}
+    cp->pak[pkt].d[GCS_STSL] = cp->pak[tpkt].d[RW_WBCL];
+    cp->pak[pkt].d[GCS_STSH] = cp->pak[tpkt].d[RW_WBCH];
+    }
 else {
     cp->pak[pkt].d[GCS_STSL] = 0;                       /* return 0 */
     cp->pak[pkt].d[GCS_STSH] = 0;

@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001-2011, Robert M Supnik
+   Copyright (c) 2001-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   28-Mar-15    RMS     Revised to use sim_printf
    16-Jan-11    MP      Made option negotiation more reliable
    20-Nov-08    RMS     Added three new standardized SHOW routines
    30-Sep-08    JDB     Reverted tmxr_find_ldsc to original implementation
@@ -130,9 +131,7 @@ void tmxr_rmvrc (TMLN *lp, int32 p);
 int32 tmxr_send_buffered_data (TMLN *lp);
 TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp);
 
-extern int32 sim_switches;
 extern char sim_name[];
-extern FILE *sim_log;
 extern uint32 sim_os_msec (void);
 
 /* Poll for new connection
@@ -554,9 +553,7 @@ if ((r != SCPE_OK) || (port == 0))
 sock = sim_master_sock (port);                          /* make master socket */
 if (sock == INVALID_SOCKET)                             /* open error */
     return SCPE_OPENERR;
-printf ("Listening on port %d (socket %d)\n", port, sock);
-if (sim_log)
-    fprintf (sim_log, "Listening on port %d (socket %d)\n", port, sock);
+sim_printf ("Listening on port %d (socket %d)\n", port, sock);
 mp->port = port;                                        /* save port */
 mp->master = sock;                                      /* save master socket */
 for (i = 0; i < mp->lines; i++) {                       /* initialize lines */

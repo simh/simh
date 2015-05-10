@@ -1,0 +1,193 @@
+Notes for the Sigma Disk Controllers
+
+Two patterns of disk controllers - "10 byte" sense controllers and "16 byte" sense controllers
+All disks have 1024B (256W) sectors
+
+
+model			units/cylinders/heads/sectors		type
+
+7240/7242		8  / 203 (3 spare) / 20 / 6		10 byte		24360
+7260/7261		15 / 203 (3 spare) / 20 / 11		16 byte		44660
+7270/7271		8  / 406 (6 spare) / 20 / 6		10 byte		48720
+7275/7276		15 / 411 (7 spare) / 19 / 11		16 byte		85899
+7265/7266		15 / 411 (7 spare) / 20 / 11		16 byte		90420
+
+T3281/T3282		15 / 815 / 19 / 11			16 byte		170335
+T3281/T3283		15 / 815 / 19 / 17			16 byte		263245
+T3281/T3286		15 / 555 / 30 / 17 (16?)		16 byte
+T3281/T3286F		15 / 555 / 60 / 17 (16?)		16 byte
+T3281/T3288		15 / 822 / 5 / 17			16 byte		69870	
+
+header format		7240				726X/727X/T3281
+
+bytes 0-3		flaw / 0 / C / H		flaw / 0'CH / C / H
+bytes 4-7		S / alt C / alt H / 0		S / alt CH / alt CL'alt H / 0
+
+
+sense status		7240/7270
+
+bytes 0-3		0'CH / C / H / S		most recent address
+bytes 4-7		M'CS / diag / diag / diag	seek intr + current sector
+bytes 8-11		stat / stat
+
+			726X/7275
+
+bytes 0-3		W'0'CH / C / H / S		W = write protect, most recent address
+bytes 4-7		M'R'CS / cnf / stat / 0		M = modifier, R = reserve/release mode
+bytes 8-11		stat / stat / modi / fiers
+bytes 12-15		check / bytes / 0'dh / dl	14-15 = difference
+
+sense byte 5-6
+
+	7240,7270
+
+0-15	header parity check bytes
+
+	726X, 7275, T3281
+
+0	1 for dual access
+1-3	device type
+	5 = 7261
+	6 = 7266
+	7 = 7276, T3286
+4-7	device physical addr (cable position)
+
+0	device fault
+1	write fault
+2	loss of on cylinder
+3	offset polarity
+4	airflow loss
+5	parity error on device ID byte
+6	spindle speed fault
+7	positioning servo faulT
+
+sense byte 7
+
+	7240, 7270		726X, 7275		T3281
+
+0-7	LSB of difference	0			physical address (unique)
+
+sense bytes 8-9
+
+	7240, 7270		726X, 7275, T3281
+
+0	data parity error	check write error
+1	check write error	data check error
+2	sector verif error	IOP parity error
+3	head verif error	data overrun
+4	cylinder verif error	head addr incr err
+5	sec addr !=0 @ hdr wr	arm in motion err
+6	diff sent to device	order parity err
+7	sector sel to device	test mode err
+
+0	ctrl sel to device	seek transfer err
+1	head sel to device	device unavailable
+2	cyl sel sent to device	head addr ver err
+3	seek forward set	sector addr ver err
+4	read gate to device	cyl addr ver err
+5	write/erase to device	726X, 7275: 0
+				T3281: ctrl overtemp
+6	read cyl sel to device	channel addr err
+7	7240: not used		missing on sect
+	7270: MSB of diff
+
+sense bytes 10+
+
+10-11	modifier bits
+12-13	check bytes
+14	0'diff high
+15	diff low (absolute value)
+
+
+operations			7240	726X
+				7270	7275
+					T3281
+
+01	write			x	x
+02	read 2			x	x
+03	seek			x	x
+04	sense			x	x
+05	check-write		x	x
+07	reserve				x
+09	header write		x	x
+0A	header read		x	x
+0F	condition rls intr		x
+12	read 1			x	x
+13	select test mode	x	x
+17	release				x
+1F	condition rls intr		x
+23	release			x
+33	restore			x	x
+83	seek with interrupt	x	x
+B3	restore with interrupt		x
+
+
+TIO, SIO, HIO status
+
+	all
+
+0	interrupt pending
+1-2	device state
+	00 = ready
+	01 = not operational
+	10 = reserved
+	11 = busy
+3	1 (automatic)
+4	unusual end
+5-6	controller state
+	00 = ready
+	01,10 = n/a
+	11 = busy
+7	0
+
+TDV status
+
+	7240, 7270		726X,7275		T3281
+
+0	data overrun		0			error corrected
+1	flaw mark		flaw mark		flaw mark
+2	sector unavailable	programming err		programming err
+3	0			write prot err		write prot err
+4	header verif error	IOP parity err		IOP parity err
+5	on cylinder		operational err		operational err
+6	seek timeout error	verification err	verification err
+7	header parity error	header parity err	header parity err
+
+AIO status
+
+	7240, 7270		726X, 7275, T3281
+
+0	data overrun		data overrun
+1	0			attn int ack
+2	0			rls int ack
+3	0			0
+4	on sector interrupt	on sector intr
+5	on cylinder		0
+6	seek timeout error	seek timeout error
+7	0			0
+
+operational status byte (SIO, HIO, TIO, TDV)
+
+	all
+
+8	incorrect lnt
+9	xmit data error
+10	xmit memory err
+11	mem addr err
+12	IOP memory err
+13	IOP ctrl err
+14	IOP halt
+15	0
+
+operational status byte (AIO)
+
+	all
+
+8	incorrect lnt
+9	xmit data error
+10	zero byte cnt intr
+11	channel end intr
+12	unusual end intr
+13-15	0
+
+

@@ -24,12 +24,13 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Oct-12    MB      Added working map base address
    09-Jan-03    RMS     Tape read/write end pkt is longer than disk read/write
    20-Sep-02    RMS     Merged TMSCP definitions
 */
 
-#ifndef _PDP11_MSCP_H_
-#define _PDP11_MSCP_H_  0
+#ifndef PDP11_MSCP_H_
+#define PDP11_MSCP_H_  0
 
 /* Misc constants */
 
@@ -84,6 +85,7 @@
 #define MD_ACL          0x0002                          /* t avl: all class NI */
 #define MD_NXU          0x0001                          /* b gus: next unit */
 #define MD_RIP          0x0001                          /* d onl: allow rip NI */
+#define MD_SPD          0x0001                          /* d avl: spin-down */
 
 /* End flags */
 
@@ -210,7 +212,7 @@
 #define CMD_REFL        2                               /* ref # */
 #define CMD_REFH        3
 #define CMD_UN          4                               /* unit # */
-/*                      5                               /* reserved */
+/*                      5                             *//* reserved */
 #define CMD_OPC         6                               /* opcode */
 #define CMD_MOD         7                               /* modifier */
 
@@ -255,14 +257,14 @@
 /* Flush - 10 W status (8 undefined) */
 
 #define FLU_LNT         32
-/*                      8 - 15                          /* reserved */
+/*                      8 - 15                        *//* reserved */
 #define FLU_POSL        16                              /* position */
 #define FLU_POSH        17
 
 /* Write tape mark - 10W status (8 undefined) */
 
 #define WTM_LNT         32
-/*                      8 - 15                          /* reserved */
+/*                      8 - 15                        *//* reserved */
 #define WTM_POSL        16                              /* position */
 #define WTM_POSH        17
 
@@ -398,8 +400,8 @@
 #define RW_BAH          11
 #define RW_MAPL         12                              /* map table */
 #define RW_MAPH         13
-/*                      14                              /* reserved */
-/*                      15                              /* reserved */
+/*                      14                            *//* reserved */
+/*                      15                            *//* reserved */
 
 /* Disk specific parameters */
 
@@ -411,6 +413,8 @@
 #define RW_WBAH         21
 #define RW_WBLL         22                              /* working lbn */
 #define RW_WBLH         23
+#define RW_WMPL         24                              /* working map */
+#define RW_WMPH         25
 
 /* Tape specific status */
 

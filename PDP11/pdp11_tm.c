@@ -155,7 +155,6 @@
 
 extern uint16 *M;                                       /* memory */
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint8 *tmxb = NULL;                                     /* xfer buffer */
 int32 tm_sta = 0;                                       /* status register */
@@ -167,7 +166,6 @@ int32 tm_rdl = 0;                                       /* read lines */
 int32 tm_time = 10;                                     /* record latency */
 int32 tm_stopioe = 1;                                   /* stop on error */
 
-DEVICE tm_dev;
 t_stat tm_rd (int32 *data, int32 PA, int32 access);
 t_stat tm_wr (int32 data, int32 PA, int32 access);
 t_stat tm_svc (UNIT *uptr);
@@ -378,7 +376,7 @@ if (f == MTC_UNLOAD) {                                  /* unload? */
     }
 else if (f == MTC_REWIND)                               /* rewind */
     uptr->USTAT = uptr->USTAT | STA_REW;                /* rewinding */
-/* else /* uncomment this else if rewind/unload don't set done */
+/* else *//* uncomment this else if rewind/unload don't set done */
 tm_cmd = tm_cmd & ~MTC_DONE;                            /* clear done */
 CLR_INT (TM);                                           /* clear int */
 sim_activate (uptr, tm_time);                           /* start io */
@@ -440,7 +438,7 @@ switch (f) {                                            /* case on function */
             tm_sta = tm_sta | STA_RLE;
         if (tbc < cbc)                                  /* use smaller */
             cbc = tbc;
-        if (t = Map_WriteB (xma, cbc, tmxb)) {          /* copy buf to mem */
+        if ((t = Map_WriteB (xma, cbc, tmxb))) {        /* copy buf to mem */
             tm_sta = tm_sta | STA_NXM;                  /* NXM, set err */
             cbc = cbc - t;                              /* adj byte cnt */
             }
@@ -450,13 +448,13 @@ switch (f) {                                            /* case on function */
 
     case MTC_WRITE:                                     /* write */
     case MTC_WREXT:                                     /* write ext gap */
-        if (t = Map_ReadB (xma, cbc, tmxb)) {           /* copy mem to buf */
+        if ((t = Map_ReadB (xma, cbc, tmxb))) {         /* copy mem to buf */
             tm_sta = tm_sta | STA_NXM;                  /* NXM, set err */
             cbc = cbc - t;                              /* adj byte cnt */
             if (cbc == 0)                               /* no xfr? done */
                 break;
             }
-        if (st = sim_tape_wrrecf (uptr, tmxb, cbc))     /* write rec, err? */
+        if ((st = sim_tape_wrrecf (uptr, tmxb, cbc)))   /* write rec, err? */
             r = tm_map_err (uptr, st);                  /* map error */
         else {
             xma = (xma + cbc) & 0777777;                /* inc bus addr */
@@ -465,14 +463,14 @@ switch (f) {                                            /* case on function */
         break;
 
     case MTC_WREOF:                                     /* write eof */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = tm_map_err (uptr, st);                  /* map error */
         break;
 
     case MTC_SPACEF:                                    /* space forward */
         do {
             tm_bc = (tm_bc + 1) & 0177777;              /* incr wc */
-            if (st = sim_tape_sprecf (uptr, &tbc)) {    /* spc rec fwd, err? */
+            if ((st = sim_tape_sprecf (uptr, &tbc))) {  /* spc rec fwd, err? */
                 r = tm_map_err (uptr, st);              /* map error */
                 break;
                 }
@@ -482,7 +480,7 @@ switch (f) {                                            /* case on function */
     case MTC_SPACER:                                    /* space reverse */
         do {
             tm_bc = (tm_bc + 1) & 0177777;              /* incr wc */
-            if (st = sim_tape_sprecr (uptr, &tbc)) {    /* spc rec rev, err? */
+            if ((st = sim_tape_sprecr (uptr, &tbc))) {  /* spc rec rev, err? */
                 r = tm_map_err (uptr, st);              /* map error */
                 break;
                 }
@@ -639,7 +637,7 @@ int32 u = uptr - tm_dev.units;
 
 if ((uptr->flags & UNIT_ATT) && 
     (val || sim_tape_wrp (uptr)))
-	uptr->USTAT = uptr->USTAT | STA_WLK;
+    uptr->USTAT = uptr->USTAT | STA_WLK;
 else uptr->USTAT = uptr->USTAT & ~STA_WLK;
 if (u == GET_UNIT (tm_cmd))
     tm_updcsta (uptr);
@@ -712,8 +710,7 @@ static const uint16 boot2_rom[] = {
 
 t_stat tm_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
-extern int32 sim_switches;
+size_t i;
 
 sim_tape_rewind (&tm_unit[unitno]);
 if (sim_switches & SWMASK ('O')) {
@@ -724,7 +721,7 @@ else {
     for (i = 0; i < BOOT2_LEN; i++)
         M[(BOOT_START >> 1) + i] = boot2_rom[i];
     }
-M[BOOT_UNIT >> 1] = unitno;
+M[BOOT_UNIT >> 1] = (uint16)unitno;
 M[BOOT_CSR >> 1] = (tm_dib.ba & DMASK) + 06;
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;

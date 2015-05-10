@@ -1,6 +1,6 @@
 /* gri_sys.c: GRI-909 simulator interface
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -37,7 +37,6 @@ extern DEVICE hsr_dev, hsp_dev;
 extern DEVICE rtc_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
-extern int32 sim_switches;
 
 void fprint_addr (FILE *of, uint32 val, uint32 mod, uint32 dst);
 

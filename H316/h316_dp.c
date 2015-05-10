@@ -1,6 +1,6 @@
 /* h316_dp.c: Honeywell 4623, 4651, 4720 disk simulator
 
-   Copyright (c) 2003-2012, Robert M. Supnik
+   Copyright (c) 2003-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
                 4651 disk subsystem
                 4720 disk subsystem
 
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    04-Sep-05    RMS     Fixed missing return (Peter Schorn)
    15-Jul-05    RMS     Fixed bug in attach routine
@@ -220,7 +221,6 @@ extern int32 dev_int, dev_enb;
 extern uint32 chan_req;
 extern int32 stop_inst;
 extern uint32 dma_ad[DMA_MAX];
-extern int32 sim_switches;
 
 uint32 dp_cw1 = 0;                                      /* cmd word 1 */
 uint32 dp_cw2 = 0;                                      /* cmd word 2 */
@@ -270,7 +270,7 @@ t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, void *desc);
    dp_mod       DP modifier list
 */
 
-DIB dp_dib = { DP, DMC1, 1, &dpio };
+DIB dp_dib = { DP, 1, DMC1, IOBUS, INT_V_DP, INT_V_NONE, &dpio, 0 };
 
 UNIT dp_unit[] = {
     { UDATA (&dp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
@@ -617,7 +617,7 @@ switch (uptr->FNC) {                                    /* case on function */
     case FNC_RCA:                                       /* read current addr */
         if (h >= dp_tab[dp_ctype].surf)                 /* invalid head? */
             return dp_done (1, STA_ADRER);              /* error */
-        if (r = dp_rdtrk (uptr, dpxb, uptr->CYL, h))    /* get track; error? */
+        if ((r = dp_rdtrk (uptr, dpxb, uptr->CYL, h)))  /* get track; error? */
             return r;
         dp_rptr = 0;                                    /* init rec ptr */
         if (dpxb[dp_rptr + REC_LNT] == 0)               /* unformated? */
@@ -722,7 +722,7 @@ switch (uptr->FNC) {                                    /* case on function */
     case FNC_RW:                                        /* read/write */
         if (h >= dp_tab[dp_ctype].surf)                 /* invalid head? */
             return dp_done (1, STA_ADRER);              /* error */
-        if (r = dp_rdtrk (uptr, dpxb, uptr->CYL, h))    /* get track; error? */
+        if ((r = dp_rdtrk (uptr, dpxb, uptr->CYL, h)))  /* get track; error? */
             return r;
         if (!dp_findrec (dp_cw2))                       /* find rec; error? */
             return dp_done (1, STA_ADRER);              /* address error */
@@ -750,7 +750,7 @@ switch (uptr->FNC) {                                    /* case on function */
         if (dp_cw1 & CW1_RW) {                          /* write? */
             if (dp_sta & STA_RDY)                       /* timing failure? */
                 return dp_wrdone (uptr, STA_DTRER);     /* yes, error */
-            if (r = dp_wrwd (uptr, dp_buf))             /* wr word, error? */
+            if ((r = dp_wrwd (uptr, dp_buf)))           /* wr word, error? */
                 return r;
             if (dp_eor) {                               /* transfer done? */
                 dpxb[dp_rptr + REC_DATA + dp_wptr] = dp_csum;
@@ -855,7 +855,7 @@ if (dp_wptr < (lnt + REC_MAXEXT)) {
     }
 dpxb[dp_rptr + REC_DATA + dp_wptr] = dp_csum;           /* write csum */
 dpxb[dp_rptr + lnt + REC_OVHD] = 0;                     /* zap rest of track */
-if (r = dp_wrdone (uptr, STA_UNSER))                    /* dump track */
+if ((r = dp_wrdone (uptr, STA_UNSER)))                  /* dump track */
     return r;
 return STOP_DPOVR;
 }       
@@ -1002,7 +1002,7 @@ else {
     if (nr <= 0)
         return SCPE_ARG;
     }
-printf ("Proposed format: records/track = %d, record size = %d\n", nr, nw);
+sim_printf ("Proposed format: records/track = %d, record size = %d\n", nr, nw);
 if (!get_yn ("Formatting will destroy all data on this disk; proceed? [N]", FALSE))
     return SCPE_OK;
 for (c = cntr = 0; c < dp_tab[dp_ctype].cyl; c++) {
@@ -1017,11 +1017,11 @@ for (c = cntr = 0; c < dp_tab[dp_ctype].cyl; c++) {
             else tbuf[rptr + REC_ADDR] = (c << 8) + (h << 3) + i;
             rptr = rptr + nw + REC_OVHD;
             }
-        if (r = dp_wrtrk (uptr, tbuf, c, h))
+        if ((r = dp_wrtrk (uptr, tbuf, c, h)))
             return r;
         }
     }
-printf ("Formatting complete\n");
+sim_printf ("Formatting complete\n");
 return SCPE_OK;
 }
 
@@ -1043,7 +1043,7 @@ if ((uptr->flags & UNIT_ATT) == 0)
     return SCPE_UNATT;
 for (c = 0; c < dp_tab[dp_ctype].cyl; c++) {
     for (h = 0; h < dp_tab[dp_ctype].surf; h++) {
-        if (r = dp_rdtrk (uptr, tbuf, c, h))
+        if ((r = dp_rdtrk (uptr, tbuf, c, h)))
             return r;
         rptr = 0;
         rlnt = tbuf[rptr + REC_LNT];

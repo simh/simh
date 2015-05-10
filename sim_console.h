@@ -1,6 +1,6 @@
 /* sim_console.h: simulator console I/O library headers
 
-   Copyright (c) 1993-2014, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Dec-14    JDB     [4.0] Added sim_*_char externals
    02-Jan-14    RMS     Added tab stop routines
    22-Jun-06    RMS     Implemented SET/SHOW PCHAR
    22-Nov-05    RMS     Added central input/output conversion support
@@ -31,8 +32,8 @@
    02-Jan-04    RMS     Removed timer routines, added Telnet console routines
 */
 
-#ifndef _SIM_CONSOLE_H_
-#define _SIM_CONSOLE_H_ 0
+#ifndef SIM_CONSOLE_H_
+#define SIM_CONSOLE_H_  0
 
 #define TTUF_V_MODE     (UNIT_V_UF + 0)
 #define TTUF_W_MODE     2
@@ -40,16 +41,31 @@
 #define  TTUF_MODE_8B   1
 #define  TTUF_MODE_UC   2
 #define  TTUF_MODE_7P   3
-#define  TTUF_KSR       (1u << TTUF_W_MODE)
 #define TTUF_M_MODE     ((1u << TTUF_W_MODE) - 1)
-#define TTUF_V_UF       (TTUF_V_MODE + TTUF_W_MODE)
+#define TTUF_V_PAR      (TTUF_V_MODE + TTUF_W_MODE)
+#define TTUF_W_PAR      2
+#define  TTUF_PAR_SPACE 0
+#define  TTUF_PAR_MARK  1
+#define  TTUF_PAR_EVEN  2
+#define  TTUF_PAR_ODD   3
+#define TTUF_M_PAR      ((1u << TTUF_W_PAR) - 1)
+#define  TTUF_KSR       (1u << (TTUF_W_MODE + TTUF_W_PAR))
+#define TTUF_V_UF       (TTUF_V_MODE + TTUF_W_MODE + TTUF_W_PAR)
 #define TT_MODE         (TTUF_M_MODE << TTUF_V_MODE)
 #define  TT_MODE_7B     (TTUF_MODE_7B << TTUF_V_MODE)
 #define  TT_MODE_8B     (TTUF_MODE_8B << TTUF_V_MODE)
 #define  TT_MODE_UC     (TTUF_MODE_UC << TTUF_V_MODE)
 #define  TT_MODE_7P     (TTUF_MODE_7P << TTUF_V_MODE)
 #define  TT_MODE_KSR    (TT_MODE_UC)
-#define TT_GET_MODE(x)  (((x) >> TTUF_V_MODE) & TTUF_M_MODE)
+/* 7 bit modes allow for an 8th bit parity mode */
+#define TT_PAR          (TTUF_M_PAR << TTUF_V_PAR)
+#define  TT_PAR_SPACE   (TTUF_PAR_SPACE << TTUF_V_PAR)
+#define  TT_PAR_MARK    (TTUF_PAR_MARK  << TTUF_V_PAR)
+#define  TT_PAR_EVEN    (TTUF_PAR_EVEN  << TTUF_V_PAR)
+#define  TT_PAR_ODD     (TTUF_PAR_ODD   << TTUF_V_PAR)
+/* TT_GET_MODE returns both the TT_MODE and TT_PAR fields 
+   since they together are passed into sim_tt_inpcvt() */
+#define TT_GET_MODE(x)  (((x) >> TTUF_V_MODE) & (TTUF_M_MODE | (TTUF_M_PAR << TTUF_W_MODE)))
 
 t_stat sim_set_console (int32 flag, char *cptr);
 t_stat sim_set_kmap (int32 flag, char *cptr);
@@ -80,5 +96,10 @@ int32 sim_tt_inpcvt (int32 c, uint32 mode);
 int32 sim_tt_outcvt (int32 c, uint32 mode);
 t_stat sim_tt_settabs (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat sim_tt_showtabs (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+extern int32 sim_int_char;                                  /* interrupt character */
+extern int32 sim_brk_char;                                  /* break character */
+extern int32 sim_tt_pchar;                                  /* printable character mask */
+extern int32 sim_del_char;                                  /* delete character */
 
 #endif

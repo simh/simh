@@ -35,8 +35,6 @@
 extern int32 int_req, dev_busy, dev_done, dev_disable;
 t_stat pkb_svc (UNIT *uptr);
 t_stat pkb_reset (DEVICE *dptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
 extern int32 IAR[], level;
 extern int32 debug_reg;
 
@@ -233,7 +231,7 @@ int32 pkb (int32 op, int32 m, int32 n, int32 data)
         default:
             break;
     }                       
-    printf (">>PKB non-existent function %d\n", op);
+    sim_printf (">>PKB non-existent function %d\n", op);
     return SCPE_OK;                     
 }
 

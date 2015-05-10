@@ -332,7 +332,7 @@ do {
         if ((rf_wlk >> t) & 1)                          /* write locked? */
             rf_sta = rf_sta | RFS_WLS;
         else {                                          /* not locked */
-            fbuf[rf_da] = M[pa];						/* write word */
+            fbuf[rf_da] = M[pa];                        /* write word */
             if (((uint32) rf_da) >= uptr->hwmark)
                 uptr->hwmark = rf_da + 1;
             }
@@ -400,8 +400,7 @@ static const uint16 dm4_rom[] = {
 
 t_stat rf_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
-extern int32 sim_switches, saved_PC;
+size_t i;
 
 if (rf_dib.dev != DEV_RF)                               /* only std devno */
     return STOP_NOTSTD;

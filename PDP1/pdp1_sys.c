@@ -1,6 +1,6 @@
 /* pdp1_sys.c: PDP-1 simulator interface
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Mar-15    RMS     Backported changes from GitHub master
    03-Jan-07    RMS     Fixed bugs in block loader, char input
    21-Dec-06    RMS     Added 16-channel sequence break support, PDP-1D support
    06-Apr-04    RMS     Fixed bug in binary loader (found by Mark Crispin)
@@ -58,14 +59,15 @@ extern DEVICE dt_dev;
 extern DEVICE drm_dev;
 extern DEVICE drp_dev;
 extern DEVICE dcs_dev, dcsl_dev;
+#if defined(USE_DISPLAY)
 extern DEVICE dpy_dev;
+#endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern int32 M[];
 extern int32 PC;
 extern int32 ascii_to_fiodec[], fiodec_to_ascii[];
 extern int32 sc_map[];
-extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 
@@ -96,7 +98,9 @@ DEVICE *sim_devices[] = {
     &drp_dev,
     &dcs_dev,
     &dcsl_dev,
-/*  &dpy_dev, */
+#if defined(USE_DISPLAY)
+    &dpy_dev,
+#endif
     NULL
     };
 

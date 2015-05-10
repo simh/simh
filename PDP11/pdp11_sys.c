@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   02-Sep-13	RMS	Added third Massbus, RS03/RS04
+   02-Sep-13    RMS     Added third Massbus, RS03/RS04
    29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    15-May-08    RMS     Added KE11-A, DC11 support
@@ -252,8 +252,8 @@ do {                                                    /* block loop */
         if (org >= MEMSIZE)                             /* invalid addr? */
             return SCPE_NXM;
         M[org >> 1] = (org & 1)?                        /* store data */
-            (M[org >> 1] & 0377) | (d << 8):
-            (M[org >> 1] & 0177400) | d;
+            (M[org >> 1] & 0377) | (uint16)(d << 8):
+            (M[org >> 1] & 0177400) | (uint16)d;
         org = (org + 1) & 0177777;                      /* inc origin */
         }
     if ((d = getc (fileref)) == EOF)                    /* get csum */
@@ -801,7 +801,7 @@ return tptr;
 t_stat get_spec (char *cptr, t_addr addr, int32 n1, int32 *sptr, t_value *dptr,
     int32 cflag, int32 iflag)
 {
-int32 reg, indir, pflag, disp;
+int32 reg, indir, pflag, disp = 0;
 
 indir = 0;                                              /* no indirect */
 pflag = 0;
@@ -1075,7 +1075,8 @@ switch (j) {                                            /* case on class */
         for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
             cptr = get_glyph (cptr, gbuf, 0)) {
             for (i = 0; (opcode[i] != NULL) &&
-                (strcmp (opcode[i], gbuf) != 0) ; i++) ;
+                (strcmp (opcode[i], gbuf) != 0) ; i++)
+                ;
              if ((((opc_val[i] >> I_V_CL) & I_M_CL) != j) ||
                 (opcode[i] == NULL))
                 return SCPE_ARG;

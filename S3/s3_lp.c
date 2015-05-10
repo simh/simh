@@ -203,7 +203,7 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
         default:
             break;
     }                       
-    printf (">>LPT non-existent function %d\n", op);
+    sim_printf (">>LPT non-existent function %d\n", op);
     return SCPE_OK;                     
 }
 

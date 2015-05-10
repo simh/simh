@@ -40,11 +40,7 @@ extern REG cpu_reg[];
 extern uint32 M[];
 extern uint32 PC;
 extern uint32 ts_flag;
-extern int32 sim_switches;
 extern int32 flex_to_ascii[128], ascii_to_flex[128];
-
-extern void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr);
-extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
 
 /* SCP data structures and interface routines
 
@@ -297,7 +293,7 @@ if (uptr && (uptr != &cpu_unit))                        /* must be CPU */
     return SCPE_ARG;
 if ((sw & SWMASK ('M')) &&                              /* symbolic decode? */
     ((inst & ~(SIGN|I_OP|I_EA)) == 0)) {
-	op = I_GETOP (inst);
+    op = I_GETOP (inst);
     ea = I_GETEA (inst);
     if (inst & SIGN)
         fputc ('-', of);
@@ -363,7 +359,7 @@ if ((sw & SWMASK ('L')) ||                              /* LGP hex? */
             return SCPE_OK;
         if (islower (c))
             c = toupper (c);
-        if (tptr = strchr (hex_decode, c))
+        if ((tptr = strchr (hex_decode, c)))
             val[0] = (val[0] << 4) | (tptr - hex_decode);
         else return SCPE_ARG;
         }
@@ -388,7 +384,7 @@ else sgn = 0;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 if (gbuf[1] != 0)
     return SCPE_ARG;
-if (tptr = strchr (opcode, gbuf[0]))
+if ((tptr = strchr (opcode, gbuf[0])))
     val[0] = ((tptr - opcode) << I_V_OP) | sgn;         /* merge opcode */
 else return SCPE_ARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get address */

@@ -66,8 +66,6 @@ extern uint32 int_req[INTSZ], int_enb[INTSZ];
 extern uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout);
 extern uint32 pawidth;
 extern UNIT cpu_unit;
-extern FILE *sim_log;
-extern DEVICE *sim_devices[];
 
 uint32 sch_max = 2;                                     /* sch count */
 uint32 sch_sa[SCH_NUMCH] = { 0 };                       /* start addr */
@@ -358,14 +356,11 @@ if ((r != SCPE_OK) || (newmax == sch_max))              /* err or no chg? */
 if (newmax == 0)                                        /* must be > 0 */
     return SCPE_ARG;
 if (newmax < sch_max) {                                 /* reducing? */
-    for (i = 0; dptr = sim_devices[i]; i++) {           /* loop thru dev */
+    for (i = 0; (dptr = sim_devices[i]); i++) {           /* loop thru dev */
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp && (dibp->sch >= (int32) newmax)) {    /* dev using chan? */
-            printf ("Device %02X uses channel %d\n",
+            sim_printf ("Device %02X uses channel %d\n",
                     dibp->dno, dibp->sch);
-            if (sim_log)
-                fprintf (sim_log, "Device %02X uses channel %d\n",
-                         dibp->dno, dibp->sch);
             return SCPE_OK;
             }
         }
@@ -439,7 +434,7 @@ int32 i, j, t;
 uint32 r;
 
 for (i = t = 0; i < INTSZ; i++) {                       /* loop thru array */
-    if (r = int_req[i] & int_enb[i]) {                  /* find nz int wd */
+    if ((r = int_req[i] & int_enb[i])) {                /* find nz int wd */
         for (j = 0; j < 32; t++, j++) {
             if (r & (1u << j)) {
                 int_req[i] = int_req[i] & ~(1u << j);   /* clr request */
@@ -630,7 +625,7 @@ for (i = 0; i < (DEVNO / 32); i++)
 
 /* Test each device for conflict; add to map; init tables */
 
-for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru devices */
+for (i = 0; (dptr = sim_devices[i]); i++) {               /* loop thru devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if ((dibp == NULL) || (dptr->flags & DEV_DIS))      /* exist, enabled? */
         continue;
@@ -645,9 +640,7 @@ for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru devices */
         dmsk = 1u << (t & 0x1F);                        /* bit to test */
         doff = t / 32;                                  /* word to test */
         if (dmap[doff] & dmsk) {                        /* in use? */
-            printf ("Device number conflict, devno = %02X\n", t);
-            if (sim_log)
-                fprintf (sim_log, "Device number conflict, devno = %02X\n", t);
+            sim_printf ("Device number conflict, devno = %02X\n", t);
             return TRUE;
             }
         dmap[doff] = dmap[doff] | dmsk;

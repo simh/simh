@@ -36,8 +36,8 @@
    28-Feb-03    RMS     Changed magtape device default to 0x85
 */
 
-#ifndef _ID_DEFS_H_
-#define _ID_DEFS_H_     0
+#ifndef ID_DEFS_H_
+#define ID_DEFS_H_     0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

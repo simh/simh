@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    tto          teleprinter
    clk          clock
 
+   28-Mar-15    RMS     Revised to use sim_printf
    18-Apr-12    RMS     Added clk_cosched routine
                         Revised clk and tti scheduling
    18-Jun-07    RMS     Added UNIT_IDLE to console input, clock
@@ -85,8 +86,6 @@
 
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1], PC, ASW;
-extern int32 sim_switches;
-extern int32 sim_is_running;
 extern UNIT cpu_unit;
 
 int32 clk_state = 0;
@@ -428,7 +427,7 @@ int32 t;
 
 t = sim_rtc_calb (clk_tps);                             /* calibrate clock */
 tmxr_poll = t;                                          /* set mux poll */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 #if defined (PDP15)
 clk_task_upd (FALSE);                                   /* update task timer */
 #endif
@@ -453,7 +452,6 @@ int32 clk_task_upd (t_bool clr)
 {
 uint32 delta, val, iusec10;
 uint32 cur = sim_grtime ();
-uint32 old = clk_task_timer;
 double usec10;
 
 if (cur > clk_task_last)
@@ -495,6 +493,7 @@ t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
 
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 CLR_INT (CLK);                                          /* clear flag */
 if (!sim_is_running) {                                  /* RESET (not CAF)? */
     t = sim_rtc_init (clk_unit.wait);                   /* init calibration */
@@ -584,7 +583,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
 #endif
     if (feof (ptr_unit.fileref)) {
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");
@@ -594,7 +593,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
 if (ptr_state == 0) {                                   /* ASCII */
     if (ptr_unit.flags & UNIT_RASCII) {                 /* want parity? */
         ptr_unit.buf = temp = temp & 0177;              /* parity off */
-        while (temp = temp & (temp - 1))
+        while ((temp = temp & (temp - 1)))
             ptr_unit.buf = ptr_unit.buf ^ 0200;         /* count bits */
         ptr_unit.buf = ptr_unit.buf ^ 0200;             /* set even parity */
         }
@@ -861,8 +860,8 @@ static const int32 boot_rom[] = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i, mask, wd;
-extern int32 sim_switches;
+size_t i;
+int32 mask, wd;
 
 #if defined (PDP7)
 if (sim_switches & SWMASK ('H'))                        /* hardware RIM load? */
@@ -994,7 +993,7 @@ if (pulse & 001) {                                      /* KSF */
     }
 if (pulse & 002) {                                      /* KRS/KRB */
     CLR_INT (TTI);                                      /* clear flag */
-    dat = dat | tti_unit.buf & TTI_MASK;                /* return buffer */
+    dat = dat | (tti_unit.buf & TTI_MASK);              /* return buffer */
 #if defined (PDP15)
     if (pulse & 020)                                    /* KRS? */
         tti_fdpx = 1;

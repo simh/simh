@@ -193,7 +193,7 @@ uint32 GREG[16] = { 0 };                                /* general registers */
 uint16 *M = NULL;                                       /* memory */
 uint32 *R = &GREG[0];                                   /* register set ptr */
 uint32 F[8] = { 0 };                                    /* sp fp registers */
-dpr_t D[8] = { 0 };                                     /* dp fp registers */
+dpr_t D[8] = { {0, 0} };                                /* dp fp registers */
 uint32 PSW = 0;                                         /* processor status word */
 uint32 psw_mask = PSW_x16;                              /* PSW mask */
 uint32 PC = 0;                                          /* program counter */
@@ -222,11 +222,6 @@ uint32 hst_lnt = 0;                                     /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 struct BlockIO blk_io;                                  /* block I/O status */
 uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout) = { NULL };
-
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
 
 uint32 ReadB (uint32 loc);
 uint32 ReadH (uint32 loc);
@@ -604,7 +599,7 @@ while (reason == 0) {                                   /* loop until halted */
     int32 sr, st;
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         int_eval ();
         }
@@ -650,9 +645,7 @@ while (reason == 0) {                                   /* loop until halted */
             }
 
         if (PSW & PSW_WAIT) {                           /* wait state? */
-            if (sim_idle_enab)                          /* idling enabled? */
-                sim_idle (TMR_LFC, TRUE);
-            else sim_interval = sim_interval - 1;       /* no, count cycle */
+            sim_idle (TMR_LFC, TRUE);                   /* idling */
             continue;
             }
 
@@ -664,7 +657,7 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     sim_interval = sim_interval - 1;
 
@@ -1642,7 +1635,7 @@ do {
             if (DEV_ACC (dev)) {                        /* dev exist? */
                 by = ReadB ((vec + CCB16_IOC) & VAMASK);/* read OC byte */
                 dev_tab[dev] (dev, IO_OC, by);          /* send to dev */
-				}
+                }
             break;                                      /* and exit */
             }
         }
@@ -1955,7 +1948,7 @@ if (!(val & UNIT_816E) && (MEMSIZE > MAXMEMSIZE16)) {
     MEMSIZE = MAXMEMSIZE16;
     for (i = MEMSIZE; i < MAXMEMSIZE16E; i = i + 2)
         M[i >> 1] = 0;
-    printf ("Reducing memory to 64KB\n");
+    sim_printf ("Reducing memory to 64KB\n");
     }
 return SCPE_OK;
 }
@@ -2011,8 +2004,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[2];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

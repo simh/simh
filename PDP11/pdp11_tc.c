@@ -26,7 +26,7 @@
    tc           TC11/TU56 DECtape
 
    23-Oct-13    RMS     Revised for new boot setup routine
-   23-Jun-06	RMS     Fixed switch conflict in ATTACH
+   23-Jun-06    RMS     Fixed switch conflict in ATTACH
    10-Feb-06    RMS     READ sets extended data bits in TCST (Alan Frisbie)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -266,17 +266,15 @@
 #define LOG_BL          0x4
 
 #define DT_SETDONE      tccm = tccm | CSR_DONE; \
-						if (tccm & CSR_IE) \
+                        if (tccm & CSR_IE) \
                             SET_INT (DTA)
 #define DT_CLRDONE      tccm = tccm & ~CSR_DONE; \
-						CLR_INT (DTA)
+                        CLR_INT (DTA)
 #define ABS(x)          (((x) < 0)? (-(x)): (x))
 
 extern uint16 *M;                                       /* memory */
 extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
-extern int32 sim_switches;
-extern FILE *sim_deb;
 
 int32 tcst = 0;                                         /* status */
 int32 tccm = 0;                                         /* command */
@@ -290,7 +288,6 @@ int32 dt_substate = 0;
 int32 dt_logblk = 0;
 int32 dt_stopoffr = 0;
 
-DEVICE dt_dev;
 t_stat dt_rd (int32 *data, int32 PA, int32 access);
 t_stat dt_wr (int32 data, int32 PA, int32 access);
 t_stat dt_svc (UNIT *uptr);
@@ -309,7 +306,6 @@ void dt_stopunit (UNIT *uptr);
 int32 dt_comobv (int32 val);
 int32 dt_csum (UNIT *uptr, int32 blk);
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
-extern int32 sim_is_running;
 
 /* DT data structures
 
@@ -710,7 +706,7 @@ switch (fnc) {                                          /* case function */
             if (dir)
                 newpos = DT_BLK2LN (blk + 1, uptr) - DT_CSMLN - DT_WSIZE;
             else newpos = DT_BLK2LN (blk, uptr) + DT_CSMLN + (DT_WSIZE - 1);
-			}
+            }
         if (fnc == FNC_WALL) sim_activate               /* write all? */
             (&dt_dev.units[DT_TIMER], dt_ctime);        /* sched done */
         if (DEBUG_PRI (dt_dev, LOG_RW) ||
@@ -750,7 +746,7 @@ t_bool dt_setpos (UNIT *uptr)
 {
 uint32 new_time, ut, ulin, udelt;
 int32 mot = DTS_GETMOT (uptr->STATE);
-int32 unum, delta;
+int32 unum, delta = 0;
 
 new_time = sim_grtime ();                               /* current time */
 ut = new_time - uptr->LASTT;                            /* elapsed time */
@@ -785,13 +781,13 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
-	uptr->STATE = uptr->pos = 0;
-	unum = (int32) (uptr - dt_dev.units);
-	if ((unum == CSR_GETUNIT (tccm)) && (CSR_GETFNC (tccm) != FNC_STOP))
-		dt_seterr (uptr, STA_SEL);						/* error */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel? */
+    uptr->STATE = uptr->pos = 0;
+    unum = (int32) (uptr - dt_dev.units);
+    if ((unum == CSR_GETUNIT (tccm)) && (CSR_GETFNC (tccm) != FNC_STOP))
+        dt_seterr (uptr, STA_SEL);                      /* error */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -993,7 +989,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (ba >= uptr->hwmark)
                 uptr->hwmark = ba + 1;
             }
-/*      else                                            /* ignore hdr */ 
+/*      else                                          *//* ignore hdr */ 
         sim_activate (uptr, DT_WSIZE * dt_ltime);
         DT_SETDONE;                                     /* set done */
         break;
@@ -1184,7 +1180,7 @@ static const uint16 boot_rom[] = {
 
 t_stat dt_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 
 dt_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++)
@@ -1235,13 +1231,13 @@ if (uptr->filebuf == NULL) {                            /* can't alloc? */
     return SCPE_MEM;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
-printf ("%s%d: ", sim_dname (&dt_dev), u);
+sim_printf ("%s%d: ", sim_dname (&dt_dev), u);
 if (uptr->flags & UNIT_8FMT)
-    printf ("12b format");
+    sim_printf ("12b format");
 else if (uptr->flags & UNIT_11FMT)
-    printf ("16b format");
-else printf ("18b/36b format");
-printf (", buffering file in memory\n");
+    sim_printf ("16b format");
+else sim_printf ("18b/36b format");
+sim_printf (", buffering file in memory\n");
 if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp8b, sizeof (int16), D8_NBSIZE, uptr->fileref);
@@ -1304,12 +1300,12 @@ if (sim_is_active (uptr)) {                             /* active? cancel op */
         tccm = tccm | CSR_ERR | CSR_DONE;
         if (tccm & CSR_IE)
             SET_INT (DTA);
-		}
+        }
     uptr->STATE = uptr->pos = 0;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
 if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-    printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
+    sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
     rewind (uptr->fileref);                             /* start of file */
     if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
         for (ba = 0; ba < uptr->hwmark; ) {             /* loop thru file */

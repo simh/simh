@@ -28,7 +28,7 @@
    17-Sep-07    RMS     Changed to use central set_bootpc routine
    13-Aug-07    RMS     Fixed handling of BEOT
    06-Aug-07    RMS     Foward op at BOT skips initial file gap
-   30-May007    RMS     Fixed typo (Norm Lastovica)
+   30-May-07    RMS     Fixed typo (Norm Lastovica)
 
    Magnetic tapes are represented as a series of variable records
    of the form:
@@ -139,7 +139,6 @@
 
 extern int32 int_req, stop_inst;
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 uint32 ct_sra = 0;                                      /* status reg A */
 uint32 ct_srb = 0;                                      /* status reg B */
@@ -227,7 +226,7 @@ DEVICE ct_dev = {
     CT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ct_reset,
     &ct_boot, &ct_attach, &ct_detach,
-    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG
+    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_TAPE
     };
 
 /* IOT routines */
@@ -271,7 +270,7 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
 
     case 6:                                             /* KGOA */
         ct_df = 0;                                      /* clear data flag */
-        if (uptr = ct_busy ())                          /* op in progress? */
+        if ((uptr = ct_busy ()))                        /* op in progress? */
             AC = ct_go_cont (uptr, AC);                 /* yes */
         else AC = ct_go_start (AC);                     /* no, start */
         ct_updsta (NULL);
@@ -434,7 +433,7 @@ switch (uptr->FNC) {                                    /* case on function */
 
     case SRA_CRC:                                       /* CRC */
         if (ct_write) {                                 /* write? */
-           if (st = sim_tape_wrrecf (uptr, ct_xb, ct_bptr)) /* write, err? */
+           if ((st = sim_tape_wrrecf (uptr, ct_xb, ct_bptr)))/* write, err? */
                r = ct_map_err (uptr, st);               /* map error */
            break;                                       /* write done */
            }
@@ -453,7 +452,7 @@ switch (uptr->FNC) {                                    /* case on function */
          break;                                         /* read done */
 
     case SRA_WFG:                                       /* write file gap */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = ct_map_err (uptr, st);                  /* map error */
         break;
 
@@ -463,7 +462,7 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     case SRA_SRB:                                       /* space rev blk */
-        if (st = sim_tape_sprecr (uptr, &tbc))          /* space rev, err? */
+        if ((st = sim_tape_sprecr (uptr, &tbc)))        /* space rev, err? */
             r = ct_map_err (uptr, st);                  /* map error */
          break;
 
@@ -719,7 +718,7 @@ static const uint16 boot_rom[] = {
 
 t_stat ct_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern uint16 M[];
 
 if ((ct_dib.dev != DEV_CT) || unitno)                   /* only std devno */
