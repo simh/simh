@@ -122,10 +122,14 @@ static const uint32 bpi [] = {                          /* tape density table, i
 
 #define BPI_COUNT       (sizeof (bpi) / sizeof (bpi [0]))   /* count of density table entries */
 
-t_stat sim_tape_ioerr (UNIT *uptr);
-t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
-uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map);
-t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
+static t_stat sim_tape_ioerr (UNIT *uptr);
+static t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
+static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map);
+static t_stat sim_tape_simh_check (UNIT *uptr);
+static t_stat sim_tape_e11_check (UNIT *uptr);
+static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
+static void sim_tape_data_trace (UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason);
+
 
 struct tape_context {
     DEVICE              *dptr;              /* Device for unit (access to debug flags) */
@@ -462,6 +466,20 @@ if (r != SCPE_OK)                                       /* error? */
     return r;
 switch (MT_GET_FMT (uptr)) {                            /* case on format */
 
+    case MTUF_F_STD:                                    /* SIMH */
+        if (SCPE_OK != sim_tape_simh_check (uptr)) {
+            sim_tape_detach (uptr);
+            return SCPE_FMT;                            /* yes, complain */
+            }
+        break;
+
+    case MTUF_F_E11:                                    /* E11 */
+        if (SCPE_OK != sim_tape_e11_check (uptr)) {
+            sim_tape_detach (uptr);
+            return SCPE_FMT;                            /* yes, complain */
+            }
+        break;
+
     case MTUF_F_TPC:                                    /* TPC */
         objc = sim_tape_tpc_map (uptr, NULL);           /* get # objects */
         if (objc == 0) {                                /* tape empty? */
@@ -558,7 +576,7 @@ fprintf (st, "                is SIMH, alternatives are E11, TPC and P7B)\n");
 return SCPE_OK;
 }
 
-void sim_tape_data_trace(UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason)
+static void sim_tape_data_trace(UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
@@ -643,7 +661,7 @@ if (sim_deb && (ctx->dptr->dctrl & reason))
             1024              171
 */
 
-t_stat sim_tape_rdlntf (UNIT *uptr, t_mtrlnt *bc)
+static t_stat sim_tape_rdlntf (UNIT *uptr, t_mtrlnt *bc)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint8 c;
@@ -838,7 +856,7 @@ return r;
    runaway and the erase gap implementation, respectively.
 */
 
-t_stat sim_tape_rdlntr (UNIT *uptr, t_mtrlnt *bc)
+static t_stat sim_tape_rdlntr (UNIT *uptr, t_mtrlnt *bc)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint8 c;
@@ -1186,7 +1204,7 @@ return r;
 
 /* Write metadata forward (internal routine) */
 
-t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat)
+static t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
@@ -2048,7 +2066,7 @@ return ((uptr->flags & MTUF_WRP) || (MT_GET_FMT (uptr) == MTUF_F_TPC))? TRUE: FA
 
 /* Process I/O error */
 
-t_stat sim_tape_ioerr (UNIT *uptr)
+static t_stat sim_tape_ioerr (UNIT *uptr)
 {
 sim_printf ("%s: Magtape library I/O error: %s\n", sim_uname (uptr), strerror (errno));
 clearerr (uptr->fileref);
@@ -2091,32 +2109,51 @@ return SCPE_OK;
 
 /* Map a TPC format tape image */
 
-uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map)
+static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map)
 {
 t_addr tpos;
-t_tpclnt bc;
+t_addr tape_size;
+t_tpclnt bc, last_bc;
 size_t i;
 uint32 objc;
 
 if ((uptr == NULL) || (uptr->fileref == NULL))
     return 0;
+tape_size = (t_addr)sim_fsize (uptr->fileref);
 for (objc = 0, tpos = 0;; ) {
     sim_fseek (uptr->fileref, tpos, SEEK_SET);
     i = sim_fread (&bc, sizeof (t_tpclnt), 1, uptr->fileref);
-    if (i == 0)
+    if (i == 0)     /* past or at eof? */
         break;
     if (map)
         map[objc] = tpos;
     objc++;
     tpos = tpos + ((bc + 1) & ~1) + sizeof (t_tpclnt);
+    last_bc = bc;
     }
+if ((last_bc != 0xffff) && (tpos > tape_size))  /* Unreasonable format? */
+    return 0;
 if (map) map[objc] = tpos;
 return objc;
 }
 
+/* Check the basic structure of a SIMH format tape image */
+
+static t_stat sim_tape_simh_check (UNIT *uptr)
+{
+return SCPE_OK;
+}
+
+/* Check the basic structure of a E11 format tape image */
+
+static t_stat sim_tape_e11_check (UNIT *uptr)
+{
+return SCPE_OK;
+}
+
 /* Find the preceding record in a TPC file */
 
-t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map)
+static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map)
 {
 uint32 lo, hi, p;
 
