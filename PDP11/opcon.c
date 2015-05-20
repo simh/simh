@@ -319,7 +319,7 @@ else
     if (!sim_quiet)
 	printf ("LOCK\n");
 
-oc_send_all (0x002103, 0x2014);
+oc_send_all (0x002005, 0x2015);
 oc_ctl.resched = sim_os_msec();		/* store initial timer value */
 
 return SCPE_OK;
@@ -360,25 +360,36 @@ return SCPE_OK;
 /*
  * Function : oc_svc()
  * Note	    : This is the service routine to update the address & data leds.
- *            With a line speed of 9600 bits/s, 960 characters per second can
- *            be transmitted (using the 8N1 setting).
+ *            With a line speed of 9600 bits/s, roughly 800 characters per second
+ *            can be transmitted (using the 8N1 setting).
  *
- *            4 actions are executed by the service call:
- *             - sending data & address values       (6 bytes per call)
- *               OR every 5th call the combined
- *                  address/data & status is send    (8 bytes per call)
- *             - checking the 'HALT' switch setting  (1 byte (if set), every
- *             						 5th call)
- *             - getting rotary knobs settings	     (2 bytes per call, every
- *             						 5th call)
- *               OR every 20th call the switch settings
- *               are retrieved			    (6 bytes per call)
- *               and the halt key position is checked
+ *   MODE_1 is true
+ *            the following actions are executed by the service call:
+ *             - send data & address values         (6 bytes per call)
+ *               OR
+ *               every 5th call :
+ *                - send address/data & status      (8 bytes per call)
+ *                - check the 'HALT' switch setting (1 byte if set)
+ *                - get rotary knobs settings	    (2 bytes per call)
  *
- *            Automatic updates commence when the simulated processor is
- *            running again.
+ *   MODE_1 is false
+ *            the following actions are executed by the service call:
+ *             - sending data,address & status values (8 bytes per call)
+ *             - every 5th call :
+ *               check the 'HALT' switch setting      (1 byte if set)
+ *               get rotary knobs settings	      (2 bytes per call)
+ *
+ *            updates commence when the simulated processor is running again.
+ *
  * Returns  : SCPE_OK
  */
+#define MODE_1
+#ifdef MODE_1
+#define OC_INTERVAL 10
+#else
+# define OC_INTERVAL 12
+#endif
+
 t_stat oc_svc (UNIT *uptr)
 {
 uint32 A, R;
@@ -391,7 +402,7 @@ sim_debug (OCDEB_TRC, &oc_dev, "oc_svc : called\n");
 
 R = sim_os_msec();
 sim_debug (OCDEB_SVC, &oc_dev, "oc_svc : delta = %d\n", R - oc_ctl.resched);
-if ((R - oc_ctl.resched) < 9) {		/* sufficient time passed by? */
+if ((R - oc_ctl.resched) < OC_INTERVAL) {		/* sufficient time passed by? */
     sim_activate_after (uptr, OC_INTERVAL);	/* reschedule */
     return 0;
     }
@@ -450,6 +461,7 @@ switch (cpu_model) {
 		break;
     }
 
+#ifdef MODE_1
 if (oc_ctl.c_upd++ > 4) {		/* Update threshold reached? */
     oc_ctl.c_upd = 0;
     oc_send_all (A, D);
@@ -461,7 +473,18 @@ if (oc_ctl.c_upd++ > 4) {		/* Update threshold reached? */
     }
 else 
     oc_send_address_data (A, D);
- 
+#else
+oc_send_all (A, D);
+if (oc_ctl.c_upd++ > 4) {		/* Update threshold reached? */
+    oc_ctl.c_upd = 0;
+    if (oc_ctl.c_rot++ > 2) {		/* Rotary threshold reached? */
+	oc_ctl.c_rot = 0;
+        oc_get_rotary ();
+        }
+    oc_get_halt ();			/* check for HALT key */
+    }
+#endif
+
 sim_activate_after (uptr, OC_INTERVAL);		/* reschedule */
 
 return SCPE_OK;
