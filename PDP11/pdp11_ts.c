@@ -282,7 +282,7 @@ int32 ts_ownc = 0;                                      /* tape owns cmd */
 int32 ts_ownm = 0;                                      /* tape owns msg */
 int32 ts_qatn = 0;                                      /* queued attn */
 int32 ts_bcmd = 0;                                      /* boot cmd */
-int32 ts_time = 10;                                     /* record latency */
+int32 ts_time = 2000;                                   /* record latency */
 static uint16 cpy_buf[MAX_PLNT];                        /* copy buffer */
 
 t_stat ts_rd (int32 *data, int32 PA, int32 access);
