@@ -3818,7 +3818,7 @@ if (!peer[0]) {
     sim_printf ("Peer must be specified before attach\n");
     return SCPE_ARG;
     }
-sprintf (attach_string, "Line=%d,%s,Connect=%s,%s", dmc, cptr, peer);
+sprintf (attach_string, "Line=%d,Connect=%s,%s", dmc, peer, cptr);
 ans = tmxr_open_master (mp, attach_string);                 /* open master socket */
 if (ans != SCPE_OK)
     return ans;

@@ -2287,37 +2287,6 @@ while (*tptr) {
             if (0 == MATCH_CMD (gbuf, "CONNECT")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
-                serport = sim_open_serial (cptr, NULL, &r);
-                if (serport != INVALID_HANDLE) {
-                    sim_close_serial (serport);
-                    if (strchr (cptr, ';') && mp->modem_control)
-                        return SCPE_ARG;
-                    }
-                else {
-                    memset (hostport, '\0', sizeof(hostport));
-                    strncpy (hostport, cptr, sizeof(hostport)-1);
-                    if ((cptr = strchr (hostport, ';')))
-                        *(cptr++) = '\0';
-                    if (cptr) {
-                        get_glyph (cptr, cptr, 0);          /* upcase this string */
-                        if (0 == MATCH_CMD (cptr, "NOTELNET"))
-                            notelnet = TRUE;
-                        else
-                            if (0 == MATCH_CMD (cptr, "TELNET"))
-                                if (datagram)
-                                    return SCPE_ARG;
-                                else
-                                    notelnet = FALSE;
-                            else
-                                return SCPE_ARG;
-                        }
-                    sock = sim_connect_sock_ex (NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
-                    if (sock != INVALID_SOCKET)
-                        sim_close_sock (sock);
-                    else
-                        return SCPE_ARG;
-                    cptr = hostport;
-                    }
                 strcpy (destination, cptr);
                 continue;
                 }
@@ -2354,6 +2323,39 @@ while (*tptr) {
                     listennotelnet = FALSE;
                 else
                     return SCPE_ARG;
+            }
+        }
+    if (destination[0]) {
+        /* Validate destination */
+        serport = sim_open_serial (destination, NULL, &r);
+        if (serport != INVALID_HANDLE) {
+            sim_close_serial (serport);
+            if (strchr (destination, ';') && mp->modem_control)
+                return SCPE_ARG;
+            }
+        else {
+            memset (hostport, '\0', sizeof(hostport));
+            strncpy (hostport, destination, sizeof(hostport)-1);
+            if ((cptr = strchr (hostport, ';')))
+                *(cptr++) = '\0';
+            if (cptr) {
+                get_glyph (cptr, cptr, 0);          /* upcase this string */
+                if (0 == MATCH_CMD (cptr, "NOTELNET"))
+                    notelnet = TRUE;
+                else
+                    if (0 == MATCH_CMD (cptr, "TELNET"))
+                        if (datagram)
+                            return SCPE_ARG;
+                        else
+                            notelnet = FALSE;
+                    else
+                        return SCPE_ARG;
+                }
+            sock = sim_connect_sock_ex (NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
+            if (sock != INVALID_SOCKET)
+                sim_close_sock (sock);
+            else
+                return SCPE_ARG;
             }
         }
     if (line == -1) {
