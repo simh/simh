@@ -86,6 +86,11 @@ Linux (Fedora Core 18, 20, CentOS, RedHat, etc.):
     yum install libpcap-devel
     yum install uml-utilities
 
+Linux (Centos 6.x):
+    yum install gcc
+    yum install libpcap-devel
+    yum install uml_utilities
+    
 OpenBSD (OpenBSD 4.6)
 
     /sbin/ifconfig tun0 create
