@@ -3840,10 +3840,12 @@ return;
 
 void tmxr_linemsg (TMLN *lp, const char *msg)
 {
-int32 len;
-
-for (len = (int32)strlen (msg); len > 0; --len)
-    tmxr_putc_ln (lp, *msg++);
+while (*msg) {
+    while (SCPE_STALL == tmxr_putc_ln (lp, (int32)(*msg)))
+        if (lp->txbsz == tmxr_send_buffered_data (lp))
+            sim_os_ms_sleep (10);
+    ++msg;
+    }
 return;
 }
 
