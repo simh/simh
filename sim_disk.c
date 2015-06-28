@@ -837,6 +837,7 @@ if (sim_switches & SWMASK ('F')) {                      /* format spec? */
         return SCPE_2FARG;
     if (sim_disk_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
         return SCPE_ARG;
+    sim_switches = sim_switches & ~(SWMASK ('F'));      /* Record Format specifier already processed */
     }
 if (sim_switches & SWMASK ('D')) {                      /* create difference disk? */
     char gbuf[CBUFSIZE];
@@ -1652,6 +1653,22 @@ if (strchr (openmode, 'r'))
     DesiredAccess |= GENERIC_READ;
 if (strchr (openmode, 'w') || strchr (openmode, '+'))
     DesiredAccess |= GENERIC_WRITE;
+/* SCP Command Line parsing replaces \\ with \ presuming this is an 
+   escape sequence.  This only affecdts RAW device names and UNC paths.
+   We handle the RAW device name case here by prepending paths beginning 
+   with \.\ with an extra \. */
+if (!memcmp ("\\.\\", rawdevicename, 3)) {
+    char *tmpname = malloc (2 + strlen (rawdevicename));
+
+    if (tmpname == NULL)
+        return NULL;
+    *tmpname = '\\';
+    strcpy (tmpname + 1, rawdevicename);
+    Handle = CreateFileA (tmpname, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
+    free (tmpname);
+    if (Handle != INVALID_HANDLE_VALUE)
+        return (FILE *)Handle;
+    }
 Handle = CreateFileA (rawdevicename, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
 if (Handle == INVALID_HANDLE_VALUE) {
     _set_errno_from_status (GetLastError ());
