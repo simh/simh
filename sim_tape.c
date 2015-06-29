@@ -134,6 +134,7 @@ static void sim_tape_data_trace (UNIT *uptr, const uint8 *data, size_t len, cons
 struct tape_context {
     DEVICE              *dptr;              /* Device for unit (access to debug flags) */
     uint32              dbit;               /* debugging bit */
+    uint32              auto_format;        /* Format determined dynamically */
 #if defined SIM_ASYNCH_IO
     int                 asynch_io;          /* Asynchronous Interrupt scheduling enabled */
     int                 asynch_io_latency;  /* instructions to delay pending interrupt */
@@ -449,6 +450,7 @@ uint32 objc;
 DEVICE *dptr;
 char gbuf[CBUFSIZE];
 t_stat r;
+t_bool auto_format = FALSE;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
@@ -457,13 +459,15 @@ if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     if (*cptr == 0)                                     /* must be more */
         return SCPE_2FARG;
     if (sim_tape_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid Tape Format: %s\n", gbuf);
+    sim_switches = sim_switches & ~(SWMASK ('F'));      /* Record Format specifier already processed */
+    auto_format = TRUE;
     }
 if (MT_GET_FMT (uptr) == MTUF_F_TPC)
     sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC tapes */
 r = attach_unit (uptr, cptr);                           /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
-    return r;
+    return sim_messagef (r, "Can't open tape image: %s\n", cptr);
 switch (MT_GET_FMT (uptr)) {                            /* case on format */
 
     case MTUF_F_STD:                                    /* SIMH */
@@ -502,6 +506,7 @@ switch (MT_GET_FMT (uptr)) {                            /* case on format */
 uptr->tape_ctx = ctx = (struct tape_context *)calloc(1, sizeof(struct tape_context));
 ctx->dptr = dptr;                                       /* save DEVICE pointer */
 ctx->dbit = dbit;                                       /* save debug bit */
+ctx->auto_format = auto_format;                         /* save that we auto selected format */
 
 sim_tape_rewind (uptr);
 
@@ -517,14 +522,17 @@ return SCPE_OK;
 
 t_stat sim_tape_detach (UNIT *uptr)
 {
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint32 f = MT_GET_FMT (uptr);
 t_stat r;
+t_bool auto_format;
 
 if ((uptr == NULL) || !(uptr->flags & UNIT_ATT))
     return SCPE_IERR;
 
 if (uptr->io_flush)
     uptr->io_flush (uptr);                              /* flush buffered data */
+auto_format = ctx->auto_format;
 
 sim_tape_clr_async (uptr);
 
@@ -548,6 +556,8 @@ sim_tape_rewind (uptr);
 free (uptr->tape_ctx);
 uptr->tape_ctx = NULL;
 uptr->io_flush = NULL;
+if (auto_format)    /* format was determined or specified at attach time? */
+    sim_tape_set_fmt (uptr, 0, "SIMH", NULL);   /* restore default format */
 return SCPE_OK;
 }
 

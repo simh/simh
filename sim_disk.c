@@ -836,8 +836,9 @@ if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     if (*cptr == 0)                                     /* must be more */
         return SCPE_2FARG;
     if (sim_disk_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid Disk Format: %s\n", gbuf);
     sim_switches = sim_switches & ~(SWMASK ('F'));      /* Record Format specifier already processed */
+    auto_format = TRUE;
     }
 if (sim_switches & SWMASK ('D')) {                      /* create difference disk? */
     char gbuf[CBUFSIZE];
@@ -852,7 +853,7 @@ if (sim_switches & SWMASK ('D')) {                      /* create difference dis
         sim_vhd_disk_close (vhd);
         return sim_disk_attach (uptr, gbuf, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
         }
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "Unable to create differencing VHD: %s\n", gbuf);
     }
 if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & copy contents? */
     char gbuf[CBUFSIZE];
@@ -873,7 +874,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
     sim_quiet = saved_sim_quiet;
     if (r != SCPE_OK) {
         sim_switches = saved_sim_switches;
-        return r;
+        return sim_messagef (r, "Can't open source VHD: %s\n", cptr);
         }
     if (!sim_quiet) {
         sim_printf ("%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
@@ -881,10 +882,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
     capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
     vhd = sim_vhd_disk_create (gbuf, ((t_offset)uptr->capac)*capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));
     if (!vhd) {
-        if (!sim_quiet) {
-            sim_printf ("%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
-            }
-        return SCPE_OPENERR;
+        return sim_messagef (r, "%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
         }
     else {
         uint8 *copy_buf = (uint8*) malloc (1024*1024);
