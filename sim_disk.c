@@ -72,6 +72,8 @@ Internal routines:
 
 */
 
+#define _FILE_OFFSET_BITS 64    /* 64 bit file offset for raw I/O operations  */
+
 #include "sim_defs.h"
 #include "sim_disk.h"
 #include "sim_ether.h"
@@ -1976,18 +1978,12 @@ fsync ((int)((long)f));
 
 static t_offset sim_os_disk_size_raw (FILE *f)
 {
-#if defined (DONT_DO_LARGEFILE)
-struct stat statb;
+t_offset pos, size;
 
-if (fstat ((int)((long)f), &statb))
-    return (t_offset)-1;
-#else
-struct stat64 statb;
-
-if (fstat64 ((int)((long)f), &statb))
-    return (t_offset)-1;
-#endif
-return (t_offset)statb.st_size;
+pos = (t_offset)lseek ((int)((long)f), (off_t)0, SEEK_CUR);
+size = (t_offset)lseek ((int)((long)f), (off_t)0, SEEK_END);
+lseek ((int)((long)f), (off_t)pos, SEEK_SET);
+return size;
 }
 
 static t_stat sim_os_disk_unload_raw (FILE *f)
