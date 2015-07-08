@@ -33,7 +33,7 @@
 
 /* Unibus adapter */
 
-#define UBA_NDPATH      16                              /* number of data paths */
+#define UBA_NDPATH      4                               /* number of data paths */
 #define UBA_NMAPR       496                             /* number of map reg */
 
 /* Unibus adapter configuration register */
@@ -53,6 +53,16 @@
 #define UBACSR_RD        (UBACSR_PUR | UBACSR_UCE | UBACSR_NXM | \
                           UBACSR_ERR)
 #define UBACSR_WR        0
+
+/* Data path registers */
+
+#define UBADPR_OF       0x010
+#define UBADPR_ERR      0x80000000                      /* buf not empty - ni */
+#define UBADPR_NXM      0x40000000                      /* nonexistent memory */
+#define UBADPR_UCE      0x20000000                      /* uncorrectable error */
+#define UBADPR_PUR      0x00000001                      /* purge request */
+#define UBADPR_RD       0xE0000000
+#define UBADPR_W1C      0xC0000000
 
 /* Map registers */
 
@@ -82,6 +92,7 @@ uint32 uba_csr1 = 0;                                    /* csr reg 1 */
 uint32 uba_csr2 = 0;                                    /* csr reg 2 */
 uint32 uba_csr3 = 0;                                    /* csr reg 3 */
 uint32 uba_int = 0;                                     /* UBA interrupt */
+uint32 uba_dpr[UBA_NDPATH] = { 0 };                     /* number data paths */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
@@ -226,6 +237,18 @@ switch (ofs) {                                          /* case on offset */
         *val = (uba_csr3 & UBACSR_RD);
         break;
 
+    case UBADPR_OF + 1:
+    case UBADPR_OF + 2:  case UBADPR_OF + 3:
+    case UBADPR_OF + 4:  case UBADPR_OF + 5:
+    case UBADPR_OF + 6:  case UBADPR_OF + 7:
+    case UBADPR_OF + 8:  case UBADPR_OF + 9:
+    case UBADPR_OF + 10: case UBADPR_OF + 11:
+    case UBADPR_OF + 12: case UBADPR_OF + 13:
+    case UBADPR_OF + 14: case UBADPR_OF + 15:
+        idx = ofs - UBADPR_OF;
+        *val = uba_dpr[idx] & UBADPR_RD;
+        break;
+
     default:
         return SCPE_NXM;
         }
@@ -272,6 +295,15 @@ switch (ofs) {                                          /* case on offset */
 
     case UBACSR3_OF:                                    /* CSR3 */
         uba_csr3 = (val & UBACSR_WR);
+        break;
+
+    case UBADPR_OF + 0:                                 /* DPR */
+        break;                                          /* direct */
+
+    case UBADPR_OF + 1:
+    case UBADPR_OF + 2:  case UBADPR_OF + 3:
+        idx = ofs - UBADPR_OF;
+        uba_dpr[idx] = uba_dpr[idx] & ~(val & UBADPR_W1C);
         break;
 
     default:
