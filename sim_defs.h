@@ -278,6 +278,10 @@ typedef uint32          t_addr;
 #define SIM_SW_REG      (1u << 28)                      /* register value */
 #define SIM_SW_STOP     (1u << 29)                      /* stop message */
 
+/* Convert switch letter to bit mask */
+
+#define SWMASK(x) sim_swmask ((int)x)
+
 /* Simulator status codes
 
    0                    ok
@@ -357,10 +361,6 @@ typedef uint32          t_addr;
 #define NOQUEUE_WAIT    1000000                         /* min check time */
 #define KBD_LIM_WAIT(x) (((x) > KBD_MAX_WAIT)? KBD_MAX_WAIT: (x))
 #define KBD_WAIT(w,s)   ((w)? w: KBD_LIM_WAIT (s))
-
-/* Convert switch letter to bit mask */
-
-#define SWMASK(x) (1u << (((int) (x)) - ((int) 'A')))
 
 /* String match - at least one character required */
 

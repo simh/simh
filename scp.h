@@ -116,6 +116,7 @@ t_stat sim_run_boot_prep (void);
 double sim_gtime (void);
 uint32 sim_grtime (void);
 int32 sim_qcount (void);
+int32 sim_swmask (int switch_ch);
 t_stat attach_unit (UNIT *uptr, char *cptr);
 t_stat detach_unit (UNIT *uptr);
 t_stat assign_device (DEVICE *dptr, char *cptr);

@@ -1845,6 +1845,18 @@ return 0;
 }
 #endif
 
+/* Convert switch letter to bit mask */
+
+int32 sim_swmask (int switch_ch)
+{
+static char *letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+char *index = strchr (letters, switch_ch);
+
+if (index)
+    return (1u << (int)(index - letters));
+return 0;                   /* shouldn't happen */
+}
+
 t_stat process_stdin_commands (t_stat stat, char *argv[]);
 
 /* Main command loop */
