@@ -2056,7 +2056,7 @@ void setClockFrequency(const uint32 Value) {
 
 void pollForCPUStop(void) {
     static uint32 pollCounter = INITIAL_POLL_COUNTER;
-    if (--pollCounter <= 0) {
+    if (--pollCounter == 0) {
         pollCounter = INITIAL_POLL_COUNTER;
         sim_poll_kbd(); /* the following sim_process_event will check for stop */
     }
