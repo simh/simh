@@ -2494,11 +2494,11 @@ while (*tptr) {
                         return SCPE_ARG;
                     }
                 lp->packet = packet;
-                sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
+                sock = sim_connect_sock_ex (datagram ? listen : NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
                 if (sock != INVALID_SOCKET) {
                     _mux_detach_line (lp, FALSE, TRUE);
-                    lp->destination = (char *)malloc(1+strlen(destination));
-                    strcpy (lp->destination, destination);
+                    lp->destination = (char *)malloc(1+strlen(hostport));
+                    strcpy (lp->destination, hostport);
                     lp->mp = mp;
                     if (!lp->modem_control || (lp->modembits & TMXR_MDM_DTR)) {
                         lp->connecting = sock;
@@ -2523,7 +2523,7 @@ while (*tptr) {
             sim_close_logfile (&lp->txlogref);
             lp->txlog = NULL;
             lp->txlogname = (char *)realloc (lp->txlogname, 1 + strlen (logfiletmpl));
-            strcpy (lp->txlogname, mp->logfiletmpl);
+            strcpy (lp->txlogname, logfiletmpl);
             r = sim_open_logfile (lp->txlogname, TRUE, &lp->txlog, &lp->txlogref);
             if (r == SCPE_OK)
                 setvbuf(lp->txlog, NULL, _IOFBF, 65536);
@@ -2600,11 +2600,11 @@ while (*tptr) {
                     else
                         return SCPE_ARG;
                     }
-                sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
+                sock = sim_connect_sock_ex (datagram ? listen : NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
                 if (sock != INVALID_SOCKET) {
                     _mux_detach_line (lp, FALSE, TRUE);
-                    lp->destination = (char *)malloc(1+strlen(destination));
-                    strcpy (lp->destination, destination);
+                    lp->destination = (char *)malloc(1+strlen(hostport));
+                    strcpy (lp->destination, hostport);
                     if (!lp->modem_control || (lp->modembits & TMXR_MDM_DTR)) {
                         lp->connecting = sock;
                         lp->ipad = (char *)malloc (1 + strlen (lp->destination));
