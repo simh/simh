@@ -3985,8 +3985,10 @@ if (sim_ofile) {                                        /* output file? */
     }
 else {
     r = show_cmd_fi (stdout, flag, cptr);               /* no, stdout, log */
-    if (sim_log)
+    if (sim_log && (sim_log != stdout))
         show_cmd_fi (sim_log, flag, cptr);
+    if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
+        show_cmd_fi (sim_deb, flag, cptr);
     }
 return r;
 }
