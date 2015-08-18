@@ -1094,7 +1094,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                             tmxr_debug_connect_line (lp, msg);
                             free (sockname);
                             free (peername);
-                            break;
+                            return i;
                         case -1:                                /* failed connection */
                             sprintf (msg, "tmxr_poll_conn() - Outgoing Line Connection to %s failed", lp->destination);
                             tmxr_debug_connect_line (lp, msg);
