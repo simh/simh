@@ -2724,7 +2724,7 @@ if (cptr) {
         else dlnt = 2;
         bpa = ad << val;
         if (virt && map_reloc (bpa, VNT, &bpa))
-            fprintf (of, "Virtual address %-X: memory management error\n");
+            fprintf (of, "Virtual address %-X: memory management error\n", ad);
         else fprintf (of, "%s %s %-X: physical %s %-X\n",
             ((virt)? "Virtual": "Physical"), lnt_str[val], ad, lnt_str[dlnt], bpa >> dlnt);
         return SCPE_OK;

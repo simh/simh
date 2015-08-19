@@ -139,6 +139,7 @@ static int32 fir;                                       /* instruction */
 static int32 jea;                                       /* exc address */
 static int32 fguard;                                    /* guard bit */
 static int32 stop_fpp = STOP_RSRV;                      /* stop if fp dis */
+#define fma fma_X   /* Avoid name conflict with math.h defined fma() routine */
 static UFP fma;                                         /* FMA */
 static UFP fmb;                                         /* FMB */
 static UFP fmq;                                         /* FMQ - hi,lo only */

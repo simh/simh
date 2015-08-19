@@ -45,6 +45,12 @@
 #if !defined(CLOCK_REALTIME) && !defined(__hpux)
 #define CLOCK_REALTIME 1
 #define NEED_CLOCK_GETTIME 1
+#if  defined(_MSC_VER)      /* Visual Studio/Visual C++ */
+#if _MSC_VER >= 1900        /* Visual Studio Community (2015) */
+#define HAVE_STRUCT_TIMESPEC 1
+#define _TIMESPEC_DEFINED 1
+#endif /* _MSC_VER >= 1900 */
+#endif /* defined(_MSC_VER) */
 #if !defined(HAVE_STRUCT_TIMESPEC)
 #define HAVE_STRUCT_TIMESPEC 1
 #if !defined(_TIMESPEC_DEFINED)
@@ -53,8 +59,8 @@ struct timespec {
     long   tv_sec;
     long   tv_nsec;
 };
-#endif /* _TIMESPEC_DEFINED */
-#endif /* HAVE_STRUCT_TIMESPEC */
+#endif /* !defined(_TIMESPEC_DEFINED) */
+#endif /* !defined(HAVE_STRUCT_TIMESPEC) */
 int clock_gettime(int clock_id, struct timespec *tp);
 #endif
 
