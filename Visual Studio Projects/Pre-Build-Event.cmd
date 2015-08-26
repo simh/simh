@@ -93,6 +93,8 @@ if ERRORLEVEL 1 goto _notice2
 if "%_X_LIBSDL%" == "" goto _done_libsdl
 if not exist ../../windows-build/libSDL/SDL2-2.0.3/include/SDL.h goto _notice2
 if not exist "../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)/Lib/x86/dxguid.lib" goto _notice2
+findstr "/c:__FLTUSED__" ..\..\windows-build\libSDL\SDL2-2.0.3\VisualC\SDL_Static\SDL_VS2008.vcproj >NUL
+if ERRORLEVEL 1 goto _notice2
 :_done_libsdl
 if "%_X_LIBPCRE%" == "" goto _done_libpcre
 if not exist ../../windows-build/PCRE/include/pcreposix.h goto _notice2
