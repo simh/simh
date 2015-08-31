@@ -27,7 +27,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd LIBPCRE ROM BUILD"
+				CommandLine="Pre-Build-Event.cmd $(InputFileName) LIBPCRE ROM BUILD"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -108,7 +108,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd LIBPCRE ROM BUILD"
+				CommandLine="Pre-Build-Event.cmd $(InputFileName) LIBPCRE ROM BUILD"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"

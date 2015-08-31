@@ -32,6 +32,32 @@ rem         available in an include file during compiles.
 rem
 rem
 
+if "%~x1" == ".vcproj" goto _done_xp_check
+if not "%~x1" == ".vcxproj" goto _next_arg
+findstr PlatformToolset %1 | findstr _xp >NUL
+if not ERRORLEVEL 1 goto _done_xp_check
+echo *********************************************************
+echo *********************************************************
+echo **  The %~n1.exe binary can't run on windows XP.       **
+echo **  Adding Windows XP suppport to the %~n1 project file**
+echo *********************************************************
+echo *********************************************************
+
+echo Set objFSO = CreateObject("Scripting.FileSystemObject")                       >>%1.fix.vbs
+echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 1)                    >>%1.fix.vbs
+echo.                                                                              >>%1.fix.vbs
+echo strText = objFile.ReadAll                                                     >>%1.fix.vbs
+echo objFile.Close                                                                 >>%1.fix.vbs
+echo strNewText = Replace(strText, "</PlatformToolset>", "_xp</PlatformToolset>")  >>%1.fix.vbs
+echo.                                                                              >>%1.fix.vbs
+echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 2)                    >>%1.fix.vbs
+echo objFile.Write strNewText                                                      >>%1.fix.vbs
+echo objFile.Close                                                                 >>%1.fix.vbs
+cscript %1.fix.vbs %1
+del %1.fix.vbs
+:_done_xp_check
+shift
+
 :_next_arg
 if "%1" == "" goto _done_args
 set _arg=
