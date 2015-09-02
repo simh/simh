@@ -1862,7 +1862,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                     }                                   /* end case state */
                 }                                       /* end for char */
             if (nbytes != (lp->rxbpi-lp->rxbpr)) {
-                tmxr_debug (TMXR_DBG_RCV, lp, "Remaining", &(lp->rxb[lp->rxbpi]), lp->rxbpi-lp->rxbpr);
+                tmxr_debug (TMXR_DBG_RCV, lp, "Remaining", &(lp->rxb[lp->rxbpr]), lp->rxbpi-lp->rxbpr);
                 }
             }
         }                                               /* end else nbytes */
