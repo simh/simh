@@ -34,27 +34,47 @@ rem
 
 if "%~x1" == ".vcproj" goto _done_xp_check
 if not "%~x1" == ".vcxproj" goto _next_arg
+findstr PlatformToolset %1 >NUL
+if ERRORLEVEL 1 goto _next_arg
 findstr PlatformToolset %1 | findstr _xp >NUL
 if not ERRORLEVEL 1 goto _done_xp_check
 echo *********************************************************
 echo *********************************************************
-echo **  The %~n1.exe binary can't run on windows XP.       **
-echo **  Adding Windows XP suppport to the %~n1 project file**
+echo warning: The %~n1.exe binary can't run on windows XP.
+echo warning: Adding Windows XP suppport to all of the project files
 echo *********************************************************
 echo *********************************************************
+set _XP_Support_Available=
+for /r "%PROGRAMDATA%" %%z in (packages\XPSupport\Win_XPSupport.msi) do if exist "%%z" set _XP_Support_Available=1
+if "" == "%_XP_Support_Available%" goto _done_xp_check
 
-echo Set objFSO = CreateObject("Scripting.FileSystemObject")                       >>%1.fix.vbs
-echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 1)                    >>%1.fix.vbs
-echo.                                                                              >>%1.fix.vbs
-echo strText = objFile.ReadAll                                                     >>%1.fix.vbs
-echo objFile.Close                                                                 >>%1.fix.vbs
-echo strNewText = Replace(strText, "</PlatformToolset>", "_xp</PlatformToolset>")  >>%1.fix.vbs
-echo.                                                                              >>%1.fix.vbs
-echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 2)                    >>%1.fix.vbs
-echo objFile.Write strNewText                                                      >>%1.fix.vbs
-echo objFile.Close                                                                 >>%1.fix.vbs
-cscript %1.fix.vbs %1
-del %1.fix.vbs
+echo Set objFSO = CreateObject("Scripting.FileSystemObject")                       >>PlatformToolset.fix.vbs
+echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 1)                    >>PlatformToolset.fix.vbs
+echo.                                                                              >>PlatformToolset.fix.vbs
+echo strText = objFile.ReadAll                                                     >>PlatformToolset.fix.vbs
+echo objFile.Close                                                                 >>PlatformToolset.fix.vbs
+echo strNewText = Replace(strText, "</PlatformToolset>", "_xp</PlatformToolset>")  >>PlatformToolset.fix.vbs
+echo.                                                                              >>PlatformToolset.fix.vbs
+echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 2)                    >>PlatformToolset.fix.vbs
+echo objFile.Write strNewText                                                      >>PlatformToolset.fix.vbs
+echo objFile.Close                                                                 >>PlatformToolset.fix.vbs
+cd
+for %%f in (*.vcxproj) do call :_Fix_PlatformToolset %%f
+del PlatformToolset.fix.vbs
+echo *********************************************************
+echo *********************************************************
+echo Error: Reload the changed projects and start the build again
+echo *********************************************************
+echo *********************************************************
+exit /B 1
+:_Fix_PlatformToolset
+findstr PlatformToolset %1 >NUL
+if ERRORLEVEL 1 exit /B 0
+findstr PlatformToolset %1 | findstr _xp >NUL
+if not ERRORLEVEL 1 exit /B 0
+echo Adding XP support to project %1
+cscript PlatformToolset.fix.vbs %1 > NUL 2>&1
+exit /B 0
 :_done_xp_check
 shift
 
@@ -119,7 +139,7 @@ if ERRORLEVEL 1 goto _notice2
 if "%_X_LIBSDL%" == "" goto _done_libsdl
 if not exist ../../windows-build/libSDL/SDL2-2.0.3/include/SDL.h goto _notice2
 if not exist "../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)/Lib/x86/dxguid.lib" goto _notice2
-findstr "/c:__FLTUSED__" ..\..\windows-build\libSDL\SDL2-2.0.3\VisualC\SDL_Static\SDL_VS2008.vcproj >NUL
+findstr "/c:HAVE_FTOL2_SSE" ..\..\windows-build\libSDL\SDL2-2.0.3\VisualC\SDL_Static\SDL_VS2008.vcproj >NUL
 if ERRORLEVEL 1 goto _notice2
 :_done_libsdl
 if "%_X_LIBPCRE%" == "" goto _done_libpcre
