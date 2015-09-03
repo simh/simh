@@ -84,6 +84,7 @@ extern int32 tmxr_poll;
 
 uint16 dli_csr[DLX_LINES] = { 0 };                      /* control/status */
 uint16 dli_buf[DLX_LINES] = { 0 };
+uint32 dli_buftime[DLX_LINES] = { 0 };
 uint32 dli_ireq[2] = { 0, 0};
 uint16 dlo_csr[DLX_LINES] = { 0 };                      /* control/status */
 uint8 dlo_buf[DLX_LINES] = { 0 };
@@ -391,6 +392,9 @@ if (ln >= 0) {                                          /* got one? rcv enb */
 tmxr_poll_rx (&dlx_desc);                               /* poll for input */
 for (ln = 0; ln < DLX_LINES; ln++) {                    /* loop thru lines */
     if (dlx_ldsc[ln].conn) {                            /* connected? */
+        if ((dli_csr[ln] & CSR_DONE) &&                 /* input still pending and < 500ms? */
+            ((sim_os_msec () - dli_buftime[ln]) < 500))
+            continue;
         if ((temp = tmxr_getc_ln (&dlx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
                 c = DLIBUF_ERR|DLIBUF_RBRK;
@@ -401,6 +405,7 @@ for (ln = 0; ln < DLX_LINES; ln++) {                    /* loop thru lines */
             if (dli_csr[ln] & CSR_IE)
                 dli_set_int (ln, DLI_RCI);
             dli_buf[ln] = (uint16)c;
+            dli_buftime[ln] = sim_os_msec ();
             }
         }
     else if (dlo_unit[ln].flags & DLX_MDM) {            /* discpnn & modem? */
