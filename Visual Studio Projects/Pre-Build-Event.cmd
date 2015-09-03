@@ -29,51 +29,57 @@ rem         the current commit id is generated if git.exe is available in the
 rem         current path.
 rem       - performing the activities which make the git repository commit id
 rem         available in an include file during compiles.
+rem       - Converting Visual Studio Projects to a form which will produce 
+rem         binaries which run on Windows XP if the current build environment 
+rem         supports it and the correct components are installed.
 rem
 rem
 
+if exist PlatformToolset.fix exit /b 1
 if "%~x1" == ".vcproj" goto _done_xp_check
 if not "%~x1" == ".vcxproj" goto _next_arg
 findstr PlatformToolset %1 >NUL
 if ERRORLEVEL 1 goto _next_arg
 findstr PlatformToolset %1 | findstr _xp >NUL
 if not ERRORLEVEL 1 goto _done_xp_check
-echo *********************************************************
-echo *********************************************************
 echo warning: The %~n1.exe binary can't run on windows XP.
-echo warning: Adding Windows XP suppport to all of the project files
-echo *********************************************************
-echo *********************************************************
 set _XP_Support_Available=
 for /r "%PROGRAMDATA%" %%z in (packages\XPSupport\Win_XPSupport.msi) do if exist "%%z" set _XP_Support_Available=1
 if "" == "%_XP_Support_Available%" goto _done_xp_check
+if exist PlatformToolset.fix exit /b 1
+echo.                                                                              >>PlatformToolset.fix
+if ERRORLEVEL 1 exit /B 1
+set /a _SleepTime= 4 + %RANDOM% %% %NUMBER_OF_PROCESSORS%
+ping -n %_SleepTime% localhost > NUL
+echo warning: Adding Windows XP suppport to all project files at %TIME%
 
-echo Set objFSO = CreateObject("Scripting.FileSystemObject")                       >>PlatformToolset.fix.vbs
-echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 1)                    >>PlatformToolset.fix.vbs
-echo.                                                                              >>PlatformToolset.fix.vbs
-echo strText = objFile.ReadAll                                                     >>PlatformToolset.fix.vbs
-echo objFile.Close                                                                 >>PlatformToolset.fix.vbs
-echo strNewText = Replace(strText, "</PlatformToolset>", "_xp</PlatformToolset>")  >>PlatformToolset.fix.vbs
-echo.                                                                              >>PlatformToolset.fix.vbs
-echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 2)                    >>PlatformToolset.fix.vbs
-echo objFile.Write strNewText                                                      >>PlatformToolset.fix.vbs
-echo objFile.Close                                                                 >>PlatformToolset.fix.vbs
-cd
-for %%f in (*.vcxproj) do call :_Fix_PlatformToolset %%f
-del PlatformToolset.fix.vbs
-echo *********************************************************
-echo *********************************************************
+echo Set objFSO = CreateObject("Scripting.FileSystemObject")                       >>%1.fix.vbs
+echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 1)                    >>%1.fix.vbs
+echo.                                                                              >>%1.fix.vbs
+echo strText = objFile.ReadAll                                                     >>%1.fix.vbs
+echo objFile.Close                                                                 >>%1.fix.vbs
+echo strNewText = Replace(strText, "</PlatformToolset>", "_xp</PlatformToolset>")  >>%1.fix.vbs
+echo.                                                                              >>%1.fix.vbs
+echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 2)                    >>%1.fix.vbs
+echo objFile.Write strNewText                                                      >>%1.fix.vbs
+echo objFile.Close                                                                 >>%1.fix.vbs
+
+call :_Fix_PlatformToolset %1 %1
+for %%f in (*.vcxproj) do call :_Fix_PlatformToolset %1 %%f
+call :_GitHooks
+del %1.fix.vbs
+rem wait a bit here to allow a parallel build of the to complete additional projects
+ping -n 10 localhost > NUL
+del PlatformToolset.fix
 echo Error: Reload the changed projects and start the build again
-echo *********************************************************
-echo *********************************************************
 exit /B 1
 :_Fix_PlatformToolset
-findstr PlatformToolset %1 >NUL
+findstr PlatformToolset %2 >NUL
 if ERRORLEVEL 1 exit /B 0
-findstr PlatformToolset %1 | findstr _xp >NUL
+findstr PlatformToolset %2 | findstr _xp >NUL
 if not ERRORLEVEL 1 exit /B 0
-echo Adding XP support to project %1
-cscript PlatformToolset.fix.vbs %1 > NUL 2>&1
+echo Adding XP support to project %2
+cscript %1.fix.vbs %2 > NUL 2>&1
 exit /B 0
 :_done_xp_check
 shift

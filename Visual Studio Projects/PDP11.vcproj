@@ -124,7 +124,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
-				WholeProgramOptimization="true"
+				WholeProgramOptimization="false"
 				AdditionalIncludeDirectories="./;../;../PDP11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;"
 				PreprocessorDefinitions="USE_SHARED;USE_DISPLAY;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
 				StringPooling="true"
