@@ -27,7 +27,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Check for required build dependencies"
-				CommandLine="Pre-Build-Event.cmd $(InputFileName) BUILD"
+				CommandLine="Pre-Build-Event.cmd BUILD"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -108,7 +108,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Check for required build dependencies"
-				CommandLine="Pre-Build-Event.cmd $(InputFileName) BUILD"
+				CommandLine="Pre-Build-Event.cmd BUILD"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"

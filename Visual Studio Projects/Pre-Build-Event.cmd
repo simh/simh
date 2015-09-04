@@ -32,12 +32,17 @@ rem         available in an include file during compiles.
 rem       - Converting Visual Studio Projects to a form which will produce 
 rem         binaries which run on Windows XP if the current build environment 
 rem         supports it and the correct components are installed.
+rem         This activity is triggered by the first argument being the name
+rem         of a the current Visual Studio project file.  This argument MUST 
+rem         only be provided on a single project which invokes this procedure
+rem         AND that project should be one which all other projects in a 
+rem         solution are dependent on.
 rem
 rem
 
-if exist PlatformToolset.fix exit /b 1
 if "%~x1" == ".vcproj" goto _done_xp_check
-if not "%~x1" == ".vcxproj" goto _next_arg
+if not "%~x1" == ".vcxproj" goto _done_project
+if exist PlatformToolset.fix goto _project_cleanup
 findstr PlatformToolset %1 >NUL
 if ERRORLEVEL 1 goto _next_arg
 findstr PlatformToolset %1 | findstr _xp >NUL
@@ -49,8 +54,6 @@ if "" == "%_XP_Support_Available%" goto _done_xp_check
 if exist PlatformToolset.fix exit /b 1
 echo.                                                                              >>PlatformToolset.fix
 if ERRORLEVEL 1 exit /B 1
-set /a _SleepTime= 4 + %RANDOM% %% %NUMBER_OF_PROCESSORS%
-ping -n %_SleepTime% localhost > NUL
 echo warning: Adding Windows XP suppport to all project files at %TIME%
 
 echo Set objFSO = CreateObject("Scripting.FileSystemObject")                       >>%1.fix.vbs
@@ -69,8 +72,6 @@ for %%f in (*.vcxproj) do call :_Fix_PlatformToolset %1 %%f
 call :_GitHooks
 del %1.fix.vbs
 rem wait a bit here to allow a parallel build of the to complete additional projects
-ping -n 10 localhost > NUL
-del PlatformToolset.fix
 echo Error: Reload the changed projects and start the build again
 exit /B 1
 :_Fix_PlatformToolset
@@ -83,6 +84,14 @@ cscript %1.fix.vbs %2 > NUL 2>&1
 exit /B 0
 :_done_xp_check
 shift
+goto _done_project
+:_project_cleanup
+shift
+del PlatformToolset.fix 
+:_done_project
+if exist PlatformToolset.fix echo error: Reload any changed projects and rebuild again,
+if exist PlatformToolset.fix exit /b 1
+
 
 :_next_arg
 if "%1" == "" goto _done_args
