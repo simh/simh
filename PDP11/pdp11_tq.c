@@ -570,7 +570,7 @@ struct tq_req_results {           /* intermediate State during tape motion comma
 
 t_stat tq_rd (int32 *data, int32 PA, int32 access)
 {
-sim_debug(DBG_REG, &tq_dev, "tq_rd(PA=0x%08X [%s], access=%d)\n", PA, ((PA >> 1) & 01) ? "IP" : "SA", access);
+sim_debug(DBG_REG, &tq_dev, "tq_rd(PA=0x%08X [%s], access=%d)=0x%04X\n", PA, ((PA >> 1) & 01) ? "SA" : "IP", access, ((PA >> 1) & 01) ? tq_sa : 0);
 
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
     case 0:                                             /* IP */
@@ -593,7 +593,7 @@ return SCPE_OK;
 
 t_stat tq_wr (int32 data, int32 PA, int32 access)
 {
-sim_debug(DBG_REG, &tq_dev, "tq_wr(PA=0x%08X [%s], access=%d)\n", PA, ((PA >> 1) & 01) ? "IP" : "SA", access);
+sim_debug(DBG_REG, &tq_dev, "tq_wr(PA=0x%08X [%s], access=%d, data=0x%04X)\n", PA, ((PA >> 1) & 01) ? "SA" : "IP", access, data);
 
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 

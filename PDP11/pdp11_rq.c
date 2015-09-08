@@ -1323,7 +1323,7 @@ int32 cidx = rq_map_pa ((uint32) PA);
 MSC *cp = rq_ctxmap[cidx];
 DEVICE *dptr = rq_devmap[cidx];
 
-sim_debug(DBG_REG, dptr, "rq_rd(PA=0x%08X [%s], access=%d)\n", PA, ((PA >> 1) & 01) ? "IP" : "SA", access);
+sim_debug(DBG_REG, dptr, "rq_rd(PA=0x%08X [%s], access=%d)=0x%04X\n", PA, ((PA >> 1) & 01) ? "SA" : "IP", access, ((PA >> 1) & 01) ? cp->sa : 0);
 
 if (cidx < 0)
     return SCPE_IERR;
@@ -1356,7 +1356,7 @@ DEVICE *dptr = rq_devmap[cidx];
 if (cidx < 0)
     return SCPE_IERR;
 
-sim_debug(DBG_REG, dptr, "rq_wr(PA=0x%08X [%s], access=%d)\n", PA, ((PA >> 1) & 01) ? "IP" : "SA", access);
+sim_debug(DBG_REG, dptr, "rq_wr(PA=0x%08X [%s], access=%d, data=0x%04X)\n", PA, ((PA >> 1) & 01) ? "SA" : "IP", access, data);
 
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
