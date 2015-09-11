@@ -223,6 +223,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define REG_M_OFS       0x7FF   
 #define REGSIZE         (1u << REGAWIDTH)               /* REG length */
 #define REGBASE         0x20000000                      /* REG addr base */
+#define NEXUSBASE       REGBASE                         /* NEXUS addr base */
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
                         (((uint32) (x)) < (REGBASE + REGSIZE)))
 #define NEXUS_GETNEX(x) (((x) >> REG_V_NEXUS) & REG_M_NEXUS)

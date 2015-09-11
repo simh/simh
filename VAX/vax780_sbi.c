@@ -751,7 +751,7 @@ return "Synchronous Backplane Interconnect";
 
 t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, "nexus=%d", val);
+fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;
 }
 

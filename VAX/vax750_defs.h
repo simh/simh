@@ -157,9 +157,13 @@
                         { UNIT_MSIZE, (1u << 23) + (7u << 20), NULL, "15M", &cpu_set_size, NULL, NULL, "Set Memory to 15M bytes" }, \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
 extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
-#define CPU_MODEL_MODIFIERS                                                                     \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
-                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "MODEL",     NULL,                                      \
+                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" },              \
+                            { MTAB_XTD|MTAB_VDV, 0, "BOOTDEV",   "BOOTDEV={A|B|C|D}",                       \
+                              &vax750_set_bootdev, &vax750_show_bootdev, NULL, "Set Boot Device" }
+extern t_stat vax750_set_bootdev (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, void *desc);
+
 
 /* Unibus I/O registers */
 
@@ -187,15 +191,15 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
                         (((uint32) (x)) < (REGBASE + REGSIZE)))
 #define NEXUSBASE       (REGBASE + 0x20000)
-#define NEXUSSIZE       0x2000
 #define NEXUS_GETNEX(x) (((x) >> REG_V_NEXUS) & REG_M_NEXUS)
 #define NEXUS_GETOFS(x) (((x) >> REG_V_OFS) & REG_M_OFS)
 
 /* ROM address space in memory controllers */
 
-#define ROMAWIDTH       12                              /* ROM addr width */
+#define ROMAWIDTH       10                              /* ROM addr width */
 #define ROMSIZE         (1u << ROMAWIDTH)               /* ROM size */
-#define ROMBASE         (REGBASE + (TR_MCTL << REG_V_NEXUS) + 0x400)
+#define ROMAMASK        (ROMSIZE - 1)                   /* ROM addr mask */
+#define ROMBASE         (NEXUSBASE + 0x400)
 #define ADDR_IS_ROM(x)  ((((uint32) (x)) >= ROMBASE) && \
                         (((uint32) (x)) < (ROMBASE + ROMSIZE)))
 

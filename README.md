@@ -116,9 +116,9 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     imbedded files are used if the normal boot file isn't found when the 
     simulator boots.  Specific examples are:  VAX (MicroVAX 3900 - ka655x.bin), 
     VAX8600 (VAX 8600 - vmb.exe), VAX780 (VAX 11/780 - vmb.exe), 
-    VAX750 (VAX 11/750 - vmb.exe), VAX730 (VAX 11/730 - vmb.exe), 
-    VAX610 (MicroVAX I - ka610.bin), VAX620 (rtVAX 1000 - ka620.bin), 
-    VAX630 (MicroVAX II - ka630.bin)
+    VAX750 (VAX 11/750 - vmb.exe, ka750_old.bin, ka750_new.bin), 
+    VAX730 (VAX 11/730 - vmb.exe), VAX610 (MicroVAX I - ka610.bin), 
+    VAX620 (rtVAX 1000 - ka620.bin), VAX630 (MicroVAX II - ka630.bin)
 
 #### Control Flow
 

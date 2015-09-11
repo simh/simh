@@ -365,13 +365,19 @@ uint32 t;
 t_stat r;
 
 mb = NEXUS_GETNEX (pa) - TR_MBA0;                       /* get MBA */
+/* 
+   The VAX 750 Boot ROMs have code which makes Non longword references 
+   to MassBus register space.  This code works on real hardware so even
+   though such references had potentially undefined behavior, in the 
+   interest of closely modeling how hardware works we tolerate it here,
+ */
+#if !defined(VAX_750)
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
     sim_printf (">>MBA%d: invalid adapter read mask, pa = 0x%X, lnt = %d\r\n", mb, pa, lnt);
-#if defined(VAX_780)
     sbi_set_errcnf ();                                  /* err confirmation */
-#endif
     return SCPE_OK;
     }
+#endif
 if (mb >= MBA_NUM)                                      /* valid? */
     return SCPE_NXM;
 rtype = MBA_RTYPE (pa);                                 /* get reg type */

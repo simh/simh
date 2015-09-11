@@ -56,8 +56,9 @@ extern DEVICE vh_dev;
 extern DEVICE xu_dev, xub_dev;
 extern DEVICE dmc_dev;
 
-extern UNIT cpu_unit;
 extern void WriteB (uint32 pa, int32 val);
+extern void rom_wr_B (int32 pa, int32 val);
+extern UNIT cpu_unit;
 
 DEVICE *sim_devices[] = { 
     &cpu_dev,
@@ -112,16 +113,24 @@ if (flag)                                               /* dump? */
     return SCPE_ARG;
 origin = 0;                                             /* memory */
 limit = (uint32) cpu_unit.capac;
-if (sim_switches & SWMASK ('O')) {                      /* origin? */
-    origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
-    if (r != SCPE_OK)
-        return SCPE_ARG;
+if (sim_switches & SWMASK ('R')) {                      /* ROM? */
+    origin = ROMBASE;
+    limit = ROMBASE + ROMSIZE;
     }
+else
+    if (sim_switches & SWMASK ('O')) {                  /* origin? */
+        origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
+        if (r != SCPE_OK)
+            return SCPE_ARG;
+        }
 
 while ((val = getc (fileref)) != EOF) {                 /* read byte stream */
     if (origin >= limit)                                /* NXM? */
         return SCPE_NXM;
-    WriteB (origin, val);                               /* memory */
+    if (sim_switches & SWMASK ('R'))                    /* ROM? */
+        rom_wr_B (origin, val);                         /* not writeable */
+    else
+        WriteB (origin, val);                           /* store byte */
     origin = origin + 1;
     }
 return SCPE_OK;

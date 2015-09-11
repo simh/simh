@@ -38,11 +38,13 @@
       =======================================================================================
 */
 struct ROM_File_Descriptor {
-    const char *BinaryName;             const char *IncludeFileName; size_t expected_size; unsigned int checksum;  const char *ArrayName;} ROMs[] = {
+    const char *BinaryName;             const char *IncludeFileName; size_t expected_size; unsigned int checksum;  const char *ArrayName;            const char *Comments;} ROMs[] = {
    {"VAX/ka655x.bin",                   "VAX/vax_ka655x_bin.h",                    131072,            0xFF7673B6,        "vax_ka655x_bin"},
    {"VAX/ka620.bin",                    "VAX/vax_ka620_bin.h",                      65536,            0xFF7F930F,        "vax_ka620_bin"},
    {"VAX/ka630.bin",                    "VAX/vax_ka630_bin.h",                      65536,            0xFF7F73EF,        "vax_ka630_bin"},
    {"VAX/ka610.bin",                    "VAX/vax_ka610_bin.h",                      16384,            0xFFEF3312,        "vax_ka610_bin"},
+   {"VAX/ka750_new.bin",                "VAX/vax_ka750_bin_new.h",                   1024,            0xFFFE7BE5,        "vax_ka750_bin_new", "From ROM set: E40A9, E41A9, E42A9, E43A9 (Boots: A=DD, B=DB, C=DU"},
+   {"VAX/ka750_old.bin",                "VAX/vax_ka750_bin_old.h",                   1024,            0xFFFEBAA5,        "vax_ka750_bin_old", "From ROM set: 990A9, 948A9, 906A9, 905A9 (Boots: A=DD, B=DM, C=DL, D=DU"},
    {"VAX/vmb.exe",                      "VAX/vax_vmb_exe.h",                        44544,            0xFFC014BB,        "vax_vmb_exe"},
    {"swtp6800/swtp6800/swtbug.bin",     "swtp6800/swtp6800/swtp_swtbug_bin.h",       1024,            0xFFFE4FBC,        "swtp_swtbug_bin"},
    };
@@ -196,7 +198,8 @@ int sim_make_ROM_include(const char *rom_filename,
                          int expected_size,
                          unsigned int expected_checksum,
                          const char *include_filename, 
-                         const char *rom_array_name)
+                         const char *rom_array_name,
+                         const char *Comments)
 {
 FILE *rFile;
 FILE *iFile;
@@ -307,6 +310,8 @@ fprintf (iFile, "   %s         produced at %s", include_filename, ctime(&now));
 fprintf (iFile, "   from %s which was last modified at %s", rom_filename, ctime(&statb.st_mtime));
 fprintf (iFile, "   file size: %d (0x%X) - checksum: 0x%08X\n", (int)statb.st_size, (int)statb.st_size, checksum);
 fprintf (iFile, "   This file is a generated file and should NOT be edited or changed by hand.\n");
+if (Comments)
+    fprintf (iFile, "\n   %s\n\n", Comments);
 fprintf (iFile, "*/\n");
 fprintf (iFile, "#define BOOT_CODE_SIZE 0x%X\n", (int)statb.st_size);
 fprintf (iFile, "#define BOOT_CODE_FILENAME \"%s\"\n", load_filename);
@@ -371,7 +376,7 @@ int status = 0;
 
 if (argc == 1) {  /* invoked without any arguments */
     for (i=0; i<sizeof(ROMs)/sizeof(ROMs[0]); ++i)
-        status += sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName);
+        status += sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName, ROMs[i].Comments);
     exit((status == 0) ? 0 : 2);
     }
 if ((0 == strcmp(argv[1], "/?")) ||
@@ -388,7 +393,7 @@ else {
     if (i == sizeof(ROMs)/sizeof(ROMs[0]))
         status = sim_make_ROMs_entry (argv[1]);
     else
-        status = sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName);
+        status = sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName, ROMs[i].Comments);
     }
 exit((status == 0) ? 0 : 2);
 }

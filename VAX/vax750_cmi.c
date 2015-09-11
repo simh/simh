@@ -57,39 +57,35 @@
 #define CMIERR_RM             0x00080000
 #define CMIERR_EN             0x00100000
 
+/* PCS Patch Address */
+
+#define PCS_BITCNT      0x2000          /* Number of patchbits */
+#define PCS_MICRONUM    0x400           /* Number of Microcode locations */
+#define PCS_PATCHADDR   0xf00000        /* Beginning addr of patchbits */
+#define PCS_PCSADDR     0x8000          /* offset to pcs */
+#define PCS_PATCHENBIT  0xF0C000        /* Patch Enable register */
+#define PCS_ENABLE      0xfff00000      /* enable pcs */
+
+
 /* System registers */
 
-/* VAX-11/750 boot device definitions */
-
-struct boot_dev {
-    char                *name;
-    int32               code;
-    int32               let;
-    };
 
 uint32 nexus_req[NEXUS_HLVL];                           /* nexus int req */
 uint32 cmi_err = 0;
 uint32 cmi_cadr = 0;
 char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
 int32 sys_model = 0;
+int32 vax750_bootdev = 0;                               /* 0-A, 1-B, 2-C, 3-D */
+
+uint32 pcspatchbit = 0;
+uint32 vax750_wcsmem[16384];
 
 static t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
 
-static struct boot_dev boot_tab[] = {
-    { "RP", BOOT_MB, 0 },
-    { "HK", BOOT_HK, 0 },
-    { "RL", BOOT_RL, 0 },
-    { "RQ", BOOT_UDA, 1 << 24 },
-    { "RQB", BOOT_UDA, 1 << 24 },
-    { "RQC", BOOT_UDA, 1 << 24 },
-    { "RQD", BOOT_UDA, 1 << 24 },
-    { "TD", BOOT_TD, 0 },
-    { NULL }
-    };
-
 extern int32 R[16];
 extern int32 PSL;
+extern uint32 rom[ROMSIZE/sizeof(uint32)];                     /* boot ROM */
 extern int32 ASTLVL, SISR;
 extern int32 mapen, pme, trpirq;
 extern int32 in_ie;
@@ -105,6 +101,8 @@ void cmi_set_tmo (void);
 t_stat vax750_boot (int32 flag, char *ptr);
 t_stat vax750_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
+t_stat vax750_set_bootdev (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
@@ -133,6 +131,7 @@ extern t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp);
 extern void uba_eval_int (void);
 extern int32 uba_get_ubvector (int32 lvl);
 extern void uba_ioreset (void);
+extern t_stat mctl_populate_rom (const char *rom_filename);
 
 /* CMI data structures
 
@@ -450,11 +449,18 @@ int32 ReadReg (uint32 pa, int32 lnt)
 int32 nexus, val;
 
 if (ADDR_IS_REG (pa)) {                                 /* reg space? */
-    nexus = NEXUS_GETNEX (pa);                          /* get nexus */
-    if (nexusR[nexus] &&                                /* valid? */
-        (nexusR[nexus] (&val, pa, lnt) == SCPE_OK)) {
+    if (pa < NEXUSBASE) {
+        val = (int32)vax750_wcsmem[((pa-REGBASE)>>2)];
         SET_IRQL;
         return val;
+        }
+    else {                  /* Nexus register reference */
+        nexus = NEXUS_GETNEX (pa);                          /* get nexus */
+        if (nexusR[nexus] &&                                /* valid? */
+            (nexusR[nexus] (&val, pa, lnt) == SCPE_OK)) {
+            SET_IRQL;
+            return val;
+            }
         }
     }
 cmi_set_tmo ();                                         /* timeout */
@@ -477,11 +483,25 @@ void WriteReg (uint32 pa, int32 val, int32 lnt)
 int32 nexus;
 
 if (ADDR_IS_REG (pa)) {                                 /* reg space? */
-    nexus = NEXUS_GETNEX (pa);                          /* get nexus */
-    if (nexusW[nexus] &&                                /* valid? */
-        (nexusW[nexus] (val, pa, lnt) == SCPE_OK)) {
-        SET_IRQL;
-        return;
+    if (pa < NEXUSBASE) {
+        if (pa == PCS_PATCHENBIT) {
+            pcspatchbit = val;
+            SET_IRQL;
+            return;
+            }
+        else {
+            vax750_wcsmem[((pa-REGBASE)>>2)] = val;
+            SET_IRQL;
+            return;
+            }
+        }
+    else {                  /* Nexus register reference */
+        nexus = NEXUS_GETNEX (pa);                          /* get nexus */
+        if (nexusW[nexus] &&                                /* valid? */
+            (nexusW[nexus] (val, pa, lnt) == SCPE_OK)) {
+            SET_IRQL;
+            return;
+            }
         }
     }
 cmi_set_tmo ();                                         /* timeout */
@@ -554,6 +574,41 @@ sim_printf ("Rebooting...\n");
 return cc;
 }
 
+#define BOOT_A 0
+#define BOOT_B 1
+#define BOOT_C 2
+#define BOOT_D 3
+
+/* VAX-11/750 boot device definitions */
+
+struct boot_dev {
+    char                *devname;
+    char                *romdevalias;
+    char                *bootcodefile;
+    int32               bootdev;
+    int32               code;
+    int32               let;
+    };
+
+static struct boot_dev boot_tab[] = {
+    { "RQB", "DUB", NULL,            0,      BOOT_UDA, 1 << 24  },  /* DUBn */
+    { "RQC", "DUC", NULL,            0,      BOOT_UDA, 1 << 24  },  /* DUCn */
+    { "RQD", "DUD", NULL,            0,      BOOT_UDA, 1 << 24  },  /* DUDn */
+    { "RQ",  "DUA", "ka750_new.bin", BOOT_C, BOOT_UDA, 1 << 24  },  /* DUAn */
+    { "RQ",  "DU",  "ka750_new.bin", BOOT_C, 0,        0        },  /* DUAn */
+    { "RP",  "DBA", "ka750_new.bin", BOOT_B, BOOT_MB,  0        },  /* DBAn */
+    { "RP",  "DB",  "ka750_new.bin", BOOT_B, 0,        0        },  /* DBAn */
+    { "RP",  "DRA", "ka750_new.bin", BOOT_B, BOOT_MB,  0        },  /* DRAn */
+    { "RP",  "DR",  "ka750_new.bin", BOOT_B, 0,        0        },  /* DRAn */
+    { "HK",  "DMA", "ka750_old.bin", BOOT_B, BOOT_HK,  0        },  /* DMAn */
+    { "HK",  "DM",  "ka750_old.bin", BOOT_B, 0,        0        },  /* DMAn */
+    { "RL",  "DLA", "ka750_old.bin", BOOT_C, BOOT_RL,  0        },  /* DLAn */
+    { "RL",  "DL",  "ka750_old.bin", BOOT_C, 0,        0        },  /* DLAn */
+    { "TD",  "DDA", "ka750_new.bin", BOOT_A, BOOT_TD,  0        },  /* DDAn */
+    { "TD",  "DD",  "ka750_new.bin", BOOT_A, 0,        0        },  /* DDAn */
+    { NULL }
+    };
+
 /* Special boot command - linked into SCP by initial reset
 
    Syntax: BOOT <device>{/R5:val}
@@ -581,31 +636,26 @@ return run_cmd (flag, "CPU");
 
 t_stat vax750_boot_parse (int32 flag, char *ptr)
 {
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], dbuf[CBUFSIZE], rbuf[CBUFSIZE];
 char *slptr, *regptr;
 int32 i, r5v, unitno;
 DEVICE *dptr;
 UNIT *uptr;
-DIB *dibp;
-uint32 ba;
 t_stat r;
 
-if (!ptr || !*ptr)
-    return SCPE_2FARG;
-regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
-if ((slptr = strchr (gbuf, '/'))) {                     /* found slash? */
-    regptr = strchr (ptr, '/');                         /* locate orig */
-    *slptr = 0;                                         /* zero in string */
+if (ptr && (*ptr == '/')) {                             /* handle "BOOT /R5:n DEV" format */
+    ptr = get_glyph (ptr, rbuf, 0);                     /* get glyph */
+    regptr = rbuf;
+    ptr = get_glyph (ptr, gbuf, 0);                     /* get glyph */
     }
-dptr = find_unit (gbuf, &uptr);                         /* find device */
-if ((dptr == NULL) || (uptr == NULL))
-    return SCPE_ARG;
-dibp = (DIB *) dptr->ctxt;                              /* get DIB */
-if (dibp == NULL)
-    ba = 0;
-else
-    ba = dibp->ba;
-unitno = (int32) (uptr - dptr->units);
+else {                                                  /* handle "BOOT DEV /R5:n" format */
+    regptr = get_glyph (ptr, gbuf, 0);                  /* get glyph */
+    if ((slptr = strchr (gbuf, '/'))) {                 /* found slash? */
+        regptr = strchr (ptr, '/');                     /* locate orig */
+        *slptr = 0;                                     /* zero in string */
+        }
+    }
+/* parse R5 parameter value */
 r5v = 0;
 if ((strncmp (regptr, "/R5:", 4) == 0) ||
     (strncmp (regptr, "/R5=", 4) == 0) ||
@@ -615,32 +665,83 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     if (r != SCPE_OK)
         return r;
     }
-else 
-    if (*regptr == '/') {
-        r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
-        if (r != SCPE_OK)
-            return r;
-        }
-    else {
-        if (*regptr != 0)
-            return SCPE_ARG;
-        }
-for (i = 0; boot_tab[i].name != NULL; i++) {
-    if (strcmp (dptr->name, boot_tab[i].name) == 0) {
-        R[0] = boot_tab[i].code;
-        if (dptr->flags & DEV_MBUS) {
-            R[1] = (NEXUSBASE + (TR_MBA0 * NEXUSSIZE));
-            R[2] = unitno;
+else if (*regptr == '/') {
+    r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
+    if (r != SCPE_OK)
+        return r;
+    }
+else if (*regptr != 0)
+    return SCPE_ARG;
+if (gbuf[0]) {
+    unitno = -1;
+    for (i = 0; boot_tab[i].devname != NULL; i++) {
+        /* ROM device name specified use ROM to boot */
+        if (memcmp (gbuf, boot_tab[i].romdevalias, strlen(boot_tab[i].romdevalias)) == 0) {
+            if (memcmp (gbuf, ((char *)rom) + (0x100 * boot_tab[i].bootdev), 2)) {
+                r = mctl_populate_rom (boot_tab[i].bootcodefile);
+                if (r != SCPE_OK)
+                    return r;
+                vax750_bootdev = boot_tab[i].bootdev;
+                }
+            sprintf(dbuf, "%s%s", boot_tab[i].devname, gbuf + strlen(boot_tab[i].romdevalias));
+            dptr = find_unit (dbuf, &uptr);
+            if ((dptr == NULL) || (uptr == NULL))
+                return SCPE_ARG;
+            unitno = (int32) (uptr - dptr->units);
+             /* Page 2-16 of VAX750 Student Training suggests the following register state: */
+            R[1] = (NEXUSBASE + (TR_MBA0 * (1 << REG_V_NEXUS)));    /* MBA Address */
+            R[2] = IOPAGEBASE;      /* UBA I/O Page Address */
+            R[3] = unitno;          /* Boot Device Unit Number */
+            R[5] = r5v;             /* Boot Flags */
+            SP = 0x200;
+            PC = 0xFA02 + 0x100*vax750_bootdev;
             }
-        else {
-            R[1] = ba;
-            R[2] = (ba & UBADDRMASK);
+        /* SCP device name specified use VMB to boot */
+        if ((unitno == -1) && 
+            (memcmp (gbuf, boot_tab[i].devname, strlen(boot_tab[i].devname)) == 0)) {
+            DIB *dibp;
+            uint32 ba;
+
+            sprintf(dbuf, "%s%s", boot_tab[i].devname, gbuf + strlen(boot_tab[i].devname));
+            dptr = find_unit (dbuf, &uptr);
+            if ((dptr == NULL) || (uptr == NULL))
+                return SCPE_ARG;
+            unitno = (int32) (uptr - dptr->units);
+            dibp = (DIB *) dptr->ctxt;                  /* get DIB */
+            if (dibp == NULL)
+                ba = 0;
+            else
+                ba = dibp->ba;
+            R[0] = boot_tab[i].code;
+            if (dptr->flags & DEV_MBUS) {
+                R[1] = (NEXUSBASE + (TR_MBA0 * (1 << REG_V_NEXUS)));
+                R[2] = unitno;
+                }
+            else {
+                R[1] = ba;
+                R[2] = (ba & UBADDRMASK);
+                }
+            R[3] = unitno;
+            R[4] = 0;
+            R[5] = r5v;
+            PC = SP = 0x200;
             }
-        R[3] = unitno;
-        R[4] = 0;
-        R[5] = r5v;
+        if (unitno == -1)
+            continue;
         return SCPE_OK;
         }
+    }
+else {
+     /* Page 2-16 of VAX750 Student Training suggests the following register state: */
+    unitno = 0;
+    R[0] = 0;
+    R[1] = (NEXUSBASE + (TR_MBA0 * (1 << REG_V_NEXUS)));    /* MBA Address */
+    R[2] = IOPAGEBASE;      /* UBA I/O Page Address */
+    R[3] = unitno;          /* Boot Device Unit Number */
+    R[5] = r5v;             /* Boot Flags */
+    SP = 0x200;
+    PC = 0xFA02 + 0x100*vax750_bootdev;
+    return SCPE_OK;
     }
 return SCPE_NOFNC;
 }
@@ -651,12 +752,32 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
 
-r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200);
-if (r != SCPE_OK)
-    return r;
-SP = PC = 512;
+if (PC == 0x200) {    /* Use VMB directly to boot */
+    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200);
+    if (r != SCPE_OK)
+        return r;
+    }
+else                    /* Boot ROM boot */
+    memcpy (&M[0xFA00>>2], rom, ROMSIZE);
 return SCPE_OK;
 }
+
+t_stat vax750_set_bootdev (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if ((!cptr) || (!*cptr || (*cptr < 'A') || (*cptr > 'D')))
+    return SCPE_ARG;
+vax750_bootdev = *cptr - 'A';
+return SCPE_OK;
+}
+
+t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf(st, "bootdev=%c", 'A' + vax750_bootdev);
+if (*((char *)rom) + (0x100 * vax750_bootdev))
+    fprintf(st, "(%c%cA0)", *(((char *)rom) + (0x100 * vax750_bootdev) + 1), *(((char *)rom) + (0x100 * vax750_bootdev)));
+return SCPE_OK;
+}
+
 
 /* CMI reset */
 
@@ -677,7 +798,7 @@ return "CPU/Memory interconnect";
 
 t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, "nexus=%d", val);
+fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;
 }
 
@@ -770,7 +891,24 @@ t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
 fprintf (st, "Initial memory size is 2MB.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");
 fprintf (st, "   sim> BO{OT} <device>{/R5:flags}\n\n");
-fprintf (st, "where <device> is one of:\n\n");
+fprintf (st, "if <device> specifies a simh device name, VMB will be loaded and used to\n");
+fprintf (st, "to start the system.\n");
+fprintf (st, "If <device> specifies a traditional VAX 750 Console Device name the Console\n");
+fprintf (st, "Boot ROM Boot Block Boot will be used to start the system.\n");
+fprintf (st, "Boot ROM <device> names are one of:\n\n");
+fprintf (st, "   DUAn       to boot from rqn\n");
+fprintf (st, "   DUn        to boot from rqn\n");
+fprintf (st, "   DBAn       to boot from rpn\n");
+fprintf (st, "   DBn        to boot from rpn\n");
+fprintf (st, "   DRAn       to boot from rpn\n");
+fprintf (st, "   DRn        to boot from rpn\n");
+fprintf (st, "   DMAn       to boot from hkn\n");
+fprintf (st, "   DMn        to boot from hkn\n");
+fprintf (st, "   DLAn       to boot from rln\n");
+fprintf (st, "   DLn        to boot from rln\n");
+fprintf (st, "   DDAn       to boot from td (TU58)\n");
+fprintf (st, "   DDn        to boot from td (TU58)\n\n");
+fprintf (st, "VMB boot <device> names are one of:\n\n");
 fprintf (st, "   RPn        to boot from rpn\n");
 fprintf (st, "   HKn        to boot from hkn\n");
 fprintf (st, "   RLn        to boot from rln\n");
@@ -778,7 +916,6 @@ fprintf (st, "   RQn        to boot from rqn\n");
 fprintf (st, "   RQBn       to boot from rqbn\n");
 fprintf (st, "   RQCn       to boot from rqcn\n");
 fprintf (st, "   RQDn       to boot from rqdn\n");
-fprintf (st, "   TQn        to boot from tqn\n");
 fprintf (st, "   TDn        to boot from tdn (TU58)\n\n");
 return SCPE_OK;
 }

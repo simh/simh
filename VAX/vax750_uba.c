@@ -393,10 +393,10 @@ void WriteIO (uint32 pa, int32 val, int32 lnt)
 {
 if (lnt == L_BYTE)                                      /* byte? DATOB */
     WriteUb (pa, val, WRITEB);
-else if ((lnt == L_WORD) && ((pa & 1) == 0))            /* aligned word? */
+else if (((lnt == L_WORD) || (lnt == L_LONG)) && ((pa & 1) == 0))/* aligned word? */
      WriteUb (pa, val, WRITE);                          /* DATO */
 else {
-    sim_printf (">>UBA: invalid write mask, pa = %x, lnt = %d\n", pa, lnt);
+    sim_printf (">>UBA: invalid write mask, pa = %x, lnt = %d, val = 0x%x\n", pa, lnt, val);
     /* FIXME: set appropriate error bits */
     }
 SET_IRQL;                                               /* update ints */
@@ -659,7 +659,7 @@ for (i = 0; i < IPL_HLVL; i++) {
     int_req[i] = 0;
     }
 for (i = 0; i < UBA_NMAPR; i++)
-    uba_map[i] = 0;
+    uba_map[i] = UBAMAP_VLD|i;
 uba_csr1 = 0;
 uba_csr2 = 0;
 uba_csr3 = 0;

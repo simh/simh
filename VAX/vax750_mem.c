@@ -30,6 +30,14 @@
 
 #include "vax_defs.h"
 
+#ifndef DONT_USE_INTERNAL_ROM
+#include "vax_ka750_bin_old.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#undef BOOT_CODE_FILENAME
+#undef BOOT_CODE_SIZE
+#undef BOOT_CODE_ARRAY
+#include "vax_ka750_bin_new.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#endif /* DONT_USE_INTERNAL_ROM */
+
 /* Memory adapter register 0 */
 
 #define MCSR0_OF        0x00
@@ -88,6 +96,8 @@ uint32 mcsr0 = 0;
 uint32 mcsr1 = 0;
 uint32 mcsr2 = 0;
 
+uint32 rom[ROMSIZE/sizeof(uint32)];                     /* boot ROM */
+
 t_stat mctl_reset (DEVICE *dptr);
 const char *mctl_description (DEVICE *dptr);
 t_stat mctl_rdreg (int32 *val, int32 pa, int32 mode);
@@ -108,6 +118,7 @@ REG mctl_reg[] = {
     { HRDATAD (CSR0, mcsr0, 32, "ECC syndrome bits") },
     { HRDATAD (CSR1, mcsr1, 32, "CPU error control/check bits") },
     { HRDATAD (CSR2, mcsr2, 32, "Memory Configuration") },
+    { BRDATAD (ROM,    rom, 16, 32, 256, "Bootstrap ROM") },
     { NULL }
     };
 
@@ -159,7 +170,7 @@ switch (ofs) {                                          /* case on offset */
     }
 
 if (DEBUG_PRI (mctl_dev, MCTL_DEB_RRD))
-    fprintf (sim_deb, ">>MCTL: reg %d read, value = %X\n", ofs, *val);
+    fprintf (sim_deb, ">>MCTL: reg %d(%x) read, value = %X\n", ofs, pa, *val);
 
 return SCPE_OK;
 }
@@ -190,7 +201,7 @@ switch (ofs) {                                          /* case on offset */
     }
 
 if (DEBUG_PRI (mctl_dev, MCTL_DEB_RWR))
-    fprintf (sim_deb, ">>MCTL: reg %d write, value = %X\n", ofs, val);
+    fprintf (sim_deb, ">>MCTL: reg %d(%x) write, value = %X\n", ofs, pa, val);
 
 return SCPE_OK;
 }
@@ -199,6 +210,10 @@ return SCPE_OK;
 
 void rom_wr_B (int32 pa, int32 val)
 {
+int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
+int32 sc = (pa & 3) << 3;
+
+rom[rg] = ((val & 0xFF) << sc) | (rom[rg] & ~(0xFF << sc));
 return;
 }
 
@@ -225,6 +240,18 @@ boards = ((1u << ((large_slots + small_slots) << 1)) - 1);
 board_mask = (((large_slot_size == MEM_SIZE_16K)? 0xFFFF : 0x5555) & (((1u << (large_slots << 1)) - 1))) | (((large_slot_size == MEM_SIZE_256K) ? 0xAAAA : 0xFFFF) << (large_slots << 1));
 mcsr2 = MCSR2_INIT | (boards & board_mask) | ((large_slot_size == MEM_SIZE_256K) ? MCSR2_CS256 : 0);  /* Use 256k chips */
 return SCPE_OK;
+}
+
+t_stat mctl_populate_rom (const char *rom_filename)
+{
+#ifdef DONT_USE_INTERNAL_ROM
+return cpu_load_bootcode (rom_filename, NULL, sizeof (rom), TRUE, 0);
+#else
+if (strcmp (rom_filename, "ka750_new.bin") == 0)
+    return cpu_load_bootcode ("ka750_new.bin", vax_ka750_bin_new, BOOT_CODE_SIZE, TRUE, 0);
+else
+    return cpu_load_bootcode ("ka750_old.bin", vax_ka750_bin_old, BOOT_CODE_SIZE, TRUE, 0);
+#endif
 }
 
 const char *mctl_description (DEVICE *dptr)
