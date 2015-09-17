@@ -1944,7 +1944,7 @@ fprintf (st, "video support unavailable");
 return SCPE_OK;
 }
 
-t_stat vid_screenshot (char *filename)
+t_stat vid_screenshot (const char *filename)
 {
 sim_printf ("video support unavailable\n");
 return SCPE_NOFNC|SCPE_NOMESSAGE;
