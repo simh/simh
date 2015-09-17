@@ -2605,7 +2605,12 @@ t_stat screenshot_cmd (int32 flag, char *cptr)
 {
 if ((cptr == NULL) || (strlen (cptr) == 0))
     return SCPE_ARG;
+#if defined (USE_SIM_VIDEO)
 return vid_screenshot (cptr);
+#else
+sim_printf ("No video device\n");
+return SCPE_UNK|SCPE_NOMESSAGE;
+#endif
 }
 
 /* Echo command */
