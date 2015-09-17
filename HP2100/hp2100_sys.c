@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Jun-15    JDB     Added cast to int for isspace parameter
    24-Dec-14    JDB     Added casts to t_addr and t_value for 64-bit compatibility
                         Made local routines static
    05-Feb-13    JDB     Added hp_fprint_stopped to handle HLT instruction message
@@ -430,10 +431,12 @@ static const int32 vtab[] = {
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
 
+#if (SIM_MAJOR >= 4)
 /* Use scp.c provided fprintf function */
 #define fprintf Fprintf
 #define fputs(_s,f) Fprintf(f,"%s",_s)
 #define fputc(_c,f) Fprintf(f,"%c",_c)
+#endif
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
@@ -615,7 +618,7 @@ t_stat r, ret;
 char *cptr, gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-while (isspace (*iptr)) iptr++;                         /* absorb spaces */
+while (isspace ((int) *iptr)) iptr++;                   /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*iptr == '\'') && iptr++)) { /* ASCII char? */
     if (iptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
     val[0] = (t_value) iptr[0] & 0177;

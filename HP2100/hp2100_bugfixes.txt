@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2015-01-03
+                             Last update: 2015-09-14
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6787,5 +6787,29 @@
      behalf of the caller.  Modify the boot routines for the CPU, DA, DP, DQ,
      DR, DS, IPL, MS, and PTR devices to use the new parameters instead of
      modifying the S register directly.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+267. ENHANCEMENT:  Add a register to the IPLI device to configure the DMA delay.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  Occasionally, the 2000 Access terminal multiplexer does not
+     initialize properly; the problem is more prevalent on multiprocessor
+     systems.
+
+     There is a race condition between the system processor (SP) and the I/O
+     processor (IOP) during initialization.  The problem occurs if the IOP DMA
+     completion interrupt routine finishes before the SP DMA completion
+     interrupt routine.  As a workaround, the simulator suspends the IOP process
+     for one millisecond before signaling a DMA completion (EDT) interrupt.
+     Depending on system loading, this time may be insufficient.
+
+     RESOLUTION:  Modify "ipli_reg" (hp2100_ipl.c) to add a hidden register,
+     EDTDELAY, that allows the user to configure the completion delay.  The
+     register value is expressed in milliseconds and defaults to one
+     millisecond.
 
      STATUS:  Fixed in version 4.0-0.
