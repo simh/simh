@@ -97,6 +97,7 @@ t_stat assert_cmd (int32 flag, char *ptr);
 t_stat send_cmd (int32 flag, char *ptr);
 t_stat expect_cmd (int32 flag, char *ptr);
 t_stat help_cmd (int32 flag, char *ptr);
+t_stat screenshot_cmd (int32 flag, char *ptr);
 t_stat spawn_cmd (int32 flag, char *ptr);
 t_stat echo_cmd (int32 flag, char *ptr);
 

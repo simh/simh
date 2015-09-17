@@ -1660,6 +1660,13 @@ ASSERT      failure have several different actions:
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
       " EXIT (synonyms QUIT and BYE) returns control to the operating system.\n"
+       /***************** 80 character line width template *************************/
+#define HLP_SCREENSHOT  "*Commands Screenshot_Video_Window"
+      "2Screenshot Video Window\n"
+      " Simulators with Video devices display the simulated video in a window\n"
+      " on the local system.  The contents of that display can be saved in a\n"
+      " file with the SCREENSHOT command:\n\n"
+      " SCREENSHOT screenshotfile.bmp\n"
 #define HLP_SPAWN       "*Commands Executing_System_Commands"
       "2Executing System Commands\n"
       " The simulator can execute operating system commands with the ! (spawn)\n"
@@ -1722,6 +1729,9 @@ static CTAB cmd_table[] = {
     { "NOEXPECT",   &expect_cmd,    0,          HLP_EXPECT },
     { "!",          &spawn_cmd,     0,          HLP_SPAWN },
     { "HELP",       &help_cmd,      0,          HLP_HELP },
+#if defined(USE_SIM_VIDEO)
+    { "SCREENSHOT", &screenshot_cmd,0,          HLP_SCREENSHOT },
+#endif
     { NULL, NULL, 0 }
     };
 
@@ -2587,6 +2597,15 @@ printf ("\n");
 #endif
 
 return status;
+}
+
+/* Screenshot command */
+
+t_stat screenshot_cmd (int32 flag, char *cptr)
+{
+if ((cptr == NULL) || (strlen (cptr) == 0))
+    return SCPE_ARG;
+return vid_screenshot (cptr);
 }
 
 /* Echo command */

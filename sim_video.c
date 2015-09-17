@@ -65,15 +65,16 @@ char vid_release_key[64] = "Ctrl-Right-Shift";
      
  */
 
-#define EVENT_REDRAW    1                               /* redraw event for SDL */
-#define EVENT_CLOSE     2                               /* close event for SDL */
-#define EVENT_CURSOR    3                               /* new cursor for SDL */
-#define EVENT_WARP      4                               /* warp mouse position for SDL */
-#define EVENT_DRAW      5                               /* draw/blit region for SDL */
-#define EVENT_SHOW      6                               /* show SDL capabilities */
-#define EVENT_OPEN      7                               /* vid_open request */
-#define EVENT_EXIT      8                               /* program exit */
-#define MAX_EVENTS      20                              /* max events in queue */
+#define EVENT_REDRAW     1                              /* redraw event for SDL */
+#define EVENT_CLOSE      2                              /* close event for SDL */
+#define EVENT_CURSOR     3                              /* new cursor for SDL */
+#define EVENT_WARP       4                              /* warp mouse position for SDL */
+#define EVENT_DRAW       5                              /* draw/blit region for SDL */
+#define EVENT_SHOW       6                              /* show SDL capabilities */
+#define EVENT_OPEN       7                              /* vid_open request */
+#define EVENT_EXIT       8                              /* program exit */
+#define EVENT_SCREENSHOT 9                              /* show SDL capabilities */
+#define MAX_EVENTS       20                             /* max events in queue */
 
 typedef struct {
     SIM_KEY_EVENT events[MAX_EVENTS];
@@ -94,6 +95,7 @@ typedef struct {
 int vid_thread (void* arg);
 int vid_video_events (void);
 void vid_show_video_event (void);
+void vid_screenshot_event (void);
 
 /* 
    libSDL and libSDL2 have significantly different APIs.  
@@ -187,8 +189,12 @@ while (1) {
                 if (event.user.code == EVENT_SHOW)
                     vid_show_video_event ();
                 else {
-                    sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
-                    break;
+                    if (event.user.code == EVENT_SCREENSHOT)
+                        vid_screenshot_event ();
+                    else {
+                        sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
+                        break;
+                        }
                     }
                 }
             }
@@ -1459,6 +1465,10 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
                         vid_show_video_event ();
                         event.user.code = 0;    /* Mark as done */
                         }
+                    if (event.user.code == EVENT_SCREENSHOT) {
+                        vid_screenshot_event ();
+                        event.user.code = 0;    /* Mark as done */
+                        }
                     if (event.user.code != 0) {
                         sim_printf ("vid_thread(): Unexpected user event code: %d\n", event.user.code);
                         }
@@ -1818,6 +1828,55 @@ while (_show_stat == -1)
 return _show_stat;
 }
 
+static t_stat _vid_screenshot (const char *filename)
+{
+if (!vid_active) {
+    sim_printf ("No video display is active\n");
+    return SCPE_UDIS | SCPE_NOMESSAGE;
+    }
+#if SDL_MAJOR_VERSION == 1
+SDL_SaveBMP(vid_image, filename);
+#else
+if (1) {
+    SDL_Surface *sshot = sim_end ? SDL_CreateRGBSurface(0, vid_width, vid_height, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000) :
+                                   SDL_CreateRGBSurface(0, vid_width, vid_height, 32, 0x0000ff00, 0x000ff000, 0xff000000, 0x000000ff) ;
+    SDL_RenderReadPixels(vid_renderer, NULL, SDL_PIXELFORMAT_ARGB8888, sshot->pixels, sshot->pitch);
+    SDL_SaveBMP(sshot, filename);
+    SDL_FreeSurface(sshot);
+    }
+#endif
+return SCPE_OK;
+}
+
+static t_stat _screenshot_stat;
+static const char *_screenshot_filename;
+
+void vid_screenshot_event (void)
+{
+_screenshot_stat = _vid_screenshot (_screenshot_filename);
+}
+
+t_stat vid_screenshot (const char *filename)
+{
+SDL_Event user_event;
+
+_screenshot_stat = -1;
+_screenshot_filename = filename;
+
+user_event.type = SDL_USEREVENT;
+user_event.user.code = EVENT_SCREENSHOT;
+user_event.user.data1 = NULL;
+user_event.user.data2 = NULL;
+#if defined (SDL_MAIN_AVAILABLE)
+SDL_PushEvent (&user_event);
+#else
+vid_screenshot_event ();
+#endif
+while (_screenshot_stat == -1)
+    SDL_Delay (20);
+return _screenshot_stat;
+}
+
 #else /* !(defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)) */
 /* Non-implemented versions */
 
@@ -1883,5 +1942,11 @@ t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
 fprintf (st, "video support unavailable");
 return SCPE_OK;
+}
+
+t_stat vid_screenshot (char *filename)
+{
+sim_printf ("video support unavailable\n");
+return SCPE_NOFNC|SCPE_NOMESSAGE;
 }
 #endif /* defined(USE_SIM_VIDEO) */
