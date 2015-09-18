@@ -772,9 +772,16 @@ return SCPE_OK;
 
 t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf(st, "bootdev=%c", 'A' + vax750_bootdev);
-if (*((char *)rom) + (0x100 * vax750_bootdev))
-    fprintf(st, "(%c%cA0)", *(((char *)rom) + (0x100 * vax750_bootdev) + 1), *(((char *)rom) + (0x100 * vax750_bootdev)));
+int i;
+
+fprintf (st, "bootdev=%c", 'A' + vax750_bootdev);
+if (*rom) {
+    fprintf (st, "(");
+    for (i=0; i<4; i++)
+        if ((*((char *)rom) + (0x100 * i)) && (*(((char *)rom) + (0x100 * i) + 2)))
+            fprintf (st, "%s%c=%c%cA0", (i != 0) ? "," : "", 'A' + i, *(((char *)rom) + (0x100 * i) + 1), *(((char *)rom) + (0x100 * i)));
+    fprintf (st, ")");
+    }
 return SCPE_OK;
 }
 
