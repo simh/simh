@@ -9632,17 +9632,24 @@ for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition
    indicating the state and transition of the bit and bitfields. States:
    0=steady(0->0), 1=steady(1->1), _=falling(1->0), ^=rising(0->1) */
 
-void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
-    uint32 before, uint32 after, int terminate)
+void sim_debug_bits_hdr(uint32 dbits, DEVICE* dptr, const char *header, 
+    BITFIELD* bitdefs, uint32 before, uint32 after, int terminate)
 {
 if (sim_deb && dptr && (dptr->dctrl & dbits)) {
     if (!debug_unterm)
-        fprintf(sim_deb, "%s", sim_debug_prefix(dbits, dptr));                      /* print prefix if required */
+        fprintf(sim_deb, "%s", sim_debug_prefix(dbits, dptr));         /* print prefix if required */
+    if (header)
+        fprintf(sim_deb, "%s: ", header);
     fprint_fields (sim_deb, (t_value)before, (t_value)after, bitdefs); /* print xlation, transition */
     if (terminate)
         fprintf(sim_deb, "\r\n");
     debug_unterm = terminate ? 0 : 1;                   /* set unterm for next */
     }
+}
+void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
+    uint32 before, uint32 after, int terminate)
+{
+sim_debug_bits_hdr(dbits, dptr, NULL, bitdefs, before, after, terminate);
 }
 
 /* Print message to stdout, sim_log (if enabled) and sim_deb (if enabled) */

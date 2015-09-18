@@ -85,6 +85,41 @@
 #define CSTS_RD         (CSR_DONE + CSR_IE + CSTS_BRK)  /* terminal output */
 #define CSTS_WR         (CSR_IE + CSTS_BRK)
 
+static BITFIELD rx_csr_bits[] = {
+    BITNCF(6),                          /* unused */
+    BIT(IE),                            /* Interrupt Enable */
+    BIT(DONE),                          /* Xmit Ready */
+    BITNCF(8),                          /* unused */
+    ENDBITS
+};
+
+static BITFIELD rx_buf_bits[] = {
+    BITF(DAT,8),                        /* data buffer */
+    BITNCF(5),                          /* unused */
+    BIT(RBRK),
+    BIT(OVR),
+    BIT(ERR),
+    ENDBITS
+};
+
+static BITFIELD tx_csr_bits[] = {
+    BIT(XBR),                           /* Break */
+    BITNC,                              /* unused */
+    BIT(MAINT),                         /* Maint */
+    BITNCF(3),                          /* unused */
+    BIT(IE),                            /* Interrupt Enable */
+    BIT(DONE),                          /* Xmit Ready */
+    BITNCF(8),                          /* unused */
+    ENDBITS
+};
+
+static BITFIELD tx_buf_bits[] = {
+    BITF(DAT,8),                        /* data buffer */
+    BITNCF(8),                          /* unused */
+    ENDBITS
+};
+
+
 /* Clock definitions */
 
 #define TMR_CSR_ERR     0x80000000                      /* error W1C */
@@ -155,6 +190,18 @@
 #define TD_END          7                               /* empty buffer */
 #define TD_END1         8                               /* empty buffer */
 #define TD_INIT         9                               /* empty buffer */
+
+static char *td_states[] = {
+    "IDLE", "READ", "READ1", "READ2", "WRITE", "WRITE1", "WRITE2", "END", "END1", "INIT"
+    };
+
+static char *td_ops[] = {
+    "NOP", "INI", "RD", "WR", "POS", "DIA", "GST", "SST", "MRSP"
+    };
+
+static char *td_csostates[] = {
+    "GETOPC", "GETLEN", "GETDATA"
+    };
 
 int32 tti_csr = 0;                                      /* control/status */
 uint32 tti_buftime;                                     /* time input character arrived */
@@ -382,12 +429,39 @@ MTAB td_mod[] = {
     { 0 }
     };
 
+/* Debug detail levels */
+
+#define TDDEB_OPS       00001                           /* transactions */
+#define TDDEB_IRD       00002                           /* input reg reads */
+#define TDDEB_ORD       00004                           /* output reg reads */
+#define TDDEB_RRD       00006                           /* reg reads */
+#define TDDEB_IWR       00010                           /* input reg writes */
+#define TDDEB_OWR       00020                           /* output reg writes */
+#define TDDEB_RWR       00030                           /* reg writes */
+#define TDDEB_TRC       00040                           /* trace */
+#define TDDEB_INT       00100                           /* interrupts */
+#define TDDEB_PKT       00200                           /* packet */
+
+DEBTAB td_deb[] = {
+    { "OPS", TDDEB_OPS, "transactions" },
+    { "PKT", TDDEB_PKT, "packet" },
+    { "RRD", TDDEB_RRD, "reg reads"},
+    { "IRD", TDDEB_IRD, "input reg reads" },
+    { "ORD", TDDEB_ORD, "output reg reads" },
+    { "RWR", TDDEB_RWR, "reg writes" },
+    { "IWR", TDDEB_IWR, "input reg writes" },
+    { "OWR", TDDEB_OWR, "output reg writes" },
+    { "INT", TDDEB_INT, "interrupts" },
+    { "TRC", TDDEB_TRC, "trace" },
+    { NULL, 0 }
+    };
+
 DEVICE td_dev = {
     "TD", &td_unit, td_reg, td_mod,
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &td_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_DEBUG, 0, td_deb, NULL, NULL, NULL, NULL, NULL, 
     &td_description
     };
 
@@ -401,15 +475,23 @@ DEVICE td_dev = {
 
 int32 csrs_rd (void)
 {
+sim_debug(TDDEB_IRD, &td_dev, "csrs_rd()\n");
+sim_debug_bits_hdr(TDDEB_IRD, &td_dev, "RX_CSR", rx_csr_bits, csi_csr, csi_csr, 1);
 return (csi_csr & RXCS_RD);
 }
 
 void csrs_wr (int32 data)
 {
-if ((data & CSR_IE) == 0)
-    cso_int = 0;
-else if ((csi_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
+sim_debug(TDDEB_IWR, &td_dev, "csrs_wr()\n");
+sim_debug_bits_hdr(TDDEB_IWR, &td_dev, "RX_CSR", rx_csr_bits, data, data, 1);
+if ((data & CSR_IE) == 0) {
+    csi_int = 0;
+    sim_debug (TDDEB_INT, &td_dev, "CSI_INT(0)\n");
+    }
+else if ((csi_csr & (CSR_DONE + CSR_IE)) == CSR_DONE) {
     csi_int = 1;
+    sim_debug (TDDEB_INT, &td_dev, "CSI_INT(1)\n");
+    }
 csi_csr = (csi_csr & ~RXCS_WR) | (data & RXCS_WR);
 return;
 }
@@ -418,37 +500,57 @@ int32 csrd_rd (void)
 {
 int32 t = csi_buf;                                      /* char + error */
 
+sim_debug(TDDEB_IRD, &td_dev, "csrd_rd()\n");
+sim_debug_bits_hdr(TDDEB_IRD, &td_dev, "RX_BUF", rx_buf_bits, t, t, 1);
 csi_csr = csi_csr & ~CSR_DONE;                          /* clr done */
 csi_buf = csi_buf & BMASK;                              /* clr errors */
-csi_int = 0;
+if (csi_int) {
+    csi_int = 0;
+    sim_debug (TDDEB_INT, &td_dev, "CSI_INT(0)\n");
+    }
 return t;
 }
 
 int32 csts_rd (void)
 {
+sim_debug(TDDEB_ORD, &td_dev, "csts_rd()\n");
+sim_debug_bits_hdr(TDDEB_ORD, &td_dev, "TX_CSR", tx_csr_bits, cso_csr, cso_csr, 1);
 return (cso_csr & TXCS_RD);
 }
 
 void csts_wr (int32 data)
 {
+sim_debug(TDDEB_OWR, &td_dev, "csts_wr()\n");
+sim_debug_bits_hdr(TDDEB_OWR, &td_dev, "TX_CSR", tx_csr_bits, data, data, 1);
 if ((cso_csr & CSTS_BRK) && !(data & CSTS_BRK)) {
     td_ibptr = 0;
     td_ibuf[td_ibptr++] = TD_OPINI;
     td_process_packet();                                 /* check packet */
     }
-if ((data & CSR_IE) == 0)
-    cso_int = 0;
-else if ((cso_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
+if ((data & CSR_IE) == 0) {
+    if (cso_int) {
+        cso_int = 0;
+        sim_debug (TDDEB_INT, &td_dev, "CSO_INT(0)\n");
+        }
+    }
+else if ((cso_csr & (CSR_DONE + CSR_IE)) == CSR_DONE) {
     cso_int = 1;
+    sim_debug (TDDEB_INT, &td_dev, "CSO_INT(1)\n");
+    }
 cso_csr = (cso_csr & ~CSTS_WR) | (data & CSTS_WR);
 return;
 }
 
 void cstd_wr (int32 data)
 {
-cso_buf = data & WMASK;                                  /* save data */
+sim_debug(TDDEB_OWR, &td_dev, "cstd_wr() state=%s, ibptr=%d, ilen=%d\n", td_csostates[cso_state], td_ibptr, td_ilen);
+sim_debug_bits_hdr(TDDEB_OWR, &td_dev, "TX_BUF", tx_buf_bits, data, data, 1);
+cso_buf = data & BMASK;                                  /* save data */
 cso_csr = cso_csr & ~CSR_DONE;                           /* clear flag */
-cso_int = 0;                                             /* clear int */
+if (cso_int) {
+    cso_int = 0;                                         /* clear int */
+    sim_debug (TDDEB_INT, &td_dev, "CSO_INT(0)\n");
+    }
 
 switch (cso_state) {
 
@@ -474,15 +576,41 @@ switch (cso_state) {
     }
 
 cso_csr = cso_csr | CSR_DONE;                            /* set input flag */
-if (cso_csr & CSR_IE)
+if (cso_csr & CSR_IE) {
     cso_int = 1;
+    sim_debug (TDDEB_INT, &td_dev, "CSO_INT(1)\n");
+    }
 return;
 }
 
 void td_process_packet()
 {
 int32 opcode = td_ibuf[0];
+char *opcode_name, *command_name;
 
+switch (opcode) {
+    case TD_OPDAT:
+        opcode_name = "OPDAT";
+        break;
+    case TD_OPCMD:
+        opcode_name = "OPCMD";
+        break;
+    case TD_OPINI:
+        opcode_name = "OPINI";
+        break;
+    case TD_OPBOO:
+        opcode_name = "OPBOO";
+        break;
+    case TD_OPCNT:
+        opcode_name = "OPCNT";
+        break;
+    case TD_OPXOF:
+        opcode_name = "OPXOF";
+        break;
+    default:
+        opcode_name = "unknown";
+    }
+sim_debug (TDDEB_TRC, &td_dev, "td_process_packet() Opcode=%s(%d)\n", opcode_name, opcode);
 switch (opcode) {
 
     case TD_OPDAT:
@@ -507,6 +635,11 @@ switch (opcode) {
             cso_state = TD_GETLEN;                       /* get rest of packet */
             return;
             }
+        if (td_ibuf[2] == TD_CMDEND)
+            command_name = "END";
+        else
+            command_name = td_ops[td_ibuf[2]];
+        sim_debug (TDDEB_OPS, &td_dev, "strt: fnc=%d(%s), block=%d, size=%d\n", td_ibuf[2], command_name, ((td_ibuf[11] << 8) | td_ibuf[10]), ((td_ibuf[9] << 8) | td_ibuf[8]));
         switch (td_ibuf[2]) {
             case TD_CMDNOP:                              /* NOP */
             case TD_CMDGST:                              /* Get status */
@@ -526,6 +659,8 @@ switch (opcode) {
                 td_txsize = ((td_ibuf[9] << 8) | td_ibuf[8]);
                 td_state = TD_READ;
                 td_offset = 0;
+                if (td_block == 0)
+                    td_block = td_block;
                 sim_activate (&td_unit, td_cwait);       /* sched command */
                 break;
                
@@ -548,8 +683,10 @@ switch (opcode) {
             case TD_CMDMRSP:
                 csi_buf = TD_OPDAT;
                 csi_csr = csi_csr | CSR_DONE;            /* set input flag */
-                if (csi_csr & CSR_IE)
+                if (csi_csr & CSR_IE) {
                     csi_int = 1;
+                    sim_debug (TDDEB_INT, &td_dev, "CSI_INT(1)\n");
+                    }
                 break;
             }
         break;
@@ -690,6 +827,7 @@ sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 csi_buf = 0;
 csi_csr = 0;
 csi_int = 0;
+sim_debug (TDDEB_INT, &td_dev, "CSI_INT(0)\n");
 return SCPE_OK;
 }
 
@@ -1093,6 +1231,7 @@ uint16 c, w;
 uint32 da;
 int8 *fbuf = uptr->filebuf;
 
+sim_debug (TDDEB_TRC, &td_dev, "td_svc(state=%s)\n", td_states[td_state]);
 switch (td_state) {                                     /* case on state */
 
     case TD_IDLE:                                       /* idle */
@@ -1141,8 +1280,10 @@ switch (td_state) {                                     /* case on state */
         if ((csi_csr & CSR_DONE) == 0) {                /* prev data taken? */
             csi_buf = td_obuf[td_obptr++];              /* get next byte */
             csi_csr = csi_csr | CSR_DONE;               /* set input flag */
-            if (csi_csr & CSR_IE)
+            if (csi_csr & CSR_IE) {
                 csi_int = 1;
+                sim_debug (TDDEB_INT, &td_dev, "CSI_INT(1)\n");
+                }
             if (td_obptr >= td_olen) {                  /* buffer empty? */
                 if (td_txsize > 0)
                     td_state = TD_READ1;
@@ -1157,8 +1298,10 @@ switch (td_state) {                                     /* case on state */
         if ((csi_csr & CSR_DONE) == 0) {                /* prev data taken? */
             csi_buf = TD_OPCNT;
             csi_csr = csi_csr | CSR_DONE;               /* set input flag */
-            if (csi_csr & CSR_IE)
+            if (csi_csr & CSR_IE) {
                 csi_int = 1;
+                sim_debug (TDDEB_INT, &td_dev, "CSI_INT(1)\n");
+                }
             break;
             }
         sim_activate (uptr, td_xwait);                  /* schedule next */
@@ -1213,6 +1356,7 @@ switch (td_state) {                                     /* case on state */
         td_olen = td_obptr;
         td_obptr = 0;
         td_state = TD_END1;                             /* go empty */
+        sim_debug(TDDEB_PKT, &td_dev, "END PKT: Generated - Success Code: %X\n", td_ecode);
         sim_activate (uptr, td_xwait);                  /* schedule next */
         break;
 
@@ -1220,9 +1364,12 @@ switch (td_state) {                                     /* case on state */
         if ((csi_csr & CSR_DONE) == 0) {                /* prev data taken? */
             csi_buf = td_obuf[td_obptr++];              /* get next byte */
             csi_csr = csi_csr | CSR_DONE;               /* set input flag */
-            if (csi_csr & CSR_IE)
+            if (csi_csr & CSR_IE) {
                 csi_int = 1;
+                sim_debug (TDDEB_INT, &td_dev, "CSI_INT(1)\n");
+                }
             if (td_obptr >= td_olen) {                  /* buffer empty? */
+                sim_debug(TDDEB_PKT, &td_dev, "END PKT: Sent\n");
                 td_state = TD_IDLE;
                 break;
                 }
@@ -1234,8 +1381,10 @@ switch (td_state) {                                     /* case on state */
         if ((csi_csr & CSR_DONE) == 0) {                /* prev data taken? */
             csi_buf = TD_OPCNT;
             csi_csr = csi_csr | CSR_DONE;               /* set input flag */
-            if (csi_csr & CSR_IE)
+            if (csi_csr & CSR_IE) {
                 csi_int = 1;
+                sim_debug (TDDEB_INT, &td_dev, "CSI_INT(1)\n");
+                }
             td_state = TD_IDLE;
             break;
             }
@@ -1269,6 +1418,7 @@ t_stat td_reset (DEVICE *dptr)
 cso_buf = 0;
 cso_csr = CSR_DONE;
 cso_int = 0;
+sim_debug (TDDEB_INT, &td_dev, "CSO_INT(0)\n");
 cso_state = TD_GETOPC;
 td_ibptr = 0;
 td_obptr = 0;

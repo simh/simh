@@ -190,6 +190,8 @@ void sim_printf (const char* fmt, ...);
 void sim_perror (const char* msg);
 t_stat sim_messagef (t_stat stat, const char* fmt, ...);
 void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason);
+void sim_debug_bits_hdr (uint32 dbits, DEVICE* dptr, const char *header, 
+    BITFIELD* bitdefs, uint32 before, uint32 after, int terminate);
 void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate);
 #if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))
