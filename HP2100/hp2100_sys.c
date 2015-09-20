@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Jun-15    JDB     Conditionally use Fprintf function for version 4.x and on
    18-Jun-15    JDB     Added cast to int for isspace parameter
    24-Dec-14    JDB     Added casts to t_addr and t_value for 64-bit compatibility
                         Made local routines static
@@ -62,9 +63,18 @@
    27-Oct-98    RMS     V2.4 load interface
 */
 
+
+#include <ctype.h>
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include <ctype.h>
+#include "sim_rev.h"
+
+
+#if (SIM_MAJOR >= 4)
+  #define fprintf       Fprintf
+  #define fputs(_s,_f)  Fprintf (_f, "%s", _s)
+  #define fputc(_c,_f)  Fprintf (_f, "%c", _c)
+#endif
 
 
 extern DEVICE mp_dev;
@@ -430,13 +440,6 @@ static const int32 vtab[] = {
 */
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
-
-#if (SIM_MAJOR >= 4)
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-#endif
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
