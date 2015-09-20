@@ -587,6 +587,7 @@ const struct scp_error {
          {"INVREM",  "Invalid remote console command"},
          {"NOTATT",  "Not attached"},
          {"EXPECT",  "Expect matched"},
+         {"REMOTE",  "remote console command"},
     };
 
 const size_t size_map[] = { sizeof (int8),
