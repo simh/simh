@@ -565,6 +565,8 @@ struct sim_reg {
     uint32              qptr;                           /* circ q ptr */
     };
 
+/* Register flags */
+
 #define REG_FMT         00003                           /* see PV_x */
 #define REG_RO          00004                           /* read only */
 #define REG_HIDDEN      00010                           /* hidden */
@@ -575,6 +577,10 @@ struct sim_reg {
 #define REG_VMAD        00400                           /* use VM addr print/parse */
 #define REG_FIT         01000                           /* fit access to size */
 #define REG_HRO         (REG_RO | REG_HIDDEN)           /* hidden, read only */
+
+#define REG_V_UF        16                              /* device specific */
+#define REG_UFMASK      (~((1u << REG_V_UF) - 1))       /* user flags mask */
+#define REG_VMFLAGS     (REG_VMIO | REG_UFMASK)         /* call VM routine if any of these are set */
 
 /* Command tables, base and alternate formats */
 

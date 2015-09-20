@@ -6504,8 +6504,9 @@ if (!(flag & EX_E))
 GET_RADIX (rdx, rptr->radix);
 if ((rptr->flags & REG_VMAD) && sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, sim_dflt_dev, (t_addr) val);
-else if (!(rptr->flags & REG_VMIO) ||
-    (fprint_sym (ofile, rdx, &val, NULL, sim_switches | SIM_SW_REG) > 0)) {
+else if (!(rptr->flags & REG_VMFLAGS) ||
+    (fprint_sym (ofile, (rptr->flags & REG_UFMASK) | rdx, &val,
+                 NULL, sim_switches | SIM_SW_REG) > 0)) {
         fprint_val (ofile, val, rdx, rptr->width, rptr->flags & REG_FMT);
         if (rptr->fields) {
             Fprintf (ofile, "\t");
@@ -6603,8 +6604,10 @@ if ((rptr->flags & REG_VMAD) && sim_vm_parse_addr) {    /* address form? */
     if ((tptr == cptr) || (*tptr != 0) || (val > mask))
         return SCPE_ARG;
     }
-else if (!(rptr->flags & REG_VMIO) ||                   /* dont use sym? */
-    (parse_sym (cptr, rdx, NULL, &val, sim_switches | SIM_SW_REG) > SCPE_OK)) {
+else
+    if (!(rptr->flags & REG_VMFLAGS) ||                 /* dont use sym? */
+        (parse_sym (cptr, (rptr->flags & REG_UFMASK) | rdx, NULL,
+                    &val, sim_switches | SIM_SW_REG) > SCPE_OK)) {
     val = get_uint (cptr, rdx, mask, &r);
     if (r != SCPE_OK)
         return SCPE_ARG;
