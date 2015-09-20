@@ -3153,7 +3153,7 @@ else {
                               (sim_switches & SWMASK ('I')) ? "" : "\n");
     free (mbuf);
     mbuf = sim_encode_quoted_string ((uint8 *)mbuf2, strlen (mbuf2));
-    sim_exp_set (&sim_con_expect, mbuf, 0, sim_con_expect.after, 0, NULL);
+    sim_exp_set (&sim_con_expect, mbuf, 0, sim_con_expect.after, EXP_TYP_PERSIST, NULL);
     free (mbuf);
     free (mbuf2);
     }
