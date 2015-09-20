@@ -389,6 +389,7 @@ for (i = 0; i < h; i++)
 #else
 SDL_Event user_event;
 SDL_Rect *vid_dst;
+uint32 *vid_data;
 
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
 
@@ -397,11 +398,17 @@ vid_dst->x = x;
 vid_dst->y = y;
 vid_dst->w = w;
 vid_dst->h = h;
+vid_data = (uint32 *)malloc (w*h*sizeof(*buf));
+memcpy (vid_data, buf, w*h*sizeof(*buf));
 user_event.type = SDL_USEREVENT;
 user_event.user.code = EVENT_DRAW;
 user_event.user.data1 = (void *)vid_dst;
-user_event.user.data2 = (void *)buf;
-SDL_PushEvent (&user_event);
+user_event.user.data2 = (void *)vid_data;
+if (SDL_PushEvent (&user_event) < 0) {
+    sim_printf ("%s: vid_draw() SDL_PushEvent error: %s\n", sim_dname(vid_dev), SDL_GetError());
+    free (vid_dst);
+    free (vid_data);
+    }
 #endif
 }
 
@@ -432,8 +439,10 @@ user_event.user.code = EVENT_CURSOR;
 user_event.user.data1 = cursor;
 user_event.user.data2 = (void *)((size_t)visible);
 
-if (SDL_PushEvent (&user_event) < 0)
+if (SDL_PushEvent (&user_event) < 0) {
     sim_printf ("%s: vid_set_cursor() SDL_PushEvent error: %s\n", sim_dname(vid_dev), SDL_GetError());
+    SDL_FreeCursor (cursor);
+    }
 
 return SCPE_OK;
 }
@@ -1146,6 +1155,7 @@ if (SDL_UpdateTexture(vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf)))
     sim_printf ("%s: vid_draw() - SDL_UpdateTexture error: %s\n", sim_dname(vid_dev), SDL_GetError());
 
 free (vid_dst);
+free (buf);
 event->data1 = NULL;
 }
 #endif
