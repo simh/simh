@@ -988,6 +988,8 @@ static const char simh_help[] =
       "++++++++                     console sessions\n"
       "+set remote TIMEOUT=n        specify number of seconds without input\n"
       "++++++++                     before automatic continue\n"
+      "+set remote MASTER           enable master mode remote console\n"
+      "+set remote NOMASTER         disable remote master mode console\n"
 #define HLP_SET_DEFAULT "*Commands SET Working_Directory"
       "3Working Directory\n"
       "+set default <dir>           set the current directory\n"
