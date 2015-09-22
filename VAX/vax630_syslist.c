@@ -55,6 +55,7 @@ extern DEVICE wtc_dev;
 extern DEVICE sysd_dev;
 extern DEVICE qba_dev;
 extern DEVICE tti_dev, tto_dev;
+extern DEVICE tdc_dev;
 extern DEVICE cr_dev;
 extern DEVICE lpt_dev;
 extern DEVICE clk_dev;
@@ -84,6 +85,7 @@ DEVICE *sim_devices[] = {
     &clk_dev,
     &tti_dev,
     &tto_dev,
+    &tdc_dev,
     &dz_dev,
     &vh_dev,
     &cr_dev,

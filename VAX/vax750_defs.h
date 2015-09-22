@@ -309,6 +309,8 @@ typedef struct {
 #define INT_V_CR        3
 #define INT_V_VHRX      4
 #define INT_V_VHTX      5
+#define INT_V_TDRX      6
+#define INT_V_TDTX      7
 
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
@@ -329,6 +331,8 @@ typedef struct {
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_TDRX        (1u << INT_V_TDRX)
+#define INT_TDTX        (1u << INT_V_TDTX)
 
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
@@ -349,6 +353,8 @@ typedef struct {
 #define IPL_DMCTX       (0x15 - IPL_HMIN)
 #define IPL_DUPRX       (0x15 - IPL_HMIN)
 #define IPL_DUPTX       (0x15 - IPL_HMIN)
+#define IPL_TDRX        (0x14 - IPL_HMIN)
+#define IPL_TDTX        (0x14 - IPL_HMIN)
 
 /* Device vectors */
 

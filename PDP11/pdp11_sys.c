@@ -82,6 +82,7 @@ extern DEVICE dli_dev;
 extern DEVICE dlo_dev;
 extern DEVICE dci_dev;
 extern DEVICE dco_dev;
+extern DEVICE tdc_dev;
 extern DEVICE dz_dev;
 extern DEVICE vh_dev;
 extern DEVICE dt_dev;
@@ -145,6 +146,7 @@ DEVICE *sim_devices[] = {
     &ptp_dev,
     &tti_dev,
     &tto_dev,
+    &tdc_dev,
     &cr_dev,
     &lpt_dev,
     &dli_dev,

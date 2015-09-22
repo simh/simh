@@ -59,6 +59,7 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
         Qbus systems 128 port limit (default of 16).
     DZ devices optionally support full modem control (and port speed settings 
         when connected to serial ports).
+    TU58 device support for all PDP11 and VAX systems.
     DHU11 (device VH) on Unibus systems now has 16 ports per multiplexer.
     XQ devices (DEQNA, DELQA and DELQA-T) are bootable on Qbus PDP11 simulators
     XQ and XU devices (DEQNA, DELQA, DELQA-T, DEUNA and DELQA) devices can now 

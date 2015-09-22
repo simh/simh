@@ -327,6 +327,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_td.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_tm.c"
 				>
 			</File>
@@ -461,6 +465,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_mscp.h"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_td.h"
 				>
 			</File>
 			<File

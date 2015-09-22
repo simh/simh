@@ -2301,6 +2301,11 @@ void xq_start_receiver(CTLR* xq)
   if (!xq->var->etherface)
     return;
 
+  /* clear read queue */
+  ethq_clear(&xq->var->ReadQ);
+
+
+
   /* start the read service timer or enable asynch reading as appropriate */
   if (xq->var->must_poll) {
     if (sim_idle_enab)

@@ -106,6 +106,7 @@
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((t_addr) (x)) < cpu_memsize)  /* use only in sim! */
 #define DMASK           0177777
+#define BMASK           0377
 
 /* CPU models */
 
@@ -633,6 +634,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_VTCH      15
 #define INT_V_VTNM      16
 #define INT_V_LK        17
+#define INT_V_TDRX      18
+#define INT_V_TDTX      19
 
 #define INT_V_PIR3      0                               /* BR3 */
 #define INT_V_PIR2      0                               /* BR2 */
@@ -690,6 +693,8 @@ typedef struct pdp_dib DIB;
 #define INT_PIR3        (1u << INT_V_PIR3)
 #define INT_PIR2        (1u << INT_V_PIR2)
 #define INT_PIR1        (1u << INT_V_PIR1)
+#define INT_TDRX        (1u << INT_V_TDRX)
+#define INT_TDTX        (1u << INT_V_TDTX)
 
 #define INT_INTERNAL7   (INT_PIR7)
 #define INT_INTERNAL6   (INT_PIR6 | INT_CLK)
@@ -744,6 +749,8 @@ typedef struct pdp_dib DIB;
 #define IPL_VTCH        4
 #define IPL_VTNM        4
 #define IPL_LK          4           /* XXX just a guess */
+#define IPL_TDRX        4
+#define IPL_TDTX        4
 
 #define IPL_PIR7        7
 #define IPL_PIR6        6
