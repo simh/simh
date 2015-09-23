@@ -1069,9 +1069,10 @@ t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 {
 fprintf (st, "TM02/TM03/TE16/TU45/TU77 Magnetic Tapes\n\n");
 fprintf (st, "The TU controller implements the Massbus family of 800/1600bpi magnetic tape\n");
-fprintf (st, "drives.  TU options include the ability to select the formatter type (TM02\n");
-fprintf (st, "or TM03), to set the drive type to one of three drives (TE16, TU45, or TU77),\n");
-fprintf (st, "and to set the drives write enabled or write locked.\n\n");
+fprintf (st, "drives.  TU options include the ability to set the drive type to one of three\n");
+fprintf (st, "drives (TE16, TU45, or TU77), and to set the drives write enabled or write\n");
+fprintf (st, "locked.  When configured on a PDP11 simulator, the TU formatter type can be\n");
+fprintf (st, "selected as either TM02 or TM03),\n\n");
 fprint_set_help (st, dptr);
 fprintf (st, "\nMagnetic tape units can be set to a specific reel capacity in MB, or to\n");
 fprintf (st, "unlimited capacity:\n\n");
