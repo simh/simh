@@ -379,7 +379,7 @@ DEVICE td_dev = {
     &td_description
     };
 
-static void set_csi_int (int ctlr, t_bool val)
+static void set_csi_int (int32 ctlr, t_bool val)
 {
 if (csi_int ^ val) {
     csi_int = val;
@@ -387,7 +387,7 @@ if (csi_int ^ val) {
     }
 }
 
-static void set_cso_int (int ctlr, t_bool val)
+static void set_cso_int (int32 ctlr, t_bool val)
 {
 if (cso_int ^ val) {
     cso_int = val;

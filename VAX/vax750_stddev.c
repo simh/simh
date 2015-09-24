@@ -221,6 +221,7 @@ REG tti_reg[] = {
     { FLDATAD (IE,         tti_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
     { DRDATAD (POS,   tti_unit.pos,   T_ADDR_W, "number of characters input"), PV_LEFT },
     { DRDATAD (TIME, tti_unit.wait,         24, "input polling interval"), PV_LEFT },
+    { URDATAD (TIMEX, tti_unit,         10, 24, offsetof(UNIT, wait), 5, 0, "input polling interval"), PV_LEFT },
     { NULL }
     };
 
@@ -371,7 +372,7 @@ DEVICE td_dev = {
     &td_description
     };
 
-static void set_csi_int (int ctlr, t_bool val)
+static void set_csi_int (int32 ctlr, t_bool val)
 {
 if (csi_int ^ val) {
     csi_int = val;
@@ -379,7 +380,7 @@ if (csi_int ^ val) {
     }
 }
 
-static void set_cso_int (int ctlr, t_bool val)
+static void set_cso_int (int32 ctlr, t_bool val)
 {
 if (cso_int ^ val) {
     cso_int = val;
