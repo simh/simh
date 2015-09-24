@@ -99,6 +99,11 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     Outgoing connections per line (virtual Null Modem cable).
     Packet sending and reception semantics for simulated network device support using either TCP or UDP transport.
 
+#### Video Display Capabilities
+    Added support for monochrome displays with optional keyboards and mice.  
+    The VAXstation QVSS device (VCB01) simulation uses this capability.
+    Host platforms which have libSDL available can leverage this functionality.
+
 #### Asynchronous I/O
     * Disk and Tape I/O can be asynchronous.  Asynchronous support exists 
       for pdp11_rq, pdp11_rp and pdp11_tq devices (used by VAX and PDP11 
@@ -109,7 +114,7 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
 
 #### Disk Extensions
     RAW Disk Access (including CDROM)
-    Virtual Disk Container files, including differincing disks
+    Virtual Disk Container files, including differencing disks
 
 #### Embedded ROM support
     Simulators which have boot commands which load constant files as part of 
@@ -205,6 +210,7 @@ The EXPECT command now exists to provide a means of reacting to simulator output
 
 #### New SCP Commands:
 
+    SCREENSHOT filename.bmp         Save video window to the specified file
     SET ENVIRONMENT Name=Value      Set Environment variable
     SET ASYNCH                      Enable Asynchronous I/O
     SET NOASYNCH                    Disable Asynchronous I/O

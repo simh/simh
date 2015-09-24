@@ -81,7 +81,7 @@ Linux (Ubuntu 10.04):
     # Run simulator and "attach xq tap:tap0"
     
 
-Linux (Fedora Core 18, 20, etc.):
+Linux (Fedora Core 18, 20, CentOS, RedHat, etc.):
     yum install gcc
     yum install libpcap-devel
     yum install uml-utilities
