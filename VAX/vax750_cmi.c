@@ -732,7 +732,16 @@ if (gbuf[0]) {
         }
     }
 else {
-     /* Page 2-16 of VAX750 Student Training suggests the following register state: */
+    if (!(*rom)) {                              /* ROM loaded? */
+        for (i=0; boot_tab[i].devname; i++) {   /* Find a ROM file name */
+            if (boot_tab[i].bootcodefile)
+                break;
+            }
+        r = mctl_populate_rom (boot_tab[i].bootcodefile);
+        if (r != SCPE_OK)
+            return r;
+        }
+    /* Page 2-16 of VAX750 Student Training suggests the following register state: */
     unitno = 0;
     R[0] = 0;
     R[1] = (NEXUSBASE + (TR_MBA0 * (1 << REG_V_NEXUS)));    /* MBA Address */
