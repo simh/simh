@@ -40,7 +40,7 @@ static t_stat symtrace_cmd(int32 arg,char* buf);
 
 static CTAB m68k_sim_cmds[] = {
         {"STEP", &run_cmd, RU_STEP,
-         "s{tep} {n}               simulate n instructions\n" },
+         "s{tep} {n}               simulate n instructions\n", NULL, &run_cmd_message },
         {"HEXDUMP", &hdump_cmd, 0,
          "hex{dump} range          dump memory\n" },
         {"SYMSET", &symset_cmd, 0,
