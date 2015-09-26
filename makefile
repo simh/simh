@@ -414,6 +414,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
   endif
   ifneq (,$(VIDEO_USEFUL))
+    ifeq (cygwin,$(OSTYPE))
+      LIBEXTSAVE := $(LIBEXT)
+      LIBEXT = dll.a
+    endif
     ifneq (,$(call find_include,SDL2/SDL))
       ifneq (,$(call find_lib,SDL2))
         VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL2/SDL))
@@ -436,6 +440,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           endif
         endif
       endif
+    endif
+    ifeq (cygwin,$(OSTYPE))
+      LIBEXT = $(LIBEXTSAVE)
     endif
     ifeq (,$(findstring HAVE_LIBSDL,$(VIDEO_CCDEFS)))
       $(info *** Info ***)
