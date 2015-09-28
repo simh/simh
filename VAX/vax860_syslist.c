@@ -127,7 +127,7 @@ if (sim_switches & SWMASK ('O')) {                      /* origin? */
         return SCPE_ARG;
     }
 
-while ((val = getc (fileref)) != EOF) {                 /* read byte stream */
+while ((val = Fgetc (fileref)) != EOF) {                 /* read byte stream */
     if (origin >= limit)                                /* NXM? */
         return SCPE_NXM;
     WriteB (origin, val);                               /* memory */

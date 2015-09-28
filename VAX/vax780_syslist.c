@@ -131,7 +131,7 @@ if (sim_switches & SWMASK ('O')) {                      /* origin? */
         return SCPE_ARG;
     }
 
-while ((val = getc (fileref)) != EOF) {                 /* read byte stream */
+while ((val = Fgetc (fileref)) != EOF) {                 /* read byte stream */
     if (sim_switches & SWMASK ('R')) {                  /* ROM0? */
         if (origin >= ROMSIZE)
             return SCPE_NXM;

@@ -139,7 +139,7 @@ else {
             return SCPE_ARG;
         }
     }
-while ((i = getc (fileref)) != EOF) {                   /* read byte stream */
+while ((i = Fgetc (fileref)) != EOF) {                   /* read byte stream */
     if (origin >= limit)                                /* NXM? */
         return SCPE_NXM;
     if (sim_switches & SWMASK ('R'))                    /* ROM? */
