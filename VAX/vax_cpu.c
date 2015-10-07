@@ -3570,27 +3570,16 @@ t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_cod
 char args[CBUFSIZE];
 t_stat r;
 
-sim_printf ("Loading boot code from %s\n", filename);
+sim_printf ("Loading boot code from %s%s\n", builtin_code ? "internal " : "", filename);
+if (builtin_code)
+    sim_set_memory_load_file (builtin_code, size);
 if (rom)
     sprintf (args, "-R %s", filename);
 else
     sprintf (args, "-O %s %X", filename, (int)offset);
 r = load_cmd (0, args);
-if (r != SCPE_OK) {
-    if (builtin_code) {
-        FILE *f;
-
-        if ((f = sim_fopen (filename, "wb"))) {
-            sim_printf ("Saving boot code to %s\n", filename);
-            sim_fwrite ((void *)builtin_code, 1, size, f);
-            fclose (f);
-            sim_printf ("Loading boot code from %s\n", filename);
-            r = load_cmd (0, args);
-            }
-        }
-    return r;
-    }
-return SCPE_OK;
+sim_set_memory_load_file (NULL, 0);
+return r;
 }
 
 t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)

@@ -1669,7 +1669,12 @@ ASSERT      failure have several different actions:
       " Simulators with Video devices display the simulated video in a window\n"
       " on the local system.  The contents of that display can be saved in a\n"
       " file with the SCREENSHOT command:\n\n"
-      " SCREENSHOT screenshotfile.bmp\n"
+      " +SCREENSHOT screenshotfile\n\n"
+#if defined(HAVE_LIBPNG)
+      " which will create a screen shot file called screenshotfile.png\n"
+#else
+      " which will create a screen shot file called screenshotfile.bmp\n"
+#endif
 #define HLP_SPAWN       "*Commands Executing_System_Commands"
       "2Executing System Commands\n"
       " The simulator can execute operating system commands with the ! (spawn)\n"
@@ -5043,22 +5048,55 @@ return r;
    du[mp] filename {arg}        dump to specified file
 */
 
+/* Memory File use (for internal memory static ROM images) 
+
+    when used to read ROM image with internally generated
+    load commands, calling code setups with sim_set_memory_file() 
+    sim_load uses Fgetc() instead of fgetc() or getc()
+*/
+
+static const unsigned char *mem_data = NULL;
+static size_t mem_data_size = 0;
+
+t_stat sim_set_memory_load_file (const unsigned char *data, size_t size)
+{
+mem_data = data;
+mem_data_size = size;
+return SCPE_OK;
+}
+
+int Fgetc (FILE *f)
+{
+if (mem_data) {
+    if (mem_data_size == 0)
+        return EOF;
+    --mem_data_size;
+    return (int)(*mem_data++);
+    }
+else
+    return fgetc (f);
+}
+
+
 t_stat load_cmd (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
-FILE *loadfile;
+FILE *loadfile = NULL;
 t_stat reason;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
-loadfile = sim_fopen (gbuf, flag? "wb": "rb");          /* open for wr/rd */
-if (loadfile == NULL)
-    return SCPE_OPENERR;
+if (!mem_data) {
+    loadfile = sim_fopen (gbuf, flag? "wb": "rb");      /* open for wr/rd */
+    if (loadfile == NULL)
+        return SCPE_OPENERR;
+    }
 GET_SWITCHES (cptr);                                    /* get switches */
 reason = sim_load (loadfile, cptr, gbuf, flag);         /* load or dump */
-fclose (loadfile);
+if (loadfile)
+    fclose (loadfile);
 return reason;
 }
 
@@ -9927,7 +9965,6 @@ else
 va_end (args);
 return ret;
 }
-
 
 /* Hierarchical help presentation
  *
