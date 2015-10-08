@@ -765,8 +765,6 @@ typedef struct pdp_dib DIB;
 #define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
-#define VEC_Q           0000                            /* vector base */
-
 /* Processor specific internal fixed vectors */
 #define VEC_PIRQ        0240
 #define VEC_TTI         0060

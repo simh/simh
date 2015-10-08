@@ -1465,8 +1465,6 @@ if (cp->csta < CST_UP) {                                /* still init? */
             else {
                 cp->s1dat = cp->saw;                    /* save data */
                 dibp->vec = (cp->s1dat & SA_S1H_VEC) << 2; /* get vector */
-                if (dibp->vec)                          /* if nz, bias */
-                    dibp->vec = dibp->vec + VEC_Q;
                 cp->sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (cp->s1dat);
                 cp->csta = CST_S2;                      /* now in step 2 */
                 rq_init_int (cp);                       /* intr if req */

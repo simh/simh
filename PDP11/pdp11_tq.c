@@ -678,8 +678,6 @@ if (tq_csta < CST_UP) {                                 /* still init? */
             else {
                 tq_s1dat = tq_saw;                      /* save data */
                 tq_dib.vec = (tq_s1dat & SA_S1H_VEC) << 2; /* get vector */
-                if (tq_dib.vec)                         /* if nz, bias */
-                    tq_dib.vec = tq_dib.vec + VEC_Q;
                 tq_sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (tq_s1dat);
                 tq_csta = CST_S2;                       /* now in step 2 */
                 tq_init_int ();                         /* intr if req */

@@ -2183,7 +2183,7 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
 
   /* set vector of SIMH device */
   if (data & XQ_VEC_IV)
-    xq->dib->vec = (data & XQ_VEC_IV) + VEC_Q;
+    xq->dib->vec = (data & XQ_VEC_IV);
   else
     xq->dib->vec = 0;
 
@@ -2361,7 +2361,7 @@ t_stat xq_wr_srqr(CTLR* xq, int32 data)
 
         xq_debug_turbo_setup(xq);
 
-        xq->dib->vec = xq->var->init.vector + VEC_Q;
+        xq->dib->vec = xq->var->init.vector;
         xq->var->tbindx = xq->var->rbindx = 0;
         if ((xq->var->sanity.enabled) && (xq->var->init.options & XQ_IN_OP_HIT)) {
           xq->var->sanity.quarter_secs = 4*xq->var->init.hit_timeout;

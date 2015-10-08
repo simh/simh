@@ -39,6 +39,12 @@
 
 extern int32 autcon_enb;
 extern int32 int_vec[IPL_HLVL][32];
+#if !defined(VEC_SET)
+#define VEC_SET 0
+#endif
+#if (VEC_SET != 0)
+extern int32 int_vec_set[IPL_HLVL][32];                 /* bits to set in vector */
+#endif
 extern int32 (*int_ack[IPL_HLVL][32])(void);
 extern t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
 extern t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
@@ -46,6 +52,8 @@ extern t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
 extern t_stat build_dib_tab (void);
 
 static DIB *iodibp[IOPAGESIZE >> 1];
+
+static void build_vector_tab (void);
 
 #if !defined(UNIMEMSIZE)
 #define UNIMEMSIZE      001000000                       /* 2**18 */
@@ -181,10 +189,10 @@ if (dptr == NULL)
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL)
     return SCPE_IERR;
-newvec = (uint32) get_uint (cptr, DEV_RDX, VEC_Q + 01000, &r);
-if ((r != SCPE_OK) || (newvec == VEC_Q) ||
-    ((newvec + (dibp->vnum * 4)) >= (VEC_Q + 01000)) ||
-    (newvec & ((dibp->vnum > 1)? 07: 03)))
+newvec = (uint32) get_uint (cptr, DEV_RDX, 01000, &r);
+if ((r != SCPE_OK) ||
+    ((newvec + (dibp->vnum * 4)) >= 01000) ||           /* total too big? */
+    (newvec & ((dibp->vnum > 1)? 07: 03)))              /* properly aligned value? */
     return SCPE_ARG;
 dibp->vec = newvec;
 autcon_enb = 0;                                         /* autoconfig off */
@@ -214,10 +222,15 @@ if (sim_switches & SWMASK ('O'))
 vec = dibp->vec;
 if (arg)
     numvec = arg;
-else numvec = dibp->vnum;
+else
+    numvec = dibp->vnum;
 if (vec == 0)
     fprintf (st, "no vector");
 else {
+#if (VEC_SET != 0)
+    vec |= (int_vec_set[dibp->vloc / 32][dibp->vloc % 32] & ~3);
+    vec &= (int_vec_set[dibp->vloc / 32][dibp->vloc % 32] | 0x1FF);
+#endif
     fprintf (st, "vector=");
     fprint_val (st, (t_value) vec, DEV_RDX, 16, PV_LEFT);
     if (radix != DEV_RDX) {
@@ -235,7 +248,7 @@ else {
             }
         }
     }
-if (vec >= VEC_Q + AUTO_VECBASE)
+if (vec >= ((VEC_SET | AUTO_VECBASE) & ~3))
     fprintf (st, "*");
 return SCPE_OK;
 }
@@ -257,6 +270,7 @@ void init_ubus_tab (void)
 {
 size_t i, j;
 
+build_vector_tab ();
 for (i = 0; i < IPL_HLVL; i++) {                        /* clear intr tab */
     for (j = 0; j < 32; j++) {
         int_vec[i][j] = 0;
@@ -285,6 +299,12 @@ if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
 if (dibp->vnum > VEC_DEVMAX)
     return SCPE_IERR;
 vec = dibp->vec;
+ilvl = dibp->vloc / 32;
+ibit = dibp->vloc % 32;
+#if (VEC_SET != 0)
+if (vec)
+    vec |= (int_vec_set[ilvl][ibit] & ~3);
+#endif
 /* hivec & cdhivec are first vector AFTER device */
 hivec = vec + (dibp->vnum * 4 * (dibp->ulnt? dibp->lnt/dibp->ulnt:
                                  (dptr->numunits? dptr->numunits: 1)));
@@ -296,10 +316,17 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
     for (j = 0; vec && (cdptr = sim_devices[j]) != NULL; j++) {
         DIB *cdibp = (DIB *)(cdptr->ctxt);
         int32 cdvec, cdhivec;
+
         if (!cdibp || (cdptr->flags & DEV_DIS)) {
             continue;
             }
         cdvec = cdibp->vec;
+        ilvl = cdibp->vloc / 32;
+        ibit = cdibp->vloc % 32;
+#if (VEC_SET != 0)
+        if (cdvec)
+            cdvec |= (int_vec_set[ilvl][ibit] & ~3);
+#endif
         cdhivec = cdvec + (cdibp->vnum * 4 * 
                            (cdibp->ulnt? cdibp->lnt/cdibp->ulnt:
                             (cdptr->numunits? cdptr->numunits: 1)));
@@ -326,6 +353,10 @@ for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
     vec = dibp->vec? (dibp->vec + (i * 4)): 0;          /* vector addr */
     ilvl = idx / 32;
     ibit = idx % 32;
+#if (VEC_SET != 0)
+    if (vec)
+        vec |= (int_vec_set[ilvl][ibit] & ~3);
+#endif
     if ((int_ack[ilvl][ibit] && dibp->ack[i] &&         /* conflict? */
         (int_ack[ilvl][ibit] != dibp->ack[i])) ||
         (int_vec[ilvl][ibit] && vec &&
@@ -336,8 +367,10 @@ for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
         }
     if (dibp->ack[i])
         int_ack[ilvl][ibit] = dibp->ack[i];
-    else if (vec)
-        int_vec[ilvl][ibit] = vec;
+    else {
+        if (vec)
+            int_vec[ilvl][ibit] = vec;
+        }
     }
 /* Register I/O space address and check for conflicts */
 for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
@@ -750,10 +783,44 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
 #define DEV_NEXUS 0
 #endif
 #endif
+
+static void build_vector_tab (void)
+{
+int32 ilvl, ibit;
+static t_bool done = FALSE;
+AUTO_CON *autp;
+DEVICE *dptr;
+DIB *dibp;
+uint32 j, k;
+
+if (done)
+    return;
+/* Locate all Unibus/Qbus devices and make sure vector masks are set */
+for (j = 0; (dptr = sim_devices[j]) != NULL; j++) {
+    if ((dptr->flags & (DEV_UBUS | DEV_QBUS)) == 0)
+        continue;
+    for (autp = auto_tab; autp->numc >= 0; autp++) {
+        for (k=0; autp->dnam[k]; k++) {
+            if (!strcmp(dptr->name, autp->dnam[k])) {
+                dibp = (DIB *)dptr->ctxt;
+                ilvl = dibp->vloc / 32;
+                ibit = dibp->vloc % 32;
+#if (VEC_SET != 0)
+                int_vec_set[ilvl][ibit] = VEC_SET;
+#endif
+                break;
+                }
+            }
+        }
+    }
+done = TRUE;
+}
+
 t_stat auto_config (const char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
-uint32 vec = VEC_Q + AUTO_VECBASE;
+uint32 vec = AUTO_VECBASE;
+int32 ilvl, ibit;
 extern UNIT cpu_unit;
 AUTO_CON *autp;
 DEVICE *dptr;
@@ -803,6 +870,8 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp == NULL)                               /* not there??? */
             return SCPE_IERR;
+        ilvl = dibp->vloc / 32;
+        ibit = dibp->vloc % 32;
         if (autp->fixa[j])                              /* fixed csr avail? */
             dibp->ba = IOPAGEBASE + autp->fixa[j];      /* use it */
         else {                                          /* no fixed left */
@@ -812,7 +881,7 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         if (autp->numv) {                               /* vec needed? */
             if (autp->fixv[j]) {                        /* fixed vec avail? */
                 if (autp->numv > 0)
-                    dibp->vec = VEC_Q + autp->fixv[j];  /* use it */
+                    dibp->vec = autp->fixv[j];          /* use it */
                 }
             else {                                      /* no fixed left */
                 uint32 numv = abs (autp->numv);         /* get num vec */

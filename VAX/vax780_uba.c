@@ -122,6 +122,7 @@
 
 #define UBABRRVR_OF     0x0C
 #define UBA_UVEC        0x80000000
+#define UBA_VEC_MASK    0x1FC                           /* Vector value mask */
 
 /* Data path registers */
 
@@ -595,8 +596,8 @@ if (((uba_dr & UBADR_DINTR) == 0) && !uba_uiip &&       /* intr enabled? */
         if ((int_req[lvl] >> i) & 1) {
             int_req[lvl] = int_req[lvl] & ~(1u << i);
             if (int_ack[lvl][i])
-                return (vec | int_ack[lvl][i]());
-            return (vec | int_vec[lvl][i]);
+                return ((UBA_VEC_MASK|UBA_UVEC) & (vec | int_ack[lvl][i]()));
+            return ((UBA_VEC_MASK|UBA_UVEC) & (vec | int_vec[lvl][i]));
             }
         }
     }

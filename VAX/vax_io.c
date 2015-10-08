@@ -103,7 +103,10 @@
 #define CQMAP_VLD       0x80000000                      /* valid */
 #define CQMAP_PAG       0x000FFFFF                      /* mem page */
 
+#define QB_VEC_MASK     0x1FC                           /* Interrupt Vector value mask */
+
 int32 int_req[IPL_HLVL] = { 0 };                        /* intr, IPL 14-17 */
+int32 int_vec_set[IPL_HLVL][32] = { 0 };                /* bits to set in vector */
 int32 cq_scr = 0;                                       /* SCR */
 int32 cq_dser = 0;                                      /* DSER */
 int32 cq_mear = 0;                                      /* MEAR */
@@ -427,10 +430,16 @@ if (lvl > IPL_HMAX) {                                   /* error req lvl? */
     }
 for (i = 0; int_req[l] && (i < 32); i++) {
     if ((int_req[l] >> i) & 1) {
+        int32 vec;
+
         int_req[l] = int_req[l] & ~(1u << i);
         if (int_ack[l][i])
-            return int_ack[l][i]();
-        return int_vec[l][i];
+            vec = int_ack[l][i]();
+        else
+            vec = int_vec[l][i];
+        vec |= int_vec_set[l][i];
+        vec &= (int_vec_set[l][i] | QB_VEC_MASK);
+        return vec;
         }
     }
 return 0;
