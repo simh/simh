@@ -101,6 +101,13 @@ t_stat screenshot_cmd (int32 flag, char *ptr);
 t_stat spawn_cmd (int32 flag, char *ptr);
 t_stat echo_cmd (int32 flag, char *ptr);
 
+/* Allow compiler to help validate printf style format arguments */
+#if defined __GNUC__
+#define GCC_FMT_ATTR(n, m) __attribute__ ((format (__printf__, n, m)))
+#else
+#define GCC_FMT_ATTR(n, m)
+#endif
+
 /* Utility routines */
 
 t_stat sim_process_event (void);
@@ -144,7 +151,7 @@ t_stat sim_decode_quoted_string (const char *iptr, uint8 *optr, uint32 *osize);
 char *sim_encode_quoted_string (const uint8 *iptr, uint32 size);
 void fprint_buffer_string (FILE *st, const uint8 *buf, uint32 size);
 t_value strtotv (const char *cptr, const char **endptr, uint32 radix);
-int Fprintf (FILE *f, const char* fmt, ...);
+int Fprintf (FILE *f, const char* fmt, ...) GCC_FMT_ATTR(2, 3);
 t_stat sim_set_memory_load_file (const unsigned char *data, size_t size);
 int Fgetc (FILE *f);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
@@ -188,9 +195,9 @@ t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cpt
 const char *sim_error_text (t_stat stat);
 t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
-void sim_printf (const char* fmt, ...);
+void sim_printf (const char* fmt, ...) GCC_FMT_ATTR(1, 2);
 void sim_perror (const char* msg);
-t_stat sim_messagef (t_stat stat, const char* fmt, ...);
+t_stat sim_messagef (t_stat stat, const char* fmt, ...) GCC_FMT_ATTR(2, 3);
 void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason);
 void sim_debug_bits_hdr (uint32 dbits, DEVICE* dptr, const char *header, 
     BITFIELD* bitdefs, uint32 before, uint32 after, int terminate);
@@ -201,9 +208,9 @@ void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
 #endif
 #ifdef CANT_USE_MACRO_VA_ARGS
 #define _sim_debug sim_debug
-void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
+void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...) GCC_FMT_ATTR(3, 4);
 #else
-void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
+void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...) GCC_FMT_ATTR(3, 4);
 #define sim_debug(dbits, dptr, ...) if (sim_deb && dptr && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__); else (void)0
 #endif
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);

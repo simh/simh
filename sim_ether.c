@@ -1872,7 +1872,7 @@ else
 
     memset(&voa, 0, sizeof(voa));
     if (!strcmp(savname, "vde:vdedevice")) {
-      sim_printf ("Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\r\n", errbuf);
+      sim_printf ("Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\r\n");
       return SCPE_OPENERR;
       }
     if (!(*handle = (void*) vde_open(savname+4, "simh", &voa)))

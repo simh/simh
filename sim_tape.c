@@ -173,7 +173,7 @@ if ((!callback) || !ctx->asynch_io)
         pthread_mutex_lock (&ctx->io_lock);                             \
                                                                         \
         sim_debug (ctx->dbit, ctx->dptr,                                \
-      "sim_tape AIO_CALL(op=%d, unit=%d)\n", op, uptr-ctx->dptr->units);\
+      "sim_tape AIO_CALL(op=%d, unit=%ld)\n", op, uptr-ctx->dptr->units);\
                                                                         \
         if (ctx->callback)                                              \
             abort(); /* horrible mistake, stop */                       \
@@ -227,7 +227,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
     ++sched_priority.sched_priority;
     pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
-    sim_debug (ctx->dbit, ctx->dptr, "_tape_io(unit=%d) starting\n", uptr-ctx->dptr->units);
+    sim_debug (ctx->dbit, ctx->dptr, "_tape_io(unit=%ld) starting\n", uptr-ctx->dptr->units);
 
     pthread_mutex_lock (&ctx->io_lock);
     pthread_cond_signal (&ctx->startup_cond);   /* Signal we're ready to go */
@@ -296,7 +296,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
     }
     pthread_mutex_unlock (&ctx->io_lock);
 
-    sim_debug (ctx->dbit, ctx->dptr, "_tape_io(unit=%d) exiting\n", uptr-ctx->dptr->units);
+    sim_debug (ctx->dbit, ctx->dptr, "_tape_io(unit=%ld) exiting\n", uptr-ctx->dptr->units);
 
     return NULL;
 }
@@ -315,7 +315,7 @@ static void _tape_completion_dispatch (UNIT *uptr)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 TAPE_PCALLBACK callback = ctx->callback;
 
-sim_debug (ctx->dbit, ctx->dptr, "_tape_completion_dispatch(unit=%d, top=%d, callback=%p)\n", uptr-ctx->dptr->units, ctx->io_top, ctx->callback);
+sim_debug (ctx->dbit, ctx->dptr, "_tape_completion_dispatch(unit=%ld, top=%d, callback=%p)\n", uptr-ctx->dptr->units, ctx->io_top, ctx->callback);
 
 if (ctx->io_top != TOP_DONE)
     abort();                                            /* horribly wrong, stop */
@@ -331,7 +331,7 @@ static t_bool _tape_is_active (UNIT *uptr)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
 if (ctx) {
-    sim_debug (ctx->dbit, ctx->dptr, "_tape_is_active(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
+    sim_debug (ctx->dbit, ctx->dptr, "_tape_is_active(unit=%ld, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
     return (ctx->io_top != TOP_DONE);
     }
 return FALSE;
@@ -342,7 +342,7 @@ static void _tape_cancel (UNIT *uptr)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
 if (ctx) {
-    sim_debug (ctx->dbit, ctx->dptr, "_tape_cancel(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
+    sim_debug (ctx->dbit, ctx->dptr, "_tape_cancel(unit=%ld, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
     if (ctx->asynch_io) {
         pthread_mutex_lock (&ctx->io_lock);
         while (ctx->io_top != TOP_DONE)
@@ -1047,7 +1047,7 @@ t_mtrlnt i, tbc, rbc;
 t_addr opos;
 t_stat st;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rdrecf(unit=%d, buf=%p, max=%d)\n", uptr-ctx->dptr->units, buf, max);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rdrecf(unit=%ld, buf=%p, max=%d)\n", uptr-ctx->dptr->units, buf, max);
 
 opos = uptr->pos;                                       /* old position */
 if (MTSE_OK != (st = sim_tape_rdlntf (uptr, &tbc)))     /* read rec lnt */
@@ -1111,7 +1111,7 @@ uint32 f = MT_GET_FMT (uptr);
 t_mtrlnt i, rbc, tbc;
 t_stat st;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rdrecr(unit=%d, buf=%p, max=%d)\n", uptr-ctx->dptr->units, buf, max);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rdrecr(unit=%ld, buf=%p, max=%d)\n", uptr-ctx->dptr->units, buf, max);
 
 if (MTSE_OK != (st = sim_tape_rdlntr (uptr, &tbc)))     /* read rec lnt */
     return st;
@@ -1161,7 +1161,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint32 f = MT_GET_FMT (uptr);
 t_mtrlnt sbc;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wrrecf(unit=%d, buf=%p, bc=%d)\n", uptr-ctx->dptr->units, buf, bc);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wrrecf(unit=%ld, buf=%p, bc=%d)\n", uptr-ctx->dptr->units, buf, bc);
 
 sim_tape_data_trace(uptr, buf, bc, "Record Write", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
 MT_CLR_PNU (uptr);
@@ -1240,7 +1240,7 @@ t_stat sim_tape_wrtmk (UNIT *uptr)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wrtmk(unit=%d)\n", uptr-ctx->dptr->units);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wrtmk(unit=%ld)\n", uptr-ctx->dptr->units);
 if (MT_GET_FMT (uptr) == MTUF_F_P7B) {                  /* P7B? */
     uint8 buf = P7B_EOF;                                /* eof mark */
     return sim_tape_wrrecf (uptr, &buf, 1);             /* write char */
@@ -1264,7 +1264,7 @@ t_stat sim_tape_wreom (UNIT *uptr)
 t_stat result;
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wreom(unit=%d)\n", uptr-ctx->dptr->units);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wreom(unit=%ld)\n", uptr-ctx->dptr->units);
 if (MT_GET_FMT (uptr) == MTUF_F_P7B)                    /* cant do P7B */
     return MTSE_FMT;
 
@@ -1292,7 +1292,7 @@ t_stat sim_tape_wreomrw (UNIT *uptr)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat r;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wreomrw(unit=%d)\n", uptr-ctx->dptr->units);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wreomrw(unit=%ld)\n", uptr-ctx->dptr->units);
 if (MT_GET_FMT (uptr) == MTUF_F_P7B)                    /* cant do P7B */
     return MTSE_FMT;
 r = sim_tape_wrdata (uptr, MTR_EOM);
@@ -1424,7 +1424,7 @@ const uint32 format = MT_GET_FMT (uptr);                /* tape format */
 const uint32 meta_size = sizeof (t_mtrlnt);             /* bytes per metadatum */
 const uint32 min_rec_size = 2 + sizeof (t_mtrlnt) * 2;  /* smallest data record size */
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wrgap(unit=%d, gaplen=%p)\n", uptr-ctx->dptr->units, gaplen);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_wrgap(unit=%ld, gaplen=%u)\n", uptr-ctx->dptr->units, gaplen);
 
 MT_CLR_PNU (uptr);
 
@@ -1591,7 +1591,7 @@ t_stat sim_tape_sprecf (UNIT *uptr, t_mtrlnt *bc)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_sprecf(unit=%d)\n", uptr-ctx->dptr->units);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_sprecf(unit=%ld)\n", uptr-ctx->dptr->units);
 
 st = sim_tape_rdlntf (uptr, bc);                        /* get record length */
 *bc = MTR_L (*bc);
@@ -1632,7 +1632,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 t_mtrlnt tbc;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_sprecsf(unit=%d, count=%d)\n", uptr-ctx->dptr->units, count);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_sprecsf(unit=%ld, count=%d)\n", uptr-ctx->dptr->units, count);
 
 *skipped = 0;
 while (*skipped < count) {                              /* loopo */
@@ -1677,7 +1677,7 @@ t_stat sim_tape_sprecr (UNIT *uptr, t_mtrlnt *bc)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_sprecr(unit=%d)\n", uptr-ctx->dptr->units);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_sprecr(unit=%ld)\n", uptr-ctx->dptr->units);
 
 if (MT_TST_PNU (uptr)) {
     MT_CLR_PNU (uptr);
@@ -1724,7 +1724,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 t_mtrlnt tbc;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_sprecsr(unit=%d, count=%d)\n", uptr-ctx->dptr->units, count);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_sprecsr(unit=%ld, count=%d)\n", uptr-ctx->dptr->units, count);
 
 *skipped = 0;
 while (*skipped < count) {                              /* loopo */
@@ -1773,7 +1773,7 @@ t_stat st;
 t_bool last_tapemark = FALSE;
 uint32 filerecsskipped;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilebyrecf(unit=%d, count=%d, check_leot=%d)\n", uptr-ctx->dptr->units, count, check_leot);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilebyrecf(unit=%ld, count=%d, check_leot=%d)\n", uptr-ctx->dptr->units, count, check_leot);
 
 if (check_leot) {
     t_mtrlnt rbc;
@@ -1841,7 +1841,7 @@ t_stat sim_tape_spfilef (UNIT *uptr, uint32 count, uint32 *skipped)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint32 totalrecsskipped;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilef(unit=%d, count=%d)\n", uptr-ctx->dptr->units, count);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilef(unit=%ld, count=%d)\n", uptr-ctx->dptr->units, count);
 
 return sim_tape_spfilebyrecf (uptr, count, skipped, &totalrecsskipped, FALSE);
 }
@@ -1882,7 +1882,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 uint32 filerecsskipped;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilebyrecr(unit=%d, count=%d)\n", uptr-ctx->dptr->units, count);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilebyrecr(unit=%ld, count=%d)\n", uptr-ctx->dptr->units, count);
 
 *skipped = 0;
 *recsskipped = 0;
@@ -1935,7 +1935,7 @@ t_stat sim_tape_spfiler (UNIT *uptr, uint32 count, uint32 *skipped)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint32 totalrecsskipped;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfiler(unit=%d, count=%d)\n", uptr-ctx->dptr->units, count);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfiler(unit=%ld, count=%d)\n", uptr-ctx->dptr->units, count);
 
 return sim_tape_spfilebyrecr (uptr, count, skipped, &totalrecsskipped);
 }
@@ -1956,7 +1956,7 @@ t_stat sim_tape_rewind (UNIT *uptr)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
 if (uptr->flags & UNIT_ATT) {
-    sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rewind(unit=%d)\n", uptr-ctx->dptr->units);
+    sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rewind(unit=%ld)\n", uptr-ctx->dptr->units);
     }
 uptr->pos = 0;
 MT_CLR_PNU (uptr);
@@ -1979,7 +1979,7 @@ t_stat sim_tape_position (UNIT *uptr, uint32 flags, uint32 recs, uint32 *recsski
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat r = MTSE_OK;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_position(unit=%d, flags=0x%X, recs=%d, files=%d)\n", uptr-ctx->dptr->units, flags, recs, files);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_position(unit=%ld, flags=0x%X, recs=%d, files=%d)\n", uptr-ctx->dptr->units, flags, recs, files);
 
 *recsskipped = *filesskipped = *objectsskipped = 0;
 if (flags & MTPOS_M_REW)
@@ -2043,7 +2043,7 @@ MT_CLR_PNU (uptr);
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_reset(unit=%d)\n", (int)(uptr-ctx->dptr->units));
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_reset(unit=%ld)\n", uptr-ctx->dptr->units);
 
 _sim_tape_io_flush(uptr);
 AIO_VALIDATE;

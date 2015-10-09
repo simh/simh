@@ -742,7 +742,7 @@ if ((pkt == 0) && tq_pip) {                             /* polling? */
         UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
 
         if (up)
-            sim_debug (DBG_REQ, &tq_dev, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X, obj=%d, pos=0x%X\n", 
+            sim_debug (DBG_REQ, &tq_dev, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X, obj=%d, pos=0x%" T_ADDR_FMT "X\n", 
                     tq_pkt[pkt].d[CMD_OPC], tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f],
                     tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN],
                     tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
@@ -1311,7 +1311,7 @@ uint32 ntmk = GETP32 (pkt, POS_TMCL);                   /* #tmk to skp */
 struct tq_req_results *res = (struct tq_req_results *)uptr->results;
 int32 io_complete = res->io_complete;
 
-sim_debug (DBG_TRC, &tq_dev, "tq_svc(unit=%d, pkt=%d, cmd=%s, mdf=0x%0X, bc=0x%0x, phase=%s)\n",
+sim_debug (DBG_TRC, &tq_dev, "tq_svc(unit=%ld, pkt=%d, cmd=%s, mdf=0x%0X, bc=0x%0x, phase=%s)\n",
            uptr-tq_dev.units, pkt, tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f], mdf, bc,
            uptr->io_complete ? "bottom" : "top");
 
@@ -1822,7 +1822,7 @@ UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
 if (pkt == 0)                                           /* any packet? */
     return OK;
 if (up)
-    sim_debug (DBG_REQ, &tq_dev, "rsp=%04X, sts=%04X, rszl=%04X, obj=%d, pos=%d\n", 
+    sim_debug (DBG_REQ, &tq_dev, "rsp=%04X, sts=%04X, rszl=%04X, obj=%d, pos=%" T_ADDR_FMT "d\n", 
                                tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS], tq_pkt[pkt].d[RW_RSZL],
                                up->objp, up->pos);
 else

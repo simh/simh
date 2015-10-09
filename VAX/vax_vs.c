@@ -154,23 +154,23 @@ sim_debug (DBG_SERIAL, &vs_dev, "vax -> mouse: %c\n", c);
 switch (c) {
 
     case 0x52:                                          /* R */
-        sim_debug (DBG_CMD, &vs_dev, "set mode incremental\n", c);
+        sim_debug (DBG_CMD, &vs_dev, "set mode incremental(%c)\n", c);
         vs_mode = VSXXX_INC;
         break;
 
     case 0x44:                                          /* D */
-        sim_debug (DBG_CMD, &vs_dev, "set mode prompt\n", c);
+        sim_debug (DBG_CMD, &vs_dev, "set mode prompt(%c)\n", c);
         vs_mode = VSXXX_PROMPT;
         break;
 
     case 0x50:                                          /* P */
-        sim_debug (DBG_CMD, &vs_dev, "poll\n", c);
+        sim_debug (DBG_CMD, &vs_dev, "poll(%c)\n", c);
         vs_mode = VSXXX_PROMPT;
         vs_sendupd ();
         break;
 
     case 0x54:                                          /* T */
-        sim_debug (DBG_CMD, &vs_dev, "test\n", c);
+        sim_debug (DBG_CMD, &vs_dev, "test(%c)\n", c);
         vs_reset (&vs_dev);
         vs_state = VSXXX_TEST;                          /* send self test report */
         vs_buf[0] = RPT_TEST | RPT_SYNC | (VSXXX_REV & RPT_REV);
