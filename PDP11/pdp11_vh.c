@@ -867,7 +867,7 @@ fprintf (stderr, "\rtqln %d\n", 64 - tmxr_tqln (lp->tmln));
     }
 
     sim_debug(DBG_REG, &vh_dev, "vh_rd(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, 
-              ((vh_unit[vh].flags & UNIT_MODEDHU) ? vh_rd_dhu_regs : vh_rd_dhv_regs)[(PA >> 1) & 07], access, data);
+              ((vh_unit[vh].flags & UNIT_MODEDHU) ? vh_rd_dhu_regs : vh_rd_dhv_regs)[(PA >> 1) & 07], access, *data);
 
     return (SCPE_OK);
 }

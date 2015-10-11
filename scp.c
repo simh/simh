@@ -9916,9 +9916,9 @@ void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *pos
 {
 
 if (sim_deb && (dptr->dctrl & reason)) {
-    sim_debug (reason, dptr, "%s %s %slen: %08X\n", sim_uname(uptr), txt, position, len);
+    sim_debug (reason, dptr, "%s %s %slen: %08X\n", sim_uname(uptr), txt, position, (unsigned int)len);
     if (data && len) {
-        size_t i, same, group, sidx, oidx;
+        unsigned int i, same, group, sidx, oidx;
         char outbuf[80], strbuf[18];
         static char hex[] = "0123456789ABCDEF";
 
@@ -9946,7 +9946,7 @@ if (sim_deb && (dptr->dctrl & reason)) {
             sim_debug (reason, dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
             }
         if (same > 0) {
-            sim_debug (reason, dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            sim_debug (reason, dptr, "%04X thru %04X same as above\n", i-(16*same), (unsigned int)(len-1));
             }
         }
     }

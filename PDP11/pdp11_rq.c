@@ -1465,8 +1465,6 @@ if (cp->csta < CST_UP) {                                /* still init? */
             else {
                 cp->s1dat = cp->saw;                    /* save data */
                 dibp->vec = (cp->s1dat & SA_S1H_VEC) << 2; /* get vector */
-                if (dibp->vec)                          /* if nz, bias */
-                    dibp->vec = dibp->vec + VEC_Q;
                 cp->sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (cp->s1dat);
                 cp->csta = CST_S2;                      /* now in step 2 */
                 rq_init_int (cp);                       /* intr if req */
@@ -2132,7 +2130,7 @@ uint32 bc = GETP32 (pkt, RW_WBCL);                      /* byte count */
 uint32 bl = GETP32 (pkt, RW_WBLL);                      /* block addr */
 uint32 ma = GETP32 (pkt, RW_WMPL);                      /* block addr */
 
-sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%d, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
+sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%ld, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
            uptr-rq_devmap[cp->cnum]->units, pkt, rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f], bl, bc,
            uptr->io_complete ? "bottom" : "top");
 

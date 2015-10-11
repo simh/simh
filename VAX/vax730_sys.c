@@ -546,7 +546,7 @@ for (i = 0; boot_tab[i].name != NULL; i++) {
         R[0] = boot_tab[i].code;
         if (boot_tab[i].code == BOOT_RB) {              /* vector set by console for RB730 */
             extern DIB rb_dib;
-            R[0] = R[0] | ((rb_dib.vec - VEC_Q) << 16);
+            R[0] = R[0] | ((rb_dib.vec) << 16);
             }
         R[1] = TR_UBA;
         R[2] = boot_tab[i].let | (ba & UBADDRMASK);

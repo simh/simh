@@ -322,8 +322,8 @@ typedef struct {
 #define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
-#define VEC_QBUS        0
-#define VEC_Q           0x200
+#define VEC_QBUS        0                               /* Unibus system */
+#define VEC_SET         0x200                           /* Vector bits to set in Unibus vectors */
 
 /* Interrupt macros */
 

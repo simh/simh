@@ -237,7 +237,7 @@ static t_bool _disk_is_active (UNIT *uptr)
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 if (ctx) {
-    sim_debug (ctx->dbit, ctx->dptr, "_disk_is_active(unit=%d, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
+    sim_debug (ctx->dbit, ctx->dptr, "_disk_is_active(unit=%ld, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
     return (ctx->io_dop != DOP_DONE);
     }
 return FALSE;
@@ -248,7 +248,7 @@ static void _disk_cancel (UNIT *uptr)
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 if (ctx) {
-    sim_debug (ctx->dbit, ctx->dptr, "_disk_cancel(unit=%d, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
+    sim_debug (ctx->dbit, ctx->dptr, "_disk_cancel(unit=%ld, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
     if (ctx->asynch_io) {
         pthread_mutex_lock (&ctx->io_lock);
         while (ctx->io_dop != DOP_DONE)

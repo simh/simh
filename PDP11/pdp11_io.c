@@ -157,7 +157,8 @@ for (i = IPL_HLVL - 1; i > nipl; i--) {                 /* loop thru lvls */
             int_req[i] = int_req[i] & ~(1u << j);       /* clr irq */
             if (int_ack[i][j])
                 vec = int_ack[i][j]();
-            else vec = int_vec[i][j];
+            else
+                vec = int_vec[i][j];
             return vec;                                 /* return vector */
             }                                           /* end if t */
         }                                               /* end for j */

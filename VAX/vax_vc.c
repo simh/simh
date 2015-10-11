@@ -566,7 +566,15 @@ switch (rg) {
         else if (vc_intc.ptr == 9)                      /* ACR */
             vc_intc.acr = data & 0xFFFF;
         else  
-            vc_intc.vec[vc_intc.ptr] = data & 0xFFFF;   /* Vector */
+            /* 
+               Masking the vector with 0x1FC is probably storing 
+               one more bit than the original hardware did.  
+               Doing this allows a maximal simulated hardware 
+               configuration use a reasonable vector where real 
+               hardware could never be assembled with that many 
+               devices.
+             */
+            vc_intc.vec[vc_intc.ptr] = data & 0x1FC;    /* Vector */ 
         break;
 
     case 7:                                             /* ICSR */
@@ -860,7 +868,7 @@ for (i = 0; i < 8; i++) {
             vc_intc.isr &= ~(1u << i);
         else vc_intc.isr |= (1u << i);
         vc_checkint();
-        result = (vc_intc.vec[i] + VEC_Q);
+        result = vc_intc.vec[i];
         sim_debug (DBG_INT, &vc_dev, "Int Ack Vector: 0%03o (0x%X)\n", result, result);
         return result;
         }

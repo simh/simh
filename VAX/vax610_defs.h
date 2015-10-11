@@ -308,7 +308,7 @@ typedef struct {
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
 #define VEC_QBUS        1                               /* Qbus system */
-#define VEC_Q           0x200                           /* Qbus vector offset */
+#define VEC_SET         0x201                           /* Vector bits to set in Qbus vectors */
 
 /* Interrupt macros */
 

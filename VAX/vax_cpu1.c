@@ -1138,13 +1138,15 @@ else {
     }
 if (ei > 0) {                                           /* if int, new IPL */
     int32 newipl;
-    if (VEC_QBUS && ((vec & VEC_Q) != 0))               /* Qbus and Qbus vector? */
+    if ((VEC_QBUS & vec) != 0)                          /* Qbus vector? */
         newipl = PSL_IPL17;                             /* force IPL 17 */
-    else newipl = ipl << PSL_V_IPL;                     /* otherwise, int IPL */
+    else
+        newipl = ipl << PSL_V_IPL;                      /* otherwise, int IPL */
     PSL = newpsl | newipl;
     }
-else PSL = newpsl |                                     /* exc, old IPL/1F */
-    ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
+else 
+    PSL = newpsl |                                      /* exc, old IPL/1F */
+        ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
 sim_debug (LOG_CPU_I, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, oldpsl, oldsp, vec, PSL, SP);
 acc = ACC_MASK (KERN);                                  /* new mode is kernel */

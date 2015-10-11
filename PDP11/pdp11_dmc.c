@@ -2834,7 +2834,7 @@ else {  /* DMP */
                         sim_debug(DBG_WRN, controller->device, "%s%d: Transmit Buffer command (not processed yet)\n", controller->device->name, controller->index);
                         }
                     else {
-                        sim_debug(DBG_WRN, controller->device, "%s%d: Unrecognised command code %hu\n", controller->device->name, controller->index, controller->transfer_type);
+                        sim_debug(DBG_WRN, controller->device, "%s%d: Unrecognised command code 0x%X\n", controller->device->name, controller->index, controller->transfer_type);
                         }
 
         controller->transfer_state = Idle;

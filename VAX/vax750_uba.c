@@ -64,6 +64,8 @@
 #define UBADPR_RD       0xE0000000
 #define UBADPR_W1C      0xC0000000
 
+#define UBA_VEC_MASK    0x1FC                           /* Vector value mask */
+
 /* Map registers */
 
 #define UBAMAP_OF       0x200
@@ -136,6 +138,7 @@ int32 (*int_ack[IPL_HLVL][32])(void);                   /* int ack routines */
 /* Unibus interrupt request to vector map */
 
 int32 int_vec[IPL_HLVL][32];                            /* int req to vector */
+int32 int_vec_set[IPL_HLVL][32] = { 0 };                /* bits to set in vector */
 
 /* Unibus adapter data structures
 
@@ -424,21 +427,26 @@ return;
 
 int32 uba_get_ubvector (int32 lvl)
 {
-int32 i, vec;
+int32 i;
 
-vec = 0;
 if ((lvl == (IPL_UBA - IPL_HMIN)) && uba_int) {         /* UBA lvl, int? */
     uba_int = 0;                                        /* clear int */
     }
 for (i = 0; int_req[lvl] && (i < 32); i++) {
     if ((int_req[lvl] >> i) & 1) {
+        int32 vec;
+        
         int_req[lvl] = int_req[lvl] & ~(1u << i);
         if (int_ack[lvl][i])
-            return (vec | int_ack[lvl][i]());
-        return (vec | int_vec[lvl][i]);
+            vec = int_ack[lvl][i]();
+        else
+            vec = int_vec[lvl][i];
+        vec |= int_vec_set[lvl][i];
+        vec &= (int_vec_set[lvl][i] | UBA_VEC_MASK);
+        return vec;
         }
     }
-return vec;
+return 0;
 }
 
 /* Unibus I/O buffer routines
