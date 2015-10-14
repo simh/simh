@@ -784,6 +784,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
 #endif
 #endif
 
+#define MAX(a,b) (((a)>(b))? (a) : (b))
+
 static void build_vector_tab (void)
 {
 int32 ilvl, ibit;
@@ -792,6 +794,7 @@ AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
 uint32 j, k;
+int v;
 
 if (done)
     return;
@@ -806,7 +809,8 @@ for (j = 0; (dptr = sim_devices[j]) != NULL; j++) {
                 ilvl = dibp->vloc / 32;
                 ibit = dibp->vloc % 32;
 #if (VEC_SET != 0)
-                int_vec_set[ilvl][ibit] = VEC_SET;
+                for (v=0; v<MAX(dibp->vnum, 1); v++)
+                    int_vec_set[ilvl][ibit+v] = VEC_SET;
 #endif
                 break;
                 }
