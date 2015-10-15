@@ -37,9 +37,9 @@ static inline void tftp_session_update(struct tftp_session *spt)
 
 static void tftp_session_terminate(struct tftp_session *spt)
 {
-    if (spt->fd >= 0) {
-        close(spt->fd);
-        spt->fd = -1;
+    if (spt->f != NULL) {
+        fclose(spt->f);
+        spt->f = NULL;
     }
     g_free(spt->filename);
     spt->slirp = NULL;
@@ -68,7 +68,7 @@ static int tftp_session_allocate(Slirp *slirp, struct tftp_t *tp)
  found:
   memset(spt, 0, sizeof(*spt));
   memcpy(&spt->client_ip, &tp->ip.ip_src, sizeof(spt->client_ip));
-  spt->fd = -1;
+  spt->f = NULL;
   spt->client_port = tp->udp.uh_sport;
   spt->slirp = slirp;
 
@@ -102,18 +102,18 @@ static int tftp_read_data(struct tftp_session *spt, uint32_t block_nr,
 {
     int bytes_read = 0;
 
-    if (spt->fd < 0) {
-        spt->fd = open(spt->filename, O_RDONLY | O_BINARY);
+    if (spt->f == NULL) {
+        spt->f = fopen(spt->filename, "rb");
     }
 
-    if (spt->fd < 0) {
+    if (spt->f == NULL) {
         return -1;
     }
 
     if (len) {
-        lseek(spt->fd, block_nr * 512, SEEK_SET);
+        fseek(spt->f, block_nr * 512, SEEK_SET);
 
-        bytes_read = read(spt->fd, buf, len);
+        bytes_read = fread(buf, 1, len, spt->f);
     }
 
     return bytes_read;
