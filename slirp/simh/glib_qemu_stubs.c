@@ -154,7 +154,6 @@ unsigned long non_block = 1;
 void qemu_set_nonblock(int fd)
 {
     int f;
-fprintf (stderr, "qemu_set_nonblock()\r\n");
     f = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, f | O_NONBLOCK);
 }
