@@ -1805,7 +1805,7 @@ dev->throttle_mask = (1 << dev->throttle_burst) - 1;
 return SCPE_OK;
 }
 
-static t_stat _eth_open_port(char *savname, int *eth_api, void **handle, SOCKET *fd_handle, char errbuf[PCAP_ERRBUF_SIZE], char *bpf_filter, void *opaque)
+static t_stat _eth_open_port(char *savname, int *eth_api, void **handle, SOCKET *fd_handle, char errbuf[PCAP_ERRBUF_SIZE], char *bpf_filter, void *opaque, DEVICE *dptr, uint32 dbit)
 {
 int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
 
@@ -1924,7 +1924,7 @@ else { /* !tap: */
   else { /* !vde: */
     if (0 == strncmp("nat:", savname, 4)) {
 #if defined(HAVE_SLIRP_NETWORK)
-      if (!(*handle = (void*) sim_slirp_open(savname+4, opaque, &_slirp_callback)))
+      if (!(*handle = (void*) sim_slirp_open(savname+4, opaque, &_slirp_callback, dptr, dbit)))
         strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
       else {
         *eth_api = ETH_API_NAT;
@@ -2081,7 +2081,7 @@ else {
     }
   }
 
-r = _eth_open_port(savname, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, NULL, (void *)dev);
+r = _eth_open_port(savname, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, NULL, (void *)dev, dptr, dbit);
 
 if (errbuf[0]) {
   sim_printf ("Eth: open error - %s\r\n", errbuf);
@@ -2462,7 +2462,7 @@ if (dev->error_needs_reset) {
   _eth_close_port(dev->eth_api, (pcap_t *)dev->handle, dev->fd_handle);
   sim_os_sleep (ETH_ERROR_REOPEN_PAUSE);
 
-  r = _eth_open_port(dev->name, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, dev->bpf_filter, (void *)dev);
+  r = _eth_open_port(dev->name, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, dev->bpf_filter, (void *)dev, dev->dptr, dev->dbit);
   dev->error_needs_reset = FALSE;
   if (r == SCPE_OK)
     sim_printf ("%s ReOpened: %s \n", msg, dev->name);

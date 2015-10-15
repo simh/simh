@@ -144,9 +144,11 @@ struct sim_slirp {
     pthread_mutex_t write_buffer_lock;
     void *opaque;               /* opaque value passed during packet delivery */
     packet_callback callback;   /* slirp arriving packet delivery callback */
+    DEVICE *dptr;
+    uint32 dbit;
     };
 
-SLIRP *sim_slirp_open (const char *args, void *opaque, packet_callback callback)
+SLIRP *sim_slirp_open (const char *args, void *opaque, packet_callback callback, DEVICE *dptr, uint32 dbit)
 {
 SLIRP *slirp = (SLIRP *)g_malloc0(sizeof(*slirp));
 char *targs = g_strdup (args);
@@ -294,6 +296,8 @@ else {
     pfd.fd = slirp->db_chime;
     pfd.events = G_IO_IN;
     g_array_append_val(slirp->gpollfds, pfd);
+    slirp->dbit = dbit;
+    slirp->dptr = dptr;
     
     sim_slirp_show(slirp, stdout);
     if (sim_log && (sim_log != stdout))
@@ -514,14 +518,14 @@ if (select_ret) {
         /* consume the doorbell wakeup ring */
         recv (slirp->db_chime, buf, sizeof (buf), 0);
         }
-    fprintf (stderr, "Select returned %d\r\n", select_ret);
+    sim_debug (slirp->dbit, slirp->dptr, "Select returned %d\r\n", select_ret);
     for (i=0; i<nfds+1; i++) {
         if (FD_ISSET(i, &rfds) || FD_ISSET(i, &save_rfds))
-            fprintf (stderr, "%d: save_rfd=%d, rfd=%d\r\n", i, FD_ISSET(i, &save_rfds), FD_ISSET(i, &rfds));
+            sim_debug (slirp->dbit, slirp->dptr, "%d: save_rfd=%d, rfd=%d\r\n", i, FD_ISSET(i, &save_rfds), FD_ISSET(i, &rfds));
         if (FD_ISSET(i, &wfds) || FD_ISSET(i, &save_wfds))
-            fprintf (stderr, "%d: save_wfd=%d, wfd=%d\r\n", i, FD_ISSET(i, &save_wfds), FD_ISSET(i, &wfds));
+            sim_debug (slirp->dbit, slirp->dptr, "%d: save_wfd=%d, wfd=%d\r\n", i, FD_ISSET(i, &save_wfds), FD_ISSET(i, &wfds));
         if (FD_ISSET(i, &xfds) || FD_ISSET(i, &save_xfds))
-            fprintf (stderr, "%d: save_xfd=%d, xfd=%d\r\n", i, FD_ISSET(i, &save_xfds), FD_ISSET(i, &xfds));
+            sim_debug (slirp->dbit, slirp->dptr, "%d: save_xfd=%d, xfd=%d\r\n", i, FD_ISSET(i, &save_xfds), FD_ISSET(i, &xfds));
             }
     }
 return select_ret + 1;  /* Force dispatch even on timeout */
