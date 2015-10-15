@@ -187,6 +187,11 @@ return now*100;
 
 #else
 
+#if !defined(CLOCK_REALTIME) && !defined(__hpux)
+#define CLOCK_REALTIME 1
+int clock_gettime(int clk_id, struct timespec *tp);
+#endif
+
 int64_t qemu_clock_get_ns(int type)
 {
     struct timespec tv;
