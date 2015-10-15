@@ -102,10 +102,11 @@ t_stat spawn_cmd (int32 flag, char *ptr);
 t_stat echo_cmd (int32 flag, char *ptr);
 
 /* Allow compiler to help validate printf style format arguments */
-#if defined __GNUC__
-#define GCC_FMT_ATTR(n, m) __attribute__ ((format (__printf__, n, m)))
-#else
+#if !defined __GNUC__
 #define GCC_FMT_ATTR(n, m)
+#endif
+#if !defined(GCC_FMT_ATTR)
+#define GCC_FMT_ATTR(n, m) __attribute__ ((format (__printf__, n, m)))
 #endif
 
 /* Utility routines */

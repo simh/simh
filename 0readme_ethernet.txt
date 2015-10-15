@@ -178,6 +178,31 @@ OSX:
     install the net/vde2 package.
 
 -------------------------------------------------------------------------------
+Another alternative to direct pcap and tun/tap networking on all environments is 
+NAT (SLiRP) networking.  NAT networking is limited to only IP network protocols
+so DECnet, LAT and Clusting can't work on a NAT connected interface, but this may
+be the easiest solution for many folks.
+
+       sim> attach xq nat:
+       
+The simulator can use static IP addresses of 10.0.2.4 thru 10.0.2.14 with a 
+netmask of 255.255.255.0 and a gateway of 10.0.2.2 and a nameserver of 10.0.2.3.
+If the simulated machine uses DHCP it will get the address 10.0.2.15.  Various 
+NAT based parameters can be configured on the attach command.  HELP XQ ATTACH 
+will provide useful information.  Host to simulator connectivitiy can be 
+achieved for a simulator which gets its IP address via DHCP with the following 
+command:
+
+       sim> attach xq nat:tcp=2323:10.0.2.15:23,tcp=2121:10.0.2.15:21
+       
+The host computer can telnet to localhost:2323 to reach the simulator via 
+telnet, etc.
+
+Additionally NAT based networking is useful to allow host systems with WiFi 
+networking to a) reach the simulated system and b) allow the simulated system
+to reach out to the Internet.
+
+-------------------------------------------------------------------------------
 
 Windows notes:
  1. The Windows-specific code uses the WinPCAP 4.x package from
@@ -389,7 +414,7 @@ Building on OpenVMS Alpha and OpenVMS Integrety (IA64):
 
 VAX simulator support:
 
-An OpenVMS VAX v7.2 system with DECNET Phase IV, MultiNet 4.4a, and LAT 5.3 has
+An OpenVMS VAX v7.3 system with DECNET Phase IV, MultiNet 5.4, and LAT 5.3 has
 been successfully run. Other testers have reported success booting NetBSD and
 OpenVMS VAX 5.5-2 also.
 
