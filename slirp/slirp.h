@@ -9,8 +9,8 @@
 
 typedef char *caddr_t;
 
-# include <windows.h>
 # include <winsock2.h>
+# include <windows.h>
 # include <ws2tcpip.h>
 # include <sys/timeb.h>
 # include <iphlpapi.h>
@@ -167,12 +167,14 @@ void free(void *ptr);
 #define ARPOP_REQUEST 1         /* ARP request */
 #define ARPOP_REPLY   2         /* ARP reply   */
 
+PACKED_BEGIN
 struct ethhdr {
     unsigned char  h_dest[ETH_ALEN];   /* destination eth addr */
     unsigned char  h_source[ETH_ALEN]; /* source ether addr    */
     unsigned short h_proto;            /* packet type ID field */
-};
+} PACKED_END;
 
+PACKED_BEGIN
 struct arphdr {
     unsigned short ar_hrd;      /* format of hardware address */
     unsigned short ar_pro;      /* format of protocol address */
@@ -187,7 +189,7 @@ struct arphdr {
     uint32_t      ar_sip;           /* sender IP address       */
     unsigned char ar_tha[ETH_ALEN]; /* target hardware address */
     uint32_t      ar_tip;           /* target IP address       */
-} QEMU_PACKED;
+} PACKED_END;
 
 #define ARP_TABLE_SIZE 16
 

@@ -231,18 +231,21 @@ fork_exec(struct socket *so, const char *ex, int do_pty)
 
 void slirp_connection_info(Slirp *slirp, Monitor *mon)
 {
+#if (TCPS_CLOSED != 0) || (TCPS_TIME_WAIT != 10)
+#error unexpected symbol values
+#endif
     const char * const tcpstates[] = {
-        [TCPS_CLOSED]       = "CLOSED",
-        [TCPS_LISTEN]       = "LISTEN",
-        [TCPS_SYN_SENT]     = "SYN_SENT",
-        [TCPS_SYN_RECEIVED] = "SYN_RCVD",
-        [TCPS_ESTABLISHED]  = "ESTABLISHED",
-        [TCPS_CLOSE_WAIT]   = "CLOSE_WAIT",
-        [TCPS_FIN_WAIT_1]   = "FIN_WAIT_1",
-        [TCPS_CLOSING]      = "CLOSING",
-        [TCPS_LAST_ACK]     = "LAST_ACK",
-        [TCPS_FIN_WAIT_2]   = "FIN_WAIT_2",
-        [TCPS_TIME_WAIT]    = "TIME_WAIT",
+       /* [TCPS_CLOSED]       = */ "CLOSED",
+       /* [TCPS_LISTEN]       = */ "LISTEN",
+       /* [TCPS_SYN_SENT]     = */ "SYN_SENT",
+       /* [TCPS_SYN_RECEIVED] = */ "SYN_RCVD",
+       /* [TCPS_ESTABLISHED]  = */ "ESTABLISHED",
+       /* [TCPS_CLOSE_WAIT]   = */ "CLOSE_WAIT",
+       /* [TCPS_FIN_WAIT_1]   = */ "FIN_WAIT_1",
+       /* [TCPS_CLOSING]      = */ "CLOSING",
+       /* [TCPS_LAST_ACK]     = */ "LAST_ACK",
+       /* [TCPS_FIN_WAIT_2]   = */ "FIN_WAIT_2",
+       /* [TCPS_TIME_WAIT]    = */ "TIME_WAIT",
     };
     struct in_addr dst_addr;
     struct sockaddr_in src;

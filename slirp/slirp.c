@@ -335,10 +335,8 @@ void slirp_pollfds_fill(GArray *pollfds, uint32_t *timeout)
              * Set for reading sockets which are accepting
              */
             if (so->so_state & SS_FACCEPTCONN) {
-                GPollFD pfd = {
-                    .fd = so->s,
-                    .events = G_IO_IN | G_IO_HUP | G_IO_ERR,
-                };
+                GPollFD pfd = { so->s, G_IO_IN | G_IO_HUP | G_IO_ERR, 0 };
+
                 so->pollfds_idx = pollfds->len;
                 g_array_append_val(pollfds, pfd);
                 continue;
@@ -348,10 +346,8 @@ void slirp_pollfds_fill(GArray *pollfds, uint32_t *timeout)
              * Set for writing sockets which are connecting
              */
             if (so->so_state & SS_ISFCONNECTING) {
-                GPollFD pfd = {
-                    .fd = so->s,
-                    .events = G_IO_OUT | G_IO_ERR,
-                };
+                GPollFD pfd = { so->s, G_IO_OUT | G_IO_ERR, 0 };
+
                 so->pollfds_idx = pollfds->len;
                 g_array_append_val(pollfds, pfd);
                 continue;
@@ -375,10 +371,8 @@ void slirp_pollfds_fill(GArray *pollfds, uint32_t *timeout)
             }
 
             if (events) {
-                GPollFD pfd = {
-                    .fd = so->s,
-                    .events = events,
-                };
+                GPollFD pfd = { so->s, events, 0 };
+
                 so->pollfds_idx = pollfds->len;
                 g_array_append_val(pollfds, pfd);
             }
@@ -416,10 +410,8 @@ void slirp_pollfds_fill(GArray *pollfds, uint32_t *timeout)
              * (XXX <= 4 ?)
              */
             if ((so->so_state & SS_ISFCONNECTED) && so->so_queued <= 4) {
-                GPollFD pfd = {
-                    .fd = so->s,
-                    .events = G_IO_IN | G_IO_HUP | G_IO_ERR,
-                };
+                GPollFD pfd = { so->s, G_IO_IN | G_IO_HUP | G_IO_ERR, 0 };
+
                 so->pollfds_idx = pollfds->len;
                 g_array_append_val(pollfds, pfd);
             }
@@ -447,10 +439,8 @@ void slirp_pollfds_fill(GArray *pollfds, uint32_t *timeout)
             }
 
             if (so->so_state & SS_ISFCONNECTED) {
-                GPollFD pfd = {
-                    .fd = so->s,
-                    .events = G_IO_IN | G_IO_HUP | G_IO_ERR,
-                };
+                GPollFD pfd = { so->s, G_IO_IN | G_IO_HUP | G_IO_ERR, 0 };
+
                 so->pollfds_idx = pollfds->len;
                 g_array_append_val(pollfds, pfd);
             }
@@ -846,7 +836,7 @@ int slirp_remove_hostfwd(Slirp *slirp, int is_udp, struct in_addr host_addr,
             getsockname(so->s, (struct sockaddr *)&addr, &addr_len) == 0 &&
             addr.sin_addr.s_addr == host_addr.s_addr &&
             addr.sin_port == port) {
-            close(so->s);
+            closesocket(so->s);
             sofree(so);
             return 0;
         }

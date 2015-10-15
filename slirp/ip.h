@@ -68,6 +68,7 @@ typedef uint32_t n_long;                 /* long as received from the net */
 /*
  * Structure of an internet header, naked of options.
  */
+PACKED_BEGIN
 struct ip {
 #ifdef HOST_WORDS_BIGENDIAN
 	uint8_t ip_v:4,			/* version */
@@ -87,7 +88,7 @@ struct ip {
 	uint8_t ip_p;			/* protocol */
 	uint16_t	ip_sum;			/* checksum */
 	struct	in_addr ip_src,ip_dst;	/* source and dest address */
-} QEMU_PACKED;
+} PACKED_END;
 
 #define	IP_MAXPACKET	65535		/* maximum packet size */
 
@@ -131,6 +132,7 @@ struct ip {
 /*
  * Time stamp option structure.
  */
+PACKED_BEGIN
 struct	ip_timestamp {
 	uint8_t	ipt_code;		/* IPOPT_TS */
 	uint8_t	ipt_len;		/* size of structure (variable) */
@@ -149,7 +151,7 @@ struct	ip_timestamp {
 			n_long ipt_time;
 		} ipt_ta[1];
 	} ipt_timestamp;
-} QEMU_PACKED;
+} PACKED_END;
 
 /* flag bits for ipt_flg */
 #define	IPOPT_TS_TSONLY		0		/* timestamps only */
@@ -175,16 +177,18 @@ struct	ip_timestamp {
 
 #define	IP_MSS		576		/* default maximum segment size */
 
+PACKED_BEGIN
 #if SIZEOF_CHAR_P == 4
 struct mbuf_ptr {
 	struct mbuf *mptr;
 	uint32_t dummy;
-} QEMU_PACKED;
+} PACKED_END;
 #else
 struct mbuf_ptr {
 	struct mbuf *mptr;
-} QEMU_PACKED;
+} PACKED_END;
 #endif
+
 struct qlink {
 	void *next, *prev;
 };
@@ -192,6 +196,7 @@ struct qlink {
 /*
  * Overlay for ip header used by other protocols (tcp, udp).
  */
+PACKED_BEGIN
 struct ipovly {
 	struct mbuf_ptr ih_mbuf;	/* backpointer to mbuf */
 	uint8_t	ih_x1;			/* (unused) */
@@ -199,7 +204,7 @@ struct ipovly {
 	uint16_t	ih_len;			/* protocol length */
 	struct	in_addr ih_src;		/* source internet address */
 	struct	in_addr ih_dst;		/* destination internet address */
-} QEMU_PACKED;
+} PACKED_END;
 
 /*
  * Ip reassembly queue structure.  Each fragment
@@ -208,6 +213,7 @@ struct ipovly {
  * be reclaimed if memory becomes tight.
  * size 28 bytes
  */
+PACKED_BEGIN
 struct ipq {
         struct qlink frag_link;			/* to ip headers of fragments */
 	struct qlink ip_link;				/* to other reass headers */
@@ -215,17 +221,18 @@ struct ipq {
 	uint8_t	ipq_p;			/* protocol of this fragment */
 	uint16_t	ipq_id;			/* sequence id for reassembly */
 	struct	in_addr ipq_src,ipq_dst;
-} QEMU_PACKED;
+} PACKED_END;
 
 /*
  * Ip header, when holding a fragment.
  *
  * Note: ipf_link must be at same offset as frag_link above
  */
+PACKED_BEGIN
 struct	ipasfrag {
 	struct qlink ipf_link;
 	struct ip ipf_ip;
-} QEMU_PACKED;
+} PACKED_END;
 
 #define ipf_off      ipf_ip.ip_off
 #define ipf_tos      ipf_ip.ip_tos
@@ -241,9 +248,10 @@ struct	ipasfrag {
  */
 #define MAX_IPOPTLEN	40
 
+PACKED_BEGIN
 struct ipoption {
 	struct	in_addr ipopt_dst;	/* first-hop dst if source routed */
 	int8_t	ipopt_list[MAX_IPOPTLEN];	/* options proper */
-} QEMU_PACKED;
+} PACKED_END;
 
 #endif

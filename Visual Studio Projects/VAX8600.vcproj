@@ -41,8 +41,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_860;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
+				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;../slirp;../slirp/simh;../slirp/simh/qemu;../slirp/simh/qemu/win32"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_860;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_SLIRP_NETWORK"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="1"
@@ -64,7 +64,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wsock32.lib winmm.lib pcrestaticd.lib pcreposixstaticd.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib pcrestaticd.lib pcreposixstaticd.lib Iphlpapi.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
 				GenerateDebugInformation="true"
@@ -127,8 +127,8 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_860;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
+				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;../slirp;../slirp/simh;../slirp/simh/qemu;../slirp/simh/qemu/win32"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_860;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_SLIRP_NETWORK"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
@@ -150,7 +150,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wsock32.lib winmm.lib pcrestatic.lib pcreposixstatic.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib pcrestatic.lib pcreposixstatic.lib Iphlpapi.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
 				GenerateDebugInformation="false"
@@ -383,6 +383,170 @@
 				RelativePath="..\VAX\vax_syscm.c"
 				>
 			</File>
+			<Filter
+				Name="slirp"
+				>
+				<File
+					RelativePath="..\slirp\arp_table.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\bootp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\bootp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\cksum.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\debug.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\dnssearch.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\simh\glib_qemu_stubs.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\if.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\if.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_icmp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_icmp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_input.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_output.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\libslirp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\main.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\mbuf.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\mbuf.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\misc.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\misc.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\sbuf.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\sbuf.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\simh\sim_slirp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp_config.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\socket.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\socket.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_input.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_output.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_subr.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_timer.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_timer.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_var.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcpip.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tftp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tftp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\udp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\udp.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Header Files"
