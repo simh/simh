@@ -181,7 +181,7 @@ if exist %_X_FontIncludeName%.temp del %_X_FontIncludeName%.temp
 call :FindVCVersion _VC_VER
 if not exist "..\..\windows-build\libpng-1.6.18\projects\Release Library" goto _setup_library
 if not exist "..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version" set _LIB_VC_VER=9
-if exist "..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version" for /f "delims=." %%v in ("..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version") do set _LIB_VC_VER=%%v
+if exist "..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version" for /f "usebackq delims=." %%v in (`type "..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version"`) do set _LIB_VC_VER=%%v
 if %_LIB_VC_VER% EQU %_VC_VER% goto _done_library
 if %_VC_VER% GEQ 14 goto _check_new_library
 if %_LIB_VC_VER% LSS 14 goto _done_library
