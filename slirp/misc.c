@@ -12,8 +12,11 @@
 #include "qemu/error-report.h"
 #include "qemu/main-loop.h"
 
+int slirp_debug =
 #ifdef DEBUG
-int slirp_debug = DBG_CALL|DBG_MISC|DBG_ERROR;
+                 DBG_CALL|DBG_MISC|DBG_ERROR;
+#else
+                 0;
 #endif
 
 struct quehead {
@@ -232,7 +235,7 @@ fork_exec(struct socket *so, const char *ex, int do_pty)
 void slirp_connection_info(Slirp *slirp, Monitor *mon)
 {
 #if (TCPS_CLOSED != 0) || (TCPS_TIME_WAIT != 10)
-#error unexpected symbol values
+#error unexpected TCPS symbol values
 #endif
     const char * const tcpstates[] = {
        /* [TCPS_CLOSED]       = */ "CLOSED",

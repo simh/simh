@@ -165,7 +165,7 @@ soread(struct socket *so)
 
 #ifdef HAVE_READV
 	nn = readv(so->s, (struct iovec *)iov, n);
-	DEBUG_MISC((dfd, " ... read nn = %d bytes\n", nn));
+	DEBUG_MISC(" ... read nn = %d bytes\n", nn);
 #else
 	nn = qemu_recv(so->s, iov[0].iov_base, iov[0].iov_len,0);
 #endif
@@ -173,7 +173,7 @@ soread(struct socket *so)
 		if (nn < 0 && (errno == EINTR || errno == EAGAIN))
 			return 0;
 		else {
-			DEBUG_MISC((dfd, " --- soread() disconnected, nn = %d, errno = %d-%s\n", nn, errno,strerror(errno)));
+			DEBUG_MISC(" --- soread() disconnected, nn = %d, errno = %d-%s\n", nn, errno,strerror(errno));
 			sofcantrcvmore(so);
 			tcp_sockclosed(sototcpcb(so));
 			return -1;
@@ -197,7 +197,7 @@ soread(struct socket *so)
                 nn += ret;
         }
 
-	DEBUG_MISC((dfd, " ... read nn = %d bytes\n", nn));
+	DEBUG_MISC(" ... read nn = %d bytes\n", nn);
 #endif
 
 	/* Update fields */
@@ -304,7 +304,7 @@ sosendoob(struct socket *so)
 		n = slirp_send(so, sb->sb_rptr, so->so_urgc, (MSG_OOB)); /* |MSG_DONTWAIT)); */
 		so->so_urgc -= n;
 
-		DEBUG_MISC((dfd, " --- sent %d bytes urgent data, %d urgent bytes left\n", n, so->so_urgc));
+		DEBUG_MISC(" --- sent %d bytes urgent data, %d urgent bytes left\n", n, so->so_urgc);
 	} else {
 		/*
 		 * Since there's no sendv or sendtov like writev,
@@ -325,9 +325,9 @@ sosendoob(struct socket *so)
 		n = slirp_send(so, buff, len, (MSG_OOB)); /* |MSG_DONTWAIT)); */
 #ifdef DEBUG
 		if (n != len)
-		   DEBUG_ERROR((dfd, "Didn't send all data urgently XXXXX\n"));
+		   DEBUG_ERROR("Didn't send all data urgently XXXXX\n");
 #endif
-		DEBUG_MISC((dfd, " ---2 sent %d bytes urgent data, %d urgent bytes left\n", n, so->so_urgc));
+		DEBUG_MISC(" ---2 sent %d bytes urgent data, %d urgent bytes left\n", n, so->so_urgc);
 	}
 
 	sb->sb_cc -= n;
@@ -389,7 +389,7 @@ sowrite(struct socket *so)
 #ifdef HAVE_READV
 	nn = writev(so->s, (const struct iovec *)iov, n);
 
-	DEBUG_MISC((dfd, "  ... wrote nn = %d bytes\n", nn));
+	DEBUG_MISC("  ... wrote nn = %d bytes\n", nn);
 #else
 	nn = slirp_send(so, iov[0].iov_base, iov[0].iov_len,0);
 #endif
@@ -398,8 +398,8 @@ sowrite(struct socket *so)
 		return 0;
 
 	if (nn <= 0) {
-		DEBUG_MISC((dfd, " --- sowrite disconnected, so->so_state = %x, errno = %d\n",
-			so->so_state, errno));
+		DEBUG_MISC(" --- sowrite disconnected, so->so_state = %x, errno = %d\n",
+			so->so_state, errno);
 		sofcantsendmore(so);
 		tcp_sockclosed(sototcpcb(so));
 		return -1;
@@ -412,7 +412,7 @@ sowrite(struct socket *so)
             if (ret > 0)
                 nn += ret;
         }
-        DEBUG_MISC((dfd, "  ... wrote nn = %d bytes\n", nn));
+        DEBUG_MISC("  ... wrote nn = %d bytes\n", nn);
 #endif
 
 	/* Update sbuf */
@@ -457,8 +457,8 @@ sorecvfrom(struct socket *so)
 	    if(errno == EHOSTUNREACH) code=ICMP_UNREACH_HOST;
 	    else if(errno == ENETUNREACH) code=ICMP_UNREACH_NET;
 
-	    DEBUG_MISC((dfd," udp icmp rx errno = %d-%s\n",
-			errno,strerror(errno)));
+	    DEBUG_MISC(" udp icmp rx errno = %d-%s\n",
+			errno,strerror(errno));
 	    icmp_error(so->so_m, ICMP_UNREACH,code, 0,strerror(errno));
 	  } else {
 	    icmp_reflect(so->so_m);
@@ -468,7 +468,7 @@ sorecvfrom(struct socket *so)
 	  udp_detach(so);
 	} else {                            	/* A "normal" UDP packet */
 	  struct mbuf *m;
-          int len;
+          u_int len;
 #ifdef _WIN32
           unsigned long n;
 #else
@@ -498,15 +498,15 @@ sorecvfrom(struct socket *so)
 
 	  m->m_len = recvfrom(so->s, m->m_data, len, 0,
 			      (struct sockaddr *)&addr, &addrlen);
-	  DEBUG_MISC((dfd, " did recvfrom %d, errno = %d-%s\n",
-		      m->m_len, errno,strerror(errno)));
+	  DEBUG_MISC(" did recvfrom %d, errno = %d-%s\n",
+		      m->m_len, errno,strerror(errno));
 	  if(m->m_len<0) {
 	    u_char code=ICMP_UNREACH_PORT;
 
 	    if(errno == EHOSTUNREACH) code=ICMP_UNREACH_HOST;
 	    else if(errno == ENETUNREACH) code=ICMP_UNREACH_NET;
 
-	    DEBUG_MISC((dfd," rx error, tx icmp ICMP_UNREACH:%i\n", code));
+	    DEBUG_MISC(" rx error, tx icmp ICMP_UNREACH:%i\n", code);
 	    icmp_error(so->so_m, ICMP_UNREACH,code, 0,strerror(errno));
 	    m_free(m);
 	  } else {
@@ -560,7 +560,7 @@ sosendto(struct socket *so, struct mbuf *m)
 	  addr.sin_addr = so->so_faddr;
 	addr.sin_port = so->so_fport;
 
-	DEBUG_MISC((dfd, " sendto()ing, addr.sin_port=%d, addr.sin_addr.s_addr=%.16s\n", ntohs(addr.sin_port), inet_ntoa(addr.sin_addr)));
+	DEBUG_MISC(" sendto()ing, addr.sin_port=%d, addr.sin_addr.s_addr=%.16s\n", ntohs(addr.sin_port), inet_ntoa(addr.sin_addr));
 
 	/* Don't care what port we get */
 	ret = sendto(so->s, m->m_data, m->m_len, 0,

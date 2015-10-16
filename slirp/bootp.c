@@ -29,13 +29,6 @@
 
 static const uint8_t rfc1533_cookie[] = { RFC1533_COOKIE };
 
-#ifdef DEBUG
-#define DPRINTF(fmt, ...) \
-do if (slirp_debug & DBG_CALL) { fprintf(dfd, fmt, ##  __VA_ARGS__); fflush(dfd); } while (0)
-#else
-#define DPRINTF(fmt, ...) do{}while(0)
-#endif
-
 static BOOTPClient *get_new_addr(Slirp *slirp, struct in_addr *paddr,
                                  const uint8_t *macaddr)
 {
@@ -291,7 +284,7 @@ static void bootp_reply(Slirp *slirp, const struct bootp_t *bp)
         if (slirp->vdnssearch) {
             size_t spaceleft = sizeof(rbp->bp_vend) - (q - rbp->bp_vend);
             val = slirp->vdnssearch_len;
-            if (val + 1 > spaceleft) {
+            if ((size_t)val + 1 > spaceleft) {
                 g_warning("DHCP packet size exceeded, "
                     "omitting domain-search option.");
             } else {

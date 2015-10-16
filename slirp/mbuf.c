@@ -235,7 +235,7 @@ dtom(Slirp *slirp, void *dat)
 	  }
 	}
 
-	DEBUG_ERROR((dfd, "dtom failed"));
+	DEBUG_ERROR("dtom failed");
 
 	return (struct mbuf *)0;
 }

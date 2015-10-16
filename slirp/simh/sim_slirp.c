@@ -148,6 +148,9 @@ struct sim_slirp {
     uint32 dbit;
     };
 
+DEVICE *slirp_dptr;
+uint32 slirp_dbit;
+
 SLIRP *sim_slirp_open (const char *args, void *opaque, packet_callback callback, DEVICE *dptr, uint32 dbit)
 {
 SLIRP *slirp = (SLIRP *)g_malloc0(sizeof(*slirp));
@@ -157,6 +160,8 @@ char *cptr;
 char tbuf[CBUFSIZE], gbuf[CBUFSIZE];
 int err;
 
+slirp_dptr = dptr;
+slirp_dbit = dbit;
 slirp->args = (char *)g_malloc0(1 + strlen(args));
 strcpy (slirp->args, args);
 slirp->opaque = opaque;
@@ -454,7 +459,7 @@ for (i = 0; i < pollfds->len; i++) {
         FD_SET(fd, wfds);
         nfds = MAX(nfds, fd);
         }
-    if (events & G_IO_PRI) {
+    if (events & (G_IO_PRI | G_IO_HUP | G_IO_ERR)) {
         FD_SET(fd, xfds);
         nfds = MAX(nfds, fd);
         }

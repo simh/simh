@@ -355,9 +355,9 @@ int tcp_fconnect(struct socket *so)
       addr.sin_addr = so->so_faddr;
     addr.sin_port = so->so_fport;
 
-    DEBUG_MISC((dfd, " connect()ing, addr.sin_port=%d, "
+    DEBUG_MISC(" connect()ing, addr.sin_port=%d, "
 		"addr.sin_addr.s_addr=%.16s\n",
-		ntohs(addr.sin_port), inet_ntoa(addr.sin_addr)));
+		ntohs(addr.sin_port), inet_ntoa(addr.sin_addr));
     /* We don't care what port we get */
     ret = connect(s,(struct sockaddr *)&addr,sizeof (addr));
 
@@ -913,7 +913,7 @@ int tcp_ctl(struct socket *so)
                     return 1;
                 }
                 do_pty = ex_ptr->ex_pty;
-                DEBUG_MISC((dfd, " executing %s\n", ex_ptr->ex_exec));
+                DEBUG_MISC(" executing %s\n", ex_ptr->ex_exec);
                 return fork_exec(so, ex_ptr->ex_exec, do_pty);
             }
         }

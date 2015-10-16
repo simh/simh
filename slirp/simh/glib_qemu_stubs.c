@@ -112,32 +112,27 @@ void pstrcpy(char *buf, int buf_size, const char *str)
 
 int qemu_socket(int domain, int type, int protocol)
 {
-fprintf (stderr, "qemu_socket()\r\n");
 return socket (domain, type, protocol);
 }
 
 int qemu_accept(int s, struct sockaddr *addr, socklen_t *addrlen)
 {
-fprintf (stderr, "qemu_accept()\r\n");
 return accept (s, addr, addrlen);
 }
 
 int qemu_setsockopt (int s, int level, int optname, void *optval, int optlen)
 {
-fprintf (stderr, "qemu_setsockopt()\r\n");
 return setsockopt ((SOCKET)s, level, optname, (char *)optval, optlen);
 }
 
 int qemu_recv (int s, void *buf, size_t len, int flags)
 {
-fprintf (stderr, "qemu_recv()\r\n");
 return recv ((SOCKET)s, buf, len, flags);
 }
 
 int socket_set_nodelay(int fd)
 {
     int v = 1;
-fprintf (stderr, "socket_set_nodelay()\r\n");
     return setsockopt((SOCKET)fd, IPPROTO_TCP, TCP_NODELAY, (char *)&v, sizeof(v));
 }
 

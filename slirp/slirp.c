@@ -207,6 +207,11 @@ Slirp *slirp_init(int restricted, struct in_addr vnetwork,
     Slirp *slirp = g_malloc0(sizeof(Slirp));
 
     slirp_init_once();
+    
+    /* set debug flags (useful when compiled with DEBUG enabled)*/
+    /* bitmask values (1 = CALL, 2 = MISC, 3 = ERROR) */
+    if (getenv("SLIRP_DEBUG"))
+        slirp_debug = atoi(getenv("SLIRP_DEBUG"));
 
     slirp->restricted = restricted;
 

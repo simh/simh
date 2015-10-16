@@ -19,13 +19,13 @@ sbfree(struct sbuf *sb)
 void
 sbdrop(struct sbuf *sb, int num)
 {
-    int limit = sb->sb_datalen / 2;
+    u_int limit = sb->sb_datalen / 2;
 
 	/*
 	 * We can only drop how much we have
 	 * This should never succeed
 	 */
-	if(num > sb->sb_cc)
+	if((u_int)num > sb->sb_cc)
 		num = sb->sb_cc;
 	sb->sb_cc -= num;
 	sb->sb_rptr += num;
@@ -173,7 +173,7 @@ sbcopy(struct sbuf *sb, int off, int len, char *to)
 		from -= sb->sb_datalen;
 
 	if (from < sb->sb_wptr) {
-		if (len > sb->sb_cc) len = sb->sb_cc;
+		if ((u_int)len > sb->sb_cc) len = sb->sb_cc;
 		memcpy(to,from,len);
 	} else {
 		/* re-use off */
