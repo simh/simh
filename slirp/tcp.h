@@ -108,7 +108,7 @@ struct tcphdr {
 #define	TCP_MSS	1460
 
 #undef TCP_MAXWIN
-#define	TCP_MAXWIN	65535	/* largest value for (unscaled) window */
+#define	TCP_MAXWIN	65535u	/* largest value for (unscaled) window */
 
 #undef TCP_MAX_WINSHIFT
 #define TCP_MAX_WINSHIFT	14	/* maximum window shift */

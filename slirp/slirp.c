@@ -464,7 +464,7 @@ void slirp_pollfds_poll(GArray *pollfds, int select_error)
         return;
     }
 
-    curtime = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    curtime = (u_int)qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
 
     QTAILQ_FOREACH(slirp, &slirp_instances, entry) {
         /*

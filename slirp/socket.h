@@ -92,6 +92,6 @@ void soisfconnected(register struct socket *);
 void sofwdrain(struct socket *);
 struct iovec; /* For win32 */
 size_t sopreprbuf(struct socket *so, struct iovec *iov, int *np);
-int soreadbuf(struct socket *so, const char *buf, int size);
+int soreadbuf(struct socket *so, const char *buf, size_t size);
 
 #endif /* _SOCKET_H_ */

@@ -135,7 +135,7 @@ static void domain_mklabels(CompactDomain *cd, const char *input)
             if ((len == 0 && cur_chr == '.') || len >= 64) {
                 goto fail;
             }
-            *len_marker = len;
+            *len_marker = (uint8_t)len;
 
             output++;
             len_marker = output;
@@ -222,7 +222,7 @@ static size_t domain_compactify(CompactDomain *domains, size_t n)
             if (moff < 0x3FFFu) {
                 cd->len -= cd->common_octets - 2;
                 cd->labels[cd->len - 1] = moff & 0xFFu;
-                cd->labels[cd->len - 2] = 0xC0u | (moff >> 8);
+                cd->labels[cd->len - 2] = (uint8_t)(0xC0u | (moff >> 8));
             }
         }
 
@@ -301,7 +301,7 @@ int translate_dnssearch(Slirp *s, const char **names)
         size_t len = bsrc_end - bsrc_start;
         memmove(result + bdst_start, result + bsrc_start, len);
         result[bdst_start - 2] = RFC3397_OPT_DOMAIN_SEARCH;
-        result[bdst_start - 1] = len;
+        result[bdst_start - 1] = (uint8_t)len;
         bsrc_end = bsrc_start;
         bsrc_start -= MAX_OPT_LEN;
         bdst_start -= MAX_OPT_LEN + OPT_HEADER_LEN;

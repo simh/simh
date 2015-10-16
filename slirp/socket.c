@@ -208,7 +208,7 @@ soread(struct socket *so)
 	return nn;
 }
 
-int soreadbuf(struct socket *so, const char *buf, int size)
+int soreadbuf(struct socket *so, const char *buf, size_t size)
 {
     int n, nn, copy = size;
 	struct sbuf *sb = &so->so_snd;

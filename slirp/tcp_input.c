@@ -1468,7 +1468,7 @@ int
 tcp_mss(struct tcpcb *tp, u_int offer)
 {
 	struct socket *so = tp->t_socket;
-	int mss;
+	u_int mss;
 
 	DEBUG_CALL("tcp_mss");
 	DEBUG_ARG("tp = %lx", (long)tp);
