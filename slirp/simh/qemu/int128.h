@@ -2,8 +2,13 @@
 #define INT128_H
 
 #include <assert.h>
+#ifdef _MSC_VER
+#include <win32/stdint.h>
+#include <win32/stdbool.h>
+#else
 #include <stdint.h>
 #include <stdbool.h>
+#endif
 
 typedef struct Int128 Int128;
 

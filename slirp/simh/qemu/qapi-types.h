@@ -16,8 +16,13 @@
 #ifndef QAPI_TYPES_H
 #define QAPI_TYPES_H
 
-#include <stdbool.h>
+#ifdef _MSC_VER
+#include <win32/stdint.h>
+#include <win32/stdbool.h>
+#else
 #include <stdint.h>
+#include <stdbool.h>
+#endif
 #include "qapi/qmp/qobject.h"
 
 #ifndef QAPI_TYPES_BUILTIN

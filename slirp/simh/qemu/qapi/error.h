@@ -79,7 +79,6 @@
 
 #include "qemu/compiler.h"
 #include "qapi-types.h"
-#include <stdbool.h>
 
 /*
  * Opaque error object.

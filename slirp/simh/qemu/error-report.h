@@ -14,7 +14,6 @@
 #define QEMU_ERROR_H
 
 #include <stdarg.h>
-#include <stdbool.h>
 #include "qemu/compiler.h"
 
 typedef struct Location {

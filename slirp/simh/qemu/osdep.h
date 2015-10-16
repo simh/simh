@@ -29,8 +29,15 @@
 #include "qemu/compiler.h"
 #include <stdarg.h>
 #include <stddef.h>
-#include <stdbool.h>
+#ifdef _MSC_VER
+#include <win32/stdint.h>
+#include <win32/stdbool.h>
+#include <win32/inttypes.h>
+#else
 #include <stdint.h>
+#include <stdbool.h>
+#include <inttypes.h>
+#endif
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -38,11 +45,12 @@
 #ifndef _MSC_VER
 #include <strings.h>
 #endif
-#include <inttypes.h>
 #include <limits.h>
 /* Put unistd.h before time.h as that triggers localtime_r/gmtime_r
  * function availability on recentish Mingw-w64 platforms. */
-#include <unistd.h>
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
 #include <time.h>
 #include <ctype.h>
 #include <errno.h>

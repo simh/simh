@@ -26,7 +26,11 @@
 #ifndef QEMU_OPTIONS_H
 #define QEMU_OPTIONS_H
 
+#ifdef _MSC_VER
+#include <win32/stdint.h>
+#else
 #include <stdint.h>
+#endif
 #include "qemu/queue.h"
 #include "qapi/error.h"
 #include "qapi/qmp/qdict.h"

@@ -52,7 +52,9 @@
 #undef DUMMY_PPP
 
 /* Define if you have unistd.h */
+#ifndef _WIN32
 #define HAVE_UNISTD_H
+#endif
 
 /* Define if you have stdlib.h */
 #define HAVE_STDLIB_H

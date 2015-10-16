@@ -1,7 +1,7 @@
 #ifndef INTTYPES_H
 #define INTTYPES_H
 
-#include <stdint.h>
+#include <win32/stdint.h>
 
 #ifdef _WIN64
 typedef __int64 ssize_t;

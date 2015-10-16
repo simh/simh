@@ -24,7 +24,11 @@
 #ifndef BLOCK_ACCOUNTING_H
 #define BLOCK_ACCOUNTING_H
 
+#ifdef _MSC_VER
+#include <win32/stdint.h>
+#else
 #include <stdint.h>
+#endif
 
 #include "qemu/typedefs.h"
 

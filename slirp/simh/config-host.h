@@ -1,7 +1,9 @@
 #ifndef CONFIG_HOST_H
 #define CONFIG_HOST_H
 
+#include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #ifdef _MSC_VER
 #include <winsock2.h>
 #else
@@ -9,7 +11,11 @@ typedef int SOCKET;
 #endif
 
 typedef int bool;
+#ifdef _MSC_VER
+#include <win32/stdint.h>
+#else
 #include <stdint.h>
+#endif
 #include <sockets.h>
 #define qemu_add_child_watch(pid)
 int qemu_setsockopt (int s, int level, int optname, void *optval, int optlen);
