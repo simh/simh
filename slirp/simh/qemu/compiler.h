@@ -40,21 +40,6 @@
 #define QEMU_ARTIFICIAL
 #endif
 
-#ifdef _MSC_VER
-# define PACKED_BEGIN __pragma( pack(push, 1) )
-# define PACKED_END __pragma( pack(pop) )
-# define QEMU_PACKED
-#else
-# define PACKED_BEGIN
-#if defined(_WIN32)
-# define PACKED_END __attribute__((gcc_struct, packed))
-# define QEMU_PACKED __attribute__((gcc_struct, packed))
-#else
-# define PACKED_END __attribute__((packed))
-# define QEMU_PACKED __attribute__((packed))
-#endif
-#endif
-
 #ifndef glue
 #define xglue(x, y) x ## y
 #define glue(x, y) xglue(x, y)

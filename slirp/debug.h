@@ -44,12 +44,12 @@ extern void _sim_debug (int dbits, DEVICE* dptr, const char* fmt, ...);
 
 #else
 
-#define DEBUG_CALL(x)
-#define DEBUG_ARG(x, y)
-#define DEBUG_ARGS(...)
-#define DEBUG_MISC(...)
-#define DEBUG_ERROR(...)
-#define DPRINTF(fmt, ...)
+#define DEBUG_CALL(x) do {} while (0)
+#define DEBUG_ARG(x, y) do {} while (0)
+#define DEBUG_ARGS(...) do {} while (0)
+#define DEBUG_MISC(...) do {} while (0)
+#define DEBUG_ERROR(...) do {} while (0)
+#define DPRINTF(fmt, ...) do {} while (0)
 
 #endif
 #endif
