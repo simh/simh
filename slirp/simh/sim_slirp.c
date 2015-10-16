@@ -320,6 +320,7 @@ struct redir_tcp_udp *rtmp;
 
 if (slirp) {
     g_free (slirp->args);
+    g_free (slirp->tftp_path);
     while ((rtmp = slirp->rtcp)) {
         slirp_remove_hostfwd(slirp->slirp, rtmp->is_udp, rtmp->inaddr, rtmp->lport);
         slirp->rtcp = rtmp->next;

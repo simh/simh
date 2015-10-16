@@ -1651,6 +1651,7 @@ while (dev->handle) {
 #ifdef HAVE_SLIRP_NETWORK
       case ETH_API_NAT:
         sim_slirp_dispatch ((SLIRP*)dev->handle);
+        status = 1;
         break;
 #endif /* HAVE_SLIRP_NETWORK */
       case ETH_API_UDP:
