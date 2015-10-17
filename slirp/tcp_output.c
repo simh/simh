@@ -115,7 +115,7 @@ again:
 			 * to send then the probe will be the FIN
 			 * itself.
 			 */
-			if (off < so->so_snd.sb_cc)
+			if (off < (int)so->so_snd.sb_cc)
 				flags &= ~TH_FIN;
 			win = 1;
 		} else {
@@ -124,7 +124,7 @@ again:
 		}
 	}
 
-	len = min(so->so_snd.sb_cc, win) - off;
+	len = min((long)so->so_snd.sb_cc, win) - off;
 
 	if (len < 0) {
 		/*
@@ -166,12 +166,12 @@ again:
 	if (len) {
 		if (len == tp->t_maxseg)
 			goto send;
-		if ((1 || idle || tp->t_flags & TF_NODELAY) &&
-		    len + off >= so->so_snd.sb_cc)
+		if ((1 || idle || (tp->t_flags & TF_NODELAY)) &&
+		    ((len + off) >= (long)so->so_snd.sb_cc))
 			goto send;
 		if (tp->t_force)
 			goto send;
-		if (len >= tp->max_sndwnd / 2 && tp->max_sndwnd > 0)
+		if ((len >= (long)(tp->max_sndwnd / 2)) && (tp->max_sndwnd > 0))
 			goto send;
 		if (SEQ_LT(tp->snd_nxt, tp->snd_max))
 			goto send;
@@ -280,7 +280,7 @@ send:
 	 * Adjust data length if insertion of options will
 	 * bump the packet length beyond the t_maxseg length.
 	 */
-	 if (len > tp->t_maxseg - optlen) {
+	 if (len > (long)(tp->t_maxseg - optlen)) {
 		len = tp->t_maxseg - optlen;
 		sendalot = 1;
 	 }

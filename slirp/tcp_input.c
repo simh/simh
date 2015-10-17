@@ -1030,7 +1030,7 @@ trimthenstep6:
 		    incr = incr * incr / cw;
 		  tp->snd_cwnd = min(cw + incr, TCP_MAXWIN<<tp->snd_scale);
 		}
-		if (acked > so->so_snd.sb_cc) {
+		if (acked > (int)so->so_snd.sb_cc) {
 			tp->snd_wnd -= so->so_snd.sb_cc;
 			sbdrop(&so->so_snd, (int )so->so_snd.sb_cc);
 			ourfinisacked = 1;
