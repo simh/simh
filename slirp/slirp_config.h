@@ -52,7 +52,7 @@
 #undef DUMMY_PPP
 
 /* Define if you have unistd.h */
-#ifndef _WIN32
+#ifndef _MSC_VER
 #define HAVE_UNISTD_H
 #endif
 

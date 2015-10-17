@@ -5,6 +5,9 @@
 #include "slirp_config.h"
 
 #ifdef _WIN32
+#ifndef _MSC_VER
+# include <inttypes.h>
+#endif
 
 typedef char *caddr_t;
 

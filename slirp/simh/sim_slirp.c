@@ -60,7 +60,7 @@ struct redir_tcp_udp {
 static int
 _parse_redirect_port (struct redir_tcp_udp **head, char *buff, int is_udp)
 {
-u_int32_t inaddr = 0;
+uint32 inaddr = 0;
 int port = 0;
 int lport = 0;
 char *ipaddrstr = NULL;
@@ -550,7 +550,7 @@ for (i = 0; i < pollfds->len; i++) {
 int sim_slirp_select (SLIRP *slirp, int ms_timeout)
 {
 int select_ret = 0;
-uint32_t slirp_timeout = ms_timeout;
+uint32 slirp_timeout = ms_timeout;
 struct timeval timeout;
 fd_set rfds, wfds, xfds;
 fd_set save_rfds, save_wfds, save_xfds;

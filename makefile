@@ -801,6 +801,10 @@ else
       OS_LDFLAGS += -lpcreposix -lpcre -L../windows-build/PCRE/lib/
       $(info using libpcreposix: $(abspath ../windows-build/PCRE/lib/pcreposix.a) $(abspath ../windows-build/PCRE/include/pcreposix.h))
     endif
+    ifeq (slirp,slirp)
+      NETWORK_OPT += -Islirp -Islirp/simh -Islirp/simh/qemu -DHAVE_SLIRP_NETWORK slirp/*.c slirp/simh/*.c -lIphlpapi
+      NETWORK_LAN_FEATURES += NAT(SLiRP)
+    endif
   endif
 endif # Win32 (via MinGW)
 ifneq (,$(GIT_COMMIT_ID))

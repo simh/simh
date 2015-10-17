@@ -1,0 +1,16 @@
+The files in and below this directory are the necessary glue and stubs 
+to allow the effectively unmodified qemu slirp code to be used in simh 
+as a network connection mechanism.
+
+Most of the include files here started from related files in the qemu
+include directories and have been chopped up and tweaked as necessary
+so that the slirp code can be used outside of qemu.
+
+Slirp depends on a small set of capabilities from glib (GArrays mostly).
+
+All of the other include files exist so that the references in the 
+slirp code don't have to be modified.
+
+- Mark Pizzolato
+
+

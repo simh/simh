@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <winsock2.h>
 #else
 typedef int SOCKET;
@@ -24,7 +24,9 @@ int qemu_recv (int s, void *buf, size_t len, int flags);
 #define snprintf _snprintf
 #define strcasecmp stricmp
 #else
+#ifndef _WIN32
 #define CONFIG_IOVEC 1
+#endif
 #endif
 #define register_savevm(p1, p2, p3, p4, p5, p6, p7)
 #define unregister_savevm(p1, p2, p3)

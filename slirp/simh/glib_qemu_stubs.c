@@ -254,7 +254,9 @@ slirp_remque(void *a)
   ((struct quehead *)(element->qh_rlink))->qh_link = element->qh_link;
   element->qh_rlink = NULL;
 }
+#endif
 
+#if defined(_WIN32)
 int
 inet_aton(const char *arg, struct in_addr *addr)
 {
