@@ -225,7 +225,6 @@ return 0;
 
 void qemu_notify_event(void)
 {
-fprintf (stderr, "qemu_notify_event() called\n");
 }
 
 #if defined(_MSC_VER)

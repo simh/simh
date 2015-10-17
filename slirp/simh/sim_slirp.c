@@ -130,7 +130,10 @@ struct sim_slirp {
     int dhcpmgmt;
     struct in_addr vdhcp_start;
     struct in_addr vnameserver;
+    char *boot_file;
     char *tftp_path;
+    char *dns_search;
+    char **dns_search_domains;
     struct redir_tcp_udp *rtcp;
     GArray *gpollfds;
     SOCKET db_chime;            /* write packet doorbell */
@@ -192,12 +195,46 @@ while (*tptr && !err) {
             }
         continue;
         }
+    if (0 == MATCH_CMD (gbuf, "BOOTFILE")) {
+        if (cptr && *cptr)
+            slirp->boot_file = g_strdup (cptr);
+        else {
+            sim_printf ("Missing DHCP Boot file name\n");
+            err = 1;
+            }
+        continue;
+        }
     if ((0 == MATCH_CMD (gbuf, "NAMESERVER")) ||
         (0 == MATCH_CMD (gbuf, "DNS"))) {
         if (cptr && *cptr)
             inet_aton (cptr, &slirp->vnameserver);
         else {
             sim_printf ("Missing nameserver\n");
+            err = 1;
+            }
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "DNSSEARCH")) {
+        if (cptr && *cptr) {
+            int count = 0;
+            char *name;
+           
+            slirp->dns_search = g_strdup (cptr);
+            name = slirp->dns_search;
+            do {
+                ++count;
+                slirp->dns_search_domains = realloc (slirp->dns_search_domains, (count + 1)*sizeof(char *));
+                slirp->dns_search_domains[count] = NULL;
+                slirp->dns_search_domains[count-1] = name;
+                name = strchr (name, ':');
+                if (name) {
+                    *name = '\0';
+                    ++name;
+                    }
+                } while (name && *name);
+            }
+        else {
+            sim_printf ("Missing DNS search list\n");
             err = 1;
             }
         continue;
@@ -272,8 +309,9 @@ if ((slirp->vdhcp_start.s_addr == 0) && slirp->dhcpmgmt)
 if (slirp->vnameserver.s_addr == 0)
     slirp->vnameserver.s_addr = htonl(ntohl(slirp->vnetwork.s_addr) | 3);
 slirp->slirp = slirp_init (0, slirp->vnetwork, slirp->vnetmask, slirp->vgateway, 
-                           NULL, slirp->tftp_path, NULL, slirp->vdhcp_start, 
-                           slirp->vnameserver, NULL, (void *)slirp);
+                           NULL, slirp->tftp_path, slirp->boot_file, 
+                           slirp->vdhcp_start, slirp->vnameserver, 
+                           (const char **)(slirp->dns_search_domains), (void *)slirp);
 
 if (_do_redirects (slirp->slirp, slirp->rtcp)) {
     sim_slirp_close (slirp);
@@ -321,6 +359,9 @@ struct redir_tcp_udp *rtmp;
 if (slirp) {
     g_free (slirp->args);
     g_free (slirp->tftp_path);
+    g_free (slirp->boot_file);
+    g_free (slirp->dns_search);
+    g_free (slirp->dns_search_domains);
     while ((rtmp = slirp->rtcp)) {
         slirp_remove_hostfwd(slirp->slirp, rtmp->is_udp, rtmp->inaddr, rtmp->lport);
         slirp->rtcp = rtmp->next;
@@ -353,10 +394,12 @@ fprintf (st, "%s",
 "NAT options:\n"
 "    DHCP{=dhcp_start_address}           Enables DHCP server and specifies\n"
 "                                        guest LAN DHCP start IP address\n"
+"    BOOTFILE=bootfilename               specifies DHCP returned Boot Filename\n"
 "    TFTP=tftp-base-path                 Enables TFTP server and specifies\n"
 "                                        base file path\n"
 "    NAMESERVER=nameserver_ipaddres      specifies DHCP nameserver IP address\n"
 "    DNS=nameserver_ipaddres             specifies DHCP nameserver IP address\n"
+"    DNSSEARCH=domain{:domain{:domain}}  specifies DNS Domains search suffixes\n"
 "    GATEWAY=host_ipaddress{/masklen}    specifies LAN gateway IP address\n"
 "    NETWORK=network_ipaddress{/masklen} specifies LAN network address\n"
 "    UDP=port:address:internal-port      maps host UDP port to guest port\n"
@@ -424,15 +467,28 @@ if ((slirp == NULL) || (slirp->slirp == NULL))
     return;
 fprintf (st, "NAT args: %s\n", slirp->args);
 fprintf (st, "NAT network setup:\n");
-fprintf (st, "        gateway     =%s/%d\n", inet_ntoa(slirp->vgateway), slirp->maskbits);
-fprintf (st, "        DNS         =%s\n", inet_ntoa(slirp->vnameserver));
+fprintf (st, "        gateway       =%s/%d", inet_ntoa(slirp->vgateway), slirp->maskbits);
+fprintf (st, "(%s)\n", inet_ntoa(slirp->vnetmask));
+fprintf (st, "        DNS           =%s\n", inet_ntoa(slirp->vnameserver));
 if (slirp->vdhcp_start.s_addr != 0)
-    fprintf (st, "        dhcp_start  =%s\n", inet_ntoa(slirp->vdhcp_start));
+    fprintf (st, "        dhcp_start    =%s\n", inet_ntoa(slirp->vdhcp_start));
+if (slirp->boot_file)
+    fprintf (st, "        dhcp bootfile =%s\n", slirp->boot_file);
+if (slirp->dns_search_domains) {
+    char **domains = slirp->dns_search_domains;
+    
+    fprintf (st, "        DNS domains   =");
+    while (*domains) {
+        fprintf (st, "%s%s", (domains != slirp->dns_search_domains) ? ", " : "", *domains);
+        ++domains;
+        }
+    fprintf (st, "\n");
+    }
 if (slirp->tftp_path)
-    fprintf (st, "        tftp prefix =%s\n", slirp->tftp_path);
+    fprintf (st, "        tftp prefix   =%s\n", slirp->tftp_path);
 rtmp = slirp->rtcp;
 while (rtmp) {
-    fprintf (st, "        redir %3s   =%d:%s:%d\n", tcpudp[rtmp->is_udp], rtmp->lport, inet_ntoa(rtmp->inaddr), rtmp->port);
+    fprintf (st, "        redir %3s     =%d:%s:%d\n", tcpudp[rtmp->is_udp], rtmp->lport, inet_ntoa(rtmp->inaddr), rtmp->port);
     rtmp = rtmp->next;
     }
 slirp_connection_info (slirp->slirp, (Monitor *)st);
