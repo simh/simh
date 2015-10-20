@@ -1822,7 +1822,10 @@ memset(errbuf, 0, PCAP_ERRBUF_SIZE);
 if (0 == strncmp("tap:", savname, 4)) {
   int  tun = -1;    /* TUN/TAP Socket */
   int  on = 1;
+  char *devname = savname + 4;
 
+  while (isspace(*devname))
+      ++devname;
 #if defined(HAVE_TAP_NETWORK)
   if (!strcmp(savname, "tap:tapN")) {
     sim_printf ("Eth: Must specify actual tap device name (i.e. tap:tap0)\r\n");
@@ -1835,7 +1838,7 @@ if (0 == strncmp("tap:", savname, 4)) {
 
     memset(&ifr, 0, sizeof(ifr));
     /* Set up interface flags */
-    strcpy(ifr.ifr_name, savname+4);
+    strcpy(ifr.ifr_name, devname);
     ifr.ifr_flags = IFF_TAP|IFF_NO_PI;
 
     /* Send interface requests to TUN/TAP driver. */
@@ -1858,7 +1861,7 @@ if (0 == strncmp("tap:", savname, 4)) {
   if (1) {
     char dev_name[64] = "";
 
-    snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", savname+4);
+    snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", devname);
     dev_name[sizeof(dev_name)-1] = '\0';
 
     if ((tun = open(dev_name, O_RDWR)) >= 0) {
@@ -1868,7 +1871,7 @@ if (0 == strncmp("tap:", savname, 4)) {
         }
       else {
         *fd_handle = tun;
-        strcpy(savname, savname+4);
+        strcpy(savname, devname);
         }
 #if defined (__APPLE__)
       if (1) {
@@ -1906,13 +1909,16 @@ else { /* !tap: */
   if (0 == strncmp("vde:", savname, 4)) {
 #if defined(HAVE_VDE_NETWORK)
     struct vde_open_args voa;
+    char *devname = savname + 4;
 
     memset(&voa, 0, sizeof(voa));
     if (!strcmp(savname, "vde:vdedevice")) {
       sim_printf ("Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\r\n");
       return SCPE_OPENERR | SCPE_NOMESSAGE;
       }
-    if (!(*handle = (void*) vde_open(savname+4, "simh", &voa)))
+    while (isspace(*devname))
+        ++devname;
+    if (!(*handle = (void*) vde_open(devname, "simh", &voa)))
       strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
     else {
       *eth_api = ETH_API_VDE;
@@ -1925,7 +1931,11 @@ else { /* !tap: */
   else { /* !vde: */
     if (0 == strncmp("nat:", savname, 4)) {
 #if defined(HAVE_SLIRP_NETWORK)
-      if (!(*handle = (void*) sim_slirp_open(savname+4, opaque, &_slirp_callback, dptr, dbit)))
+      char *devname = savname + 4;
+
+      while (isspace(*devname))
+          ++devname;
+      if (!(*handle = (void*) sim_slirp_open(devname, opaque, &_slirp_callback, dptr, dbit)))
         strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
       else {
         *eth_api = ETH_API_NAT;
@@ -1939,13 +1949,16 @@ else { /* !tap: */
       if (0 == strncmp("udp:", savname, 4)) {
         char localport[CBUFSIZE], host[CBUFSIZE], port[CBUFSIZE];
         char hostport[2*CBUFSIZE];
+        char *devname = savname + 4;
 
         if (!strcmp(savname, "udp:sourceport:remotehost:remoteport")) {
           sim_printf ("Eth: Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)\r\n");
           return SCPE_OPENERR | SCPE_NOMESSAGE;
           }
 
-        if (SCPE_OK != sim_parse_addr_ex (savname+4, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL))
+        while (isspace(*devname))
+            ++devname;
+        if (SCPE_OK != sim_parse_addr_ex (devname, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL))
           return SCPE_OPENERR;
 
         if (localport[0] == '\0')
