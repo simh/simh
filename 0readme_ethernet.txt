@@ -202,6 +202,14 @@ Additionally NAT based networking is useful to allow host systems with WiFi
 networking to a) reach the simulated system and b) allow the simulated system
 to reach out to the Internet.
 
+Note: As mentioned above, NAT networking is specifically capable of providing 
+      TCP/IP connectivity.  Only expect TCP and UDP traffic to pass through 
+      the interface.  Do not expect ICMP traffic (ping mostly) to traverse 
+      the NAT boundary.  This restriction is a conseqence of host platform 
+      and network limitations regarding direct user mode code generating ICMP 
+      packets.
+
+
 -------------------------------------------------------------------------------
 
 Windows notes:
