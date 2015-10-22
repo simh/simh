@@ -634,7 +634,7 @@ tcp_listen(Slirp *slirp, uint32_t haddr, u_int hport, uint32_t laddr,
 
 		closesocket(s);
 		sofree(so);
-		fprintf (stderr, "\r\nSocket Error %d\r\n", tmperrno);
+		fprintf (stderr, "Socket Error %d", tmperrno);
 		/* Restore the real errno */
 #ifdef _WIN32
 		WSASetLastError(tmperrno);

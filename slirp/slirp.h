@@ -11,8 +11,8 @@
 
 typedef char *caddr_t;
 
-# include <winsock2.h>
 # include <windows.h>
+# include <winsock2.h>
 # include <ws2tcpip.h>
 # include <sys/timeb.h>
 # include <iphlpapi.h>

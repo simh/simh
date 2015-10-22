@@ -653,8 +653,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         NETWORK_CCDEFS += -DUSE_NETWORK
       endif
     endif
-    ifeq (slirp,$(shell if $(TEST) -e slirp/simh/sim_slirp.c; then echo slirp; fi))
-      NETWORK_CCDEFS += -Islirp -Islirp/simh -Islirp/simh/qemu -DHAVE_SLIRP_NETWORK slirp/*.c slirp/simh/*.c
+    ifeq (slirp,$(shell if $(TEST) -e slirp_glue/sim_slirp.c; then echo slirp; fi))
+      NETWORK_CCDEFS += -Islirp -Islirp_glue -Islirp_glue/qemu -DHAVE_SLIRP_NETWORK -DUSE_SIMH_SLIRP_DEBUG slirp/*.c slirp_glue/*.c
       NETWORK_LAN_FEATURES += NAT(SLiRP)
     endif
     ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS))$(findstring HAVE_VDE_NETWORK,$(NETWORK_CCDEFS)))
@@ -802,7 +802,7 @@ else
       $(info using libpcreposix: $(abspath ../windows-build/PCRE/lib/pcreposix.a) $(abspath ../windows-build/PCRE/include/pcreposix.h))
     endif
     ifeq (slirp,slirp)
-      NETWORK_OPT += -Islirp -Islirp/simh -Islirp/simh/qemu -DHAVE_SLIRP_NETWORK slirp/*.c slirp/simh/*.c -lIphlpapi
+      NETWORK_OPT += -Islirp -Islirp_glue -Islirp_glue/qemu -DHAVE_SLIRP_NETWORK -DUSE_SIMH_SLIRP_DEBUG slirp/*.c slirp_glue/*.c -lIphlpapi
       NETWORK_LAN_FEATURES += NAT(SLiRP)
     endif
   endif

@@ -41,8 +41,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/include&quot;;&quot;../../windows-build/PCRE/include&quot;;&quot;../../windows-build/libpng-1.6.18&quot;;../slirp;../slirp/simh;../slirp/simh/qemu;../slirp/simh/qemu/win32/include"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_610;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;USE_SIM_VIDEO;HAVE_LIBSDL;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_LIBPNG;HAVE_SLIRP_NETWORK"
+				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/include&quot;;&quot;../../windows-build/PCRE/include&quot;;&quot;../../windows-build/libpng-1.6.18&quot;;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_610;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;USE_SIM_VIDEO;HAVE_LIBSDL;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_LIBPNG;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
 				KeepComments="false"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="0"
@@ -128,8 +128,8 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/include&quot;;&quot;../../windows-build/PCRE/include&quot;;&quot;../../windows-build/libpng-1.6.18&quot;;../slirp;../slirp/simh;../slirp/simh/qemu;../slirp/simh/qemu/win32/include"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_610;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;USE_SIM_VIDEO;HAVE_LIBSDL;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_LIBPNG;HAVE_SLIRP_NETWORK"
+				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/include&quot;;&quot;../../windows-build/PCRE/include&quot;;&quot;../../windows-build/libpng-1.6.18&quot;;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_610;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;USE_SIM_VIDEO;HAVE_LIBSDL;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_LIBPNG;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
 				KeepComments="false"
 				StringPooling="true"
 				RuntimeLibrary="0"
@@ -405,7 +405,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\slirp\simh\glib_qemu_stubs.c"
+					RelativePath="..\slirp_glue\glib_qemu_stubs.c"
 					>
 				</File>
 				<File
@@ -469,7 +469,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\slirp\simh\sim_slirp.c"
+					RelativePath="..\slirp_glue\sim_slirp.c"
 					>
 				</File>
 				<File
