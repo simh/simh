@@ -300,11 +300,13 @@ gchar *
 g_array_free (GArray *array,
               gboolean free_segment)
 {
-gchar *result = free_segment ? NULL : array->data;
+gchar *result = ((array == NULL) || free_segment) ? NULL : array->data;
 
-if (free_segment)
-    free (array->data); 
-free (array);
+if (array != NULL) {
+    if (free_segment)
+        free (array->data); 
+    free (array);
+    }
 return result;
 }
  
