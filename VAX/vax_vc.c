@@ -350,7 +350,7 @@ DEVICE vc_dev = {
     };
 
 UART2681 vc_uart = {
-    &vc_uart_int,
+    &vc_uart_int, NULL,
     { { &lk_wr, &lk_rd }, { &vs_wr, &vs_rd } }
     };
 

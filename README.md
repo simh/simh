@@ -112,6 +112,20 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
       Asynchronous support exists for console I/O and most multiplexer 
       devices.  (Still experimental - not currently by default)
 
+#### Ethernet Transport Enhancements
+	* UDP packet transport.  Direct simulator connections to HECnet can be 
+	  made without running a local packet bridge program.
+	* NAT packet transport.  Simulators which only speak TCP/IP (No DECnet)
+	  and want to communicate with their host systems and/or directly to 
+	  the Internet can use NAT packet transport.  This also works for WiFi 
+	  connected host systems.
+	* Packet Transmission Throttling.  When connected to a LAN which has 
+	  legacy network adapaters (DEQNA, DEUNA) on legacy systems, it is very
+	  easy for a simulated system to overrun the receiving capacity of the
+	  older systems.  Throttling of simulated traffic delivered to the LAN 
+	  can be used to mitigate this problem.
+	* Reliable MAC address conflict detection.  
+
 #### Disk Extensions
     RAW Disk Access (including CDROM)
     Virtual Disk Container files, including differencing disks

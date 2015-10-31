@@ -1,0 +1,14 @@
+October 6, 2015 
+
+This version of slirp is a fork from QEMU Version 2.4.0.1 slirp implementation
+Taken from commit 83c92b45140be773f0c5545dddea35a89db1ad03 
+in the qemu repository git://git.qemu.orgu/qemu.git
+
+The goal being to absolutely mininize changes from the base qemu provided code 
+so that the more active changes being done by the qemu folks can easily be 
+adopted in the future by directly replacing the revised modules.  This is 
+achieved by careful manipulation of the include files provided in the 
+../slirp_glue directory so that things are stubbed out locally and the minimal 
+capabilities needed for sim_ether integration are provided.
+
+Thanks to Fabrice Bellard.

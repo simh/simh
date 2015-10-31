@@ -653,6 +653,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         NETWORK_CCDEFS += -DUSE_NETWORK
       endif
     endif
+    ifeq (slirp,$(shell if $(TEST) -e slirp_glue/sim_slirp.c; then echo slirp; fi))
+      NETWORK_CCDEFS += -Islirp -Islirp_glue -Islirp_glue/qemu -DHAVE_SLIRP_NETWORK -DUSE_SIMH_SLIRP_DEBUG slirp/*.c slirp_glue/*.c
+      NETWORK_LAN_FEATURES += NAT(SLiRP)
+    endif
     ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS))$(findstring HAVE_VDE_NETWORK,$(NETWORK_CCDEFS)))
       NETWORK_CCDEFS += -DUSE_NETWORK
       NETWORK_FEATURES = - WITHOUT Local LAN networking support
@@ -796,6 +800,10 @@ else
       OS_CCDEFS += -DHAVE_PCREPOSIX_H -DPCRE_STATIC -I$(abspath ../windows-build/PCRE/include)
       OS_LDFLAGS += -lpcreposix -lpcre -L../windows-build/PCRE/lib/
       $(info using libpcreposix: $(abspath ../windows-build/PCRE/lib/pcreposix.a) $(abspath ../windows-build/PCRE/include/pcreposix.h))
+    endif
+    ifeq (slirp,slirp)
+      NETWORK_OPT += -Islirp -Islirp_glue -Islirp_glue/qemu -DHAVE_SLIRP_NETWORK -DUSE_SIMH_SLIRP_DEBUG slirp/*.c slirp_glue/*.c -lIphlpapi
+      NETWORK_LAN_FEATURES += NAT(SLiRP)
     endif
   endif
 endif # Win32 (via MinGW)
