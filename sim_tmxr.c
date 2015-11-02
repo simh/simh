@@ -786,7 +786,7 @@ else if (uptr) {                                        /* implied line form? */
     }
 
 else if (cptr == NULL)                                  /* named line form, parameter supplied? */
-    code = SCPE_ARG;                                    /* no, so report missing */
+    code = SCPE_MISVAL;                                    /* no, so report missing */
 
 else {
     ln = get_uint (cptr, 10, mp->lines - 1, &code);     /* get line number */
