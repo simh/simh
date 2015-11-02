@@ -1105,7 +1105,7 @@ int sim_check_conn (SOCKET sock, int rd)
 fd_set rw_set, er_set;
 fd_set *rw_p = &rw_set;
 fd_set *er_p = &er_set;
-struct timeval tz;
+struct timeval zero;
 struct sockaddr_storage peername;
 #if defined (macintosh) || defined (__linux) || defined (__linux__) || \
     defined (__APPLE__) || defined (__OpenBSD__) || \
@@ -1121,14 +1121,15 @@ int peernamesize = (int)sizeof(peername);
 size_t peernamesize = sizeof(peername); 
 #endif
 
-timerclear (&tz);
+memset (&zero, 0, sizeof(zero));
 FD_ZERO (rw_p);
 FD_ZERO (er_p);
 FD_SET (sock, rw_p);
 FD_SET (sock, er_p);
 if (rd)
-    select ((int) sock + 1, rw_p, NULL, er_p, &tz);
-else select ((int) sock + 1, NULL, rw_p, er_p, &tz);
+    select ((int) sock + 1, rw_p, NULL, er_p, &zero);
+else
+    select ((int) sock + 1, NULL, rw_p, er_p, &zero);
 if (FD_ISSET (sock, er_p))
     return -1;
 if (FD_ISSET (sock, rw_p)) {
