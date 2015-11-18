@@ -8447,6 +8447,18 @@ else
         reason  =       result (SCPE_OK if ok)
 */
 
+t_stat sim_activate_after_abs (UNIT *uptr, int32 event_time)
+{
+return _sim_activate_after_abs (uptr, event_time);
+}
+
+t_stat _sim_activate_after_abs (UNIT *uptr, int32 event_time)
+{
+AIO_ACTIVATE (_sim_activate_after_abs, uptr, event_time);
+sim_cancel (uptr);
+return _sim_activate_after (uptr, event_time);
+}
+
 t_stat sim_activate_after (UNIT *uptr, int32 event_time)
 {
 return _sim_activate_after (uptr, event_time);
