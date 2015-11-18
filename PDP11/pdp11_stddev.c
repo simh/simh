@@ -114,7 +114,7 @@ DIB tti_dib = {
     1, IVCL (TTI), VEC_TTI, { NULL }
     };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), SERIAL_IN_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
     { HRDATAD (BUF,       tti_unit.buf,          8, "last data item processed") },
@@ -259,7 +259,7 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
         tti_csr = tti_csr & ~CSR_DONE;
         CLR_INT (TTI);
         *data = tti_unit.buf & 0377;
-        sim_activate_abs (&tti_unit, tti_unit.wait);    /* check soon for more input */
+        sim_activate_after_abs (&tti_unit, tti_unit.wait);  /* check soon for more input */
         return SCPE_OK;
         }                                               /* end switch PA */
 

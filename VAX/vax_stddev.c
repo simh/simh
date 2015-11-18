@@ -139,7 +139,7 @@ extern int32 fault_PC;
 
 DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), SERIAL_IN_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
     { HRDATAD (BUF,     tti_unit.buf,         16, "last data item processed") },
@@ -278,7 +278,7 @@ if (tti_csr & CSR_DONE) {                               /* Input pending ? */
     tti_csr = tti_csr & ~CSR_DONE;                      /* clr done */
     tti_unit.buf = tti_unit.buf & 0377;                 /* clr errors */
     CLR_INT (TTI);
-    sim_activate_abs (&tti_unit, tti_unit.wait);        /* check soon for more input */
+    sim_activate_after_abs (&tti_unit, tti_unit.wait);  /* check soon for more input */
     }
 return t;
 }
