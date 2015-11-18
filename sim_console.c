@@ -259,6 +259,7 @@ static CTAB set_con_tab[] = {
     { "BRK", &sim_set_kmap, KMAP_BRK },
     { "DEL", &sim_set_kmap, KMAP_DEL |KMAP_NZ },
     { "PCHAR", &sim_set_pchar, 0 },
+    { "SPEED", &sim_set_cons_speed, 0 },
     { "TELNET", &sim_set_telnet, 0 },
     { "NOTELNET", &sim_set_notelnet, 0 },
     { "SERIAL", &sim_set_serial, 0 },
@@ -291,6 +292,7 @@ static SHTAB show_con_tab[] = {
     { "BRK", &sim_show_kmap, KMAP_BRK },
     { "DEL", &sim_show_kmap, KMAP_DEL },
     { "PCHAR", &sim_show_pchar, 0 },
+    { "SPEED", &sim_show_cons_speed, 0 },
     { "LOG", &sim_show_cons_log, 0 },
     { "TELNET", &sim_show_telnet, 0 },
     { "DEBUG", &sim_show_cons_debug, 0 },
@@ -1322,6 +1324,20 @@ else fprintf (st, "pchar mask = %o\n", sim_tt_pchar);
 return SCPE_OK;
 }
 
+/* Set input speed (bps) */
+
+t_stat sim_set_cons_speed (int32 flag, char *cptr)
+{
+return tmxr_set_line_speed (&sim_con_ldsc, cptr);
+}
+
+t_stat sim_show_cons_speed (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+if (sim_con_ldsc.rxbps)
+    fprintf (st, "Speed = %dbps\n", sim_con_ldsc.rxbps);
+return SCPE_OK;
+}
+
 /* Set log routine */
 
 t_stat sim_set_logon (int32 flag, char *cptr)
@@ -1906,14 +1922,20 @@ t_stat c;
 if (sim_send_poll_data (&sim_con_send, &c))                 /* injected input characters available? */
     return c;
 if (!sim_rem_master_mode) {
+    if ((sim_con_ldsc.rxbps) &&                             /* rate limiting && */
+        ((sim_con_ldsc.rxlasttime + (sim_con_ldsc.rxdelta + 500)/1000) > sim_os_msec ())) /* too soon? */
+        return SCPE_OK;                                     /* not yet */
     c = sim_os_poll_kbd ();                                 /* get character */
     if (c == SCPE_STOP) {                                   /* ^E */
         stop_cpu = 1;                                       /* Force a stop (which is picked up by sim_process_event */
         return SCPE_OK;
         }
     if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
-        (sim_con_ldsc.serport == 0))                        /* and not serial? */
+        (sim_con_ldsc.serport == 0)) {                      /* and not serial? */
+        if (c && sim_con_ldsc.rxbps)                        /* got something && rate limiting? */
+            sim_con_ldsc.rxlasttime = sim_os_msec ();       /* save last input time */
         return c;                                           /* in-window */
+        }
     if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */
         if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
             return SCPE_LOST;                               /* connection lost */
