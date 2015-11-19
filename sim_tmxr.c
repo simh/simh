@@ -3843,7 +3843,7 @@ else {
         fprintf (st, "Valid line numbers are from 0 thru %d\n\n", mux->lines-1);
     }
 if (single_line) {          /* Single Line Multiplexer */
-    fprintf (st, "The input data rate for the $s device can be controlled by\n", dptr->name);
+    fprintf (st, "The input data rate for the %s device can be controlled by\n", dptr->name);
     fprintf (st, "specifying SPEED=nnn on the the ATTACH command.\n");
     }
 else {
