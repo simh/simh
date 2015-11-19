@@ -1349,11 +1349,14 @@ return cptr;			/* points to begin of cmd or 0*/
 /*
  * Function : oc_halt_status()
  * Note     : Check the value of the oc_ctl.halt variable
- * Returns  : The value of oc_ctl.halt
+ * Returns  : 0 - if halt mode = 0 or 1
+ *          : 1 - if halt mode = 2
  */
 int oc_halt_status (void)
 {
-return oc_ctl.halt;
+if (oc_ctl.halt == 2) return(1);
+return(0);
+//return oc_ctl.halt;
 }
 
 /*
