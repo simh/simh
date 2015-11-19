@@ -1886,6 +1886,8 @@ return;
 
 int32 tmxr_rqln (TMLN *lp)
 {
+if ((lp->rxbps && (lp->rxlasttime + (lp->rxdelta + 500)/1000) > sim_os_msec ()))
+    return 0;
 return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
 }
 
@@ -3840,6 +3842,29 @@ else {
     if (mux)
         fprintf (st, "Valid line numbers are from 0 thru %d\n\n", mux->lines-1);
     }
+if (single_line) {          /* Single Line Multiplexer */
+    fprintf (st, "The input data rate for the $s device can be controlled by\n", dptr->name);
+    fprintf (st, "specifying SPEED=nnn on the the ATTACH command.\n");
+    }
+else {
+    fprintf (st, "The input data rate for all lines or a particular line of a the %s\n", dptr->name);
+    fprintf (st, "device can be controlled by specifying SPEED=nnn on the the ATTACH command.\n");
+    }
+fprintf (st, "SPEED values can be any one of:\n\n");
+fprintf (st, "    0 50 75 110 134 150 300 600 1200 1800 2000 2400\n");
+fprintf (st, "    3600 4800 7200 9600 19200 38400 57600 76800 115200\n\n");
+fprintf (st, "A SPEED value of 0 causes input data to be delivered to the simulated\n");
+fprintf (st, "port as fast as it arrives.\n\n");
+fprintf (st, "If a simulated multiplexor devices can programmatically set a serial\n");
+fprintf (st, "port line speed, the programmatically specified speed will take precidence\n");
+fprintf (st, "over any input speed specified on an attach command.\n");
+fprintf (st, "Example:\n\n");
+fprintf (st, "   sim> ATTACH %s 1234,SPEED=2400\n", dptr->name);
+if (!single_line)
+    fprintf (st, "   sim> ATTACH %s Line=2,SPEED=2400\n", dptr->name);
+fprintf (st, "\n");
+fprintf (st, "The SPEED parameter only influences the rate at which data is deliverd\n");
+fprintf (st, "into the simulated multiplexor port.  Output data rates are unaffected\n\n");
 fprintf (st, "An optional serial port configuration string may be present after the port\n");
 fprintf (st, "name.  If present, it must be separated from the port name with a semicolon\n");
 fprintf (st, "and has this form:\n\n");

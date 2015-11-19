@@ -452,13 +452,15 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             dz_clear (dz, FALSE);
         if (data & CSR_MSE)                             /* MSE? start poll */
             sim_clock_coschedule (&dz_unit, tmxr_poll);
-        else dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
+        else
+            dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
         if ((data & CSR_RIE) == 0)                      /* RIE = 0? */
             dz_clr_rxint (dz);
-        else if (((dz_csr[dz] & CSR_IE) == 0) &&        /* RIE 0->1? */
-             ((dz_csr[dz] & CSR_SAE)?
-             (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
-            dz_set_rxint (dz);
+        else
+            if (((dz_csr[dz] & CSR_IE) == 0) &&        /* RIE 0->1? */
+                ((dz_csr[dz] & CSR_SAE)?
+                (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
+                dz_set_rxint (dz);
         if ((data & CSR_TIE) == 0)                      /* TIE = 0? */
             dz_clr_txint (dz);
         else if (((dz_csr[dz] & CSR_TIE) == 0) && (dz_csr[dz] & CSR_TRDY))
@@ -472,12 +474,11 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         lp = &dz_ldsc[line];                            /* get line desc */
         if (dz_lpr[dz] & LPR_RCVE)                      /* rcv enb? on */
             lp->rcve = 1;
-        else lp->rcve = 0;                              /* else line off */
-        if (dz_mctl) {
-            sprintf(lineconfig, "%s-%s%s%s", LPR_GETSPD(data), LPR_GETCHARSIZE(data), LPR_GETPARITY(data), LPR_GETSTOPBITS(data));
-            if (!lp->serconfig || (0 != strcmp(lp->serconfig, lineconfig))) /* config changed? */
-                tmxr_set_config_line (lp, lineconfig);  /* set it */
-            }
+        else
+            lp->rcve = 0;                               /* else line off */
+        sprintf(lineconfig, "%s-%s%s%s", LPR_GETSPD(data), LPR_GETCHARSIZE(data), LPR_GETPARITY(data), LPR_GETSTOPBITS(data));
+        if (!lp->serconfig || (0 != strcmp(lp->serconfig, lineconfig))) /* config changed? */
+            tmxr_set_config_line (lp, lineconfig);      /* set it */
         tmxr_poll_rx (&dz_desc);                        /* poll input */
         dz_update_rcvi ();                              /* update rx intr */
         break;
@@ -578,7 +579,7 @@ for (i = c = 0; (i < DZ_LINES) && (c == 0); i++) {      /* loop thru lines */
     if (c & SCPE_BREAK)                                 /* break? frame err */
         c = RBUF_VALID | RBUF_FRME;
     if (c)                                              /* or in line # */
-        c = c | (i << RBUF_V_RLINE);
+        c = (c & RBUF_CHAR) | RBUF_VALID | (i << RBUF_V_RLINE);
     }                                                   /* end for */
 return (uint16)c;
 }
@@ -608,12 +609,14 @@ for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
             dz_sae[dz] = 0;                             /* disable alarm */
             }
         }
-    else dz_csr[dz] &= ~CSR_RDONE;                      /* no, clear done */
+    else
+        dz_csr[dz] &= ~CSR_RDONE;                       /* no, clear done */
     if ((dz_csr[dz] & CSR_RIE) &&                       /* int enable */
         ((dz_csr[dz] & CSR_SAE)?
          (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
         dz_set_rxint (dz);                              /* and alm/done? */
-    else dz_clr_rxint (dz);                             /* no, clear int */
+    else
+        dz_clr_rxint (dz);                              /* no, clear int */
     }
 return;
 }

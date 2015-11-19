@@ -123,7 +123,7 @@ DIB dli_dib = {
     2, IVCL (DLI), VEC_AUTO, { &dli_iack, &dlo_iack }, IOLN_DL,
     };
 
-UNIT dli_unit = { UDATA (&dli_svc, 0, 0), SERIAL_IN_WAIT };
+UNIT dli_unit = { UDATA (&dli_svc, 0, 0), TMLN_SPD_9600_BPS };
 
 REG dli_reg[] = {
     { BRDATA (BUF, dli_buf, DEV_RDX, 16, DLX_LINES) },
@@ -272,7 +272,7 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
         *data = dli_buf[ln] & DLIBUF_RD;
         dli_csr[ln] &= ~CSR_DONE;                       /* clr rcv done */
         dli_clr_int (ln, DLI_RCI);                      /* clr rcv int req */
-        sim_activate_abs (&dli_unit, dli_unit.wait);
+        sim_activate_after_abs (&dli_unit, dli_unit.wait);
         break;
 
     case 02:                                            /* tto csr */

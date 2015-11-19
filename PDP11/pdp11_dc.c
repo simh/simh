@@ -158,7 +158,7 @@ DIB dci_dib = {
     2, IVCL (DCI), VEC_AUTO, { &dci_iack, &dco_iack }, IOLN_DC,
     };
 
-UNIT dci_unit = { UDATA (&dci_svc, 0, 0), SERIAL_IN_WAIT };
+UNIT dci_unit = { UDATA (&dci_svc, 0, 0), TMLN_SPD_9600_BPS };
 
 REG dci_reg[] = {
     { BRDATAD (BUF,          dci_buf, DEV_RDX, 8, DCX_LINES,  "input control/stats register") },
@@ -290,7 +290,7 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
     case 01:                                            /* dci buf */
         dci_clr_int (ln);
         *data = dci_buf[ln];
-        sim_activate_abs (&dci_unit, dci_unit.wait);
+        sim_activate_after_abs (&dci_unit, dci_unit.wait);
         return SCPE_OK;
 
     case 02:                                            /* dco csr */
