@@ -4276,14 +4276,15 @@ if (vdelt)
 fprintf (st, " %s", SIM_VERSION_MODE);
 #endif
 if (flag) {
-    uint32 idle_capable, os_tick_size;
+    t_bool idle_capable;
+    uint32 os_ms_sleep_1, os_tick_size;
 
     fprintf (st, "\n\tSimulator Framework Capabilities:");
     fprintf (st, "\n\t\t%s", sim_si64);
     fprintf (st, "\n\t\t%s", sim_sa64);
     fprintf (st, "\n\t\t%s", eth_capabilities());
-    idle_capable = sim_timer_idle_capable (&os_tick_size);
-    fprintf (st, "\n\t\tIdle/Throttling support is %savailable", ((idle_capable == 0) ? "NOT " : ""));
+    idle_capable = sim_timer_idle_capable (&os_ms_sleep_1, &os_tick_size);
+    fprintf (st, "\n\t\tIdle/Throttling support is %savailable", idle_capable ? "" : "NOT ");
     if (sim_disk_vhd_support())
         fprintf (st, "\n\t\tVirtual Hard Disk (VHD) support");
     if (sim_disk_raw_support())
@@ -4333,7 +4334,7 @@ if (flag) {
     fprintf (st, "\n\t\tNo RegEx support for EXPECT commands");
 #endif
     fprintf (st, "\n\t\tOS clock resolution: %dms", os_tick_size);
-    fprintf (st, "\n\t\tTime taken by msleep(1): %dms", idle_capable);
+    fprintf (st, "\n\t\tTime taken by msleep(1): %dms", os_ms_sleep_1);
 #if defined(__VMS)
     if (1) {
         char *arch = 

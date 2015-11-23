@@ -743,11 +743,13 @@ return (sim_idle_rate_ms != 0);
 
 /* sim_timer_idle_capable - tell if the host is Idle capable and what the host OS tick size is */
 
-uint32 sim_timer_idle_capable (uint32 *host_tick_ms)
+t_bool sim_timer_idle_capable (uint32 *host_ms_sleep_1, uint32 *host_tick_ms)
 {
 if (host_tick_ms)
     *host_tick_ms = sim_os_clock_resoluton_ms;
-return sim_idle_rate_ms;
+if (host_ms_sleep_1)
+    *host_ms_sleep_1 = sim_os_sleep_min_ms;
+return (sim_idle_rate_ms != 0);
 }
 
 /* sim_show_timers - show running timer information */
