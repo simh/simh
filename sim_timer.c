@@ -636,10 +636,17 @@ delta_rtime = new_rtime - rtc_rtime[tmr];               /* elapsed wtime */
 rtc_rtime[tmr] = new_rtime;                             /* adv wall time */
 rtc_vtime[tmr] = rtc_vtime[tmr] + 1000;                 /* adv sim time */
 if (delta_rtime > 30000) {                              /* gap too big? */
-    rtc_currd[tmr] = rtc_initd[tmr];
+    /* This simulator process has somehow been suspended for a significant */
+    /* amount of time.  This will certainly happen if the host system has  */
+    /* slept or hibernated.  It also might happen when a simulator         */
+    /* developer stops the simulator at a breakpoint (a process, not simh  */
+    /* breakpoint).  To accomodate this, we set the calibration state to   */
+    /* ignore what happened and proceed from here.                         */
+    rtc_vtime[tmr] = rtc_rtime[tmr];                    /* sync virtual and real time */
+    rtc_nxintv[tmr] = 1000;                             /* reset next interval */
     rtc_gtime[tmr] = sim_gtime();                       /* save instruction time */
-    sim_debug (DBG_CAL, &sim_timer_dev, "gap too big: delta = %d - result: %d\n", delta_rtime, rtc_initd[tmr]);
-    return rtc_initd[tmr];                              /* can't calibr */
+    sim_debug (DBG_CAL, &sim_timer_dev, "gap too big: delta = %d - result: %d\n", delta_rtime, rtc_currd[tmr]);
+    return rtc_currd[tmr];                              /* can't calibr */
     }
 new_gtime = sim_gtime();
 if (sim_asynch_enabled && sim_asynch_timer) {
