@@ -92,6 +92,7 @@ static int32 sim_calb_tmr = -1;                     /* the system calibrated tim
 
 static uint32 sim_idle_rate_ms = 0;
 static uint32 sim_os_sleep_min_ms = 0;
+static uint32 sim_os_clock_resoluton_ms = 0;
 static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
 static t_bool sim_idle_idled = FALSE;
 static uint32 sim_throt_ms_start = 0;
@@ -709,6 +710,7 @@ return sim_rtcn_calb (ticksper, 0);
 t_bool sim_timer_init (void)
 {
 int i;
+uint32 clock_start, clock_last, clock_now;
 
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_init()\n");
 for (i=0; i<SIM_NTIMERS; i++)
@@ -717,6 +719,18 @@ sim_timer_units[SIM_NTIMERS].action = &sim_throt_svc;
 sim_register_internal_device (&sim_timer_dev);
 sim_idle_enab = FALSE;                                  /* init idle off */
 sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
+
+clock_last = clock_start = sim_os_msec ();
+sim_os_clock_resoluton_ms = 1000;
+do {
+    uint32 clock_diff;
+    
+    clock_now = sim_os_msec ();
+    clock_diff = clock_now - clock_last;
+    if ((clock_diff > 0) && (clock_diff < sim_os_clock_resoluton_ms))
+        sim_os_clock_resoluton_ms = clock_diff;
+    clock_last = clock_now;
+    } while (clock_now < clock_start + 100);
 return (sim_idle_rate_ms != 0);
 }
 
@@ -725,7 +739,7 @@ return (sim_idle_rate_ms != 0);
 uint32 sim_timer_idle_capable (uint32 *host_tick_ms)
 {
 if (host_tick_ms)
-    *host_tick_ms = sim_os_sleep_min_ms;
+    *host_tick_ms = sim_os_clock_resoluton_ms;
 return sim_idle_rate_ms;
 }
 

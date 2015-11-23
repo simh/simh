@@ -4332,7 +4332,8 @@ if (flag) {
 #else
     fprintf (st, "\n\t\tNo RegEx support for EXPECT commands");
 #endif
-    fprintf (st, "\n\t\tOS clock tick size (time taken by msleep(1)): %dms", os_tick_size);
+    fprintf (st, "\n\t\tOS clock resolution: %dms", os_tick_size);
+    fprintf (st, "\n\t\tTime taken by msleep(1): %dms", idle_capable);
 #if defined(__VMS)
     if (1) {
         char *arch = 
