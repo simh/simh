@@ -283,6 +283,8 @@ static uint32   vh_rxi = 0; /* rcv interrupts */
 static uint32   vh_txi = 0; /* xmt interrupts */
 static uint32   vh_crit = 0;/* FIFO.CRIT */
 
+static uint32   vh_wait = SERIAL_IN_WAIT;       /* input polling adjustment */
+
 static const int32 bitmask[4] = { 037, 077, 0177, 0377 };
 
 /* RX FIFO state */
@@ -397,6 +399,7 @@ static const REG vh_reg[] = {
     { GRDATAD (RCVINT,      vh_rxi, DEV_RDX, 32, 0,        "rcv interrupts 1 bit/channel") },
     { GRDATAD (TXINT,       vh_txi, DEV_RDX, 32, 0,        "xmt interrupts 1 bit/channel") },
     { GRDATAD (FIFOCRIT,   vh_crit, DEV_RDX, 32, 0,        "FIFO.CRIT 1 bit/channel") },
+    { DRDATAD (TIME,       vh_wait, 24,                    "input polling adjustment"), PV_LEFT },
     { GRDATA  (DEVADDR,  vh_dib.ba, DEV_RDX, 32, 0), REG_HRO },
     { GRDATA  (DEVVEC,  vh_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
@@ -678,6 +681,9 @@ static int32 fifo_get ( int32   vh  )
             }
         }
     }
+    /* Schedule the next poll somewhat preceisely so that the 
+       programmed input speed is observed. */
+    sim_activate_after_abs (&vh_unit[0], vh_parm[(vh * VH_LINES) + RBUF_GETLINE(data)].tmln->rxdelta + vh_wait);
     return (data & 0177777);
 }
 /* TX Q manipulation */

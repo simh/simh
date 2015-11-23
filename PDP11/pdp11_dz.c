@@ -229,6 +229,7 @@ uint16 dz_tcr[MAX_DZ_MUXES] = { 0 };                    /* xmit control */
 uint16 dz_msr[MAX_DZ_MUXES] = { 0 };                    /* modem status */
 uint16 dz_tdr[MAX_DZ_MUXES] = { 0 };                    /* xmit data */
 uint8 dz_sae[MAX_DZ_MUXES] = { 0 };                     /* silo alarm enabled */
+uint32 dz_wait = SERIAL_IN_WAIT;                        /* input polling adjustment */
 uint32 dz_rxi = 0;                                      /* rcv interrupts */
 uint32 dz_txi = 0;                                      /* xmt interrupts */
 int32 dz_mctl = 0;                                      /* modem ctrl enabled */
@@ -309,6 +310,7 @@ REG dz_reg[] = {
     { BRDATAD  (SAENB, dz_sae,   DEV_RDX,  1, MAX_DZ_MUXES, "silo alarm enabled") },
     { GRDATAD  (RXINT, dz_rxi,   DEV_RDX, MAX_DZ_MUXES,  0, "receive interrupts") },
     { GRDATAD  (TXINT, dz_txi,   DEV_RDX, MAX_DZ_MUXES,  0, "transmit interrupts") },
+    { DRDATAD  (TIME, dz_wait,   24,                        "input polling adjustment"), PV_LEFT },
     { FLDATAD  (MDMCTL, dz_mctl, 0,                         "modem control enabled") },
     { FLDATAD  (AUTODS, dz_auto, 0,                         "autodisconnect enabled") },
     { GRDATA   (DEVADDR, dz_dib.ba, DEV_RDX, 32, 0), REG_HRO },
@@ -389,6 +391,11 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
                 dz_sae[dz] = 1;
             tmxr_poll_rx (&dz_desc);                    /* poll input */
             dz_update_rcvi ();                          /* update rx intr */
+            if (dz_rbuf[dz]) {
+                /* Schedule the next poll somewhat preceisely so that 
+                   the programmed input speed is observed. */
+                sim_activate_after_abs (&dz_unit, dz_ldsc[(dz * DZ_LINES) + (dz_rbuf[dz]>>RBUF_V_RLINE) & 07].rxdelta + dz_wait);
+                }
             }
         else {
             dz_rbuf[dz] = 0;                            /* no data */
