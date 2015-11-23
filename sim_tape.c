@@ -525,14 +525,15 @@ t_stat sim_tape_detach (UNIT *uptr)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint32 f = MT_GET_FMT (uptr);
 t_stat r;
-t_bool auto_format;
+t_bool auto_format = FALSE;
 
 if ((uptr == NULL) || !(uptr->flags & UNIT_ATT))
     return SCPE_IERR;
 
 if (uptr->io_flush)
     uptr->io_flush (uptr);                              /* flush buffered data */
-auto_format = ctx->auto_format;
+if (ctx)
+    auto_format = ctx->auto_format;
 
 sim_tape_clr_async (uptr);
 
