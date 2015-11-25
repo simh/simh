@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2015-09-14
+                             Last update: 2015-11-24
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6811,5 +6811,103 @@
      EDTDELAY, that allows the user to configure the completion delay.  The
      register value is expressed in milliseconds and defaults to one
      millisecond.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+268. ENHANCEMENT:  Provide "fprint_sym" and "parse_sym" with register-specific
+     information when a register is being examined or deposited.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  When EXAMINE or DEPOSIT specifies a register that has the
+     REG_VMIO flag, "fprint_sym" or "parse_sym", respectively, is called in lieu
+     of "fprint_val" or "get_uint".  This allows VM-specific interpretations,
+     such as symbolic display of a status or current instruction register value,
+     by specifying a switch with the command:
+
+       sim> examine STAT-CIR
+       STAT:   060001
+       CIR:    030020
+
+       sim> examine -s STAT
+       STAT:   mITroc CCG 001
+
+       sim> examine -m CIR
+       CIR:    PAUS 0
+
+     The REG definition contains a radix field that allows a register to have a
+     default radix that is different than that of the device.  This is
+     particularly helpful in connection with the EXAMINE STATE command, as
+     different registers may have different preferred radices:
+
+       sim> examine state
+       P:      012077       (defaults to octal)
+       CNTR:   9            (defaults to decimal)
+       MASK:   FFF0         (defaults to hex)
+
+     However, there is no way to specify that the preferred display or input is
+     symbolic.  So a CPU state that contains such registers would have to be
+     displayed multiple times -- once to get most of the values in their default
+     forms, and again to display those registers whose preferred form is
+     symbolic:
+
+       sim> examine state
+       PB:     000100
+       P:      012077
+       PL:     023000
+       STAT:   060001
+       CIR:    030020
+
+       sim> examine -s STAT
+       STAT:   mITroc CCG 001
+
+       sim> examine -m CIR
+       CIR:    PAUS 0
+
+     It would be useful if a default symbolic interpretation could be specified
+     in the REG structure and passed to "fprint_sym" and "parse_sym" to be used
+     in the absence of overriding command-line switches.  Currently, no
+     information is provided to these routines to indicate which register is
+     being manipulated, so there is no way to provide register-specific default
+     interpretations within the routines.
+
+     RESOLUTION:  Reserve space for register-specific flags in the "flags" field
+     of the REG structure (sim_defs.h) starting at REG_V_UF.  Modify "ex_reg"
+     and "dep_reg" (scp.c) to merge the register-specific flags into the radix
+     value passed as the "addr" parameter to "fprint_sym" and "parse_sym".
+
+     A VM that defines register-specific flags will know to separate them from
+     the passed radix value by the presence of the SIM_SW_REG value in the
+     "switch" parameter.  VMs that do not define register-specific flags are not
+     affected by this change.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+269. PROBLEM:  Tape read reports "end of medium" even if a gap precedes it.
+
+     VERSION:  4.0-0
+
+     OBSERVATION:  Calling "sim_tape_rdrecf" to read a tape record sometimes
+     returns MTSE_EOM and sets the "position not updated" (PNU) flag, even when
+     an erase gap precedes the EOM.  The correct response should be to return
+     MTSE_RUNAWAY to indicate that spacing over a gap did not end with a data
+     record or tape mark.  Moreover, PNU should not be set, as the position has
+     been updated.
+
+     CAUSE:  The routine attempts to handle this case by returning MTSE_RUNAWAY
+     if the EOF was detected while reading a buffer of gap markers.  However, if
+     a buffer read ends immediately before an EOM marker or the physical EOF,
+     the next read attempt will return a zero buffer length.  The routine
+     misinterprets this to mean that no gap was present and returns MTSE_EOM and
+     sets the PNU flag.
+
+     RESOLUTION:  Modify "sim_tape_rdlntf" (sim_tape.c) to determine whether the
+     EOM marker or physical EOF was seen on the first or a subsequent buffer
+     read, and to return MTSE_EOM with PNU or MTSE_RUNAWAY without PNU,
+     respectively.
 
      STATUS:  Fixed in version 4.0-0.
