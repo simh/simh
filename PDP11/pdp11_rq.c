@@ -2130,8 +2130,8 @@ uint32 bc = GETP32 (pkt, RW_WBCL);                      /* byte count */
 uint32 bl = GETP32 (pkt, RW_WBLL);                      /* block addr */
 uint32 ma = GETP32 (pkt, RW_WMPL);                      /* block addr */
 
-sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%ld, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
-           uptr-rq_devmap[cp->cnum]->units, pkt, rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f], bl, bc,
+sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%d, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
+           (int)(uptr-rq_devmap[cp->cnum]->units), pkt, rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f], bl, bc,
            uptr->io_complete ? "bottom" : "top");
 
 if ((cp == NULL) || (pkt == 0))                         /* what??? */
