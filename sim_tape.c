@@ -604,10 +604,10 @@ if (sim_deb && (ctx->dptr->dctrl & reason))
         status  =       operation status
 
    exit condition       tape position
-   ------------------   -------------------------------------------
+   ------------------   -----------------------------------------------------
    unit unattached      unchanged
    read error           unchanged, PNU set
-   end of file/medium   unchanged, PNU set
+   end of file/medium   updated if a gap precedes, else unchanged and PNU set
    tape mark            updated
    tape runaway         updated
    data record          updated, sim_fread will read record forward
@@ -628,7 +628,8 @@ if (sim_deb && (ctx->dptr->dctrl & reason))
    then the length is monitored when skipping over erase gaps.  If the length
    reaches 25 feet, motion is terminated, and MTSE_RUNAWAY status is returned.
    Runaway status is also returned if an end-of-medium marker or the physical
-   end of file is encountered while spacing over a gap.
+   end of file is encountered while spacing over a gap; however, MTSE_EOM is
+   returned if the tape is positioned at the EOM on entry.
 
    If the density has not been set, then a gap of any length is skipped, and
    MTSE_RUNAWAY status is never returned.  In effect, erase gaps present in the
@@ -670,6 +671,13 @@ if (sim_deb && (ctx->dptr->dctrl & reason))
              256              203
              512              186
             1024              171
+
+    4. Because an erase gap may precede the logical end-of-medium, represented
+       either by the physical end-of-file or by an EOM marker, the "position not
+       updated" flag is set only if the tape is positioned at the EOM when the
+       routine is entered.  If at least one gap marker precedes the EOM, then
+       the PNU flag is not set.  This ensures that a backspace-and-retry
+       sequence will work correctly in both cases.
 */
 
 static t_stat sim_tape_rdlntf (UNIT *uptr, t_mtrlnt *bc)
@@ -708,9 +716,9 @@ switch (f) {                                            /* the read method depen
         bufcntr = 0;                                    /* force an initial read */
         bufcap = 0;                                     /*   but of just one metadata marker */
 
-        do {                                            /* loop until a record, gap, or error seen */
+        do {                                            /* loop until a record, gap, or error is seen */
             if (bufcntr == bufcap) {                    /* if the buffer is empty then refill it */
-                if (feof (uptr->fileref)) {             /* if we hit the EOF while reading gaps */
+                if (feof (uptr->fileref)) {             /* if we hit the EOF while reading a gap */
                     if (sizeof_gap > 0)                 /*   then if detection is enabled */
                         r = MTSE_RUNAWAY;               /*     then report a tape runaway */
                     else                                /*   otherwise report the physical EOF */
@@ -731,16 +739,28 @@ switch (f) {                                            /* the read method depen
                                     uptr->fileref);
 
                 if (ferror (uptr->fileref)) {           /* if a file I/O error occurred */
-                    MT_SET_PNU (uptr);                  /*   then set position not updated */
-                    r = sim_tape_ioerr (uptr);          /*     report the error and quit */
+                    if (bufcntr == 0)                   /*   then if this is the initial read */
+                        MT_SET_PNU (uptr);              /*     then set position not updated */
+
+                    r = sim_tape_ioerr (uptr);          /* report the error and quit */
                     break;
                     }
 
-                else if (bufcap == 0) {                 /* otherwise if nothing was read */
-                    MT_SET_PNU (uptr);                  /*   then set position not updated */
-                    r = MTSE_EOM;                       /*     report the end of medium and quit */
-                    break;
-                    }
+                else if (bufcap == 0                    /* otherwise if positioned at the physical EOF */
+                  || buffer [0] == MTR_EOM)             /*   or at the logical EOM */
+                    if (bufcntr == 0) {                 /*     then if this is the initial read */
+                        MT_SET_PNU (uptr);              /*       then set position not updated */
+                        r = MTSE_EOM;                   /*         and report the end-of-medium and quit */
+                        break;
+                        }
+
+                    else {                              /*     otherwise some gap has already been skipped */
+                        if (sizeof_gap > 0)             /*       so if detection is enabled */
+                            r = MTSE_RUNAWAY;           /*         then report a tape runaway */
+                        else                            /*       otherwise report the physical EOF */
+                            r = MTSE_EOM;               /*         as the end-of-medium */
+                        break;
+                        }
 
                 else                                    /* otherwise reset the index */
                     bufcntr = 0;                        /*   to the start of the buffer */
@@ -749,8 +769,10 @@ switch (f) {                                            /* the read method depen
             *bc = buffer [bufcntr++];                   /* store the metadata marker value */
 
             if (*bc == MTR_EOM) {                       /* if an end-of-medium marker is seen */
-                MT_SET_PNU (uptr);                      /*   then set position not updated */
-                r = MTSE_EOM;                           /*     report the end of medium and quit */
+                if (sizeof_gap > 0)                     /*   then if detection is enabled */
+                    r = MTSE_RUNAWAY;                   /*     then report a tape runaway */
+                else                                    /*   otherwise report the physical EOF */
+                    r = MTSE_EOM;                       /*     as the end-of-medium */
                 break;
                 }
 
