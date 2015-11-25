@@ -1923,7 +1923,7 @@ if (sim_send_poll_data (&sim_con_send, &c))                 /* injected input ch
     return c;
 if (!sim_rem_master_mode) {
     if ((sim_con_ldsc.rxbps) &&                             /* rate limiting && */
-        ((sim_con_ldsc.rxlasttime + (sim_con_ldsc.rxdelta + 500)/1000) > sim_os_msec ())) /* too soon? */
+        (sim_con_ldsc.rxnexttime > sim_gtime ()))           /* too soon? */
         return SCPE_OK;                                     /* not yet */
     c = sim_os_poll_kbd ();                                 /* get character */
     if (c == SCPE_STOP) {                                   /* ^E */
@@ -1933,7 +1933,8 @@ if (!sim_rem_master_mode) {
     if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
         (sim_con_ldsc.serport == 0)) {                      /* and not serial? */
         if (c && sim_con_ldsc.rxbps)                        /* got something && rate limiting? */
-            sim_con_ldsc.rxlasttime = sim_os_msec ();       /* save last input time */
+            sim_con_ldsc.rxnexttime =                       /* compute next input time */
+                sim_gtime () + ((sim_con_ldsc.rxdelta * sim_timer_inst_per_sec ())/1000000.0);
         return c;                                           /* in-window */
         }
     if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */

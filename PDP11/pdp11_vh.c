@@ -283,7 +283,7 @@ static uint32   vh_rxi = 0; /* rcv interrupts */
 static uint32   vh_txi = 0; /* xmt interrupts */
 static uint32   vh_crit = 0;/* FIFO.CRIT */
 
-static uint32   vh_wait = SERIAL_IN_WAIT;       /* input polling adjustment */
+static uint32   vh_wait = 0;                    /* input polling adjustment */
 
 static const int32 bitmask[4] = { 037, 077, 0177, 0377 };
 

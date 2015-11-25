@@ -1547,8 +1547,8 @@ uint32 tmp;
 
 tmxr_debug_trace_line (lp, "tmxr_getc_ln()");
 if ((lp->conn && lp->rcve) &&                           /* conn & enb & */
-    ((!lp->rxbps) ||                                    /* (!rate limited | enough time passed)? */
-     ((lp->rxlasttime + (lp->rxdelta+500)/1000) <= sim_os_msec ()))) {
+    ((!lp->rxbps) ||                                    /* (!rate limited || enough time passed)? */
+     (sim_gtime () >= lp->rxnexttime))) {
     if (!sim_send_poll_data (&lp->send, &val)) {        /* injected input characters available? */
         j = lp->rxbpi - lp->rxbpr;                      /* # input chrs */
         if (j) {                                        /* any? */
@@ -1565,7 +1565,7 @@ if ((lp->conn && lp->rcve) &&                           /* conn & enb & */
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
 if (val && lp->rxbps)
-    lp->rxlasttime = sim_os_msec ();
+    lp->rxnexttime = sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/1000000.0);
 tmxr_debug_return(lp, val);
 return val;
 }
@@ -1886,7 +1886,7 @@ return;
 
 int32 tmxr_rqln (TMLN *lp)
 {
-if ((lp->rxbps && (lp->rxlasttime + (lp->rxdelta + 500)/1000) > sim_os_msec ()))
+if ((lp->rxbps) && (sim_gtime () < lp->rxnexttime)) /* rate limiting and too soon */
     return 0;
 return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
 }
@@ -2215,7 +2215,7 @@ if (_tmln_speed_delta (speed) < 0)
     return SCPE_ARG;
 lp->rxbps = atoi (speed);
 lp->rxdelta = _tmln_speed_delta (speed);
-lp->rxlasttime = 0;
+lp->rxnexttime = 0;
 uptr = lp->uptr;
 if ((!uptr) && (lp->mp))
     uptr = lp->mp->uptr;

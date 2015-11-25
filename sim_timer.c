@@ -1558,6 +1558,8 @@ pthread_mutex_unlock (&sim_timer_lock);
 pthread_cond_signal (&sim_timer_wake);                  /* wake the timer thread to deal with it */
 return SCPE_OK;
 #else
+sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after() - queue addition %s at %d (%d usecs)\n", 
+           sim_uname(uptr), inst_delay, usec_delay);
 return _sim_activate (uptr, inst_delay);                /* queue it now */
 #endif
 }
