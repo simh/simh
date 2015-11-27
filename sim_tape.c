@@ -2147,26 +2147,54 @@ static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map)
 t_addr tpos;
 t_addr tape_size;
 t_tpclnt bc, last_bc;
+t_bool had_double_tape_mark = FALSE;
 size_t i;
-uint32 objc;
+uint32 objc, sizec;
+uint32 *countmap = NULL;
+DEVICE *dptr = find_dev_from_unit (uptr);
 
 if ((uptr == NULL) || (uptr->fileref == NULL))
     return 0;
+countmap = calloc (65536, sizeof(*countmap));
 tape_size = (t_addr)sim_fsize (uptr->fileref);
-for (objc = 0, tpos = 0;; ) {
+sim_debug (MTSE_DBG_STR, dptr, "tpc_map: tape_size: %" T_ADDR_FMT "u\n", tape_size);
+for (objc = 0, sizec = 0, tpos = 0;; ) {
     sim_fseek (uptr->fileref, tpos, SEEK_SET);
     i = sim_fread (&bc, sizeof (t_tpclnt), 1, uptr->fileref);
     if (i == 0)     /* past or at eof? */
         break;
+    if (countmap[bc] == 0)
+        sizec++;
+    ++countmap[bc];
     if (map)
         map[objc] = tpos;
+    sim_debug (MTSE_DBG_STR, dptr, "tpc_map: %d byte count at pos: %" T_ADDR_FMT "u\n", bc, tpos);
     objc++;
     tpos = tpos + ((bc + 1) & ~1) + sizeof (t_tpclnt);
+    if ((bc == 0) && (last_bc == 0))    /* double tape mark? */
+        had_double_tape_mark |= TRUE;
     last_bc = bc;
     }
-if ((last_bc != 0xffff) && (tpos > tape_size))  /* Unreasonable format? */
+sim_debug (MTSE_DBG_STR, dptr, "tpc_map: objc: %d, sizec: %d\n", objc, sizec);
+if (((last_bc != 0xffff) && 
+     (tpos > tape_size))    ||
+    (!had_double_tape_mark) ||
+    ((objc == countmap[0]) && 
+     (countmap[0] != 2))) {     /* Unreasonable format? */
+    if (last_bc != 0xffff)
+        sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR unexpected EOT byte count: %d\n", last_bc);
+    if (tpos > tape_size)
+        sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR next record position %" T_ADDR_FMT "u beyond EOT: %" T_ADDR_FMT "u\n", tpos, tape_size);
+    if (objc == countmap[0])
+        sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR tape cnly contains tape marks\n");
+    free (countmap);
     return 0;
-if (map) map[objc] = tpos;
+    }
+
+if (map)
+    map[objc] = tpos;
+sim_debug (MTSE_DBG_STR, dptr, "tpc_map: OK objc: %d\n", objc);
+free (countmap);
 return objc;
 }
 
