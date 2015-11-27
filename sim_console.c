@@ -1333,8 +1333,12 @@ return tmxr_set_line_speed (&sim_con_ldsc, cptr);
 
 t_stat sim_show_cons_speed (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-if (sim_con_ldsc.rxbps)
-    fprintf (st, "Speed = %dbps\n", sim_con_ldsc.rxbps);
+if (sim_con_ldsc.rxbps) {
+    fprintf (st, "Speed = %d", sim_con_ldsc.rxbps);
+    if (sim_con_ldsc.rxbpsfactor != TMXR_RX_BPS_UNIT_SCALE)
+        fprintf (st, "*%.0f", sim_con_ldsc.rxbpsfactor/TMXR_RX_BPS_UNIT_SCALE);
+    fprintf (st, " bps\n");
+    }
 return SCPE_OK;
 }
 
@@ -1923,7 +1927,7 @@ if (sim_send_poll_data (&sim_con_send, &c))                 /* injected input ch
     return c;
 if (!sim_rem_master_mode) {
     if ((sim_con_ldsc.rxbps) &&                             /* rate limiting && */
-        (sim_con_ldsc.rxnexttime > sim_gtime ()))           /* too soon? */
+        (sim_gtime () < sim_con_ldsc.rxnexttime))           /* too soon? */
         return SCPE_OK;                                     /* not yet */
     c = sim_os_poll_kbd ();                                 /* get character */
     if (c == SCPE_STOP) {                                   /* ^E */
@@ -1934,7 +1938,7 @@ if (!sim_rem_master_mode) {
         (sim_con_ldsc.serport == 0)) {                      /* and not serial? */
         if (c && sim_con_ldsc.rxbps)                        /* got something && rate limiting? */
             sim_con_ldsc.rxnexttime =                       /* compute next input time */
-                sim_gtime () + ((sim_con_ldsc.rxdelta * sim_timer_inst_per_sec ())/1000000.0);
+                sim_gtime () + ((sim_con_ldsc.rxdelta * sim_timer_inst_per_sec ())/sim_con_ldsc.rxbpsfactor);
         return c;                                           /* in-window */
         }
     if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */
@@ -2196,6 +2200,7 @@ return NULL;
 
 t_stat sim_ttinit (void)
 {
+sim_con_tmxr.ldsc->mp = &sim_con_tmxr;
 sim_register_internal_device (&sim_con_telnet);
 tmxr_startup ();
 return sim_os_ttinit ();

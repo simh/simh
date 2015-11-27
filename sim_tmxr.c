@@ -1565,7 +1565,7 @@ if ((lp->conn && lp->rcve) &&                           /* conn & enb & */
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
 if (val && lp->rxbps)
-    lp->rxnexttime = sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/1000000.0);
+    lp->rxnexttime = sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor);
 tmxr_debug_return(lp, val);
 return val;
 }
@@ -2187,10 +2187,10 @@ struct {
     {"115200",  TMLN_SPD_115200_BPS},
     {"0",       0}};                    /* End of List, last valid value */
 int nspeed;
-char speed[20];
+char speed[24];
 
 nspeed = (uint32)strtotv (cptr, &cptr, 10);
-if ((*cptr != '\0') && (*cptr != '-'))
+if ((*cptr != '\0') && (*cptr != '-') && (*cptr != '*'))
     return -1;
 sprintf (speed, "%d", nspeed);
 
@@ -2208,12 +2208,20 @@ return -1;
 t_stat tmxr_set_line_speed (TMLN *lp, const char *speed)
 {
 UNIT *uptr;
+const char *cptr;
+t_stat r;
 
 if (!speed || !*speed)
     return SCPE_2FARG;
 if (_tmln_speed_delta (speed) < 0)
     return SCPE_ARG;
-lp->rxbps = atoi (speed);
+lp->rxbps = (uint32)strtotv (speed, &cptr, 10);
+if (*cptr == '*') {
+    uint32 rxbpsfactor = (uint32) get_uint (cptr+1, 10, 32, &r);
+    if (r != SCPE_OK)
+        return r;
+    lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE * rxbpsfactor;
+    }
 lp->rxdelta = _tmln_speed_delta (speed);
 lp->rxnexttime = 0;
 uptr = lp->uptr;
@@ -2221,6 +2229,8 @@ if ((!uptr) && (lp->mp))
     uptr = lp->mp->uptr;
 if (uptr)
     uptr->wait = lp->rxdelta;
+if (lp->rxbpsfactor == 0.0)
+    lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
 return SCPE_OK;
 }
 
@@ -2256,6 +2266,8 @@ for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     lp = mp->ldsc + i;
     lp->mp = mp;                                /* set the back pointer */
     lp->modem_control = mp->modem_control;
+    if (lp->rxbpsfactor == 0.0)
+        lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
     }
 tmxr_debug_trace (mp, "tmxr_open_master()");
 while (*tptr) {
@@ -3567,6 +3579,14 @@ else {
         free (attach);
         tmxr_show_summ(st, NULL, 0, mp);
         fprintf(st, ", sessions=%d", mp->sessions);
+        if (mp->lines == 1) {
+            if (mp->ldsc->rxbps) {
+                fprintf(st, ", Speed=%d", mp->ldsc->rxbps);
+                if (mp->ldsc->rxbpsfactor != TMXR_RX_BPS_UNIT_SCALE)
+                    fprintf(st, "*%.0f", mp->ldsc->rxbpsfactor/TMXR_RX_BPS_UNIT_SCALE);
+                fprintf(st, " bps");
+                }
+            }
         fprintf(st, "\n");
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
@@ -3582,13 +3602,14 @@ else {
                     fprintf(st, ", ModemControl=%s", lp->modem_control ? "enabled" : "disabled");
                 if (lp->loopback)
                     fprintf(st, ", Loopback");
-                if (lp->rxbps)
-                    fprintf(st, ", Speed=%dbps", lp->rxbps);
+                if (lp->rxbps) {
+                    fprintf(st, ", Speed=%d", lp->rxbps);
+                    if (lp->rxbpsfactor != TMXR_RX_BPS_UNIT_SCALE)
+                        fprintf(st, "*%.0f", lp->rxbpsfactor/TMXR_RX_BPS_UNIT_SCALE);
+                    fprintf(st, " bps");
+                    }
                 fprintf (st, "\n");
                 }
-            else
-                if (lp->rxbps)
-                    fprintf(st, ", Speed=%dbps", lp->rxbps);
             if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master)) {
                 if (lp->modem_control)
                     tmxr_fconns (st, lp, -1);
@@ -3858,13 +3879,22 @@ fprintf (st, "port as fast as it arrives.\n\n");
 fprintf (st, "If a simulated multiplexor devices can programmatically set a serial\n");
 fprintf (st, "port line speed, the programmatically specified speed will take precidence\n");
 fprintf (st, "over any input speed specified on an attach command.\n");
+fprintf (st, "Some simulated systems run very much faster than the original system\n");
+fprintf (st, "which is being simulated.  To accomodate this, the speed specified may\n");
+fprintf (st, "include a factor which will increase the input data delivery rate by\n");
+fprintf (st, "the specified facctor.  A factor is specified with a speed value of the\n");
+fprintf (st, "form \"speed*factor\".  Factor values can range from 1 thru 32.\n");
 fprintf (st, "Example:\n\n");
 fprintf (st, "   sim> ATTACH %s 1234,SPEED=2400\n", dptr->name);
+fprintf (st, "   sim> ATTACH %s 1234,SPEED=9600*8\n", dptr->name);
 if (!single_line)
     fprintf (st, "   sim> ATTACH %s Line=2,SPEED=2400\n", dptr->name);
 fprintf (st, "\n");
 fprintf (st, "The SPEED parameter only influences the rate at which data is deliverd\n");
-fprintf (st, "into the simulated multiplexor port.  Output data rates are unaffected\n\n");
+fprintf (st, "into the simulated multiplexor port.  Output data rates are unaffected\n");
+fprintf (st, "If an attach command specifies a speed multiply factor, that value will\n");
+fprintf (st, "persist independent of any programatic action by the simulated system to\n");
+fprintf (st, "change the port speed.\n\n");
 fprintf (st, "An optional serial port configuration string may be present after the port\n");
 fprintf (st, "name.  If present, it must be separated from the port name with a semicolon\n");
 fprintf (st, "and has this form:\n\n");
