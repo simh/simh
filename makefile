@@ -902,7 +902,15 @@ ifeq (HP-UX,$(OSTYPE))
   CC_STD = -std=gnu99
 else
   ifeq (,$(SUNC_VERSION))
-    CC_STD = -std=c99
+    ifneq (,$(findstring error,$(shell $(GCC) -std=c11 -version /dev/null 2>&1)))
+      CC_STD = -std=c11
+    else
+      ifneq (,$(findstring error,$(shell $(GCC) -std=gnu99 -version /dev/null 2>&1)))
+        CC_STD = -std=gnu99
+      else
+        CC_STD = -std=c99 -fms-extensions
+      endif
+    endif
   endif
 endif
 CC_OUTSPEC = -o $@
