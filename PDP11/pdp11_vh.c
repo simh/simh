@@ -681,9 +681,9 @@ static int32 fifo_get ( int32   vh  )
             }
         }
     }
-    /* Schedule the next poll somewhat preceisely so that the 
+    /* Reschedule the next poll preceisely so that the 
        programmed input speed is observed. */
-    sim_activate_after_abs (&vh_unit[0], vh_parm[(vh * VH_LINES) + RBUF_GETLINE(data)].tmln->rxdelta + vh_wait);
+    sim_clock_coschedule_abs (&vh_unit[0], tmxr_poll);
     return (data & 0177777);
 }
 /* TX Q manipulation */

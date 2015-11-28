@@ -488,6 +488,7 @@ struct sim_unit {
     int32               u6;                             /* device specific */
     void                *up7;                           /* device specific */
     void                *up8;                           /* device specific */
+    void                *tmxr;                          /* TMXR linkage */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(struct sim_unit *);
     t_bool              (*a_is_active)(struct sim_unit *);

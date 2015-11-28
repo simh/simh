@@ -290,7 +290,9 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
     case 01:                                            /* dci buf */
         dci_clr_int (ln);
         *data = dci_buf[ln];
-        sim_activate_after_abs (&dci_unit, dci_unit.wait);
+        /* Rechedule the next poll preceisely so that 
+           the programmed input speed is observed. */
+        sim_clock_coschedule_abs (&dci_unit, tmxr_poll);
         return SCPE_OK;
 
     case 02:                                            /* dco csr */
@@ -387,7 +389,6 @@ int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 ln = tmxr_poll_conn (&dcx_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
     dcx_ldsc[ln].rcve = 1;                              /* set rcv enb */
@@ -432,7 +433,7 @@ for (ln = 0; ln < DCX_LINES; ln++) {                    /* loop thru lines */
         dco_csr[ln] &= ~DCOCSR_CTS;
         }
     }
-return SCPE_OK;
+return sim_clock_coschedule (uptr, tmxr_poll);          /* continue poll */
 }
 
 /* Terminal output service */
@@ -531,7 +532,7 @@ int32 ln;
 dcx_enbdis (dptr->flags & DEV_DIS);                     /* sync enables */
 sim_cancel (&dci_unit);                                 /* assume stop */
 if (dci_unit.flags & UNIT_ATT)                          /* if attached, */
-    sim_activate (&dci_unit, tmxr_poll);                /* activate */
+    sim_clock_coschedule (&dci_unit, tmxr_poll);                /* activate */
 for (ln = 0; ln < DCX_LINES; ln++)                      /* for all lines */
     dcx_reset_ln (ln);
 return auto_config (dci_dev.name, dcx_desc.lines);      /* auto config */

@@ -122,7 +122,9 @@ t_stat sim_timer_change_asynch (void);
 t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
 t_stat sim_register_clock_unit (UNIT *uptr);
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
+t_stat sim_clock_coschedule_abs (UNIT *uptr, int32 interval);
 t_stat sim_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval);
+t_stat sim_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 interval);
 double sim_timer_inst_per_sec (void);
 t_bool sim_timer_idle_capable (uint32 *host_ms_sleep_1, uint32 *host_tick_ms);
 

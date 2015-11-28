@@ -129,7 +129,8 @@
 #include "sim_serial.h"
 #include "sim_timer.h"
 #include <ctype.h>
- 
+#include <math.h>
+
 #ifdef __HAIKU__
 #define nice(n) ({})
 #endif
@@ -1938,7 +1939,7 @@ if (!sim_rem_master_mode) {
         (sim_con_ldsc.serport == 0)) {                      /* and not serial? */
         if (c && sim_con_ldsc.rxbps)                        /* got something && rate limiting? */
             sim_con_ldsc.rxnexttime =                       /* compute next input time */
-                sim_gtime () + ((sim_con_ldsc.rxdelta * sim_timer_inst_per_sec ())/sim_con_ldsc.rxbpsfactor);
+                floor (sim_gtime () + ((sim_con_ldsc.rxdelta * sim_timer_inst_per_sec ())/sim_con_ldsc.rxbpsfactor));
         return c;                                           /* in-window */
         }
     if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */

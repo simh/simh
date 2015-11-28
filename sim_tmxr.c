@@ -340,6 +340,7 @@
 #include "scp.h"
 
 #include <ctype.h>
+#include <math.h>
 
 /* Telnet protocol constants - negatives are for init'ing signed char data */
 
@@ -1565,7 +1566,7 @@ if ((lp->conn && lp->rcve) &&                           /* conn & enb & */
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
 if (val && lp->rxbps)
-    lp->rxnexttime = sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor);
+    lp->rxnexttime = floor (sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor));
 tmxr_debug_return(lp, val);
 return val;
 }
@@ -1884,11 +1885,18 @@ return;
 
 /* Return count of available characters for line */
 
-int32 tmxr_rqln (TMLN *lp)
+int32 tmxr_rqln_bare (TMLN *lp, t_bool speed)
 {
-if ((lp->rxbps) && (sim_gtime () < lp->rxnexttime)) /* rate limiting and too soon */
+if ((speed) && 
+    (lp->rxbps) && 
+     (sim_gtime () < lp->rxnexttime)) /* rate limiting and too soon */
     return 0;
 return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
+}
+
+int32 tmxr_rqln (TMLN *lp)
+{
+return tmxr_rqln_bare (lp, TRUE);
 }
 
 
@@ -3505,6 +3513,7 @@ if (r != SCPE_OK)                                       /* error? */
 mp->uptr = uptr;                                        /* save unit for polling */
 uptr->filename = tmxr_mux_attach_string (uptr->filename, mp);/* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
+uptr->tmxr = (void *)mp;
 if ((mp->lines > 1) ||
     ((mp->master == 0) &&
      (mp->ldsc[0].connecting == 0) &&
@@ -3703,6 +3712,7 @@ if (!(uptr->flags & UNIT_ATT))                          /* attached? */
 tmxr_close_master (mp);                                 /* close master socket */
 free (uptr->filename);                                  /* free setup string */
 uptr->filename = NULL;
+uptr->tmxr = NULL;
 mp->last_poll_time = 0;
 for (i=0; i < mp->lines; i++) {
     UNIT *uptr = mp->ldsc[i].uptr ? mp->ldsc[i].uptr : mp->uptr;
@@ -3762,8 +3772,19 @@ t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval)
 return tmxr_clock_coschedule_tmr (uptr, 0, interval);
 }
 
+t_stat tmxr_clock_coschedule_abs (UNIT *uptr, int32 interval)
+{
+sim_cancel (uptr);
+return tmxr_clock_coschedule_tmr (uptr, 0, interval);
+}
+
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
+
 t_stat tmxr_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
 {
+TMXR *mp = (TMXR *)uptr->tmxr;
+double sim_gtime_now = sim_gtime ();
+
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
@@ -3771,8 +3792,33 @@ if ((!(uptr->dynflags & UNIT_TM_POLL)) ||
     }
 return SCPE_OK;
 #else
+if (mp) {
+    int32 i, soon = interval;
+
+    for (i = 0; i < mp->lines; i++) {
+        TMLN *lp = &mp->ldsc[i];
+
+        if (tmxr_rqln_bare (lp, FALSE)) {
+            int32 due;
+
+            if (lp->rxbps)
+                due = (int32)(lp->rxnexttime - sim_gtime_now);
+            else
+                due = (int32)((uptr->wait * sim_timer_inst_per_sec ())/TMXR_RX_BPS_UNIT_SCALE);
+            soon = MIN(soon, due);
+            }
+        }
+    if (soon != interval)
+        return _sim_activate (uptr, soon);
+    }
 return sim_clock_coschedule_tmr (uptr, tmr, interval);
 #endif
+}
+
+t_stat tmxr_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 interval)
+{
+sim_cancel (uptr);
+return tmxr_clock_coschedule_tmr (uptr, tmr, interval);
 }
 
 /* Generic Multiplexer attach help */

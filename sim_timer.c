@@ -1578,6 +1578,12 @@ t_stat sim_clock_coschedule (UNIT *uptr, int32 interval)
 return sim_clock_coschedule_tmr (uptr, 0, interval);
 }
 
+t_stat sim_clock_coschedule_abs (UNIT *uptr, int32 interval)
+{
+sim_cancel (uptr);
+return sim_clock_coschedule_tmr (uptr, 0, interval);
+}
+
 t_stat sim_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
 {
 if (NULL == sim_clock_unit[tmr])
@@ -1614,5 +1620,11 @@ else
         t = sim_activate_time (sim_clock_unit[tmr]);
         return sim_activate (uptr, t? t - 1: interval);
         }
+}
+
+t_stat sim_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 interval)
+{
+sim_cancel (uptr);
+return sim_clock_coschedule_tmr (uptr, tmr, interval);
 }
 

@@ -392,9 +392,9 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             tmxr_poll_rx (&dz_desc);                    /* poll input */
             dz_update_rcvi ();                          /* update rx intr */
             if (dz_rbuf[dz]) {
-                /* Schedule the next poll somewhat preceisely so that 
+                /* Rechedule the next poll preceisely so that 
                    the programmed input speed is observed. */
-                sim_activate_after_abs (&dz_unit, dz_ldsc[(dz * DZ_LINES) + (dz_rbuf[dz]>>RBUF_V_RLINE) & 07].rxdelta + dz_wait);
+                sim_clock_coschedule_abs (&dz_unit, tmxr_poll);
                 }
             }
         else {
