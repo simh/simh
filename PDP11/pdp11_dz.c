@@ -569,7 +569,12 @@ if (t) {                                                /* any enabled? */
     dz_update_rcvi ();                                  /* upd rcv intr */
     tmxr_poll_tx (&dz_desc);                            /* poll output */
     dz_update_xmti ();                                  /* upd xmt intr */
-    sim_clock_coschedule (uptr, tmxr_poll);             /* reactivate */
+    for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {
+        if (dz_csr[dz] & CSR_RDONE)
+            break;
+        }
+    if (dz == dz_desc.lines/DZ_LINES)                   /* All idle? */
+        sim_clock_coschedule (uptr, tmxr_poll);         /* reactivate */
     }
 return SCPE_OK;
 }
