@@ -123,6 +123,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang'))
     GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
     COMPILER_NAME = GCC Version: $(GCC_VERSION)
+    GCC_VERSION_MAJOR = $(word 1,$(subst ., ,$(GCC_VERSION)))
+    GCC_VERSION_MINOR = $(word 2,$(subst ., ,$(GCC_VERSION)))
+	CC_STD = $(shell if $(TEST) \( $(GCC_VERSION_MAJOR) -ge 5 \) -o \( \( $(GCC_VERSION_MAJOR) -eq 4 \) -a \( $(GCC_VERSION_MINOR) -ge 7 \) \); then echo -std=c11; else echo -std=gnu99; fi)
     ifeq (,$(GCC_VERSION))
       ifeq (SunOS,$(OSTYPE))
         ifneq (,$(shell $(GCC) -V 2>&1 | grep 'Sun C'))
@@ -133,6 +136,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifeq (HP-UX,$(OSTYPE))
         ifneq (,$(shell what `which $(firstword $(GCC)) 2>&1`| grep -i compiler))
           COMPILER_NAME = $(strip $(shell what `which $(firstword $(GCC)) 2>&1` | grep -i compiler))
+          CC_STD = -std=gnu99
         endif
       endif
     endif
@@ -690,6 +694,7 @@ else
   endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
+  CC_STD = -std=gnu99
   LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (,$(PATH_SEPARATOR))
     PATH_SEPARATOR := ;
@@ -718,11 +723,13 @@ else
     NETWORK_LDFLAGS =
     NETWORK_OPT = -DUSE_SHARED -I../windows-build/winpcap/Wpdpack/include
     NETWORK_FEATURES = - dynamic networking support using windows-build provided libpcap components
+    NETWORK_LAN_FEATURES += PCAP
   else
     ifneq (,$(call find_include,pcap))
       NETWORK_LDFLAGS =
       NETWORK_OPT = -DUSE_SHARED
       NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
+      NETWORK_LAN_FEATURES += PCAP
     endif
   endif
   ifneq (,$(VIDEO_USEFUL))
@@ -898,21 +905,6 @@ ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
 endif
 
-ifeq (HP-UX,$(OSTYPE))
-  CC_STD = -std=gnu99
-else
-  ifeq (,$(SUNC_VERSION))
-    ifeq (,$(findstring error,$(shell $(GCC) -std=c11 --version 2>&1)))
-      CC_STD = -std=c11
-    else
-      ifeq (,$(findstring error,$(shell $(GCC) -std=gnu99 --version 2>&1)))
-        CC_STD = -std=gnu99
-      else
-        CC_STD = -std=c99 -fms-extensions
-      endif
-    endif
-  endif
-endif
 CC_OUTSPEC = -o $@
 CC := $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -DSIM_COMPILER="$(COMPILER_NAME)" -I . $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS := $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
