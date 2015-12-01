@@ -78,6 +78,7 @@ t_stat vs_reset (DEVICE *dptr);
 void vs_cmd (int32 c);
 void vs_sendupd (void);
 void vs_poll (void);
+const char *vs_description (DEVICE *dptr);
 
 
 /* VS data structures
@@ -90,8 +91,8 @@ void vs_poll (void);
 */
 
 DEBTAB vs_debug[] = {
-    {"SERIAL", DBG_SERIAL},
-    {"CMD",    DBG_CMD},
+    {"SERIAL", DBG_SERIAL,  "Serial port data"},
+    {"CMD",    DBG_CMD,     "Commands"},
     {0}
     };
 
@@ -111,7 +112,8 @@ DEVICE vs_dev = {
     NULL, NULL, &vs_reset,
     NULL, NULL, NULL,
     NULL, DEV_DIS | DEV_DEBUG, 0,
-    vs_debug
+    vs_debug, NULL, NULL, NULL, NULL, NULL, 
+    &vs_description
     };
 
 
@@ -237,6 +239,11 @@ if (vs_state == VSXXX_IDLE) {
     if (vs_mode == VSXXX_INC)
         vs_sendupd ();
     }
+}
+
+const char *vs_description (DEVICE *dptr)
+{
+return "  VCB01 - VS Mouse interface";
 }
 
 #else /* defined(VAX_620) */

@@ -84,9 +84,9 @@ DEVICE *sim_devices[] = {
     &cr_dev,
     &lpt_dev,
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+    &vc_dev,
     &lk_dev,
     &vs_dev,
-    &vc_dev,
 #endif
     &rl_dev,
     &rq_dev,
