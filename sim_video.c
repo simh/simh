@@ -579,6 +579,17 @@ return stat;
 
 void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf)
 {
+#if SDL_MAJOR_VERSION == 1
+int32 i;
+uint32* pixels;
+
+sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
+
+pixels = (uint32 *)vid_image->pixels;
+
+for (i = 0; i < h; i++)
+    memcpy (pixels + ((i + y) * vid_width) + x, buf + w*i, w*sizeof(*pixels));
+#else
 SDL_Event user_event;
 SDL_Rect *vid_dst;
 uint32 *vid_data;
@@ -601,6 +612,7 @@ if (SDL_PushEvent (&user_event) < 0) {
     free (vid_dst);
     free (vid_data);
     }
+#endif
 }
 
 t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask)
