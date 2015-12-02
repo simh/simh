@@ -123,14 +123,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang'))
     GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
     COMPILER_NAME = GCC Version: $(GCC_VERSION)
-    GCC_VERSION_MAJOR = $(word 1,$(subst ., ,$(GCC_VERSION)))
-    GCC_VERSION_MINOR = $(word 2,$(subst ., ,$(GCC_VERSION)))
-	CC_STD = $(shell if $(TEST) \( $(GCC_VERSION_MAJOR) -ge 5 \) -o \( \( $(GCC_VERSION_MAJOR) -eq 4 \) -a \( $(GCC_VERSION_MINOR) -ge 7 \) \); then echo -std=c11; else echo -std=gnu99; fi)
     ifeq (,$(GCC_VERSION))
       ifeq (SunOS,$(OSTYPE))
         ifneq (,$(shell $(GCC) -V 2>&1 | grep 'Sun C'))
           SUNC_VERSION = $(shell $(GCC) -V 2>&1 | grep 'Sun C')
           COMPILER_NAME = $(wordlist 2,10,$(SUNC_VERSION))
+          CC_STD = -std=c99
         endif
       endif
       ifeq (HP-UX,$(OSTYPE))
@@ -139,6 +137,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           CC_STD = -std=gnu99
         endif
       endif
+    else
+      CC_STD = -std=gnu99
     endif
   else
     ifeq (Apple,$(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
@@ -152,6 +152,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         CLANG_VERSION = $(word 4,$(COMPILER_NAME))
       endif
     endif
+    CC_STD = -std=c99
   endif
   ifeq (git-repo,$(shell if $(TEST) -d ./.git; then echo git-repo; fi))
     ifeq (need-hooks,$(shell if $(TEST) ! -e ./.git/hooks/post-checkout; then echo need-hooks; fi))
