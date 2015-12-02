@@ -97,8 +97,17 @@ t_stat assert_cmd (int32 flag, char *ptr);
 t_stat send_cmd (int32 flag, char *ptr);
 t_stat expect_cmd (int32 flag, char *ptr);
 t_stat help_cmd (int32 flag, char *ptr);
+t_stat screenshot_cmd (int32 flag, char *ptr);
 t_stat spawn_cmd (int32 flag, char *ptr);
 t_stat echo_cmd (int32 flag, char *ptr);
+
+/* Allow compiler to help validate printf style format arguments */
+#if !defined __GNUC__
+#define GCC_FMT_ATTR(n, m)
+#endif
+#if !defined(GCC_FMT_ATTR)
+#define GCC_FMT_ATTR(n, m) __attribute__ ((format (__printf__, n, m)))
+#endif
 
 /* Utility routines */
 
@@ -109,6 +118,8 @@ t_stat sim_activate_abs (UNIT *uptr, int32 interval);
 t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
 t_stat sim_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat _sim_activate_after (UNIT *uptr, int32 usecs_walltime);
+t_stat sim_activate_after_abs (UNIT *uptr, int32 usecs_walltime);
+t_stat _sim_activate_after_abs (UNIT *uptr, int32 usecs_walltime);
 t_stat sim_cancel (UNIT *uptr);
 t_bool sim_is_active (UNIT *uptr);
 int32 sim_activate_time (UNIT *uptr);
@@ -122,9 +133,9 @@ t_stat assign_device (DEVICE *dptr, char *cptr);
 t_stat deassign_device (DEVICE *dptr);
 t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
-char *sim_dname (DEVICE *dptr);
-char *sim_uname (UNIT *dptr);
-t_stat get_yn (char *ques, t_stat deflt);
+const char *sim_dname (DEVICE *dptr);
+const char *sim_uname (UNIT *dptr);
+t_stat get_yn (const char *ques, t_stat deflt);
 int sim_isspace (char c);
 int sim_islower (char c);
 int sim_isalpha (char c);
@@ -143,6 +154,9 @@ t_stat sim_decode_quoted_string (const char *iptr, uint8 *optr, uint32 *osize);
 char *sim_encode_quoted_string (const uint8 *iptr, uint32 size);
 void fprint_buffer_string (FILE *st, const uint8 *buf, uint32 size);
 t_value strtotv (const char *cptr, const char **endptr, uint32 radix);
+int Fprintf (FILE *f, const char* fmt, ...) GCC_FMT_ATTR(2, 3);
+t_stat sim_set_memory_load_file (const unsigned char *data, size_t size);
+int Fgetc (FILE *f);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 t_stat sim_print_val (t_value val, uint32 radix, uint32 width, uint32 format);
 char *read_line (char *cptr, int32 size, FILE *stream);
@@ -177,16 +191,19 @@ t_stat sim_exp_clrall (EXPECT *exp);
 t_stat sim_exp_show (FILE *st, EXPECT *exp, const char *match);
 t_stat sim_exp_showall (FILE *st, EXPECT *exp);
 t_stat sim_exp_check (EXPECT *exp, uint8 data);
-char *match_ext (char *fnam, char *ext);
+char *match_ext (char *fnam, const char *ext);
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 const char *sim_error_text (t_stat stat);
 t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
-void sim_printf (const char* fmt, ...);
-t_stat sim_messagef (t_stat stat, const char* fmt, ...);
+void sim_printf (const char* fmt, ...) GCC_FMT_ATTR(1, 2);
+void sim_perror (const char* msg);
+t_stat sim_messagef (t_stat stat, const char* fmt, ...) GCC_FMT_ATTR(2, 3);
 void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason);
+void sim_debug_bits_hdr (uint32 dbits, DEVICE* dptr, const char *header, 
+    BITFIELD* bitdefs, uint32 before, uint32 after, int terminate);
 void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate);
 #if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))
@@ -194,10 +211,10 @@ void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
 #endif
 #ifdef CANT_USE_MACRO_VA_ARGS
 #define _sim_debug sim_debug
-void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
+void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...) GCC_FMT_ATTR(3, 4);
 #else
-void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
-#define sim_debug(dbits, dptr, ...) if (sim_deb && dptr && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__); else (void)0
+void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...) GCC_FMT_ATTR(3, 4);
+#define sim_debug(dbits, dptr, ...) do { if (sim_deb && dptr && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__);} while (0)
 #endif
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 #define SCP_HELP_FLAT   (1u << 31)       /* Force flat help when prompting is not possible */
@@ -219,6 +236,7 @@ extern int32 sim_interval;
 extern int32 sim_switches;
 extern int32 sim_quiet;
 extern int32 sim_step;
+extern t_stat sim_last_cmd_stat;                        /* Command Status */
 extern FILE *sim_log;                                   /* log file */
 extern FILEREF *sim_log_ref;                            /* log file file reference */
 extern FILE *sim_deb;                                   /* debug file */
@@ -228,6 +246,7 @@ extern struct timespec sim_deb_basetime;                /* debug base time for r
 extern UNIT *sim_clock_queue;
 extern int32 sim_is_running;
 extern char *sim_prompt;                                /* prompt string */
+extern const char *sim_savename;                        /* Simulator Name used in Save/Restore files */
 extern t_value *sim_eval;
 extern volatile int32 stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
@@ -264,6 +283,5 @@ extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
 extern t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason);
 extern t_value (*sim_vm_pc_value) (void);
 extern t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs);
-
 
 #endif

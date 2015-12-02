@@ -1,6 +1,6 @@
 /* gri_cpu.c: GRI-909 CPU simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -417,9 +417,6 @@ ao_update ();                                           /* update AO */
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        /* make sure all useful state is in simh registers while processing events */
-        ao_update ();                                   /* update AO */
-        scq_r->qptr = scq_p;                            /* update sc q ptr */
         if ((reason = sim_process_event ()))
             break;
         }

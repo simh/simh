@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2013, Robert M. Supnik
+   Copyright (c) 1999-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@
 
    10-Sep-13    RMS     Fixed several bugs in the TTY logic
                         Added SET file type commands to PTR/PTP
-    3-Jul-13    RLA     compatibility changes for extended interrupts
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    23-May-13    RLA     Move the SMK/OTK to h316_cpu (where it belongs!)
                         Allow the CLK device to be disabled
    09-Jun-07    RMS     Fixed bug in clock increment (Theo Engel)
@@ -398,7 +398,7 @@ else {
                 sim_printf ("PTR end of file\n");
             else return SCPE_OK;
             }
-        else perror ("PTR I/O error");
+        else sim_perror ("PTR I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -559,7 +559,7 @@ if (uptr->flags & UNIT_ASC) {                           /* ASCII? */
     }
 else c = uptr->buf & 0377;                              /* no, binary */
 if (putc (c, uptr->fileref) == EOF) {                   /* output byte */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -689,7 +689,7 @@ else if ((ruptr->flags & UNIT_ATT) &&                   /* TTR attached */
                     sim_printf ("TTR end of file\n");
                 else return SCPE_OK;
                 }
-            else perror ("TTR I/O error");
+            else sim_perror ("TTR I/O error");
             clearerr (ruptr->fileref);
             return SCPE_IOERR;
             }
@@ -799,7 +799,7 @@ if ((puptr->flags & UNIT_ATT) &&                        /* TTP attached */
             }
         else p = c;                                     /* untouched */
         if (putc (p, puptr->fileref) == EOF) {          /* output byte */
-            perror ("TTP I/O error");
+            sim_perror ("TTP I/O error");
             clearerr (puptr->fileref);
             return SCPE_IOERR;
             }

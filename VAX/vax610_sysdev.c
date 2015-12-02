@@ -69,7 +69,7 @@ static struct boot_dev boot_tab[] = {
     };
 
 t_stat sysd_reset (DEVICE *dptr);
-char *sysd_description (DEVICE *dptr);
+const char *sysd_description (DEVICE *dptr);
 t_stat vax610_boot (int32 flag, char *ptr);
 t_stat vax610_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
@@ -477,6 +477,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 p2, acc;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 p2 = mchk_va + 4;                                       /* save vap */
 cc = intexc (SCB_MCHK, cc, 0, IE_EXC);                  /* take exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */
@@ -524,7 +526,7 @@ sim_vm_cmd = vax610_cmd;
 return SCPE_OK;
 }
 
-char *sysd_description (DEVICE *dptr)
+const char *sysd_description (DEVICE *dptr)
 {
 return "system devices";
 }
@@ -567,7 +569,7 @@ fprintf (st, (sys_model ? "VAXstation I" : "MicroVAX I"));
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Initial memory size is 4MB.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");

@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2013, Robert M Supnik
+   Copyright (c) 2004-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Mar-15    RMS     Added model specific IPR max
+   16-Dec-14    RMS     Removed TQ boot code (780 VMB doesn't support tape boot)
+   05-Sep-14    RMS     Fixed SBR test (found by Mark Pizzolato)
    29-Nov-13    RMS     Added system-specific unaligned routines
    12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
    05-Nov-11    RMS     Added VEC_QMODE definition
@@ -197,6 +200,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define REG_M_OFS       0x7FF   
 #define REGSIZE         (1u << REGAWIDTH)               /* REG length */
 #define REGBASE         0x20000000                      /* REG addr base */
+#define NEXUSBASE       REGBASE                         /* NEXUS addr base */
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
                         (((uint32) (x)) < (REGBASE + REGSIZE)))
 #define NEXUS_GETNEX(x) (((x) >> REG_V_NEXUS) & REG_M_NEXUS)
@@ -319,6 +323,8 @@ typedef struct {
 #define INT_V_CR        3
 #define INT_V_VHRX      4
 #define INT_V_VHTX      5
+#define INT_V_TDRX      6
+#define INT_V_TDTX      7
 
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
@@ -339,6 +345,8 @@ typedef struct {
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_TDRX        (1u << INT_V_TDRX)
+#define INT_TDTX        (1u << INT_V_TDTX)
 
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
@@ -359,14 +367,16 @@ typedef struct {
 #define IPL_DMCTX       (0x15 - IPL_HMIN)
 #define IPL_DUPRX       (0x15 - IPL_HMIN)
 #define IPL_DUPTX       (0x15 - IPL_HMIN)
+#define IPL_TDRX        (0x14 - IPL_HMIN)
+#define IPL_TDTX        (0x14 - IPL_HMIN)
 
 /* Device vectors */
 
 #define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
-#define VEC_QBUS        0
-#define VEC_Q           0000
+#define VEC_QBUS        0                               /* Unibus system */
+#define VEC_SET         0x000                           /* Vector bits to set in Unibus vectors */
 
 /* Interrupt macros */
 
@@ -398,7 +408,6 @@ typedef struct {
 #define BOOT_HK         1                               /* for VMB */
 #define BOOT_RL         2
 #define BOOT_UDA        17
-#define BOOT_TK         18
 #define BOOT_CS         64
 
 /* Function prototypes for I/O */

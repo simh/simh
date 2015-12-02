@@ -55,6 +55,8 @@
 /* Vector registers - read only */
 
 #define UBA_UVEC        0x80000000
+#define UBA_VEC_MASK    0x1FC                           /* Vector value mask */
+
 
 /* RB730 registers */
 
@@ -85,7 +87,8 @@
 #define UBA_DEB_ERR     0x20                            /* errors */
 
 int32 int_req[IPL_HLVL] = { 0 };                        /* intr, IPL 14-17 */
-uint32 uba_csr = 0;                                      /* control & status reg */
+int32 int_vec_set[IPL_HLVL][32] = { 0 };                /* bits to set in vector */
+uint32 uba_csr = 0;                                     /* control & status reg */
 uint32 uba_fmer = 0;                                    /* failing map reg */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
@@ -97,7 +100,7 @@ extern UNIT cpu_unit;
 extern int32 p1;
 
 t_stat uba_reset (DEVICE *dptr);
-char *uba_description (DEVICE *dptr);
+const char *uba_description (DEVICE *dptr);
 t_stat uba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_rdreg (int32 *val, int32 pa, int32 mode);
@@ -385,8 +388,12 @@ for (i = 0; int_req[lvl] && (i < 32); i++) {
     if ((int_req[lvl] >> i) & 1) {
         int_req[lvl] = int_req[lvl] & ~(1u << i);
         if (int_ack[lvl][i])
-            return (vec | int_ack[lvl][i]());
-        return (vec | int_vec[lvl][i]);
+            vec = int_ack[lvl][i]();
+        else
+            vec = int_vec[lvl][i];
+        vec |= int_vec_set[lvl][i];
+        vec &= (int_vec_set[lvl][i] | UBA_VEC_MASK);
+        return vec;
         }
     }
 return vec;
@@ -665,7 +672,7 @@ fprintf (of, "Invalid argument\n");
 return SCPE_OK;
 }
 
-char *uba_description (DEVICE *dptr)
+const char *uba_description (DEVICE *dptr)
 {
 return "Unibus adapter";
 }

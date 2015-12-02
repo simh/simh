@@ -521,7 +521,7 @@ rlsa = rlsa + ((bc + (RL_NUMBY - 1)) / RL_NUMBY);
 rl_set_done (0);
 
 if (err != 0) {                                         /* error? */
-    perror ("RL I/O error");
+    sim_perror ("RL I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

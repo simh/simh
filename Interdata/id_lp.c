@@ -185,7 +185,7 @@ if (lpt_spnd || ((t >= LF) && (t < CR))) {              /* spc pend or spc op? *
     else fputs ("\r", uptr->fileref);                   /* overprint */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (lpt_unit.fileref)) {
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -217,7 +217,7 @@ if (lpxb[0]) {                                          /* any char left? */
     fputs (lpxb, uptr->fileref);                        /* write line */
     lpt_unit.pos = ftell (uptr->fileref);               /* update position */
     if (ferror (uptr->fileref)) {
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         r = SCPE_IOERR;
         }

@@ -216,7 +216,7 @@ void Mul48 (uint32 mplc, uint32 mplr);
 void Div48 (uint32 dvdh, uint32 dvdl, uint32 dvr);
 void RotR48 (uint32 sc);
 void ShfR48 (uint32 sc, uint32 sgn);
-t_stat one_inst (uint32 inst, uint32 pc, uint32 mode);
+t_stat one_inst (uint32 inst, uint32 pc, uint32 mode, uint32 *trappc);
 void inst_hist (uint32 inst, uint32 pc, uint32 typ);
 t_stat rtc_inst (uint32 inst);
 t_stat rtc_svc (UNIT *uptr);
@@ -357,7 +357,7 @@ static const uint32 int_vec[32] = {
 
 t_stat sim_instr (void)
 {
-uint32 inst, tinst, pa, save_P, save_mode;
+uint32 inst, tinst, pa, save_P, save_mode, trap_P, tmp;
 t_stat reason, tr;
 
 /* Restore register state */
@@ -382,8 +382,6 @@ while (reason == 0) {                                   /* loop until halted */
         }
 
     if (sim_interval <= 0) {                            /* event queue? */
-        /* make sure all useful state is in simh registers while processing events */
-        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         if ((reason = sim_process_event ()))            /* process */
             break;
         int_reqhi = api_findreq ();                     /* recalc int req */
@@ -410,7 +408,7 @@ while (reason == 0) {                                   /* loop until halted */
         if (hst_lnt)                                    /* record inst */
             inst_hist (tinst, P, HIST_INT);
         if (pa != VEC_RTCP) {                           /* normal intr? */
-            tr = one_inst (tinst, P, save_mode);        /* exec intr inst */
+            tr = one_inst (tinst, P, save_mode, &tmp);  /* exec intr inst */
             if (tr) {                                   /* stop code? */
                 cpu_mode = save_mode;                   /* restore mode */
                 reason = (tr > 0)? tr: STOP_MMINT;
@@ -463,7 +461,7 @@ while (reason == 0) {                                   /* loop until halted */
             ion_defer = 0;                              /* clear ion */
             if (hst_lnt)
                 inst_hist (inst, save_P, HIST_XCT);
-            reason = one_inst (inst, save_P, cpu_mode); /* exec inst */
+            reason = one_inst (inst, save_P, cpu_mode, &trap_P); /* exec inst */
             if (reason > 0) {                           /* stop code? */
                 if (reason != STOP_HALT)
                     P = save_P;
@@ -472,12 +470,13 @@ while (reason == 0) {                                   /* loop until halted */
                 }
             }                                           /* end if r == 0 */
         if (reason < 0) {                               /* mm (fet or ex)? */
+            int8 op;
             pa = -reason;                               /* get vector */
             if (reason == MM_MONUSR)                    /* record P of user-mode */
                 save_P = P;                             /*  transition point     */
-            reason = 0;                                 /* defang */
             tinst = ReadP (pa);                         /* get inst */
-            if (I_GETOP (tinst) != BRM) {               /* not BRM? */
+            op = I_GETOP (tinst);
+            if (op != BRM && op != BRU) {               /* not BRM or BRU? */
                 reason = STOP_TRPINS;                   /* fatal err */
                 break;
                 }
@@ -486,13 +485,20 @@ while (reason == 0) {                                   /* loop until halted */
             mon_usr_trap = 0;
             if (hst_lnt)
                 inst_hist (tinst, save_P, HIST_TRP);
-            tr = one_inst (tinst, save_P, save_mode);   /* trap inst */
+            
+            /* Use previously recorded trap address if memory acccess trap.
+               Will differ from save_P if trapped instruction was a branch.
+               See page 17 of 940 reference manual for additional info.
+            */
+            tr = one_inst (tinst, (reason == MM_NOACC)?
+                  trap_P: save_P, save_mode, &tmp);     /* trap address */
             if (tr) {                                   /* stop code? */
                 cpu_mode = save_mode;                   /* restore mode */
                 P = save_P;                             /* restore PC */
                 reason = (tr > 0)? tr: STOP_MMTRP;
                 break;
                 }
+            reason = 0;                                 /* defang */
             }                                           /* end if reason */
         }                                               /* end else int */
     }                                                   /* end while */
@@ -505,13 +511,14 @@ return reason;
 
 /* Simulate one instruction */
 
-t_stat one_inst (uint32 inst, uint32 pc, uint32 mode)
+t_stat one_inst (uint32 inst, uint32 pc, uint32 mode, uint32 *trappc)
 {
 uint32 op, shf_op, va, dat;
 uint32 old_A, old_B, old_X;
 int32 i, exu_cnt, sc;
 t_stat r;
 
+*trappc = pc;                                           /* default trap pc to pc */
 exu_cnt = 0;                                            /* init EXU count */
 EXU_LOOP:
 op = I_GETOP (inst);                                    /* get opcode */
@@ -813,7 +820,11 @@ switch (op) {                                           /* case on opcode */
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
         if ((r = Read (va, &dat)))                      /* get operand */
+        {
+            if (r == MM_NOACC)
+                *trappc = va & VA_MASK;                 /* use target as trap adr */
             return r;
+        }
         PCQ_ENTRY;
         P = va & VA_MASK;                               /* branch */
         if ((va & VA_USR) && (cpu_mode == MON_MODE)) {  /* user ref from mon. mode? */
@@ -829,7 +840,11 @@ switch (op) {                                           /* case on opcode */
         X = (X + 1) & DMASK;                            /* incr X */
         if (X & I_IND) {                                /* bit 9 set? */
             if ((r = Read (va, &dat)))                  /* test dest access */
+            {
+                if (r == MM_NOACC)
+                    *trappc = va & VA_MASK;             /* use target as trap adr */
                 return r;
+            }
             PCQ_ENTRY;
             P = va & VA_MASK;                           /* branch */
             if ((va & VA_USR) && (cpu_mode == MON_MODE)) {  /* user ref from mon. mode? */
@@ -848,7 +863,11 @@ switch (op) {                                           /* case on opcode */
             dat = dat | ((mode == USR_MODE) << 23) | (OV << 21);
         else dat = dat | (OV << 23);                    /* normal or user */
         if ((r = Write (va, dat)))                      /* write ret word */
+        {
+            if (r == MM_NOACC)
+                *trappc = va & VA_MASK;                 /* use target as trap adr */
             return r;
+        }
         PCQ_ENTRY;
         P = (va + 1) & VA_MASK;                         /* branch */
         if ((va & VA_USR) && (cpu_mode == MON_MODE)) {  /* user ref from mon. mode? */
@@ -862,7 +881,11 @@ switch (op) {                                           /* case on opcode */
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
         if ((r = Read (va, &dat)))                      /* get operand */
+        {
+            if (r == MM_NOACC)
+                *trappc = va & VA_MASK;                 /* use target as trap adr */
             return r;
+        }
         PCQ_ENTRY;
         P = (dat + 1) & VA_MASK;                        /* branch */
         if (cpu_mode == MON_MODE) {                     /* monitor mode? */
@@ -882,7 +905,11 @@ switch (op) {                                           /* case on opcode */
         if ((r = Ea (inst, &va)))                       /* decode eff addr */
             return r;
         if ((r = Read (va, &dat)))                      /* get operand */
+        {
+            if (r == MM_NOACC)
+                *trappc = va & VA_MASK;                 /* use target as trap adr */
             return r;
+        }
         api_dismiss ();                                 /* dismiss hi api */
         PCQ_ENTRY;
         P = dat & VA_MASK;                              /* branch */
@@ -940,7 +967,7 @@ switch (op) {                                           /* case on opcode */
 /* Overflow instruction */
 
     case OVF:
-        if ((inst & 0100) & OV)
+        if ((inst & 0100) && !OV)
             P = (P + 1) & VA_MASK;
         if (inst & 0001)
             OV = 0;

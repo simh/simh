@@ -489,7 +489,7 @@ switch (st) {
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
         chan_set_chf (mt_dib.dva, CHF_XMDE);
         chan_uen (mt_dib.dva);                          /* force uend */
-	    return SCPE_IOERR;
+        return SCPE_IOERR;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
@@ -639,7 +639,8 @@ t_stat mt_detach (UNIT* uptr)
 {
 uint32 un = uptr - mt_dev.units;
 
-if (!(uptr->flags & UNIT_ATTABLE)) return SCPE_NOATT;
+if (!(uptr->flags & UNIT_ATTABLE))
+    return SCPE_NOATT;
 uptr->UST = 0;
 sim_cancel (uptr + MT_REW);
 return sim_tape_detach (uptr);

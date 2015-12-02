@@ -143,7 +143,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {
 fputc (uptr->buf, uptr->fileref);                       /* print char */
 uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("LPT I/O error");
+    sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

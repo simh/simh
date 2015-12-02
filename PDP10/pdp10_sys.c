@@ -55,6 +55,7 @@ extern DEVICE dz_dev;
 extern DEVICE ry_dev;
 extern DEVICE cr_dev;
 extern DEVICE lp20_dev;
+extern DEVICE xu_dev;
 extern DEVICE dup_dev;
 extern DEVICE kmc_dev;
 extern DEVICE dmc_dev;
@@ -93,6 +94,7 @@ DEVICE *sim_devices[] = {
     &rp_dev,
     &tu_dev,
     &dz_dev,
+    &xu_dev,
     &dup_dev,
     &kmc_dev,
     &dmc_dev,
@@ -696,6 +698,10 @@ static const char *devnam[NUMDEV] = {
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
 #define SIXTOASC(x) ((x) + 040)
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
@@ -714,14 +720,14 @@ if (sw & SWMASK ('C')) {                                /* character? */
     for (i = 30; i >= 0; i = i - 6) {
         c = (int32) ((inst >> i) & 077);
         fprintf (of, "%c", SIXTOASC (c));
-		}    
+        }    
     return SCPE_OK;
     }
 if (sw & SWMASK ('P')) {                                /* packed? */
     for (i = 29; i >= 0; i = i - 7) {
         c = (int32) ((inst >> i) & 0177);
         fprintf (of, FMTASC (c));
-		}
+        }
     return SCPE_OK;
     }
 if (!(sw & SWMASK ('M')))

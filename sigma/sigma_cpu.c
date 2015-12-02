@@ -433,10 +433,6 @@ while (reason == 0) {                                   /* loop until stop */
         }
 
     if (sim_interval <= 0) {                            /* event queue? */
-        /* make sure all useful state is in simh registers while processing events */
-        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
-        cpu_assemble_PSD ();                            /* visible PSD */
-        set_rf_display (R);                             /* visible registers */
         if (reason = sim_process_event ())              /* process */
             break;
         int_hireq = io_eval_int ();                     /* re-evaluate intr */
@@ -728,7 +724,7 @@ switch (op) {
             PSW1 = ((PSW1 & ~PSW1_FPC) |                /* set ctrls */
                 ((opnd & PSW1_M_FPC) << PSW1_V_FPC)) &
                 ~cpu_tab[cpu_model].psw1_mbz;           /* clear mbz */
-	    break;
+        break;
 
     case OP_LCF:                                        /* load cc, flt */
         if ((tr = Ea (IR, &bva, VR, BY)) != 0)          /* get eff addr */
@@ -1122,7 +1118,7 @@ switch (op) {
         res = R[rn] | opnd;
         CC34_W (res);                                   /* set CC's */
         R[rn] = res;                                    /* store */
-	break;
+        break;
 
     case OP_EOR:                                        /* xor */
         if ((tr = Ea (IR, &bva, VR, WD)) != 0)          /* get eff addr */
@@ -1132,7 +1128,7 @@ switch (op) {
         res = R[rn] ^ opnd;
         CC34_W (res);                                   /* set CC's */
         R[rn] = res;                                    /* store */
-	break;
+        break;
 
 /* Compares */
 
@@ -1141,7 +1137,7 @@ switch (op) {
             return tr;
         opnd = SEXT_LIT_W (opnd) & WMASK;               /* sext to 32b */
         CC234_CMP (R[rn], opnd);                        /* set CC's */
-	    break;
+        break;
 
     case OP_CB:                                         /* compare byte */
         if ((tr = Ea (IR, &bva, VR, BY)) != 0)          /* get eff addr */
@@ -2728,7 +2724,7 @@ if (cptr) {
         else dlnt = 2;
         bpa = ad << val;
         if (virt && map_reloc (bpa, VNT, &bpa))
-            fprintf (of, "Virtual address %-X: memory management error\n");
+            fprintf (of, "Virtual address %-X: memory management error\n", ad);
         else fprintf (of, "%s %s %-X: physical %s %-X\n",
             ((virt)? "Virtual": "Physical"), lnt_str[val], ad, lnt_str[dlnt], bpa >> dlnt);
         return SCPE_OK;

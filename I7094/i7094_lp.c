@@ -340,7 +340,7 @@ if (uptr->flags & UNIT_ATT) {                           /* file? */
     fputc ('\n', uptr->fileref);                        /* append nl */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }

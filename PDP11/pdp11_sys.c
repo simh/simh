@@ -82,6 +82,7 @@ extern DEVICE dli_dev;
 extern DEVICE dlo_dev;
 extern DEVICE dci_dev;
 extern DEVICE dco_dev;
+extern DEVICE tdc_dev;
 extern DEVICE dz_dev;
 extern DEVICE vh_dev;
 extern DEVICE dt_dev;
@@ -148,6 +149,7 @@ DEVICE *sim_devices[] = {
     &ptp_dev,
     &tti_dev,
     &tto_dev,
+    &tdc_dev,
     &cr_dev,
     &lpt_dev,
     &dli_dev,
@@ -498,6 +500,11 @@ static const char r50_to_asc[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ$._0123456789";
    Outputs:
         count   =       -number of extra words retired
 */
+
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 
 int32 fprint_spec (FILE *of, t_addr addr, int32 spec, t_value nval,
     int32 flag, int32 iflag)

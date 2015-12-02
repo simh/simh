@@ -103,7 +103,6 @@ static struct boot_dev boot_tab[] = {
     { "RQB", BOOT_UDA, 1 << 24 },
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
-    { "TQ", BOOT_TK, 1 << 24 },
     { "CS", BOOT_CS, 0 },
     { NULL }
     };
@@ -124,7 +123,7 @@ extern UNIT cpu_unit;
 
 void uba_eval_int (void);
 t_stat abus_reset (DEVICE *dptr);
-char *abus_description (DEVICE *dptr);
+const char *abus_description (DEVICE *dptr);
 t_stat vax860_boot (int32 flag, char *ptr);
 t_stat vax860_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
@@ -633,6 +632,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 int32 acc;
 int32 mstat1, mstat2, mear, ebcs, merg, ehmsts;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 mstat1 = (MSTAT1_CPRD << MSTAT1_V_CYC);                 /* MBOX Status 1 */
 mstat2 = MSTAT2_NXM;                                    /* MBOX Status 2 */
 mear = mchk_va;                                         /* Memory error address */
@@ -799,7 +800,7 @@ init_pamm ();
 return SCPE_OK;
 }
 
-char *abus_description (DEVICE *dptr)
+const char *abus_description (DEVICE *dptr)
 {
 return "bus controller";
 }
@@ -855,7 +856,7 @@ fprintf (st, "VAX %s", (sys_model ? "8650" : "8600"));
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Initial memory size is 32MB.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");

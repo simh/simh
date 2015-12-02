@@ -238,24 +238,24 @@ static uint32 rom_delay = 0;
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
-t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rom_description (DEVICE *dptr);
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rom_description (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
 t_stat nvr_attach (UNIT *uptr, char *cptr);
 t_stat nvr_detach (UNIT *uptr);
-t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *nvr_description (DEVICE *dptr);
+t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *nvr_description (DEVICE *dptr);
 t_stat csi_reset (DEVICE *dptr);
-char *csi_description (DEVICE *dptr);
+const char *csi_description (DEVICE *dptr);
 t_stat cso_reset (DEVICE *dptr);
 t_stat cso_svc (UNIT *uptr);
-char *cso_description (DEVICE *dptr);
+const char *cso_description (DEVICE *dptr);
 t_stat tmr_svc (UNIT *uptr);
 t_stat sysd_reset (DEVICE *dptr);
-t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *sysd_description (DEVICE *dptr);
+t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *sysd_description (DEVICE *dptr);
 
 int32 rom_rd (int32 pa);
 int32 nvr_rd (int32 pa);
@@ -610,7 +610,7 @@ if (rom == NULL)
 return SCPE_OK;
 }
 
-t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Read-only memory (ROM)\n\n");
 fprintf (st, "The boot ROM consists of a single unit, simulating the 128KB boot ROM.  It\n");
@@ -629,7 +629,7 @@ fprint_set_help (st, dptr);
 return SCPE_OK;
 }
 
-char *rom_description (DEVICE *dptr)
+const char *rom_description (DEVICE *dptr)
 {
 return "read-only memory";
 }
@@ -727,7 +727,7 @@ if ((uptr->flags & UNIT_ATT) == 0)
 return r;
 }
 
-t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Non-volatile Memory (NVR)\n\n");
 fprintf (st, "The NVR consists of a single unit, simulating 1KB of battery-backed up memory\n");
@@ -740,7 +740,7 @@ fprintf (st, "Successfully loading an NVR image clears the SSC battery-low indic
 return SCPE_OK;
 }
 
-char *nvr_description (DEVICE *dptr)
+const char *nvr_description (DEVICE *dptr)
 {
 return "non-volatile memory";
 }
@@ -777,7 +777,7 @@ CLR_INT (CSI);
 return SCPE_OK;
 }
 
-char *csi_description (DEVICE *dptr)
+const char *csi_description (DEVICE *dptr)
 {
 return "console storage input";
 }
@@ -816,7 +816,7 @@ if (cso_csr & CSR_IE)
 if ((cso_unit.flags & UNIT_ATT) == 0)
     return SCPE_OK;
 if (putc (cso_unit.buf, cso_unit.fileref) == EOF) {
-    perror ("CSO I/O error");
+    sim_perror ("CSO I/O error");
     clearerr (cso_unit.fileref);
     return SCPE_IOERR;
     }
@@ -833,7 +833,7 @@ sim_cancel (&cso_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-char *cso_description (DEVICE *dptr)
+const char *cso_description (DEVICE *dptr)
 {
 return "console storage output";
 }
@@ -1643,6 +1643,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 i, st1, st2, p2, hsir, acc;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 if (p1 & 0x80)                                          /* mref? set v/p */
     p1 = p1 + mchk_ref;
 p2 = mchk_va + 4;                                       /* save vap */
@@ -1788,7 +1790,7 @@ ssc_otp = 0;
 return SCPE_OK;
 }
 
-t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "System Devices (SYSD)\n\n");
 fprintf (st, "The system devices are the system-specific facilities implemented in the CVAX\n");
@@ -1808,7 +1810,7 @@ fprintf (st, "setting the flag.  The default value is set.\n");
 return SCPE_OK;
 }
 
-char *sysd_description (DEVICE *dptr)
+const char *sysd_description (DEVICE *dptr)
 {
 return "system devices";
 }
@@ -1857,7 +1859,7 @@ fprintf (st, "%s 3900 (KA655)", (sys_model ? "MicroVAX" : "VAXServer"));
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Notes on memory size:\n\n");
 fprintf (st, "- The real KA655 CPU only supported 16MB to 64MB of memory.  The simulator\n");

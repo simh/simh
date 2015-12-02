@@ -48,8 +48,8 @@
 #define STOP_EXULIM     8                               /* EXU limit */
 #define STOP_MMINT      9                               /* mm in intr */
 #define STOP_MMTRP      10                              /* mm in trap */
-#define STOP_TRPINS     11                              /* trap inst not BRM */
-#define STOP_RTCINS     12                              /* rtc inst not MIN/SKR */
+#define STOP_TRPINS     11                              /* trap inst not BRM or BRU */
+#define STOP_RTCINS     12                              /* rtc inst not MIN or SKR */
 #define STOP_ILLVEC     13                              /* zero vector */
 #define STOP_CCT        14                              /* runaway CCT */
 #define STOP_MBKPT      15                              /* monitor-mode breakpoint */

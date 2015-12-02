@@ -26,9 +26,9 @@
 
 #include "sigma_defs.h"
 
-#define BVA_REG		(RF_NUM << 2)
-#define BPAMASK     ((cpu_tab[cpu_model].pamask << 2) | 0x3)
-#define NUM_MUNITS  (MAXMEMSIZE / CPU_MUNIT_SIZE)
+#define BVA_REG         (RF_NUM << 2)
+#define BPAMASK         ((cpu_tab[cpu_model].pamask << 2) | 0x3)
+#define NUM_MUNITS      (MAXMEMSIZE / CPU_MUNIT_SIZE)
 
 /* Sigma 8-9 memory status words */
 

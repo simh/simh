@@ -393,11 +393,6 @@ while (reason == 0) {
         }
 
     if (sim_interval <= 0) {                            /* chk clock queue */
-        /* make sure all useful state is in simh registers while processing events */
-        pcc_l = pcc_l & M32;
-        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
-        pc_align = ((uint32) PC) & 3;                   /* separate PC<1:0> */
-        PC = PC & 0xFFFFFFFFFFFFFFFC;
         if ((reason = sim_process_event ())) break;
         intr_summ = pal_eval_intr (1);                  /* eval interrupts */
         }
@@ -1377,7 +1372,7 @@ while (reason == 0) {
             if (!(arch_mask & AMASK_CIX)) ABORT (EXC_RSVI);
             for (res = 0; rbv != 0; res++) {
                 rbv = rbv & ~(rbv & NEG_Q (rbv));
-				}
+                }
             break;
 
         case 0x31:                                      /* PERR */

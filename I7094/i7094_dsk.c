@@ -888,7 +888,7 @@ da = DSK_DA (dsk_acc, trk, dtyp);                       /* get disk address */
 sim_fseek (udptr->fileref, da, SEEK_SET);               /* read track */
 k = sim_fread (dsk_buf, sizeof (t_uint64), dsk_tab[dtyp].wdspt, udptr->fileref);
 if (ferror (udptr->fileref)) {                          /* error? */
-    perror ("DSK I/O error");
+    sim_perror ("DSK I/O error");
     clearerr (udptr->fileref);
     dsk_uend (dsk_ch, DSKS_DSKE);
     return SCPE_IOERR;
@@ -989,7 +989,7 @@ uint32 da = DSK_DA (dsk_acc, trk, dtyp);
 sim_fseek (udptr->fileref, da, SEEK_SET);
 sim_fwrite (dsk_buf, sizeof (t_uint64), dsk_tab[dtyp].wdspt, udptr->fileref);
 if (ferror (udptr->fileref)) {
-    perror ("DSK I/O error");
+    sim_perror ("DSK I/O error");
     clearerr (udptr->fileref);
     dsk_uend (dsk_ch, DSKS_DSKE);
     return SCPE_IOERR;
@@ -1189,7 +1189,7 @@ for (a = 0, ctss = TRUE; a < dsk_tab[dtyp].accpm; a++) {
                 fprintf (st, "Invalid record length %d, unit = %d, access = %d, track = %d, record = %d\n",
                     rlnt, u, a, t, rec);
                 return SCPE_OK;
-				}
+                }
             if (rlnt > maxrsz)
                 maxrsz = rlnt;
             if (rlnt < minrsz)

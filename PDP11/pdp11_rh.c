@@ -179,8 +179,8 @@ void mba_clr_int (uint32 mb);
 void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb);
 void mba_set_cs2 (uint32 flg, uint32 mb);
 int32 mba_map_pa (int32 pa, int32 *ofs);
-t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rh_description (DEVICE *dptr);
+t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rh_description (DEVICE *dptr);
 
 extern uint32 Map_Addr (uint32 ba);
 
@@ -921,7 +921,7 @@ if (dibp->ack[0])                                       /* set abort dispatch */
 return SCPE_OK;
 }
 
-t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
@@ -945,7 +945,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *rh_description (DEVICE *dptr)
+const char *rh_description (DEVICE *dptr)
 {
 if (dptr == &mba_dev[0])
     return "RH70/RH11 Massbus adapter (for RP)";

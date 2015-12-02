@@ -118,8 +118,8 @@ set _ZipPath=..\..\%BIN_REPO%
 if not exist "%_ZipPath%" mkdir "%_ZipPath%"
 set _ZipPath=%_ZipPath%\
 
-if not exist "%_ZipPath%%_ZipName%" vcbuild /M2 /useenv /rebuild Simh.sln "Release|Win32"
-7z a -tzip "%_ZipPath%%_ZipName%" "..\BIN\NT\Win32-Release\*.exe"
+if not exist "%_ZipPath%%_ZipName%" vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "Release|Win32"
+7z a -tzip -x!BuildROMs.exe "%_ZipPath%%_ZipName%" "..\BIN\NT\Win32-Release\*.exe"
 popd
 pushd ..\%_ZipPath%
 if "%1" neq "reset" goto GitAddNew

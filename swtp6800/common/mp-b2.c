@@ -1,27 +1,34 @@
 /*  mp-b2.c: SWTP SS-50/SS-30 MP-B2 Mother Board
 
-    Copyright (c) 2011, William A. Beech
+    Copyright (c) 2011-2012, William A. Beech
 
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
+        Permission is hereby granted, free of charge, to any person obtaining a
+        copy of this software and associated documentation files (the "Software"),
+        to deal in the Software without restriction, including without limitation
+        the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        and/or sell copies of the Software, and to permit persons to whom the
+        Software is furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
+        The above copyright notice and this permission notice shall be included in
+        all copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-    WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+        IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+        CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the name of William A. Beech shall not be
-    used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from William A. Beech.
+        Except as contained in this notice, the name of William A. Beech shall not be
+        used in advertising or otherwise to promote the sale, use or other dealings
+        in this Software without prior written authorization from William A. Beech.
+
+    MODIFICATIONS:
+
+        24 Apr 15 -- Modified to use simh_debug
+
+    NOTES:
+
 */
 
 #include <stdio.h>
@@ -174,13 +181,13 @@ int32 MB_get_mbyte(int32 addr)
 {
     int32 val;
 
-    if (MB_dev.dctrl & DEBUG_read)
-        printf("MB_get_mbyte: addr=%04X\n", addr);
+    sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: addr=%04X\n", addr);
     switch(addr & 0xF000) {
         case 0x0000:
         case 0x1000:
             if (MB_unit.flags & UNIT_RAM_0000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
+    sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: addr=%04X\n", addr);
                 if (MB_dev.dctrl & DEBUG_read)
                     printf("MB_get_mbyte: mp_8m val=%02X\n", val);
                 return val;
@@ -190,8 +197,7 @@ int32 MB_get_mbyte(int32 addr)
         case 0x3000:
             if (MB_unit.flags & UNIT_RAM_2000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
-                if (MB_dev.dctrl & DEBUG_read)
-                    printf("MB_get_mbyte: mp_8m val=%02X\n", val);
+                sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: mp_8m val=%02X\n", val);
                 return val;
             } else
                 return 0xFF;
@@ -199,6 +205,7 @@ int32 MB_get_mbyte(int32 addr)
         case 0x5000:
             if (MB_unit.flags & UNIT_RAM_4000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
+    sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: addr=%04X\n", addr);
                 if (MB_dev.dctrl & DEBUG_read)
                     printf("MB_get_mbyte: mp_8m val=%02X\n", val);
                 return val;
@@ -208,8 +215,7 @@ int32 MB_get_mbyte(int32 addr)
         case 0x7000:
             if (MB_unit.flags & UNIT_RAM_6000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
-                if (MB_dev.dctrl & DEBUG_read)
-                    printf("MB_get_mbyte: mp_8m val=%02X\n", val);
+                sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: mp_8m val=%02X\n", val);
                 return val;
             } else
                 return 0xFF;
@@ -218,15 +224,14 @@ int32 MB_get_mbyte(int32 addr)
                 val = (dev_table[addr - 0x8000].routine(0, 0)) & 0xFF;
             else
                 val = 0xFF;
-            if (MB_dev.dctrl & DEBUG_read)
-                printf("MB_get_mbyte: I/O addr=%04X val=%02X\n", addr, val);
+            sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: I/O addr=%04X val=%02X\n",
+                addr, val);
             return val;
         case 0xA000:
         case 0xB000:
             if (MB_unit.flags & UNIT_RAM_A000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
-                if (MB_dev.dctrl & DEBUG_read)
-                    printf("MB_get_mbyte: mp_8m val=%02X\n", val);
+                sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: mp_8m val=%02X\n", val);
                 return val;
             } else
                 return 0xFF;
@@ -234,8 +239,7 @@ int32 MB_get_mbyte(int32 addr)
         case 0xD000:
             if (MB_unit.flags & UNIT_RAM_C000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
-                if (MB_dev.dctrl & DEBUG_read)
-                    printf("MB_get_mbyte: mp_8m val=%02X\n", val);
+                sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: mp_8m val=%02X\n", val);
                 return val;
             } else
                 return 0xFF;
@@ -250,14 +254,11 @@ int32 MB_get_mword(int32 addr)
 {
     int32 val;
 
-
-    if (MB_dev.dctrl & DEBUG_read)
-        printf("MB_get_mword: addr=%04X\n", addr);
+    sim_debug (DEBUG_read, &MB_dev, "MB_get_mword: addr=%04X\n", addr);
     val = (MB_get_mbyte(addr) << 8);
     val |= MB_get_mbyte(addr+1);
     val &= 0xFFFF;
-    if (MB_dev.dctrl & DEBUG_read)
-        printf("MB_get_mword: val=%04X\n", val);
+    sim_debug (DEBUG_read, &MB_dev, "MB_get_mword: val=%04X\n", val);
     return val;
 }
 
@@ -265,8 +266,8 @@ int32 MB_get_mword(int32 addr)
 
 void MB_put_mbyte(int32 addr, int32 val)
 {
-    if (MB_dev.dctrl & DEBUG_write)
-        printf("MB_put_mbyte: addr=%04X, val=%02X\n", addr, val);
+    sim_debug (DEBUG_write, &MB_dev, "MB_put_mbyte: addr=%04X, val=%02X\n",
+        addr, val);
     switch(addr & 0xF000) {
         case 0x0000:
         case 0x1000:
@@ -317,8 +318,7 @@ void MB_put_mbyte(int32 addr, int32 val)
 
 void MB_put_mword(int32 addr, int32 val)
 {
-    if (MB_dev.dctrl & DEBUG_write)
-        printf("MB_ptt_mword: addr=%04X, val=%04X\n", addr, val);
+    sim_debug (DEBUG_write, &MB_dev, "MB_ptt_mword: addr=%04X, val=%04X\n", addr, val);
     MB_put_mbyte(addr, val >> 8);
     MB_put_mbyte(addr+1, val);
 }

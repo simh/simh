@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Jun-15    JDB     Conditionally use Fprintf function for version 4.x and on
+   18-Jun-15    JDB     Added cast to int for isspace parameter
    24-Dec-14    JDB     Added casts to t_addr and t_value for 64-bit compatibility
                         Made local routines static
    05-Feb-13    JDB     Added hp_fprint_stopped to handle HLT instruction message
@@ -61,9 +63,18 @@
    27-Oct-98    RMS     V2.4 load interface
 */
 
+
+#include <ctype.h>
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include <ctype.h>
+#include "sim_rev.h"
+
+
+#if (SIM_MAJOR >= 4)
+  #define fprintf       Fprintf
+  #define fputs(_s,_f)  Fprintf (_f, "%s", _s)
+  #define fputc(_c,_f)  Fprintf (_f, "%c", _c)
+#endif
 
 
 extern DEVICE mp_dev;
@@ -610,7 +621,7 @@ t_stat r, ret;
 char *cptr, gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-while (isspace (*iptr)) iptr++;                         /* absorb spaces */
+while (isspace ((int) *iptr)) iptr++;                   /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*iptr == '\'') && iptr++)) { /* ASCII char? */
     if (iptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
     val[0] = (t_value) iptr[0] & 0177;

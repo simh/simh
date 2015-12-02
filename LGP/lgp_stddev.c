@@ -501,10 +501,10 @@ do {
     if ((ch = getc (uptr->fileref)) == EOF) {           /* read char */
         if (feof (uptr->fileref)) {                     /* err or eof? */
             if (stop)
-                printf ("Reader end of file\n");
+                sim_printf ("Reader end of file\n");
             else return SCPE_OK;
             }
-        else perror ("Reader I/O error");
+        else sim_perror ("Reader I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -516,10 +516,10 @@ do {
         if ((d1 == EOF) || (d2 == EOF)) {               /* error? */
             if (feof (uptr->fileref)) {                 /* eof? */
                 if (stop)
-                    printf ("Reader end of file\n");
+                    sim_printf ("Reader end of file\n");
                 else return SCPE_OK;
                 }
-            else perror ("Reader I/O error");
+            else sim_perror ("Reader I/O error");
             clearerr (uptr->fileref);
             return SCPE_IOERR;
             }
@@ -570,7 +570,7 @@ if (c >= 0)                                             /* valid? */
     sta = fputc (c, uptr->fileref);
 else sta = fprintf (uptr->fileref, "!%02d", flex);      /* no, encode */
 if (sta == EOF) {                                       /* error? */
-    perror ("Punch I/O error");                         /* error? */
+    sim_perror ("Punch I/O error");                         /* error? */
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

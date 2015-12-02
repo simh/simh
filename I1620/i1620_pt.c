@@ -1,6 +1,6 @@
 /* i1620_pt.c: IBM 1621/1624 paper tape reader/punch simulator
 
-   Copyright (c) 2002-2013, Robert M Supnik
+   Copyright (c) 2002-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    ptr          1621 paper tape reader
    ptp          1624 paper tape punch
 
+   23-Feb-15    TFM     Fixed RA, RBPT to preserve flags on RM at end (Tom McBride)
+   09-Feb-15    TFM     Fixed numerous translation problems (Tom McBride)
+   09-Feb-15    TFM     Fixed pack/unpack errors in binary r/w (Tom McBride)
    21-Dec-13    RMS     Fixed translation of paper tape code X0C
    10-Dec-13    RMS     Fixed DN wraparound (Bob Armstrong)
    19-Mar-12    RMS     Fixed declaration of io_stop (Mark Pizzolato)
@@ -117,75 +120,73 @@ const int8 bad_par[128] = {
 /* Paper tape read (7b) to numeric (one digit) */
 
 const int8 ptr_to_num[128] = {
- 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* - */
- 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x00, 0x0E, 0x0F,
- 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* C */
- 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x00, 0x0E, 0x0F,
- 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* O */
- 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x00, 0x0E, 0x0F,
- 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* OC */
- 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x00, 0x0E, 0x0F,
- 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,        /* X */
- 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x10, 0x1E, 0x1F,
- 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,        /* XC */
- 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x10, 0x1E, 0x1F,
- 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* XO */
- 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x00, 0x0E, 0x0F,
- 0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* XOC */
- 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x00, 0x0E, 0x0F
+   -1, 0x01, 0x02,   -1, 0x04,   -1,   -1, 0x07,        /* - */
+ 0x08,   -1,   -1, 0x0B,   -1,   -1,   -1,   -1,
+ 0x00,   -1,   -1, 0x03,   -1, 0x05, 0x06,   -1,        /* C */
+   -1, 0x09,   -1,   -1, 0x0C,   -1,   -1,   -1,
+ 0x00,   -1,   -1, 0x03,   -1, 0x05, 0x06,   -1,        /* O */
+   -1, 0x09, 0x0A,   -1, 0x0C,   -1,   -1, 0x0F,
+   -1, 0x01, 0x02,   -1, 0x04,   -1,   -1, 0x07,        /* OC */
+ 0x08,   -1,   -1, 0x0B,   -1,   -1,   -1,   -1,
+ 0x10,   -1,   -1, 0x13,   -1, 0x15, 0x16,   -1,        /* X */
+   -1, 0x19, 0x1A,   -1, 0x1C,   -1,   -1, 0x1F,
+   -1, 0x11, 0x12,   -1, 0x14,   -1,   -1, 0x17,        /* XC */
+ 0x18,   -1,   -1, 0x1B,   -1,   -1,   -1,   -1,
+   -1, 0x01, 0x02,   -1, 0x04,   -1,   -1, 0x07,        /* XO */
+ 0x08,   -1,   -1, 0x0B,   -1,   -1,   -1,   -1,
+ 0x10,   -1,   -1, 0x03,   -1, 0x05, 0x06,   -1,        /* XOC */
+   -1, 0x09, 0x0A,   -1, 0x0C,    -1,  -1,   -1         /* X0C82 is not defined but will treat as RM (tfm) */
  };
 
-/* Paper tape read (7b) to alphameric (two digits)
-   Codes XO82, 82, XO842, 842 do not have consistent translations
-*/
+/* Paper tape read (7b) to alphameric (two digits) */
 
 const int8 ptr_to_alp[128] = {
  0x00, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,        /* - */
- 0x78, 0x79,   -1, 0x33, 0x34, 0x70,   -1, 0x0F,
+ 0x78, 0x79,   -1, 0x33, 0x34,   -1,   -1,   -1,
  0x00, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,        /* C */
- 0x78, 0x79,   -1, 0x33, 0x34, 0x70,   -1, 0x0F,
- 0x70, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,        /* O */
- 0x68, 0x69, 0x0A, 0x23, 0x24, 0x60, 0x0E, 0x0F,
- 0x70, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,        /* OC */
- 0x68, 0x69, 0x0A, 0x23, 0x24, 0x60, 0x0E, 0x0F,
+ 0x78, 0x79,   -1, 0x33, 0x34,   -1,   -1,   -1,
+ 0x70, 0x21, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,        /* O */
+ 0x68, 0x69, 0x0A, 0x23, 0x24,   -1,   -1, 0x0F,
+ 0x70, 0x21, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,        /* OC */
+ 0x68, 0x69, 0x0A, 0x23, 0x24,   -1,   -1, 0x0F,
  0x20, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,        /* X */
- 0x58, 0x59, 0x5A, 0x13, 0x14, 0x50, 0x5E, 0x5F,
+ 0x58, 0x59, 0x5A, 0x13, 0x14,   -1,   -1, 0x5F,
  0x20, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,        /* XC */
- 0x58, 0x59, 0x5A, 0x13, 0x14, 0x50, 0x5E, 0x5F,
+ 0x58, 0x59, 0x5A, 0x13, 0x14,   -1,   -1, 0x5F,
  0x10, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,        /* XO */
- 0x48, 0x49,   -1, 0x03, 0x04, 0x40,   -1, 0x7F,
+ 0x48, 0x49,   -1, 0x03, 0x04,   -1,   -1,   -1,
  0x10, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,        /* XOC */
- 0x48, 0x49,   -1, 0x03, 0x04, 0x40,   -1, 0x7F
+ 0x48, 0x49,   -1, 0x03, 0x04,   -1,   -1,   -1
  };
 
 /* Numeric (flag + digit) to paper tape punch */
 
 const int8 num_to_ptp[32] = {
  0x20, 0x01, 0x02, 0x13, 0x04, 0x15, 0x16, 0x07,        /* 0 */
- 0x08, 0x19, 0x2A, 0x3B, 0x1C, 0x0D, 0x3E, 0x3F,
+ 0x08, 0x19, 0x2A,   -1, 0x1C,   -1,   -1, 0x2F,
  0x40, 0x51, 0x52, 0x43, 0x54, 0x45, 0x46, 0x57,        /* F + 0 */
- 0x58, 0x49, 0x4A, 0x5B, 0x4C, 0x5D, 0x5E, 0x4F
+ 0x58, 0x49, 0x4A,   -1, 0x4C,   -1,   -1, 0x4F
  };
 
 /* Alphameric (two digits) to paper tape punch */
 
 const int8 alp_to_ptp[256] = {
- 0x10,   -1, 0x7A, 0x6B, 0x7C,   -1,   -1, 0x7F,        /* 00 */
-   -1,   -1, 0x2A,   -1,   -1,   -1,   -1, 0x1F,
- 0x70,   -1, 0x4A, 0x5B, 0x4C,   -1,   -1,   -1,        /* 10 */
+ 0x10,   -1,   -1, 0x6B, 0x7C,   -1,   -1,   -1,        /* 00 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
- 0x40, 0x31, 0x2A, 0x3B, 0x2C,   -1,   -1,   -1,        /* 20 */ 
+ 0x70,   -1,   -1, 0x5B, 0x4C,   -1,   -1,   -1,        /* 10 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
-   -1,   -1, 0x1A, 0x0B, 0x1C, 0x0D, 0x0E,   -1,        /* 30 */
+ 0x40, 0x31,   -1, 0x3B, 0x2C,   -1,   -1,   -1,        /* 20 */ 
+   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
+   -1,   -1,   -1, 0x0B, 0x1C,   -1,   -1,   -1,        /* 30 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1, 0x61, 0x62, 0x73, 0x64, 0x75, 0x76, 0x67,        /* 40 */
  0x68, 0x79,   -1,   -1,   -1,   -1,   -1,   -1,
  0x40, 0x51, 0x52, 0x43, 0x54, 0x45, 0x46, 0x57,        /* 50 */
- 0x58, 0x49, 0x4A,   -1,   -1,   -1,   -1, 0x4F,
-   -1, 0x31, 0x32, 0x23, 0x34, 0x25, 0x26, 0x37,        /* 60 */
+ 0x58, 0x49,   -1,   -1,   -1,   -1,   -1,   -1,
+   -1,   -1, 0x32, 0x23, 0x34, 0x25, 0x26, 0x37,        /* 60 */
  0x38, 0x29,   -1,   -1,   -1,   -1,   -1,   -1,
  0x20, 0x01, 0x02, 0x13, 0x04, 0x15, 0x16, 0x07,        /* 70 */
- 0x08, 0x19, 0x7A,   -1,   -1,   -1,   -1, 0x7F,
+ 0x08, 0x19,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 80 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 90 */
@@ -214,7 +215,7 @@ const int8 alp_to_ptp[256] = {
 
 t_stat ptr (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
-uint32 i, q = 0;
+uint32 i = 0;
 int8 mc;
 uint8 ptc;
 t_stat r, sta;
@@ -231,15 +232,14 @@ switch (op) {                                           /* case on op */
                 M[pa] = REC_MARK;                       /* store rec mark */
                 return sta;                             /* done */
                 }
-            if (pa == 18976)
-                q++;
-            if (bad_par[ptc]) {                         /* bad parity? */
+            mc = ptr_to_num[ptc];                       /* translate char */
+            if ((bad_par[ptc]) || (mc < 0)) {           /* bad par. or char? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
                 if (io_stop)                            /* set return status */
                     sta = STOP_INVCHR;
                 M[pa] = 0;                              /* store zero */
                 }
-            else M[pa] = ptr_to_num[ptc];               /* translate, store */
+            else M[pa] = mc;                            /* stor translated char */
             PP (pa);                                    /* incr mem addr */
             }
         break;
@@ -250,8 +250,8 @@ switch (op) {                                           /* case on op */
             if (r != SCPE_OK)                           /* error? */
                 return r;
             if (ptc & PT_EL) {                          /* end record? */
-                M[pa] = REC_MARK;                       /* store rec mark */
-                M[pa - 1] = 0;
+                M[pa] = (M[pa] & FLAG) | REC_MARK;      /* store alpha RM ..    */
+                M[pa - 1] = M[pa - 1] & FLAG;           /* ..and preserve flags */
                 return sta;                             /* done */
                 }
             mc = ptr_to_alp[ptc];                       /* translate */
@@ -294,8 +294,8 @@ switch (op) {                                           /* case on op */
             if (r != SCPE_OK)                           /* error? */
                 return r;
             if (ptc & PT_EL) {                          /* end record? */
-                M[pa] = REC_MARK;                       /* store rec mark */
-                M[pa - 1] = 0;
+                M[pa] = (M[pa] & FLAG) | REC_MARK;      /* store alpha RM ..    */
+                M[pa - 1] = M[pa - 1] & FLAG;           /* ..and preserve flags */
                 return sta;                             /* done */
                 }
             if (bad_par[ptc]) {                         /* bad parity? */
@@ -305,7 +305,7 @@ switch (op) {                                           /* case on op */
                 }
             M[pa] = (M[pa] & FLAG) | (ptc & 07);        /* store 2 digits */
             M[pa - 1] = (M[pa - 1] & FLAG) |
-                (((ptc >> 5) & 06) | ((ptc >> 3) & 1));
+                (((ptc >> 4) & 06) | ((ptc >> 3) & 1));
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
         break;  
@@ -334,7 +334,7 @@ do {
         if (feof (ptr_unit.fileref))
             sim_printf ("PTR end of file\n");
         else
-            sim_printf ("PTR I/O error: %d\n", errno);
+            sim_perror ("PTR I/O error");;
         clearerr (ptr_unit.fileref);
         return SCPE_IOERR;
         }
@@ -354,13 +354,7 @@ return SCPE_OK;
 /* Bootstrap routine */
 
 static const uint8 boot_rom[] = {
- 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                    /* NOP */
- 3, 6, 0, 0, 0, 3, 1, 0, 0, 3, 0, 0,                    /* RNPT 31 */
- 2, 5, 0, 0, 0, 7, 1, 0, 0, 0, 0, 0,                    /* TD 71,loc */
- 3, 6, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0,                    /* RNPT loc1 */
- 2, 6, 0, 0, 0, 6, 6, 0, 0, 0, 3, 5,                    /* TF 66,35 */
- 1, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                    /* TDM loc2,loc3 */
- 4, 9, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0                     /* BR 12 */
+ 3, 6, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0,                    /* RNPT 0 */
  };
 
 #define BOOT_START      0
@@ -442,7 +436,7 @@ switch (op) {                                           /* decode op */
             z = M[pa - 1] & DIGIT;                      /* get zone */
             if ((d & REC_MARK) == REC_MARK)             /* 8-2 char? */
                 return ptp_write (PT_EL);               /* end record */
-            ptc = ((z & 06) << 5) | ((z & 01) << 3) | (d & 07);
+            ptc = ((z & 06) << 4) | ((z & 01) << 3) | (d & 07);
             if (bad_par[ptc])                           /* set parity */
                 ptc = ptc | PT_C;
             r = ptp_write (ptc);                        /* write char */
@@ -466,13 +460,19 @@ t_stat ptp_num (uint32 pa, uint32 len, t_bool dump)
 t_stat r;
 uint8 d;
 uint32 i;
+int8 ptc;
 
 for (i = 0; i < MEMSIZE; i++) {                         /* stop runaway */
     d = M[pa] & (FLAG | DIGIT);                         /* get char */
     if (dump? (len-- == 0):                             /* dump: end reached? */
        ((d & REC_MARK) == REC_MARK))                    /* write: rec mark? */
         return ptp_write (PT_EL);                       /* end record */
-    r = ptp_write (num_to_ptp[d]);                      /* write */
+    ptc = num_to_ptp[d];                                /* translate digit */
+    if (ptc < 0) {                                      /* bad char? */
+        ind[IN_WRCHK] = 1;                              /* write check */
+        CRETIOE(io_stop, STOP_INVCHR);                                  
+        }
+    r = ptp_write(ptc);                                 /* write char */
     if (r != SCPE_OK)                                   /* error? */
         return r;
     PP (pa);                                            /* incr mem addr */
@@ -490,7 +490,7 @@ if ((ptp_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
     }
 if (putc (c, ptp_unit.fileref) == EOF) {                /* write char */
     ind[IN_WRCHK] = 1;                                  /* error? */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;
     }

@@ -1,6 +1,6 @@
 /* nova_tt.c: NOVA console terminal simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti          terminal input
    tto          terminal output
 
+   31-Mar-15    RMS     Backported parity capability from GitHub master
    04-Jul-07    BKR     fixed Dasher CR/LF swap function in 'tti_svc()',
                         DEV_SET/CLR macros now used,
                         TTO device may now be DISABLED
@@ -40,7 +41,6 @@
    31-May-01    RMS     Added multiconsole support
 
    Notes:
-    - TTO output is always masked to 7 bits in this rev
     - TTO "Dasher" attribute sends '\b' to console instead of '\031'
     - TTO may be disabled
     - TTI "Dasher" attribute swaps <CR> and <LF>
@@ -90,10 +90,10 @@ REG tti_reg[] = {
 MTAB ttx_mod[] = {
     { UNIT_DASHER, 0, "ANSI", "ANSI", &ttx_setmod },
     { UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx_setmod },
-    { TT_PAR, TT_PAR_EVEN,  "Even Parity", "EVEN",  &ttx_setpar },
-    { TT_PAR, TT_PAR_ODD,   "Odd Parity",  "ODD",   &ttx_setpar },
-    { TT_PAR, TT_PAR_MARK,  "Mark Parity", "MARK",  &ttx_setpar },
-    { TT_PAR, TT_PAR_SPACE, "No Parity",   "NONE",  &ttx_setpar },
+    { TT_PAR, TT_PAR_EVEN,  "even parity", "EVEN",  &ttx_setpar },
+    { TT_PAR, TT_PAR_ODD,   "odd parity",  "ODD",   &ttx_setpar },
+    { TT_PAR, TT_PAR_MARK,  "mark parity", "MARK",  &ttx_setpar },
+    { TT_PAR, TT_PAR_SPACE, "no parity",   "NONE",  &ttx_setpar },
     { 0 }
     } ;
 

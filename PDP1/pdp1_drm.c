@@ -296,7 +296,7 @@ for (i = 0; i < DRM_NUMWDS; i++, da++) {                /* do transfer */
         if ((drm_wlk >> (drm_da >> 4)) & 1)
             drm_err = 1;
         else {                                          /* not locked */
-            fbuf[da] = M[drm_ma];						/* write word */
+            fbuf[da] = M[drm_ma];                       /* write word */
             if (da >= uptr->hwmark)
                 uptr->hwmark = da + 1;
             }

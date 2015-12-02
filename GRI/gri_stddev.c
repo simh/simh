@@ -1,6 +1,6 @@
 /* gri_stddev.c: GRI-909 standard devices
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    hsp          S42-006 high speed punch
    rtc          real time clock
 
+   28-Mar-15    RMS     Revised to use sim_printf
    31-May-08    RMS     Fixed declarations (Peter Schorn)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -346,7 +347,7 @@ if ((temp = getc (hsr_unit.fileref)) == EOF) {          /* read char */
             sim_printf ("HSR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("HSR I/O error");
+    else sim_perror ("HSR I/O error");
     clearerr (hsr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -362,7 +363,7 @@ dev_done = dev_done | INT_HSP;                          /* set ready */
 if ((hsp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (hsp_stopioe, SCPE_UNATT);
 if (putc (hsp_unit.buf, hsp_unit.fileref) == EOF) {     /* write char */
-    perror ("HSP I/O error");                           /* error? */
+    sim_perror ("HSP I/O error");                           /* error? */
     clearerr (hsp_unit.fileref);
     return SCPE_IOERR;
     }

@@ -137,6 +137,10 @@ t_stat sim_load (FILE *fi, char *cptr, char *fnam, int flag)
  * The t_addr type must be 32 bit, the upper half contains the segment, the lower
  * half contains the offset. If the upper half is NIL, it is a word address
  */
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 void pdq3_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
 {
   if (ADDR_ISWORD(addr))

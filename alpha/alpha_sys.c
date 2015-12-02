@@ -494,6 +494,11 @@ const uint32 opval[] = {
                         if < 0, number of extra bytes retired
 */
 
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
+
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
@@ -538,7 +543,7 @@ if (sw & SWMASK ('C')) {                                /* char format? */
     for (sc = 0; sc < 64; sc = sc + 8) {                /* print string */
         c = (uint32) (val[0] >> sc) & 0x7F;
         fprintf (of, (c < 0x20)? "<%02X>": "%c", c);
-		}
+        }
     return -7;                                          /* return # chars */
     }
 if (sw & SWMASK ('M')) {                                /* inst format? */

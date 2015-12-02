@@ -31,32 +31,32 @@
 static t_stat sageaux_reset(DEVICE* dptr);
 
 UNIT sageaux_unit[] = {
-	{ UDATA (NULL, UNIT_FIX | UNIT_BINK, 0) },
-	{ UDATA (NULL, UNIT_FIX | UNIT_BINK, 0) },
-	{ UDATA (NULL, UNIT_FIX | UNIT_BINK, 0) },
-	{ UDATA (NULL, UNIT_FIX | UNIT_BINK, 0) }
+    { UDATA (NULL, UNIT_FIX | UNIT_BINK, 0) },
+    { UDATA (NULL, UNIT_FIX | UNIT_BINK, 0) },
+    { UDATA (NULL, UNIT_FIX | UNIT_BINK, 0) },
+    { UDATA (NULL, UNIT_FIX | UNIT_BINK, 0) }
 };
 
 REG sageaux_reg[] = {
-	{ NULL }
+    { NULL }
 };
 
 static MTAB sageaux_mod[] = {
-	{ 0 }
+    { 0 }
 };
 
 DEVICE sageaux_dev = {
-	"AUX", sageaux_unit, sageaux_reg, sageaux_mod,
-	4, 16, 32, 2, 16, 16,
-	NULL, NULL, &sageaux_reset,
-	NULL, NULL, NULL,
-	NULL, DEV_DISABLE|DEV_DIS, 0,
-	NULL, NULL, NULL
+    "AUX", sageaux_unit, sageaux_reg, sageaux_mod,
+    4, 16, 32, 2, 16, 16,
+    NULL, NULL, &sageaux_reset,
+    NULL, NULL, NULL,
+    NULL, DEV_DISABLE|DEV_DIS, 0,
+    NULL, NULL, NULL
 };
 
 static t_stat sageaux_reset(DEVICE* dptr) 
 {
-	printf("sageaux_reset\n");
-	return SCPE_OK;
+    printf("sageaux_reset\n");
+    return SCPE_OK;
 }
 

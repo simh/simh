@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Jun-15    JDB     Conditionally use Global_PC for PC for version 4.0 and on
    30-Dec-14    JDB     Added S-register parameters to ibl_copy, more IBL constants
    28-Dec-14    JDB     Changed suppression from #pragma GCC to #pragma clang
    05-Feb-13    JDB     Added declaration for hp_fprint_stopped
@@ -77,11 +78,14 @@
 #ifndef HP2100_DEFS_H_
 #define HP2100_DEFS_H_ 0
 
-#include "sim_defs.h"                                   /* simulator defns */
 
-/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+#include "sim_defs.h"
+#include "sim_rev.h"
 
-#define PC PC_Global
+
+#if (SIM_MAJOR >= 4)
+  #define PC    PC_Global                       /* Rename to avoid namespace conflicts */
+#endif
 
 
 /* The following pragmas quell clang warnings that are on by default but should

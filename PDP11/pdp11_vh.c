@@ -168,9 +168,12 @@ extern int32    tmxr_poll, clk_tps;
 #define LPR_M_DIAG      (03)
 #define LPR_V_CHAR_LGTH     (3)
 #define LPR_M_CHAR_LGTH     (03)
-#define LPR_PARITY_ENAB     (1 << 5)
-#define LPR_EVEN_PARITY     (1 << 6)
-#define LPR_STOP_CODE       (1 << 7)
+#define LPR_V_PARITY_ENAB   (5)
+#define LPR_PARITY_ENAB     (1 << LPR_V_PARITY_ENAB)
+#define LPR_V_EVEN_PARITY   (6)
+#define LPR_EVEN_PARITY     (1 << LPR_V_EVEN_PARITY)
+#define LPR_V_STOP_CODE     (7)
+#define LPR_STOP_CODE       (1 << LPR_V_STOP_CODE)
 #define LPR_V_RX_SPEED      (8)
 #define LPR_M_RX_SPEED      (017)
 #define LPR_V_TX_SPEED      (12)
@@ -192,6 +195,17 @@ extern int32    tmxr_poll, clk_tps;
 #define RATE_9600       (13)
 #define RATE_19200      (14)
 #define RATE_38400      (15)
+
+static const char *vh_charsizes[] = {"5", "6", "7", "8"};
+static const char *vh_baudrates[] = {"50", "75", "110", "134.5", "150", "300", "600", "1200", 
+                        "1800", "2000", "2400", "4800", "7200", "9600", "19200", "38400"};
+static const char *vh_parity[] = {"N", "N", "E", "O"};
+static const char *vh_stopbits[] = {"1", "2", "1", "1.5"};
+
+#define LPR_GETSPD(x)   vh_baudrates[((x) >> LPR_V_RX_SPEED) & LPR_M_RX_SPEED]
+#define LPR_GETCHARSIZE(x) vh_charsizes[((x) >> LPR_V_CHAR_LGTH) & LPR_M_CHAR_LGTH]
+#define LPR_GETPARITY(x) vh_parity[(((x) >> LPR_V_PARITY_ENAB) & 1) | (((x) >> (LPR_V_EVEN_PARITY-1)) & 2)]
+#define LPR_GETSTOPBITS(x) vh_stopbits[(((x) >> LPR_V_STOP_CODE) & 1) + (((((x) >> LPR_V_CHAR_LGTH) & LPR_M_CHAR_LGTH) == 5) ? 2 : 0)]
 
 /* Line-Status Register (STAT) */
 
@@ -269,6 +283,8 @@ static uint32   vh_rxi = 0; /* rcv interrupts */
 static uint32   vh_txi = 0; /* xmt interrupts */
 static uint32   vh_crit = 0;/* FIFO.CRIT */
 
+static uint32   vh_wait = 0;                    /* input polling adjustment */
+
 static const int32 bitmask[4] = { 037, 077, 0177, 0377 };
 
 /* RX FIFO state */
@@ -338,6 +354,7 @@ static t_stat vh_show_detail (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_show_rbuf (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_show_txq (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_putc (int32 vh, TMLX *lp, int32 chan, int32 data);
+static void vh_set_config (TMLX *lp );
 static void doDMA (int32 vh, int32 chan);
 static t_stat vh_setmode (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -345,9 +362,9 @@ static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-static char *vh_description (DEVICE *dptr);
+static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+static const char *vh_description (DEVICE *dptr);
 
 /* SIMH I/O Structures */
 
@@ -369,6 +386,8 @@ static UNIT vh_unit[VH_MUXES+1] = {
     { UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
 };
 
+static UNIT *vh_timer_unit;
+
 static const REG vh_reg[] = {
     { BRDATAD (CSR,         vh_csr, DEV_RDX, 16, VH_MUXES, "control/status register, boards 0 to 3") },
     { BRDATAD (TIMER,     vh_timer, DEV_RDX, 16, VH_MUXES, "controller timeout, boards 0 to 3") },
@@ -380,6 +399,7 @@ static const REG vh_reg[] = {
     { GRDATAD (RCVINT,      vh_rxi, DEV_RDX, 32, 0,        "rcv interrupts 1 bit/channel") },
     { GRDATAD (TXINT,       vh_txi, DEV_RDX, 32, 0,        "xmt interrupts 1 bit/channel") },
     { GRDATAD (FIFOCRIT,   vh_crit, DEV_RDX, 32, 0,        "FIFO.CRIT 1 bit/channel") },
+    { DRDATAD (TIME,       vh_wait, 24,                    "input polling adjustment"), PV_LEFT },
     { GRDATA  (DEVADDR,  vh_dib.ba, DEV_RDX, 32, 0), REG_HRO },
     { GRDATA  (DEVVEC,  vh_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
@@ -464,13 +484,13 @@ DEVICE vh_dev = {
 };
 
 /* Register names for Debug tracing */
-static char *vh_rd_dhv_regs[] =
+static const char *vh_rd_dhv_regs[] =
     {"CSR   ", "RBUF  ", "LPR   ", "STAT  ", "LNCTRL", "TBFAD1", "TBFAD2", "TBFCNT" };
-static char *vh_wr_dhv_regs[] =
+static const char *vh_wr_dhv_regs[] =
     {"CSR   ", "TXCHAR", "LPR   ", "STAT  ", "LNCTRL", "TBFAD1", "TBFAD2", "TBFCNT" };
-static char *vh_rd_dhu_regs[] =
+static const char *vh_rd_dhu_regs[] =
     {"CSR   ", "RBUF  ", "LPR   ", "FIFOSZ", "LNCTRL", "TBFAD1", "TBFAD2", "TBFCNT" };
-static char *vh_wr_dhu_regs[] =
+static const char *vh_wr_dhu_regs[] =
     {"CSR   ", "RXTIMR", "LPR   ", "FIFODT", "LNCTRL", "TBFAD1", "TBFAD2", "TBFCNT" };
 
 /* Interrupt routines */
@@ -661,6 +681,9 @@ static int32 fifo_get ( int32   vh  )
             }
         }
     }
+    /* Reschedule the next poll preceisely so that the 
+       programmed input speed is observed. */
+    sim_clock_coschedule_abs (&vh_unit[0], tmxr_poll);
     return (data & 0177777);
 }
 /* TX Q manipulation */
@@ -765,20 +788,29 @@ static void vh_getc (   int32   vh  )
     TMLX    *lp;
 
     for (i = 0; i < (uint32)VH_LINES; i++) {
+        if (rbuf_idx[vh] >= (FIFO_ALARM-1)) /* close to fifo capacity? */
+            continue;                       /* don't bother checking for data */
         lp = &vh_parm[(vh * VH_LINES) + i];
         while ((c = tmxr_getc_ln (lp->tmln)) != 0) {
             if (c & SCPE_BREAK) {
                 fifo_put (vh, lp,
                     RBUF_FRAME_ERR | RBUF_PUTLINE (i));
-                /* BUG: check for overflow above */
             } else {
                 c &= bitmask[(lp->lpr >> LPR_V_CHAR_LGTH) &
                     LPR_M_CHAR_LGTH];
                 fifo_put (vh, lp, RBUF_PUTLINE (i) | c);
-                /* BUG: check for overflow above */
             }
         }
     }
+}
+
+static void vh_set_config (     TMLX    *lp )
+{
+    char lineconfig[16];
+    
+    sprintf(lineconfig, "%s-%s%s%s", LPR_GETSPD(lp->lpr), LPR_GETCHARSIZE(lp->lpr), LPR_GETPARITY(lp->lpr), LPR_GETSTOPBITS(lp->lpr));
+    if (!lp->tmln->serconfig || (0 != strcmp(lp->tmln->serconfig, lineconfig))) /* config changed? */
+        tmxr_set_config_line (lp->tmln, lineconfig);      /* set it */
 }
 
 /* I/O dispatch routines */
@@ -867,7 +899,7 @@ fprintf (stderr, "\rtqln %d\n", 64 - tmxr_tqln (lp->tmln));
     }
 
     sim_debug(DBG_REG, &vh_dev, "vh_rd(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, 
-              ((vh_unit[vh].flags & UNIT_MODEDHU) ? vh_rd_dhu_regs : vh_rd_dhv_regs)[(PA >> 1) & 07], access, data);
+              ((vh_unit[vh].flags & UNIT_MODEDHU) ? vh_rd_dhu_regs : vh_rd_dhv_regs)[(PA >> 1) & 07], access, *data);
 
     return (SCPE_OK);
 }
@@ -929,7 +961,7 @@ static t_stat vh_wr (   int32   ldata,
             break;
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
+            sim_clock_coschedule (vh_timer_unit, tmxr_poll);
             break;
         }
         if (vh_unit[vh].flags & UNIT_MODEDHU) {
@@ -974,7 +1006,7 @@ static t_stat vh_wr (   int32   ldata,
     case 2:     /* LPR */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
+            sim_clock_coschedule (vh_timer_unit, tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -989,6 +1021,7 @@ static t_stat vh_wr (   int32   ldata,
         if (CSR_GETCHAN (vh_csr[vh]) != 0)
             data &= ~LPR_DISAB_XRPT;
         lp->lpr = data;
+        vh_set_config (lp);
         if (((lp->lpr >> LPR_V_DIAG) & LPR_M_DIAG) == 1) {
             fifo_put (vh, lp,
                 RBUF_DIAG |
@@ -1001,7 +1034,7 @@ static t_stat vh_wr (   int32   ldata,
     case 3:     /* STAT/FIFODATA */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
+            sim_clock_coschedule (vh_timer_unit, tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -1025,7 +1058,7 @@ static t_stat vh_wr (   int32   ldata,
     case 4:     /* LNCTRL */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
+            sim_clock_coschedule (vh_timer_unit, tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)   
@@ -1093,7 +1126,7 @@ static t_stat vh_wr (   int32   ldata,
     case 5:     /* TBUFFAD1 */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
+            sim_clock_coschedule (vh_timer_unit, tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)   
@@ -1109,7 +1142,7 @@ static t_stat vh_wr (   int32   ldata,
     case 6:     /* TBUFFAD2 */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
+            sim_clock_coschedule (vh_timer_unit, tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -1130,7 +1163,7 @@ static t_stat vh_wr (   int32   ldata,
     case 7:     /* TBUFFCT */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
+            sim_clock_coschedule (vh_timer_unit, tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -1293,6 +1326,7 @@ static void vh_init_chan (  int32   vh,
     lp->lpr = (RATE_9600 << LPR_V_TX_SPEED) |
           (RATE_9600 << LPR_V_RX_SPEED) |
           (03 << LPR_V_CHAR_LGTH);
+    vh_set_config ( lp );
     lp->lnctrl = 0;
     lp->lstat &= ~(STAT_MDL | STAT_DHUID | STAT_RI);
     if (vh_unit[vh].flags & UNIT_MODEDHU)
@@ -1366,8 +1400,9 @@ static t_stat vh_reset (    DEVICE  *dptr   )
     for (i = 0; i < vh_desc.lines; i++)
         vh_parm[i].tmln = &vh_ldsc[i];
     vh_dev.numunits = (vh_desc.lines / VH_LINES) + 1;
-    vh_unit[vh_dev.numunits-1].action = &vh_timersvc;
-    vh_unit[vh_dev.numunits-1].flags = UNIT_DIS;
+    vh_timer_unit = &vh_unit[vh_dev.numunits-1];
+    vh_timer_unit->action = &vh_timersvc;
+    vh_timer_unit->flags = UNIT_DIS;
     for (i = 0; i < vh_desc.lines/VH_LINES; i++) {
         /* if Unibus, force DHU mode */
         if (UNIBUS)
@@ -1557,9 +1592,9 @@ for (i = 0; i < vh_desc.lines; i++) {
 return SCPE_OK;
 }
 
-static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
+const char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
 
 fprintf (st, "%s Terminal Multiplexer (%s)\n\n", devtype, dptr->name);
 fprintf (st, "The %s is an %d-line terminal multiplexer for %s systems.  Up to %d %s's\n", devtype, VH_LINES, (UNIBUS) ? "Unibus" : "Qbus", VH_MUXES, devtype);
@@ -1612,15 +1647,15 @@ vh_help_attach (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
+const char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
 
 fprintf (st, "%s %s Terminal Multiplexer Attach Help\n\n", devtype, dptr->name);
 return tmxr_attach_help (st, dptr, uptr, 1, cptr);
 }
 
-static char *vh_description (DEVICE *dptr)
+static const char *vh_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "DH11 16-line Terminal Multiplexer" : "DHQ11 8-line Terminal Multiplexer";
 }

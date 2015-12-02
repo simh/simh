@@ -204,10 +204,10 @@ if ((temp = getc (uptr->fileref)) == EOF) {             /* error? */
     if (feof (uptr->fileref)) {                         /* eof? */
         pt_sta = pt_sta | STA_DU;                       /* set DU */
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_perror ("PTR I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -228,7 +228,7 @@ if (!pt_rd) {                                           /* write mode? */
         SET_INT (v_PT);
     }
 if (putc (uptr->buf, uptr -> fileref) == EOF) {         /* write char */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (uptr -> fileref);
     return SCPE_IOERR;
     }

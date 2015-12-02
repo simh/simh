@@ -152,10 +152,8 @@ static t_stat net_reset(DEVICE *dptr) {
 static t_stat net_attach(UNIT *uptr, char *cptr) {
     uint32 i;
     char host[CBUFSIZE], port[CBUFSIZE];
-    t_stat r;
 
-    r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), "3000", NULL);
-    if (r != SCPE_OK)
+    if (sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), "3000", NULL))
         return SCPE_ARG;
     net_reset(&net_dev);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
@@ -185,10 +183,10 @@ static t_stat net_detach(UNIT *uptr) {
     if (!(net_unit.flags & UNIT_ATT))
         return SCPE_OK;       /* if not attached simply return */
     if (net_unit.flags & UNIT_SERVER)
-        sim_close_sock(serviceDescriptor[1].masterSocket, TRUE);
+        sim_close_sock(serviceDescriptor[1].masterSocket);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
         if (serviceDescriptor[i].ioSocket)
-            sim_close_sock(serviceDescriptor[i].ioSocket, FALSE);
+            sim_close_sock(serviceDescriptor[i].ioSocket);
     free(net_unit.filename);                                /* free port string */
     net_unit.filename = NULL;
     net_unit.flags &= ~UNIT_ATT;                            /* not attached */
@@ -226,7 +224,7 @@ static t_stat net_svc(UNIT *uptr) {
                         BUFFER_LENGTH - serviceDescriptor[i].inputSize);
                     if (r == -1) {
                         sim_debug(DROP_MSG, &net_dev, "NET: " ADDRESS_FORMAT " Drop connection %i with socket %i.\n", PCX, i, serviceDescriptor[i].ioSocket);
-                        sim_close_sock(serviceDescriptor[i].ioSocket, FALSE);
+                        sim_close_sock(serviceDescriptor[i].ioSocket);
                         serviceDescriptor[i].ioSocket = 0;
                         serviceDescriptor_reset(i);
                         continue;

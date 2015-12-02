@@ -107,7 +107,7 @@ extern uint8 GetByteDMA(const uint32 Addr);
 #define I8272_READ_DELETED_DATA     0x0C
 #define I8272_FORMAT_TRACK          0x0D
 #define I8272_SEEK                  0x0F
-#define UPD765_VERSION				0x10
+#define UPD765_VERSION              0x10
 #define I8272_SCAN_EQUAL            0x11
 #define I8272_SCAN_LOW_EQUAL        0x19
 #define I8272_SCAN_HIGH_EQUAL       0x1D
@@ -148,8 +148,8 @@ DEBTAB i8272_dt[] = {
 };
 
 static char* states[] = {
-	"invalid", "S_CMD", "S_CMDREAD", "S_EXEC", "S_DATAWRITE", "S_SECWRITE", 
-	"S_SECREAD", "S_DATAREAD", "S_RESULT"
+    "invalid", "S_CMD", "S_CMDREAD", "S_EXEC", "S_DATAWRITE", "S_SECWRITE", 
+    "S_SECREAD", "S_DATAREAD", "S_RESULT"
 };
 
 static char* messages[] = {
@@ -164,17 +164,17 @@ static char* messages[] = {
 };
 
 static int8 cmdsizes[] = {
-	1, 1, 9, 3, 2, 9, 9, 2,
-	1, 9, 2, 1, 9, 6, 1, 3,
-	1, 9, 1, 1, 1, 1, 1, 1,
-	1, 9, 1, 1, 1, 9, 1, 1
+    1, 1, 9, 3, 2, 9, 9, 2,
+    1, 9, 2, 1, 9, 6, 1, 3,
+    1, 9, 1, 1, 1, 1, 1, 1,
+    1, 9, 1, 1, 1, 9, 1, 1
 };
 
 static int8 resultsizes[] = {
-	1, 1, 7, 0, 1, 7, 7, 0,
-	2, 7, 7, 1, 7, 7, 1, 0,
-	1, 7, 1, 1, 1, 1, 1, 1,
-	1, 7, 1, 1, 1, 7, 1, 1
+    1, 1, 7, 0, 1, 7, 7, 0,
+    2, 7, 7, 1, 7, 7, 1, 0,
+    1, 7, 1, 1, 1, 1, 1, 1,
+    1, 7, 1, 1, 1, 7, 1, 1
 };
 
 /* default routine to select the drive.
@@ -183,7 +183,7 @@ static int8 resultsizes[] = {
  */
 void i8272_seldrv(I8272* chip, int drvnum)
 {
-	chip->fdc_curdrv = drvnum & 0x03;
+    chip->fdc_curdrv = drvnum & 0x03;
 }
 
 /*
@@ -298,21 +298,21 @@ t_stat i8272_setDMA(I8272* chip, uint32 dma_addr)
 
 t_stat i8272_io(IOHANDLER* ioh,uint32* value,uint32 rw,uint32 mask)
 {
-	int port = ioh->offset;
-	I8272* chip = (I8272*)ioh->ctxt;
-	if (rw==MEM_WRITE)
-		return chip->write ? chip->write(chip,port,*value) : i8272_write(chip,port,*value);
-	else
-		return chip->read ? chip->read(chip,port,value) : i8272_read(chip,port,value);
+    int port = ioh->offset;
+    I8272* chip = (I8272*)ioh->ctxt;
+    if (rw==MEM_WRITE)
+        return chip->write ? chip->write(chip,port,*value) : i8272_write(chip,port,*value);
+    else
+        return chip->read ? chip->read(chip,port,value) : i8272_read(chip,port,value);
 }
 
 t_stat i8272_reset(I8272* chip)
 {
-	NEXTSTATE(S_CMD);
-	chip->idcount = 0;
-	chip->fdc_fault = 0;
+    NEXTSTATE(S_CMD);
+    chip->idcount = 0;
+    chip->fdc_fault = 0;
 
-	return SCPE_OK;
+    return SCPE_OK;
 }
 
 static uint8 floorlog2(unsigned int n)
@@ -329,13 +329,13 @@ static uint8 floorlog2(unsigned int n)
 
 static t_stat i8272_resultphase(I8272* chip,int delay) 
 {
-	uint8 cmd = chip->cmd[0] & 0x1f;
-	chip->fdc_msr &= ~I8272_MSR_NON_DMA;
-	chip->result_len = resultsizes[cmd];
+    uint8 cmd = chip->cmd[0] & 0x1f;
+    chip->fdc_msr &= ~I8272_MSR_NON_DMA;
+    chip->result_len = resultsizes[cmd];
     chip->result_cnt = 0;
-	NEXTSTATE(S_RESULT);
+    NEXTSTATE(S_RESULT);
     if (delay) i8272_interrupt(chip,delay);
-	return SCPE_OK;
+    return SCPE_OK;
 }
 
 /*
@@ -346,21 +346,21 @@ static t_stat i8272_resultphase(I8272* chip,int delay)
  */
 t_stat i8272_finish(I8272* chip)
 {
-	switch (chip->fdc_state) {
-	case S_DATAREAD:
-	case S_DATAWRITE:
-	case S_SECREAD:
-	case S_SECWRITE:
-	case S_RESULT:
-		TRACE_PRINT0(DBG_FD_VERBOSE,"Finish I/O, returning result");
-		chip->irqflag = 0;
-		chip->result[0] &= 0x3f; /* IC=normal termination */
-		return i8272_resultphase(chip,0);
-	default: /* @TODO is this correct? */
-		TRACE_PRINT0(DBG_FD_VERBOSE,"Finish I/O, reset to S_CMD state");
-		NEXTSTATE(S_CMD);
-		return SCPE_OK;
-	}
+    switch (chip->fdc_state) {
+    case S_DATAREAD:
+    case S_DATAWRITE:
+    case S_SECREAD:
+    case S_SECWRITE:
+    case S_RESULT:
+        TRACE_PRINT0(DBG_FD_VERBOSE,"Finish I/O, returning result");
+        chip->irqflag = 0;
+        chip->result[0] &= 0x3f; /* IC=normal termination */
+        return i8272_resultphase(chip,0);
+    default: /* @TODO is this correct? */
+        TRACE_PRINT0(DBG_FD_VERBOSE,"Finish I/O, reset to S_CMD state");
+        NEXTSTATE(S_CMD);
+        return SCPE_OK;
+    }
 }
 
 /* this routine is called when RDY pin goes to zero, effectively
@@ -368,58 +368,58 @@ t_stat i8272_finish(I8272* chip)
  */
 t_stat i8272_abortio(I8272* chip)
 {
-	switch (chip->fdc_state) {
-	case S_DATAREAD:
-	case S_DATAWRITE:
-	case S_SECREAD:
-	case S_SECWRITE:
-		TRACE_PRINT0(DBG_FD_VERBOSE,"RDY=0 during I/O, aborting and returning result");
-		chip->irqflag = 0;
-		chip->result[0] |= 0xc0; /* notify RDY change condition */
-		return i8272_resultphase(chip,0);
+    switch (chip->fdc_state) {
+    case S_DATAREAD:
+    case S_DATAWRITE:
+    case S_SECREAD:
+    case S_SECWRITE:
+        TRACE_PRINT0(DBG_FD_VERBOSE,"RDY=0 during I/O, aborting and returning result");
+        chip->irqflag = 0;
+        chip->result[0] |= 0xc0; /* notify RDY change condition */
+        return i8272_resultphase(chip,0);
 
-	case S_RESULT:
-		TRACE_PRINT0(DBG_FD_VERBOSE,"RDY=0, returning result");
-		chip->irqflag = 0;
-		return i8272_resultphase(chip,0);
-	
-	default: /* @TODO is this correct? */
-		TRACE_PRINT0(DBG_FD_VERBOSE,"Abort I/O, reset to S_CMD state");
-		NEXTSTATE(S_CMD);
-		return SCPE_OK;
-	}
+    case S_RESULT:
+        TRACE_PRINT0(DBG_FD_VERBOSE,"RDY=0, returning result");
+        chip->irqflag = 0;
+        return i8272_resultphase(chip,0);
+
+    default: /* @TODO is this correct? */
+        TRACE_PRINT0(DBG_FD_VERBOSE,"Abort I/O, reset to S_CMD state");
+        NEXTSTATE(S_CMD);
+        return SCPE_OK;
+    }
 }
 
 
 static t_stat i8272_dataread(I8272* chip,uint32* value)
 {
-	if (chip->fdc_nd_cnt < chip->fdc_secsz) {
-		/* return a single byte */
-		chip->irqflag = 0;
-		*value = chip->fdc_sdata[chip->fdc_nd_cnt];
-		TRACE_PRINT2(DBG_FD_RDDATA,"read buffer #%d value=%x", chip->fdc_nd_cnt, *value);
-		chip->fdc_nd_cnt++;
-		if (chip->fdc_nd_cnt != chip->fdc_secsz) {
-			i8272_interrupt(chip,1); /* notify one more byte is ready */
-			return SCPE_OK;
-		}
-	}
-	/* more sectors to read? */
-	if (chip->fdc_sector <= chip->fdc_eot) {
-		NEXTSTATE(S_SECREAD);
-		return SCPE_OK;
-	}
-		
-	/* finished data read */
-	TRACE_PRINT0(DBG_FD_RDDATA,"read buffer complete.");
-	chip->result[0] &= 0x3f; /* clear bits 7,6: terminated correctly */
-	return i8272_resultphase(chip,0);
+    if (chip->fdc_nd_cnt < chip->fdc_secsz) {
+        /* return a single byte */
+        chip->irqflag = 0;
+        *value = chip->fdc_sdata[chip->fdc_nd_cnt];
+        TRACE_PRINT2(DBG_FD_RDDATA,"read buffer #%d value=%x", chip->fdc_nd_cnt, *value);
+        chip->fdc_nd_cnt++;
+        if (chip->fdc_nd_cnt != chip->fdc_secsz) {
+            i8272_interrupt(chip,1); /* notify one more byte is ready */
+            return SCPE_OK;
+        }
+    }
+    /* more sectors to read? */
+    if (chip->fdc_sector <= chip->fdc_eot) {
+        NEXTSTATE(S_SECREAD);
+        return SCPE_OK;
+    }
+
+    /* finished data read */
+    TRACE_PRINT0(DBG_FD_RDDATA,"read buffer complete.");
+    chip->result[0] &= 0x3f; /* clear bits 7,6: terminated correctly */
+    return i8272_resultphase(chip,0);
 }
 
 static I8272_DRIVE_INFO* i8272_select_drive(I8272* chip, uint8 drive)
 {
-	I8272_DRIVE_INFO* dip;
-	
+    I8272_DRIVE_INFO* dip;
+
     (*chip->seldrv)(chip,drive);
     dip = &chip->drive[chip->fdc_curdrv];
     return dip->uptr == NULL ? NULL : dip;
@@ -427,138 +427,138 @@ static I8272_DRIVE_INFO* i8272_select_drive(I8272* chip, uint8 drive)
 
 static t_stat i8272_secread(I8272* chip)
 {
-	int i;
-	unsigned int flags = 0;
-	unsigned int readlen;
-	I8272_DRIVE_INFO* dip = &chip->drive[chip->fdc_curdrv];
+    int i;
+    unsigned int flags = 0;
+    unsigned int readlen;
+    I8272_DRIVE_INFO* dip = &chip->drive[chip->fdc_curdrv];
 
-	/* finished with sector read? */
-	if (chip->fdc_sector > chip->fdc_eot) {
-		TRACE_PRINT2(DBG_FD_RDDATA,"No more sectors: sec=%d EOT=%d",chip->fdc_sector,chip->fdc_eot);
-		return i8272_resultphase(chip,10);
-	}
-	
+    /* finished with sector read? */
+    if (chip->fdc_sector > chip->fdc_eot) {
+        TRACE_PRINT2(DBG_FD_RDDATA,"No more sectors: sec=%d EOT=%d",chip->fdc_sector,chip->fdc_eot);
+        return i8272_resultphase(chip,10);
+    }
+
     /* no, read a buffer */
-	TRACE_PRINT(DBG_FD_RDDATA,(sim_deb,"RD Data, C/H/S=%d/%d/%d sector len=%d",
-		dip->track, chip->fdc_head, chip->fdc_sector, chip->fdc_secsz));
+    TRACE_PRINT(DBG_FD_RDDATA,(sim_deb,"RD Data, C/H/S=%d/%d/%d sector len=%d",
+        dip->track, chip->fdc_head, chip->fdc_sector, chip->fdc_secsz));
 
-	if (dip->imd == NULL) {
-		sim_printf(".imd is NULL!" NLP);
-		return SCPE_STOP;
-	}
-	
-	sectRead(dip->imd, dip->track, chip->fdc_head, chip->fdc_sector,
+    if (dip->imd == NULL) {
+        sim_printf(".imd is NULL!" NLP);
+        return SCPE_STOP;
+    }
+
+    sectRead(dip->imd, dip->track, chip->fdc_head, chip->fdc_sector,
                   chip->fdc_sdata, chip->fdc_secsz, &flags, &readlen);
 
-	chip->result[5] = chip->fdc_sector;
-	chip->result[1] = 0x80;
-	chip->fdc_sector++; /* prepare next sector */
-	
-	/* DMA mode? */
-	if (chip->fdc_nd==0) { /* DMA mode */
-		for (i=0; i < chip->fdc_secsz; i++) {
-			PutByteDMA(chip->fdc_dma_addr, chip->fdc_sdata[i]);
-			chip->fdc_dma_addr++;
-		}
-		TRACE_PRINT(DBG_FD_RDDATA, (sim_deb,"C:%d/H:%d/S:%d/L:%4d: Data transferred to RAM at 0x%06x",
-			dip->track, chip->fdc_head, chip->fdc_sector,
-			chip->fdc_secsz, chip->fdc_dma_addr - i));
-	} else {
-		chip->fdc_nd_cnt = 0; /* start buffer transfer */
+    chip->result[5] = chip->fdc_sector;
+    chip->result[1] = 0x80;
+    chip->fdc_sector++; /* prepare next sector */
+
+    /* DMA mode? */
+    if (chip->fdc_nd==0) { /* DMA mode */
+        for (i=0; i < chip->fdc_secsz; i++) {
+            PutByteDMA(chip->fdc_dma_addr, chip->fdc_sdata[i]);
+            chip->fdc_dma_addr++;
+        }
+        TRACE_PRINT(DBG_FD_RDDATA, (sim_deb,"C:%d/H:%d/S:%d/L:%4d: Data transferred to RAM at 0x%06x",
+            dip->track, chip->fdc_head, chip->fdc_sector,
+            chip->fdc_secsz, chip->fdc_dma_addr - i));
+    } else {
+        chip->fdc_nd_cnt = 0; /* start buffer transfer */
         TRACE_PRINT0(DBG_FD_RDDATA,"read buffer started.");
 
-		/* go to data transfer state */
-		NEXTSTATE(S_DATAREAD);
-		i8272_interrupt(chip,100);
-	}
-	return SCPE_OK;
+        /* go to data transfer state */
+        NEXTSTATE(S_DATAREAD);
+        i8272_interrupt(chip,100);
+    }
+    return SCPE_OK;
 }
 
 t_stat i8272_read(I8272* chip,int addr,uint32* value)
 {
-	t_stat rc;
-	I8272_DRIVE_INFO* dip;
-	if ((dip = &chip->drive[chip->fdc_curdrv]) == NULL) {
-		sim_printf("i8272_read: chip->drive returns NULL, fdc_curdrv=%d\n",chip->fdc_curdrv); 
-		return SCPE_IERR;
-	}
+    t_stat rc;
+    I8272_DRIVE_INFO* dip;
+    if ((dip = &chip->drive[chip->fdc_curdrv]) == NULL) {
+        sim_printf("i8272_read: chip->drive returns NULL, fdc_curdrv=%d\n",chip->fdc_curdrv); 
+        return SCPE_IERR;
+    }
 
-	switch(addr & 0x1) {
-	case I8272_FDC_MSR:
-		*value  = chip->fdc_msr | I8272_MSR_RQM;
-		switch (chip->fdc_state) {
-		case S_CMD:
-		case S_CMDREAD:
-			*value &= ~(I8272_MSR_DATA_OUT|I8272_MSR_FDC_BUSY);
-			return SCPE_OK;
-		case S_SECREAD:
-		case S_DATAWRITE:
-		case S_DATAREAD:
-		case S_SECWRITE:
-		case S_EXEC:
-			*value |= (I8272_MSR_DATA_OUT|I8272_MSR_FDC_BUSY);
-			break;
-			
-		case S_RESULT:
-			*value |= I8272_MSR_DATA_OUT;
-			*value &= ~I8272_MSR_FDC_BUSY;
-			break;
-		default:
-			sim_printf("Default case in i8272_read(FDC_MSR): state=%d\n",chip->fdc_state);
-			return SCPE_IERR;
-		}            
-		TRACE_PRINT1(DBG_FD_STATUS,"RD FDC MSR = 0x%02x",*value);
-		return SCPE_OK;
+    switch(addr & 0x1) {
+    case I8272_FDC_MSR:
+        *value  = chip->fdc_msr | I8272_MSR_RQM;
+        switch (chip->fdc_state) {
+        case S_CMD:
+        case S_CMDREAD:
+            *value &= ~(I8272_MSR_DATA_OUT|I8272_MSR_FDC_BUSY);
+            return SCPE_OK;
+        case S_SECREAD:
+        case S_DATAWRITE:
+        case S_DATAREAD:
+        case S_SECWRITE:
+        case S_EXEC:
+            *value |= (I8272_MSR_DATA_OUT|I8272_MSR_FDC_BUSY);
+            break;
 
-	case I8272_FDC_DATA:
-		for (;;) {
-			switch (chip->fdc_state) {
-			case S_DATAREAD: /* only comes here in non-DMA mode */
-				if ((rc=i8272_dataread(chip,value)) != SCPE_OK) return rc;
-				if (chip->fdc_state == S_RESULT ||
-				    chip->fdc_state == S_DATAREAD) return SCPE_OK;
-				/* otherwise will immediately move to state S_SECREAD */
-				break;
-			
-			case S_SECREAD:
-				if ((rc=i8272_secread(chip)) != SCPE_OK) return rc;
-				if (chip->fdc_state ==S_DATAREAD) return SCPE_OK;
-				/* will immediately move to state S_RESULT */
-			case S_RESULT:
-	            *value = chip->result[chip->result_cnt];
-	            TRACE_PRINT2(DBG_FD_STATUS, "Result [%d]=0x%02x",chip->result_cnt, *value);
-	            chip->irqflag = 0;
-	            chip->result_cnt ++;
-	            if(chip->result_cnt == chip->result_len) {
-	                TRACE_PRINT0(DBG_FD_STATUS,"Result phase complete.\n");
-	                NEXTSTATE(S_CMD);
-	            }
-	            
+        case S_RESULT:
+            *value |= I8272_MSR_DATA_OUT;
+            *value &= ~I8272_MSR_FDC_BUSY;
+            break;
+        default:
+            sim_printf("Default case in i8272_read(FDC_MSR): state=%d\n",chip->fdc_state);
+            return SCPE_IERR;
+        }            
+        TRACE_PRINT1(DBG_FD_STATUS,"RD FDC MSR = 0x%02x",*value);
+        return SCPE_OK;
+
+    case I8272_FDC_DATA:
+        for (;;) {
+            switch (chip->fdc_state) {
+            case S_DATAREAD: /* only comes here in non-DMA mode */
+                if ((rc=i8272_dataread(chip,value)) != SCPE_OK) return rc;
+                if (chip->fdc_state == S_RESULT ||
+                    chip->fdc_state == S_DATAREAD) return SCPE_OK;
+                /* otherwise will immediately move to state S_SECREAD */
+                break;
+
+            case S_SECREAD:
+                if ((rc=i8272_secread(chip)) != SCPE_OK) return rc;
+                if (chip->fdc_state ==S_DATAREAD) return SCPE_OK;
+                /* will immediately move to state S_RESULT */
+            case S_RESULT:
+                *value = chip->result[chip->result_cnt];
+                TRACE_PRINT2(DBG_FD_STATUS, "Result [%d]=0x%02x",chip->result_cnt, *value);
+                chip->irqflag = 0;
+                chip->result_cnt ++;
+                if(chip->result_cnt == chip->result_len) {
+                    TRACE_PRINT0(DBG_FD_STATUS,"Result phase complete.\n");
+                    NEXTSTATE(S_CMD);
+                }
+                
 #if 0
-            	else {
-	        	    i8272_interrupt(chip,5);
-            	}
+                else {
+                    i8272_interrupt(chip,5);
+                }
 #endif
-            	return SCPE_OK;
+                return SCPE_OK;
 
-			case S_CMD:
-			case S_CMDREAD:
-			case S_EXEC:
-			case S_DATAWRITE:
-			case S_SECWRITE:
-	            *value = chip->result[0]; /* hack, in theory any value should be ok but this makes "format" work */
-	            TRACE_PRINT1(DBG_FD_VERBOSE,"error, reading data register when not in data phase. Returning 0x%02x",*value);
-				return SCPE_OK;
-			
-			default:
-				sim_printf("Default case in i8272_read(FDC_DATA): state=%d\n",chip->fdc_state);
-				return SCPE_IERR;
-			}
-		}
-		return SCPE_OK;
-	default:
-		TRACE_PRINT1(DBG_FD_VERBOSE,"Cannot read register %x",addr);
-		*value = 0xFF;
+            case S_CMD:
+            case S_CMDREAD:
+            case S_EXEC:
+            case S_DATAWRITE:
+            case S_SECWRITE:
+                *value = chip->result[0]; /* hack, in theory any value should be ok but this makes "format" work */
+                TRACE_PRINT1(DBG_FD_VERBOSE,"error, reading data register when not in data phase. Returning 0x%02x",*value);
+                return SCPE_OK;
+
+            default:
+                sim_printf("Default case in i8272_read(FDC_DATA): state=%d\n",chip->fdc_state);
+                return SCPE_IERR;
+            }
+        }
+        return SCPE_OK;
+    default:
+        TRACE_PRINT1(DBG_FD_VERBOSE,"Cannot read register %x",addr);
+        *value = 0xFF;
     }
 
     return SCPE_OK;
@@ -566,24 +566,24 @@ t_stat i8272_read(I8272* chip,int addr,uint32* value)
 
 static t_stat i8272_makeresult(I8272* chip, uint8 s0, uint8 s1, uint8 s2, uint8 s3,uint8 s4, uint8 s5, uint8 s6)
 {
-	chip->result[0] = s0;
-	chip->result[1] = s1;
-	chip->result[2] = s2;
-	chip->result[3] = s3;
-	chip->result[4] = s4;
-	chip->result[5] = s5;
-	chip->result[6] = s6;
-	chip->result_cnt = 0;
-	chip->fdc_fault = 0;
-	return SCPE_OK;
+    chip->result[0] = s0;
+    chip->result[1] = s1;
+    chip->result[2] = s2;
+    chip->result[3] = s3;
+    chip->result[4] = s4;
+    chip->result[5] = s5;
+    chip->result[6] = s6;
+    chip->result_cnt = 0;
+    chip->fdc_fault = 0;
+    return SCPE_OK;
 }
 
 static I8272_DRIVE_INFO* i8272_decodecmdbits(I8272* chip)
 {
-	/* note this routine is also used in places where MT or SK bits are irrelevant.
-	 * chip docs imply these bits to be set to 0 
-	 */
-	chip->fdc_mt = (chip->cmd[0] & 0x80) >> 7;
+    /* note this routine is also used in places where MT or SK bits are irrelevant.
+     * chip docs imply these bits to be set to 0 
+     */
+    chip->fdc_mt = (chip->cmd[0] & 0x80) >> 7;
     chip->fdc_mfm = (chip->cmd[0] & 0x40) >> 6;
     chip->fdc_sk = (chip->cmd[0] & 0x20) >> 5;
     chip->fdc_hds = (chip->cmd[1] & 0x04) ? 1 : 0;
@@ -599,10 +599,10 @@ static I8272_DRIVE_INFO* i8272_decodecmdbits(I8272* chip)
 
 static t_stat i8272_nodriveerror(I8272* chip,const char* command,int delay)
 {
-	uint8 st0;
-	
-	TRACE_PRINT1(DBG_FD_ERROR,"%s: no drive or disk\n",command);
-	st0 = 0x40 | 0x10 | chip->fdc_curdrv;
+    uint8 st0;
+
+    TRACE_PRINT1(DBG_FD_ERROR,"%s: no drive or disk\n",command);
+    st0 = 0x40 | 0x10 | chip->fdc_curdrv;
     i8272_makeresult(chip, st0, 0, 0, 0, 0, 0, 0);
     return i8272_resultphase(chip,delay);
 }
@@ -610,15 +610,15 @@ static t_stat i8272_nodriveerror(I8272* chip,const char* command,int delay)
 
 static t_stat i8272_format(I8272* chip)
 {
-	uint8 track, fillbyte, sc, cnt;
+    uint8 track, fillbyte, sc, cnt;
     uint8 sectormap[I8272_MAX_SECTOR]; /* Physical to logical sector map for FORMAT TRACK */
-	unsigned int flags = 0;
+    unsigned int flags = 0;
     int i;
-	I8272_DRIVE_INFO* dip;
+    I8272_DRIVE_INFO* dip;
 
-	/* get MFM bit, others are irrelevant */
+    /* get MFM bit, others are irrelevant */
     if ((dip = i8272_decodecmdbits(chip)) == NULL)
-    	return i8272_nodriveerror(chip,"Format",10);
+        return i8272_nodriveerror(chip,"Format",10);
 
     track = dip->track;   
     chip->fdc_seek_end = track != chip->cmd[2] ? 1 : 0;
@@ -642,15 +642,15 @@ static t_stat i8272_format(I8272* chip)
     cnt = 0;
 
     i8272_makeresult(chip,
-    		((chip->fdc_hds & 1) << 2) | chip->fdc_curdrv, 
-			0, 0, track,
-			chip->fdc_head,   /* AGN for now we cannot format with logicalHead */
-    		chip->fdc_sector, /* AGN ditto for logicalCyl */
-    		chip->fdc_sec_len);
+            ((chip->fdc_hds & 1) << 2) | chip->fdc_curdrv, 
+            0, 0, track,
+            chip->fdc_head,   /* AGN for now we cannot format with logicalHead */
+            chip->fdc_sector, /* AGN ditto for logicalCyl */
+            chip->fdc_sec_len);
 
     for(i = 1; i <= sc; i++) {
-		TRACE_PRINT(DBG_FD_CMD, (sim_deb,"Format Track %d, Sector=%d, len=%d",
-			track, i, chip->fdc_secsz));
+        TRACE_PRINT(DBG_FD_CMD, (sim_deb,"Format Track %d, Sector=%d, len=%d",
+            track, i, chip->fdc_secsz));
 
         if(cnt >= I8272_MAX_SECTOR) {
             TRACE_PRINT0(DBG_FD_ERROR,"Illegal sector count");
@@ -673,12 +673,12 @@ static t_stat i8272_format(I8272* chip)
 
 static t_stat i8272_readid(I8272* chip)
 {
-	TRACK_INFO* curtrk;
-	I8272_DRIVE_INFO* dip;
-	uint8 hds = chip->fdc_hds;
-	
-	if ((dip = i8272_decodecmdbits(chip)) == NULL)
-    	return i8272_nodriveerror(chip,"Readid",10);
+    TRACK_INFO* curtrk;
+    I8272_DRIVE_INFO* dip;
+    uint8 hds = chip->fdc_hds;
+
+    if ((dip = i8272_decodecmdbits(chip)) == NULL)
+        return i8272_nodriveerror(chip,"Readid",10);
 
     curtrk = &dip->imd->track[dip->track][hds];
     
@@ -687,7 +687,7 @@ static t_stat i8272_readid(I8272* chip)
     /* The calculation also works for non-standard format disk images with  */
     /* sectorsizes of 2048, 4096 and 8192 bytes                             */
     chip->fdc_sec_len = floorlog2(curtrk->sectsize) - 7; /* AGN fix to use fdc_hds (was fdc_head)*/
-	chip->fdc_secsz = I8272_SEC2SZ(chip->fdc_sec_len);
+    chip->fdc_secsz = I8272_SEC2SZ(chip->fdc_sec_len);
     
     /* HV we cycle the read sectors on each call of READID to emulator disk spinning */
     /* Sage BIOS need this to find the highest sector number. */
@@ -696,10 +696,10 @@ static t_stat i8272_readid(I8272* chip)
     /* This would allow disk analysis programs that use   */
     /* READID to detect non-standard disk formats.        */
     if (chip->idcount == 0 || chip->idcount >= curtrk->nsects) {
-    	chip->fdc_sector = curtrk->start_sector;
-    	chip->idcount = 1;
+        chip->fdc_sector = curtrk->start_sector;
+        chip->idcount = 1;
     } else {
-    	chip->fdc_sector++;
+        chip->fdc_sector++;
         chip->idcount++;
     }
     if((chip->fdc_sec_len == 0xF8) || (chip->fdc_sec_len > I8272_MAX_N)) { /* Error calculating N or N too large */
@@ -710,15 +710,15 @@ static t_stat i8272_readid(I8272* chip)
     }
 
     /* build result */
-	i8272_makeresult(chip,
-			((hds & 1) << 2) | chip->fdc_curdrv,
-    		0, 0,
-			curtrk->logicalCyl[chip->fdc_sector],  /* AGN logicalCyl */
-			curtrk->logicalHead[chip->fdc_sector], /* AGN logicalHead */
-			chip->fdc_sector,
-			chip->fdc_sec_len);
+    i8272_makeresult(chip,
+            ((hds & 1) << 2) | chip->fdc_curdrv,
+            0, 0,
+            curtrk->logicalCyl[chip->fdc_sector],  /* AGN logicalCyl */
+            curtrk->logicalHead[chip->fdc_sector], /* AGN logicalHead */
+            chip->fdc_sector,
+            chip->fdc_sec_len);
 
-	TRACE_PRINT(DBG_FD_CMD, (sim_deb,
+    TRACE_PRINT(DBG_FD_CMD, (sim_deb,
         "READ ID Drive %d result ST0=%02x ST1=%02x ST2=%02x C=%d H=%d R=%02x N=%d",
         chip->fdc_curdrv, chip->result[0],
         chip->result[1],chip->result[2],chip->result[3],
@@ -728,9 +728,9 @@ static t_stat i8272_readid(I8272* chip)
 
 static t_stat i8272_seek(I8272* chip)
 {
-	I8272_DRIVE_INFO* dip;
-	if ((dip = i8272_decodecmdbits(chip)) == NULL)
-    	return i8272_nodriveerror(chip,"Seek",10);
+    I8272_DRIVE_INFO* dip;
+    if ((dip = i8272_decodecmdbits(chip)) == NULL)
+        return i8272_nodriveerror(chip,"Seek",10);
 
     dip->track = chip->cmd[2];
     chip->fdc_head = chip->fdc_hds; /*AGN seek should save the head */
@@ -739,93 +739,93 @@ static t_stat i8272_seek(I8272* chip)
                 chip->fdc_curdrv, msgMT, msgMFM, chip->cmd[2], msgSK, msgHDS));
 
     NEXTSTATE(S_CMD); /* no result phase */
-	i8272_interrupt(chip,100);
+    i8272_interrupt(chip,100);
     return SCPE_OK;
 }
 
 static t_stat i8272_senseint(I8272* chip)
 {
-	I8272_DRIVE_INFO* dip = &chip->drive[chip->fdc_curdrv];
-	uint8 st0 = (chip->fdc_seek_end ? 0x20 : 0x00) | chip->fdc_curdrv;
-	if (chip->fdc_fault)
-		st0 |= (0x40 | chip->fdc_fault);
+    I8272_DRIVE_INFO* dip = &chip->drive[chip->fdc_curdrv];
+    uint8 st0 = (chip->fdc_seek_end ? 0x20 : 0x00) | chip->fdc_curdrv;
+    if (chip->fdc_fault)
+        st0 |= (0x40 | chip->fdc_fault);
 
     TRACE_PRINT2(DBG_FD_CMD,"Sense Interrupt Status ST0=0x%x PCN=%d",st0,dip->track);
-	i8272_makeresult(chip, st0, dip->track, 0,0,0,0,0);
+    i8272_makeresult(chip, st0, dip->track, 0,0,0,0,0);
     chip->irqflag = 0; /* clear interrupt flag, don't raise a new one */
-	return i8272_resultphase(chip,0);
+    return i8272_resultphase(chip,0);
 }
 
 static t_stat i8272_sensedrive(I8272* chip)
 {
-	uint8 st3;
-	I8272_DRIVE_INFO* dip;
-	t_bool track0;
-	
+    uint8 st3;
+    I8272_DRIVE_INFO* dip;
+    t_bool track0;
+
     if ((dip = i8272_select_drive(chip,chip->cmd[1])) == NULL) {
-    	sim_printf("i8272_sensedrive: i8272_select_drive returns 0\n");
-    	st3 = DRIVE_STATUS_FAULT;
-    	track0 = FALSE;
+        sim_printf("i8272_sensedrive: i8272_select_drive returns 0\n");
+        st3 = DRIVE_STATUS_FAULT;
+        track0 = FALSE;
     } else {
-    	track0 = dip->track == 0;
-	    st3 = dip->ready ? DRIVE_STATUS_READY : 0; /* Drive Ready */
-	    if(imdGetSides(dip->imd) == 2) {
-	        st3 |= DRIVE_STATUS_TWO_SIDED;    /* Two-sided?       */
-	    }
-	    if(imdIsWriteLocked(dip->imd) || (dip->uptr->flags & UNIT_I8272_WLK)) {
-	        st3 |= DRIVE_STATUS_WP;           /* Write Protected? */
-	    }
+        track0 = dip->track == 0;
+        st3 = dip->ready ? DRIVE_STATUS_READY : 0; /* Drive Ready */
+        if(imdGetSides(dip->imd) == 2) {
+            st3 |= DRIVE_STATUS_TWO_SIDED;    /* Two-sided?       */
+        }
+        if(imdIsWriteLocked(dip->imd) || (dip->uptr->flags & UNIT_I8272_WLK)) {
+            st3 |= DRIVE_STATUS_WP;           /* Write Protected? */
+        }
     }
     st3 |= (chip->fdc_hds & 1) << 2;
     st3 |= chip->fdc_curdrv;
     st3 |= track0 ? DRIVE_STATUS_TRACK0 : 0x00; /* Track 0 */
-	i8272_makeresult(chip, st3, 0, 0, 0, 0, 0, 0);
+    i8272_makeresult(chip, st3, 0, 0, 0, 0, 0, 0);
     
     TRACE_PRINT1(DBG_FD_CMD,"Sense Drive Status = 0x%02x", st3);
-	return i8272_resultphase(chip,5);
+    return i8272_resultphase(chip,5);
 }
 
 static t_stat i8272_recalibrate(I8272* chip)
 {
-	I8272_DRIVE_INFO* dip;
+    I8272_DRIVE_INFO* dip;
     if ((dip = i8272_select_drive(chip,chip->cmd[1])) == NULL) {
-    	TRACE_PRINT1(DBG_FD_ERROR,"Recalibrate: no drive or disk drive=%x\n",chip->cmd[1]);
-    	chip->fdc_fault = 0x10; /* EC error */
+        TRACE_PRINT1(DBG_FD_ERROR,"Recalibrate: no drive or disk drive=%x\n",chip->cmd[1]);
+        chip->fdc_fault = 0x10; /* EC error */
     } else {
-	    dip->track = 0;
-	    chip->idcount = 0; /* initialize the ID cycler (used by READID) */
+        dip->track = 0;
+        chip->idcount = 0; /* initialize the ID cycler (used by READID) */
 //    chip->fdc_seek_end = 1;
-	    chip->fdc_seek_end = 0;
+        chip->fdc_seek_end = 0;
     }
     TRACE_PRINT2(DBG_FD_SEEK,"Recalibrate: Drive 0x%02x, EC=%d",chip->fdc_curdrv,chip->fdc_fault?1:0);
 
     NEXTSTATE(S_CMD);  /* No result phase */
-	i8272_interrupt(chip,20);
+    i8272_interrupt(chip,20);
     return SCPE_OK;
 }
 
 static t_stat i8272_specify(I8272* chip)
 {
-	chip->fdc_fault = 0;
-    chip->fdc_nd  = chip->cmd[2] & 0x01;		/* DMA/non-DMA mode */
+    chip->fdc_fault = 0;
+    chip->fdc_nd  = chip->cmd[2] & 0x01;        /* DMA/non-DMA mode */
     TRACE_PRINT(DBG_FD_CMD, (sim_deb,"Specify: SRT=%d, HUT=%d, HLT=%d, ND=%s",
-    		16 - ((chip->cmd[1] & 0xF0) >> 4),	/*SRT*/
-    		(chip->cmd[1] & 0x0F) * 16,			/*HUT*/
-    		((chip->cmd[2] & 0xFE) >> 1) * 2,	/*HLT*/
-    		msgND));
+            16 - ((chip->cmd[1] & 0xF0) >> 4),  /*SRT*/
+            (chip->cmd[1] & 0x0F) * 16,         /*HUT*/
+            ((chip->cmd[2] & 0xFE) >> 1) * 2,   /*HLT*/
+            msgND));
 
-    NEXTSTATE(S_CMD); 							/* no result phase */
+    NEXTSTATE(S_CMD);                           /* no result phase */
     i8272_interrupt(chip,1);
     return SCPE_OK;
 }
 
 static t_bool i8272_secrw(I8272* chip,uint8 cmd)
 {
-	TRACK_INFO* curtrk;
-	I8272_DRIVE_INFO* dip;
-	if ((dip = i8272_decodecmdbits(chip)) == NULL) return FALSE;
+    TRACK_INFO* curtrk;
+    I8272_DRIVE_INFO* dip;
+    if ((dip = i8272_decodecmdbits(chip)) == NULL) return FALSE;
 
-	chip->fdc_seek_end = dip->track != chip->cmd[2] ? 1 : 0;
+    chip->fdc_seek_end = dip->track != chip->cmd[2] ? 1 : 0;
     if (dip->track != chip->cmd[2]) {
         TRACE_PRINT(DBG_FD_CMD, (sim_deb,
             "ERROR: CMD=0x%02x[%s]: Drive: %d, Command wants track %d, but positioner is on track %d.",
@@ -856,203 +856,203 @@ static t_bool i8272_secrw(I8272* chip,uint8 cmd)
         chip->fdc_sec_len, chip->fdc_eot, chip->fdc_gap, chip->fdc_dtl));
 
     i8272_makeresult(chip,
-    		((chip->fdc_hds & 1) << 2) | chip->fdc_curdrv | 0x40, 
-    		0, 0,
-    		curtrk->logicalCyl[chip->fdc_sector],  /* AGN logicalCyl */
-    		curtrk->logicalHead[chip->fdc_sector], /* AGN logicalHead */
-    		chip->fdc_sector,
-			chip->fdc_sec_len);
-	chip->result_cnt = 0;
-	chip->fdc_nd_cnt = 0; /* start buffer transfer */
-	return TRUE;
+            ((chip->fdc_hds & 1) << 2) | chip->fdc_curdrv | 0x40, 
+            0, 0,
+            curtrk->logicalCyl[chip->fdc_sector],  /* AGN logicalCyl */
+            curtrk->logicalHead[chip->fdc_sector], /* AGN logicalHead */
+            chip->fdc_sector,
+            chip->fdc_sec_len);
+    chip->result_cnt = 0;
+    chip->fdc_nd_cnt = 0; /* start buffer transfer */
+    return TRUE;
 }
 
 static t_bool i8272_secwrite(I8272* chip)
 {
-	unsigned int readlen;
-	unsigned int flags = 0;
-	I8272_DRIVE_INFO* dip = &chip->drive[chip->fdc_curdrv];
-	
-	TRACE_PRINT(DBG_FD_WRDATA, (sim_deb,"SecWrite: C:%d/H:%d/S:%d/L:%4d",
-			dip->track, chip->fdc_head, chip->fdc_sector,
-			chip->fdc_secsz));
-	sectWrite(dip->imd, dip->track, chip->fdc_head, chip->fdc_sector,
-            chip->fdc_sdata, chip->fdc_secsz, &flags, &readlen);
-	chip->fdc_sector++;
-	if (chip->fdc_sector > chip->fdc_eot)
-		return i8272_resultphase(chip,200);
+    unsigned int readlen;
+    unsigned int flags = 0;
+    I8272_DRIVE_INFO* dip = &chip->drive[chip->fdc_curdrv];
 
-	NEXTSTATE(S_DATAWRITE);
-	if (chip->fdc_nd) { /* non-DMA */
-		chip->fdc_nd_cnt = 0;
-		i8272_interrupt(chip,10); /* non-DMA: initiate next sector write */
-		return TRUE;
-	}				
-	return FALSE;
+    TRACE_PRINT(DBG_FD_WRDATA, (sim_deb,"SecWrite: C:%d/H:%d/S:%d/L:%4d",
+            dip->track, chip->fdc_head, chip->fdc_sector,
+            chip->fdc_secsz));
+    sectWrite(dip->imd, dip->track, chip->fdc_head, chip->fdc_sector,
+            chip->fdc_sdata, chip->fdc_secsz, &flags, &readlen);
+    chip->fdc_sector++;
+    if (chip->fdc_sector > chip->fdc_eot)
+        return i8272_resultphase(chip,200);
+
+    NEXTSTATE(S_DATAWRITE);
+    if (chip->fdc_nd) { /* non-DMA */
+        chip->fdc_nd_cnt = 0;
+        i8272_interrupt(chip,10); /* non-DMA: initiate next sector write */
+        return TRUE;
+    }
+    return FALSE;
 }
 
 static t_bool i8272_datawrite(I8272* chip,uint32 value,I8272_DRIVE_INFO* dip)
 {
-	int i;
-	
-	/* finished with sector write? */
-	if (chip->fdc_sector > chip->fdc_eot) {
-		TRACE_PRINT0(DBG_FD_WRDATA,"Finished sector write");
-		return i8272_resultphase(chip,200);
-	}
-	if (chip->fdc_nd == 0) { /* DMA */
-		for (i=0; i< chip->fdc_secsz; i++) {
-			chip->fdc_sdata[i] = GetByteDMA(chip->fdc_dma_addr);
-			chip->fdc_dma_addr++;
-		}
-		TRACE_PRINT(DBG_FD_WRDATA, (sim_deb,"C:%d/H:%d/S:%d/L:%4d: Data transferred from RAM at 0x%06x",
-				dip->track, chip->fdc_head, chip->fdc_sector,
-				chip->fdc_secsz, chip->fdc_dma_addr - i));
-	} else { /* non-DMA */
-		chip->fdc_msr |= I8272_MSR_NON_DMA;
-		if ((chip->fdc_nd_cnt+1) < chip->fdc_secsz) {
-			chip->fdc_sdata[chip->fdc_nd_cnt] = value;
-			TRACE_PRINT(DBG_FD_WRDATA,(sim_deb,"write buffer #%d value=%x (%c)", chip->fdc_nd_cnt,value,isprint(value)?value:'?'));
-			chip->fdc_nd_cnt++;
-			/* not yet finished buffering data, leave writer routine */
-			i8272_interrupt(chip,10);
-			TRACE_PRINT0(DBG_FD_WRDATA,"Expect more data");
-			return TRUE;
-		}
-	}
-	TRACE_PRINT0(DBG_FD_WRDATA,"Finished with data write");
-	return FALSE;
+    int i;
+
+    /* finished with sector write? */
+    if (chip->fdc_sector > chip->fdc_eot) {
+        TRACE_PRINT0(DBG_FD_WRDATA,"Finished sector write");
+        return i8272_resultphase(chip,200);
+    }
+    if (chip->fdc_nd == 0) { /* DMA */
+        for (i=0; i< chip->fdc_secsz; i++) {
+            chip->fdc_sdata[i] = GetByteDMA(chip->fdc_dma_addr);
+            chip->fdc_dma_addr++;
+        }
+        TRACE_PRINT(DBG_FD_WRDATA, (sim_deb,"C:%d/H:%d/S:%d/L:%4d: Data transferred from RAM at 0x%06x",
+                dip->track, chip->fdc_head, chip->fdc_sector,
+                chip->fdc_secsz, chip->fdc_dma_addr - i));
+    } else { /* non-DMA */
+        chip->fdc_msr |= I8272_MSR_NON_DMA;
+        if ((chip->fdc_nd_cnt+1) < chip->fdc_secsz) {
+            chip->fdc_sdata[chip->fdc_nd_cnt] = value;
+            TRACE_PRINT(DBG_FD_WRDATA,(sim_deb,"write buffer #%d value=%x (%c)", chip->fdc_nd_cnt,value,isprint(value)?value:'?'));
+            chip->fdc_nd_cnt++;
+            /* not yet finished buffering data, leave writer routine */
+            i8272_interrupt(chip,10);
+            TRACE_PRINT0(DBG_FD_WRDATA,"Expect more data");
+            return TRUE;
+        }
+    }
+    TRACE_PRINT0(DBG_FD_WRDATA,"Finished with data write");
+    return FALSE;
 }
 
 t_stat i8272_write(I8272* chip, int addr, uint32 value)
 {
-	uint8 cmd;
-	I8272_DRIVE_INFO* dip;
-	if ((dip = &chip->drive[chip->fdc_curdrv]) == NULL) {
-    	sim_printf("i8272_write: chip->drive returns 0 fdc_curdrv=%d\n",chip->fdc_curdrv);
-		return SCPE_IERR;
-	}
+    uint8 cmd;
+    I8272_DRIVE_INFO* dip;
+    if ((dip = &chip->drive[chip->fdc_curdrv]) == NULL) {
+        sim_printf("i8272_write: chip->drive returns 0 fdc_curdrv=%d\n",chip->fdc_curdrv);
+        return SCPE_IERR;
+    }
 
-	switch(addr & 0x1) {
-	case I8272_FDC_MSR:
-		TRACE_PRINT1(DBG_FD_VERBOSE,"WR Drive Select Reg=%02x", value);
-		return SCPE_OK;
+    switch(addr & 0x1) {
+    case I8272_FDC_MSR:
+        TRACE_PRINT1(DBG_FD_VERBOSE,"WR Drive Select Reg=%02x", value);
+        return SCPE_OK;
 
-	case I8272_FDC_DATA:
-		chip->fdc_msr &= 0xF0;
-		TRACE_PRINT2(DBG_FD_VERBOSE,"WR Data, index=%d value=%x", chip->cmd_cnt,value);
-		
-		for (;;) {
-			switch (chip->fdc_state) {
-			case S_CMD:
-				/* first cmd byte */
-				cmd = value & 0x1f;
-				chip->cmd_cnt = 0;
-	            TRACE_PRINT2(DBG_FD_CMD,"CMD=0x%02x[%s]", cmd, msgCMD);
-	           	chip->cmd_len = cmdsizes[cmd];
-	           	NEXTSTATE(S_CMDREAD);
-	           	/*fallthru*/
-			case S_CMDREAD:
-				/* following cmd bytes */
-				chip->cmd[chip->cmd_cnt] = value;
-				chip->cmd_cnt++;
-			
-				if (chip->cmd_cnt == chip->cmd_len) {
-					chip->fdc_nd_cnt = 0; /* initialize counter for Non-DMA mode */
-					chip->cmd_cnt = 0; /* reset index for next CMD */
-					NEXTSTATE(S_EXEC); /* continue immediately with S_EXEC code */
-					break;
-				}
-				return SCPE_OK;
-			case S_DATAREAD: /* data reading happens in i8272_read */
-				return SCPE_OK;
-			case S_RESULT: /* result polling happens in i8272_read */
-				return SCPE_OK;
-			case S_DATAWRITE:
-				if (i8272_datawrite(chip,value,dip)) return SCPE_OK;
-				TRACE_PRINT0(DBG_FD_WRDATA,"Go Sector Write");
-				NEXTSTATE(S_SECWRITE);
-				/*fallthru*/
-			case S_SECWRITE: /* write buffer */
-				if (i8272_secwrite(chip)) return SCPE_OK;
-				break;
-			case S_SECREAD:
-				return i8272_secread(chip);
-			case S_EXEC:
-				cmd = chip->cmd[0] & 0x1f;
-				switch (cmd) {
-				case I8272_SPECIFY:
-					return i8272_specify(chip);
+    case I8272_FDC_DATA:
+        chip->fdc_msr &= 0xF0;
+        TRACE_PRINT2(DBG_FD_VERBOSE,"WR Data, index=%d value=%x", chip->cmd_cnt,value);
 
-				case I8272_SENSE_INTR_STATUS:
-					return i8272_senseint(chip);
+        for (;;) {
+            switch (chip->fdc_state) {
+            case S_CMD:
+                /* first cmd byte */
+                cmd = value & 0x1f;
+                chip->cmd_cnt = 0;
+                TRACE_PRINT2(DBG_FD_CMD,"CMD=0x%02x[%s]", cmd, msgCMD);
+                chip->cmd_len = cmdsizes[cmd];
+                NEXTSTATE(S_CMDREAD);
+                /*fallthru*/
+            case S_CMDREAD:
+                /* following cmd bytes */
+                chip->cmd[chip->cmd_cnt] = value;
+                chip->cmd_cnt++;
 
-				case I8272_SENSE_DRIVE_STATUS:  /* Setup Status3 Byte */
-					return i8272_sensedrive(chip);
+                if (chip->cmd_cnt == chip->cmd_len) {
+                    chip->fdc_nd_cnt = 0; /* initialize counter for Non-DMA mode */
+                    chip->cmd_cnt = 0; /* reset index for next CMD */
+                    NEXTSTATE(S_EXEC); /* continue immediately with S_EXEC code */
+                    break;
+                }
+                return SCPE_OK;
+            case S_DATAREAD: /* data reading happens in i8272_read */
+                return SCPE_OK;
+            case S_RESULT: /* result polling happens in i8272_read */
+                return SCPE_OK;
+            case S_DATAWRITE:
+                if (i8272_datawrite(chip,value,dip)) return SCPE_OK;
+                TRACE_PRINT0(DBG_FD_WRDATA,"Go Sector Write");
+                NEXTSTATE(S_SECWRITE);
+                /*fallthru*/
+            case S_SECWRITE: /* write buffer */
+                if (i8272_secwrite(chip)) return SCPE_OK;
+                break;
+            case S_SECREAD:
+                return i8272_secread(chip);
+            case S_EXEC:
+                cmd = chip->cmd[0] & 0x1f;
+                switch (cmd) {
+                case I8272_SPECIFY:
+                    return i8272_specify(chip);
+
+                case I8272_SENSE_INTR_STATUS:
+                    return i8272_senseint(chip);
+
+                case I8272_SENSE_DRIVE_STATUS:  /* Setup Status3 Byte */
+                    return i8272_sensedrive(chip);
 
                 case I8272_RECALIBRATE: /* RECALIBRATE */
-                	return i8272_recalibrate(chip);
+                    return i8272_recalibrate(chip);
 
                 case UPD765_VERSION:
-					i8272_makeresult(chip, 0x80, 0, 0, 0, 0, 0, 0);
-					/* signal UPD765A, don't know whether B version (0x90) is relevant */
-					return i8272_resultphase(chip,5);
+                    i8272_makeresult(chip, 0x80, 0, 0, 0, 0, 0, 0);
+                    /* signal UPD765A, don't know whether B version (0x90) is relevant */
+                    return i8272_resultphase(chip,5);
 
-				case I8272_SEEK:    /* SEEK */
-					return i8272_seek(chip);
+                case I8272_SEEK:    /* SEEK */
+                    return i8272_seek(chip);
 
                case I8272_READ_ID:
-					return i8272_readid(chip);
+                    return i8272_readid(chip);
 
                 case I8272_FORMAT_TRACK:    /* FORMAT A TRACK */
-                	return i8272_format(chip);
+                    return i8272_format(chip);
 
                 case I8272_READ_TRACK:
                     sim_printf("I8272: " ADDRESS_FORMAT " Read a track (untested.)" NLP, PCX);
                     chip->fdc_sector = 1; /* Read entire track from sector 1...eot */
                 case I8272_READ_DATA:
                 case I8272_READ_DELETED_DATA:
-                	if (!i8272_secrw(chip,cmd))
-                    	return i8272_nodriveerror(chip,"I8272_READ_*_DATA",10);
+                    if (!i8272_secrw(chip,cmd))
+                        return i8272_nodriveerror(chip,"I8272_READ_*_DATA",10);
 
-                	/* go directly to secread state */
-                	NEXTSTATE(S_SECREAD);
-					break;
-                	
+                    /* go directly to secread state */
+                    NEXTSTATE(S_SECREAD);
+                    break;
+
                 case I8272_WRITE_DATA:
                 case I8272_WRITE_DELETED_DATA:
-                	if (!i8272_secrw(chip,cmd))
-                    	return i8272_nodriveerror(chip,"I8272_WRITE_*_DATA",10);
+                    if (!i8272_secrw(chip,cmd))
+                        return i8272_nodriveerror(chip,"I8272_WRITE_*_DATA",10);
 
-                	NEXTSTATE(S_DATAWRITE); /* fill buffer */
-					if (chip->fdc_nd != 0) { /* non-DMA */
-                		i8272_interrupt(chip,100); /* request the first data byte */
-                		return SCPE_OK;
-					}
-                	break;
+                    NEXTSTATE(S_DATAWRITE); /* fill buffer */
+                    if (chip->fdc_nd != 0) { /* non-DMA */
+                        i8272_interrupt(chip,100); /* request the first data byte */
+                        return SCPE_OK;
+                    }
+                    break;
 
                 case I8272_SCAN_LOW_EQUAL:
                 case I8272_SCAN_HIGH_EQUAL:
                 case I8272_SCAN_EQUAL:
-                	if (!i8272_secrw(chip,cmd))
-                    	return i8272_nodriveerror(chip,"I8272_SCAN_*",10);
+                    if (!i8272_secrw(chip,cmd))
+                        return i8272_nodriveerror(chip,"I8272_SCAN_*",10);
 
-                	TRACE_PRINT0(DBG_FD_CMD,"Scan Data");
+                    TRACE_PRINT0(DBG_FD_CMD,"Scan Data");
                     TRACE_PRINT0(DBG_FD_ERROR,"ERROR: Scan not implemented.");
                     return i8272_resultphase(chip,200);
-				}
-			}
-		}
-		/*NOTREACHED*/
-	
-	default:
-		return SCPE_OK;
-	}
+                }
+            }
+        }
+        /*NOTREACHED*/
+
+    default:
+        return SCPE_OK;
+    }
 }
 
 static void i8272_interrupt(I8272* chip,int delay)
 {
     TRACE_PRINT0(DBG_FD_IRQ,"FDC Interrupt");
     chip->irqflag = 1;
-	(*chip->irq)(chip,delay);
+    (*chip->irq)(chip,delay);
 }

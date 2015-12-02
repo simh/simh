@@ -338,19 +338,19 @@
 typedef union YYSTYPE
 #line 74 "m68k_parse.y"
 {
-	int rc;
-	int reg;
-	int wl;
-	int opc;
-	struct _ea ea;
-	t_value num;
-	struct _rea rea;
-	struct _mask mask;
-	struct _brop brop;
+    int rc;
+    int reg;
+    int wl;
+    int opc;
+    struct _ea ea;
+    t_value num;
+    struct _rea rea;
+    struct _mask mask;
+    struct _brop brop;
 }
 /* Line 1489 of yacc.c.  */
 #line 353 "m68k_parse.tab.h"
-	YYSTYPE;
+    YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

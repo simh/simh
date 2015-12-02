@@ -46,26 +46,26 @@ extern DEVICE sagehd_dev;
 extern DEVICE sageaux_dev;
 #endif
 
-char	sim_name[] = "Sage-II/IV 68k";
+char    sim_name[] = "Sage-II/IV 68k";
 
-REG		*sim_PC = &m68kcpu_reg[18];
-int		sim_emax = SIM_EMAX;
-DEVICE	*sim_devices[] = {
-		&sagecpu_dev,
-		&sagepic_dev,
-		&sagetimer1_dev,
-		&sagetimer2_dev,
-		&sagedip_dev,
-		&sagefd_dev,
-		&sagecons_dev,
-		&sagesio_dev,
-		&sagelp_dev,
+REG     *sim_PC = &m68kcpu_reg[18];
+int     sim_emax = SIM_EMAX;
+DEVICE  *sim_devices[] = {
+        &sagecpu_dev,
+        &sagepic_dev,
+        &sagetimer1_dev,
+        &sagetimer2_dev,
+        &sagedip_dev,
+        &sagefd_dev,
+        &sagecons_dev,
+        &sagesio_dev,
+        &sagelp_dev,
 #if 0
-		&sageieee_dev,
+        &sageieee_dev,
 #endif
 #ifdef SAGE_IV
-		&sagehd_dev,
-		&sageaux_dev,
+        &sagehd_dev,
+        &sageaux_dev,
 #endif
-		NULL
+        NULL
 };

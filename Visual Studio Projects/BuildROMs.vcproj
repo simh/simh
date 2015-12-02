@@ -26,15 +26,14 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
+				Description="Check for required build dependencies &amp; git commit id"
+				CommandLine="Pre-Build-Event.cmd $(InputFileName)"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
-			/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
 			/>
 			<Tool
 				Name="VCMIDLTool"
@@ -108,15 +107,14 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
+				Description="Check for required build dependencies &amp; git commit id"
+				CommandLine="Pre-Build-Event.cmd $(InputFileName)"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
-			/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
 			/>
 			<Tool
 				Name="VCMIDLTool"

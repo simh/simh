@@ -50,8 +50,8 @@
 #define DKA_M_TK        0x1FF
 #define DKA_V_SC        0                               /* sector offset */
 #define DKA_M_SC        0xF
-#define DKA_GETTK(x)	(((x) >> DKA_V_TK) & DKA_M_TK)
-#define DKA_GETSC(x)	(((x) >> DKA_V_SC) & DKA_M_SC)
+#define DKA_GETTK(x)    (((x) >> DKA_V_TK) & DKA_M_TK)
+#define DKA_GETSC(x)    (((x) >> DKA_V_SC) & DKA_M_SC)
 
 /* Status byte 3 is current sector */
 

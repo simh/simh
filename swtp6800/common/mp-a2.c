@@ -1,38 +1,44 @@
 /*  mp-a2.c: SWTP MP-A2 M6800 CPU simulator
 
-    Copyright (c) 2011, William Beech
+    Copyright (c) 2011-2012, William Beech
 
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
+        Permission is hereby granted, free of charge, to any person obtaining a
+        copy of this software and associated documentation files (the "Software"),
+        to deal in the Software without restriction, including without limitation
+        the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        and/or sell copies of the Software, and to permit persons to whom the
+        Software is furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
+        The above copyright notice and this permission notice shall be included in
+        all copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-    WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+        IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+        CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the name of William A. Beech shall not
-    be used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from William A. Beech.
+        Except as contained in this notice, the name of William A. Beech shall not
+        be used in advertising or otherwise to promote the sale, use or other dealings
+        in this Software without prior written authorization from William A. Beech.
 
-    The MP-A2 CPU Board contains the following devices [mp-a2.c]:
-        M6800 processor [m6800.c].
-        M6810 128 byte RAM at 0xA000 [m6810.c].
-        M6830, SWTBUG, or custom boot ROM at 0xE000 [bootrom.c].
-        4 ea 2716 EPROMs at either 0xC000, 0xC800, 0xD000 and 0xD800 (LO_PROM)or
-            0xE000, 0xE800, 0xF000 and 0xF800 (HI_PROM) [eprom.c].
-        Interface to the SS-50 bus and the MP-B2 Mother Board for I/O 
-            and memory boards [mp-b2.c].
-        Note: The file names of the emulator source programs for each device are
-        contained in "[]".
+    MODIFICATIONS:
+
+        24 Apr 15 -- Modified to use simh_debug
+
+    NOTES:
+
+        The MP-A2 CPU Board contains the following devices [mp-a2.c]:
+            M6800 processor [m6800.c].
+            M6810 128 byte RAM at 0xA000 [m6810.c].
+            M6830, SWTBUG, or custom boot ROM at 0xE000 [bootrom.c].
+            4 ea 2716 EPROMs at either 0xC000, 0xC800, 0xD000 and 0xD800 (LO_PROM)or
+                0xE000, 0xE800, 0xF000 and 0xF800 (HI_PROM) [eprom.c].
+            Interface to the SS-50 bus and the MP-B2 Mother Board for I/O 
+                and memory boards [mp-b2.c].
+            Note: The file names of the emulator source programs for each device are
+            contained in "[]".
 */
 
 #include <stdio.h>
@@ -169,46 +175,39 @@ int32 CPU_BD_get_mbyte(int32 addr)
 {
     int32 val;
 
-    if (CPU_BD_dev.dctrl & DEBUG_read)
-        printf("CPU_BD_get_mbyte: addr=%04X\n", addr);
+    sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: addr=%04X\n", addr);
     switch(addr & 0xF000) {
         case 0xA000:
             if (CPU_BD_unit.flags & UNIT_RAM) {
                 val = m6810_get_mbyte(addr - 0xA000) & 0xFF;
-                if (CPU_BD_dev.dctrl & DEBUG_read)
-                    printf("CPU_BD_get_mbyte: m6810 val=%02X\n", val);
+                sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: m6810 val=%02X\n", val);
                 return val;
             } else {
                 val = MB_get_mbyte(addr) & 0xFF;
-                if (CPU_BD_dev.dctrl & DEBUG_read)
-                    printf("CPU_BD_get_mbyte: m6810 val=%02X\n", val);
+                sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: m6810 val=%02X\n", val);
                 return val;
             }
         case 0xC000:
             if (CPU_BD_unit.flags & UNIT_LO_PROM) {
                 val = i2716_get_mbyte(addr - 0xC000) & 0xFF;
-                if (CPU_BD_dev.dctrl & DEBUG_read)
-                    printf("CPU_BD_get_mbyte: 2716=%02X\n", val);
+                sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: 2716=%02X\n", val);
                 return val;
             } else
                 return 0xFF;
             break;
         case 0xE000:
             val = BOOTROM_get_mbyte(addr - 0xE000) & 0xFF;
-            if (CPU_BD_dev.dctrl & DEBUG_read)
-                printf("CPU_BD_get_mbyte: EPROM=%02X\n", val);
+            sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: EPROM=%02X\n", val);
             return val;
         case 0xF000:
             if (CPU_BD_unit.flags & UNIT_MON) {
                 val = BOOTROM_get_mbyte(addr - (0x10000 - BOOTROM_unit.capac)) & 0xFF;
-                if (CPU_BD_dev.dctrl & DEBUG_read)
-                    printf("CPU_BD_get_mbyte: EPROM=%02X\n", val);
+                sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: EPROM=%02X\n", val);
                 return val;
             }
         default:
             val = MB_get_mbyte(addr) & 0xFF;
-            if (CPU_BD_dev.dctrl & DEBUG_read)
-                printf("CPU_BD_get_mbyte: mp_b2 val=%02X\n", val);
+            sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: mp_b2 val=%02X\n", val);
             return val;
     }
 }
@@ -219,13 +218,11 @@ int32 CPU_BD_get_mword(int32 addr)
 {
     int32 val;
 
-    if (CPU_BD_dev.dctrl & DEBUG_read)
-        printf("CPU_BD_get_mword: addr=%04X\n", addr);
+    sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mword: addr=%04X\n", addr);
     val = (CPU_BD_get_mbyte(addr) << 8);
     val |= CPU_BD_get_mbyte(addr+1);
     val &= 0xFFFF;
-    if (CPU_BD_dev.dctrl & DEBUG_read)
-        printf("CPU_BD_get_mword: val=%04X\n", val);
+    sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mword: val=%04X\n", val);
     return val;
 }
 
@@ -233,8 +230,8 @@ int32 CPU_BD_get_mword(int32 addr)
 
 void CPU_BD_put_mbyte(int32 addr, int32 val)
 {
-    if (CPU_BD_dev.dctrl & DEBUG_write)
-        printf("CPU_BD_put_mbyte: addr=%04X, val=%02X\n", addr, val);
+    sim_debug (DEBUG_write, &CPU_BD_dev, "CPU_BD_put_mbyte: addr=%04X, val=%02X\n",
+        addr, val);
     switch(addr & 0xF000) {
         case 0xA000:
             if (CPU_BD_unit.flags & UNIT_RAM) {
@@ -254,8 +251,8 @@ void CPU_BD_put_mbyte(int32 addr, int32 val)
 
 void CPU_BD_put_mword(int32 addr, int32 val)
 {
-    if (CPU_BD_dev.dctrl & DEBUG_write)
-        printf("CPU_BD_put_mword: addr=%04X, val=%04X\n", addr, val);
+    sim_debug (DEBUG_write, &CPU_BD_dev, "CPU_BD_put_mword: addr=%04X, val=%04X\n",
+        addr, val);
     CPU_BD_put_mbyte(addr, val >> 8);
     CPU_BD_put_mbyte(addr+1, val);
 }

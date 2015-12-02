@@ -408,7 +408,7 @@ rk_busy = 0;
 RK_INT_UPDATE;
 
 if (err != 0) {
-    perror ("RK I/O error");
+    sim_perror ("RK I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

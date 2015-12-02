@@ -25,7 +25,7 @@
 
    mt           516-4100 seven track magnetic tape
 
-    3-Jul-13    RLA     compatibility changes for extended interrupts
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    09-Jun-07    RMS     Fixed bug in write without stop (Theo Engel)
    16-Feb-06    RMS     Added tape capacity checking

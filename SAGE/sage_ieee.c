@@ -33,30 +33,30 @@
 static t_stat sageieee_reset(DEVICE* dptr);
 
 UNIT sageieee_unit = {
-	UDATA (NULL, UNIT_FIX | UNIT_BINK, 0)
+    UDATA (NULL, UNIT_FIX | UNIT_BINK, 0)
 };
 
 REG sageieee_reg[] = {
-	{ NULL }
+    { NULL }
 };
 
 static MTAB sageieee_mod[] = {
-	{ 0 }
+    { 0 }
 };
 
 DEVICE sageieee_dev = {
-	"IEEE", &sageieee_unit, sageieee_reg, sageieee_mod,
-	1, 16, 32, 2, 16, 16,
-	NULL, NULL, &sageieee_reset,
-	NULL, NULL, NULL,
-	NULL, DEV_DISABLE|DEV_DIS, 0,
-	NULL, NULL, NULL
+    "IEEE", &sageieee_unit, sageieee_reg, sageieee_mod,
+    1, 16, 32, 2, 16, 16,
+    NULL, NULL, &sageieee_reset,
+    NULL, NULL, NULL,
+    NULL, DEV_DISABLE|DEV_DIS, 0,
+    NULL, NULL, NULL
 };
 
 static t_stat sageieee_reset(DEVICE* dptr) 
 {
-	printf("sageieee_reset\n");
-	return SCPE_OK;
+    printf("sageieee_reset\n");
+    return SCPE_OK;
 }
 
 #endif

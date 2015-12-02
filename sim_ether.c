@@ -150,6 +150,9 @@
                       specified at open time.  This functionality is only 
                       available on *nix platforms since the vde api isn't 
                       available on Windows.
+  HAVE_SLIRP_NETWORK- Specifies that support for SLiRP networking should be 
+                      included.  This can be leveraged to provide User Mode 
+                      IP NAT connectivity for simulators.
 
   NEED_PCAP_SENDPACKET
                     - Specifies that you are using an older version of libpcap
@@ -511,7 +514,7 @@ void eth_setcrc(ETH_DEV* dev, int need_crc)
   dev->need_crc = need_crc;
 }
 
-void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int detail, uint32 reason)
+void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, const char* txt, int detail, uint32 reason)
 {
   if (dev->dptr->dctrl & reason) {
     char src[20];
@@ -557,12 +560,12 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int
   }
 }
 
-void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
+void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, const char* txt)
 {
   eth_packet_trace_ex(dev, msg, len, txt, 0, dev->dbit);
 }
 
-void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
+void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, const char* txt)
 {
   eth_packet_trace_ex(dev, msg, len, txt, 1     , dev->dbit);
 }
@@ -851,7 +854,7 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
   {return SCPE_NOFNC;}
-t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
   {
   fprintf (st, "%s attach help\n\n", dptr->name);
   fprintf (st, "This simulator was not built with ethernet device support\n");
@@ -884,7 +887,7 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 
 const char *eth_capabilities(void)
  {
- return "Ethernet Packet transport"
+ return "Ethernet Packet transports"
 #if defined (HAVE_PCAP_NETWORK)
      ":PCAP"
 #endif
@@ -893,6 +896,9 @@ const char *eth_capabilities(void)
 #endif
 #if defined (HAVE_VDE_NETWORK)
      ":VDE"
+#endif
+#if defined (HAVE_SLIRP_NETWORK)
+     ":NAT"
 #endif
      ":UDP";
  }
@@ -938,6 +944,10 @@ typedef void * pcap_t;  /* Pseudo Type to avoid compiler errors */
 #include <libvdeplug.h>
 #endif /* HAVE_VDE_NETWORK */
 
+#ifdef HAVE_SLIRP_NETWORK
+#include "sim_slirp.h"
+#endif /* HAVE_SLIRP_NETWORK */
+
 /* Allows windows to look up user-defined adapter names */
 #if defined(_WIN32)
 #include <winreg.h>
@@ -958,7 +968,7 @@ static HINSTANCE hLib = 0;                      /* handle to DLL */
 static void *hLib = 0;                      /* handle to Library */
 #endif
 static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
-static char* lib_name =
+static const char* lib_name =
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
 #elif defined(__APPLE__)
@@ -968,7 +978,7 @@ static char* lib_name =
 #define __STR(tok) __STR_QUOTE(tok)
                           "libpcap." __STR(HAVE_DLOPEN);
 #endif
-static char* no_pcap = 
+static const char* no_pcap = 
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap load failure";
 #else
@@ -1003,7 +1013,7 @@ static char*   (*p_pcap_lib_version) (void);
 /* load function pointer from DLL */
 typedef int (*_func)();
 
-static void load_function(char* function, _func* func_ptr) {
+static void load_function(const char* function, _func* func_ptr) {
 #ifdef _WIN32
     *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
 #else
@@ -1441,7 +1451,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
     char command[1024];
     FILE *f;
     int i;
-    char *patterns[] = {
+    const char *patterns[] = {
         "grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
         "egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
         NULL};
@@ -1495,6 +1505,17 @@ _eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine);
 static void
 _eth_error(ETH_DEV* dev, const char* where);
 
+#if defined(HAVE_SLIRP_NETWORK)
+static void _slirp_callback (void *opaque, const unsigned char *buf, int len)
+{
+struct pcap_pkthdr header;
+
+memset(&header, 0, sizeof(header));
+header.caplen = header.len = len;
+_eth_callback((u_char *)opaque, &header, buf);
+}
+#endif
+
 #if defined (USE_READER_THREAD)
 #include <pthread.h>
 
@@ -1524,6 +1545,7 @@ switch (dev->eth_api) {
   case ETH_API_TAP:
   case ETH_API_VDE:
   case ETH_API_UDP:
+  case ETH_API_NAT:
     do_select = 1;
     select_fd = dev->fd_handle;
     break;
@@ -1532,8 +1554,8 @@ switch (dev->eth_api) {
 sim_debug(dev->dbit, dev->dptr, "Reader Thread Starting\n");
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
-   thread which in general won't be readily yielding the processor when 
-   this thread needs to run */
+   thread which, in general, won't be readily yielding the processor 
+   when this thread needs to run */
 pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
@@ -1544,22 +1566,31 @@ while (dev->handle) {
     if (WAIT_OBJECT_0 == WaitForSingleObject (hWait, 250))
       sel_ret = 1;
     }
-  if (dev->eth_api == ETH_API_UDP)
+  if ((dev->eth_api == ETH_API_UDP) || (dev->eth_api == ETH_API_NAT))
 #endif /* _WIN32 */
   if (1) {
-    fd_set setl;
-    struct timeval timeout;
-
     if (do_select) {
-      FD_ZERO(&setl);
-      FD_SET(select_fd, &setl);
-      timeout.tv_sec = 0;
-      timeout.tv_usec = 250*1000;
-      sel_ret = select(1+select_fd, &setl, NULL, NULL, &timeout);
+#ifdef HAVE_SLIRP_NETWORK
+      if (dev->eth_api == ETH_API_NAT) {
+        sel_ret = sim_slirp_select ((SLIRP*)dev->handle, 250);
+        }
+      else
+#endif
+        {
+        fd_set setl;
+        struct timeval timeout;
+        
+        FD_ZERO(&setl);
+        FD_SET(select_fd, &setl);
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 250*1000;
+        sel_ret = select(1+select_fd, &setl, NULL, NULL, &timeout);
+        }
       }
     else
       sel_ret = 1;
-    if (sel_ret < 0 && errno != EINTR) break;
+    if (sel_ret < 0 && errno != EINTR) 
+      break;
     }
   if (sel_ret > 0) {
     if (!dev->handle)
@@ -1617,6 +1648,12 @@ while (dev->handle) {
           }
         break;
 #endif /* HAVE_VDE_NETWORK */
+#ifdef HAVE_SLIRP_NETWORK
+      case ETH_API_NAT:
+        sim_slirp_dispatch ((SLIRP*)dev->handle);
+        status = 1;
+        break;
+#endif /* HAVE_SLIRP_NETWORK */
       case ETH_API_UDP:
         if (1) {
           struct pcap_pkthdr header;
@@ -1769,7 +1806,7 @@ dev->throttle_mask = (1 << dev->throttle_burst) - 1;
 return SCPE_OK;
 }
 
-static t_stat _eth_open_port(char *savname, int *eth_api, void **handle, SOCKET *fd_handle, char errbuf[PCAP_ERRBUF_SIZE], char *bpf_filter)
+static t_stat _eth_open_port(char *savname, int *eth_api, void **handle, SOCKET *fd_handle, char errbuf[PCAP_ERRBUF_SIZE], char *bpf_filter, void *opaque, DEVICE *dptr, uint32 dbit)
 {
 int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
 
@@ -1785,11 +1822,14 @@ memset(errbuf, 0, PCAP_ERRBUF_SIZE);
 if (0 == strncmp("tap:", savname, 4)) {
   int  tun = -1;    /* TUN/TAP Socket */
   int  on = 1;
+  char *devname = savname + 4;
 
+  while (isspace(*devname))
+      ++devname;
 #if defined(HAVE_TAP_NETWORK)
   if (!strcmp(savname, "tap:tapN")) {
     sim_printf ("Eth: Must specify actual tap device name (i.e. tap:tap0)\r\n");
-    return SCPE_OPENERR;
+    return SCPE_OPENERR | SCPE_NOMESSAGE;
     }
 #endif
 #if (defined(__linux) || defined(__linux__)) && defined(HAVE_TAP_NETWORK)
@@ -1798,7 +1838,7 @@ if (0 == strncmp("tap:", savname, 4)) {
 
     memset(&ifr, 0, sizeof(ifr));
     /* Set up interface flags */
-    strcpy(ifr.ifr_name, savname+4);
+    strcpy(ifr.ifr_name, devname);
     ifr.ifr_flags = IFF_TAP|IFF_NO_PI;
 
     /* Send interface requests to TUN/TAP driver. */
@@ -1821,7 +1861,7 @@ if (0 == strncmp("tap:", savname, 4)) {
   if (1) {
     char dev_name[64] = "";
 
-    snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", savname+4);
+    snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", devname);
     dev_name[sizeof(dev_name)-1] = '\0';
 
     if ((tun = open(dev_name, O_RDWR)) >= 0) {
@@ -1831,7 +1871,7 @@ if (0 == strncmp("tap:", savname, 4)) {
         }
       else {
         *fd_handle = tun;
-        strcpy(savname, savname+4);
+        strcpy(savname, devname);
         }
 #if defined (__APPLE__)
       if (1) {
@@ -1865,17 +1905,20 @@ if (0 == strncmp("tap:", savname, 4)) {
     *handle = (void *)1;  /* Flag used to indicated open */
     }
   }
-else
+else { /* !tap: */
   if (0 == strncmp("vde:", savname, 4)) {
 #if defined(HAVE_VDE_NETWORK)
     struct vde_open_args voa;
+    char *devname = savname + 4;
 
     memset(&voa, 0, sizeof(voa));
     if (!strcmp(savname, "vde:vdedevice")) {
-      sim_printf ("Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\r\n", errbuf);
-      return SCPE_OPENERR;
+      sim_printf ("Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\r\n");
+      return SCPE_OPENERR | SCPE_NOMESSAGE;
       }
-    if (!(*handle = (void*) vde_open(savname+4, "simh", &voa)))
+    while (isspace(*devname))
+        ++devname;
+    if (!(*handle = (void*) vde_open(devname, "simh", &voa)))
       strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
     else {
       *eth_api = ETH_API_VDE;
@@ -1885,76 +1928,98 @@ else
     strncpy(errbuf, "No support for vde: network devices", PCAP_ERRBUF_SIZE-1);
 #endif /* defined(HAVE_VDE_NETWORK) */
     }
-  else {
-    if (0 == strncmp("udp:", savname, 4)) {
-      char localport[CBUFSIZE], host[CBUFSIZE], port[CBUFSIZE];
-      char hostport[2*CBUFSIZE];
+  else { /* !vde: */
+    if (0 == strncmp("nat:", savname, 4)) {
+#if defined(HAVE_SLIRP_NETWORK)
+      char *devname = savname + 4;
 
-      if (!strcmp(savname, "udp:sourceport:remotehost:remoteport")) {
-        sim_printf ("Eth: Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)\r\n");
-        return SCPE_OPENERR;
+      while (isspace(*devname))
+          ++devname;
+      if (!(*handle = (void*) sim_slirp_open(devname, opaque, &_slirp_callback, dptr, dbit)))
+        strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+      else {
+        *eth_api = ETH_API_NAT;
+        *fd_handle = 0;
         }
-
-      if (SCPE_OK != sim_parse_addr_ex (savname+4, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL))
-        return SCPE_OPENERR;
-
-      if (localport[0] == '\0')
-        strcpy (localport, port);
-      sprintf (hostport, "%s:%s", host, port);
-      if ((SCPE_OK == sim_parse_addr (hostport, NULL, 0, NULL, NULL, 0, NULL, "localhost")) &&
-          (0 == strcmp (localport, port))) {
-        sim_printf ("Eth: Must specify different udp localhost ports\r\n");
-        return SCPE_OPENERR;
-        }
-      *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, TRUE, FALSE);
-      if (INVALID_SOCKET == *fd_handle)
-          return SCPE_OPENERR;
-      *eth_api = ETH_API_UDP;
-      *handle = (void *)1;  /* Flag used to indicated open */
+#else
+      strncpy(errbuf, "No support for nat: network devices", PCAP_ERRBUF_SIZE-1);
+#endif /* defined(HAVE_SLIRP_NETWORK) */
       }
-    else {
+    else { /* not nat: */
+      if (0 == strncmp("udp:", savname, 4)) {
+        char localport[CBUFSIZE], host[CBUFSIZE], port[CBUFSIZE];
+        char hostport[2*CBUFSIZE];
+        char *devname = savname + 4;
+
+        if (!strcmp(savname, "udp:sourceport:remotehost:remoteport")) {
+          sim_printf ("Eth: Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)\r\n");
+          return SCPE_OPENERR | SCPE_NOMESSAGE;
+          }
+
+        while (isspace(*devname))
+            ++devname;
+        if (SCPE_OK != sim_parse_addr_ex (devname, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL))
+          return SCPE_OPENERR;
+
+        if (localport[0] == '\0')
+          strcpy (localport, port);
+        sprintf (hostport, "%s:%s", host, port);
+        if ((SCPE_OK == sim_parse_addr (hostport, NULL, 0, NULL, NULL, 0, NULL, "localhost")) &&
+            (0 == strcmp (localport, port))) {
+          sim_printf ("Eth: Must specify different udp localhost ports\r\n");
+          return SCPE_OPENERR | SCPE_NOMESSAGE;
+          }
+        *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, SIM_SOCK_OPT_DATAGRAM);
+        if (INVALID_SOCKET == *fd_handle)
+            return SCPE_OPENERR;
+        *eth_api = ETH_API_UDP;
+        *handle = (void *)1;  /* Flag used to indicated open */
+        }
+      else { /* not udp:, so attempt to open the parameter as if it were an explicit device name */
 #if defined(HAVE_PCAP_NETWORK)
-      *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-      if (!*handle) { /* can't open device */
-        sim_printf ("Eth: pcap_open_live error - %s\r\n", errbuf);
-        return SCPE_OPENERR;
-        }
-      *eth_api = ETH_API_PCAP;
+        *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
+        if (!*handle) { /* can't open device */
+          sim_printf ("Eth: pcap_open_live error - %s\r\n", errbuf);
+          return SCPE_OPENERR | SCPE_NOMESSAGE;
+          }
+        *eth_api = ETH_API_PCAP;
 #if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__)
-      /* Tell the kernel that the header is fully-formed when it gets it.
-         This is required in order to fake the src address. */
-      if (1) {
-        int one = 1;
-        ioctl(pcap_fileno(*handle), BIOCSHDRCMPLT, &one);
-        }
+        /* Tell the kernel that the header is fully-formed when it gets it.
+           This is required in order to fake the src address. */
+        if (1) {
+          int one = 1;
+          ioctl(pcap_fileno(*handle), BIOCSHDRCMPLT, &one);
+          }
 #endif /* xBSD */
 #if defined(_WIN32)
-      pcap_setmintocopy ((pcap_t*)(*handle), 0);
+        pcap_setmintocopy ((pcap_t*)(*handle), 0);
 #endif
 #if !defined (USE_READER_THREAD)
 #ifdef USE_SETNONBLOCK
-/* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
-      if (pcap_setnonblock (*handle, 1, errbuf) == -1) {
-        sim_printf ("Eth: Failed to set non-blocking: %s\r\n", errbuf);
-        }
+        /* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
+        if (pcap_setnonblock (*handle, 1, errbuf) == -1) {
+          sim_printf ("Eth: Failed to set non-blocking: %s\r\n", errbuf);
+          }
 #endif
 #if defined (__APPLE__)
-      if (1) {
-        /* Deliver packets immediately, needed for OS X 10.6.2 and later
-         * (Snow-Leopard).
-         * See this thread on libpcap and Mac Os X 10.6 Snow Leopard on
-         * the tcpdump mailinglist: http://seclists.org/tcpdump/2010/q1/110
-         */
-        int v = 1;
-        ioctl(pcap_fileno(*handle), BIOCIMMEDIATE, &v);
-        }
+        if (1) {
+          /* Deliver packets immediately, needed for OS X 10.6.2 and later
+           * (Snow-Leopard).
+           * See this thread on libpcap and Mac Os X 10.6 Snow Leopard on
+           * the tcpdump mailinglist: http://seclists.org/tcpdump/2010/q1/110
+           */
+          int v = 1;
+          ioctl(pcap_fileno(*handle), BIOCIMMEDIATE, &v);
+          }
 #endif /* defined (__APPLE__) */
 #endif /* !defined (USE_READER_THREAD) */
 #else
-      strncpy (errbuf, "Unknown or unsupported network device", PCAP_ERRBUF_SIZE-1);
+        strncpy (errbuf, "Unknown or unsupported network device", PCAP_ERRBUF_SIZE-1);
 #endif /* defined(HAVE_PCAP_NETWORK) */
-      }
-    }
+        } /* not udp:, so attempt to open the parameter as if it were an explicit device name */
+      } /* !nat: */
+    } /* !vde: */
+  } /* !tap: */
 if (errbuf[0])
   return SCPE_OPENERR;
 
@@ -2030,11 +2095,11 @@ else {
     }
   }
 
-r = _eth_open_port(savname, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, NULL);
+r = _eth_open_port(savname, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, NULL, (void *)dev, dptr, dbit);
 
 if (errbuf[0]) {
   sim_printf ("Eth: open error - %s\r\n", errbuf);
-  return SCPE_OPENERR;
+  return SCPE_OPENERR | SCPE_NOMESSAGE;
   }
 if (r != SCPE_OK)
   return r;
@@ -2100,14 +2165,14 @@ switch (eth_api) {
     vde_close((VDECONN*)pcap);
     break;
 #endif
-  case ETH_API_UDP:
-    sim_close_sock(pcap_fd, TRUE);
-    break;
-#ifdef USE_SLIRP_NETWORK
+#ifdef HAVE_SLIRP_NETWORK
   case ETH_API_NAT:
-    vde_close((VDECONN*)pcap);
+    sim_slirp_close((SLIRP*)pcap);
     break;
 #endif
+  case ETH_API_UDP:
+    sim_close_sock(pcap_fd);
+    break;
   }
 return SCPE_OK;
 }
@@ -2160,17 +2225,29 @@ _eth_remove_from_open_list (dev);
 return SCPE_OK;
 }
 
-t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "%s attach help\n\n", dptr->name);
 fprintf (st, "   sim> SHOW ETHERNET\n");
 fprintf (st, "   libpcap version 1.0.0\n");
 fprintf (st, "   ETH devices:\n");
-fprintf (st, "    eth0   en0      (No description available)\n");
-fprintf (st, "   eth1   tap:tapN (Integrated Tun/Tap support)\n");
+fprintf (st, "    eth0   en0                                  (No description available)\n");
+#if defined(HAVE_TAP_NETWORK)
+fprintf (st, "    eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
+#endif
+#if defined(HAVE_SLIRP_NETWORK)
+fprintf (st, "    eth2   vde:device                           (Integrated VDE support)\n");
+#endif
+#if defined(HAVE_SLIRP_NETWORK)
+fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
+#endif
+fprintf (st, "    eth4   udp:sourceport:remotehost:remoteport (Integrated UDP bridge support)\n");
 fprintf (st, "   sim> ATTACH %s eth0\n\n", dptr->name);
 fprintf (st, "or equivalently:\n\n");
 fprintf (st, "   sim> ATTACH %s en0\n\n", dptr->name);
+#if defined(HAVE_SLIRP_NETWORK)
+sim_slirp_attach_help (st, dptr, uptr, flag, cptr);
+#endif
 return SCPE_OK;
 }
 
@@ -2333,7 +2410,7 @@ static void
 _eth_error(ETH_DEV* dev, const char* where)
 {
 char msg[64];
-char *netname = "";
+const char *netname = "";
 time_t now;
 
 time(&now);
@@ -2363,7 +2440,7 @@ switch (dev->eth_api) {
       break;
 #endif
   default:
-      sim_err_sock (INVALID_SOCKET, msg, 0);
+      sim_err_sock (INVALID_SOCKET, msg);
       break;
   }
 #ifdef USE_READER_THREAD
@@ -2399,7 +2476,7 @@ if (dev->error_needs_reset) {
   _eth_close_port(dev->eth_api, (pcap_t *)dev->handle, dev->fd_handle);
   sim_os_sleep (ETH_ERROR_REOPEN_PAUSE);
 
-  r = _eth_open_port(dev->name, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, dev->bpf_filter);
+  r = _eth_open_port(dev->name, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, dev->bpf_filter, (void *)dev, dev->dptr, dev->dbit);
   dev->error_needs_reset = FALSE;
   if (r == SCPE_OK)
     sim_printf ("%s ReOpened: %s \n", msg, dev->name);
@@ -2472,6 +2549,15 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
           status = 0;
         else
           status = 1;
+      break;
+#endif
+#ifdef HAVE_SLIRP_NETWORK
+    case ETH_API_NAT:
+      status = sim_slirp_send((SLIRP*)dev->handle, (char *)packet->msg, (size_t)packet->len, 0);
+      if ((status == (int)packet->len) || (status == 0))
+        status = 0;
+      else
+        status = 1;
       break;
 #endif
     case ETH_API_UDP:
@@ -3086,6 +3172,7 @@ switch (dev->eth_api) {
   case ETH_API_TAP:
   case ETH_API_VDE:
   case ETH_API_UDP:
+  case ETH_API_NAT:
     bpf_used = 0;
     to_me = 0;
     eth_packet_trace (dev, data, header->len, "received");
@@ -3130,7 +3217,7 @@ if ((LOOPBACK_SELF_FRAME(dev->physical_addr, data)) ||
 #ifdef USE_READER_THREAD
   pthread_mutex_unlock (&dev->self_lock);
 #endif
-}
+  }
 
 if (bpf_used ? to_me : (to_me && !from_me)) {
   if (header->len > ETH_MIN_JUMBO_FRAME) {
@@ -3490,21 +3577,21 @@ if (dev->eth_api == ETH_API_PCAP) {
   if (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0)
     bpf_netmask = 0;
   /* compile filter string */
-  if ((status = pcap_compile(dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
-    sprintf(errbuf, "%s", pcap_geterr(dev->handle));
+  if ((status = pcap_compile((pcap_t*)dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
+    sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
     sim_printf("Eth: pcap_compile error: %s\r\n", errbuf);
     /* show erroneous BPF string */
     sim_printf ("Eth: BPF string is: |%s|\r\n", buf);
     }
   else {
     /* apply compiled filter string */
-    if ((status = pcap_setfilter(dev->handle, &bpf)) < 0) {
-      sprintf(errbuf, "%s", pcap_geterr(dev->handle));
+    if ((status = pcap_setfilter((pcap_t*)dev->handle, &bpf)) < 0) {
+      sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
       sim_printf("Eth: pcap_setfilter error: %s\r\n", errbuf);
       }
     else {
       /* Save BPF filter string */
-      dev->bpf_filter = realloc(dev->bpf_filter, 1 + strlen(buf));
+      dev->bpf_filter = (char *)realloc(dev->bpf_filter, 1 + strlen(buf));
       strcpy (dev->bpf_filter, buf);
 #ifdef USE_SETNONBLOCK
       /* set file non-blocking */
@@ -3623,20 +3710,19 @@ if (used < max) {
   ++used;
   }
 #endif
+#ifdef HAVE_SLIRP_NETWORK
+if (used < max) {
+  sprintf(list[used].name, "%s", "nat:{optional-nat-parameters}");
+  sprintf(list[used].desc, "%s", "Integrated NAT (SLiRP) support");
+  ++used;
+  }
+#endif
 
 if (used < max) {
   sprintf(list[used].name, "%s", "udp:sourceport:remotehost:remoteport");
   sprintf(list[used].desc, "%s", "Integrated UDP bridge support");
   ++used;
   }
-
-#ifdef USE_SLIRP_NETWORK
-if (used < max) {
-  sprintf(list[used].name, "%s", "nat:device");
-  sprintf(list[used].desc, "%s", "Integrated User Mode NAT support");
-  ++used;
-  }
-#endif
 
 return used;
 }
@@ -3731,5 +3817,9 @@ fprintf(st, "  Peak Write Queue Size:   %d\n", dev->write_queue_peak);
 #endif
 if (dev->bpf_filter)
   fprintf(st, "  BPF Filter: %s\n", dev->bpf_filter);
+#if defined(HAVE_SLIRP_NETWORK)
+if (dev->eth_api == ETH_API_NAT)
+  sim_slirp_show ((SLIRP *)dev->handle, st);
+#endif
 }
 #endif /* USE_NETWORK */

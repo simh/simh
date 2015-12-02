@@ -45,6 +45,12 @@
 #if !defined(CLOCK_REALTIME) && !defined(__hpux)
 #define CLOCK_REALTIME 1
 #define NEED_CLOCK_GETTIME 1
+#if  defined(_MSC_VER)      /* Visual Studio/Visual C++ */
+#if _MSC_VER >= 1900        /* Visual Studio Community (2015) */
+#define HAVE_STRUCT_TIMESPEC 1
+#define _TIMESPEC_DEFINED 1
+#endif /* _MSC_VER >= 1900 */
+#endif /* defined(_MSC_VER) */
 #if !defined(HAVE_STRUCT_TIMESPEC)
 #define HAVE_STRUCT_TIMESPEC 1
 #if !defined(_TIMESPEC_DEFINED)
@@ -53,8 +59,8 @@ struct timespec {
     long   tv_sec;
     long   tv_nsec;
 };
-#endif /* _TIMESPEC_DEFINED */
-#endif /* HAVE_STRUCT_TIMESPEC */
+#endif /* !defined(_TIMESPEC_DEFINED) */
+#endif /* !defined(HAVE_STRUCT_TIMESPEC) */
 int clock_gettime(int clock_id, struct timespec *tp);
 #endif
 
@@ -116,9 +122,11 @@ t_stat sim_timer_change_asynch (void);
 t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
 t_stat sim_register_clock_unit (UNIT *uptr);
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
+t_stat sim_clock_coschedule_abs (UNIT *uptr, int32 interval);
 t_stat sim_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval);
+t_stat sim_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 interval);
 double sim_timer_inst_per_sec (void);
-uint32 sim_timer_idle_capable (uint32 *hoat_tick_ms);
+t_bool sim_timer_idle_capable (uint32 *host_ms_sleep_1, uint32 *host_tick_ms);
 
 extern t_bool sim_idle_enab;                        /* idle enabled flag */
 extern volatile t_bool sim_idle_wait;               /* idle waiting flag */

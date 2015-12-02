@@ -61,11 +61,14 @@ BITFIELD qb_ipc_bits[] = {
 #define QBMAP_RD        (QBMAP_VLD | QBMAP_PAG)
 #define QBMAP_WR        (QBMAP_VLD | QBMAP_PAG)
 
+#define QB_VEC_MASK     0x1FC                           /* Interrupt Vector value mask */
+
 /* KA630 Memory system error register */
 
 #define MSER_NXM        0x00000080                      /* CPU NXM */
 
 int32 int_req[IPL_HLVL] = { 0 };                        /* intr, IPL 14-17 */
+int32 int_vec_set[IPL_HLVL][32] = { 0 };                /* bits to set in vector */
 int32 qb_ipc = 0;                                       /* IPC */
 int32 qb_map[QBNMAPR] = { 0 };                          /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
@@ -90,8 +93,8 @@ t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc);
-t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *qba_description (DEVICE *dptr);
+t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *qba_description (DEVICE *dptr);
 
 /* Qbus adapter data structures
 
@@ -375,10 +378,16 @@ if (lvl > IPL_HMAX) {                                   /* error req lvl? */
     }
 for (i = 0; int_req[l] && (i < 32); i++) {
     if ((int_req[l] >> i) & 1) {
+        int32 vec;
+
         int_req[l] = int_req[l] & ~(1u << i);
         if (int_ack[l][i])
-            return int_ack[l][i]();
-        return int_vec[l][i];
+            vec =int_ack[l][i]();
+        else
+            vec = int_vec[l][i];
+        vec |= int_vec_set[l][i];
+        vec &= (int_vec_set[l][i] | QB_VEC_MASK);
+        return vec;
         }
     }
 return 0;
@@ -746,7 +755,7 @@ fprintf (of, "Invalid argument\n");
 return SCPE_OK;
 }
 
-t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Qbus Adapter (QBA)\n\n");
 fprintf (st, "The Qbus adapter (QBA) simulates the CQBIC Qbus adapter chip.\n");
@@ -760,7 +769,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *qba_description (DEVICE *dptr)
+const char *qba_description (DEVICE *dptr)
 {
 return "Qbus adapter";
 }

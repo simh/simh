@@ -108,6 +108,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+#define snprintf _snprintf      /* poor man's snprintf which will work most of the time but has different return value */
+#endif
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
@@ -333,8 +336,9 @@ typedef uint32          t_addr;
 #define SCPE_INVREM     (SCPE_BASE + 43)                /* invalid remote console command */
 #define SCPE_NOTATT     (SCPE_BASE + 44)                /* not attached */
 #define SCPE_EXPECT     (SCPE_BASE + 45)                /* expect matched */
+#define SCPE_REMOTE     (SCPE_BASE + 46)                /* remote console command */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 46)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 47)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x1000                          /* tti data flag */
 #define SCPE_BREAK      0x2000                          /* tti break flag */
 #define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
@@ -376,7 +380,7 @@ typedef uint32          t_addr;
 /* Device data structure */
 
 struct sim_device {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     struct sim_unit     *units;                         /* units */
     struct sim_reg      *registers;                     /* registers */
     struct sim_mtab     *modifiers;                     /* modifiers */
@@ -404,13 +408,13 @@ struct sim_device {
                                                         /* mem size routine */
     char                *lname;                         /* logical name */
     t_stat              (*help)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr); 
+                            struct sim_unit *uptr, int32 flag, const char *cptr); 
                                                         /* help */
     t_stat              (*attach_help)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr);
+                            struct sim_unit *uptr, int32 flag, const char *cptr);
                                                         /* attach help */
     void *help_ctx;                                     /* Context available to help routines */
-    char                *(*description)(struct sim_device *dptr);
+    const char          *(*description)(struct sim_device *dptr);
                                                         /* Device Description */
     };
 
@@ -425,6 +429,7 @@ struct sim_device {
 #define DEV_V_SECTORS   7                               /* Unit Capacity is in 512byte sectors */
 #define DEV_V_DONTAUTO  8                               /* Do not auto detach already attached units */
 #define DEV_V_FLATHELP  9                               /* Use traditional (unstructured) help */
+#define DEV_V_NOSAVE    10                              /* Don't save device state */
 #define DEV_V_UF_31     12                              /* user flags, V3.1 */
 #define DEV_V_UF        16                              /* user flags */
 #define DEV_V_RSV       31                              /* reserved */
@@ -436,6 +441,7 @@ struct sim_device {
 #define DEV_SECTORS     (1 << DEV_V_SECTORS)            /* capacity is 512 byte sectors */
 #define DEV_DONTAUTO    (1 << DEV_V_DONTAUTO)           /* Do not auto detach already attached units */
 #define DEV_FLATHELP    (1 << DEV_V_FLATHELP)           /* Use traditional (unstructured) help */
+#define DEV_NOSAVE      (1 << DEV_V_NOSAVE)             /* Don't save device state */
 #define DEV_NET         0                               /* Deprecated - meaningless */
 
 
@@ -482,6 +488,7 @@ struct sim_unit {
     int32               u6;                             /* device specific */
     void                *up7;                           /* device specific */
     void                *up8;                           /* device specific */
+    void                *tmxr;                          /* TMXR linkage */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(struct sim_unit *);
     t_bool              (*a_is_active)(struct sim_unit *);
@@ -540,7 +547,7 @@ struct sim_unit {
 #define UNIT_S_DF_TAPE  3               /* Bits Reserved for Tape Density */
 
 struct sim_bitfield {
-    char            *name;                              /* field name */
+    const char      *name;                              /* field name */
     uint32          offset;                             /* starting bit */
     uint32          width;                              /* width */
     const char      **valuenames;                       /* map of values to strings */
@@ -550,17 +557,19 @@ struct sim_bitfield {
 /* Register data structure */
 
 struct sim_reg {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     void                *loc;                           /* location */
     uint32              radix;                          /* radix */
     uint32              width;                          /* width */
     uint32              offset;                         /* starting bit */
     uint32              depth;                          /* save depth */
-    char                *desc;                          /* description */
+    const char          *desc;                          /* description */
     struct sim_bitfield *fields;                        /* bit fields */
     uint32              flags;                          /* flags */
     uint32              qptr;                           /* circ q ptr */
     };
+
+/* Register flags */
 
 #define REG_FMT         00003                           /* see PV_x */
 #define REG_RO          00004                           /* read only */
@@ -573,10 +582,14 @@ struct sim_reg {
 #define REG_FIT         01000                           /* fit access to size */
 #define REG_HRO         (REG_RO | REG_HIDDEN)           /* hidden, read only */
 
+#define REG_V_UF        16                              /* device specific */
+#define REG_UFMASK      (~((1u << REG_V_UF) - 1))       /* user flags mask */
+#define REG_VMFLAGS     (REG_VMIO | REG_UFMASK)         /* call VM routine if any of these are set */
+
 /* Command tables, base and alternate formats */
 
 struct sim_ctab {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     t_stat              (*action)(int32 flag, char *cptr);
                                                         /* action routine */
     int32               arg;                            /* argument */
@@ -587,19 +600,19 @@ struct sim_ctab {
     };
 
 struct sim_c1tab {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     t_stat              (*action)(struct sim_device *dptr, struct sim_unit *uptr,
                             int32 flag, char *cptr);    /* action routine */
     int32               arg;                            /* argument */
-    char                *help;                          /* help string */
+    const char          *help;                          /* help string */
     };
 
 struct sim_shtab {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     t_stat              (*action)(FILE *st, struct sim_device *dptr,
                             struct sim_unit *uptr, int32 flag, char *cptr);
     int32               arg;                            /* argument */
-    char                *help;                          /* help string */
+    const char          *help;                          /* help string */
     };
 
 /* Modifier table - only extended entries have disp, reg, or flags */
@@ -607,8 +620,8 @@ struct sim_shtab {
 struct sim_mtab {
     uint32              mask;                           /* mask */
     uint32              match;                          /* match */
-    char                *pstring;                       /* print string */
-    char                *mstring;                       /* match string */
+    const char          *pstring;                       /* print string */
+    const char          *mstring;                       /* match string */
     t_stat              (*valid)(struct sim_unit *up, int32 v, char *cp, void *dp);
                                                         /* validation routine */
     t_stat              (*disp)(FILE *st, struct sim_unit *up, int32 v, void *dp);
@@ -616,7 +629,7 @@ struct sim_mtab {
     void                *desc;                          /* value descriptor */
                                                         /* REG * if MTAB_VAL */
                                                         /* int * if not */
-    char                *help;                          /* help string */
+    const char          *help;                          /* help string */
     };
 
 
@@ -705,9 +718,9 @@ struct sim_send {
 /* Debug table */
 
 struct sim_debtab {
-    char                *name;                          /* control name */
+    const char          *name;                          /* control name */
     uint32              mask;                           /* control bit */
-    char                *desc;                          /* description */
+    const char          *desc;                          /* description */
     };
 
 /* Deprecated Debug macros.  Use sim_debug() */
@@ -835,11 +848,9 @@ typedef struct sim_bitfield BITFIELD;
 /* This replaces any references to "assert()" which should never be invoked */
 /* with an expression which causes side effects (i.e. must be executed for */
 /* the program to work correctly) */
-#define ASSURE(_Expression) if (!(_Expression)) {char *_exp = #_Expression; char *_file = __FILE__;                                 \
-                                                 fprintf(stderr, "%s failed at %s line %d\n", _exp, _file, __LINE__);               \
-                                                 if (sim_log) fprintf(sim_log, "%s failed at %s line %d\n", _exp, _file, __LINE__); \
-                                                 if (sim_deb) fprintf(sim_deb, "%s failed at %s line %d\n", _exp, _file, __LINE__); \
-                                                 abort();} else (void)0
+#define ASSURE(_Expression) while (!(_Expression)) {fprintf(stderr, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__);  \
+                                                    sim_printf("%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__);       \
+                                                    abort();}
 
 /* Asynch/Threaded I/O support */
 
@@ -1229,6 +1240,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_QUEUE_MODE "Lock based asynchronous event queue access"
 #define AIO_INIT                                                  \
     if (1) {                                                      \
+      int tmr;                                                    \
       pthread_mutexattr_t attr;                                   \
                                                                   \
       pthread_mutexattr_init (&attr);                             \
@@ -1242,7 +1254,8 @@ extern int32 sim_asynch_inst_latency;
       sim_asynch_queue = QUEUE_LIST_END;                          \
       sim_wallclock_queue = QUEUE_LIST_END;                       \
       sim_wallclock_entry = NULL;                                 \
-      sim_clock_cosched_queue = QUEUE_LIST_END;                   \
+      for (tmr=0; tmr<SIM_NTIMERS; tmr++)                         \
+          sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;          \
       }                                                           \
     else                                                          \
       (void)0

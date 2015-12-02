@@ -1138,15 +1138,16 @@ else {
     }
 if (ei > 0) {                                           /* if int, new IPL */
     int32 newipl;
-    if (VEC_QBUS && ((vec & VEC_Q) != 0))               /* Qbus and Qbus vector? */
+    if ((VEC_QBUS & vec) != 0)                          /* Qbus vector? */
         newipl = PSL_IPL17;                             /* force IPL 17 */
-    else newipl = ipl << PSL_V_IPL;                     /* otherwise, int IPL */
+    else
+        newipl = ipl << PSL_V_IPL;                      /* otherwise, int IPL */
     PSL = newpsl | newipl;
     }
-else PSL = newpsl |                                     /* exc, old IPL/1F */
-    ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
-if (DEBUG_PRI (cpu_dev, LOG_CPU_I))
-    fprintf (sim_deb, ">>IEX: PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
+else 
+    PSL = newpsl |                                      /* exc, old IPL/1F */
+        ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
+sim_debug (LOG_CPU_I, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, oldpsl, oldsp, vec, PSL, SP);
 acc = ACC_MASK (KERN);                                  /* new mode is kernel */
 Write (SP - 4, oldpsl, L_LONG, WA);                     /* push old PSL */
@@ -1251,8 +1252,7 @@ SP = SP + 8;                                            /* pop stack */
 if (PSL & PSL_IS)                                       /* save stack */
     IS = SP;
 else STK[oldcur] = SP;
-if (DEBUG_PRI (cpu_dev, LOG_CPU_R))
-    fprintf (sim_deb, ">>REI: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
+sim_debug (LOG_CPU_R, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
 PSL = (PSL & PSL_TP) | (newpsl & ~CC_MASK);             /* set PSL */
 if (PSL & PSL_IS)                                       /* set new stack */
@@ -1260,8 +1260,7 @@ if (PSL & PSL_IS)                                       /* set new stack */
 else {
     SP = STK[newcur];                                   /* if ~IS, chk AST */
     if (newcur >= ASTLVL) {
-        if (DEBUG_PRI (cpu_dev, LOG_CPU_R))
-            fprintf (sim_deb, ">>REI: AST delivered\n");
+        sim_debug (LOG_CPU_R, &cpu_dev, "AST delivered\n");
         SISR = SISR | SISR_2;
         }
     }
@@ -1320,8 +1319,7 @@ pme = (t >> 31) & 1;                                    /* restore PME */
 
 zap_tb (0);                                             /* clear process TB */
 set_map_reg ();
-if (DEBUG_PRI (cpu_dev, LOG_CPU_P))
-    fprintf (sim_deb, ">>LDP: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
+sim_debug (LOG_CPU_P, &cpu_dev, ">>LDP: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, PSL, SP, newpc, newpsl, KSP);
 if (PSL & PSL_IS)                                       /* if istk, */
     IS = SP;
@@ -1342,8 +1340,7 @@ if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
 savpc = Read (SP, L_LONG, RA);                          /* pop PC, PSL */
 savpsl = Read (SP + 4, L_LONG, RA);
-if (DEBUG_PRI (cpu_dev, LOG_CPU_P))
-    fprintf (sim_deb, ">>SVP: PC=%08x, PSL=%08x, SP=%08x, oPC=%08x, oPSL=%08x\n",
+sim_debug (LOG_CPU_P, &cpu_dev, ">>SVP: PC=%08x, PSL=%08x, SP=%08x, oPC=%08x, oPSL=%08x\n",
              PC, PSL, SP, savpc, savpsl);
 if (PSL & PSL_IS)                                       /* int stack? */
     SP = SP + 8;

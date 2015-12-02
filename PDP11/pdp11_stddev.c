@@ -75,6 +75,7 @@ extern int32 int_req[IPL_HLVL];
 extern uint32 cpu_type;
 
 int32 tti_csr = 0;                                      /* control/status */
+uint32 tti_buftime;                                     /* time input character arrived */
 int32 tto_csr = 0;                                      /* control/status */
 int32 clk_csr = 0;                                      /* control/status */
 int32 clk_tps = 60;                                     /* ticks/second */
@@ -113,7 +114,7 @@ DIB tti_dib = {
     1, IVCL (TTI), VEC_TTI, { NULL }
     };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), SERIAL_IN_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
     { HRDATAD (BUF,       tti_unit.buf,          8, "last data item processed") },
@@ -258,7 +259,7 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
         tti_csr = tti_csr & ~CSR_DONE;
         CLR_INT (TTI);
         *data = tti_unit.buf & 0377;
-        sim_activate_abs (&tti_unit, tti_unit.wait);    /* check soon for more input */
+        sim_activate_after_abs (&tti_unit, tti_unit.wait);  /* check soon for more input */
         return SCPE_OK;
         }                                               /* end switch PA */
 
@@ -293,11 +294,16 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
+
+if ((tti_csr & CSR_DONE) &&                             /* input still pending and < 500ms? */
+    ((sim_os_msec () - tti_buftime) < 500))
+     return SCPE_OK;
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
     uptr->buf = 0;
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+tti_buftime = sim_os_msec ();
 uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
 if (tti_csr & CSR_IE)

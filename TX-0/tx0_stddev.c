@@ -290,13 +290,13 @@ circuitry. Lines without seventh hole punched are ignored by the PETR.
 As each line of the tape is read in, the data is stored into an 18-bit BUF
 register with bits mapped as follows:
 
-Tape	BUF
-0		0
-1		3
-2		6
-3		9
-4		12
-5		15
+Tape    BUF
+0       0
+1       3
+2       6
+3       9
+4       12
+5       15
 
 Up to three lines of tape may be read into a single the single BUF register.
 Before subsequent lines are read, the BUF register is cycled one bit right.
@@ -366,7 +366,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* attached? */
                 ios = 0;
                 return SCPE_IOERR;
         }
-        else perror ("PETR I/O error");
+        else sim_perror ("PETR I/O error");
         clearerr (uptr->fileref);
         ios = 0;
         return SCPE_IOERR;
@@ -410,18 +410,18 @@ extern UNIT cpu_unit;
 /* Switches the CPU to READIN mode and starts execution. */
 t_stat petr_boot (int32 unitno, DEVICE *dptr)
 {
-	t_stat reason = SCPE_OK;
+    t_stat reason = SCPE_OK;
 
 #ifdef SANITY_CHECK_TAPE
-	int32 AC, MBR, MAR, IR = 0;
-	int32 blkcnt, chksum = 0, fa, la;
-	int32 addr, tdata;
+    int32 AC, MBR, MAR, IR = 0;
+    int32 blkcnt, chksum = 0, fa, la;
+    int32 addr, tdata;
 #endif /* SANITY_CHECK_TAPE */
 
     /* Switch to READIN mode. */
     cpu_set_mode(&cpu_unit, UNIT_MODE_READIN, NULL, NULL);
 #ifdef SANITY_CHECK_TAPE
-	for(;(IR != 2) && (IR != 1);) {
+    for(;(IR != 2) && (IR != 1);) {
         AC = petr(3,0,0);   /* Read three chars from tape into AC */
         MAR = AC & AMASK;   /* Set memory address */
         IR = AC >> 16;
@@ -453,62 +453,62 @@ t_stat petr_boot (int32 unitno, DEVICE *dptr)
             default:
                 reason = SCPE_IERR;
                 break;
-		}	
-	}
+        }
+    }
 
-	blkcnt = 0;
-	while (1) {
-		chksum = 0;
+    blkcnt = 0;
+    while (1) {
+        chksum = 0;
 
-		fa = petr(3,0,0);  /* Read three characters from tape. */
+        fa = petr(3,0,0);  /* Read three characters from tape. */
 
-		if ((fa & 0400000) || (fa & 0200000)) {
-			break;
-		}
+        if ((fa & 0400000) || (fa & 0200000)) {
+            break;
+        }
 
-		chksum += fa;
-		if (chksum > 0777777) {
-			chksum +=1;
-		}
-		chksum &= 0777777;
+        chksum += fa;
+        if (chksum > 0777777) {
+            chksum +=1;
+        }
+        chksum &= 0777777;
 
-		la = petr(3,0,0);  /* Read three characters from tape. */
+        la = petr(3,0,0);  /* Read three characters from tape. */
 
-		chksum += la;
-		if (chksum > 0777777) {
-			chksum +=1;
-		}
-		chksum &= 0777777;
+        chksum += la;
+        if (chksum > 0777777) {
+            chksum +=1;
+        }
+        chksum &= 0777777;
 
-		la = (~la) & 0177777;
+        la = (~la) & 0177777;
 
-		sim_printf("First Address=%06o, Last Address=%06o\n", fa, la);
+        sim_printf("First Address=%06o, Last Address=%06o\n", fa, la);
 
-		for(addr = fa; addr <= la; addr++) {
-			tdata = petr(3,0,0);  /* Read three characters from tape. */
-			chksum += tdata;
-			if (chksum > 0777777) {
-				chksum +=1;
-			}
-			chksum &= 0777777;
-		}
+        for(addr = fa; addr <= la; addr++) {
+            tdata = petr(3,0,0);  /* Read three characters from tape. */
+            chksum += tdata;
+            if (chksum > 0777777) {
+                chksum +=1;
+            }
+            chksum &= 0777777;
+        }
 
-		chksum = (~chksum) & 0777777;
+        chksum = (~chksum) & 0777777;
 
-		tdata = petr(3,0,0);
+        tdata = petr(3,0,0);
 
-		if (chksum != tdata) {
-			reason = SCPE_FMT;
-		}
+        if (chksum != tdata) {
+            reason = SCPE_FMT;
+        }
 
-		sim_printf("Block %d: Calculated checksum=%06o, real checksum=%06o, %s\n", blkcnt, chksum, tdata, chksum == tdata ? "OK" : "BAD Checksum!");
-		blkcnt++;
-	}
+        sim_printf("Block %d: Calculated checksum=%06o, real checksum=%06o, %s\n", blkcnt, chksum, tdata, chksum == tdata ? "OK" : "BAD Checksum!");
+        blkcnt++;
+    }
 
-	fseek (petr_dev.units[0].fileref, 0, SEEK_SET);
+    fseek (petr_dev.units[0].fileref, 0, SEEK_SET);
 #endif /* SANITY_CHECK_TAPE */
 
-	/* Start Execution */
+    /* Start Execution */
     return (reason);
 
 }
@@ -533,7 +533,7 @@ t_stat ptp_svc (UNIT *uptr)
     if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
         return SCPE_UNATT;
     if (putc (uptr->buf, uptr->fileref) == EOF) {           /* I/O error? */
-        perror ("PTP I/O error");
+        sim_perror ("PTP I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }

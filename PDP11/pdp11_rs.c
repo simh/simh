@@ -60,7 +60,7 @@
 
 #define UNIT_V_DTYPE    (UNIT_V_UF + 0)                 /* disk type */
 #define RS03_DTYPE       (0)
-#define RS04_DTYPE	     (1)
+#define RS04_DTYPE       (1)
 #define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
 #define UNIT_V_WLK      (UNIT_V_UF + 2)                 /* write lock */
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
@@ -186,8 +186,8 @@ void rs_update_ds (uint16 flg, int32 drv);
 t_stat rs_go (int32 drv);
 t_stat rs_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 rs_abort (void);
-t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rs_description (DEVICE *dptr);
+t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rs_description (DEVICE *dptr);
 
 /* RS data structures
 
@@ -695,7 +695,7 @@ cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 
-t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "RS03/RS04 Massbus disk controller (RS)\n\n");
 fprintf (st, "The RS controller implements the Massbus family fixed head disks.  RS\n");
@@ -715,7 +715,7 @@ fprintf (st, "errors cannot occur.\n");
 return SCPE_OK;
 }
 
-char *rs_description (DEVICE *dptr)
+const char *rs_description (DEVICE *dptr)
 {
 return "RS03/RS04 Massbus disk controller";
 }

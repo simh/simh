@@ -72,6 +72,8 @@ Internal routines:
 
 */
 
+#define _FILE_OFFSET_BITS 64    /* 64 bit file offset for raw I/O operations  */
+
 #include "sim_defs.h"
 #include "sim_disk.h"
 #include "sim_ether.h"
@@ -235,7 +237,7 @@ static t_bool _disk_is_active (UNIT *uptr)
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 if (ctx) {
-    sim_debug (ctx->dbit, ctx->dptr, "_disk_is_active(unit=%d, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
+    sim_debug (ctx->dbit, ctx->dptr, "_disk_is_active(unit=%d, dop=%d)\n", (int)(uptr-ctx->dptr->units), ctx->io_dop);
     return (ctx->io_dop != DOP_DONE);
     }
 return FALSE;
@@ -246,7 +248,7 @@ static void _disk_cancel (UNIT *uptr)
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 if (ctx) {
-    sim_debug (ctx->dbit, ctx->dptr, "_disk_cancel(unit=%d, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
+    sim_debug (ctx->dbit, ctx->dptr, "_disk_cancel(unit=%d, dop=%d)\n", (int)(uptr-ctx->dptr->units), ctx->io_dop);
     if (ctx->asynch_io) {
         pthread_mutex_lock (&ctx->io_lock);
         while (ctx->io_dop != DOP_DONE)
@@ -292,7 +294,7 @@ static char *HostPathToVhdPath (const char *szHostPath, char *szVhdPath, size_t 
 static char *VhdPathToHostPath (const char *szVhdPath, char *szHostPath, size_t HostPathSize);
 
 struct sim_disk_fmt {
-    char                *name;                          /* name */
+    const char          *name;                          /* name */
     int32               uflags;                         /* unit flags */
     int32               fmtval;                         /* Format type value */
     t_stat              (*impl_fnc)(void);              /* Implemented Test Function */
@@ -366,12 +368,11 @@ return SCPE_OK;
 
 t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-char *cap_units = "B";
+const char *cap_units = "B";
 DEVICE *dptr = find_dev_from_unit (uptr);
 t_offset capac = ((t_offset)uptr->capac)*((dptr->flags & DEV_SECTORS) ? 512 : 1);
 
-if (ctx->capac_factor == 2)
+if ((dptr->dwidth / dptr->aincr) == 16)
     cap_units = "W";
 if (capac) {
     if (capac >= (t_offset) 1000000)
@@ -837,7 +838,9 @@ if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     if (*cptr == 0)                                     /* must be more */
         return SCPE_2FARG;
     if (sim_disk_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid Disk Format: %s\n", gbuf);
+    sim_switches = sim_switches & ~(SWMASK ('F'));      /* Record Format specifier already processed */
+    auto_format = TRUE;
     }
 if (sim_switches & SWMASK ('D')) {                      /* create difference disk? */
     char gbuf[CBUFSIZE];
@@ -852,7 +855,7 @@ if (sim_switches & SWMASK ('D')) {                      /* create difference dis
         sim_vhd_disk_close (vhd);
         return sim_disk_attach (uptr, gbuf, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
         }
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "Unable to create differencing VHD: %s\n", gbuf);
     }
 if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & copy contents? */
     char gbuf[CBUFSIZE];
@@ -873,7 +876,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
     sim_quiet = saved_sim_quiet;
     if (r != SCPE_OK) {
         sim_switches = saved_sim_switches;
-        return r;
+        return sim_messagef (r, "Can't open source VHD: %s\n", cptr);
         }
     if (!sim_quiet) {
         sim_printf ("%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
@@ -881,10 +884,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
     capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
     vhd = sim_vhd_disk_create (gbuf, ((t_offset)uptr->capac)*capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));
     if (!vhd) {
-        if (!sim_quiet) {
-            sim_printf ("%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
-            }
-        return SCPE_OPENERR;
+        return sim_messagef (r, "%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
         }
     else {
         uint8 *copy_buf = (uint8*) malloc (1024*1024);
@@ -1215,7 +1215,7 @@ if (close_function (fileref) == EOF)
 return SCPE_OK;
 }
 
-t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "%s Disk Attach Help\n\n", dptr->name);
 
@@ -1350,6 +1350,8 @@ return SCPE_OK;
 
 t_stat sim_disk_perror (UNIT *uptr, const char *msg)
 {
+int saved_errno = errno;
+
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
@@ -1357,6 +1359,7 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_VHD:                                    /* VHD format */
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
         perror (msg);
+        sim_printf ("%s %s: %s\n", sim_uname(uptr), msg, strerror(saved_errno));
     default:
         ;
     }
@@ -1443,7 +1446,7 @@ for (i = 4; i < wds; i++)
     buf[i] = 0177777u;
 da = (uptr->capac*((dptr->flags & DEV_SECTORS) ? 512 : 1)) - (sec * wds);
 for (i = 0; (i < sec) && (i < 10); i++, da += wds)
-    if (sim_disk_wrsect (uptr, (t_lba)(da/wds), (void *)buf, NULL, 1)) {
+    if (sim_disk_wrsect (uptr, (t_lba)(da/wds), (uint8 *)buf, NULL, 1)) {
         free (buf);
         return SCPE_IOERR;
         }
@@ -1650,6 +1653,22 @@ if (strchr (openmode, 'r'))
     DesiredAccess |= GENERIC_READ;
 if (strchr (openmode, 'w') || strchr (openmode, '+'))
     DesiredAccess |= GENERIC_WRITE;
+/* SCP Command Line parsing replaces \\ with \ presuming this is an 
+   escape sequence.  This only affecdts RAW device names and UNC paths.
+   We handle the RAW device name case here by prepending paths beginning 
+   with \.\ with an extra \. */
+if (!memcmp ("\\.\\", rawdevicename, 3)) {
+    char *tmpname = malloc (2 + strlen (rawdevicename));
+
+    if (tmpname == NULL)
+        return NULL;
+    *tmpname = '\\';
+    strcpy (tmpname + 1, rawdevicename);
+    Handle = CreateFileA (tmpname, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
+    free (tmpname);
+    if (Handle != INVALID_HANDLE_VALUE)
+        return (FILE *)Handle;
+    }
 Handle = CreateFileA (rawdevicename, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
 if (Handle == INVALID_HANDLE_VALUE) {
     _set_errno_from_status (GetLastError ());
@@ -1959,18 +1978,12 @@ fsync ((int)((long)f));
 
 static t_offset sim_os_disk_size_raw (FILE *f)
 {
-#if defined (DONT_DO_LARGEFILE)
-struct stat statb;
+t_offset pos, size;
 
-if (fstat ((int)((long)f), &statb))
-    return (t_offset)-1;
-#else
-struct stat64 statb;
-
-if (fstat64 ((int)((long)f), &statb))
-    return (t_offset)-1;
-#endif
-return (t_offset)statb.st_size;
+pos = (t_offset)lseek ((int)((long)f), (off_t)0, SEEK_CUR);
+size = (t_offset)lseek ((int)((long)f), (off_t)0, SEEK_END);
+lseek ((int)((long)f), (off_t)pos, SEEK_SET);
+return size;
 }
 
 static t_stat sim_os_disk_unload_raw (FILE *f)

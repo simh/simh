@@ -157,7 +157,6 @@ int32 ry_swait = 10;                                    /* seek, per track */
 int32 ry_xwait = 1;                                     /* tr set time */
 uint8 rx2xb[RY_NUMBY] = { 0 };                          /* sector buffer */
 
-DEVICE ry_dev;
 t_stat ry_rd (int32 *data, int32 PA, int32 access);
 t_stat ry_wr (int32 data, int32 PA, int32 access);
 t_stat ry_svc (UNIT *uptr);
@@ -166,8 +165,8 @@ t_stat ry_boot (int32 unitno, DEVICE *dptr);
 void ry_done (int32 esr_flags, uint8 new_ecode);
 t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ry_attach (UNIT *uptr, char *cptr);
-t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *ry_description (DEVICE *dptr);
+t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *ry_description (DEVICE *dptr);
 
 
 /* RY11 data structures
@@ -714,7 +713,7 @@ return SCPE_NOFNC;
 
 #endif
 
-t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "RX211/RX02 Floppy Disk\n\n");
 fprintf (st, "RX211 options include the ability to set units write enabled or write locked,\n");
@@ -736,7 +735,7 @@ fprintf (st, "errors cannot occur.\n");
 return SCPE_OK;
 }
 
-char *ry_description (DEVICE *dptr)
+const char *ry_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "RX211 floppy disk controller" : 
                   "RXV21 floppy disk controller";

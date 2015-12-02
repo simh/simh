@@ -325,7 +325,7 @@ REG cpu_reg[] = {
     { ORDATA (MBR, MBR, 18) },
     { ORDATA (LR, LR, 18) },
     { ORDATA (TAC, TAC, 18) },
-	{ ORDATA (TBR, TBR, 18) },
+    { ORDATA (TBR, TBR, 18) },
     { ORDATA (PF, PF, 18) },
     { BRDATA (PCQ, pcq, 8, ASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
@@ -462,8 +462,6 @@ t_stat sim_instr (void)
     while (reason == 0) {                                   /* loop until halted */
 
         if (sim_interval <= 0) {                            /* check clock queue */
-            /* make sure all useful state is in simh registers while processing events */
-            pcq_r->qptr = pcq_p;                            /* update pc q ptr */
             reason = sim_process_event ();
             if (reason != SCPE_OK)
                 break;
@@ -705,10 +703,10 @@ t_stat sim_instr (void)
                     break;
                 case 3:     /* tix (Transfer and Index) */
                     TRACE_PRINT(TRN_MSG, ("[%06o] TIX: XR=%05o\n", PC-1, XR));
-					if ((XR == 037777) || (XR == 000000)) { /* +/- 0, take next instruction */
+                    if ((XR == 037777) || (XR == 000000)) { /* +/- 0, take next instruction */
                         TRACE_PRINT(TRN_MSG, ("+/- 0, transfer not taken.\n"));
                     } else { /* Not +/- 0 */
-						if (XR & 0020000) { /* XR[4] == 1 */
+                        if (XR & 0020000) { /* XR[4] == 1 */
                             TRACE_PRINT(TRN_MSG, ("XR is negative, transfer taken,"));
                             XR ++;
                         } else { /* XR[4] = 0 */

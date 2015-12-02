@@ -339,12 +339,6 @@ reason = 0;
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        /* Make sure all intermediate state is visible in simh registers */
-        saved_PC = IF | (PC & 07777);                   /* save copies */
-        saved_DF = DF & 070000;
-        saved_LAC = LAC & 017777;
-        saved_MQ = MQ & 07777;
-        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         if ((reason = sim_process_event ()))
             break;
         }
@@ -363,7 +357,7 @@ while (reason == 0) {                                   /* loop until halted */
         sim_brk_test (MA, (1u << SIM_BKPT_V_SPC) | SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     IR = M[MA];                                         /* fetch instruction */
     if (sim_brk_summ && 

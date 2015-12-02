@@ -332,7 +332,7 @@ do {
         if ((rf_wlk >> t) & 1)                          /* write locked? */
             rf_sta = rf_sta | RFS_WLS;
         else {                                          /* not locked */
-            fbuf[rf_da] = M[pa];						/* write word */
+            fbuf[rf_da] = M[pa];                        /* write word */
             if (((uint32) rf_da) >= uptr->hwmark)
                 uptr->hwmark = rf_da + 1;
             }

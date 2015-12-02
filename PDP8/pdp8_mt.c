@@ -128,7 +128,7 @@
 
 #define STA_CLR         (FN_RMASK | 00020)              /* always clear */
 #define STA_DYN         (STA_REW | STA_BOT | STA_REM | STA_EOF | \
-						 STA_EOT | STA_WLK)             /* kept in USTAT */
+                         STA_EOT | STA_WLK)             /* kept in USTAT */
 
 extern uint16 M[];
 extern int32 int_req, stop_inst;

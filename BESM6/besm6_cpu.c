@@ -19,7 +19,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -60,8 +60,8 @@ t_value memory [MEMSIZE];
 uint32 PC, RK, Aex, M [NREGS], RAU, RUU;
 t_value ACC, RMR, GRP, MGRP;
 uint32 PRP, MPRP;
-uint32 READY, READY2; /* ready flags of various devices */
-int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
+uint32 READY, READY2;                   /* ready flags of various devices */
+int32 tmr_poll = CLK_DELAY;             /* pgm timer poll */
 
 extern const char *scp_errors[];
 
@@ -145,12 +145,24 @@ REG cpu_reg[] = {
 };
 
 MTAB cpu_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Enables idle detection mode" },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL,           NULL,  "Disables idle detection" },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "REQ",    &cpu_req,      NULL,           NULL,  "Sends a request interrupt" },
-    { MTAB_XTD|MTAB_VDV, 0, "PANEL", "PANEL", &besm6_init_panel, &besm6_show_panel,         NULL, "Displays graphical panel" },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPANEL", &besm6_close_panel, NULL,         NULL, "Closes graphical panel" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALO, 0, "PULT", "PULT",    &cpu_set_pult, &cpu_show_pult, NULL, "Selects a hardwired program or switch reg." },
+    { MTAB_XTD|MTAB_VDV,
+        0, "IDLE",  "IDLE",     &sim_set_idle,      &sim_show_idle,     NULL,
+                                "Enables idle detection mode" },
+    { MTAB_XTD|MTAB_VDV,
+        0, NULL,    "NOIDLE",   &sim_clr_idle,      NULL,               NULL,
+                                "Disables idle detection" },
+    { MTAB_XTD|MTAB_VDV,
+        0, NULL,    "REQ",      &cpu_req,           NULL,               NULL,
+                                "Sends a request interrupt" },
+    { MTAB_XTD|MTAB_VDV,
+        0, "PANEL", "PANEL",    &besm6_init_panel,  &besm6_show_panel,  NULL,
+                                "Displays graphical panel" },
+    { MTAB_XTD|MTAB_VDV,
+        0, NULL,    "NOPANEL",  &besm6_close_panel, NULL,               NULL,
+                                "Closes graphical panel" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALO,
+        0, "PULT",  "PULT",     &cpu_set_pult,      &cpu_show_pult,     NULL,
+                                "Selects a hardwired program or switch reg." },
     { 0 }
 };
 
@@ -332,9 +344,9 @@ t_stat cpu_deposit (t_value val, t_addr addr, UNIT *uptr, int32 sw)
         /* Deposited values for the switch register address range
          * always go to switch registers.
          */
-        pult [0][addr] = SET_CONVOL (val, CONVOL_INSN);
+        pult [0][addr] = SET_PARITY (val, PARITY_INSN);
     } else
-        memory [addr] = SET_CONVOL (val, CONVOL_INSN);
+        memory [addr] = SET_PARITY (val, PARITY_INSN);
     return SCPE_OK;
 }
 
@@ -393,7 +405,7 @@ t_stat cpu_set_pult (UNIT *u, int32 val, char *cptr, void *desc)
     if (cptr) sw = atoi(cptr); else sw = 0;
     if (sw >= 0 && sw <= 10) {
         pult_packet_switch = sw;
-        if (sw) 
+        if (sw)
             sim_printf("Pult packet switch set to hardwired program %d\n", sw);
         else
             sim_printf("Pult packet switch set to switch registers\n");
@@ -496,7 +508,7 @@ static void cmd_002 ()
     case 64: case 65: case 66: case 67: case 68: case 69: case 70: case 71:
     case 72: case 73: case 74: case 75: case 76: case 77: case 78: case 79:
     case 80: case 81: case 82: case 83: case 84: case 85: case 86: case 87:
-    case 88: case 89: case 90: case 91: case 92: case 93: case 94: case 95: 
+    case 88: case 89: case 90: case 91: case 92: case 93: case 94: case 95:
         /* 0100 - 0137:
          * Бит 1: управление блокировкой режима останова БРО.
          * Биты 2 и 3 - признаки формирования контрольных
@@ -506,13 +518,13 @@ static void cmd_002 ()
         else
             RUU &= ~RUU_AVOST_DISABLE;
         if (Aex & 2)
-            RUU |= RUU_CONVOL_RIGHT;
+            RUU |= RUU_PARITY_RIGHT;
         else
-            RUU &= ~RUU_CONVOL_RIGHT;
+            RUU &= ~RUU_PARITY_RIGHT;
         if (Aex & 4)
-            RUU |= RUU_CONVOL_LEFT;
+            RUU |= RUU_PARITY_LEFT;
         else
-            RUU &= ~RUU_CONVOL_LEFT;
+            RUU &= ~RUU_PARITY_LEFT;
         break;
     case 0200: case 0201: case 0202: case 0203:
     case 0204: case 0205: case 0206: case 0207:
@@ -546,12 +558,8 @@ static void cmd_033 ()
 #endif
     switch (Aex & 04177) {
     case 0:
-        /* 
-         * Using an I/O control instruction with Aex == 0
-         * after issuing a 033 instruction with a non-zero Aex 
-         * to send data to a device was required
-         * for some devices (e.g. printers) according to the docs.
-         * What is the exact purpose is unclear (timing, power, ???)
+        /*
+         * Releasing the drum printer solenoids. No effect on simulation.
          */
         break;
     case 1: case 2:
@@ -818,7 +826,7 @@ void check_initial_setup ()
             (d->tm_year % 10) << 20 |
             ((d->tm_year / 10) % 10) << 16 |
             (memory[YEAR] & 7);
-        memory[YEAR] = SET_CONVOL (date, CONVOL_NUMBER);
+        memory[YEAR] = SET_PARITY (date, PARITY_NUMBER);
         /* приказ ВРЕ: ТР6 = 016, ТР5 = 9-14 р.-часы, 1-8 р.-минуты */
         pult[0][6] = 016;
         pult[0][4] = 0;
@@ -1735,18 +1743,24 @@ t_stat sim_instr (void)
         }
 
         if (PC > BITS(15) && IS_SUPERVISOR(RUU)) {
-          /* 
+          /*
            * Runaway instruction execution in supervisor mode
            * warrants attention.
            */
             besm6_draw_panel(1);
-            return STOP_RUNOUT;             /* stop simulation */
+            return STOP_RUNOUT;                 /* stop simulation */
         }
 
         if (sim_brk_summ & SWMASK('E') &&       /* breakpoint? */
             sim_brk_test (PC, SWMASK ('E'))) {
             besm6_draw_panel(1);
-            return STOP_IBKPT;              /* stop simulation */
+            return STOP_IBKPT;                  /* stop simulation */
+        }
+
+        if (redraw_panel) {
+            /* Periodic panel redraw is not forcing */
+            besm6_draw_panel(0);
+            redraw_panel = 0;
         }
 
         if (PRP & MPRP) {
@@ -1762,11 +1776,6 @@ t_stat sim_instr (void)
         }
         cpu_one_inst ();                        /* one instr */
         iintr = 0;
-        if (redraw_panel) {
-            /* Periodic panel redraw is not forcing */
-            besm6_draw_panel(0);
-            redraw_panel = 0;
-        }
 
         sim_interval -= 1;                      /* count down instructions */
     }
@@ -1789,8 +1798,8 @@ t_stat fast_clk (UNIT * this)
     GRP |= GRP_TIMER;
 
     if ((counter & 15) == 0) {
-        /* 
-         * The OS used the (undocumented, later addition) 
+        /*
+         * The OS used the (undocumented, later addition)
          * slow clock interrupt to initiate servicing
          * terminal I/O. Its frequency was reportedly 16 Hz;
          * 64 ms is a good enough approximation. It can be sped up
@@ -1806,7 +1815,7 @@ t_stat fast_clk (UNIT * this)
     }
 
     /* Baudot TTYs are synchronised to the main timer rather than the
-     * serial line clock. Their baud rate is 50. 
+     * serial line clock. Their baud rate is 50.
      */
     if (tty_counter == CLK_TPS/50) {
         tt_print();
@@ -1827,9 +1836,9 @@ t_stat clk_reset (DEVICE * dev)
 
     /* Схема автозапуска включается по нереализованной кнопке "МР" */
 
-    if (!sim_is_running) {                                  /* RESET (not IORESET)? */
-        tmr_poll = sim_rtcn_init (clocks[0].wait, 0);       /* init timer */
-        sim_activate (&clocks[0], tmr_poll);                /* activate unit */
+    if (!sim_is_running) {                              /* RESET (not IORESET)? */
+        tmr_poll = sim_rtcn_init (clocks[0].wait, 0);   /* init timer */
+        sim_activate (&clocks[0], tmr_poll);            /* activate unit */
         }
     return SCPE_OK;
 }

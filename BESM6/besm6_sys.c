@@ -19,7 +19,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -418,6 +418,10 @@ t_stat parse_instruction_word (char *cptr, t_value *val)
 /*
  * Печать машинной инструкции с мнемоникой.
  */
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 void besm6_fprint_cmd (FILE *of, uint32 cmd)
 {
     int reg, opcode, addr;
@@ -559,7 +563,7 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
  * Форматы строк:
  * п 76543                     - адрес пуска
  * в 12345                     - адрес ввода
- * ч -123.45e+6                        - вещественное число
+ * ч -123.45e+6                - вещественное число
  * с 0123 4567 0123 4567       - восьмеричное слово
  * к 00 22 00000 00 010 0000   - команды
  */
@@ -656,16 +660,16 @@ t_stat besm6_load (FILE *input)
             break;
         case '=':               /* word */
             if (addr < 010)
-                pult [0][addr] = SET_CONVOL (word, CONVOL_NUMBER);
+                pult [0][addr] = SET_PARITY (word, PARITY_NUMBER);
             else
-                memory [addr] = SET_CONVOL (word, CONVOL_NUMBER);
+                memory [addr] = SET_PARITY (word, PARITY_NUMBER);
             ++addr;
             break;
         case '*':               /* instruction */
             if (addr < 010)
-                pult [0][addr] = SET_CONVOL (word, CONVOL_INSN);
+                pult [0][addr] = SET_PARITY (word, PARITY_INSN);
             else
-                memory [addr] = SET_CONVOL (word, CONVOL_INSN);
+                memory [addr] = SET_PARITY (word, PARITY_INSN);
             ++addr;
             break;
         case '@':               /* start address */

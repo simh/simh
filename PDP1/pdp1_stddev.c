@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tti          keyboard
    tto          teleprinter
 
+   28-Mar-15    RMS     Revised to use sim_printf
    21-Mar-12    RMS     Fixed unitialized variable in tto_svc (Michael Bloom)
    21-Dec-06    RMS     Added 16-channel sequence break support
    29-Oct-03    RMS     Added PTR FIODEC-to-ASCII translation (Phil Budne)
@@ -346,7 +347,7 @@ if (temp == EOF) {                                      /* end of file? */
             sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_perror ("PTR I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -509,7 +510,7 @@ dev_req_int (ptp_sbs);                                  /* req interrupt */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (uptr->buf, uptr->fileref) == EOF) {           /* I/O error? */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

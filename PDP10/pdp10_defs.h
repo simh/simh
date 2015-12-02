@@ -699,6 +699,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_KMCB      9
 #define INT_V_DMCRX     10                              /* DMC11/DMR11 */
 #define INT_V_DMCTX     11
+#define INT_V_XU        15                              /* DEUNA/DELUA */
 #define INT_V_DZRX      16                              /* DZ11 */
 #define INT_V_DZTX      17
 #define INT_V_RY        18                              /* RX211 */
@@ -750,7 +751,6 @@ typedef struct pdp_dib DIB;
 #define INT_IPL5        0x000FFF00
 #define INT_IPL4        0x7FF00000
 
-#define VEC_Q           0000                            /* vector base */
 #define VEC_TU          0224                            /* interrupt vectors */
 #define VEC_RP          0254
 #define VEC_LP20        0754
@@ -779,7 +779,7 @@ t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat auto_config (char *name, int32 num);
+t_stat auto_config (const char *name, int32 num);
 
 
 #endif

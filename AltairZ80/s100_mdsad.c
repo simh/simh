@@ -101,6 +101,7 @@ typedef struct {
     uint8 ss;       /* Specifies the side of a double-sided diskette. The bottom side (and only side of a single-sided diskette) is selected when SS=0. The second (top) side is selected when SS=1. */
     uint8 dp;       /* has shared use. During stepping operations, DP=O specifies a step out and DP=1 specifies a step in. During write operations, write procompensation is invoked if and only if DP=1. */
     uint8 st;       /* controls the level of the head step signal to the disk drives. */
+    uint8 pst;      /* value of step signal (st) on previous order */
     uint8 ds;       /* is the drive select field, encoded as follows: */
                     /* 0=no drive selected
                      * 1=drive 1 selected
@@ -312,6 +313,8 @@ static t_stat mdsad_attach(UNIT *uptr, char *cptr)
         if(mdsad_dev.units[i].fileref == uptr->fileref) {
             break;
         }
+
+    mdsad_info->orders.st = 0;      /* ensure valid state */
     }
 
     /* Default for new file is DSK */
@@ -510,6 +513,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
             mdsad_info->orders.dd = (Addr & 0x80) >> 7;
             mdsad_info->orders.ss = (Addr & 0x40) >> 6;
             mdsad_info->orders.dp = (Addr & 0x20) >> 5;
+            mdsad_info->orders.pst = mdsad_info->orders.st;     /* save previous state of st */
             mdsad_info->orders.st = (Addr & 0x10) >> 4;
             mdsad_info->orders.ds = (Addr & 0x0F);
 
@@ -543,7 +547,9 @@ static uint8 MDSAD_Read(const uint32 Addr)
             /* use latest selected drive */
             pDrive = &mdsad_info->drive[mdsad_info->orders.ds];
 
-            if(mdsad_info->orders.st == 1) {
+            /* step only on transition of the step bit from 1 to 0. This duplicates the
+               way the hardware functions and is required by some North Star code */
+            if((mdsad_info->orders.st == 0) && (mdsad_info->orders.pst != 0)) {
                 if(mdsad_info->orders.dp == 0) {
                     sim_debug(SEEK_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
                               " Step out: Track=%d%s\n", PCX, pDrive->track,

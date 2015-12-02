@@ -610,7 +610,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
         default:
             break;
     }
-    printf (">>DSK%d non-existent function %d\n", disk, op);
+    sim_printf (">>DSK%d non-existent function %d\n", disk, op);
     return SCPE_OK;                     
 }
 

@@ -494,8 +494,8 @@ static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, void *desc);
 static t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v, void *dp);
 
 static t_stat kmc_help (FILE *st, struct sim_device *dptr,
-                        struct sim_unit *uptr, int32 flag, char *cptr); 
-static char *kmc_description (DEVICE *dptr);
+                        struct sim_unit *uptr, int32 flag, const char *cptr); 
+static const char *kmc_description (DEVICE *dptr);
 
 /* Global data */
 
@@ -844,7 +844,7 @@ static t_stat kmc_writeCsr (int32 data, int32 PA, int32 access) {
                 }
             }
         }
-        if (changed & SEL0_RUN) {	            /* Changing the run bit? */
+        if (changed & SEL0_RUN) {               /* Changing the run bit? */
             if (sel0 & SEL0_RUN) {
                 kmc_startUcode (k);
             } else {
@@ -858,7 +858,7 @@ static t_stat kmc_writeCsr (int32 data, int32 PA, int32 access) {
             if ((sel0 & SEL0_RQI) && !(sel2 & SEL2_RDO))
                 sel2 = (sel2 & 0xFF00) | SEL2_RDI; /* Clear command bits too */
             kmc_updints(k);
-	    }
+        }
         break;
     case 01: /* SEL2 */
         if (access == WRITEB) {
@@ -921,23 +921,23 @@ static t_stat kmc_writeCsr (int32 data, int32 PA, int32 access) {
 static void kmc_doMicroinstruction (int32 k, uint16 instr) {
  switch (instr) {
  case 0041222: /* MOVE <MEM><BSEL2> */
-	sel2 = (sel2 & ~0xFF) |  (dram[mar%KMC_DRAMSIZE] & 0xFF);
-	break;
+    sel2 = (sel2 & ~0xFF) |  (dram[mar%KMC_DRAMSIZE] & 0xFF);
+    break;
  case 0055222: /* MOVE <MRM><BSEL2><MARINC> */
-	sel2 = (sel2 & ~0xFF) |  (dram[mar%KMC_DRAMSIZE] & 0xFF);
-	mar = (mar +1)%KMC_DRAMSIZE;
-	break;
+    sel2 = (sel2 & ~0xFF) |  (dram[mar%KMC_DRAMSIZE] & 0xFF);
+    mar = (mar +1)%KMC_DRAMSIZE;
+    break;
  case 0122440: /* MOVE <BSEL2><MEM> */
         dram[mar%KMC_DRAMSIZE] = sel2 & 0xFF;
-	break;
+    break;
  case 0136440: /* MOVE <BSEL2><MEM><MARINC> */
         dram[mar%KMC_DRAMSIZE] = sel2 & 0xFF;
-	mar = (mar +1)%KMC_DRAMSIZE;
-	break;
+    mar = (mar +1)%KMC_DRAMSIZE;
+    break;
  case 0121202: /* MOVE <NPR><BSEL2> */
  case 0021002: /* MOVE <IBUS 0><BSEL2> */
-	sel2 = (sel2 & ~0xFF) |  0;   
-	break;
+    sel2 = (sel2 & ~0xFF) |  0;   
+    break;
  default:
    if ((instr & 0160000) == 0000000) { /* MVI */
      switch (instr & 0174000) {
@@ -1707,19 +1707,19 @@ static void kmc_dispatchInputCmd(int32 k) {
               cmdsel2, sel4, sel6, ba);
     
     switch (cmdsel2 & (SEL2_IOT | SEL2_CMD)) {
-    case CMD_BUFFIN:		                    /* TX BUFFER IN */
+    case CMD_BUFFIN:                            /* TX BUFFER IN */
         kmc_txBufferIn(d, ba, sel6);
         break;
-    case CMD_CTRLIN:			                /* CONTROL IN. */
+    case CMD_CTRLIN:                            /* CONTROL IN. */
     case SEL2_IOT | CMD_CTRLIN:
         kmc_ctrlIn (k, d, line);
         break;
 
-    case CMD_BASEIN:			                /* BASE IN. */
+    case CMD_BASEIN:                            /* BASE IN. */
         kmc_baseIn (k, d, cmdsel2, line);
         break;
 
-    case (SEL2_IOT | CMD_BUFFIN):			    /* Buffer in, receive buffer for us... */
+    case (SEL2_IOT | CMD_BUFFIN):               /* Buffer in, receive buffer for us... */
         kmc_rxBufferIn(d, ba ,sel6);
         break;
     default:
@@ -1756,7 +1756,7 @@ static void kmc_baseIn (int32 k, dupstate *d, uint16 cmdsel2, uint8 line) {
     csraddress = sel6 & SEL6_II_DUPCSR;
 
     if ((sel4 != 0) || (cmdsel2 & SEL2_II_RESERVED)) {
-        sim_debug (DF_ERR, &kmc_dev, "KMC%u: BASE IN reserved bits set\n");
+        sim_debug (DF_ERR, &kmc_dev, "KMC%u: BASE IN reserved bits set\n", k);
         kmc_halt (k, HALT_BADCSR);
         return;
     }
@@ -1839,7 +1839,7 @@ static void kmc_ctrlIn (int32 k, dupstate *d, int line) {
                       (sel6 & SEL6_CI_DDCMP)? "DDCMP":"Bit-stuffing",
                       (sel6 & SEL6_CI_HDX)? "half" : "full");
             if (sel6 & SEL6_CI_ENASS) {
-                sim_debug (DF_CMD, &kmc_dev, " SS:%u",
+                sim_debug (DF_CMD, &kmc_dev, " SS:%u-%d",
                           (sel6 & SEL6_CI_SADDR), line);
             }
             sim_debug (DF_CMD, &kmc_dev, "\n");
@@ -2942,7 +2942,7 @@ t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v,  void *dp) {
  */
 
 static t_stat kmc_help (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag, char *cptr) {
+                         struct sim_unit *uptr, int32 flag, const char *cptr) {
     const char *const text =
 " The KMC11-A is a general purpose microprocessor that is used in\n"
 " several DEC products.  The KDP is an emulation of one of those\n"
@@ -3071,6 +3071,6 @@ static t_stat kmc_help (FILE *st, struct sim_device *dptr,
 /* Description of this device.
  * Conventionally last function in the file.
  */
-static char *kmc_description (DEVICE *dptr) {
+static const char *kmc_description (DEVICE *dptr) {
     return "KMC11-A Synchronous line controller supporting only COMM IOP/DUP microcode";
 }

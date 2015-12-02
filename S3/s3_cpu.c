@@ -521,8 +521,6 @@ reason = 0;
 
 while (reason == 0) {                                   /* loop until halted */
 if (sim_interval <= 0) {                                /* check clock queue */
-    /* make sure all useful state is in simh registers while processing events */
-    saved_PC = PC;
     if ((reason = sim_process_event ())) break;
 }
 
@@ -611,12 +609,12 @@ if (opaddr == 0xf0) {                                   /* Is it command format?
             if (qbyte & 0x01) display[2][3] = '|' ;
             if (rbyte & 0x01) display[2][7] = '|' ;
                                                         /* Print display segment array */
-            printf("\n\r");
+            sim_printf("\n");
             for (i = 0; i < 3; i++) {
                 for (j = 0; j < 9; j++) {
-                    printf ("%c", display[i][j]);
+                    sim_printf ("%c", display[i][j]);
                 }
-                printf ("\n\r");
+                sim_printf ("\n");
             }
             reason = STOP_HALT;
             break;

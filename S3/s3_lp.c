@@ -203,7 +203,7 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
         default:
             break;
     }                       
-    printf (">>LPT non-existent function %d\n", op);
+    sim_printf (">>LPT non-existent function %d\n", op);
     return SCPE_OK;                     
 }
 
@@ -240,7 +240,7 @@ else {
 }
 lines = lflag = 0;                                      /* clear cc action */
 if (ferror (lpt_unit.fileref)) {                        /* error? */
-    perror ("Line printer I/O error");
+    sim_perror ("Line printer I/O error");
     clearerr (lpt_unit.fileref);
     lpterror = 1;
 }

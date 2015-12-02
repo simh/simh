@@ -50,7 +50,7 @@
 #define MUX_SCANMAX     (MUX_LINES * MUX_FLAGS)         /* flags to scan */
 #define MUX_SCANMASK    (MUX_SCANMAX - 1)
 #define MUX_INIT_POLL   8000
-#define MUXL_WAIT       500
+#define MUXL_WAIT       250
 #define MUX_SETFLG(l,x) mux_flags[((l) * MUX_FLAGS) + (x)] = 1
 #define MUX_SETINT(x)   int_req = int_req | (INT_MUXR >> (x))
 #define MUX_CLRINT(x)   int_req = int_req & ~(INT_MUXR >> (x))
@@ -113,7 +113,7 @@ uint32 mux_tps = 100;                                   /* polls/second */
 uint32 mux_scan = 0;                                    /* scanner */
 uint32 mux_slck = 0;                                    /* scanner locked */
 
-TMLN mux_ldsc[MUX_LINES] = { {0} };                       /* line descriptors */
+TMLN mux_ldsc[MUX_LINES] = { {0} };                     /* line descriptors */
 TMXR mux_desc = { MUX_LINES, 0, 0, mux_ldsc };          /* mux descriptor */
 
 t_stat mux (uint32 fnc, uint32 inst, uint32 *dat);

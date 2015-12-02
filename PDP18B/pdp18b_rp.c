@@ -90,7 +90,7 @@
 
 #define STA_RW          0777000                         /* read/write */
 #define STA_EFLGS       (STA_WPE | STA_NXC | STA_NXF | STA_NXS | \
-						 STA_HNF | STA_SUSI)            /* error flags */
+                         STA_HNF | STA_SUSI)            /* error flags */
 #define STA_DYN         (STA_SUWP | STA_SUSI)           /* per unit status */
 #define GET_UNIT(x)     (((x) >> STA_V_UNIT) & STA_M_UNIT)
 #define GET_FUNC(x)     (((x) >> STA_V_FUNC) & STA_M_FUNC)
@@ -111,7 +111,7 @@
 #define STB_SUNR        0000001                         /* sel unit not rdy */
 
 #define STB_EFLGS       (STB_SUFU | STB_PGE | STB_EOP | STB_TME | STB_FME | \
-						 STB_WCE | STB_WPE | STB_LON )  /* error flags */
+                         STB_WCE | STB_WPE | STB_LON )  /* error flags */
 #define STB_DYN         (STB_SUFU | STB_SUSU | STB_SUNR) /* per unit */
 
 /* Disk address */
@@ -432,7 +432,7 @@ rp_busy = 0;                                            /* clear busy */
 rp_updsta (STA_DON, 0);                                 /* set done */
 
 if (err != 0) {                                         /* error? */
-    perror ("RP I/O error");
+    sim_perror ("RP I/O error");
     clearerr (uptr->fileref);
     return IORETURN (rp_stopioe, SCPE_IOERR);
     }

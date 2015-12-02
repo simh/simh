@@ -158,6 +158,10 @@ static uint32 m68k_fc;                              /* Current function code fro
 extern uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];
 extern UNIT cpu_unit;
 
+#if !UNIX_PLATFORM
+extern void pollForCPUStop(void);
+#endif
+
 #define M68K_BOOT_LENGTH        (32 * 1024)                 /* size of bootstrap    */
 #define M68K_BOOT_PC            0x000400                    /* initial PC for boot  */
 #define M68K_BOOT_SP            0xfe0000                    /* initial SP for boot  */
@@ -215,9 +219,8 @@ t_stat sim_instr_m68k(void) {
     while (TRUE) {
         if (sim_interval <= 0) {                            /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_poll_kbd()) == SCPE_STOP)     /* poll on platforms without reliable
-                                                             signalling             */
-                break;
+            /* poll on platforms without reliable signalling but not too often */
+            pollForCPUStop(); /* following sim_process_event will check for stop */
 #endif
             if ((reason = sim_process_event()))
                 break;

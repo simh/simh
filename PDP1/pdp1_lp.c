@@ -115,7 +115,7 @@ if ((inst & 07000) == 01000) {                          /* fill buf */
         lpt_buf[i] = lpt_trans[(dat >> 12) & 077];
         lpt_buf[i + 1] = lpt_trans[(dat >> 6) & 077];
         lpt_buf[i + 2] = lpt_trans[dat & 077];
-		}
+        }
     lpt_bptr = (lpt_bptr + 1) & BPTR_MASK;
     return dat;
     }
@@ -169,7 +169,7 @@ if (lpt_spc) {                                          /* space? */
     fputs (lpt_cc[lpt_spc & 07], uptr->fileref);        /* print cctl */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -184,7 +184,7 @@ else {
     fputs (lpt_buf, uptr->fileref);                     /* print buffer */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* test error */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }

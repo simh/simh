@@ -758,7 +758,7 @@ extern t_stat cpu_load_bootcode (const char *filename, const unsigned char *buil
 extern t_stat cpu_print_model (FILE *st);
 extern t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-extern t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+extern t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+extern t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 #endif                                                  /* _VAX_DEFS_H */

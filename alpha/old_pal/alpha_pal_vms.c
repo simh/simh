@@ -211,7 +211,7 @@ REG vmspal_reg[] = {
     { HRDATA (ASTSR, vms_astsr, 4) },
     { FLDATA (DATFX, vms_datfx, 0) },
     { NULL }
-	};
+    };
 
 DEVICE vmspal_dev = {
     "VMSPAL", &vmspal_unit, vmspal_reg, NULL,
@@ -219,7 +219,7 @@ DEVICE vmspal_dev = {
     NULL, NULL, &pal_proc_reset_vms,
     NULL, NULL, NULL,
     NULL, 0
-	};
+    };
 
 /* VMS interrupt evaluator - returns IPL of highest priority interrupt */
 
@@ -1571,7 +1571,7 @@ if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
     if (lnt == L_LONG) return ReadPL (pa);              /* long? */
     if (lnt == L_WORD) return ReadPW (pa);              /* word? */
     return ReadPB (pa);                                 /* byte */
-	}
+    }
 if ((VA_GETOFF (va) + lnt) > VA_PAGSIZE) {              /* cross page? */
     if (exc = Test (va + 8, acc, &pa1))                 /* test, translate */
         ABORT1 (va + 8, exc + EXC_R);

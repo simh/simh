@@ -50,6 +50,9 @@
    sim_fsize_name_ex -       get file size as a t_offset of named file
    sim_buf_copy_swapped -    copy data swapping elements along the way
    sim_buf_swap_data -       swap data elements inplace in buffer
+   sim_shmem_open            create or attach to a shared memory region
+   sim_shmem_close           close a shared memory region
+
 
    sim_fopen and sim_fseek are OS-dependent.  The other routines are not.
    sim_fsize is always a 32b routine (it is used only with small capacity random
@@ -152,6 +155,8 @@ if ((size == 0) || (count == 0))                        /* check arguments */
 if (sim_end || (size == sizeof (char)))                 /* le or byte? */
     return fwrite (bptr, size, count, fptr);            /* done */
 sim_flip = (unsigned char *)malloc(FLIP_SIZE);
+if (!sim_flip)
+    return 0;
 nelem = FLIP_SIZE / size;                               /* elements in buffer */
 nbuf = count / nelem;                                   /* number buffers */
 lcnt = count % nelem;                                   /* count in last buf */
@@ -375,6 +380,50 @@ int sim_set_fifo_nonblock (FILE *fptr)
 return -1;
 }
 
+struct SHMEM {
+    HANDLE hMapping;
+    size_t shm_size;
+    void *shm_base;
+    };
+
+t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr)
+{
+*shmem = (SHMEM *)calloc (1, sizeof(**shmem));
+
+if (*shmem == NULL)
+    return SCPE_MEM;
+
+(*shmem)->hMapping = INVALID_HANDLE_VALUE;
+(*shmem)->shm_size = size;
+(*shmem)->shm_base = NULL;
+(*shmem)->hMapping = CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, (DWORD)size, name);
+if ((*shmem)->hMapping == INVALID_HANDLE_VALUE) {
+    sim_shmem_close (*shmem);
+    *shmem = NULL;
+    return SCPE_OPENERR;
+    }
+(*shmem)->shm_base = MapViewOfFile ((*shmem)->hMapping, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+if ((*shmem)->shm_base == NULL) {
+    sim_shmem_close (*shmem);
+    *shmem = NULL;
+    return SCPE_OPENERR;
+    }
+
+*addr = (*shmem)->shm_base;
+return SCPE_OK;
+}
+
+void sim_shmem_close (SHMEM *shmem)
+{
+if (shmem == NULL)
+    return;
+if (shmem->shm_base != NULL)
+    UnmapViewOfFile (shmem->shm_base);
+if (shmem->hMapping != INVALID_HANDLE_VALUE)
+    CloseHandle (shmem->hMapping);
+free (shmem);
+}
+
 #else /* !defined(_WIN32) */
 #include <unistd.h>
 int sim_set_fsize (FILE *fptr, t_addr size)
@@ -398,6 +447,73 @@ if ((stbuf.st_mode & S_IFIFO)) {
     }
 #endif
 return -1;
+}
+
+#include <sys/mman.h>
+
+struct SHMEM {
+    int shm_fd;
+    size_t shm_size;
+    void *shm_base;
+    };
+
+t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr)
+{
+#ifdef HAVE_SHM_OPEN
+*shmem = (SHMEM *)calloc (1, sizeof(**shmem));
+
+*addr = NULL;
+if (*shmem == NULL)
+    return SCPE_MEM;
+
+(*shmem)->shm_base = MAP_FAILED;
+(*shmem)->shm_size = size;
+(*shmem)->shm_fd = shm_open (name, O_RDWR, 0);
+if ((*shmem)->shm_fd == -1) {
+    (*shmem)->shm_fd = shm_open (name, O_CREAT | O_RDWR, 0660);
+    if ((*shmem)->shm_fd == -1) {
+        sim_shmem_close (*shmem);
+        *shmem = NULL;
+        return SCPE_OPENERR;
+        }
+    if (ftruncate((*shmem)->shm_fd, size)) {
+        sim_shmem_close (*shmem);
+        *shmem = NULL;
+        return SCPE_OPENERR;
+        }
+    }
+else {
+    struct stat statb;
+
+    if ((fstat ((*shmem)->shm_fd, &statb)) ||
+        (statb.st_size != (*shmem)->shm_size)) {
+        sim_shmem_close (*shmem);
+        *shmem = NULL;
+        return SCPE_OPENERR;
+        }
+    }
+(*shmem)->shm_base = mmap(NULL, (*shmem)->shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, (*shmem)->shm_fd, 0);
+if ((*shmem)->shm_base == MAP_FAILED) {
+    sim_shmem_close (*shmem);
+    *shmem = NULL;
+    return SCPE_OPENERR;
+    }
+*addr = (*shmem)->shm_base;
+return SCPE_OK;
+#else
+return SCPE_NOFNC;
+#endif
+}
+
+void sim_shmem_close (SHMEM *shmem)
+{
+if (shmem == NULL)
+    return;
+if (shmem->shm_base != MAP_FAILED)
+    munmap (shmem->shm_base, shmem->shm_size);
+if (shmem->shm_fd != -1)
+    close (shmem->shm_fd);
+free (shmem);
 }
 
 #endif

@@ -170,13 +170,13 @@ uint8 lk_rbuf[10];                                      /* receive buffer */
 int32 lk_rbuf_p = 0;                                    /* receive buffer ptr */
 int32 lk_mode[16];                                      /* mode of each key group */
 
-DEVICE lk_dev;
 t_stat lk_wr (uint8 c);
 t_stat lk_rd (uint8 *c);
 t_stat lk_reset (DEVICE *dptr);
 void lk_reset_mode (void);
 void lk_cmd (void);
 void lk_poll (void);
+const char *lk_description (DEVICE *dptr);
 
 /* LK data structures
 
@@ -188,8 +188,8 @@ void lk_poll (void);
 */
 
 DEBTAB lk_debug[] = {
-    {"SERIAL", DBG_SERIAL},
-    {"CMD",    DBG_CMD},
+    {"SERIAL", DBG_SERIAL,  "Serial port data"},
+    {"CMD",    DBG_CMD,     "Commands"},
     {0}
     };
 
@@ -209,7 +209,8 @@ DEVICE lk_dev = {
     NULL, NULL, &lk_reset,
     NULL, NULL, NULL,
     NULL, DEV_DIS | DEV_DEBUG, 0,
-    lk_debug
+    lk_debug, NULL, NULL, NULL, NULL, NULL, 
+    &lk_description
     };
 
 /* Incoming data on serial line */
@@ -829,4 +830,11 @@ switch (mode) {
     }            
 }
 
-#endif /* !VAX_620 */
+const char *lk_description (DEVICE *dptr)
+{
+return "  VCB01 - LK Keyboard interface";
+}
+
+#else /* defined(VAX_620) */
+static const char *dummy_declaration = "Something to compile";
+#endif /* !defined(VAX_620) */

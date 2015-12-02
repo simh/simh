@@ -54,7 +54,7 @@ t_stat plt_svc (UNIT *uptr);
 t_stat plt_reset (DEVICE *dptr);
 
 
-	/*  7 or 8 bit data mask support for either device  */
+/* 7 or 8 bit data mask support for either device  */
 
 #define UNIT_V_8B   (UNIT_V_UF + 0)                     /* 8b output */
 #define UNIT_8B     (1 << UNIT_V_8B)
@@ -139,7 +139,7 @@ DEV_UPDATE_INTR ;
 if ((plt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (plt_stopioe, SCPE_UNATT);
 if (putc (plt_unit.buf, plt_unit.fileref) == EOF) {
-    perror ("PLT I/O error");
+    sim_perror ("PLT I/O error");
     clearerr (plt_unit.fileref);
     return SCPE_IOERR;
     }

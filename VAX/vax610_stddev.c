@@ -88,11 +88,11 @@ t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
-char *tti_description (DEVICE *dptr);
-char *tto_description (DEVICE *dptr);
-char *clk_description (DEVICE *dptr);
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+const char *tti_description (DEVICE *dptr);
+const char *tto_description (DEVICE *dptr);
+const char *clk_description (DEVICE *dptr);
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 void txdb_func (int32 data);
 
 extern int32 sysd_hlt_enb (void);
@@ -107,7 +107,7 @@ extern int32 con_halt (int32 code, int32 cc);
 
 DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), SERIAL_IN_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
     { HRDATAD (BUF,     tti_unit.buf,         16, "last data item processed") },
@@ -239,7 +239,7 @@ if (tti_csr & CSR_DONE) {                               /* Input pending ? */
     tti_csr = tti_csr & ~CSR_DONE;                      /* clr done */
     tti_unit.buf = tti_unit.buf & 0377;                 /* clr errors */
     CLR_INT (TTI);
-    sim_activate_abs (&tti_unit, tti_unit.wait);        /* check soon for more input */
+    sim_activate_after_abs (&tti_unit, tti_unit.wait);  /* check soon for more input */
     }
 return t;
 }
@@ -368,7 +368,7 @@ sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Input (TTI)\n\n");
 fprintf (st, "The terminal input (TTI) polls the console keyboard for input.\n\n");
@@ -378,7 +378,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tti_description (DEVICE *dptr)
+const char *tti_description (DEVICE *dptr)
 {
 return "console terminal input";
 }
@@ -417,7 +417,7 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Output (TTO)\n\n");
 fprintf (st, "The terminal output (TTO) writes to the simulator console.\n\n");
@@ -427,7 +427,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tto_description (DEVICE *dptr)
+const char *tto_description (DEVICE *dptr)
 {
 return "console terminal output";
 }
@@ -468,7 +468,7 @@ tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
 return SCPE_OK;
 }
 
-char *clk_description (DEVICE *dptr)
+const char *clk_description (DEVICE *dptr)
 {
 return "100hz clock tick";
 }

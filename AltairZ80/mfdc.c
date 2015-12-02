@@ -2,8 +2,8 @@
  *                                                                       *
  * $Id: mfdc.c 1995 2008-07-15 03:59:13Z hharte $                        *
  *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2015 Howard M. Harte.                              *
+ * hharte@magicandroidapps.com                                           *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -353,7 +353,7 @@ static int32 mdskdev(const int32 Addr, const int32 rw, const int32 data)
             if(rw == 0) {   /* Read boot ROM */
                 return(mfdc_rom[Addr & 0xFF]);
             } else {
-                sim_printf("MFDC: Attempt to write to boot ROM." NLP);
+                sim_debug(VERBOSE_MSG, &mfdc_dev, "MFDC: " ADDRESS_FORMAT " Attempt to write to boot ROM." NLP, PCX);
                 return (-1);
             }
             break;
@@ -499,7 +499,14 @@ static uint8 MFDC_Read(const uint32 Addr)
                     checksum = adc(checksum, sdata.raw[i]);
                 }
 
-                sdata.u.checksum = checksum & 0xFF;
+#ifndef USE_VGI
+                /* VGI has the checksum in the data read from the disk image,
+                 * so inserting the computed version of the checksum is not
+                 * necessary. MZOS computes the checksum differently than all
+                 * other VG software, so this allows MZOS disks to work
+                 */
+                sdata.u.checksum = checksum & 0xFF; 
+#endif
 /*              DBG_PRINT(("Checksum=%x" NLP, sdata.u.checksum)); */
                 mfdc_info->read_in_progress = TRUE;
             }

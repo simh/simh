@@ -167,7 +167,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {
             sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else sim_printf ("PTR I/O error: %d\n", errno);
+    else sim_perror ("PTR I/O error");
     clearerr (ptr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -217,9 +217,9 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         sim_activate (&ptp_unit, ptp_unit.wait);        /* activate unit */
         return AC;
 
-	default:
-		return (stop_inst << IOT_V_REASON) + AC;
-		}                                               /* end switch */
+    default:
+        return (stop_inst << IOT_V_REASON) + AC;
+        }                                               /* end switch */
 }
 
 /* Unit service */
@@ -231,7 +231,7 @@ int_req = INT_UPDATE;                                   /* update interrupts */
 if ((ptp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;
     }

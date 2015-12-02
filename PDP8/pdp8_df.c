@@ -131,7 +131,7 @@ DIB df_dib = { DEV_DF, 3, { &df60, &df61, &df62 } };
 
 UNIT df_unit = {
     UDATA (&df_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-		   DF_DKSIZE)
+           DF_DKSIZE)
     };
 
 REG df_reg[] = {
@@ -266,7 +266,7 @@ do {
     if (da >= uptr->capac) {                            /* nx disk addr? */
         df_sta = df_sta | DFS_NXD;
         break;
-		}
+        }
     M[DF_WC] = (M[DF_WC] + 1) & 07777;                  /* incr word count */
     M[DF_MA] = (M[DF_MA] + 1) & 07777;                  /* incr mem addr */
     pa = mex | M[DF_MA];                                /* add extension */
@@ -278,7 +278,7 @@ do {
         if ((df_wlk >> t) & 1)                          /* locked? set err */
             df_sta = df_sta | DFS_WLS;
         else {                                          /* not locked */
-            fbuf[da] = M[pa];							/* write word */
+            fbuf[da] = M[pa];                           /* write word */
             if (da >= uptr->hwmark) uptr->hwmark = da + 1;
             }
         }

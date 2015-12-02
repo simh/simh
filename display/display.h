@@ -139,5 +139,5 @@ extern unsigned char display_tablet;
  * users of this library are expected to provide these calls.
  * simulator will set 18 simulated switches.
  */
-extern unsigned long cpu_get_switches(void);	/* get current switch state */
-extern void cpu_set_switches(unsigned long);	/* set switches */
+extern unsigned long cpu_get_switches(void);    /* get current switch state */
+extern void cpu_set_switches(unsigned long);    /* set switches */

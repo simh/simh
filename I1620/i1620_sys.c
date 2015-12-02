@@ -1,6 +1,6 @@
 /* i1620_sys.c: IBM 1620 simulator interface
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -278,6 +278,11 @@ struct opc opcode[] = {
     };
 
 /* Print an address from five characters */
+
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 
 void fprint_addr (FILE *of, int32 spc, t_value *dig, t_bool flg)
 {

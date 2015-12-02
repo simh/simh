@@ -463,7 +463,7 @@ i = fxread (dpxb, sizeof (uint8), DP_NUMBY, uptr->fileref);
 for ( ; i < DP_NUMBY; i++)                              /* fill with 0's */
     dpxb[i] = 0;
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("DP I/O error");
+    sim_perror ("DP I/O error");
     clearerr (uptr->fileref);
     dp_done (STC_DTE);
     return SCPE_IOERR;
@@ -479,7 +479,7 @@ for ( ; dp_bptr < DP_NUMBY; dp_bptr++)
     dpxb[dp_bptr] = dp_db;                              /* fill with last */
 fxwrite (dpxb, sizeof (uint8), DP_NUMBY, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("DP I/O error");
+    sim_perror ("DP I/O error");
     clearerr (uptr->fileref);
     dp_done (STC_DTE);
     return SCPE_IOERR;
@@ -496,9 +496,9 @@ uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
 
 if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not attached? */
     ((uptr->flags & UNIT_WPRT) && (dp_cmd == CMC_WR))) {
-        dp_done (STC_DTE);                              /* error, done */
-        return TRUE;
-        }
+    dp_done (STC_DTE);                                  /* error, done */
+    return TRUE;
+    }
 hd = GET_SRF (dp_hdsc);                                 /* get head */
 sc = GET_SEC (dp_hdsc);                                 /* get sector */
 if (dp_cyl != (uint32) uptr->CYL) {                     /* wrong cylinder? */

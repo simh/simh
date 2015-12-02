@@ -31,12 +31,20 @@
 
 char sim_name[32] = "MicroVAX I (KA610)";
 
+void vax_init(void)
+{
+sim_savename = "MicroVAX I (KA610)";
+}
+
+void (*sim_vm_init) (void) = &vax_init;
+
 extern DEVICE cpu_dev;
 extern DEVICE mctl_dev;
 extern DEVICE tlb_dev;
 extern DEVICE sysd_dev;
 extern DEVICE qba_dev;
 extern DEVICE tti_dev, tto_dev;
+extern DEVICE tdc_dev;
 extern DEVICE cr_dev;
 extern DEVICE lpt_dev;
 extern DEVICE clk_dev;
@@ -63,14 +71,15 @@ DEVICE *sim_devices[] = {
     &clk_dev,
     &tti_dev,
     &tto_dev,
+    &tdc_dev,
     &dz_dev,
     &vh_dev,
     &cr_dev,
     &lpt_dev,
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+    &vc_dev,
     &lk_dev,
     &vs_dev,
-    &vc_dev,
 #endif
     &rl_dev,
     &rq_dev,
@@ -108,7 +117,7 @@ if (sim_switches & SWMASK ('O')) {                      /* origin? */
     if (r != SCPE_OK)
         return SCPE_ARG;
     }
-while ((i = getc (fileref)) != EOF) {                   /* read byte stream */
+while ((i = Fgetc (fileref)) != EOF) {                   /* read byte stream */
     if (origin >= limit)                                /* NXM? */
         return SCPE_NXM;
     else WriteB (origin, i);                            /* store byte */

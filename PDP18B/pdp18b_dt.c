@@ -27,8 +27,8 @@
                 (PDP-9) TC02/TU55 DECtape
                 (PDP-15) TC15/TU56 DECtape
 
-   23-Jun-06	RMS     Fixed switch conflict in ATTACH
-                    	Revised Type 550 header based on DECTOG formatter
+   23-Jun-06    RMS     Fixed switch conflict in ATTACH
+                        Revised Type 550 header based on DECTOG formatter
    13-Jun-06    RMS     Fixed checksum calculation bug in Type 550
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    25-Jan-04    RMS     Revised for device debug support
@@ -557,7 +557,7 @@ else if ((pulse & 044) == 004) {                        /* MMLC */
         ((fnc == FNC_WALL) && (uptr->flags & UNIT_WLK)))
         dt_seterr (uptr, DTB_SEL);                      /* select err */
     else dt_newsa (dtsa);
-	}
+    }
 DT_UPDINT;
 return dat;
 }
@@ -858,13 +858,13 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
-	uptr->STATE = uptr->pos = 0;
-	unum = (int32) (uptr - dt_dev.units);
-	if (unum == DTA_GETUNIT (dtsa))						/* if selected, */
-		dt_seterr (uptr, DTB_SEL);						/* error */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel? */
+    uptr->STATE = uptr->pos = 0;
+    unum = (int32) (uptr - dt_dev.units);
+    if (unum == DTA_GETUNIT (dtsa))                     /* if selected, */
+        dt_seterr (uptr, DTB_SEL);                      /* error */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -1038,7 +1038,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (dtsb & DTB_DTF) {                       /* DTF set? */
                 dt_seterr (uptr, DTB_TIM);              /* timing error */
                 return SCPE_OK;
-				}
+                }
             if (DEBUG_PRI (dt_dev, LOG_RW) ||
                (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
                 fprintf (sim_deb, ">>DT%d: writing block %d %s%s\n", unum, blk,
@@ -1460,7 +1460,7 @@ if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
             }
         }                                               /* end file loop */
     uptr->hwmark = ba;
-	}													/* end if */
+    }                                                   /* end if */
 else if (uptr->flags & UNIT_11FMT) {                    /* 16b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp11b, sizeof (uint16), D18_BSIZE, uptr->fileref);
@@ -1508,7 +1508,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
                     ((fbuf[ba + 1] >> 12) & 077);
                 pdp8b[k + 2] = fbuf[ba + 1] & 07777;
                 ba = ba + 2;
-				}			                         /* end loop blk */
+                }                                    /* end loop blk */
             fxwrite (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);
             if (ferror (uptr->fileref))
                 break;
@@ -1528,7 +1528,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
             fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */
                      uptr->hwmark, uptr->fileref);
     if (ferror (uptr->fileref))
-        perror ("I/O error");
+        sim_perror ("I/O error");
     }
 uptr->WRITTEN = FALSE;                                  /* no longer dirty */
 }
@@ -1544,7 +1544,7 @@ if (sim_is_active (uptr)) {
     if ((u == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
         dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
         DT_UPDINT;
-		}
+        }
     uptr->STATE = uptr->pos = 0;
     }
 if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */

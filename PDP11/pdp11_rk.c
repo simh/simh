@@ -282,7 +282,7 @@ int32 rk_stopioe = 1;                                   /* stop on error */
 int32 rk_swait = 10;                                    /* seek time */
 int32 rk_rwait = 10;                                    /* rotate time */
 
-char *rk_regnames[] = {
+const char *rk_regnames[] = {
     "RKDS",
     "RKER",
     "RKCS",
@@ -302,7 +302,6 @@ int32 *rk_regs[] = {
     &rkda,
     };
 
-DEVICE rk_dev;
 t_stat rk_rd (int32 *data, int32 PA, int32 access);
 t_stat rk_wr (int32 data, int32 PA, int32 access);
 int32 rk_inta (void);
@@ -312,8 +311,8 @@ void rk_go (void);
 void rk_set_done (int32 error);
 void rk_clr_done (void);
 t_stat rk_boot (int32 unitno, DEVICE *dptr);
-t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rk_description (DEVICE *dptr);
+t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rk_description (DEVICE *dptr);
 
 DEBTAB rk_deb[] = {
     { "OPS", RKDEB_OPS },
@@ -768,7 +767,7 @@ rkda = (rkda & RKDA_DRIVE) | (track << RKDA_V_TRACK) | (sect << RKDA_V_SECT);
 rk_set_done (0);
 
 if (err != 0) {                                         /* error? */
-    perror ("RK I/O error");
+    sim_perror ("RK I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -906,7 +905,7 @@ cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 
-t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
@@ -954,7 +953,7 @@ fprintf (st, "    OS I/O error  x          report error and stop\n");
 return SCPE_OK;
 }
 
-char *rk_description (DEVICE *dptr)
+const char *rk_description (DEVICE *dptr)
 {
 return "RK11/RKV11 cartridge disk controller";
 }

@@ -65,9 +65,9 @@
 #define DPA_M_HD        0x1F
 #define DPA_V_SC        0                               /* sector offset */
 #define DPA_M_SC        0x1F
-#define DPA_GETCY(x)	(((x) >> DPA_V_CY) & DPA_M_CY)
+#define DPA_GETCY(x)    (((x) >> DPA_V_CY) & DPA_M_CY)
 #define DPA_GETHD(x)    (((x) >> DPA_V_HD) & DPA_M_HD)
-#define DPA_GETSC(x)	(((x) >> DPA_V_SC) & DPA_M_SC)
+#define DPA_GETSC(x)    (((x) >> DPA_V_SC) & DPA_M_SC)
 
 /* Sense order */
 
@@ -1081,7 +1081,7 @@ t_stat dp_ioerr (UNIT *uptr)
 uint32 cidx = uptr->UCTX;
 uint32 dva = dp_dib[cidx].dva;
 
-perror ("DP I/O error");
+sim_perror ("DP I/O error");
 clearerr (uptr->fileref);
 dp_ctx[cidx].dp_flags |= DPF_DPE;                       /* set DPE flag */
 chan_set_chf (dva, CHF_XMDE);

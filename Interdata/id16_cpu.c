@@ -599,10 +599,6 @@ while (reason == 0) {                                   /* loop until halted */
     int32 sr, st;
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        /* make sure all useful state is in simh registers while processing events */
-        PSW = BUILD_PSW (cc);
-        PC = PC & VAMASK;
-        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
         if ((reason = sim_process_event ()))
             break;
         int_eval ();
@@ -1952,7 +1948,7 @@ if (!(val & UNIT_816E) && (MEMSIZE > MAXMEMSIZE16)) {
     MEMSIZE = MAXMEMSIZE16;
     for (i = MEMSIZE; i < MAXMEMSIZE16E; i = i + 2)
         M[i >> 1] = 0;
-    printf ("Reducing memory to 64KB\n");
+    sim_printf ("Reducing memory to 64KB\n");
     }
 return SCPE_OK;
 }

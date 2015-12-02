@@ -18,7 +18,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -31,18 +31,18 @@
 /*
  * Управляющее слово обмена с магнитным барабаном.
  */
-#define DRUM_READ_OVERLAY       020000000       /* считывание с наложением */
-#define DRUM_PARITY_FLAG        010000000       /* блокировка считывания слов с неверной
-                                                 * чётностью или запись с неверной чётностью */
-#define DRUM_READ_SYSDATA       004000000       /* считывание только служебных слов */
-#define DRUM_PAGE_MODE          001000000       /* обмен целой страницей */
-#define DRUM_READ               000400000       /* чтение с барабана в память */
-#define DRUM_PAGE               000370000       /* номер страницы памяти */
-#define DRUM_BLOCK             0740000000       /* номер блока памяти - 27-24 рр */
-#define DRUM_PARAGRAF           000006000       /* номер абзаца */
-#define DRUM_UNIT               000001600       /* номер барабана */
-#define DRUM_CYLINDER           000000174       /* номер тракта на барабане */
-#define DRUM_SECTOR             000000003       /* номер сектора */
+#define DRUM_READ_OVERLAY   020000000   /* считывание с наложением */
+#define DRUM_PARITY_FLAG    010000000   /* блокировка считывания слов с неверной
+                                         * чётностью или запись с неверной чётностью */
+#define DRUM_READ_SYSDATA   004000000   /* считывание только служебных слов */
+#define DRUM_PAGE_MODE      001000000   /* обмен целой страницей */
+#define DRUM_READ           000400000   /* чтение с барабана в память */
+#define DRUM_PAGE           000370000   /* номер страницы памяти */
+#define DRUM_BLOCK         0740000000   /* номер блока памяти - 27-24 рр */
+#define DRUM_PARAGRAF       000006000   /* номер абзаца */
+#define DRUM_UNIT           000001600   /* номер барабана */
+#define DRUM_CYLINDER       000000174   /* номер тракта на барабане */
+#define DRUM_SECTOR         000000003   /* номер сектора */
 
 /*
  * Параметры обмена с внешним устройством.
@@ -69,11 +69,11 @@ UNIT drum_unit [] = {
 };
 
 REG drum_reg[] = {
-    { "УС",     &drum_op,         8, 24, 0, 1 },
-    { "ЗОНА",   &drum_zone,             8, 10, 0, 1 },
-    { "СЕКТОР", &drum_sector, 8, 2,  0, 1 },
+    { "УС",     &drum_op,       8, 24, 0, 1 },
+    { "ЗОНА",   &drum_zone,     8, 10, 0, 1 },
+    { "СЕКТОР", &drum_sector,   8, 2,  0, 1 },
     { "МОЗУ",   &drum_memory,   8, 15, 0, 1 },
-    { "СЧСЛОВ", &drum_nwords, 8, 11, 0, 1 },
+    { "СЧСЛОВ", &drum_nwords,   8, 11, 0, 1 },
     { 0 }
 };
 
@@ -259,7 +259,7 @@ void drum_read_sector (UNIT *u)
 static void clear_memory (t_value *p, int nwords)
 {
     while (nwords-- > 0)
-        *p++ = SET_CONVOL (0, CONVOL_NUMBER);
+        *p++ = SET_PARITY (0, PARITY_NUMBER);
 }
 
 /*

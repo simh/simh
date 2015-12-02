@@ -1773,9 +1773,9 @@ if (dptr == NULL)
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL)
     return SCPE_IERR;
-newvec = (uint32) get_uint (cptr, 8, VEC_Q + 01000, &r);
-if ((r != SCPE_OK) || (newvec == VEC_Q) ||
-    ((newvec + (dibp->vnum * 4)) >= (VEC_Q + 01000)) ||
+newvec = (uint32) get_uint (cptr, 8, 01000, &r);
+if ((r != SCPE_OK) ||
+    ((newvec + (dibp->vnum * 4)) >= (01000)) ||
     (newvec & ((dibp->vnum > 1)? 07: 03)))
     return SCPE_ARG;
 dibp->vec = newvec;
@@ -1997,6 +1997,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {0017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
     { { "PTP" },         1,  1,  0, 0, 
         {0017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
+    { { "XU", "XUB" },   1,  1,  8, 4, 
+        {014510}, {0120} },                              /* DEUNA */
     { { "DUP" },         1,  2,  0, 0, 
         {0000300}, {0570} },                             /* DUP11 bit sync - fx CSR, fx VEC */
     { { "KDP" },         1,  2,  0, 0, 
@@ -2212,10 +2214,10 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
 #define DEV_NEXUS 0
 #endif
 #endif
-t_stat auto_config (char *name, int32 nctrl)
+t_stat auto_config (const char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
-uint32 vec = VEC_Q + AUTO_VECBASE;
+uint32 vec = AUTO_VECBASE;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
@@ -2258,7 +2260,7 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         if (autp->numv) {                               /* vec needed? */
             if (autp->fixv[j]) {                        /* fixed vec avail? */
                 if (autp->numv > 0)
-                    dibp->vec = VEC_Q + autp->fixv[j];  /* use it */
+                    dibp->vec = autp->fixv[j];          /* use it */
                 }
             else {                                      /* no fixed left */
                 uint32 numv = abs (autp->numv);         /* get num vec */

@@ -33,7 +33,7 @@
 
 /* Unibus adapter */
 
-#define UBA_NDPATH      16                              /* number of data paths */
+#define UBA_NDPATH      4                               /* number of data paths */
 #define UBA_NMAPR       496                             /* number of map reg */
 
 /* Unibus adapter configuration register */
@@ -53,6 +53,18 @@
 #define UBACSR_RD        (UBACSR_PUR | UBACSR_UCE | UBACSR_NXM | \
                           UBACSR_ERR)
 #define UBACSR_WR        0
+
+/* Data path registers */
+
+#define UBADPR_OF       0x010
+#define UBADPR_ERR      0x80000000                      /* buf not empty - ni */
+#define UBADPR_NXM      0x40000000                      /* nonexistent memory */
+#define UBADPR_UCE      0x20000000                      /* uncorrectable error */
+#define UBADPR_PUR      0x00000001                      /* purge request */
+#define UBADPR_RD       0xE0000000
+#define UBADPR_W1C      0xC0000000
+
+#define UBA_VEC_MASK    0x1FC                           /* Vector value mask */
 
 /* Map registers */
 
@@ -82,6 +94,7 @@ uint32 uba_csr1 = 0;                                    /* csr reg 1 */
 uint32 uba_csr2 = 0;                                    /* csr reg 2 */
 uint32 uba_csr3 = 0;                                    /* csr reg 3 */
 uint32 uba_int = 0;                                     /* UBA interrupt */
+uint32 uba_dpr[UBA_NDPATH] = { 0 };                     /* number data paths */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
@@ -95,7 +108,7 @@ extern int32 fault_PC;                                  /* fault PC */
 extern int32 mem_err;
 
 t_stat uba_reset (DEVICE *dptr);
-char *uba_description (DEVICE *dptr);
+const char *uba_description (DEVICE *dptr);
 t_stat uba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_rdreg (int32 *val, int32 pa, int32 mode);
@@ -125,6 +138,7 @@ int32 (*int_ack[IPL_HLVL][32])(void);                   /* int ack routines */
 /* Unibus interrupt request to vector map */
 
 int32 int_vec[IPL_HLVL][32];                            /* int req to vector */
+int32 int_vec_set[IPL_HLVL][32] = { 0 };                /* bits to set in vector */
 
 /* Unibus adapter data structures
 
@@ -226,6 +240,18 @@ switch (ofs) {                                          /* case on offset */
         *val = (uba_csr3 & UBACSR_RD);
         break;
 
+    case UBADPR_OF + 1:
+    case UBADPR_OF + 2:  case UBADPR_OF + 3:
+    case UBADPR_OF + 4:  case UBADPR_OF + 5:
+    case UBADPR_OF + 6:  case UBADPR_OF + 7:
+    case UBADPR_OF + 8:  case UBADPR_OF + 9:
+    case UBADPR_OF + 10: case UBADPR_OF + 11:
+    case UBADPR_OF + 12: case UBADPR_OF + 13:
+    case UBADPR_OF + 14: case UBADPR_OF + 15:
+        idx = ofs - UBADPR_OF;
+        *val = uba_dpr[idx] & UBADPR_RD;
+        break;
+
     default:
         return SCPE_NXM;
         }
@@ -272,6 +298,15 @@ switch (ofs) {                                          /* case on offset */
 
     case UBACSR3_OF:                                    /* CSR3 */
         uba_csr3 = (val & UBACSR_WR);
+        break;
+
+    case UBADPR_OF + 0:                                 /* DPR */
+        break;                                          /* direct */
+
+    case UBADPR_OF + 1:
+    case UBADPR_OF + 2:  case UBADPR_OF + 3:
+        idx = ofs - UBADPR_OF;
+        uba_dpr[idx] = uba_dpr[idx] & ~(val & UBADPR_W1C);
         break;
 
     default:
@@ -361,10 +396,10 @@ void WriteIO (uint32 pa, int32 val, int32 lnt)
 {
 if (lnt == L_BYTE)                                      /* byte? DATOB */
     WriteUb (pa, val, WRITEB);
-else if ((lnt == L_WORD) && ((pa & 1) == 0))            /* aligned word? */
+else if (((lnt == L_WORD) || (lnt == L_LONG)) && ((pa & 1) == 0))/* aligned word? */
      WriteUb (pa, val, WRITE);                          /* DATO */
 else {
-    sim_printf (">>UBA: invalid write mask, pa = %x, lnt = %d\n", pa, lnt);
+    sim_printf (">>UBA: invalid write mask, pa = %x, lnt = %d, val = 0x%x\n", pa, lnt, val);
     /* FIXME: set appropriate error bits */
     }
 SET_IRQL;                                               /* update ints */
@@ -392,21 +427,26 @@ return;
 
 int32 uba_get_ubvector (int32 lvl)
 {
-int32 i, vec;
+int32 i;
 
-vec = 0;
 if ((lvl == (IPL_UBA - IPL_HMIN)) && uba_int) {         /* UBA lvl, int? */
     uba_int = 0;                                        /* clear int */
     }
 for (i = 0; int_req[lvl] && (i < 32); i++) {
     if ((int_req[lvl] >> i) & 1) {
+        int32 vec;
+        
         int_req[lvl] = int_req[lvl] & ~(1u << i);
         if (int_ack[lvl][i])
-            return (vec | int_ack[lvl][i]());
-        return (vec | int_vec[lvl][i]);
+            vec = int_ack[lvl][i]();
+        else
+            vec = int_vec[lvl][i];
+        vec |= int_vec_set[lvl][i];
+        vec &= (int_vec_set[lvl][i] | UBA_VEC_MASK);
+        return vec;
         }
     }
-return vec;
+return 0;
 }
 
 /* Unibus I/O buffer routines
@@ -627,14 +667,14 @@ for (i = 0; i < IPL_HLVL; i++) {
     int_req[i] = 0;
     }
 for (i = 0; i < UBA_NMAPR; i++)
-    uba_map[i] = 0;
+    uba_map[i] = UBAMAP_VLD|i;
 uba_csr1 = 0;
 uba_csr2 = 0;
 uba_csr3 = 0;
 return SCPE_OK;
 }
 
-char *uba_description (DEVICE *dptr)
+const char *uba_description (DEVICE *dptr)
 {
 return "Unibus adapter";
 }

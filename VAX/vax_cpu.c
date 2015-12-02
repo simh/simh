@@ -395,7 +395,7 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
-char *cpu_description (DEVICE *dptr);
+const char *cpu_description (DEVICE *dptr);
 int32 cpu_get_vsw (int32 sw);
 static SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
@@ -534,7 +534,7 @@ fprintf (st, "model=");
 return cpu_print_model (st);
 }
 
-char *cpu_description (DEVICE *dptr)
+const char *cpu_description (DEVICE *dptr)
 {
 static char buf[80];
 uint32 min_mem = 4096, max_mem = 0;
@@ -640,11 +640,6 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
         break;
 
     case SCB_MCHK:                                      /* machine check */
-/* The ka630 and ka620 CPU ROMs use double machine checks to size memory */
-#if !defined(VAX_620) && !defined(VAX_630)
-        if (in_ie)                                      /* in exc? panic */
-            ABORT (STOP_INIE);
-#endif
         cc = machine_check (p1, opc, cc, delta);        /* system specific */
         in_ie = 0;
         GET_CUR;                                        /* PSL<cur> changed */
@@ -3523,7 +3518,7 @@ return more;
 }
 
 struct os_idle {
-    char        *name;
+    const char        *name;
     uint32      mask;
     };
 
@@ -3575,30 +3570,19 @@ t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_cod
 char args[CBUFSIZE];
 t_stat r;
 
-sim_printf ("Loading boot code from %s\n", filename);
+sim_printf ("Loading boot code from %s%s\n", builtin_code ? "internal " : "", filename);
+if (builtin_code)
+    sim_set_memory_load_file (builtin_code, size);
 if (rom)
     sprintf (args, "-R %s", filename);
 else
     sprintf (args, "-O %s %X", filename, (int)offset);
 r = load_cmd (0, args);
-if (r != SCPE_OK) {
-    if (builtin_code) {
-        FILE *f;
-
-        if ((f = sim_fopen (filename, "wb"))) {
-            sim_printf ("Saving boot code to %s\n", filename);
-            sim_fwrite ((void *)builtin_code, 1, size, f);
-            fclose (f);
-            sim_printf ("Loading boot code from %s\n", filename);
-            r = load_cmd (0, args);
-            }
-        }
-    return r;
-    }
-return SCPE_OK;
+sim_set_memory_load_file (NULL, 0);
+return r;
 }
 
-t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "The ");cpu_print_model (st);fprintf (st, " CPU help\n\n");
 fprintf (st, "CPU options include the size of main memory.\n\n");

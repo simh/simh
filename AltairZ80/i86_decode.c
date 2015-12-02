@@ -44,6 +44,10 @@ extern int32 PCX_S;     /* PC register (8086), 20 bit                   */
 extern uint32 PCX;      /* external view of PC                          */
 extern UNIT cpu_unit;
 
+#if !UNIX_PLATFORM
+extern void pollForCPUStop(void);
+#endif
+
 void i86_intr_raise(PC_ENV *m,uint8 intrnum);
 void cpu8086reset(void);
 t_stat sim_instr_8086(void);
@@ -209,8 +213,8 @@ t_stat sim_instr_8086(void) {
     while (switch_cpu_now == TRUE) {                        /* loop until halted    */
         if (sim_interval <= 0) {                            /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_poll_kbd()) == SCPE_STOP)     /* poll on platforms without reliable signalling */
-                break;
+            /* poll on platforms without reliable signalling but not too often */
+            pollForCPUStop(); /* following sim_process_event will check for stop */
 #endif
             if ( (reason = sim_process_event()) )
                 break;

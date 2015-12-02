@@ -28,6 +28,10 @@
 
 ### New Host Platform support - HP-UX and AIX
 
+### Simulator Front Panel API
+
+The sim_frontpanel API provides a programatic interface to start and control any simulator without any special additions to the simulator code.
+
 ### New Functionality
 
 #### Remote Console Facility
@@ -55,12 +59,18 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
         Qbus systems 128 port limit (default of 16).
     DZ devices optionally support full modem control (and port speed settings 
         when connected to serial ports).
+    TU58 device support for all PDP11 and VAX systems.
     DHU11 (device VH) on Unibus systems now has 16 ports per multiplexer.
     XQ devices (DEQNA, DELQA and DELQA-T) are bootable on Qbus PDP11 simulators
     XQ and XU devices (DEQNA, DELQA, DELQA-T, DEUNA and DELQA) devices can now 
         directly communicate to a remote device via UDP (i.e. a built-in HECnet bridge).
+    XQ and XU devices (DEQNA, DELQA, DELQA-T, DEUNA and DELQA) devices can now 
+        optionally throttle outgoing packets which is useful when communicating with
+        legacy systems on a local LAN which can easily get over run when packets
+        arrive too fast.
+    MicroVAX 3900 has QVSS (VCB01) board available.
     MicroVAX 3900 and MicroVAX II have SET CPU AUTOBOOT option
-    MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer) command to change between system types
+    MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer|VAXStation) command to change between system types
     MicroVAX I has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
     MicroVAX II has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
 
@@ -89,6 +99,11 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     Outgoing connections per line (virtual Null Modem cable).
     Packet sending and reception semantics for simulated network device support using either TCP or UDP transport.
 
+#### Video Display Capabilities
+    Added support for monochrome displays with optional keyboards and mice.  
+    The VAXstation QVSS device (VCB01) simulation uses this capability.
+    Host platforms which have libSDL available can leverage this functionality.
+
 #### Asynchronous I/O
     * Disk and Tape I/O can be asynchronous.  Asynchronous support exists 
       for pdp11_rq, pdp11_rp and pdp11_tq devices (used by VAX and PDP11 
@@ -97,9 +112,23 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
       Asynchronous support exists for console I/O and most multiplexer 
       devices.  (Still experimental - not currently by default)
 
+#### Ethernet Transport Enhancements
+	* UDP packet transport.  Direct simulator connections to HECnet can be 
+	  made without running a local packet bridge program.
+	* NAT packet transport.  Simulators which only speak TCP/IP (No DECnet)
+	  and want to communicate with their host systems and/or directly to 
+	  the Internet can use NAT packet transport.  This also works for WiFi 
+	  connected host systems.
+	* Packet Transmission Throttling.  When connected to a LAN which has 
+	  legacy network adapaters (DEQNA, DEUNA) on legacy systems, it is very
+	  easy for a simulated system to overrun the receiving capacity of the
+	  older systems.  Throttling of simulated traffic delivered to the LAN 
+	  can be used to mitigate this problem.
+	* Reliable MAC address conflict detection.  
+
 #### Disk Extensions
     RAW Disk Access (including CDROM)
-    Virtual Disk Container files, including differincing disks
+    Virtual Disk Container files, including differencing disks
 
 #### Embedded ROM support
     Simulators which have boot commands which load constant files as part of 
@@ -107,9 +136,9 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     imbedded files are used if the normal boot file isn't found when the 
     simulator boots.  Specific examples are:  VAX (MicroVAX 3900 - ka655x.bin), 
     VAX8600 (VAX 8600 - vmb.exe), VAX780 (VAX 11/780 - vmb.exe), 
-    VAX750 (VAX 11/750 - vmb.exe), VAX730 (VAX 11/730 - vmb.exe), 
-    VAX610 (MicroVAX I - ka610.bin), VAX620 (rtVAX 1000 - ka620.bin), 
-    VAX630 (MicroVAX II - ka630.bin)
+    VAX750 (VAX 11/750 - vmb.exe, ka750_old.bin, ka750_new.bin), 
+    VAX730 (VAX 11/730 - vmb.exe), VAX610 (MicroVAX I - ka610.bin), 
+    VAX620 (rtVAX 1000 - ka620.bin), VAX630 (MicroVAX II - ka630.bin)
 
 #### Control Flow
 
@@ -195,6 +224,7 @@ The EXPECT command now exists to provide a means of reacting to simulator output
 
 #### New SCP Commands:
 
+    SCREENSHOT filename.bmp         Save video window to the specified file
     SET ENVIRONMENT Name=Value      Set Environment variable
     SET ASYNCH                      Enable Asynchronous I/O
     SET NOASYNCH                    Disable Asynchronous I/O

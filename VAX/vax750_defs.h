@@ -157,9 +157,13 @@
                         { UNIT_MSIZE, (1u << 23) + (7u << 20), NULL, "15M", &cpu_set_size, NULL, NULL, "Set Memory to 15M bytes" }, \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
 extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
-#define CPU_MODEL_MODIFIERS                                                                     \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
-                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "MODEL",     NULL,                                      \
+                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" },              \
+                            { MTAB_XTD|MTAB_VDV, 0, "BOOTDEV",   "BOOTDEV={A|B|C|D}",                       \
+                              &vax750_set_bootdev, &vax750_show_bootdev, NULL, "Set Boot Device" }
+extern t_stat vax750_set_bootdev (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, void *desc);
+
 
 /* Unibus I/O registers */
 
@@ -187,15 +191,15 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
                         (((uint32) (x)) < (REGBASE + REGSIZE)))
 #define NEXUSBASE       (REGBASE + 0x20000)
-#define NEXUSSIZE       0x2000
 #define NEXUS_GETNEX(x) (((x) >> REG_V_NEXUS) & REG_M_NEXUS)
 #define NEXUS_GETOFS(x) (((x) >> REG_V_OFS) & REG_M_OFS)
 
 /* ROM address space in memory controllers */
 
-#define ROMAWIDTH       12                              /* ROM addr width */
+#define ROMAWIDTH       10                              /* ROM addr width */
 #define ROMSIZE         (1u << ROMAWIDTH)               /* ROM size */
-#define ROMBASE         (REGBASE + (TR_MCTL << REG_V_NEXUS) + 0x400)
+#define ROMAMASK        (ROMSIZE - 1)                   /* ROM addr mask */
+#define ROMBASE         (NEXUSBASE + 0x400)
 #define ADDR_IS_ROM(x)  ((((uint32) (x)) >= ROMBASE) && \
                         (((uint32) (x)) < (ROMBASE + ROMSIZE)))
 
@@ -305,6 +309,8 @@ typedef struct {
 #define INT_V_CR        3
 #define INT_V_VHRX      4
 #define INT_V_VHTX      5
+#define INT_V_TDRX      6
+#define INT_V_TDTX      7
 
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
@@ -325,6 +331,8 @@ typedef struct {
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_TDRX        (1u << INT_V_TDRX)
+#define INT_TDTX        (1u << INT_V_TDTX)
 
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
@@ -345,14 +353,17 @@ typedef struct {
 #define IPL_DMCTX       (0x15 - IPL_HMIN)
 #define IPL_DUPRX       (0x15 - IPL_HMIN)
 #define IPL_DUPTX       (0x15 - IPL_HMIN)
+#define IPL_TDRX        (0x14 - IPL_HMIN)
+#define IPL_TDTX        (0x14 - IPL_HMIN)
 
 /* Device vectors */
 
 #define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
-#define VEC_QBUS        0
-#define VEC_Q           0x200
+#define VEC_QBUS        0                               /* Unibus system */
+#define VEC_SET         0x200                           /* Vector bits to set in Unibus vectors */
+#define VEC_MASK        0x3FF                           /* Vector bits to return in Unibus vectors */
 
 /* Interrupt macros */
 
@@ -384,7 +395,6 @@ typedef struct {
 #define BOOT_HK         1                               /* for VMB */
 #define BOOT_RL         2
 #define BOOT_UDA        17
-#define BOOT_TK         18
 #define BOOT_CI         32
 #define BOOT_TD         64
 

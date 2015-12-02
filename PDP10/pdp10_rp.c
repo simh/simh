@@ -1024,7 +1024,7 @@ switch (uptr->FUNC) {                                   /* case on function */
         if (err != 0) {                                 /* error? */
             set_rper (ER1_PAR, drv);                    /* set drive error */
             update_rpcs (CS1_DONE | CS1_TRE, drv);      /* set done, err */
-            perror ("RP I/O error");
+            sim_perror ("RP I/O error");
             clearerr (uptr->fileref);
             return SCPE_IOERR;
             }

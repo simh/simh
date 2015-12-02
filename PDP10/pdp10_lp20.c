@@ -218,8 +218,8 @@ static void update_lpcs (int32 flg);
 static void change_rdy (int32 setrdy, int32 clrrdy);
 static int16 evenbits (int16 value);
 static t_stat lp20_help (FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr); 
-static char *lp20_description (DEVICE *dptr); 
+                            struct sim_unit *uptr, int32 flag, const char *cptr); 
+static const char *lp20_description (DEVICE *dptr); 
 
 /* DEC standard VFU tape for 'optical' VFU default.
  * Note that this must be <= DV_SIZE as we copy it into the DAVFU.
@@ -734,7 +734,7 @@ if (lpbc)                                               /* intr, but not done */
     update_lpcs (CSA_MBZ);
 else update_lpcs (CSA_DONE);                            /* intr and done */
 if ((fnc == FNC_PR) && ferror (lp20_unit.fileref)) {
-    perror ("LP I/O error");
+    sim_perror ("LP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -780,7 +780,7 @@ else {
     }
 for (i = 0; i < rpt; i++)
     fputc (lppdat, lp20_unit.fileref); 
-lp20_unit.pos = ftell (lp20_unit.fileref);
+lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
 lpcolc = lpcolc + rpt;
 return r;
 }
@@ -816,7 +816,7 @@ for (i = 0; i < cnt; i++) {                             /* print 'n' newlines; e
             } /* At TOF */
         } /* update pointer */
     }
-lp20_unit.pos = ftell (lp20_unit.fileref);
+lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
 if (stoppc)                                            /* Crossed one or more TOFs? */
     return FALSE;
 
@@ -841,7 +841,7 @@ for (i = 0; i < dvlnt; i++) {                           /* search DAVFU */
         if (lpcolc)                                     /* TOF, need newline? */
             lp20_adv (1, FALSE);
         fputc ('\f', lp20_unit.fileref);                /* print form feed */
-        lp20_unit.pos = ftell (lp20_unit.fileref);
+        lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
         lppagc = (lppagc - 1) & PAGC_MASK;              /* decr page cntr */
         if (lppagc != 0)
             return TRUE;
@@ -1279,7 +1279,7 @@ return SCPE_OK;
 }
 
 static t_stat lp20_help (FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr)
+                            struct sim_unit *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, 
          "The LP20 DMA line printer controller is a UNIBUS device developed by the 36-bit product line.\n"
@@ -1320,7 +1320,7 @@ fprintf (st,
 
 return SCPE_OK;
 }
-static char *lp20_description (DEVICE *dptr)
+static const char *lp20_description (DEVICE *dptr)
 {
     return "DMA Line Printer controller";
 }

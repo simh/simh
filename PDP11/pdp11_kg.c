@@ -175,8 +175,8 @@ static t_stat kg_wr (int32, int32, int32);
 static t_stat kg_reset (DEVICE *);
 static void do_poly (int, t_bool);
 static t_stat set_units (UNIT *, int32, char *, void *);
-t_stat kg_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *kg_description (DEVICE *dptr);
+t_stat kg_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *kg_description (DEVICE *dptr);
 
 /* 16-bit rotate right */
 
@@ -463,7 +463,7 @@ static t_stat set_units (UNIT *u, int32 val, char *s, void *desc)
     return (SCPE_OK);
 }
 
-t_stat kg_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat kg_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
@@ -488,7 +488,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *kg_description (DEVICE *dptr)
+const char *kg_description (DEVICE *dptr)
 {
 return "KG11-A Communications Arithmetic Option";
 }

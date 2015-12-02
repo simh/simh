@@ -55,7 +55,7 @@
 /* generic debug tracing support */
 #if DBG_MSG==1
 
-#define ADDRESS_FORMAT		"[0x%08x]"	
+#define ADDRESS_FORMAT      "[0x%08x]"  
 #if UNIX_PLATFORM
 #define NLP "\r\n"
 #else
@@ -63,21 +63,21 @@
 #endif
 
 #define TRACE_PRINT(level,args)\
-	if(sim_deb && chip->dev->dctrl & level) { \
-		fprintf(sim_deb,"%-4s: " ADDRESS_FORMAT " ", chip->dev->name, PCX); \
-		fprintf args; fputs(NLP,sim_deb); }
+    if(sim_deb && chip->dev->dctrl & level) { \
+        fprintf(sim_deb,"%-4s: " ADDRESS_FORMAT " ", chip->dev->name, PCX); \
+        fprintf args; fputs(NLP,sim_deb); }
 #define TRACE_PRINT0(level,fmt)\
-	if(sim_deb && chip->dev->dctrl & level) { \
-		fprintf(sim_deb,"%-4s: " ADDRESS_FORMAT " ", chip->dev->name, PCX); \
-		fprintf(sim_deb,fmt NLP); }
+    if(sim_deb && chip->dev->dctrl & level) { \
+        fprintf(sim_deb,"%-4s: " ADDRESS_FORMAT " ", chip->dev->name, PCX); \
+        fprintf(sim_deb,fmt NLP); }
 #define TRACE_PRINT1(level,fmt,arg1)\
-	if(sim_deb && chip->dev->dctrl & level) { \
-		fprintf(sim_deb,"%-4s: " ADDRESS_FORMAT " ", chip->dev->name, PCX); \
-		fprintf(sim_deb,fmt NLP,arg1); }
+    if(sim_deb && chip->dev->dctrl & level) { \
+        fprintf(sim_deb,"%-4s: " ADDRESS_FORMAT " ", chip->dev->name, PCX); \
+        fprintf(sim_deb,fmt NLP,arg1); }
 #define TRACE_PRINT2(level,fmt,arg1,arg2)\
-	if(sim_deb && chip->dev->dctrl & level) { \
-		fprintf(sim_deb,"%-4s: " ADDRESS_FORMAT " ", chip->dev->name, PCX); \
-		fprintf(sim_deb,fmt NLP,arg1,arg2); }
+    if(sim_deb && chip->dev->dctrl & level) { \
+        fprintf(sim_deb,"%-4s: " ADDRESS_FORMAT " ", chip->dev->name, PCX); \
+        fprintf(sim_deb,fmt NLP,arg1,arg2); }
 #else
 #define TRACE_PRINT(level,args)
 #define TRACE_PRINT0(level,fmt)
@@ -90,12 +90,12 @@
  *****************************************************************************************/
 
 typedef struct {
-	int pfirst;
-	int prate;
-	TMLN ldsc;
-	TMXR desc;
-	UNIT* term;
-	UNIT* poll;
+    int pfirst;
+    int prate;
+    TMLN ldsc;
+    TMXR desc;
+    UNIT* term;
+    UNIT* poll;
 } SERMUX;
 t_stat mux_attach(UNIT*,char*,SERMUX*);
 t_stat mux_detach(UNIT*,SERMUX*);
@@ -103,44 +103,44 @@ t_stat mux_detach(UNIT*,SERMUX*);
 /*****************************************************************************************
  *  8259 PIC
  *****************************************************************************************/
-#define I8259_ICW1			0x10
-#define I8259_ICW1_A765		0xe0
-#define I8259_ICW1_LTIM		0x08
-#define	I8259_ICW1_ADI		0x04
-#define I8259_ICW1_SNGL		0x02
-#define I8259_ICW1_IC4		0x01
-#define I8259_ICW4_SFNM		0x10
-#define I8259_ICW4_BUF		0x08
-#define I8259_ICW4_MS		0x04
-#define I8259_ICW4_AEOI		0x02
-#define I8259_ICW4_UPM		0x01
-#define I8259_OCW2_MODE		0xe0
-#define I8259_OCW2_LEVEL	0x07
-#define I8259_OCW3_ESMM		0x40
-#define I8259_OCW3_SMM		0x20
-#define I8259_OCW3			0x08
-#define I8259_OCW3_POLL		0x04
-#define I8259_OCW3_RR		0x02
-#define I8259_OCW3_RIS		0x01
+#define I8259_ICW1          0x10
+#define I8259_ICW1_A765     0xe0
+#define I8259_ICW1_LTIM     0x08
+#define I8259_ICW1_ADI      0x04
+#define I8259_ICW1_SNGL     0x02
+#define I8259_ICW1_IC4      0x01
+#define I8259_ICW4_SFNM     0x10
+#define I8259_ICW4_BUF      0x08
+#define I8259_ICW4_MS       0x04
+#define I8259_ICW4_AEOI     0x02
+#define I8259_ICW4_UPM      0x01
+#define I8259_OCW2_MODE     0xe0
+#define I8259_OCW2_LEVEL    0x07
+#define I8259_OCW3_ESMM     0x40
+#define I8259_OCW3_SMM      0x20
+#define I8259_OCW3          0x08
+#define I8259_OCW3_POLL     0x04
+#define I8259_OCW3_RR       0x02
+#define I8259_OCW3_RIS      0x01
 
 typedef struct i8259 {
-	PNP_INFO	pnp;
-	DEVICE* dev;         /* backlink to device */
-	t_stat (*write)(struct i8259* chip,int port,uint32 value);
-	t_stat (*read)(struct i8259* chip,int port,uint32* value);
-	t_stat (*reset)(struct i8259* chip);
-	int   state;
-	int   rmode;
-	int32 imr;
-	int32 isr;
-	int32 irr;
-	int32 icw1;
-	int32 icw2;
-	int32 icw4;
-	int32 prio; /* which IR* has prio 7? */
-	t_bool autoint;
-	int intlevel;
-	int intvector;
+    PNP_INFO    pnp;
+    DEVICE* dev;         /* backlink to device */
+    t_stat (*write)(struct i8259* chip,int port,uint32 value);
+    t_stat (*read)(struct i8259* chip,int port,uint32* value);
+    t_stat (*reset)(struct i8259* chip);
+    int   state;
+    int   rmode;
+    int32 imr;
+    int32 isr;
+    int32 irr;
+    int32 icw1;
+    int32 icw2;
+    int32 icw4;
+    int32 prio; /* which IR* has prio 7? */
+    t_bool autoint;
+    int intlevel;
+    int intvector;
 } I8259;
 
 extern t_stat i8259_io(IOHANDLER* ioh,uint32* value,uint32 rw,uint32 mask);
@@ -159,63 +159,63 @@ extern DEBTAB i8259_dt[];
 /*****************************************************************************************
  *  8251 USART
  *****************************************************************************************/
-#define I8251_AMODE_STOP	0xc0
-#define  I8251_AMODE_S1		0x40
-#define  I8251_AMODE_S15	0x80
-#define  I8251_AMODE_S2		0xc0
-#define I8251_MODE_EP		0x20
-#define I8251_MODE_PEN		0x10
-#define I8251_AMODE_BITS	0x0c
-#define  I8251_AMODE_BITS5	0x00
-#define  I8251_AMODE_BITS6	0x04
-#define  I8251_AMODE_BITS7	0x08
-#define  I8251_AMODE_BITS8	0x0c
-#define I8251_MODE_BAUD		0x03
-#define  I8251_MODE_SYNC	0x00
-#define  I8251_AMODE_BAUD1	0x01
-#define  I8251_AMODE_BAUD16	0x02
-#define  I8251_AMODE_BAUD64	0x03
-#define I8251_SMODE_ESD		0x40
-#define I8251_SMODE_SCS		0x80
-#define I8251_CMD_EH		0x80
-#define I8251_CMD_IR		0x40
-#define I8251_CMD_RTS		0x20
-#define I8251_CMD_ER		0x10
-#define I8251_CMD_SBRK		0x08
-#define I8251_CMD_RXE		0x04
-#define I8251_CMD_DTR		0x02
-#define I8251_CMD_TXEN		0x01
-#define I8251_ST_DSR		0x80
-#define I8251_ST_SYNBRK		0x40
-#define I8251_ST_FE			0x20
-#define I8251_ST_OE			0x10
-#define I8251_ST_PE			0x08
-#define I8251_ST_TXEMPTY	0x04
-#define I8251_ST_RXRDY		0x02
-#define I8251_ST_TXRDY		0x01
+#define I8251_AMODE_STOP    0xc0
+#define  I8251_AMODE_S1     0x40
+#define  I8251_AMODE_S15    0x80
+#define  I8251_AMODE_S2     0xc0
+#define I8251_MODE_EP       0x20
+#define I8251_MODE_PEN      0x10
+#define I8251_AMODE_BITS    0x0c
+#define  I8251_AMODE_BITS5  0x00
+#define  I8251_AMODE_BITS6  0x04
+#define  I8251_AMODE_BITS7  0x08
+#define  I8251_AMODE_BITS8  0x0c
+#define I8251_MODE_BAUD     0x03
+#define  I8251_MODE_SYNC    0x00
+#define  I8251_AMODE_BAUD1  0x01
+#define  I8251_AMODE_BAUD16 0x02
+#define  I8251_AMODE_BAUD64 0x03
+#define I8251_SMODE_ESD     0x40
+#define I8251_SMODE_SCS     0x80
+#define I8251_CMD_EH        0x80
+#define I8251_CMD_IR        0x40
+#define I8251_CMD_RTS       0x20
+#define I8251_CMD_ER        0x10
+#define I8251_CMD_SBRK      0x08
+#define I8251_CMD_RXE       0x04
+#define I8251_CMD_DTR       0x02
+#define I8251_CMD_TXEN      0x01
+#define I8251_ST_DSR        0x80
+#define I8251_ST_SYNBRK     0x40
+#define I8251_ST_FE         0x20
+#define I8251_ST_OE         0x10
+#define I8251_ST_PE         0x08
+#define I8251_ST_TXEMPTY    0x04
+#define I8251_ST_RXRDY      0x02
+#define I8251_ST_TXRDY      0x01
 
 typedef struct i8251 {
-	PNP_INFO pnp;
-	DEVICE* dev;         /* backlink to device */
-	t_stat (*write)(struct i8251* chip,int port,uint32 value);
-	t_stat (*read)(struct i8251* chip,int port,uint32* value);
-	t_stat (*reset)(struct i8251* chip);
-	t_stat (*txint)(struct i8251* chip);
-	t_stat (*rxint)(struct i8251* chip);
-	UNIT* in;
-	UNIT* out;
-	SERMUX* mux;
-	int init;
-	int mode;
-	int sync1;
-	int sync2;
-	int cmd;
-	int ibuf;
-	int obuf;
-	int status;
-	int bitmask;
-	t_bool oob; /* out-of-band=1 will allow a console to receive CTRL-E even when receiver is disabled */
-	int crlf;  /* CRLF state machine to suppress NUL bytes */
+    PNP_INFO pnp;
+    DEVICE* dev;         /* backlink to device */
+    t_stat (*write)(struct i8251* chip,int port,uint32 value);
+    t_stat (*read)(struct i8251* chip,int port,uint32* value);
+    t_stat (*reset)(struct i8251* chip);
+    t_stat (*txint)(struct i8251* chip);
+    t_stat (*rxint)(struct i8251* chip);
+    UNIT* in;
+    UNIT* out;
+    SERMUX* mux;
+    int init;
+    int mode;
+    int sync1;
+    int sync2;
+    int cmd;
+    int ibuf;
+    int obuf;
+    int status;
+    int bitmask;
+    t_bool oob; /* out-of-band=1 will allow a console to receive CTRL-E even when receiver is disabled */
+    int crlf;  /* CRLF state machine to suppress NUL bytes */
 } I8251;
 
 /* default handlers */
@@ -236,48 +236,48 @@ extern DEBTAB i8251_dt[];
  *****************************************************************************************/
 /*forward*/ struct i8253;
 typedef struct {
-	t_stat (*call)(struct i8253* chip,int rw,uint32* src);
-	int state;			/* the current output state (latching, MSB/LSB out */
-	int mode;			/* programmed mode */
-	int32 latch;		/* the latched value of count */
-	int32 divider;		/* programmed divider value */
-	int32 count;		/* the real count value as calculated by rcall callback */
+    t_stat (*call)(struct i8253* chip,int rw,uint32* src);
+    int state;          /* the current output state (latching, MSB/LSB out */
+    int mode;           /* programmed mode */
+    int32 latch;        /* the latched value of count */
+    int32 divider;      /* programmed divider value */
+    int32 count;        /* the real count value as calculated by rcall callback */
 } I8253CNTR;
 
 typedef struct i8253 {
-	PNP_INFO pnp;
-	DEVICE* dev;         /* backlink to device */
-	UNIT* unit;          /* backlink to unit */
-	t_stat (*reset)(struct i8253* chip);
-	t_stat (*ckmode)(struct i8253* chip, uint32 value);
-	I8253CNTR cntr[3];
-	int init;
+    PNP_INFO pnp;
+    DEVICE* dev;         /* backlink to device */
+    UNIT* unit;          /* backlink to unit */
+    t_stat (*reset)(struct i8253* chip);
+    t_stat (*ckmode)(struct i8253* chip, uint32 value);
+    I8253CNTR cntr[3];
+    int init;
 } I8253;
 
-#define I8253_SCMASK	0xc0
-#define  I8253_SC0		0x00
-#define  I8253_SC1		0x40
-#define  I8253_SC2		0x80
-#define I8253_RLMASK	0x30
-#define  I8253_LATCH	0x00
-#define  I8253_LSB		0x10
-#define  I8253_MSB		0x20
-#define  I8253_BOTH		0x30
-#define I8253_MODEMASK	0xe0
-#define  I8253_MODE0	0x00
-#define  I8253_MODE1	0x02
-#define  I8253_MODE2	0x04
-#define  I8253_MODE2a	0x0c
-#define  I8253_MODE3	0x06
-#define  I8253_MODE3a	0x0e
-#define  I8253_MODE4	0x08
-#define  I8253_MODE5	0x0a
-#define I8253_MODEBIN	0x00
-#define I8253_MODEBCD	0x01
+#define I8253_SCMASK    0xc0
+#define  I8253_SC0      0x00
+#define  I8253_SC1      0x40
+#define  I8253_SC2      0x80
+#define I8253_RLMASK    0x30
+#define  I8253_LATCH    0x00
+#define  I8253_LSB      0x10
+#define  I8253_MSB      0x20
+#define  I8253_BOTH     0x30
+#define I8253_MODEMASK  0xe0
+#define  I8253_MODE0    0x00
+#define  I8253_MODE1    0x02
+#define  I8253_MODE2    0x04
+#define  I8253_MODE2a   0x0c
+#define  I8253_MODE3    0x06
+#define  I8253_MODE3a   0x0e
+#define  I8253_MODE4    0x08
+#define  I8253_MODE5    0x0a
+#define I8253_MODEBIN   0x00
+#define I8253_MODEBCD   0x01
 
-#define I8253_ST_LSBNEXT	0x01
-#define I8253_ST_MSBNEXT	0x02
-#define I8253_ST_LATCH		0x08
+#define I8253_ST_LSBNEXT    0x01
+#define I8253_ST_MSBNEXT    0x02
+#define I8253_ST_LATCH      0x08
 
 /* default handlers */
 extern t_stat i8253_io(IOHANDLER* ioh,uint32* value,uint32 rw,uint32 mask);
@@ -311,20 +311,20 @@ typedef struct {
 } I8272_DRIVE_INFO;
 
 typedef enum i8272state {
-	S_CMD=1, S_CMDREAD, S_EXEC, S_DATAWRITE, S_SECWRITE, S_SECREAD, S_DATAREAD, S_RESULT
+    S_CMD=1, S_CMDREAD, S_EXEC, S_DATAWRITE, S_SECWRITE, S_SECREAD, S_DATAREAD, S_RESULT
 } I8272_STATE;
 
 typedef struct i8272 {
-	PNP_INFO pnp;       /* Plug-n-Play Information */
-	DEVICE* dev;         /* backlink to device */
-	t_stat (*write)(struct i8272* chip,int port,uint32 data);
-	t_stat (*read)(struct i8272* chip,int port,uint32* data);
-	t_stat (*reset)(struct i8272* chip);
-	void   (*seldrv)(struct i8272* chip,int seldrv);
-	void   (*irq)(struct i8272* chip,int delay);
-	
-	I8272_STATE fdc_state;	/* internal state machine */
-	uint32 fdc_dma_addr;/* DMA Transfer Address */
+    PNP_INFO pnp;       /* Plug-n-Play Information */
+    DEVICE* dev;         /* backlink to device */
+    t_stat (*write)(struct i8272* chip,int port,uint32 data);
+    t_stat (*read)(struct i8272* chip,int port,uint32* data);
+    t_stat (*reset)(struct i8272* chip);
+    void   (*seldrv)(struct i8272* chip,int seldrv);
+    void   (*irq)(struct i8272* chip,int delay);
+    
+    I8272_STATE fdc_state;  /* internal state machine */
+    uint32 fdc_dma_addr;/* DMA Transfer Address */
     uint8 fdc_msr;      /* 8272 Main Status Register */
     uint8 fdc_nd;       /* Non-DMA Mode 1=Non-DMA, 0=DMA */
     uint8 fdc_head;     /* H Head Number */
@@ -340,9 +340,9 @@ typedef struct i8272 {
     uint8 fdc_seek_end; /* Seek was executed successfully */
     int   fdc_secsz;    /* N Sector Length in bytes: 2^(7 + fdc_sec_len),  fdc_sec_len <= I8272_MAX_N */
     int   fdc_nd_cnt;   /* read/write count in non-DMA mode, -1 if start read */
-	uint8 fdc_sdata[I8272_MAX_SECTOR_SZ]; /* sector buffer */
-	uint8 fdc_fault;	/* error code passed from some commands to sense_int */
-	
+    uint8 fdc_sdata[I8272_MAX_SECTOR_SZ]; /* sector buffer */
+    uint8 fdc_fault;    /* error code passed from some commands to sense_int */
+    
     uint8 cmd_cnt;      /* command read count */
     uint8 cmd[10];      /* Storage for current command */
     uint8 cmd_len;      /* FDC Command Length */
@@ -397,22 +397,22 @@ extern DEVICE* i8272_dev;
  *  8255 PARPORT
  *****************************************************************************************/
 typedef struct i8255 {
-	PNP_INFO pnp;
-	DEVICE* dev;         /* backlink to device */
-	t_stat (*write)(struct i8255* chip,int port,uint32 data);
-	t_stat (*read)(struct i8255* chip,int port,uint32* data);
-	t_stat (*reset)(struct i8255* chip);
-	t_stat (*calla)(struct i8255* chip,int rw);
-	t_stat (*callb)(struct i8255* chip,int rw);
-	t_stat (*callc)(struct i8255* chip,int rw);
-	t_stat (*ckmode)(struct i8255* chip,uint32 data);
-	uint32 porta;
-	uint32 last_porta; /* for edge detection */
-	uint32 portb;
-	uint32 last_portb; /* for edge detection */
-	uint32 portc;
-	uint32 last_portc; /* for edge detection */
-	uint32 ctrl;
+    PNP_INFO pnp;
+    DEVICE* dev;         /* backlink to device */
+    t_stat (*write)(struct i8255* chip,int port,uint32 data);
+    t_stat (*read)(struct i8255* chip,int port,uint32* data);
+    t_stat (*reset)(struct i8255* chip);
+    t_stat (*calla)(struct i8255* chip,int rw);
+    t_stat (*callb)(struct i8255* chip,int rw);
+    t_stat (*callc)(struct i8255* chip,int rw);
+    t_stat (*ckmode)(struct i8255* chip,uint32 data);
+    uint32 porta;
+    uint32 last_porta; /* for edge detection */
+    uint32 portb;
+    uint32 last_portb; /* for edge detection */
+    uint32 portc;
+    uint32 last_portc; /* for edge detection */
+    uint32 ctrl;
 } I8255;
 extern t_stat i8255_io(IOHANDLER* ioh,uint32* value,uint32 rw,uint32 mask);
 extern t_stat i8255_read(I8255* chip,int port,uint32* data);

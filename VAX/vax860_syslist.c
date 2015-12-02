@@ -31,6 +31,13 @@
 
 char sim_name[] = "VAX 8600";
 
+void vax_init(void)
+{
+sim_savename = "VAX 8600";
+}
+
+void (*sim_vm_init) (void) = &vax_init;
+
 extern DEVICE cpu_dev;
 extern DEVICE tlb_dev;
 extern DEVICE abus_dev;
@@ -41,6 +48,7 @@ extern DEVICE clk_dev;
 extern DEVICE tmr_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE rlcs_dev;
+extern DEVICE tdc_dev;
 extern DEVICE cr_dev;
 extern DEVICE lpt_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
@@ -72,6 +80,7 @@ DEVICE *sim_devices[] = {
     &tti_dev,
     &tto_dev,
     &rlcs_dev,
+    &tdc_dev,
     &dz_dev,
     &vh_dev,
     &cr_dev,
@@ -118,7 +127,7 @@ if (sim_switches & SWMASK ('O')) {                      /* origin? */
         return SCPE_ARG;
     }
 
-while ((val = getc (fileref)) != EOF) {                 /* read byte stream */
+while ((val = Fgetc (fileref)) != EOF) {                 /* read byte stream */
     if (origin >= limit)                                /* NXM? */
         return SCPE_NXM;
     WriteB (origin, val);                               /* memory */

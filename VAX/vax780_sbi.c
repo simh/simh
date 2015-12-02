@@ -1,6 +1,6 @@
 /* vax780_sbi.c: VAX 11/780 SBI
 
-   Copyright (c) 2004-2011, Robert M Supnik
+   Copyright (c) 2004-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,9 @@
 
    sbi                  bus controller
 
-   21-Mar-2011  RMS     Added autoreboot capability (Mark Pizzalato)
+   29-Mar-2015  RMS     Added in-exception test to machine check
+   16-Dec-2014  RMS     Removed TQ boot entry (VMB doesn't support tape boot)
+   21-Mar-2011  RMS     Added autoreboot capability (Mark Pizzolato)
    04-Feb-2011  MP      Added RQB, RQC, and RQD as bootable controllers
    31-May-2008  RMS     Fixed machine_check calling sequence (Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
@@ -122,7 +124,6 @@ static struct boot_dev boot_tab[] = {
     { "RQB", BOOT_UDA, 1 << 24 },
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
-    { "TQ", BOOT_TK, 1 << 24 },
     { "CS", BOOT_CS, 0 },
     { NULL }
     };
@@ -139,7 +140,7 @@ extern jmp_buf save_env;
 extern int32 p1;
 
 t_stat sbi_reset (DEVICE *dptr);
-char *sbi_description (DEVICE *dptr);
+const char *sbi_description (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
 void uba_eval_int (void);
 t_stat vax780_boot (int32 flag, char *ptr);
@@ -585,6 +586,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 acc, err;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 err = (GET_TRAP (trpirq) << 4) | (pme << 3) | ASTLVL;   /* error word */
 cc = intexc (SCB_MCHK, cc, 0, IE_SVE);                  /* take exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */
@@ -739,7 +742,7 @@ sim_vm_cmd = vax780_cmd;
 return SCPE_OK;
 }
 
-char *sbi_description (DEVICE *dptr)
+const char *sbi_description (DEVICE *dptr)
 {
 return "Synchronous Backplane Interconnect";
 }
@@ -748,7 +751,7 @@ return "Synchronous Backplane Interconnect";
 
 t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, "nexus=%d", val);
+fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;
 }
 
@@ -848,7 +851,7 @@ fprintf (st, "VAX 11/%s", (sys_model ? "785" : "780"));
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Initial memory size is 8MB.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");

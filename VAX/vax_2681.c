@@ -62,6 +62,7 @@
 
 void ua2681_update_rxi (UART2681 *ctx);
 void ua2681_update_txi (UART2681 *ctx);
+uint8 ua2681_oport (UART2681 *ctx);
 
 
 void ua2681_wr (UART2681 *ctx, uint32 rg, uint32 data)
@@ -187,7 +188,21 @@ switch (rg) {
             }
         ua2681_update_txi (ctx);
         break;
-    
+
+    case 13:
+        ctx->opcr = data;
+        break;
+
+    case 14:
+        ctx->oport |= data;
+        ctx->output_port (ua2681_oport (ctx));
+        break;
+
+    case 15:
+        ctx->oport &= ~data;
+        ctx->output_port (ua2681_oport (ctx));
+        break;
+
     default:                                            /* NI */
         break;
     }
@@ -213,6 +228,13 @@ switch (rg) {
         data = ctx->port[PORT_A].buf | (ctx->port[PORT_A].sts << 8);
         ctx->port[PORT_A].sts &= ~STS_RXR;
         ctx->ists &= ~ISTS_RAI;
+        ua2681_update_rxi (ctx);
+        break;
+
+    case 4:                                             /* input port change */
+        data = ctx->ipcr;
+        ctx->ipcr &= 0x0f;
+        ctx->ists &= ~ISTS_IPC;
         ua2681_update_rxi (ctx);
         break;
 
@@ -267,9 +289,14 @@ else {
     ctx->port[PORT_B].sts &= ~STS_TXE;                  /* clear empty */
     ctx->ists &= ~ISTS_TBI;                             /* clear int */
     }
+
 if ((ctx->ists & ctx->imask) > 0)                       /* unmasked ints? */
      ctx->set_int (1);
 else ctx->set_int (0);
+
+if (ctx->opcr & 0xc0)
+    ctx->output_port (ua2681_oport (ctx));
+
 }
 
 void ua2681_update_rxi (UART2681 *ctx)
@@ -320,7 +347,91 @@ else {
 if ((ctx->ists & ctx->imask) > 0)
      ctx->set_int (1);
 else ctx->set_int (0);
+
+if (ctx->opcr & 0x30)
+    ctx->output_port (ua2681_oport (ctx));
+
 }
+
+uint8 ua2681_oport (UART2681 *ctx)
+{
+uint8 t = ctx->oport;
+
+if (ctx->opcr & 0x80) {
+    t &= ~0x80;
+    if (ctx->ists & ISTS_TBI) t |= 0x80;
+    }
+if (ctx->opcr & 0x40) {
+    t &= ~0x40;
+    if (ctx->ists & ISTS_TAI) t |= 0x40;
+    }
+if (ctx->opcr & 0x20) {
+    t &= ~0x20;
+    if (ctx->ists & ISTS_RBI) t |= 0x20;
+    }
+if (ctx->opcr & 0x10) {
+    t &= ~0x10;
+    if (ctx->ists & ISTS_RAI) t |= 0x10;
+    }
+
+return t ^ 0xff;
+}
+
+/* input ports */
+
+void ua2681_ip0_wr (UART2681 *ctx, uint32 set)
+{
+uint8 new = (ctx->iport & ~1) | (set ? 1 : 0);
+
+if (new != ctx->iport) {
+    ctx->ipcr &= ~0x0f;
+    ctx->ipcr |= (new & 0x0f);
+    ctx->ipcr |= 0x10;
+    }
+
+ctx->iport = new;
+}
+
+void ua2681_ip1_wr (UART2681 *ctx, uint32 set)
+{
+uint8 new = (ctx->iport & ~2) | (set ? 2 : 0);
+
+if (new != ctx->iport) {
+    ctx->ipcr &= ~0x0f;
+    ctx->ipcr |= (new & 0x0f);
+    ctx->ipcr |= 0x20;
+    }
+
+ctx->iport = new;
+}
+
+void ua2681_ip2_wr (UART2681 *ctx, uint32 set)
+{
+uint8 new = (ctx->iport & ~4) | (set ? 4 : 0);
+
+if (new != ctx->iport) {
+    ctx->ipcr &= ~0x0f;
+    ctx->ipcr |= (new & 0x0f);
+    ctx->ipcr |= 0x40;
+    }
+
+ctx->iport = new;
+}
+
+void ua2681_ip3_wr (UART2681 *ctx, uint32 set)
+{
+uint8 new = (ctx->iport & ~8) | (set ? 8 : 0);
+
+if (new != ctx->iport) {
+    ctx->ipcr &= ~0x0f;
+    ctx->ipcr |= (new & 0x0f);
+    ctx->ipcr |= 0x80;
+    }
+
+ctx->iport = new;
+}
+
+/**/
 
 t_stat ua2681_svc (UART2681 *ctx)
 {
@@ -332,6 +443,8 @@ t_stat ua2681_reset (UART2681 *ctx)
 {
 ctx->ists = 0;
 ctx->imask = 0;
+ctx->iport = ctx->ipcr = 0;
+ctx->oport = 0;
 
 ctx->port[PORT_A].sts = 0;
 ctx->port[PORT_A].mode[0] = 0;

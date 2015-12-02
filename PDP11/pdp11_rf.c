@@ -125,7 +125,6 @@ uint32 rf_time = 10;                                    /* inter-word time */
 uint32 rf_burst = 1;                                    /* burst mode flag */
 uint32 rf_stopioe = 1;                                  /* stop on error */
 
-DEVICE rf_dev;
 t_stat rf_rd (int32 *data, int32 PA, int32 access);
 t_stat rf_wr (int32 data, int32 PA, int32 access);
 int32 rf_inta (void);
@@ -135,8 +134,8 @@ t_stat rf_boot (int32 unitno, DEVICE *dptr);
 t_stat rf_attach (UNIT *uptr, char *cptr);
 t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 uint32 update_rfcs (uint32 newcs, uint32 newdae);
-t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rf_description (DEVICE *dptr);
+t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rf_description (DEVICE *dptr);
 
 /* RF11 data structures
 
@@ -508,7 +507,7 @@ uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }
 
-t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *text2, *text3;
 const char *const text =
@@ -567,7 +566,7 @@ fprintf (st, "%s", text3);
 return SCPE_OK;
 }
 
-char *rf_description (DEVICE *dptr)
+const char *rf_description (DEVICE *dptr)
 {
 return "RF11-A Fixed Head Disk controller";
 }
