@@ -2298,10 +2298,14 @@ if (dptr->flags & DEV_DEBUG) {
     sprintf (buf, "set %s NODEBUG", sim_dname (dptr));
     fprintf (st,  "%-30s\tDisables debugging for device %s\n", buf, sim_dname (dptr));
     if (dptr->debflags) {
+        t_bool desc_available = FALSE;
+
         strcpy (buf, "");
         fprintf (st, "set %s DEBUG=", sim_dname (dptr));
-        for (dep = dptr->debflags; dep->name != NULL; dep++)
+        for (dep = dptr->debflags; dep->name != NULL; dep++) {
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
+            desc_available |= ((dep->desc != NULL) && (dep->desc[0] != '\0'));
+            }
         fprintf (st, "\n");
         fprintf (st,  "%-30s\tEnables specific debugging for device %s\n", buf, sim_dname (dptr));
         fprintf (st, "set %s NODEBUG=", sim_dname (dptr));
@@ -2309,6 +2313,11 @@ if (dptr->flags & DEV_DEBUG) {
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
         fprintf (st, "\n");
         fprintf (st,  "%-30s\tDisables specific debugging for device %s\n", buf, sim_dname (dptr));
+        if (desc_available) {
+            fprintf (st, "\n*%s device DEBUG settings:\n", sim_dname (dptr));
+            for (dep = dptr->debflags; dep->name != NULL; dep++)
+                fprintf (st, "%4s%-12s%s\n", "", dep->name, dep->desc ? dep->desc : "");
+            }
         }
     }
 if ((dptr->modifiers) && (dptr->units) && (dptr->numunits != 1)) {
