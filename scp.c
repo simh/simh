@@ -1694,6 +1694,7 @@ ASSERT      failure have several different actions:
       "++SET <unit> DISABLED\n\n"
       " When a unit is disabled, it will not be displayed by SHOW DEVICE.\n\n"
        /***************** 80 character line width template *************************/
+#endif
 #define HLP_SCREENSHOT  "*Commands Screenshot_Video_Window"
       "2Screenshot Video Window\n"
       " Simulators with Video devices display the simulated video in a window\n"
@@ -6138,54 +6139,51 @@ sim_start_timer_services ();                            /* enable wall clock tim
 do {
     t_addr *addrs;
 
+    while (1) {
 #ifdef OPCON
         /* Set RUN light on or off, other leds too, depending on model */
-if (oc_halt_status() == TRUE) {
-  r = SCPE_STOP;
-  oc_toggle_clear();
-  switch (cpu_model) {
-    case MOD_1105: oc_port1(FSTS_RUN, 0);
-                   break;
-    case MOD_1120: oc_port1(FSTS_RUN, 0);
-                   break;
-    case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 1);
-                   oc_port1(FSTS_RUN, 0);
-                   break;
-    case MOD_1145: oc_port1(FSTS_RUN, 0);
-                   oc_port1(FSTS_1145_PAUSE, 1);
-                   break;
-    case MOD_1170: oc_port1(FSTS_RUN, 0);
-                   oc_port1(FSTS_1170_PAUSE, 1);
-                   break;
-    default      : break;
-    }
-  }
-else  {
-  switch (cpu_model) {
-    case MOD_1105: oc_port1(FSTS_RUN, 1);
-                   break;
-    case MOD_1120: oc_port1(FSTS_RUN, 1);
-                   break;
-    case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 0);
-                   oc_port1(FSTS_RUN, 1);
-                   break;
-    case MOD_1145: oc_port1(FSTS_RUN, 1);
-                   oc_port1(FSTS_1145_PAUSE, 0);
-                   break;
-    case MOD_1170: oc_port1(FSTS_RUN, 1);
-                   oc_port1(FSTS_1170_PAUSE, 0);
-                   break;
-    default      : break;
-    }
-  r = sim_instr();
-  }
-#else
-    r = sim_instr();
-#endif
-
-/* CONTROLEREN!!! */
-    while (1) {
+      if (oc_halt_status() == TRUE) {
+        r = SCPE_STOP;
+        oc_toggle_clear();
+        switch (cpu_model) {
+          case MOD_1105: oc_port1(FSTS_RUN, 0);
+                         break;
+          case MOD_1120: oc_port1(FSTS_RUN, 0);
+                         break;
+          case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 1);
+                         oc_port1(FSTS_RUN, 0);
+                         break;
+          case MOD_1145: oc_port1(FSTS_RUN, 0);
+                         oc_port1(FSTS_1145_PAUSE, 1);
+                         break;
+          case MOD_1170: oc_port1(FSTS_RUN, 0);
+                         oc_port1(FSTS_1170_PAUSE, 1);
+                         break;
+          default      : break;
+          }
+        }
+      else  {
+        switch (cpu_model) {
+          case MOD_1105: oc_port1(FSTS_RUN, 1);
+                         break;
+          case MOD_1120: oc_port1(FSTS_RUN, 1);
+                         break;
+          case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 0);
+                         oc_port1(FSTS_RUN, 1);
+                         break;
+          case MOD_1145: oc_port1(FSTS_RUN, 1);
+                         oc_port1(FSTS_1145_PAUSE, 0);
+                         break;
+          case MOD_1170: oc_port1(FSTS_RUN, 1);
+                         oc_port1(FSTS_1170_PAUSE, 0);
+                         break;
+          default      : break;
+          }
         r = sim_instr();
+        }
+#else
+        r = sim_instr();
+#endif
         if (r != SCPE_REMOTE)
             break;
         sim_remote_process_command ();                  /* Process the command and resume processing */
