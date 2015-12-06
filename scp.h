@@ -245,6 +245,7 @@ extern int32 sim_deb_switches;                          /* debug display flags *
 extern struct timespec sim_deb_basetime;                /* debug base time for relative time output */
 extern UNIT *sim_clock_queue;
 extern int32 sim_is_running;
+extern t_bool sim_processing_event;                     /* Called from sim_process_event */
 extern char *sim_prompt;                                /* prompt string */
 extern const char *sim_savename;                        /* Simulator Name used in Save/Restore files */
 extern t_value *sim_eval;

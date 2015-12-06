@@ -471,6 +471,7 @@ DEVICE **sim_internal_devices = NULL;
 uint32 sim_internal_device_count = 0;
 int32 sim_opt_out = 0;
 int32 sim_is_running = 0;
+t_bool sim_processing_event = FALSE;
 uint32 sim_brk_summ = 0;
 uint32 sim_brk_types = 0;
 uint32 sim_brk_dflt = 0;
@@ -8327,6 +8328,7 @@ if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Empty New Interval = %d\n", sim_interval);
     return SCPE_OK;
     }
+sim_processing_event = TRUE;
 do {
     uptr = sim_clock_queue;                             /* get first */
     sim_clock_queue = uptr->next;                       /* remove first */
@@ -8357,6 +8359,7 @@ else
 
 if ((reason == SCPE_OK) && stop_cpu)
     reason = SCPE_STOP;
+sim_processing_event = FALSE;
 return reason;
 }
 
