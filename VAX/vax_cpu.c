@@ -227,11 +227,6 @@
                             R[rn] = rl; \
                             R[rn + 1] = rh; \
                             }
-#define CHECK_FOR_IDLE_LOOP if (PC == fault_PC) {                           /* to self? */ \
-                                if (PSL_GETIPL (PSL) == 0x1F)               /* int locked out? */ \
-                                    ABORT (STOP_LOOP);                      /* infinite loop */ \
-                                cpu_idle ();                                /* idle loop */ \
-                                }
 
 
 #define HIST_MIN        64
@@ -2185,12 +2180,10 @@ for ( ;; ) {
 
     case BRB:
         BRANCHB (brdisp);                               /* branch  */
-        CHECK_FOR_IDLE_LOOP;
         break;
 
     case BRW:
         BRANCHW (brdisp);                               /* branch */
-        CHECK_FOR_IDLE_LOOP;
         break;
 
     case BSBB:
@@ -2304,7 +2297,7 @@ for ( ;; ) {
         CC_IIZP_L (r);                                  /* set cc's */
         V_SUB_L (r, 1, op0);                            /* test for ovflo */    
         if (r >= 0)                                     /* if >= 0, branch */
-            BRANCHB (brdisp);
+            BRANCHB_ALWAYS (brdisp);
         break;
 
     case SOBGTR:
@@ -2313,7 +2306,7 @@ for ( ;; ) {
         CC_IIZP_L (r);                                  /* set cc's */
         V_SUB_L (r, 1, op0);                            /* test for ovflo */    
         if (r > 0)                                      /* if >= 0, branch */
-            BRANCHB (brdisp);
+            BRANCHB_ALWAYS (brdisp);
         break;
 
 /* AOB instructions - op limit.rl,idx.ml,disp.bb
@@ -2331,7 +2324,7 @@ for ( ;; ) {
         CC_IIZP_L (r);                                  /* set cc's */
         V_ADD_L (r, 1, op1);                            /* test for ovflo */
         if (r < op0)                                    /* if < lim, branch */
-            BRANCHB (brdisp);
+            BRANCHB_ALWAYS (brdisp);
         break;
 
     case AOBLEQ:
@@ -2340,7 +2333,7 @@ for ( ;; ) {
         CC_IIZP_L (r);                                  /* set cc's */
         V_ADD_L (r, 1, op1);                            /* test for ovflo */
         if (r <= op0)                                   /* if < lim, branch */
-            BRANCHB (brdisp);
+            BRANCHB_ALWAYS (brdisp);
         break;
 
 /* ACB instructions - op limit.rx,add.rx,index.mx,disp.bw
@@ -2359,7 +2352,7 @@ for ( ;; ) {
         CC_IIZP_B (r);                                  /* set cc's */
         V_ADD_B (r, op1, op2);                          /* test for ovflo */
         if ((op1 & BSIGN)? (SXTB (r) >= SXTB (op0)): (SXTB (r) <= SXTB (op0)))
-            BRANCHW (brdisp);
+            BRANCHW_ALWAYS (brdisp);
         break;
 
     case ACBW:
@@ -2368,7 +2361,7 @@ for ( ;; ) {
         CC_IIZP_W (r);                                  /* set cc's */
         V_ADD_W (r, op1, op2);                          /* test for ovflo */
         if ((op1 & WSIGN)? (SXTW (r) >= SXTW (op0)): (SXTW (r) <= SXTW (op0)))
-            BRANCHW (brdisp);
+            BRANCHW_ALWAYS (brdisp);
         break;
 
     case ACBL:
@@ -2377,7 +2370,7 @@ for ( ;; ) {
         CC_IIZP_L (r);                                  /* set cc's */
         V_ADD_L (r, op1, op2);                          /* test for ovflo */
         if ((op1 & LSIGN)? (r >= op0): (r <= op0))
-            BRANCHW (brdisp);
+            BRANCHW_ALWAYS (brdisp);
         break;
 
 /* CASE instructions - casex sel.rx,base.rx,lim.rx
@@ -2454,26 +2447,22 @@ for ( ;; ) {
 
     case BBSC:
         if (op_bb_x (opnd, 0, acc))                     /* br if clr, set */
-            BRANCHB (brdisp);
+            BRANCHB_ALWAYS (brdisp);
         break;
 
     case BBCS:
         if (!op_bb_x (opnd, 1, acc))                    /* br if set, clr */
-            BRANCHB (brdisp);
+            BRANCHB_ALWAYS (brdisp);
         break;
 
     case BLBS:
-        if (op0 & 1) {                                  /* br if bit set */
+        if (op0 & 1)                                    /* br if bit set */
             BRANCHB (brdisp);
-            CHECK_FOR_IDLE_LOOP;
-            }
         break;
 
     case BLBC:
-        if ((op0 & 1) == 0) {                           /* br if bit clear */
+        if ((op0 & 1) == 0)                             /* br if bit clear */
             BRANCHB (brdisp);
-            CHECK_FOR_IDLE_LOOP;
-            }
         break;
 
 /* Extract field instructions - ext?v pos.rl,size.rb,base.wb,dst.wl
@@ -3532,7 +3521,7 @@ static struct os_idle os_tab[] = {
     { "OPENBSDOLD", VAX_IDLE_QUAD },
     { "OPENBSD", VAX_IDLE_BSDNEW },
     { "QUASIJARUS", VAX_IDLE_QUAD },
-    { "32V", VAX_IDLE_QUAD },
+    { "32V", VAX_IDLE_VMS },
     { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_ULT1X|VAX_IDLE_QUAD|VAX_IDLE_BSDNEW },
     { NULL, 0 }
     };
