@@ -7201,6 +7201,10 @@ t_stat get_yn (const char *ques, t_stat deflt)
 {
 char cbuf[CBUFSIZE], *cptr;
 
+if (sim_switches & SWMASK ('Y'))
+    return TRUE;
+if (sim_switches & SWMASK ('N'))
+    return FALSE;
 if (sim_rem_cmd_active_line != -1)
     return deflt;
 cptr = read_line_p (ques, cbuf, sizeof(cbuf), stdin);
