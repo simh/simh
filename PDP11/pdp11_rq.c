@@ -793,12 +793,12 @@ typedef struct {
 #define DBG_DAT  0x0020                                 /* display transfer data */
 
 DEBTAB rq_debug[] = {
-  {"TRACE",  DBG_TRC},
-  {"INIT",   DBG_INI},
-  {"REG",    DBG_REG},
-  {"REQ",    DBG_REQ},
-  {"DISK",   DBG_DSK},
-  {"DATA",   DBG_DAT},
+  {"TRACE",  DBG_TRC, "trace routine calls"},
+  {"INIT",   DBG_INI, "display setup/init sequence info"},
+  {"REG",    DBG_REG, "trace read/write registers"},
+  {"REQ",    DBG_REQ, "display transfer requests"},
+  {"DISK",   DBG_DSK, "display sim_disk activities"},
+  {"DATA",   DBG_DAT, "display transfer data"},
   {0}
 };
 

@@ -221,12 +221,12 @@ REG xua_reg[] = {
   { NULL }  };
 
 DEBTAB xu_debug[] = {
-  {"TRACE",  DBG_TRC},
-  {"WARN",   DBG_WRN},
-  {"REG",    DBG_REG},
-  {"PACKET", DBG_PCK},
-  {"DATA",   DBG_DAT},
-  {"ETH",    DBG_ETH},
+  {"TRACE",  DBG_TRC, "trace routine calls"},
+  {"WARN",   DBG_WRN, "warnings"},
+  {"REG",    DBG_REG, "read/write registers"},
+  {"PACKET", DBG_PCK, "packet headers"},
+  {"DATA",   DBG_DAT, "packet data"},
+  {"ETH",    DBG_ETH, "ethernet device"},
   {0}
 };
 

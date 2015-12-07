@@ -239,7 +239,7 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };     /* mux descriptor */
 
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
-#define DBG_INT  0x0002                                 /* display transfer requests */
+#define DBG_INT  0x0002                                 /* display interrupt activities */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 #define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
@@ -248,14 +248,14 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };     /* mux descriptor */
 #define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
 DEBTAB dz_debug[] = {
-  {"REG",    DBG_REG},
-  {"INT",    DBG_INT},
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
-  {"MDM",    DBG_MDM},
-  {"CON",    DBG_CON},
-  {"TRC",    DBG_TRC},
-  {"ASY",    DBG_ASY},
+  {"REG",    DBG_REG, "read/write registers"},
+  {"INT",    DBG_INT, "interrupt activities"},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"MDM",    DBG_MDM, "Modem Signals"},
+  {"CON",    DBG_CON, "connection activities"},
+  {"TRC",    DBG_TRC, "trace routine calls"},
+  {"ASY",    DBG_ASY, "Asynchronous Activities"},
   {0}
 };
 
