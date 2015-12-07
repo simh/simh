@@ -654,6 +654,35 @@ uint8 *tbuf = NULL;
 
 sim_debug (ctx->dbit, ctx->dptr, "sim_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
+if (uptr->dynflags & UNIT_DISK_CHK) {
+    DEVICE *dptr = find_dev_from_unit (uptr);
+    uint32 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
+    t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(ctx->sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+    t_lba sect;
+
+    for (sect = 0; sect < sects; sect++) {
+        t_lba offset;
+        t_bool sect_error = FALSE;
+
+        for (offset = 0; offset < ctx->sector_size; offset += sizeof(uint32)) {
+            if (*((uint32 *)&buf[sect*ctx->sector_size + offset]) != (uint32)(lba + sect)) {
+                sect_error = TRUE;
+                break;
+                }
+            }
+        if (sect_error) {
+            uint32 save_dctrl = dptr->dctrl;
+            FILE *save_sim_deb = sim_deb;
+
+            sim_printf ("\n%s%d: Write Address Verification Error on lbn %d(0x%X) of %d(0x%X).\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(lba+sect), (int)(lba+sect), (int)total_sectors, (int)total_sectors);
+            dptr->dctrl = 0xFFFFFFFF;
+            sim_deb = save_sim_deb ? save_sim_deb : stdout;
+            sim_disk_data_trace (uptr, buf+sect*ctx->sector_size, lba+sect, ctx->sector_size,    "Found", TRUE, 1);
+            dptr->dctrl = save_dctrl;
+            sim_deb = save_sim_deb;
+            }
+        }
+    }
 if (f == DKUF_F_STD)
     return _sim_disk_wrsect (uptr, lba, buf, sectswritten, sects);
 if ((0 == (ctx->sector_size & (ctx->storage_sector_size - 1))) ||   /* Sector Aligned & whole sector transfers */
@@ -990,23 +1019,24 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         /* fall through and open/return the newly created & copied vhd */
         }
     }
-else if (sim_switches & SWMASK ('M')) {                 /* merge difference disk? */
-    char gbuf[CBUFSIZE], *Parent = NULL;
-    FILE *vhd;
+else
+    if (sim_switches & SWMASK ('M')) {                 /* merge difference disk? */
+        char gbuf[CBUFSIZE], *Parent = NULL;
+        FILE *vhd;
 
-    sim_switches = sim_switches & ~(SWMASK ('M'));
-    get_glyph_nc (cptr, gbuf, 0);                       /* get spec */
-    vhd = sim_vhd_disk_merge (gbuf, &Parent);
-    if (vhd) {
-        t_stat r;
+        sim_switches = sim_switches & ~(SWMASK ('M'));
+        get_glyph_nc (cptr, gbuf, 0);                  /* get spec */
+        vhd = sim_vhd_disk_merge (gbuf, &Parent);
+        if (vhd) {
+            t_stat r;
 
-        sim_vhd_disk_close (vhd);
-        r = sim_disk_attach (uptr, Parent, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
-        free (Parent);
-        return r;
+            sim_vhd_disk_close (vhd);
+            r = sim_disk_attach (uptr, Parent, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
+            free (Parent);
+            return r;
+            }
+        return SCPE_ARG;
         }
-    return SCPE_ARG;
-    }
 
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
@@ -1129,8 +1159,94 @@ if ((created) && (!copied)) {
         remove (cptr);                                  /* remove the create file */
         return SCPE_OPENERR;
         }
+    if (sim_switches & SWMASK ('I')) {                  /* Initialize To Sector Address */
+        uint8 *init_buf = (uint8*) malloc (1024*1024);
+        t_lba lba, sect;
+        uint32 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
+        t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
+        t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+        t_seccnt sects = sectors_per_buffer;
+
+        if (!init_buf) {
+            sim_disk_detach (uptr);                         /* report error now */
+            remove (cptr);
+            return SCPE_MEM;
+            }
+        for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
+            sects = sectors_per_buffer;
+            if (lba + sects > total_sectors)
+                sects = total_sectors - lba;
+            for (sect = 0; sect < sects; sect++) {
+                t_lba offset;
+                for (offset = 0; offset < sector_size; offset += sizeof(uint32))
+                    *((uint32 *)&init_buf[sect*sector_size + offset]) = (uint32)(lba + sect);
+                }
+            r = sim_disk_wrsect (uptr, lba, init_buf, NULL, sects);
+            if (r != SCPE_OK) {
+                free (init_buf);
+                sim_disk_detach (uptr);                         /* report error now */
+                remove (cptr);                                  /* remove the create file */
+                return SCPE_OPENERR;
+                }
+            if (!sim_quiet)
+                sim_printf ("%s%d: Initialized To Sector Address %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
+            }
+        if (!sim_quiet)
+            sim_printf ("%s%d: Initialized To Sector Address %dMB.  100%% complete.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000));
+        }
     if (pdp11tracksize)
         sim_disk_pdp11_bad_block (uptr, pdp11tracksize);
+    }
+
+if (sim_switches & SWMASK ('K')) {
+    t_stat r = SCPE_OK;
+    t_lba lba, sect;
+    uint32 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
+    t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
+    t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+    t_seccnt sects = sectors_per_buffer;
+    uint8 *verify_buf = (uint8*) malloc (1024*1024);
+
+    if (!verify_buf) {
+        sim_disk_detach (uptr);                         /* report error now */
+        return SCPE_MEM;
+        }
+    for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
+        sects = sectors_per_buffer;
+        if (lba + sects > total_sectors)
+            sects = total_sectors - lba;
+        r = sim_disk_rdsect (uptr, lba, verify_buf, NULL, sects);
+        if (r == SCPE_OK) {
+            for (sect = 0; sect < sects; sect++) {
+                t_lba offset;
+                t_bool sect_error = FALSE;
+
+                for (offset = 0; offset < sector_size; offset += sizeof(uint32)) {
+                    if (*((uint32 *)&verify_buf[sect*sector_size + offset]) != (uint32)(lba + sect)) {
+                        sect_error = TRUE;
+                        break;
+                        }
+                    }
+                if (sect_error) {
+                    uint32 save_dctrl = dptr->dctrl;
+                    FILE *save_sim_deb = sim_deb;
+
+                    sim_printf ("\n%s%d: Verification Error on lbn %d(0x%X) of %d(0x%X).\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(lba+sect), (int)(lba+sect), (int)total_sectors, (int)total_sectors);
+                    dptr->dctrl = 0xFFFFFFFF;
+                    sim_deb = stdout;
+                    sim_disk_data_trace (uptr, verify_buf+sect*sector_size, lba+sect, sector_size,    "Found", TRUE, 1);
+                    dptr->dctrl = save_dctrl;
+                    sim_deb = save_sim_deb;
+                    }
+                }
+            }
+        if (!sim_quiet)
+            sim_printf ("%s%d: Verified containing Sector Address %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
+        }
+    if (!sim_quiet)
+        sim_printf ("%s%d: Verified containing Sector Address %dMB.  100%% complete.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000));
+    free (verify_buf);
+    uptr->dynflags |= UNIT_DISK_CHK;
     }
 
 capac = size_function (uptr->fileref);
@@ -1201,7 +1317,7 @@ if (uptr->io_flush)
 sim_disk_clr_async (uptr);
 
 uptr->flags &= ~(UNIT_ATT | UNIT_RO);
-uptr->dynflags &= ~UNIT_NO_FIO;
+uptr->dynflags &= ~(UNIT_NO_FIO | UNIT_DISK_CHK);
 free (uptr->filename);
 uptr->filename = NULL;
 uptr->fileref = NULL;
@@ -1259,6 +1375,11 @@ fprintf (st, "                disk container will be attempted).\n");
 fprintf (st, "    -F          Open the indicated disk container in a specific format (default\n");
 fprintf (st, "                is to autodetect VHD defaulting to simh if the indicated\n");
 fprintf (st, "                container is not a VHD).\n");
+fprintf (st, "    -I          Initialize newly created disk so that each sector contains its\n");
+fprintf (st, "                sector address\n");
+fprintf (st, "    -K          Verify that the disk contents contain the sector address in each\n");
+fprintf (st, "                sector.  Whole disk checked at attach time and each sector is\n");
+fprintf (st, "                checked when written.\n");
 fprintf (st, "    -C          Create a VHD and copy its contents from another disk (simh, VHD,\n");
 fprintf (st, "                or RAW format). Add a -V switch to verify a copy operation.\n");
 fprintf (st, "    -V          Perform a verification pass to confirm successful data copy\n");
@@ -1270,6 +1391,8 @@ fprintf (st, "                disk)\n");
 fprintf (st, "    -M          Merge a Differencing VHD into its parent VHD disk\n");
 fprintf (st, "    -O          Override consistency checks when attaching differencing disks\n");
 fprintf (st, "                which have unexpected parent disk GUID or timestamps\n\n");
+fprintf (st, "    -Y          Answer Yes to prompt to overwrite last track (on disk create)\n");
+fprintf (st, "    -N          Answer No to prompt to overwrite last track (on disk create)\n");
 fprintf (st, "Examples:\n");
 fprintf (st, "  sim> show rq\n");
 fprintf (st, "    RQ, address=20001468-2000146B*, no vector, 4 units\n");
