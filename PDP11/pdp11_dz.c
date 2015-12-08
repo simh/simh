@@ -300,7 +300,7 @@ DIB dz_dib = {
 
 UNIT dz_unit[2] = {
         { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) },
-        { UDATA (&dz_xmt_svc, 0, 0), SERIAL_OUT_WAIT } };
+        { UDATA (&dz_xmt_svc, UNIT_DIS, 0), SERIAL_OUT_WAIT } };
 
 REG dz_reg[] = {
     { BRDATADF (CSR,   dz_csr,   DEV_RDX, 16, MAX_DZ_MUXES, "control/status register", dz_csr_bits) },
