@@ -229,7 +229,6 @@ uint16 dz_tcr[MAX_DZ_MUXES] = { 0 };                    /* xmit control */
 uint16 dz_msr[MAX_DZ_MUXES] = { 0 };                    /* modem status */
 uint16 dz_tdr[MAX_DZ_MUXES] = { 0 };                    /* xmit data */
 uint8 dz_sae[MAX_DZ_MUXES] = { 0 };                     /* silo alarm enabled */
-uint32 dz_wait = 1;                                     /* input polling adjustment */
 uint32 dz_rxi = 0;                                      /* rcv interrupts */
 uint32 dz_txi = 0;                                      /* xmt interrupts */
 int32 dz_mctl = 0;                                      /* modem ctrl enabled */
@@ -264,6 +263,7 @@ t_stat dz_wr (int32 data, int32 PA, int32 access);
 int32 dz_rxinta (void);
 int32 dz_txinta (void);
 t_stat dz_svc (UNIT *uptr);
+t_stat dz_xmt_svc (UNIT *uptr);
 t_stat dz_reset (DEVICE *dptr);
 t_stat dz_attach (UNIT *uptr, char *cptr);
 t_stat dz_detach (UNIT *uptr);
@@ -298,7 +298,9 @@ DIB dz_dib = {
     IOLN_DZ,
     };
 
-UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };
+UNIT dz_unit[2] = {
+        { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) },
+        { UDATA (&dz_xmt_svc, 0, 0), SERIAL_OUT_WAIT } };
 
 REG dz_reg[] = {
     { BRDATADF (CSR,   dz_csr,   DEV_RDX, 16, MAX_DZ_MUXES, "control/status register", dz_csr_bits) },
@@ -310,7 +312,7 @@ REG dz_reg[] = {
     { BRDATAD  (SAENB, dz_sae,   DEV_RDX,  1, MAX_DZ_MUXES, "silo alarm enabled") },
     { GRDATAD  (RXINT, dz_rxi,   DEV_RDX, MAX_DZ_MUXES,  0, "receive interrupts") },
     { GRDATAD  (TXINT, dz_txi,   DEV_RDX, MAX_DZ_MUXES,  0, "transmit interrupts") },
-    { DRDATAD  (TIME, dz_wait,   24,                        "input polling adjustment"), PV_LEFT },
+    { DRDATAD  (TIME, dz_unit[1].wait,   24,                "output character delay"), PV_LEFT },
     { FLDATAD  (MDMCTL, dz_mctl, 0,                         "modem control enabled") },
     { FLDATAD  (AUTODS, dz_auto, 0,                         "autodisconnect enabled") },
     { GRDATA   (DEVADDR, dz_dib.ba, DEV_RDX, 32, 0), REG_HRO },
@@ -350,8 +352,8 @@ MTAB dz_mod[] = {
     };
 
 DEVICE dz_dev = {
-    "DZ", &dz_unit, dz_reg, dz_mod,
-    1, DEV_RDX, 8, 1, DEV_RDX, 8,
+    "DZ", dz_unit, dz_reg, dz_mod,
+    2, DEV_RDX, 8, 1, DEV_RDX, 8,
     &tmxr_ex, &tmxr_dep, &dz_reset,
     NULL, &dz_attach, &dz_detach,
     &dz_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_MUX,
@@ -394,7 +396,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             if (dz_rbuf[dz]) {
                 /* Rechedule the next poll preceisely so that 
                    the programmed input speed is observed. */
-                sim_clock_coschedule_abs (&dz_unit, tmxr_poll);
+                sim_clock_coschedule_abs (dz_unit, tmxr_poll);
                 }
             }
         else {
@@ -458,7 +460,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if (data & CSR_CLR)                             /* clr? reset */
             dz_clear (dz, FALSE);
         if (data & CSR_MSE)                             /* MSE? start poll */
-            sim_clock_coschedule (&dz_unit, tmxr_poll);
+            sim_clock_coschedule (dz_unit, tmxr_poll);
         else
             dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
         if ((data & CSR_RIE) == 0)                      /* RIE = 0? */
@@ -526,11 +528,10 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if (dz_csr[dz] & CSR_MSE) {                     /* enabled? */
             line = (dz * DZ_LINES) + CSR_GETTL (dz_csr[dz]);
             lp = &dz_ldsc[line];                        /* get line desc */
-            c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit.flags));
+            c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit[0].flags));
             if (c >= 0)                                 /* store char */
                 tmxr_putc_ln (lp, c);
-            tmxr_poll_tx (&dz_desc);                    /* poll output */
-            dz_update_xmti ();                          /* update int */
+            sim_activate (&dz_unit[1], dz_unit[1].wait);/* */
             }
         break;
         }
@@ -538,7 +539,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 return SCPE_OK;
 }
 
-/* Unit service routine
+/* Unit Input service routine
 
    The DZ11 polls to see if asynchronous activity has occurred and now
    needs to be processed.  The polling interval is controlled by the clock
@@ -576,6 +577,13 @@ if (t) {                                                /* any enabled? */
     if (dz == dz_desc.lines/DZ_LINES)                   /* All idle? */
         sim_clock_coschedule (uptr, tmxr_poll);         /* reactivate */
     }
+return SCPE_OK;
+}
+
+t_stat dz_xmt_svc (UNIT *uptr)
+{
+tmxr_poll_tx (&dz_desc);                                /* poll output */
+dz_update_xmti ();                                      /* update int */
 return SCPE_OK;
 }
 
@@ -763,7 +771,7 @@ for (i = 0; i < dz_desc.lines/DZ_LINES; i++)            /* init muxes */
 dz_rxi = dz_txi = 0;                                    /* clr master int */
 CLR_INT (DZRX);
 CLR_INT (DZTX);
-sim_cancel (&dz_unit);                                  /* stop poll */
+sim_cancel (dz_unit);                                  /* stop poll */
 ndev = ((dptr->flags & DEV_DIS)? 0: (dz_desc.lines / DZ_LINES));
 return auto_config (dptr->name, ndev);                  /* auto config */
 }
