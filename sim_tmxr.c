@@ -1565,8 +1565,12 @@ if ((lp->conn && lp->rcve) &&                           /* conn & enb & */
     }                                                   /* end if conn */
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
-if (val && lp->rxbps)
-    lp->rxnexttime = floor (sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor));
+if (lp->rxbps) {
+    if (val)
+        lp->rxnexttime = floor (sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor));
+    else
+        lp->rxnexttime = 0.0;
+    }
 tmxr_debug_return(lp, val);
 return val;
 }
@@ -2231,7 +2235,7 @@ if (*cptr == '*') {
     lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE * rxbpsfactor;
     }
 lp->rxdelta = _tmln_speed_delta (speed);
-lp->rxnexttime = 0;
+lp->rxnexttime = 0.0;
 uptr = lp->uptr;
 if ((!uptr) && (lp->mp))
     uptr = lp->mp->uptr;
@@ -3801,16 +3805,21 @@ if (mp) {
         if (tmxr_rqln_bare (lp, FALSE)) {
             int32 due;
 
-            if (lp->rxbps)
+            if ((lp->rxbps) && (lp->rxnexttime != 0.0))
                 due = (int32)(lp->rxnexttime - sim_gtime_now);
             else
                 due = (int32)((uptr->wait * sim_timer_inst_per_sec ())/TMXR_RX_BPS_UNIT_SCALE);
             soon = MIN(soon, due);
             }
         }
-    if (soon != interval)
+    if (soon != interval) {
+        if (soon < 0)
+            soon = 0;
+        sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %d instructions\n", sim_uname (uptr), soon);
         return _sim_activate (uptr, soon);
+        }
     }
+sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after interval %d instructions\n", sim_uname (uptr), interval);
 return sim_clock_coschedule_tmr (uptr, tmr, interval);
 #endif
 }
