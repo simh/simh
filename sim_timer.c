@@ -116,17 +116,19 @@ t_stat sim_timer_tick_svc (UNIT *uptr);
 
 #define DBG_IDL       TIMER_DBG_IDLE        /* idling */
 #define DBG_QUE       TIMER_DBG_QUEUE       /* queue activities */
-#define DBG_TRC       0x004                 /* tracing */
-#define DBG_CAL       0x008                 /* calibration activities */
-#define DBG_TIM       0x010                 /* timer thread activities */
-#define DBG_THR       0x020                 /* throttle activities */
+#define DBG_MUX       TIMER_DBG_MUX         /* tmxr queue activities */
+#define DBG_TRC       0x008                 /* tracing */
+#define DBG_CAL       0x010                 /* calibration activities */
+#define DBG_TIM       0x020                 /* timer thread activities */
+#define DBG_THR       0x040                 /* throttle activities */
 DEBTAB sim_timer_debug[] = {
-  {"TRACE",   DBG_TRC},
-  {"IDLE",    DBG_IDL},
-  {"QUEUE",   DBG_QUE},
-  {"CALIB",   DBG_CAL},
-  {"TIME",    DBG_TIM},
-  {"THROT",   DBG_THR},
+  {"TRACE",   DBG_TRC, "Trace routine calls"},
+  {"IDLE",    DBG_IDL, "Idling activities"},
+  {"QUEUE",   DBG_QUE, "Event queuing activities"},
+  {"CALIB",   DBG_CAL, "Calibration activities"},
+  {"TIME",    DBG_TIM, "Activation an scheduling activities"},
+  {"THROT",   DBG_THR, "Throttling activities"},
+  {"MUX",     DBG_MUX, "Tmxr scheduling activities"},
   {0}
 };
 
