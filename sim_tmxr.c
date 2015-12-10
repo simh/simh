@@ -3744,7 +3744,7 @@ return _sim_activate (uptr, interval);
 #endif
 }
 
-t_stat tmxr_activate_after (UNIT *uptr, int32 usecs_walltime)
+t_stat tmxr_activate_after (UNIT *uptr, uint32 usecs_walltime)
 {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
@@ -3757,7 +3757,7 @@ return _sim_activate_after (uptr, usecs_walltime);
 #endif
 }
 
-t_stat tmxr_activate_after_abs (UNIT *uptr, int32 usecs_walltime)
+t_stat tmxr_activate_after_abs (UNIT *uptr, uint32 usecs_walltime)
 {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 

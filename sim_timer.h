@@ -120,7 +120,7 @@ uint32 sim_os_ms_sleep_init (void);
 void sim_start_timer_services (void);
 void sim_stop_timer_services (void);
 t_stat sim_timer_change_asynch (void);
-t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
+t_stat sim_timer_activate_after (UNIT *uptr, uint32 usec_delay);
 t_stat sim_register_clock_unit (UNIT *uptr);
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
 t_stat sim_clock_coschedule_abs (UNIT *uptr, int32 interval);

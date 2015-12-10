@@ -1440,7 +1440,7 @@ if (sim_asynch_enabled && sim_asynch_timer)
     sim_start_timer_services ();
 else {
     UNIT *uptr;
-    int32 accum = 0;
+    uint32 accum = 0;
 
     sim_stop_timer_services ();
     while (1) {
@@ -1475,7 +1475,7 @@ if (0 == inst_per_sec)
 return inst_per_sec;
 }
 
-t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay)
+t_stat sim_timer_activate_after (UNIT *uptr, uint32 usec_delay)
 {
 int inst_delay;
 double inst_delay_d, inst_per_sec;

@@ -8465,24 +8465,24 @@ else
         reason  =       result (SCPE_OK if ok)
 */
 
-t_stat sim_activate_after_abs (UNIT *uptr, int32 event_time)
+t_stat sim_activate_after_abs (UNIT *uptr, uint32 event_time)
 {
 return _sim_activate_after_abs (uptr, event_time);
 }
 
-t_stat _sim_activate_after_abs (UNIT *uptr, int32 event_time)
+t_stat _sim_activate_after_abs (UNIT *uptr, uint32 event_time)
 {
 AIO_ACTIVATE (_sim_activate_after_abs, uptr, event_time);
 sim_cancel (uptr);
 return _sim_activate_after (uptr, event_time);
 }
 
-t_stat sim_activate_after (UNIT *uptr, int32 event_time)
+t_stat sim_activate_after (UNIT *uptr, uint32 usec_delay)
 {
-return _sim_activate_after (uptr, event_time);
+return _sim_activate_after (uptr, usec_delay);
 }
 
-t_stat _sim_activate_after (UNIT *uptr, int32 usec_delay)
+t_stat _sim_activate_after (UNIT *uptr, uint32 usec_delay)
 {
 if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
@@ -10000,8 +10000,8 @@ return ret;
  *
  * Device help can be presented hierarchically by calling
  *
- * t_stat scp_help (FILE *st, struct sim_device *dptr,
- *                  struct sim_unit *uptr, int flag, const char *help, char *cptr)
+ * t_stat scp_help (FILE *st, DEVICE *dptr,
+ *                  UNIT *uptr, int flag, const char *help, char *cptr)
  *
  * or one of its three cousins from the device HELP routine.
  *
@@ -10083,8 +10083,8 @@ return;
 /* Build a help tree from a string.
  * Handles substitutions, formatting.
  */
-static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
-                         struct sim_unit *uptr, const char *htext, va_list ap)
+static TOPIC *buildHelp (TOPIC *topic, DEVICE *dptr,
+                         UNIT *uptr, const char *htext, va_list ap)
 {
 char *end;
 size_t n, ilvl;
@@ -10368,7 +10368,7 @@ free (prefix);
 return newp;
 }
 
-static void displayMagicTopic (FILE *st, struct sim_device *dptr, TOPIC *topic)
+static void displayMagicTopic (FILE *st, DEVICE *dptr, TOPIC *topic)
 {
 char tbuf[CBUFSIZE];
 size_t i, skiplines;
@@ -10434,8 +10434,8 @@ return;
 /* Flatten and display help for those who say they prefer it.
  */
 
-static t_stat displayFlatHelp (FILE *st, struct sim_device *dptr,
-                               struct sim_unit *uptr, int32 flag,
+static t_stat displayFlatHelp (FILE *st, DEVICE *dptr,
+                               UNIT *uptr, int32 flag,
                                TOPIC *topic, va_list ap )
 {
 size_t i;
@@ -10498,8 +10498,8 @@ return match;
  * Takes a va_list
  */
 
-t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
-                  struct sim_unit *uptr, int32 flag,
+t_stat scp_vhelp (FILE *st, DEVICE *dptr,
+                  UNIT *uptr, int32 flag,
                   const char *help, const char *cptr, va_list ap)
 {
 
@@ -10731,8 +10731,8 @@ return SCPE_OK;
 /* variable argument list shell - most commonly used
  */
 
-t_stat scp_help (FILE *st, struct sim_device *dptr,
-                 struct sim_unit *uptr, int32 flag,
+t_stat scp_help (FILE *st, DEVICE *dptr,
+                 UNIT *uptr, int32 flag,
                  const char *help, const char *cptr, ...)
 {
 t_stat r;
@@ -10753,8 +10753,8 @@ return r;
  * be found.
  */
 
-t_stat scp_vhelpFromFile (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag,
+t_stat scp_vhelpFromFile (FILE *st, DEVICE *dptr,
+                          UNIT *uptr, int32 flag,
                           const char *helpfile,
                           const char *cptr, va_list ap)
 {
@@ -10850,8 +10850,8 @@ free (help);
 return r;
 }
 
-t_stat scp_helpFromFile (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag,
+t_stat scp_helpFromFile (FILE *st, DEVICE *dptr,
+                         UNIT *uptr, int32 flag,
                          const char *helpfile, const char *cptr, ...)
 {
 t_stat r;

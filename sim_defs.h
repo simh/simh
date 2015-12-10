@@ -377,44 +377,64 @@ typedef uint32          t_addr;
 /*     2 - to not be a valid/possible pointer (alignment)   */
 #define QUEUE_LIST_END ((UNIT *)1)
 
+/* Typedefs for principal structures */
+
+typedef struct DEVICE DEVICE;
+typedef struct UNIT UNIT;
+typedef struct REG REG;
+typedef struct CTAB CTAB;
+typedef struct C1TAB C1TAB;
+typedef struct SHTAB SHTAB;
+typedef struct MTAB MTAB;
+typedef struct SCHTAB SCHTAB;
+typedef struct BRKTAB BRKTAB;
+typedef struct EXPTAB EXPTAB;
+typedef struct EXPECT EXPECT;
+typedef struct SEND SEND;
+typedef struct DEBTAB DEBTAB;
+typedef struct FILEREF FILEREF;
+typedef struct BITFIELD BITFIELD;
+
+typedef t_stat (*ACTIVATE_API)(UNIT *unit, int32 interval);
+
 /* Device data structure */
 
-struct sim_device {
+struct DEVICE {
     const char          *name;                          /* name */
-    struct sim_unit     *units;                         /* units */
-    struct sim_reg      *registers;                     /* registers */
-    struct sim_mtab     *modifiers;                     /* modifiers */
+    UNIT                *units;                         /* units */
+    REG                 *registers;                     /* registers */
+    MTAB                *modifiers;                     /* modifiers */
     uint32              numunits;                       /* #units */
     uint32              aradix;                         /* address radix */
     uint32              awidth;                         /* address width */
     uint32              aincr;                          /* addr increment */
     uint32              dradix;                         /* data radix */
     uint32              dwidth;                         /* data width */
-    t_stat              (*examine)(t_value *v, t_addr a, struct sim_unit *up,
+    t_stat              (*examine)(t_value *v, t_addr a, UNIT *up,
                             int32 sw);                  /* examine routine */
-    t_stat              (*deposit)(t_value v, t_addr a, struct sim_unit *up,
+    t_stat              (*deposit)(t_value v, t_addr a, UNIT *up,
                             int32 sw);                  /* deposit routine */
-    t_stat              (*reset)(struct sim_device *dp);/* reset routine */
-    t_stat              (*boot)(int32 u, struct sim_device *dp);
+    t_stat              (*reset)(DEVICE *dp);           /* reset routine */
+    t_stat              (*boot)(int32 u, DEVICE *dp);
                                                         /* boot routine */
-    t_stat              (*attach)(struct sim_unit *up, char *cp);
+    t_stat              (*attach)(UNIT *up, char *cp);
                                                         /* attach routine */
-    t_stat              (*detach)(struct sim_unit *up); /* detach routine */
+    t_stat              (*detach)(UNIT *up);            /* detach routine */
     void                *ctxt;                          /* context */
     uint32              flags;                          /* flags */
     uint32              dctrl;                          /* debug control */
-    struct sim_debtab   *debflags;                      /* debug flags */
-    t_stat              (*msize)(struct sim_unit *up, int32 v, char *cp, void *dp);
+    DEBTAB              *debflags;                      /* debug flags */
+    t_stat              (*msize)(UNIT *up, int32 v, char *cp, void *dp);
                                                         /* mem size routine */
     char                *lname;                         /* logical name */
-    t_stat              (*help)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, const char *cptr); 
+    t_stat              (*help)(FILE *st, DEVICE *dptr,
+                            UNIT *uptr, int32 flag, const char *cptr); 
                                                         /* help */
-    t_stat              (*attach_help)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, const char *cptr);
+    t_stat              (*attach_help)(FILE *st, DEVICE *dptr,
+                            UNIT *uptr, int32 flag, const char *cptr);
                                                         /* attach help */
     void *help_ctx;                                     /* Context available to help routines */
-    const char          *(*description)(struct sim_device *dptr);
+    const char          *(*description)(DEVICE *dptr);
                                                         /* Device Description */
     };
 
@@ -466,9 +486,9 @@ struct sim_device {
    are for a typical sequential device.
 */
 
-struct sim_unit {
-    struct sim_unit     *next;                          /* next active */
-    t_stat              (*action)(struct sim_unit *up); /* action routine */
+struct UNIT {
+    UNIT                *next;                          /* next active */
+    t_stat              (*action)(UNIT *up);            /* action routine */
     char                *filename;                      /* open file name */
     FILE                *fileref;                       /* file reference */
     void                *filebuf;                       /* memory buffer */
@@ -478,7 +498,7 @@ struct sim_unit {
     uint32              dynflags;                       /* dynamic flags */
     t_addr              capac;                          /* capacity */
     t_addr              pos;                            /* file position */
-    void                (*io_flush)(struct sim_unit *up);/* io flush routine */
+    void                (*io_flush)(UNIT *up);          /* io flush routine */
     uint32              iostarttime;                    /* I/O start time */
     int32               buf;                            /* buffer */
     int32               wait;                           /* wait */
@@ -490,12 +510,12 @@ struct sim_unit {
     void                *up8;                           /* device specific */
     void                *tmxr;                          /* TMXR linkage */
 #ifdef SIM_ASYNCH_IO
-    void                (*a_check_completion)(struct sim_unit *);
-    t_bool              (*a_is_active)(struct sim_unit *);
-    void                (*a_cancel)(struct sim_unit *);
-    struct sim_unit     *a_next;                        /* next asynch active */
+    void                (*a_check_completion)(UNIT *);
+    t_bool              (*a_is_active)(UNIT *);
+    void                (*a_cancel)(UNIT *);
+    UNIT                *a_next;                        /* next asynch active */
     int32               a_event_time;
-    t_stat              (*a_activate_call)(struct sim_unit *, int32);
+    ACTIVATE_API        a_activate_call;
     /* Asynchronous Polling control */
     /* These fields should only be referenced when holding the sim_tmxr_poll_lock */
     t_bool              a_polling_now;                  /* polling active flag */
@@ -547,7 +567,7 @@ struct sim_unit {
 #define UNIT_V_DF_TAPE  4               /* Bit offset for Tape Density reservation */
 #define UNIT_S_DF_TAPE  3               /* Bits Reserved for Tape Density */
 
-struct sim_bitfield {
+struct BITFIELD {
     const char      *name;                              /* field name */
     uint32          offset;                             /* starting bit */
     uint32          width;                              /* width */
@@ -557,7 +577,7 @@ struct sim_bitfield {
 
 /* Register data structure */
 
-struct sim_reg {
+struct REG {
     const char          *name;                          /* name */
     void                *loc;                           /* location */
     uint32              radix;                          /* radix */
@@ -565,7 +585,7 @@ struct sim_reg {
     uint32              offset;                         /* starting bit */
     uint32              depth;                          /* save depth */
     const char          *desc;                          /* description */
-    struct sim_bitfield *fields;                        /* bit fields */
+    BITFIELD            *fields;                        /* bit fields */
     uint32              flags;                          /* flags */
     uint32              qptr;                           /* circ q ptr */
     };
@@ -589,7 +609,7 @@ struct sim_reg {
 
 /* Command tables, base and alternate formats */
 
-struct sim_ctab {
+struct CTAB {
     const char          *name;                          /* name */
     t_stat              (*action)(int32 flag, char *cptr);
                                                         /* action routine */
@@ -600,32 +620,32 @@ struct sim_ctab {
                                                         /* message printing routine */
     };
 
-struct sim_c1tab {
+struct C1TAB {
     const char          *name;                          /* name */
-    t_stat              (*action)(struct sim_device *dptr, struct sim_unit *uptr,
+    t_stat              (*action)(DEVICE *dptr, UNIT *uptr,
                             int32 flag, char *cptr);    /* action routine */
     int32               arg;                            /* argument */
     const char          *help;                          /* help string */
     };
 
-struct sim_shtab {
+struct SHTAB {
     const char          *name;                          /* name */
-    t_stat              (*action)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr);
+    t_stat              (*action)(FILE *st, DEVICE *dptr,
+                            UNIT *uptr, int32 flag, char *cptr);
     int32               arg;                            /* argument */
     const char          *help;                          /* help string */
     };
 
 /* Modifier table - only extended entries have disp, reg, or flags */
 
-struct sim_mtab {
+struct MTAB {
     uint32              mask;                           /* mask */
     uint32              match;                          /* match */
     const char          *pstring;                       /* print string */
     const char          *mstring;                       /* match string */
-    t_stat              (*valid)(struct sim_unit *up, int32 v, char *cp, void *dp);
+    t_stat              (*valid)(UNIT *up, int32 v, char *cp, void *dp);
                                                         /* validation routine */
-    t_stat              (*disp)(FILE *st, struct sim_unit *up, int32 v, void *dp);
+    t_stat              (*disp)(FILE *st, UNIT *up, int32 v, void *dp);
                                                         /* display routine */
     void                *desc;                          /* value descriptor */
                                                         /* REG * if MTAB_VAL */
@@ -649,7 +669,7 @@ struct sim_mtab {
 
 /* Search table */
 
-struct sim_schtab {
+struct SCHTAB {
     int32               logic;                          /* logical operator */
     int32               boolop;                         /* boolean operator */
     uint32              count;                          /* value count in mask and comp arrays */
@@ -659,7 +679,7 @@ struct sim_schtab {
 
 /* Breakpoint table */
 
-struct sim_brktab {
+struct BRKTAB {
     t_addr              addr;                           /* address */
     uint32              typ;                            /* mask of types */
 #define BRK_TYP_DYN_STEPOVER    (SWMASK ('Z'+1))
@@ -671,7 +691,7 @@ struct sim_brktab {
 
 /* Expect rule */
 
-struct sim_exptab {
+struct EXPTAB {
     uint8               *match;                         /* match string */
     uint32              size;                           /* match string size */
     char                *match_pattern;                 /* match pattern for format */
@@ -690,10 +710,10 @@ struct sim_exptab {
 
 /* Expect Context */
 
-struct sim_expect {
-    struct sim_device   *dptr;                          /* Device (for Debug) */
+struct EXPECT {
+    DEVICE              *dptr;                          /* Device (for Debug) */
     uint32              dbit;                           /* Debugging Bit */
-    struct sim_exptab   *rules;                         /* match rules */
+    EXPTAB              *rules;                         /* match rules */
     int32               size;                           /* count of match rules */
     uint32              after;                          /* delay before halting */
     uint8               *buf;                           /* buffer of output data which has produced */
@@ -703,10 +723,10 @@ struct sim_expect {
 
 /* Send Context */
 
-struct sim_send {
+struct SEND {
     uint32              delay;                          /* instruction delay between sent data */
 #define SEND_DEFAULT_DELAY  1000                        /* default delay instruction count */
-    struct sim_device   *dptr;                          /* Device (for Debug) */
+    DEVICE              *dptr;                          /* Device (for Debug) */
     uint32              dbit;                           /* Debugging Bit */
     uint32              after;                          /* instruction delay before sending any data */
     double              next_time;                      /* execution time when next data can be sent */
@@ -718,7 +738,7 @@ struct sim_send {
 
 /* Debug table */
 
-struct sim_debtab {
+struct DEBTAB {
     const char          *name;                          /* control name */
     uint32              mask;                           /* control bit */
     const char          *desc;                          /* description */
@@ -736,7 +756,7 @@ struct sim_debtab {
 #define SIM_DBG_AIO_QUEUE   0x40000
 
 /* File Reference */
-struct sim_fileref {
+struct FILEREF {
     char                name[CBUFSIZE];                 /* file name */
     FILE                *file;                          /* file handle */
     int32               refcount;                       /* reference count */
@@ -820,23 +840,6 @@ struct sim_fileref {
 #endif
 #define ENDBITS {NULL}  /* end of bitfield list */
 
-/* Typedefs for principal structures */
-
-typedef struct sim_device DEVICE;
-typedef struct sim_unit UNIT;
-typedef struct sim_reg REG;
-typedef struct sim_ctab CTAB;
-typedef struct sim_c1tab C1TAB;
-typedef struct sim_shtab SHTAB;
-typedef struct sim_mtab MTAB;
-typedef struct sim_schtab SCHTAB;
-typedef struct sim_brktab BRKTAB;
-typedef struct sim_exptab EXPTAB;
-typedef struct sim_expect EXPECT;
-typedef struct sim_send SEND;
-typedef struct sim_debtab DEBTAB;
-typedef struct sim_fileref FILEREF;
-typedef struct sim_bitfield BITFIELD;
 
 /* Function prototypes */
 
@@ -1184,7 +1187,7 @@ extern int32 sim_asynch_inst_latency;
       } else {                                                                   \
         UNIT *q, *qe;                                                            \
         ouptr->a_event_time = event_time;                                        \
-        ouptr->a_activate_call = caller;                                         \
+        ouptr->a_activate_call = (ACTIVATE_API)&caller;                          \
         ouptr->a_next = QUEUE_LIST_END;                 /* Mark as on list */    \
         do {                                                                     \
           do                                                                     \
@@ -1211,11 +1214,11 @@ extern int32 sim_asynch_inst_latency;
       sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch events for %s after %d instructions\n", sim_uname(list), event_time);\
       for (qe=(list); qe->a_next != QUEUE_LIST_END;) {                           \
           qe->a_event_time = event_time;                                         \
-          qe->a_activate_call = caller;                                          \
+          qe->a_activate_call = (ACTIVATE_API)&caller;                           \
           qe = qe->a_next;                                                       \
           }                                                                      \
       qe->a_event_time = event_time;                                             \
-      qe->a_activate_call = caller;                                              \
+      qe->a_activate_call = (ACTIVATE_API)&caller;                               \
       ouptr = (list);                                                            \
       do {                                                                       \
         do                                                                       \
@@ -1307,7 +1310,7 @@ extern int32 sim_asynch_inst_latency;
       } else {                                                         \
         uptr->a_next = sim_asynch_queue;                               \
         uptr->a_event_time = event_time;                               \
-        uptr->a_activate_call = caller;                                \
+        uptr->a_activate_call = (ACTIVATE_API)&caller;                 \
         sim_asynch_queue = uptr;                                       \
       }                                                                \
       if (sim_idle_wait) {                                             \
@@ -1324,11 +1327,11 @@ extern int32 sim_asynch_inst_latency;
       sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch events for %s after %d instructions\n", sim_uname(list), event_time);\
       for (qe=list; qe->a_next != QUEUE_LIST_END;) {                             \
           qe->a_event_time = event_time;                                         \
-          qe->a_activate_call = caller;                                          \
+          qe->a_activate_call = (ACTIVATE_API)&caller;                           \
           qe = qe->a_next;                                                       \
           }                                                                      \
       qe->a_event_time = event_time;                                             \
-      qe->a_activate_call = caller;                                              \
+      qe->a_activate_call = (ACTIVATE_API)&caller;                               \
       AIO_LOCK;                                                                  \
       qe->a_next = sim_asynch_queue;                                             \
       sim_asynch_queue = list;                                                   \

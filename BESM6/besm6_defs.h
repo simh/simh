@@ -360,7 +360,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 void besm6_draw_panel (int force);
 t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc);
 t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc);
-t_stat besm6_show_panel (FILE *st, struct sim_unit *up, int32 v, void *dp);
+t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, void *dp);
 
 /*
  * Арифметика.

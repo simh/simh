@@ -116,10 +116,10 @@ t_stat sim_activate (UNIT *uptr, int32 interval);
 t_stat _sim_activate (UNIT *uptr, int32 interval);
 t_stat sim_activate_abs (UNIT *uptr, int32 interval);
 t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
-t_stat sim_activate_after (UNIT *uptr, int32 usecs_walltime);
-t_stat _sim_activate_after (UNIT *uptr, int32 usecs_walltime);
-t_stat sim_activate_after_abs (UNIT *uptr, int32 usecs_walltime);
-t_stat _sim_activate_after_abs (UNIT *uptr, int32 usecs_walltime);
+t_stat sim_activate_after (UNIT *uptr, uint32 usecs_walltime);
+t_stat _sim_activate_after (UNIT *uptr, uint32 usecs_walltime);
+t_stat sim_activate_after_abs (UNIT *uptr, uint32 usecs_walltime);
+t_stat _sim_activate_after_abs (UNIT *uptr, uint32 usecs_walltime);
 t_stat sim_cancel (UNIT *uptr);
 t_bool sim_is_active (UNIT *uptr);
 int32 sim_activate_time (UNIT *uptr);
@@ -220,14 +220,14 @@ void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 #define SCP_HELP_FLAT   (1u << 31)       /* Force flat help when prompting is not possible */
 #define SCP_HELP_ONECMD (1u << 30)       /* Display one topic, do not prompt */
 #define SCP_HELP_ATTACH (1u << 29)       /* Top level topic is ATTACH help */
-t_stat scp_help (FILE *st, struct sim_device *dptr,
-                 struct sim_unit *uptr, int32 flag, const char *help, const char *cptr, ...);
-t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
-                  struct sim_unit *uptr, int32 flag, const char *help, const char *cptr, va_list ap);
-t_stat scp_helpFromFile (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag, const char *help, const char *cptr, ...);
-t_stat scp_vhelpFromFile (FILE *st, struct sim_device *dptr,
-                          struct sim_unit *uptr, int32 flag, const char *help, const char *cptr, va_list ap);
+t_stat scp_help (FILE *st, DEVICE *dptr,
+                 UNIT *uptr, int32 flag, const char *help, const char *cptr, ...);
+t_stat scp_vhelp (FILE *st, DEVICE *dptr,
+                  UNIT *uptr, int32 flag, const char *help, const char *cptr, va_list ap);
+t_stat scp_helpFromFile (FILE *st, DEVICE *dptr,
+                         UNIT *uptr, int32 flag, const char *help, const char *cptr, ...);
+t_stat scp_vhelpFromFile (FILE *st, DEVICE *dptr,
+                          UNIT *uptr, int32 flag, const char *help, const char *cptr, va_list ap);
 
 /* Global data */
 
