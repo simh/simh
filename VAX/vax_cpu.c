@@ -2422,7 +2422,7 @@ for ( ;; ) {
 
     case BBS:
         if (op_bb_n (opnd, acc)) {                      /* br if bit set */
-            BRANCHB (brdisp);
+            BRANCHB_ALWAYS (brdisp);
             if (((PSL & PSL_IS) != 0) &&                /* on IS? */
                 (PSL_GETIPL (PSL) == 0x3) &&            /* at IPL 3? */
                 ((cpu_idle_mask & VAX_IDLE_VMS) != 0))  /* running VMS? */
@@ -2432,7 +2432,7 @@ for ( ;; ) {
 
     case BBC:
         if (!op_bb_n (opnd, acc))                       /* br if bit clr */
-            BRANCHB (brdisp);
+            BRANCHB_ALWAYS (brdisp);
         break;
 
     case BBSS: case BBSSI:
