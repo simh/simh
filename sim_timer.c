@@ -920,16 +920,16 @@ static uint32 cyc_ms = 0;
 uint32 w_ms, w_idle, act_ms;
 int32 act_cyc;
 
-if ((!sim_idle_enab)                             ||     /* idling disabled */
-    ((sim_clock_queue == QUEUE_LIST_END) &&             /* or clock queue empty? */
+int test_sim_clock = (sim_clock_queue == QUEUE_LIST_END);             /* clock queue empty? */
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
-     (!(sim_asynch_enabled && sim_asynch_timer)))||     /*     and not asynch? */
-#else
-     (TRUE))                                     ||
+    test_sim_clock = test_sim_clock && !(sim_asynch_enabled && sim_asynch_timer);     /*     and not asynch? */
 #endif
-    ((sim_clock_queue != QUEUE_LIST_END) && 
-     ((sim_clock_queue->flags & UNIT_IDLE) == 0))||     /* or event not idle-able? */
-    (rtc_elapsed[tmr] < sim_idle_stable)) {             /* or timer not stable? */
+test_sim_clock = (test_sim_clock) ||
+(!sim_idle_enab) ||     /* idling disabled */
+((sim_clock_queue != QUEUE_LIST_END) && 
+((sim_clock_queue->flags & UNIT_IDLE) == 0))||     /* or event not idle-able? */
+(rtc_elapsed[tmr] < sim_idle_stable);     /* or timer not stable? */
+if (test_sim_clock) {             
     if (sin_cyc)
         sim_interval = sim_interval - 1;
     return FALSE;
