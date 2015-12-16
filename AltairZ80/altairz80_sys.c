@@ -50,6 +50,7 @@ extern DEVICE mfdc_dev;
 extern DEVICE fw2_dev;
 extern DEVICE fif_dev;
 extern DEVICE vfdhd_dev;
+extern DEVICE mdsa_dev;
 extern DEVICE mdsad_dev;
 extern DEVICE nsfpb_dev;
 extern DEVICE disk1a_dev;
@@ -112,6 +113,7 @@ DEVICE      *sim_devices[]  = {
     /* Micropolis Devices */
     &mfdc_dev,
     /* North Star Devices */
+    &mdsa_dev,
     &mdsad_dev,
     /* Seattle Computer Products Devices */
     &scp300f_dev,
