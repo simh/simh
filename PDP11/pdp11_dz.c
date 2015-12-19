@@ -228,6 +228,8 @@ uint16 dz_lpr[MAX_DZ_MUXES] = { 0 };                    /* line param */
 uint16 dz_tcr[MAX_DZ_MUXES] = { 0 };                    /* xmit control */
 uint16 dz_msr[MAX_DZ_MUXES] = { 0 };                    /* modem status */
 uint16 dz_tdr[MAX_DZ_MUXES] = { 0 };                    /* xmit data */
+uint16 dz_silo[MAX_DZ_MUXES][DZ_SILO_ALM] = { 0 };      /* silo */
+uint16 dz_scnt[MAX_DZ_MUXES] = { 0 };                   /* silo used */
 uint8 dz_sae[MAX_DZ_MUXES] = { 0 };                     /* silo alarm enabled */
 uint32 dz_rxi = 0;                                      /* rcv interrupts */
 uint32 dz_txi = 0;                                      /* xmt interrupts */
@@ -241,6 +243,7 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };     /* mux descriptor */
 #define DBG_INT  0x0002                                 /* display interrupt activities */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_RET  TMXR_DBG_RET                           /* display Read Data */
 #define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
 #define DBG_CON  TMXR_DBG_CON                           /* display connection activities */
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
@@ -251,6 +254,7 @@ DEBTAB dz_debug[] = {
   {"INT",    DBG_INT, "interrupt activities"},
   {"XMT",    DBG_XMT, "Transmitted Data"},
   {"RCV",    DBG_RCV, "Received Data"},
+  {"RET",    DBG_RET, "Read Data"},
   {"MDM",    DBG_MDM, "Modem Signals"},
   {"CON",    DBG_CON, "connection activities"},
   {"TRC",    DBG_TRC, "trace routine calls"},
@@ -591,40 +595,47 @@ return SCPE_OK;
 
 uint16 dz_getc (int32 dz)
 {
-uint32 i, line, c;
+uint16 ret;
+uint32 i;
 
-for (i = c = 0; (i < DZ_LINES) && (c == 0); i++) {      /* loop thru lines */
-    line = (dz * DZ_LINES) + i;                         /* get line num */
-    c = tmxr_getc_ln (&dz_ldsc[line]);                  /* test for input */
-    if (c & SCPE_BREAK)                                 /* break? frame err */
-        c = RBUF_VALID | RBUF_FRME;
-    if (c)                                              /* or in line # */
-        c = (c & RBUF_CHAR) | RBUF_VALID | (i << RBUF_V_RLINE);
-    }                                                   /* end for */
-return (uint16)c;
+if (!dz_scnt[dz])
+    return 0;
+ret = dz_silo[dz][0];                       /* first fifo element */
+for (i=1; i < dz_scnt[dz]; i++)             /* slide down remaining entries */
+    dz_silo[dz][i-1] = dz_silo[dz][i];
+--dz_scnt[dz];                              /* adjust count */
+sim_debug(DBG_RCV, &dz_dev, "DZ Device %d - Received: 0x%X - '%c'\n", dz, ret, sim_isprint(ret&0xFF) ? ret & 0xFF : '.');
+return ret;
 }
 
 /* Update receive interrupts */
 
 void dz_update_rcvi (void)
 {
-int32 i, dz, line, scnt[MAX_DZ_MUXES];
+int32 i, dz, c;
 TMLN *lp;
 
 for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
-    scnt[dz] = 0;                                       /* clr input count */
-    for (i = 0; i < DZ_LINES; i++) {                    /* poll lines */
-        line = (dz * DZ_LINES) + i;                     /* get line num */
-        lp = &dz_ldsc[line];                            /* get line desc */
-        scnt[dz] = scnt[dz] + tmxr_rqln (lp);           /* sum buffers */
-        if (dz_mctl && !lp->conn)                       /* if disconn */
-            dz_msr[dz] &= ~(1 << (i + MSR_V_CD));       /* reset car det */
+    if (dz_csr[dz] & CSR_MSE) {                         /* enabled? */
+        for (i = 0; i < DZ_LINES; i++) {                /* poll lines */
+            if (dz_scnt[dz] >= DZ_SILO_ALM)
+                break;
+            lp = &dz_ldsc[(dz * DZ_LINES) + i];         /* get line desc */
+            c = tmxr_getc_ln (lp);                      /* test for input */
+            if (c & SCPE_BREAK)                         /* break? frame err */
+                c = RBUF_FRME;
+            if (c) {                                    /* save in silo */
+                c = (c & (RBUF_CHAR | RBUF_FRME)) | RBUF_VALID | (i << RBUF_V_RLINE);
+                dz_silo[dz][dz_scnt[dz]] = (uint16)c;
+                ++dz_scnt[dz];
+                }
+            if (dz_mctl && !lp->conn)                   /* if disconn */
+                dz_msr[dz] &= ~(1 << (i + MSR_V_CD));   /* reset car det */
+            }
         }
-    }
-for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
-    if (scnt[dz] && (dz_csr[dz] & CSR_MSE)) {           /* input & enabled? */
+    if (dz_scnt[dz] && (dz_csr[dz] & CSR_MSE)) {        /* input & enabled? */
         dz_csr[dz] |= CSR_RDONE;                        /* set done */
-        if (dz_sae[dz] && (scnt[dz] >= DZ_SILO_ALM)) {  /* alm enb & cnt hi? */
+        if (dz_sae[dz] && (dz_scnt[dz] >= DZ_SILO_ALM)) {/* alm enb & cnt hi? */
             dz_csr[dz] |= CSR_SA;                       /* set status */
             dz_sae[dz] = 0;                             /* disable alarm */
             }
@@ -671,6 +682,8 @@ return;
 
 void dz_clr_rxint (int32 dz)
 {
+if (dz_rxi & (1 << dz))
+    sim_debug(DBG_INT, &dz_dev, "dz_clr_rxint(dz=%d, rxi=0x%X)\n", dz, dz_rxi);
 dz_rxi = dz_rxi & ~(1 << dz);                           /* clr mux rcv int */
 if (dz_rxi == 0)                                        /* all clr? */
     CLR_INT (DZRX);
