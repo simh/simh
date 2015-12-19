@@ -1510,6 +1510,14 @@ if (sim_deb) {
             show_dev_debug (st, dptr, NULL, 0, NULL);
             }
         }
+    for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i) {
+        if (!(dptr->flags & DEV_DIS) &&
+            (dptr->flags & DEV_DEBUG) &&
+            (dptr->dctrl)) {
+            fprintf (st, "Device: %-6s ", dptr->name);
+            show_dev_debug (st, dptr, NULL, 0, NULL);
+            }
+        }
     }
 else fprintf (st, "Debug output disabled\n");
 return SCPE_OK;

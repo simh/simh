@@ -243,6 +243,8 @@ extern FILE *sim_deb;                                   /* debug file */
 extern FILEREF *sim_deb_ref;                            /* debug file file reference */
 extern int32 sim_deb_switches;                          /* debug display flags */
 extern struct timespec sim_deb_basetime;                /* debug base time for relative time output */
+extern DEVICE **sim_internal_devices;
+extern uint32 sim_internal_device_count;
 extern UNIT *sim_clock_queue;
 extern int32 sim_is_running;
 extern t_bool sim_processing_event;                     /* Called from sim_process_event */
