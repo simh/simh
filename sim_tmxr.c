@@ -1568,8 +1568,6 @@ if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
 if (lp->rxbps) {
     if (val)
         lp->rxnexttime = floor (sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor));
-    else
-        lp->rxnexttime = 0.0;
     }
 tmxr_debug_return(lp, val);
 return val;
@@ -1891,10 +1889,12 @@ return;
 
 int32 tmxr_rqln_bare (TMLN *lp, t_bool speed)
 {
-if ((speed) && 
-    (lp->rxbps) && 
-     (sim_gtime () < lp->rxnexttime)) /* rate limiting and too soon */
-    return 0;
+if ((speed) && (lp->rxbps)) {                   /* consider speed and rate limiting? */
+    if (sim_gtime () < lp->rxnexttime)          /* too soon? */
+        return 0;
+    else
+        return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz : 0)) ? 1 : 0;
+    }
 return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
 }
 
@@ -3787,7 +3787,6 @@ return tmxr_clock_coschedule_tmr (uptr, 0, interval);
 t_stat tmxr_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
 {
 TMXR *mp = (TMXR *)uptr->tmxr;
-double sim_gtime_now = sim_gtime ();
 
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
@@ -3798,6 +3797,7 @@ return SCPE_OK;
 #else
 if (mp) {
     int32 i, soon = interval;
+    double sim_gtime_now = sim_gtime ();
 
     for (i = 0; i < mp->lines; i++) {
         TMLN *lp = &mp->ldsc[i];
@@ -3805,16 +3805,17 @@ if (mp) {
         if (tmxr_rqln_bare (lp, FALSE)) {
             int32 due;
 
-            if ((lp->rxbps) && (lp->rxnexttime != 0.0))
-                due = (int32)(lp->rxnexttime - sim_gtime_now);
+            if (lp->rxbps)
+                if (lp->rxnexttime > sim_gtime_now)
+                    due = (int32)(lp->rxnexttime - sim_gtime_now);
+                else
+                    due = sim_processing_event ? 1 : 0;     /* avoid potential infinite loop if called from service routine */
             else
                 due = (int32)((uptr->wait * sim_timer_inst_per_sec ())/TMXR_RX_BPS_UNIT_SCALE);
             soon = MIN(soon, due);
             }
         }
     if (soon != interval) {
-        if (soon < 0)
-            soon = 0;
         sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %d instructions\n", sim_uname (uptr), soon);
         return _sim_activate (uptr, soon);
         }
