@@ -202,9 +202,9 @@
   05-Dec-02  MP   Restructured the flow of processing in xq_svc so that eth_read
                   is called repeatedly until either a packet isn't found or
                   there is no room for another one in the queue.  Once that has
-                  been done, xq_process_rdbl is called to pass the queued packets
+                  been done, xq_process_rbdl is called to pass the queued packets
                   into the simulated system as space is available there.
-                  xq_process_rdbl is also called at the beginning of xq_svc to
+                  xq_process_rbdl is also called at the beginning of xq_svc to
                   drain the queue into the simulated system, making more room
                   available in the queue.  No processing is done at all in
                   xq_svc if the receiver is disabled.
@@ -261,6 +261,7 @@ t_stat xq_rd(int32* data, int32 PA, int32 access);
 t_stat xq_wr(int32  data, int32 PA, int32 access);
 t_stat xq_svc(UNIT * uptr);
 t_stat xq_tmrsvc(UNIT * uptr);
+t_stat xq_startsvc(UNIT * uptr);
 t_stat xq_reset (DEVICE * dptr);
 t_stat xq_attach (UNIT * uptr, char * cptr);
 t_stat xq_detach (UNIT * uptr);
@@ -317,7 +318,8 @@ struct xq_device    xqa = {
   0,                                        /* DEQNA-Lock mode */
   ETH_THROT_DEFAULT_TIME,                   /* ms throttle window */
   ETH_THROT_DEFAULT_BURST,                  /* packet packet burst in throttle window */
-  ETH_THROT_DISABLED_DELAY                  /* throttle disabled */
+  ETH_THROT_DISABLED_DELAY,                 /* throttle disabled */
+  XQ_STARTUP_DELAY                          /* instructions to delay when starting the receiver */
   };
 
 struct xq_device    xqb = {
@@ -332,7 +334,8 @@ struct xq_device    xqb = {
   0,                                        /* DEQNA-Lock mode */
   ETH_THROT_DEFAULT_TIME,                   /* ms throttle window */
   ETH_THROT_DEFAULT_BURST,                  /* packet packet burst in throttle window */
-  ETH_THROT_DISABLED_DELAY                  /* throttle disabled */
+  ETH_THROT_DISABLED_DELAY,                 /* throttle disabled */
+  XQ_STARTUP_DELAY                          /* instructions to delay when starting the receiver */
   };
 
 /* SIMH device structures */
@@ -345,6 +348,7 @@ DIB xqa_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
 UNIT xqa_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
+ { UDATA (&xq_startsvc, UNIT_DIS, 0) },
 };
 
 BITFIELD xq_csr_bits[] = {
@@ -414,6 +418,7 @@ REG xqa_reg[] = {
   { GRDATA ( THR_TIME, xqa.throttle_time, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( THR_BURST, xqa.throttle_burst, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( THR_DELAY, xqa.throttle_delay, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATAD ( START_DELAY, xqa.startup_delay,  XQ_RDX, 32, 0, "instruction delay before receiver starts"), REG_FIT },
   { NULL },
 };
 
@@ -423,6 +428,7 @@ DIB xqb_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
 UNIT xqb_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
+ { UDATA (&xq_startsvc, UNIT_DIS, 0) },
 };
 
 REG xqb_reg[] = {
@@ -474,6 +480,7 @@ REG xqb_reg[] = {
   { GRDATA ( THR_TIME, xqb.throttle_time, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( THR_BURST, xqb.throttle_burst, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( THR_DELAY, xqb.throttle_delay, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATAD ( START_DELAY, xqb.startup_delay,  XQ_RDX, 32, 0, "instruction delay before receiver starts"), REG_FIT },
   { NULL },
 };
 
@@ -526,7 +533,7 @@ DEBTAB xq_debug[] = {
 
 DEVICE xq_dev = {
   "XQ", xqa_unit, xqa_reg, xq_mod,
-  2, XQ_RDX, 11, 1, XQ_RDX, 16,
+  3, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
@@ -536,7 +543,7 @@ DEVICE xq_dev = {
 
 DEVICE xqb_dev = {
   "XQB", xqb_unit, xqb_reg, xq_mod,
-  2, XQ_RDX, 11, 1, XQ_RDX, 16,
+  3, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
@@ -1095,7 +1102,7 @@ t_stat xq_process_rbdl(CTLR* xq)
   if (xq->var->mode == XQ_T_DELQA_PLUS)
     return xq_process_turbo_rbdl(xq);
 
-  sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl\n");
+  sim_debug(DBG_TRC, xq->dev, "xq_process_rbdl\n");
 
   if (xq->var->csr & XQ_CSR_RL)
       return SCPE_OK;
@@ -1245,7 +1252,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
     if (wstatus) return xq_nxm_error(xq);
 
-    sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", 
+    sim_debug(DBG_TRC, xq->dev, "xq_process_rbdl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", 
         xq->var->rbdl_ba, address, b_length, (int)((uint16)(rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0))), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
 
     /* remove packet from queue */
@@ -2270,10 +2277,10 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
 
   /* start receiver when RE transitions to set */
   if (~xq->var->csr & XQ_CSR_RE & data) {
-    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - receiver started\n", data);
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - receiver starting soon\n", data);
 
     /* start the read service timer or enable asynch reading as appropriate */
-    xq_start_receiver(xq);
+    sim_activate(&xq->unit[2], xq->var->startup_delay);
   }
 
   /* stop receiver when RE transitions to clear */
@@ -2326,6 +2333,7 @@ void xq_start_receiver(CTLR* xq)
 void xq_stop_receiver(CTLR* xq)
 {
   sim_cancel(&xq->unit[0]); /* Stop Receiving */
+  sim_cancel(&xq->unit[2]);
   if (xq->var->etherface)
     eth_clr_async(xq->var->etherface);
 }
@@ -2564,6 +2572,7 @@ t_stat xq_reset(DEVICE* dptr)
 
   /* stop the receiver */
   sim_cancel(xq->unit);
+  sim_cancel(&xq->unit[2]);
 
   /* set hardware sanity controls */
   if (xq->var->sanity.enabled) {
@@ -2752,6 +2761,21 @@ t_stat xq_tmrsvc(UNIT* uptr)
   return SCPE_OK;
 }
 
+/*
+** service routine - used to delay receiver start by a few simulated 
+**                   instructions
+*/
+t_stat xq_startsvc(UNIT* uptr)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+
+  sim_debug(DBG_TRC, xq->dev, "xq_startsvc()\n");
+
+  /* start the read service timer or enable asynch reading as appropriate */
+  xq_start_receiver(xq);
+
+  return SCPE_OK;
+}
 
 /* attach device: */
 t_stat xq_attach(UNIT* uptr, char* cptr)

@@ -94,6 +94,7 @@ extern int32 int_req[IPL_HLVL];
 #define XQ_SERVICE_INTERVAL  100                        /* polling interval - X per second */
 #endif
 #define XQ_SYSTEM_ID_SECS    540                        /* seconds before system ID timer expires */
+#define XQ_STARTUP_DELAY      20                        /* instruction delay before receiver starts */
 #define XQ_HW_SANITY_SECS    240                        /* seconds before HW sanity timer expires */
 #define XQ_MAX_CONTROLLERS     2                        /* maximum controllers allowed */
 
@@ -268,6 +269,7 @@ struct xq_device {
   uint32            throttle_time;                      /* ms burst time window */
   uint32            throttle_burst;                     /* packets passed with throttle_time which trigger throttling */
   uint32            throttle_delay;                     /* ms to delay when throttling.  0 disables throttling */
+  uint16            startup_delay;                      /* instructions to delay when starting the receiver */
                                                         /*- initialized values - DO NOT MOVE */
 
                                                         /* I/O register storage */
