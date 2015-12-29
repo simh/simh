@@ -108,6 +108,7 @@ void dlo_clr_int (int32 ln);
 void dlo_set_int (int32 ln);
 int32 dlo_iack (void);
 void dlx_reset_ln (int32 ln);
+const char *dlx_description (DEVICE *dptr);
 
 /* DLI data structures
 
@@ -185,7 +186,7 @@ DEVICE dli_dev = {
     NULL, NULL, &dlx_reset,
     NULL, &dlx_attach, &dlx_detach,
     &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX | DEV_DEBUG,
-    0, dl_debug, NULL, NULL, NULL, NULL, NULL, NULL};
+    0, dl_debug, NULL, NULL, NULL, NULL, NULL, &dlx_description};
 
 /* DLO data structures
 
@@ -244,7 +245,7 @@ DEVICE dlo_dev = {
     NULL, NULL, &dlx_reset,
     NULL, NULL, NULL,
     NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
-    0, dl_debug, NULL, NULL, NULL, NULL, NULL, NULL };
+    0, dl_debug, NULL, NULL, NULL, NULL, NULL, &dlx_description};
 
 /* Register names for Debug tracing */
 static const char *dl_regs[] =
@@ -642,4 +643,10 @@ else {
 dlx_desc.lines = newln;
 dli_dib.lnt = newln * 010;                             /* upd IO page lnt */
 return auto_config (dli_dev.name, newln);              /* auto config */
+}
+
+const char *dlx_description (DEVICE *dptr)
+{
+return (dptr == &dli_dev) ? "DL11 asynchronous line interface - receiver" 
+                          : "DL11 asynchronous line interface - transmitter";
 }

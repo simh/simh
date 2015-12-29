@@ -141,6 +141,7 @@ t_stat pclk_wr (int32 data, int32 PA, int32 access);
 t_stat pclk_svc (UNIT *uptr);
 t_stat pclk_reset (DEVICE *dptr);
 t_stat pclk_set_line (UNIT *uptr, int32 val, char *cptr, void *desc);
+const char *pclk_description (DEVICE *dptr);
 void pclk_tick (void);
 
 /* PCLK data structures
@@ -193,7 +194,9 @@ DEVICE pclk_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &pclk_reset,
     NULL, NULL, NULL,
-    &pclk_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS
+    &pclk_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS, 
+    0, NULL, NULL, NULL, NULL,
+    NULL, NULL, &pclk_description,
     };
 
 /* Clock I/O address routines */
@@ -316,4 +319,9 @@ if (val == UNIT_LINE50HZ)
     rate[2] = 50;
 else rate[2] = 60;
 return SCPE_OK;
+}
+
+const char *pclk_description (DEVICE *dptr)
+{
+return "KW11-P programmable real time clock";
 }
