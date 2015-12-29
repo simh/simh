@@ -3022,25 +3022,29 @@ PIRQ = 0;
 STKLIM = 0;
 if (CPUT (CPUT_T))                                      /* T11? */
     PSW = 000340;                                       /* start at IPL 7 */
-else PSW = 0;                                           /* else at IPL 0 */
+else
+    PSW = 0;                                            /* else at IPL 0 */
 MMR0 = 0;
 MMR1 = 0;
 MMR2 = 0;
 MMR3 = 0;
 trap_req = 0;
 wait_state = 0;
-if (M == NULL)
+if (M == NULL) {                    /* First time init */
     M = (uint16 *) calloc (MEMSIZE >> 1, sizeof (uint16));
-if (M == NULL)
-    return SCPE_MEM;
+    if (M == NULL)
+        return SCPE_MEM;
+    sim_brk_types = sim_brk_dflt = SWMASK ('E');
+    sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
+    auto_config(NULL, 0);           /* do an initial auto configure */
+    }
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
-else return SCPE_IERR;
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
-sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
+else
+    return SCPE_IERR;
 set_r_display (0, MD_KER);
-return SCPE_OK;
+return build_dib_tab ();                /* build, chk dib_tab */
 }
 
 static const char *cpu_next_caveats =
