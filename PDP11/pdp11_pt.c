@@ -99,8 +99,8 @@ REG ptr_reg[] = {
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptr_stopioe, 0) },
-    { GRDATA  (DEVADDR,   ptr_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA  (DEVVEC,   ptr_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { GRDATA (DEVADDR, ptr_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA (DEVVEC, ptr_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 

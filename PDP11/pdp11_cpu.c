@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          PDP-11 CPU
 
+   30-Dec-15    RMS     Added NOBEVENT option for 11/03, 11/23
+   29-Dec-15    RMS     Call build_dib_tab during reset (Mark Pizzolato)
    05-Dec-13    RMS     Fixed bug in CSM (John Dundas)
    23-Oct-13    RMS     Fixed PS behavior on initialization and boot
    10-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
@@ -587,6 +589,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "NOCIS", &cpu_clr_opt },
     { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "MMU", &cpu_set_opt },
     { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "NOMMU", &cpu_clr_opt },
+    { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "BEVENT", &cpu_set_opt },
+    { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "NOBEVENT", &cpu_clr_opt },
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
@@ -3008,7 +3012,7 @@ if (pcq_r)
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 set_r_display (0, MD_KER);
-return SCPE_OK;
+return build_dib_tab ();
 }
 
 /* Boot setup routine */
