@@ -228,6 +228,8 @@ uint16 dz_lpr[MAX_DZ_MUXES] = { 0 };                    /* line param */
 uint16 dz_tcr[MAX_DZ_MUXES] = { 0 };                    /* xmit control */
 uint16 dz_msr[MAX_DZ_MUXES] = { 0 };                    /* modem status */
 uint16 dz_tdr[MAX_DZ_MUXES] = { 0 };                    /* xmit data */
+uint16 dz_silo[MAX_DZ_MUXES][DZ_SILO_ALM] = { 0 };      /* silo */
+uint16 dz_scnt[MAX_DZ_MUXES] = { 0 };                   /* silo used */
 uint8 dz_sae[MAX_DZ_MUXES] = { 0 };                     /* silo alarm enabled */
 uint32 dz_rxi = 0;                                      /* rcv interrupts */
 uint32 dz_txi = 0;                                      /* xmt interrupts */
@@ -238,23 +240,25 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };     /* mux descriptor */
 
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
-#define DBG_INT  0x0002                                 /* display transfer requests */
+#define DBG_INT  0x0002                                 /* display interrupt activities */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_RET  TMXR_DBG_RET                           /* display Read Data */
 #define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
 #define DBG_CON  TMXR_DBG_CON                           /* display connection activities */
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 #define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
 DEBTAB dz_debug[] = {
-  {"REG",    DBG_REG},
-  {"INT",    DBG_INT},
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
-  {"MDM",    DBG_MDM},
-  {"CON",    DBG_CON},
-  {"TRC",    DBG_TRC},
-  {"ASY",    DBG_ASY},
+  {"REG",    DBG_REG, "read/write registers"},
+  {"INT",    DBG_INT, "interrupt activities"},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"RET",    DBG_RET, "Read Data"},
+  {"MDM",    DBG_MDM, "Modem Signals"},
+  {"CON",    DBG_CON, "connection activities"},
+  {"TRC",    DBG_TRC, "trace routine calls"},
+  {"ASY",    DBG_ASY, "Asynchronous Activities"},
   {0}
 };
 
@@ -263,6 +267,7 @@ t_stat dz_wr (int32 data, int32 PA, int32 access);
 int32 dz_rxinta (void);
 int32 dz_txinta (void);
 t_stat dz_svc (UNIT *uptr);
+t_stat dz_xmt_svc (UNIT *uptr);
 t_stat dz_reset (DEVICE *dptr);
 t_stat dz_attach (UNIT *uptr, char *cptr);
 t_stat dz_detach (UNIT *uptr);
@@ -297,7 +302,9 @@ DIB dz_dib = {
     IOLN_DZ,
     };
 
-UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };
+UNIT dz_unit[2] = {
+        { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) },
+        { UDATA (&dz_xmt_svc, UNIT_DIS, 0), SERIAL_OUT_WAIT } };
 
 REG dz_reg[] = {
     { BRDATADF (CSR,   dz_csr,   DEV_RDX, 16, MAX_DZ_MUXES, "control/status register", dz_csr_bits) },
@@ -309,6 +316,7 @@ REG dz_reg[] = {
     { BRDATAD  (SAENB, dz_sae,   DEV_RDX,  1, MAX_DZ_MUXES, "silo alarm enabled") },
     { GRDATAD  (RXINT, dz_rxi,   DEV_RDX, MAX_DZ_MUXES,  0, "receive interrupts") },
     { GRDATAD  (TXINT, dz_txi,   DEV_RDX, MAX_DZ_MUXES,  0, "transmit interrupts") },
+    { DRDATAD  (TIME, dz_unit[1].wait,   24,                "output character delay"), PV_LEFT },
     { FLDATAD  (MDMCTL, dz_mctl, 0,                         "modem control enabled") },
     { FLDATAD  (AUTODS, dz_auto, 0,                         "autodisconnect enabled") },
     { GRDATA   (DEVADDR, dz_dib.ba, DEV_RDX, 32, 0), REG_HRO },
@@ -348,8 +356,8 @@ MTAB dz_mod[] = {
     };
 
 DEVICE dz_dev = {
-    "DZ", &dz_unit, dz_reg, dz_mod,
-    1, DEV_RDX, 8, 1, DEV_RDX, 8,
+    "DZ", dz_unit, dz_reg, dz_mod,
+    2, DEV_RDX, 8, 1, DEV_RDX, 8,
     &tmxr_ex, &tmxr_dep, &dz_reset,
     NULL, &dz_attach, &dz_detach,
     &dz_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_MUX,
@@ -389,6 +397,11 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
                 dz_sae[dz] = 1;
             tmxr_poll_rx (&dz_desc);                    /* poll input */
             dz_update_rcvi ();                          /* update rx intr */
+            if (dz_rbuf[dz]) {
+                /* Rechedule the next poll preceisely so that 
+                   the programmed input speed is observed. */
+                sim_clock_coschedule_abs (dz_unit, tmxr_poll);
+                }
             }
         else {
             dz_rbuf[dz] = 0;                            /* no data */
@@ -451,14 +464,16 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if (data & CSR_CLR)                             /* clr? reset */
             dz_clear (dz, FALSE);
         if (data & CSR_MSE)                             /* MSE? start poll */
-            sim_clock_coschedule (&dz_unit, tmxr_poll);
-        else dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
+            sim_clock_coschedule (dz_unit, tmxr_poll);
+        else
+            dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
         if ((data & CSR_RIE) == 0)                      /* RIE = 0? */
             dz_clr_rxint (dz);
-        else if (((dz_csr[dz] & CSR_IE) == 0) &&        /* RIE 0->1? */
-             ((dz_csr[dz] & CSR_SAE)?
-             (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
-            dz_set_rxint (dz);
+        else
+            if (((dz_csr[dz] & CSR_IE) == 0) &&        /* RIE 0->1? */
+                ((dz_csr[dz] & CSR_SAE)?
+                (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
+                dz_set_rxint (dz);
         if ((data & CSR_TIE) == 0)                      /* TIE = 0? */
             dz_clr_txint (dz);
         else if (((dz_csr[dz] & CSR_TIE) == 0) && (dz_csr[dz] & CSR_TRDY))
@@ -472,12 +487,11 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         lp = &dz_ldsc[line];                            /* get line desc */
         if (dz_lpr[dz] & LPR_RCVE)                      /* rcv enb? on */
             lp->rcve = 1;
-        else lp->rcve = 0;                              /* else line off */
-        if (dz_mctl) {
-            sprintf(lineconfig, "%s-%s%s%s", LPR_GETSPD(data), LPR_GETCHARSIZE(data), LPR_GETPARITY(data), LPR_GETSTOPBITS(data));
-            if (!lp->serconfig || (0 != strcmp(lp->serconfig, lineconfig))) /* config changed? */
-                tmxr_set_config_line (lp, lineconfig);  /* set it */
-            }
+        else
+            lp->rcve = 0;                               /* else line off */
+        sprintf(lineconfig, "%s-%s%s%s", LPR_GETSPD(data), LPR_GETCHARSIZE(data), LPR_GETPARITY(data), LPR_GETSTOPBITS(data));
+        if (!lp->serconfig || (0 != strcmp(lp->serconfig, lineconfig))) /* config changed? */
+            tmxr_set_config_line (lp, lineconfig);      /* set it */
         tmxr_poll_rx (&dz_desc);                        /* poll input */
         dz_update_rcvi ();                              /* update rx intr */
         break;
@@ -518,11 +532,10 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if (dz_csr[dz] & CSR_MSE) {                     /* enabled? */
             line = (dz * DZ_LINES) + CSR_GETTL (dz_csr[dz]);
             lp = &dz_ldsc[line];                        /* get line desc */
-            c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit.flags));
+            c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit[0].flags));
             if (c >= 0)                                 /* store char */
                 tmxr_putc_ln (lp, c);
-            tmxr_poll_tx (&dz_desc);                    /* poll output */
-            dz_update_xmti ();                          /* update int */
+            sim_activate (&dz_unit[1], dz_unit[1].wait);/* */
             }
         break;
         }
@@ -530,7 +543,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 return SCPE_OK;
 }
 
-/* Unit service routine
+/* Unit Input service routine
 
    The DZ11 polls to see if asynchronous activity has occurred and now
    needs to be processed.  The polling interval is controlled by the clock
@@ -561,8 +574,20 @@ if (t) {                                                /* any enabled? */
     dz_update_rcvi ();                                  /* upd rcv intr */
     tmxr_poll_tx (&dz_desc);                            /* poll output */
     dz_update_xmti ();                                  /* upd xmt intr */
-    sim_clock_coschedule (uptr, tmxr_poll);             /* reactivate */
+    for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {
+        if (dz_csr[dz] & CSR_RDONE)
+            break;
+        }
+    if (dz == dz_desc.lines/DZ_LINES)                   /* All idle? */
+        sim_clock_coschedule (uptr, tmxr_poll);         /* reactivate */
     }
+return SCPE_OK;
+}
+
+t_stat dz_xmt_svc (UNIT *uptr)
+{
+tmxr_poll_tx (&dz_desc);                                /* poll output */
+dz_update_xmti ();                                      /* update int */
 return SCPE_OK;
 }
 
@@ -570,50 +595,59 @@ return SCPE_OK;
 
 uint16 dz_getc (int32 dz)
 {
-uint32 i, line, c;
+uint16 ret;
+uint32 i;
 
-for (i = c = 0; (i < DZ_LINES) && (c == 0); i++) {      /* loop thru lines */
-    line = (dz * DZ_LINES) + i;                         /* get line num */
-    c = tmxr_getc_ln (&dz_ldsc[line]);                  /* test for input */
-    if (c & SCPE_BREAK)                                 /* break? frame err */
-        c = RBUF_VALID | RBUF_FRME;
-    if (c)                                              /* or in line # */
-        c = c | (i << RBUF_V_RLINE);
-    }                                                   /* end for */
-return (uint16)c;
+if (!dz_scnt[dz])
+    return 0;
+ret = dz_silo[dz][0];                       /* first fifo element */
+for (i=1; i < dz_scnt[dz]; i++)             /* slide down remaining entries */
+    dz_silo[dz][i-1] = dz_silo[dz][i];
+--dz_scnt[dz];                              /* adjust count */
+sim_debug(DBG_RCV, &dz_dev, "DZ Device %d - Received: 0x%X - '%c'\n", dz, ret, sim_isprint(ret&0xFF) ? ret & 0xFF : '.');
+return ret;
 }
 
 /* Update receive interrupts */
 
 void dz_update_rcvi (void)
 {
-int32 i, dz, line, scnt[MAX_DZ_MUXES];
+int32 i, dz, c;
 TMLN *lp;
 
 for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
-    scnt[dz] = 0;                                       /* clr input count */
-    for (i = 0; i < DZ_LINES; i++) {                    /* poll lines */
-        line = (dz * DZ_LINES) + i;                     /* get line num */
-        lp = &dz_ldsc[line];                            /* get line desc */
-        scnt[dz] = scnt[dz] + tmxr_rqln (lp);           /* sum buffers */
-        if (dz_mctl && !lp->conn)                       /* if disconn */
-            dz_msr[dz] &= ~(1 << (i + MSR_V_CD));       /* reset car det */
+    if (dz_csr[dz] & CSR_MSE) {                         /* enabled? */
+        for (i = 0; i < DZ_LINES; i++) {                /* poll lines */
+            if (dz_scnt[dz] >= DZ_SILO_ALM)
+                break;
+            lp = &dz_ldsc[(dz * DZ_LINES) + i];         /* get line desc */
+            c = tmxr_getc_ln (lp);                      /* test for input */
+            if (c & SCPE_BREAK)                         /* break? frame err */
+                c = RBUF_FRME;
+            if (c) {                                    /* save in silo */
+                c = (c & (RBUF_CHAR | RBUF_FRME)) | RBUF_VALID | (i << RBUF_V_RLINE);
+                dz_silo[dz][dz_scnt[dz]] = (uint16)c;
+                ++dz_scnt[dz];
+                }
+            if (dz_mctl && !lp->conn)                   /* if disconn */
+                dz_msr[dz] &= ~(1 << (i + MSR_V_CD));   /* reset car det */
+            }
         }
-    }
-for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
-    if (scnt[dz] && (dz_csr[dz] & CSR_MSE)) {           /* input & enabled? */
+    if (dz_scnt[dz] && (dz_csr[dz] & CSR_MSE)) {        /* input & enabled? */
         dz_csr[dz] |= CSR_RDONE;                        /* set done */
-        if (dz_sae[dz] && (scnt[dz] >= DZ_SILO_ALM)) {  /* alm enb & cnt hi? */
+        if (dz_sae[dz] && (dz_scnt[dz] >= DZ_SILO_ALM)) {/* alm enb & cnt hi? */
             dz_csr[dz] |= CSR_SA;                       /* set status */
             dz_sae[dz] = 0;                             /* disable alarm */
             }
         }
-    else dz_csr[dz] &= ~CSR_RDONE;                      /* no, clear done */
+    else
+        dz_csr[dz] &= ~CSR_RDONE;                       /* no, clear done */
     if ((dz_csr[dz] & CSR_RIE) &&                       /* int enable */
         ((dz_csr[dz] & CSR_SAE)?
          (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
         dz_set_rxint (dz);                              /* and alm/done? */
-    else dz_clr_rxint (dz);                             /* no, clear int */
+    else
+        dz_clr_rxint (dz);                              /* no, clear int */
     }
 return;
 }
@@ -648,6 +682,8 @@ return;
 
 void dz_clr_rxint (int32 dz)
 {
+if (dz_rxi & (1 << dz))
+    sim_debug(DBG_INT, &dz_dev, "dz_clr_rxint(dz=%d, rxi=0x%X)\n", dz, dz_rxi);
 dz_rxi = dz_rxi & ~(1 << dz);                           /* clr mux rcv int */
 if (dz_rxi == 0)                                        /* all clr? */
     CLR_INT (DZRX);
@@ -748,7 +784,7 @@ for (i = 0; i < dz_desc.lines/DZ_LINES; i++)            /* init muxes */
 dz_rxi = dz_txi = 0;                                    /* clr master int */
 CLR_INT (DZRX);
 CLR_INT (DZTX);
-sim_cancel (&dz_unit);                                  /* stop poll */
+sim_cancel (dz_unit);                                  /* stop poll */
 ndev = ((dptr->flags & DEV_DIS)? 0: (dz_desc.lines / DZ_LINES));
 return auto_config (dptr->name, ndev);                  /* auto config */
 }

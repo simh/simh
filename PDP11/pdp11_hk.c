@@ -676,11 +676,11 @@ MTAB hk_mod[] = {
     };
 
 DEBTAB hk_deb[] = {
-    { "OPS", HKDEB_OPS },
-    { "RRD", HKDEB_RRD },
-    { "RWR", HKDEB_RWR },
-    { "INTERRUPT", HKDEB_INT },
-    { "TRACE", HKDEB_TRC },
+    { "OPS",   HKDEB_OPS, "transactions" },
+    { "RRD",   HKDEB_RRD, "register reads" },
+    { "RWR",   HKDEB_RWR, "register writes" },
+    { "INT",   HKDEB_INT, "interrupts" },
+    { "TRACE", HKDEB_TRC, "trace" },
     { NULL, 0 }
     };
 

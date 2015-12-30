@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          PDP-11 CPU
 
+   30-Dec-15    RMS     Added NOBEVENT option for 11/03, 11/23
+   29-Dec-15    RMS     Call build_dib_tab during reset (Mark Pizzolato)
    05-Dec-13    RMS     Fixed bug in CSM (John Dundas)
    23-Oct-13    RMS     Fixed PS behavior on initialization and boot
    10-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
@@ -588,6 +590,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "NOCIS", &cpu_clr_opt },
     { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "MMU", &cpu_set_opt },
     { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "NOMMU", &cpu_clr_opt },
+    { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "BEVENT", &cpu_set_opt, NULL, NULL, "Enable BEVENT line (11/03, 11/23 only)" },
+    { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "NOBEVENT", &cpu_clr_opt, NULL, NULL, "Disable BEVENT line (11/03, 11/23 only)" },
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
@@ -3022,25 +3026,29 @@ PIRQ = 0;
 STKLIM = 0;
 if (CPUT (CPUT_T))                                      /* T11? */
     PSW = 000340;                                       /* start at IPL 7 */
-else PSW = 0;                                           /* else at IPL 0 */
+else
+    PSW = 0;                                            /* else at IPL 0 */
 MMR0 = 0;
 MMR1 = 0;
 MMR2 = 0;
 MMR3 = 0;
 trap_req = 0;
 wait_state = 0;
-if (M == NULL)
+if (M == NULL) {                    /* First time init */
     M = (uint16 *) calloc (MEMSIZE >> 1, sizeof (uint16));
-if (M == NULL)
-    return SCPE_MEM;
+    if (M == NULL)
+        return SCPE_MEM;
+    sim_brk_types = sim_brk_dflt = SWMASK ('E');
+    sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
+    auto_config(NULL, 0);           /* do an initial auto configure */
+    }
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
-else return SCPE_IERR;
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
-sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
+else
+    return SCPE_IERR;
 set_r_display (0, MD_KER);
-return SCPE_OK;
+return build_dib_tab ();            /* build, chk dib_tab */
 }
 
 static const char *cpu_next_caveats =

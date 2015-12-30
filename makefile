@@ -128,13 +128,17 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         ifneq (,$(shell $(GCC) -V 2>&1 | grep 'Sun C'))
           SUNC_VERSION = $(shell $(GCC) -V 2>&1 | grep 'Sun C')
           COMPILER_NAME = $(wordlist 2,10,$(SUNC_VERSION))
+          CC_STD = -std=c99
         endif
       endif
       ifeq (HP-UX,$(OSTYPE))
         ifneq (,$(shell what `which $(firstword $(GCC)) 2>&1`| grep -i compiler))
           COMPILER_NAME = $(strip $(shell what `which $(firstword $(GCC)) 2>&1` | grep -i compiler))
+          CC_STD = -std=gnu99
         endif
       endif
+    else
+      CC_STD = -std=gnu99
     endif
   else
     ifeq (Apple,$(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
@@ -148,6 +152,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         CLANG_VERSION = $(word 4,$(COMPILER_NAME))
       endif
     endif
+    CC_STD = -std=c99
   endif
   ifeq (git-repo,$(shell if $(TEST) -d ./.git; then echo git-repo; fi))
     ifeq (need-hooks,$(shell if $(TEST) ! -e ./.git/hooks/post-checkout; then echo need-hooks; fi))
@@ -690,6 +695,7 @@ else
   endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
+  CC_STD = -std=gnu99
   LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (,$(PATH_SEPARATOR))
     PATH_SEPARATOR := ;
@@ -718,11 +724,13 @@ else
     NETWORK_LDFLAGS =
     NETWORK_OPT = -DUSE_SHARED -I../windows-build/winpcap/Wpdpack/include
     NETWORK_FEATURES = - dynamic networking support using windows-build provided libpcap components
+    NETWORK_LAN_FEATURES += PCAP
   else
     ifneq (,$(call find_include,pcap))
       NETWORK_LDFLAGS =
       NETWORK_OPT = -DUSE_SHARED
       NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
+      NETWORK_LAN_FEATURES += PCAP
     endif
   endif
   ifneq (,$(VIDEO_USEFUL))
@@ -898,13 +906,6 @@ ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
 endif
 
-ifeq (HP-UX,$(OSTYPE))
-  CC_STD = -std=gnu99
-else
-  ifeq (,$(SUNC_VERSION))
-    CC_STD = -std=c99
-  endif
-endif
 CC_OUTSPEC = -o $@
 CC := $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -DSIM_COMPILER="$(COMPILER_NAME)" -I . $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS := $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
@@ -1189,6 +1190,7 @@ ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
 	${ALTAIRZ80D}/mfdc.c ${ALTAIRZ80D}/n8vem.c ${ALTAIRZ80D}/vfdhd.c \
 	${ALTAIRZ80D}/s100_disk1a.c ${ALTAIRZ80D}/s100_disk2.c ${ALTAIRZ80D}/s100_disk3.c \
 	${ALTAIRZ80D}/s100_fif.c ${ALTAIRZ80D}/s100_mdriveh.c \
+	${ALTAIRZ80D}/s100_mdsa.c \
 	${ALTAIRZ80D}/s100_mdsad.c ${ALTAIRZ80D}/s100_selchan.c \
 	${ALTAIRZ80D}/s100_ss1.c ${ALTAIRZ80D}/s100_64fdc.c \
 	${ALTAIRZ80D}/s100_scp300f.c \

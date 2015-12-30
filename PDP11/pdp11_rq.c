@@ -754,7 +754,7 @@ static struct ctlrtyp ctlr_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 
-int32 rq_itime = 200;                                   /* init time, except */
+int32 rq_itime = 450;                                   /* init time, except */
 int32 rq_itime4 = 10;                                   /* stage 4 */
 int32 rq_qtime = RQ_QTIME;                              /* queue time */
 int32 rq_xtime = RQ_XTIME;                              /* transfer time */
@@ -793,12 +793,12 @@ typedef struct {
 #define DBG_DAT  0x0020                                 /* display transfer data */
 
 DEBTAB rq_debug[] = {
-  {"TRACE",  DBG_TRC},
-  {"INIT",   DBG_INI},
-  {"REG",    DBG_REG},
-  {"REQ",    DBG_REQ},
-  {"DISK",   DBG_DSK},
-  {"DATA",   DBG_DAT},
+  {"TRACE",  DBG_TRC, "trace routine calls"},
+  {"INIT",   DBG_INI, "display setup/init sequence info"},
+  {"REG",    DBG_REG, "trace read/write registers"},
+  {"REQ",    DBG_REQ, "display transfer requests"},
+  {"DISK",   DBG_DSK, "display sim_disk activities"},
+  {"DATA",   DBG_DAT, "display transfer data"},
   {0}
 };
 
@@ -2130,8 +2130,8 @@ uint32 bc = GETP32 (pkt, RW_WBCL);                      /* byte count */
 uint32 bl = GETP32 (pkt, RW_WBLL);                      /* block addr */
 uint32 ma = GETP32 (pkt, RW_WMPL);                      /* block addr */
 
-sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%ld, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
-           uptr-rq_devmap[cp->cnum]->units, pkt, rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f], bl, bc,
+sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%d, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
+           (int)(uptr-rq_devmap[cp->cnum]->units), pkt, rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f], bl, bc,
            uptr->io_complete ? "bottom" : "top");
 
 if ((cp == NULL) || (pkt == 0))                         /* what??? */

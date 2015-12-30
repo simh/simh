@@ -219,7 +219,7 @@ t_stat txdb_misc_wr (int32 data);
    tti_reg      TTI register list
 */
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), SERIAL_IN_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
     { HRDATAD (RXDB,       tti_buf,         16, "last data item processed") },
@@ -480,7 +480,7 @@ if (tti_csr & CSR_DONE) {                               /* Input pending ? */
     tti_csr = tti_csr & ~CSR_DONE;                      /* clr done */
     tti_buf = tti_buf & BMASK;                          /* clr errors */
     tti_int = 0;
-    sim_activate_abs (&tti_unit, tti_unit.wait);        /* check soon for more input */
+    sim_activate_after_abs (&tti_unit, tti_unit.wait);  /* check soon for more input */
     }
 return t;
 }
@@ -517,8 +517,8 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_clock_coschedule (uptr, KBD_WAIT (uptr->wait, tmr_poll));
-                                                        /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
+
 if ((tti_csr & CSR_DONE) &&                             /* input still pending and < 500ms? */
     ((sim_os_msec () - tti_buftime) < 500))
      return SCPE_OK;

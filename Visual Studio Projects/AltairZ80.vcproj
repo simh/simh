@@ -321,6 +321,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_mdsa.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\s100_mdsad.c"
 				>
 			</File>

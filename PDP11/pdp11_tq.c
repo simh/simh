@@ -1311,8 +1311,8 @@ uint32 ntmk = GETP32 (pkt, POS_TMCL);                   /* #tmk to skp */
 struct tq_req_results *res = (struct tq_req_results *)uptr->results;
 int32 io_complete = res->io_complete;
 
-sim_debug (DBG_TRC, &tq_dev, "tq_svc(unit=%ld, pkt=%d, cmd=%s, mdf=0x%0X, bc=0x%0x, phase=%s)\n",
-           uptr-tq_dev.units, pkt, tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f], mdf, bc,
+sim_debug (DBG_TRC, &tq_dev, "tq_svc(unit=%d, pkt=%d, cmd=%s, mdf=0x%0X, bc=0x%0x, phase=%s)\n",
+           (int)(uptr-tq_dev.units), pkt, tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f], mdf, bc,
            uptr->io_complete ? "bottom" : "top");
 
 res->io_complete = 0;

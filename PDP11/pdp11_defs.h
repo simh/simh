@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   30-Dec-15    RMS     Added NOBVT option
    23-Oct-13    RMS     Added cpu_set_boot prototype
    02-Sep-13    RMS     Added third Massbus adapter and RS drive
    11-Dec-11    RMS     Fixed priority of PIRQ vs IO; added INT_INTERNALn
@@ -174,6 +175,7 @@
 #define OPT_RH11        (1u << 6)                       /* RH11 */
 #define OPT_PAR         (1u << 7)                       /* parity */
 #define OPT_UBM         (1u << 8)                       /* UBM */
+#define OPT_BVT         (1u << 9)                       /* BEVENT */
 
 #define CPUT(x)         ((cpu_type & (x)) != 0)
 #define CPUO(x)         ((cpu_opt & (x)) != 0)

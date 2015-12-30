@@ -340,6 +340,7 @@
 #include "scp.h"
 
 #include <ctype.h>
+#include <math.h>
 
 /* Telnet protocol constants - negatives are for init'ing signed char data */
 
@@ -1503,16 +1504,18 @@ t_stat tmxr_set_config_line (TMLN *lp, const char *config)
 t_stat r;
 
 tmxr_debug_trace_line (lp, "tmxr_set_config_line()");
-if (!lp->modem_control)                             /* This API ONLY works on modem_control enabled multiplexer lines */
-    return SCPE_IERR;
 if (lp->serport)
     r = sim_config_serial (lp->serport, config);
 else {
     lp->serconfig = (char *)realloc (lp->serconfig, 1 + strlen (config));
     strcpy (lp->serconfig, config);
-    r = SCPE_OK;
+    r = tmxr_set_line_speed (lp, lp->serconfig);;
+    if (r != SCPE_OK) {
+        free (lp->serconfig);
+        lp->serconfig = NULL;
+        }
     }
-if (r == SCPE_OK)                                   /* Record port state for proper restore */
+if ((r == SCPE_OK) && (lp->mp) && (lp->mp->uptr))   /* Record port state for proper restore */
     lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
 return r;
 }
@@ -1544,7 +1547,9 @@ t_stat val = 0;
 uint32 tmp;
 
 tmxr_debug_trace_line (lp, "tmxr_getc_ln()");
-if (lp->conn && lp->rcve) {                             /* conn & enb? */
+if ((lp->conn && lp->rcve) &&                           /* conn & enb & */
+    ((!lp->rxbps) ||                                    /* (!rate limited || enough time passed)? */
+     (sim_gtime () >= lp->rxnexttime))) {
     if (!sim_send_poll_data (&lp->send, &val)) {        /* injected input characters available? */
         j = lp->rxbpi - lp->rxbpr;                      /* # input chrs */
         if (j) {                                        /* any? */
@@ -1560,6 +1565,10 @@ if (lp->conn && lp->rcve) {                             /* conn & enb? */
     }                                                   /* end if conn */
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
+if (lp->rxbps) {
+    if (val)
+        lp->rxnexttime = floor (sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor));
+    }
 tmxr_debug_return(lp, val);
 return val;
 }
@@ -1878,9 +1887,20 @@ return;
 
 /* Return count of available characters for line */
 
+int32 tmxr_rqln_bare (TMLN *lp, t_bool speed)
+{
+if ((speed) && (lp->rxbps)) {                   /* consider speed and rate limiting? */
+    if (sim_gtime () < lp->rxnexttime)          /* too soon? */
+        return 0;
+    else
+        return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz : 0)) ? 1 : 0;
+    }
+return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
+}
+
 int32 tmxr_rqln (TMLN *lp)
 {
-return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
+return tmxr_rqln_bare (lp, TRUE);
 }
 
 
@@ -2151,6 +2171,82 @@ if (uptr && uptr->filename) {
 return SCPE_OK;
 }
 
+static int32 _tmln_speed_delta (const char *cptr)
+{
+struct {
+    const char *bps;
+    int32 delta;
+    } *spd, speeds[] = {
+    {"50",      TMLN_SPD_50_BPS},
+    {"75",      TMLN_SPD_75_BPS},
+    {"110",     TMLN_SPD_110_BPS},
+    {"134",     TMLN_SPD_134_BPS},
+    {"150",     TMLN_SPD_150_BPS},
+    {"300",     TMLN_SPD_300_BPS},
+    {"600",     TMLN_SPD_600_BPS},
+    {"1200",    TMLN_SPD_1200_BPS},
+    {"1800",    TMLN_SPD_1800_BPS},
+    {"2000",    TMLN_SPD_2000_BPS},
+    {"2400",    TMLN_SPD_2400_BPS},
+    {"3600",    TMLN_SPD_3600_BPS},
+    {"4800",    TMLN_SPD_4800_BPS},
+    {"7200",    TMLN_SPD_7200_BPS},
+    {"9600",    TMLN_SPD_9600_BPS},
+    {"19200",   TMLN_SPD_19200_BPS},
+    {"38400",   TMLN_SPD_38400_BPS},
+    {"57600",   TMLN_SPD_57600_BPS},
+    {"76800",   TMLN_SPD_76800_BPS},
+    {"115200",  TMLN_SPD_115200_BPS},
+    {"0",       0}};                    /* End of List, last valid value */
+int nspeed;
+char speed[24];
+
+nspeed = (uint32)strtotv (cptr, &cptr, 10);
+if ((*cptr != '\0') && (*cptr != '-') && (*cptr != '*'))
+    return -1;
+sprintf (speed, "%d", nspeed);
+
+spd = speeds;
+while (1) {
+    if (0 == strcmp(spd->bps, speed))
+        return spd->delta;
+    if (spd->delta == 0)
+        break;
+    ++spd;
+    }
+return -1;
+}
+
+t_stat tmxr_set_line_speed (TMLN *lp, const char *speed)
+{
+UNIT *uptr;
+const char *cptr;
+t_stat r;
+
+if (!speed || !*speed)
+    return SCPE_2FARG;
+if (_tmln_speed_delta (speed) < 0)
+    return SCPE_ARG;
+lp->rxbps = (uint32)strtotv (speed, &cptr, 10);
+if (*cptr == '*') {
+    uint32 rxbpsfactor = (uint32) get_uint (cptr+1, 10, 32, &r);
+    if (r != SCPE_OK)
+        return r;
+    lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE * rxbpsfactor;
+    }
+lp->rxdelta = _tmln_speed_delta (speed);
+lp->rxnexttime = 0.0;
+uptr = lp->uptr;
+if ((!uptr) && (lp->mp))
+    uptr = lp->mp->uptr;
+if (uptr)
+    uptr->wait = lp->rxdelta;
+if (lp->rxbpsfactor == 0.0)
+    lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
+return SCPE_OK;
+}
+
+
 /* Open a master listening socket (and all of the other variances of connections).
 
    A listening socket for the port number described by "cptr" is opened for the
@@ -2168,7 +2264,7 @@ t_stat tmxr_open_master (TMXR *mp, char *cptr)
 int32 i, line, nextline = -1;
 char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE], 
      logfiletmpl[CBUFSIZE], buffered[CBUFSIZE], hostport[CBUFSIZE], 
-     port[CBUFSIZE], option[CBUFSIZE];
+     port[CBUFSIZE], option[CBUFSIZE], speed[CBUFSIZE];
 SOCKET sock;
 SERHANDLE serport;
 char *tptr = cptr;
@@ -2182,6 +2278,8 @@ for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     lp = mp->ldsc + i;
     lp->mp = mp;                                /* set the back pointer */
     lp->modem_control = mp->modem_control;
+    if (lp->rxbpsfactor == 0.0)
+        lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
     }
 tmxr_debug_trace (mp, "tmxr_open_master()");
 while (*tptr) {
@@ -2192,6 +2290,7 @@ while (*tptr) {
     memset(buffered,    '\0', sizeof(buffered));
     memset(port,        '\0', sizeof(port));
     memset(option,      '\0', sizeof(option));
+    memset(speed,       '\0', sizeof(speed));
     nolog = notelnet = listennotelnet = loopback = FALSE;
     datagram = mp->datagram;
     packet = mp->packet;
@@ -2288,6 +2387,13 @@ while (*tptr) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
                 strcpy (destination, cptr);
+                continue;
+                }
+            if (0 == MATCH_CMD (gbuf, "SPEED")) {
+                if ((NULL == cptr) || ('\0' == *cptr) || 
+                    (_tmln_speed_delta (cptr) < 0))
+                    return SCPE_ARG;
+                strcpy (speed, cptr);
                 continue;
                 }
             cptr = get_glyph (gbuf, port, ';');
@@ -2442,6 +2548,10 @@ while (*tptr) {
                     free (lp->serconfig);
                     lp->serconfig = NULL;
                     }
+                else {
+                    if (speed[0])
+                        tmxr_set_line_speed (lp, speed);
+                    }
                 tmxr_init_line (lp);                        /* initialize line state */
                 lp->sock = 0;                               /* clear the socket */
                 }
@@ -2453,6 +2563,8 @@ while (*tptr) {
             for (i = 0; i < mp->lines; i++) {
                 lp = mp->ldsc + i;
                 tmxr_set_line_loopback (lp, loopback);
+                if (speed[0])
+                    tmxr_set_line_speed (lp, speed);
                 }
             }
         if (destination[0]) {
@@ -2509,6 +2621,8 @@ while (*tptr) {
                         sim_close_sock (sock);
                     lp->notelnet = notelnet;
                     tmxr_init_line (lp);                    /* init the line state */
+                    if (speed[0] && (!datagram))
+                        tmxr_set_line_speed (lp, speed);
                     return SCPE_OK;
                     }
                 else
@@ -2624,6 +2738,8 @@ while (*tptr) {
             sim_printf ("Line %d operating in loopback mode\n", line);
             }
         lp->modem_control = modem_control;
+        if (speed[0] && (!datagram) && (!lp->serport))
+            tmxr_set_line_speed (lp, speed);
         r = SCPE_OK;
         }
     }
@@ -3401,6 +3517,7 @@ if (r != SCPE_OK)                                       /* error? */
 mp->uptr = uptr;                                        /* save unit for polling */
 uptr->filename = tmxr_mux_attach_string (uptr->filename, mp);/* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
+uptr->tmxr = (void *)mp;
 if ((mp->lines > 1) ||
     ((mp->master == 0) &&
      (mp->ldsc[0].connecting == 0) &&
@@ -3475,6 +3592,14 @@ else {
         free (attach);
         tmxr_show_summ(st, NULL, 0, mp);
         fprintf(st, ", sessions=%d", mp->sessions);
+        if (mp->lines == 1) {
+            if (mp->ldsc->rxbps) {
+                fprintf(st, ", Speed=%d", mp->ldsc->rxbps);
+                if (mp->ldsc->rxbpsfactor != TMXR_RX_BPS_UNIT_SCALE)
+                    fprintf(st, "*%.0f", mp->ldsc->rxbpsfactor/TMXR_RX_BPS_UNIT_SCALE);
+                fprintf(st, " bps");
+                }
+            }
         fprintf(st, "\n");
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
@@ -3490,6 +3615,12 @@ else {
                     fprintf(st, ", ModemControl=%s", lp->modem_control ? "enabled" : "disabled");
                 if (lp->loopback)
                     fprintf(st, ", Loopback");
+                if (lp->rxbps) {
+                    fprintf(st, ", Speed=%d", lp->rxbps);
+                    if (lp->rxbpsfactor != TMXR_RX_BPS_UNIT_SCALE)
+                        fprintf(st, "*%.0f", lp->rxbpsfactor/TMXR_RX_BPS_UNIT_SCALE);
+                    fprintf(st, " bps");
+                    }
                 fprintf (st, "\n");
                 }
             if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master)) {
@@ -3585,6 +3716,7 @@ if (!(uptr->flags & UNIT_ATT))                          /* attached? */
 tmxr_close_master (mp);                                 /* close master socket */
 free (uptr->filename);                                  /* free setup string */
 uptr->filename = NULL;
+uptr->tmxr = NULL;
 mp->last_poll_time = 0;
 for (i=0; i < mp->lines; i++) {
     UNIT *uptr = mp->ldsc[i].uptr ? mp->ldsc[i].uptr : mp->uptr;
@@ -3612,7 +3744,7 @@ return _sim_activate (uptr, interval);
 #endif
 }
 
-t_stat tmxr_activate_after (UNIT *uptr, int32 usecs_walltime)
+t_stat tmxr_activate_after (UNIT *uptr, uint32 usecs_walltime)
 {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
@@ -3625,13 +3757,37 @@ return _sim_activate_after (uptr, usecs_walltime);
 #endif
 }
 
+t_stat tmxr_activate_after_abs (UNIT *uptr, uint32 usecs_walltime)
+{
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
+    (!sim_asynch_enabled)) {
+    return _sim_activate_after_abs (uptr, usecs_walltime);
+    }
+return SCPE_OK;
+#else
+return _sim_activate_after_abs (uptr, usecs_walltime);
+#endif
+}
+
+
 t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval)
 {
 return tmxr_clock_coschedule_tmr (uptr, 0, interval);
 }
 
+t_stat tmxr_clock_coschedule_abs (UNIT *uptr, int32 interval)
+{
+sim_cancel (uptr);
+return tmxr_clock_coschedule_tmr (uptr, 0, interval);
+}
+
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
+
 t_stat tmxr_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
 {
+TMXR *mp = (TMXR *)uptr->tmxr;
+
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
@@ -3639,8 +3795,40 @@ if ((!(uptr->dynflags & UNIT_TM_POLL)) ||
     }
 return SCPE_OK;
 #else
+if (mp) {
+    int32 i, soon = interval;
+    double sim_gtime_now = sim_gtime ();
+
+    for (i = 0; i < mp->lines; i++) {
+        TMLN *lp = &mp->ldsc[i];
+
+        if (tmxr_rqln_bare (lp, FALSE)) {
+            int32 due;
+
+            if (lp->rxbps)
+                if (lp->rxnexttime > sim_gtime_now)
+                    due = (int32)(lp->rxnexttime - sim_gtime_now);
+                else
+                    due = sim_processing_event ? 1 : 0;     /* avoid potential infinite loop if called from service routine */
+            else
+                due = (int32)((uptr->wait * sim_timer_inst_per_sec ())/TMXR_RX_BPS_UNIT_SCALE);
+            soon = MIN(soon, due);
+            }
+        }
+    if (soon != interval) {
+        sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %d instructions\n", sim_uname (uptr), soon);
+        return _sim_activate (uptr, soon);
+        }
+    }
+sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after interval %d instructions\n", sim_uname (uptr), interval);
 return sim_clock_coschedule_tmr (uptr, tmr, interval);
 #endif
+}
+
+t_stat tmxr_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 interval)
+{
+sim_cancel (uptr);
+return tmxr_clock_coschedule_tmr (uptr, tmr, interval);
 }
 
 /* Generic Multiplexer attach help */
@@ -3731,6 +3919,38 @@ else {
     if (mux)
         fprintf (st, "Valid line numbers are from 0 thru %d\n\n", mux->lines-1);
     }
+if (single_line) {          /* Single Line Multiplexer */
+    fprintf (st, "The input data rate for the %s device can be controlled by\n", dptr->name);
+    fprintf (st, "specifying SPEED=nnn on the the ATTACH command.\n");
+    }
+else {
+    fprintf (st, "The input data rate for all lines or a particular line of a the %s\n", dptr->name);
+    fprintf (st, "device can be controlled by specifying SPEED=nnn on the the ATTACH command.\n");
+    }
+fprintf (st, "SPEED values can be any one of:\n\n");
+fprintf (st, "    0 50 75 110 134 150 300 600 1200 1800 2000 2400\n");
+fprintf (st, "    3600 4800 7200 9600 19200 38400 57600 76800 115200\n\n");
+fprintf (st, "A SPEED value of 0 causes input data to be delivered to the simulated\n");
+fprintf (st, "port as fast as it arrives.\n\n");
+fprintf (st, "If a simulated multiplexor devices can programmatically set a serial\n");
+fprintf (st, "port line speed, the programmatically specified speed will take precidence\n");
+fprintf (st, "over any input speed specified on an attach command.\n");
+fprintf (st, "Some simulated systems run very much faster than the original system\n");
+fprintf (st, "which is being simulated.  To accomodate this, the speed specified may\n");
+fprintf (st, "include a factor which will increase the input data delivery rate by\n");
+fprintf (st, "the specified facctor.  A factor is specified with a speed value of the\n");
+fprintf (st, "form \"speed*factor\".  Factor values can range from 1 thru 32.\n");
+fprintf (st, "Example:\n\n");
+fprintf (st, "   sim> ATTACH %s 1234,SPEED=2400\n", dptr->name);
+fprintf (st, "   sim> ATTACH %s 1234,SPEED=9600*8\n", dptr->name);
+if (!single_line)
+    fprintf (st, "   sim> ATTACH %s Line=2,SPEED=2400\n", dptr->name);
+fprintf (st, "\n");
+fprintf (st, "The SPEED parameter only influences the rate at which data is deliverd\n");
+fprintf (st, "into the simulated multiplexor port.  Output data rates are unaffected\n");
+fprintf (st, "If an attach command specifies a speed multiply factor, that value will\n");
+fprintf (st, "persist independent of any programatic action by the simulated system to\n");
+fprintf (st, "change the port speed.\n\n");
 fprintf (st, "An optional serial port configuration string may be present after the port\n");
 fprintf (st, "name.  If present, it must be separated from the port name with a semicolon\n");
 fprintf (st, "and has this form:\n\n");

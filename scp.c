@@ -471,6 +471,7 @@ DEVICE **sim_internal_devices = NULL;
 uint32 sim_internal_device_count = 0;
 int32 sim_opt_out = 0;
 int32 sim_is_running = 0;
+t_bool sim_processing_event = FALSE;
 uint32 sim_brk_summ = 0;
 uint32 sim_brk_types = 0;
 uint32 sim_brk_dflt = 0;
@@ -2298,10 +2299,14 @@ if (dptr->flags & DEV_DEBUG) {
     sprintf (buf, "set %s NODEBUG", sim_dname (dptr));
     fprintf (st,  "%-30s\tDisables debugging for device %s\n", buf, sim_dname (dptr));
     if (dptr->debflags) {
+        t_bool desc_available = FALSE;
+
         strcpy (buf, "");
         fprintf (st, "set %s DEBUG=", sim_dname (dptr));
-        for (dep = dptr->debflags; dep->name != NULL; dep++)
+        for (dep = dptr->debflags; dep->name != NULL; dep++) {
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
+            desc_available |= ((dep->desc != NULL) && (dep->desc[0] != '\0'));
+            }
         fprintf (st, "\n");
         fprintf (st,  "%-30s\tEnables specific debugging for device %s\n", buf, sim_dname (dptr));
         fprintf (st, "set %s NODEBUG=", sim_dname (dptr));
@@ -2309,6 +2314,11 @@ if (dptr->flags & DEV_DEBUG) {
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
         fprintf (st, "\n");
         fprintf (st,  "%-30s\tDisables specific debugging for device %s\n", buf, sim_dname (dptr));
+        if (desc_available) {
+            fprintf (st, "\n*%s device DEBUG settings:\n", sim_dname (dptr));
+            for (dep = dptr->debflags; dep->name != NULL; dep++)
+                fprintf (st, "%4s%-12s%s\n", "", dep->name, dep->desc ? dep->desc : "");
+            }
         }
     }
 if ((dptr->modifiers) && (dptr->units) && (dptr->numunits != 1)) {
@@ -4276,14 +4286,15 @@ if (vdelt)
 fprintf (st, " %s", SIM_VERSION_MODE);
 #endif
 if (flag) {
-    uint32 idle_capable, os_tick_size;
+    t_bool idle_capable;
+    uint32 os_ms_sleep_1, os_tick_size;
 
     fprintf (st, "\n\tSimulator Framework Capabilities:");
     fprintf (st, "\n\t\t%s", sim_si64);
     fprintf (st, "\n\t\t%s", sim_sa64);
     fprintf (st, "\n\t\t%s", eth_capabilities());
-    idle_capable = sim_timer_idle_capable (&os_tick_size);
-    fprintf (st, "\n\t\tIdle/Throttling support is %savailable", ((idle_capable == 0) ? "NOT " : ""));
+    idle_capable = sim_timer_idle_capable (&os_ms_sleep_1, &os_tick_size);
+    fprintf (st, "\n\t\tIdle/Throttling support is %savailable", idle_capable ? "" : "NOT ");
     if (sim_disk_vhd_support())
         fprintf (st, "\n\t\tVirtual Hard Disk (VHD) support");
     if (sim_disk_raw_support())
@@ -4332,7 +4343,8 @@ if (flag) {
 #else
     fprintf (st, "\n\t\tNo RegEx support for EXPECT commands");
 #endif
-    fprintf (st, "\n\t\tOS clock tick size (time taken by msleep(1)): %dms", os_tick_size);
+    fprintf (st, "\n\t\tOS clock resolution: %dms", os_tick_size);
+    fprintf (st, "\n\t\tTime taken by msleep(1): %dms", os_ms_sleep_1);
 #if defined(__VMS)
     if (1) {
         char *arch = 
@@ -7189,6 +7201,10 @@ t_stat get_yn (const char *ques, t_stat deflt)
 {
 char cbuf[CBUFSIZE], *cptr;
 
+if (sim_switches & SWMASK ('Y'))
+    return TRUE;
+if (sim_switches & SWMASK ('N'))
+    return FALSE;
 if (sim_rem_cmd_active_line != -1)
     return deflt;
 cptr = read_line_p (ques, cbuf, sizeof(cbuf), stdin);
@@ -8316,6 +8332,7 @@ if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Empty New Interval = %d\n", sim_interval);
     return SCPE_OK;
     }
+sim_processing_event = TRUE;
 do {
     uptr = sim_clock_queue;                             /* get first */
     sim_clock_queue = uptr->next;                       /* remove first */
@@ -8346,6 +8363,7 @@ else
 
 if ((reason == SCPE_OK) && stop_cpu)
     reason = SCPE_STOP;
+sim_processing_event = FALSE;
 return reason;
 }
 
@@ -8447,12 +8465,24 @@ else
         reason  =       result (SCPE_OK if ok)
 */
 
-t_stat sim_activate_after (UNIT *uptr, int32 event_time)
+t_stat sim_activate_after_abs (UNIT *uptr, uint32 event_time)
 {
+return _sim_activate_after_abs (uptr, event_time);
+}
+
+t_stat _sim_activate_after_abs (UNIT *uptr, uint32 event_time)
+{
+AIO_ACTIVATE (_sim_activate_after_abs, uptr, event_time);
+sim_cancel (uptr);
 return _sim_activate_after (uptr, event_time);
 }
 
-t_stat _sim_activate_after (UNIT *uptr, int32 usec_delay)
+t_stat sim_activate_after (UNIT *uptr, uint32 usec_delay)
+{
+return _sim_activate_after (uptr, usec_delay);
+}
+
+t_stat _sim_activate_after (UNIT *uptr, uint32 usec_delay)
 {
 if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
@@ -9970,8 +10000,8 @@ return ret;
  *
  * Device help can be presented hierarchically by calling
  *
- * t_stat scp_help (FILE *st, struct sim_device *dptr,
- *                  struct sim_unit *uptr, int flag, const char *help, char *cptr)
+ * t_stat scp_help (FILE *st, DEVICE *dptr,
+ *                  UNIT *uptr, int flag, const char *help, char *cptr)
  *
  * or one of its three cousins from the device HELP routine.
  *
@@ -10053,8 +10083,8 @@ return;
 /* Build a help tree from a string.
  * Handles substitutions, formatting.
  */
-static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
-                         struct sim_unit *uptr, const char *htext, va_list ap)
+static TOPIC *buildHelp (TOPIC *topic, DEVICE *dptr,
+                         UNIT *uptr, const char *htext, va_list ap)
 {
 char *end;
 size_t n, ilvl;
@@ -10338,7 +10368,7 @@ free (prefix);
 return newp;
 }
 
-static void displayMagicTopic (FILE *st, struct sim_device *dptr, TOPIC *topic)
+static void displayMagicTopic (FILE *st, DEVICE *dptr, TOPIC *topic)
 {
 char tbuf[CBUFSIZE];
 size_t i, skiplines;
@@ -10404,8 +10434,8 @@ return;
 /* Flatten and display help for those who say they prefer it.
  */
 
-static t_stat displayFlatHelp (FILE *st, struct sim_device *dptr,
-                               struct sim_unit *uptr, int32 flag,
+static t_stat displayFlatHelp (FILE *st, DEVICE *dptr,
+                               UNIT *uptr, int32 flag,
                                TOPIC *topic, va_list ap )
 {
 size_t i;
@@ -10468,8 +10498,8 @@ return match;
  * Takes a va_list
  */
 
-t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
-                  struct sim_unit *uptr, int32 flag,
+t_stat scp_vhelp (FILE *st, DEVICE *dptr,
+                  UNIT *uptr, int32 flag,
                   const char *help, const char *cptr, va_list ap)
 {
 
@@ -10701,8 +10731,8 @@ return SCPE_OK;
 /* variable argument list shell - most commonly used
  */
 
-t_stat scp_help (FILE *st, struct sim_device *dptr,
-                 struct sim_unit *uptr, int32 flag,
+t_stat scp_help (FILE *st, DEVICE *dptr,
+                 UNIT *uptr, int32 flag,
                  const char *help, const char *cptr, ...)
 {
 t_stat r;
@@ -10723,8 +10753,8 @@ return r;
  * be found.
  */
 
-t_stat scp_vhelpFromFile (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag,
+t_stat scp_vhelpFromFile (FILE *st, DEVICE *dptr,
+                          UNIT *uptr, int32 flag,
                           const char *helpfile,
                           const char *cptr, va_list ap)
 {
@@ -10820,8 +10850,8 @@ free (help);
 return r;
 }
 
-t_stat scp_helpFromFile (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag,
+t_stat scp_helpFromFile (FILE *st, DEVICE *dptr,
+                         UNIT *uptr, int32 flag,
                          const char *helpfile, const char *cptr, ...)
 {
 t_stat r;

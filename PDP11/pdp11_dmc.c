@@ -971,16 +971,16 @@ void dmc_queue_control_out (CTLR *controller, uint16 sel6);
 
 
 DEBTAB dmc_debug[] = {
-    {"TRACE",   DBG_TRC},
-    {"WARN",    DBG_WRN},
-    {"REG",     DBG_REG},
-    {"INTREG",  DBG_RGC},
-    {"INFO",    DBG_INF},
-    {"DATA",    DBG_DAT},
-    {"DATASUM", DBG_DTS},
-    {"MODEM",   DBG_MDM},
-    {"CONNECT", DBG_CON},
-    {"INT",     DBG_INT},
+    {"TRACE",   DBG_TRC, "trace routine calls"},
+    {"WARN",    DBG_WRN, "warnings"},
+    {"REG",     DBG_REG, "read/write registers"},
+    {"INTREG",  DBG_RGC, "internal read/write registers changes"},
+    {"INFO",    DBG_INF, "informational messages (high level trace)"},
+    {"DATA",    DBG_DAT, "data buffer contents"},
+    {"DATASUM", DBG_DTS, "data summary"},
+    {"MODEM",   DBG_MDM, "modem related transitions"},
+    {"CONNECT", DBG_CON, "connection establishment"},
+    {"INT",     DBG_INT, "interrupt activites"},
     {0}
     };
 

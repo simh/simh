@@ -155,7 +155,9 @@ if "%_X_LIBSDL%" == "" goto _done_libsdl
 if not exist ../../windows-build/libSDL/SDL2-2.0.3/include/SDL.h goto _notice2
 if not exist "..\..\windows-build\libpng-1.6.18\projects\vstudio\Release Library\*" goto _notice2
 if not exist "../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)/Lib/x86/dxguid.lib" goto _notice2
-findstr "/c:HAVE_FTOL2_SSE" ..\..\windows-build\libSDL\SDL2-2.0.3\VisualC\SDL_Static\SDL_VS2008.vcproj >NUL
+findstr "/c:LIBSDL_FTOL2_SSE" ..\..\windows-build\Windows-Build_Versions.txt >NUL
+if ERRORLEVEL 1 goto _notice2
+findstr "/c:LIBSDL_ALLMUL" ..\..\windows-build\Windows-Build_Versions.txt >NUL
 if ERRORLEVEL 1 goto _notice2
 :_done_libsdl
 if "%_X_LIBPCRE%" == "" goto _done_libpcre
