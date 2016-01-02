@@ -165,7 +165,7 @@ static t_stat sim_set_delay (int32 flag, char *cptr);
 
 int32 sim_int_char = 005;                               /* interrupt character */
 int32 sim_brk_char = 000;                               /* break character */
-int32 sim_tt_pchar = 0x080027A0;
+int32 sim_tt_pchar = 0x00002780;
 #if defined (_WIN32) || defined (__OS2__) || (defined (__MWERKS__) && defined (macintosh))
 int32 sim_del_char = '\b';                              /* delete character */
 #else
@@ -1324,14 +1324,14 @@ if (sim_devices[0]->dradix == 16)
 else fprintf (st, "pchar mask = %o", sim_tt_pchar);
 if (sim_tt_pchar) {
     static char *pchars[] = {"NUL(^@)", "SOH(^A)", "STX(^B)", "ETX(^C)", "EOT(^D)", "ENQ(^E)", "ACK(^F)", "BEL(^G)", 
-                             "BS(^H)" , "TAB(^I)", "LF(^J)",  "VT(^K)",  "FF(^L)",  "CR(^M)",  "SO(^N)",  "SI(^O)",
+                             "BS(^H)" , "HT(^I)",  "LF(^J)",  "VT(^K)",  "FF(^L)",  "CR(^M)",  "SO(^N)",  "SI(^O)",
                              "DLE(^P)", "DC1(^Q)", "DC2(^R)", "DC3(^S)", "DC4(^T)", "NAK(^U)", "SYN(^V)", "ETB(^W)",
                              "CAN(^X)", "EM(^Y)",  "SUB(^Z)", "ESC",     "FS",      "GS",      "RS",      "US"};
     int i;
     t_bool found = FALSE;
 
     fprintf (st, " {");
-    for (i=0; i<32; i++)
+    for (i=31; i>=0; i--)
         if (sim_tt_pchar & (1 << i)) {
             fprintf (st, "%s%s", found ? "," : "", pchars[i]);
             found = TRUE;

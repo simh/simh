@@ -3038,6 +3038,7 @@ if (M == NULL) {                    /* First time init */
     M = (uint16 *) calloc (MEMSIZE >> 1, sizeof (uint16));
     if (M == NULL)
         return SCPE_MEM;
+    sim_set_pchar (0, "01000023640"); /* ESC, CR, LF, TAB, BS, BEL, ENQ */
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
     sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
     auto_config(NULL, 0);           /* do an initial auto configure */
