@@ -1030,6 +1030,12 @@ static const char simh_help[] =
       "5-N\n"
       " The -N switch causes a new/empty file to be written to.  The default\n"
       " is to append to an existing debug log file.\n"
+      "5-D\n"
+      " The -D switch causes data blob output to also display the data as\n"
+      " RADIX-50 characters.\n"
+      "5-E\n"
+      " The -E switch causes data blob output to also display the data as\n"
+      " EBCDIC characters.\n"
 #define HLP_SET_BREAK  "*Commands SET Breakpoints"
       "3Breakpoints\n"
       "+set break <list>            set breakpoints\n"
@@ -9948,9 +9954,44 @@ void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *pos
 if (sim_deb && (dptr->dctrl & reason)) {
     sim_debug (reason, dptr, "%s %s %slen: %08X\n", sim_uname(uptr), txt, position, (unsigned int)len);
     if (data && len) {
-        unsigned int i, same, group, sidx, oidx;
-        char outbuf[80], strbuf[18];
+        unsigned int i, same, group, sidx, oidx, ridx, eidx, soff;
+        char outbuf[80], strbuf[28], rad50buf[36], ebcdicbuf[32];
         static char hex[] = "0123456789ABCDEF";
+        static char rad50[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ$._0123456789";
+        static char ebcdic2ascii[] = {
+            0000,0001,0002,0003,0234,0011,0206,0177,
+            0227,0215,0216,0013,0014,0015,0016,0017,
+            0020,0021,0022,0023,0235,0205,0010,0207,
+            0030,0031,0222,0217,0034,0035,0036,0037,
+            0200,0201,0202,0203,0204,0012,0027,0033,
+            0210,0211,0212,0213,0214,0005,0006,0007,
+            0220,0221,0026,0223,0224,0225,0226,0004,
+            0230,0231,0232,0233,0024,0025,0236,0032,
+            0040,0240,0241,0242,0243,0244,0245,0246,
+            0247,0250,0133,0056,0074,0050,0053,0041,
+            0046,0251,0252,0253,0254,0255,0256,0257,
+            0260,0261,0135,0044,0052,0051,0073,0136,
+            0055,0057,0262,0263,0264,0265,0266,0267,
+            0270,0271,0174,0054,0045,0137,0076,0077,
+            0272,0273,0274,0275,0276,0277,0300,0301,
+            0302,0140,0072,0043,0100,0047,0075,0042,
+            0303,0141,0142,0143,0144,0145,0146,0147,
+            0150,0151,0304,0305,0306,0307,0310,0311,
+            0312,0152,0153,0154,0155,0156,0157,0160,
+            0161,0162,0313,0314,0315,0316,0317,0320,
+            0321,0176,0163,0164,0165,0166,0167,0170,
+            0171,0172,0322,0323,0324,0325,0326,0327,
+            0330,0331,0332,0333,0334,0335,0336,0337,
+            0340,0341,0342,0343,0344,0345,0346,0347,
+            0173,0101,0102,0103,0104,0105,0106,0107,
+            0110,0111,0350,0351,0352,0353,0354,0355,
+            0175,0112,0113,0114,0115,0116,0117,0120,
+            0121,0122,0356,0357,0360,0361,0362,0363,
+            0134,0237,0123,0124,0125,0126,0127,0130,
+            0131,0132,0364,0365,0366,0367,0370,0371,
+            0060,0061,0062,0063,0064,0065,0066,0067,
+            0070,0071,0372,0373,0374,0375,0376,0377,
+            };
 
         for (i=same=0; i<len; i += 16) {
             if ((i > 0) && (0 == memcmp (&data[i], &data[i-16], 16))) {
@@ -9962,18 +10003,46 @@ if (sim_deb && (dptr->dctrl & reason)) {
                 same = 0;
                 }
             group = (((len - i) > 16) ? 16 : (len - i));
+            strcpy (ebcdicbuf, (sim_deb_switches & SWMASK ('E')) ? " EBCDIC:" : "");
+            eidx = strlen(ebcdicbuf);
+            strcpy (rad50buf, (sim_deb_switches & SWMASK ('D')) ? " RAD50:" : "");
+            ridx = strlen(rad50buf);
+            strcpy (strbuf, (sim_deb_switches & (SWMASK ('E') | SWMASK ('D'))) ? "ASCII:" : "");
+            soff = strlen(strbuf);
             for (sidx=oidx=0; sidx<group; ++sidx) {
                 outbuf[oidx++] = ' ';
                 outbuf[oidx++] = hex[(data[i+sidx]>>4)&0xf];
                 outbuf[oidx++] = hex[data[i+sidx]&0xf];
                 if (sim_isprint (data[i+sidx]))
-                    strbuf[sidx] = data[i+sidx];
+                    strbuf[soff+sidx] = data[i+sidx];
                 else
-                    strbuf[sidx] = '.';
+                    strbuf[soff+sidx] = '.';
+                if (ridx && ((sidx&1) == 0)) {
+                    uint16 word = data[i+sidx] + (((uint16)data[i+sidx+1]) << 8);
+
+                    if (word >= 64000) {
+                        rad50buf[ridx++] = '|'; /* Invalid RAD-50 character */
+                        rad50buf[ridx++] = '|'; /* Invalid RAD-50 character */
+                        rad50buf[ridx++] = '|'; /* Invalid RAD-50 character */
+                        }
+                    else {
+                        rad50buf[ridx++] = rad50[word/1600];
+                        rad50buf[ridx++] = rad50[(word/40)%40];
+                        rad50buf[ridx++] = rad50[word%40];
+                        }
+                    }
+                if (eidx) {
+                    if (sim_isprint (ebcdic2ascii[data[i+sidx]]))
+                        ebcdicbuf[eidx++] = ebcdic2ascii[data[i+sidx]];
+                    else
+                        ebcdicbuf[eidx++] = '.';
+                    }
                 }
             outbuf[oidx] = '\0';
-            strbuf[sidx] = '\0';
-            sim_debug (reason, dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
+            strbuf[soff+sidx] = '\0';
+            ebcdicbuf[eidx] = '\0';
+            rad50buf[ridx] = '\0';
+            sim_debug (reason, dptr, "%04X%-48s %s%s%s\n", i, outbuf, strbuf, ebcdicbuf, rad50buf);
             }
         if (same > 0) {
             sim_debug (reason, dptr, "%04X thru %04X same as above\n", i-(16*same), (unsigned int)(len-1));
