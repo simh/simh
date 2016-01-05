@@ -884,7 +884,7 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         for (k=jdis=0; k<j; k++) {
             DEVICE *kdptr = find_dev (autp->dnam[k]);
             
-            if (kdptr->flags & DEV_DIS)
+            if ((kdptr == NULL) || (kdptr->flags & DEV_DIS))
                 ++jdis;
             }
         if (autp->fixa[j-jdis])                         /* fixed csr avail? */
