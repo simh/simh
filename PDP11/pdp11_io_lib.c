@@ -832,7 +832,7 @@ extern UNIT cpu_unit;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
-uint32 j, vmask, amask;
+uint32 j, k, jdis, vmask, amask;
 
 if (autcon_enb == 0)                                    /* enabled? */
     return SCPE_OK;
@@ -879,16 +879,24 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
             return SCPE_IERR;
         ilvl = dibp->vloc / 32;
         ibit = dibp->vloc % 32;
-        if (autp->fixa[j])                              /* fixed csr avail? */
-            dibp->ba = IOPAGEBASE + autp->fixa[j];      /* use it */
+        /* Identify how many devices earlier in the device list are 
+           disabled and use that info to determine fixed address assignments */
+        for (k=jdis=0; k<j; k++) {
+            DEVICE *kdptr = find_dev (autp->dnam[k]);
+            
+            if (kdptr->flags & DEV_DIS)
+                ++jdis;
+            }
+        if (autp->fixa[j-jdis])                         /* fixed csr avail? */
+            dibp->ba = IOPAGEBASE + autp->fixa[j-jdis]; /* use it */
         else {                                          /* no fixed left */
             dibp->ba = csr;                             /* set CSR */
             csr += (autp->numc * autp->amod);           /* next CSR */
             }                                           /* end else */
         if (autp->numv) {                               /* vec needed? */
-            if (autp->fixv[j]) {                        /* fixed vec avail? */
+            if (autp->fixv[j-jdis]) {                   /* fixed vec avail? */
                 if (autp->numv > 0)
-                    dibp->vec = autp->fixv[j];          /* use it */
+                    dibp->vec = autp->fixv[j-jdis];     /* use it */
                 }
             else {                                      /* no fixed left */
                 uint32 numv = abs (autp->numv);         /* get num vec */

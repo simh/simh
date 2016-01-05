@@ -1084,7 +1084,7 @@ t_stat ts_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-r = sim_tape_attach (uptr, cptr);                       /* attach unit */
+r = sim_tape_attach_ex (uptr, cptr, DBG_TAP, 0);        /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
     return r;
 tssr = tssr & ~TSSR_OFL;                                /* clr offline */
