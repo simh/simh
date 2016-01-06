@@ -1358,6 +1358,21 @@ static t_stat td_reset (DEVICE *dptr)
 {
 CTLR *ctlr;
 int ctl;
+static t_bool td_enabled_reset = FALSE;
+
+if (dptr->flags & DEV_DIS)
+    td_enabled_reset = FALSE;
+else {
+    /* When the TDC device is just being enabled, */
+    if (!td_enabled_reset) {
+        char num[16];
+
+        td_enabled_reset = TRUE;
+        /* make sure to bound the number of DLI devices */
+        sprintf (num, "%d", td_ctrls);
+        td_set_ctrls (dptr->units, 0, num, NULL);
+        }
+    }
 
 sim_debug (TDDEB_INT, dptr, "td_reset()\n");
 for (ctl=0; ctl<TD_NUMCTLR; ctl++) {
@@ -1396,11 +1411,12 @@ static t_stat td_set_ctrls (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 newln, i;
 t_stat r;
+DEVICE *dli_dptr = find_dev ("DLI");
 
 if (cptr == NULL)
     return SCPE_ARG;
 newln = (int32)get_uint (cptr, 10, TD_NUMCTLR, &r);
-if ((r != SCPE_OK) || (newln == td_ctrls))
+if (r != SCPE_OK)
     return r;
 if (newln == 0)
     return SCPE_ARG;
@@ -1412,6 +1428,16 @@ if (newln < td_ctrls) {
     }
 td_ctrls = newln;
 td_dib.lnt = td_ctrls * td_dib.ulnt;            /* upd IO page lnt */
+/* Make sure that the number of TU58 controllers plus DL devices is 16 or less */
+if ((dli_dptr != NULL) && !(dli_dptr->flags & DEV_DIS) && 
+    ((((DIB *)dli_dptr->ctxt)->numc + td_ctrls) > 16)) {
+    dli_dptr->flags |= DEV_DIS;
+    dli_dptr->reset (dli_dptr);
+    if (td_ctrls < 16) {
+        dli_dptr->flags &= ~DEV_DIS;
+        dli_dptr->reset (dli_dptr);
+        }
+    }
 return td_reset (&tdc_dev);
 }
 
