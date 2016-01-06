@@ -551,15 +551,15 @@ return SCPE_OK;
 
 /* Autoconfiguration
 
-   The table reflects the MicroVAX 3900 microcode, with one field addition - the
-   number of controllers field handles devices where multiple instances
-   are simulated through a single DEVICE structure (e.g., DZ, VH, DL, DC).
+   The table reflects the MicroVAX 3900 microcode, with one field 
+   addition:
+      a valid flag marking the end of the list when the value is -1
 
-   The table has been reviewed, extended and updated to reflect the contents of
-   the auto configure table in VMS sysgen (V5.5-2)
+   The table has been reviewed, extended and updated to reflect the 
+   contents of the auto configure table in VMS sysgen (V5.5-2)
 
-   A minus number of vectors indicates a field that should be calculated
-   but not placed in the DIB (RQ, TQ dynamic vectors)
+   A minus number of vectors indicates a field that should be 
+   calculated but not placed in the DIB (RQ, TQ dynamic vectors)
 
    An amod value of 0 indicates that all addresses are FIXED
    An vmod value of 0 indicates that all vectors are FIXED */
@@ -567,7 +567,7 @@ return SCPE_OK;
 
 typedef struct {
     const char  *dnam[AUTO_MAXC];
-    int32       numc;
+    int32       valid;
     int32       numv;
     uint32      amod;
     uint32      vmod;
@@ -624,11 +624,6 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
          014240, 014250, 014260, 014270,
          014300, 014310, 014320, 014330, 
          014340, 014350, 014360, 014370} },             /* DC11 - fx CSRs */
-    { { "TDC" },          1,  2,  0, 8, 
-        {016500, 016510, 016520, 016530, 
-         016540, 016550, 016560, 016570,
-         016600, 016610, 016620, 016630,
-         016640, 016650, 016660, 016670} },             /* TU58 - fx CSRs */
     { { NULL },          1,  1,  0, 4, 
         {015200, 015210, 015220, 015230, 
          015240, 015250, 015260, 015270,
@@ -652,11 +647,11 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
          017430, 017432, 017434, 017436} },             /* DT11 - fx CSRs */
     { { NULL },          1,  2,  0, 8,
       {016200, 016240} },                               /* DX11 */
-    { { "DLI" },         1,  2,  0, 8, 
+    { { "TDC", "DLI" },  1,  2,  0, 8, 
         {016500, 016510, 016520, 016530,
          016540, 016550, 016560, 016570,
          016600, 016610, 016620, 016630,
-         016740, 016750, 016760, 016770} },             /* KL11/DL11/DLV11 - fx CSRs */
+         016740, 016750, 016760, 016770} },             /* KL11/DL11/DLV11/TU58 - fx CSRs */
     { { NULL },          1,  2,  0, 8, { 0 } },         /* DLV11J - fx CSRs */
     { { NULL },          1,  2,  8, 8 },                /* DJ11 */
     { { NULL },          1,  2, 16, 8 },                /* DH11 */
@@ -773,7 +768,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  2,  4, 8 },                /* DTC05, DECvoice */
     { { NULL },          1,  2,  8, 8 },                /* KWV32 (DSV11) */
     { { NULL },          1,  1, 64, 4 },                /* QZA */
-    { { NULL }, -1 }                                    /* end table */
+    { { NULL },         -1 }                            /* end table */
 };
 
 #if !defined(DEV_NEXUS) 
@@ -801,7 +796,7 @@ if (done)
 for (j = 0; (dptr = sim_devices[j]) != NULL; j++) {
     if ((dptr->flags & (DEV_UBUS | DEV_QBUS)) == 0)
         continue;
-    for (autp = auto_tab; autp->numc >= 0; autp++) {
+    for (autp = auto_tab; autp->valid >= 0; autp++) {
         for (k=0; autp->dnam[k]; k++) {
             if (!strcmp(dptr->name, autp->dnam[k])) {
                 dibp = (DIB *)dptr->ctxt;
@@ -827,7 +822,7 @@ t_stat auto_config (const char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
 uint32 vec = AUTO_VECBASE;
-int32 ilvl, ibit;
+int32 ilvl, ibit, numc;
 extern UNIT cpu_unit;
 AUTO_CON *autp;
 DEVICE *dptr;
@@ -837,20 +832,13 @@ uint32 j, k, jdis, vmask, amask;
 if (autcon_enb == 0)                                    /* enabled? */
     return SCPE_OK;
 if (name) {                                             /* updating? */
-    if (nctrl < 0)
+    dptr = find_dev (name);
+    dibp = (DIB *) dptr->ctxt;                          /* get DIB */
+    if ((nctrl < 0) || (dptr == NULL) || (dibp == NULL))
         return SCPE_ARG;
-    for (autp = auto_tab; autp->numc >= 0; autp++) {
-        for (j = 0; (j < AUTO_MAXC) && autp->dnam[j]; j++) {
-            if (strcmp (name, autp->dnam[j]) == 0) {
-                autp->numc = nctrl;
-                break;
-                }
-            }
-        if ((j < AUTO_MAXC) && autp->dnam[j] && (strcmp (name, autp->dnam[j]) == 0))
-            break;
-        }
+    dibp->numc = nctrl;
     }
-for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
+for (autp = auto_tab; autp->valid >= 0; autp++) {       /* loop thru table */
     if (autp->amod) {                                   /* floating csr? */
         amask = autp->amod - 1;
         csr = (csr + amask) & ~amask;                   /* align csr */
@@ -877,6 +865,7 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp == NULL)                               /* not there??? */
             return SCPE_IERR;
+        numc = dibp->numc ? dibp->numc : 1;
         ilvl = dibp->vloc / 32;
         ibit = dibp->vloc % 32;
         /* Identify how many devices earlier in the device list are 
@@ -891,7 +880,7 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
             dibp->ba = IOPAGEBASE + autp->fixa[j-jdis]; /* use it */
         else {                                          /* no fixed left */
             dibp->ba = csr;                             /* set CSR */
-            csr += (autp->numc * autp->amod);           /* next CSR */
+            csr += (numc * autp->amod);                 /* next CSR */
             }                                           /* end else */
         if (autp->numv) {                               /* vec needed? */
             if (autp->fixv[j-jdis]) {                   /* fixed vec avail? */
@@ -904,7 +893,7 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
                 vec = (vec + vmask) & ~vmask;           /* align vector */
                 if (autp->numv > 0)
                     dibp->vec = vec;                    /* set vector */
-                vec += (autp->numc * numv * 4);
+                vec += (numc * numv * 4);
                 }                                       /* end else */
             }                                           /* end vec needed */
         }                                               /* end for j */
