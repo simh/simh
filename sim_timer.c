@@ -1486,6 +1486,8 @@ inst_delay_d = ((inst_per_sec*usec_delay)/1000000.0);
 if (inst_delay_d > (double)0x7fffffff)
     inst_delay_d = (double)0x7fffffff;
 inst_delay = (int32)inst_delay_d;
+if ((inst_delay == 0) && (usec_delay != 0))
+    inst_delay = 1;     /* Minimum non-zero delay is 1 instruction */
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 if ((sim_calb_tmr == -1) ||                             /* if No timer initialized */
     (inst_delay < rtc_currd[sim_calb_tmr]) ||           /*    or sooner than next clock tick? */
