@@ -248,7 +248,7 @@ if ((*cptr != 0) || (flag != 0))
 do {                                                    /* block loop */
     csum = 0;                                           /* init checksum */
     for (i = 0; i < 6; ) {                              /* 6 char header */
-        if ((c[i] = getc (fileref)) == EOF)
+        if ((c[i] = Fgetc (fileref)) == EOF)
             return SCPE_FMT;
         if ((i != 0) || (c[i] == 1))                    /* 1st must be 1 */
             csum = csum + c[i++];                       /* add into csum */
@@ -263,7 +263,7 @@ do {                                                    /* block loop */
         return SCPE_OK;
         }
     for (i = 6; i < cnt; i++) {                         /* exclude hdr */
-        if ((d = getc (fileref)) == EOF)                /* data char */
+        if ((d = Fgetc (fileref)) == EOF)                /* data char */
             return SCPE_FMT;
         csum = csum + d;                                /* add into csum */
         if (org >= MEMSIZE)                             /* invalid addr? */
@@ -273,7 +273,7 @@ do {                                                    /* block loop */
             (M[org >> 1] & 0177400) | (uint16)d;
         org = (org + 1) & 0177777;                      /* inc origin */
         }
-    if ((d = getc (fileref)) == EOF)                    /* get csum */
+    if ((d = Fgetc (fileref)) == EOF)                    /* get csum */
         return SCPE_FMT;
     csum = csum + d;                                    /* add in */
     } while ((csum & 0377) == 0);                       /* result mbz */
