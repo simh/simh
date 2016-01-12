@@ -98,11 +98,12 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     Separate TCP listening ports per line
     Outgoing connections per line (virtual Null Modem cable).
     Packet sending and reception semantics for simulated network device support using either TCP or UDP transport.
+    Input character rates reflect the natural character arrival time based on the line speed.
 
 #### Video Display Capabilities
-    Added support for monochrome displays with optional keyboards and mice.  
-    The VAXstation QVSS device (VCB01) simulation uses this capability.
-    Host platforms which have libSDL available can leverage this functionality.
+Added support for monochrome displays with optional keyboards and mice.  
+The VAXstation QVSS device (VCB01) simulation uses this capability.
+Host platforms which have libSDL available can leverage this functionality.
 
 #### Asynchronous I/O
     * Disk and Tape I/O can be asynchronous.  Asynchronous support exists 
@@ -191,11 +192,16 @@ Error traps can be taken for any command which returns a status other than SCPE_
 ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL.  These values can be indicated by name or by their internal numeric value (not recommended).
 
 Interactions with ASSERT command and "DO -e":
-DO -e		is equivalent to SET ON, which by itself it equivalent to "SET ON; ON ERROR RETURN".
-ASSERT		failure have several different actions:
-       If error trapping is not enabled then AFAIL causes exit from the current do command file.
-       If error trapping is enabled and an explicit "ON AFAIL" action is defined, then the specified action is performed.
-       If error trapping is enabled and no "ON AFAIL" action is defined, then an AFAIL causes exit from the current do command file.
+    DO -e		is equivalent to SET ON, which by itself it equivalent 
+                to "SET ON; ON ERROR RETURN".
+    ASSERT		failure have several different actions:
+       * If error trapping is not enabled then AFAIL causes exit from 
+         the current do command file.
+       * If error trapping is enabled and an explicit "ON AFAIL" 
+         action is defined, then the specified action is performed.
+       * If error trapping is enabled and no "ON AFAIL" action is 
+         defined, then an AFAIL causes exit from the current do 
+         command file.
 
 Other related changes/extensions:
 The "!" command (execute a command on the local OS), now returns the command's exit status as the status from the "!" command.  This allows ON conditions to handle error status responses from OS commands and act as desired.
@@ -265,6 +271,7 @@ The EXPECT command now exists to provide a means of reacting to simulator output
     NEXT                            Step across a subroutine call or step a single instruction.
     EXPECT                          React to output produced by a simulated system
     SEND                            Inject input to a simulated system's console
+    SCREENSHOT                      Snapshot the current video display window
 
 #### Command Processing Enhancements
 
@@ -352,7 +359,7 @@ Depending on your host platform one of the following steps should be followed:
 
 If you are interested in using a simulator with Ethernet networking support (i.e. one of the VAX simulators or the PDP11), then you should make sure you have the correct networking components available.  The instructions in https://github.com/simh/simh/blob/master/0readme_ethernet.txt describe the required steps to get ethernet networking components installed and how to configure your environment.
 
-See the 0readme_ethernet.txt file for details about the required network components for your platform.  Once your operating system has the correct networking components available the following command will build working simulators:
+See the 0readme_ethernet.txt file for details about the required network components for your platform.  Once your operating system build environment has the correct networking components available the following command will build working simulators:
 
    $ make {simulator-name (i.e. vax)}
 
@@ -362,7 +369,7 @@ Compiling on windows is supported with recent versions of Microsoft Visual Studi
 
 ##### Required related files.  The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt
 
-##### Visual Studio (Standard or Express) 2008, 2010 or 2012
+##### Visual Studio (Standard or Express) 2008, 2010, 2012, 2013 or Visual Studio Community 2015
 
 The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt describes the required steps to use the setup your environment to build using Visual Studio.
 
