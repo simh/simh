@@ -591,6 +591,18 @@ sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
 
+/* Number of DL devices used by TU58 */
+
+t_value dlx_tu58_count (void)
+{
+DEVICE *td_dptr = find_dev ("TDC");
+
+if ((td_dptr == NULL) ||
+    (td_dptr->flags & DEV_DIS))
+    return 0;
+return (t_value)((DIB *)td_dptr->ctxt)->numc;
+}
+
 /* Enable/disable device */
 
 void dlx_enbdis (int32 dis)
@@ -600,8 +612,17 @@ if (dis) {
     dlo_dev.flags = dlo_dev.flags | DEV_DIS;
     }
 else {
-    dli_dev.flags = dli_dev.flags & ~DEV_DIS;
-    dlo_dev.flags = dlo_dev.flags & ~DEV_DIS;
+    if (((dli_dev.flags & DEV_DIS) || (dlo_dev.flags & DEV_DIS)) && 
+        (dlx_tu58_count() < 16)) {
+        if ((dlx_desc.lines + dlx_tu58_count()) > 16)
+            dlx_desc.lines = 16 - dlx_tu58_count();
+        dli_dev.flags = dli_dev.flags & ~DEV_DIS;
+        dlo_dev.flags = dlo_dev.flags & ~DEV_DIS;
+        }
+    else {
+        dli_dev.flags = dli_dev.flags | DEV_DIS;
+        dlo_dev.flags = dlo_dev.flags | DEV_DIS;
+        }
     }
 return;
 }
@@ -615,7 +636,7 @@ t_stat r;
 
 if (cptr == NULL)
     return SCPE_ARG;
-newln = get_uint (cptr, 10, DLX_LINES, &r);
+newln = get_uint (cptr, 10, DLX_LINES - dlx_tu58_count(), &r);
 if ((r != SCPE_OK) || (newln == dlx_desc.lines))
     return r;
 if (newln == 0)

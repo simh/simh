@@ -66,6 +66,8 @@ ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
     VIDEO_USEFUL = true
+  endif
+  ifneq (,$(findstring pdp11,$(MAKECMDGOALS))$(findstring all,$(MAKECMDGOALS)))
     DISPLAY_USEFUL = true
   endif
 else ifneq (,$(findstring besm6,$(MAKECMDGOALS)))

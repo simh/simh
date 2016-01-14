@@ -246,14 +246,36 @@ vt_reset(DEVICE *dptr)
     return auto_config ("VT", (dptr->flags & DEV_DIS) ? 0 : 1);
 }
 
+#include "pdp11_vt_lunar_rom.h"         /* Lunar Lander image */
+
 /*
  * GT4x/GT62 bootstrap (acts as remote terminal)
+ * 
  */
 t_stat
 vt_boot(int32 unit, DEVICE *dptr)
 {
+    t_stat r;
+    extern int32 saved_PC;
+    extern uint16 *M;
+    
     /* XXX  should do something like vt11_set_dpc(&appropriate_ROM_image) */
-    return SCPE_NOFNC;                  /* not yet implemented */
+
+    /* Instead, since that won't be too useful.... */
+    /* Load and start Lunar Lander which has the potential to be fun! */
+    sim_set_memory_load_file (BOOT_CODE_ARRAY, BOOT_CODE_SIZE);
+    r = load_cmd (0, BOOT_CODE_FILENAME);
+    sim_set_memory_load_file (NULL, 0);
+    /* Lunar Lander presumes a VT device vector of 320 */
+    if (0320 != vt_dib.vec) { /* If that is not the case, then copy the 320 vector to */
+        M[vt_dib.vec >> 1] = M[0320 >> 1];
+        M[(vt_dib.vec >> 1) + 1] = M[(0320 >> 1) + 1];
+        }
+    M[032530>>1] = 1;
+    cpu_set_boot (saved_PC);
+    set_cmd (0, "VT SCALE=1");
+    set_cmd (0, "VT CRT=VR14");
+    return r;
 }
 
 /* SET/SHOW VT options: */
