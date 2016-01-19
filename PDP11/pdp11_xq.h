@@ -104,6 +104,8 @@ enum xq_type {XQ_T_DEQNA, XQ_T_DELQA, XQ_T_DELQA_PLUS};
 
 struct xq_sanity {
   int       enabled;                                    /* sanity timer enabled? 2=HW, 1=SW, 0=off */
+#define XQ_SAN_HW_SW  2
+#define XQ_SAN_ENABLE 1
   int       quarter_secs;                               /* sanity timer value in 1/4 seconds */
   int       timer;                                      /* countdown timer */
 };
