@@ -521,6 +521,8 @@ DEBTAB xq_debug[] = {
   {"CSR",    DBG_CSR,   "watch CSR"},
   {"VAR",    DBG_VAR,   "watch VAR"},
   {"WARN",   DBG_WRN,   "display warnings"},
+  {"RBDL",   DBG_RBL,   "display RBDL warnings"},
+  {"XBDL",   DBG_XBL,   "display XBDL warnings"},
   {"SETUP",  DBG_SET,   "display setup info"},
   {"SANITY", DBG_SAN,   "display sanity timer info"},
   {"REG",    DBG_REG,   "trace read/write registers"},
@@ -724,6 +726,7 @@ t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
   fprintf(st, fmt, "SW Reset:",    xq->var->stats.reset);
   fprintf(st, fmt, "Setup:",       xq->var->stats.setup);
   fprintf(st, fmt, "Loopback:",    xq->var->stats.loop);
+  fprintf(st, fmt, "Recv Overrun:",xq->var->stats.recv_overrun);
   fprintf(st, fmt, "ReadQ count:", xq->var->ReadQ.count);
   fprintf(st, fmt, "ReadQ high:",  xq->var->ReadQ.high);
   eth_show_dev(st, xq->var->etherface);
@@ -1090,7 +1093,8 @@ t_stat xq_process_rbdl(CTLR* xq)
 {
   int32 rstatus, wstatus;
   uint16 b_length, w_length, rbl;
-  uint32 address;
+  uint32 address, start_rbdl_ba;
+  int dcount;
   ETH_ITEM* item;
   uint8* rbuf;
 
@@ -1102,6 +1106,9 @@ t_stat xq_process_rbdl(CTLR* xq)
   if (xq->var->csr & XQ_CSR_RL)
       return SCPE_OK;
 
+  start_rbdl_ba = xq->var->rbdl_ba;
+  dcount = 0;
+
   /* process buffer descriptors */
   while(1) {
 
@@ -1111,6 +1118,15 @@ t_stat xq_process_rbdl(CTLR* xq)
     
     /* DEQNA stops processing if nothing in read queue */
     if ((xq->var->type == XQ_T_DEQNA) && (!xq->var->ReadQ.count)) break;
+
+    /* if all descriptors have been processed, avoid overrun and stop now */
+    /* this only happens if the receive descriptors are setup in a circular loop */
+    if (dcount && (xq->var->rbdl_ba == start_rbdl_ba)) {
+      ++xq->var->stats.recv_overrun;
+      sim_debug(DBG_RBL, xq->dev, "RBDL Processed all %d descriptors, avoiding overrun\n", dcount);
+      break;
+      }
+    ++dcount;
 
     /* set descriptor processed flag */
     xq->var->rbdl_buf[0] = 0xFFFF;
@@ -1154,6 +1170,13 @@ t_stat xq_process_rbdl(CTLR* xq)
     sim_debug(DBG_TRC, xq->dev, "Using receive descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n", 
                                               xq->var->rbdl_ba, xq->var->rbdl_buf[0], xq->var->rbdl_buf[1] & 0xFFC0, address, b_length, xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
 
+    /* Examine the descriptor to try and determine if any prior contents haven't been 'digested' yet */
+    if (((xq->var->rbdl_buf[4] & 0xC000) != 0x8000) ||
+        ((xq->var->rbdl_buf[5] & 0xFF) == (((xq->var->rbdl_buf[5] >> 8) & 0xFF)))) {
+      sim_debug(DBG_TRC, xq->dev, "Undigested receive descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n", 
+                                  xq->var->rbdl_ba, xq->var->rbdl_buf[0], xq->var->rbdl_buf[1] & 0xFFC0, address, b_length, xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
+      }
+
     item = &xq->var->ReadQ.item[xq->var->ReadQ.head];
     rbl = (uint16)item->packet.len;
     rbuf = item->packet.msg;
@@ -1172,7 +1195,7 @@ t_stat xq_process_rbdl(CTLR* xq)
          packets sent by the host diagnostics (OR short setup packets) */
       if ((item->type == ETH_ITM_NORMAL) && (rbl < ETH_MIN_PACKET)) {
         xq->var->stats.runt += 1;
-        sim_debug(DBG_WRN, xq->dev, "Runt detected, size = %d\n", rbl);
+        sim_debug(DBG_RBL, xq->dev, "Runt detected, size = %d\n", rbl);
         /* pad runts with zeros up to minimum size - this allows "legal" (size - 60)
            processing of those weird short ARP packets that seem to occur occasionally */
         memset(&item->packet.msg[rbl], 0, ETH_MIN_PACKET-rbl);
@@ -1182,7 +1205,7 @@ t_stat xq_process_rbdl(CTLR* xq)
       /* adjust oversized non-loopback packets */
       if ((item->type != ETH_ITM_LOOPBACK) && (rbl > ETH_FRAME_SIZE)) {
         xq->var->stats.giant += 1;
-        sim_debug(DBG_WRN, xq->dev, "Giant detected, size=%d\n", rbl);
+        sim_debug(DBG_RBL, xq->dev, "Giant detected, size=%d\n", rbl);
         /* trim giants down to maximum size - no documentation on how to handle the data loss */
         if (rbl > XQ_MAX_RCV_PACKET) {
           item->packet.len = XQ_MAX_RCV_PACKET;
@@ -1238,7 +1261,7 @@ t_stat xq_process_rbdl(CTLR* xq)
       xq->var->rbdl_buf[4] |= XQ_RST_LASTNOT;   /* not last segment */
     xq->var->rbdl_buf[5] = ((rbl & 0x00FF) << 8) | (rbl & 0x00FF);
     if (xq->var->ReadQ.loss) {
-      sim_debug(DBG_WRN, xq->dev, "ReadQ overflow!\n");
+      sim_debug(DBG_RBL, xq->dev, "ReadQ overflow!\n");
       xq->var->rbdl_buf[4] |= XQ_RST_OVERFLOW;  /* set overflow bit */
       xq->var->stats.dropped += xq->var->ReadQ.loss;
       xq->var->ReadQ.loss = 0;                  /* reset loss counter */
@@ -1485,14 +1508,14 @@ t_stat xq_process_xbdl(CTLR* xq)
     /* explicit chain buffer? */
     if (xq->var->xbdl_buf[1] & XQ_DSC_C) {
       xq->var->xbdl_ba = address;
-      sim_debug(DBG_WRN, xq->dev, "XBDL chaining to buffer descriptor at: 0x%X\n", address);
+      sim_debug(DBG_XBL, xq->dev, "Chaining to buffer descriptor at: 0x%X\n", address);
       continue;
     }
 
     /* invalid buffer? */
     if (~xq->var->xbdl_buf[1] & XQ_DSC_V) {
       xq_csr_set_clr(xq, XQ_CSR_XL, 0);
-      sim_debug(DBG_WRN, xq->dev, "XBDL List empty\n");
+      sim_debug(DBG_XBL, xq->dev, "List empty\n");
       return SCPE_OK;
     }
 
@@ -1560,13 +1583,13 @@ t_stat xq_process_xbdl(CTLR* xq)
           if (xq->var->coalesce_latency == 0)
             xq_svc(&xq->unit[0]);        /* service any received data */
       }
-        sim_debug(DBG_WRN, xq->dev, "XBDL completed processing write\n");
+        sim_debug(DBG_XBL, xq->dev, "completed processing write\n");
 
       } /* loopback/non-loopback */
 
     } else { /* not at end-of-message */
 
-      sim_debug(DBG_WRN, xq->dev, "XBDL implicitly chaining to buffer descriptor at: 0x%X\n", xq->var->xbdl_ba+12);
+      sim_debug(DBG_XBL, xq->dev, "implicitly chaining to buffer descriptor at: 0x%X\n", xq->var->xbdl_ba+12);
       /* update bdl status words */
       wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, (uint16*) implicit_chain_status);
       if(wstatus) return xq_nxm_error(xq);
@@ -1744,7 +1767,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       /* adjust non loopback runt packets */
       if ((item->type != ETH_ITM_LOOPBACK) && (rbl < ETH_MIN_PACKET)) {
         xq->var->stats.runt += 1;
-        sim_debug(DBG_WRN, xq->dev, "Runt detected, size = %d\n", rbl);
+        sim_debug(DBG_RBL, xq->dev, "Runt detected, size = %d\n", rbl);
         /* pad runts with zeros up to minimum size - this allows "legal" (size - 60)
            processing of those weird short ARP packets that seem to occur occasionally */
         memset(&item->packet.msg[rbl], 0, ETH_MIN_PACKET-rbl);
@@ -1754,7 +1777,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       /* adjust oversized non-loopback packets */
       if ((item->type != ETH_ITM_LOOPBACK) && (rbl > ETH_FRAME_SIZE)) {
         xq->var->stats.giant += 1;
-        sim_debug(DBG_WRN, xq->dev, "Giant detected, size=%d\n", rbl);
+        sim_debug(DBG_RBL, xq->dev, "Giant detected, size=%d\n", rbl);
         /* trim giants down to maximum size - no documentation on how to handle the data loss */
         item->packet.len = ETH_MAX_PACKET;
         rbl = ETH_FRAME_SIZE;
@@ -1783,7 +1806,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
     
     if (xq->var->ReadQ.loss) {
       xq->var->rring[i].rmd2 |= XQ_RMD2_MIS; 
-      sim_debug(DBG_WRN, xq->dev, "ReadQ overflow!\n");
+      sim_debug(DBG_RBL, xq->dev, "ReadQ overflow!\n");
       xq->var->stats.dropped += xq->var->ReadQ.loss;
       xq->var->ReadQ.loss = 0;          /* reset loss counter */
     }
@@ -1807,7 +1830,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
   } while (0 == (xq->var->rring[xq->var->rbindx].rmd3 & XQ_RMD3_OWN));
 
   if (xq->var->rring[xq->var->rbindx].rmd3 & XQ_RMD3_OWN) {
-      sim_debug(DBG_WRN, xq->dev, "xq_process_turbo_rbdl() - receive ring full\n");
+      sim_debug(DBG_RBL, xq->dev, "xq_process_turbo_rbdl() - receive ring full\n");
   }
 
   if (descriptors_consumed)
@@ -1894,7 +1917,7 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
         xq->var->xring[i].tmd0 = 0;
         xq->var->xring[i].tmd1 = (uint16)(100 + xq->var->write_buffer.len * 8); /* arbitrary value */
       }
-      sim_debug(DBG_WRN, xq->dev, "XBDL completed processing write\n");
+      sim_debug(DBG_XBL, xq->dev, "completed processing write\n");
       /* clear transmit buffer */
       xq->var->write_buffer.len = 0;
       xq->var->xring[i].tmd2 = XQ_TMD2_RON | XQ_TMD2_TON;
@@ -1931,7 +1954,7 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
        and finding nothing to do.  We ignore this and the next write the ARQR will
        properly cause the packet transmission.
      */
-    sim_debug(DBG_WRN, xq->dev, "xq_process_turbo_xbdl() - Nothing to Transmit\n");
+    sim_debug(DBG_XBL, xq->dev, "xq_process_turbo_xbdl() - Nothing to Transmit\n");
   }
 
   return status;
@@ -2475,7 +2498,6 @@ t_stat xq_wr(int32 ldata, int32 PA, int32 access)
           break;
         case 3:   /* receive bdl high bits */
           xq->var->rbdl[1] = data;
-          xq_csr_set_clr(xq, 0, XQ_CSR_RL);
           xq_dispatch_rbdl(xq); /* start receive operation */
           break;
         case 4:   /* transmit bdl low bits */
@@ -3245,6 +3267,8 @@ const char helpString[] =
     "++TRACE   Shows detailed routine calls.\n"
     "++CSR     Shows activities affecting the CSR.\n"
     "++VAR     Shows activities affecting the VAR.\n"
+    "++RBL     Shows receive list warnings.\n"
+    "++XBL     Shows transmit list warnings.\n"
     "++WARN    Shows warnings.\n"
     "++SETUP   Shows setup info.\n"
     "++SANITY  Shows sanity timer info.\n"
