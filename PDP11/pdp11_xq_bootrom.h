@@ -1109,6 +1109,7 @@ uint16 xq_bootrom_delqat[2048] = {
 
 #ifdef VM_PDP11
 #if 0
+/*
 Tim Shoppa said:
 
 Hopefully better late than never, but I finally got to digging and
@@ -1232,6 +1233,7 @@ Assume settings for R0 as follows:
         R0 - Contains a "4" for QNA#1 @ 174440
              Contains a "5" for QNA#2 @ 174460
 PDP-11 code for booting the DEQNA EPB might be as follows:
+*/
 #endif
 
 #define BOOT_LEN (sizeof(boot_rom)/sizeof(uint16))/* Code size */
