@@ -88,8 +88,9 @@ int clock_gettime(int clock_id, struct timespec *tp);
 #define SIM_THROT_PCT   3                           /* Max Percent of host CPU */
 #define SIM_THROT_SPC   4                           /* Specific periodic Delay */
 
-#define TIMER_DBG_IDLE  1                           /* Debug Flag for Idle Debugging */
-#define TIMER_DBG_QUEUE 2                           /* Debug Flag for Asynch Queue Debugging */
+#define TIMER_DBG_IDLE  0x001                       /* Debug Flag for Idle Debugging */
+#define TIMER_DBG_QUEUE 0x002                       /* Debug Flag for Asynch Queue Debugging */
+#define TIMER_DBG_MUX   0x004                       /* Debug Flag for Asynch Queue Debugging */
 
 t_bool sim_timer_init (void);
 void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub);
@@ -119,7 +120,7 @@ uint32 sim_os_ms_sleep_init (void);
 void sim_start_timer_services (void);
 void sim_stop_timer_services (void);
 t_stat sim_timer_change_asynch (void);
-t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
+t_stat sim_timer_activate_after (UNIT *uptr, uint32 usec_delay);
 t_stat sim_register_clock_unit (UNIT *uptr);
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
 t_stat sim_clock_coschedule_abs (UNIT *uptr, int32 interval);

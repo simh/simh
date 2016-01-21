@@ -1565,8 +1565,10 @@ if ((lp->conn && lp->rcve) &&                           /* conn & enb & */
     }                                                   /* end if conn */
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
-if (val && lp->rxbps)
-    lp->rxnexttime = floor (sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor));
+if (lp->rxbps) {
+    if (val)
+        lp->rxnexttime = floor (sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ())/lp->rxbpsfactor));
+    }
 tmxr_debug_return(lp, val);
 return val;
 }
@@ -1887,10 +1889,12 @@ return;
 
 int32 tmxr_rqln_bare (TMLN *lp, t_bool speed)
 {
-if ((speed) && 
-    (lp->rxbps) && 
-     (sim_gtime () < lp->rxnexttime)) /* rate limiting and too soon */
-    return 0;
+if ((speed) && (lp->rxbps)) {                   /* consider speed and rate limiting? */
+    if (sim_gtime () < lp->rxnexttime)          /* too soon? */
+        return 0;
+    else
+        return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz : 0)) ? 1 : 0;
+    }
 return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
 }
 
@@ -2231,7 +2235,7 @@ if (*cptr == '*') {
     lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE * rxbpsfactor;
     }
 lp->rxdelta = _tmln_speed_delta (speed);
-lp->rxnexttime = 0;
+lp->rxnexttime = 0.0;
 uptr = lp->uptr;
 if ((!uptr) && (lp->mp))
     uptr = lp->mp->uptr;
@@ -3740,7 +3744,7 @@ return _sim_activate (uptr, interval);
 #endif
 }
 
-t_stat tmxr_activate_after (UNIT *uptr, int32 usecs_walltime)
+t_stat tmxr_activate_after (UNIT *uptr, uint32 usecs_walltime)
 {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
@@ -3753,7 +3757,7 @@ return _sim_activate_after (uptr, usecs_walltime);
 #endif
 }
 
-t_stat tmxr_activate_after_abs (UNIT *uptr, int32 usecs_walltime)
+t_stat tmxr_activate_after_abs (UNIT *uptr, uint32 usecs_walltime)
 {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
@@ -3783,7 +3787,6 @@ return tmxr_clock_coschedule_tmr (uptr, 0, interval);
 t_stat tmxr_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
 {
 TMXR *mp = (TMXR *)uptr->tmxr;
-double sim_gtime_now = sim_gtime ();
 
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
@@ -3794,6 +3797,7 @@ return SCPE_OK;
 #else
 if (mp) {
     int32 i, soon = interval;
+    double sim_gtime_now = sim_gtime ();
 
     for (i = 0; i < mp->lines; i++) {
         TMLN *lp = &mp->ldsc[i];
@@ -3802,15 +3806,21 @@ if (mp) {
             int32 due;
 
             if (lp->rxbps)
-                due = (int32)(lp->rxnexttime - sim_gtime_now);
+                if (lp->rxnexttime > sim_gtime_now)
+                    due = (int32)(lp->rxnexttime - sim_gtime_now);
+                else
+                    due = sim_processing_event ? 1 : 0;     /* avoid potential infinite loop if called from service routine */
             else
                 due = (int32)((uptr->wait * sim_timer_inst_per_sec ())/TMXR_RX_BPS_UNIT_SCALE);
             soon = MIN(soon, due);
             }
         }
-    if (soon != interval)
+    if (soon != interval) {
+        sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %d instructions\n", sim_uname (uptr), soon);
         return _sim_activate (uptr, soon);
+        }
     }
+sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after interval %d instructions\n", sim_uname (uptr), interval);
 return sim_clock_coschedule_tmr (uptr, tmr, interval);
 #endif
 }

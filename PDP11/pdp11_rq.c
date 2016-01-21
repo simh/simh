@@ -155,12 +155,12 @@ extern uint32 cpu_opt;
 #define RQ_MAPXFER      (1u << 31)                      /* mapped xfer */
 #define RQ_M_PFN        0x1FFFFF                        /* map entry PFN */
 
-#define UNIT_V_ONL      (UNIT_V_UF + 0)                 /* online */
-#define UNIT_V_WLK      (UNIT_V_UF + 1)                 /* hwre write lock */
-#define UNIT_V_ATP      (UNIT_V_UF + 2)                 /* attn pending */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 3)                 /* drive type */
+#define UNIT_V_ONL      (DKUF_V_UF + 0)                 /* online */
+#define UNIT_V_WLK      (DKUF_V_UF + 1)                 /* hwre write lock */
+#define UNIT_V_ATP      (DKUF_V_UF + 2)                 /* attn pending */
+#define UNIT_V_DTYPE    (DKUF_V_UF + 3)                 /* drive type */
 #define UNIT_M_DTYPE    0x1F
-#define UNIT_V_NOAUTO   (UNIT_V_UF + 8)                 /* noautosize */
+#define UNIT_V_NOAUTO   (DKUF_V_UF + 8)                 /* noautosize */
 #define UNIT_ONL        (1 << UNIT_V_ONL)
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_ATP        (1 << UNIT_V_ATP)
@@ -754,7 +754,7 @@ static struct ctlrtyp ctlr_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 
-int32 rq_itime = 200;                                   /* init time, except */
+int32 rq_itime = 450;                                   /* init time, except */
 int32 rq_itime4 = 10;                                   /* stage 4 */
 int32 rq_qtime = RQ_QTIME;                              /* queue time */
 int32 rq_xtime = RQ_XTIME;                              /* transfer time */
@@ -793,12 +793,12 @@ typedef struct {
 #define DBG_DAT  0x0020                                 /* display transfer data */
 
 DEBTAB rq_debug[] = {
-  {"TRACE",  DBG_TRC},
-  {"INIT",   DBG_INI},
-  {"REG",    DBG_REG},
-  {"REQ",    DBG_REQ},
-  {"DISK",   DBG_DSK},
-  {"DATA",   DBG_DAT},
+  {"TRACE",  DBG_TRC, "trace routine calls"},
+  {"INIT",   DBG_INI, "display setup/init sequence info"},
+  {"REG",    DBG_REG, "trace read/write registers"},
+  {"REQ",    DBG_REQ, "display transfer requests"},
+  {"DISK",   DBG_DSK, "display sim_disk activities"},
+  {"DATA",   DBG_DAT, "display transfer data"},
   {0}
 };
 

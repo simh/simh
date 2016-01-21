@@ -84,11 +84,11 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
+#define UNIT_V_WLK      (DKUF_V_UF + 0)                 /* write locked */
+#define UNIT_V_DTYPE    (DKUF_V_UF + 1)                 /* disk type */
 #define UNIT_M_DTYPE    7
-#define UNIT_V_AUTO     (UNIT_V_UF + 4)                 /* autosize */
-#define UNIT_V_DUMMY    (UNIT_V_UF + 5)                 /* dummy flag */
+#define UNIT_V_AUTO     (DKUF_V_UF + 4)                 /* autosize */
+#define UNIT_V_DUMMY    (DKUF_V_UF + 5)                 /* dummy flag */
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
@@ -698,11 +698,11 @@ MTAB rp_mod[] = {
 #define DBG_DAT  0x0010                                 /* display transfer data */
 
 DEBTAB rp_debug[] = {
-  {"TRACE",  DBG_TRC},
-  {"REG",    DBG_REG},
-  {"REQ",    DBG_REQ},
-  {"DISK",   DBG_DSK},
-  {"DATA",   DBG_DAT},
+  {"TRACE",  DBG_TRC, "trace routine calls"},
+  {"REG",    DBG_REG, "trace read/write registers"},
+  {"REQ",    DBG_REQ, "display transfer requests"},
+  {"DISK",   DBG_DSK, "display sim_disk activities"},
+  {"DATA",   DBG_DAT, "display transfer data"},
   {0}
 };
 

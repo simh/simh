@@ -1102,10 +1102,13 @@ if (vid_mouse_captured) {
 #endif
         sim_debug (SIM_VID_DBG_KEY, vid_dev, "vid_key() - Cursor Release\n");
 #if SDL_MAJOR_VERSION == 1
-        SDL_WM_GrabInput (SDL_GRAB_OFF);                /* relese cursor */
-        SDL_ShowCursor (SDL_ENABLE);                    /* show cursor */
+        if (SDL_WM_GrabInput (SDL_GRAB_OFF) < 0)        /* relese cursor */
+            sim_printf ("%s: vid_key(): SDL_WM_GrabInput error: %s\n", sim_dname(vid_dev), SDL_GetError());
+        if (SDL_ShowCursor (SDL_ENABLE) < 0)            /* show cursor */
+            sim_printf ("%s: vid_key(): SDL_ShowCursor error: %s\n", sim_dname(vid_dev), SDL_GetError());
 #else
-        SDL_SetRelativeMouseMode(SDL_FALSE);            /* release cursor, show cursor */
+        if (SDL_SetRelativeMouseMode(SDL_FALSE) < 0)    /* release cursor, show cursor */
+            sim_printf ("%s: vid_key(): SDL_SetRelativeMouseMode error: %s\n", sim_dname(vid_dev), SDL_GetError());
 #endif
         vid_mouse_captured = FALSE;
         return;
@@ -1244,7 +1247,8 @@ if ((!vid_mouse_captured) && (vid_flags & SIM_VID_INPUTCAPTURED)) {
         SDL_PumpEvents ();
         while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTIONMASK)) {};
 #else
-        SDL_SetRelativeMouseMode(SDL_TRUE);                 /* lock cursor to window, hide cursor */
+        if (SDL_SetRelativeMouseMode (SDL_TRUE) < 0)        /* lock cursor to window, hide cursor */
+            sim_printf ("%s: vid_mouse_button(): SDL_SetRelativeMouseMode error: %s\n", sim_dname(vid_dev), SDL_GetError());
         SDL_WarpMouseInWindow (NULL, vid_width/2, vid_height/2);/* back to center */
         SDL_PumpEvents ();
         while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION)) {};
@@ -1301,7 +1305,8 @@ sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Video Update Event: \n");
 if (sim_deb)
     fflush (sim_deb);
 #if SDL_MAJOR_VERSION == 1
-SDL_BlitSurface (vid_image, NULL, vid_window, &vid_dst);
+if (SDL_BlitSurface (vid_image, NULL, vid_window, &vid_dst) < 0)
+    sim_printf ("%s: vid_update(): SDL_BlitSurface error: %s\n", sim_dname(vid_dev), SDL_GetError());
 SDL_UpdateRects (vid_window, 1, &vid_dst);
 #else
 if (SDL_RenderClear (vid_renderer))

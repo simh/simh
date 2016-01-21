@@ -94,6 +94,7 @@ extern int32 int_req[IPL_HLVL];
 #define XQ_SERVICE_INTERVAL  100                        /* polling interval - X per second */
 #endif
 #define XQ_SYSTEM_ID_SECS    540                        /* seconds before system ID timer expires */
+#define XQ_STARTUP_DELAY      20                        /* instruction delay before receiver starts */
 #define XQ_HW_SANITY_SECS    240                        /* seconds before HW sanity timer expires */
 #define XQ_MAX_CONTROLLERS     2                        /* maximum controllers allowed */
 
@@ -103,6 +104,8 @@ enum xq_type {XQ_T_DEQNA, XQ_T_DELQA, XQ_T_DELQA_PLUS};
 
 struct xq_sanity {
   int       enabled;                                    /* sanity timer enabled? 2=HW, 1=SW, 0=off */
+#define XQ_SAN_HW_SW  2
+#define XQ_SAN_ENABLE 1
   int       quarter_secs;                               /* sanity timer value in 1/4 seconds */
   int       timer;                                      /* countdown timer */
 };
@@ -208,6 +211,7 @@ struct xq_stats {
   int               giant;                              /* oversize packets */
   int               setup;                              /* setup packets */
   int               loop;                               /* loopback packets */
+  int               recv_overrun;                       /* receiver overruns */
 };
 
 #pragma pack(2)
@@ -268,6 +272,7 @@ struct xq_device {
   uint32            throttle_time;                      /* ms burst time window */
   uint32            throttle_burst;                     /* packets passed with throttle_time which trigger throttling */
   uint32            throttle_delay;                     /* ms to delay when throttling.  0 disables throttling */
+  uint16            startup_delay;                      /* instructions to delay when starting the receiver */
                                                         /*- initialized values - DO NOT MOVE */
 
                                                         /* I/O register storage */
@@ -430,10 +435,12 @@ typedef struct xq_controller CTLR;
 #define DBG_CSR  0x0004                                 /* watch CSR */
 #define DBG_VAR  0x0008                                 /* watch VAR */
 #define DBG_WRN  0x0010                                 /* display warnings */
-#define DBG_SAN  0x0020                                 /* display sanity timer info */
-#define DBG_SET  0x0040                                 /* display setup info */
-#define DBG_PCK  0x0080                                 /* display packet headers */
-#define DBG_DAT  0x0100                                 /* display packet data */
+#define DBG_RBL  0x0020                                 /* RBDL issues */
+#define DBG_XBL  0x0040                                 /* XBDL issues */
+#define DBG_SAN  0x0080                                 /* display sanity timer info */
+#define DBG_SET  0x0100                                 /* display setup info */
+#define DBG_PCK  0x0200                                 /* display packet headers */
+#define DBG_DAT  0x0400                                 /* display packet data */
 #define DBG_ETH  0x8000                                 /* debug ethernet device */
 
 #endif                                                  /* _PDP11_XQ_H */

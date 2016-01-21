@@ -116,17 +116,19 @@ t_stat sim_timer_tick_svc (UNIT *uptr);
 
 #define DBG_IDL       TIMER_DBG_IDLE        /* idling */
 #define DBG_QUE       TIMER_DBG_QUEUE       /* queue activities */
-#define DBG_TRC       0x004                 /* tracing */
-#define DBG_CAL       0x008                 /* calibration activities */
-#define DBG_TIM       0x010                 /* timer thread activities */
-#define DBG_THR       0x020                 /* throttle activities */
+#define DBG_MUX       TIMER_DBG_MUX         /* tmxr queue activities */
+#define DBG_TRC       0x008                 /* tracing */
+#define DBG_CAL       0x010                 /* calibration activities */
+#define DBG_TIM       0x020                 /* timer thread activities */
+#define DBG_THR       0x040                 /* throttle activities */
 DEBTAB sim_timer_debug[] = {
-  {"TRACE",   DBG_TRC},
-  {"IDLE",    DBG_IDL},
-  {"QUEUE",   DBG_QUE},
-  {"CALIB",   DBG_CAL},
-  {"TIME",    DBG_TIM},
-  {"THROT",   DBG_THR},
+  {"TRACE",   DBG_TRC, "Trace routine calls"},
+  {"IDLE",    DBG_IDL, "Idling activities"},
+  {"QUEUE",   DBG_QUE, "Event queuing activities"},
+  {"CALIB",   DBG_CAL, "Calibration activities"},
+  {"TIME",    DBG_TIM, "Activation an scheduling activities"},
+  {"THROT",   DBG_THR, "Throttling activities"},
+  {"MUX",     DBG_MUX, "Tmxr scheduling activities"},
   {0}
 };
 
@@ -920,13 +922,9 @@ int32 act_cyc;
 
 if ((!sim_idle_enab)                             ||     /* idling disabled */
     ((sim_clock_queue == QUEUE_LIST_END) &&             /* or clock queue empty? */
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
      (!(sim_asynch_enabled && sim_asynch_timer)))||     /*     and not asynch? */
-#else
-     (TRUE))                                     ||
-#endif
-    ((sim_clock_queue != QUEUE_LIST_END) && 
-     ((sim_clock_queue->flags & UNIT_IDLE) == 0))||     /* or event not idle-able? */
+    ((sim_clock_queue != QUEUE_LIST_END) &&             /* or clock queue not empty */
+     ((sim_clock_queue->flags & UNIT_IDLE) == 0))||     /*   and event not idle-able? */
     (rtc_elapsed[tmr] < sim_idle_stable)) {             /* or timer not stable? */
     if (sin_cyc)
         sim_interval = sim_interval - 1;
@@ -1438,7 +1436,7 @@ if (sim_asynch_enabled && sim_asynch_timer)
     sim_start_timer_services ();
 else {
     UNIT *uptr;
-    int32 accum = 0;
+    uint32 accum = 0;
 
     sim_stop_timer_services ();
     while (1) {
@@ -1473,7 +1471,7 @@ if (0 == inst_per_sec)
 return inst_per_sec;
 }
 
-t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay)
+t_stat sim_timer_activate_after (UNIT *uptr, uint32 usec_delay)
 {
 int inst_delay;
 double inst_delay_d, inst_per_sec;
@@ -1488,6 +1486,8 @@ inst_delay_d = ((inst_per_sec*usec_delay)/1000000.0);
 if (inst_delay_d > (double)0x7fffffff)
     inst_delay_d = (double)0x7fffffff;
 inst_delay = (int32)inst_delay_d;
+if ((inst_delay == 0) && (usec_delay != 0))
+    inst_delay = 1;     /* Minimum non-zero delay is 1 instruction */
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 if ((sim_calb_tmr == -1) ||                             /* if No timer initialized */
     (inst_delay < rtc_currd[sim_calb_tmr]) ||           /*    or sooner than next clock tick? */

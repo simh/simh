@@ -441,7 +441,7 @@ t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
     return SCPE_OK;
 }
 
-t_stat besm6_show_panel (FILE *st, struct sim_unit *up, int32 v, void *dp)
+t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, void *dp)
 {
     if (screen)
         fprintf(st, "Panel displayed");
@@ -688,7 +688,7 @@ t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
     return SCPE_NOTATT;
 }
 
-t_stat besm6_show_panel (FILE *st, struct sim_unit *up, int32 v, void *dp)
+t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, void *dp)
 {
     return SCPE_NOTATT;
 }

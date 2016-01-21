@@ -367,7 +367,7 @@ int32 speed = 0;                                        /* Delay for each instru
 
 int32 XCT_mode = 0;                                     /* 1 if XCT mode */
 int32 XCT_inst = 0;                                     /* XCT instruction */
-int32 PPC = -1;
+int32 PrevPC = -1;
 int32 AMASK = 077777;
 
 struct ndev dev_table[64];                              /* dispatch table */
@@ -845,14 +845,14 @@ if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) {  /* breakpoint? */
 }
 
 if ((PC < 1 || PC > 077777) && Debug_Flags) {
-    if (PPC != -1) {                                    /* Don't break on 1st instruction */
-        printf("\n<<Invalid PC=%o from %o>>\n\r", PC, PPC);
+    if (PrevPC != -1) {                                    /* Don't break on 1st instruction */
+        printf("\n<<Invalid PC=%o from %o>>\n\r", PC, PrevPC);
         reason = STOP_IBKPT;
         break;
     }    
 }
 
-PPC = PC;
+PrevPC = PC;
 
 if (Debug_Flags) {
     if (!Tron) {

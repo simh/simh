@@ -37,7 +37,6 @@
 #ifndef PDP11_XQ_BOOTROM_H
 #define PDP11_XQ_BOOTROM_H
 
-#ifdef VM_PDP11
 /*
   Word 0: NOP
   Word 1: Branch to extended primary boot (EPB)
@@ -49,11 +48,6 @@
   Boot ROM code is available for each of the respective boards
   which are being simulated (DEQNA, DELQA and DELQA-T)
 */
-
-#define BOOT_LEN 512            /* EPB Code size */
-#define BOOT_START 0            /* Initial load Address of the EPB code */
-#define BOOT_ENTRY 0            /* Start address of EPB code */
-#define BOOT_XSUM_OFFSET 6      /* Location containing checksum offset */
 
 /*
   Bootrom code is from executing a Boot Diagnostic load command to a real
@@ -1111,6 +1105,194 @@ uint16 xq_bootrom_delqat[2048] = {
     0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,  /* 0FD0 (0007720) */
     0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,  /* 0FE0 (0007740) */
     0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x84D2,  /* 0FF0 (0007760) */
+    };
+
+#ifdef VM_PDP11
+#if 0
+/*
+Tim Shoppa said:
+
+Hopefully better late than never, but I finally got to digging and
+found that the CIQNDC0 sources give an example bootstrap:
+
+                IDENTIFICATION
+                --------------
+
+PRODUCT CODE:  AC-T612A-MC
+
+PRODUCT NAME:  CIQNDC0 DEQNA ROM RESIDENT CODE
+
+PRODUCT DATE:  29 June 1984
+
+MAINTAINER:    DIAGNOSTIC ENGINEERING
+
+[...]
+
+4.1     PRIMARY BOOT PROCESS
+
+The primary boot, resident in the host, normally checks for the existence 
+of the device it is going to boot from, boots 512. bytes from the device, 
+verifies the operation, sets parameters and transfers to the "booted" code.
+
+A suggested method for "checking" for a QNA is as follows:
+
+        Write a "2" (a module reset) into the QNA's CSR at location 
+        17774456 or 17774476.
+
+        Read back the CSR and compare against an octal 000062.
+
+        If equal then there is most likely a QNA there.
+
+        If not equal (Bus time-out?) then "sniff" elsewhere.
+
+        Write a "0" back into the CSR to "reset" the reset bit.
+
+If a QNA is present and it is to be used for the boot the first thing 
+then:
+
+        A descriptor for a 256. word "receive" is validated in the QNA.
+
+                Data is read into the host starting at location 0
+                The descriptor is 8 words long, words 0, 4, 5 and 6 will
+                contain operation status. Words 1, 2, 3, and 7 are constant.
+
+        Write a "1010" into the CSR to move the boot code into the QNA's
+        internal receive buffer and delay for approximately one second.
+
+        Write a "1000" into the CSR to move the data in the internal
+        receive buffer into host memory and delay for approximately one
+        second.
+
+        Reset the QNA and check the CSR for proper status.
+
+        Checked the receive descriptor for nominal states.
+
+        The Data transfer is verified.
+                                
+        If the QNA primary boot code detects a failure at this point the
+        host boot is re-entered.
+
+        Transfer is made to the first location of the freshly loaded 
+        portion of the QNA BD ROM.
+
+                R1 contains the I/O Page address of the QNA (174440)
+
+                R0 contains a "000000" if the DECnet boot resident on the 
+                QNA is to be used. 
+                                - or -
+                If R0 is greater than "000777" an effective JMP (R0) is 
+                executed in lieu of the DECnet boot.
+
+
+                Location 12 contains a "000000" if the EPB is to halt when 
+                an error is detected.
+                                - or -
+                If loaction 12 is greater than "000000" an effective JMP @12
+                is executed in lieu of a "HALT".                
+
+4.1.1   EXPECTED VALUES FOR VERIFICATION
+
+CSR is checked for a nominal state as are the status words in the receive
+descriptor.
+
+                Status  Nominal
+                ---------------
+                CSR     000060 or 010060
+                FLAG    14xxxx
+                BSW1    14xxxx
+                BSW2    14xxxx
+                CSW0    177777
+
+      x - don't care bits
+
+Next the actual data transfer is verified by checking the first three bytes 
+of the data transferred for standard values. These first locations and their
+expected contents are:
+
+                Location        Contents
+                --------------------------
+                0000-1          000240  (NOP)
+                0002               001  (a BR instruction)
+                0003               xxx
+
+                0004
+                 ..             The QNA Extended Primary Boot (EPB) code
+                0777
+
+4.1.2   SAMPLE PRIMARY BOOT CODE
+
+Below is an example of how a primary boot could be implemented on a typical
+PDP-11 based host.
+
+Upon entry R0 is coded to indicate which QNA is to be used for the boot. 
+The first 32K bytes of the host memory is assumed to be mapped 1 to 1 
+physical to logical. The I/O page is mapped to the last 4K.
+
+Assume settings for R0 as follows:      
+
+        R0 - Contains a "4" for QNA#1 @ 174440
+             Contains a "5" for QNA#2 @ 174460
+PDP-11 code for booting the DEQNA EPB might be as follows:
+*/
+#endif
+
+#define BOOT_LEN (sizeof(boot_rom)/sizeof(uint16))/* Code size */
+#define BOOT_START 020000               /* Initial load Address of the Boot code */
+#define BOOT_ENTRY (BOOT_START+0)       /* Start address of Boot code */
+
+static const uint16 boot_rom[] = {
+                               //       DESC = 4000                    ; Descriptor List Address
+                               //       DECnet = 0                     ; MOP boot request
+    0012701, 0174440,          // 0000         mov     #174440,r1      ; assume device is DEQNA #1
+    0022700, 0000004,          // 0004         cmp     #4,r0
+    0001402,                   // 0010         beq     10$             ; good assumption
+    0012701, 0177460,          // 0012         mov     #174460,r1      ; select device at DEQNA #2
+
+    0012761, 0000002, 0000016, // 0016 10$:    mov     #SR,16(r1)      ; assert QNA software reset
+    0032761, 0000062, 0000016, // 0024         bit     #<RL|XL|SR>,16(r1); "nominal" status during reset
+    0001466,                   // 0032         beq     90$             ;? not a proper response, halt
+    0005061, 0000016,          // 0034         clr     16(r1)          ; clear reset state and all others
+
+    0012703, 0004000,          // 0040         mov     #DESC,r3        ; pick an address for descriptor
+    0010304,                   // 0044         mov     r3,r4
+    0012724, 0100000,          // 0046         mov     #100000,(r4)+   ; Flag word, changed to -1
+    0011324,                   // 0052         mov     (r3),(r4)+      ; Valid buffer descriptor, receive
+    0005024,                   // 0054         clr     (r4)+           ; location zero
+    0012724, 0177400,          // 0056         mov      #-400,(r4)+    ; 256. words or 512. bytes
+    0005024,                   // 0062         clr     (r4)+           ; Descriptor status 1, changed to -1
+    0005024,                   // 0064         clr     (r4)+           ; Descriptor status 2, changed to -1
+    0011324,                   // 0066         mov     (r3),(r4)+      ; Another flag word, changed to -1
+    0012714, 0020000,          // 0070         mov     #020000,(r4)    ; end descriptor code
+    0010361, 0000004,          // 0074         mov     r3,04(r1)       ; receive descriptor low address
+    0005061, 0000006,          // 0100         clr     06(r1)          ; validate a receive descriptor
+
+    0012761, 0001010, 0000016, // 0104         mov     #<EL|BD>,16(r1) ; Instruct QNA to unload the EPB code
+    0005000,                   // 0112         clr     r0              ; delay about 60 ms for transfer of
+    0077001,                   // 0114         sob     r0,.            ; i8051 contents to receive FIFO
+    0012761, 0001000, 0000016, // 0116         mov     #<EL>,16(r1)    ; Complete the EPB unload
+    0005000,                   // 0124         clr     r0              ; delay about 60 ms for transfer of
+    0077001,                   // 0126         sob     r0,.            ; receive FIFO to host memory
+    0012761, 0000002, 0000016, // 0130         mov     #SR,16(r1)      ; reset
+    0005061, 0000016,          // 0136         clr     16(r1)          ; Final reset to complete operation
+
+    0012704, 0004014,          // 0142         mov     #<DESC+14>,r4
+    0042714, 0037777,          // 0146         bic     #037777,(r4)    ; check if last status word was updated 
+    0022714, 0140000,          // 0152         cmp     #140000,(r4)    ;
+    0001014,                   // 0156         bne     90$             ;
+
+    0022737, 0000240, 0000000, // 0160         cmp     #240,@#0        ; check for QNA boot block
+    0001010,                   // 0166         bne     90$             ;? operation data check
+    0122737, 0000001, 0000003, // 0170         cmpb    #001,@#3        ; check for "BR" opcode
+    0001004,                   // 0176         bne     90$             ;? operation data check
+
+    0012700, 0000000,          // 0200         mov     #DECnet,r0      ; Load DECnet code (or other code into R0)
+    0000137, 0000000,          // 0204         jmp     @#0             ; go to extended primary boot
+
+                               //              ; R0 - set to zero for DECnet boot
+                               //              ; R1 - has address of QNA #1 or #2
+
+    0000000,                   // 0210 90$:    halt            ;? QNA error, get back to host boot control?
+    0000776,                   // 0212         br      90$
     };
 #endif                                                  /* VM_PDP11 */
 

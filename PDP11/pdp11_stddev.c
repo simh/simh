@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   30-Dec-15    RMS     Added NOBEVENT support
    18-Apr-12    RMS     Modified to use clock coscheduling
    20-May-08    RMS     Standardized clock delay at 1mips
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
@@ -473,7 +474,10 @@ t_stat clk_reset (DEVICE *dptr)
 sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 if (CPUT (HAS_LTCR))                                    /* reg there? */
     clk_fie = clk_fnxm = 0;
-else clk_fie = clk_fnxm = 1;                            /* no, BEVENT */
+else {
+    clk_fnxm = 1;                                       /* no LTCR, set nxm */
+    clk_fie = CPUO (OPT_BVT);                           /* ie = 1 unless no BEVENT */
+    }
 clk_tps = clk_default;                                  /* set default tps */
 clk_csr = CSR_DONE;                                     /* set done */
 CLR_INT (CLK);

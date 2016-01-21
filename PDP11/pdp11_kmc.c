@@ -493,8 +493,8 @@ static t_stat kmc_setLineSpeed (UNIT *txup, int32 val, char *cptr, void *desc);
 static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, void *desc);
 static t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v, void *dp);
 
-static t_stat kmc_help (FILE *st, struct sim_device *dptr,
-                        struct sim_unit *uptr, int32 flag, const char *cptr); 
+static t_stat kmc_help (FILE *st, DEVICE *dptr,
+                        UNIT *uptr, int32 flag, const char *cptr); 
 static const char *kmc_description (DEVICE *dptr);
 
 /* Global data */
@@ -2941,8 +2941,8 @@ t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v,  void *dp) {
  *
  */
 
-static t_stat kmc_help (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag, const char *cptr) {
+static t_stat kmc_help (FILE *st, DEVICE *dptr,
+                         UNIT *uptr, int32 flag, const char *cptr) {
     const char *const text =
 " The KMC11-A is a general purpose microprocessor that is used in\n"
 " several DEC products.  The KDP is an emulation of one of those\n"

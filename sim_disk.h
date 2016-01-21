@@ -37,9 +37,9 @@ typedef uint32          t_lba;                          /* disk logical block ad
 
 /* Unit flags */
 
-#define DKUF_V_WLK      (UNIT_V_UF + 12)                /* write locked */
-#define DKUF_V_FMT      (UNIT_V_UF + 13)                /* disk file format */
-#define DKUF_W_FMT      3                               /* 3b of formats */
+#define DKUF_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
+#define DKUF_V_FMT      (UNIT_V_UF + 1)                 /* disk file format */
+#define DKUF_W_FMT      2                               /* 2b of formats */
 #define DKUF_N_FMT      (1u << DKUF_W_FMT)              /* number of formats */
 #define DKUF_M_FMT      ((1u << DKUF_W_FMT) - 1)
 #define DKUF_F_STD       0                              /* SIMH format */

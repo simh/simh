@@ -971,16 +971,16 @@ void dmc_queue_control_out (CTLR *controller, uint16 sel6);
 
 
 DEBTAB dmc_debug[] = {
-    {"TRACE",   DBG_TRC},
-    {"WARN",    DBG_WRN},
-    {"REG",     DBG_REG},
-    {"INTREG",  DBG_RGC},
-    {"INFO",    DBG_INF},
-    {"DATA",    DBG_DAT},
-    {"DATASUM", DBG_DTS},
-    {"MODEM",   DBG_MDM},
-    {"CONNECT", DBG_CON},
-    {"INT",     DBG_INT},
+    {"TRACE",   DBG_TRC, "trace routine calls"},
+    {"WARN",    DBG_WRN, "warnings"},
+    {"REG",     DBG_REG, "read/write registers"},
+    {"INTREG",  DBG_RGC, "internal read/write registers changes"},
+    {"INFO",    DBG_INF, "informational messages (high level trace)"},
+    {"DATA",    DBG_DAT, "data buffer contents"},
+    {"DATASUM", DBG_DTS, "data summary"},
+    {"MODEM",   DBG_MDM, "modem related transitions"},
+    {"CONNECT", DBG_CON, "connection establishment"},
+    {"INT",     DBG_INT, "interrupt activites"},
     {0}
     };
 
@@ -998,9 +998,10 @@ uint16 dmc_sel2[DMC_NUMDEVICE];
 uint16 dmc_sel4[DMC_NUMDEVICE];
 uint16 dmc_sel6[DMC_NUMDEVICE];
 
+#define PEERSIZE 512
 uint32 dmc_speed[DMC_NUMDEVICE];
-char dmc_peer[DMC_NUMDEVICE][CBUFSIZE];
-char dmc_port[DMC_NUMDEVICE][CBUFSIZE];
+char dmc_peer[DMC_NUMDEVICE][PEERSIZE];
+char dmc_port[DMC_NUMDEVICE][PEERSIZE];
 uint32 dmc_baseaddr[DMC_NUMDEVICE];
 uint16 dmc_basesize[DMC_NUMDEVICE];
 uint8 dmc_modem[DMC_NUMDEVICE];
@@ -1015,8 +1016,8 @@ uint16 dmp_sel6[DMC_NUMDEVICE];
 uint16 dmp_sel10[DMC_NUMDEVICE];
 
 uint32 dmp_speed[DMP_NUMDEVICE];
-char dmp_peer[DMP_NUMDEVICE][CBUFSIZE];
-char dmp_port[DMP_NUMDEVICE][CBUFSIZE];
+char dmp_peer[DMP_NUMDEVICE][PEERSIZE];
+char dmp_port[DMP_NUMDEVICE][PEERSIZE];
 uint32 dmp_baseaddr[DMP_NUMDEVICE];
 uint16 dmp_basesize[DMP_NUMDEVICE];
 uint8 dmp_modem[DMP_NUMDEVICE];
@@ -1058,8 +1059,8 @@ REG dmc_reg[] = {
     { BRDATAD (SPEED,            dmc_speed, DEV_RDX, 32, DMC_NUMDEVICE,         "line speed") },
     { BRDATAD (CORRUPT,     dmc_corruption, DEV_RDX, 32, DMC_NUMDEVICE,         "data corruption factor (0.1%)") },
     { BRDATAD (DIAG,         dmc_microdiag, DEV_RDX,  1, DMC_NUMDEVICE,         "Microdiagnostic Enabled") },
-    { BRDATAD (PEER,              dmc_peer, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "peer address:port") },
-    { BRDATAD (PORT,              dmc_port, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "listen port") },
+    { BRDATAD (PEER,              dmc_peer, DEV_RDX,  8, DMC_NUMDEVICE*PEERSIZE, "peer address:port") },
+    { BRDATAD (PORT,              dmc_port, DEV_RDX,  8, DMC_NUMDEVICE*PEERSIZE, "listen port") },
     { BRDATAD (BASEADDR,      dmc_baseaddr, DEV_RDX, 32, DMC_NUMDEVICE,         "program set base address") },
     { BRDATAD (BASESIZE,      dmc_basesize, DEV_RDX, 16, DMC_NUMDEVICE,         "program set base size") },
     { BRDATAD (MODEM,            dmc_modem, DEV_RDX,  8, DMC_NUMDEVICE,         "modem control bits") },
@@ -1076,8 +1077,8 @@ REG dmp_reg[] = {
     { BRDATAD (SEL10,            dmp_sel10, DEV_RDX, 16, DMP_NUMDEVICE,         "Select 10 CSR") },
     { BRDATAD (SPEED,            dmp_speed, DEV_RDX, 32, DMC_NUMDEVICE,         "line speed") },
     { BRDATAD (CORRUPT,     dmp_corruption, DEV_RDX, 32, DMC_NUMDEVICE,         "data corruption factor (0.1%)") },
-    { BRDATAD (PEER,              dmp_peer, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "peer address:port") },
-    { BRDATAD (PORT,              dmp_port, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "listen port") },
+    { BRDATAD (PEER,              dmp_peer, DEV_RDX,  8, DMC_NUMDEVICE*PEERSIZE, "peer address:port") },
+    { BRDATAD (PORT,              dmp_port, DEV_RDX,  8, DMC_NUMDEVICE*PEERSIZE, "listen port") },
     { BRDATAD (BASEADDR,      dmp_baseaddr, DEV_RDX, 32, DMC_NUMDEVICE,         "program set base address") },
     { BRDATAD (BASESIZE,      dmp_basesize, DEV_RDX, 16, DMC_NUMDEVICE,         "program set base size") },
     { BRDATAD (MODEM,            dmp_modem, DEV_RDX,  8, DMP_NUMDEVICE,         "modem control bits") },
@@ -1258,7 +1259,7 @@ t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc)
 DEVICE *dptr = (UNIBUS) ? ((&dmc_dev == find_dev_from_unit(uptr)) ? &dmc_dev : &dmp_dev) : &dmv_dev;
 int32 dmc = (int32)(uptr-dptr->units);
 char *peer = ((dptr == &dmc_dev)? &dmc_peer[dmc][0] : &dmp_peer[dmc][0]);
-char host[CBUFSIZE], port[CBUFSIZE];
+char host[PEERSIZE], port[PEERSIZE];
 
 if ((!cptr) || (!*cptr))
     return SCPE_ARG;
@@ -1268,7 +1269,7 @@ if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NU
     return SCPE_ARG;
 if (host[0] == '\0')
     return SCPE_ARG;
-strncpy(peer, cptr, CBUFSIZE-1);
+strncpy(peer, cptr, PEERSIZE-1);
 return SCPE_OK;
 }
 
@@ -3822,7 +3823,7 @@ sprintf (attach_string, "Line=%d,Connect=%s,%s", dmc, peer, cptr);
 ans = tmxr_open_master (mp, attach_string);                 /* open master socket */
 if (ans != SCPE_OK)
     return ans;
-strncpy (port, cptr, CBUFSIZE-1);
+strncpy (port, cptr, sizeof(dmc_port[0]));
 uptr->filename = (char *)malloc (strlen(port)+1);
 strcpy (uptr->filename, port);
 uptr->flags |= UNIT_ATT;

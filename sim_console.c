@@ -1320,8 +1320,25 @@ return SCPE_OK;
 t_stat sim_show_pchar (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 if (sim_devices[0]->dradix == 16)
-    fprintf (st, "pchar mask = %X\n", sim_tt_pchar);
-else fprintf (st, "pchar mask = %o\n", sim_tt_pchar);
+    fprintf (st, "pchar mask = %X", sim_tt_pchar);
+else fprintf (st, "pchar mask = %o", sim_tt_pchar);
+if (sim_tt_pchar) {
+    static char *pchars[] = {"NUL(^@)", "SOH(^A)", "STX(^B)", "ETX(^C)", "EOT(^D)", "ENQ(^E)", "ACK(^F)", "BEL(^G)", 
+                             "BS(^H)" , "HT(^I)",  "LF(^J)",  "VT(^K)",  "FF(^L)",  "CR(^M)",  "SO(^N)",  "SI(^O)",
+                             "DLE(^P)", "DC1(^Q)", "DC2(^R)", "DC3(^S)", "DC4(^T)", "NAK(^U)", "SYN(^V)", "ETB(^W)",
+                             "CAN(^X)", "EM(^Y)",  "SUB(^Z)", "ESC",     "FS",      "GS",      "RS",      "US"};
+    int i;
+    t_bool found = FALSE;
+
+    fprintf (st, " {");
+    for (i=31; i>=0; i--)
+        if (sim_tt_pchar & (1 << i)) {
+            fprintf (st, "%s%s", found ? "," : "", pchars[i]);
+            found = TRUE;
+            }
+    fprintf (st, "}");
+    }
+fprintf (st, "\n");
 return SCPE_OK;
 }
 
@@ -1503,6 +1520,14 @@ if (sim_deb) {
     if (sim_deb_switches & SWMASK ('A'))
         fprintf (st, "   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+        if (!(dptr->flags & DEV_DIS) &&
+            (dptr->flags & DEV_DEBUG) &&
+            (dptr->dctrl)) {
+            fprintf (st, "Device: %-6s ", dptr->name);
+            show_dev_debug (st, dptr, NULL, 0, NULL);
+            }
+        }
+    for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i) {
         if (!(dptr->flags & DEV_DIS) &&
             (dptr->flags & DEV_DEBUG) &&
             (dptr->dctrl)) {

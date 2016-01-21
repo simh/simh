@@ -217,8 +217,8 @@ static t_bool lp20_davfu (int32 c);
 static void update_lpcs (int32 flg);
 static void change_rdy (int32 setrdy, int32 clrrdy);
 static int16 evenbits (int16 value);
-static t_stat lp20_help (FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, const char *cptr); 
+static t_stat lp20_help (FILE *st, DEVICE *dptr,
+                            UNIT *uptr, int32 flag, const char *cptr); 
 static const char *lp20_description (DEVICE *dptr); 
 
 /* DEC standard VFU tape for 'optical' VFU default.
@@ -1278,8 +1278,8 @@ update_lpcs (0);
 return SCPE_OK;
 }
 
-static t_stat lp20_help (FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, const char *cptr)
+static t_stat lp20_help (FILE *st, DEVICE *dptr,
+                            UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, 
          "The LP20 DMA line printer controller is a UNIBUS device developed by the 36-bit product line.\n"

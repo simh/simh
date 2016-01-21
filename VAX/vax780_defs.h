@@ -292,7 +292,15 @@ typedef struct {
     int32               vloc;                           /* locator */
     int32               vec;                            /* value */
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
-    uint32              ulnt;                           /* IO length per unit */
+    uint32              ulnt;                           /* IO length per-device */
+                                                        /* Only need to be populated */
+                                                        /* when numunits != num devices */
+    int32               numc;                           /* Number of controllers */
+                                                        /* this field handles devices */
+                                                        /* where multiple instances are */
+                                                        /* simulated through a single */
+                                                        /* DEVICE structure (e.g., DZ, VH, DL, DC). */
+                                                        /* Populated by auto-configure */
     } DIB;
 
 /* Unibus I/O page layout - see pdp11_io_lib.c for address layout details
