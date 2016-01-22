@@ -197,7 +197,7 @@
 extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 
 #define CPU_MODEL_MODIFIERS                                                                     \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL=8600|8650",                                  \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={8600|8650}",                   \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Display processor model" }
 
 /* Unibus I/O registers */
