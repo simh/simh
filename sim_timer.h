@@ -33,6 +33,9 @@
 
 /* Pick up a struct timespec definition if it is available */
 #include <time.h>
+#if defined(__struct_timespec_defined)
+#define _TIMESPEC_DEFINED
+#endif
 #if defined(SIM_ASYNCH_IO) || defined(USE_READER_THREAD)
 #include <pthread.h>
 #endif
