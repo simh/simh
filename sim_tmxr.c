@@ -4387,10 +4387,12 @@ return SCPE_OK;
    If an error occurs, the original line order is not disturbed.
 */
 
-t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, char *carg, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
+char *tbuf;
 char *tptr;
+const char *cptr;
 t_addr low, high, max = (t_addr) mp->lines - 1;
 int32 *list;
 t_bool *set;
@@ -4400,7 +4402,7 @@ t_stat result = SCPE_OK;
 if (mp->lnorder == NULL)                                /* line connection order undefined? */
     return SCPE_NXPAR;                                  /* "Non-existent parameter" error */
 
-else if ((cptr == NULL) || (*cptr == '\0'))             /* line range not supplied? */
+else if ((carg == NULL) || (*carg == '\0'))             /* line range not supplied? */
     return SCPE_MISVAL;                                 /* "Missing value" error */
 
 list = (int32 *) calloc (mp->lines, sizeof (int32));    /* allocate new line order array */
@@ -4415,12 +4417,15 @@ if (set == NULL) {                                      /* allocation failed? */
     return SCPE_MEM;                                    /* report it */
     }
 
-tptr = cptr + strlen (cptr);                            /* append a semicolon */
+tbuf = (char *) calloc (strlen(carg)+2, sizeof(*carg));
+strcpy (tbuf, carg);
+tptr = tbuf + strlen (tbuf);                            /* append a semicolon */
 *tptr++ = ';';                                          /*   to the command string */
 *tptr = '\0';                                           /*   to make parsing easier for get_range */
+cptr = tbuf;
 
 while (*cptr) {                                         /* parse command string */
-    cptr = (char *)get_range (NULL, cptr, &low, &high, 10, max, ';');/* get a line range */
+    cptr = get_range (NULL, cptr, &low, &high, 10, max, ';');/* get a line range */
 
     if (cptr == NULL) {                                 /* parsing error? */
         result = SCPE_ARG;                              /* "Invalid argument" error */
@@ -4460,6 +4465,7 @@ if (result == SCPE_OK) {                                /* assignment successful
 
 free (list);                                            /* free list allocation */
 free (set);                                             /* free set allocation */
+free (tbuf);                                            /* free arg copy with ; */
 
 return result;
 }

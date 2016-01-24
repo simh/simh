@@ -347,7 +347,7 @@ char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream) = NULL;
 void (*sim_vm_post) (t_bool from_scp) = NULL;
 CTAB *sim_vm_cmd = NULL;
 void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr) = NULL;
-t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr) = NULL;
+t_addr (*sim_vm_parse_addr) (DEVICE *dptr, const char *cptr, const char **tptr) = NULL;
 t_value (*sim_vm_pc_value) (void) = NULL;
 t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
 t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason) = NULL;
@@ -2111,8 +2111,8 @@ return SCPE_EXIT;
 /* Used when sorting a list of command names */
 static int _cmd_name_compare (const void *pa, const void *pb)
 {
-CTAB **a = (CTAB **)pa;
-CTAB **b = (CTAB **)pb;
+CTAB * const *a = (CTAB * const *)pa;
+CTAB * const *b = (CTAB * const *)pb;
 
 return strcmp((*a)->name, (*b)->name);
 }
@@ -3306,7 +3306,7 @@ else {
         }
     else {                                              /* not reg, check for memory */
         if (sim_dfdev && sim_vm_parse_addr)             /* get addr */
-            addr = sim_vm_parse_addr (sim_dfdev, (char *)gbuf, (char **)&gptr);
+            addr = sim_vm_parse_addr (sim_dfdev, gbuf, &gptr);
         else addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev->dradix);
         if (gbuf == gptr)                               /* error? */
             return SCPE_NXREG;
@@ -5974,7 +5974,7 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
         if (*cptr != 0)                                 /* should be end */
             return SCPE_2MARG;
         if (sim_vm_parse_addr)                          /* address parser? */
-            pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, (char **)&tptr);
+            pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
         else pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
         if ((tptr == gbuf) || (*tptr != 0) ||           /* error? */
             (pcv > width_mask[sim_PC->width]))
@@ -6643,7 +6643,8 @@ t_stat dep_reg (int32 flag, char *cptr, REG *rptr, uint32 idx)
 t_stat r;
 t_value val, mask;
 int32 rdx;
-char *tptr, gbuf[CBUFSIZE];
+const char *tptr;
+char gbuf[CBUFSIZE];
 
 if ((cptr == NULL) || (rptr == NULL))
     return SCPE_IERR;
@@ -7283,7 +7284,7 @@ else {
         }
     else {
         if (dptr && sim_vm_parse_addr)                      /* get low */
-            *lo = sim_vm_parse_addr (dptr, (char *)cptr, (char **)&tptr);
+            *lo = sim_vm_parse_addr (dptr, cptr, &tptr);
         else
             *lo = (t_addr) strtotv (cptr, &tptr, rdx);
         if (cptr == tptr)                                   /* error? */
@@ -7291,7 +7292,7 @@ else {
         if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
             cptr = tptr + 1;
             if (dptr && sim_vm_parse_addr)                  /* get high */
-                *hi = sim_vm_parse_addr (dptr, (char *)cptr, (char **)&tptr);
+                *hi = sim_vm_parse_addr (dptr, cptr, &tptr);
             else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
             if (cptr == tptr)
                 return NULL;
@@ -7938,7 +7939,7 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
         logval = strtotv (cptr, &tptr, radix);
         if (cptr == tptr)
             return NULL;
-        cptr = (char *)tptr;
+        cptr = tptr;
         }
     else if ((sptr = strchr (cmpstr, c))) {             /* check for boolop */
         cmpop = (int32)(sptr - cmpstr);
@@ -7949,7 +7950,7 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
         cmpval = strtotv (cptr, &tptr, radix);
         if (cptr == tptr)
             return NULL;
-        cptr = (char *)tptr;
+        cptr = tptr;
         }
     else return NULL;
     }                                                   /* end for */
@@ -8152,10 +8153,10 @@ int32 nodigit;
 t_value val;
 uint32 c, digit;
 
-*endptr = (char *)inptr;                                /* assume fails */
+*endptr = inptr;                                        /* assume fails */
 if ((radix < 2) || (radix > 36))
     return 0;
-while (sim_isspace (*inptr))                                /* bypass white space */
+while (sim_isspace (*inptr))                            /* bypass white space */
     inptr++;
 val = 0;
 nodigit = 1;
@@ -8174,7 +8175,7 @@ for (c = *inptr; sim_isalnum(c); c = *++inptr) {        /* loop through char */
     }
 if (nodigit)                                            /* no digits? */
     return 0;
-*endptr = (char *)inptr;                                /* result pointer */
+*endptr = inptr;                                        /* result pointer */
 return val;
 }
 
@@ -9021,7 +9022,7 @@ return SCPE_OK;
 
 /* Set expect */
 
-t_stat sim_set_expect (EXPECT *exp, char *cptr)
+t_stat sim_set_expect (EXPECT *exp, const char *cptr)
 {
 char gbuf[CBUFSIZE], *tptr;
 const char *c1ptr;
@@ -9035,7 +9036,7 @@ if (*cptr == '[') {
     cnt = (int32) strtotv (cptr + 1, &c1ptr, 10);
     if ((cptr == c1ptr) || (*c1ptr != ']'))
         return sim_messagef (SCPE_ARG, "Invalid Repeat count specification\n");
-    cptr = (char *)(c1ptr + 1);
+    cptr = c1ptr + 1;
     while (sim_isspace(*cptr))
         ++cptr;
     }
@@ -9055,7 +9056,7 @@ return sim_exp_set (exp, gbuf, cnt, (after ? after : exp->after), sim_switches, 
 
 /* Clear expect */
 
-t_stat sim_set_noexpect (EXPECT *exp, char *cptr)
+t_stat sim_set_noexpect (EXPECT *exp, const char *cptr)
 {
 char gbuf[CBUFSIZE];
 
@@ -9136,7 +9137,7 @@ return SCPE_OK;
 
 /* Set/Add an expect rule */
 
-t_stat sim_exp_set (EXPECT *exp, const char *match, int32 cnt, uint32 after, int32 switches, char *act)
+t_stat sim_exp_set (EXPECT *exp, const char *match, int32 cnt, uint32 after, int32 switches, const char *act)
 {
 EXPTAB *ep;
 uint8 *match_buf;
@@ -9179,7 +9180,7 @@ else {
         free (match_buf);
         return sim_messagef (SCPE_ARG, "Case independed matching is only valid for RegEx expect rules\n");
         }
-    sim_data_trace(exp->dptr, exp->dptr->units, (uint8 *)match, "", strlen(match)+1, "Expect Match String", exp->dbit);
+    sim_data_trace(exp->dptr, exp->dptr->units, (const uint8 *)match, "", strlen(match)+1, "Expect Match String", exp->dbit);
     if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
         free (match_buf);
         return sim_messagef (SCPE_ARG, "Invalid quoted string\n");
@@ -9215,7 +9216,7 @@ if (switches & EXP_TYP_REGEX) {
     match_buf = NULL;
     }
 else {
-    sim_data_trace(exp->dptr, exp->dptr->units, (uint8 *)match, "", strlen(match)+1, "Expect Match String", exp->dbit);
+    sim_data_trace(exp->dptr, exp->dptr->units, (const uint8 *)match, "", strlen(match)+1, "Expect Match String", exp->dbit);
     sim_decode_quoted_string (match, match_buf, &match_size);
     ep->match = match_buf;
     ep->size = match_size;

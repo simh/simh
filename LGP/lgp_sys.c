@@ -237,21 +237,21 @@ else fprint_val (st, addr, dptr->aradix, dptr->awidth, PV_LEFT);
 return;
 }
 
-t_addr lgp_parse_addr (DEVICE *dptr, char *cptr, char **tptr)
+t_addr lgp_parse_addr (DEVICE *dptr, const char *cptr, const char **tptr)
 {
 t_addr ad, ea;
 
 if ((dptr == sim_devices[0]) &&
     ((sim_switches & SWMASK ('T')) ||
     ((cpu_unit.flags & UNIT_TTSS_D) && !(sim_switches & SWMASK ('N'))))) {
-    ad = (t_addr) strtotv (cptr, (const char **)tptr, 10);
+    ad = (t_addr) strtotv (cptr, tptr, 10);
     if (((ad / 100) >= NTK_30) || ((ad % 100) >= NSC_30)) {
         *tptr = cptr;
         return 0;
         }
     ea = ((ad / 100) * NSC_30) | (ad % 100);
     }
-else ea = (t_addr) strtotv (cptr, (const char **)tptr, dptr->aradix);
+else ea = (t_addr) strtotv (cptr, tptr, dptr->aradix);
 return ea;
 }
 
@@ -379,7 +379,8 @@ return SCPE_ARG;
 t_stat parse_sym_m (char *cptr, t_value *val, int32 sw)
 {
 uint32 ea, sgn;
-char *tptr, gbuf[CBUFSIZE];
+const char *tptr;
+char gbuf[CBUFSIZE];
 
 if (*cptr == '-') {
     cptr++;
