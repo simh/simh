@@ -560,7 +560,7 @@ static void tmxr_report_disconnection (TMLN *lp)
 {
 if (lp->notelnet)
     return;
-tmxr_linemsgf (lp, "\nDisconnected from the %s simulator\n\n", sim_name);/* report disconnection */
+tmxr_linemsgf (lp, "\r\nDisconnected from the %s simulator\r\n\n", sim_name);/* report disconnection */
 return;
 }
 
@@ -1408,8 +1408,11 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
         if (lp->serport)
             return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
         if ((lp->sock) || (lp->connecting)) {
-            if (bits_to_clear&TMXR_MDM_DTR)             /* drop DTR? */
+            if (bits_to_clear&TMXR_MDM_DTR) {           /* drop DTR? */
+                if (lp->sock)
+                    tmxr_report_disconnection (lp);     /* report closure */
                 tmxr_reset_ln (lp);
+                }
             }
         else {
             if ((lp->destination) &&                    /* Virtual Null Modem Cable */
