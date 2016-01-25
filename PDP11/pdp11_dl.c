@@ -612,10 +612,16 @@ if (dis) {
     dlo_dev.flags = dlo_dev.flags | DEV_DIS;
     }
 else {
-    if (((dli_dev.flags & DEV_DIS) || (dlo_dev.flags & DEV_DIS)) && 
-        (dlx_tu58_count() < 16)) {
-        if ((dlx_desc.lines + dlx_tu58_count()) > 16)
-            dlx_desc.lines = 16 - dlx_tu58_count();
+    if (dlx_tu58_count() < 16) {
+        if ((dlx_desc.lines + dlx_tu58_count()) > 16) {
+            char lines[16];
+            int32 saved_switches = sim_switches;
+            
+            sprintf (lines, "%d", 16 - dlx_tu58_count());
+            sim_switches |= SWMASK('Y');
+            dlx_set_lines (NULL, 0, lines, NULL);
+            sim_switches = saved_switches;
+            }
         dli_dev.flags = dli_dev.flags & ~DEV_DIS;
         dlo_dev.flags = dlo_dev.flags & ~DEV_DIS;
         }
