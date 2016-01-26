@@ -125,7 +125,7 @@ int32 i;
 uint32 origin, limit, step = 1;
 
 if (flag)                                               /* dump? */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_NOFNC, "Command Not Implemented\n");
 if (sim_switches & SWMASK ('R')) {                      /* ROM? */
     origin = ROMBASE;
     limit = ROMBASE + ROMSIZE;

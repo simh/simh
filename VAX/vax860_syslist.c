@@ -118,7 +118,7 @@ int32 val;
 uint32 origin, limit;
 
 if (flag)                                               /* dump? */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_NOFNC, "Command Not Implemented\n");
 origin = 0;                                             /* memory */
 limit = (uint32) cpu_unit.capac;
 if (sim_switches & SWMASK ('O')) {                      /* origin? */
