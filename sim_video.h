@@ -156,6 +156,8 @@
 struct mouse_event {
     int32 x_rel;                                          /* X axis relative motion */
     int32 y_rel;                                          /* Y axis relative motion */
+    int32 x_pos;                                          /* X axis position */
+    int32 y_pos;                                          /* Y axis position */
     t_bool b1_state;                                      /* state of button 1 */
     t_bool b2_state;                                      /* state of button 2 */
     t_bool b3_state;                                      /* state of button 3 */
@@ -176,6 +178,7 @@ t_stat vid_close (void);
 t_stat vid_poll_kb (SIM_KEY_EVENT *ev);
 t_stat vid_poll_mouse (SIM_MOUSE_EVENT *ev);
 void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf);
+void vid_beep (void);
 void vid_refresh (void);
 const char *vid_version (void);
 t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask);
@@ -199,7 +202,7 @@ void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set 
 #define SIM_VID_DBG_KEY     0x04000000
 #define SIM_VID_DBG_VIDEO   0x08000000
 
-#if HAVE_LIBSDL
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 #include <SDL.h>
 #endif /* HAVE_LIBSDL */
 

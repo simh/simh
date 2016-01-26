@@ -243,6 +243,7 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
 #define EVENT_OPEN       7                              /* vid_open request */
 #define EVENT_EXIT       8                              /* program exit */
 #define EVENT_SCREENSHOT 9                              /* show SDL capabilities */
+#define EVENT_BEEP      10                              /* audio beep */
 #define MAX_EVENTS       20                             /* max events in queue */
 
 typedef struct {
@@ -265,6 +266,7 @@ int vid_thread (void* arg);
 int vid_video_events (void);
 void vid_show_video_event (void);
 void vid_screenshot_event (void);
+void vid_beep_event (void);
 
 /* 
    libSDL and libSDL2 have significantly different APIs.  
@@ -283,6 +285,8 @@ int32 vid_flags;                                        /* Open Flags */
 int32 vid_width;
 int32 vid_height;
 t_bool vid_ready;
+static void vid_beep_setup (int duration_ms, int tone_frequency);
+static void vid_beep_cleanup (void);
 #if SDL_MAJOR_VERSION == 1
 
 /*
@@ -379,6 +383,8 @@ SDL_Init (SDL_INIT_VIDEO);
 vid_main_thread_handle = SDL_CreateThread (main_thread , "simh-main", NULL);
 #endif
 
+vid_beep_setup (400, 660);
+
 while (1) {
     int status = SDL_WaitEvent (&event);
     if (status == 1) {
@@ -394,8 +400,12 @@ while (1) {
                     if (event.user.code == EVENT_SCREENSHOT)
                         vid_screenshot_event ();
                     else {
-                        sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
-                        break;
+                        if (event.user.code == EVENT_BEEP)
+                            vid_beep_event ();
+                        else {
+                            sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
+                            break;
+                            }
                         }
                     }
                 }
@@ -410,6 +420,7 @@ while (1) {
         }
     }
 SDL_WaitThread (vid_main_thread_handle, &status);
+vid_beep_cleanup ();
 SDL_Quit ();
 return status;
 }
@@ -608,7 +619,7 @@ user_event.user.code = EVENT_DRAW;
 user_event.user.data1 = (void *)vid_dst;
 user_event.user.data2 = (void *)vid_data;
 if (SDL_PushEvent (&user_event) < 0) {
-    sim_printf ("%s: vid_draw() SDL_PushEvent error: %s\n", sim_dname(vid_dev), SDL_GetError());
+    sim_printf ("%s: vid_draw() SDL_PushEvent error: %s\n", vid_dev ? sim_dname(vid_dev) : "Video Device", SDL_GetError());
     free (vid_dst);
     free (vid_data);
     }
@@ -643,7 +654,7 @@ user_event.user.data1 = cursor;
 user_event.user.data2 = (void *)((size_t)visible);
 
 if (SDL_PushEvent (&user_event) < 0) {
-    sim_printf ("%s: vid_set_cursor() SDL_PushEvent error: %s\n", sim_dname(vid_dev), SDL_GetError());
+    sim_printf ("%s: vid_set_cursor() SDL_PushEvent error: %s\n", vid_dev ? sim_dname(vid_dev) : "Video Device", SDL_GetError());
     SDL_FreeCursor (cursor);
     }
 
@@ -674,10 +685,10 @@ if ((x_delta) || (y_delta)) {
             vid_mouse_yrel += ev->y_rel;
             }
         if (SDL_SemPost (vid_mouse_events.sem))
-            sim_printf ("%s: vid_set_cursor_position(): SDL_SemPost error: %s\n", sim_dname(vid_dev), SDL_GetError());
+            sim_printf ("%s: vid_set_cursor_position(): SDL_SemPost error: %s\n", vid_dev ? sim_dname(vid_dev) : "Video Device", SDL_GetError());
         }
     else {
-        sim_printf ("%s: vid_set_cursor_position(): SDL_SemWait error: %s\n", sim_dname(vid_dev), SDL_GetError());
+        sim_printf ("%s: vid_set_cursor_position(): SDL_SemWait error: %s\n", vid_dev ? sim_dname(vid_dev) : "Video Device", SDL_GetError());
         }
     vid_cursor_x = x;
     vid_cursor_y = y;
@@ -1206,12 +1217,16 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
         ev.b1_state = vid_mouse_b1;
         ev.b2_state = vid_mouse_b2;
         ev.b3_state = vid_mouse_b3;
+        ev.x_pos = event->x;
+        ev.y_pos = event->y;
         if ((vid_mouse_events.count > 0) &&             /* Is there a tail event? */
             (ev.b1_state == tail->b1_state) &&          /* With the same button state? */
             (ev.b2_state == tail->b2_state) && 
             (ev.b3_state == tail->b3_state)) {          /* Merge the motion */
             tail->x_rel += ev.x_rel;
             tail->y_rel += ev.y_rel;
+            tail->x_pos = ev.x_pos;
+            tail->y_pos = ev.y_pos;
             sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: Coalesced into pending event: (%d,%d) vid_mouse_rel:(%d,%d)\n", 
                 tail->x_rel, tail->y_rel, vid_mouse_xrel, vid_mouse_yrel);
             }
@@ -1276,6 +1291,8 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
     if (vid_mouse_events.count < MAX_EVENTS) {
         ev.x_rel = 0;
         ev.y_rel = 0;
+        ev.x_pos = event->x;
+        ev.y_pos = event->y;
         ev.b1_state = vid_mouse_b1;
         ev.b2_state = vid_mouse_b2;
         ev.b3_state = vid_mouse_b3;
@@ -1695,6 +1712,10 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
                         vid_screenshot_event ();
                         event.user.code = 0;    /* Mark as done */
                         }
+                    if (event.user.code == EVENT_BEEP) {
+                        vid_beep_event ();
+                        event.user.code = 0;    /* Mark as done */
+                        }
                     if (event.user.code != 0) {
                         sim_printf ("vid_thread(): Unexpected user event code: %d\n", event.user.code);
                         }
@@ -1738,7 +1759,9 @@ SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
 
 SDL_Init (SDL_INIT_VIDEO);
 #endif
+vid_beep_setup (400, 660);
 vid_video_events ();
+vid_beep_cleanup ();
 SDL_Quit ();
 return 0;
 }
@@ -2132,6 +2155,88 @@ while (_screenshot_stat == -1)
 return _screenshot_stat;
 }
 
+#include <SDL_audio.h>
+#include <math.h>
+
+const int AMPLITUDE = 20000;
+const int SAMPLE_FREQUENCY = 11025;
+static int16 *vid_beep_data;
+static int vid_beep_offset;
+static int vid_beep_duration;
+static int vid_beep_samples;
+
+static void vid_audio_callback(void *ctx, Uint8 *stream, int length)
+{
+int16 *data = (int16 *)stream;
+int i, sum, remnant = ((vid_beep_samples - vid_beep_offset) * sizeof (*vid_beep_data));
+
+if (length > remnant) {
+    memset (stream + remnant, 0, length - remnant);
+    length = remnant;
+    if (remnant == 0) {
+        SDL_PauseAudio(1);
+        return;
+        }
+    }
+memcpy (stream, &vid_beep_data[vid_beep_offset], length);
+for (i=sum=0; i<length; i++)
+    sum += stream[i];
+vid_beep_offset += length / sizeof(*vid_beep_data);
+}
+
+static void vid_beep_setup (int duration_ms, int tone_frequency)
+{
+if (!vid_beep_data) {
+    int i;
+    SDL_AudioSpec desiredSpec;
+
+    memset (&desiredSpec, 0, sizeof(desiredSpec));
+    desiredSpec.freq = SAMPLE_FREQUENCY;
+    desiredSpec.format = AUDIO_S16SYS;
+    desiredSpec.channels = 1;
+    desiredSpec.samples = 2048;
+    desiredSpec.callback = vid_audio_callback;
+
+    SDL_OpenAudio(&desiredSpec, NULL);
+
+    vid_beep_samples = (int)((SAMPLE_FREQUENCY * duration_ms) / 1000.0);
+    vid_beep_duration = duration_ms;
+    vid_beep_data = (int16 *)malloc (sizeof(*vid_beep_data) * vid_beep_samples);
+    for (i=0; i<vid_beep_samples; i++)
+        vid_beep_data[i] = (int16)(AMPLITUDE * sin(((double)(i * M_PI * tone_frequency)) / SAMPLE_FREQUENCY));
+    }
+}
+
+static void vid_beep_cleanup (void)
+{
+SDL_CloseAudio();
+free (vid_beep_data);
+vid_beep_data = NULL;
+}
+
+void vid_beep_event (void)
+{
+vid_beep_offset = 0;                /* reset to beginning of sample set */
+SDL_PauseAudio (0);                 /* Play sound */
+}
+
+void vid_beep (void)
+{
+SDL_Event user_event;
+
+user_event.type = SDL_USEREVENT;
+user_event.user.code = EVENT_BEEP;
+user_event.user.data1 = NULL;
+user_event.user.data2 = NULL;
+#if defined (SDL_MAIN_AVAILABLE)
+while (SDL_PushEvent (&user_event) < 0)
+    sim_os_ms_sleep (10);
+#else
+vid_beep_event ();
+#endif
+SDL_Delay (vid_beep_duration + 100);/* Wait for sound to finnish */
+}
+
 #else /* !(defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)) */
 /* Non-implemented versions */
 
@@ -2173,6 +2278,11 @@ return;
 }
 
 void vid_refresh (void)
+{
+return;
+}
+
+void vid_beep (void)
 {
 return;
 }

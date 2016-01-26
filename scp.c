@@ -221,9 +221,7 @@
 #include "sim_tape.h"
 #include "sim_ether.h"
 #include "sim_serial.h"
-#if defined (USE_SIM_VIDEO)
 #include "sim_video.h"
-#endif
 #include "sim_sock.h"
 #include "sim_frontpanel.h"
 #include <signal.h>
@@ -2007,6 +2005,7 @@ detach_all (0, TRUE);                                   /* close files */
 sim_set_deboff (0, NULL);                               /* close debug */
 sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
+vid_close ();                                           /* close video */
 sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
 sim_cleanup_sock ();                                    /* cleanup sockets */
@@ -4339,9 +4338,7 @@ if (flag) {
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
-#if defined (USE_SIM_VIDEO)
     fprintf (st, "\n\t\tSDL Video support: %s", vid_version());
-#endif
 #if defined (HAVE_PCREPOSIX_H)
     fprintf (st, "\n\t\tPCRE RegEx support for EXPECT commands");
 #elif defined (HAVE_REGEX_H)
@@ -5452,7 +5449,7 @@ return SCPE_OK;
 
 const char *sim_dname (DEVICE *dptr)
 {
-return (dptr->lname? dptr->lname: dptr->name);
+return (dptr ? (dptr->lname? dptr->lname: dptr->name) : "");
 }
 
 /* Get unit display name */
