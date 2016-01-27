@@ -349,7 +349,7 @@ static t_stat fdc_start(UNIT *uptr,int time) {
 
 static t_stat fdc_stop(UNIT *uptr) {
   /* request service */
-  sim_debug(DBG_FD_SVC, &fdc_dev, DBG_PCFORMAT2 "Cancel Service\n", DBG_PC, time);
+  sim_debug(DBG_FD_SVC, &fdc_dev, DBG_PCFORMAT2 "Cancel Service\n", DBG_PC);
   return sim_cancel(uptr);
 }
 

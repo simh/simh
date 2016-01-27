@@ -1822,7 +1822,7 @@ char gbuf[CBUFSIZE];
 if ((cptr == NULL) || (!*cptr))
     return SCPE_ARG;
 cptr = get_glyph (cptr, gbuf, 0);
-if (MATCH_CMD(cptr, "VAXSERVER") == 0) {
+if (MATCH_CMD(gbuf, "VAXSERVER") == 0) {
     sys_model = 0;
     strcpy (sim_name, "VAXServer 3900 (KA655)");
     }
@@ -1845,7 +1845,7 @@ else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
     reset_all (0);                                       /* reset everything */
 #else
-    return SCPE_ARG;
+    return sim_messagef(SCPE_ARG, "Simulator built without Graphic Device Support");
 #endif
     }
 else

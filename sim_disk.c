@@ -1511,9 +1511,11 @@ return SCPE_OK;
 
 /* Factory bad block table creation routine
 
-   This routine writes a DEC standard 044 compliant bad block table on the
-   last track of the specified unit.  The bad block table consists of 10
-   repetitions of the same table, formatted as follows:
+   This routine writes a DEC standard 144 compliant bad block table on the
+   last track of the specified unit as described in: 
+      EL-00144_B_DEC_STD_144_Disk_Standard_for_Recording_and_Handling_Bad_Sectors_Nov76.pdf
+   The bad block table consists of 10 repetitions of the same table, 
+   formatted as follows:
 
         words 0-1       pack id number
         words 2-3       cylinder/sector/surface specifications
@@ -1552,17 +1554,13 @@ if (!get_yn ("Overwrite last track? [N]", FALSE))
     return SCPE_OK;
 if ((buf = (uint16 *) malloc (wds * sizeof (uint16))) == NULL)
     return SCPE_MEM;
-if ((namebuf = (char *) malloc (1 + strlen (uptr->filename))) == NULL) {
-    free (buf);
-    return SCPE_MEM;
-    }
-strcpy (namebuf, uptr->filename);
+namebuf = uptr->filename;
 if ((c = strrchr (namebuf, '/')))
-    memcpy (namebuf, c+1, strlen(c+1)+1);
+    namebuf = c+1;
 if ((c = strrchr (namebuf, '\\')))
-    memcpy (namebuf, c+1, strlen(c+1)+1);
+    namebuf = c+1;
 if ((c = strrchr (namebuf, ']')))
-    memcpy (namebuf, c+1, strlen(c+1)+1);
+    namebuf = c+1;
 packid = eth_crc32(0, namebuf, strlen (namebuf));
 buf[0] = (uint16)packid;
 buf[1] = (uint16)(packid >> 16) & 0x7FFF;   /* Make sure MSB is clear */

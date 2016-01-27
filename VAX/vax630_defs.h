@@ -91,7 +91,7 @@
 
 /* CPU */
 
-#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0,          "MODEL", "MODEL={MICROVAX|VAXSTATION}",        \
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0,          "MODEL", "MODEL={MicroVAX|VAXStation}",        \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" },  \
                             { MTAB_XTD|MTAB_VDV, 0,          "DIAG", "DIAG={FULL|MIN}",                     \
                               &sysd_set_diag, &sysd_show_diag, NULL, "Set/Show boot rom diagnostic mode" }, \

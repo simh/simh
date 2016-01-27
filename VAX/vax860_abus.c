@@ -841,10 +841,14 @@ return SCPE_OK;
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (cptr == NULL) return SCPE_ARG;
-if (strcmp(cptr, "8600") == 0)
+if (strcmp(cptr, "8600") == 0) {
    sys_model = 0;
-else if (strcmp(cptr, "8650") == 0)
+   strcpy (sim_name, "VAX 8600");
+   }
+else if (strcmp(cptr, "8650") == 0) {
    sys_model = 1;
+   strcpy (sim_name, "VAX 8650");
+   }
 else
    return SCPE_ARG;
 return SCPE_OK;

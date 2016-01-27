@@ -139,7 +139,7 @@ DIB xua_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
                 1, IVCL (XU), VEC_AUTO, {&xu_int}, IOLN_XU };
 
 UNIT xua_unit[] = {
- { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },     /* receive timer */
  { UDATA (&xu_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) }
 };
 
@@ -245,7 +245,7 @@ DIB xub_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
                 1, IVCL (XU), 0, { &xu_int }, IOLN_XU };
 
 UNIT xub_unit[] = {
- { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },     /* receive timer */
  { UDATA (&xu_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) }
 };
 

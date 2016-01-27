@@ -1441,12 +1441,12 @@ td_ctrls = newln;
 td_dib.lnt = td_ctrls * td_dib.ulnt;            /* upd IO page lnt */
 /* Make sure that the number of TU58 controllers plus DL devices is 16 or less */
 if ((dli_dptr != NULL) && !(dli_dptr->flags & DEV_DIS) && 
-    ((((DIB *)dli_dptr->ctxt)->numc + td_ctrls) > 16)) {
-    dli_dptr->flags |= DEV_DIS;
-    dli_dptr->reset (dli_dptr);
-    if (td_ctrls < 16) {
-        dli_dptr->flags &= ~DEV_DIS;
-        dli_dptr->reset (dli_dptr);
+    ((((DIB *)dli_dptr->ctxt)->numc + td_ctrls) > 16)) { /* Too many? */
+    dli_dptr->flags |= DEV_DIS;                 /* First disable DL devices */
+    dli_dptr->reset (dli_dptr);                 /* Notify of the disable */
+    if (td_ctrls < 16) {                        /* Room for some DL devices? */
+        dli_dptr->flags &= ~DEV_DIS;            /* Re-Enable DL devices */
+        dli_dptr->reset (dli_dptr);             /* Notify of the enable which forces sizing */
         }
     }
 return td_reset (&tdc_dev);

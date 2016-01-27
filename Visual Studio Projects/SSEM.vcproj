@@ -148,10 +148,10 @@
 				AdditionalLibraryDirectories="../../windows-build/PCRE/lib/"
 				GenerateDebugInformation="false"
 				SubSystem="1"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
 				StackReserveSize="10485760"
 				StackCommitSize="10485760"
+				OptimizeReferences="2"
+				EnableCOMDATFolding="2"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
@@ -227,6 +227,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_video.c"
+				>
+			</File>
+			<File
 				RelativePath="..\SSEM\ssem_cpu.c"
 				>
 			</File>
@@ -285,6 +289,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_video.h"
 				>
 			</File>
 			<File

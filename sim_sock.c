@@ -384,7 +384,7 @@ static int     WSAAPI s_getnameinfo (const struct sockaddr *sa, socklen_t salen,
 {
 struct hostent *he;
 struct servent *se = NULL;
-struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+const struct sockaddr_in *sin = (const struct sockaddr_in *)sa;
 
 if (sin->sin_family != PF_INET)
     return EAI_FAMILY;
@@ -416,7 +416,7 @@ if ((host) && (hostlen > 0)) {
     if (flags & NI_NUMERICHOST)
         he = NULL;
     else
-        he = gethostbyaddr((char *)&sin->sin_addr, 4, AF_INET);
+        he = gethostbyaddr((const char *)&sin->sin_addr, 4, AF_INET);
     if (he) {
         if (hostlen < strlen(he->h_name)+1)
             return EAI_OVERFLOW;

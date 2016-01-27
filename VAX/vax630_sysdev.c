@@ -1049,7 +1049,6 @@ return SCPE_OK;
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 char gbuf[CBUFSIZE];
 
 if ((cptr == NULL) || (!*cptr))
@@ -1057,26 +1056,29 @@ if ((cptr == NULL) || (!*cptr))
 cptr = get_glyph (cptr, gbuf, 0);
 if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
     sys_model = 0;
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
     vc_dev.flags = vc_dev.flags | DEV_DIS;               /* disable QVSS */
     lk_dev.flags = lk_dev.flags | DEV_DIS;               /* disable keyboard */
     vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
+#endif
     strcpy (sim_name, "MicroVAX II (KA630)");
     reset_all (0);                                       /* reset everything */
     }
 else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
     sys_model = 1;
     vc_dev.flags = vc_dev.flags & ~DEV_DIS;              /* enable QVSS */
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
     strcpy (sim_name, "VAXStation II (KA630)");
     reset_all (0);                                       /* reset everything */
+#else
+    return sim_messagef(SCPE_ARG, "Simulator built without Graphic Device Support");
+#endif
     }
 else
     return SCPE_ARG;
 return SCPE_OK;
-#else
-return SCPE_NOFNC;
-#endif
 }
 
 t_stat cpu_print_model (FILE *st)

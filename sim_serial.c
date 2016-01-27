@@ -222,8 +222,8 @@ return;
 /* Used when sorting a list of serial port names */
 static int _serial_name_compare (const void *pa, const void *pb)
 {
-SERIAL_LIST *a = (SERIAL_LIST *)pa;
-SERIAL_LIST *b = (SERIAL_LIST *)pb;
+const SERIAL_LIST *a = (const SERIAL_LIST *)pa;
+const SERIAL_LIST *b = (const SERIAL_LIST *)pb;
 
 return strcmp(a->name, b->name);
 }

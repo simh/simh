@@ -243,8 +243,10 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 int32 c[6], d, i, cnt, csum;
 uint32 org;
 
-if ((*cptr != 0) || (flag != 0))
+if (*cptr != 0)
     return SCPE_ARG;
+if (flag != 0)
+    return sim_messagef (SCPE_NOFNC, "Command Not Implemented\n");
 do {                                                    /* block loop */
     csum = 0;                                           /* init checksum */
     for (i = 0; i < 6; ) {                              /* 6 char header */

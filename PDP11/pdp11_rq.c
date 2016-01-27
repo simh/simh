@@ -155,12 +155,12 @@ extern uint32 cpu_opt;
 #define RQ_MAPXFER      (1u << 31)                      /* mapped xfer */
 #define RQ_M_PFN        0x1FFFFF                        /* map entry PFN */
 
-#define UNIT_V_ONL      (UNIT_V_UF + 0)                 /* online */
-#define UNIT_V_WLK      (UNIT_V_UF + 1)                 /* hwre write lock */
-#define UNIT_V_ATP      (UNIT_V_UF + 2)                 /* attn pending */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 3)                 /* drive type */
+#define UNIT_V_ONL      (DKUF_V_UF + 0)                 /* online */
+#define UNIT_V_WLK      (DKUF_V_UF + 1)                 /* hwre write lock */
+#define UNIT_V_ATP      (DKUF_V_UF + 2)                 /* attn pending */
+#define UNIT_V_DTYPE    (DKUF_V_UF + 3)                 /* drive type */
 #define UNIT_M_DTYPE    0x1F
-#define UNIT_V_NOAUTO   (UNIT_V_UF + 8)                 /* noautosize */
+#define UNIT_V_NOAUTO   (DKUF_V_UF + 8)                 /* noautosize */
 #define UNIT_ONL        (1 << UNIT_V_ONL)
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_ATP        (1 << UNIT_V_ATP)

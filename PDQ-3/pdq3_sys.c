@@ -155,7 +155,7 @@ void pdq3_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
   return;
 }
 
-t_addr pdq3_parse_addr (DEVICE *dptr, char *cptr, char **tptr)
+t_addr pdq3_parse_addr (DEVICE *dptr, const char *cptr, const char **tptr)
 {
   t_addr seg, off;
   if (cptr[0] == '#') {
@@ -207,13 +207,13 @@ static t_stat pdq3_cmd_exstack(int32 arg, char *buf)
 
 static t_stat pdq3_cmd_exmscw(int32 arg, char *buf)
 {
-  char* next;
+  const char* next;
   return dbg_dump_mscw(stdout, buf[0] ? pdq3_parse_addr(&cpu_dev, buf, &next) : reg_mp);
 }
 
 static t_stat pdq3_cmd_extib(int32 arg, char *buf)
 {
-  char* next;
+  const char* next;
   return dbg_dump_tib(stdout, buf[0] ? pdq3_parse_addr(&cpu_dev, buf, &next) : reg_ctp);
 }
 
@@ -222,7 +222,7 @@ static t_stat pdq3_cmd_exseg(int32 arg, char *buf)
   t_stat rc;
   uint16 nsegs;
   uint16 segnum, segptr;
-  char* next;
+  const char* next;
   FILE* fd = stdout; /* XXX */
   
   if (reg_ssv < 0x2030 || reg_ssv > 0xf000) {

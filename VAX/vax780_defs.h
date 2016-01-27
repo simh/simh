@@ -174,8 +174,8 @@
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
 extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define CPU_MODEL_MODIFIERS                                                                     \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
-                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={780|785}",                     \
+                          &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" }
 
 /* Unibus I/O registers */
 

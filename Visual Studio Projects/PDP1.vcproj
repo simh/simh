@@ -269,6 +269,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_video.c"
+				>
+			</File>
+			<File
 				RelativePath="..\display\win32.c"
 				>
 			</File>
@@ -331,6 +335,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_video.h"
 				>
 			</File>
 			<File

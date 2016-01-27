@@ -300,6 +300,10 @@
 				RelativePath="..\sim_tmxr.c"
 				>
 			</File>
+			<File
+				RelativePath="..\sim_video.c"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -355,6 +359,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_video.h"
 				>
 			</File>
 		</Filter>
