@@ -794,7 +794,7 @@ if ((vc_dev.dctrl & DBG_CURSOR) && (vc_dev.dctrl & DBG_TCURSOR)) {
             }
         }
     }
-vid_set_cursor (visible, 16, 16, data, mask);
+vid_set_cursor (visible, 16, 16, data, mask, 0, 0);
 }
 
 void vc_checkint (void)

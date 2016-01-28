@@ -608,11 +608,20 @@ uint32 *vid_data;
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
 
 vid_dst = (SDL_Rect *)malloc (sizeof(*vid_dst));
+if (!vid_dst) {
+    sim_printf ("%s: vid_draw() memory allocation error\n", vid_dev ? sim_dname(vid_dev) : "Video Device");
+    return;
+    }
 vid_dst->x = x;
 vid_dst->y = y;
 vid_dst->w = w;
 vid_dst->h = h;
 vid_data = (uint32 *)malloc (w*h*sizeof(*buf));
+if (!vid_data) {
+    sim_printf ("%s: vid_draw() memory allocation error\n", vid_dev ? sim_dname(vid_dev) : "Video Device");
+    free (vid_dst);
+    return;
+    }
 memcpy (vid_data, buf, w*h*sizeof(*buf));
 user_event.type = SDL_USEREVENT;
 user_event.user.code = EVENT_DRAW;
@@ -626,9 +635,9 @@ if (SDL_PushEvent (&user_event) < 0) {
 #endif
 }
 
-t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask)
+t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask, uint32 hot_x, uint32 hot_y)
 {
-SDL_Cursor *cursor = SDL_CreateCursor (data, mask, width, height, 0, 0);
+SDL_Cursor *cursor = SDL_CreateCursor (data, mask, width, height, hot_x, hot_y);
 SDL_Event user_event;
 
 sim_debug (SIM_VID_DBG_CURSOR, vid_dev, "vid_set_cursor(%s, %d, %d) Setting New Cursor\n", visible ? "visible" : "invisible", width, height);
@@ -1348,7 +1357,7 @@ if (visible)
 if ((vid_window == SDL_GetMouseFocus ()) && visible)
     SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);/* sync position */
 #endif
-if (vid_cursor)
+if ((vid_cursor != cursor) && (vid_cursor))
     SDL_FreeCursor (vid_cursor);
 vid_cursor = cursor;
 SDL_ShowCursor (visible);
@@ -2089,6 +2098,8 @@ if (!vid_active) {
     return SCPE_UDIS | SCPE_NOMESSAGE;
     }
 fullname = malloc (strlen(filename) + 5);
+if (!filename)
+    return SCPE_MEM;
 #if SDL_MAJOR_VERSION == 1
 #if defined(HAVE_LIBPNG)
 sprintf (fullname, "%s.png", filename);
@@ -2267,7 +2278,7 @@ void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf)
 return;
 }
 
-t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask)
+t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask, uint32 hot_x, uint32 hot_y)
 {
 return SCPE_NOFNC;
 }
