@@ -947,6 +947,13 @@ static const char simh_help[] =
 #define HLP_LS          "*Commands Listing_Files LS"
       "3LS\n"
       "++LS {path}                 list directory files\n"
+      "2Displaying Files\n"
+#define HLP_TYPE         "*Commands Displaying_Files TYPE"
+      "3TYPE\n"
+      "++TYPE {file}               display a file contents\n"
+#define HLP_CAT          "*Commands Displaying_Files CAT"
+      "3CAT\n"
+      "++CAT {file}                display a file contents\n"
 #define HLP_SET         "*Commands SET"
       "2SET\n"
        /***************** 80 character line width template *************************/
@@ -1724,6 +1731,8 @@ static CTAB cmd_table[] = {
     { "PWD",        &pwd_cmd,       0,          HLP_PWD },
     { "DIR",        &dir_cmd,       0,          HLP_DIR },
     { "LS",         &dir_cmd,       0,          HLP_LS },
+    { "TYPE",       &type_cmd,      0,          HLP_TYPE },
+    { "CAT",        &type_cmd,      0,          HLP_CAT },
     { "SET",        &set_cmd,       0,          HLP_SET },
     { "SHOW",       &show_cmd,      0,          HLP_SHOW },
     { "DO",         &do_cmd,        1,          HLP_DO },
@@ -4890,6 +4899,25 @@ return SCPE_OK;
 }
 
 #endif /* !defined(_WIN32) */
+
+
+t_stat type_cmd (int32 flg, char *cptr)
+{
+FILE *file;
+char lbuf[CBUFSIZE*2];
+
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+sim_trim_endspc(cptr);
+file = sim_fopen (cptr, "r");
+if (file == NULL)                           /* open failed? */
+    return SCPE_OPENERR;
+lbuf[sizeof(lbuf)-1] = '\0';
+while (fgets (lbuf, sizeof(lbuf)-1, file))
+    sim_printf ("%s", lbuf);
+fclose (file);
+return SCPE_OK;
+}
 
 /* Breakpoint commands */
 
@@ -9608,6 +9636,7 @@ static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr)
 {
 static const char *debtab_none    = "DEBTAB_ISNULL";
 static const char *debtab_nomatch = "DEBTAB_NOMATCH";
+const char *some_match = NULL;
 int32 offset = 0;
 
 if (dptr->debflags == 0)
@@ -9616,11 +9645,13 @@ if (dptr->debflags == 0)
 /* Find matching words for bitmask */
 
 while (dptr->debflags[offset].name && (offset < 32)) {
-    if (dptr->debflags[offset].mask & dbits)
+    if (dptr->debflags[offset].mask == dbits)   /* All Bits Match */
         return dptr->debflags[offset].name;
+    if (dptr->debflags[offset].mask & dbits)
+        some_match = dptr->debflags[offset].name;
     offset++;
     }
-return debtab_nomatch;
+return some_match ? some_match : debtab_nomatch;
 }
 
 /* Prints standard debug prefix unless previous call unterminated */
