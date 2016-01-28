@@ -555,7 +555,8 @@ static uint32 rtc_elapsed[SIM_NTIMERS] = { 0 };         /* sec since init */
 static uint32 rtc_calibrations[SIM_NTIMERS] = { 0 };    /* calibration count */
 static double rtc_clock_skew_max[SIM_NTIMERS] = { 0 };  /* asynchronous max skew */
 
-UNIT sim_timer_units[SIM_NTIMERS+1];                    /* one for each timer and one for throttle */
+UNIT sim_timer_units[SIM_NTIMERS+2];                    /* one for each timer and one for throttle */
+                                                        /* plus one for an internal clock if no clocks are registered */
 
 
 void sim_rtcn_init_all (void)
@@ -896,7 +897,7 @@ MTAB sim_timer_mod[] = {
 
 DEVICE sim_timer_dev = {
     "TIMER", sim_timer_units, sim_timer_reg, sim_timer_mod, 
-    SIM_NTIMERS+1, 0, 0, 0, 0, 0, 
+    SIM_NTIMERS+2, 0, 0, 0, 0, 0, 
     NULL, NULL, NULL, NULL, NULL, NULL, 
     NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
 
@@ -1376,8 +1377,34 @@ return NULL;
 
 #endif /* defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS) */
 
+/*
+   In the event that there are no active clock devices, no instruction 
+   rate calibration will be performed.  This is more likely on simpler
+   simulators which don't have a full spectrum of standard devices or 
+   possibly when a clock device exists but its use is optional.
+   
+   To solve this we merely run an internal clock at 50Hz.
+ */
+#define CLK_TPS 50
+static sim_timer_clock_tick_svc (UNIT *uptr)
+{
+sim_rtcn_calb (CLK_TPS, SIM_NTIMERS-1);
+sim_activate_after (uptr, 1000000/CLK_TPS);             /* reactivate unit */
+}
+
 void sim_start_timer_services (void)
 {
+uint32 i;
+
+for (i = 0; i < SIM_NTIMERS; i++)
+    if (rtc_initd[i] != 0)
+        break;
+if (i == SIM_NTIMERS) {     /* No clocks have signed in. */
+    /* setup internal clock */
+    sim_timer_units[SIM_NTIMERS+1].action = &sim_timer_clock_tick_svc;
+    sim_rtcn_init_unit (&sim_timer_units[SIM_NTIMERS+1], 5000, SIM_NTIMERS-1);
+    sim_activate_abs (&sim_timer_units[SIM_NTIMERS+1], 5000);
+    }
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 pthread_mutex_lock (&sim_timer_lock);
 if (sim_asynch_enabled && sim_asynch_timer) {
