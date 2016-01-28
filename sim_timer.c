@@ -895,10 +895,12 @@ MTAB sim_timer_mod[] = {
   { 0 },
 };
 
+static t_stat sim_timer_clock_reset (DEVICE *dptr);
+
 DEVICE sim_timer_dev = {
     "TIMER", sim_timer_units, sim_timer_reg, sim_timer_mod, 
     SIM_NTIMERS+2, 0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, NULL, &sim_timer_clock_reset, NULL, NULL, NULL, 
     NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
 
 
@@ -1390,6 +1392,25 @@ static t_stat sim_timer_clock_tick_svc (UNIT *uptr)
 {
 sim_rtcn_calb (CLK_TPS, SIM_NTIMERS-1);
 sim_activate_after (uptr, 1000000/CLK_TPS);             /* reactivate unit */
+return SCPE_OK;
+}
+
+static t_stat sim_timer_clock_reset (DEVICE *dptr)
+{
+uint32 i;
+
+for (i = 0; i < SIM_NTIMERS; i++)
+    if (rtc_initd[i] != 0)
+        break;
+if (i == SIM_NTIMERS) {     /* No clocks have signed in. */
+    /* setup internal clock */
+    sim_timer_units[SIM_NTIMERS+1].action = &sim_timer_clock_tick_svc;
+    }
+if (sim_timer_units[SIM_NTIMERS+1].action == &sim_timer_clock_tick_svc) {
+    /* actual clock reset */
+    sim_rtcn_init_unit (&sim_timer_units[SIM_NTIMERS+1], 5000, SIM_NTIMERS-1);
+    sim_activate_abs (&sim_timer_units[SIM_NTIMERS+1], 5000);
+    }
 return SCPE_OK;
 }
 
