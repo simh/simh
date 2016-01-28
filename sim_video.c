@@ -285,6 +285,7 @@ int32 vid_flags;                                        /* Open Flags */
 int32 vid_width;
 int32 vid_height;
 t_bool vid_ready;
+char vid_title[128];
 static void vid_beep_setup (int duration_ms, int tone_frequency);
 static void vid_beep_cleanup (void);
 #if SDL_MAJOR_VERSION == 1
@@ -469,12 +470,16 @@ return SCPE_OK;
 }
 #endif
 
-t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int flags)
+t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags)
 {
 if (!vid_active) {
     int wait_count = 0;
     t_stat stat;
 
+    if ((strlen(sim_name) + 7 + (dptr ? strlen (dptr->name) : 0) + (title ? strlen (title) : 0)) < sizeof (vid_title))
+        sprintf (vid_title, "%s%s%s%s%s", sim_name, dptr ? " - " : "", dptr ? dptr->name : "", title ? " - " : "", title ? title : "");
+    else
+        sprintf (vid_title, "%s", sim_name);
     vid_flags = flags;
     vid_active = TRUE;
     vid_width = width;
@@ -1619,7 +1624,7 @@ if (vid_flags & SIM_VID_INPUTCAPTURED) {
     char title[150];
 
     memset (title, 0, sizeof(title));
-    strncpy (title, sim_name, sizeof(title)-1);
+    strncpy (title, vid_title, sizeof(title)-1);
     strncat (title, "                                             ReleaseKey=", sizeof(title)-(1+strlen(title)));
     strncat (title, vid_release_key, sizeof(title)-(1+strlen(title)));
 #if SDL_MAJOR_VERSION == 1
@@ -1630,9 +1635,9 @@ if (vid_flags & SIM_VID_INPUTCAPTURED) {
     }
 else
 #if SDL_MAJOR_VERSION == 1
-    SDL_WM_SetCaption (sim_name, sim_name);
+    SDL_WM_SetCaption (vid_title, sim_name);
 #else
-    SDL_SetWindowTitle (vid_window, sim_name);
+    SDL_SetWindowTitle (vid_window, vid_title);
 #endif
 
 vid_ready = TRUE;
@@ -2253,7 +2258,7 @@ SDL_Delay (vid_beep_duration + 100);/* Wait for sound to finnish */
 
 uint32 vid_mono_palette[2];                             /* Monochrome Color Map */
 
-t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int flags)
+t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags)
 {
 return SCPE_NOFNC;
 }

@@ -171,7 +171,7 @@ struct key_event {
 typedef struct mouse_event SIM_MOUSE_EVENT;
 typedef struct key_event SIM_KEY_EVENT;
 
-t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int flags);
+t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags);
 #define SIM_VID_INPUTCAPTURED       1                       /* Mouse and Keyboard input captured (calling */
                                                             /* code responsible for cursor display in video) */
 t_stat vid_close (void);
