@@ -1386,10 +1386,11 @@ return NULL;
    To solve this we merely run an internal clock at 50Hz.
  */
 #define CLK_TPS 50
-static sim_timer_clock_tick_svc (UNIT *uptr)
+static t_stat sim_timer_clock_tick_svc (UNIT *uptr)
 {
 sim_rtcn_calb (CLK_TPS, SIM_NTIMERS-1);
 sim_activate_after (uptr, 1000000/CLK_TPS);             /* reactivate unit */
+return SCPE_OK;
 }
 
 void sim_start_timer_services (void)
