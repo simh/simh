@@ -174,6 +174,8 @@ typedef struct key_event SIM_KEY_EVENT;
 t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags);
 #define SIM_VID_INPUTCAPTURED       1                       /* Mouse and Keyboard input captured (calling */
                                                             /* code responsible for cursor display in video) */
+typedef void (*VID_QUIT_CALLBACK)(void);
+t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback);
 t_stat vid_close (void);
 t_stat vid_poll_kb (SIM_KEY_EVENT *ev);
 t_stat vid_poll_mouse (SIM_MOUSE_EVENT *ev);

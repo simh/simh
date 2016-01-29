@@ -38,6 +38,13 @@ int32 vid_cursor_y;
 t_bool vid_mouse_b1 = FALSE;
 t_bool vid_mouse_b2 = FALSE;
 t_bool vid_mouse_b3 = FALSE;
+static VID_QUIT_CALLBACK vid_quit_callback = NULL;
+
+t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback)
+{
+vid_quit_callback = callback;
+return SCPE_OK;
+}
 
 t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc)
 {
@@ -1734,6 +1741,11 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
                         sim_printf ("vid_thread(): Unexpected user event code: %d\n", event.user.code);
                         }
                     }
+                break;
+            case SDL_QUIT:
+                sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE|SIM_VID_DBG_CURSOR, vid_dev, "vid_thread() - QUIT Event - %s\n", vid_quit_callback ? "Signaled" : "Ignored");
+                if (vid_quit_callback)
+                    vid_quit_callback ();
                 break;
 
             default:
