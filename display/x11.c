@@ -207,7 +207,8 @@ handle_exposure(w, d, e, b)
 int
 ws_init(char *crtname,          /* crt type name */
     int xp, int yp,             /* screen size in pixels */
-    int colors)                 /* colors to support (not used) */
+    int colors,                 /* colors to support (not used) */
+    void *dptr)
 {
     Arg arg[25];
     XGCValues gcvalues;
@@ -297,6 +298,10 @@ ws_init(char *crtname,          /* crt type name */
                       handle_exposure, NULL);
     return 1;
 } /* ws_init */
+
+void ws_shutdown (void)
+{
+}
 
 void *
 ws_color_black(void)

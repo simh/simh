@@ -56,35 +56,32 @@ ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if (
   $(warning *** Warning *** GNU Make Version $(GMAKE_VERSION) is too old to)
   $(warning *** Warning *** fully process this makefile)
 endif
-# building the pdp11, or any vax simulator could use networking support
 BUILD_SINGLE := $(MAKECMDGOALS) $(BLANK_SUFFIX)
+# building the pdp1, pdp11, tx-0, or any microvax simulator could use video support
+ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS)))),$(findstring pdp11,$(MAKECMDGOALS)),$(findstring tx-0,$(MAKECMDGOALS)),$(findstring microvax1,$(MAKECMDGOALS)),$(findstring microvax2,$(MAKECMDGOALS)),$(findstring microvax3900,$(MAKECMDGOALS)),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS))))))
+  VIDEO_USEFUL = true
+endif
+# building the besm6 needs both video support and fontfile support
+ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
+  VIDEO_USEFUL = true
+  BESM6_BUILD = true
+endif
+# building the pdp11, or any vax simulator could use networking support
 ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
-  ifneq (,$(or $(findstring microvax1,$(MAKECMDGOALS)),$(findstring microvax2,$(MAKECMDGOALS)),$(findstring microvax3900,$(MAKECMDGOALS)),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS))))))
-    VIDEO_USEFUL = true
-  endif
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
     VIDEO_USEFUL = true
+    BESM6_BUILD = true
   endif
-  ifneq (,$(findstring pdp11,$(MAKECMDGOALS))$(findstring all,$(MAKECMDGOALS)))
-    DISPLAY_USEFUL = true
-  endif
-else ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
-  VIDEO_USEFUL = true
-  BESM6_BUILD = true
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
     NETWORK_USEFUL = true
     VIDEO_USEFUL = true
-    DISPLAY_USEFUL = true
     BUILD_MULTIPLE = s
     BUILD_SINGLE := all $(BUILD_SINGLE)
-  else
-    ifneq (,$(or $(or $(findstring pdp1,$(MAKECMDGOALS)),$(findstring pdp11,$(MAKECMDGOALS))),$(findstring tx-0,$(MAKECMDGOALS))))
-      DISPLAY_USEFUL = true
-    endif
+    BESM6_BUILD = true
   endif
 endif
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
@@ -427,9 +424,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
     ifneq (,$(call find_include,SDL2/SDL))
       ifneq (,$(call find_lib,SDL2))
-        VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL2/SDL))
+        VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(dir $(call find_include,SDL2/SDL))
         VIDEO_LDFLAGS += -lSDL2
         VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
+        DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+        DISPLAYVT = ${DISPLAYD}/vt11.c
+        DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
         $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
         ifeq (Darwin,$(OSTYPE))
           VIDEO_LDFLAGS += -lobjc -framework cocoa -DSDL_MAIN_AVAILABLE
@@ -438,9 +438,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     else
       ifneq (,$(call find_include,SDL/SDL))
         ifneq (,$(call find_lib,SDL))
-          VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
+          VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(dir $(call find_include,SDL/SDL))
           VIDEO_LDFLAGS += -lSDL
           VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
+          DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+          DISPLAYVT = ${DISPLAYD}/vt11.c
+          DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
           $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
           ifeq (Darwin,$(OSTYPE))
             VIDEO_LDFLAGS += -lobjc -framework cocoa -DSDL_MAIN_AVAILABLE
@@ -459,27 +462,6 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info *** Info *** operating system distribution and rebuild your simulator to)
       $(info *** Info *** enable this extra functionality.)
       $(info *** Info ***)
-    endif
-  endif
-  ifneq (,$(DISPLAY_USEFUL))
-    ifeq (,$(WIN32))
-      ifneq (,$(call find_include,X11/Intrinsic))
-        ifneq (,$(call find_lib,Xt))
-          DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/x11.c
-          DISPLAYVT = ${DISPLAYD}/vt11.c
-          DISPLAY_OPT += -DUSE_DISPLAY -I$(dir $(call find_include,X11/Intrinsic))/include -lXt -lX11 -lm
-          $(info using display: $(call find_lib,Xt) $(call find_include,X11/Intrinsic))
-        endif
-        ifneq (,$(GCC_WARNINGS_CMD)$(CLANG_VERSION))
-          ifneq (,$(CLANG_VERSION)$(findstring -Wdeprecated-declarations,$(shell $(GCC_WARNINGS_CMD))))
-            DISPLAY_OPT += -Wno-deprecated-declarations
-          endif
-        endif
-      endif
-    else
-      DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/win32.c
-      DISPLAYVT = ${DISPLAYD}/vt11.c
-      DISPLAY_OPT = -DUSE_DISPLAY -lgdi32
     endif
   endif
   ifneq (,$(NETWORK_USEFUL))
@@ -926,10 +908,13 @@ DISPLAYD = display
 # Emulator source files and compile time options
 #
 PDP1D = PDP1
+ifneq (,$(DISPLAY_OPT))
+  PDP1_DISPLAY_OPT = -DDISPLAY_TYPE=DIS_TYPE30 -DPIX_SCALE=RES_HALF
+endif
 PDP1 = ${PDP1D}/pdp1_lp.c ${PDP1D}/pdp1_cpu.c ${PDP1D}/pdp1_stddev.c \
 	${PDP1D}/pdp1_sys.c ${PDP1D}/pdp1_dt.c ${PDP1D}/pdp1_drm.c \
 	${PDP1D}/pdp1_clk.c ${PDP1D}/pdp1_dcs.c ${PDP1D}/pdp1_dpy.c ${DISPLAYL}
-PDP1_OPT = -I ${PDP1D} $(DISPLAY_OPT)
+PDP1_OPT = -I ${PDP1D} $(DISPLAY_OPT) $(PDP1_DISPLAY_OPT)
 
 
 NOVAD = NOVA

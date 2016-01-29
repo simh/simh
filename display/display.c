@@ -589,12 +589,14 @@ display_age(int t,          /* simulated us since last call */
 {
     struct point *p;
     static int elapsed = 0;
+    static int refresh_elapsed = 0; /* in units of DELAY_UNIT bounded by refresh_interval */
     int changed;
 
-    if (!initialized && !display_init(DISPLAY_TYPE, PIX_SCALE))
+    if (!initialized && !display_init(DISPLAY_TYPE, PIX_SCALE, NULL))
         return 0;
 
-    display_delay(t, slowdown);
+    if (slowdown)
+        display_delay(t, slowdown);
 
     changed = 0;
 
@@ -604,6 +606,12 @@ display_age(int t,          /* simulated us since last call */
 
     t = elapsed / DELAY_UNIT;
     elapsed %= DELAY_UNIT;
+
+    ++refresh_elapsed;
+    if (refresh_elapsed >= refresh_interval) {
+        display_sync ();
+        refresh_elapsed = 0;
+        }
 
     while ((p = head->next) != head) {
         int x, y;
@@ -717,7 +725,7 @@ display_point(int x,        /* 0..xpixels (unscaled) */
 {
     long lx, ly;
 
-    if (!initialized && !display_init(DISPLAY_TYPE, PIX_SCALE))
+    if (!initialized && !display_init(DISPLAY_TYPE, PIX_SCALE, NULL))
         return 0;
 
     /* scale x and y to the displayed number of pixels */
@@ -828,7 +836,7 @@ find_type(enum display_type type)
 }
 
 int
-display_init(enum display_type type, int sf)
+display_init(enum display_type type, int sf, void *dptr)
 {
     static int init_failed = 0;
     struct display *dp;
@@ -924,7 +932,7 @@ display_init(enum display_type type, int sf)
     if (!points)
         goto failed;
 
-    if (!ws_init(dp->name, xpixels, ypixels, ncolors))
+    if (!ws_init(dp->name, xpixels, ypixels, ncolors, dptr))
         goto failed;
 
     phosphor_init(dp->color0->phosphors, dp->color0->nphosphors, 0);
@@ -950,7 +958,8 @@ display_reset(void)
 void
 display_sync(void)
 {
-    ws_sync();
+    ws_poll (NULL, 0);
+    ws_sync ();
 }
 
 void
