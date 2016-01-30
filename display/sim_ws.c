@@ -146,7 +146,7 @@ ws_poll(int *valp, int maxus)
     if (SCPE_OK == vid_poll_mouse (&mev)) {
         unsigned char old_lp_sw = display_lp_sw;
         
-        if (display_lp_sw = mev.b1_state) {
+        if ((display_lp_sw = mev.b1_state)) {
             ws_lp_x = mev.x_pos;
             ws_lp_y = (ypixels - 1) - mev.y_pos; /* range 0 - (ypixels-1) */
             /* convert to display coordinates */
