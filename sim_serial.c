@@ -974,6 +974,24 @@ for (i=1; (ports < max) && (i < 64); ++i) {
         close (port);
         }
     }
+for (i=1; (ports < max) && (i < 64); ++i) {
+    sprintf (list[ports].name, "/dev/tty%02d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
+for (i=1; (ports < max) && (i < 8); ++i) {
+    sprintf (list[ports].name, "/dev/ttyU%d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
 #endif
 return ports;
 }
