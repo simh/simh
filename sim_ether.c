@@ -570,7 +570,7 @@ void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, const char
   eth_packet_trace_ex(dev, msg, len, txt, 1     , dev->dbit);
 }
 
-char* eth_getname(int number, char* name)
+char* eth_getname(int number, char* name, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
@@ -578,10 +578,11 @@ char* eth_getname(int number, char* name)
   if ((number < 0) || (count <= number))
       return NULL;
   strcpy(name, list[number].name);
+  strcpy(desc, list[number].desc);
   return name;
 }
 
-char* eth_getname_bydesc(char* desc, char* name)
+char* eth_getname_bydesc(char* desc, char* name, char *ndesc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
@@ -600,6 +601,7 @@ char* eth_getname_bydesc(char* desc, char* name)
 
     /* found a case-insensitive description match */
     strcpy(name, list[i].name);
+    strcpy(ndesc, list[i].desc);
     return name;
   }
   /* not found */
@@ -627,7 +629,7 @@ int eth_strncasecmp(char* string1, char* string2, size_t len)
   return 0;
 }
 
-char* eth_getname_byname(char* name, char* temp)
+char* eth_getname_byname(char* name, char* temp, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
@@ -641,6 +643,7 @@ char* eth_getname_byname(char* name, char* temp)
         (eth_strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].name); /* only case might be different */
+      strcpy(desc, list[i].desc);
     }
   }
   return (found ? temp : NULL);
@@ -2062,7 +2065,7 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
 t_stat r;
 int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
 char errbuf[PCAP_ERRBUF_SIZE];
-char temp[1024];
+char temp[1024], desc[1024] = "";
 char* savname = name;
 int   num;
 
@@ -2080,18 +2083,20 @@ if ((strlen(name) == 4)
     && isdigit(name[3])
    ) {
   num = atoi(&name[3]);
-  savname = eth_getname(num, temp);
+  savname = eth_getname(num, temp, desc);
   if (savname == NULL) /* didn't translate */
     return SCPE_OPENERR;
   }
 else {
   /* are they trying to use device description? */
-  savname = eth_getname_bydesc(name, temp);
+  savname = eth_getname_bydesc(name, temp, desc);
   if (savname == NULL) { /* didn't translate */
     /* probably is not ethX and has no description */
-    savname = eth_getname_byname(name, temp);
-    if (savname == NULL) /* didn't translate */
+    savname = eth_getname_byname(name, temp, desc);
+    if (savname == NULL) {/* didn't translate */
       savname = name;
+      desc[0] = '\0';   /* no description */
+      }
     }
   }
 
@@ -2104,7 +2109,7 @@ if (errbuf[0]) {
 if (r != SCPE_OK)
   return r;
 
-sim_printf ("Eth: opened OS device %s\r\n", savname);
+sim_printf ("Eth: opened OS device %s%s%s\r\n", savname, desc[0] ? " - " : "", desc);
 
 /* get the NIC's hardware MAC address */
 eth_get_nic_hw_addr(dev, savname);
