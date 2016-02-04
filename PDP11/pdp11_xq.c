@@ -1546,12 +1546,16 @@ t_stat xq_process_xbdl(CTLR* xq)
           status = xq_process_setup(xq);
           ethq_insert (&xq->var->ReadQ, 0, &xq->var->write_buffer, status);/* put packet in read buffer */
         } else { /* loopback */
+          if ((DBG_PCK & xq->dev->dctrl) && xq->var->etherface) {
+            static char *loopback_modes[] = {"xq-write-loopback-Internal", "", "xq-write-loopback-Internal Extended", "xq-write-loopback-External"};
+            eth_packet_trace_ex(xq->var->etherface, xq->var->write_buffer.msg, xq->var->write_buffer.len, loopback_modes[(xq->var->csr >> 8) & 3], DBG_DAT & xq->dev->dctrl, DBG_PCK);
+            }
           if (((~xq->var->csr & XQ_CSR_RL) &&        /* If a buffer descriptor list is good */
                (xq->var->rbdl_buf[1] & XQ_DSC_V)) || /* AND the descriptor is valid */
               (xq->var->csr & XQ_CSR_EL))            /* OR External Loopback */
             ethq_insert (&xq->var->ReadQ, 1, &xq->var->write_buffer, 0);
-          if ((DBG_PCK & xq->dev->dctrl) && xq->var->etherface)
-            eth_packet_trace_ex(xq->var->etherface, xq->var->write_buffer.msg, xq->var->write_buffer.len, "xq-write-loopback", DBG_DAT & xq->dev->dctrl, DBG_PCK);
+          else
+            sim_debug(DBG_XBL, xq->dev, "Dropping Loopback packet: No Receive Buffer\n");
           write_success[0] |= XQ_XMT_FAIL;
         }
 
@@ -2283,7 +2287,7 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
   }
 
   /* start receiver when RE transitions to set */
-  if (~xq->var->csr & XQ_CSR_RE & data) {
+  if ((~xq->var->csr) & XQ_CSR_RE & data) {
     sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - receiver starting soon\n", data);
 
     /* start the read service timer or enable asynch reading as appropriate */
