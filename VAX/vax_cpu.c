@@ -3232,13 +3232,18 @@ t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
 static t_addr returns[MAX_SUB_RETURN_SKIP+1] = {0};
 static t_bool caveats_displayed = FALSE;
 int i;
+int32 saved_sim_switches = sim_switches;
 
 if (!caveats_displayed) {
     caveats_displayed = TRUE;
     sim_printf ("%s", cpu_next_caveats);
     }
-if (SCPE_OK != get_aval (PC, &cpu_dev, &cpu_unit))  /* get data */
+sim_switches |= SWMASK('V');
+if (SCPE_OK != get_aval (PC, &cpu_dev, &cpu_unit)) {/* get data */
+    sim_switches = saved_sim_switches;
     return FALSE;
+    }
+sim_switches = saved_sim_switches;
 switch (sim_eval[0])
     {
     case BSBB:  case BSBW:  case JSB:
