@@ -2545,7 +2545,7 @@ t_stat xq_reset(DEVICE* dptr)
       break;
     case XQ_T_DELQA:
     case XQ_T_DELQA_PLUS:
-      xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
+      xq->var->var = (xq->var->lockmode ? XQ_VEC_MS : 0) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
       xq->var->mode = (xq->var->lockmode ? XQ_T_DEQNA : XQ_T_DELQA);
       break;
   }
