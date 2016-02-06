@@ -1248,6 +1248,12 @@ SSEMD = SSEM
 SSEM = ${SSEMD}/ssem_cpu.c ${SSEMD}/ssem_sys.c
 SSEM_OPT = -I ${SSEMD}
 
+B5500D = B5500
+B5500 = ${B5500D}/b5500_cpu.c ${B5500D}/b5500_io.c ${B5500D}/b5500_sys.c \
+	${B5500D}/b5500_dk.c ${B5500D}/b5500_mt.c ${B5500D}/b5500_urec.c \
+	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c ${B5500D}/sim_card.c
+B5500_OPT = -I.. -DUSE_INT64 -DB5500
+
 ###
 ### Experimental simulators
 ###
@@ -1336,7 +1342,8 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
-	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
+	b5500
 
 all : ${ALL}
 
@@ -1640,6 +1647,12 @@ pdq3 : ${BIN}pdq3${EXE}
 ${BIN}pdq3${EXE} : ${PDQ3} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDQ3} ${SIM} ${PDQ3_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+b5500 : $(BIN)b5500$(EXE)
+
+${BIN}b5500${EXE} : ${B5500} ${SIM} 
+	${MKDIRBIN}
+	${CC} ${B5500} ${SIM} ${B5500_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 # Front Panel API Demo/Test program
 

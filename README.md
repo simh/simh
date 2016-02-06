@@ -18,6 +18,8 @@
 
 #### Gerardo Ospina has implemented a Manchester University SSEM (Small Scale Experimental Machine) simulator.
 
+#### Richard Cornwell has implemented a Burroughs B5500 simulator.
+
 #### Updated AltairZ80 simulator from Peter Schorn.
 
 #### Updated HP2100 simulator from Dave Bryan.
