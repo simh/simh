@@ -2109,6 +2109,8 @@ if (errbuf[0]) {
 if (r != SCPE_OK)
   return r;
 
+if (!strcmp (desc, "No description available"))
+    strcpy (desc, "");
 sim_printf ("Eth: opened OS device %s%s%s\r\n", savname, desc[0] ? " - " : "", desc);
 
 /* get the NIC's hardware MAC address */
