@@ -154,6 +154,7 @@ uint8               loading;                    /* Set when loading */
 uint8               HALT;                       /* Set when halt requested */
 uint8               P1_run;                     /* Run flag for P1 */
 uint8               P2_run;                     /* Run flag for P2 */
+uint16              idle_addr = 0;              /* Address of idle loop */
 
 
 struct InstHistory
@@ -218,7 +219,7 @@ int32               rtc_tps = 60 ;
 */
 
 UNIT                cpu_unit[] =
-    {{ UDATA(rtc_srv, MEMAMOUNT(7), MAXMEMSIZE ), 16667 },
+    {{ UDATA(rtc_srv, MEMAMOUNT(7)|UNIT_IDLE, MAXMEMSIZE ), 16667 },
     { UDATA(0, UNIT_DISABLE|UNIT_DIS, 0 ), 0 }};
 
 REG                 cpu_reg[] = {
@@ -262,6 +263,8 @@ MTAB                cpu_mod[] = {
     {UNIT_MSIZE|MTAB_VDV, MEMAMOUNT(6), NULL, "28K", &cpu_set_size},
     {UNIT_MSIZE|MTAB_VDV, MEMAMOUNT(7), NULL, "32K", &cpu_set_size},
     {MTAB_VDV, 0, "MEMORY", NULL, NULL, &cpu_show_size},
+    {MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    {MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     {MTAB_XTD | MTAB_VDV | MTAB_NMO | MTAB_SHP, 0, "HISTORY", "HISTORY",
      &cpu_set_hist, &cpu_show_hist},
     {0}
@@ -305,21 +308,21 @@ DEVICE              cpu_dev = {
 #define HLTF    hltf[cpu_index]
 
 /* Definitions to help extract fields */
-#define FF(x)    ((uint16)(((x) >> FFIELD_V) & CORE))
-#define CF(x)    ((uint16)((x) & CORE))
-#define LF(x)    ((uint8)(((x) & RL) >> RL_V) & 03)
+#define FF(x)    (uint16)(((x) & FFIELD) >> FFIELD_V)
+#define CF(x)    (uint16) ((x) & CORE)
+#define LF(x)    (uint16)(((x) & RL) >> RL_V)
 #define RF(x)    (uint16)(((x) & RFIELD) >> RFIELD_V)
 
-#define toF(x)   (((t_uint64)((x) & CORE)) << FFIELD_V)
-#define toC(x)   ((t_uint64)((x) & CORE))
-#define toL(x)   (((t_uint64)(x)) << RL_V)
-#define toR(x)   (((t_uint64)(x)) << RFIELD_V) 
+#define toF(x)   ((((t_uint64)(x)) << FFIELD_V) & FFIELD)
+#define toC(x)    (((t_uint64)(x)) & CORE)
+#define toL(x)   ((((t_uint64)(x)) << RL_V) & RL)
+#define toR(x)   ((((t_uint64)(x)) << RFIELD_V) & RFIELD)
 
 #define replF(y, x)   ((y & ~FFIELD) | toF(x))
 #define replC(y, x)   ((y & ~CORE) | toC(x))
 
-#define next_addr(x)   (x = (x + 1) & CORE)
-#define prev_addr(x)   (x = (x - 1) & CORE)
+#define next_addr(x)   (x = (x + 1) & 077777)
+#define prev_addr(x)   (x = (x - 1) & 077777)
 
 /* Definitions to handle building of control words */
 #define MSCW     (FLAG | DFLAG | toR(R) | toF(F) | \
@@ -934,6 +937,59 @@ void storeInterrupt(int forced, int test) {
            TROF = 1;
         }
     } 
+}
+
+/* Check if in idle loop. 
+   assume that current instruction is ITI */
+/* Typical idle loop for MCP is: 
+
+  -1   ITI                               0211
+  +0   TUS                               2431
+  +1   OPDC  address1                    xxx2
+  +2   LOR                               0215
+  +3   OPDC  address2                    xxx2
+  +4   NEQ                               0425
+  +5   LITC  010          LITC 1         0040   0004
+  +6   BBC                LBC            0131   2131
+
+*/
+
+int check_idle() {
+    static uint16  loop_data[7] = {
+          WMOP_TUS, WMOP_OPDC, WMOP_LOR, WMOP_OPDC, 
+          WMOP_NEQ, WMOP_LITC, WMOP_BBC };
+    static uint16  loop_mask[7] = {
+          07777,    00003,     07777,     00003,
+          07777,    07733,     05777};
+    t_uint64     data;
+    uint16       addr = C;
+    int          l = (3 - L) * 12;
+    uint16       word;
+    int          i;
+
+    /* Quick check to see if not correct location */
+    if (idle_addr != 0 && idle_addr != addr) 
+       return 0;
+    /* If address same, then idle loop */
+    if (idle_addr == addr)  
+       return 1;
+
+    /* Not set, see if this could be loop */
+    data = M[addr];
+    for (i = 0; i < 7; i++) {
+        word = (uint16)(data >> l) & 07777;
+        if ((word & loop_mask[i]) != loop_data[i])
+            return 0;
+        if (l == 0) {
+            addr++; 
+            l = 3 * 12;
+            data = M[addr];
+        } else {
+            l -= 12;
+        }
+    }
+    idle_addr = C;
+    return 1;
 }
 
 
@@ -1807,7 +1863,7 @@ void double_divide() {
 
 void relativeAddr(int store) {
     uint16    base = R;
-    uint16    addr = (A & 01777);
+    uint16    addr = (uint16)(A & 01777);
 
     if (SALF) {
        switch ((addr >> 7) & 7) {
@@ -2111,7 +2167,7 @@ crf_loop:
                     L = 0;
                 } else {
                     C = CF(B);
-                    L = RF(B) + 1;
+                    L = LF(B) + 1;
                     if (L > 3) {
                         L = 0;
                         next_addr(C);
@@ -2152,7 +2208,7 @@ crf_loop:
                     field--;
                 }
                 B &= FLAG|FWORD;
-                GH = (B >> 12) & 070;
+                GH = (uint8)((B >> 12) & 070);
                 Ma = CF(B);
                 break;
                 
@@ -2172,7 +2228,7 @@ crf_loop:
                     field--;
                 }
                 BROF = 0;
-                KV = (temp >> 12) & 070;
+                KV = (uint8)((temp >> 12) & 070);
                 S = CF(temp);
                 break;
 
@@ -2181,7 +2237,8 @@ crf_loop:
                 AROF = BROF;
                 B = toF(F) | toL(L) | toC(C);
                 F = S;
-                S = CF(FF(B) - field);
+                S = FF(B);
+                S = (S - field) & CORE;
                 memory_cycle(013);      /* Store B in S */
                 S = F;
                 F = FF(B);
@@ -2313,7 +2370,8 @@ crf_loop:
                 A = toC(F);
                 B = R >> 6;
                 F = S;
-                S = CF(CF(A) - field);
+                S = CF(A);
+                S = (S - field) & CORE;
                 memory_cycle(11);
                 S = F;
                 F = CF(A);
@@ -2839,7 +2897,7 @@ desc:
                 if (A & FLAG) {
                     /* Check if it is a control word. */
                     if ((A & DFLAG) != 0 && (A & PROGF) == 0) {
-                        A = toC(Ma) | PRESENT | FLAG;
+                        A = FLAG | PRESENT | toC(Ma);
                         break;
                     }
                     /* Check if descriptor present */
@@ -2854,10 +2912,10 @@ desc:
                     } else {
                         if (indexWord()) 
                            break;
-                        A |= FLAG|PRESENT;
+                        A |= FLAG | PRESENT;
                     }
                 } else {
-                    A = toC(Ma) | FLAG | PRESENT;
+                    A = FLAG | PRESENT | toC(Ma);
                 }
                 break;
 
@@ -2950,7 +3008,14 @@ control:
                                 q_reg[1] &= ~STK_OVERFL;
                             }
                         } else {
-                             /* False IRQ */
+                             /* Could be an idle loop, if P2 running, continue */
+                             if (P2_run)
+                                 break;
+                             if (sim_idle_enab) {
+                             /* Check if possible idle loop */
+                                 if (check_idle()) 
+                                    sim_idle (TMR_RTC, FALSE);
+                             }
                              break;
                         }
                         sim_debug(DEBUG_DETAIL, &cpu_dev, "IAR=%05o Q=%03o\n\r",
@@ -3396,7 +3461,7 @@ control:
                             next_addr(Ma);
                             memory_cycle(4);
                         }
-                        A = toC(Ma) | FLAG | PRESENT;
+                        A = FLAG | PRESENT | toC(Ma);
                         break;
                 }
                 break;
@@ -3716,6 +3781,7 @@ cpu_reset(DEVICE * dptr)
     hltf[0] = 0;
     P1_run = 0;
 
+    idle_addr = 0;
     sim_brk_types = sim_brk_dflt = SWMASK('E') | SWMASK('A') | SWMASK('B');
     hst_p = 0;
 
