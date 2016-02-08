@@ -1418,7 +1418,7 @@ ${BIN}pdp10${EXE} : ${PDP10} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP10} ${SIM} ${PDP10_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-pdp11 : ${BIN}pdp11${EXE}
+pdp11 : ${BIN}BuildROMs${EXE} ${BIN}pdp11${EXE}
 
 ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 	${MKDIRBIN}
@@ -1426,7 +1426,7 @@ ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 
 vax : microvax3900
 
-microvax3900 : ${BIN}microvax3900${EXE}
+microvax3900 : ${BIN}BuildROMs${EXE} ${BIN}microvax3900${EXE}
 
 ${BIN}microvax3900${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -1437,43 +1437,43 @@ else
 	copy $(@D)\microvax3900${EXE} $(@D)\vax${EXE}
 endif
 
-microvax1 : ${BIN}microvax1${EXE}
+microvax1 : ${BIN}BuildROMs${EXE} ${BIN}microvax1${EXE}
 
 ${BIN}microvax1${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX610} ${SIM} ${VAX610_OPT} -o $@ ${LDFLAGS}
 
-rtvax1000 : ${BIN}rtvax1000${EXE}
+rtvax1000 : ${BIN}BuildROMs${EXE} ${BIN}rtvax1000${EXE}
 
 ${BIN}rtvax1000${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX620_OPT} -o $@ ${LDFLAGS}
 
-microvax2 : ${BIN}microvax2${EXE}
+microvax2 : ${BIN}BuildROMs${EXE} ${BIN}microvax2${EXE}
 
 ${BIN}microvax2${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX630_OPT} -o $@ ${LDFLAGS}
 
-vax730 : ${BIN}vax730${EXE}
+vax730 : ${BIN}BuildROMs${EXE} ${BIN}vax730${EXE}
 
 ${BIN}vax730${EXE} : ${VAX730} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX730} ${SIM} ${VAX730_OPT} -o $@ ${LDFLAGS}
 
-vax750 : ${BIN}vax750${EXE}
+vax750 : ${BIN}BuildROMs${EXE} ${BIN}vax750${EXE}
 
 ${BIN}vax750${EXE} : ${VAX750} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX750} ${SIM} ${VAX750_OPT} -o $@ ${LDFLAGS}
 
-vax780 : ${BIN}vax780${EXE}
+vax780 : ${BIN}BuildROMs${EXE} ${BIN}vax780${EXE}
 
 ${BIN}vax780${EXE} : ${VAX780} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-vax8600 : ${BIN}vax8600${EXE}
+vax8600 : ${BIN}BuildROMs${EXE} ${BIN}vax8600${EXE}
 
 ${BIN}vax8600${EXE} : ${VAX8600} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -1581,13 +1581,13 @@ ${BIN}sds${EXE} : ${SDS} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-swtp6800mp-a : ${BIN}swtp6800mp-a${EXE}
+swtp6800mp-a : ${BIN}BuildROMs${EXE} ${BIN}swtp6800mp-a${EXE}
 
 ${BIN}swtp6800mp-a${EXE} : ${SWTP6800MP-A} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
+swtp6800mp-a2 : ${BIN}BuildROMs${EXE} ${BIN}swtp6800mp-a2${EXE}
 
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
