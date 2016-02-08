@@ -266,9 +266,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
                       $(info *** Warning ***)
                     else
                       LIBPATH = $(subst :, ,$(LPATH))
-                      OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
                     endif
                   endif
+                  OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
                 endif
               endif
             endif
