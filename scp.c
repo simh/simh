@@ -5443,8 +5443,10 @@ if (uptr->flags & UNIT_BUF) {
 uptr->flags = uptr->flags & ~(UNIT_ATT | UNIT_RO);
 free (uptr->filename);
 uptr->filename = NULL;
-if (fclose (uptr->fileref) == EOF)
-    return SCPE_IOERR;
+if (uptr->fileref != NULL) {  /* Sometimes this can be null! */
+    if (fclose (uptr->fileref) == EOF)
+        return SCPE_IOERR;
+    }
 return SCPE_OK;
 }
 
