@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ws.h"
-#include "xy.h"
+#include "display.h"
 
 #include <sys/types.h>
 #include <sys/time.h>

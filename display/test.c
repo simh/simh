@@ -1,5 +1,5 @@
 /*
- * $Id: test.c,v 1.24 2005/01/14 18:58:00 phil Exp $
+ * $Id: test.c,v 1.22 2004/01/25 17:20:50 phil Exp - revised by DAG $
  * XY Display simulator test program (PDP-1 Munching Squares)
  * Phil Budne <phil@ultimate.com>
  * September 2003
@@ -52,7 +52,7 @@
 #define EXIT_FAILURE 1
 #endif
 
-#include "xy.h"
+#include "display.h"
 
 static unsigned long test_switches = 0;
 

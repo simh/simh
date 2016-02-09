@@ -5,7 +5,7 @@
  * September 16, 2003
  * Substantially revised by Douglas A. Gwyn, 14 Jan. 2004
  *
- * prerequisite: xy.h
+ * prerequisite: display.h
  */
 
 /*

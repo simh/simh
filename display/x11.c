@@ -42,7 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ws.h"
-#include "xy.h"
+#include "display.h"
 
 #include <X11/X.h>
 #include <X11/Xlib.h>

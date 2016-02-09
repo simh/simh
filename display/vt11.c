@@ -1,5 +1,5 @@
 /*
- * $Id: vt11.c,v 1.28 2005/08/06 21:09:04 phil Exp $
+ * $Id: vt11.c,v 1.17 2004/01/24 20:44:46 phil Exp - revised by DAG $
  * Simulator Independent VT11/VS60 Graphic Display Processor Simulation
  * Phil Budne <phil@ultimate.com>
  * September 13, 2003
@@ -114,7 +114,7 @@
 #include <math.h>                       /* atan2, cos, sin, sqrt */
 #endif
 
-#include "xy.h"                         /* XY plot interface */
+#include "display.h"                    /* XY plot interface */
 #include "vt11.h"
 
 #define BITMASK(n) (1<<(n))             /* PDP-11 bit numbering */
@@ -131,7 +131,7 @@
 static void *vt11_dptr;
 static int vt11_dbit;
 
-#ifdef DEBUG_VT11
+#if defined(DEBUG_VT11) || defined(VM_PDP11)
 
 #include <stdio.h>
 
@@ -140,10 +140,13 @@ static int vt11_dbit;
 #define DBG_CALL 1
 int vt11_debug;
 
+#if defined(VM_PDP11)
 extern void _sim_debug (int dbits, DEVICE* dptr, const char* fmt, ...);
 
-#define DEBUGF(...) do {if (vt11_debug & DBG_CALL) { _sim_debug (vt11_dbit, vt11_dptr, ##  __VA_ARGS__); };} while (0)
-
+#define DEBUGF(...) _sim_debug (vt11_dbit, vt11_dptr, ##  __VA_ARGS__)
+#else /* DEBUG_VT11 */
+#define DEBUGF(...) do {if (vt11_debug & DBG_CALL) { printf(##  __VA_ARGS__); fflush(stdout); };} while (0)
+#endif /* defined(DEBUG_VT11) || defined(VM_PDP11) */
 #else
 
 #define DEBUGF(...) 
@@ -419,18 +422,18 @@ static unsigned char name_irq = 0;      /* 1 bit: name matches associative nm */
 
 static struct frame
         {
-        vt11word      _dpc;                 /* Display Program Counter (even) */
+        vt11word      _dpc;             /* Display Program Counter (even) */
         unsigned      _name;            /* (11-bit) name from display file */
         enum mode     _mode;            /* 4 bits: sets type for graphic data */
         unsigned char _vscale;          /* non-character scale factor * 4 */
-        unsigned char _csi;                 /* character scale index 0..3 */
+        unsigned char _csi;             /* character scale index 0..3 */
         unsigned char _cscale;          /* character scale factor * 4 */
         unsigned char _crotate;         /* rotate chars 90 degrees CCW */
         unsigned char _intens;          /* intensity: 0 => dim .. 7 => bright */
         enum linetype _ltype;           /* line type (long dash, etc.) */
         unsigned char _blink;           /* blink enable */
         unsigned char _italics;         /* italicize characters */
-        unsigned char _so;                  /* currently in shift-out mode */
+        unsigned char _so;              /* currently in shift-out mode */
         unsigned char _menu;            /* VS60 graphics in menu area */
         unsigned char _cesc;            /* perform POPR on char. term. match */
         unsigned char _edgeintr;        /* generate intr. on edge transition */
@@ -1760,7 +1763,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (x0 * (long)tPEd > (long)tPEn * rdx)
                     tPEn = x0, tPEd = rdx;
         }
-    } else                              /* rdx > 0 */
+    } else {                            /* rdx > 0 */
         if (x0 >= 0 && x0 <= rdx) {
             if (tPLd > 0) {
                 if (x0 * (long)tPLd < (long)tPLn * rdx)
@@ -1769,6 +1772,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (x0 * (long)tPLd > (long)tPLn * rdx)
                     tPLn = x0, tPLd = rdx;
         }
+    }
 
     /*
      * Right:   tR = NR . (PR - P0) / NR . (P1 - P0)
@@ -1812,7 +1816,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (tn * (long)tPLd < (long)tPLn * rdx)
                     tPLn = tn, tPLd = rdx;
         }
-    } else                              /* rdx > 0 */
+    } else {                            /* rdx > 0 */
         if (tn >= 0 && tn <= rdx) {
             if (tPEd > 0) {
                 if (tn * (long)tPEd > (long)tPEn * rdx)
@@ -1821,6 +1825,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (tn * (long)tPEd < (long)tPEn * rdx)
                     tPEn = tn, tPEd = rdx;
         }
+    }
 
     /*
      * Bottom:  tB = NB . (PB - P0) / NB . (P1 - P0)
@@ -1861,15 +1866,16 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
             } else                      /* tPEd < 0 */
                 if (y0 * (long)tPEd > (long)tPEn * rdy)
                     tPEn = y0, tPEd = rdy;
-            }
+        }
     } else                              /* rdy > 0 */
         if (y0 >= 0 && y0 <= rdy) {
             if (tPLd > 0) {
                 if (y0 * (long)tPLd < (long)tPLn * rdy)
                     tPLn = y0, tPLd = rdy;
-            } else                      /* tPLd < 0 */
+            } else {                    /* tPLd < 0 */
                 if (y0 * (long)tPLd > (long)tPLn * rdy)
                     tPLn = y0, tPLd = rdy;
+            }
         }
 
     /*
@@ -1914,7 +1920,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (tn * (long)tPLd < (long)tPLn * rdy)
                     tPLn = tn, tPLd = rdy;
         }
-    } else                              /* rdy > 0 */
+    } else {                            /* rdy > 0 */
         if (tn >= 0 && tn <= rdy) {
             if (tPEd > 0) {
                 if (tn * (long)tPEd > (long)tPEn * rdy)
@@ -1922,8 +1928,9 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
             } else                      /* tPEd < 0 */
                 if (tn * (long)tPEd < (long)tPEn * rdy)
                     tPEn = tn, tPEd = rdy;
-
         }
+    }
+
     /*
      *  if ( tPL < tPE )
      *          invisible
@@ -1936,7 +1943,8 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
      *                  invis
      */
 
-    if (((tPLd > 0) && (tPEd < 0)) || ((tPLd < 0) && (tPEd > 0))) {
+    if (((tPLd > 0) && (tPEd < 0)) || 
+        ((tPLd < 0) && (tPEd > 0))) {
         if (tPLn * (long)tPEd > (long)tPEn * tPLd)
             return 0;                   /* invisible */
     } else
@@ -2010,8 +2018,8 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
     dz = z1 - z0;
 
     if (stroking) {                     /* drawing a VS60 character */
-        DEBUGF(("offset, normalized stroke i%d (%ld,%ld) to (%ld,%ld)\r\n",
-                i, (long)x0,(long)y0, (long)x1,(long)y1));
+        DEBUGF("offset, normalized stroke i%d (%ld,%ld) to (%ld,%ld)\r\n",
+               i, (long)x0,(long)y0, (long)x1,(long)y1);
 
         if (dx == 0 && dy == 0) {       /* just display a point */
             if (i) {
@@ -2023,9 +2031,8 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
             return;
         }
     } else {
-        DEBUGF((
-            "offset, normalized vector i%d (%ld,%ld,%ld) to (%ld,%ld,%ld)\r\n",
-            i, (long)x0, (long)y0, (long)z0, (long)x1, (long)y1, (long)z1));
+        DEBUGF("offset, normalized vector i%d (%ld,%ld,%ld) to (%ld,%ld,%ld)\r\n",
+               i, (long)x0, (long)y0, (long)z0, (long)x1, (long)y1, (long)z1);
 
         line_counter = 037;             /* reset line-style counter */
 
@@ -2141,8 +2148,8 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
             tangent = 010000L * dz / dy;
             lp_zpos = z0 + tangent * (lp_ypos - y0) / 010000L;
         }
-        DEBUGF(("adjusted LP coords (0%o,0%o,0%o)\r\n",
-                lp_xpos, lp_ypos, lp_zpos));
+        DEBUGF("adjusted LP coords (0%o,0%o,0%o)\r\n",
+               lp_xpos, lp_ypos, lp_zpos);
         /* xpos,ypos,zpos still pertain to the original endpoint
            (assuming that Maintenance Switch 3 isn't set) */
     }
@@ -2264,10 +2271,9 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
     dey -= dcy;
     dez -= dcz;
 
-    DEBUGF((
-  "offset, normalized arc i%d s(%ld,%ld,%ld) c(%ld,%ld,%ld) e(%ld,%ld,%ld)\r\n",
-                i, (long)xs,(long)ys,(long)zs, (long)xc,(long)yc,(long)zc,
-                (long)xe,(long)ye,(long)ze));
+    DEBUGF("offset, normalized arc i%d s(%ld,%ld,%ld) c(%ld,%ld,%ld) e(%ld,%ld,%ld)\r\n",
+           i, (long)xs,(long)ys,(long)zs, (long)xc,(long)yc,(long)zc,
+           (long)xe,(long)ye,(long)ze);
 
     /* XXX  not known whether Maintenance Switch 3 has any effect for arcs */
 
@@ -2292,7 +2298,6 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
         } else
             edge_flag = 0;
     }
-
     /* XXX  for now, resort to scissoring:
                 illuminates only pixels that lie in the visible display area */
 
@@ -2343,8 +2348,8 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
         x = xc + (re >= 0 ? (int32)(re + 0.5) : -(int32)(-re + 0.5));
         re = rs * sin(as);
         y = yc + (re >= 0 ? (int32)(re + 0.5) : -(int32)(-re + 0.5));
-        z = (int32)(zo + seg * dz);         /* truncates */
-        lineTwoStep(xs, ys, zs, x, y, z);       /* (continuing line style) */
+        z = (int32)(zo + seg * dz);     /* truncates */
+        lineTwoStep(xs, ys, zs, x, y, z);/* (continuing line style) */
         skip_start = 1;                 /* don't double-illuminate junctions */
         xs = x;
         ys = y;
@@ -2360,8 +2365,8 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
     ypos += dcy + dey;
     zpos += dcz + dez;
     if (lp0_hit) {
-        DEBUGF(("LP hit on arc at (0%o,0%o,0%o)\r\n",
-                lp_xpos, lp_ypos, lp_zpos));
+        DEBUGF("LP hit on arc at (0%o,0%o,0%o)\r\n",
+               lp_xpos, lp_ypos, lp_zpos);
         if (lphit_irq) {
             /* XXX  save parameters for drawing remaining chords */
         }
@@ -3057,9 +3062,9 @@ vt11_cycle(int us, int slowdown)
         int32 dx = clip_x1 - clip_x0,
               dy = clip_y1 - clip_y0,
               dz = clip_z1 - clip_z0;
-        DEBUGF(("clipped vector i%d (%ld,%ld,%ld) to (%ld,%ld,%ld)\r\n", clip_i,
-                (long)clip_x0, (long)clip_y0, (long)clip_z0,
-                (long)clip_x1, (long)clip_y1, (long)clip_z1));
+        DEBUGF("clipped vector i%d (%ld,%ld,%ld) to (%ld,%ld,%ld)\r\n", clip_i,
+               (long)clip_x0, (long)clip_y0, (long)clip_z0,
+               (long)clip_x1, (long)clip_y1, (long)clip_z1);
         if (VS60                        /* XXX  assuming VT11 doesn't display */
          && (dx != 0 || dy != 0 || dz != 0)     /* hardware skips null vects */
          && clip_i && int0_scope) {     /* show it */
@@ -3090,8 +3095,8 @@ vt11_cycle(int us, int slowdown)
                 tangent = 010000L * dz / dy;
                 lp_zpos = clip_z0 + tangent * (lp_ypos - clip_y0) / 010000L;
             }
-            DEBUGF(("adjusted LP coords (0%o,0%o,0%o)\r\n",
-                lp_xpos, lp_ypos, lp_zpos));
+            DEBUGF("adjusted LP coords (0%o,0%o,0%o)\r\n",
+                   lp_xpos, lp_ypos, lp_zpos);
             /* xpos,ypos,zpos still pertain to the original endpoint
                (assuming that Maintenance Switch 3 isn't set) */
         }
@@ -3117,8 +3122,8 @@ vt11_cycle(int us, int slowdown)
         DPC += 2;
         if (time_out)
             goto bus_timeout;
-        DEBUGF(("0%06o: 0%06o\r\n",
-                (unsigned)(DPC - 2 + reloc) & 0777777, (unsigned)inst));
+        DEBUGF("0%06o: 0%06o\r\n",
+               (unsigned)(DPC - 2 + reloc) & 0777777, (unsigned)inst);
         if (finish_jmpa)
             goto jmpa;
         if (finish_jsra)
@@ -3230,17 +3235,17 @@ vt11_cycle(int us, int slowdown)
                 if (TESTBIT(inst,8)) {
 #if 0                   /* manual seems to say this, but it's wrong: */
                         DPC -= ez;
-                        DEBUGF(("Display Jump Relative -0%o\r\n",
-                                (unsigned)ez));
+                        DEBUGF("Display Jump Relative -0%o\r\n",
+                               (unsigned)ez);
 #else                   /* sign extend, twos complement add, 16-bit wrapping */
                         DPC = (DPC + (~0777 | ez)) & 0177777;
-                        DEBUGF(("Display Jump Relative -0%o\r\n",
-                                ~((~0777 | ez) - 1)));
+                        DEBUGF("Display Jump Relative -0%o\r\n",
+                               ~((~0777 | ez) - 1));
 #endif
                 } else {
                         DPC += (vt11word)ez;
-                        DEBUGF(("Display Jump Relative +0%o\r\n",
-                                (unsigned)ez));
+                        DEBUGF("Display Jump Relative +0%o\r\n",
+                               (unsigned)ez);
                 }
                 /* DPC was already incremented by 2 */
                 break;
@@ -3254,8 +3259,8 @@ vt11_cycle(int us, int slowdown)
                 finish_jsra = 0;
                 push();                 /* save return address and parameters */
                 DPC = inst & ~1;
-                DEBUGF(("Display Jump to Subroutine Absolute 0%06o\r\n",
-                        (unsigned)inst));
+                DEBUGF("Display Jump to Subroutine Absolute 0%06o\r\n",
+                       (unsigned)inst);
                 goto check;             /* (break would set jsr = 0) */
 
             case 3:            /* 110011: Display Jump to Subroutine Relative */
@@ -3265,18 +3270,18 @@ vt11_cycle(int us, int slowdown)
                 /* have to be careful; DPC is unsigned */
                 if (TESTBIT(inst,8)) {
 #if 0                   /* manual seems to say this, but it's wrong: */
-                        DPC -= ez;
-                        DEBUGF(("Display Jump to Subroutine Relative -0%o\r\n",
-                                (unsigned)ez));
+                        DPC -= (vt11word)ez;
+                        DEBUGF("Display Jump to Subroutine Relative -0%o\r\n",
+                               (unsigned)ez);
 #else                   /* sign extend, twos complement add, 16-bit wrapping */
                         DPC = (DPC + (~0777 | ez)) & 0177777;
-                        DEBUGF(("Display Jump to Subroutine Relative -0%o\r\n",
-                                ~((~0777 | ez) - 1)));
+                        DEBUGF("Display Jump to Subroutine Relative -0%o\r\n",
+                               ~((~0777 | ez) - 1));
 #endif
                 } else {
                         DPC += (vt11word)ez;
-                        DEBUGF(("Display Jump to Subroutine Relative +0%o\r\n",
-                                (unsigned)ez));
+                        DEBUGF("Display Jump to Subroutine Relative +0%o\r\n",
+                               (unsigned)ez);
                 }
                 /* DPC was already incremented by 2 */
                 break;                  /* jsr = 0 ?? */
@@ -3360,7 +3365,7 @@ vt11_cycle(int us, int slowdown)
             refresh_rate = GETFIELD(inst,VS60?3:2,2);
             DEBUGF(" refresh=%d", refresh_rate);
             if (sync_period != refresh_rate)
-            DEBUGF("old sync_period=%d, new refresh=%d", sync_period, refresh_rate);
+                DEBUGF("old sync_period=%d, new refresh=%d", sync_period, refresh_rate);
             switch (refresh_rate) {
             case 0:                     /* continuous */
                 sync_period = 0;
@@ -3478,8 +3483,8 @@ vt11_cycle(int us, int slowdown)
                 z = GETFIELD(inst,9,2); /* delta_z */
                 if (TESTBIT(inst,13))
                         z = -z;
-                DEBUGF(("short vector i%d (%d,%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)z));
+                DEBUGF("short vector i%d (%d,%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)z);
                 vector3(i, x, y, z);
             } else {
                 DEBUGF("short vector i%d (%d,%d)\r\n", i, (int)x, (int)y);
@@ -3511,8 +3516,8 @@ vt11_cycle(int us, int slowdown)
                 z = GETFIELD(inst,9,2); /* delta_z */
                 if (TESTBIT(inst,13))
                         z = -z;
-                DEBUGF(("long vector i%d (%d,%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)z));
+                DEBUGF("long vector i%d (%d,%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)z);
                 vector3(i, x, y, z);
             } else {
                 if (ex)
@@ -3566,8 +3571,8 @@ vt11_cycle(int us, int slowdown)
                     s_yoff = (unsigned char)(syo & 0xFF);
                     s_zoff = (unsigned char)(szo & 0xFF);
                 } else {
-                    DEBUGF(("point i%d (%d,%d,%d)\r\n", i,
-                                (int)ex, (int)ey, (int)ez));
+                    DEBUGF("point i%d (%d,%d,%d)\r\n", i,
+                           (int)ex, (int)ey, (int)ez);
                     point3(i, VSCALE(ex) + xoff, VSCALE(ey) + yoff,
                                 VSCALE(ez * 4) + zoff, VS60);
                 }
@@ -3607,8 +3612,8 @@ vt11_cycle(int us, int slowdown)
   blv:                                  /* (VS60) BLVECT rather than GRAPHY */
                 x = GETFIELD(inst,13,11);       /* direction */
                 y = GETFIELD(inst,9,0);         /* length */
-                DEBUGF(("basic long vector i%d d%d l%d\r\n",
-                        i, (int)x, (int)y));
+                DEBUGF("basic long vector i%d d%d l%d\r\n",
+                       i, (int)x, (int)y);
                 basic_vector(i, (int)x, (int)y);
             } else {
                 ey = GETFIELD(inst,9,0);
@@ -3638,8 +3643,8 @@ vt11_cycle(int us, int slowdown)
                 ez = GETFIELD(inst,9,2);
                 if (TESTBIT(inst,13))
                     ez = -ez;
-                DEBUGF(("relative point i%d (%d,%d,%d)\r\n",
-                        i, (int)ex, (int)ey, (int)ez));
+                DEBUGF("relative point i%d (%d,%d,%d)\r\n",
+                       i, (int)ex, (int)ey, (int)ez);
                 point3(i, xpos + VSCALE(ex), ypos + VSCALE(ey),
                         zpos + VSCALE(ez * 4), 1);
             } else {
@@ -3659,8 +3664,8 @@ vt11_cycle(int us, int slowdown)
                 y = GETFIELD(inst,3,0);         /* length 0 */
                 ex = GETFIELD(inst,13,11);      /* direction 1 */
                 ey = GETFIELD(inst,10,7);       /* length 1 */
-                DEBUGF(("basic short vector1 i%d d%d l%d\r\n",
-                        i, (int)x, (int)y));
+                DEBUGF("basic short vector1 i%d d%d l%d\r\n",
+                       i, (int)x, (int)y);
                 basic_vector(i, (int)x, (int)y);
                 if (lphit_irq || edge_irq)      /* MORE_DATA skips this */
                     vt_lpen_intr();     /* post graphic interrupt to host */
@@ -3692,8 +3697,8 @@ vt11_cycle(int us, int slowdown)
                 z = GETFIELD(inst,11,2);
                 if (TESTBIT(inst,13))
                         z = -z;
-                DEBUGF(("absolute vector i%d (%d,%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)z));
+                DEBUGF("absolute vector i%d (%d,%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)z);
                 ex = VSCALE(x) + xoff;
                 ey = VSCALE(y) + yoff;
                 ez = VSCALE(z * 4) + zoff;
@@ -3751,12 +3756,12 @@ vt11_cycle(int us, int slowdown)
                 ez = GETFIELD(inst,11,2);       /* delta ez */
                 if (TESTBIT(inst,13))
                     ez = -ez;
-                DEBUGF(("circle/arc i%d C(%d,%d,%d) E(%d,%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)z, (int)ex, (int)ey, (int)ez));
+                DEBUGF("circle/arc i%d C(%d,%d,%d) E(%d,%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)z, (int)ex, (int)ey, (int)ez);
                 conic3(i, x, y, z, ex, ey, ez); /* approx. */
             } else {
-                DEBUGF(("circle/arc i%d C(%d,%d) E(%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)ex, (int)ey));
+                DEBUGF("circle/arc i%d C(%d,%d) E(%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)ex, (int)ey);
                 conic2(i, x, y, ex, ey);
             }
             break;

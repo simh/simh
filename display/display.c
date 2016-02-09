@@ -1,10 +1,10 @@
 /*
- * $Id: display.c,v 1.57 2004/02/04 16:59:01 phil Exp $
+ * $Id: display.c,v 1.56 2004/02/03 21:44:34 phil Exp - revised by DAG $
  * Simulator and host O/S independent XY display simulator
  * Phil Budne <phil@ultimate.com>
  * September 2003
  *
- * with changes by Douglas A. Gwyn, 21 Jan. 2004
+ * with changes by Douglas A. Gwyn, 05 Feb. 2004
  *
  * started from PDP-8/E simulator vc8e.c;
  *  This PDP8 Emulator was written by Douglas W. Jones at the

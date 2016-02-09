@@ -47,7 +47,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "ws.h"
-#include "xy.h"
+#include "display.h"
 
 #ifndef PIX_SIZE
 #define PIX_SIZE 1

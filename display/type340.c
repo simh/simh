@@ -35,7 +35,7 @@
  * from the authors.
  */
 
-#include "xy.h"                 /* XY plot interface */
+#include "display.h"                 /* XY plot interface */
 
 /*
  * The Type 340 was used on the PDP-{4,6,7,9,10}
