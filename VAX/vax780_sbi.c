@@ -39,7 +39,7 @@
 #include "vax_defs.h"
 
 #ifdef DONT_USE_INTERNAL_ROM
-#define BOOT_CODE_FILENAME "vmb.exe"
+#define BOOT_CODE_FILENAME "vmb.boot"
 #else /* !DONT_USE_INTERNAL_ROM */
 #include "vax_vmb_exe.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 #endif /* DONT_USE_INTERNAL_ROM */

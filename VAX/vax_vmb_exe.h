@@ -2,12 +2,12 @@
 #define ROM_vax_vmb_exe_H 0
 /*
    VAX/vax_vmb_exe.h         produced at Sun Mar 24 16:38:01 2013
-   from VAX/vmb.exe which was last modified at Sun Mar 24 12:24:51 2013
+   from VAX/vmb.boot which was last modified at Sun Mar 24 12:24:51 2013
    file size: 44544 (0xAE00) - checksum: 0xFFC014BB
    This file is a generated file and should NOT be edited or changed by hand.
 */
 #define BOOT_CODE_SIZE 0xAE00
-#define BOOT_CODE_FILENAME "vmb.exe"
+#define BOOT_CODE_FILENAME "vmb.boot"
 #define BOOT_CODE_ARRAY vax_vmb_exe
 unsigned char vax_vmb_exe[] = {
 0xD4,0xEF,0x34,0x61,0x00,0x00,0x17,0xEF,0xB8,0x5D,0x00,0x00,0xC1,0xAB,0x38,0xAB,
