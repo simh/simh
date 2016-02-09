@@ -4379,19 +4379,20 @@ if (flag) {
         char *proc_arch3264 = getenv ("PROCESSOR_ARCHITEW6432");
         char *tmpnam = _tempnam (NULL, "simh-ver");
         char vercmd[PATH_MAX+1];
-        char osversion[PATH_MAX+1];
+        char osversion[PATH_MAX+1] = "";
         FILE *f;
         
         sprintf (vercmd, "ver >%s", tmpnam);
         system (vercmd);
-        f = fopen (tmpnam, "r");
-        memset (osversion, 0, sizeof(osversion));
-        do {
-            if (NULL == fgets (osversion, sizeof(osversion)-1, f))
-                break;
-            sim_trim_endspc (osversion);
-            } while (osversion[0] == '\0');
-        fclose (f);
+        if ((f = fopen (tmpnam, "r"))) {
+            memset (osversion, 0, sizeof(osversion));
+            do {
+                if (NULL == fgets (osversion, sizeof(osversion)-1, f))
+                    break;
+                sim_trim_endspc (osversion);
+                } while (osversion[0] == '\0');
+            fclose (f);
+            }
         remove (tmpnam);
         free (tmpnam);
         fprintf (st, "\n\t\tOS: %s", osversion);
@@ -4402,19 +4403,20 @@ if (flag) {
     if (1) {
         char *tmpnam = tempnam (NULL, "simh-ver");
         char vercmd[2*PATH_MAX+1];
-        char osversion[2*PATH_MAX+1];
+        char osversion[2*PATH_MAX+1] = "";
         FILE *f;
         
         sprintf (vercmd, "uname -a >%s", tmpnam);
         system (vercmd);
-        f = fopen (tmpnam, "r");
-        memset (osversion, 0, sizeof(osversion));
-        do {
-            if (NULL == fgets (osversion, sizeof(osversion)-1, f))
-                break;
-            sim_trim_endspc (osversion);
-            } while (osversion[0] == '\0');
-        fclose (f);
+        if ((f = fopen (tmpnam, "r"))) {
+            memset (osversion, 0, sizeof(osversion));
+            do {
+                if (NULL == fgets (osversion, sizeof(osversion)-1, f))
+                    break;
+                sim_trim_endspc (osversion);
+                } while (osversion[0] == '\0');
+            fclose (f);
+            }
         remove (tmpnam);
         free (tmpnam);
         fprintf (st, "\n\t\tOS: %s", osversion);
