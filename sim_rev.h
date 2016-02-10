@@ -37,7 +37,7 @@
 #define SIM_PATCH       0
 #endif
 #ifndef SIM_DELTA
-#define SIM_DELTA       0
+#define SIM_DELTA       1
 #endif
 
 #ifndef SIM_VERSION_MODE
