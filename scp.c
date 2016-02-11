@@ -4377,48 +4377,36 @@ if (flag) {
         char *proc_level = getenv ("PROCESSOR_LEVEL");
         char *proc_rev = getenv ("PROCESSOR_REVISION");
         char *proc_arch3264 = getenv ("PROCESSOR_ARCHITEW6432");
-        char *tmpnam = _tempnam (NULL, "simh-ver");
-        char vercmd[PATH_MAX+1];
         char osversion[PATH_MAX+1] = "";
         FILE *f;
-        
-        sprintf (vercmd, "ver >%s", tmpnam);
-        system (vercmd);
-        if ((f = fopen (tmpnam, "r"))) {
+
+        if ((f = _popen ("ver", "r"))) {
             memset (osversion, 0, sizeof(osversion));
             do {
                 if (NULL == fgets (osversion, sizeof(osversion)-1, f))
                     break;
                 sim_trim_endspc (osversion);
                 } while (osversion[0] == '\0');
-            fclose (f);
+            _pclose (f);
             }
-        remove (tmpnam);
-        free (tmpnam);
         fprintf (st, "\n\t\tOS: %s", osversion);
         fprintf (st, "\n\t\tArchitecture: %s%s%s, Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", procs);
         fprintf (st, "\n\t\tProcessor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
         }
 #else
     if (1) {
-        char *tmpnam = tempnam (NULL, "simh-ver");
-        char vercmd[2*PATH_MAX+1];
         char osversion[2*PATH_MAX+1] = "";
         FILE *f;
         
-        sprintf (vercmd, "uname -a >%s", tmpnam);
-        system (vercmd);
-        if ((f = fopen (tmpnam, "r"))) {
+        if ((f = popen ("uname -a", "r"))) {
             memset (osversion, 0, sizeof(osversion));
             do {
                 if (NULL == fgets (osversion, sizeof(osversion)-1, f))
                     break;
                 sim_trim_endspc (osversion);
                 } while (osversion[0] == '\0');
-            fclose (f);
+            pclose (f);
             }
-        remove (tmpnam);
-        free (tmpnam);
         fprintf (st, "\n\t\tOS: %s", osversion);
         }
 #endif
