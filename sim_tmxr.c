@@ -1143,6 +1143,8 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                                 if (!lp->notelnet) {
                                     sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
                                     tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                                    lp->telnet_sent_opts = (uint8 *)realloc (lp->telnet_sent_opts, 256);
+                                    memset (lp->telnet_sent_opts, 0, 256);
                                     }
                                 tmxr_report_connection (mp, lp);
                                 lp->cnms = sim_os_msec ();          /* time of connection */
