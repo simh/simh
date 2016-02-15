@@ -311,12 +311,12 @@ static void vid_beep_cleanup (void);
 static void _XInitThreads (void)
 {
 #ifdef HAVE_DLOPEN
-static void *hLib = 0;                      /* handle to Library */
+static void *hLib = NULL;                   /* handle to Library */
 #define __STR_QUOTE(tok) #tok
 #define __STR(tok) __STR_QUOTE(tok)
 static const char* lib_name = "libX11." __STR(HAVE_DLOPEN);
 typedef int (*_func)();
-_func _func_ptr;
+_func _func_ptr = NULL;
 
 if (!hLib)
     hLib = dlopen(lib_name, RTLD_NOW);
