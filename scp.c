@@ -3061,8 +3061,29 @@ for (; *ip && (op < oend); ) {
                         sprintf (rbuf, "%d", (tmnow->tm_year + 1900)/100);
                         ap = rbuf;
                         }
+                    else if ((!strcmp ("DATE_19XX_YY", gbuf)) || /* Year with same calendar */
+                             (!strcmp ("DATE_19XX_YYYY", gbuf))) {
+                        int year = tmnow->tm_year + 1900 + 22;
+                        int days = year - 2001;
+                        int leaps = days/4 - days/100 + days/400;
+                        int lyear = ((year % 4) == 0) && (((year % 100) != 0) || ((year % 400) == 0));
+                        int selector = ((days + leaps + 7) % 7) + lyear * 7;
+                        static int years[] = {90, 91, 97, 98, 99, 94, 89, 
+                                              96, 80, 92, 76, 88, 72, 84};
+                        int cal_year = years[selector];
+
+                        if (!strcmp ("DATE_19XX_YY", gbuf))
+                            sprintf (rbuf, "%d", cal_year);        /* 2 digit year */
+                        else
+                            sprintf (rbuf, "%d", cal_year + 1900); /* 4 digit year */
+                        ap = rbuf;
+                        }
                     else if (!strcmp ("DATE_MM", gbuf)) {/* Month number (01-12) */
                         strftime (rbuf, sizeof(rbuf), "%m", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("DATE_MMM", gbuf)) {/* Month number (01-12) */
+                        strftime (rbuf, sizeof(rbuf), "%b", tmnow);
                         ap = rbuf;
                         }
                     else if (!strcmp ("DATE_DD", gbuf)) {/* Day of Month (01-31) */
