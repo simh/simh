@@ -1434,8 +1434,8 @@ return 0;
 
 int32 op_mtpr (int32 *opnd)
 {
-int32 val = opnd[0];
-int32 prn = opnd[1];
+uint32 val = (uint32)opnd[0];
+uint32 prn = (uint32)opnd[1];
 int32 cc;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
