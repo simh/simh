@@ -23,3 +23,6 @@ Bugs Found and Fixed During Simulator Debug
 16. RHCS1: writing IE cannot trigger an interrupt
 17. Tape bootstrap was set to 800bpi instead of 1600bpi
 18. FIXR off by 1 in testing for lower limit to process
+19. Indirect loops and XCT loops should run indefinitely,
+    test for interrupts on each memory reference
+
