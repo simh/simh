@@ -1,6 +1,6 @@
 /* pdp10_cpu.c: PDP-10 CPU simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          KS10 central processor
 
+   09-Feb-16    RMS     Fixed nested indirects and executes (Tim Litt)
    25-Mar-12    RMS     Added missing parameters to prototypes (Mark Pizzolato)
    17-Jul-07    RMS     Fixed non-portable usage in SHOW HISTORY
    28-Apr-07    RMS     Removed clock initialization
@@ -191,8 +192,8 @@ int32 flags = 0;                                        /* flags */
 int32 its_1pr = 0;                                      /* ITS 1-proceed */
 int32 stop_op0 = 0;                                     /* stop on 0 */
 int32 rlog = 0;                                         /* extend fixup log */
-int32 ind_max = 32;                                     /* nested ind limit */
-int32 xct_max = 32;                                     /* nested XCT limit */
+int32 ind_max = 0;                                      /* nested ind limit */
+int32 xct_max = 0;                                      /* nested XCT limit */
 int32 t20_idlelock = 0;                                 /* TOPS-20 idle lock */
 a10 pcq[PCQ_SIZE] = { 0 };                              /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
@@ -388,8 +389,8 @@ REG cpu_reg[] = {
     { FLDATA (F1PR, its_1pr, 0) },
     { BRDATA (PCQ, pcq, 8, VASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
-    { DRDATA (INDMAX, ind_max, 8), PV_LEFT + REG_NZ },
-    { DRDATA (XCTMAX, xct_max, 8), PV_LEFT + REG_NZ },
+    { DRDATA (INDMAX, ind_max, 8), PV_LEFT },
+    { DRDATA (XCTMAX, xct_max, 8), PV_LEFT },
     { ORDATA (WRU, sim_int_char, 8) },
     { FLDATA (STOP_ILL, stop_op0, 0) },
     { BRDATA (REG, acs, 8, 36, AC_NUM * AC_NBLK) },
@@ -857,17 +858,23 @@ its_2pr = its_1pr;                                      /* save 1-proc flag */
 XCT:
 op = GET_OP (inst);                                     /* get opcode */
 ac = GET_AC (inst);                                     /* get AC */
-for (indrct = inst, i = 0; i < ind_max; i++) {          /* calc eff addr */
+for (indrct = inst, i = 0; ; i++) {                     /* calc eff addr */
     ea = GET_ADDR (indrct);
     xr = GET_XR (indrct);
     if (xr)
         ea = (ea + ((a10) XR (xr, MM_EA))) & AMASK;
-    if (TST_IND (indrct))
-        indrct = Read (ea, MM_EA);
+    if (TST_IND (indrct)) {                             /* indirect? */
+        if (i != 0) {                                   /* not first cycle? */
+            int32 t = test_int ();                      /* test for intr */
+            if (t != 0)                                 /* err or intr? */
+                ABORT (t);
+            if ((ind_max != 0) && (i >= ind_max))       /* limit exceeded? */
+                ABORT (STOP_IND);
+            }
+        indrct = Read (ea, MM_EA);                      /* fetch indirect */
+        }
     else break;
     }
-if (i >= ind_max)
-    ABORT (STOP_IND);                                   /* too many ind? stop */
 if (hst_lnt) {                                          /* history enabled? */
     hst_p = (hst_p + 1);                                /* next entry */
     if (hst_p >= hst_lnt)
@@ -1072,10 +1079,15 @@ case 0255:  if (flags & (ac << 14)) {                   /* JFCL */
                 CLRF (ac << 14);
                 }
             break;
-case 0256:  if (xct_cnt++ >= xct_max)                   /* XCT */
-                ABORT (STOP_XCT);
-            inst = Read (ea, MM_OPND);
-            if (ac && !TSTF (F_USR) && !Q_ITS)
+case 0256:  if (xct_cnt++ != 0) {                       /* XCT: not first? */
+                int32 t = test_int ();                  /* test for intr */
+                if (t != 0)                             /* intr or err? */
+                    ABORT (t);
+                 if ((xct_max != 0) && (xct_cnt >= xct_max))
+                    ABORT (STOP_XCT);
+                }
+            inst = Read (ea, MM_OPND);                  /* get opnd */
+            if (ac && !TSTF (F_USR) && !Q_ITS)          /* PXCT? */
                 pflgs = pflgs | ac;
             goto XCT;
 case 0257:  if (Q_ITS) goto MUUO;                       /* MAP */
@@ -1831,17 +1843,23 @@ a10 calc_ea (d10 inst, int32 prv)
 int32 i, ea, xr;
 d10 indrct;
 
-for (indrct = inst, i = 0; i < ind_max; i++) {
+for (indrct = inst, i = 0; ; i++) {
     ea = GET_ADDR (indrct);
     xr = GET_XR (indrct);
     if (xr)
         ea = (ea + ((a10) XR (xr, prv))) & AMASK;
-    if (TST_IND (indrct))
+    if (TST_IND (indrct)) {                             /* indirect? */
+        if (i != 0) {                                   /* not first cycle? */
+            int32 t = test_int ();                      /* test for intr */
+            if (t != 0)                                 /* intr or error? */
+                ABORT (t);
+            if ((ind_max != 0) && (i >= ind_max))       /* limit exceeded? */
+                ABORT (STOP_IND);
+            }
         indrct = Read (ea, prv);
+        }
     else break;
     }
-if (i >= ind_max)
-    ABORT (STOP_IND);
 return ea;
 }
 
@@ -1882,17 +1900,23 @@ d10 calc_jrstfea (d10 inst, int32 pflgs)
 int32 i, xr;
 d10 mb;
 
-for (i = 0; i < ind_max; i++) {
+for (i = 0; ; i++) {
     mb = inst;
     xr = GET_XR (inst);
     if (xr)
         mb = (mb & AMASK) + XR (xr, MM_EA);
-    if (TST_IND (inst))
+    if (TST_IND (inst)) {                               /* indirect? */
+        if (i != 0) {                                   /* not first cycle? */
+            int32 t = test_int ();                      /* test for intr */
+            if (t != 0)                                 /* intr or error? */
+                ABORT (t);
+            if ((ind_max != 0) && (i >= ind_max))       /* limit exceeded? */
+                ABORT (STOP_IND);
+            }
         inst = Read (((a10) mb) & AMASK, MM_EA);
+        }
     else break;
     }
-if (i >= ind_max)
-    ABORT (STOP_IND);
 return (mb & DMASK);
 }
 
