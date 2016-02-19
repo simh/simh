@@ -3063,7 +3063,7 @@ for (; *ip && (op < oend); ) {
                         }
                     else if ((!strcmp ("DATE_19XX_YY", gbuf)) || /* Year with same calendar */
                              (!strcmp ("DATE_19XX_YYYY", gbuf))) {
-                        int year = tmnow->tm_year + 1900 + 22;
+                        int year = tmnow->tm_year + 1900;
                         int days = year - 2001;
                         int leaps = days/4 - days/100 + days/400;
                         int lyear = ((year % 4) == 0) && (((year % 100) != 0) || ((year % 400) == 0));
