@@ -218,6 +218,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isys8020", "isys8020.vcproj
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "B5500", "B5500.vcproj", "{BA514FA1-D029-4D25-91CC-255E5953FF6E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -400,6 +405,10 @@ Global
 		{9BBA76FE-45DD-4902-9421-BEA3EC2DCDB0}.Debug|Win32.Build.0 = Debug|Win32
 		{9BBA76FE-45DD-4902-9421-BEA3EC2DCDB0}.Release|Win32.ActiveCfg = Release|Win32
 		{9BBA76FE-45DD-4902-9421-BEA3EC2DCDB0}.Release|Win32.Build.0 = Release|Win32
+		{BA514FA1-D029-4D25-91CC-255E5953FF6E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{BA514FA1-D029-4D25-91CC-255E5953FF6E}.Debug|Win32.Build.0 = Debug|Win32
+		{BA514FA1-D029-4D25-91CC-255E5953FF6E}.Release|Win32.ActiveCfg = Release|Win32
+		{BA514FA1-D029-4D25-91CC-255E5953FF6E}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

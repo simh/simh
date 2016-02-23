@@ -636,9 +636,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_DCO       12
                     /* VT simulation is sequential, so only
                        one interrupt is posted at a time. */
-#define INT_V_VTLP      13  /* XXX - Manual says VTLP, VTST have opposite */
-#define INT_V_VTST      14  /* XXX   precedence, but that breaks LUNAR! */
-                            /* XXX   How this happens is an utter mystery. */
+#define INT_V_VTST      13
+#define INT_V_VTLP      14
 #define INT_V_VTCH      15
 #define INT_V_VTNM      16
 #define INT_V_LK        17
@@ -784,6 +783,7 @@ typedef struct pdp_dib DIB;
 #define IREQ(dv)        int_req[IPL_##dv]
 #define SET_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
+#define INT_IS_SET(dv)  (int_req[IPL_##dv] & (INT_##dv))
 
 /* Massbus definitions */
 

@@ -794,7 +794,7 @@ if ((vc_dev.dctrl & DBG_CURSOR) && (vc_dev.dctrl & DBG_TCURSOR)) {
             }
         }
     }
-vid_set_cursor (visible, 16, 16, data, mask);
+vid_set_cursor (visible, 16, 16, data, mask, 0, 0);
 }
 
 void vc_checkint (void)
@@ -1023,7 +1023,7 @@ if (dptr->flags & DEV_DIS) {
     }
 
 if (!vid_active)  {
-    r = vid_open (dptr, VC_XSIZE, VC_YSIZE, vc_input_captured ? SIM_VID_INPUTCAPTURED : 0);/* display size & capture mode */
+    r = vid_open (dptr, NULL, VC_XSIZE, VC_YSIZE, vc_input_captured ? SIM_VID_INPUTCAPTURED : 0);/* display size & capture mode */
     if (r != SCPE_OK)
         return r;
     vc_buf = (uint32 *) calloc (VC_MEMSIZE, sizeof (uint32));

@@ -2146,7 +2146,7 @@ static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map, uint32 mapsize)
 {
 t_addr tpos, leot;
 t_addr tape_size;
-t_tpclnt bc, last_bc;
+t_tpclnt bc, last_bc = 0xFFFF;
 uint32 had_double_tape_mark = 0;
 size_t i;
 uint32 objc, sizec;

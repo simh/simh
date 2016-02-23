@@ -179,7 +179,7 @@ panel = sim_panel_start_simulator_debug (sim_path,
                                          debug? "frontpanel.dbg" : NULL);
 
 if (!panel) {
-    printf ("Error starting simulator: %s\n", sim_panel_get_error());
+    printf ("Error starting simulator %s with config %s: %s\n", sim_path, sim_config, sim_panel_get_error());
     goto Done;
     }
 
@@ -335,6 +335,23 @@ if (sim_panel_dismount (panel, "RL0")) {
     goto Done;
     }
 remove ("TEST-RL.DSK");
+if (sim_panel_break_set (panel, "400")) {
+    printf ("Unexpected establishing a breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_break_clear (panel, "400")) {
+    printf ("Unexpected clearing a breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_break_output_set (panel, "\"32..31..30\"")) {
+    printf ("Unexpected establishing an output breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_break_output_clear (panel, "\"32..31..30\"")) {
+    printf ("Unexpected clearing an output breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+sim_panel_clear_error ();
 while (1) {
     size_t i;
     char cmd[512];

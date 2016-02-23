@@ -427,11 +427,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\display\vt11.c"
+				RelativePath="..\display\sim_ws.c"
 				>
 			</File>
 			<File
-				RelativePath="..\display\win32.c"
+				RelativePath="..\display\vt11.c"
 				>
 			</File>
 			<Filter

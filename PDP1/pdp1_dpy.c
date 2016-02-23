@@ -35,6 +35,7 @@
 #ifdef USE_DISPLAY
 #include "pdp1_defs.h"
 #include "display/display.h"
+#include "sim_video.h"
 
 extern int32 ios, cpls, iosta, PF;
 extern int32 stop_inst;
@@ -55,12 +56,33 @@ t_stat dpy_reset (DEVICE *dptr);
 UNIT dpy_unit = {
         UDATA (&dpy_svc, UNIT_ATTABLE, 0), DPY_WAIT };
 
+static t_bool dpy_stop_flag = FALSE;
+
+static void dpy_quit_callback (void)
+{
+dpy_stop_flag = TRUE;
+}
+
+#define DEB_VMOU      SIM_VID_DBG_MOUSE             /* Video mouse */
+#define DEB_VKEY      SIM_VID_DBG_KEY               /* Video key */
+#define DEB_VCUR      SIM_VID_DBG_CURSOR            /* Video cursor */
+#define DEB_VVID      SIM_VID_DBG_VIDEO             /* Video */
+
+DEBTAB dpy_deb[] = {
+    { "VMOU",    DEB_VMOU, "Video Mouse" },
+    { "VKEY",    DEB_VKEY, "Video Key" },
+    { "VCUR",    DEB_VCUR, "Video Cursor" },
+    { "VVID",    DEB_VVID, "Video Video" },
+    { NULL, 0 }
+    };
+
 DEVICE dpy_dev = {
         "DPY", &dpy_unit, NULL, NULL,
         1, 10, 31, 1, 8, 8,
         NULL, NULL, &dpy_reset,
         NULL, NULL, NULL,
-        NULL, DEV_DIS | DEV_DISABLE };
+        NULL, DEV_DIS | DEV_DISABLE | DEV_DEBUG,
+        0, dpy_deb};
 
 /* Display IOT routine */
 
@@ -115,8 +137,6 @@ return io;
 /*
  * Unit service routine
  *
- * Under X11 this includes polling for events, so it can't be
- * call TOO infrequently...
  */
 t_stat dpy_svc (UNIT *uptr)
 {
@@ -124,8 +144,12 @@ t_stat dpy_svc (UNIT *uptr)
         ios = 1;                        /* restart */
         cpls = cpls & ~CPLS_DPY;  }     /* clr pulse pending */
 
-    display_age(dpy_unit.wait*CYCLE_TIME, 1);
-    sim_activate (&dpy_unit, dpy_unit.wait); /* requeue! */
+    display_age(dpy_unit.wait*CYCLE_TIME, 0);
+    sim_activate_after (&dpy_unit, dpy_unit.wait*CYCLE_TIME); /* requeue! */
+    if (dpy_stop_flag) {
+        dpy_stop_flag = FALSE;          /* reset flag after we notice it */
+        return SCPE_STOP;
+        }
     return SCPE_OK;
 }
 
@@ -134,7 +158,9 @@ t_stat dpy_svc (UNIT *uptr)
 t_stat dpy_reset (DEVICE *dptr)
 {
     if (!(dptr->flags & DEV_DIS)) {
+        display_init(DISPLAY_TYPE, PIX_SCALE, dptr);
         display_reset();
+        vid_register_quit_callback (&dpy_quit_callback);
         cpls = cpls & ~CPLS_DPY;
         iosta = iosta & ~(IOS_PNT | IOS_SPC); /* clear flags */
         }

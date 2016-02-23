@@ -947,6 +947,13 @@ static const char simh_help[] =
 #define HLP_LS          "*Commands Listing_Files LS"
       "3LS\n"
       "++LS {path}                 list directory files\n"
+      "2Displaying Files\n"
+#define HLP_TYPE         "*Commands Displaying_Files TYPE"
+      "3TYPE\n"
+      "++TYPE {file}               display a file contents\n"
+#define HLP_CAT          "*Commands Displaying_Files CAT"
+      "3CAT\n"
+      "++CAT {file}                display a file contents\n"
 #define HLP_SET         "*Commands SET"
       "2SET\n"
        /***************** 80 character line width template *************************/
@@ -1724,6 +1731,8 @@ static CTAB cmd_table[] = {
     { "PWD",        &pwd_cmd,       0,          HLP_PWD },
     { "DIR",        &dir_cmd,       0,          HLP_DIR },
     { "LS",         &dir_cmd,       0,          HLP_LS },
+    { "TYPE",       &type_cmd,      0,          HLP_TYPE },
+    { "CAT",        &type_cmd,      0,          HLP_CAT },
     { "SET",        &set_cmd,       0,          HLP_SET },
     { "SHOW",       &show_cmd,      0,          HLP_SHOW },
     { "DO",         &do_cmd,        1,          HLP_DO },
@@ -3052,8 +3061,29 @@ for (; *ip && (op < oend); ) {
                         sprintf (rbuf, "%d", (tmnow->tm_year + 1900)/100);
                         ap = rbuf;
                         }
+                    else if ((!strcmp ("DATE_19XX_YY", gbuf)) || /* Year with same calendar */
+                             (!strcmp ("DATE_19XX_YYYY", gbuf))) {
+                        int year = tmnow->tm_year + 1900;
+                        int days = year - 2001;
+                        int leaps = days/4 - days/100 + days/400;
+                        int lyear = ((year % 4) == 0) && (((year % 100) != 0) || ((year % 400) == 0));
+                        int selector = ((days + leaps + 7) % 7) + lyear * 7;
+                        static int years[] = {90, 91, 97, 98, 99, 94, 89, 
+                                              96, 80, 92, 76, 88, 72, 84};
+                        int cal_year = years[selector];
+
+                        if (!strcmp ("DATE_19XX_YY", gbuf))
+                            sprintf (rbuf, "%d", cal_year);        /* 2 digit year */
+                        else
+                            sprintf (rbuf, "%d", cal_year + 1900); /* 4 digit year */
+                        ap = rbuf;
+                        }
                     else if (!strcmp ("DATE_MM", gbuf)) {/* Month number (01-12) */
                         strftime (rbuf, sizeof(rbuf), "%m", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("DATE_MMM", gbuf)) {/* Month number (01-12) */
+                        strftime (rbuf, sizeof(rbuf), "%b", tmnow);
                         ap = rbuf;
                         }
                     else if (!strcmp ("DATE_DD", gbuf)) {/* Day of Month (01-31) */
@@ -4361,14 +4391,45 @@ if (flag) {
         fprintf (st, "\n\t\tOS: OpenVMS %s %s", arch, __VMS_VERSION);
         }
 #elif defined(_WIN32)
-    fprintf (st, "\n\t\tOS: Windows: ");
-    fflush (st);
-    system ("ver");
-    system ("echo \t\t%PROCESSOR_IDENTIFIER% - %PROCESSOR_ARCHITECTURE%-%PROCESSOR_ARCHITEW6432%");
+    if (1) {
+        char *proc_id = getenv ("PROCESSOR_IDENTIFIER");
+        char *arch = getenv ("PROCESSOR_ARCHITECTURE");
+        char *procs = getenv ("NUMBER_OF_PROCESSORS");
+        char *proc_level = getenv ("PROCESSOR_LEVEL");
+        char *proc_rev = getenv ("PROCESSOR_REVISION");
+        char *proc_arch3264 = getenv ("PROCESSOR_ARCHITEW6432");
+        char osversion[PATH_MAX+1] = "";
+        FILE *f;
+
+        if ((f = _popen ("ver", "r"))) {
+            memset (osversion, 0, sizeof(osversion));
+            do {
+                if (NULL == fgets (osversion, sizeof(osversion)-1, f))
+                    break;
+                sim_trim_endspc (osversion);
+                } while (osversion[0] == '\0');
+            _pclose (f);
+            }
+        fprintf (st, "\n\t\tOS: %s", osversion);
+        fprintf (st, "\n\t\tArchitecture: %s%s%s, Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", procs);
+        fprintf (st, "\n\t\tProcessor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
+        }
 #else
-    fprintf (st, "\n\t\tOS: ");
-    fflush (st);
-    system ("uname -a");
+    if (1) {
+        char osversion[2*PATH_MAX+1] = "";
+        FILE *f;
+        
+        if ((f = popen ("uname -a", "r"))) {
+            memset (osversion, 0, sizeof(osversion));
+            do {
+                if (NULL == fgets (osversion, sizeof(osversion)-1, f))
+                    break;
+                sim_trim_endspc (osversion);
+                } while (osversion[0] == '\0');
+            pclose (f);
+            }
+        fprintf (st, "\n\t\tOS: %s", osversion);
+        }
 #endif
     }
 #if defined(SIM_GIT_COMMIT_ID)
@@ -4890,6 +4951,25 @@ return SCPE_OK;
 }
 
 #endif /* !defined(_WIN32) */
+
+
+t_stat type_cmd (int32 flg, char *cptr)
+{
+FILE *file;
+char lbuf[CBUFSIZE*2];
+
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+sim_trim_endspc(cptr);
+file = sim_fopen (cptr, "r");
+if (file == NULL)                           /* open failed? */
+    return SCPE_OPENERR;
+lbuf[sizeof(lbuf)-1] = '\0';
+while (fgets (lbuf, sizeof(lbuf)-1, file))
+    sim_printf ("%s", lbuf);
+fclose (file);
+return SCPE_OK;
+}
 
 /* Breakpoint commands */
 
@@ -9608,6 +9688,7 @@ static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr)
 {
 static const char *debtab_none    = "DEBTAB_ISNULL";
 static const char *debtab_nomatch = "DEBTAB_NOMATCH";
+const char *some_match = NULL;
 int32 offset = 0;
 
 if (dptr->debflags == 0)
@@ -9616,11 +9697,13 @@ if (dptr->debflags == 0)
 /* Find matching words for bitmask */
 
 while (dptr->debflags[offset].name && (offset < 32)) {
-    if (dptr->debflags[offset].mask & dbits)
+    if (dptr->debflags[offset].mask == dbits)   /* All Bits Match */
         return dptr->debflags[offset].name;
+    if (dptr->debflags[offset].mask & dbits)
+        some_match = dptr->debflags[offset].name;
     offset++;
     }
-return debtab_nomatch;
+return some_match ? some_match : debtab_nomatch;
 }
 
 /* Prints standard debug prefix unless previous call unterminated */

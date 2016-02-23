@@ -38,6 +38,13 @@ int32 vid_cursor_y;
 t_bool vid_mouse_b1 = FALSE;
 t_bool vid_mouse_b2 = FALSE;
 t_bool vid_mouse_b3 = FALSE;
+static VID_QUIT_CALLBACK vid_quit_callback = NULL;
+
+t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback)
+{
+vid_quit_callback = callback;
+return SCPE_OK;
+}
 
 t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc)
 {
@@ -285,6 +292,7 @@ int32 vid_flags;                                        /* Open Flags */
 int32 vid_width;
 int32 vid_height;
 t_bool vid_ready;
+char vid_title[128];
 static void vid_beep_setup (int duration_ms, int tone_frequency);
 static void vid_beep_cleanup (void);
 #if SDL_MAJOR_VERSION == 1
@@ -303,12 +311,12 @@ static void vid_beep_cleanup (void);
 static void _XInitThreads (void)
 {
 #ifdef HAVE_DLOPEN
-static void *hLib = 0;                      /* handle to Library */
+static void *hLib = NULL;                   /* handle to Library */
 #define __STR_QUOTE(tok) #tok
 #define __STR(tok) __STR_QUOTE(tok)
 static const char* lib_name = "libX11." __STR(HAVE_DLOPEN);
 typedef int (*_func)();
-_func _func_ptr;
+_func _func_ptr = NULL;
 
 if (!hLib)
     hLib = dlopen(lib_name, RTLD_NOW);
@@ -469,12 +477,16 @@ return SCPE_OK;
 }
 #endif
 
-t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int flags)
+t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags)
 {
 if (!vid_active) {
     int wait_count = 0;
     t_stat stat;
 
+    if ((strlen(sim_name) + 7 + (dptr ? strlen (dptr->name) : 0) + (title ? strlen (title) : 0)) < sizeof (vid_title))
+        sprintf (vid_title, "%s%s%s%s%s", sim_name, dptr ? " - " : "", dptr ? dptr->name : "", title ? " - " : "", title ? title : "");
+    else
+        sprintf (vid_title, "%s", sim_name);
     vid_flags = flags;
     vid_active = TRUE;
     vid_width = width;
@@ -608,11 +620,20 @@ uint32 *vid_data;
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
 
 vid_dst = (SDL_Rect *)malloc (sizeof(*vid_dst));
+if (!vid_dst) {
+    sim_printf ("%s: vid_draw() memory allocation error\n", vid_dev ? sim_dname(vid_dev) : "Video Device");
+    return;
+    }
 vid_dst->x = x;
 vid_dst->y = y;
 vid_dst->w = w;
 vid_dst->h = h;
 vid_data = (uint32 *)malloc (w*h*sizeof(*buf));
+if (!vid_data) {
+    sim_printf ("%s: vid_draw() memory allocation error\n", vid_dev ? sim_dname(vid_dev) : "Video Device");
+    free (vid_dst);
+    return;
+    }
 memcpy (vid_data, buf, w*h*sizeof(*buf));
 user_event.type = SDL_USEREVENT;
 user_event.user.code = EVENT_DRAW;
@@ -626,9 +647,9 @@ if (SDL_PushEvent (&user_event) < 0) {
 #endif
 }
 
-t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask)
+t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask, uint32 hot_x, uint32 hot_y)
 {
-SDL_Cursor *cursor = SDL_CreateCursor (data, mask, width, height, 0, 0);
+SDL_Cursor *cursor = SDL_CreateCursor (data, mask, width, height, hot_x, hot_y);
 SDL_Event user_event;
 
 sim_debug (SIM_VID_DBG_CURSOR, vid_dev, "vid_set_cursor(%s, %d, %d) Setting New Cursor\n", visible ? "visible" : "invisible", width, height);
@@ -1348,7 +1369,7 @@ if (visible)
 if ((vid_window == SDL_GetMouseFocus ()) && visible)
     SDL_WarpMouseInWindow (NULL, vid_cursor_x, vid_cursor_y);/* sync position */
 #endif
-if (vid_cursor)
+if ((vid_cursor != cursor) && (vid_cursor))
     SDL_FreeCursor (vid_cursor);
 vid_cursor = cursor;
 SDL_ShowCursor (visible);
@@ -1610,7 +1631,7 @@ if (vid_flags & SIM_VID_INPUTCAPTURED) {
     char title[150];
 
     memset (title, 0, sizeof(title));
-    strncpy (title, sim_name, sizeof(title)-1);
+    strncpy (title, vid_title, sizeof(title)-1);
     strncat (title, "                                             ReleaseKey=", sizeof(title)-(1+strlen(title)));
     strncat (title, vid_release_key, sizeof(title)-(1+strlen(title)));
 #if SDL_MAJOR_VERSION == 1
@@ -1621,9 +1642,9 @@ if (vid_flags & SIM_VID_INPUTCAPTURED) {
     }
 else
 #if SDL_MAJOR_VERSION == 1
-    SDL_WM_SetCaption (sim_name, sim_name);
+    SDL_WM_SetCaption (vid_title, sim_name);
 #else
-    SDL_SetWindowTitle (vid_window, sim_name);
+    SDL_SetWindowTitle (vid_window, vid_title);
 #endif
 
 vid_ready = TRUE;
@@ -1720,6 +1741,11 @@ if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SD
                         sim_printf ("vid_thread(): Unexpected user event code: %d\n", event.user.code);
                         }
                     }
+                break;
+            case SDL_QUIT:
+                sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE|SIM_VID_DBG_CURSOR, vid_dev, "vid_thread() - QUIT Event - %s\n", vid_quit_callback ? "Signaled" : "Ignored");
+                if (vid_quit_callback)
+                    vid_quit_callback ();
                 break;
 
             default:
@@ -2089,6 +2115,8 @@ if (!vid_active) {
     return SCPE_UDIS | SCPE_NOMESSAGE;
     }
 fullname = malloc (strlen(filename) + 5);
+if (!filename)
+    return SCPE_MEM;
 #if SDL_MAJOR_VERSION == 1
 #if defined(HAVE_LIBPNG)
 sprintf (fullname, "%s.png", filename);
@@ -2242,7 +2270,7 @@ SDL_Delay (vid_beep_duration + 100);/* Wait for sound to finnish */
 
 uint32 vid_mono_palette[2];                             /* Monochrome Color Map */
 
-t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height, int flags)
+t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags)
 {
 return SCPE_NOFNC;
 }
@@ -2267,7 +2295,7 @@ void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf)
 return;
 }
 
-t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask)
+t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask, uint32 hot_x, uint32 hot_y)
 {
 return SCPE_NOFNC;
 }

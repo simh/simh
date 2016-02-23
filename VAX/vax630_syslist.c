@@ -30,7 +30,7 @@
 #include "vax_defs.h"
 
 #if defined(VAX_620)
-char sim_name[] = "rtVAX1000 (KA620)";
+char sim_name[32] = "rtVAX1000 (KA620)";
 
 void vax_init(void)
 {
