@@ -20,7 +20,7 @@ typedef char *caddr_t;
 #else
 # define ioctlsocket ioctl
 # define closesocket(s) close(s)
-# if !defined(__HAIKU__)
+# if !defined(__HAIKU__) && !defined(__CYGWIN__)
 #  define O_BINARY 0
 # endif
 #endif
