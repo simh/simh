@@ -230,9 +230,10 @@
 
 
 #define HIST_MIN        64
-#define HIST_MAX        65536
+#define HIST_MAX        250000
 
 typedef struct {
+    double              time;
     int32               iPC;
     int32               PSL;
     int32               opc;
@@ -266,8 +267,6 @@ int32 crd_err = 0;
 int32 p1 = 0, p2 = 0;                                   /* fault parameters */
 int32 fault_PC;                                         /* fault PC */
 int32 pcq_p = 0;                                        /* PC queue ptr */
-int32 hst_p = 0;                                        /* history pointer */
-int32 hst_lnt = 0;                                      /* history length */
 int32 badabo = 0;
 int32 cpu_astop = 0;
 int32 mchk_va, mchk_ref;                                /* mem ref param */
@@ -279,6 +278,11 @@ jmp_buf save_env;
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
 InstHistory *hst = NULL;                                /* instruction history */
+int32 hst_p = 0;                                        /* history pointer */
+int32 hst_lnt = 0;                                      /* history length */
+int32 hst_switches;                                     /* history option switches */
+FILE *hst_log;                                          /* history log file */
+int32 hst_log_p;                                        /* history last log written pointer */
 
 const uint32 byte_mask[33] = { 0x00000000,
  0x00000001, 0x00000003, 0x00000007, 0x0000000F,
@@ -395,6 +399,7 @@ int32 cpu_get_vsw (int32 sw);
 static SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
 t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
+t_stat cpu_show_hist_records (FILE *st, t_bool do_header, int32 start, int32 count);
 t_stat cpu_idle_svc (UNIT *uptr);
 void cpu_idle (void);
 
@@ -574,6 +579,10 @@ abortval = setjmp (save_env);                           /* set abort hdlr */
 if (abortval > 0) {                                     /* sim stop? */
     PSL = PSL | cc;                                     /* put PSL together */
     pcq_r->qptr = pcq_p;                                /* update pc q ptr */
+    if (hst_log) {                                      /* auto logging history? */
+        cpu_show_hist_records (hst_log, FALSE, hst_log_p, (hst_p < hst_log_p) ? hst_lnt - (hst_log_p - hst_p) : hst_p - hst_log_p);
+        hst_log_p = hst_p;                              /* record everything logged */
+        }
     return abortval;                                    /* return to SCP */
     }
 else if (abortval < 0) {                                /* mm or rsrv or int */
@@ -1556,26 +1565,31 @@ for ( ;; ) {
     if (hst_lnt) {
         int32 lim;
         t_value wd;
+        InstHistory *h = &hst[hst_p];
 
-        hst[hst_p].iPC = fault_PC;
-        hst[hst_p].PSL = PSL | cc;
-        hst[hst_p].opc = opc;
+        h->iPC = fault_PC;
+        h->PSL = PSL | cc;
+        h->opc = opc;
         for (i = 0; i < j; i++)
-            hst[hst_p].opnd[i] = opnd[i];
+            h->opnd[i] = opnd[i];
         lim = PC - fault_PC;
         if ((uint32) lim > INST_SIZE)
             lim = INST_SIZE;
         for (i = 0; i < lim; i++) {
             if ((cpu_ex (&wd, fault_PC + i, &cpu_unit, SWMASK ('V'))) == SCPE_OK)
-                hst[hst_p].inst[i] = (uint8) wd;
+                h->inst[i] = (uint8) wd;
             else {
-                hst[hst_p].inst[0] = hst[hst_p].inst[1] = 0xFF;
+                h->inst[0] = h->inst[1] = 0xFF;
                 break;
                 }
             }
+        if (hst_switches & SWMASK('T'))
+            h->time = sim_gtime();
         hst_p = hst_p + 1;
         if (hst_p >= hst_lnt)
             hst_p = 0;
+        if (hst_log && (hst_p == hst_log_p))
+            cpu_show_hist_records (hst_log, FALSE, hst_log_p, hst_lnt);
         }
 
 /* Dispatch to instructions */
@@ -3390,28 +3404,53 @@ return ACC_MASK (md);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 i, lnt;
+char gbuf[CBUFSIZE];
 t_stat r;
 
 if (cptr == NULL) {
     for (i = 0; i < hst_lnt; i++)
         hst[i].iPC = 0;
     hst_p = 0;
+    if (hst_log) {
+        sim_set_fsize (hst_log, (t_addr)0);
+        hst_log_p = 0;
+        cpu_show_hist_records (hst_log, TRUE, 0, 0);
+        }
     return SCPE_OK;
     }
-lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
-    return SCPE_ARG;
+cptr = get_glyph (cptr, gbuf, ':');
+lnt = (int32) get_uint (gbuf, 10, HIST_MAX, &r);
+if (r != SCPE_OK)
+    return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s\n", gbuf);
+if (lnt && (lnt < HIST_MIN))
+    return sim_messagef (SCPE_ARG, "%d is less than the minumum history value of %d\n", lnt, HIST_MIN);
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
     hst_lnt = 0;
     hst = NULL;
+    if (hst_log) {
+        fclose (hst_log);
+        hst_log = NULL;
+        }
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
     if (hst == NULL)
             return SCPE_MEM;
     hst_lnt = lnt;
+    hst_switches = sim_switches;
+    if (cptr && *cptr) {
+        hst_log = sim_fopen (cptr, "w");
+        if (hst_log)
+            cpu_show_hist_records (hst_log, TRUE, 0, 0);
+        else {
+            free (hst);
+            hst_lnt = 0;
+            hst = NULL;
+            return sim_messagef(SCPE_OPENERR, "Unable to open file '%s': %s\n", cptr, strerror (errno));
+            }            
+        }
     }
 return SCPE_OK;
 }
@@ -3420,12 +3459,9 @@ return SCPE_OK;
 
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 i, k, di, lnt, numspec;
+int32 di, lnt;
 char *cptr = (char *) desc;
 t_stat r;
-InstHistory *h;
-extern const char *opcode[];
-extern t_value *sim_eval;
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;
@@ -3438,11 +3474,29 @@ else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
 if (di < 0)
     di = di + hst_lnt;
-fprintf (st, "PC       PSL       IR\n\n");
-for (k = 0; k < lnt; k++) {                             /* print specified */
-    h = &hst[(di++) % hst_lnt];                         /* entry pointer */
+return cpu_show_hist_records (st, TRUE, di, lnt);
+}
+
+t_stat cpu_show_hist_records (FILE *st, t_bool do_header, int32 start, int32 count)
+{
+int32 i, k, numspec;
+InstHistory *h;
+extern const char *opcode[];
+extern t_value *sim_eval;
+
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
+if (do_header) {
+    if (hst_switches & SWMASK('T'))
+        fprintf (st," TIME       ");
+    fprintf (st, "PC       PSL       IR\n\n");
+    }
+for (k = 0; k < count; k++) {                           /* print specified */
+    h = &hst[(start++) % hst_lnt];                      /* entry pointer */
     if (h->iPC == 0)                                    /* filled in? */
         continue;
+    if (hst_switches & SWMASK('T'))                     /* sim_time */
+        fprintf(st, "%10.0f  ", h->time);
     fprintf(st, "%08X %08X| ", h->iPC, h->PSL);         /* PC, PSL */
     numspec = drom[h->opc][0] & DR_NSPMASK;             /* #specifiers */
     if (opcode[h->opc] == NULL)                         /* undefined? */
@@ -3466,6 +3520,7 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         }                                               /* end else */
     fputc ('\n', st);                                   /* end line */
     }                                                   /* end for */
+fflush (st);
 return SCPE_OK;
 }
 
@@ -3477,6 +3532,8 @@ t_bool more;
 
 numspec = drom[h->opc][0] & DR_NSPMASK;                 /* #specifiers */
 fputs ("\n                  ", st);                     /* space */
+if (hst_switches & SWMASK('T'))
+    fputs ("            ", st);
 for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
     disp = drom[h->opc][i];                             /* specifier type */
     if (disp == RG)                                     /* fix specials */
@@ -3639,9 +3696,13 @@ fprintf (st, "The CPU can maintain a history of the most recently executed instr
 fprintf (st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
 fprintf (st, "   sim> SET CPU HISTORY                 clear history buffer\n");
 fprintf (st, "   sim> SET CPU HISTORY=0               disable history\n");
-fprintf (st, "   sim> SET CPU HISTORY=n               enable history, length = n\n");
+fprintf (st, "   sim> SET CPU {-T} HISTORY=n{:file}   enable history, length = n\n");
 fprintf (st, "   sim> SHOW CPU HISTORY                print CPU history\n");
 fprintf (st, "   sim> SHOW CPU HISTORY=n              print first n entries of CPU history\n\n");
-fprintf (st, "The maximum length for the history is 65536 entries.\n\n");
+fprintf (st, "The -T switch causes simulator time to be recorded (and displayed)\n");
+fprintf (st, "with each history entry.\n");
+fprintf (st, "When writing history to a file (SET CPU HISTORY=n:file), 'n' specifies\n");
+fprintf (st, "the buffer flush frequency.  Warning: prodigious amounts of disk space\n");
+fprintf (st, "may be comsumed.  The maximum length for the history is %d entries.\n\n", HIST_MAX);
 return SCPE_OK;
 }
