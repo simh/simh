@@ -18,6 +18,10 @@
 #include "glib.h"
 #include "config-host.h"
 
+#if defined(O_BINARY)   /* O_BINARY isn't used in slirp */
+#undef O_BINARY         /* Avoid potential redefinition elsewhere */
+#endif
+
 /* HOST_LONG_BITS is the size of a native pointer in bits. */
 #if UINTPTR_MAX == UINT32_MAX
 # define HOST_LONG_BITS 32
