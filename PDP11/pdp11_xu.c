@@ -1219,6 +1219,9 @@ void xu_process_receive(CTLR* xu)
     if (!(xu->var->rxhdr[2] & RXR_OWN)) {
       /* tell the host there are no more buffers */
       /* xu->var->pcsr0 |= PCSR0_RCBI; */ /* I don't think this is correct 08-dec-2005 dth */
+      sim_debug(DBG_TRC, xu->dev, "Stopping input processing - Not Owned receive descriptor=0x%X, slen=0x%04X(%d), segb=0x%04X, ", ba, slen, slen, segb);
+      sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+      sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 1);
       break;
     }
 
@@ -1264,6 +1267,11 @@ void xu_process_receive(CTLR* xu)
     wlen = item->packet.crc_len - item->packet.used;
     if (wlen > slen)
       wlen = slen;
+
+    sim_debug(DBG_TRC, xu->dev, "Using receive descriptor=0x%X, slen=0x%04X(%d), segb=0x%04X, ", ba, slen, slen, segb);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 0);
+    sim_debug(DBG_TRC, xu->dev, ", pktlen=0x%X(%d), used=0x%X, wlen=0x%X\n", item->packet.len, item->packet.len, item->packet.used, wlen);
 
     /* transfer chained packet to host buffer */
     wstatus = Map_WriteB (segb, wlen, &item->packet.msg[item->packet.used]);
@@ -1326,6 +1334,10 @@ void xu_process_receive(CTLR* xu)
 
     /* give buffer back to host */
     xu->var->rxhdr[2] &= ~RXR_OWN;              /* clear ownership flag */
+
+    sim_debug(DBG_TRC, xu->dev, "Updating receive descriptor=0x%X, slen=0x%04X, segb=0x%04X, ", ba, slen, segb);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 1);
 
     /* update the ring entry in host memory. */
     wstatus = Map_WriteW (ba, 8, xu->var->rxhdr);
