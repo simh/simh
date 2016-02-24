@@ -283,6 +283,7 @@ int32 hst_lnt = 0;                                      /* history length */
 int32 hst_switches;                                     /* history option switches */
 FILE *hst_log;                                          /* history log file */
 int32 hst_log_p;                                        /* history last log written pointer */
+int32 step_out_nest_level = 0;                          /* step to call return - nest level */
 
 const uint32 byte_mask[33] = { 0x00000000,
  0x00000001, 0x00000003, 0x00000007, 0x0000000F,
@@ -2204,12 +2205,16 @@ for ( ;; ) {
         Write (SP - 4, PC, L_LONG, WA);                 /* push PC on stk */
         SP = SP - 4;                                    /* decr stk ptr */
         BRANCHB (brdisp);                               /* branch  */
+        if (sim_switches & SWMASK ('R'))
+            ++step_out_nest_level;
         break;
 
     case BSBW:
         Write (SP - 4, PC, L_LONG, WA);                 /* push PC on stk */
         SP = SP - 4;                                    /* decr stk ptr */
         BRANCHW (brdisp);                               /* branch */
+        if (sim_switches & SWMASK ('R'))
+            ++step_out_nest_level;
         break;
 
     case BGEQ:
@@ -2290,6 +2295,8 @@ for ( ;; ) {
     case JSB:
         Write (SP - 4, PC, L_LONG, WA);                 /* push PC on stk */
         SP = SP - 4;                                    /* decr stk ptr */
+        if (sim_switches & SWMASK ('R'))
+            ++step_out_nest_level;
 
     case JMP:
         JUMP (op0);                                     /* jump */
@@ -2299,6 +2306,12 @@ for ( ;; ) {
         temp = Read (SP, L_LONG, RA);                   /* get top of stk */
         SP = SP + 4;                                    /* incr stk ptr */
         JUMP (temp);
+        if (sim_switches & SWMASK ('R')) {
+            if (step_out_nest_level <= 0)
+                ABORT (SCPE_STEP);
+            else
+                --step_out_nest_level;
+            }
         break;
 
 /* SOB instructions - op idx.ml,disp.bb
@@ -2582,14 +2595,24 @@ for ( ;; ) {
 
     case CALLS:
         cc = op_call (opnd, TRUE, acc);
+        if (sim_switches & SWMASK ('R'))
+            ++step_out_nest_level;
         break;
 
     case CALLG:
         cc = op_call (opnd, FALSE, acc);
+        if (sim_switches & SWMASK ('R'))
+            ++step_out_nest_level;
         break;
 
     case RET:
         cc = op_ret (acc);
+        if (sim_switches & SWMASK ('R')) {
+            if (step_out_nest_level <= 0)
+                ABORT (SCPE_STEP);
+            else
+                --step_out_nest_level;
+            }
         break;
 
 /* Miscellaneous instructions */
@@ -3629,6 +3652,7 @@ t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_cod
 {
 char args[CBUFSIZE];
 t_stat r;
+int32 saved_sim_switches = sim_switches;
 
 sim_printf ("Loading boot code from %s%s\n", builtin_code ? "internal " : "", filename);
 if (builtin_code)
@@ -3639,6 +3663,7 @@ else
     sprintf (args, "-O %s %X", filename, (int)offset);
 r = load_cmd (0, args);
 sim_set_memory_load_file (NULL, 0);
+sim_switches = saved_sim_switches;
 return r;
 }
 
