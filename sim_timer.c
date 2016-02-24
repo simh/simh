@@ -723,9 +723,12 @@ int i;
 uint32 clock_start, clock_last, clock_now;
 
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_init()\n");
-for (i=0; i<SIM_NTIMERS; i++)
+for (i=0; i<SIM_NTIMERS; i++) {
     sim_timer_units[i].action = &sim_timer_tick_svc;
+    sim_timer_units[i].flags = UNIT_DIS;
+    }
 sim_timer_units[SIM_NTIMERS].action = &sim_throt_svc;
+sim_timer_units[SIM_NTIMERS].flags = UNIT_DIS;
 sim_register_internal_device (&sim_timer_dev);
 sim_idle_enab = FALSE;                                  /* init idle off */
 sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
@@ -761,6 +764,9 @@ t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* des
 {
 int tmr, clocks;
 
+fprintf (st, "Minimum Host Sleep Time:       %dms\n", sim_os_sleep_min_ms);
+fprintf (st, "Host Clock Resolution:         %dms\n", sim_os_clock_resoluton_ms);
+fprintf (st, "Time before Clock Calibration: %d seconds\n\n", sim_idle_stable);
 for (tmr=clocks=0; tmr<SIM_NTIMERS; ++tmr) {
     if (0 == rtc_initd[tmr])
         continue;
@@ -1405,6 +1411,7 @@ for (i = 0; i < SIM_NTIMERS; i++)
 if (i == SIM_NTIMERS) {     /* No clocks have signed in. */
     /* setup internal clock */
     sim_timer_units[SIM_NTIMERS+1].action = &sim_timer_clock_tick_svc;
+    sim_timer_units[SIM_NTIMERS+1].flags = UNIT_DIS;
     }
 if (sim_timer_units[SIM_NTIMERS+1].action == &sim_timer_clock_tick_svc) {
     /* actual clock reset */

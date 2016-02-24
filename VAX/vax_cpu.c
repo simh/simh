@@ -3600,13 +3600,15 @@ static struct os_idle os_tab[] = {
 t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 uint32 i;
+char gbuf[CBUFSIZE];
 
 if (cptr != NULL) {
+    cptr = get_glyph (cptr, gbuf, ':');
     for (i = 0; os_tab[i].name != NULL; i++) {
-        if (strcmp (os_tab[i].name, cptr) == 0) {
+        if (strcmp (os_tab[i].name, gbuf) == 0) {
             cpu_idle_type = i + 1;
             cpu_idle_mask = os_tab[i].mask;
-            return sim_set_idle (uptr, val, NULL, desc);
+            return sim_set_idle (uptr, val, cptr, desc);
             }
         }
     return SCPE_ARG;
@@ -3684,14 +3686,16 @@ fprintf (st, "      -u      interpret address as virtual, user mode\n\n");
 fprintf (st, "The CPU attempts to detect when the simulator is idle.  When idle, the\n");
 fprintf (st, "simulator does not use any resources on the host system.  Idle detection is\n");
 fprintf (st, "controlled by the SET IDLE and SET NOIDLE commands:\n\n");
-fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|NETBSD|FREEBSD|32V|ELN|ALL}\n");
+fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|NETBSD|FREEBSD|32V|ELN|ALL}{:n}\n");
 fprintf (st, "                                        enable idle detection\n");
 fprintf (st, "   sim> SET CPU NOIDLE                  disable idle detection\n\n");
 fprintf (st, "Idle detection is disabled by default.  Unless ALL is specified, idle\n");
 fprintf (st, "detection is operating system specific.  If idle detection is enabled with\n");
 fprintf (st, "an incorrect operating system setting, simulator performance or correct\n");
 fprintf (st, "functionality could be impacted.  The default operating system setting is\n");
-fprintf (st, "VMS.\n\n");
+fprintf (st, "VMS.  The value 'n', if present in the \"SET CPU IDLE={OS}:n\" command,\n");
+fprintf (st, "indicated the number of seconds which the simulator must run before idling\n");
+fprintf (st, "(and clock calibration) starts.\n\n");
 fprintf (st, "The CPU can maintain a history of the most recently executed instructions.\n");
 fprintf (st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
 fprintf (st, "   sim> SET CPU HISTORY                 clear history buffer\n");
