@@ -1305,7 +1305,7 @@ void xu_process_receive(CTLR* xu)
      * part of the packet, and is included in the MLEN count. -- DTH
      */
     xu->var->rxhdr[3] &= ~RXR_MLEN;
-    xu->var->rxhdr[3] |= wlen;
+    xu->var->rxhdr[3] |= (uint16)(item->packet.crc_len);
 
     /* Is this the end-of-frame? OR is buffer chaining disabled? */
     if ((item->packet.used == item->packet.crc_len) ||
