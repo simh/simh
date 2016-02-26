@@ -1004,18 +1004,14 @@ t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
 t_stat r;
 uint32 v;
 
-if (sim_idle_rate_ms == 0) {
-    sim_printf ("Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
-    return SCPE_NOFNC;
-    }
-if ((val != 0) && (sim_idle_rate_ms > (uint32) val)) {
-    sim_printf ("Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
-    return SCPE_NOFNC;
-    }
-if (cptr) {
+if (sim_idle_rate_ms == 0)
+    return sim_messagef (SCPE_NOFNC, "Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
+if ((val != 0) && (sim_idle_rate_ms > (uint32) val))
+        return sim_messagef (SCPE_NOFNC, "Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
+if (cptr && *cptr) {
     v = (uint32) get_uint (cptr, 10, SIM_IDLE_STMAX, &r);
     if ((r != SCPE_OK) || (v < SIM_IDLE_STMIN))
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid Stability value: %s.  Valid values range from %d to %d.\n", cptr, SIM_IDLE_STMIN, SIM_IDLE_STMAX);
     sim_idle_stable = v;
     }
 sim_idle_enab = TRUE;

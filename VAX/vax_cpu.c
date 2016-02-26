@@ -3719,8 +3719,8 @@ fprintf (st, "detection is operating system specific.  If idle detection is enab
 fprintf (st, "an incorrect operating system setting, simulator performance or correct\n");
 fprintf (st, "functionality could be impacted.  The default operating system setting is\n");
 fprintf (st, "VMS.  The value 'n', if present in the \"SET CPU IDLE={OS}:n\" command,\n");
-fprintf (st, "indicated the number of seconds which the simulator must run before idling\n");
-fprintf (st, "(and clock calibration) starts.\n\n");
+fprintf (st, "indicats the number of seconds which the simulator must run before idling\n");
+fprintf (st, "starts.\n\n");
 fprintf (st, "The CPU can maintain a history of the most recently executed instructions.\n");
 fprintf (st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
 fprintf (st, "   sim> SET CPU HISTORY                 clear history buffer\n");
