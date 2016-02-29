@@ -381,6 +381,22 @@
 #define DR_GETNSP(x)    ((x) & DR_NSPMASK)
 #define DR_GETUSP(x)    (((x) >> DR_V_USPMASK) & DR_M_USPMASK)
 
+/* Extra bits in the opcode flag word of the Decode ROM array only for history results */
+
+#define DR_V_RESMASK    8
+#define DR_M_RESMASK    0x0F00
+#define RB_0    (0 << DR_V_RESMASK)     /* No Results */
+#define RB_B    (1 << DR_V_RESMASK)     /* Byte Result */
+#define RB_W    (2 << DR_V_RESMASK)     /* Word Result */
+#define RB_L    (3 << DR_V_RESMASK)     /* Long Result */
+#define RB_Q    (4 << DR_V_RESMASK)     /* Quad Result */
+#define RB_O    (5 << DR_V_RESMASK)     /* Octa Result */
+#define RB_R0   (6 << DR_V_RESMASK)     /* Reg  R0     */
+#define RB_R1   (7 << DR_V_RESMASK)     /* Regs R0-R1  */
+#define RB_R3   (8 << DR_V_RESMASK)     /* Regs R0-R3  */
+#define RB_R5   (9 << DR_V_RESMASK)     /* Regs R0-R5  */
+#define RB_SP  (10 << DR_V_RESMASK)     /* @SP         */
+
 /* Decode ROM: specifier entry */
 
 #define DR_ACMASK       0x300                           /* type */

@@ -215,18 +215,20 @@
 #define WRITE_L(r)      if (spec > (GRN | nPC)) \
                             Write (va, r, L_LONG, WA); \
                         else R[rn] = (r)
-#define WRITE_Q(rl,rh)  if (spec > (GRN | nPC)) { \
+#define WRITE_Q(arl,arh)  if (spec > (GRN | nPC)) { \
                         if ((Test (va + 7, WA, &mstat) >= 0) || \
                             (Test (va, WA, &mstat) < 0)) \
-                            Write (va, rl, L_LONG, WA); \
-                            Write (va + 4, rh, L_LONG, WA); \
+                            Write (va, arl, L_LONG, WA); \
+                            Write (va + 4, arh, L_LONG, WA); \
                             } \
                         else { \
                             if (rn >= nSP) \
                                 RSVD_ADDR_FAULT; \
-                            R[rn] = rl; \
-                            R[rn + 1] = rh; \
-                            }
+                            R[rn] = arl; \
+                            R[rn + 1] = arh; \
+                            } \
+                        r = arl; \
+                        rh = arh
 
 
 #define HIST_MIN        64
@@ -238,7 +240,8 @@ typedef struct {
     int32               PSL;
     int32               opc;
     uint8               inst[INST_SIZE];
-    int32               opnd[OPND_SIZE];
+    uint32              opnd[OPND_SIZE];
+    uint32              res[6];
     } InstHistory;
 
 uint32 *M = NULL;                                       /* memory */
@@ -667,6 +670,43 @@ for ( ;; ) {
     int32 i, j, r, rh, temp;
     uint32 va, iad;
     int32 opnd[OPND_SIZE];                              /* operand queue */
+
+/* Optionally record instruction history results from prior instruction */
+
+    if (hst_lnt) {
+        InstHistory *hlast = &hst[hst_p ? hst_p-1 : hst_lnt -1];
+        int res = (drom[hlast->opc][0] & DR_M_RESMASK) >> DR_V_RESMASK;
+
+        switch ((drom[hlast->opc][0] & DR_M_RESMASK) >> DR_V_RESMASK) {
+            case RB_O>>DR_V_RESMASK:
+                break;
+            case RB_Q>>DR_V_RESMASK:
+                hlast->res[1] = rh;
+                hlast->res[0] = r;
+                break;
+            case RB_B>>DR_V_RESMASK:
+            case RB_W>>DR_V_RESMASK:
+            case RB_L>>DR_V_RESMASK:
+                hlast->res[0] = r;
+                break;
+            case RB_R5>>DR_V_RESMASK:
+                hlast->res[5] = R[5];
+                hlast->res[4] = R[4];
+            case RB_R3>>DR_V_RESMASK:
+                hlast->res[3] = R[3];
+                hlast->res[2] = R[2];
+            case RB_R1>>DR_V_RESMASK:
+                hlast->res[1] = R[1];
+            case RB_R0>>DR_V_RESMASK:
+                hlast->res[0] = R[0];
+                break;
+            case RB_SP>>DR_V_RESMASK:
+                hlast->res[0] = Read (SP, L_LONG, RA);
+                break;
+            default:
+                break;
+            }
+        }
 
     if (cpu_astop) {
         cpu_astop = 0;
@@ -1605,17 +1645,20 @@ for ( ;; ) {
 */
 
     case CLRB:
-        WRITE_B (0);                                    /* store result */
+        r = 0;
+        WRITE_B (r);                                    /* store result */
         CC_ZZ1P;                                        /* set cc's */
         break;
 
     case CLRW:
-        WRITE_W (0);                                    /* store result */
+        r = 0;
+        WRITE_W (r);                                    /* store result */
         CC_ZZ1P;                                        /* set cc's */
         break;
 
     case CLRL:
-        WRITE_L (0);                                    /* store result */
+        r = 0;
+        WRITE_L (r);                                    /* store result */
         CC_ZZ1P;                                        /* set cc's */
         break;
 
@@ -1714,19 +1757,22 @@ for ( ;; ) {
 */
 
     case MOVB:
-        WRITE_B (op0);                                  /* result */
-        CC_IIZP_B (op0);                                /* set cc's */
+        r = op0;
+        WRITE_B (r);                                    /* result */
+        CC_IIZP_B (r);                                  /* set cc's */
         break;
 
     case MOVW: case MOVZBW:
-        WRITE_W (op0);                                  /* result */
-        CC_IIZP_W (op0);                                /* set cc's */
+        r = op0;
+        WRITE_W (r);                                    /* result */
+        CC_IIZP_W (r);                                  /* set cc's */
         break;
 
     case MOVL: case MOVZBL: case MOVZWL:
     case MOVAB: case MOVAW: case MOVAL: case MOVAQ:
-        WRITE_L (op0);                                  /* result */
-        CC_IIZP_L (op0);                                /* set cc's */
+        r = op0;
+        WRITE_L (r);                                    /* result */
+        CC_IIZP_L (r);                                  /* set cc's */
         break;
 
     case MCOMB:
@@ -3521,7 +3567,7 @@ for (k = 0; k < count; k++) {                           /* print specified */
     if (hst_switches & SWMASK('T'))                     /* sim_time */
         fprintf(st, "%10.0f  ", h->time);
     fprintf(st, "%08X %08X| ", h->iPC, h->PSL);         /* PC, PSL */
-    numspec = drom[h->opc][0] & DR_NSPMASK;             /* #specifiers */
+    numspec = DR_GETNSP (drom[h->opc][0]);              /* #specifiers */
     if (opcode[h->opc] == NULL)                         /* undefined? */
         fprintf (st, "%03X (undefined)", h->opc);
     else if (h->PSL & PSL_FPD)                          /* FPD set? */
@@ -3594,6 +3640,39 @@ for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
         break;
         }                                       /* end case */
     }                                           /* end for */
+if ((line == 0) && ((drom[h->opc][0] & DR_M_RESMASK) >> DR_V_RESMASK)) {
+    fprintf (st, " ->");
+    switch ((drom[h->opc][0] & DR_M_RESMASK) >> DR_V_RESMASK) {
+        case RB_O>>DR_V_RESMASK:
+            fprintf (st, " %08X %08X %08X %08X", h->res[0], h->res[1], h->res[2], h->res[3]);
+            break;
+        case RB_Q>>DR_V_RESMASK:
+            fprintf (st, " %08X %08X", h->res[0], h->res[1]);
+            break;
+        case RB_B>>DR_V_RESMASK:
+        case RB_W>>DR_V_RESMASK:
+        case RB_L>>DR_V_RESMASK:
+            fprintf (st, " %08X", h->res[0]);
+            break;
+        case RB_R5>>DR_V_RESMASK:
+        case RB_R3>>DR_V_RESMASK:
+        case RB_R1>>DR_V_RESMASK:
+        case RB_R0>>DR_V_RESMASK:
+            if (1) {
+                static const int rcnts[] = {1, 2, 4, 6};
+                int i;
+
+                for (i = 0; i < rcnts[((drom[h->opc][0] & DR_M_RESMASK) - RB_R0) >> DR_V_RESMASK]; i++)
+                    fprintf (st, " R%d:%08X", i, h->res[i]);
+                }
+            break;
+        case RB_SP>>DR_V_RESMASK:
+            fprintf (st, " SP: %08X", h->res[0]);
+            break;
+        default:
+            break;
+        }
+    }
 return more;
 }
 
