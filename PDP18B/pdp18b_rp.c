@@ -1,6 +1,6 @@
 /* pdp18b_rp.c: RP15/RP02 disk pack simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RP15/RP02 disk pack
 
+   13-Sep-15    RMS     Added APIVEC register
    14-Jan-04    RMS     Revised IO device call interface
    06-Feb-03    RMS     Revised IOT decoding, fixed bug in initiation
    05-Oct-02    RMS     Added DIB, device number support
@@ -133,6 +134,7 @@
 
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1], nexm;
+extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
 
 int32 rp_sta = 0;                                       /* status A */
@@ -188,6 +190,7 @@ REG rp_reg[] = {
     { DRDATA (STIME, rp_swait, 24), PV_LEFT },
     { DRDATA (RTIME, rp_rwait, 24), PV_LEFT },
     { ORDATA (DEVNO, rp_dib.dev, 6), REG_HRO },
+    { ORDATA (APIVEC, api_vec[API_RP][INT_V_RP], 6), REG_HRO },
     { NULL }
     };
 

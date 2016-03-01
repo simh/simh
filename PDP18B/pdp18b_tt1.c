@@ -1,6 +1,6 @@
 /* pdp18b_ttx.c: PDP-9/15 additional terminals simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    LT15/LT19 terminal input/output
 
+   13-Sep-15    RMS     Added APIVEC register
    11-Oct-13    RMS     Poll TTIX immediately to pick up initial connect
    18-Apr-12    RMS     Revised to use clock coscheduling
    19-Nov-08    RMS     Revised for common TMXR show routines
@@ -63,6 +64,7 @@ TMXR ttx_desc = { 1, 0, 0, ttx_ldsc };                  /* mux descriptor */
 #define ttx_lines ttx_desc.lines                        /* current number of lines */
 
 extern int32 int_hwre[API_HLVL+1];
+extern int32 api_vec[API_HLVL][32];
 extern int32 tmxr_poll;
 extern int32 stop_inst;
 
@@ -105,6 +107,9 @@ REG ttix_reg[] = {
     { FLDATA (INT, int_hwre[API_TTI1], INT_V_TTI1) },
     { DRDATA (TIME, ttix_unit.wait, 24), REG_NZ + PV_LEFT },
     { ORDATA (DEVNUM, ttix_dib.dev, 6), REG_HRO },
+#if defined (PDP15)
+    { ORDATA (APIVEC, api_vec[API_TTI1][INT_V_TTI1], 6), REG_HRO },
+#endif
     { NULL }
     };
 
@@ -164,6 +169,9 @@ REG ttox_reg[] = {
     { FLDATA (INT, int_hwre[API_TTO1], INT_V_TTO1) },
     { URDATA (TIME, ttox_unit[0].wait, 10, 24, 0,
               TTX_MAXL, PV_LEFT) },
+#if defined (PDP15)
+    { ORDATA (APIVEC, api_vec[API_TTO1][INT_V_TTO1], 6), REG_HRO },
+#endif
     { NULL }
     };
 

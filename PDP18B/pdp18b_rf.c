@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    rf           (PDP-9) RF09/RF09
                 (PDP-15) RF15/RS09
 
+   13-Sep-15    RMS     Added APIVEC register
    03-Sep-13    RMS     Added explicit void * cast
    04-Oct-06    RMS     Fixed bug, DSCD does not clear function register
    15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
@@ -110,6 +111,7 @@
 
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1];
+extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
 
 int32 rf_sta = 0;                                       /* status register */
@@ -157,6 +159,7 @@ REG rf_reg[] = {
     { FLDATA (STOP_IOE, rf_stopioe, 0) },
     { DRDATA (CAPAC, rf_unit.capac, 31), PV_LEFT + REG_HRO },
     { ORDATA (DEVNO, rf_dib.dev, 6), REG_HRO },
+    { ORDATA (APIVEC, api_vec[API_RF][INT_V_RF], 6), REG_HRO },
     { NULL }
     };
 

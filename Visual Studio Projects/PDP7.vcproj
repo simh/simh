@@ -210,6 +210,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP18B\pdp18b_rb.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP18B\pdp18b_rf.c"
 				>
 			</File>

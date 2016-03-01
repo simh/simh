@@ -1,6 +1,6 @@
 /* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    mt           (PDP-9) TC59 magtape
                 (PDP-15) TC59D magtape
 
+   13-Sep-15    RMS     Added APIVEC register
    14-Nov-08    RMS     Replaced mt_log with standard debug facility
    16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -126,6 +127,7 @@
 
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1];
+extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
 
 int32 mt_cu = 0;                                        /* command/unit */
@@ -178,6 +180,7 @@ REG mt_reg[] = {
     { URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
               MT_NUMDR, PV_LEFT | REG_RO) },
     { ORDATA (DEVNO, mt_dib.dev, 6), REG_HRO },
+    { ORDATA (APIVEC, api_vec[API_MTA][INT_V_MTA], 6), REG_HRO },
     { NULL }
     };
 
