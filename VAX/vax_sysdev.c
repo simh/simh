@@ -189,22 +189,7 @@ CTAB vax_cmd[] = {
 
 #define SSCADS_MASK     0x3FFFFFFC                      /* match or mask */
 
-extern int32 R[16];
-extern int32 STK[5];
-extern int32 PSL;
-extern int32 SISR;
-extern int32 mapen;
-extern int32 pcq[PCQ_SIZE];
-extern int32 pcq_p;
-extern int32 ibcnt, ppc;
-extern int32 in_ie;
-extern int32 mchk_va, mchk_ref;
-extern int32 fault_PC;
-extern int32 int_req[IPL_HLVL];
-extern UNIT cpu_unit;
 extern UNIT clk_unit;
-extern jmp_buf save_env;
-extern int32 p1;
 extern int32 MSER;
 extern int32 tmr_poll;
 extern DEVICE vc_dev, lk_dev, vs_dev;

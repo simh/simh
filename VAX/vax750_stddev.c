@@ -175,8 +175,6 @@ typedef struct todr_battery_info TOY;
 
 int32 td_regval;                                        /* temp location used in reg declarations */
 
-extern jmp_buf save_env;
-
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat clk_svc (UNIT *uptr);

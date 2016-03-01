@@ -59,11 +59,6 @@
 #include "vax_defs.h"
 #include <setjmp.h>
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 p1;
-extern jmp_buf save_env;
-
 #if defined (USE_INT64)
 
 #define M64             0xFFFFFFFFFFFFFFFF              /* 64b */

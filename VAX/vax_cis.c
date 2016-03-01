@@ -74,14 +74,6 @@ typedef struct {
 static DSTR Dstr_zero = { 0, {0, 0, 0, 0} };
 static DSTR Dstr_one = { 0, {0x10, 0, 0, 0} };
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 trpirq;
-extern int32 p1;
-extern int32 fault_PC;
-extern int32 ibcnt, ppc;
-extern jmp_buf save_env;
-
 int32 ReadDstr (int32 lnt, int32 addr, DSTR *dec, int32 acc);
 int32 WriteDstr (int32 lnt, int32 addr, DSTR *dec, int32 v, int32 acc);
 int32 SetCCDstr (int32 lnt, DSTR *src, int32 pslv);
@@ -1652,15 +1644,6 @@ return sign;
 }
 
 #else
-
-extern int32 R[16];
-extern int32 PSL;
-extern int32 SCBB;
-extern int32 fault_PC;
-extern int32 ibcnt, ppc;
-extern int32 pcq[PCQ_SIZE];
-extern int32 pcq_p;
-extern jmp_buf save_env;
 
 /* CIS instructions - invoke emulator interface
 

@@ -80,17 +80,6 @@ uint32 sbi_er = 0;                                      /* SBI error status */
 uint32 sbi_tmo = 0;                                     /* SBI timeout addr */
 uint32 sbi_csr = 0;                                     /* SBI control/status */
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 ASTLVL, SISR;
-extern jmp_buf save_env;
-extern int32 trpirq;
-extern int32 p1;
-extern int32 mchk_ref;
-extern int32 crd_err;
-extern int32 fault_PC;                                  /* fault PC */
-extern UNIT cpu_unit;
-
 t_stat sbia_reset (DEVICE *dptr);
 const char *sbia_description (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);

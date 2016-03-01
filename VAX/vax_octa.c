@@ -48,14 +48,6 @@
 
 #if defined (FULL_VAX)
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 trpirq;
-extern int32 p1;
-extern jmp_buf save_env;
-
-extern int32 Test (uint32 va, int32 acc, int32 *status);
-
 #define WORDSWAP(x)     ((((x) & WMASK) << 16) | (((x) >> 16) & WMASK))
 
 typedef struct {
@@ -1250,8 +1242,6 @@ return;
 }
 
 #else
-
-extern jmp_buf save_env;
 
 int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va)
 {

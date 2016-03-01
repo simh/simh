@@ -252,7 +252,6 @@ uint32 mba_smr[MBA_NUM];                                /* sel map reg */
 uint32 mba_map[MBA_NUM][MBA_NMAPR];                     /* map */
 
 extern uint32 nexus_req[NEXUS_HLVL];
-extern UNIT cpu_unit;
 
 t_stat mba_reset (DEVICE *dptr);
 t_stat mba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);

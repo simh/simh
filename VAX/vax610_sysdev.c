@@ -48,13 +48,6 @@ struct boot_dev {
     int32               code;
     };
 
-extern int32 R[16];
-extern int32 in_ie;
-extern int32 mchk_va, mchk_ref;
-extern int32 int_req[IPL_HLVL];
-extern jmp_buf save_env;
-extern int32 p1;
-extern int32 trpirq, mem_err;
 extern DEVICE vc_dev, lk_dev, vs_dev;
 
 int32 conisp, conpc, conpsl;                            /* console reg */
@@ -72,9 +65,7 @@ t_stat sysd_reset (DEVICE *dptr);
 const char *sysd_description (DEVICE *dptr);
 t_stat vax610_boot (int32 flag, char *ptr);
 t_stat vax610_boot_parse (int32 flag, char *ptr);
-t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 
-extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 vc_mem_rd (int32 pa);
 extern void vc_mem_wr (int32 pa, int32 val, int32 lnt);
 extern int32 iccs_rd (void);
@@ -88,7 +79,6 @@ extern void rxcs_wr (int32 dat);
 extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void ioreset_wr (int32 dat);
-extern int32 eval_int (void);
 
 /* SYSD data structures
 

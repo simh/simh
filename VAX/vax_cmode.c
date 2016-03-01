@@ -49,18 +49,6 @@
 #define CC_XOR_NV(x)    ((((x) & CC_N) != 0) ^ (((x) & CC_V) != 0))
 #define CC_XOR_NC(x)    ((((x) & CC_N) != 0) ^ (((x) & CC_C) != 0))
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 trpirq;
-extern int32 p1;
-extern int32 fault_PC;
-extern int32 recq[];                                    /* recovery queue */
-extern int32 recqptr;                                   /* recq pointer */
-extern int32 pcq[];
-extern int32 pcq_p;
-extern int32 ibcnt, ppc;
-extern jmp_buf save_env;
-
 int32 GeteaB (int32 spec);
 int32 GeteaW (int32 spec);
 int32 RdMemW (int32 a);
@@ -1311,8 +1299,6 @@ return;
    Never legal to set CM in PSL
    Should never get to instruction execution
 */
-
-extern jmp_buf save_env;
 
 t_bool BadCmPSL (int32 newpsl)
 {

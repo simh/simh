@@ -193,7 +193,6 @@ BITFIELD vc_ic_mode_bits[] = {
 
 #define IOLN_QVSS       0100
 
-extern int32 int_req[IPL_HLVL];
 extern int32 tmxr_poll;                                 /* calibrated delay */
 
 extern t_stat lk_wr (uint8 c);
@@ -665,9 +664,6 @@ switch (rg) {
 
 return SCPE_OK;
 }
-
-extern jmp_buf save_env;
-extern int32 p1;
 
 int32 vc_mem_rd (int32 pa)
 {

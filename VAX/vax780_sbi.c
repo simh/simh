@@ -128,16 +128,7 @@ static struct boot_dev boot_tab[] = {
     { NULL }
     };
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 ASTLVL, SISR;
-extern int32 mapen, pme, trpirq;
-extern int32 in_ie;
-extern int32 mchk_va, mchk_ref;
-extern int32 crd_err, mem_err, hlt_pin;
 extern int32 tmr_int, tti_int, tto_int;
-extern jmp_buf save_env;
-extern int32 p1;
 
 t_stat sbi_reset (DEVICE *dptr);
 const char *sbi_description (DEVICE *dptr);
@@ -145,10 +136,8 @@ void sbi_set_tmo (int32 pa);
 void uba_eval_int (void);
 t_stat vax780_boot (int32 flag, char *ptr);
 t_stat vax780_boot_parse (int32 flag, char *ptr);
-t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 
 extern t_stat vax780_fload (int32 flag, char *cptr);
-extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
 extern int32 icr_rd (void);

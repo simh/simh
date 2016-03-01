@@ -98,14 +98,8 @@ uint32 uba_dpr[UBA_NDPATH] = { 0 };                     /* number data paths */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
-extern int32 trpirq;
 extern int32 autcon_enb;
-extern jmp_buf save_env;
-extern UNIT cpu_unit;
 extern uint32 nexus_req[NEXUS_HLVL];
-extern int32 p1;
-extern int32 fault_PC;                                  /* fault PC */
-extern int32 mem_err;
 
 t_stat uba_reset (DEVICE *dptr);
 const char *uba_description (DEVICE *dptr);

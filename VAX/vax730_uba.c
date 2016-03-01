@@ -93,11 +93,7 @@ uint32 uba_fmer = 0;                                    /* failing map reg */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
-extern int32 trpirq;
 extern int32 autcon_enb;
-extern jmp_buf save_env;
-extern UNIT cpu_unit;
-extern int32 p1;
 
 t_stat uba_reset (DEVICE *dptr);
 const char *uba_description (DEVICE *dptr);

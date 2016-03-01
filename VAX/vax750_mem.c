@@ -90,8 +90,6 @@
 #define MEM_256K_MASK    0x5555
 #define MEM_BOARD_MASK_256K(x) ((((1u << (uint32)(x/MEM_SIZE_256K)) - 1) & MEM_256K_MASK) | MCSR2_CS256)
 
-extern UNIT cpu_unit;
-
 uint32 mcsr0 = 0;
 uint32 mcsr1 = 0;
 uint32 mcsr2 = 0;

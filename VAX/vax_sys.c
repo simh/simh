@@ -53,10 +53,7 @@
 #define ODC(x)          ((x) << DR_V_USPMASK)
 #endif
 
-extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern int32 saved_PC;
-extern int32 PSL;
 
 t_stat fprint_sym_m (FILE *of, uint32 addr, t_value *val);
 int32 fprint_sym_qoimm (FILE *of, t_value *val, int32 vp, int32 lnt);

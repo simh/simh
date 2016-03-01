@@ -57,8 +57,9 @@ typedef struct {
     } TLBENT;
 
 extern uint32 *M;
-extern int32 mapen;
+extern int32 mapen;                                     /* map enable */
 extern UNIT cpu_unit;
+extern DEVICE cpu_dev;
 
 extern int32 mchk_va, mchk_ref;                         /* for mcheck */
 extern TLBENT stlb[VA_TBSIZE], ptlb[VA_TBSIZE];
@@ -67,6 +68,10 @@ static const int32 insert[4] = {
     0x00000000, 0x000000FF, 0x0000FFFF, 0x00FFFFFF
     };
 
+extern void zap_tb (int stb);
+extern void zap_tb_ent (uint32 va);
+extern t_bool chk_tb_ent (uint32 va);
+extern void set_map_reg (void);
 extern int32 ReadIO (uint32 pa, int32 lnt);
 extern void WriteIO (uint32 pa, int32 val, int32 lnt);
 extern int32 ReadReg (uint32 pa, int32 lnt);

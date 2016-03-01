@@ -121,23 +121,7 @@ CTAB vax630_cmd[] = {
 #define DEAR_LMADD      0x00007FFF                      /* local mem addr */
 #define DEAR_RD         (DEAR_LMADD)
 
-extern int32 R[16];
-extern int32 STK[5];
-extern int32 PSL;
-extern int32 SISR;
-extern int32 SCBB;
-extern int32 mapen;
-extern int32 pcq[PCQ_SIZE];
-extern int32 pcq_p;
-extern int32 ibcnt, ppc;
-extern int32 in_ie;
-extern int32 mchk_va, mchk_ref;
-extern int32 fault_PC;
-extern int32 int_req[IPL_HLVL];
-extern UNIT cpu_unit;
 extern UNIT clk_unit;
-extern jmp_buf save_env;
-extern int32 p1;
 extern int32 tmr_poll;
 extern DEVICE vc_dev, lk_dev, vs_dev;
 
@@ -178,7 +162,6 @@ void ka_wr (int32 pa, int32 val, int32 lnt);
 t_stat sysd_powerup (void);
 int32 con_halt (int32 code, int32 cc);
 
-extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 qbmap_rd (int32 pa);
 extern void qbmap_wr (int32 pa, int32 val, int32 lnt);
 extern int32 qbmem_rd (int32 pa);

@@ -77,7 +77,6 @@
 #define DE_SIZE         7                               /* entry size in words */
 #define DE_GET_STAT(x)  (((x) >> 8) & 0377)
 
-extern UNIT cpu_unit;
 extern UNIT fl_unit;
 
 t_bool rtfile_parse (char *pntr, uint16 *file_name);

@@ -73,12 +73,6 @@ int32 qb_ipc = 0;                                       /* IPC */
 int32 qb_map[QBNMAPR] = { 0 };                          /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
-extern int32 R[16];
-extern uint32 *M;
-extern UNIT cpu_unit;
-extern int32 PSL, SISR, trpirq, mem_err, hlt_pin;
-extern int32 p1;
-extern jmp_buf save_env;
 extern int32 ka_mser;                                   /* KA630 mem sys err */
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);

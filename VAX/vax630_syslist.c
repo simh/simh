@@ -70,10 +70,6 @@ extern DEVICE vc_dev;
 extern DEVICE lk_dev;
 extern DEVICE vs_dev;
 
-extern void WriteB (uint32 pa, int32 val);
-extern void rom_wr_B (int32 pa, int32 val);
-extern UNIT cpu_unit;
-
 DEVICE *sim_devices[] = { 
     &cpu_dev,
     &tlb_dev,
