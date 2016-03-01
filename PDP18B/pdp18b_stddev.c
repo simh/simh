@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,8 @@
    tto          teleprinter
    clk          clock
 
+   13-Sep-15    RMS     Added APIVEC register to PTR, CLK only
+   28-Mar-15    RMS     Revised to use sim_printf
    18-Apr-12    RMS     Added clk_cosched routine
                         Revised clk and tti scheduling
    18-Jun-07    RMS     Added UNIT_IDLE to console input, clock
@@ -86,6 +88,7 @@
 
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1], PC, ASW;
+extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
 
 int32 clk_state = 0;
@@ -181,6 +184,7 @@ REG clk_reg[] = {
 #endif
     { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
+    { ORDATA (APIVEC, api_vec[API_CLK][INT_V_CLK], 6), REG_HRO },
     { NULL }
     };
 
@@ -228,6 +232,7 @@ REG ptr_reg[] = {
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { ORDATA (APIVEC, api_vec[API_PTR][INT_V_PTR], 6), REG_HRO },
     { NULL }
     };
 

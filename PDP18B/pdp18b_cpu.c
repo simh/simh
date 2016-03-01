@@ -433,7 +433,7 @@ static const int32 api_ffo[256] = {
  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
  };
 
-static const int32 api_vec[API_HLVL][32] = {
+int32 api_vec[API_HLVL][32] = {
  { ACH_PWRFL },                                         /* API 0 */
  { ACH_DTA, ACH_MTA, ACH_DRM, ACH_RF, ACH_RP, ACH_RB }, /* API 1 */
  { ACH_PTR, ACH_LPT, ACH_LPT },                         /* API 2 */

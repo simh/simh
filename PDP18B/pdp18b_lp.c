@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    lp09         (PDP-9,15) LP09 line printer
    lp15         (PDP-15)   LP15 line printer
 
+   13-Sep-15    RMS     Added APIVEC register
    19-Jan-07    RMS     Added UNIT_TEXT flag
    11-Jun-06    RMS     Made character translation table global scope
    14-Jan-04    RMS     Revised IO device call interface
@@ -47,7 +48,10 @@
 */
 
 #include "pdp18b_defs.h"
+
 extern int32 int_hwre[API_HLVL+1];
+extern int32 api_vec[API_HLVL][32];
+
 const char fio_to_asc[64] = {
     ' ','1','2','3','4','5','6','7','8','9','\'','~','#','V','^','<',
     '0','/','S','T','U','V','W','X','Y','Z','"',',','>','^','-','?',
@@ -534,6 +538,7 @@ REG lp09_reg[] = {
     { DRDATA (TIME, lp09_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, lp09_stopioe, 0) },
     { ORDATA (DEVNO, lp09_dib.dev, 6), REG_HRO },
+    { ORDATA (APIVEC, api_vec[API_LPT][INT_V_LPT], 6), REG_HRO },
     { NULL }
     };
 
@@ -720,6 +725,7 @@ REG lp15_reg[] = {
     { FLDATA (STOP_IOE, lp15_stopioe, 0) },
     { BRDATA (LBUF, lp15_buf, 8, 8, LP15_BSIZE) },
     { ORDATA (DEVNO, lp15_dib.dev, 6), REG_HRO },
+    { ORDATA (APIVEC, api_vec[API_LPT][INT_V_LPT], 6), REG_HRO },
     { NULL }
     };
 

@@ -1,6 +1,6 @@
 /* pdp18b_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
                 (PDP-9) TC02/TU55 DECtape
                 (PDP-15) TC15/TU56 DECtape
 
+   13-Mar-15    RMS     Added APIVEC register
+   28-Mar-15    RMS     Revised to use sim_printf
    23-Jun-06    RMS     Fixed switch conflict in ATTACH
                         Revised Type 550 header based on DECTOG formatter
    13-Jun-06    RMS     Fixed checksum calculation bug in Type 550
@@ -327,6 +329,7 @@
 
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1];
+extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
 
 int32 dtsa = 0;                                         /* status A */
@@ -419,6 +422,9 @@ REG dt_reg[] = {
               DT_NUMDR, REG_HRO) },
     { ORDATA (DEVNO, dt_dib.dev, 6), REG_HRO },
     { FLDATA (STOP_OFFR, dt_stopoffr, 0) },
+#if defined (TC02)
+    { ORDATA (APIVEC, api_vec[API_DTA][INT_V_DTA], 6), REG_HRO },
+#endif
     { NULL }
     };
 
@@ -1508,7 +1514,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
                     ((fbuf[ba + 1] >> 12) & 077);
                 pdp8b[k + 2] = fbuf[ba + 1] & 07777;
                 ba = ba + 2;
-                }                                    /* end loop blk */
+                }                                       /* end loop blk */
             fxwrite (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);
             if (ferror (uptr->fileref))
                 break;
