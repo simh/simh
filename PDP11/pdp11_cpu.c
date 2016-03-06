@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   06-Mar-16    RMS     Fixed bug in history virtual addressing
    30-Dec-15    RMS     Added NOBEVENT option for 11/03, 11/23
    29-Dec-15    RMS     Call build_dib_tab during reset (Mark Pizzolato)
    05-Dec-13    RMS     Fixed bug in CSM (John Dundas)
@@ -876,13 +877,17 @@ while (reason == 0)  {
     if (hst_lnt) {                                      /* record history? */
         t_value val;
         uint32 i;
+        static int32 swmap[4] = {
+            SWMASK ('K') | SWMASK ('V'), SWMASK ('S') | SWMASK ('V'),
+            SWMASK ('U') | SWMASK ('V'), SWMASK ('U') | SWMASK ('V')
+            };
         hst[hst_p].pc = PC | HIST_VLD;
         hst[hst_p].psw = get_PSW ();
         hst[hst_p].src = R[srcspec & 07];
         hst[hst_p].dst = R[dstspec & 07];
         hst[hst_p].inst[0] = IR;
         for (i = 1; i < HIST_ILNT; i++) {
-            if (cpu_ex (&val, (PC + (i << 1)) & 0177777, &cpu_unit, SWMASK ('V')))
+            if (cpu_ex (&val, (PC + (i << 1)) & 0177777, &cpu_unit, swmap[cm & 03]))
                 hst[hst_p].inst[i] = 0;
             else hst[hst_p].inst[i] = (uint16) val;
             }
