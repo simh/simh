@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2015-11-24
+                             Last update: 2016-03-04
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6909,5 +6909,30 @@
      EOM marker or physical EOF was seen on the first or a subsequent buffer
      read, and to return MTSE_EOM with PNU or MTSE_RUNAWAY without PNU,
      respectively.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+270. PROBLEM:  The disc libraries in the HP2100 and HP3000 directories differ.
+
+     VERSION:  4.0-0
+
+     OBSERVATION:  The "hp_disclib.c" and "hp_disclib.h" files appear in both
+     the HP2100 and HP3000 subdirectories.  However, the contents of the files
+     are different.  If both source sets are compiled to a common object
+     subdirectory, one of the two executables will not link, due to unresolved
+     externals.
+
+     CAUSE:  The disc library in the HP3000 subdirectory is an extension of the
+     one in the HP2100 subdirectory.  It is intended as an eventual replacement
+     for the HP2100 version, so that both simulators can share the library.
+     Until then, however, they are not interchangeable, as they export different
+     routines, leading to link errors if one is accidentally substituted for the
+     other.
+
+     RESOLUTION:  Rename "hp_disclib.c/h" in the HP2100 subdirectory to
+     "hp2100_disclib.c/h" to indicate that it is HP2100-specific.  Alter
+     "hp2100_ds.c" and "hp2100_di_da.c" to use the new include file name.
 
      STATUS:  Fixed in version 4.0-0.

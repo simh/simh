@@ -1,6 +1,6 @@
-/* hp_disclib.c: HP MAC/ICD disc controller simulator library
+/* hp2100_disclib.c: HP MAC/ICD disc controller simulator library
 
-   Copyright (c) 2011-2014, J. David Bryan
+   Copyright (c) 2011-2016, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
    24-Dec-14    JDB     Added casts for explicit downward conversions
    27-Oct-14    JDB     Corrected the relative movement calculation in start_seek
    20-Dec-12    JDB     sim_is_active() now returns t_bool
@@ -254,7 +255,7 @@
 
 #include <math.h>
 
-#include "hp_disclib.h"
+#include "hp2100_disclib.h"
 
 
 

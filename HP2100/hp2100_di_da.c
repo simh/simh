@@ -1,6 +1,6 @@
 /* hp2100_di_da.c: HP 12821A HP-IB Disc Interface simulator for Amigo disc drives
 
-   Copyright (c) 2011-2014, J. David Bryan
+   Copyright (c) 2011-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
+   04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
                         Removed redundant global declarations
@@ -339,7 +340,7 @@
 
 #include "hp2100_defs.h"
 #include "hp2100_di.h"
-#include "hp_disclib.h"
+#include "hp2100_disclib.h"
 
 
 

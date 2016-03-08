@@ -237,6 +237,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\HP2100\hp2100_disclib.c"
+				>
+			</File>
+			<File
 				RelativePath="..\HP2100\hp2100_dp.c"
 				>
 			</File>
@@ -298,10 +302,6 @@
 			</File>
 			<File
 				RelativePath="..\HP2100\hp2100_sys.c"
-				>
-			</File>
-			<File
-				RelativePath="..\HP2100\hp_disclib.c"
 				>
 			</File>
 			<File
@@ -370,15 +370,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\HP2100\hp2100_disclib.h"
+				>
+			</File>
+			<File
 				RelativePath="..\HP2100\hp2100_fp.h"
 				>
 			</File>
 			<File
 				RelativePath="..\HP2100\hp2100_fp1.h"
-				>
-			</File>
-			<File
-				RelativePath="..\HP2100\hp_disclib.h"
 				>
 			</File>
 			<File
