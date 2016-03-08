@@ -25,6 +25,7 @@
 #            LGP             Just Build The Royal-McBee LGP-30.
 #            H316            Just Build The Honewell 316/516.
 #            HP2100          Just Build The Hewlett-Packard HP-2100. 
+#            HP3000          Just Build The Hewlett-Packard HP-3000. 
 #            I1401           Just Build The IBM 1401.
 #            I1620           Just Build The IBM 1620.
 #            I7094           Just Build The IBM 7094.
@@ -421,6 +422,26 @@ HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))\
                     /DEF=($(CC_DEFS),"HAVE_INT64=1")
 .ELSE
 HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))/DEF=($(CC_DEFS))
+.ENDIF
+
+#
+# Hewlett-Packard HP-3000 Simulator Definitions.
+#
+HP3000_DIR = SYS$DISK:[.HP3000]
+HP3000_LIB1 = $(LIB_DIR)HP3000L1-$(ARCH).OLB
+HP3000_SOURCE1 = $(HP3000_DIR)HP3000_ATC.C,$(HP3000_DIR)HP3000_CLK.C,\
+                 $(HP3000_DIR)HP3000_CPU.C,$(HP3000_DIR)HP3000_CPU_BASE.C,\
+                 $(HP3000_DIR)HP3000_CPU_FP.C,$(HP3000_DIR)HP3000_DS.C,\
+                 $(HP3000_DIR)HP3000_IOP.C,$(HP3000_DIR)HP3000_MPX.C,\
+                 $(HP3000_DIR)HP3000_MS.C,$(HP3000_DIR)HP3000_SCMB.C,\
+                 $(HP3000_DIR)HP3000_SEL.C,$(HP3000_DIR)HP3000_SYS.C
+HP3000_LIB2 = $(LIB_DIR)HP3000L2-$(ARCH).OLB
+HP3000_SOURCE2 = $(HP3000_DIR)HP_TAPELIB.C,$(HP3000_DIR)HP_DISCLIB.C
+.IFDEF ALPHA_OR_IA64
+HP3000_OPTIONS = /INCL=($(SIMH_DIR),$(HP3000_DIR))\
+                    /DEF=($(CC_DEFS),"HAVE_INT64=1")
+.ELSE
+HP3000_OPTIONS = /INCL=($(SIMH_DIR),$(HP3000_DIR))/DEF=($(CC_DEFS))
 .ENDIF
 
 #
@@ -911,7 +932,7 @@ I7094_OPTIONS = /INCL=($(SIMH_DIR),$(I7094_DIR))/DEF=($(CC_DEFS))
 # If we're not a VAX, Build Everything
 #
 .IFDEF ALPHA_OR_IA64
-ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
+ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 HP3000 I1401 I1620 IBM1130 ID16 \
       ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 \
       VAX MICROVAX3900 MICROVAX1 RTVAX1000 MICROVAX2 VAX730 VAX750 VAX780 VAX8600 \
       SDS I7094 SWTP6800MP-A SWTP6800MP-A2 SSEM BESM6 B5500
@@ -1101,6 +1122,28 @@ $(HP2100_LIB2) : $(HP2100_SOURCE2)
         $! Building The $(HP2100_LIB2) Library.
         $!
         $ $(CC)$(HP2100_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(HP3000_LIB1) : $(HP3000_SOURCE1)
+        $!
+        $! Building The $(HP3000_LIB1) Library.
+        $!
+        $ $(CC)$(HP3000_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(HP3000_LIB2) : $(HP3000_SOURCE2)
+        $!
+        $! Building The $(HP3000_LIB2) Library.
+        $!
+        $ $(CC)$(HP3000_OPTIONS) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
@@ -1704,6 +1747,19 @@ $(BIN_DIR)HP2100-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(HP2100_LIB1) $(H
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)HP2100-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(HP2100_LIB1)/LIBRARY, -
                $(HP2100_LIB2)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+HP3000 : $(BIN_DIR)HP3000-$(ARCH).EXE
+        $! HP3000 done
+
+$(BIN_DIR)HP3000-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(HP3000_LIB1) $(HP3000_LIB2)
+        $!
+        $! Building The $(BIN_DIR)HP3000-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(HP3000_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)HP3000-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(HP3000_LIB1)/LIBRARY, -
+               $(HP3000_LIB2)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 I1401 : $(BIN_DIR)I1401-$(ARCH).EXE

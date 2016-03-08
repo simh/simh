@@ -20,6 +20,8 @@
 
 #### Richard Cornwell has implemented a Burroughs B5500 simulator.
 
+#### Dave Bryan has implemented an HP-3000 Series III simulator.
+
 #### Updated AltairZ80 simulator from Peter Schorn.
 
 #### Updated HP2100 simulator from Dave Bryan.

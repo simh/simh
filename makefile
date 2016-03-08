@@ -1101,6 +1101,14 @@ HP2100 = ${HP2100D}/hp2100_stddev.c ${HP2100D}/hp2100_dp.c ${HP2100D}/hp2100_dq.
 	${HP2100D}/hp2100_di_da.c ${HP2100D}/hp2100_disclib.c
 HP2100_OPT = -DHAVE_INT64 -I ${HP2100D}
 
+HP3000D = HP3000
+HP3000 = ${HP3000D}/hp_disclib.c ${HP3000D}/hp_tapelib.c ${HP3000D}/hp3000_atc.c \
+	${HP3000D}/hp3000_clk.c ${HP3000D}/hp3000_cpu.c ${HP3000D}/hp3000_cpu_base.c \
+	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_ds.c ${HP3000D}/hp3000_iop.c \
+	${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
+	${HP3000D}/hp3000_scmb.c ${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
+HP3000_OPT = -I ${HP3000D}
+
 
 I1401D = I1401
 I1401 = ${I1401D}/i1401_lp.c ${I1401D}/i1401_cpu.c ${I1401D}/i1401_iq.c \
@@ -1340,7 +1348,7 @@ PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
-	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
+	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
 	b5500
@@ -1502,6 +1510,12 @@ hp2100 : ${BIN}hp2100${EXE}
 ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
 	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+hp3000 : ${BIN}hp3000${EXE}
+
+${BIN}hp3000${EXE} : ${HP3000} ${SIM}
+	${MKDIRBIN}
+	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 i1401 : ${BIN}i1401${EXE}
 
