@@ -180,11 +180,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
-    INCPATH:=$(shell $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
+    INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
-      INCPATH:=$(shell $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+      INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
       ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
         INCPATH += /opt/local/include
         OS_CCDEFS += -I/opt/local/include
@@ -204,7 +204,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       else
         ifeq (SunOS,$(OSTYPE))
           OSNAME = Solaris
-          LIBPATH := $(shell crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          LIBPATH := $(shell LANG=C; crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
           LIBEXT = so
           OS_LDFLAGS += -lsocket -lnsl
           ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
@@ -250,7 +250,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
               else
                 ifeq (,$(findstring NetBSD,$(OSTYPE)))
                   ifneq (no ldconfig,$(findstring no ldconfig,$(shell which ldconfig 2>&1)))
-                    LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+                    LDSEARCH :=$(shell LANG=C; ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
                   endif
                   ifneq (,$(LDSEARCH))
                     LIBPATH := $(LDSEARCH)
