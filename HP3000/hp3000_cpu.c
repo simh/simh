@@ -25,6 +25,7 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   11-Mar-16    JDB     Fixed byte EA calculations with negative indexes
    22-Dec-15    JDB     First release version
    01-Apr-15    JDB     First successful run of MPE-V/R through account login
    11-Dec-12    JDB     Created
@@ -2457,10 +2458,10 @@ else {                                                      /* otherwise the mod
 
 if ((CIR & LSDX_MASK) == LDD_X                          /* if the mode */
   || (CIR & LSDX_MASK) == STD_X)                        /*   is double-word indexed */
-    displacement = displacement + X * 2;                /*     then add the doubled index to the displacement */
+    displacement = displacement + X * 2 & DV_MASK;      /*     then add the doubled index to the displacement */
 
 else if (mode_disp & X_FLAG)                            /* otherwise if the mode is indexed */
-    displacement = displacement + X;                    /*   then add the index to the displacement */
+    displacement = displacement + X & DV_MASK;          /*   then add the index to the displacement */
 
 if (selector == NULL)                                   /* if a word address is requested */
     base = base + displacement;                         /*   then add in the word displacement */
