@@ -673,26 +673,33 @@ static UNIT td_unit[2*TD_NUMCTLR];
 
 static REG td_reg[] = {
     { DRDATAD (CTRLRS, td_ctrls,  4, "number of controllers"), REG_HRO },
-    { HRDATAD (ECODE,  td_regval, 8, "end packet success code") },
-    { HRDATAD (BLOCK,  td_regval, 8, "current block number") },
-    { HRDATAD (RX_CSR, td_regval,16, "input control/status register") },
-    { HRDATAD (RX_BUF, td_regval,16, "input buffer register") },
-    { HRDATAD (TX_CSR, td_regval,16, "output control/status register") },
-    { HRDATAD (TX_BUF, td_regval,16, "output buffer register") },
-    { DRDATAD (P_STATE,td_regval, 4, "protocol state"), REG_RO },
-    { DRDATAD (O_STATE,td_regval, 4, "output state"), REG_RO },
-    { DRDATAD (IBPTR,  td_regval, 9, "input buffer pointer")  },
-    { DRDATAD (OBPTR,  td_regval, 9, "output buffer pointer")  },
-    { DRDATAD (ILEN,   td_regval, 9, "input length")  },
-    { DRDATAD (OLEN,   td_regval, 9, "output length")  },
-    { DRDATAD (TXSIZE, td_regval, 9, "remaining transfer size")  },
-    { DRDATAD (OFFSET, td_regval, 9, "offset into current transfer")  },
-    { DRDATAD (CTIME,  td_regval,24, "command time"), PV_LEFT },
-    { DRDATAD (STIME,  td_regval,24, "seek, per block"), PV_LEFT },
-    { DRDATAD (XTIME,  td_regval,24, "tr set time"), PV_LEFT },
-    { DRDATAD (ITIME,  td_regval,24, "init time"), PV_LEFT },
-    { BRDATAD (IBUF,   &td_regval,16, 8, 512, "input buffer"), },
-    { BRDATAD (OBUF,   &td_regval,16, 8, 512, "output buffer"), },
+
+    { DRDATAD (CTIME,  td_ctime,24, "command time"), PV_LEFT },
+    { DRDATAD (STIME,  td_stime,24, "seek, per block"), PV_LEFT },
+    { DRDATAD (XTIME,  td_xtime,24, "tr set time"), PV_LEFT },
+    { DRDATAD (ITIME,  td_itime,24, "init time"), PV_LEFT },
+
+#define RDATA(nm,loc,wd,desc) SRDATAD(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc)
+#define RDATAF(nm,loc,wd,desc,flds) SRDATADF(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc,flds)
+
+    { RDATA  (ECODE,  ecode,  16, "end packet success code") },
+    { RDATA  (BLOCK,  block,  16, "current block number") },
+    { RDATAF (RX_CSR, rx_csr, 16, "input control/status register",  rx_csr_bits) },
+    { RDATAF (RX_BUF, rx_buf, 16, "input buffer register",          rx_buf_bits) },
+    { RDATAF (TX_CSR, tx_csr, 16, "output control/status register", tx_csr_bits) },
+    { RDATAF (TX_BUF, tx_buf, 16, "output buffer register",         tx_buf_bits) },
+    { RDATA  (P_STATE,p_state, 4, "protocol state") },
+    { RDATA  (O_STATE,o_state, 4, "output state") },
+    { RDATA  (IBPTR,  ibptr,  16, "input buffer pointer") },
+    { RDATA  (OBPTR,  obptr,  16, "output buffer pointer") },
+    { RDATA  (ILEN,   ilen,   16, "input length") },
+    { RDATA  (OLEN,   olen,   16, "output length") },
+    { RDATA  (TXSIZE, txsize, 16, "remaining transfer size") },
+    { RDATA  (OFFSET, offset, 16, "offset into current transfer") },
+    { RDATA  (UNITNO, unitno, 16, "active unit number") },
+
+    { BRDATAD (IBUF,   td_ctlr[0].ibuf,16, 8, 512, "input buffer"), },
+    { BRDATAD (OBUF,   td_ctlr[0].obuf,16, 8, 512, "output buffer"), },
     { NULL }
     };
 
