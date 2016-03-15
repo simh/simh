@@ -1062,9 +1062,9 @@ if (c & SCPE_BREAK)                                     /* break? */
 else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 if (uptr->flags & TTUF_UNIX) {                          /* unix v0? */
     if (c == 0215)                                      /* cr -> lf */
-        c = 0212;
+        c = out = 0212;
     else if (c == 0212)                                 /* lf -> cr */
-        c = 0215;
+        c = out = 0215;
     else if (c == 0233)                                 /* esc -> altmode */
         c = 0375;
     }
