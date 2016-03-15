@@ -1,6 +1,6 @@
 /* pdp18b_rp.c: RP15/RP02 disk pack simulator
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RP15/RP02 disk pack
 
+   07-Mar-16    RMS     Revised for dynamically allocated memory
    13-Sep-15    RMS     Added APIVEC register
    14-Jan-04    RMS     Revised IO device call interface
    06-Feb-03    RMS     Revised IOT decoding, fixed bug in initiation
@@ -132,7 +133,7 @@
 #define RP_MIN 2
 #define MAX(x,y) (((x) > (y))? (x): (y))
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1], nexm;
 extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
