@@ -2825,6 +2825,8 @@ do {
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
+    if (stat == SCPE_EXPECT)                            /* EXPECT status is non actionable */
+        stat = SCPE_OK;                                 /* so adjust it to SCPE_OK */
     if ((stat != SCPE_OK) ||
         ((cmdp->action != &return_cmd) &&
          (cmdp->action != &goto_cmd) &&
