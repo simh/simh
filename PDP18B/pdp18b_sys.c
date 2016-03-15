@@ -23,7 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   26-Feb-15    RMS     Added support for -u modifier (UC15 and Unix v0)
+   07-Mar-16    RMS     Revised for dynamically allocated memory
+   03-Mar-16    RMS     Added DR15C support
+   26-Feb-16    RMS     Added support for -u modifier (UC15 and Unix v0)
    13-Sep-15    RMS     Added DR15C instructions
    30-Oct-06    RMS     Added infinite loop stop
    18-Oct-06    RMS     Re-ordered device list
@@ -97,16 +99,17 @@ extern DEVICE mt_dev;
 extern DEVICE tti1_dev, tto1_dev;
 extern UNIT tti1_unit, tto1_unit;
 #endif
+#if defined (UC15)
+extern DEVICE dr15_dev;
+#endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern int32 M[];
+extern int32 *M;
 extern int32 memm;
 extern int32 PC;
 extern const char asc_to_baud[128];
 extern const char baud_to_asc[64];
 extern const char fio_to_asc[64];
-extern t_stat fprint_sym_cm_w (FILE *of, t_addr addr, t_value *val, int32 sw);
-extern t_stat parse_sym_cm_w (char *cptr, t_addr addr, t_value *val, int32 sw);
 
 /* SCP data structures and interface routines
 
@@ -172,6 +175,9 @@ DEVICE *sim_devices[] = {
 #endif
 #if defined (TTY1)
     &tti1_dev, &tto1_dev,
+#endif
+#if defined (UC15)
+    &dr15_dev,
 #endif
     NULL
     };
@@ -505,15 +511,15 @@ static const char *opcode[] = {
  "DTCA", "DTRA", "DTXA", "DTLA",
  "DTEF", "DTRB", "DTDF",
 #endif
-#if defined (DR)                                        /* DR15C */
+#if defined (TTY1)
+ "KSF1", "KRB1",
+ "TSF1", "TCF1", "TLS1", "TCF1!TLS1",
+#endif
+#if defined (UC15)                                      /* DR15C */
  "SIOA", "CIOD", "LIOR",
  "RDRS", "LDRS",
  "SAPI0", "SAPI1", "SAPI2", "SAPI3",
  "CAPI0", "CAPI1", "CAPI2", "CAPI3",
-#endif
-#if defined (TTY1)
- "KSF1", "KRB1",
- "TSF1", "TCF1", "TLS1", "TCF1!TLS1",
 #endif
 #if defined (PDP7)
  "ITON", "TTS", "SKP7", "CAF",
@@ -748,9 +754,9 @@ static const int32 opc_val[] = {
  0704101+I_NPI, 0704112+I_NPN,
  0704001+I_NPI, 0704002+I_NPI, 0704004+I_NPI, 0704006+I_NPI,
 #endif
-#if defined (DR)
+#if defined (UC15)
  0706001+I_NPI, 0706002+I_NPI, 0706006+I_NPI,
- 0706112+I_NPI, 0706122+I_NPI,
+ 0706112+I_NPN, 0706122+I_NPI,
  0706101+I_NPI, 0706121+I_NPI, 0706141+I_NPI, 0706161+I_NPI,
  0706104+I_NPI, 0706124+I_NPI, 0706144+I_NPI, 0706164+I_NPI,
 #endif
@@ -957,12 +963,8 @@ if ((sw & SWMASK ('A')) != 0) {                         /* ASCII? */
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
-#if defined (UC15)
-if (dptr->dwidth == 16)					/* 16b device? */
-    return fprint_sym_cm_w (of, addr, val, sw);
-#endif
 
-if (dptr->dwidth < 18)					/* 18b device? */
+if (dptr->dwidth < 18)                                  /* 18b device? */
     return SCPE_ARG;
 
 if ((sw & SWMASK ('C')) != 0) {                         /* character? */
@@ -1169,18 +1171,6 @@ if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     val[0] = (t_value) cptr[0] | 0200;
     return SCPE_OK;
     }
-#if defined (UC15)
-if (dptr->dwidth == 16) {                                 /* 16b decode? */
-    if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* char string? */
-        if (cptr[0] == 0)                               /* must have 1 char */
-            return SCPE_ARG;
-        val[0] = (((t_value) cptr[1] & 0377) << 8) |
-            ((t_value) cptr[0] & 0377);
-        return SCPE_OK;
-        }
-    return fparse_sym_cm_w (of, addr, val, uptr, sw);
-    }
-#endif
 if (dptr->dwidth < 18)                                  /* 18b decode? */
     return SCPE_ARG;                                    /* no, fail */
 

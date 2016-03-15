@@ -1,6 +1,6 @@
 /* pdp18b_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
                 (PDP-9) TC02/TU55 DECtape
                 (PDP-15) TC15/TU56 DECtape
 
+   10-Mar-16    RMS     Added 3-cycle databreak set/show entries
+   07-Mar-16    RMS     Revised for dynamically allocated memory
    13-Mar-15    RMS     Added APIVEC register
    28-Mar-15    RMS     Revised to use sim_printf
    23-Jun-06    RMS     Fixed switch conflict in ATTACH
@@ -327,7 +329,7 @@
 
 #define ABS(x)          (((x) < 0)? (-(x)): (x))
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1];
 extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
@@ -406,10 +408,6 @@ REG dt_reg[] = {
     { FLDATA (BEF, dtsb, DTB_V_BEF) },
 #endif
     { FLDATA (ERF, dtsb, DTB_V_ERF) },
-#if defined (TC02)                                      /* TC02/TC15 */
-    { ORDATA (WC, M[DT_WC], 18) },
-    { ORDATA (CA, M[DT_CA], 18) },
-#endif
     { DRDATA (LTIME, dt_ltime, 31), REG_NZ },
     { DRDATA (DCTIME, dt_dctime, 31), REG_NZ },
     { ORDATA (SUBSTATE, dt_substate, 2) },
@@ -434,6 +432,10 @@ MTAB dt_mod[] = {
     { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
+#if defined (TC02)
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, DT_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, "WC" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, DT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
+#endif
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
     };

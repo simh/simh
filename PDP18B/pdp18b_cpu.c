@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    cpu          PDP-4/7/9/15 central processor
 
+   10-Mar-16    RMS     Added 3-cycle databreak set/show routines
+   07-Mar-16    RMS     Revised to allocate memory dynamically
+   28-Mar-15    RMS     Revised to use sim_printf
    28-Apr-07    RMS     Removed clock initialization
    26-Dec-06    RMS     Fixed boundary test in KT15/XVM (Andrew Warkentin)
    30-Oct-06    RMS     Added idle and infinite loop detection
@@ -330,7 +333,7 @@ typedef struct {
 #define ASW_DFLT        017720
 #endif
 
-int32 M[MAXMEMSIZE] = { 0 };                            /* memory */
+int32 *M = NULL;                                        /* memory */
 int32 LAC = 0;                                          /* link'AC */
 int32 MQ = 0;                                           /* MQ */
 int32 PC = 0;                                           /* PC */
@@ -1550,7 +1553,7 @@ while (reason == 0) {                                   /* loop until halted */
                 }
             else if (pulse == 004) {                    /* ISA */
                 api_enb = (iot_data & SIGN)? 1: 0;
-                api_req = api_req | ((LAC >> 8) & 017);
+                api_req = api_req | ((LAC >> 8) & 017); /* swre levels only */
                 api_act = api_act | (LAC & 0377);
                 }
             break;
@@ -1643,7 +1646,7 @@ while (reason == 0) {                                   /* loop until halted */
                 }
             else if (pulse == 004) {                    /* ISA */
                 api_enb = (iot_data & SIGN)? 1: 0;
-                api_req = api_req | ((LAC >> 8) & 017);
+                api_req = api_req | ((LAC >> 8) & 017); /* swre levels only */
                 api_act = api_act | (LAC & 0377);
                 }
             else if (pulse == 021)                      /* ENB */
@@ -2096,6 +2099,10 @@ usmd = usmd_buf = usmd_defer = 0;
 memm = memm_init;
 nexm = prvn = trap_pending = 0;
 emir_pending = rest_pending = 0;
+if (M == NULL)
+    M = (int32 *) calloc (MEMSIZE, sizeof (int32));
+if (M == NULL)
+    return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
@@ -2251,7 +2258,7 @@ for (i = 0; i < DEV_MAX; i++) {                         /* clr tables */
     }
 for (i = 0; i < ((uint32) sizeof (std_dev)); i++)       /* std entries */
     dev_tab[std_dev[i]] = &bad_dev;
-for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices */
+for (i = p = 0; (dptr = sim_devices[i]) != NULL; i++) { /* add devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* enabled? */
         if (dibp->iors)                                 /* if IORS, add */
@@ -2260,7 +2267,7 @@ for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices *
             if (dibp->dsp[j]) {                         /* any dispatch? */
                 if (dev_tab[dibp->dev + j]) {           /* already filled? */
                     sim_printf ("%s device number conflict at %02o\n",
-                                sim_dname (dptr), dibp->dev + j);
+                            sim_dname (dptr), dibp->dev + j);
                     return TRUE;
                     }
                 dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
@@ -2269,6 +2276,31 @@ for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices *
         }                                               /* end if enb */
     }                                                   /* end for i */
 return FALSE;
+}
+
+/* Set in memory 3-cycle databreak register */
+
+t_stat set_3cyc_reg (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+t_stat r;
+int32 newv;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+newv = (int32) get_uint (cptr, 8, 0777777, &r);
+if (r != SCPE_OK)
+    return SCPE_ARG;
+M[val] = newv;
+return SCPE_OK;
+}
+
+/* Show in-memory 3-cycle databreak register */
+
+t_stat show_3cyc_reg (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "%s=", (char *) desc);
+fprint_val (st, (t_value) M[val], 8, 18, PV_RZRO);
+return SCPE_OK;
 }
 
 /* Set history */

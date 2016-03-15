@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    rf           (PDP-9) RF09/RF09
                 (PDP-15) RF15/RS09
 
+   10-Mar-16    RMS     Added 3-cycle databreak set/show entries
+   07-Mar-16    RMS     Revised for dynamically allocated memory
    13-Sep-15    RMS     Added APIVEC register
    03-Sep-13    RMS     Added explicit void * cast
    04-Oct-06    RMS     Fixed bug, DSCD does not clear function register
@@ -109,7 +111,7 @@
                         ((double) RF_NUMWD)))
 #define RF_BUSY         (sim_is_active (&rf_unit))
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1];
 extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
@@ -149,8 +151,6 @@ UNIT rf_unit = {
 REG rf_reg[] = {
     { ORDATA (STA, rf_sta, 18) },
     { ORDATA (DA, rf_da, 22) },
-    { ORDATA (WC, M[RF_WC], 18) },
-    { ORDATA (CA, M[RF_CA], 18) },
     { ORDATA (BUF, rf_dbuf, 18) },
     { FLDATA (INT, int_hwre[API_RF], INT_V_RF) },
     { BRDATA (WLK, rf_wlk, 8, 16, RF_NUMDK) },
@@ -173,6 +173,8 @@ MTAB rf_mod[] = {
     { UNIT_PLAT, (6 << UNIT_V_PLAT), NULL, "7P", &rf_set_size },
     { UNIT_PLAT, (7 << UNIT_V_PLAT), NULL, "8P", &rf_set_size },
     { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, RF_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, "WC" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, RF_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
     };
@@ -314,9 +316,9 @@ return SCPE_OK;
 
 /* Update status */
 
-int32 rf_updsta (int32 new)
+int32 rf_updsta (int32 news)
 {
-rf_sta = (rf_sta | new) & ~(RFS_ERR | RFS_CLR);
+rf_sta = (rf_sta | news) & ~(RFS_ERR | RFS_CLR);
 if (rf_sta & RFS_EFLGS)
     rf_sta = rf_sta | RFS_ERR;
 if ((rf_sta & (RFS_ERR | RFS_DON)) && (rf_sta & RFS_IE))

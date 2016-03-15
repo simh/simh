@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Mar-16    RMS     Added 3-cycle databreak set/show routines
    26-Feb-16    RMS     Added RB09 to PDP-7 for Unix "v0" and RM09 to PDP-9
    13-Sep-15    RMS     Added DR15C
    18-Apr-12    RMS     Added clk_cosched prototype
@@ -108,6 +109,7 @@
                                         TC59D magnetic tape
                                         TC15/TU56 DECtape
                                         LT15/LT19 additional Teletypes
+					DR15C parallel interface to UC15
 
    ??Indicates not implemented.  The PDP-4 manual refers to a memory
    ??extension control; there is no documentation on it.
@@ -164,7 +166,6 @@
 #define MTA             0                               /* magtape */
 #define TC02            0                               /* DECtape */
 #define TTY1            16                              /* second Teletype(s) */
-#define DR              0                               /* DR15C */
 #define BRMASK          0377400                         /* bounds mask */
 #define BRMASK_XVM      0777400                         /* bounds mask, XVM */
 #endif
@@ -520,5 +521,7 @@ typedef struct {
 
 t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_3cyc_reg (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_3cyc_reg (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif

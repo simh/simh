@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@
    lp09         (PDP-9,15) LP09 line printer
    lp15         (PDP-15)   LP15 line printer
 
+   10-Mar-16    RMS     Added 3-cycle databreak set/show entry
+   07-Mar-16    RMS     Revised for dynamically allocated memory
    13-Sep-15    RMS     Added APIVEC register
    19-Jan-07    RMS     Added UNIT_TEXT flag
    11-Jun-06    RMS     Made character translation table global scope
@@ -666,7 +668,6 @@ return detach_unit (uptr);
 /* LP15 line printer */
 
 #define LP15_BSIZE      132                             /* line size */
-#define LPT_WC          034                             /* word count */
 #define LPT_CA          035                             /* current addr */
 
 /* Status register */
@@ -681,7 +682,7 @@ return detach_unit (uptr);
 #define STA_EFLGS       (STA_ALM | STA_OVF | STA_IHT | STA_ILK)
 #define STA_CLR         0003777                         /* always clear */
 
-extern int32 M[];
+extern int32 *M;
 int32 lp15_sta = 0;
 int32 lp15_ie = 1;
 int32 lp15_stopioe = 0;
@@ -714,7 +715,6 @@ UNIT lp15_unit = {
 
 REG lp15_reg[] = {
     { ORDATA (STA, lp15_sta, 18) },
-    { ORDATA (CA, M[LPT_CA], 18) },
     { FLDATA (INT, int_hwre[API_LPT], INT_V_LPT) },
     { FLDATA (ENABLE, lp15_ie, 0) },
     { DRDATA (LCNT, lp15_lc, 9) },
@@ -730,6 +730,7 @@ REG lp15_reg[] = {
     };
 
 MTAB lp15_mod[] = {
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, LPT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
     };

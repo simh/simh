@@ -25,6 +25,7 @@
 
    drm          (PDP-4,PDP-7) Type 24 serial drum; (PDP-9) RM09 drum
 
+   07-Mar-16    RMS     Revised for dynamically allocated memory
    26-Feb-16    RMS     Added PDP-9 support; set default state to disabled
    03-Sep-13    RMS     Added explicit void * cast
    14-Jan-04    RMS     Revised IO device call interface
@@ -64,7 +65,7 @@
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
                         ((double) DRM_NUMWDT)))
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
 
