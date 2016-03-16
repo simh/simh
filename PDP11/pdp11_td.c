@@ -577,9 +577,13 @@ static const char *tdc_regnam[] =
 #define TD_END          7                               /* empty buffer */
 #define TD_END1         8                               /* empty buffer */
 #define TD_INIT         9                               /* empty buffer */
+#define TD_BOOTSTRAP    10                              /* bootstrap read */
+#define TD_POSITION     11                              /* position */
 
 static char *td_states[] = {
-    "IDLE", "READ", "READ1", "READ2", "WRITE", "WRITE1", "WRITE2", "END", "END1", "INIT"
+    "IDLE",     "READ",     "READ1",    "READ2", 
+    "WRITE",    "WRITE1",   "WRITE2",   "END", 
+    "END1",     "INIT",     "BOOTSTRAP","POSITION"
     };
 
 static char *td_ops[] = {
@@ -946,15 +950,13 @@ switch (opcode) {
             case TD_CMDNOP:                              /* NOP */
             case TD_CMDGST:                              /* Get status */
             case TD_CMDSST:                              /* Set status */
+            case TD_CMDINI:                              /* INIT */
+            case TD_CMDDIA:                              /* Diagnose */
                 ctlr->unitno = ctlr->ibuf[4];
                 ctlr->p_state = TD_END;                  /* All treated as NOP */
                 ctlr->ecode = TD_STSOK;
                 ctlr->offset = 0;
                 sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
-                break;
-               
-            case TD_CMDINI:
-                sim_printf("Warning: TU58 command 'INIT' not implemented\n");
                 break;
                
             case TD_CMDRD:
@@ -976,11 +978,12 @@ switch (opcode) {
                 break;
                
             case TD_CMDPOS:
-                sim_printf("Warning: TU58 command 'Position' not implemented\n");
-                break;
-               
-            case TD_CMDDIA:
-                sim_printf("Warning: TU58 command 'Diagnose' not implemented\n");
+                ctlr->unitno = ctlr->ibuf[4];
+                ctlr->block = ((ctlr->ibuf[11] << 8) | ctlr->ibuf[10]);
+                ctlr->txsize = 0;
+                ctlr->p_state = TD_POSITION;
+                ctlr->offset = 0;
+                sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
                 break;
                
             case TD_CMDMRSP:
@@ -1020,7 +1023,7 @@ switch (opcode) {
             fbuf = ctlr->uptr[ctlr->unitno].filebuf;
             ctlr->block = 0;
             ctlr->txsize = 0;
-            ctlr->p_state = TD_READ2;
+            ctlr->p_state = TD_BOOTSTRAP;
             ctlr->offset = 0;
             ctlr->obptr = 0;
 
@@ -1028,6 +1031,9 @@ switch (opcode) {
                 ctlr->obuf[i] = fbuf[i];
             ctlr->olen = TD_NUMBY;
             ctlr->rx_buf = ctlr->obuf[ctlr->obptr++];   /* get first byte */
+            ctlr->rx_csr |= CSR_DONE;                   /* set input flag */
+            if (ctlr->rx_csr & CSR_IE)                  /* interrupt if enabled */
+                CSI_SET_INT;
             sim_data_trace(ctlr->dptr, &ctlr->uptr[ctlr->unitno], ctlr->obuf, "Boot Block Data", ctlr->olen, "", TDDEB_DAT);
             sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
             }
@@ -1062,6 +1068,20 @@ switch (ctlr->p_state) {                                /* case on state */
             if (t == 0)                                 /* minimum 1 */
                 t = 1;
             ctlr->p_state++;                            /* set next state */
+            sim_activate (uptr, td_stime * t);          /* schedule seek */
+            break;
+            }
+        else 
+            ctlr->p_state = TD_END;
+        sim_activate (uptr, td_xtime);                  /* schedule next */
+        break;
+
+    case TD_POSITION:                                   /* position */
+        if (td_test_xfr (uptr, ctlr->p_state)) {        /* transfer ok? */
+            t = abs (ctlr->block - 0);                  /* # blocks to seek */
+            if (t == 0)                                 /* minimum 1 */
+                t = 1;
+            ctlr->p_state = TD_END;                     /* set next state */
             sim_activate (uptr, td_stime * t);          /* schedule seek */
             break;
             }
@@ -1150,6 +1170,20 @@ switch (ctlr->p_state) {                                /* case on state */
         sim_activate (uptr, td_xtime);                  /* schedule next */
         break;
         
+    case TD_BOOTSTRAP:                                  /* send data to host */
+        if ((ctlr->rx_csr & CSR_DONE) == 0) {           /* prev data taken? */
+            ctlr->rx_buf = ctlr->obuf[ctlr->obptr++];   /* get next byte */
+            ctlr->rx_csr |= CSR_DONE;                   /* set input flag */
+            if (ctlr->rx_csr & CSR_IE)
+                CSI_SET_INT;
+            if (ctlr->obptr >= ctlr->olen) {            /* buffer empty? */
+                ctlr->p_state = TD_IDLE;
+                break;
+                }
+            }
+        sim_activate (uptr, td_xtime);                  /* schedule next */
+        break;
+
     case TD_END:                                        /* build end packet */
         ctlr->obptr = 0;
         ctlr->obuf[ctlr->obptr++] = TD_OPCMD;           /* Command packet */
