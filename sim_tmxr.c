@@ -1018,7 +1018,8 @@ if (mp->master) {
             if ((lp->conn == FALSE) &&                  /* is the line available? */
                 (lp->destination == NULL) &&
                 (lp->master == 0) &&
-                (lp->ser_connect_pending == FALSE))
+                (lp->ser_connect_pending == FALSE) &&
+                (lp->modem_control ? ((lp->modembits & TMXR_MDM_DTR) != 0) : TRUE))
                 break;                                  /* yes, so stop search */
             }
 
