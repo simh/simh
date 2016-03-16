@@ -23,8 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   rp           RP15/RP02 disk pack
+   rp           RP15/RP02/RP03 disk pack
 
+   15-Mar-16    RMS     Added RP03 support
+                        Fixed handling of done flag
    07-Mar-16    RMS     Revised for dynamically allocated memory
    13-Sep-15    RMS     Added APIVEC register
    14-Jan-04    RMS     Revised IO device call interface
@@ -46,15 +48,20 @@
 #define RP_NUMWD        256                             /* words/sector */
 #define RP_NUMSC        10                              /* sectors/surface */
 #define RP_NUMSF        20                              /* surfaces/cylinder */
-#define RP_NUMCY        203                             /* cylinders/drive */
+#define RP02_NUMCY      203                             /* cylinders/drive */
+#define RP03_NUMCY      406
 #define RP_NUMDR        8                               /* drives/controller */
-#define RP_SIZE         (RP_NUMCY * RP_NUMSF * RP_NUMSC * RP_NUMWD)
-                                                        /* words/drive */
+#define RP02_SIZE       (RP02_NUMCY * RP_NUMSF * RP_NUMSC * RP_NUMWD)
+#define RP03_SIZE       (RP03_NUMCY * RP_NUMSF * RP_NUMSC * RP_NUMWD)
+#define RP_QCYL(f)      (((f) & UNIT_RP03)? RP03_NUMCY: RP02_NUMCY)
+#define RP_QSIZE(f)     (((f) & UNIT_RP03)? RP03_SIZE: RP02_SIZE)
 
 /* Unit specific flags */
 
 #define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* hwre write lock */
+#define UNIT_V_RP03     (UNIT_V_UF + 1)                 /* RP03 */
 #define UNIT_WLK        (1u << UNIT_V_WLK)
+#define UNIT_RP03       (1u << UNIT_V_RP03)
 #define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
@@ -120,15 +127,22 @@
 
 #define DA_V_SECT       0                               /* sector */
 #define DA_M_SECT       017
+#define DA_V_C256       4
+#define DA_C256         (1 << DA_V_C256)
 #define DA_V_SURF       5
 #define DA_M_SURF       037
 #define DA_V_CYL        10                              /* cylinder */
 #define DA_M_CYL        0377
 #define GET_SECT(x)     (((x) >> DA_V_SECT) & DA_M_SECT)
 #define GET_SURF(x)     (((x) >> DA_V_SURF) & DA_M_SURF)
-#define GET_CYL(x)      (((x) >> DA_V_CYL) & DA_M_CYL)
+#define GET_CYL(x)      ((((x) >> DA_V_CYL) & DA_M_CYL) + \
+                         (((x) & DA_C256)? 256: 0))
 #define GET_DA(x)       ((((GET_CYL (x) * RP_NUMSF) + GET_SURF (x)) * \
                         RP_NUMSC) + GET_SECT (x))
+
+/* Current cylinder */
+
+#define CCYL_RP03       0400000                         /* RP03 flag */
 
 #define RP_MIN 2
 #define MAX(x,y) (((x) > (y))? (x): (y))
@@ -154,6 +168,7 @@ int32 rp64 (int32 dev, int32 pulse, int32 dat);
 int32 rp_iors (void);
 t_stat rp_svc (UNIT *uptr);
 void rp_updsta (int32 newa, int32 newb);
+t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rp_reset (DEVICE *dptr);
 t_stat rp_attach (UNIT *uptr, char *cptr);
 t_stat rp_detach (UNIT *uptr);
@@ -169,14 +184,14 @@ t_stat rp_detach (UNIT *uptr);
 DIB rp_dib = { DEV_RP, 2, &rp_iors, { &rp63, &rp64 } };
 
 UNIT rp_unit[] = {
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) }
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP02_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP02_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP02_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP02_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP02_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP02_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP02_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP02_SIZE) }
     };
 
 REG rp_reg[] = {
@@ -196,6 +211,8 @@ REG rp_reg[] = {
     };
 
 MTAB rp_mod[] = {
+    { UNIT_RP03, 0,         "RP02", "RP02", &rp_set_size },
+    { UNIT_RP03, UNIT_RP03, "RP03", "RP03", &rp_set_size },
     { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
     { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
@@ -204,7 +221,7 @@ MTAB rp_mod[] = {
 
 DEVICE rp_dev = {
     "RP", rp_unit, rp_reg, rp_mod,
-    RP_NUMDR, 8, 24, 1, 8, 18,
+    RP_NUMDR, 8, 26, 1, 8, 18,
     NULL, NULL, &rp_reset,
     NULL, &rp_attach, &rp_detach,
     &rp_dib, DEV_DISABLE
@@ -236,20 +253,21 @@ if (pulse & 02) {
     }
 if (pulse & 04) {
     if (rp_busy) {                                      /* busy? */
-        rp_updsta (0, STB_PGE);
+        rp_updsta (0, STB_PGE);                         /* prog error */
         return dat;
         }
     else if (sb == 000) {                               /* DPLA */
+        int32 u = GET_UNIT (rp_sta);
         rp_da = dat & DMASK;
         if (GET_SECT (rp_da) >= RP_NUMSC)
             rp_updsta (STA_NXS, 0);
         if (GET_SURF (rp_da) >= RP_NUMSF)
             rp_updsta (STA_NXF, 0);
-        if (GET_CYL (rp_da) >= RP_NUMCY)
+        if (GET_CYL (rp_da) >= RP_QCYL (rp_unit[u].flags))
             rp_updsta (STA_NXC, 0);
         }
     else if (sb == 020) {                               /* DPCS */
-        rp_sta = rp_sta & ~(STA_HNF | STA_DON);
+        rp_sta = rp_sta & ~(STA_HNF | STA_DON);         /* clr err, done */
         rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
             STB_TME | STB_PGE | STB_EOP);
         rp_updsta (0, 0);
@@ -275,8 +293,11 @@ if (pulse & 01) {
         dat = IOT_SKP | dat;
     }
 if (pulse & 02) {
-    if (sb == 000)                                      /* DPOU */
-        dat = dat | rp_unit[GET_UNIT (rp_sta)].CYL;
+    if (sb == 000) {                                    /* DPOU */
+        u = GET_UNIT (rp_sta);
+        uptr = rp_dev.units + u;                        /* select unit */
+        dat = dat | uptr->CYL | ((uptr->flags & UNIT_RP03)? CCYL_RP03: 0);
+        }
     else if (sb == 020)                                 /* DPOA */
         dat = dat | rp_da;
     else if (sb == 040)                                 /* DPOC */
@@ -285,25 +306,26 @@ if (pulse & 02) {
         dat = dat | rp_wc;
     }
 if (pulse & 04) {
-    if (rp_busy) {                                      /* busy? */
-        rp_updsta (0, STB_PGE);
+    if (sb == 000) {                                    /* DPCF */
+        rp_reset (&rp_dev);                             /* reset dev */
         return dat;
         }
-    if (sb == 000)                                      /* DPCF */
-        rp_sta = rp_sta & ~STA_RW;
-    else if (sb == 020)                                 /* DPLZ */
+    if (rp_busy != 0) {                                 /* others: busy? */
+        rp_updsta (0, STB_PGE);                         /* prog error */
+        return dat;
+        }
+    if (sb == 020)                                      /* DPLZ */
         rp_sta = rp_sta & (dat | ~STA_RW);
     else if (sb == 040)                                 /* DPLO */
          rp_sta = rp_sta | (dat & STA_RW);
     else if (sb == 060)                                 /* DPLF */
         rp_sta = (rp_sta & ~STA_RW) | (dat & STA_RW);
-    rp_sta = rp_sta & ~STA_DON;                         /* clear done */
     u = GET_UNIT (rp_sta);                              /* get unit num */
     uptr = rp_dev.units + u;                            /* select unit */
     if ((rp_sta & STA_GO) && !sim_is_active (uptr)) {
         f = uptr->FUNC = GET_FUNC (rp_sta);             /* get function */
         rp_busy = 1;                                    /* set ctrl busy */
-        rp_sta = rp_sta & ~(STA_HNF | STA_DON);         /* clear flags */
+        rp_sta = rp_sta & ~STA_HNF;                     /* clear flag */
         rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
             STB_TME | STB_PGE | STB_EOP | (1 << (STB_V_ATT0 - u)));
         if (((uptr->flags & UNIT_ATT) == 0) || (f == FN_IDLE) ||
@@ -313,6 +335,7 @@ if (pulse & 04) {
             c = GET_CYL (rp_da);
             c = abs (c - uptr->CYL) * rp_swait;         /* seek time */
             sim_activate (uptr, MAX (RP_MIN, c + rp_rwait));
+            rp_sta = rp_sta & ~STA_DON;                 /* clear done */
             }
         }
     }
@@ -323,7 +346,7 @@ return dat;
 /* Unit service
 
    If function = idle, clear busy
-   If seek or recal initial state, clear attention line, compute seek time,
+   If seek or recal initial state, clear busy, compute seek time,
         put on cylinder, set second state
    If unit not attached, give error
    If seek or recal second state, set attention line, compute errors
@@ -375,13 +398,14 @@ if (GET_SECT (rp_da) >= RP_NUMSC)
     rp_updsta (STA_NXS, 0);
 if (GET_SURF (rp_da) >= RP_NUMSF)
     rp_updsta (STA_NXF, 0);
-if (GET_CYL (rp_da) >= RP_NUMCY)
+if (GET_CYL (rp_da) >= RP_QCYL (uptr->flags))
     rp_updsta (STA_NXC, 0);
 if (rp_sta & (STA_NXS | STA_NXF | STA_NXC)) {           /* or bad disk addr? */
     rp_updsta (STA_DON, STB_SUFU);                      /* done, unsafe */
     return SCPE_OK;
     }
 
+uptr->CYL = GET_CYL (rp_da);                            /* on cylinder */
 pa = rp_ma & AMASK;                                     /* get mem addr */
 da = GET_DA (rp_da) * RP_NUMWD;                         /* get disk addr */
 wc = 01000000 - rp_wc;                                  /* get true wc */
@@ -389,12 +413,12 @@ if (((uint32) (pa + wc)) > MEMSIZE) {                   /* memory overrun? */
     nexm = 1;                                           /* set nexm flag */
     wc = MEMSIZE - pa;                                  /* limit xfer */
     }
-if ((da + wc) > RP_SIZE) {                              /* disk overrun? */
+if ((da + wc) > RP_QSIZE (uptr->flags)) {               /* disk overrun? */
     rp_updsta (0, STB_EOP);                             /* error */
-    wc = RP_SIZE - da;                                  /* limit xfer */
+    wc = RP_QSIZE (uptr->flags) - da;                   /* limit xfer */
     }
 
-err = fseek (uptr->fileref, da * sizeof (int), SEEK_SET);
+err = fseek (uptr->fileref, da * sizeof (int32), SEEK_SET);
 
 if ((f == FN_READ) && (err == 0)) {                     /* read? */
     awc = fxread (&M[pa], sizeof (int32), wc, uptr->fileref);
@@ -407,7 +431,7 @@ if ((f == FN_WRITE) && (err == 0)) {                    /* write? */
     fxwrite (&M[pa], sizeof (int32), wc, uptr->fileref);
     err = ferror (uptr->fileref);
     if ((err == 0) && (i = (wc & (RP_NUMWD - 1)))) {
-        fxwrite (fill, sizeof (int), i, uptr->fileref);
+        fxwrite (fill, sizeof (int32), i, uptr->fileref);
         err = ferror (uptr->fileref);
         }
     }
@@ -427,11 +451,13 @@ rp_wc = (rp_wc + wc) & DMASK;                           /* final word count */
 rp_ma = (rp_ma + wc) & DMASK;                           /* final mem addr */
 da = (da + wc + (RP_NUMWD - 1)) / RP_NUMWD;             /* final sector num */
 cyl = da / (RP_NUMSC * RP_NUMSF);                       /* get cyl */
-if (cyl >= RP_NUMCY)
-    cyl = RP_NUMCY - 1;
+if (cyl >= RP_QCYL (uptr->flags))                       /* cyl ovflo wraps */
+    cyl = 0;
 surf = (da % (RP_NUMSC * RP_NUMSF)) / RP_NUMSC;         /* get surface */
 sect = (da % (RP_NUMSC * RP_NUMSF)) % RP_NUMSC;         /* get sector */
-rp_da = (cyl << DA_V_CYL) | (surf << DA_V_SURF) | (sect << DA_V_SECT);
+rp_da = ((cyl & DA_M_CYL) << DA_V_CYL) | (surf << DA_V_SURF) | (sect << DA_V_SECT);
+if (cyl >= 256)                                         /* cyl >= 8 bits? */
+    rp_da = rp_da | DA_C256;
 rp_busy = 0;                                            /* clear busy */
 rp_updsta (STA_DON, 0);                                 /* set done */
 
@@ -462,7 +488,7 @@ else if (sim_is_active (uptr)) {
     if ((f == FN_SEEK) || (f == FN_RECAL))
         rp_stb = rp_stb | STB_SUSU | STB_SUNR;
     }
-else if (uptr->CYL >= RP_NUMCY)
+else if (uptr->CYL >= RP_QCYL (uptr->flags))
     rp_sta = rp_sta | STA_SUSI;
 if ((rp_sta & STA_EFLGS) || (rp_stb & STB_EFLGS))
     rp_sta = rp_sta | STA_ERR;
@@ -503,6 +529,7 @@ t_stat rp_attach (UNIT *uptr, char *cptr)
 {
 t_stat reason;
 
+uptr->capac = RP_QSIZE (uptr->flags);
 reason = attach_unit (uptr, cptr);
 rp_updsta (0, 0);
 return reason;
@@ -517,4 +544,14 @@ t_stat reason;
 reason = detach_unit (uptr);
 rp_updsta (0, 0);
 return reason;
+}
+
+/* Set size routine */
+
+t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
+uptr->capac = RP_QSIZE (val);
+return SCPE_OK;
 }
