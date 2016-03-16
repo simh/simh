@@ -2317,28 +2317,28 @@ while (*tptr) {
             cptr = get_glyph (cptr, gbuf, '=');
             if (0 == MATCH_CMD (gbuf, "LINE")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_2FARG, "Missing Line Specifier\n");
                 nextline = (int32) get_uint (cptr, 10, mp->lines-1, &r);
                 if (r)
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_ARG, "Invalid Line Specifier: %s\n", cptr);
                 break;
                 }
             if (0 == MATCH_CMD (gbuf, "LOG")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
-                    return SCPE_2FARG;
+                    return sim_messagef (SCPE_2FARG, "Missing Log Specifier\n");
                 strncpy(logfiletmpl, cptr, sizeof(logfiletmpl)-1);
                 continue;
                 }
              if (0 == MATCH_CMD (gbuf, "LOOPBACK")) {
                 if ((NULL != cptr) && ('\0' != *cptr))
-                    return SCPE_2MARG;
+                    return sim_messagef (SCPE_2MARG, "Unexpected Loopback Specifier: %s\n", cptr);
                 loopback = TRUE;
                 continue;
                 }
            if ((0 == MATCH_CMD (gbuf, "NOBUFFERED")) || 
                 (0 == MATCH_CMD (gbuf, "UNBUFFERED"))) {
                 if ((NULL != cptr) && ('\0' != *cptr))
-                    return SCPE_2MARG;
+                    return sim_messagef (SCPE_2MARG, "Unexpected Unbuffered Specifier: %s\n", cptr);
                 buffered[0] = '\0';
                 continue;
                 }
@@ -2348,63 +2348,63 @@ while (*tptr) {
                 else {
                     i = (int32) get_uint (cptr, 10, 1024*1024, &r);
                     if (r || (i == 0))
-                        return SCPE_ARG;
+                        return sim_messagef (SCPE_ARG, "Invalid Buffered Specifier: %s\n", cptr);
                     sprintf(buffered, "%d", i);
                     }
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "NOLOG")) {
                 if ((NULL != cptr) && ('\0' != *cptr))
-                    return SCPE_2MARG;
+                    return sim_messagef (SCPE_2MARG, "Unexpected NoLog Specifier: %s\n", cptr);
                 nolog = TRUE;
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "NOMODEM")) {
                 if ((NULL != cptr) && ('\0' != *cptr))
-                    return SCPE_2MARG;
+                    return sim_messagef (SCPE_2MARG, "Unexpected NoModem Specifier: %s\n", cptr);
                 modem_control = FALSE;
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "MODEM")) {
                 if ((NULL != cptr) && ('\0' != *cptr))
-                    return SCPE_2MARG;
+                    return sim_messagef (SCPE_2MARG, "Unexpected Modem Specifier: %s\n", cptr);
                 modem_control = TRUE;
                 continue;
                 }
             if ((0 == MATCH_CMD (gbuf, "DATAGRAM")) || (0 == MATCH_CMD (gbuf, "UDP"))) {
                 if ((NULL != cptr) && ('\0' != *cptr))
-                    return SCPE_2MARG;
+                    return sim_messagef (SCPE_2MARG, "Unexpected Datagram Specifier: %s\n", cptr);
                 notelnet = datagram = TRUE;
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "PACKET")) {
                 if ((NULL != cptr) && ('\0' != *cptr))
-                    return SCPE_2MARG;
+                    return sim_messagef (SCPE_2MARG, "Unexpected Packet Specifier: %s\n", cptr);
                 packet = TRUE;
                 continue;
                 }
             if ((0 == MATCH_CMD (gbuf, "STREAM")) || (0 == MATCH_CMD (gbuf, "TCP"))) {
                 if ((NULL != cptr) && ('\0' != *cptr))
-                    return SCPE_2MARG;
+                    return sim_messagef (SCPE_2MARG, "Unexpected Stream Specifier: %s\n", cptr);
                 datagram = FALSE;
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "CONNECT")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_2FARG, "Missing Connect Specifier\n");
                 strcpy (destination, cptr);
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "SPEED")) {
                 if ((NULL == cptr) || ('\0' == *cptr) || 
                     (_tmln_speed_delta (cptr) < 0))
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_ARG, "Invalid Speed Specifier: %s\n", (cptr ? cptr : ""));
                 strcpy (speed, cptr);
                 continue;
                 }
             cptr = get_glyph (gbuf, port, ';');
             if (sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL, NULL))
-                return SCPE_ARG;
+                return sim_messagef (SCPE_ARG, "Invalid Port Specifier: %s\n", port);
             if (cptr) {
                 get_glyph (cptr, cptr, 0);                  /* upcase this string */
                 if (0 == MATCH_CMD (cptr, "NOTELNET"))
@@ -2413,16 +2413,16 @@ while (*tptr) {
                     if (0 == MATCH_CMD (cptr, "TELNET"))
                         listennotelnet = FALSE;
                     else
-                        return SCPE_ARG;
+                        return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", cptr);
                 }
             cptr = init_cptr;
             }
         cptr = get_glyph_nc (cptr, port, ';');
         sock = sim_master_sock (port, &r);                      /* make master socket to validate port */
         if (r)
-            return SCPE_ARG;
+            return sim_messagef (SCPE_ARG, "Invalid Port Specifier: %s\n", port);
         if (sock == INVALID_SOCKET)                             /* open error */
-            return SCPE_OPENERR;
+            return sim_messagef (SCPE_OPENERR, "Can't open network port: %s\n", port);
         sim_close_sock (sock);
         sim_os_ms_sleep (2);                                    /* let the close finish (required on some platforms) */
         strcpy (listen, port);
@@ -2434,7 +2434,7 @@ while (*tptr) {
                 if (0 == MATCH_CMD (option, "TELNET"))
                     listennotelnet = FALSE;
                 else
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", option);
             }
         }
     if (destination[0]) {
@@ -2443,7 +2443,7 @@ while (*tptr) {
         if (serport != INVALID_HANDLE) {
             sim_close_serial (serport);
             if (strchr (destination, ';') && mp->modem_control)
-                return SCPE_ARG;
+                return sim_messagef (SCPE_ARG, "Serial line parameters must be set within simulated OS: %s\n", 1 + strchr (destination, ';'));
             }
         else {
             memset (hostport, '\0', sizeof(hostport));
@@ -2457,17 +2457,17 @@ while (*tptr) {
                 else
                     if (0 == MATCH_CMD (cptr, "TELNET"))
                         if (datagram)
-                            return SCPE_ARG;
+                            return sim_messagef (SCPE_ARG, "Telnet invalid on Datagram socket\n");
                         else
                             notelnet = FALSE;
                     else
-                        return SCPE_ARG;
+                        return sim_messagef (SCPE_ARG, "Unexpected specifier: %s\n", cptr);
                 }
             sock = sim_connect_sock_ex (NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
             if (sock != INVALID_SOCKET)
                 sim_close_sock (sock);
             else
-                return SCPE_ARG;
+                return sim_messagef (SCPE_ARG, "Invalid destination: %s\n", hostport);
             }
         }
     if (line == -1) {
@@ -2527,9 +2527,9 @@ while (*tptr) {
         if ((listen[0]) && (!datagram)) {
             sock = sim_master_sock (listen, &r);            /* make master socket */
             if (r)
-                return SCPE_ARG;
+                return sim_messagef (SCPE_ARG, "Invalid network listen port: %s\n", listen);
             if (sock == INVALID_SOCKET)                     /* open error */
-                return SCPE_OPENERR;
+                return sim_messagef (SCPE_OPENERR, "Can't open network socket for listen port: %s\n", listen);
             if (mp->port) {                                 /* close prior listener */
                 sim_close_sock (mp->master);
                 mp->master = 0;
@@ -2564,7 +2564,7 @@ while (*tptr) {
             }
         if (loopback) {
             if (mp->lines > 1)
-                return SCPE_ARG;                            /* ambiguous */
+                return sim_messagef (SCPE_ARG, "Ambiguous Loopback specification\n");
             sim_printf ("Operating in loopback mode\n");
             for (i = 0; i < mp->lines; i++) {
                 lp = mp->ldsc + i;
@@ -2575,7 +2575,7 @@ while (*tptr) {
             }
         if (destination[0]) {
             if (mp->lines > 1)
-                return SCPE_ARG;                            /* ambiguous */
+                return sim_messagef (SCPE_ARG, "Ambiguous Destination specification\n");
             lp = &mp->ldsc[0];
             serport = sim_open_serial (destination, lp, &r);
             if (serport != INVALID_HANDLE) {
@@ -2609,7 +2609,7 @@ while (*tptr) {
                         strcpy (lp->port, listen);           /* save port */
                         }
                     else
-                        return SCPE_ARG;
+                        return sim_messagef (SCPE_ARG, "Missing listen port for Datagram socket\n");
                     }
                 lp->packet = packet;
                 sock = sim_connect_sock_ex (datagram ? listen : NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
@@ -2632,7 +2632,7 @@ while (*tptr) {
                     return SCPE_OK;
                     }
                 else
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_ARG, "Can't open %s socket on %s%s%s\n", datagram ? "Datagram" : "Stream", datagram ? listen : "", datagram ? "<->" : "", hostport);
                 }
             }
         }
@@ -2650,7 +2650,7 @@ while (*tptr) {
             else {
                 free (lp->txlogname);
                 lp->txlogname = NULL;
-                return r;
+                return sim_messagef (r, "Can't open log file: %s\n", logfiletmpl);
                 }
             }
         if (buffered[0] == '\0') {
@@ -2675,13 +2675,13 @@ while (*tptr) {
                 }
             }
         if ((listen[0]) && (!datagram)) {
-            if ((mp->lines == 1) && (mp->master))           /* single line mux can have either line specific OR mux listener but NOT both */
-                return SCPE_ARG;
+            if ((mp->lines == 1) && (mp->master))
+                return sim_messagef (SCPE_ARG, "Single Line MUX can have either line specific OR MUS listener but NOT both\n");
             sock = sim_master_sock (listen, &r);            /* make master socket */
             if (r)
-                return SCPE_ARG;
+                return sim_messagef (SCPE_ARG, "Invalid Listen Specification: %s\n", listen);
             if (sock == INVALID_SOCKET)                     /* open error */
-                return SCPE_OPENERR;
+                return sim_messagef (SCPE_OPENERR, "Can't listen on port: %s\n", listen);
             _mux_detach_line (lp, TRUE, FALSE);
             sim_printf ("Line %d Listening on port %s\n", line, listen);
             lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
@@ -2718,7 +2718,7 @@ while (*tptr) {
                         strcpy (lp->port, listen);          /* save port */
                         }
                     else
-                        return SCPE_ARG;
+                        return sim_messagef (SCPE_ARG, "Missing listen port for Datagram socket\n");
                     }
                 sock = sim_connect_sock_ex (datagram ? listen : NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
                 if (sock != INVALID_SOCKET) {
@@ -2736,7 +2736,7 @@ while (*tptr) {
                     tmxr_init_line (lp);                    /* init the line state */
                     }
                 else
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_ARG, "Can't open %s socket on %s%s%s\n", datagram ? "Datagram" : "Stream", datagram ? listen : "", datagram ? "<->" : "", hostport);
                 }
             }
         if (loopback) {
