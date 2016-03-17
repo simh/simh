@@ -683,8 +683,8 @@ static REG td_reg[] = {
     { DRDATAD (XTIME,  td_xtime,24, "tr set time"), PV_LEFT },
     { DRDATAD (ITIME,  td_itime,24, "init time"), PV_LEFT },
 
-#define RDATA(nm,loc,wd,desc) SRDATAD(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc)
-#define RDATAF(nm,loc,wd,desc,flds) SRDATADF(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc,flds)
+#define RDATA(nm,loc,wd,desc) STRDATAD(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc)
+#define RDATAF(nm,loc,wd,desc,flds) STRDATADF(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc,flds)
 
     { RDATA  (ECODE,  ecode,  16, "end packet success code") },
     { RDATA  (BLOCK,  block,  16, "current block number") },
