@@ -88,8 +88,6 @@ uint32 mcr_c[MCTL_NUM];
 uint32 mcr_d[MCTL_NUM];
 uint32 rom_lw[MCTL_NUM][ROMSIZE >> 2];
 
-extern UNIT cpu_unit;
-
 t_stat mctl_reset (DEVICE *dptr);
 const char *mctl_description (DEVICE *dptr);
 t_stat mctl_rdreg (int32 *val, int32 pa, int32 mode);

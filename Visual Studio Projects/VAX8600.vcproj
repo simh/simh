@@ -324,6 +324,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_video.c"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax780_uba.c"
 				>
 			</File>
@@ -626,6 +630,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_video.h"
 				>
 			</File>
 			<File

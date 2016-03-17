@@ -35,10 +35,6 @@ int32 int_req[IPL_HLVL] = { 0 };                        /* intr, IPL 14-17 */
 int32 int_vec_set[IPL_HLVL][32] = { 0 };                /* bits to set in vector */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
-extern int32 PSL, SISR, trpirq, mem_err, hlt_pin;
-extern int32 p1;
-extern jmp_buf save_env;
-
 int32 eval_int (void);
 t_stat qba_reset (DEVICE *dptr);
 const char *qba_description (DEVICE *dptr);

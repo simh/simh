@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,10 @@
    tto          teleprinter
    clk          clock
 
+   15-Mar-16    RMS     Added unix v0 terminal support
+   07-Mar-16    RMS     Revised for dynamically allocated memory
+   13-Sep-15    RMS     Added APIVEC register to PTR, CLK only
+   28-Mar-15    RMS     Revised to use sim_printf
    18-Apr-12    RMS     Added clk_cosched routine
                         Revised clk and tti scheduling
    18-Jun-07    RMS     Added UNIT_IDLE to console input, clock
@@ -84,8 +88,9 @@
 #define UNIT_V_PASCII   (UNIT_V_UF + 0)                 /* punch ASCII */
 #define UNIT_PASCII     (1 << UNIT_V_PASCII)
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1], PC, ASW;
+extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
 
 int32 clk_state = 0;
@@ -181,6 +186,7 @@ REG clk_reg[] = {
 #endif
     { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
+    { ORDATA (APIVEC, api_vec[API_CLK][INT_V_CLK], 6), REG_HRO },
     { NULL }
     };
 
@@ -228,6 +234,7 @@ REG ptr_reg[] = {
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { ORDATA (APIVEC, api_vec[API_PTR][INT_V_PTR], 6), REG_HRO },
     { NULL }
     };
 
@@ -307,7 +314,9 @@ DEVICE ptp_dev = {
 
 #define TTI_MASK        ((1 << TTI_WIDTH) - 1)
 #define TTUF_V_HDX      (TTUF_V_UF + 0)                 /* half duplex */
+#define TTUF_V_UNIX     (TTUF_V_UF + 1)
 #define TTUF_HDX        (1 << TTUF_V_HDX)
+#define TTUF_UNIX       (1 << TTUF_V_UNIX)
 
 DIB tti_dib = { DEV_TTI, 1, &tti_iors, { &tti } };
 
@@ -330,10 +339,13 @@ REG tti_reg[] = {
 
 MTAB tti_mod[] = {
 #if !defined (KSR28)
-    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
-    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
-    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
-    { TT_MODE, TT_MODE_7P,  "7b",  NULL,  NULL },
+    { TTUF_UNIX|TT_PAR|TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
+    { TTUF_UNIX|TT_PAR|TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
+    { TTUF_UNIX|TT_PAR|TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
+    { TTUF_UNIX|TT_PAR|TT_MODE, TT_MODE_7P,  "7b",  NULL,  NULL },
+#if !defined (PDP15)
+    { TTUF_UNIX|TT_PAR|TT_MODE, TTUF_UNIX|TT_PAR_MARK|TT_MODE_7B, "Unix v0", "UNIX", &tty_set_mode },
+#endif
 #endif
     { TTUF_HDX, 0       , "full duplex", "FDX", NULL },
     { TTUF_HDX, TTUF_HDX, "half duplex", "HDX", NULL },
@@ -385,10 +397,13 @@ REG tto_reg[] = {
 
 MTAB tto_mod[] = {
 #if !defined (KSR28)
-    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
-    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
-    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
-    { TT_MODE, TT_MODE_7P,  "7p",  "7P",  &tty_set_mode },
+    { TTUF_UNIX|TT_PAR|TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
+    { TTUF_UNIX|TT_PAR|TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
+    { TTUF_UNIX|TT_PAR|TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
+    { TTUF_UNIX|TT_PAR|TT_MODE, TT_MODE_7P,  "7p",  "7P",  &tty_set_mode },
+#if !defined (PDP15)
+    { TTUF_UNIX|TT_PAR|TT_MODE, TTUF_UNIX|TT_PAR_MARK|TT_MODE_7B, "Unix v0", "UNIX", &tty_set_mode },
+#endif
 #endif
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno },
     { 0 }
@@ -1045,6 +1060,14 @@ out = c & 0177;                                         /* mask echo to 7b */
 if (c & SCPE_BREAK)                                     /* break? */
     c = 0;
 else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
+if (uptr->flags & TTUF_UNIX) {                          /* unix v0? */
+    if (c == 0215)                                      /* cr -> lf */
+        c = out = 0212;
+    else if (c == 0212)                                 /* lf -> cr */
+        c = out = 0215;
+    else if (c == 0233)                                 /* esc -> altmode */
+        c = 0375;
+    }
 if ((uptr->flags & TTUF_HDX) && !tti_fdpx && out &&     /* half duplex and */
     ((out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags) | TTUF_KSR)) >= 0)) {
     sim_putchar (out);                                  /* echo */
@@ -1151,7 +1174,7 @@ return SCPE_OK;
 
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
-tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;
+tti_unit.flags = (tti_unit.flags & ~(TTUF_UNIX|TT_PAR|TT_MODE)) | val;
+tto_unit.flags = (tto_unit.flags & ~(TTUF_UNIX|TT_PAR|TT_MODE)) | val;
 return SCPE_OK;
 }

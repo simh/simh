@@ -303,6 +303,15 @@ typedef struct xu_controller CTLR;
 #define RXR_OVRN  0010000                               /* <12> Overrun Error [DELUA only] */
 #define RXR_MLEN  0007777                               /* <11:0> Message Length */
 
+BITFIELD xu_rdes_w2[] = {
+  BITNCF(8), BIT(ENP), BIT(STP), BITNC, BIT(CRC), BIT(OFLO), BIT(FRAM), BIT(ERRS), BIT(OWN),
+  ENDBITS
+};
+BITFIELD xu_rdes_w3[] = {
+  BITFFMT(mlen,12,"0x%X"), BITNC, BIT(NCHN), BIT(UBTO), BIT(BUFL),
+  ENDBITS
+};
+
 /* debugging bitmaps */
 #define DBG_TRC  0x0001                                 /* trace routine calls */
 #define DBG_REG  0x0002                                 /* trace read/write registers */

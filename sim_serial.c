@@ -222,8 +222,8 @@ return;
 /* Used when sorting a list of serial port names */
 static int _serial_name_compare (const void *pa, const void *pb)
 {
-SERIAL_LIST *a = (SERIAL_LIST *)pa;
-SERIAL_LIST *b = (SERIAL_LIST *)pb;
+const SERIAL_LIST *a = (const SERIAL_LIST *)pa;
+const SERIAL_LIST *b = (const SERIAL_LIST *)pb;
 
 return strcmp(a->name, b->name);
 }
@@ -967,6 +967,24 @@ for (i=0; (ports < max) && (i < 64); ++i) {
     }
 for (i=1; (ports < max) && (i < 64); ++i) {
     sprintf (list[ports].name, "/dev/tty.serial%d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
+for (i=0; (ports < max) && (i < 64); ++i) {
+    sprintf (list[ports].name, "/dev/tty%02d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
+for (i=0; (ports < max) && (i < 8); ++i) {
+    sprintf (list[ports].name, "/dev/ttyU%d", i);
     port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
     if (port != -1) {                                   /* open OK? */
         if (isatty (port))                              /* is device a TTY? */

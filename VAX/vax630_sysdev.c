@@ -121,23 +121,7 @@ CTAB vax630_cmd[] = {
 #define DEAR_LMADD      0x00007FFF                      /* local mem addr */
 #define DEAR_RD         (DEAR_LMADD)
 
-extern int32 R[16];
-extern int32 STK[5];
-extern int32 PSL;
-extern int32 SISR;
-extern int32 SCBB;
-extern int32 mapen;
-extern int32 pcq[PCQ_SIZE];
-extern int32 pcq_p;
-extern int32 ibcnt, ppc;
-extern int32 in_ie;
-extern int32 mchk_va, mchk_ref;
-extern int32 fault_PC;
-extern int32 int_req[IPL_HLVL];
-extern UNIT cpu_unit;
 extern UNIT clk_unit;
-extern jmp_buf save_env;
-extern int32 p1;
 extern int32 tmr_poll;
 extern DEVICE vc_dev, lk_dev, vs_dev;
 
@@ -178,7 +162,6 @@ void ka_wr (int32 pa, int32 val, int32 lnt);
 t_stat sysd_powerup (void);
 int32 con_halt (int32 code, int32 cc);
 
-extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 qbmap_rd (int32 pa);
 extern void qbmap_wr (int32 pa, int32 val, int32 lnt);
 extern int32 qbmem_rd (int32 pa);
@@ -1049,7 +1032,6 @@ return SCPE_OK;
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 char gbuf[CBUFSIZE];
 
 if ((cptr == NULL) || (!*cptr))
@@ -1057,26 +1039,29 @@ if ((cptr == NULL) || (!*cptr))
 cptr = get_glyph (cptr, gbuf, 0);
 if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
     sys_model = 0;
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
     vc_dev.flags = vc_dev.flags | DEV_DIS;               /* disable QVSS */
     lk_dev.flags = lk_dev.flags | DEV_DIS;               /* disable keyboard */
     vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
+#endif
     strcpy (sim_name, "MicroVAX II (KA630)");
     reset_all (0);                                       /* reset everything */
     }
 else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
     sys_model = 1;
     vc_dev.flags = vc_dev.flags & ~DEV_DIS;              /* enable QVSS */
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
     strcpy (sim_name, "VAXStation II (KA630)");
     reset_all (0);                                       /* reset everything */
+#else
+    return sim_messagef(SCPE_ARG, "Simulator built without Graphic Device Support");
+#endif
     }
 else
     return SCPE_ARG;
 return SCPE_OK;
-#else
-return SCPE_NOFNC;
-#endif
 }
 
 t_stat cpu_print_model (FILE *st)

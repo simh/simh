@@ -65,8 +65,6 @@
 
 #define MEM_BOARD_MASK(x,y)  ((1u << (uint32)(x/y)) - 1)
 
-extern UNIT cpu_unit;
-
 uint32 mcsr0 = 0;
 uint32 mcsr1 = 0;
 uint32 mcsr2 = 0;

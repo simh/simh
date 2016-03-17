@@ -555,7 +555,8 @@ static uint32 rtc_elapsed[SIM_NTIMERS] = { 0 };         /* sec since init */
 static uint32 rtc_calibrations[SIM_NTIMERS] = { 0 };    /* calibration count */
 static double rtc_clock_skew_max[SIM_NTIMERS] = { 0 };  /* asynchronous max skew */
 
-UNIT sim_timer_units[SIM_NTIMERS+1];                    /* one for each timer and one for throttle */
+UNIT sim_timer_units[SIM_NTIMERS+2];                    /* one for each timer and one for throttle */
+                                                        /* plus one for an internal clock if no clocks are registered */
 
 
 void sim_rtcn_init_all (void)
@@ -722,9 +723,12 @@ int i;
 uint32 clock_start, clock_last, clock_now;
 
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_init()\n");
-for (i=0; i<SIM_NTIMERS; i++)
+for (i=0; i<SIM_NTIMERS; i++) {
     sim_timer_units[i].action = &sim_timer_tick_svc;
+    sim_timer_units[i].flags = UNIT_DIS;
+    }
 sim_timer_units[SIM_NTIMERS].action = &sim_throt_svc;
+sim_timer_units[SIM_NTIMERS].flags = UNIT_DIS;
 sim_register_internal_device (&sim_timer_dev);
 sim_idle_enab = FALSE;                                  /* init idle off */
 sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
@@ -760,6 +764,9 @@ t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* des
 {
 int tmr, clocks;
 
+fprintf (st, "Minimum Host Sleep Time:       %dms\n", sim_os_sleep_min_ms);
+fprintf (st, "Host Clock Resolution:         %dms\n", sim_os_clock_resoluton_ms);
+fprintf (st, "Time before Clock Calibration: %d seconds\n\n", sim_idle_stable);
 for (tmr=clocks=0; tmr<SIM_NTIMERS; ++tmr) {
     if (0 == rtc_initd[tmr])
         continue;
@@ -894,10 +901,12 @@ MTAB sim_timer_mod[] = {
   { 0 },
 };
 
+static t_stat sim_timer_clock_reset (DEVICE *dptr);
+
 DEVICE sim_timer_dev = {
     "TIMER", sim_timer_units, sim_timer_reg, sim_timer_mod, 
-    SIM_NTIMERS+1, 0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
+    SIM_NTIMERS+2, 0, 0, 0, 0, 0, 
+    NULL, NULL, &sim_timer_clock_reset, NULL, NULL, NULL, 
     NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
 
 
@@ -995,18 +1004,14 @@ t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
 t_stat r;
 uint32 v;
 
-if (sim_idle_rate_ms == 0) {
-    sim_printf ("Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
-    return SCPE_NOFNC;
-    }
-if ((val != 0) && (sim_idle_rate_ms > (uint32) val)) {
-    sim_printf ("Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
-    return SCPE_NOFNC;
-    }
-if (cptr) {
+if (sim_idle_rate_ms == 0)
+    return sim_messagef (SCPE_NOFNC, "Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
+if ((val != 0) && (sim_idle_rate_ms > (uint32) val))
+        return sim_messagef (SCPE_NOFNC, "Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
+if (cptr && *cptr) {
     v = (uint32) get_uint (cptr, 10, SIM_IDLE_STMAX, &r);
     if ((r != SCPE_OK) || (v < SIM_IDLE_STMIN))
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid Stability value: %s.  Valid values range from %d to %d.\n", cptr, SIM_IDLE_STMIN, SIM_IDLE_STMAX);
     sim_idle_stable = v;
     }
 sim_idle_enab = TRUE;
@@ -1376,8 +1381,55 @@ return NULL;
 
 #endif /* defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS) */
 
+/*
+   In the event that there are no active clock devices, no instruction 
+   rate calibration will be performed.  This is more likely on simpler
+   simulators which don't have a full spectrum of standard devices or 
+   possibly when a clock device exists but its use is optional.
+   
+   To solve this we merely run an internal clock at 50Hz.
+ */
+#define CLK_TPS 50
+static t_stat sim_timer_clock_tick_svc (UNIT *uptr)
+{
+sim_rtcn_calb (CLK_TPS, SIM_NTIMERS-1);
+sim_activate_after (uptr, 1000000/CLK_TPS);             /* reactivate unit */
+return SCPE_OK;
+}
+
+static t_stat sim_timer_clock_reset (DEVICE *dptr)
+{
+uint32 i;
+
+for (i = 0; i < SIM_NTIMERS; i++)
+    if (rtc_initd[i] != 0)
+        break;
+if (i == SIM_NTIMERS) {     /* No clocks have signed in. */
+    /* setup internal clock */
+    sim_timer_units[SIM_NTIMERS+1].action = &sim_timer_clock_tick_svc;
+    sim_timer_units[SIM_NTIMERS+1].flags = UNIT_DIS;
+    }
+if (sim_timer_units[SIM_NTIMERS+1].action == &sim_timer_clock_tick_svc) {
+    /* actual clock reset */
+    sim_rtcn_init_unit (&sim_timer_units[SIM_NTIMERS+1], 5000, SIM_NTIMERS-1);
+    sim_activate_abs (&sim_timer_units[SIM_NTIMERS+1], 5000);
+    }
+return SCPE_OK;
+}
+
 void sim_start_timer_services (void)
 {
+uint32 i;
+
+for (i = 0; i < SIM_NTIMERS; i++)
+    if (rtc_initd[i] != 0)
+        break;
+if (i == SIM_NTIMERS) {     /* No clocks have signed in. */
+    /* setup internal clock */
+    sim_timer_units[SIM_NTIMERS+1].action = &sim_timer_clock_tick_svc;
+    sim_rtcn_init_unit (&sim_timer_units[SIM_NTIMERS+1], 5000, SIM_NTIMERS-1);
+    sim_activate_abs (&sim_timer_units[SIM_NTIMERS+1], 5000);
+    }
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 pthread_mutex_lock (&sim_timer_lock);
 if (sim_asynch_enabled && sim_asynch_timer) {

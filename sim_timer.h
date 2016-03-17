@@ -33,6 +33,9 @@
 
 /* Pick up a struct timespec definition if it is available */
 #include <time.h>
+#if defined(__struct_timespec_defined)
+#define _TIMESPEC_DEFINED
+#endif
 #if defined(SIM_ASYNCH_IO) || defined(USE_READER_THREAD)
 #include <pthread.h>
 #endif
@@ -73,7 +76,7 @@ int clock_gettime(int clock_id, struct timespec *tp);
 
 #define SIM_IDLE_CAL    10                          /* ms to calibrate */
 #define SIM_IDLE_MAX    10                          /* max granularity idle */
-#define SIM_IDLE_STMIN  10                          /* min sec for stability */
+#define SIM_IDLE_STMIN  2                           /* min sec for stability */
 #define SIM_IDLE_STDFLT 20                          /* dft sec for stability */
 #define SIM_IDLE_STMAX  600                         /* max sec for stability */
 

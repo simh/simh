@@ -1,6 +1,6 @@
 /* pdp18b_fpp.c: FP15 floating point processor simulator
 
-   Copyright (c) 2003-2012, Robert M Supnik
+   Copyright (c) 2003-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fpp          PDP-15 floating point processor
 
+   07-Mar-16    RMS     Revised for dynamically allocated memory
    19-Mar-12    RMS     Fixed declaration of pc queue (Mark Pizzolato)
    06-Jul-06    RMS     Fixed bugs in left shift, multiply
    31-Oct-04    RMS     Fixed URFST to mask low 9b of fraction
@@ -144,7 +145,7 @@ static UFP fma;                                         /* FMA */
 static UFP fmb;                                         /* FMB */
 static UFP fmq;                                         /* FMQ - hi,lo only */
 
-extern int32 M[MAXMEMSIZE];
+extern int32 *M;
 #if defined (PDP15)
 extern int32 pcq[PCQ_SIZE];                             /* PC queue */
 #else

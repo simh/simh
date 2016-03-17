@@ -19,11 +19,13 @@
 #            ALTAIR          Just Build The MITS Altair.
 #            ALTAIRZ80       Just Build The MITS Altair Z80.
 #            BESM6           Just Build The BESM-6.
+#            B5500           Just Build The B5500.
 #            ECLIPSE         Just Build The Data General Eclipse.
 #            GRI             Just Build The GRI Corporation GRI-909.
 #            LGP             Just Build The Royal-McBee LGP-30.
 #            H316            Just Build The Honewell 316/516.
 #            HP2100          Just Build The Hewlett-Packard HP-2100. 
+#            HP3000          Just Build The Hewlett-Packard HP-3000. 
 #            I1401           Just Build The IBM 1401.
 #            I1620           Just Build The IBM 1620.
 #            I7094           Just Build The IBM 7094.
@@ -414,12 +416,32 @@ HP2100_LIB2 = $(LIB_DIR)HP2100L2-$(ARCH).OLB
 HP2100_SOURCE2 = $(HP2100_DIR)HP2100_FP1.C,$(HP2100_DIR)HP2100_BACI.C,\
                  $(HP2100_DIR)HP2100_MPX.C,$(HP2100_DIR)HP2100_PIF.C,\
                  $(HP2100_DIR)HP2100_DI.C,$(HP2100_DIR)HP2100_DI_DA.C,\
-                 $(HP2100_DIR)HP_DISCLIB.C
+                 $(HP2100_DIR)HP2100_DISCLIB.C
 .IFDEF ALPHA_OR_IA64
 HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))\
                     /DEF=($(CC_DEFS),"HAVE_INT64=1")
 .ELSE
 HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))/DEF=($(CC_DEFS))
+.ENDIF
+
+#
+# Hewlett-Packard HP-3000 Simulator Definitions.
+#
+HP3000_DIR = SYS$DISK:[.HP3000]
+HP3000_LIB1 = $(LIB_DIR)HP3000L1-$(ARCH).OLB
+HP3000_SOURCE1 = $(HP3000_DIR)HP3000_ATC.C,$(HP3000_DIR)HP3000_CLK.C,\
+                 $(HP3000_DIR)HP3000_CPU.C,$(HP3000_DIR)HP3000_CPU_BASE.C,\
+                 $(HP3000_DIR)HP3000_CPU_FP.C,$(HP3000_DIR)HP3000_DS.C,\
+                 $(HP3000_DIR)HP3000_IOP.C,$(HP3000_DIR)HP3000_MPX.C,\
+                 $(HP3000_DIR)HP3000_MS.C,$(HP3000_DIR)HP3000_SCMB.C,\
+                 $(HP3000_DIR)HP3000_SEL.C,$(HP3000_DIR)HP3000_SYS.C
+HP3000_LIB2 = $(LIB_DIR)HP3000L2-$(ARCH).OLB
+HP3000_SOURCE2 = $(HP3000_DIR)HP_TAPELIB.C,$(HP3000_DIR)HP_DISCLIB.C
+.IFDEF ALPHA_OR_IA64
+HP3000_OPTIONS = /INCL=($(SIMH_DIR),$(HP3000_DIR))\
+                    /DEF=($(CC_DEFS),"HAVE_INT64=1")
+.ELSE
+HP3000_OPTIONS = /INCL=($(SIMH_DIR),$(HP3000_DIR))/DEF=($(CC_DEFS))
 .ENDIF
 
 #
@@ -630,7 +652,6 @@ SWTP6800MP_A2_SOURCE = $(SWTP6800MP_A2_COMMON)mp-a2.c,$(SWTP6800MP_A2_COMMON)m68
 	$(SWTP6800MP_A2_COMMON)mp-8m.c,$(SWTP6800MP_A2_COMMON)i2716.c
 SWTP6800MP_A2_OPTIONS = /INCL=($(SIMH_DIR),$(SWTP6800MP_A2_DIR))/DEF=($(CC_DEFS))
 
-
 #
 # BESM6
 #
@@ -641,6 +662,16 @@ BESM6_SOURCE = $(BESM6_DIR)BESM6_CPU.C,$(BESM6_DIR)BESM6_SYS.C,$(BESM6_DIR)BESM6
 	$(BESM6_DIR)BESM6_TTY.C,$(BESM6_DIR)BESM6_PANEL.C,$(BESM6_DIR)BESM6_PRINTER.C,\
 	$(BESM6_DIR)BESM6_PUNCH.C
 BESM6_OPTIONS = /INCL=($(SIMH_DIR),$(BESM6_DIR))/DEF=($(CC_DEFS),"USE_INT64=1")
+
+#
+# B5500
+#
+B5500_DIR = SYS$DISK:[.B5500]
+B5500_LIB = $(LIB_DIR)B5500-$(ARCH).OLB
+B5500_SOURCE = $(B5500_DIR)B5500_CPU.C,$(B5500_DIR)B5500_DK.C,$(B5500_DIR)B5500_DR.C,\
+	$(B5500_DIR)B5500_DTC.C,$(B5500_DIR)B5500_IO.C,$(B5500_DIR)B5500_MT.C,\
+	$(B5500_DIR)B5500_SYS.C,$(B5500_DIR)B5500_UREC.C,$(B5500_DIR)SIM_CARD.C
+B5500_OPTIONS = /INCL=($(SIMH_DIR),$(B5500_DIR))/DEF=($(CC_DEFS),"USE_INT64=1")
 
 #
 # Digital Equipment VAX 3900 Simulator Definitions.
@@ -901,10 +932,10 @@ I7094_OPTIONS = /INCL=($(SIMH_DIR),$(I7094_DIR))/DEF=($(CC_DEFS))
 # If we're not a VAX, Build Everything
 #
 .IFDEF ALPHA_OR_IA64
-ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
+ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 HP3000 I1401 I1620 IBM1130 ID16 \
       ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 \
       VAX MICROVAX3900 MICROVAX1 RTVAX1000 MICROVAX2 VAX730 VAX750 VAX780 VAX8600 \
-      SDS I7094 SWTP6800MP-A SWTP6800MP-A2 SSEM BESM6
+      SDS I7094 SWTP6800MP-A SWTP6800MP-A2 SSEM BESM6 B5500
         $! No further actions necessary
 .ELSE
 #
@@ -1091,6 +1122,28 @@ $(HP2100_LIB2) : $(HP2100_SOURCE2)
         $! Building The $(HP2100_LIB2) Library.
         $!
         $ $(CC)$(HP2100_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(HP3000_LIB1) : $(HP3000_SOURCE1)
+        $!
+        $! Building The $(HP3000_LIB1) Library.
+        $!
+        $ $(CC)$(HP3000_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(HP3000_LIB2) : $(HP3000_SOURCE2)
+        $!
+        $! Building The $(HP3000_LIB2) Library.
+        $!
+        $ $(CC)$(HP3000_OPTIONS) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
@@ -1329,6 +1382,10 @@ $(SWTP6800MP_A2_LIB) : $(SWTP6800MP_A2_SOURCE)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+#
+# If Not On VAX, Build The BESM6 Library.
+#
+.IFDEF ALPHA_OR_IA64
 $(BESM6_LIB) : $(BESM6_SOURCE)
         $!
         $! Building The $(BESM6_LIB) Library.
@@ -1339,6 +1396,37 @@ $(BESM6_LIB) : $(BESM6_SOURCE)
              LIBRARY/CREATE $(MMS$TARGET)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# We Are On VAX And Due To The Use of INT64 We Can't Build It.
+#
+$(BESM6_LIB) : 
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
+.ENDIF
+
+#
+# If Not On VAX, Build The Burroughs B5500 Library.
+#
+.IFDEF ALPHA_OR_IA64
+$(B5500_LIB) : $(B5500_SOURCE)
+        $!
+        $! Building The $(B5500_LIB) Library.
+        $!
+        $ $(CC)$(B5500_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# We Are On VAX And Due To The Use of INT64 We Can't Build It.
+#
+$(B5500_LIB) : 
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
+.ENDIF
 
 $(VAX_LIB1) : $(VAX_SOURCE1)
         $!
@@ -1661,6 +1749,19 @@ $(BIN_DIR)HP2100-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(HP2100_LIB1) $(H
                $(HP2100_LIB2)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+HP3000 : $(BIN_DIR)HP3000-$(ARCH).EXE
+        $! HP3000 done
+
+$(BIN_DIR)HP3000-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(HP3000_LIB1) $(HP3000_LIB2)
+        $!
+        $! Building The $(BIN_DIR)HP3000-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(HP3000_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)HP3000-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(HP3000_LIB1)/LIBRARY, -
+               $(HP3000_LIB2)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
 I1401 : $(BIN_DIR)I1401-$(ARCH).EXE
         $! I1401 done
 
@@ -1904,6 +2005,10 @@ $(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(SWTP6800M
                $(BLD_DIR)SCP.OBJ,$(SWTP6800MP_A2_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+#
+# If Not On VAX, Build The BESM6 Simulator.
+#
+.IFDEF ALPHA_OR_IA64
 BESM6 : $(BIN_DIR)BESM6-$(ARCH).EXE
         $! BESM6 done
 
@@ -1915,6 +2020,42 @@ $(BIN_DIR)BESM6-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(BESM6_LIB)
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)BESM6-$(ARCH).EXE -
                  $(BLD_DIR)SCP.OBJ,$(BESM6_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# Else We Are On VAX And Tell The User We Can't Build On VAX
+# Due To The Use Of INT64.
+#
+BESM6 : 
+        $! Sorry, Can't Build $(BIN_DIR)BESM6-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+.ENDIF
+
+
+#
+# If Not On VAX, Build The Burroughs B5500 Simulator.
+#
+.IFDEF ALPHA_OR_IA64
+B5500 : $(BIN_DIR)B5500-$(ARCH).EXE
+        $! B5500 done
+
+$(BIN_DIR)B5500-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(B5500_LIB)
+        $!
+        $! Building The $(BIN_DIR)B5500-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(B5500_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)B5500-$(ARCH).EXE -
+                 $(BLD_DIR)SCP.OBJ,$(B5500_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# Else We Are On VAX And Tell The User We Can't Build On VAX
+# Due To The Use Of INT64.
+#
+B5500 : 
+        $! Sorry, Can't Build $(BIN_DIR)B5500-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+.ENDIF
+
 
 VAX : MICROVAX3900
         $! MICROVAX3900 aka VAX done

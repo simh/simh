@@ -1,6 +1,6 @@
-/* pdp18b_drm.c: drum/fixed head disk simulator
+/* pdp18b_drm.c: drum head disk simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   drm          (PDP-4,PDP-7) Type 24 serial drum
+   drm          (PDP-4,PDP-7) Type 24 serial drum; (PDP-9) RM09 drum
 
+   07-Mar-16    RMS     Revised for dynamically allocated memory
+   26-Feb-16    RMS     Added PDP-9 support; set default state to disabled
    03-Sep-13    RMS     Added explicit void * cast
    14-Jan-04    RMS     Revised IO device call interface
    26-Oct-03    RMS     Cleaned up buffer copy code
@@ -37,6 +39,8 @@
    10-Jun-01    RMS     Cleaned up IOT decoding to reflect hardware
    26-Apr-01    RMS     Added device enable/disable support
    14-Apr-99    RMS     Changed t_addr to unsigned
+
+   Variable drum sizes are not supported.
 */
 
 #include "pdp18b_defs.h"
@@ -61,7 +65,7 @@
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
                         ((double) DRM_NUMWDT)))
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
 
@@ -118,7 +122,7 @@ DEVICE drm_dev = {
     1, 8, 20, 1, 8, 18,
     NULL, NULL, &drm_reset,
     &drm_boot, NULL, NULL,
-    &drm_dib, DEV_DISABLE
+    &drm_dib, DEV_DISABLE + DEV_DIS
     };
 
 /* IOT routines */

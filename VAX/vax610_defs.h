@@ -87,7 +87,7 @@
 
 #define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,                               \
                               NULL, &cpu_show_leds, NULL, "Display the CPU LED values" },       \
-                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={MICROVAX|VAXSTATION}",     \
+                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={MicroVAX|VAXStation}",     \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" }
 
 /* QVSS memory space */
@@ -325,6 +325,7 @@ typedef struct {
 #define SET_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
 #define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* cond error return */
+extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 /* Logging */
 

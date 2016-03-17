@@ -197,7 +197,7 @@
 extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 
 #define CPU_MODEL_MODIFIERS                                                                     \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL=8600|8650",                                  \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={8600|8650}",                   \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Display processor model" }
 
 /* Unibus I/O registers */
@@ -424,6 +424,7 @@ typedef struct {
 #define SET_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
 #define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* cond error return */
+extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 /* Logging */
 

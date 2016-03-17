@@ -193,7 +193,6 @@ BITFIELD vc_ic_mode_bits[] = {
 
 #define IOLN_QVSS       0100
 
-extern int32 int_req[IPL_HLVL];
 extern int32 tmxr_poll;                                 /* calibrated delay */
 
 extern t_stat lk_wr (uint8 c);
@@ -666,9 +665,6 @@ switch (rg) {
 return SCPE_OK;
 }
 
-extern jmp_buf save_env;
-extern int32 p1;
-
 int32 vc_mem_rd (int32 pa)
 {
 uint32 rg = (pa >> 2) & 0xFFFF;
@@ -794,7 +790,7 @@ if ((vc_dev.dctrl & DBG_CURSOR) && (vc_dev.dctrl & DBG_TCURSOR)) {
             }
         }
     }
-vid_set_cursor (visible, 16, 16, data, mask);
+vid_set_cursor (visible, 16, 16, data, mask, 0, 0);
 }
 
 void vc_checkint (void)
@@ -1023,7 +1019,7 @@ if (dptr->flags & DEV_DIS) {
     }
 
 if (!vid_active)  {
-    r = vid_open (dptr, VC_XSIZE, VC_YSIZE, vc_input_captured ? SIM_VID_INPUTCAPTURED : 0);/* display size & capture mode */
+    r = vid_open (dptr, NULL, VC_XSIZE, VC_YSIZE, vc_input_captured ? SIM_VID_INPUTCAPTURED : 0);/* display size & capture mode */
     if (r != SCPE_OK)
         return r;
     vc_buf = (uint32 *) calloc (VC_MEMSIZE, sizeof (uint32));

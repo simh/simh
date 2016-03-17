@@ -233,10 +233,6 @@ int32 rlcs_mp = 0;
 int32 rlcs_bcnt = 0;                                    /* byte count */
 uint16 *rlcs_buf = NULL;
 
-extern jmp_buf save_env;
-extern UNIT cpu_unit;
-extern int32 brk_req;
-
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat clk_svc (UNIT *uptr);

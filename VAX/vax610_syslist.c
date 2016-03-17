@@ -59,9 +59,6 @@ extern DEVICE vc_dev;
 extern DEVICE lk_dev;
 extern DEVICE vs_dev;
 
-extern void WriteB (uint32 pa, int32 val);
-extern UNIT cpu_unit;
-
 DEVICE *sim_devices[] = { 
     &cpu_dev,
     &mctl_dev,
@@ -109,7 +106,7 @@ int32 i;
 uint32 origin, limit;
 
 if (flag)                                               /* dump? */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_NOFNC, "Command Not Implemented\n");
 origin = 0;                                             /* memory */
 limit = (uint32) cpu_unit.capac;
 if (sim_switches & SWMASK ('O')) {                      /* origin? */

@@ -53,16 +53,6 @@
 #include "vax_mmu.h"
 #include <setjmp.h>
 
-extern uint32 *M;
-extern int32 PSL;
-extern int32 mapen;
-extern int32 p1, p2;
-extern int32 P0BR, P0LR;
-extern int32 P1BR, P1LR;
-extern int32 SBR, SLR;
-extern int32 SISR;
-extern jmp_buf save_env;
-
 int32 d_p0br, d_p0lr;                                   /* dynamic copies */
 int32 d_p1br, d_p1lr;                                   /* altered per ucode */
 int32 d_sbr, d_slr;
@@ -219,7 +209,7 @@ return stlb[tbi];
 
 /* Utility routines */
 
-extern void set_map_reg (void)
+void set_map_reg (void)
 {
 d_p0br = P0BR & ~03;
 d_p1br = (P1BR - 0x800000) & ~03;                       /* VA<30> >> 7 */
@@ -227,7 +217,6 @@ d_sbr = (SBR - 0x1000000) & ~03;                        /* VA<31> >> 7 */
 d_p0lr = (P0LR << 2);
 d_p1lr = (P1LR << 2) + 0x800000;                        /* VA<30> >> 7 */
 d_slr = (SLR << 2) + 0x1000000;                         /* VA<31> >> 7 */
-return;
 }
 
 /* Zap process (0) or whole (1) tb */
@@ -241,7 +230,6 @@ for (i = 0; i < VA_TBSIZE; i++) {
     if (stb)
         stlb[i].tag = stlb[i].pte = -1;
     }
-return;
 }
 
 /* Zap single tb entry corresponding to va */
@@ -253,7 +241,6 @@ int32 tbi = VA_GETTBI (VA_GETVPN (va));
 if (va & VA_S0)
     stlb[tbi].tag = stlb[tbi].pte = -1;
 else ptlb[tbi].tag = ptlb[tbi].pte = -1;
-return;
 }
 
 /* Check for tlb entry corresponding to va */

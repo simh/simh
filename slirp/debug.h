@@ -43,7 +43,7 @@ extern int slirp_debug;
 #define DEVICE void
 
 extern void *slirp_dptr;
-extern int slirp_dbit;
+extern unsigned int slirp_dbit;
 
 extern void _sim_debug (int dbits, DEVICE* dptr, const char* fmt, ...);
 

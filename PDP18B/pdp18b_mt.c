@@ -1,6 +1,6 @@
 /* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    mt           (PDP-9) TC59 magtape
                 (PDP-15) TC59D magtape
 
+   10-Mar-16    RMS     Added 3-cycle databreak set/show entries
+   07-Mar-16    RMS     Revised for dynamically allocated memory
+   13-Sep-15    RMS     Added APIVEC register
    14-Nov-08    RMS     Replaced mt_log with standard debug facility
    16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -124,8 +127,9 @@
 #define STA_DYN         (STA_REW | STA_BOT | STA_EOF | STA_EOT)
                                                         /* kept in USTAT */
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1];
+extern int32 api_vec[API_HLVL][32];
 extern UNIT cpu_unit;
 
 int32 mt_cu = 0;                                        /* command/unit */
@@ -169,8 +173,6 @@ UNIT mt_unit[] = {
 REG mt_reg[] = {
     { ORDATA (STA, mt_sta, 18) },
     { ORDATA (CMD, mt_cu, 18) },
-    { ORDATA (WC, M[MT_WC], 18) },
-    { ORDATA (CA, M[MT_CA], 18) },
     { FLDATA (INT, int_hwre[API_MTA], INT_V_MTA) },
     { FLDATA (STOP_IOE, mt_stopioe, 0) },
     { DRDATA (TIME, mt_time, 24), PV_LEFT },
@@ -178,6 +180,7 @@ REG mt_reg[] = {
     { URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
               MT_NUMDR, PV_LEFT | REG_RO) },
     { ORDATA (DEVNO, mt_dib.dev, 6), REG_HRO },
+    { ORDATA (APIVEC, api_vec[API_MTA][INT_V_MTA], 6), REG_HRO },
     { NULL }
     };
 
@@ -186,8 +189,10 @@ MTAB mt_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
-    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+    { MTAB_XTD|MTAB_VUN, 0, "TCAPACITY", "TCAPACITY",
       &sim_tape_set_capac, &sim_tape_show_capac, NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, "WC" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
       &set_devno, &show_devno, NULL },
     { 0 }

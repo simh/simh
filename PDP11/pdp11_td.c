@@ -577,9 +577,13 @@ static const char *tdc_regnam[] =
 #define TD_END          7                               /* empty buffer */
 #define TD_END1         8                               /* empty buffer */
 #define TD_INIT         9                               /* empty buffer */
+#define TD_BOOTSTRAP    10                              /* bootstrap read */
+#define TD_POSITION     11                              /* position */
 
 static char *td_states[] = {
-    "IDLE", "READ", "READ1", "READ2", "WRITE", "WRITE1", "WRITE2", "END", "END1", "INIT"
+    "IDLE",     "READ",     "READ1",    "READ2", 
+    "WRITE",    "WRITE1",   "WRITE2",   "END", 
+    "END1",     "INIT",     "BOOTSTRAP","POSITION"
     };
 
 static char *td_ops[] = {
@@ -673,26 +677,33 @@ static UNIT td_unit[2*TD_NUMCTLR];
 
 static REG td_reg[] = {
     { DRDATAD (CTRLRS, td_ctrls,  4, "number of controllers"), REG_HRO },
-    { HRDATAD (ECODE,  td_regval, 8, "end packet success code") },
-    { HRDATAD (BLOCK,  td_regval, 8, "current block number") },
-    { HRDATAD (RX_CSR, td_regval,16, "input control/status register") },
-    { HRDATAD (RX_BUF, td_regval,16, "input buffer register") },
-    { HRDATAD (TX_CSR, td_regval,16, "output control/status register") },
-    { HRDATAD (TX_BUF, td_regval,16, "output buffer register") },
-    { DRDATAD (P_STATE,td_regval, 4, "protocol state"), REG_RO },
-    { DRDATAD (O_STATE,td_regval, 4, "output state"), REG_RO },
-    { DRDATAD (IBPTR,  td_regval, 9, "input buffer pointer")  },
-    { DRDATAD (OBPTR,  td_regval, 9, "output buffer pointer")  },
-    { DRDATAD (ILEN,   td_regval, 9, "input length")  },
-    { DRDATAD (OLEN,   td_regval, 9, "output length")  },
-    { DRDATAD (TXSIZE, td_regval, 9, "remaining transfer size")  },
-    { DRDATAD (OFFSET, td_regval, 9, "offset into current transfer")  },
-    { DRDATAD (CTIME,  td_regval,24, "command time"), PV_LEFT },
-    { DRDATAD (STIME,  td_regval,24, "seek, per block"), PV_LEFT },
-    { DRDATAD (XTIME,  td_regval,24, "tr set time"), PV_LEFT },
-    { DRDATAD (ITIME,  td_regval,24, "init time"), PV_LEFT },
-    { BRDATAD (IBUF,   &td_regval,16, 8, 512, "input buffer"), },
-    { BRDATAD (OBUF,   &td_regval,16, 8, 512, "output buffer"), },
+
+    { DRDATAD (CTIME,  td_ctime,24, "command time"), PV_LEFT },
+    { DRDATAD (STIME,  td_stime,24, "seek, per block"), PV_LEFT },
+    { DRDATAD (XTIME,  td_xtime,24, "tr set time"), PV_LEFT },
+    { DRDATAD (ITIME,  td_itime,24, "init time"), PV_LEFT },
+
+#define RDATA(nm,loc,wd,desc) STRDATAD(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc)
+#define RDATAF(nm,loc,wd,desc,flds) STRDATADF(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc,flds)
+
+    { RDATA  (ECODE,  ecode,  16, "end packet success code") },
+    { RDATA  (BLOCK,  block,  16, "current block number") },
+    { RDATAF (RX_CSR, rx_csr, 16, "input control/status register",  rx_csr_bits) },
+    { RDATAF (RX_BUF, rx_buf, 16, "input buffer register",          rx_buf_bits) },
+    { RDATAF (TX_CSR, tx_csr, 16, "output control/status register", tx_csr_bits) },
+    { RDATAF (TX_BUF, tx_buf, 16, "output buffer register",         tx_buf_bits) },
+    { RDATA  (P_STATE,p_state, 4, "protocol state") },
+    { RDATA  (O_STATE,o_state, 4, "output state") },
+    { RDATA  (IBPTR,  ibptr,  16, "input buffer pointer") },
+    { RDATA  (OBPTR,  obptr,  16, "output buffer pointer") },
+    { RDATA  (ILEN,   ilen,   16, "input length") },
+    { RDATA  (OLEN,   olen,   16, "output length") },
+    { RDATA  (TXSIZE, txsize, 16, "remaining transfer size") },
+    { RDATA  (OFFSET, offset, 16, "offset into current transfer") },
+    { RDATA  (UNITNO, unitno, 16, "active unit number") },
+
+    { BRDATAD (IBUF,   td_ctlr[0].ibuf,16, 8, 512, "input buffer"), },
+    { BRDATAD (OBUF,   td_ctlr[0].obuf,16, 8, 512, "output buffer"), },
     { NULL }
     };
 
@@ -939,15 +950,13 @@ switch (opcode) {
             case TD_CMDNOP:                              /* NOP */
             case TD_CMDGST:                              /* Get status */
             case TD_CMDSST:                              /* Set status */
+            case TD_CMDINI:                              /* INIT */
+            case TD_CMDDIA:                              /* Diagnose */
                 ctlr->unitno = ctlr->ibuf[4];
                 ctlr->p_state = TD_END;                  /* All treated as NOP */
                 ctlr->ecode = TD_STSOK;
                 ctlr->offset = 0;
                 sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
-                break;
-               
-            case TD_CMDINI:
-                sim_printf("Warning: TU58 command 'INIT' not implemented\n");
                 break;
                
             case TD_CMDRD:
@@ -969,11 +978,12 @@ switch (opcode) {
                 break;
                
             case TD_CMDPOS:
-                sim_printf("Warning: TU58 command 'Position' not implemented\n");
-                break;
-               
-            case TD_CMDDIA:
-                sim_printf("Warning: TU58 command 'Diagnose' not implemented\n");
+                ctlr->unitno = ctlr->ibuf[4];
+                ctlr->block = ((ctlr->ibuf[11] << 8) | ctlr->ibuf[10]);
+                ctlr->txsize = 0;
+                ctlr->p_state = TD_POSITION;
+                ctlr->offset = 0;
+                sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
                 break;
                
             case TD_CMDMRSP:
@@ -1013,7 +1023,7 @@ switch (opcode) {
             fbuf = ctlr->uptr[ctlr->unitno].filebuf;
             ctlr->block = 0;
             ctlr->txsize = 0;
-            ctlr->p_state = TD_READ2;
+            ctlr->p_state = TD_BOOTSTRAP;
             ctlr->offset = 0;
             ctlr->obptr = 0;
 
@@ -1021,6 +1031,9 @@ switch (opcode) {
                 ctlr->obuf[i] = fbuf[i];
             ctlr->olen = TD_NUMBY;
             ctlr->rx_buf = ctlr->obuf[ctlr->obptr++];   /* get first byte */
+            ctlr->rx_csr |= CSR_DONE;                   /* set input flag */
+            if (ctlr->rx_csr & CSR_IE)                  /* interrupt if enabled */
+                CSI_SET_INT;
             sim_data_trace(ctlr->dptr, &ctlr->uptr[ctlr->unitno], ctlr->obuf, "Boot Block Data", ctlr->olen, "", TDDEB_DAT);
             sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
             }
@@ -1055,6 +1068,20 @@ switch (ctlr->p_state) {                                /* case on state */
             if (t == 0)                                 /* minimum 1 */
                 t = 1;
             ctlr->p_state++;                            /* set next state */
+            sim_activate (uptr, td_stime * t);          /* schedule seek */
+            break;
+            }
+        else 
+            ctlr->p_state = TD_END;
+        sim_activate (uptr, td_xtime);                  /* schedule next */
+        break;
+
+    case TD_POSITION:                                   /* position */
+        if (td_test_xfr (uptr, ctlr->p_state)) {        /* transfer ok? */
+            t = abs (ctlr->block - 0);                  /* # blocks to seek */
+            if (t == 0)                                 /* minimum 1 */
+                t = 1;
+            ctlr->p_state = TD_END;                     /* set next state */
             sim_activate (uptr, td_stime * t);          /* schedule seek */
             break;
             }
@@ -1143,6 +1170,20 @@ switch (ctlr->p_state) {                                /* case on state */
         sim_activate (uptr, td_xtime);                  /* schedule next */
         break;
         
+    case TD_BOOTSTRAP:                                  /* send data to host */
+        if ((ctlr->rx_csr & CSR_DONE) == 0) {           /* prev data taken? */
+            ctlr->rx_buf = ctlr->obuf[ctlr->obptr++];   /* get next byte */
+            ctlr->rx_csr |= CSR_DONE;                   /* set input flag */
+            if (ctlr->rx_csr & CSR_IE)
+                CSI_SET_INT;
+            if (ctlr->obptr >= ctlr->olen) {            /* buffer empty? */
+                ctlr->p_state = TD_IDLE;
+                break;
+                }
+            }
+        sim_activate (uptr, td_xtime);                  /* schedule next */
+        break;
+
     case TD_END:                                        /* build end packet */
         ctlr->obptr = 0;
         ctlr->obuf[ctlr->obptr++] = TD_OPCMD;           /* Command packet */
@@ -1441,12 +1482,12 @@ td_ctrls = newln;
 td_dib.lnt = td_ctrls * td_dib.ulnt;            /* upd IO page lnt */
 /* Make sure that the number of TU58 controllers plus DL devices is 16 or less */
 if ((dli_dptr != NULL) && !(dli_dptr->flags & DEV_DIS) && 
-    ((((DIB *)dli_dptr->ctxt)->numc + td_ctrls) > 16)) {
-    dli_dptr->flags |= DEV_DIS;
-    dli_dptr->reset (dli_dptr);
-    if (td_ctrls < 16) {
-        dli_dptr->flags &= ~DEV_DIS;
-        dli_dptr->reset (dli_dptr);
+    ((((DIB *)dli_dptr->ctxt)->numc + td_ctrls) > 16)) { /* Too many? */
+    dli_dptr->flags |= DEV_DIS;                 /* First disable DL devices */
+    dli_dptr->reset (dli_dptr);                 /* Notify of the disable */
+    if (td_ctrls < 16) {                        /* Room for some DL devices? */
+        dli_dptr->flags &= ~DEV_DIS;            /* Re-Enable DL devices */
+        dli_dptr->reset (dli_dptr);             /* Notify of the enable which forces sizing */
         }
     }
 return td_reset (&tdc_dev);

@@ -1176,6 +1176,90 @@ panel->State = Run;
 return 0;
 }
 
+int
+sim_panel_break_set (PANEL *panel, const char *condition)
+{
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->parent) {
+    sim_panel_set_error ("Can't establish a breakpoint from device front panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+    
+if (_panel_sendf (panel, 1, NULL, "BREAK %s\r", condition))
+    return -1;
+return 0;
+}
+
+int
+sim_panel_break_clear (PANEL *panel, const char *condition)
+{
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->parent) {
+    sim_panel_set_error ("Can't clear a breakpoint from device front panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+    
+if (_panel_sendf (panel, 1, NULL, "NOBREAK %s\r", condition))
+    return -1;
+return 0;
+}
+
+int
+sim_panel_break_output_set (PANEL *panel, const char *condition)
+{
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->parent) {
+    sim_panel_set_error ("Can't establish an output breakpoint from device front panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+    
+if (_panel_sendf (panel, 1, NULL, "EXPECT %s\r", condition))
+    return -1;
+return 0;
+}
+
+int
+sim_panel_break_output_clear (PANEL *panel, const char *condition)
+{
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error ("Invalid Panel");
+    return -1;
+    }
+if (panel->parent) {
+    sim_panel_set_error ("Can't clear an output breakpoint from device front panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+    
+if (_panel_sendf (panel, 1, NULL, "NOEXPECT %s\r", condition))
+    return -1;
+return 0;
+}
+
 /**
 
    sim_panel_gen_examine

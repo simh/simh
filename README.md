@@ -18,6 +18,10 @@
 
 #### Gerardo Ospina has implemented a Manchester University SSEM (Small Scale Experimental Machine) simulator.
 
+#### Richard Cornwell has implemented a Burroughs B5500 simulator.
+
+#### Dave Bryan has implemented an HP-3000 Series III simulator.
+
 #### Updated AltairZ80 simulator from Peter Schorn.
 
 #### Updated HP2100 simulator from Dave Bryan.
@@ -289,8 +293,8 @@ Command Aliases
    Omitted parameters result in null-string substitutions.
 
    A Tokens preceeded and followed by % characters are expanded as environment
-   variables, and if one isn't found then can be one of several special 
-   variables: 
+   variables, and if an environment variable isn't found then it can be one of 
+   several special variables: 
    
           %DATE%              yyyy-mm-dd
           %TIME%              hh:mm:ss
@@ -301,11 +305,16 @@ Command Aliases
           %DATE_YYYY%         yyyy        (0000-9999)
           %DATE_YY%           yy          (00-99)
           %DATE_MM%           mm          (01-12)
+          %DATE_MMM%          mmm         (JAN-DEC)
           %DATE_DD%           dd          (01-31)
           %DATE_WW%           ww          (01-53)     ISO 8601 week number
           %DATE_WYYYY%        yyyy        (0000-9999) ISO 8601 week year number
           %DATE_D%            d           (1-7)       ISO 8601 day of week
           %DATE_JJJ%          jjj         (001-366) day of year
+          %DATE_19XX_YY%      yy          A year prior to 2000 with the same
+                                          calendar days as the current year
+          %DATE_19XX_YYYY%    yyyy        A year prior to 2000 with the same 
+                                          calendar days as the current year
           %TIME_HH%           hh          (00-23)
           %TIME_MM%           mm          (00-59)
           %TIME_SS%           ss          (00-59)
@@ -362,6 +371,8 @@ If you are interested in using a simulator with Ethernet networking support (i.e
 See the 0readme_ethernet.txt file for details about the required network components for your platform.  Once your operating system build environment has the correct networking components available the following command will build working simulators:
 
    $ make {simulator-name (i.e. vax)}
+
+The makefile provided requires GNU make, which is the default make facility for most systems these days.  Any host system which doesn't have GNU make available as the default make facility may have it installed as 'gmake'.  GNU make (gmake) is generally available an installation package for all current operating systems which have a package installation system.
 
 #### Windows
 

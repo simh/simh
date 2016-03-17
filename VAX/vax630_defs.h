@@ -91,7 +91,7 @@
 
 /* CPU */
 
-#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0,          "MODEL", "MODEL={MICROVAX|VAXSTATION}",        \
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0,          "MODEL", "MODEL={MicroVAX|VAXStation}",        \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" },  \
                             { MTAB_XTD|MTAB_VDV, 0,          "DIAG", "DIAG={FULL|MIN}",                     \
                               &sysd_set_diag, &sysd_show_diag, NULL, "Set/Show boot rom diagnostic mode" }, \
@@ -381,6 +381,7 @@ typedef struct {
 #define SET_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
 #define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* cond error return */
+extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 /* Logging */
 

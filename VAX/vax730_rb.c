@@ -197,8 +197,6 @@
 #define DBG_RD          0x0004                          /* disk reads */
 #define DBG_WR          0x0008                          /* disk writes */
 
-extern int32 int_req[IPL_HLVL];
-
 uint16 *rbxb = NULL;                                     /* xfer buffer */
 int32 rbcs = 0;                                         /* control/status */
 int32 rbba = 0;                                         /* memory address */

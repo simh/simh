@@ -57,7 +57,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   1
+#define SIM_FRONTPANEL_VERSION   2
 
 /**
 
@@ -231,6 +231,39 @@ sim_panel_exec_run (PANEL *panel);
 
 int
 sim_panel_exec_step (PANEL *panel);
+
+/**
+
+    When a front panel application wants to describe conditions that 
+    should stop instruction execution an execution or an output
+    should be used.  To established or clear a breakpoint, one of 
+    the following routines should be called:  
+    
+    sim_panel_break_set          - Establish a simulation breakpoint
+    sim_panel_break_clear        - Cancel/Delete a previously defined
+                                   breakpoint
+    sim_panel_break_output_set   - Establish a simulator output 
+                                   breakpoint
+    sim_panel_break_output_clear - Cancel/Delete a previously defined
+                                   output breakpoint
+    
+    Note: Any breakpoint switches/flags must be located at the 
+          beginning of the condition string
+
+ */
+
+int
+sim_panel_break_set (PANEL *panel, const char *condition);
+
+int
+sim_panel_break_clear (PANEL *panel, const char *condition);
+
+int
+sim_panel_break_output_set (PANEL *panel, const char *condition);
+
+int
+sim_panel_break_output_clear (PANEL *panel, const char *condition);
+
 
 /**
 

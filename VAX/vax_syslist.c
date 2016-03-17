@@ -62,8 +62,6 @@ extern DEVICE vc_dev;
 extern DEVICE lk_dev;
 extern DEVICE vs_dev;
 
-extern void WriteB (uint32 pa, int32 val);
-extern void rom_wr_B (int32 pa, int32 val);
 extern UNIT cpu_unit;
 
 DEVICE *sim_devices[] = { 
@@ -120,7 +118,7 @@ extern int32 ssc_cnf;
 #define SSCCNF_BLO      0x80000000
 
 if (flag)                                               /* dump? */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_NOFNC, "Command Not Implemented\n");
 if (sim_switches & SWMASK ('R')) {                      /* ROM? */
     origin = ROMBASE;
     limit = ROMBASE + ROMSIZE;

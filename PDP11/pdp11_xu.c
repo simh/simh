@@ -139,7 +139,7 @@ DIB xua_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
                 1, IVCL (XU), VEC_AUTO, {&xu_int}, IOLN_XU };
 
 UNIT xua_unit[] = {
- { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },     /* receive timer */
  { UDATA (&xu_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) }
 };
 
@@ -245,7 +245,7 @@ DIB xub_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
                 1, IVCL (XU), 0, { &xu_int }, IOLN_XU };
 
 UNIT xub_unit[] = {
- { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },     /* receive timer */
  { UDATA (&xu_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) }
 };
 
@@ -1219,6 +1219,9 @@ void xu_process_receive(CTLR* xu)
     if (!(xu->var->rxhdr[2] & RXR_OWN)) {
       /* tell the host there are no more buffers */
       /* xu->var->pcsr0 |= PCSR0_RCBI; */ /* I don't think this is correct 08-dec-2005 dth */
+      sim_debug(DBG_TRC, xu->dev, "Stopping input processing - Not Owned receive descriptor=0x%X, slen=0x%04X(%d), segb=0x%04X, ", ba, slen, slen, segb);
+      sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+      sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 1);
       break;
     }
 
@@ -1265,6 +1268,11 @@ void xu_process_receive(CTLR* xu)
     if (wlen > slen)
       wlen = slen;
 
+    sim_debug(DBG_TRC, xu->dev, "Using receive descriptor=0x%X, slen=0x%04X(%d), segb=0x%04X, ", ba, slen, slen, segb);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 0);
+    sim_debug(DBG_TRC, xu->dev, ", pktlen=0x%X(%d), used=0x%X, wlen=0x%X\n", item->packet.len, item->packet.len, item->packet.used, wlen);
+
     /* transfer chained packet to host buffer */
     wstatus = Map_WriteB (segb, wlen, &item->packet.msg[item->packet.used]);
     if (wstatus) {
@@ -1297,7 +1305,7 @@ void xu_process_receive(CTLR* xu)
      * part of the packet, and is included in the MLEN count. -- DTH
      */
     xu->var->rxhdr[3] &= ~RXR_MLEN;
-    xu->var->rxhdr[3] |= wlen;
+    xu->var->rxhdr[3] |= (uint16)(item->packet.crc_len);
 
     /* Is this the end-of-frame? OR is buffer chaining disabled? */
     if ((item->packet.used == item->packet.crc_len) ||
@@ -1326,6 +1334,10 @@ void xu_process_receive(CTLR* xu)
 
     /* give buffer back to host */
     xu->var->rxhdr[2] &= ~RXR_OWN;              /* clear ownership flag */
+
+    sim_debug(DBG_TRC, xu->dev, "Updating receive descriptor=0x%X, slen=0x%04X, segb=0x%04X, ", ba, slen, segb);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 1);
 
     /* update the ring entry in host memory. */
     wstatus = Map_WriteW (ba, 8, xu->var->rxhdr);

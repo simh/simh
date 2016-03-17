@@ -42,6 +42,14 @@
 #include "sim_sock.h"
 #include "libslirp.h"
 
+#if !defined (USE_READER_THREAD)
+#define pthread_mutex_init(mtx, val)
+#define pthread_mutex_destroy(mtx)
+#define pthread_mutex_lock(mtx)
+#define pthread_mutex_unlock(mtx)
+#define pthread_mutex_t int
+#endif
+
 #define IS_TCP 0
 #define IS_UDP 1
 static const char *tcpudp[] = {

@@ -56,35 +56,32 @@ ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if (
   $(warning *** Warning *** GNU Make Version $(GMAKE_VERSION) is too old to)
   $(warning *** Warning *** fully process this makefile)
 endif
-# building the pdp11, or any vax simulator could use networking support
 BUILD_SINGLE := $(MAKECMDGOALS) $(BLANK_SUFFIX)
+# building the pdp1, pdp11, tx-0, or any microvax simulator could use video support
+ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS)))),$(findstring pdp11,$(MAKECMDGOALS)),$(findstring tx-0,$(MAKECMDGOALS)),$(findstring microvax1,$(MAKECMDGOALS)),$(findstring microvax2,$(MAKECMDGOALS)),$(findstring microvax3900,$(MAKECMDGOALS)),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS))))))
+  VIDEO_USEFUL = true
+endif
+# building the besm6 needs both video support and fontfile support
+ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
+  VIDEO_USEFUL = true
+  BESM6_BUILD = true
+endif
+# building the pdp11, or any vax simulator could use networking support
 ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
-  ifneq (,$(or $(findstring microvax1,$(MAKECMDGOALS)),$(findstring microvax2,$(MAKECMDGOALS)),$(findstring microvax3900,$(MAKECMDGOALS)),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS))))))
-    VIDEO_USEFUL = true
-  endif
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
     VIDEO_USEFUL = true
+    BESM6_BUILD = true
   endif
-  ifneq (,$(findstring pdp11,$(MAKECMDGOALS))$(findstring all,$(MAKECMDGOALS)))
-    DISPLAY_USEFUL = true
-  endif
-else ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
-  VIDEO_USEFUL = true
-  BESM6_BUILD = true
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
     NETWORK_USEFUL = true
     VIDEO_USEFUL = true
-    DISPLAY_USEFUL = true
     BUILD_MULTIPLE = s
     BUILD_SINGLE := all $(BUILD_SINGLE)
-  else
-    ifneq (,$(or $(or $(findstring pdp1,$(MAKECMDGOALS)),$(findstring pdp11,$(MAKECMDGOALS))),$(findstring tx-0,$(MAKECMDGOALS))))
-      DISPLAY_USEFUL = true
-    endif
+    BESM6_BUILD = true
   endif
 endif
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
@@ -183,11 +180,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
-    INCPATH:=$(shell $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
+    INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
-      INCPATH:=$(shell $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+      INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
       ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
         INCPATH += /opt/local/include
         OS_CCDEFS += -I/opt/local/include
@@ -207,7 +204,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       else
         ifeq (SunOS,$(OSTYPE))
           OSNAME = Solaris
-          LIBPATH := $(shell crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          LIBPATH := $(shell LANG=C; crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
           LIBEXT = so
           OS_LDFLAGS += -lsocket -lnsl
           ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
@@ -253,7 +250,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
               else
                 ifeq (,$(findstring NetBSD,$(OSTYPE)))
                   ifneq (no ldconfig,$(findstring no ldconfig,$(shell which ldconfig 2>&1)))
-                    LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+                    LDSEARCH :=$(shell LANG=C; ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
                   endif
                   ifneq (,$(LDSEARCH))
                     LIBPATH := $(LDSEARCH)
@@ -269,9 +266,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
                       $(info *** Warning ***)
                     else
                       LIBPATH = $(subst :, ,$(LPATH))
-                      OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
                     endif
                   endif
+                  OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
                 endif
               endif
             endif
@@ -427,9 +424,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
     ifneq (,$(call find_include,SDL2/SDL))
       ifneq (,$(call find_lib,SDL2))
-        VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL2/SDL))
+        VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(dir $(call find_include,SDL2/SDL))
         VIDEO_LDFLAGS += -lSDL2
         VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
+        DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+        DISPLAYVT = ${DISPLAYD}/vt11.c
+        DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
         $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
         ifeq (Darwin,$(OSTYPE))
           VIDEO_LDFLAGS += -lobjc -framework cocoa -DSDL_MAIN_AVAILABLE
@@ -438,9 +438,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     else
       ifneq (,$(call find_include,SDL/SDL))
         ifneq (,$(call find_lib,SDL))
-          VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
+          VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(dir $(call find_include,SDL/SDL))
           VIDEO_LDFLAGS += -lSDL
           VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
+          DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+          DISPLAYVT = ${DISPLAYD}/vt11.c
+          DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
           $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
           ifeq (Darwin,$(OSTYPE))
             VIDEO_LDFLAGS += -lobjc -framework cocoa -DSDL_MAIN_AVAILABLE
@@ -459,27 +462,6 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info *** Info *** operating system distribution and rebuild your simulator to)
       $(info *** Info *** enable this extra functionality.)
       $(info *** Info ***)
-    endif
-  endif
-  ifneq (,$(DISPLAY_USEFUL))
-    ifeq (,$(WIN32))
-      ifneq (,$(call find_include,X11/Intrinsic))
-        ifneq (,$(call find_lib,Xt))
-          DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/x11.c
-          DISPLAYVT = ${DISPLAYD}/vt11.c
-          DISPLAY_OPT += -DUSE_DISPLAY -I$(dir $(call find_include,X11/Intrinsic))/include -lXt -lX11 -lm
-          $(info using display: $(call find_lib,Xt) $(call find_include,X11/Intrinsic))
-        endif
-        ifneq (,$(GCC_WARNINGS_CMD)$(CLANG_VERSION))
-          ifneq (,$(CLANG_VERSION)$(findstring -Wdeprecated-declarations,$(shell $(GCC_WARNINGS_CMD))))
-            DISPLAY_OPT += -Wno-deprecated-declarations
-          endif
-        endif
-      endif
-    else
-      DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/win32.c
-      DISPLAYVT = ${DISPLAYD}/vt11.c
-      DISPLAY_OPT = -DUSE_DISPLAY -lgdi32
     endif
   endif
   ifneq (,$(NETWORK_USEFUL))
@@ -926,10 +908,13 @@ DISPLAYD = display
 # Emulator source files and compile time options
 #
 PDP1D = PDP1
+ifneq (,$(DISPLAY_OPT))
+  PDP1_DISPLAY_OPT = -DDISPLAY_TYPE=DIS_TYPE30 -DPIX_SCALE=RES_HALF
+endif
 PDP1 = ${PDP1D}/pdp1_lp.c ${PDP1D}/pdp1_cpu.c ${PDP1D}/pdp1_stddev.c \
 	${PDP1D}/pdp1_sys.c ${PDP1D}/pdp1_dt.c ${PDP1D}/pdp1_drm.c \
 	${PDP1D}/pdp1_clk.c ${PDP1D}/pdp1_dcs.c ${PDP1D}/pdp1_dpy.c ${DISPLAYL}
-PDP1_OPT = -I ${PDP1D} $(DISPLAY_OPT)
+PDP1_OPT = -I ${PDP1D} $(DISPLAY_OPT) $(PDP1_DISPLAY_OPT)
 
 
 NOVAD = NOVA
@@ -1114,8 +1099,16 @@ HP2100 = ${HP2100D}/hp2100_stddev.c ${HP2100D}/hp2100_dp.c ${HP2100D}/hp2100_dq.
 	${HP2100D}/hp2100_cpu4.c ${HP2100D}/hp2100_cpu5.c ${HP2100D}/hp2100_cpu6.c \
 	${HP2100D}/hp2100_cpu7.c ${HP2100D}/hp2100_fp1.c ${HP2100D}/hp2100_baci.c \
 	${HP2100D}/hp2100_mpx.c ${HP2100D}/hp2100_pif.c ${HP2100D}/hp2100_di.c \
-	${HP2100D}/hp2100_di_da.c ${HP2100D}/hp_disclib.c
+	${HP2100D}/hp2100_di_da.c ${HP2100D}/hp2100_disclib.c
 HP2100_OPT = -DHAVE_INT64 -I ${HP2100D}
+
+HP3000D = HP3000
+HP3000 = ${HP3000D}/hp_disclib.c ${HP3000D}/hp_tapelib.c ${HP3000D}/hp3000_atc.c \
+	${HP3000D}/hp3000_clk.c ${HP3000D}/hp3000_cpu.c ${HP3000D}/hp3000_cpu_base.c \
+	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_ds.c ${HP3000D}/hp3000_iop.c \
+	${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
+	${HP3000D}/hp3000_scmb.c ${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
+HP3000_OPT = -I ${HP3000D}
 
 
 I1401D = I1401
@@ -1264,6 +1257,12 @@ SSEMD = SSEM
 SSEM = ${SSEMD}/ssem_cpu.c ${SSEMD}/ssem_sys.c
 SSEM_OPT = -I ${SSEMD}
 
+B5500D = B5500
+B5500 = ${B5500D}/b5500_cpu.c ${B5500D}/b5500_io.c ${B5500D}/b5500_sys.c \
+	${B5500D}/b5500_dk.c ${B5500D}/b5500_mt.c ${B5500D}/b5500_urec.c \
+	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c ${B5500D}/sim_card.c
+B5500_OPT = -I.. -DUSE_INT64 -DB5500
+
 ###
 ### Experimental simulators
 ###
@@ -1350,9 +1349,10 @@ PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
-	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
+	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
-	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
+	b5500
 
 all : ${ALL}
 
@@ -1427,7 +1427,7 @@ ${BIN}pdp10${EXE} : ${PDP10} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP10} ${SIM} ${PDP10_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-pdp11 : ${BIN}pdp11${EXE}
+pdp11 : ${BIN}BuildROMs${EXE} ${BIN}pdp11${EXE}
 
 ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 	${MKDIRBIN}
@@ -1435,7 +1435,7 @@ ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 
 vax : microvax3900
 
-microvax3900 : ${BIN}microvax3900${EXE}
+microvax3900 : ${BIN}BuildROMs${EXE} ${BIN}microvax3900${EXE}
 
 ${BIN}microvax3900${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -1446,43 +1446,43 @@ else
 	copy $(@D)\microvax3900${EXE} $(@D)\vax${EXE}
 endif
 
-microvax1 : ${BIN}microvax1${EXE}
+microvax1 : ${BIN}BuildROMs${EXE} ${BIN}microvax1${EXE}
 
 ${BIN}microvax1${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX610} ${SIM} ${VAX610_OPT} -o $@ ${LDFLAGS}
 
-rtvax1000 : ${BIN}rtvax1000${EXE}
+rtvax1000 : ${BIN}BuildROMs${EXE} ${BIN}rtvax1000${EXE}
 
 ${BIN}rtvax1000${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX620_OPT} -o $@ ${LDFLAGS}
 
-microvax2 : ${BIN}microvax2${EXE}
+microvax2 : ${BIN}BuildROMs${EXE} ${BIN}microvax2${EXE}
 
 ${BIN}microvax2${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX630_OPT} -o $@ ${LDFLAGS}
 
-vax730 : ${BIN}vax730${EXE}
+vax730 : ${BIN}BuildROMs${EXE} ${BIN}vax730${EXE}
 
 ${BIN}vax730${EXE} : ${VAX730} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX730} ${SIM} ${VAX730_OPT} -o $@ ${LDFLAGS}
 
-vax750 : ${BIN}vax750${EXE}
+vax750 : ${BIN}BuildROMs${EXE} ${BIN}vax750${EXE}
 
 ${BIN}vax750${EXE} : ${VAX750} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX750} ${SIM} ${VAX750_OPT} -o $@ ${LDFLAGS}
 
-vax780 : ${BIN}vax780${EXE}
+vax780 : ${BIN}BuildROMs${EXE} ${BIN}vax780${EXE}
 
 ${BIN}vax780${EXE} : ${VAX780} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-vax8600 : ${BIN}vax8600${EXE}
+vax8600 : ${BIN}BuildROMs${EXE} ${BIN}vax8600${EXE}
 
 ${BIN}vax8600${EXE} : ${VAX8600} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -1511,6 +1511,12 @@ hp2100 : ${BIN}hp2100${EXE}
 ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
 	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+hp3000 : ${BIN}hp3000${EXE}
+
+${BIN}hp3000${EXE} : ${HP3000} ${SIM}
+	${MKDIRBIN}
+	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 i1401 : ${BIN}i1401${EXE}
 
@@ -1590,13 +1596,13 @@ ${BIN}sds${EXE} : ${SDS} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-swtp6800mp-a : ${BIN}swtp6800mp-a${EXE}
+swtp6800mp-a : ${BIN}BuildROMs${EXE} ${BIN}swtp6800mp-a${EXE}
 
 ${BIN}swtp6800mp-a${EXE} : ${SWTP6800MP-A} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
+swtp6800mp-a2 : ${BIN}BuildROMs${EXE} ${BIN}swtp6800mp-a2${EXE}
 
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -1656,6 +1662,12 @@ pdq3 : ${BIN}pdq3${EXE}
 ${BIN}pdq3${EXE} : ${PDQ3} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDQ3} ${SIM} ${PDQ3_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+b5500 : $(BIN)b5500$(EXE)
+
+${BIN}b5500${EXE} : ${B5500} ${SIM} 
+	${MKDIRBIN}
+	${CC} ${B5500} ${SIM} ${B5500_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 # Front Panel API Demo/Test program
 

@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ws.h"
-#include "xy.h"
+#include "display.h"
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -151,7 +151,8 @@ static pascal OSStatus doKbdEvent (     EventHandlerCallRef     handlerRef,
 int ws_init (   char    *crtname,       /* crt type name */
                 int     xp,             /* screen size in pixels */
                 int     yp,
-                int     colors )        /* colors to support (not used) */
+                int     colors,         /* colors to support (not used) */
+                void    *dptr)
 {
         WindowAttributes        windowAttrs;
         Rect                    r;
@@ -215,6 +216,10 @@ int ws_init (   char    *crtname,       /* crt type name */
         PaintRect (&r);
         RGBBackColor (&blckColor);
         return (1);
+}
+
+void ws_shutdown (void)
+{
 }
 
 void *ws_color_black (void)

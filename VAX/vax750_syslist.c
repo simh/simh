@@ -57,10 +57,6 @@ extern DEVICE vh_dev;
 extern DEVICE xu_dev, xub_dev;
 extern DEVICE dmc_dev;
 
-extern void WriteB (uint32 pa, int32 val);
-extern void rom_wr_B (int32 pa, int32 val);
-extern UNIT cpu_unit;
-
 DEVICE *sim_devices[] = { 
     &cpu_dev,
     &tlb_dev,
@@ -112,7 +108,7 @@ int32 val;
 uint32 origin, limit;
 
 if (flag)                                               /* dump? */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_NOFNC, "Command Not Implemented\n");
 origin = 0;                                             /* memory */
 limit = (uint32) cpu_unit.capac;
 if (sim_switches & SWMASK ('R')) {                      /* ROM? */

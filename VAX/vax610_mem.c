@@ -35,8 +35,6 @@
 #define MCSR_ECR        0x4000                          /* extended CSR read enable */
 #define MCSR_RW         (MCSR_ECR|MCSR_WWP|MCSR_PEN)
 
-extern UNIT cpu_unit;
-
 int32 mctl_csr[MAX_MCTL_COUNT];
 int32 mctl_count = 0;
 
