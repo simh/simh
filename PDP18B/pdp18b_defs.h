@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   17-Mar-16	PLB	Start GRAPHICS-2 support for PDP-7 UNIX
+   17-Mar-16    PLB     Start GRAPHICS-2 support for PDP-7 UNIX
    10-Mar-16    RMS     Added 3-cycle databreak set/show routines
    26-Feb-16    RMS     Added RB09 to PDP-7 for Unix "v0" and RM09 to PDP-9
    13-Sep-15    RMS     Added DR15C
@@ -87,7 +87,7 @@
                                         Type 550/555 DECtape
                                         Type 24 serial drum
                                         RB09 fixed head disk (Unix V0 only)
-					Bell Labs GRAPHICS-2 (Unix V0 only)
+                                        Bell Labs GRAPHICS-2 (Unix V0 only)
 
    PDP9    32K  KE09A EAE               KSR-33 Teletype
                 KF09A auto pri intr     PC09A paper tape reader and punch
@@ -148,7 +148,7 @@
 #define TYPE550         0                               /* DECtape */
 #define DRM             0                               /* drum */
 #define RB              0                               /* fixed head disk */
-#define GRAPHICS2	0				/* BTL display */
+#define GRAPHICS2       0                               /* BTL display */
 #elif defined (PDP9)
 #define ADDRSIZE        15
 #define TYPE647         0                               /* sixbit printer */
@@ -295,20 +295,26 @@ typedef struct {
 #define DEV_DTA         075                             /* dectape */
 
 #ifdef GRAPHICS2
-#define DEV_G2D1	005                             /* Display Ctrl 1 */
-#define DEV_G2D2	006                             /* (Display Ctrl 2) */
-#define DEV_G2LP	007                             /* (Light Pen) */
-#define DEV_G2DS	010                             /* (Display Status) */
-#define DEV_G2D3	014                             /* (Display Ctrl 3) */
-#define DEV_G2D4	034                             /* (Display Ctrl 4) */
+/* Bell Telephone Labs GRAPHICS-2 Display System ("as large as the PDP-7")
+ * Used by PDP-7 UNIX as a "Glass TTY"
+ */
+#define DEV_G2D1        005                             /* Display Ctrl 1 */
+/*#define DEV_G2D       006                             /* (Display Ctrl 2) */
+/*#define DEV_G2LP      007                             /* (Light Pen) */
+/*#define DEV_G2DS      010                             /* (Display Status) */
+/*#define DEV_G2D3      014                             /* (Display Ctrl 3) */
+/*#define DEV_G2D4      034                             /* (Display Ctrl 4) */
 
-#define DEV_G2UNK	042                             /* (???) */
-#define DEV_G2KB	043                             /* Keyboard */
-#define DEV_G2PB	044                             /* Button Box */
-#define DEV_G2IM	045                             /* (PDP7 int. mask) */
+/*#define DEV_G2UNK     042                             /* (???) */
+#define DEV_G2KB        043                             /* Keyboard */
+#define DEV_G2BB        044                             /* Button Box */
+/*#define DEV_G2IM      045                             /* (PDP7 int. mask) */
 
-/* Bell Labs PDP-7/9 to 201A Data Phone Interface */
-#define DEV_BLGP	047                             /* (Data Phone) */
+/* PDP-7/9 to 201A Data Phone Interface
+ * (status bits retrieved with G2DS IOT)
+ * used for UNIX to GCOS Remote Job Entry
+ */
+/*#define DEV_DP        047                             /* (Data Phone) */
 #endif
 
 /* Interrupt system
