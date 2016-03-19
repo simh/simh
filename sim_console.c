@@ -130,6 +130,9 @@
 #include "sim_timer.h"
 #include <ctype.h>
 #include <math.h>
+#if defined (_WIN32)
+#include <process.h>
+#endif
 
 #ifdef __HAIKU__
 #define nice(n) ({})
@@ -162,6 +165,9 @@ static t_stat sim_set_delay (int32 flag, char *cptr);
 #define KMAP_DEL        2
 #define KMAP_MASK       0377
 #define KMAP_NZ         0400
+
+#define SIM_TELNET      0
+#define SIM_PUTTY       1
 
 int32 sim_int_char = 005;                               /* interrupt character */
 int32 sim_brk_char = 000;                               /* break character */
@@ -214,7 +220,13 @@ DEVICE sim_con_telnet = {
     NULL, DEV_DEBUG, 0, sim_con_debug};
 TMLN sim_con_ldsc = { 0 };                                          /* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console line mux */
+int32 sim_client = SIM_TELNET;
 
+static char *con_cli_tab[] = {
+    "telnet",
+    "putty",
+    NULL
+};
 
 SEND sim_con_send = {SEND_DEFAULT_DELAY, &sim_con_telnet, DBG_SND};
 EXPECT sim_con_expect = {&sim_con_telnet, DBG_EXP};
@@ -263,6 +275,7 @@ static CTAB set_con_tab[] = {
     { "SPEED", &sim_set_cons_speed, 0 },
     { "TELNET", &sim_set_telnet, 0 },
     { "NOTELNET", &sim_set_notelnet, 0 },
+    { "CLIENT", &sim_set_client, 0 },
     { "SERIAL", &sim_set_serial, 0 },
     { "NOSERIAL", &sim_set_noserial, 0 },
     { "LOG", &sim_set_logon, 0 },
@@ -296,6 +309,7 @@ static SHTAB show_con_tab[] = {
     { "SPEED", &sim_show_cons_speed, 0 },
     { "LOG", &sim_show_cons_log, 0 },
     { "TELNET", &sim_show_telnet, 0 },
+    { "CLIENT", &sim_show_client, 0 },
     { "DEBUG", &sim_show_cons_debug, 0 },
     { "BUFFERED", &sim_show_cons_buff, 0 },
     { "EXPECT", &sim_show_cons_expect, 0 },
@@ -1613,6 +1627,93 @@ else {
 return SCPE_OK;
 }
 
+/* Set console Telnet client */
+
+t_stat sim_set_client (int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE];
+
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;  /* need arg */
+cptr = get_glyph (cptr, gbuf, 0);                        /* get client name */
+if (*cptr != 0) return SCPE_2MARG;                      /* now eol? */
+
+if (strcmp (gbuf, "TELNET") == 0) sim_client = SIM_TELNET;
+#if defined (_WIN32)
+else if (strcmp (gbuf, "PUTTY") == 0) sim_client = SIM_PUTTY;
+#endif
+else return SCPE_ARG;
+
+if (!sim_quiet) sim_printf ("Set console client to %s\n", con_cli_tab[sim_client]);
+if (sim_log) fprintf (sim_log, "Set console client to %s\n", con_cli_tab[sim_client]);
+
+return SCPE_OK;
+}
+
+/* Show console Telnet client */
+
+t_stat sim_show_client (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0)) return SCPE_2MARG;
+
+fprintf (st, "Console client is %s\n", con_cli_tab[sim_client]);
+
+return SCPE_OK;
+}
+
+/* Start telnet/putty client and connect to specified port */
+
+t_stat sim_start_telnet (char *port)
+{
+int32 sts;
+pid_t pid;
+
+errno = 0; sts = 0;
+
+switch (sim_client) {
+#if defined (_WIN32)
+    case SIM_TELNET:
+        sim_printf ("Starting %s\n", con_cli_tab[sim_client]);
+        sts = _spawnlp (_P_NOWAIT,
+                  "cmd.exe", "cmd.exe", "/c", "start",
+                  con_cli_tab[sim_client],
+                  "localhost", port, NULL);
+        break;
+    case SIM_PUTTY:
+        sim_printf ("Starting %s\n", con_cli_tab[sim_client]);
+        sts = _spawnlp (_P_NOWAIT,
+                  con_cli_tab[sim_client],
+                  con_cli_tab[sim_client],
+                  "-raw", "-P", port, "localhost", NULL);
+        break;
+#elif !defined (__VMS) && !defined (macintosh) && !defined (__OS2__) /* Unix only */
+    default:
+        pid = fork();
+        if (pid < 0) {
+            sim_printf ("Can't fork: %s\n", strerror(errno));
+            return SCPE_ARG;
+            }
+        else if (pid == 0) { /* child */
+            sts = execlp ("xterm", "xterm",
+                      "-T", "telnet", "-n", "telnet", "-sb",
+                      "-e", "telnet", "localhost", port, NULL);
+            sim_printf ("Can't start telnet: %s\n", strerror(errno));
+            exit(1);
+            }
+        /* parent */
+        return SCPE_OK;
+#else
+    default:
+        return SCPE_NOFNC; /* not implemented yet */
+#endif
+    }
+if (sts < 0) {
+    sim_printf ("Can't start %s: %s\n",
+                con_cli_tab[sim_client], strerror(errno));
+    return SCPE_ARG;
+    }
+return SCPE_OK;
+}
+
 /* Set console to Buffering  */
 
 t_stat sim_set_cons_buff (int32 flg, char *cptr)
@@ -1897,11 +1998,12 @@ if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered
         return SCPE_OK;
         }
     }
+sim_start_telnet (sim_con_tmxr.port); /* start telnet/putty client and connect to port */
 for (; trys < sec; trys++) {                            /* loop */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {          /* poll connect */
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
         if (trys) {                                     /* if delayed */
-            sim_printf ("Running\r\n");                 /* print transition */
+            sim_printf ("Running, press Ctrl-E to stop\r\n"); /* print transition */
             fflush (stdout);
             if (sim_log)                                /* log file? */
                 fflush (sim_log);

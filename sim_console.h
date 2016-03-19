@@ -73,6 +73,7 @@ void sim_remote_process_command (void);
 t_stat sim_set_kmap (int32 flag, char *cptr);
 t_stat sim_set_telnet (int32 flag, char *cptr);
 t_stat sim_set_notelnet (int32 flag, char *cptr);
+t_stat sim_set_client (int32 flag, char *cptr);
 t_stat sim_set_serial (int32 flag, char *cptr);
 t_stat sim_set_noserial (int32 flag, char *cptr);
 t_stat sim_set_logon (int32 flag, char *cptr);
@@ -93,6 +94,7 @@ t_stat sim_show_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *c
 t_stat sim_show_remote_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_kmap (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_telnet (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_client (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_pchar (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
