@@ -53,21 +53,21 @@
 #include "sim_tmxr.h"
 #include <ctype.h>
 
-uint32 g2do_buf = 0;			/* output char */
+uint32 g2do_buf = 0;                    /* output char */
 
-uint8 g2kb_done = 0;			/* keyboard flag */
-uint32 g2kb_buf = 0;			/* keyboard buffer */
+uint8 g2kb_done = 0;                    /* keyboard flag */
+uint32 g2kb_buf = 0;                    /* keyboard buffer */
 
-uint8 g2pb_done = 0;			/* button flag */
-uint32 g2pb_bbuf = 0;			/* button buffer */
-uint32 g2pb_lbuf = 0;			/* button lights */
+uint8 g2pb_done = 0;                    /* button flag */
+uint32 g2pb_bbuf = 0;                   /* button buffer */
+uint32 g2pb_lbuf = 0;                   /* button lights */
 
-uint32 g2_dpyaddr = 0;			/* display address */
-int32 g2_dpycount = 0;			/* character count */
+uint32 g2_dpyaddr = 0;                  /* display address */
+int32 g2_dpycount = 0;                  /* character count */
 
 /* terminal mux data */
-TMLN g2_ldsc = { 0 };			/* line descriptor */
-TMXR g2_desc = { 1, 0, 0, &g2_ldsc };	/* mux descriptor */
+TMLN g2_ldsc = { 0 };                   /* line descriptor */
+TMXR g2_desc = { 1, 0, 0, &g2_ldsc };   /* mux descriptor */
 
 /* kernel display lists always start like this: */
 static const int32 g2_expect[3] = {
@@ -201,17 +201,17 @@ DEVICE g2d1_dev = {
 /* real device might have done bitwise decode?! */
 int32 g2kb (int32 dev, int32 pulse, int32 dat)
 {
-if (pulse == 001) {			/* sck */
+if (pulse == 001) {                     /* sck */
     if (g2kb_done) {
         dat = dat | IOT_SKP;
         }
     }
-else if (pulse == 002) {		/* lck */
-    g2kb_clr_done ();			/* clear flag */
-    dat = dat | g2kb_buf;		/* return buffer */
+else if (pulse == 002) {                /* lck */
+    g2kb_clr_done ();                   /* clear flag */
+    dat = dat | g2kb_buf;               /* return buffer */
     }
-else if (pulse == 004) {		/* cck */
-    g2kb_clr_done ();			/* clear flag */
+else if (pulse == 004) {                /* cck */
+    g2kb_clr_done ();                   /* clear flag */
     }
 return dat;
 }
@@ -244,15 +244,15 @@ t_stat g2kb_svc (UNIT *uptr)
 {
 int32 ln, c, temp;
 
-if ((uptr->flags & UNIT_ATT) == 0)		/* attached? */
+if ((uptr->flags & UNIT_ATT) == 0)              /* attached? */
     return SCPE_OK;
-sim_clock_coschedule (uptr, tmxr_poll);		/* continue poll */
-ln = tmxr_poll_conn (&g2_desc);			/* look for connect */
-if (ln >= 0)					/* got one? rcv enab */
+sim_clock_coschedule (uptr, tmxr_poll);         /* continue poll */
+ln = tmxr_poll_conn (&g2_desc);                 /* look for connect */
+if (ln >= 0)                                    /* got one? rcv enab */
     g2_ldsc.rcve = 1;
 tmxr_poll_rx (&g2_desc);                        /* poll for input */
 if (g2_ldsc.conn) {                             /* connected? */
-    if ((temp = tmxr_getc_ln (&g2_ldsc))) {	/* get char */
+    if ((temp = tmxr_getc_ln (&g2_ldsc))) {     /* get char */
         if (temp & SCPE_BREAK)                  /* break? */
             c = 0;
         else c = sim_tt_inpcvt (temp, TT_GET_MODE(g2d1_unit.flags) );
@@ -323,8 +323,8 @@ static void g2_putchar(char c)
 if (g2_ldsc.conn && g2_ldsc.xmte) { /* connected, tx enabled? */
     tmxr_putc_ln (&g2_ldsc, c);
     if (c == '\n')
-	tmxr_putc_ln (&g2_ldsc, '\r');
-    g2_dpycount++;	      /* only consume if connected+enabled! */
+        tmxr_putc_ln (&g2_ldsc, '\r');
+    g2_dpycount++;            /* only consume if connected+enabled! */
 }
 }
 
@@ -334,33 +334,33 @@ if (g2_ldsc.conn && g2_ldsc.xmte && pulse == 047) { /* beg */
     int32 n = g2_dpycount, i;
     g2_dpyaddr = dat & 017777;
     for (i = g2_dpyaddr; i < 020000; i++) {
-	uint32 w = M[i] & 0777777;
-	if (w & 0400000)		/* TRAP? */
-	    break;
-	/* check first three words for expected setup commands */
-	int o = i - g2_dpyaddr;
-	if (o < sizeof(g2_expect)/sizeof(g2_expect[0])) {
-	    if (w != g2_expect[o]) {
-		printf("g2: unexpected command at %#o: %#o expected %#o\r\n",
-		       i, w, g2_expect[o]);
-		break;
-	    }
-	    continue;
-	}
-	if (w & 0300000)	{ /* not characters? */
-	    printf("g2: unexpected command at %#o: %#o\r\n", i, w);
-	    break;
-	}
-	if (--n < 0)			/* new? */
-	    g2_putchar( (w>>7) & 0177 );
+        uint32 w = M[i] & 0777777;
+        if (w & 0400000)                /* TRAP? */
+            break;
+        /* check first three words for expected setup commands */
+        int o = i - g2_dpyaddr;
+        if (o < sizeof(g2_expect)/sizeof(g2_expect[0])) {
+            if (w != g2_expect[o]) {
+                printf("g2: unexpected command at %#o: %#o expected %#o\r\n",
+                       i, w, g2_expect[o]);
+                break;
+            }
+            continue;
+        }
+        if (w & 0300000)        { /* not characters? */
+            printf("g2: unexpected command at %#o: %#o\r\n", i, w);
+            break;
+        }
+        if (--n < 0)                    /* new? */
+            g2_putchar( (w>>7) & 0177 );
 
-	if ((w & 0177) && --n < 0)	/* char2 & new? */
-	    g2_putchar( w & 0177 );
+        if ((w & 0177) && --n < 0)      /* char2 & new? */
+            g2_putchar( w & 0177 );
 
     } /* for loop */
-    fflush(stdout);		/* TEMP */
+    fflush(stdout);             /* TEMP */
     if (n > 0)
-	g2_dpycount = 0;	/* didn't see as much as last time? */
+        g2_dpycount = 0;        /* didn't see as much as last time? */
 } /* beg IOT */
 return dat;
 }
@@ -369,9 +369,9 @@ return dat;
 
 t_stat g2d1_svc (UNIT *uptr)
 {
-if (g2_ldsc.conn) {			/* connected? */
-    tmxr_poll_tx (&g2_desc);		/* poll xmt */
-    if (!g2_ldsc.xmte) {		/* tx not enabled? */
+if (g2_ldsc.conn) {                     /* connected? */
+    tmxr_poll_tx (&g2_desc);            /* poll xmt */
+    if (!g2_ldsc.xmte) {                /* tx not enabled? */
         sim_activate (uptr, g2d1_unit.wait); /* wait */
     }
 }
