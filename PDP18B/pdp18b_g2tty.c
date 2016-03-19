@@ -225,20 +225,18 @@ return dat;
 }
 
 /* Button Box IOT routine */
-/* real device could have done bitwise decode? */
 int32 g2bb_iot (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse == 001) {                     /* "spb" -- skip on push button flag */
     if (g2bb_flag)
         dat = dat | IOT_SKP;
     }
-else if (pulse == 002)                  /* "lpb" -- load push buttons */
+else if (pulse == 002)                  /* "lpb"/"opb" -- or push buttons */
     dat = dat | g2bb_bbuf;              /* return buttons */
 else if (pulse == 004)                  /* "cpb" -- clear push button flag */
     g2bb_clr_flag ();                   /* clear flag */
-else if (pulse == 020) {                /* "wbl" -- write buttons lights */
+else if (pulse == 024)                  /* "wbl" -- write buttons lights */
     g2bb_lbuf = dat;
-    }
 return dat;
 }
 
