@@ -46,6 +46,7 @@
        G2KB     043     GRAPHICS-2 keyboard
        G2BB     044     GRAPHICS-2 button box (lighted bush buttons)
 
+   19-Mar-16    PLB     Working (up to a screen full)
    17-Mar-16    PLB     Cloned from 13-Sep-15 version of pdp18b_tt1.c
 */
 
@@ -63,6 +64,7 @@ uint32 g2bb_lbuf = 0;                   /* button lights buffer */
 
 uint32 g2out_addr = 0;                  /* display address */
 int32 g2out_count = 0;                  /* character count (not a hw reg) */
+uint8 g2out_stuffcr = 0;                /* need to stuff a CR */
 
 /* terminal mux data */
 TMLN g2_ldsc = { 0 };                   /* line descriptor */
@@ -235,7 +237,6 @@ else if (pulse == 002)                  /* "lpb" -- load push buttons */
 else if (pulse == 004)                  /* "cpb" -- clear push button flag */
     g2bb_clr_flag ();                   /* clear flag */
 else if (pulse == 020) {                /* "wbl" -- write buttons lights */
-    printf("G2: wbl %#o\r\n", dat);     /* TEMP */
     g2bb_lbuf = dat;
     }
 return dat;
@@ -244,11 +245,14 @@ return dat;
 /* Input side Unit service */
 t_stat g2in_svc (UNIT *uptr)
 {
-int32 ln, c, temp;
+int32 ln, c;
 
 if ((uptr->flags & UNIT_ATT) == 0)              /* attached? */
     return SCPE_OK;
-/* XXX if light for button 7 lit (screen full), press button 7!! */
+if (g2bb_lbuf & 02000) {                        /* button 7 lit? */
+    g2bb_bbuf |= 02000;                         /* press it to clear screen! */
+    g2bb_set_flag ();
+    }
 sim_clock_coschedule (uptr, tmxr_poll);         /* continue poll */
 ln = tmxr_poll_conn (&g2_desc);                 /* look for connect */
 if (ln >= 0)                                    /* got one? rcv enab */
@@ -256,17 +260,23 @@ if (ln >= 0)                                    /* got one? rcv enab */
 tmxr_poll_rx (&g2_desc);                        /* poll for input */
 if (g2_ldsc.conn) {                             /* connected? */
     tmxr_poll_tx (&g2_desc);                    /* PLB: poll xmt */
-    if ((temp = tmxr_getc_ln (&g2_ldsc))) {     /* get char */
-        if (temp & SCPE_BREAK)                  /* break? */
+    if ((c = tmxr_getc_ln (&g2_ldsc))) {        /* get char */
+        if (c & SCPE_BREAK)                     /* break? */
             c = 0;
-        else if (c == '\r')                     /* translate CR but not ESC */
-            c = '\n';
+        else {
+            c &= 0177;
+            if (c == '\r')                      /* translate CR but not ESC! */
+                c = '\n';
+            }
         g2kb_buf = c;
         g2kb_set_done ();
         }
     } /* connected */
-else
-    g2out_count = 0; /* not connected; next connections sees entire "screen" */
+else {
+    /* not connected; next connection sees entire "screen" */
+    g2out_count = 0;
+    g2out_stuffcr = 0;
+    }
 return SCPE_OK;
 }
 
@@ -274,9 +284,7 @@ return SCPE_OK;
 
 t_bool g2kb_test_done ()
 {
-if (g2kb_done)
-    return TRUE;
-return FALSE;
+return g2kb_done != 0;
 }
 
 void g2kb_set_done ()
@@ -295,9 +303,7 @@ return;
 
 t_bool g2bb_test_flag ()
 {
-if (g2bb_flag)
-    return TRUE;
-return FALSE;
+return g2bb_flag != 0;
 }
 
 void g2bb_set_flag ()
@@ -324,9 +330,24 @@ return;
 static void g2out_putchar(char c)
 {
 if (g2_ldsc.conn && g2_ldsc.xmte) {     /* connected, tx enabled? */
+
+    if (g2out_stuffcr) {                /* need to stuff a CR? */
+        tmxr_putc_ln (&g2_ldsc, '\r');
+        g2out_stuffcr = 0;
+        if (!g2_ldsc.xmte)              /* full? */
+            return;                     /* yes: wait until next time */
+        }
+
     tmxr_putc_ln (&g2_ldsc, c);
     g2out_count++;                      /* consumed */
-    }
+
+    if (c == '\n') {                    /* was it a NL? */
+        if (g2_ldsc.xmte)               /* transmitter enabled? */
+            tmxr_putc_ln (&g2_ldsc, '\r'); /* send CR now */
+        else
+            g2out_stuffcr = 1;          /* wait until next time */
+        }
+}
 }
 
 /* Device 05 IOT routine */
@@ -399,6 +420,7 @@ g2bb_clr_flag ();
 
 g2out_addr = 0;
 g2out_count = 0;
+g2out_stuffcr = 0;
 sim_cancel (&g2out_unit);                                /* stop poll */
 return SCPE_OK;
 }
