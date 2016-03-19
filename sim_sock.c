@@ -816,6 +816,18 @@ if (sta == -1)
     return SOCKET_ERROR;
 #endif
 
+/*
+ * PLB: enable quick reuse of TCP port# (without TIME_WAIT) after
+ * quitting SIMH, at the risk that multiple processes might be
+ * listening at the same time.  It's a ROYAL pain to have to wait, or
+ * constantly change ports while debugging!  Wrap in "ifdef DEBUG"??
+ */
+#if defined(SO_REUSEPORT)
+(void) setsockopt (sock, SOL_SOCKET, SO_REUSEPORT, (char *)&nodelay, sizeof(nodelay));
+#elif defined(SO_REUSEADDR)
+(void) setsockopt (sock, SOL_SOCKET, SO_REUSEADDR, (char *)&nodelay, sizeof(nodelay));
+#endif
+
 return sta;
 }
 
