@@ -103,8 +103,7 @@ extern UNIT tti1_unit, tto1_unit;
 extern DEVICE dr15_dev;
 #endif
 #if defined (GRAPHICS2)
-extern DEVICE g2kb_dev;
-extern DEVICE g2d1_dev;
+extern DEVICE g2out_dev, g2in_dev;
 #endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
@@ -184,7 +183,7 @@ DEVICE *sim_devices[] = {
     &dr15_dev,
 #endif
 #if defined (GRAPHICS2)
-    &g2kb_dev, &g2d1_dev,
+    &g2out_dev, &g2in_dev,
 #endif
     NULL
     };

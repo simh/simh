@@ -1,4 +1,4 @@
-/* pdp18b_g2.c: PDP-7/9 Bell Labs "GRAPHIC-2" subsystem (as a TTY!!)
+/* pdp18b_g2tty.c: PDP-7/9 Bell Labs "GRAPHIC-2" subsystem (as a TTY!!)
    from 13-Sep-15 version of pdp18b_tt1.c
 
    Copyright (c) 1993-2015, Robert M Supnik
@@ -25,7 +25,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   Doug McIlroy had this to say about the BTL PDP-7 Ken Thompson
+   Doug McIlroy had this to say about the Bell Labs PDP-7 Ken Thompson
    created UNIX on:
 
       The pdp7 was cast off by the visual and acoustics research department.
@@ -35,35 +35,34 @@
       realized that the axis was perpendicular to the loading dock 4 floors
       below. A 90-degree turn solved the problem.
 
-   The graphics system consists of eleven PDP-7 "devices",
+   The graphics system responds as ten PDP-7 "devices";
    UNIX only uses six, and only three of the six are simulated here
-   (and *JUST* enough of those to figure out the text being displayed)!!
+   (and *JUST* enough of those to figure out the text being displayed),
+   as two SIMH DEVICES, G2OUT and G2IN:
 
-   G2D1         GRAPHICS-2 display output
-   G2DS         GRAPHICS-2 display status
-   G2KB         GRAPHICS-2 keyboard
-   G2PB         GRAPHICS-2 push buttons
+   G2OUT:
+       G2D1     005     GRAPHICS-2 display output
+   G2IN:
+       G2KB     043     GRAPHICS-2 keyboard
+       G2BB     044     GRAPHICS-2 button box (lighted bush buttons)
 
    17-Mar-16    PLB     Cloned from 13-Sep-15 version of pdp18b_tt1.c
 */
 
 #include "pdp18b_defs.h"
 #ifdef GRAPHICS2
-#include "sim_sock.h"
 #include "sim_tmxr.h"
 #include <ctype.h>
-
-uint32 g2do_buf = 0;                    /* output char */
 
 uint8 g2kb_done = 0;                    /* keyboard flag */
 uint32 g2kb_buf = 0;                    /* keyboard buffer */
 
-uint8 g2pb_done = 0;                    /* button flag */
-uint32 g2pb_bbuf = 0;                   /* button buffer */
-uint32 g2pb_lbuf = 0;                   /* button lights */
+uint8 g2bb_flag = 0;                    /* button flag */
+uint32 g2bb_bbuf = 0;                   /* button buffer */
+uint32 g2bb_lbuf = 0;                   /* button lights buffer */
 
-uint32 g2_dpyaddr = 0;                  /* display address */
-int32 g2_dpycount = 0;                  /* character count */
+uint32 g2out_addr = 0;                  /* display address */
+int32 g2out_count = 0;                  /* character count (not a hw reg) */
 
 /* terminal mux data */
 TMLN g2_ldsc = { 0 };                   /* line descriptor */
@@ -82,51 +81,54 @@ extern int32 api_vec[API_HLVL][32];
 extern int32 tmxr_poll;
 extern int32 stop_inst;
 
-int32 g2d1 (int32 dev, int32 pulse, int32 dat);
-int32 g2kb (int32 dev, int32 pulse, int32 dat);
-int32 g2pb (int32 dev, int32 pulse, int32 dat);
-
-t_stat g2kb_svc (UNIT *uptr);
+/* SIMH G2IN DEVICE */
 t_bool g2kb_test_done ();
 void g2kb_set_done ();
 void g2kb_clr_done ();
+int32 g2kb_iot (int32 dev, int32 pulse, int32 dat); /* device 043 */
 
-t_bool g2pb_test_done ();
-void g2pb_set_done ();
-void g2pb_clr_done ();
+t_bool g2bb_test_flag ();
+void g2bb_set_flag ();
+void g2bb_clr_flag ();
+int32 g2bb_iot (int32 dev, int32 pulse, int32 dat); /* device 044 */
 
-t_stat g2d1_svc (UNIT *uptr);
+t_stat g2in_svc (UNIT *uptr);
 
+/* SIMH G2OUT DEVICE */
+int32 g2d1_iot (int32 dev, int32 pulse, int32 dat); /* device 05 */
+
+/* both G2IN/G2OUT: */
 t_stat g2_attach (UNIT *uptr, char *cptr);
 t_stat g2_detach (UNIT *uptr);
 t_stat g2_reset (DEVICE *dptr);
 
-/* G2 keyboard data structures
+/****************************************************************
+ * SIMH G2IN (keyboard/buttons) DEVICE data structures
+ *
+ *  g2in_dev     G2IN device descriptor
+ *  g2in_unit    G2IN unit descriptor
+ *  g2in_reg     G2IN register list
+ *  g2in_mod     G2IN modifiers list
+ */
 
-   g2kb_dev     G2kb device descriptor
-   g2kb_unit    G2kb unit descriptor
-   g2kb_reg     G2kb register list
-   g2kb_mod     G2kb modifiers list
-*/
+DIB g2in_dib = { DEV_G2KB, 2, NULL, { &g2kb_iot, &g2bb_iot } };
 
-/* push button device number is contiguous with keyboard */
-DIB g2kb_dib = { DEV_G2KB, 2, NULL, { &g2kb, &g2pb } };
-
-UNIT g2kb_unit = {
-    UDATA (&g2kb_svc, UNIT_IDLE|UNIT_ATTABLE, 0), KBD_POLL_WAIT
+UNIT g2in_unit = {
+    UDATA (&g2in_svc, UNIT_IDLE|UNIT_ATTABLE, 0), KBD_POLL_WAIT
 };
 
-REG g2kb_reg[] = {
-    { ORDATA (BUF, g2kb_buf, 1) },
-    { ORDATA (DONE, g2kb_done, 1) },
+REG g2in_reg[] = {
+    { ORDATA (KBBUF, g2kb_buf, 1) },
+    { ORDATA (KBDONE, g2kb_done, 1) },
     { FLDATA (INT, int_hwre[API_G2], INT_V_G2) },
-    { DRDATA (TIME, g2kb_unit.wait, 24), REG_NZ + PV_LEFT },
-    { ORDATA (BUTTONS, g2pb_bbuf, 1) },
-    { ORDATA (LITES, g2pb_lbuf, 1) },
+    { DRDATA (TIME, g2in_unit.wait, 24), REG_NZ + PV_LEFT },
+    { ORDATA (BBBBUF, g2bb_bbuf, 1) },  /* button box button buffer */
+    { ORDATA (BBFLAG, g2bb_flag, 1) },  /* button box IRQ */
+    { ORDATA (BBLBUF, g2bb_lbuf, 1) },  /* button box lights buffer */
     { NULL }
     };
 
-MTAB g2kb_mod[] = {
+MTAB g2in_mod[] = {
     { UNIT_ATT, UNIT_ATT, "summary", NULL,
       NULL, &tmxr_show_summ, (void *) &g2_desc },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
@@ -135,43 +137,6 @@ MTAB g2kb_mod[] = {
       NULL, &tmxr_show_cstat, (void *) &g2_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
       NULL, &tmxr_show_cstat, (void *) &g2_desc },
-    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-      NULL, &show_devno, NULL },
-    { 0 }
-    };
-
-DEVICE g2kb_dev = {
-    "G2KB",                             /* name */
-    &g2kb_unit,                         /* units */
-    g2kb_reg, g2kb_mod,                 /* registers, modifiers */
-    1,                                  /* numunits */
-    10, 31,                             /* aradix, awidth */
-    1, 8, 8,                            /* aincr, dradix, dwidth */
-    &tmxr_ex, &tmxr_dep, &g2_reset,     /* examine, deposit, reset */
-    NULL, &g2_attach, &g2_detach,       /* boot, attach, detach */
-    &g2kb_dib, DEV_MUX | DEV_DISABLE    /* ctxt, flags */
-    };
-
-/* G2 Display Output Device 1 data structures
-   g2d1_dev     g2d1 device descriptor
-   g2d1_unit    g2d1 unit descriptor
-   g2d1_reg     g2d1 register list
-*/
-
-DIB g2d1_dib = { DEV_G2D1, 1, NULL, { &g2d1 } };
-
-UNIT g2d1_unit = { UDATA (&g2d1_svc, 0, 0), SERIAL_OUT_WAIT };
-
-REG g2d1_reg[] = {
-    { ORDATA (DPYADDR, g2_dpyaddr, 1) },
-    { FLDATA (INT, int_hwre[API_G2], INT_V_G2) },
-    { URDATA (TIME, g2d1_unit.wait, 10, 24, 0, 1, PV_LEFT) },
-    { NULL }
-    };
-
-MTAB g2d1_mod[] = {
-    { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &g2_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
       &tmxr_set_log, &tmxr_show_log, &g2_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
@@ -181,16 +146,58 @@ MTAB g2d1_mod[] = {
     { 0 }
     };
 
-DEVICE g2d1_dev = {
-    "G2D1",                             /* name */
-    &g2d1_unit,                         /* units */
-    g2d1_reg, g2d1_mod,                 /* registers, modifiers */
+/* SIMH G2IN device descriptor (GRAPHICS-2 keyboard & button box) */
+DEVICE g2in_dev = {
+    "G2IN",                             /* name */
+    &g2in_unit,                         /* units */
+    g2in_reg, g2in_mod,                 /* registers, modifiers */
+    1,                                  /* numunits */
+    10, 31,                             /* aradix, awidth */
+    1, 8, 8,                            /* aincr, dradix, dwidth */
+    &tmxr_ex, &tmxr_dep, &g2_reset,     /* examine, deposit, reset */
+    NULL, &g2_attach, &g2_detach,       /* boot, attach, detach */
+    &g2in_dib, DEV_MUX | DEV_DISABLE    /* ctxt, flags */
+    };
+
+/****************************************************************
+ * SIMH G2OUT (display output) DEVICE data structures
+ * Only needed to hold "iot" routine, since DIB's can't represent
+ * devices with register sets as sparse as GRAPHICS-2
+ *
+ *  g2out_dev     G2OUT device descriptor
+ *  g2out_unit    G2OUT unit descriptor
+ *  g2out_reg     G2OUT register list
+ *  g2out_mod     G2OUT modifiers list
+ */
+
+DIB g2out_dib = { DEV_G2D1, 1, NULL, { &g2d1_iot } };
+
+UNIT g2out_unit = { UDATA (NULL, 0, 0) };
+
+REG g2out_reg[] = {
+    { ORDATA (DPYADDR, g2out_addr, 1) },
+    { NULL }
+    };
+
+MTAB g2out_mod[] = {
+    { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
+      &tmxr_dscln, NULL, &g2_desc },
+    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+      NULL, &show_devno, NULL },
+    { 0 }
+    };
+
+/* SIMH G2OUT device descriptor (simulates just one of many display IOTs!) */
+DEVICE g2out_dev = {
+    "G2OUT",                            /* name */
+    &g2out_unit,                        /* units */
+    g2out_reg, g2out_mod,               /* registers, modifiers */
     1,                                  /* numunits */
     10, 31,                             /* aradix, awidth */
     1, 8, 8,                            /* aincr, dradix, dwidth */
     NULL, NULL, &g2_reset,              /* examine, deposit, reset */
     NULL, NULL, NULL,                   /* boot, attach, detach */
-    &g2d1_dib, DEV_DISABLE              /* ctxt, flags */
+    &g2out_dib, DEV_DISABLE             /* ctxt, flags */
     };
 
 /****************************************************************
@@ -198,8 +205,8 @@ DEVICE g2d1_dev = {
  */
 
 /* Keyboard input IOT routine */
-/* real device might have done bitwise decode?! */
-int32 g2kb (int32 dev, int32 pulse, int32 dat)
+/* real device could have done bitwise decode?! */
+int32 g2kb_iot (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse == 001) {                     /* sck */
     if (g2kb_done) {
@@ -207,7 +214,6 @@ if (pulse == 001) {                     /* sck */
         }
     }
 else if (pulse == 002) {                /* lck */
-    g2kb_clr_done ();                   /* clear flag */
     dat = dat | g2kb_buf;               /* return buffer */
     }
 else if (pulse == 004) {                /* cck */
@@ -216,54 +222,54 @@ else if (pulse == 004) {                /* cck */
 return dat;
 }
 
-/* Push Button: IOT routine */
-int32 g2pb (int32 dev, int32 pulse, int32 dat)
+/* Button Box IOT routine */
+/* real device could have done bitwise decode? */
+int32 g2bb_iot (int32 dev, int32 pulse, int32 dat)
 {
-if (pulse & 020) {                                      /* wbl */
-    /* XXX if light for pb 7, press button 7!! */
-    printf("G2: wbl %#o\r\n", dat);
-    g2pb_lbuf = dat;
-    }
-if (pulse & 001) {                                      /* spb */
-    if (g2pb_done) {
+if (pulse == 001) {                     /* "spb" -- skip on push button flag */
+    if (g2bb_flag)
         dat = dat | IOT_SKP;
     }
-}
-if (pulse & 002) {                                      /* lpb */
-    g2pb_clr_done ();                                   /* clear flag */
-    dat = dat | g2pb_bbuf;                              /* return buttons */
+else if (pulse == 002)                  /* "lpb" -- load push buttons */
+    dat = dat | g2bb_bbuf;              /* return buttons */
+else if (pulse == 004)                  /* "cpb" -- clear push button flag */
+    g2bb_clr_flag ();                   /* clear flag */
+else if (pulse == 020) {                /* "wbl" -- write buttons lights */
+    printf("G2: wbl %#o\r\n", dat);     /* TEMP */
+    g2bb_lbuf = dat;
     }
-if (pulse & 004) {                                      /* cpb */
-    g2pb_clr_done ();                                   /* clear flag */
-    }
+return dat;
 }
 
-/* Unit service */
-
-t_stat g2kb_svc (UNIT *uptr)
+/* Input side Unit service */
+t_stat g2in_svc (UNIT *uptr)
 {
 int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)              /* attached? */
     return SCPE_OK;
+/* XXX if light for button 7 lit (screen full), press button 7!! */
 sim_clock_coschedule (uptr, tmxr_poll);         /* continue poll */
 ln = tmxr_poll_conn (&g2_desc);                 /* look for connect */
 if (ln >= 0)                                    /* got one? rcv enab */
     g2_ldsc.rcve = 1;
 tmxr_poll_rx (&g2_desc);                        /* poll for input */
 if (g2_ldsc.conn) {                             /* connected? */
+    tmxr_poll_tx (&g2_desc);                    /* PLB: poll xmt */
     if ((temp = tmxr_getc_ln (&g2_ldsc))) {     /* get char */
         if (temp & SCPE_BREAK)                  /* break? */
             c = 0;
-        else c = sim_tt_inpcvt (temp, TT_GET_MODE(g2d1_unit.flags) );
+        else if (c == '\r')                     /* translate CR but not ESC */
+            c = '\n';
         g2kb_buf = c;
         g2kb_set_done ();
         }
-    }
+    } /* connected */
+else
+    g2out_count = 0; /* not connected; next connections sees entire "screen" */
 return SCPE_OK;
 }
 
-/****************************************************************/
 /* Interrupt handling routines */
 
 t_bool g2kb_test_done ()
@@ -287,121 +293,113 @@ CLR_INT (G2);
 return;
 }
 
-/****************/
-
-t_bool g2pb_test_done ()
+t_bool g2bb_test_flag ()
 {
-if (g2pb_done)
+if (g2bb_flag)
     return TRUE;
 return FALSE;
 }
 
-void g2pb_set_done ()
+void g2bb_set_flag ()
 {
-g2pb_done = 1;
+g2bb_flag = 1;
 SET_INT (G2);
 return;
 }
 
-void g2pb_clr_done ()
+void g2bb_clr_flag ()
 {
-g2pb_done = 0;
+g2bb_flag = 0;
 CLR_INT (G2);
 return;
 }
 
-/****************************************************************/
-/* Display Output: IOT routine */
+/****************************************************************
+ * SIMH G2OUT (Display Output) DEVICE routines
+ */
 
+/* helper to put 7-bit display character:
+ * characters are only consumed if TELNET user connected & output ready/enabled
+ */
+static void g2out_putchar(char c)
+{
+if (g2_ldsc.conn && g2_ldsc.xmte) {     /* connected, tx enabled? */
+    tmxr_putc_ln (&g2_ldsc, c);
+    g2out_count++;                      /* consumed */
+    }
+}
+
+/* Device 05 IOT routine */
+int32 g2d1_iot (int32 dev, int32 pulse, int32 dat)
+{
 /*
  * UNIX text display command lists always end with a TRAP
  * and display output is restarted periodicly in timer PI service code
  */
-
-static void g2_putchar(char c)
-{
-if (g2_ldsc.conn && g2_ldsc.xmte) { /* connected, tx enabled? */
-    tmxr_putc_ln (&g2_ldsc, c);
-    if (c == '\n')
-        tmxr_putc_ln (&g2_ldsc, '\r');
-    g2_dpycount++;            /* only consume if connected+enabled! */
-}
-}
-
-int32 g2d1 (int32 dev, int32 pulse, int32 dat)
-{
-if (g2_ldsc.conn && g2_ldsc.xmte && pulse == 047) { /* beg */
-    int32 n = g2_dpycount, i;
-    g2_dpyaddr = dat & 017777;
-    for (i = g2_dpyaddr; i < 020000; i++) {
+if (g2_ldsc.conn && g2_ldsc.xmte && pulse == 047) { /* conn&ready, "beg" */
+    int32 n = g2out_count, i;
+    g2out_addr = dat & 017777;
+    for (i = g2out_addr; i < 020000; i++) {
         uint32 w = M[i] & 0777777;
-        if (w & 0400000)                /* TRAP? */
+        int offset = i - g2out_addr;
+        if (w & 0400000)                /* TRAP (stops display engine)? */
             break;
         /* check first three words for expected setup commands */
-        int o = i - g2_dpyaddr;
-        if (o < sizeof(g2_expect)/sizeof(g2_expect[0])) {
-            if (w != g2_expect[o]) {
-                printf("g2: unexpected command at %#o: %#o expected %#o\r\n",
-                       i, w, g2_expect[o]);
+        if (offset < sizeof(g2_expect)/sizeof(g2_expect[0])) {
+            if (w != g2_expect[offset]) {
+                /* TEMP: */
+                printf("G2: unexpected command at %#o: %#o expected %#o\r\n",
+                       i, w, g2_expect[offset]);
                 break;
             }
             continue;
         }
         if (w & 0300000)        { /* not characters? */
-            printf("g2: unexpected command at %#o: %#o\r\n", i, w);
+            printf("G2: unexpected command at %#o: %#o\r\n", i, w); /* TEMP */
             break;
         }
         if (--n < 0)                    /* new? */
-            g2_putchar( (w>>7) & 0177 );
+            g2out_putchar( (w>>7) & 0177 );
 
         if ((w & 0177) && --n < 0)      /* char2 & new? */
-            g2_putchar( w & 0177 );
+            g2out_putchar( w & 0177 );
 
-    } /* for loop */
-    fflush(stdout);             /* TEMP */
+        } /* for loop */
     if (n > 0)
-        g2_dpycount = 0;        /* didn't see as much as last time? */
-} /* beg IOT */
+        g2out_count = 0;        /* didn't see as much as last time? */
+    } /* beg IOT */
 return dat;
 }
 
-/* Unit service */
-
-t_stat g2d1_svc (UNIT *uptr)
-{
-if (g2_ldsc.conn) {                     /* connected? */
-    tmxr_poll_tx (&g2_desc);            /* poll xmt */
-    if (!g2_ldsc.xmte) {                /* tx not enabled? */
-        sim_activate (uptr, g2d1_unit.wait); /* wait */
-    }
-}
-return SCPE_OK;
-}
-
+/****************************************************************
+ * subsystem common routines (used by both G2IN and G2OUT SIMH DEVICEs)
+ */
 
 /* Reset routine */
 t_stat g2_reset (DEVICE *dptr)
 {
 if (dptr->flags & DEV_DIS) {                            /* sync enables */
-    g2kb_dev.flags = g2kb_dev.flags | DEV_DIS;
-    g2d1_dev.flags = g2d1_dev.flags | DEV_DIS;
+    g2in_dev.flags = g2in_dev.flags | DEV_DIS;
+    g2out_dev.flags = g2out_dev.flags | DEV_DIS;
     }
 else {
-    g2kb_dev.flags = g2kb_dev.flags & ~DEV_DIS;
-    g2d1_dev.flags = g2d1_dev.flags & ~DEV_DIS;
+    g2in_dev.flags = g2in_dev.flags & ~DEV_DIS;
+    g2out_dev.flags = g2out_dev.flags & ~DEV_DIS;
     }
-if (g2kb_unit.flags & UNIT_ATT)                         /* if attached, */
-    sim_activate (&g2kb_unit, tmxr_poll);               /* activate */
-else sim_cancel (&g2kb_unit);                           /* else stop */
+if (g2in_unit.flags & UNIT_ATT)                         /* if attached, */
+    sim_activate (&g2in_unit, tmxr_poll);               /* activate */
+else sim_cancel (&g2in_unit);                           /* else stop */
 
 g2kb_buf = 0;                                           /* clear buf */
-g2pb_bbuf = 0;                                          /* clear buttons */
-g2pb_lbuf = 0;                                          /* clear lites */
-g2_dpyaddr = 0;
-g2_dpycount = 0;
 g2kb_clr_done ();                                       /* clear done */
-g2pb_clr_done ();
-sim_cancel (&g2d1_unit);                                /* stop poll */
+
+g2bb_bbuf = 0;                                          /* clear buttons */
+g2bb_lbuf = 0;                                          /* clear lights */
+g2bb_clr_flag ();
+
+g2out_addr = 0;
+g2out_count = 0;
+sim_cancel (&g2out_unit);                                /* stop poll */
 return SCPE_OK;
 }
 
