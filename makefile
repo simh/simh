@@ -185,9 +185,17 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OSNAME = OSX
       LIBEXT = dylib
       INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+      ifeq (incbrew,$(shell if $(TEST) -d /usr/local/include && $(TEST) -e /usr/local/bin/brew; then echo incbrew; fi))
+        INCPATH += /usr/local/include
+        OS_CCDEFS += -I/usr/local/include
+      endif
       ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
         INCPATH += /opt/local/include
         OS_CCDEFS += -I/opt/local/include
+      endif
+				ifeq (libbrew,$(shell if $(TEST) -d /usr/local/lib && $(TEST) -e /usr/local/bin/brew; then echo libbrew; fi))
+        LIBPATH += /usr/local/lib
+        OS_LDFLAGS += -L/usr/local/lib
       endif
       ifeq (libopt,$(shell if $(TEST) -d /opt/local/lib; then echo libopt; fi))
         LIBPATH += /opt/local/lib
