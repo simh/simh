@@ -1,4 +1,4 @@
-/* pdp18b_g2tty.c: PDP-7/9 Bell Labs "GRAPHIC-2" subsystem (as a TTY!!)
+/* pdp18b_g2tty.c: PDP-7/9 Bell Labs "GRAPHIC-2" subsystem as a TTY via TELNET
    from 13-Sep-15 version of pdp18b_tt1.c
 
    Copyright (c) 1993-2015, Robert M Supnik
@@ -46,25 +46,57 @@
        G2KB     043     GRAPHICS-2 keyboard
        G2BB     044     GRAPHICS-2 button box (lighted bush buttons)
 
+   20-Mar-16    PLB     Works, mostly
    19-Mar-16    PLB     Working (up to a screen full)
    17-Mar-16    PLB     Cloned from 13-Sep-15 version of pdp18b_tt1.c
 */
 
+/*
+
+ * GRAPHICS-2 was vector graphics hardware, UNIX-7 uses it as a
+ * "Glass TTY" for a "second seat".
+ *
+ * This simulation ONLY handles text display; the one program
+ * found that uses the "capt" (capture?) call to set a user
+ * supplied display list will not work here.
+ *
+ * When the display buffer or screen is filled, the UNIX "display"
+ * driver lights "push button 7" (PB7), and waits for the user to
+ * press the button.  UNIX then clears the screen, and output
+ * continues.  If the program outputs a "Form Feed" character the
+ * display is also cleared.
+ *
+ * This simulation automatically presses PB7 when lit, without
+ * bothering the user (a more accurate simulation might prompt
+ * the user to press any key)!
+ */
+
 #include "pdp18b_defs.h"
 #ifdef GRAPHICS2
 #include "sim_tmxr.h"
-#include <ctype.h>
 
+int debug = 0;
+
+/* hardware registers */
 uint8 g2kb_done = 0;                    /* keyboard flag */
 uint32 g2kb_buf = 0;                    /* keyboard buffer */
-
 uint8 g2bb_flag = 0;                    /* button flag */
 uint32 g2bb_bbuf = 0;                   /* button buffer */
 uint32 g2bb_lbuf = 0;                   /* button lights buffer */
-
 uint32 g2out_addr = 0;                  /* display address */
-int32 g2out_count = 0;                  /* character count (not a hw reg) */
+
+/* not hardware registers: */
+uint32 g2out_count = 0;
 uint8 g2out_stuffcr = 0;                /* need to stuff a CR */
+uint g2out_which = 0;
+#define OLD g2out_which
+#define NEW (g2out_which ^ 1)
+
+#define MAXBUFCHARS 700                 /* larger than kernel display list */
+static struct dspbuf {
+    uint16 count;
+    char buffer[MAXBUFCHARS];           /* 7-bit ASCII */
+} g2out_dspbufs[2];
 
 /* terminal mux data */
 TMLN g2_ldsc = { 0 };                   /* line descriptor */
@@ -98,6 +130,9 @@ t_stat g2in_svc (UNIT *uptr);
 
 /* SIMH G2OUT DEVICE */
 int32 g2d1_iot (int32 dev, int32 pulse, int32 dat); /* device 05 */
+static void g2out_clear ();
+static void g2out_process_display_list ();
+static void g2out_send_new ();
 
 /* both G2IN/G2OUT: */
 t_stat g2_attach (UNIT *uptr, char *cptr);
@@ -228,15 +263,22 @@ return dat;
 int32 g2bb_iot (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse == 001) {                     /* "spb" -- skip on push button flag */
-    if (g2bb_flag)
+    if (g2bb_flag) {
         dat = dat | IOT_SKP;
+        printf("bb: SKIP\r\n");
+        }
     }
 else if (pulse == 002)                  /* "lpb"/"opb" -- or push buttons */
     dat = dat | g2bb_bbuf;              /* return buttons */
-else if (pulse == 004)                  /* "cpb" -- clear push button flag */
+else if (pulse == 004) {                /* "cpb" -- clear push button flag */
     g2bb_clr_flag ();                   /* clear flag */
-else if (pulse == 024)                  /* "wbl" -- write buttons lights */
+    printf("bb: CLEAR\r\n");
+    g2out_clear();
+    }
+else if (pulse == 024) {                  /* "wbl" -- write buttons lights */
     g2bb_lbuf = dat;
+    printf("G2: wbl %#o\r\n", dat);     /* TEMP */
+    }
 return dat;
 }
 
@@ -247,7 +289,8 @@ int32 ln, c;
 
 if ((uptr->flags & UNIT_ATT) == 0)              /* attached? */
     return SCPE_OK;
-if (g2bb_lbuf & 02000) {                        /* button 7 lit? */
+if (g2bb_lbuf & 02000) { /* button 7 lit? */
+    if (g2bb_bbuf == 0) { printf("pressing pb7\r\n"); debug = 1; }
     g2bb_bbuf |= 02000;                         /* press it to clear screen! */
     g2bb_set_flag ();
     }
@@ -265,6 +308,8 @@ if (g2_ldsc.conn) {                             /* connected? */
             c &= 0177;
             if (c == '\r')                      /* translate CR but not ESC! */
                 c = '\n';
+            else if ((c & 0155) == 055)         /* kernel swaps around -?/= */
+                c ^= 020;                       /* pre-swap!!  */
             }
         g2kb_buf = c;
         g2kb_set_done ();
@@ -272,7 +317,6 @@ if (g2_ldsc.conn) {                             /* connected? */
     } /* connected */
 else {
     /* not connected; next connection sees entire "screen" */
-    g2out_count = 0;
     g2out_stuffcr = 0;
     }
 return SCPE_OK;
@@ -322,30 +366,35 @@ return;
  * SIMH G2OUT (Display Output) DEVICE routines
  */
 
-/* helper to put 7-bit display character:
- * characters are only consumed if TELNET user connected & output ready/enabled
- */
-static void g2out_putchar(char c)
-{
-if (g2_ldsc.conn && g2_ldsc.xmte) {     /* connected, tx enabled? */
-
-    if (g2out_stuffcr) {                /* need to stuff a CR? */
-        tmxr_putc_ln (&g2_ldsc, '\r');
-        g2out_stuffcr = 0;
-        if (!g2_ldsc.xmte)              /* full? */
-            return;                     /* yes: wait until next time */
-        }
-
+/* helper to put 7-bit display character */
+static void g2pc(char c) {
+    //if (debug) putchar(c);
     tmxr_putc_ln (&g2_ldsc, c);
-    g2out_count++;                      /* consumed */
-
-    if (c == '\n') {                    /* was it a NL? */
-        if (g2_ldsc.xmte)               /* transmitter enabled? */
-            tmxr_putc_ln (&g2_ldsc, '\r'); /* send CR now */
-        else
-            g2out_stuffcr = 1;          /* wait until next time */
-        }
 }
+
+/* send a character from the display. adds CR after LF */
+/* returns 1 if "c" was sent; 0 means try again later */
+static int g2out_putchar(char c)
+{
+if (!g2_ldsc.conn || !g2_ldsc.xmte)     /* connected, tx enabled? */
+    return 0;
+
+if (g2out_stuffcr) {                    /* need to stuff a CR? */
+    g2pc ('\r');
+    g2out_stuffcr = 0;
+    if (!g2_ldsc.xmte)                 /* full? */
+        return 0;                      /* yes: wait until next time */
+    }
+
+g2pc (c);
+
+if (c == '\n') {                        /* was it a NL? */
+    if (g2_ldsc.xmte)                   /* transmitter enabled? */
+        g2pc ('\r');                    /* send CR now */
+    else
+        g2out_stuffcr = 1;              /* wait until next time */
+    }
+return 1;
 }
 
 /* Device 05 IOT routine */
@@ -356,38 +405,99 @@ int32 g2d1_iot (int32 dev, int32 pulse, int32 dat)
  * and display output is restarted periodicly in timer PI service code
  */
 if (g2_ldsc.conn && g2_ldsc.xmte && pulse == 047) { /* conn&ready, "beg" */
-    int32 n = g2out_count, i;
     g2out_addr = dat & 017777;
+    g2out_process_display_list();
+    g2out_send_new();
+    g2out_which ^= 1;                   /* swap buffers */
+    } /* beg IOT */
+return dat;
+}
+
+/****************
+ * display buffer management/process
+ * we're informed when UNIX wants to clear the screen (PB7 lit)
+ * we then press the button
+ * UNIX does a "cpb" to ACK/clear the interrupt.
+ *
+ * *BUT* UNIX clears the screen when a FF (014) char is output,
+ * which just resets the buffer (and not issuing any IOTs)
+ */
+
+static void g2out_clear() {
+    g2out_stuffcr = 0;
+    g2out_which = 0;
+    g2out_count = 0;
+    g2out_dspbufs[0].count = g2out_dspbufs[1].count = 0;
+}
+
+/* process display list into "other" buffer */
+static void g2out_process_display_list() {
+    uint32 i;
+    struct dspbuf *dp = g2out_dspbufs + NEW;
+
+    dp->count = 0;
     for (i = g2out_addr; i < 020000; i++) {
         uint32 w = M[i] & 0777777;
         int offset = i - g2out_addr;
-        if (w & 0400000)                /* TRAP (stops display engine)? */
-            break;
+        char c;
+
+        if (w & 0400000)                /* TRAP (always last word in buf) */
+            return;
+
         /* check first three words for expected setup commands */
         if (offset < sizeof(g2_expect)/sizeof(g2_expect[0])) {
             if (w != g2_expect[offset]) {
-                /* TEMP: */
+                /* XXX TEMP? send out on TELNET connection?? */
                 printf("G2: unexpected command at %#o: %#o expected %#o\r\n",
                        i, w, g2_expect[offset]);
-                break;
+                return;
             }
             continue;
         }
-        if (w & 0300000)        { /* not characters? */
-            printf("G2: unexpected command at %#o: %#o\r\n", i, w); /* TEMP */
-            break;
+        if (w & 0300000) {      /* not characters? */
+            /* XXX TEMP? send out on TELNET connection?? */
+            printf("G2: unexpected command at %#o: %#o\r\n", i, w);
+            return;
         }
-        if (--n < 0)                    /* new? */
-            g2out_putchar( (w>>7) & 0177 );
+        c = (w >> 7) & 0177;
+        if (c)
+            dp->buffer[dp->count++] = c;
+        c = w & 0177;
+        if (c)
+            dp->buffer[dp->count++] = c;
+    }
+}
 
-        if ((w & 0177) && --n < 0)      /* char2 & new? */
-            g2out_putchar( w & 0177 );
+/* figure out what to send
+ * truncates new->count to the number sent
+ */
+static void g2out_send_new() {
+    struct dspbuf *old = g2out_dspbufs + OLD;
+    struct dspbuf *new = g2out_dspbufs + NEW;
+    char *cp = new->buffer;
+    int cur = 0;
 
-        } /* for loop */
-    if (n > 0)
-        g2out_count = 0;        /* didn't see as much as last time? */
-    } /* beg IOT */
-return dat;
+    /* nothing in newest refresh?
+     * COULD have had undisplayed stuff on last screen before it was cleared??
+     * would need to have a transmit queue??
+     */
+    if (new->count == 0)
+        return;
+
+    if (old->count &&                   /* have old chars */
+        memcmp(old->buffer, new->buffer, old->count) == 0) { /* and a prefix */
+        cur = old->count;
+        cp += cur;
+    }
+
+    /* loop for chars while connected & tx enabled */
+    while (cur < new->count && g2_ldsc.conn && g2_ldsc.xmte) {
+        if (g2out_putchar(*cp)) {
+            cp++;
+            cur++;
+        }
+    }
+    new->count = cur;                   /* only remember number sent */
 }
 
 /****************************************************************
@@ -417,8 +527,7 @@ g2bb_lbuf = 0;                                          /* clear lights */
 g2bb_clr_flag ();
 
 g2out_addr = 0;
-g2out_count = 0;
-g2out_stuffcr = 0;
+g2out_clear();
 sim_cancel (&g2out_unit);                                /* stop poll */
 return SCPE_OK;
 }
