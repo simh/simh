@@ -95,7 +95,7 @@ uint8 g2out_stuffcr = 0;                /* need to stuff a CR */
  * a count & checksum of the "old" screen contents might suffice,
  * time will tell....
  */
-uint g2out_which = 0;
+uint8 g2out_which = 0;
 #define OLD g2out_which
 #define NEW (g2out_which ^ 1)
 
