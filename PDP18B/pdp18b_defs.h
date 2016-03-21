@@ -463,6 +463,7 @@ typedef struct {
 #define INT_V_TTI       0                               /* console keyboard */
 #define INT_V_TTO       1                               /* console output */
 #define INT_V_PTP       2                               /* paper tape punch */
+#define INT_V_G2        3                               /* BTL GRAPHICS-2 */
 
 #define INT_TTI         (1 << INT_V_TTI)
 #define INT_TTO         (1 << INT_V_TTO)
@@ -474,12 +475,11 @@ typedef struct {
 
 #ifdef GRAPHICS2
 /*
- * a PDP-9 version existed, and may have used API, 
- * but we're only interested in the PDP-7
+ * A PDP-9 version existed,
+ * but we're only interested simulating a PDP-7 without API
  */
-#define INT_V_G2       2                                /* GRAPHICS-2 */
-#define INT_G2         (1 << INT_V_G2)
-#define API_G2         4
+#define INT_G2          (1 << INT_V_G2)
+#define API_G2          4
 #endif
 
 /* Interrupt macros */
