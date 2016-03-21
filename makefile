@@ -193,7 +193,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         INCPATH += /opt/local/include
         OS_CCDEFS += -I/opt/local/include
       endif
-				ifeq (libbrew,$(shell if $(TEST) -d /usr/local/lib && $(TEST) -e /usr/local/bin/brew; then echo libbrew; fi))
+      ifeq (libbrew,$(shell if $(TEST) -d /usr/local/lib && $(TEST) -e /usr/local/bin/brew; then echo libbrew; fi))
         LIBPATH += /usr/local/lib
         OS_LDFLAGS += -L/usr/local/lib
       endif
