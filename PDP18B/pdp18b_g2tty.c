@@ -84,11 +84,18 @@ uint8 g2bb_flag = 0;                    /* button flag */
 uint32 g2bb_bbuf = 0;                   /* button buffer */
 uint32 g2bb_lbuf = 0;                   /* button lights buffer */
 uint32 g2out_addr = 0;                  /* display address */
+#define PB7 02000
 
 /* not hardware registers: */
 uint32 g2out_count = 0;
 uint8 g2out_stuffcr = 0;                /* need to stuff a CR */
-uint g2out_which = 0;
+
+
+/* keep old and new version of characters to display
+ * a count & checksum of the "old" screen contents might suffice,
+ * time will tell....
+ */
+uint8 g2out_which = 0;
 #define OLD g2out_which
 #define NEW (g2out_which ^ 1)
 
@@ -132,7 +139,7 @@ t_stat g2in_svc (UNIT *uptr);
 int32 g2d1_iot (int32 dev, int32 pulse, int32 dat); /* device 05 */
 static void g2out_clear ();
 static void g2out_process_display_list ();
-static void g2out_send_new ();
+static int g2out_send_new ();
 
 /* both G2IN/G2OUT: */
 t_stat g2_attach (UNIT *uptr, char *cptr);
@@ -263,21 +270,18 @@ return dat;
 int32 g2bb_iot (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse == 001) {                     /* "spb" -- skip on push button flag */
-    if (g2bb_flag) {
+    if (g2bb_flag)
         dat = dat | IOT_SKP;
-        printf("bb: SKIP\r\n");
-        }
     }
 else if (pulse == 002)                  /* "lpb"/"opb" -- or push buttons */
     dat = dat | g2bb_bbuf;              /* return buttons */
 else if (pulse == 004) {                /* "cpb" -- clear push button flag */
     g2bb_clr_flag ();                   /* clear flag */
-    printf("bb: CLEAR\r\n");
-    g2out_clear();
     }
-else if (pulse == 024) {                  /* "wbl" -- write buttons lights */
+else if (pulse == 024) {                /* "wbl" -- write buttons lights */
+    if (dat == 0)
+        g2out_clear();                  /* UNIX has ack'ed button press */
     g2bb_lbuf = dat;
-    printf("G2: wbl %#o\r\n", dat);     /* TEMP */
     }
 return dat;
 }
@@ -289,9 +293,13 @@ int32 ln, c;
 
 if ((uptr->flags & UNIT_ATT) == 0)              /* attached? */
     return SCPE_OK;
-if (g2bb_lbuf & 02000) { /* button 7 lit? */
-    if (g2bb_bbuf == 0) { printf("pressing pb7\r\n"); debug = 1; }
-    g2bb_bbuf |= 02000;                         /* press it to clear screen! */
+
+if (g2bb_lbuf & PB7) {                          /* button 7 lit? */
+    /* yes: try sending anything new */
+    g2out_process_display_list();
+    g2out_send_new();
+
+    g2bb_bbuf |= PB7;                           /* press it to clear screen! */
     g2bb_set_flag ();
     }
 sim_clock_coschedule (uptr, tmxr_poll);         /* continue poll */
@@ -430,7 +438,9 @@ static void g2out_clear() {
     g2out_dspbufs[0].count = g2out_dspbufs[1].count = 0;
 }
 
-/* process display list into "other" buffer */
+/* interpret display list; save characters into "new" dspbuf
+ * quits early if display list doesn't conform to what's expected
+ */
 static void g2out_process_display_list() {
     uint32 i;
     struct dspbuf *dp = g2out_dspbufs + NEW;
@@ -441,24 +451,18 @@ static void g2out_process_display_list() {
         int offset = i - g2out_addr;
         char c;
 
-        if (w & 0400000)                /* TRAP (always last word in buf) */
+        if (w & 0400000)                /* TRAP (end of display list) */
             return;
 
         /* check first three words for expected setup commands */
         if (offset < sizeof(g2_expect)/sizeof(g2_expect[0])) {
-            if (w != g2_expect[offset]) {
-                /* XXX TEMP? send out on TELNET connection?? */
-                printf("G2: unexpected command at %#o: %#o expected %#o\r\n",
-                       i, w, g2_expect[offset]);
+            if (w != g2_expect[offset])
                 return;
-            }
             continue;
         }
-        if (w & 0300000) {      /* not characters? */
-            /* XXX TEMP? send out on TELNET connection?? */
-            printf("G2: unexpected command at %#o: %#o\r\n", i, w);
+        if (w & 0300000)                /* not characters? */
             return;
-        }
+
         c = (w >> 7) & 0177;
         if (c)
             dp->buffer[dp->count++] = c;
@@ -468,36 +472,39 @@ static void g2out_process_display_list() {
     }
 }
 
-/* figure out what to send
- * truncates new->count to the number sent
+/* figure out what to send on TELNET connection
+ * truncates new->count to the number sent so far
+ * returns number of new characters sent
  */
-static void g2out_send_new() {
+static int g2out_send_new() {
     struct dspbuf *old = g2out_dspbufs + OLD;
     struct dspbuf *new = g2out_dspbufs + NEW;
     char *cp = new->buffer;
     int cur = 0;
+    int start;
 
     /* nothing in newest refresh?
      * COULD have had undisplayed stuff on last screen before it was cleared??
      * would need to have a transmit queue??
      */
     if (new->count == 0)
-        return;
+        return 0;
 
     if (old->count &&                   /* have old chars */
         memcmp(old->buffer, new->buffer, old->count) == 0) { /* and a prefix */
         cur = old->count;
         cp += cur;
     }
-
     /* loop for chars while connected & tx enabled */
+    start = cur;
     while (cur < new->count && g2_ldsc.conn && g2_ldsc.xmte) {
         if (g2out_putchar(*cp)) {
             cp++;
             cur++;
         }
     }
-    new->count = cur;                   /* only remember number sent */
+    new->count = cur;                   /* only remember what's been sent */
+    return cur - start;                 /* remember number sent */
 }
 
 /****************************************************************
