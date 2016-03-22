@@ -675,8 +675,11 @@ void eth_zero(ETH_DEV* dev)
   dev->reflections = -1;                          /* not established yet */
 }
 
+static char*   (*p_pcap_lib_version) (void);
+
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
+static t_bool eth_show_active = FALSE;
 
 #if defined (USE_NETWORK) || defined (USE_SHARED)
 static void _eth_add_to_open_list (ETH_DEV* dev)
@@ -702,8 +705,10 @@ for (i=0; i<eth_open_device_count; ++i)
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int number = eth_devices(ETH_MAX_DEVICE, list);
+  int number;
 
+  eth_show_active = TRUE;
+  number = eth_devices(ETH_MAX_DEVICE, list);
   fprintf(st, "ETH devices:\n");
   if (number == -1)
     fprintf(st, "  network support not available in simulator\n");
@@ -718,6 +723,8 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0; i<number; i++)
         fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
+  if (p_pcap_lib_version)
+    fprintf(st, "%s\n", p_pcap_lib_version());
   if (eth_open_device_count) {
     int i;
     char desc[ETH_DEV_DESC_MAX], *d;
@@ -732,6 +739,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       eth_show_dev (st, eth_open_devices[i]);
       }
     }
+  eth_show_active = FALSE;
   return SCPE_OK;
 }
 
@@ -1011,7 +1019,6 @@ static int     (*p_pcap_fileno) (pcap_t *);
 static int     (*p_pcap_sendpacket) (pcap_t* handle, const u_char* msg, int len);
 static int     (*p_pcap_setfilter) (pcap_t *, struct bpf_program *);
 static int     (*p_pcap_setnonblock)(pcap_t* a, int nonblock, char *errbuf);
-static char*   (*p_pcap_lib_version) (void);
 
 /* load function pointer from DLL */
 typedef int (*_func)();
@@ -1078,7 +1085,7 @@ int load_pcap(void) {
       load_function("pcap_setnonblock",  (_func *) &p_pcap_setnonblock);
       load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
 
-      if (lib_loaded == 1) {
+      if ((lib_loaded == 1) && (!eth_show_active)) {
         /* log successful load */
         sim_printf("%s\n", p_pcap_lib_version());
       }
