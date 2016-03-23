@@ -7107,7 +7107,7 @@ static readline_func p_readline = NULL;
 typedef void (*add_history_func)(const char *);
 static add_history_func p_add_history = NULL;
 
-if (!initialized) {
+if (prompt && (!initialized)) {
     initialized = 1;
     void *handle;
 
