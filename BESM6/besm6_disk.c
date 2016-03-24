@@ -102,19 +102,19 @@ UNIT disk_unit [16] = {
 };
 
 REG disk_reg[] = {
-    { "КУС_0",      &controller[0].op,      8, 24, 0, 1 },
-    { "УСТР_0",     &controller[0].dev,     8, 3,  0, 1 },
-    { "ЗОНА_0",     &controller[0].zone,    8, 10, 0, 1 },
-    { "ДОРОЖКА_0",  &controller[0].track,   8, 2,  0, 1 },
-    { "МОЗУ_0",     &controller[0].memory,  8, 20, 0, 1 },
-    { "РС_0",       &controller[0].status,  8, 24, 0, 1 },
-    { "КУС_1",      &controller[1].op,      8, 24, 0, 1 },
-    { "УСТР_1",     &controller[1].dev,     8, 3,  0, 1 },
-    { "ЗОНА_1",     &controller[1].zone,    8, 10, 0, 1 },
-    { "ДОРОЖКА_1",  &controller[1].track,   8, 2,  0, 1 },
-    { "МОЗУ_1",     &controller[1].memory,  8, 20, 0, 1 },
-    { "РС_1",       &controller[1].status,  8, 24, 0, 1 },
-    { "ОШ",         &disk_fail,             8, 6,  0, 1 },
+    { ORDATA   ( "КУС_0",      controller[0].op,      24) },
+    { ORDATA   ( "УСТР_0",     controller[0].dev,      3) },
+    { ORDATA   ( "ЗОНА_0",     controller[0].zone,    10) },
+    { ORDATA   ( "ДОРОЖКА_0",  controller[0].track,    2) },
+    { ORDATA   ( "МОЗУ_0",     controller[0].memory,  20) },
+    { ORDATA   ( "РС_0",       controller[0].status,  24) },
+    { ORDATA   ( "КУС_1",      controller[1].op,      24) },
+    { ORDATA   ( "УСТР_1",     controller[1].dev,      3) },
+    { ORDATA   ( "ЗОНА_1",     controller[1].zone,    10) },
+    { ORDATA   ( "ДОРОЖКА_1",  controller[1].track,    2) },
+    { ORDATA   ( "МОЗУ_1",     controller[1].memory,  20) },
+    { ORDATA   ( "РС_1",       controller[1].status,  24) },
+    { ORDATA   ( "ОШ",         disk_fail,              6) },
     { 0 }
 };
 

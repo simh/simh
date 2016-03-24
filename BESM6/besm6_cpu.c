@@ -107,40 +107,42 @@ t_stat cpu_show_pult (FILE *st, UNIT *up, int32 v, void *dp);
 
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX, MEMSIZE) };
 
+#define ORDATAVM(nm,loc,wd) REGDATA(nm,(loc),8,wd,0,1,NULL,NULL,REG_VMIO,0,0)
+
 REG cpu_reg[] = {
-    { "СчАС",  &PC,        8, 15, 0, 1 }, /* счётчик адреса команды */
-    { "РК",    &RK,        8, 24, 0, 1 }, /* регистр выполняемой команды */
-    { "Аисп",  &Aex,       8, 15, 0, 1 }, /* исполнительный адрес */
-    { "СМ",    &ACC,       8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* сумматор */
-    { "РМР",   &RMR,       8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* регистр младших разрядов */
-    { "РАУ",   &RAU,       2, 6,  0, 1 }, /* режимы АУ */
-    { "М1",    &M[1],      8, 15, 0, 1 }, /* регистры-модификаторы */
-    { "М2",    &M[2],      8, 15, 0, 1 },
-    { "М3",    &M[3],      8, 15, 0, 1 },
-    { "М4",    &M[4],      8, 15, 0, 1 },
-    { "М5",    &M[5],      8, 15, 0, 1 },
-    { "М6",    &M[6],      8, 15, 0, 1 },
-    { "М7",    &M[7],      8, 15, 0, 1 },
-    { "М10",   &M[010],    8, 15, 0, 1 },
-    { "М11",   &M[011],    8, 15, 0, 1 },
-    { "М12",   &M[012],    8, 15, 0, 1 },
-    { "М13",   &M[013],    8, 15, 0, 1 },
-    { "М14",   &M[014],    8, 15, 0, 1 },
-    { "М15",   &M[015],    8, 15, 0, 1 },
-    { "М16",   &M[016],    8, 15, 0, 1 },
-    { "М17",   &M[017],    8, 15, 0, 1 }, /* указатель магазина */
-    { "М20",   &M[020],    8, 15, 0, 1 }, /* MOD - модификатор адреса */
-    { "М21",   &M[021],    8, 15, 0, 1 }, /* PSW - режимы УУ */
-    { "М27",   &M[027],    8, 15, 0, 1 }, /* SPSW - упрятывание режимов УУ */
-    { "М32",   &M[032],    8, 15, 0, 1 }, /* ERET - адрес возврата из экстракода */
-    { "М33",   &M[033],    8, 15, 0, 1 }, /* IRET - адрес возврата из прерывания */
-    { "М34",   &M[034],    8, 16, 0, 1 }, /* IBP - адрес прерывания по выполнению */
-    { "М35",   &M[035],    8, 16, 0, 1 }, /* DWP - адрес прерывания по чтению/записи */
-    { "РУУ",   &RUU,       2, 9,  0, 1 }, /* ПКП, ПКЛ, РежЭ, РежПр, ПрИК, БРО, ПрК */
-    { "ГРП",   &GRP,       8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* главный регистр прерываний */
-    { "МГРП",  &MGRP,      8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* маска ГРП */
-    { "ПРП",   &PRP,       8, 24, 0, 1 }, /* периферийный регистр прерываний */
-    { "МПРП",  &MPRP,      8, 24, 0, 1 }, /* маска ПРП */
+    { ORDATA   ( "СчАС",  PC,       15) }, /* счётчик адреса команды */
+    { ORDATA   ( "РК",    RK,       24) }, /* регистр выполняемой команды */
+    { ORDATA   ( "Аисп",  Aex,      15) }, /* исполнительный адрес */
+    { ORDATAVM ( "СМ",    ACC,      48) }, /* сумматор */
+    { ORDATAVM ( "РМР",   RMR,      48) }, /* регистр младших разрядов */
+    { BINRDATA ( "РАУ",   RAU,       6) }, /* режимы АУ */
+    { ORDATA   ( "М1",    M[1],     15) }, /* регистры-модификаторы */
+    { ORDATA   ( "М2",    M[2],     15) },
+    { ORDATA   ( "М3",    M[3],     15) },
+    { ORDATA   ( "М4",    M[4],     15) },
+    { ORDATA   ( "М5",    M[5],     15) },
+    { ORDATA   ( "М6",    M[6],     15) },
+    { ORDATA   ( "М7",    M[7],     15) },
+    { ORDATA   ( "М10",   M[010],   15) },
+    { ORDATA   ( "М11",   M[011],   15) },
+    { ORDATA   ( "М12",   M[012],   15) },
+    { ORDATA   ( "М13",   M[013],   15) },
+    { ORDATA   ( "М14",   M[014],   15) },
+    { ORDATA   ( "М15",   M[015],   15) },
+    { ORDATA   ( "М16",   M[016],   15) },
+    { ORDATA   ( "М17",   M[017],   15) }, /* указатель магазина */
+    { ORDATA   ( "М20",   M[020],   15) }, /* MOD - модификатор адреса */
+    { ORDATA   ( "М21",   M[021],   15) }, /* PSW - режимы УУ */
+    { ORDATA   ( "М27",   M[027],   15) }, /* SPSW - упрятывание режимов УУ */
+    { ORDATA   ( "М32",   M[032],   15) }, /* ERET - адрес возврата из экстракода */
+    { ORDATA   ( "М33",   M[033],   15) }, /* IRET - адрес возврата из прерывания */
+    { ORDATA   ( "М34",   M[034],   16) }, /* IBP - адрес прерывания по выполнению */
+    { ORDATA   ( "М35",   M[035],   16) }, /* DWP - адрес прерывания по чтению/записи */
+    { BINRDATA ( "РУУ",   RUU,       9) }, /* ПКП, ПКЛ, РежЭ, РежПр, ПрИК, БРО, ПрК */
+    { ORDATAVM ( "ГРП",   GRP,      48) }, /* главный регистр прерываний */
+    { ORDATAVM ( "МГРП",  MGRP,     48) }, /* маска ГРП */
+    { ORDATA   ( "ПРП",   PRP,      24) }, /* периферийный регистр прерываний */
+    { ORDATA   ( "МПРП",  MPRP,     24) }, /* маска ПРП */
     { 0 }
 };
 
@@ -178,73 +180,73 @@ DEVICE cpu_dev = {
  * REG: A pseudo-device containing Latin synonyms of all CPU registers.
  */
 REG reg_reg[] = {
-    { "PC",    &PC,         8, 15, 0, 1 },          /* program counter */
-    { "RK",    &RK,         8, 24, 0, 1 },          /* instruction register */
-    { "Aex",   &Aex,        8, 15, 0, 1 },          /* effective address */
-    { "ACC",   &ACC,        8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* accumulator */
-    { "RMR",   &RMR,        8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* LSB register */
-    { "RAU",   &RAU,        2, 6,  0, 1 },          /* ALU modes */
-    { "M1",    &M[1],       8, 15, 0, 1 },          /* index (modifier) registers */
-    { "M2",    &M[2],       8, 15, 0, 1 },
-    { "M3",    &M[3],       8, 15, 0, 1 },
-    { "M4",    &M[4],       8, 15, 0, 1 },
-    { "M5",    &M[5],       8, 15, 0, 1 },
-    { "M6",    &M[6],       8, 15, 0, 1 },
-    { "M7",    &M[7],       8, 15, 0, 1 },
-    { "M10",   &M[010],     8, 15, 0, 1 },
-    { "M11",   &M[011],     8, 15, 0, 1 },
-    { "M12",   &M[012],     8, 15, 0, 1 },
-    { "M13",   &M[013],     8, 15, 0, 1 },
-    { "M14",   &M[014],     8, 15, 0, 1 },
-    { "M15",   &M[015],     8, 15, 0, 1 },
-    { "M16",   &M[016],     8, 15, 0, 1 },
-    { "M17",   &M[017],     8, 15, 0, 1 },          /* also the stack pointer */
-    { "M20",   &M[020],     8, 15, 0, 1 },          /* MOD - address modifier register */
-    { "M21",   &M[021],     8, 15, 0, 1 },          /* PSW - CU modes */
-    { "M27",   &M[027],     8, 15, 0, 1 },          /* SPSW - saved CU modes */
-    { "M32",   &M[032],     8, 15, 0, 1 },          /* ERET - extracode return address */
-    { "M33",   &M[033],     8, 15, 0, 1 },          /* IRET - interrupt return address */
-    { "M34",   &M[034],     8, 16, 0, 1 },          /* IBP - instruction bkpt address */
-    { "M35",   &M[035],     8, 16, 0, 1 },          /* DWP - watchpoint address */
-    { "RUU",   &RUU,        2, 9,  0, 1 },          /* execution modes  */
-    { "GRP",   &GRP,        8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* main interrupt reg */
-    { "MGRP",  &MGRP,       8, 48, 0, 1, NULL, NULL, REG_VMIO},     /* mask of the above  */
-    { "PRP",   &PRP,        8, 24, 0, 1 },          /* peripheral interrupt reg */
-    { "MPRP",  &MPRP,       8, 24, 0, 1 },          /* mask of the above*/
+    { ORDATA   ( "PC",    PC,         15) },          /* program counter */
+    { ORDATA   ( "RK",    RK,         24) },          /* instruction register */
+    { ORDATA   ( "Aex",   Aex,        15) },          /* effective address */
+    { ORDATAVM ( "ACC",   ACC,        48) },          /* accumulator */
+    { ORDATAVM ( "RMR",   RMR,        48) },          /* LSB register */
+    { BINRDATA ( "RAU",   RAU,         6) },          /* ALU modes */
+    { ORDATA   ( "M1",    M[1],       15) },          /* index (modifier) registers */
+    { ORDATA   ( "M2",    M[2],       15) },
+    { ORDATA   ( "M3",    M[3],       15) },
+    { ORDATA   ( "M4",    M[4],       15) },
+    { ORDATA   ( "M5",    M[5],       15) },
+    { ORDATA   ( "M6",    M[6],       15) },
+    { ORDATA   ( "M7",    M[7],       15) },
+    { ORDATA   ( "M10",   M[010],     15) },
+    { ORDATA   ( "M11",   M[011],     15) },
+    { ORDATA   ( "M12",   M[012],     15) },
+    { ORDATA   ( "M13",   M[013],     15) },
+    { ORDATA   ( "M14",   M[014],     15) },
+    { ORDATA   ( "M15",   M[015],     15) },
+    { ORDATA   ( "M16",   M[016],     15) },
+    { ORDATA   ( "M17",   M[017],     15) },          /* also the stack pointer */
+    { ORDATA   ( "M20",   M[020],     15) },          /* MOD - address modifier register */
+    { ORDATA   ( "M21",   M[021],     15) },          /* PSW - CU modes */
+    { ORDATA   ( "M27",   M[027],     15) },          /* SPSW - saved CU modes */
+    { ORDATA   ( "M32",   M[032],     15) },          /* ERET - extracode return address */
+    { ORDATA   ( "M33",   M[033],     15) },          /* IRET - interrupt return address */
+    { ORDATA   ( "M34",   M[034],     16) },          /* IBP - instruction bkpt address */
+    { ORDATA   ( "M35",   M[035],     16) },          /* DWP - watchpoint address */
+    { BINRDATA ( "RUU",   RUU,         9) },          /* execution modes  */
+    { ORDATAVM ( "GRP",   GRP,        48) },          /* main interrupt reg */
+    { ORDATAVM ( "MGRP",  MGRP,       48) },          /* mask of the above  */
+    { ORDATA   ( "PRP",   PRP,        24) },          /* peripheral interrupt reg */
+    { ORDATA   ( "MPRP",  MPRP,       24) },          /* mask of the above*/
 
-    { "BRZ0",  &BRZ[0],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "BRZ1",  &BRZ[1],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "BRZ2",  &BRZ[2],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "BRZ3",  &BRZ[3],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "BRZ4",  &BRZ[4],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "BRZ5",  &BRZ[5],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "BRZ6",  &BRZ[6],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "BRZ7",  &BRZ[7],     8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "BAZ0",  &BAZ[0],     8, 16, 0, 1 },
-    { "BAZ1",  &BAZ[1],     8, 16, 0, 1 },
-    { "BAZ2",  &BAZ[2],     8, 16, 0, 1 },
-    { "BAZ3",  &BAZ[3],     8, 16, 0, 1 },
-    { "BAZ4",  &BAZ[4],     8, 16, 0, 1 },
-    { "BAZ5",  &BAZ[5],     8, 16, 0, 1 },
-    { "BAZ6",  &BAZ[6],     8, 16, 0, 1 },
-    { "BAZ7",  &BAZ[7],     8, 16, 0, 1 },
-    { "TABST", &TABST,      8, 28, 0, 1 },
-    { "RP0",   &RP[0],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
-    { "RP1",   &RP[1],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
-    { "RP2",   &RP[2],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
-    { "RP3",   &RP[3],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
-    { "RP4",   &RP[4],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
-    { "RP5",   &RP[5],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
-    { "RP6",   &RP[6],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
-    { "RP7",   &RP[7],      8, 48, 0, 1, NULL, NULL, REG_VMIO },
-    { "RZ",    &RZ,         8, 32, 0, 1 },
-    { "FP1",   &pult[0][1],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP2",   &pult[0][2],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP3",   &pult[0][3],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP4",   &pult[0][4],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP5",   &pult[0][5],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP6",   &pult[0][6],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
-    { "FP7",   &pult[0][7],    8, 50, 0, 1, NULL, NULL, REG_VMIO },
+    { ORDATAVM ( "BRZ0",  BRZ[0],     50) },
+    { ORDATAVM ( "BRZ1",  BRZ[1],     50) },
+    { ORDATAVM ( "BRZ2",  BRZ[2],     50) },
+    { ORDATAVM ( "BRZ3",  BRZ[3],     50) },
+    { ORDATAVM ( "BRZ4",  BRZ[4],     50) },
+    { ORDATAVM ( "BRZ5",  BRZ[5],     50) },
+    { ORDATAVM ( "BRZ6",  BRZ[6],     50) },
+    { ORDATAVM ( "BRZ7",  BRZ[7],     50) },
+    { ORDATA   ( "BAZ0",  BAZ[0],     16) },
+    { ORDATA   ( "BAZ1",  BAZ[1],     16) },
+    { ORDATA   ( "BAZ2",  BAZ[2],     16) },
+    { ORDATA   ( "BAZ3",  BAZ[3],     16) },
+    { ORDATA   ( "BAZ4",  BAZ[4],     16) },
+    { ORDATA   ( "BAZ5",  BAZ[5],     16) },
+    { ORDATA   ( "BAZ6",  BAZ[6],     16) },
+    { ORDATA   ( "BAZ7",  BAZ[7],     16) },
+    { ORDATA   ( "TABST", TABST,      28) },
+    { ORDATAVM ( "RP0",   RP[0],      48) },
+    { ORDATAVM ( "RP1",   RP[1],      48) },
+    { ORDATAVM ( "RP2",   RP[2],      48) },
+    { ORDATAVM ( "RP3",   RP[3],      48) },
+    { ORDATAVM ( "RP4",   RP[4],      48) },
+    { ORDATAVM ( "RP5",   RP[5],      48) },
+    { ORDATAVM ( "RP6",   RP[6],      48) },
+    { ORDATAVM ( "RP7",   RP[7],      48) },
+    { ORDATA   ( "RZ",    RZ,         32) },
+    { ORDATAVM ( "FP1",   pult[0][1], 50) },
+    { ORDATAVM ( "FP2",   pult[0][2], 50) },
+    { ORDATAVM ( "FP3",   pult[0][3], 50) },
+    { ORDATAVM ( "FP4",   pult[0][4], 50) },
+    { ORDATAVM ( "FP5",   pult[0][5], 50) },
+    { ORDATAVM ( "FP6",   pult[0][6], 50) },
+    { ORDATAVM ( "FP7",   pult[0][7], 50) },
     { 0 }
 };
 
