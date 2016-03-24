@@ -429,7 +429,7 @@ REG cpu_reg[] = {
 MTAB cpu_mod[] = {
     { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL, NULL, NULL, "Set HALT to trap to simulator" },
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL, NULL, NULL, "Set HALT to trap to console ROM" },
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE={VMS|ULTRIX|NETBSD|OPENBSD|ULTRIXOLD|OPENBSDOLD|QUASIJARUS|32V|ELN|ALL}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE={VMS|ULTRIX|NETBSD|OPENBSD|ULTRIXOLD|OPENBSDOLD|QUASIJARUS|32V|ELN}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL,  "Disables idle detection" },
     MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
@@ -3619,7 +3619,6 @@ static struct os_idle os_tab[] = {
     { "QUASIJARUS", VAX_IDLE_QUAD },
     { "32V", VAX_IDLE_VMS },
     { "ELN", VAX_IDLE_ELN },
-    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_ULT1X|VAX_IDLE_QUAD|VAX_IDLE_BSDNEW|VAX_IDLE_ELN },
     { NULL, 0 }
     };
 
@@ -3716,11 +3715,10 @@ fprintf (st, "      -u      interpret address as virtual, user mode\n\n");
 fprintf (st, "The CPU attempts to detect when the simulator is idle.  When idle, the\n");
 fprintf (st, "simulator does not use any resources on the host system.  Idle detection is\n");
 fprintf (st, "controlled by the SET IDLE and SET NOIDLE commands:\n\n");
-fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|NETBSD|FREEBSD|32V|ELN|ALL}{:n}\n");
+fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|NETBSD|FREEBSD|32V|ELN}{:n}\n");
 fprintf (st, "                                        enable idle detection\n");
 fprintf (st, "   sim> SET CPU NOIDLE                  disable idle detection\n\n");
-fprintf (st, "Idle detection is disabled by default.  Unless ALL is specified, idle\n");
-fprintf (st, "detection is operating system specific.  If idle detection is enabled with\n");
+fprintf (st, "Idle detection is disabled by default.  If idle detection is enabled with\n");
 fprintf (st, "an incorrect operating system setting, simulator performance or correct\n");
 fprintf (st, "functionality could be impacted.  The default operating system setting is\n");
 fprintf (st, "VMS.  The value 'n', if present in the \"SET CPU IDLE={OS}:n\" command,\n");
