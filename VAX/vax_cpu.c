@@ -3722,7 +3722,7 @@ fprintf (st, "The CPU attempts to detect when the simulator is idle.  When idle,
 fprintf (st, "simulator does not use any resources on the host system.  Idle detection is\n");
 fprintf (st, "controlled by the SET IDLE and SET NOIDLE commands:\n\n");
 fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|ULTRIXOLD|ULTRIX-1.X|\n");
-fprintf (st, "                      3BSD|4.0BSD|4.1BSD|4.2BSD|QUASIJARUS|\n);
+fprintf (st, "                      3BSD|4.0BSD|4.1BSD|4.2BSD|QUASIJARUS|\n");
 fprintf (st, "                      NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|32V|ELN}{:n}\n");
 fprintf (st, "                                        enable idle detection\n");
 fprintf (st, "   sim> SET CPU NOIDLE                  disable idle detection\n\n");
