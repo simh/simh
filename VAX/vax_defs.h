@@ -66,6 +66,7 @@
 #define STOP_BOOT       12                              /* reboot (780) */
 #define STOP_UNKNOWN    13                              /* unknown reason */
 #define STOP_UNKABO     14                              /* unknown abort */
+#define STOP_DTOFF      15                              /* DECtape off reel */
 #define ABORT_INTR      -1                              /* interrupt */
 #define ABORT_MCHK      (-SCB_MCHK)                     /* machine check */
 #define ABORT_RESIN     (-SCB_RESIN)                    /* rsvd instruction */

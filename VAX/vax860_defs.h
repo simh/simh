@@ -341,6 +341,8 @@ typedef struct {
 
 /* Interrupt assignments; within each level, priority is right to left */
 
+#define INT_V_DTA       0                               /* BR6 */
+
 #define INT_V_DZRX      0                               /* BR5 */
 #define INT_V_DZTX      1
 #define INT_V_HK        2
@@ -364,6 +366,7 @@ typedef struct {
 #define INT_V_TDRX      6
 #define INT_V_TDTX      7
 
+#define INT_DTA         (1u << INT_V_DTA)
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
 #define INT_HK          (1u << INT_V_HK)
@@ -386,6 +389,7 @@ typedef struct {
 #define INT_TDRX        (1u << INT_V_TDRX)
 #define INT_TDTX        (1u << INT_V_TDTX)
 
+#define IPL_DTA         (0x16 - IPL_HMIN)
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
 #define IPL_HK          (0x15 - IPL_HMIN)

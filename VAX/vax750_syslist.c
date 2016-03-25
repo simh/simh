@@ -40,6 +40,7 @@ extern DEVICE mba_dev[MBA_NUM];
 extern DEVICE clk_dev;
 extern DEVICE tmr_dev;
 extern DEVICE tti_dev, tto_dev;
+extern DEVICE dt_dev;
 extern DEVICE td_dev;
 extern DEVICE tdc_dev;
 extern DEVICE cr_dev;
@@ -69,6 +70,7 @@ DEVICE *sim_devices[] = {
     &tmr_dev,
     &tti_dev,
     &tto_dev,
+    &dt_dev,
     &td_dev,
     &tdc_dev,
     &dz_dev,

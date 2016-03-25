@@ -99,7 +99,8 @@ const char *sim_stop_messages[] = {
     "Software done",
     "Reboot request failed",
     "Unknown error",
-    "Unknown abort code"
+    "Unknown abort code",
+    "DECtape off reel"
     };
 
 /* Dispatch/decoder table
