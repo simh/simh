@@ -3608,17 +3608,23 @@ struct os_idle {
     };
 
 static struct os_idle os_tab[] = {
-    { "VMS", VAX_IDLE_VMS },
-    { "NETBSDOLD", VAX_IDLE_ULTOLD },
-    { "NETBSD", VAX_IDLE_BSDNEW },
-    { "ULTRIX", VAX_IDLE_ULT },
-    { "ULTRIXOLD", VAX_IDLE_ULTOLD },
-    { "ULTRIX-1.X", VAX_IDLE_ULT1X },
-    { "OPENBSDOLD", VAX_IDLE_QUAD },
-    { "OPENBSD", VAX_IDLE_BSDNEW },
-    { "QUASIJARUS", VAX_IDLE_QUAD },
-    { "32V", VAX_IDLE_VMS },
-    { "ELN", VAX_IDLE_ELN },
+    { "VMS",            VAX_IDLE_VMS },
+    { "ULTRIX",         VAX_IDLE_ULT },
+    { "ULTRIXOLD",      VAX_IDLE_ULTOLD },
+    { "ULTRIX-1.X",     VAX_IDLE_ULT1X },
+    { "3BSD",           VAX_IDLE_ULT1X },
+    { "4.0BSD",         VAX_IDLE_ULT1X },
+    { "4.1BSD",         VAX_IDLE_ULT1X },
+    { "4.2BSD",         VAX_IDLE_ULT1X },
+    { "QUASIJARUS",     VAX_IDLE_QUAD },
+    { "4.3BSD",         VAX_IDLE_QUAD },
+    { "4.4BSD-Reno",    VAX_IDLE_QUAD },
+    { "NETBSD",         VAX_IDLE_BSDNEW },
+    { "NETBSDOLD",      VAX_IDLE_ULTOLD },
+    { "OPENBSD",        VAX_IDLE_BSDNEW },
+    { "OPENBSDOLD",     VAX_IDLE_QUAD },
+    { "32V",            VAX_IDLE_VMS },
+    { "ELN",            VAX_IDLE_ELN },
     { NULL, 0 }
     };
 
@@ -3715,7 +3721,9 @@ fprintf (st, "      -u      interpret address as virtual, user mode\n\n");
 fprintf (st, "The CPU attempts to detect when the simulator is idle.  When idle, the\n");
 fprintf (st, "simulator does not use any resources on the host system.  Idle detection is\n");
 fprintf (st, "controlled by the SET IDLE and SET NOIDLE commands:\n\n");
-fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|ULTRIX-1.X|ULTRIXOLD|NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|QUASIJARUS|32V|ELN}{:n}\n");
+fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|ULTRIXOLD|ULTRIX-1.X|\n");
+fprintf (st, "                      3BSD|4.0BSD|4.1BSD|4.2BSD|QUASIJARUS|\n);
+fprintf (st, "                      NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|32V|ELN}{:n}\n");
 fprintf (st, "                                        enable idle detection\n");
 fprintf (st, "   sim> SET CPU NOIDLE                  disable idle detection\n\n");
 fprintf (st, "Idle detection is disabled by default.  If idle detection is enabled with\n");
