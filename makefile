@@ -809,6 +809,9 @@ ifneq ($(DEBUG),)
 else
   ifneq (clang,$(findstring clang,$(COMPILER_NAME)))
     CFLAGS_O = -O2
+    ifeq (Darwin,$(OSTYPE))
+      NO_LTO = 1
+    endif
   else
     ifeq (Darwin,$(OSTYPE))
       CFLAGS_O += -O4 -fno-strict-overflow -flto -fwhole-program
