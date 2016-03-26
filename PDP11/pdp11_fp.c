@@ -152,7 +152,7 @@
 
 /* Reg change word */
 
-#define FPCHG(v,r)      (((v) << FPCHG_V_VAL) | (r))
+#define FPCHG(v,r)      ((int32)((((uint32)(v)) << FPCHG_V_VAL) | (r)))
 #define FPCHG_REG       07                              /* register number */
 #define FPCHG_V_VAL     3                               /* offset to value */
 #define FPCHG_GETREG(x) ((x) & FPCHG_REG)
