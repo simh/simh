@@ -35,6 +35,46 @@
       realized that the axis was perpendicular to the loading dock 4 floors
       below. A 90-degree turn solved the problem.
 
+   GRAPHICS-2 was a command list based graphics display system,
+   and included a light pen, a "button box" and status bits
+   for a "dataphone" interface to speak to a GECOS system.
+
+   The UNIX-7 system driver only uses text display, and reserves 269
+   words (holding two characters each; the buffer is 273 words, but
+   three contain display "setup" commands, and the final word in the
+   buffer must be a display "TRAP" instruction that ends the display
+   list).
+
+   The UNIX system code triggers a refresh every 10 60Hz "ticks" of
+   the real time clock.  This driver attempts to do detect new text
+   and send it to a user who has TELNETed in.
+
+   Thoughts on implementing a web interface:
+
+   538 characters redisplaying at 6Hz (every 10 "ticks") gives a
+   bandwith requirement of only 26Kbit, and most refreshes won't
+   change the screen and could be suppressed.  So it seems like it
+   would be reasonable to create a web interface.
+
+   Make a SIMH TCP server port which implements a tiny HTTP server.
+   The base URL serves up a skeletal page with (lighted) buttons,
+   and a "display window".
+
+   And either:
+
+   1) Use "AJAX": an (invisible) <iframe> on in the HTML served by the
+      "base URL" keeps a never-ending connection that is sent "script"
+      tags to alter the "screen" (div) contents, and light push buttons.
+      Keypresses and buttons could be implemented using "onclick"
+      actions which trigger a GET (or a POST) on a URLs which
+      open new (temporary) HTTP connections to SIMH.  The key/button
+      press URL could contain a session UUID which has to match
+      a value sent in the initial page.
+
+   2) Have the "home" page HTML establish a bi-directional WebSocket
+      connection to Encapsulate all the traffic (screen contents,
+      button lighting, key & button presses).
+
    The graphics system responds as ten PDP-7 "devices";
    UNIX only uses six, and only three of the six are simulated here
    (and *JUST* enough of those to figure out the text being displayed),
