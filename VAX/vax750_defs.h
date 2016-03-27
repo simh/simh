@@ -312,6 +312,7 @@ typedef struct {
 #define INT_V_DMCTX     10
 #define INT_V_DUPRX     11
 #define INT_V_DUPTX     12
+#define INT_V_RK        13
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
@@ -342,6 +343,7 @@ typedef struct {
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_RK          (1u << INT_V_RK)
 #define INT_TDRX        (1u << INT_V_TDRX)
 #define INT_TDTX        (1u << INT_V_TDTX)
 
@@ -365,6 +367,7 @@ typedef struct {
 #define IPL_DMCTX       (0x15 - IPL_HMIN)
 #define IPL_DUPRX       (0x15 - IPL_HMIN)
 #define IPL_DUPTX       (0x15 - IPL_HMIN)
+#define IPL_RK          (0x15 - IPL_HMIN)
 #define IPL_TDRX        (0x14 - IPL_HMIN)
 #define IPL_TDTX        (0x14 - IPL_HMIN)
 
