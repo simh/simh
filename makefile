@@ -431,6 +431,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         DISPLAYVT = ${DISPLAYD}/vt11.c
         DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
         $(info using libSDL2: $(call find_include,SDL2/SDL))
+        ifeq (Darwin,$(OSTYPE))
+          VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
+        endif
       endif
     else
       ifneq (,$(call find_include,SDL/SDL))
@@ -442,6 +445,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           DISPLAYVT = ${DISPLAYD}/vt11.c
           DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
           $(info using libSDL: $(call find_include,SDL/SDL))
+          ifeq (Darwin,$(OSTYPE))
+            VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
+          endif
         endif
       endif
     endif
