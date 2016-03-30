@@ -927,7 +927,8 @@ static t_stat vh_wr (   int32   ldata,
                 data &= ~CSR_MASTER_RESET;
             if (vh == 0) /* Only start unit service on the first unit.  Units are polled there */
                 sim_clock_coschedule (&vh_unit[0], tmxr_poll);
-            sim_activate_after (&vh_unit[vh_dev.numunits-1], 120000);  /* 120 milliseconds */
+            vh_mcount[vh] = MS2SIMH (1200); /* 1.2 seconds */
+            sim_clock_coschedule (&vh_unit[vh_dev.numunits-1], tmxr_poll);
         }
         if ((data & CSR_RXIE) == 0)
             vh_clr_rxint (vh);
@@ -1211,7 +1212,7 @@ static void doDMA ( int32   vh,
         lp->tbuf1 = pa & 0177777;
         lp->tbuf2 = (lp->tbuf2 & ~TB2_M_TBUFFAD) |
                 ((pa >> 16) & TB2_M_TBUFFAD);
-        if (lp->tbuffct == 0) {
+        if ((lp->tbuffct == 0) || (!lp->tmln->conn)) {
             lp->tbuf2 &= ~TB2_TX_DMA_START;
             q_tx_report (vh, status);
         }
@@ -1222,24 +1223,30 @@ static void doDMA ( int32   vh,
 
 static t_stat vh_timersvc (  UNIT    *uptr   )
 {
-    int32   vh, again;
+    int32   vh;
 
     sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_timersvc()\n");
 
+    /* scan all DHU-mode muxes for RX FIFO timeout */
+    for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
+        if (vh_unit[vh].flags & UNIT_MODEDHU) {
+            if (vh_timeo[vh] && (vh_csr[vh] & CSR_RXIE)) {
+                vh_timeo[vh] -= 1;
+                if ((vh_timeo[vh] == 0) && rbuf_idx[vh])
+                    vh_set_rxint (vh);
+            }
+        }
+    }
     /* scan all muxes for countdown reset */
-    again = 0;
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
         if (vh_csr[vh] & CSR_MASTER_RESET) {
-            if (vh_mcount[vh] != 0) {
+            if (vh_mcount[vh] != 0)
                 vh_mcount[vh] -= 1;
-                ++again;
-                }
             else
                 vh_clear (vh, FALSE);
         }
     }
-    if (again)
-        sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
+    sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
     return (SCPE_OK);
 }
 
@@ -1276,16 +1283,6 @@ static t_stat vh_svc (  UNIT    *uptr   )
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++)
         vh_getc (vh);
     tmxr_poll_tx (&vh_desc);
-    /* scan all DHU-mode muxes for RX FIFO timeout */
-    for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
-        if (vh_unit[vh].flags & UNIT_MODEDHU) {
-            if (vh_timeo[vh] && (vh_csr[vh] & CSR_RXIE)) {
-                vh_timeo[vh] -= 1;
-                if ((vh_timeo[vh] == 0) && rbuf_idx[vh])
-                    vh_set_rxint (vh);
-            }
-        }
-    }
     sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
     return (SCPE_OK);
 }
