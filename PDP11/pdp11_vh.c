@@ -927,7 +927,7 @@ static t_stat vh_wr (   int32   ldata,
                 data &= ~CSR_MASTER_RESET;
             if (vh == 0) /* Only start unit service on the first unit.  Units are polled there */
                 sim_clock_coschedule (&vh_unit[0], tmxr_poll);
-            sim_activate_after (&vh_unit[vh_dev.numunits-1], 1200000);  /* 1.2 seconds */
+            sim_activate_after (&vh_unit[vh_dev.numunits-1], 120000);  /* 120 milliseconds */
         }
         if ((data & CSR_RXIE) == 0)
             vh_clr_rxint (vh);
