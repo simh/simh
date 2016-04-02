@@ -853,7 +853,7 @@ extern int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, i
 
 /* vax_cmode.c externals */
 extern int32 op_cmode (int32 cc);
-extern int32 BadCmPSL (int32 newpsl);
+extern t_bool BadCmPSL (int32 newpsl);
 
 /* vax_sys.c externals */
 extern const uint16 drom[NUM_INST][MAX_SPEC + 1];
