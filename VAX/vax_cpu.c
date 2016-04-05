@@ -498,7 +498,7 @@ if ((PSL & PSL_MBZ) ||                                  /* validate PSL<mbz> */
     ((PSL_GETCUR (PSL) != KERN) &&                      /* esu => is, ipl = 0 */
         (PSL & (PSL_IS|PSL_IPL))) ||
     ((PSL & PSL_IS) && ((PSL & PSL_IPL) == 0)))         /* is => ipl > 0 */
-    return SCPE_STOP;
+    return sim_messagef (SCPE_STOP, "Unreasonable PSL value: %08X\r\n", PSL);
 cc = PSL & CC_MASK;                                     /* split PSL */
 PSL = PSL & ~CC_MASK;
 in_ie = 0;                                              /* not in exc */
