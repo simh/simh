@@ -2116,8 +2116,9 @@ void xq_sw_reset(CTLR* xq)
   sim_debug(DBG_TRC, xq->dev, "xq_sw_reset()\n");
   ++xq->var->stats.reset;
 
-  /* Return DELQA-T to DELQA Normal mode */
-  if (xq->var->type == XQ_T_DELQA_PLUS) {
+  /* Return DELQA-T in DELQA-T mode to DELQA Normal mode */
+  if ((xq->var->type == XQ_T_DELQA_PLUS) && (xq->var->mode == XQ_T_DELQA_PLUS)){
+    xq->var->var |= XQ_VEC_MS;
     xq->var->mode = XQ_T_DELQA;
     xq->var->iba = xq->var->srr = 0;
   }
@@ -2165,7 +2166,7 @@ void xq_sw_reset(CTLR* xq)
 t_stat xq_wr_var(CTLR* xq, int32 data)
 {
   uint16 save_var = xq->var->var;
-  sim_debug(DBG_REG, xq->dev, "xq_wr_var(data= 0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_var(data=0x%08X)\n", data);
   
   switch (xq->var->type) {
     case XQ_T_DEQNA:
@@ -2176,7 +2177,7 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
       if (xq->var->lockmode)
         xq->var->var = data & (XQ_VEC_IV | XQ_VEC_ID);
       else
-        xq->var->var = (data & ~XQ_VEC_RO) | (XQ_VEC_ID & XQ_VEC_RW);
+        xq->var->var = (data & XQ_VEC_RW);
 
       if ((save_var ^ xq->var->var) & XQ_VEC_MS) { /* DEQNA-Lock mode changing? */
         if (~xq->var->var & XQ_VEC_MS) {
@@ -2197,15 +2198,13 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
           xq->var->var |= XQ_VEC_S1; /* Indicate No Network Connection */
         else
           xq->var->var &= ~XQ_VEC_ST; /* Set success Status */
+        sim_debug(DBG_REG, xq->dev, "xq_wr_var(DELQA self test performed. Result: %d\n", xq->var->var & XQ_VEC_ST);
       }
       break;
   }
 
   /* set vector of SIMH device */
-  if (data & XQ_VEC_IV)
-    xq->dib->vec = (data & XQ_VEC_IV);
-  else
-    xq->dib->vec = 0;
+  xq->dib->vec = (data & XQ_VEC_IV);
 
   sim_debug_bits(DBG_VAR, xq->dev, xq_var_bits, save_var, xq->var->var, 1);
 
@@ -2302,6 +2301,11 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
     xq_stop_receiver(xq);
   }
 
+  if (xq->var->csr & XQ_CSR_EL & ~data)
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - External Loopback %s\n", data, (data & XQ_CSR_EL) ? "enabled" : "disabled");
+  if (xq->var->csr & XQ_CSR_IL & ~data)
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - Internal Loopback %s\n", data, (data & XQ_CSR_IL) ? "disabled" : "enabled");
+
   /* update CSR bits */
   xq_csr_set_clr (xq, set_bits, clr_bits);
 
@@ -2316,11 +2320,6 @@ void xq_start_receiver(CTLR* xq)
 {
   if (!xq->var->etherface)
     return;
-
-  /* clear read queue */
-  ethq_clear(&xq->var->ReadQ);
-
-
 
   /* start the read service timer or enable asynch reading as appropriate */
   if (xq->var->must_poll) {
@@ -2545,7 +2544,7 @@ t_stat xq_reset(DEVICE* dptr)
       break;
     case XQ_T_DELQA:
     case XQ_T_DELQA_PLUS:
-      xq->var->var = (xq->var->lockmode ? XQ_VEC_MS : 0) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
+      xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
       xq->var->mode = (xq->var->lockmode ? XQ_T_DEQNA : XQ_T_DELQA);
       break;
   }
@@ -2754,7 +2753,7 @@ t_stat xq_tmrsvc(UNIT* uptr)
         sim_debug(DBG_TRC, xq->dev, "xq_tmrsvc(DELQA-PLUS Host Inactivity Expired\n");
         xq->var->mode = XQ_T_DELQA;
         xq->var->iba = xq->var->srr = 0;
-        xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
+        xq->var->var = XQ_VEC_MS | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
       }
     }
   }
