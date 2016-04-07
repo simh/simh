@@ -1383,7 +1383,7 @@ if ((lp->sock) || (lp->serport) || (lp->loopback)) {
             incoming_state |= TMXR_MDM_DCD;
         }
     else
-        incoming_state = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_DSR;
+        incoming_state = TMXR_MDM_DCD | TMXR_MDM_DSR;
     }
 else
     if ((lp->master) || (lp->mp && lp->mp->master) ||
