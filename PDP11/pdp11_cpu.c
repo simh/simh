@@ -745,6 +745,7 @@ while (reason == 0)  {
     int32 IR, srcspec, srcreg, dstspec, dstreg;
     int32 src, src2, dst, ea;
     int32 i, t, sign, oldrs, trapnum;
+    InstHistory *hst_ent;
 
     if (cpu_astop) {
         cpu_astop = 0;
@@ -886,20 +887,22 @@ while (reason == 0)  {
             SWMASK ('K') | SWMASK ('V'), SWMASK ('S') | SWMASK ('V'),
             SWMASK ('U') | SWMASK ('V'), SWMASK ('U') | SWMASK ('V')
             };
-        hst[hst_p].pc = PC | HIST_VLD;
-        hst[hst_p].psw = get_PSW ();
-        hst[hst_p].src = R[srcspec & 07];
-        hst[hst_p].dst = R[dstspec & 07];
-        hst[hst_p].inst[0] = IR;
+        hst_ent = &hst[hst_p];
+        hst_ent->pc = PC | HIST_VLD;
+        hst_ent->psw = get_PSW ();
+        hst_ent->src = 0;
+        hst_ent->dst = 0;
+        hst_ent->inst[0] = IR;
         for (i = 1; i < HIST_ILNT; i++) {
             if (cpu_ex (&val, (PC + (i << 1)) & 0177777, &cpu_unit, swmap[cm & 03]))
-                hst[hst_p].inst[i] = 0;
-            else hst[hst_p].inst[i] = (uint16) val;
+                hst_ent->inst[i] = 0;
+            else hst_ent->inst[i] = (uint16) val;
             }
         hst_p = (hst_p + 1);
         if (hst_p >= hst_lnt)
             hst_p = 0;
         }
+    else hst_ent = NULL;
     PC = (PC + 2) & 0177777;                            /* incr PC, mod 65k */
     switch ((IR >> 12) & 017) {                         /* decode IR<15:12> */
 
@@ -988,6 +991,8 @@ while (reason == 0)  {
                 if (CPUT (CPUT_05|CPUT_20) &&           /* 11/05, 11/20 */
                     ((dstspec & 070) == 020))           /* JMP (R)+? */
                     dst = R[dstspec & 07];              /* use post incr */
+                if (hst_ent)
+                    hst_ent->dst = dst;
                 JMP_PC (dst);
                 }
             break;                                      /* end JMP */
@@ -995,6 +1000,8 @@ while (reason == 0)  {
         case 002:                                       /* RTS et al*/
             if (IR < 000210) {                          /* RTS */
                 dstspec = dstspec & 07;
+                if (hst_ent)
+                    hst_ent->dst = R[dstspec];
                 JMP_PC (R[dstspec]);
                 R[dstspec] = ReadW (SP | dsenable);
                 if (dstspec != 6)
@@ -1043,6 +1050,8 @@ while (reason == 0)  {
             if (!CPUT (CPUT_20))
                 V = 0;
             C = 0;
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1143,6 +1152,8 @@ while (reason == 0)  {
                 if ((cm == MD_KER) && (SP < (STKLIM + STKL_Y)))
                     set_stack_trap (SP);
                 R[srcspec] = PC;
+                if (hst_ent)
+                    hst_ent->dst = dst;
                 JMP_PC (dst & 0177777);
                 }
             break;                                      /* end JSR */
@@ -1150,6 +1161,8 @@ while (reason == 0)  {
         case 050:                                       /* CLR */
             N = V = C = 0;
             Z = 1;
+            if (hst_ent)
+                hst_ent->dst = 0;
             if (dstreg)
                 R[dstspec] = 0;
             else WriteW (0, GeteaW (dstspec));
@@ -1162,6 +1175,8 @@ while (reason == 0)  {
             Z = GET_Z (dst);
             V = 0;
             C = 1;
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1173,6 +1188,8 @@ while (reason == 0)  {
             N = GET_SIGN_W (dst);
             Z = GET_Z (dst);
             V = (dst == 0100000);
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1184,6 +1201,8 @@ while (reason == 0)  {
             N = GET_SIGN_W (dst);
             Z = GET_Z (dst);
             V = (dst == 077777);
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1196,6 +1215,8 @@ while (reason == 0)  {
             Z = GET_Z (dst);
             V = (dst == 0100000);
             C = Z ^ 1;
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1208,6 +1229,8 @@ while (reason == 0)  {
             Z = GET_Z (dst);
             V = (C && (dst == 0100000));
             C = C & Z;
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1220,6 +1243,8 @@ while (reason == 0)  {
             Z = GET_Z (dst);
             V = (C && (dst == 077777));
             C = (C && (dst == 0177777));
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1227,6 +1252,8 @@ while (reason == 0)  {
 
         case 057:                                       /* TST */
             dst = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
+            if (hst_ent)
+                hst_ent->dst = dst;
             N = GET_SIGN_W (dst);
             Z = GET_Z (dst);
             V = C = 0;
@@ -1239,6 +1266,8 @@ while (reason == 0)  {
             Z = GET_Z (dst);
             C = (src & 1);
             V = N ^ C;
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1251,6 +1280,8 @@ while (reason == 0)  {
             Z = GET_Z (dst);
             C = GET_SIGN_W (src);
             V = N ^ C;
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1263,6 +1294,8 @@ while (reason == 0)  {
             Z = GET_Z (dst);
             C = (src & 1);
             V = N ^ C;
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1275,6 +1308,8 @@ while (reason == 0)  {
             Z = GET_Z (dst);
             C = GET_SIGN_W (src);
             V = N ^ C;
+            if (hst_ent)
+                hst_ent->dst = dst;
             if (dstreg)
                 R[dstspec] = dst;
             else PWriteW (dst, last_pa);
@@ -1312,6 +1347,8 @@ while (reason == 0)  {
                 SP = (SP - 2) & 0177777;
                 if (update_MM)
                     MMR1 = calc_MMR1 (0366);
+                if (hst_ent)
+                    hst_ent->dst = dst;
                 WriteW (dst, SP | dsenable);
                 if ((cm == MD_KER) && (SP < (STKLIM + STKL_Y)))
                     set_stack_trap (SP);
@@ -1327,6 +1364,8 @@ while (reason == 0)  {
                 V = 0;
                 SP = (SP + 2) & 0177777;
                 if (update_MM) MMR1 = 026;
+                if (hst_ent)
+                    hst_ent->dst = dst;
                 if (dstreg) {
                     if ((dstspec == 6) && (cm != pm))
                         STACKFILE[pm] = dst;
@@ -1342,6 +1381,8 @@ while (reason == 0)  {
                 dst = N? 0177777: 0;
                 Z = N ^ 1;
                 V = 0;
+                if (hst_ent)
+                    hst_ent->dst = dst;
                 if (dstreg)
                     R[dstspec] = dst;
                 else WriteW (dst, GeteaW (dstspec));
@@ -1376,6 +1417,8 @@ while (reason == 0)  {
                 V = 0;
                 C = (dst & 1);
                 R[0] = dst;                             /* R[0] <- dst */
+                if (hst_ent)
+                    hst_ent->dst = dst | 1;
                 PWriteW (R[0] | 1, last_pa);            /* dst <- R[0] | 1 */
                 }
             else setTRAP (TRAP_ILL);
@@ -1387,6 +1430,8 @@ while (reason == 0)  {
                 Z = GET_Z (R[0]);
                 V = 0;
                 WriteW (R[0], GeteaW (dstspec));
+                if (hst_ent)
+                    hst_ent->dst = R[0];
                 }
             else setTRAP (TRAP_ILL);
             break;
@@ -1421,6 +1466,10 @@ while (reason == 0)  {
         N = GET_SIGN_W (dst);
         Z = GET_Z (dst);
         V = 0;
+        if (hst_ent) {
+            hst_ent->src = dst;
+            hst_ent->dst = dst;
+            }
         if (dstreg)
             R[dstspec] = dst;
         else WriteW (dst, ea);
@@ -1436,6 +1485,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
             }
         dst = (src - src2) & 0177777;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = src2;
+            }
         N = GET_SIGN_W (dst);
         Z = GET_Z (dst);
         V = GET_SIGN_W ((src ^ src2) & (~src2 ^ dst));
@@ -1452,6 +1505,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
             }
         dst = src2 & src;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = dst;
+            }
         N = GET_SIGN_W (dst);
         Z = GET_Z (dst);
         V = 0;
@@ -1467,6 +1524,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
             }
         dst = src2 & ~src;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = dst;
+            }
         N = GET_SIGN_W (dst);
         Z = GET_Z (dst);
         V = 0;
@@ -1485,6 +1546,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
             }
         dst = src2 | src;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = dst;
+            }
         N = GET_SIGN_W (dst);
         Z = GET_Z (dst);
         V = 0;
@@ -1503,6 +1568,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
             }
         dst = (src2 + src) & 0177777;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = dst;
+            }
         N = GET_SIGN_W (dst);
         Z = GET_Z (dst);
         V = GET_SIGN_W ((~src ^ src2) & (src ^ dst));
@@ -1545,6 +1614,10 @@ while (reason == 0)  {
             if (GET_SIGN_W (src))
                 src = src | ~077777;
             dst = src * src2;
+            if (hst_ent) {
+                hst_ent->src = src;
+                hst_ent->dst = dst;
+                }
             R[srcspec] = (dst >> 16) & 0177777;
             R[srcspec | 1] = dst & 0177777;
             N = (dst < 0);
@@ -1575,6 +1648,10 @@ while (reason == 0)  {
             if (GET_SIGN_W (R[srcspec]))
                 src = src | ~017777777777;
             dst = src / src2;
+            if (hst_ent) {
+                hst_ent->src = src;
+                hst_ent->dst = dst;
+                }
             N = (dst < 0);                              /* N set on 32b result */
             if ((dst > 077777) || (dst < -0100000)) {
                 V = 1;                                  /* J11,11/70 compat */
@@ -1621,6 +1698,10 @@ while (reason == 0)  {
                 V = 0;
                 C = ((src >> (63 - src2)) & 1);
                 }
+            if (hst_ent) {
+                hst_ent->src = src;
+                hst_ent->dst = dst;
+                }
             dst = R[srcspec] = dst & 0177777;
             N = GET_SIGN_W (dst);
             Z = GET_Z (dst);
@@ -1656,6 +1737,10 @@ while (reason == 0)  {
                 C = ((src >> (63 - src2)) & 1);
                 }
             i = R[srcspec] = (dst >> 16) & 0177777;
+            if (hst_ent) {
+                hst_ent->src = src;
+                hst_ent->dst = dst;
+                }
             dst = R[srcspec | 1] = dst & 0177777;
             N = GET_SIGN_W (i);
             Z = GET_Z (dst | i);
@@ -1672,6 +1757,10 @@ while (reason == 0)  {
                     src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
                     }
                 dst = src ^ src2;
+                if (hst_ent) {
+                    hst_ent->src = src;
+                    hst_ent->dst = dst;
+                    }
                 N = GET_SIGN_W (dst);
                 Z = GET_Z (dst);
                 V = 0;
@@ -1702,6 +1791,8 @@ while (reason == 0)  {
         case 7:                                         /* SOB */
             if (CPUT (HAS_SXS)) {
                 R[srcspec] = (R[srcspec] - 1) & 0177777;
+                if (hst_ent)
+                    hst_ent->dst = R[srcspec];
                 if (R[srcspec]) {
                     JMP_PC ((PC - dstspec - dstspec) & 0177777);
                     }
@@ -1826,6 +1917,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = R[dstspec] & 0177400;
             else WriteB (0, GeteaB (dstspec));
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = 0;
+            }
             break;
 
         case 051:                                       /* COMB */
@@ -1838,6 +1934,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 052:                                       /* INCB */
@@ -1849,6 +1950,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 053:                                       /* DECB */
@@ -1860,6 +1966,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 054:                                       /* NEGB */
@@ -1872,6 +1983,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 055:                                       /* ADCB */
@@ -1884,6 +2000,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 056:                                       /* SBCB */
@@ -1896,10 +2017,17 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 057:                                       /* TSTB */
             dst = dstreg? R[dstspec] & 0377: ReadB (GeteaB (dstspec));
+            if (hst_ent)
+                hst_ent->dst = dst;
             N = GET_SIGN_B (dst);
             Z = GET_Z (dst);
             V = C = 0;
@@ -1915,6 +2043,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 061:                                       /* ROLB */
@@ -1927,6 +2060,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 062:                                       /* ASRB */
@@ -1939,6 +2077,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
         case 063:                                       /* ASLB */
@@ -1951,6 +2094,11 @@ while (reason == 0)  {
             if (dstreg)
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
+            if (hst_ent) {
+                if (dstreg)
+                    hst_ent->dst = R[dstspec];
+                else hst_ent->dst = dst;
+            }
             break;
 
 /* Notes:
@@ -1988,6 +2136,8 @@ while (reason == 0)  {
                 SP = (SP - 2) & 0177777;
                 if (update_MM)
                     MMR1 = calc_MMR1 (0366);
+                if (hst_ent)
+                    hst_ent->dst = dst;
                 WriteW (dst, SP | dsenable);
                 if ((cm == MD_KER) && (SP < (STKLIM + STKL_Y)))
                     set_stack_trap (SP);
@@ -2004,6 +2154,8 @@ while (reason == 0)  {
                 SP = (SP + 2) & 0177777;
                 if (update_MM)
                     MMR1 = 026;
+                if (hst_ent)
+                    hst_ent->dst = dst;
                 if (dstreg) {
                     if ((dstspec == 6) && (cm != pm))
                         STACKFILE[pm] = dst;
@@ -2055,6 +2207,10 @@ while (reason == 0)  {
         if (dstreg)
             R[dstspec] = (dst & 0200)? 0177400 | dst: dst;
         else WriteB (dst, ea);
+        if (hst_ent) {
+            hst_ent->src = srcreg? R[srcspec]: dst;
+            hst_ent->dst = dstreg? R[dstspec]: dst;
+            }
         break;
 
     case 012:                                           /* CMPB */
@@ -2065,6 +2221,10 @@ while (reason == 0)  {
         else {
             src = srcreg? R[srcspec] & 0377: ReadB (GeteaB (srcspec));
             src2 = dstreg? R[dstspec] & 0377: ReadB (GeteaB (dstspec));
+            }
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = src2;
             }
         dst = (src - src2) & 0377;
         N = GET_SIGN_B (dst);
@@ -2083,6 +2243,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec] & 0377: ReadB (GeteaB (dstspec));
             }
         dst = (src2 & src) & 0377;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = dst;
+            }
         N = GET_SIGN_B (dst);
         Z = GET_Z (dst);
         V = 0;
@@ -2098,6 +2262,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec]: ReadMB (GeteaB (dstspec));
             }
         dst = (src2 & ~src) & 0377;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = dst;
+            }
         N = GET_SIGN_B (dst);
         Z = GET_Z (dst);
         V = 0;
@@ -2116,6 +2284,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec]: ReadMB (GeteaB (dstspec));
             }
         dst = (src2 | src) & 0377;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = dst;
+            }
         N = GET_SIGN_B (dst);
         Z = GET_Z (dst);
         V = 0;
@@ -2134,6 +2306,10 @@ while (reason == 0)  {
             src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
             }
         dst = (src2 - src) & 0177777;
+        if (hst_ent) {
+            hst_ent->src = src;
+            hst_ent->dst = dst;
+            }
         N = GET_SIGN_W (dst);
         Z = GET_Z (dst);
         V = GET_SIGN_W ((src ^ src2) & (~src ^ dst));
