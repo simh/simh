@@ -2442,7 +2442,7 @@ while (*tptr) {
         serport = sim_open_serial (destination, NULL, &r);
         if (serport != INVALID_HANDLE) {
             sim_close_serial (serport);
-            if (strchr (destination, ';') && mp->modem_control)
+            if (strchr (destination, ';') && mp->modem_control && !(sim_switches & SIM_SW_REST))
                 return sim_messagef (SCPE_ARG, "Serial line parameters must be set within simulated OS: %s\n", 1 + strchr (destination, ';'));
             }
         else {
