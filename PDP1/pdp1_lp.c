@@ -72,17 +72,17 @@ UNIT lpt_unit = {
     };
 
 REG lpt_reg[] = {
-    { ORDATA (BUF, lpt_unit.buf, 8) },
-    { FLDATA (PNT, iosta, IOS_V_PNT) },
-    { FLDATA (SPC, iosta, IOS_V_SPC) },
-    { FLDATA (RPLS, cpls, CPLS_V_LPT) },
-    { DRDATA (BPTR, lpt_bptr, 6) },
+    { ORDATAD (BUF, lpt_unit.buf, 8, "last data item processed") },
+    { FLDATAD (PNT, iosta, IOS_V_PNT, "printing done flag") },
+    { FLDATAD (SPC, iosta, IOS_V_SPC, "spacing done flag") },
+    { FLDATAD (RPLS, cpls, CPLS_V_LPT, "return restart pulse flag") },
+    { DRDATAD (BPTR, lpt_bptr, 6, "print buffer pointer") },
     { ORDATA (LPT_STATE, lpt_spc, 6), REG_HRO },
     { FLDATA (LPT_OVRPR, lpt_ovrpr, 0), REG_HRO },
-    { DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, lpt_stopioe, 0) },
-    { BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
+    { DRDATAD (POS, lpt_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, lpt_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, lpt_stopioe, 0, "stop on I/O error") },
+{ BRDATAD (LBUF, lpt_buf, 8, 8, LPT_BSIZE, "line buffer") },
     { DRDATA (SBSLVL, lpt_sbs, 4), REG_HRO },
     { NULL }
     };

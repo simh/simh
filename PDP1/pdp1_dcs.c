@@ -72,11 +72,11 @@ void dcs_scan_next (t_bool unlk);
 UNIT dcs_unit = { UDATA (&dcsi_svc, UNIT_ATTABLE, 0) };
 
 REG dcs_reg[] = {
-    { BRDATA (BUF, dcs_buf, 8, 8, DCS_LINES) },
-    { BRDATA (FLAGS, dcs_flg, 8, 1, DCS_LINES) },
-    { FLDATA (SCNF, iosta, IOS_V_DCS) },
-    { ORDATA (SCAN, dcs_scan, 5) },
-    { ORDATA (SEND, dcs_send, 5) },
+    { BRDATAD (BUF, dcs_buf, 8, 8, DCS_LINES, "input buffer, lines 0 to 31") },
+    { BRDATAD (FLAGS, dcs_flg, 8, 1, DCS_LINES, "line ready flag, lines 0 to 31") },
+    { FLDATAD (SCNF, iosta, IOS_V_DCS, "scanner ready flag") },
+    { ORDATAD (SCAN, dcs_scan, 5, "scanner line number") },
+    { ORDATAD (SEND, dcs_send, 5, "output line number") },
     { DRDATA (SBSLVL, dcs_sbs, 4), REG_HRO },
     { NULL }
     };
@@ -163,8 +163,8 @@ MTAB dcsl_mod[] = {
     };
 
 REG dcsl_reg[] = {
-    { URDATA (TIME, dcsl_unit[0].wait, 10, 24, 0,
-              DCS_LINES, REG_NZ + PV_LEFT) },
+    { URDATAD (TIME, dcsl_unit[0].wait, 10, 24, 0,
+              DCS_LINES, REG_NZ + PV_LEFT, "time from I/O initiation to interrupt, lines 0 to 31") },
     { NULL }
     };
 
