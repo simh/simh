@@ -317,21 +317,21 @@ extern int32 dpy (int32 ac);
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_EXT_INST | UNIT_MODE_READIN, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
-    { ORDATA (PC, PC, ASIZE) },
-    { ORDATA (AC, AC, 18) },
-    { ORDATA (IR, IR, 5) },
-    { ORDATA (MAR, MAR, 16) },
-    { ORDATA (XR, XR, 14) },
-    { ORDATA (MBR, MBR, 18) },
-    { ORDATA (LR, LR, 18) },
-    { ORDATA (TAC, TAC, 18) },
-    { ORDATA (TBR, TBR, 18) },
+    { ORDATAD (PC, PC, ASIZE, "program counter") },
+    { ORDATAD (AC, AC, 18, "accumulator") },
+    { ORDATAD (IR, IR, 5, "instruction register (5 bits in Extented Mode,                                  2 bits in standard mode)") },
+    { ORDATAD (MAR, MAR, 16, "memory address register") },
+    { ORDATAD (XR, XR, 14, "index register (Extended Mode only)") },
+    { ORDATAD (MBR, MBR, 18, "memory buffer register") },
+    { ORDATAD (LR, LR, 18, "live register") },
+    { ORDATAD (TAC, TAC, 18, "toggle switch accumulator") },
+    { ORDATAD (TBR, TBR, 18, "toggle switch buffer register") },
     { ORDATA (PF, PF, 18) },
     { BRDATA (PCQ, pcq, 8, ASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
-    { FLDATA (IOS, ios, 0) },       /* In Out Stop */
-    { FLDATA (CH, ch, 0) },         /* Chime Alarm */
-    { ORDATA (LP, LPEN, 2) },       /* Light Pen */
+    { FLDATAD (IOS, ios, 0, "in out stop") },       /* In Out Stop */
+    { FLDATAD (CH, ch, 0, "chime alarm") },         /* Chime Alarm */
+    { ORDATAD (LP, LPEN, 2, "light pen") },       /* Light Pen */
     { FLDATA (R, mode_rdin, 0), REG_HRO },      /* Mode "R" (Read In) Flip-Flop */
     { FLDATA (T, mode_tst, 0), REG_HRO },       /* Mode "T" (Test) Flip-Flop */
     { NULL }

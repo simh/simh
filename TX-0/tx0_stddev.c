@@ -145,16 +145,16 @@ UNIT petr_unit = {
     };
 
 REG petr_reg[] = {
-    { ORDATA (BUF, petr_unit.buf, 18) },
-    { FLDATA (UC, petr_uc, UC_V) },
-    { FLDATA (DONE, iosta, IOS_V_PETR) },
+    { ORDATAD (BUF, petr_unit.buf, 18, "18-bit buffer to store up to three lines of                                     paper tape input") },
+    { FLDATAD (UC, petr_uc, UC_V, "upper case/lower case state") },
+    { FLDATAD (DONE, iosta, IOS_V_PETR, "input ready flag") },
     { ORDATA (HOLD, petr_hold, 9), REG_HRO },
     { ORDATA (STATE, petr_state, 5), REG_HRO },
     { FLDATA (WAIT, petr_wait, 0), REG_HRO },
-    { DRDATA (POS, petr_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, petr_unit.wait, 24), PV_LEFT },
+    { DRDATAD (POS, petr_unit.pos, T_ADDR_W, "position in input file"), PV_LEFT },
+    { DRDATAD (TIME, petr_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
     { DRDATA (LEADER, petr_leader, 6), REG_HRO },
-    { FLDATA (STOP_IOE, petr_stopioe, 0) },
+    { FLDATAD (STOP_IOE, petr_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 
@@ -198,11 +198,11 @@ UNIT ptp_unit = {
     };
 
 REG ptp_reg[] = {
-    { ORDATA (BUF, ptp_unit.buf, 8) },
-    { FLDATA (DONE, iosta, IOS_V_PTP) },
-    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { ORDATAD (BUF, ptp_unit.buf, 8, "last data item processed") },
+    { FLDATAD (DONE, iosta, IOS_V_PTP, "device done flag") },
+    { DRDATAD (POS, ptp_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, ptp_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, ptp_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 
@@ -229,12 +229,12 @@ DEVICE ptp_dev = {
 UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
-    { ORDATA (BUF, tty_buf, 6) },
-    { FLDATA (UC, tty_uc, UC_V) },
+    { ORDATAD (BUF, tty_buf, 6, "typewrite buffer (shared)") },
+    { FLDATAD (UC, tty_uc, UC_V, "upper case/lower case state (shared)") },
     { ORDATA (HOLD, tti_hold, 9), REG_HRO },
-    { FLDATA (DONE, iosta, IOS_V_TTI) },
-    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { FLDATAD (DONE, iosta, IOS_V_TTI, "input ready flag") },
+    { DRDATAD (POS, tti_unit.pos, T_ADDR_W, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME, tti_unit.wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
     { NULL }
     };
 
@@ -261,11 +261,11 @@ DEVICE tti_dev = {
 UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT * 10 };
 
 REG tto_reg[] = {
-    { ORDATA (BUF, tty_buf, 6) },
-    { FLDATA (UC, tty_uc, UC_V) },
-    { FLDATA (DONE, iosta, IOS_V_TTO) },
-    { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF, tty_buf, 6, "typewrite buffer (shared)") },
+    { FLDATAD (UC, tty_uc, UC_V, "upper case/lower case state (shared)") },
+    { FLDATAD (DONE, iosta, IOS_V_TTO, "output done flag") },
+    { DRDATAD (POS, tto_unit.pos, T_ADDR_W, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME, tto_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
     { NULL }
     };
 
