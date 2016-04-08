@@ -431,6 +431,14 @@ static BITFIELD tmxr_modem_bits[] = {
   ENDBITS
 };
 
+static u_char mantra[] = {                  /* Telnet Option Negotiation Mantra */
+    TN_IAC, TN_WILL, TN_LINE,
+    TN_IAC, TN_WILL, TN_SGA,
+    TN_IAC, TN_WILL, TN_ECHO,
+    TN_IAC, TN_WILL, TN_BIN,
+    TN_IAC, TN_DO, TN_BIN
+    };
+
 /* Local routines */
 
 static void tmxr_add_to_open_list (TMXR* mux);
@@ -957,13 +965,6 @@ int32 i, j;
 char *address;
 char msg[512];
 uint32 poll_time = sim_os_msec ();
-static u_char mantra[] = {
-    TN_IAC, TN_WILL, TN_LINE,
-    TN_IAC, TN_WILL, TN_SGA,
-    TN_IAC, TN_WILL, TN_ECHO,
-    TN_IAC, TN_WILL, TN_BIN,
-    TN_IAC, TN_DO, TN_BIN
-    };
 
 if (mp->last_poll_time == 0) {                          /* first poll initializations */
     UNIT *uptr = mp->uptr;
@@ -999,7 +1000,14 @@ mp->last_poll_time = poll_time;
 /* Check for a pending Telnet/tcp connection */
 
 if (mp->master) {
-    newsock = sim_accept_conn_ex (mp->master, &address, (mp->packet ? SIM_SOCK_OPT_NODELAY : 0));/* poll connect */
+    if (mp->ring_sock != INVALID_SOCKET) {  /* Use currently 'ringing' socket if one is active */
+        newsock = mp->ring_sock;
+        mp->ring_sock = INVALID_SOCKET;
+        address = mp->ring_ipad;
+        mp->ring_ipad = NULL;
+        }
+    else
+        newsock = sim_accept_conn_ex (mp->master, &address, (mp->packet ? SIM_SOCK_OPT_NODELAY : 0));/* poll connect */
 
     if (newsock != INVALID_SOCKET) {                    /* got a live one? */
         sprintf (msg, "tmxr_poll_conn() - Connection from %s", address);
@@ -1024,17 +1032,62 @@ if (mp->master) {
             }
 
         if (i >= mp->lines) {                           /* all busy? */
-            tmxr_msg (newsock, "All connections busy\r\n");
-            tmxr_debug_connect (mp, "tmxr_poll_conn() - All connections busy");
-            sim_close_sock (newsock);
-            free (address);
+            int32 ringable_count = 0;
+
+            for (j = 0; j < mp->lines; j++, i++) {      /* find next avail line */
+                lp = mp->ldsc + j;                      /* get pointer to line descriptor */
+                if ((lp->conn == FALSE) &&              /* is the line available? */
+                    (lp->destination == NULL) &&
+                    (lp->master == 0) &&
+                    (lp->ser_connect_pending == FALSE) &&
+                    ((lp->modembits & TMXR_MDM_DTR) == 0)) {
+                    ++ringable_count;
+                    tmxr_set_get_modem_bits (lp, TMXR_MDM_RNG, 0, NULL);
+                    tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Ringing line");
+                    }
+                }
+            if (ringable_count > 0) {
+                if (mp->ring_start_time == 0) {
+                    mp->ring_start_time = poll_time;
+                    mp->ring_sock = newsock;
+                    mp->ring_ipad = address;
+                    }
+                else {
+                    if ((poll_time - mp->ring_start_time) < TMXR_MODEM_RING_TIME*1000) {
+                        mp->ring_sock = newsock;
+                        mp->ring_ipad = address;
+                        }
+                    else {                                      /* Timeout waiting for DTR */
+                        int ln;
+
+                        /* turn off pending ring signals */
+                        for (ln = 0; ln < lp->mp->lines; ln++) {
+                            TMLN *tlp = lp->mp->ldsc + ln;
+                            if (((tlp->destination == NULL) && (tlp->master == 0)) &&
+                                (tlp->modembits & TMXR_MDM_RNG) && (tlp->conn == FALSE))
+                                tlp->modembits &= ~TMXR_MDM_RNG;
+                            }
+                        mp->ring_start_time = 0;
+                        tmxr_msg (newsock, "No answer on any connection\r\n");
+                        tmxr_debug_connect (mp, "tmxr_poll_conn() - No Answer - All connections busy");
+                        sim_close_sock (newsock);
+                        free (address);
+                        }
+                    }
+                }
+            else {
+                tmxr_msg (newsock, "All connections busy\r\n");
+                tmxr_debug_connect (mp, "tmxr_poll_conn() - All connections busy");
+                sim_close_sock (newsock);
+                free (address);
+                }
             }
         else {
             lp = mp->ldsc + i;                          /* get line desc */
-            tmxr_init_line (lp);                        /* init line */
             lp->conn = TRUE;                            /* record connection */
             lp->sock = newsock;                         /* save socket */
             lp->ipad = address;                         /* ip address */
+            tmxr_init_line (lp);                        /* init line */
             lp->notelnet = mp->notelnet;                /* apply mux default telnet setting */
             if (!lp->notelnet) {
                 sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
@@ -1137,10 +1190,10 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                             }
                         if (lp->conn == FALSE) {                    /* is the line available? */
                             if ((!lp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
-                                tmxr_init_line (lp);                /* init line */
                                 lp->conn = TRUE;                    /* record connection */
                                 lp->sock = newsock;                 /* save socket */
                                 lp->ipad = address;                 /* ip address */
+                                tmxr_init_line (lp);                /* init line */
                                 if (!lp->notelnet) {
                                     sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
                                     tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
@@ -1383,14 +1436,50 @@ if ((lp->sock) || (lp->serport) || (lp->loopback)) {
             incoming_state |= TMXR_MDM_DCD;
         }
     else
-        incoming_state = TMXR_MDM_DCD | TMXR_MDM_DSR;
+        incoming_state = TMXR_MDM_DCD | TMXR_MDM_DSR | ((lp->modembits & TMXR_MDM_DTR) ? 0 : TMXR_MDM_RNG);
     }
-else
+else {
+    if (((before_modem_bits & TMXR_MDM_DTR) == 0) &&    /* Upward transition of DTR? */
+        ((lp->modembits & TMXR_MDM_DTR) != 0)     &&
+        (lp->conn == FALSE)                       &&    /* Not connected */ 
+        (lp->modembits & TMXR_MDM_RNG)) {               /* and Ring Signal Present */
+        if ((lp->destination == NULL) && 
+            (lp->master == 0) &&
+            (lp->mp && (lp->mp->ring_sock))) {
+            int ln;
+            
+            lp->conn = TRUE;                            /* record connection */
+            lp->sock = lp->mp->ring_sock;               /* save socket */
+            lp->mp->ring_sock = INVALID_SOCKET;
+            lp->ipad = lp->mp->ring_ipad;               /* ip address */
+            lp->mp->ring_ipad = NULL;
+            lp->mp->ring_start_time = 0;
+            tmxr_init_line (lp);                        /* init line */
+            lp->notelnet = lp->mp->notelnet;            /* apply mux default telnet setting */
+            if (!lp->notelnet) {
+                sim_write_sock (lp->sock, (char *)mantra, sizeof(mantra));
+                tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                lp->telnet_sent_opts = (uint8 *)realloc (lp->telnet_sent_opts, 256);
+                memset (lp->telnet_sent_opts, 0, 256);
+                }
+            tmxr_report_connection (lp->mp, lp);
+            lp->cnms = sim_os_msec ();                  /* time of connection */
+            lp->modembits &= ~TMXR_MDM_RNG;             /* turn off ring on this line*/
+            /* turn off other pending ring signals */
+            for (ln = 0; ln < lp->mp->lines; ln++) {
+                TMLN *tlp = lp->mp->ldsc + ln;
+                if (((tlp->destination == NULL) && (tlp->master == 0)) &&
+                    (tlp->modembits & TMXR_MDM_RNG) && (tlp->conn == FALSE))
+                    tlp->modembits &= ~TMXR_MDM_RNG;
+                }
+            }
+        }
     if ((lp->master) || (lp->mp && lp->mp->master) ||
         (lp->port && lp->destination))
         incoming_state = TMXR_MDM_DSR;
     else
         incoming_state = 0;
+    }
 lp->modembits |= incoming_state;
 dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
 if ((lp->modembits != before_modem_bits) && (sim_deb && lp->mp && dptr)) {
@@ -3614,6 +3703,9 @@ else {
                 }
             }
         fprintf(st, "\n");
+        if (mp->ring_start_time) {
+            fprintf (st, "    incoming Connection from: %s ringing for %d milliseconds\n", mp->ring_ipad, sim_os_msec () - mp->ring_start_time);
+            }
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
             if (mp->lines > 1) {
@@ -3708,6 +3800,13 @@ if (mp->master)
 mp->master = 0;
 free (mp->port);
 mp->port = NULL;
+if (mp->ring_sock != INVALID_SOCKET) {
+    sim_close_sock (mp->ring_sock);
+    mp->ring_sock = INVALID_SOCKET;
+    free (mp->ring_ipad);
+    mp->ring_ipad = NULL;
+    mp->ring_start_time = 0;
+    }
 _tmxr_remove_from_open_list (mp);
 return SCPE_OK;
 }
