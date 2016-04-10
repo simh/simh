@@ -69,12 +69,12 @@ DIB tti_dib = { DEV_TTI, 1, { &tti } };
 UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_KSR, 0), SERIAL_IN_WAIT };
 
 REG tti_reg[] = {
-    { ORDATA (BUF, tti_unit.buf, 8) },
-    { FLDATA (DONE, dev_done, INT_V_TTI) },
-    { FLDATA (ENABLE, int_enable, INT_V_TTI) },
-    { FLDATA (INT, int_req, INT_V_TTI) },
-    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF, tti_unit.buf, 8, "last data item processed") },
+    { FLDATAD (DONE, dev_done, INT_V_TTI, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_TTI, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_TTI, "interrupt pending flag") },
+    { DRDATAD (POS, tti_unit.pos, T_ADDR_W, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME, tti_unit.wait, 24, "input polling interval                                                          (if 0, the keyboard is polled synchronously with the clock)"), PV_LEFT },
     { NULL }
     };
 
@@ -107,12 +107,12 @@ DIB tto_dib = { DEV_TTO, 1, { &tto } };
 UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
-    { ORDATA (BUF, tto_unit.buf, 8) },
-    { FLDATA (DONE, dev_done, INT_V_TTO) },
-    { FLDATA (ENABLE, int_enable, INT_V_TTO) },
-    { FLDATA (INT, int_req, INT_V_TTO) },
-    { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF, tto_unit.buf, 8, "last date item processed") },
+    { FLDATAD (DONE, dev_done, INT_V_TTO, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_TTO, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_TTO, "interrupt pending flag") },
+    { DRDATAD (POS, tto_unit.pos, T_ADDR_W, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME, tto_unit.wait, 24, "time form I/O initiation to interrupt"), PV_LEFT },
     { NULL }
     };
 

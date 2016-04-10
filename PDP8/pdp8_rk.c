@@ -167,15 +167,15 @@ UNIT rk_unit[] = {
     };
 
 REG rk_reg[] = {
-    { ORDATA (RKSTA, rk_sta, 12) },
-    { ORDATA (RKCMD, rk_cmd, 12) },
-    { ORDATA (RKDA, rk_da, 12) },
-    { ORDATA (RKMA, rk_ma, 12) },
-    { FLDATA (BUSY, rk_busy, 0) },
-    { FLDATA (INT, int_req, INT_V_RK) },
-    { DRDATA (STIME, rk_swait, 24), PV_LEFT },
-    { DRDATA (RTIME, rk_rwait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, rk_stopioe, 0) },
+    { ORDATAD (RKSTA, rk_sta, 12, "status") },
+    { ORDATAD (RKCMD, rk_cmd, 12, "disk command") },
+    { ORDATAD (RKDA, rk_da, 12, "disk address") },
+    { ORDATAD (RKMA, rk_ma, 12, "current memory address") },
+    { FLDATAD (BUSY, rk_busy, 0, "control busy flag") },
+    { FLDATAD (INT, int_req, INT_V_RK, "interrupt pending flag") },
+    { DRDATAD (STIME, rk_swait, 24, "seek time, per cylinder"), PV_LEFT },
+    { DRDATAD (RTIME, rk_rwait, 24, "rotational delay"), PV_LEFT },
+    { FLDATAD (STOP_IOE, rk_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVNUM, rk_dib.dev, 6), REG_HRO },
     { NULL }
     };

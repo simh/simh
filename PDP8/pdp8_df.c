@@ -135,16 +135,16 @@ UNIT df_unit = {
     };
 
 REG df_reg[] = {
-    { ORDATA (STA, df_sta, 12) },
-    { ORDATA (DA, df_da, 12) },
-    { ORDATA (WC, M[DF_WC], 12), REG_FIT },
-    { ORDATA (MA, M[DF_MA], 12), REG_FIT },
-    { FLDATA (DONE, df_done, 0) },
-    { FLDATA (INT, int_req, INT_V_DF) },
-    { ORDATA (WLS, df_wlk, 8) },
-    { DRDATA (TIME, df_time, 24), REG_NZ + PV_LEFT },
-    { FLDATA (BURST, df_burst, 0) },
-    { FLDATA (STOP_IOE, df_stopioe, 0) },
+    { ORDATAD (STA, df_sta, 12, "status, disk and memory address extension") },
+    { ORDATAD (DA, df_da, 12, "low order disk address") },
+    { ORDATAD (WC, M[DF_WC], 12, "word count (in memory)"), REG_FIT },
+    { ORDATAD (MA, M[DF_MA], 12, "memory address (in memory)"), REG_FIT },
+    { FLDATAD (DONE, df_done, 0, "device done flag") },
+    { FLDATAD (INT, int_req, INT_V_DF, "interrupt pending flag") },
+    { ORDATAD (WLS, df_wlk, 8, "write lock switches") },
+    { DRDATAD (TIME, df_time, 24, "rotational delay, per word"), REG_NZ + PV_LEFT },
+    { FLDATAD (BURST, df_burst, 0, "burst flag") },
+    { FLDATAD (STOP_IOE, df_stopioe, 0, "stop on I/O error") },
     { DRDATA (CAPAC, df_unit.capac, 18), REG_HRO },
     { ORDATA (DEVNUM, df_dib.dev, 6), REG_HRO },
     { NULL }
