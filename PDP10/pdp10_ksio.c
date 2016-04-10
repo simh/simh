@@ -194,9 +194,9 @@ UNIT uba_unit[] = {
     };
 
 REG uba_reg[] = {
-    { ORDATA (INTREQ, int_req, 32), REG_RO },
-    { ORDATA (UB1CS, ubcs[0], 18) },
-    { ORDATA (UB3CS, ubcs[1], 18) },
+    { ORDATAD (INTREQ, int_req, 32, "interrupt request"), REG_RO },
+    { ORDATAD (UB1CS, ubcs[0], 18, "Unibus adapter 1 control/status") },
+    { ORDATAD (UB3CS, ubcs[1], 18, "Unibus adapter 3 control/status") },
     { NULL }
     };
 
