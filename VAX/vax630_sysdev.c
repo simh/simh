@@ -261,7 +261,6 @@ REG sysd_reg[] = {
     { HRDATAD (MSER,          ka_mser,  8, "KA630 mem sys err") },
     { HRDATAD (CEAR,          ka_cear,  8, "KA630 cpu err") },
     { HRDATAD (DEAR,          ka_dear,  8, "KA630 dma err") },
-    { HRDATAD (DEAR,          ka_dear,  8, "KA630 dma err") },
     { FLDATAD (DIAG,     ka_diag_full,  0, "KA630 Full Boot diagnostics") },
     { FLDATAD (HLTENAB,    ka_hltenab,  0, "KA630 Autoboot/Halt Enable") },
     { NULL }
