@@ -442,7 +442,7 @@ else
     else
         result = nvr[rg] | (((int32)nvr[rg+1]) << 16);
 
-sim_debug (DBG_REG, &nvr_dev, "nvr_rd(pa=0x%X) returns: 0x%X\n", pa, result);
+sim_debug (DBG_REG, &nvr_dev, "nvr_rd(pa=0x%X) nvr[0x%X] returns: 0x%X\n", pa, rg, result);
 
 return result;
 }
@@ -450,11 +450,11 @@ return result;
 void nvr_wr (int32 pa, int32 val, int32 lnt)
 {
 int32 rg = (pa - NVRBASE) >> 1;
-uint32 orig_nvr = nvr[rg] | (nvr[rg+1] << 8);
 
 if (rg < 14)                                             /* watch chip */
     wtc_wr (pa, val, lnt);
 else {
+    int32 orig_nvr = (int32)nvr[rg];
     int32 v = val;
     int32 r = rg;
     int32 l = lnt;
@@ -466,7 +466,13 @@ else {
         v = (v >> 16);
         }
 
-    sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) nvr[%02X] was %04X now %04X\n", pa, val, lnt, rg, orig_nvr, nvr[rg] | (nvr[rg+1] << 8));
+    if (lnt > 1)
+        sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) Unexpected write length\n", pa, val, lnt);
+
+    if (pa & 1)
+        sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) Unexpected write address\n", pa, val, lnt);
+
+    sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) nvr[0x%02X] was %04X now %04X\n", pa, val, lnt, rg, orig_nvr, nvr[rg]);
     }
 }
 
@@ -478,9 +484,9 @@ uint32 addr = (uint32) exta;
 
 if ((vptr == NULL) || (addr & 03))
     return SCPE_ARG;
-if (addr >= NVRBASE+NVRASIZE)
+if (addr >= NVRASIZE)
     return SCPE_NXM;
-*vptr = nvr[addr >> 1] | (nvr[(addr >> 1) + 1] << 8);
+*vptr = (t_value)(nvr[addr >> 1] | (nvr[(addr >> 1) + 1] << 16));
 return SCPE_OK;
 }
 
@@ -492,10 +498,10 @@ uint32 addr = (uint32) exta;
 
 if (addr & 03)
     return SCPE_ARG;
-if (addr >= NVRBASE+NVRASIZE)
+if (addr >= NVRASIZE)
     return SCPE_NXM;
-nvr[addr >> 1] = (uint8) val;
-nvr[(addr >> 1) + 1] = (uint8) (val >> 8);
+nvr[addr >> 1] = (uint8)val;
+nvr[(addr >> 1) + 1] = (uint8)(val >> 16);
 return SCPE_OK;
 }
 
@@ -540,13 +546,17 @@ uint8 nvr_empty_valid[NVRSIZE] = {
 t_stat nvr_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
+int32 saved_sim_quiet = sim_quiet;
 
-memcpy (nvr, nvr_empty_valid, NVRSIZE);
 uptr->flags = uptr->flags | (UNIT_ATTABLE | UNIT_BUFABLE);
+sim_quiet = 1;
 r = attach_unit (uptr, cptr);
+sim_quiet = saved_sim_quiet;
 if (r != SCPE_OK)
     uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
 else {
+    if (uptr->hwmark == 0)
+        memcpy (nvr, nvr_empty_valid, NVRSIZE);
     uptr->hwmark = (uint32) uptr->capac;
     wtc_set_valid ();
     }
