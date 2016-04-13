@@ -2636,6 +2636,10 @@ while (*tptr) {
             mp->port = (char *)realloc (mp->port, 1 + strlen (listen));
             strcpy (mp->port, listen);                      /* save port */
             mp->master = sock;                              /* save master socket */
+            mp->ring_sock = INVALID_SOCKET;
+            free (mp->ring_ipad);
+            mp->ring_ipad = NULL;
+            mp->ring_start_time = 0;
             mp->notelnet = listennotelnet;                  /* save desired telnet behavior flag */
             for (i = 0; i < mp->lines; i++) {               /* initialize lines */
                 lp = mp->ldsc + i;
