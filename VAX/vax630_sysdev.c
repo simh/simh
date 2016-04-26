@@ -27,7 +27,7 @@
    This module contains the MicroVAX II system-specific registers and devices.
 
    rom          bootstrap ROM (no registers)
-   nvr          non-volatile ROM (no registers)
+   nvr          non-volatile RAM (no registers)
    sysd         system devices
 
    08-Nov-2012  MB      First version
@@ -431,16 +431,16 @@ return "read-only memory";
 
 int32 nvr_rd (int32 pa)
 {
-int32 rg = (pa - NVRBASE) >> 1;
+int32 rg = (pa + 1 - NVRBASE) >> 1;
 int32 result;
 
 if (rg < 14)                                             /* watch chip */
     result = wtc_rd (pa);
-else
-    if (rg & 1)
-        result = ((int32)nvr[rg]) << 16;
-    else
-        result = nvr[rg] | (((int32)nvr[rg+1]) << 16);
+else {
+    result = (nvr[rg] & WMASK) | (((uint32)nvr[rg]) << 16);
+    if (pa & 1)
+        result = result << 8;
+    }
 
 sim_debug (DBG_REG, &nvr_dev, "nvr_rd(pa=0x%X) nvr[0x%X] returns: 0x%X\n", pa, rg, result);
 
@@ -449,21 +449,21 @@ return result;
 
 void nvr_wr (int32 pa, int32 val, int32 lnt)
 {
-int32 rg = (pa - NVRBASE) >> 1;
+int32 rg = (pa + 1 - NVRBASE) >> 1;
 
 if (rg < 14)                                             /* watch chip */
     wtc_wr (pa, val, lnt);
 else {
     int32 orig_nvr = (int32)nvr[rg];
-    int32 v = val;
-    int32 r = rg;
-    int32 l = lnt;
 
-    while (l > 0) {
-        nvr[r] = (uint8)v;
-        ++r;
-        l -= 2;
-        v = (v >> 16);
+    switch (pa & 03) {
+        case 0:
+        case 2:
+            nvr[rg] = (uint8)val;
+            break;
+        case 1:
+            nvr[rg] = 0;
+            break;
         }
 
     if (lnt > 1)
@@ -784,7 +784,9 @@ MACH_CHECK (MCHK_READ);
 
 int32 ReadRegU (uint32 pa, int32 lnt)
 {
-return ReadReg (pa & ~03, L_LONG);
+if (lnt == L_BYTE)
+    return ReadReg (pa & ~03, L_LONG);
+return (ReadReg (pa & ~03, L_WORD) & WMASK) | (ReadReg ((pa & ~03) + 2, L_WORD) & (WMASK << 16));
 }
 
 /* WriteReg - write register space
