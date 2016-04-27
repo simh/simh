@@ -892,6 +892,7 @@ else
       NO_LTO = 1
     endif
   else
+    NO_LTO = 1
     ifeq (Darwin,$(OSTYPE))
       CFLAGS_O += -O4 -fno-strict-overflow -flto -fwhole-program
     else
