@@ -35,9 +35,22 @@
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
 #
-# OSX and other environments may have the LLVM (clang) compiler 
-# installed.  If you want to build with the clang compiler, invoke
-# make with GCC=clang.
+# simh project support is provided for simulators that are built with 
+# dependent packages provided with the or by the operating system 
+# distribution OR for platforms where that isn't directly available (OS X) 
+# by packages from specific package management systems (MacPorts).  Users 
+# wanting to build simulators with locally build dependent packages or 
+# packages provided by an unsupported package management system can 
+# override where this procedure looks for include files and/or libraries.  
+# Overrides can be specified by define exported environment variables or 
+# GNU make command line arguments which specify INCLUDES and/or LIBRARIES.  
+# Each of these, if specified, must be the complete list include directories
+# or library directories that should be used with each element separated by 
+# colons. (i.e. INCLUDES=/usr/include/:/usr/local/include/:...)
+#
+# Some environments may have the LLVM (clang) compiler installed as
+# an alternate to gcc.  If you want to build with the clang compiler, 
+# invoke make with GCC=clang.
 #
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
@@ -84,6 +97,7 @@ else
     BESM6_BUILD = true
   endif
 endif
+find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,$(PATH))),$(wildcard $(dir)/$(1))))))
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
 ifneq ($(findstring Windows,$(OS)),)
@@ -174,17 +188,41 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
     OS_LDFLAGS = -lm
   else # Non-Android Builds
-    INCPATH:=/usr/include
-    LIBPATH:=/usr/lib
+    ifeq (,$(INCLUDES)$(LIBRARIES))
+      INCPATH:=/usr/include
+      LIBPATH:=/usr/lib
+    else
+      $(info *** Warning ***)
+      ifeq (,$(INCLUDES))
+        INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
+      else
+        $(info *** Warning *** Unsupported build with INCLUDES defined as: $(INCLUDES))
+        INCPATH:=$(strip $(subst :, ,$(INCLUDES)))
+        UNSUPPORTED_BUILD := include
+      endif
+      ifeq (,$(LIBRARIES))
+        LIBPATH:=/usr/lib
+      else
+        $(info *** Warning *** Unsupported build with LIBRARIES defined as: $(LIBRARIES))
+        LIBPATH:=$(strip $(subst :, ,$(LIBRARIES)))
+        ifeq (include,$(UNSUPPORTED_BUILD))
+          UNSUPPORTED_BUILD := include+lib
+        else
+          UNSUPPORTED_BUILD := lib
+        endif
+      endif
+      $(info *** Warning ***)
+    endif
     OS_CCDEFS = -D_GNU_SOURCE
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
-    INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
-      INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+      ifneq (include,$(findstring include,$(UNSUPPORTED_BUILD)))
+        INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+      endif
       ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
         INCPATH += /opt/local/include
         OS_CCDEFS += -I/opt/local/include
@@ -199,12 +237,16 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     else
       ifeq (Linux,$(OSTYPE))
-        LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+        ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
+          LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+        endif
         LIBEXT = so
       else
         ifeq (SunOS,$(OSTYPE))
           OSNAME = Solaris
-          LIBPATH := $(shell LANG=C; crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
+            LIBPATH := $(shell LANG=C; crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          endif
           LIBEXT = so
           OS_LDFLAGS += -lsocket -lnsl
           ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
@@ -458,9 +500,24 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info *** Info ***)
       $(info *** Info *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
       $(info *** Info *** functionality if video support were available on your system.)
-      $(info *** Info *** Install the development components of libSDL packaged by your)
-      $(info *** Info *** operating system distribution and rebuild your simulator to)
-      $(info *** Info *** enable this extra functionality.)
+      ifeq (Darwin,$(OSTYPE))
+        $(info *** Info *** Install the MacPorts libSDL2 packaged to provide this)
+        $(info *** Info *** functionality for your OS X system:)
+        $(info *** Info ***       # port install libsdl2)
+	  else
+        ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
+          $(info *** Info *** Install the development components of libSDL or libSDL2)
+          $(info *** Info *** packaged for your operating system distribution for)
+          $(info *** Info *** your Linux system:)
+          $(info *** Info ***        # apt-get install libsdl2-dev)
+          $(info *** Info ***    or)
+          $(info *** Info ***        # apt-get install libsdl-dev)
+        else
+          $(info *** Info *** Install the development components of libSDL packaged by your)
+          $(info *** Info *** operating system distribution and rebuild your simulator to)
+          $(info *** Info *** enable this extra functionality.)
+        endif
+	  endif
       $(info *** Info ***)
     endif
   endif
@@ -581,9 +638,15 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         $(info *** Warning *** libpcap networking support)
         $(info *** Warning ***)
         $(info *** Warning *** To build simulator(s) with libpcap networking support you)
-        $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
-        $(info *** Warning *** regarding the needed libpcap development components for your)
-        $(info *** Warning *** $(OSTYPE) platform)
+        ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
+          $(info *** Warning *** should install the libpcap development components for)
+          $(info *** Warning *** for your Linux system:)
+          $(info *** Warning ***        # apt-get install libpcap-dev)
+        else
+          $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
+          $(info *** Warning *** regarding the needed libpcap development components for your)
+          $(info *** Warning *** $(OSTYPE) platform)
+        endif
         $(info *** Warning ***)
       endif
     endif
@@ -616,13 +679,26 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           $(info *** Info *** minimal libpcap networking support)
           $(info *** Info ***)
         endif
+        $(info *** Info ***)
         $(info *** Info *** Simulators on your $(OSNAME) platform can also be built with)
         $(info *** Info *** extended LAN Ethernet networking support by using VDE Ethernet.)
         $(info *** Info ***)
         $(info *** Info *** To build simulator(s) with extended networking support you)
-        $(info *** Info *** should read 0readme_ethernet.txt and follow the instructions)
-        $(info *** Info *** regarding the needed libvdeplug components for your $(OSNAME))
-        $(info *** Info *** platform)
+        ifeq (Darwin,$(OSTYPE))
+          $(info *** Info *** should install the MacPorts vde2 package to provide this)
+          $(info *** Info *** functionality for your OS X system:)
+          $(info *** Info ***       # port install vde2)
+        else
+          ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
+            $(info *** Info *** should install the vde2 package to provide this)
+            $(info *** Info *** functionality for your $(OSNAME) system:)
+            $(info *** Info ***        # apt-get install vde2)
+          else
+            $(info *** Info *** should read 0readme_ethernet.txt and follow the instructions)
+            $(info *** Info *** regarding the needed libvdeplug components for your $(OSNAME))
+            $(info *** Info *** platform)
+          endif
+        endif
         $(info *** Info ***)
       endif
     endif
@@ -801,6 +877,9 @@ else
 endif # Win32 (via MinGW)
 ifneq (,$(GIT_COMMIT_ID))
   CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=$(GIT_COMMIT_ID)
+endif
+ifneq (,$(UNSUPPORTED_BUILD))
+  CFLAGS_GIT += -DSIM_BUILD=Unsupported=$(UNSUPPORTED_BUILD)
 endif
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
