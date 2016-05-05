@@ -1,6 +1,6 @@
 /* sds_sys.c: SDS 940 simulator interface
 
-   Copyright (c) 2001-2012, Robert M Supnik
+   Copyright (c) 2001-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-May-16    RMS     Fixed ascii-to-sds940 data (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declarations of CCT arrays (Mark Pizzolato)
 */
 
@@ -150,10 +151,10 @@ const int8 sds940_to_ascii[64] = {
      };
 
 const int8 ascii_to_sds940[128] = {
-     -1, 141, 142, 143, 144, 145, 146, 147,             /* 00 - 37 */
-     -1, 151, 152, 153, 154, 155,  -1,  -1,             
-     -1, 161, 162, 163, 164, 165, 166, 167,
-    170, 171, 172,  -1,  -1,  -1,  -1,  -1,
+      -1, 0141, 0142, 0143, 0144, 0145, 0146, 0147,     /* 00 - 37 */
+      -1, 0151, 0152, 0153, 0154, 0155,   -1,   -1,             
+      -1, 0161, 0162, 0163, 0164, 0165, 0166, 0167,
+    0170, 0171, 0172,   -1,   -1,   -1,   -1,   -1,
     000, 001, 002, 003, 004, 005, 006, 007,             /* 40 - 77 */
     010, 011, 012, 013, 014, 015, 016, 017,
     020, 021, 022, 023, 024, 025, 026, 027,
