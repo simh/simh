@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2015, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   05-May-16    RMS     Fixed calling sequence inconsistency (Mark Pizzolato)
    28-Feb-15    RMS     Added read from console
    24-Mar-09    RMS     Fixed read stacker operation in column binary mode
                         Fixed punch stacker operation (Van Snyder)
@@ -391,7 +392,7 @@ return SCPE_OK;
    or $, ., square for overlap control (ignored).
 */
 
-t_stat select_stack (int32 ilnt, int32 mod)
+t_stat select_stack (int32 mod)
 {
 if (mod == BCD_ONE)
     s1sel = 1;
