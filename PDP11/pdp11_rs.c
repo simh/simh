@@ -197,7 +197,7 @@ const char *rs_description (DEVICE *dptr);
    rs_mod       RS modifier list
 */
 
-DIB rs_dib = { MBA_RS, 0, &rs_mbrd, &rs_mbwr, 0, 0, 0, { &rs_abort } };
+DIB rs_dib = { MBA_AUTO, 0, &rs_mbrd, &rs_mbwr, 0, 0, 0, { &rs_abort } };
 
 UNIT rs_unit[] = {
     { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
@@ -580,7 +580,7 @@ t_stat rs_reset (DEVICE *dptr)
 int32 i;
 UNIT *uptr;
 
-mba_set_enbdis (MBA_RS, rs_dev.flags & DEV_DIS);
+mba_set_enbdis (dptr);
 for (i = 0; i < RS_NUMDR; i++) {
     uptr = rs_dev.units + i;
     sim_cancel (uptr);

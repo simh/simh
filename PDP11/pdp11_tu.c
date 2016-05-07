@@ -266,7 +266,7 @@ t_stat tu_map_err (int32 drv, t_stat st, t_bool qdt);
    tu_mod       TU modifier list
 */
 
-DIB tu_dib = { MBA_TU, 0, &tu_mbrd, &tu_mbwr,0, 0, 0, { &tu_abort } };
+DIB tu_dib = { MBA_AUTO, 0, &tu_mbrd, &tu_mbwr,0, 0, 0, { &tu_abort } };
 
 UNIT tu_unit[] = {
     { UDATA (&tu_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0) },
@@ -920,7 +920,7 @@ t_stat tu_reset (DEVICE *dptr)
 int32 u;
 UNIT *uptr;
 
-mba_set_enbdis (MBA_TU, tu_dev.flags & DEV_DIS);
+mba_set_enbdis (dptr);
 tucs1 = 0;
 tufc = 0;
 tuer = 0;

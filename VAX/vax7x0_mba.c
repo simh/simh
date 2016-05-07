@@ -270,6 +270,8 @@ static t_stat (*mbregR[MBA_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*mbregW[MBA_NUM])(int32 dat, int32 ad, int32 md);
 static int32 (*mbabort[MBA_NUM])(void);
 
+static int32 mba_active = 0;    /* Number of active MBA's */
+
 /* Massbus adapter data structures
 
    mba_dev      MBA device descriptors
@@ -838,14 +840,11 @@ return;
 t_stat mba_reset (DEVICE *dptr)
 {
 int32 i, mb;
-DIB *dibp;
+DIB *dibp = (DIB *)dptr->ctxt;
 
-dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL)
     return SCPE_IERR;
-mb = dibp->ba - TR_MBA0;
-if ((mb < 0) || (mb >= MBA_NUM))
-    return SCPE_IERR;
+mb = dptr - mba_dev;
 mba_cnf[mb] = 0;
 mba_cr[mb] &= MBACR_MNT;
 mba_sr[mb] = 0;
@@ -859,7 +858,7 @@ if (sim_switches & SWMASK ('P')) {
     }
 if (mbabort[mb])                                        /* reset device */
     mbabort[mb] ();
-return SCPE_OK;
+return build_dib_tab();
 }
 
 t_stat mba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
@@ -876,8 +875,22 @@ return SCPE_OK;
 const char *mba_description (DEVICE *dptr)
 {
 static char buf[64];
+uint32 mb = dptr - mba_dev;
 
-sprintf (buf, "Massbus adapter %d", (int)(dptr-mba_dev));
+if (dptr->flags & DEV_DIS)
+    dptr = NULL;
+else {
+    int i;
+
+    for (i = 0; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru devs */
+        if (!(dptr->flags & DEV_DIS) && 
+            (dptr->flags & DEV_MBUS) &&
+            ((DIB *)dptr->ctxt)->ba == mb)
+            break;
+        }
+    }
+sprintf (buf, "Massbus adapter %d", mb, 
+               dptr ? " (for " : "", dptr ? dptr->name : "", dptr ? ")" : "");
 return buf;
 }
 
@@ -899,14 +912,29 @@ return SCPE_OK;
 
 /* Enable/disable Massbus adapter */
 
-void mba_set_enbdis (uint32 mb, t_bool dis)
+void mba_set_enbdis (DEVICE *dptr)
 {
-if (mb >= MBA_NUM)                                      /* valid MBA? */
+DIB *dibp = (DIB *)dptr->ctxt;
+
+if (((dptr->flags & DEV_DIS) &&     /* Already Disabled     */
+     (dibp->ba == MBA_AUTO)) ||     /* OR                   */
+    (!(dptr->flags & DEV_DIS) &&    /* Already Enabled      */
+     (dibp->ba != MBA_AUTO)))
     return;
-if (dis)
-    mba_dev[mb].flags |= DEV_DIS;
-else mba_dev[mb].flags &= ~DEV_DIS;
-return;
+if (dptr->flags & DEV_DIS) {        /* Disabling? */
+    uint32 mb = dibp->ba;
+
+    dibp->ba = MBA_AUTO;            /*   Flag unassigned */
+    mba_reset (&mba_dev[mb]);       /*   reset prior MBA */
+    mba_dev[mb].flags |= DEV_DIS;   /*   disable prior MBA */
+    }
+build_dib_tab();
+if (!(dptr->flags & DEV_DIS)) {     /* Enabling? */
+    uint32 mb = dibp->ba;
+
+    mba_dev[mb].flags &= ~DEV_DIS;  /*   enable assigned MBA */
+    mba_reset (&mba_dev[dibp->ba]); /*   reset new MBA */
+    }
 }
 
 /* Init Mbus tables */
@@ -914,13 +942,27 @@ return;
 void init_mbus_tab (void)
 {
 uint32 i;
+static t_bool initialized = FALSE;
 
+if (!initialized) {         /* Force MBA devices to reflect initial state */
+    DEVICE *dptr;           /* of potentially attached devices */
+    int mba_devs;
+
+    for (i = mba_devs = 0; (dptr = sim_devices[i]) != NULL; i++) {
+        if (dptr->flags & DEV_MBUS) {
+            mba_dev[mba_devs].flags &= ~DEV_DIS;
+            mba_dev[mba_devs].flags |= (dptr->flags & DEV_DIS);
+            mba_devs++;
+            }
+        }
+    initialized = TRUE;
+    }
 for (i = 0; i < MBA_NUM; i++) {
     mbregR[i] = NULL;
     mbregW[i] = NULL;
     mbabort[i] = NULL;
     }
-return;
+mba_active = 0;
 }
 
 /* Build dispatch tables */
@@ -931,7 +973,8 @@ uint32 idx;
 
 if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
     return SCPE_IERR;
-idx = dibp->ba;                                         /* Mbus # */
+idx = mba_active++;
+dibp->ba = idx;                                         /* Mbus # */
 if (idx >= MBA_NUM)
     return SCPE_STOP;
 if ((mbregR[idx] && dibp->rd &&                         /* conflict? */

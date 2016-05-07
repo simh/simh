@@ -68,6 +68,7 @@ int32 calc_ints (int32 nipl, int32 trq);
 extern t_stat cpu_build_dib (void);
 extern void init_mbus_tab (void);
 extern t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp);
+extern void fixup_mbus_tab (void);
 
 /* I/O data structures */
 
@@ -433,5 +434,6 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
             }
         }                                               /* end if enabled */
     }                                                   /* end for */
+fixup_mbus_tab ();
 return SCPE_OK;
 }
