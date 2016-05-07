@@ -889,7 +889,7 @@ else {
             break;
         }
     }
-sprintf (buf, "Massbus adapter %d", mb, 
+sprintf (buf, "Massbus adapter %d%s%s%s", mb, 
                dptr ? " (for " : "", dptr ? dptr->name : "", dptr ? ")" : "");
 return buf;
 }
