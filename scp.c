@@ -4197,6 +4197,10 @@ fprintf (st, "%s", sim_dname (dptr));                   /* print dev name */
 if ((flag == 2) && dptr->description) {
     fprintf (st, "\t%s\n", dptr->description(dptr));
     }
+else {
+    if ((sim_switches & SWMASK ('D')) && dptr->description)
+        fprintf (st, "\t%s\n", dptr->description(dptr));
+    }
 if (qdisable (dptr)) {                                  /* disabled? */
     fprintf (st, "\tdisabled\n");
     return SCPE_OK;
@@ -7659,6 +7663,8 @@ DEVICE *find_dev (const char *cptr)
 int32 i;
 DEVICE *dptr;
 
+if (cptr == NULL)
+    return NULL;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     if ((strcmp (cptr, dptr->name) == 0) ||
         (dptr->lname &&
