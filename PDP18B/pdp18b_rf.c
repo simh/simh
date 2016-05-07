@@ -149,14 +149,14 @@ UNIT rf_unit = {
     };
 
 REG rf_reg[] = {
-    { ORDATA (STA, rf_sta, 18) },
-    { ORDATA (DA, rf_da, 22) },
-    { ORDATA (BUF, rf_dbuf, 18) },
-    { FLDATA (INT, int_hwre[API_RF], INT_V_RF) },
-    { BRDATA (WLK, rf_wlk, 8, 16, RF_NUMDK) },
-    { DRDATA (TIME, rf_time, 24), PV_LEFT + REG_NZ },
-    { FLDATA (BURST, rf_burst, 0) },
-    { FLDATA (STOP_IOE, rf_stopioe, 0) },
+    { ORDATAD (STA, rf_sta, 18, "status") },
+    { ORDATAD (DA, rf_da, 22, "current disk address") },
+    { ORDATAD (BUF, rf_dbuf, 18, "data buffer (diagnostic only)") },
+    { FLDATAD (INT, int_hwre[API_RF], INT_V_RF, "interrupt pending flag") },
+    { BRDATAD (WLK, rf_wlk, 8, 16, RF_NUMDK, "write lock switches for disks 0 to 7") },
+    { DRDATAD (TIME, rf_time, 24, "rotational delay per word"), PV_LEFT + REG_NZ },
+    { FLDATAD (BURST, rf_burst, 0, "burst flag") },
+    { FLDATAD (STOP_IOE, rf_stopioe, 0, "stop on I/O error") },
     { DRDATA (CAPAC, rf_unit.capac, 31), PV_LEFT + REG_HRO },
     { ORDATA (DEVNO, rf_dib.dev, 6), REG_HRO },
     { ORDATA (APIVEC, api_vec[API_RF][INT_V_RF], 6), REG_HRO },

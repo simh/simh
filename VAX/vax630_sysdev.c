@@ -27,7 +27,7 @@
    This module contains the MicroVAX II system-specific registers and devices.
 
    rom          bootstrap ROM (no registers)
-   nvr          non-volatile ROM (no registers)
+   nvr          non-volatile RAM (no registers)
    sysd         system devices
 
    08-Nov-2012  MB      First version
@@ -261,7 +261,6 @@ REG sysd_reg[] = {
     { HRDATAD (MSER,          ka_mser,  8, "KA630 mem sys err") },
     { HRDATAD (CEAR,          ka_cear,  8, "KA630 cpu err") },
     { HRDATAD (DEAR,          ka_dear,  8, "KA630 dma err") },
-    { HRDATAD (DEAR,          ka_dear,  8, "KA630 dma err") },
     { FLDATAD (DIAG,     ka_diag_full,  0, "KA630 Full Boot diagnostics") },
     { FLDATAD (HLTENAB,    ka_hltenab,  0, "KA630 Autoboot/Halt Enable") },
     { NULL }
@@ -432,42 +431,48 @@ return "read-only memory";
 
 int32 nvr_rd (int32 pa)
 {
-int32 rg = (pa - NVRBASE) >> 1;
+int32 rg = (pa + 1 - NVRBASE) >> 1;
 int32 result;
 
 if (rg < 14)                                             /* watch chip */
     result = wtc_rd (pa);
-else
-    if (rg & 1)
-        result = ((int32)nvr[rg]) << 16;
-    else
-        result = nvr[rg] | (((int32)nvr[rg+1]) << 16);
+else {
+    result = (nvr[rg] & WMASK) | (((uint32)nvr[rg]) << 16);
+    if (pa & 1)
+        result = result << 8;
+    }
 
-sim_debug (DBG_REG, &nvr_dev, "nvr_rd(pa=0x%X) returns: 0x%X\n", pa, result);
+sim_debug (DBG_REG, &nvr_dev, "nvr_rd(pa=0x%X) nvr[0x%X] returns: 0x%X\n", pa, rg, result);
 
 return result;
 }
 
 void nvr_wr (int32 pa, int32 val, int32 lnt)
 {
-int32 rg = (pa - NVRBASE) >> 1;
-uint32 orig_nvr = nvr[rg] | (nvr[rg+1] << 8);
+int32 rg = (pa + 1 - NVRBASE) >> 1;
 
 if (rg < 14)                                             /* watch chip */
     wtc_wr (pa, val, lnt);
 else {
-    int32 v = val;
-    int32 r = rg;
-    int32 l = lnt;
+    int32 orig_nvr = (int32)nvr[rg];
 
-    while (l > 0) {
-        nvr[r] = (uint8)v;
-        ++r;
-        l -= 2;
-        v = (v >> 16);
+    switch (pa & 03) {
+        case 0:
+        case 2:
+            nvr[rg] = (uint8)val;
+            break;
+        case 1:
+            nvr[rg] = 0;
+            break;
         }
 
-    sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) nvr[%02X] was %04X now %04X\n", pa, val, lnt, rg, orig_nvr, nvr[rg] | (nvr[rg+1] << 8));
+    if (lnt > 1)
+        sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) Unexpected write length\n", pa, val, lnt);
+
+    if (pa & 1)
+        sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) Unexpected write address\n", pa, val, lnt);
+
+    sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) nvr[0x%02X] was %04X now %04X\n", pa, val, lnt, rg, orig_nvr, nvr[rg]);
     }
 }
 
@@ -479,9 +484,9 @@ uint32 addr = (uint32) exta;
 
 if ((vptr == NULL) || (addr & 03))
     return SCPE_ARG;
-if (addr >= NVRBASE+NVRASIZE)
+if (addr >= NVRASIZE)
     return SCPE_NXM;
-*vptr = nvr[addr >> 1] | (nvr[(addr >> 1) + 1] << 8);
+*vptr = (t_value)(nvr[addr >> 1] | (nvr[(addr >> 1) + 1] << 16));
 return SCPE_OK;
 }
 
@@ -493,10 +498,10 @@ uint32 addr = (uint32) exta;
 
 if (addr & 03)
     return SCPE_ARG;
-if (addr >= NVRBASE+NVRASIZE)
+if (addr >= NVRASIZE)
     return SCPE_NXM;
-nvr[addr >> 1] = (uint8) val;
-nvr[(addr >> 1) + 1] = (uint8) (val >> 8);
+nvr[addr >> 1] = (uint8)val;
+nvr[(addr >> 1) + 1] = (uint8)(val >> 16);
 return SCPE_OK;
 }
 
@@ -541,13 +546,17 @@ uint8 nvr_empty_valid[NVRSIZE] = {
 t_stat nvr_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
+int32 saved_sim_quiet = sim_quiet;
 
-memcpy (nvr, nvr_empty_valid, NVRSIZE);
 uptr->flags = uptr->flags | (UNIT_ATTABLE | UNIT_BUFABLE);
+sim_quiet = 1;
 r = attach_unit (uptr, cptr);
+sim_quiet = saved_sim_quiet;
 if (r != SCPE_OK)
     uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
 else {
+    if (uptr->hwmark == 0)
+        memcpy (nvr, nvr_empty_valid, NVRSIZE);
     uptr->hwmark = (uint32) uptr->capac;
     wtc_set_valid ();
     }
@@ -775,7 +784,9 @@ MACH_CHECK (MCHK_READ);
 
 int32 ReadRegU (uint32 pa, int32 lnt)
 {
-return ReadReg (pa & ~03, L_LONG);
+if (lnt == L_BYTE)
+    return ReadReg (pa & ~03, L_LONG);
+return (ReadReg (pa & ~03, L_WORD) & WMASK) | (ReadReg ((pa & ~03) + 2, L_WORD) & (WMASK << 16));
 }
 
 /* WriteReg - write register space

@@ -194,20 +194,20 @@ extern int32 Jms_word (int32 t);
 UNIT fpp_unit = { UDATA (NULL, 0, 0) };
 
 REG fpp_reg[] = {
-    { ORDATA (FIR, fir, 12) },
-    { ORDATA (EPA, fma.exp, 18) },
-    { FLDATA (FMAS, fma.sign, 0) },
-    { ORDATA (FMAH, fma.hi, 17) },
-    { ORDATA (FMAL, fma.lo, 18) },
-    { ORDATA (EPB, fmb.exp, 18) },
-    { FLDATA (FMBS, fmb.sign, 0) },
-    { ORDATA (FMBH, fmb.hi, 17) },
-    { ORDATA (FMBL, fmb.lo, 18) },
-    { FLDATA (FGUARD, fguard, 0) },
-    { ORDATA (FMQH, fmq.hi, 17) },
-    { ORDATA (FMQL, fmq.lo, 18) },
-    { ORDATA (JEA, jea, 15) },
-    { FLDATA (STOP_FPP, stop_fpp, 0) },
+    { ORDATAD (FIR, fir, 12, "floating instruction register") },
+    { ORDATAD (EPA, fma.exp, 18, "EPA (A exponent") },
+    { FLDATAD (FMAS, fma.sign, 0, "FMA sign") },
+    { ORDATAD (FMAH, fma.hi, 17, "FMA<1:17>") },
+    { ORDATAD (FMAL, fma.lo, 18, "FMA<18:35>") },
+    { ORDATAD (EPB, fmb.exp, 18, "EPB (B exponent)") },
+    { FLDATAD (FMBS, fmb.sign, 0, "FMB sign") },
+    { ORDATAD (FMBH, fmb.hi, 17, "FMB<1:17>") },
+    { ORDATAD (FMBL, fmb.lo, 18, "FMB<18:35>" ) },
+    { FLDATAD (FGUARD, fguard, 0, "guard bit") },
+    { ORDATAD (FMQH, fmq.hi, 17, "FMQ<1:17>") },
+    { ORDATAD (FMQL, fmq.lo, 18, "FMQ<18:35>") },
+    { ORDATAD (JEA, jea, 15, "exception address register") },
+    { FLDATAD (STOP_FPP, stop_fpp, 0, "stop if FB15 instruction decoded while FB15 is disabled") },
     { NULL }
     };
 

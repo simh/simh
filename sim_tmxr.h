@@ -64,6 +64,7 @@ typedef int SERHANDLE;
 #define TMXR_GUARD      12                              /* buffer guard */
 
 #define TMXR_DTR_DROP_TIME 500                          /* milliseconds to drop DTR for 'pseudo' modem control */
+#define TMXR_MODEM_RING_TIME 3                          /* seconds to wait for DTR for incoming connections */
 #define TMXR_DEFAULT_CONNECT_POLL_INTERVAL 1            /* seconds between connection polls */
 
 #define TMXR_DBG_XMT    0x0010000                        /* Debug Transmit Data */
@@ -211,6 +212,9 @@ struct tmxr {
     int32               sessions;                       /* count of tcp connections received */
     uint32              poll_interval;                  /* frequency of connection polls (seconds) */
     uint32              last_poll_time;                 /* time of last connection poll */
+    uint32              ring_start_time;                /* time ring signal was raised */
+    char                *ring_ipad;                     /* incoming connection address awaiting DTR */
+    SOCKET              ring_sock;                      /* incoming connection socket awaiting DTR */
     t_bool              notelnet;                       /* default telnet capability for incoming connections */
     t_bool              modem_control;                  /* multiplexer supports modem control behaviors */
     t_bool              packet;                         /* Lines are packet oriented */

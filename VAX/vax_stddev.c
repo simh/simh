@@ -239,12 +239,22 @@ MTAB clk_mod[] = {
     { 0 }
     };
 
+#define DBG_REG 1   /* TODR register access */
+#define DBG_TIC 2   /* clock ticks */
+
+DEBTAB clk_debug[] = {
+  {"REG",  DBG_REG,   "TODR register access"},
+  {"TIC",  DBG_TIC,   "clock ticks"},
+  {0}
+};
+
 DEVICE clk_dev = {
     "CLK", &clk_unit, clk_reg, clk_mod,
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    &clk_dib, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL, 
+    &clk_dib, DEV_DEBUG, 0, clk_debug, 
+    NULL, NULL, &clk_help, NULL, NULL, 
     &clk_description
     };
 
@@ -460,11 +470,15 @@ int32 todr_rd (void)
 TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec base, now, val;
 
-if ((fault_PC&0xFFFE0000) == 0x20040000)                /* running from ROM? */
+if ((fault_PC&0xFFFE0000) == 0x20040000) {              /* running from ROM? */
+    sim_debug (DBG_REG, &clk_dev, "todr_rd(ROM) - TODR=0x%X\n", todr_reg);
     return todr_reg;                                    /* return counted value for ROM diags */
+    }
 
-if (0 == todr_reg)                                      /* clock running? */
+if (0 == todr_reg) {                                    /* clock running? */
+    sim_debug (DBG_REG, &clk_dev, "todr_rd(Not Running) - TODR=0x%X\n", todr_reg);
     return todr_reg;
+    }
 
 /* Maximum number of seconds which can be represented as 10ms ticks 
    in the 32bit TODR.  This is the 33bit value 0x100000000/100 to get seconds */
@@ -475,9 +489,12 @@ base.tv_sec = toy->toy_gmtbase;
 base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
 sim_timespec_diff (&val, &now, &base);
 
-if (val.tv_sec >= TOY_MAX_SECS)                         /* todr overflowed? */
+if (val.tv_sec >= TOY_MAX_SECS) {                       /* todr overflowed? */
+    sim_debug (DBG_REG, &clk_dev, "todr_rd(Overflowed) - TODR=0x%X\n", 0);
     return todr_reg = 0;                                /* stop counting */
+    }
 
+sim_debug (DBG_REG, &clk_dev, "todr_rd() - TODR=0x%X\n", (int32)(val.tv_sec*100 + val.tv_nsec/10000000));
 return (int32)(val.tv_sec*100 + val.tv_nsec/10000000);  /* 100hz Clock Ticks */
 }
 
@@ -500,6 +517,7 @@ toy->toy_gmtbasemsec = base.tv_nsec/1000000;
 todr_reg = data;
 if (data)
     todr_blow = 0;
+sim_debug (DBG_REG, &clk_dev, "todr_wr(0x%X) - TODR=0x%X blow=%d\n", data, todr_reg, todr_blow);
 }
 
 /* TODR resync routine */

@@ -70,11 +70,11 @@
 #define MODE_TEXT       (2 << UNIT_V_MODE)
 #define MODE_BCD        (3 << UNIT_V_MODE)
 #define MODE_CBN        (4 << UNIT_V_MODE)
+#define MODE_EBCDIC     (5 << UNIT_V_MODE)
 /* Allow lower case letters */
 #define MODE_LOWER      (8 << UNIT_V_MODE)
 #define MODE_026        (0x10 << UNIT_V_MODE)
 #define MODE_029        (0x20 << UNIT_V_MODE)
-#define MODE_EBCDIC     (0x30 << UNIT_V_MODE)
 #define MODE_CHAR       (0x30 << UNIT_V_MODE)
 
 

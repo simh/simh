@@ -2333,7 +2333,7 @@ return SCPE_OK;
 
 t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
-fprintf (st, "video support unavailable");
+fprintf (st, "video support unavailable\n");
 return SCPE_OK;
 }
 

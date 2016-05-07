@@ -374,6 +374,27 @@ See the 0readme_ethernet.txt file for details about the required network compone
 
 The makefile provided requires GNU make, which is the default make facility for most systems these days.  Any host system which doesn't have GNU make available as the default make facility may have it installed as 'gmake'.  GNU make (gmake) is generally available an installation package for all current operating systems which have a package installation system.
 
+##### Build Dependencies
+
+Some simulators depend on external packages to provide the full scope of functionality they may be simulating.  These additional external packages may or may not be included in as part of the standard Operating System distributions.  
+
+###### OS X - Dependencies
+
+The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, these commands will install the required dependent packages:
+
+    # port install vde2
+    # port install libsdl2
+
+###### Linux - Dependencies
+
+Different Linux distributions have different package managment systems:
+
+Ubuntu:
+
+    # apt-get install libpcap-dev
+    # apt-get install vde2
+    # apt-get install libsdl2
+
 #### Windows
 
 Compiling on windows is supported with recent versions of Microsoft Visual Studio (Standard or Express) and using GCC via the MinGW environment.  Things may also work under Cygwin, but that is not the preferred windows environment.  Not all features will be available as well as with either Visual Studio or MinGW.

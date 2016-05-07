@@ -162,6 +162,7 @@ int32 wtc_rd (int32 pa)
 int32 rg = (pa >> 1) & 0xF;
 int32 val = 0;
 time_t curr;
+static int mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 struct tm *ctm = NULL;
 
 if (rg < 10) {                                          /* time reg? */
@@ -171,6 +172,22 @@ if (rg < 10) {                                          /* time reg? */
     ctm = localtime (&curr);                            /* decompose */
     if (ctm == NULL)                                    /* error? */
         return 0;
+    if ((wtc_mode == WTC_MODE_VMS) &&
+        ((ctm->tm_year % 4) == 0)) {                    /* Leap Year? */
+        if (ctm->tm_mon > 1) {                          /* Past February? */
+            ++ctm->tm_mday;                             /* Adjust for Leap Day */
+            if (ctm->tm_mday > mdays[ctm->tm_mon]) {    /* wrap to last day of prior month */
+                ++ctm->tm_mon;
+                ctm->tm_mday = 1;
+                }
+            }
+        else
+            if ((ctm->tm_mon == 1) &&                   /* February 29th? */
+                (ctm->tm_mday == 29)) {
+                ctm->tm_mon = 2;                        /* Is March 1 in 1982 */
+                ctm->tm_mday = 1;
+                }
+        }
     }
 
 switch(rg) {
@@ -196,7 +213,7 @@ switch(rg) {
         break;
 
     case 8:                                             /* month */
-        val = ctm->tm_mon;
+        val = ctm->tm_mon + 1;
         break;
 
     case 9:                                             /* year */

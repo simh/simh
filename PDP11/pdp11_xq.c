@@ -261,6 +261,7 @@ t_stat xq_wr(int32  data, int32 PA, int32 access);
 t_stat xq_svc(UNIT * uptr);
 t_stat xq_tmrsvc(UNIT * uptr);
 t_stat xq_startsvc(UNIT * uptr);
+t_stat xq_receivesvc(UNIT * uptr);
 t_stat xq_reset (DEVICE * dptr);
 t_stat xq_attach (UNIT * uptr, char * cptr);
 t_stat xq_detach (UNIT * uptr);
@@ -348,6 +349,7 @@ UNIT xqa_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE, 2047) },  /* receive timer */
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
  { UDATA (&xq_startsvc, UNIT_DIS, 0) },
+ { UDATA (&xq_receivesvc, UNIT_DIS, 0) },
 };
 
 BITFIELD xq_csr_bits[] = {
@@ -428,6 +430,7 @@ UNIT xqb_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE, 2047) },  /* receive timer */
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
  { UDATA (&xq_startsvc, UNIT_DIS, 0) },
+ { UDATA (&xq_receivesvc, UNIT_DIS, 0) },
 };
 
 REG xqb_reg[] = {
@@ -534,7 +537,7 @@ DEBTAB xq_debug[] = {
 
 DEVICE xq_dev = {
   "XQ", xqa_unit, xqa_reg, xq_mod,
-  3, XQ_RDX, 11, 1, XQ_RDX, 16,
+  4, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
@@ -544,7 +547,7 @@ DEVICE xq_dev = {
 
 DEVICE xqb_dev = {
   "XQB", xqb_unit, xqb_reg, xq_mod,
-  3, XQ_RDX, 11, 1, XQ_RDX, 16,
+  4, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
@@ -1545,6 +1548,8 @@ t_stat xq_process_xbdl(CTLR* xq)
         if (xq->var->xbdl_buf[1] & XQ_DSC_S) { /* setup packet */
           status = xq_process_setup(xq);
           ethq_insert (&xq->var->ReadQ, 0, &xq->var->write_buffer, status);/* put packet in read buffer */
+          write_success[0] = 0x200C;    /* DELQA Setup Packet Transmit Status Word 1 */
+          write_success[1] = 0x0860;    /* DELQA Setup Packet Transmit Status Word 2 */
         } else { /* loopback */
           if ((DBG_PCK & xq->dev->dctrl) && xq->var->etherface) {
             static char *loopback_modes[] = {"xq-write-loopback-Internal", "", "xq-write-loopback-Internal Extended", "xq-write-loopback-External"};
@@ -1574,9 +1579,9 @@ t_stat xq_process_xbdl(CTLR* xq)
         /* signal transmission complete */
         xq_csr_set_clr(xq, XQ_CSR_XI, 0);
 
-        /* now trigger "read" of setup or loopback packet */
+        /* now schedule "reading" of setup or loopback packet */
         if (~xq->var->csr & XQ_CSR_RL)
-          status = xq_process_rbdl(xq);
+          sim_activate_after_abs(xq->unit+3, 400);  /* 400usecs on real hardware */
 
       } else { /* not loopback */
 
@@ -2116,8 +2121,9 @@ void xq_sw_reset(CTLR* xq)
   sim_debug(DBG_TRC, xq->dev, "xq_sw_reset()\n");
   ++xq->var->stats.reset;
 
-  /* Return DELQA-T to DELQA Normal mode */
-  if (xq->var->type == XQ_T_DELQA_PLUS) {
+  /* Return DELQA-T in DELQA-T mode to DELQA Normal mode */
+  if ((xq->var->type == XQ_T_DELQA_PLUS) && (xq->var->mode == XQ_T_DELQA_PLUS)){
+    xq->var->var |= XQ_VEC_MS;
     xq->var->mode = XQ_T_DELQA;
     xq->var->iba = xq->var->srr = 0;
   }
@@ -2165,7 +2171,7 @@ void xq_sw_reset(CTLR* xq)
 t_stat xq_wr_var(CTLR* xq, int32 data)
 {
   uint16 save_var = xq->var->var;
-  sim_debug(DBG_REG, xq->dev, "xq_wr_var(data= 0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_var(data=0x%04X)\n", data);
   
   switch (xq->var->type) {
     case XQ_T_DEQNA:
@@ -2176,7 +2182,7 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
       if (xq->var->lockmode)
         xq->var->var = data & (XQ_VEC_IV | XQ_VEC_ID);
       else
-        xq->var->var = (data & ~XQ_VEC_RO) | (XQ_VEC_ID & XQ_VEC_RW);
+        xq->var->var = (data & XQ_VEC_RW);
 
       if ((save_var ^ xq->var->var) & XQ_VEC_MS) { /* DEQNA-Lock mode changing? */
         if (~xq->var->var & XQ_VEC_MS) {
@@ -2197,15 +2203,13 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
           xq->var->var |= XQ_VEC_S1; /* Indicate No Network Connection */
         else
           xq->var->var &= ~XQ_VEC_ST; /* Set success Status */
+        sim_debug(DBG_REG, xq->dev, "xq_wr_var(DELQA self test performed. Result: %d\n", xq->var->var & XQ_VEC_ST);
       }
       break;
   }
 
   /* set vector of SIMH device */
-  if (data & XQ_VEC_IV)
-    xq->dib->vec = (data & XQ_VEC_IV);
-  else
-    xq->dib->vec = 0;
+  xq->dib->vec = (data & XQ_VEC_IV);
 
   sim_debug_bits(DBG_VAR, xq->dev, xq_var_bits, save_var, xq->var->var, 1);
 
@@ -2278,7 +2282,7 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
                   |  (data & XQ_CSR_W1)                    /* write 1 to clear bits */
                   | ((data & XQ_CSR_XI) ? XQ_CSR_NI : 0);  /* clearing XI clears NI */
 
-  sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X)\n", data);
 
   /* reset controller when SR transitions to cleared */
   if (xq->var->csr & XQ_CSR_SR & ~data) {
@@ -2288,7 +2292,7 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
 
   /* start receiver when RE transitions to set */
   if ((~xq->var->csr) & XQ_CSR_RE & data) {
-    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - receiver starting soon\n", data);
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X) - receiver starting soon\n", data);
 
     /* start the read service timer or enable asynch reading as appropriate */
     sim_activate(&xq->unit[2], xq->var->startup_delay);
@@ -2296,11 +2300,16 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
 
   /* stop receiver when RE transitions to clear */
   if (xq->var->csr & XQ_CSR_RE & ~data) {
-    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - receiver stopped\n", data);
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X) - receiver stopped\n", data);
 
     /* stop the read service timer or disable asynch reading as appropriate */
     xq_stop_receiver(xq);
   }
+
+  if (xq->var->csr & XQ_CSR_EL & ~data)
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X) - External Loopback %s\n", data, (data & XQ_CSR_EL) ? "enabled" : "disabled");
+  if (xq->var->csr & XQ_CSR_IL & ~data)
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X) - Internal Loopback %s\n", data, (data & XQ_CSR_IL) ? "disabled" : "enabled");
 
   /* update CSR bits */
   xq_csr_set_clr (xq, set_bits, clr_bits);
@@ -2316,11 +2325,6 @@ void xq_start_receiver(CTLR* xq)
 {
   if (!xq->var->etherface)
     return;
-
-  /* clear read queue */
-  ethq_clear(&xq->var->ReadQ);
-
-
 
   /* start the read service timer or enable asynch reading as appropriate */
   if (xq->var->must_poll) {
@@ -2351,7 +2355,7 @@ t_stat xq_wr_srqr(CTLR* xq, int32 data)
 {
   uint16 set_bits = data & XQ_SRQR_RW;                     /* set RW set bits */
 
-  sim_debug(DBG_REG, xq->dev, "xq_wr_srqr(data=0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_srqr(data=0x%04X)\n", data);
 
   xq->var->srr = set_bits;
 
@@ -2410,7 +2414,7 @@ t_stat xq_wr_srqr(CTLR* xq, int32 data)
 
 t_stat xq_wr_arqr(CTLR* xq, int32 data)
 {
-  sim_debug(DBG_REG, xq->dev, "xq_wr_arqr(data=0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_arqr(data=0x%04X)\n", data);
 
   /* initiate transmit activity when requested */
   if (XQ_ARQR_TRQ & data) {
@@ -2436,7 +2440,7 @@ t_stat xq_wr_icr(CTLR* xq, int32 data)
 {
   uint16 old_icr = xq->var->icr;
 
-  sim_debug(DBG_REG, xq->dev, "xq_wr_icr(data=0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_icr(data=0x%04X)\n", data);
 
   xq->var->icr = data & XQ_ICR_ENA;
 
@@ -2452,7 +2456,7 @@ t_stat xq_wr(int32 ldata, int32 PA, int32 access)
   int index = (PA >> 1) & 07;   /* word index */
   uint16 data = (uint16)ldata;
 
-  sim_debug(DBG_REG, xq->dev, "xq_wr(data=0x%08X, PA=0x%08X[%s], access=%d)\n", data, PA, ((xq->var->mode == XQ_T_DELQA_PLUS) ? xqt_xmit_regnames[index] : xq_xmit_regnames[index]), access);
+  sim_debug(DBG_REG, xq->dev, "xq_wr(data=0x%04X, PA=0x%08X[%s], access=%d)\n", data, PA, ((xq->var->mode == XQ_T_DELQA_PLUS) ? xqt_xmit_regnames[index] : xq_xmit_regnames[index]), access);
 
   switch (xq->var->mode) {
     case XQ_T_DELQA_PLUS:
@@ -2545,7 +2549,7 @@ t_stat xq_reset(DEVICE* dptr)
       break;
     case XQ_T_DELQA:
     case XQ_T_DELQA_PLUS:
-      xq->var->var = (xq->var->lockmode ? XQ_VEC_MS : 0) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
+      xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
       xq->var->mode = (xq->var->lockmode ? XQ_T_DEQNA : XQ_T_DELQA);
       break;
   }
@@ -2754,7 +2758,7 @@ t_stat xq_tmrsvc(UNIT* uptr)
         sim_debug(DBG_TRC, xq->dev, "xq_tmrsvc(DELQA-PLUS Host Inactivity Expired\n");
         xq->var->mode = XQ_T_DELQA;
         xq->var->iba = xq->var->srr = 0;
-        xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
+        xq->var->var = XQ_VEC_MS | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
       }
     }
   }
@@ -2783,6 +2787,22 @@ t_stat xq_startsvc(UNIT* uptr)
 
   /* start the read service timer or enable asynch reading as appropriate */
   xq_start_receiver(xq);
+
+  return SCPE_OK;
+}
+
+/*
+** service routine - used to delay receiption of loopback and setup packets by 
+**                   400 useconds like the real hardware
+*/
+t_stat xq_receivesvc(UNIT* uptr)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+
+  sim_debug(DBG_TRC, xq->dev, "xq_receivesvc()\n");
+
+  /* read setup or loopback packet */
+  xq_process_rbdl(xq);
 
   return SCPE_OK;
 }

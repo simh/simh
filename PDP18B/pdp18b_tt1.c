@@ -102,10 +102,10 @@ DIB ttix_dib = {
 UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_IDLE|UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
 REG ttix_reg[] = {
-    { BRDATA (BUF, ttix_buf, 8, 8, TTX_MAXL) },
-    { ORDATA (DONE, ttix_done, TTX_MAXL) },
-    { FLDATA (INT, int_hwre[API_TTI1], INT_V_TTI1) },
-    { DRDATA (TIME, ttix_unit.wait, 24), REG_NZ + PV_LEFT },
+    { BRDATAD (BUF, ttix_buf, 8, 8, TTX_MAXL, "last character received, lines 0 to 3/15") },
+    { ORDATAD (DONE, ttix_done, TTX_MAXL, "input ready flags, line 0 on right") },
+    { FLDATAD (INT, int_hwre[API_TTI1], INT_V_TTI1, "interrupt pending flag") },
+    { DRDATAD (TIME, ttix_unit.wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
     { ORDATA (DEVNUM, ttix_dib.dev, 6), REG_HRO },
 #if defined (PDP15)
     { ORDATA (APIVEC, api_vec[API_TTI1][INT_V_TTI1], 6), REG_HRO },
@@ -164,11 +164,11 @@ UNIT ttox_unit[] = {
     };
 
 REG ttox_reg[] = {
-    { BRDATA (BUF, ttox_buf, 8, 8, TTX_MAXL) },
-    { ORDATA (DONE, ttox_done, TTX_MAXL) },
-    { FLDATA (INT, int_hwre[API_TTO1], INT_V_TTO1) },
-    { URDATA (TIME, ttox_unit[0].wait, 10, 24, 0,
-              TTX_MAXL, PV_LEFT) },
+    { BRDATAD (BUF, ttox_buf, 8, 8, TTX_MAXL, "last character transmitted, lines 0 to 3/15") },
+    { ORDATAD (DONE, ttox_done, TTX_MAXL, "output ready flags, line 0 on right") },
+    { FLDATAD (INT, int_hwre[API_TTO1], INT_V_TTO1, "interrupt pending flag") },
+    { URDATAD (TIME, ttox_unit[0].wait, 10, 24, 0,
+              TTX_MAXL, PV_LEFT, "time from initiation to interrupt, lines 0 to 3/15") },
 #if defined (PDP15)
     { ORDATA (APIVEC, api_vec[API_TTO1][INT_V_TTO1], 6), REG_HRO },
 #endif

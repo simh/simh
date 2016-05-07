@@ -383,21 +383,25 @@ t_stat dtc_srv(UNIT * uptr)
         if (chan_read_char(chan, &ch, dtc_bufptr[line] >= dtc_blimit[line])) {
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm write done %d %d ",
                          line, dtc_bufptr[line]);
+                dtc_bsize[line] = dtc_bufptr[line];
+                dtc_bufptr[line] = 0;
                 if (dtc_lstatus[line] & BufAbnormal) {
                     chan_set_wcflg(chan);
                 }
                 dtc_lstatus[line] = BufOutBusy;
                 /* Check if we filled up buffer */
-                if (dtc_bufptr[line] >= dtc_blimit[line]) {
+                if (dtc_bsize[line] >= dtc_blimit[line]) {
                      chan_set_gm(chan);
                      sim_debug(DEBUG_DETAIL, &dtc_dev, "full ");
+                /* Empty write, clears flags */
+                } else if (dtc_bsize[line] == 0) {
+                    sim_debug(DEBUG_DETAIL, &dtc_dev, "empty\n");
+                    dtc_lstatus[line] = BufIdle;
                 } else {
                      dtc_lstatus[line] |= BufGM;
                      sim_debug(DEBUG_DETAIL, &dtc_dev, "gm ");
                 }
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "\n");
-                dtc_bsize[line] = dtc_bufptr[line];
-                dtc_bufptr[line] = 0;
                 chan_set_end(chan);
                 uptr->u5 = DTC_RDY;
                 return SCPE_OK;
@@ -595,7 +599,8 @@ dtco_srv(UNIT * uptr)
                        sim_debug(DEBUG_DATA, &dtc_dev, 
                                 "Datacomm recieve %d ?\n", ln);
                        dtc_lstatus[ln] |= BufAbnormal;
-                       c1 = 0;
+                       tmxr_putc_ln(&dtc_ldsc[ln], '?');
+                       dtc_buf[ln][dtc_bufptr[ln]++] = c1;
                        break;
                  default:
                        sim_debug(DEBUG_DATA, &dtc_dev,

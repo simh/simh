@@ -299,22 +299,22 @@ typedef struct {
  * Used by PDP-7 UNIX as a "Glass TTY"
  */
 #define DEV_G2D1        005                             /* Display Ctrl 1 */
-/*#define DEV_G2D       006                             /* (Display Ctrl 2) */
-/*#define DEV_G2LP      007                             /* (Light Pen) */
-/*#define DEV_G2DS      010                             /* (Display Status) */
-/*#define DEV_G2D3      014                             /* (Display Ctrl 3) */
-/*#define DEV_G2D4      034                             /* (Display Ctrl 4) */
+#define DEV_G2D         006                             /* (Display Ctrl 2) */
+#define DEV_G2LP        007                             /* (Light Pen) */
+#define DEV_G2DS        010                             /* (Display Status) */
+#define DEV_G2D3        014                             /* (Display Ctrl 3) */
+#define DEV_G2D4        034                             /* (Display Ctrl 4) */
 
-/*#define DEV_G2UNK     042                             /* (???) */
+#define DEV_G2UNK       042                             /* (???) */
 #define DEV_G2KB        043                             /* Keyboard */
 #define DEV_G2BB        044                             /* Button Box */
-/*#define DEV_G2IM      045                             /* (PDP7 int. mask) */
+#define DEV_G2IM        045                             /* (PDP7 int. mask) */
 
 /* PDP-7/9 to 201A Data Phone Interface
  * (status bits retrieved with G2DS IOT)
  * used for UNIX to GCOS Remote Job Entry
  */
-/*#define DEV_DP        047                             /* (Data Phone) */
+#define DEV_DP          047                             /* (Data Phone) */
 #endif
 
 /* Interrupt system

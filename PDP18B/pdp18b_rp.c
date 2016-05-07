@@ -195,16 +195,16 @@ UNIT rp_unit[] = {
     };
 
 REG rp_reg[] = {
-    { ORDATA (STA, rp_sta, 18) },
-    { ORDATA (STB, rp_stb, 18) },
-    { ORDATA (DA, rp_da, 18) },
-    { ORDATA (MA, rp_ma, 18) },
-    { ORDATA (WC, rp_wc, 18) },
-    { FLDATA (INT, int_hwre[API_RP], INT_V_RP) },
-    { FLDATA (BUSY, rp_busy, 0) },
-    { FLDATA (STOP_IOE, rp_stopioe, 0) },
-    { DRDATA (STIME, rp_swait, 24), PV_LEFT },
-    { DRDATA (RTIME, rp_rwait, 24), PV_LEFT },
+    { ORDATAD (STA, rp_sta, 18, "status A") },
+    { ORDATAD (STB, rp_stb, 18, "status B") },
+    { ORDATAD (DA, rp_da, 18, "disk address") },
+    { ORDATAD (MA, rp_ma, 18, "current memory address") },
+    { ORDATAD (WC, rp_wc, 18, "word count") },
+    { FLDATAD (INT, int_hwre[API_RP], INT_V_RP, "interrupt pending flag") },
+    { FLDATAD (BUSY, rp_busy, 0, "control busy flag") },
+    { FLDATAD (STOP_IOE, rp_stopioe, 0, "stop on I/O error") },
+    { DRDATAD (STIME, rp_swait, 24, "seek time per cylinder"), PV_LEFT },
+    { DRDATAD (RTIME, rp_rwait, 24, "rotational delay"), PV_LEFT },
     { ORDATA (DEVNO, rp_dib.dev, 6), REG_HRO },
     { ORDATA (APIVEC, api_vec[API_RP][INT_V_RP], 6), REG_HRO },
     { NULL }

@@ -171,14 +171,14 @@ UNIT mt_unit[] = {
     };
 
 REG mt_reg[] = {
-    { ORDATA (STA, mt_sta, 18) },
-    { ORDATA (CMD, mt_cu, 18) },
-    { FLDATA (INT, int_hwre[API_MTA], INT_V_MTA) },
-    { FLDATA (STOP_IOE, mt_stopioe, 0) },
-    { DRDATA (TIME, mt_time, 24), PV_LEFT },
-    { URDATA (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0) },
-    { URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
-              MT_NUMDR, PV_LEFT | REG_RO) },
+    { ORDATAD (STA, mt_sta, 18, "main status") },
+    { ORDATAD (CMD, mt_cu, 18, "command") },
+    { FLDATAD (INT, int_hwre[API_MTA], INT_V_MTA, "interrupt pending flag") },
+    { FLDATAD (STOP_IOE, mt_stopioe, 0, "stop on I/O error") },
+    { DRDATAD (TIME, mt_time, 24, "record delay"), PV_LEFT },
+    { URDATAD (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0, "unit status, units 0 to 7") },
+    { URDATAD (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
+              MT_NUMDR, PV_LEFT | REG_RO, "position units 0 to 7") },
     { ORDATA (DEVNO, mt_dib.dev, 6), REG_HRO },
     { ORDATA (APIVEC, api_vec[API_MTA][INT_V_MTA], 6), REG_HRO },
     { NULL }

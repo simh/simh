@@ -2825,9 +2825,7 @@ do {
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
-    if (stat == SCPE_EXPECT)                            /* EXPECT status is non actionable */
-        stat = SCPE_OK;                                 /* so adjust it to SCPE_OK */
-    if ((stat != SCPE_OK) ||
+    if (((stat != SCPE_OK) && (stat != SCPE_EXPECT)) ||
         ((cmdp->action != &return_cmd) &&
          (cmdp->action != &goto_cmd) &&
          (cmdp->action != &on_cmd) &&
@@ -2862,6 +2860,8 @@ do {
             if (stat >= SCPE_BASE)                      /* report error if not suppressed */
                 sim_printf ("%s\n", sim_error_text (stat));
         }
+    if (stat == SCPE_EXPECT)                            /* EXPECT status is non actionable */
+        stat = SCPE_OK;                                 /* so adjust it to SCPE_OK */
     if (staying &&
         (sim_on_check[sim_do_depth]) && 
         (stat != SCPE_OK) &&

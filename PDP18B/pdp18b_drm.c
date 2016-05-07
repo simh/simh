@@ -100,14 +100,14 @@ UNIT drm_unit = {
     };
 
 REG drm_reg[] = {
-    { ORDATA (DA, drm_da, 9) },
-    { ORDATA (MA, drm_ma, 16) },
-    { FLDATA (INT, int_hwre[API_DRM], INT_V_DRM) },
-    { FLDATA (DONE, int_hwre[API_DRM], INT_V_DRM) },
-    { FLDATA (ERR, drm_err, 0) },
-    { ORDATA (WLK, drm_wlk, 32) },
-    { DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
-    { FLDATA (STOP_IOE, drm_stopioe, 0) },
+    { ORDATAD (DA, drm_da, 9, "drum address (sector number") },
+    { ORDATAD (MA, drm_ma, 16, "current memor address") },
+    { FLDATAD (INT, int_hwre[API_DRM], INT_V_DRM, "interrupt pending flag") },
+    { FLDATAD (DONE, int_hwre[API_DRM], INT_V_DRM, "device done flag") },
+    { FLDATAD (ERR, drm_err, 0, "error flag") },
+    { ORDATAD (WLK, drm_wlk, 32, "write lock switches") },
+    { DRDATAD (TIME, drm_time, 24, "rotational latency, per word"), REG_NZ + PV_LEFT },
+    { FLDATAD (STOP_IOE, drm_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVNO, drm_dib.dev, 6), REG_HRO },
     { NULL }
     };
