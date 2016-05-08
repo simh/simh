@@ -74,6 +74,7 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 extern int32 find_unit_index(UNIT *uptr);
 
 static void MFDC_Command(uint8 cData);
+static const char* mfdc_description(DEVICE *dptr);
 
 #define MFDC_MAX_DRIVES 4
 #define JUMPER_W9       1   /* Not Installed (0) = 2MHz, Installed (1) = 4MHz. */
@@ -149,7 +150,11 @@ static REG mfdc_reg[] = {
     { NULL }
 };
 
-#define MDSK_NAME   "Micropolis FD Control MDSK"
+#define MDSK_NAME   "Micropolis FD Control"
+
+static const char* mfdc_description(DEVICE *dptr) {
+    return MDSK_NAME;
+}
 
 static MTAB mfdc_mod[] = {
     { MTAB_XTD|MTAB_VDV,            0,                  "MEMBASE",  "MEMBASE",
@@ -184,7 +189,7 @@ DEVICE mfdc_dev = {
     NULL, NULL, &mfdc_reset,
     NULL, &mfdc_attach, &mfdc_detach,
     &mfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    mfdc_dt, NULL, MDSK_NAME
+    mfdc_dt, NULL, NULL, NULL, NULL, NULL, &mfdc_description
 };
 
 /* Micropolis FD Control Boot ROM

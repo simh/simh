@@ -117,6 +117,7 @@ static int32 hdc1001dev(const int32 port, const int32 io, const int32 data);
 
 static uint8 HDC1001_Read(const uint32 Addr);
 static uint8 HDC1001_Write(const uint32 Addr, uint8 cData);
+static const char* hdc1001_description(DEVICE *dptr);
 
 static UNIT hdc1001_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDC1001_CAPACITY) },
@@ -129,7 +130,11 @@ static REG hdc1001_reg[] = {
     { NULL }
 };
 
-#define HDC1001_NAME    "ADC Hard Disk Controller HDC1001"
+#define HDC1001_NAME    "ADC Hard Disk Controller"
+
+static const char* hdc1001_description(DEVICE *dptr) {
+    return HDC1001_NAME;
+}
 
 static MTAB hdc1001_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
@@ -160,7 +165,7 @@ DEVICE hdc1001_dev = {
     NULL, NULL, &hdc1001_reset,
     NULL, &hdc1001_attach, &hdc1001_detach,
     &hdc1001_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    hdc1001_dt, NULL, HDC1001_NAME
+    hdc1001_dt, NULL, NULL, NULL, NULL, NULL, &hdc1001_description
 };
 
 /* Reset routine */

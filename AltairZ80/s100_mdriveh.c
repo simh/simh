@@ -88,6 +88,7 @@ static t_stat mdriveh_reset(DEVICE *mdriveh_dev);
 static int32 mdrivehdev(const int32 port, const int32 io, const int32 data);
 static uint8 MDRIVEH_Read(const uint32 Addr);
 static uint8 MDRIVEH_Write(const uint32 Addr, uint8 cData);
+static const char* mdriveh_description(DEVICE *dptr);
 
 static UNIT mdriveh_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_DISABLE + UNIT_ROABLE, MDRIVEH_CAPACITY) },
@@ -104,7 +105,11 @@ static REG mdriveh_reg[] = {
     { NULL }
 };
 
-#define MDRIVEH_NAME    "Compupro Memory Drive MDRIVEH"
+#define MDRIVEH_NAME    "Compupro Memory Drive"
+
+static const char* mdriveh_description(DEVICE *dptr) {
+    return MDRIVEH_NAME;
+}
 
 static MTAB mdriveh_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
@@ -139,7 +144,7 @@ DEVICE mdriveh_dev = {
     NULL, NULL, &mdriveh_reset,
     NULL, NULL, NULL,
     &mdriveh_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    mdriveh_dt, NULL, MDRIVEH_NAME
+    mdriveh_dt, NULL, NULL, NULL, NULL, NULL, &mdriveh_description
 };
 
 

@@ -180,6 +180,7 @@ static t_stat sim_instr_mmu(void);
 static uint32 GetBYTE(register uint32 Addr);
 static void PutWORD(register uint32 Addr, const register uint32 Value);
 static void PutBYTE(register uint32 Addr, const register uint32 Value);
+static const char* cpu_description(DEVICE *dptr);
 void out(const uint32 Port, const uint32 Value);
 uint32 in(const uint32 Port);
 void altairz80_init(void);
@@ -447,6 +448,10 @@ REG cpu_reg[] = {
     { NULL }
 };
 
+static const char* cpu_description(DEVICE *dptr) {
+    return "Central Processing Unit";
+}
+
 static MTAB cpu_mod[] = {
     { MTAB_XTD | MTAB_VDV,  CHIP_TYPE_8080,     NULL,           "8080",         &cpu_set_chiptype,
     NULL, NULL, "Chooses 8080 CPU"},
@@ -544,7 +549,7 @@ DEVICE cpu_dev = {
     &cpu_ex, &cpu_dep, &cpu_reset,
     NULL, NULL, NULL,
     NULL, DEV_DEBUG, 0,
-    cpu_dt, NULL, NULL
+    cpu_dt, NULL, NULL, NULL, NULL, NULL, &cpu_description
 };
 
 /*  This is the I/O configuration table. There are 255 possible

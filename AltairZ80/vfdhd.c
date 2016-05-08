@@ -133,6 +133,7 @@ typedef struct {
 
 static VFDHD_INFO vfdhd_info_data = { { 0x0, 0, 0xC0, 4 } };
 static VFDHD_INFO *vfdhd_info = &vfdhd_info_data;
+static const char* vfdhd_description(DEVICE *dptr);
 
 static SECTOR_FORMAT sdata;
 extern uint32 PCX;
@@ -168,7 +169,11 @@ static REG vfdhd_reg[] = {
     { NULL }
 };
 
-#define VFDHD_NAME  "Vector Graphic FD-HD Controller VFDHD"
+#define VFDHD_NAME  "Vector Graphic FD-HD Controller"
+
+static const char* vfdhd_description(DEVICE *dptr) {
+    return VFDHD_NAME;
+}
 
 static MTAB vfdhd_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
@@ -200,7 +205,7 @@ DEVICE vfdhd_dev = {
     NULL, NULL, &vfdhd_reset,
     NULL, &vfdhd_attach, &vfdhd_detach,
     &vfdhd_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    vfdhd_dt, NULL, VFDHD_NAME
+    vfdhd_dt, NULL, NULL, NULL, NULL, NULL, &vfdhd_description
 };
 
 /* Reset routine */

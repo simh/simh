@@ -152,6 +152,7 @@ static t_stat mdsa_attach(UNIT *uptr, char *cptr);
 static t_stat mdsa_detach(UNIT *uptr);
 static t_stat mdsa_boot(int32 unitno, DEVICE *dptr);
 static uint8 MDSA_Read(const uint32 Addr);
+static const char* mdsa_description(DEVICE *dptr);
 
 static int32 mdsadev(const int32 Addr, const int32 rw, const int32 data);
 
@@ -166,7 +167,11 @@ static REG mdsa_reg[] = {
     { NULL }
 };
 
-#define MDSA_NAME  "North Star Single Density Controller MDSA"
+#define MDSA_NAME  "North Star Single Density Controller"
+
+static const char* mdsa_description(DEVICE *dptr) {
+    return MDSA_NAME;
+}
 
 static MTAB mdsa_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",
@@ -199,7 +204,7 @@ DEVICE mdsa_dev = {
     NULL, NULL, &mdsa_reset,
     &mdsa_boot, &mdsa_attach, &mdsa_detach,
     &mdsa_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG, 
-    mdsa_dt, NULL, MDSA_NAME
+    mdsa_dt, NULL, NULL, NULL, NULL, NULL, &mdsa_description
 };
 
 /* Reset routine */

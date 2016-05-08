@@ -113,6 +113,7 @@ static int32 adcs6_timer(const int32 port, const int32 io, const int32 data);
 static int32 adcs6_control(const int32 port, const int32 io, const int32 data);
 static int32 adcs6_banksel(const int32 port, const int32 io, const int32 data);
 static int32 adcs6rom(const int32 port, const int32 io, const int32 data);
+static const char* adcs6_description(DEVICE *dptr);
 
 static int32 dipswitch      = 0x00;     /* 5-position DIP switch on 64FDC card */
 
@@ -181,7 +182,11 @@ static REG adcs6_reg[] = {
     { NULL }
 };
 
-#define ADCS6_NAME  "ADC Super-Six ADCS6"
+#define ADCS6_NAME  "ADC Super-Six"
+
+static const char* adcs6_description(DEVICE *dptr) {
+    return ADCS6_NAME;
+}
 
 static MTAB adcs6_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",
@@ -211,7 +216,7 @@ DEVICE adcs6_dev = {
     NULL, NULL, &adcs6_reset,
     &adcs6_boot, &adcs6_attach, &adcs6_detach,
     &adcs6_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    adcs6_dt, NULL, ADCS6_NAME
+    adcs6_dt, NULL, NULL, NULL, NULL, NULL, &adcs6_description
 };
 
 /* This is the DIGITEX Monitor version 1.2.A -- 10/06/83

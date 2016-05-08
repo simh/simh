@@ -140,6 +140,10 @@ static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, char *cptr, void
 static t_stat sio_svc(UNIT *uptr);
 static t_stat simh_dev_reset(DEVICE *dptr);
 static t_stat simh_svc(UNIT *uptr);
+static const char* sio_description(DEVICE *dptr);
+static const char* simh_description(DEVICE *dptr);
+static const char* ptr_description(DEVICE *dptr);
+static const char* ptp_description(DEVICE *dptr);
 static void mapAltairPorts(void);
 int32 nulldev   (const int32 port, const int32 io, const int32 data);
 int32 sr_dev    (const int32 port, const int32 io, const int32 data);
@@ -347,13 +351,17 @@ static MTAB sio_mod[] = {
     { 0 }
 };
 
+static const char* sio_description(DEVICE *dptr) {
+    return "Serial Input Output";
+}
+
 DEVICE sio_dev = {
     "SIO", &sio_unit, sio_reg, sio_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &sio_reset,
     NULL, &sio_attach, &sio_detach,
     NULL, DEV_DEBUG | DEV_MUX, 0,
-    generic_dt, NULL, "Serial Input Output SIO"
+    generic_dt, NULL, NULL, NULL, NULL, NULL, &sio_description
 };
 
 static MTAB ptpptr_mod[] = {
@@ -369,18 +377,26 @@ static REG ptr_reg[] = {
     { NULL }
 };
 
+static const char* ptr_description(DEVICE *dptr) {
+    return "Paper Tape Reader";
+}
+
 DEVICE ptr_dev = {
     "PTR", &ptr_unit, ptr_reg, ptpptr_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptr_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    generic_dt, NULL, "Paper Tape Reader PTR"
+    generic_dt, NULL, NULL, NULL, NULL, NULL, &ptr_description
 };
 
 static UNIT ptp_unit = {
     UDATA (NULL, UNIT_ATTABLE, 0)
 };
+
+static const char* ptp_description(DEVICE *dptr) {
+    return "Paper Tape Puncher";
+}
 
 DEVICE ptp_dev = {
     "PTP", &ptp_unit, NULL, ptpptr_mod,
@@ -388,7 +404,7 @@ DEVICE ptp_dev = {
     NULL, NULL, &ptp_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    generic_dt, NULL, "Paper Tape Puncher PTP"
+    generic_dt, NULL, NULL, NULL, NULL, NULL, &ptp_description
 };
 
 /*  Synthetic device SIMH for communication
@@ -465,13 +481,17 @@ static MTAB simh_mod[] = {
     { 0 }
 };
 
+const char* simh_description(DEVICE *dptr) {
+    return "Pseudo Device";
+}
+
 DEVICE simh_device = {
     "SIMH", &simh_unit, simh_reg, simh_mod,
     1, 10, 31, 1, 16, 4,
     NULL, NULL, &simh_dev_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    generic_dt, NULL, "Pseudo Device SIMH"
+    generic_dt, NULL, NULL, NULL, NULL, NULL, &simh_description
 };
 
 static void resetSIOWarningFlags(void) {
