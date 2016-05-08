@@ -93,6 +93,7 @@ static uint8 IF3_Read(const uint32 Addr);
 static uint8 IF3_Write(const uint32 Addr, uint8 cData);
 static int32 if3dev(const int32 port, const int32 io, const int32 data);
 static t_stat update_rx_tx_isr (UNIT *uptr);
+static const char* if3_description(DEVICE *dptr);
 
 static UNIT if3_unit[] = {
     { UDATA (&if3_svc, UNIT_FIX | UNIT_DISABLE | UNIT_ROABLE | UNIT_IF3_CONNECT, 0) },
@@ -118,7 +119,11 @@ static REG if3_reg[] = {
     { NULL }
 };
 
-#define IF3_NAME    "Compupro Interfacer 3 IF3"
+#define IF3_NAME    "Compupro Interfacer 3"
+
+static const char* if3_description(DEVICE *dptr) {
+    return IF3_NAME;
+}
 
 static MTAB if3_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,               "IOBASE",   "IOBASE",
@@ -146,7 +151,7 @@ DEVICE if3_dev = {
     NULL, NULL, &if3_reset,
     NULL, NULL, NULL,
     &if3_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    if3_dt, NULL, IF3_NAME
+    if3_dt, NULL, NULL, NULL, NULL, NULL, &if3_description
 };
 
 static t_stat set_if3_connect(UNIT *uptr, int32 val, char *cptr, void *desc)

@@ -112,6 +112,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
 static int32 cromfdc_banksel(const int32 port, const int32 io, const int32 data);
 static int32 cromfdcrom(const int32 port, const int32 io, const int32 data);
 static int32 ccs2810_uart_status(const int32 port, const int32 io, const int32 data);
+static const char* cromfdc_description(DEVICE *dptr);
 
 static int32 dipswitch          = 0;    /* 5-position DIP switch on 64FDC card */
 static int32 bootstrap          = 0;    /* 0 for RDOS 2.52, 1 for RDOS 3.12. */
@@ -229,7 +230,11 @@ static REG cromfdc_reg[] = {
     { NULL }
 };
 
-#define CROMFDC_NAME    "Cromemco 4/16/64 FDC CROMFDC"
+#define CROMFDC_NAME    "Cromemco 4/16/64 FDC"
+
+static const char* cromfdc_description(DEVICE *dptr) {
+    return CROMFDC_NAME;
+}
 
 static MTAB cromfdc_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
@@ -259,7 +264,7 @@ DEVICE cromfdc_dev = {
     NULL, NULL, &cromfdc_reset,
     &cromfdc_boot, &wd179x_attach, &wd179x_detach,
     &cromfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    cromfdc_dt, NULL, CROMFDC_NAME
+    cromfdc_dt, NULL, NULL, NULL, NULL, NULL, &cromfdc_description
 };
 
 /* This is the CROMFDC RDOS-II ROM.

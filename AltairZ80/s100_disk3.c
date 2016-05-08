@@ -194,6 +194,7 @@ static t_stat disk3_reset(DEVICE *disk3_dev);
 static t_stat disk3_attach(UNIT *uptr, char *cptr);
 static t_stat disk3_detach(UNIT *uptr);
 static void raise_disk3_interrupt(void);
+static const char* disk3_description(DEVICE *dptr);
 
 static int32 disk3dev(const int32 port, const int32 io, const int32 data);
 
@@ -233,7 +234,11 @@ static REG disk3_reg[] = {
     { NULL }
 };
 
-#define DISK3_NAME  "Compupro ST-506 Disk Controller DISK3"
+#define DISK3_NAME  "Compupro ST-506 Disk Controller"
+
+static const char* disk3_description(DEVICE *dptr) {
+    return DISK3_NAME;
+}
 
 static MTAB disk3_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
@@ -266,7 +271,7 @@ DEVICE disk3_dev = {
     NULL, NULL, &disk3_reset,
     NULL, &disk3_attach, &disk3_detach,
     &disk3_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    disk3_dt, NULL, DISK3_NAME
+    disk3_dt, NULL, NULL, NULL, NULL, NULL, &disk3_description
 };
 
 /* Reset routine */

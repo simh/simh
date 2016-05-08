@@ -82,6 +82,7 @@ extern void PutByteDMA(const uint32 Addr, const uint32 Value);
 extern uint8 GetByteDMA(const uint32 Addr);
 
 static t_stat selchan_reset(DEVICE *selchan_dev);
+static const char* selchan_description(DEVICE *dptr);
 
 static int32 selchandev(const int32 port, const int32 io, const int32 data);
 
@@ -95,6 +96,10 @@ static REG selchan_reg[] = {
     { HRDATAD (DMA_ADDR, selchan_info_data.dma_addr, 24,    "DMA transfer address register"),   },
     { NULL }
 };
+
+static const char* selchan_description(DEVICE *dptr) {
+    return "Compupro Selector Channel";
+}
 
 static MTAB selchan_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "IOBASE", "IOBASE", &set_iobase, &show_iobase, NULL,
@@ -115,7 +120,7 @@ DEVICE selchan_dev = {
     NULL, NULL, &selchan_reset,
     NULL, NULL, NULL,
     &selchan_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    selchan_dt, NULL, "Compupro Selector Channel SELCHAN"
+    selchan_dt, NULL, NULL, NULL, NULL, NULL, &selchan_description
 };
 
 /* Reset routine */

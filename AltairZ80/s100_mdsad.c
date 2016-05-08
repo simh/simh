@@ -215,6 +215,7 @@ static t_stat mdsad_attach(UNIT *uptr, char *cptr);
 static t_stat mdsad_detach(UNIT *uptr);
 static t_stat mdsad_boot(int32 unitno, DEVICE *dptr);
 static uint8 MDSAD_Read(const uint32 Addr);
+static const char* mdsad_description(DEVICE *dptr);
 
 static int32 mdsaddev(const int32 Addr, const int32 rw, const int32 data);
 
@@ -229,7 +230,11 @@ static REG mdsad_reg[] = {
     { NULL }
 };
 
-#define MDSAD_NAME  "North Star Floppy Controller MDSAD"
+#define MDSAD_NAME  "North Star Floppy Controller"
+
+static const char* mdsad_description(DEVICE *dptr) {
+    return MDSAD_NAME;
+}
 
 static MTAB mdsad_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",
@@ -263,7 +268,7 @@ DEVICE mdsad_dev = {
     NULL, NULL, &mdsad_reset,
     &mdsad_boot, &mdsad_attach, &mdsad_detach,
     &mdsad_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    mdsad_dt, NULL, "North Star Floppy Controller MDSAD"
+    mdsad_dt, NULL, NULL, NULL, NULL, NULL, &mdsad_description
 };
 
 /* Reset routine */

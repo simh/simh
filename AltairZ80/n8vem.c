@@ -103,6 +103,7 @@ static int32 n8vem_pio1a    = 0x00;     /* 8255 PIO1A IN Port */
 static int32 n8vem_pio1b    = 0x00;     /* 8255 PIO1B OUT Port */
 static int32 n8vem_pio1c    = 0x00;     /* 8255 PIO1C IN Port */
 static int32 n8vem_pio1ctrl = 0x00;     /* 8255 PIO1 Control Port */
+static const char* n8vem_description(DEVICE *dptr);
 
 #define N8VEM_ROM_SIZE  (1024 * 1024)
 #define N8VEM_RAM_SIZE  (512 * 1024)
@@ -133,7 +134,11 @@ static REG n8vem_reg[] = {
     { NULL }
 };
 
-#define N8VEM_NAME  "Single-Board Computer N8VEM"
+#define N8VEM_NAME  "Single-Board Computer"
+
+static const char* n8vem_description(DEVICE *dptr) {
+    return N8VEM_NAME;
+}
 
 static MTAB n8vem_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,  "MEMBASE",  "MEMBASE",  &set_membase, &show_membase,
@@ -158,7 +163,7 @@ DEVICE n8vem_dev = {
     NULL, NULL, &n8vem_reset,
     &n8vem_boot, &n8vem_attach, &n8vem_detach,
     &n8vem_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    n8vem_dt, NULL, "Single-Board Computer N8VEM"
+    n8vem_dt, NULL, NULL, NULL, NULL, NULL, &n8vem_description
 };
 
 /* Reset routine */

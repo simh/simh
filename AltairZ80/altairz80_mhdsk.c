@@ -165,6 +165,7 @@ static t_stat dsk_reset(DEVICE *dptr);
 static char* cmdTranslate(const int32 cmd);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
+static const char* mhdsk_description(DEVICE *dptr);
 
 /* 88DSK Standard I/O Data Structures */
 
@@ -178,7 +179,11 @@ static UNIT dsk_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) }};
 
-#define MHDSK_NAME  "MITS Hard Disk MHDSK"
+#define MHDSK_NAME  "MITS Hard Disk"
+
+static const char* mhdsk_description(DEVICE *dptr) {
+    return MHDSK_NAME;
+}
 
 static MTAB dsk_mod[] = {
     { UNIT_DSK_WLK,     0,                  "WRTENB",    "WRTENB",  NULL, NULL, NULL,
@@ -202,7 +207,7 @@ DEVICE mhdsk_dev = {
     NULL, NULL, &dsk_reset,
     &mhdsk_boot, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    mhdsk_dt, NULL, MHDSK_NAME
+    mhdsk_dt, NULL, NULL, NULL, NULL, NULL, &mhdsk_description
 };
 
 static int32 bootrom_mhdsk[BOOTROM_SIZE_MHDSK] = {

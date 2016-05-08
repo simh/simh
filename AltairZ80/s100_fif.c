@@ -42,6 +42,7 @@
 static t_stat fif_reset(DEVICE *dptr);
 static t_stat fif_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc);
 static int32 fif_io(const int32 port, const int32 io, const int32 data);
+static const char* fif_description(DEVICE *dptr);
 
 extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -81,7 +82,11 @@ static UNIT fif_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) }
 };
 
-#define FIF_NAME    "IMSAI FIF"
+#define FIF_NAME    "IMSAI"
+
+static const char* fif_description(DEVICE *dptr) {
+    return FIF_NAME;
+}
 
 static REG fif_reg[] = {
     { DRDATAD (DISK,         current_disk,   4,
@@ -113,7 +118,7 @@ DEVICE fif_dev = {
     NULL, NULL, &fif_reset,
     NULL, NULL, NULL,
     &fif_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, FIF_NAME
+    NULL, NULL, NULL, NULL, NULL, NULL, &fif_description
 };
 
 static void resetDSKWarningFlags(void) {

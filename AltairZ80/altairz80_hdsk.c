@@ -86,6 +86,7 @@ extern int32 find_unit_index(UNIT *uptr);
 
 static t_stat hdsk_boot(int32 unitno, DEVICE *dptr);
 int32 hdsk_io(const int32 port, const int32 io, const int32 data);
+static const char* hdsk_description(DEVICE *dptr);
 
 static int32 hdskLastCommand        = HDSK_NONE;
 static int32 hdskCommandPosition    = 0;
@@ -331,7 +332,11 @@ static REG hdsk_reg[] = {
     { NULL }
 };
 
-#define HDSK_NAME   "Hard Disk HDSK"
+#define HDSK_NAME   "Hard Disk"
+
+static const char* hdsk_description(DEVICE *dptr) {
+    return HDSK_NAME;
+}
 
 static MTAB hdsk_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,              "IOBASE",   "IOBASE",
@@ -361,7 +366,7 @@ DEVICE hdsk_dev = {
     NULL, NULL, &hdsk_reset,
     &hdsk_boot, &hdsk_attach, &hdsk_detach,
     &hdsk_info_data, (DEV_DISABLE | DEV_DEBUG), 0,
-    hdsk_dt, NULL, "Hard Disk HDSK"
+    hdsk_dt, NULL, NULL, NULL, NULL, NULL, &hdsk_description
 };
 
 /* Reset routine */

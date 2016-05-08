@@ -80,6 +80,7 @@ static t_stat fw2_detach(UNIT *uptr);
 static uint8 FW2_Read(const uint32 Addr);
 static uint8 FW2_Write(const uint32 Addr, uint8 cData);
 static t_stat get_base_address(char *cptr, uint32 *baseaddr);
+static const char* fw2_description(DEVICE *dptr);
 
 static UNIT fw2_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, FW2_CAPACITY) },
@@ -88,7 +89,11 @@ static UNIT fw2_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, FW2_CAPACITY) }
 };
 
-#define FWII_NAME   "Vector Graphic Flashwriter 2 FWII"
+#define FWII_NAME   "Vector Graphic Flashwriter 2"
+
+static const char* fw2_description(DEVICE *dptr) {
+    return FWII_NAME;
+}
 
 static MTAB fw2_mod[] = {
     /* quiet, no warning messages       */
@@ -106,7 +111,7 @@ DEVICE fw2_dev = {
     NULL, NULL, NULL,
     NULL, &fw2_attach, &fw2_detach,
     NULL, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, FWII_NAME
+    NULL, NULL, NULL, NULL, NULL, NULL, &fw2_description
 };
 
 /* Attach routine */
