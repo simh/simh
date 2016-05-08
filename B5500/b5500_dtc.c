@@ -282,8 +282,12 @@ t_stat dtc_srv(UNIT * uptr)
             sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm inqury found %d %d ",
                 line, buf);
             if (line != -1) {
-                chan_set_eof(chan);
-                sim_debug(DEBUG_DETAIL, &dtc_dev, " writerdy ");
+                if ((dtc_lstatus[line] & BufSMASK) == BufWriteRdy) {
+                     chan_set_eof(chan);
+                     sim_debug(DEBUG_DETAIL, &dtc_dev, " writerdy ");
+                } else {
+                     sim_debug(DEBUG_DETAIL, &dtc_dev, " idle ");
+                }
             } else if (buf != -1) {
                 chan_set_read(chan);
                 sim_debug(DEBUG_DETAIL, &dtc_dev, " readrdy ");
@@ -310,6 +314,9 @@ t_stat dtc_srv(UNIT * uptr)
                 case BufWriteRdy:
                       chan_set_eof(chan);
                       sim_debug(DEBUG_DETAIL, &dtc_dev, " writerdy ");
+                      break;
+                case BufIdle:
+                      sim_debug(DEBUG_DETAIL, &dtc_dev, " idle ");
                       break;
                 default:
                       chan_set_error(chan);
@@ -368,7 +375,6 @@ t_stat dtc_srv(UNIT * uptr)
         /* Ok to start filling */
         case BufIdle:
         case BufWriteRdy:
-                dtc_lstatus[line] = BufWrite;
                 dtc_bufptr[line] = 0;
                 dtc_bsize[line] = 0;
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm write start %d\n",
@@ -388,24 +394,31 @@ t_stat dtc_srv(UNIT * uptr)
                 if (dtc_lstatus[line] & BufAbnormal) {
                     chan_set_wcflg(chan);
                 }
-                dtc_lstatus[line] = BufOutBusy;
+                /* Empty write, clears flags */
+                if (dtc_bsize[line] == 0) {
+                    sim_debug(DEBUG_DETAIL, &dtc_dev, "empty\n");
+                    if ((dtc_lstatus[line] & BufSMASK) != BufIdle) {
+                        dtc_lstatus[line] = BufIRQ|BufIdle;
+                        IAR |= IRQ_12;
+                    }
                 /* Check if we filled up buffer */
-                if (dtc_bsize[line] >= dtc_blimit[line]) {
+                } else if (dtc_bsize[line] >= dtc_blimit[line]) {
+                     dtc_lstatus[line] = BufOutBusy;
                      chan_set_gm(chan);
                      sim_debug(DEBUG_DETAIL, &dtc_dev, "full ");
-                /* Empty write, clears flags */
-                } else if (dtc_bsize[line] == 0) {
-                    sim_debug(DEBUG_DETAIL, &dtc_dev, "empty\n");
-                    dtc_lstatus[line] = BufIdle;
                 } else {
-                     dtc_lstatus[line] |= BufGM;
+                     dtc_lstatus[line] = BufOutBusy|BufGM;
                      sim_debug(DEBUG_DETAIL, &dtc_dev, "gm ");
                 }
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "\n");
+                for (ttu = 1; line > 15; ttu++)
+                    line -= 15;
+                chan_set_wc(chan, (ttu << 5) | line);
                 chan_set_end(chan);
                 uptr->u5 = DTC_RDY;
                 return SCPE_OK;
         } else {
+              dtc_lstatus[line] = BufWrite;
               dtc_buf[line][dtc_bufptr[line]++] = ch & 077;
               sim_debug(DEBUG_DATA, &dtc_dev, "Datacomm write data %d %02o %d\n",
                           line, ch&077, dtc_bufptr[line]);
@@ -464,14 +477,18 @@ t_stat dtc_srv(UNIT * uptr)
                 if (dtc_lstatus[line] & BufAbnormal) 
                      chan_set_wcflg(chan);
                 if (dtc_ldsc[line].conn == 0)   /* connected? */
-                    dtc_lstatus[line] = BufNotReady;
+                    dtc_lstatus[line] = BufIRQ|BufNotReady;
                 else
-                    dtc_lstatus[line] = BufIdle;
+                    dtc_lstatus[line] = BufIRQ|BufIdle;
                 dtc_bsize[line] = 0;
-                chan_set_end(chan);
-                uptr->u5 = DTC_RDY;
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm read done %d\n",
                          line);
+                for (ttu = 1; line > 15; ttu++)
+                    line -= 15;
+                chan_set_wc(chan, (ttu << 5) | line);
+                chan_set_end(chan);
+                uptr->u5 = DTC_RDY;
+                IAR |= IRQ_12;
                 return SCPE_OK;
         } else {
              sim_debug(DEBUG_DATA, &dtc_dev, "Datacomm read data %d %02o %d\n",
@@ -559,6 +576,16 @@ dtco_srv(UNIT * uptr)
                                         "Datacomm recieve ENQ %d\n", ln);
                        t = 0;
                        break;
+                 case '\003':   /* ^B send STX */
+                       dtc_lstatus[ln] &= ~BufSMASK;
+                       dtc_lstatus[ln] |= BufIRQ|BufReadRdy|BufAbnormal;
+                       dtc_buf[ln][0] = 0;
+                       dtc_buf[ln][1] = 017;
+                       dtc_buf[ln][2] = 077;
+                       dtc_bsize[ln] = 1;
+                       IAR |= IRQ_12;
+                       t = 0;
+                       break;
                  case '}':
                        dtc_buf[ln][dtc_bufptr[ln]++] = 017;
                        dtc_lstatus[ln] |= BufAbnormal;
@@ -574,6 +601,7 @@ dtco_srv(UNIT * uptr)
                        dtc_bsize[ln] = dtc_bufptr[ln];
                        IAR |= IRQ_12;
                        t = 0;
+                       c1 = 0;
                        sim_debug(DEBUG_DETAIL, &dtc_dev,
                                  "Datacomm recieve %d return\n", ln);
                        break;
@@ -593,7 +621,7 @@ dtco_srv(UNIT * uptr)
                        }
                        c1 = 0;
                        sim_debug(DEBUG_DATA, &dtc_dev, 
-                                "Datacomm recieve %d backspace\n", ln);
+                                "Datacomm recieve %d backspace %d\n", ln, dtc_bufptr[ln]);
                        break;
                  case '?':
                        sim_debug(DEBUG_DATA, &dtc_dev, 
@@ -604,7 +632,8 @@ dtco_srv(UNIT * uptr)
                        break;
                  default:
                        sim_debug(DEBUG_DATA, &dtc_dev,
-                         "Datacomm recieve %d %02x %c %02o\n", ln, c, c, c1);
+                         "Datacomm recieve %d %02x %c %02o %d\n", ln, c, c, c1,
+                             dtc_bufptr[ln]);
                  }
                  if (t && c1) {
                    tmxr_putc_ln(&dtc_ldsc[ln], con_to_ascii[c1]);
