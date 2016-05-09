@@ -441,9 +441,8 @@ extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 /* Massbus definitions */
 
-#define MBA_RP          (TR_MBA0 - TR_MBA0)             /* MBA for RP */
-#define MBA_TU          (TR_MBA1 - TR_MBA0)             /* MBA for TU */
 #define MBA_RMASK       0x1F                            /* max 32 reg */
+#define MBA_AUTO        (uint32)0xFFFFFFFF              /* Unassigned MBA */
 #define MBE_NXD         1                               /* nx drive */
 #define MBE_NXR         2                               /* nx reg */
 #define MBE_GOE         3                               /* err on GO */
@@ -470,7 +469,7 @@ int32 mba_get_bc (uint32 mbus);
 void mba_upd_ata (uint32 mbus, uint32 val);
 void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
-void mba_set_enbdis (uint32 mbus, t_bool dis);
+void mba_set_enbdis (DEVICE *dptr);
 t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);

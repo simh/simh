@@ -595,7 +595,7 @@ const char *rp_description (DEVICE *dptr);
    rp_mod       RP modifier list
 */
 
-DIB rp_dib = { MBA_RP, 0, &rp_mbrd, &rp_mbwr, 0, 0, 0, { &rp_abort } };
+DIB rp_dib = { MBA_AUTO, 0, &rp_mbrd, &rp_mbwr, 0, 0, 0, { &rp_abort } };
 
 UNIT rp_unit[] = {
     { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
@@ -648,6 +648,8 @@ MTAB rp_mod[] = {
         NULL, NULL, NULL, "Write lock disk drive"  },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &rp_set_bad, NULL, NULL, "write bad block table on last track" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
+      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
     { (UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
       "RM03", NULL, NULL },
     { (UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
@@ -1334,7 +1336,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, dptr, "rp_reset()\n");
 
-mba_set_enbdis (MBA_RP, dptr->flags & DEV_DIS);
+mba_set_enbdis (dptr);
 for (i = 0; i < RP_NUMDR; i++) {
     uptr = dptr->units + i;
     sim_cancel (uptr);

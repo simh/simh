@@ -788,9 +788,7 @@ typedef struct pdp_dib DIB;
 /* Massbus definitions */
 
 #define MBA_NUM         3                               /* number of MBA's */
-#define MBA_RP          0                               /* MBA for RP */
-#define MBA_TU          1                               /* MBA for TU */
-#define MBA_RS          2                               /* MBA for RS */
+#define MBA_AUTO        (uint32)0xFFFFFFFF              /* Unassigned MBA */
 #define MBA_RMASK       037                             /* max 32 reg */
 #define MBE_NXD         1                               /* nx drive */
 #define MBE_NXR         2                               /* nx reg */
@@ -820,8 +818,10 @@ int32 mba_get_csr (uint32 mbus);
 void mba_upd_ata (uint32 mbus, uint32 val);
 void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
-void mba_set_enbdis (uint32 mb, t_bool dis);
+void mba_set_enbdis (DEVICE *dptr);
 t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+t_stat build_dib_tab (void);
 
 void cpu_set_boot (int32 pc);
 
