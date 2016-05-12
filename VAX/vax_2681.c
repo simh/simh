@@ -119,7 +119,7 @@ switch (rg) {
         if (((ctx->port[PORT_A].mode[1] >> MODE_V_CHM) & MODE_M_CHM) == 0x2) {   /* Maint */
             ctx->port[PORT_A].buf = data & 0xFF;
             ctx->port[PORT_A].sts |= STS_RXR;
-            ctx->ists |= 0x2;
+            ctx->ists |= ISTS_RAI;
             }
         else {
             if (ctx->port[PORT_A].put_char != NULL)
@@ -180,7 +180,7 @@ switch (rg) {
         if (((ctx->port[PORT_B].mode[1] >> MODE_V_CHM) & MODE_M_CHM) == 0x2) {   /* Maint */
             ctx->port[PORT_B].buf = data & 0xFF;
             ctx->port[PORT_B].sts |= STS_RXR;
-            ctx->ists |= 0x20;
+            ctx->ists |= ISTS_RBI;
             }
         else {
             if (ctx->port[PORT_B].put_char != NULL)
