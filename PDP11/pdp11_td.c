@@ -996,7 +996,7 @@ switch (opcode) {
         break;
 
     case TD_OPINI:
-        for (unit=0; unit < ctlr->dptr->numunits; unit++)
+        for (unit=0; unit < 2; unit++)
             sim_cancel (ctlr->uptr+unit);
         ctlr->ibptr = 0;
         ctlr->obptr = 0;
