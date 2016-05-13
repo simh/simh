@@ -128,6 +128,10 @@ switch (rg) {
         ua2681_update_txi (ctx);
         break;
 
+    case 4:                                             /* auxiliary control */
+        ctx->acr = data & 0xFF;
+        break;
+
     case 5:                                             /* interrupt status/mask */
         ctx->imask = data & 0xFF;
         break;
@@ -258,7 +262,11 @@ switch (rg) {
         ctx->ists &= ~ISTS_RBI;
         ua2681_update_rxi (ctx);
         break;
-    
+
+    case 13:                                            /* input port */
+        data = ctx->iport;
+        break;
+
     default:                                            /* NI */
         data = 0;
         break;
@@ -387,6 +395,8 @@ if (new_val != ctx->iport) {
     ctx->ipcr &= ~0x0f;
     ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x10;
+    if (ctx->acr & 0x01)
+    	ctx->ists |= ISTS_IPC;
     }
 
 ctx->iport = new_val;
@@ -400,6 +410,8 @@ if (new_val != ctx->iport) {
     ctx->ipcr &= ~0x0f;
     ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x20;
+    if (ctx->acr & 0x02)
+    	ctx->ists |= ISTS_IPC;
     }
 
 ctx->iport = new_val;
@@ -413,6 +425,8 @@ if (new_val != ctx->iport) {
     ctx->ipcr &= ~0x0f;
     ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x40;
+    if (ctx->acr & 0x04)
+    	ctx->ists |= ISTS_IPC;
     }
 
 ctx->iport = new_val;
@@ -426,6 +440,8 @@ if (new_val != ctx->iport) {
     ctx->ipcr &= ~0x0f;
     ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x80;
+    if (ctx->acr & 0x08)
+    	ctx->ists |= ISTS_IPC;
     }
 
 ctx->iport = new_val;
