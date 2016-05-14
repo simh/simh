@@ -95,6 +95,7 @@ static t_stat disk1a_reset(DEVICE *disk1a_dev);
 static t_stat disk1a_boot(int32 unitno, DEVICE *dptr);
 static t_stat disk1a_attach(UNIT *uptr, char *cptr);
 static t_stat disk1a_detach(UNIT *uptr);
+static const char* disk1a_description(DEVICE *dptr);
 
 static int32 disk1adev(const int32 port, const int32 io, const int32 data);
 static int32 disk1arom(const int32 port, const int32 io, const int32 data);
@@ -123,7 +124,11 @@ static REG disk1a_reg[] = {
     { NULL }
 };
 
-#define DISK1A_NAME "Compupro Floppy Controller DISK1A"
+#define DISK1A_NAME "Compupro Floppy Controller"
+
+static const char* disk1a_description(DEVICE *dptr) {
+    return DISK1A_NAME;
+}
 
 static MTAB disk1a_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
@@ -153,7 +158,7 @@ DEVICE disk1a_dev = {
     NULL, NULL, &disk1a_reset,
     &disk1a_boot, &disk1a_attach, &disk1a_detach,
     &disk1a_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 9,
-    disk1a_dt, NULL, DISK1A_NAME
+    disk1a_dt, NULL, NULL, NULL, NULL, NULL, &disk1a_description
 };
 
 /* This is the DISK1A Boot ROM.

@@ -133,6 +133,8 @@ extern void raise_ss1_interrupt(uint8 intnum);
 static t_stat disk2_reset(DEVICE *disk2_dev);
 static t_stat disk2_attach(UNIT *uptr, char *cptr);
 static t_stat disk2_detach(UNIT *uptr);
+static const char* disk2_description(DEVICE *dptr);
+
 static void raise_disk2_interrupt(void);
 
 static int32 disk2dev(const int32 port, const int32 io, const int32 data);
@@ -168,7 +170,11 @@ static REG disk2_reg[] = {
     { NULL }
 };
 
-#define DISK2_NAME  "Compupro Hard Disk Controller DISK2"
+#define DISK2_NAME  "Compupro Hard Disk Controller"
+
+static const char* disk2_description(DEVICE *dptr) {
+    return DISK2_NAME;
+}
 
 static MTAB disk2_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
@@ -201,7 +207,7 @@ DEVICE disk2_dev = {
     NULL, NULL, &disk2_reset,
     NULL, &disk2_attach, &disk2_detach,
     &disk2_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    disk2_dt, NULL, DISK2_NAME
+    disk2_dt, NULL, NULL, NULL, NULL, NULL, &disk2_description
 };
 
 /* Reset routine */
