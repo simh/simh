@@ -31,6 +31,11 @@
 #ifndef SIM_TIMER_H_
 #define SIM_TIMER_H_   0
 
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 /* Pick up a struct timespec definition if it is available */
 #include <time.h>
 #if defined(__struct_timespec_defined)
@@ -106,14 +111,14 @@ void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
-t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
-t_stat sim_show_clock_queues (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc);
+t_stat sim_show_clock_queues (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_bool sim_idle (uint32 tmr, t_bool sin_cyc);
-t_stat sim_set_throt (int32 arg, char *cptr);
-t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr);
-t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sim_clr_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sim_set_throt (int32 arg, CONST char *cptr);
+t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, CONST char *cptr);
+t_stat sim_set_idle (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_clr_idle (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 void sim_throt_sched (void);
 void sim_throt_cancel (void);
 uint32 sim_os_msec (void);
@@ -136,5 +141,11 @@ extern t_bool sim_idle_enab;                        /* idle enabled flag */
 extern volatile t_bool sim_idle_wait;               /* idle waiting flag */
 extern t_bool sim_asynch_timer;
 extern DEVICE sim_timer_dev;
+extern UNIT * volatile sim_clock_cosched_queue[SIM_NTIMERS];
+extern const t_bool rtc_avail;
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

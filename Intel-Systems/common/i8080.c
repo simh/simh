@@ -206,7 +206,7 @@ extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 
 struct idev {
-    int32 (*routine)();
+    int32 (*routine)(int32, int32);
 };
 
 /* This is the I/O configuration table.  There are 256 possible
@@ -290,7 +290,7 @@ DEVICE i8080_dev = {
 };
 
 /* tables for the disassembler */
-char *opcode[] = {                      
+const char *opcode[] = {                      
 "NOP", "LXI B,", "STAX B", "INX B",             /* 0x00 */
 "INR B", "DCR B", "MVI B,", "RLC",
 "???", "DAD B", "LDAX B", "DCX B",
@@ -1278,7 +1278,7 @@ t_stat i8080_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
    starts at the current value of the PC.
 */
 
-int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+int32 sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
     int32 i, addr = 0, cnt = 0;
 
@@ -1354,7 +1354,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     int32 cflag, i = 0, j, r;
     char gbuf[CBUFSIZE];

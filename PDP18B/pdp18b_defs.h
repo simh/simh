@@ -555,9 +555,14 @@ typedef struct {
 
 /* Function prototypes */
 
-t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_3cyc_reg (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_3cyc_reg (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_devno (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat set_3cyc_reg (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_3cyc_reg (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+
+/* Translation tables */
+extern const int32 asc_to_baud[128];
+extern const char baud_to_asc[64];
+extern const char fio_to_asc[64];
 
 #endif

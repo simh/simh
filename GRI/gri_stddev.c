@@ -53,7 +53,7 @@ t_stat tti_svc (UNIT *uhsr);
 t_stat tto_svc (UNIT *uhsr);
 t_stat tti_reset (DEVICE *dhsr);
 t_stat tto_reset (DEVICE *dhsr);
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat hsr_svc (UNIT *uhsr);
 t_stat hsp_svc (UNIT *uhsr);
 t_stat hsr_reset (DEVICE *dhsr);
@@ -295,7 +295,7 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
 tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;

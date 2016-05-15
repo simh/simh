@@ -140,15 +140,15 @@ int32 ttyio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
-t_stat ttio_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ttrp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ttio_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttrp_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 clkio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat pt_attach (UNIT *uptr, char *cptr);
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat pt_attach (UNIT *uptr, CONST char *cptr);
 t_stat pt_detach (UNIT *uptr);
 t_stat tto_write (int32 c);
 t_stat ttp_write (int32 c);
@@ -418,7 +418,7 @@ return SCPE_OK;
 /* Paper tape attach routine - set or clear ASC/UASC flags if specified
    Can be called for TTY units at well, hence, check for attachability */
 
-t_stat pt_attach (UNIT *uptr, char *cptr)
+t_stat pt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -832,7 +832,7 @@ return SCPE_OK;
 
 /* Set keyboard/printer mode - make sure flags agree */
 
-t_stat ttio_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttio_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATTABLE)                         /* not TTR, TTP */
     return SCPE_NOFNC;
@@ -845,7 +845,7 @@ return SCPE_OK;
 
 /* Set reader/punch mode */
 
-t_stat ttrp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttrp_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (!(uptr->flags & UNIT_ATTABLE))                      /* PTR, PTP, TTR, TTP only */
     return SCPE_NOFNC;
@@ -856,7 +856,7 @@ return SCPE_OK;
 
 /* Set reader/punch start/stop */
 
-t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (!(uptr->flags & UNIT_ATTABLE))                      /* TTR, TTP only */
     return SCPE_NOFNC;
@@ -948,7 +948,7 @@ return SCPE_OK;
 
 /* Set frequency */
 
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -960,7 +960,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;

@@ -24,6 +24,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the authors.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    11-Nov-15    JDB     First release version
    24-Mar-13    JDB     Created tape controller common library from MS simulator
 
@@ -524,14 +525,14 @@ extern const char *tl_unit_name   (uint32       unit);
 
 /* Tape library global SCP support routines */
 
-extern t_stat tl_attach (CVPTR cvptr, UNIT *uptr, char *cptr);
+extern t_stat tl_attach (CVPTR cvptr, UNIT *uptr, CONST char *cptr);
 extern t_stat tl_detach (UNIT  *uptr);
 
-extern t_stat tl_set_timing   (UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat tl_set_model    (UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat tl_set_density  (UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat tl_set_reelsize (UNIT *uptr, int32 value, char *cptr, void *desc);
+extern t_stat tl_set_timing   (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat tl_set_model    (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat tl_set_density  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat tl_set_reelsize (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 
-extern t_stat tl_show_timing   (FILE *st, UNIT *uptr, int32 value, void *desc);
-extern t_stat tl_show_density  (FILE *st, UNIT *uptr, int32 value, void *desc);
-extern t_stat tl_show_reelsize (FILE *st, UNIT *uptr, int32 value, void *desc);
+extern t_stat tl_show_timing   (FILE *st, UNIT *uptr, int32 value, CONST void *desc);
+extern t_stat tl_show_density  (FILE *st, UNIT *uptr, int32 value, CONST void *desc);
+extern t_stat tl_show_reelsize (FILE *st, UNIT *uptr, int32 value, CONST void *desc);

@@ -1371,11 +1371,11 @@ return cy;
 void SubDstr (DSTR *s1, DSTR *s2, DSTR *ds)
 {
 int32 i;
-DSTR compl;
+DSTR complX;
 
 for (i = 0; i < DSTRLNT; i++)
-    compl.val[i] = 0x99999999 - s1->val[i];
-AddDstr (&compl, s2, ds, 1);                            /* s1 + ~s2 + 1 */
+    complX.val[i] = 0x99999999 - s1->val[i];
+AddDstr (&complX, s2, ds, 1);                           /* s1 + ~s2 + 1 */
 return;
 }
 

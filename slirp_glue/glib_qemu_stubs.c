@@ -48,7 +48,7 @@
 gpointer
 g_malloc (gsize n_bytes)
 {
-gpointer ret = malloc (n_bytes);
+gpointer ret = (gpointer)malloc (n_bytes);
 
 if (!ret)
     exit (errno);
@@ -58,7 +58,7 @@ return ret;
 gpointer
 g_malloc0 (gsize n_bytes)
 {
-gpointer ret = calloc (1, n_bytes);
+gpointer ret = (gpointer)calloc (1, n_bytes);
 
 if (!ret)
     exit (errno);
@@ -68,7 +68,7 @@ return ret;
 gpointer
 g_realloc (gpointer mem, gsize n_bytes)
 {
-gpointer ret = realloc (mem, n_bytes);
+gpointer ret = (gpointer)realloc (mem, n_bytes);
 
 if (!ret)
     exit (errno);
@@ -129,7 +129,7 @@ return setsockopt ((SOCKET)s, level, optname, (char *)optval, optlen);
 
 int qemu_recv (int s, void *buf, size_t len, int flags)
 {
-return recv ((SOCKET)s, buf, len, flags);
+return recv ((SOCKET)s, (char *)buf, len, flags);
 }
 
 int socket_set_nodelay(int fd)
@@ -165,6 +165,9 @@ int socket_set_fast_reuse(int fd)
     return ret;
 }
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
 #include <time.h>
 #ifdef _WIN32
 int64_t qemu_clock_get_ns(int type)
@@ -191,6 +194,9 @@ int64_t qemu_clock_get_ns(int type)
 
     clock_gettime(CLOCK_REALTIME, &tv);
     return tv.tv_sec * 1000000000LL + tv.tv_nsec;
+}
+#endif
+#if defined(__cplusplus)
 }
 #endif
 
@@ -226,35 +232,6 @@ void qemu_notify_event(void)
 {
 }
 
-#if defined(_MSC_VER)
-
-struct quehead {
-	struct quehead *qh_link;
-	struct quehead *qh_rlink;
-};
-
-void
-slirp_insque(void *a, void *b)
-{
-	register struct quehead *element = (struct quehead *) a;
-	register struct quehead *head = (struct quehead *) b;
-	element->qh_link = head->qh_link;
-	head->qh_link = (struct quehead *)element;
-	element->qh_rlink = (struct quehead *)head;
-	((struct quehead *)(element->qh_link))->qh_rlink
-	= (struct quehead *)element;
-}
-
-void
-slirp_remque(void *a)
-{
-  register struct quehead *element = (struct quehead *) a;
-  ((struct quehead *)(element->qh_link))->qh_rlink = element->qh_rlink;
-  ((struct quehead *)(element->qh_rlink))->qh_link = element->qh_link;
-  element->qh_rlink = NULL;
-}
-#endif
-
 #if defined(_WIN32)
 int
 inet_aton(const char *arg, struct in_addr *addr)
@@ -282,15 +259,15 @@ g_array_sized_new (gboolean zero_terminated,
                    guint element_size,
                    guint reserved_size)
 {
-GArrayInternal *ar = g_malloc (sizeof (*ar));
+GArrayInternal *ar = (GArrayInternal *)g_malloc (sizeof (*ar));
 
 ar->_zero_terminated = zero_terminated ? 1 : 0;
 ar->_clear = clear ? 1 : 0;
 ar->_element_size = element_size;
 ar->_size = reserved_size;
 ar->len = 0;
-ar->data = clear ? g_malloc0 (element_size*(reserved_size + zero_terminated)) :
-                      g_malloc (element_size*(reserved_size + zero_terminated));
+ar->data = clear ? (gchar *)g_malloc0 (element_size*(reserved_size + zero_terminated)) :
+                   (gchar *)g_malloc (element_size*(reserved_size + zero_terminated));
 if (ar->_zero_terminated && !ar->_clear)
     memset (ar->data + (ar->len * ar->_element_size), 0, ar->_element_size);
 return (GArray *)ar;
@@ -317,7 +294,7 @@ g_array_set_size (GArray *array,
 GArrayInternal *ar = (GArrayInternal *)array;
 
 if (length > ar->_size) {
-    ar->data = g_realloc (ar->data, (length + ar->_zero_terminated) * ar->_element_size);
+    ar->data = (gchar *)g_realloc (ar->data, (length + ar->_zero_terminated) * ar->_element_size);
     if (ar->_clear)
         memset (ar->data + (ar->len * ar->_element_size), 0, (length + ar->_zero_terminated - ar->len) * ar->_element_size);
     ar->_size = length;
@@ -336,7 +313,7 @@ g_array_append_vals (GArray *array,
 GArrayInternal *ar = (GArrayInternal *)array;
 
 if ((ar->len + len) > ar->_size) {
-    ar->data = g_realloc (ar->data, (ar->len + len + ar->_zero_terminated) * ar->_element_size);
+    ar->data = (gchar *)g_realloc (ar->data, (ar->len + len + ar->_zero_terminated) * ar->_element_size);
     ar->_size = ar->len + len;
     }
 memcpy (ar->data + (ar->len * ar->_element_size), data, len * ar->_element_size);

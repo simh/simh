@@ -269,7 +269,7 @@ int32 dz_txinta (void);
 t_stat dz_svc (UNIT *uptr);
 t_stat dz_xmt_svc (UNIT *uptr);
 t_stat dz_reset (DEVICE *dptr);
-t_stat dz_attach (UNIT *uptr, char *cptr);
+t_stat dz_attach (UNIT *uptr, CONST char *cptr);
 t_stat dz_detach (UNIT *uptr);
 t_stat dz_clear (int32 dz, t_bool flag);
 uint16 dz_getc (int32 dz);
@@ -279,10 +279,10 @@ void dz_clr_rxint (int32 dz);
 void dz_set_rxint (int32 dz);
 void dz_clr_txint (int32 dz);
 void dz_set_txint (int32 dz);
-t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dz_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dz_setnl (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dz_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dz_set_nolog (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat dz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat dz_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *dz_description (DEVICE *dptr);
@@ -348,7 +348,7 @@ MTAB dz_mod[] = {
         &dz_setnl, &tmxr_show_lines, (void *) &dz_desc, "Display number of lines" },
     { MTAB_XTD|MTAB_VDV|MTAB_NC, 0, NULL, "LOG=n=file",
         &dz_set_log, NULL, &dz_desc },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "NOLOG",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "NOLOG=n",
         &dz_set_nolog, NULL, &dz_desc, "Disable logging on designated line" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "LOG", NULL,
         NULL, &dz_show_log, &dz_desc, "Display logging for all lines" },
@@ -791,7 +791,7 @@ return auto_config (dptr->name, ndev);                  /* auto config */
 
 /* Attach */
 
-t_stat dz_attach (UNIT *uptr, char *cptr)
+t_stat dz_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 dz, muxln;
 t_stat r;
@@ -839,7 +839,7 @@ return r;
 
 /* SET LINES processor */
 
-t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dz_setnl (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;
@@ -876,27 +876,26 @@ return dz_reset (&dz_dev);                              /* setup lines and auto 
 
 /* SET LOG processor */
 
-t_stat dz_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dz_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-char *tptr;
 t_stat r;
+char gbuf[CBUFSIZE];
 int32 ln;
 
 if (cptr == NULL)
     return SCPE_ARG;
-tptr = strchr (cptr, '=');
-if ((tptr == NULL) || (*tptr == 0))
+cptr = get_glyph (cptr, gbuf, '=');
+if ((cptr == NULL) || (*cptr == 0) || (gbuf[0] == 0))
     return SCPE_ARG;
-*tptr++ = 0;
-ln = (int32) get_uint (cptr, 10, dz_desc.lines, &r);
+ln = (int32) get_uint (gbuf, 10, dz_desc.lines, &r);
 if ((r != SCPE_OK) || (ln >= dz_desc.lines))
     return SCPE_ARG;
-return tmxr_set_log (NULL, ln, tptr, desc);
+return tmxr_set_log (NULL, ln, cptr, desc);
 }
 
 /* SET NOLOG processor */
 
-t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dz_set_nolog (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 t_stat r;
 int32 ln;
@@ -911,7 +910,7 @@ return tmxr_set_nolog (NULL, ln, NULL, desc);
 
 /* SHOW LOG processor */
 
-t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i;
 

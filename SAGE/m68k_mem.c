@@ -51,7 +51,7 @@ int     m68k_dma = 0;
 
 #if 0
 /* TODO */
-t_stat m68k_set_mmu(UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat m68k_set_mmu(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     uptr->flags |= value;
     
@@ -60,7 +60,7 @@ t_stat m68k_set_mmu(UNIT *uptr, int32 value, char *cptr, void *desc)
     return SCPE_OK;
 }
 
-t_stat m68k_set_nommu(UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat m68k_set_nommu(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     uptr->flags &= ~value;
 

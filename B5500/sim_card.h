@@ -91,7 +91,7 @@ struct _card_data
 t_stat   sim_read_card(UNIT * uptr);
 int      sim_card_eof(UNIT * uptr);
 t_stat   sim_punch_card(UNIT * uptr, UNIT *stkptr);
-t_stat   sim_card_attach(UNIT * uptr, char *file);
+t_stat   sim_card_attach(UNIT * uptr, CONST char *file);
 t_stat   sim_card_detach(UNIT *uptr);
 
 /* Conversion routines to save code */
@@ -101,13 +101,13 @@ uint8    sim_hol_to_bcd(uint16 hol);
 uint8    sim_hol_to_ebbcd(uint16 hol);
 
 /* Format control routines. */
-t_stat sim_card_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sim_card_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sim_card_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_card_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* Help information */
 t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 /* Translation tables */
-const char      sim_six_to_ascii[64];
-const char      sim_ascii_to_six[128];
-const uint8     sim_parity_table[64];
+extern const char      sim_six_to_ascii[64];
+extern const char      sim_ascii_to_six[128];
+extern const uint8     sim_parity_table[64];

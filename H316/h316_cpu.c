@@ -302,15 +302,15 @@ int32 undio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_interrupts (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_interrupts (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_nchan (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_interrupts (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_interrupts (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 sim_ota_2024 (int32 inst, int32 fnc, int32 dat, int32 dev);
 int32 cpu_interrupt (int32 vec);
 int32 cpu_ext_interrupt (void);
@@ -1479,14 +1479,14 @@ return SCPE_OK;
 
 /* Option processors */
 
-t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (MEMSIZE > (NX_AMASK + 1))
     return SCPE_ARG;
 return SCPE_OK;
 }
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -1506,7 +1506,7 @@ return SCPE_OK;
 
 /* [RLA] Set/Show number of interrupts supported */
 
-t_stat cpu_set_interrupts (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_interrupts (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
   uint32 newint;  t_stat ret;
   if (cptr == NULL) return SCPE_ARG;
@@ -1517,7 +1517,7 @@ t_stat cpu_set_interrupts (UNIT *uptr, int32 val, char *cptr, void *desc)
   return SCPE_OK;
 }
 
-t_stat cpu_show_interrupts (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_interrupts (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
   if (ext_ints == 0)
     fprintf(st,"standard interrupts");
@@ -1526,7 +1526,7 @@ t_stat cpu_show_interrupts (FILE *st, UNIT *uptr, int32 val, void *desc)
   return SCPE_OK;
 }
 
-t_stat cpu_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_nchan (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, newmax;
 t_stat r;
@@ -1546,7 +1546,7 @@ return SCPE_OK;
 
 /* Show DMA channels */
 
-t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (dma_nch)
     fprintf (st, "DMA channels = %d", dma_nch);
@@ -1556,7 +1556,7 @@ return SCPE_OK;
 
 /* Show channel state */
 
-t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if ((val < 0) || (val >= DMA_MAX))
     return SCPE_IERR;
@@ -1568,7 +1568,7 @@ return SCPE_OK;
 
 /* Set I/O device to IOBUS / DMA channel / DMC channel */
 
-t_stat io_set_iobus (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_iobus (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1585,7 +1585,7 @@ dibp->chan = 0;
 return SCPE_OK;
 }
 
-t_stat io_set_dma (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_dma (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1609,7 +1609,7 @@ dibp->chan = (newc - DMA_MIN) + DMA_V_DMA1 + 1;         /* store */
 return SCPE_OK;
 }
 
-t_stat io_set_dmc (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_dmc (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1635,7 +1635,7 @@ return SCPE_OK;
 
 /* Show channel configuration */
 
-t_stat io_show_chan (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_chan (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1722,7 +1722,7 @@ return FALSE;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1753,10 +1753,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 cr, k, di, op, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval;
 t_stat r;
 InstHistory *h;

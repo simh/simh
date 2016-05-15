@@ -103,10 +103,10 @@ uint32 lp_tdv_status (void);
 t_stat lp_chan_err (uint32 st);
 t_stat lp_svc (UNIT *uptr);
 t_stat lp_reset (DEVICE *dptr);
-t_stat lp_attach (UNIT *uptr, char *cptr);
-t_stat lp_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat lp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat lp_load_cct (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat lp_attach (UNIT *uptr, CONST char *cptr);
+t_stat lp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat lp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat lp_load_cct (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 uint32 lp_fmt (UNIT *uptr);
 uint32 lp_skip (UNIT *uptr, uint32 ch);
 uint32 lp_space (UNIT *uptr, uint32 lines, t_bool skp);
@@ -459,7 +459,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lp_attach (UNIT *uptr, char *cptr)
+t_stat lp_attach (UNIT *uptr, CONST char *cptr)
 {
 lp_cctp = 0;                                            /* clear cct ptr */
 lp_pass = 0;
@@ -468,7 +468,7 @@ return attach_unit (uptr, cptr);
 
 /* Set carriage control tape */
 
-t_stat lp_load_cct (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat lp_load_cct (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 col, rpt, ptr, mask;
 uint8 cctbuf[CCT_LNT];
@@ -514,7 +514,7 @@ return SCPE_OK;
 
 /* Set controller type */
 
-t_stat lp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat lp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 lp_model = val;
 lp_reset (&lp_dev);
@@ -523,7 +523,7 @@ return SCPE_OK;
 
 /* Show controller type */
 
-t_stat lp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat lp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, lp_model? "7450": "7440");
 return SCPE_OK;

@@ -381,54 +381,54 @@ return t ^ 0xff;
 
 void ua2681_ip0_wr (UART2681 *ctx, uint32 set)
 {
-uint8 new = (ctx->iport & ~1) | (set ? 1 : 0);
+uint8 new_val = (ctx->iport & ~1) | (set ? 1 : 0);
 
-if (new != ctx->iport) {
+if (new_val != ctx->iport) {
     ctx->ipcr &= ~0x0f;
-    ctx->ipcr |= (new & 0x0f);
+    ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x10;
     }
 
-ctx->iport = new;
+ctx->iport = new_val;
 }
 
 void ua2681_ip1_wr (UART2681 *ctx, uint32 set)
 {
-uint8 new = (ctx->iport & ~2) | (set ? 2 : 0);
+uint8 new_val = (ctx->iport & ~2) | (set ? 2 : 0);
 
-if (new != ctx->iport) {
+if (new_val != ctx->iport) {
     ctx->ipcr &= ~0x0f;
-    ctx->ipcr |= (new & 0x0f);
+    ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x20;
     }
 
-ctx->iport = new;
+ctx->iport = new_val;
 }
 
 void ua2681_ip2_wr (UART2681 *ctx, uint32 set)
 {
-uint8 new = (ctx->iport & ~4) | (set ? 4 : 0);
+uint8 new_val = (ctx->iport & ~4) | (set ? 4 : 0);
 
-if (new != ctx->iport) {
+if (new_val != ctx->iport) {
     ctx->ipcr &= ~0x0f;
-    ctx->ipcr |= (new & 0x0f);
+    ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x40;
     }
 
-ctx->iport = new;
+ctx->iport = new_val;
 }
 
 void ua2681_ip3_wr (UART2681 *ctx, uint32 set)
 {
-uint8 new = (ctx->iport & ~8) | (set ? 8 : 0);
+uint8 new_val = (ctx->iport & ~8) | (set ? 8 : 0);
 
-if (new != ctx->iport) {
+if (new_val != ctx->iport) {
     ctx->ipcr &= ~0x0f;
-    ctx->ipcr |= (new & 0x0f);
+    ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x80;
     }
 
-ctx->iport = new;
+ctx->iport = new_val;
 }
 
 /**/

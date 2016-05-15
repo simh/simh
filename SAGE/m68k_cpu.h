@@ -169,8 +169,8 @@ typedef struct {
 extern t_stat add_iohandler(UNIT* u,void* ctxt,
     t_stat (*io)(IOHANDLER* ioh,uint32* value,uint32 rw,uint32 mask));
 extern t_stat del_iohandler(void* ctxt);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* public memory access routines */
 extern t_stat ReadPB(t_addr a, uint32* val);
@@ -192,13 +192,13 @@ extern t_stat (*Mem)(t_addr a,uint8** mem);
 extern t_stat m68k_mem(t_addr a,uint8** mem);
 
 /* cpu_mod for alternative implementations */
-extern t_stat m68k_set_cpu(UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat m68k_show_cpu(FILE* st,UNIT *uptr, int32 value, void *desc);
-extern t_stat m68k_set_size(UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat m68k_set_fpu(UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat m68k_set_nofpu(UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat m68kcpu_set_flag(UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat m68kcpu_set_noflag(UNIT *uptr, int32 value, char *cptr, void *desc);
+extern t_stat m68k_set_cpu(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat m68k_show_cpu(FILE* st,UNIT *uptr, int32 value, CONST void *desc);
+extern t_stat m68k_set_size(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat m68k_set_fpu(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat m68k_set_nofpu(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat m68kcpu_set_flag(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat m68kcpu_set_noflag(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 extern t_stat m68kcpu_reset(DEVICE* dptr);
 extern t_stat m68kcpu_ex(t_value* eval_array, t_addr addr, UNIT *uptr, int32 switches);
 extern t_stat m68kcpu_dep(t_value value, t_addr addr, UNIT* uptr, int32 switches);
@@ -218,9 +218,9 @@ extern void (*m68kcpu_trapcallback)(DEVICE* cpudev,int trapnum);
 
 /* standard MTAB declarations for most 68K CPUs */
 #define M68KCPU_STDMOD \
-{ UNIT_CPUTYPE_MASK,    CPU_TYPE_68000,     "",         "68000",    &m68k_set_cpu,      &m68k_show_cpu, "68000" },\
-{ UNIT_CPUTYPE_MASK,    CPU_TYPE_68008,     "",         "68008",    &m68k_set_cpu,      &m68k_show_cpu, "68008" },\
-{ UNIT_CPUTYPE_MASK,    CPU_TYPE_68010,     "",         "68010",    &m68k_set_cpu,      &m68k_show_cpu, "68010" },\
+{ UNIT_CPUTYPE_MASK,    CPU_TYPE_68000,     "",         "68000",    &m68k_set_cpu,      &m68k_show_cpu, (void *)"68000" },\
+{ UNIT_CPUTYPE_MASK,    CPU_TYPE_68008,     "",         "68008",    &m68k_set_cpu,      &m68k_show_cpu, (void *)"68008" },\
+{ UNIT_CPUTYPE_MASK,    CPU_TYPE_68010,     "",         "68010",    &m68k_set_cpu,      &m68k_show_cpu, (void *)"68010" },\
 { UNIT_CPU_MSIZE,       (1u << 16),         NULL,       "64K",      &m68k_set_size      },\
 { UNIT_CPU_MSIZE,       (1u << 17),         NULL,       "128K",     &m68k_set_size      },\
 { UNIT_CPU_MSIZE,       (1u << 18),         NULL,       "256K",     &m68k_set_size      },\

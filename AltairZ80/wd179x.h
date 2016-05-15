@@ -39,7 +39,7 @@
  *                                                                       *
  *************************************************************************/
 
-extern t_stat wd179x_attach(UNIT *uptr, char *cptr);
+extern t_stat wd179x_attach(UNIT *uptr, CONST char *cptr);
 extern t_stat wd179x_detach(UNIT *uptr);
 extern uint8 WD179X_Set_DMA(const uint32 dma_addr);
 extern uint8 WD179X_Read(const uint32 Addr);

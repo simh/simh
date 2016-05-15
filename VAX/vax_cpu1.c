@@ -82,8 +82,6 @@ static const uint8 rcnt[128] = {
 12,16,16,20,16,20,20,24,16,20,20,24,20,24,24,28         /* 70 - 7F */
 };
 
-extern const uint32 byte_mask[33];
-
 extern int32 ReadIPR (int32 rg);
 extern void WriteIPR (int32 rg, int32 val);
 extern t_bool BadCmPSL (int32 newpsl);

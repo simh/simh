@@ -115,7 +115,7 @@
    enumerates the available host serial ports
 
 
-   t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
+   t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, const void* desc)
    ---------------------------------
 
    displays the available host serial ports
@@ -352,7 +352,7 @@ for (i=0; i<count && !found; i++) {
   return (found ? temp : NULL);
 }
 
-t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int number = sim_serial_devices(SER_MAX_DEVICE, list);
@@ -391,7 +391,7 @@ SERHANDLE sim_open_serial (char *name, TMLN *lp, t_stat *stat)
 char temp1[1024], devname [1024];
 char *savname = name;
 SERHANDLE port = INVALID_HANDLE;
-const char *config;
+CONST char *config;
 t_stat status;
 
 config = get_glyph_nc (name, devname, ';');             /* separate port name from optional config params */
@@ -468,10 +468,10 @@ sim_close_os_serial (port);
 _serial_remove_from_open_list (port);
 }
 
-t_stat sim_config_serial  (SERHANDLE port, const char *sconfig)
+t_stat sim_config_serial  (SERHANDLE port, CONST char *sconfig)
 {
-const char *pptr;
-const char *sptr, *tptr;
+CONST char *pptr;
+CONST char *sptr, *tptr;
 SERCONFIG config = { 0 };
 t_bool arg_error = FALSE;
 t_stat r;

@@ -95,14 +95,14 @@ static HDC1001_INFO hdc1001_info_data = { { 0x0, 0, 0xC8, 8 } };
 static HDC1001_INFO *hdc1001_info = &hdc1001_info_data;
 
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern int32 find_unit_index(UNIT *uptr);
 
 /* These are needed for DMA. */
-extern void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
+extern void PutBYTEWrapper(const uint32 Addr, CONST uint32 Value);
 extern uint8 GetBYTEWrapper(const uint32 Addr);
 
 #define UNIT_V_HDC1001_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
@@ -110,7 +110,7 @@ extern uint8 GetBYTEWrapper(const uint32 Addr);
 #define HDC1001_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
 
 static t_stat hdc1001_reset(DEVICE *hdc1001_dev);
-static t_stat hdc1001_attach(UNIT *uptr, char *cptr);
+static t_stat hdc1001_attach(UNIT *uptr, CONST char *cptr);
 static t_stat hdc1001_detach(UNIT *uptr);
 
 static int32 hdc1001dev(const int32 port, const int32 io, const int32 data);
@@ -190,7 +190,7 @@ static t_stat hdc1001_reset(DEVICE *dptr)
 
 
 /* Attach routine */
-static t_stat hdc1001_attach(UNIT *uptr, char *cptr)
+static t_stat hdc1001_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r = SCPE_OK;
     HDC1001_DRIVE_INFO *pDrive;

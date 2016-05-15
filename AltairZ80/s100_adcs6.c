@@ -86,10 +86,10 @@ extern WD179X_INFO_PUB *wd179x_infop;
 static ADCS6_INFO adcs6_info_data = { { 0xF000, ADCS6_ROM_SIZE, 0x3, 2 } };
 static ADCS6_INFO *adcs6_info = &adcs6_info_data;
 
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -105,7 +105,7 @@ extern uint32 PCX;      /* external view of PC  */
 
 static t_stat adcs6_reset(DEVICE *adcs6_dev);
 static t_stat adcs6_boot(int32 unitno, DEVICE *dptr);
-static t_stat adcs6_attach(UNIT *uptr, char *cptr);
+static t_stat adcs6_attach(UNIT *uptr, CONST char *cptr);
 static t_stat adcs6_detach(UNIT *uptr);
 
 static int32 adcs6_dma(const int32 port, const int32 io, const int32 data);
@@ -469,7 +469,7 @@ static t_stat adcs6_boot(int32 unitno, DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat adcs6_attach(UNIT *uptr, char *cptr)
+static t_stat adcs6_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     r = wd179x_attach(uptr, cptr);

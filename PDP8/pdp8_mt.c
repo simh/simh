@@ -145,18 +145,17 @@ int32 mt_time = 10;                                     /* record latency */
 int32 mt_stopioe = 1;                                   /* stop on error */
 uint8 *mtxb = NULL;                                     /* transfer buffer */
 
-DEVICE mt_dev;
 int32 mt70 (int32 IR, int32 AC);
 int32 mt71 (int32 IR, int32 AC);
 int32 mt72 (int32 IR, int32 AC);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cptr);
+t_stat mt_attach (UNIT *uptr, CONST char *cptr);
 t_stat mt_detach (UNIT *uptr);
 int32 mt_updcsta (UNIT *uptr);
 int32 mt_ixma (int32 xma);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
-t_stat mt_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat mt_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 UNIT *mt_busy (void);
 void mt_set_done (void);
 
@@ -618,7 +617,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat mt_attach (UNIT *uptr, char *cptr)
+t_stat mt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 int32 u = uptr - mt_dev.units;                          /* get unit number */
@@ -649,7 +648,7 @@ return sim_tape_detach (uptr);
 
 /* Write lock/enable routine */
 
-t_stat mt_vlock (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mt_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 u = uptr - mt_dev.units;                          /* get unit number */
 

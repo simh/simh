@@ -153,14 +153,14 @@ t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat ptr_attach (UNIT *uptr, char *cptr);
-t_stat ptp_attach (UNIT *uptr, char *cptr);
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr);
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_detach (UNIT *uptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 clk_task_upd (t_bool clr);
 
 extern int32 upd_iors (void);
@@ -513,7 +513,7 @@ return SCPE_OK;
 
 /* Set frequency */
 
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -525,7 +525,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
@@ -647,7 +647,7 @@ return ((TST_INT (PTR)? IOS_PTR: 0)
 
 /* Attach routine */
 
-t_stat ptr_attach (UNIT *uptr, char *cptr)
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -965,7 +965,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat ptp_attach (UNIT *uptr, char *cptr)
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -1172,7 +1172,7 @@ return SCPE_OK;
 
 /* Set mode */
 
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~(TTUF_UNIX|TT_PAR|TT_MODE)) | val;
 tto_unit.flags = (tto_unit.flags & ~(TTUF_UNIX|TT_PAR|TT_MODE)) | val;

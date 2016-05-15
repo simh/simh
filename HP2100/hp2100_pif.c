@@ -1,6 +1,6 @@
 /* hp2100_pif.c: HP 12620A/12936A privileged interrupt fence simulator
 
-   Copyright (c) 2008-2012, J. David Bryan
+   Copyright (c) 2008-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    PIF          12620A/12936A privileged interrupt fence
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
@@ -118,8 +119,8 @@ struct {
 IOHANDLER pif_io;
 
 t_stat pif_reset     (DEVICE *dptr);
-t_stat pif_set_card  (UNIT   *uptr, int32  val,  char  *cptr, void *desc);
-t_stat pif_show_card (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
+t_stat pif_set_card  (UNIT   *uptr, int32  val,  CONST char *cptr, void *desc);
+t_stat pif_show_card (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
 
 
 /* PIF data structures.
@@ -347,7 +348,7 @@ return SCPE_OK;
    val == 1 --> set to 12620A (RTE PIF)
 */
 
-t_stat pif_set_card (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat pif_set_card (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if ((val < 0) || (val > 1) || (cptr != NULL))           /* sanity check */
     return SCPE_ARG;                                    /* bad argument */
@@ -363,7 +364,7 @@ return SCPE_OK;
 
 /* Show card type */
 
-t_stat pif_show_card (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat pif_show_card (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (pif_dev.flags & DEV_12936)
     fputs ("12936A", st);

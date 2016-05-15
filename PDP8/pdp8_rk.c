@@ -138,7 +138,6 @@ int32 rk_ma = 0;                                        /* memory address */
 int32 rk_swait = 10, rk_rwait = 10;                     /* seek, rotate wait */
 int32 rk_stopioe = 1;                                   /* stop on error */
 
-DEVICE rk_dev;
 int32 rk (int32 IR, int32 AC);
 t_stat rk_svc (UNIT *uptr);
 t_stat rk_reset (DEVICE *dptr);

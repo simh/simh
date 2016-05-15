@@ -75,10 +75,10 @@ typedef struct {
 static SCP300F_INFO scp300f_info_data = { { 0xFF800, SCP300F_ROM_SIZE, 0xF0, SCP300F_IO_SIZE } };
 static SCP300F_INFO *scp300f_info = &scp300f_info_data;
 
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;

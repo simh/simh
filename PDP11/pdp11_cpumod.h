@@ -292,11 +292,11 @@ typedef struct conf_table CNFTAB;
 
 /* Prototypes */
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_clr_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_clr_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_set_bus (int32 opt);
 
 #endif

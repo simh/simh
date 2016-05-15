@@ -438,12 +438,12 @@ fflush (uptr->fileref);
 
 /* Attach tape unit */
 
-t_stat sim_tape_attach (UNIT *uptr, char *cptr)
+t_stat sim_tape_attach (UNIT *uptr, CONST char *cptr)
 {
 return sim_tape_attach_ex (uptr, cptr, 0, 0);
 }
 
-t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit, int completion_delay)
+t_stat sim_tape_attach_ex (UNIT *uptr, const char *cptr, uint32 dbit, int completion_delay)
 {
 struct tape_context *ctx;
 uint32 objc;
@@ -465,7 +465,7 @@ if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     }
 if (MT_GET_FMT (uptr) == MTUF_F_TPC)
     sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC tapes */
-r = attach_unit (uptr, cptr);                           /* attach unit */
+r = attach_unit (uptr, (CONST char *)cptr);             /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
     return sim_messagef (r, "Can't open tape image: %s\n", cptr);
 switch (MT_GET_FMT (uptr)) {                            /* case on format */
@@ -2108,7 +2108,7 @@ return MTSE_IOERR;
 
 /* Set tape format */
 
-t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 f;
 
@@ -2130,7 +2130,7 @@ return SCPE_ARG;
 
 /* Show tape format */
 
-t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 f = MT_GET_FMT (uptr);
 
@@ -2156,8 +2156,8 @@ DEVICE *dptr = find_dev_from_unit (uptr);
 
 if ((uptr == NULL) || (uptr->fileref == NULL))
     return 0;
-countmap = calloc (65536, sizeof(*countmap));
-recbuf = malloc (65536);
+countmap = (uint32 *)calloc (65536, sizeof(*countmap));
+recbuf = (uint8 *)malloc (65536);
 tape_size = (t_addr)sim_fsize (uptr->fileref);
 sim_debug (MTSE_DBG_STR, dptr, "tpc_map: tape_size: %" T_ADDR_FMT "u\n", tape_size);
 for (objc = 0, sizec = 0, tpos = 0;; ) {
@@ -2265,7 +2265,7 @@ return ((p == 0)? map[p]: map[p - 1]);
 
 /* Set tape capacity */
 
-t_stat sim_tape_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sim_tape_set_capac (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 t_addr cap;
 t_stat r;
@@ -2283,7 +2283,7 @@ return SCPE_OK;
 
 /* Show tape capacity */
 
-t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (uptr->capac) {
     if (uptr->capac >= (t_addr) 1000000)
@@ -2319,7 +2319,7 @@ return SCPE_OK;
    structure, and SCPE_OK is returned.
 */
 
-t_stat sim_tape_set_dens (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sim_tape_set_dens (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 density, new_bpi;
 t_stat result = SCPE_OK;
@@ -2345,7 +2345,7 @@ else {                                                          /* otherwise a v
 
     else for (density = 0; density < BPI_COUNT; density++)      /* otherwise validate the density */
         if (new_bpi == bpi [density]                            /* if it matches a value in the list */
-          && ((1 << density) & *(int32 *) desc)) {              /*   and it's an allowed value */
+          && ((1 << density) & *(const int32 *) desc)) {        /*   and it's an allowed value */
             uptr->dynflags = (uptr->dynflags & ~MTVF_DENS_MASK) /*     then store the index of the value */
                                | density << UNIT_V_DF_TAPE;     /*       in the unit flags */
             return SCPE_OK;                                     /*         and return success */
@@ -2359,7 +2359,7 @@ return result;                                                  /* return the re
 
 /* Show the tape density */
 
-t_stat sim_tape_show_dens (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sim_tape_show_dens (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 tape_density;
 

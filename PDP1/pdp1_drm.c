@@ -327,7 +327,7 @@ return SCPE_OK;
 t_stat drp_svc (UNIT *uptr)
 {
 uint32 i, lim;
-uint32 *fbuf = uptr->filebuf;
+uint32 *fbuf = (uint32 *)uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     drp_err = 1;                                        /* set error */

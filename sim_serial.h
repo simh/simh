@@ -30,6 +30,10 @@
 #ifndef SIM_SERIAL_H_
 #define SIM_SERIAL_H_    0
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 #if defined (_WIN32)                        /* Windows definitions */
 
 /* We need the basic Win32 definitions, but including "windows.h" also includes
@@ -89,11 +93,15 @@ typedef int SERHANDLE;
 #include "sim_tmxr.h"                           /* need TMLN definition and modem definitions */
 
 extern SERHANDLE sim_open_serial    (char *name, TMLN *lp, t_stat *status);
-extern t_stat    sim_config_serial  (SERHANDLE port, const char *config);
+extern t_stat    sim_config_serial  (SERHANDLE port, CONST char *config);
 extern t_stat    sim_control_serial (SERHANDLE port, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits);
 extern int32     sim_read_serial    (SERHANDLE port, char *buffer, int32 count, char *brk);
 extern int32     sim_write_serial   (SERHANDLE port, char *buffer, int32 count);
 extern void      sim_close_serial   (SERHANDLE port);
-extern t_stat    sim_show_serial    (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
+extern t_stat    sim_show_serial    (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

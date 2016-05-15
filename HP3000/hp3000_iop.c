@@ -25,6 +25,7 @@
 
    IOP          HP 3000 Series III I/O Processor
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    28-Aug-15    JDB     First release version
    11-Dec-12    JDB     Created
 
@@ -274,8 +275,8 @@ static uint32 filter [4] = {                    /* filter bitmap for device numb
 
 /* IOP local SCP support routines */
 
-static t_stat iop_set_filter  (UNIT *uptr, int32 value, char  *cptr, void *desc);
-static t_stat iop_show_filter (FILE *st,   UNIT  *uptr, int32 value, void *desc);
+static t_stat iop_set_filter  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat iop_show_filter (FILE *st,   UNIT  *uptr, int32 value, CONST void *desc);
 
 
 /* IOP SCP data structures */
@@ -730,29 +731,31 @@ return;
    disturbed.
 */
 
-static t_stat iop_set_filter (UNIT *uptr, int32 value, char *cptr, void *desc)
+static t_stat iop_set_filter (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
-const char  *sptr;
-char        *tptr;
-t_addr      dev, low, high;
-t_stat      result = SCPE_OK;
-uint32      new_filter [4] = { TRACE_ALL, TRACE_ALL, TRACE_ALL, TRACE_ALL };
+CONST char *tptr;
+char       *mptr;
+t_addr     dev, low, high;
+t_stat     result = SCPE_OK;
+uint32     new_filter [4] = { TRACE_ALL, TRACE_ALL, TRACE_ALL, TRACE_ALL };
 
 if (value == 1) {                                       /* if we are setting the filter */
     if ((cptr == NULL) || (*cptr == '\0'))              /*   then if a line range was not supplied */
         return SCPE_MISVAL;                             /*     then report a "Missing value" error */
 
-    tptr = cptr + strlen (cptr);                        /* append a semicolon */
-    *tptr++ = ';';                                      /*   to the command string */
-    *tptr = '\0';                                       /*     to make parsing easier for get_range */
+    mptr = malloc (strlen (cptr) + 2);                  /* allocate space for the string, a semicolon, and a NUL */
 
-    sptr = cptr;                                        /* start at the character after the equals sign */
+    if (mptr == NULL)                                   /* if the allocation failed */
+        return SCPE_MEM;                                /*   report memory exhaustion */
 
-    while (*sptr) {                                     /* parse the command string until it is exhausted */
-        sptr = get_range (NULL, sptr, &low, &high,      /* get a semicolon-separated device number range */
+    strcpy (mptr, cptr);                                /* copy over the existing command string */
+    tptr = strcat (mptr, ";");                          /*   and append a semicolon to make parsing easier */
+
+    while (*tptr) {                                     /* parse the command string until it is exhausted */
+        tptr = get_range (NULL, tptr, &low, &high,      /* get a semicolon-separated device number range */
                           10, 127, ';');                /*   in radix 10 with a maximum value of 127 */
 
-        if (sptr == NULL || low > 127 || high > 127) {  /* if a parsing error occurred or a number was out of range */
+        if (tptr == NULL || low > 127 || high > 127) {  /* if a parsing error occurred or a number was out of range */
             result = SCPE_ARG;                          /*   then report an "Invalid argument" error */
             break;                                      /*     and quit at this point */
             }
@@ -760,6 +763,8 @@ if (value == 1) {                                       /* if we are setting the
         else for (dev = low; dev <= high; dev++)        /* otherwise loop through the range of device numbers */
             new_filter [dev / 32] &= ~(1 << dev % 32);  /*   and clear each corresponding bit in the array */
         }
+
+    free (mptr);                                        /* deallocate the temporary string */
     }
 
 else if (cptr != NULL)                                  /* otherwise we are clearing the filter */
@@ -788,7 +793,7 @@ return result;                                          /* return the result of 
    in the filter is encountered.
 */
 
-static t_stat iop_show_filter (FILE *st, UNIT *uptr, int32 value, void *desc)
+static t_stat iop_show_filter (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
 int32  group, low, high;
 uint32 test_filter;

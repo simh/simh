@@ -96,7 +96,7 @@
 /* VAX-11/780 boot device definitions */
 
 struct boot_dev {
-    char                *name;
+    const char          *name;
     int32               code;
     int32               let;
     };
@@ -134,10 +134,10 @@ t_stat sbi_reset (DEVICE *dptr);
 const char *sbi_description (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
 void uba_eval_int (void);
-t_stat vax780_boot (int32 flag, char *ptr);
-t_stat vax780_boot_parse (int32 flag, char *ptr);
+t_stat vax780_boot (int32 flag, CONST char *ptr);
+t_stat vax780_boot_parse (int32 flag, const char *ptr);
 
-extern t_stat vax780_fload (int32 flag, char *cptr);
+extern t_stat vax780_fload (int32 flag, CONST char *cptr);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
 extern int32 icr_rd (void);
@@ -618,7 +618,7 @@ return cc;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax780_boot (int32 flag, char *ptr)
+t_stat vax780_boot (int32 flag, CONST char *ptr)
 {
 t_stat r;
 
@@ -636,10 +636,11 @@ return run_cmd (flag, "CPU");
 
 /* Parse boot command, set up registers - also used on reset */
 
-t_stat vax780_boot_parse (int32 flag, char *ptr)
+t_stat vax780_boot_parse (int32 flag, const char *ptr)
 {
 char gbuf[CBUFSIZE];
-char *slptr, *regptr;
+char *slptr;
+const char *regptr;
 int32 i, r5v, unitno;
 uint32 ba;
 DEVICE *dptr;
@@ -738,7 +739,7 @@ return "Synchronous Backplane Interconnect";
 
 /* Show nexus */
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;
@@ -822,7 +823,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
 return SCPE_OK;
 }
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr == NULL) return SCPE_ARG;
 if (strcmp(cptr, "780") == 0) {

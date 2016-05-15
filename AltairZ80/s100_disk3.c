@@ -175,8 +175,8 @@ static int32 nsectors     = C20MB_NSECTORS;
 static int32 sectsize     = C20MB_SECTSIZE;
 
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern int32 find_unit_index(UNIT *uptr);
@@ -191,7 +191,7 @@ extern uint8 GetByteDMA(const uint32 Addr);
 #define DISK3_CAPACITY          (C20MB_NTRACKS*C20MB_NHEADS*C20MB_NSECTORS*C20MB_SECTSIZE)   /* Default Disk Capacity */
 
 static t_stat disk3_reset(DEVICE *disk3_dev);
-static t_stat disk3_attach(UNIT *uptr, char *cptr);
+static t_stat disk3_attach(UNIT *uptr, CONST char *cptr);
 static t_stat disk3_detach(UNIT *uptr);
 static void raise_disk3_interrupt(void);
 static const char* disk3_description(DEVICE *dptr);
@@ -296,7 +296,7 @@ static t_stat disk3_reset(DEVICE *dptr)
 
 
 /* Attach routine */
-static t_stat disk3_attach(UNIT *uptr, char *cptr)
+static t_stat disk3_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r = SCPE_OK;
     DISK3_DRIVE_INFO *pDrive;
@@ -544,7 +544,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
 
                 xfr_len = pDrive->xfr_nsects * pDrive->sectsize;
 
-                dataBuffer = malloc(xfr_len);
+                dataBuffer = (uint8 *)malloc(xfr_len);
 
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
 
@@ -620,7 +620,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 file_offset = (pDrive->track * (pDrive->nheads) * data_len); /* Calculate offset based on current track */
                 file_offset += (disk3_info->iopb[DISK3_IOPB_ARG3] * data_len);
 
-                fmtBuffer = malloc(data_len);
+                fmtBuffer = (uint8 *)malloc(data_len);
                 memset(fmtBuffer, disk3_info->iopb[DISK3_IOPB_ARG2], data_len);
 
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);

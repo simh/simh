@@ -70,14 +70,13 @@ int32 ttx_tps = 100;                                    /* polls per second */
 TMLN ttx_ldsc[TTX_LINES] = { {0} };                     /* line descriptors */
 TMXR ttx_desc = { TTX_LINES, 0, 0, ttx_ldsc };          /* mux descriptor */
 
-DEVICE ttix_dev, ttox_dev;
 int32 ttix (int32 IR, int32 AC);
 int32 ttox (int32 IR, int32 AC);
 t_stat ttix_svc (UNIT *uptr);
 t_stat ttix_reset (DEVICE *dptr);
 t_stat ttox_svc (UNIT *uptr);
 t_stat ttox_reset (DEVICE *dptr);
-t_stat ttx_attach (UNIT *uptr, char *cptr);
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr);
 t_stat ttx_detach (UNIT *uptr);
 void ttx_enbdis (int32 dis);
 
@@ -376,7 +375,7 @@ return SCPE_OK;
 
 /* Attach master unit */
 
-t_stat ttx_attach (UNIT *uptr, char *cptr)
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

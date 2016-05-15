@@ -66,8 +66,8 @@
 #define WR_DATA_DETAIL_MSG  (1 << 8)
 
 extern uint32 PCX;
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -211,7 +211,7 @@ static SECTOR_FORMAT sdata;
 
 /* Local function prototypes */
 static t_stat mdsad_reset(DEVICE *mdsad_dev);
-static t_stat mdsad_attach(UNIT *uptr, char *cptr);
+static t_stat mdsad_attach(UNIT *uptr, CONST char *cptr);
 static t_stat mdsad_detach(UNIT *uptr);
 static t_stat mdsad_boot(int32 unitno, DEVICE *dptr);
 static uint8 MDSAD_Read(const uint32 Addr);
@@ -293,7 +293,7 @@ static t_stat mdsad_reset(DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat mdsad_attach(UNIT *uptr, char *cptr)
+static t_stat mdsad_attach(UNIT *uptr, CONST char *cptr)
 {
     char header[4];
     t_stat r;

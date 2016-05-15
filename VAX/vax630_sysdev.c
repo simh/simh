@@ -54,7 +54,7 @@
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
 
-t_stat vax630_boot (int32 flag, char *ptr);
+t_stat vax630_boot (int32 flag, CONST char *ptr);
 int32 sys_model = 0;                                    /* MicroVAX or VAXstation */
 
 /* Special boot command, overrides regular boot */
@@ -139,15 +139,15 @@ t_bool ka_hltenab = TRUE;                               /* Halt Enable / Autoboo
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
-t_stat rom_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rom_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rom_set_diag (UNIT *uptr, int32 val, const char *cptr, const void *desc);
+t_stat rom_show_diag (FILE *st, UNIT *uptr, int32 val, const void *desc);
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *rom_description (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
 t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-t_stat nvr_attach (UNIT *uptr, char *cptr);
+t_stat nvr_attach (UNIT *uptr, CONST char *cptr);
 t_stat nvr_detach (UNIT *uptr);
 const char *nvr_description (DEVICE *dptr);
 t_stat sysd_reset (DEVICE *dptr);
@@ -543,7 +543,7 @@ uint8 nvr_empty_valid[NVRSIZE] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
     };
 
-t_stat nvr_attach (UNIT *uptr, char *cptr)
+t_stat nvr_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 int32 saved_sim_quiet = sim_quiet;
@@ -943,7 +943,7 @@ return 0;                                               /* new cc = 0 */
 
 */
 
-t_stat vax630_boot (int32 flag, char *ptr)
+t_stat vax630_boot (int32 flag, CONST char *ptr)
 {
 char gbuf[CBUFSIZE];
 
@@ -975,31 +975,31 @@ if (*rom == 0) {                                        /* no boot? */
 return SCPE_OK;
 }
 
-t_stat sysd_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sysd_set_diag (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr != NULL) ka_diag_full = strcmp(cptr, "MIN");
 return SCPE_OK;
 }
 
-t_stat sysd_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sysd_show_diag (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf(st, "DIAG=%s", (ka_diag_full ? "full" :"min"));
 return SCPE_OK;
 }
 
-t_stat sysd_set_halt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sysd_set_halt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 ka_hltenab = val;
 return SCPE_OK;
 }
 
-t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf(st, "%s", ka_hltenab ? "NOAUTOBOOT" : "AUTOBOOT");
 return SCPE_OK;
 }
 
-t_stat sysd_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sysd_show_leds (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "leds=(%s,%s,%s,%s)", ka_bdr&8 ? "ON" : "OFF", 
                                    ka_bdr&4 ? "ON" : "OFF", 
@@ -1041,7 +1041,7 @@ ka_diag_full = 0;
 return SCPE_OK;
 }
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 char gbuf[CBUFSIZE];
 
@@ -1098,13 +1098,13 @@ fprintf (st, "   sim> BOOT\n\n");
 return SCPE_OK;
 }
 
-t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 uint32 memsize = (uint32)(MEMSIZE>>20);
 uint32 baseaddr = 0;
 struct {
     uint32 capacity;
-    char *option;
+    const char *option;
     } boards[] = {
         { 16, "MS630-CA"},
         {  4, "MS630-BB"},

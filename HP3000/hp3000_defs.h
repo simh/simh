@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    04-Feb-16    JDB     First release version
    11-Dec-12    JDB     Created
 
@@ -40,8 +41,8 @@
 #define HP3000_DEFS_H_
 
 
-#include "sim_defs.h"
 #include "sim_rev.h"
+#include "sim_defs.h"
 
 
 
@@ -63,15 +64,14 @@
 */
 
 #if defined (__clang__)
-#pragma clang diagnostic ignored "-Wlogical-op-parentheses"
-#pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
-#pragma clang diagnostic ignored "-Wshift-op-parentheses"
-#pragma clang diagnostic ignored "-Wdangling-else"
+  #pragma clang diagnostic ignored "-Wlogical-op-parentheses"
+  #pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
+  #pragma clang diagnostic ignored "-Wshift-op-parentheses"
+  #pragma clang diagnostic ignored "-Wdangling-else"
 
 #elif defined (_MSC_VER)
-#pragma warning (disable: 4114 4554 4996)
+  #pragma warning (disable: 4114 4554 4996)
 #endif
-
 
 
 /* Device register display mode flags */
@@ -106,13 +106,22 @@
        offsets 13 and 15 can be used with an array of 16-bit elements.  However,
        offsets 3 and 13 cannot be used, as the first implies 8-bit elements, and
        the second implies 16-bit elements.
+
+    2. The REG structure for version 4.0 contains two extra fields that are not
+       present in 3.x versions.
 */
 
 /*                Macro              name    loc    radix  width  offset    depth     desc  fields */
 /*        ----------------------     ----  -------  -----  -----  ------  ----------  ----  ------ */
+#if (SIM_MAJOR >= 4)
   #define FBDATA(nm,loc,ofs,dep)     #nm,  &(loc),    2,     1,   (ofs),    (dep),    NULL,  NULL
   #define SRDATA(nm,loc)             #nm,  &(loc),    8,     8,     0,    sizeof loc, NULL,  NULL
   #define YRDATA(nm,loc,wid)         #nm,  &(loc),    2,   (wid),   0,        1,      NULL,  NULL
+#else
+  #define FBDATA(nm,loc,ofs,dep)     #nm,  &(loc),    2,     1,   (ofs),    (dep)
+  #define SRDATA(nm,loc)             #nm,  &(loc),    8,     8,     0,    sizeof loc
+  #define YRDATA(nm,loc,wid)         #nm,  &(loc),    2,   (wid),   0,        1
+#endif
 
 
 /* Debugging and console output.
@@ -510,15 +519,15 @@ extern const BITSET_FORMAT outbound_format;     /* the outbound signal format st
 
 /* System interface global SCP support routines previously declared in scp.h */
 /*
-extern t_stat sim_load   (FILE *fptr,  char   *cptr, char    *fnam, int     flag);
-extern t_stat fprint_sym (FILE *ofile, t_addr addr,  t_value *val,  UNIT    *uptr, int32 sw);
-extern t_stat parse_sym  (char *cptr,  t_addr addr,  UNIT    *uptr, t_value *val,  int32 sw);
+extern t_stat sim_load   (FILE       *fptr,  CONST char *cptr, CONST char *fnam, int     flag);
+extern t_stat fprint_sym (FILE       *ofile, t_addr     addr,  t_value    *val,  UNIT    *uptr, int32 sw);
+extern t_stat parse_sym  (CONST char *cptr,  t_addr     addr,  UNIT       *uptr, t_value *val,  int32 sw);
 */
 
 /* System interface global SCP support routines */
 
-extern t_stat hp_set_dib  (UNIT *uptr, int32 code,  char  *cptr, void *desc);
-extern t_stat hp_show_dib (FILE *st,   UNIT  *uptr, int32 code,  void *desc);
+extern t_stat hp_set_dib  (UNIT *uptr, int32 code,  CONST char *cptr, void       *desc);
+extern t_stat hp_show_dib (FILE *st,   UNIT  *uptr, int32      code,  CONST void *desc);
 
 
 /* System interface global utility routines */

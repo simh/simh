@@ -276,12 +276,11 @@ int32 dt_substate = 0;
 int32 dt_logblk = 0;
 int32 dt_stopoffr = 0;
 
-DEVICE dt_dev;
 int32 dt76 (int32 IR, int32 AC);
 int32 dt77 (int32 IR, int32 AC);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
-t_stat dt_attach (UNIT *uptr, char *cptr);
+t_stat dt_attach (UNIT *uptr, CONST char *cptr);
 void dt_flush (UNIT *uptr);
 t_stat dt_detach (UNIT *uptr);
 t_stat dt_boot (int32 unitno, DEVICE *dptr);
@@ -1202,7 +1201,7 @@ return SCPE_OK;
    If 12b, read data into buffer
 */
 
-t_stat dt_attach (UNIT *uptr, char *cptr)
+t_stat dt_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 pdp18b[D18_NBSIZE];
 uint16 pdp11b[D18_NBSIZE], *fbuf;

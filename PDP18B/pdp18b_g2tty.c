@@ -182,7 +182,7 @@ static void g2out_process_display_list ();
 static int g2out_send_new ();
 
 /* both G2IN/G2OUT: */
-t_stat g2_attach (UNIT *uptr, char *cptr);
+t_stat g2_attach (UNIT *uptr, CONST char *cptr);
 t_stat g2_detach (UNIT *uptr);
 t_stat g2_reset (DEVICE *dptr);
 
@@ -518,8 +518,8 @@ static void g2out_process_display_list() {
  */
 static int g2out_send_new() {
     struct dspbuf *old = g2out_dspbufs + OLD;
-    struct dspbuf *new = g2out_dspbufs + NEW;
-    char *cp = new->buffer;
+    struct dspbuf *New = g2out_dspbufs + NEW;
+    char *cp = New->buffer;
     int cur = 0;
     int start;
 
@@ -527,23 +527,23 @@ static int g2out_send_new() {
      * COULD have had undisplayed stuff on last screen before it was cleared??
      * would need to have a transmit queue??
      */
-    if (new->count == 0)
+    if (New->count == 0)
         return 0;
 
     if (old->count &&                   /* have old chars */
-        memcmp(old->buffer, new->buffer, old->count) == 0) { /* and a prefix */
+        memcmp(old->buffer, New->buffer, old->count) == 0) { /* and a prefix */
         cur = old->count;
         cp += cur;
     }
     /* loop for chars while connected & tx enabled */
     start = cur;
-    while (cur < new->count && g2_ldsc.conn && g2_ldsc.xmte) {
+    while (cur < New->count && g2_ldsc.conn && g2_ldsc.xmte) {
         if (g2out_putchar(*cp)) {
             cp++;
             cur++;
         }
     }
-    new->count = cur;                   /* only remember what's been sent */
+    New->count = cur;                   /* only remember what's been sent */
     return cur - start;                 /* remember number sent */
 }
 
@@ -580,7 +580,7 @@ return SCPE_OK;
 }
 
 /* Attach master unit */
-t_stat g2_attach (UNIT *uptr, char *cptr)
+t_stat g2_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

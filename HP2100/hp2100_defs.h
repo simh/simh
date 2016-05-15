@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2015, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    19-Jun-15    JDB     Conditionally use Global_PC for PC for version 4.0 and on
    30-Dec-14    JDB     Added S-register parameters to ibl_copy, more IBL constants
    28-Dec-14    JDB     Changed suppression from #pragma GCC to #pragma clang
@@ -79,8 +80,8 @@
 #define HP2100_DEFS_H_ 0
 
 
-#include "sim_defs.h"
 #include "sim_rev.h"
+#include "sim_defs.h"
 
 
 #if (SIM_MAJOR >= 4)
@@ -485,10 +486,10 @@ extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
 /* System functions */
 
 extern const char *fmt_char   (uint8 ch);
-extern t_stat      hp_setsc   (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat      hp_setdev  (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat      hp_setsc   (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat      hp_setdev  (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern t_bool      hp_fprint_stopped (FILE *st, t_stat reason);
 
 /* Device-specific functions */

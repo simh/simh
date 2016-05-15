@@ -225,18 +225,18 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_svc (UNIT *uptr);
-t_stat cpu_set_size (UNIT *uptr, int32 value, char *cptr, void *desc);
-t_stat cpu_set_type (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+t_stat cpu_set_type (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 void calc_ints (void);
 
 extern t_stat ts_wr (int32 data, int32 addr, int32 access);
 extern UNIT cr_unit, prt_unit[];
 
 #ifdef ENABLE_BACKTRACE
-	static void   archive_backtrace(char *inst);
+	static void   archive_backtrace(const char *inst);
 	static void   reset_backtrace (void);
 	static void   show_backtrace (int nshow);
-	static t_stat backtrace_cmd (int32 flag, char *cptr);
+	static t_stat backtrace_cmd (int32 flag, CONST char *cptr);
 #else
 	#define archive_backtrace(inst)
 	#define reset_backtrace()
@@ -251,8 +251,8 @@ extern UNIT cr_unit, prt_unit[];
 
 static void   init_console_window (void);
 static void   destroy_console_window (void);
-static t_stat view_cmd (int32 flag, char *cptr);
-static t_stat cpu_attach (UNIT *uptr, char *cptr);
+static t_stat view_cmd (int32 flag, CONST char *cptr);
+static t_stat cpu_attach (UNIT *uptr, CONST char *cptr);
 static t_bool bsctest (int32 DSPLC, t_bool reset_V);
 static void   exit_irq (void);
 static void   trace_instruction (void);
@@ -452,18 +452,18 @@ void calc_ints (void)
 
 #define INCREMENT_IAR 	IAR = (IAR + 1) & mem_mask
 
-void bail (char *msg)
+void bail (const char *msg)
 {
 	printf("%s\n", msg);
 	exit(1);
 }
 
-static void weirdop (char *msg)
+static void weirdop (const char *msg)
 {
 	printf("Weird opcode: %s at %04x\n", msg, IAR-1);
 }
 
-static char *xio_devs[]  = {
+static const char *xio_devs[]  = {
 	"dev-00?",	"console", 	"1442card",		"1134ptape",
 	"dsk0", 	"1627plot", "1132print",	"switches",
 	"1231omr", 	"2501card",	"sca",	 		"dev-0b?",
@@ -474,7 +474,7 @@ static char *xio_devs[]  = {
 	"dev-1c?", 	"dev-1d?",	"dev-1e?", 		"dev-1f?"
 };
 
-static char *xio_funcs[] = {
+static const char *xio_funcs[] = {
 	"func0?",  "write", "read",  "sense_irq",
 	"control", "initw", "initr", "sense"
 };
@@ -486,7 +486,7 @@ t_stat sim_instr (void)
 	char msg[50];
 	int cwincount = 0, status;
 	static long ninstr = 0;
-	static char *intlabel[] = {"INT0","INT1","INT2","INT3","INT4","INT5"};
+	static const char *intlabel[] = {"INT0","INT1","INT2","INT3","INT4","INT5"};
 
 	/* the F bit indicates a two-word instruction for most instructions except the ones marked FALSE below */
 	static t_bool F_bit_used[] = {									/* FALSE for those few instructions that don't have a long instr version */
@@ -1377,7 +1377,7 @@ t_stat cpu_svc (UNIT *uptr)
  * Memory allocation
  * ------------------------------------------------------------------------ */
 
-t_stat cpu_set_size (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 	t_bool used;
 	int32 i;
@@ -1406,7 +1406,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 value, char *cptr, void *desc)
 
 /* processor type */
 
-t_stat cpu_set_type (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat cpu_set_type (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 	REG *r;
 
@@ -1451,7 +1451,7 @@ void xio_1131_switches (int32 addr, int32 func, int32 modify)
  * Illegal IO operation.  Not yet sure what the actual CPU does in this case
  * ------------------------------------------------------------------------ */
 
-void xio_error (char *msg)
+void xio_error (const char *msg)
 {
 	printf("*** XIO error at %04x: %s\n", prev_IAR, msg);
 	if (cgi)									/* if this happens in CGI mode, probably best to halt */
@@ -1462,7 +1462,7 @@ void xio_error (char *msg)
  * register_cmd - add a command to the extensible command table
  * ------------------------------------------------------------------------ */
 
-t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int arg, char *help)
+t_stat register_cmd (const char *name, t_stat (*action)(int32 flag, CONST char *ptr), int arg, const char *help)
 {
 	int i;
 
@@ -1495,7 +1495,7 @@ t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int ar
  * echo_cmd - just echo the command line
  * ------------------------------------------------------------------------ */
 
-static t_stat echo_cmd (int32 flag, char *cptr)
+static t_stat echo_cmd (int32 flag, CONST char *cptr)
 {
 	printf("%s\n", cptr);
 	return SCPE_OK;
@@ -1542,11 +1542,11 @@ void sim_init (void)
 
 static struct tag_arch {
 	int iar;
-	char *inst;
+	const char *inst;
 } arch[MAXARCHIVE];
 int narchived = 0, archind = 0;
 
-static void archive_backtrace (char *inst)
+static void archive_backtrace (const char *inst)
 {
 	static int prevind;
 
@@ -1596,7 +1596,7 @@ static void show_backtrace (int nshow)
 		putchar('\n');
 }
 
-static t_stat backtrace_cmd (int32 flag, char *cptr)
+static t_stat backtrace_cmd (int32 flag, CONST char *cptr)
 {
 	int n;
 
@@ -1680,9 +1680,9 @@ typedef struct tag_symentry {
 static PSYMENTRY syms = NULL;
 static t_bool new_log, log_fac;
 
-static t_stat cpu_attach (UNIT *uptr, char *cptr)
+static t_stat cpu_attach (UNIT *uptr, CONST char *cptr)
 {
-	char mapfile[200], buf[200], sym[100];
+	char mapfile[200], buf[200], sym[100], gbuf[2*CBUFSIZE];
 	int addr;
 	PSYMENTRY n, prv, s;
 	FILE *fd;
@@ -1719,7 +1719,7 @@ static t_stat cpu_attach (UNIT *uptr, char *cptr)
 					break;
 			}
 
-			if ((n = malloc(sizeof(SYMENTRY))) == NULL) {
+			if ((n = (PSYMENTRY)malloc(sizeof(SYMENTRY))) == NULL) {
 				printf("out of memory reading map!\n");
 				break;
 			}
@@ -1741,7 +1741,7 @@ static t_stat cpu_attach (UNIT *uptr, char *cptr)
 		fclose(fd);
 	}
 
-	return attach_unit(uptr, quotefix(cptr));			/* fix quotes in filenames & attach */
+	return attach_unit(uptr, quotefix(cptr, gbuf));			/* fix quotes in filenames & attach */
 }
 
 static void trace_instruction (void)
@@ -1843,7 +1843,7 @@ static void trace_common (FILE *fout)
 	fprintf(fout, "[IAR %04x IPL %c] ", IAR, (ipl < 0) ? ' ' : ('0' + ipl));
 }
 
-void trace_io (char *fmt, ...)
+void trace_io (const char *fmt, ...)
 {
 	va_list args;
 
@@ -1858,7 +1858,7 @@ void trace_io (char *fmt, ...)
 	fputs(CRLF, cpu_unit.fileref);
 }
 
-void trace_both (char *fmt, ...)
+void trace_both (const char *fmt, ...)
 {
 	va_list args;
 
@@ -1879,7 +1879,7 @@ void trace_both (char *fmt, ...)
 
 /* debugging */
 
-void debug_print (char *fmt, ...)
+void debug_print (const char *fmt, ...)
 {
 	va_list args;
 	FILE *fout = stdout;
@@ -1917,7 +1917,7 @@ void debug_print (char *fmt, ...)
 
 /* view_cmd - let user view and/or edit a file (e.g. a printer output file, script, or source deck) */
 
-static t_stat view_cmd (int32 flag, char *cptr)
+static t_stat view_cmd (int32 flag, CONST char *cptr)
 {
 #ifdef _WIN32
 	char cmdline[256];

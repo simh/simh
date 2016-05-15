@@ -156,11 +156,10 @@ static uint8 ct_fnc_tab[SRA_M_FNC + 1] = {
     OP_WRI|OP_FWD, OP_REV, 0,             OP_FWD
     };
 
-DEVICE ct_dev;
 int32 ct70 (int32 IR, int32 AC);
 t_stat ct_svc (UNIT *uptr);
 t_stat ct_reset (DEVICE *dptr);
-t_stat ct_attach (UNIT *uptr, char *cptr);
+t_stat ct_attach (UNIT *uptr, CONST char *cptr);
 t_stat ct_detach (UNIT *uptr);
 t_stat ct_boot (int32 unitno, DEVICE *dptr);
 uint32 ct_updsta (UNIT *uptr);
@@ -650,7 +649,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat ct_attach (UNIT *uptr, char *cptr)
+t_stat ct_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

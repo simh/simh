@@ -131,7 +131,7 @@
                         { UNIT_MSIZE, (4u << 20), NULL, "4M", &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" }, \
                         { UNIT_MSIZE, (5u << 20), NULL, "5M", &cpu_set_size, NULL, NULL, "Set Memory to 5M bytes" }, \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
-extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 #define CPU_MODEL_MODIFIERS                                                                     \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
                               NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
@@ -368,10 +368,10 @@ extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 void sbi_set_errcnf (void);
 

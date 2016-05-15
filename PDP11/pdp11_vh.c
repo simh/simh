@@ -346,20 +346,20 @@ static int32 vh_rxinta (void);
 static int32 vh_txinta (void);
 static t_stat vh_clear (int32 vh, t_bool flag);
 static t_stat vh_reset (DEVICE *dptr);
-static t_stat vh_attach (UNIT *uptr, char *cptr);
+static t_stat vh_attach (UNIT *uptr, CONST char *cptr);
 static t_stat vh_detach (UNIT *uptr);       
-static t_stat vh_show_detail (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat vh_show_rbuf (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat vh_show_txq (FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat vh_show_detail (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat vh_show_rbuf (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat vh_show_txq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat vh_putc (int32 vh, TMLX *lp, int32 chan, int32 data);
 static void vh_set_config (TMLX *lp );
 static void doDMA (int32 vh, int32 chan);
-static t_stat vh_setmode (UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat vh_setmode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat vh_setnl (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat vh_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat vh_set_nolog (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char *vh_description (DEVICE *dptr);
@@ -446,7 +446,7 @@ static const MTAB vh_mod[] = {
         NULL, &vh_show_txq, NULL, "Display transmit queue for each mux" },
     { MTAB_XTD|MTAB_VDV|MTAB_NC, 0, NULL, "LOG=n=file",
         &vh_set_log, NULL, &vh_desc, "Display logging"  },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "NOLOG",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "NOLOG=n",
         &vh_set_nolog, NULL, &vh_desc, "Disable logging on designated line" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "LOG", NULL,
         NULL, &vh_show_log, &vh_desc, "Display logging for all lines" },
@@ -1415,7 +1415,7 @@ static t_stat vh_reset (    DEVICE  *dptr   )
 
 
 static t_stat vh_attach (   UNIT    *uptr,
-                char    *cptr   )
+                CONST char    *cptr   )
 {
     if (uptr == &vh_unit[0])
         return (tmxr_attach (&vh_desc, uptr, cptr));
@@ -1427,9 +1427,9 @@ static t_stat vh_detach (   UNIT    *uptr   )
     return (tmxr_detach (&vh_desc, uptr));
 }
 
-static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
+static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc)
 {
-TMXR *mp = (TMXR *) desc;
+const TMXR *mp = (const TMXR *) desc;
 
 return show_vec (st, uptr, ((mp->lines * 2) / VH_LINES), desc);
 }
@@ -1454,7 +1454,7 @@ static void vh_detail_line (    FILE    *st,
 static t_stat vh_show_detail (   FILE    *st,
                 UNIT    *uptr,
                 int32   val,
-                void    *desc   )
+                CONST void    *desc   )
 {
     int32   i, j;
 
@@ -1474,7 +1474,7 @@ static t_stat vh_show_detail (   FILE    *st,
 static t_stat vh_show_rbuf (    FILE    *st,
                 UNIT    *uptr,
                 int32   val,
-                void    *desc   )
+                CONST void    *desc   )
 {
     int32   i;
 
@@ -1486,7 +1486,7 @@ static t_stat vh_show_rbuf (    FILE    *st,
 static t_stat vh_show_txq ( FILE    *st,
                 UNIT    *uptr,
                 int32   val,
-                void    *desc   )
+                CONST void    *desc   )
 {
     int32   i;
 
@@ -1497,7 +1497,7 @@ static t_stat vh_show_txq ( FILE    *st,
 
 /* SET LINES processor */
 
-static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat vh_setnl (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;
@@ -1529,7 +1529,7 @@ return vh_reset (&vh_dev);
 
 /* SET DHU/DHV mode processor */
 
-static t_stat vh_setmode (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat vh_setmode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -1540,27 +1540,26 @@ return SCPE_OK;
 
 /* SET LOG processor */
 
-static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat vh_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-char *tptr;
 t_stat r;
+char gbuf[CBUFSIZE];
 int32 ln;
 
 if (cptr == NULL)
     return SCPE_ARG;
-tptr = strchr (cptr, '=');
-if ((tptr == NULL) || (*tptr == 0))
+cptr = get_glyph (cptr, gbuf, '=');
+if ((cptr == NULL) || (*cptr == 0) || (gbuf[0] == 0))
     return SCPE_ARG;
-*tptr++ = 0;
-ln = (int32) get_uint (cptr, 10, (VH_MUXES * VH_LINES), &r);
+ln = (int32) get_uint (gbuf, 10, vh_desc.lines, &r);
 if ((r != SCPE_OK) || (ln >= vh_desc.lines))
     return SCPE_ARG;
-return tmxr_set_log (NULL, ln, tptr, desc);
+return tmxr_set_log (NULL, ln, cptr, desc);
 }
 
 /* SET NOLOG processor */
 
-static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat vh_set_nolog (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 t_stat r;
 int32 ln;
@@ -1575,7 +1574,7 @@ return tmxr_set_nolog (NULL, ln, NULL, desc);
 
 /* SHOW LOG processor */
 
-static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc)
+static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i;
 

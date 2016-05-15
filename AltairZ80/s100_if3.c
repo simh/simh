@@ -76,8 +76,8 @@ typedef struct {
 
 static IF3_INFO if3_info_data = { { 0x0, 0, 0x10, 8 } };
 
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
@@ -85,7 +85,7 @@ extern uint32 PCX;
 extern int32 sio0d(const int32 port, const int32 io, const int32 data);
 extern int32 sio0s(const int32 port, const int32 io, const int32 data);
 
-static t_stat set_if3_connect(UNIT *uptr, int32 val, char *cptr, void *desc);
+static t_stat set_if3_connect(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 static t_stat if3_reset(DEVICE *if3_dev);
 static t_stat if3_svc (UNIT *uptr);
@@ -154,7 +154,7 @@ DEVICE if3_dev = {
     if3_dt, NULL, NULL, NULL, NULL, NULL, &if3_description
 };
 
-static t_stat set_if3_connect(UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat set_if3_connect(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     if(uptr->flags & UNIT_DISABLE) {
         sim_debug(ERROR_MSG, &if3_dev, "IF3[%d]: not enabled.\n", uptr->u3);

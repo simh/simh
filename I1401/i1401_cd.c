@@ -105,19 +105,19 @@ int32 cdp_buf_full = 0;                                 /* punch buf full? */
 
 t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno, DEVICE *dptr);
-t_stat cdr_attach (UNIT *uptr, char *cptr);
+t_stat cdr_attach (UNIT *uptr, CONST char *cptr);
 t_stat cdr_detach (UNIT *uptr);
-t_stat cdp_attach (UNIT *uptr, char *cptr);
+t_stat cdp_attach (UNIT *uptr, CONST char *cptr);
 t_stat cdp_detach (UNIT *uptr);
-t_stat cdp_npr (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cdp_npr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cd_reset (DEVICE *dptr);
 t_stat cdr_read_file (char *buf, int32 sz);
 t_stat cdr_read_cons (char *buf, int32 sz);
-t_stat cdr_chg_cons (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cdr_chg_cons (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 bcd2asc (int32 c, UNIT *uptr);
 char colbin_to_bcd (uint32 cb);
 
-extern void inq_puts (char *cptr);
+extern void inq_puts (const char *cptr);
 
 /* Card reader data structures
 
@@ -358,7 +358,7 @@ return SCPE_OK;
 
 /* Punch buffered card (also handles non-process runout button) */
 
-t_stat cdp_npr (UNIT *notused, int32 val, char *cptr, void *desc)
+t_stat cdp_npr (UNIT *notused, int32 val, CONST char *cptr, void *desc)
 {
 UNIT *uptr;
 
@@ -477,7 +477,7 @@ return SCPE_OK;
 
    Caller will do actual bit field update on successful return */
 
-t_stat cdr_chg_cons (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cdr_chg_cons (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val == 0)                                           /* clear? */
     cdr_unit.flags |= UNIT_ATTABLE;                     /* attachable on */
@@ -488,7 +488,7 @@ return SCPE_OK;
 
 /* Card reader attach */
 
-t_stat cdr_attach (UNIT *uptr, char *cptr)
+t_stat cdr_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -538,7 +538,7 @@ return SCPE_OK;
 
 /* Card punch attach */
 
-t_stat cdp_attach (UNIT *uptr, char *cptr)
+t_stat cdp_attach (UNIT *uptr, CONST char *cptr)
 {
 cdp_buf_full = 0;
 return attach_unit (uptr, cptr);

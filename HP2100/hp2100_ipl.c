@@ -1,6 +1,6 @@
 /* hp2100_ipl.c: HP 2000 interprocessor link simulator
 
-   Copyright (c) 2002-2015, Robert M Supnik
+   Copyright (c) 2002-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    14-Sep-15    JDB     Exposed "ipl_edtdelay" via a REG_HIDDEN to allow user tuning
                         Corrected typos in comments and strings
    05-Jun-15    JDB     Merged 3.x and 4.x versions using conditionals
@@ -126,11 +127,11 @@ IOHANDLER iplio;
 
 t_stat ipl_svc (UNIT *uptr);
 t_stat ipl_reset (DEVICE *dptr);
-t_stat ipl_attach (UNIT *uptr, char *cptr);
+t_stat ipl_attach (UNIT *uptr, CONST char *cptr);
 t_stat ipl_detach (UNIT *uptr);
 t_stat ipl_boot (int32 unitno, DEVICE *dptr);
-t_stat ipl_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ipl_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ipl_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ipl_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_bool ipl_check_conn (UNIT *uptr);
 
 /* Debug flags table */
@@ -585,7 +586,7 @@ return SCPE_OK;
    attach -c - connect to ip address and port
 */
 
-t_stat ipl_attach (UNIT *uptr, char *cptr)
+t_stat ipl_attach (UNIT *uptr, CONST char *cptr)
 {
 SOCKET newsock;
 char *tptr = NULL;
@@ -752,7 +753,7 @@ return SCPE_OK;
 
 /* Disconnect routine */
 
-t_stat ipl_dscln (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ipl_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -768,7 +769,7 @@ return SCPE_OK;
 
 /* Diagnostic/normal mode routine */
 
-t_stat ipl_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ipl_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val) {
     ipli_unit.flags = ipli_unit.flags | UNIT_DIAG;

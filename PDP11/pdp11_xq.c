@@ -263,24 +263,24 @@ t_stat xq_tmrsvc(UNIT * uptr);
 t_stat xq_startsvc(UNIT * uptr);
 t_stat xq_receivesvc(UNIT * uptr);
 t_stat xq_reset (DEVICE * dptr);
-t_stat xq_attach (UNIT * uptr, char * cptr);
+t_stat xq_attach (UNIT * uptr, CONST char * cptr);
 t_stat xq_detach (UNIT * uptr);
-t_stat xq_showmac (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_setmac  (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_stats  (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_poll (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat xq_showmac (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_setmac  (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_stats  (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_type (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_sanity (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_throttle (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_lockmode (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_poll (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 t_stat xq_process_xbdl(CTLR* xq);
 t_stat xq_dispatch_xbdl(CTLR* xq);
 t_stat xq_process_turbo_rbdl(CTLR* xq);
@@ -645,7 +645,7 @@ t_stat xq_dep (t_value val, t_addr addr, UNIT* uptr, int32 sw)
   return SCPE_NOFNC;
 }
 
-t_stat xq_showmac (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_showmac (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char  buffer[20];
@@ -678,7 +678,7 @@ void xq_make_checksum(CTLR* xq)
   xq->var->mac_checksum[1] = (uint8)(checksum >> 8);
 }
 
-t_stat xq_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_setmac (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   t_stat status;
   CTLR* xq = xq_unit2ctlr(uptr);
@@ -694,7 +694,7 @@ t_stat xq_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_stats (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   /* this sets all ints in the stats structure to the integer passed */
   CTLR* xq = xq_unit2ctlr(uptr);
@@ -714,7 +714,7 @@ t_stat xq_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   const char* fmt = "  %-15s%d\n";
   CTLR* xq = xq_unit2ctlr(uptr);
@@ -736,7 +736,7 @@ t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char  buffer[20];
@@ -767,7 +767,7 @@ t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   fprintf(st, "type=");
@@ -787,7 +787,7 @@ t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_type (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -805,7 +805,7 @@ t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (xq->var->poll)
@@ -818,7 +818,7 @@ t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_poll (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_poll (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -851,7 +851,7 @@ t_stat xq_set_poll (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
@@ -859,7 +859,7 @@ t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_sanity (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -873,7 +873,7 @@ t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
@@ -884,11 +884,11 @@ t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_throttle (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char tbuf[CBUFSIZE], gbuf[CBUFSIZE];
-  char *tptr = cptr;
+  const char *tptr = cptr;
   uint32 newval;
   uint32 set_time = xq->var->throttle_time;
   uint32 set_burst = xq->var->throttle_burst;
@@ -945,7 +945,7 @@ t_stat xq_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
@@ -954,7 +954,7 @@ t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_lockmode (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -970,7 +970,7 @@ t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
@@ -1552,7 +1552,7 @@ t_stat xq_process_xbdl(CTLR* xq)
           write_success[1] = 0x0860;    /* DELQA Setup Packet Transmit Status Word 2 */
         } else { /* loopback */
           if ((DBG_PCK & xq->dev->dctrl) && xq->var->etherface) {
-            static char *loopback_modes[] = {"xq-write-loopback-Internal", "", "xq-write-loopback-Internal Extended", "xq-write-loopback-External"};
+            static const char *loopback_modes[] = {"xq-write-loopback-Internal", "", "xq-write-loopback-Internal Extended", "xq-write-loopback-External"};
             eth_packet_trace_ex(xq->var->etherface, xq->var->write_buffer.msg, xq->var->write_buffer.len, loopback_modes[(xq->var->csr >> 8) & 3], DBG_DAT & xq->dev->dctrl, DBG_PCK);
             }
           if (((~xq->var->csr & XQ_CSR_RL) &&        /* If a buffer descriptor list is good */
@@ -1600,7 +1600,7 @@ t_stat xq_process_xbdl(CTLR* xq)
 
       sim_debug(DBG_XBL, xq->dev, "implicitly chaining to buffer descriptor at: 0x%X\n", xq->var->xbdl_ba+12);
       /* update bdl status words */
-      wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, (uint16*) implicit_chain_status);
+      wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, implicit_chain_status);
       if(wstatus) return xq_nxm_error(xq);
     }
 
@@ -2808,7 +2808,7 @@ t_stat xq_receivesvc(UNIT* uptr)
 }
 
 /* attach device: */
-t_stat xq_attach(UNIT* uptr, char* cptr)
+t_stat xq_attach(UNIT* uptr, CONST char* cptr)
 {
   t_stat status;
   char* tptr;

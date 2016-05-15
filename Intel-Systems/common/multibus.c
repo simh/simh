@@ -49,7 +49,7 @@ t_stat multibus_reset(DEVICE *dptr);
 void set_irq(int32 int_num);
 void clr_irq(int32 int_num);
 int32 nulldev(int32 io, int32 data);
-int32 reg_dev(int32 (*routine)(), int32 port);
+int32 reg_dev(int32 (*routine)(int32, int32), int32 port);
 t_stat multibus_reset (DEVICE *dptr);
 int32 multibus_get_mbyte(int32 addr);
 int32 multibus_get_mword(int32 addr);
@@ -166,7 +166,7 @@ device addresses, if a device is plugged to a port it's routine
 address is here, 'nulldev' means no device is available
 */
 struct idev {
-    int32 (*routine)();
+    int32 (*routine)(int32, int32);
 };
 
 struct idev dev_table[256] = {
@@ -244,7 +244,7 @@ int32 nulldev(int32 flag, int32 data)
     return 0;
 }
 
-int32 reg_dev(int32 (*routine)(), int32 port)
+int32 reg_dev(int32 (*routine)(int32, int32), int32 port)
 {
     if (dev_table[port].routine != &nulldev) {  /* port already assigned */
 //        sim_printf("Multibus: I/O Port %02X is already assigned\n", port);

@@ -154,8 +154,6 @@ typedef struct {                                        /* unpacked fp number */
 #define UNEG(x)         ((~x) + 1)
 #define DUNEG(x)        x.flo = UNEG (x.flo); x.fhi = ~x.fhi + (x.flo == 0)
 
-extern d10 *ac_cur;                                     /* current AC block */
-extern int32 flags;                                     /* flags */
 void mul (d10 a, d10 b, d10 *rs);
 void funpack (d10 h, d10 l, UFP *r, t_bool sgn);
 void fnorm (UFP *r, t_int64 rnd);

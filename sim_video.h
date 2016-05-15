@@ -32,6 +32,10 @@
 
 #include "sim_defs.h"
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 #define SIM_KEYPRESS_DOWN      0                        /* key states */
 #define SIM_KEYPRESS_UP        1
 #define SIM_KEYPRESS_REPEAT    2
@@ -184,10 +188,10 @@ void vid_beep (void);
 void vid_refresh (void);
 const char *vid_version (void);
 t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask, uint32 hot_x, uint32 hot_y);
-t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc);
+t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, CONST char* desc);
 t_stat vid_screenshot (const char *filename);
 
 extern t_bool vid_active;
@@ -203,6 +207,10 @@ void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set 
 #define SIM_VID_DBG_CURSOR  0x02000000
 #define SIM_VID_DBG_KEY     0x04000000
 #define SIM_VID_DBG_VIDEO   0x08000000
+
+#ifdef  __cplusplus
+}
+#endif
 
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 #include <SDL.h>

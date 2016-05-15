@@ -1,6 +1,6 @@
 /* hp2100_dr.c: HP 2100 12606B/12610B fixed head disk/drum simulator
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    DR           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -204,13 +205,13 @@ IOHANDLER drcio;
 
 t_stat drc_svc (UNIT *uptr);
 t_stat drc_reset (DEVICE *dptr);
-t_stat drc_attach (UNIT *uptr, char *cptr);
+t_stat drc_attach (UNIT *uptr, CONST char *cptr);
 t_stat drc_boot (int32 unitno, DEVICE *dptr);
 int32 dr_incda (int32 trk, int32 sec, int32 ptr);
 int32 dr_seccntr (double simtime);
-t_stat dr_set_prot (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dr_set_prot (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat dr_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 DEVICE drd_dev, drc_dev;
 
@@ -630,7 +631,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat drc_attach (UNIT *uptr, char *cptr)
+t_stat drc_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 sz = sz_tab[DR_GETSZ (uptr->flags)];
 
@@ -641,7 +642,7 @@ return attach_unit (uptr, cptr);
 
 /* Set protected track count */
 
-t_stat dr_set_prot (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dr_set_prot (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 count;
 t_stat status;
@@ -677,7 +678,7 @@ return SCPE_OK;
 
 /* Show protected track count */
 
-t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "protected tracks=%d", drc_pcount);
 return SCPE_OK;
@@ -685,7 +686,7 @@ return SCPE_OK;
 
 /* Set size routine */
 
-t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dr_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 sz;
 int32 szindex;

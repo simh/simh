@@ -135,6 +135,10 @@
 #define USE_REGEX 1
 #endif
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 /* avoid macro names collisions */
 #ifdef MAX
 #undef MAX
@@ -156,6 +160,18 @@
 #ifndef TRUE
 #define TRUE            1
 #define FALSE           0
+#endif
+
+/* SCP API shim.
+
+   The SCP API for version 4.0 introduces a number of "pointer-to-const"
+   parameter qualifiers that were not present in the 3.x versions.  To maintain
+   compatibility with the earlier versions, the new qualifiers are expressed as
+   "CONST" rather than "const".  This allows macro removal of the qualifiers
+   when compiling for SIMH 3.x.
+*/
+#ifndef CONST
+#define CONST const
 #endif
 
 /* Length specific integer declarations */
@@ -255,6 +271,20 @@ typedef uint32          t_addr;
 #define SIM_INLINE inline
 #else
 #define SIM_INLINE 
+#endif
+
+/* Storage class modifier for weak link definition for sim_vm_init() */
+
+#if defined(__cplusplus)
+#if defined(__GNUC__)
+#define WEAK __attribute__((weak))
+#elif defined(_MSC_VER)
+#define WEAK __declspec(selectany) 
+#else
+#define WEAK extern 
+#endif
+#else
+#define WEAK 
 #endif
 
 /* System independent definitions */
@@ -417,14 +447,14 @@ struct DEVICE {
     t_stat              (*reset)(DEVICE *dp);           /* reset routine */
     t_stat              (*boot)(int32 u, DEVICE *dp);
                                                         /* boot routine */
-    t_stat              (*attach)(UNIT *up, char *cp);
+    t_stat              (*attach)(UNIT *up, CONST char *cp);
                                                         /* attach routine */
     t_stat              (*detach)(UNIT *up);            /* detach routine */
     void                *ctxt;                          /* context */
     uint32              flags;                          /* flags */
     uint32              dctrl;                          /* debug control */
     DEBTAB              *debflags;                      /* debug flags */
-    t_stat              (*msize)(UNIT *up, int32 v, char *cp, void *dp);
+    t_stat              (*msize)(UNIT *up, int32 v, CONST char *cp, void *dp);
                                                         /* mem size routine */
     char                *lname;                         /* logical name */
     t_stat              (*help)(FILE *st, DEVICE *dptr,
@@ -434,8 +464,7 @@ struct DEVICE {
                             UNIT *uptr, int32 flag, const char *cptr);
                                                         /* attach help */
     void *help_ctx;                                     /* Context available to help routines */
-    const char          *(*description)(DEVICE *dptr);
-                                                        /* Device Description */
+    const char          *(*description)(DEVICE *dptr);  /* Device Description */
     };
 
 /* Device flags */
@@ -578,7 +607,7 @@ struct BITFIELD {
 /* Register data structure */
 
 struct REG {
-    const char          *name;                          /* name */
+    CONST char          *name;                          /* name */
     void                *loc;                           /* location */
     uint32              radix;                          /* radix */
     uint32              width;                          /* width */
@@ -613,7 +642,7 @@ struct REG {
 
 struct CTAB {
     const char          *name;                          /* name */
-    t_stat              (*action)(int32 flag, char *cptr);
+    t_stat              (*action)(int32 flag, CONST char *cptr);
                                                         /* action routine */
     int32               arg;                            /* argument */
     const char          *help;                          /* help string/structured locator */
@@ -625,7 +654,7 @@ struct CTAB {
 struct C1TAB {
     const char          *name;                          /* name */
     t_stat              (*action)(DEVICE *dptr, UNIT *uptr,
-                            int32 flag, char *cptr);    /* action routine */
+                            int32 flag, CONST char *cptr);/* action routine */
     int32               arg;                            /* argument */
     const char          *help;                          /* help string */
     };
@@ -633,7 +662,7 @@ struct C1TAB {
 struct SHTAB {
     const char          *name;                          /* name */
     t_stat              (*action)(FILE *st, DEVICE *dptr,
-                            UNIT *uptr, int32 flag, char *cptr);
+                            UNIT *uptr, int32 flag, CONST char *cptr);
     int32               arg;                            /* argument */
     const char          *help;                          /* help string */
     };
@@ -645,9 +674,9 @@ struct MTAB {
     uint32              match;                          /* match */
     const char          *pstring;                       /* print string */
     const char          *mstring;                       /* match string */
-    t_stat              (*valid)(UNIT *up, int32 v, char *cp, void *dp);
+    t_stat              (*valid)(UNIT *up, int32 v, CONST char *cp, void *dp);
                                                         /* validation routine */
-    t_stat              (*disp)(FILE *st, UNIT *up, int32 v, void *dp);
+    t_stat              (*disp)(FILE *st, UNIT *up, int32 v, CONST void *dp);
                                                         /* display routine */
     void                *desc;                          /* value descriptor */
                                                         /* REG * if MTAB_VAL */
@@ -865,7 +894,6 @@ struct FILEREF {
     REGDATA(nm,(loc),(rdx),(wd),(off),(dep),(desc),(flds),((fl) | REG_UNIT),0,0)
 #define STRDATADF(nm,loc,rdx,wd,off,dep,siz,fl,desc,flds) \
     REGDATA(nm,(loc),(rdx),(wd),(off),(dep),(desc),(flds),((fl) | REG_STRUCT),0,(siz))
-
 
 /* Function prototypes */
 
@@ -1177,8 +1205,8 @@ extern int32 sim_asynch_inst_latency;
 #else
 #error "Implementation of function InterlockedCompareExchangePointer() is needed to build with USE_AIO_INTRINSICS"
 #endif
-#define AIO_QUEUE_VAL (UNIT *)(InterlockedCompareExchangePointer(&sim_asynch_queue, sim_asynch_queue, NULL))
-#define AIO_QUEUE_SET(val, queue) (UNIT *)(InterlockedCompareExchangePointer(&sim_asynch_queue, val, queue))
+#define AIO_QUEUE_VAL (UNIT *)(InterlockedCompareExchangePointer((void * volatile *)&sim_asynch_queue, (void *)sim_asynch_queue, NULL))
+#define AIO_QUEUE_SET(val, queue) (UNIT *)(InterlockedCompareExchangePointer((void * volatile *)&sim_asynch_queue, (void *)val, queue))
 #define AIO_UPDATE_QUEUE                                                         \
     if (AIO_QUEUE_VAL != QUEUE_LIST_END) { /* List !Empty */                     \
       UNIT *q, *uptr;                                                            \
@@ -1401,5 +1429,9 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_SET_INTERRUPT_LATENCY(instpersec)
 #define AIO_TLS
 #endif /* SIM_ASYNCH_IO */
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

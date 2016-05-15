@@ -211,11 +211,11 @@ extern int32 sim_emax;
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_conv (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_conv (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 store_addr_h (int32 addr);
 int32 store_addr_t (int32 addr);
 int32 store_addr_u (int32 addr);
@@ -1852,7 +1852,7 @@ return SCPE_OK;
 
 /* Memory size change */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -1874,7 +1874,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1905,10 +1905,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[MAX_L + 1];
 t_stat r;
 InstHistory *h;
@@ -1945,7 +1945,7 @@ return SCPE_OK;
 
 /* Set conversions */
 
-t_stat cpu_set_conv (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_conv (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 conv_old = val;
 return SCPE_OK;
@@ -1953,7 +1953,7 @@ return SCPE_OK;
 
 /* Show conversions */
 
-t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (conv_old)
     fputs ("Old (pre-3.5-1) conversions\n", st);

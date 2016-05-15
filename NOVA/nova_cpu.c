@@ -320,12 +320,12 @@ static  Hist_entry * hist = NULL ;                      /* instruction history *
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_stat build_devtab (void);
 
-t_stat hist_set( UNIT * uptr, int32 val, char * cptr, void * desc ) ;
-t_stat hist_show( FILE * st, UNIT * uptr, int32 val, void * desc ) ;
+t_stat hist_set( UNIT * uptr, int32 val, CONST char * cptr, void * desc ) ;
+t_stat hist_show( FILE * st, UNIT * uptr, int32 val, CONST void * desc ) ;
 static int hist_save( int32 pc, int32 our_ir ) ;
 char * devBitNames( int32 flags, char * ptr, char * sepStr ) ;
 
@@ -1126,7 +1126,7 @@ return SCPE_OK;
 
 /* Alter memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 t_addr i;
@@ -1330,7 +1330,7 @@ return ( -1 ) ;
 
 /*  setup history save area (proposed global routine)  */
 
-t_stat hist_set( UNIT * uptr, int32 val, char * cptr, void * desc )
+t_stat hist_set( UNIT * uptr, int32 val, CONST char * cptr, void * desc )
 {
 int32   i, lnt ;
 t_stat  r ;
@@ -1420,10 +1420,10 @@ return ( 0 ) ;
 
 /* show execution history (proposed global routine) */
 
-t_stat hist_show( FILE * st, UNIT * uptr, int32 val, void * desc )
+t_stat hist_show( FILE * st, UNIT * uptr, int32 val, CONST void * desc )
 {
 int32           k, di, lnt ;
-char *          cptr = (char *) desc ;
+const char *    cptr = (const char *) desc ;
 t_stat          r ;
 Hist_entry *    hptr ;
 
@@ -1467,7 +1467,7 @@ struct Dbits
     {
     int32      dBit ;
     int32      dInvertMask ;
-    char *     dName ;
+    const char *dName ;
     }  devBits [] =
 
     {

@@ -109,4 +109,6 @@ typedef struct {
     uint32 io_size;     /* I/O Address Space requirement */
 } PNP_INFO;
 
+extern ChipType chiptype;
+
 #endif

@@ -123,8 +123,8 @@ t_stat sys_reset (DEVICE *dptr);
 int32 toy_read (void);
 void toy_write (int32 bit);
 uint8 toy_set (int32 val);
-t_stat sys_set_jclk_dflt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sys_show_jclk_dflt (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sys_set_jclk_dflt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sys_show_jclk_dflt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern t_stat PSW_rd (int32 *data, int32 addr, int32 access);
 extern t_stat PSW_wr (int32 data, int32 addr, int32 access);
@@ -1084,7 +1084,7 @@ return SCPE_OK;
 
 /* Set/show CPU model */
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr != NULL)
     return SCPE_ARG;
@@ -1104,7 +1104,7 @@ reset_all (0);                                          /* reset world */
 return SCPE_OK;
 }
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 i, all_opt;
 
@@ -1120,7 +1120,7 @@ return SCPE_OK;
 
 /* Set/clear CPU option */
 
-t_stat cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -1130,7 +1130,7 @@ cpu_opt = cpu_opt | val;
 return SCPE_OK;
 }
 
-t_stat cpu_clr_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_clr_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -1142,7 +1142,7 @@ return SCPE_OK;
 
 /* Memory allocation */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i, clim;
@@ -1227,7 +1227,7 @@ return SCPE_OK;
 
 /* Set/show JCLK default values */
 
-t_stat sys_set_jclk_dflt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sys_set_jclk_dflt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i;
 
@@ -1242,7 +1242,7 @@ if ((CPUT (CPUT_JB|CPUT_JE)) && cptr) {
 return SCPE_ARG;
 }
 
-t_stat sys_show_jclk_dflt (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sys_show_jclk_dflt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (CPUT (CPUT_JB|CPUT_JE))
     fprintf (st, "JCLK default=%s\n", jcsr_val[CSRJ_LTCSEL (JCSR_dflt)]);

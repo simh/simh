@@ -37,9 +37,6 @@
 #include "i1401_defs.h"
 
 extern uint8 M[];
-extern char bcd_to_ascii_old[64];
-extern char bcd_to_ascii_a[64], bcd_to_ascii_h[64];
-extern char bcd_to_pca[64], bcd_to_pch[64];
 extern int32 iochk, ind[64];
 extern t_bool conv_old;
 
@@ -47,16 +44,16 @@ int32 cct[CCT_LNT] = { 03 };
 int32 cctlnt = 66, cctptr = 0, lines = 0, lflag = 0;
 
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat space (int32 lines, int32 lflag);
-t_stat lpt_puts (char *buf);
+t_stat lpt_puts (const char *buf);
 
-extern void inq_puts (char *buf);
+extern void inq_puts (const char *buf);
 
-char *pch_table_old[4] = {
+const char *pch_table_old[4] = {
     bcd_to_ascii_old, bcd_to_ascii_old, bcd_to_pca, bcd_to_pch 
     };
-char *pch_table[4] = {
+const char *pch_table[4] = {
     bcd_to_ascii_a, bcd_to_ascii_h, bcd_to_pca, bcd_to_pch
     };
 
@@ -120,7 +117,7 @@ DEVICE lpt_dev = {
 t_stat write_line (int32 ilnt, int32 mod)
 {
 int32 i, t, wm, sup;
-char *bcd2asc;
+const char *bcd2asc;
 t_stat r;
 static char lbuf[LPT_WIDTH + 1];                        /* + null */
 
@@ -240,7 +237,7 @@ return r;
 
    Note that if printing to the console, newline must be converted to crlf */
 
-t_stat lpt_puts (char *buf)
+t_stat lpt_puts (const char *buf)
 {
 if ((lpt_unit.flags & UNIT_ATT) != 0) {                 /* attached? */
     fputs (buf, lpt_unit.fileref);                      /* print string */
@@ -278,7 +275,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 cctptr = 0;                                             /* clear cct ptr */
 lines = 0;                                              /* no cc action */

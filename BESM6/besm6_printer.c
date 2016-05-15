@@ -74,7 +74,7 @@ MTAB printer_mod[] = {
 };
 
 t_stat printer_reset (DEVICE *dptr);
-t_stat printer_attach (UNIT *uptr, char *cptr);
+t_stat printer_attach (UNIT *uptr, CONST char *cptr);
 t_stat printer_detach (UNIT *uptr);
 
 DEVICE printer_dev = {
@@ -101,7 +101,7 @@ t_stat printer_reset (DEVICE *dptr)
     return SCPE_OK;
 }
 
-t_stat printer_attach (UNIT *u, char *cptr)
+t_stat printer_attach (UNIT *u, CONST char *cptr)
 {
     t_stat s;
     int num = u - printer_unit;

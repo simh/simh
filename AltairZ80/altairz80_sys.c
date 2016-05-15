@@ -73,18 +73,17 @@ extern DEVICE wdi2_dev;
 
 extern DEVICE scp300f_dev;
 
-extern int32 chiptype;
 extern long disasm (unsigned char *data, char *output, int segsize, long offset);
 
 void prepareMemoryAccessMessage(const t_addr loc);
 void prepareInstructionMessage(const t_addr loc, const uint32 op);
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
-t_stat parse_sym(char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw);
+t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw);
 
-t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* SCP data structures
     sim_name            simulator name string
@@ -135,7 +134,7 @@ const char *sim_stop_messages[] = {
     "Invalid Opcode"
 };
 
-static char *const Mnemonics8080[] = {
+static const char *const Mnemonics8080[] = {
 /*  0/8             1/9             2/A             3/B             4/C             5/D             6/E             7/F                         */
     "NOP",          "LXI B,#h",     "STAX B",       "INX B",        "INR B",        "DCR B",        "MVI B,*h",     "RLC",          /*  00-07   */
     "_NOP",         "DAD B",        "LDAX B",       "DCX B",        "INR C",        "DCR C",        "MVI C,*h",     "RRC",          /*  08-0f   */
@@ -171,7 +170,7 @@ static char *const Mnemonics8080[] = {
     "RM",           "SPHL",         "JM #h",        "EI",           "CM #h",        "_CALL #h",     "CPI *h",       "RST 7"         /*  f8-ff   */
 };
 
-static char *const MnemonicsZ80[256] = {
+static const char *const MnemonicsZ80[256] = {
 /*  0/8             1/9             2/A             3/B             4/C             5/D             6/E             7/F                         */
     "NOP",          "LD BC,#h",     "LD (BC),A",    "INC BC",       "INC B",        "DEC B",        "LD B,*h",      "RLCA",         /*  00-07   */
     "EX AF,AF'",    "ADD HL,BC",    "LD A,(BC)",    "DEC BC",       "INC C",        "DEC C",        "LD C,*h",      "RRCA",         /*  08-0f   */
@@ -207,7 +206,7 @@ static char *const MnemonicsZ80[256] = {
     "RET M",        "LD SP,HL",     "JP M,#h",      "EI",           "CALL M,#h",    "PFX_FD",       "CP *h",        "RST 38h"       /*  f8-ff   */
 };
 
-static char *const MnemonicsCB[256] = {
+static const char *const MnemonicsCB[256] = {
 /*  0/8             1/9             2/A             3/B             4/C             5/D             6/E             7/F                         */
     "RLC B",        "RLC C",        "RLC D",        "RLC E",        "RLC H",        "RLC L",        "RLC (HL)",     "RLC A",        /*  00-07   */
     "RRC B",        "RRC C",        "RRC D",        "RRC E",        "RRC H",        "RRC L",        "RRC (HL)",     "RRC A",        /*  08-0f   */
@@ -243,7 +242,7 @@ static char *const MnemonicsCB[256] = {
     "SET 7,B",      "SET 7,C",      "SET 7,D",      "SET 7,E",      "SET 7,H",      "SET 7,L",      "SET 7,(HL)",   "SET 7,A"       /*  f8-ff   */
 };
 
-static char *const MnemonicsED[256] = {
+static const char *const MnemonicsED[256] = {
 /*  0/8             1/9             2/A             3/B             4/C             5/D             6/E             7/F                         */
     "DB EDh,00h",   "DB EDh,01h",   "DB EDh,02h",   "DB EDh,03h",   "DB EDh,04h",   "DB EDh,05h",   "DB EDh,06h",   "DB EDh,07h",   /*  00-07   */
     "DB EDh,08h",   "DB EDh,09h",   "DB EDh,0Ah",   "DB EDh,0Bh",   "DB EDh,0Ch",   "DB EDh,0Dh",   "DB EDh,0Eh",   "DB EDh,0Fh",   /*  08-0f   */
@@ -279,7 +278,7 @@ static char *const MnemonicsED[256] = {
     "DB EDh,F8h",   "DB EDh,F9h",   "DB EDh,FAh",   "DB EDh,FBh",   "DB EDh,FCh",   "DB EDh,FDh",   "DB EDh,FEh",   "DB EDh,FFh"    /*  f8-ff   */
 };
 
-static char *const MnemonicsXX[256] = {
+static const char *const MnemonicsXX[256] = {
 /*  0/8             1/9             2/A             3/B             4/C             5/D             6/E             7/F                         */
     "NOP",          "LD BC,#h",     "LD (BC),A",    "INC BC",       "INC B",        "DEC B",        "LD B,*h",      "RLCA",         /*  00-07   */
     "EX AF,AF'",    "ADD I%,BC",    "LD A,(BC)",    "DEC BC",       "INC C",        "DEC C",        "LD C,*h",      "RRCA",         /*  08-0f   */
@@ -315,7 +314,7 @@ static char *const MnemonicsXX[256] = {
     "RET M",        "LD SP,I%",     "JP M,#h",      "EI",           "CALL M,#h",    "PFX_FD",       "CP *h",        "RST 38h"       /*  f8-ff   */
 };
 
-static char *const MnemonicsXCB[256] = {
+static const char *const MnemonicsXCB[256] = {
 /*0/8               1/9             2/A             3/B             4/C             5/D             6/E             7/F                         */
     "RLC B",        "RLC C",        "RLC D",        "RLC E",        "RLC H",        "RLC L",        "RLC (I%@h)",   "RLC A",        /*  00-07   */
     "RRC B",        "RRC C",        "RRC D",        "RRC E",        "RRC H",        "RRC L",        "RRC (I%@h)",   "RRC A",        /*  08-0f   */
@@ -386,7 +385,8 @@ static void printHex4(char* string, const uint32 value) {
 */
 
 static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const int32 addr) {
-    char R[128], H[10], C = '\0', *T, *P;
+    char R[128], H[10], C = '\0', *P;
+    const char *T, *T1;
     uint8 J = 0, Offset = 0;
     uint16 B = 0;
 
@@ -423,12 +423,12 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
     else
         T = Mnemonics8080[val[B++]];
 
-    if ( (P = strchr(T, '^')) ) {
-        strncpy(R, T, P - T);
-        R[P - T] = '\0';
+    if ( (T1 = strchr(T, '^')) ) {
+        strncpy(R, T, T1 - T);
+        R[T1 - T] = '\0';
         printHex2(H, val[B++]);
         strcat(R, H);
-        strcat(R, P + 1);
+        strcat(R, T1 + 1);
     }
     else
         strcpy(R, T);
@@ -659,7 +659,7 @@ static int32 checkXY(const char xy) {
     return xy == 'X' ? 0xdd : 0xfd; /* else is 'Y' */
 }
 
-static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *const Mnemonics[]) {
+static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, const char *const Mnemonics[]) {
     char xyFirst = 0, xy;
     int32 op, number, star, at, hat, dollar;
     for (op = 0; op < 256; op++) {
@@ -784,7 +784,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
     Outputs:
         status  =   error status
 */
-t_stat parse_sym(char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) {
+t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) {
     static t_bool symbolicInputNotImplementedMessage8086 = FALSE;
     static t_bool symbolicInputNotImplementedMessageM68K = FALSE;
     if ((sw & (SWMASK('M'))) && (chiptype == CHIP_TYPE_8086)) {
@@ -813,7 +813,7 @@ t_stat parse_sym(char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) {
 }
 
 /* Set Memory Base Address routine */
-t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     DEVICE *dptr;
     PNP_INFO *pnp;
@@ -853,7 +853,7 @@ t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc)
 }
 
 /* Show Base Address routine */
-t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     DEVICE *dptr;
     PNP_INFO *pnp;
@@ -872,7 +872,7 @@ t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc)
 }
 
 /* Set Memory Base Address routine */
-t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     DEVICE *dptr;
     PNP_INFO *pnp;
@@ -913,7 +913,7 @@ t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc)
 }
 
 /* Show I/O Base Address routine */
-t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     DEVICE *dptr;
     PNP_INFO *pnp;

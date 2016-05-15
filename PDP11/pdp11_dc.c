@@ -130,9 +130,9 @@ t_stat dcx_wr (int32 data, int32 PA, int32 access);
 t_stat dcx_reset (DEVICE *dptr);
 t_stat dci_svc (UNIT *uptr);
 t_stat dco_svc (UNIT *uptr);
-t_stat dcx_attach (UNIT *uptr, char *cptr);
+t_stat dcx_attach (UNIT *uptr, CONST char *cptr);
 t_stat dcx_detach (UNIT *uptr);
-t_stat dcx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dcx_set_lines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void dcx_enbdis (int32 dis);
 void dci_clr_int (int32 ln);
 void dci_set_int (int32 ln);
@@ -554,7 +554,7 @@ return;
 
 /* Attach master unit */
 
-t_stat dcx_attach (UNIT *uptr, char *cptr)
+t_stat dcx_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -596,7 +596,7 @@ return;
 
 /* Change number of lines */
 
-t_stat dcx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dcx_set_lines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;

@@ -1,6 +1,6 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disk simulator
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    DP           12557A 2871 disk subsystem
                 13210A 7900 disk subsystem
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Dec-12    MP      Now calls sim_activate_time to get remaining seek time
@@ -265,14 +266,14 @@ IOHANDLER dpcio;
 t_stat dpc_svc (UNIT *uptr);
 t_stat dpd_svc (UNIT *uptr);
 t_stat dpc_reset (DEVICE *dptr);
-t_stat dpc_attach (UNIT *uptr, char *cptr);
+t_stat dpc_attach (UNIT *uptr, CONST char *cptr);
 t_stat dpc_detach (UNIT* uptr);
 t_stat dpc_boot (int32 unitno, DEVICE *dptr);
 void dp_god (int32 fnc, int32 drv, int32 time);
 void dp_goc (int32 fnc, int32 drv, int32 time);
-t_stat dpc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
-t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dpc_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+t_stat dp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* DPD data structures
 
@@ -1041,7 +1042,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat dpc_attach (UNIT *uptr, char *cptr)
+t_stat dpc_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -1062,7 +1063,7 @@ return detach_unit (uptr);                              /* detach unit */
 
 /* Load and unload heads */
 
-t_stat dpc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat dpc_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 int32 drv;
 
@@ -1083,7 +1084,7 @@ return SCPE_OK;
 
 /* Set controller type */
 
-t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 
@@ -1105,7 +1106,7 @@ return SCPE_OK;
 
 /* Show controller type */
 
-t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (dp_ctype == A13210)
     fprintf (st, "13210A");

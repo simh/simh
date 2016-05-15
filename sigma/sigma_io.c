@@ -99,8 +99,8 @@ t_bool io_init_inst (uint32 ad, uint32 rn, uint32 ch, uint32 dev, uint32 r0);
 uint32 io_set_status (uint32 rn, uint32 ch, uint32 dev, uint32 dvst, t_bool tdv);
 uint32 io_rwd_m0 (uint32 op, uint32 rn, uint32 ad);
 uint32 io_rwd_m1 (uint32 op, uint32 rn, uint32 ad);
-t_stat io_set_eiblks (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat io_show_eiblks (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat io_set_eiblks (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat io_show_eiblks (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat int_reset (DEVICE *dptr);
 t_stat chan_reset (DEVICE *dptr);
 uint32 chan_new_cmd (uint32 ch, uint32 dev, uint32 clc);
@@ -1052,7 +1052,7 @@ if (op == OP_RD) {                                      /* read direct? */
         }
     else if (QCPU_S89 && (fnc == 0x045)) {              /* S89 only */
         if (rn)
-            R[rn] = s9_marg & 0x00C00000 |              /* <8,9> = margins */
+            R[rn] = (s9_marg & 0x00C00000) |            /* <8,9> = margins */
                 (QCPU_S9? 0x00100000: 0x00200000);      /* S8 sets 10, S9 11 */            
         }
     else if (QCPU_S89 && (fnc == 0x049)) {              /* S89 only */
@@ -1317,7 +1317,7 @@ return SCPE_OK;
 
 /* Set/show external interrupt blocks */
 
-t_stat io_set_eiblks (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_eiblks (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 lnt;
 t_stat r;
@@ -1332,7 +1332,7 @@ io_set_eimax (lnt);
 return SCPE_OK;
 }
 
-t_stat io_show_eiblks (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_eiblks (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "eiblks=%d", ei_bmax);
 return SCPE_OK;
@@ -1368,7 +1368,7 @@ return;
 
 /* Set or show number of channels */
 
-t_stat io_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_nchan (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, num;
 t_stat r;
@@ -1388,7 +1388,7 @@ for (i = 0; i < CHAN_N_CHAN; i++) {
 return SCPE_OK;
 }
 
-t_stat io_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_nchan (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "channels=%d", chan_num);
 return SCPE_OK;
@@ -1396,7 +1396,7 @@ return SCPE_OK;
 
 /* Set or show device channel assignment */
 
-t_stat io_set_dvc (UNIT* uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_dvc (UNIT* uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 num;
 DEVICE *dptr;
@@ -1414,7 +1414,7 @@ dibp->dva = (dibp->dva & ~DVA_CHAN) | (num << DVA_V_CHAN);
 return SCPE_OK;
 }
 
-t_stat io_show_dvc (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_dvc (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 dib_t *dibp;
@@ -1428,7 +1428,7 @@ return SCPE_OK;
 
 /* Set or show device address */
 
-t_stat io_set_dva (UNIT* uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_dva (UNIT* uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 num;
 DEVICE *dptr;
@@ -1449,7 +1449,7 @@ else dibp->dva = (dibp->dva & ~DVA_DEVSU) | ((num & DVA_M_DEVSU) << DVA_V_DEVSU)
 return SCPE_OK;
 }
 
-t_stat io_show_dva (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_dva (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 dib_t *dibp;
@@ -1463,7 +1463,7 @@ return SCPE_OK;
 
 /* Show channel state */
 
-t_stat io_show_cst (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_cst (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 dib_t *dibp;

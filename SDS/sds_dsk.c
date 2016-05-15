@@ -87,7 +87,6 @@ DSPT dsk_tplt[] = {                                     /* template */
     { 0, 0 }
     };
 
-DEVICE dsk_dev;
 t_stat dsk_svc (UNIT *uptr);
 t_stat dsk_reset (DEVICE *dptr);
 t_stat dsk_fill (uint32 dev);

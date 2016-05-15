@@ -36,7 +36,7 @@ void vax_init(void)
 sim_savename = "VAX780";
 }
 
-void (*sim_vm_init) (void) = &vax_init;
+WEAK void (*sim_vm_init) (void) = &vax_init;
 
 extern DEVICE cpu_dev;
 extern DEVICE tlb_dev;
@@ -115,7 +115,7 @@ DEVICE *sim_devices[] = {
    -o           for memory, specify origin
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 t_stat r;
 int32 val;

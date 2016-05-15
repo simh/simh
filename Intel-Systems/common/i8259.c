@@ -47,7 +47,7 @@ t_stat i8259_reset (DEVICE *dptr, int32 base);
 
 /* external function prototypes */
 
-extern int32 reg_dev(int32 (*routine)(), int32 port);
+extern int32 reg_dev(int32 (*routine)(int32, int32), int32 port);
 
 /* globals */
 

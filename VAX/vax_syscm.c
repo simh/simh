@@ -565,7 +565,7 @@ switch (pflag) {                                        /* case on syntax */
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym_cm (char *cptr, t_addr addr, t_value *bytes, int32 sw)
+t_stat parse_sym_cm (const char *cptr, t_addr addr, t_value *bytes, int32 sw)
 {
 int32 d, i, j, reg, spec, n1, n2, disp, pflag;
 int32 val[3];

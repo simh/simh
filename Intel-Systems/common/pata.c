@@ -68,7 +68,7 @@
 
 #include "system_defs.h"
 
-extern int32 reg_dev(int32 (*routine)(), int32 port);
+extern int32 reg_dev(int32 (*routine)(int32, int32), int32 port);
 
 /* function prototypes */
 

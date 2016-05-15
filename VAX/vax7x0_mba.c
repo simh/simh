@@ -49,7 +49,7 @@
 #define MBA_EXTDRV(x)   (((x) >> MBA_V_DRV) & MBA_M_DRV)
 #define MBA_EXTOFS(x)   (((x) >> MBA_V_DEVOFS) & MBA_M_DEVOFS)
 
-char *mba_regnames[] = {"CNF", "CR", "SR", "VA", "BC", "DR", "SMR", "CMD"};
+const char *mba_regnames[] = {"CNF", "CR", "SR", "VA", "BC", "DR", "SMR", "CMD"};
 
 /* Massbus configuration register */
 
@@ -262,7 +262,6 @@ t_bool mba_map_addr (uint32 va, uint32 *ma, uint32 mb);
 void mba_set_int (uint32 mb);
 void mba_clr_int (uint32 mb);
 void mba_upd_sr (uint32 set, uint32 clr, uint32 mb);
-DIB mba0_dib, mba1_dib;
 
 /* Massbus register dispatches */
 
@@ -643,7 +642,7 @@ mba_va[mb] = (mba_va[mb] + i) & MBAVA_WR;
 return i;
 }
 
-int32 mba_wrbufW (uint32 mb, int32 bc, uint16 *buf)
+int32 mba_wrbufW (uint32 mb, int32 bc, const uint16 *buf)
 {
 int32 i, j, ba, mbc, pbc;
 uint32 pa, dat;
@@ -896,7 +895,7 @@ return buf;
 
 /* Show Massbus adapter number */
 
-t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr = find_dev_from_unit (uptr);
 DIB *dibp;

@@ -309,7 +309,7 @@ static struct sim_disk_fmt fmts[DKUF_N_FMT] = {
 
 /* Set disk format */
 
-t_stat sim_disk_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sim_disk_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 f;
 
@@ -331,7 +331,7 @@ return SCPE_ARG;
 
 /* Show disk format */
 
-t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 f = DK_GET_FMT (uptr);
 size_t i;
@@ -347,7 +347,7 @@ return SCPE_OK;
 
 /* Set disk capacity */
 
-t_stat sim_disk_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sim_disk_set_capac (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 t_offset cap;
 t_stat r;
@@ -366,7 +366,7 @@ return SCPE_OK;
 
 /* Show disk capacity */
 
-t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 const char *cap_units = "B";
 DEVICE *dptr = find_dev_from_unit (uptr);
@@ -842,11 +842,12 @@ return stat;
 }
 
 
-t_stat sim_disk_attach (UNIT *uptr, char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
+t_stat sim_disk_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
                         uint32 dbit, const char *dtype, uint32 pdp11tracksize, int completion_delay)
 {
 struct disk_context *ctx;
 DEVICE *dptr;
+char tbuf[4*CBUFSIZE];
 FILE *(*open_function)(const char *filename, const char *mode) = sim_fopen;
 FILE *(*create_function)(const char *filename, t_offset desiredsize) = NULL;
 t_offset (*size_function)(FILE *file);
@@ -1010,7 +1011,9 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         if (r == SCPE_OK) {
             created = TRUE;
             copied = TRUE;
-            strcpy (cptr, gbuf);
+            tbuf[sizeof(tbuf)-1] = '\0';
+            strncpy (tbuf, gbuf, sizeof(tbuf)-1);
+            cptr = tbuf;
             sim_disk_set_fmt (uptr, 0, "VHD", NULL);
             sim_switches = saved_sim_switches;
             }
@@ -1781,7 +1784,7 @@ if (strchr (openmode, 'w') || strchr (openmode, '+'))
    We handle the RAW device name case here by prepending paths beginning 
    with \.\ with an extra \. */
 if (!memcmp ("\\.\\", rawdevicename, 3)) {
-    char *tmpname = malloc (2 + strlen (rawdevicename));
+    char *tmpname = (char *)malloc (2 + strlen (rawdevicename));
 
     if (tmpname == NULL)
         return NULL;

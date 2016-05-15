@@ -35,12 +35,12 @@
 
 t_stat parse_sym_m (char *cptr, t_value *val, int32 sw);
 void pdq3_vm_init (void);
-static t_stat pdq3_cmd_exstack(int32 arg, char *buf);
-static t_stat pdq3_cmd_exmscw(int32 arg, char *buf);
-static t_stat pdq3_cmd_extib(int32 arg, char *buf);
-static t_stat pdq3_cmd_exseg(int32 arg, char *buf);
-static t_stat pdq3_cmd_calltree(int32 arg, char *buf);
-static t_stat pdq3_cmd_namealias(int32 arg, char *buf);
+static t_stat pdq3_cmd_exstack(int32 arg, CONST char *buf);
+static t_stat pdq3_cmd_exmscw(int32 arg, CONST char *buf);
+static t_stat pdq3_cmd_extib(int32 arg, CONST char *buf);
+static t_stat pdq3_cmd_exseg(int32 arg, CONST char *buf);
+static t_stat pdq3_cmd_calltree(int32 arg, CONST char *buf);
+static t_stat pdq3_cmd_namealias(int32 arg, CONST char *buf);
 
 extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
@@ -94,10 +94,10 @@ CTAB pdq3_cmds[] = {
   { NULL, NULL, 0, NULL }
 };
 
-void (*sim_vm_init)(void) = &pdq3_vm_init;
+WEAK void (*sim_vm_init)(void) = &pdq3_vm_init;
 
 /* Loader proper */
-t_stat sim_load (FILE *fi, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int flag)
 {
   int rombase;
   int c1, c2, i;
@@ -155,7 +155,7 @@ void pdq3_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
   return;
 }
 
-t_addr pdq3_parse_addr (DEVICE *dptr, const char *cptr, const char **tptr)
+t_addr pdq3_parse_addr (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
 {
   t_addr seg, off;
   if (cptr[0] == '#') {
@@ -188,7 +188,7 @@ void pdq3_vm_init (void)
 return;
 }
 
-static t_stat pdq3_cmd_exstack(int32 arg, char *buf)
+static t_stat pdq3_cmd_exstack(int32 arg, CONST char *buf)
 {
   t_stat rc;
   uint16 data;
@@ -205,24 +205,24 @@ static t_stat pdq3_cmd_exstack(int32 arg, char *buf)
   return SCPE_OK;
 }
 
-static t_stat pdq3_cmd_exmscw(int32 arg, char *buf)
+static t_stat pdq3_cmd_exmscw(int32 arg, CONST char *buf)
 {
-  const char* next;
+  CONST char* next;
   return dbg_dump_mscw(stdout, buf[0] ? pdq3_parse_addr(&cpu_dev, buf, &next) : reg_mp);
 }
 
-static t_stat pdq3_cmd_extib(int32 arg, char *buf)
+static t_stat pdq3_cmd_extib(int32 arg, CONST char *buf)
 {
-  const char* next;
+  CONST char* next;
   return dbg_dump_tib(stdout, buf[0] ? pdq3_parse_addr(&cpu_dev, buf, &next) : reg_ctp);
 }
 
-static t_stat pdq3_cmd_exseg(int32 arg, char *buf)
+static t_stat pdq3_cmd_exseg(int32 arg, CONST char *buf)
 {
   t_stat rc;
   uint16 nsegs;
   uint16 segnum, segptr;
-  const char* next;
+  CONST char* next;
   FILE* fd = stdout; /* XXX */
   
   if (reg_ssv < 0x2030 || reg_ssv > 0xf000) {
@@ -246,17 +246,19 @@ static t_stat pdq3_cmd_exseg(int32 arg, char *buf)
   return rc;
 }
 
-static t_stat pdq3_cmd_calltree(int32 arg, char *buf) {
+static t_stat pdq3_cmd_calltree(int32 arg, CONST char *buf) {
   return dbg_calltree(stdout);
 }
 
-static t_stat pdq3_cmd_namealias(int32 arg, char *buf) {
-  char* name, *alias;
+static t_stat pdq3_cmd_namealias(int32 arg, CONST char *buf) {
+  char* name, *alias, gbuf[2*CBUFSIZE];
   
   if (buf[0]==0)
     return dbg_listalias(stdout);
 
-  name = strtok(buf, " \t");
+  gbuf[sizeof(gbuf)-1] = '\0';
+  strncpy (gbuf, buf, sizeof(gbuf)-1);
+  name = strtok(gbuf, " \t");
   alias = strtok(NULL, " \t\n");
   return dbg_enteralias(name,alias);
 }
@@ -616,7 +618,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
    Outputs:
         status  =       error status
 */
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
   return SCPE_ARG;
 }

@@ -61,7 +61,7 @@ domain_suffix_diffoff(const CompactDomain *a, const CompactDomain *b)
 
 static int domain_suffix_ord(const void *cva, const void *cvb)
 {
-    const CompactDomain *a = cva, *b = cvb;
+    const CompactDomain *a = (const CompactDomain *)cva, *b = (const CompactDomain *)cvb;
     size_t la = a->len, lb = b->len;
     size_t doff = domain_suffix_diffoff(a, b);
     uint8_t ca = a->labels[la - doff];
@@ -252,7 +252,7 @@ int translate_dnssearch(Slirp *s, const char **names)
         return -2;
     }
 
-    domains = g_malloc(num_domains * sizeof(*domains));
+    domains = (CompactDomain *)g_malloc(num_domains * sizeof(*domains));
 
     for (i = 0; i < num_domains; i++) {
         size_t nlen = strlen(names[i]);
@@ -265,7 +265,7 @@ int translate_dnssearch(Slirp *s, const char **names)
 
     /* reserve extra 2 header bytes for each 255 bytes of output */
     memreq += ((memreq + MAX_OPT_LEN - 1) / MAX_OPT_LEN) * OPT_HEADER_LEN;
-    result = g_malloc(memreq * sizeof(*result));
+    result = (uint8_t *)g_malloc(memreq * sizeof(*result));
 
     outptr = result;
     for (i = 0; i < num_domains; i++) {

@@ -106,7 +106,7 @@ const char *sim_stop_messages[] = {
    Tbs.
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 return SCPE_FMT;
 }
@@ -232,13 +232,13 @@ static const int32 opc_val[] = {
 #define fputs(_s,f) Fprintf(f,"%s",_s)
 #define fputc(_c,f) Fprintf(f,"%c",_c)
 
-void fprint_opr (FILE *of, int32 inst, int32 class)
+void fprint_opr (FILE *of, int32 inst, int32 Class)
 {
 int32 i, j, sp;
 
 for (i = sp = 0; opc_val[i] >= 0; i++) {                /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
-    if ((j == class) && (opc_val[i] & inst)) {          /* same class? */
+    if ((j == Class) && (opc_val[i] & inst)) {          /* same class? */
         inst = inst & ~opc_val[i];                      /* mask bit set? */
         fprintf (of, (sp? " %s": "%s"), opcode[i]);
         sp = 1;
@@ -343,7 +343,7 @@ return SCPE_ARG;
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, d, i, j, k;
 t_stat r;

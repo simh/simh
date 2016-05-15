@@ -152,8 +152,8 @@ ip_input(struct mbuf *m)
 		 * Look for queue of fragments
 		 * of this datagram.
 		 */
-		for (l = slirp->ipq.ip_link.next; l != &slirp->ipq.ip_link;
-		     l = l->next) {
+		for (l = (struct qlink *)slirp->ipq.ip_link.next; l != &slirp->ipq.ip_link;
+		     l = (struct qlink *)l->next) {
             fp = container_of(l, struct ipq, ip_link);
             if (ip->ip_id == fp->ipq_id &&
                     ip->ip_src.s_addr == fp->ipq_src.s_addr &&
@@ -268,8 +268,8 @@ ip_reass(Slirp *slirp, struct ip *ip, struct ipq *fp)
 	/*
 	 * Find a segment which begins after this one does.
 	 */
-	for (q = fp->frag_link.next; q != (struct ipasfrag *)&fp->frag_link;
-            q = q->ipf_next)
+	for (q = (struct ipasfrag *)fp->frag_link.next; q != (struct ipasfrag *)&fp->frag_link;
+            q = (struct ipasfrag *)q->ipf_next)
 		if (q->ipf_off > ip->ip_off)
 			break;
 
@@ -279,7 +279,7 @@ ip_reass(Slirp *slirp, struct ip *ip, struct ipq *fp)
 	 * segment.  If it provides all of our data, drop us.
 	 */
 	if (q->ipf_prev != &fp->frag_link) {
-        struct ipasfrag *pq = q->ipf_prev;
+        struct ipasfrag *pq = (struct ipasfrag *)q->ipf_prev;
 		i = pq->ipf_off + pq->ipf_len - ip->ip_off;
 		if (i > 0) {
 			if (i >= ip->ip_len)
@@ -303,9 +303,9 @@ ip_reass(Slirp *slirp, struct ip *ip, struct ipq *fp)
 			m_adj(dtom(slirp, q), i);
 			break;
 		}
-		q = q->ipf_next;
+		q = (struct ipasfrag *)q->ipf_next;
 		m_free(dtom(slirp, q->ipf_prev));
-		ip_deq(q->ipf_prev);
+		ip_deq((struct ipasfrag*)q->ipf_prev);
 	}
 
 insert:
@@ -313,10 +313,10 @@ insert:
 	 * Stick new segment in its place;
 	 * check for complete reassembly.
 	 */
-	ip_enq(iptofrag(ip), q->ipf_prev);
+	ip_enq(iptofrag(ip), (struct ipasfrag*)q->ipf_prev);
 	next = 0;
-	for (q = fp->frag_link.next; q != (struct ipasfrag*)&fp->frag_link;
-            q = q->ipf_next) {
+	for (q = (struct ipasfrag*)fp->frag_link.next; q != (struct ipasfrag*)&fp->frag_link;
+            q = (struct ipasfrag*)q->ipf_next) {
 		if (q->ipf_off != next)
                         return NULL;
 		next += q->ipf_len;
@@ -327,7 +327,7 @@ insert:
 	/*
 	 * Reassembly is complete; concatenate fragments.
 	 */
-    q = fp->frag_link.next;
+    q = (struct ipasfrag*)fp->frag_link.next;
 	m = dtom(slirp, q);
 
 	q = (struct ipasfrag *) q->ipf_next;
@@ -343,7 +343,7 @@ insert:
 	 * dequeue and discard fragment reassembly header.
 	 * Make header visible.
 	 */
-	q = fp->frag_link.next;
+	q = (struct ipasfrag*)fp->frag_link.next;
 
 	/*
 	 * If the fragments concatenated to an mbuf that's
@@ -383,8 +383,8 @@ ip_freef(Slirp *slirp, struct ipq *fp)
 {
 	register struct ipasfrag *q, *p;
 
-	for (q = fp->frag_link.next; q != (struct ipasfrag*)&fp->frag_link; q = p) {
-		p = q->ipf_next;
+	for (q = (struct ipasfrag*)fp->frag_link.next; q != (struct ipasfrag*)&fp->frag_link; q = p) {
+		p = (struct ipasfrag*)q->ipf_next;
 		ip_deq(q);
 		m_free(dtom(slirp, q));
 	}
@@ -429,14 +429,14 @@ ip_slowtimo(Slirp *slirp)
 
 	DEBUG_CALL("ip_slowtimo");
 
-    l = slirp->ipq.ip_link.next;
+    l = (struct qlink*)slirp->ipq.ip_link.next;
 
         if (l == NULL)
 	   return;
 
     while (l != &slirp->ipq.ip_link) {
         struct ipq *fp = container_of(l, struct ipq, ip_link);
-        l = l->next;
+        l = (struct qlink*)l->next;
 		if (--fp->ipq_ttl == 0) {
 			ip_freef(slirp, fp);
 		}

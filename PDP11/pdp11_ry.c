@@ -163,8 +163,8 @@ t_stat ry_svc (UNIT *uptr);
 t_stat ry_reset (DEVICE *dptr);
 t_stat ry_boot (int32 unitno, DEVICE *dptr);
 void ry_done (int32 esr_flags, uint8 new_ecode);
-t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ry_attach (UNIT *uptr, char *cptr);
+t_stat ry_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ry_attach (UNIT *uptr, CONST char *cptr);
 t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *ry_description (DEVICE *dptr);
 
@@ -595,7 +595,7 @@ return auto_config (dptr->name, 1);                     /* run autoconfig */
 
 /* Attach routine */
 
-t_stat ry_attach (UNIT *uptr, char *cptr)
+t_stat ry_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 sz;
 
@@ -610,7 +610,7 @@ return attach_unit (uptr, cptr);
 
 /* Set size routine */
 
-t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ry_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;

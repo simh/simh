@@ -473,8 +473,8 @@
 t_stat isbc208_svc (UNIT *uptr);
 t_stat isbc208_reset (DEVICE *dptr);
 void isbc208_reset1 (void);
-t_stat isbc208_attach (UNIT *uptr, char *cptr);
-t_stat isbc208_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat isbc208_attach (UNIT *uptr, CONST char *cptr);
+t_stat isbc208_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 isbc208_r0(int32 io, int32 data);
 int32 isbc208_r1(int32 io, int32 data);
 int32 isbc208_r2(int32 io, int32 data);
@@ -502,7 +502,7 @@ int32 isbc208_r15(int32 io, int32 data);
 
 extern void set_irq(int32 int_num);
 extern void clr_irq(int32 int_num);
-extern int32 reg_dev(int32 (*routine)(), int32 port);
+extern int32 reg_dev(int32 (*routine)(int32, int32), int32 port);
 extern void multibus_put_mbyte(int32 addr, int32 val);
 extern int32 multibus_get_mbyte(int32 addr);
 
@@ -1137,7 +1137,7 @@ void isbc208_reset1 (void)
 
 /* isbc208 attach - attach an .IMG file to a FDD */
 
-t_stat isbc208_attach (UNIT *uptr, char *cptr)
+t_stat isbc208_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     FILE *fp;
@@ -1159,7 +1159,7 @@ t_stat isbc208_attach (UNIT *uptr, char *cptr)
         flen = ftell(fp);
         fseek(fp, 0, SEEK_SET);
         if (isbc208_buf[uptr->u6] == NULL) { /* no buffer allocated */
-            isbc208_buf[uptr->u6] = malloc(flen);
+            isbc208_buf[uptr->u6] = (uint8 *)malloc(flen);
             if (isbc208_buf[uptr->u6] == NULL) {
                 sim_printf("   iSBC208_attach: Malloc error\n");
                 return SCPE_MEM;
@@ -1199,7 +1199,7 @@ t_stat isbc208_attach (UNIT *uptr, char *cptr)
 
 /* isbc208 set mode = 8- or 16-bit data bus */
 
-t_stat isbc208_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat isbc208_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_set_mode: Entered with val=%08XH uptr->flags=%08X\n", 
         val, uptr->flags);

@@ -197,7 +197,8 @@
 /* Device routines */
 
 t_stat dev_req_int (int32 lvl);
-t_stat dev_set_sbs (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dev_show_sbs (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dev_set_sbs (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dev_show_sbs (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
+extern const int32 sc_map[512];
 #endif

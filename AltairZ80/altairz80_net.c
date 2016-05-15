@@ -40,11 +40,11 @@ extern uint32 PCX;
 #define NET_INIT_POLL_SERVER  16000
 #define NET_INIT_POLL_CLIENT  15000
 
-static t_stat net_attach    (UNIT *uptr, char *cptr);
+static t_stat net_attach    (UNIT *uptr, CONST char *cptr);
 static t_stat net_detach    (UNIT *uptr);
 static t_stat net_reset     (DEVICE *dptr);
 static t_stat net_svc       (UNIT *uptr);
-static t_stat set_net       (UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat set_net       (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 int32 netStatus             (const int32 port, const int32 io, const int32 data);
 int32 netData               (const int32 port, const int32 io, const int32 data);
 static const char* net_description(DEVICE *dptr);
@@ -119,7 +119,7 @@ DEVICE net_dev = {
     net_dt, NULL, NULL, NULL, NULL, NULL, &net_description
 };
 
-static t_stat set_net(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat set_net(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     char temp[CBUFSIZE];
     if ((net_unit.flags & UNIT_ATT) && ((net_unit.flags & UNIT_SERVER) != (uint32)value)) {
         strncpy(temp, net_unit.filename, CBUFSIZE); /* save name for later attach */
@@ -154,7 +154,7 @@ static t_stat net_reset(DEVICE *dptr) {
     return SCPE_OK;
 }
 
-static t_stat net_attach(UNIT *uptr, char *cptr) {
+static t_stat net_attach(UNIT *uptr, CONST char *cptr) {
     uint32 i;
     char host[CBUFSIZE], port[CBUFSIZE];
 

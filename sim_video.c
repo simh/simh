@@ -46,7 +46,7 @@ vid_quit_callback = callback;
 return SCPE_OK;
 }
 
-t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, char* desc)
+t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, CONST char* desc)
 {
 return vid_show_video (st, uptr, val, desc);
 }
@@ -1420,7 +1420,7 @@ int vid_video_events (void)
 {
 SDL_Event event;
 #if SDL_MAJOR_VERSION == 1
-static char *eventtypes[] = {
+static const char *eventtypes[] = {
     "NOEVENT",              /**< Unused (do not remove) */
     "ACTIVEEVENT",          /**< Application loses/gains visibility */
     "KEYDOWN",              /**< Keys pressed */
@@ -1819,19 +1819,19 @@ else
 return (const char *)SDLVersion;
 }
 
-t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 return SCPE_NOFNC;
 }
 
-t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 if (vid_flags & SIM_VID_INPUTCAPTURED)
     fprintf (st, "ReleaseKey=%s", vid_release_key);
 return SCPE_OK;
 }
 
-static t_stat _vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
+static t_stat _vid_show_video (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 int i;
 
@@ -2073,14 +2073,14 @@ static t_stat _show_stat;
 static FILE *_show_st;
 static UNIT *_show_uptr;
 static int32 _show_val;
-static void *_show_desc;
+static CONST void *_show_desc;
 
 void vid_show_video_event (void)
 {
 _show_stat = _vid_show_video (_show_st, _show_uptr, _show_val, _show_desc);
 }
 
-t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 SDL_Event user_event;
 
@@ -2114,7 +2114,7 @@ if (!vid_active) {
     sim_printf ("No video display is active\n");
     return SCPE_UDIS | SCPE_NOMESSAGE;
     }
-fullname = malloc (strlen(filename) + 5);
+fullname = (char *)malloc (strlen(filename) + 5);
 if (!filename)
     return SCPE_MEM;
 #if SDL_MAJOR_VERSION == 1
@@ -2320,20 +2320,20 @@ const char *vid_version (void)
 return "No Video Support";
 }
 
-t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 return SCPE_NOFNC;
 }
 
-t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 fprintf (st, "no release key");
 return SCPE_OK;
 }
 
-t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
-fprintf (st, "video support unavailable\n");
+fprintf (st, "video support unavailable");
 return SCPE_OK;
 }
 

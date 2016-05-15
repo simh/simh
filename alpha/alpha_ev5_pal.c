@@ -115,7 +115,7 @@ extern uint32 pal_type;
 extern t_uint64 pcq[PCQ_SIZE];                          /* PC queue */
 extern int32 pcq_p;                                     /* PC queue ptr */
 
-extern int32 parse_reg (char *cptr);
+extern int32 parse_reg (const char *cptr);
 
 /* EV5PAL data structures
 
@@ -839,7 +839,7 @@ return;
 
 /* Parse options for hardware PAL instruction */
 
-char *parse_opt_ev5 (char *cptr, uint32 *val, struct pal_opt opt[])
+CONST char *parse_opt_ev5 (CONST char *cptr, uint32 *val, struct pal_opt opt[])
 {
 uint32 i;
 char *tptr, gbuf[CBUFSIZE];
@@ -900,11 +900,11 @@ return -3;
 
 /* Parse PAL hardware opcode symbolically */
 
-t_stat parse_pal_hwre (char *cptr, t_value *inst)
+t_stat parse_pal_hwre (CONST char *cptr, t_value *inst)
 {
 uint32 i, d, val = 0;
 int32 reg;
-const char *tptr;
+CONST char *tptr;
 char gbuf[CBUFSIZE];
 t_stat r;
 

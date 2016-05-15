@@ -85,7 +85,6 @@ static const char *lp62_cc[] = {
     "\f"
     };
 
-DEVICE lp62_dev;
 int32 lp62_65 (int32 dev, int32 pulse, int32 dat);
 int32 lp62_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp62_iors (void);
@@ -269,13 +268,12 @@ static const char *lp647_cc[] = {
     "\f"
     };
 
-DEVICE lp647_dev;
 int32 lp647_65 (int32 dev, int32 pulse, int32 dat);
 int32 lp647_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp647_iors (void);
 t_stat lp647_svc (UNIT *uptr);
 t_stat lp647_reset (DEVICE *dptr);
-t_stat lp647_attach (UNIT *uptr, char *cptr);
+t_stat lp647_attach (UNIT *uptr, CONST char *cptr);
 t_stat lp647_detach (UNIT *uptr);
 
 /* Type 647 LPT data structures
@@ -479,7 +477,7 @@ return (lp647_don? IOS_LPT: 0) | (lp647_err? IOS_LPT1: 0);
 
 /* Attach routine */
 
-t_stat lp647_attach (UNIT *uptr, char *cptr)
+t_stat lp647_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -508,13 +506,12 @@ int32 lp09_don = 0;                                     /* ready */
 int32 lp09_err = 0;                                     /* error */
 int32 lp09_ie = 1;                                      /* int enable */
 int32 lp09_stopioe = 0;
-DEVICE lp09_dev;
 
 int32 lp09_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp09_iors (void);
 t_stat lp09_svc (UNIT *uptr);
 t_stat lp09_reset (DEVICE *dptr);
-t_stat lp09_attach (UNIT *uptr, char *cptr);
+t_stat lp09_attach (UNIT *uptr, CONST char *cptr);
 t_stat lp09_detach (UNIT *uptr);
 
 /* LP09 LPT data structures
@@ -644,7 +641,7 @@ return (lp09_don? IOS_LPT: 0);
 
 /* Attach routine */
 
-t_stat lp09_attach (UNIT *uptr, char *cptr)
+t_stat lp09_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -691,14 +688,13 @@ int32 lp15_lc = 0;
 int32 lp15_bp = 0;
 char lp15_buf[LP15_BSIZE + 1] = { 0 };
 
-DEVICE lp15_dev;
 int32 lp15_65 (int32 dev, int32 pulse, int32 dat);
 int32 lp15_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp15_iors (void);
 t_stat lp15_svc (UNIT *uptr);
 t_stat lp15_reset (DEVICE *dptr);
 
-int32 lp15_updsta (int32 new);
+int32 lp15_updsta (int32 New);
 
 /* LP15 LPT data structures
 
@@ -730,7 +726,7 @@ REG lp15_reg[] = {
     };
 
 MTAB lp15_mod[] = {
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, LPT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, LPT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, (void *)"CA" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
     };
@@ -856,9 +852,9 @@ return SCPE_OK;
 
 /* Update status */
 
-int32 lp15_updsta (int32 new)
+int32 lp15_updsta (int32 New)
 {
-lp15_sta = (lp15_sta | new) & ~(STA_CLR | STA_ERR | STA_BUSY);
+lp15_sta = (lp15_sta | New) & ~(STA_CLR | STA_ERR | STA_BUSY);
 if (lp15_sta & STA_EFLGS)                               /* update errors */
     lp15_sta = lp15_sta | STA_ERR;
 if (sim_is_active (&lp15_unit))

@@ -37,8 +37,8 @@
 #define WR_DATA_DETAIL_MSG  (1 << 7)
 
 extern uint32 PCX;
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -148,7 +148,7 @@ static uint32 stepCleared = TRUE;   /* true when step bit has returned to zero *
 
 /* Local function prototypes */
 static t_stat mdsa_reset(DEVICE *mdsa_dev);
-static t_stat mdsa_attach(UNIT *uptr, char *cptr);
+static t_stat mdsa_attach(UNIT *uptr, CONST char *cptr);
 static t_stat mdsa_detach(UNIT *uptr);
 static t_stat mdsa_boot(int32 unitno, DEVICE *dptr);
 static uint8 MDSA_Read(const uint32 Addr);
@@ -229,7 +229,7 @@ t_stat mdsa_reset(DEVICE *dptr)
 }
 
 /* Attach routine */
-t_stat mdsa_attach(UNIT *uptr, char *cptr)
+t_stat mdsa_attach(UNIT *uptr, CONST char *cptr)
 {
     char header[4];
     t_stat r;

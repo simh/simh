@@ -75,11 +75,11 @@ static FW2_INFO *fw2_info[FW2_MAX_BOARDS];
 static uint8 port_map[FW2_MAX_BOARDS] = { 0x11, 0x15, 0x17, 0x19 };
 
 static int32 fw2dev(const int32 Addr, const int32 rw, const int32 data);
-static t_stat fw2_attach(UNIT *uptr, char *cptr);
+static t_stat fw2_attach(UNIT *uptr, CONST char *cptr);
 static t_stat fw2_detach(UNIT *uptr);
 static uint8 FW2_Read(const uint32 Addr);
 static uint8 FW2_Write(const uint32 Addr, uint8 cData);
-static t_stat get_base_address(char *cptr, uint32 *baseaddr);
+static t_stat get_base_address(const char *cptr, uint32 *baseaddr);
 static const char* fw2_description(DEVICE *dptr);
 
 static UNIT fw2_unit[] = {
@@ -115,7 +115,7 @@ DEVICE fw2_dev = {
 };
 
 /* Attach routine */
-static t_stat fw2_attach(UNIT *uptr, char *cptr)
+static t_stat fw2_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     unsigned int i = 0;
@@ -137,7 +137,7 @@ static t_stat fw2_attach(UNIT *uptr, char *cptr)
         }
     }
 
-    fw2_info[i] = calloc(1, sizeof(FW2_INFO));
+    fw2_info[i] = (FW2_INFO *)calloc(1, sizeof(FW2_INFO));
     fw2_info[i]->uptr = uptr;
     fw2_info[i]->uptr->u3 = baseaddr;
 
@@ -197,7 +197,7 @@ static t_stat fw2_detach(UNIT *uptr)
     return SCPE_OK;
 }
 
-static t_stat get_base_address(char *cptr, uint32 *baseaddr)
+static t_stat get_base_address(const char *cptr, uint32 *baseaddr)
 {
     uint32 b;
     sscanf(cptr, "%x", &b);

@@ -138,12 +138,11 @@ int32 mt_time = 10;                                     /* record latency */
 int32 mt_stopioe = 1;                                   /* stop on error */
 uint8 *mtxb = NULL;                                     /* transfer buffer */
 
-DEVICE mt_dev;
 int32 mt (int32 dev, int32 pulse, int32 dat);
 int32 mt_iors (void);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cptr);
+t_stat mt_attach (UNIT *uptr, CONST char *cptr);
 t_stat mt_detach (UNIT *uptr);
 int32 mt_updcsta (UNIT *uptr, int32 val);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
@@ -191,10 +190,9 @@ MTAB mt_mod[] = {
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "TCAPACITY", "TCAPACITY",
       &sim_tape_set_capac, &sim_tape_show_capac, NULL },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, "WC" },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
-    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &set_devno, &show_devno, NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, (void *)"WC" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, (void *)"CA" },
+    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno, NULL },
     { 0 }
     };
 
@@ -510,7 +508,7 @@ return (mt_sta & (STA_ERR | STA_DON))? IOS_MTA: 0;
 
 /* Attach routine */
 
-t_stat mt_attach (UNIT *uptr, char *cptr)
+t_stat mt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

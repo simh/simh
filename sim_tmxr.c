@@ -746,7 +746,7 @@ return;
    at each call, rather than depending on the DEVICE pointer stored in the TMXR.
 */
 
-static TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp)
+static TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, const TMXR *mp)
 {
 if (mp == NULL)                                         /* invalid multiplexer descriptor? */
     return NULL;                                        /* programming error! */
@@ -778,7 +778,7 @@ return mp->ldsc + val;                                  /* line descriptor */
        invalid pointer or an invalid unit).
 */
 
-static TMLN *tmxr_get_ldsc (UNIT *uptr, char *cptr, TMXR *mp, t_stat *status)
+static TMLN *tmxr_get_ldsc (UNIT *uptr, const char *cptr, TMXR *mp, t_stat *status)
 {
 t_value  ln;
 TMLN    *lp = NULL;
@@ -1601,7 +1601,7 @@ t_bool tmxr_get_line_halfduplex (TMLN *lp)
 return (lp->halfduplex != FALSE);
 }
 
-t_stat tmxr_set_config_line (TMLN *lp, const char *config)
+t_stat tmxr_set_config_line (TMLN *lp, CONST char *config)
 {
 t_stat r;
 
@@ -1989,7 +1989,7 @@ return;
 
 /* Return count of available characters for line */
 
-int32 tmxr_rqln_bare (TMLN *lp, t_bool speed)
+int32 tmxr_rqln_bare (const TMLN *lp, t_bool speed)
 {
 if ((speed) && (lp->rxbps)) {                   /* consider speed and rate limiting? */
     if (sim_gtime () < lp->rxnexttime)          /* too soon? */
@@ -2000,7 +2000,7 @@ if ((speed) && (lp->rxbps)) {                   /* consider speed and rate limit
 return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
 }
 
-int32 tmxr_rqln (TMLN *lp)
+int32 tmxr_rqln (const TMLN *lp)
 {
 return tmxr_rqln_bare (lp, TRUE);
 }
@@ -2198,21 +2198,21 @@ return tmxr_tqln(lp) + tmxr_tpqln(lp);
 
 /* Return count of buffered characters for line */
 
-int32 tmxr_tqln (TMLN *lp)
+int32 tmxr_tqln (const TMLN *lp)
 {
 return (lp->txbpi - lp->txbpr + ((lp->txbpi < lp->txbpr)? lp->txbsz: 0));
 }
 
 /* Return count of buffered packet characters for line */
 
-int32 tmxr_tpqln (TMLN *lp)
+int32 tmxr_tpqln (const TMLN *lp)
 {
 return (lp->txppsize - lp->txppoffset);
 }
 
 /* Return transmit packet busy status for line */
 
-t_bool tmxr_tpbusyln (TMLN *lp)
+t_bool tmxr_tpbusyln (const TMLN *lp)
 {
 return (0 != (lp->txppsize - lp->txppoffset));
 }
@@ -2273,7 +2273,7 @@ if (uptr && uptr->filename) {
 return SCPE_OK;
 }
 
-static int32 _tmln_speed_delta (const char *cptr)
+static int32 _tmln_speed_delta (CONST char *cptr)
 {
 struct {
     const char *bps;
@@ -2319,10 +2319,10 @@ while (1) {
 return -1;
 }
 
-t_stat tmxr_set_line_speed (TMLN *lp, const char *speed)
+t_stat tmxr_set_line_speed (TMLN *lp, CONST char *speed)
 {
 UNIT *uptr;
-const char *cptr;
+CONST char *cptr;
 t_stat r;
 
 if (!speed || !*speed)
@@ -2361,7 +2361,7 @@ return SCPE_OK;
 
 */
 
-t_stat tmxr_open_master (TMXR *mp, char *cptr)
+t_stat tmxr_open_master (TMXR *mp, CONST char *cptr)
 {
 int32 i, line, nextline = -1;
 char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE], 
@@ -2369,7 +2369,7 @@ char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE],
      port[CBUFSIZE], option[CBUFSIZE], speed[CBUFSIZE];
 SOCKET sock;
 SERHANDLE serport;
-char *tptr = cptr;
+CONST char *tptr = cptr;
 t_bool nolog, notelnet, listennotelnet, modem_control, loopback, datagram, packet;
 TMLN *lp;
 t_stat r = SCPE_OK;
@@ -2408,7 +2408,7 @@ while (*tptr) {
         cptr = tbuf;
         if (!isdigit(*cptr)) {
             char gbuf[CBUFSIZE];
-            char *init_cptr = cptr;
+            CONST char *init_cptr = cptr;
 
             cptr = get_glyph (cptr, gbuf, '=');
             if (0 == MATCH_CMD (gbuf, "LINE")) {
@@ -2502,14 +2502,15 @@ while (*tptr) {
             if (sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL, NULL))
                 return sim_messagef (SCPE_ARG, "Invalid Port Specifier: %s\n", port);
             if (cptr) {
-                get_glyph (cptr, cptr, 0);                  /* upcase this string */
+                char *tptr = gbuf + (cptr - gbuf);
+                get_glyph (cptr, tptr, 0);                  /* upcase this string */
                 if (0 == MATCH_CMD (cptr, "NOTELNET"))
                     listennotelnet = TRUE;
                 else
                     if (0 == MATCH_CMD (cptr, "TELNET"))
                         listennotelnet = FALSE;
                     else
-                        return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", cptr);
+                        return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", tptr);
                 }
             cptr = init_cptr;
             }
@@ -2542,22 +2543,24 @@ while (*tptr) {
                 return sim_messagef (SCPE_ARG, "Serial line parameters must be set within simulated OS: %s\n", 1 + strchr (destination, ';'));
             }
         else {
+            char *eptr;
+
             memset (hostport, '\0', sizeof(hostport));
             strncpy (hostport, destination, sizeof(hostport)-1);
-            if ((cptr = strchr (hostport, ';')))
-                *(cptr++) = '\0';
-            if (cptr) {
-                get_glyph (cptr, cptr, 0);          /* upcase this string */
-                if (0 == MATCH_CMD (cptr, "NOTELNET"))
+            if ((eptr = strchr (hostport, ';')))
+                *(eptr++) = '\0';
+            if (eptr) {
+                get_glyph (eptr, eptr, 0);          /* upcase this string */
+                if (0 == MATCH_CMD (eptr, "NOTELNET"))
                     notelnet = TRUE;
                 else
-                    if (0 == MATCH_CMD (cptr, "TELNET"))
+                    if (0 == MATCH_CMD (eptr, "TELNET"))
                         if (datagram)
                             return sim_messagef (SCPE_ARG, "Telnet invalid on Datagram socket\n");
                         else
                             notelnet = FALSE;
                     else
-                        return sim_messagef (SCPE_ARG, "Unexpected specifier: %s\n", cptr);
+                        return sim_messagef (SCPE_ARG, "Unexpected specifier: %s\n", eptr);
                 }
             sock = sim_connect_sock_ex (NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (packet ? SIM_SOCK_OPT_NODELAY : 0));
             if (sock != INVALID_SOCKET)
@@ -3612,7 +3615,7 @@ return SCPE_OK;
 
 /* Attach unit to master socket */
 
-t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, char *cptr, t_bool async)
+t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, CONST char *cptr, t_bool async)
 {
 t_stat r;
 int32 i;
@@ -3665,7 +3668,7 @@ if (tmxr_open_device_count)
 return SCPE_OK;
 }
 
-t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc)
 {
 int i, j;
 
@@ -4249,7 +4252,7 @@ return;
 
 /* Print connections - used only in named SHOW command */
 
-void tmxr_fconns (FILE *st, TMLN *lp, int32 ln)
+void tmxr_fconns (FILE *st, const TMLN *lp, int32 ln)
 {
 int32 hr, mn, sc;
 uint32 ctime;
@@ -4318,7 +4321,7 @@ return;
 
 /* Print statistics - used only in named SHOW command */
 
-void tmxr_fstats (FILE *st, TMLN *lp, int32 ln)
+void tmxr_fstats (FILE *st, const TMLN *lp, int32 ln)
 {
 static const char *enab = "on";
 static const char *dsab = "off";
@@ -4380,7 +4383,7 @@ return;
     1. This function is usually called as an MTAB processing routine.
 */
 
-t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tmxr_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
 TMLN *lp;
@@ -4408,7 +4411,7 @@ return SCPE_OK;
 
 /* Enable logging for line */
 
-t_stat tmxr_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tmxr_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
 TMLN *lp;
@@ -4437,7 +4440,7 @@ return SCPE_OK;
 
 /* Disable logging for line */
 
-t_stat tmxr_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tmxr_set_nolog (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
 TMLN *lp;
@@ -4460,9 +4463,9 @@ return SCPE_OK;
 
 /* Show logging status for line */
 
-t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-TMXR *mp = (TMXR *) desc;
+const TMXR *mp = (const TMXR *) desc;
 TMLN *lp;
 
 lp = tmxr_find_ldsc (uptr, val, mp);                    /* find line desc */
@@ -4503,12 +4506,12 @@ return SCPE_OK;
    If an error occurs, the original line order is not disturbed.
 */
 
-t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, char *carg, void *desc)
+t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, CONST char *carg, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
 char *tbuf;
 char *tptr;
-const char *cptr;
+CONST char *cptr;
 t_addr low, high, max = (t_addr) mp->lines - 1;
 int32 *list;
 t_bool *set;
@@ -4602,10 +4605,10 @@ return result;
    where possible to shorten the output.
 */
 
-t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, j, low, last;
-TMXR *mp = (TMXR *) desc;
+const TMXR *mp = (const TMXR *) desc;
 int32 *iptr = mp->lnorder;
 t_bool first = TRUE;
 
@@ -4654,9 +4657,9 @@ return SCPE_OK;
 
 /* Show summary processor */
 
-t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-TMXR *mp = (TMXR *) desc;
+const TMXR *mp = (const TMXR *) desc;
 int32 i, t;
 
 if (mp == NULL)
@@ -4673,9 +4676,9 @@ return SCPE_OK;
 
 /* Show conn/stat processor */
 
-t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-TMXR *mp = (TMXR *) desc;
+const TMXR *mp = (const TMXR *) desc;
 int32 i, any;
 
 if (mp == NULL)
@@ -4699,9 +4702,9 @@ return SCPE_OK;
 
 /* Show number of lines */
 
-t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-TMXR *mp = (TMXR *) desc;
+const TMXR *mp = (const TMXR *) desc;
 
 if (mp == NULL)
     return SCPE_IERR;

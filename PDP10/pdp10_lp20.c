@@ -193,7 +193,6 @@ static int32 lpi = DEFAULT_LPI;                         /* Printer's LPI. */
 static int16 txram[TX_SIZE] = { 0 };                    /* translation RAM */
 static int16 davfu[DV_SIZE] = { 0 };                    /* DAVFU */
 
-DEVICE lp20_dev;
 static t_stat lp20_rd (int32 *data, int32 pa, int32 access);
 static t_stat lp20_wr (int32 data, int32 pa, int32 access);
 static int32 lp20_inta (void);
@@ -202,15 +201,15 @@ static t_stat idle_svc (UNIT *uptr);
 static void set_flush_timer (UNIT *uptr);
 static t_stat lp20_reset (DEVICE *dptr);
 static t_stat lp20_init (DEVICE *dptr);
-static t_stat lp20_attach (UNIT *uptr, char *ptr);
+static t_stat lp20_attach (UNIT *uptr, CONST char *ptr);
 static t_stat lp20_detach (UNIT *uptr);
-static t_stat lp20_set_lpi (UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat lp20_show_lpi (FILE *st, UNIT *up, int32 v, void *dp);
-static t_stat lp20_set_vfu_type (UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat lp20_show_vfu_type (FILE *st, UNIT *up, int32 v, void *dp);
-static t_stat lp20_show_vfu (FILE *st, UNIT *up, int32 v, void *dp);
-static t_stat lp20_set_tof (UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat lp20_clear_vfu (UNIT *uptr, int32 val, char *cptr, void *desc);
+static t_stat lp20_set_lpi (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat lp20_show_lpi (FILE *st, UNIT *up, int32 v, CONST void *dp);
+static t_stat lp20_set_vfu_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat lp20_show_vfu_type (FILE *st, UNIT *up, int32 v, CONST void *dp);
+static t_stat lp20_show_vfu (FILE *st, UNIT *up, int32 v, CONST void *dp);
+static t_stat lp20_set_tof (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat lp20_clear_vfu (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static t_bool lp20_print (int32 c);
 static t_bool lp20_adv (int32 c, t_bool advdvu);
 static t_bool lp20_davfu (int32 c);
@@ -341,14 +340,9 @@ static DIB lp20_dib = {
  * product'.  It's not implemented in this emulation.
  */
 
-static UNIT lp20_idle;
-static UNIT lp20_unit = {
-    UDATA (&lp20_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0), SERIAL_OUT_WAIT,
-           0, 0, 0, 0, &lp20_idle,
-    };
-static UNIT lp20_idle = {
-    UDATA (&idle_svc, UNIT_DIS, 0), 1000000, LP20_IDLE_TIME,
-           0, 0, 0, &lp20_unit,
+static UNIT lp20_unit[] = {
+    {UDATA (&lp20_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0), SERIAL_OUT_WAIT},
+    {UDATA (&idle_svc, UNIT_DIS, 0), 1000000, LP20_IDLE_TIME}
     };
 
 static REG lp20_reg[] = {
@@ -371,8 +365,8 @@ static REG lp20_reg[] = {
     { FLDATAD (ERR, lpcsa, CSR_V_ERR, "error flag") },
     { FLDATAD (DONE, lpcsa, CSR_V_DONE, "done flag") },
     { FLDATAD (IE, lpcsa, CSR_V_IE, "interrupt enable flag") },
-    { DRDATAD (POS, lp20_unit.pos, T_ADDR_W, "position in output file"), PV_LEFT },
-    { DRDATAD (TIME, lp20_unit.wait, 24, "response time"), PV_LEFT },
+    { DRDATAD (POS, lp20_unit[0].pos, T_ADDR_W, "position in output file"), PV_LEFT },
+    { DRDATAD (TIME, lp20_unit[0].wait, 24, "response time"), PV_LEFT },
     { FLDATAD (STOP_IOE, lp20_stopioe, 0, "stop on I/O error") },
     { BRDATAD (TXRAM, txram, 8, 13, TX_SIZE, "translation RAM") },
     { BRDATAD (DAVFU, davfu, 8, 12, DV_SIZE, "vertical forms unit array") },
@@ -401,8 +395,8 @@ static MTAB lp20_mod[] = {
     };
 
 DEVICE lp20_dev = {
-    "LP20", &lp20_unit, lp20_reg, lp20_mod,
-    1, 10, 31, 1, 8, 8,
+    "LP20", lp20_unit, lp20_reg, lp20_mod,
+    2, 10, 31, 1, 8, 8,
     NULL, NULL, &lp20_reset,
     NULL, &lp20_attach, &lp20_detach,
     &lp20_dib, DEV_DISABLE | DEV_UBUS, 0,
@@ -484,7 +478,7 @@ switch ((pa >> 1) & 07) {                               /* case on PA<3:1> */
         if (data & CSA_ECLR) {                          /* error clear? */
             lpcsa = (lpcsa | CSA_DONE) & ~CSA_GO;       /* set done, clr go */
             lpcsb = lpcsb & ~CSB_ECLR;                  /* clear err */
-            sim_cancel (&lp20_unit);                    /* cancel I/O */
+            sim_cancel (lp20_unit);                     /* cancel I/O */
             }
         if (data & CSA_INIT)                            /* init? */
             lp20_init (&lp20_dev);
@@ -493,10 +487,10 @@ switch ((pa >> 1) & 07) {                               /* case on PA<3:1> */
                 if (lpcsb & CSB_ERR)
                     lpcsb = lpcsb | CSB_GOE;
                 lpcsum = 0;                             /* clear checksum */
-                sim_activate (&lp20_unit, lp20_unit.wait);
+                sim_activate (lp20_unit, lp20_unit->wait);
                 }
             }
-        else sim_cancel (&lp20_unit);                   /* go clr, stop DMA */
+        else sim_cancel (lp20_unit);                    /* go clr, stop DMA */
         lpcsa = (lpcsa & ~CSA_RW) | (data & CSA_RW);
         if (dvld && (CSA_GETFNC (lpcsa) != FNC_DVU)) {  /* DVU load aborted */
             change_rdy (0, CSA_DVON);                   /* Mark DVU off-line and empty */
@@ -598,7 +592,7 @@ lpcsa = lpcsa & ~CSA_GO;
 ba = CSA_GETUAE (lpcsa) | lpba;
 fnc = CSA_GETFNC (lpcsa);
 tbc = 010000 - lpbc;
-if (((fnc & FNC_INTERNAL) == 0) && ((lp20_unit.flags & UNIT_ATT) == 0)) {
+if (((fnc & FNC_INTERNAL) == 0) && ((uptr->flags & UNIT_ATT) == 0)) {
     update_lpcs (CSA_ERR);
     return IORETURN (lp20_stopioe, SCPE_UNATT);
     }
@@ -724,16 +718,16 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
         }                                               /* end case function */
     }                                                   /* end for */
 if (lpcolc == 0)
-    set_flush_timer (&lp20_unit);
+    set_flush_timer (uptr);
 else
-    sim_cancel ((UNIT *)lp20_unit.up7);
+    sim_cancel (uptr+1);
 lpba = ba & 0177777;
 lpcsa = (lpcsa & ~CSA_UAE) | ((ba >> (16 - CSA_V_UAE)) & CSA_UAE);
 lpbc = (lpbc + i) & BC_MASK;
 if (lpbc)                                               /* intr, but not done */
     update_lpcs (CSA_MBZ);
 else update_lpcs (CSA_DONE);                            /* intr and done */
-if ((fnc == FNC_PR) && ferror (lp20_unit.fileref)) {
+if ((fnc == FNC_PR) && ferror (uptr->fileref)) {
     sim_perror ("LP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
@@ -779,8 +773,8 @@ else {
         r = lp20_adv (1, TRUE);                         /* adv carriage */
     }
 for (i = 0; i < rpt; i++)
-    fputc (lppdat, lp20_unit.fileref); 
-lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
+    fputc (lppdat, lp20_unit->fileref); 
+lp20_unit->pos = (t_addr)sim_ftell (lp20_unit->fileref);
 lpcolc = lpcolc + rpt;
 return r;
 }
@@ -804,7 +798,7 @@ if (lpcsb & CSB_DVOF)
 
 lpcolc = 0;                                             /* reset col cntr */
 for (i = 0; i < cnt; i++) {                             /* print 'n' newlines; each can complete a page */
-    fputc ('\n', lp20_unit.fileref);
+    fputc ('\n', lp20_unit->fileref);
     if (dvuadv) {                                       /* update DAVFU ptr */
         dvptr = (dvptr + cnt) % dvlnt;
         if (davfu[dvptr] & (1 << DV_TOF)) {              /* at top of form? */
@@ -816,7 +810,7 @@ for (i = 0; i < cnt; i++) {                             /* print 'n' newlines; e
             } /* At TOF */
         } /* update pointer */
     }
-lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
+lp20_unit->pos = (t_addr)sim_ftell (lp20_unit->fileref);
 if (stoppc)                                            /* Crossed one or more TOFs? */
     return FALSE;
 
@@ -840,8 +834,8 @@ for (i = 0; i < dvlnt; i++) {                           /* search DAVFU */
             return lp20_adv (i + 1, FALSE);
         if (lpcolc)                                     /* TOF, need newline? */
             lp20_adv (1, FALSE);
-        fputc ('\f', lp20_unit.fileref);                /* print form feed */
-        lp20_unit.pos = (t_addr)sim_ftell (lp20_unit.fileref);
+        fputc ('\f', lp20_unit->fileref);               /* print form feed */
+        lp20_unit->pos = (t_addr)sim_ftell (lp20_unit->fileref);
         lppagc = (lppagc - 1) & PAGC_MASK;              /* decr page cntr */
         if (lppagc != 0)
             return TRUE;
@@ -863,7 +857,7 @@ if (flg)                                                /* set int req */
     lp20_irq = 1;
 lpcsa = (lpcsa | flg) & ~(CSA_MBZ | CSA_ERR | CSA_ONL);
 lpcsb = (lpcsb | CSB_OFFL) & ~CSB_MBZ;
-if (lp20_unit.flags & UNIT_ATT) {
+if (lp20_unit->flags & UNIT_ATT) {
     lpcsa = lpcsa | CSA_ONL;
     lpcsb = lpcsb & ~CSB_OFFL;
     }
@@ -884,7 +878,7 @@ static void change_rdy (int32 setrdy, int32 clrrdy)
 {
 int32 newcsa = (lpcsa | setrdy) & ~clrrdy;
 
-if ((newcsa ^ lpcsa) & (CSA_ONL | CSA_DVON) && !sim_is_active (&lp20_unit)) {
+if ((newcsa ^ lpcsa) & (CSA_ONL | CSA_DVON) && !sim_is_active (lp20_unit)) {
     lp20_irq |= 1;
     if (newcsa & CSA_IE)
         SET_INT(LP20);
@@ -945,16 +939,16 @@ lpcsb = lpcsb & (CSB_OVFU | CSB_DVOF);
 lpba = lpbc = lppagc = lpcolc = 0;                      /* clear registers */
 lprdat = lppdat = lpcbuf = lpcsum = 0;
 lp20_irq = 0;                                           /* clear int req */
-sim_cancel (&lp20_unit);                                /* deactivate unit */
-if (sim_is_active ((UNIT *)lp20_unit.up7)) {
-    fflush (lp20_unit.fileref);
-    sim_cancel ((UNIT *)lp20_unit.up7);
+sim_cancel (lp20_unit);                                /* deactivate unit */
+if (sim_is_active (lp20_unit+1)) {
+    fflush (lp20_unit->fileref);
+    sim_cancel (lp20_unit+1);
     }
 update_lpcs (0);                                        /* update status */
 return SCPE_OK;
 }
 
-static t_stat lp20_attach (UNIT *uptr, char *cptr)
+static t_stat lp20_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
     
@@ -975,7 +969,7 @@ if (lpcsa & CSA_DVON) {
 }
 if (lpcsa & CSA_ONL)                                    /* just file chg? */
     return reason;
-if (sim_is_active (&lp20_unit))                         /* busy? no int */
+if (sim_is_active (lp20_unit))                          /* busy? no int */
     update_lpcs (0);
 else update_lpcs (CSA_MBZ);                             /* interrupt */
 return reason;
@@ -987,12 +981,12 @@ t_stat reason;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
-if (sim_is_active ((UNIT *)lp20_unit.up7)) {
-    fflush (lp20_unit.fileref);
-    sim_cancel ((UNIT *)lp20_unit.up7);
+if (sim_is_active (lp20_unit+1)) {
+    fflush (lp20_unit->fileref);
+    sim_cancel (lp20_unit+1);
 }
 reason = detach_unit (uptr);
-sim_cancel (&lp20_unit);
+sim_cancel (lp20_unit);
 lpcsa = lpcsa & ~CSA_GO;
 update_lpcs (CSA_MBZ);
 return reason;
@@ -1022,14 +1016,19 @@ fflush (uptr->fileref);
 return SCPE_OK;
 }
 
-static t_stat lp20_set_vfu_type (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat lp20_set_vfu_type (UNIT *uptr, int32 val, CONST char *gptr, void *desc)
 {
+char gbuf[CBUFSIZE], *cptr;
 char *fname, *cp;
 FILE *vfile;
 int sum = 0;
 
-if (!cptr || !*cptr)
+if (!gptr || !*gptr)
     return SCPE_ARG;
+
+gbuf[sizeof(gbuf)-1] = '\0';
+strncpy (gbuf, gptr, sizeof(gbuf)-1);
+cptr = gbuf;
 
 fname = strchr (cptr, '=');
 if (fname)
@@ -1148,7 +1147,7 @@ fclose(vfile);
 return SCPE_FMT;
 }
 
-static t_stat lp20_show_vfu_type (FILE *st, UNIT *up, int32 v, void *dp)
+static t_stat lp20_show_vfu_type (FILE *st, UNIT *up, int32 v, CONST void *dp)
 {
 if (lpcsb & CSB_OVFU)
     fprintf (st, "optical VFU");
@@ -1163,7 +1162,7 @@ else
 return SCPE_OK;
 }
 
-static t_stat lp20_set_lpi (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat lp20_set_lpi (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newlpi;
 
@@ -1186,14 +1185,14 @@ lpi = newlpi;
 return SCPE_OK;
 }
 
-static t_stat lp20_show_lpi (FILE *st, UNIT *up, int32 v, void *dp)
+static t_stat lp20_show_lpi (FILE *st, UNIT *up, int32 v, CONST void *dp)
 {
 fprintf (st, "%u LPI", lpi);
 
 return SCPE_OK;
 }
 
-static t_stat lp20_show_vfu (FILE *st, UNIT *up, int32 v, void *dp)
+static t_stat lp20_show_vfu (FILE *st, UNIT *up, int32 v, CONST void *dp)
 {
 int l, c, sum;
 
@@ -1231,7 +1230,7 @@ if (!(sum & (1 << DV_BOF))) {
 
 return SCPE_OK;
 }
-static t_stat lp20_set_tof (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat lp20_set_tof (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 s_lpcsa = lpcsa;
 int32 s_lppagc = lppagc;
@@ -1262,7 +1261,7 @@ while (value) {
 return even;
 }
 
-static t_stat lp20_clear_vfu (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat lp20_clear_vfu (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int i;
 

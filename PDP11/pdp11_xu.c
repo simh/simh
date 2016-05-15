@@ -107,16 +107,16 @@ t_stat xu_wr(int32  data, int32 PA, int32 access);
 t_stat xu_svc(UNIT * uptr);
 t_stat xu_tmrsvc(UNIT * uptr);
 t_stat xu_reset (DEVICE * dptr);
-t_stat xu_attach (UNIT * uptr, char * cptr);
+t_stat xu_attach (UNIT * uptr, CONST char * cptr);
 t_stat xu_detach (UNIT * uptr);
-t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_setmac  (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_set_stats  (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_set_type (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_setmac  (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_set_stats  (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_set_type (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_set_throttle (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 int32 xu_int (void);
 t_stat xu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat xu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -129,7 +129,7 @@ void xu_clrint (CTLR* xu);
 void xu_process_receive(CTLR* xu);
 void xu_dump_rxring(CTLR* xu);
 void xu_dump_txring(CTLR* xu);
-t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *xu_description (DEVICE *dptr);
 
@@ -363,7 +363,7 @@ t_stat xu_dep (t_value val, t_addr addr, UNIT* uptr, int32 sw)
   return SCPE_NOFNC;
 }
 
-t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   char  buffer[20];
@@ -373,7 +373,7 @@ t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xu_setmac (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   t_stat status;
   CTLR* xu = xu_unit2ctlr(uptr);
@@ -384,7 +384,7 @@ t_stat xu_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
   return status;
 }
 
-t_stat xu_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xu_set_stats (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
 
@@ -393,7 +393,7 @@ t_stat xu_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   const char* fmt = "  %-26s%d\n";
   CTLR* xu = xu_unit2ctlr(uptr);
@@ -413,7 +413,7 @@ t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   char  buffer[20];
@@ -431,7 +431,7 @@ t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   fprintf(st, "type=");
@@ -442,7 +442,7 @@ t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xu_set_type (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -456,7 +456,7 @@ t_stat xu_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
 
@@ -467,11 +467,11 @@ t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xu_set_throttle (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   char tbuf[CBUFSIZE], gbuf[CBUFSIZE];
-  char *tptr = cptr;
+  const char *tptr = cptr;
   uint32 newval;
   uint32 set_time = xu->var->throttle_time;
   uint32 set_burst = xu->var->throttle_burst;
@@ -1152,7 +1152,7 @@ int32 xu_command(CTLR* xu)
     case FC_RLSA: /* read load server address */
       if (memcmp(xu->var->load_server, zeros, sizeof(ETH_MAC))) {
         /* not set, use default multicast load address */
-        wstatus = Map_WriteB(xu->var->pcbb + 2, 6, (uint8*) mcast_load_server);
+        wstatus = Map_WriteB(xu->var->pcbb + 2, 6, (const uint8*) mcast_load_server);
       } else {
         /* is set, use load_server */
         wstatus = Map_WriteB(xu->var->pcbb + 2, 6, xu->var->load_server);
@@ -1734,7 +1734,7 @@ t_stat xu_wr(int32 data, int32 PA, int32 access)
 
 
 /* attach device: */
-t_stat xu_attach(UNIT* uptr, char* cptr)
+t_stat xu_attach(UNIT* uptr, CONST char* cptr)
 {
   t_stat status;
   char* tptr;

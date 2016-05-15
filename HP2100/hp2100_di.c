@@ -1,6 +1,6 @@
 /* hp2100_di.c: HP 12821A HP-IB Disc Interface simulator
 
-   Copyright (c) 2010-2014, J. David Bryan
+   Copyright (c) 2010-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    DI           12821A Disc Interface
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Dec-14    JDB     Added casts for explicit downward conversions
                         Removed redundant global declarations
    13-Feb-12    JDB     First release
@@ -805,7 +806,7 @@ return SCPE_OK;
        at power-up.
 */
 
-t_stat di_set_address (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat di_set_address (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 t_stat status;
 uint32 index, new_address;
@@ -849,9 +850,9 @@ return status;                                              /* return the result
    address (0) or a card's bus address (1).
 */
 
-t_stat di_show_address (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat di_show_address (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-DEVICE *dptr = (DEVICE *) desc;
+const DEVICE *dptr = (const DEVICE *) desc;
 
 if (value)                                                  /* do we want the card address? */
     fprintf (st, "address=%d", GET_DIADR (dptr->flags));    /* get it from the device flags */
@@ -880,15 +881,17 @@ return SCPE_OK;
        will no longer be necessary.
 */
 
-t_stat di_set_cable (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat di_set_cable (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
+DEVICE *dptr = (DEVICE *) desc;
+
 if (value) {                                            /* is the diagnostic cable selected? */
-    ((DEVICE *) desc)->flags |= DEV_DIAG;               /* set the diagnostic flag */
+    dptr->flags |= DEV_DIAG;                            /* set the diagnostic flag */
     dc_dev.flags &= ~DEV_DIS;                           /* enable the dummy device */
     dc_dev.flags |= DEV_DIAG;                           /*   and set its flag as well */
     }
 else {                                                  /* the peripheral cable is selected */
-    ((DEVICE *) desc)->flags &= ~DEV_DIAG;              /* clear the diagnostic flag */
+    dptr->flags &= ~DEV_DIAG;                           /* clear the diagnostic flag */
     dc_dev.flags |= DEV_DIS;                            /* disable the dummy device */
     dc_dev.flags &= ~DEV_DIAG;                          /*  and clear its flag */
     }
@@ -903,9 +906,11 @@ return SCPE_OK;
    normal use (0) or to another card for diagnostics (1).
 */
 
-t_stat di_show_cable (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat di_show_cable (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-if (((DEVICE *) desc)->flags & DEV_DIAG)                /* is the cable connected for diagnostics? */
+const DEVICE *dptr = (const DEVICE *) desc;
+
+if (dptr->flags & DEV_DIAG)                             /* is the cable connected for diagnostics? */
     fputs ("diagnostic cable", st);                     /* report it */
 else                                                    /* the cable is connected for device use */
     fputs ("HP-IB cable", st);                          /* report the condition */

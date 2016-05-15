@@ -125,18 +125,18 @@ uint8 *URLContents(const char *URL, uint32 *length) {
 #define SLEEP_ALLOWED_START_DEFAULT 100         /* default initial value for sleepAllowedCounter*/
 #define DEFAULT_TIMER_DELTA 100                 /* default value for timer delta in ms          */
 
-static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat simh_dev_set_timeroff (UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat simh_dev_set_timeroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat sio_reset(DEVICE *dptr);
-static t_stat sio_attach(UNIT *uptr, char *cptr);
+static t_stat sio_attach(UNIT *uptr, CONST char *cptr);
 static t_stat sio_detach(UNIT *uptr);
 static t_stat ptr_reset(DEVICE *dptr);
 static t_stat ptp_reset(DEVICE *dptr);
 static t_stat toBool(char tf, int32 *result);
-static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat sio_dev_set_port(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat sio_svc(UNIT *uptr);
 static t_stat simh_dev_reset(DEVICE *dptr);
 static t_stat simh_svc(UNIT *uptr);
@@ -167,8 +167,6 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 extern uint32 getClockFrequency(void);
 extern void setClockFrequency(const uint32 Value);
 
-extern int32 chiptype;
-extern const t_bool rtc_avail;
 extern uint32 PCX;
 extern int32 SR;
 extern UNIT cpu_unit;
@@ -498,7 +496,7 @@ static void resetSIOWarningFlags(void) {
     warnUnattachedPTP = warnUnattachedPTR = warnPTREOF = warnUnassignedPort = 0;
 }
 
-static t_stat sio_attach(UNIT *uptr, char *cptr) {
+static t_stat sio_attach(UNIT *uptr, CONST char *cptr) {
     t_stat r = SCPE_IERR;
     sio_unit.u3 = FALSE;                                    /* no character in terminal input buffer    */
     get_uint(cptr, 10, 65535, &r);                          /* attempt to get port, discard result      */
@@ -974,7 +972,7 @@ static uint32 equalSIP(SIO_PORT_INFO x, SIO_PORT_INFO y) {
     (x.sio_reset == y.sio_reset) && (x.hasOUT == y.hasOUT);
 }
 
-static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat sio_dev_set_port(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     int32 result, n, position;
     SIO_PORT_INFO sip = { 0 }, old;
     char hasReset, hasOUT;
@@ -1040,7 +1038,7 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
     return SCPE_OK;
 }
 
-static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc) {
+static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     int32 i, first = TRUE;
     for (i = 0; port_table[i].port != -1; i++)
         if (!port_table[i].isBuiltin) {
@@ -1055,12 +1053,12 @@ static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc) {
     return SCPE_OK;
 }
 
-static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     keyboardInterrupt = FALSE;
     return sim_activate(&sio_unit, sio_unit.wait);          /* activate unit */
 }
 
-static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     keyboardInterrupt = FALSE;
     sim_cancel(&sio_unit);
     return SCPE_OK;
@@ -1191,7 +1189,7 @@ enum simhPseudoDeviceCommands { /* do not change order or remove commands, add o
     kSimhPseudoDeviceCommands
 };
 
-static char *cmdNames[kSimhPseudoDeviceCommands] = {
+static const char *cmdNames[kSimhPseudoDeviceCommands] = {
     "printTime",
     "startTimer",
     "stopTimer",
@@ -1277,12 +1275,12 @@ static void warnNoRealTimeClock(void) {
               " Sorry - no real time clock available.\n", PCX);
 }
 
-static t_stat simh_dev_set_timeron(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat simh_dev_set_timeron(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     timeOfNextInterrupt = sim_os_msec() + timerDelta;
     return sim_activate(&simh_unit, simh_unit.wait);    /* activate unit */
 }
 
-static t_stat simh_dev_set_timeroff(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat simh_dev_set_timeroff(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     timerInterrupt = FALSE;
     return SCPE_OK;
 }

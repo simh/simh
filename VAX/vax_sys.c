@@ -57,18 +57,18 @@ extern REG cpu_reg[];
 
 t_stat fprint_sym_m (FILE *of, uint32 addr, t_value *val);
 int32 fprint_sym_qoimm (FILE *of, t_value *val, int32 vp, int32 lnt);
-t_stat parse_char (char *cptr, t_value *val, int32 lnt);
-t_stat parse_sym_m (char *cptr, uint32 addr, t_value *val);
-int32 parse_brdisp (char *cptr, uint32 addr, t_value *val,
+t_stat parse_char (const char *cptr, t_value *val, int32 lnt);
+t_stat parse_sym_m (const char *cptr, uint32 addr, t_value *val);
+int32 parse_brdisp (const char *cptr, uint32 addr, t_value *val,
     int32 vp, int32 lnt, t_stat *r);
-int32 parse_spec (char *cptr, uint32 addr, t_value *val,
+int32 parse_spec (CONST char *cptr, uint32 addr, t_value *val,
     int32 vp, int32 disp, t_stat *r);
-char *parse_rnum (char *cptr, int32 *rn);
+CONST char *parse_rnum (CONST char *cptr, int32 *rn);
 int32 parse_sym_qoimm (int32 *lit, t_value *val, int32 vp,
     int lnt, int32 minus);
 
 extern t_stat fprint_sym_cm (FILE *of, t_addr addr, t_value *bytes, int32 sw);
-extern t_stat parse_sym_cm (char *cptr, t_addr addr, t_value *bytes, int32 sw);
+extern t_stat parse_sym_cm (const char *cptr, t_addr addr, t_value *bytes, int32 sw);
 
 /* SCP data structures and interface routines
 
@@ -964,7 +964,7 @@ return vp;
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym (char *cptr, t_addr exta, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr exta, UNIT *uptr, t_value *val, int32 sw)
 {
 uint32 addr = (uint32) exta;
 int32 k, rdx, lnt, num, vp;
@@ -1031,7 +1031,7 @@ return -(lnt - 1);
                         <= 0  -number of extra words
 */
 
-t_stat parse_char (char *cptr, t_value *val, int32 lnt)
+t_stat parse_char (const char *cptr, t_value *val, int32 lnt)
 {
 int32 vp;
 
@@ -1055,7 +1055,7 @@ return -(vp - 1);                                       /* return # chars */
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym_m (char *cptr, uint32 addr, t_value *val)
+t_stat parse_sym_m (const char *cptr, uint32 addr, t_value *val)
 {
 int32 i, numspec, disp, opc, vp;
 t_stat r;
@@ -1112,7 +1112,7 @@ return -(vp - 1);
         vp      =       updated output pointer
 */
 
-int32 parse_brdisp (char *cptr, uint32 addr, t_value *val, int32 vp,
+int32 parse_brdisp (const char *cptr, uint32 addr, t_value *val, int32 vp,
     int32 lnt, t_stat *r)
 {
 int32 k, dest, num;
@@ -1167,13 +1167,14 @@ return vp;
                             }
 #define SEL_LIM(p,m,u)  ((fl & SP_PLUS)? (p): ((fl & SP_MINUS)? (m): (u)))
 
-int32 parse_spec (char *cptr, uint32 addr, t_value *val, int32 vp, int32 disp, t_stat *r)
+int32 parse_spec (CONST char *cptr, uint32 addr, t_value *val, int32 vp, int32 disp, t_stat *r)
 {
 int32 i, k, litsize, rn, index;
 int32 num, dispsize, mode;
 int32 lit[4] = { 0 };
 int32 fl = 0;
-char c, *tptr;
+char c;
+const char *tptr;
 const char *force[] = { "S^", "I^", "B^", "W^", "L^", NULL };
 
 *r = SCPE_OK;                                           /* assume ok */
@@ -1424,11 +1425,11 @@ if (*cptr != 0)                                         /* must be done */
 return vp;
 }
 
-char *parse_rnum (char *cptr, int32 *rn)
+CONST char *parse_rnum (CONST char *cptr, int32 *rn)
 {
 int32 i, lnt;
 t_value regnum;
-char *tptr;
+CONST char *tptr;
 
 *rn = 0;
 for (i = 15; i >= 0; i--) {                             /* chk named reg */
@@ -1440,7 +1441,7 @@ for (i = 15; i >= 0; i--) {                             /* chk named reg */
     }
 if (*cptr++ != 'R')                                     /* look for R */
     return NULL;
-regnum = strtotv (cptr, (const char **)&tptr, 10);                     /* look for reg # */
+regnum = strtotv (cptr, &tptr, 10);                     /* look for reg # */
 if ((cptr == tptr) || (regnum > 15))
     return NULL;
 *rn = (int32) regnum;

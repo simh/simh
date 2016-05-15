@@ -122,7 +122,7 @@ typedef struct {
 extern DISK_INFO *diskOpen(FILE *fileref, uint32 isVerbose);
 extern DISK_INFO *diskOpenEx(FILE *fileref, uint32 isVerbose, DEVICE *device, uint32 debugmask, uint32 verbosedebugmask);
 extern t_stat diskClose(DISK_INFO **myDisk);
-extern t_stat diskCreate(FILE *fileref, char *ctlr_comment);
+extern t_stat diskCreate(FILE *fileref, const char *ctlr_comment);
 extern uint32 imdGetSides(DISK_INFO *myDisk);
 extern uint32 imdIsWriteLocked(DISK_INFO *myDisk);
 

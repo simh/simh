@@ -196,7 +196,8 @@ int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
 t_stat r;
 extern int32 lpt_ccl, lpt_ccp;
 extern uint8 lpt_cct[CCT_LNT];
-char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
+const char *cptr;
+char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 ptr = 0;
 for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
@@ -251,7 +252,7 @@ for (i = wd = 0; i < 4; ) {
 return wd;
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 i, wd, buf[8];
 int32 ldr = 1;
@@ -634,9 +635,10 @@ return SCPE_ARG;
         cptr  = updated pointer to input string
 */
 
-char *get_tag (char *cptr, t_value *tag)
+CONST char *get_tag (CONST char *cptr, t_value *tag)
 {
-char *tptr, gbuf[CBUFSIZE];
+CONST char *tptr;
+char gbuf[CBUFSIZE];
 t_stat r;
 
 tptr = get_glyph (cptr, gbuf, 0);                       /* get next field */
@@ -659,20 +661,17 @@ return cptr;                                            /* no change */
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, j, k, ch;
 t_value d, tag;
 t_stat r;
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], cbuf[2*CBUFSIZE];
 
 while (isspace (*cptr)) cptr++;
-for (i = 1; (i < 4) && (cptr[i] != 0); i++) {
-    if (cptr[i] == 0) {
-        for (j = i + 1; j <= 4; j++)
-            cptr[j] = 0;
-        }
-    }
+memset (cbuf, '\0', sizeof(cbuf));
+strncpy (cbuf, cptr, sizeof(cbuf)-5);
+cptr = cbuf;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;

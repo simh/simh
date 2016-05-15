@@ -39,7 +39,6 @@ extern DEVICE dp_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint8 M[MAXMEMSIZE];
-extern int8 cdr_to_alp[128], alp_to_cdp[256];
 
 /* SCP data structures and interface routines
 
@@ -122,7 +121,7 @@ const char *sim_stop_messages[] = {
    number of entries
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 uint32 col, mask, cctbuf[CCT_LNT];
 int32 ptr, rpt;
@@ -168,7 +167,7 @@ return SCPE_OK;
 /* Symbol table */
 
 struct opc {
-    char                *str;                           /* mnemonic */
+    const char          *str;                           /* mnemonic */
     uint32              opv;                            /* opcode & flags */
     uint32              qv;                             /* q field */
     };
@@ -476,7 +475,7 @@ return SCPE_OK;
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, qv, opfl, last;
 char la, *fptr, gbuf[CBUFSIZE];

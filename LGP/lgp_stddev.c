@@ -58,14 +58,14 @@ t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *uptr);
 t_stat ptp_reset (DEVICE *uptr);
-t_stat tap_attach (UNIT *uptr, char *cptr);
-t_stat tap_attable (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tap_attach (UNIT *uptr, CONST char *cptr);
+t_stat tap_attable (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat read_reader (UNIT *uptr, int32 stop, int32 *c);
 t_stat write_tto (int32 flex);
 t_stat write_punch (UNIT *uptr, int32 flex);
-t_stat tti_rdrss (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat punch_feed (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat send_start (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tti_rdrss (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat punch_feed (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat send_start (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 extern uint32 shift_in (uint32 a, uint32 dat, uint32 sh4);
 
@@ -614,7 +614,7 @@ return SCPE_OK;
 
 /* Attach paper tape unit */
 
-t_stat tap_attach (UNIT *uptr, char *cptr)
+t_stat tap_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -629,7 +629,7 @@ return SCPE_OK;
 
 /* Validate unit is attachable */
 
-t_stat tap_attable (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tap_attable (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATTABLE)
     return SCPE_OK;
@@ -638,7 +638,7 @@ return SCPE_NOFNC;
 
 /* Typewriter reader start/stop */
 
-t_stat tti_rdrss (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tti_rdrss (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val) {
     if ((tti_unit[1].flags & UNIT_ATT) == 0)
@@ -651,7 +651,7 @@ return SCPE_OK;
 
 /* Punch feed routine */
 
-t_stat punch_feed (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat punch_feed (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 cnt;
 t_stat r;
@@ -674,7 +674,7 @@ return SCPE_OK;
 
 /* Send start signal */
 
-t_stat send_start (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat send_start (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (inp_strt)
     inp_done = 1;

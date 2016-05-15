@@ -67,7 +67,6 @@ extern REG cpu_reg[];
 extern int32 M[];
 extern int32 PC;
 extern int32 ascii_to_fiodec[], fiodec_to_ascii[];
-extern int32 sc_map[];
 
 /* SCP data structures and interface routines
 
@@ -199,7 +198,7 @@ for (;;) {
 return SCPE_OK;                                         /* done */
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 t_stat sta;
 int32 fld;
@@ -420,13 +419,13 @@ static const int32 opc_val[] = {
 #define fputs(_s,f) Fprintf(f,"%s",_s)
 #define fputc(_c,f) Fprintf(f,"%c",_c)
 
-int32 fprint_opr (FILE *of, int32 inst, int32 class, int32 sp)
+int32 fprint_opr (FILE *of, int32 inst, int32 Class, int32 sp)
 {
 int32 i, j;
 
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
-    if ((j == class) && (opc_val[i] & inst)) {          /* same class? */
+    if ((j == Class) && (opc_val[i] & inst)) {          /* same class? */
         inst = inst & ~opc_val[i];                      /* mask bit set? */
         fprintf (of, (sp? " %s": "%s"), opcode[i]);
         sp = 1;
@@ -580,21 +579,18 @@ return get_uint (cptr, 8, DMASK, status);
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, d, i, j, k, sign;
 t_stat r;
 static int32 sc_enc[10] = { 0, 01, 03, 07, 017, 037, 077, 0177, 0377, 0777 };
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], cbuf[2*CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;
-for (i = 1; (i < 3) && (cptr[i] != 0); i++) {
-    if (cptr[i] == 0) {
-        for (j = i + 1; j <= 3; j++)
-            cptr[j] = 0;
-        }
-    }
+memset (cbuf, '\0', sizeof(cbuf));
+strncpy (cbuf, cptr, sizeof(cbuf)-4);
+cptr = cbuf;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;

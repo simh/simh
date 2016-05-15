@@ -347,13 +347,12 @@ static const int32 map_unit[16] = {                     /* Type 550 unit map */
     0, -1, -1, -1, -1, -1, -1, -1
     };
 
-DEVICE dt_dev;
 int32 dt75 (int32 dev, int32 pulse, int32 dat);
 int32 dt76 (int32 dev, int32 pulse, int32 dat);
 int32 dt_iors (void);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
-t_stat dt_attach (UNIT *uptr, char *cptr);
+t_stat dt_attach (UNIT *uptr, CONST char *cptr);
 void dt_flush (UNIT *uptr);
 t_stat dt_detach (UNIT *uptr);
 void dt_deselect (int32 oldf);
@@ -433,8 +432,8 @@ MTAB dt_mod[] = {
     { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
 #if defined (TC02)
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, DT_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, "WC" },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, DT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, DT_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, (void *)"WC" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, DT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, (void *)"CA" },
 #endif
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
@@ -1412,7 +1411,7 @@ return 0;
    If 18b/36b, read data into buffer
 */
 
-t_stat dt_attach (UNIT *uptr, char *cptr)
+t_stat dt_attach (UNIT *uptr, CONST char *cptr)
 {
 uint16 pdp8b[D8_NBSIZE];
 uint16 pdp11b[D18_BSIZE];

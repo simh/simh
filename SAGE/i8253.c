@@ -37,7 +37,7 @@ DEBTAB i8253_dt[] = {
     { NULL,     0 }
 };
 
-static char* rltype[] = { "latch","8bitL","8bitH", "16bit" };
+static const char* rltype[] = { "latch","8bitL","8bitH", "16bit" };
 
 t_stat i8253_write(I8253* chip, int addr, uint32 value)
 {

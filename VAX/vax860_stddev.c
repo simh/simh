@@ -250,11 +250,11 @@ const char *rlcs_description (DEVICE *dptr);
 t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-t_stat clk_attach (UNIT *uptr, char *cptr);
+t_stat clk_attach (UNIT *uptr, CONST char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
 t_stat rlcs_reset (DEVICE *dptr);
-t_stat rlcs_attach (UNIT *uptr, char *cptr);
+t_stat rlcs_attach (UNIT *uptr, CONST char *cptr);
 int32 icr_rd (t_bool interp);
 void tmr_incr (uint32 inc);
 void tmr_sched (void);
@@ -907,7 +907,7 @@ return "time of year clock";
 
 /* CLK attach */
 
-t_stat clk_attach (UNIT *uptr, char *cptr)
+t_stat clk_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -1238,7 +1238,7 @@ const char *rlcs_description (DEVICE *dptr)
 return "Console RL02 disk";
 }
 
-t_stat rlcs_attach (UNIT *uptr, char *cptr)
+t_stat rlcs_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 p;
 t_stat r;

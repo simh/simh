@@ -55,9 +55,9 @@ TMXR dcs_desc = { DCS_LINES, 0, 0, dcs_ldsc };          /* mux descriptor */
 t_stat dcsi_svc (UNIT *uptr);
 t_stat dcso_svc (UNIT *uptr);
 t_stat dcs_reset (DEVICE *dptr);
-t_stat dcs_attach (UNIT *uptr, char *cptr);
+t_stat dcs_attach (UNIT *uptr, CONST char *cptr);
 t_stat dcs_detach (UNIT *uptr);
-t_stat dcs_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dcs_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void dcs_reset_ln (int32 ln);
 void dcs_scan_next (t_bool unlk);
 
@@ -341,7 +341,7 @@ return SCPE_OK;
 
 /* Attach master unit */
 
-t_stat dcs_attach (UNIT *uptr, char *cptr)
+t_stat dcs_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -368,7 +368,7 @@ return r;
 
 /* Change number of lines */
 
-t_stat dcs_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dcs_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;

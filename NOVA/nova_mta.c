@@ -166,17 +166,16 @@ int32 mta_cwait = 100;                                  /* command latency */
 int32 mta_rwait = 100;                                  /* record latency */
 uint8 *mtxb = NULL;                                     /* transfer buffer */
 
-DEVICE mta_dev;
 int32 mta (int32 pulse, int32 code, int32 AC);
 t_stat mta_svc (UNIT *uptr);
 t_stat mta_reset (DEVICE *dptr);
 t_stat mta_boot (int32 unitno, DEVICE *dptr);
-t_stat mta_attach (UNIT *uptr, char *cptr);
+t_stat mta_attach (UNIT *uptr, CONST char *cptr);
 t_stat mta_detach (UNIT *uptr);
 int32 mta_updcsta (UNIT *uptr);
 void mta_upddsta (UNIT *uptr, int32 newsta);
 t_stat mta_map_err (UNIT *uptr, t_stat st);
-t_stat mta_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat mta_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 static const int ctype[32] = {                          /* c vs r timing */
  0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
@@ -592,7 +591,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat mta_attach (UNIT *uptr, char *cptr)
+t_stat mta_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -618,7 +617,7 @@ return sim_tape_detach (uptr);
 
 /* Write lock/unlock validate routine */
 
-t_stat mta_vlock (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mta_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if ((uptr->flags & UNIT_ATT) && (val || sim_tape_wrp (uptr)))
     mta_upddsta (uptr, uptr->USTAT | STA_WLK);

@@ -24,7 +24,7 @@ struct quehead {
 	struct quehead *qh_rlink;
 };
 
-inline void
+void
 insque(void *a, void *b)
 {
 	register struct quehead *element = (struct quehead *) a;
@@ -36,7 +36,7 @@ insque(void *a, void *b)
 	= (struct quehead *)element;
 }
 
-inline void
+void
 remque(void *a)
 {
   register struct quehead *element = (struct quehead *) a;
@@ -45,7 +45,7 @@ remque(void *a)
   element->qh_rlink = NULL;
 }
 
-int add_exec(struct ex_list **ex_ptr, int do_pty, char *exec,
+int add_exec(struct ex_list **ex_ptr, int do_pty, const char *exec,
              struct in_addr addr, int port)
 {
 	struct ex_list *tmp_ptr;
@@ -58,7 +58,7 @@ int add_exec(struct ex_list **ex_ptr, int do_pty, char *exec,
 	}
 
 	tmp_ptr = *ex_ptr;
-	*ex_ptr = g_new(struct ex_list, 1);
+	*ex_ptr = (struct ex_list *)g_new(struct ex_list, 1);
 	(*ex_ptr)->ex_fport = port;
 	(*ex_ptr)->ex_addr = addr;
 	(*ex_ptr)->ex_pty = do_pty;
@@ -195,7 +195,7 @@ fork_exec(struct socket *so, const char *ex, int do_pty)
 		   } while (c);
 
                 argv[i] = NULL;
-		execvp(argv[0], (char **)argv);
+		execvp(argv[0], (char * const *)argv);
 
 		/* Ooops, failed, let's tell the user why */
         fprintf(stderr, "Error: execvp of %s failed: %s\n",

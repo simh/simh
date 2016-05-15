@@ -154,24 +154,24 @@ extern t_stat sim_instr_8086(void);
 extern void cpu8086reset(void);
 
 /* function prototypes */
-static t_stat cpu_set_switcher  (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_reset_switcher(UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_show_switcher (FILE *st, UNIT *uptr, int32 val, void *desc);
-static int32 switchcpu_io       (const int32 port, const int32 io, const int32 data);
+static t_stat cpu_set_switcher  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_reset_switcher(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_show_switcher (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static int32 switchcpu_io       (const int32 port, const int32 io, CONST int32 data);
 
-static t_stat cpu_set_altairrom     (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_set_noaltairrom   (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_set_nommu         (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_set_banked        (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_set_nonbanked     (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_set_ramtype       (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_set_chiptype      (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_set_size          (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_set_memory        (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat cpu_clear_command     (UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat cpu_set_altairrom     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_noaltairrom   (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_nommu         (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_banked        (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_nonbanked     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_ramtype       (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_chiptype      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_size          (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_memory        (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_clear_command     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static void cpu_clear(void);
-static t_stat cpu_show              (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat chip_show             (FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat cpu_show              (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat chip_show             (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat cpu_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat cpu_reset(DEVICE *dptr);
@@ -2075,7 +2075,6 @@ static t_stat sim_instr_mmu (void) {
     extern int32 timerInterruptHandler;
     extern int32 keyboardInterrupt;
     extern uint32 keyboardInterruptHandler;
-    extern const t_bool rtc_avail;
     int32 reason = SCPE_OK;
     register uint32 specialProcessing;
     register uint32 AF;
@@ -6738,9 +6737,9 @@ const static CPUFLAG *cpuflags[NUM_CHIP_TYPE] = { cpuflags8080, cpuflagsZ80,
     cpuflags8086, cpuflagsM68K, };
 
 /* needs to be set for each ramtype <= MAX_RAM_TYPE */
-static char *ramTypeToString[] = { "AZ80", "HRAM", "VRAM", "CRAM" };
+static const char *ramTypeToString[] = { "AZ80", "HRAM", "VRAM", "CRAM" };
 
-static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, void *desc) {
+static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     fprintf(st, cpu_unit.flags & UNIT_CPU_OPSTOP ? "ITRAP, " : "NOITRAP, ");
     if (chiptype < NUM_CHIP_TYPE)
         fprintf(st, "%s", cpu_mod[chiptype].mstring);
@@ -6750,7 +6749,7 @@ static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, void *desc) {
     return SCPE_OK;
 }
 
-static t_stat cpu_show(FILE *st, UNIT *uptr, int32 val, void *desc) {
+static t_stat cpu_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     uint32 i, maxBanks, first = TRUE;
     MDEV m;
     maxBanks = ((cpu_unit.flags & UNIT_CPU_BANKED) ||
@@ -6815,23 +6814,23 @@ static void cpu_clear(void) {
     clockHasChanged = FALSE;
 }
 
-static t_stat cpu_clear_command(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_clear_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     cpu_clear();
     return SCPE_OK;
 }
 
-static t_stat cpu_set_altairrom(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_altairrom(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     install_ALTAIRbootROM();
     return SCPE_OK;
 }
 
-static t_stat cpu_set_noaltairrom(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_noaltairrom(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     mmu_table[ALTAIR_ROM_LOW >> LOG2PAGESIZE] = MEMORYSIZE < MAXBANKSIZE ?
         EMPTY_PAGE : RAM_PAGE;
     return SCPE_OK;
 }
 
-static t_stat cpu_set_nommu(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_nommu(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     if (chiptype == CHIP_TYPE_8086) {
         sim_printf("Cannot switch off MMU for 8086 CPU.\n");
         return SCPE_ARG;
@@ -6849,7 +6848,7 @@ static t_stat cpu_set_nommu(UNIT *uptr, int32 value, char *cptr, void *desc) {
     return SCPE_OK;
 }
 
-static t_stat cpu_set_banked(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_banked(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     if ((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80)) {
         if (MEMORYSIZE <= MAXBANKSIZE)
             previousCapacity = MEMORYSIZE;
@@ -6864,7 +6863,7 @@ static t_stat cpu_set_banked(UNIT *uptr, int32 value, char *cptr, void *desc) {
     return SCPE_OK;
 }
 
-static t_stat cpu_set_nonbanked(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_nonbanked(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     if ((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80)) {
         MEMORYSIZE = previousCapacity;
         cpu_dev.awidth = MAXBANKSIZELOG2;
@@ -6965,10 +6964,10 @@ static void cpu_set_chiptype_short(const int32 value) {
         return; /* nothing to do */
     if (((chiptype == CHIP_TYPE_8080) && (value == CHIP_TYPE_Z80)) ||
         ((chiptype == CHIP_TYPE_Z80) && (value == CHIP_TYPE_8080))) {
-        chiptype = value;
+        chiptype = (ChipType)value;
         return;
     }
-    chiptype = value;
+    chiptype = (ChipType)value;
     switch (chiptype) {
         case CHIP_TYPE_8080:
         case CHIP_TYPE_Z80:
@@ -6998,13 +6997,13 @@ static void cpu_set_chiptype_short(const int32 value) {
     }
 }
 
-static t_stat cpu_set_chiptype(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_chiptype(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     cpu_set_chiptype_short(value);
     cpu_clear();
     return SCPE_OK;
 }
 
-static int32 switchcpu_io(const int32 port, const int32 io, const int32 data) {
+static int32 switchcpu_io(const int32 port, const int32 io, CONST int32 data) {
     int32 new_chiptype = 0;
     if (io == 0) { /* Read, switch CPU */
         switch(chiptype) {
@@ -7036,7 +7035,7 @@ static int32 switchcpu_io(const int32 port, const int32 io, const int32 data) {
     return 0;
 }
 
-static t_stat cpu_show_switcher(FILE *st, UNIT *uptr, int32 val, void *desc) {
+static t_stat cpu_show_switcher(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     if ((cpu_unit.flags & UNIT_CPU_SWITCHER) && (switcherPort >= 0))
         fprintf(st, "SWITCHER=0x%02x", switcherPort);
     else
@@ -7044,7 +7043,7 @@ static t_stat cpu_show_switcher(FILE *st, UNIT *uptr, int32 val, void *desc) {
     return SCPE_OK;
 }
 
-static t_stat cpu_set_switcher(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_switcher(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     struct idev safe;
     switcherPort &= 0xff;
     safe = dev_table[switcherPort];
@@ -7056,7 +7055,7 @@ static t_stat cpu_set_switcher(UNIT *uptr, int32 value, char *cptr, void *desc) 
     return SCPE_OK;
 }
 
-static t_stat cpu_reset_switcher(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_reset_switcher(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     if (sim_map_resource(switcherPort, 1, RESOURCE_TYPE_IO, oldSwitcherDevice.routine, FALSE)) {
         sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, switcherPort);
         return SCPE_ARG;
@@ -7064,7 +7063,7 @@ static t_stat cpu_reset_switcher(UNIT *uptr, int32 value, char *cptr, void *desc
     return SCPE_OK;
 }
 
-static t_stat cpu_set_ramtype(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_ramtype(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
 
     if (value == ramtype) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
@@ -7149,11 +7148,11 @@ static t_stat set_size(uint32 size) {
     return SCPE_OK;
 }
 
-static t_stat cpu_set_size(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_size(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     return set_size(value);
 }
 
-static t_stat cpu_set_memory(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat cpu_set_memory(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     uint32 size, result, i;
     if (cptr == NULL)
         return SCPE_ARG;
@@ -7175,7 +7174,7 @@ void altairz80_init(void) {
 /* altairz80_print_tables(); */
 }
 
-void (*sim_vm_init) (void) = &altairz80_init;
+WEAK void (*sim_vm_init) (void) = &altairz80_init;
 
 /*  This is the binary loader. The input file is considered to be a string of
     literal bytes with no special format. The load starts at the current value
@@ -7186,12 +7185,12 @@ void (*sim_vm_init) (void) = &altairz80_init;
 
 #define PLURAL(x) (x), (x) == 1 ? "" : "s"
 
-static t_stat sim_load_m68k(FILE *fileref, char *cptr, char *fnam, int flag) {
+static t_stat sim_load_m68k(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     char gbuf[CBUFSIZE];
     int32 i;
     t_addr j, lo, hi;
     uint32 addr, org, cnt = 0;
-    const char* result;
+    CONST char* result;
     if (flag ) {
         result = get_range(NULL, cptr, &lo, &hi, 16, M68K_MAX_RAM, 0);
         if (result == NULL)
@@ -7221,11 +7220,11 @@ static t_stat sim_load_m68k(FILE *fileref, char *cptr, char *fnam, int flag) {
     return SCPE_OK;
 }
 
-t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
+t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     int32 i;
     uint32 addr, cnt = 0, org, pagesModified = 0, makeROM = FALSE;
     t_addr j, lo, hi;
-    const char *result;
+    CONST char *result;
     MDEV m;
     char gbuf[CBUFSIZE];
     if (chiptype == CHIP_TYPE_M68K)

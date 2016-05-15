@@ -1,6 +1,6 @@
 /* hp2100_cpu.c: HP 21xx/1000 CPU simulator
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    DMA1,DMA2    12607B/12578A/12895A direct memory access controller
    DCPC1,DCPC2  12897B dual channel port controller
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    31-Dec-14    JDB     Corrected devdisp data parameters
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -589,14 +590,14 @@ t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_stat mp_reset (DEVICE *dptr);
 t_stat dma_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 new_size, char *cptr, void *desc);
-t_stat cpu_set_model (UNIT *uptr, int32 new_model, char *cptr, void *desc);
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_opt (UNIT *uptr, int32 option, char *cptr, void *desc);
-t_stat cpu_clr_opt (UNIT *uptr, int32 option, char *cptr, void *desc);
-t_stat cpu_set_ldr (UNIT *uptr, int32 enable, char *cptr, void *desc);
-t_stat cpu_set_idle  (UNIT *uptr, int32 option, char *cptr, void *desc);
-t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 new_size, CONST char *cptr, void *desc);
+t_stat cpu_set_model (UNIT *uptr, int32 new_model, CONST char *cptr, void *desc);
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_opt (UNIT *uptr, int32 option, CONST char *cptr, void *desc);
+t_stat cpu_clr_opt (UNIT *uptr, int32 option, CONST char *cptr, void *desc);
+t_stat cpu_set_ldr (UNIT *uptr, int32 enable, CONST char *cptr, void *desc);
+t_stat cpu_set_idle  (UNIT *uptr, int32 option, CONST char *cptr, void *desc);
+t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 void hp_post_cmd (t_bool from_scp);
 
 IOHANDLER cpuio;
@@ -3666,7 +3667,7 @@ return is_conflict;
    - If new size < old size, truncation accepted.
 */
 
-t_stat cpu_set_size (UNIT *uptr, int32 new_size, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 new_size, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -3715,7 +3716,7 @@ return SCPE_OK;
    - Disables loader on 21xx machines.
 */
 
-t_stat cpu_set_model (UNIT *uptr, int32 new_model, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 new_model, CONST char *cptr, void *desc)
 {
 uint32 old_family = UNIT_CPU_FAMILY;                    /* current CPU type */
 uint32 new_family = new_model & UNIT_FAMILY_MASK;       /* new CPU family */
@@ -3799,9 +3800,9 @@ return result;
    Loader status is displayed for 21xx models and suppressed for 1000 models.
 */
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-fputs ((char *) desc, st);                              /* write model name */
+fputs ((const char *) desc, st);                        /* write model name */
 
 if (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX)                /* valid only for 21xx */
     if (fwanxm < MEMSIZE)                               /* loader area non-existent? */
@@ -3822,7 +3823,7 @@ return SCPE_OK;
      (FP is required for FFP installation).
 */
 
-t_stat cpu_set_opt (UNIT *uptr, int32 option, char *cptr, void *desc)
+t_stat cpu_set_opt (UNIT *uptr, int32 option, CONST char *cptr, void *desc)
 {
 uint32 model = CPU_MODEL_INDEX;                         /* current CPU model index */
 
@@ -3858,7 +3859,7 @@ return SCPE_OK;
      (FP is required for FFP installation).
 */
 
-t_bool cpu_clr_opt (UNIT *uptr, int32 option, char *cptr, void *desc)
+t_bool cpu_clr_opt (UNIT *uptr, int32 option, CONST char *cptr, void *desc)
 {
 uint32 model = CPU_MODEL_INDEX;                         /* current CPU model index */
 
@@ -3904,7 +3905,7 @@ return SCPE_OK;
    breakpoints within and single-stepping through the loaders.
 */
 
-t_stat cpu_set_ldr (UNIT *uptr, int32 enable, char *cptr, void *desc)
+t_stat cpu_set_ldr (UNIT *uptr, int32 enable, CONST char *cptr, void *desc)
 {
 static BOOT_ROM loader;
 int32 i;
@@ -3934,20 +3935,20 @@ return SCPE_OK;
 
 /* Idle enable/disable */
 
-t_stat cpu_set_idle (UNIT *uptr, int32 option, char *cptr, void *desc)
+t_stat cpu_set_idle (UNIT *uptr, int32 option, CONST char *cptr, void *desc)
 {
-    if (option)
-        return sim_set_idle (uptr, 10, NULL, NULL);
-    else
-        return sim_clr_idle (uptr, 0, NULL, NULL);
+if (option)
+    return sim_set_idle (uptr, 10, NULL, NULL);
+else
+    return sim_clr_idle (uptr, 0, NULL, NULL);
 }
 
 
 /* Idle display */
 
-t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-    return sim_show_idle (st, uptr, val, desc);
+return sim_show_idle (st, uptr, val, desc);
 }
 
 

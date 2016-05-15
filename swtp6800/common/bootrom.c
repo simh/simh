@@ -66,8 +66,8 @@
 /* function prototypes */
 
 t_stat BOOTROM_svc (UNIT *uptr);
-t_stat BOOTROM_config (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat BOOTROM_attach (UNIT *uptr, char *cptr);
+t_stat BOOTROM_config (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat BOOTROM_attach (UNIT *uptr, CONST char *cptr);
 t_stat BOOTROM_reset (DEVICE *dptr);
 int32 BOOTROM_get_mbyte(int32 offset);
 
@@ -130,7 +130,7 @@ DEVICE BOOTROM_dev = {
 
 /* BOOTROM_attach - attach file to EPROM unit */
 
-t_stat BOOTROM_attach (UNIT *uptr, char *cptr)
+t_stat BOOTROM_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     t_addr image_size, capac;
@@ -155,7 +155,7 @@ t_stat BOOTROM_attach (UNIT *uptr, char *cptr)
 
 /* BOOTROM_config = None, 2704, 2708, 2716, 2732 or 2764 */
 
-t_stat BOOTROM_config (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat BOOTROM_config (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_config: val=%d\n", val);
     if ((val < UNIT_NONE) || (val > UNIT_2764)) { /* valid param? */

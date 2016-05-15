@@ -49,7 +49,7 @@ protocol (RSP), or the modified radial serial protocol (MRSP), and were designed
 by asynchronous interfaces.
 
 3.1.1 Block Number, Byte Count, and Drive Number
-The TU58 uses a drive number, block number, and byte count to write or read data. Figure 1-4 (Chapter 1)
+The TU58 uses a drive number, block number, and byte count to write or read data.  1-4 (Chapter 1)
 shows the locations of blocks on the tape. If all of the desired data is contained within a single 512-byte
 block, the byte count will be 512 or less. When the host asks for a particular block and a 512-or-Iess byte
 count, the TU58 positions the specified drive (unit) at that block and transfers the number of bytes specified.
@@ -140,7 +140,7 @@ the serial line, which normally switches between two logic states called mark an
 space condition for at least one character time. This causes the TU58's UART to set its framing error
 bit. The TU58 interprets the framing error as Break.
 
-If communications break· down, due to any transient problem, the host may restore order by sending
+If communications breakdown, due to any transient problem, the host may restore order by sending
 Break and IN IT as outlined above. The faulty operations are cancelled, and the TU58 reinitializes itself,
 returns Continue, and waits for instructions.
 
@@ -377,7 +377,7 @@ The TUS8 returns the following end packet.
     13  XXXX XXXX   CHECKSUM H
 
 OP CODE 1 INIT
-This instruction causes the TU58 controller to reset itself to· a ready state. No tape positioning results
+This instruction causes the TU58 controller to reset itself to a ready state. No tape positioning results
 from this operation. The command 'packet is tbe same as for NOP except for the op code and the resultant
 change to the low order checksum byte. The TU58 sends the same end packet as for NOP after
 reinitializing itself. There are no modifiers to IN IT.
@@ -418,7 +418,7 @@ The write operation has to cope with the fact that the TU58 only has 128 bytes o
 necessary for the host to send a data packet and wait for the TU58 to write it before sending the next data
 packet. This is accomplished using the continue flag. The continue flag is a single byte response of 000 1
 0000 from TU58 to host. The RSP write transaction for both write and write/verify operations is shown in
-Figure 3·2. The MRSP write transaction for both write and write/verify operations is shown in Figure 3·3.
+Figure 3.2. The MRSP write transaction for both write and write/verify operations is shown in Figure 3.3.
 
 OP CODE 4 (Resened)
 
@@ -580,13 +580,13 @@ static const char *tdc_regnam[] =
 #define TD_BOOTSTRAP    10                              /* bootstrap read */
 #define TD_POSITION     11                              /* position */
 
-static char *td_states[] = {
+static const char *td_states[] = {
     "IDLE",     "READ",     "READ1",    "READ2", 
     "WRITE",    "WRITE1",   "WRITE2",   "END", 
     "END1",     "INIT",     "BOOTSTRAP","POSITION"
     };
 
-static char *td_ops[] = {
+static const char *td_ops[] = {
     "NOP", "INI",   "RD",  "WR", "004", "POS", "006", "DIA", 
     "GST", "SST", "MRSP", "013", "014", "015", "016", "017",
     "020", "021",  "022", "023", "024", "025", "026", "027",
@@ -598,7 +598,7 @@ static char *td_ops[] = {
     "END"
     };
 
-static char *td_csostates[] = {
+static const char *td_csostates[] = {
     "GETOPC", "GETLEN", "GETDATA"
     };
 
@@ -644,8 +644,8 @@ static t_stat td_rd (int32 *data, int32 PA, int32 access);
 static t_stat td_wr (int32 data, int32 PA, int32 access);
 static t_stat td_svc (UNIT *uptr);
 static t_stat td_reset (DEVICE *dptr);
-static t_stat td_set_ctrls (UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat td_show_ctlrs (FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat td_set_ctrls (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat td_show_ctlrs (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat td_boot (int32 unitno, DEVICE *dptr);
 static t_stat td_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static void tdi_set_int (int32 ctlr, t_bool val);
@@ -836,7 +836,7 @@ return SCPE_OK;
 }
 
 
-static char *reg_access[] = {"Read", "ReadC", "Write", "WriteC", "WriteB"};
+static const char *reg_access[] = {"Read", "ReadC", "Write", "WriteC", "WriteB"};
 
 typedef t_stat (*reg_read_routine) (CTLR *ctlr, int32 *data);
 
@@ -892,7 +892,7 @@ static void td_process_packet(CTLR *ctlr)
 {
 uint32 unit;
 int32 opcode = ctlr->ibuf[0];
-char *opcode_name, *command_name;
+const char *opcode_name, *command_name;
 
 switch (opcode) {
     case TD_OPDAT:
@@ -1020,7 +1020,7 @@ switch (opcode) {
 
             sim_debug (TDDEB_TRC, ctlr->dptr, "td_process_packet(OPBOO) Unit=%d\n", ctlr->ibuf[4]);
             ctlr->unitno = ctlr->ibuf[1];
-            fbuf = ctlr->uptr[ctlr->unitno].filebuf;
+            fbuf = (int8 *)ctlr->uptr[ctlr->unitno].filebuf;
             ctlr->block = 0;
             ctlr->txsize = 0;
             ctlr->p_state = TD_BOOTSTRAP;
@@ -1053,7 +1053,7 @@ static t_stat td_svc (UNIT *uptr)
 int32 i, t, data_size;
 uint16 c, w;
 uint32 da;
-int8 *fbuf = uptr->filebuf;
+int8 *fbuf = (int8 *)uptr->filebuf;
 CTLR *ctlr = (CTLR *)uptr->up7;
 
 sim_debug (TDDEB_TRC, ctlr->dptr, "td_svc(%s, p_state=%s)\n", sim_uname(uptr), td_states[ctlr->p_state]);
@@ -1459,7 +1459,7 @@ return "TU58 cartridge";
 
 /* Change number of controllers */
 
-static t_stat td_set_ctrls (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat td_set_ctrls (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i;
 t_stat r;
@@ -1495,7 +1495,7 @@ return td_reset (&tdc_dev);
 
 /* Show number of controllers */
 
-t_stat td_show_ctlrs (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat td_show_ctlrs (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "controllers=%d", td_ctrls);
 return SCPE_OK;

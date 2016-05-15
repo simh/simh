@@ -97,7 +97,7 @@ typedef struct {
     UNIT* term;
     UNIT* poll;
 } SERMUX;
-t_stat mux_attach(UNIT*,char*,SERMUX*);
+t_stat mux_attach(UNIT*,CONST char*,SERMUX*);
 t_stat mux_detach(UNIT*,SERMUX*);
 
 /*****************************************************************************************
@@ -365,7 +365,7 @@ extern t_stat i8272_reset(I8272* chip);
 extern void   i8272_seldrv(I8272* chip,int drvnum);
 extern t_stat i8272_abortio(I8272* chip);
 extern t_stat i8272_finish(I8272* chip);
-extern t_stat i8272_attach(UNIT *uptr, char *cptr);
+extern t_stat i8272_attach(UNIT *uptr, CONST char *cptr);
 extern t_stat i8272_detach(UNIT *uptr);
 extern t_stat i8272_setDMA(I8272* chip, uint32 dma_addr);
 

@@ -85,7 +85,7 @@ DEBTAB              cdr_debug[] = {
 #if NUM_DEVS_CDR > 0
 t_stat              cdr_boot(int32, DEVICE *);
 t_stat              cdr_srv(UNIT *);
-t_stat              cdr_attach(UNIT *, char *);
+t_stat              cdr_attach(UNIT *, CONST char *);
 t_stat              cdr_detach(UNIT *);
 t_stat              cdr_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *cdr_description(DEVICE *dptr);
@@ -93,7 +93,7 @@ const char         *cdr_description(DEVICE *dptr);
 
 #if NUM_DEVS_CDP > 0
 t_stat              cdp_srv(UNIT *);
-t_stat              cdp_attach(UNIT *, char *);
+t_stat              cdp_attach(UNIT *, CONST char *);
 t_stat              cdp_detach(UNIT *);
 t_stat              cdp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *cdp_description(DEVICE *dptr);
@@ -107,10 +107,10 @@ struct _lpr_data
 lpr_data[NUM_DEVS_LPR];
 
 t_stat              lpr_srv(UNIT *);
-t_stat              lpr_attach(UNIT *, char *);
+t_stat              lpr_attach(UNIT *, CONST char *);
 t_stat              lpr_detach(UNIT *);
-t_stat              lpr_setlpp(UNIT *, int32, char *, void *);
-t_stat              lpr_getlpp(FILE *, UNIT *, int32, void *);
+t_stat              lpr_setlpp(UNIT *, int32, CONST char *, void *);
+t_stat              lpr_getlpp(FILE *, UNIT *, int32, CONST void *);
 t_stat              lpr_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *lpr_description(DEVICE *dptr);
 #endif
@@ -126,7 +126,7 @@ con_data[NUM_DEVS_CON];
 
 t_stat              con_ini(DEVICE *);
 t_stat              con_srv(UNIT *);
-t_stat              con_attach(UNIT *, char *);
+t_stat              con_attach(UNIT *, CONST char *);
 t_stat              con_detach(UNIT *);
 t_stat              con_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *con_description(DEVICE *dptr);
@@ -146,7 +146,7 @@ MTAB                cdr_mod[] = {
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
           &sim_card_set_fmt, &sim_card_show_fmt, NULL, 
           "Sets card format"},    
-    {MODE_EOF, MODE_EOF, "EOF", "EOF", NULL, NULL,
+    {MODE_EOF, MODE_EOF, "EOF", "EOF", NULL, NULL, NULL,
           "Causes EOF to be set when reader empty"},
     {0}
 };
@@ -420,7 +420,7 @@ cdr_boot(int32 unit_num, DEVICE * dptr)
 }
 
 t_stat
-cdr_attach(UNIT * uptr, char *file)
+cdr_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
     int                 u = uptr-cdr_unit;
@@ -523,7 +523,7 @@ cdp_srv(UNIT *uptr) {
 
 
 t_stat
-cdp_attach(UNIT * uptr, char *file)
+cdp_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
 
@@ -568,7 +568,7 @@ cdp_description(DEVICE *dptr)
 
 #if NUM_DEVS_LPR > 0
 t_stat
-lpr_setlpp(UNIT *uptr, int32 val, char *cptr, void *desc) 
+lpr_setlpp(UNIT *uptr, int32 val, CONST char *cptr, void *desc) 
 {
     int i;
     if (cptr == NULL)
@@ -589,7 +589,7 @@ lpr_setlpp(UNIT *uptr, int32 val, char *cptr, void *desc)
 }
 
 t_stat
-lpr_getlpp(FILE *st, UNIT *uptr, int32 v, void *desc)
+lpr_getlpp(FILE *st, UNIT *uptr, int32 v, CONST void *desc)
 {
     if (uptr == NULL)
         return SCPE_IERR;
@@ -791,7 +791,7 @@ lpr_srv(UNIT *uptr) {
 }
 
 t_stat
-lpr_attach(UNIT * uptr, char *file)
+lpr_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
     int                 u = (uptr - lpr_unit);

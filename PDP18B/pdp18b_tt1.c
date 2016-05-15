@@ -80,11 +80,11 @@ t_bool ttox_test_done (int32 ln);
 void ttox_set_done (int32 ln);
 void ttox_clr_done (int32 ln);
 int32 ttx_getln (int32 dev, int32 pulse);
-t_stat ttx_attach (UNIT *uptr, char *cptr);
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr);
 t_stat ttx_detach (UNIT *uptr);
 t_stat ttx_reset (DEVICE *dptr);
 void ttx_reset_ln (int32 i);
-t_stat ttx_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTIx data structures
 
@@ -398,7 +398,7 @@ return;
 
 /* Attach master unit */
 
-t_stat ttx_attach (UNIT *uptr, char *cptr)
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -425,7 +425,7 @@ return r;
 
 /* Change number of lines */
 
-t_stat ttx_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;

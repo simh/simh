@@ -24,6 +24,9 @@
 #include "altairz80_defs.h"
 #include "i86.h"
 
+/* GLOBAL */
+volatile int intr;
+
 extern uint32 GetBYTEExtended(register uint32 Addr);
 extern void PutBYTEExtended(register uint32 Addr, const register uint32 Value);
 extern int32 AX_S;      /* AX register (8086)                           */

@@ -328,7 +328,7 @@ int32 reg_in_fmtr1[32] = {                              /* rmr if write + go */
 int32 fmt_test[16] = {                                  /* fmt bytes/10 wd */
     5, 0, 5, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
-static char *tu_fname[CS1_N_FNC] = {
+static const char *tu_fname[CS1_N_FNC] = {
     "NOP", "UNLD", "2", "REW", "FCLR", "5", "6", "7",
     "RIP", "11", "ERASE", "WREOF", "SPCF", "SPCR", "16", "17",
     "20", "21", "22", "23", "WRCHKF", "25", "26", "WRCHKR",
@@ -341,7 +341,7 @@ t_stat tu_wr (int32 data, int32 PA, int32 access);
 int32 tu_inta (void);
 t_stat tu_svc (UNIT *uptr);
 t_stat tu_reset (DEVICE *dptr);
-t_stat tu_attach (UNIT *uptr, char *cptr);
+t_stat tu_attach (UNIT *uptr, CONST char *cptr);
 t_stat tu_detach (UNIT *uptr);
 t_stat tu_boot (int32 unitno, DEVICE *dptr);
 void tu_go (int32 drv);
@@ -1179,7 +1179,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat tu_attach (UNIT *uptr, char *cptr)
+t_stat tu_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 drv = uptr - tu_dev.units;
 t_stat r;

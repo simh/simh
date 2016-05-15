@@ -25,6 +25,7 @@
 
    SCMB1,SCMB2  HP 30033A Selector Channel Maintenance Board
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    21-Sep-15    JDB     First release version
    27-Jan-15    JDB     Passes the selector channel diagnostic (D429A)
    12-Jan-15    JDB     Passes the SCMB diagnostic (D429A)
@@ -383,7 +384,7 @@ static SCMB_STATE scmb [2];                     /* per-card state variables */
 static CNTLR_INTRF scmb_interface;
 static t_stat      scmb_service   (UNIT   *uptr);
 static t_stat      scmb_reset     (DEVICE *dptr);
-static t_stat      scmb_set_bus   (UNIT   *uptr, int32 value, char *cptr, void *desc);
+static t_stat      scmb_set_bus   (UNIT   *uptr, int32 value, CONST char *cptr, void *desc);
 
 
 /* SCMB local utility routines */
@@ -1134,7 +1135,7 @@ return SCPE_OK;
    multiplexer initialization won't pick it up by mistake.
 */
 
-static t_stat scmb_set_bus (UNIT *uptr, int32 value, char *cptr, void *desc)
+static t_stat scmb_set_bus (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const CARD_ID card = (CARD_ID) (uptr == &scmb_unit [card2]);
 

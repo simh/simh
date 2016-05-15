@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    TTY          12531C buffered teleprinter interface
    TBG          12539C time base generator
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
    28-Dec-12    JDB     Allocate the TBG logical name during power-on reset
@@ -188,7 +189,7 @@ DEVICE ptr_dev, ptp_dev, tty_dev, clk_dev;
 
 IOHANDLER ptrio;
 t_stat ptr_svc (UNIT *uptr);
-t_stat ptr_attach (UNIT *uptr, char *cptr);
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 
@@ -200,8 +201,8 @@ IOHANDLER ttyio;
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
-t_stat tty_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tty_set_alf (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tty_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tty_set_alf (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat tto_out (int32 c);
 t_stat ttp_out (int32 c);
 
@@ -538,7 +539,7 @@ return SCPE_OK;
 
 /* Attach routine - clear the trailer counter */
 
-t_stat ptr_attach (UNIT *uptr, char *cptr)
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 ptr_trlcnt = 0;
 return attach_unit (uptr, cptr);
@@ -991,7 +992,7 @@ return SCPE_OK;
 }
 
 
-t_stat tty_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 u = uptr - tty_unit;
 
@@ -1003,7 +1004,7 @@ return SCPE_OK;
 }
 
 
-t_stat tty_set_alf (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_alf (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 u = uptr - tty_unit;
 

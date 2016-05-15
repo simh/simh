@@ -807,11 +807,11 @@ typedef struct pdp_dib DIB;
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
 int32 mba_rdbufW (uint32 mbus, int32 bc, uint16 *buf);
-int32 mba_wrbufW (uint32 mbus, int32 bc, uint16 *buf);
+int32 mba_wrbufW (uint32 mbus, int32 bc, const uint16 *buf);
 int32 mba_chbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_get_bc (uint32 mbus);
 int32 mba_get_csr (uint32 mbus);
@@ -819,7 +819,7 @@ void mba_upd_ata (uint32 mbus, uint32 val);
 void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
 void mba_set_enbdis (DEVICE *dptr);
-t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 t_stat build_dib_tab (void);
 

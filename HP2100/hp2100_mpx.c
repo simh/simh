@@ -1,6 +1,6 @@
 /* hp2100_mpx.c: HP 12792C eight-channel asynchronous multiplexer simulator
 
-   Copyright (c) 2008-2014, J. David Bryan
+   Copyright (c) 2008-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MPX          12792C 8-channel multiplexer card
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
    28-Dec-12    JDB     Allow direct attach to the poll unit only when restoring
@@ -594,11 +595,11 @@ t_stat mpx_line_svc  (UNIT   *uptr);
 t_stat mpx_cntl_svc  (UNIT   *uptr);
 t_stat mpx_poll_svc  (UNIT   *uptr);
 t_stat mpx_reset     (DEVICE *dptr);
-t_stat mpx_attach    (UNIT   *uptr, char *cptr);
+t_stat mpx_attach    (UNIT   *uptr, CONST char *cptr);
 t_stat mpx_detach    (UNIT   *uptr);
-t_stat mpx_status    (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
-t_stat mpx_set_frev  (UNIT   *uptr, int32  val,  char  *cptr, void *desc);
-t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
+t_stat mpx_status    (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
+t_stat mpx_set_frev  (UNIT   *uptr, int32  val,  CONST char *cptr, void *desc);
+t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
 
 
 /* MPX data structures.
@@ -2074,7 +2075,7 @@ return SCPE_OK;
    devices in the simulator to facilitate idling.
 */
 
-t_stat mpx_attach (UNIT *uptr, char *cptr)
+t_stat mpx_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat status = SCPE_OK;
 
@@ -2129,7 +2130,7 @@ return status;
 
 /* Show multiplexer status */
 
-t_stat mpx_status (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat mpx_status (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (mpx_poll.flags & UNIT_ATT)                          /* attached to socket? */
     fprintf (st, "attached to port %s, ", mpx_poll.filename);
@@ -2148,7 +2149,7 @@ return SCPE_OK;
    will enable changing the firmware revision.
 */
 
-t_stat mpx_set_frev (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mpx_set_frev (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if ((cptr == NULL) ||                                   /* no parameter? */
     (*cptr < 'C') || (*cptr > 'D') ||                   /*   or not C or D? */
@@ -2168,7 +2169,7 @@ else {
 
 /* Show firmware revision */
 
-t_stat mpx_show_frev (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat mpx_show_frev (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (mpx_dev.flags & DEV_REV_D)
     fputs ("12792D", st);

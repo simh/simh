@@ -195,13 +195,13 @@ t_stat              cpu_ex(t_value * vptr, t_addr addr, UNIT * uptr,
 t_stat              cpu_dep(t_value val, t_addr addr, UNIT * uptr,
                             int32 sw);
 t_stat              cpu_reset(DEVICE * dptr);
-t_stat              cpu_set_size(UNIT * uptr, int32 val, char *cptr,
+t_stat              cpu_set_size(UNIT * uptr, int32 val, CONST char *cptr,
                                  void *desc);
 t_stat              cpu_show_size(FILE * st, UNIT * uptr, int32 val,
-                                  void *desc);
+                                  CONST void *desc);
 t_stat              cpu_show_hist(FILE * st, UNIT * uptr, int32 val,
-                                  void *desc);
-t_stat              cpu_set_hist(UNIT * uptr, int32 val, char *cptr,
+                                  CONST void *desc);
+t_stat              cpu_set_hist(UNIT * uptr, int32 val, CONST char *cptr,
                                  void *desc);
 t_stat              cpu_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 /* Interval timer */
@@ -3818,14 +3818,14 @@ cpu_dep(t_value val, t_addr addr, UNIT * uptr, int32 sw)
 }
 
 t_stat
-cpu_show_size(FILE *st, UNIT *uptr, int32 val, void *desc) 
+cpu_show_size(FILE *st, UNIT *uptr, int32 val, CONST void *desc) 
 {
     fprintf(st, "%dK", MEMSIZE/1024);
     return SCPE_OK;
 }
 
 t_stat
-cpu_set_size(UNIT * uptr, int32 val, char *cptr, void *desc)
+cpu_set_size(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
 {
     t_uint64            mc = 0;
     uint32              i;
@@ -3852,7 +3852,7 @@ cpu_set_size(UNIT * uptr, int32 val, char *cptr, void *desc)
 
 /* Set history */
 t_stat
-cpu_set_hist(UNIT * uptr, int32 val, char *cptr, void *desc)
+cpu_set_hist(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
 {
     int32               i, lnt;
     t_stat              r;
@@ -3873,7 +3873,7 @@ cpu_set_hist(UNIT * uptr, int32 val, char *cptr, void *desc)
         hst = NULL;
     }
     if (lnt) {
-        hst = calloc(sizeof(struct InstHistory), lnt);
+        hst = (struct InstHistory *)calloc(sizeof(struct InstHistory), lnt);
 
         if (hst == NULL)
             return SCPE_MEM;
@@ -3885,10 +3885,10 @@ cpu_set_hist(UNIT * uptr, int32 val, char *cptr, void *desc)
 /* Show history */
 
 t_stat
-cpu_show_hist(FILE * st, UNIT * uptr, int32 val, void *desc)
+cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
 {
     int32               k, di, lnt;
-    char               *cptr = (char *) desc;
+    const char          *cptr = (const char *) desc;
     t_stat              r;
     t_value             sim_eval;
     struct InstHistory *h;

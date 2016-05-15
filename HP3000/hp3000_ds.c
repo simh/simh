@@ -25,6 +25,7 @@
 
    DS           HP 30229B Cartridge Disc Interface
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    21-Jul-15    JDB     First release version
    15-Jun-15    JDB     Passes the cartridge disc diagnostic (D419A)
    15-Feb-15    JDB     Created
@@ -360,9 +361,9 @@ static CNTLR_INTRF ds_interface;
 static t_stat      ds_service     (UNIT   *uptr);
 static t_stat      ds_reset       (DEVICE *dptr);
 static t_stat      ds_boot        (int32  unit_number, DEVICE *dptr);
-static t_stat      ds_attach      (UNIT   *uptr,       char   *cptr);
+static t_stat      ds_attach      (UNIT   *uptr, CONST char *cptr);
 static t_stat      ds_detach      (UNIT   *uptr);
-static t_stat      ds_load_unload (UNIT   *uptr,       int32  value, char *cptr, void *desc);
+static t_stat      ds_load_unload (UNIT   *uptr, int32 value, CONST char *cptr, void *desc);
 
 
 /* Interface local utility routines */
@@ -941,7 +942,7 @@ else {                                                  /* otherwise */
        changed by the controller, so the unit will not request attention.
 */
 
-static t_stat ds_attach (UNIT *uptr, char *cptr)
+static t_stat ds_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat result;
 
@@ -1007,7 +1008,7 @@ else                                                    /* otherwise */
    becomes idle.
 */
 
-static t_stat ds_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+static t_stat ds_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const t_bool load = (value != UNIT_UNLOAD);             /* TRUE if the heads are loading */
 t_stat result;

@@ -125,11 +125,11 @@ sim_buf_swap_data (bptr, size, count);
 return c;
 }
 
-void sim_buf_copy_swapped (void *dbuf, void *sbuf, size_t size, size_t count)
+void sim_buf_copy_swapped (void *dbuf, const void *sbuf, size_t size, size_t count)
 {
 size_t j;
 int32 k;
-unsigned char *sptr = (unsigned char *)sbuf;
+const unsigned char *sptr = (const unsigned char *)sbuf;
 unsigned char *dptr = (unsigned char *)dbuf;
 
 if (sim_end || (size == sizeof (char))) {
@@ -143,11 +143,11 @@ for (j = 0; j < count; j++) {                           /* loop on items */
     }
 }
 
-size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr)
+size_t sim_fwrite (const void *bptr, size_t size, size_t count, FILE *fptr)
 {
 size_t c, nelem, nbuf, lcnt, total;
 int32 i;
-unsigned char *sptr;
+const unsigned char *sptr;
 unsigned char *sim_flip;
 
 if ((size == 0) || (count == 0))                        /* check arguments */
@@ -163,7 +163,7 @@ lcnt = count % nelem;                                   /* count in last buf */
 if (lcnt) nbuf = nbuf + 1;
 else lcnt = nelem;
 total = 0;
-sptr = (unsigned char *) bptr;                          /* init input ptr */
+sptr = (const unsigned char *) bptr;                    /* init input ptr */
 for (i = (int32)nbuf; i > 0; i--) {                     /* loop on buffers */
     c = (i == 1)? lcnt: nelem;
     sim_buf_copy_swapped (sim_flip, sptr, size, c);
@@ -198,7 +198,7 @@ sim_fseeko (fp, pos, SEEK_SET);
 return sz;
 }
 
-t_offset sim_fsize_name_ex (char *fname)
+t_offset sim_fsize_name_ex (const char *fname)
 {
 FILE *fp;
 t_offset sz;
@@ -210,7 +210,7 @@ fclose (fp);
 return sz;
 }
 
-uint32 sim_fsize_name (char *fname)
+uint32 sim_fsize_name (const char *fname)
 {
 return (uint32)(sim_fsize_name_ex (fname));
 }

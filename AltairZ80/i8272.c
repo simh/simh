@@ -134,8 +134,8 @@ typedef struct {
 
 static SECTOR_FORMAT sdata;
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -279,7 +279,7 @@ int32 find_unit_index (UNIT *uptr)
 }
 
 /* Attach routine */
-t_stat i8272_attach(UNIT *uptr, char *cptr)
+t_stat i8272_attach(UNIT *uptr, CONST char *cptr)
 {
     char header[4];
     t_stat r;
@@ -461,7 +461,7 @@ uint8 I8272_Read(const uint32 Addr)
     return (cData);
 }
 
-static char *messages[0x20] = {
+static const char *messages[0x20] = {
 /*  0                           1                       2                       3                   */
     "Undefined Command 0x0","Undefined Command 0x1","Read Track",           "Specify",
 /*  4                           5                       6                       7                   */

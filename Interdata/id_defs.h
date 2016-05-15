@@ -483,11 +483,14 @@ t_bool sch_actv (uint32 sch, uint32 devno);
 void sch_stop (uint32 sch);
 uint32 sch_wrmem (uint32 sch, uint8 *buf, uint32 cnt);
 uint32 sch_rdmem (uint32 sch, uint8 *buf, uint32 cnt);
-t_stat set_sch (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_sch (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_sch (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat set_dev (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_sch (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat show_dev (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 int32 lfc_cosched (int32 wait);
+
+extern uint32 PC, dec_flgs;
+extern const uint16 decrom[256];
 
 #endif

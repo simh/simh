@@ -89,7 +89,7 @@ extern t_stat install_bootrom(const int32 bootrom[], const int32 size, const int
 #define CMD_INITIALIZE  14
 #define CMD_MAX         (CMD_INITIALIZE + 1)
 
-static char* commandMessage[CMD_MAX] = {
+static const char* commandMessage[CMD_MAX] = {
     "Seek",                     //  CMD_SEEK        0
     "Undefined 1",              //                  1
     "Write Sector",             //  CMD_WRITE_SEC   2
@@ -162,7 +162,7 @@ static int32 hdAdata(const int32 port, const int32 io, const int32 data);
 static void doRead(const int32 port, const int32 data, const uint32 command);
 static void doWrite(const int32 port, const int32 data, const uint32 command);
 static t_stat dsk_reset(DEVICE *dptr);
-static char* cmdTranslate(const int32 cmd);
+static const char* cmdTranslate(const int32 cmd);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 static const char* mhdsk_description(DEVICE *dptr);
@@ -253,7 +253,7 @@ static t_stat mhdsk_boot(int32 unitno, DEVICE *dptr) {
     return SCPE_OK;
 }
 
-static char* cmdTranslate(const int32 cmd) {
+static const char* cmdTranslate(const int32 cmd) {
     static char result[128];
     if ((0 <= cmd) && (cmd < CMD_MAX))
         return commandMessage[cmd];

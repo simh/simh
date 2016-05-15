@@ -123,7 +123,7 @@ MTAB disk_mod[] = {
 };
 
 t_stat disk_reset (DEVICE *dptr);
-t_stat disk_attach (UNIT *uptr, char *cptr);
+t_stat disk_attach (UNIT *uptr, CONST char *cptr);
 t_stat disk_detach (UNIT *uptr);
 
 DEVICE disk_dev = {
@@ -163,7 +163,7 @@ t_stat disk_reset (DEVICE *dptr)
     return SCPE_OK;
 }
 
-t_stat disk_attach (UNIT *u, char *cptr)
+t_stat disk_attach (UNIT *u, CONST char *cptr)
 {
     t_stat s;
     int32 saved_switches = sim_switches;
@@ -174,7 +174,7 @@ t_stat disk_attach (UNIT *u, char *cptr)
         if ((s == SCPE_OK) && (sim_switches & SWMASK ('N'))) {
             t_value control[4];  /* block (zone) number, key, userid, checksum */
             int diskno, blkno, word;
-            char *pos;
+            const char *pos;
             /* Using the rightmost sequence of digits within the filename
              * as a volume number, e.g. "/var/tmp/besm6/2052.bin" -> 2052
              */

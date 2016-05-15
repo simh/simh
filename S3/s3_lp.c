@@ -38,7 +38,7 @@ extern int32 iochk, ind[64];
 int32 cct[CCT_LNT] = { 03 };
 int32 cctlnt = 66, cctptr = 0, lines = 0, lflag = 0;
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat write_line (int32 ilnt, int32 mod);
 t_stat space (int32 lines, int32 lflag);
 t_stat carriage_control (int32 action, int32 mod);
@@ -354,7 +354,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 cctptr = 0;                                             /* clear cct ptr */
 lines = 0;                                              /* no cc action */
