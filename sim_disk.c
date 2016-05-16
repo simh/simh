@@ -1676,7 +1676,7 @@ errno = EINVAL;
 #endif
 struct _device_type {
     int32 Type;
-    char *desc;
+    const char *desc;
     } DeviceTypes[] = {
         {FILE_DEVICE_8042_PORT,             "8042_PORT"},
         {FILE_DEVICE_ACPI,                  "ACPI"},

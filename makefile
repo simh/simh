@@ -763,7 +763,11 @@ else
   endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
-  CC_STD = -std=gnu99
+  ifeq (,$(findstring ++,$(GCC)))
+    CC_STD = -std=gnu99
+  else
+    CPP_BUILD = 1
+  endif
   LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (,$(PATH_SEPARATOR))
     PATH_SEPARATOR := ;

@@ -445,21 +445,19 @@ static HINSTANCE hLib = 0;                      /* handle to DLL */
 static void *hLib = NULL;                       /* handle to Library */
 #endif
 static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
-static char* lib_name = "Ws2_32.dll";
+static const char* lib_name = "Ws2_32.dll";
 
 /* load function pointer from DLL */
 typedef int (*_func)();
 
-static void load_function(char* function, _func* func_ptr) {
+static void load_function(const char* function, _func* func_ptr) {
 #ifdef _WIN32
     *func_ptr = (_func)GetProcAddress(hLib, function);
 #else
     *func_ptr = (_func)dlsym(hLib, function);
 #endif
     if (*func_ptr == 0) {
-    char* msg = "Sockets: Failed to find function '%s' in %s\r\n";
-
-    sim_printf (msg, function, lib_name);
+    sim_printf ("Sockets: Failed to find function '%s' in %s\r\n", function, lib_name);
     lib_loaded = 3;
   }
 }
@@ -476,9 +474,7 @@ int load_ws2(void) {
 #endif
       if (hLib == 0) {
         /* failed to load DLL */
-        char* msg  = "Sockets: Failed to load %s\r\n";
-
-        sim_printf (msg, lib_name);
+        sim_printf ("Sockets: Failed to load %s\r\n", lib_name);
         lib_loaded = 2;
         break;
       } else {
