@@ -59,6 +59,12 @@
     or card format binary.
 */
 
+#ifndef SIM_CARD_H_
+#define SIM_CARD_H_     0
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
 
 #define DEBUG_CARD      0x0000010       /* Show details */
 
@@ -111,3 +117,9 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
 extern const char      sim_six_to_ascii[64];
 extern const char      sim_ascii_to_six[128];
 extern const uint8     sim_parity_table[64];
+
+#ifdef  __cplusplus
+}
+#endif
+
+#endif

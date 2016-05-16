@@ -61,6 +61,8 @@
     The card module uses up7 to hold a buffer for the card being translated
     and the backward translation table. Which is generated from the table.
 */
+
+#if defined(USE_SIM_CARD)
 
 #include <ctype.h>
 #include "sim_defs.h"
@@ -1034,3 +1036,4 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
 }
 
 
+#endif /* USE_SIM_CARD */

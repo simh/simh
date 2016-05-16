@@ -991,7 +991,7 @@ LDFLAGS := $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
 	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c sim_serial.c \
-	sim_video.c sim_imd.c
+	sim_video.c sim_imd.c sim_card.c
 
 DISPLAYD = display
   
@@ -1356,8 +1356,8 @@ SSEM_OPT = -I ${SSEMD}
 B5500D = B5500
 B5500 = ${B5500D}/b5500_cpu.c ${B5500D}/b5500_io.c ${B5500D}/b5500_sys.c \
 	${B5500D}/b5500_dk.c ${B5500D}/b5500_mt.c ${B5500D}/b5500_urec.c \
-	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c ${B5500D}/sim_card.c
-B5500_OPT = -I.. -DUSE_INT64 -DB5500
+	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c
+B5500_OPT = -I.. -DUSE_INT64 -DB5500 -DUSE_SIM_CARD
 
 ###
 ### Experimental simulators
