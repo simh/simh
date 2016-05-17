@@ -364,8 +364,7 @@ if (ctx) {
 t_stat sim_tape_set_async (UNIT *uptr, int latency)
 {
 #if !defined(SIM_ASYNCH_IO)
-char *msg = "Tape: can't operate asynchronously\r\n";
-sim_printf ("%s", msg);
+sim_printf ("Tape: can't operate asynchronously\r\n");
 return SCPE_NOFNC;
 #else
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
