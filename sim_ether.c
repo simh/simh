@@ -406,7 +406,7 @@ t_stat eth_mac_scan (ETH_MAC* mac, const char* strmac)
   return SCPE_OK;
 }
 
-void eth_mac_fmt(const ETH_MAC* mac, char* buff)
+void eth_mac_fmt(ETH_MAC* const mac, char* buff)
 {
   const uint8* m = (const uint8*) mac;
   sprintf(buff, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
@@ -521,8 +521,8 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, const char* tx
     char dst[20];
     const unsigned short* proto = (const unsigned short*) &msg[12];
     uint32 crc = eth_crc32(0, msg, len);
-    eth_mac_fmt((const ETH_MAC*)msg, dst);
-    eth_mac_fmt((const ETH_MAC*)(msg+6), src);
+    eth_mac_fmt((ETH_MAC*)msg, dst);
+    eth_mac_fmt((ETH_MAC*)(msg+6), src);
     sim_debug(reason, dev->dptr, "%s  dst: %s  src: %s  proto: 0x%04X  len: %d  crc: %X\n",
           txt, dst, src, ntohs(*proto), len, crc);
     if (detail) {

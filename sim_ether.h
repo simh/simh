@@ -357,7 +357,7 @@ t_stat eth_show_devices (FILE* st, DEVICE *dptr,        /* show ethernet devices
                          UNIT* uptr, int32 val, CONST char* desc);
 void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device state */
 
-void eth_mac_fmt (const ETH_MAC* add, char* buffer);    /* format ethernet mac address */
+void eth_mac_fmt (ETH_MAC* const add, char* buffer);    /* format ethernet mac address */
 t_stat eth_mac_scan (ETH_MAC* mac, const char* strmac); /* scan string for mac, put in mac */
 
 t_stat ethq_init (ETH_QUE* que, int max);               /* initialize FIFO queue */
