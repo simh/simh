@@ -408,7 +408,7 @@ if (spamask & CALL_S) {                                 /* CALLS? */
     }
 PSL = (PSL & ~(PSW_DV | PSW_FU | PSW_IV | PSW_T)) |     /* reset PSW */
     (spamask & (PSW_DV | PSW_FU | PSW_IV | PSW_T));
-JUMP (newpc);                                           /* set new PC */
+JUMP_ALWAYS(newpc);                                     /* set new PC */
 return spamask & (CC_MASK);                             /* return cc's */
 }
 
@@ -1132,7 +1132,7 @@ acc = ACC_MASK (KERN);                                  /* new mode is kernel */
 Write (SP - 4, oldpsl, L_LONG, WA);                     /* push old PSL */
 Write (SP - 8, PC, L_LONG, WA);                         /* push old PC */
 SP = SP - 8;                                            /* update stk ptr */
-JUMP (newpc & ~3);                                      /* change PC */
+JUMP_ALWAYS (newpc & ~3);                               /* change PC */
 in_ie = 0;                                              /* out of flows */
 return 0;
 }
@@ -1171,7 +1171,7 @@ Write (tsp - 4, PSL | cc, L_LONG, WA);                  /* push PSL */
 SP = tsp - 12;                                          /* set new stk */
 PSL = (mode << PSL_V_CUR) | (PSL & PSL_IPL) |           /* set new PSL */
     (cur << PSL_V_PRV);                                 /* IPL unchanged */
-JUMP (newpc & ~03);                                     /* set new PC */
+JUMP_ALWAYS (newpc & ~03);                              /* set new PC */
 return 0;                                               /* cc = 0 */
 }
 
@@ -1243,7 +1243,7 @@ else {
         SISR = SISR | SISR_2;
         }
     }
-JUMP (newpc);                                           /* set new PC */
+JUMP_ALWAYS (newpc);                                    /* set new PC */
 return newpsl & CC_MASK;                                /* set new cc */
 }
 

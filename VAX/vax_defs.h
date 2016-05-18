@@ -611,6 +611,7 @@ enum opcodes {
 /* Instructions which have side effects (ACB, AOBLSS, BBSC, BBCS, etc.) can't be an idle loop so avoid the idle check */
 #define BRANCHB_ALWAYS(d)      do {PCQ_ENTRY; PC = PC + SXTB (d); FLUSH_ISTR; } while (0)
 #define BRANCHW_ALWAYS(d)      do {PCQ_ENTRY; PC = PC + SXTW (d); FLUSH_ISTR; } while (0)
+#define JUMP_ALWAYS(d)         do {PCQ_ENTRY; PC = (d);           FLUSH_ISTR; } while (0)
 /* Any basic branch instructions could be an idle loop */
 #define BRANCHB(d)      do {PCQ_ENTRY; PC = PC + SXTB (d); FLUSH_ISTR; CHECK_FOR_IDLE_LOOP; } while (0)
 #define BRANCHW(d)      do {PCQ_ENTRY; PC = PC + SXTW (d); FLUSH_ISTR; CHECK_FOR_IDLE_LOOP; } while (0)

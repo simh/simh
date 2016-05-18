@@ -2279,7 +2279,7 @@ for ( ;; ) {
     case RSB:
         temp = Read (SP, L_LONG, RA);                   /* get top of stk */
         SP = SP + 4;                                    /* incr stk ptr */
-        JUMP (temp);
+        JUMP_ALWAYS (temp);
         if (sim_switches & SWMASK ('R')) {
             if (step_out_nest_level <= 0)
                 ABORT (SCPE_STEP);
