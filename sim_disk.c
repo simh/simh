@@ -1817,11 +1817,12 @@ static void sim_os_disk_flush_raw (FILE *f)
 FlushFileBuffers ((HANDLE)f);
 }
 
+extern WINBASEAPI BOOL WINAPI GetFileSizeEx(HANDLE hFile, PLARGE_INTEGER lpFileSize);
+
 static t_offset sim_os_disk_size_raw (FILE *Disk)
 {
 DWORD IoctlReturnSize;
 LARGE_INTEGER Size;
-WINBASEAPI BOOL WINAPI GetFileSizeEx(HANDLE hFile, PLARGE_INTEGER lpFileSize);
 
 if (GetFileSizeEx((HANDLE)Disk, &Size))
     return (t_offset)(Size.QuadPart);
