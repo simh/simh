@@ -827,7 +827,7 @@ extern UNIT cpu_unit;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
-uint32 j, k, jdis, vmask, amask;
+uint32 j, k, jena, vmask, amask;
 
 if (autcon_enb == 0)                                    /* enabled? */
     return SCPE_OK;
@@ -868,23 +868,23 @@ for (autp = auto_tab; autp->valid >= 0; autp++) {       /* loop thru table */
         ilvl = dibp->vloc / 32;
         ibit = dibp->vloc % 32;
         /* Identify how many devices earlier in the device list are 
-           disabled and use that info to determine fixed address assignments */
-        for (k=jdis=0; k<j; k++) {
+           enabled and use that info to determine fixed address assignments */
+        for (k=jena=0; k<j; k++) {
             DEVICE *kdptr = find_dev (autp->dnam[k]);
             
-            if ((kdptr == NULL) || (kdptr->flags & DEV_DIS))
-                ++jdis;
+            if (kdptr && (!(kdptr->flags & DEV_DIS)))
+                jena += ((DIB *)kdptr->ctxt)->numc ? ((DIB *)kdptr->ctxt)->numc : 1;
             }
-        if (autp->fixa[j-jdis])                         /* fixed csr avail? */
-            dibp->ba = IOPAGEBASE + autp->fixa[j-jdis]; /* use it */
+        if (autp->fixa[jena])                           /* fixed csr avail? */
+            dibp->ba = IOPAGEBASE + autp->fixa[jena];   /* use it */
         else {                                          /* no fixed left */
             dibp->ba = csr;                             /* set CSR */
             csr += (numc * autp->amod);                 /* next CSR */
             }                                           /* end else */
         if (autp->numv) {                               /* vec needed? */
-            if (autp->fixv[j-jdis]) {                   /* fixed vec avail? */
+            if (autp->fixv[jena]) {                     /* fixed vec avail? */
                 if (autp->numv > 0)
-                    dibp->vec = autp->fixv[j-jdis];     /* use it */
+                    dibp->vec = autp->fixv[jena];       /* use it */
                 }
             else {                                      /* no fixed left */
                 uint32 numv = abs (autp->numv);         /* get num vec */
