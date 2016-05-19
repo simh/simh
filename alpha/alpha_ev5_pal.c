@@ -288,12 +288,12 @@ uint32 lvl = flag? ev5_ipl: 0;
 
 if (flag && pal_mode) return 0;
 if (ev5_mchk) req = IPL_1F;
-else if (ev5_crd && (ICSR & ICSR_CRDE)) req = IPL_CRD;
+else if (ev5_crd && (ev5_icsr & ICSR_CRDE)) req = IPL_CRD;
 else if (ev5_pwrfl) req = IPL_PWRFL;
-else if (int_req[3] && !(ICSR & ICSR_MSK3)) req = IPL_HMIN + 3;
-else if (int_req[2] && !(ICSR & ICSR_MSK2)) req = IPL_HMIN + 2;
-else if (int_req[1] && !(ICSR & ICSR_MSK1)) req = IPL_HMIN + 1;
-else if (int_req[0] && !(ICSR & ICSR_MSK0)) req = IPL_HMIN + 0;
+else if (int_req[3] && !(ev5_icsr & ICSR_MSK3)) req = IPL_HMIN + 3;
+else if (int_req[2] && !(ev5_icsr & ICSR_MSK2)) req = IPL_HMIN + 2;
+else if (int_req[1] && !(ev5_icsr & ICSR_MSK1)) req = IPL_HMIN + 1;
+else if (int_req[0] && !(ev5_icsr & ICSR_MSK0)) req = IPL_HMIN + 0;
 else if (ev5_sirr) {
     for (i = IPL_SMAX; i > 0; i--) {                    /* check swre int */
         if ((ev5_sirr >> (i - 1)) & 1) {                /* req != 0? int */
@@ -305,7 +305,7 @@ else if (ev5_sirr) {
 if ((req < IPL_AST) && (ev5_astrr & ev5_asten & ast_map[itlb_cm]))
     req = IPL_AST;
 if (req <= lvl) req = 0;
-if (ev5_sli && (ICSR & ICSR_SLE)) req = req | IPL_SLI;
+if (ev5_sli && (ev5_icsr & ICSR_SLE)) req = req | IPL_SLI;
 if (ev5_isr & ISR_HALT) req = req | IPL_HALT;
 return req;
 }
