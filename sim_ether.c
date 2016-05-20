@@ -1371,7 +1371,7 @@ static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6
 #include <stsdef.h>
 #include <nmadef.h>
 
-static int pcap_mac_if_vms(char *AdapterName, unsigned char MACAddress[6])
+static int pcap_mac_if_vms(const char *AdapterName, unsigned char MACAddress[6])
 {
   char VMS_Device[16];
   $DESCRIPTOR(Device, VMS_Device);
