@@ -56,16 +56,21 @@ echo.                                                                           
 if ERRORLEVEL 1 exit /B 1
 echo warning: Adding Windows XP suppport to all project files at %TIME%
 
-echo Set objFSO = CreateObject("Scripting.FileSystemObject")                       >>%1.fix.vbs
-echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 1)                    >>%1.fix.vbs
-echo.                                                                              >>%1.fix.vbs
-echo strText = objFile.ReadAll                                                     >>%1.fix.vbs
-echo objFile.Close                                                                 >>%1.fix.vbs
-echo strNewText = Replace(strText, "</PlatformToolset>", "_xp</PlatformToolset>")  >>%1.fix.vbs
-echo.                                                                              >>%1.fix.vbs
-echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 2)                    >>%1.fix.vbs
-echo objFile.Write strNewText                                                      >>%1.fix.vbs
-echo objFile.Close                                                                 >>%1.fix.vbs
+call :FindVCVersion _VC_VER
+echo Set objFSO = CreateObject("Scripting.FileSystemObject")                           >>%1.fix.vbs
+echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 1)                        >>%1.fix.vbs
+echo.                                                                                  >>%1.fix.vbs
+echo strText = objFile.ReadAll                                                         >>%1.fix.vbs
+echo objFile.Close                                                                     >>%1.fix.vbs
+echo strText = Replace(strText, "</PlatformToolset>", "_xp</PlatformToolset>")         >>%1.fix.vbs
+echo.                                                                                  >>%1.fix.vbs
+if %_VC_VER% GEQ 14 echo strText = Replace(strText,                                   _>>%1.fix.vbs
+if %_VC_VER% GEQ 14 echo          "__CLEANUP_C</PreprocessorDefinitions>",            _>>%1.fix.vbs
+if %_VC_VER% GEQ 14 echo "__CLEANUP_C;_USING_V110_SDK71_</PreprocessorDefinitions>")  _>>%1.fix.vbs
+if %_VC_VER% GEQ 14 echo.                                                              >>%1.fix.vbs
+echo Set objFile = objFSO.OpenTextFile(Wscript.Arguments(0), 2)                        >>%1.fix.vbs
+echo objFile.Write strText                                                             >>%1.fix.vbs
+echo objFile.Close                                                                     >>%1.fix.vbs
 
 call :_Fix_PlatformToolset %1 %1
 for %%f in (*.vcxproj) do call :_Fix_PlatformToolset %1 %%f
