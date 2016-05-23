@@ -221,7 +221,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\iSBC80-10.c"
+				RelativePath="..\Intel-Systems\common\isbc80-20.c"
 				>
 			</File>
 			<File

@@ -165,7 +165,7 @@ uint32 HL = 0;                          /* HL register pair */
 uint32 SP = 0;                          /* Stack pointer */
 uint32 saved_PC = 0;                    /* program counter */
 uint32 IM = 0;                          /* Interrupt Mask Register */
-uint32 xack = 0;                        /* XACK signal */
+uint8 xack = 0;                        /* XACK signal */
 uint32 int_req = 0;                     /* Interrupt request */
 
 int32 PCX;                              /* External view of PC */
@@ -197,16 +197,17 @@ t_stat  i8080_reset (DEVICE *dptr);
 /* external function prototypes */
 
 extern t_stat i8080_reset (DEVICE *dptr);
-extern int32 get_mbyte(int32 addr);
-extern int32 get_mword(int32 addr);
-extern void put_mbyte(int32 addr, int32 val);
-extern void put_mword(int32 addr, int32 val);
+extern uint8 get_mbyte(uint16 addr);
+extern uint16 get_mword(uint16 addr);
+extern void put_mbyte(uint16 addr, uint8 val);
+extern void put_mword(uint16 addr, uint16 val);
 extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 
 struct idev {
-    int32 (*routine)(int32, int32);
+    uint8 (*routine)(t_bool, uint8, uint8);
+    uint8 devnum;
 };
 
 /* This is the I/O configuration table.  There are 256 possible
@@ -889,13 +890,15 @@ int32 sim_instr (void)
 
         case 0xDB:                  /* IN */
             DAR = fetch_byte(1);
-            A = dev_table[DAR].routine(0, 0);
+            A = dev_table[DAR].routine(0, 0, dev_table[DAR].devnum);
             A &= BYTE_R;
+//            sim_printf("\n%04X\tIN\t%02X\t;devnum=%d", PC - 1, DAR, dev_table[DAR].devnum);
             break;
 
         case 0xD3:                  /* OUT */
             DAR = fetch_byte(1);
-            dev_table[DAR].routine(1, A);
+            dev_table[DAR].routine(1, A, dev_table[DAR].devnum);
+//            sim_printf("\n%04X\tOUT\t%02X\t;devnum=%d", PC - 1, DAR, dev_table[DAR].devnum);
             break;
 
         default:                    /* undefined opcode */ 
@@ -906,7 +909,7 @@ int32 sim_instr (void)
             break;
         }
 loop_end:
-        if (GET_XACK(1) == 0) {         /* no XACK for instruction fetch */
+        if (GET_XACK(1) == 0) {     /* no XACK for instruction fetch */
             reason = STOP_XACK;
             sim_printf("Stopped for XACK-2 PC=%04X\n", --PC);
             continue;

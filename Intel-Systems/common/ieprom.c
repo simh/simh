@@ -31,11 +31,11 @@
 
     NOTES:
 
-        These functions support a simulated i2732 EPROM device on an Intel iSBC 80/XX.
+        These functions support a simulated ROM devices on an iSBC-80/XX SBCs.
         This allows the attachment of the device to a binary file containing the EPROM
-        code image.
-
-        Unit will support a single 2708, 2716, 2732 and 2764 type EPROMs.
+        code image.  Unit will support a single 2708, 2716, 2732, or 2764 type EPROM.
+        These functions also support bit 1 of 8255 number 1, port B, to enable/
+        disable the onboard ROM.
 */
 
 #include "system_defs.h"
@@ -45,10 +45,12 @@
 /* function prototypes */
 
 t_stat EPROM_attach (UNIT *uptr, CONST char *cptr);
-t_stat EPROM_reset (DEVICE *dptr, int32 size);
-int32 EPROM_get_mbyte(uint32 addr);
+t_stat EPROM_reset (DEVICE *dptr, uint16 size);
+uint8 EPROM_get_mbyte(uint16 addr);
 
-extern UNIT i8255_unit;
+/* external function prototypes */
+
+extern UNIT i8255_unit[];
 extern uint8 xack;						/* XACK signal */
 
 /* SIMH EPROM Standard I/O Data Structures */
@@ -75,7 +77,7 @@ DEVICE EPROM_dev = {
     NULL,               //modifiers
     1,                  //numunits
     16,                 //aradix
-    32,                 //awidth
+    16,                 //awidth
     1,                  //aincr
     16,                 //dradix
     8,                  //dwidth
@@ -147,7 +149,7 @@ t_stat EPROM_attach (UNIT *uptr, CONST char *cptr)
 
 /* EPROM reset */
 
-t_stat EPROM_reset (DEVICE *dptr, int32 size)
+t_stat EPROM_reset (DEVICE *dptr, uint16 size)
 {
 //    sim_debug (DEBUG_flow, &EPROM_dev, "   EPROM_reset: base=0000 size=%04X\n", size);
     if ((EPROM_unit.flags & UNIT_ATT) == 0) { /* if unattached */
@@ -166,11 +168,11 @@ t_stat EPROM_reset (DEVICE *dptr, int32 size)
 
 /*  get a byte from memory */
 
-int32 EPROM_get_mbyte(uint32 addr)
+uint8 EPROM_get_mbyte(uint16 addr)
 {
-    int32 val;
+    uint8 val;
 
-    if (i8255_unit.u5 & 0x01) {         /* EPROM enabled */
+    if (i8255_unit[0].u5 & 0x01) {         /* EPROM enabled */
         sim_debug (DEBUG_read, &EPROM_dev, "EPROM_get_mbyte: addr=%04X\n", addr);
         if (addr < EPROM_unit.capac) {
             SET_XACK(1);                /* good memory address */

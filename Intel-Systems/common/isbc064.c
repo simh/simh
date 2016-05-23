@@ -42,10 +42,8 @@
 /* prototypes */
 
 t_stat isbc064_reset (DEVICE *dptr);
-int32 isbc064_get_mbyte(int32 addr);
-int32 isbc064_get_mword(int32 addr);
-void isbc064_put_mbyte(int32 addr, int32 val);
-void isbc064_put_mword(int32 addr, int32 val);
+uint8 isbc064_get_mbyte(uint16 addr);
+void isbc064_put_mbyte(uint16 addr, uint8 val);
 
 extern uint8 xack;                         /* XACK signal */
 
@@ -73,7 +71,7 @@ DEVICE isbc064_dev = {
     NULL,               //modifiers
     1,                  //numunits
     16,                 //aradix
-    8,                  //awidth
+    16,                 //awidth
     1,                  //aincr
     16,                 //dradix
     8,                  //dwidth
@@ -118,9 +116,9 @@ t_stat isbc064_reset (DEVICE *dptr)
 
 /*  get a byte from memory */
 
-int32 isbc064_get_mbyte(int32 addr)
+uint8 isbc064_get_mbyte(uint16 addr)
 {
-    int32 val, org, len;
+    uint32 val, org, len;
     int i = 0;
 
     if ((isbc064_dev.flags & DEV_DIS) == 0) {
@@ -143,22 +141,11 @@ int32 isbc064_get_mbyte(int32 addr)
     return 0xFF;        /* multibus has active high pullups */
 }
 
-/*  get a word from memory */
-
-int32 isbc064_get_mword(int32 addr)
-{
-    int32 val;
-
-    val = isbc064_get_mbyte(addr);
-    val |= (isbc064_get_mbyte(addr+1) << 8);
-    return val;
-}
-
 /*  put a byte into memory */
 
-void isbc064_put_mbyte(int32 addr, int32 val)
+void isbc064_put_mbyte(uint16 addr, uint8 val)
 {
-    int32 org, len;
+    uint32 org, len;
     int i = 0;
 
     if ((isbc064_dev.flags & DEV_DIS) == 0) {
@@ -178,14 +165,6 @@ void isbc064_put_mbyte(int32 addr, int32 val)
         }
     }
     sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Disabled\n");
-}
-
-/*  put a word into memory */
-
-void isbc064_put_mword(int32 addr, int32 val)
-{
-    isbc064_put_mbyte(addr, val);
-    isbc064_put_mbyte(addr+1, val << 8);
 }
 
 /* end of isbc064.c */

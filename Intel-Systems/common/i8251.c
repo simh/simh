@@ -119,16 +119,18 @@
 #define TXE         0x04
 #define SD          0x40
 
-extern int32 reg_dev(int32 (*routine)(int32, int32), int32 port);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint8);
 
 /* function prototypes */
 
 t_stat i8251_svc (UNIT *uptr);
-t_stat i8251_reset (DEVICE *dptr, int32 base);
-int32 i8251s(int32 io, int32 data);
-int32 i8251d(int32 io, int32 data);
-void i8251_reset1(void);
+t_stat i8251_reset (DEVICE *dptr, uint16 base, uint8 devnum);
+uint8 i8251s(t_bool io, uint8 data, uint8 devnum);
+uint8 i8251d(t_bool io, uint8 data, uint8 devnum);
+void i8251_reset1(uint8 devnum);
+
 /* i8251 Standard I/O Data Structures */
+/* up to 1 i8251 devices */
 
 UNIT i8251_unit = { 
     UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT 
@@ -142,11 +144,24 @@ REG i8251_reg[] = {
     { NULL }
 };
 
+DEBTAB i8251_debug[] = {
+    { "ALL", DEBUG_all },
+    { "FLOW", DEBUG_flow },
+    { "READ", DEBUG_read },
+    { "WRITE", DEBUG_write },
+    { "XACK", DEBUG_xack },
+    { "LEV1", DEBUG_level1 },
+    { "LEV2", DEBUG_level2 },
+    { NULL }
+};
+
 MTAB i8251_mod[] = {
     { UNIT_ANSI, 0, "TTY", "TTY", NULL },
     { UNIT_ANSI, UNIT_ANSI, "ANSI", "ANSI", NULL },
     { 0 }
 };
+
+/* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE i8251_dev = {
     "8251",             //name
@@ -154,8 +169,8 @@ DEVICE i8251_dev = {
     i8251_reg,          //registers
     i8251_mod,          //modifiers
     1,                  //numunits
-    10,                 //aradix
-    31,                 //awidth
+    16,                 //aradix
+    16,                  //awidth
     1,                  //aincr
     16,                 //dradix
     8,                  //dwidth
@@ -169,7 +184,7 @@ DEVICE i8251_dev = {
     NULL,               //ctxt
     0,                  //flags
     0,                  //dctrl
-    NULL,               //debflags
+    i8251_debug,        //debflags
     NULL,               //msize
     NULL                //lname
 };
@@ -196,14 +211,18 @@ t_stat i8251_svc (UNIT *uptr)
 
 /* Reset routine */
 
-t_stat i8251_reset (DEVICE *dptr, int32 base)
+t_stat i8251_reset (DEVICE *dptr, uint16 base, uint8 devnum)
 {
-    reg_dev(i8251d, base); 
-    reg_dev(i8251s, base + 1); 
-    reg_dev(i8251d, base + 2); 
-    reg_dev(i8251s, base + 3); 
-    i8251_reset1();
-    sim_printf("   8251: Registered at %02X\n", base);
+    if (devnum >= I8251_NUM) {
+        sim_printf("8251_reset: Illegal Device Number %d\n", devnum);
+        return 0;
+    }
+    reg_dev(i8251d, base, devnum); 
+    reg_dev(i8251s, base + 1, devnum); 
+    reg_dev(i8251d, base + 2, devnum); 
+    reg_dev(i8251s, base + 3, devnum); 
+    i8251_reset1(devnum);
+    sim_printf("   8251-%d: Registered at %04X\n", devnum, base);
     sim_activate (&i8251_unit, i8251_unit.wait); /* activate unit */
     return SCPE_OK;
 }
@@ -212,28 +231,36 @@ t_stat i8251_reset (DEVICE *dptr, int32 base)
     IN or OUT instruction is issued.
 */
 
-int32 i8251s(int32 io, int32 data)
+uint8 i8251s(t_bool io, uint8 data, uint8 devnum)
 {
+    if (devnum >= I8251_NUM) {
+        sim_printf("8251s: Illegal Device Number %d\n", devnum);
+        return 0;
+    }
 //    sim_printf("\nio=%d data=%04X\n", io, data);
     if (io == 0) {                      /* read status port */
         return i8251_unit.u3;
     } else {                            /* write status port */
         if (i8251_unit.u6) {            /* if mode, set cmd */
             i8251_unit.u5 = data;
-            sim_printf("8251: Command Instruction=%02X\n", data);
+            sim_printf("   8251-%d: Command Instruction=%02X\n", devnum, data);
             if (data & SD)              /* reset port! */
-                i8251_reset1();
+                i8251_reset1(devnum);
         } else {                        /* set mode */
             i8251_unit.u4 = data;
-            sim_printf("8251: Mode Instruction=%02X\n", data);
+            sim_printf("   8251-%d: Mode Instruction=%02X\n", devnum, data);
             i8251_unit.u6 = 1;          /* set cmd received */
         }
         return (0);
     }
 }
 
-int32 i8251d(int32 io, int32 data)
+uint8 i8251d(t_bool io, uint8 data, uint8 devnum)
 {
+    if (devnum >= I8251_NUM) {
+        sim_printf("8251d: Illegal Device Number %d\n", devnum);
+        return 0;
+    }
     if (io == 0) {                      /* read data port */
         i8251_unit.u3 &= ~RXR;
         return (i8251_unit.buf);
@@ -243,7 +270,7 @@ int32 i8251d(int32 io, int32 data)
     return 0;
 }
 
-void i8251_reset1(void)
+void i8251_reset1(uint8 devnum)
 {
     i8251_unit.u3 = TXR + TXE;          /* status */
     i8251_unit.u4 = 0;                  /* mode instruction */
@@ -251,7 +278,7 @@ void i8251_reset1(void)
     i8251_unit.u6 = 0;
     i8251_unit.buf = 0;
     i8251_unit.pos = 0;
-    sim_printf("   8251: Reset\n");
+    sim_printf("   8251-%d: Reset\n", devnum);
 }
 
 /* end of i8251.c */
