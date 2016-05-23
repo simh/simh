@@ -525,6 +525,9 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw) {
             r = m68k_disassemble(disasm_result, addr, M68K_CPU_TYPE_68000);
             break;
 
+        default:
+            return SCPE_IERR;
+            
     }
     fprintf(of, "%s", disasm_result);
     return 1 - r;

@@ -164,6 +164,7 @@ int32 dsk12(const int32 port, const int32 io, const int32 data);
 static t_stat dsk_boot(int32 unitno, DEVICE *dptr);
 static t_stat dsk_reset(DEVICE *dptr);
 static t_stat dsk_attach(UNIT *uptr, CONST char *cptr);
+static const char* dsk_description(DEVICE *dptr);
 
 extern UNIT cpu_unit;
 extern uint32 PCX;
