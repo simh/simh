@@ -359,6 +359,8 @@ void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device 
 
 void eth_mac_fmt (ETH_MAC* const add, char* buffer);    /* format ethernet mac address */
 t_stat eth_mac_scan (ETH_MAC* mac, const char* strmac); /* scan string for mac, put in mac */
+t_stat eth_mac_scan_ex (ETH_MAC* mac,                   /* scan string for mac, put in mac */
+                        const char* strmac, UNIT *uptr);/* for specified unit */
 
 t_stat ethq_init (ETH_QUE* que, int max);               /* initialize FIFO queue */
 void ethq_clear  (ETH_QUE* que);                        /* clear FIFO queue */

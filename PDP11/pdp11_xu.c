@@ -380,7 +380,7 @@ t_stat xu_setmac (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 
   if (!cptr) return SCPE_IERR;
   if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-  status = eth_mac_scan(&xu->var->mac, cptr);
+  status = eth_mac_scan_ex(&xu->var->mac, cptr, uptr);
   return status;
 }
 

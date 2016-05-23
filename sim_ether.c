@@ -369,6 +369,14 @@
 #include "sim_ether.h"
 #include "sim_sock.h"
 #include "sim_timer.h"
+#if defined(_WIN32)
+#include <direct.h>
+#else
+#include <unistd.h>
+#endif
+
+/* Internal routines - forward declarations */
+static int _eth_get_system_id (char *buf, size_t buf_size);
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -376,23 +384,80 @@
 
 t_stat eth_mac_scan (ETH_MAC* mac, const char* strmac)
 {
-  unsigned int a0, a1, a2, a3, a4, a5;
-  const ETH_MAC zeros = {0,0,0,0,0,0};
-  const ETH_MAC ones  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-  ETH_MAC newmac;
+return eth_mac_scan_ex (mac, strmac, NULL);
+}
 
-  if ((6 != sscanf(strmac, "%x:%x:%x:%x:%x:%x", &a0, &a1, &a2, &a3, &a4, &a5)) &&
-      (6 != sscanf(strmac, "%x.%x.%x.%x.%x.%x", &a0, &a1, &a2, &a3, &a4, &a5)) &&
-      (6 != sscanf(strmac, "%x-%x-%x-%x-%x-%x", &a0, &a1, &a2, &a3, &a4, &a5)))
+t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
+{
+  unsigned int a[6], g[6];
+  FILE *f;
+  char filebuf[64] = "";
+  uint32 i;
+  static const ETH_MAC zeros = {0,0,0,0,0,0};
+  static const ETH_MAC ones  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  ETH_MAC newmac;
+  struct {
+      uint32 bits;
+      char system_id[37];
+      char cwd[PATH_MAX];
+      char file[PATH_MAX];
+      ETH_MAC base_mac;
+      char uname[64];
+      char sim[128];
+      } state;
+  CONST char *cptr, *tptr;
+  uint32 data;
+
+  /* Allow generated MAC address */
+  /* XX:XX:XX:XX:XX:XX{/bits{>file}} */
+  /* bits (if specified) must be <= 32 */
+
+  memset (&state, 0, sizeof(state));
+  _eth_get_system_id (state.system_id, sizeof(state.system_id));
+  strncpy (state.sim, sim_name, sizeof(state.sim));
+  getcwd (state.cwd, sizeof(state.cwd));
+  if (uptr)
+    strncpy (state.uname, sim_uname (uptr), sizeof(state.uname));
+  cptr = strchr (strmac, '>');
+  if (cptr) {
+    strncpy (state.file, cptr + 1, sizeof(state.file));
+    if ((f = fopen (state.file, "r"))) {
+      filebuf[sizeof(filebuf)-1] = '\0';
+      fgets (filebuf, sizeof(filebuf)-1, f);
+      strmac = filebuf;
+      fclose (f);
+      strcpy (state.file, "");  /* avoid saving */
+      }
+    }
+  cptr = strchr (strmac, '/');
+  if (cptr) {
+    state.bits = (uint32)strtotv (cptr + 1, &tptr, 10);
+    if ((state.bits < 16) || (state.bits > 48))
+      return SCPE_ARG;
+    }
+  else
+    state.bits = 48;
+  data = eth_crc32 (0, (void *)&state, sizeof(state));
+  for (i=g[0]=g[1]=0; i<4; i++)
+    g[i+2] = (data >> (i << 3)) & 0xFF;
+  if ((6 != sscanf(strmac, "%x:%x:%x:%x:%x:%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])) &&
+      (6 != sscanf(strmac, "%x.%x.%x.%x.%x.%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])) &&
+      (6 != sscanf(strmac, "%x-%x-%x-%x-%x-%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])))
     return SCPE_ARG;
-  if ((a0 > 0xFF) || (a1 > 0xFF) || (a2 > 0xFF) || (a3 > 0xFF) || (a4 > 0xFF) || (a5 > 0xFF))
-    return SCPE_ARG;
-  newmac[0] = (unsigned char)a0;
-  newmac[1] = (unsigned char)a1;
-  newmac[2] = (unsigned char)a2;
-  newmac[3] = (unsigned char)a3;
-  newmac[4] = (unsigned char)a4;
-  newmac[5] = (unsigned char)a5;
+  for (i=0; i<6; i++)
+    if (a[i] > 0xFF)
+      return SCPE_ARG;
+    else {
+      uint32 mask, shift;
+    
+      state.base_mac[i] = a[i];
+      if (((i + 1) << 3) < state.bits)
+          shift = 0;
+      else
+          shift = ((i + 1) << 3) - state.bits;
+      mask = 0xFF << shift;
+      newmac[i] = (unsigned char)((a[i] & mask) | (g[i] & ~mask));
+      }
 
   /* final check - mac cannot be broadcast or multicast address */
   if (!memcmp(newmac, zeros, sizeof(ETH_MAC)) ||  /* broadcast */
@@ -401,7 +466,26 @@ t_stat eth_mac_scan (ETH_MAC* mac, const char* strmac)
      )
     return SCPE_ARG;
 
-  /* new mac is OK, copy into passed mac */
+  /* new mac is OK */
+  /* optionally save */
+  if (state.file[0]) {              /* Save File specified? */
+    f = fopen (state.file, "w");
+    if (f == NULL)
+      return SCPE_ARG;
+    eth_mac_fmt (&newmac, filebuf);
+    fprintf (f, "%s/48\n", filebuf);
+    fprintf (f, "system-id: %s\n", state.system_id);
+    fprintf (f, "directory: %s\n", state.cwd);
+    fprintf (f, "simulator: %s\n", state.sim);
+    fprintf (f, "device:    %s\n", state.uname);
+    fprintf (f, "file:      %s\n", state.file);
+    eth_mac_fmt (&state.base_mac, filebuf);
+    fprintf (f, "base-mac:  %s\n", filebuf);
+    fprintf (f, "specified: %d bits\n", state.bits);
+    fprintf (f, "generated: %d bits\n", 48-state.bits);
+    fclose (f);
+    }
+  /* copy into passed mac */
   memcpy (*mac, newmac, sizeof(ETH_MAC));
   return SCPE_OK;
 }
@@ -894,6 +978,8 @@ int eth_devices (int max, ETH_LIST* dev)
   {return -1;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
   {}
+static int _eth_get_system_id (char *buf, size_t buf_size)
+  {memset (buf, 0, buf_size); return 0;}
 #else    /* endif unimplemented */
 
 const char *eth_capabilities(void)
@@ -1360,6 +1446,29 @@ static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6
 #endif
   return ReturnValue;
 }
+
+static int _eth_get_system_id (char *buf, size_t buf_size)
+{
+  LONG status;
+  DWORD reglen, regtype;
+  HKEY reghnd;
+
+  memset (buf, 0, buf_size);
+  if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", 0, KEY_QUERY_VALUE|KEY_WOW64_64KEY, &reghnd)) != ERROR_SUCCESS)
+    return -1;
+  reglen = buf_size;
+  if ((status = RegQueryValueExA (reghnd, "MachineGuid", NULL, &regtype, buf, &reglen)) != ERROR_SUCCESS) {
+    RegCloseKey (reghnd);
+    return -1;
+    }
+  RegCloseKey (reghnd );
+  /* make sure value is the right type, bail if not acceptable */
+  if ((regtype != REG_SZ) || (reglen > buf_size))
+    return -1;
+  /* registry value seems OK */
+  return 0;
+}
+
 #endif  /* defined(_WIN32) || defined(__CYGWIN__) */
 
 #if defined (__VMS) && !defined(__VAX)
@@ -1510,6 +1619,44 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
     }
 #endif
 }
+
+#if defined(__APPLE__)
+#include <uuid/uuid.h>
+#include <unistd.h>
+static int _eth_get_system_id (char *buf, size_t buf_size)
+{
+static struct timespec wait = {5, 0};   /* 5 seconds */
+static uuid_t uuid;
+
+memset (buf, 0, buf_size);
+if (buf_size < 37)
+  return -1;
+if (gethostuuid (uuid, &wait))
+  memset (uuid, 0, sizeof(uuid));
+uuid_unparse_lower(uuid, buf);
+return 0;
+}
+#elif !defined(_WIN32)
+static int _eth_get_system_id (char *buf, size_t buf_size)
+{
+FILE *f;
+
+memset (buf, 0, buf_size);
+if ((f = fopen ("/etc/machine-id", "r"))) {
+  fread (buf, 1, buf_size, f);
+  fclose (f);
+  }
+else {
+  if ((f = popen ("hostname", "r"))) {
+    fread (buf, 1, buf_size, f);
+    pclose (f);
+    }
+  }
+while ((strlen (buf) > 0) && sim_isspace(buf[strlen (buf) - 1]))
+  buf[strlen (buf) - 1] = '\0';
+return 0;
+}
+#endif
 
 /* Forward declarations */
 static void
