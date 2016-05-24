@@ -167,7 +167,7 @@ MTAB xu_mod[] = {
   { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
     NULL, &show_vec, NULL, "Interrupt vector" },
 #endif
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xu_setmac, &xu_showmac, NULL, "MAC address" },
   { MTAB_XTD |MTAB_VDV|MTAB_NMO, 0, "ETH", NULL,
     NULL, &eth_show, NULL, "Display attachable devices" },

@@ -491,7 +491,7 @@ MTAB xq_mod[] = {
     NULL, &show_addr, NULL, "Qbus address" },
   { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
     NULL, &show_vec, NULL,  "Interrupt vector" },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xq_setmac, &xq_showmac, NULL, "MAC address" },
   { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "ETH", NULL,
     NULL, &eth_show, NULL, "Display attachable devices" },
