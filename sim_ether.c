@@ -410,7 +410,7 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
 
   /* Allow generated MAC address */
   /* XX:XX:XX:XX:XX:XX{/bits{>file}} */
-  /* bits (if specified) must be <= 32 */
+  /* bits (if specified) must be from 16 thru 48 */
 
   memset (&state, 0, sizeof(state));
   _eth_get_system_id (state.system_id, sizeof(state.system_id));
@@ -433,7 +433,7 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
   if (cptr) {
     state.bits = (uint32)strtotv (cptr + 1, &tptr, 10);
     if ((state.bits < 16) || (state.bits > 48))
-      return SCPE_ARG;
+      return sim_messagef (SCPE_ARG, "Invalid MAC address bits specifier '%d'. Valid values are from 16 thru 48\n", state.bits);
     }
   else
     state.bits = 48;
@@ -443,10 +443,10 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
   if ((6 != sscanf(strmac, "%x:%x:%x:%x:%x:%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])) &&
       (6 != sscanf(strmac, "%x.%x.%x.%x.%x.%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])) &&
       (6 != sscanf(strmac, "%x-%x-%x-%x-%x-%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])))
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "Invalid MAC address format: '%s'\n", strmac);
   for (i=0; i<6; i++)
     if (a[i] > 0xFF)
-      return SCPE_ARG;
+      return sim_messagef (SCPE_ARG, "Invalid MAC address byte value: %02X\n", a[i]);
     else {
       uint32 mask, shift;
     
@@ -464,14 +464,14 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
       !memcmp(newmac, ones,  sizeof(ETH_MAC)) ||  /* broadcast */
       (newmac[0] & 0x01)                          /* multicast */
      )
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "Can't use Broadcast or MultiCast address as interface MAC address\n");
 
   /* new mac is OK */
   /* optionally save */
   if (state.file[0]) {              /* Save File specified? */
     f = fopen (state.file, "w");
     if (f == NULL)
-      return SCPE_ARG;
+      return sim_messagef (SCPE_ARG, "Can't open MAC address configuration file '%s'.\n", state.file);
     eth_mac_fmt (&newmac, filebuf);
     fprintf (f, "%s/48\n", filebuf);
     fprintf (f, "system-id: %s\n", state.system_id);
