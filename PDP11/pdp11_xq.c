@@ -2538,6 +2538,12 @@ t_stat xq_reset(DEVICE* dptr)
 
   sim_debug(DBG_TRC, xq->dev, "xq_reset()\n");
 
+  /* One time only initializations */
+  if (!xq->var->initialized) {
+    xq->var->initialized = TRUE;
+    /* Set an initial MAC address in the DEC range */
+    xq_setmac (dptr->units, 0, "08:00:2B:00:00:00/24", NULL);
+    }
   /* calculate MAC checksum */
   xq_make_checksum(xq);
 
@@ -3171,8 +3177,8 @@ const char helpString[] =
     " A Valid MAC address is comprised of 6 pairs of hex digits delimited by\n"
     " dashes, colons or period characters.\n"
     "\n"
-    " The default MAC address for the XQ device is 08-00-2B-AA-BB-CC.  The\n"
-    " default MAC address for the XQB device is 08-00-2B-BB-CC-DD.\n"
+    " The default MAC address for the %D device is set to a value in the range\n"
+    " from 08-00-2B-00-00-00 thru 08-00-2B-FF-FF-FF.\n"
     "\n"
     " The SET MAC command must be done before the %D device is attached to a\n"
     " network.\n"

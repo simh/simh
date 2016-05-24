@@ -849,6 +849,12 @@ t_stat xu_reset(DEVICE* dptr)
   CTLR* xu = xu_dev2ctlr(dptr);
 
   sim_debug(DBG_TRC, xu->dev, "xu_reset()\n");
+  /* One time only initializations */
+  if (!xu->var->initialized) {
+    xu->var->initialized = TRUE;
+    /* Set an initial MAC address in the DEC range */
+    xu_setmac (dptr->units, 0, "08:00:2B:00:00:00/24", NULL);
+    }
   /* init read queue (first time only) */
   status = ethq_init (&xu->var->ReadQ, XU_QUE_MAX);
   if (status != SCPE_OK)
@@ -1903,9 +1909,10 @@ fprint_set_help (st, dptr);
 fprintf (st, "\nConfigured options and controller state can be displayed with:\n\n");
 fprint_show_help (st, dptr);
 fprintf (st, "\nMAC address octets must be delimited by dashes, colons or periods.\n");
-fprintf (st, "The controller defaults to 08-00-2B-CC-DD-EE, which should be sufficient if\n");
-fprintf (st, "there is only one SIMH DEUNA/DELUA controller on your LAN.  Two cards with the\n");
-fprintf (st, "same MAC address will see each other's packets, resulting in a serious mess.\n\n");
+fprintf (st, "The controller defaults to a relatively unique MAC address in the range\n");
+fprintf (st, "08-00-2B-00-00-00 thru 08-00-2B-FF-FF-FF, which should be sufficient\n");
+fprintf (st, "for most network environments.  If desired, the simulated MAC address\n");
+fprintf (st, "can be directly set.\n");
 fprintf (st, "To access the network, the simulated Ethernet controller must be attached to a\n");
 fprintf (st, "real Ethernet interface.\n\n");
 eth_attach_help(st, dptr, uptr, flag, cptr);
