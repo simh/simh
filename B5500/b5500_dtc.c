@@ -148,6 +148,8 @@ t_stat              dtc_setnl (UNIT *, int32, CONST char *, void *);
 t_stat              dtc_set_log (UNIT *, int32, CONST char *, void *);
 t_stat              dtc_set_nolog (UNIT *, int32, CONST char *, void *);
 t_stat              dtc_show_log (FILE *, UNIT *, int32, CONST void *);
+t_stat              dtc_set_buf (UNIT *, int32, CONST char *, void *);
+t_stat              dtc_show_buf (FILE *, UNIT *, int32, CONST void *);
 t_stat              dtc_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 t_stat              dtc_help_attach (FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *dtc_description(DEVICE *);
@@ -162,6 +164,7 @@ uint8               dtc_lstatus[DTC_MLINES];                    /* Line status *
 uint16              dtc_bufptr[DTC_MLINES];                     /* Buffer pointer */
 uint16              dtc_bsize[DTC_MLINES];                      /* Buffer size */
 uint16              dtc_blimit[DTC_MLINES];                     /* Buffer size */
+int                 dtc_bufsize = DTC_BUFSIZ;
 
 
 MTAB                dtc_mod[] = {
@@ -175,12 +178,14 @@ MTAB                dtc_mod[] = {
         NULL, &tmxr_show_cstat, (void *) &dtc_desc, "Display multiplexer statistics" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
         &dtc_setnl, &tmxr_show_lines, (void *) &dtc_desc, "Display number of lines" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "BUFSIZE", "BUFSIZE=n",
+        &dtc_set_buf, &dtc_show_buf, (void *)&dtc_bufsize, "Set buffer size" },
     { MTAB_XTD|MTAB_VDV|MTAB_NC, 0, NULL, "LOG=n=file",
-        &dtc_set_log, NULL, &dtc_desc },
+        &dtc_set_log, NULL, (void *)&dtc_desc },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "NOLOG",
-        &dtc_set_nolog, NULL, &dtc_desc, "Disable logging on designated line" },
+        &dtc_set_nolog, NULL, (void *)&dtc_desc, "Disable logging on designated line" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "LOG", NULL,
-        NULL, &dtc_show_log, &dtc_desc, "Display logging for all lines" },
+        NULL, &dtc_show_log, (void *)&dtc_desc, "Display logging for all lines" },
     {0}
 };
 
@@ -512,7 +517,7 @@ dtco_srv(UNIT * uptr)
     sim_clock_coschedule(uptr, tmxr_poll);
     ln = tmxr_poll_conn(&dtc_desc);     /* look for connect */
     if (ln >= 0) {              /* got one? */
-        dtc_blimit[ln] = DTC_BUFSIZ-1;
+        dtc_blimit[ln] = dtc_bufsize-1;
         dtc_lstatus[ln] = BufIRQ|BufAbnormal|BufWriteRdy;
         IAR |= IRQ_12;
         sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm connect %d\n", ln);
@@ -839,6 +844,33 @@ t_stat dtc_show_log (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
+/* SET BUFFER processor */
+
+t_stat dtc_set_buf (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    t_stat r;
+    int32 bufsiz;
+
+    if (cptr == NULL)
+        return SCPE_ARG;
+    bufsiz = (int32) get_uint (cptr, 10, DTC_BUFSIZ, &r);
+    if ((r != SCPE_OK) || (bufsiz >= DTC_BUFSIZ))
+        return SCPE_ARG;
+    if (bufsiz > 0 && (bufsiz % 28) == 0) {
+        dtc_bufsize = bufsiz;
+        return SCPE_OK;
+    }
+    return SCPE_ARG;
+}
+
+/* SHOW BUFFER processor */
+
+t_stat dtc_show_buf (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    fprintf (st, "bufsize=%d ", dtc_bufsize);
+    return SCPE_OK;
+}
+
 /* Show summary processor */
 
 t_stat
@@ -886,6 +918,11 @@ fprintf (st, "The B249 is a terminal multiplexor.  Up to %d lines are supported.
 fprintf (st, "The default number of lines is %d.  The number of lines can\n", DTC_MLINES);
 fprintf (st, "be changed with the command\n\n");
 fprintf (st, "   sim> SET %s LINES=n            set line count to n\n\n", dptr->name);
+fprintf (st, "The default buffer size for all lines can be set to a multiple of 28\n");
+fprintf (st, "to a max of %d characters. Changes will take effect when ", DTC_BUFSIZ);
+fprintf (st, "devices connect.\nThis number must match what MCP believes to be the ");
+fprintf (st, "buffer size.\n\n");
+fprintf (st, "   sim> SET %s BUFSIZE=n          set buffer size to n\n\n", dptr->name);
 fprintf (st, "The B249 supports logging on a per-line basis.  The command\n\n");
 fprintf (st, "   sim> SET %s LOG=n=filename\n\n", dptr->name);
 fprintf (st, "enables logging for the specified line(n) to the indicated file.  The command\n\n");
