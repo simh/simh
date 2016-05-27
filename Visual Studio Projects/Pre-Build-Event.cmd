@@ -164,6 +164,8 @@ findstr "/c:LIBSDL_FTOL2_SSE" ..\..\windows-build\Windows-Build_Versions.txt >NU
 if ERRORLEVEL 1 goto _notice2
 findstr "/c:LIBSDL_ALLMUL" ..\..\windows-build\Windows-Build_Versions.txt >NUL
 if ERRORLEVEL 1 goto _notice2
+findstr "/c:LIBSDL_ALLSHR" ..\..\windows-build\Windows-Build_Versions.txt >NUL
+if ERRORLEVEL 1 goto _notice2
 :_done_libsdl
 if "%_X_LIBPCRE%" == "" goto _done_libpcre
 if not exist ../../windows-build/PCRE/include/pcreposix.h goto _notice2
