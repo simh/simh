@@ -2533,6 +2533,7 @@ for ( ;; ) {
         temp = op_ffs (r, op1);                         /* find first 1 */
         WRITE_L (op0 + temp);                           /* store result */
         cc = r? 0: CC_Z;                                /* set cc's */
+        r = op0 + temp;
         if ((cc == CC_Z) &&                             /* No set bits found? */
             (cpu_idle_mask & VAX_IDLE_ULT1X) &&         /* running Ultrix 1.X" */
             (PSL_GETIPL (PSL) == 0x0) &&                /*  at IPL 0? */
@@ -2547,6 +2548,7 @@ for ( ;; ) {
         temp = op_ffs (r, op1);                         /* find first 1 */
         WRITE_L (op0 + temp);                           /* store result */
         cc = r? 0: CC_Z;                                /* set cc's */
+        r = op0 + temp;
         break;
 
 /* Insert field instruction - insv src.rl,pos.rb,size.rl,base.wb

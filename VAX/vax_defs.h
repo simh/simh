@@ -381,7 +381,7 @@ extern jmp_buf save_env;
 #define DR_V_USPMASK    4
 #define DR_M_USPMASK    0x70                            /* #spec, sym_ */
 #define DR_GETNSP(x)    ((x) & DR_NSPMASK)
-#define DR_GETUSP(x)    (((x) >> DR_V_USPMASK) & DR_M_USPMASK)
+#define DR_GETUSP(x)    (((x) & DR_M_USPMASK) >> DR_V_USPMASK)
 
 /* Extra bits in the opcode flag word of the Decode ROM array only for history results */
 
