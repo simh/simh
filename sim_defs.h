@@ -310,6 +310,7 @@ typedef uint32          t_addr;
 #define SIM_SW_REST     (1u << 27)                      /* attach/restore */
 #define SIM_SW_REG      (1u << 28)                      /* register value */
 #define SIM_SW_STOP     (1u << 29)                      /* stop message */
+#define SIM_SW_SHUT     (1u << 30)                      /* shutdown */
 
 /* Simulator status codes
 

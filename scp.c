@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Mar-16    RMS     Added shutdown flag for detach_all
    20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
    06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
    25-Sep-11    MP      Added the ability for a simulator built with 
@@ -3907,8 +3908,8 @@ while (*cptr != 0) {                                    /* do all mods */
                     }
                 else if (!mptr->desc)                   /* value desc? */
                     break;
-//                else if (mptr->mask & MTAB_VAL) {       /* take a value? */
-//                    if (!cvptr) return SCPE_MISVAL;     /* none? error */
+//                else if (mptr->mask & MTAB_VAL) {     /* take a value? */
+//                    if (!cvptr) return SCPE_MISVAL;   /* none? error */
 //                    r = dep_reg (0, cvptr, (REG *) mptr->desc, 0);
 //                    if (r != SCPE_OK) return r;
 //                    }
@@ -5402,7 +5403,7 @@ if (strcmp (gbuf, "ALL") == 0)
 dptr = find_unit (gbuf, &uptr);                         /* locate unit */
 if (dptr == NULL)                                       /* found dev? */
     return SCPE_NXDEV;
-if (uptr == NULL)                                        /* valid unit? */
+if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
 return scp_detach_unit (dptr, uptr);                    /* detach */
 }
@@ -5429,6 +5430,8 @@ t_stat r;
 
 if ((start < 0) || (start > 1))
     return SCPE_IERR;
+if (shutdown)
+    sim_switches = sim_switches | SIM_SW_SHUT;          /* flag shutdown */
 for (i = start; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
     for (j = 0; j < dptr->numunits; j++) {              /* loop thru units */
         uptr = (dptr->units) + j;
