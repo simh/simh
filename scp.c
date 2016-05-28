@@ -8193,10 +8193,16 @@ if (logop >= 0) {
     free (schptr->mask);
     schptr->mask = logval;
     }
+else {
+    free (logval);
+    }
 if (cmpop >= 0) {
     schptr->boolop = cmpop;
     free (schptr->comp);
     schptr->comp = cmpval;
+    }
+else {
+    free (cmpval);
     }
 return schptr;
 }
