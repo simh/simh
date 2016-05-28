@@ -379,25 +379,30 @@ extern jmp_buf save_env;
 #define DR_F            0x80                            /* FPD ok flag */
 #define DR_NSPMASK      0x07                            /* #specifiers */
 #define DR_V_USPMASK    4
-#define DR_M_USPMASK    0x70                            /* #spec, sym_ */
+#define DR_M_USPMASK    0x07                            /* #spec, sym_ */
 #define DR_GETNSP(x)    ((x) & DR_NSPMASK)
-#define DR_GETUSP(x)    (((x) & DR_M_USPMASK) >> DR_V_USPMASK)
+#define DR_GETUSP(x)    (((x) >> DR_V_USPMASK) & DR_M_USPMASK)
 
 /* Extra bits in the opcode flag word of the Decode ROM array only for history results */
 
 #define DR_V_RESMASK    8
-#define DR_M_RESMASK    0x0F00
+#define DR_M_RESMASK    0x000F
 #define RB_0    (0 << DR_V_RESMASK)     /* No Results */
 #define RB_B    (1 << DR_V_RESMASK)     /* Byte Result */
 #define RB_W    (2 << DR_V_RESMASK)     /* Word Result */
 #define RB_L    (3 << DR_V_RESMASK)     /* Long Result */
 #define RB_Q    (4 << DR_V_RESMASK)     /* Quad Result */
 #define RB_O    (5 << DR_V_RESMASK)     /* Octa Result */
-#define RB_R0   (6 << DR_V_RESMASK)     /* Reg  R0     */
-#define RB_R1   (7 << DR_V_RESMASK)     /* Regs R0-R1  */
-#define RB_R3   (8 << DR_V_RESMASK)     /* Regs R0-R3  */
-#define RB_R5   (9 << DR_V_RESMASK)     /* Regs R0-R5  */
-#define RB_SP  (10 << DR_V_RESMASK)     /* @SP         */
+#define RB_OB   (6 << DR_V_RESMASK)     /* Octa Byte Result */
+#define RB_OW   (7 << DR_V_RESMASK)     /* Octa Word Result */
+#define RB_OL   (8 << DR_V_RESMASK)     /* Octa Long Result */
+#define RB_OQ   (9 << DR_V_RESMASK)     /* Octa Quad Result */
+#define RB_R0  (10 << DR_V_RESMASK)     /* Reg  R0     */
+#define RB_R1  (11 << DR_V_RESMASK)     /* Regs R0-R1  */
+#define RB_R3  (12 << DR_V_RESMASK)     /* Regs R0-R3  */
+#define RB_R5  (13 << DR_V_RESMASK)     /* Regs R0-R5  */
+#define RB_SP  (14 << DR_V_RESMASK)     /* @SP         */
+#define DR_GETRES(x)    (((x) >> DR_V_RESMASK) & DR_M_RESMASK)
 
 /* Decode ROM: specifier entry */
 
@@ -760,6 +765,24 @@ enum opcodes {
 extern uint32 cpu_idle_mask;                            /* idle mask */
 void cpu_idle (void);
 
+/* Instruction History */
+#define HIST_MIN        64
+#define HIST_MAX        250000
+
+#define OPND_SIZE       16
+#define INST_SIZE       52
+
+typedef struct {
+    double              time;
+    int32               iPC;
+    int32               PSL;
+    int32               opc;
+    uint8               inst[INST_SIZE];
+    uint32              opnd[OPND_SIZE];
+    uint32              res[6];
+    } InstHistory;
+
+
 /* CPU Register definitions */
 
 extern int32 R[16];                                     /* registers */
@@ -850,7 +873,7 @@ extern void op_polyd (int32 *opnd, int32 acc);
 extern void op_polyg (int32 *opnd, int32 acc);
 
 /* vax_octa.c externals */
-extern int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va);
+extern int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va, InstHistory *hst);
 
 /* vax_cmode.c externals */
 extern int32 op_cmode (int32 cc);
