@@ -1,6 +1,6 @@
 /* vax_cis.c: VAX CIS instructions
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,8 @@
    On a full VAX, this module simulates the VAX commercial instruction set (CIS).
    On a subset VAX, this module implements the emulated instruction fault.
 
-   16-Oct-08    RMS     Fixed bug in ASHP left overflow calc (Word/NibbleLShift)
+   30-May-16    RMS     Fixed WorldLshift FOR REAL
+   16-Oct-08    RMS     Fixed bug in ASHP left overflow calc (Word/NibbleLshift)
                         Fixed bug in DIVx (LntDstr calculation)
    28-May-08    RMS     Inlined physical memory routines
    16-May-06    RMS     Fixed bug in length calculation (Tim Stark)
@@ -1494,7 +1495,7 @@ void WordRshift (DSTR *dsrc, int32 sc)
 {
 int32 i;
 
-if (sc) {
+if (sc != 0) {
     for (i = 0; i < DSTRLNT; i++) {
         if ((i + sc) < DSTRLNT)
             dsrc->val[i] = dsrc->val[i + sc];
@@ -1513,18 +1514,18 @@ return;
 
 int32 WordLshift (DSTR *dsrc, int32 sc)
 {
-int32 i, c;
+int32 i, c, zc;
 
 c = 0;
-if (sc) {
-    for (i = DSTRMAX; i >= 0; i--) {
-        if (i >= sc)
-            dsrc->val[i] = dsrc->val[i - sc];
-        else {
-            c |= dsrc->val[i];
-            dsrc->val[i] = 0;
-            }
+if (sc != 0) {
+    for (i = DSTRMAX; i >= 0; i--) {                    /* work hi to low */
+        if ((i + sc) <= DSTRMAX)                        /* move in range? */
+            dsrc->val[i + sc] = dsrc->val[i];
+        else c |= dsrc->val[i];                         /* no, count as ovflo */
         }
+    zc = (sc >= DSTRLNT)? DSTRLNT: sc;                  /* cap fill */
+    for (i = 0; i < zc; i++)                            /* fill with 0s */
+        dsrc->val[i] = 0;
     }
 return c;
 }               
@@ -1541,7 +1542,7 @@ uint32 NibbleRshift (DSTR *dsrc, int32 sc, uint32 cin)
 {
 int32 i, s, nc;
 
-if ((s = sc * 4)) {
+if ((s = sc * 4) != 0) {
     for (i = DSTRMAX; i >= 0; i--) {
         nc = (dsrc->val[i] << (32 - s)) & LMASK;
         dsrc->val[i] = ((dsrc->val[i] >> s) |
@@ -1565,7 +1566,7 @@ uint32 NibbleLshift (DSTR *dsrc, int32 sc, uint32 cin)
 {
 int32 i, s, nc;
 
-if ((s = sc * 4)) {
+if ((s = sc * 4) != 0) {
     for (i = 0; i < DSTRLNT; i++) {
         nc = dsrc->val[i] >> (32 - s);
         dsrc->val[i] = ((dsrc->val[i] << s) |
