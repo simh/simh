@@ -19,7 +19,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\GRI\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -27,7 +27,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd"
+				CommandLine="Pre-Build-Event.cmd LIBPCRE"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -41,14 +41,17 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../GRI/"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
+				AdditionalIncludeDirectories="./;../;../GRI/;&quot;../../windows-build/PCRE/include/&quot;"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
+				KeepComments="false"
 				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
+				BasicRuntimeChecks="0"
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				DebugInformationFormat="4"
+				DebugInformationFormat="3"
+				CompileAs="1"
+				ShowIncludes="false"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -61,12 +64,13 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\GRI.exe"
+				AdditionalDependencies="wsock32.lib winmm.lib pcrestaticd.lib pcreposixstaticd.lib"
 				LinkIncremental="2"
+				AdditionalLibraryDirectories="../../windows-build/PCRE/lib/"
 				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(OutDir)\GRI.pdb"
 				SubSystem="1"
+				StackReserveSize="10485760"
+				StackCommitSize="10485760"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
@@ -96,7 +100,7 @@
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\GRI\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -104,7 +108,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd"
+				CommandLine="Pre-Build-Event.cmd LIBPCRE"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -120,14 +124,15 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
-				AdditionalIncludeDirectories="./;../;../GRI/"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
+				AdditionalIncludeDirectories="./;../;../GRI/;&quot;../../windows-build/PCRE/include/&quot;"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="3"
+				CompileAs="1"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -140,11 +145,13 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\GRI.exe"
+				AdditionalDependencies="wsock32.lib winmm.lib pcrestatic.lib pcreposixstatic.lib"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="../../windows-build/PCRE/lib/"
 				GenerateDebugInformation="false"
 				SubSystem="1"
+				StackReserveSize="10485760"
+				StackCommitSize="10485760"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				RandomizedBaseAddress="1"
@@ -233,6 +240,10 @@
 				RelativePath="..\sim_tmxr.c"
 				>
 			</File>
+			<File
+				RelativePath="..\sim_video.c"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -288,6 +299,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_video.h"
 				>
 			</File>
 		</Filter>

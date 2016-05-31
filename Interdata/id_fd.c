@@ -132,7 +132,6 @@ static uint32 ctab[16] = {
     0, 0, 0, 0
     };
 
-DEVICE fd_dev;
 uint32 fd (uint32 dev, uint32 op, uint32 dat);
 t_stat fd_svc (UNIT *uptr);
 t_stat fd_reset (DEVICE *dptr);
@@ -227,7 +226,7 @@ switch (op) {                                           /* case IO op */
                 fd_sta = fd_sta | STA_BSY;              /* set busy */
                 }
             else fd_bptr = 0;                           /* just wrap */
-			}
+            }
         if ((ctab[fnc] & C_RD) && fd_arm)               /* if rd & arm, */
             SET_INT (v_FD);                             /* interrupt */
         return fd_db;                                   /* return buf */
@@ -367,7 +366,7 @@ switch (fnc) {                                          /* case on function */
         if ((uptr->flags & UNIT_BUF) == 0) {            /* not attached? */
             fd_es[u][0] = fd_es[u][0] | ES0_FLT;        /* set err */
             fd_es[u][1] = fd_es[u][1] | ES1_NRDY;
-			}
+            }
         for (i = 0; i < ES_SIZE; i++)                   /* copy to buf */
             fdxb[i] = fd_es[u][i];
         for (i = ES_SIZE; i < FD_NUMBY; i++)
@@ -378,7 +377,7 @@ switch (fnc) {                                          /* case on function */
         if ((uptr->flags & UNIT_BUF) == 0) {            /* not attached? */
             fd_done (u, STA_ERR, ES0_ERR | ES0_FLT, ES1_NRDY);
             return SCPE_OK;
-			}
+            }
         for (i = 0; i < FD_NUMBY; i++) fdxb[i] = 0;     /* clr buf */
         tk = GET_TRK (uptr->LRN);                       /* get track */
         sc = GET_SEC (uptr->LRN);                       /* get sector */
@@ -516,9 +515,6 @@ static uint8 boot_rom[] = {
 
 t_stat fd_boot (int32 unitno, DEVICE *dptr)
 {
-extern uint32 PC, dec_flgs;
-extern uint16 decrom[];
-
 if (decrom[0xD5] & dec_flgs)                            /* AL defined? */
     return SCPE_NOFNC;
 IOWriteBlk (BOOT_START, BOOT_LEN, boot_rom);            /* copy boot */

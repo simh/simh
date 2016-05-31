@@ -48,9 +48,9 @@ extern REG cpu_reg[];
 extern uint16 *M;
 
 t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val);
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val);
-extern t_stat lp_load (FILE *fileref, char *cptr, char *fnam);
-extern t_stat pt_dump (FILE *of, char *cptr, char *fnam);
+t_stat parse_sym_m (const char *cptr, t_addr addr, t_value *val);
+extern t_stat lp_load (FILE *fileref, CONST char *cptr, CONST char *fnam);
+extern t_stat pt_dump (FILE *of, CONST char *cptr, CONST char *fnam);
 
 /* SCP data structures and interface routines
 
@@ -98,7 +98,7 @@ const char *sim_stop_messages[] = {
 /* Binary loader -- load carriage control tape
    Binary dump -- paper tape dump */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 if (flag)
     return pt_dump (fileref, cptr, fnam);
@@ -278,6 +278,11 @@ static const uint32 opc_val[] = {
                         if < 0, number of extra bytes retired
 */
 
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
+
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
@@ -352,9 +357,8 @@ return -1;
 
 t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val)
 {
-uint32 i, j, inst, r1, r2, ea, vp;
+uint32 i, j, inst, r1, r2, ea;
 
-vp = 0;
 inst = val[0];                                          /* first 16b */
 ea = val[1];                                            /* second 16b */
 for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
@@ -485,7 +489,7 @@ return SCPE_OK;
 
 /* Symbolic input */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 bflag, by, rdx, num;
 t_stat r;
@@ -567,10 +571,10 @@ return -1;
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val)
+t_stat parse_sym_m (const char *cptr, t_addr addr, t_value *val)
 {
 uint32 i, j, t, df, db, inst;
-int32 st, r1, r2;
+int32 r1, r2;
 t_stat r;
 char *tptr, gbuf[CBUFSIZE];
 
@@ -627,7 +631,6 @@ switch (j) {                                            /* case on class */
         r = get_addr (gbuf, &tptr, &t, addr);           /* get addr */
         if ((r != SCPE_OK) || (t & 1) || *tptr)         /* error if odd */
             return SCPE_ARG;
-        st = t;                                         /* signed version */
         db = (addr - t) & 0x1F;                         /* back displ */
         df = (t - addr) & 0x1F;                         /* fwd displ */
         if ((t == ((addr - db) & VAMASK16)) &&          /* back work and */

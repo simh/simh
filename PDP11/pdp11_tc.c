@@ -105,7 +105,15 @@
    bit bucket.
 */
 
+#if defined (VM_VAX)                                    /* VAX version */
+#include "vax_defs.h"
+extern int32 int_req[IPL_HLVL];
+#define DMASK           0xFFFF
+
+#else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
+extern int32 int_req[IPL_HLVL];
+#endif
 
 #define DT_NUMDR        8                               /* #drives */
 #define DT_M_NUMDR      (DT_NUMDR - 1)
@@ -273,10 +281,6 @@
                         CLR_INT (DTA)
 #define ABS(x)          (((x) < 0)? (-(x)): (x))
 
-extern uint16 *M;                                       /* memory */
-extern int32 int_req[IPL_HLVL];
-extern UNIT cpu_unit;
-
 int32 tcst = 0;                                         /* status */
 int32 tccm = 0;                                         /* command */
 int32 tcwc = 0;                                         /* word count */
@@ -289,13 +293,12 @@ int32 dt_substate = 0;
 int32 dt_logblk = 0;
 int32 dt_stopoffr = 0;
 
-DEVICE dt_dev;
 t_stat dt_rd (int32 *data, int32 PA, int32 access);
 t_stat dt_wr (int32 data, int32 PA, int32 access);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_svcdone (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
-t_stat dt_attach (UNIT *uptr, char *cptr);
+t_stat dt_attach (UNIT *uptr, CONST char *cptr);
 void dt_flush (UNIT *uptr);
 t_stat dt_detach (UNIT *uptr);
 t_stat dt_boot (int32 unitno, DEVICE *dptr);
@@ -309,8 +312,8 @@ void dt_stopunit (UNIT *uptr);
 int32 dt_comobv (int32 val);
 int32 dt_csum (UNIT *uptr, int32 blk);
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
-t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *dt_description (DEVICE *dptr);
+t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *dt_description (DEVICE *dptr);
 
 /* DT data structures
 
@@ -635,7 +638,7 @@ return;
 void dt_newfnc (UNIT *uptr, int32 newsta)
 {
 int32 fnc, dir, blk, unum, relpos, newpos;
-uint32 oldpos;
+t_addr oldpos;
 
 oldpos = uptr->pos;                                     /* save old pos */
 if (dt_setpos (uptr))                                   /* update pos */
@@ -646,7 +649,7 @@ dir = DTS_GETMOT (uptr->STATE) & DTS_DIR;
 unum = (int32) (uptr - dt_dev.units);
 if (oldpos == uptr->pos)
     uptr->pos = uptr->pos + (dir? -1: 1);
-blk = DT_LIN2BL (uptr->pos, uptr);
+blk = (int32)DT_LIN2BL (uptr->pos, uptr);
 
 if (dir? DT_QREZ (uptr): DT_QFEZ (uptr)) {              /* wrong ez? */
     dt_seterr (uptr, STA_END);                          /* set ez flag, stop */
@@ -792,7 +795,7 @@ else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
     detach_unit (uptr);                                 /* off reel? */
-    uptr->STATE = uptr->pos = 0;
+    uptr->STATE = 0, uptr->pos = 0;
     unum = (int32) (uptr - dt_dev.units);
     if ((unum == CSR_GETUNIT (tccm)) && (CSR_GETFNC (tccm) != FNC_STOP))
         dt_seterr (uptr, STA_SEL);                      /* error */
@@ -865,7 +868,7 @@ if (DT_QEZ (uptr)) {                                    /* in end zone? */
     dt_seterr (uptr, STA_END);                          /* end zone error */
     return SCPE_OK;
     }
-blk = DT_LIN2BL (uptr->pos, uptr);                      /* get block # */
+blk = (int32)DT_LIN2BL (uptr->pos, uptr);                      /* get block # */
 
 switch (fnc) {                                          /* at speed, check fnc */
 
@@ -877,7 +880,7 @@ switch (fnc) {                                          /* at speed, check fnc *
 
     case DTS_OFR:                                       /* off reel */
         detach_unit (uptr);                             /* must be deselected */
-        uptr->STATE = uptr->pos = 0;                    /* no visible action */
+        uptr->STATE = 0, uptr->pos = 0;                 /* no visible action */
         break;
 
 /* Read
@@ -1143,6 +1146,8 @@ return auto_config (0, 0);
 
 /* Device bootstrap */
 
+#if defined (VM_PDP11)
+
 #define BOOT_START      02000                           /* start */
 #define BOOT_ENTRY      (BOOT_START + 002)              /* entry */
 #define BOOT_UNIT       (BOOT_START + 010)              /* unit number */
@@ -1192,6 +1197,7 @@ static const uint16 boot_rom[] = {
 t_stat dt_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
+extern uint16 *M;                                       /* memory */
 
 dt_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++)
@@ -1202,6 +1208,15 @@ cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 
+#else
+
+t_stat dt_boot (int32 unitno, DEVICE *dptr)
+{
+return SCPE_NOFNC;
+}
+
+#endif
+
 /* Attach routine
 
    Determine 12b, 16b, or 18b/36b format
@@ -1211,7 +1226,7 @@ return SCPE_OK;
    If 18b/36b, read data into buffer
 */
 
-t_stat dt_attach (UNIT *uptr, char *cptr)
+t_stat dt_attach (UNIT *uptr, CONST char *cptr)
 {
 uint16 pdp8b[D8_NBSIZE];
 uint16 pdp11b[D18_BSIZE];
@@ -1236,7 +1251,7 @@ if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
         }
     }
 uptr->capac = DTU_CAPAC (uptr);                         /* set capacity */
-uptr->filebuf = calloc (uptr->capac, sizeof (uint32));
+uptr->filebuf = calloc ((size_t)uptr->capac, sizeof (uint32));
 if (uptr->filebuf == NULL) {                            /* can't alloc? */
     detach_unit (uptr);
     return SCPE_MEM;
@@ -1280,7 +1295,7 @@ else if (uptr->flags & UNIT_11FMT) {                    /* 16b? */
     uptr->hwmark = ba;
     }                                                   /* end elif */
 else uptr->hwmark = fxread (uptr->filebuf, sizeof (uint32),
-    uptr->capac, uptr->fileref);
+    (size_t)uptr->capac, uptr->fileref);
 uptr->flags = uptr->flags | UNIT_BUF;                   /* set buf flag */
 uptr->pos = DT_EZLIN;                                   /* beyond leader */
 uptr->LASTT = sim_grtime ();                            /* last pos update */
@@ -1334,7 +1349,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
             fxwrite (uptr->filebuf, sizeof (uint32),    /* write file */
                      uptr->hwmark, uptr->fileref);
     if (ferror (uptr->fileref))
-        perror ("I/O error");
+        sim_perror ("I/O error");
     }
 uptr->WRITTEN = FALSE;                                  /* no longer dirty */
 }
@@ -1353,7 +1368,7 @@ if (sim_is_active (uptr)) {                             /* active? cancel op */
         if (tccm & CSR_IE)
             SET_INT (DTA);
         }
-    uptr->STATE = uptr->pos = 0;
+    uptr->STATE = 0, uptr->pos = 0;
     }
 if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
     sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
@@ -1367,7 +1382,7 @@ uptr->capac = DT_CAPAC;                                 /* default size */
 return detach_unit (uptr);
 }
 
-t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *text2;
 const char *const text =
@@ -1515,7 +1530,7 @@ fprintf (st, "%s", text2);
 return SCPE_OK;
 }
 
-char *dt_description (DEVICE *dptr)
+const char *dt_description (DEVICE *dptr)
 {
 return "TC11/TU56 DECtape controller";
 }

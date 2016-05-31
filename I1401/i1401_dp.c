@@ -94,8 +94,8 @@
 extern uint8 M[];                                       /* memory */
 extern int32 ind[64];
 extern int32 AS, BS, iochk;
-extern int32 bcd_to_bin[16];
-extern int32 bin_to_bcd[16];
+extern const int32 bcd_to_bin[16];
+extern const int32 bin_to_bcd[16];
 extern UNIT cpu_unit;
 
 int32 dp_lastf = 0;                                     /* prior function */
@@ -269,7 +269,7 @@ switch (fnc) {                                          /* case on function */
         for (;;) {                                      /* loop */
             qzr = (--cnt == 0);                         /* set zero latch */
             dp_cvt_bin (dcf + DCF_CNT, DCF_CNT_LEN, cnt, MD_WM); /* redo count */
-            if ((r = dp_rdsec (uptr, psec, flg, qwc)))    /* read sector */
+            if ((r = dp_rdsec (uptr, psec, flg, qwc)))  /* read sector */
                 break;
             cnt = dp_get_cnt (dcf);                     /* get new count */
             if (cnt < 0)                                /* bad count? */

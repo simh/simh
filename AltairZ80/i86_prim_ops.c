@@ -1488,7 +1488,7 @@ void div_byte(PC_ENV *m, uint8 s)
     }
     div = dvd / dvs;
     mod = dvd % dvs;
-    if (abs(div) > 0xff)
+    if (div > 0xff)     // psco changed from if (abs(div) > 0xff)
     {
        i86_intr_raise(m,0);
        return;
@@ -1513,8 +1513,8 @@ void div_word(PC_ENV *m, uint16 s)
     }
     div = dvd / dvs;
     mod = dvd % dvs;
-/*    printf("dvd=%x dvs=%x -> div=%x mod=%x\n",dvd, dvs,div, mod);*/
-    if (abs(div) > 0xffff)
+/*    sim_printf("dvd=%x dvs=%x -> div=%x mod=%x\n",dvd, dvs,div, mod);*/
+    if (div > 0xffff)  // psco changed from if (abs(div) > 0xffff)
     {
        i86_intr_raise(m,0);
        return;

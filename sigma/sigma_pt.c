@@ -61,7 +61,7 @@ uint32 pt_tdv_status (void);
 t_stat pt_chan_err (uint32 st);
 t_stat pt_svc (UNIT *uptr);
 t_stat pt_reset (DEVICE *dptr);
-t_stat pt_attach (UNIT *uptr, char *cptr);
+t_stat pt_attach (UNIT *uptr, CONST char *cptr);
 
 /* PT data structures
 
@@ -186,7 +186,7 @@ switch (pt_cmd) {                                       /* case on state */
                 break;
                 }
             else {                                      /* real error */
-                perror ("PTR I/O error");
+                sim_perror ("PTR I/O error");
                 clearerr (uptr->fileref);
                 chan_set_chf (pt_dib.dva, CHF_XMDE);    /* data error */
                 return pt_chan_err (SCPE_IOERR);        /* force uend */
@@ -208,11 +208,11 @@ switch (pt_cmd) {                                       /* case on state */
         sim_activate (uptr, pt_unit[PTP].wait);         /* continue thread */
         if ((pt_unit[PTP].flags & UNIT_ATT) == 0)       /* not attached? */
             return ptp_stopioe? SCPE_UNATT: SCPE_OK;
-        st = chan_RdMemB (pt_dib.dva, &c);              /* read from channel */
+        st = chan_RdMemB (pt_dib.dva, (uint32 *)&c);    /* read from channel */
         if (CHS_IFERR (st))                             /* channel error? */
             return pt_chan_err (st);
         if (putc (c, pt_unit[PTP].fileref) == EOF) {
-            perror ("PTP I/O error");
+            sim_perror ("PTP I/O error");
             clearerr (pt_unit[PTP].fileref);
             chan_set_chf (pt_dib.dva, CHF_XMDE);        /* data error */
             return pt_chan_err (SCPE_IOERR);            /* force uend */
@@ -286,7 +286,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat pt_attach (UNIT *uptr, char *cptr)
+t_stat pt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat st;
 

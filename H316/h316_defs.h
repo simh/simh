@@ -1,6 +1,6 @@
 /* h316_defs.h: Honeywell 316/516 simulator definitions
 
-   Copyright (c) 1999-2011, Robert M. Supnik
+   Copyright (c) 1999-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -33,7 +33,7 @@
 */
 
 #ifndef H316_DEFS_H_
-#define H316_DEFS_H_   0
+#define H316_DEFS_H_    0
 
 #include "sim_defs.h"                                   /* simulator defns */
 
@@ -111,14 +111,14 @@
 /* Device information block */
 
 struct h316_dib {
-    uint32      dev;                            /* device number */
-    uint32      num;                            /* number of slots */
-    uint32      chan;                           /* dma/dmc channel */
-    uint32      chan2;                          /* alternate DMA/DMD channel */
-    uint32      inum;                           /* interrupt number */
-    uint32      inum2;                          /* alternate interrupt */
-    int32       (*io) (int32 inst, int32 fnc, int32 dat, int32 dev);
-    uint32      u3;                             /* "user" parameter #1 */
+    uint32              dev;                            /* device number */
+    uint32              num;                            /* number of slots */
+    uint32              chan;                           /* dma/dmc channel */
+    uint32              chan2;                          /* alternate DMA/DMD channel */
+    uint32              inum;                           /* interrupt number */
+    uint32              inum2;                          /* alternate interrupt */
+    int32               (*io) (int32 inst, int32 fnc, int32 dat, int32 dev);
+    uint32              u3;                             /* "user" parameter #1 */
 };
 typedef struct h316_dib DIB;
 
@@ -147,35 +147,35 @@ typedef struct h316_dib DIB;
 
 /* I/O device codes */
 
-#define PTR             001             /* paper tape reader */
-#define PTP             002             /* paper tape punch */
-#define LPT             003             /* line printer */
-#define TTY             004             /* console */
-#define CDR             005             /* card reader */
-#define MT              010             /* mag tape data */
-#define CLK_KEYS        020             /* clock/keys (CPU) */
-#define FHD             022             /* fixed head disk */
-#define DMA             024             /* DMA control */
-#define DP              025             /* moving head disk */
+#define PTR             001                             /* paper tape reader */
+#define PTP             002                             /* paper tape punch */
+#define LPT             003                             /* line printer */
+#define TTY             004                             /* console */
+#define CDR             005                             /* card reader */
+#define MT              010                             /* mag tape data */
+#define CLK_KEYS        020                             /* clock/keys (CPU) */
+#define FHD             022                             /* fixed head disk */
+#define DMA             024                             /* DMA control */
+#define DP              025                             /* moving head disk */
 #define DEV_MAX         64
 
 /* Interrupt flags, definitions correspond to SMK bits */
 
-#define INT_V_CLK       0               /* clock */
-#define INT_V_MPE       1               /* parity error */
-#define INT_V_LPT       2               /* line printer */
-#define INT_V_CDR       4               /* card reader */
-#define INT_V_TTY       5               /* teletype */
-#define INT_V_PTP       6               /* paper tape punch */
-#define INT_V_PTR       7               /* paper tape reader */
-#define INT_V_FHD       8               /* fixed head disk */
-#define INT_V_DP        12              /* moving head disk */
-#define INT_V_MT        15              /* mag tape */
-#define INT_V_START     16              /* start button */
-#define INT_V_NODEF     17              /* int not deferred */
-#define INT_V_ON        18              /* int on */
-#define INT_V_EXTD      16              /* first extended interrupt */
-#define INT_V_NONE      0xffffffff      /* no interrupt used */
+#define INT_V_CLK       0                               /* clock */
+#define INT_V_MPE       1                               /* parity error */
+#define INT_V_LPT       2                               /* line printer */
+#define INT_V_CDR       4                               /* card reader */
+#define INT_V_TTY       5                               /* teletype */
+#define INT_V_PTP       6                               /* paper tape punch */
+#define INT_V_PTR       7                               /* paper tape reader */
+#define INT_V_FHD       8                               /* fixed head disk */
+#define INT_V_DP        12                              /* moving head disk */
+#define INT_V_MT        15                              /* mag tape */
+#define INT_V_START     16                              /* start button */
+#define INT_V_NODEF     17                              /* int not deferred */
+#define INT_V_ON        18                              /* int on */
+#define INT_V_EXTD      16                              /* first extended interrupt */
+#define INT_V_NONE      0xffffffff                      /* no interrupt used */
 
 /* I/O macros */
 
@@ -204,23 +204,24 @@ typedef struct h316_dib DIB;
 
 // [RLA]   These macros now all affect the standard interrupts.  We'll leave
 // [RLA] them alone for backward compatibility with the existing code.
-#define SET_INT(x)      dev_int = dev_int |  (x)
+#define SET_INT(x)      dev_int = dev_int | (x)
 #define CLR_INT(x)      dev_int = dev_int & ~(x)
-#define TST_INT(x)    ((dev_int           &  (x)) != 0)
+#define TST_INT(x)      ((dev_int & (x)) != 0)
 #define CLR_ENB(x)      dev_enb = dev_enb & ~(x)
-#define TST_INTREQ(x) ((dev_int & dev_enb &  (x)) != 0)
+#define TST_INTREQ(x)   ((dev_int & dev_enb & (x)) != 0)
 
 // [RLA] These macros are functionally identical, but affect extended interrupts.
-#define SET_EXT_INT(x)      dev_ext_int = dev_ext_int |  (x)
-#define CLR_EXT_INT(x)      dev_ext_int = dev_ext_int & ~(x)
-#define TST_EXT_INT(x)    ((dev_ext_int               &  (x)) != 0)
-#define CLR_EXT_ENB(x)      dev_ext_enb = dev_ext_enb & ~(x)
-#define TST_EXT_INTREQ(x) ((dev_ext_int & dev_ext_enb &  (x)) != 0)
+#define SET_EXT_INT(x)  dev_ext_int = dev_ext_int |  (x)
+#define CLR_EXT_INT(x)  dev_ext_int = dev_ext_int & ~(x)
+#define TST_EXT_INT(x)  ((dev_ext_int & (x)) != 0)
+#define CLR_EXT_ENB(x)  dev_ext_enb = dev_ext_enb & ~(x)
+#define TST_EXT_INTREQ(x) ((dev_ext_int & dev_ext_enb & (x)) != 0)
 
 /* Prototypes */
-t_stat io_set_iobus (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat io_set_dma (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat io_set_dmc (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat io_show_chan (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+t_stat io_set_iobus (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat io_set_dma (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat io_set_dmc (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat io_show_chan (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 #endif

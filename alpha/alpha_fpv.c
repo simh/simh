@@ -82,7 +82,7 @@ uint32 sign = FPR_GETSIGN (op)? F_SIGN: 0;
 uint32 frac = (uint32) (op >> F_V_FRAC);
 uint32 exp = FPR_GETEXP (op);
 
-if (exp != 0) exp = exp + F_BIAS - G_BIAS;		        /* zero? */	
+if (exp != 0) exp = exp + F_BIAS - G_BIAS;              /* zero? */
 exp = (exp & F_M_EXP) << F_V_EXP;
 return (t_uint64) (sign | exp | (SWAP_VAXF (frac) & ~(F_SIGN|F_EXP)));
 }
@@ -209,7 +209,7 @@ t_uint64 vax_cvtif (t_uint64 val, uint32 ir, uint32 dp)
 UFP a;
 
 if (val == 0) return 0;                                 /* 0? return +0 */
-if (val < 0) {                                          /* < 0? */
+if ((val & Q_SIGN) != 0) {                              /* < 0? */
     a.sign = 1;                                         /* set sign */
     val = NEG_Q (val);                                  /* |val| */
     }
@@ -398,7 +398,7 @@ r->frac = r->frac & M64;
 if (r->frac == 0) {                                     /* if fraction = 0 */
     r->sign = r->exp = 0;                               /* result is 0 */
     return;
-	}
+    }
 while ((r->frac & UF_NM) == 0) {                        /* normalized? */
     for (i = 0; i < 5; i++) {                           /* find first 1 */
         if (r->frac & normmask[i]) break;

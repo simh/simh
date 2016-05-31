@@ -67,11 +67,10 @@ int32 lpt_stopioe = 0;                                  /* stop on err */
 
 extern uint32 int_req[INTSZ], int_enb[INTSZ];
 
-DEVICE lpt_dev;
 uint32 lpt (uint32 dev, uint32 op, uint32 dat);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat lpt_bufout (UNIT *uptr);
 t_stat lpt_vfu (UNIT *uptr, int32 ch);
 t_stat lpt_spc (UNIT *uptr, int32 cnt);
@@ -185,7 +184,7 @@ if (lpt_spnd || ((t >= LF) && (t < CR))) {              /* spc pend or spc op? *
     else fputs ("\r", uptr->fileref);                   /* overprint */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (lpt_unit.fileref)) {
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -217,7 +216,7 @@ if (lpxb[0]) {                                          /* any char left? */
     fputs (lpxb, uptr->fileref);                        /* write line */
     lpt_unit.pos = ftell (uptr->fileref);               /* update position */
     if (ferror (uptr->fileref)) {
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         r = SCPE_IOERR;
         }
@@ -283,7 +282,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 lpt_vfup = 0;                                           /* top of form */
 return attach_unit (uptr, cptr);
@@ -291,7 +290,7 @@ return attach_unit (uptr, cptr);
 
 /* Carriage control load routine */
 
-t_stat lp_load (FILE *fileref, char *cptr, char *fnam)
+t_stat lp_load (FILE *fileref, CONST char *cptr, CONST char *fnam)
 {
 int32 col, ptr, mask, vfubuf[VFU_LNT];
 uint32 rpt;

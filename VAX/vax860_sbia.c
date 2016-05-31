@@ -72,7 +72,7 @@
 
 #define SBIQC_MBZ       0xC0000007                      /* MBZ */
 
-uint32 nexus_req[NEXUS_HLVL];                           /* nexus int req */
+extern uint32 nexus_req[NEXUS_HLVL];                    /* nexus int req */
 uint32 sbi_fs = 0;                                      /* SBI fault status */
 uint32 sbi_sc = 0;                                      /* SBI silo comparator */
 uint32 sbi_mt = 0;                                      /* SBI maintenance */
@@ -80,19 +80,8 @@ uint32 sbi_er = 0;                                      /* SBI error status */
 uint32 sbi_tmo = 0;                                     /* SBI timeout addr */
 uint32 sbi_csr = 0;                                     /* SBI control/status */
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 ASTLVL, SISR;
-extern jmp_buf save_env;
-extern int32 trpirq;
-extern int32 p1;
-extern int32 mchk_ref;
-extern int32 crd_err;
-extern int32 fault_PC;                                  /* fault PC */
-extern UNIT cpu_unit;
-
 t_stat sbia_reset (DEVICE *dptr);
-char *sbia_description (DEVICE *dptr);
+const char *sbia_description (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
 t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
@@ -302,16 +291,16 @@ sbi_csr = SBICSR_SCOEN | SBICSR_SCIEN;
 return SCPE_OK;
 }
 
-char *sbia_description (DEVICE *dptr)
+const char *sbia_description (DEVICE *dptr)
 {
 return "SBI adapter";
 }
 
 /* Show nexus */
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-fprintf (st, "nexus=%d", val);
+fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;
 }
 

@@ -48,7 +48,7 @@
 #endif
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -72,8 +72,8 @@ static MDRIVEH_INFO mdriveh_info_data = { { 0x0, 0, 0xC6, 2 } };
 static MDRIVEH_INFO *mdriveh_info = &mdriveh_info_data;
 
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -88,6 +88,7 @@ static t_stat mdriveh_reset(DEVICE *mdriveh_dev);
 static int32 mdrivehdev(const int32 port, const int32 io, const int32 data);
 static uint8 MDRIVEH_Read(const uint32 Addr);
 static uint8 MDRIVEH_Write(const uint32 Addr, uint8 cData);
+static const char* mdriveh_description(DEVICE *dptr);
 
 static UNIT mdriveh_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_DISABLE + UNIT_ROABLE, MDRIVEH_CAPACITY) },
@@ -104,7 +105,11 @@ static REG mdriveh_reg[] = {
     { NULL }
 };
 
-#define MDRIVEH_NAME    "Compupro Memory Drive MDRIVEH"
+#define MDRIVEH_NAME    "Compupro Memory Drive"
+
+static const char* mdriveh_description(DEVICE *dptr) {
+    return MDRIVEH_NAME;
+}
 
 static MTAB mdriveh_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
@@ -139,7 +144,7 @@ DEVICE mdriveh_dev = {
     NULL, NULL, &mdriveh_reset,
     NULL, NULL, NULL,
     &mdriveh_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    mdriveh_dt, NULL, MDRIVEH_NAME
+    mdriveh_dt, NULL, NULL, NULL, NULL, NULL, &mdriveh_description
 };
 
 
@@ -154,7 +159,7 @@ static t_stat mdriveh_reset(DEVICE *dptr)
     } else {
         /* Connect MDRIVEH at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &mdrivehdev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }
@@ -163,21 +168,21 @@ static t_stat mdriveh_reset(DEVICE *dptr)
         mdriveh_info->uptr[i] = dptr->units[i];
         if((dptr->flags & DEV_DIS) || (dptr->units[i].flags & UNIT_DIS)) {
             if (dptr->units[i].flags & UNIT_MDRIVEH_VERBOSE)
-                printf("MDRIVEH: Unit %d disabled", i);
+                sim_printf("MDRIVEH: Unit %d disabled", i);
             if(mdriveh_info->storage[i] != NULL) {
                 if (dptr->units[i].flags & UNIT_MDRIVEH_VERBOSE)
-                    printf(", freed 0x%p\n", mdriveh_info->storage[i]);
+                    sim_printf(", freed 0x%p\n", mdriveh_info->storage[i]);
                 free(mdriveh_info->storage[i]);
                 mdriveh_info->storage[i] = NULL;
             } else if (dptr->units[i].flags & UNIT_MDRIVEH_VERBOSE) {
-                printf(".\n");
+                sim_printf(".\n");
             }
         } else {
             if(mdriveh_info->storage[i] == NULL) {
-                mdriveh_info->storage[i] = calloc(1, 524288);
+                mdriveh_info->storage[i] = (uint8 *)calloc(1, 524288);
             }
             if (dptr->units[i].flags & UNIT_MDRIVEH_VERBOSE)
-                printf("MDRIVEH: Unit %d enabled, 512K at 0x%p\n", i, mdriveh_info->storage[i]);
+                sim_printf("MDRIVEH: Unit %d enabled, 512K at 0x%p\n", i, mdriveh_info->storage[i]);
         }
     }
 

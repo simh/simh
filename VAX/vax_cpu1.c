@@ -82,36 +82,9 @@ static const uint8 rcnt[128] = {
 12,16,16,20,16,20,20,24,16,20,20,24,20,24,24,28         /* 70 - 7F */
 };
 
-int32 last_chm = 0;
-
-extern uint32 *M;
-extern const uint32 byte_mask[33];
-extern int32 R[16];
-extern int32 STK[5];
-extern int32 PSL;
-extern int32 SCBB, PCBB, SBR, SLR;
-extern int32 P0BR, P0LR, P1BR, P1LR;
-extern int32 ASTLVL, SISR, mapen;
-extern int32 pme;
-extern int32 trpirq;
-extern int32 p1, p2;
-extern int32 fault_PC;
-extern int32 pcq[PCQ_SIZE];
-extern int32 pcq_p;
-extern int32 in_ie;
-extern int32 ibcnt, ppc;
-extern DEVICE cpu_dev;
-
-extern int32 Test (uint32 va, int32 acc, int32 *status);
-extern void set_map_reg (void);
-extern void zap_tb (int stb);
-extern void zap_tb_ent (uint32 va);
-extern t_bool chk_tb_ent (uint32 va);
 extern int32 ReadIPR (int32 rg);
 extern void WriteIPR (int32 rg, int32 val);
 extern t_bool BadCmPSL (int32 newpsl);
-
-extern jmp_buf save_env;
 
 /* Branch on bit and no modify
    Branch on bit and modify
@@ -126,9 +99,10 @@ int32 op_bb_n (int32 *opnd, int32 acc)
 {
 int32 pos = opnd[0];
 int32 rn = opnd[1];
-int32 ea, by;
+int32 ea;
+int32 by;
 
-if (rn >= 0) {                                          /* register? */
+if (rn != OP_MEM) {                                     /* register? */
     if (((uint32) pos) > 31)                            /* pos > 31? fault */
         RSVD_OPND_FAULT;
     return (R[rn] >> pos) & 1;                          /* get bit */
@@ -143,9 +117,10 @@ int32 op_bb_x (int32 *opnd, int32 newb, int32 acc)
 {
 int32 pos = opnd[0];
 int32 rn = opnd[1];
-int32 ea, by, bit;
+int32 ea;
+int32 by, bit;
 
-if (rn >= 0) {                                          /* register? */
+if (rn != OP_MEM) {                                     /* register? */
     if (((uint32) pos) > 31)                            /* pos > 31? fault */
         RSVD_OPND_FAULT;
     bit = (R[rn] >> pos) & 1;                           /* get bit */
@@ -183,7 +158,7 @@ if (size == 0)                                          /* size 0? field = 0 */
     return 0;
 if (size > 32)                                          /* size > 32? fault */
     RSVD_OPND_FAULT;
-if (rn >= 0) {                                          /* register? */
+if (rn != OP_MEM) {                                     /* register? */
     if (((uint32) pos) > 31)                            /* pos > 31? fault */
         RSVD_OPND_FAULT;
     if (((pos + size) > 32) && (rn >= nSP))             /* span 2 reg, PC? */
@@ -227,7 +202,7 @@ if (size == 0)                                          /* size = 0? done */
     return;
 if (size > 32)                                          /* size > 32? fault */
     RSVD_OPND_FAULT;
-if (rn >= 0) {                                          /* in registers? */
+if (rn != OP_MEM) {                                     /* in registers? */
     if (((uint32) pos) > 31)                            /* pos > 31? fault */
         RSVD_OPND_FAULT;
     if ((pos + size) > 32) {                            /* span two reg? */
@@ -433,7 +408,7 @@ if (spamask & CALL_S) {                                 /* CALLS? */
     }
 PSL = (PSL & ~(PSW_DV | PSW_FU | PSW_IV | PSW_T)) |     /* reset PSW */
     (spamask & (PSW_DV | PSW_FU | PSW_IV | PSW_T));
-JUMP (newpc);                                           /* set new PC */
+JUMP_ALWAYS(newpc);                                     /* set new PC */
 return spamask & (CC_MASK);                             /* return cc's */
 }
 
@@ -573,13 +548,13 @@ p = Read (e + 4, L_LONG, RA);                           /* p <- (e+4) */
 CC_CMP_L (s, p);                                        /* set cc's */
 if (e != p) {                                           /* queue !empty? */
     Read (s + 4, L_LONG, WA);                           /* wchk (s+4) */
-    if (opnd[1] < 0)                                    /* wchk dest */
+    if (opnd[1] == OP_MEM)                              /* wchk dest */
         Read (opnd[2], L_LONG, WA);
     Write (p, s, L_LONG, WA);                           /* (p) <- s */
     Write (s + 4, p, L_LONG, WA);                       /* (s+4) <- p */
     }
 else cc = cc | CC_V;                                    /* else set v */
-if (opnd[1] >= 0)                                       /* store result */
+if (opnd[1] != OP_MEM)                                  /* store result */
     R[opnd[1]] = e;
 else Write (opnd[2], e, L_LONG, WA);
 return cc;
@@ -619,7 +594,8 @@ int32 op_insqhi (int32 *opnd, int32 acc)
 {
 int32 h = opnd[1];
 int32 d = opnd[0];
-int32 a, t;
+int32 a;
+int32 t;
 
 if ((h == d) || ((h | d) & 07))                         /* h, d quad align? */
     RSVD_OPND_FAULT;
@@ -644,7 +620,8 @@ int32 op_insqti (int32 *opnd, int32 acc)
 {
 int32 h = opnd[1];
 int32 d = opnd[0];
-int32 a, c, t;
+int32 a, c;
+int32 t;
 
 if ((h == d) || ((h | d) & 07))                         /* h, d quad align? */
     RSVD_OPND_FAULT;
@@ -701,11 +678,12 @@ return 0;                                               /* q >= 2 entries */
 int32 op_remqhi (int32 *opnd, int32 acc)
 {
 int32 h = opnd[0];
-int32 ar, a, b, t;
+int32 ar, a, b;
+int32 t;
 
 if (h & 07)                                             /* h quad aligned? */
     RSVD_OPND_FAULT;
-if (opnd[1] < 0) {                                      /* mem destination? */
+if (opnd[1] == OP_MEM) {                                /* mem destination? */
     if (h == opnd[2])                                   /* hdr = dst? */
         RSVD_OPND_FAULT;
     Read (opnd[2], L_LONG, WA);                         /* wchk dst */
@@ -730,7 +708,7 @@ if (ar) {                                               /* queue not empty? */
     Write (b + 4, h - b, L_LONG, WA);                   /* (b+4) <- h-b, flt ok */
     Write (h, b - h, L_LONG, WA);                       /* (h) <- b-h, rls int */
     }
-if (opnd[1] >= 0)                                       /* store result */
+if (opnd[1] != OP_MEM)                                  /* store result */
     R[opnd[1]] = a;
 else Write (opnd[2], a, L_LONG, WA);
 if (ar == 0)                                            /* empty, cc = 0110 */
@@ -741,11 +719,12 @@ return (b == h)? CC_Z: 0;                               /* if b = h, q empty */
 int32 op_remqti (int32 *opnd, int32 acc)
 {
 int32 h = opnd[0];
-int32 ar, b, c, t;
+int32 ar, b, c;
+int32 t;
 
 if (h & 07)                                             /* h quad aligned? */
     RSVD_OPND_FAULT;
-if (opnd[1] < 0) {                                      /* mem destination? */
+if (opnd[1] == OP_MEM) {                                /* mem destination? */
     if (h == opnd[2])                                   /* hdr = dst? */
         RSVD_OPND_FAULT;
     Read (opnd[2], L_LONG, WA);                         /* wchk dst */
@@ -781,7 +760,7 @@ if (ar) {                                               /* queue not empty */
     Write (h, ar, L_LONG, WA);                          /* release interlock */
     }
 else c = h;                                             /* empty, result = h */
-if (opnd[1] >= 0)                                       /* store result */
+if (opnd[1] != OP_MEM)                                  /* store result */
     R[opnd[1]] = c;
 else Write (opnd[2], c, L_LONG, WA);
 if (ar == 0)                                            /* empty, cc = 0110 */
@@ -1138,21 +1117,22 @@ else {
     }
 if (ei > 0) {                                           /* if int, new IPL */
     int32 newipl;
-    if (VEC_QBUS && ((vec & VEC_Q) != 0))               /* Qbus and Qbus vector? */
+    if ((VEC_QBUS & vec) != 0)                          /* Qbus vector? */
         newipl = PSL_IPL17;                             /* force IPL 17 */
-    else newipl = ipl << PSL_V_IPL;                     /* otherwise, int IPL */
+    else
+        newipl = ipl << PSL_V_IPL;                      /* otherwise, int IPL */
     PSL = newpsl | newipl;
     }
-else PSL = newpsl |                                     /* exc, old IPL/1F */
-    ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
-if (DEBUG_PRI (cpu_dev, LOG_CPU_I))
-    fprintf (sim_deb, ">>IEX: PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
+else 
+    PSL = newpsl |                                      /* exc, old IPL/1F */
+        ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
+sim_debug (LOG_CPU_I, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, oldpsl, oldsp, vec, PSL, SP);
 acc = ACC_MASK (KERN);                                  /* new mode is kernel */
 Write (SP - 4, oldpsl, L_LONG, WA);                     /* push old PSL */
 Write (SP - 8, PC, L_LONG, WA);                         /* push old PC */
 SP = SP - 8;                                            /* update stk ptr */
-JUMP (newpc & ~3);                                      /* change PC */
+JUMP_ALWAYS (newpc & ~3);                               /* change PC */
 in_ie = 0;                                              /* out of flows */
 return 0;
 }
@@ -1166,7 +1146,8 @@ int32 op_chm (int32 *opnd, int32 cc, int32 opc)
 {
 int32 mode = opc & PSL_M_MODE;
 int32 cur = PSL_GETCUR (PSL);
-int32 tsp, newpc, acc, sta;
+int32 tsp, newpc, acc;
+int32 sta;
 
 if (PSL & PSL_IS)
     ABORT (STOP_CHMFI);
@@ -1190,8 +1171,7 @@ Write (tsp - 4, PSL | cc, L_LONG, WA);                  /* push PSL */
 SP = tsp - 12;                                          /* set new stk */
 PSL = (mode << PSL_V_CUR) | (PSL & PSL_IPL) |           /* set new PSL */
     (cur << PSL_V_PRV);                                 /* IPL unchanged */
-last_chm = fault_PC;
-JUMP (newpc & ~03);                                     /* set new PC */
+JUMP_ALWAYS (newpc & ~03);                              /* set new PC */
 return 0;                                               /* cc = 0 */
 }
 
@@ -1251,8 +1231,7 @@ SP = SP + 8;                                            /* pop stack */
 if (PSL & PSL_IS)                                       /* save stack */
     IS = SP;
 else STK[oldcur] = SP;
-if (DEBUG_PRI (cpu_dev, LOG_CPU_R))
-    fprintf (sim_deb, ">>REI: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
+sim_debug (LOG_CPU_R, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
 PSL = (PSL & PSL_TP) | (newpsl & ~CC_MASK);             /* set PSL */
 if (PSL & PSL_IS)                                       /* set new stack */
@@ -1260,12 +1239,11 @@ if (PSL & PSL_IS)                                       /* set new stack */
 else {
     SP = STK[newcur];                                   /* if ~IS, chk AST */
     if (newcur >= ASTLVL) {
-        if (DEBUG_PRI (cpu_dev, LOG_CPU_R))
-            fprintf (sim_deb, ">>REI: AST delivered\n");
+        sim_debug (LOG_CPU_R, &cpu_dev, "AST delivered\n");
         SISR = SISR | SISR_2;
         }
     }
-JUMP (newpc);                                           /* set new PC */
+JUMP_ALWAYS (newpc);                                    /* set new PC */
 return newpsl & CC_MASK;                                /* set new cc */
 }
 
@@ -1320,8 +1298,7 @@ pme = (t >> 31) & 1;                                    /* restore PME */
 
 zap_tb (0);                                             /* clear process TB */
 set_map_reg ();
-if (DEBUG_PRI (cpu_dev, LOG_CPU_P))
-    fprintf (sim_deb, ">>LDP: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
+sim_debug (LOG_CPU_P, &cpu_dev, ">>LDP: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, PSL, SP, newpc, newpsl, KSP);
 if (PSL & PSL_IS)                                       /* if istk, */
     IS = SP;
@@ -1342,8 +1319,7 @@ if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
 savpc = Read (SP, L_LONG, RA);                          /* pop PC, PSL */
 savpsl = Read (SP + 4, L_LONG, RA);
-if (DEBUG_PRI (cpu_dev, LOG_CPU_P))
-    fprintf (sim_deb, ">>SVP: PC=%08x, PSL=%08x, SP=%08x, oPC=%08x, oPSL=%08x\n",
+sim_debug (LOG_CPU_P, &cpu_dev, ">>SVP: PC=%08x, PSL=%08x, SP=%08x, oPC=%08x, oPSL=%08x\n",
              PC, PSL, SP, savpc, savpsl);
 if (PSL & PSL_IS)                                       /* int stack? */
     SP = SP + 8;
@@ -1437,8 +1413,8 @@ return 0;
 
 int32 op_mtpr (int32 *opnd)
 {
-int32 val = opnd[0];
-int32 prn = opnd[1];
+uint32 val = (uint32)opnd[0];
+uint32 prn = (uint32)opnd[1];
 int32 cc;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */

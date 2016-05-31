@@ -48,7 +48,7 @@ int32 sys_model = 0;
 /* VAX-11/730 boot device definitions */
 
 struct boot_dev {
-    char                *name;
+    const char          *name;
     int32               code;
     int32               let;
     };
@@ -63,30 +63,18 @@ static struct boot_dev boot_tab[] = {
     { "RQB", BOOT_UDA, 1 << 24 },
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
-    { "TQ", BOOT_TK, 1 << 24 },
     { "TD", BOOT_TD, 0 },
     { "RB", BOOT_RB, 0 },
     { NULL }
     };
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 ASTLVL, SISR;
-extern int32 mapen, pme, trpirq;
-extern int32 in_ie;
-extern int32 mchk_va, mchk_ref;
-extern int32 crd_err, mem_err, hlt_pin;
 extern int32 tmr_int, tti_int, tto_int, csi_int, cso_int;
-extern jmp_buf save_env;
-extern int32 p1;
 
 t_stat sysb_reset (DEVICE *dptr);
-char *sysb_description (DEVICE *dptr);
-t_stat vax730_boot (int32 flag, char *ptr);
-t_stat vax730_boot_parse (int32 flag, char *ptr);
-t_stat cpu_boot (int32 unitno, DEVICE *dptr);
+const char *sysb_description (DEVICE *dptr);
+t_stat vax730_boot (int32 flag, CONST char *ptr);
+t_stat vax730_boot_parse (int32 flag, const char *ptr);
 
-extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
 extern int32 icr_rd (t_bool interp);
@@ -382,7 +370,7 @@ return;
         longword of data
 */
 
-int32 ReadReg (int32 pa, int32 lnt)
+int32 ReadReg (uint32 pa, int32 lnt)
 {
 int32 nexus, val;
 
@@ -408,7 +396,7 @@ return 0;
         none
 */
 
-void WriteReg (int32 pa, int32 val, int32 lnt)
+void WriteReg (uint32 pa, int32 val, int32 lnt)
 {
 int32 nexus;
 
@@ -437,6 +425,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 acc, nxm;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 nxm = ((p1 == MCHK_NXM) || (p1 == MCHK_IIA) || (p1 == MCHK_IUA));
 if (nxm)
     cc = intexc (SCB_MCHK, cc, 0, IE_EXC);              /* take normal exception */
@@ -476,7 +466,7 @@ return cc;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax730_boot (int32 flag, char *ptr)
+t_stat vax730_boot (int32 flag, CONST char *ptr)
 {
 t_stat r;
 
@@ -494,10 +484,11 @@ return run_cmd (flag, "CPU");
 
 /* Parse boot command, set up registers - also used on reset */
 
-t_stat vax730_boot_parse (int32 flag, char *ptr)
+t_stat vax730_boot_parse (int32 flag, const char *ptr)
 {
 char gbuf[CBUFSIZE];
-char *slptr, *regptr;
+char *slptr;
+const char *regptr;
 int32 i, r5v, unitno;
 DEVICE *dptr;
 UNIT *uptr;
@@ -545,7 +536,7 @@ for (i = 0; boot_tab[i].name != NULL; i++) {
         R[0] = boot_tab[i].code;
         if (boot_tab[i].code == BOOT_RB) {              /* vector set by console for RB730 */
             extern DIB rb_dib;
-            R[0] = R[0] | ((rb_dib.vec - VEC_Q) << 16);
+            R[0] = R[0] | ((rb_dib.vec) << 16);
             }
         R[1] = TR_UBA;
         R[2] = boot_tab[i].let | (ba & UBADDRMASK);
@@ -580,16 +571,16 @@ sim_vm_cmd = vax730_cmd;
 return SCPE_OK;
 }
 
-char *sysb_description (DEVICE *dptr)
+const char *sysb_description (DEVICE *dptr)
 {
 return "system bus controller";
 }
 
 /* Show nexus */
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-fprintf (st, "nexus=%d", val);
+fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;
 }
 
@@ -672,7 +663,7 @@ fprintf (st, "VAX 11/730");
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Initial memory size is 2MB.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");

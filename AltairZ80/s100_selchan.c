@@ -48,7 +48,7 @@
 #endif
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -71,8 +71,8 @@ static SELCHAN_INFO selchan_info_data = { { 0x0, 0, 0xF0, 1 } };
 static SELCHAN_INFO *selchan_info = &selchan_info_data;
 int32 selchan_dma(uint8 *buf, uint32 len);
 
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
@@ -82,6 +82,7 @@ extern void PutByteDMA(const uint32 Addr, const uint32 Value);
 extern uint8 GetByteDMA(const uint32 Addr);
 
 static t_stat selchan_reset(DEVICE *selchan_dev);
+static const char* selchan_description(DEVICE *dptr);
 
 static int32 selchandev(const int32 port, const int32 io, const int32 data);
 
@@ -95,6 +96,10 @@ static REG selchan_reg[] = {
     { HRDATAD (DMA_ADDR, selchan_info_data.dma_addr, 24,    "DMA transfer address register"),   },
     { NULL }
 };
+
+static const char* selchan_description(DEVICE *dptr) {
+    return "Compupro Selector Channel";
+}
 
 static MTAB selchan_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "IOBASE", "IOBASE", &set_iobase, &show_iobase, NULL,
@@ -115,7 +120,7 @@ DEVICE selchan_dev = {
     NULL, NULL, &selchan_reset,
     NULL, NULL, NULL,
     &selchan_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    selchan_dt, NULL, "Compupro Selector Channel SELCHAN"
+    selchan_dt, NULL, NULL, NULL, NULL, NULL, &selchan_description
 };
 
 /* Reset routine */
@@ -128,7 +133,7 @@ static t_stat selchan_reset(DEVICE *dptr)
     } else {
         /* Connect SELCHAN at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &selchandev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }
@@ -171,14 +176,14 @@ int32 selchan_dma(uint8 *buf, uint32 len)
     uint32 i;
 
     if(selchan_info->reg_cnt != 4) {
-        printf("SELCHAN: " ADDRESS_FORMAT " Programming error: selector channel disabled." NLP,
+        sim_printf("SELCHAN: " ADDRESS_FORMAT " Programming error: selector channel disabled." NLP,
             PCX);
         return (-1);
     }
 
     if(selchan_info->dma_mode & SELCHAN_MODE_IO)
     {
-        printf("SELCHAN: " ADDRESS_FORMAT " I/O Not supported" NLP, PCX);
+        sim_printf("SELCHAN: " ADDRESS_FORMAT " I/O Not supported" NLP, PCX);
         return (-1);
     } else {
         sim_debug(DMA_MSG, &selchan_dev, "SELCHAN: " ADDRESS_FORMAT " DMA %s Transfer, len=%d\n", PCX, (selchan_info->dma_mode & SELCHAN_MODE_WRITE) ? "WR" : "RD", len);

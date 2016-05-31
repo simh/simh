@@ -1,6 +1,6 @@
 /* pdp18b_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Mar-16    PLB     Start GRAPHICS-2 support for PDP-7 UNIX
+   10-Mar-16    RMS     Added 3-cycle databreak set/show routines
+   26-Feb-16    RMS     Added RB09 to PDP-7 for Unix "v0" and RM09 to PDP-9
+   13-Sep-15    RMS     Added DR15C
    18-Apr-12    RMS     Added clk_cosched prototype
    22-May-10    RMS     Added check for 64b definitions
    30-Oct-06    RMS     Added infinite loop stop
@@ -55,6 +59,10 @@
 
 #include "sim_defs.h"                                   /* simulator defns */
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 #if defined(USE_INT64) || defined(USE_ADDR64)
 #error "18b PDP's do not support 64b values!"
 #endif
@@ -78,6 +86,8 @@
                                         Type 647B line printer (sixbit)
                                         Type 550/555 DECtape
                                         Type 24 serial drum
+                                        RB09 fixed head disk (Unix V0 only)
+                                        Bell Labs GRAPHICS-2 (Unix V0 only)
 
    PDP9    32K  KE09A EAE               KSR-33 Teletype
                 KF09A auto pri intr     PC09A paper tape reader and punch
@@ -86,6 +96,7 @@
                 KX09A mem protection    LP09 line printer (ASCII)
                                         RF09/RS09 fixed head disk
                                         RB09 fixed head disk
+                                        RM09 drum
                                         TC59 magnetic tape
                                         TC02/TU55 DECtape
                                         LT09A additional Teletypes
@@ -100,6 +111,7 @@
                                         TC59D magnetic tape
                                         TC15/TU56 DECtape
                                         LT15/LT19 additional Teletypes
+					DR15C parallel interface to UC15
 
    ??Indicates not implemented.  The PDP-4 manual refers to a memory
    ??extension control; there is no documentation on it.
@@ -135,12 +147,15 @@
 #define TYPE647         0                               /* sixbit printer */
 #define TYPE550         0                               /* DECtape */
 #define DRM             0                               /* drum */
+#define RB              0                               /* fixed head disk */
+#define GRAPHICS2       0                               /* BTL display */
 #elif defined (PDP9)
 #define ADDRSIZE        15
 #define TYPE647         0                               /* sixbit printer */
 #define LP09            0                               /* ASCII printer */
 #define RB              0                               /* fixed head disk */
 #define RF              0                               /* fixed head disk */
+#define DRM             0                               /* drum */
 #define MTA             0                               /* magtape */
 #define TC02            0                               /* DECtape */
 #define TTY1            4                               /* second Teletype(s) */
@@ -271,12 +286,36 @@ typedef struct {
 #define DEV_TTI1        041                             /* extra terminals */
 #define DEV_TTO1        040
 #define DEV_DRM         060                             /* drum */
+#define DEV_DR          060                             /* DR15 */
 #define DEV_RP          063                             /* RP15 */
 #define DEV_LPT         065                             /* line printer */
 #define DEV_RF          070                             /* RF09 */
 #define DEV_RB          071                             /* RB09 */
 #define DEV_MT          073                             /* magtape */
 #define DEV_DTA         075                             /* dectape */
+
+#ifdef GRAPHICS2
+/* Bell Telephone Labs GRAPHICS-2 Display System ("as large as the PDP-7")
+ * Used by PDP-7 UNIX as a "Glass TTY"
+ */
+#define DEV_G2D1        005                             /* Display Ctrl 1 */
+#define DEV_G2D         006                             /* (Display Ctrl 2) */
+#define DEV_G2LP        007                             /* (Light Pen) */
+#define DEV_G2DS        010                             /* (Display Status) */
+#define DEV_G2D3        014                             /* (Display Ctrl 3) */
+#define DEV_G2D4        034                             /* (Display Ctrl 4) */
+
+#define DEV_G2UNK       042                             /* (???) */
+#define DEV_G2KB        043                             /* Keyboard */
+#define DEV_G2BB        044                             /* Button Box */
+#define DEV_G2IM        045                             /* (PDP7 int. mask) */
+
+/* PDP-7/9 to 201A Data Phone Interface
+ * (status bits retrieved with G2DS IOT)
+ * used for UNIX to GCOS Remote Job Entry
+ */
+#define DEV_DP          047                             /* (Data Phone) */
+#endif
 
 /* Interrupt system
 
@@ -319,6 +358,8 @@ typedef struct {
         35      LT15 TTI                3       PDP-15 only
         36      -
         37      -
+
+   The DR15C uses four API channels that are assigned by software.
 
    On the PDP-9, any API level active masks PI, and PI does not mask API.
    On the PDP-15, only the hardware API levels active mask PI, and PI masks
@@ -422,6 +463,7 @@ typedef struct {
 #define INT_V_TTI       0                               /* console keyboard */
 #define INT_V_TTO       1                               /* console output */
 #define INT_V_PTP       2                               /* paper tape punch */
+#define INT_V_G2        3                               /* BTL GRAPHICS-2 */
 
 #define INT_TTI         (1 << INT_V_TTI)
 #define INT_TTO         (1 << INT_V_TTO)
@@ -431,11 +473,31 @@ typedef struct {
 #define API_TTO         4
 #define API_PTP         4
 
+#ifdef GRAPHICS2
+/*
+ * A PDP-9 version existed,
+ * but we're only interested simulating a PDP-7 without API
+ */
+#define INT_G2          (1 << INT_V_G2)
+#define API_G2          4
+#endif
+
 /* Interrupt macros */
 
 #define SET_INT(dv)     int_hwre[API_##dv] = int_hwre[API_##dv] | INT_##dv
 #define CLR_INT(dv)     int_hwre[API_##dv] = int_hwre[API_##dv] & ~INT_##dv
 #define TST_INT(dv)     (int_hwre[API_##dv] & INT_##dv)
+
+/* The DR15C uses the same relative bit position in all four interrupt levels.
+   This allows software to have a single definition for the interrupt bit position,
+   regardless of level. The standard macros cannot be used. */
+
+#define INT_V_DR        7                               /* to left of all */
+#define INT_DR          (1 << INT_V_DR)
+#define API_DR0         0
+#define API_DR1         1
+#define API_DR2         2
+#define API_DR3         3
 
 /* I/O status flags for the IORS instruction
 
@@ -493,7 +555,14 @@ typedef struct {
 
 /* Function prototypes */
 
-t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_devno (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat set_3cyc_reg (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_3cyc_reg (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+
+/* Translation tables */
+extern const int32 asc_to_baud[128];
+extern const char baud_to_asc[64];
+extern const char fio_to_asc[64];
 
 #endif

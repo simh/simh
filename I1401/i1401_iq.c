@@ -1,6 +1,6 @@
 /* i1401_iq.c: IBM 1407 inquiry terminal
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    inq          1407 inquiry terminal
 
+   08-Mar-15    RMS     Renamed puts_tty to inq_puts
    20-Sep-05    RMS     Revised for new code tables
    22-Dec-02    RMS     Added break support
    07-Sep-01    RMS     Moved function prototypes
@@ -47,7 +48,7 @@ int32 inq_char = 033;                                   /* request inq */
 t_stat inq_svc (UNIT *uptr);
 t_stat inq_reset (DEVICE *dptr);
 
-void puts_tty (char *cptr);
+void inq_puts (const char *cptr);
 
 /* INQ data structures
 
@@ -96,7 +97,7 @@ switch (mod) {                                          /* case on mod */
 /*      if (ind[IN_INR] == 0)                         */
 /*          return SCPE_OK;                           *//* return if no req */
         ind[IN_INR] = 0;                                /* clear req */
-        puts_tty ("[Enter]\r\n");                       /* prompt */
+        inq_puts ("[Enter]\r\n");                       /* prompt */
         for (i = 0; M[BS] != (BCD_GRPMRK + WM); i++) {  /* until GM + WM */
             while (((t = sim_poll_kbd ()) == SCPE_OK) ||
                     (t & SCPE_BREAK)) {
@@ -110,11 +111,11 @@ switch (mod) {                                          /* case on mod */
                 break;
             if (t == inq_char) {                        /* cancel? */
                 ind[IN_INC] = 1;                        /* set indicator */
-                puts_tty ("\r\n[Canceled]\r\n");
+                inq_puts ("\r\n[Canceled]\r\n");
                 return SCPE_OK;
                 }
             if (i && ((i % INQ_WIDTH) == 0))
-                puts_tty ("\r\n");
+                inq_puts ("\r\n");
             sim_putchar (t);                            /* echo */
             if (flag == MD_WM) {                        /* word mark mode? */
                 if ((t == '~') && (wm_seen == 0))
@@ -132,7 +133,7 @@ switch (mod) {                                          /* case on mod */
                 return STOP_NXM;
                 }
             }
-        puts_tty ("\r\n");
+        inq_puts ("\r\n");
         M[BS++] = BCD_GRPMRK + WM;
         break;
 
@@ -140,20 +141,20 @@ switch (mod) {                                          /* case on mod */
         for (i = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); i++) {
             if ((flag == MD_WM) && (t & WM)) {
                 if (i && ((i % INQ_WIDTH) == 0))
-                    puts_tty ("\r\n");
+                    inq_puts ("\r\n");
                 if (conv_old)
                     sim_putchar ('~');
                 else sim_putchar ('`');
                 }
             if (i && ((i % INQ_WIDTH) == 0))
-                puts_tty ("\r\n");
+                inq_puts ("\r\n");
             sim_putchar (bcd2ascii (t & CHAR, use_h));
             if (ADDR_ERR (BS)) {
                 BS = BA | (BS % MAXMEMSIZE);
                 return STOP_NXM;
                 }
             }
-        puts_tty ("\r\n");
+        inq_puts ("\r\n");
         break;
 
     default:                                            /* invalid mod */
@@ -179,7 +180,7 @@ return SCPE_OK;
 
 /* Output multiple characters */
 
-void puts_tty (char *cptr)
+void inq_puts (const char *cptr)
 {
 if (cptr == NULL)
     return;

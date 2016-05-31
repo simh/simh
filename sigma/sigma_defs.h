@@ -34,6 +34,10 @@
 
 #include "sim_defs.h"                                   /* simulator defns */
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 #if defined(USE_INT64) || defined(USE_ADDR64)
 #error "Sigma 32b does not support 64b values!"
 #endif
@@ -166,7 +170,7 @@ typedef struct {
 #define S_V_MCNT        24                              /* string mask/count */
 #define S_M_MCNT        0xFF
 #define S_MCNT          (S_M_MCNT << S_V_MCNT)
-#define S_GETMCNT(x)	(((x) >> S_V_MCNT) & S_M_MCNT)
+#define S_GETMCNT(x)    (((x) >> S_V_MCNT) & S_M_MCNT)
 #define S_ADDRINC       (S_MCNT + 1)
 
 /* Data types */
@@ -192,7 +196,7 @@ typedef struct {
 #define FP_NORM         0x00F00000
 #define FP_M_FRLO       0xFFFFFFFF                      /* low fraction */
 #define FP_GETSIGN(x)   (((x) >> FP_V_SIGN) & 1)
-#define FP_GETEXP(x)	(((x) >> FP_V_EXP) & FP_M_EXP)
+#define FP_GETEXP(x)    (((x) >> FP_V_EXP) & FP_M_EXP)
 #define FP_GETFRHI(x)   (((x) >> FP_V_FRHI) & FP_M_FRHI)
 #define FP_GETFRLO(x)   ((x) & FP_M_FRLO)
 
@@ -318,7 +322,7 @@ typedef struct {
 #define MMC_M_CNT       0xFF
 #define MMC_CNT         (MMC_M_CNT << MMC_V_CNT)
 #define MMC_V_CS        9                               /* start of page */
-/*                                                      /* map 1: 2b locks, per model */
+                                                        /* map 1: 2b locks, per model */
 #define MMC_M_CS2       0xFC                            /* map 2: access controls */
 #define MMC_M_CS3       0x7FE                           /* map 3: 4b locks */
 #define MMC_M_CS4       0xFF                            /* map 4: 8b relocation */
@@ -424,7 +428,7 @@ typedef struct {
 
 #define SEXT_RN_W(x)    (((x) & RNSIGN)? ((x) | ~RNMASK): ((x) & RNMASK))
 #define SEXT_H_W(x)     (((x) & HSIGN)? ((x) | ~HMASK): ((x) & HMASK))
-#define SEXT_LIT_W(x)	(((x) & LITSIGN)? ((x) | ~LITMASK): ((x) & LITMASK))
+#define SEXT_LIT_W(x)   (((x) & LITSIGN)? ((x) | ~LITMASK): ((x) & LITMASK))
 #define NEG_W(x)        ((~(x) + 1) & WMASK)
 #define NEG_D(x,y)      do { y = NEG_W(y); x = (~(x) + ((y) == 0)) & WMASK; } while (0)
 #define CC34_W(x)       CC = (((x) & WSIGN)? \

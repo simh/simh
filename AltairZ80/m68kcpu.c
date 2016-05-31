@@ -45,7 +45,7 @@ uint m68ki_tracing = 0;
 uint m68ki_address_space;
 
 #ifdef M68K_LOG_ENABLE
-char* m68ki_cpu_names[9] =
+const char* m68ki_cpu_names[9] =
 {
     "Invalid CPU",
     "M68000",
@@ -799,7 +799,7 @@ void m68k_set_context(void* src)
     if(src) m68ki_cpu = *(m68ki_cpu_core*)src;
 }
 
-void m68k_save_context( void (*save_value)(char*, unsigned int))
+void m68k_save_context( void (*save_value)(const char*, unsigned int))
 {
     if(!save_value)
         return;
@@ -840,7 +840,7 @@ void m68k_save_context( void (*save_value)(char*, unsigned int))
     save_value("PREF_DATA" , CPU_PREF_DATA);
 }
 
-void m68k_load_context(unsigned int (*load_value)(char*))
+void m68k_load_context(unsigned int (*load_value)(const char*))
 {
     unsigned int temp;
 

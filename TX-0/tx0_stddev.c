@@ -90,7 +90,7 @@ t_stat petr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat petr_boot (int32 unitno, DEVICE *dptr);
-t_stat petr_attach (UNIT *uptr, char *cptr);
+t_stat petr_attach (UNIT *uptr, CONST char *cptr);
 
 /* Character translation tables */
 
@@ -145,16 +145,16 @@ UNIT petr_unit = {
     };
 
 REG petr_reg[] = {
-    { ORDATA (BUF, petr_unit.buf, 18) },
-    { FLDATA (UC, petr_uc, UC_V) },
-    { FLDATA (DONE, iosta, IOS_V_PETR) },
+    { ORDATAD (BUF, petr_unit.buf, 18, "18-bit buffer to store up to three lines of                                     paper tape input") },
+    { FLDATAD (UC, petr_uc, UC_V, "upper case/lower case state") },
+    { FLDATAD (DONE, iosta, IOS_V_PETR, "input ready flag") },
     { ORDATA (HOLD, petr_hold, 9), REG_HRO },
     { ORDATA (STATE, petr_state, 5), REG_HRO },
     { FLDATA (WAIT, petr_wait, 0), REG_HRO },
-    { DRDATA (POS, petr_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, petr_unit.wait, 24), PV_LEFT },
+    { DRDATAD (POS, petr_unit.pos, T_ADDR_W, "position in input file"), PV_LEFT },
+    { DRDATAD (TIME, petr_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
     { DRDATA (LEADER, petr_leader, 6), REG_HRO },
-    { FLDATA (STOP_IOE, petr_stopioe, 0) },
+    { FLDATAD (STOP_IOE, petr_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 
@@ -198,11 +198,11 @@ UNIT ptp_unit = {
     };
 
 REG ptp_reg[] = {
-    { ORDATA (BUF, ptp_unit.buf, 8) },
-    { FLDATA (DONE, iosta, IOS_V_PTP) },
-    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { ORDATAD (BUF, ptp_unit.buf, 8, "last data item processed") },
+    { FLDATAD (DONE, iosta, IOS_V_PTP, "device done flag") },
+    { DRDATAD (POS, ptp_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, ptp_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, ptp_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 
@@ -229,12 +229,12 @@ DEVICE ptp_dev = {
 UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
-    { ORDATA (BUF, tty_buf, 6) },
-    { FLDATA (UC, tty_uc, UC_V) },
+    { ORDATAD (BUF, tty_buf, 6, "typewrite buffer (shared)") },
+    { FLDATAD (UC, tty_uc, UC_V, "upper case/lower case state (shared)") },
     { ORDATA (HOLD, tti_hold, 9), REG_HRO },
-    { FLDATA (DONE, iosta, IOS_V_TTI) },
-    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { FLDATAD (DONE, iosta, IOS_V_TTI, "input ready flag") },
+    { DRDATAD (POS, tti_unit.pos, T_ADDR_W, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME, tti_unit.wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
     { NULL }
     };
 
@@ -261,11 +261,11 @@ DEVICE tti_dev = {
 UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT * 10 };
 
 REG tto_reg[] = {
-    { ORDATA (BUF, tty_buf, 6) },
-    { FLDATA (UC, tty_uc, UC_V) },
-    { FLDATA (DONE, iosta, IOS_V_TTO) },
-    { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF, tty_buf, 6, "typewrite buffer (shared)") },
+    { FLDATAD (UC, tty_uc, UC_V, "upper case/lower case state (shared)") },
+    { FLDATAD (DONE, iosta, IOS_V_TTO, "output done flag") },
+    { DRDATAD (POS, tto_unit.pos, T_ADDR_W, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME, tto_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
     { NULL }
     };
 
@@ -290,13 +290,13 @@ circuitry. Lines without seventh hole punched are ignored by the PETR.
 As each line of the tape is read in, the data is stored into an 18-bit BUF
 register with bits mapped as follows:
 
-Tape	BUF
-0		0
-1		3
-2		6
-3		9
-4		12
-5		15
+Tape    BUF
+0       0
+1       3
+2       6
+3       9
+4       12
+5       15
 
 Up to three lines of tape may be read into a single the single BUF register.
 Before subsequent lines are read, the BUF register is cycled one bit right.
@@ -320,7 +320,7 @@ int32 petr (int32 inst, int32 dev, int32 dat)
         do {
             result = petr_svc(&petr_unit);
             if (result != SCPE_OK) {
-                printf("PETR: Read error\n");
+                sim_printf("PETR: Read error\n");
                 break;
             }
         } while ((petr_unit.buf & 0100) == 0);  /* NOTE: Lines without seventh hole are ignored by PETR. */
@@ -366,7 +366,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* attached? */
                 ios = 0;
                 return SCPE_IOERR;
         }
-        else perror ("PETR I/O error");
+        else sim_perror ("PETR I/O error");
         clearerr (uptr->fileref);
         ios = 0;
         return SCPE_IOERR;
@@ -395,14 +395,14 @@ t_stat petr_reset (DEVICE *dptr)
 
 /* Attach routine */
 
-t_stat petr_attach (UNIT *uptr, char *cptr)
+t_stat petr_attach (UNIT *uptr, CONST char *cptr)
 {
     petr_leader = PETR_LEADER;                                /* set up leader */
     return attach_unit (uptr, cptr);
 }
 
 /* Bootstrap routine */
-extern t_stat cpu_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat cpu_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern UNIT cpu_unit;
 
 //#define SANITY_CHECK_TAPE
@@ -410,18 +410,18 @@ extern UNIT cpu_unit;
 /* Switches the CPU to READIN mode and starts execution. */
 t_stat petr_boot (int32 unitno, DEVICE *dptr)
 {
-	t_stat reason = SCPE_OK;
+    t_stat reason = SCPE_OK;
 
 #ifdef SANITY_CHECK_TAPE
-	int32 AC, MBR, MAR, IR = 0;
-	int32 blkcnt, chksum = 0, fa, la;
-	int32 addr, tdata;
+    int32 AC, MBR, MAR, IR = 0;
+    int32 blkcnt, chksum = 0, fa, la;
+    int32 addr, tdata;
 #endif /* SANITY_CHECK_TAPE */
 
     /* Switch to READIN mode. */
     cpu_set_mode(&cpu_unit, UNIT_MODE_READIN, NULL, NULL);
 #ifdef SANITY_CHECK_TAPE
-	for(;(IR != 2) && (IR != 1);) {
+    for(;(IR != 2) && (IR != 1);) {
         AC = petr(3,0,0);   /* Read three chars from tape into AC */
         MAR = AC & AMASK;   /* Set memory address */
         IR = AC >> 16;
@@ -436,7 +436,7 @@ t_stat petr_boot (int32 unitno, DEVICE *dptr)
             case 03:    /* Storage (opr x) */
                 MBR = petr(3,0,0);  /* Read three characters from tape. */
                 TRACE_PRINT(petr_dev, ERROR_MSG, ("READIN: sto @%06o = %06o\n", MAR, MBR));
-                printf("[%06o] = %06o\n", MAR, MBR);
+                sim_printf("[%06o] = %06o\n", MAR, MBR);
                 break;
             case 02:    /* Transfer Control (trn x) Start Execution */
                 PC = MAR;
@@ -453,62 +453,62 @@ t_stat petr_boot (int32 unitno, DEVICE *dptr)
             default:
                 reason = SCPE_IERR;
                 break;
-		}	
-	}
+        }
+    }
 
-	blkcnt = 0;
-	while (1) {
-		chksum = 0;
+    blkcnt = 0;
+    while (1) {
+        chksum = 0;
 
-		fa = petr(3,0,0);  /* Read three characters from tape. */
+        fa = petr(3,0,0);  /* Read three characters from tape. */
 
-		if ((fa & 0400000) || (fa & 0200000)) {
-			break;
-		}
+        if ((fa & 0400000) || (fa & 0200000)) {
+            break;
+        }
 
-		chksum += fa;
-		if (chksum > 0777777) {
-			chksum +=1;
-		}
-		chksum &= 0777777;
+        chksum += fa;
+        if (chksum > 0777777) {
+            chksum +=1;
+        }
+        chksum &= 0777777;
 
-		la = petr(3,0,0);  /* Read three characters from tape. */
+        la = petr(3,0,0);  /* Read three characters from tape. */
 
-		chksum += la;
-		if (chksum > 0777777) {
-			chksum +=1;
-		}
-		chksum &= 0777777;
+        chksum += la;
+        if (chksum > 0777777) {
+            chksum +=1;
+        }
+        chksum &= 0777777;
 
-		la = (~la) & 0177777;
+        la = (~la) & 0177777;
 
-		printf("First Address=%06o, Last Address=%06o\n", fa, la);
+        sim_printf("First Address=%06o, Last Address=%06o\n", fa, la);
 
-		for(addr = fa; addr <= la; addr++) {
-			tdata = petr(3,0,0);  /* Read three characters from tape. */
-			chksum += tdata;
-			if (chksum > 0777777) {
-				chksum +=1;
-			}
-			chksum &= 0777777;
-		}
+        for(addr = fa; addr <= la; addr++) {
+            tdata = petr(3,0,0);  /* Read three characters from tape. */
+            chksum += tdata;
+            if (chksum > 0777777) {
+                chksum +=1;
+            }
+            chksum &= 0777777;
+        }
 
-		chksum = (~chksum) & 0777777;
+        chksum = (~chksum) & 0777777;
 
-		tdata = petr(3,0,0);
+        tdata = petr(3,0,0);
 
-		if (chksum != tdata) {
-			reason = SCPE_FMT;
-		}
+        if (chksum != tdata) {
+            reason = SCPE_FMT;
+        }
 
-		printf("Block %d: Calculated checksum=%06o, real checksum=%06o, %s\n", blkcnt, chksum, tdata, chksum == tdata ? "OK" : "BAD Checksum!");
-		blkcnt++;
-	}
+        sim_printf("Block %d: Calculated checksum=%06o, real checksum=%06o, %s\n", blkcnt, chksum, tdata, chksum == tdata ? "OK" : "BAD Checksum!");
+        blkcnt++;
+    }
 
-	fseek (petr_dev.units[0].fileref, 0, SEEK_SET);
+    fseek (petr_dev.units[0].fileref, 0, SEEK_SET);
 #endif /* SANITY_CHECK_TAPE */
 
-	/* Start Execution */
+    /* Start Execution */
     return (reason);
 
 }
@@ -533,7 +533,7 @@ t_stat ptp_svc (UNIT *uptr)
     if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
         return SCPE_UNATT;
     if (putc (uptr->buf, uptr->fileref) == EOF) {           /* I/O error? */
-        perror ("PTP I/O error");
+        sim_perror ("PTP I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }

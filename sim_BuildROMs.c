@@ -38,13 +38,16 @@
       =======================================================================================
 */
 struct ROM_File_Descriptor {
-    char *BinaryName;                   char *IncludeFileName;   size_t expected_size; unsigned int checksum;  char *ArrayName;} ROMs[] = {
-   {"VAX/ka655x.bin",                   "VAX/vax_ka655x_bin.h",                131072,            0xFF7673B6, "vax_ka655x_bin"},
-   {"VAX/ka620.bin",                    "VAX/vax_ka620_bin.h",                  65536,            0xFF7F930F, "vax_ka620_bin"},
-   {"VAX/ka630.bin",                    "VAX/vax_ka630_bin.h",                  65536,            0xFF7F73EF, "vax_ka630_bin"},
-   {"VAX/ka610.bin",                    "VAX/vax_ka610_bin.h",                  16384,            0xFFEF3312, "vax_ka610_bin"},
-   {"VAX/vmb.exe",                      "VAX/vax_vmb_exe.h",                    44544,            0xFFC014CC, "vax_vmb_exe"},
-   {"swtp6800/swtp6800/swtbug.bin",     "swtp6800/swtp6800/swtp_swtbug_bin.h",   1024,            0xFFFE4FBC, "swtp_swtbug_bin"},
+    const char *BinaryName;             const char *IncludeFileName; size_t expected_size; unsigned int checksum;  const char *ArrayName;            const char *Comments;} ROMs[] = {
+   {"VAX/ka655x.bin",                   "VAX/vax_ka655x_bin.h",                    131072,            0xFF7673B6,        "vax_ka655x_bin"},
+   {"VAX/ka620.bin",                    "VAX/vax_ka620_bin.h",                      65536,            0xFF7F930F,        "vax_ka620_bin"},
+   {"VAX/ka630.bin",                    "VAX/vax_ka630_bin.h",                      65536,            0xFF7F73EF,        "vax_ka630_bin"},
+   {"VAX/ka610.bin",                    "VAX/vax_ka610_bin.h",                      16384,            0xFFEF3312,        "vax_ka610_bin"},
+   {"VAX/ka750_new.bin",                "VAX/vax_ka750_bin_new.h",                   1024,            0xFFFE7BE5,        "vax_ka750_bin_new", "From ROM set: E40A9, E41A9, E42A9, E43A9 (Boots: A=DD, B=DB, C=DU"},
+   {"VAX/ka750_old.bin",                "VAX/vax_ka750_bin_old.h",                   1024,            0xFFFEBAA5,        "vax_ka750_bin_old", "From ROM set: 990A9, 948A9, 906A9, 905A9 (Boots: A=DD, B=DM, C=DL, D=DU"},
+   {"VAX/vmb.exe",                      "VAX/vax_vmb_exe.h",                        44544,            0xFFC014BB,        "vax_vmb_exe"},
+   {"PDP11/lunar11/lunar.lda",          "PDP11/pdp11_vt_lunar_rom.h",               13824   ,         0xFFF15D00,        "lunar_lda"},
+   {"swtp6800/swtp6800/swtbug.bin",     "swtp6800/swtp6800/swtp_swtbug_bin.h",       1024,            0xFFFE4FBC,        "swtp_swtbug_bin"},
    };
 
 
@@ -144,6 +147,7 @@ unsigned char *ROMData = NULL;
 unsigned int checksum = 0;
 char *c;
 int i;
+char cleaned_rom_filename[512];
 char include_filename[512];
 char array_name[512];
 
@@ -167,9 +171,11 @@ fclose (rFile);
 for (i=0; i<statb.st_size; ++i)
     checksum += ROMData[i];
 checksum = ~checksum;
-while ((c = strchr (rom_filename, '\\')))
+strncpy (cleaned_rom_filename, rom_filename, sizeof(cleaned_rom_filename)-2);
+cleaned_rom_filename[sizeof(cleaned_rom_filename)-1] = '\0';
+while ((c = strchr (cleaned_rom_filename, '\\')))
     *c = '/';
-strcpy (array_name, rom_filename);
+strcpy (array_name, cleaned_rom_filename);
 for (c=array_name; *c; ++c)
     if (isupper(*c))
         *c = (char)tolower(*c);
@@ -177,7 +183,7 @@ if ((c = strchr (array_name, '.')))
     *c = '_';
 if ((c = strchr (array_name, '/')))
     *c = '_';
-sprintf (include_filename, "%s.h", rom_filename);
+sprintf (include_filename, "%s.h", cleaned_rom_filename);
 if ((c = strrchr (include_filename, '/')))
     sprintf (c+1, "%s.h", array_name);
 else
@@ -185,6 +191,7 @@ else
 printf ("The ROMs array entry for this new ROM image file should look something like:\n");
 printf ("{\"%s\",    \"%s\",     %d,  0x%08X, \"%s\"}\n",
         rom_filename, include_filename, (int)(statb.st_size), checksum, array_name);
+free (ROMData);
 return 1;
 }
 
@@ -192,7 +199,8 @@ int sim_make_ROM_include(const char *rom_filename,
                          int expected_size,
                          unsigned int expected_checksum,
                          const char *include_filename, 
-                         const char *rom_array_name)
+                         const char *rom_array_name,
+                         const char *Comments)
 {
 FILE *rFile;
 FILE *iFile;
@@ -259,7 +267,7 @@ if ((expected_checksum != 0) && (checksum != expected_checksum)) {
     printf ("This can happen if the file was transferred or unpacked incorrectly\n");
     printf ("and in the process tried to convert line endings rather than passing\n");
     printf ("the file's contents unmodified\n");
-    fclose (rFile);
+    free (ROMData);
     return -1;
     }
 /*
@@ -287,6 +295,7 @@ if (0 == sim_read_ROM_include(include_filename,
 
 if (NULL == (iFile = fopen (include_filename, "w"))) {
     printf ("Error Opening '%s' for output: %s\n", include_filename, strerror(errno));
+    free (ROMData);
     return -1;
     }
 load_filename = strrchr (rom_filename, '/');
@@ -302,6 +311,8 @@ fprintf (iFile, "   %s         produced at %s", include_filename, ctime(&now));
 fprintf (iFile, "   from %s which was last modified at %s", rom_filename, ctime(&statb.st_mtime));
 fprintf (iFile, "   file size: %d (0x%X) - checksum: 0x%08X\n", (int)statb.st_size, (int)statb.st_size, checksum);
 fprintf (iFile, "   This file is a generated file and should NOT be edited or changed by hand.\n");
+if (Comments)
+    fprintf (iFile, "\n   %s\n\n", Comments);
 fprintf (iFile, "*/\n");
 fprintf (iFile, "#define BOOT_CODE_SIZE 0x%X\n", (int)statb.st_size);
 fprintf (iFile, "#define BOOT_CODE_FILENAME \"%s\"\n", load_filename);
@@ -366,7 +377,7 @@ int status = 0;
 
 if (argc == 1) {  /* invoked without any arguments */
     for (i=0; i<sizeof(ROMs)/sizeof(ROMs[0]); ++i)
-        status += sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName);
+        status += sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName, ROMs[i].Comments);
     exit((status == 0) ? 0 : 2);
     }
 if ((0 == strcmp(argv[1], "/?")) ||
@@ -383,7 +394,7 @@ else {
     if (i == sizeof(ROMs)/sizeof(ROMs[0]))
         status = sim_make_ROMs_entry (argv[1]);
     else
-        status = sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName);
+        status = sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName, ROMs[i].Comments);
     }
 exit((status == 0) ? 0 : 2);
 }

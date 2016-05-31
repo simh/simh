@@ -1,6 +1,6 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disk simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    DP           12557A 2871 disk subsystem
                 13210A 7900 disk subsystem
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Dec-12    MP      Now calls sim_activate_time to get remaining seek time
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -263,14 +266,14 @@ IOHANDLER dpcio;
 t_stat dpc_svc (UNIT *uptr);
 t_stat dpd_svc (UNIT *uptr);
 t_stat dpc_reset (DEVICE *dptr);
-t_stat dpc_attach (UNIT *uptr, char *cptr);
+t_stat dpc_attach (UNIT *uptr, CONST char *cptr);
 t_stat dpc_detach (UNIT* uptr);
 t_stat dpc_boot (int32 unitno, DEVICE *dptr);
 void dp_god (int32 fnc, int32 drv, int32 time);
 void dp_goc (int32 fnc, int32 drv, int32 time);
-t_stat dpc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
-t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dpc_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+t_stat dp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* DPD data structures
 
@@ -575,7 +578,8 @@ while (working_set) {
             data = 0;
 
             for (i = 0; i < DP_NUMDRV; i++)             /* form attention register value */
-                if (dpc_sta[i] & STA_ATN) data = data | (1 << i);
+                if (dpc_sta[i] & STA_ATN)
+                    data = data | (uint16) (1 << i);
 
             stat_data = IORETURN (SCPE_OK, data);       /* merge in return status */
             break;
@@ -950,7 +954,7 @@ switch (uptr->FNC) {                                    /* case function */
                 break;                                  /* done */
                 }
             }
-        dpxb[dp_ptr++] = dpd_wval? dpd_obuf: 0;         /* store word/fill */
+        dpxb[dp_ptr++] = dpd_wval ? (uint16) dpd_obuf : 0;  /* store word/fill */
         dpd_wval = 0;                                   /* clr data valid */
         if (dp_ptr >= DP_NUMWD) {                       /* buffer full? */
             da = GETDA (dpc_rarc, dpc_rarh, dpc_rars);  /* calc disk addr */
@@ -1038,7 +1042,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat dpc_attach (UNIT *uptr, char *cptr)
+t_stat dpc_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -1059,7 +1063,7 @@ return detach_unit (uptr);                              /* detach unit */
 
 /* Load and unload heads */
 
-t_stat dpc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat dpc_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 int32 drv;
 
@@ -1080,7 +1084,7 @@ return SCPE_OK;
 
 /* Set controller type */
 
-t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 
@@ -1102,7 +1106,7 @@ return SCPE_OK;
 
 /* Show controller type */
 
-t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (dp_ctype == A13210)
     fprintf (st, "13210A");
@@ -1181,12 +1185,15 @@ const BOOT_ROM dp_rom = {
 
 t_stat dpc_boot (int32 unitno, DEVICE *dptr)
 {
-int32 dev;
+const int32 dev = dpd_dib.select_code;                  /* data chan select code */
 
-if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
-dev = dpd_dib.select_code;                              /* get data chan dev */
-if (ibl_copy (dp_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
-SR = (SR & IBL_OPT) | IBL_DP | (dev << IBL_V_DEV);      /* set SR */
-if (sim_switches & SWMASK ('R')) SR = SR | IBL_DP_REM;  /* boot from removable? */
-return SCPE_OK;
+if (unitno != 0)                                        /* boot supported on drive unit 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
+
+if (ibl_copy (dp_rom, dev, IBL_OPT,                     /* copy the boot ROM to memory and configure */
+              IBL_DP | IBL_SET_SC (dev)                 /*   the S register accordingly */
+                | (sim_switches & SWMASK ('R') ? IBL_DP_REM : 0)))
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+else
+    return SCPE_OK;
 }

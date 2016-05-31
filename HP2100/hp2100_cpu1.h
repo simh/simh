@@ -1,6 +1,6 @@
 /* hp2100_cpu1.h: HP 2100/1000 firmware dispatcher definitions
 
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2013, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+   18-Mar-13    JDB     Added externs for microcode helper functions
+   14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    11-Sep-08    JDB     Moved microcode function prototypes here
    30-Apr-08    JDB     Corrected OP_AFF to OP_AAFF for SIGNAL/1000
                         Removed unused operand patterns

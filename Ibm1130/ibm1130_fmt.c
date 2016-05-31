@@ -164,7 +164,7 @@ char*	pszX;												/* work pointer */
  * EditToAsm - convert tab-formatted text line to 1130 Assembler format
  */
 
-char *EditToAsm (char* p_pszEdit, int width)				/* convert line to 1130 assembler */
+const char *EditToAsm (char* p_pszEdit, int width)			/* convert line to 1130 assembler */
 {
 char	pszLine[MAXLINE];									/* source line */
 char	pszWork[WORKSZ];									/* work buffer */
@@ -230,7 +230,7 @@ size_t	iI;													/* work integer */
  * (a la DEC Fortran)
  */
 
-char *EditToFortran(char* p_pszEdit, int width)				/* convert line to 1130 assembler */
+const char *EditToFortran(char* p_pszEdit, int width)		/* convert line to 1130 assembler */
 {
 char	pszLine[MAXLINE];									/* source line */
 char*	pszWork;											/* work pointer */
@@ -287,7 +287,7 @@ int		bContinue;											/* true if continue */
  * EditToWhitespace - expand tabs at n space intervals.
  */
 
-char*	EditToWhitespace(char *p_pszEdit, int width)
+const char*	EditToWhitespace(char *p_pszEdit, int width)
 {
 int		iI;													/* work integer	*/
 int     iPos;                                               /* work integer for settings tab stops */

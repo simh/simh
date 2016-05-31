@@ -28,7 +28,7 @@
    28-Apr-07    RMS     Removed clock initialization
    27-Oct-06    RMS     Added idle support
                         Removed separate PASLA clock
-   09-Mar-06	RMS     Added 8 register bank support for 8/32
+   09-Mar-06    RMS     Added 8 register bank support for 8/32
    06-Feb-06    RMS     Fixed bug in DH (Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -268,10 +268,10 @@ uint32 display (uint32 dev, uint32 op, uint32 dat);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_consint (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 void set_r_display (uint32 *rbase);
 
 extern t_bool devtab_init (void);
@@ -2285,7 +2285,7 @@ if ((sw & SWMASK ('V')) && (PSW & PSW_REL)) {
     int32 cc = RelocT (addr, MAC_BASE, P, &addr);
     if (cc & (CC_C | CC_V))
         return SCPE_NXM;
-	}
+    }
 if (addr >= MEMSIZE)
     return SCPE_NXM;
 if (vptr != NULL)
@@ -2301,7 +2301,7 @@ if ((sw & SWMASK ('V')) && (PSW & PSW_REL)) {
     int32 cc = RelocT (addr, MAC_BASE, P, &addr);
     if (cc & (CC_C | CC_V))
         return SCPE_NXM;
-	}
+    }
 if (addr >= MEMSIZE)
     return SCPE_NXM;
 IOWriteH (addr, val);
@@ -2310,12 +2310,12 @@ return SCPE_OK;
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 mc = 0;
 uint32 i;
 
-if ((val <= 0) || (val > MAXMEMSIZE32) || ((val & 0xFFFF) != 0))
+if ((val <= 0) || (((unsigned)val) > MAXMEMSIZE32) || ((val & 0xFFFF) != 0))
     return SCPE_ARG;
 for (i = val; i < MEMSIZE; i = i + 4)
     mc = mc | M[i >> 2];
@@ -2331,7 +2331,6 @@ return SCPE_OK;
 
 void set_r_display (uint32 *rbase)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 int32 i;
 
@@ -2345,7 +2344,7 @@ return;
 
 /* Set console interrupt */
 
-t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_consint (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (PSW & PSW_EXI)
     SET_INT (v_DS);
@@ -2354,7 +2353,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, lnt;
 t_stat r;
@@ -2385,10 +2384,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 op, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[3];
 t_stat r;
 InstHistory *h;

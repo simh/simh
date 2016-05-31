@@ -1,6 +1,6 @@
 /* pdp11_cpumod.h: PDP-11 CPU model definitions
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Dec-15    RMS     Added 11/03, 11/23 BEVENT disable
    22-Apr-08    RMS     Added 11/70 MBRK register
    30-Aug-05    RMS     Added additional 11/60 registers
 */
@@ -30,8 +31,8 @@
 #ifndef PDP11_CPUMOD_H_
 #define PDP11_CPUMOD_H_        0
 
-#define SOP_1103        (BUS_Q)
-#define OPT_1103        (OPT_EIS|OPT_FIS)
+#define SOP_1103        (BUS_Q|OPT_BVT)
+#define OPT_1103        (OPT_EIS|OPT_FIS|OPT_BVT)
 #define PSW_1103        0000377
 
 #define SOP_1104        (BUS_U)
@@ -46,8 +47,8 @@
 #define OPT_1120        0
 #define PSW_1120        0000377
 
-#define SOP_1123        (BUS_Q|OPT_EIS|OPT_FPP|OPT_MMU)
-#define OPT_1123        (OPT_FPP|OPT_CIS)
+#define SOP_1123        (BUS_Q|OPT_EIS|OPT_FPP|OPT_MMU|OPT_BVT)
+#define OPT_1123        (OPT_FPP|OPT_CIS|OPT_BVT)
 #define PSW_F           0170777
 #define PAR_F           0177777
 #define PDR_F           0077516
@@ -267,7 +268,7 @@
 /* Data tables */
 
 struct cpu_table {
-    char                *name;                          /* model name */
+    const char          *name;                          /* model name */
     uint32              std;                            /* standard flags */
     uint32              opt;                            /* set/clear flags */
     uint32              maxm;                           /* max memory */
@@ -291,11 +292,11 @@ typedef struct conf_table CNFTAB;
 
 /* Prototypes */
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_clr_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_clr_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_set_bus (int32 opt);
 
 #endif

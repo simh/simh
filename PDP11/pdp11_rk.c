@@ -66,7 +66,17 @@
    non-seeking drive is recorded in last_drv.
 */
 
+#if defined (VM_VAX)                                    /* VAX version */
+#include "vax_defs.h"
+extern int32 int_req[IPL_HLVL];
+#define DMASK           0xFFFF
+#define RK_DIS  DEV_DIS
+
+#else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
+extern int32 int_req[IPL_HLVL];
+#define RK_DIS  0
+#endif
 
 /* Constants */
 
@@ -266,9 +276,6 @@ BITFIELD *rk_reg_bits[] = {
 #define RK_MIN          10
 #define MAX(x,y)        (((x) > (y))? (x): (y))
 
-extern uint16 *M;                                       /* memory */
-extern int32 int_req[IPL_HLVL];
-
 uint16 *rkxb = NULL;                                    /* xfer buffer */
 int32 rkcs = 0;                                         /* control/status */
 int32 rkds = 0;                                         /* drive status */
@@ -282,7 +289,7 @@ int32 rk_stopioe = 1;                                   /* stop on error */
 int32 rk_swait = 10;                                    /* seek time */
 int32 rk_rwait = 10;                                    /* rotate time */
 
-char *rk_regnames[] = {
+const char *rk_regnames[] = {
     "RKDS",
     "RKER",
     "RKCS",
@@ -302,7 +309,6 @@ int32 *rk_regs[] = {
     &rkda,
     };
 
-DEVICE rk_dev;
 t_stat rk_rd (int32 *data, int32 PA, int32 access);
 t_stat rk_wr (int32 data, int32 PA, int32 access);
 int32 rk_inta (void);
@@ -312,8 +318,8 @@ void rk_go (void);
 void rk_set_done (int32 error);
 void rk_clr_done (void);
 t_stat rk_boot (int32 unitno, DEVICE *dptr);
-t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rk_description (DEVICE *dptr);
+t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rk_description (DEVICE *dptr);
 
 DEBTAB rk_deb[] = {
     { "OPS", RKDEB_OPS },
@@ -396,7 +402,7 @@ DEVICE rk_dev = {
     RK_NUMDR, 8, 24, 1, 8, 16,
     NULL, NULL, &rk_reset,
     &rk_boot, NULL, NULL,
-    &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG, 0,
+    &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | RK_DIS, 0,
     rk_deb, NULL, NULL, &rk_help, NULL, NULL,
     &rk_description 
     };
@@ -661,7 +667,7 @@ ma = ((rkcs & RKCS_MEX) << (16 - RKCS_V_MEX)) | rkba;   /* get mem addr */
 da = GET_DA (rkda) * RK_NUMWD;                          /* get disk addr */
 wc = 0200000 - rkwc;                                    /* get wd cnt */
 if ((da + wc) > (int32) uptr->capac) {                  /* overrun? */
-    wc = uptr->capac - da;                              /* trim transfer */
+    wc = (int32)uptr->capac - da;                       /* trim transfer */
     rker = rker | RKER_OVR;                             /* set overrun err */
     }
 
@@ -768,7 +774,7 @@ rkda = (rkda & RKDA_DRIVE) | (track << RKDA_V_TRACK) | (sect << RKDA_V_SECT);
 rk_set_done (0);
 
 if (err != 0) {                                         /* error? */
-    perror ("RK I/O error");
+    sim_perror ("RK I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -862,6 +868,8 @@ return auto_config (0, 0);
 
 /* Device bootstrap */
 
+#if defined (VM_PDP11)
+
 #define BOOT_START      02000                           /* start */
 #define BOOT_ENTRY      (BOOT_START + 002)              /* entry */
 #define BOOT_UNIT       (BOOT_START + 010)              /* unit number */
@@ -897,6 +905,7 @@ static const uint16 boot_rom[] = {
 t_stat rk_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
+extern uint16 *M;                                       /* memory */
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
@@ -906,7 +915,16 @@ cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 
-t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+#else
+
+t_stat rk_boot (int32 unitno, DEVICE *dptr)
+{
+return SCPE_NOFNC;
+}
+
+#endif
+
+t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
@@ -954,7 +972,7 @@ fprintf (st, "    OS I/O error  x          report error and stop\n");
 return SCPE_OK;
 }
 
-char *rk_description (DEVICE *dptr)
+const char *rk_description (DEVICE *dptr)
 {
 return "RK11/RKV11 cartridge disk controller";
 }

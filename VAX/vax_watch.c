@@ -107,10 +107,10 @@ int32 wtc_csrc = 0;
 int32 wtc_csrd = 0;
 int32 wtc_mode = WTC_MODE_VMS;
 
-t_stat wtc_set (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat wtc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *wtc_description (DEVICE *dptr);
+t_stat wtc_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat wtc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *wtc_description (DEVICE *dptr);
 t_stat wtc_reset (DEVICE *dptr);
 void wtc_set_valid (void);
 void wtc_set_invalid (void);
@@ -149,7 +149,7 @@ DEVICE wtc_dev = {
     };
 
 /* Register names for Debug tracing */
-static char *wtc_regs[] =
+static const char *wtc_regs[] =
     {"SEC ", "SECA", "MIN ", "MINA", 
      "HR  ", "HRA ", "DOW ", "DOM ", 
      "MON ", "YEAR", "CSRA", "CSRB", 
@@ -162,6 +162,7 @@ int32 wtc_rd (int32 pa)
 int32 rg = (pa >> 1) & 0xF;
 int32 val = 0;
 time_t curr;
+static int mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 struct tm *ctm = NULL;
 
 if (rg < 10) {                                          /* time reg? */
@@ -171,6 +172,22 @@ if (rg < 10) {                                          /* time reg? */
     ctm = localtime (&curr);                            /* decompose */
     if (ctm == NULL)                                    /* error? */
         return 0;
+    if ((wtc_mode == WTC_MODE_VMS) &&
+        ((ctm->tm_year % 4) == 0)) {                    /* Leap Year? */
+        if (ctm->tm_mon > 1) {                          /* Past February? */
+            ++ctm->tm_mday;                             /* Adjust for Leap Day */
+            if (ctm->tm_mday > mdays[ctm->tm_mon]) {    /* wrap to last day of prior month */
+                ++ctm->tm_mon;
+                ctm->tm_mday = 1;
+                }
+            }
+        else
+            if ((ctm->tm_mon == 1) &&                   /* February 29th? */
+                (ctm->tm_mday == 29)) {
+                ctm->tm_mon = 2;                        /* Is March 1 in 1982 */
+                ctm->tm_mday = 1;
+                }
+        }
     }
 
 switch(rg) {
@@ -196,7 +213,7 @@ switch(rg) {
         break;
 
     case 8:                                             /* month */
-        val = ctm->tm_mon;
+        val = ctm->tm_mon + 1;
         break;
 
     case 9:                                             /* year */
@@ -277,13 +294,13 @@ if (sim_switches & SWMASK ('P')) {                      /* powerup? */
 return SCPE_OK;
 }
 
-t_stat wtc_set (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat wtc_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr != NULL) wtc_mode = strcmp(cptr, "STD");
 return SCPE_OK;
 }
 
-t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf(st, "time=%s", (wtc_mode ? "vms" :"std"));
 return SCPE_OK;
@@ -301,7 +318,7 @@ void wtc_set_invalid (void)
 wtc_csrd &= ~WTC_CSRD_VRT;
 }
 
-t_stat wtc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat wtc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Watch Chip (WTC)\n\n");
 fprintf (st, "The WTC simulates the MC146818 watch chip.  It recognizes the following options:\n\n");
@@ -314,7 +331,7 @@ fprintf (st, "verify that the time reported is valid.  The default mode is VMS.\
 return SCPE_OK;
 }
 
-char *wtc_description (DEVICE *dptr)
+const char *wtc_description (DEVICE *dptr)
 {
 return "watch chip";
 }

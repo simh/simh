@@ -70,14 +70,13 @@ int32 ttx_tps = 100;                                    /* polls per second */
 TMLN ttx_ldsc[TTX_LINES] = { {0} };                     /* line descriptors */
 TMXR ttx_desc = { TTX_LINES, 0, 0, ttx_ldsc };          /* mux descriptor */
 
-DEVICE ttix_dev, ttox_dev;
 int32 ttix (int32 IR, int32 AC);
 int32 ttox (int32 IR, int32 AC);
 t_stat ttix_svc (UNIT *uptr);
 t_stat ttix_reset (DEVICE *dptr);
 t_stat ttox_svc (UNIT *uptr);
 t_stat ttox_reset (DEVICE *dptr);
-t_stat ttx_attach (UNIT *uptr, char *cptr);
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr);
 t_stat ttx_detach (UNIT *uptr);
 void ttx_enbdis (int32 dis);
 
@@ -95,12 +94,12 @@ DIB ttix_dib = { DEV_KJ8, 8,
 UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_IDLE|UNIT_ATTABLE, 0), SERIAL_IN_WAIT };
 
 REG ttix_reg[] = {
-    { BRDATA (BUF, ttix_buf, 8, 8, TTX_LINES) },
-    { GRDATA (DONE, dev_done, 8, TTX_LINES, INT_V_TTI1) },
-    { GRDATA (ENABLE, int_enable, 8, TTX_LINES, INT_V_TTI1) },
-    { GRDATA (INT, int_req, 8, TTX_LINES, INT_V_TTI1) },
-    { DRDATA (TIME, ttix_unit.wait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (TPS, ttx_tps, 10), REG_NZ + PV_LEFT },
+    { BRDATAD (BUF, ttix_buf, 8, 8, TTX_LINES, "input buffer, lines 0 to 3") },
+    { GRDATAD (DONE, dev_done, 8, TTX_LINES, INT_V_TTI1, "device done flag (line 0 rightmost)") },
+    { GRDATAD (ENABLE, int_enable, 8, TTX_LINES, INT_V_TTI1, "interrupt enable flag") },
+    { GRDATAD (INT, int_req, 8, TTX_LINES, INT_V_TTI1, "interrupt pending flag") },
+    { DRDATAD (TIME, ttix_unit.wait, 24, "initial polling interval"), REG_NZ + PV_LEFT },
+    { DRDATAD (TPS, ttx_tps, 10, "polls per second after calibration"), REG_NZ + PV_LEFT },
     { ORDATA (DEVNUM, ttix_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -159,12 +158,12 @@ UNIT ttox_unit[] = {
     };
 
 REG ttox_reg[] = {
-    { BRDATA (BUF, ttox_buf, 8, 8, TTX_LINES) },
-    { GRDATA (DONE, dev_done, 8, TTX_LINES, INT_V_TTO1) },
-    { GRDATA (ENABLE, int_enable, 8, TTX_LINES, INT_V_TTO1) },
-    { GRDATA (INT, int_req, 8, TTX_LINES, INT_V_TTO1) },
-    { URDATA (TIME, ttox_unit[0].wait, 10, 24, 0,
-              TTX_LINES, PV_LEFT) },
+    { BRDATAD (BUF, ttox_buf, 8, 8, TTX_LINES, "last data item processed, lines 0 to 3") },
+    { GRDATAD (DONE, dev_done, 8, TTX_LINES, INT_V_TTO1, "device done flag (line 0 rightmost)") },
+    { GRDATAD (ENABLE, int_enable, 8, TTX_LINES, INT_V_TTO1, "interrupt enable flag") },
+    { GRDATAD (INT, int_req, 8, TTX_LINES, INT_V_TTO1, "interrupt pending flag") },
+    { URDATAD (TIME, ttox_unit[0].wait, 10, 24, 0,
+              TTX_LINES, PV_LEFT, "line from I/O initiation to interrupt, lines 0 to 3") },
     { NULL }
     };
 
@@ -376,7 +375,7 @@ return SCPE_OK;
 
 /* Attach master unit */
 
-t_stat ttx_attach (UNIT *uptr, char *cptr)
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

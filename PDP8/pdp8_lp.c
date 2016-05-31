@@ -38,11 +38,10 @@ extern int32 int_req, int_enable, dev_done, stop_inst;
 int32 lpt_err = 0;                                      /* error flag */
 int32 lpt_stopioe = 0;                                  /* stop on error */
 
-DEVICE lpt_dev;
 int32 lpt (int32 IR, int32 AC);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat lpt_detach (UNIT *uptr);
 
 /* LPT data structures
@@ -59,14 +58,14 @@ UNIT lpt_unit = {
     };
 
 REG lpt_reg[] = {
-    { ORDATA (BUF, lpt_unit.buf, 8) },
-    { FLDATA (ERR, lpt_err, 0) },
-    { FLDATA (DONE, dev_done, INT_V_LPT) },
-    { FLDATA (ENABLE, int_enable, INT_V_LPT) },
-    { FLDATA (INT, int_req, INT_V_LPT) },
-    { DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, lpt_stopioe, 0) },
+    { ORDATAD (BUF, lpt_unit.buf, 8,"last data item processed") },
+    { FLDATAD (ERR, lpt_err, 0, "error status flag") },
+    { FLDATAD (DONE, dev_done, INT_V_LPT, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_LPT, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_LPT, "interrupt pending flag") },
+    { DRDATAD (POS, lpt_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, lpt_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, lpt_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVNUM, lpt_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -143,7 +142,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {
 fputc (uptr->buf, uptr->fileref);                       /* print char */
 uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("LPT I/O error");
+    sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -165,7 +164,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 

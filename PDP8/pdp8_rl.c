@@ -174,16 +174,15 @@ int32 rl_swait = 10;                                    /* seek wait */
 int32 rl_rwait = 10;                                    /* rotate wait */
 int32 rl_stopioe = 1;                                   /* stop on error */
 
-DEVICE rl_dev;
 int32 rl60 (int32 IR, int32 AC);
 int32 rl61 (int32 IR, int32 AC);
 t_stat rl_svc (UNIT *uptr);
 t_stat rl_reset (DEVICE *dptr);
 void rl_set_done (int32 error);
 t_stat rl_boot (int32 unitno, DEVICE *dptr);
-t_stat rl_attach (UNIT *uptr, char *cptr);
-t_stat rl_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rl_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rl_attach (UNIT *uptr, CONST char *cptr);
+t_stat rl_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rl_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* RL8A data structures
 
@@ -207,25 +206,25 @@ UNIT rl_unit[] = {
     };
 
 REG rl_reg[] = {
-    { ORDATA (RLCSA, rlcsa, 12) },
-    { ORDATA (RLCSB, rlcsb, 12) },
-    { ORDATA (RLMA, rlma, 12) },
-    { ORDATA (RLWC, rlwc, 12) },
-    { ORDATA (RLSA, rlsa, 6) },
-    { ORDATA (RLER, rler, 12) },
-    { ORDATA (RLSI, rlsi, 16) },
-    { ORDATA (RLSI1, rlsi1, 16) },
-    { ORDATA (RLSI2, rlsi2, 16) },
-    { FLDATA (RLSIL, rl_lft, 0) },
-    { FLDATA (INT, int_req, INT_V_RL) },
-    { FLDATA (DONE, rl_done, INT_V_RL) },
+    { ORDATAD (RLCSA, rlcsa, 12, "control/status A") },
+    { ORDATAD (RLCSB, rlcsb, 12, "control/status B") },
+    { ORDATAD (RLMA, rlma, 12, "memory address") },
+    { ORDATAD (RLWC, rlwc, 12, "word count") },
+    { ORDATAD (RLSA, rlsa, 6, "sector address") },
+    { ORDATAD (RLER, rler, 12, "error flags") },
+    { ORDATAD (RLSI, rlsi, 16, "silo top word") },
+    { ORDATAD (RLSI1, rlsi1, 16, "silo second word") },
+    { ORDATAD (RLSI2, rlsi2, 16, "silo third word") },
+    { FLDATAD (RLSIL, rl_lft, 0, "silo read left/right flag") },
+    { FLDATAD (INT, int_req, INT_V_RL, "interrupt request") },
+    { FLDATAD (DONE, rl_done, INT_V_RL, "done flag") },
     { FLDATA (IE, rlcsb, RLCSB_V_IE) },
-    { FLDATA (ERR, rl_erf, 0) },
-    { DRDATA (STIME, rl_swait, 24), PV_LEFT },
-    { DRDATA (RTIME, rl_rwait, 24), PV_LEFT },
+    { FLDATAD (ERR, rl_erf, 0, "composite error flag") },
+    { DRDATAD (STIME, rl_swait, 24, "seek time, per cylinder"), PV_LEFT },
+    { DRDATAD (RTIME, rl_rwait, 24, "rotational delay"), PV_LEFT },
     { URDATA (CAPAC, rl_unit[0].capac, 10, T_ADDR_W, 0,
               RL_NUMDR, PV_LEFT + REG_HRO) },
-    { FLDATA (STOP_IOE, rl_stopioe, 0) },
+    { FLDATAD (STOP_IOE, rl_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVNUM, rl_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -521,7 +520,7 @@ rlsa = rlsa + ((bc + (RL_NUMBY - 1)) / RL_NUMBY);
 rl_set_done (0);
 
 if (err != 0) {                                         /* error? */
-    perror ("RL I/O error");
+    sim_perror ("RL I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -573,7 +572,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat rl_attach (UNIT *uptr, char *cptr)
+t_stat rl_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 p;
 t_stat r;
@@ -604,7 +603,7 @@ return SCPE_OK;
 
 /* Set size routine */
 
-t_stat rl_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rl_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
@@ -628,7 +627,7 @@ return SCPE_OK;
         sta     =       status code
 */
 
-t_stat rl_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rl_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, da = RL_BBMAP * RL_NUMBY;
 

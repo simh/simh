@@ -106,7 +106,7 @@ return SCPE_OK;
         return  =       status code
 */
 
-t_stat sim_load (FILE *fi, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int flag)
 {
 size_t len;
 
@@ -116,6 +116,11 @@ if (len <= 3 || strcmp(fnam + (len - 3), ".st") != 0) return SCPE_ARG;
 if (flag == 1) return ssem_dump(fi);
 return ssem_load_dmp(fi);
 }
+
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 
 /* Utility routine - prints number in decimal */
 
@@ -257,9 +262,9 @@ static const char *opcode[] = {
 
 /* Utility function - parses decimal number. */
 
-t_stat parse_sym_d (char *cptr, t_value *val)
+t_stat parse_sym_d (const char *cptr, t_value *val)
 {
-char *start;
+const char *start;
 int n;
 
 start = cptr;
@@ -270,7 +275,6 @@ while (*cptr >= '0' && *cptr <= '9') {
     cptr++;
     }
 if (*start == '-') n = -n;
-if (*start) *start = 'x';
 
 if (*cptr) return SCPE_ARG;    /* junk at end? */
 
@@ -289,15 +293,12 @@ return SCPE_OK;
     http://www.computer50.org/mark1/prog98/ssemref.html
 */
 
-t_stat parse_sym_m (char *cptr, t_value *val)
+t_stat parse_sym_m (const char *cptr, t_value *val)
 {
-char *start;
 uint32 n,a;
 char gbuf[CBUFSIZE];
 
-start = cptr;
 cptr = get_glyph(cptr, gbuf, 0);
-if (*start) *start = 'x';
 
 for (n = 0; opcode[n] != NULL && strcmp(opcode[n], gbuf) != 0; n++) ;
 if (opcode[n] == NULL) return SCPE_ARG;                /* invalid mnemonic? */
@@ -326,13 +327,11 @@ return SCPE_OK;
 
 /* Utility function - parses binary backward number. */
 
-t_stat parse_sym_b (char *cptr, t_value *val)
+t_stat parse_sym_b (const char *cptr, t_value *val)
 {
-char *start;
 int count;
 t_value n;
 
-start = cptr;
 count = 0;
 n = 0;
 while (*cptr == '0' || *cptr == '1') {
@@ -340,7 +339,6 @@ while (*cptr == '0' || *cptr == '1') {
     count++;
     cptr++;
     }
-if (*start) *start = 'x';
 
 if (*cptr) return SCPE_ARG;    /* junk at end? */
 
@@ -350,13 +348,11 @@ return SCPE_OK;
 
 /* Utility function - parses binary backward instruccion. */
 
-t_stat parse_sym_i (char *cptr, t_value *val)
+t_stat parse_sym_i (const char *cptr, t_value *val)
 {
-char *start;
 int count;
 t_value a,n;
 
-start = cptr;
 count = 0;
 n = 0;
 while (*cptr == '0' || *cptr == '1') {
@@ -364,7 +360,6 @@ while (*cptr == '0' || *cptr == '1') {
     count++;
     cptr++;
     }
-if (*start) *start = 'x';
 
 if (!(*cptr) && n > OP_UNDOCUMENTED && n <= OP_STOP) {
     *val = n << I_V_OP; return SCPE_OK;
@@ -404,7 +399,7 @@ return SCPE_OK;
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 
 if (sw & SWMASK ('H')) return SCPE_ARG;    /* hexadecimal? */

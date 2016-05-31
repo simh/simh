@@ -58,22 +58,21 @@ int32 ptr_stopioe = 0;                                  /* stop on error */
 int32 ptp_csr = 0;                                      /* control/status */
 int32 ptp_stopioe = 0;                                  /* stop on error */
 
-DEVICE ptr_dev, ptp_dev;
 t_stat ptr_rd (int32 *data, int32 PA, int32 access);
 t_stat ptr_wr (int32 data, int32 PA, int32 access);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
-t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *ptr_description (DEVICE *dptr);
-t_stat ptr_attach (UNIT *uptr, char *ptr);
+t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *ptr_description (DEVICE *dptr);
+t_stat ptr_attach (UNIT *uptr, CONST char *ptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_rd (int32 *data, int32 PA, int32 access);
 t_stat ptp_wr (int32 data, int32 PA, int32 access);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptp_reset (DEVICE *dptr);
-t_stat ptp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *ptp_description (DEVICE *dptr);
-t_stat ptp_attach (UNIT *uptr, char *ptr);
+t_stat ptp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *ptp_description (DEVICE *dptr);
+t_stat ptp_attach (UNIT *uptr, CONST char *ptr);
 t_stat ptp_detach (UNIT *uptr);
 
 /* PTR data structures
@@ -95,6 +94,7 @@ UNIT ptr_unit = {
            SERIAL_IN_WAIT
     };
 
+extern DEVICE ptr_dev;
 REG ptr_reg[] = {
     { GRDATAD (BUF,     ptr_unit.buf, DEV_RDX,  8, 0, "last data item processed") },
     { GRDATAD (CSR,          ptr_csr, DEV_RDX, 16, 0, "control/status register") },
@@ -245,7 +245,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {
             sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_perror ("PTR I/O error");
     clearerr (ptr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -268,7 +268,7 @@ sim_cancel (&ptr_unit);
 return auto_config (dptr->name, 1);
 }
 
-t_stat ptr_attach (UNIT *uptr, char *cptr)
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -341,7 +341,7 @@ if (ptp_csr & CSR_IE)
 if ((ptp_unit.flags & UNIT_ATT) == 0)
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;
     }
@@ -363,7 +363,7 @@ sim_cancel (&ptp_unit);                                 /* deactivate unit */
 return auto_config (dptr->name, 1);
 }
 
-t_stat ptp_attach (UNIT *uptr, char *cptr)
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -380,7 +380,7 @@ ptp_csr = ptp_csr | CSR_ERR;
 return detach_unit (uptr);
 }
 
-t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "PC11 Paper Tape Reader (PTR)\n\n");
 fprintf (st, "The paper tape reader (PTR) reads data from a disk file.  The POS register\n");
@@ -399,12 +399,12 @@ fprintf (st, "    OS I/O error  x          report error and stop\n");
 return SCPE_OK;
 }
 
-char *ptr_description (DEVICE *dptr)
+const char *ptr_description (DEVICE *dptr)
 {
 return "PC11 paper tape reader";
 }
 
-t_stat ptp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat ptp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "PC11 Paper Tape Punch (PTP)\n\n");
 fprintf (st, "The paper tape punch (PTP) writes data to a disk file.  The POS register\n");
@@ -421,7 +421,7 @@ fprintf (st, "    OS I/O error  x          report error and stop\n");
 return SCPE_OK;
 }
 
-char *ptp_description (DEVICE *dptr)
+const char *ptp_description (DEVICE *dptr)
 {
 return "PC11 paper tape punch";
 }

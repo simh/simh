@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Jan-15    RMS     Fixed treatment of overflow (Ken Shirriff)
    08-Oct-12    RMS     Clear storage and branch preserves B register (Van Snyder)
    19-Mar-11    RMS     Reverted multiple tape indicator implementation
    20-Jan-11    RMS     Fixed branch on EOT indicator per hardware (Van Snyder)
@@ -36,10 +37,9 @@
    22-May-06    RMS     Fixed format error in CPU history (Peter Schorn)
    06-Mar-06    RMS     Fixed bug in divide (Van Snyder)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
-   01-Sep-05	RMS     Removed error stops in MCE
+   01-Sep-05    RMS     Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET
-                        (Ralph Reinke)
+   02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET (Ralph Reinke)
    14-Nov-04    WVS     Added column binary support, debug support
    06-Nov-04    RMS     Added instruction history
    12-Jul-03    RMS     Moved ASCII/BCD tables to included file
@@ -207,16 +207,15 @@ InstHistory *hst = NULL;                                /* instruction history *
 t_bool conv_old = 0;                                    /* old conversions */
 
 extern int32 sim_emax;
-extern t_value *sim_eval;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_conv (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_conv (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 store_addr_h (int32 addr);
 int32 store_addr_t (int32 addr);
 int32 store_addr_u (int32 addr);
@@ -521,7 +520,6 @@ static const int32 mtf_mod[] = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 int32 IS, ilnt, flags;
 int32 op, xa, t, wm, ioind, dev, unit;
 int32 a, b, i, k, asave, bsave;
@@ -958,9 +956,11 @@ CHECK_LENGTH:
         M[BS] = b;                                      /* store result */
         MM (BS);
         if (b & WM) {                                   /* b wm? done */
-            if (qsign && (carry == 0))                  /* compl, no carry? */
+            if ((qsign != 0) && (carry == 0))           /* eff sub and no carry? */
                 M[bsave] = WM + ((b & ZONE) ^ ABIT) + sum_table[10 - t];
-            break;
+            if ((qsign == 0) && (carry != 0))           /* eff add and carry */
+                 ind[IN_OVF] = 1;                       /* overflow */
+             break;
             }
         do {
             if (a & WM)                                 /* A WM? char = 0 */
@@ -976,7 +976,8 @@ CHECK_LENGTH:
             if ((b & WM) && (qsign == 0)) {             /* last, no recomp? */
                 M[BS] = WM + sum_table[t] +             /* zone add */
                     (((a & ZONE) + b + (carry? ABIT: 0)) & ZONE);
-                ind[IN_OVF] = carry;                    /* ovflo if carry */
+                if (carry != 0)                         /* carry out? */
+                    ind[IN_OVF] = 1;                    /* ovflo if carry */
                 }
             else M[BS] = (b & WM) + sum_table[t];       /* normal add */
             MM (BS);
@@ -1851,7 +1852,7 @@ return SCPE_OK;
 
 /* Memory size change */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -1873,7 +1874,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1904,10 +1905,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[MAX_L + 1];
 t_stat r;
 InstHistory *h;
@@ -1944,7 +1945,7 @@ return SCPE_OK;
 
 /* Set conversions */
 
-t_stat cpu_set_conv (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_conv (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 conv_old = val;
 return SCPE_OK;
@@ -1952,7 +1953,7 @@ return SCPE_OK;
 
 /* Show conversions */
 
-t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (conv_old)
     fputs ("Old (pre-3.5-1) conversions\n", st);

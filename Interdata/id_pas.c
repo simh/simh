@@ -113,10 +113,10 @@ void pas_ini (t_bool dtpl);
 t_stat pasi_svc (UNIT *uptr);
 t_stat paso_svc (UNIT *uptr);
 t_stat pas_reset (DEVICE *dptr);
-t_stat pas_attach (UNIT *uptr, char *cptr);
+t_stat pas_attach (UNIT *uptr, CONST char *cptr);
 t_stat pas_detach (UNIT *uptr);
 int32 pas_par (int32 cmd, int32 c);
-t_stat pas_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat pas_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void pas_reset_ln (int32 i);
 
 /* PAS data structures
@@ -479,7 +479,7 @@ return SCPE_OK;
 
 /* Attach master unit */
 
-t_stat pas_attach (UNIT *uptr, char *cptr)
+t_stat pas_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -506,7 +506,7 @@ return r;
 
 /* Change number of lines */
 
-t_stat pas_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat pas_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;
@@ -527,7 +527,7 @@ if (newln < PAS_ENAB) {
         if (pas_ldsc[i].conn) {
             tmxr_linemsg (&pas_ldsc[i], "\r\nOperator disconnected line\r\n");
             tmxr_reset_ln (&pas_ldsc[i]);               /* reset line */
-			}
+            }
         pasl_unit[i].flags = pasl_unit[i].flags | UNIT_DIS;
         pas_reset_ln (i);
         }

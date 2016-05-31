@@ -300,5 +300,23 @@
 int32 bcd2ascii (int32 c, t_bool use_h);
 int32 ascii2bcd (int32 c);
 
+/* Translation Tables */
+
+extern const char ascii_to_bcd_old[128];
+extern char bcd_to_ascii_old[64];
+extern const char ascii_to_bcd[128];
+extern const char bcd_to_ascii_a[64];
+extern const char bcd_to_ascii_h[64];
+extern const char bcd_to_pca[64];
+extern const char bcd_to_pch[64];
+extern const uint32 bcd_to_colbin[64];
+extern const int32 bcd_to_bin[16];
+extern const int32 bin_to_bcd[16];
+extern const int32 one_table[64];
+extern const int32 ten_table[64];
+extern const int32 hun_table[64];
+extern const int32 len_table[9];
+extern const int32 op_table[64];
+
 
 #endif

@@ -47,7 +47,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "ws.h"
-#include "xy.h"
+#include "display.h"
 
 #ifndef PIX_SIZE
 #define PIX_SIZE 1
@@ -66,7 +66,7 @@ int ws_lp_y = -1;
 static HWND static_wh;
 static HINSTANCE static_inst;
 static int xpixels, ypixels;
-static char *window_name;
+static const char *window_name;
 static HBRUSH white_brush;
 static HBRUSH black_brush;
 #ifdef SWITCH_CURSORS
@@ -317,7 +317,7 @@ ws_thread_init(void)
 
 /* called from display layer on first display op */
 int
-ws_init(char *name, int xp, int yp, int colors)
+ws_init(const char *name, int xp, int yp, int colors, void *dptr)
 {
     xpixels = xp;
     ypixels = yp;
@@ -329,6 +329,10 @@ ws_init(char *name, int xp, int yp, int colors)
     ws_init2();
 #endif
     return 1;                           /* XXX return errors!! */
+}
+
+void ws_shutdown (void)
+{
 }
 
 void *

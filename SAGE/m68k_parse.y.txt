@@ -1,0 +1,667 @@
+%{
+/* m68k_parse.c: line assembler for generic m68k_cpu
+  
+   Copyright (c) 2009-2010, Holger Veit
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   HOLGER VEIT BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Holger Veit et al shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Holger Veit et al.
+
+   04-Oct-09    HV      Initial version
+*/
+
+#include "m68k_cpu.h"
+#include <ctype.h>
+#include <string.h>
+
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+struct _ea {
+	int ea;
+	int cnt;
+	t_value arg[10];
+};
+struct _rea {
+	int reg;
+	struct _ea ea;
+};
+struct _mask {
+	int x;
+	int d;
+};
+struct _brop {
+	int opc;
+	int len;
+};
+
+static int oplen;
+static int movemx[] = { 0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000,
+				 	    0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080 };
+static int movemd[] = { 0x0080, 0x0040, 0x0020, 0x0010, 0x0008, 0x0004, 0x0002, 0x0001,
+					    0x8000, 0x4000, 0x2000, 0x1000, 0x0800, 0x0400, 0x0200, 0x0100 };
+static int yyrc;
+static int yyerrc;
+extern int yylex();
+static int _genop(t_value arg);
+static int _genea(struct _ea arg);
+static int _genbr(t_value arg,t_value,int);
+static void yyerror(char* s);
+
+#define YYDEBUG 1
+%}
+
+%union {
+	int rc;
+	int reg;
+	int wl;
+	int opc;
+	struct _ea ea;
+	t_value num;
+	struct _rea rea;
+	struct _mask mask;
+	struct _brop brop;
+}
+
+%token       A0 A1 A2 A3 A4 A5 A6 A7 D0 D1 D2 D3 D4 D5 D6 D7
+%token       CCR SR USP PC
+%token <num> NUMBER
+%token       ABCD ADD ADDA ADDI ADDQ ADDX AND ANDI OR ORI SBCD SUB SUBA SUBI SUBQ SUBX
+%token       ASL ASR LSL LSR ROL ROR ROXL ROXR
+%token		 BCC BCS BEQ BGE BGT BHI BLE BLS BLT BMI BNE BPL BVC BVS BSR BRA
+%token		 BCLR BSET BCHG BTST CHK CMP CMPA CMPI CMPM EOR EORI EXG EXT
+%token		 DIVU DIVS MULU MULS
+%token		 DBCC DBCS DBEQ DBF DBGE DBGT DBHI DBLE DBLS DBLT DBMI DBNE DBPL DBT DBVC DBVS
+%token		 SCC SCS SEQ SF SGE SGT SHI SLE SLS SLT SMI SNE SPL ST SVC SVS
+%token		 ILLEGAL NOP RESET RTE RTR RTS TRAPV
+%token		 JMP JSR LEA LINK MOVE MOVEA MOVEM MOVEP MOVEQ
+%token		 CLR NEG NEGX NBCD NOT PEA STOP TAS SWAP TRAP TST UNLK 
+
+%token		 PREDEC POSTINC BSIZE WSIZE LSIZE SSIZE
+
+%start      stmt
+%type <opc> bcdop bcdarg dualop immop qop immop2 shftarg monop btop
+%type <opc> mdop dbop jop arop
+%type <opc> direct
+%type <brop> brop
+%type <rea> dualarg shftop
+%type <reg> dreg areg
+%type <ea> ea0 ea1 ea2 ea3 ea4 ea5 ea6 ea70 ea72 ea73 ea74 eama eaa eaall eada eadas easr ead eac eacad eacai
+%type <wl> szwl szbwl szmv szm szs
+%type <mask> regs reglist
+
+%%
+stmt:
+	bcdop bcdarg { _genop($1 | $2); yyrc = -1; }
+|	dualop dualarg { _genop($1 | $2.reg | $2.ea.ea); yyrc = _genea($2.ea) -1; } 
+|   immop '#' NUMBER ',' eada { _genop($1 | $5.ea); if (oplen==0) { _genop($3 & 0xff); yyrc = _genea($5) - 3; }
+		else if (oplen==1) { _genop($3); yyrc = _genea($5) - 3; } else { _genop($3>>16); _genop($3 & 0xffff); yyrc = _genea($5)-5; } } 
+|   qop '#' NUMBER ',' eaa { _genop($1 | (($3&7)<<9) | $5.ea); yyrc = _genea($5) - 1; } 
+|   immop2 '#' NUMBER ',' eadas { _genop($1 | $5.ea); if (oplen==0) { _genop($3 & 0xff); yyrc = _genea($5) - 3; }
+		else if (oplen==1) { _genop($3); yyrc = _genea($5) - 3; } else { _genop($3>>16); _genop($3 & 0xffff); yyrc = _genea($5)-5; } } 
+|   shftop { _genop($1.reg); if (($1.reg&0xc0)==0xc0) yyrc = _genea($1.ea) - 1; else { yyrc = -1; } }
+|	brop NUMBER { yyrc = _genbr($1.opc,$2,$1.len) - 1; }
+|	btop dreg ',' eada { _genop($1 | ($2<<9) | 0x100 | $4.ea); yyrc = _genea($4) - 1; }
+|	btop '#' NUMBER ',' eada { _genop($1 | 0x0800 | $5.ea); _genop($3); yyrc = _genea($5) - 3; }
+|	CHK ead ',' dreg { _genop(0x4180 | ($4<<9) | $2.ea); yyrc = _genea($2) - 1; }
+|	monop eada { _genop($1 | $2.ea); yyrc = _genea($2) - 1; }
+|	CMP szbwl eaall ',' dreg { _genop(0xb000 | ($2<<6) | ($5<<9) | $3.ea); yyrc = _genea($3) - 1; }
+|	mdop ead ',' dreg { _genop($1 | ($4<<9) | $2.ea); yyrc = _genea($2) - 1; }
+|	CMPA szwl eaall ',' areg { _genop(0xb0c0 | ($2<<8) | ($5<<9) | $3.ea); yyrc = _genea($3) - 1; }
+|	CMPM szbwl ea3 ',' ea3 { _genop(0xb108 | ($5.ea<<9) | ($2<<6) | $3.ea); yyrc = -1; }
+|	dbop dreg ',' NUMBER { yyrc = _genbr($1 | $2, $4, 1) - 1; }
+|	EOR szbwl dreg ',' eada { _genop(0xb000 | ($2 << 6) | 0x100 | $5.ea); yyrc = _genea($5) - 1; }
+|	EXG dreg ',' dreg { _genop(0xc140 | ($2<<9) | $4); yyrc = -1; }
+|	EXG areg ',' areg { _genop(0xc148 | ($2<<9) | $4); yyrc = -1; }
+|	EXG areg ',' dreg { _genop(0xc188 | ($4<<9) | $2); yyrc = -1; }
+|	EXG dreg ',' areg { _genop(0xc188 | ($2<<9) | $4); yyrc = -1; }
+|	EXT szwl dreg { _genop(0x4840 | ($2<<6) | $3); yyrc = -1; }
+|	direct { _genop($1); yyrc = -1; }
+|	jop eac { _genop($1 | $2.ea); yyrc = _genea($2) -1; }
+|	LEA eac ',' areg { _genop(0x41c0 | $2.ea); yyrc = _genea($2) - 1; }
+|	LINK areg ',' '#' NUMBER { _genop(0x4e50 | $2); _genop($5); yyrc = -3; }
+|	MOVE szmv eaall ',' eadas { if ($5.ea==074) { _genop(0x44c0 | ($5.cnt==1?0x0200:0x0000) | $3.ea); yyrc = _genea($3) - 1; }
+							    else { int tmp = (($5.ea&070)>>3)|(($5.ea&7)<<3); _genop(0x0000 | ($2<<12) | (tmp<<6) | $3.ea);
+    	                           	   yyrc = _genea($3) - 1; yyrc += _genea($5); } }
+|	MOVE SR ',' eada { _genop(0x40c0 | $4.ea); yyrc = _genea($4) - 1; }
+|	MOVE USP ',' areg { _genop(0x4e68 | $4);  yyrc = -1; }
+|	MOVE areg ',' USP { _genop(0x4e60 | $2);  yyrc = -1; }
+|	MOVEA szm eada ',' areg { _genop(0x0040 | ($2<<12) | ($5<<9) | $3.ea); yyrc = _genea($3) - 1; }
+|	MOVEM szwl reglist ',' eacad { _genop(0x4880 | ($2<<6) | $5.ea); _genop(($5.ea&070)==040 ? $3.d : $3.x); yyrc = _genea($5) - 3; }
+|	MOVEM szwl eacai ',' reglist  { _genop(0x4c80 | ($2<<6) | $3.ea); _genop($5.x); yyrc = _genea($3) - 3; }
+|	MOVEP szwl dreg ',' ea5 { _genop(0x0108 | ($3<<9) | ($2<<6) | ($5.ea & 7)); yyrc = _genea($5) - 1; }
+|	MOVEP szwl ea5 ',' dreg { _genop(0x0188 | ($5<<9) | ($2<<6) | ($3.ea & 7)); yyrc = _genea($3) - 1; }
+|   MOVEQ '#' NUMBER ',' dreg { _genop(0x7000 | ($5<<9) | ($3&0xff)); yyrc = -1; }
+|	STOP '#' NUMBER { _genop(0x4e72); yyrc = _genop($3&0xffff) - 1; }
+|	arop szwl eaall ',' areg { _genop($1 | ($5<<9) | ($2<<8) | $3.ea); yyrc = _genea($3) - 1; }
+|	SWAP dreg { _genop(0x4840 | $2); yyrc = -1; }
+|	TRAP '#' NUMBER { _genop(0x4e40 | ($3 & 0x0f)); yyrc = -1; }
+|	UNLK areg { _genop(0x4e58 | $2); yyrc = -1; }
+;
+
+arop:
+	ADDA { $$ = 0xd0c0; }
+|	SUBA { $$ = 0x90c0; };
+
+bcdop:
+	ABCD { $$ = 0xc100; }
+|	ADDX szbwl { $$ = 0xd100 | ($2<<6); }
+|	SBCD { $$ = 0x8100; }
+|	SUBX szbwl { $$ = 0x9100 | ($2<<6); }
+;
+
+dualop:
+	ADD szbwl { $$ = 0xd000 | ($2<<6); }
+|	AND szbwl { $$ = 0xc000 | ($2<<6); }
+|	OR szbwl  { $$ = 0x8000 | ($2<<6); }
+|	SUB szbwl { $$ = 0x9000 | ($2<<6); }
+;
+
+immop:
+	ADDI szbwl { $$ = 0x0600 | ($2<<6); }
+|	CMPI szbwl { $$ = 0x0c00 | ($2<<6); }
+|	SUBI szbwl { $$ = 0x0400 | ($2<<6); }
+;
+
+immop2:
+	ANDI szbwl { $$ = 0x0200 | ($2<<6); }
+|	EORI szbwl { $$ = 0x0a00 | ($2<<6); }
+|	ORI szbwl  { $$ = 0x0000 | ($2<<6); }
+;
+
+qop:
+	ADDQ szbwl { $$ = 0x5000 | ($2<<6); }
+|	SUBQ szbwl { $$ = 0x5100 | ($2<<6); }
+;
+
+shftop:
+	ASL eama { $$.reg = 0xe1c0 | $2.ea; $$.ea = $2; }
+|	ASL szbwl shftarg { $$.reg = 0xe100 | ($2<<6) | $3; }
+|	ASR eama { $$.reg = 0xe0c0 | $2.ea; $$.ea = $2; }
+|	ASR szbwl shftarg { $$.reg = 0xe000 | ($2<<6) | $3; }
+|	LSL eama { $$.reg = 0xe3c0 | $2.ea; $$.ea = $2; }
+|	LSL szbwl shftarg { $$.reg = 0xe108 | ($2<<6) | $3; }
+|	LSR eama { $$.reg = 0xe2c0 | $2.ea; $$.ea = $2; }
+|	LSR szbwl shftarg { $$.reg = 0xe008 | ($2<<6) | $3; }
+|	ROL eama { $$.reg = 0xe7c0 | $2.ea; $$.ea = $2; }
+|	ROL szbwl shftarg { $$.reg = 0xe118 | ($2<<6) | $3; }
+|	ROR eama { $$.reg = 0xe6c0 | $2.ea; $$.ea = $2; }
+|	ROR szbwl shftarg { $$.reg = 0xe018 | ($2<<6) | $3; }
+|	ROXL eama { $$.reg = 0xe5c0 | $2.ea; $$.ea = $2; }
+|	ROXL szbwl shftarg { $$.reg = 0xe100 | ($2<<6) | $3; }
+|	ROXR eama { $$.reg = 0xe4c0 | $2.ea; $$.ea = $2; }
+|	ROXR szbwl shftarg { $$.reg = 0xe000 | ($2<<6) | $3; }
+;
+
+brop:
+	BCC { $$.opc = 0x6400; $$.len = 1; }
+|	BCS { $$.opc = 0x6500; $$.len = 1; }
+|	BEQ { $$.opc = 0x6700; $$.len = 1; }
+|	BGE { $$.opc = 0x6c00; $$.len = 1; }
+|	BGT { $$.opc = 0x6e00; $$.len = 1; }
+|	BHI { $$.opc = 0x6200; $$.len = 1; }
+|	BLE { $$.opc = 0x6f00; $$.len = 1; }
+|	BLS { $$.opc = 0x6300; $$.len = 1; }
+|	BLT { $$.opc = 0x6d00; $$.len = 1; }
+|	BMI { $$.opc = 0x6b00; $$.len = 1; }
+|	BNE { $$.opc = 0x6600; $$.len = 1; }
+|	BPL { $$.opc = 0x6a00; $$.len = 1; }
+|	BVC { $$.opc = 0x6800; $$.len = 1; }
+|	BVS { $$.opc = 0x6900; $$.len = 1; }
+|	BSR { $$.opc = 0x6100; $$.len = 1; }
+|	BRA { $$.opc = 0x6000; $$.len = 1; }
+|	BCC szs { $$.opc = 0x6400; $$.len = 0; }
+|	BCS szs { $$.opc = 0x6500; $$.len = 0; }
+|	BEQ szs { $$.opc = 0x6700; $$.len = 0; }
+|	BGE szs { $$.opc = 0x6c00; $$.len = 0; }
+|	BGT szs { $$.opc = 0x6e00; $$.len = 0; }
+|	BHI szs { $$.opc = 0x6200; $$.len = 0; }
+|	BLE szs { $$.opc = 0x6f00; $$.len = 0; }
+|	BLS szs { $$.opc = 0x6300; $$.len = 0; }
+|	BLT szs { $$.opc = 0x6d00; $$.len = 0; }
+|	BMI szs { $$.opc = 0x6b00; $$.len = 0; }
+|	BNE szs { $$.opc = 0x6600; $$.len = 0; }
+|	BPL szs { $$.opc = 0x6a00; $$.len = 0; }
+|	BVC szs { $$.opc = 0x6800; $$.len = 0; }
+|	BVS szs { $$.opc = 0x6900; $$.len = 0; }
+|	BSR szs { $$.opc = 0x6100; $$.len = 0; }
+|	BRA szs { $$.opc = 0x6000; $$.len = 0; }
+;
+
+btop:
+	BCHG { $$ = 0x0040; }
+|	BCLR { $$ = 0x0080; }
+|	BSET { $$ = 0x00c0; }
+|	BTST { $$ = 0x0000; }
+;
+
+monop:
+	CLR szbwl { $$ = 0x4200 | ($2<<6); }
+|	NBCD { $$ = 0x4800; }
+|	NEG szbwl { $$ = 0x4400 | ($2<<6); }
+|	NEGX szbwl { $$ = 0x4000 | ($2<<6); }
+|	NOT szbwl { $$ = 0x4600 | ($2<<6); }
+|	SCC { $$ = 0x54c0; }
+|	SCS { $$ = 0x55c0; }
+|	SEQ { $$ = 0x57c0; }
+|	SF { $$ = 0x51c0; }
+|	SGE { $$ = 0x5cc0; }
+|	SGT { $$ = 0x5ec0; }
+|	SHI { $$ = 0x52c0; }
+|	SLE { $$ = 0x5fc0; }
+|	SLS { $$ = 0x53c0; }
+|	SLT { $$ = 0x5dc0; }
+|	SMI { $$ = 0x5bc0; }
+|	SNE { $$ = 0x56c0; }
+|	SPL { $$ = 0x5ac0; }
+|	ST { $$ = 0x50c0; }
+|	SVC { $$ = 0x58c0; }
+|	SVS { $$ = 0x59c0; }
+|	TAS { $$ = 0x4ac0; }
+|	TST szbwl { $$ = 0x4a00 | ($2<<6); }
+;
+
+mdop:
+	DIVS { $$ = 0x81c0; }
+|	DIVU { $$ = 0x80c0; }
+|	MULS { $$ = 0xc1c0; }
+|	MULU { $$ = 0xc0c0; }
+;
+
+dbop:
+	DBCC { $$ = 0x54c8; }
+|	DBCS { $$ = 0x55c8; }
+|	DBEQ { $$ = 0x57c8; }
+|	DBGE { $$ = 0x5cc8; }
+|	DBGT { $$ = 0x5ec8; }
+|	DBHI { $$ = 0x52c8; }
+|	DBLE { $$ = 0x5fc8; }
+|	DBLS { $$ = 0x53c8; }
+|	DBLT { $$ = 0x5dc8; }
+|	DBMI { $$ = 0x5bc8; }
+|	DBNE { $$ = 0x56c8; }
+|	DBPL { $$ = 0x5ac8; }
+|	DBVC { $$ = 0x58c8; }
+|	DBVS { $$ = 0x59c8; }
+|	DBF  { $$ = 0x51c8; }
+|	DBT  { $$ = 0x50c8; }
+;
+
+direct:
+	ILLEGAL { $$ = 0x4afc; }
+|	NOP { $$ = 0x4e71; }
+|	RESET { $$ = 0x4e70; }
+|	RTE { $$ = 0x4e73; }
+|	RTR { $$ = 0x4e77; }
+|	RTS { $$ = 0x4e75; }
+|	TRAPV { $$ = 0x4e76; }
+;
+
+jop:
+	JMP { $$ = 0x4ec0; }
+|	JSR { $$ = 0x4e80; }
+|	PEA { $$ = 0x4840; };
+
+shftarg:
+	dreg ',' dreg { $$ = ($1<<9) | 0x20 | $3; }
+|	'#' NUMBER ',' dreg { $$ = (($2 & 7)<<9) | $4; };
+
+bcdarg:
+	ea0 ',' ea0 { $$ = (($1.ea & 7) << 9) |          ($3.ea & 7); }
+|	ea4 ',' ea4 { $$ = (($1.ea & 7) << 9) | 0x0008 | ($3.ea & 7); };
+
+dualarg:
+	dreg ',' eaa  { if (($3.ea & 070)==0) { /* dx,dy must be swapped */
+						$$.reg = ($3.ea & 7)<<9; $3.ea = $1 & 7; $$.ea = $3; }
+					else { $$.reg = ($1<<9) | 0x100; $$.ea = $3; } }
+|	eama ',' dreg { $$.reg = ($3<<9); $$.ea = $1; };
+
+areg:
+	A0 { $$=0; }
+|	A1 { $$=1; }
+|	A2 { $$=2; }
+|	A3 { $$=3; }
+|	A4 { $$=4; }
+|	A5 { $$=5; }
+|	A6 { $$=6; }
+|	A7 { $$=7; };
+
+dreg:
+	D0 { $$=0; }
+|	D1 { $$=1; }
+|	D2 { $$=2; }
+|	D3 { $$=3; }
+|	D4 { $$=4; }
+|	D5 { $$=5; }
+|	D6 { $$=6; }
+|	D7 { $$=7; };
+
+szs:
+	SSIZE { $$ = 1; oplen = 0; }
+
+szwl:
+	WSIZE { $$ = 0; oplen = 1; }
+|	LSIZE { $$ = 1; oplen = 2; };
+
+szbwl:
+	BSIZE { $$ = 0; oplen = 0; }
+|	WSIZE { $$ = 1; oplen = 1; }
+|	LSIZE { $$ = 2; oplen = 2; };
+
+szmv:
+	BSIZE { $$ = 1; oplen = 0; }
+|	WSIZE { $$ = 3; oplen = 1; }
+|	LSIZE { $$ = 2; oplen = 2; };
+
+szm:
+	WSIZE { $$ = 3; oplen = 1; }
+|	LSIZE { $$ = 2; oplen = 2; };
+
+reglist: 
+	regs { $$ = $1; }
+|	regs '/' reglist { $$.x = $1.x | $3.x; $$.d = $1.d | $3.d; };
+
+regs:
+	areg { $$.x = movemx[$1]; $$.d = movemd[$1]; }
+|	dreg { $$.x = movemx[$1+8]; $$.d = movemd[$1+8]; }
+|	areg '-' areg { int i,l=$1,h=$3; if (l>h) { l=$3; h=$1; } $$.x = $$.d = 0; 
+					for (i=l; i<=h; i++) { $$.d |= movemx[i]; $$.d |= movemd[i]; } }
+|	dreg '-' dreg { int i,l=$1,h=$3; if (l>h) { l=$3; h=$1; } $$.x = $$.d = 0; 
+					for (i=l; i<=h; i++) { $$.x |= movemx[i+8]; $$.d |= movemd[i+8]; } }
+;
+
+eama:         ea1 | ea2 | ea3 | ea4 | ea5 | ea6 | ea70 | ea72 | ea73 | ea74;
+eaa:    ea0 | ea1 | ea2 | ea3 | ea4 | ea5 | ea6 | ea70;
+ead:    ea0 |       ea2 | ea3 | ea4 | ea5 | ea6 | ea70 | ea72 | ea73 | ea74;
+eaall:	ea0 | eama;
+eada:   ea0 |       ea2 | ea3 | ea4 | ea5 | ea6 | ea70;
+eadas:  eada | easr;
+eac:                ea2 |             ea5 | ea6 | ea70 | ea72 | ea73;
+eacai:              ea2 | ea3 |       ea5 | ea6 | ea70;
+eacad:              ea2 |       ea4 | ea5 | ea6 | ea70;
+
+ea0:
+	dreg { $$.ea = $1; $$.cnt = 0; };
+ea1:
+	areg { $$.ea = 010 | $1; $$.cnt = 0; };
+ea2:
+	'(' areg ')' { $$.ea = 020 | $2; $$.cnt = 0; };
+ea3:
+	'(' areg POSTINC { $$.ea = 030 | $2; $$.cnt = 0; };
+ea4:
+	PREDEC areg ')' { $$.ea = 040 | $2; $$.cnt = 0; };
+ea5:
+	'(' NUMBER ',' areg ')' { $$.ea = 050 | $4; $$.cnt = 1; $$.arg[0] = $2; };
+ea6:
+	'(' NUMBER ',' areg ',' dreg szwl ')' 
+		{ $$.ea = 060 | $4; $$.cnt = 1; $$.arg[0] = 0x8000 | ($6<<12) | ($7<<11) | ($2 & 0xff); }
+|  	'(' NUMBER ',' areg ',' areg szwl ')' 
+		{ $$.ea = 060 | $4; $$.cnt = 1; $$.arg[0] =          ($6<<12) | ($7<<11) | ($2 & 0xff); };
+ea70:
+	'(' NUMBER ')' szwl { if ($4==0) { $$.ea = 070; $$.cnt = 1; $$.arg[0] = $2; } 
+				          else {       $$.ea = 071; $$.cnt = 2; $$.arg[0] = $2 >> 16; $$.arg[1] = $2 & 0xffff; } }
+|   '(' NUMBER ')' { int tmp = ($2>>15) & 0x1ffff; if (tmp==0 || tmp==0x1ffff) { $$.ea = 070; $$.cnt = 1; $$.arg[0] = $2; }
+			 else { $$.ea = 070; $$.cnt = 2;  $$.arg[0] = $2 >> 16; $$.arg[1] = $2 & 0xffff; } };
+ea72:
+	'(' NUMBER ',' PC ')' { $$.ea = 072; $$.cnt = 1; $$.arg[0] = $2; }
+|	NUMBER { $$.ea = 072; $$.cnt = 1; $$.arg[0] = $1; };
+ea73:
+	'(' NUMBER ',' PC ',' dreg szwl ')' 
+		{ $$.ea = 073; $$.cnt = 1; $$.arg[0] = 0x8000 | ($6<<12) | ($7<<11) | ($2 & 0xff); }
+|  	'(' NUMBER ',' PC ',' areg szwl ')' 
+		{ $$.ea = 073; $$.cnt = 1; $$.arg[0] = ($6<<12) | ($7<<11) | ($2 & 0xff); };
+ea74:
+	'#' NUMBER { $$.ea = 074; if (oplen==0) { $$.cnt = 1; $$.arg[0] = $2 & 0xff; }
+				 else if (oplen==1) { $$.cnt = 1; $$.arg[0] = $2 & 0xffff; }
+				 else { $$.cnt = 2; $$.arg[0] = $2 >> 16; $$.arg[1] = $2 & 0xffff; } };
+easr:
+	CCR { $$.ea = 074; $$.cnt = 0; }
+|	SR { $$.ea = 074; $$.cnt = 1; };
+%%
+
+static void yyerror(char* s)
+{
+	/* do not emit anything, but set error flag */
+	yyerrc = 1;
+}
+
+struct _optable {
+	char* mnem;
+	int token;
+};
+
+static struct _optable ops[] = {
+	{ "abcd",	ABCD },		{ "add",	ADD },		{ "adda",	ADDA },		{ "addi",	ADDI },
+	{ "addq",	ADDQ },		{ "addx",	ADDX },		{ "and",	AND },		{ "andi",	ANDI },
+	{ "asl",	ASL }, 		{ "asr",	ASR },		{ "bcc",	BCC },		{ "bcs",	BCS },
+	{ "beq",	BEQ },		{ "bge",	BGE },		{ "bgt",	BGT },		{ "bhi",	BHI },
+	{ "ble",	BLE },		{ "bls",	BLS },		{ "blt",	BLT },		{ "bmi",	BMI },
+	{ "bne",	BNE },		{ "bpl",	BPL },		{ "bvc",	BVC },		{ "bvs",	BVS },
+	{ "bchg",	BCHG },		{ "bclr",	BCLR },		{ "bra",	BRA },		{ "bset",	BSET },
+	{ "bsr",	BSR },		{ "btst",	BTST },		{ "chk",	CHK },		{ "clr",	CLR },
+	{ "cmp",	CMP },		{ "cmpa",	CMPA },		{ "cmpi",	CMPI },		{ "cmpm",	CMPM },
+	{ "dbcc",	DBCC },		{ "dbcs",	DBCS },		{ "dbeq",	DBEQ },		{ "dbf",	DBF },
+	{ "dbge",	DBGE },		{ "dbgt",	DBGT },		{ "dbhi",	DBHI },		{ "dble",	DBLE },
+	{ "dbls",	DBLS },		{ "dblt",	DBLT },		{ "dbmi",	DBMI },		{ "dbne",	DBNE },
+	{ "dbpl",	DBPL },		{ "dbt",	DBT },		{ "dbvc",	DBVC },		{ "dbvs",	DBVS },
+	{ "divs",	DIVS },		{ "divu",	DIVU },		{ "eor",	EOR },		{ "eori",	EORI },
+	{ "exg",	EXG },		{ "ext",	EXT },		{ "illegal",ILLEGAL },	{ "jmp",	JMP },
+	{ "jsr",	JSR },		{ "lea",	LEA },		{ "link",	LINK },		{ "lsl",	LSL },
+	{ "lsr",	LSR }, 		{ "move",	MOVE },		{ "movea",	MOVEA },	{ "movem",	MOVEM },
+	{ "movep",	MOVEP },	{ "moveq",	MOVEQ },	{ "muls",	MULS },		{ "mulu",	MULU },
+	{ "nbcd",	NBCD },		{ "neg",	NEG },		{ "negx",	NEGX },		{ "nop",	NOP },
+	{ "not",	NOT },		{ "or",		OR },		{ "ori",	ORI },		{ "pea",	PEA },
+	{ "reset",	RESET },	{ "rol",	ROL },		{ "ror",	ROR },		{ "roxl",	ROXL },
+	{ "roxr",	ROXR },		{ "rte",	RTE },		{ "rtr",	RTR },
+	{ "rts",	RTS },		{ "scc",	SCC },		{ "scs",	SCS },		{ "seq",	SEQ },
+	{ "sf",		SF },		{ "sge",	SGE },		{ "sgt",	SGT },		{ "shi",	SHI },
+	{ "sle",	SLE },		{ "sls",	SLS },		{ "slt",	SLT },		{ "smi",	SMI },
+	{ "sne",	SNE },		{ "spl",	SPL },		{ "st",		ST },		{ "svc",	SVC },
+	{ "svs",	SVS },		{ "stop",	STOP },		{ "sub",	SUB },		{ "suba",	SUBA },
+	{ "subi",	SUBI },		{ "subq",	SUBQ },		{ "subx",	SUBX },		{ "swap",	SWAP },
+	{ "tas",	TAS },		{ "trap",	TRAP },		{ "trapv",	TRAPV },	{ "tst",	TST },
+	{ "unlk",	UNLK },		{ "a0",		A0 },		{ "a1",		A1 },		{ "a2",		A2 },
+	{ "a3",		A3 },		{ "a4",		A4 },		{ "a5",		A5 },		{ "a6",		A6 },
+	{ "a7",		A7 },		{ "d0",		D0 },		{ "d1",		D1 },		{ "d2",		D2 },
+	{ "d3",		D3 },		{ "d4",		D4 },		{ "d5",		D5 },		{ "d6",		D6 },
+	{ "d7",		D7 },		{ "ccr",	CCR },		{ "sr",		SR },		{ "usp",	USP },
+	{ "pc",		PC },		
+	{ 0, 		0 }
+};
+
+typedef struct _ophash {
+	struct _ophash* next;
+	struct _optable* op;
+} OPHASH;
+#define OPHASHSIZE 97
+
+static OPHASH **ophash = 0;
+
+static int getophash(const char* s)
+{
+	int h = 0;
+	while (*s++) h += (int)*s;
+	return h % OPHASHSIZE;
+}
+
+static int oplookup(const char* s)
+{
+	int idx = getophash(s);
+	OPHASH* oph = ophash[idx];
+	if (oph) {
+		if (oph->next) {
+			while (oph) {
+				if (!strcmp(s,oph->op->mnem)) return oph->op->token;
+				oph = oph->next;
+			}
+			return 0;
+		}
+		return oph->op->token;
+	}
+	return 0;
+}
+
+static void init_ophash() 
+{
+	struct _optable* op = ops;
+	OPHASH* oph;
+	ophash = (OPHASH**)calloc(sizeof(OPHASH*),OPHASHSIZE);
+	while (op->mnem) {
+		int idx = getophash(op->mnem);
+		oph = (OPHASH*)malloc(sizeof(OPHASH));
+		oph->next = ophash[idx];
+		oph->op = op;
+		ophash[idx] = oph;
+		op++;
+	}
+}
+
+static char* yystream;
+
+int yylex()
+{
+	char ident[30];
+	char *p = ident;
+	char c = yystream[0];
+	
+	while (c != 0 && (c=='\t' || c==' ')) {
+		c = *++yystream;
+	}
+	if (c==0) return EOF;
+	
+	if (isalpha(c)) {
+		while (isalnum(c) && (p-ident)<28) {
+			*p++ = tolower(c); c = *++yystream;
+		}
+		*p = 0;
+		if (p>ident) { return oplookup(ident); }
+		return EOF;
+	} else if (isdigit(c)) {
+		*p++ = c; 
+		if (yystream[1]=='x' || yystream[1]=='X') { *p++ = 'x'; yystream++; }
+		c = *++yystream;
+		while ((isdigit(c) || isxdigit(c)) && (p-ident)<28) {
+			*p++ = c; c = *++yystream;
+		}
+		*p = 0;
+		yylval.num = strtol(ident,0,0);
+		return NUMBER;
+    } else if (c=='$') {
+    	if (isdigit(yystream[1]) || isxdigit(yystream[1])) {
+			c = *++yystream;
+			while ((isdigit(c) || isxdigit(c)) && (p-ident)<28) {
+				*p++ = c; c = *++yystream;
+			}
+			*p = 0;
+			yylval.num = strtol(ident,0,16);
+			return NUMBER;
+		} else return '$';
+	} else if (c == '-' && yystream[1] == '(') {
+		yystream += 2; return PREDEC;
+	} else if (c == ')' && yystream[1] == '+') {
+		yystream += 2; return POSTINC;
+	} else if (c == '.') {
+		switch (yystream[1]) {
+		case 'b': yystream += 2; return BSIZE;
+		case 'w': yystream += 2; return WSIZE;
+		case 'l': yystream += 2; return LSIZE;
+		case 's': yystream += 2; return SSIZE;
+		default: yystream++; return '.';
+		}
+	} else {
+		++yystream; return c;
+	}
+}
+
+static t_value *yyvalptr;
+static t_addr yyaddr;
+
+t_stat parse_sym(char* c, t_addr a, UNIT* u, t_value* val, int32 sw)
+{
+	char ch;
+	
+	if (!ophash) init_ophash();
+
+	yyvalptr = val;
+	yyaddr = a;
+
+	yystream = c;
+	yyerrc = 0;
+	
+	ch = *yystream;
+	while (ch != 0 && (ch=='\t' || ch==' ')) {
+		ch = *++yystream;
+	}
+	if (ch == 0) return 0;
+
+	if (sw & SWMASK('Y')) yydebug = 1 - yydebug;
+	if ((sw & SWMASK('A')) || ch=='\'') {
+		if ((ch = yystream[1])) {
+			val[0] = (uint32)ch;
+			return SCPE_OK;
+		} else return SCPE_ARG;
+	}
+	if ((sw & SWMASK('C')) || ch=='"') {
+		if ((ch = yystream[1])) {
+			val[0] = ((uint32)ch << 8) | (uint32)yystream[1];
+			return SCPE_OK;
+		} else return SCPE_ARG;
+	}
+	
+	yyparse();
+	printf("rc=%d\n",yyrc);
+	if (yyerrc) return SCPE_ARG;
+	return yyrc;
+}
+
+static int _genop(t_value arg) 
+{
+//	printf("_genop(%x)@%x\n",arg,(int)yyvalptr);
+	*yyvalptr = arg;
+	yyvalptr++;
+	return -1;
+}
+
+static int _genea(struct _ea arg)
+{
+	int i;
+	for (i=0; i<arg.cnt; i++) _genop(arg.arg[i]);
+	return -(arg.cnt*2)-1;
+}
+
+static int _genbr(t_value arg,t_addr tgt,int len) 
+{
+	t_addr a = tgt - yyaddr -2;
+	if (len==1) {
+		_genop(arg);
+		_genop(a & 0xffff);
+		a &= 0xffff8000;
+		if (a != 0x00000000 && a != 0xffff8000) return SCPE_ARG;
+		return -3;
+	} else {
+		_genop(arg | (a&0xff));
+		a &= 0xffffff80;
+		if (a != 0x00000000 && a != 0xffffff80) return SCPE_ARG;
+		return -1;
+	}
+}

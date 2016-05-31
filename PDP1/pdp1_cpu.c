@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-1 central processor
 
+   27-Mar-15    RMS     Backported changed from GitHub master
    21-Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
    30-May-07    RMS     Fixed typo in SBS clear (Norm Lastovica)
    28-Dec-06    RMS     Added 16-channel SBS support, PDP-1D support
@@ -339,10 +340,10 @@ InstHistory *hst = NULL;                                /* inst history */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_1d (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_1d (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat Ea (int32 IR);
 t_stat Ea_ch (int32 IR, int32 *byte_num);
 int32 inc_bp (int32 bp);
@@ -433,41 +434,41 @@ const int32 byt_shf[4] = { 0, 0, 6, 12 };
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
-    { ORDATA (PC, PC, ASIZE) },
-    { ORDATA (AC, AC, 18) },
-    { ORDATA (IO, IO, 18) },
+    { ORDATAD (PC, PC, ASIZE, "program counter") },
+    { ORDATAD (AC, AC, 18, "accumulator") },
+    { ORDATAD (IO, IO, 18, "I/O register") },
     { ORDATA (MA, MA, 16) },
     { ORDATA (MB, MB, 18) },
-    { FLDATA (OV, OV, 0) },
-    { ORDATA (PF, PF, 8) },
-    { ORDATA (SS, SS, 6) },
-    { ORDATA (TA, TA, ASIZE) },
-    { ORDATA (TW, TW, 18) },
-    { FLDATA (EXTM, extm, 0) },
-    { FLDATA (RNGM, PF, PF_V_RNG) },
-    { FLDATA (L, PF, PF_V_L) },
-    { FLDATA (RM, rm, 0) },
-    { ORDATA (RMASK, rmask, 18) },
-    { ORDATA (RTB, rtb, 18) },
-    { BRDATA (RNAME, rname, 8, 2, RN45_SIZE) },
-    { FLDATA (SBON, sbs, SB_V_ON) },
-    { FLDATA (SBRQ, sbs, SB_V_RQ) },
-    { FLDATA (SBIP, sbs, SB_V_IP) },
-    { ORDATA (SBSREQ, sbs_req, 16) },
-    { ORDATA (SBSENB, sbs_enb, 16) },
-    { ORDATA (SBSACT, sbs_act, 16) },
-    { ORDATA (IOSTA, iosta, 18), REG_RO },
+    { FLDATAD (OV, OV, 0, "overflow flag") },
+    { ORDATAD (PF, PF, 8, "programs flags <1:6>") },
+    { ORDATAD (SS, SS, 6, "sense switches <1:6>") },
+    { ORDATAD (TA, TA, ASIZE, "address switches") },
+    { ORDATAD (TW, TW, 18, "test word (front panel switches)") },
+    { FLDATAD (EXTM, extm, 0, "extend mode") },
+    { FLDATAD (RNGM, PF, PF_V_RNG, "ring mode (PDP-1D only)") },
+    { FLDATAD (L, PF, PF_V_L, "link (PDP-1D #45 only)") },
+    { FLDATAD (RM, rm, 0, "restrict mode (PDP-1D)") },
+    { ORDATAD (RMASK, rmask, 18, "restrict memory mask (PDP-1D)") },
+    { ORDATAD (RTB, rtb, 18, "restrict trap buffer (PDP-1D #45 only)") },
+    { BRDATAD (RNAME, rname, 8, 2, RN45_SIZE, "rename map (PDP-1D #45 only)") },
+    { FLDATAD (SBON, sbs, SB_V_ON, "sequence break enable") },
+    { FLDATAD (SBRQ, sbs, SB_V_RQ, "sequence break request") },
+    { FLDATAD (SBIP, sbs, SB_V_IP, "sequence break in progress") },
+    { ORDATAD (SBSREQ, sbs_req, 16, "pending sequence break requests") },
+    { ORDATAD (SBSENB, sbs_enb, 16, "enabled sequence break levels") },
+    { ORDATAD (SBSACT, sbs_act, 16, "active sequence break levels") },
+    { ORDATAD (IOSTA, iosta, 18, "I/O status register"), REG_RO },
     { ORDATA (CPLS, cpls, 6) },
-    { FLDATA (IOH, ioh, 0) },
-    { FLDATA (IOS, ios, 0) },
-    { BRDATA (PCQ, pcq, 8, ASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
+    { FLDATAD (IOH, ioh, 0, "I/O halt in progress") },
+    { FLDATAD (IOS, ios, 0, "I/O synchronizer (completion)") },
+    { BRDATAD (PCQ, pcq, 8, ASIZE, PCQ_SIZE, "PC prior to last jump or interrupt; most recent PC change first"), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
-    { FLDATA (STOP_INST, stop_inst, 0) },
-    { FLDATA (SBS_INIT, sbs_init, SB_V_ON) },
-    { FLDATA (EXTM_INIT, extm_init, 0) },
-    { DRDATA (XCT_MAX, xct_max, 8), PV_LEFT + REG_NZ },
-    { DRDATA (IND_MAX, ind_max, 8), PV_LEFT + REG_NZ },
-    { ORDATA (WRU, sim_int_char, 8) },
+    { FLDATAD (STOP_INST, stop_inst, 0, "stop on undefined instruction") },
+    { FLDATAD (SBS_INIT, sbs_init, SB_V_ON, "initial state of sequence break enable") },
+    { FLDATAD (EXTM_INIT, extm_init, 0, "initial state of extend mode") },
+    { DRDATAD (XCT_MAX, xct_max, 8, "maximum XCT chain"), PV_LEFT + REG_NZ },
+    { DRDATAD (IND_MAX, ind_max, 8, "maximum nested indirect addresses"), PV_LEFT + REG_NZ },
+    { ORDATAD (WRU, sim_int_char, 8, "interrupt character") },
     { NULL }
     };
 
@@ -1522,7 +1523,7 @@ return SCPE_OK;
 
 /* Device set/show SBS level */
 
-t_stat dev_set_sbs (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dev_set_sbs (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 *lvl = (int32 *) desc;
 int32 newlvl;
@@ -1537,9 +1538,9 @@ if (r != SCPE_OK)
 return SCPE_OK;
 }
 
-t_stat dev_show_sbs (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dev_show_sbs (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-int32 *lvl = (int32 *) desc;
+const int32 *lvl = (const int32 *) desc;
 
 if (lvl == NULL)
     return SCPE_IERR;
@@ -1601,12 +1602,12 @@ return SCPE_OK;
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
 
-if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
+if ((val <= 0) || (((size_t)val) > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
 for (i = val; i < MEMSIZE; i++)
     mc = mc | M[i];
@@ -1620,7 +1621,7 @@ return SCPE_OK;
 
 /* Set PDP-1D */
 
-t_stat cpu_set_1d (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_1d (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uptr->flags |= UNIT_SBS|UNIT_MDV;
 return SCPE_OK;
@@ -1628,7 +1629,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1659,10 +1660,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 ov, pf, op, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
@@ -1703,15 +1704,14 @@ return SCPE_OK;
 
 #ifdef USE_DISPLAY
 /* set "test switches"; from display code */
-void
-cpu_set_switches(unsigned long bits)
+
+void cpu_set_switches(unsigned long bits)
 {
 /* just what we want; smaller CPUs might want to shift down? */
 TW = bits;
 }
 
-unsigned long
-cpu_get_switches(void)
+unsigned long cpu_get_switches(void)
 {
 return TW;
 }

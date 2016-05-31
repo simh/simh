@@ -114,15 +114,7 @@ static const uint8 echo_map[LPT_BINLNT + LPT_ECHLNT] = {
  18+ECHO_F, 19+ECHO_F, 20+ECHO_F, 21+ECHO_F
  };
 
-extern uint32 ind_ioc;
-extern t_uint64 bit_masks[36];
-extern uint32 col_masks[12];
-extern char bcd_to_ascii_a[64];
-extern char bcd_to_ascii_h[64];
-extern char bcd_to_pca[64];
-extern char bcd_to_pch[64];
-
-char *pch_table[4] = {
+const char *pch_table[4] = {
     bcd_to_ascii_h, bcd_to_ascii_a, bcd_to_pch, bcd_to_pca,
     };
 
@@ -315,7 +307,8 @@ return SCPE_OK;
 t_stat lpt_end_line (UNIT *uptr)
 {
 uint32 i, col, row, bufw, colbin;
-char *pch, bcd, lpt_cbuf[LPT_CHRLNT + 1];
+const char *pch;
+char bcd, lpt_cbuf[LPT_CHRLNT + 1];
 t_uint64 dat;
 
 pch = pch_table[GET_PCHAIN (lpt_unit.flags)];           /* get print chain */
@@ -340,7 +333,7 @@ if (uptr->flags & UNIT_ATT) {                           /* file? */
     fputc ('\n', uptr->fileref);                        /* append nl */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }

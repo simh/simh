@@ -30,37 +30,37 @@
 * Changes:
 *   10/20/03   DGP   Original.
 *   12/28/04   DGP   Changed for new object formats.
-*	
+*
 ***********************************************************************/
 
-#define IBSYSSYM	'$'		/* Marks end of object file */
-#define WORDPERREC	5		/* Object words per record */
-#define LOADADDR	0200		/* Default load address */
-#define OBJRECLEN	80		/* Object record length */
-#define CHARWORD	12		/* Characters per word */
+#define IBSYSSYM        '$'         /* Marks end of object file */
+#define WORDPERREC      5           /* Object words per record */
+#define LOADADDR        0200        /* Default load address */
+#define OBJRECLEN       80          /* Object record length */
+#define CHARWORD        12          /* Characters per word */
 
 /*
 ** Object tags
 */
 
-#define IDT_TAG		'0'		/* 0SSSSSS0LLLLL */
-#define ABSENTRY_TAG	'1'		/* 10000000AAAAA */
-#define RELENTRY_TAG	'2'		/* 20000000RRRRR */
-#define ABSEXTRN_TAG	'3'		/* 3SSSSSS0AAAAA */
-#define RELEXTRN_TAG	'4'		/* 4SSSSSS0RRRRR */
-#define ABSGLOBAL_TAG	'5'		/* 5SSSSSS0AAAAA */
-#define RELGLOBAL_TAG	'6'		/* 6SSSSSS0RRRRR */
-#define ABSORG_TAG	'7'		/* 70000000AAAAA */
-#define RELORG_TAG	'8'		/* 80000000RRRRR */
-#define ABSDATA_TAG	'9'		/* 9AAAAAAAAAAAA */
-#define RELADDR_TAG 	'A'		/* AAAAAAAARRRRR */
-#define RELDECR_TAG 	'B'		/* BARRRRRAAAAAA */
-#define RELBOTH_TAG 	'C'		/* CARRRRRARRRRR */
-#define BSS_TAG		'D'    		/* D0000000PPPPP */
-#define ABSXFER_TAG	'E'		/* E0000000RRRRR */
-#define RELXFER_TAG	'F'		/* F0000000RRRRR */
-#define EVEN_TAG	'G'		/* G0000000RRRRR */
-#define FAPCOMMON_TAG	'H'		/* H0000000AAAAA */
+#define IDT_TAG         '0'         /* 0SSSSSS0LLLLL */
+#define ABSENTRY_TAG    '1'         /* 10000000AAAAA */
+#define RELENTRY_TAG    '2'         /* 20000000RRRRR */
+#define ABSEXTRN_TAG    '3'         /* 3SSSSSS0AAAAA */
+#define RELEXTRN_TAG    '4'         /* 4SSSSSS0RRRRR */
+#define ABSGLOBAL_TAG   '5'         /* 5SSSSSS0AAAAA */
+#define RELGLOBAL_TAG   '6'         /* 6SSSSSS0RRRRR */
+#define ABSORG_TAG      '7'         /* 70000000AAAAA */
+#define RELORG_TAG      '8'         /* 80000000RRRRR */
+#define ABSDATA_TAG     '9'         /* 9AAAAAAAAAAAA */
+#define RELADDR_TAG     'A'         /* AAAAAAAARRRRR */
+#define RELDECR_TAG     'B'         /* BARRRRRAAAAAA */
+#define RELBOTH_TAG     'C'         /* CARRRRRARRRRR */
+#define BSS_TAG         'D'         /* D0000000PPPPP */
+#define ABSXFER_TAG     'E'         /* E0000000RRRRR */
+#define RELXFER_TAG     'F'         /* F0000000RRRRR */
+#define EVEN_TAG        'G'         /* G0000000RRRRR */
+#define FAPCOMMON_TAG   'H'         /* H0000000AAAAA */
 
 /* Where:
  *    SSSSSS - Symbol
@@ -89,7 +89,7 @@ extern t_uint64 *M;
 extern uint32 PC;
 
 t_stat
-binloader (FILE *fd, char *file, int loadpt)
+binloader (FILE *fd, const char *file, int loadpt)
 {
 #ifdef DEBUGLOADER
    FILE *lfd;
@@ -115,96 +115,92 @@ binloader (FILE *fd, char *file, int loadpt)
       char *op = inbuf;
       int i;
 
-      if (*op == IBSYSSYM)	                            /* End of object marker */
+      if (*op == IBSYSSYM)                  /* End of object marker */
          break;
 
       for (i = 0; i < WORDPERREC; i++)
       {
-	char otag;
-	char item[16];
-	t_uint64 ldata;
+        char otag;
+        char item[16];
+        t_uint64 ldata;
 
-	otag = *op++;
-	if (otag == ' ')
+        otag = *op++;
+        if (otag == ' ')
         break;
-	strncpy (item, op, CHARWORD);
-	item[CHARWORD] = '\0';
-#ifdef WIN32
-	sscanf (item, "%I64o", &ldata);
-#else
-	sscanf (item, "%llo", &ldata);
-#endif
+        strncpy (item, op, CHARWORD);
+        item[CHARWORD] = '\0';
+        sscanf (item, "%" LL_FMT "o", &ldata);
 
 #ifdef DEBUGLOADER
-	fprintf (lfd, "loadaddr = %05o, curraddr = %05o\n",
-		  loadaddr, curraddr);
-	fprintf (lfd, "   otag = %c, item = %s\n", otag, item);
-	fprintf (lfd, "   ldata = %12.12o\n", ldata);
+        fprintf (lfd, "loadaddr = %05o, curraddr = %05o\n",
+                      loadaddr, curraddr);
+        fprintf (lfd, "   otag = %c, item = %s\n", otag, item);
+        fprintf (lfd, "   ldata = %12.12o\n", ldata);
 #endif
 
-         switch (otag)
-	{
-	case IDT_TAG:
-	    break;
+        switch (otag)
+        {
+        case IDT_TAG:
+            break;
 
-	case ABSORG_TAG:
-	    curraddr = loadaddr = (int32) ldata & AMASK;
-	    break;
+        case ABSORG_TAG:
+            curraddr = loadaddr = (int32) ldata & AMASK;
+            break;
 
-	case RELORG_TAG:
-	    curraddr = (int32) (ldata + loadaddr) & AMASK;
-	    break;
+        case RELORG_TAG:
+            curraddr = (int32) (ldata + loadaddr) & AMASK;
+            break;
 
-	case BSS_TAG:
-	    curraddr = (int32) (curraddr + ldata) & AMASK;
-	    break;
+        case BSS_TAG:
+            curraddr = (int32) (curraddr + ldata) & AMASK;
+            break;
 
-	case RELBOTH_TAG:
-	    ldata = ldata + loadaddr + (loadaddr << INST_V_DEC);
-	    goto STORE;
+        case RELBOTH_TAG:
+            ldata = ldata + loadaddr + (loadaddr << INST_V_DEC);
+            goto STORE;
 
-	case RELDECR_TAG:
-	    ldata = ldata + (loadaddr << INST_V_DEC);
-	    goto STORE;
+        case RELDECR_TAG:
+            ldata = ldata + (loadaddr << INST_V_DEC);
+            goto STORE;
 
-	case RELADDR_TAG:
-	    ldata = ldata + loadaddr;
+        case RELADDR_TAG:
+            ldata = ldata + loadaddr;
 
-	case ABSDATA_TAG:
-	STORE:
+        case ABSDATA_TAG:
+        STORE:
 #ifdef DEBUGLOADER
-	    fprintf (lfd, "   M[%05o] = %12.12o\n", curraddr, ldata);
+            fprintf (lfd, "   M[%05o] = %12.12o\n", curraddr, ldata);
 #endif
-	    M[curraddr] = ldata & DMASK;
-	    curraddr++;
-	    break;
+            M[curraddr] = ldata & DMASK;
+            curraddr++;
+            break;
 
-	case ABSXFER_TAG:
-	    transfer = TRUE;
-	case ABSENTRY_TAG:
-	    PC = (uint32) ldata & AMASK;
+        case ABSXFER_TAG:
+            transfer = TRUE;
+        case ABSENTRY_TAG:
+            PC = (uint32) ldata & AMASK;
 #ifdef DEBUGLOADER
-	    fprintf (lfd, "   PC = %05o\n", PC);
+            fprintf (lfd, "   PC = %05o\n", PC);
 #endif
-	    if (transfer)
+            if (transfer)
             goto GOSTART;
-	    break;
+            break;
 
-	case RELXFER_TAG:
-	    transfer = TRUE;
-	case RELENTRY_TAG:
-	    ldata = (ldata + loadaddr) & AMASK;
-	    PC = (uint32) ldata & AMASK;
+        case RELXFER_TAG:
+            transfer = TRUE;
+        case RELENTRY_TAG:
+            ldata = (ldata + loadaddr) & AMASK;
+            PC = (uint32) ldata & AMASK;
 #ifdef DEBUGLOADER
-	    fprintf (lfd, "   PC = %05o\n", PC);
+            fprintf (lfd, "   PC = %05o\n", PC);
 #endif
-	    if (transfer)
+            if (transfer)
             goto GOSTART;
-	    break;
+            break;
 
-	default: ;
-	}
-	op += CHARWORD;
+        default: ;
+        }
+        op += CHARWORD;
       }
    }
 

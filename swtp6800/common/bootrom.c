@@ -1,46 +1,58 @@
 /*  bootrom.c: Boot ROM simulator for Motorola processors
 
-    Copyright (c) 2010-2011, William A. Beech
+    Copyright (c) 2010-2012, William A. Beech
 
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
+        Permission is hereby granted, free of charge, to any person obtaining a
+        copy of this software and associated documentation files (the "Software"),
+        to deal in the Software without restriction, including without limitation
+        the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        and/or sell copies of the Software, and to permit persons to whom the
+        Software is furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
+        The above copyright notice and this permission notice shall be included in
+        all copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-    WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+        IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+        CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the name of William A. Beech shall not be
-    used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from William A. Beech.
+        Except as contained in this notice, the name of William A. Beech shall not be
+        used in advertising or otherwise to promote the sale, use or other dealings
+        in this Software without prior written authorization from William A. Beech.
 
-    These functions support a single simulated 2704 to 2764 EPROM device on 
-    an 8-bit computer system..  This device allows the the device buffer to 
-    be loaded from a binary file containing the emulated EPROM code.
+    MODIFICATIONS:
 
-    These functions support a simulated 2704, 2708, 2716, 2732 or 2764 EPROM 
-    device on a CPU board.  The byte get and put routines use an offset into 
-    the boot EPROM image to locate the proper byte.  This allows another device 
-    to set the base address for the boot EPROM.  The device type is stored as
-    a binary number in the first three unit flag bits.
+        23 Apr 15 -- Modified to use simh_debug
 
-    This device uses a dynamically allocated buffer to hold the EPROM image.  
-    A call to BOOTROM_config will free the current buffer.  A call to 
-    BOOTROM_reset will allocate a new buffer of BOOTROM_unit.capac bytes.  A
-    call to BOOTROM_attach will load the buffer with the EPROM image.
+    NOTES:
+
+        These functions support a single simulated 2704 to 2764 EPROM device on 
+        an 8-bit computer system..  This device allows the buffer to be loaded from
+        a binary file containing the emulated EPROM code.
+
+        These functions support a simulated 2704, 2708, 2716, 2732 or 2764 EPROM 
+        device on a CPU board.  The byte get and put routines use an offset into 
+        the boot EPROM image to locate the proper byte.  This allows another device 
+        to set the base address for the boot EPROM.  The device type is stored as
+        a binary number in the first three unit flag bits.
+
+        This device uses a dynamically allocated buffer to hold the EPROM image.  
+        A call to BOOTROM_config will free the current buffer.  A call to 
+        BOOTROM_reset will allocate a new buffer of BOOTROM_unit.capac bytes.  A
+        call to BOOTROM_attach will load the buffer with the EPROM image.
+
 */
 
 #include <stdio.h>
 #include "swtp_defs.h"
+
+
+#if !defined(DONT_USE_INTERNAL_ROM)
+#include "swtp_swtbug_bin.h"
+#endif /* DONT_USE_INTERNAL_ROM */
 
 #define UNIT_V_MSIZE    (UNIT_V_UF)     /* ROM Size */
 #define UNIT_MSIZE      (0x7 << UNIT_V_MSIZE)
@@ -54,16 +66,20 @@
 /* function prototypes */
 
 t_stat BOOTROM_svc (UNIT *uptr);
-t_stat BOOTROM_config (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat BOOTROM_attach (UNIT *uptr, char *cptr);
+t_stat BOOTROM_config (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat BOOTROM_attach (UNIT *uptr, CONST char *cptr);
 t_stat BOOTROM_reset (DEVICE *dptr);
 int32 BOOTROM_get_mbyte(int32 offset);
 
 /* SIMH Standard I/O Data Structures */
 
-UNIT BOOTROM_unit = { UDATA (NULL, 
-                           UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO, 0),
-                    KBD_POLL_WAIT };
+UNIT BOOTROM_unit = {
+#if defined(DONT_USE_INTERNAL_ROM)
+    UDATA (NULL, UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO, 0),
+#else /* !defined(DONT_USE_INTERNAL_ROM) */
+    UDATA (NULL, UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO+((BOOT_CODE_SIZE>>9)<<UNIT_V_MSIZE), BOOT_CODE_SIZE),
+#endif
+    KBD_POLL_WAIT };
 
 MTAB BOOTROM_mod[] = {
     { UNIT_MSIZE, UNIT_NONE, "None", "NONE", &BOOTROM_config },
@@ -114,31 +130,36 @@ DEVICE BOOTROM_dev = {
 
 /* BOOTROM_attach - attach file to EPROM unit */
 
-t_stat BOOTROM_attach (UNIT *uptr, char *cptr)
+t_stat BOOTROM_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
+    t_addr image_size, capac;
+    int i;
 
-    if (BOOTROM_dev.dctrl & DEBUG_flow)
-        printf("BOOTROM_attach: cptr=%s\n", cptr);
+    sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_attach: cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
-        if (BOOTROM_dev.dctrl & DEBUG_flow)
-            printf("BOOTROM_attach: Error\n");
+        sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_attach: Error\n");
         return r;
     }
-    if (BOOTROM_dev.dctrl & DEBUG_flow)
-        printf("BOOTROM_attach: Done\n");
+    image_size = (t_addr)sim_fsize_ex (BOOTROM_unit.fileref);
+    for (capac = 0x200, i=1; capac < image_size; capac <<= 1, i++);
+    if (i > (UNIT_2764>>UNIT_V_MSIZE)) {
+        detach_unit (uptr);
+        return SCPE_ARG;
+    }
+    uptr->flags &= ~UNIT_MSIZE;
+    uptr->flags |= (i << UNIT_V_MSIZE);
+    sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_attach: Done\n");
     return (BOOTROM_reset (NULL));
 }
 
 /* BOOTROM_config = None, 2704, 2708, 2716, 2732 or 2764 */
 
-t_stat BOOTROM_config (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat BOOTROM_config (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    if (BOOTROM_dev.dctrl & DEBUG_flow) /* entry message */
-        printf("BOOTROM_config: val=%d\n", val);
+    sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_config: val=%d\n", val);
     if ((val < UNIT_NONE) || (val > UNIT_2764)) { /* valid param? */
-        if (BOOTROM_dev.dctrl & DEBUG_flow) /* No */
-            printf("BOOTROM_config: Parameter error\n");
+        sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_config: Parameter error\n");
         return SCPE_ARG;
     }
     if (val == UNIT_NONE)
@@ -149,11 +170,9 @@ t_stat BOOTROM_config (UNIT *uptr, int32 val, char *cptr, void *desc)
         free (BOOTROM_unit.filebuf);
         BOOTROM_unit.filebuf = NULL;
     }
-    if (BOOTROM_dev.dctrl & DEBUG_flow) /* status message */
-        printf("BOOTROM_config: BOOTROM_unit.capac=%d\n",
+    sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_config: BOOTROM_unit.capac=%d\n",
             BOOTROM_unit.capac);
-    if (BOOTROM_dev.dctrl & DEBUG_flow) /* exit message */
-        printf("BOOTROM_config: Done\n");
+    sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_config: Done\n");
     return SCPE_OK;
 }
 
@@ -165,27 +184,32 @@ t_stat BOOTROM_reset (DEVICE *dptr)
     int c;
     FILE *fp;
 
-    if (BOOTROM_dev.dctrl & DEBUG_flow)
-        printf("BOOTROM_reset: \n");
+    sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_reset: \n");
     if ((BOOTROM_unit.flags & UNIT_MSIZE) == 0) { /* if none selected */
 //        printf("   EPROM: Defaulted to None\n");
 //        printf("      \"set eprom NONE | 2704 | 2708 | 2716 | 2732 | 2764\"\n");
 //        printf("      \"att eprom <filename>\"\n");
         BOOTROM_unit.capac = 0;         /* set EPROM size to 0 */
-        if (BOOTROM_dev.dctrl & DEBUG_flow)
-            printf("BOOTROM_reset: Done1\n");
+        sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_reset: Done1\n");
         return SCPE_OK;
         }                               /* if attached */
 //    printf("   EPROM: Initializing [%04X-%04XH]\n", 
 //        0xE000, 0xE000 + BOOTROM_unit.capac - 1);
     if (BOOTROM_unit.filebuf == NULL) { /* no buffer allocated */
-        BOOTROM_unit.filebuf = malloc(BOOTROM_unit.capac); /* allocate EPROM buffer */
+        BOOTROM_unit.filebuf = calloc(1, BOOTROM_unit.capac); /* allocate EPROM buffer */
         if (BOOTROM_unit.filebuf == NULL) {
-            if (BOOTROM_dev.dctrl & DEBUG_flow)
-                printf("BOOTROM_reset: Malloc error\n");
+            sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_reset: Malloc error\n");
             return SCPE_MEM;
         }
     }
+#if !defined(DONT_USE_INTERNAL_ROM)
+    if (!BOOTROM_unit.filename) {
+        if (BOOTROM_unit.capac < BOOT_CODE_SIZE)
+            return SCPE_ARG;
+        memcpy (BOOTROM_unit.filebuf, BOOT_CODE_ARRAY, BOOT_CODE_SIZE);
+        return SCPE_OK;
+        }
+#endif
     fp = fopen(BOOTROM_unit.filename, "rb"); /* open EPROM file */
     if (fp == NULL) {
         printf("\tUnable to open ROM file %s\n",BOOTROM_unit.filename);
@@ -204,8 +228,7 @@ t_stat BOOTROM_reset (DEVICE *dptr)
     }
     fclose(fp);
 //    printf("\t%d bytes of ROM image %s loaded\n", j, BOOTROM_unit.filename);
-    if (BOOTROM_dev.dctrl & DEBUG_flow)
-        printf("BOOTROM_reset: Done2\n");
+    sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_reset: Done2\n");
     return SCPE_OK;
 }
 
@@ -216,15 +239,16 @@ int32 BOOTROM_get_mbyte(int32 offset)
     int32 val;
 
     if (BOOTROM_unit.filebuf == NULL) {
-        if (BOOTROM_dev.dctrl & DEBUG_read)
-            printf("BOOTROM_get_mbyte: EPROM not configured\n");
+        sim_debug (DEBUG_read, &BOOTROM_dev, "BOOTROM_get_mbyte: EPROM not configured\n");
         return 0xFF;
     }
-    if (BOOTROM_dev.dctrl & DEBUG_read)
-        printf("BOOTROM_get_mbyte: offset=%04X\n", offset);
+    sim_debug (DEBUG_read, &BOOTROM_dev, "BOOTROM_get_mbyte: offset=%04X\n", offset);
+    if ((t_addr)offset > BOOTROM_unit.capac) {
+        sim_debug (DEBUG_read, &BOOTROM_dev, "BOOTROM_get_mbyte: EPROM reference beyond ROM size\n");
+        return 0xFF;
+    }
     val = *((uint8 *)(BOOTROM_unit.filebuf) + offset) & 0xFF;
-    if (BOOTROM_dev.dctrl & DEBUG_read)
-        printf("BOOTROM_get_mbyte: Normal val=%02X\n", val);
+    sim_debug (DEBUG_read, &BOOTROM_dev, "BOOTROM_get_mbyte: Normal val=%02X\n", val);
     return val;
 }
 

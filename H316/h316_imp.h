@@ -189,7 +189,7 @@ extern t_stat mi_tx_service (uint32 quantum);
 
 // Prototypes for UDP modem/host interface emulation routines ...
 #define NOLINK  (-1)
-t_stat udp_create (DEVICE *pdtr, char *premote, int32 *plink);
+t_stat udp_create (DEVICE *pdtr, const char *premote, int32 *plink);
 t_stat udp_release (DEVICE *dptr, int32 link);
 t_stat udp_send (DEVICE *pdtr, int32 link, uint16 *pdata, uint16 count);
 t_stat udp_set_link_loopback (DEVICE *dptr, int32 link, t_bool enable_loopback);

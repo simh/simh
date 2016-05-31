@@ -28,6 +28,8 @@
    11-Jun-2013  MB      First version
 */
 
+#if !defined(VAX_620)
+
 #include "vax_defs.h"
 #include "sim_video.h"
 
@@ -48,7 +50,7 @@
 
 typedef struct {
     int8 group;
-    int8 code;
+    uint8 code;
 } LK_KEYDATA;
 
 LK_KEYDATA LK_KEY_UNKNOWN    = { 0, 0 };
@@ -166,15 +168,15 @@ int32 lk_shptr = 0;                                     /* send buf head ptr */
 int32 lk_stptr = 0;                                     /* send buf tail ptr */
 uint8 lk_rbuf[10];                                      /* receive buffer */
 int32 lk_rbuf_p = 0;                                    /* receive buffer ptr */
-int32 lk_mode[15];                                      /* mode of each key group */
+int32 lk_mode[16];                                      /* mode of each key group */
 
-DEVICE lk_dev;
 t_stat lk_wr (uint8 c);
 t_stat lk_rd (uint8 *c);
 t_stat lk_reset (DEVICE *dptr);
 void lk_reset_mode (void);
 void lk_cmd (void);
 void lk_poll (void);
+const char *lk_description (DEVICE *dptr);
 
 /* LK data structures
 
@@ -186,8 +188,8 @@ void lk_poll (void);
 */
 
 DEBTAB lk_debug[] = {
-    {"SERIAL", DBG_SERIAL},
-    {"CMD",    DBG_CMD},
+    {"SERIAL", DBG_SERIAL,  "Serial port data"},
+    {"CMD",    DBG_CMD,     "Commands"},
     {0}
     };
 
@@ -207,7 +209,8 @@ DEVICE lk_dev = {
     NULL, NULL, &lk_reset,
     NULL, NULL, NULL,
     NULL, DEV_DIS | DEV_DEBUG, 0,
-    lk_debug
+    lk_debug, NULL, NULL, NULL, NULL, NULL, 
+    &lk_description
     };
 
 /* Incoming data on serial line */
@@ -826,3 +829,12 @@ switch (mode) {
         break;
     }            
 }
+
+const char *lk_description (DEVICE *dptr)
+{
+return "  VCB01 - LK Keyboard interface";
+}
+
+#else /* defined(VAX_620) */
+static const char *dummy_declaration = "Something to compile";
+#endif /* !defined(VAX_620) */

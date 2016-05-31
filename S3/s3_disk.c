@@ -45,19 +45,19 @@ int32 read_sector(UNIT *uptr, char *dbuf, int32 sect);
 int32 write_sector(UNIT *uptr, char *dbuf, int32 sect);
 t_stat r1_svc (UNIT *uptr);
 t_stat r1_boot (int32 unitno, DEVICE *dptr);
-t_stat r1_attach (UNIT *uptr, char *cptr);
+t_stat r1_attach (UNIT *uptr, CONST char *cptr);
 t_stat r1_reset (DEVICE *dptr);
 t_stat f1_svc (UNIT *uptr);
 t_stat f1_boot (int32 unitno, DEVICE *dptr);
-t_stat f1_attach (UNIT *uptr, char *cptr);
+t_stat f1_attach (UNIT *uptr, CONST char *cptr);
 t_stat f1_reset (DEVICE *dptr);
 t_stat r2_svc (UNIT *uptr);
 t_stat r2_boot (int32 unitno, DEVICE *dptr);
-t_stat r2_attach (UNIT *uptr, char *cptr);
+t_stat r2_attach (UNIT *uptr, CONST char *cptr);
 t_stat r2_reset (DEVICE *dptr);
 t_stat f2_svc (UNIT *uptr);
 t_stat f2_boot (int32 unitno, DEVICE *dptr);
-t_stat f2_attach (UNIT *uptr, char *cptr);
+t_stat f2_attach (UNIT *uptr, CONST char *cptr);
 t_stat f2_reset (DEVICE *dptr);
 extern int32 GetMem(int32 addr);
 extern int32 PutMem(int32 addr, int32 data);
@@ -610,7 +610,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
         default:
             break;
     }
-    printf (">>DSK%d non-existent function %d\n", disk, op);
+    sim_printf (">>DSK%d non-existent function %d\n", disk, op);
     return SCPE_OK;                     
 }
 
@@ -678,28 +678,28 @@ return SCPE_OK;
 
 /* Disk unit attach */
 
-t_stat r1_attach (UNIT *uptr, char *cptr)
+t_stat r1_attach (UNIT *uptr, CONST char *cptr)
 {
 diskerr[0] = notrdy[0] = seekbusy[0] = 0;               /* clear status */
 found[0] = 0;
 uptr -> u3 = 0;                                         /* cylinder 0 */
 return attach_unit (uptr, cptr);
 }
-t_stat f1_attach (UNIT *uptr, char *cptr)
+t_stat f1_attach (UNIT *uptr, CONST char *cptr)
 {
 diskerr[0] = notrdy[0] = seekbusy[0] = 0;               /* clear status */
 found[0] = 0;
 uptr -> u3 = 0;                                         /* cylinder 0 */
 return attach_unit (uptr, cptr);
 }
-t_stat r2_attach (UNIT *uptr, char *cptr)
+t_stat r2_attach (UNIT *uptr, CONST char *cptr)
 {
 diskerr[1] = notrdy[1] = seekbusy[1] = 0;               /* clear status */
 found[1] = 0;
 uptr -> u3 = 0;                                         /* cylinder 0 */
 return attach_unit (uptr, cptr);
 }
-t_stat f2_attach (UNIT *uptr, char *cptr)
+t_stat f2_attach (UNIT *uptr, CONST char *cptr)
 {
 diskerr[1] = notrdy[1] = seekbusy[1] = 0;               /* clear status */
 found[1] = 0;

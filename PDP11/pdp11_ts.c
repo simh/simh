@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ts           TS11/TSV05 magtape
 
+   27-Oct-14    RMS     Fixed bug in read forward with byte swap
    23-Oct-13    RMS     Revised for new boot setup routine
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
@@ -281,15 +282,14 @@ int32 ts_ownc = 0;                                      /* tape owns cmd */
 int32 ts_ownm = 0;                                      /* tape owns msg */
 int32 ts_qatn = 0;                                      /* queued attn */
 int32 ts_bcmd = 0;                                      /* boot cmd */
-int32 ts_time = 10;                                     /* record latency */
+int32 ts_time = 2000;                                   /* record latency */
 static uint16 cpy_buf[MAX_PLNT];                        /* copy buffer */
 
-DEVICE ts_dev;
 t_stat ts_rd (int32 *data, int32 PA, int32 access);
 t_stat ts_wr (int32 data, int32 PA, int32 access);
 t_stat ts_svc (UNIT *uptr);
 t_stat ts_reset (DEVICE *dptr);
-t_stat ts_attach (UNIT *uptr, char *cptr);
+t_stat ts_attach (UNIT *uptr, CONST char *cptr);
 t_stat ts_detach (UNIT *uptr);
 t_stat ts_boot (int32 unitno, DEVICE *dptr);
 int32 ts_updtssr (int32 t);
@@ -297,8 +297,8 @@ int32 ts_updxs0 (int32 t);
 void ts_cmpendcmd (int32 s0, int32 s1);
 void ts_endcmd (int32 ssf, int32 xs0f, int32 msg);
 int32 ts_map_status (t_stat st);
-t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *ts_description (DEVICE *dptr);
+t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *ts_description (DEVICE *dptr);
 
 /* TS data structures
 
@@ -365,13 +365,29 @@ MTAB ts_mod[] = {
     { 0 }
     };
 
+/* debugging bitmaps */
+#define DBG_REG  0x0001                                 /* display read/write register access */
+#define DBG_REQ  0x0002                                 /* display transfer requests */
+#define DBG_TAP  MTSE_DBG_STR                           /* display sim_tape and tape structure detail */
+#define DBG_POS  MTSE_DBG_POS                           /* display position activities */
+#define DBG_DAT  MTSE_DBG_DAT                           /* display transfer data */
+
+DEBTAB ts_debug[] = {
+  {"REG",    DBG_REG,   "display read/write register access"},
+  {"REQ",    DBG_REQ,   "display transfer requests"},
+  {"TAPE",   DBG_TAP,   "display sim_tape and tape structure detail"},
+  {"POS",    DBG_POS,   "display position activities"},
+  {"DATA",   DBG_DAT,   "display transfer data"},
+  {0}
+};
+
 DEVICE ts_dev = {
     "TS", &ts_unit, ts_reg, ts_mod,
     1, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &ts_reset,
     &ts_boot, &ts_attach, &ts_detach,
     &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE, 0,
-    NULL, NULL, NULL, &ts_help, NULL, NULL, 
+    ts_debug, NULL, NULL, &ts_help, NULL, NULL, 
     &ts_description
     };
 
@@ -393,12 +409,16 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
         break;
         }
 
+sim_debug(DBG_REG, &ts_dev, "ts_rd(PA=0x%08X [%s], access=%d): 0x%04X\n", PA, ((PA >> 1) & 01) ? "TSBA" : "TSSR", access, *data);
+
 return SCPE_OK;
 }
 
 t_stat ts_wr (int32 data, int32 PA, int32 access)
 {
 int32 i, t;
+
+sim_debug(DBG_REG, &ts_dev, "ts_wr(PA=0x%08X [%s], access=%d): 0x%04X\n", PA, ((PA >> 1) & 01) ? "TSDB" : "TSSR", access, data);
 
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
@@ -591,7 +611,7 @@ msgxs0 = msgxs0 | XS0_MOT;                              /* tape has moved */
 if (cmdhdr & CMD_SWP) {                                 /* swapped? */
     for (i = 0; i < wbc; i++) {                         /* copy buffer */
         wa = tsba ^ 1;                                  /* apply OPP */
-        if (Map_WriteB (tsba, 1, &tsxb[i])) {           /* store byte, nxm? */
+        if (Map_WriteB (wa, 1, &tsxb[i])) {             /* store byte, nxm? */
             tssr = ts_updtssr (tssr | TSSR_NXM);        /* set error */
             return (XTC (XS0_RLS, TC4));
             }
@@ -627,7 +647,7 @@ if (st != MTSE_OK)                                      /* error? */
     return ts_map_status (st);
 if (fc == 0)                                            /* byte count */
     fc = 0200000;
-tsba = (cmdadh << 16) | cmdadl + fc;                    /* buf addr */
+tsba = ((cmdadh << 16) | cmdadl) + fc;                  /* buf addr */
 wbc = (tbc > fc)? fc: tbc;                              /* cap buf size */
 msgxs0 = msgxs0 | XS0_MOT;                              /* tape has moved */
 for (i = wbc; i > 0; i--) {                             /* copy buffer */
@@ -744,12 +764,8 @@ if (!(cmdhdr & CMD_ACK)) {                              /* no acknowledge? */
     }
 fnc = GET_FNC (cmdhdr);                                 /* get fnc+mode */
 mod = GET_MOD (cmdhdr);
-if (DEBUG_PRS (ts_dev)) {
-    fprintf (sim_deb, ">>TS: cmd=%s, mod=%o, buf=%o, lnt=%d, pos=",
-        fnc_name[fnc], mod, cmdadl, cmdlnt);
-    fprint_val (sim_deb, ts_unit.pos, 10, T_ADDR_W, PV_LEFT);
-    fprintf (sim_deb, "\n");
-    }
+sim_debug (DBG_REQ, &ts_dev, ">>STRT: cmd=%s, mod=%o, buf=%o, lnt=%d, pos=%" T_ADDR_FMT "u\n",
+        fnc_name[fnc], mod, cmdadl, cmdlnt, ts_unit.pos);
 if ((fnc != FNC_WCHR) && (tssr & TSSR_NBA)) {           /* ~wr chr & nba? */
     ts_endcmd (TC3, 0, 0);                              /* error */
     return SCPE_OK;
@@ -1030,12 +1046,8 @@ tssr = ts_updtssr (tssr | tc | TSSR_SSR | (tc? TSSR_SC: 0));
 if (cmdhdr & CMD_IE)
     SET_INT (TS);
 ts_ownm = 0; ts_ownc = 0;
-if (DEBUG_PRS (ts_dev)) {
-    fprintf (sim_deb, ">>TS: sta=%o, tc=%o, rfc=%d, pos=",
-        msgxs0, GET_TC (tssr), msgrfc);
-    fprint_val (sim_deb, ts_unit.pos, 10, T_ADDR_W, PV_LEFT);
-    fprintf (sim_deb, "\n");
-    }
+sim_debug (DBG_REQ, &ts_dev, ">>CMPL: sta=%o, tc=%o, rfc=%d, pos=%" T_ADDR_FMT "u\n",
+                        msgxs0, GET_TC (tssr), msgrfc, ts_unit.pos);
 return;
 }
 
@@ -1068,11 +1080,11 @@ return auto_config (0, 0);
 
 /* Attach */
 
-t_stat ts_attach (UNIT *uptr, char *cptr)
+t_stat ts_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
-r = sim_tape_attach (uptr, cptr);                       /* attach unit */
+r = sim_tape_attach_ex (uptr, cptr, DBG_TAP, 0);        /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
     return r;
 tssr = tssr & ~TSSR_OFL;                                /* clr offline */
@@ -1178,7 +1190,7 @@ return SCPE_NOFNC;
 }
 #endif
 
-t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "TS11 Magnetic Tape (TS)\n\n");
 fprint_set_help (st, dptr);
@@ -1199,7 +1211,7 @@ sim_tape_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-char *ts_description (DEVICE *dptr)
+const char *ts_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "TS11 magnetic tape controller" :
                   "TSV11/TSV05 magnetic tape controller ";

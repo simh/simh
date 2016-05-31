@@ -1,0 +1,53 @@
+ШИФР 419999 ЗС5^
+EEВ1А3
+*NAME PRIME NUMBERS
+*     The ^L char before *NAME is important
+*     NO LIST	Disable source listing by removing spaces between * and NO
+*NO LOAD LIST	Enable loader listing by adding 5 spaces between * and NO
+*               Disabling fanfold page alignment
+*CALL NOTLIS
+*ASSEM
+ ETIME: ,NAME,
+c       Get time of day in jiffies
+	,*53 , 010B
+c       OR the integer exponent
+	,AOX , =6400000000000000
+c       F.p. divide by 50
+	,A/X , =R50.0
+c       Return
+     13 ,UJ  ,
+	,END ,
+*FTN
+        PROGRAM MAIN
+        PRINT 1000
+1000    FORMAT(' Computing prime numbers the dumb way')
+        TIME0 = ETIME(0)
+        CALL PRIMES
+        TIME1 = ETIME(0)
+        NTIME = TIME1 - TIME0
+        PRINT 2000, NTIME
+        STOP
+2000    FORMAT (' Time, seconds =', i6)
+        end
+
+        SUBROUTINE PRIMES
+        T=0
+        DO 10 N=1001, 100000, 2
+                MAXK=SQRT(N+0.0)+1
+                DO 20 K=3, MAXK, 2
+                M = (N / K) * K
+                IF (N .EQ. M) GOTO 10
+20              CONTINUE
+c------ Printing every 1000th prime number
+                T=T+1
+                IF (T .LT. 1000) GOTO 10
+                PRINT 1000, N
+                T=0
+10      CONTINUE
+        RETURN
+1000    FORMAT (1X, I9)
+        END
+*EXECUTE
+*     The ^L char after *END FILE is important
+*END FILE
+ЕКОНЕЦ

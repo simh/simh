@@ -1,0 +1,158 @@
+;**** some possible debugging options
+;set debug debug.log
+;set debug stdout
+
+;**** debugging of FDC
+;**** read/write operations, attach&detach, FDC service, IMD handling, DMA/verbose, FDC cmds
+;set fdc debug=read
+;set fdc debug=write
+;set fdc debug=verbose
+;set fdc debug=svc
+;set fdc debug=imd
+;set fdc debug=dma
+;set fdc debug=dmavb
+;set fdc debug=cmd
+
+;**** debugging of CPU: exceptions, tracing, memory read/write
+;**** opcode fetch, stack push/pull, concurrency 
+;set cpu exc
+;set cpu debug=int
+;set cpu debug=trace
+;set cpu debug=write
+;set cpu debug=read
+;set cpu debug=fetch
+;set cpu debug=stack
+;set cpu debug=conc
+
+;**** debugging of console: read/write to registers
+;set con debug=read
+;set con debug=write
+
+;**** debugging of timer: read/write, service
+;set tim debug=read
+;set tim debug=write
+;set tim debug=svc
+
+;**** you should attach a telnet terminal emulator to PDQ-3 console
+;**** to avoid mess with SIMH's control panel
+set console telnet=8000
+
+;**** you might remote control SIMH's control panel
+;set remote telnet=7000,telnet=buffered
+
+;**** you need a boot disk
+att fdc0 master.imd
+
+;**** make this write protected currently while emulator is still being debugged
+set fdc0 wrtlck
+
+;**** disable the second FDC
+set fdc1 disable
+
+;************************************************************************
+;**** The following is pure f***ing magic - you must have the source code
+;**** and a commented object dump of boot loader, SYSTEM.PASCAL, SYSTEM.DRIVERS etc.
+; otherwise you won't understand where I had checkpoints for debugging.
+
+; HDT boot
+;break f418:368
+;break f418:36a
+;break f418:218
+
+; HDT:bootfd
+;break f418:e0
+
+; HDT CHK instruction: will fail if CPU serial is > 0x7fff
+;break 2018:067d
+;break 2018:070f
+
+; entering PASCALSY
+;break eb1e:10
+
+; problem main loop in syscode1
+;break dc26:1d0a
+;break d488:b1b
+;break d488:b55
+
+; bug in SPR(4), does not save SP in TIB?
+;break d488:bb8
+;break d488:bc7
+
+; problem with wait?
+;break d488:0917
+
+; interrupt debugging
+;break d078:4f
+;break d488:919
+;break d488:ebe
+;break dc26:ec3
+;break d1bd:79
+;break b80d:715
+;break dc26:1d35
+;break d488:806
+;break d488:915
+;break dc26:1d36
+
+; SHELL handling
+;break badf:98
+;break badf:51
+;break bbd2:1ba
+;break bbd2:1be
+;break bbd2:32a
+
+; Ser_RawEmit
+;break c964:5f2
+;break d488:d80
+;break c964:6be
+
+; ticker interrrupts
+;break d078:4f
+;break d1bd:6e
+
+; Start/Stop Process
+;break d488:7f0
+;break d488:92e
+;break d488:934
+;break d488:958
+;break d488:0dd9
+;break c964:756
+;break c964:a6
+;break c964:cf4
+
+; waiting for DSR sem
+;break c964:624
+
+; Ser_Read
+;break c964:466
+;break c964:4f9
+;break c964:4fa
+;break c964:327
+;break c964:59e
+;break c964:323
+
+;break d078:4c
+;break d078:4f
+;break d1bd:6a
+;break d1bd:6d
+
+;break d488:ed0
+
+;****
+;**** end of PFM section
+;************************************************************************
+
+;**** load the boot PROM code for HD support
+load hdt/CPU_C5.BIN
+;
+;**** set the INIT bit of SSR
+dep _ssr 80
+dep _ses 80
+
+;**** load some symbolic names for debuging (not needed in production)
+do names.sim
+
+;**** run
+boot cpu
+
+;**** reset debug mode to normal when boot fails.
+set debug stdout

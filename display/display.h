@@ -58,7 +58,7 @@ enum display_type {
  * must be called before first call to display_age()
  * (but called implicitly by display_point())
  */
-extern int display_init(enum display_type, int scale);
+extern int display_init(enum display_type, int scale, void *dptr);
 
 /* return size of virtual display */
 extern int display_xpoints(void);
@@ -97,6 +97,7 @@ extern int display_point(int,int,int,int);
 /*
  * force window system to output bits to screen;
  * call after adding points, or aging the screen
+ * collect any window system input (mouse or keyboard)
  */
 extern void display_sync(void);
 
@@ -139,5 +140,5 @@ extern unsigned char display_tablet;
  * users of this library are expected to provide these calls.
  * simulator will set 18 simulated switches.
  */
-extern unsigned long cpu_get_switches(void);	/* get current switch state */
-extern void cpu_set_switches(unsigned long);	/* set switches */
+extern unsigned long cpu_get_switches(void);    /* get current switch state */
+extern void cpu_set_switches(unsigned long);    /* set switches */

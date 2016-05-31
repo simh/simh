@@ -24,6 +24,9 @@
 #include "altairz80_defs.h"
 #include "i86.h"
 
+/* GLOBAL */
+volatile int intr;
+
 extern uint32 GetBYTEExtended(register uint32 Addr);
 extern void PutBYTEExtended(register uint32 Addr, const register uint32 Value);
 extern int32 AX_S;      /* AX register (8086)                           */
@@ -43,6 +46,10 @@ extern int32 FLAGS_S;   /* flags register (8086)                        */
 extern int32 PCX_S;     /* PC register (8086), 20 bit                   */
 extern uint32 PCX;      /* external view of PC                          */
 extern UNIT cpu_unit;
+
+#if !UNIX_PLATFORM
+extern void pollForCPUStop(void);
+#endif
 
 void i86_intr_raise(PC_ENV *m,uint8 intrnum);
 void cpu8086reset(void);
@@ -159,7 +166,7 @@ static void setCPURegisters(void) {
 void cpu8086reset(void) {
     cpu8086.R_AX = 0x1961;
     if ((cpu8086.R_AH != 0x19) || (cpu8086.R_AL != 0x61)) {
-        printf("Fatal endian error - make sure to compile with '#define LOWFIRST %i'\n", 1 - LOWFIRST);
+        sim_printf("Fatal endian error - make sure to compile with '#define LOWFIRST %i'\n", 1 - LOWFIRST);
         exit(1);
     }
     /* 16 bit registers */
@@ -202,15 +209,15 @@ t_stat sim_instr_8086(void) {
         if (CS_S != ((PCX_S & 0xf0000) >> 4)) {
             cpu8086.R_CS = (PCX_S & 0xf0000) >> 4;
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
-                printf("CPU: " ADDRESS_FORMAT " Segment register CS set to %04x" NLP, PCX, cpu8086.R_CS);
+                sim_printf("CPU: " ADDRESS_FORMAT " Segment register CS set to %04x" NLP, PCX, cpu8086.R_CS);
         }
         cpu8086.R_IP = PCX_S & 0xffff;
     }
     while (switch_cpu_now == TRUE) {                        /* loop until halted    */
         if (sim_interval <= 0) {                            /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_poll_kbd()) == SCPE_STOP)     /* poll on platforms without reliable signalling */
-                break;
+            /* poll on platforms without reliable signalling but not too often */
+            pollForCPUStop(); /* following sim_process_event will check for stop */
 #endif
             if ( (reason = sim_process_event()) )
                 break;
@@ -287,14 +294,14 @@ void halt_sys(PC_ENV *m)
 /* this code generated the following table */
 main()
 {    int i;
-    printf("\n\nstruct modrm{ uint8 mod,rh,rl;} modrmtab[] = {\n");
+    sim_printf("\n\nstruct modrm{ uint8 mod,rh,rl;} modrmtab[] = {\n");
     for (i=0; i<256; i++)
     {
-       printf("{%d,%d,%d}, ",((i&0xc0)>>6),((i&0x38)>>3),(i&0x07));
+       sim_printf("{%d,%d,%d}, ",((i&0xc0)>>6),((i&0x38)>>3),(i&0x07));
            if (i%4==3)
-         printf("/* %d to %d */\n",i&0xfc,i);
+         sim_printf("/* %d to %d */\n",i&0xfc,i);
     }
-    printf("};\n\n");
+    sim_printf("};\n\n");
 }
 #endif
 
@@ -729,7 +736,7 @@ uint8 fetch_data_byte(PC_ENV *m, uint16 offset)
        value  =  GetBYTEExtended((((uint32)m->R_SS << 4) + offset) & 0xFFFFF);
        break;
      default:
-       printf("error: should not happen:  multiple overrides. " NLP);
+       sim_printf("error: should not happen:  multiple overrides. " NLP);
        value = 0;
        halt_sys(m);
     }
@@ -809,7 +816,7 @@ uint16 fetch_data_word(PC_ENV *m, uint16 offset)
                 + (uint16)(offset + 1)) & 0xFFFFF) << 8);
        break;
      default:
-       printf("error: should not happen:  multiple overrides. " NLP);
+       sim_printf("error: should not happen:  multiple overrides. " NLP);
        value = 0;
        halt_sys(m);
     }
@@ -873,7 +880,7 @@ void store_data_byte(PC_ENV *m, uint16 offset, uint8 val)
        segment = m->R_SS;
        break;
      default:
-       printf("error: should not happen:  multiple overrides. " NLP);
+       sim_printf("error: should not happen:  multiple overrides. " NLP);
        segment = 0;
        halt_sys(m);
     }
@@ -935,7 +942,7 @@ void store_data_word(PC_ENV *m, uint16 offset, uint16 val)
        segment = m->R_SS;
        break;
      default:
-       printf("error: should not happen:  multiple overrides." NLP);
+       sim_printf("error: should not happen:  multiple overrides." NLP);
        segment = 0;
        halt_sys(m);
     }

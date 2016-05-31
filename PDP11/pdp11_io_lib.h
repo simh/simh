@@ -27,16 +27,16 @@
 #ifndef PDP11_IO_LIB_H_
 #define PDP11_IO_LIB_H_    0
 
-t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat set_vec (UNIT *uptr, int32 arg, char *cptr, void *desc);
-t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc);
-t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 arg, void *desc);
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat auto_config (char *name, int32 nctrl);
+t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat set_addr_flt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat set_vec (UNIT *uptr, int32 arg, CONST char *cptr, void *desc);
+t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc);
+t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 arg, CONST void *desc);
+t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat auto_config (const char *name, int32 nctrl);
 t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds);
 void init_ubus_tab (void);
 t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp);

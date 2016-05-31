@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2013, Robert M. Supnik
+   Copyright (c) 1999-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@
 
    10-Sep-13    RMS     Fixed several bugs in the TTY logic
                         Added SET file type commands to PTR/PTP
-    3-Jul-13    RLA     compatibility changes for extended interrupts
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    23-May-13    RLA     Move the SMK/OTK to h316_cpu (where it belongs!)
                         Allow the CLK device to be disabled
    09-Jun-07    RMS     Fixed bug in clock increment (Theo Engel)
@@ -140,15 +140,15 @@ int32 ttyio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
-t_stat ttio_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ttrp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ttio_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttrp_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 clkio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat pt_attach (UNIT *uptr, char *cptr);
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat pt_attach (UNIT *uptr, CONST char *cptr);
 t_stat pt_detach (UNIT *uptr);
 t_stat tto_write (int32 c);
 t_stat ttp_write (int32 c);
@@ -395,10 +395,10 @@ else {
     if ((c = getc (uptr->fileref)) == EOF) {            /* read byte */
         if (feof (uptr->fileref)) {
             if (ptr_stopioe)
-                printf ("PTR end of file\n");
+                sim_printf ("PTR end of file\n");
             else return SCPE_OK;
             }
-        else perror ("PTR I/O error");
+        else sim_perror ("PTR I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
@@ -418,7 +418,7 @@ return SCPE_OK;
 /* Paper tape attach routine - set or clear ASC/UASC flags if specified
    Can be called for TTY units at well, hence, check for attachability */
 
-t_stat pt_attach (UNIT *uptr, char *cptr)
+t_stat pt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -559,7 +559,7 @@ if (uptr->flags & UNIT_ASC) {                           /* ASCII? */
     }
 else c = uptr->buf & 0377;                              /* no, binary */
 if (putc (c, uptr->fileref) == EOF) {                   /* output byte */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -686,10 +686,10 @@ else if ((ruptr->flags & UNIT_ATT) &&                   /* TTR attached */
             if (feof (ruptr->fileref)) {                /* EOF? */
                 ruptr->STA &= ~RUNNING;                 /* stop reader */
                 if (ttr_stopioe)
-                    printf ("TTR end of file\n");
+                    sim_printf ("TTR end of file\n");
                 else return SCPE_OK;
                 }
-            else perror ("TTR I/O error");
+            else sim_perror ("TTR I/O error");
             clearerr (ruptr->fileref);
             return SCPE_IOERR;
             }
@@ -799,7 +799,7 @@ if ((puptr->flags & UNIT_ATT) &&                        /* TTP attached */
             }
         else p = c;                                     /* untouched */
         if (putc (p, puptr->fileref) == EOF) {          /* output byte */
-            perror ("TTP I/O error");
+            sim_perror ("TTP I/O error");
             clearerr (puptr->fileref);
             return SCPE_IOERR;
             }
@@ -832,7 +832,7 @@ return SCPE_OK;
 
 /* Set keyboard/printer mode - make sure flags agree */
 
-t_stat ttio_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttio_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATTABLE)                         /* not TTR, TTP */
     return SCPE_NOFNC;
@@ -845,7 +845,7 @@ return SCPE_OK;
 
 /* Set reader/punch mode */
 
-t_stat ttrp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttrp_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (!(uptr->flags & UNIT_ATTABLE))                      /* PTR, PTP, TTR, TTP only */
     return SCPE_NOFNC;
@@ -856,7 +856,7 @@ return SCPE_OK;
 
 /* Set reader/punch start/stop */
 
-t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (!(uptr->flags & UNIT_ATTABLE))                      /* TTR, TTP only */
     return SCPE_NOFNC;
@@ -948,7 +948,7 @@ return SCPE_OK;
 
 /* Set frequency */
 
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -960,7 +960,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;

@@ -2,8 +2,8 @@
  *                                                                       *
  * $Id: mfdc.c 1995 2008-07-15 03:59:13Z hharte $                        *
  *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2015 Howard M. Harte.                              *
+ * hharte@magicandroidapps.com                                           *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -53,7 +53,7 @@
 #endif
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -64,15 +64,17 @@
 #define CMD_MSG     (1 << 2)
 #define RD_DATA_MSG (1 << 3)
 #define WR_DATA_MSG (1 << 4)
+#define VERBOSE_MSG (1 << 5)
 
 extern uint32 PCX;
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
     int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern int32 find_unit_index(UNIT *uptr);
 
 static void MFDC_Command(uint8 cData);
+static const char* mfdc_description(DEVICE *dptr);
 
 #define MFDC_MAX_DRIVES 4
 #define JUMPER_W9       1   /* Not Installed (0) = 2MHz, Installed (1) = 4MHz. */
@@ -130,7 +132,7 @@ static SECTOR_FORMAT sdata;
 #define MFDC_CAPACITY           (77*16*MFDC_SECTOR_LEN) /* Default Micropolis Disk Capacity */
 
 static t_stat mfdc_reset(DEVICE *mfdc_dev);
-static t_stat mfdc_attach(UNIT *uptr, char *cptr);
+static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr);
 static t_stat mfdc_detach(UNIT *uptr);
 static uint8 MFDC_Read(const uint32 Addr);
 static uint8 MFDC_Write(const uint32 Addr, uint8 cData);
@@ -148,7 +150,11 @@ static REG mfdc_reg[] = {
     { NULL }
 };
 
-#define MDSK_NAME   "Micropolis FD Control MDSK"
+#define MDSK_NAME   "Micropolis FD Control"
+
+static const char* mfdc_description(DEVICE *dptr) {
+    return MDSK_NAME;
+}
 
 static MTAB mfdc_mod[] = {
     { MTAB_XTD|MTAB_VDV,            0,                  "MEMBASE",  "MEMBASE",
@@ -173,6 +179,7 @@ static DEBTAB mfdc_dt[] = {
     { "CMD",    CMD_MSG,        "Commands"              },
     { "READ",   RD_DATA_MSG,    "Disk read activity"    },
     { "WRITE",  WR_DATA_MSG,    "Disk write activity"   },
+    { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
     { NULL,     0                                       }
 };
 
@@ -182,7 +189,7 @@ DEVICE mfdc_dev = {
     NULL, NULL, &mfdc_reset,
     NULL, &mfdc_attach, &mfdc_detach,
     &mfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    mfdc_dt, NULL, MDSK_NAME
+    mfdc_dt, NULL, NULL, NULL, NULL, NULL, &mfdc_description
 };
 
 /* Micropolis FD Control Boot ROM
@@ -222,7 +229,7 @@ static t_stat mfdc_reset(DEVICE *dptr)
             mfdc_info->drive[i].uptr = &mfdc_dev.units[i];
         }
         if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &mdskdev, FALSE) != 0) {
-            printf("%s: error mapping resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
+            sim_printf("%s: error mapping resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
             dptr->flags |= DEV_DIS;
             return SCPE_ARG;
         }
@@ -231,7 +238,7 @@ static t_stat mfdc_reset(DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat mfdc_attach(UNIT *uptr, char *cptr)
+static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     unsigned int i = 0;
@@ -261,22 +268,23 @@ static t_stat mfdc_attach(UNIT *uptr, char *cptr)
     }
 
     if (uptr->flags & UNIT_MFDC_VERBOSE)
-        printf("MDSK%d, attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("MDSK%d, attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
 
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if(uptr->capac < 318000) {
-            printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
+            sim_printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
             mfdc_detach(uptr);
             return SCPE_OPENERR;
         }
 
         if (uptr->flags & UNIT_MFDC_VERBOSE)
-            printf("--------------------------------------------------------\n");
-        mfdc_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_MFDC_VERBOSE));
+            sim_printf("--------------------------------------------------------\n");
+        mfdc_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_MFDC_VERBOSE),
+                                             &mfdc_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_MFDC_VERBOSE)
-            printf("\n");
+            sim_printf("\n");
     } else {
         mfdc_info->drive[i].imd = NULL;
     }
@@ -350,7 +358,7 @@ static int32 mdskdev(const int32 Addr, const int32 rw, const int32 data)
             if(rw == 0) {   /* Read boot ROM */
                 return(mfdc_rom[Addr & 0xFF]);
             } else {
-                printf("MFDC: Attempt to write to boot ROM." NLP);
+                sim_debug(VERBOSE_MSG, &mfdc_dev, "MFDC: " ADDRESS_FORMAT " Attempt to write to boot ROM." NLP, PCX);
                 return (-1);
             }
             break;
@@ -442,7 +450,7 @@ static uint8 MFDC_Read(const uint32 Addr)
 
                 if (!(pDrive->uptr->flags & UNIT_ATT)) {
                     if (pDrive->uptr->flags & UNIT_MFDC_VERBOSE)
-                        printf("MFDC: " ADDRESS_FORMAT " MDSK%i not attached." NLP, PCX,
+                        sim_printf("MFDC: " ADDRESS_FORMAT " MDSK%i not attached." NLP, PCX,
                             mfdc_info->sel_drive);
                     return 0x00;
                 }
@@ -451,9 +459,9 @@ static uint8 MFDC_Read(const uint32 Addr)
                 {
                     case IMAGE_TYPE_IMD:
                         if(pDrive->imd == NULL) {
-                            printf(".imd is NULL!" NLP);
+                            sim_printf(".imd is NULL!" NLP);
                         }
-/*                      printf("%s: Read: imd=%p" NLP, __FUNCTION__, pDrive->imd); */
+/*                      sim_printf("%s: Read: imd=%p" NLP, __FUNCTION__, pDrive->imd); */
                         sectRead(pDrive->imd,
                             pDrive->track,
                             mfdc_info->head,
@@ -465,7 +473,7 @@ static uint8 MFDC_Read(const uint32 Addr)
                         break;
                     case IMAGE_TYPE_DSK:
                         if(pDrive->uptr->fileref == NULL) {
-                            printf(".fileref is NULL!" NLP);
+                            sim_printf(".fileref is NULL!" NLP);
                         } else {
                             sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
@@ -475,18 +483,18 @@ static uint8 MFDC_Read(const uint32 Addr)
                             rtn = sim_fread(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
                             if (rtn != 256)
 #endif /* USE_VGI */
-                                printf("%s: sim_fread error. Result = %d." NLP, __FUNCTION__, rtn);
+                                sim_printf("%s: sim_fread error. Result = %d." NLP, __FUNCTION__, rtn);
                         }
                         break;
                     case IMAGE_TYPE_CPT:
-                        printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                        sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
                         break;
                     default:
-                        printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                        sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
                         break;
                 }
 
-/*              printf("%d/%d @%04x Len=%04x" NLP, sdata.u.header[0], sdata.u.header[1], sdata.u.header[9]<<8|sdata.u.header[8], sdata.u.header[11]<<8|sdata.u.header[10]); */
+/*              sim_printf("%d/%d @%04x Len=%04x" NLP, sdata.u.header[0], sdata.u.header[1], sdata.u.header[9]<<8|sdata.u.header[8], sdata.u.header[11]<<8|sdata.u.header[10]); */
 
                 adc(0,0); /* clear Carry bit */
                 checksum = 0;
@@ -496,7 +504,14 @@ static uint8 MFDC_Read(const uint32 Addr)
                     checksum = adc(checksum, sdata.raw[i]);
                 }
 
-                sdata.u.checksum = checksum & 0xFF;
+#ifndef USE_VGI
+                /* VGI has the checksum in the data read from the disk image,
+                 * so inserting the computed version of the checksum is not
+                 * necessary. MZOS computes the checksum differently than all
+                 * other VG software, so this allows MZOS disks to work
+                 */
+                sdata.u.checksum = checksum & 0xFF; 
+#endif
 /*              DBG_PRINT(("Checksum=%x" NLP, sdata.u.checksum)); */
                 mfdc_info->read_in_progress = TRUE;
             }
@@ -534,7 +549,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
         case 3:
 /*          DBG_PRINT(("MFDC: " ADDRESS_FORMAT " WR Data" NLP, PCX)); */
             if(mfdc_info->wr_latch == 0) {
-                printf("MFDC: " ADDRESS_FORMAT " Error, attempt to write data when write latch is not set." NLP, PCX);
+                sim_printf("MFDC: " ADDRESS_FORMAT " Error, attempt to write data when write latch is not set." NLP, PCX);
             } else {
 #ifdef USE_VGI
                 sec_offset = (pDrive->track * MFDC_SECTOR_LEN * 16) + \
@@ -563,7 +578,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
 
                     if (!(pDrive->uptr->flags & UNIT_ATT)) {
                         if (pDrive->uptr->flags & UNIT_MFDC_VERBOSE)
-                            printf("MFDC: " ADDRESS_FORMAT " MDSK%i not attached." NLP, PCX,
+                            sim_printf("MFDC: " ADDRESS_FORMAT " MDSK%i not attached." NLP, PCX,
                                 mfdc_info->sel_drive);
                         return 0x00;
                     }
@@ -572,7 +587,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                     {
                         case IMAGE_TYPE_IMD:
                             if(pDrive->imd == NULL) {
-                                printf(".imd is NULL!" NLP);
+                                sim_printf(".imd is NULL!" NLP);
                             }
                             sectWrite(pDrive->imd,
                                 pDrive->track,
@@ -585,7 +600,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                             break;
                         case IMAGE_TYPE_DSK:
                             if(pDrive->uptr->fileref == NULL) {
-                                printf(".fileref is NULL!" NLP);
+                                sim_printf(".fileref is NULL!" NLP);
                             } else {
                                 sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
@@ -596,10 +611,10 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                             }
                             break;
                         case IMAGE_TYPE_CPT:
-                            printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                            sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
                             break;
                         default:
-                            printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                            sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
                             break;
                     }
                 }

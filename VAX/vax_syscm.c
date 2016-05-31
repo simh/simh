@@ -32,9 +32,6 @@
 */
 
 #include "vax_defs.h"
-#include <ctype.h>
-
-extern UNIT cpu_unit;
 
 /* Symbol tables */
 /* Warning: for literals, the class number MUST equal the field width!! */
@@ -203,6 +200,11 @@ static const char r50_to_asc[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ$._0123456789";
    Outputs:
         count   =       -number of extra words retired
 */
+
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 
 int32 fprint_spec (FILE *of, t_addr addr, int32 spec, int32 nval)
 {
@@ -563,7 +565,7 @@ switch (pflag) {                                        /* case on syntax */
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym_cm (char *cptr, t_addr addr, t_value *bytes, int32 sw)
+t_stat parse_sym_cm (const char *cptr, t_addr addr, t_value *bytes, int32 sw)
 {
 int32 d, i, j, reg, spec, n1, n2, disp, pflag;
 int32 val[3];

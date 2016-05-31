@@ -1139,11 +1139,11 @@ void m68k_op_divl_32_d(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)(NFLAG_32(quotient));
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)(NFLAG_32(quotient));
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -1350,11 +1350,11 @@ void m68k_op_divl_32_ai(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)NFLAG_32(quotient);
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)NFLAG_32(quotient);
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -1561,11 +1561,11 @@ void m68k_op_divl_32_pi(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)NFLAG_32(quotient);
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)NFLAG_32(quotient);
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -1772,11 +1772,11 @@ void m68k_op_divl_32_pd(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)NFLAG_32(quotient);
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)NFLAG_32(quotient);
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -1983,11 +1983,11 @@ void m68k_op_divl_32_di(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)NFLAG_32(quotient);
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)NFLAG_32(quotient);
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -2194,11 +2194,11 @@ void m68k_op_divl_32_ix(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)NFLAG_32(quotient);
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)NFLAG_32(quotient);
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -2405,11 +2405,11 @@ void m68k_op_divl_32_aw(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)(NFLAG_32(quotient));
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)(NFLAG_32(quotient));
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -2616,11 +2616,11 @@ void m68k_op_divl_32_al(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)(NFLAG_32(quotient));
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)(NFLAG_32(quotient));
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -2827,11 +2827,11 @@ void m68k_op_divl_32_pcdi(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)(NFLAG_32(quotient));
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)(NFLAG_32(quotient));
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -3038,11 +3038,11 @@ void m68k_op_divl_32_pcix(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)(NFLAG_32(quotient));
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)(NFLAG_32(quotient));
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -3249,11 +3249,11 @@ void m68k_op_divl_32_i(void)
                 }
             }
 
-			REG_D[word2 & 7] = (uint)remainder;
-			REG_D[(word2 >> 12) & 7] = (uint)quotient;
+            REG_D[word2 & 7] = (uint)remainder;
+            REG_D[(word2 >> 12) & 7] = (uint)quotient;
 
-			FLAG_N = (uint)(NFLAG_32(quotient));
-			FLAG_Z = (uint)quotient;
+            FLAG_N = (uint)(NFLAG_32(quotient));
+            FLAG_Z = (uint)quotient;
             FLAG_V = VFLAG_CLEAR;
             FLAG_C = CFLAG_CLEAR;
             return;
@@ -11869,7 +11869,7 @@ void m68k_op_mull_32_d(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -11886,7 +11886,7 @@ void m68k_op_mull_32_d(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -11993,7 +11993,7 @@ void m68k_op_mull_32_ai(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -12010,7 +12010,7 @@ void m68k_op_mull_32_ai(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -12117,7 +12117,7 @@ void m68k_op_mull_32_pi(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -12134,7 +12134,7 @@ void m68k_op_mull_32_pi(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -12241,7 +12241,7 @@ void m68k_op_mull_32_pd(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -12258,7 +12258,7 @@ void m68k_op_mull_32_pd(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -12365,7 +12365,7 @@ void m68k_op_mull_32_di(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -12382,7 +12382,7 @@ void m68k_op_mull_32_di(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -12489,7 +12489,7 @@ void m68k_op_mull_32_ix(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -12506,7 +12506,7 @@ void m68k_op_mull_32_ix(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -12613,7 +12613,7 @@ void m68k_op_mull_32_aw(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -12630,7 +12630,7 @@ void m68k_op_mull_32_aw(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -12737,7 +12737,7 @@ void m68k_op_mull_32_al(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -12754,7 +12754,7 @@ void m68k_op_mull_32_al(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -12861,7 +12861,7 @@ void m68k_op_mull_32_pcdi(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -12878,7 +12878,7 @@ void m68k_op_mull_32_pcdi(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -12985,7 +12985,7 @@ void m68k_op_mull_32_pcix(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -13002,7 +13002,7 @@ void m68k_op_mull_32_pcix(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;
@@ -13109,7 +13109,7 @@ void m68k_op_mull_32_i(void)
             if(!BIT_A(word2))
             {
                 FLAG_Z = MASK_OUT_ABOVE_32(res);
-				FLAG_N = (uint)(NFLAG_32(res));
+                FLAG_N = (uint)(NFLAG_32(res));
                 FLAG_V = ((sint64)res != (sint32)res)<<7;
                 REG_D[(word2 >> 12) & 7] = FLAG_Z;
                 return;
@@ -13126,7 +13126,7 @@ void m68k_op_mull_32_i(void)
         if(!BIT_A(word2))
         {
             FLAG_Z = MASK_OUT_ABOVE_32(res);
-			FLAG_N = (uint)(NFLAG_32(res));
+            FLAG_N = (uint)(NFLAG_32(res));
             FLAG_V = (res > 0xffffffff)<<7;
             REG_D[(word2 >> 12) & 7] = FLAG_Z;
             return;

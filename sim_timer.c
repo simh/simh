@@ -92,6 +92,7 @@ static int32 sim_calb_tmr = -1;                     /* the system calibrated tim
 
 static uint32 sim_idle_rate_ms = 0;
 static uint32 sim_os_sleep_min_ms = 0;
+static uint32 sim_os_clock_resoluton_ms = 0;
 static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
 static t_bool sim_idle_idled = FALSE;
 static uint32 sim_throt_ms_start = 0;
@@ -101,7 +102,8 @@ static uint32 sim_throt_val = 0;
 static uint32 sim_throt_state = 0;
 static uint32 sim_throt_sleep_time = 0;
 static int32 sim_throt_wait = 0;
-UNIT *sim_clock_unit = NULL;
+static UNIT *sim_clock_unit[SIM_NTIMERS] = {NULL};
+UNIT * volatile sim_clock_cosched_queue[SIM_NTIMERS] = {NULL};
 t_bool sim_asynch_timer = 
 #if defined (SIM_ASYNCH_CLOCKS)
                                  TRUE;
@@ -110,22 +112,23 @@ t_bool sim_asynch_timer =
 #endif
 
 t_stat sim_throt_svc (UNIT *uptr);
-
-UNIT sim_throt_unit = { UDATA (&sim_throt_svc, 0, 0) };
+t_stat sim_timer_tick_svc (UNIT *uptr);
 
 #define DBG_IDL       TIMER_DBG_IDLE        /* idling */
 #define DBG_QUE       TIMER_DBG_QUEUE       /* queue activities */
-#define DBG_TRC       0x004                 /* tracing */
-#define DBG_CAL       0x008                 /* calibration activities */
-#define DBG_TIM       0x010                 /* timer thread activities */
-#define DBG_THR       0x020                 /* throttle activities */
+#define DBG_MUX       TIMER_DBG_MUX         /* tmxr queue activities */
+#define DBG_TRC       0x008                 /* tracing */
+#define DBG_CAL       0x010                 /* calibration activities */
+#define DBG_TIM       0x020                 /* timer thread activities */
+#define DBG_THR       0x040                 /* throttle activities */
 DEBTAB sim_timer_debug[] = {
-  {"TRACE",   DBG_TRC},
-  {"IDLE",    DBG_IDL},
-  {"QUEUE",   DBG_QUE},
-  {"CALIB",   DBG_CAL},
-  {"TIME",    DBG_TIM},
-  {"THROT",   DBG_THR},
+  {"TRACE",   DBG_TRC, "Trace routine calls"},
+  {"IDLE",    DBG_IDL, "Idling activities"},
+  {"QUEUE",   DBG_QUE, "Event queuing activities"},
+  {"CALIB",   DBG_CAL, "Calibration activities"},
+  {"TIME",    DBG_TIM, "Activation an scheduling activities"},
+  {"THROT",   DBG_THR, "Throttling activities"},
+  {"MUX",     DBG_MUX, "Tmxr scheduling activities"},
   {0}
 };
 
@@ -552,23 +555,36 @@ static uint32 rtc_elapsed[SIM_NTIMERS] = { 0 };         /* sec since init */
 static uint32 rtc_calibrations[SIM_NTIMERS] = { 0 };    /* calibration count */
 static double rtc_clock_skew_max[SIM_NTIMERS] = { 0 };  /* asynchronous max skew */
 
+UNIT sim_timer_units[SIM_NTIMERS+2];                    /* one for each timer and one for throttle */
+                                                        /* plus one for an internal clock if no clocks are registered */
+
+
 void sim_rtcn_init_all (void)
 {
 uint32 i;
 
-for (i = 0; i < SIM_NTIMERS; i++) {
-    if (rtc_initd[i] != 0) sim_rtcn_init (rtc_initd[i], i);
-    }
+for (i = 0; i < SIM_NTIMERS; i++)
+    if (rtc_initd[i] != 0)
+        sim_rtcn_init (rtc_initd[i], i);
 return;
 }
 
 int32 sim_rtcn_init (int32 time, int32 tmr)
+{
+return sim_rtcn_init_unit (NULL, time, tmr);
+}
+
+int32 sim_rtcn_init_unit (UNIT *uptr, int32 time, int32 tmr)
 {
 sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_init(time=%d, tmr=%d)\n", time, tmr);
 if (time == 0)
     time = 1;
 if ((tmr < 0) || (tmr >= SIM_NTIMERS))
     return time;
+if (uptr) {
+    sim_clock_unit[tmr] = uptr;
+    sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;
+    }
 rtc_rtime[tmr] = sim_os_msec ();
 rtc_vtime[tmr] = rtc_rtime[tmr];
 rtc_nxintv[tmr] = 1000;
@@ -623,10 +639,17 @@ delta_rtime = new_rtime - rtc_rtime[tmr];               /* elapsed wtime */
 rtc_rtime[tmr] = new_rtime;                             /* adv wall time */
 rtc_vtime[tmr] = rtc_vtime[tmr] + 1000;                 /* adv sim time */
 if (delta_rtime > 30000) {                              /* gap too big? */
-    rtc_currd[tmr] = rtc_initd[tmr];
+    /* This simulator process has somehow been suspended for a significant */
+    /* amount of time.  This will certainly happen if the host system has  */
+    /* slept or hibernated.  It also might happen when a simulator         */
+    /* developer stops the simulator at a breakpoint (a process, not simh  */
+    /* breakpoint).  To accomodate this, we set the calibration state to   */
+    /* ignore what happened and proceed from here.                         */
+    rtc_vtime[tmr] = rtc_rtime[tmr];                    /* sync virtual and real time */
+    rtc_nxintv[tmr] = 1000;                             /* reset next interval */
     rtc_gtime[tmr] = sim_gtime();                       /* save instruction time */
-    sim_debug (DBG_CAL, &sim_timer_dev, "gap too big: delta = %d - result: %d\n", delta_rtime, rtc_initd[tmr]);
-    return rtc_initd[tmr];                              /* can't calibr */
+    sim_debug (DBG_CAL, &sim_timer_dev, "gap too big: delta = %d - result: %d\n", delta_rtime, rtc_currd[tmr]);
+    return rtc_currd[tmr];                              /* can't calibr */
     }
 new_gtime = sim_gtime();
 if (sim_asynch_enabled && sim_asynch_timer) {
@@ -696,36 +719,63 @@ return sim_rtcn_calb (ticksper, 0);
 
 t_bool sim_timer_init (void)
 {
+int i;
+uint32 clock_start, clock_last, clock_now;
+
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_init()\n");
+for (i=0; i<SIM_NTIMERS; i++) {
+    sim_timer_units[i].action = &sim_timer_tick_svc;
+    sim_timer_units[i].flags = UNIT_DIS;
+    }
+sim_timer_units[SIM_NTIMERS].action = &sim_throt_svc;
+sim_timer_units[SIM_NTIMERS].flags = UNIT_DIS;
 sim_register_internal_device (&sim_timer_dev);
 sim_idle_enab = FALSE;                                  /* init idle off */
 sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
+
+clock_last = clock_start = sim_os_msec ();
+sim_os_clock_resoluton_ms = 1000;
+do {
+    uint32 clock_diff;
+    
+    clock_now = sim_os_msec ();
+    clock_diff = clock_now - clock_last;
+    if ((clock_diff > 0) && (clock_diff < sim_os_clock_resoluton_ms))
+        sim_os_clock_resoluton_ms = clock_diff;
+    clock_last = clock_now;
+    } while (clock_now < clock_start + 100);
 return (sim_idle_rate_ms != 0);
 }
 
 /* sim_timer_idle_capable - tell if the host is Idle capable and what the host OS tick size is */
 
-uint32 sim_timer_idle_capable (uint32 *host_tick_ms)
+t_bool sim_timer_idle_capable (uint32 *host_ms_sleep_1, uint32 *host_tick_ms)
 {
 if (host_tick_ms)
-    *host_tick_ms = sim_os_sleep_min_ms;
-return sim_idle_rate_ms;
+    *host_tick_ms = sim_os_clock_resoluton_ms;
+if (host_ms_sleep_1)
+    *host_ms_sleep_1 = sim_os_sleep_min_ms;
+return (sim_idle_rate_ms != 0);
 }
 
 /* sim_show_timers - show running timer information */
 
-t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc)
 {
-int tmr;
+int tmr, clocks;
 
-if (sim_clock_unit)
-    fprintf (st, "%s clock device is %s\n", sim_name, sim_uname(sim_clock_unit));
-else
-    fprintf (st, "%s clock device is not specified, co-scheduling is unavailable\n", sim_name);
-for (tmr=0; tmr<SIM_NTIMERS; ++tmr) {
+fprintf (st, "Minimum Host Sleep Time:       %dms\n", sim_os_sleep_min_ms);
+fprintf (st, "Host Clock Resolution:         %dms\n", sim_os_clock_resoluton_ms);
+fprintf (st, "Time before Clock Calibration: %d seconds\n\n", sim_idle_stable);
+for (tmr=clocks=0; tmr<SIM_NTIMERS; ++tmr) {
     if (0 == rtc_initd[tmr])
         continue;
     
+    if (sim_clock_unit[tmr]) {
+        ++clocks;
+        fprintf (st, "%s clock device is %s\n", sim_name, sim_uname(sim_clock_unit[tmr]));
+        }
+
     fprintf (st, "%s%sTimer %d:\n", (sim_asynch_enabled && sim_asynch_timer) ? "Asynchronous " : "", rtc_hz[tmr] ? "Calibrated " : "Uncalibrated ", tmr);
     if (rtc_hz[tmr]) {
         fprintf (st, "  Running at:              %dhz\n", rtc_hz[tmr]);
@@ -745,6 +795,54 @@ for (tmr=0; tmr<SIM_NTIMERS; ++tmr) {
     if (rtc_clock_skew_max[tmr] != 0.0)
         fprintf (st, "  Peak Clock Skew:         %.0fms\n",   rtc_clock_skew_max[tmr]);
     }
+if (clocks == 0)
+    fprintf (st, "%s clock device is not specified, co-scheduling is unavailable\n", sim_name);
+return SCPE_OK;
+}
+
+t_stat sim_show_clock_queues (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
+{
+#if defined (SIM_ASYNCH_IO)
+int tmr;
+
+pthread_mutex_lock (&sim_timer_lock);
+if (sim_wallclock_queue == QUEUE_LIST_END)
+    fprintf (st, "%s wall clock event queue empty\n", sim_name);
+else {
+    fprintf (st, "%s wall clock event queue status\n", sim_name);
+    for (uptr = sim_wallclock_queue; uptr != QUEUE_LIST_END; uptr = uptr->a_next) {
+        if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+            fprintf (st, "  %s", sim_dname (dptr));
+            if (dptr->numunits > 1)
+                fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+            }
+        else fprintf (st, "  Unknown");
+        fprintf (st, " after ");
+        fprint_val (st, (t_value)uptr->a_usec_delay, 10, 0, PV_RCOMMA);
+        fprintf (st, " usec\n");
+        }
+    }
+if (sim_asynch_timer) {
+    for (tmr=0; tmr<SIM_NTIMERS; ++tmr) {
+        if (sim_clock_unit[tmr] == NULL)
+            continue;
+        if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) {
+            fprintf (st, "%s clock (%s) co-schedule event queue status\n",
+                     sim_name, sim_uname(sim_clock_unit[tmr]));
+            for (uptr = sim_clock_cosched_queue[tmr]; uptr != QUEUE_LIST_END; uptr = uptr->a_next) {
+                if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+                    fprintf (st, "  %s", sim_dname (dptr));
+                    if (dptr->numunits > 1)
+                        fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+                    }
+                else fprintf (st, "  Unknown");
+                fprintf (st, "\n");
+                }
+            }
+        }
+    }
+pthread_mutex_unlock (&sim_timer_lock);
+#endif /* SIM_ASYNCH_IO */
 return SCPE_OK;
 }
 
@@ -803,11 +901,13 @@ MTAB sim_timer_mod[] = {
   { 0 },
 };
 
+static t_stat sim_timer_clock_reset (DEVICE *dptr);
+
 DEVICE sim_timer_dev = {
-    "TIMER", &sim_throt_unit, sim_timer_reg, sim_timer_mod, 
-    1, 0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_DEBUG, 0, sim_timer_debug};
+    "TIMER", sim_timer_units, sim_timer_reg, sim_timer_mod, 
+    SIM_NTIMERS+2, 0, 0, 0, 0, 0, 
+    NULL, NULL, &sim_timer_clock_reset, NULL, NULL, NULL, 
+    NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
 
 
 /* sim_idle - idle simulator until next event or for specified interval
@@ -831,13 +931,9 @@ int32 act_cyc;
 
 if ((!sim_idle_enab)                             ||     /* idling disabled */
     ((sim_clock_queue == QUEUE_LIST_END) &&             /* or clock queue empty? */
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
      (!(sim_asynch_enabled && sim_asynch_timer)))||     /*     and not asynch? */
-#else
-     (TRUE))                                     ||
-#endif
-    ((sim_clock_queue != QUEUE_LIST_END) && 
-     ((sim_clock_queue->flags & UNIT_IDLE) == 0))||     /* or event not idle-able? */
+    ((sim_clock_queue != QUEUE_LIST_END) &&             /* or clock queue not empty */
+     ((sim_clock_queue->flags & UNIT_IDLE) == 0))||     /*   and event not idle-able? */
     (rtc_elapsed[tmr] < sim_idle_stable)) {             /* or timer not stable? */
     if (sin_cyc)
         sim_interval = sim_interval - 1;
@@ -903,23 +999,19 @@ return TRUE;
 
 /* Set idling - implicitly disables throttling */
 
-t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sim_set_idle (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 t_stat r;
 uint32 v;
 
-if (sim_idle_rate_ms == 0) {
-    sim_printf ("Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
-    return SCPE_NOFNC;
-    }
-if ((val != 0) && (sim_idle_rate_ms > (uint32) val)) {
-    sim_printf ("Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
-    return SCPE_NOFNC;
-    }
-if (cptr) {
+if (sim_idle_rate_ms == 0)
+    return sim_messagef (SCPE_NOFNC, "Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
+if ((val != 0) && (sim_idle_rate_ms > (uint32) val))
+        return sim_messagef (SCPE_NOFNC, "Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
+if (cptr && *cptr) {
     v = (uint32) get_uint (cptr, 10, SIM_IDLE_STMAX, &r);
     if ((r != SCPE_OK) || (v < SIM_IDLE_STMIN))
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid Stability value: %s.  Valid values range from %d to %d.\n", cptr, SIM_IDLE_STMIN, SIM_IDLE_STMAX);
     sim_idle_stable = v;
     }
 sim_idle_enab = TRUE;
@@ -932,7 +1024,7 @@ return SCPE_OK;
 
 /* Clear idling */
 
-t_stat sim_clr_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sim_clr_idle (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 sim_idle_enab = FALSE;
 return SCPE_OK;
@@ -940,7 +1032,7 @@ return SCPE_OK;
 
 /* Show idling */
 
-t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (sim_idle_enab)
     fprintf (st, "idle enabled");
@@ -953,9 +1045,10 @@ return SCPE_OK;
 
 /* Throttling package */
 
-t_stat sim_set_throt (int32 arg, char *cptr)
+t_stat sim_set_throt (int32 arg, CONST char *cptr)
 {
-char *tptr, c;
+CONST char *tptr;
+char c;
 t_value val, val2 = 0;
 
 if (arg == 0) {
@@ -1005,7 +1098,7 @@ else {
 return SCPE_OK;
 }
 
-t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr)
+t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, CONST char *cptr)
 {
 if (sim_idle_rate_ms == 0)
     fprintf (st, "Throttling not available\n");
@@ -1047,12 +1140,12 @@ void sim_throt_sched (void)
 {
 sim_throt_state = 0;
 if (sim_throt_type)
-    sim_activate (&sim_throt_unit, SIM_THROT_WINIT);
+    sim_activate (&sim_timer_units[SIM_NTIMERS], SIM_THROT_WINIT);
 }
 
 void sim_throt_cancel (void)
 {
-sim_cancel (&sim_throt_unit);
+sim_cancel (&sim_timer_units[SIM_NTIMERS]);
 }
 
 /* Throttle service
@@ -1064,7 +1157,6 @@ sim_cancel (&sim_throt_unit);
        1    take final measurement, calculate wait values
        2    periodic waits to slow down the CPU
 */
-
 t_stat sim_throt_svc (UNIT *uptr)
 {
 uint32 delta_ms;
@@ -1134,6 +1226,11 @@ sim_activate (uptr, sim_throt_wait);                    /* reschedule */
 return SCPE_OK;
 }
 
+t_stat sim_timer_tick_svc (UNIT *uptr)
+{
+return SCPE_OK;
+}
+
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 
 static double _timespec_to_double (struct timespec *time)
@@ -1155,7 +1252,6 @@ clock_gettime(CLOCK_REALTIME, &now);
 return _timespec_to_double (&now);
 }
 
-extern int32 sim_is_running;
 extern UNIT * volatile sim_wallclock_queue;
 extern UNIT * volatile sim_wallclock_entry;
 
@@ -1233,6 +1329,8 @@ while (sim_asynch_enabled && sim_asynch_timer && sim_is_running) {
         sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - waiting for %.0f usecs until %.6f for %s\n", wait_usec, sim_wallclock_queue->a_due_time, sim_uname(sim_wallclock_queue));
     if ((wait_usec <= 0.0) || 
         (0 != pthread_cond_timedwait (&sim_timer_wake, &sim_timer_lock, &due_time))) {
+        int tmr;
+
         if (sim_wallclock_queue == QUEUE_LIST_END)      /* queue empty? */
             continue;                                   /* wait again */
         inst_per_sec = sim_timer_inst_per_sec ();
@@ -1252,15 +1350,18 @@ while (sim_asynch_enabled && sim_asynch_timer && sim_is_running) {
             }
         sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - slept %.0fms - activating(%s,%d)\n", 
                    1000.0*(_timespec_to_double (&stop_time)-_timespec_to_double (&start_time)), sim_uname(uptr), inst_delay);
-        if (sim_clock_unit == uptr) {
+        for (tmr=0; tmr<SIM_NTIMERS; tmr++)
+            if (sim_clock_unit[tmr] == uptr)
+                break;
+        if (tmr != SIM_NTIMERS) {
             /*
              * Some devices may depend on executing during the same instruction or immediately 
              * after the clock tick event.  To satisfy this, we link the clock unit to the head
              * of the clock coschedule queue and then insert that list in the asynch event 
              * queue in a single operation
              */
-            uptr->a_next = sim_clock_cosched_queue;
-            sim_clock_cosched_queue = QUEUE_LIST_END;
+            uptr->a_next = sim_clock_cosched_queue[tmr];
+            sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;
             AIO_ACTIVATE_LIST(sim_activate, uptr, inst_delay);
             }
         else
@@ -1280,8 +1381,55 @@ return NULL;
 
 #endif /* defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS) */
 
+/*
+   In the event that there are no active clock devices, no instruction 
+   rate calibration will be performed.  This is more likely on simpler
+   simulators which don't have a full spectrum of standard devices or 
+   possibly when a clock device exists but its use is optional.
+   
+   To solve this we merely run an internal clock at 50Hz.
+ */
+#define CLK_TPS 50
+static t_stat sim_timer_clock_tick_svc (UNIT *uptr)
+{
+sim_rtcn_calb (CLK_TPS, SIM_NTIMERS-1);
+sim_activate_after (uptr, 1000000/CLK_TPS);             /* reactivate unit */
+return SCPE_OK;
+}
+
+static t_stat sim_timer_clock_reset (DEVICE *dptr)
+{
+uint32 i;
+
+for (i = 0; i < SIM_NTIMERS; i++)
+    if (rtc_initd[i] != 0)
+        break;
+if (i == SIM_NTIMERS) {     /* No clocks have signed in. */
+    /* setup internal clock */
+    sim_timer_units[SIM_NTIMERS+1].action = &sim_timer_clock_tick_svc;
+    sim_timer_units[SIM_NTIMERS+1].flags = UNIT_DIS;
+    }
+if (sim_timer_units[SIM_NTIMERS+1].action == &sim_timer_clock_tick_svc) {
+    /* actual clock reset */
+    sim_rtcn_init_unit (&sim_timer_units[SIM_NTIMERS+1], 5000, SIM_NTIMERS-1);
+    sim_activate_abs (&sim_timer_units[SIM_NTIMERS+1], 5000);
+    }
+return SCPE_OK;
+}
+
 void sim_start_timer_services (void)
 {
+uint32 i;
+
+for (i = 0; i < SIM_NTIMERS; i++)
+    if (rtc_initd[i] != 0)
+        break;
+if (i == SIM_NTIMERS) {     /* No clocks have signed in. */
+    /* setup internal clock */
+    sim_timer_units[SIM_NTIMERS+1].action = &sim_timer_clock_tick_svc;
+    sim_rtcn_init_unit (&sim_timer_units[SIM_NTIMERS+1], 5000, SIM_NTIMERS-1);
+    sim_activate_abs (&sim_timer_units[SIM_NTIMERS+1], 5000);
+    }
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 pthread_mutex_lock (&sim_timer_lock);
 if (sim_asynch_enabled && sim_asynch_timer) {
@@ -1340,7 +1488,7 @@ if (sim_asynch_enabled && sim_asynch_timer)
     sim_start_timer_services ();
 else {
     UNIT *uptr;
-    int32 accum = 0;
+    uint32 accum = 0;
 
     sim_stop_timer_services ();
     while (1) {
@@ -1375,16 +1523,23 @@ if (0 == inst_per_sec)
 return inst_per_sec;
 }
 
-t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay)
+t_stat sim_timer_activate_after (UNIT *uptr, uint32 usec_delay)
 {
-int32 inst_delay;
-double inst_per_sec;
+int inst_delay;
+double inst_delay_d, inst_per_sec;
 
 AIO_VALIDATE;
 if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
 inst_per_sec = sim_timer_inst_per_sec ();
-inst_delay = (int32)((inst_per_sec*usec_delay)/1000000.0);
+inst_delay_d = ((inst_per_sec*usec_delay)/1000000.0);
+/* Bound delay to avoid overflow.  */
+/* Long delays are usually canceled before they expire */
+if (inst_delay_d > (double)0x7fffffff)
+    inst_delay_d = (double)0x7fffffff;
+inst_delay = (int32)inst_delay_d;
+if ((inst_delay == 0) && (usec_delay != 0))
+    inst_delay = 1;     /* Minimum non-zero delay is 1 instruction */
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 if ((sim_calb_tmr == -1) ||                             /* if No timer initialized */
     (inst_delay < rtc_currd[sim_calb_tmr]) ||           /*    or sooner than next clock tick? */
@@ -1455,6 +1610,8 @@ pthread_mutex_unlock (&sim_timer_lock);
 pthread_cond_signal (&sim_timer_wake);                  /* wake the timer thread to deal with it */
 return SCPE_OK;
 #else
+sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after() - queue addition %s at %d (%d usecs)\n", 
+           sim_uname(uptr), inst_delay, usec_delay);
 return _sim_activate (uptr, inst_delay);                /* queue it now */
 #endif
 }
@@ -1463,13 +1620,25 @@ return _sim_activate (uptr, inst_delay);                /* queue it now */
 
 t_stat sim_register_clock_unit (UNIT *uptr)
 {
-sim_clock_unit = uptr;
+sim_clock_unit[0] = uptr;
+sim_clock_cosched_queue[0] = QUEUE_LIST_END;
 return SCPE_OK;
 }
 
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval)
 {
-if (NULL == sim_clock_unit)
+return sim_clock_coschedule_tmr (uptr, 0, interval);
+}
+
+t_stat sim_clock_coschedule_abs (UNIT *uptr, int32 interval)
+{
+sim_cancel (uptr);
+return sim_clock_coschedule_tmr (uptr, 0, interval);
+}
+
+t_stat sim_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
+{
+if (NULL == sim_clock_unit[tmr])
     return sim_activate (uptr, interval);
 else
     if (sim_asynch_enabled && sim_asynch_timer) {
@@ -1479,8 +1648,8 @@ else
                 (rtc_elapsed[sim_calb_tmr ] >= sim_idle_stable))  {
                 sim_debug (DBG_TIM, &sim_timer_dev, "sim_clock_coschedule() - queueing %s for clock co-schedule\n", sim_uname (uptr));
                 pthread_mutex_lock (&sim_timer_lock);
-                uptr->a_next = sim_clock_cosched_queue;
-                sim_clock_cosched_queue = uptr;
+                uptr->a_next = sim_clock_cosched_queue[tmr];
+                sim_clock_cosched_queue[tmr] = uptr;
                 pthread_mutex_unlock (&sim_timer_lock);
                 return SCPE_OK;
                 }
@@ -1490,7 +1659,7 @@ else
 #endif
                 int32 t;
 
-                t = sim_activate_time (sim_clock_unit);
+                t = sim_activate_time (sim_clock_unit[tmr]);
                 return sim_activate (uptr, t? t - 1: interval);
                 }
             }
@@ -1500,8 +1669,14 @@ else
     else {
         int32 t;
 
-        t = sim_activate_time (sim_clock_unit);
+        t = sim_activate_time (sim_clock_unit[tmr]);
         return sim_activate (uptr, t? t - 1: interval);
         }
+}
+
+t_stat sim_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 interval)
+{
+sim_cancel (uptr);
+return sim_clock_coschedule_tmr (uptr, tmr, interval);
 }
 

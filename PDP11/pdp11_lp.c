@@ -56,15 +56,14 @@ extern int32 int_req[IPL_HLVL];
 int32 lpt_csr = 0;                                      /* control/status */
 int32 lpt_stopioe = 0;                                  /* stop on error */
 
-DEVICE lpt_dev;
 t_stat lpt_rd (int32 *data, int32 PA, int32 access);
 t_stat lpt_wr (int32 data, int32 PA, int32 access);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *ptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *ptr);
 t_stat lpt_detach (UNIT *uptr);
-t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *lpt_description (DEVICE *dptr);
+t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *lpt_description (DEVICE *dptr);
 
 /* LPT data structures
 
@@ -168,7 +167,7 @@ if ((uptr->flags & UNIT_ATT) == 0)
 fputc (uptr->buf & 0177, uptr->fileref);
 uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {
-    perror ("LPT I/O error");
+    sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -187,7 +186,7 @@ sim_cancel (&lpt_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -204,7 +203,7 @@ lpt_csr = lpt_csr | CSR_ERR;
 return detach_unit (uptr);
 }
 
-t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Line Printer (LPT)\n\n");
 fprintf (st, "The line printer (LPT) writes data to a disk file.  The POS register specifies\n");
@@ -221,7 +220,7 @@ fprintf (st, "    OS I/O error  x          report error and stop\n");
 return SCPE_OK;
 }
 
-char *lpt_description (DEVICE *dptr)
+const char *lpt_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "LP11 line printer" :
                   "LPV11 line printer";

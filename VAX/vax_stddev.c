@@ -93,9 +93,6 @@
 #define CLK_DELAY       5000                            /* 100 Hz */
 #define TMXR_MULT       1                               /* 100 Hz */
 
-extern int32 int_req[IPL_HLVL];
-extern int32 hlt_pin;
-
 int32 tti_csr = 0;                                      /* control/status */
 uint32 tti_buftime;                                     /* time input character arrived */
 int32 tto_csr = 0;                                      /* control/status */
@@ -117,15 +114,15 @@ t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat clk_attach (UNIT *uptr, char *cptr);
+t_stat clk_attach (UNIT *uptr, CONST char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat todr_resync (void);
-char *tti_description (DEVICE *dptr);
-char *tto_description (DEVICE *dptr);
-char *clk_description (DEVICE *dptr);
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+const char *tti_description (DEVICE *dptr);
+const char *tto_description (DEVICE *dptr);
+const char *clk_description (DEVICE *dptr);
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 extern int32 sysd_hlt_enb (void);
 extern int32 fault_PC;
@@ -139,7 +136,7 @@ extern int32 fault_PC;
 
 DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), SERIAL_IN_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
     { HRDATAD (BUF,     tti_unit.buf,         16, "last data item processed") },
@@ -242,12 +239,22 @@ MTAB clk_mod[] = {
     { 0 }
     };
 
+#define DBG_REG 1   /* TODR register access */
+#define DBG_TIC 2   /* clock ticks */
+
+DEBTAB clk_debug[] = {
+  {"REG",  DBG_REG,   "TODR register access"},
+  {"TIC",  DBG_TIC,   "clock ticks"},
+  {0}
+};
+
 DEVICE clk_dev = {
     "CLK", &clk_unit, clk_reg, clk_mod,
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    &clk_dib, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL, 
+    &clk_dib, DEV_DEBUG, 0, clk_debug, 
+    NULL, NULL, &clk_help, NULL, NULL, 
     &clk_description
     };
 
@@ -278,7 +285,7 @@ if (tti_csr & CSR_DONE) {                               /* Input pending ? */
     tti_csr = tti_csr & ~CSR_DONE;                      /* clr done */
     tti_unit.buf = tti_unit.buf & 0377;                 /* clr errors */
     CLR_INT (TTI);
-    sim_activate_abs (&tti_unit, tti_unit.wait);        /* check soon for more input */
+    sim_activate_after_abs (&tti_unit, tti_unit.wait);  /* check soon for more input */
     }
 return t;
 }
@@ -335,8 +342,8 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_clock_coschedule (uptr, KBD_WAIT (uptr->wait, tmr_poll));
-                                                        /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
+
 if ((tti_csr & CSR_DONE) &&                             /* input still pending and < 500ms? */
     ((sim_os_msec () - tti_buftime) < 500))
      return SCPE_OK;
@@ -366,7 +373,7 @@ sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Input (TTI)\n\n");
 fprintf (st, "The terminal input (TTI) polls the console keyboard for input.\n\n");
@@ -381,7 +388,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tti_description (DEVICE *dptr)
+const char *tti_description (DEVICE *dptr)
 {
 return "console terminal input";
 }
@@ -420,7 +427,7 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Output (TTO)\n\n");
 fprintf (st, "The terminal output (TTO) writes to the simulator console.\n\n");
@@ -430,7 +437,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tto_description (DEVICE *dptr)
+const char *tto_description (DEVICE *dptr)
 {
 return "console terminal output";
 }
@@ -463,11 +470,15 @@ int32 todr_rd (void)
 TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec base, now, val;
 
-if ((fault_PC&0xFFFE0000) == 0x20040000)                /* running from ROM? */
+if ((fault_PC&0xFFFE0000) == 0x20040000) {              /* running from ROM? */
+    sim_debug (DBG_REG, &clk_dev, "todr_rd(ROM) - TODR=0x%X\n", todr_reg);
     return todr_reg;                                    /* return counted value for ROM diags */
+    }
 
-if (0 == todr_reg)                                      /* clock running? */
+if (0 == todr_reg) {                                    /* clock running? */
+    sim_debug (DBG_REG, &clk_dev, "todr_rd(Not Running) - TODR=0x%X\n", todr_reg);
     return todr_reg;
+    }
 
 /* Maximum number of seconds which can be represented as 10ms ticks 
    in the 32bit TODR.  This is the 33bit value 0x100000000/100 to get seconds */
@@ -478,9 +489,12 @@ base.tv_sec = toy->toy_gmtbase;
 base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
 sim_timespec_diff (&val, &now, &base);
 
-if (val.tv_sec >= TOY_MAX_SECS)                         /* todr overflowed? */
+if (val.tv_sec >= TOY_MAX_SECS) {                       /* todr overflowed? */
+    sim_debug (DBG_REG, &clk_dev, "todr_rd(Overflowed) - TODR=0x%X\n", 0);
     return todr_reg = 0;                                /* stop counting */
+    }
 
+sim_debug (DBG_REG, &clk_dev, "todr_rd() - TODR=0x%X\n", (int32)(val.tv_sec*100 + val.tv_nsec/10000000));
 return (int32)(val.tv_sec*100 + val.tv_nsec/10000000);  /* 100hz Clock Ticks */
 }
 
@@ -503,6 +517,7 @@ toy->toy_gmtbasemsec = base.tv_nsec/1000000;
 todr_reg = data;
 if (data)
     todr_blow = 0;
+sim_debug (DBG_REG, &clk_dev, "todr_wr(0x%X) - TODR=0x%X blow=%d\n", data, todr_reg, todr_blow);
 }
 
 /* TODR resync routine */
@@ -559,7 +574,7 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
 return SCPE_OK;
 }
 
-t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Real-Time Clock (%s)\n\n", dptr->name);
 fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
@@ -590,14 +605,14 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *clk_description (DEVICE *dptr)
+const char *clk_description (DEVICE *dptr)
 {
 return "time of year clock";
 }
 
 /* CLK attach */
 
-t_stat clk_attach (UNIT *uptr, char *cptr)
+t_stat clk_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

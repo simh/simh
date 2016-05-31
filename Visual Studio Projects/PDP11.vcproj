@@ -19,7 +19,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\PDP11\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -41,14 +41,17 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../PDP11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
-				PreprocessorDefinitions="USE_SHARED;USE_DISPLAY;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID"
+				AdditionalIncludeDirectories="./;../;../PDP11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/include&quot;;&quot;../../windows-build/pthreads&quot;;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include"
+				PreprocessorDefinitions="USE_SHARED;USE_DISPLAY;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG;USE_SIM_VIDEO;HAVE_LIBSDL"
+				KeepComments="false"
 				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
+				BasicRuntimeChecks="0"
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				DebugInformationFormat="4"
+				DebugInformationFormat="3"
+				CompileAs="1"
+				ShowIncludes="false"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -61,13 +64,13 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\PDP11.exe"
+				AdditionalDependencies="wsock32.lib winmm.lib SDL2-StaticD.lib dxguid.lib Imm32.lib Version.lib pcrestaticd.lib pcreposixstaticd.lib Iphlpapi.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
+				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/lib/&quot;;&quot;../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)\Lib\x86&quot;"
 				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(OutDir)\PDP11.pdb"
 				SubSystem="1"
+				StackReserveSize="10485760"
+				StackCommitSize="10485760"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
@@ -97,7 +100,7 @@
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
-			IntermediateDirectory="..\BIN\NT\Project\simh\PDP11\$(PlatformName)-$(ConfigurationName)"
+			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
@@ -121,14 +124,16 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
-				AdditionalIncludeDirectories="./;../;../PDP11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
-				PreprocessorDefinitions="USE_SHARED;USE_DISPLAY;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID"
+				WholeProgramOptimization="false"
+				AdditionalIncludeDirectories="./;../;../PDP11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/include&quot;;&quot;../../windows-build/pthreads&quot;;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include"
+				PreprocessorDefinitions="USE_SHARED;USE_DISPLAY;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG;USE_SIM_VIDEO;HAVE_LIBSDL"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="3"
+				CompileAs="1"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -141,14 +146,16 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\PDP11.exe"
+				AdditionalDependencies="wsock32.lib winmm.lib pcrestatic.lib pcreposixstatic.lib SDL2-Static.lib dxguid.lib Imm32.lib Version.lib Iphlpapi.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
+				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.3/lib/&quot;;&quot;../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)\Lib\x86&quot;"
 				GenerateDebugInformation="false"
 				SubSystem="1"
+				StackReserveSize="10485760"
+				StackCommitSize="10485760"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				LinkTimeCodeGeneration="1"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
@@ -320,6 +327,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_td.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_tm.c"
 				>
 			</File>
@@ -360,6 +371,7 @@
 					<Tool
 						Name="VCCLCompilerTool"
 						PreprocessorDefinitions="HAVE_PTW32_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+						CompileAs="1"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -367,7 +379,9 @@
 					>
 					<Tool
 						Name="VCCLCompilerTool"
+						WholeProgramOptimization="false"
 						PreprocessorDefinitions="HAVE_PTW32_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+						CompileAs="1"
 					/>
 				</FileConfiguration>
 			</File>
@@ -412,13 +426,181 @@
 				>
 			</File>
 			<File
-				RelativePath="..\display\vt11.c"
+				RelativePath="..\sim_video.c"
 				>
 			</File>
 			<File
-				RelativePath="..\display\win32.c"
+				RelativePath="..\display\sim_ws.c"
 				>
 			</File>
+			<File
+				RelativePath="..\display\vt11.c"
+				>
+			</File>
+			<Filter
+				Name="slirp"
+				>
+				<File
+					RelativePath="..\slirp\arp_table.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\bootp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\bootp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\cksum.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\debug.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\dnssearch.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp_glue\glib_qemu_stubs.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\if.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\if.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_icmp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_icmp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_input.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_output.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\libslirp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\main.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\mbuf.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\mbuf.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\misc.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\misc.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\sbuf.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\sbuf.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp_glue\sim_slirp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp_config.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\socket.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\socket.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_input.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_output.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_subr.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_timer.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_timer.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_var.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcpip.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tftp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tftp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\udp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\udp.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -454,6 +636,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_mscp.h"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_td.h"
 				>
 			</File>
 			<File
@@ -518,6 +704,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_video.h"
 				>
 			</File>
 			<File

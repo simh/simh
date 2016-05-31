@@ -1,6 +1,6 @@
 /* pdp18b_rb.c: RB09 fixed head disk simulator
 
-   Copyright (c) 2003-2013, Robert M Supnik
+   Copyright (c) 2003-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rb           RB09 fixed head disk
 
+   07-Mar-16    RMS     Revised for dynamically allocated memory
    03-Sep-13    RMS     Added explicit void * cast
    14-Jan-04    RMS     Revised IO device call interface
    26-Oct-03    RMS     Cleaned up buffer copy code
@@ -77,7 +78,7 @@
 #define GET_POS(x)      ((int) fmod (sim_gtime () / ((double) (x)), \
                         ((double) (RB_NUMSC * RB_NUMWD))))
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
 
@@ -90,11 +91,10 @@ int32 rb_time = 10;                                     /* inter-word time */
 int32 rb_burst = 1;                                     /* burst mode flag */
 int32 rb_stopioe = 1;                                   /* stop on error */
 
-DEVICE rb_dev;
 int32 rb71 (int32 dev, int32 pulse, int32 AC);
 t_stat rb_svc (UNIT *uptr);
 t_stat rb_reset (DEVICE *dptr);
-int32 rb_updsta (int32 new);
+int32 rb_updsta (int32 val);
 int32 rb_make_da (int32 dat);
 int32 rb_make_bcd (int32 dat);
 int32 rb_set_da (int32 dat, int32 old);
@@ -204,9 +204,9 @@ int32 s = rb_set_bcd (bcd_s);                           /* bin sector */
 
 if ((t >= RB_NUMTR) || (t < 0) ||                       /* invalid? */
     (s >= RB_NUMSC) || (s < 0)) {
-	rb_updsta (RBS_ILA);								/* error */
-	return old_da;										/* don't change */
-	}
+    rb_updsta (RBS_ILA);                                /* error */
+    return old_da;                                      /* don't change */
+    }
 else return (((t * RB_NUMSC) + s) * RB_NUMWD);          /* new da */
 }
 
@@ -279,9 +279,9 @@ return SCPE_OK;
 
 /* Update status */
 
-int32 rb_updsta (int32 new)
+int32 rb_updsta (int32 val)
 {
-rb_sta = (rb_sta | new) & ~(RBS_ERR | RBS_MBZ);         /* clear err, mbz */
+rb_sta = (rb_sta | val) & ~(RBS_ERR | RBS_MBZ);         /* clear err, mbz */
 if (rb_sta & RBS_EFLGS)                                 /* error? */
     rb_sta = rb_sta | RBS_ERR;
 if (rb_sta & RBS_DON)                                   /* done? clear busy */

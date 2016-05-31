@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tti          keyboard
    tto          teleprinter
 
+   28-Mar-15    RMS     Revised to use sim_printf
    21-Mar-12    RMS     Fixed unitialized variable in tto_svc (Michael Bloom)
    21-Dec-06    RMS     Added 16-channel sequence break support
    29-Oct-03    RMS     Added PTR FIODEC-to-ASCII translation (Phil Budne)
@@ -93,7 +94,7 @@ t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
-t_stat ptr_attach (UNIT *uptr, char *cptr);
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr);
 
 /* Character translation tables */
 
@@ -148,17 +149,17 @@ UNIT ptr_unit = {
     };
 
 REG ptr_reg[] = {
-    { ORDATA (BUF, ptr_unit.buf, 18) },
+    { ORDATAD (BUF, ptr_unit.buf, 18, "last data item processed") },
     { FLDATA (UC, ptr_uc, UC_V) },
-    { FLDATA (DONE, iosta, IOS_V_PTR) },
-    { FLDATA (RPLS, cpls, CPLS_V_PTR) },
+    { FLDATAD (DONE, iosta, IOS_V_PTR, "device done flag") },
+    { FLDATAD (RPLS, cpls, CPLS_V_PTR, "return restart pulse flag") },
     { ORDATA (HOLD, ptr_hold, 9), REG_HRO },
     { ORDATA (STATE, ptr_state, 5), REG_HRO },
     { FLDATA (WAIT, ptr_wait, 0), REG_HRO },
-    { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
+    { DRDATAD (POS, ptr_unit.pos, T_ADDR_W, "position in the input file"), PV_LEFT },
+    { DRDATAD (TIME, ptr_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
     { DRDATA (LEADER, ptr_leader, 6), REG_HRO },
-    { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { FLDATAD (STOP_IOE, ptr_stopioe, 0, "stop on I/O error") },
     { DRDATA (SBSLVL, ptr_sbs, 4), REG_HRO },
     { NULL }
     };
@@ -191,12 +192,12 @@ UNIT ptp_unit = {
     };
 
 REG ptp_reg[] = {
-    { ORDATA (BUF, ptp_unit.buf, 8) },
-    { FLDATA (DONE, iosta, IOS_V_PTP) },
-    { FLDATA (RPLS, cpls, CPLS_V_PTP) },
-    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { ORDATAD (BUF, ptp_unit.buf, 8, "last data item processed") },
+    { FLDATAD (DONE, iosta, IOS_V_PTP, "device done flag") },
+    { FLDATAD (RPLS, cpls, CPLS_V_PTP, "return restart pulse flag") },
+    { DRDATAD (POS, ptp_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, ptp_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, ptp_stopioe, 0, "stop on I/O error") },
     { DRDATA (SBSLVL, ptp_sbs, 4), REG_HRO },
     { NULL }
     };
@@ -225,12 +226,12 @@ DEVICE ptp_dev = {
 UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
-    { ORDATA (BUF, tty_buf, 6) },
-    { FLDATA (UC, tty_uc, UC_V) },
+    { ORDATAD (BUF, tty_buf, 6, "typewriter buffer (shared)") },
+    { FLDATAD (UC, tty_uc, UC_V, "upper case/lower case state (shared)") },
     { ORDATA (HOLD, tti_hold, 9), REG_HRO },
-    { FLDATA (DONE, iosta, IOS_V_TTI) },
-    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { FLDATAD (DONE, iosta, IOS_V_TTI, "input ready flag") },
+    { DRDATAD (POS, tti_unit.pos, T_ADDR_W, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME, tti_unit.wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
     { DRDATA (SBSLVL, tti_sbs, 4), REG_HRO },
     { NULL }
     };
@@ -259,12 +260,12 @@ DEVICE tti_dev = {
 UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT * 10 };
 
 REG tto_reg[] = {
-    { ORDATA (BUF, tty_buf, 6) },
-    { FLDATA (UC, tty_uc, UC_V) },
-    { FLDATA (RPLS, cpls, CPLS_V_TTO) },
-    { FLDATA (DONE, iosta, IOS_V_TTO) },
-    { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF, tty_buf, 6, "typewriter buffer (shared)") },
+    { FLDATAD (UC, tty_uc, UC_V, "upper case/lower case state (shared") },
+    { FLDATAD (RPLS, cpls, CPLS_V_TTO, "return restart pulse flag") },
+    { FLDATAD (DONE, iosta, IOS_V_TTO, "output done flag") },
+    { DRDATAD (POS, tto_unit.pos, T_ADDR_W, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME, tto_unit.wait, 24, "time from I/O initiation interrupt"), PV_LEFT },
     { DRDATA (SBSLVL, tto_sbs, 4), REG_HRO },
     { NULL }
     };
@@ -343,10 +344,10 @@ if (temp == EOF) {                                      /* end of file? */
         ptr_wait = ioh = 0;
     if (feof (uptr->fileref)) {
         if ((cpls & CPLS_PTR) || ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_perror ("PTR I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -433,7 +434,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat ptr_attach (UNIT *uptr, char *cptr)
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 ptr_leader = PTR_LEADER;                                /* set up leader */
 return attach_unit (uptr, cptr);
@@ -509,7 +510,7 @@ dev_req_int (ptp_sbs);                                  /* req interrupt */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (uptr->buf, uptr->fileref) == EOF) {           /* I/O error? */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

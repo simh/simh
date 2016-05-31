@@ -31,13 +31,13 @@
 
 /* unless you're writing a new driver, you shouldn't be looking here! */
 
-extern int ws_init(char *, int, int, int); 
+extern int ws_init(const char *, int, int, int, void *); 
+void ws_shutdown(void);
 extern void *ws_color_rgb(int, int, int);
 extern void *ws_color_black(void);
 extern void *ws_color_white(void);
 extern void ws_display_point(int, int, void *);
 extern void ws_sync(void);
-extern int ws_loop(void (*)(void *), void *);
 extern int ws_poll(int *, int);
 extern void ws_beep(void);
 

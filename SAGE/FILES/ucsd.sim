@@ -1,0 +1,15 @@
+set cpu debug=int
+set cpu debug=exc
+set cpu 512k
+set debug debug.log
+break fe1ad6
+
+set fd debug=verbose
+set fd debug=cmd
+;set fd debug=seek
+;set fd debug=irq
+;set fd debug=state
+set fd debug=status
+set fd debug=rddata
+att fd0 system.imd
+boot cpu

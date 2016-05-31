@@ -1,6 +1,6 @@
 /* pdp11_fp.c: PDP-11 floating point simulator (32b version)
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Mar-15    RMS     MMR1 does not track register changes (Johnny Billquist)
    20-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    04-Oct-04    RMS     Added FIS instructions
@@ -69,10 +70,8 @@
    and exception enable bits for individual error conditions.  Exceptions
    cause a trap through 0244, unless the individual exception, or all
    exceptions, are disabled.  Illegal address mode, undefined variable,
-   and divide by zero abort the current instruction; all other exceptions
-   permit the instruction to complete.  (Aborts are implemented as traps
-   that request an "interrupt" trap.  If an interrupt is pending, it is
-   serviced; if not, trap_req is updated and processing continues.)
+   and divide by zero NOP the current instruction; all other exceptions
+   permit the instruction to complete.
 
    Floating point specifiers are similar to integer specifiers, with
    the length of the operand being up to 8 bytes.  In two specific cases,
@@ -85,7 +84,14 @@
 
         immediate       for integers or floating point, only 16b are
                         accessed;  if the operand is 32b or 64b, these
-                        are the high order 16b of the operand
+                        are the high order 16b of the operand.
+
+   The FP11 cannot update MMR1 on specifier changes, because the
+   quantity field is too narrow for +8 or -8. Instead, the simulator
+   records changes to be made and only commits them at instruction
+   completion. Instructions that can overwrite a general register
+   (STFPS, STST, STEXP, STCFi in mode 0) need not check for conflicts;
+   in mode 0, no general register changes occur in the specifier flow.
 */
 
 #include "pdp11_defs.h"
@@ -107,7 +113,7 @@
 #define FPS_C           (1u << FPS_V_C)
 #define FPS_CC          (FPS_N + FPS_Z + FPS_V + FPS_C)
 #define FPS_RW          (FPS_ER + FPS_ID + FPS_IUV + FPS_IU + FPS_IV + \
-                    FPS_IC + FPS_D + FPS_L + FPS_T + FPS_CC)
+                         FPS_IC + FPS_D + FPS_L + FPS_T + FPS_CC)
 
 /* Floating point exception codes */
 
@@ -143,6 +149,14 @@
 #define WORD            2
 #define LONG            4
 #define QUAD            8
+
+/* Reg change word */
+
+#define FPCHG(v,r)      ((int32)((((uint32)(v)) << FPCHG_V_VAL) | (r)))
+#define FPCHG_REG       07                              /* register number */
+#define FPCHG_V_VAL     3                               /* offset to value */
+#define FPCHG_GETREG(x) ((x) & FPCHG_REG)
+#define FPCHG_GETVAL(x) ((x) >> FPCHG_V_VAL)
 
 /* Double precision operations on 64b quantities */
 
@@ -231,11 +245,13 @@ static const uint32 and_mask[33] = { 0,
     0x1FFFFFFF, 0x3FFFFFFF, 0x7FFFFFFF, 0xFFFFFFFF
     };
 int32 backup_PC;
-int32 fpnotrap (int32 code);
-int32 GeteaFP (int32 spec, int32 len);
+int32 fp_change;
 
+int32 fpnotrap (int32 code);
+int32 GeteaFW (int32 spec);
+int32 GeteaFP (int32 spec, int32 len);
 uint32 ReadI (int32 addr, int32 spec, int32 len);
-void ReadFP (fpac_t *fac, int32 addr, int32 spec, int32 len);
+t_bool ReadFP (fpac_t *fac, int32 addr, int32 spec, int32 len);
 void WriteI (int32 data, int32 addr, int32 spec, int32 len);
 void WriteFP (fpac_t *data, int32 addr, int32 spec, int32 len);
 int32 setfcc (int32 old_status, int32 result_high, int32 newV);
@@ -247,7 +263,6 @@ void frac_mulfp11 (fpac_t *src1, fpac_t *src2);
 int32 roundfp11 (fpac_t *src);
 int32 round_and_pack (fpac_t *fac, int32 exp, fpac_t *frac, int r);
 
-extern int32 GeteaW (int32 spec);
 extern int32 ReadW (int32 addr);
 extern void WriteW (int32 data, int32 addr);
 extern void set_stack_trap (int32 adr);
@@ -266,6 +281,7 @@ static const uint32 i_limit[2][2] = {
     };
 
 backup_PC = PC;                                         /* save PC for FEA */
+fp_change = 0;                                          /* assume no reg chg */
 ac = (IR >> 6) & 03;                                    /* fac is IR<7:6> */
 dstspec = IR & 077;
 qdouble = FPS & FPS_D;
@@ -294,7 +310,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
             break;
 
         case 1:                                         /* LDFPS */
-            dst = (dstspec <= 07)? R[dstspec]: ReadW (GeteaW (dstspec));
+            dst = (dstspec <= 07)? R[dstspec]: ReadW (GeteaFW (dstspec));
             FPS = dst & FPS_RW;
             break;
 
@@ -302,7 +318,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
             FPS = FPS & FPS_RW;
             if (dstspec <= 07)
                 R[dstspec] = FPS;
-            else WriteW (FPS, GeteaW (dstspec));
+            else WriteW (FPS, GeteaFW (dstspec));
             break;
 
         case 3:                                         /* STST */
@@ -323,34 +339,37 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
             break;
 
         case 1:                                         /* TSTf */
-            ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
-            FPS = setfcc (FPS, fsrc.h, 0);
+            if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf))
+                FPS = setfcc (FPS, fsrc.h, 0);
             break;
 
         case 2:                                         /* ABSf */
-            ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf);
-            if (GET_EXP (fsrc.h) == 0)
-                fsrc = zero_fac;
-            else fsrc.h = fsrc.h & ~FP_SIGN;
-            WriteFP (&fsrc, ea, dstspec, lenf);
-            FPS = setfcc (FPS, fsrc.h, 0);
+            if (ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf)) {
+                if (GET_EXP (fsrc.h) == 0)
+                    fsrc = zero_fac;
+                else fsrc.h = fsrc.h & ~FP_SIGN;
+                WriteFP (&fsrc, ea, dstspec, lenf);
+                FPS = setfcc (FPS, fsrc.h, 0);
+                }
             break;
 
         case 3:                                         /* NEGf */
-            ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf);
-            if (GET_EXP (fsrc.h) == 0)
-                fsrc = zero_fac;
-            else fsrc.h = fsrc.h ^ FP_SIGN;
-            WriteFP (&fsrc, ea, dstspec, lenf);
-            FPS = setfcc (FPS, fsrc.h, 0);
+            if (ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf)) {
+                if (GET_EXP (fsrc.h) == 0)
+                    fsrc = zero_fac;
+                else fsrc.h = fsrc.h ^ FP_SIGN;
+                WriteFP (&fsrc, ea, dstspec, lenf);
+                FPS = setfcc (FPS, fsrc.h, 0);
+                }
             break;
             }                                           /* end switch <7:6> */
         break;                                          /* end case 1 */
 
     case 005:                                           /* LDf */
-        ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
-        F_STORE (qdouble, fsrc, FR[ac]);
-        FPS = setfcc (FPS, fsrc.h, 0);
+        if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf)) {
+            F_STORE (qdouble, fsrc, FR[ac]);
+            FPS = setfcc (FPS, fsrc.h, 0);
+            }
         break;
 
     case 010:                                           /* STf */
@@ -359,14 +378,15 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         break;
 
     case 017:                                           /* LDCff' */
-        ReadFP (&fsrc, GeteaFP (dstspec, 12 - lenf), dstspec, 12 - lenf);
-        if (GET_EXP (fsrc.h) == 0)
-            fsrc = zero_fac;
-        if ((FPS & (FPS_D + FPS_T)) == 0)
-            newV = roundfp11 (&fsrc);
-        else newV = 0;
-        F_STORE (qdouble, fsrc, FR[ac]);
-        FPS = setfcc (FPS, fsrc.h, newV);
+        if (ReadFP (&fsrc, GeteaFP (dstspec, 12 - lenf), dstspec, 12 - lenf)) {
+            if (GET_EXP (fsrc.h) == 0)
+                fsrc = zero_fac;
+            if ((FPS & (FPS_D + FPS_T)) == 0)
+                newV = roundfp11 (&fsrc);
+            else newV = 0;
+            F_STORE (qdouble, fsrc, FR[ac]);
+            FPS = setfcc (FPS, fsrc.h, newV);
+            }
         break;
 
     case 014:                                           /* STCff' */
@@ -381,27 +401,29 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         break;
 
     case 007:                                           /* CMPf */
-        ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
-        F_LOAD (qdouble, FR[ac], fac);
-        if (GET_EXP (fsrc.h) == 0)
-            fsrc = zero_fac;
-        if (GET_EXP (fac.h) == 0)
-            fac = zero_fac;
-        if ((fsrc.h == fac.h) && (fsrc.l == fac.l)) {   /* equal? */
-            FPS = (FPS & ~FPS_CC) | FPS_Z;
-            if ((fsrc.h | fsrc.l) == 0) {               /* zero? */
-                F_STORE (qdouble, zero_fac, FR[ac]);
+        if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf)) {
+            F_LOAD (qdouble, FR[ac], fac);
+            if (GET_EXP (fsrc.h) == 0)
+                fsrc = zero_fac;
+            if (GET_EXP (fac.h) == 0)
+                fac = zero_fac;
+            if ((fsrc.h == fac.h) && (fsrc.l == fac.l)) { /* equal? */
+                FPS = (FPS & ~FPS_CC) | FPS_Z;
+                if ((fsrc.h | fsrc.l) == 0) {           /* zero? */
+                    F_STORE (qdouble, zero_fac, FR[ac]);
+                    }
                 }
-            break;
+            else {                                      /* unequal */
+                FPS = (FPS & ~FPS_CC) | ((fsrc.h >> (FP_V_SIGN - PSW_V_N)) & FPS_N);
+                if ((GET_SIGN (fsrc.h ^ fac.h) == 0) && (fac.h != 0) &&
+                    F_LT (fsrc, fac))
+                    FPS = FPS ^ FPS_N;
+                }
             }
-        FPS = (FPS & ~FPS_CC) | ((fsrc.h >> (FP_V_SIGN - PSW_V_N)) & FPS_N);
-        if ((GET_SIGN (fsrc.h ^ fac.h) == 0) && (fac.h != 0) &&
-            F_LT (fsrc, fac))
-            FPS = FPS ^ FPS_N;
         break;
 
     case 015:                                           /* LDEXP */
-        dst = (dstspec <= 07)? R[dstspec]: ReadW (GeteaW (dstspec));
+        dst = (dstspec <= 07)? R[dstspec]: ReadW (GeteaFW (dstspec));
         F_LOAD (qdouble, FR[ac], fac);
         fac.h = (fac.h & ~FP_EXP) | (((dst + FP_BIAS) & FP_M_EXP) << FP_V_EXP);
         newV = 0;
@@ -429,7 +451,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         FPS = (FPS & ~FPS_CC) | (N << PSW_V_N) | (Z << PSW_V_Z);
         if (dstspec <= 07)
             R[dstspec] = dst;
-        else WriteW (dst, GeteaW (dstspec));
+        else WriteW (dst, GeteaFW (dstspec));
         break;
 
     case 016:                                           /* LDCif */
@@ -500,54 +522,129 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         break;
 
     case 002:                                           /* MULf */
-        ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
-        F_LOAD (qdouble, FR[ac], fac);
-        newV = mulfp11 (&fac, &fsrc);
-        F_STORE (qdouble, fac, FR[ac]);
-        FPS = setfcc (FPS, fac.h, newV);
+        if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf)) {
+            F_LOAD (qdouble, FR[ac], fac);
+            newV = mulfp11 (&fac, &fsrc);
+            F_STORE (qdouble, fac, FR[ac]);
+            FPS = setfcc (FPS, fac.h, newV);
+            }
         break;
 
     case 003:                                           /* MODf */
-        ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
+        if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf)) {
         F_LOAD (qdouble, FR[ac], fac);
-        newV = modfp11 (&fac, &fsrc, &modfrac);
-        F_STORE (qdouble, fac, FR[ac | 1]);
-        F_STORE (qdouble, modfrac, FR[ac]);
-        FPS = setfcc (FPS, modfrac.h, newV);
+            newV = modfp11 (&fac, &fsrc, &modfrac);
+            F_STORE (qdouble, fac, FR[ac | 1]);
+            F_STORE (qdouble, modfrac, FR[ac]);
+            FPS = setfcc (FPS, modfrac.h, newV);
+            }
         break;
 
     case 004:                                           /* ADDf */
-        ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
-        F_LOAD (qdouble, FR[ac], fac);
-        newV = addfp11 (&fac, &fsrc);
-        F_STORE (qdouble, fac, FR[ac]);
-        FPS = setfcc (FPS, fac.h, newV);
+        if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf)) {
+            F_LOAD (qdouble, FR[ac], fac);
+            newV = addfp11 (&fac, &fsrc);
+            F_STORE (qdouble, fac, FR[ac]);
+            FPS = setfcc (FPS, fac.h, newV);
+            }
         break;
 
     case 006:                                           /* SUBf */
-        ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
-        F_LOAD (qdouble, FR[ac], fac);
-        if (GET_EXP (fsrc.h) != 0)
-            fsrc.h = fsrc.h ^ FP_SIGN;
-        newV = addfp11 (&fac, &fsrc);
-        F_STORE (qdouble, fac, FR[ac]);
-        FPS = setfcc (FPS, fac.h, newV);
+        if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf)) {
+            F_LOAD (qdouble, FR[ac], fac);
+            if (GET_EXP (fsrc.h) != 0)
+                fsrc.h = fsrc.h ^ FP_SIGN;
+            newV = addfp11 (&fac, &fsrc);
+            F_STORE (qdouble, fac, FR[ac]);
+            FPS = setfcc (FPS, fac.h, newV);
+            }
         break;
 
     case 011:                                           /* DIVf */
-        ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
-        F_LOAD (qdouble, FR[ac], fac);
-        if (GET_EXP (fsrc.h) == 0) {                    /* divide by zero? */
-            fpnotrap (FEC_DZRO);
-            ABORT (TRAP_INT);
+        if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf)) {
+            F_LOAD (qdouble, FR[ac], fac);
+            if (GET_EXP (fsrc.h) == 0)                  /* divide by zero? */
+                fpnotrap (FEC_DZRO);
+            else {                                      /* no, do divide */
+                newV = divfp11 (&fac, &fsrc);
+                F_STORE (qdouble, fac, FR[ac]);
+                FPS = setfcc (FPS, fac.h, newV);
+                }
             }
-        newV = divfp11 (&fac, &fsrc);
-        F_STORE (qdouble, fac, FR[ac]);
-        FPS = setfcc (FPS, fac.h, newV);
         break;
         }                                               /* end switch fop */
 
+/* Now process any general register modification */
+
+if (fp_change != 0) {
+    int32 reg = FPCHG_GETREG (fp_change);               /* get register */
+    int32 val = FPCHG_GETVAL (fp_change);               /* get value */
+    if (val & 020)                                      /* negative? */
+        val = val | (-16);                              /* ensure proper sext */
+    R[reg] = (R[reg] + val) & 0177777;                  /* commit change */
+    }
 return;
+}
+
+/* Effective address calculation for word integers */
+
+int32 GeteaFW (int32 spec)
+{
+int32 adr, reg, ds;
+
+reg = spec & 07;                                        /* register number */
+ds = (reg == 7)? isenable: dsenable;                    /* dspace if not PC */
+switch (spec >> 3) {                                    /* decode spec<5:3> */
+
+    default:                                            /* can't get here */
+    case 1:                                             /* (R) */
+        return (R[reg] | ds);
+
+    case 2:                                             /* (R)+ */
+        adr = R[reg];                                   /* post increment */
+        if (reg == 7)                                   /* commit PC chg now */
+            R[reg] = (R[reg] + 2) & 0177777;
+        else fp_change = FPCHG (2, reg);                /* others, update later */
+        return (adr | ds);
+
+    case 3:                                             /* @(R)+ */
+        adr = R[reg];                                   /* post increment */
+        if (reg == 7)                                   /* commit PC chg now */
+            R[reg] = (R[reg] + 2) & 0177777;
+        else fp_change = FPCHG (2, reg);                /* others, update later */
+        adr = ReadW (adr | ds);
+        return (adr | dsenable);
+
+    case 4:                                             /* -(R) */
+        adr = (R[reg] - 2) & 0177777;                   /* predecrement */
+        if (reg == 7)                                   /* commit PC chg now */
+            R[reg] = adr;
+        else fp_change = FPCHG (-2, reg);               /* others, update later */
+        if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
+            set_stack_trap (adr);
+        return (adr | ds);
+
+    case 5:                                             /* @-(R) */
+        adr = (R[reg] - 2) & 0177777;                   /* predecrement */
+        if (reg == 7)                                   /* commit PC chg now */
+            R[reg] = adr;
+        else fp_change = FPCHG (-2, reg);               /* others, update later */
+        if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
+            set_stack_trap (adr);
+        adr = ReadW (adr | ds);
+        return (adr | dsenable);
+
+    case 6:                                             /* d(r) */
+        adr = ReadW (PC | isenable);
+        PC = (PC + 2) & 0177777;
+        return (((R[reg] + adr) & 0177777) | dsenable);
+
+    case 7:                                             /* @d(R) */
+        adr = ReadW (PC | isenable);
+        PC = (PC + 2) & 0177777;
+        adr = ReadW (((R[reg] + adr) & 0177777) | dsenable);
+        return (adr | dsenable);
+        }                                               /* end switch */
 }
 
 /* Effective address calculation for fp operands
@@ -561,6 +658,9 @@ return;
    Warnings:
         - Do not call this routine for integer mode 0 operands
         - Do not call this routine more than once per instruction
+
+   Note that for modes 06 and 07, it is OKAY to bail out of the FP
+   instruction immediately; no general register updates can occur.
 */
 
 int32 GeteaFP (int32 spec, int32 len)
@@ -574,7 +674,7 @@ switch (spec >> 3) {                                    /* case on spec */
     case 0:                                             /* floating AC */
         if (reg >= 06) {
             fpnotrap (FEC_OP);
-            ABORT (TRAP_INT);
+            ABORT (TRAP_INT);                           /* scuttle instr */
             }
         return 0;
 
@@ -582,33 +682,35 @@ switch (spec >> 3) {                                    /* case on spec */
         return (R[reg] | ds);
 
     case 2:                                             /* (R)+ */
-        if (reg == 7)
-            len = 2;
-        R[reg] = ((adr = R[reg]) + len) & 0177777;
-        if (update_MM && (reg != 7))
-            MMR1 = (len << 3) | reg;
+        adr = R[reg];                                   /* post increment */
+        if (reg == 7)                                   /* commit PC chg now */
+            R[reg] = (R[reg] + 2) & 0177777;
+        else fp_change = FPCHG (len, reg);              /* others, update later */
         return (adr | ds);
 
     case 3:                                             /* @(R)+ */
-        R[reg] = ((adr = R[reg]) + 2) & 0177777;
-        if (update_MM && (reg != 7))
-            MMR1 = 020 | reg;
+        adr = R[reg];                                   /* post increment */
+        if (reg == 7)                                   /* commit PC chg now */
+            R[reg] = (R[reg] + 2) & 0177777;
+        else fp_change = FPCHG (2, reg);                /* others, update later */
         adr = ReadW (adr | ds);
         return (adr | dsenable);
 
     case 4:                                             /* -(R) */
-        adr = R[reg] = (R[reg] - len) & 0177777;
-        if (update_MM && (reg != 7))
-            MMR1 = (((-len) & 037) << 3) | reg;
+        adr = (R[reg] - len) & 0177777;                 /* predecrement */
+        if (reg == 7)                                   /* commit PC chg now */
+            R[reg] = adr;
+        else fp_change = FPCHG (-len, reg);             /* others, udpate later */
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
         return (adr | ds);
 
     case 5:                                             /* @-(R) */
-        adr = R[reg] = (R[reg] - 2) & 0177777;
-        if (update_MM && (reg != 7))
-            MMR1 = 0360 | reg;
-        if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
+        adr = (R[reg] - 2) & 0177777;                   /* predecrement */
+        if (reg == 7)                                   /* commit PC chg now */
+            R[reg] = adr;
+        else fp_change = FPCHG (-2, reg);               /* others, update later */
+        if ((reg == 6) && (cm == MD_KER) && ((adr - 2) < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
         adr = ReadW (adr | ds);
         return (adr | dsenable);
@@ -653,15 +755,18 @@ return ((ReadW (VA) << 16) |
         VA      =       virtual address, VA<18:16> = mode, I/D space
         spec    =       specifier
         len     =       length (4/8 bytes)
+   Output:
+        TRUE if read succeeded
+        FALSE if instruction must be NOP'd
 */
 
-void ReadFP (fpac_t *fptr, int32 VA, int32 spec, int32 len)
+t_bool ReadFP (fpac_t *fptr, int32 VA, int32 spec, int32 len)
 {
 int32 exta;
 
 if (spec <= 07) {
     F_LOAD_P (len == QUAD, FR[spec], fptr);
-    return;
+    return TRUE;
     }
 if (spec == 027) {
     fptr->h = (ReadW (VA) << FP_V_F0);
@@ -676,9 +781,11 @@ else {
         (ReadW (exta | ((VA + 6) & 0177777)) << FP_V_F3);
     else fptr->l = 0;
     }
-if ((GET_SIGN (fptr->h) != 0) && (GET_EXP (fptr->h) == 0) &&
-    (fpnotrap (FEC_UNDFV) == 0)) ABORT (TRAP_INT);
-return;
+if ((GET_SIGN (fptr->h) != 0) &&
+    (GET_EXP (fptr->h) == 0) &&
+    (fpnotrap (FEC_UNDFV) == 0))
+    return FALSE;
+return TRUE;
 }
 
 /* Write integer result
@@ -1228,7 +1335,8 @@ int32 fpnotrap (int32 code)
 {
 static const int32 test_code[] = { 0, 0, 0, FPS_IC, FPS_IV, FPS_IU, FPS_IUV };
 
-if ((code >= FEC_ICVT) && (code <= FEC_UNDFV) &&
+if ((code >= FEC_ICVT) &&
+    (code <= FEC_UNDFV) &&
     ((FPS & test_code[code >> 1]) == 0))
     return TRUE;
 FPS = FPS | FPS_ER;

@@ -50,8 +50,6 @@ extern DEVICE dp_dev, mt_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint8 M[];
-extern char ascii_to_bcd_old[128], ascii_to_bcd[128];
-extern char bcd_to_ascii_old[64], bcd_to_ascii_a[64], bcd_to_ascii_h[64];
 extern int32 store_addr_h (int32 addr);
 extern int32 store_addr_t (int32 addr);
 extern int32 store_addr_u (int32 addr);
@@ -126,7 +124,7 @@ const char *sim_stop_messages[] = {
    number of entries
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
 t_stat r;
@@ -182,10 +180,14 @@ const char *opcode[64] = {
 
 /* Print an address from three characters */
 
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
+
 void fprint_addr (FILE *of, t_value *dig)
 {
 int32 addr, xa;
-extern int32 hun_table[64], ten_table[64], one_table[64];
 
 addr = hun_table[dig[0] & CHAR] + ten_table[dig[1]] + one_table[dig[2]];
 xa = (addr >> V_INDEX) & M_INDEX;
@@ -235,7 +237,6 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 int32 op, flags, ilnt, i, t;
 int32 wmch = conv_old? '~': '`';
 t_bool use_h = sw & SWMASK ('F');
-extern int32 op_table[64], len_table[9];
 
 if (sw & SWMASK ('C')) {                                /* character? */
     t = val[0];
@@ -299,7 +300,7 @@ if (ilnt > 2) {                                         /* A address? */
         fprintf (of, " %%%c%c", bcd2ascii (val[2], use_h),
             bcd2ascii (val[3], sw));
     else fprint_addr (of, &val[1]);
-	}
+    }
 if (ilnt > 5)                                           /* B address? */
     fprint_addr (of, &val[4]);
 if ((ilnt == 2) || (ilnt == 5) || (ilnt >= 8))          /* d character? */
@@ -309,7 +310,7 @@ return -(ilnt - 1);                                     /* return # chars */
 
 /* get_addr - get address + index pair */
 
-t_stat get_addr (char *cptr, t_value *val)
+t_stat get_addr (const char *cptr, t_value *val)
 {
 int32 addr, index;
 t_stat r;
@@ -360,11 +361,10 @@ return SCPE_OK;
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, op, ilnt, t, cflag, wm_seen;
 int32 wmch = conv_old? '~': '`';
-extern int32 op_table[64], len_table[9];
 char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
@@ -383,7 +383,7 @@ if ((sw & SWMASK ('C')) || (sw & SWMASK ('S')) || (*cptr == wmch) ||
                 wm_seen = 0;
                 }
             else val[i++] = t;
-			}
+            }
         if ((i == 0) || wm_seen)
             return SCPE_ARG;
         return -(i - 1);

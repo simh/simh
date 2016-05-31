@@ -47,8 +47,8 @@ int32 tmxr_poll = 16000;                                /* term mux poll */
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* CLK data structures
 
@@ -62,10 +62,10 @@ DIB clk_dib = { DEV_CLK, 1, { &clk } };
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 16000 };
 
 REG clk_reg[] = {
-    { FLDATA (DONE, dev_done, INT_V_CLK) },
-    { FLDATA (ENABLE, int_enable, INT_V_CLK) },
-    { FLDATA (INT, int_req, INT_V_CLK) },
-    { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
+    { FLDATAD (DONE, dev_done, INT_V_CLK, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_CLK, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_CLK, "interrupt pending flag") },
+    { DRDATAD (TIME, clk_unit.wait, 24, "clock interval"), REG_NZ + PV_LEFT },
     { DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
     { NULL }
     };
@@ -171,7 +171,7 @@ return SCPE_OK;
 
 /* Set frequency */
 
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -183,7 +183,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;

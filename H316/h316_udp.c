@@ -179,8 +179,8 @@ typedef struct _UDP_PACKET UDP_PACKET;
 #define UDP_HEADER_LEN  (2*sizeof(uint32) + sizeof(uint16))
 
 // Locals ...
-UDP_LINK udp_links[MAXLINKS] = {0};             // data for every active connection
-TMLN udp_lines[MAXLINKS] = { 0 };               // line descriptors
+UDP_LINK udp_links[MAXLINKS] = { {0} };         // data for every active connection
+TMLN udp_lines[MAXLINKS] = { {0} };             // line descriptors
 TMXR udp_tmxr = { MAXLINKS, NULL, 0, udp_lines};// datagram mux
 
 int32 udp_find_free_link (void)
@@ -197,7 +197,7 @@ int32 udp_find_free_link (void)
   return NOLINK;
 }
 
-t_stat udp_parse_remote (int32 link, char *premote)
+t_stat udp_parse_remote (int32 link, const char *premote)
 {
   // This routine will parse a remote address string in any of these forms -
   //
@@ -215,7 +215,7 @@ t_stat udp_parse_remote (int32 link, char *premote)
   // yourself!!  In both cases, "w.x.y.z" is a dotted IP for the remote machine
   // and "name.domain.com" is its name (which will be looked up to get the IP).
   // If the host name/IP is omitted then it defaults to "localhost".
-  char *end;  int32 lport, rport; t_stat ret;
+  char *end;  int32 lport, rport;
   char host[64], port[16];
   if (*premote == '\0') return SCPE_2FARG;
   memset (udp_links[link].lport, 0, sizeof(udp_links[link].lport));
@@ -235,8 +235,8 @@ t_stat udp_parse_remote (int32 link, char *premote)
     premote = end+1;
   }
 
-  ret = sim_parse_addr (premote, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL);
-  if (ret != SCPE_OK) return SCPE_ARG;
+  if (sim_parse_addr (premote, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL))
+    return SCPE_ARG;
   sprintf (udp_links[link].rhostport, "%s:%s", host, port);
   if (udp_links[link].lport[0] == '\0')
     strcpy (udp_links[link].lport, port);
@@ -255,7 +255,7 @@ t_stat udp_error (int32 link, const char *msg)
   return SCPE_IOERR;
 }
 
-t_stat udp_create (DEVICE *dptr, char *premote, int32 *pln)
+t_stat udp_create (DEVICE *dptr, const char *premote, int32 *pln)
 {
   //   Create a logical UDP link to the specified remote system.  The "remote"
   // string specifies both the remote host name or IP and a port number.  The
@@ -402,7 +402,7 @@ int32 udp_receive (DEVICE *dptr, int32 link, uint16 *pdata, uint16 maxbuf)
 
   while ((pktlen = udp_receive_packet(link, &pkt)) > 0) {
     // First do some header checks for a valid UDP packet ...
-    if (pktlen < UDP_HEADER_LEN) {
+    if (((size_t)pktlen) < UDP_HEADER_LEN) {
       sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet w/o header (length=%d)\n", link, pktlen);
       continue;
     }

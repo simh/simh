@@ -25,7 +25,7 @@
 
    mt           516-4100 seven track magnetic tape
 
-    3-Jul-13    RLA     compatibility changes for extended interrupts
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    09-Jun-07    RMS     Fixed bug in write without stop (Theo Engel)
    16-Feb-06    RMS     Added tape capacity checking
@@ -107,7 +107,7 @@ int32 mtio (int32 inst, int32 fnc, int32 dat, int32 dev);
 void mt_updint (uint32 rdy, uint32 mdone);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cptr);
+t_stat mt_attach (UNIT *uptr, CONST char *cptr);
 t_stat mt_detach (UNIT *uptr);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
 void mt_wrwd (UNIT *uptr, uint32 dat);
@@ -596,7 +596,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat mt_attach (UNIT *uptr, char *cptr)
+t_stat mt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

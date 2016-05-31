@@ -44,14 +44,24 @@ struct uart2681_port_t {
 
 struct uart2681_t {
     set_int_t   set_int;
+    set_int_t   output_port;
     struct uart2681_port_t port[2];
     uint32      ists;
     uint32      imask;
+    uint8       iport;
+    uint8       ipcr;
+    uint8       oport;
+    uint8       opcr;
+    uint8       acr;
     };
 
 typedef struct uart2681_t UART2681;
     
 void ua2681_wr (UART2681 *ctx, uint32 rg, uint32 data);
 uint32 ua2681_rd (UART2681 *ctx, uint32 rg);
+void ua2681_ip0_wr (UART2681 *ctx, uint32 set);
+void ua2681_ip1_wr (UART2681 *ctx, uint32 set);
+void ua2681_ip2_wr (UART2681 *ctx, uint32 set);
+void ua2681_ip3_wr (UART2681 *ctx, uint32 set);
 t_stat ua2681_svc (UART2681 *ctx);
 t_stat ua2681_reset (UART2681 *ctx);

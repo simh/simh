@@ -1,6 +1,6 @@
-/* pdp18b_drm.c: drum/fixed head disk simulator
+/* pdp18b_drm.c: drum head disk simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   drm          (PDP-4,PDP-7) Type 24 serial drum
+   drm          (PDP-4,PDP-7) Type 24 serial drum; (PDP-9) RM09 drum
 
+   07-Mar-16    RMS     Revised for dynamically allocated memory
+   26-Feb-16    RMS     Added PDP-9 support; set default state to disabled
    03-Sep-13    RMS     Added explicit void * cast
    14-Jan-04    RMS     Revised IO device call interface
    26-Oct-03    RMS     Cleaned up buffer copy code
@@ -37,6 +39,8 @@
    10-Jun-01    RMS     Cleaned up IOT decoding to reflect hardware
    26-Apr-01    RMS     Added device enable/disable support
    14-Apr-99    RMS     Changed t_addr to unsigned
+
+   Variable drum sizes are not supported.
 */
 
 #include "pdp18b_defs.h"
@@ -61,7 +65,7 @@
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
                         ((double) DRM_NUMWDT)))
 
-extern int32 M[];
+extern int32 *M;
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
 
@@ -72,7 +76,6 @@ int32 drm_wlk = 0;                                      /* write lock */
 int32 drm_time = 10;                                    /* inter-word time */
 int32 drm_stopioe = 1;                                  /* stop on error */
 
-DEVICE drm_dev;
 int32 drm60 (int32 dev, int32 pulse, int32 AC);
 int32 drm61 (int32 dev, int32 pulse, int32 AC);
 int32 drm62 (int32 dev, int32 pulse, int32 AC);
@@ -96,14 +99,14 @@ UNIT drm_unit = {
     };
 
 REG drm_reg[] = {
-    { ORDATA (DA, drm_da, 9) },
-    { ORDATA (MA, drm_ma, 16) },
-    { FLDATA (INT, int_hwre[API_DRM], INT_V_DRM) },
-    { FLDATA (DONE, int_hwre[API_DRM], INT_V_DRM) },
-    { FLDATA (ERR, drm_err, 0) },
-    { ORDATA (WLK, drm_wlk, 32) },
-    { DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
-    { FLDATA (STOP_IOE, drm_stopioe, 0) },
+    { ORDATAD (DA, drm_da, 9, "drum address (sector number") },
+    { ORDATAD (MA, drm_ma, 16, "current memor address") },
+    { FLDATAD (INT, int_hwre[API_DRM], INT_V_DRM, "interrupt pending flag") },
+    { FLDATAD (DONE, int_hwre[API_DRM], INT_V_DRM, "device done flag") },
+    { FLDATAD (ERR, drm_err, 0, "error flag") },
+    { ORDATAD (WLK, drm_wlk, 32, "write lock switches") },
+    { DRDATAD (TIME, drm_time, 24, "rotational latency, per word"), REG_NZ + PV_LEFT },
+    { FLDATAD (STOP_IOE, drm_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVNO, drm_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -118,7 +121,7 @@ DEVICE drm_dev = {
     1, 8, 20, 1, 8, 18,
     NULL, NULL, &drm_reset,
     &drm_boot, NULL, NULL,
-    &drm_dib, DEV_DISABLE
+    &drm_dib, DEV_DISABLE + DEV_DIS
     };
 
 /* IOT routines */
@@ -241,7 +244,7 @@ static const int32 boot_rom[] = {
     0706101,                        /* DRSF             ; wait for done */
     0602003,                        /* JMP .-1 */
     0600000                         /* JMP 0            ; enter boot */
-	};
+    };
 
 t_stat drm_boot (int32 unitno, DEVICE *dptr)
 {

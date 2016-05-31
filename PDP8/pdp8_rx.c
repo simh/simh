@@ -137,17 +137,16 @@ int32 rx_stopioe = 0;                                   /* stop on error */
 uint8 rx_buf[RX2_NUMBY] = { 0 };                        /* sector buffer */
 int32 rx_bptr = 0;                                      /* buffer pointer */
 
-DEVICE rx_dev;
 int32 rx (int32 IR, int32 AC);
 t_stat rx_svc (UNIT *uptr);
 t_stat rx_reset (DEVICE *dptr);
 t_stat rx_boot (int32 unitno, DEVICE *dptr);
-t_stat rx_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rx_attach (UNIT *uptr, char *cptr);
+t_stat rx_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rx_attach (UNIT *uptr, CONST char *cptr);
 void rx_cmd (void);
 void rx_done (int32 esr_flags, int32 new_ecode);
-t_stat rx_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rx_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rx_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rx_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* RX8E data structures
 
@@ -167,24 +166,24 @@ UNIT rx_unit[] = {
     };
 
 REG rx_reg[] = {
-    { ORDATA (RXCS, rx_csr, 12) },
-    { ORDATA (RXDB, rx_dbr, 12) },
-    { ORDATA (RXES, rx_esr, 12) },
+    { ORDATAD (RXCS, rx_csr, 12, "status") },
+    { ORDATAD (RXDB, rx_dbr, 12, "data buffer") },
+    { ORDATAD (RXES, rx_esr, 12, "error status") },
     { ORDATA (RXERR, rx_ecode, 8) },
-    { ORDATA (RXTA, rx_track, 8) },
-    { ORDATA (RXSA, rx_sector, 8) },
-    { DRDATA (STAPTR, rx_state, 4), REG_RO },
-    { DRDATA (BUFPTR, rx_bptr, 8)  },
-    { FLDATA (TR, rx_tr, 0) },
-    { FLDATA (ERR, rx_err, 0) },
-    { FLDATA (DONE, dev_done, INT_V_RX) },
-    { FLDATA (ENABLE, int_enable, INT_V_RX) },
-    { FLDATA (INT, int_req, INT_V_RX) },
-    { DRDATA (CTIME, rx_cwait, 24), PV_LEFT },
-    { DRDATA (STIME, rx_swait, 24), PV_LEFT },
-    { DRDATA (XTIME, rx_xwait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, rx_stopioe, 0) },
-    { BRDATA (SBUF, rx_buf, 8, 8, RX2_NUMBY) },
+    { ORDATAD (RXTA, rx_track, 8, "current track") },
+    { ORDATAD (RXSA, rx_sector, 8, "current sector") },
+    { DRDATAD (STAPTR, rx_state, 4, "controller state"), REG_RO },
+    { DRDATAD (BUFPTR, rx_bptr, 8, "buffer pointer")  },
+    { FLDATAD (TR, rx_tr, 0, "transfer ready flag") },
+    { FLDATAD (ERR, rx_err, 0, "error flag") },
+    { FLDATAD (DONE, dev_done, INT_V_RX, "done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_RX, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_RX, "interrupt pending flag") },
+    { DRDATAD (CTIME, rx_cwait, 24, "command completion time"), PV_LEFT },
+    { DRDATAD (STIME, rx_swait, 24, "seek time per track"), PV_LEFT },
+    { DRDATAD (XTIME, rx_xwait, 24, "transfer ready delay"), PV_LEFT },
+    { FLDATAD (STOP_IOE, rx_stopioe, 0, "stop on I/O error") },
+    { BRDATAD (SBUF, rx_buf, 8, 8, RX2_NUMBY, "sector buffer array") },
     { FLDATA (RX28, rx_28, 0), REG_HRO },
     { URDATA (CAPAC, rx_unit[0].capac, 10, T_ADDR_W, 0,
               RX_NUMDR, REG_HRO | PV_LEFT) },
@@ -593,7 +592,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat rx_attach (UNIT *uptr, char *cptr)
+t_stat rx_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 sz;
 
@@ -608,7 +607,7 @@ return attach_unit (uptr, cptr);
 
 /* Set size routine */
 
-t_stat rx_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rx_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
@@ -620,7 +619,7 @@ return SCPE_OK;
 
 /* Set controller type */
 
-t_stat rx_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rx_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 
@@ -644,7 +643,7 @@ return SCPE_OK;
 
 /* Show controller type */
 
-t_stat rx_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rx_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (rx_28) fprintf (st, "RX28");
 else fprintf (st, "RX8E");

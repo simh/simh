@@ -50,32 +50,13 @@
 */
 
 #include "vax_defs.h"
+#include "vax_mmu.h"
 #include <setjmp.h>
-
-typedef struct {
-    int32       tag;                                    /* tag */
-    int32       pte;                                    /* pte */
-    } TLBENT;
-
-extern uint32 *M;
-extern int32 PSL;
-extern int32 mapen;
-extern int32 p1, p2;
-extern int32 P0BR, P0LR;
-extern int32 P1BR, P1LR;
-extern int32 SBR, SLR;
-extern int32 SISR;
-extern jmp_buf save_env;
-extern UNIT cpu_unit;
 
 int32 d_p0br, d_p0lr;                                   /* dynamic copies */
 int32 d_p1br, d_p1lr;                                   /* altered per ucode */
 int32 d_sbr, d_slr;
-extern int32 mchk_va, mchk_ref;                         /* for mcheck */
 TLBENT stlb[VA_TBSIZE], ptlb[VA_TBSIZE];
-static const int32 insert[4] = {
-    0x00000000, 0x000000FF, 0x0000FFFF, 0x00FFFFFF
-    };
 static const int32 cvtacc[16] = { 0, 0,
     TLB_ACCW (KERN)+TLB_ACCR (KERN),
     TLB_ACCR (KERN),
@@ -102,7 +83,7 @@ static const int32 cvtacc[16] = { 0, 0,
 t_stat tlb_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tlb_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tlb_reset (DEVICE *dptr);
-char *tlb_description (DEVICE *dptr);
+const char *tlb_description (DEVICE *dptr);
 
 TLBENT fill (uint32 va, int32 lnt, int32 acc, int32 *stat);
 extern int32 ReadIO (uint32 pa, int32 lnt);
@@ -135,355 +116,6 @@ DEVICE tlb_dev = {
     NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
     &tlb_description
     };
-
-/* Read and write virtual
-
-   These routines logically fall into three phases:
-
-   1.   Look up the virtual address in the translation buffer, calling
-        the fill routine on a tag mismatch or access mismatch (invalid
-        tlb entries have access = 0 and thus always mismatch).  The
-        fill routine handles all errors.  If the resulting physical
-        address is aligned, do an aligned physical read or write.
-   2.   Test for unaligned across page boundaries.  If cross page, look
-        up the physical address of the second page.  If not cross page,
-        the second physical address is the same as the first.
-   3.   Using the two physical addresses, do an unaligned read or
-        write, with three cases: unaligned long, unaligned word within
-        a longword, unaligned word crossing a longword boundary.
-
-   Note that these routines do not handle quad or octa references.
-*/
-
-/* Read virtual
-
-   Inputs:
-        va      =       virtual address
-        lnt     =       length code (BWL)
-        acc     =       access code (KESU)
-   Output:
-        returned data, right justified in 32b longword
-*/
-
-int32 Read (uint32 va, int32 lnt, int32 acc)
-{
-int32 vpn, off, tbi, pa;
-int32 pa1, bo, sc, wl, wh;
-TLBENT xpte;
-
-mchk_va = va;
-if (mapen) {                                            /* mapping on? */
-    vpn = VA_GETVPN (va);                               /* get vpn, offset */
-    off = VA_GETOFF (va);
-    tbi = VA_GETTBI (vpn);
-    xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */
-    if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
-        ((acc & TLB_WACC) && ((xpte.pte & TLB_M) == 0)))
-        xpte = fill (va, lnt, acc, NULL);               /* fill if needed */
-    pa = (xpte.pte & TLB_PFN) | off;                    /* get phys addr */
-    }
-else {
-    pa = va & PAMASK;
-    off = 0;
-    }
-if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
-    if (lnt >= L_LONG)                                  /* long, quad? */
-        return ReadL (pa);
-    if (lnt == L_WORD)                                  /* word? */
-        return ReadW (pa);
-    return ReadB (pa);                                  /* byte */
-    }
-if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {      /* cross page? */
-    vpn = VA_GETVPN (va + lnt);                         /* vpn 2nd page */
-    tbi = VA_GETTBI (vpn);
-    xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */
-    if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
-        ((acc & TLB_WACC) && ((xpte.pte & TLB_M) == 0)))
-        xpte = fill (va + lnt, lnt, acc, NULL);         /* fill if needed */
-    pa1 = ((xpte.pte & TLB_PFN) | VA_GETOFF (va + 4)) & ~03;
-    }
-else pa1 = ((pa + 4) & PAMASK) & ~03;                   /* not cross page */
-bo = pa & 3;
-if (lnt >= L_LONG) {                                    /* lw unaligned? */
-    sc = bo << 3;
-    wl = ReadU (pa, L_LONG - bo);                       /* read both fragments */
-    wh = ReadU (pa1, bo);                               /* extract */
-    return ((wl | (wh << (32 - sc))) & LMASK);
-    }
-else if (bo == 1)                                       /* read within lw */
-    return ReadU (pa, L_WORD);
-else {
-    wl = ReadU (pa, L_BYTE);                            /* word cross lw */
-    wh = ReadU (pa1, L_BYTE);                           /* read, extract */
-    return (wl | (wh << 8));
-    }
-}
-
-/* Write virtual
-
-   Inputs:
-        va      =       virtual address
-        val     =       data to be written, right justified in 32b lw
-        lnt     =       length code (BWL)
-        acc     =       access code (KESU)
-   Output:
-        none
-*/
-
-void Write (uint32 va, int32 val, int32 lnt, int32 acc)
-{
-int32 vpn, off, tbi, pa;
-int32 pa1, bo, sc;
-TLBENT xpte;
-
-mchk_va = va;
-if (mapen) {
-    vpn = VA_GETVPN (va);
-    off = VA_GETOFF (va);
-    tbi = VA_GETTBI (vpn);
-    xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */
-    if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
-        ((xpte.pte & TLB_M) == 0))
-        xpte = fill (va, lnt, acc, NULL);
-    pa = (xpte.pte & TLB_PFN) | off;
-    }
-else {
-    pa = va & PAMASK;
-    off = 0;
-    }
-if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
-    if (lnt >= L_LONG)                                  /* long, quad? */
-        WriteL (pa, val);
-    else if (lnt == L_WORD)                             /* word? */
-        WriteW (pa, val);
-    else WriteB (pa, val);                              /* byte */
-    return;
-    }
-if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {
-    vpn = VA_GETVPN (va + 4);
-    tbi = VA_GETTBI (vpn);
-    xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */
-    if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
-        ((xpte.pte & TLB_M) == 0))
-        xpte = fill (va + lnt, lnt, acc, NULL);
-    pa1 = ((xpte.pte & TLB_PFN) | VA_GETOFF (va + 4)) & ~03;
-    }
-else pa1 = ((pa + 4) & PAMASK) & ~03;
-bo = pa & 3;
-if (lnt >= L_LONG) {
-    sc = bo << 3;
-    WriteU (pa, val & insert[L_LONG - bo], L_LONG - bo);
-    WriteU (pa1, (val >> (32 - sc)) & insert[bo], bo);
-    }
-else if (bo == 1)                                       /* read within lw */
-    WriteU (pa, val & WMASK, L_WORD);
-else {                                                  /* word cross lw */
-    WriteU (pa, val & BMASK, L_BYTE);
-    WriteU (pa1, (val >> 8) & BMASK, L_BYTE);
-    }
-return;
-}
-
-/* Test access to a byte (VAX PROBEx) */
-
-int32 Test (uint32 va, int32 acc, int32 *status)
-{
-int32 vpn, off, tbi;
-TLBENT xpte;
-
-*status = PR_OK;                                        /* assume ok */
-if (mapen) {                                            /* mapping on? */
-    vpn = VA_GETVPN (va);                               /* get vpn, off */
-    off = VA_GETOFF (va);
-    tbi = VA_GETTBI (vpn);
-    xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */
-    if ((xpte.pte & acc) && (xpte.tag == vpn))          /* TB hit, acc ok? */ 
-        return (xpte.pte & TLB_PFN) | off;
-    xpte = fill (va, L_BYTE, acc, status);              /* fill TB */
-    if (*status == PR_OK)
-        return (xpte.pte & TLB_PFN) | off;
-    else return -1;
-    }
-return va & PAMASK;                                     /* ret phys addr */
-}
-
-/* Read aligned physical (in virtual context, unless indicated)
-
-   Inputs:
-        pa      =       physical address, naturally aligned
-   Output:
-        returned data, right justified in 32b longword
-*/
-
-SIM_INLINE int32 ReadB (uint32 pa)
-{
-int32 dat;
-
-if (ADDR_IS_MEM (pa))
-    dat = M[pa >> 2];
-else {
-    mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa))
-        dat = ReadIO (pa, L_BYTE);
-    else dat = ReadReg (pa, L_BYTE);
-    }
-return ((dat >> ((pa & 3) << 3)) & BMASK);
-}
-
-SIM_INLINE int32 ReadW (uint32 pa)
-{
-int32 dat;
-
-if (ADDR_IS_MEM (pa))
-    dat = M[pa >> 2];
-else {
-    mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa))
-        dat = ReadIO (pa, L_WORD);
-    else dat = ReadReg (pa, L_WORD);
-    }
-return ((dat >> ((pa & 2)? 16: 0)) & WMASK);
-}
-
-SIM_INLINE int32 ReadL (uint32 pa)
-{
-if (ADDR_IS_MEM (pa))
-    return M[pa >> 2];
-mchk_ref = REF_V;
-if (ADDR_IS_IO (pa))
-    return ReadIO (pa, L_LONG);
-return ReadReg (pa, L_LONG);
-}
-
-SIM_INLINE int32 ReadLP (uint32 pa)
-{
-if (ADDR_IS_MEM (pa))
-    return M[pa >> 2];
-mchk_va = pa;
-mchk_ref = REF_P;
-if (ADDR_IS_IO (pa))
-    return ReadIO (pa, L_LONG);
-return ReadReg (pa, L_LONG);
-}
-
-/* Read unaligned physical (in virtual context)
-
-   Inputs:
-        pa      =       physical address
-        lnt     =       length in bytes (1, 2, or 3)
-   Output:
-        returned data
-*/
-
-int32 ReadU (uint32 pa, int32 lnt)
-{
-int32 dat;
-int32 sc = (pa & 3) << 3;
-if (ADDR_IS_MEM (pa))
-    dat = M[pa >> 2];
-else {
-    mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa))
-        dat = ReadIOU (pa, lnt);
-    else dat = ReadRegU (pa, lnt);
-    }
-return ((dat >> sc) & insert[lnt]);
-}
-
-/* Write aligned physical (in virtual context, unless indicated)
-
-   Inputs:
-        pa      =       physical address, naturally aligned
-        val     =       data to be written, right justified in 32b longword
-   Output:
-        none
-*/
-
-SIM_INLINE void WriteB (uint32 pa, int32 val)
-{
-if (ADDR_IS_MEM (pa)) {
-    int32 id = pa >> 2;
-    int32 sc = (pa & 3) << 3;
-    int32 mask = 0xFF << sc;
-    M[id] = (M[id] & ~mask) | (val << sc);
-    }
-else {
-    mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa))
-        WriteIO (pa, val, L_BYTE);
-    else WriteReg (pa, val, L_BYTE);
-    }
-return;
-}
-
-SIM_INLINE void WriteW (uint32 pa, int32 val)
-{
-if (ADDR_IS_MEM (pa)) {
-    int32 id = pa >> 2;
-    M[id] = (pa & 2)? (M[id] & 0xFFFF) | (val << 16):
-        (M[id] & ~0xFFFF) | val;
-    }
-else {
-    mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa))
-        WriteIO (pa, val, L_WORD);
-    else WriteReg (pa, val, L_WORD);
-    }
-return;
-}
-
-SIM_INLINE void WriteL (uint32 pa, int32 val)
-{
-if (ADDR_IS_MEM (pa))
-    M[pa >> 2] = val;
-else {
-    mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa))
-        WriteIO (pa, val, L_LONG);
-    else WriteReg (pa, val, L_LONG);
-    }
-return;
-}
-
-void WriteLP (uint32 pa, int32 val)
-{
-if (ADDR_IS_MEM (pa))
-    M[pa >> 2] = val;
-else {
-    mchk_va = pa;
-    mchk_ref = REF_P;
-    if (ADDR_IS_IO (pa))
-        WriteIO (pa, val, L_LONG);
-    else WriteReg (pa, val, L_LONG);
-    }
-return;
-}
-
-/* Write unaligned physical (in virtual context)
-
-   Inputs:
-        pa      =       physical address
-        val     =       data to be written, right justified in 32b longword
-        lnt     =       length (1, 2, or 3 bytes)
-   Output:
-        none
-*/
-
-void WriteU (uint32 pa, int32 val, int32 lnt)
-{
-if (ADDR_IS_MEM (pa)) {
-    int32 bo = pa & 3;
-    int32 sc = bo << 3;
-    M[pa >> 2] = (M[pa >> 2] & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
-    }
-else {
-    mchk_ref = REF_V;
-    if ADDR_IS_IO (pa)
-        WriteIOU (pa, val, lnt);
-    else WriteRegU (pa, val, lnt);
-    }
-return;
-}
 
 
 /* TLB fill
@@ -577,7 +209,7 @@ return stlb[tbi];
 
 /* Utility routines */
 
-extern void set_map_reg (void)
+void set_map_reg (void)
 {
 d_p0br = P0BR & ~03;
 d_p1br = (P1BR - 0x800000) & ~03;                       /* VA<30> >> 7 */
@@ -585,7 +217,6 @@ d_sbr = (SBR - 0x1000000) & ~03;                        /* VA<31> >> 7 */
 d_p0lr = (P0LR << 2);
 d_p1lr = (P1LR << 2) + 0x800000;                        /* VA<30> >> 7 */
 d_slr = (SLR << 2) + 0x1000000;                         /* VA<31> >> 7 */
-return;
 }
 
 /* Zap process (0) or whole (1) tb */
@@ -599,7 +230,6 @@ for (i = 0; i < VA_TBSIZE; i++) {
     if (stb)
         stlb[i].tag = stlb[i].pte = -1;
     }
-return;
 }
 
 /* Zap single tb entry corresponding to va */
@@ -611,7 +241,6 @@ int32 tbi = VA_GETTBI (VA_GETVPN (va));
 if (va & VA_S0)
     stlb[tbi].tag = stlb[tbi].pte = -1;
 else ptlb[tbi].tag = ptlb[tbi].pte = -1;
-return;
 }
 
 /* Check for tlb entry corresponding to va */
@@ -674,7 +303,7 @@ for (i = 0; i < VA_TBSIZE; i++)
 return SCPE_OK;
 }
 
-char *tlb_description (DEVICE *dptr)
+const char *tlb_description (DEVICE *dptr)
     {
     return "translation buffer";
     }

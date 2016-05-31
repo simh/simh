@@ -115,7 +115,7 @@ extern uint32 pal_type;
 extern t_uint64 pcq[PCQ_SIZE];                          /* PC queue */
 extern int32 pcq_p;                                     /* PC queue ptr */
 
-extern int32 parse_reg (char *cptr);
+extern int32 parse_reg (const char *cptr);
 
 /* EV5PAL data structures
 
@@ -164,7 +164,7 @@ REG ev5pal_reg[] = {
     { FLDATA (PWRFL, ev5_pwrfl, 0) },
     { FLDATA (SLI, ev5_sli, 0) },
     { NULL }
-	};
+    };
 
 DEVICE ev5pal_dev = {
     "EV5PAL", &ev5pal_unit, ev5pal_reg, NULL,
@@ -172,7 +172,7 @@ DEVICE ev5pal_dev = {
     NULL, NULL, &pal_proc_reset_hwre,
     NULL, NULL, NULL,
     NULL, DEV_DIS
-	};
+    };
 
 /* EV5 interrupt dispatch - reached from top of instruction loop -
    dispatch to PALcode */
@@ -288,12 +288,12 @@ uint32 lvl = flag? ev5_ipl: 0;
 
 if (flag && pal_mode) return 0;
 if (ev5_mchk) req = IPL_1F;
-else if (ev5_crd && (ICSR & ICSR_CRDE)) req = IPL_CRD;
+else if (ev5_crd && (ev5_icsr & ICSR_CRDE)) req = IPL_CRD;
 else if (ev5_pwrfl) req = IPL_PWRFL;
-else if (int_req[3] && !(ICSR & ICSR_MSK3)) req = IPL_HMIN + 3;
-else if (int_req[2] && !(ICSR & ICSR_MSK2)) req = IPL_HMIN + 2;
-else if (int_req[1] && !(ICSR & ICSR_MSK1)) req = IPL_HMIN + 1;
-else if (int_req[0] && !(ICSR & ICSR_MSK0)) req = IPL_HMIN + 0;
+else if (int_req[3] && !(ev5_icsr & ICSR_MSK3)) req = IPL_HMIN + 3;
+else if (int_req[2] && !(ev5_icsr & ICSR_MSK2)) req = IPL_HMIN + 2;
+else if (int_req[1] && !(ev5_icsr & ICSR_MSK1)) req = IPL_HMIN + 1;
+else if (int_req[0] && !(ev5_icsr & ICSR_MSK0)) req = IPL_HMIN + 0;
 else if (ev5_sirr) {
     for (i = IPL_SMAX; i > 0; i--) {                    /* check swre int */
         if ((ev5_sirr >> (i - 1)) & 1) {                /* req != 0? int */
@@ -305,7 +305,7 @@ else if (ev5_sirr) {
 if ((req < IPL_AST) && (ev5_astrr & ev5_asten & ast_map[itlb_cm]))
     req = IPL_AST;
 if (req <= lvl) req = 0;
-if (ev5_sli && (ICSR & ICSR_SLE)) req = req | IPL_SLI;
+if (ev5_sli && (ev5_icsr & ICSR_SLE)) req = req | IPL_SLI;
 if (ev5_isr & ISR_HALT) req = req | IPL_HALT;
 return req;
 }
@@ -675,7 +675,7 @@ switch (fnc) {
         if (pal_mode && ((val ^ ev5_icsr) & ICSR_SDE)) {
             if (val & ICSR_SDE) { PAL_USE_SHADOW; }
             else { PAL_USE_MAIN; }
-			}
+            }
         ev5_icsr = val & ICSR_RW;
         itlb_set_spage ((((uint32) val) >> ICSR_V_SPE) & ICSR_M_SPE);
         fpen = (((uint32) val) >> ICSR_V_FPE) & 1;
@@ -815,12 +815,12 @@ static struct pal_opt ld_st_opt[] = {
     { HW_LD_PTE,    'P' },
     { HW_LD_LCK,    'L' },
     { 0 }
-	};
+    };
 
 static struct pal_opt rei_opt[] = {
     { HW_REI_S, 'S' },
     { 0 }
-	};
+    };
 
 /* Print options for hardware PAL instruction */
 
@@ -839,7 +839,7 @@ return;
 
 /* Parse options for hardware PAL instruction */
 
-char *parse_opt_ev5 (char *cptr, uint32 *val, struct pal_opt opt[])
+CONST char *parse_opt_ev5 (CONST char *cptr, uint32 *val, struct pal_opt opt[])
 {
 uint32 i;
 char *tptr, gbuf[CBUFSIZE];
@@ -900,11 +900,12 @@ return -3;
 
 /* Parse PAL hardware opcode symbolically */
 
-t_stat parse_pal_hwre (char *cptr, t_value *inst)
+t_stat parse_pal_hwre (CONST char *cptr, t_value *inst)
 {
 uint32 i, d, val = 0;
 int32 reg;
-char *tptr, gbuf[CBUFSIZE];
+CONST char *tptr;
+char gbuf[CBUFSIZE];
 t_stat r;
 
 cptr = get_glyph (cptr, gbuf, '/');

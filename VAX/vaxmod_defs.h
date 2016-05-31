@@ -127,8 +127,8 @@
                         { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size, NULL, NULL, "Set Memory to 256M bytes" },            \
                         { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size, NULL, NULL, "Set Memory to 512M bytes" },            \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
-extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
-#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={VAXServer|MicroVAX}",                  \
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={VAXServer|MicroVAX|VAXStation}",       \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Display processor model" },       \
                             { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",                      \
                               &sysd_set_halt, &sysd_show_halt, NULL, "Enable autoboot (Disable Halt)" },    \
@@ -220,6 +220,17 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define CQMSIZE         (1u << CQMAWIDTH)               /* Qmem length */
 #define CQMAMASK        (CQMSIZE - 1)                   /* Qmem addr mask */
 #define CQMBASE         0x30000000                      /* Qmem base */
+#define ADDR_IS_CQM(x)  ((((uint32) (x)) >= CQMBASE) && \
+                        (((uint32) (x)) < (CQMBASE + CQMSIZE)))
+
+/* QVSS memory space */
+
+#define QVMAWIDTH       18                              /* QVSS mem addr width */
+#define QVMSIZE         (1u << QVMAWIDTH)               /* QVSS mem length */
+#define QVMAMASK        (QVMSIZE - 1)                   /* QVSS mem addr mask */
+#define QVMBASE         (CQMBASE + CQMSIZE - QVMSIZE)   /* QVSS mem base - end of Qbus memory space */
+#define ADDR_IS_QVM(x)  ((((uint32) (x)) >= QVMBASE) && \
+                        (((uint32) (x)) < (QVMBASE + QVMSIZE)))
 
 /* Machine specific reserved operand tests (all NOPs) */
 
@@ -285,7 +296,15 @@ typedef struct {
     int32               vloc;                           /* locator */
     int32               vec;                            /* value */
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
-    uint32              ulnt;                           /* IO length per unit */
+    uint32              ulnt;                           /* IO length per-device */
+                                                        /* Only need to be populated */
+                                                        /* when numunits != num devices */
+    int32               numc;                           /* Number of controllers */
+                                                        /* this field handles devices */
+                                                        /* where multiple instances are */
+                                                        /* simulated through a single */
+                                                        /* DEVICE structure (e.g., DZ, VH, DL, DC). */
+                                                        /* Populated by auto-configure */
     } DIB;
 
 /* Qbus I/O page layout - see pdp11_io_lib.c for address layout details */
@@ -330,8 +349,11 @@ typedef struct {
 #define INT_V_VHTX      18 
 #define INT_V_QDSS      19                              /* QDSS */
 #define INT_V_CR        20
-#define INT_V_DMCRX     21                              /* DMC11 */
-#define INT_V_DMCTX     22
+#define INT_V_QVSS      21                              /* QVSS */
+#define INT_V_DMCRX     22                              /* DMC11 */
+#define INT_V_DMCTX     23
+#define INT_V_TDRX      24                              /* TU58 */
+#define INT_V_TDTX      25
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -355,8 +377,11 @@ typedef struct {
 #define INT_VHTX        (1u << INT_V_VHTX)
 #define INT_QDSS        (1u << INT_V_QDSS)
 #define INT_CR          (1u << INT_V_CR)
+#define INT_QVSS        (1u << INT_V_QVSS)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
+#define INT_TDRX        (1u << INT_V_TDRX)
+#define INT_TDTX        (1u << INT_V_TDTX)
 
 #define IPL_CLK         (0x16 - IPL_HMIN)                       /* relative IPL */
 #define IPL_RQ          (0x14 - IPL_HMIN)
@@ -380,8 +405,11 @@ typedef struct {
 #define IPL_VHTX        (0x14 - IPL_HMIN)
 #define IPL_QDSS        (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
+#define IPL_QVSS        (0x14 - IPL_HMIN)
 #define IPL_DMCRX       (0x14 - IPL_HMIN)
 #define IPL_DMCTX       (0x14 - IPL_HMIN)
+#define IPL_TDRX        (0x14 - IPL_HMIN)
+#define IPL_TDTX        (0x14 - IPL_HMIN)
 
 #define IPL_HMAX        0x17                            /* highest hwre level */
 #define IPL_HMIN        0x14                            /* lowest hwre level */
@@ -394,7 +422,7 @@ typedef struct {
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
 #define VEC_QBUS        1                               /* Qbus system */
-#define VEC_Q           0x200                           /* Qbus vector offset */
+#define VEC_SET         0x201                           /* Vector bits to set in Qbus vectors */
 
 /* Interrupt macros */
 
@@ -403,6 +431,7 @@ typedef struct {
 #define SET_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
 #define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* cond error return */
+extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 /* Logging */
 
@@ -410,33 +439,17 @@ typedef struct {
 #define LOG_CPU_R       0x2                             /* REI */
 #define LOG_CPU_P       0x4                             /* context */
 
-/* Function prototypes for virtual memory interface */
-
-int32 Read (uint32 va, int32 lnt, int32 acc);
-void Write (uint32 va, int32 val, int32 lnt, int32 acc);
-
-/* Function prototypes for physical memory interface (inlined) */
-
-SIM_INLINE int32 ReadB (uint32 pa);
-SIM_INLINE int32 ReadW (uint32 pa);
-SIM_INLINE int32 ReadL (uint32 pa);
-SIM_INLINE int32 ReadLP (uint32 pa);
-SIM_INLINE void WriteB (uint32 pa, int32 val);
-SIM_INLINE void WriteW (uint32 pa, int32 val);
-SIM_INLINE void WriteL (uint32 pa, int32 val);
-void WriteLP (uint32 pa, int32 val);
-
 /* Function prototypes for I/O */
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
 #include "pdp11_io_lib.h"
 
-extern t_stat sysd_set_halt (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat sysd_set_halt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* Function prototypes for system-specific unaligned support */
 
@@ -444,5 +457,9 @@ int32 ReadIOU (uint32 pa, int32 lnt);
 int32 ReadRegU (uint32 pa, int32 lnt);
 void WriteIOU (uint32 pa, int32 val, int32 lnt);
 void WriteRegU (uint32 pa, int32 val, int32 lnt);
+
+/* Function prototypes for virtual and physical memory interface (inlined) */
+
+#include "vax_mmu.h"
 
 #endif

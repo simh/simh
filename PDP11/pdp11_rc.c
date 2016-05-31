@@ -164,15 +164,14 @@ static uint32   rc_stopioe = 1;                         /* stop on error */
 
 /* forward references */
 
-DEVICE rc_dev;
 static t_stat rc_rd (int32 *, int32, int32);
 static t_stat rc_wr (int32, int32, int32);
 static t_stat rc_svc (UNIT *);
 static t_stat rc_reset (DEVICE *);
-static t_stat rc_attach (UNIT *, char *);
-static t_stat rc_set_size (UNIT *, int32, char *, void *);
+static t_stat rc_attach (UNIT *, CONST char *);
+static t_stat rc_set_size (UNIT *, int32, CONST char *, void *);
 static uint32 update_rccs (uint32, uint32);
-static char *rc_description (DEVICE *dptr);
+static const char *rc_description (DEVICE *dptr);
 
 /* RC11 data structures
 
@@ -246,7 +245,7 @@ DEVICE rc_dev = {
     NULL,                                               /* detach */
     &rc_dib,
     DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, 
     &rc_description
 };
 
@@ -564,7 +563,7 @@ static t_stat rc_reset (DEVICE *dptr)
 
 /* Attach routine */
 
-static t_stat rc_attach (UNIT *uptr, char *cptr)
+static t_stat rc_attach (UNIT *uptr, CONST char *cptr)
 {
     uint32 sz, p;
     static const uint32 ds_bytes = RC_DKSIZE * sizeof (int16);
@@ -581,7 +580,7 @@ static t_stat rc_attach (UNIT *uptr, char *cptr)
 
 /* Change disk size */
 
-static t_stat rc_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat rc_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     if (val < 0)
         return (SCPE_IERR);
@@ -592,7 +591,7 @@ static t_stat rc_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
     return (SCPE_OK);
 }
 
-static char *rc_description (DEVICE *dptr)
+static const char *rc_description (DEVICE *dptr)
 {
     return "RC11/RS64 fixed head disk controller";
 }

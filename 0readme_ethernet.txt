@@ -81,7 +81,7 @@ Linux (Ubuntu 10.04):
     # Run simulator and "attach xq tap:tap0"
     
 
-Linux (Fedora Core 18, 20, etc.):
+Linux (Fedora Core 18, 20, CentOS, RedHat, etc.):
     yum install gcc
     yum install libpcap-devel
     yum install uml-utilities
@@ -178,6 +178,39 @@ OSX:
     install the net/vde2 package.
 
 -------------------------------------------------------------------------------
+Another alternative to direct pcap and tun/tap networking on all environments is 
+NAT (SLiRP) networking.  NAT networking is limited to only IP network protocols
+so DECnet, LAT and Clusting can't work on a NAT connected interface, but this may
+be the easiest solution for many folks.
+
+       sim> attach xq nat:
+       
+The simulator can use static IP addresses of 10.0.2.4 thru 10.0.2.14 with a 
+netmask of 255.255.255.0 and a gateway of 10.0.2.2 and a nameserver of 10.0.2.3.
+If the simulated machine uses DHCP it will get the address 10.0.2.15.  Various 
+NAT based parameters can be configured on the attach command.  HELP XQ ATTACH 
+will provide useful information.  Host to simulator connectivitiy can be 
+achieved for a simulator which gets its IP address via DHCP with the following 
+command:
+
+       sim> attach xq nat:tcp=2323:10.0.2.15:23,tcp=2121:10.0.2.15:21
+       
+The host computer can telnet to localhost:2323 to reach the simulator via 
+telnet, etc.
+
+Additionally NAT based networking is useful to allow host systems with WiFi 
+networking to a) reach the simulated system and b) allow the simulated system
+to reach out to the Internet.
+
+Note: As mentioned above, NAT networking is specifically capable of providing 
+      TCP/IP connectivity.  Only expect TCP and UDP traffic to pass through 
+      the interface.  Do not expect ICMP traffic (ping mostly) to traverse 
+      the NAT boundary.  This restriction is a conseqence of host platform 
+      and network limitations regarding direct user mode code generating ICMP 
+      packets.
+
+
+-------------------------------------------------------------------------------
 
 Windows notes:
  1. The Windows-specific code uses the WinPCAP 4.x package from
@@ -207,11 +240,11 @@ Building on Windows:
  
  For Example, the directory structure should look like:
 
-    .../simh/simhv38-2-rc1/VAX/vax_cpu.c
-    .../simh/simhv38-2-rc1/scp.c
-    .../simh/simhv38-2-rc1/Visual Studio Projects/simh.sln
-    .../simh/simhv38-2-rc1/Visual Studio Projects/VAX.vcproj
-    .../simh/simhv38-2-rc1/BIN/Nt/Win32-Release/vax.exe
+    .../simh/simh-master/VAX/vax_cpu.c
+    .../simh/simh-master/scp.c
+    .../simh/simh-master/Visual Studio Projects/simh.sln
+    .../simh/simh-master/Visual Studio Projects/VAX.vcproj
+    .../simh/simh-master/BIN/Nt/Win32-Release/vax.exe
     .../simh/windows-build/pthreads/pthread.h
     .../simh/windows-build/winpcap/WpdPack/Include/pcap.h
 
@@ -325,8 +358,9 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
     binaries will run on any system whether or not libpcap is installed.  If 
     you want to force direct libpcap linking during a build you do so by 
     typing 'make USE_NETWORK=1'.  You must build with gcc to do this.  There 
-    is no observable benefit to statically linking against libpcap and as 
-    such support for this ia deprecated and will be removed in the future.
+    is no observable benefit to statically linking against libpcap.  Support
+    for statically linking libpcap ia deprecated on all platforms except
+    Linux and OS X where it has already been removed.
     
  4. Some platforms (HP-UX in particular) may not have vendor supplied libpcap 
     components available and installed with the operating system.  The packages
@@ -388,7 +422,7 @@ Building on OpenVMS Alpha and OpenVMS Integrety (IA64):
 
 VAX simulator support:
 
-An OpenVMS VAX v7.2 system with DECNET Phase IV, MultiNet 4.4a, and LAT 5.3 has
+An OpenVMS VAX v7.3 system with DECNET Phase IV, MultiNet 5.4, and LAT 5.3 has
 been successfully run. Other testers have reported success booting NetBSD and
 OpenVMS VAX 5.5-2 also.
 

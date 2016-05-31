@@ -40,7 +40,6 @@
 #define SET_EOR         2                               /* print, set eor */
 #define SET_SPC         4                               /* space */
 
-extern char sds_to_ascii[64];
 extern uint32 xfr_req;
 extern int32 stop_invins, stop_invdev, stop_inviop;
 int32 lpt_spc = 0;                                      /* space instr */
@@ -59,16 +58,16 @@ DSPT lpt_tplt[] = {                                     /* template */
     { 0, 0 }
     };
 
-DEVICE lpt_dev;
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat lpt_crctl (UNIT *uptr, int32 ch);
 t_stat lpt_space (UNIT *uptr, int32 cnt);
 t_stat lpt_status (UNIT *uptr);
 t_stat lpt_bufout (UNIT *uptr);
 void lpt_end_op (int32 fl);
 t_stat lpt (uint32 fnc, uint32 inst, uint32 *dat);
+int8 sds_to_ascii(int8 c);
 
 /* LPT data structures
 
@@ -182,7 +181,7 @@ switch (fnc) {                                          /* case function */
         break;
 
     case IO_WRITE:                                      /* write */
-        asc = sds_to_ascii[(*dat) & 077];               /* convert data */
+        asc = sds_to_ascii(*dat);                       /* convert data */
         xfr_req = xfr_req & ~XFR_LPT;                   /* clr xfr flag */
         if (lpt_bptr < LPT_WIDTH)                       /* store data */
             lpt_buf[lpt_bptr++] = asc;
@@ -245,7 +244,7 @@ if (uptr->flags & UNIT_ATT) {                           /* attached? */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* I/O error? */
         lpt_end_op (CHF_EOR | CHF_ERR);                 /* set err, disc */
-        perror ("LPT I/O error");                       /* print msg */
+        sim_perror ("LPT I/O error");                       /* print msg */
         clearerr (uptr->fileref);
         return SCPE_IOERR;                              /* ret error */
         }
@@ -324,7 +323,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 lpt_ccp = 0;                                            /* top of form */
 return attach_unit (uptr, cptr);

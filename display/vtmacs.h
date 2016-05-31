@@ -1,5 +1,5 @@
 /*
- * $Id: vtmacs.h,v 1.5 2005/01/12 18:10:13 phil Exp $
+ * $Id: vtmacs.h,v 1.3 2004/01/24 20:54:54 phil Exp - revised by DAG $
  * macros for coding a VT11/VS60 display file (instructions and data)
  * for standalone use of vt11.c (not embedded in PDP-11 simulator)
  * Douglas A. Gwyn <gwyn@arl.army.mil>

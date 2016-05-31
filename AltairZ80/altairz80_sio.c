@@ -72,7 +72,7 @@ uint8 *URLContents(const char *URL, uint32 *length) {
     char *result;
     strncat(str, URL, RESULT_BUFFER_LENGTH - strlen(RESULT_LEAD_IN) - strlen(RESULT_LEAD_OUT) - 1);
     strcat(str, RESULT_LEAD_OUT);
-    result = (char*)malloc(strlen(str));
+    result = (char*)malloc(strlen(str) + 1);
     strcpy(result, str);
     *length = strlen(str);
     return (uint8*)result;
@@ -125,21 +125,25 @@ uint8 *URLContents(const char *URL, uint32 *length) {
 #define SLEEP_ALLOWED_START_DEFAULT 100         /* default initial value for sleepAllowedCounter*/
 #define DEFAULT_TIMER_DELTA 100                 /* default value for timer delta in ms          */
 
-static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat simh_dev_set_timeroff (UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat simh_dev_set_timeroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat sio_reset(DEVICE *dptr);
-static t_stat sio_attach(UNIT *uptr, char *cptr);
+static t_stat sio_attach(UNIT *uptr, CONST char *cptr);
 static t_stat sio_detach(UNIT *uptr);
 static t_stat ptr_reset(DEVICE *dptr);
 static t_stat ptp_reset(DEVICE *dptr);
 static t_stat toBool(char tf, int32 *result);
-static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat sio_dev_set_port(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat sio_svc(UNIT *uptr);
 static t_stat simh_dev_reset(DEVICE *dptr);
 static t_stat simh_svc(UNIT *uptr);
+static const char* sio_description(DEVICE *dptr);
+static const char* simh_description(DEVICE *dptr);
+static const char* ptr_description(DEVICE *dptr);
+static const char* ptp_description(DEVICE *dptr);
 static void mapAltairPorts(void);
 int32 nulldev   (const int32 port, const int32 io, const int32 data);
 int32 sr_dev    (const int32 port, const int32 io, const int32 data);
@@ -163,8 +167,6 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 extern uint32 getClockFrequency(void);
 extern void setClockFrequency(const uint32 Value);
 
-extern int32 chiptype;
-extern const t_bool rtc_avail;
 extern uint32 PCX;
 extern int32 SR;
 extern UNIT cpu_unit;
@@ -347,13 +349,17 @@ static MTAB sio_mod[] = {
     { 0 }
 };
 
+static const char* sio_description(DEVICE *dptr) {
+    return "Serial Input Output";
+}
+
 DEVICE sio_dev = {
     "SIO", &sio_unit, sio_reg, sio_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &sio_reset,
     NULL, &sio_attach, &sio_detach,
     NULL, DEV_DEBUG | DEV_MUX, 0,
-    generic_dt, NULL, "Serial Input Output SIO"
+    generic_dt, NULL, NULL, NULL, NULL, NULL, &sio_description
 };
 
 static MTAB ptpptr_mod[] = {
@@ -369,18 +375,26 @@ static REG ptr_reg[] = {
     { NULL }
 };
 
+static const char* ptr_description(DEVICE *dptr) {
+    return "Paper Tape Reader";
+}
+
 DEVICE ptr_dev = {
     "PTR", &ptr_unit, ptr_reg, ptpptr_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptr_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    generic_dt, NULL, "Paper Tape Reader PTR"
+    generic_dt, NULL, NULL, NULL, NULL, NULL, &ptr_description
 };
 
 static UNIT ptp_unit = {
     UDATA (NULL, UNIT_ATTABLE, 0)
 };
+
+static const char* ptp_description(DEVICE *dptr) {
+    return "Paper Tape Puncher";
+}
 
 DEVICE ptp_dev = {
     "PTP", &ptp_unit, NULL, ptpptr_mod,
@@ -388,7 +402,7 @@ DEVICE ptp_dev = {
     NULL, NULL, &ptp_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    generic_dt, NULL, "Paper Tape Puncher PTP"
+    generic_dt, NULL, NULL, NULL, NULL, NULL, &ptp_description
 };
 
 /*  Synthetic device SIMH for communication
@@ -465,20 +479,24 @@ static MTAB simh_mod[] = {
     { 0 }
 };
 
+const char* simh_description(DEVICE *dptr) {
+    return "Pseudo Device";
+}
+
 DEVICE simh_device = {
     "SIMH", &simh_unit, simh_reg, simh_mod,
     1, 10, 31, 1, 16, 4,
     NULL, NULL, &simh_dev_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    generic_dt, NULL, "Pseudo Device SIMH"
+    generic_dt, NULL, NULL, NULL, NULL, NULL, &simh_description
 };
 
 static void resetSIOWarningFlags(void) {
     warnUnattachedPTP = warnUnattachedPTR = warnPTREOF = warnUnassignedPort = 0;
 }
 
-static t_stat sio_attach(UNIT *uptr, char *cptr) {
+static t_stat sio_attach(UNIT *uptr, CONST char *cptr) {
     t_stat r = SCPE_IERR;
     sio_unit.u3 = FALSE;                                    /* no character in terminal input buffer    */
     get_uint(cptr, 10, 65535, &r);                          /* attempt to get port, discard result      */
@@ -736,12 +754,11 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
         if (sio_unit.u3)                                    /* character available?                     */
             return spi.sio_can_read | spi.sio_can_write;
         ch = sim_poll_kbd();                                /* no, try to get a character               */
-        if (ch) {                                           /* character available?                     */
-            if (ch == SCPE_STOP) {                          /* stop CPU in case ^E (default) was typed  */
-                stop_cpu = TRUE;
+        if ((ch == SCPE_OK) && stop_cpu) {
                 sim_interval = 0;                           /* detect stop condition as soon as possible*/
                 return spi.sio_cannot_read | spi.sio_can_write; /* do not consume stop character        */
             }
+        if (ch) {                                           /* character available?                     */
             sio_unit.u3 = TRUE;                             /* indicate character available             */
             sio_unit.buf = ch;                              /* store character in buffer                */
             return spi.sio_can_read | spi.sio_can_write;
@@ -955,7 +972,7 @@ static uint32 equalSIP(SIO_PORT_INFO x, SIO_PORT_INFO y) {
     (x.sio_reset == y.sio_reset) && (x.hasOUT == y.hasOUT);
 }
 
-static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat sio_dev_set_port(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     int32 result, n, position;
     SIO_PORT_INFO sip = { 0 }, old;
     char hasReset, hasOUT;
@@ -965,7 +982,7 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
     if ((result == 1) && (cptr[n] == 0)) {
         old = lookupPortInfo(sip.port, &position);
         if (old.port == -1) {
-            printf("No mapping for port 0x%02x exists - cannot remove.\n", sip.port);
+            sim_printf("No mapping for port 0x%02x exists - cannot remove.\n", sip.port);
             return SCPE_ARG;
         }
         do {
@@ -974,7 +991,7 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
         } while (port_table[position].port != -1);
         sim_map_resource(sip.port, 1, RESOURCE_TYPE_IO, &nulldev, FALSE);
         if (sio_unit.flags & UNIT_SIO_VERBOSE) {
-            printf("Removing mapping for port 0x%02x.\n\t", sip.port);
+            sim_printf("Removing mapping for port 0x%02x.\n\t", sip.port);
             show_sio_port_info(stdout, old);
         }
         return SCPE_OK;
@@ -991,29 +1008,29 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
     if (result != SCPE_OK)
         return result;
     if (sip.port != (sip.port & 0xff)) {
-        printf("Truncating port 0x%x to 0x%02x.\n", sip.port, sip.port & 0xff);
+        sim_printf("Truncating port 0x%x to 0x%02x.\n", sip.port, sip.port & 0xff);
         sip.port &= 0xff;
     }
     old = lookupPortInfo(sip.port, &position);
     if (old.port == sip.port) {
         if (sio_unit.flags & UNIT_SIO_VERBOSE) {
-            printf("Replacing mapping for port 0x%02x.\n\t", sip.port);
+            sim_printf("Replacing mapping for port 0x%02x.\n\t", sip.port);
             show_sio_port_info(stdout, old);
-            printf("-> ");
+            sim_printf("-> ");
             show_sio_port_info(stdout, sip);
             if (equalSIP(sip, old))
-                printf("[identical]");
+                sim_printf("[identical]");
         }
     }
     else {
         port_table[position + 1] = old;
         if (sio_unit.flags & UNIT_SIO_VERBOSE) {
-            printf("Adding mapping for port 0x%02x.\n\t", sip.port);
+            sim_printf("Adding mapping for port 0x%02x.\n\t", sip.port);
             show_sio_port_info(stdout, sip);
         }
     }
     if (sio_unit.flags & UNIT_SIO_VERBOSE)
-        printf("\n");
+        sim_printf("\n");
     port_table[position] = sip;
     sim_map_resource(sip.port, 1, RESOURCE_TYPE_IO, (sip.hasOUT ||
         ((sip.sio_can_read == 0) && (sip.sio_cannot_read == 0) &&
@@ -1021,7 +1038,7 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
     return SCPE_OK;
 }
 
-static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc) {
+static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     int32 i, first = TRUE;
     for (i = 0; port_table[i].port != -1; i++)
         if (!port_table[i].isBuiltin) {
@@ -1036,12 +1053,12 @@ static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc) {
     return SCPE_OK;
 }
 
-static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     keyboardInterrupt = FALSE;
     return sim_activate(&sio_unit, sio_unit.wait);          /* activate unit */
 }
 
-static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     keyboardInterrupt = FALSE;
     sim_cancel(&sio_unit);
     return SCPE_OK;
@@ -1172,7 +1189,7 @@ enum simhPseudoDeviceCommands { /* do not change order or remove commands, add o
     kSimhPseudoDeviceCommands
 };
 
-static char *cmdNames[kSimhPseudoDeviceCommands] = {
+static const char *cmdNames[kSimhPseudoDeviceCommands] = {
     "printTime",
     "startTimer",
     "stopTimer",
@@ -1258,12 +1275,12 @@ static void warnNoRealTimeClock(void) {
               " Sorry - no real time clock available.\n", PCX);
 }
 
-static t_stat simh_dev_set_timeron(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat simh_dev_set_timeron(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     timeOfNextInterrupt = sim_os_msec() + timerDelta;
     return sim_activate(&simh_unit, simh_unit.wait);    /* activate unit */
 }
 
-static t_stat simh_dev_set_timeroff(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat simh_dev_set_timeroff(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     timerInterrupt = FALSE;
     return SCPE_OK;
 }
@@ -1363,11 +1380,18 @@ static time_t mkCPM3Origin(void) {
         3 BCD byte: MM
         4 BCD byte: SS                              */
 static void setClockCPM3(void) {
-    ClockCPM3Delta = mkCPM3Origin()                                                                 +
+    struct tm targetDate;
+    const time_t targetSeconds = mkCPM3Origin()                                                                 +
     (GetBYTEWrapper(setClockCPM3Adr) + GetBYTEWrapper(setClockCPM3Adr + 1) * 256) * SECONDS_PER_DAY +
     fromBCD(GetBYTEWrapper(setClockCPM3Adr + 2)) * SECONDS_PER_HOUR                                 +
     fromBCD(GetBYTEWrapper(setClockCPM3Adr + 3)) * SECONDS_PER_MINUTE                               +
-    fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4)) - time(NULL);
+    fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4));
+    // compute target year, month and day and replace hour, minute and second fields
+    targetDate = *localtime(&targetSeconds);
+    targetDate.tm_hour = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 2));
+    targetDate.tm_min = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 3));
+    targetDate.tm_sec = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4));
+    ClockCPM3Delta = mktime(&targetDate) - time(NULL);
 }
 
 static int32 simh_in(const int32 port) {
@@ -1744,7 +1768,7 @@ static int32 simh_out(const int32 port, const int32 data) {
 
                 case printTimeCmd:  /* print time */
                     if (rtc_avail)
-                        printf("SIMH: " ADDRESS_FORMAT " Current time in milliseconds = %d." NLP, PCX, sim_os_msec());
+                        sim_printf("SIMH: " ADDRESS_FORMAT " Current time in milliseconds = %d." NLP, PCX, sim_os_msec());
                     else
                         warnNoRealTimeClock();
                     break;
@@ -1754,7 +1778,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         if (markTimeSP < TIMER_STACK_LIMIT)
                             markTime[markTimeSP++] = sim_os_msec();
                         else
-                            printf("SIMH: " ADDRESS_FORMAT " Timer stack overflow." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer stack overflow." NLP, PCX);
                         else
                             warnNoRealTimeClock();
                     break;
@@ -1763,10 +1787,10 @@ static int32 simh_out(const int32 port, const int32 data) {
                     if (rtc_avail)
                         if (markTimeSP > 0) {
                             uint32 delta = sim_os_msec() - markTime[--markTimeSP];
-                            printf("SIMH: " ADDRESS_FORMAT " Timer stopped. Elapsed time in milliseconds = %d." NLP, PCX, delta);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer stopped. Elapsed time in milliseconds = %d." NLP, PCX, delta);
                         }
                         else
-                            printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
                         else
                             warnNoRealTimeClock();
                     break;
@@ -1852,10 +1876,10 @@ static int32 simh_out(const int32 port, const int32 data) {
                     if (rtc_avail)
                         if (markTimeSP > 0) {
                             uint32 delta = sim_os_msec() - markTime[markTimeSP - 1];
-                            printf("SIMH: " ADDRESS_FORMAT " Timer running. Elapsed in milliseconds = %d." NLP, PCX, delta);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer running. Elapsed in milliseconds = %d." NLP, PCX, delta);
                         }
                         else
-                            printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
                         else
                             warnNoRealTimeClock();
                     break;

@@ -129,9 +129,9 @@ return STOP_CHBKPT;
 
 /* Binary loader, not implemented */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
-extern t_stat binloader (FILE *fd, char *file, int loadpt);
+extern t_stat binloader (FILE *fd, const char *file, int loadpt);
 
 if (flag == 0)
     return binloader (fileref, cptr, 0);
@@ -590,6 +590,11 @@ static const t_uint64 opc_v[] = {
         return  =       status code
 */
 
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
+
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
@@ -697,7 +702,7 @@ else return nine_to_ascii_h[c];
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 uint32 i, j, c;
 t_uint64 fld[3];

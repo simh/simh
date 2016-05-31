@@ -52,9 +52,9 @@ extern REG cpu_reg[];
 extern uint32 *M;
 
 t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val);
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val);
-extern t_stat lp_load (FILE *fileref, char *cptr, char *fnam);
-extern t_stat pt_dump (FILE *of, char *cptr, char *fnam);
+t_stat parse_sym_m (const char *cptr, t_addr addr, t_value *val);
+extern t_stat lp_load (FILE *fileref, CONST char *cptr, CONST char *fnam);
+extern t_stat pt_dump (FILE *of, CONST char *cptr, CONST char *fnam);
 
 /* SCP data structures and interface routines
 
@@ -102,7 +102,7 @@ const char *sim_stop_messages[] = {
 /* Binary loader -- load carriage control tape
    Binary dump -- paper tape dump */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 if (flag)
     return pt_dump (fileref, cptr, fnam);
@@ -299,6 +299,11 @@ static const uint32 opc_val[] = {
 };
 
 /* Print an RX specifier */
+
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 
 t_stat fprint_addr (FILE *of, t_addr addr, uint32 rx, uint32 ea1,
     uint32 ea2)
@@ -586,7 +591,7 @@ return SCPE_OK;
 
 /* Symbolic input */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 bflag, by, rdx, num;
 t_stat r;
@@ -667,14 +672,13 @@ return -3;
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val)
+t_stat parse_sym_m (const char *cptr, t_addr addr, t_value *val)
 {
-uint32 i, j, df, db, t, inst, vp;
+uint32 i, j, df, db, t, inst;
 int32 st, r1, r2, rx2;
 t_stat r;
 char *tptr, gbuf[CBUFSIZE];
 
-vp = 0;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL)

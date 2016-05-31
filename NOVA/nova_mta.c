@@ -139,22 +139,22 @@
 #define STA_PEM         0000001                         /* *PE mode */
 
 #define STA_EFLGS1      (STA_DLT | STA_ILL | STA_DAE | STA_EOT | \
-						 STA_EOF | STA_BOT | STA_BAT | STA_ODD)
+                         STA_EOF | STA_BOT | STA_BAT | STA_ODD)
 #define STA_EFLGS2      (STA_FGP | STA_CDL | STA_BDS | STA_OVS | \
-						 STA_CRC | STA_FPR | STA_FPR)   /* set error 2 */
+                         STA_CRC | STA_FPR | STA_FPR)   /* set error 2 */
 #define STA_CLR         ((020 << 16) | 0010000)         /* always clear */
 #define STA_SET         (STA_HDN | STA_9TK)             /* always set */
 #define STA_DYN         (STA_REW | STA_EOT | STA_EOF | STA_BOT | \
-						 STA_WLK | STA_RDY | STA_PEM)   /* kept in USTAT */
+                         STA_WLK | STA_RDY | STA_PEM)   /* kept in USTAT */
 #define STA_MON         (STA_REW | STA_BOT | STA_WLK | STA_RDY | \
-						 STA_PEM)                       /* set status chg */
+                         STA_PEM)                       /* set status chg */
 
-extern	uint16	M[];
-extern	UNIT	cpu_unit;
-extern	int32	int_req, dev_busy, dev_done, dev_disable;
-extern	int32	SR, AMASK;
+extern uint16 M[];
+extern UNIT cpu_unit;
+extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 SR, AMASK;
 
-extern	t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
+extern t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
 
 
 int32 mta_ma = 0;                                       /* memory address */
@@ -166,17 +166,16 @@ int32 mta_cwait = 100;                                  /* command latency */
 int32 mta_rwait = 100;                                  /* record latency */
 uint8 *mtxb = NULL;                                     /* transfer buffer */
 
-DEVICE mta_dev;
 int32 mta (int32 pulse, int32 code, int32 AC);
 t_stat mta_svc (UNIT *uptr);
 t_stat mta_reset (DEVICE *dptr);
 t_stat mta_boot (int32 unitno, DEVICE *dptr);
-t_stat mta_attach (UNIT *uptr, char *cptr);
+t_stat mta_attach (UNIT *uptr, CONST char *cptr);
 t_stat mta_detach (UNIT *uptr);
 int32 mta_updcsta (UNIT *uptr);
 void mta_upddsta (UNIT *uptr, int32 newsta);
 t_stat mta_map_err (UNIT *uptr, t_stat st);
-t_stat mta_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat mta_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 static const int ctype[32] = {                          /* c vs r timing */
  0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
@@ -363,9 +362,9 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     }
 else switch (c) {                                       /* case on command */
 
-	case CU_CMODE:                                      /* controller mode */
-		mta_ep = mta_cu & CU_EP;
-		break;
+    case CU_CMODE:                                      /* controller mode */
+        mta_ep = mta_cu & CU_EP;
+        break;
 
     case CU_DMODE:                                      /* drive mode */
         if (!sim_tape_bot (uptr))                       /* must be BOT */
@@ -496,7 +495,7 @@ if (change) {
 /*  if (mta_ep) {                                     *//* if polling */
 /*      u = uptr - mta_dev.units;                     *//* unit num */
 /*      mta_sta = (mta_sta & ~STA_UNIT) | (u << STA_V_UNIT); */
-/*      set polling interupt...                       */
+/*      set polling interupt...                         */
 /*      }                                               */
     mta_sta = mta_sta | STA_CHG;                        /* flag change */
     }
@@ -577,9 +576,9 @@ for (u = 0; u < MTA_NUMDR; u++) {                       /* loop thru units */
     sim_tape_reset (uptr);                              /* clear pos flag */
     sim_cancel (uptr);                                  /* cancel activity */
     if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_RDY |
-		(uptr->USTAT & STA_PEM) |
-		(sim_tape_wrp (uptr)? STA_WLK: 0) |
-		(sim_tape_bot (uptr)? STA_BOT: 0);
+        (uptr->USTAT & STA_PEM) |
+        (sim_tape_wrp (uptr)? STA_WLK: 0) |
+        (sim_tape_bot (uptr)? STA_BOT: 0);
     else uptr->USTAT = 0;
     }
 mta_updcsta (&mta_unit[0]);                             /* update status */
@@ -592,7 +591,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat mta_attach (UNIT *uptr, char *cptr)
+t_stat mta_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -618,7 +617,7 @@ return sim_tape_detach (uptr);
 
 /* Write lock/unlock validate routine */
 
-t_stat mta_vlock (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mta_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if ((uptr->flags & UNIT_ATT) && (val || sim_tape_wrp (uptr)))
     mta_upddsta (uptr, uptr->USTAT | STA_WLK);
@@ -629,17 +628,17 @@ return SCPE_OK;
 /*  Boot routine  */
 
 t_stat mta_boot (int32 unitno, DEVICE *dptr)
-	{
-	sim_tape_rewind( &mta_unit[unitno] ) ;
-	/*
-	use common rewind/reset code
-		device reset
-		rewind 'tape' file
-		device
-		unit
-		controller
-	 */
-	cpu_boot( unitno, dptr ) ;
-	SR = 0100000 + DEV_MTA ;
-	return ( SCPE_OK );
-	}	/*  end of 'mta_boot'  */
+    {
+    sim_tape_rewind( &mta_unit[unitno] ) ;
+    /*
+    use common rewind/reset code
+        device reset
+        rewind 'tape' file
+        device
+        unit
+        controller
+     */
+    cpu_boot( unitno, dptr ) ;
+    SR = 0100000 + DEV_MTA ;
+    return ( SCPE_OK );
+    }                                                   /*  end of 'mta_boot'  */

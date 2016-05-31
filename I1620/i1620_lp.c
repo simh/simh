@@ -1,6 +1,6 @@
 /* i1620_lp.c: IBM 1443 line printer simulator
 
-   Copyright (c) 2002-2013, Robert M. Supnik
+   Copyright (c) 2002-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          1443 line printer
 
+   31-Jan-15    TFM     Fixed various problems ... see comments in code
    10-Dec-13    RMS     Fixed DN wraparound (Bob Armstrong)
                         Fixed test on VFU 10 (Bob Armstrong)
    19-Jan-07    RMS     Added UNIT_TEXT flag
@@ -56,9 +57,9 @@ int32 lpt_savctrl = 0;                                  /* saved spc ctrl */
 
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 void lpt_buf_init (void);
-t_stat lpt_num (uint32 pa, uint32 len, uint32 f1, t_bool dump);
+t_stat lpt_num(uint32 pa, uint32 f1, t_bool dump);      /* tfm: length parameter removed, not needed */
 t_stat lpt_print (void);
 t_stat lpt_space (int32 lines, int32 lflag);
 
@@ -101,29 +102,29 @@ DEVICE lpt_dev = {
 
 /* Numeric (flag plus digit) to lineprinter (ASCII) */
 
-const char num_to_lpt[32] = {
- '0', '1', '2', '3', '4', '5', '6', '7',
- '8', '9', '|', ' ', '@', ':', ' ', 'G',
+const int8 num_to_lpt[32] = {
+ '0', '1', '2', '3', '4', '5', '6', '7',                /* tfm: All invalid char treated as errors */
+ '8', '9', '|', -1,  '@',  -1,  -1, 'G',                /* tfm: @, G only print on DN; else NB is blank */
  '-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
- 'Q', 'R', 'W', ' ', '*', ' ',  -1, 'X'
+ 'Q', 'R', 'W',  -1, '*',  -1,  -1, 'X'                 /* tfm: W, *, X only print on DN */
  };
 
 /* Alphameric (digit pair) to lineprinter (ASCII) */
 
-const char alp_to_lpt[256] = {
- ' ',  -1, '?', '.', ')',  -1,  -1,  -1,                /* 00 */
+const int8 alp_to_lpt[256] = {                          /* tfm: invalid codes 02, 12, 15, 32, 35, 61 removed */
+ ' ',  -1,  -1, '.', ')',  -1,  -1,  -1,                /* 00 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
- '+',  -1, '!', '$', '*', ' ',  -1,  -1,                /* 10 */
+ '+',  -1,  -1, '$', '*',  -1,  -1,  -1,                /* 10 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
  '-', '/', '|', ',', '(',  -1,  -1,  -1,                /* 20 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-  -1,  -1, '0', '=', '@', ':',  -1,  -1,                /* 30 */
+  -1,  -1,  -1, '=', '@',  -1,  -1,  -1,                /* 30 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
   -1, 'A', 'B', 'C', 'D', 'E', 'F', 'G',                /* 40 */
  'H', 'I',  -1,  -1,  -1,  -1,  -1,  -1,
  '-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',                /* 50 */
  'Q', 'R',  -1,  -1,  -1,  -1,  -1,  -1,
-  -1, '/', 'S', 'T', 'U', 'V', 'W', 'X',                /* 60 */
+  -1,  -1, 'S', 'T', 'U', 'V', 'W', 'X',                /* 60 */
  'Y', 'Z',  -1,  -1,  -1,  -1,  -1,  -1,
  '0', '1', '2', '3', '4', '5', '6', '7',                /* 70 */
  '8', '9',  -1,  -1,  -1,  -1,  -1,  -1,
@@ -171,10 +172,10 @@ switch (op) {                                           /* decode op */
         break;
 
     case OP_DN:
-        return lpt_num (pa, 20000 - (pa % 20000), f1, TRUE);  /* dump numeric */
+        return lpt_num (pa, f1, TRUE);                  /* dump numeric  (tfm: removed len parm ) */
 
     case OP_WN:
-        return lpt_num (pa, 0, f1, FALSE);              /* write numeric */
+        return lpt_num (pa, f1, FALSE);                 /* write numeric (tfm: removed len parm ) */
 
     case OP_WA:
         for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {     /* only fill buf */
@@ -207,7 +208,7 @@ return SCPE_OK;
 
 /* Print numeric */
 
-t_stat lpt_num (uint32 pa, uint32 len, uint32 f1, t_bool dump)
+t_stat lpt_num (uint32 pa, uint32 f1, t_bool dump)      /* tfm: removed len parm and reorganized code */
 {
 uint8 d;
 int8 lpc;
@@ -215,17 +216,20 @@ t_stat r, sta;
 
 sta = SCPE_OK;
 for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {             /* only fill buf */
-    d = M[pa];                                          /* get digit */
-    if (dump? (len-- == 0):                             /* end reached? */
-        ((d & REC_MARK) == REC_MARK))
+    d = M[pa];                                          /* get data char */
+    if (!dump &&                                        /* not dumping? */
+        ((d & REC_MARK) == REC_MARK))                   /* quit on RM or GM */
         break;
-    lpc = num_to_lpt[d];                                /* translate */
+    lpc = num_to_lpt[d];                                /* translate digit */
+    if (!dump &&                                        /* if not dumping */
+        ((d & DIGIT) == NUM_BLANK))                     /* translate numeric blank */
+        lpc = ' ';                                      /* to normal space */
     if (lpc < 0) {                                      /* bad char? */
         ind[IN_WRCHK] = ind[IN_PRCHK] = 1;              /* wr chk */
         if (io_stop)                                    /* set return status */
             sta = STOP_INVCHR;
         }
-    lpt_buf[lpt_bptr++] = lpc & 0x7F;                   /* fill buffer */
+    lpt_buf[lpt_bptr] = lpc & 0x7F;                     /* put char into buffer (tfm: correct increment)*/
     PP (pa);                                            /* incr mem addr */
     }
 if ((f1 & 1) == 0) {                                    /* print now? */
@@ -260,7 +264,7 @@ if (lpt_bptr) {                                         /* any line? */
     lpt_buf_init ();                                    /* reinit buf */
     if (ferror (lpt_unit.fileref)) {                    /* error? */
         ind[IN_PRCHK] = ind[IN_WRCHK] = 1;              /* wr, pri check */
-        perror ("LPT I/O error");
+        sim_perror ("LPT I/O error");
         clearerr (lpt_unit.fileref);
         return SCPE_IOERR;
         }
@@ -311,7 +315,7 @@ ind[IN_PRCH9] = CHP (9, cct[cct_ptr]) != 0;             /* set indicators */
 ind[IN_PRCH12] = CHP (12, cct[cct_ptr]) != 0;
 if (ferror (lpt_unit.fileref)) {                        /* error? */
     ind[IN_PRCHK] = ind[IN_WRCHK] = 1;                  /* wr, pri check */
-    perror ("LPT I/O error");
+    sim_perror ("LPT I/O error");
     clearerr (lpt_unit.fileref);
     return SCPE_IOERR;
     }
@@ -352,7 +356,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 lpt_reset (&lpt_dev);
 return attach_unit (uptr, cptr);

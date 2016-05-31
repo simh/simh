@@ -49,7 +49,7 @@
 #endif
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -66,8 +66,8 @@
 #define WR_DATA_DETAIL_MSG  (1 << 8)
 
 extern uint32 PCX;
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -101,6 +101,7 @@ typedef struct {
     uint8 ss;       /* Specifies the side of a double-sided diskette. The bottom side (and only side of a single-sided diskette) is selected when SS=0. The second (top) side is selected when SS=1. */
     uint8 dp;       /* has shared use. During stepping operations, DP=O specifies a step out and DP=1 specifies a step in. During write operations, write procompensation is invoked if and only if DP=1. */
     uint8 st;       /* controls the level of the head step signal to the disk drives. */
+    uint8 pst;      /* value of step signal (st) on previous order */
     uint8 ds;       /* is the drive select field, encoded as follows: */
                     /* 0=no drive selected
                      * 1=drive 1 selected
@@ -210,10 +211,11 @@ static SECTOR_FORMAT sdata;
 
 /* Local function prototypes */
 static t_stat mdsad_reset(DEVICE *mdsad_dev);
-static t_stat mdsad_attach(UNIT *uptr, char *cptr);
+static t_stat mdsad_attach(UNIT *uptr, CONST char *cptr);
 static t_stat mdsad_detach(UNIT *uptr);
 static t_stat mdsad_boot(int32 unitno, DEVICE *dptr);
 static uint8 MDSAD_Read(const uint32 Addr);
+static const char* mdsad_description(DEVICE *dptr);
 
 static int32 mdsaddev(const int32 Addr, const int32 rw, const int32 data);
 
@@ -228,7 +230,11 @@ static REG mdsad_reg[] = {
     { NULL }
 };
 
-#define MDSAD_NAME  "North Star Floppy Controller MDSAD"
+#define MDSAD_NAME  "North Star Floppy Controller"
+
+static const char* mdsad_description(DEVICE *dptr) {
+    return MDSAD_NAME;
+}
 
 static MTAB mdsad_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",
@@ -262,7 +268,7 @@ DEVICE mdsad_dev = {
     NULL, NULL, &mdsad_reset,
     &mdsad_boot, &mdsad_attach, &mdsad_detach,
     &mdsad_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    mdsad_dt, NULL, "North Star Floppy Controller MDSAD"
+    mdsad_dt, NULL, NULL, NULL, NULL, NULL, &mdsad_description
 };
 
 /* Reset routine */
@@ -277,7 +283,7 @@ static t_stat mdsad_reset(DEVICE *dptr)
         /* Connect MDSAD at base address */
         if(sim_map_resource(pnp->mem_base, pnp->mem_size,
             RESOURCE_TYPE_MEMORY, &mdsaddev, FALSE) != 0) {
-            printf("%s: error mapping resource at 0x%04x\n",
+            sim_printf("%s: error mapping resource at 0x%04x\n",
                 __FUNCTION__, pnp->mem_base);
             dptr->flags |= DEV_DIS;
             return SCPE_ARG;
@@ -287,7 +293,7 @@ static t_stat mdsad_reset(DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat mdsad_attach(UNIT *uptr, char *cptr)
+static t_stat mdsad_attach(UNIT *uptr, CONST char *cptr)
 {
     char header[4];
     t_stat r;
@@ -312,6 +318,8 @@ static t_stat mdsad_attach(UNIT *uptr, char *cptr)
         if(mdsad_dev.units[i].fileref == uptr->fileref) {
             break;
         }
+
+    mdsad_info->orders.st = 0;      /* ensure valid state */
     }
 
     /* Default for new file is DSK */
@@ -320,7 +328,7 @@ static t_stat mdsad_attach(UNIT *uptr, char *cptr)
     if(uptr->capac > 0) {
         char *rtn = fgets(header, 4, uptr->fileref);
         if((rtn != NULL) && (strncmp(header, "CPT", 3) == 0)) {
-            printf("CPT images not yet supported\n");
+            sim_printf("CPT images not yet supported\n");
             uptr->u3 = IMAGE_TYPE_CPT;
             mdsad_detach(uptr);
             return SCPE_OPENERR;
@@ -330,7 +338,7 @@ static t_stat mdsad_attach(UNIT *uptr, char *cptr)
     }
 
     if (uptr->flags & UNIT_MDSAD_VERBOSE)
-        printf("MDSAD%d, attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("MDSAD%d, attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
 
@@ -415,13 +423,13 @@ static uint8 mdsad_rom[] = {
 
 static void showdata(int32 isRead) {
     int32 i;
-    printf("MDSAD: " ADDRESS_FORMAT " %s Sector =" NLP "\t", PCX, isRead ? "Read" : "Write");
+    sim_printf("MDSAD: " ADDRESS_FORMAT " %s Sector =" NLP "\t", PCX, isRead ? "Read" : "Write");
     for(i=0; i < MDSAD_SECTOR_LEN; i++) {
-        printf("%02X ", sdata.u.data[i]);
+        sim_printf("%02X ", sdata.u.data[i]);
         if(((i+1) & 0xf) == 0)
-            printf(NLP "\t");
+            sim_printf(NLP "\t");
     }
-    printf(NLP);
+    sim_printf(NLP);
 }
 
 static int checksum;
@@ -489,7 +497,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                 {
                     case IMAGE_TYPE_DSK:
                         if(pDrive->uptr->fileref == NULL) {
-                            printf(".fileref is NULL!" NLP);
+                            sim_printf(".fileref is NULL!" NLP);
                         } else {
                             sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
                             sim_fwrite(sdata.u.data, 1, MDSAD_SECTOR_LEN,
@@ -497,10 +505,10 @@ static uint8 MDSAD_Read(const uint32 Addr)
                         }
                         break;
                     case IMAGE_TYPE_CPT:
-                        printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                        sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
                         break;
                     default:
-                        printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                        sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
                         break;
                 }
             }
@@ -510,6 +518,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
             mdsad_info->orders.dd = (Addr & 0x80) >> 7;
             mdsad_info->orders.ss = (Addr & 0x40) >> 6;
             mdsad_info->orders.dp = (Addr & 0x20) >> 5;
+            mdsad_info->orders.pst = mdsad_info->orders.st;     /* save previous state of st */
             mdsad_info->orders.st = (Addr & 0x10) >> 4;
             mdsad_info->orders.ds = (Addr & 0x0F);
 
@@ -543,7 +552,9 @@ static uint8 MDSAD_Read(const uint32 Addr)
             /* use latest selected drive */
             pDrive = &mdsad_info->drive[mdsad_info->orders.ds];
 
-            if(mdsad_info->orders.st == 1) {
+            /* step only on transition of the step bit from 1 to 0. This duplicates the
+               way the hardware functions and is required by some North Star code */
+            if((mdsad_info->orders.st == 0) && (mdsad_info->orders.pst != 0)) {
                 if(mdsad_info->orders.dp == 0) {
                     sim_debug(SEEK_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
                               " Step out: Track=%d%s\n", PCX, pDrive->track,
@@ -720,7 +731,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                             {
                                 case IMAGE_TYPE_DSK:
                                     if(pDrive->uptr->fileref == NULL) {
-                                        printf(".fileref is NULL!" NLP);
+                                        sim_printf(".fileref is NULL!" NLP);
                                     } else {
                                         sim_fseek((pDrive->uptr)->fileref,
                                             sec_offset, SEEK_SET);
@@ -733,11 +744,11 @@ static uint8 MDSAD_Read(const uint32 Addr)
                                     }
                                     break;
                                 case IMAGE_TYPE_CPT:
-                                    printf("%s: CPT Format not supported"
+                                    sim_printf("%s: CPT Format not supported"
                                         NLP, __FUNCTION__);
                                     break;
                                 default:
-                                    printf("%s: Unknown image Format"
+                                    sim_printf("%s: Unknown image Format"
                                         NLP, __FUNCTION__);
                                     break;
                             }

@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    cpu          PDP-4/7/9/15 central processor
 
+   10-Mar-16    RMS     Added 3-cycle databreak set/show routines
+   07-Mar-16    RMS     Revised to allocate memory dynamically
+   28-Mar-15    RMS     Revised to use sim_printf
    28-Apr-07    RMS     Removed clock initialization
    26-Dec-06    RMS     Fixed boundary test in KT15/XVM (Andrew Warkentin)
    30-Oct-06    RMS     Added idle and infinite loop detection
@@ -330,7 +333,7 @@ typedef struct {
 #define ASW_DFLT        017720
 #endif
 
-int32 M[MAXMEMSIZE] = { 0 };                            /* memory */
+int32 *M = NULL;                                        /* memory */
 int32 LAC = 0;                                          /* link'AC */
 int32 MQ = 0;                                           /* MQ */
 int32 PC = 0;                                           /* PC */
@@ -383,9 +386,9 @@ t_bool build_dev_tab (void);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 void cpu_caf (void);
 void cpu_inst_hist (int32 addr, int32 inst);
 void cpu_intr_hist (int32 flag, int32 lvl);
@@ -433,7 +436,7 @@ static const int32 api_ffo[256] = {
  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
  };
 
-static const int32 api_vec[API_HLVL][32] = {
+int32 api_vec[API_HLVL][32] = {
  { ACH_PWRFL },                                         /* API 0 */
  { ACH_DTA, ACH_MTA, ACH_DRM, ACH_RF, ACH_RP, ACH_RB }, /* API 1 */
  { ACH_PTR, ACH_LPT, ACH_LPT },                         /* API 2 */
@@ -454,69 +457,69 @@ UNIT cpu_unit = {
     };
 
 REG cpu_reg[] = {
-    { ORDATA (PC, PC, ADDRSIZE) },
-    { ORDATA (AC, LAC, 18) },
-    { FLDATA (L, LAC, 18) },
-    { ORDATA (MQ, MQ, 18) },
-    { ORDATA (SC, SC, 6) },
-    { FLDATA (EAE_AC_SIGN, eae_ac_sign, 18) },
-    { ORDATA (SR, SR, 18) },
-    { ORDATA (ASW, ASW, ADDRSIZE) },
-    { ORDATA (IORS, iors, 18), REG_RO },
-    { BRDATA (INT, int_hwre, 8, 32, API_HLVL+1), REG_RO },
-    { FLDATA (INT_PEND, int_pend, 0), REG_RO },
-    { FLDATA (ION, ion, 0) },
-    { ORDATA (ION_DELAY, ion_defer, 2) },
+    { ORDATAD (PC, PC, ADDRSIZE, "program counter") },
+    { ORDATAD (AC, LAC, 18, "accumulator") },
+    { FLDATAD (L, LAC, 18, "link") },
+    { ORDATAD (MQ, MQ, 18, "multiplier-quotient") },
+    { ORDATAD (SC, SC, 6, "shift counter") },
+    { FLDATAD (EAE_AC_SIGN, eae_ac_sign, 18, "EAE AC sign") },
+    { ORDATAD (SR, SR, 18, "front panel switches") },
+    { ORDATAD (ASW, ASW, ADDRSIZE, "address switches for RIM load") },
+    { ORDATAD (IORS, iors, 18, "IORS register"), REG_RO },
+    { BRDATAD (INT, int_hwre, 8, 32, API_HLVL+1, "interrupt requests, 0:3 = API levels 0 to 3,                                    4 = PI level"), REG_RO },
+    { FLDATAD (INT_PEND, int_pend, 0, "interrupt pending"), REG_RO },
+    { FLDATAD (ION, ion, 0, "interrupt enable") },
+    { ORDATAD (ION_DELAY, ion_defer, 2, "interrupt enable delay") },
 #if defined (PDP7) 
-    { FLDATA (TRAPM, usmd, 0) },
-    { FLDATA (TRAPP, trap_pending, 0) },
-    { FLDATA (EXTM, memm, 0) },
-    { FLDATA (EXTM_INIT, memm_init, 0) },
-    { FLDATA (EMIRP, emir_pending, 0) },
+    { FLDATAD (TRAPM, usmd, 0, "trap mode") },
+    { FLDATAD (TRAPP, trap_pending, 0, "trap pending") },
+    { FLDATAD (EXTM, memm, 0, "extend mode") },
+    { FLDATAD (EXTM_INIT, memm_init, 0, "exit mode value after reset") },
+    { FLDATAD (EMIRP, emir_pending, 0, "EMIR instruction pending") },
 #endif
 #if defined (PDP9)
-    { FLDATA (APIENB, api_enb, 0) },
-    { ORDATA (APIREQ, api_req, 8) },
-    { ORDATA (APIACT, api_act, 8) },
-    { ORDATA (BR, BR, ADDRSIZE) },
-    { FLDATA (USMD, usmd, 0) },
-    { FLDATA (USMDBUF, usmd_buf, 0) },
-    { FLDATA (USMDDEF, usmd_defer, 0) },
-    { FLDATA (NEXM, nexm, 0) },
-    { FLDATA (PRVN, prvn, 0) },
-    { FLDATA (TRAPP, trap_pending, 0) },
-    { FLDATA (EXTM, memm, 0) },
-    { FLDATA (EXTM_INIT, memm_init, 0) },
-    { FLDATA (EMIRP, emir_pending, 0) },
-    { FLDATA (RESTP, rest_pending, 0) },
-    { FLDATA (PWRFL, int_hwre[API_PWRFL], INT_V_PWRFL) },
+    { FLDATAD (APIENB, api_enb, 0, "api enable") },
+    { ORDATAD (APIREQ, api_req, 8, "api requesting levels") },
+    { ORDATAD (APIACT, api_act, 8, "api active levels") },
+    { ORDATAD (BR, BR, ADDRSIZE, "memory protection bounds") },
+    { FLDATAD (USMD, usmd, 0, "user mode") },
+    { FLDATAD (USMDBUF, usmd_buf, 0, "user mode buffer") },
+    { FLDATAD (USMDDEF, usmd_defer, 0, "user mode load defer") },
+    { FLDATAD (NEXM, nexm, 0, "non-existent memory violation") },
+    { FLDATAD (PRVN, prvn, 0, "privilege violation") },
+    { FLDATAD (TRAPP, trap_pending, 0, "trap pending") },
+    { FLDATAD (EXTM, memm, 0, "extend mode") },
+    { FLDATAD (EXTM_INIT, memm_init, 0, "extend mode value after reset") },
+    { FLDATAD (EMIRP, emir_pending, 0, "EMIR instruction pending") },
+    { FLDATAD (RESTP, rest_pending, 0, "DBR or RES instruction pending") },
+    { FLDATAD (PWRFL, int_hwre[API_PWRFL], INT_V_PWRFL, "power fail pending") },
 #endif
 #if defined (PDP15)
-    { FLDATA (ION_INH, ion_inh, 0) },
-    { FLDATA (APIENB, api_enb, 0) },
-    { ORDATA (APIREQ, api_req, 8) },
-    { ORDATA (APIACT, api_act, 8) },
-    { ORDATA (XR, XR, 18) },
-    { ORDATA (LR, LR, 18) },
-    { ORDATA (BR, BR, 18) },
-    { ORDATA (RR, RR, 18) },
-    { ORDATA (MMR, MMR, 18) },
-    { FLDATA (USMD, usmd, 0) },
-    { FLDATA (USMDBUF, usmd_buf, 0) },
-    { FLDATA (USMDDEF, usmd_defer, 0) },
-    { FLDATA (NEXM, nexm, 0) },
-    { FLDATA (PRVN, prvn, 0) },
-    { FLDATA (TRAPP, trap_pending, 0) },
-    { FLDATA (BANKM, memm, 0) },
-    { FLDATA (BANKM_INIT, memm_init, 0) },
-    { FLDATA (RESTP, rest_pending, 0) },
-    { FLDATA (PWRFL, int_hwre[API_PWRFL], INT_V_PWRFL) },
+    { FLDATAD (ION_INH, ion_inh, 0, "interrupt inhibit") },
+    { FLDATAD (APIENB, api_enb, 0, "API enable") },
+    { ORDATAD (APIREQ, api_req, 8, "API requesting levels") },
+    { ORDATAD (APIACT, api_act, 8, "API active levels") },
+    { ORDATAD (XR, XR, 18, "index register") },
+    { ORDATAD (LR, LR, 18, "limit register") },
+    { ORDATAD (BR, BR, 18, "memory protection bounds") },
+    { ORDATAD (RR, RR, 18, "memory protection relocation") },
+    { ORDATAD (MMR, MMR, 18, "memory protection control") },
+    { FLDATAD (USMD, usmd, 0, "user mode") },
+    { FLDATAD (USMDBUF, usmd_buf, 0, "user mode buffer") },
+    { FLDATAD (USMDDEF, usmd_defer, 0, "user mode load defer") },
+    { FLDATAD (NEXM, nexm, 0, "non-existent memory violation") },
+    { FLDATAD (PRVN, prvn, 0, "privilege violation") },
+    { FLDATAD (TRAPP, trap_pending, 0, "trap pending") },
+    { FLDATAD (BANKM, memm, 0, "bank mode") },
+    { FLDATAD (BANKM_INIT, memm_init, 0, "bank mode value after reset") },
+    { FLDATAD (RESTP, rest_pending, 0, "DBR or RES instruction pending") },
+    { FLDATAD (PWRFL, int_hwre[API_PWRFL], INT_V_PWRFL, "power fail flag") },
 #endif
-    { BRDATA (PCQ, pcq, 8, ADDRSIZE, PCQ_SIZE), REG_RO+REG_CIRC },
+    { BRDATAD (PCQ, pcq, 8, ADDRSIZE, PCQ_SIZE, "PC prior to last JMP, JMS, CAL or interrupt; most recent                        PC change first stop on undefineds instruction"), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
-    { FLDATA (STOP_INST, stop_inst, 0) },
-    { DRDATA (XCT_MAX, xct_max, 8), PV_LEFT + REG_NZ },
-    { ORDATA (WRU, sim_int_char, 8) },
+    { FLDATAD (STOP_INST, stop_inst, 0, "stop on defined instruction") },
+    { DRDATAD (XCT_MAX, xct_max, 8, "max numb of chained XCT's allowed"), PV_LEFT + REG_NZ },
+    { ORDATAD (WRU, sim_int_char, 8, "interrupt character") },
     { NULL }  };
 
 MTAB cpu_mod[] = {
@@ -727,7 +730,7 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
     if (!usmd_defer)                                    /* no IOT? load usmd */
         usmd = usmd_buf;
     else usmd_defer = 0;                                /* cancel defer */
@@ -1550,7 +1553,7 @@ while (reason == 0) {                                   /* loop until halted */
                 }
             else if (pulse == 004) {                    /* ISA */
                 api_enb = (iot_data & SIGN)? 1: 0;
-                api_req = api_req | ((LAC >> 8) & 017);
+                api_req = api_req | ((LAC >> 8) & 017); /* swre levels only */
                 api_act = api_act | (LAC & 0377);
                 }
             break;
@@ -1643,7 +1646,7 @@ while (reason == 0) {                                   /* loop until halted */
                 }
             else if (pulse == 004) {                    /* ISA */
                 api_enb = (iot_data & SIGN)? 1: 0;
-                api_req = api_req | ((LAC >> 8) & 017);
+                api_req = api_req | ((LAC >> 8) & 017); /* swre levels only */
                 api_act = api_act | (LAC & 0377);
                 }
             else if (pulse == 021)                      /* ENB */
@@ -2051,15 +2054,15 @@ if (MMR & MM_RDIS)                                      /* reloc disabled? */
 else if ((MMR & MM_SH) &&                               /* shared enabled and */
     (ma >= g_base[gmode]) &&                            /* >= shared base and */
     (ma < (g_base[gmode] + slr_lnt[slr]))) {            /* < shared end? */
-	if (ma & 017400) {									/* ESAS? */
-		if ((rc == REL_W) && (MMR & MM_WP)) {			/* write and protected? */
-			prvn = trap_pending = 1;					/* set flag, trap */
-			return -1;
-			}
-		pa = (((MMR & MM_SBR_MASK) << 8) + ma) & DMASK; /* ESAS reloc */
-		}
-	else pa = RR + (ma & 0377);							/* no, ISAS reloc */
-	}
+    if (ma & 017400) {                                  /* ESAS? */
+        if ((rc == REL_W) && (MMR & MM_WP)) {           /* write and protected? */
+            prvn = trap_pending = 1;                    /* set flag, trap */
+            return -1;
+            }
+        pa = (((MMR & MM_SBR_MASK) << 8) + ma) & DMASK; /* ESAS reloc */
+        }
+    else pa = RR + (ma & 0377);                         /* no, ISAS reloc */
+    }
 else {
     if (ma > (BR | 0377)) {                             /* normal reloc, viol? */
         if (rc != REL_C)                                /* set flag, trap */
@@ -2096,6 +2099,10 @@ usmd = usmd_buf = usmd_defer = 0;
 memm = memm_init;
 nexm = prvn = trap_pending = 0;
 emir_pending = rest_pending = 0;
+if (M == NULL)
+    M = (int32 *) calloc (MEMSIZE, sizeof (int32));
+if (M == NULL)
+    return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
@@ -2158,7 +2165,7 @@ return SCPE_OK;
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -2177,7 +2184,7 @@ return SCPE_OK;
 
 /* Change device number for a device */
 
-t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_devno (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -2203,7 +2210,7 @@ return SCPE_OK;
 
 /* Show device number for a device */
 
-t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -2248,10 +2255,10 @@ static const uint8 std_dev[] =
 for (i = 0; i < DEV_MAX; i++) {                         /* clr tables */
     dev_tab[i] = NULL;
     dev_iors[i] = NULL;
-	}
+    }
 for (i = 0; i < ((uint32) sizeof (std_dev)); i++)       /* std entries */
     dev_tab[std_dev[i]] = &bad_dev;
-for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices */
+for (i = p = 0; (dptr = sim_devices[i]) != NULL; i++) { /* add devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* enabled? */
         if (dibp->iors)                                 /* if IORS, add */
@@ -2260,7 +2267,7 @@ for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices *
             if (dibp->dsp[j]) {                         /* any dispatch? */
                 if (dev_tab[dibp->dev + j]) {           /* already filled? */
                     sim_printf ("%s device number conflict at %02o\n",
-                                sim_dname (dptr), dibp->dev + j);
+                            sim_dname (dptr), dibp->dev + j);
                     return TRUE;
                     }
                 dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
@@ -2271,9 +2278,34 @@ for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices *
 return FALSE;
 }
 
+/* Set in memory 3-cycle databreak register */
+
+t_stat set_3cyc_reg (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+t_stat r;
+int32 newv;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+newv = (int32) get_uint (cptr, 8, 0777777, &r);
+if (r != SCPE_OK)
+    return SCPE_ARG;
+M[val] = newv;
+return SCPE_OK;
+}
+
+/* Show in-memory 3-cycle databreak register */
+
+t_stat show_3cyc_reg (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%s=", (const char *) desc);
+fprint_val (st, (t_value) M[val], 8, 18, PV_RZRO);
+return SCPE_OK;
+}
+
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -2304,10 +2336,11 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 l, j, k, di, lnt;
-char *cptr = (char *) desc;
+
+const char *cptr = (const char *) desc;
 t_value sim_eval[2];
 t_stat r;
 InstHistory *h;

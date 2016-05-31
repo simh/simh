@@ -285,13 +285,13 @@ int32 addr_mask = YMASK;
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 cpu_get_mode (void);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_ext (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_ext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat Read (void);
 t_stat Write (void);
 
@@ -317,21 +317,21 @@ extern int32 dpy (int32 ac);
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_EXT_INST | UNIT_MODE_READIN, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
-    { ORDATA (PC, PC, ASIZE) },
-    { ORDATA (AC, AC, 18) },
-    { ORDATA (IR, IR, 5) },
-    { ORDATA (MAR, MAR, 16) },
-    { ORDATA (XR, XR, 14) },
-    { ORDATA (MBR, MBR, 18) },
-    { ORDATA (LR, LR, 18) },
-    { ORDATA (TAC, TAC, 18) },
-	{ ORDATA (TBR, TBR, 18) },
+    { ORDATAD (PC, PC, ASIZE, "program counter") },
+    { ORDATAD (AC, AC, 18, "accumulator") },
+    { ORDATAD (IR, IR, 5, "instruction register (5 bits in Extented Mode,                                  2 bits in standard mode)") },
+    { ORDATAD (MAR, MAR, 16, "memory address register") },
+    { ORDATAD (XR, XR, 14, "index register (Extended Mode only)") },
+    { ORDATAD (MBR, MBR, 18, "memory buffer register") },
+    { ORDATAD (LR, LR, 18, "live register") },
+    { ORDATAD (TAC, TAC, 18, "toggle switch accumulator") },
+    { ORDATAD (TBR, TBR, 18, "toggle switch buffer register") },
     { ORDATA (PF, PF, 18) },
     { BRDATA (PCQ, pcq, 8, ASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
-    { FLDATA (IOS, ios, 0) },       /* In Out Stop */
-    { FLDATA (CH, ch, 0) },         /* Chime Alarm */
-    { ORDATA (LP, LPEN, 2) },       /* Light Pen */
+    { FLDATAD (IOS, ios, 0, "in out stop") },       /* In Out Stop */
+    { FLDATAD (CH, ch, 0, "chime alarm") },         /* Chime Alarm */
+    { ORDATAD (LP, LPEN, 2, "light pen") },       /* Light Pen */
     { FLDATA (R, mode_rdin, 0), REG_HRO },      /* Mode "R" (Read In) Flip-Flop */
     { FLDATA (T, mode_tst, 0), REG_HRO },       /* Mode "T" (Test) Flip-Flop */
     { NULL }
@@ -420,22 +420,22 @@ typedef struct {
 INST_CTRS inst_ctr;
 
 
-void tx0_dump_regs(char *desc)
+void tx0_dump_regs(const char *desc)
 {
     TRACE_PRINT(TRACE_MSG, ("%s: AC=%06o, MAR=%05o, MBR=%06o, LR=%06o, XR=%05o\n", desc, AC, MAR, MBR, LR, XR));
 
     /* Check regs sanity */
     if (AC > DMASK) {
-        printf("Error: AC > DMASK\n");
+        sim_printf("Error: AC > DMASK\n");
     }
     if (MBR > DMASK) {
-        printf("Error: MBR > DMASK\n");
+        sim_printf("Error: MBR > DMASK\n");
     }
     if (LR > DMASK) {
-        printf("Error: LR > DMASK\n");
+        sim_printf("Error: LR > DMASK\n");
     }
     if (!MEM_ADDR_OK(MAR)) {
-        printf("Error: MAR > %06o\n", MEMSIZE);
+        sim_printf("Error: MAR > %06o\n", MEMSIZE);
     }
 
 }
@@ -703,10 +703,10 @@ t_stat sim_instr (void)
                     break;
                 case 3:     /* tix (Transfer and Index) */
                     TRACE_PRINT(TRN_MSG, ("[%06o] TIX: XR=%05o\n", PC-1, XR));
-					if ((XR == 037777) || (XR == 000000)) { /* +/- 0, take next instruction */
+                    if ((XR == 037777) || (XR == 000000)) { /* +/- 0, take next instruction */
                         TRACE_PRINT(TRN_MSG, ("+/- 0, transfer not taken.\n"));
                     } else { /* Not +/- 0 */
-						if (XR & 0020000) { /* XR[4] == 1 */
+                        if (XR & 0020000) { /* XR[4] == 1 */
                             TRACE_PRINT(TRN_MSG, ("XR is negative, transfer taken,"));
                             XR ++;
                         } else { /* XR[4] = 0 */
@@ -809,10 +809,10 @@ t_stat sim_instr (void)
                         int32 BINDEC = (op & 020);
                         int32 device = op & 03;
                         int32 tape_ord = (op >> 2) & 03;
-                        char *tape_cmd[] = {"Backspace Tape", "Read/Select Tape", "Rewind Tape", "Write/Select Tape" };
+                        const char *tape_cmd[] = {"Backspace Tape", "Read/Select Tape", "Rewind Tape", "Write/Select Tape" };
 
                         TRACE_PRINT(ERROR_MSG, ("[%06o] TODO: SEL (magtape)\n", PC-1));
-                        printf("Device %d: CLRA=%d, BINDEC=%d: %s\n", device, CLRA, BINDEC, tape_cmd[tape_ord]);
+                        sim_printf("Device %d: CLRA=%d, BINDEC=%d: %s\n", device, CLRA, BINDEC, tape_cmd[tape_ord]);
                     }
                     break;
                 case IOS_RPF: /* These are used for Magtape control. */
@@ -1070,7 +1070,7 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     int32 mc = 0;
     uint32 i;
@@ -1087,7 +1087,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 /* Change CPU Mode (Normal, Test, Readin) */
 
-t_stat cpu_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     if (val == UNIT_MODE_TEST) {
         mode_tst = 1;
@@ -1106,15 +1106,15 @@ t_stat cpu_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 /* Set TX-0 with Extended Instruction Set */
 
-t_stat cpu_set_ext (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_ext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    printf("Set CPU Extended Mode\n");
+    sim_printf("Set CPU Extended Mode\n");
     return SCPE_OK;
 }
 
-t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    printf("Set CPU Non-Extended Mode\n");
+    sim_printf("Set CPU Non-Extended Mode\n");
     return SCPE_OK;
 }
 
@@ -1127,7 +1127,7 @@ int32 cpu_get_mode (void)
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1155,10 +1155,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 ov, pf, op, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
@@ -1208,10 +1208,10 @@ cpu_get_switches(void)
     return TAC;
 }
 
-t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
+t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     uint32 word;
     t_addr j, lo, hi, sz, sz_words;
-    char *result;
+    CONST char *result;
 
     if (flag) { /* Dump to file. */
         result = get_range(NULL, cptr, &lo, &hi, 8, 0xFFFF, 0);
@@ -1231,7 +1231,7 @@ t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
         }
     }
 
-    printf("%d words %s [%06o - %06o].\n", j - lo, flag ? "dumped" : "loaded", lo, j-1);
+    sim_printf("%d words %s [%06o - %06o].\n", j - lo, flag ? "dumped" : "loaded", lo, j-1);
 
     return SCPE_OK;
 }
@@ -1314,7 +1314,7 @@ t_stat sim_opr_orig(int32 op)
         int32 rbuf;
         rbuf = tti(0,0,0);
         TRACE_PRINT(IOS_MSG, ("TTI: character received='%c'\n", rbuf &077));
-        printf("TTI: character received='%c'\n", rbuf &077);
+        sim_printf("TTI: character received='%c'\n", rbuf &077);
         LR &= 0266666; /* Clear bits 0,2,5,8,...,17 */
 
         LR |= SIGN; /* Set bit 0, character available. */

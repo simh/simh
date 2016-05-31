@@ -1,6 +1,6 @@
 /* hp2100_dr.c: HP 2100 12606B/12610B fixed head disk/drum simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    DR           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
@@ -202,13 +205,13 @@ IOHANDLER drcio;
 
 t_stat drc_svc (UNIT *uptr);
 t_stat drc_reset (DEVICE *dptr);
-t_stat drc_attach (UNIT *uptr, char *cptr);
+t_stat drc_attach (UNIT *uptr, CONST char *cptr);
 t_stat drc_boot (int32 unitno, DEVICE *dptr);
 int32 dr_incda (int32 trk, int32 sec, int32 ptr);
 int32 dr_seccntr (double simtime);
-t_stat dr_set_prot (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dr_set_prot (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat dr_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 DEVICE drd_dev, drc_dev;
 
@@ -466,14 +469,14 @@ while (working_set) {
 
 
         case ioIOI:                                         /* I/O data input */
-            data = drc_sta;                                 /* static bits */
+            data = (uint16) drc_sta;                        /* static bits */
 
             if (!(drc_unit.flags & UNIT_PROT) ||            /* not protected? */
                  (CW_GETTRK(drc_cw) >= drc_pcount))         /* or not in range? */
                 data = data | DRS_WEN;                      /* set wrt enb status */
 
             if (drc_unit.flags & UNIT_ATT) {                /* attached? */
-                data = data | (dr_seccntr (sim_gtime()) << DRS_V_NS) | DRS_RDY;
+                data = data | (uint16) (dr_seccntr (sim_gtime()) << DRS_V_NS) | DRS_RDY;
                 if (sim_is_active (&drc_unit))              /* op in progress? */
                     data = data | DRS_BSY;
                 if (CALC_SCP (sim_gtime()))                 /* SCP ff set? */
@@ -528,7 +531,7 @@ drc_run = 1;                                            /* set run ff */
 
 if (drc_cw & CW_WR) {                                   /* write? */
     if ((da < uptr->capac) && (sec < DR_NUMSC)) {
-        bptr[da + drd_ptr] = drd_obuf;
+        bptr[da + drd_ptr] = (uint16) drd_obuf;
         if (((uint32) (da + drd_ptr)) >= uptr->hwmark)
             uptr->hwmark = da + drd_ptr + 1;
         }
@@ -540,7 +543,7 @@ if (drc_cw & CW_WR) {                                   /* write? */
     else {                                              /* done */
         if (drd_ptr)                                    /* need to fill? */
             for ( ; drd_ptr < DR_NUMWD; drd_ptr++)
-                bptr[da + drd_ptr] = drd_obuf;          /* fill with last word */
+                bptr[da + drd_ptr] = (uint16) drd_obuf; /* fill with last word */
         if (!(drc_unit.flags & UNIT_DRUM))              /* disk? */
             drc_sta = drc_sta | DRS_PER;                /* parity bit sets on write */
         drc_run = 0;                                    /* clear run ff */
@@ -628,7 +631,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat drc_attach (UNIT *uptr, char *cptr)
+t_stat drc_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 sz = sz_tab[DR_GETSZ (uptr->flags)];
 
@@ -639,7 +642,7 @@ return attach_unit (uptr, cptr);
 
 /* Set protected track count */
 
-t_stat dr_set_prot (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dr_set_prot (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 count;
 t_stat status;
@@ -675,7 +678,7 @@ return SCPE_OK;
 
 /* Show protected track count */
 
-t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "protected tracks=%d", drc_pcount);
 return SCPE_OK;
@@ -683,7 +686,7 @@ return SCPE_OK;
 
 /* Set size routine */
 
-t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dr_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 sz;
 int32 szindex;
@@ -735,13 +738,15 @@ t_stat drc_boot (int32 unitno, DEVICE *dptr)
 {
 const int32 dev = drd_dib.select_code;                  /* data chan select code */
 
-if (unitno != 0)                                        /* only unit 0 */
-    return SCPE_NOFNC;
-if (ibl_copy (dr_rom, dev))                             /* copy boot to memory */
-    return SCPE_IERR;
+if (unitno != 0)                                        /* boot supported on drive unit 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
+
+if (ibl_copy (dr_rom, dev, IBL_S_NOCLR, IBL_S_NOSET))   /* copy the boot ROM to memory and configure */
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
 
 WritePW (PC + IBL_DPC, dr_rom [IBL_DPC]);               /* restore overwritten word */
 WritePW (PC + IBL_END, dr_rom [IBL_END]);               /* restore overwritten word */
 PC = PC + BOOT_START;                                   /* correct starting address */
+
 return SCPE_OK;
 }

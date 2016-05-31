@@ -27,12 +27,16 @@ Copyright (c) 2005-2012, William Beech
 #include <ctype.h>
 #include "sim_defs.h"                   // simulator defs
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 /* Memory */
 
-#define MAXMEMSIZE	65536		// max memory size
-#define MEMSIZE		(m6800_unit.capac) // actual memory size
-#define ADDRMASK	(MAXMEMSIZE - 1) // address mask
-#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
+#define MAXMEMSIZE      65536               // max memory size
+#define MEMSIZE         (m6800_unit.capac)  // actual memory size
+#define ADDRMASK        (MAXMEMSIZE - 1)    // address mask
+#define MEM_ADDR_OK(x)  (((uint32) (x)) < MEMSIZE)
 
 /* debug definitions */
 
@@ -47,9 +51,9 @@ Copyright (c) 2005-2012, William Beech
 
 /* Simulator stop codes */
 
-#define STOP_RSRV	1		// must be 1
-#define STOP_HALT	2		// HALT-really WAI
-#define STOP_IBKPT	3		// breakpoint
-#define STOP_OPCODE	4		// invalid opcode
-#define STOP_MEMORY	5		// invalid memory address
+#define STOP_RSRV   1       // must be 1
+#define STOP_HALT   2       // HALT-really WAI
+#define STOP_IBKPT  3       // breakpoint
+#define STOP_OPCODE 4       // invalid opcode
+#define STOP_MEMORY 5       // invalid memory address
 

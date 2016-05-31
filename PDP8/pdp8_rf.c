@@ -117,7 +117,6 @@ int32 rf_time = 10;                                     /* inter-word time */
 int32 rf_burst = 1;                                     /* burst mode flag */
 int32 rf_stopioe = 1;                                   /* stop on error */
 
-DEVICE rf_dev;
 int32 rf60 (int32 IR, int32 AC);
 int32 rf61 (int32 IR, int32 AC);
 int32 rf62 (int32 IR, int32 AC);
@@ -126,8 +125,8 @@ t_stat rf_svc (UNIT *uptr);
 t_stat pcell_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
 t_stat rf_boot (int32 unitno, DEVICE *dptr);
-t_stat rf_attach (UNIT *uptr, char *cptr);
-t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rf_attach (UNIT *uptr, CONST char *cptr);
+t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* RF08 data structures
 
@@ -147,16 +146,16 @@ UNIT rf_unit = {
 UNIT pcell_unit = { UDATA (&pcell_svc, 0, 0) };
 
 REG rf_reg[] = {
-    { ORDATA (STA, rf_sta, 12) },
-    { ORDATA (DA, rf_da, 20) },
-    { ORDATA (WC, M[RF_WC], 12), REG_FIT },
-    { ORDATA (MA, M[RF_MA], 12), REG_FIT },
-    { FLDATA (DONE, rf_done, 0) },
-    { FLDATA (INT, int_req, INT_V_RF) },
-    { ORDATA (WLK, rf_wlk, 32) },
-    { DRDATA (TIME, rf_time, 24), REG_NZ + PV_LEFT },
-    { FLDATA (BURST, rf_burst, 0) },
-    { FLDATA (STOP_IOE, rf_stopioe, 0) },
+    { ORDATAD (STA, rf_sta, 12, "status") },
+    { ORDATAD (DA, rf_da, 20, "low order disk address") },
+    { ORDATAD (WC, M[RF_WC], 12, "word count (in memory)"), REG_FIT },
+    { ORDATAD (MA, M[RF_MA], 12, "memory address (in memory)"), REG_FIT },
+    { FLDATAD (DONE, rf_done, 0, "device done flag") },
+    { FLDATAD (INT, int_req, INT_V_RF, "interrupt pending flag") },
+    { ORDATAD (WLK, rf_wlk, 32, "write lock switches") },
+    { DRDATAD (TIME, rf_time, 24, "rotational delay, per word"), REG_NZ + PV_LEFT },
+    { FLDATAD (BURST, rf_burst, 0, "burst flag") },
+    { FLDATAD (STOP_IOE, rf_stopioe, 0, "stop on I/O error") },
     { DRDATA (CAPAC, rf_unit.capac, 21), REG_HRO },
     { ORDATA (DEVNUM, rf_dib.dev, 6), REG_HRO },
     { NULL }
@@ -332,7 +331,7 @@ do {
         if ((rf_wlk >> t) & 1)                          /* write locked? */
             rf_sta = rf_sta | RFS_WLS;
         else {                                          /* not locked */
-            fbuf[rf_da] = M[pa];						/* write word */
+            fbuf[rf_da] = M[pa];                        /* write word */
             if (((uint32) rf_da) >= uptr->hwmark)
                 uptr->hwmark = rf_da + 1;
             }
@@ -419,7 +418,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat rf_attach (UNIT *uptr, char *cptr)
+t_stat rf_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 sz, p;
 uint32 ds_bytes = RF_DKSIZE * sizeof (int16);
@@ -437,7 +436,7 @@ return attach_unit (uptr, cptr);
 
 /* Change disk size */
 
-t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val < 0)
     return SCPE_IERR;

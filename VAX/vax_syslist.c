@@ -30,7 +30,14 @@
 
 #include "vax_defs.h"
 
-char sim_name[] = "MicroVAX 3900";
+char sim_name[64] = "MicroVAX 3900";
+
+void vax_init(void)
+{
+sim_savename = "VAX";
+}
+
+WEAK void (*sim_vm_init) (void) = &vax_init;
 
 extern DEVICE cpu_dev;
 extern DEVICE tlb_dev;
@@ -39,6 +46,7 @@ extern DEVICE nvr_dev;
 extern DEVICE sysd_dev;
 extern DEVICE qba_dev;
 extern DEVICE tti_dev, tto_dev;
+extern DEVICE tdc_dev;
 extern DEVICE cr_dev;
 extern DEVICE lpt_dev;
 extern DEVICE clk_dev;
@@ -50,9 +58,10 @@ extern DEVICE dz_dev;
 extern DEVICE csi_dev, cso_dev;
 extern DEVICE xq_dev, xqb_dev;
 extern DEVICE vh_dev;
+extern DEVICE vc_dev;
+extern DEVICE lk_dev;
+extern DEVICE vs_dev;
 
-extern void WriteB (uint32 pa, int32 val);
-extern void rom_wr_B (int32 pa, int32 val);
 extern UNIT cpu_unit;
 
 DEVICE *sim_devices[] = { 
@@ -67,10 +76,16 @@ DEVICE *sim_devices[] = {
     &tto_dev,
     &csi_dev,
     &cso_dev,
+    &tdc_dev,
     &dz_dev,
     &vh_dev,
     &cr_dev,
     &lpt_dev,
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+    &vc_dev,
+    &lk_dev,
+    &vs_dev,
+#endif
     &rl_dev,
     &rq_dev,
     &rqb_dev,
@@ -94,7 +109,7 @@ DEVICE *sim_devices[] = {
    -o           for memory, specify origin
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 t_stat r;
 int32 i;
@@ -103,7 +118,7 @@ extern int32 ssc_cnf;
 #define SSCCNF_BLO      0x80000000
 
 if (flag)                                               /* dump? */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_NOFNC, "Command Not Implemented\n");
 if (sim_switches & SWMASK ('R')) {                      /* ROM? */
     origin = ROMBASE;
     limit = ROMBASE + ROMSIZE;
@@ -122,7 +137,7 @@ else {
             return SCPE_ARG;
         }
     }
-while ((i = getc (fileref)) != EOF) {                   /* read byte stream */
+while ((i = Fgetc (fileref)) != EOF) {                   /* read byte stream */
     if (origin >= limit)                                /* NXM? */
         return SCPE_NXM;
     if (sim_switches & SWMASK ('R'))                    /* ROM? */

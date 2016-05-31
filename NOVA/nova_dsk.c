@@ -109,13 +109,12 @@ int32 dsk_wlk = 0;                                      /* wrt lock switches */
 int32 dsk_stopioe = 0;                                  /* stop on error */
 int32 dsk_time = 100;                                   /* time per sector */
 
-DEVICE dsk_dev;
 int32 dsk (int32 pulse, int32 code, int32 AC);
 t_stat dsk_svc (UNIT *uptr);
 t_stat dsk_reset (DEVICE *dptr);
 t_stat dsk_boot (int32 unitno, DEVICE *dptr);
-t_stat dsk_attach (UNIT *uptr, char *cptr);
-t_stat dsk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dsk_attach (UNIT *uptr, CONST char *cptr);
+t_stat dsk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* DSK data structures
 
@@ -309,7 +308,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat dsk_attach (UNIT *uptr, char *cptr)
+t_stat dsk_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 sz, p;
 uint32 ds_bytes = DSK_DKSIZE * sizeof (int16);
@@ -327,7 +326,7 @@ return attach_unit (uptr, cptr);
 
 /* Change disk size */
 
-t_stat dsk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dsk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val < 0)
     return SCPE_IERR;

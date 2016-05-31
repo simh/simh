@@ -1,6 +1,6 @@
 /* h316_dp.c: Honeywell 4623, 4651, 4720 disk simulator
 
-   Copyright (c) 2003-2012, Robert M. Supnik
+   Copyright (c) 2003-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@
                 4651 disk subsystem
                 4720 disk subsystem
 
-    3-Jul-13    RLA     compatibility changes for extended interrupts
+   03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    04-Sep-05    RMS     Fixed missing return (Peter Schorn)
    15-Jul-05    RMS     Fixed bug in attach routine
@@ -195,7 +195,7 @@
 #define CAP_4720        (CYL_4720*SURF_4720*DP_TRKLEN)
 
 struct drvtyp {
-    char                *name;
+    const char          *name;
     uint32              numu;
     uint32              cyl;
     uint32              surf;
@@ -247,9 +247,9 @@ uint16 dpxb[DP_TRKLEN];                                 /* track buffer */
 int32 dpio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat dp_svc (UNIT *uptr);
 t_stat dp_reset (DEVICE *dptr);
-t_stat dp_attach (UNIT *uptr, char *cptr);
-t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dp_attach (UNIT *uptr, CONST char *cptr);
+t_stat dp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat dp_go (uint32 dma);
 t_stat dp_go1 (uint32 dat);
 t_stat dp_go2 (uint32 dat);
@@ -259,8 +259,8 @@ t_bool dp_findrec (uint32 addr);
 t_stat dp_wrwd (UNIT *uptr, uint32 dat);
 t_stat dp_wrdone (UNIT *uptr, uint32 flg);
 t_stat dp_done (uint32 req, uint32 f);
-t_stat dp_setformat (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dp_setformat (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* DP data structures
 
@@ -793,7 +793,7 @@ l = fxread (buf, sizeof (uint16), DP_TRKLEN, uptr->fileref);
 for ( ; l < DP_TRKLEN; l++)
     buf[l] = 0;
 if (ferror (uptr->fileref)) {
-    perror ("DP I/O error");
+    sim_perror ("DP I/O error");
     clearerr (uptr->fileref);
     dp_done (1, STA_UNSER);
     return SCPE_IOERR;
@@ -810,7 +810,7 @@ uint32 da = ((c * dp_tab[dp_ctype].surf) + h) * DP_TRKLEN;
 fseek (uptr->fileref, da * sizeof (uint16), SEEK_SET);
 fxwrite (buf, sizeof (uint16), DP_TRKLEN, uptr->fileref);
 if (ferror (uptr->fileref)) {
-    perror ("DP I/O error");
+    sim_perror ("DP I/O error");
     clearerr (uptr->fileref);
     dp_done (1, STA_UNSER);
     return SCPE_IOERR;
@@ -912,7 +912,7 @@ return SCPE_OK;
 
 /* Attach routine, test formating */
 
-t_stat dp_attach (UNIT *uptr, char *cptr)
+t_stat dp_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 r = attach_unit (uptr, cptr);
@@ -923,7 +923,7 @@ return dp_showformat (stdout, uptr, 0, NULL);
 
 /* Set controller type */
 
-t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 
@@ -940,7 +940,7 @@ return SCPE_OK;
 
 /* Show controller type */
 
-t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (dp_ctype >= DP_NUMTYP)
     return SCPE_IERR;
@@ -970,7 +970,7 @@ return SCPE_OK;
    per record.
 */
 
-t_stat dp_setformat (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_setformat (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 h, c, cntr, rptr;
 int32 i, nr, nw, inp;
@@ -1002,7 +1002,7 @@ else {
     if (nr <= 0)
         return SCPE_ARG;
     }
-printf ("Proposed format: records/track = %d, record size = %d\n", nr, nw);
+sim_printf ("Proposed format: records/track = %d, record size = %d\n", nr, nw);
 if (!get_yn ("Formatting will destroy all data on this disk; proceed? [N]", FALSE))
     return SCPE_OK;
 for (c = cntr = 0; c < dp_tab[dp_ctype].cyl; c++) {
@@ -1021,13 +1021,13 @@ for (c = cntr = 0; c < dp_tab[dp_ctype].cyl; c++) {
             return r;
         }
     }
-printf ("Formatting complete\n");
+sim_printf ("Formatting complete\n");
 return SCPE_OK;
 }
 
 /* Show format */
 
-t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 c, h, rptr, rlnt, sec;
 uint32 minrec = DP_TRKLEN;

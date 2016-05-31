@@ -40,12 +40,15 @@ extern DEVICE mba_dev[MBA_NUM];
 extern DEVICE clk_dev;
 extern DEVICE tmr_dev;
 extern DEVICE tti_dev, tto_dev;
+extern DEVICE dt_dev;
 extern DEVICE td_dev;
+extern DEVICE tdc_dev;
 extern DEVICE cr_dev;
 extern DEVICE lpt_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE rl_dev;
 extern DEVICE hk_dev;
+extern DEVICE rk_dev;
 extern DEVICE rp_dev;
 extern DEVICE ry_dev;
 extern DEVICE ts_dev;
@@ -55,9 +58,6 @@ extern DEVICE dz_dev;
 extern DEVICE vh_dev;
 extern DEVICE xu_dev, xub_dev;
 extern DEVICE dmc_dev;
-
-extern UNIT cpu_unit;
-extern void WriteB (uint32 pa, int32 val);
 
 DEVICE *sim_devices[] = { 
     &cpu_dev,
@@ -71,7 +71,9 @@ DEVICE *sim_devices[] = {
     &tmr_dev,
     &tti_dev,
     &tto_dev,
+    &dt_dev,
     &td_dev,
+    &tdc_dev,
     &dz_dev,
     &vh_dev,
     &cr_dev,
@@ -79,6 +81,7 @@ DEVICE *sim_devices[] = {
     &rp_dev,
     &rl_dev,
     &hk_dev,
+    &rk_dev,
     &rq_dev,
     &rqb_dev,
     &rqc_dev,
@@ -102,26 +105,34 @@ DEVICE *sim_devices[] = {
    -o           for memory, specify origin
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 t_stat r;
 int32 val;
 uint32 origin, limit;
 
 if (flag)                                               /* dump? */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_NOFNC, "Command Not Implemented\n");
 origin = 0;                                             /* memory */
 limit = (uint32) cpu_unit.capac;
-if (sim_switches & SWMASK ('O')) {                      /* origin? */
-    origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
-    if (r != SCPE_OK)
-        return SCPE_ARG;
+if (sim_switches & SWMASK ('R')) {                      /* ROM? */
+    origin = ROMBASE;
+    limit = ROMBASE + ROMSIZE;
     }
+else
+    if (sim_switches & SWMASK ('O')) {                  /* origin? */
+        origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
+        if (r != SCPE_OK)
+            return SCPE_ARG;
+        }
 
-while ((val = getc (fileref)) != EOF) {                 /* read byte stream */
+while ((val = Fgetc (fileref)) != EOF) {                 /* read byte stream */
     if (origin >= limit)                                /* NXM? */
         return SCPE_NXM;
-    WriteB (origin, val);                               /* memory */
+    if (sim_switches & SWMASK ('R'))                    /* ROM? */
+        rom_wr_B (origin, val);                         /* not writeable */
+    else
+        WriteB (origin, val);                           /* store byte */
     origin = origin + 1;
     }
 return SCPE_OK;

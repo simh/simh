@@ -125,12 +125,11 @@ static uint8 ta_fnc_tab[TACS_M_FNC + 1] = {
     OP_REV       , OP_FWD,        OP_FWD, 0
     };
 
-DEVICE ta_dev;
 t_stat ta_rd (int32 *data, int32 PA, int32 access);
 t_stat ta_wr (int32 data, int32 PA, int32 access);
 t_stat ta_svc (UNIT *uptr);
 t_stat ta_reset (DEVICE *dptr);
-t_stat ta_attach (UNIT *uptr, char *cptr);
+t_stat ta_attach (UNIT *uptr, CONST char *cptr);
 t_stat ta_detach (UNIT *uptr);
 t_stat ta_boot (int32 unitno, DEVICE *dptr);
 void ta_go (void);
@@ -139,8 +138,8 @@ UNIT *ta_busy (void);
 void ta_set_tr (void);
 uint32 ta_updsta (UNIT *uptr);
 uint32 ta_crc (uint8 *buf, uint32 cnt);
-t_stat ta_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *ta_description (DEVICE *dptr);
+t_stat ta_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *ta_description (DEVICE *dptr);
 
 /* TA data structures
 
@@ -595,7 +594,7 @@ return auto_config (0, 0);
 
 /* Attach routine */
 
-t_stat ta_attach (UNIT *uptr, char *cptr)
+t_stat ta_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -671,7 +670,7 @@ cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 
-t_stat ta_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat ta_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
@@ -698,7 +697,7 @@ sim_tape_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-char *ta_description (DEVICE *dptr)
+const char *ta_description (DEVICE *dptr)
 {
 return "TA11/TA60 Cassette Tape";
 }

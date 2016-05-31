@@ -38,6 +38,10 @@
 
 #include "sim_defs.h"                                   /* simulator defns */
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 #if defined(USE_ADDR64)
 #error "7094 does not support 64b addresses!"
 #endif
@@ -177,8 +181,8 @@ typedef struct {
 #define INST_M_TAG      07
 #define INST_V_ADDR     0
 #define INST_M_ADDR     077777
-#define INST_V_4B		0
-#define INST_M_4B		017
+#define INST_V_4B       0
+#define INST_M_4B       017
 
 #define GET_OPD(x)      ((uint32) (((x) >> INST_V_OPD) & INST_M_OPD))
 #define GET_DEC(x)      ((uint32) (((x) >> INST_V_DEC) & INST_M_DEC))
@@ -467,7 +471,7 @@ typedef struct {
 #define WriteP(p,d)     M[p] = d
 
 void cpu_ent_hist (uint32 pc, uint32 ea, t_uint64 ir, t_uint64 opnd);
-t_stat ch_show_chan (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat ch_show_chan (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat ch6_end_nds (uint32 ch);
 uint32 ch6_set_flags (uint32 ch, uint32 unit, uint32 flags);
 t_stat ch6_err_disc (uint32 ch, uint32 unit, uint32 flags);
@@ -481,5 +485,20 @@ void ch9_set_end (uint32 ch, uint32 ireq);
 t_bool ch9_qconn (uint32 ch);
 void ch_set_map (void);
 t_bool ch_qidle (void);
+
+extern const uint32 col_masks[12];
+extern const t_uint64 bit_masks[36];
+extern const char nine_to_ascii_a[64];
+extern const char nine_to_ascii_h[64];
+extern const char ascii_to_nine[128];
+extern const char ascii_to_bcd[128];
+extern const char bcd_to_ascii_a[64];
+extern const char bcd_to_ascii_h[64];
+extern const char bcd_to_pca[64];
+extern const char bcd_to_pch[64];
+extern const uint32 bcd_to_colbin[64];
+
+extern uint32 PC;
+extern uint32 ind_ioc;
 
 #endif

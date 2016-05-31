@@ -71,7 +71,7 @@ t_stat tti_rtc_svc (uint32 tm);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tt_reset (DEVICE *dptr);
-t_stat tt_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tt_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void tto_echo (int32 c);
 
 extern t_stat io_set_pint (void);
@@ -214,7 +214,7 @@ return SCPE_OK;
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 c, cmd;
+uint32 c, cmd;
 uint32 st;
 
 switch (tt_cmd) {                                       /* case on state */
@@ -321,7 +321,7 @@ return SCPE_OK;
 
 /* Make mode flags uniform */
 
-t_stat tt_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tt_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tt_unit[TTO].flags = (tt_unit[TTO].flags & ~TT_MODE) | val;
 if (val == TT_MODE_7P)

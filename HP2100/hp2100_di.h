@@ -1,6 +1,6 @@
 /* hp2100_di.h: HP 12821A HP-IB Disc Interface simulator definitions
 
-   Copyright (c) 2010-2012, J. David Bryan
+   Copyright (c) 2010-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    DI           12821A Disc Interface
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    14-Feb-12    JDB     First release
    16-Nov-10    JDB     Created DI common definitions file
 
@@ -144,8 +145,8 @@ typedef enum {
 #define GET_UPPER(w)    (uint8) (((w) & UPPER_BYTE) >> BYTE_SHIFT)
 #define GET_LOWER(w)    (uint8) ((w) & LOWER_BYTE)
 
-#define SET_UPPER(b)    ((b) << BYTE_SHIFT)
-#define SET_LOWER(b)    (b)
+#define SET_UPPER(b)    (uint16) ((b) << BYTE_SHIFT)
+#define SET_LOWER(b)    (uint16) (b)
 #define SET_BOTH(b)     (SET_UPPER (b) | SET_LOWER (b))
 
 typedef enum {
@@ -261,10 +262,11 @@ extern t_stat    di_reset (DEVICE *dptr);
 
 /* Disc interface global SCP routines */
 
-extern t_stat di_set_address  (UNIT *uptr, int32 value, char  *cptr, void *desc);
-extern t_stat di_show_address (FILE *st,   UNIT  *uptr, int32 value, void *desc);
-extern t_stat di_set_cable    (UNIT *uptr, int32 value, char  *cptr, void *desc);
-extern t_stat di_show_cable   (FILE *st,   UNIT  *uptr, int32 value, void *desc);
+extern t_stat di_set_address (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat di_set_cable   (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+
+extern t_stat di_show_address (FILE *st, UNIT *uptr, int32 value, CONST void *desc);
+extern t_stat di_show_cable   (FILE *st, UNIT *uptr, int32 value, CONST void *desc);
 
 /* Disc interface global bus routines */
 
@@ -291,8 +293,8 @@ extern t_stat ma_boot    (int32 unitno, DEVICE *dptr);
 
 /* Amigo mag tape global SCP routines */
 
-extern t_stat ma_set_timing  (UNIT *uptr, int32 val,   char  *cptr, void *desc);
-extern t_stat ma_show_timing (FILE *st,   UNIT  *uptr, int32 val,   void *desc);
+extern t_stat ma_set_timing  (UNIT *uptr, int32 val,   CONST char *cptr, void *desc);
+extern t_stat ma_show_timing (FILE *st,   UNIT  *uptr, int32 val,        CONST void *desc);
 
 /* Amigo mag tape global bus routines */
 

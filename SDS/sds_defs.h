@@ -48,8 +48,8 @@
 #define STOP_EXULIM     8                               /* EXU limit */
 #define STOP_MMINT      9                               /* mm in intr */
 #define STOP_MMTRP      10                              /* mm in trap */
-#define STOP_TRPINS     11                              /* trap inst not BRM */
-#define STOP_RTCINS     12                              /* rtc inst not MIN/SKR */
+#define STOP_TRPINS     11                              /* trap inst not BRM or BRU */
+#define STOP_RTCINS     12                              /* rtc inst not MIN or SKR */
 #define STOP_ILLVEC     13                              /* zero vector */
 #define STOP_CCT        14                              /* runaway CCT */
 #define STOP_MBKPT      15                              /* monitor-mode breakpoint */
@@ -418,9 +418,13 @@ void chan_set_flag (int32 ch, uint32 fl);
 void chan_set_ordy (int32 ch);
 void chan_disc (int32 ch);
 void chan_set_uar (int32 ch, uint32 dev);
-t_stat set_chan (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_chan (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_chan (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_chan (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat chan_process (void);
 t_bool chan_testact (void);
+
+/* Translation tables */
+extern const int8 odd_par[64];
+
 
 #endif

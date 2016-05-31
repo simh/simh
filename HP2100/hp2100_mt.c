@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    MT           12559A 3030 nine track magnetic tape
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+   10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
    09-May-12    JDB     Separated assignments from conditional expressions
    25-Mar-12    JDB     Removed redundant MTAB_VUN from "format" MTAB entry
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -143,7 +146,7 @@ IOHANDLER mtcio;
 
 t_stat mtc_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mtc_attach (UNIT *uptr, char *cptr);
+t_stat mtc_attach (UNIT *uptr, CONST char *cptr);
 t_stat mtc_detach (UNIT *uptr);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
 t_stat mt_clear (void);
@@ -551,7 +554,7 @@ switch (mtc_fnc) {                                      /* case on function */
         if (mtc_1st) mtc_1st = 0;                       /* no xfr on first */
         else {
             if (mt_ptr < DBSIZE) {                      /* room in buffer? */
-                mtxb[mt_ptr++] = mtc_unit.buf;
+                mtxb[mt_ptr++] = (uint8) mtc_unit.buf;
                 mtc_sta = mtc_sta & ~STA_BOT;           /* clear BOT */
                 }
             else mtc_sta = mtc_sta | STA_PAR;
@@ -676,7 +679,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat mtc_attach (UNIT *uptr, char *cptr)
+t_stat mtc_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

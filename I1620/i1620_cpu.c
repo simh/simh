@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002-2013, Robert M. Supnik
+   Copyright (c) 2002-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,10 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   07-May-15    RMS     Added missing TFL instruction (Tom McBride)
+   28-Mar-15    RMS     Revised to use sim_printf
+   26-Mar-15    RMS     Separated compare from add/sub flows (Tom McBride)
+                        Removed ADD_SIGNC return from add/sub flows
    10-Dec-13    RMS     Fixed several bugs in add and compare (Bob Armstrong)
                         Fixed handling of P field in K instruction (Bob Armstrong)
    28-May-06    RMS     Fixed bug in cpu history (Peter Schorn)
@@ -136,14 +140,14 @@ uint8 ind[NUM_IND] = { 0 };                             /* indicators */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_opt1 (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_opt2 (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_save (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_table (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_opt1 (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_opt2 (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_save (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_table (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 int32 get_2d (uint32 ad);
 t_stat get_addr (uint32 alast, int32 lnt, t_bool indexok, uint32 *addr);
@@ -155,7 +159,8 @@ t_stat xmt_index (uint32 d, uint32 s);
 t_stat xmt_divd (uint32 d, uint32 s);
 t_stat xmt_tns (uint32 d, uint32 s);
 t_stat xmt_tnf (uint32 d, uint32 s);
-t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, uint32 skp, int32 *sta);
+t_stat add_field (uint32 d, uint32 s, t_bool sub, uint32 skp, int32 *sta);
+t_stat cmp_field (uint32 d, uint32 s);
 uint32 add_one_digit (uint32 dst, uint32 src, uint32 *cry);
 t_stat mul_field (uint32 mpc, uint32 mpy);
 t_stat mul_one_digit (uint32 mpyd, uint32 mpcp, uint32 prop, uint32 last);
@@ -495,7 +500,7 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     sim_interval = sim_interval - 1;
 
@@ -535,7 +540,7 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }
         }
-    else if (flags & IF_IMM)                             /* immediate? */
+    else if (flags & IF_IMM)                            /* immediate? */
         QAR = qla;
 
     if (hst_lnt) {                                      /* history enabled? */
@@ -563,6 +568,12 @@ while (reason == 0) {                                   /* loop until halted */
     case OP_TF:
     case OP_TFM:
         reason = xmt_field (PAR, QAR, 1);               /* xmit field */
+        break;
+
+/* Transmit floating - P,Q are valid */
+
+    case OP_TFL:
+        reason = xmt_field (PAR, QAR, 3);               /* xmit field */
         break;
 
 /* Transmit record - P,Q are valid */
@@ -688,7 +699,7 @@ while (reason == 0) {                                   /* loop until halted */
 
     case OP_A:
     case OP_AM:
-        reason = add_field (PAR, QAR, FALSE, TRUE, 0, &sta); /* add, store */
+        reason = add_field (PAR, QAR, FALSE, 0, &sta);  /* add */
         if (sta == ADD_CARRY)                           /* cout => ovflo */
             ind[IN_OVF] = 1;
         if (ar_stop && ind[IN_OVF])
@@ -697,7 +708,7 @@ while (reason == 0) {                                   /* loop until halted */
 
     case OP_S:
     case OP_SM:
-        reason = add_field (PAR, QAR, TRUE, TRUE, 0, &sta); /* sub, store */
+        reason = add_field (PAR, QAR, TRUE, 0, &sta);   /* sub, store */
         if (sta == ADD_CARRY)                           /* cout => ovflo */
             ind[IN_OVF] = 1;
         if (ar_stop && ind[IN_OVF])
@@ -709,7 +720,7 @@ while (reason == 0) {                                   /* loop until halted */
 
     case OP_C:
     case OP_CM:
-        reason = add_field (PAR, QAR, TRUE, FALSE, 0, &sta); /* sub, nostore */
+        reason = cmp_field (PAR, QAR);                  /* compare */
         if (ar_stop && ind[IN_OVF])
             reason = STOP_OVERFL;
         break;
@@ -849,7 +860,7 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_INVIDX;                       /* stop */
             break;
             }
-        reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 0, &sta);
+        reason = add_field (GET_IDXADDR (idx), QAR, FALSE, 0, &sta);
         if (ar_stop && ind[IN_OVF])
             reason = STOP_OVERFL;
         BRANCH (PAR);                                   /* branch to P */
@@ -861,7 +872,7 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_INVIDX;                       /* stop */
             break;
             }
-        reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 3, &sta);
+        reason = add_field (GET_IDXADDR (idx), QAR, FALSE, 3, &sta);
         if (ar_stop && ind[IN_OVF])
             reason = STOP_OVERFL;
         BRANCH (PAR);                                   /* branch to P */
@@ -875,12 +886,12 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_INVIDX;                       /* stop */
             break;
             }
-        reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 0, &sta);
+        reason = add_field (GET_IDXADDR (idx), QAR, FALSE, 0, &sta);
         if (ar_stop && ind[IN_OVF])
             reason = STOP_OVERFL;
         if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {  /* ~z, ~c, ~sign chg? */
             BRANCH (PAR);                               /* branch */
-			}
+            }
         break;
 
     case OP_BCXM:
@@ -889,12 +900,12 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_INVIDX;                       /* stop */
             break;
             }
-        reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 3, &sta);
+        reason = add_field (GET_IDXADDR (idx), QAR, FALSE, 3, &sta);
         if (ar_stop && ind[IN_OVF])
             reason = STOP_OVERFL;
         if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {  /* ~z, ~c, ~sign chg? */
             BRANCH (PAR);                               /* branch */
-			}
+            }
         break;
 
 /* Branch and select - P is valid */
@@ -920,7 +931,7 @@ while (reason == 0) {                                   /* loop until halted */
         default:
             reason = STOP_INVSEL;                       /* undefined */
             break;
-			}
+            }
         BRANCH (PAR);
         break;
 
@@ -1323,18 +1334,17 @@ return SCPE_OK;
    Output:
         return  =       status
         sta     =       ADD_NOCRY: no carry out, no sign change
-                        ADD_SCHNG: sign change
+                        ADD_SIGNC: sign change
                         ADD_CARRY: carry out
 
    Reference Manual: "When the sum is zero, the sign of the P field
    is retained."
+*/
 
-   Bob Armstrong: record marks are treated by add as though they were zero */
-
-t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, uint32 skp, int32 *sta)
+t_stat add_field (uint32 d, uint32 s, t_bool sub, uint32 skp, int32 *sta)
 {
 uint32 cry, src, dst, res, comp, dp, dsv;
-uint32 src_f = 0, cnt = 0, dst_f;
+uint32 src_f = 0, cnt = 0, dst_f = 0;
 
 *sta = ADD_NOCRY;                                       /* assume no cry */
 dsv = d;                                                /* save dst */
@@ -1345,29 +1355,20 @@ ind[IN_EZ] = 1;                                         /* assume zero */
 
 dst = M[d] & DIGIT;                                     /* 1st digits */
 src = M[s] & DIGIT;
-if (dst == REC_MARK)                                    /* chk for rec mark */
-    dst = 0;
-if (src == REC_MARK)
-    src = 0;
 if (BAD_DIGIT (dst) || BAD_DIGIT (src))                 /* bad digit? */
      return STOP_INVDIG;
 if (comp)                                               /* complement? */
     src = 10 - src;
 res = add_one_digit (dst, src, &cry);                   /* add */
-if (sto)                                                /* store */
-    M[d] = (M[d] & FLAG) | res;
+M[d] = (M[d] & FLAG) | res;                             /* store */
 MM (d); MM (s);                                         /* decr mem addrs */
 do {
     dst = M[d] & DIGIT;                                 /* get dst digit */
-    if (dst == REC_MARK)
-        dst = 0;
     dst_f = M[d] & FLAG;                                /* get dst flag */
     if (src_f)                                          /* src done? src = 0 */
         src = 0;
     else {
         src = M[s] & DIGIT;                             /* get src digit */
-        if (src == REC_MARK)
-            src = 0;
         if (cnt >= skp)                                 /* get src flag */
             src_f = M[s] & FLAG;
         MM (s);                                         /* decr src addr */
@@ -1377,8 +1378,7 @@ do {
     if (comp)                                           /* complement? */
         src = 9 - src;
     res = add_one_digit (dst, src, &cry);               /* add */
-    if (sto)                                            /* store */
-        M[d] = dst_f | res;
+    M[d] = dst_f | res;                                 /* store */
     MM (d);                                             /* decr dst addr */
     if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
         return STOP_FWRAP;
@@ -1392,16 +1392,14 @@ if (!src_f)                                             /* !src done? ovf */
 
 if (comp && !cry && !ind[IN_EZ]) {                      /* recomp needed? */
     ind[IN_HP] = ind[IN_HP] ^ 1;                        /* flip indicator */
-    if (sto) {                                          /* storing? */
-        for (cry = 0, dp = dsv; dp != d; ) {            /* rescan */
-            dst = M[dp] & DIGIT;                        /* get dst digit */
-            dst = (dp == dsv)? (10 - dst): (9 - dst);	/* 10 or 9s comp */
-            res = add_one_digit (0, dst, &cry);         /* "add" */
-            M[dp] = (M[dp] & FLAG) | res;               /* store */
-            MM (dp);                                    /* decr dst addr */
-            }
-        M[dsv] = M[dsv] ^ FLAG;                         /* compl sign */
+    for (cry = 0, dp = dsv; dp != d; ) {                /* rescan */
+        dst = M[dp] & DIGIT;                            /* get dst digit */
+        dst = (dp == dsv)? (10 - dst): (9 - dst);       /* 10 or 9s comp */
+        res = add_one_digit (0, dst, &cry);             /* "add" */
+        M[dp] = (M[dp] & FLAG) | res;                   /* store */
+        MM (dp);                                        /* decr dst addr */
         }
+    M[dsv] = M[dsv] ^ FLAG;                             /* compl sign */
     *sta = ADD_SIGNC;                                   /* sign changed */
     return SCPE_OK;     
     }                                                   /* end if recomp */
@@ -1409,6 +1407,73 @@ if (ind[IN_EZ])                                         /* res = 0? clr HP */
     ind[IN_HP] = 0;
 if (!comp && cry)                                       /* set status */
     *sta = ADD_CARRY;
+return SCPE_OK;
+}
+
+/* Compare routine
+
+   Inputs:
+        d       =       destination field low (P)
+        s       =       source field low (Q)
+   Output:
+        return  =       status
+
+   In the unlike signs case, the compare is abandoned as soon as a non-zero
+   digit is seen; zeroes go through the normal flows.
+*/
+
+t_stat cmp_field (uint32 d, uint32 s)
+{
+uint32 cry, src, dst, unlike, dsv;
+uint32 src_f = 0, cnt = 0, dst_f = 0;
+
+dsv = d;                                                /* save dst */
+cry = 0;                                                /* clr carry */
+unlike = (M[d] ^ M[s]) & FLAG;                          /* set unlike signs flag */
+ind[IN_HP] = ((M[d] & FLAG) == 0);                      /* set sign from res */
+ind[IN_EZ] = 1;                                         /* assume zero */
+
+do {
+    dst = M[d] & DIGIT;                                 /* get dst digit */
+    if (d != dsv)                                       /* if not first digit, */
+        dst_f = M[d] & FLAG;                            /* get dst flag */
+    if (src_f)                                          /* src done? src = 0 */
+        src = 0;
+    else {
+        src = M[s] & DIGIT;                             /* get src digit */
+        if (d != dsv)                                   /* if not first digit, */
+            src_f = M[s] & FLAG;                        /* get src flag */
+        MM (s);                                         /* decr src addr */
+        }
+    if (BAD_DIGIT (dst) || BAD_DIGIT (src))             /* bad digit? */
+        return STOP_INVDIG;
+    if (unlike && ((dst | src) != 0)) {                 /* unlike signs, digit? */
+        ind[IN_EZ] = 0;                                 /* not equal */
+        return SCPE_OK;
+        }
+    src = (d != dsv)? 9 - src: 10 - src;                /* complement */
+    add_one_digit (dst, src, &cry);                     /* throw away result */
+    MM (d);                                             /* decr dst addr */
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
+    } while (dst_f == 0);                               /* until dst done */
+if (!src_f)                                             /* !src done? ovf */
+    ind[IN_OVF] = 1;
+
+/* At this point, we have three possible cases:
+   - Fields are equal, signs irrelevant: ind[IN_EZ] is still set
+   - Fields are unequal, signs are the same, carry out:
+        |p| > |q|, ind[IN_HP] is correct
+   - Fields are unequal, signs are the same, no carry out:
+        |p| < |q, ind[IN_HP] must be inverted
+*/
+
+if (!cry && !ind[IN_EZ]) {                              /* recomp needed? */
+    ind[IN_HP] = ind[IN_HP] ^ 1;                        /* flip indicator */
+    return SCPE_OK;     
+    }                                                   /* end if recomp */
+if (ind[IN_EZ])                                         /* res = 0? clr HP */
+    ind[IN_HP] = 0;
 return SCPE_OK;
 }
 
@@ -2075,7 +2140,7 @@ return SCPE_OK;
 
 /* Memory size change */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -2094,7 +2159,7 @@ return SCPE_OK;
 
 /* Model change */
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val)
     cpu_unit.flags = (cpu_unit.flags & (UNIT_SCP | UNIT_BCD | MII_OPT)) |
@@ -2105,12 +2170,10 @@ return SCPE_OK;
 
 /* Set/clear Model 1 option */
 
-t_stat cpu_set_opt1 (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_opt1 (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cpu_unit.flags & IF_MII) {
-    printf ("Feature is standard on 1620 Model 2\n");
-    if (sim_log)
-        fprintf (sim_log, "Feature is standard on 1620 Model 2\n");
+    sim_printf ("Feature is standard on 1620 Model 2\n");
     return SCPE_NOFNC;
     }
 return SCPE_OK;
@@ -2118,12 +2181,10 @@ return SCPE_OK;
 
 /* Set/clear Model 2 option */
 
-t_stat cpu_set_opt2 (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_opt2 (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (!(cpu_unit.flags & IF_MII)) {
-    printf ("Feature is not available on 1620 Model 1\n");
-    if (sim_log)
-        fprintf (sim_log, "Feature is not available on 1620 Model 1\n");
+    sim_printf ("Feature is not available on 1620 Model 1\n");
     return SCPE_NOFNC;
     }
 return SCPE_OK;
@@ -2131,7 +2192,7 @@ return SCPE_OK;
 
 /* Front panel save */
 
-t_stat cpu_set_save (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_save (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (saved_PC & 1)
     return SCPE_NOFNC;
@@ -2141,7 +2202,7 @@ return SCPE_OK;
 
 /* Set standard add/multiply tables */
 
-t_stat cpu_set_table (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_table (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 
@@ -2156,7 +2217,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -2187,10 +2248,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[INST_LEN];
 t_stat r;
 InstHistory *h;

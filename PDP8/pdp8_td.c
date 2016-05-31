@@ -193,11 +193,10 @@ int32 td_dctime = 40000;                                /* decel time */
 int32 td_stopoffr = 0;
 static uint8 tdb_mtk[DT_NUMDR][D18_LPERB];              /* mark track bits */
 
-DEVICE td_dev;
 int32 td77 (int32 IR, int32 AC);
 t_stat td_svc (UNIT *uptr);
 t_stat td_reset (DEVICE *dptr);
-t_stat td_attach (UNIT *uptr, char *cptr);
+t_stat td_attach (UNIT *uptr, CONST char *cptr);
 void td_flush (UNIT *uptr);
 t_stat td_detach (UNIT *uptr);
 t_stat td_boot (int32 unitno, DEVICE *dptr);
@@ -208,7 +207,7 @@ int32 td_trailer (UNIT *uptr, int32 blk, int32 line);
 int32 td_read (UNIT *uptr, int32 blk, int32 line);
 void td_write (UNIT *uptr, int32 blk, int32 line, int32 datb);
 int32 td_set_mtk (int32 code, int32 u, int32 k);
-t_stat td_show_pos (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat td_show_pos (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern uint16 M[];
 
@@ -230,23 +229,23 @@ UNIT td_unit[] = {
     };
 
 REG td_reg[] = {
-    { GRDATA (TDCMD, td_cmd, 8, 4, 8) },
-    { ORDATA (TDDAT, td_dat, 12) },
-    { ORDATA (TDMTK, td_mtk, 6) },
-    { FLDATA (TDSLF, td_slf, 0) },
-    { FLDATA (TDQLF, td_qlf, 0) },
-    { FLDATA (TDTME, td_tme, 0) },
-    { ORDATA (TDQL, td_qlctr, 2) },
+    { GRDATAD (TDCMD, td_cmd, 8, 4, 8, "command register") },
+    { ORDATAD (TDDAT, td_dat, 12, "data register") },
+    { ORDATAD (TDMTK, td_mtk, 6, "mark track register") },
+    { FLDATAD (TDSLF, td_slf, 0, "single line flag") },
+    { FLDATAD (TDQLF, td_qlf, 0, "quad line flag") },
+    { FLDATAD (TDTME, td_tme, 0, "timing error flag") },
+    { ORDATAD (TDQL, td_qlctr, 2, "quad line counter") },
     { ORDATA (TDCSUM, td_csum, 6), REG_RO },
-    { DRDATA (LTIME, td_ltime, 31), REG_NZ | PV_LEFT },
-    { DRDATA (DCTIME, td_dctime, 31), REG_NZ | PV_LEFT },
-    { URDATA (POS, td_unit[0].pos, 10, T_ADDR_W, 0,
-              DT_NUMDR, PV_LEFT | REG_RO) },
-    { URDATA (STATT, td_unit[0].STATE, 8, 18, 0,
-              DT_NUMDR, REG_RO) },
+    { DRDATAD (LTIME, td_ltime, 31, "time between lines"), REG_NZ | PV_LEFT },
+    { DRDATAD (DCTIME, td_dctime, 31, "time to decelerate to a full stop"), REG_NZ | PV_LEFT },
+    { URDATAD (POS, td_unit[0].pos, 10, T_ADDR_W, 0,
+              DT_NUMDR, PV_LEFT | REG_RO, "positions, in lines, units 0 and 1") },
+    { URDATAD (STATT, td_unit[0].STATE, 8, 18, 0,
+              DT_NUMDR, REG_RO, "unit state, units 0 and 1") },
     { URDATA (LASTT, td_unit[0].LASTT, 10, 32, 0,
               DT_NUMDR, REG_HRO) },
-    { FLDATA (STOP_OFFR, td_stopoffr, 0) },
+    { FLDATAD (STOP_OFFR, td_stopoffr, 0, "stop on off-reel error") },
     { ORDATA (DEVNUM, td_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -375,16 +374,16 @@ if (new_mving && !prev_mving) {                         /* start from stop? */
 
 if ((prev_mving && !new_mving) ||                       /* stop from moving? */
     (prev_dir != new_dir)) {                            /* dir chg while moving? */
-	if (uptr->STATE >= STA_ACC) {						/* not stopping? */
-		if (td_setpos (uptr))				            /* update pos */
+    if (uptr->STATE >= STA_ACC) {                       /* not stopping? */
+        if (td_setpos (uptr))                           /* update pos */
             return TRUE;
-		sim_cancel (uptr);								/* stop current */
-		sim_activate (uptr, td_dctime);					/* schedule decel */
-		uptr->STATE = STA_DEC | prev_dir;				/* set status */
-		td_slf = td_qlf = td_qlctr = 0;					/* clear state */
-		}
-	return FALSE;
-	}
+        sim_cancel (uptr);                              /* stop current */
+        sim_activate (uptr, td_dctime);                 /* schedule decel */
+        uptr->STATE = STA_DEC | prev_dir;               /* set status */
+        td_slf = td_qlf = td_qlctr = 0;                 /* clear state */
+        }
+    return FALSE;
+    }
 
 return FALSE;   
 }
@@ -445,10 +444,10 @@ if (uptr->STATE & STA_DIR)                              /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel */
-	sim_cancel (uptr);									/* no timing pulses */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel */
+    sim_cancel (uptr);                                  /* no timing pulses */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -766,7 +765,7 @@ return SCPE_OK;
    Set up mark track bit array
 */
 
-t_stat td_attach (UNIT *uptr, char *cptr)
+t_stat td_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 pdp18b[D18_NBSIZE];
 uint16 pdp11b[D18_NBSIZE], *fbuf;
@@ -799,13 +798,13 @@ if (uptr->filebuf == NULL) {                            /* can't alloc? */
     return SCPE_MEM;
     }
 fbuf = (uint16 *) uptr->filebuf;                        /* file buffer */
-printf ("%s%d: ", sim_dname (&td_dev), u);
+sim_printf ("%s%d: ", sim_dname (&td_dev), u);
 if (uptr->flags & UNIT_8FMT)
-    printf ("12b format");
+    sim_printf ("12b format");
 else if (uptr->flags & UNIT_11FMT)
-    printf ("16b format");
-else printf ("18b/36b format");
-printf (", buffering file in memory\n");
+    sim_printf ("16b format");
+else sim_printf ("18b/36b format");
+sim_printf (", buffering file in memory\n");
 uptr->io_flush = td_flush;
 if (uptr->flags & UNIT_8FMT)                            /* 12b? */
     uptr->hwmark = fxread (uptr->filebuf, sizeof (uint16),
@@ -893,7 +892,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
             }                                           /* end loop buf */
         }                                               /* end else */
     if (ferror (uptr->fileref))
-        perror ("I/O error");
+        sim_perror ("I/O error");
     }
 uptr->WRITTEN = FALSE;                                  /* no longer dirty */
 }
@@ -905,7 +904,7 @@ int u = (int)(uptr - td_dev.units);
 if (!(uptr->flags & UNIT_ATT))
     return SCPE_OK;
 if (uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
-    printf ("%s%d: writing buffer to file\n", sim_dname (&td_dev), u);
+    sim_printf ("%s%d: writing buffer to file\n", sim_dname (&td_dev), u);
     td_flush (uptr);
     }                                                   /* end if hwmark */
 free (uptr->filebuf);                                   /* release buf */
@@ -931,7 +930,7 @@ return k;
 
 /* Show position */
 
-t_stat td_show_pos (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat td_show_pos (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
 if (uptr->pos < DT_EZLIN)                               /* rev end zone? */

@@ -100,21 +100,21 @@
 
 /* 780 microcode patch 37 - only test LR<23:0> for appropriate length */
 
-#define ML_LR_TEST(r)   if ((uint32)((r) & 0xFFFFFF) > 0x200000) RSVD_OPND_FAULT
+#define ML_LR_TEST(r)   if (((uint32)((r) & 0xFFFFFF)) > 0x200000) RSVD_OPND_FAULT
 
-/* 780 microcode patch 38 - only test PxBR<31>=1 and xBR<1:0> = 0 */
+/* 780 microcode patch 38 - only test PxBR<31>=1, PxBR<30> = 0, and xBR<1:0> = 0 */
 
-#define ML_PXBR_TEST(r) if ((((r) & 0x80000000) == 0) || \
-                            ((r) & 0x00000003)) RSVD_OPND_FAULT
-#define ML_SBR_TEST(r)  if ((r) & 0x00000003) RSVD_OPND_FAULT
+#define ML_PXBR_TEST(r) if (((((uint32)(r)) & 0x80000000) == 0) || \
+                            ((((uint32)(r)) & 0x40000003) != 0)) RSVD_OPND_FAULT
+#define ML_SBR_TEST(r)  if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
-/* 780 microcode patch 78 - only test xCBB<1:0> = 0 */
+/* 780 microcode patch 78 - test xCBB<1:0> = 0 */
 
-#define ML_PA_TEST(r)   if ((r) & 0x00000003) RSVD_OPND_FAULT
+#define ML_PA_TEST(r)   if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
 #define LP_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
-#define LP_MBZ84_TEST(r) if ((r) & 0xF8C00000) RSVD_OPND_FAULT
-#define LP_MBZ92_TEST(r) if ((r) & 0x7FC00000) RSVD_OPND_FAULT
+#define LP_MBZ84_TEST(r) if ((((uint32)(r)) & 0xF8C00000) != 0) RSVD_OPND_FAULT
+#define LP_MBZ92_TEST(r) if ((((uint32)(r)) & 0x7FC00000) != 0) RSVD_OPND_FAULT
 
 /* Memory */
 
@@ -131,7 +131,7 @@
                         { UNIT_MSIZE, (4u << 20), NULL, "4M", &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" }, \
                         { UNIT_MSIZE, (5u << 20), NULL, "5M", &cpu_set_size, NULL, NULL, "Set Memory to 5M bytes" }, \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
-extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 #define CPU_MODEL_MODIFIERS                                                                     \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
                               NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
@@ -164,6 +164,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define REG_M_OFS       0x7FF   
 #define REGSIZE         (1u << REGAWIDTH)               /* REG length */
 #define REGBASE         0xF00000                        /* REG addr base */
+#define NEXUSBASE       REGBASE                         /* NEXUS addr base */
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
                         (((uint32) (x)) < (REGBASE + REGSIZE)))
 #define NEXUS_GETNEX(x) (((x) >> REG_V_NEXUS) & REG_M_NEXUS)
@@ -237,7 +238,15 @@ typedef struct {
     int32               vloc;                           /* locator */
     int32               vec;                            /* value */
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
-    uint32              ulnt;                           /* IO length per unit */
+    uint32              ulnt;                           /* IO length per-device */
+                                                        /* Only need to be populated */
+                                                        /* when numunits != num devices */
+    int32               numc;                           /* Number of controllers */
+                                                        /* this field handles devices */
+                                                        /* where multiple instances are */
+                                                        /* simulated through a single */
+                                                        /* DEVICE structure (e.g., DZ, VH, DL, DC). */
+                                                        /* Populated by auto-configure */
     } DIB;
 
 /* Unibus I/O page layout - see pdp11_io_lib.c for address layout details */
@@ -245,6 +254,8 @@ typedef struct {
 #define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
 
 /* Interrupt assignments; within each level, priority is right to left */
+
+#define INT_V_DTA       0                               /* BR6 */
 
 #define INT_V_DZRX      0                               /* BR5 */
 #define INT_V_DZTX      1
@@ -260,6 +271,7 @@ typedef struct {
 #define INT_V_DMCTX     11
 #define INT_V_DUPRX     12
 #define INT_V_DUPTX     13
+#define INT_V_RK        14
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
@@ -267,7 +279,10 @@ typedef struct {
 #define INT_V_CR        3
 #define INT_V_VHRX      4
 #define INT_V_VHTX      5
+#define INT_V_TDRX      6
+#define INT_V_TDTX      7
 
+#define INT_DTA         (1u << INT_V_DTA)
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
 #define INT_HK          (1u << INT_V_HK)
@@ -288,7 +303,11 @@ typedef struct {
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_RK          (1u << INT_V_RK)
+#define INT_TDRX        (1u << INT_V_TDRX)
+#define INT_TDTX        (1u << INT_V_TDTX)
 
+#define IPL_DTA         (0x16 - IPL_HMIN)
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
 #define IPL_HK          (0x15 - IPL_HMIN)
@@ -309,14 +328,17 @@ typedef struct {
 #define IPL_DMCTX       (0x15 - IPL_HMIN)
 #define IPL_DUPRX       (0x15 - IPL_HMIN)
 #define IPL_DUPTX       (0x15 - IPL_HMIN)
+#define IPL_RK          (0x15 - IPL_HMIN)
+#define IPL_TDRX        (0x14 - IPL_HMIN)
+#define IPL_TDTX        (0x14 - IPL_HMIN)
 
 /* Device vectors */
 
 #define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
-#define VEC_QBUS        0
-#define VEC_Q           0x200
+#define VEC_QBUS        0                               /* Unibus system */
+#define VEC_SET         0x200                           /* Vector bits to set in Unibus vectors */
 
 /* Interrupt macros */
 
@@ -326,6 +348,7 @@ typedef struct {
 #define SET_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
 #define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* cond error return */
+extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 /* Logging */
 
@@ -339,33 +362,16 @@ typedef struct {
 #define BOOT_RL         2                               /* for VMB */
 #define BOOT_RB         3
 #define BOOT_UDA        17
-#define BOOT_TK         18
 #define BOOT_TD         64
-
-/* Function prototypes for virtual memory interface */
-
-int32 Read (uint32 va, int32 lnt, int32 acc);
-void Write (uint32 va, int32 val, int32 lnt, int32 acc);
-
-/* Function prototypes for physical memory interface (inlined) */
-
-SIM_INLINE int32 ReadB (uint32 pa);
-SIM_INLINE int32 ReadW (uint32 pa);
-SIM_INLINE int32 ReadL (uint32 pa);
-SIM_INLINE int32 ReadLP (uint32 pa);
-SIM_INLINE void WriteB (uint32 pa, int32 val);
-SIM_INLINE void WriteW (uint32 pa, int32 val);
-SIM_INLINE void WriteL (uint32 pa, int32 val);
-void WriteLP (uint32 pa, int32 val);
 
 /* Function prototypes for I/O */
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 void sbi_set_errcnf (void);
 
@@ -378,5 +384,9 @@ void sbi_set_errcnf (void);
 #define WriteRegU(p,v,l)    WriteReg (p, v, l)
 
 #include "pdp11_io_lib.h"
+
+/* Function prototypes for virtual and physical memory interface (inlined) */
+
+#include "vax_mmu.h"
 
 #endif

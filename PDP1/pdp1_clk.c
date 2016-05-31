@@ -59,7 +59,7 @@ UNIT clk_unit = {
     };
 
 REG clk_reg[] = {
-    { ORDATA (CNTR, clk_cntr, 16) },
+    { ORDATAD (CNTR, clk_cntr, 16, "clock counter, 0-59999(base 10)") },
     { DRDATA (SBS32LVL, clk32ms_sbs, 4), REG_HRO },
     { DRDATA (SBS1MLVL, clk1min_sbs, 4), REG_HRO },
     { NULL }

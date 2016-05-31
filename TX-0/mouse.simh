@@ -1,4 +1,5 @@
 ; TX-0 Initialization file for the Mouse Maze Game
+set dpy enable
 att petr bin_newMouse_3-22-66.bin
 
 ; The mouse maze game mode is manipulated under TAC control.

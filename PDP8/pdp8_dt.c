@@ -276,12 +276,11 @@ int32 dt_substate = 0;
 int32 dt_logblk = 0;
 int32 dt_stopoffr = 0;
 
-DEVICE dt_dev;
 int32 dt76 (int32 IR, int32 AC);
 int32 dt77 (int32 IR, int32 AC);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
-t_stat dt_attach (UNIT *uptr, char *cptr);
+t_stat dt_attach (UNIT *uptr, CONST char *cptr);
 void dt_flush (UNIT *uptr);
 t_stat dt_detach (UNIT *uptr);
 t_stat dt_boot (int32 unitno, DEVICE *dptr);
@@ -325,25 +324,25 @@ UNIT dt_unit[] = {
     };
 
 REG dt_reg[] = {
-    { ORDATA (DTSA, dtsa, 12) },
-    { ORDATA (DTSB, dtsb, 12) },
-    { FLDATA (INT, int_req, INT_V_DTA) },
-    { FLDATA (ENB, dtsa, DTA_V_ENB) },
-    { FLDATA (DTF, dtsb, DTB_V_DTF) },
-    { FLDATA (ERF, dtsb, DTB_V_ERF) },
-    { ORDATA (WC, M[DT_WC], 12), REG_FIT },
-    { ORDATA (CA, M[DT_CA], 12), REG_FIT },
-    { DRDATA (LTIME, dt_ltime, 24), REG_NZ | PV_LEFT },
-    { DRDATA (DCTIME, dt_dctime, 24), REG_NZ | PV_LEFT },
-    { ORDATA (SUBSTATE, dt_substate, 2) },
+    { ORDATAD (DTSA, dtsa, 12, "status register A") },
+    { ORDATAD (DTSB, dtsb, 12, "status register B") },
+    { FLDATAD (INT, int_req, INT_V_DTA, "interrupt pending flag") },
+    { FLDATAD (ENB, dtsa, DTA_V_ENB, "interrupt enable flag") },
+    { FLDATAD (DTF, dtsb, DTB_V_DTF, "DECtape flag") },
+    { FLDATAD (ERF, dtsb, DTB_V_ERF, "error flag") },
+    { ORDATAD (WC, M[DT_WC], 12, "word count (memory location 7755)"), REG_FIT },
+    { ORDATAD (CA, M[DT_CA], 12, "current address (memory location 7754)"), REG_FIT },
+    { DRDATAD (LTIME, dt_ltime, 24, "time between lines"), REG_NZ | PV_LEFT },
+    { DRDATAD (DCTIME, dt_dctime, 24, "time to decelerate to a full stop"), REG_NZ | PV_LEFT },
+    { ORDATAD (SUBSTATE, dt_substate, 2, "read/write command substate") },
     { DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
-    { URDATA (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
-              DT_NUMDR, PV_LEFT | REG_RO) },
-    { URDATA (STATT, dt_unit[0].STATE, 8, 18, 0,
-              DT_NUMDR, REG_RO) },
+    { URDATAD (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
+              DT_NUMDR, PV_LEFT | REG_RO, "position, in lines, units 0 to 7") },
+    { URDATAD (STATT, dt_unit[0].STATE, 8, 18, 0,
+              DT_NUMDR, REG_RO, "unit state, units 0 to 7") },
     { URDATA (LASTT, dt_unit[0].LASTT, 10, 32, 0,
               DT_NUMDR, REG_HRO) },
-    { FLDATA (STOP_OFFR, dt_stopoffr, 0) },
+    { FLDATAD (STOP_OFFR, dt_stopoffr, 0, "stop on off-reel error") },
     { ORDATA (DEVNUM, dt_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -682,13 +681,13 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
-	uptr->STATE = uptr->pos = 0;
-	unum = (int32) (uptr - dt_dev.units);
-	if (unum == DTA_GETUNIT (dtsa))						/* if selected, */
-		dt_seterr (uptr, DTB_SEL);						/* error */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel? */
+    uptr->STATE = uptr->pos = 0;
+    unum = (int32) (uptr - dt_dev.units);
+    if (unum == DTA_GETUNIT (dtsa))                     /* if selected, */
+        dt_seterr (uptr, DTB_SEL);                      /* error */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -796,7 +795,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (dtsb & DTB_DTF) {                       /* DTF set? */
                 dt_seterr (uptr, DTB_TIM);              /* timing error */
                 return SCPE_OK;
-				}
+                }
             if (DEBUG_PRI (dt_dev, LOG_RW) ||
                (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
                 fprintf (sim_deb, ">>DT%d: reading block %d %s%s\n",
@@ -950,7 +949,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (dtsb & DTB_DTF) {                       /* DTF set? */
                 dt_seterr (uptr, DTB_TIM);              /* timing error */
                 return SCPE_OK;
-				}
+                }
             relpos = DT_LIN2OF (uptr->pos, uptr);       /* cur pos in blk */
             M[DT_WC] = (M[DT_WC] + 1) & 07777;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & 07777;
@@ -965,7 +964,7 @@ switch (fnc) {                                          /* at speed, check fnc *
                 fbuf[ba] = dat;                         /* write word */
                 if (ba >= uptr->hwmark)
                     uptr->hwmark = ba + 1;
-				}
+                }
                                                         /* ignore hdr */
             sim_activate (uptr, DT_WSIZE * dt_ltime);
             if (M[DT_WC] == 0)
@@ -1202,7 +1201,7 @@ return SCPE_OK;
    If 12b, read data into buffer
 */
 
-t_stat dt_attach (UNIT *uptr, char *cptr)
+t_stat dt_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 pdp18b[D18_NBSIZE];
 uint16 pdp11b[D18_NBSIZE], *fbuf;
@@ -1312,7 +1311,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
             }                                           /* end loop buf */
         }                                               /* end else */
     if (ferror (uptr->fileref))
-        perror ("I/O error");
+        sim_perror ("I/O error");
     }
 uptr->WRITTEN = FALSE;                                  /* no longer dirty */
 }

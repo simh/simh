@@ -30,6 +30,10 @@
 #ifndef SIM_DISK_H_
 #define SIM_DISK_H_    0
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 /* SIMH/Disk format */
 
 typedef uint32          t_seccnt;                       /* disk sector count */
@@ -37,9 +41,9 @@ typedef uint32          t_lba;                          /* disk logical block ad
 
 /* Unit flags */
 
-#define DKUF_V_WLK      (UNIT_V_UF + 12)                /* write locked */
-#define DKUF_V_FMT      (UNIT_V_UF + 13)                /* disk file format */
-#define DKUF_W_FMT      3                               /* 3b of formats */
+#define DKUF_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
+#define DKUF_V_FMT      (UNIT_V_UF + 1)                 /* disk file format */
+#define DKUF_W_FMT      2                               /* 2b of formats */
 #define DKUF_N_FMT      (1u << DKUF_W_FMT)              /* number of formats */
 #define DKUF_M_FMT      ((1u << DKUF_W_FMT) - 1)
 #define DKUF_F_STD       0                              /* SIMH format */
@@ -64,19 +68,19 @@ typedef void (*DISK_PCALLBACK)(UNIT *unit, t_stat status);
 
 /* Prototypes */
 
-t_stat sim_disk_attach (UNIT *uptr, char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, 
+t_stat sim_disk_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, 
                         uint32 debugbit, const char *drivetype, uint32 pdp11_tracksize, int completion_delay);
 t_stat sim_disk_detach (UNIT *uptr);
-t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat sim_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
 t_stat sim_disk_rdsect_a (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects, DISK_PCALLBACK callback);
 t_stat sim_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 t_stat sim_disk_wrsect_a (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects, DISK_PCALLBACK callback);
 t_stat sim_disk_unload (UNIT *uptr);
-t_stat sim_disk_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat sim_disk_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sim_disk_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat sim_disk_set_capac (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat sim_disk_set_asynch (UNIT *uptr, int latency);
 t_stat sim_disk_clr_asynch (UNIT *uptr);
 t_stat sim_disk_reset (UNIT *uptr);
@@ -89,5 +93,9 @@ t_offset sim_disk_size (UNIT *uptr);
 t_bool sim_disk_vhd_support (void);
 t_bool sim_disk_raw_support (void);
 void sim_disk_data_trace (UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

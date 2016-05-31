@@ -1,5 +1,5 @@
 /*
- * $Id: test.c,v 1.24 2005/01/14 18:58:00 phil Exp $
+ * $Id: test.c,v 1.22 2004/01/25 17:20:50 phil Exp - revised by DAG $
  * XY Display simulator test program (PDP-1 Munching Squares)
  * Phil Budne <phil@ultimate.com>
  * September 2003
@@ -52,7 +52,7 @@
 #define EXIT_FAILURE 1
 #endif
 
-#include "xy.h"
+#include "display.h"
 
 static unsigned long test_switches = 0;
 
@@ -132,7 +132,7 @@ void
 t2(void) {
     int x, y;
 
-    display_init(TEST_DIS, TEST_RES);
+    display_init(TEST_DIS, TEST_RES, NULL);
     for (x = INTENSITIES-1; x >= 0; x--) {
         for (y = 0; y < 20; y++) {
             ws_display_point(x*4, y, x, 0);
@@ -160,7 +160,7 @@ void
 t3(void) {
     int x, y;
 
-    display_init(TEST_DIS, TEST_RES);
+    display_init(TEST_DIS, TEST_RES, NULL);
     for (x = DISPLAY_INT_MAX; x >= 0; x--) {
         for (y = 0; y < 20; y++) {
             display_point(x*2, y*2, x, 0);
@@ -175,7 +175,7 @@ t3(void) {
 
 int
 main(void) {
-    if (!display_init(TEST_DIS, TEST_RES))
+    if (!display_init(TEST_DIS, TEST_RES, NULL))
         exit(EXIT_FAILURE);
 
     cpu_set_switches(04000UL);          /* classic starting value */

@@ -1,5 +1,5 @@
 /*
- * $Id: vt11.c,v 1.28 2005/08/06 21:09:04 phil Exp $
+ * $Id: vt11.c,v 1.17 2004/01/24 20:44:46 phil Exp - revised by DAG $
  * Simulator Independent VT11/VS60 Graphic Display Processor Simulation
  * Phil Budne <phil@ultimate.com>
  * September 13, 2003
@@ -114,7 +114,7 @@
 #include <math.h>                       /* atan2, cos, sin, sqrt */
 #endif
 
-#include "xy.h"                         /* XY plot interface */
+#include "display.h"                    /* XY plot interface */
 #include "vt11.h"
 
 #define BITMASK(n) (1<<(n))             /* PDP-11 bit numbering */
@@ -128,10 +128,35 @@
 /* extract a 1-bit field */
 #define TESTBIT(W,B) (((W) & BITMASK(B)) != 0)
 
-#ifdef DEBUG_VT11
-#define DEBUGF(X) do { printf X; fflush(stdout); } while (0)
+static void *vt11_dptr;
+static int vt11_dbit;
+
+#if defined(DEBUG_VT11) || defined(VM_PDP11)
+
+#include <stdio.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+#define DEVICE void
+
+#define DBG_CALL 1
+int vt11_debug;
+
+#if defined(VM_PDP11)
+extern void _sim_debug (unsigned int dbits, DEVICE* dptr, const char* fmt, ...);
+
+#define DEBUGF(...) _sim_debug (vt11_dbit, vt11_dptr, ##  __VA_ARGS__)
+#else /* DEBUG_VT11 */
+#define DEBUGF(...) do {if (vt11_debug & DBG_CALL) { printf(##  __VA_ARGS__); fflush(stdout); };} while (0)
+#endif /* defined(DEBUG_VT11) || defined(VM_PDP11) */
+#if defined(__cplusplus)
+}
+#endif
 #else
-#define DEBUGF(X)
+
+#define DEBUGF(...) 
+
 #endif
 
 /*
@@ -194,8 +219,8 @@
 enum display_type vt11_display = DISPLAY_TYPE;  /* DIS_VR{14,17,48} */
 int vt11_scale = PIX_SCALE;     /* RES_{FULL,HALF,QUARTER,EIGHTH} */
 unsigned char vt11_init = 0;    /* set after display_init() called */
-#define INIT { if (!vt11_init) { display_init(vt11_display, vt11_scale); \
-                    vt11_init = 1; vt11_reset(); } }
+#define INIT { if (!vt11_init) { display_init(vt11_display, vt11_scale, vt11_dptr); \
+                    vt11_init = 1; vt11_reset(vt11_dptr, vt11_dbit); } }
 
 /* state visible to host */
 
@@ -230,7 +255,7 @@ static uint16 bdb = 0;                  /* Buffered Data Bits register;
 static unsigned char internal_stop = 0; /* 1 bit: stop display */
 static unsigned char mode_field = 0;    /* copy of control instr. bits 14-11 */
 #define graphic_mode stack[8]._mode     /* 4 bits: sets type for graphic data */
-enum mode { CHAR=0, SVECTOR, LVECTOR, POINT, GRAPHX, GRAPHY, RELPOINT, /* all */
+enum gmode { CHAR=0, SVECTOR, LVECTOR, POINT, GRAPHX, GRAPHY, RELPOINT, /* all */
             BSVECT, CIRCLE, ABSVECTOR   /* VS60 only */
 };
 
@@ -403,18 +428,18 @@ static unsigned char name_irq = 0;      /* 1 bit: name matches associative nm */
 
 static struct frame
         {
-        vt11word      _dpc;                 /* Display Program Counter (even) */
+        vt11word      _dpc;             /* Display Program Counter (even) */
         unsigned      _name;            /* (11-bit) name from display file */
-        enum mode     _mode;            /* 4 bits: sets type for graphic data */
+        enum gmode    _mode;            /* 4 bits: sets type for graphic data */
         unsigned char _vscale;          /* non-character scale factor * 4 */
-        unsigned char _csi;                 /* character scale index 0..3 */
+        unsigned char _csi;             /* character scale index 0..3 */
         unsigned char _cscale;          /* character scale factor * 4 */
         unsigned char _crotate;         /* rotate chars 90 degrees CCW */
         unsigned char _intens;          /* intensity: 0 => dim .. 7 => bright */
         enum linetype _ltype;           /* line type (long dash, etc.) */
         unsigned char _blink;           /* blink enable */
         unsigned char _italics;         /* italicize characters */
-        unsigned char _so;                  /* currently in shift-out mode */
+        unsigned char _so;              /* currently in shift-out mode */
         unsigned char _menu;            /* VS60 graphics in menu area */
         unsigned char _cesc;            /* perform POPR on char. term. match */
         unsigned char _edgeintr;        /* generate intr. on edge transition */
@@ -429,24 +454,24 @@ static struct frame
         enum scolor   _color;           /* scope display color (option) */
         unsigned char _zdata;           /* flag: display file has Z coords */
         unsigned char _depth;           /* flag: display Z using depth cue */
-        } stack[9] = { { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        } stack[9] = { { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
                        { 0, 0, CHAR, 4, 1, 4, 0, 4, SOLID, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 },
+                         0, 0, 0, 0, 0, 0, 0, 0, 1, 0, GREEN, 0, 0 },
                      };
 
 #define char_scale      stack[8]._cscale /* character scale factor * 4 */
@@ -638,7 +663,7 @@ void
 vt11_set_dpc(uint16 d)
 {   INIT
     bdb = d;                            /* save all bits in case maint1 used */
-    DEBUGF(("set DPC 0%06o\r\n", (unsigned)d));
+    DEBUGF("set DPC 0%06o\r\n", (unsigned)d);
     /* Stack level is unaffected, except that stack_sel==037 goes to 040; this
        fudge is necessary to pass DZVSC test 3, which misleadingly calls it
        setting top-of-stack upon START (vt11_set_dpc(even)).  If one instead
@@ -728,7 +753,7 @@ vt11_get_xpr(void)
 void
 vt11_set_xpr(uint16 d)
 {   INIT
-    DEBUGF(("set XPR: no effect\r\n"));
+    DEBUGF("set XPR: no effect\r\n");
 }
 
 int32
@@ -743,7 +768,7 @@ vt11_get_ypr(void)
 void
 vt11_set_ypr(uint16 d)
 {   INIT
-    DEBUGF(("set YPR: no effect\r\n"));
+    DEBUGF("set YPR: no effect\r\n");
 }
 
 /* All the remaining registers pertain to the VS60 only. */
@@ -820,7 +845,7 @@ vt11_set_yor(uint16 d)
 int32
 vt11_get_anr(void)
 {   INIT
-    DEBUGF(("get ANR: no effect\r\n"));
+    DEBUGF("get ANR: no effect\r\n");
     return (search << 12) | assoc_name; /* [garbage] */
 }
 
@@ -896,7 +921,7 @@ vt11_get_nr(void)
 void
 vt11_set_nr(uint16 d)
 {   INIT
-    DEBUGF(("set NR: no effect\r\n"));
+    DEBUGF("set NR: no effect\r\n");
 }
 
 int32
@@ -932,7 +957,7 @@ vt11_get_sdr(void)
 void
 vt11_set_sdr(uint16 d)
 {   INIT
-    DEBUGF(("set SDR: no effect\r\n"));
+    DEBUGF("set SDR: no effect\r\n");
 }
 
 int32
@@ -1010,7 +1035,7 @@ vt11_get_zpr(void)
 void
 vt11_set_zpr(uint16 d)
 {   INIT
-    DEBUGF(("set ZPR: no effect\r\n"));
+    DEBUGF("set ZPR: no effect\r\n");
 }
 
 int32
@@ -1039,8 +1064,13 @@ vt11_set_zor(uint16 d)
 }
 
 void
-vt11_reset(void)
+vt11_reset(void *dev, int debug)
 {
+    if (dev) {
+        vt11_dptr = dev;
+        vt11_dbit = debug;
+        }
+
     /* make sure display code has been initialized */
     if (!vt11_init)     /* (SIMH invokes before display type is set) */
         return;                         /* wait until last moment */
@@ -1739,7 +1769,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (x0 * (long)tPEd > (long)tPEn * rdx)
                     tPEn = x0, tPEd = rdx;
         }
-    } else                              /* rdx > 0 */
+    } else {                            /* rdx > 0 */
         if (x0 >= 0 && x0 <= rdx) {
             if (tPLd > 0) {
                 if (x0 * (long)tPLd < (long)tPLn * rdx)
@@ -1748,6 +1778,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (x0 * (long)tPLd > (long)tPLn * rdx)
                     tPLn = x0, tPLd = rdx;
         }
+    }
 
     /*
      * Right:   tR = NR . (PR - P0) / NR . (P1 - P0)
@@ -1791,7 +1822,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (tn * (long)tPLd < (long)tPLn * rdx)
                     tPLn = tn, tPLd = rdx;
         }
-    } else                              /* rdx > 0 */
+    } else {                            /* rdx > 0 */
         if (tn >= 0 && tn <= rdx) {
             if (tPEd > 0) {
                 if (tn * (long)tPEd > (long)tPEn * rdx)
@@ -1800,6 +1831,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (tn * (long)tPEd < (long)tPEn * rdx)
                     tPEn = tn, tPEd = rdx;
         }
+    }
 
     /*
      * Bottom:  tB = NB . (PB - P0) / NB . (P1 - P0)
@@ -1840,15 +1872,16 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
             } else                      /* tPEd < 0 */
                 if (y0 * (long)tPEd > (long)tPEn * rdy)
                     tPEn = y0, tPEd = rdy;
-            }
+        }
     } else                              /* rdy > 0 */
         if (y0 >= 0 && y0 <= rdy) {
             if (tPLd > 0) {
                 if (y0 * (long)tPLd < (long)tPLn * rdy)
                     tPLn = y0, tPLd = rdy;
-            } else                      /* tPLd < 0 */
+            } else {                    /* tPLd < 0 */
                 if (y0 * (long)tPLd > (long)tPLn * rdy)
                     tPLn = y0, tPLd = rdy;
+            }
         }
 
     /*
@@ -1893,7 +1926,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
                 if (tn * (long)tPLd < (long)tPLn * rdy)
                     tPLn = tn, tPLd = rdy;
         }
-    } else                              /* rdy > 0 */
+    } else {                            /* rdy > 0 */
         if (tn >= 0 && tn <= rdy) {
             if (tPEd > 0) {
                 if (tn * (long)tPEd > (long)tPEn * rdy)
@@ -1901,8 +1934,9 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
             } else                      /* tPEd < 0 */
                 if (tn * (long)tPEd < (long)tPEn * rdy)
                     tPEn = tn, tPEd = rdy;
-
         }
+    }
+
     /*
      *  if ( tPL < tPE )
      *          invisible
@@ -1915,7 +1949,8 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
      *                  invis
      */
 
-    if (((tPLd > 0) && (tPEd < 0)) || ((tPLd < 0) && (tPEd > 0))) {
+    if (((tPLd > 0) && (tPEd < 0)) || 
+        ((tPLd < 0) && (tPEd > 0))) {
         if (tPLn * (long)tPEd > (long)tPEn * tPLd)
             return 0;                   /* invisible */
     } else
@@ -1989,8 +2024,8 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
     dz = z1 - z0;
 
     if (stroking) {                     /* drawing a VS60 character */
-        DEBUGF(("offset, normalized stroke i%d (%ld,%ld) to (%ld,%ld)\r\n",
-                i, (long)x0,(long)y0, (long)x1,(long)y1));
+        DEBUGF("offset, normalized stroke i%d (%ld,%ld) to (%ld,%ld)\r\n",
+               i, (long)x0,(long)y0, (long)x1,(long)y1);
 
         if (dx == 0 && dy == 0) {       /* just display a point */
             if (i) {
@@ -2002,9 +2037,8 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
             return;
         }
     } else {
-        DEBUGF((
-            "offset, normalized vector i%d (%ld,%ld,%ld) to (%ld,%ld,%ld)\r\n",
-            i, (long)x0, (long)y0, (long)z0, (long)x1, (long)y1, (long)z1));
+        DEBUGF("offset, normalized vector i%d (%ld,%ld,%ld) to (%ld,%ld,%ld)\r\n",
+               i, (long)x0, (long)y0, (long)z0, (long)x1, (long)y1, (long)z1);
 
         line_counter = 037;             /* reset line-style counter */
 
@@ -2021,7 +2055,7 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
                 xpos = 010000L * adx / ady + 1; /* truncates */
                 ypos = ady;             /* according to DZVSC test 100 */
             }
-            DEBUGF(("delta=0%o, tangent=0%o\r\n", xpos, ypos));
+            DEBUGF("delta=0%o, tangent=0%o\r\n", xpos, ypos);
             xpos = PSCALE(xpos);        /* compensates for eventual PNORM */
             ypos = PSCALE(ypos);        /* compensates for eventual PNORM */
         }
@@ -2078,7 +2112,7 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
         case 0:                         /* invisible */
             return;
         default:
-            DEBUGF(("clip() bad return: %d\n", clip_vect));
+            DEBUGF("clip() bad return: %d\n", clip_vect);
         case -1:                        /* visible, not clipped */
             clip_vect = 0;
             break;                      /* draw immediately */
@@ -2120,8 +2154,8 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
             tangent = 010000L * dz / dy;
             lp_zpos = z0 + tangent * (lp_ypos - y0) / 010000L;
         }
-        DEBUGF(("adjusted LP coords (0%o,0%o,0%o)\r\n",
-                lp_xpos, lp_ypos, lp_zpos));
+        DEBUGF("adjusted LP coords (0%o,0%o,0%o)\r\n",
+               lp_xpos, lp_ypos, lp_zpos);
         /* xpos,ypos,zpos still pertain to the original endpoint
            (assuming that Maintenance Switch 3 isn't set) */
     }
@@ -2174,10 +2208,10 @@ basic_vector(int i, int dir, int len)   /* unscaled display-file units */
         dy = -len;
         break;
     default:                            /* "can't happen" */
-        DEBUGF(("BUG: basic vector: illegal direction %d\r\n", dir));
+        DEBUGF("BUG: basic vector: illegal direction %d\r\n", dir);
         return;
     }
-    DEBUGF(("basic "));
+    DEBUGF("basic ");
     vector2(i, dx, dy);
 }
 
@@ -2243,10 +2277,9 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
     dey -= dcy;
     dez -= dcz;
 
-    DEBUGF((
-  "offset, normalized arc i%d s(%ld,%ld,%ld) c(%ld,%ld,%ld) e(%ld,%ld,%ld)\r\n",
-                i, (long)xs,(long)ys,(long)zs, (long)xc,(long)yc,(long)zc,
-                (long)xe,(long)ye,(long)ze));
+    DEBUGF("offset, normalized arc i%d s(%ld,%ld,%ld) c(%ld,%ld,%ld) e(%ld,%ld,%ld)\r\n",
+           i, (long)xs,(long)ys,(long)zs, (long)xc,(long)yc,(long)zc,
+           (long)xe,(long)ye,(long)ze);
 
     /* XXX  not known whether Maintenance Switch 3 has any effect for arcs */
 
@@ -2271,7 +2304,6 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
         } else
             edge_flag = 0;
     }
-
     /* XXX  for now, resort to scissoring:
                 illuminates only pixels that lie in the visible display area */
 
@@ -2322,8 +2354,8 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
         x = xc + (re >= 0 ? (int32)(re + 0.5) : -(int32)(-re + 0.5));
         re = rs * sin(as);
         y = yc + (re >= 0 ? (int32)(re + 0.5) : -(int32)(-re + 0.5));
-        z = (int32)(zo + seg * dz);         /* truncates */
-        lineTwoStep(xs, ys, zs, x, y, z);       /* (continuing line style) */
+        z = (int32)(zo + seg * dz);     /* truncates */
+        lineTwoStep(xs, ys, zs, x, y, z);/* (continuing line style) */
         skip_start = 1;                 /* don't double-illuminate junctions */
         xs = x;
         ys = y;
@@ -2339,8 +2371,8 @@ conic3(int i, int32 dcx, int32 dcy, int32 dcz, int32 dex, int32 dey, int32 dez)
     ypos += dcy + dey;
     zpos += dcz + dez;
     if (lp0_hit) {
-        DEBUGF(("LP hit on arc at (0%o,0%o,0%o)\r\n",
-                lp_xpos, lp_ypos, lp_zpos));
+        DEBUGF("LP hit on arc at (0%o,0%o,0%o)\r\n",
+               lp_xpos, lp_ypos, lp_zpos);
         if (lphit_irq) {
             /* XXX  save parameters for drawing remaining chords */
         }
@@ -3036,9 +3068,9 @@ vt11_cycle(int us, int slowdown)
         int32 dx = clip_x1 - clip_x0,
               dy = clip_y1 - clip_y0,
               dz = clip_z1 - clip_z0;
-        DEBUGF(("clipped vector i%d (%ld,%ld,%ld) to (%ld,%ld,%ld)\r\n", clip_i,
-                (long)clip_x0, (long)clip_y0, (long)clip_z0,
-                (long)clip_x1, (long)clip_y1, (long)clip_z1));
+        DEBUGF("clipped vector i%d (%ld,%ld,%ld) to (%ld,%ld,%ld)\r\n", clip_i,
+               (long)clip_x0, (long)clip_y0, (long)clip_z0,
+               (long)clip_x1, (long)clip_y1, (long)clip_z1);
         if (VS60                        /* XXX  assuming VT11 doesn't display */
          && (dx != 0 || dy != 0 || dz != 0)     /* hardware skips null vects */
          && clip_i && int0_scope) {     /* show it */
@@ -3069,8 +3101,8 @@ vt11_cycle(int us, int slowdown)
                 tangent = 010000L * dz / dy;
                 lp_zpos = clip_z0 + tangent * (lp_ypos - clip_y0) / 010000L;
             }
-            DEBUGF(("adjusted LP coords (0%o,0%o,0%o)\r\n",
-                lp_xpos, lp_ypos, lp_zpos));
+            DEBUGF("adjusted LP coords (0%o,0%o,0%o)\r\n",
+                   lp_xpos, lp_ypos, lp_zpos);
             /* xpos,ypos,zpos still pertain to the original endpoint
                (assuming that Maintenance Switch 3 isn't set) */
         }
@@ -3096,8 +3128,8 @@ vt11_cycle(int us, int slowdown)
         DPC += 2;
         if (time_out)
             goto bus_timeout;
-        DEBUGF(("0%06o: 0%06o\r\n",
-                (unsigned)(DPC - 2 + reloc) & 0777777, (unsigned)inst));
+        DEBUGF("0%06o: 0%06o\r\n",
+               (unsigned)(DPC - 2 + reloc) & 0777777, (unsigned)inst);
         if (finish_jmpa)
             goto jmpa;
         if (finish_jsra)
@@ -3120,7 +3152,7 @@ vt11_cycle(int us, int slowdown)
             /*FALLTHRU*/
         case 010:                       /* Set Graphic Mode 1000 */
             if (VT11) {
-                DEBUGF(("SGM 1000 IGNORED\r\n"));
+                DEBUGF("SGM 1000 IGNORED\r\n");
                 break;
             }
             /*FALLTHRU*/
@@ -3131,34 +3163,34 @@ vt11_cycle(int us, int slowdown)
         case 4:                         /* Set Graphic Mode 0100 */
         case 5:                         /* Set Graphic Mode 0101 */
         case 6:                         /* Set Graphic Mode 0110 */
-            DEBUGF(("Set Graphic Mode %u", (unsigned)mode_field));
-            graphic_mode = mode_field;
+            DEBUGF("Set Graphic Mode %u", (unsigned)mode_field);
+            graphic_mode = (enum gmode)mode_field;
             offset = 0;
             shift_out = 0;              /* seems to be right */
             if (TESTBIT(inst,10)) {
                 intensity = GETFIELD(inst,9,7);
-                DEBUGF((" intensity=%d", (int)intensity));
+                DEBUGF(" intensity=%d", (int)intensity);
             }
             if (TESTBIT(inst,6)) {
                 lp0_intr_ena = TESTBIT(inst,5);
-                DEBUGF((" lp0_intr_ena=%d", (int)lp0_intr_ena));
+                DEBUGF(" lp0_intr_ena=%d", (int)lp0_intr_ena);
             }
             if (TESTBIT(inst,4)) {
                 blink_ena = TESTBIT(inst,3);
-                DEBUGF((" blink=%d", (int)blink_ena));
+                DEBUGF(" blink=%d", (int)blink_ena);
             }
             if (TESTBIT(inst,2)) {
-                line_type = GETFIELD(inst,1,0);
-                DEBUGF((" line_type=%d", (int)line_type));
+                line_type = (enum linetype)GETFIELD(inst,1,0);
+                DEBUGF(" line_type=%d", (int)line_type);
             }
-            DEBUGF(("\r\n"));
+            DEBUGF("\r\n");
             break;
 
         case 012:                       /* 1010: Load Name Register */
             if (VT11)
                 goto bad_ins;
             name = GETFIELD(inst,10,0);
-            DEBUGF(("Load Name Register name=0%o\r\n", name));
+            DEBUGF("Load Name Register name=0%o\r\n", name);
             {   static unsigned nmask[4] = { 0, 03777, 03770, 03600 };
 
                 if (search != 0 && ((name^assoc_name) & nmask[search]) == 0)
@@ -3169,21 +3201,21 @@ vt11_cycle(int us, int slowdown)
         case 013:                       /* 1011: Load Status C */
             if (VT11)
                 goto bad_ins;
-            DEBUGF(("Load Status C"));
+            DEBUGF("Load Status C");
             if (TESTBIT(inst,9)) {
                 char_rotate = TESTBIT(inst,8);
-                DEBUGF((" char_rotate=d", (int)char_rotate));
+                DEBUGF(" char_rotate=d", (int)char_rotate);
             }
             if (TESTBIT(inst,7)) {
                 cs_index = GETFIELD(inst,6,5);  /*  0, 1, 2, 3 */
                 char_scale = csi2csf[cs_index]; /* for faster CSCALE macro */
-                DEBUGF((" cs_index=%d(x%d/4)", (int)cs_index, (int)char_scale));
+                DEBUGF(" cs_index=%d(x%d/4)", (int)cs_index, (int)char_scale);
             }
             if (TESTBIT(inst,4)) {
                 vector_scale = GETFIELD(inst,3,0);
-                DEBUGF((" vector_scale=%d/4", (int)vector_scale));
+                DEBUGF(" vector_scale=%d/4", (int)vector_scale);
             }
-            DEBUGF(("\r\n"));
+            DEBUGF("\r\n");
             break;
 
         case 014:                       /* 1100__ */
@@ -3199,7 +3231,7 @@ vt11_cycle(int us, int slowdown)
   jmpa:
                 finish_jmpa = 0;
                 DPC = inst & ~1;
-                DEBUGF(("Display Jump Absolute 0%06o\r\n", (unsigned)inst));
+                DEBUGF("Display Jump Absolute 0%06o\r\n", (unsigned)inst);
                 break;
 
             case 1:                     /* 110001: Display Jump Relative */
@@ -3209,17 +3241,17 @@ vt11_cycle(int us, int slowdown)
                 if (TESTBIT(inst,8)) {
 #if 0                   /* manual seems to say this, but it's wrong: */
                         DPC -= ez;
-                        DEBUGF(("Display Jump Relative -0%o\r\n",
-                                (unsigned)ez));
+                        DEBUGF("Display Jump Relative -0%o\r\n",
+                               (unsigned)ez);
 #else                   /* sign extend, twos complement add, 16-bit wrapping */
                         DPC = (DPC + (~0777 | ez)) & 0177777;
-                        DEBUGF(("Display Jump Relative -0%o\r\n",
-                                ~((~0777 | ez) - 1)));
+                        DEBUGF("Display Jump Relative -0%o\r\n",
+                               ~((~0777 | ez) - 1));
 #endif
                 } else {
                         DPC += (vt11word)ez;
-                        DEBUGF(("Display Jump Relative +0%o\r\n",
-                                (unsigned)ez));
+                        DEBUGF("Display Jump Relative +0%o\r\n",
+                               (unsigned)ez);
                 }
                 /* DPC was already incremented by 2 */
                 break;
@@ -3233,8 +3265,8 @@ vt11_cycle(int us, int slowdown)
                 finish_jsra = 0;
                 push();                 /* save return address and parameters */
                 DPC = inst & ~1;
-                DEBUGF(("Display Jump to Subroutine Absolute 0%06o\r\n",
-                        (unsigned)inst));
+                DEBUGF("Display Jump to Subroutine Absolute 0%06o\r\n",
+                       (unsigned)inst);
                 goto check;             /* (break would set jsr = 0) */
 
             case 3:            /* 110011: Display Jump to Subroutine Relative */
@@ -3244,18 +3276,18 @@ vt11_cycle(int us, int slowdown)
                 /* have to be careful; DPC is unsigned */
                 if (TESTBIT(inst,8)) {
 #if 0                   /* manual seems to say this, but it's wrong: */
-                        DPC -= ez;
-                        DEBUGF(("Display Jump to Subroutine Relative -0%o\r\n",
-                                (unsigned)ez));
+                        DPC -= (vt11word)ez;
+                        DEBUGF("Display Jump to Subroutine Relative -0%o\r\n",
+                               (unsigned)ez);
 #else                   /* sign extend, twos complement add, 16-bit wrapping */
                         DPC = (DPC + (~0777 | ez)) & 0177777;
-                        DEBUGF(("Display Jump to Subroutine Relative -0%o\r\n",
-                                ~((~0777 | ez) - 1)));
+                        DEBUGF("Display Jump to Subroutine Relative -0%o\r\n",
+                               ~((~0777 | ez) - 1));
 #endif
                 } else {
                         DPC += (vt11word)ez;
-                        DEBUGF(("Display Jump to Subroutine Relative +0%o\r\n",
-                                (unsigned)ez));
+                        DEBUGF("Display Jump to Subroutine Relative +0%o\r\n",
+                               (unsigned)ez);
                 }
                 /* DPC was already incremented by 2 */
                 break;                  /* jsr = 0 ?? */
@@ -3264,19 +3296,19 @@ vt11_cycle(int us, int slowdown)
 
         case 015:                       /* 1101__ */
             if (VT11)
-                DEBUGF(("Display NOP\r\n"));
+                DEBUGF("Display NOP\r\n");
             else {
                 op = GETFIELD(inst,10,9);
                 switch (op) {
 
                 case 0:                 /* 110100: Load Scope Selection */
                                         /* also used as Display NOP */
-                    DEBUGF(("Load Scope Selection"));
+                    DEBUGF("Load Scope Selection");
                     c = TESTBIT(inst,8);
-                    DEBUGF((" console=%d", c));
+                    DEBUGF(" console=%d", c);
                     if (TESTBIT(inst,7)) {
                         ez = TESTBIT(inst,6);
-                        DEBUGF((" blank=%d", (int)!ez));
+                        DEBUGF(" blank=%d", (int)!ez);
                         if (c)
                             int1_scope = (unsigned char)(ez & 0xFF);
                         else
@@ -3284,7 +3316,7 @@ vt11_cycle(int us, int slowdown)
                     }
                     if (TESTBIT(inst,5)) {
                         ez = TESTBIT(inst,4);
-                        DEBUGF((" lp_intr_ena=%d", (int)ez));
+                        DEBUGF(" lp_intr_ena=%d", (int)ez);
                         if (c)
                             lp1_intr_ena = (unsigned char)(ez & 0xFF);
                         else
@@ -3292,52 +3324,54 @@ vt11_cycle(int us, int slowdown)
                     }
                     if (TESTBIT(inst,3)) {
                         ez = TESTBIT(inst,2);
-                        DEBUGF((" lp_sw_intr_ena=%d", (int)ez));
+                        DEBUGF(" lp_sw_intr_ena=%d", (int)ez);
                         if (c)
                             lp1_sw_intr_ena = (unsigned char)(ez & 0xFF);
                         else
                             lp0_sw_intr_ena = (unsigned char)(ez & 0xFF);
                     }
-                    DEBUGF(("\r\n"));
+                    DEBUGF("\r\n");
                     break;
 
                 case 1:                 /* 110101: Display POP Not Restore */
-                    DEBUGF(("Display POP Not Restore\r\n"));
+                    DEBUGF("Display POP Not Restore\r\n");
                     pop(0);             /* sets new DPC as side effect */
                     break;
 
                 case 2:                 /* 110110: Display POP Restore */
-                    DEBUGF(("Display POP Restore\r\n"));
+                    DEBUGF("Display POP Restore\r\n");
                     pop(1);             /* sets new DPC as side effect */
                     break;
 
                 default:                /* 110111: undocumented -- ignored? */
-                    DEBUGF(("Display NOP?\r\n"));
+                    DEBUGF("Display NOP?\r\n");
                 }
             }
             break;
 
         case 016:                       /* 1110: Load Status A */
-            DEBUGF(("Load Status A"));
+            DEBUGF("Load Status A");
             internal_stop = TESTBIT(inst,10);   /* 11101 Display Stop */
             if (internal_stop) {
                 stopped = 1;            /* (synchronous with display cycle) */
-                DEBUGF((" stop"));
+                DEBUGF(" stop");
             }
             if (TESTBIT(inst,9)) {
                 stop_intr_ena  = TESTBIT(inst,8);
-                DEBUGF((" stop_intr_ena=%d", (int)stop_intr_ena));
+                DEBUGF(" stop_intr_ena=%d", (int)stop_intr_ena);
             }
             if (TESTBIT(inst,7)) {
                 lp_intensify = !TESTBIT(inst,6);
-                DEBUGF((" lp_intensify=%d", (int)lp_intensify));
+                DEBUGF(" lp_intensify=%d", (int)lp_intensify);
             }
             if (TESTBIT(inst,5)) {
                 italics = TESTBIT(inst,4);
-                DEBUGF((" italics=%d", (int)italics));
+                DEBUGF(" italics=%d", (int)italics);
             }
             refresh_rate = GETFIELD(inst,VS60?3:2,2);
-            DEBUGF((" refresh=%d", refresh_rate));
+            DEBUGF(" refresh=%d", refresh_rate);
+            if (sync_period != refresh_rate)
+                DEBUGF("old sync_period=%d, new refresh=%d", sync_period, refresh_rate);
             switch (refresh_rate) {
             case 0:                     /* continuous */
                 sync_period = 0;
@@ -3357,46 +3391,46 @@ vt11_cycle(int us, int slowdown)
             }
             if (VS60 && TESTBIT(inst,1)) {
                 menu = TESTBIT(inst,0);
-                DEBUGF((" menu=%d", (int)menu));
+                DEBUGF(" menu=%d", (int)menu);
             }
-            DEBUGF(("\r\n"));
+            DEBUGF("\r\n");
             break;
 
         case 017:                       /* 1111_ */
             if (VS60 && TESTBIT(inst,10)) {     /* 11111: Load Status BB */
-                DEBUGF(("Load Status BB"));
+                DEBUGF("Load Status BB");
                 if (TESTBIT(inst,7)) {
                     depth_cue_proc = TESTBIT(inst,6);
-                    DEBUGF((" depth_cue_proc=%d", (int)depth_cue_proc));
+                    DEBUGF(" depth_cue_proc=%d", (int)depth_cue_proc);
                 }
                 if (TESTBIT(inst,5)) {
                     edge_intr_ena = TESTBIT(inst,4);
-                    DEBUGF((" edge_intr_ena=%d", (int)edge_intr_ena));
+                    DEBUGF(" edge_intr_ena=%d", (int)edge_intr_ena);
                 }
                 if (TESTBIT(inst,3)) {
                     file_z_data = TESTBIT(inst,2);
-                    DEBUGF((" file_z_data=%d", (int)file_z_data));
+                    DEBUGF(" file_z_data=%d", (int)file_z_data);
                 }
                 if (TESTBIT(inst,1)) {
                     char_escape = TESTBIT(inst,0);
-                    DEBUGF((" char_escape=%d", (int)char_escape));
+                    DEBUGF(" char_escape=%d", (int)char_escape);
                 }
             } else {                            /* 11110: Load Status B */
-                DEBUGF(("Load Status B"));
+                DEBUGF("Load Status B");
                 if (VS60 && TESTBIT(inst,9)) {
-                    color = GETFIELD(inst,8,7);
-                    DEBUGF((" color=%d", (int)color));
+                    color = (enum scolor)GETFIELD(inst,8,7);
+                    DEBUGF(" color=%d", (int)color);
                 }
                 if (TESTBIT(inst,6)) {
                     graphplot_step = GETFIELD(inst,5,0);
-                    DEBUGF((" graphplot_step=%d", (int)graphplot_step));
+                    DEBUGF(" graphplot_step=%d", (int)graphplot_step);
                 }
             }
-            DEBUGF(("\r\n"));
+            DEBUGF("\r\n");
             break;
 
         default:
-  bad_ins:  DEBUGF(("SPARE COMMAND 0%o\r\n", mode_field));
+  bad_ins:  DEBUGF("SPARE COMMAND 0%o\r\n", mode_field);
             /* "display processor hangs" */
             DPC -= 2;                   /* hang around scene of crime */
             break;
@@ -3423,17 +3457,17 @@ vt11_cycle(int us, int slowdown)
                 word_number = 0;
             if (word_number == 0) {
                 c = GETFIELD(inst,6,0);
-                DEBUGF(("char1 %d (", c));
-                    DEBUGF((040 <= c && c < 0177 ? "'%c'" : "0%o", c));
-                        DEBUGF((")\r\n"));
+                DEBUGF("char1 %d (", c);
+                    DEBUGF(040 <= c && c < 0177 ? "'%c'" : "0%o", c);
+                        DEBUGF(")\r\n");
                 if (character(c))       /* POPR was done; end chars */
                     break;
                 MORE_DATA               /* post any intrs now */
             }
             c = GETFIELD(inst,15,8);
-            DEBUGF(("char2 %d (", c));
-                DEBUGF((040 <= c && c < 0177 ? "'%c'" : "0%o", c));
-                    DEBUGF((")\r\n"));
+            DEBUGF("char2 %d (", c);
+                DEBUGF(040 <= c && c < 0177 ? "'%c'" : "0%o", c);
+                    DEBUGF(")\r\n");
             (void)character(c);
             break;
 
@@ -3455,11 +3489,11 @@ vt11_cycle(int us, int slowdown)
                 z = GETFIELD(inst,9,2); /* delta_z */
                 if (TESTBIT(inst,13))
                         z = -z;
-                DEBUGF(("short vector i%d (%d,%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)z));
+                DEBUGF("short vector i%d (%d,%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)z);
                 vector3(i, x, y, z);
             } else {
-                DEBUGF(("short vector i%d (%d,%d)\r\n", i, (int)x, (int)y));
+                DEBUGF("short vector i%d (%d,%d)\r\n", i, (int)x, (int)y);
                 vector2(i, x, y);
             }
             break;
@@ -3488,15 +3522,15 @@ vt11_cycle(int us, int slowdown)
                 z = GETFIELD(inst,9,2); /* delta_z */
                 if (TESTBIT(inst,13))
                         z = -z;
-                DEBUGF(("long vector i%d (%d,%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)z));
+                DEBUGF("long vector i%d (%d,%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)z);
                 vector3(i, x, y, z);
             } else {
                 if (ex)
   norot:            /* undocumented and probably nonfunctional */
-                    DEBUGF(("ROTATE NOT SUPPORTED\r\n"));
+                    DEBUGF("ROTATE NOT SUPPORTED\r\n");
                 else {
-                    DEBUGF(("long vector i%d (%d,%d)\r\n", i, (int)x, (int)y));
+                    DEBUGF("long vector i%d (%d,%d)\r\n", i, (int)x, (int)y);
                     vector2(i, x, y);
                 }
             }
@@ -3535,7 +3569,7 @@ vt11_cycle(int us, int slowdown)
                 if (szo)
                     ez = -ez;
                 if (offset) {           /* OFFSET rather than POINT */
-                    DEBUGF(("offset (%d,%d,%d)\r\n", (int)ex,(int)ey,(int)ez));
+                    DEBUGF("offset (%d,%d,%d)\r\n", (int)ex,(int)ey,(int)ez);
                     xoff = PSCALE(ex);
                     yoff = PSCALE(ey);
                     zoff = PSCALE(ez * 4);      /* XXX  include bits 1:0 ? */
@@ -3543,20 +3577,20 @@ vt11_cycle(int us, int slowdown)
                     s_yoff = (unsigned char)(syo & 0xFF);
                     s_zoff = (unsigned char)(szo & 0xFF);
                 } else {
-                    DEBUGF(("point i%d (%d,%d,%d)\r\n", i,
-                                (int)ex, (int)ey, (int)ez));
+                    DEBUGF("point i%d (%d,%d,%d)\r\n", i,
+                           (int)ex, (int)ey, (int)ez);
                     point3(i, VSCALE(ex) + xoff, VSCALE(ey) + yoff,
                                 VSCALE(ez * 4) + zoff, VS60);
                 }
             } else {
                 if (offset) {           /* (VS60) OFFSET rather than POINT */
-                    DEBUGF(("offset (%d,%d)\r\n", (int)ex, (int)ey));
+                    DEBUGF("offset (%d,%d)\r\n", (int)ex, (int)ey);
                     xoff = PSCALE(ex);
                     yoff = PSCALE(ey);
                     s_xoff = (unsigned char)(sxo & 0xFF);
                     s_yoff = (unsigned char)(syo & 0xFF);
                 } else {
-                    DEBUGF(("point i%d (%d,%d)\r\n", i, (int)ex, (int)ey));
+                    DEBUGF("point i%d (%d,%d)\r\n", i, (int)ex, (int)ey);
                     point2(i, VSCALE(ex) + xoff, VSCALE(ey) + yoff, VS60);
                 }
             }
@@ -3569,7 +3603,7 @@ vt11_cycle(int us, int slowdown)
                 goto blv;               /* (VS60) BLVECT rather than GRAPHX */
             else {
                 ex = GETFIELD(inst,9,0);
-                DEBUGF(("graphplot x (%d) i%d\r\n", (int)ex, i));
+                DEBUGF("graphplot x (%d) i%d\r\n", (int)ex, i);
                 ey = ypos + VSCALE(graphplot_step);
                 /* VT48 ES says first datum doesn't increment Y; that's wrong */
                 /* diagnostic DZVSD shows that "i" bit is ignored! */
@@ -3584,12 +3618,12 @@ vt11_cycle(int us, int slowdown)
   blv:                                  /* (VS60) BLVECT rather than GRAPHY */
                 x = GETFIELD(inst,13,11);       /* direction */
                 y = GETFIELD(inst,9,0);         /* length */
-                DEBUGF(("basic long vector i%d d%d l%d\r\n",
-                        i, (int)x, (int)y));
+                DEBUGF("basic long vector i%d d%d l%d\r\n",
+                       i, (int)x, (int)y);
                 basic_vector(i, (int)x, (int)y);
             } else {
                 ey = GETFIELD(inst,9,0);
-                DEBUGF(("graphplot y (%d) i%d\r\n", (int)ey, i));
+                DEBUGF("graphplot y (%d) i%d\r\n", (int)ey, i);
                 ex = xpos + VSCALE(graphplot_step);
                 /* VT48 ES says first datum doesn't increment X; that's wrong */
                 /* diagnostic DZVSD shows that "i" bit is ignored! */
@@ -3615,12 +3649,12 @@ vt11_cycle(int us, int slowdown)
                 ez = GETFIELD(inst,9,2);
                 if (TESTBIT(inst,13))
                     ez = -ez;
-                DEBUGF(("relative point i%d (%d,%d,%d)\r\n",
-                        i, (int)ex, (int)ey, (int)ez));
+                DEBUGF("relative point i%d (%d,%d,%d)\r\n",
+                       i, (int)ex, (int)ey, (int)ez);
                 point3(i, xpos + VSCALE(ex), ypos + VSCALE(ey),
                         zpos + VSCALE(ez * 4), 1);
             } else {
-                DEBUGF(("relative point i%d (%d,%d)\r\n", i, (int)ex, (int)ey));
+                DEBUGF("relative point i%d (%d,%d)\r\n", i, (int)ex, (int)ey);
                 point2(i, xpos + VSCALE(ex), ypos + VSCALE(ey), 1);
             }
             break;
@@ -3636,14 +3670,14 @@ vt11_cycle(int us, int slowdown)
                 y = GETFIELD(inst,3,0);         /* length 0 */
                 ex = GETFIELD(inst,13,11);      /* direction 1 */
                 ey = GETFIELD(inst,10,7);       /* length 1 */
-                DEBUGF(("basic short vector1 i%d d%d l%d\r\n",
-                        i, (int)x, (int)y));
+                DEBUGF("basic short vector1 i%d d%d l%d\r\n",
+                       i, (int)x, (int)y);
                 basic_vector(i, (int)x, (int)y);
                 if (lphit_irq || edge_irq)      /* MORE_DATA skips this */
                     vt_lpen_intr();     /* post graphic interrupt to host */
                 MORE_DATA
             }
-            DEBUGF(("basic short vector2 i%d d%d l%d\r\n", i, (int)ex,(int)ey));
+            DEBUGF("basic short vector2 i%d d%d l%d\r\n", i, (int)ex,(int)ey);
             basic_vector(i, (int)ex, (int)ey);
             break;
 
@@ -3669,8 +3703,8 @@ vt11_cycle(int us, int slowdown)
                 z = GETFIELD(inst,11,2);
                 if (TESTBIT(inst,13))
                         z = -z;
-                DEBUGF(("absolute vector i%d (%d,%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)z));
+                DEBUGF("absolute vector i%d (%d,%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)z);
                 ex = VSCALE(x) + xoff;
                 ey = VSCALE(y) + yoff;
                 ez = VSCALE(z * 4) + zoff;
@@ -3678,7 +3712,7 @@ vt11_cycle(int us, int slowdown)
                            PNORM(ez - zpos) / 4);       /* approx. */
                 zpos = ez;              /* more precise, if PSCALEF > 1 */
             } else {
-                DEBUGF(("absolute vector i%d (%d,%d)\r\n", i, (int)x, (int)y));
+                DEBUGF("absolute vector i%d (%d,%d)\r\n", i, (int)x, (int)y);
                 ex = VSCALE(x) + xoff;
                 ey = VSCALE(y) + yoff;
                 vector2(i, PNORM(ex - xpos), PNORM(ey - ypos)); /* approx. */
@@ -3728,12 +3762,12 @@ vt11_cycle(int us, int slowdown)
                 ez = GETFIELD(inst,11,2);       /* delta ez */
                 if (TESTBIT(inst,13))
                     ez = -ez;
-                DEBUGF(("circle/arc i%d C(%d,%d,%d) E(%d,%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)z, (int)ex, (int)ey, (int)ez));
+                DEBUGF("circle/arc i%d C(%d,%d,%d) E(%d,%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)z, (int)ex, (int)ey, (int)ez);
                 conic3(i, x, y, z, ex, ey, ez); /* approx. */
             } else {
-                DEBUGF(("circle/arc i%d C(%d,%d) E(%d,%d)\r\n",
-                        i, (int)x, (int)y, (int)ex, (int)ey));
+                DEBUGF("circle/arc i%d C(%d,%d) E(%d,%d)\r\n",
+                       i, (int)x, (int)y, (int)ex, (int)ey);
                 conic2(i, x, y, ex, ey);
             }
             break;
@@ -3753,7 +3787,7 @@ vt11_cycle(int us, int slowdown)
     goto check;
 
   bus_timeout:
-    DEBUGF(("TIMEOUT\r\n"));
+    DEBUGF("TIMEOUT\r\n");
     /* fall through to check (time_out has already been set) */
 
   check:
@@ -3788,4 +3822,3 @@ vt11_cycle(int us, int slowdown)
     display_age(us, slowdown);
     return !maint1 && !maint2 && busy;
 } /* vt11_cycle */
-

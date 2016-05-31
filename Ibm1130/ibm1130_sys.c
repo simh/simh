@@ -109,7 +109,7 @@ const char *sim_stop_messages[] = {
  * but the asm1130 cross assembler may put them there.
  */
 
-t_stat my_load (FILE *fileref, char *cptr, char *fnam)
+t_stat my_load (FILE *fileref, const char *cptr, const char *fnam)
 {
 	char line[150], *c;
 	int iaddr = -1, runaddr = -1, val, nwords;
@@ -167,7 +167,7 @@ t_stat my_load (FILE *fileref, char *cptr, char *fnam)
 	return SCPE_OK;
 }
 
-t_stat my_save (FILE *fileref, char *cptr, char *fnam)
+t_stat my_save (FILE *fileref, const char *cptr, const char *fnam)
 {
 	int iaddr, nzeroes = 0, nwords = (int) (MEMSIZE/2), val;
 
@@ -205,7 +205,7 @@ t_stat my_save (FILE *fileref, char *cptr, char *fnam)
 	return SCPE_OK;
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 	if (flag)
 		return my_save(fileref, cptr, fnam);
@@ -239,7 +239,7 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 			if < 0, number of extra words retired
 */
 
-static char *opcode[] = {
+static const char *opcode[] = {
 	"?00 ",		"XIO ",		"SLA ",		"SRA ",
 	"LDS ",		"STS ",		"WAIT",		"?07 ",
 	"BSI ",		"BSC ",		"?0A ",		"?0B ",
@@ -261,9 +261,9 @@ static char relative[] = {						/*true if short mode displacements are IAR relat
 	TRUE,		TRUE,		TRUE,		FALSE
 };
 
-static char *lsopcode[] = {"SLA ", "SLCA ", "SLT ", "SLC "};
-static char *rsopcode[] = {"SRA ", "?188 ", "SRT ", "RTE "};
-static char tagc[]      = " 123";
+static const char *lsopcode[] = {"SLA ", "SLCA ", "SLT ", "SLC "};
+static const char *rsopcode[] = {"SRA ", "?188 ", "SRT ", "RTE "};
+static const char tagc[]      = " 123";
 
 static int ascii_to_ebcdic_table[128] = 
 {
@@ -289,10 +289,16 @@ static int ebcdic_to_ascii (int ch)
 	return '?';
 }
 
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
+
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 {
 	int32 ch, OP, F, TAG, INDIR, DSPLC, IR, eaddr;
-	char *mnem, tst[12];
+	const char *mnem;
+    char tst[12];
 
 /*  if (sw & SWMASK ('A')) {					// ASCII? not useful
  		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
@@ -454,7 +460,7 @@ t_stat get_spec (char *cptr, t_addr addr, int32 n1, int32 *sptr, t_value *dptr,
 			<= 0  -number of extra words
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 	return SCPE_ARG;
 }

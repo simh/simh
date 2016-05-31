@@ -115,7 +115,7 @@
    enumerates the available host serial ports
 
 
-   t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
+   t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, const void* desc)
    ---------------------------------
 
    displays the available host serial ports
@@ -213,7 +213,7 @@ for (i=0; i<serial_open_device_count; ++i)
    an error message if desired, rather than printing this generic error message.
 */
 
-static void sim_error_serial (char *routine, int error)
+static void sim_error_serial (const char *routine, int error)
 {
 sim_printf ("Serial: %s fails with error %d\n", routine, error);
 return;
@@ -222,8 +222,8 @@ return;
 /* Used when sorting a list of serial port names */
 static int _serial_name_compare (const void *pa, const void *pb)
 {
-SERIAL_LIST *a = (SERIAL_LIST *)pa;
-SERIAL_LIST *b = (SERIAL_LIST *)pb;
+const SERIAL_LIST *a = (const SERIAL_LIST *)pa;
+const SERIAL_LIST *b = (const SERIAL_LIST *)pb;
 
 return strcmp(a->name, b->name);
 }
@@ -352,7 +352,7 @@ for (i=0; i<count && !found; i++) {
   return (found ? temp : NULL);
 }
 
-t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int number = sim_serial_devices(SER_MAX_DEVICE, list);
@@ -391,7 +391,7 @@ SERHANDLE sim_open_serial (char *name, TMLN *lp, t_stat *stat)
 char temp1[1024], devname [1024];
 char *savname = name;
 SERHANDLE port = INVALID_HANDLE;
-char *config;
+CONST char *config;
 t_stat status;
 
 config = get_glyph_nc (name, devname, ';');             /* separate port name from optional config params */
@@ -468,10 +468,10 @@ sim_close_os_serial (port);
 _serial_remove_from_open_list (port);
 }
 
-t_stat sim_config_serial  (SERHANDLE port, const char *sconfig)
+t_stat sim_config_serial  (SERHANDLE port, CONST char *sconfig)
 {
-const char *pptr;
-char *sptr, *tptr;
+CONST char *pptr;
+CONST char *sptr, *tptr;
 SERCONFIG config = { 0 };
 t_bool arg_error = FALSE;
 t_stat r;
@@ -974,6 +974,24 @@ for (i=1; (ports < max) && (i < 64); ++i) {
         close (port);
         }
     }
+for (i=0; (ports < max) && (i < 64); ++i) {
+    sprintf (list[ports].name, "/dev/tty%02d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
+for (i=0; (ports < max) && (i < 8); ++i) {
+    sprintf (list[ports].name, "/dev/ttyU%d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
 #endif
 return ports;
 }
@@ -1282,7 +1300,7 @@ else {                                                      /* read succeeded */
     remaining = read_count - 1;                             /* stop search one char from end of string */
 
     while (remaining > 0 &&                                 /* still characters to search? */
-           (bptr = memchr (cptr, '\377', remaining))) {     /* search for start of PARMRK sequence */
+           (bptr = (char*)memchr (cptr, '\377', remaining))) {/* search for start of PARMRK sequence */
         remaining = remaining - (bptr - cptr) - 1;          /* calc characters remaining */
 
         if (*(bptr + 1) == '\377') {                        /* is it a \377 \377 sequence? */

@@ -5,7 +5,7 @@
  * September 16, 2003
  * Substantially revised by Douglas A. Gwyn, 14 Jan. 2004
  *
- * prerequisite: xy.h
+ * prerequisite: display.h
  */
 
 /*
@@ -34,10 +34,13 @@
  * from the authors.
  */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
 #ifndef SIM_DEFS_H_
 typedef unsigned short uint16;
-typedef long int32;
-typedef unsigned long uint32;
+typedef int int32;
+typedef unsigned int uint32;
 #endif /* SIM_DEFS_H_ */
 
 /*
@@ -124,8 +127,8 @@ extern void vt11_set_sar(uint16);       /* write stack address/maint register */
 extern void vt11_set_zpr(uint16);       /* write Z position register */
 extern void vt11_set_zor(uint16);       /* write Z offset register */
 
-extern void vt11_reset(void);           /* reset the display processor */
-extern int  vt11_cycle(int,int);        /* perform a display processor cycle */
+extern void vt11_reset(void *, int);    /* reset the display processor */
+extern int  vt11_cycle(int, int);       /* perform a display processor cycle */
 
 /*
  * callbacks from VT11/VS60 simulator (to SIMH PDP-11 VT driver, for example)
@@ -135,3 +138,7 @@ extern void vt_stop_intr(void);         /* post a display-stop interrupt */
 extern void vt_lpen_intr(void);         /* post a surface-related interrupt */
 extern void vt_char_intr(void);         /* post a bad-char./timeout interrupt */
 extern void vt_name_intr(void);         /* post a name-match interrupt */
+
+#if defined(__cplusplus)
+}
+#endif

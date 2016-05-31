@@ -127,9 +127,9 @@
 
 #define ML_PXBR_TEST(r) if (((((uint32)(r)) & 0x80000000) == 0) || \
                             ((((uint32)(r)) & 0x40000003) != 0)) RSVD_OPND_FAULT
-#define ML_SBR_TEST(r)  if ((((uint32)(r)) & 0xC0000003) != 0) RSVD_OPND_FAULT
+#define ML_SBR_TEST(r)  if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
-/* 780 microcode patch 78 - only test xCBB<1:0> = 0 */
+/* 780 microcode patch 78 - test xCBB<1:0> = 0 */
 
 #define ML_PA_TEST(r)   if ((((uint32)(r)) & 0x00000003) != 0) RSVD_OPND_FAULT
 
@@ -156,10 +156,14 @@
                         { UNIT_MSIZE, (1u << 23) + (6u << 20), NULL, "14M", &cpu_set_size, NULL, NULL, "Set Memory to 14M bytes" }, \
                         { UNIT_MSIZE, (1u << 23) + (7u << 20), NULL, "15M", &cpu_set_size, NULL, NULL, "Set Memory to 15M bytes" }, \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
-extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
-#define CPU_MODEL_MODIFIERS                                                                     \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
-                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "MODEL",     NULL,                                      \
+                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" },              \
+                            { MTAB_XTD|MTAB_VDV, 0, "BOOTDEV",   "BOOTDEV={A|B|C|D}",                       \
+                              &vax750_set_bootdev, &vax750_show_bootdev, NULL, "Set Boot Device" }
+extern t_stat vax750_set_bootdev (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+
 
 /* Unibus I/O registers */
 
@@ -187,15 +191,15 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
                         (((uint32) (x)) < (REGBASE + REGSIZE)))
 #define NEXUSBASE       (REGBASE + 0x20000)
-#define NEXUSSIZE       0x2000
 #define NEXUS_GETNEX(x) (((x) >> REG_V_NEXUS) & REG_M_NEXUS)
 #define NEXUS_GETOFS(x) (((x) >> REG_V_OFS) & REG_M_OFS)
 
 /* ROM address space in memory controllers */
 
-#define ROMAWIDTH       12                              /* ROM addr width */
+#define ROMAWIDTH       10                              /* ROM addr width */
 #define ROMSIZE         (1u << ROMAWIDTH)               /* ROM size */
-#define ROMBASE         (REGBASE + (TR_MCTL << REG_V_NEXUS) + 0x400)
+#define ROMAMASK        (ROMSIZE - 1)                   /* ROM addr mask */
+#define ROMBASE         (NEXUSBASE + 0x400)
 #define ADDR_IS_ROM(x)  ((((uint32) (x)) >= ROMBASE) && \
                         (((uint32) (x)) < (ROMBASE + ROMSIZE)))
 
@@ -274,7 +278,15 @@ typedef struct {
     int32               vloc;                           /* locator */
     int32               vec;                            /* value */
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
-    uint32              ulnt;                           /* IO length per unit */
+    uint32              ulnt;                           /* IO length per-device */
+                                                        /* Only need to be populated */
+                                                        /* when numunits != num devices */
+    int32               numc;                           /* Number of controllers */
+                                                        /* this field handles devices */
+                                                        /* where multiple instances are */
+                                                        /* simulated through a single */
+                                                        /* DEVICE structure (e.g., DZ, VH, DL, DC). */
+                                                        /* Populated by auto-configure */
     } DIB;
 
 /* Unibus I/O page layout - see pdp11_io_lib.c for address layout details
@@ -284,6 +296,8 @@ typedef struct {
 
 
 /* Interrupt assignments; within each level, priority is right to left */
+
+#define INT_V_DTA       0                               /* BR6 */
 
 #define INT_V_DZRX      0                               /* BR5 */
 #define INT_V_DZTX      1
@@ -298,6 +312,7 @@ typedef struct {
 #define INT_V_DMCTX     10
 #define INT_V_DUPRX     11
 #define INT_V_DUPTX     12
+#define INT_V_RK        13
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
@@ -305,7 +320,10 @@ typedef struct {
 #define INT_V_CR        3
 #define INT_V_VHRX      4
 #define INT_V_VHTX      5
+#define INT_V_TDRX      6
+#define INT_V_TDTX      7
 
+#define INT_DTA         (1u << INT_V_DTA)
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
 #define INT_HK          (1u << INT_V_HK)
@@ -325,7 +343,11 @@ typedef struct {
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_RK          (1u << INT_V_RK)
+#define INT_TDRX        (1u << INT_V_TDRX)
+#define INT_TDTX        (1u << INT_V_TDTX)
 
+#define IPL_DTA         (0x16 - IPL_HMIN)
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
 #define IPL_HK          (0x15 - IPL_HMIN)
@@ -345,14 +367,18 @@ typedef struct {
 #define IPL_DMCTX       (0x15 - IPL_HMIN)
 #define IPL_DUPRX       (0x15 - IPL_HMIN)
 #define IPL_DUPTX       (0x15 - IPL_HMIN)
+#define IPL_RK          (0x15 - IPL_HMIN)
+#define IPL_TDRX        (0x14 - IPL_HMIN)
+#define IPL_TDTX        (0x14 - IPL_HMIN)
 
 /* Device vectors */
 
 #define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
-#define VEC_QBUS        0
-#define VEC_Q           0x200
+#define VEC_QBUS        0                               /* Unibus system */
+#define VEC_SET         0x200                           /* Vector bits to set in Unibus vectors */
+#define VEC_MASK        0x3FF                           /* Vector bits to return in Unibus vectors */
 
 /* Interrupt macros */
 
@@ -362,6 +388,7 @@ typedef struct {
 #define SET_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
 #define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* cond error return */
+extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 /* Logging */
 
@@ -371,9 +398,8 @@ typedef struct {
 
 /* Massbus definitions */
 
-#define MBA_RP          (TR_MBA0 - TR_MBA0)             /* MBA for RP */
-#define MBA_TU          (TR_MBA1 - TR_MBA0)             /* MBA for TU */
 #define MBA_RMASK       0x1F                            /* max 32 reg */
+#define MBA_AUTO        (uint32)0xFFFFFFFF              /* Unassigned MBA */
 #define MBE_NXD         1                               /* nx drive */
 #define MBE_NXR         2                               /* nx reg */
 #define MBE_GOE         3                               /* err on GO */
@@ -384,44 +410,27 @@ typedef struct {
 #define BOOT_HK         1                               /* for VMB */
 #define BOOT_RL         2
 #define BOOT_UDA        17
-#define BOOT_TK         18
 #define BOOT_CI         32
 #define BOOT_TD         64
-
-/* Function prototypes for virtual memory interface */
-
-int32 Read (uint32 va, int32 lnt, int32 acc);
-void Write (uint32 va, int32 val, int32 lnt, int32 acc);
-
-/* Function prototypes for physical memory interface (inlined) */
-
-SIM_INLINE int32 ReadB (uint32 pa);
-SIM_INLINE int32 ReadW (uint32 pa);
-SIM_INLINE int32 ReadL (uint32 pa);
-SIM_INLINE int32 ReadLP (uint32 pa);
-SIM_INLINE void WriteB (uint32 pa, int32 val);
-SIM_INLINE void WriteW (uint32 pa, int32 val);
-SIM_INLINE void WriteL (uint32 pa, int32 val);
-void WriteLP (uint32 pa, int32 val);
 
 /* Function prototypes for I/O */
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
 int32 mba_rdbufW (uint32 mbus, int32 bc, uint16 *buf);
-int32 mba_wrbufW (uint32 mbus, int32 bc, uint16 *buf);
+int32 mba_wrbufW (uint32 mbus, int32 bc, const uint16 *buf);
 int32 mba_chbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_get_bc (uint32 mbus);
 void mba_upd_ata (uint32 mbus, uint32 val);
 void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
-void mba_set_enbdis (uint32 mbus, t_bool dis);
-t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
+void mba_set_enbdis (DEVICE *dptr);
+t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 void sbi_set_errcnf (void);
 
@@ -434,5 +443,9 @@ void sbi_set_errcnf (void);
 #define WriteRegU(p,v,l)    WriteReg (p, v, l)
 
 #include "pdp11_io_lib.h"
+
+/* Function prototypes for virtual and physical memory interface (inlined) */
+
+#include "vax_mmu.h"
 
 #endif

@@ -81,7 +81,7 @@
 /* VAX 8600 boot device definitions */
 
 struct boot_dev {
-    char                *name;
+    const char          *name;
     int32               code;
     int32               let;
     };
@@ -103,36 +103,22 @@ static struct boot_dev boot_tab[] = {
     { "RQB", BOOT_UDA, 1 << 24 },
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
-    { "TQ", BOOT_TK, 1 << 24 },
     { "CS", BOOT_CS, 0 },
     { NULL }
     };
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 ASTLVL, SISR;
-extern int32 mapen, pme, trpirq;
-extern int32 in_ie;
-extern int32 mchk_va, mchk_ref;
-extern int32 crd_err, mem_err, hlt_pin;
 extern int32 tmr_int, tti_int, tto_int, csi_int;
 extern uint32 sbi_er;
-extern jmp_buf save_env;
-extern int32 p1;
-extern int32 fault_PC;                                  /* fault PC */
-extern UNIT cpu_unit;
 
 void uba_eval_int (void);
 t_stat abus_reset (DEVICE *dptr);
-char *abus_description (DEVICE *dptr);
-t_stat vax860_boot (int32 flag, char *ptr);
-t_stat vax860_boot_parse (int32 flag, char *ptr);
-t_stat cpu_boot (int32 unitno, DEVICE *dptr);
+const char *abus_description (DEVICE *dptr);
+t_stat vax860_boot (int32 flag, CONST char *ptr);
+t_stat vax860_boot_parse (int32 flag, const char *ptr);
 void init_pamm (void);
 
 extern t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 extern t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
-extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
 extern int32 icr_rd (t_bool interp);
@@ -247,13 +233,13 @@ for (i=0; i<32; i++)
     pamm[512+i] = PAMM_IOA0;
 }
 
-t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 int32 slot[32];
 int32 base[32];
 struct {
     int capacity;
-    char *option;
+    const char *option;
     } boards[] = {
         {  4, "MS86-B"}, 
         { 16, "MS86-C"},
@@ -587,7 +573,7 @@ return;
         longword of data
 */
 
-int32 ReadReg (int32 pa, int32 lnt)
+int32 ReadReg (uint32 pa, int32 lnt)
 {
 int32 val;
 
@@ -610,7 +596,7 @@ return 0;
         none
 */
 
-void WriteReg (int32 pa, int32 val, int32 lnt)
+void WriteReg (uint32 pa, int32 val, int32 lnt)
 {
 if (ADDR_IS_SBIA (pa)) {                                /* SBI adapter space? */
     sbia_wr (pa, val, lnt);
@@ -633,6 +619,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 int32 acc;
 int32 mstat1, mstat2, mear, ebcs, merg, ehmsts;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 mstat1 = (MSTAT1_CPRD << MSTAT1_V_CYC);                 /* MBOX Status 1 */
 mstat2 = MSTAT2_NXM;                                    /* MBOX Status 2 */
 mear = mchk_va;                                         /* Memory error address */
@@ -693,7 +681,7 @@ return cc;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax860_boot (int32 flag, char *ptr)
+t_stat vax860_boot (int32 flag, CONST char *ptr)
 {
 t_stat r;
 
@@ -711,10 +699,11 @@ return run_cmd (flag, "CPU");
 
 /* Parse boot command, set up registers - also used on reset */
 
-t_stat vax860_boot_parse (int32 flag, char *ptr)
+t_stat vax860_boot_parse (int32 flag, const char *ptr)
 {
 char gbuf[CBUFSIZE];
-char *slptr, *regptr;
+char *slptr;
+const char *regptr;
 int32 i, r5v, unitno;
 DEVICE *dptr;
 UNIT *uptr;
@@ -799,7 +788,7 @@ init_pamm ();
 return SCPE_OK;
 }
 
-char *abus_description (DEVICE *dptr)
+const char *abus_description (DEVICE *dptr)
 {
 return "bus controller";
 }
@@ -837,13 +826,17 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
 return SCPE_OK;
 }
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr == NULL) return SCPE_ARG;
-if (strcmp(cptr, "8600") == 0)
+if (strcmp(cptr, "8600") == 0) {
    sys_model = 0;
-else if (strcmp(cptr, "8650") == 0)
+   strcpy (sim_name, "VAX 8600");
+   }
+else if (strcmp(cptr, "8650") == 0) {
    sys_model = 1;
+   strcpy (sim_name, "VAX 8650");
+   }
 else
    return SCPE_ARG;
 return SCPE_OK;
@@ -855,7 +848,7 @@ fprintf (st, "VAX %s", (sys_model ? "8650" : "8600"));
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Initial memory size is 32MB.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");

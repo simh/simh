@@ -29,15 +29,14 @@
 
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern int32 sim_switches;
 extern uint32 pal_type;
 
 t_stat fprint_sym_m (FILE *of, t_addr addr, uint32 inst);
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *inst);
-int32 parse_reg (char *cptr);
+t_stat parse_sym_m (CONST char *cptr, t_addr addr, t_value *inst);
+int32 parse_reg (const char *cptr);
 
 extern t_stat fprint_pal_hwre (FILE *of, uint32 inst);
-extern t_stat parse_pal_hwre (char *cptr, t_value *inst);
+extern t_stat parse_pal_hwre (CONST char *cptr, t_value *inst);
 extern t_bool rom_wr (t_uint64 pa, t_uint64 val, uint32 lnt);
 
 /* SCP data structures and interface routines
@@ -72,7 +71,7 @@ const char *sim_stop_messages[] = {
    -o           specify origin
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 t_stat r;
 int32 i;
@@ -495,6 +494,11 @@ const uint32 opval[] = {
                         if < 0, number of extra bytes retired
 */
 
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
+
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
@@ -539,7 +543,7 @@ if (sw & SWMASK ('C')) {                                /* char format? */
     for (sc = 0; sc < 64; sc = sc + 8) {                /* print string */
         c = (uint32) (val[0] >> sc) & 0x7F;
         fprintf (of, (c < 0x20)? "<%02X>": "%c", c);
-		}
+        }
     return -7;                                          /* return # chars */
     }
 if (sw & SWMASK ('M')) {                                /* inst format? */
@@ -627,7 +631,7 @@ return SCPE_ARG;
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 t_value num;
 uint32 i, sc, rdx;
@@ -711,13 +715,14 @@ return -7;
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *inst)
+t_stat parse_sym_m (CONST char *cptr, t_addr addr, t_value *inst)
 {
 t_uint64 bra, df, db;
 uint32 i, k, lit8, fl;
 int32 reg;
 t_stat r;
-char *tptr, gbuf[CBUFSIZE];
+CONST char *tptr;
+char gbuf[CBUFSIZE];
 
 if ((r = parse_pal_hwre (cptr, inst)) < 0) return r;    /* PAL hardware? */
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
@@ -800,7 +805,7 @@ return -3;
 
 /* Parse a register */
 
-int32 parse_reg (char *cptr)
+int32 parse_reg (const char *cptr)
 {
 t_stat r;
 int32 reg;

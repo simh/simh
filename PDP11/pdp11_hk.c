@@ -68,8 +68,6 @@
 extern uint32 cpu_opt;
 #endif
 
-extern uint16 *M;
-
 #define HK_NUMDR        8                               /* #drives */
 #define HK_NUMCY6       411                             /* cyl/drive */
 #define HK_NUMCY7       815                             /* cyl/drive */
@@ -481,7 +479,7 @@ BITFIELD hk_mr3_bits[] = {
   ENDBITS
 };
 
-char *hk_regnames[] = {
+const char *hk_regnames[] = {
     "HKCS1",
     "HKWC",
     "HKBA",
@@ -556,13 +554,12 @@ int16 hk_dif[HK_NUMDR] = { 0 };                         /* cylinder diff */
 static const uint8 reg_in_drive[16] = {
  0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-DEVICE hk_dev;
 t_stat hk_rd (int32 *data, int32 PA, int32 access);
 t_stat hk_wr (int32 data, int32 PA, int32 access);
 t_stat hk_svc (UNIT *uptr);
 t_stat hk_reset (DEVICE *dptr);
 t_stat hk_boot (int32 unitno, DEVICE *dptr);
-t_stat hk_attach (UNIT *uptr, char *cptr);
+t_stat hk_attach (UNIT *uptr, CONST char *cptr);
 t_stat hk_detach (UNIT *uptr);
 int32 hk_inta (void);
 int32 hk_rdmr2 (int32 msg);
@@ -571,10 +568,10 @@ void update_hkcs (int32 flags, int32 drv);
 void update_hkds (int32 drv);
 void hk_err (int32 cs1e, int32 cs2e, int32 drve, int32 drv);
 void hk_go (int32 drv);
-t_stat hk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *hk_description (DEVICE *dptr);
+t_stat hk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat hk_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *hk_description (DEVICE *dptr);
 
 /* HK data structures
 
@@ -679,11 +676,11 @@ MTAB hk_mod[] = {
     };
 
 DEBTAB hk_deb[] = {
-    { "OPS", HKDEB_OPS },
-    { "RRD", HKDEB_RRD },
-    { "RWR", HKDEB_RWR },
-    { "INTERRUPT", HKDEB_INT },
-    { "TRACE", HKDEB_TRC },
+    { "OPS",   HKDEB_OPS, "transactions" },
+    { "RRD",   HKDEB_RRD, "register reads" },
+    { "RWR",   HKDEB_RWR, "register writes" },
+    { "INT",   HKDEB_INT, "interrupts" },
+    { "TRACE", HKDEB_TRC, "trace" },
     { NULL, 0 }
     };
 
@@ -970,9 +967,9 @@ if (fnc_rdy[fnc] && sim_is_active (uptr))               /* need inactive? */
 if (fnc_cyl[fnc] &&                                     /* need valid cyl */
    ((GET_CY (hkdc) >= HK_CYL (uptr)) ||                 /* bad cylinder */
     (GET_SF (hkda) >= HK_NUMSF))) {                     /* bad surface */
-	hk_err (CS1_ERR|CS1_DONE, 0, ER_SKI|ER_IAE, drv);   /* set err, no op */
-	return;
-	}
+    hk_err (CS1_ERR|CS1_DONE, 0, ER_SKI|ER_IAE, drv);   /* set err, no op */
+    return;
+    }
 
 
 hkcs1 = (hkcs1 | CS1_GO) & ~CS1_DONE;                   /* set go, clear done */
@@ -1225,7 +1222,7 @@ switch (fnc) {                                          /* case on function */
 
         if (err != 0) {                                 /* error? */
             hk_err (CS1_ERR|CS1_DONE, 0, ER_PAR, drv);  /* set drive error */
-            perror ("HK I/O error");
+            sim_perror ("HK I/O error");
             clearerr (uptr->fileref);
             return SCPE_IOERR;
             }
@@ -1486,7 +1483,7 @@ return auto_config (0, 0);
 
 /* Device attach */
 
-t_stat hk_attach (UNIT *uptr, char *cptr)
+t_stat hk_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 drv, p;
 t_stat r;
@@ -1552,7 +1549,7 @@ return detach_unit (uptr);
 
 /* Set size command validation routine */
 
-t_stat hk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat hk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
@@ -1562,12 +1559,14 @@ return SCPE_OK;
 
 /* Set bad block routine */
 
-t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat hk_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);
 }
 
 #if defined (VM_PDP11)
+
+extern uint16 *M;
 
 /* Device bootstrap - does not clear CSR when done */
 
@@ -1631,7 +1630,7 @@ return SCPE_NOFNC;
 
 #endif
 
-t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "RK611/RK06,RK07 Cartridge Disk (HK)\n\n");
 fprintf (st, "RK611  options include the ability to set units write enabled or write locked,\n");
@@ -1655,7 +1654,7 @@ fprintf (st, "    OS I/O error  x          report error and stop\n");
 return SCPE_OK;
 }
 
-char *hk_description (DEVICE *dptr)
+const char *hk_description (DEVICE *dptr)
 {
 return "RK611/RK06(7) cartridge disk controller";
 }

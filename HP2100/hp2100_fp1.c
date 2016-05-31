@@ -1,6 +1,6 @@
 /* hp2100_fp1.c: HP 1000 multiple-precision floating point routines
 
-   Copyright (c) 2005-2013, J. David Bryan
+   Copyright (c) 2005-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   16-May-16    JDB     Reformulated the definitions of op_mask
+   24-Dec-14    JDB     Added casts for explicit downward conversions
+                        Changed fp_ucom return from uint32 to uint16
    18-Mar-13    JDB     Changed type of mantissa masks array to to unsigned
    06-Feb-12    JDB     Added missing precision on constant "one" in fp_trun
    21-Jun-11    JDB     Completed the comments for divide; no code changes
@@ -324,12 +327,12 @@ static const uint32  op_bits[6]    = { IN_W_SMAGN,
                                        FP_W_TMANT + FP_W_MSIGN,
                                        FP_W_EMANT + FP_W_MSIGN };
 
-static const t_int64 op_mask[6]    = { ~(t_int64) 0 << IN_V_SNUM,
-                                       ~(t_int64) 0 << IN_V_DNUM,
-                                       ~(t_int64) 0 << FP_V_FNUM,
-                                       ~(t_int64) 0 << FP_V_XNUM,
-                                       ~(t_int64) 0 << FP_V_TNUM,
-                                       ~(t_int64) 0 << FP_V_ENUM };
+static const t_int64 op_mask[6]    = { ~(((t_int64) 1 << IN_V_SNUM) - 1),
+                                       ~(((t_int64) 1 << IN_V_DNUM) - 1),
+                                       ~(((t_int64) 1 << FP_V_FNUM) - 1),
+                                       ~(((t_int64) 1 << FP_V_XNUM) - 1),
+                                       ~(((t_int64) 1 << FP_V_TNUM) - 1),
+                                       ~(((t_int64) 1 << FP_V_ENUM) - 1) };
 
 static const uint32  int_p_max[2]  = { IN_M_SMAGN,
                                        IN_M_DMAGN };
@@ -510,8 +513,8 @@ uint8 exp;
 
 packed = pack_int (unpacked.mantissa, unpacked.precision);  /* pack mantissa */
 
-exp = ((uint8) unpacked.exponent << FP_V_EXP) |         /* rotate exponent */
-      ((unpacked.exponent < 0) << FP_V_ESIGN);
+exp = (uint8) (unpacked.exponent << FP_V_EXP |          /* rotate exponent */
+              (unpacked.exponent < 0) << FP_V_ESIGN);
 
 switch (unpacked.precision) {                           /* merge exponent into correct word */
 
@@ -527,8 +530,8 @@ switch (unpacked.precision) {                           /* merge exponent into c
         break;
 
     case fp_e:                                          /* place in separate word */
-        packed.fpk[4] = ((uint16) unpacked.exponent << FP_V_EXP) |
-                         ((unpacked.exponent < 0) << FP_V_ESIGN);
+        packed.fpk[4] = (uint16) (unpacked.exponent << FP_V_EXP |
+                                 (unpacked.exponent < 0) << FP_V_ESIGN);
         break;
 
     case fp_a:                                          /* no action for value in accum */
@@ -970,12 +973,12 @@ else {
 
         div = ah >> 2;                                  /* ASR 2 to prevent overflow */
 
-        pq1 = div / dh;                                 /* form first partial quotient */
+        pq1 = (int16) (div / dh);                       /* form first partial quotient */
         div = ((div % dh) & ~1) << 15;                  /* ASR 1, move rem to upper */
-        pq2 = div / dh;                                 /* form second partial quotient */
+        pq2 = (int16) (div / dh);                       /* form second partial quotient */
 
         div = (uint16) dl << 13;                        /* move divisor LSB to upper, LSR 3 */
-        cq = div / dh;                                  /* form correction quotient */
+        cq = (int16) (div / dh);                        /* form correction quotient */
         cp = -cq * pq1;                                 /* and correction product */
 
         cp = (((cp >> 14) & ~3) + (int32) pq2) << 1;    /* add corr prod and 2nd partial quo */
@@ -1392,7 +1395,7 @@ return 0;
    significant in the mantissa.
 */
 
-uint32 fp_ucom (OP *mantissa, OPSIZE precision)
+uint16 fp_ucom (OP *mantissa, OPSIZE precision)
 {
 FPU unpacked;
 
@@ -1401,7 +1404,7 @@ unpacked.exponent = 0;                                  /* clear undefined expon
 unpacked.precision = precision;                         /* set precision */
 complement (&unpacked);                                 /* negate it */
 *mantissa = pack_int (unpacked.mantissa, precision);    /* replace mantissa */
-return (uint32) unpacked.exponent;                      /* return exponent increment */
+return (uint16) unpacked.exponent;                      /* return exponent increment */
 }
 
 

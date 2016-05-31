@@ -1,6 +1,6 @@
 /* pdp18b_sys.c: 18b PDP's simulator interface
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Mar-16    RMS     Revised for dynamically allocated memory
+   03-Mar-16    RMS     Added DR15C support
+   26-Feb-16    RMS     Added support for -u modifier (UC15 and Unix v0)
+   13-Sep-15    RMS     Added DR15C instructions
    30-Oct-06    RMS     Added infinite loop stop
    18-Oct-06    RMS     Re-ordered device list
    02-Oct-06    RMS     Added RDCLK instruction
@@ -95,14 +99,17 @@ extern DEVICE mt_dev;
 extern DEVICE tti1_dev, tto1_dev;
 extern UNIT tti1_unit, tto1_unit;
 #endif
+#if defined (UC15)
+extern DEVICE dr15_dev;
+#endif
+#if defined (GRAPHICS2)
+extern DEVICE g2out_dev, g2in_dev;
+#endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern int32 M[];
+extern int32 *M;
 extern int32 memm;
 extern int32 PC;
-extern const char asc_to_baud[128];
-extern const char baud_to_asc[64];
-extern const char fio_to_asc[64];
 
 /* SCP data structures and interface routines
 
@@ -126,7 +133,7 @@ char sim_name[] = "PDP-15";
 
 REG *sim_PC = &cpu_reg[0];
 
-int32 sim_emax = 2;
+int32 sim_emax = 3;
 
 DEVICE *sim_devices[] = {
     &cpu_dev,
@@ -168,6 +175,12 @@ DEVICE *sim_devices[] = {
 #endif
 #if defined (TTY1)
     &tti1_dev, &tto1_dev,
+#endif
+#if defined (UC15)
+    &dr15_dev,
+#endif
+#if defined (GRAPHICS2)
+    &g2out_dev, &g2in_dev,
 #endif
     NULL
     };
@@ -218,7 +231,7 @@ return word;
         jmp addr or hlt
 */
 
-t_stat rim_load_47 (FILE *fileref, char *cptr)
+t_stat rim_load_47 (FILE *fileref, const char *cptr)
 {
 int32 origin, val;
 
@@ -255,7 +268,7 @@ return SCPE_OK;                                         /* done */
         word to execute (bit 1 of last character set)
 */
 
-t_stat hri_load_7915 (FILE *fileref, char *cptr)
+t_stat hri_load_7915 (FILE *fileref, const char *cptr)
 {
 int32 bits, origin, val;
 char gbuf[CBUFSIZE];
@@ -301,7 +314,7 @@ return SCPE_OK;
         endblock/       origin (< 0)
 */
 
-t_stat bin_load_915 (FILE *fileref, char *cptr)
+t_stat bin_load_915 (FILE *fileref, const char *cptr)
 {
 int32 i, val, bits, origin, count, cksum;
 
@@ -343,7 +356,7 @@ return SCPE_OK;
 
 /* Binary loader, all formats */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 if (flag != 0)
     return SCPE_NOFNC;
@@ -504,6 +517,12 @@ static const char *opcode[] = {
 #if defined (TTY1)
  "KSF1", "KRB1",
  "TSF1", "TCF1", "TLS1", "TCF1!TLS1",
+#endif
+#if defined (UC15)                                      /* DR15C */
+ "SIOA", "CIOD", "LIOR",
+ "RDRS", "LDRS",
+ "SAPI0", "SAPI1", "SAPI2", "SAPI3",
+ "CAPI0", "CAPI1", "CAPI2", "CAPI3",
 #endif
 #if defined (PDP7)
  "ITON", "TTS", "SKP7", "CAF",
@@ -738,6 +757,12 @@ static const int32 opc_val[] = {
  0704101+I_NPI, 0704112+I_NPN,
  0704001+I_NPI, 0704002+I_NPI, 0704004+I_NPI, 0704006+I_NPI,
 #endif
+#if defined (UC15)
+ 0706001+I_NPI, 0706002+I_NPI, 0706006+I_NPI,
+ 0706112+I_NPN, 0706122+I_NPI,
+ 0706101+I_NPI, 0706121+I_NPI, 0706141+I_NPI, 0706161+I_NPI,
+ 0706104+I_NPI, 0706124+I_NPI, 0706144+I_NPI, 0706164+I_NPI,
+#endif
 #if defined (PDP7)
  0703201+I_NPI, 0703301+I_NPI, 0703341+I_NPI, 0703302+I_NPI,
  0707701+I_NPI, 0707702+I_NPI, 0707742+I_NPI, 0707704+I_NPI,
@@ -880,13 +905,18 @@ static const int32 opc_val[] = {
         status  =       space needed?
 */
 
-int32 fprint_opr (FILE *of, int32 inst, int32 class, int32 sp)
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
+
+int32 fprint_opr (FILE *of, int32 inst, int32 clss, int32 sp)
 {
 int32 i, j;
 
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
-    if ((j == class) && (opc_val[i] & inst)) {          /* same class? */
+    if ((j == clss) && (opc_val[i] & inst)) {           /* same class? */
         inst = inst & ~opc_val[i];                      /* mask bit set? */
         fprintf (of, (sp? " %s": "%s"), opcode[i]);
         sp = 1;
@@ -919,52 +949,74 @@ return (c >> 1) | (c << 5);
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
-int32 cflag, i, j, k, sp, inst, disp, ma;
+int32 i, j, k, sp, inst, disp, ma;
+t_bool cflag;
+DEVICE *dptr;
+
+if (uptr == NULL)
+    uptr = &cpu_unit;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL)
+    return SCPE_IERR;
 
 inst = val[0];
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
-if (sw & SWMASK ('A')) {                                /* ASCII? */
+if ((sw & SWMASK ('A')) != 0) {                         /* ASCII? */
     if (inst > 0377)
         return SCPE_ARG;
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
-if (sw & SWMASK ('C')) {                                /* character? */
+
+if (dptr->dwidth < 18)                                  /* 18b device? */
+    return SCPE_ARG;
+
+if ((sw & SWMASK ('C')) != 0) {                         /* character? */
     fprintf (of, "%c", SIXTOASC ((inst >> 12) & 077));
     fprintf (of, "%c", SIXTOASC ((inst >> 6) & 077));
     fprintf (of, "%c", SIXTOASC (inst & 077));
     return SCPE_OK;
     }
-#if defined (PDP4) || defined (PDP7)
-if (sw & SWMASK ('F')) {                                /* FIODEC? */
+if ((sw & SWMASK ('F')) != 0) {                         /* FIODEC? */
     fprintf (of, "%c", fio_to_asc[(inst >> 12) & 077]);
     fprintf (of, "%c", fio_to_asc[(inst >> 6) & 077]);
     fprintf (of, "%c", fio_to_asc[inst & 077]);
     return SCPE_OK;
     }
-if (sw & SWMASK ('B')) {                                /* Baudot? */
+if ((sw & SWMASK ('B')) != 0) {                         /* Baudot? */
     fprintf (of, "%c", baud_to_asc[rar (inst >> 12) & 077]);
     fprintf (of, "%c", baud_to_asc[rar (inst >> 6) & 077]);
     fprintf (of, "%c", baud_to_asc[rar (inst) & 077]);
     return SCPE_OK;
     }
-#endif
-#if defined (PDP15)
-if (sw & SWMASK ('P')) {                                /* packed ASCII? */
-    i = val[1];
+#if defined (PDP7) || defined (PDP9)
+if ((sw & SWMASK ('U')) != 0) {                         /* Unix v0 ASCII? */
+    fprintf (of, FMTASC ((inst >> 9) & 0177));
+    fprintf (of, FMTASC (inst & 0177));
+    return SCPE_OK;
+    }
+#elif defined (PDP15)
+if ((sw & SWMASK ('P')) != 0) {                         /* packed ASCII? */
+    int32 t = val[1];
     fprintf (of, FMTASC ((inst >> 11) & 0177));
     fprintf (of, FMTASC ((inst >> 4) & 0177));
-    fprintf (of, FMTASC (((inst << 3) | (i >> 15)) & 0177));
-    fprintf (of, FMTASC ((i >> 8) & 0177));
-    fprintf (of, FMTASC ((i >> 1) & 0177));
+    fprintf (of, FMTASC (((inst << 3) | (t >> 15)) & 0177));
+    fprintf (of, FMTASC ((t >> 8) & 0177));
+    fprintf (of, FMTASC ((t >> 1) & 0177));
     return -1;
     }
+if ((sw & SWMASK ('U')) != 0) {                         /* Unibus ASCII? */
+    fprintf (of, FMTASC (inst & 0177));
+    fprintf (of, FMTASC ((inst >> 8) & 0177));
+    return SCPE_OK;
+    }
 #endif
-if (!(sw & SWMASK ('M')))
+if ((sw & SWMASK ('M')) == 0)                           /* symbolic? */
     return SCPE_ARG;
 
 /* Instruction decode */
 
+cflag = (uptr == &cpu_unit);
+inst = val[0];
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
     if ((opc_val[i] & DMASK) == (inst & masks[j])) {    /* match? */
@@ -1094,27 +1146,34 @@ return get_uint (cptr, 8, 0777777, status);
    Outputs:
         status  =       error status
 */
-
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-int32 cflag, d, i, j, k, sign, damask, epcmask;
+int32 d, i, j, k, sign, damask, epcmask;
 t_stat r, sta = SCPE_OK;
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], cbuf[2*CBUFSIZE];
+t_bool cflag;
+DEVICE *dptr;
 
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
-while (isspace (*cptr)) cptr++;
-for (i = 1; (i < 5) && (cptr[i] != 0); i++) {
-    if (cptr[i] == 0) {
-        for (j = i + 1; j <= 5; j++)
-            cptr[j] = 0;
-        }
-    }
+if (uptr == NULL)
+    uptr = &cpu_unit;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL)
+    return SCPE_IERR;
+
+while (isspace (*cptr))
+    cptr++;
+memset (cbuf, '\0', sizeof(cbuf));
+strcpy (cbuf, cptr);
+cptr = cbuf;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;
     val[0] = (t_value) cptr[0] | 0200;
     return SCPE_OK;
     }
+if (dptr->dwidth < 18)                                  /* 18b decode? */
+    return SCPE_ARG;                                    /* no, fail */
+
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;
@@ -1123,8 +1182,16 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
               ((t_value) cptr[2] & 077);
     return SCPE_OK;
     }
-#if defined (PDP15)
-if ((sw & SWMASK ('P')) || ((*cptr == '#') && cptr++)) { /* packed string? */
+#if defined (PDP7) || defined (PDP9)
+if (sw & SWMASK ('U')) {                                /* Unix v0 ASCII? */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
+    val[0] = (((t_value) cptr[0] & 0177) << 9) |
+             ((t_value) cptr[1] & 0177);
+    return SCPE_OK;
+    } 
+#elif defined (PDP15)
+if (sw & SWMASK ('P')) {                                /* packed string? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;
     val[0] = (((t_value) cptr[0] & 0177) << 11) |
@@ -1135,6 +1202,13 @@ if ((sw & SWMASK ('P')) || ((*cptr == '#') && cptr++)) { /* packed string? */
              (((t_value) cptr[4] & 0177) << 1);
     return -1;
     }
+if (sw & SWMASK ('U')) {                                /* Unibus ASCII? */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
+    val[0] = (((t_value) cptr[1] & 0377) << 8) |
+             ((t_value) cptr[0] & 0377);
+    return SCPE_OK;
+    }
 #endif
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
@@ -1144,6 +1218,7 @@ if (opcode[i] == NULL)
 val[0] = opc_val[i] & DMASK;                            /* get value */
 j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
+cflag = (uptr == &cpu_unit);
 switch (j) {                                            /* case on class */
 
     case I_V_XR:                                        /* index */

@@ -54,7 +54,6 @@ uint32 pt_arm = 0;                                      /* int arm */
 uint32 pt_sta = STA_BSY;                                /* status */
 uint32 ptr_stopioe = 0, ptp_stopioe = 0;                /* stop on error */
 
-DEVICE pt_dev;
 uint32 pt (uint32 dev, uint32 op, uint32 dat);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
@@ -204,10 +203,10 @@ if ((temp = getc (uptr->fileref)) == EOF) {             /* error? */
     if (feof (uptr->fileref)) {                         /* eof? */
         pt_sta = pt_sta | STA_DU;                       /* set DU */
         if (ptr_stopioe)
-            printf ("PTR end of file\n");
+            sim_printf ("PTR end of file\n");
         else return SCPE_OK;
         }
-    else perror ("PTR I/O error");
+    else sim_perror ("PTR I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
@@ -228,7 +227,7 @@ if (!pt_rd) {                                           /* write mode? */
         SET_INT (v_PT);
     }
 if (putc (uptr->buf, uptr -> fileref) == EOF) {         /* write char */
-    perror ("PTP I/O error");
+    sim_perror ("PTP I/O error");
     clearerr (uptr -> fileref);
     return SCPE_IOERR;
     }
@@ -285,9 +284,6 @@ static uint8 boot3_rom[] = {
 
 t_stat pt_boot (int32 unitno, DEVICE *dptr)
 {
-extern uint32 PC, dec_flgs;
-extern uint16 decrom[];
-
 if (decrom[0xD5] & dec_flgs)                            /* AL defined? */
     IOWriteBlk (BOOT3_START, BOOT3_LEN, boot3_rom);     /* no, 50 seq */
 else IOWriteBlk (BOOT_START, BOOT_LEN, boot_rom);       /* copy AL boot */
@@ -342,10 +338,10 @@ static uint8 load_rom[] = {
     0x22, 0x03                                          /*      BS .-6 */
     };
 
-t_stat pt_dump (FILE *of, char *cptr, char *fnam)
+t_stat pt_dump (FILE *of, CONST char *cptr, CONST char *fnam)
 {
 uint32 i, lo, hi, cs;
-char *tptr;
+const char *tptr;
 extern DEVICE cpu_dev;
 
 if ((cptr == NULL) || (*cptr == 0))

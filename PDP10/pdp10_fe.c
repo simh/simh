@@ -49,7 +49,7 @@ t_stat fei_svc (UNIT *uptr);
 t_stat feo_svc (UNIT *uptr);
 static t_stat kaf_svc (UNIT *uptr);
 t_stat fe_reset (DEVICE *dptr);
-t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat fe_stop_os (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 a10 fe_xct = 0;
 uint32 fe_bootrh = 0;
 int32 fe_bootunit = -1;
@@ -73,12 +73,12 @@ UNIT fe_unit[] = {
     };
 
 REG fe_reg[] = {
-    { ORDATA (IBUF, fei_unit.buf, 8) },
-    { DRDATA (ICOUNT, fei_unit.pos, T_ADDR_W), REG_RO + PV_LEFT },
-    { DRDATA (ITIME, fei_unit.wait, 24), PV_LEFT },
-    { ORDATA (OBUF, feo_unit.buf, 8) },
-    { DRDATA (OCOUNT, feo_unit.pos, T_ADDR_W), REG_RO + PV_LEFT },
-    { DRDATA (OTIME, feo_unit.wait, 24), REG_NZ + PV_LEFT },
+    { ORDATAD (IBUF, fei_unit.buf, 8, "input buffer") },
+    { DRDATAD (ICOUNT, fei_unit.pos, T_ADDR_W, "count of input characters"), REG_RO + PV_LEFT },
+    { DRDATAD (ITIME, fei_unit.wait, 24, "input polling interval (if 0, the keyboard is polled                            synchronously with the clock"), PV_LEFT },
+    { ORDATAD (OBUF, feo_unit.buf, 8, "output buffer") },
+    { DRDATAD (OCOUNT, feo_unit.pos, T_ADDR_W, "count of output characters"), REG_RO + PV_LEFT },
+    { DRDATAD (OTIME, feo_unit.wait, 24, "console output response time"), REG_NZ + PV_LEFT },
     { NULL }
     };
 
@@ -121,45 +121,45 @@ DEVICE fe_dev = {
 */
 
 /* Here is the definition of the communications area:
-XPP RLWORD,31		;RELOAD WORD  [FE_KEEPA]
-	KSRLD==1B4		;RELOAD REQUEST    (8080 will reload -10 if this is set)
-	KPACT==1B5		;KEEP ALIVE ACTIVE (8080 reloads -10 if KPALIV doesn't change)
-	KLACT==1B6		;KLINIK ACTIVE     (Remote diagnosis line enabled)
-	PAREN==1B7		;PARITY ERROR DETECT ENABLED
-	CRMPAR==1B8		;CRAM PAR ERR DETECT ENABLED
-	DRMPAR==1B9		;DRAM PAR ERR DETECT ENABLED
-	CASHEN==1B10		;CACHE ENABLED
-	MILSEN==1B11		;1MSEC ENABLED
-    TRPENA==1B12     ;TRAPS ENABLED
-    MFGMOD==1B13     ;MANUFACTURING MODE
-	KPALIV==377B27		;KEEP ALIVE WORD CHECKED EVERY 1 SEC, AFTER 15, FAIL
+XPP RLWORD,31           ;RELOAD WORD  [FE_KEEPA]
+    KSRLD==1B4          ;RELOAD REQUEST    (8080 will reload -10 if this is set)
+    KPACT==1B5          ;KEEP ALIVE ACTIVE (8080 reloads -10 if KPALIV doesn't change)
+    KLACT==1B6          ;KLINIK ACTIVE     (Remote diagnosis line enabled)
+    PAREN==1B7          ;PARITY ERROR DETECT ENABLED
+    CRMPAR==1B8         ;CRAM PAR ERR DETECT ENABLED
+    DRMPAR==1B9         ;DRAM PAR ERR DETECT ENABLED
+    CASHEN==1B10        ;CACHE ENABLED
+    MILSEN==1B11        ;1MSEC ENABLED
+    TRPENA==1B12        ;TRAPS ENABLED
+    MFGMOD==1B13        ;MANUFACTURING MODE
+    KPALIV==377B27      ;KEEP ALIVE WORD CHECKED EVERY 1 SEC, AFTER 15, FAIL
     ; Why reload (8080->10)
-	AUTOBT==1B32		;BOOT SWITCH OR POWER UP CONDITION
-	PWRFAL==1B33		;POWER FAIL restart (Start at 70)
-	FORREL==1B34		;FORCED RELOAD
-	KEPFAL==1B35		;KEEP ALIVE FAILURE (XCT exec 71)
+    AUTOBT==1B32        ;BOOT SWITCH OR POWER UP CONDITION
+    PWRFAL==1B33        ;POWER FAIL restart (Start at 70)
+    FORREL==1B34        ;FORCED RELOAD
+    KEPFAL==1B35        ;KEEP ALIVE FAILURE (XCT exec 71)
 
-XPP CTYIWD,32		;CTY INPUT WORD [FE_CTYIN]
-	CTYICH==377B35		;CTY INPUT CHARACTER
-	CTYIVL==1B27		;INPUT VALID BIT (Actually, this is an 8-bit function code)
+XPP CTYIWD,32       ;CTY INPUT WORD [FE_CTYIN]
+    CTYICH==377B35      ;CTY INPUT CHARACTER
+    CTYIVL==1B27        ;INPUT VALID BIT (Actually, this is an 8-bit function code)
 
-XPP CTYOWD,33		;CTY OUTPUT WORD [FE_CTYOUT]
-	CTYOCH==377B35		;CTY OUTPUT CHARACTER
-	CTYOVL==1B27		;OUTPUT VALID FLAG
+XPP CTYOWD,33       ;CTY OUTPUT WORD [FE_CTYOUT]
+    CTYOCH==377B35      ;CTY OUTPUT CHARACTER
+    CTYOVL==1B27        ;OUTPUT VALID FLAG
 
-XPP KLIIWD,34		;KLINIK INPUT WORD [FE_KLININ]
-	KLIICH==377B35		;KLINIK INPUT CHARACTER
-	KLIIVL==1B27		;KLINIK INPUT VALID (Historical)
-	KLICHR==1B27		;KLINIK CHARACTER
-	KLIINI==2B27		;KLINIK INITED
-	KLICAR==3B27		;CARRIER LOST
+XPP KLIIWD,34       ;KLINIK INPUT WORD [FE_KLININ]
+    KLIICH==377B35      ;KLINIK INPUT CHARACTER
+    KLIIVL==1B27        ;KLINIK INPUT VALID (Historical)
+    KLICHR==1B27        ;KLINIK CHARACTER
+    KLIINI==2B27        ;KLINIK INITED
+    KLICAR==3B27        ;CARRIER LOST
 
 
-XPP KLIOWD,35		;KLINIK OUTPUT WORD [FE_KLINOUT]
-	KLIOCH==377B35		;KLINIK OUTPUT CHARACTER
-	KLIOVL==1B27		;KLINIK OUTPUT VALID (Historical)
-	KLOCHR==1B27		;KLINIK CHARACTER AVAILABLE
-	KLIHUP==2B27		;KLINIK HANGUP REQUEST
+XPP KLIOWD,35       ;KLINIK OUTPUT WORD [FE_KLINOUT]
+    KLIOCH==377B35      ;KLINIK OUTPUT CHARACTER
+    KLIOVL==1B27        ;KLINIK OUTPUT VALID (Historical)
+    KLOCHR==1B27        ;KLINIK CHARACTER AVAILABLE
+    KLIHUP==2B27        ;KLINIK HANGUP REQUEST
 */
 
 void fe_intr (void)
@@ -307,7 +307,7 @@ return SCPE_OK;
 
 /* Stop operating system */
 
-t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat fe_stop_os (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 M[FE_SWITCH] = IOBA_RP;                                 /* tell OS to stop */
 return SCPE_OK;

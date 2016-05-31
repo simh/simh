@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   30-Dec-15    RMS     Added NOBVT option
    23-Oct-13    RMS     Added cpu_set_boot prototype
    02-Sep-13    RMS     Added third Massbus adapter and RS drive
    11-Dec-11    RMS     Fixed priority of PIRQ vs IO; added INT_INTERNALn
@@ -106,6 +107,7 @@
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((t_addr) (x)) < cpu_memsize)  /* use only in sim! */
 #define DMASK           0177777
+#define BMASK           0377
 
 /* CPU models */
 
@@ -173,6 +175,7 @@
 #define OPT_RH11        (1u << 6)                       /* RH11 */
 #define OPT_PAR         (1u << 7)                       /* parity */
 #define OPT_UBM         (1u << 8)                       /* UBM */
+#define OPT_BVT         (1u << 9)                       /* BEVENT */
 
 #define CPUT(x)         ((cpu_type & (x)) != 0)
 #define CPUO(x)         ((cpu_opt & (x)) != 0)
@@ -518,6 +521,12 @@ struct pdp_dib {
     uint32              ulnt;                           /* IO length per-device */
                                                         /* Only need to be populated */
                                                         /* when numunits != num devices */
+    int32               numc;                           /* Number of controllers */
+                                                        /* this field handles devices */
+                                                        /* where multiple instances are */
+                                                        /* simulated through a single */
+                                                        /* DEVICE structure (e.g., DZ, VH, DL, DC). */
+                                                        /* Populated by auto-configure */
     };
 
 typedef struct pdp_dib DIB;
@@ -627,12 +636,13 @@ typedef struct pdp_dib DIB;
 #define INT_V_DCO       12
                     /* VT simulation is sequential, so only
                        one interrupt is posted at a time. */
-#define INT_V_VTLP      13  /* XXX - Manual says VTLP, VTST have opposite */
-#define INT_V_VTST      14  /* XXX	   precedence, but that breaks LUNAR! */
-                            /* XXX  How this happens is an utter mystery. */
+#define INT_V_VTST      13
+#define INT_V_VTLP      14
 #define INT_V_VTCH      15
 #define INT_V_VTNM      16
 #define INT_V_LK        17
+#define INT_V_TDRX      18
+#define INT_V_TDTX      19
 
 #define INT_V_PIR3      0                               /* BR3 */
 #define INT_V_PIR2      0                               /* BR2 */
@@ -690,6 +700,8 @@ typedef struct pdp_dib DIB;
 #define INT_PIR3        (1u << INT_V_PIR3)
 #define INT_PIR2        (1u << INT_V_PIR2)
 #define INT_PIR1        (1u << INT_V_PIR1)
+#define INT_TDRX        (1u << INT_V_TDRX)
+#define INT_TDTX        (1u << INT_V_TDTX)
 
 #define INT_INTERNAL7   (INT_PIR7)
 #define INT_INTERNAL6   (INT_PIR6 | INT_CLK)
@@ -744,6 +756,8 @@ typedef struct pdp_dib DIB;
 #define IPL_VTCH        4
 #define IPL_VTNM        4
 #define IPL_LK          4           /* XXX just a guess */
+#define IPL_TDRX        4
+#define IPL_TDTX        4
 
 #define IPL_PIR7        7
 #define IPL_PIR6        6
@@ -758,8 +772,6 @@ typedef struct pdp_dib DIB;
 #define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
-#define VEC_Q           0000                            /* vector base */
-
 /* Processor specific internal fixed vectors */
 #define VEC_PIRQ        0240
 #define VEC_TTI         0060
@@ -771,13 +783,12 @@ typedef struct pdp_dib DIB;
 #define IREQ(dv)        int_req[IPL_##dv]
 #define SET_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
+#define INT_IS_SET(dv)  (int_req[IPL_##dv] & (INT_##dv))
 
 /* Massbus definitions */
 
 #define MBA_NUM         3                               /* number of MBA's */
-#define MBA_RP          0                               /* MBA for RP */
-#define MBA_TU          1                               /* MBA for TU */
-#define MBA_RS          2                               /* MBA for RS */
+#define MBA_AUTO        (uint32)0xFFFFFFFF              /* Unassigned MBA */
 #define MBA_RMASK       037                             /* max 32 reg */
 #define MBE_NXD         1                               /* nx drive */
 #define MBE_NXR         2                               /* nx reg */
@@ -796,19 +807,21 @@ typedef struct pdp_dib DIB;
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
 int32 mba_rdbufW (uint32 mbus, int32 bc, uint16 *buf);
-int32 mba_wrbufW (uint32 mbus, int32 bc, uint16 *buf);
+int32 mba_wrbufW (uint32 mbus, int32 bc, const uint16 *buf);
 int32 mba_chbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_get_bc (uint32 mbus);
 int32 mba_get_csr (uint32 mbus);
 void mba_upd_ata (uint32 mbus, uint32 val);
 void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
-void mba_set_enbdis (uint32 mb, t_bool dis);
-t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
+void mba_set_enbdis (DEVICE *dptr);
+t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+
+t_stat build_dib_tab (void);
 
 void cpu_set_boot (int32 pc);
 

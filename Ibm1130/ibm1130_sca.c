@@ -142,7 +142,7 @@ typedef enum {				/*  ms     m = mode (0 = idle, 1 = send, 2 = receive), s = sub
 
 static t_stat sca_svc			(UNIT *uptr);				/* prototypes */
 static t_stat sca_reset			(DEVICE *dptr);
-static t_stat sca_attach		(UNIT *uptr, char *cptr);
+static t_stat sca_attach		(UNIT *uptr, CONST char *cptr);
 static t_stat sca_detach		(UNIT *uptr);
 static void sca_start_timer		(int n, int msec_now);
 static void sca_halt_timer		(int n);
@@ -202,7 +202,7 @@ static int    sca_rcvptr = 0;								/* index of next byte to take from rcvbuf *
 #define UNIT_AUTOANSWER	  (1u << UNIT_V_AUTOANSWER)
 #define UNIT_LISTEN		  (1u << UNIT_V_LISTEN)
 
-t_stat sca_set_baud (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat sca_set_baud (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 
 UNIT sca_unit = {														/* default settings */
 	UDATA (sca_svc, UNIT_ATTABLE|UNIT_BISYNC|UNIT_BAUD4800|UNIT_FULLDUPLEX, 0),
@@ -243,7 +243,7 @@ DEVICE sca_dev = {
  * sca_set_baud - set baud rate handler (SET SCA.BAUD nnn)
  *********************************************************************************************/
 
-t_stat sca_set_baud (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat sca_set_baud (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 	uint32 newbits;
 
@@ -275,15 +275,15 @@ t_stat sca_set_baud (UNIT *uptr, int32 value, char *cptr, void *desc)
  * mstring - allocate a copy of a string
  *********************************************************************************************/
 
-char *mstring (char *str)
+char *mstring (const char *str)
 {
 	int len;
 	char *m;
 
 	len = strlen(str)+1;
-	if ((m = malloc(len)) == NULL) {
+	if ((m = (char *)malloc(len)) == NULL) {
 		printf("Out of memory!");
-		return "?";				/* this will of course cause trouble if it's subsequently freed */
+		return (char *)"?";		/* this will of course cause trouble if it's subsequently freed */
 	}
 	strcpy(m, str);
 	return m;
@@ -305,7 +305,7 @@ static void sca_socket_error (void)
 
 	if (sca_sock != INVALID_SOCKET) {
 		/* close socket, prepare to listen again if in listen mode. It's a "master" socket if it was an outgoing connection */
-		sim_close_sock(sca_sock, (sca_unit.flags & UNIT_LISTEN) == 0);
+		sim_close_sock(sca_sock);
 		sca_sock = INVALID_SOCKET;
 
 		if (sca_unit.filename != NULL)								/* reset filename string in unit record */
@@ -447,7 +447,7 @@ static t_stat sca_reset (DEVICE *dptr)
  * sca_attach - attach the SCA device
  *********************************************************************************************/
 
-static t_stat sca_attach (UNIT *uptr, char *cptr)
+static t_stat sca_attach (UNIT *uptr, CONST char *cptr)
 {
     char host[CBUFSIZE], port[CBUFSIZE];
 	t_bool do_listen;
@@ -460,9 +460,8 @@ static t_stat sca_attach (UNIT *uptr, char *cptr)
 		detach_unit(&sca_unit);
 
 	if (do_listen) {							/* if listen mode, string specifies port number (only; otherwise it's a dummy argument) */
-        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL);
-        if (r != SCPE_OK)
-            return r;
+        if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL))
+            return SCPE_ARG;
         if ((0 == strcmp(port, cptr)) && (0 == strcmp(port, "dummy")))
             strcpy(port, SCA_DEFAULT_PORT);
 
@@ -491,9 +490,8 @@ static t_stat sca_attach (UNIT *uptr, char *cptr)
 		if (! *cptr)
 			return SCPE_2FARG;
 
-        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL);
-        if (r != SCPE_OK)
-            return r;
+        if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL))
+            return SCPE_ARG;
         if ((0 == strcmp(cptr, port)) && (0 == strcmp(host, ""))) {
             strcpy(host, port);
             strcpy(port, SCA_DEFAULT_PORT);
@@ -518,7 +516,7 @@ static t_stat sca_attach (UNIT *uptr, char *cptr)
 			SETBIT(sca_dsw, SCA_DSW_READY);
 		}
 		else {                                  /* sca_sock appears in "error" set -- connect failed */
-			sim_close_sock(sca_sock, TRUE);
+			sim_close_sock(sca_sock);
 			sca_sock = INVALID_SOCKET;
 			return SCPE_OPENERR;
 		}
@@ -559,11 +557,11 @@ static t_stat sca_detach (UNIT *uptr)
 	CLRBIT(sca_dsw, SCA_DSW_READY);				/* indicate offline */
 
 	if (sca_sock != INVALID_SOCKET) {			/* close connected socket */
-		sim_close_sock(sca_sock, (sca_unit.flags & UNIT_LISTEN) == 0);
+		sim_close_sock(sca_sock);
 		sca_sock = INVALID_SOCKET;
 	}
 	if (sca_lsock != INVALID_SOCKET) {			/* close listening socket */
-		sim_close_sock(sca_lsock, TRUE);
+		sim_close_sock(sca_lsock);
 		sca_lsock = INVALID_SOCKET;
 	}
 	

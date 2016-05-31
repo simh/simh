@@ -37,7 +37,7 @@
 #include <stdlib.h>
 
 #include "ws.h"                         /* for ws_beep() */
-#include "xy.h"
+#include "display.h"
 #include "vt11.h"
 #include "vtmacs.h"
 

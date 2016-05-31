@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    cpu          PDP-11 CPU
 
+   06-Mar-16    RMS     Fixed bug in history virtual addressing
+   30-Dec-15    RMS     Added NOBEVENT option for 11/03, 11/23
+   29-Dec-15    RMS     Call build_dib_tab during reset (Mark Pizzolato)
    05-Dec-13    RMS     Fixed bug in CSM (John Dundas)
    23-Oct-13    RMS     Fixed PS behavior on initialization and boot
    10-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
@@ -313,9 +316,9 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 GeteaB (int32 spec);
 int32 GeteaW (int32 spec);
 int32 relocR (int32 addr);
@@ -344,9 +347,9 @@ extern void fp11 (int32 IR);
 extern t_stat cis11 (int32 IR);
 extern t_stat fis11 (int32 IR);
 extern t_stat build_dib_tab (void);
-extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern t_stat iopageR (int32 *data, uint32 addr, int32 access);
 extern t_stat iopageW (int32 data, uint32 addr, int32 access);
 extern int32 calc_ints (int32 nipl, int32 trq);
@@ -383,62 +386,80 @@ int32 trap_clear[TRAP_V_MAX] = {                        /* trap clears */
 
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX|UNIT_BINK, INIMEMSIZE) };
 
+const char *psw_modes[] = {"K", "E", "S", "U"};
+
+
+BITFIELD psw_bits[] = {
+    BIT(C),                                 /* Carry */
+    BIT(V),                                 /* Overflow */
+    BIT(Z),                                 /* Zero */
+    BIT(N),                                 /* Negative */
+    BIT(TBIT),                              /* trace trap */
+    BITFFMT(IPL,3,%d),                      /* IPL */
+    BIT(FPD),                               /* First Part Done */
+    BITNCF(2),                              /* MBZ */
+    BIT(RS),                                /* Register Set */
+    BITFNAM(PM,2,psw_modes),                /* Previous Access Mode */
+    BITFNAM(CM,2,psw_modes),                /* Current Access Mode */
+    ENDBITS
+};
+
 REG cpu_reg[] = {
-    { ORDATA (PC, saved_PC, 16) },
-    { ORDATA (R0, REGFILE[0][0], 16) },
-    { ORDATA (R1, REGFILE[1][0], 16) },
-    { ORDATA (R2, REGFILE[2][0], 16) },
-    { ORDATA (R3, REGFILE[3][0], 16) },
-    { ORDATA (R4, REGFILE[4][0], 16) },
-    { ORDATA (R5, REGFILE[5][0], 16) },
-    { ORDATA (SP, STACKFILE[MD_KER], 16) },
-    { ORDATA (R00, REGFILE[0][0], 16) },
-    { ORDATA (R01, REGFILE[1][0], 16) },
-    { ORDATA (R02, REGFILE[2][0], 16) },
-    { ORDATA (R03, REGFILE[3][0], 16) },
-    { ORDATA (R04, REGFILE[4][0], 16) },
-    { ORDATA (R05, REGFILE[5][0], 16) },
-    { ORDATA (R10, REGFILE[0][1], 16) },
-    { ORDATA (R11, REGFILE[1][1], 16) },
-    { ORDATA (R12, REGFILE[2][1], 16) },
-    { ORDATA (R13, REGFILE[3][1], 16) },
-    { ORDATA (R14, REGFILE[4][1], 16) },
-    { ORDATA (R15, REGFILE[5][1], 16) },
-    { ORDATA (KSP, STACKFILE[MD_KER], 16) },
-    { ORDATA (SSP, STACKFILE[MD_SUP], 16) },
-    { ORDATA (USP, STACKFILE[MD_USR], 16) },
-    { ORDATA (PSW, PSW, 16) },
-    { GRDATA (CM, PSW, 8, 2, PSW_V_CM) },
-    { GRDATA (PM, PSW, 8, 2, PSW_V_PM) },
-    { FLDATA (RS, PSW, PSW_V_RS) },
-    { FLDATA (FPD, PSW, PSW_V_FPD) },
-    { GRDATA (IPL, PSW, 8, 3, PSW_V_IPL) },
-    { FLDATA (T, PSW, PSW_V_TBIT) },
-    { FLDATA (N, PSW, PSW_V_N) },
-    { FLDATA (Z, PSW, PSW_V_Z) },
-    { FLDATA (V, PSW, PSW_V_V) },
-    { FLDATA (C, PSW, PSW_V_C) },
-    { ORDATA (PIRQ, PIRQ, 16) },
-    { ORDATA (STKLIM, STKLIM, 16) },
-    { ORDATA (FAC0H, FR[0].h, 32) },
-    { ORDATA (FAC0L, FR[0].l, 32) },
-    { ORDATA (FAC1H, FR[1].h, 32) },
-    { ORDATA (FAC1L, FR[1].l, 32) },
-    { ORDATA (FAC2H, FR[2].h, 32) },
-    { ORDATA (FAC2L, FR[2].l, 32) },
-    { ORDATA (FAC3H, FR[3].h, 32) },
-    { ORDATA (FAC3L, FR[3].l, 32) },
-    { ORDATA (FAC4H, FR[4].h, 32) },
-    { ORDATA (FAC4L, FR[4].l, 32) },
-    { ORDATA (FAC5H, FR[5].h, 32) },
-    { ORDATA (FAC5L, FR[5].l, 32) },
-    { ORDATA (FPS, FPS, 16) },
-    { ORDATA (FEA, FEA, 16) },
-    { ORDATA (FEC, FEC, 4) },
-    { ORDATA (MMR0, MMR0, 16) },
-    { ORDATA (MMR1, MMR1, 16) },
-    { ORDATA (MMR2, MMR2, 16) },
-    { ORDATA (MMR3, MMR3, 16) },
+    { ORDATAD (PC, saved_PC, 16,            "Program Counter") },
+    { ORDATAD (R0, REGFILE[0][0], 16,       "General Purpose R0") },
+    { ORDATAD (R1, REGFILE[1][0], 16,       "General Purpose R1") },
+    { ORDATAD (R2, REGFILE[2][0], 16,       "General Purpose R2") },
+    { ORDATAD (R3, REGFILE[3][0], 16,       "General Purpose R3") },
+    { ORDATAD (R4, REGFILE[4][0], 16,       "General Purpose R4") },
+    { ORDATAD (R5, REGFILE[5][0], 16,       "General Purpose R5") },
+    { ORDATAD (SP, STACKFILE[MD_KER], 16,   "Stack Pointer"), },
+    { ORDATAD (R00, REGFILE[0][0], 16,      "Register File R00") },
+    { ORDATAD (R01, REGFILE[1][0], 16,      "Register File R01") },
+    { ORDATAD (R02, REGFILE[2][0], 16,      "Register File R02") },
+    { ORDATAD (R03, REGFILE[3][0], 16,      "Register File R03") },
+    { ORDATAD (R04, REGFILE[4][0], 16,      "Register File R04") },
+    { ORDATAD (R05, REGFILE[5][0], 16,      "Register File R05") },
+    { ORDATAD (R10, REGFILE[0][1], 16,      "Register File R10") },
+    { ORDATAD (R11, REGFILE[1][1], 16,      "Register File R11") },
+    { ORDATAD (R12, REGFILE[2][1], 16,      "Register File R12") },
+    { ORDATAD (R13, REGFILE[3][1], 16,      "Register File R13") },
+    { ORDATAD (R14, REGFILE[4][1], 16,      "Register File R14") },
+    { ORDATAD (R15, REGFILE[5][1], 16,      "Register File R15") },
+    { ORDATAD (KSP, STACKFILE[MD_KER], 16,  "Kernel Stack Pointer" ) },
+    { ORDATAD (SSP, STACKFILE[MD_SUP], 16,  "Supervisor Stack Pointer" ) },
+    { ORDATAD (USP, STACKFILE[MD_USR], 16,  "User Stack Pointer" ) },
+    { ORDATADF(PSW, PSW, 16,                "Processor Status Word", psw_bits) },
+    { GRDATAD (CM, PSW, 8, 2, PSW_V_CM,     "Current Mode") },
+    { GRDATAD (PM, PSW, 8, 2, PSW_V_PM,     "Previous Mode") },
+    { FLDATAD (RS, PSW, PSW_V_RS,           "Register Set") },
+    { FLDATAD (FPD, PSW, PSW_V_FPD,         "First Part Done") },
+    { GRDATAD (IPL, PSW, 8, 3, PSW_V_IPL,   "Interrupt Priority Level") },
+    { FLDATAD (T, PSW, PSW_V_TBIT,          "Trace Trap") },
+    { FLDATAD (N, PSW, PSW_V_N,             "Condition Code: Negative") },
+    { FLDATAD (Z, PSW, PSW_V_Z,             "Condition Code: Zero") },
+    { FLDATAD (V, PSW, PSW_V_V,             "Condition Code: Overflow") },
+    { FLDATAD (C, PSW, PSW_V_C,             "Condition Code: Carry") },
+    { ORDATAD (PIRQ, PIRQ, 16,              "Programmed Interrupt Request") },
+    { ORDATAD (STKLIM, STKLIM, 16,          "Stack Limit") },
+    { ORDATAD (FAC0H, FR[0].h, 32,          "Floating Point: R0 High") },
+    { ORDATAD (FAC0L, FR[0].l, 32,          "Floating Point: R0 Low") },
+    { ORDATAD (FAC1H, FR[1].h, 32,          "Floating Point: R1 High") },
+    { ORDATAD (FAC1L, FR[1].l, 32,          "Floating Point: R1 Low") },
+    { ORDATAD (FAC2H, FR[2].h, 32,          "Floating Point: R2 High") },
+    { ORDATAD (FAC2L, FR[2].l, 32,          "Floating Point: R2 Low") },
+    { ORDATAD (FAC3H, FR[3].h, 32,          "Floating Point: R3 High") },
+    { ORDATAD (FAC3L, FR[3].l, 32,          "Floating Point: R3 Low") },
+    { ORDATAD (FAC4H, FR[4].h, 32,          "Floating Point: R4 High") },
+    { ORDATAD (FAC4L, FR[4].l, 32,          "Floating Point: R4 Low") },
+    { ORDATAD (FAC5H, FR[5].h, 32,          "Floating Point: R5 High") },
+    { ORDATAD (FAC5L, FR[5].l, 32,          "Floating Point: R5 Low") },
+    { ORDATAD (FPS, FPS, 16,                "FP Status") },
+    { ORDATAD (FEA, FEA, 16,                "FP Exception Code") },
+    { ORDATAD (FEC, FEC, 4,                 "FP Exception Address") },
+    { ORDATAD (MMR0, MMR0, 16,              "MMR0 - Status") },
+    { ORDATAD (MMR1, MMR1, 16,              "MMR1 - R+/-R") },
+    { ORDATAD (MMR2, MMR2, 16,              "MMR2 - saved PC") },
+    { ORDATAD (MMR3, MMR3, 16,              "MMR3 - 22b status") },
     { GRDATA (KIPAR0, APRFILE[000], 8, 16, 16) },
     { GRDATA (KIPDR0, APRFILE[000], 8, 16, 0) },
     { GRDATA (KIPAR1, APRFILE[001], 8, 16, 16) },
@@ -535,13 +556,13 @@ REG cpu_reg[] = {
     { GRDATA (UDPDR6, APRFILE[076], 8, 16, 0) },
     { GRDATA (UDPAR7, APRFILE[077], 8, 16, 16) },
     { GRDATA (UDPDR7, APRFILE[077], 8, 16, 0) },
-    { BRDATA (IREQ, int_req, 8, 32, IPL_HLVL), REG_RO },
-    { ORDATA (TRAPS, trap_req, TRAP_V_MAX) },
-    { FLDATA (WAIT, wait_state, 0) },
+    { BRDATAD (IREQ, int_req, 8, 32, IPL_HLVL, "Interrupt Requests"), REG_RO },
+    { ORDATAD (TRAPS, trap_req, TRAP_V_MAX, "Trap Requests") },
+    { FLDATAD (WAIT, wait_state, 0,         "Wait State") },
     { FLDATA (WAIT_ENABLE, wait_enable, 0), REG_HIDDEN },
-    { ORDATA (STOP_TRAPS, stop_trap, TRAP_V_MAX) },
-    { FLDATA (STOP_VECA, stop_vecabort, 0) },
-    { FLDATA (STOP_SPA, stop_spabort, 0) },
+    { ORDATAD (STOP_TRAPS, stop_trap, TRAP_V_MAX, "Stop on Trap") },
+    { FLDATAD (STOP_VECA, stop_vecabort, 0, "Stop on Vec Abort") },
+    { FLDATAD (STOP_SPA, stop_spabort, 0,   "Stop on SP Abort") },
     { FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
     { BRDATA (PCQ, pcq, 8, 16, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
@@ -588,6 +609,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "NOCIS", &cpu_clr_opt },
     { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "MMU", &cpu_set_opt },
     { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "NOMMU", &cpu_clr_opt },
+    { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "BEVENT", &cpu_set_opt, NULL, NULL, "Enable BEVENT line (11/03, 11/23 only)" },
+    { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "NOBEVENT", &cpu_clr_opt, NULL, NULL, "Disable BEVENT line (11/03, 11/23 only)" },
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
@@ -731,7 +754,29 @@ while (reason == 0)  {
 
     AIO_CHECK_EVENT;
     if (sim_interval <= 0) {                            /* intv cnt expired? */
+        /* Make sure all intermediate state is visible in simh registers */
+        PSW = get_PSW ();
+        for (i = 0; i < 6; i++)
+            REGFILE[i][rs] = R[i];
+        STACKFILE[cm] = SP;
+        saved_PC = PC & 0177777;
+        pcq_r->qptr = pcq_p;                            /* update pc q ptr */
+        set_r_display (rs, cm);
+
         reason = sim_process_event ();                  /* process events */
+
+        /* restore simh register contents into running variables */
+        PC = saved_PC;
+        put_PSW (PSW, 0);                               /* set PSW, call calc_xs */
+        for (i = 0; i < 6; i++)
+            R[i] = REGFILE[i][rs];
+        SP = STACKFILE[cm];
+        isenable = calc_is (cm);
+        dsenable = calc_ds (cm);
+        put_PIRQ (PIRQ);                                /* rewrite PIRQ */
+        STKLIM = STKLIM & STKLIM_RW;                    /* clean up STKLIM */
+        MMR0 = MMR0 | MMR0_IC;                          /* usually on */
+
         trap_req = calc_ints (ipl, trap_req);           /* recalc int req */
         continue;
         }                                               /* end if sim_interval */
@@ -810,11 +855,7 @@ while (reason == 0)  {
     if (tbit)
         setTRAP (TRAP_TRC);
     if (wait_state) {                                   /* wait state? */
-        if (sim_idle_enab)                              /* idle enabled? */
-            sim_idle (TMR_CLK, TRUE);
-        else if (wait_enable)                           /* old style idle? */
-            sim_interval = 0;                           /* force check */
-        else sim_interval = sim_interval - 1;           /* count cycle */
+        sim_idle (TMR_CLK, TRUE);
         continue;
         }
 
@@ -836,13 +877,17 @@ while (reason == 0)  {
     if (hst_lnt) {                                      /* record history? */
         t_value val;
         uint32 i;
+        static int32 swmap[4] = {
+            SWMASK ('K') | SWMASK ('V'), SWMASK ('S') | SWMASK ('V'),
+            SWMASK ('U') | SWMASK ('V'), SWMASK ('U') | SWMASK ('V')
+            };
         hst[hst_p].pc = PC | HIST_VLD;
         hst[hst_p].psw = get_PSW ();
         hst[hst_p].src = R[srcspec & 07];
         hst[hst_p].dst = R[dstspec & 07];
         hst[hst_p].inst[0] = IR;
         for (i = 1; i < HIST_ILNT; i++) {
-            if (cpu_ex (&val, (PC + (i << 1)) & 0177777, &cpu_unit, SWMASK ('V')))
+            if (cpu_ex (&val, (PC + (i << 1)) & 0177777, &cpu_unit, swmap[cm & 03]))
                 hst[hst_p].inst[i] = 0;
             else hst[hst_p].inst[i] = (uint16) val;
             }
@@ -1515,7 +1560,7 @@ while (reason == 0)  {
                 Z = V = C = 1;                          /* N = 0, Z = 1 */
                 break;
                 }
-            if ((src == 020000000000) && (src2 == 0177777)) {
+            if ((((uint32)src) == 020000000000) && (src2 == 0177777)) {
                 V = 1;                                  /* J11,11/70 compat */
                 N = Z = C = 0;                          /* N = Z = 0 */
                 break;
@@ -3004,25 +3049,30 @@ PIRQ = 0;
 STKLIM = 0;
 if (CPUT (CPUT_T))                                      /* T11? */
     PSW = 000340;                                       /* start at IPL 7 */
-else PSW = 0;                                           /* else at IPL 0 */
+else
+    PSW = 0;                                            /* else at IPL 0 */
 MMR0 = 0;
 MMR1 = 0;
 MMR2 = 0;
 MMR3 = 0;
 trap_req = 0;
 wait_state = 0;
-if (M == NULL)
+if (M == NULL) {                    /* First time init */
     M = (uint16 *) calloc (MEMSIZE >> 1, sizeof (uint16));
-if (M == NULL)
-    return SCPE_MEM;
+    if (M == NULL)
+        return SCPE_MEM;
+    sim_set_pchar (0, "01000023640"); /* ESC, CR, LF, TAB, BS, BEL, ENQ */
+    sim_brk_types = sim_brk_dflt = SWMASK ('E');
+    sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
+    auto_config(NULL, 0);           /* do an initial auto configure */
+    }
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
-else return SCPE_IERR;
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
-sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
+else
+    return SCPE_IERR;
 set_r_display (0, MD_KER);
-return SCPE_OK;
+return build_dib_tab ();            /* build, chk dib_tab */
 }
 
 static const char *cpu_next_caveats =
@@ -3044,9 +3094,7 @@ static t_bool caveats_displayed = FALSE;
 
 if (!caveats_displayed) {
     caveats_displayed = TRUE;
-    printf ("%s", cpu_next_caveats);
-    if (sim_log)
-        fprintf (sim_log, "%s", cpu_next_caveats);
+    sim_printf ("%s", cpu_next_caveats);
     }
 if (SCPE_OK != get_aval (PC, &cpu_dev, &cpu_unit))      /* get data */
     return FALSE;
@@ -3135,7 +3183,6 @@ return iopageW ((int32) val, addr, WRITEC);
 
 void set_r_display (int32 rs, int32 cm)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 int32 i;
 
@@ -3150,7 +3197,7 @@ return;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -3181,10 +3228,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 j, k, di, lnt, ir;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[HIST_ILNT];
 t_stat r;
 InstHistory *h;
@@ -3226,10 +3273,10 @@ return SCPE_OK;
 
 /* Virtual address translation */
 
-t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 uint32 va, pa;
 
 if (cptr) {

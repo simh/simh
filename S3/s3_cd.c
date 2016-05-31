@@ -47,7 +47,7 @@ int32 s1sel, s2sel;
 char rbuf[CBUFSIZE];                                    /* > CDR_WIDTH */
 t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno, DEVICE *dptr);
-t_stat cdr_attach (UNIT *uptr, char *cptr);
+t_stat cdr_attach (UNIT *uptr, CONST char *cptr);
 t_stat cd_reset (DEVICE *dptr);
 t_stat read_card (int32 ilnt, int32 mod);
 t_stat punch_card (int32 ilnt, int32 mod);
@@ -264,7 +264,7 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
         default:
             break;
     }                       
-    printf (">>CRD non-existent function %d\n", op);
+    sim_printf (">>CRD non-existent function %d\n", op);
     return SCPE_OK;                     
 }
 
@@ -311,7 +311,7 @@ if (feof (cdr_unit.fileref)) {                          /* eof? */
     return STOP_NOCD;
 }       
 if (ferror (cdr_unit.fileref)) {                        /* error? */
-    perror ("Card reader I/O error");
+    sim_perror ("Card reader I/O error");
     clearerr (cdr_unit.fileref);
     carderr = 1;  
     return SCPE_OK;  }
@@ -346,13 +346,13 @@ int32 i;
 if (s2sel) uptr = &stack_unit[0];                       /* stacker 1? */
 else uptr = &stack_unit[0];                             /* then default */
 if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_OK;    /* attached? */
-for (i = 0; i < CDR_WIDTH; i++) rbuf[i] = ebcdic_to_ascii[rbuf[i]];
+for (i = 0; (size_t)i < CDR_WIDTH; i++) rbuf[i] = ebcdic_to_ascii[rbuf[i]];
 for (i = CDR_WIDTH - 1; (i >= 0) && (rbuf[i] == ' '); i--) rbuf[i] = 0;
 rbuf[CDR_WIDTH] = 0;                                    /* null at end */
 fputs (rbuf, uptr -> fileref);                          /* write card */
 fputc ('\n', uptr -> fileref);                          /* plus new line */
 if (ferror (uptr -> fileref)) {                         /* error? */
-    perror ("Card stacker I/O error");
+    sim_perror ("Card stacker I/O error");
     clearerr (uptr -> fileref);
 }
 uptr -> pos = ftell (uptr -> fileref);                  /* update position */
@@ -397,7 +397,7 @@ if (!cdp_ebcdic) {
     }   
 }   
 if (ferror (uptr -> fileref)) {                         /* error? */
-    perror ("Card punch I/O error");
+    sim_perror ("Card punch I/O error");
     clearerr (uptr -> fileref);
     pcherror = 1;
 }
@@ -430,7 +430,7 @@ return SCPE_OK;
 
 /* Card reader attach */
 
-t_stat cdr_attach (UNIT *uptr, char *cptr)
+t_stat cdr_attach (UNIT *uptr, CONST char *cptr)
 {
 carderr = lastcard = notready = 0;                      /* clear last card */
 return attach_unit (uptr, cptr);

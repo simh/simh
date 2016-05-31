@@ -1,0 +1,71 @@
+set cpu debug=int
+set cpu debug=exc
+set cpu 512k
+set cpu nostop
+set debug debug.log
+;set debug stdout
+break fe1ad6
+;break 7bd08
+
+
+; raise PICINT7 for fdcread
+break 7def2
+; softint7_fdcread
+break 7db38
+;fdcint6_callback
+break 7d5ba
+;fdc_read
+break 7d832
+;fdc_cb_reenable_pic7_2
+break 7d82a
+;fdc_reset
+break 7d7f4
+;fdc_sendcmd
+break 7d454
+;fdc_senseint
+break 7d48e
+;fdc_readstatus
+break 7d544
+;fdc_startdrive
+break 7d6d6
+;process_schedqueue
+break 7c64c
+;fdc_readid
+break 7d956
+;fdc_recalibrate_routine
+break 7da14
+;fdc_Recalibrate_done
+break 7da60
+;fdc_autointhandler
+break 7d7d0
+;handler_autoint6_default
+break 7d7ec
+;cancelschedule
+break 7c614
+;addschedule
+break 7c5b0
+;fdc_getstatus7
+break 7d4dc
+
+
+
+set timer1 debug=read
+set timer1 debug=write
+set timer2 debug=read
+set timer2 debug=write
+;set pic debug=read
+set pic debug=write
+set pic debug=irqin
+set pic debug=irqout
+;set fd debug=verbose
+set fd debug=cmd
+set fd debug=seek
+;set fd debug=irq
+;set fd debug=state
+;set fd debug=status
+;set fd debug=rddata
+set lp debug=rdc
+set lp debug=rdb
+set dip debug=wrc
+att fd0 cpm68k12.imd
+boot cpu

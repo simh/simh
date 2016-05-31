@@ -51,7 +51,7 @@
 #include <time.h>
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -74,8 +74,8 @@ typedef struct {
 
 static SS1_INFO ss1_info_data = { { 0x0, 0, 0x50, 16 } };
 
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
@@ -86,6 +86,7 @@ static uint8 SS1_Read(const uint32 Addr);
 static uint8 SS1_Write(const uint32 Addr, uint8 cData);
 static int32 ss1dev(const int32 port, const int32 io, const int32 data);
 void raise_ss1_interrupt(uint8 isr_index);
+static const char* ss1_description(DEVICE *dptr);
 
 /* SS1 Interrupt Controller notes:
  *
@@ -202,6 +203,10 @@ static REG ss1_reg[] = {
     { NULL }
 };
 
+static const char* ss1_description(DEVICE *dptr) {
+    return "Compupro System Support 1";
+}
+
 static MTAB ss1_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,              "IOBASE",   "IOBASE",
         &set_iobase, &show_iobase, NULL, "Sets system support module base address" },
@@ -227,7 +232,7 @@ DEVICE ss1_dev = {
     NULL, NULL, &ss1_reset,
     NULL, NULL, NULL,
     &ss1_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    ss1_dt, NULL, "Compupro System Support 1 SS1"
+    ss1_dt, NULL, NULL, NULL, NULL, NULL, &ss1_description
 };
 
 /* Reset routine */
@@ -240,7 +245,7 @@ static t_stat ss1_reset(DEVICE *dptr)
     } else {
         /* Connect SS1 at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &ss1dev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         } else {
             DBG_PRINT(("SS1: Mapped I/O resource at 0x%04x, len=%d\n", pnp->io_base, pnp->io_size));

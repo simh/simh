@@ -1,6 +1,6 @@
 /* i1401_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 1993-2013, Robert M. Supnik
+   Copyright (c) 1993-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          1403 line printer
 
+   08-Mar-15    RMS     Added print to console option
    16-Apr-13    RMS     Fixed printer chain selection
    19-Jan-07    RMS     Added UNIT_TEXT flag
    07-Mar-05    RMS     Fixed bug in write_line (Van Snyder)
@@ -36,9 +37,6 @@
 #include "i1401_defs.h"
 
 extern uint8 M[];
-extern char bcd_to_ascii_old[64];
-extern char bcd_to_ascii_a[64], bcd_to_ascii_h[64];
-extern char bcd_to_pca[64], bcd_to_pch[64];
 extern int32 iochk, ind[64];
 extern t_bool conv_old;
 
@@ -46,20 +44,25 @@ int32 cct[CCT_LNT] = { 03 };
 int32 cctlnt = 66, cctptr = 0, lines = 0, lflag = 0;
 
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat space (int32 lines, int32 lflag);
+t_stat lpt_puts (const char *buf);
 
-char *pch_table_old[4] = {
+extern void inq_puts (const char *buf);
+
+const char *pch_table_old[4] = {
     bcd_to_ascii_old, bcd_to_ascii_old, bcd_to_pca, bcd_to_pch 
     };
-char *pch_table[4] = {
+const char *pch_table[4] = {
     bcd_to_ascii_a, bcd_to_ascii_h, bcd_to_pca, bcd_to_pch
     };
 
 #define UNIT_V_FT       (UNIT_V_UF + 0)
 #define UNIT_V_48       (UNIT_V_UF + 1)
+#define UNIT_V_CONS     (UNIT_V_UF + 2)
 #define UNIT_FT         (1 << UNIT_V_FT)
 #define UNIT_48         (1 << UNIT_V_48)
+#define UNIT_CONS       (1 << UNIT_V_CONS)
 #define GET_PCHAIN(x)   (((x) >> UNIT_V_FT) & 03)
 #define CHP(ch,val)     ((val) & (1 << (ch)))
 
@@ -89,6 +92,8 @@ MTAB lpt_mod[] = {
     { UNIT_48, 0,       "64 character chain", "64" },
     { UNIT_FT, UNIT_FT, "Fortran set", "FORTRAN" },
     { UNIT_FT, 0,       "business set", "BUSINESS" },
+    { UNIT_CONS, UNIT_CONS, "default to console", "DEFAULT" },
+    { UNIT_CONS, 0        , "no default device", "NODEFAULT" },
     { UNIT_FT|UNIT_48, 0,               NULL, "PCF" },  /* obsolete */
     { UNIT_FT|UNIT_48, UNIT_48,         NULL, "PCA" },
     { UNIT_FT|UNIT_48, UNIT_FT|UNIT_48, NULL, "PCH" },
@@ -112,11 +117,10 @@ DEVICE lpt_dev = {
 t_stat write_line (int32 ilnt, int32 mod)
 {
 int32 i, t, wm, sup;
-char *bcd2asc;
+const char *bcd2asc;
+t_stat r;
 static char lbuf[LPT_WIDTH + 1];                        /* + null */
 
-if ((lpt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
-    return SCPE_UNATT;
 wm = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_SQUARE);
 sup = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_S);
 ind[IN_LPT] = 0;                                        /* clear error */
@@ -133,24 +137,15 @@ for (i = 0; i < LPT_WIDTH; i++) {                       /* convert print buf */
 lbuf[LPT_WIDTH] = 0;                                    /* trailing null */
 for (i = LPT_WIDTH - 1; (i >= 0) && (lbuf[i] == ' '); i--)
     lbuf[i] = 0;
-fputs (lbuf, lpt_unit.fileref);                         /* write line */
+if ((r = lpt_puts (lbuf)) != SCPE_OK)                   /* write line */
+    return r;                                           /* error? */
 if (lines)                                              /* cc action? do it */
-    space (lines, lflag); 
+    r = space (lines, lflag); 
 else if (sup == 0)                                      /* default? 1 line */
-    space (1, FALSE);
-else {
-    fputc ('\r', lpt_unit.fileref);                     /* sup -> overprint */
-    lpt_unit.pos = ftell (lpt_unit.fileref);            /* update position */
-    }
+    r = space (1, FALSE);
+else r = lpt_puts ("\r");                               /* sup -> overprint */
 lines = lflag = 0;                                      /* clear cc action */
-if (ferror (lpt_unit.fileref)) {                        /* error? */
-    ind[IN_LPT] = 1;
-    perror ("Line printer I/O error");
-    clearerr (lpt_unit.fileref);
-    if (iochk)
-        return SCPE_IOERR;
-    }
-return SCPE_OK;
+return r;
 }
 
 /* Carriage control routine
@@ -221,20 +216,51 @@ return SCPE_OK;
 t_stat space (int32 count, int32 sflag)
 {
 int32 i;
+t_stat r;
 
-if ((lpt_unit.flags & UNIT_ATT) == 0)
-    return SCPE_UNATT;
 cctptr = (cctptr + count) % cctlnt;                     /* adv cct, mod lnt */
 if (sflag && CHP (0, cct[cctptr]))                      /* skip, top of form? */
-    fputs ("\n\f", lpt_unit.fileref);                   /* nl, ff */
+    r = lpt_puts ("\n\f");                              /* nl, ff */
 else {
-    for (i = 0; i < count; i++)
-        fputc ('\n', lpt_unit.fileref);
+    for (i = 0; (i < count); i++)
+        if ((r = lpt_puts ("\n")) != SCPE_OK)
+            break;
     }
-lpt_unit.pos = ftell (lpt_unit.fileref);                /* update position */
 ind[IN_CC9] = CHP (9, cct[cctptr]) != 0;                /* set indicators */
 ind[IN_CC12] = CHP (12, cct[cctptr]) != 0;
-return SCPE_OK;
+return r;
+}
+
+
+/* Centralized string print routine
+   Prints to either a file or the console
+
+   Note that if printing to the console, newline must be converted to crlf */
+
+t_stat lpt_puts (const char *buf)
+{
+if ((lpt_unit.flags & UNIT_ATT) != 0) {                 /* attached? */
+    fputs (buf, lpt_unit.fileref);                      /* print string */
+    if (ferror (lpt_unit.fileref)) {                    /* error? */
+        ind[IN_LPT] = 1;
+        sim_perror ("Line printer I/O error");
+        clearerr (lpt_unit.fileref);
+        if (iochk)
+            return SCPE_IOERR;
+        }
+    lpt_unit.pos = ftell (lpt_unit.fileref);            /* update position */
+    return SCPE_OK;
+    }
+if ((lpt_unit.flags & UNIT_CONS) != 0) {               /* default to cons? */
+    if (buf[0] == '\n') {                              /* bare lf? */
+        inq_puts ("\r");                               /* cvt to crlf */
+        lpt_unit.pos = lpt_unit.pos + 1;
+        }
+    inq_puts (buf);
+    lpt_unit.pos = lpt_unit.pos + strlen (buf);
+    return SCPE_OK;
+    }
+return SCPE_UNATT;
 }
 
 /* Reset routine */
@@ -249,7 +275,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 cctptr = 0;                                             /* clear cct ptr */
 lines = 0;                                              /* no cc action */

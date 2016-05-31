@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2013, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,14 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   19-Jun-15    JDB     Conditionally use Global_PC for PC for version 4.0 and on
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy, more IBL constants
+   28-Dec-14    JDB     Changed suppression from #pragma GCC to #pragma clang
+   05-Feb-13    JDB     Added declaration for hp_fprint_stopped
    18-Mar-13    JDB     Added "-Wdangling-else" to the suppression pragmas
+                        Removed redundant extern declarations
+   14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    14-Dec-12    JDB     Added "-Wbitwise-op-parentheses" to the suppression pragmas
    12-May-12    JDB     Added pragmas to suppress logical operator precedence warnings
    10-Feb-12    JDB     Added hp_setsc, hp_showsc functions to support SC modifier
@@ -72,17 +79,28 @@
 #ifndef HP2100_DEFS_H_
 #define HP2100_DEFS_H_ 0
 
-#include "sim_defs.h"                                   /* simulator defns */
+
+#include "sim_rev.h"
+#include "sim_defs.h"
 
 
-/* Required to quell clang precedence warnings */
+#if (SIM_MAJOR >= 4)
+  #define PC    PC_Global                       /* Rename to avoid namespace conflicts */
+#endif
 
-#if defined (__GNUC__)
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
-#pragma GCC diagnostic ignored "-Wbitwise-op-parentheses"
-#pragma GCC diagnostic ignored "-Wdangling-else"
+
+/* The following pragmas quell clang warnings that are on by default but should
+   not be, in my opinion.  They warn about the use of perfectly valid code and
+   require the addition of redundant parentheses and braces to silence them.
+   Rather than clutter up the code with scores of extra symbols that, in my
+   view, make the code harder to read and maintain, I elect to suppress these
+   warnings.
+*/
+
+#if defined (__clang__)
+#pragma clang diagnostic ignored "-Wlogical-op-parentheses"
+#pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
+#pragma clang diagnostic ignored "-Wdangling-else"
 #endif
 
 
@@ -212,6 +230,12 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define IBL_MASK        (IBL_LNT - 1)                   /* boot length mask */
 #define IBL_DPC         (IBL_LNT - 2)                   /* DMA ctrl word */
 #define IBL_END         (IBL_LNT - 1)                   /* last location */
+
+#define IBL_S_CLR       0000000                         /* ibl_copy mask to clear the S register */
+#define IBL_S_NOCLR     0177777                         /* ibl_copy mask to preserve the S register */
+#define IBL_S_NOSET     0000000                         /* ibl_copy mask to preserve the S register */
+
+#define IBL_SET_SC(s)   ((s) << IBL_V_DEV)              /* position the select code in the S register */
 
 typedef uint16 BOOT_ROM [IBL_LNT];                      /* boot ROM data */
 
@@ -452,21 +476,21 @@ struct dib {                                            /* Device information bl
 
 /* CPU state */
 
-extern uint32 SR;                                       /* S register (for IBL) */
 extern uint32 dev_prl [2], dev_irq [2], dev_srq [2];    /* I/O signal vectors */
 
 /* CPU functions */
 
-extern t_stat ibl_copy       (const BOOT_ROM rom, int32 dev);
+extern t_stat ibl_copy       (const BOOT_ROM rom, int32 dev, uint32 sr_clear, uint32 sr_set);
 extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
 
 /* System functions */
 
 extern const char *fmt_char   (uint8 ch);
-extern t_stat      hp_setsc   (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat      hp_setdev  (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat      hp_setsc   (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat      hp_setdev  (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_bool      hp_fprint_stopped (FILE *st, t_stat reason);
 
 /* Device-specific functions */
 

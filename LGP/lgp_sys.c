@@ -29,7 +29,7 @@
 #include "lgp_defs.h"
 #include <ctype.h>
 
-t_stat parse_sym_m (char *cptr, t_value *val, int32 sw);
+t_stat parse_sym_m (CONST char *cptr, t_value *val, int32 sw);
 void lgp_init (void);
 
 extern DEVICE cpu_dev;
@@ -40,7 +40,6 @@ extern REG cpu_reg[];
 extern uint32 M[];
 extern uint32 PC;
 extern uint32 ts_flag;
-extern int32 flex_to_ascii[128], ascii_to_flex[128];
 
 /* SCP data structures and interface routines
 
@@ -135,7 +134,7 @@ return SCPE_OK;
 
 /* Loader proper */
 
-t_stat sim_load (FILE *fi, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int flag)
 {
 uint32 wd, origin, amod, csum, cnt, tr, sc, ad, cmd;
 
@@ -222,6 +221,11 @@ static const char opcode[] = "ZBYRIDNMPEUTHCAS";
 
 static const char hex_decode[] = "0123456789FGJKQW";
 
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
+
 void lgp_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
 {
 if ((dptr == sim_devices[0]) &&
@@ -232,7 +236,7 @@ else fprint_val (st, addr, dptr->aradix, dptr->awidth, PV_LEFT);
 return;
 }
 
-t_addr lgp_parse_addr (DEVICE *dptr, char *cptr, char **tptr)
+t_addr lgp_parse_addr (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
 {
 t_addr ad, ea;
 
@@ -293,7 +297,7 @@ if (uptr && (uptr != &cpu_unit))                        /* must be CPU */
     return SCPE_ARG;
 if ((sw & SWMASK ('M')) &&                              /* symbolic decode? */
     ((inst & ~(SIGN|I_OP|I_EA)) == 0)) {
-	op = I_GETOP (inst);
+    op = I_GETOP (inst);
     ea = I_GETEA (inst);
     if (inst & SIGN)
         fputc ('-', of);
@@ -325,10 +329,10 @@ return SCPE_ARG;
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, c;
-char *tptr;
+const char *tptr;
 
 while (isspace (*cptr))                                 /* absorb spaces */
     cptr++;
@@ -371,10 +375,11 @@ return SCPE_ARG;
 
 /* Instruction parse */
 
-t_stat parse_sym_m (char *cptr, t_value *val, int32 sw)
+t_stat parse_sym_m (CONST char *cptr, t_value *val, int32 sw)
 {
 uint32 ea, sgn;
-char *tptr, gbuf[CBUFSIZE];
+CONST char *tptr;
+char gbuf[CBUFSIZE];
 
 if (*cptr == '-') {
     cptr++;

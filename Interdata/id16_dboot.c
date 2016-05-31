@@ -305,7 +305,7 @@ static uint8 dboot_rom[] = {
 */
 
 struct dboot_id {
-    char        *name;
+    const char  *name;
     uint32      sw;
     uint32      cap;
     uint32      dtype;

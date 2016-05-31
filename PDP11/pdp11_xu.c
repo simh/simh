@@ -107,16 +107,16 @@ t_stat xu_wr(int32  data, int32 PA, int32 access);
 t_stat xu_svc(UNIT * uptr);
 t_stat xu_tmrsvc(UNIT * uptr);
 t_stat xu_reset (DEVICE * dptr);
-t_stat xu_attach (UNIT * uptr, char * cptr);
+t_stat xu_attach (UNIT * uptr, CONST char * cptr);
 t_stat xu_detach (UNIT * uptr);
-t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_setmac  (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_set_stats  (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_set_type (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_setmac  (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_set_stats  (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_set_type (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_set_throttle (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 int32 xu_int (void);
 t_stat xu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat xu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -129,9 +129,9 @@ void xu_clrint (CTLR* xu);
 void xu_process_receive(CTLR* xu);
 void xu_dump_rxring(CTLR* xu);
 void xu_dump_txring(CTLR* xu);
-t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *xu_description (DEVICE *dptr);
+t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *xu_description (DEVICE *dptr);
 
 #define IOLN_XU        010
 
@@ -139,7 +139,7 @@ DIB xua_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
                 1, IVCL (XU), VEC_AUTO, {&xu_int}, IOLN_XU };
 
 UNIT xua_unit[] = {
- { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },     /* receive timer */
  { UDATA (&xu_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) }
 };
 
@@ -167,7 +167,7 @@ MTAB xu_mod[] = {
   { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
     NULL, &show_vec, NULL, "Interrupt vector" },
 #endif
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xu_setmac, &xu_showmac, NULL, "MAC address" },
   { MTAB_XTD |MTAB_VDV|MTAB_NMO, 0, "ETH", NULL,
     NULL, &eth_show, NULL, "Display attachable devices" },
@@ -221,12 +221,12 @@ REG xua_reg[] = {
   { NULL }  };
 
 DEBTAB xu_debug[] = {
-  {"TRACE",  DBG_TRC},
-  {"WARN",   DBG_WRN},
-  {"REG",    DBG_REG},
-  {"PACKET", DBG_PCK},
-  {"DATA",   DBG_DAT},
-  {"ETH",    DBG_ETH},
+  {"TRACE",  DBG_TRC, "trace routine calls"},
+  {"WARN",   DBG_WRN, "warnings"},
+  {"REG",    DBG_REG, "read/write registers"},
+  {"PACKET", DBG_PCK, "packet headers"},
+  {"DATA",   DBG_DAT, "packet data"},
+  {"ETH",    DBG_ETH, "ethernet device"},
   {0}
 };
 
@@ -245,7 +245,7 @@ DIB xub_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
                 1, IVCL (XU), 0, { &xu_int }, IOLN_XU };
 
 UNIT xub_unit[] = {
- { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },     /* receive timer */
  { UDATA (&xu_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) }
 };
 
@@ -363,7 +363,7 @@ t_stat xu_dep (t_value val, t_addr addr, UNIT* uptr, int32 sw)
   return SCPE_NOFNC;
 }
 
-t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   char  buffer[20];
@@ -373,18 +373,18 @@ t_stat xu_showmac (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xu_setmac (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   t_stat status;
   CTLR* xu = xu_unit2ctlr(uptr);
 
   if (!cptr) return SCPE_IERR;
   if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-  status = eth_mac_scan(&xu->var->mac, cptr);
+  status = eth_mac_scan_ex(&xu->var->mac, cptr, uptr);
   return status;
 }
 
-t_stat xu_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xu_set_stats (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
 
@@ -393,9 +393,9 @@ t_stat xu_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
-  char* fmt = "  %-26s%d\n";
+  const char* fmt = "  %-26s%d\n";
   CTLR* xu = xu_unit2ctlr(uptr);
   struct xu_stats* stats = &xu->var->stats;
 
@@ -413,7 +413,7 @@ t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   char  buffer[20];
@@ -431,7 +431,7 @@ t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   fprintf(st, "type=");
@@ -442,7 +442,7 @@ t_stat xu_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xu_set_type (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -456,7 +456,7 @@ t_stat xu_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
 
@@ -467,11 +467,11 @@ t_stat xu_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xu_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xu_set_throttle (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   char tbuf[CBUFSIZE], gbuf[CBUFSIZE];
-  char *tptr = cptr;
+  const char *tptr = cptr;
   uint32 newval;
   uint32 set_time = xu->var->throttle_time;
   uint32 set_burst = xu->var->throttle_burst;
@@ -619,12 +619,14 @@ void xu_read_callback(CTLR* xu, int status)
   if (DBG_PCK & xu->dev->dctrl)
       eth_packet_trace_ex(xu->var->etherface, xu->var->read_buffer.msg, xu->var->read_buffer.len, "xu-recvd", DBG_DAT & xu->dev->dctrl, DBG_PCK);
 
+  xu->var->read_buffer.used = 0;  /* none processed yet */
+
   /* process any packets locally that can be */
   status = xu_process_local (xu, &xu->var->read_buffer);
 
   /* add packet to read queue */
   if (status != SCPE_OK)
-    ethq_insert(&xu->var->ReadQ, 2, &xu->var->read_buffer, 0);
+    ethq_insert(&xu->var->ReadQ, ETH_ITM_NORMAL, &xu->var->read_buffer, 0);
 }
 
 void xua_read_callback(int status)
@@ -847,6 +849,12 @@ t_stat xu_reset(DEVICE* dptr)
   CTLR* xu = xu_dev2ctlr(dptr);
 
   sim_debug(DBG_TRC, xu->dev, "xu_reset()\n");
+  /* One time only initializations */
+  if (!xu->var->initialized) {
+    xu->var->initialized = TRUE;
+    /* Set an initial MAC address in the DEC range */
+    xu_setmac (dptr->units, 0, "08:00:2B:00:00:00/24", NULL);
+    }
   /* init read queue (first time only) */
   status = ethq_init (&xu->var->ReadQ, XU_QUE_MAX);
   if (status != SCPE_OK)
@@ -871,7 +879,7 @@ int32 xu_command(CTLR* xu)
   uint16* mac_w = (uint16*) xu->var->mac;
   static const ETH_MAC zeros = {0,0,0,0,0,0};
   static const ETH_MAC mcast_load_server = {0xAB, 0x00, 0x00, 0x01, 0x00, 0x00};
-  static char* command[] = {
+  static const char* command[] = {
       "NO-OP",
       "Start Microaddress",
       "Read Default Physical Address",
@@ -1150,7 +1158,7 @@ int32 xu_command(CTLR* xu)
     case FC_RLSA: /* read load server address */
       if (memcmp(xu->var->load_server, zeros, sizeof(ETH_MAC))) {
         /* not set, use default multicast load address */
-        wstatus = Map_WriteB(xu->var->pcbb + 2, 6, (uint8*) mcast_load_server);
+        wstatus = Map_WriteB(xu->var->pcbb + 2, 6, (const uint8*) mcast_load_server);
       } else {
         /* is set, use load_server */
         wstatus = Map_WriteB(xu->var->pcbb + 2, 6, xu->var->load_server);
@@ -1180,7 +1188,7 @@ int32 xu_command(CTLR* xu)
 void xu_process_receive(CTLR* xu)
 {
   uint32 segb, ba;
-  int slen, wlen, off = 0;
+  int slen, wlen;
   t_stat rstatus, wstatus;
   ETH_ITEM* item = 0;
   int state = xu->var->pcsr1 & PCSR1_STATE;
@@ -1217,12 +1225,18 @@ void xu_process_receive(CTLR* xu)
     if (!(xu->var->rxhdr[2] & RXR_OWN)) {
       /* tell the host there are no more buffers */
       /* xu->var->pcsr0 |= PCSR0_RCBI; */ /* I don't think this is correct 08-dec-2005 dth */
+      sim_debug(DBG_TRC, xu->dev, "Stopping input processing - Not Owned receive descriptor=0x%X, slen=0x%04X(%d), segb=0x%04X, ", ba, slen, slen, segb);
+      sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+      sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 1);
       break;
     }
 
     /* set buffer length and address */
     slen = xu->var->rxhdr[0];
     segb = xu->var->rxhdr[1] + ((xu->var->rxhdr[2] & 3) << 16);
+
+    /* Initially clear status bits which are conditionally set below */
+    xu->var->rxhdr[2] &= ~(RXR_FRAM|RXR_OFLO|RXR_CRC|RXR_STF|RXR_ENF);
 
     /* get first packet from receive queue */
     if (!item) {
@@ -1252,18 +1266,21 @@ void xu_process_receive(CTLR* xu)
     }
 
     /* is this the start of frame? */
-    if (item->packet.used == 0) {
+    if (item->packet.used == 0)
       xu->var->rxhdr[2] |= RXR_STF;
-      off = 0;
-    }
 
     /* figure out chained packet size */
     wlen = item->packet.crc_len - item->packet.used;
     if (wlen > slen)
       wlen = slen;
 
+    sim_debug(DBG_TRC, xu->dev, "Using receive descriptor=0x%X, slen=0x%04X(%d), segb=0x%04X, ", ba, slen, slen, segb);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 0);
+    sim_debug(DBG_TRC, xu->dev, ", pktlen=0x%X(%d), used=0x%X, wlen=0x%X\n", item->packet.len, item->packet.len, item->packet.used, wlen);
+
     /* transfer chained packet to host buffer */
-    wstatus = Map_WriteB (segb, wlen, &item->packet.msg[off]);
+    wstatus = Map_WriteB (segb, wlen, &item->packet.msg[item->packet.used]);
     if (wstatus) {
       /* error during write */
       xu->var->stat |= STAT_ERRS | STAT_MERR | STAT_TMOT | STAT_RRNG;
@@ -1273,34 +1290,35 @@ void xu_process_receive(CTLR* xu)
 
     /* update chained counts */
     item->packet.used += wlen;
-    off += wlen;
 
-    /* Is this the end-of-frame? */
-    if (item->packet.used == item->packet.crc_len) {
+    /*
+     * Fill in the Received Message Length field.
+     * The documenation notes that the DEUNA actually performs
+     * a full CRC check on the data buffer, and adds this CRC
+     * value to the data, in the last 4 bytes.  The question
+     * is: does MLEN include these 4 bytes, or not???  --FvK
+     *
+     * A quick look at the RSX Process Software driver shows
+     * that the CRC byte count(4) is added to MLEN, but does
+     * not show if the DEUNA/DELUA actually transfers the
+     * CRC bytes to the host buffers, since the driver never
+     * tries to use them. However, since the host max buffer
+     * size is only 1514, not 1518, I doubt the CRC is actually
+     * transferred in normal mode. Maybe CRC is transferred
+     * and used in Loopback mode.. -- DTH
+     *
+     * The VMS XEDRIVER indicates that CRC is transferred as
+     * part of the packet, and is included in the MLEN count. -- DTH
+     */
+    xu->var->rxhdr[3] &= ~RXR_MLEN;
+    xu->var->rxhdr[3] |= (uint16)(item->packet.crc_len);
+
+    /* Is this the end-of-frame? OR is buffer chaining disabled? */
+    if ((item->packet.used == item->packet.crc_len) ||
+        (xu->var->mode & MODE_DRDC)) {
       /* mark end-of-frame */
       xu->var->rxhdr[2] |= RXR_ENF;
 
-      /*
-       * Fill in the Received Message Length field.
-       * The documenation notes that the DEUNA actually performs
-       * a full CRC check on the data buffer, and adds this CRC
-       * value to the data, in the last 4 bytes.  The question
-       * is: does MLEN include these 4 bytes, or not???  --FvK
-       *
-       * A quick look at the RSX Process Software driver shows
-       * that the CRC byte count(4) is added to MLEN, but does
-       * not show if the DEUNA/DELUA actually transfers the
-       * CRC bytes to the host buffers, since the driver never
-       * tries to use them. However, since the host max buffer
-       * size is only 1514, not 1518, I doubt the CRC is actually
-       * transferred in normal mode. Maybe CRC is transferred
-       * and used in Loopback mode.. -- DTH
-       *
-       * The VMS XEDRIVER indicates that CRC is transferred as
-       * part of the packet, and is included in the MLEN count. -- DTH
-       */
-      xu->var->rxhdr[3] &= ~RXR_MLEN;
-      xu->var->rxhdr[3] |= (item->packet.crc_len);
       if (xu->var->mode & MODE_DRDC) /* data chaining disabled */
         xu->var->rxhdr[3] |= RXR_NCHN;
 
@@ -1322,6 +1340,10 @@ void xu_process_receive(CTLR* xu)
 
     /* give buffer back to host */
     xu->var->rxhdr[2] &= ~RXR_OWN;              /* clear ownership flag */
+
+    sim_debug(DBG_TRC, xu->dev, "Updating receive descriptor=0x%X, slen=0x%04X, segb=0x%04X, ", ba, slen, segb);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
+    sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 1);
 
     /* update the ring entry in host memory. */
     wstatus = Map_WriteW (ba, 8, xu->var->rxhdr);
@@ -1425,7 +1447,7 @@ void xu_process_transmit(CTLR* xu)
       /* are we in internal loopback mode ? */
       if ((xu->var->mode & MODE_LOOP) && (xu->var->mode & MODE_INTL)) {
         /* just put packet in  receive buffer */
-        ethq_insert (&xu->var->ReadQ, 1, &xu->var->write_buffer, 0);
+        ethq_insert (&xu->var->ReadQ, ETH_ITM_LOOPBACK, &xu->var->write_buffer, 0);
       } else {
         /* transmit packet synchronously - write callback sets status */
         wstatus = eth_write(xu->var->etherface, &xu->var->write_buffer, xu->var->wcallback);
@@ -1495,10 +1517,9 @@ void xu_process_transmit(CTLR* xu)
 
 void xu_port_command (CTLR* xu)
 {
-  char* msg;
   int command = xu->var->pcsr0 & PCSR0_PCMD;
   int state = xu->var->pcsr1 & PCSR1_STATE;
-  static char* commands[] = {
+  static const char* commands[] = {
       "NO-OP",
       "GET PCBB",
       "GET CMD",
@@ -1585,8 +1606,7 @@ void xu_port_command (CTLR* xu)
 
     case CMD_BOOT:      /* BOOT */
       /* not implemented */
-      msg = "%s: BOOT command not implemented!\n";
-      sim_printf (msg, xu->dev->name);
+      sim_printf ("%s: BOOT command not implemented!\n", xu->dev->name);
 
       xu->var->pcsr0 |= PCSR0_PCEI;
       break;
@@ -1720,7 +1740,7 @@ t_stat xu_wr(int32 data, int32 PA, int32 access)
 
 
 /* attach device: */
-t_stat xu_attach(UNIT* uptr, char* cptr)
+t_stat xu_attach(UNIT* uptr, CONST char* cptr)
 {
   t_stat status;
   char* tptr;
@@ -1879,7 +1899,7 @@ void xu_dump_txring (CTLR* xu)
   }
 }
 
-t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "DELUA/DEUNA Unibus Ethernet Controllers (XU, XUB)\n\n");
 fprintf (st, "The simulator implements two DELUA/DEUNA Unibus Ethernet controllers (XU, XUB).\n");
@@ -1889,9 +1909,10 @@ fprint_set_help (st, dptr);
 fprintf (st, "\nConfigured options and controller state can be displayed with:\n\n");
 fprint_show_help (st, dptr);
 fprintf (st, "\nMAC address octets must be delimited by dashes, colons or periods.\n");
-fprintf (st, "The controller defaults to 08-00-2B-CC-DD-EE, which should be sufficient if\n");
-fprintf (st, "there is only one SIMH DEUNA/DELUA controller on your LAN.  Two cards with the\n");
-fprintf (st, "same MAC address will see each other's packets, resulting in a serious mess.\n\n");
+fprintf (st, "The controller defaults to a relatively unique MAC address in the range\n");
+fprintf (st, "08-00-2B-00-00-00 thru 08-00-2B-FF-FF-FF, which should be sufficient\n");
+fprintf (st, "for most network environments.  If desired, the simulated MAC address\n");
+fprintf (st, "can be directly set.\n");
 fprintf (st, "To access the network, the simulated Ethernet controller must be attached to a\n");
 fprintf (st, "real Ethernet interface.\n\n");
 eth_attach_help(st, dptr, uptr, flag, cptr);
@@ -1902,7 +1923,7 @@ fprintf (st, "card, and \"Feel the Power!\" :-)\n");
 return SCPE_OK;
 }
 
-char *xu_description (DEVICE *dptr)
+const char *xu_description (DEVICE *dptr)
 {
 return "DEUNA/DELUA Ethernet controller";
 }

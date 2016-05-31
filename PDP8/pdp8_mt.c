@@ -128,7 +128,7 @@
 
 #define STA_CLR         (FN_RMASK | 00020)              /* always clear */
 #define STA_DYN         (STA_REW | STA_BOT | STA_REM | STA_EOF | \
-						 STA_EOT | STA_WLK)             /* kept in USTAT */
+                         STA_EOT | STA_WLK)             /* kept in USTAT */
 
 extern uint16 M[];
 extern int32 int_req, stop_inst;
@@ -145,18 +145,17 @@ int32 mt_time = 10;                                     /* record latency */
 int32 mt_stopioe = 1;                                   /* stop on error */
 uint8 *mtxb = NULL;                                     /* transfer buffer */
 
-DEVICE mt_dev;
 int32 mt70 (int32 IR, int32 AC);
 int32 mt71 (int32 IR, int32 AC);
 int32 mt72 (int32 IR, int32 AC);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cptr);
+t_stat mt_attach (UNIT *uptr, CONST char *cptr);
 t_stat mt_detach (UNIT *uptr);
 int32 mt_updcsta (UNIT *uptr);
 int32 mt_ixma (int32 xma);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
-t_stat mt_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat mt_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 UNIT *mt_busy (void);
 void mt_set_done (void);
 
@@ -182,20 +181,20 @@ UNIT mt_unit[] = {
     };
 
 REG mt_reg[] = {
-    { ORDATA (CMD, mt_cu, 12) },
-    { ORDATA (FNC, mt_fn, 12) },
-    { ORDATA (CA, mt_ca, 12) },
-    { ORDATA (WC, mt_wc, 12) },
-    { ORDATA (DB, mt_db, 12) },
-    { GRDATA (STA, mt_sta, 8, 12, 12) },
-    { ORDATA (STA2, mt_sta, 6) },
-    { FLDATA (DONE, mt_done, 0) },
-    { FLDATA (INT, int_req, INT_V_MT) },
-    { FLDATA (STOP_IOE, mt_stopioe, 0) },
-    { DRDATA (TIME, mt_time, 24), PV_LEFT },
-    { URDATA (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0) },
-    { URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
-              MT_NUMDR, PV_LEFT | REG_RO) },
+    { ORDATAD (CMD, mt_cu, 12, "command") },
+    { ORDATAD (FNC, mt_fn, 12, "function") },
+    { ORDATAD (CA, mt_ca, 12, "memory address") },
+    { ORDATAD (WC, mt_wc, 12, "word count") },
+    { ORDATAD (DB, mt_db, 12, "data buffer") },
+    { GRDATAD (STA, mt_sta, 8, 12, 12, "status buffer") },
+    { ORDATAD (STA2, mt_sta, 6, "secondary status") },
+    { FLDATAD (DONE, mt_done, 0, "device done flag") },
+    { FLDATAD (INT, int_req, INT_V_MT, "interrupt pending flag") },
+    { FLDATAD (STOP_IOE, mt_stopioe, 0, "stop on I/O error") },
+    { DRDATAD (TIME, mt_time, 24, "record delay"), PV_LEFT },
+    { URDATAD (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0, "unit status, units 0 to 7") },
+    { URDATAD (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
+              MT_NUMDR, PV_LEFT | REG_RO, "position, units 0 to 7") },
     { FLDATA (DEVNUM, mt_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -618,7 +617,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat mt_attach (UNIT *uptr, char *cptr)
+t_stat mt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 int32 u = uptr - mt_dev.units;                          /* get unit number */
@@ -649,7 +648,7 @@ return sim_tape_detach (uptr);
 
 /* Write lock/enable routine */
 
-t_stat mt_vlock (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mt_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 u = uptr - mt_dev.units;                          /* get unit number */
 

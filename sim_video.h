@@ -27,10 +27,14 @@
    11-Jun-2013  MB      First version
 */
 
-#ifndef _SIM_VIDEO_H_
-#define _SIM_VIDEO_H_     0
+#ifndef SIM_VIDEO_H_
+#define SIM_VIDEO_H_     0
 
 #include "sim_defs.h"
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
 
 #define SIM_KEYPRESS_DOWN      0                        /* key states */
 #define SIM_KEYPRESS_UP        1
@@ -154,8 +158,10 @@
 #define SIM_KEY_UNKNOWN        200
 
 struct mouse_event {
-    uint32 x_rel;                                         /* X axis relative motion */
-    uint32 y_rel;                                         /* Y axis relative motion */
+    int32 x_rel;                                          /* X axis relative motion */
+    int32 y_rel;                                          /* Y axis relative motion */
+    int32 x_pos;                                          /* X axis position */
+    int32 y_pos;                                          /* Y axis position */
     t_bool b1_state;                                      /* state of button 1 */
     t_bool b2_state;                                      /* state of button 2 */
     t_bool b3_state;                                      /* state of button 3 */
@@ -169,15 +175,24 @@ struct key_event {
 typedef struct mouse_event SIM_MOUSE_EVENT;
 typedef struct key_event SIM_KEY_EVENT;
 
-t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height);
+t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags);
+#define SIM_VID_INPUTCAPTURED       1                       /* Mouse and Keyboard input captured (calling */
+                                                            /* code responsible for cursor display in video) */
+typedef void (*VID_QUIT_CALLBACK)(void);
+t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback);
 t_stat vid_close (void);
 t_stat vid_poll_kb (SIM_KEY_EVENT *ev);
 t_stat vid_poll_mouse (SIM_MOUSE_EVENT *ev);
 void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf);
+void vid_beep (void);
 void vid_refresh (void);
 const char *vid_version (void);
-t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat vid_set_cursor (t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask, uint32 hot_x, uint32 hot_y);
+t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, CONST char* desc);
+t_stat vid_screenshot (const char *filename);
 
 extern t_bool vid_active;
 extern uint32 vid_mono_palette[2];
@@ -186,9 +201,19 @@ extern int32 vid_mouse_yrel;                            /* mouse cumulative y re
 extern t_bool vid_mouse_b1;                             /* mouse button 1 state */
 extern t_bool vid_mouse_b2;                             /* mouse button 2 state */
 extern t_bool vid_mouse_b3;                             /* mouse button 3 state */
+void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set by calling code) */
 
 #define SIM_VID_DBG_MOUSE   0x01000000
-#define SIM_VID_DBG_KEY     0x02000000
-#define SIM_VID_DBG_VIDEO   0x04000000
+#define SIM_VID_DBG_CURSOR  0x02000000
+#define SIM_VID_DBG_KEY     0x04000000
+#define SIM_VID_DBG_VIDEO   0x08000000
+
+#ifdef  __cplusplus
+}
+#endif
+
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+#include <SDL.h>
+#endif /* HAVE_LIBSDL */
 
 #endif

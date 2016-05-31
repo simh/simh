@@ -47,9 +47,8 @@
       seen by the simulated cpu since there are no minimum response times.
 
   Known Bugs or Unsupported features, in priority order:
-    1) PDP11 bootstrap
-    2) MOP functionality not implemented
-    3) Local packet processing not implemented
+    1) MOP functionality not implemented
+    2) Local packet processing not implemented
 
   Regression Tests:
     VAX:    1. Console SHOW DEVICE
@@ -202,9 +201,9 @@
   05-Dec-02  MP   Restructured the flow of processing in xq_svc so that eth_read
                   is called repeatedly until either a packet isn't found or
                   there is no room for another one in the queue.  Once that has
-                  been done, xq_process_rdbl is called to pass the queued packets
+                  been done, xq_process_rbdl is called to pass the queued packets
                   into the simulated system as space is available there.
-                  xq_process_rdbl is also called at the beginning of xq_svc to
+                  xq_process_rbdl is also called at the beginning of xq_svc to
                   drain the queue into the simulated system, making more room
                   available in the queue.  No processing is done at all in
                   xq_svc if the receiver is disabled.
@@ -261,25 +260,27 @@ t_stat xq_rd(int32* data, int32 PA, int32 access);
 t_stat xq_wr(int32  data, int32 PA, int32 access);
 t_stat xq_svc(UNIT * uptr);
 t_stat xq_tmrsvc(UNIT * uptr);
+t_stat xq_startsvc(UNIT * uptr);
+t_stat xq_receivesvc(UNIT * uptr);
 t_stat xq_reset (DEVICE * dptr);
-t_stat xq_attach (UNIT * uptr, char * cptr);
+t_stat xq_attach (UNIT * uptr, CONST char * cptr);
 t_stat xq_detach (UNIT * uptr);
-t_stat xq_showmac (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_setmac  (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_stats  (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat xq_set_poll (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat xq_showmac (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_setmac  (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_stats  (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_type (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_sanity (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_throttle (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_lockmode (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+t_stat xq_set_poll (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 t_stat xq_process_xbdl(CTLR* xq);
 t_stat xq_dispatch_xbdl(CTLR* xq);
 t_stat xq_process_turbo_rbdl(CTLR* xq);
@@ -302,8 +303,8 @@ int32 xq_int (void);
 void xq_csr_set_clr(CTLR* xq, uint16 set_bits, uint16 clear_bits);
 void xq_show_debug_bdl(CTLR* xq, uint32 bdl_ba);
 t_stat xq_boot (int32 unitno, DEVICE *dptr);
-t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *xq_description (DEVICE *dptr);
+t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *xq_description (DEVICE *dptr);
 
 struct xq_device    xqa = {
   xqa_read_callback,                        /* read callback routine */
@@ -317,7 +318,8 @@ struct xq_device    xqa = {
   0,                                        /* DEQNA-Lock mode */
   ETH_THROT_DEFAULT_TIME,                   /* ms throttle window */
   ETH_THROT_DEFAULT_BURST,                  /* packet packet burst in throttle window */
-  ETH_THROT_DISABLED_DELAY                  /* throttle disabled */
+  ETH_THROT_DISABLED_DELAY,                 /* throttle disabled */
+  XQ_STARTUP_DELAY                          /* instructions to delay when starting the receiver */
   };
 
 struct xq_device    xqb = {
@@ -332,7 +334,8 @@ struct xq_device    xqb = {
   0,                                        /* DEQNA-Lock mode */
   ETH_THROT_DEFAULT_TIME,                   /* ms throttle window */
   ETH_THROT_DEFAULT_BURST,                  /* packet packet burst in throttle window */
-  ETH_THROT_DISABLED_DELAY                  /* throttle disabled */
+  ETH_THROT_DISABLED_DELAY,                 /* throttle disabled */
+  XQ_STARTUP_DELAY                          /* instructions to delay when starting the receiver */
   };
 
 /* SIMH device structures */
@@ -343,8 +346,10 @@ DIB xqa_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
                 1, IVCL (XQ), 0, { &xq_int }, IOLN_XQ };
 
 UNIT xqa_unit[] = {
- { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
+ { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE, 2047) },  /* receive timer */
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
+ { UDATA (&xq_startsvc, UNIT_DIS, 0) },
+ { UDATA (&xq_receivesvc, UNIT_DIS, 0) },
 };
 
 BITFIELD xq_csr_bits[] = {
@@ -414,6 +419,7 @@ REG xqa_reg[] = {
   { GRDATA ( THR_TIME, xqa.throttle_time, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( THR_BURST, xqa.throttle_burst, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( THR_DELAY, xqa.throttle_delay, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATAD ( START_DELAY, xqa.startup_delay,  XQ_RDX, 32, 0, "instruction delay before receiver starts"), REG_FIT },
   { NULL },
 };
 
@@ -421,8 +427,10 @@ DIB xqb_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
                 1, IVCL (XQ), 0, { &xq_int }, IOLN_XQ };
 
 UNIT xqb_unit[] = {
- { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
+ { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE, 2047) },  /* receive timer */
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
+ { UDATA (&xq_startsvc, UNIT_DIS, 0) },
+ { UDATA (&xq_receivesvc, UNIT_DIS, 0) },
 };
 
 REG xqb_reg[] = {
@@ -474,6 +482,7 @@ REG xqb_reg[] = {
   { GRDATA ( THR_TIME, xqb.throttle_time, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( THR_BURST, xqb.throttle_burst, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( THR_DELAY, xqb.throttle_delay, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATAD ( START_DELAY, xqb.startup_delay,  XQ_RDX, 32, 0, "instruction delay before receiver starts"), REG_FIT },
   { NULL },
 };
 
@@ -482,7 +491,7 @@ MTAB xq_mod[] = {
     NULL, &show_addr, NULL, "Qbus address" },
   { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
     NULL, &show_vec, NULL,  "Interrupt vector" },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xq_setmac, &xq_showmac, NULL, "MAC address" },
   { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "ETH", NULL,
     NULL, &eth_show, NULL, "Display attachable devices" },
@@ -515,6 +524,8 @@ DEBTAB xq_debug[] = {
   {"CSR",    DBG_CSR,   "watch CSR"},
   {"VAR",    DBG_VAR,   "watch VAR"},
   {"WARN",   DBG_WRN,   "display warnings"},
+  {"RBDL",   DBG_RBL,   "display RBDL warnings"},
+  {"XBDL",   DBG_XBL,   "display XBDL warnings"},
   {"SETUP",  DBG_SET,   "display setup info"},
   {"SANITY", DBG_SAN,   "display sanity timer info"},
   {"REG",    DBG_REG,   "trace read/write registers"},
@@ -526,7 +537,7 @@ DEBTAB xq_debug[] = {
 
 DEVICE xq_dev = {
   "XQ", xqa_unit, xqa_reg, xq_mod,
-  2, XQ_RDX, 11, 1, XQ_RDX, 16,
+  4, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
@@ -536,7 +547,7 @@ DEVICE xq_dev = {
 
 DEVICE xqb_dev = {
   "XQB", xqb_unit, xqb_reg, xq_mod,
-  2, XQ_RDX, 11, 1, XQ_RDX, 16,
+  4, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
@@ -610,7 +621,6 @@ CTLR* xq_pa2ctlr(uint32 PA)
 t_stat xq_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw)
 {
   /* on PDP-11, allow EX command to look at bootrom */
-#ifdef VM_PDP11
   CTLR* xq = xq_unit2ctlr(uptr);
   uint16 *bootrom = NULL;
 
@@ -627,9 +637,6 @@ t_stat xq_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw)
   else
     *vptr = 0;
   return SCPE_OK;
-#else
-  return SCPE_NOFNC;
-#endif
 }
 
 /* stop simh from writing non-existant unit data stream */
@@ -638,7 +645,7 @@ t_stat xq_dep (t_value val, t_addr addr, UNIT* uptr, int32 sw)
   return SCPE_NOFNC;
 }
 
-t_stat xq_showmac (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_showmac (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char  buffer[20];
@@ -671,14 +678,14 @@ void xq_make_checksum(CTLR* xq)
   xq->var->mac_checksum[1] = (uint8)(checksum >> 8);
 }
 
-t_stat xq_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_setmac (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   t_stat status;
   CTLR* xq = xq_unit2ctlr(uptr);
 
   if (!cptr) return SCPE_IERR;
   if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-  status = eth_mac_scan(&xq->var->mac, cptr);
+  status = eth_mac_scan_ex(&xq->var->mac, cptr, uptr);
   if (status != SCPE_OK)
     return status;
 
@@ -687,7 +694,7 @@ t_stat xq_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_stats (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   /* this sets all ints in the stats structure to the integer passed */
   CTLR* xq = xq_unit2ctlr(uptr);
@@ -707,9 +714,9 @@ t_stat xq_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
-  char* fmt = "  %-15s%d\n";
+  const char* fmt = "  %-15s%d\n";
   CTLR* xq = xq_unit2ctlr(uptr);
 
   fprintf(st, "XQ Ethernet statistics:\n");
@@ -722,13 +729,14 @@ t_stat xq_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
   fprintf(st, fmt, "SW Reset:",    xq->var->stats.reset);
   fprintf(st, fmt, "Setup:",       xq->var->stats.setup);
   fprintf(st, fmt, "Loopback:",    xq->var->stats.loop);
+  fprintf(st, fmt, "Recv Overrun:",xq->var->stats.recv_overrun);
   fprintf(st, fmt, "ReadQ count:", xq->var->ReadQ.count);
   fprintf(st, fmt, "ReadQ high:",  xq->var->ReadQ.high);
   eth_show_dev(st, xq->var->etherface);
   return SCPE_OK;
 }
 
-t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char  buffer[20];
@@ -759,7 +767,7 @@ t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   fprintf(st, "type=");
@@ -779,7 +787,7 @@ t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_type (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -797,7 +805,7 @@ t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (xq->var->poll)
@@ -810,7 +818,7 @@ t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_poll (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_poll (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -843,29 +851,29 @@ t_stat xq_set_poll (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
-  fprintf(st, "sanity=%s", (xq->var->sanity.enabled == 2) ? "ON" : "OFF");
+  fprintf(st, "sanity=%s", (xq->var->sanity.enabled & XQ_SAN_HW_SW) ? "ON" : "OFF");
   return SCPE_OK;
 }
 
-t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_sanity (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
   if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
 
   /* this assumes that the parameter has already been upcased */
-  if      (!strcmp(cptr, "ON"))  xq->var->sanity.enabled = 2;
+  if      (!strcmp(cptr, "ON"))  xq->var->sanity.enabled = XQ_SAN_HW_SW;
   else if (!strcmp(cptr, "OFF")) xq->var->sanity.enabled = 0;
   else return SCPE_ARG;
 
   return SCPE_OK;
 }
 
-t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
@@ -876,11 +884,11 @@ t_stat xq_show_throttle (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_throttle (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char tbuf[CBUFSIZE], gbuf[CBUFSIZE];
-  char *tptr = cptr;
+  const char *tptr = cptr;
   uint32 newval;
   uint32 set_time = xq->var->throttle_time;
   uint32 set_burst = xq->var->throttle_burst;
@@ -937,7 +945,7 @@ t_stat xq_set_throttle (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
@@ -946,7 +954,7 @@ t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat xq_set_lockmode (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   if (!cptr) return SCPE_IERR;
@@ -962,7 +970,7 @@ t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
-t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
@@ -1088,50 +1096,66 @@ t_stat xq_process_rbdl(CTLR* xq)
 {
   int32 rstatus, wstatus;
   uint16 b_length, w_length, rbl;
-  uint32 address;
+  uint32 address, start_rbdl_ba;
+  int dcount;
   ETH_ITEM* item;
   uint8* rbuf;
 
   if (xq->var->mode == XQ_T_DELQA_PLUS)
     return xq_process_turbo_rbdl(xq);
 
-  sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl\n");
+  sim_debug(DBG_TRC, xq->dev, "xq_process_rbdl\n");
 
   if (xq->var->csr & XQ_CSR_RL)
       return SCPE_OK;
 
+  start_rbdl_ba = xq->var->rbdl_ba;
+  dcount = 0;
+
   /* process buffer descriptors */
   while(1) {
 
-    /* DEQNA stops processing if nothing in read queue while loading boot code */
-    if ((xq->var->type == XQ_T_DEQNA) && (!xq->var->ReadQ.count) && (xq->var->csr & XQ_CSR_BD)) break;
+    /* get receive bdl flags and descriptor bits from memory */
+    rstatus = Map_ReadW (xq->var->rbdl_ba,     4, &xq->var->rbdl_buf[0]);
+    if (rstatus) return xq_nxm_error(xq);
+    
+    /* DEQNA stops processing if nothing in read queue */
+    if ((xq->var->type == XQ_T_DEQNA) && (!xq->var->ReadQ.count)) break;
 
-    /* get receive bdl from memory */
+    /* if all descriptors have been processed, avoid overrun and stop now */
+    /* this only happens if the receive descriptors are setup in a circular loop */
+    if (dcount && (xq->var->rbdl_ba == start_rbdl_ba)) {
+      ++xq->var->stats.recv_overrun;
+      sim_debug(DBG_RBL, xq->dev, "RBDL Processed all %d descriptors, avoiding overrun\n", dcount);
+      break;
+      }
+    ++dcount;
+
+    /* set descriptor processed flag */
     xq->var->rbdl_buf[0] = 0xFFFF;
     wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
-    rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
-    if (rstatus || wstatus) return xq_nxm_error(xq);
-
-    /* DEQNA stops normal processing if nothing in read queue */
-    if ((xq->var->type == XQ_T_DEQNA) && (!xq->var->ReadQ.count)) break;
+    if (wstatus) return xq_nxm_error(xq);
 
     /* invalid buffer? */
     if (~xq->var->rbdl_buf[1] & XQ_DSC_V) {
       xq_csr_set_clr(xq, XQ_CSR_RL, 0);
       return SCPE_OK;
-    }
-
-    /* DELQA stops processing if nothing in read queue */
-    if (!xq->var->ReadQ.count) break;
+      }
 
     /* explicit chain buffer? */
     if (xq->var->rbdl_buf[1] & XQ_DSC_C) {
+      /* get low part of chain address */
+      rstatus = Map_ReadW (xq->var->rbdl_ba + 4, 2, &xq->var->rbdl_buf[2]);
+      if (rstatus) return xq_nxm_error(xq);
       xq->var->rbdl_ba = ((xq->var->rbdl_buf[1] & 0x3F) << 16) | xq->var->rbdl_buf[2];
       continue;
-    }
+      }
 
-    /* get status words */
-    rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
+    /* stop if nothing in read queue */
+    if (!xq->var->ReadQ.count) break;
+
+    /* get address, length and status words */
+    rstatus = Map_ReadW(xq->var->rbdl_ba + 4, 8, &xq->var->rbdl_buf[2]);
     if (rstatus) return xq_nxm_error(xq);
 
     /* get host memory address */
@@ -1143,8 +1167,18 @@ t_stat xq_process_rbdl(CTLR* xq)
     if (xq->var->rbdl_buf[1] & XQ_DSC_H) {
       b_length -= 1;
       address += 1;
-    }
+      }
     if (xq->var->rbdl_buf[1] & XQ_DSC_L) b_length -= 1;
+
+    sim_debug(DBG_TRC, xq->dev, "Using receive descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n", 
+                                              xq->var->rbdl_ba, xq->var->rbdl_buf[0], xq->var->rbdl_buf[1] & 0xFFC0, address, b_length, xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
+
+    /* Examine the descriptor to try and determine if any prior contents haven't been 'digested' yet */
+    if (((xq->var->rbdl_buf[4] & 0xC000) != 0x8000) ||
+        ((xq->var->rbdl_buf[5] & 0xFF) == (((xq->var->rbdl_buf[5] >> 8) & 0xFF)))) {
+      sim_debug(DBG_TRC, xq->dev, "Undigested receive descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n", 
+                                  xq->var->rbdl_ba, xq->var->rbdl_buf[0], xq->var->rbdl_buf[1] & 0xFFC0, address, b_length, xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
+      }
 
     item = &xq->var->ReadQ.item[xq->var->ReadQ.head];
     rbl = (uint16)item->packet.len;
@@ -1157,31 +1191,31 @@ t_stat xq_process_rbdl(CTLR* xq)
       uint16 used = (uint16)item->packet.used;
       rbl -= used;
       rbuf = &rbuf[used];
-    } else {
+      } else {
       /* there should be no need to adjust runt packets 
          the physical layer (sim_ether) won't deliver any short packets 
          via eth_read, so the only short packets which get here are loopback
          packets sent by the host diagnostics (OR short setup packets) */
-      if ((item->type == 2) && (rbl < ETH_MIN_PACKET)) {
+      if ((item->type == ETH_ITM_NORMAL) && (rbl < ETH_MIN_PACKET)) {
         xq->var->stats.runt += 1;
-        sim_debug(DBG_WRN, xq->dev, "Runt detected, size = %d\n", rbl);
+        sim_debug(DBG_RBL, xq->dev, "Runt detected, size = %d\n", rbl);
         /* pad runts with zeros up to minimum size - this allows "legal" (size - 60)
            processing of those weird short ARP packets that seem to occur occasionally */
         memset(&item->packet.msg[rbl], 0, ETH_MIN_PACKET-rbl);
         rbl = ETH_MIN_PACKET;
-      };
+        }
 
       /* adjust oversized non-loopback packets */
-      if ((item->type != 1) && (rbl > ETH_FRAME_SIZE)) {
+      if ((item->type != ETH_ITM_LOOPBACK) && (rbl > ETH_FRAME_SIZE)) {
         xq->var->stats.giant += 1;
-        sim_debug(DBG_WRN, xq->dev, "Giant detected, size=%d\n", rbl);
+        sim_debug(DBG_RBL, xq->dev, "Giant detected, size=%d\n", rbl);
         /* trim giants down to maximum size - no documentation on how to handle the data loss */
         if (rbl > XQ_MAX_RCV_PACKET) {
           item->packet.len = XQ_MAX_RCV_PACKET;
           rbl = XQ_MAX_RCV_PACKET;
           }
-      };
-    };
+        }
+      }
 
     /* make sure entire packet fits in buffer - if not, will need to split into multiple buffers */
     if (rbl > b_length)
@@ -1197,7 +1231,7 @@ t_stat xq_process_rbdl(CTLR* xq)
 
     xq->var->rbdl_buf[4] = 0;
     switch (item->type) {
-      case 0: /* setup packet */
+      case ETH_ITM_SETUP: /* setup packet */
         xq->var->stats.setup += 1;
         xq->var->rbdl_buf[4] = 0x2700;      /* set esetup and RBL 10:8 */
         if (xq->var->type == XQ_T_DEQNA) {  /* Strange DEQNA behavior */
@@ -1206,10 +1240,10 @@ t_stat xq_process_rbdl(CTLR* xq)
           if (b_length <= rbl + 2) {
             wstatus = Map_WriteW(address + rbl, 2, &qdtc_chip_extra);
             if (wstatus) return xq_nxm_error(xq);
+            }
           }
-        }
         break;
-      case 1: /* loopback packet */
+      case ETH_ITM_LOOPBACK: /* loopback packet */
         xq->var->stats.loop += 1;
         xq->var->rbdl_buf[4] = XQ_RST_LASTNOERR;
         if (xq->var->type == XQ_T_DEQNA)
@@ -1220,24 +1254,24 @@ t_stat xq_process_rbdl(CTLR* xq)
         if (xq->var->csr & XQ_CSR_EL)
             xq->var->rbdl_buf[4] |= XQ_RST_ESETUP;/* loopback flag */
         break;
-      case 2: /* normal packet */
+      case ETH_ITM_NORMAL: /* normal packet */
         rbl -= 60;    /* keeps max packet size in 11 bits */
         xq->var->rbdl_buf[4] = (rbl & 0x0700); /* high bits of rbl */
         xq->var->rbdl_buf[4] |= 0x00f8;        /* set reserved bits to 1 */
         break;
-    }
+      }
     if (item->packet.used < item->packet.len)
       xq->var->rbdl_buf[4] |= XQ_RST_LASTNOT;   /* not last segment */
     xq->var->rbdl_buf[5] = ((rbl & 0x00FF) << 8) | (rbl & 0x00FF);
     if (xq->var->ReadQ.loss) {
-      sim_debug(DBG_WRN, xq->dev, "ReadQ overflow!\n");
+      sim_debug(DBG_RBL, xq->dev, "ReadQ overflow!\n");
       xq->var->rbdl_buf[4] |= XQ_RST_OVERFLOW;  /* set overflow bit */
       xq->var->stats.dropped += xq->var->ReadQ.loss;
       xq->var->ReadQ.loss = 0;                  /* reset loss counter */
       }
     if (((~xq->var->csr & XQ_CSR_EL) &&
-         ((rbl + ((item->type == 2) ? 60 : 0)) > ETH_MAX_PACKET)) ||
-        ((xq->var->csr & XQ_CSR_EL) && (item->type == 1) && 
+         (((uint16)((rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0)))) > ETH_MAX_PACKET)) ||
+        ((xq->var->csr & XQ_CSR_EL) && (item->type == ETH_ITM_LOOPBACK) && 
          (rbl >= XQ_LONG_PACKET)))
       xq->var->rbdl_buf[4] |= XQ_RST_LASTERR;   /* set Error bit (LONG) */
 
@@ -1245,7 +1279,8 @@ t_stat xq_process_rbdl(CTLR* xq)
     wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
     if (wstatus) return xq_nxm_error(xq);
 
-    sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", xq->var->rbdl_ba, address, b_length, rbl + ((item->type == 2) ? 60 : 0), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
+    sim_debug(DBG_TRC, xq->dev, "xq_process_rbdl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", 
+        xq->var->rbdl_ba, address, b_length, (int)((uint16)(rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0))), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
 
     /* remove packet from queue */
     if (item->packet.used >= item->packet.len) {
@@ -1253,7 +1288,7 @@ t_stat xq_process_rbdl(CTLR* xq)
 
       /* signal reception complete */
       xq_csr_set_clr(xq, XQ_CSR_RI, 0);
-      }
+     }
 
     /* set to next bdl (implicit chain) */
     xq->var->rbdl_ba += 12;
@@ -1406,11 +1441,11 @@ t_stat xq_process_setup(CTLR* xq)
   }
 
   /* finalize sanity timer state */
-  if (xq->var->sanity.enabled != 2) {
+  if (xq->var->sanity.enabled & XQ_SAN_HW_SW) {
     if (xq->var->csr & XQ_CSR_SE)
-      xq->var->sanity.enabled = 1;
+      xq->var->sanity.enabled |= XQ_SAN_ENABLE;
     else
-      xq->var->sanity.enabled = 0;
+      xq->var->sanity.enabled &= ~XQ_SAN_ENABLE;
   }
   xq_reset_santmr(xq);
 
@@ -1476,14 +1511,14 @@ t_stat xq_process_xbdl(CTLR* xq)
     /* explicit chain buffer? */
     if (xq->var->xbdl_buf[1] & XQ_DSC_C) {
       xq->var->xbdl_ba = address;
-      sim_debug(DBG_WRN, xq->dev, "XBDL chaining to buffer descriptor at: 0x%X\n", address);
+      sim_debug(DBG_XBL, xq->dev, "Chaining to buffer descriptor at: 0x%X\n", address);
       continue;
     }
 
     /* invalid buffer? */
     if (~xq->var->xbdl_buf[1] & XQ_DSC_V) {
       xq_csr_set_clr(xq, XQ_CSR_XL, 0);
-      sim_debug(DBG_WRN, xq->dev, "XBDL List empty\n");
+      sim_debug(DBG_XBL, xq->dev, "List empty\n");
       return SCPE_OK;
     }
 
@@ -1498,7 +1533,7 @@ t_stat xq_process_xbdl(CTLR* xq)
 
     /* add to transmit buffer, making sure it's not too big */
     if ((xq->var->write_buffer.len + b_length) > sizeof(xq->var->write_buffer.msg)) {
-      xq->var->write_buffer.oversize = realloc (xq->var->write_buffer.oversize, xq->var->write_buffer.len + b_length);
+      xq->var->write_buffer.oversize = (uint8*)realloc (xq->var->write_buffer.oversize, xq->var->write_buffer.len + b_length);
       if (xq->var->write_buffer.len <= sizeof(xq->var->write_buffer.msg))
         memcpy (xq->var->write_buffer.oversize, xq->var->write_buffer.msg, xq->var->write_buffer.len);
       }
@@ -1513,13 +1548,19 @@ t_stat xq_process_xbdl(CTLR* xq)
         if (xq->var->xbdl_buf[1] & XQ_DSC_S) { /* setup packet */
           status = xq_process_setup(xq);
           ethq_insert (&xq->var->ReadQ, 0, &xq->var->write_buffer, status);/* put packet in read buffer */
+          write_success[0] = 0x200C;    /* DELQA Setup Packet Transmit Status Word 1 */
+          write_success[1] = 0x0860;    /* DELQA Setup Packet Transmit Status Word 2 */
         } else { /* loopback */
+          if ((DBG_PCK & xq->dev->dctrl) && xq->var->etherface) {
+            static const char *loopback_modes[] = {"xq-write-loopback-Internal", "", "xq-write-loopback-Internal Extended", "xq-write-loopback-External"};
+            eth_packet_trace_ex(xq->var->etherface, xq->var->write_buffer.msg, xq->var->write_buffer.len, loopback_modes[(xq->var->csr >> 8) & 3], DBG_DAT & xq->dev->dctrl, DBG_PCK);
+            }
           if (((~xq->var->csr & XQ_CSR_RL) &&        /* If a buffer descriptor list is good */
                (xq->var->rbdl_buf[1] & XQ_DSC_V)) || /* AND the descriptor is valid */
               (xq->var->csr & XQ_CSR_EL))            /* OR External Loopback */
             ethq_insert (&xq->var->ReadQ, 1, &xq->var->write_buffer, 0);
-          if ((DBG_PCK & xq->dev->dctrl) && xq->var->etherface)
-            eth_packet_trace_ex(xq->var->etherface, xq->var->write_buffer.msg, xq->var->write_buffer.len, "xq-write-loopback", DBG_DAT & xq->dev->dctrl, DBG_PCK);
+          else
+            sim_debug(DBG_XBL, xq->dev, "Dropping Loopback packet: No Receive Buffer\n");
           write_success[0] |= XQ_XMT_FAIL;
         }
 
@@ -1538,9 +1579,9 @@ t_stat xq_process_xbdl(CTLR* xq)
         /* signal transmission complete */
         xq_csr_set_clr(xq, XQ_CSR_XI, 0);
 
-        /* now trigger "read" of setup or loopback packet */
+        /* now schedule "reading" of setup or loopback packet */
         if (~xq->var->csr & XQ_CSR_RL)
-          status = xq_process_rbdl(xq);
+          sim_activate_after_abs(xq->unit+3, 400);  /* 400usecs on real hardware */
 
       } else { /* not loopback */
 
@@ -1551,15 +1592,15 @@ t_stat xq_process_xbdl(CTLR* xq)
           if (xq->var->coalesce_latency == 0)
             xq_svc(&xq->unit[0]);        /* service any received data */
       }
-        sim_debug(DBG_WRN, xq->dev, "XBDL completed processing write\n");
+        sim_debug(DBG_XBL, xq->dev, "completed processing write\n");
 
       } /* loopback/non-loopback */
 
     } else { /* not at end-of-message */
 
-      sim_debug(DBG_WRN, xq->dev, "XBDL implicitly chaining to buffer descriptor at: 0x%X\n", xq->var->xbdl_ba+12);
+      sim_debug(DBG_XBL, xq->dev, "implicitly chaining to buffer descriptor at: 0x%X\n", xq->var->xbdl_ba+12);
       /* update bdl status words */
-      wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, (uint16*) implicit_chain_status);
+      wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, implicit_chain_status);
       if(wstatus) return xq_nxm_error(xq);
     }
 
@@ -1627,17 +1668,10 @@ void xq_show_debug_bdl(CTLR* xq, uint32 bdl_ba)
 
 t_stat xq_dispatch_rbdl(CTLR* xq)
 {
-  int i;
-  int32 rstatus, wstatus;
-
   sim_debug(DBG_TRC, xq->dev, "xq_dispatch_rbdl()\n");
 
   /* mark receive bdl valid */
   xq_csr_set_clr(xq, 0, XQ_CSR_RL);
-
-  /* init receive bdl buffer */
-  for (i=0; i<6; i++)
-    xq->var->rbdl_buf[i] = 0;
 
   /* get address of first receive buffer */
   xq->var->rbdl_ba = ((xq->var->rbdl[1] & 0x3F) << 16) | (xq->var->rbdl[0] & ~01);
@@ -1645,17 +1679,9 @@ t_stat xq_dispatch_rbdl(CTLR* xq)
   /* When debugging, walk and display the buffer descriptor list */
   xq_show_debug_bdl(xq, xq->var->rbdl_ba);
 
-  /* get first receive buffer */
-  xq->var->rbdl_buf[0] = 0xFFFF;
-  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
-  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
-  if (rstatus || wstatus) return xq_nxm_error(xq);
-
-  /* is buffer valid? */
-  if (~xq->var->rbdl_buf[1] & XQ_DSC_V) {
-    xq_csr_set_clr(xq, XQ_CSR_RL, 0);
-    return SCPE_OK;
-    }
+  /* get receive bdl flags and descriptor bits from memory */
+  if (Map_ReadW (xq->var->rbdl_ba,     4, &xq->var->rbdl_buf[0]))
+    return xq_nxm_error(xq);
 
   /* process any waiting packets in receive queue */
   if (xq->var->ReadQ.count)
@@ -1748,9 +1774,9 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       rbuf = &item->packet.msg[used];
     } else {
       /* adjust non loopback runt packets */
-      if ((item->type != 1) && (rbl < ETH_MIN_PACKET)) {
+      if ((item->type != ETH_ITM_LOOPBACK) && (rbl < ETH_MIN_PACKET)) {
         xq->var->stats.runt += 1;
-        sim_debug(DBG_WRN, xq->dev, "Runt detected, size = %d\n", rbl);
+        sim_debug(DBG_RBL, xq->dev, "Runt detected, size = %d\n", rbl);
         /* pad runts with zeros up to minimum size - this allows "legal" (size - 60)
            processing of those weird short ARP packets that seem to occur occasionally */
         memset(&item->packet.msg[rbl], 0, ETH_MIN_PACKET-rbl);
@@ -1758,9 +1784,9 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       };
 
       /* adjust oversized non-loopback packets */
-      if ((item->type != 1) && (rbl > ETH_FRAME_SIZE)) {
+      if ((item->type != ETH_ITM_LOOPBACK) && (rbl > ETH_FRAME_SIZE)) {
         xq->var->stats.giant += 1;
-        sim_debug(DBG_WRN, xq->dev, "Giant detected, size=%d\n", rbl);
+        sim_debug(DBG_RBL, xq->dev, "Giant detected, size=%d\n", rbl);
         /* trim giants down to maximum size - no documentation on how to handle the data loss */
         item->packet.len = ETH_MAX_PACKET;
         rbl = ETH_FRAME_SIZE;
@@ -1789,7 +1815,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
     
     if (xq->var->ReadQ.loss) {
       xq->var->rring[i].rmd2 |= XQ_RMD2_MIS; 
-      sim_debug(DBG_WRN, xq->dev, "ReadQ overflow!\n");
+      sim_debug(DBG_RBL, xq->dev, "ReadQ overflow!\n");
       xq->var->stats.dropped += xq->var->ReadQ.loss;
       xq->var->ReadQ.loss = 0;          /* reset loss counter */
     }
@@ -1813,7 +1839,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
   } while (0 == (xq->var->rring[xq->var->rbindx].rmd3 & XQ_RMD3_OWN));
 
   if (xq->var->rring[xq->var->rbindx].rmd3 & XQ_RMD3_OWN) {
-      sim_debug(DBG_WRN, xq->dev, "xq_process_turbo_rbdl() - receive ring full\n");
+      sim_debug(DBG_RBL, xq->dev, "xq_process_turbo_rbdl() - receive ring full\n");
   }
 
   if (descriptors_consumed)
@@ -1864,7 +1890,7 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
 
     /* add to transmit buffer, accomodating it if it is too big */
     if ((xq->var->write_buffer.len + b_length) > sizeof(xq->var->write_buffer.msg)) {
-      xq->var->write_buffer.oversize = realloc (xq->var->write_buffer.oversize, xq->var->write_buffer.len + b_length);
+      xq->var->write_buffer.oversize = (uint8*)realloc (xq->var->write_buffer.oversize, xq->var->write_buffer.len + b_length);
       if (xq->var->write_buffer.len <= sizeof(xq->var->write_buffer.msg))
         memcpy (xq->var->write_buffer.oversize, xq->var->write_buffer.msg, xq->var->write_buffer.len);
       }
@@ -1900,7 +1926,7 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
         xq->var->xring[i].tmd0 = 0;
         xq->var->xring[i].tmd1 = (uint16)(100 + xq->var->write_buffer.len * 8); /* arbitrary value */
       }
-      sim_debug(DBG_WRN, xq->dev, "XBDL completed processing write\n");
+      sim_debug(DBG_XBL, xq->dev, "completed processing write\n");
       /* clear transmit buffer */
       xq->var->write_buffer.len = 0;
       xq->var->xring[i].tmd2 = XQ_TMD2_RON | XQ_TMD2_TON;
@@ -1937,7 +1963,7 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
        and finding nothing to do.  We ignore this and the next write the ARQR will
        properly cause the packet transmission.
      */
-    sim_debug(DBG_WRN, xq->dev, "xq_process_turbo_xbdl() - Nothing to Transmit\n");
+    sim_debug(DBG_XBL, xq->dev, "xq_process_turbo_xbdl() - Nothing to Transmit\n");
   }
 
   return status;
@@ -2062,8 +2088,9 @@ void xq_read_callback(CTLR* xq, int status)
   if (DBG_PCK & xq->dev->dctrl)
     eth_packet_trace_ex(xq->var->etherface, xq->var->read_buffer.msg, xq->var->read_buffer.len, "xq-recvd", DBG_DAT & xq->dev->dctrl, DBG_PCK);
 
-  if ((xq->var->csr & XQ_CSR_RE) || (xq->var->mode == XQ_T_DELQA_PLUS)) { /* receiver enabled */
+  xq->var->read_buffer.used = 0;  /* none processed yet */
 
+  if ((xq->var->csr & XQ_CSR_RE) || (xq->var->mode == XQ_T_DELQA_PLUS)) { /* receiver enabled */
     /* process any packets locally that can be */
     t_stat status = xq_process_local (xq, &xq->var->read_buffer);
 
@@ -2088,17 +2115,23 @@ void xqb_read_callback(int status)
 
 void xq_sw_reset(CTLR* xq)
 {
-  const uint16 set_bits = XQ_CSR_XL | XQ_CSR_RL;
+  uint16 set_bits = XQ_CSR_XL | XQ_CSR_RL;
   int i;
 
   sim_debug(DBG_TRC, xq->dev, "xq_sw_reset()\n");
   ++xq->var->stats.reset;
 
-  /* Return DELQA-T to DELQA Normal mode */
-  if (xq->var->type == XQ_T_DELQA_PLUS) {
+  /* Return DELQA-T in DELQA-T mode to DELQA Normal mode */
+  if ((xq->var->type == XQ_T_DELQA_PLUS) && (xq->var->mode == XQ_T_DELQA_PLUS)){
+    xq->var->var |= XQ_VEC_MS;
     xq->var->mode = XQ_T_DELQA;
     xq->var->iba = xq->var->srr = 0;
   }
+
+  /* Old DEQNA firmware also enabled interrupts and */
+  /* the Ultrix 1.X driver counts on that behavior */  
+  if ((xq->var->type == XQ_T_DEQNA) && xq->dib->vec && (ULTRIX1X))
+    set_bits |= XQ_CSR_IE;
 
   /* reset csr bits */
   xq_csr_set_clr(xq, set_bits, (uint16) ~set_bits);
@@ -2138,7 +2171,7 @@ void xq_sw_reset(CTLR* xq)
 t_stat xq_wr_var(CTLR* xq, int32 data)
 {
   uint16 save_var = xq->var->var;
-  sim_debug(DBG_REG, xq->dev, "xq_wr_var(data= 0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_var(data=0x%04X)\n", data);
   
   switch (xq->var->type) {
     case XQ_T_DEQNA:
@@ -2149,7 +2182,7 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
       if (xq->var->lockmode)
         xq->var->var = data & (XQ_VEC_IV | XQ_VEC_ID);
       else
-        xq->var->var = (data & ~XQ_VEC_RO) | (XQ_VEC_ID & XQ_VEC_RW);
+        xq->var->var = (data & XQ_VEC_RW);
 
       if ((save_var ^ xq->var->var) & XQ_VEC_MS) { /* DEQNA-Lock mode changing? */
         if (~xq->var->var & XQ_VEC_MS) {
@@ -2170,22 +2203,19 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
           xq->var->var |= XQ_VEC_S1; /* Indicate No Network Connection */
         else
           xq->var->var &= ~XQ_VEC_ST; /* Set success Status */
+        sim_debug(DBG_REG, xq->dev, "xq_wr_var(DELQA self test performed. Result: %d\n", xq->var->var & XQ_VEC_ST);
       }
       break;
   }
 
   /* set vector of SIMH device */
-  if (data & XQ_VEC_IV)
-    xq->dib->vec = (data & XQ_VEC_IV) + VEC_Q;
-  else
-    xq->dib->vec = 0;
+  xq->dib->vec = (data & XQ_VEC_IV);
 
   sim_debug_bits(DBG_VAR, xq->dev, xq_var_bits, save_var, xq->var->var, 1);
 
   return SCPE_OK;
 }
 
-#ifdef VM_PDP11
 t_stat xq_process_bootrom (CTLR* xq)
 {
   /*
@@ -2244,7 +2274,6 @@ t_stat xq_process_bootrom (CTLR* xq)
 
   return SCPE_OK;
 }
-#endif /* ifdef VM_PDP11 */
 
 t_stat xq_wr_csr(CTLR* xq, int32 data)
 {
@@ -2253,7 +2282,7 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
                   |  (data & XQ_CSR_W1)                    /* write 1 to clear bits */
                   | ((data & XQ_CSR_XI) ? XQ_CSR_NI : 0);  /* clearing XI clears NI */
 
-  sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X)\n", data);
 
   /* reset controller when SR transitions to cleared */
   if (xq->var->csr & XQ_CSR_SR & ~data) {
@@ -2262,29 +2291,32 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
   }
 
   /* start receiver when RE transitions to set */
-  if (~xq->var->csr & XQ_CSR_RE & data) {
-    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - receiver started\n", data);
+  if ((~xq->var->csr) & XQ_CSR_RE & data) {
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X) - receiver starting soon\n", data);
 
     /* start the read service timer or enable asynch reading as appropriate */
-    xq_start_receiver(xq);
+    sim_activate(&xq->unit[2], xq->var->startup_delay);
   }
 
   /* stop receiver when RE transitions to clear */
   if (xq->var->csr & XQ_CSR_RE & ~data) {
-    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%08X) - receiver stopped\n", data);
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X) - receiver stopped\n", data);
 
     /* stop the read service timer or disable asynch reading as appropriate */
     xq_stop_receiver(xq);
   }
 
+  if (xq->var->csr & XQ_CSR_EL & ~data)
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X) - External Loopback %s\n", data, (data & XQ_CSR_EL) ? "enabled" : "disabled");
+  if (xq->var->csr & XQ_CSR_IL & ~data)
+    sim_debug(DBG_REG, xq->dev, "xq_wr_csr(data=0x%04X) - Internal Loopback %s\n", data, (data & XQ_CSR_IL) ? "disabled" : "enabled");
+
   /* update CSR bits */
   xq_csr_set_clr (xq, set_bits, clr_bits);
 
-#ifdef VM_PDP11
   /* request boot/diagnostic rom? [PDP-11 only] */
   if ((xq->var->csr & XQ_CSR_BP) == XQ_CSR_BP)  /* all bits must be on */
     xq_process_bootrom(xq);
-#endif
 
   return SCPE_OK;
 }
@@ -2314,6 +2346,7 @@ void xq_start_receiver(CTLR* xq)
 void xq_stop_receiver(CTLR* xq)
 {
   sim_cancel(&xq->unit[0]); /* Stop Receiving */
+  sim_cancel(&xq->unit[2]);
   if (xq->var->etherface)
     eth_clr_async(xq->var->etherface);
 }
@@ -2322,7 +2355,7 @@ t_stat xq_wr_srqr(CTLR* xq, int32 data)
 {
   uint16 set_bits = data & XQ_SRQR_RW;                     /* set RW set bits */
 
-  sim_debug(DBG_REG, xq->dev, "xq_wr_srqr(data=0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_srqr(data=0x%04X)\n", data);
 
   xq->var->srr = set_bits;
 
@@ -2349,9 +2382,9 @@ t_stat xq_wr_srqr(CTLR* xq, int32 data)
 
         xq_debug_turbo_setup(xq);
 
-        xq->dib->vec = xq->var->init.vector + VEC_Q;
+        xq->dib->vec = xq->var->init.vector;
         xq->var->tbindx = xq->var->rbindx = 0;
-        if ((xq->var->sanity.enabled) && (xq->var->init.options & XQ_IN_OP_HIT)) {
+        if ((xq->var->sanity.enabled & XQ_SAN_HW_SW) && (xq->var->init.options & XQ_IN_OP_HIT)) {
           xq->var->sanity.quarter_secs = 4*xq->var->init.hit_timeout;
         }
         xq->var->icr = xq->var->init.options & XQ_IN_OP_INT;
@@ -2381,7 +2414,7 @@ t_stat xq_wr_srqr(CTLR* xq, int32 data)
 
 t_stat xq_wr_arqr(CTLR* xq, int32 data)
 {
-  sim_debug(DBG_REG, xq->dev, "xq_wr_arqr(data=0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_arqr(data=0x%04X)\n", data);
 
   /* initiate transmit activity when requested */
   if (XQ_ARQR_TRQ & data) {
@@ -2407,7 +2440,7 @@ t_stat xq_wr_icr(CTLR* xq, int32 data)
 {
   uint16 old_icr = xq->var->icr;
 
-  sim_debug(DBG_REG, xq->dev, "xq_wr_icr(data=0x%08X)\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_icr(data=0x%04X)\n", data);
 
   xq->var->icr = data & XQ_ICR_ENA;
 
@@ -2423,7 +2456,7 @@ t_stat xq_wr(int32 ldata, int32 PA, int32 access)
   int index = (PA >> 1) & 07;   /* word index */
   uint16 data = (uint16)ldata;
 
-  sim_debug(DBG_REG, xq->dev, "xq_wr(data=0x%08X, PA=0x%08X[%s], access=%d)\n", data, PA, ((xq->var->mode == XQ_T_DELQA_PLUS) ? xqt_xmit_regnames[index] : xq_xmit_regnames[index]), access);
+  sim_debug(DBG_REG, xq->dev, "xq_wr(data=0x%04X, PA=0x%08X[%s], access=%d)\n", data, PA, ((xq->var->mode == XQ_T_DELQA_PLUS) ? xqt_xmit_regnames[index] : xq_xmit_regnames[index]), access);
 
   switch (xq->var->mode) {
     case XQ_T_DELQA_PLUS:
@@ -2473,7 +2506,6 @@ t_stat xq_wr(int32 ldata, int32 PA, int32 access)
           break;
         case 3:   /* receive bdl high bits */
           xq->var->rbdl[1] = data;
-          xq_csr_set_clr(xq, 0, XQ_CSR_RL);
           xq_dispatch_rbdl(xq); /* start receive operation */
           break;
         case 4:   /* transmit bdl low bits */
@@ -2506,6 +2538,12 @@ t_stat xq_reset(DEVICE* dptr)
 
   sim_debug(DBG_TRC, xq->dev, "xq_reset()\n");
 
+  /* One time only initializations */
+  if (!xq->var->initialized) {
+    xq->var->initialized = TRUE;
+    /* Set an initial MAC address in the DEC range */
+    xq_setmac (dptr->units, 0, "08:00:2B:00:00:00/24", NULL);
+    }
   /* calculate MAC checksum */
   xq_make_checksum(xq);
 
@@ -2517,7 +2555,7 @@ t_stat xq_reset(DEVICE* dptr)
       break;
     case XQ_T_DELQA:
     case XQ_T_DELQA_PLUS:
-      xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled == 2) ? XQ_VEC_OS : 0);
+      xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
       xq->var->mode = (xq->var->lockmode ? XQ_T_DEQNA : XQ_T_DELQA);
       break;
   }
@@ -2552,11 +2590,11 @@ t_stat xq_reset(DEVICE* dptr)
 
   /* stop the receiver */
   sim_cancel(xq->unit);
+  sim_cancel(&xq->unit[2]);
 
   /* set hardware sanity controls */
-  if (xq->var->sanity.enabled) {
+  if (xq->var->sanity.enabled & XQ_SAN_HW_SW)
     xq->var->sanity.quarter_secs = XQ_HW_SANITY_SECS * 4/*qsec*/;
-  }
 
   if (sim_switches & SWMASK ('P')) { /* Powerup? */
     memset (&xq->var->setup, 0, sizeof(xq->var->setup));
@@ -2571,8 +2609,8 @@ t_stat xq_reset(DEVICE* dptr)
 
 void xq_reset_santmr(CTLR* xq)
 {
-  sim_debug(DBG_TRC, xq->dev, "xq_reset_santmr(enable=%d, qsecs=%d)\n", (xq->var->sanity.enabled ? 1 : 0), xq->var->sanity.quarter_secs);
-  if (xq->var->sanity.enabled) {
+  sim_debug(DBG_TRC, xq->dev, "xq_reset_santmr(enable=%d, qsecs=%d)\n", ((xq->var->sanity.enabled & XQ_SAN_ENABLE) ? 1 : 0), xq->var->sanity.quarter_secs);
+  if (xq->var->sanity.enabled & XQ_SAN_ENABLE) {
     sim_debug(DBG_SAN, xq->dev, "SANITY TIMER RESETTING, qsecs: %d\n", xq->var->sanity.quarter_secs);
 
     /* reset sanity countdown timer to max count */
@@ -2715,18 +2753,21 @@ t_stat xq_tmrsvc(UNIT* uptr)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
-  /* has sanity timer expired? if so, reboot */
-  if (xq->var->sanity.enabled)
+  /* is sanity timer running and has it expired? if so, reboot */
+  if (xq->var->sanity.enabled & XQ_SAN_ENABLE) {
+    sim_debug(DBG_SAN, xq->dev, "SANITY TIMER TICK, %d qsecs remaining out of %d qsecs\n", xq->var->sanity.timer-1, xq->var->sanity.quarter_secs);
     if (--xq->var->sanity.timer <= 0) {
+      sim_debug(DBG_SAN, xq->dev, "SANITY TIMER EXPIRED, after %d qsecs\n", xq->var->sanity.quarter_secs);
       if (xq->var->mode != XQ_T_DELQA_PLUS)
         return xq_boot_host(xq);
       else { /* DELQA-T Host Inactivity Timer expiration means switch out of DELQA-T mode */
         sim_debug(DBG_TRC, xq->dev, "xq_tmrsvc(DELQA-PLUS Host Inactivity Expired\n");
         xq->var->mode = XQ_T_DELQA;
         xq->var->iba = xq->var->srr = 0;
-        xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled == 2) ? XQ_VEC_OS : 0);
+        xq->var->var = XQ_VEC_MS | ((xq->var->sanity.enabled & XQ_SAN_HW_SW) ? XQ_VEC_OS : 0);
       }
     }
+  }
 
   /* has system id timer expired? if so, do system id */
   if (--xq->var->idtmr <= 0) {
@@ -2740,9 +2781,40 @@ t_stat xq_tmrsvc(UNIT* uptr)
   return SCPE_OK;
 }
 
+/*
+** service routine - used to delay receiver start by a few simulated 
+**                   instructions
+*/
+t_stat xq_startsvc(UNIT* uptr)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+
+  sim_debug(DBG_TRC, xq->dev, "xq_startsvc()\n");
+
+  /* start the read service timer or enable asynch reading as appropriate */
+  xq_start_receiver(xq);
+
+  return SCPE_OK;
+}
+
+/*
+** service routine - used to delay receiption of loopback and setup packets by 
+**                   400 useconds like the real hardware
+*/
+t_stat xq_receivesvc(UNIT* uptr)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+
+  sim_debug(DBG_TRC, xq->dev, "xq_receivesvc()\n");
+
+  /* read setup or loopback packet */
+  xq_process_rbdl(xq);
+
+  return SCPE_OK;
+}
 
 /* attach device: */
-t_stat xq_attach(UNIT* uptr, char* cptr)
+t_stat xq_attach(UNIT* uptr, CONST char* cptr)
 {
   t_stat status;
   char* tptr;
@@ -3042,32 +3114,20 @@ t_stat xq_boot (int32 unitno, DEVICE *dptr)
 #ifdef VM_PDP11
 size_t i;
 DIB *dib = (DIB *)dptr->ctxt;
-CTLR *xq = xq_unit2ctlr(&dptr->units[unitno]);
-uint16 *bootrom = NULL;
 extern int32 REGFILE[6][2];                 /* R0-R5, two sets */
 extern uint16 *M;                           /* Memory */
 
-if (xq->var->type == XQ_T_DEQNA)
-  bootrom = xq_bootrom_deqna;
-else
-  if (xq->var->type == XQ_T_DELQA)
-    bootrom = xq_bootrom_delqa;
-  else
-    if (xq->var->type == XQ_T_DELQA_PLUS)
-      bootrom = xq_bootrom_delqat;
-
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = bootrom[i];
+    M[(BOOT_START >> 1) + i] = boot_rom[i];
 cpu_set_boot (BOOT_ENTRY);
-REGFILE[0][0] = 0;
-REGFILE[1][0] = dib->ba;
+REGFILE[0][0] = ((dptr == &xq_dev) ? 4 : 5);
 return SCPE_OK;
 #else
 return SCPE_NOFNC;
 #endif
 }
 
-t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char helpString[] =
  /* The '*'s in the next line represent the standard text width of a help line */
@@ -3117,11 +3177,28 @@ const char helpString[] =
     " A Valid MAC address is comprised of 6 pairs of hex digits delimited by\n"
     " dashes, colons or period characters.\n"
     "\n"
-    " The default MAC address for the XQ device is 08-00-2B-AA-BB-CC.  The\n"
-    " default MAC address for the XQB device is 08-00-2B-BB-CC-DD.\n"
+    " The default MAC address for the %D device is set to a value in the range\n"
+    " from 08-00-2B-00-00-00 thru 08-00-2B-FF-FF-FF.\n"
     "\n"
     " The SET MAC command must be done before the %D device is attached to a\n"
     " network.\n"
+    "4 Generated MAC\n"
+    " Support exists to provide a way to dynamically generate relatively\n"
+    " unique MAC addresses and to provide a way to save generated addresses\n"
+    " for subsequent reuse in later simulator invocations.\n"
+    "\n"
+    "+sim> SET XQ MAC=AA:BB:CC:DD:EE:FF{/bits}{>filespec}\n"
+    "\n"
+    " where:\n"
+    "+1.  All of the AA:BB:CC:DD:EE:FF values must be hex digits\n"
+    "+2.  bits is the number of bits which are to be taken from the\n"
+    "++  supplied MAC aa:bb:cc:dd:ee:ff with legal values from 16\n"
+    "++  to 48 and a default of 48 bits.\n"
+    "+3.  filespec specifies a file which contains the MAC address\n"
+    "++  to be used and if it doesn't exist an appropriate generated\n"
+    "++  address will be stored in this file and a subsequent SET MAC\n"
+    "++  invocation specifying the same file will use the value stored\n"
+    "++  in the file rather than generating a new MAC.\n"
     "3 Type\n"
     " The type of device being emulated can be changed with the following\n"
     " command:\n"
@@ -3237,6 +3314,8 @@ const char helpString[] =
     "++TRACE   Shows detailed routine calls.\n"
     "++CSR     Shows activities affecting the CSR.\n"
     "++VAR     Shows activities affecting the VAR.\n"
+    "++RBL     Shows receive list warnings.\n"
+    "++XBL     Shows transmit list warnings.\n"
     "++WARN    Shows warnings.\n"
     "++SETUP   Shows setup info.\n"
     "++SANITY  Shows sanity timer info.\n"
@@ -3304,7 +3383,7 @@ const char helpString[] =
 return scp_help (st, dptr, uptr, flag, helpString, cptr);
 }
 
-char *xq_description (DEVICE *dptr)
+const char *xq_description (DEVICE *dptr)
 {
 return (dptr == &xq_dev) ? "DELQA/DEQNA Ethernet controller"
                          : "Second DELQA/DEQNA Ethernet controller";

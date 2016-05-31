@@ -58,7 +58,6 @@ extern int32 M[];
 extern int32 PC;
 extern int32 ascii_to_flexo[], flexo_to_ascii[];
 extern int32 sc_map[];
-extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 
@@ -120,13 +119,13 @@ return word;
 /* Symbol tables */
 typedef struct {
     int32 opr;
-    char *mnemonic;
-    char *desc;
+    const char *mnemonic;
+    const char *desc;
 } OPMAP;
 
 typedef struct {
-    char *mnemonic;
-    char *desc;
+    const char *mnemonic;
+    const char *desc;
 } INSTMAP;
 
 const INSTMAP instmap[] = {
@@ -354,7 +353,7 @@ return get_uint (cptr, 8, DMASK, status);
    Outputs:
         status  =       error status
 */
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 #if 0
     int32 cflag, d, i, j, k, sign;

@@ -1,6 +1,6 @@
 /* gri_cpu.c: GRI-909 CPU simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -190,7 +190,7 @@ REG *scq_r = NULL;                                      /* PC queue reg ptr */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat bus_op (uint32 src, uint32 op, uint32 dst);
 
 /* Dispatch tables for source, dest, function out, skip on function */
@@ -434,11 +434,11 @@ while (reason == 0) {                                   /* loop until halted */
         for (i = 15; i >= 0; i--) {
             if ((t >> i) & 1)
                 break;
-			}
+            }
         if ((i < 0) || ((vec = vec_map[i]) < 0)) {      /* undefined? */
             reason = STOP_ILLINT;                       /* stop */
             break;
-			}
+            }
         dev_done = dev_done & ~INT_ON;                  /* int off */
         M[vec] = SC;                                    /* save SC */
         SC = vec + 1;                                   /* new SC */
@@ -1087,7 +1087,7 @@ M[addr] = val & DMASK;
 return SCPE_OK;
 }
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;

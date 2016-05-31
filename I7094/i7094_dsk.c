@@ -222,7 +222,7 @@
 /* Data and declarations */
 
 typedef struct {
-    char                *name;
+    const char          *name;
     uint32              accpm;                          /* acc/module: 1 or 2 */
     uint32              wdspt;                          /* wds/track: 500 or 1000 */
     uint32              trkpc;                          /* trks/cyl: 1 or 40 */
@@ -313,8 +313,8 @@ extern uint32 ch_req;
 t_stat dsk_svc (UNIT *uptr);
 t_stat dsk_svc_sns (UNIT *uptr);
 t_stat dsk_reset (DEVICE *dptr);
-t_stat dsk_attach (UNIT *uptr, char *cptr);
-t_stat dsk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dsk_attach (UNIT *uptr, CONST char *cptr);
+t_stat dsk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat dsk_chsel (uint32 ch, uint32 sel, uint32 unit);
 t_stat dsk_chwr (uint32 ch, t_uint64 val, uint32 flags);
 t_stat dsk_new_cmd (uint32 ch, t_uint64 cmd);
@@ -326,7 +326,7 @@ t_stat dsk_xfer_done (UNIT *uaptr, uint32 dtyp);
 t_stat dsk_wr_trk (UNIT *uptr, uint32 trk);
 t_bool dsk_get_fmtc (uint32 dtyp, uint8 *fc);
 t_bool dsk_qdone (uint32 ch);
-t_stat dsk_show_format (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dsk_show_format (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* DSK data structures
 
@@ -888,7 +888,7 @@ da = DSK_DA (dsk_acc, trk, dtyp);                       /* get disk address */
 sim_fseek (udptr->fileref, da, SEEK_SET);               /* read track */
 k = sim_fread (dsk_buf, sizeof (t_uint64), dsk_tab[dtyp].wdspt, udptr->fileref);
 if (ferror (udptr->fileref)) {                          /* error? */
-    perror ("DSK I/O error");
+    sim_perror ("DSK I/O error");
     clearerr (udptr->fileref);
     dsk_uend (dsk_ch, DSKS_DSKE);
     return SCPE_IOERR;
@@ -989,7 +989,7 @@ uint32 da = DSK_DA (dsk_acc, trk, dtyp);
 sim_fseek (udptr->fileref, da, SEEK_SET);
 sim_fwrite (dsk_buf, sizeof (t_uint64), dsk_tab[dtyp].wdspt, udptr->fileref);
 if (ferror (udptr->fileref)) {
-    perror ("DSK I/O error");
+    sim_perror ("DSK I/O error");
     clearerr (udptr->fileref);
     dsk_uend (dsk_ch, DSKS_DSKE);
     return SCPE_IOERR;
@@ -1094,7 +1094,7 @@ return SCPE_OK;
 
 /* Attach routine, test formating */
 
-t_stat dsk_attach (UNIT *uptr, char *cptr)
+t_stat dsk_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 dtyp = GET_DTYPE (uptr->flags);
 t_stat r;
@@ -1111,7 +1111,7 @@ return dsk_show_format (stdout, uptr, 0, NULL);
 
 /* Set disk size */
 
-t_stat dsk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dsk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 dtyp = GET_DTYPE (val);
 uint32 u = uptr - dsk_dev.units;
@@ -1134,7 +1134,7 @@ return SCPE_OK;
 
 /* Show format */
 
-t_stat dsk_show_format (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dsk_show_format (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 a, t, k, u, tlim, dtyp, da;
 uint32 rptr, rlnt, rlim, rec, ctptr, *format;
@@ -1189,7 +1189,7 @@ for (a = 0, ctss = TRUE; a < dsk_tab[dtyp].accpm; a++) {
                 fprintf (st, "Invalid record length %d, unit = %d, access = %d, track = %d, record = %d\n",
                     rlnt, u, a, t, rec);
                 return SCPE_OK;
-				}
+                }
             if (rlnt > maxrsz)
                 maxrsz = rlnt;
             if (rlnt < minrsz)

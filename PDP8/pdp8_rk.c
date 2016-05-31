@@ -138,7 +138,6 @@ int32 rk_ma = 0;                                        /* memory address */
 int32 rk_swait = 10, rk_rwait = 10;                     /* seek, rotate wait */
 int32 rk_stopioe = 1;                                   /* stop on error */
 
-DEVICE rk_dev;
 int32 rk (int32 IR, int32 AC);
 t_stat rk_svc (UNIT *uptr);
 t_stat rk_reset (DEVICE *dptr);
@@ -167,15 +166,15 @@ UNIT rk_unit[] = {
     };
 
 REG rk_reg[] = {
-    { ORDATA (RKSTA, rk_sta, 12) },
-    { ORDATA (RKCMD, rk_cmd, 12) },
-    { ORDATA (RKDA, rk_da, 12) },
-    { ORDATA (RKMA, rk_ma, 12) },
-    { FLDATA (BUSY, rk_busy, 0) },
-    { FLDATA (INT, int_req, INT_V_RK) },
-    { DRDATA (STIME, rk_swait, 24), PV_LEFT },
-    { DRDATA (RTIME, rk_rwait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, rk_stopioe, 0) },
+    { ORDATAD (RKSTA, rk_sta, 12, "status") },
+    { ORDATAD (RKCMD, rk_cmd, 12, "disk command") },
+    { ORDATAD (RKDA, rk_da, 12, "disk address") },
+    { ORDATAD (RKMA, rk_ma, 12, "current memory address") },
+    { FLDATAD (BUSY, rk_busy, 0, "control busy flag") },
+    { FLDATAD (INT, int_req, INT_V_RK, "interrupt pending flag") },
+    { DRDATAD (STIME, rk_swait, 24, "seek time, per cylinder"), PV_LEFT },
+    { DRDATAD (RTIME, rk_rwait, 24, "rotational delay"), PV_LEFT },
+    { FLDATAD (STOP_IOE, rk_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVNUM, rk_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -408,7 +407,7 @@ rk_busy = 0;
 RK_INT_UPDATE;
 
 if (err != 0) {
-    perror ("RK I/O error");
+    sim_perror ("RK I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

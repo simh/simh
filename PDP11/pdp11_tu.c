@@ -233,7 +233,7 @@ static int32 fmt_test[16] = {                           /* fmt valid */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0
     };
 static int32 dt_map[3] = { DT_TU16, DT_TU45, DT_TU77 };
-static char *tu_fname[CS1_N_FNC] = {
+static const char *tu_fname[CS1_N_FNC] = {
     "NOP", "UNLD", "2", "REW", "FCLR", "5", "6", "7",
     "RIP", "11", "ERASE", "WREOF", "SPCF", "SPCR", "16", "17",
     "20", "21", "22", "23", "WRCHKF", "25", "26", "WRCHKR",
@@ -244,13 +244,13 @@ t_stat tu_mbrd (int32 *data, int32 PA, int32 fmtr);
 t_stat tu_mbwr (int32 data, int32 PA, int32 fmtr);
 t_stat tu_svc (UNIT *uptr);
 t_stat tu_reset (DEVICE *dptr);
-t_stat tu_attach (UNIT *uptr, char *cptr);
+t_stat tu_attach (UNIT *uptr, CONST char *cptr);
 t_stat tu_detach (UNIT *uptr);
 t_stat tu_boot (int32 unitno, DEVICE *dptr);
-t_stat tu_set_fmtr (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *tu_description (DEVICE *dptr);
+t_stat tu_set_fmtr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *tu_description (DEVICE *dptr);
 t_stat tu_go (int32 drv);
 int32 tu_abort (void);
 void tu_set_er (int32 flg);
@@ -266,7 +266,7 @@ t_stat tu_map_err (int32 drv, t_stat st, t_bool qdt);
    tu_mod       TU modifier list
 */
 
-DIB tu_dib = { MBA_TU, 0, &tu_mbrd, &tu_mbwr,0, 0, 0, { &tu_abort } };
+DIB tu_dib = { MBA_AUTO, 0, &tu_mbrd, &tu_mbwr,0, 0, 0, { &tu_abort } };
 
 UNIT tu_unit[] = {
     { UDATA (&tu_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0) },
@@ -920,7 +920,7 @@ t_stat tu_reset (DEVICE *dptr)
 int32 u;
 UNIT *uptr;
 
-mba_set_enbdis (MBA_TU, tu_dev.flags & DEV_DIS);
+mba_set_enbdis (dptr);
 tucs1 = 0;
 tufc = 0;
 tuer = 0;
@@ -947,7 +947,7 @@ return auto_config(0, 0);
 
 /* Attach routine */
 
-t_stat tu_attach (UNIT *uptr, char *cptr)
+t_stat tu_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 drv = uptr - tu_dev.units, flg;
 t_stat r;
@@ -979,7 +979,7 @@ return sim_tape_detach (uptr);
 
 /* Set/show formatter type */
 
-t_stat tu_set_fmtr (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tu_set_fmtr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr = find_dev_from_unit (uptr);
 
@@ -993,7 +993,7 @@ else dptr->flags = dptr->flags & ~DEV_TM03;
 return SCPE_OK;
 }
 
-t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr = find_dev_from_unit (uptr);
 
@@ -1065,13 +1065,14 @@ return SCPE_NOFNC;
 
 #endif
 
-t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "TM02/TM03/TE16/TU45/TU77 Magnetic Tapes\n\n");
 fprintf (st, "The TU controller implements the Massbus family of 800/1600bpi magnetic tape\n");
-fprintf (st, "drives.  TU options include the ability to select the formatter type (TM02\n");
-fprintf (st, "or TM03), to set the drive type to one of three drives (TE16, TU45, or TU77),\n");
-fprintf (st, "and to set the drives write enabled or write locked.\n\n");
+fprintf (st, "drives.  TU options include the ability to set the drive type to one of three\n");
+fprintf (st, "drives (TE16, TU45, or TU77), and to set the drives write enabled or write\n");
+fprintf (st, "locked.  When configured on a PDP11 simulator, the TU formatter type can be\n");
+fprintf (st, "selected as either TM02 or TM03),\n\n");
 fprint_set_help (st, dptr);
 fprintf (st, "\nMagnetic tape units can be set to a specific reel capacity in MB, or to\n");
 fprintf (st, "unlimited capacity:\n\n");
@@ -1088,7 +1089,7 @@ fprintf (st, "    OS I/O error    parity error; if STOP_IOE, stop\n");
 return SCPE_OK;
 }
 
-char *tu_description (DEVICE *dptr)
+const char *tu_description (DEVICE *dptr)
 {
 return "TM03 tape formatter";
 }

@@ -55,8 +55,8 @@
 #define TXCS_V_TEN      16                              /* Transmitter en */
 #define TXCS_M_TEN      0xF
 #define TXCS_TEN        (TXCS_M_TEN << TXCS_V_TEN)
-#define TXCS_RD         (CSR_DONE + CSR_IE + TXCS_TEN + TXCS_IDC)  /* terminal output */
-#define TXCS_WR         (CSR_IE + TXCS_TEN)
+#define TXCS_RD         (CSR_DONE + CSR_IE + TXCS_TEN + TXCS_IDC + TXCS_WMN)  /* Readable bits */
+#define TXCS_WR         (CSR_IE)                        /* Writeable bits */
 #define ID_CT           0                               /* console terminal */
 #define ID_RS           1                               /* remote services */
 #define ID_EMM          2                               /* environmental monitoring module */
@@ -91,6 +91,7 @@
 
 #define LC_V_FNC        0                               /* logical console function */
 #define LC_M_FNC        0xFF
+#define  LC_FNCBT       0x2                             /* boot cpu */
 #define  LC_FNCCW       0x3                             /* clear warm start flag */
 #define  LC_FNCCS       0x4                             /* clear cold start flag */
 #define  LC_FNCMV       0x12                            /* microcode version */
@@ -232,10 +233,6 @@ int32 rlcs_mp = 0;
 int32 rlcs_bcnt = 0;                                    /* byte count */
 uint16 *rlcs_buf = NULL;
 
-extern jmp_buf save_env;
-extern UNIT cpu_unit;
-extern int32 brk_req;
-
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat clk_svc (UNIT *uptr);
@@ -245,19 +242,19 @@ t_stat rlcs_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
-char *tti_description (DEVICE *dptr);
-char *tto_description (DEVICE *dptr);
-char *clk_description (DEVICE *dptr);
-char *tmr_description (DEVICE *dptr);
-char *rlcs_description (DEVICE *dptr);
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat clk_attach (UNIT *uptr, char *cptr);
+const char *tti_description (DEVICE *dptr);
+const char *tto_description (DEVICE *dptr);
+const char *clk_description (DEVICE *dptr);
+const char *tmr_description (DEVICE *dptr);
+const char *rlcs_description (DEVICE *dptr);
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat clk_attach (UNIT *uptr, CONST char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
 t_stat rlcs_reset (DEVICE *dptr);
-t_stat rlcs_attach (UNIT *uptr, char *cptr);
+t_stat rlcs_attach (UNIT *uptr, CONST char *cptr);
 int32 icr_rd (t_bool interp);
 void tmr_incr (uint32 inc);
 void tmr_sched (void);
@@ -337,6 +334,7 @@ MTAB tto_mod[] = {
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL, NULL, NULL, "Set 7 bit mode (suppress non printing)" },
     { 0 }
     };
+
 
 DEVICE tto_dev = {
     "TTO", tto_unit, tto_reg, tto_mod,
@@ -493,13 +491,16 @@ return (tto_csr & TXCS_RD);
 
 void txcs_wr (int32 data)
 {
-tto_csr = (tto_csr & ~TXCS_WR) | (data & TXCS_WR);
-if (data & TXCS_WMN)                                    /* updating mask? */
-    tto_update_int ();
-if ((data & CSR_IE) == 0)
+tto_csr = (tto_csr & ~TXCS_WR) | (data & TXCS_WR);          /* Write new bits. */
+if (data & TXCS_WMN) {                                      /* Updating enable mask? */
+    tto_csr = (tto_csr & ~TXCS_TEN) | (data & TXCS_TEN);    /* Yes. Modify enable mask. */
+    tto_update_int ();                                      /* This can change interrupt requests... */
+    }
+if ((tto_csr & CSR_IE) == 0)
     tto_int = 0;
-else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-    tto_int = 1;
+else
+    if ((tto_csr & CSR_DONE) == CSR_DONE)
+        tto_int = 1;
 return;
 }
 
@@ -511,7 +512,8 @@ if ((dest >= ID_CT) && (dest <= ID_LC)) {               /* valid line? */
     tto_int = 0;                                        /* clear int */
     tto_unit[dest].buf = data & WMASK;
     tto_unit[dest].RDY = 0;
-    sim_activate (&tto_unit[dest], tto_unit[dest].wait);/* activate unit */
+    sim_activate (&tto_unit[dest], 
+                  ((dest == ID_LC) && (data == LC_FNCBT)) ? 0 : tto_unit[dest].wait);/* activate unit */
     }
 return;
 }
@@ -628,7 +630,7 @@ sim_activate_abs (&tti_unit[ID_CT], KBD_WAIT (tti_unit[ID_CT].wait, tmr_poll));
 return SCPE_OK;
 }
 
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Input (TTI)\n\n");
 fprintf (st, "The terminal input (TTI) polls the console keyboard for input.\n\n");
@@ -638,7 +640,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tti_description (DEVICE *dptr)
+const char *tti_description (DEVICE *dptr)
 {
 return "console terminal input";
 }
@@ -690,7 +692,7 @@ sim_cancel (&tto_unit[ID_LC]);
 return SCPE_OK;
 }
 
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Output (TTO)\n\n");
 fprintf (st, "The terminal output (TTO) writes to the simulator console.\n\n");
@@ -700,7 +702,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tto_description (DEVICE *dptr)
+const char *tto_description (DEVICE *dptr)
 {
 return "console terminal output";
 }
@@ -867,7 +869,7 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
 return SCPE_OK;
 }
 
-t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Real-Time Clock (%s)\n\n", dptr->name);
 fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
@@ -898,14 +900,14 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *clk_description (DEVICE *dptr)
+const char *clk_description (DEVICE *dptr)
 {
 return "time of year clock";
 }
 
 /* CLK attach */
 
-t_stat clk_attach (UNIT *uptr, char *cptr)
+t_stat clk_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -945,7 +947,7 @@ todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
 }
 
-char *tmr_description (DEVICE *dptr)
+const char *tmr_description (DEVICE *dptr)
 {
 return "interval timer";
 }
@@ -1031,6 +1033,10 @@ if (lc_bptr > 0)                                        /* cmd in prog? */
 
 else switch (lc_fnc) {                                  /* idle, case */
 
+    case LC_FNCBT:                                      /* boot cpu */
+        con_halt (0, 0);                                /* set up reboot */
+        break;
+        
     case LC_FNCCW:                                      /* clear warm start flag */
         break;
         
@@ -1227,12 +1233,12 @@ sim_cancel (&rlcs_unit);                                /* deactivate unit */
 return SCPE_OK;
 }
 
-char *rlcs_description (DEVICE *dptr)
+const char *rlcs_description (DEVICE *dptr)
 {
 return "Console RL02 disk";
 }
 
-t_stat rlcs_attach (UNIT *uptr, char *cptr)
+t_stat rlcs_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 p;
 t_stat r;

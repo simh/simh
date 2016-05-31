@@ -112,7 +112,7 @@ extern UNIT prt_unit;
 	void   stuff_cmd (char *cmd) 				  				{}
 	t_bool stuff_and_wait (char *cmd, int timeout, int delay)	{return FALSE;}
 	char  *read_cmdline (char *ptr, int size, FILE *stream)		{return read_line(ptr, size, stream);}
-	void   remark_cmd (char *remark)			  				{printf("%s\n", remark); if (sim_log) fprintf(sim_log, "%s\n", remark);}
+    void   remark_cmd (char *remark)			  				{sim_printf("%s\n", remark);}
 #else
 
 t_stat console_reset (DEVICE *dptr)
@@ -128,7 +128,7 @@ t_stat console_reset (DEVICE *dptr)
 
 /* scp_panic - report fatal internal programming error */
 
-void scp_panic (char *msg)
+void scp_panic (const char *msg)
 {
 	fprintf(stderr, "%s\n", msg);
 	exit(1);
@@ -1563,8 +1563,7 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
 		;
 
 	if (scp_stuffed) {										/* stuffed command needs to be echoed */
-		printf("%s\n", cptr);
-		if (sim_log) fprintf(sim_log, "%s\n", cptr);
+		sim_printf("%s\n", cptr);
 	}
 
 	return cptr;
@@ -1641,13 +1640,10 @@ void remark_cmd (char *remark)
 		if (sim_log) putc('\n', sim_log);
 	}
 
-	printf("%s\n", remark);
-	if (sim_log) fprintf(sim_log, "%s\n", remark);
+	sim_printf("%s\n", remark);
 
-	if (scp_reading) {
-		printf("%s", sim_prompt);
-		if (sim_log) fprintf(sim_log, "%s", sim_prompt);
-	}
+	if (scp_reading)
+		sim_printf("%s", sim_prompt);
 }
 
 #endif 		/* _WIN32 defined */

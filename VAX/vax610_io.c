@@ -32,15 +32,12 @@
 #include "vax_defs.h"
 
 int32 int_req[IPL_HLVL] = { 0 };                        /* intr, IPL 14-17 */
+int32 int_vec_set[IPL_HLVL][32] = { 0 };                /* bits to set in vector */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
-
-extern int32 PSL, SISR, trpirq, mem_err, hlt_pin;
-extern int32 p1;
-extern jmp_buf save_env;
 
 int32 eval_int (void);
 t_stat qba_reset (DEVICE *dptr);
-char *qba_description (DEVICE *dptr);
+const char *qba_description (DEVICE *dptr);
 
 /* Qbus adapter data structures
 
@@ -91,6 +88,8 @@ int32 (*int_ack[IPL_HLVL][32])(void);                   /* int ack routines */
 /* Interrupt request to vector map */
 
 int32 int_vec[IPL_HLVL][32];                            /* int req to vector */
+
+#define QB_VEC_MASK     0x1FC                           /* Interrupt Vector value mask */
 
 /* The KA610 handles errors in I/O space as follows
 
@@ -310,10 +309,16 @@ if (lvl > IPL_HMAX) {                                   /* error req lvl? */
     }
 for (i = 0; int_req[l] && (i < 32); i++) {
     if ((int_req[l] >> i) & 1) {
+        int32 vec;
+
         int_req[l] = int_req[l] & ~(1u << i);
         if (int_ack[l][i])
-            return int_ack[l][i]();
-        return int_vec[l][i];
+            vec =int_ack[l][i]();
+        else
+            vec = int_vec[l][i];
+        vec |= int_vec_set[l][i];
+        vec &= (int_vec_set[l][i] | QB_VEC_MASK);
+        return vec;
         }
     }
 return 0;
@@ -338,7 +343,7 @@ for (i = 0; i < IPL_HLVL; i++)
 return SCPE_OK;
 }
 
-char *qba_description (DEVICE *dptr)
+const char *qba_description (DEVICE *dptr)
 {
 return "Qbus adapter";
 }
@@ -401,7 +406,7 @@ else {
 return 0;
 }
 
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf)
 {
 int32 i;
 uint32 ma = ba & 0x3FFFFF;
@@ -426,7 +431,7 @@ else {
 return 0;
 }
 
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf)
 {
 int32 i;
 uint32 ma = ba & 0x3FFFFF;

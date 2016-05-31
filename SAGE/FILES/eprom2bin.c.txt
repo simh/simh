@@ -1,0 +1,61 @@
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+#define CRLF "\r\n"
+
+#define BASE 0xfe0000
+#define RECLEN 32
+
+int main(int argc, char* argv[]) 
+{
+  FILE *e,*o,*out;
+  int c,i;
+  unsigned char eprombuf[65536];
+  int size;
+
+
+  if (argc != 4) {
+    fprintf(stderr,
+	    "Combine two 8bit-EPROM files into a single merged one\n"
+	    "and output it in 16bit binary format.\n"
+	    "Usage: %s even.dat odd.dat output.dat\n\n", argv[0]);
+    exit(1);
+  }
+
+  e = fopen(argv[1], "rb");
+  o = fopen(argv[2], "rb");
+  out =  fopen(argv[3], "wb");
+
+  if (!e) {
+    fprintf(stderr, "Could not open %s\n", argv[1]);
+    exit(1);
+  }
+  if (!o) {
+    fprintf(stderr, "Could not open %s\n", argv[2]);
+    exit(1);
+  }
+  if (!out) {
+    fprintf(stderr, "Could not open %s\n", argv[3]);
+    exit(1);
+  }
+  
+  size = 0;
+  while (!feof(e)) {
+    if ((c = fgetc(e)) == EOF) break;
+    eprombuf[size++] = c;
+    if ((c = fgetc(o)) == EOF) break;
+    eprombuf[size++] = c;
+  }
+  printf("%s: Size = %d\n", argv[3], size);
+  fclose(e);
+  fclose(o);
+
+  for (i=0; i<size; i++) {
+    fputc(eprombuf[i],out);
+  }
+
+  fclose(out);
+  exit(0);
+}
+

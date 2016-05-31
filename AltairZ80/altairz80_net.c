@@ -40,13 +40,14 @@ extern uint32 PCX;
 #define NET_INIT_POLL_SERVER  16000
 #define NET_INIT_POLL_CLIENT  15000
 
-static t_stat net_attach    (UNIT *uptr, char *cptr);
+static t_stat net_attach    (UNIT *uptr, CONST char *cptr);
 static t_stat net_detach    (UNIT *uptr);
 static t_stat net_reset     (DEVICE *dptr);
 static t_stat net_svc       (UNIT *uptr);
-static t_stat set_net       (UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat set_net       (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 int32 netStatus             (const int32 port, const int32 io, const int32 data);
 int32 netData               (const int32 port, const int32 io, const int32 data);
+static const char* net_description(DEVICE *dptr);
 
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
@@ -88,6 +89,10 @@ static REG net_reg[] = {
     { NULL }
 };
 
+static const char* net_description(DEVICE *dptr) {
+    return "Network";
+}
+
 static MTAB net_mod[] = {
     { UNIT_SERVER, 0,           "CLIENT", "CLIENT", &set_net, NULL, NULL,
         "Sets machine to client mode"}, /* machine is a client   */
@@ -111,10 +116,10 @@ DEVICE net_dev = {
     NULL, NULL, &net_reset,
     NULL, &net_attach, &net_detach,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    net_dt, NULL, "Network NET"
+    net_dt, NULL, NULL, NULL, NULL, NULL, &net_description
 };
 
-static t_stat set_net(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat set_net(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     char temp[CBUFSIZE];
     if ((net_unit.flags & UNIT_ATT) && ((net_unit.flags & UNIT_SERVER) != (uint32)value)) {
         strncpy(temp, net_unit.filename, CBUFSIZE); /* save name for later attach */
@@ -149,13 +154,11 @@ static t_stat net_reset(DEVICE *dptr) {
     return SCPE_OK;
 }
 
-static t_stat net_attach(UNIT *uptr, char *cptr) {
+static t_stat net_attach(UNIT *uptr, CONST char *cptr) {
     uint32 i;
     char host[CBUFSIZE], port[CBUFSIZE];
-    t_stat r;
 
-    r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), "3000", NULL);
-    if (r != SCPE_OK)
+    if (sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), "3000", NULL))
         return SCPE_ARG;
     net_reset(&net_dev);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
@@ -185,10 +188,10 @@ static t_stat net_detach(UNIT *uptr) {
     if (!(net_unit.flags & UNIT_ATT))
         return SCPE_OK;       /* if not attached simply return */
     if (net_unit.flags & UNIT_SERVER)
-        sim_close_sock(serviceDescriptor[1].masterSocket, TRUE);
+        sim_close_sock(serviceDescriptor[1].masterSocket);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
         if (serviceDescriptor[i].ioSocket)
-            sim_close_sock(serviceDescriptor[i].ioSocket, FALSE);
+            sim_close_sock(serviceDescriptor[i].ioSocket);
     free(net_unit.filename);                                /* free port string */
     net_unit.filename = NULL;
     net_unit.flags &= ~UNIT_ATT;                            /* not attached */
@@ -216,7 +219,7 @@ static t_stat net_svc(UNIT *uptr) {
             serviceDescriptor[0].ioSocket = sim_connect_sock(net_unit.filename, "localhost", "3000");
             if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
                 return SCPE_IOERR;
-            printf("\rWaiting for server ... Type g<return> (possibly twice) when ready" NLP);
+            sim_printf("\rWaiting for server ... Type g<return> (possibly twice) when ready" NLP);
             return SCPE_STOP;
         }
         for (i = 0; i <= MAX_CONNECTIONS; i++)
@@ -226,7 +229,7 @@ static t_stat net_svc(UNIT *uptr) {
                         BUFFER_LENGTH - serviceDescriptor[i].inputSize);
                     if (r == -1) {
                         sim_debug(DROP_MSG, &net_dev, "NET: " ADDRESS_FORMAT " Drop connection %i with socket %i.\n", PCX, i, serviceDescriptor[i].ioSocket);
-                        sim_close_sock(serviceDescriptor[i].ioSocket, FALSE);
+                        sim_close_sock(serviceDescriptor[i].ioSocket);
                         serviceDescriptor[i].ioSocket = 0;
                         serviceDescriptor_reset(i);
                         continue;
@@ -255,7 +258,7 @@ static t_stat net_svc(UNIT *uptr) {
                             serviceDescriptor[i].outputPosRead -= BUFFER_LENGTH;
                     }
                     else
-                        printf("write %i" NLP, r);
+                        sim_printf("write %i" NLP, r);
                 }
             }
     }
@@ -285,7 +288,7 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
         if (serviceDescriptor[i].Z80DataPort == port) {
             if (io == 0) {  /* IN   */
                 if (serviceDescriptor[i].inputSize == 0) {
-                    printf("re-read from %i" NLP, port);
+                    sim_printf("re-read from %i" NLP, port);
                     result = serviceDescriptor[i].inputBuffer[serviceDescriptor[i].inputPosRead > 0 ?
                         serviceDescriptor[i].inputPosRead - 1 : BUFFER_LENGTH - 1];
                 }
@@ -300,7 +303,7 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
             }
             else {          /* OUT  */
                 if (serviceDescriptor[i].outputSize == BUFFER_LENGTH) {
-                    printf("over-write %i to %i" NLP, data, port);
+                    sim_printf("over-write %i to %i" NLP, data, port);
                     serviceDescriptor[i].outputBuffer[serviceDescriptor[i].outputPosWrite > 0 ?
                         serviceDescriptor[i].outputPosWrite - 1 : BUFFER_LENGTH - 1] = data;
                 }

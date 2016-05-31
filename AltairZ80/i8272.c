@@ -57,7 +57,7 @@
 #include "i8272.h"
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -134,8 +134,8 @@ typedef struct {
 
 static SECTOR_FORMAT sdata;
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -176,6 +176,7 @@ static void raise_i8272_interrupt(void);
 static int32 i8272dev(const int32 port, const int32 io, const int32 data);
 static t_stat i8272_reset(DEVICE *dptr);
 int32 find_unit_index (UNIT *uptr);
+static const char* i8272_description(DEVICE *dptr);
 
 I8272_INFO i8272_info_data = { { 0x0, 0, 0xC0, 2 } };
 I8272_INFO *i8272_info = &i8272_info_data;
@@ -189,7 +190,11 @@ static UNIT i8272_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, I8272_CAPACITY) }
 };
 
-#define I8272_NAME  "Intel/NEC(765) FDC Core I8272"
+#define I8272_NAME  "Intel/NEC(765) FDC Core"
+
+static const char* i8272_description(DEVICE *dptr) {
+    return I8272_NAME;
+}
 
 static MTAB i8272_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
@@ -223,7 +228,7 @@ DEVICE i8272_dev = {
     NULL, NULL, &i8272_reset,
     NULL, &i8272_attach, &i8272_detach,
     &i8272_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    i8272_dt, NULL, I8272_NAME
+    i8272_dt, NULL, NULL, NULL, NULL, NULL, &i8272_description
 };
 
 static uint8 I8272_Setup_Cmd(uint8 fdc_cmd);
@@ -239,7 +244,7 @@ static t_stat i8272_reset(DEVICE *dptr)
     } else {
         /* Connect I/O Ports at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &i8272dev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }
@@ -274,7 +279,7 @@ int32 find_unit_index (UNIT *uptr)
 }
 
 /* Attach routine */
-t_stat i8272_attach(UNIT *uptr, char *cptr)
+t_stat i8272_attach(UNIT *uptr, CONST char *cptr)
 {
     char header[4];
     t_stat r;
@@ -302,14 +307,14 @@ t_stat i8272_attach(UNIT *uptr, char *cptr)
     if(uptr->capac > 0) {
         char *rtn = fgets(header, 4, uptr->fileref);
         if((rtn != NULL) && strncmp(header, "IMD", 3)) {
-            printf("I8272: Only IMD disk images are supported\n");
+            sim_printf("I8272: Only IMD disk images are supported\n");
             i8272_info->drive[i].uptr = NULL;
             return SCPE_OPENERR;
         }
     } else {
         /* create a disk image file in IMD format. */
         if (diskCreate(uptr->fileref, "$Id: i8272.c 1999 2008-07-22 04:25:28Z hharte $") != SCPE_OK) {
-            printf("I8272: Failed to create IMD disk.\n");
+            sim_printf("I8272: Failed to create IMD disk.\n");
             i8272_info->drive[i].uptr = NULL;
             return SCPE_OPENERR;
         }
@@ -319,19 +324,20 @@ t_stat i8272_attach(UNIT *uptr, char *cptr)
     uptr->u3 = IMAGE_TYPE_IMD;
 
     if (uptr->flags & UNIT_I8272_VERBOSE) {
-        printf("I8272%d: attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("I8272%d: attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
     }
 
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if (uptr->flags & UNIT_I8272_VERBOSE)
-            printf("--------------------------------------------------------\n");
-        i8272_info->drive[i].imd = diskOpen(uptr->fileref, uptr->flags & UNIT_I8272_VERBOSE);
+            sim_printf("--------------------------------------------------------\n");
+        i8272_info->drive[i].imd = diskOpenEx(uptr->fileref, uptr->flags & UNIT_I8272_VERBOSE,
+                                              &i8272_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_I8272_VERBOSE)
-            printf("\n");
+            sim_printf("\n");
         if (i8272_info->drive[i].imd == NULL) {
-            printf("I8272: IMD disk corrupt.\n");
+            sim_printf("I8272: IMD disk corrupt.\n");
             i8272_info->drive[i].uptr = NULL;
             return SCPE_OPENERR;
         }
@@ -455,7 +461,7 @@ uint8 I8272_Read(const uint32 Addr)
     return (cData);
 }
 
-static char *messages[0x20] = {
+static const char *messages[0x20] = {
 /*  0                           1                       2                       3                   */
     "Undefined Command 0x0","Undefined Command 0x1","Read Track",           "Specify",
 /*  4                           5                       6                       7                   */
@@ -776,7 +782,7 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                 if(i8272_info->fdc_phase == EXEC_PHASE) {
                     switch(i8272_info->cmd[0] & 0x1F) {
                         case I8272_READ_TRACK:
-                            printf("I8272: " ADDRESS_FORMAT " Read a track (untested.)" NLP, PCX);
+                            sim_printf("I8272: " ADDRESS_FORMAT " Read a track (untested.)" NLP, PCX);
                             i8272_info->fdc_sector = 1; /* Read entire track from sector 1...eot */
                         case I8272_READ_DATA:
                         case I8272_READ_DELETED_DATA:
@@ -791,7 +797,7 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                                           128 << i8272_info->fdc_sec_len);
 
                                 if(pDrive->imd == NULL) {
-                                    printf(".imd is NULL!" NLP);
+                                    sim_printf(".imd is NULL!" NLP);
                                 }
                                 if(disk_read) { /* Read sector */
                                     sectRead(pDrive->imd,

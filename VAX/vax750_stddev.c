@@ -62,6 +62,8 @@
 #include "sim_tmxr.h"
 #include <time.h>
 
+#include "pdp11_td.h"
+
 /* Terminal definitions */
 
 #define RXCS_RD         (CSR_DONE + CSR_IE)             /* terminal input */
@@ -81,9 +83,41 @@
 #define  MISC_CLCS       0x4                            /* clear cold start */
 #define TXDB_SEL        (TXDB_M_SEL << TXDB_V_SEL)      /* non-terminal */
 #define TXDB_GETSEL(x)  (((x) >> TXDB_V_SEL) & TXDB_M_SEL)
-#define CSTS_BRK        0x1
-#define CSTS_RD         (CSR_DONE + CSR_IE + CSTS_BRK)  /* terminal output */
-#define CSTS_WR         (CSR_IE + CSTS_BRK)
+
+static BITFIELD rx_csr_bits[] = {
+    BITNCF(6),                          /* unused */
+    BIT(IE),                            /* Interrupt Enable */
+    BIT(DONE),                          /* Xmit Ready */
+    BITNCF(8),                          /* unused */
+    ENDBITS
+};
+
+static BITFIELD rx_buf_bits[] = {
+    BITF(DAT,8),                        /* data buffer */
+    BITNCF(5),                          /* unused */
+    BIT(RBRK),
+    BIT(OVR),
+    BIT(ERR),
+    ENDBITS
+};
+
+static BITFIELD tx_csr_bits[] = {
+    BIT(XBR),                           /* Break */
+    BITNC,                              /* unused */
+    BIT(MAINT),                         /* Maint */
+    BITNCF(3),                          /* unused */
+    BIT(IE),                            /* Interrupt Enable */
+    BIT(DONE),                          /* Xmit Ready */
+    BITNCF(8),                          /* unused */
+    ENDBITS
+};
+
+static BITFIELD tx_buf_bits[] = {
+    BITF(DAT,8),                        /* data buffer */
+    BITNCF(8),                          /* unused */
+    ENDBITS
+};
+
 
 /* Clock definitions */
 
@@ -110,51 +144,7 @@
 #define TD_NUMBY        512                             /* bytes/block */
 #define TD_SIZE         (TD_NUMBLK * TD_NUMBY)          /* bytes/tape */
 
-#define TD_OPDAT        001                             /* Data */
-#define TD_OPCMD        002                             /* Command */
-#define TD_OPINI        004                             /* INIT */
-#define TD_OPBOO        010                             /* Bootstrap */
-#define TD_OPCNT        020                             /* Continue */
-#define TD_OPXOF        023                             /* XOFF */
 
-#define TD_CMDNOP       0000                            /* NOP */
-#define TD_CMDINI       0001                            /* INIT */
-#define TD_CMDRD        0002                            /* Read */
-#define TD_CMDWR        0003                            /* Write */
-#define TD_CMDPOS       0005                            /* Position */
-#define TD_CMDDIA       0007                            /* Diagnose */
-#define TD_CMDGST       0010                            /* Get Status */
-#define TD_CMDSST       0011                            /* Set Status */
-#define TD_CMDMRSP      0012                            /* MRSP Request */
-#define TD_CMDEND       0100                            /* END */
-
-#define TD_STSOK        0000                            /* Normal success */
-#define TD_STSRTY       0001                            /* Success with retries */
-#define TD_STSFAIL      0377                            /* Failed selftest */
-#define TD_STSPO        0376                            /* Partial operation (end of medium) */
-#define TD_STSBUN       0370                            /* Bad unit number */
-#define TD_STSNC        0367                            /* No cartridge */
-#define TD_STSWP        0365                            /* Write protected */
-#define TD_STSDCE       0357                            /* Data check error */
-#define TD_STSSE        0340                            /* Seek error (block not found) */
-#define TD_STSMS        0337                            /* Motor stopped */
-#define TD_STSBOP       0320                            /* Bad opcode */
-#define TD_STSBBN       0311                            /* Bad block number (>511) */
-
-#define TD_GETOPC       0                               /* get opcode state */
-#define TD_GETLEN       1                               /* get length state */
-#define TD_GETDATA      2                               /* get data state */
-
-#define TD_IDLE         0                               /* idle state */
-#define TD_READ         1                               /* read */
-#define TD_READ1        2                               /* fill buffer */
-#define TD_READ2        3                               /* empty buffer */
-#define TD_WRITE        4                               /* write */
-#define TD_WRITE1       5                               /* write */
-#define TD_WRITE2       6                               /* write */
-#define TD_END          7                               /* empty buffer */
-#define TD_END1         8                               /* empty buffer */
-#define TD_INIT         9                               /* empty buffer */
 
 int32 tti_csr = 0;                                      /* control/status */
 uint32 tti_buftime;                                     /* time input character arrived */
@@ -164,13 +154,8 @@ int32 tto_csr = 0;                                      /* control/status */
 int32 tto_buf = 0;                                      /* buffer */
 int32 tto_int = 0;                                      /* interrupt */
 
-int32 csi_csr = 0;                                      /* control/status */
-int32 csi_buf = 0;                                      /* buffer */
 int32 csi_int = 0;                                      /* interrupt */
-int32 cso_csr = 0;                                      /* control/status */
-int32 cso_buf = 0;                                      /* buffer */
 int32 cso_int = 0;                                      /* interrupt */
-int32 cso_state = 0;                                    /* state */
 
 int32 tmr_iccs = 0;                                     /* interval timer csr */
 uint32 tmr_icr = 0;                                     /* curr interval */
@@ -188,23 +173,7 @@ struct todr_battery_info {
     };
 typedef struct todr_battery_info TOY;
 
-int32 td_swait = 100;                                   /* seek, per block */
-int32 td_cwait = 150;                                   /* command time */
-int32 td_xwait = 180;                                   /* tr set time */
-int32 td_iwait = 180;                                   /* init time */
-uint8 td_ibuf[TD_NUMBY] = { 0 };                        /* input buffer */
-int32 td_ibptr = 0;                                     /* input buffer pointer */
-int32 td_ilen = 0;                                      /* input length */
-uint8 td_obuf[TD_NUMBY] = { 0 };                        /* output buffer */
-int32 td_obptr = 0;                                     /* output buffer pointer */
-int32 td_olen = 0;                                      /* output length */
-int32 td_block = 0;                                     /* current block number */
-int32 td_txsize = 0;                                    /* remaining transfer size */
-int32 td_offset = 0;                                    /* offset into current transfer */
-int32 td_state = TD_IDLE;
-int32 td_ecode = 0;                                     /* end packet success code */
-
-extern jmp_buf save_env;
+int32 td_regval;                                        /* temp location used in reg declarations */
 
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
@@ -213,26 +182,23 @@ t_stat tmr_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
-char *tti_description (DEVICE *dptr);
-char *tto_description (DEVICE *dptr);
-char *clk_description (DEVICE *dptr);
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat clk_attach (UNIT *uptr, char *cptr);
+const char *tti_description (DEVICE *dptr);
+const char *tto_description (DEVICE *dptr);
+const char *clk_description (DEVICE *dptr);
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat clk_attach (UNIT *uptr, CONST char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
-char *tmr_description (DEVICE *dptr);
-t_stat td_svc (UNIT *uptr);
+const char *tmr_description (DEVICE *dptr);
 t_stat td_reset (DEVICE *dptr);
-char *td_description (DEVICE *dptr);
+const char *td_description (DEVICE *dptr);
 int32 icr_rd (t_bool interp);
 void tmr_incr (uint32 inc);
 void tmr_sched (void);
 t_stat todr_resync (void);
 t_stat txdb_misc_wr (int32 data);
-void td_process_packet();
-t_bool td_test_xfr (UNIT *uptr, int32 state);
 
 extern int32 con_halt (int32 code, int32 cc);
 
@@ -243,7 +209,7 @@ extern int32 con_halt (int32 code, int32 cc);
    tti_reg      TTI register list
 */
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), SERIAL_IN_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
     { HRDATAD (RXDB,       tti_buf,         16, "last data item processed") },
@@ -362,17 +328,29 @@ DEVICE tmr_dev = {
    td_mod       RX modifier list
 */
 
-UNIT td_unit = { UDATA (&td_svc,
-      UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF, TD_SIZE) };
+UNIT td_unit;
 
 REG td_reg[] = {
-    { HRDATAD (ECODE,  td_ecode,  8, "end packet success code") },
-    { HRDATAD (BLK,    td_block,  8, "current block number") },
-    { DRDATAD (PSTATE, td_state,  4, "state"), REG_RO },
-    { DRDATAD (BPTR,   td_obptr,  7, "output buffer pointer")  },
-    { DRDATAD (CTIME,  td_cwait, 24, "command time"), PV_LEFT },
-    { DRDATAD (STIME,  td_swait, 24, "seek, per block"), PV_LEFT },
-    { DRDATAD (XTIME,  td_xwait, 24, "tr set time"), PV_LEFT },
+    { HRDATAD (ECODE,  td_regval, 8, "end packet success code") },
+    { HRDATAD (BLOCK,  td_regval, 8, "current block number") },
+    { HRDATAD (RX_CSR, td_regval,16, "input control/status register") },
+    { HRDATAD (RX_BUF, td_regval,16, "input buffer register") },
+    { HRDATAD (TX_CSR, td_regval,16, "output control/status register") },
+    { HRDATAD (TX_BUF, td_regval,16, "output buffer register") },
+    { DRDATAD (P_STATE,td_regval, 4, "protocol state"), REG_RO },
+    { DRDATAD (O_STATE,td_regval, 4, "output state"), REG_RO },
+    { DRDATAD (IBPTR,  td_regval, 9, "input buffer pointer")  },
+    { DRDATAD (OBPTR,  td_regval, 9, "output buffer pointer")  },
+    { DRDATAD (ILEN,   td_regval, 9, "input length")  },
+    { DRDATAD (OLEN,   td_regval, 9, "output length")  },
+    { DRDATAD (TXSIZE, td_regval, 9, "remaining transfer size")  },
+    { DRDATAD (OFFSET, td_regval, 9, "offset into current transfer")  },
+    { DRDATAD (CTIME,  td_regval,24, "command time"), PV_LEFT },
+    { DRDATAD (STIME,  td_regval,24, "seek, per block"), PV_LEFT },
+    { DRDATAD (XTIME,  td_regval,24, "tr set time"), PV_LEFT },
+    { DRDATAD (ITIME,  td_regval,24, "init time"), PV_LEFT },
+    { BRDATAD (IBUF,   &td_regval,16, 8, 512, "input buffer"), },
+    { BRDATAD (OBUF,   &td_regval,16, 8, 512, "output buffer"), },
     { NULL }
     };
 
@@ -387,9 +365,26 @@ DEVICE td_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &td_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_DEBUG, 0, td_deb, NULL, NULL, NULL, NULL, NULL, 
     &td_description
     };
+
+static void set_csi_int (int32 ctlr, t_bool val)
+{
+if (csi_int ^ val) {
+    csi_int = val;
+    sim_debug (TDDEB_INT, &td_dev, "CSI_INT(%d)\n", val);
+    }
+}
+
+static void set_cso_int (int32 ctlr, t_bool val)
+{
+if (cso_int ^ val) {
+    cso_int = val;
+    sim_debug (TDDEB_INT, &td_dev, "CSO_INT(%d)\n", val);
+    }
+}
+
 
 /* Console storage MxPR routines
 
@@ -399,197 +394,50 @@ DEVICE td_dev = {
    cstd_wr      output buffer
 */
 
+#define ctlr up7
+
 int32 csrs_rd (void)
 {
-return (csi_csr & RXCS_RD);
+int32 data;
+
+sim_debug (TDDEB_IRD, &td_dev, "csrs_rd()\n");
+td_rd_i_csr ((CTLR *)td_unit.ctlr, &data);
+return data;
 }
 
 void csrs_wr (int32 data)
 {
-if ((data & CSR_IE) == 0)
-    cso_int = 0;
-else if ((csi_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-    csi_int = 1;
-csi_csr = (csi_csr & ~RXCS_WR) | (data & RXCS_WR);
-return;
+sim_debug (TDDEB_IWR, &td_dev, "csrs_wr()\n");
+td_wr_i_csr ((CTLR *)td_unit.ctlr, data);
 }
 
 int32 csrd_rd (void)
 {
-int32 t = csi_buf;                                      /* char + error */
-
-csi_csr = csi_csr & ~CSR_DONE;                          /* clr done */
-csi_buf = csi_buf & BMASK;                              /* clr errors */
-csi_int = 0;
-return t;
+int32 data;
+sim_debug (TDDEB_IRD, &td_dev, "csrd_rd()\n");
+td_rd_i_buf ((CTLR *)td_unit.ctlr, &data);
+return data;
 }
 
 int32 csts_rd (void)
 {
-return (cso_csr & TXCS_RD);
+int32 data;
+
+sim_debug (TDDEB_ORD, &td_dev, "csts_rd()\n");
+td_rd_o_csr ((CTLR *)td_unit.ctlr, &data);
+return data;
 }
 
 void csts_wr (int32 data)
 {
-if ((cso_csr & CSTS_BRK) && !(data & CSTS_BRK)) {
-    td_ibptr = 0;
-    td_ibuf[td_ibptr++] = TD_OPINI;
-    td_process_packet();                                 /* check packet */
-    }
-if ((data & CSR_IE) == 0)
-    cso_int = 0;
-else if ((cso_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-    cso_int = 1;
-cso_csr = (cso_csr & ~CSTS_WR) | (data & CSTS_WR);
-return;
+sim_debug (TDDEB_OWR, &td_dev, "csts_wr()\n");
+td_wr_o_csr ((CTLR *)td_unit.ctlr, data);
 }
 
 void cstd_wr (int32 data)
 {
-cso_buf = data & WMASK;                                  /* save data */
-cso_csr = cso_csr & ~CSR_DONE;                           /* clear flag */
-cso_int = 0;                                             /* clear int */
-
-switch (cso_state) {
-
-    case TD_GETOPC:
-        td_ibptr = 0;
-        td_ibuf[td_ibptr++] = cso_buf;
-        td_process_packet();                             /* check packet */
-        break;
-
-    case TD_GETLEN:
-        td_ibuf[td_ibptr++] = cso_buf;
-        td_ilen = cso_buf + 4;                           /* packet length + header + checksum */
-        cso_state = TD_GETDATA;
-        break;
-
-    case TD_GETDATA:
-        td_ibuf[td_ibptr++] = cso_buf;
-        if (td_ibptr >= td_ilen) {
-            cso_state = TD_GETOPC;
-            td_process_packet();
-            }
-        break;
-    }
-
-cso_csr = cso_csr | CSR_DONE;                            /* set input flag */
-if (cso_csr & CSR_IE)
-    cso_int = 1;
-return;
-}
-
-void td_process_packet()
-{
-int32 opcode = td_ibuf[0];
-
-switch (opcode) {
-
-    case TD_OPDAT:
-        if (td_state != TD_WRITE1) {                     /* expecting data? */
-            sim_printf("TU58 protocol error 1\n");
-            return;
-            }
-        if (td_ibptr < 2) {                              /* whole packet read? */
-            cso_state = TD_GETLEN;                       /* get rest of packet */
-            return;
-            }
-        td_state = TD_WRITE2;
-        sim_activate (&td_unit, td_cwait);               /* sched command */
-        break;
-
-    case TD_OPCMD:
-        if (td_state != TD_IDLE) {                       /* expecting command? */
-            sim_printf("TU58 protocol error 2\n");
-            return;
-            }
-        if (td_ibptr < 2) {                              /* whole packet read? */
-            cso_state = TD_GETLEN;                       /* get rest of packet */
-            return;
-            }
-        switch (td_ibuf[2]) {
-            case TD_CMDNOP:                              /* NOP */
-            case TD_CMDGST:                              /* Get status */
-            case TD_CMDSST:                              /* Set status */
-                td_state = TD_END;                       /* All treated as NOP */
-                td_ecode = TD_STSOK;
-                td_offset = 0;
-                sim_activate (&td_unit, td_cwait);       /* sched command */
-                break;
-               
-            case TD_CMDINI:
-                sim_printf("Warning: TU58 command 'INIT' not implemented\n");
-                break;
-               
-            case TD_CMDRD:
-                td_block = ((td_ibuf[11] << 8) | td_ibuf[10]);
-                td_txsize = ((td_ibuf[9] << 8) | td_ibuf[8]);
-                td_state = TD_READ;
-                td_offset = 0;
-                sim_activate (&td_unit, td_cwait);       /* sched command */
-                break;
-               
-            case TD_CMDWR:
-                td_block = ((td_ibuf[11] << 8) | td_ibuf[10]);
-                td_txsize = ((td_ibuf[9] << 8) | td_ibuf[8]);
-                td_state = TD_WRITE;
-                td_offset = 0;
-                sim_activate (&td_unit, td_cwait);       /* sched command */
-                break;
-               
-            case TD_CMDPOS:
-                sim_printf("Warning: TU58 command 'Position' not implemented\n");
-                break;
-               
-            case TD_CMDDIA:
-                sim_printf("Warning: TU58 command 'Diagnose' not implemented\n");
-                break;
-               
-            case TD_CMDMRSP:
-                csi_buf = TD_OPDAT;
-                csi_csr = csi_csr | CSR_DONE;            /* set input flag */
-                if (csi_csr & CSR_IE)
-                    csi_int = 1;
-                break;
-            }
-        break;
-
-    case TD_OPINI:
-        sim_cancel (&td_unit);
-        td_ibptr = 0;
-        td_obptr = 0;
-        td_olen = 0;
-        td_offset = 0;
-        td_txsize = 0;
-        cso_state = TD_GETOPC;
-        td_state = TD_INIT;
-        sim_activate (&td_unit, td_iwait);               /* sched command */
-        break;
-
-    case TD_OPBOO:
-        if (td_state != TD_IDLE) {
-            sim_printf("TU58 protocol error 3\n");
-            return;
-            }
-        if (td_ibptr < 2) {                             /* whole packet read? */
-            td_ilen = 2;
-            cso_state = TD_GETDATA;                     /* get rest of packet */
-            return;
-            }
-        td_block = 0;
-        td_txsize = 512;
-        td_state = TD_READ;
-        td_offset = 0;
-        sim_activate (&td_unit, td_cwait);               /* sched command */
-        break;
-
-    case TD_OPCNT:
-        break;
-
-    default:
-        //printf("TU58: Unknown opcode %d\n", opcode);
-        break;
-    }
+sim_debug (TDDEB_OWR, &td_dev, "cstd_wr()\n");
+td_wr_o_buf ((CTLR *)td_unit.ctlr, data);
 }
 
 /* Terminal MxPR routines
@@ -623,7 +471,7 @@ if (tti_csr & CSR_DONE) {                               /* Input pending ? */
     tti_csr = tti_csr & ~CSR_DONE;                      /* clr done */
     tti_buf = tti_buf & BMASK;                          /* clr errors */
     tti_int = 0;
-    sim_activate_abs (&tti_unit, tti_unit.wait);        /* check soon for more input */
+    sim_activate_after_abs (&tti_unit, tti_unit.wait);  /* check soon for more input */
     }
 return t;
 }
@@ -660,8 +508,8 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_clock_coschedule (uptr, KBD_WAIT (uptr->wait, tmr_poll));
-                                                        /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
+
 if ((tti_csr & CSR_DONE) &&                             /* input still pending and < 500ms? */
     ((sim_os_msec () - tti_buftime) < 500))
      return SCPE_OK;
@@ -687,13 +535,10 @@ tti_buf = 0;
 tti_csr = 0;
 tti_int = 0;
 sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
-csi_buf = 0;
-csi_csr = 0;
-csi_int = 0;
 return SCPE_OK;
 }
 
-t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Input (TTI)\n\n");
 fprintf (st, "The terminal input (TTI) polls the console keyboard for input.\n\n");
@@ -703,7 +548,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tti_description (DEVICE *dptr)
+const char *tti_description (DEVICE *dptr)
 {
 return "console terminal input";
 }
@@ -742,7 +587,7 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Console Terminal Output (TTO)\n\n");
 fprintf (st, "The terminal output (TTO) writes to the simulator console.\n\n");
@@ -752,7 +597,7 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *tto_description (DEVICE *dptr)
+const char *tto_description (DEVICE *dptr)
 {
 return "console terminal output";
 }
@@ -919,7 +764,7 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
 return SCPE_OK;
 }
 
-t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Real-Time Clock (%s)\n\n", dptr->name);
 fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
@@ -950,14 +795,14 @@ fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
-char *clk_description (DEVICE *dptr)
+const char *clk_description (DEVICE *dptr)
 {
 return "time of year clock";
 }
 
 /* CLK attach */
 
-t_stat clk_attach (UNIT *uptr, char *cptr)
+t_stat clk_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -998,7 +843,7 @@ todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
 }
 
-char *tmr_description (DEVICE *dptr)
+const char *tmr_description (DEVICE *dptr)
 {
 return "interval timer";
 }
@@ -1086,200 +931,14 @@ if (sel == TXDB_MISC) {                                 /* misc function? */
 return SCPE_OK;
 }
 
-t_stat td_svc (UNIT *uptr)
-{
-int32 i, t, data_size;
-uint16 c, w;
-uint32 da;
-int8 *fbuf = uptr->filebuf;
-
-switch (td_state) {                                     /* case on state */
-
-    case TD_IDLE:                                       /* idle */
-        return SCPE_IERR;                               /* done */
-
-    case TD_READ: case TD_WRITE:                        /* read, write */
-        if (td_test_xfr (uptr, td_state)) {             /* transfer ok? */
-            t = abs (td_block - 0);                     /* # blocks to seek */
-            if (t == 0)                                 /* minimum 1 */
-                t = 1;
-            td_state++;                                 /* set next state */
-            sim_activate (uptr, td_swait * t);          /* schedule seek */
-            break;
-            }
-        else td_state = TD_END;
-        sim_activate (uptr, td_xwait);                  /* schedule next */
-        break;
-
-    case TD_READ1:                                      /* build data packet */
-        da = (td_block * 512) + td_offset;              /* get tape address */
-        if (td_txsize > 128)                            /* Packet length */
-            data_size = 128;
-        else data_size = td_txsize;
-        td_txsize = td_txsize - data_size;
-        td_offset = td_offset + data_size;
-        
-        td_obptr = 0;
-        td_obuf[td_obptr++] = TD_OPDAT;                 /* Data packet */
-        td_obuf[td_obptr++] = data_size;                /* Data length */
-        for (i = 0; i < data_size; i++)                 /* copy sector to buf */
-            td_obuf[td_obptr++] = fbuf[da + i];
-        c = 0;
-        for (i = 0; i < (data_size + 2); i++) {         /* Calculate checksum */
-            w = (td_obuf[i] << ((i & 0x1) ? 8 : 0));
-            c = c + w + ( (uint32)((uint32)c + (uint32)w) > 0xFFFF ? 1 : 0);
-            }
-        td_obuf[td_obptr++] = (c & 0xFF);               /* Checksum L */
-        td_obuf[td_obptr++] = ((c >> 8) & 0xFF);        /* Checksum H */
-        td_olen = td_obptr;
-        td_obptr = 0;
-        td_state = TD_READ2;                            /* go empty */
-        sim_activate (uptr, td_xwait);                  /* schedule next */
-        break;
-
-    case TD_READ2:                                      /* send data packet to host */
-        if ((csi_csr & CSR_DONE) == 0) {                /* prev data taken? */
-            csi_buf = td_obuf[td_obptr++];              /* get next byte */
-            csi_csr = csi_csr | CSR_DONE;               /* set input flag */
-            if (csi_csr & CSR_IE)
-                csi_int = 1;
-            if (td_obptr >= td_olen) {                  /* buffer empty? */
-                if (td_txsize > 0)
-                    td_state = TD_READ1;
-                else
-                    td_state = TD_END;
-                }
-            }
-        sim_activate (uptr, td_xwait);                  /* schedule next */
-        break;
-
-    case TD_WRITE1:                                     /* send continue */
-        if ((csi_csr & CSR_DONE) == 0) {                /* prev data taken? */
-            csi_buf = TD_OPCNT;
-            csi_csr = csi_csr | CSR_DONE;               /* set input flag */
-            if (csi_csr & CSR_IE)
-                csi_int = 1;
-            break;
-            }
-        sim_activate (uptr, td_xwait);                  /* schedule next */
-        break;
-
-    case TD_WRITE2:                                     /* write data to buffer */
-        da = (td_block * 512) + td_offset;              /* get tape address */
-        td_olen = td_ibuf[1];
-        for (i = 0; i < td_olen; i++)                   /* write data to buffer */
-            fbuf[da + i] = td_ibuf[i + 2];
-        td_offset += td_olen;
-        td_txsize -= td_olen;
-        da = da + td_olen;
-        if (da > uptr->hwmark)                          /* update hwmark */
-            uptr->hwmark = da;
-        if (td_txsize > 0)
-            td_state = TD_WRITE1;
-        else {                                          /* check whole number of blocks written */
-            if ((td_olen = (512 - (td_offset % 512))) != 512) {
-                for (i = 0; i < td_olen; i++)
-                    fbuf[da + i] = 0;                   /* zero fill */
-                da = da + td_olen;
-                if (da > uptr->hwmark)                  /* update hwmark */
-                    uptr->hwmark = da;
-                }
-            td_state = TD_END;
-            }
-        sim_activate (uptr, td_xwait);                  /* schedule next */
-        break;
-        
-    case TD_END:                                        /* build end packet */
-        td_obptr = 0;
-        td_obuf[td_obptr++] = TD_OPCMD;                 /* Command packet */
-        td_obuf[td_obptr++] = 0xA;                      /* ** Need definition ** */
-        td_obuf[td_obptr++] = TD_CMDEND;
-        td_obuf[td_obptr++] = td_ecode;                 /* Success code */
-        td_obuf[td_obptr++] = 0;                        /* Unit number */
-        td_obuf[td_obptr++] = 0;                        /* Not used */
-        td_obuf[td_obptr++] = 0;                        /* Sequence L (not used) */
-        td_obuf[td_obptr++] = 0;                        /* Sequence H (not used) */
-        td_obuf[td_obptr++] = (td_offset & 0xFF);       /* Byte count L */
-        td_obuf[td_obptr++] = ((td_offset >> 8) & 0xFF);/* Byte count H */
-        td_obuf[td_obptr++] = 0;                        /* Summary status L */
-        td_obuf[td_obptr++] = 0;                        /* Summary status H */
-        c = 0;
-        for (i = 0; i < (0xA + 2); i++) {               /* Calculate checksum */
-            w = (td_obuf[i] << ((i & 0x1) ? 8 : 0));
-            c = c + w + ( (uint32)((uint32)c + (uint32)w) > 0xFFFF ? 1 : 0);
-            }
-        td_obuf[td_obptr++] = c & 0xFF;                 /* Checksum L */
-        td_obuf[td_obptr++] = (c >> 8) & 0xFF;          /* Checksum H */
-        td_olen = td_obptr;
-        td_obptr = 0;
-        td_state = TD_END1;                             /* go empty */
-        sim_activate (uptr, td_xwait);                  /* schedule next */
-        break;
-
-    case TD_END1:                                       /* send end packet to host */
-        if ((csi_csr & CSR_DONE) == 0) {                /* prev data taken? */
-            csi_buf = td_obuf[td_obptr++];              /* get next byte */
-            csi_csr = csi_csr | CSR_DONE;               /* set input flag */
-            if (csi_csr & CSR_IE)
-                csi_int = 1;
-            if (td_obptr >= td_olen) {                  /* buffer empty? */
-                td_state = TD_IDLE;
-                break;
-                }
-            }
-        sim_activate (uptr, td_xwait);                  /* schedule next */
-        break;
-
-    case TD_INIT:
-        if ((csi_csr & CSR_DONE) == 0) {                /* prev data taken? */
-            csi_buf = TD_OPCNT;
-            csi_csr = csi_csr | CSR_DONE;               /* set input flag */
-            if (csi_csr & CSR_IE)
-                csi_int = 1;
-            td_state = TD_IDLE;
-            break;
-            }
-        sim_activate (uptr, td_xwait);                  /* schedule next */
-        break;
-    }
-return SCPE_OK;
-}
-
-/* Test for data transfer okay */
-
-t_bool td_test_xfr (UNIT *uptr, int32 state)
-{
-if ((uptr->flags & UNIT_BUF) == 0)                      /* not buffered? */
-    td_ecode = TD_STSNC;
-else if (td_block >= TD_NUMBLK)                         /* bad block? */
-    td_ecode = TD_STSBBN;
-else if ((state == TD_WRITE) && (uptr->flags & UNIT_WPRT))               /* write and locked? */
-    td_ecode = TD_STSWP;
-else {
-    td_ecode = TD_STSOK;
-    return TRUE;
-    }
-return FALSE;
-}
-
 /* Reset */
 
 t_stat td_reset (DEVICE *dptr)
 {
-cso_buf = 0;
-cso_csr = CSR_DONE;
-cso_int = 0;
-cso_state = TD_GETOPC;
-td_ibptr = 0;
-td_obptr = 0;
-td_olen = 0;
-td_offset = 0;
-td_txsize = 0;
-sim_cancel (&td_unit);
-return SCPE_OK;
+return td_connect_console_device (&td_dev, set_csi_int, set_cso_int);
 }
 
-char *td_description (DEVICE *dptr)
+const char *td_description (DEVICE *dptr)
 {
 return "Console TU58 cartridge";
 }

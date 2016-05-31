@@ -89,7 +89,7 @@
 
 /* ---------------------------------------------------------------------------- */
 
-static void badio (char *dev)
+static void badio (const char *dev)
 {
 /* the real 1130 just ignores attempts to use uninstalled devices. They get tested
  * at times, so it's best to just be quiet about this
@@ -138,18 +138,18 @@ static t_stat emit_conout_character(int ch);
 static t_stat map_conout_character(int ch);
 static void   reset_mapping (void);
 static void   set_conout_mapping(int32 flags);
-static t_stat validate_conout_mapping(UNIT *uptr, int32 match, char *cvptr, void *desc);
+static t_stat validate_conout_mapping(UNIT *uptr, int32 match, CONST char *cvptr, void *desc);
 static void   set_default_mapping(int32 flags);
 static void   finish_conout_mapping(int32 flags);
 static void   strsort (int n, unsigned char *s);		/* sorts an array of n characters */
 static int    os_map_comp (OS_MAP *a, OS_MAP *b);		/* compares two mapping entries */
-static t_stat font_cmd(int32 flag, char *cptr);			/* handles font command */
+static t_stat font_cmd(int32 flag, CONST char *cptr);			/* handles font command */
 static void   read_map_file(FILE *fd);					/* reads a font map file */
-static t_bool str_match(char *str, char *keyword);		/* keyword/string comparison */
-static char * handle_map_ansi_definition(char **pc);	/* input line parsers for map file sections */
-static char * handle_map_input_definition(char **pc);
-static char * handle_map_output_definition(char **pc);
-static char * handle_map_overstrike_definition(char **pc);
+static t_bool str_match(const char *str, const char *keyword);/* keyword/string comparison */
+static const char * handle_map_ansi_definition(char **pc);	/* input line parsers for map file sections */
+static const char * handle_map_input_definition(char **pc);
+static const char * handle_map_output_definition(char **pc);
+static const char * handle_map_overstrike_definition(char **pc);
 
 #define UNIT_V_CSET		(UNIT_V_UF + 0)		/* user flag: character set */
 #define UNIT_V_LOCKED	(UNIT_V_UF + 2)		/* user flag: keyboard locked */
@@ -443,31 +443,33 @@ static t_stat tti_reset (DEVICE *dptr)
 
 /* basic_attach - fix quotes in filename, then call standard unit attach routine */
 
-t_stat basic_attach (UNIT *uptr, char *cptr)
+t_stat basic_attach (UNIT *uptr, CONST char *cptr)
 {
-	return attach_unit(uptr, quotefix(cptr));	/* fix quotes in filenames & attach */
+    char gbuf[2*CBUFSIZE];
+
+	return attach_unit(uptr, quotefix(cptr, gbuf));	/* fix quotes in filenames & attach */
 }
 
 /* quotefix - strip off quotes around filename, if present */
 
-char * quotefix (char * cptr)
+CONST char * quotefix (CONST char *cptr, char * buf)
 {
-#ifdef WIN32									/* do this only for Windows builds, for the time being */
-	char *c;
-	int quote;
+    const char *c;
+    int quote;
 
-	if (*cptr == '"' || *cptr == '\'') {
-		quote = *cptr++;						/* remember quote and skip over it */
+    while (sim_isspace(*cptr))
+        ++cptr;
+    if (*cptr == '"' || *cptr == '\'') {
+        quote = *cptr++;                        /* remember quote and skip over it */
 
-		for (c = cptr; *c && *c != quote; c++)
-			;									/* find closing quote, or end of string */
+        cptr = buf;
+        for (c = cptr; *c && *c != quote; c++)
+            *buf++ = *c;                        /* find closing quote, or end of string */
 
-		if (*c)									/* terminate string at closing quote */
-			*c = '\0';
-	}
-
-#endif
-	return cptr;								/* return pointer to cleaned-up name */
+        if (*c)                                 /* terminate string at closing quote */
+            *buf = '\0';
+        }
+    return cptr;                                /* return pointer to cleaned-up name */
 }
 
 t_bool keyboard_is_busy (void)					/* return TRUE if keyboard is not expecting a character */
@@ -518,18 +520,18 @@ static struct {							/* default input mapping for APL */
 	unsigned char out;
 } conin_to_APL[] =
 {										/* these map input keys to those in like positions on 1130 keyboard */
-	'[',	'\r',						/* enter (EOF) is APL left arrow */
-	';',	'\b',						/* backspace is APL [ */
-	'\'',	'\x15',						/* ctrl-U, erase field, is APL ]*/
-	'2',	'@',						/* APL upshift */
-	'3',	'%',						/* APL rightshift */
-	'4',	'*',						/* APL + and - */
-	'5',	'<',						/* APL x and divide */
-	'8',	'-',						/* APL return */
-	'9',	'/',						/* APL backspace */
-	'-',	IRQ_KEY,					/* ctrl-q (INT REQ), APL ATTN */
-	'\r',	'-',						/* APL return */
-	'\b',	'/'							/* APL backspace */
+    {'[',	'\r'},						/* enter (EOF) is APL left arrow */
+    {';',	'\b'},						/* backspace is APL [ */
+    {'\'',	'\x15'},					/* ctrl-U, erase field, is APL ]*/
+    {'2',	'@'},						/* APL upshift */
+    {'3',	'%'},						/* APL rightshift */
+    {'4',	'*'},						/* APL + and - */
+    {'5',	'<'},						/* APL x and divide */
+    {'8',	'-'},						/* APL return */
+    {'9',	'/'},						/* APL backspace */
+    {'-',	IRQ_KEY},					/* ctrl-q (INT REQ), APL ATTN */
+    {'\r',	'-'},						/* APL return */
+    {'\b',	'/'}						/* APL backspace */
 };
 
 #define NCONIN_TO_APL (sizeof(conin_to_APL)/sizeof(conin_to_APL[0]))
@@ -539,136 +541,136 @@ static struct {							/* default output mapping for APLPLUS font */
 	unsigned char out;
 } conout_to_APL[] =
 {
-	'\x01', IGNR_,						/* controls */
-	'\x03', '\n',
-	'\x05', IGNR_,						/* (black and red are handled by ansi sequences) */
-	'\x09', IGNR_,
-	'\x11', '\b',
-	'\x21', ' ',
-	'\x41', '\t',
-	'\x81', CRLF_,
+    {'\x01', IGNR_},						/* controls */
+    {'\x03', '\n'},
+    {'\x05', IGNR_},						/* (black and red are handled by ansi sequences) */
+    {'\x09', IGNR_},
+    {'\x11', '\b'},
+    {'\x21', ' '},
+    {'\x41', '\t'},
+    {'\x81', CRLF_},
 
-	'\xC4', '\x30',						/* (if you're curious, order here is position on APL typeball) */
-	'\xE4', '\x38',
-	'\xD4', '\x37',
-	'\xF4', '\x35',
-	'\xDC', '\x33',
-	'\xFC', '\x31',
-	'\xC2', '\x29',
-	'\xE2', '\x9F',
-	'\xD2', '\x89',
-	'\xF2', '\x88',
-	'\xDA', '\xAF',
-	'\xC6', '\x5E',
-	'\xE6', '\xAC',
-	'\xD6', '\x3E',
-	'\xF6', '\x3D',
-	'\xDE', '\x3C',
-	'\xFE', '\xA8',
-	'\xC0', '\x5D',
-	'\xE0', '\x39',
-	'\xD0', '\x36',
-	'\xF0', '\x34',
-	'\xD8', '\x32',
+    {'\xC4', '\x30'},						/* (if you're curious, order here is position on APL typeball) */
+    {'\xE4', '\x38'},
+    {'\xD4', '\x37'},
+    {'\xF4', '\x35'},
+    {'\xDC', '\x33'},
+    {'\xFC', '\x31'},
+    {'\xC2', '\x29'},
+    {'\xE2', '\x9F'},
+    {'\xD2', '\x89'},
+    {'\xF2', '\x88'},
+    {'\xDA', '\xAF'},
+    {'\xC6', '\x5E'},
+    {'\xE6', '\xAC'},
+    {'\xD6', '\x3E'},
+    {'\xF6', '\x3D'},
+    {'\xDE', '\x3C'},
+    {'\xFE', '\xA8'},
+    {'\xC0', '\x5D'},
+    {'\xE0', '\x39'},
+    {'\xD0', '\x36'},
+    {'\xF0', '\x34'},
+    {'\xD8', '\x32'},
 
-	'\x84', '\x84',
-	'\xA4', '\x59',
-	'\x94', '\x58',
-	'\xB4', '\x56',
-	'\x9C', '\x54',
-	'\xBC', '\x2F',
-	'\x82', '\x3B',
-	'\xA2', '\x9B',
-	'\x92', '\xBE',
-	'\xB2', '\x87',
-	'\x9A', '\x97',
-	'\x86', '\x85',
-	'\xA6', '\x86',
-	'\x96', '\x9C',
-	'\xB6', '\x9E',
-	'\x9E', '\x7E',
-	'\xBE', '\x5C',
-	'\x80', '\x2C',
-	'\xA0', '\x5A',
-	'\x90', '\x57',
-	'\xB0', '\x55',
-	'\x98', '\x53',
+    {'\x84', '\x84'},
+    {'\xA4', '\x59'},
+    {'\x94', '\x58'},
+    {'\xB4', '\x56'},
+    {'\x9C', '\x54'},
+    {'\xBC', '\x2F'},
+    {'\x82', '\x3B'},
+    {'\xA2', '\x9B'},
+    {'\x92', '\xBE'},
+    {'\xB2', '\x87'},
+    {'\x9A', '\x97'},
+    {'\x86', '\x85'},
+    {'\xA6', '\x86'},
+    {'\x96', '\x9C'},
+    {'\xB6', '\x9E'},
+    {'\x9E', '\x7E'},
+    {'\xBE', '\x5C'},
+    {'\x80', '\x2C'},
+    {'\xA0', '\x5A'},
+    {'\x90', '\x57'},
+    {'\xB0', '\x55'},
+    {'\x98', '\x53'},
 
-	'\x44', '\x2B',
-	'\x64', '\x51',
-	'\x54', '\x50',
-	'\x74', '\x4E',
-	'\x5C', '\x4C',
-	'\x7C', '\x4A',
-	'\x42', '\x28',
-	'\x62', '\xBD',
-	'\x52', '\xB1',
-	'\x72', '\x7C',
-	'\x5A', '\x27',
-	'\x46', '\x2D',
-	'\x66', '\x3F',
-	'\x56', '\x2A',
-	'\x76', '\x82',
-	'\x5E', '\x8C',
-	'\x7E', '\xB0',
-	'\x40', '\x5B',
-	'\x60', '\x52',
-	'\x50', '\x4F',
-	'\x70', '\x4D',
-	'\x58', '\x4B',
+    {'\x44', '\x2B'},
+    {'\x64', '\x51'},
+    {'\x54', '\x50'},
+    {'\x74', '\x4E'},
+    {'\x5C', '\x4C'},
+    {'\x7C', '\x4A'},
+    {'\x42', '\x28'},
+    {'\x62', '\xBD'},
+    {'\x52', '\xB1'},
+    {'\x72', '\x7C'},
+    {'\x5A', '\x27'},
+    {'\x46', '\x2D'},
+    {'\x66', '\x3F'},
+    {'\x56', '\x2A'},
+    {'\x76', '\x82'},
+    {'\x5E', '\x8C'},
+    {'\x7E', '\xB0'},
+    {'\x40', '\x5B'},
+    {'\x60', '\x52'},
+    {'\x50', '\x4F'},
+    {'\x70', '\x4D'},
+    {'\x58', '\x4B'},
 
-	'\x04', '\xD7',
-	'\x24', '\x48',
-	'\x14', '\x47',
-	'\x34', '\x45',
-	'\x1C', '\x43',
-	'\x3C', '\x41',
-	'\x02', '\x3A',
-	'\x22', '\xBC',
-	'\x12', '\x5F',
-	'\x32', '\x98',
-	'\x1A', '\x83',
-	'\x06', '\xF7',
-	'\x26', '\x91',
-	'\x16', '\x92',
-	'\x36', '\xB9',
-	'\x1E', '\x9D',
-	'\x3E', '\xB8',
-	'\x00', '\x2E',
-	'\x20', '\x49',
-	'\x10', '\x46',
-	'\x30', '\x44',
-	'\x18', '\x42',
+    {'\x04', '\xD7'},
+    {'\x24', '\x48'},
+    {'\x14', '\x47'},
+    {'\x34', '\x45'},
+    {'\x1C', '\x43'},
+    {'\x3C', '\x41'},
+    {'\x02', '\x3A'},
+    {'\x22', '\xBC'},
+    {'\x12', '\x5F'},
+    {'\x32', '\x98'},
+    {'\x1A', '\x83'},
+    {'\x06', '\xF7'},
+    {'\x26', '\x91'},
+    {'\x16', '\x92'},
+    {'\x36', '\xB9'},
+    {'\x1E', '\x9D'},
+    {'\x3E', '\xB8'},
+    {'\x00', '\x2E'},
+    {'\x20', '\x49'},
+    {'\x10', '\x46'},
+    {'\x30', '\x44'},
+    {'\x18', '\x42'},
 };
 
 #define NCONOUT_TO_APL (sizeof(conout_to_APL)/sizeof(conout_to_APL[0]))
 
 static OS_MAP default_os_map[] =			/* overstrike mapping for APLPLUS font */
 {
-	'\x8a',	2,	"\x5e\x7e",
-	'\x8b',	2,	"\x9f\x7e",
-	'\x8d',	2,	"\x8c\x27",
-	'\x8e',	3,	"\x8c\x2d\x3a",
-	'\x8f',	2,	"\x91\x5f",
-	'\x90',	2,	"\x92\x7e",
-	'\x93',	2,	"\x91\x7c",
-	'\x94',	2,	"\x92\x7c",
-	'\x95',	2,	"\xb0\x82",
-	'\x96',	2,	"\xb0\x83",
-	'\x99',	2,	"\x2d\x5c",
-	'\x9a',	2,	"\x2d\x2f",
-	'\xae',	2,	"\x2c\x2d",
-	'\xb2',	2,	"\xb1\x7c",
-	'\xb3',	2,	"\xb1\x5c",
-	'\xb4',	2,	"\xb1\x2d",
-	'\xb5',	2,	"\xb1\x2a",
-	'\xba',	2,	"\xb9\x5f",
-	'\xd0',	2,	"\x30\x7e",
-	'\xd8',	2,	"\x4f\x2f",
-	'\x21', 2,  "\x27\x2e",
-	'\xa4',	2,	"\xb0\xb1",		/*  map degree in circle to circle cross (APL uses this as character error symbol) */
-	'\xf0',	2,	"\xb0\xa8",
-	'\xfe',	2,	"\x3a\xa8",
+	{'\x8a',	2,	"\x5e\x7e"},
+	{'\x8b',	2,	"\x9f\x7e"},
+	{'\x8d',	2,	"\x8c\x27"},
+	{'\x8e',	3,	"\x8c\x2d\x3a"},
+	{'\x8f',	2,	"\x91\x5f"},
+	{'\x90',	2,	"\x92\x7e"},
+	{'\x93',	2,	"\x91\x7c"},
+	{'\x94',	2,	"\x92\x7c"},
+	{'\x95',	2,	"\xb0\x82"},
+	{'\x96',	2,	"\xb0\x83"},
+	{'\x99',	2,	"\x2d\x5c"},
+	{'\x9a',	2,	"\x2d\x2f"},
+	{'\xae',	2,	"\x2c\x2d"},
+	{'\xb2',	2,	"\xb1\x7c"},
+	{'\xb3',	2,	"\xb1\x5c"},
+	{'\xb4',	2,	"\xb1\x2d"},
+	{'\xb5',	2,	"\xb1\x2a"},
+	{'\xba',	2,	"\xb9\x5f"},
+	{'\xd0',	2,	"\x30\x7e"},
+	{'\xd8',	2,	"\x4f\x2f"},
+	{'\x21',	2,  "\x27\x2e"},
+    {'\xa4',	2,	"\xb0\xb1"},		/*  map degree in circle to circle cross (APL uses this as character error symbol) */
+	{'\xf0',	2,	"\xb0\xa8"},
+	{'\xfe',	2,	"\x3a\xa8"},
 };
 
 #ifdef __SUNPRO_C
@@ -771,7 +773,7 @@ static void finish_conout_mapping (int32 flags)
 
 /* validate_conout_mapping - called when set command gets a new value */
 
-static t_stat validate_conout_mapping (UNIT *uptr, int32 match, char *cvptr, void *desc)
+static t_stat validate_conout_mapping (UNIT *uptr, int32 match, CONST char *cvptr, void *desc)
 {
 	set_conout_mapping(match);
 	return SCPE_OK;
@@ -938,11 +940,14 @@ static t_stat map_conout_character (int ch)
 
 /* font_cmd - parse a font mapping file. Sets input and output translations */
 
-static t_stat font_cmd (int32 flag, char *cptr)
+static t_stat font_cmd (int32 flag, CONST char *iptr)
 {
 	char *fname, quote;
+        char gbuf[4*CBUFSIZE], *cptr = gbuf;
 	FILE *fd;
 
+    gbuf[sizeof(gbuf)-1] = '\0';
+    strncpy(gbuf, iptr, sizeof(gbuf)-1);
 	while (*cptr && (*cptr <= ' ')) cptr++;			/* skip blanks */
 	if (! *cptr) return SCPE_2FARG;					/* argument missing */
 
@@ -974,7 +979,7 @@ static t_stat font_cmd (int32 flag, char *cptr)
 
 /* str_match - compare the string str to the keyword, case insensitive */
 
-static t_bool str_match (char *str, char *keyword)
+static t_bool str_match (const char *str, const char *keyword)
 {
 	char kch, sch;
 
@@ -996,7 +1001,8 @@ static t_bool str_match (char *str, char *keyword)
 
 static void read_map_file (FILE *fd)
 {
-	char str[256], *c, *errmsg;
+	char str[256], *c;
+    const char *errmsg;
 	int lineno = 0;
 	enum {SECT_UNDEFINED, SECT_DEFAULT, SECT_ANSI, SECT_INPUT, SECT_OUTPUT, SECT_OVERSTRIKE}
 		section = SECT_UNDEFINED;
@@ -1086,7 +1092,7 @@ static void read_map_file (FILE *fd)
  * may be incremented by the caller
  */
 
-static char * get_num_char (char **pc, unsigned char *out, int ndigits, int base, char *errmsg)
+static const char * get_num_char (char **pc, unsigned char *out, int ndigits, int base, const char *errmsg)
 {
 	int ch = 0, digit;
 	char *c = *pc;
@@ -1119,9 +1125,10 @@ static char * get_num_char (char **pc, unsigned char *out, int ndigits, int base
  * error encountered. *pc is advanced to next whitespace or whatever followed input.
  */
 
-static char * get_characters (char **pc, unsigned char *outstr, int nmax, int *nout)
+static const char * get_characters (char **pc, unsigned char *outstr, int nmax, int *nout)
 {
-	char *c = *pc, *errstr;
+	char *c = *pc;
+    const char *errstr;
 	unsigned char *out = outstr;
 
 	while (*c && *c <= ' ')					/* skip leading whitespace */
@@ -1218,10 +1225,10 @@ static char * get_characters (char **pc, unsigned char *outstr, int nmax, int *n
 
 /* handle_map_ansi_definition - process line in [ansi] section */
 
-static char * handle_map_ansi_definition (char **pc)
+static const char * handle_map_ansi_definition (char **pc)
 {
 	unsigned char *outstr;
-	char *errmsg;
+	const char *errmsg;
 	int n;
 
 	if (str_match(*pc, "black")) {							/* find which string we're setting */
@@ -1245,10 +1252,10 @@ static char * handle_map_ansi_definition (char **pc)
 
 /* handle_map_input_definition - process line in [input] section */
 
-static char * handle_map_input_definition (char **pc)
+static const char * handle_map_input_definition (char **pc)
 {
 	unsigned char cin, cout;
-	char *errmsg;
+	const char *errmsg;
 	int n;
 
 	if ((errmsg = get_characters(pc, &cin, 1, &n)) != NULL)	/* get input character */
@@ -1269,10 +1276,10 @@ static char * handle_map_input_definition (char **pc)
 
 /* handle_map_output_definition - process line in [output] section */
 
-static char * handle_map_output_definition (char **pc)
+static const char * handle_map_output_definition (char **pc)
 {
 	unsigned char cin, cout;
-	char *errmsg;
+	const char *errmsg;
 	int n;
 
 	if ((errmsg = get_characters(pc, &cin, 1, &n)) != NULL)	/* get input character */
@@ -1293,10 +1300,10 @@ static char * handle_map_output_definition (char **pc)
 
 /* handle_map_overstrike_definition - process line in [overstrike] section */
 
-static char * handle_map_overstrike_definition (char **pc)
+static const char * handle_map_overstrike_definition (char **pc)
 {
 	unsigned char ch, inlist[MAX_OS_CHARS];
-	char *errmsg;
+	const char *errmsg;
 	int nin;
 
 	if (n_os_mappings >= MAX_OS_MAPPINGS)					/* os_map is full, no more room */

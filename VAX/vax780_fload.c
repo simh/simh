@@ -77,7 +77,6 @@
 #define DE_SIZE         7                               /* entry size in words */
 #define DE_GET_STAT(x)  (((x) >> 8) & 0377)
 
-extern UNIT cpu_unit;
 extern UNIT fl_unit;
 
 t_bool rtfile_parse (char *pntr, uint16 *file_name);
@@ -88,7 +87,7 @@ uint32 rtfile_find (uint32 block, uint32 sector);
 
 /* FLOAD file_name {file_origin} */
 
-t_stat vax780_fload (int32 flag, char *cptr)
+t_stat vax780_fload (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
 uint16 file_name[3], blkbuf[BLK_SIZE];
@@ -170,8 +169,8 @@ return TRUE;
 
 uint32 rtfile_ator50 (uint32 ascii)
 {
-static char *r50 = " ABCDEFGHIJKLMNOPQRSTUVWXYZ$._0123456789";
-char *fptr;
+static const char *r50 = " ABCDEFGHIJKLMNOPQRSTUVWXYZ$._0123456789";
+const char *fptr;
 
 ascii = toupper (ascii);
 if ((fptr = strchr (r50, toupper (ascii))) != NULL)
@@ -212,7 +211,7 @@ t_stat rtfile_read (uint32 block, uint32 count, uint16 *buffer)
 {
 uint32 i, j;
 uint32 pos;
-uint8 *fbuf = fl_unit.filebuf;
+uint8 *fbuf = (uint8 *)fl_unit.filebuf;
 
 for (; count > 0; count--, block++) {
     for (i = 0; i < 4; i++) {                           /* 4 sectors/block */

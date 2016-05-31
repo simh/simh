@@ -35,15 +35,13 @@
 #define MCSR_ECR        0x4000                          /* extended CSR read enable */
 #define MCSR_RW         (MCSR_ECR|MCSR_WWP|MCSR_PEN)
 
-extern UNIT cpu_unit;
-
 int32 mctl_csr[MAX_MCTL_COUNT];
 int32 mctl_count = 0;
 
 t_stat mctl_rd (int32 *data, int32 PA, int32 access);
 t_stat mctl_wr (int32 data, int32 PA, int32 access);
 t_stat mctl_reset (DEVICE *dptr);
-char *mctl_description (DEVICE *dptr);
+const char *mctl_description (DEVICE *dptr);
 
 /* MCTL data structures
 
@@ -107,7 +105,7 @@ mctl_count = (int32)(MEMSIZE >> 18);                    /* memory controllers en
 return SCPE_OK;
 }
 
-char *mctl_description (DEVICE *dptr)
+const char *mctl_description (DEVICE *dptr)
 {
 return "memory controller";
 }
@@ -119,14 +117,14 @@ void rom_wr_B (int32 pa, int32 val)
 return;
 }
 
-t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 uint32 memsize = (uint32)(MEMSIZE>>10);
 uint32 baseaddr = 0;
 uint32 csraddr = mctl_dib.ba;
 struct {
     uint32 capacity;
-    char *option;
+    const char *option;
     } boards[] = {
         {  4096, "MSV11-QC"},
         {  2048, "MSV11-QB"},

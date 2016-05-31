@@ -55,6 +55,8 @@
 /* Vector registers - read only */
 
 #define UBA_UVEC        0x80000000
+#define UBA_VEC_MASK    0x1FC                           /* Vector value mask */
+
 
 /* RB730 registers */
 
@@ -85,19 +87,16 @@
 #define UBA_DEB_ERR     0x20                            /* errors */
 
 int32 int_req[IPL_HLVL] = { 0 };                        /* intr, IPL 14-17 */
-uint32 uba_csr = 0;                                      /* control & status reg */
+int32 int_vec_set[IPL_HLVL][32] = { 0 };                /* bits to set in vector */
+uint32 uba_csr = 0;                                     /* control & status reg */
 uint32 uba_fmer = 0;                                    /* failing map reg */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
-extern int32 trpirq;
 extern int32 autcon_enb;
-extern jmp_buf save_env;
-extern UNIT cpu_unit;
-extern int32 p1;
 
 t_stat uba_reset (DEVICE *dptr);
-char *uba_description (DEVICE *dptr);
+const char *uba_description (DEVICE *dptr);
 t_stat uba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_rdreg (int32 *val, int32 pa, int32 mode);
@@ -106,10 +105,10 @@ int32 uba_get_ubvector (int32 lvl);
 t_bool uba_eval_int (int32 lvl);
 void uba_ubpdn (int32 time);
 t_bool uba_map_addr (uint32 ua, uint32 *ma);
-t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat uba_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat uba_show_virt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern int32 eval_int (void);
 extern t_stat build_dib_tab (void);
@@ -385,8 +384,12 @@ for (i = 0; int_req[lvl] && (i < 32); i++) {
     if ((int_req[lvl] >> i) & 1) {
         int_req[lvl] = int_req[lvl] & ~(1u << i);
         if (int_ack[lvl][i])
-            return (vec | int_ack[lvl][i]());
-        return (vec | int_vec[lvl][i]);
+            vec = int_ack[lvl][i]();
+        else
+            vec = int_vec[lvl][i];
+        vec |= int_vec_set[lvl][i];
+        vec &= (int_vec_set[lvl][i] | UBA_VEC_MASK);
+        return vec;
         }
     }
 return vec;
@@ -472,7 +475,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
 return 0;
 }
 
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf)
 {
 int32 i, j, pbc;
 uint32 ma, dat;
@@ -505,7 +508,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
 return 0;
 }
 
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf)
 {
 int32 i, j, pbc;
 uint32 ma, dat;
@@ -646,10 +649,10 @@ return SCPE_NXM;
 
 /* Show UBA virtual address */
 
-t_stat uba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat uba_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 uint32 ua, pa;
 
 if (cptr) {
@@ -665,7 +668,7 @@ fprintf (of, "Invalid argument\n");
 return SCPE_OK;
 }
 
-char *uba_description (DEVICE *dptr)
+const char *uba_description (DEVICE *dptr)
 {
 return "Unibus adapter";
 }

@@ -55,7 +55,7 @@
 
 #define I_GETDEV3(x)    ((((x) & 020046000) != 020046000)? ((x) & DEV_MASK): DEV_MASK)
 
-#define TST_XFR(d,c)    (xfr_req && dev_map[d][c])
+#define TST_XFR(d,c)    (xfr_req & dev_map[d][c])
 #define SET_XFR(d,c)    xfr_req = xfr_req | dev_map[d][c]
 #define CLR_XFR(d,c)    xfr_req = xfr_req & ~dev_map[d][c]
 #define INV_DEV(d,c)    (dev_dsp[d][c] == NULL)
@@ -149,7 +149,7 @@ extern void set_dyn_map (void);
    support all widths.
 */
 
-t_stat chan_show_reg (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat chan_show_reg (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 struct aldisp {
     t_stat      (*pin) (uint32 num, uint32 *dat);       /* altnum, *dat */
@@ -222,11 +222,11 @@ uint32 dev_map[64][NUM_CHAN];
 
 /* dev_dsp maps device and channel numbers to dispatch routines */
 
-t_stat (*dev_dsp[64][NUM_CHAN])() = { {NULL} };
+t_stat (*dev_dsp[64][NUM_CHAN])(uint32 fnc, uint32 dev, uint32 *dat) = { {NULL} };
 
 /* dev3_dsp maps system device numbers to dispatch routines */
 
-t_stat (*dev3_dsp[64])() = { NULL };
+t_stat (*dev3_dsp[64])(uint32 fnc, uint32 dev, uint32 *dat) = { NULL };
 
 /* dev_alt maps alert numbers to dispatch routines */
 
@@ -902,7 +902,7 @@ return SCPE_OK;
 
 /* Channel assignment routines */
 
-t_stat set_chan (UNIT *uptr, int32 val, char *sptr, void *desc)
+t_stat set_chan (UNIT *uptr, int32 val, CONST char *sptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -929,7 +929,7 @@ for (i = 0; i < NUM_CHAN; i++) {                        /* match input */
 return SCPE_ARG;
 }
 
-t_stat show_chan (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_chan (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -997,7 +997,7 @@ return FALSE;
 
 /* Display channel state */
 
-t_stat chan_show_reg (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat chan_show_reg (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if ((val < 0) || (val >= NUM_CHAN)) return SCPE_IERR;
 fprintf (st, "UAR:      %02o\n", chan_uar[val]);

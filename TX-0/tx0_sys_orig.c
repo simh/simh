@@ -41,8 +41,8 @@
 
 typedef struct {
     int32 opr;
-    char *mnemonic;
-    char *desc;
+    const char *mnemonic;
+    const char *desc;
 } OPMAP;
 
 const OPMAP opmap_orig [] = {
@@ -97,6 +97,11 @@ const OPMAP opmap_orig [] = {
     { 0740023, "cll+clr+tbr+pad", "Store contents of TBR in AC" },
     { 0000000, NULL, NULL }
 };
+
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,f) Fprintf(f,"%s",_s)
+#define fputc(_c,f) Fprintf(f,"%c",_c)
 
 t_stat fprint_sym_orig (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)

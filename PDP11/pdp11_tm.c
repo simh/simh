@@ -166,21 +166,20 @@ int32 tm_rdl = 0;                                       /* read lines */
 int32 tm_time = 10;                                     /* record latency */
 int32 tm_stopioe = 1;                                   /* stop on error */
 
-DEVICE tm_dev;
 t_stat tm_rd (int32 *data, int32 PA, int32 access);
 t_stat tm_wr (int32 data, int32 PA, int32 access);
 t_stat tm_svc (UNIT *uptr);
 t_stat tm_reset (DEVICE *dptr);
-t_stat tm_attach (UNIT *uptr, char *cptr);
+t_stat tm_attach (UNIT *uptr, CONST char *cptr);
 t_stat tm_detach (UNIT *uptr);
 t_stat tm_boot (int32 unitno, DEVICE *dptr);
 void tm_go (UNIT *uptr);
 int32 tm_updcsta (UNIT *uptr);
 void tm_set_done (void);
 t_stat tm_map_err (UNIT *uptr, t_stat st);
-t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *tm_description (DEVICE *dptr);
+t_stat tm_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *tm_description (DEVICE *dptr);
 
 /* MT data structures
 
@@ -609,7 +608,7 @@ return auto_config (0, 0);
 
 /* Attach routine */
 
-t_stat tm_attach (UNIT *uptr, char *cptr)
+t_stat tm_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 int32 u = uptr - tm_dev.units;
@@ -640,7 +639,7 @@ return sim_tape_detach (uptr);
 
 /* Write lock/enable routine */
 
-t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tm_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 u = uptr - tm_dev.units;
 
@@ -736,7 +735,7 @@ cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 } 
 
-t_stat tm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat tm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *text2;
 const char *const text =
@@ -789,7 +788,7 @@ sim_tape_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-char *tm_description (DEVICE *dptr)
+const char *tm_description (DEVICE *dptr)
 {
 return "TM11 Magnet Tape controller";
 }

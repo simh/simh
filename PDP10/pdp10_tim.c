@@ -145,7 +145,6 @@ extern d10 pcst;
 extern a10 pager_PC;
 extern int32 t20_idlelock;
 
-DEVICE tim_dev;
 static t_stat tcu_rd (int32 *data, int32 PA, int32 access);
 static t_stat tim_svc (UNIT *uptr);
 static t_stat tim_reset (DEVICE *dptr);
@@ -171,10 +170,10 @@ DIB tcu_dib = { IOBA_TCU, IOLN_TCU, &tcu_rd, &wr_nop, 0 };
 static UNIT tim_unit = { UDATA (&tim_svc, UNIT_IDLE, 0), 0 };
 
 static REG tim_reg[] = {
-    { BRDATA (TIMEBASE, tim_base, 8, 36, 2) },
-    { ORDATA (PERIOD, tim_period, 36) },
-    { ORDATA (QUANT, quant, 36) },
-    { DRDATA (TIME, tim_unit.wait, 24), REG_NZ + PV_LEFT },
+    { BRDATAD (TIMEBASE, tim_base, 8, 36, 2, "time base (double precision)") },
+    { ORDATAD (PERIOD, tim_period, 36, "reset value for interval") },
+    { ORDATAD (QUANT, quant, 36, "quantum timer (ITS only)") },
+    { DRDATAD (TIME, tim_unit.wait, 24, "tick delay"), REG_NZ + PV_LEFT },
     { DRDATA (PROB, tim_t20_prob, 6), REG_NZ + PV_LEFT + REG_HIDDEN },
     { DRDATA (POLL, tmr_poll, 32), REG_HRO + PV_LEFT },
     { DRDATA (MUXPOLL, tmxr_poll, 32), REG_HRO + PV_LEFT },
@@ -378,7 +377,7 @@ return SCPE_OK;
 
 /* Set timer parameters from CPU model */
 
-t_stat tim_set_mod (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tim_set_mod (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val & (UNIT_T20|UNIT_KLAD)) {
     clk_tps = TIM_TPS_T20;

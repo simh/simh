@@ -60,7 +60,6 @@ extern int32 tsc_enb;                                   /* enable */
 #define UNIT_V_SN699    (UNIT_V_UF + 0)                 /* SN 699 or above */
 #define UNIT_SN699      (1 << UNIT_V_SN699)
 
-DEVICE tsc_dev;
 int32 tsc (int32 IR, int32 AC);
 t_stat tsc_reset (DEVICE *dptr);
 
@@ -76,11 +75,11 @@ DIB tsc_dib = { DEV_TSC, 1, { &tsc } };
 UNIT tsc_unit = { UDATA (NULL, UNIT_SN699, 0) };
 
 REG tsc_reg[] = {
-    { ORDATA (IR, tsc_ir, 12) },
-    { ORDATA (PC, tsc_pc, 12) },
-    { FLDATA (CDF, tsc_cdf, 0) },
-    { FLDATA (ENB, tsc_enb, 0) },
-    { FLDATA (INT, int_req, INT_V_TSC) },
+    { ORDATAD (IR, tsc_ir, 12, "most recently trapped instruction") },
+    { ORDATAD (PC, tsc_pc, 12, "PC of most recently trapped instruction") },
+    { FLDATAD (CDF, tsc_cdf, 0, "1 if trapped instruction is CDF, 0 otherwise") },
+    { FLDATAD (ENB, tsc_enb, 0, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_TSC, "interrupt pending flag") },
     { NULL }
     };
 

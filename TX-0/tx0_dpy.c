@@ -41,6 +41,7 @@
 #ifdef USE_DISPLAY
 #include "tx0_defs.h"
 #include "display/display.h"
+#include "sim_video.h"
 
 extern int32 ios, iosta, PF;
 extern int32 stop_inst;
@@ -61,12 +62,32 @@ t_stat dpy_reset (DEVICE *dptr);
 UNIT dpy_unit = {
     UDATA (&dpy_svc, UNIT_ATTABLE, 0), DPY_WAIT };
 
+static t_bool dpy_stop_flag = FALSE;
+
+static void dpy_quit_callback (void)
+{
+dpy_stop_flag = TRUE;
+}
+
+#define DEB_VMOU      SIM_VID_DBG_MOUSE             /* Video mouse */
+#define DEB_VKEY      SIM_VID_DBG_KEY               /* Video key */
+#define DEB_VCUR      SIM_VID_DBG_CURSOR            /* Video cursor */
+#define DEB_VVID      SIM_VID_DBG_VIDEO             /* Video */
+
+DEBTAB dpy_deb[] = {
+    { "VMOU",    DEB_VMOU, "Video Mouse" },
+    { "VKEY",    DEB_VKEY, "Video Key" },
+    { "VCUR",    DEB_VCUR, "Video Cursor" },
+    { "VVID",    DEB_VVID, "Video Video" },
+    { NULL, 0 }
+    };
+
 DEVICE dpy_dev = {
     "DPY", &dpy_unit, NULL, NULL,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dpy_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DISABLE };
+    NULL, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dpy_deb };
 
 /* Display Routine */
 int32 dpy (int32 ac)
@@ -120,6 +141,10 @@ t_stat dpy_svc (UNIT *uptr)
 {
     display_age(dpy_unit.wait*CYCLE_TIME, 1);
     sim_activate (&dpy_unit, dpy_unit.wait); /* requeue! */
+    if (dpy_stop_flag) {
+        dpy_stop_flag = FALSE;          /* reset flag after we notice it */
+        return SCPE_STOP;
+        }
     return SCPE_OK;
 }
 
@@ -127,10 +152,13 @@ t_stat dpy_svc (UNIT *uptr)
 
 t_stat dpy_reset (DEVICE *dptr)
 {
-    display_init(DIS_TX0, RES_FULL);
-    display_reset();
-    iosta = iosta & ~(IOS_PNT | IOS_SPC); /* clear flags */
     sim_cancel (&dpy_unit);     /* deactivate unit */
+    if (dpy_dev.flags & DEV_DIS)                /* disabled? */
+        return SCPE_OK;
+    display_init(DIS_TX0, RES_FULL, dptr);
+    display_reset();
+    vid_register_quit_callback (&dpy_quit_callback);
+    iosta = iosta & ~(IOS_PNT | IOS_SPC); /* clear flags */
     return SCPE_OK;
 }
 

@@ -97,9 +97,8 @@
 
 extern d10 *M;
 extern d10 acs[AC_NBLK * AC_NUM];
-extern d10 *ac_cur, *ac_prv, *last_pa;
+extern d10 *ac_prv, *last_pa;
 extern a10 epta, upta;
-extern int32 flags;
 extern d10 pager_word;
 extern int32 apr_flg;
 extern d10 ebr, ubr, hsb;

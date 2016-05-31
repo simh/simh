@@ -134,7 +134,7 @@ if ((lpt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
 fputc (uptr->buf, uptr->fileref);
 uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {
-    perror ("LPT I/O error");
+    sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }

@@ -1,6 +1,6 @@
 /* pdp1_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dt           Type 550/555 DECtape
 
+   28-Mar-15    RMS     Revised to use sim_printf
    21-Dec-06    RMS     Added 16-channel SBS support
    23-Jun-06    RMS     Fixed conflict in ATTACH switches
                         Revised header format
@@ -267,7 +268,7 @@ static const int32 map_unit[16] = {                     /* Type 550 unit map */
 
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
-t_stat dt_attach (UNIT *uptr, char *cptr);
+t_stat dt_attach (UNIT *uptr, CONST char *cptr);
 t_stat dt_detach (UNIT *uptr);
 void dt_deselect (int32 oldf);
 void dt_newsa (int32 newf);
@@ -307,23 +308,23 @@ UNIT dt_unit[] = {
     };
 
 REG dt_reg[] = {
-    { ORDATA (DTSA, dtsa, 18) },
-    { ORDATA (DTSB, dtsb, 18) },
-    { ORDATA (DTDB, dtdb, 18) },
-    { FLDATA (DTF, dtsb, DTB_V_DTF) },
-    { FLDATA (BEF, dtsb, DTB_V_BEF) },
-    { FLDATA (ERF, dtsb, DTB_V_ERF) },
-    { DRDATA (LTIME, dt_ltime, 31), REG_NZ },
-    { DRDATA (DCTIME, dt_dctime, 31), REG_NZ },
-    { ORDATA (SUBSTATE, dt_substate, 2) },
+    { ORDATAD (DTSA, dtsa, 18, "status register A") },
+    { ORDATAD (DTSB, dtsb, 18, "status register B") },
+    { ORDATAD (DTDB, dtdb, 18, "data buffer") },
+    { FLDATAD (DTF, dtsb, DTB_V_DTF, "DECtape flag") },
+    { FLDATAD (BEF, dtsb, DTB_V_BEF, "block end flag") },
+    { FLDATAD (ERF, dtsb, DTB_V_ERF, "error flag") },
+    { DRDATAD (LTIME, dt_ltime, 31, "time between lines"), REG_NZ },
+    { DRDATAD (DCTIME, dt_dctime, 31, "time to declarate to a full stop"), REG_NZ },
+    { ORDATAD (SUBSTATE, dt_substate, 2, "read/write command substate") },
     { DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
-    { URDATA (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
-              DT_NUMDR, PV_LEFT | REG_RO) },
-    { URDATA (STATT, dt_unit[0].STATE, 8, 18, 0,
-              DT_NUMDR, REG_RO) },
+    { URDATAD (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
+              DT_NUMDR, PV_LEFT | REG_RO, "position, in lines, units 0-7") },
+    { URDATAD (STATT, dt_unit[0].STATE, 8, 18, 0,
+              DT_NUMDR, REG_RO, "unit state, units 0-7") },
     { URDATA (LASTT, dt_unit[0].LASTT, 10, 32, 0,
               DT_NUMDR, REG_HRO) },
-    { FLDATA (STOP_OFFR, dt_stopoffr, 0) },
+    { FLDATAD (STOP_OFFR, dt_stopoffr, 0, "stop on off-reel error") },
     { DRDATA (SBSLVL, dt_sbs, 4), REG_HRO },
     { NULL }
     };
@@ -374,7 +375,7 @@ if (pulse == 003) {                                     /* MSE */
         dt_deselect (dtsa);
     dtsa = (dtsa & ~DTA_UNIT) | (dat & DTA_UNIT);
     dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);
-	}
+    }
 if (pulse == 004) {                                     /* MLC */
     dtsa = (dtsa & ~DTA_RW) | (dat & DTA_RW);           /* load dtsa */
     dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);
@@ -616,7 +617,7 @@ switch (fnc) {                                          /* case function */
 if ((fnc == FNC_WRIT) || (fnc == FNC_WALL)) {           /* write function? */
     dtsb = dtsb | DTB_DTF;                              /* set data flag */
     DT_UPDINT;
-	}
+    }
 sim_activate (uptr, ABS (newpos - ((int32) uptr->pos)) * dt_ltime);
 return;
 }
@@ -678,13 +679,13 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
-	uptr->STATE = uptr->pos = 0;
-	unum = (int32) (uptr - dt_dev.units);
-	if (unum == DTA_GETUNIT (dtsa))						/* if selected, */
-		dt_seterr (uptr, DTB_SEL);						/* error */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel? */
+    uptr->STATE = uptr->pos = 0;
+    unum = (int32) (uptr - dt_dev.units);
+    if (unum == DTA_GETUNIT (dtsa))                     /* if selected, */
+        dt_seterr (uptr, DTB_SEL);                      /* error */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -979,7 +980,7 @@ return 0;
    If 18b/36b, read data into buffer
 */
 
-t_stat dt_attach (UNIT *uptr, char *cptr)
+t_stat dt_attach (UNIT *uptr, CONST char *cptr)
 {
 uint16 pdp8b[D8_NBSIZE];
 uint16 pdp11b[D18_BSIZE];
@@ -1011,13 +1012,13 @@ if (uptr->filebuf == NULL) {                            /* can't alloc? */
     return SCPE_MEM;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
-printf ("%s%d: ", sim_dname (&dt_dev), u);
+sim_printf ("%s%d: ", sim_dname (&dt_dev), u);
 if (uptr->flags & UNIT_8FMT)
-    printf ("12b format");
+    sim_printf ("12b format");
 else if (uptr->flags & UNIT_11FMT)
-    printf ("16b format");
-else printf ("18b/36b format");
-printf (", buffering file in memory\n");
+    sim_printf ("16b format");
+else sim_printf ("18b/36b format");
+sim_printf (", buffering file in memory\n");
 if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);
@@ -1078,12 +1079,12 @@ if (sim_is_active (uptr)) {
     if ((u == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
         dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
         DT_UPDINT;
-		}
+        }
     uptr->STATE = uptr->pos = 0;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
 if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-    printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
+    sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
     rewind (uptr->fileref);                             /* start of file */
     if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
         for (ba = 0; ba < uptr->hwmark; ) {             /* loop thru file */
@@ -1111,7 +1112,7 @@ if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
     else fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */
         uptr->hwmark, uptr->fileref);
     if (ferror (uptr->fileref))
-        perror ("I/O error");
+        sim_perror ("I/O error");
     }                                                   /* end if hwmark */
 free (uptr->filebuf);                                   /* release buf */
 uptr->flags = uptr->flags & ~UNIT_BUF;                  /* clear buf flag */

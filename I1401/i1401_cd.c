@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2010, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,8 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   05-May-16    RMS     Fixed calling sequence inconsistency (Mark Pizzolato)
+   28-Feb-15    RMS     Added read from console
    24-Mar-09    RMS     Fixed read stacker operation in column binary mode
                         Fixed punch stacker operation (Van Snyder)
    28-Jun-07    RMS     Added support for SS overlap modifiers
@@ -50,11 +52,47 @@
    13-Apr-01    RMS     Revised for register arrays
 */
 
+/* Read from console was requested by the 1401 restoration team at the
+   Computer History Museum. It allows small programs to be entered
+   quickly, without creating card files. Unfortunately, if input is
+   coming from the keyboard, then the card reader is not attached,
+   and it won't boot.
+
+   To deal with this problem, the card reader must keep various
+   unit flags in a consistent state:
+
+   ATTABLE?     ATT?        DFLT?           state
+
+   0            0           0               impossible
+   0            0           1               input from console
+   0            1           0               impossible
+   0            1           1               impossible
+   1            0           0               waiting for file
+   1            0           1               impossible
+   1            1           0               input from file
+   1            1           1               input from file,
+                                            default to console
+                                            after detach
+
+   To maintain this state, starting from 100, means the
+   following:
+
+   SET CDR DFLT             set default flag
+                            if !ATT, clear ATTABLE
+   SET CDR NODFLT           clear default flag
+   ATTACH CDR               set ATTABLE, attach
+                            if error && DFLT, clear ATTABLE
+   DETACH CDR               detach
+                            if DFLT, clear ATTABLE
+*/
+
 #include "i1401_defs.h"
 #include <ctype.h>
 
 #define UNIT_V_PCH      (UNIT_V_UF + 0)                 /* output conv */
 #define UNIT_PCH        (1 << UNIT_V_PCH)
+#define UNIT_V_CONS     (UNIT_V_UF + 1)                 /* input from console */
+#define UNIT_CONS       (1 << UNIT_V_CONS)
 
 extern uint8 M[];
 extern int32 ind[64], ssa, iochk;
@@ -67,13 +105,19 @@ int32 cdp_buf_full = 0;                                 /* punch buf full? */
 
 t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno, DEVICE *dptr);
-t_stat cdr_attach (UNIT *uptr, char *cptr);
-t_stat cdp_attach (UNIT *uptr, char *cptr);
+t_stat cdr_attach (UNIT *uptr, CONST char *cptr);
+t_stat cdr_detach (UNIT *uptr);
+t_stat cdp_attach (UNIT *uptr, CONST char *cptr);
 t_stat cdp_detach (UNIT *uptr);
-t_stat cdp_npr (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cdp_npr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cd_reset (DEVICE *dptr);
+t_stat cdr_read_file (char *buf, int32 sz);
+t_stat cdr_read_cons (char *buf, int32 sz);
+t_stat cdr_chg_cons (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 bcd2asc (int32 c, UNIT *uptr);
 char colbin_to_bcd (uint32 cb);
+
+extern void inq_puts (const char *cptr);
 
 /* Card reader data structures
 
@@ -97,11 +141,17 @@ REG cdr_reg[] = {
     { NULL }
     };
 
+MTAB cdr_mod[] = {
+    { UNIT_CONS, UNIT_CONS, "default to console", "DEFAULT", &cdr_chg_cons },
+    { UNIT_CONS, 0        , "no default device", "NODEFAULT", &cdr_chg_cons },
+    { 0 }
+    };
+
 DEVICE cdr_dev = {
-    "CDR", &cdr_unit, cdr_reg, NULL,
+    "CDR", &cdr_unit, cdr_reg, cdr_mod,
     1, 10, 31, 1, 8, 7,
     NULL, NULL, &cd_reset,
-    &cdr_boot, &cdr_attach, NULL
+    &cdr_boot, &cdr_attach, &cdr_detach
     };
 
 /* CDP data structures
@@ -130,7 +180,6 @@ MTAB cdp_mod[] = {
     { UNIT_PCH, UNIT_PCH, "Fortran set", "FORTRAN" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "NPR",
       &cdp_npr, NULL },
- 
     { 0 }
     };
 
@@ -179,7 +228,7 @@ DEVICE stack_dev = {
 
 t_stat read_card (int32 ilnt, int32 mod)
 {
-int32 i, cbn, c1, c2;
+int32 i, cbn, c1, c2, cbufsz;
 t_stat r;
 
 if (sim_is_active (&cdr_unit)) {                        /* busy? */
@@ -187,32 +236,19 @@ if (sim_is_active (&cdr_unit)) {                        /* busy? */
     if ((r = cdr_svc (&cdr_unit)))                      /* process */
         return r;
     }
-if ((cdr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
-    return SCPE_UNATT;
 ind[IN_READ] = ind[IN_LST] = s1sel = s2sel = 0;         /* default stacker */
 cbn = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_C);   /* col binary? */
+cbufsz = (cbn)? 2 * CBUFSIZE: CBUFSIZE;                 /* buffer size */
 for (i = 0; i < (2 * CBUFSIZE) + 1; i++)                /* clear extended buf */
     cdr_buf[i] = 0;
-fgets (cdr_buf, (cbn)? 2 * CBUFSIZE: CBUFSIZE,          /* rd bin/char card */
-     cdr_unit.fileref);
-if (feof (cdr_unit.fileref))                            /* eof? */
-    return STOP_NOCD;
-if (ferror (cdr_unit.fileref)) {                        /* error? */
-    ind[IN_READ] = 1;  
-    perror ("Card reader I/O error");
-    clearerr (cdr_unit.fileref);
-    if (iochk)
-        return SCPE_IOERR;
-    return SCPE_OK;
-    }
-cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
-if (ssa) {                                              /* if last cd on */
-    getc (cdr_unit.fileref);                            /* see if more */
-    if (feof (cdr_unit.fileref))                        /* eof? set flag */
-        ind[IN_LST] = 1;
-    fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);
-    }
-if (cbn) {                                              /* column binary */
+if ((cdr_unit.flags & UNIT_ATT) != 0)                   /* attached? */
+    r = cdr_read_file (cdr_buf, cbufsz);                /* read from file */
+else if ((cdr_unit.flags & UNIT_CONS) != 0)             /* default to console? */
+    r = cdr_read_cons (cdr_buf, cbufsz);                /* read from console */
+else return SCPE_UNATT;                                 /* else can't read */
+if (r != SCPE_OK)                                       /* read error? */
+    return r;                                           /* can't read */
+if (cbn) {                                              /* column binary? */
     for (i = 0; i < CDR_WIDTH; i++) {
         if (conv_old) {
             c1 = ascii2bcd (cdr_buf[i]);
@@ -225,7 +261,7 @@ if (cbn) {                                              /* column binary */
         M[CD_CBUF1 + i] = (M[CD_CBUF1 + i] & WM) | c1;
         M[CD_CBUF2 + i] = (M[CD_CBUF2 + i] & WM) | c2;
         M[CDR_BUF + i] = colbin_to_bcd ((c1 << 6) | c2);
-        }                                               /* end for i */
+        }
     }                                                   /* end if col bin */
 else {                                                  /* normal read */
     for (i = 0; i < CDR_WIDTH; i++) {                   /* cvt to BCD */
@@ -260,7 +296,7 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
 fputs (cdr_buf, uptr->fileref);                         /* write card */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("Card stacker I/O error");
+    sim_perror ("Card stacker I/O error");
     clearerr (uptr->fileref);
     if (iochk)
         return SCPE_IOERR;
@@ -322,7 +358,7 @@ return SCPE_OK;
 
 /* Punch buffered card (also handles non-process runout button) */
 
-t_stat cdp_npr (UNIT *notused, int32 val, char *cptr, void *desc)
+t_stat cdp_npr (UNIT *notused, int32 val, CONST char *cptr, void *desc)
 {
 UNIT *uptr;
 
@@ -340,7 +376,7 @@ fputs (cdp_buf, uptr->fileref);                         /* output card */
 fputc ('\n', uptr->fileref);                            /* plus new line */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("Card punch I/O error");
+    sim_perror ("Card punch I/O error");
     clearerr (uptr->fileref);
     if (iochk)
         return SCPE_IOERR;
@@ -356,7 +392,7 @@ return SCPE_OK;
    or $, ., square for overlap control (ignored).
 */
 
-t_stat select_stack (int32 ilnt, int32 mod)
+t_stat select_stack (int32 mod)
 {
 if (mod == BCD_ONE)
     s1sel = 1;
@@ -366,6 +402,64 @@ else if (mod == BCD_FOUR)
     s4sel = 1;
 else if (mod == BCD_EIGHT)
     s8sel = 1;
+return SCPE_OK;
+}
+
+/* Read card from file */
+
+t_stat cdr_read_file (char *buf, int32 sz)
+{
+fgets (buf, sz, cdr_unit.fileref);                      /* rd bin/char card */
+if (feof (cdr_unit.fileref))                            /* eof? */
+    return STOP_NOCD;
+if (ferror (cdr_unit.fileref)) {                        /* error? */
+    ind[IN_READ] = 1;  
+    sim_perror ("Card reader I/O error");
+    clearerr (cdr_unit.fileref);
+    if (iochk)
+        return SCPE_IOERR;
+    return SCPE_OK;
+    }
+cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
+if (ssa) {                                              /* if last cd on */
+    getc (cdr_unit.fileref);                            /* see if more */
+    if (feof (cdr_unit.fileref))                        /* eof? set flag */
+        ind[IN_LST] = 1;
+    fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);
+    }
+return SCPE_OK;
+}
+
+/* Read card from console */
+
+t_stat cdr_read_cons (char *buf, int32 sz)
+{
+int32 i, t;
+
+inq_puts ("[Enter card]\r\n");
+for (i = 0; i < sz; ) {
+    while (((t = sim_poll_kbd ()) == SCPE_OK) ||        /* wait for char */
+        (t & SCPE_BREAK)) {
+        if (stop_cpu)                                   /* stop? */
+            return t;
+        }
+    if (t < SCPE_KFLAG)                                 /* error? */
+        return t;
+    t = t & 0177;
+    if ((t == '\r') || (t == '\n'))                     /* eol? */
+        break;
+    if (t == 0177) {                                    /* rubout? */
+        if (i != 0) {                                   /* anything? */
+            buf[--i] = 0;
+            sim_putchar ('\\');
+            }
+        }
+    else {
+        sim_putchar (t);
+        buf[i++] = t;
+        }
+    }
+inq_puts ("\r\n");
 return SCPE_OK;
 }
 
@@ -379,12 +473,45 @@ sim_cancel (&cdr_unit);                                 /* clear reader event */
 return SCPE_OK;
 }
 
+/* Set/clear default to console flag
+
+   Caller will do actual bit field update on successful return */
+
+t_stat cdr_chg_cons (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+if (val == 0)                                           /* clear? */
+    cdr_unit.flags |= UNIT_ATTABLE;                     /* attachable on */
+else if ((cdr_unit.flags & UNIT_ATT) == 0)              /* set, unattached? */
+    cdr_unit.flags &= ~UNIT_ATTABLE;                    /* attachable off */
+return SCPE_OK;
+}
+
 /* Card reader attach */
 
-t_stat cdr_attach (UNIT *uptr, char *cptr)
+t_stat cdr_attach (UNIT *uptr, CONST char *cptr)
 {
+t_stat r;
+
 ind[IN_LST] = ind[IN_READ] = 0;                         /* clear last card */
-return attach_unit (uptr, cptr);
+cdr_unit.flags |= UNIT_ATTABLE;                         /* must be attachable */
+r = attach_unit (uptr, cptr);                           /* do attach */
+if ((r != SCPE_OK) && ((cdr_unit.flags & UNIT_CONS) != 0)) /* failed, default? */
+    cdr_unit.flags &= ~UNIT_ATTABLE;                    /* clear attachable */
+return r;
+}
+
+/* Card reader detach */
+
+t_stat cdr_detach (UNIT *uptr)
+{
+t_stat r;
+
+cdr_unit.flags |= UNIT_ATTABLE;                         /* must be attachable */
+r = detach_unit (uptr);                                 /* detach */
+if (((cdr_unit.flags & UNIT_ATT) == 0) &&               /* attached clear? */
+    ((cdr_unit.flags & UNIT_CONS) != 0))                /* default on? */
+    cdr_unit.flags &= ~UNIT_ATTABLE;                    /* clear attachable */
+return r;
 }
 
 /* Bootstrap routine */
@@ -398,7 +525,7 @@ static const unsigned char boot_rom[] = {
 
 t_stat cdr_boot (int32 unitno, DEVICE *dptr)
 {
-size_t i;
+int32 i;
 extern int32 saved_IS;
 
 for (i = 0; i < CDR_WIDTH; i++)                         /* clear buffer */
@@ -411,7 +538,7 @@ return SCPE_OK;
 
 /* Card punch attach */
 
-t_stat cdp_attach (UNIT *uptr, char *cptr)
+t_stat cdp_attach (UNIT *uptr, CONST char *cptr)
 {
 cdp_buf_full = 0;
 return attach_unit (uptr, cptr);

@@ -156,14 +156,13 @@ int32 dp_rtime = 100;                                   /* rotate latency */
 int32 dp_wtime = 1;                                     /* word time */
 uint8 dp_tplte[(2 * DP_NUMDR) + 2];                     /* fix/rmv + ctrl + end */
 
-DEVICE dp_dev;
 uint32 dp (uint32 dev, uint32 op, uint32 dat);
 void dp_ini (t_bool dtpl);
 t_stat dp_svc (UNIT *uptr);
 t_stat dp_reset (DEVICE *dptr);
-t_stat dp_attach (UNIT *uptr, char *cptr);
+t_stat dp_attach (UNIT *uptr, CONST char *cptr);
 t_stat dp_detach (UNIT *uptr);
-t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat dp_rds (UNIT *uptr);
 t_stat dp_wds (UNIT *uptr);
 t_bool dp_dter (UNIT *uptr, uint32 first);
@@ -392,7 +391,6 @@ t_stat dp_svc (UNIT *uptr)
 uint32 u = uptr - dp_dev.units;                         /* get unit number */
 int32 cyl = uptr->CYL;                                  /* get cylinder */
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
-uint32 t;
 t_stat r;
 
 if (uptr->STD & STD_MOV) {                              /* seek? */
@@ -421,7 +419,7 @@ switch (dp_cmd & 0x7) {                                 /* case on func */
             if ((r = dp_rds (uptr)))                    /* read sec, err? */
                 return r;
             dp_1st = 0;
-            t = sch_wrmem (dp_dib.sch, dpxb, DP_NUMBY); /* write to memory */
+            sch_wrmem (dp_dib.sch, dpxb, DP_NUMBY);     /* write to memory */
             if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */       
                 sim_activate (uptr, dp_rtime);          /* reschedule */
                 return SCPE_OK;
@@ -464,7 +462,7 @@ i = fxread (dpxb, sizeof (uint8), DP_NUMBY, uptr->fileref);
 for ( ; i < DP_NUMBY; i++)                              /* fill with 0's */
     dpxb[i] = 0;
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("DP I/O error");
+    sim_perror ("DP I/O error");
     clearerr (uptr->fileref);
     dp_done (STC_DTE);
     return SCPE_IOERR;
@@ -480,7 +478,7 @@ for ( ; dp_bptr < DP_NUMBY; dp_bptr++)
     dpxb[dp_bptr] = dp_db;                              /* fill with last */
 fxwrite (dpxb, sizeof (uint8), DP_NUMBY, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("DP I/O error");
+    sim_perror ("DP I/O error");
     clearerr (uptr->fileref);
     dp_done (STC_DTE);
     return SCPE_IOERR;
@@ -497,9 +495,9 @@ uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
 
 if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not attached? */
     ((uptr->flags & UNIT_WPRT) && (dp_cmd == CMC_WR))) {
-	dp_done (STC_DTE);									/* error, done */
-	return TRUE;
-	}
+    dp_done (STC_DTE);                                  /* error, done */
+    return TRUE;
+    }
 hd = GET_SRF (dp_hdsc);                                 /* get head */
 sc = GET_SEC (dp_hdsc);                                 /* get sector */
 if (dp_cyl != (uint32) uptr->CYL) {                     /* wrong cylinder? */
@@ -565,7 +563,7 @@ return SCPE_OK;
 
 /* Attach routine (with optional autosizing) */
 
-t_stat dp_attach (UNIT *uptr, char *cptr)
+t_stat dp_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 i, p;
 t_stat r;
@@ -604,7 +602,7 @@ return detach_unit (uptr);
 
 /* Set size command validation routine */
 
-t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;

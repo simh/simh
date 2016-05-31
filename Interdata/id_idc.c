@@ -219,12 +219,11 @@ int32 idc_rtime = 100;                                  /* rotate latency */
 int32 idc_ctime = 5;                                    /* command latency */
 uint8 idc_tplte[] = { 0, 1, 2, 3, 4, TPL_END };         /* ctrl + drive */
 
-DEVICE idc_dev;
 uint32 id (uint32 dev, uint32 op, uint32 dat);
 t_stat idc_svc (UNIT *uptr);
 t_stat idc_reset (DEVICE *dptr);
-t_stat idc_attach (UNIT *uptr, char *cptr);
-t_stat idc_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat idc_attach (UNIT *uptr, CONST char *cptr);
+t_stat idc_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void idc_wd_byte (uint32 dat);
 t_stat idc_rds (UNIT *uptr);
 t_stat idc_wds (UNIT *uptr);
@@ -503,7 +502,6 @@ t_stat idc_svc (UNIT *uptr)
 int32 diff;
 uint32 f, u = uptr - idc_dev.units;                     /* get unit number */
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
-uint32 t;
 t_stat r;
 
 if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
@@ -561,7 +559,7 @@ if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
             }
         }                                               /* end else p1 */
     return SCPE_OK;                                     /* end if drv */
-	}
+    }
 
 switch (uptr->FNC & CMC_MASK) {                         /* case on func */
 
@@ -579,7 +577,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
             if ((r = idc_rds (uptr)))                   /* read sec, err? */
                 return r;
             idc_1st = 0;
-            t = sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY); /* write mem */
+            sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY);  /* write mem */
             if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;
@@ -658,7 +656,7 @@ uint32 i;
 
 i = fxread (idcxb, sizeof (uint8), IDC_NUMBY, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("IDC I/O error");
+    sim_perror ("IDC I/O error");
     clearerr (uptr->fileref);
     idc_done (STC_DTE);
     return SCPE_IOERR;
@@ -676,7 +674,7 @@ for ( ; idc_bptr < IDC_NUMBY; idc_bptr++)
     idcxb[idc_bptr] = idc_db;                           /* fill with last */
 fxwrite (idcxb, sizeof (uint8), IDC_NUMBY, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
-    perror ("IDC I/O error");
+    sim_perror ("IDC I/O error");
     clearerr (uptr->fileref);
     idc_done (STC_DTE);
     return SCPE_IOERR;
@@ -693,7 +691,7 @@ uint32 hd, sc, sa;
 uint32 dtype = GET_DTYPE (uptr->flags);                 /* get drive type */
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
-	idc_done (STC_DTE);									/* error, done */
+    idc_done (STC_DTE);                                 /* error, done */
     return TRUE;
     }
 if ((uptr->flags & UNIT_WPRT) && (uptr->FNC == CMC_WR)) {
@@ -771,7 +769,7 @@ return SCPE_OK;
 
 /* Attach routine (with optional autosizing) */
 
-t_stat idc_attach (UNIT *uptr, char *cptr)
+t_stat idc_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 i, p;
 t_stat r;
@@ -797,7 +795,7 @@ return SCPE_OK;
 
 /* Set size command validation routine */
 
-t_stat idc_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat idc_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;

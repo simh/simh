@@ -73,6 +73,7 @@
 #include "pdp10_defs.h"
 #include <setjmp.h>
 #include <assert.h>
+#include <ctype.h>
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
@@ -149,10 +150,7 @@ static const int32 ubabr54[UBANUM] = {
 #define M_WORD1 (~INT64_C (0000000777777)) /* Clear word 1 + XX */
 
 extern d10 *M;                                          /* main memory */
-extern d10 *ac_cur;
 extern d10 pager_word;
-extern int32 flags;
-extern const int32 pi_l2bit[8];
 extern UNIT cpu_unit;
 extern jmp_buf save_env;
 
@@ -193,9 +191,9 @@ UNIT uba_unit[] = {
     };
 
 REG uba_reg[] = {
-    { ORDATA (INTREQ, int_req, 32), REG_RO },
-    { ORDATA (UB1CS, ubcs[0], 18) },
-    { ORDATA (UB3CS, ubcs[1], 18) },
+    { ORDATAD (INTREQ, int_req, 32, "interrupt request"), REG_RO },
+    { ORDATAD (UB1CS, ubcs[0], 18, "Unibus adapter 1 control/status") },
+    { ORDATAD (UB3CS, ubcs[1], 18, "Unibus adapter 3 control/status") },
     { NULL }
     };
 
@@ -1035,7 +1033,7 @@ return 0;
 
 /* Byte-mode writes */
 
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf)
 {
 uint32 ea, ofs, cp, np;
 int32 seg, ubm = 0;
@@ -1182,7 +1180,7 @@ return 0;
 
 /* Word mode writes; 16-bit data */
 
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf)
 {
 uint32 ea, cp, np;
 int32 seg, ubm = 0;
@@ -1294,7 +1292,7 @@ return 0;
 
 /* Word mode writes; 18-bit data */
 
-int32 Map_WriteW18 (uint32 ba, int32 bc, uint32 *buf)
+int32 Map_WriteW18 (uint32 ba, int32 bc, const uint32 *buf)
 {
 uint32 ea, cp, np;
 int32 seg, ubm = 0;
@@ -1403,7 +1401,7 @@ return 0;
 
 /* Word mode writes; 36-bit data */
 
-int32 Map_WriteW36 (uint32 ba, int32 bc, a10 *buf)
+int32 Map_WriteW36 (uint32 ba, int32 bc, const a10 *buf)
 {
 uint32 ea, cp, np;
 int32 seg, ubm = 0;
@@ -1698,7 +1696,7 @@ return SCPE_OK;
 
 /* Change device address */
 
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1729,7 +1727,7 @@ return SCPE_OK;
 
 /* Show device address */
 
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1755,7 +1753,7 @@ return SCPE_OK;
 
 /* Change device vector */
 
-t_stat set_vec (UNIT *uptr, int32 arg, char *cptr, void *desc)
+t_stat set_vec (UNIT *uptr, int32 arg, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1772,9 +1770,9 @@ if (dptr == NULL)
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL)
     return SCPE_IERR;
-newvec = (uint32) get_uint (cptr, 8, VEC_Q + 01000, &r);
-if ((r != SCPE_OK) || (newvec == VEC_Q) ||
-    ((newvec + (dibp->vnum * 4)) >= (VEC_Q + 01000)) ||
+newvec = (uint32) get_uint (cptr, 8, 01000, &r);
+if ((r != SCPE_OK) ||
+    ((newvec + (dibp->vnum * 4)) >= (01000)) ||
     (newvec & ((dibp->vnum > 1)? 07: 03)))
     return SCPE_ARG;
 dibp->vec = newvec;
@@ -1784,7 +1782,7 @@ return SCPE_OK;
 
 /* Show device vector */
 
-t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
+t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1816,9 +1814,9 @@ return SCPE_OK;
 
 /* Show vector for terminal multiplexor */
 
-t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 arg, void *desc)
+t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 arg, CONST void *desc)
 {
-TMXR *mp = (TMXR *) desc;
+const TMXR *mp = (const TMXR *) desc;
 
 if ((mp == NULL) || (arg == 0))
     return SCPE_IERR;
@@ -1903,7 +1901,7 @@ return SCPE_OK;
 
 /* Show dib_tab */
 
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, j, done = 0;
 DEVICE *dptr;
@@ -1975,7 +1973,7 @@ return SCPE_OK;
 
 
 typedef struct {
-    char        *dnam[AUTO_MAXC];
+    const char  *dnam[AUTO_MAXC];
     int32       numc;
     int32       numv;
     uint32      amod;
@@ -1996,6 +1994,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {0017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
     { { "PTP" },         1,  1,  0, 0, 
         {0017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
+    { { "XU", "XUB" },   1,  1,  8, 4, 
+        {014510}, {0120} },                              /* DEUNA */
     { { "DUP" },         1,  2,  0, 0, 
         {0000300}, {0570} },                             /* DUP11 bit sync - fx CSR, fx VEC */
     { { "KDP" },         1,  2,  0, 0, 
@@ -2211,10 +2211,10 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
 #define DEV_NEXUS 0
 #endif
 #endif
-t_stat auto_config (char *name, int32 nctrl)
+t_stat auto_config (const char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
-uint32 vec = VEC_Q + AUTO_VECBASE;
+uint32 vec = AUTO_VECBASE;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
@@ -2257,7 +2257,7 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         if (autp->numv) {                               /* vec needed? */
             if (autp->fixv[j]) {                        /* fixed vec avail? */
                 if (autp->numv > 0)
-                    dibp->vec = VEC_Q + autp->fixv[j];  /* use it */
+                    dibp->vec = autp->fixv[j];          /* use it */
                 }
             else {                                      /* no fixed left */
                 uint32 numv = abs (autp->numv);         /* get num vec */
@@ -2278,7 +2278,7 @@ return SCPE_OK;
 
 /* Set address floating */
 
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_addr_flt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 

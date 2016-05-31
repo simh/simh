@@ -193,7 +193,7 @@ uint32 GREG[16] = { 0 };                                /* general registers */
 uint16 *M = NULL;                                       /* memory */
 uint32 *R = &GREG[0];                                   /* register set ptr */
 uint32 F[8] = { 0 };                                    /* sp fp registers */
-dpr_t D[8] = { 0 };                                     /* dp fp registers */
+dpr_t D[8] = { {0, 0} };                                /* dp fp registers */
 uint32 PSW = 0;                                         /* processor status word */
 uint32 psw_mask = PSW_x16;                              /* PSW mask */
 uint32 PC = 0;                                          /* program counter */
@@ -237,11 +237,11 @@ uint32 display (uint32 dev, uint32 op, uint32 dat);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_consint (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern t_bool devtab_init (void);
 extern void int_eval (void);
@@ -657,7 +657,7 @@ while (reason == 0) {                                   /* loop until halted */
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
-		}
+        }
 
     sim_interval = sim_interval - 1;
 
@@ -1635,7 +1635,7 @@ do {
             if (DEV_ACC (dev)) {                        /* dev exist? */
                 by = ReadB ((vec + CCB16_IOC) & VAMASK);/* read OC byte */
                 dev_tab[dev] (dev, IO_OC, by);          /* send to dev */
-				}
+                }
             break;                                      /* and exit */
             }
         }
@@ -1920,7 +1920,7 @@ return SCPE_OK;
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -1940,7 +1940,7 @@ return SCPE_OK;
 
 /* Change CPU model */
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i;
 
@@ -1948,14 +1948,14 @@ if (!(val & UNIT_816E) && (MEMSIZE > MAXMEMSIZE16)) {
     MEMSIZE = MAXMEMSIZE16;
     for (i = MEMSIZE; i < MAXMEMSIZE16E; i = i + 2)
         M[i >> 1] = 0;
-    printf ("Reducing memory to 64KB\n");
+    sim_printf ("Reducing memory to 64KB\n");
     }
 return SCPE_OK;
 }
 
 /* Set console interrupt */
 
-t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_consint (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if ((uptr->flags & (UNIT_716 | UNIT_816 | UNIT_816E)) == 0)
     return SCPE_NOFNC;
@@ -1966,7 +1966,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, lnt;
 t_stat r;
@@ -1997,10 +1997,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 op, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[2];
 t_stat r;
 InstHistory *h;

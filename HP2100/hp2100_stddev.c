@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,9 @@
    TTY          12531C buffered teleprinter interface
    TBG          12539C time base generator
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    28-Dec-12    JDB     Allocate the TBG logical name during power-on reset
    18-Dec-12    MP      Now calls sim_activate_time to get remaining poll time
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -186,7 +189,7 @@ DEVICE ptr_dev, ptp_dev, tty_dev, clk_dev;
 
 IOHANDLER ptrio;
 t_stat ptr_svc (UNIT *uptr);
-t_stat ptr_attach (UNIT *uptr, char *cptr);
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 
@@ -198,8 +201,8 @@ IOHANDLER ttyio;
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
-t_stat tty_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tty_set_alf (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tty_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tty_set_alf (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat tto_out (int32 c);
 t_stat ttp_out (int32 c);
 
@@ -536,7 +539,7 @@ return SCPE_OK;
 
 /* Attach routine - clear the trailer counter */
 
-t_stat ptr_attach (UNIT *uptr, char *cptr)
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 ptr_trlcnt = 0;
 return attach_unit (uptr, cptr);
@@ -610,12 +613,13 @@ const BOOT_ROM ptr_rom = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 dev;
+const int32 dev = ptr_dib.select_code;                  /* get device no */
 
-dev = ptr_dib.select_code;                              /* get device no */
-if (ibl_copy (ptr_rom, dev)) return SCPE_IERR;          /* copy boot to memory */
-SR = (SR & IBL_OPT) | IBL_PTR | (dev << IBL_V_DEV);     /* set SR */
-return SCPE_OK;
+if (ibl_copy (ptr_rom, dev, IBL_OPT,                    /* copy the boot ROM to memory and configure */
+              IBL_PTR | IBL_SET_SC (dev)))              /*   the S register accordingly */
+    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+else
+    return SCPE_OK;
 }
 
 
@@ -777,7 +781,7 @@ while (working_set) {
 
 
         case ioIOI:                                     /* I/O data input */
-            data = tty_buf;
+            data = (uint16) tty_buf;
 
             if (!(tty_mode & TM_KBD) && sim_is_active (&tty_unit[TTO]))
                 data = data | TP_BUSY;
@@ -988,7 +992,7 @@ return SCPE_OK;
 }
 
 
-t_stat tty_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 u = uptr - tty_unit;
 
@@ -1000,7 +1004,7 @@ return SCPE_OK;
 }
 
 
-t_stat tty_set_alf (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_alf (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 u = uptr - tty_unit;
 

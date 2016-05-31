@@ -1,6 +1,6 @@
 /* pdp18b_ttx.c: PDP-9/15 additional terminals simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    LT15/LT19 terminal input/output
 
+   13-Sep-15    RMS     Added APIVEC register
    11-Oct-13    RMS     Poll TTIX immediately to pick up initial connect
    18-Apr-12    RMS     Revised to use clock coscheduling
    19-Nov-08    RMS     Revised for common TMXR show routines
@@ -63,6 +64,7 @@ TMXR ttx_desc = { 1, 0, 0, ttx_ldsc };                  /* mux descriptor */
 #define ttx_lines ttx_desc.lines                        /* current number of lines */
 
 extern int32 int_hwre[API_HLVL+1];
+extern int32 api_vec[API_HLVL][32];
 extern int32 tmxr_poll;
 extern int32 stop_inst;
 
@@ -78,11 +80,11 @@ t_bool ttox_test_done (int32 ln);
 void ttox_set_done (int32 ln);
 void ttox_clr_done (int32 ln);
 int32 ttx_getln (int32 dev, int32 pulse);
-t_stat ttx_attach (UNIT *uptr, char *cptr);
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr);
 t_stat ttx_detach (UNIT *uptr);
 t_stat ttx_reset (DEVICE *dptr);
 void ttx_reset_ln (int32 i);
-t_stat ttx_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTIx data structures
 
@@ -100,11 +102,14 @@ DIB ttix_dib = {
 UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_IDLE|UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
 REG ttix_reg[] = {
-    { BRDATA (BUF, ttix_buf, 8, 8, TTX_MAXL) },
-    { ORDATA (DONE, ttix_done, TTX_MAXL) },
-    { FLDATA (INT, int_hwre[API_TTI1], INT_V_TTI1) },
-    { DRDATA (TIME, ttix_unit.wait, 24), REG_NZ + PV_LEFT },
+    { BRDATAD (BUF, ttix_buf, 8, 8, TTX_MAXL, "last character received, lines 0 to 3/15") },
+    { ORDATAD (DONE, ttix_done, TTX_MAXL, "input ready flags, line 0 on right") },
+    { FLDATAD (INT, int_hwre[API_TTI1], INT_V_TTI1, "interrupt pending flag") },
+    { DRDATAD (TIME, ttix_unit.wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
     { ORDATA (DEVNUM, ttix_dib.dev, 6), REG_HRO },
+#if defined (PDP15)
+    { ORDATA (APIVEC, api_vec[API_TTI1][INT_V_TTI1], 6), REG_HRO },
+#endif
     { NULL }
     };
 
@@ -159,11 +164,14 @@ UNIT ttox_unit[] = {
     };
 
 REG ttox_reg[] = {
-    { BRDATA (BUF, ttox_buf, 8, 8, TTX_MAXL) },
-    { ORDATA (DONE, ttox_done, TTX_MAXL) },
-    { FLDATA (INT, int_hwre[API_TTO1], INT_V_TTO1) },
-    { URDATA (TIME, ttox_unit[0].wait, 10, 24, 0,
-              TTX_MAXL, PV_LEFT) },
+    { BRDATAD (BUF, ttox_buf, 8, 8, TTX_MAXL, "last character transmitted, lines 0 to 3/15") },
+    { ORDATAD (DONE, ttox_done, TTX_MAXL, "output ready flags, line 0 on right") },
+    { FLDATAD (INT, int_hwre[API_TTO1], INT_V_TTO1, "interrupt pending flag") },
+    { URDATAD (TIME, ttox_unit[0].wait, 10, 24, 0,
+              TTX_MAXL, PV_LEFT, "time from initiation to interrupt, lines 0 to 3/15") },
+#if defined (PDP15)
+    { ORDATA (APIVEC, api_vec[API_TTO1][INT_V_TTO1], 6), REG_HRO },
+#endif
     { NULL }
     };
 
@@ -259,7 +267,7 @@ if (ttix_done) {
     }
 else {
     CLR_INT (TTI1);
-	}
+    }
 return;
 }
 
@@ -390,7 +398,7 @@ return;
 
 /* Attach master unit */
 
-t_stat ttx_attach (UNIT *uptr, char *cptr)
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -417,7 +425,7 @@ return r;
 
 /* Change number of lines */
 
-t_stat ttx_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;
@@ -438,7 +446,7 @@ if (newln < ttx_lines) {
         if (ttx_ldsc[i].conn) {
             tmxr_linemsg (&ttx_ldsc[i], "\r\nOperator disconnected line\r\n");
             tmxr_reset_ln (&ttx_ldsc[i]);               /* reset line */
-			}
+            }
         ttox_unit[i].flags = ttox_unit[i].flags | UNIT_DIS;
         ttx_reset_ln (i);
         }

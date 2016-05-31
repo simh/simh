@@ -125,18 +125,17 @@ uint32 rf_time = 10;                                    /* inter-word time */
 uint32 rf_burst = 1;                                    /* burst mode flag */
 uint32 rf_stopioe = 1;                                  /* stop on error */
 
-DEVICE rf_dev;
 t_stat rf_rd (int32 *data, int32 PA, int32 access);
 t_stat rf_wr (int32 data, int32 PA, int32 access);
 int32 rf_inta (void);
 t_stat rf_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
 t_stat rf_boot (int32 unitno, DEVICE *dptr);
-t_stat rf_attach (UNIT *uptr, char *cptr);
-t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rf_attach (UNIT *uptr, CONST char *cptr);
+t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 uint32 update_rfcs (uint32 newcs, uint32 newdae);
-t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rf_description (DEVICE *dptr);
+t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rf_description (DEVICE *dptr);
 
 /* RF11 data structures
 
@@ -479,7 +478,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat rf_attach (UNIT *uptr, char *cptr)
+t_stat rf_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 sz, p;
 uint32 ds_bytes = RF_DKSIZE * sizeof (int16);
@@ -497,7 +496,7 @@ return attach_unit (uptr, cptr);
 
 /* Change disk size */
 
-t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val < 0)
     return SCPE_IERR;
@@ -508,7 +507,7 @@ uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }
 
-t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char *text2, *text3;
 const char *const text =
@@ -563,11 +562,11 @@ text3 =
 "\n"
 " RF11 data files are buffered in memory; therefore, end of file and OS\n"
 " I/O errors cannot occur.\n";
-fprintf (st, "%s", text2);
+fprintf (st, "%s", text3);
 return SCPE_OK;
 }
 
-char *rf_description (DEVICE *dptr)
+const char *rf_description (DEVICE *dptr)
 {
 return "RF11-A Fixed Head Disk controller";
 }

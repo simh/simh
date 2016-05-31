@@ -1,6 +1,6 @@
 /* nova_qty.c: NOVA multiplexor (QTY/ALM) simulator
 
-   Copyright (c) 2000-2008, Robert M. Supnik
+   Copyright (c) 2000-2015, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,7 +26,9 @@
 
    qty          multiplexor: QTY = 4060, ALM = 42xx
 
-   04-Jul-07    BKR     fixed QTY output line number calculation (affected higher line numbers),
+   28-Mar-15    RMS     Revised to use sim_printf
+   14-Mar-12    RMS     Fixed dangling else clauses
+   04-Jul-07    BKR     Fixed QTY output line number calculation (affected higher line numbers),
    25-Mar-04    RMS     Updated for V3.2
    12-Jan-04    BKR     Initial release
                         includes both original DG "quad" multiplexor (QTY)
@@ -107,9 +109,9 @@
 extern int32    int_req, dev_busy, dev_done, dev_disable ;
 extern int32    tmxr_poll ;                             /* calibrated delay */
 
-t_stat  qty_setnl   ( UNIT * uptr, int32 val, char * cptr, void * desc ) ;
+t_stat  qty_setnl   ( UNIT * uptr, int32 val, CONST char * cptr, void * desc ) ;
 
-t_stat  qty_attach  ( UNIT * uptr, char * cptr ) ;
+t_stat  qty_attach  ( UNIT * uptr, CONST char * cptr ) ;
 t_stat  qty_detach  ( UNIT * uptr ) ;
 t_stat  qty_reset   ( DEVICE * dptr ) ;
 t_stat  qty_svc     ( UNIT * uptr ) ;
@@ -119,7 +121,7 @@ t_stat  alm_reset   ( DEVICE * dptr ) ;
 t_stat  alm_svc     ( UNIT * uptr ) ;
 int32   alm         ( int32 pulse, int32 code, int32 AC ) ;
 
-DEVICE  alm_dev ;
+extern DEVICE  alm_dev ;
 
 
 #define QTY_MAX     64                          /*  max number of QTY lines - hardware  */
@@ -133,7 +135,7 @@ int32   qty_auto    = 0 ;                               /*  QTY auto disconnect 
 int32   qty_polls   = 0 ;                               /*  total 'qty_svc' polls       */
 
 
-TMLN    qty_ldsc[ QTY_MAX ] = { 0 } ;                   /*  QTY line descriptors        */
+TMLN    qty_ldsc[ QTY_MAX ] = { {0} } ;                 /*  QTY line descriptors        */
 TMXR    qty_desc    = { QTY_MAX, 0, 0, qty_ldsc } ;     /*  mux descriptor      */
 int32   qty_status[ QTY_MAX ] = { 0 } ;                 /*  QTY line status             */
                                                         /*  (must be at least 32 bits)  */
@@ -471,7 +473,7 @@ int qty_update_status( DIB * dibp, TMXR * tmxr_desc )
     /*                            qty_attach                        */
     /*--------------------------------------------------------------*/
 
-t_stat qty_attach( UNIT * unitp, char * cptr )
+t_stat qty_attach( UNIT * unitp, CONST char * cptr )
     {
     t_stat  r ;
     int a ;
@@ -489,13 +491,11 @@ t_stat qty_attach( UNIT * unitp, char * cptr )
     if ( sim_switches & SWMASK('M') )                   /* modem control? */
         {
         qty_mdm = 1;
-        printf( "Modem control activated\n" ) ;
-        if ( sim_log ) fprintf( sim_log, "Modem control activated\n" ) ;
+        sim_printf( "Modem control activated\n" ) ;
         if ( sim_switches & SWMASK ('A') )              /* autodisconnect? */
             {
             qty_auto = 1 ;
-            printf( "Auto disconnect activated\n" ) ;
-            if ( sim_log ) fprintf( sim_log, "Auto disconnect activated\n" ) ;
+            sim_printf( "Auto disconnect activated\n" ) ;
             }
         }
     qty_polls = 0 ;
@@ -628,7 +628,7 @@ t_stat qty_common_svc( DIB * dibp, UNIT * unitp )
 
     sim_activate( unitp, tmxr_poll ) ;                  /*  restart the bubble machine          */
     return ( SCPE_OK ) ;
-    }   /*  end of 'qty_common_svc'  */
+    }                                                   /*  end of 'qty_common_svc'  */
 
 
     /*--------------------------------------------------------------*/
@@ -638,7 +638,7 @@ t_stat qty_common_svc( DIB * dibp, UNIT * unitp )
 t_stat qty_svc( UNIT * uptr )
     {
     return ( qty_common_svc(&qty_dib,uptr) ) ;
-    }   /*  end of 'qty_svc'  */
+    }                                                   /*  end of 'qty_svc'  */
 
 
     /*--------------------------------------------------------------*/
@@ -751,7 +751,7 @@ int32 qty( int32 pulse, int32 code, int32 AC )
     /*                             qty_setnl                        */
     /*--------------------------------------------------------------*/
 
-t_stat qty_setnl( UNIT * uptr, int32 val, char * cptr, void * desc )
+t_stat qty_setnl( UNIT * uptr, int32 val, CONST char * cptr, void * desc )
     {
     int32   newln, i, t ;
 
@@ -998,13 +998,13 @@ int32 alm( int32 pulse, int32 code, int32 AC )
                 /*  get modem section status  */
                 if ( qty_ldsc[ alm_line ].xmte )
                     {
-                    iodata = 0035 ;                         /*  set CD, CTS, DSR, MDM flags  */
+                    iodata = 0035 ;                     /*  set CD, CTS, DSR, MDM flags  */
                     }
                 }
             else
                 {
                 /*  get receiver section status  */
-                iodata = 0 ;                                /*  receiver error status - no errors by default  */
+                iodata = 0 ;                            /*  receiver error status - no errors by default  */
                 }
             }
         break ;

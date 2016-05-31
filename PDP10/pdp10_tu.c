@@ -328,7 +328,7 @@ int32 reg_in_fmtr1[32] = {                              /* rmr if write + go */
 int32 fmt_test[16] = {                                  /* fmt bytes/10 wd */
     5, 0, 5, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
-static char *tu_fname[CS1_N_FNC] = {
+static const char *tu_fname[CS1_N_FNC] = {
     "NOP", "UNLD", "2", "REW", "FCLR", "5", "6", "7",
     "RIP", "11", "ERASE", "WREOF", "SPCF", "SPCR", "16", "17",
     "20", "21", "22", "23", "WRCHKF", "25", "26", "WRCHKR",
@@ -341,7 +341,7 @@ t_stat tu_wr (int32 data, int32 PA, int32 access);
 int32 tu_inta (void);
 t_stat tu_svc (UNIT *uptr);
 t_stat tu_reset (DEVICE *dptr);
-t_stat tu_attach (UNIT *uptr, char *cptr);
+t_stat tu_attach (UNIT *uptr, CONST char *cptr);
 t_stat tu_detach (UNIT *uptr);
 t_stat tu_boot (int32 unitno, DEVICE *dptr);
 void tu_go (int32 drv);
@@ -374,26 +374,26 @@ UNIT tu_unit[] = {
     };
 
 REG tu_reg[] = {
-    { ORDATA (MTCS1, tucs1, 16) },
-    { ORDATA (MTWC, tuwc, 16) },
-    { ORDATA (MTBA, tuba, 16) },
-    { ORDATA (MTFC, tufc, 16) },
-    { ORDATA (MTCS2, tucs2, 16) },
-    { ORDATA (MTFS, tufs, 16) },
-    { ORDATA (MTER, tuer, 16) },
-    { ORDATA (MTCC, tucc, 16) },
-    { ORDATA (MTDB, tudb, 16) },
-    { ORDATA (MTMR, tumr, 16) },
-    { ORDATA (MTTC, tutc, 16) },
-    { FLDATA (IFF, tuiff, 0) },
-    { FLDATA (INT, int_req, INT_V_TU) },
-    { FLDATA (DONE, tucs1, CSR_V_DONE) },
-    { FLDATA (IE, tucs1, CSR_V_IE) },
-    { FLDATA (STOP_IOE, tu_stopioe, 0) },
-    { DRDATA (TIME, tu_time, 24), PV_LEFT },
-    { URDATA (UST, tu_unit[0].USTAT, 8, 17, 0, TU_NUMDR, 0) },
-    { URDATA (POS, tu_unit[0].pos, 10, T_ADDR_W, 0,
-              TU_NUMDR, PV_LEFT | REG_RO) },
+    { ORDATAD (MTCS1, tucs1, 16, "control/status 1") },
+    { ORDATAD (MTWC, tuwc, 16, "word count") },
+    { ORDATAD (MTBA, tuba, 16, "memory address") },
+    { ORDATAD (MTFC, tufc, 16, "frame count") },
+    { ORDATAD (MTCS2, tucs2, 1, "control/status 2") },
+    { ORDATAD (MTFS, tufs, 16, "formatter status") },
+    { ORDATAD (MTER, tuer, 16, "error status") },
+    { ORDATAD (MTCC, tucc, 16, "check character") },
+    { ORDATAD (MTDB, tudb, 16, "data buffer") },
+    { ORDATAD (MTMR, tumr, 16, "maintenance register") },
+    { ORDATAD (MTTC, tutc, 16, "tape control register") },
+    { FLDATAD (IFF, tuiff, 0, "interrupt flip/flop") },
+    { FLDATAD (INT, int_req, INT_V_TU, "interrupt pending") },
+    { FLDATAD (DONE, tucs1, CSR_V_DONE, "device done flag") },
+    { FLDATAD (IE, tucs1, CSR_V_IE, "interrupt enable flag") },
+    { FLDATAD (STOP_IOE, tu_stopioe, 0, "stop on I/O error") },
+    { DRDATAD (TIME, tu_time, 24, "delay"), PV_LEFT },
+    { URDATAD (UST, tu_unit[0].USTAT, 8, 17, 0, TU_NUMDR, 0, "unit status, units 0 to 7") },
+    { URDATAD (POS, tu_unit[0].pos, 10, T_ADDR_W, 0,
+              TU_NUMDR, PV_LEFT | REG_RO, "position, units 0 to 7") },
     { ORDATA (LOG, tu_log, 8), REG_HIDDEN },
     { NULL }
     };
@@ -1179,7 +1179,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat tu_attach (UNIT *uptr, char *cptr)
+t_stat tu_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 drv = uptr - tu_dev.units;
 t_stat r;

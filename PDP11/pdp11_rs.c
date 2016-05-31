@@ -60,7 +60,7 @@
 
 #define UNIT_V_DTYPE    (UNIT_V_UF + 0)                 /* disk type */
 #define RS03_DTYPE       (0)
-#define RS04_DTYPE	     (1)
+#define RS04_DTYPE       (1)
 #define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
 #define UNIT_V_WLK      (UNIT_V_UF + 2)                 /* write lock */
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
@@ -177,17 +177,17 @@ t_stat rs_mbrd (int32 *data, int32 ofs, int32 drv);
 t_stat rs_mbwr (int32 data, int32 ofs, int32 drv);
 t_stat rs_svc (UNIT *uptr);
 t_stat rs_reset (DEVICE *dptr);
-t_stat rs_attach (UNIT *uptr, char *cptr);
+t_stat rs_attach (UNIT *uptr, CONST char *cptr);
 t_stat rs_detach (UNIT *uptr);
 t_stat rs_boot (int32 unitno, DEVICE *dptr);
 void rs_set_er (uint16 flg, int32 drv);
 void rs_clr_as (int32 mask);
 void rs_update_ds (uint16 flg, int32 drv);
 t_stat rs_go (int32 drv);
-t_stat rs_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rs_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 rs_abort (void);
-t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *rs_description (DEVICE *dptr);
+t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rs_description (DEVICE *dptr);
 
 /* RS data structures
 
@@ -197,24 +197,24 @@ char *rs_description (DEVICE *dptr);
    rs_mod       RS modifier list
 */
 
-DIB rs_dib = { MBA_RS, 0, &rs_mbrd, &rs_mbwr, 0, 0, 0, { &rs_abort } };
+DIB rs_dib = { MBA_AUTO, 0, &rs_mbrd, &rs_mbwr, 0, 0, 0, { &rs_abort } };
 
 UNIT rs_unit[] = {
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) },
-    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO+
+    { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|
              UNIT_BUFABLE|UNIT_MUSTBUF|(RS04_DTYPE << UNIT_V_DTYPE), RS04_SIZE) }
     };
 
@@ -330,7 +330,6 @@ return SCPE_OK;
 
 t_stat rs_mbwr (int32 data, int32 ofs, int32 drv)
 {
-int32 dtype;
 UNIT *uptr;
 
 uptr = rs_dev.units + drv;                              /* get unit */
@@ -341,7 +340,6 @@ if ((ofs != RS_AS_OF) && sim_is_active (uptr)) {        /* unit busy? */
     rs_update_ds (0, drv);
     return SCPE_OK;
     }
-dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 ofs = ofs & MBA_RMASK;                                  /* mask offset */
 
 switch (ofs) {                                          /* decode PA<5:1> */
@@ -382,7 +380,7 @@ return SCPE_OK;
 
 t_stat rs_go (int32 drv)
 {
-int32 fnc, dtype, t;
+int32 fnc, t;
 UNIT *uptr;
 
 fnc = GET_FNC (rscs1[drv]);                             /* get function */
@@ -391,7 +389,6 @@ if (DEBUG_PRS (rs_dev))
              drv, rs_fname[fnc], rsds[drv], rsda[drv], rser[drv]);
 uptr = rs_dev.units + drv;                              /* get unit */
 rs_clr_as (AS_U0 << drv);                               /* clear attention */
-dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 if ((fnc != FNC_DCLR) && (rsds[drv] & DS_ERR)) {        /* err & ~clear? */
     rs_set_er (ER_ILF, drv);                            /* not allowed */
     rs_update_ds (DS_ATA, drv);                         /* set attention */
@@ -583,7 +580,7 @@ t_stat rs_reset (DEVICE *dptr)
 int32 i;
 UNIT *uptr;
 
-mba_set_enbdis (MBA_RS, rs_dev.flags & DEV_DIS);
+mba_set_enbdis (dptr);
 for (i = 0; i < RS_NUMDR; i++) {
     uptr = rs_dev.units + i;
     sim_cancel (uptr);
@@ -599,7 +596,7 @@ return SCPE_OK;
 
 /* Device attach */
 
-t_stat rs_attach (UNIT *uptr, char *cptr)
+t_stat rs_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 drv, p;
 t_stat r;
@@ -632,7 +629,6 @@ return SCPE_OK;
 t_stat rs_detach (UNIT *uptr)
 {
 int32 drv;
-extern int32 sim_is_running;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
@@ -645,7 +641,7 @@ return detach_unit (uptr);
 
 /* Set size command validation routine */
 
-t_stat rs_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rs_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 dtype = GET_DTYPE (val);
 
@@ -699,7 +695,7 @@ cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 
-t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "RS03/RS04 Massbus disk controller (RS)\n\n");
 fprintf (st, "The RS controller implements the Massbus family fixed head disks.  RS\n");
@@ -719,7 +715,7 @@ fprintf (st, "errors cannot occur.\n");
 return SCPE_OK;
 }
 
-char *rs_description (DEVICE *dptr)
+const char *rs_description (DEVICE *dptr)
 {
 return "RS03/RS04 Massbus disk controller";
 }

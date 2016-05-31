@@ -89,7 +89,7 @@ static t_stat prt1132_svc(UNIT *uptr);
 static t_stat prt1403_svc(UNIT *uptr);
 static t_stat prt_svc    (UNIT *uptr);
 static t_stat prt_reset  (DEVICE *dptr);
-static t_stat prt_attach (UNIT *uptr, char *cptr);
+static t_stat prt_attach (UNIT *uptr, CONST char *cptr);
 static t_stat prt_detach (UNIT *uptr);
 
 static int16 PRT_DSW   = 0;									/* device status word */
@@ -198,11 +198,11 @@ static struct tag_ccpunches {							/* list of rows and punches on tape */
 	int row, channels;
 }
 ccpunches[] = {
-      2, CC_CHANNEL_1,									/* channel  1 = top of form */
-	 62, CC_CHANNEL_12									/* channel 12 = bottom of form */
+    { 2, CC_CHANNEL_1},								/* channel  1 = top of form */
+    {62, CC_CHANNEL_12}								/* channel 12 = bottom of form */
 },
 cccgi[] = {
-      2, CC_CHANNEL_1									/* channel  1 = top of form; no bottom of form */
+    {2, CC_CHANNEL_1}								/* channel  1 = top of form; no bottom of form */
 };
 
 #include "ibm1130_prtwheel.h"
@@ -346,11 +346,11 @@ static void flush_prt_line (FILE *fd, int spacemode, t_bool physical_printer)
 
 #define PRT_CMD_MASK				0x00C7
 
-extern char * saywhere (int addr);
+extern const char * saywhere (int addr);
 
-static void mytrace (int start, char *what)
+static void mytrace (int start, const char *what)
 {
-	char *where;
+	const char *where;
 
 	if ((where = saywhere(prev_IAR)) == NULL) where = "?";
 	trace_io("%s %s at %04x: %s", start ? "start" : "stop", what, prev_IAR, where);
@@ -505,7 +505,8 @@ static t_stat prt1132_svc (UNIT *uptr)
 
 void save_1403_prt_line (int32 addr)
 {
-	int i, j, r, ch, even = TRUE;
+	size_t j;
+	int i, r, ch, even = TRUE;
 	unsigned char ebcdic;
 	int32 wd;
 
@@ -649,7 +650,7 @@ static t_stat prt1403_svc(UNIT *uptr)
 
 /* delete_cmd - SCP command to delete a file */
 
-static t_stat delete_cmd (int32 flag, char *cptr)
+static t_stat delete_cmd (int32 flag, CONST char *cptr)
 {
 	char gbuf[CBUFSIZE];
 	int status;
@@ -661,7 +662,7 @@ static t_stat delete_cmd (int32 flag, char *cptr)
 	status = remove(gbuf);						/* delete the file */
 
 	if (status != 0 && errno != ENOENT)			/* print message if failed and file exists */
-		perror(gbuf);
+		sim_perror(gbuf);
 
 	return SCPE_OK;
 }
@@ -671,7 +672,7 @@ static t_stat delete_cmd (int32 flag, char *cptr)
 static t_stat prt_reset (DEVICE *dptr)
 {
 	UNIT *uptr = &prt_unit[0];
-	int i;
+	size_t i;
 
 /* add a DELETE filename command so we can be sure to have clean listings */
 	register_cmd("DELETE", &delete_cmd, 0, "del{ete} filename        remove file\n");
@@ -720,9 +721,10 @@ static t_stat prt_reset (DEVICE *dptr)
 	return SCPE_OK;
 }
 
-static t_stat prt_attach (UNIT *uptr, char *cptr)
+static t_stat prt_attach (UNIT *uptr, CONST char *cptr)
 {
 	t_stat rval;
+    char gbuf[2*CBUFSIZE];
 														/* assume failure */
 	SETBIT(PRT_DSW, IS_1132(uptr) ? PRT1132_DSW_NOT_READY : PRT1403_DSW_NOT_READY);
 	formfed = FALSE;
@@ -742,14 +744,14 @@ static t_stat prt_attach (UNIT *uptr, char *cptr)
 
 	if (strcmp(cptr, "(stdout)") == 0) {				/* connect printer to stdout */
 		if (uptr -> flags & UNIT_DIS) return SCPE_UDIS;	/* disabled? */
-		uptr->filename = calloc(CBUFSIZE, sizeof(char));
+		uptr->filename = (char *)calloc(CBUFSIZE, sizeof(char));
 		strcpy(uptr->filename, "(stdout)");
 	    uptr->fileref = stdout;
 		SETBIT(uptr->flags, UNIT_ATT);
 		uptr->pos = 0;
 	}
 	else {
-		if ((rval = attach_unit(uptr, quotefix(cptr))) != SCPE_OK)
+		if ((rval = attach_unit(uptr, quotefix(cptr, gbuf))) != SCPE_OK)
 			return rval;
 	}
 

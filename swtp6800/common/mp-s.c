@@ -1,54 +1,60 @@
 /*  mp-s.c: SWTP MP-S serial I/O card simulator
 
-    Copyright (c) 2005-2011, William Beech
+    Copyright (c) 2005-2012, William Beech
 
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
+        Permission is hereby granted, free of charge, to any person obtaining a
+        copy of this software and associated documentation files (the "Software"),
+        to deal in the Software without restriction, including without limitation
+        the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        and/or sell copies of the Software, and to permit persons to whom the
+        Software is furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
+        The above copyright notice and this permission notice shall be included in
+        all copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-    Willaim Beech BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        Willaim Beech BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+        IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+        CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the name of William A. Beech shall not
-    be used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from William A. Beech.
-   
-    These functions support a simulated SWTP MP-S interface card.
-    The card contains one M6850 ACIA.  The ACIA implements one complete
-    serial port.  It provides 7 or 8-bit ASCII RS-232 interface to Terminals
-    or 20 mA current loop interface to a model 33 or 37 Teletype.  It is not
-    compatible with baudot Teletypes.  Baud rates from 110 to 1200 are
-    switch selectable from S! on the MP-S. The ACIA ports appear at all 
-    4 addresses.  This fact is used by SWTBUG to determine the presence of the 
-    MP-S vice MP-C serial card.  The ACIA interrupt request line can be connected
-    to the IRQ or NMI interrupt lines by a jumper on the MP-S.
+        Except as contained in this notice, the name of William A. Beech shall not
+        be used in advertising or otherwise to promote the sale, use or other dealings
+        in this Software without prior written authorization from William A. Beech.
 
-    All I/O is via either programmed I/O or interrupt controlled I/O.
-    It has a status port and a data port.  A write to the status port
-    can select some options for the device (0x03 will reset the port).
-    A read of the status port gets the port status:
+    MODIFICATIONS:
 
-    +---+---+---+---+---+---+---+---+
-    | I | P | O | F |CTS|DCD|TXE|RXF|
-    +---+---+---+---+---+---+---+---+
+        24 Apr 15 -- Modified to use simh_debug
 
-    RXF - A 1 in this bit position means a character has been received
-    	  on the data port and is ready to be read.
-    TXE - A 1 in this bit means the port is ready to receive a character
-    	  on the data port and transmit it out over the serial line.
- 
-    A read to the data port gets the buffered character, a write
-    to the data port writes the character to the device.
+    NOTES:
+
+        These functions support a simulated SWTP MP-S interface card.
+        The card contains one M6850 ACIA.  The ACIA implements one complete
+        serial port.  It provides 7 or 8-bit ASCII RS-232 interface to Terminals
+        or 20 mA current loop interface to a model 33 or 37 Teletype.  It is not
+        compatible with baudot Teletypes.  Baud rates from 110 to 1200 are
+        switch selectable from S! on the MP-S. The ACIA ports appear at all 
+        4 addresses.  This fact is used by SWTBUG to determine the presence of the 
+        MP-S vice MP-C serial card.  The ACIA interrupt request line can be connected
+        to the IRQ or NMI interrupt lines by a jumper on the MP-S.
+
+        All I/O is via either programmed I/O or interrupt controlled I/O.
+        It has a status port and a data port.  A write to the status port
+        can select some options for the device (0x03 will reset the port).
+        A read of the status port gets the port status:
+
+        +---+---+---+---+---+---+---+---+
+        | I | P | O | F |CTS|DCD|TXE|RXF|
+        +---+---+---+---+---+---+---+---+
+
+        RXF - A 1 in this bit position means a character has been received
+              on the data port and is ready to be read.
+        TXE - A 1 in this bit means the port is ready to receive a character
+              on the data port and transmit it out over the serial line.
+     
+        A read to the data port gets the buffered character, a write
+        to the data port writes the character to the device.
 */
 
 #include    <stdio.h>
@@ -266,12 +272,12 @@ int32 sio0d(int32 io, int32 data)
             }
             if ((odata = getc(ptr_unit.fileref)) == EOF) { // end of file?
 //              printf("Got EOF\n");
-                ptr_unit.u3 &= 0xFE;    // clear RXF flag	
+                ptr_unit.u3 &= 0xFE;    // clear RXF flag
                 return (odata = 0);     // no data
             }
 //          printf("Returning new %02X\n", odata);
             ptr_unit.pos++;             // step character count
-            ptr_unit.u3 &= 0xFE;        // clear RXF flag	
+            ptr_unit.u3 &= 0xFE;        // clear RXF flag
             return (odata & 0xFF);      // return character
         } else {
             sio_unit.u3 &= 0xFE;        // clear RXF flag
@@ -312,10 +318,10 @@ int32 sio0d(int32 io, int32 data)
     return (odata = 0);
 }
 
-/*	because each port appears at 2 addresses and this fact is used
-	to determine if it is a MP-C or MP-S repeatedly in the SWTBUG
-	monitor, this code assures that reads of the high ports return
-	the same data as was read the last time on the low ports.
+/*  because each port appears at 2 addresses and this fact is used
+    to determine if it is a MP-C or MP-S repeatedly in the SWTBUG
+    monitor, this code assures that reads of the high ports return
+    the same data as was read the last time on the low ports.
 */
 
 int32 sio1s(int32 io, int32 data)

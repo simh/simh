@@ -65,9 +65,9 @@
 #define DPA_M_HD        0x1F
 #define DPA_V_SC        0                               /* sector offset */
 #define DPA_M_SC        0x1F
-#define DPA_GETCY(x)	(((x) >> DPA_V_CY) & DPA_M_CY)
+#define DPA_GETCY(x)    (((x) >> DPA_V_CY) & DPA_M_CY)
 #define DPA_GETHD(x)    (((x) >> DPA_V_HD) & DPA_M_HD)
-#define DPA_GETSC(x)	(((x) >> DPA_V_SC) & DPA_M_SC)
+#define DPA_GETSC(x)    (((x) >> DPA_V_SC) & DPA_M_SC)
 
 /* Sense order */
 
@@ -250,10 +250,10 @@ t_bool dp_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st);
 int32 dp_clr_int (uint32 cidx);
 void dp_set_ski (uint32 cidx, uint32 un);
 void dp_clr_ski (uint32 cidx, uint32 un);
-t_stat dp_attach (UNIT *uptr, char *cptr);
-t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_set_ctl (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dp_attach (UNIT *uptr, CONST char *cptr);
+t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_set_ctl (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 static DP_TYPE dp_tab[] = {
     { DP_ENT (7242, 7270) },
@@ -748,7 +748,7 @@ switch (uptr->UCMD) {
             else wd = 0;
             dp_buf[i] = wd;                             /* store in buffer */
             }
-        if (r = dp_write (uptr, da))                    /* write buf, err? */
+        if ((r = dp_write (uptr, da)))                  /* write buf, err? */
             return r;
         if (dp_end_sec (uptr, DP_WDSC, DP_WDSC, st))    /* transfer done? */
             return SCPE_OK;                             /* err or cont */
@@ -790,7 +790,7 @@ switch (uptr->UCMD) {
             chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
-        if (r = dp_read (uptr, da))                     /* read buf, error? */
+        if ((r = dp_read (uptr, da)))                   /* read buf, error? */
             return r;
         for (i = 0, st = 0; (i < (DP_WDSC * 4)) && (st != CHS_ZBC); i++) {
             st = chan_RdMemB (dva, &wd);                /* read byte */
@@ -815,7 +815,7 @@ switch (uptr->UCMD) {
             chan_uen (dva);                             /* uend */
                 return SCPE_OK;
             }
-        if (r = dp_read (uptr, da))                     /* read buf, error? */
+        if ((r = dp_read (uptr, da)))                   /* read buf, error? */
             return r;
         for (i = 0, st = 0; (i < DP_WDSC) && (st != CHS_ZBC); i++) {
             st = chan_WrMemW (dva, dp_buf[i]);          /* store in mem */
@@ -1081,7 +1081,7 @@ t_stat dp_ioerr (UNIT *uptr)
 uint32 cidx = uptr->UCTX;
 uint32 dva = dp_dib[cidx].dva;
 
-perror ("DP I/O error");
+sim_perror ("DP I/O error");
 clearerr (uptr->fileref);
 dp_ctx[cidx].dp_flags |= DPF_DPE;                       /* set DPE flag */
 chan_set_chf (dva, CHF_XMDE);
@@ -1191,7 +1191,7 @@ return SCPE_OK;
 
 /* Device attach */
 
-t_stat dp_attach (UNIT *uptr, char *cptr)
+t_stat dp_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 i, p;
 t_stat r;
@@ -1215,7 +1215,7 @@ return SCPE_OK;
 
 /* Set drive type command validation routine */
 
-t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 dtype = GET_DTYPE (val);
 uint32 cidx = uptr->UCTX;
@@ -1232,7 +1232,7 @@ return SCPE_OK;
 
 /* Set controller type command validation routine */
 
-t_stat dp_set_ctl (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_set_ctl (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, cidx = uptr->UCTX;
 DP_CTX *ctx = &dp_ctx[cidx];
@@ -1265,7 +1265,7 @@ for (i = 0; i < DP_NUMDR; i++) {
 return SCPE_OK;
 }
 
-t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 cidx = uptr->UCTX;
 

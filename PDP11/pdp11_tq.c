@@ -45,7 +45,7 @@
                         - Fixed debug output of tape file positions when they 
                           are 64b.  Added more debug output after positioning
                           operations.  Also, added textual display of the 
-                          command being performed (GUS,POS,RD,WR,etc…)
+                          command being performed (GUS,POS,RD,WR,etc@)
    18-Jun-07    RMS     Added UNIT_IDLE flag to timer thread
    16-Feb-06    RMS     Revised for new magtape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
@@ -233,7 +233,7 @@ struct drvtyp {
     uint16      cver;
     uint16      fver;
     uint16      uver;
-    char        *name;
+    const char  *name;
     };
 
 static struct drvtyp drv_tab[] = {
@@ -309,7 +309,7 @@ static uint32 tq_cmf[64] = {
     0, 0, 0, 0, 0, 0, 0, 0
     };  
 
-static char *tq_cmdname[] = {
+static const char *tq_cmdname[] = {
     "",                                                 /*  0 */
     "ABO",                                              /*  1 b: abort */
     "GCS",                                              /*  2 b: get command status */
@@ -342,8 +342,6 @@ static char *tq_cmdname[] = {
 
 /* Forward references */
 
-DEVICE tq_dev;
-
 t_stat tq_rd (int32 *data, int32 PA, int32 access);
 t_stat tq_wr (int32 data, int32 PA, int32 access);
 int32 tq_inta (void);
@@ -351,15 +349,15 @@ t_stat tq_svc (UNIT *uptr);
 t_stat tq_tmrsvc (UNIT *uptr);
 t_stat tq_quesvc (UNIT *uptr);
 t_stat tq_reset (DEVICE *dptr);
-t_stat tq_attach (UNIT *uptr, char *cptr);
+t_stat tq_attach (UNIT *uptr, CONST char *cptr);
 t_stat tq_detach (UNIT *uptr);
 t_stat tq_boot (int32 unitno, DEVICE *dptr);
-t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-char *tq_description (DEVICE *dptr);
+t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat tq_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *tq_description (DEVICE *dptr);
 
 t_bool tq_step4 (void);
 t_bool tq_mscp (uint16 pkt, t_bool q);
@@ -572,7 +570,7 @@ struct tq_req_results {           /* intermediate State during tape motion comma
 
 t_stat tq_rd (int32 *data, int32 PA, int32 access)
 {
-sim_debug(DBG_REG, &tq_dev, "tq_rd(PA=0x%08X [%s], access=%d)\n", PA, ((PA >> 1) & 01) ? "IP" : "SA", access);
+sim_debug(DBG_REG, &tq_dev, "tq_rd(PA=0x%08X [%s], access=%d)=0x%04X\n", PA, ((PA >> 1) & 01) ? "SA" : "IP", access, ((PA >> 1) & 01) ? tq_sa : 0);
 
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
     case 0:                                             /* IP */
@@ -595,7 +593,7 @@ return SCPE_OK;
 
 t_stat tq_wr (int32 data, int32 PA, int32 access)
 {
-sim_debug(DBG_REG, &tq_dev, "tq_wr(PA=0x%08X [%s], access=%d)\n", PA, ((PA >> 1) & 01) ? "IP" : "SA", access);
+sim_debug(DBG_REG, &tq_dev, "tq_wr(PA=0x%08X [%s], access=%d, data=0x%04X)\n", PA, ((PA >> 1) & 01) ? "SA" : "IP", access, data);
 
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
@@ -680,8 +678,6 @@ if (tq_csta < CST_UP) {                                 /* still init? */
             else {
                 tq_s1dat = tq_saw;                      /* save data */
                 tq_dib.vec = (tq_s1dat & SA_S1H_VEC) << 2; /* get vector */
-                if (tq_dib.vec)                         /* if nz, bias */
-                    tq_dib.vec = tq_dib.vec + VEC_Q;
                 tq_sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (tq_s1dat);
                 tq_csta = CST_S2;                       /* now in step 2 */
                 tq_init_int ();                         /* intr if req */
@@ -746,7 +742,7 @@ if ((pkt == 0) && tq_pip) {                             /* polling? */
         UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
 
         if (up)
-            sim_debug (DBG_REQ, &tq_dev, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X, obj=%d, pos=0x%X\n", 
+            sim_debug (DBG_REQ, &tq_dev, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X, obj=%d, pos=0x%" T_ADDR_FMT "X\n", 
                     tq_pkt[pkt].d[CMD_OPC], tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f],
                     tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN],
                     tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
@@ -1316,7 +1312,7 @@ struct tq_req_results *res = (struct tq_req_results *)uptr->results;
 int32 io_complete = res->io_complete;
 
 sim_debug (DBG_TRC, &tq_dev, "tq_svc(unit=%d, pkt=%d, cmd=%s, mdf=0x%0X, bc=0x%0x, phase=%s)\n",
-           uptr-tq_dev.units, pkt, tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f], mdf, bc,
+           (int)(uptr-tq_dev.units), pkt, tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f], mdf, bc,
            uptr->io_complete ? "bottom" : "top");
 
 res->io_complete = 0;
@@ -1499,7 +1495,7 @@ t_stat tq_mot_err (UNIT *uptr, uint32 rsiz)
 uptr->flags = (uptr->flags | UNIT_SXC) & ~UNIT_TMK;     /* serious exception */
 if (tq_dte (uptr, ST_DRV))                              /* post err log */
     tq_mot_end (uptr, EF_LOG, ST_DRV, rsiz);            /* if ok, report err */
-perror ("TQ I/O error");
+sim_perror ("TQ I/O error");
 clearerr (uptr->fileref);
 return SCPE_IOERR;
 }
@@ -1826,7 +1822,7 @@ UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
 if (pkt == 0)                                           /* any packet? */
     return OK;
 if (up)
-    sim_debug (DBG_REQ, &tq_dev, "rsp=%04X, sts=%04X, rszl=%04X, obj=%d, pos=%d\n", 
+    sim_debug (DBG_REQ, &tq_dev, "rsp=%04X, sts=%04X, rszl=%04X, obj=%d, pos=%" T_ADDR_FMT "d\n", 
                                tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS], tq_pkt[pkt].d[RW_RSZL],
                                up->objp, up->pos);
 else
@@ -2029,7 +2025,7 @@ return ERR;
 
 /* Device attach */
 
-t_stat tq_attach (UNIT *uptr, char *cptr)
+t_stat tq_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -2284,7 +2280,7 @@ for (i = 0; i < TQ_SH_MAX; i = i + TQ_SH_PPL) {
 return;
 }
 
-t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 pkt, u = uptr - tq_dev.units;
 
@@ -2312,7 +2308,7 @@ else fprintf (st, "Unit %d queues are empty\n", u);
 return SCPE_OK;
 }
 
-t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, pkt;
 
@@ -2360,7 +2356,7 @@ return SCPE_OK;
 
 /* Set controller type (and capacity for user-defined type) */
 
-t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tq_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, cap;
 uint32 max = sim_taddr_64? TQU_EMAXC: TQU_MAXC;
@@ -2386,15 +2382,15 @@ return SCPE_OK;
 
 /* Show controller type and capacity */
 
-t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "%s (%dMB)", drv_tab[tq_typ].name, (uint32) (drv_tab[tq_typ].cap >> 20));
 return SCPE_OK;
 }
 
-static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-char *devtype = UNIBUS ? "TUK50" : "TQK50";
+const char *devtype = UNIBUS ? "TUK50" : "TQK50";
 
 fprintf (st, "%s (TQ)\n\n", tq_description (dptr));
 fprintf (st, "The TQ controller simulates the %s TMSCP disk controller.  TQ options\n", devtype);
@@ -2413,7 +2409,7 @@ sim_tape_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
-char *tq_description (DEVICE *dptr)
+const char *tq_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "TUK50 TMSCP magnetic tape controller" :
                   "TQK50 TMSCP magnetic tape controller";

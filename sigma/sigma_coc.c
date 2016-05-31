@@ -59,17 +59,17 @@
 
 /* DIO address */
 
-#define MUXDIO_V_FNC	0                               /* function */
-#define MUXDIO_M_FNC	0xF
-#define MUXDIO_V_COC	4                               /* ctlr num */
-#define MUXDIO_M_COC	0xF
+#define MUXDIO_V_FNC    0                               /* function */
+#define MUXDIO_M_FNC    0xF
+#define MUXDIO_V_COC    4                               /* ctlr num */
+#define MUXDIO_M_COC    0xF
 #define MUXDIO_GETFNC(x) (((x) >> MUXDIO_V_FNC) & MUXDIO_M_FNC)
 #define MUXDIO_GETCOC(x) (((x) >> MUXDIO_V_COC) & MUXDIO_M_COC)
 
-#define MUXDAT_V_LIN	0                               /* line num */
-#define MUXDAT_M_LIN	(MUX_LINES - 1)
-#define MUXDAT_V_CHR	8                               /* output char */
-#define MUXDAT_M_CHR	0xFF
+#define MUXDAT_V_LIN    0                               /* line num */
+#define MUXDAT_M_LIN    (MUX_LINES - 1)
+#define MUXDAT_V_CHR    8                               /* output char */
+#define MUXDAT_M_CHR    0xFF
 #define MUXDAT_GETLIN(x) (((x) >> MUXDAT_V_LIN) & MUXDAT_M_LIN)
 #define MUXDAT_GETCHR(x) (((x) >> MUXDAT_V_CHR) & MUXDAT_M_CHR)
 
@@ -98,9 +98,9 @@ t_stat muxc_svc (UNIT *uptr);
 t_stat muxo_svc (UNIT *uptr);
 t_stat muxi_rtc_svc (UNIT *uptr);
 t_stat mux_reset (DEVICE *dptr);
-t_stat mux_attach (UNIT *uptr, char *cptr);
+t_stat mux_attach (UNIT *uptr, CONST char *cptr);
 t_stat mux_detach (UNIT *uptr);
-t_stat mux_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat mux_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void mux_reset_ln (int32 ln);
 void mux_scan_next (t_bool clr);
 t_stat muxi_put_char (uint32 c, uint32 ln);
@@ -418,7 +418,7 @@ if ((newln >= 0) && (mux_sta[newln] & MUXL_REP)) {      /* rcv enb pending? */
 tmxr_poll_rx (&mux_desc);                               /* poll for input */
 for (ln = 0; ln < MUX_NUMLIN; ln++) {                   /* loop thru lines */
     if (mux_ldsc[ln].conn) {                            /* connected? */
-        if (c = tmxr_getc_ln (&mux_ldsc[ln])) {         /* get char */
+        if ((c = tmxr_getc_ln (&mux_ldsc[ln]))) {       /* get char */
             if (c & SCPE_BREAK)                         /* break? */
                 mux_sta[ln] |= MUXL_RBP;                /* set rcv brk */
             else {                                      /* normal char */
@@ -545,7 +545,7 @@ return SCPE_OK;
 
 /* Attach master unit */
 
-t_stat mux_attach (UNIT *uptr, char *cptr)
+t_stat mux_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -573,7 +573,7 @@ return r;
 
 /* Change number of lines */
 
-t_stat mux_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mux_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;

@@ -175,8 +175,8 @@ static int32 nsectors     = C20MB_NSECTORS;
 static int32 sectsize     = C20MB_SECTSIZE;
 
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern int32 find_unit_index(UNIT *uptr);
@@ -191,9 +191,10 @@ extern uint8 GetByteDMA(const uint32 Addr);
 #define DISK3_CAPACITY          (C20MB_NTRACKS*C20MB_NHEADS*C20MB_NSECTORS*C20MB_SECTSIZE)   /* Default Disk Capacity */
 
 static t_stat disk3_reset(DEVICE *disk3_dev);
-static t_stat disk3_attach(UNIT *uptr, char *cptr);
+static t_stat disk3_attach(UNIT *uptr, CONST char *cptr);
 static t_stat disk3_detach(UNIT *uptr);
 static void raise_disk3_interrupt(void);
+static const char* disk3_description(DEVICE *dptr);
 
 static int32 disk3dev(const int32 port, const int32 io, const int32 data);
 
@@ -233,7 +234,11 @@ static REG disk3_reg[] = {
     { NULL }
 };
 
-#define DISK3_NAME  "Compupro ST-506 Disk Controller DISK3"
+#define DISK3_NAME  "Compupro ST-506 Disk Controller"
+
+static const char* disk3_description(DEVICE *dptr) {
+    return DISK3_NAME;
+}
 
 static MTAB disk3_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
@@ -266,7 +271,7 @@ DEVICE disk3_dev = {
     NULL, NULL, &disk3_reset,
     NULL, &disk3_attach, &disk3_detach,
     &disk3_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    disk3_dt, NULL, DISK3_NAME
+    disk3_dt, NULL, NULL, NULL, NULL, NULL, &disk3_description
 };
 
 /* Reset routine */
@@ -279,7 +284,7 @@ static t_stat disk3_reset(DEVICE *dptr)
     } else {
         /* Connect DISK3 at base address */
         if(sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &disk3dev, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
     }
@@ -291,7 +296,7 @@ static t_stat disk3_reset(DEVICE *dptr)
 
 
 /* Attach routine */
-static t_stat disk3_attach(UNIT *uptr, char *cptr)
+static t_stat disk3_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r = SCPE_OK;
     DISK3_DRIVE_INFO *pDrive;
@@ -335,22 +340,23 @@ static t_stat disk3_attach(UNIT *uptr, char *cptr)
     }
 
     if (uptr->flags & UNIT_DISK3_VERBOSE)
-        printf("DISK3%d, attached to '%s', type=%s, len=%d\n", i, cptr,
+        sim_printf("DISK3%d, attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
 
     if(uptr->u3 == IMAGE_TYPE_IMD) {
         if(uptr->capac < 318000) {
-            printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
+            sim_printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
             disk3_detach(uptr);
             return SCPE_OPENERR;
         }
 
         if (uptr->flags & UNIT_DISK3_VERBOSE)
-            printf("--------------------------------------------------------\n");
-        disk3_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_DISK3_VERBOSE));
+            sim_printf("--------------------------------------------------------\n");
+        disk3_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_DISK3_VERBOSE),
+                                              &disk3_dev, VERBOSE_MSG, VERBOSE_MSG);
         if (uptr->flags & UNIT_DISK3_VERBOSE)
-            printf("\n");
+            sim_printf("\n");
     } else {
         disk3_info->drive[i].imd = NULL;
     }
@@ -377,7 +383,7 @@ static t_stat disk3_detach(UNIT *uptr)
     pDrive->ready = 0;
 
     if (uptr->flags & UNIT_DISK3_VERBOSE)
-        printf("Detach DISK3%d\n", i);
+        sim_printf("Detach DISK3%d\n", i);
 
     r = detach_unit(uptr);  /* detach unit */
     if ( r != SCPE_OK)
@@ -538,7 +544,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
 
                 xfr_len = pDrive->xfr_nsects * pDrive->sectsize;
 
-                dataBuffer = malloc(xfr_len);
+                dataBuffer = (uint8 *)malloc(xfr_len);
 
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
 
@@ -614,7 +620,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 file_offset = (pDrive->track * (pDrive->nheads) * data_len); /* Calculate offset based on current track */
                 file_offset += (disk3_info->iopb[DISK3_IOPB_ARG3] * data_len);
 
-                fmtBuffer = malloc(data_len);
+                fmtBuffer = (uint8 *)malloc(data_len);
                 memset(fmtBuffer, disk3_info->iopb[DISK3_IOPB_ARG2], data_len);
 
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);

@@ -1,6 +1,6 @@
 /* vax780_sbi.c: VAX 11/780 SBI
 
-   Copyright (c) 2004-2011, Robert M Supnik
+   Copyright (c) 2004-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,9 @@
 
    sbi                  bus controller
 
-   21-Mar-2011  RMS     Added autoreboot capability (Mark Pizzalato)
+   29-Mar-2015  RMS     Added in-exception test to machine check
+   16-Dec-2014  RMS     Removed TQ boot entry (VMB doesn't support tape boot)
+   21-Mar-2011  RMS     Added autoreboot capability (Mark Pizzolato)
    04-Feb-2011  MP      Added RQB, RQC, and RQD as bootable controllers
    31-May-2008  RMS     Fixed machine_check calling sequence (Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
@@ -94,7 +96,7 @@
 /* VAX-11/780 boot device definitions */
 
 struct boot_dev {
-    char                *name;
+    const char          *name;
     int32               code;
     int32               let;
     };
@@ -122,35 +124,23 @@ static struct boot_dev boot_tab[] = {
     { "RQB", BOOT_UDA, 1 << 24 },
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
-    { "TQ", BOOT_TK, 1 << 24 },
     { "CS", BOOT_CS, 0 },
     { NULL }
     };
 
-extern int32 R[16];
-extern int32 PSL;
-extern int32 ASTLVL, SISR;
-extern int32 mapen, pme, trpirq;
-extern int32 in_ie;
-extern int32 mchk_va, mchk_ref;
-extern int32 crd_err, mem_err, hlt_pin;
 extern int32 tmr_int, tti_int, tto_int;
-extern jmp_buf save_env;
-extern int32 p1;
 
 t_stat sbi_reset (DEVICE *dptr);
-char *sbi_description (DEVICE *dptr);
+const char *sbi_description (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
 void uba_eval_int (void);
-t_stat vax780_boot (int32 flag, char *ptr);
-t_stat vax780_boot_parse (int32 flag, char *ptr);
-t_stat cpu_boot (int32 unitno, DEVICE *dptr);
+t_stat vax780_boot (int32 flag, CONST char *ptr);
+t_stat vax780_boot_parse (int32 flag, const char *ptr);
 
-extern t_stat vax780_fload (int32 flag, char *cptr);
-extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
+extern t_stat vax780_fload (int32 flag, CONST char *cptr);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
-extern int32 icr_rd (t_bool interp);
+extern int32 icr_rd (void);
 extern int32 todr_rd (void);
 extern int32 rxcs_rd (void);
 extern int32 rxdb_rd (void);
@@ -330,7 +320,7 @@ switch (rg) {
         break;
 
     case MT_ICR:                                        /* ICR */
-        val = icr_rd (FALSE);
+        val = icr_rd ();
         break;
 
     case MT_TODR:                                       /* TODR */
@@ -502,7 +492,7 @@ return;
         longword of data
 */
 
-int32 ReadReg (int32 pa, int32 lnt)
+int32 ReadReg (uint32 pa, int32 lnt)
 {
 int32 nexus, val;
 
@@ -529,7 +519,7 @@ return 0;
         none
 */
 
-void WriteReg (int32 pa, int32 val, int32 lnt)
+void WriteReg (uint32 pa, int32 val, int32 lnt)
 {
 int32 nexus;
 
@@ -585,6 +575,8 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 acc, err;
 
+if (in_ie)                                              /* in exc? panic */
+    ABORT (STOP_INIE);
 err = (GET_TRAP (trpirq) << 4) | (pme << 3) | ASTLVL;   /* error word */
 cc = intexc (SCB_MCHK, cc, 0, IE_SVE);                  /* take exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */
@@ -626,7 +618,7 @@ return cc;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax780_boot (int32 flag, char *ptr)
+t_stat vax780_boot (int32 flag, CONST char *ptr)
 {
 t_stat r;
 
@@ -644,10 +636,11 @@ return run_cmd (flag, "CPU");
 
 /* Parse boot command, set up registers - also used on reset */
 
-t_stat vax780_boot_parse (int32 flag, char *ptr)
+t_stat vax780_boot_parse (int32 flag, const char *ptr)
 {
 char gbuf[CBUFSIZE];
-char *slptr, *regptr;
+char *slptr;
+const char *regptr;
 int32 i, r5v, unitno;
 uint32 ba;
 DEVICE *dptr;
@@ -739,16 +732,16 @@ sim_vm_cmd = vax780_cmd;
 return SCPE_OK;
 }
 
-char *sbi_description (DEVICE *dptr)
+const char *sbi_description (DEVICE *dptr)
 {
 return "Synchronous Backplane Interconnect";
 }
 
 /* Show nexus */
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-fprintf (st, "nexus=%d", val);
+fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;
 }
 
@@ -830,13 +823,17 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
 return SCPE_OK;
 }
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr == NULL) return SCPE_ARG;
-if (strcmp(cptr, "780") == 0)
+if (strcmp(cptr, "780") == 0) {
    sys_model = 0;
-else if (strcmp(cptr, "785") == 0)
+   strcpy (sim_name, "VAX 11/780");
+   }
+else if (strcmp(cptr, "785") == 0) {
    sys_model = 1;
+   strcpy (sim_name, "VAX 11/785");
+   }
 else
    return SCPE_ARG;
 return SCPE_OK;
@@ -848,7 +845,7 @@ fprintf (st, "VAX 11/%s", (sys_model ? "785" : "780"));
 return SCPE_OK;
 }
 
-t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Initial memory size is 8MB.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");
@@ -860,7 +857,6 @@ fprintf (st, "   RLn        to boot from rln\n");
 fprintf (st, "   RQn        to boot from rqn\n");
 fprintf (st, "   RQBn       to boot from rqbn\n");
 fprintf (st, "   RQCn       to boot from rqcn\n");
-fprintf (st, "   RQDn       to boot from rqdn\n");
-fprintf (st, "   TQn        to boot from tqn\n\n");
+fprintf (st, "   RQDn       to boot from rqdn\n\n");
 return SCPE_OK;
 }

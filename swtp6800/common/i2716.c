@@ -1,41 +1,47 @@
 /*  i2716.c: Intel 2716 EPROM simulator for 8-bit processors
 
-    Copyright (c) 2011, William A. Beech
+    Copyright (c) 2011-2012, William A. Beech
 
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
+        Permission is hereby granted, free of charge, to any person obtaining a
+        copy of this software and associated documentation files (the "Software"),
+        to deal in the Software without restriction, including without limitation
+        the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        and/or sell copies of the Software, and to permit persons to whom the
+        Software is furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
+        The above copyright notice and this permission notice shall be included in
+        all copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-    WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+        IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+        CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the name of William A. Beech shall not be
-    used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from William A. Beech.
+        Except as contained in this notice, the name of William A. Beech shall not be
+        used in advertising or otherwise to promote the sale, use or other dealings
+        in this Software without prior written authorization from William A. Beech.
 
-    These functions support a simulated 2704 to 2764 EPROMs device on an 8-bit 
-    computer system.  This device allows the attachment of the device to a binary file
-    containing the EPROM code.
+    MODIFICATIONS:
 
-    These functions support emulation of 0 to 4 2716 EPROM  devices on a CPU board.
-    The byte get and put routines use an offset into the boot EPROM image to locate 
-    the proper byte.  This allows another device to set the base address for each 
-    EPROM.  
+        24 Apr 15 -- Modified to use simh_debug
 
-    This device uses a dynamically allocated buffer to hold each EPROM image.  
-    A call to BOOTROM_config will free the current buffer.  A call to 
-    i2716_reset will allocate a new buffer of 2048 bytes.  A
-    call to BOOTROM_attach will load the buffer with the EPROM image.
+    NOTES:
+
+        These functions support a simulated 2704 to 2764 EPROMs device on an 8-bit 
+        computer system.  This device allows the attachment of the device to a binary file
+        containing the EPROM code.
+
+        These functions support emulation of 0 to 4 2716 EPROM  devices on a CPU board.
+        The byte get and put routines use an offset into the boot EPROM image to locate 
+        the proper byte.  This allows another device to set the base address for each 
+        EPROM.  
+
+        This device uses a dynamically allocated buffer to hold each EPROM image.  
+        A call to BOOTROM_config will free the current buffer.  A call to 
+        i2716_reset will allocate a new buffer of 2048 bytes.  A
+        call to BOOTROM_attach will load the buffer with the EPROM image.
 */
 
 #include <stdio.h>
@@ -47,7 +53,7 @@ extern  int32 get_base(void);
 
 /* function prototypes */
 
-t_stat i2716_attach (UNIT *uptr, char *cptr);
+t_stat i2716_attach (UNIT *uptr, CONST char *cptr);
 t_stat i2716_reset (DEVICE *dptr);
 int32 i2716_get_mbyte(int32 offset);
 
@@ -104,29 +110,25 @@ DEVICE i2716_dev = {
 /* i2716_attach - attach file to EPROM unit 
                   force EPROM reset at completion */
 
-t_stat i2716_attach (UNIT *uptr, char *cptr)
+t_stat i2716_attach (UNIT *uptr, CONST char *cptr)
 {
     int32 j, c;
     t_stat r;
     FILE *fp;
 
-    if (i2716_dev.dctrl & DEBUG_flow)
-        printf("i2716_attach: cptr=%s\n", cptr);
+    sim_debug (DEBUG_flow, &i2716_dev, "i2716_attach: cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
-        if (i2716_dev.dctrl & DEBUG_flow)
-            printf("i2716_attach: Error\n");
+        sim_debug (DEBUG_flow, &i2716_dev, "i2716_attach: Error\n");
         return r;
     }
-    if (i2716_dev.dctrl & DEBUG_read)
-        printf("\tOpen file\n");
+    sim_debug (DEBUG_read, &i2716_dev, "\tOpen file\n");
     fp = fopen(uptr->filename, "rb");   /* open EPROM file */
     if (fp == NULL) {
         printf("i2716%d: Unable to open ROM file %s\n", (int)(uptr - i2716_dev.units), uptr->filename);
         printf("\tNo ROM image loaded!!!\n");
         return SCPE_OK;
     }
-    if (i2716_dev.dctrl & DEBUG_read)
-        printf("\tRead file\n");
+    sim_debug (DEBUG_read, &i2716_dev, "\tRead file\n");
     j = 0;                              /* load EPROM file */
     c = fgetc(fp);
     while (c != EOF) {
@@ -137,12 +139,10 @@ t_stat i2716_attach (UNIT *uptr, char *cptr)
             break;
         }
     }
-    if (i2716_dev.dctrl & DEBUG_read)
-        printf("\tClose file\n");
+    sim_debug (DEBUG_read, &i2716_dev, "\tClose file\n");
     fclose(fp);
 //    printf("i2716%d: %d bytes of ROM image %s loaded\n",uptr - i2716_dev.units, j, uptr->filename);
-    if (i2716_dev.dctrl & DEBUG_flow)
-        printf("i2716_attach: Done\n");
+    sim_debug (DEBUG_flow, &i2716_dev, "i2716_attach: Done\n");
     return SCPE_OK;
 }
 
@@ -153,20 +153,18 @@ t_stat i2716_reset (DEVICE *dptr)
     int32 i, base;
     UNIT *uptr;
 
-    if (i2716_dev.dctrl & DEBUG_flow)
-        printf("i2716_reset: \n");
+    sim_debug (DEBUG_flow, &i2716_dev, "i2716_reset: \n");
     for (i = 0; i < I2716_NUM; i++) {   /* init all units */
         uptr = i2716_dev.units + i;
-        if (i2716_dev.dctrl & DEBUG_flow)
-            printf("i2716 %d unit.flags=%08X\n", i, uptr->flags);
+        sim_debug (DEBUG_flow, &i2716_dev, "i2716 %d unit.flags=%08X\n",
+            i, uptr->flags);
         uptr->capac = 2048;
         uptr->u3 = 2048 * i;
         base = get_base();
         if (uptr->filebuf == NULL) {    /* no buffer allocated */
             uptr->filebuf = malloc(2048); /* allocate EPROM buffer */
             if (uptr->filebuf == NULL) {
-                if (i2716_dev.dctrl & DEBUG_flow)
-                    printf("i2716_reset: Malloc error\n");
+                sim_debug (DEBUG_flow, &i2716_dev, "i2716_reset: Malloc error\n");
                 return SCPE_MEM;
             }
         }
@@ -180,8 +178,7 @@ t_stat i2716_reset (DEVICE *dptr)
 //            printf("i2716%d: No file attached\n", i);
 //        }
     }
-    if (i2716_dev.dctrl & DEBUG_flow)
-        printf("i2716_reset: Done\n");
+    sim_debug (DEBUG_flow, &i2716_dev, "i2716_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -202,19 +199,16 @@ int32 i2716_get_mbyte(int32 offset)
         len = uptr->capac - 1;
         if ((offset >= org) && (offset < (org + len))) {
             if (uptr->filebuf == NULL) {
-                if (i2716_dev.dctrl & DEBUG_read)
-                    printf("i2716_get_mbyte: EPROM not configured\n");
+                sim_debug (DEBUG_read, &i2716_dev, "i2716_get_mbyte: EPROM not configured\n");
                 return 0xFF;
             } else {
                 val = *((uint8 *)(uptr->filebuf) + (offset - org));
-                if (i2716_dev.dctrl & DEBUG_read)
-                    printf(" val=%04X\n", val);
+                sim_debug (DEBUG_read, &i2716_dev, " val=%04X\n", val);
                 return (val & 0xFF);
             }
         }
     }
-    if (i2716_dev.dctrl & DEBUG_read)
-        printf("i2716_get_mbyte: Out of range\n");
+    sim_debug (DEBUG_read, &i2716_dev, "i2716_get_mbyte: Out of range\n");
     return 0xFF;
 }
 

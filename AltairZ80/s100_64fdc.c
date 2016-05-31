@@ -53,7 +53,7 @@
 #include "wd179x.h"
 
 #ifdef DBG_MSG
-#define DBG_PRINT(args) printf args
+#define DBG_PRINT(args) sim_printf args
 #else
 #define DBG_PRINT(args)
 #endif
@@ -86,10 +86,10 @@ extern WD179X_INFO_PUB *wd179x_infop;
 static CROMFDC_INFO cromfdc_info_data = { { 0xC000, CROMFDC_ROM_SIZE, 0x3, 2 } };
 static CROMFDC_INFO *cromfdc_info = &cromfdc_info_data;
 
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -112,6 +112,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
 static int32 cromfdc_banksel(const int32 port, const int32 io, const int32 data);
 static int32 cromfdcrom(const int32 port, const int32 io, const int32 data);
 static int32 ccs2810_uart_status(const int32 port, const int32 io, const int32 data);
+static const char* cromfdc_description(DEVICE *dptr);
 
 static int32 dipswitch          = 0;    /* 5-position DIP switch on 64FDC card */
 static int32 bootstrap          = 0;    /* 0 for RDOS 2.52, 1 for RDOS 3.12. */
@@ -191,7 +192,7 @@ static uint8 ipend_to_rst_opcode(uint8 ipend)
     active_intr = cromfdc_info->imask & cromfdc_info->ipend;
 
     for(i=1;i != 0;i <<= 1) {
-/*      printf("%d: %d" NLP, i, active_intr & i); */
+/*      sim_printf("%d: %d" NLP, i, active_intr & i); */
         if (active_intr & i) {
             return(cromfdc_irq_table[j]);
         }
@@ -229,7 +230,11 @@ static REG cromfdc_reg[] = {
     { NULL }
 };
 
-#define CROMFDC_NAME    "Cromemco 4/16/64 FDC CROMFDC"
+#define CROMFDC_NAME    "Cromemco 4/16/64 FDC"
+
+static const char* cromfdc_description(DEVICE *dptr) {
+    return CROMFDC_NAME;
+}
 
 static MTAB cromfdc_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
@@ -259,7 +264,7 @@ DEVICE cromfdc_dev = {
     NULL, NULL, &cromfdc_reset,
     &cromfdc_boot, &wd179x_attach, &wd179x_detach,
     &cromfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    cromfdc_dt, NULL, CROMFDC_NAME
+    cromfdc_dt, NULL, NULL, NULL, NULL, NULL, &cromfdc_description
 };
 
 /* This is the CROMFDC RDOS-II ROM.
@@ -1487,38 +1492,38 @@ static t_stat cromfdc_reset(DEVICE *dptr)
         if (cromfdc_hasProperty(UNIT_CROMFDC_ROM)) {
             sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: ROM Enabled.\n");
             if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &cromfdcrom, FALSE) != 0) {
-                printf("%s: error mapping MEM resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+                sim_printf("%s: error mapping MEM resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
                 return SCPE_ARG;
             }
         } else
             sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: ROM Disabled.\n");
         /* Connect CROMFDC Interrupt, and Aux Disk Registers */
         if(sim_map_resource(0x03, 0x02, RESOURCE_TYPE_IO, &cromfdc_ext, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect CROMFDC Timer Registers */
         if(sim_map_resource(0x05, 0x05, RESOURCE_TYPE_IO, &cromfdc_timer, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect CROMFDC Disk Flags and Control Register */
         if(sim_map_resource(0x34, 0x01, RESOURCE_TYPE_IO, &cromfdc_control, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect CROMFDC Bank Select Register */
         if(sim_map_resource(0x40, 0x1, RESOURCE_TYPE_IO, &cromfdc_banksel, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 
         /* Connect CCS 2810 UART Status Register (needed by MOSS 2.2 Monitor */
         if(sim_map_resource(0x26, 0x01, RESOURCE_TYPE_IO, &ccs2810_uart_status, FALSE) != 0) {
-            printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
+            sim_printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         } else {
             sim_debug(VERBOSE_MSG, &cromfdc_dev, "Mapped CCS2810 UART Status at 0x26\n");
@@ -1534,7 +1539,7 @@ static t_stat cromfdc_reset(DEVICE *dptr)
 static t_stat cromfdc_boot(int32 unitno, DEVICE *dptr)
 {
     if((crofdc_type != 4) && (crofdc_type != 16) && (crofdc_type != 64) && (crofdc_type != 50)) {
-        printf("Invalid fdc_type: %d, must be 4, 16, or 64 (or 50 for CCS2422.)" NLP, crofdc_type);
+        sim_printf("Invalid fdc_type: %d, must be 4, 16, or 64 (or 50 for CCS2422.)" NLP, crofdc_type);
         return SCPE_ARG;
     }
 
@@ -1645,7 +1650,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
                     break;
             }
 
-/*          printf("CCS2422FDC: " ADDRESS_FORMAT " Read STATUS1=0x%02x" NLP, PCX, result); */
+/*          sim_printf("CCS2422FDC: " ADDRESS_FORMAT " Read STATUS1=0x%02x" NLP, PCX, result); */
         }
         sim_debug(STATUS_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
                   " Read DISK FLAGS, Port 0x%02x Result 0x%02x\n", PCX, port, result);
@@ -1675,13 +1680,13 @@ static int32 cromfdc_ext(const int32 port, const int32 io, const int32 data)
                 }
 #if 0   /* hharte - nothing implemented for these */
                 if((data & CROMFDC_AUX_EJECT) == 0) {
-                    printf("CROMFDC: Eject" NLP);
+                    sim_printf("CROMFDC: Eject" NLP);
                 }
                 if((data & CROMFDC_AUX_SEL_OVERRIDE) == 0) {
-                    printf("CROMFDC: Sel Override" NLP);
+                    sim_printf("CROMFDC: Sel Override" NLP);
                 }
                 if((data & CROMFDC_AUX_CTRL_OUT) == 0) {
-                    printf("CROMFDC: Ctrl Out" NLP);
+                    sim_printf("CROMFDC: Ctrl Out" NLP);
                 }
 #endif /* 0 */
                 if(crofdc_type < 64) {

@@ -120,14 +120,14 @@ UNIT drm_unit = {
     };
 
 REG drm_reg[] = {
-    { ORDATA (DA, drm_da, 9) },
-    { ORDATA (MA, drm_ma, 16) },
-    { FLDATA (DONE, iosta, IOS_V_DRM) },
-    { FLDATA (ERR, drm_err, 0) },
-    { ORDATA (WLK, drm_wlk, 32) },
-    { DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
+    { ORDATAD (DA, drm_da, 9, "drum address (sector number)") },
+    { ORDATAD (MA, drm_ma, 16, "current memory address") },
+    { FLDATAD (DONE, iosta, IOS_V_DRM, "device done flag") },
+    { FLDATAD (ERR, drm_err, 0, "error flag") },
+    { ORDATAD (WLK, drm_wlk, 32, "write lock switches") },
+    { DRDATAD (TIME, drm_time, 24, "rotational latency, per word"), REG_NZ + PV_LEFT },
     { DRDATA (SBSLVL, drm_sbs, 4), REG_HRO },
-    { FLDATA (STOP_IOE, drm_stopioe, 0) },
+    { FLDATAD (STOP_IOE, drm_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 
@@ -158,17 +158,17 @@ UNIT drp_unit = {
     };
 
 REG drp_reg[] = {
-    { ORDATA (TA, drp_ta, 12) },
-    { ORDATA (RDF, drp_rdf, 5) },
-    { FLDATA (RDE, drp_rde, 0) },
-    { FLDATA (WRF, drp_wrf, 5) },
-    { FLDATA (WRE, drp_wre, 0) },
-    { ORDATA (MA, drp_ma, 16) },
-    { ORDATA (WC, drp_wc, 12) },
-    { FLDATA (BUSY, iosta, IOS_V_DRP) },
-    { FLDATA (ERR, drp_err, 0) },
-    { DRDATA (TIME, drp_time, 24), REG_NZ + PV_LEFT },
-    { FLDATA (STOP_IOE, drp_stopioe, 0) },
+    { ORDATAD (TA, drp_ta, 12, "track address") },
+    { ORDATAD (RDF, drp_rdf, 5, "read field") },
+    { FLDATAD (RDE, drp_rde, 0, "read enable flag") },
+    { FLDATAD (WRF, drp_wrf, 5, "write field") },
+    { FLDATAD (WRE, drp_wre, 0, "write enable flag") },
+    { ORDATAD (MA, drp_ma, 16, "current memory address") },
+    { ORDATAD (WC, drp_wc, 12, "word count" ) },
+    { FLDATAD (BUSY, iosta, IOS_V_DRP, "device busy flag") },
+    { FLDATAD (ERR, drp_err, 0, "error flag") },
+    { DRDATAD (TIME, drp_time, 24, "rotational latency, per word"), REG_NZ + PV_LEFT },
+    { FLDATAD (STOP_IOE, drp_stopioe, 0, "stop on I/O error") },
     { DRDATA (SBSLVL, drm_sbs, 4), REG_HRO },
     { NULL }
     };
@@ -296,7 +296,7 @@ for (i = 0; i < DRM_NUMWDS; i++, da++) {                /* do transfer */
         if ((drm_wlk >> (drm_da >> 4)) & 1)
             drm_err = 1;
         else {                                          /* not locked */
-            fbuf[da] = M[drm_ma];						/* write word */
+            fbuf[da] = M[drm_ma];                       /* write word */
             if (da >= uptr->hwmark)
                 uptr->hwmark = da + 1;
             }
@@ -327,7 +327,7 @@ return SCPE_OK;
 t_stat drp_svc (UNIT *uptr)
 {
 uint32 i, lim;
-uint32 *fbuf = uptr->filebuf;
+uint32 *fbuf = (uint32 *)uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     drp_err = 1;                                        /* set error */
@@ -370,3 +370,4 @@ sim_cancel (&drp_unit);
 drp_unit.FUNC = 0;
 return SCPE_OK;
 }
+

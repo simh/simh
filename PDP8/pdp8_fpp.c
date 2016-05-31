@@ -167,7 +167,6 @@ uint32 fpp_last_lockbit = 0;                            /* last lockbit */
 static FPN fpp_zero = { 0, { 0, 0, 0, 0, 0 } };
 static FPN fpp_one = { 1, { 02000, 0, 0, 0, 0 } };
 
-DEVICE fpp_dev;
 int32 fpp55 (int32 IR, int32 AC);
 int32 fpp56 (int32 IR, int32 AC);
 void fpp_load_apt (uint32 apta);
@@ -222,23 +221,23 @@ DIB fpp_dib = { DEV_FPP, 2, { &fpp55, &fpp56 } };
 UNIT fpp_unit = { UDATA (&fpp_svc, 0, 0) };
 
 REG fpp_reg[] = {
-    { ORDATA (FPACE, fpp_ac.exp, 12) },
-    { ORDATA (FPAC0, fpp_ac.fr[0], 12) },
-    { ORDATA (FPAC1, fpp_ac.fr[1], 12) },
-    { ORDATA (FPAC2, fpp_ac.fr[2], 12) },
-    { ORDATA (FPAC3, fpp_ac.fr[3], 12) },
-    { ORDATA (FPAC4, fpp_ac.fr[4], 12) },
-    { ORDATA (CMD, fpp_cmd, 12) },
-    { ORDATA (STA, fpp_sta, 12) },
-    { ORDATA (APTA, fpp_apta, 15) },
-    { GRDATA (APTSVF, fpp_aptsvf, 8, 3, 12) },
-    { ORDATA (FPC, fpp_fpc, 15) },
-    { ORDATA (BRA, fpp_bra, 15) },
-    { ORDATA (XRA, fpp_xra, 15) },
-    { ORDATA (OPA, fpp_opa, 15) },
-    { ORDATA (SSF, fpp_ssf, 12) },
-    { ORDATA (LASTLOCK, fpp_last_lockbit, 12) },
-    { FLDATA (FLAG, fpp_flag, 0) },
+    { ORDATAD (FPACE, fpp_ac.exp, 12, "floating accumulator") },
+    { ORDATAD (FPAC0, fpp_ac.fr[0], 12, "first mantissa") },
+    { ORDATAD (FPAC1, fpp_ac.fr[1], 12, "second mantissa") },
+    { ORDATAD (FPAC2, fpp_ac.fr[2], 12, "third mantissa") },
+    { ORDATAD (FPAC3, fpp_ac.fr[3], 12, "fourth mantissa") },
+    { ORDATAD (FPAC4, fpp_ac.fr[4], 12, "fifth mantissa") },
+    { ORDATAD (CMD, fpp_cmd, 12, "FPP command register") },
+    { ORDATAD (STA, fpp_sta, 12, "status register") },
+    { ORDATAD (APTA, fpp_apta, 15, "active parameter table (APT) pointer") },
+    { GRDATAD (APTSVF, fpp_aptsvf, 8, 3, 12, "APT field") },
+    { ORDATAD (FPC, fpp_fpc, 15, "floating program counter") },
+    { ORDATAD (BRA, fpp_bra, 15, "base register") },
+    { ORDATAD (XRA, fpp_xra, 15, "pointer to index register 0") },
+    { ORDATAD (OPA, fpp_opa, 15, "operand address register") },
+    { ORDATAD (SSF, fpp_ssf, 12, "single step flag") },
+    { ORDATAD (LASTLOCK, fpp_last_lockbit, 12, "lockout from FPCOM") },
+    { FLDATAD (FLAG, fpp_flag, 0, "done flag") },
     { NULL }
     };
 

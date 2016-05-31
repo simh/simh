@@ -59,8 +59,8 @@
 #define RADA_M_TK3      0x3FF
 #define RADA_V_SC3      0
 #define RADA_M_SC3      0xF
-#define RADA_GETTK(x)	(((x) >> rad_tab[rad_model].tk_v) & rad_tab[rad_model].tk_m)
-#define RADA_GETSC(x)	(((x) >> rad_tab[rad_model].sc_v) & rad_tab[rad_model].sc_m)
+#define RADA_GETTK(x)   (((x) >> rad_tab[rad_model].tk_v) & rad_tab[rad_model].tk_m)
+#define RADA_GETSC(x)   (((x) >> rad_tab[rad_model].sc_v) & rad_tab[rad_model].sc_m)
 
 /* Address bad flag */
 
@@ -124,8 +124,8 @@ uint32 rad_tdv_status (uint32 un);
 t_stat rad_chan_err (uint32 st);
 t_stat rad_svc (UNIT *uptr);
 t_stat rad_reset (DEVICE *dptr);
-t_stat rad_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rad_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rad_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rad_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_bool rad_inv_ad (uint32 *da);
 t_bool rad_inc_ad (void);
 t_bool rad_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st);
@@ -508,7 +508,7 @@ return SCPE_OK;
 
 /* Set controller type */
 
-t_stat rad_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rad_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i;
 
@@ -525,7 +525,7 @@ return SCPE_OK;
 
 /* Show controller type */
 
-t_stat rad_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rad_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (rad_model == RAD_7212)? "7211/7212": "7231/7232");
 return SCPE_OK;

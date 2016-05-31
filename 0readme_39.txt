@@ -52,7 +52,7 @@ in the source module sim_rev.h.
 This is the last release of SimH for which I will be lead editor. After this
 release, the source is moving to a public repository:
 
-https://github.com/markpizz/simh
+https://github.com/simh/simh
 
 under the general editorship of Dave Hittner and Mark Pizzolato. The status
 of the individual simulators is as follows:

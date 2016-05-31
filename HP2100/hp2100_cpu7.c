@@ -1,7 +1,7 @@
 /* hp2100_cpu7.c: HP 1000 VIS and SIGNAL/1000 microcode
 
    Copyright (c) 2008, Holger Veit
-   Copyright (c) 2006-2013, J. David Bryan
+   Copyright (c) 2006-2014, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    CPU7         Vector Instruction Set and SIGNAL firmware
 
+   24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Mar-13    JDB     Moved EMA helper declarations to hp2100_cpu1.h
    09-May-12    JDB     Separated assignments from conditional expressions
    06-Feb-12    JDB     Corrected "opsize" parameter type in vis_abs
@@ -150,7 +151,7 @@ int16 ix1 = INT16(op[2].word) * delta;
 uint32 v2addr = op[3].word;
 int16 ix2 = INT16(op[4].word) * delta;
 int16 i, n = INT16(op[5].word);
-uint32 fpuop = (subcode & 060) | (opsize==fp_f ? 0 : 2);
+uint16 fpuop = (uint16) (subcode & 060) | (opsize==fp_f ? 0 : 2);
 
 if (n <= 0) return;
 for (i=0; i<n; i++) {
@@ -174,7 +175,7 @@ int32 ix2 = INT16(op[3].word) * delta;
 uint32 v3addr = op[4].word;
 int32 ix3 = INT16(op[5].word) * delta;
 int16 i, n = INT16(op[6].word);
-uint32 fpuop = (subcode & 060) | (opsize==fp_f ? 0 : 2);
+uint16 fpuop = (uint16) (subcode & 060) | (opsize==fp_f ? 0 : 2);
 
 if (n <= 0) return;
 for (i=0; i<n; i++) {
@@ -205,7 +206,7 @@ uint32 v1addr = op[1].word;
 int16 ix1 = INT16(op[2].word) * delta;
 int16 n = INT16(op[3].word);
 int16 i,mxmn,sign;
-int32 subop = 020 | (opsize==fp_f ? 0 : 2);
+uint16 subop = 020 | (opsize==fp_f ? 0 : 2);
 
 if (n <= 0) return;
 mxmn = 0;                                                /* index of maxmin element */
@@ -288,7 +289,7 @@ out->fpk[1] = (in.fpk[1] & 0177400) | (in.fpk[3] & 0377);
 
 static void vis_vsmnm(OPS op,OPSIZE opsize,t_bool doabs)
 {
-uint32 fpuop;
+uint16 fpuop;
 OP v1,sumnrm = zero;
 int16 delta = opsize==fp_f ? 2 : 4;
 uint32 saddr = op[0].word;
@@ -536,7 +537,7 @@ static const OP_PAT op_signal[16] = {
   };
 
 /* complex addition helper */
-static void sig_caddsub(uint32 addsub,OPS op)
+static void sig_caddsub(uint16 addsub,OPS op)
 {
 OP a,b,c,d,p1,p2;
 
@@ -617,7 +618,7 @@ WriteOp(im+rev, v1i, fp_f);
 }
 
 /* helper for PRSCR/UNSCR */
-static OP sig_scadd(uint32 oper,t_bool addh, OP a, OP b)
+static OP sig_scadd(uint16 oper,t_bool addh, OP a, OP b)
 {
 OP r;
 static const OP plus_half = { { 0040000, 0000000 } };   /* DEC +0.5 */

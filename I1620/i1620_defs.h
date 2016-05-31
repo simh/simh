@@ -1,6 +1,6 @@
 /* i1620_defs.h: IBM 1620 simulator definitions
 
-   Copyright (c) 2002-2010, Robert M. Supnik
+   Copyright (c) 2002-2015, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    I am grateful to Al Kossow, the Computer History Museum, and the IBM Corporate
    Archives for their help in gathering documentation about the IBM 1620.
 
+   05-Feb-15    TFM     Added definitions for flagged RM, GM, NB
    22-May-10    RMS     Added check for 64b definitions
    18-Oct-02    RMS     Fixed bug in ADDR_S macro (found by Hans Pufal)
 */
@@ -158,6 +159,9 @@
 #define REC_MARK        0xA
 #define NUM_BLANK       0xC
 #define GRP_MARK        0xF
+#define FLG_REC_MARK    0x1A
+#define FLG_NUM_BLANK   0x1C
+#define FLG_GRP_MARK    0x1F
 #define BAD_DIGIT(x)    ((x) > 9)
 
 /* Instruction format */
@@ -227,5 +231,8 @@ enum opcodes {
                                                         /* 80 - 89 */
     OP_BBT = 90, OP_BMK, OP_ORF, OP_ANDF, OP_CPLF,      /* 90 - 99 */
     OP_EORF, OP_OTD, OP_DTO };
+
+extern const int8 cdr_to_alp[128];
+extern const int8 alp_to_cdp[256];
 
 #endif

@@ -190,17 +190,17 @@ t_stat cpu_svc (UNIT *uptr);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_clr_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_rblks (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_rblks (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_alarm (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_alarm (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_clr_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_rblks (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_rblks (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_alarm (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_alarm (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 void set_rf_display (uint32 *rfbase);
 void inst_hist (uint32 ir, uint32 pc, uint32 typ);
 uint32 cpu_one_inst (uint32 real_pc, uint32 IR);
@@ -248,12 +248,12 @@ extern uint32 io_tio (uint32 rn, uint32 bva);
 extern uint32 io_tdv (uint32 rn, uint32 bva);
 extern uint32 io_hio (uint32 rn, uint32 bva);
 extern uint32 io_aio (uint32 rn, uint32 bva);
-extern uint32 int_reset (DEVICE *dev);
+extern t_stat int_reset (DEVICE *dev);
 extern void io_set_eimax (uint32 lnt);
 extern void io_sclr_req (uint32 inum, uint32 val);
 extern void io_sclr_arm (uint32 inum, uint32 val);
-extern t_stat io_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat io_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat io_set_nchan (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat io_show_nchan (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* CPU data structures
 
@@ -433,7 +433,7 @@ while (reason == 0) {                                   /* loop until stop */
         }
 
     if (sim_interval <= 0) {                            /* event queue? */
-        if (reason = sim_process_event ())              /* process */
+        if ((reason = sim_process_event ()))            /* process */
             break;
         int_hireq = io_eval_int ();                     /* re-evaluate intr */
         }
@@ -455,7 +455,7 @@ while (reason == 0) {                                   /* loop until stop */
             io_sclr_req (sav_hi, 0);                    /* clear request */
             io_sclr_arm (sav_hi, 1);                    /* set armed */
             if ((res == 0) &&                           /* count overflow */
-                ((vec >= VEC_C1P) || (vec <= VEC_C4P))) /* on clock? */
+                ((vec >= VEC_C1P) && (vec <= VEC_C4P))) /* on clock? */
                 io_sclr_req (INTV (INTG_CTR, vec - VEC_C1P), 1);
             int_hiact = io_actv_int ();                 /* re-eval active */
             int_hireq = io_eval_int ();                 /* re-eval intr */
@@ -724,7 +724,7 @@ switch (op) {
             PSW1 = ((PSW1 & ~PSW1_FPC) |                /* set ctrls */
                 ((opnd & PSW1_M_FPC) << PSW1_V_FPC)) &
                 ~cpu_tab[cpu_model].psw1_mbz;           /* clear mbz */
-	    break;
+        break;
 
     case OP_LCF:                                        /* load cc, flt */
         if ((tr = Ea (IR, &bva, VR, BY)) != 0)          /* get eff addr */
@@ -1118,7 +1118,7 @@ switch (op) {
         res = R[rn] | opnd;
         CC34_W (res);                                   /* set CC's */
         R[rn] = res;                                    /* store */
-	break;
+        break;
 
     case OP_EOR:                                        /* xor */
         if ((tr = Ea (IR, &bva, VR, WD)) != 0)          /* get eff addr */
@@ -1128,7 +1128,7 @@ switch (op) {
         res = R[rn] ^ opnd;
         CC34_W (res);                                   /* set CC's */
         R[rn] = res;                                    /* store */
-	break;
+        break;
 
 /* Compares */
 
@@ -1137,7 +1137,7 @@ switch (op) {
             return tr;
         opnd = SEXT_LIT_W (opnd) & WMASK;               /* sext to 32b */
         CC234_CMP (R[rn], opnd);                        /* set CC's */
-	    break;
+        break;
 
     case OP_CB:                                         /* compare byte */
         if ((tr = Ea (IR, &bva, VR, BY)) != 0)          /* get eff addr */
@@ -2570,7 +2570,7 @@ return SCPE_OK;
 
 /* Set CPU type */
 
-t_stat cpu_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 model = CPUF_GETMOD (val);
 
@@ -2588,7 +2588,7 @@ return SCPE_OK;
 
 /* Set memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 mc = 0;
 uint32 i;
@@ -2609,7 +2609,7 @@ return SCPE_OK;
 
 /* Set and clear options */
 
-t_stat cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if ((val & (cpu_tab[cpu_model].std | cpu_tab[cpu_model].opt)) == 0)
     return SCPE_NOFNC;
@@ -2617,7 +2617,7 @@ cpu_unit.flags |= val;
 return SCPE_OK;
 }
 
-t_stat cpu_clr_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_clr_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val & cpu_tab[cpu_model].std)
     return SCPE_NOFNC;
@@ -2627,7 +2627,7 @@ return SCPE_OK;
 
 /* Set/show register blocks */
 
-t_stat cpu_set_rblks (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_rblks (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 invmask, lnt, i, j;
 t_stat r;
@@ -2651,7 +2651,7 @@ for (i = rf_bmax; i < RF_NBLK; i++) {                   /* zero unused */
 return SCPE_OK;
 }
 
-t_stat cpu_show_rblks (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_rblks (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "register blocks=%d", rf_bmax);
 return SCPE_OK;
@@ -2661,7 +2661,6 @@ return SCPE_OK;
 
 void set_rf_display (uint32 *rfbase)
 {
-extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
 REG *rptr;
 uint32 i;
 
@@ -2674,13 +2673,13 @@ return;
 
 /* Front panael alarm */
 
-t_stat cpu_set_alarm (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_alarm (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 cons_alarm_enb = val;
 return SCPE_OK;
 }
 
-t_stat cpu_show_alarm (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_alarm (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fputs (cons_alarm_enb? "alarm enabled\n": "alarm disabled\n", st);
 return SCPE_OK;
@@ -2697,10 +2696,10 @@ return SCPE_OK;
 
 /* Virtual address translation */
 
-t_stat cpu_show_addr (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_addr (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 uint32 ad, bpa, dlnt, virt;
 static const char *lnt_str[] = {
     "byte",
@@ -2725,7 +2724,7 @@ if (cptr) {
         else dlnt = 2;
         bpa = ad << val;
         if (virt && map_reloc (bpa, VNT, &bpa))
-            fprintf (of, "Virtual address %-X: memory management error\n");
+            fprintf (of, "Virtual address %-X: memory management error\n", ad);
         else fprintf (of, "%s %s %-X: physical %s %-X\n",
             ((virt)? "Virtual": "Physical"), lnt_str[val], ad, lnt_str[dlnt], bpa >> dlnt);
         return SCPE_OK;
@@ -2753,7 +2752,7 @@ return;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -2816,11 +2815,11 @@ return;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 k, di, lnt;
 t_stat r;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 InstHistory *h;
 
 if (hst_lnt == 0)                                   /* enabled? */

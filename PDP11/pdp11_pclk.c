@@ -136,12 +136,12 @@ uint32 pclk_ctr = 0;                                    /* counter */
 static uint32 rate[4] = { 100000, 10000, 60, 10 };      /* ticks per second */
 static uint32 xtim[4] = { 10, 100, 16667, 100000 };     /* nominal time delay */
 
-DEVICE pclk_dev;
 t_stat pclk_rd (int32 *data, int32 PA, int32 access);
 t_stat pclk_wr (int32 data, int32 PA, int32 access);
 t_stat pclk_svc (UNIT *uptr);
 t_stat pclk_reset (DEVICE *dptr);
-t_stat pclk_set_line (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat pclk_set_line (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+const char *pclk_description (DEVICE *dptr);
 void pclk_tick (void);
 
 /* PCLK data structures
@@ -194,7 +194,9 @@ DEVICE pclk_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &pclk_reset,
     NULL, NULL, NULL,
-    &pclk_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS
+    &pclk_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS, 
+    0, NULL, NULL, NULL, NULL,
+    NULL, NULL, &pclk_description,
     };
 
 /* Clock I/O address routines */
@@ -311,10 +313,15 @@ return auto_config (0, 0);
 
 /* Set line frequency */
 
-t_stat pclk_set_line (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat pclk_set_line (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val == UNIT_LINE50HZ)
     rate[2] = 50;
 else rate[2] = 60;
 return SCPE_OK;
+}
+
+const char *pclk_description (DEVICE *dptr)
+{
+return "KW11-P programmable real time clock";
 }

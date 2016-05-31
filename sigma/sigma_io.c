@@ -99,8 +99,8 @@ t_bool io_init_inst (uint32 ad, uint32 rn, uint32 ch, uint32 dev, uint32 r0);
 uint32 io_set_status (uint32 rn, uint32 ch, uint32 dev, uint32 dvst, t_bool tdv);
 uint32 io_rwd_m0 (uint32 op, uint32 rn, uint32 ad);
 uint32 io_rwd_m1 (uint32 op, uint32 rn, uint32 ad);
-t_stat io_set_eiblks (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat io_show_eiblks (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat io_set_eiblks (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat io_show_eiblks (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat int_reset (DEVICE *dptr);
 t_stat chan_reset (DEVICE *dptr);
 uint32 chan_new_cmd (uint32 ch, uint32 dev, uint32 clc);
@@ -859,7 +859,7 @@ for (i = 0, curr = 0; i < INTG_MAX; i++) {              /* loop thru groups */
                 return NO_INT;                          /* no pending intr */
                 }
             }
-        printf ("%%int eval consistency error = %X\r\n", t);
+        sim_printf ("%%int eval consistency error = %X\r\n", t);
         int_req[curr] = 0;                              /* "impossible" */
         }
     if (curr == INT_GETGRP (int_hiact))                 /* at active group? */
@@ -868,7 +868,7 @@ for (i = 0, curr = 0; i < INTG_MAX; i++) {              /* loop thru groups */
     if (curr == 0)                                      /* end of list? */
         return NO_INT;                                  /* no pending intr */
     }
-printf ("%%int eval consistency error, list end not found\r\n");
+sim_printf ("%%int eval consistency error, list end not found\r\n");
 return NO_INT;
 }
 
@@ -886,7 +886,7 @@ for (i = 0, curr = 0; i < INTG_MAX; i++) {              /* loop thru groups */
     if (curr == 0)                                      /* end of list? */
         return FALSE;                                   /* no int possible */
     }
-printf ("%%int possible consistency error, list end not found\r\n");
+sim_printf ("%%int possible consistency error, list end not found\r\n");
 return FALSE;
 }
 
@@ -922,14 +922,14 @@ for (i = 0, curr = 0; i < INTG_MAX; i++) {              /* loop thru groups */
             if (t & mask)                               /* req active? */
                 return INTV (curr, j);                  /* return int num */
             }
-        printf ("%%int actv consistency error = %X\r\n", t);
+        sim_printf ("%%int actv consistency error = %X\r\n", t);
         int_req[curr] = 0;                              /* "impossible" */
         }
     curr = int_lnk[curr];                               /* next group */
     if (curr == 0)                                      /* end of list? */
         return NO_INT;                                  /* no pending interupt */
     }
-printf ("%%int actv consistency error, list end not found\r\n");
+sim_printf ("%%int actv consistency error, list end not found\r\n");
 return NO_INT;
 }
 
@@ -944,7 +944,7 @@ if (hireq >= NO_INT)                                    /* none pending? */
 grp = INT_GETGRP (hireq);                               /* get grp, bit */
 bit = INT_GETBIT (hireq);
 if (bit >= int_tab[grp].nbits) {                        /* validate bit */
-    printf ("%%int ack consistency error, hireq=%X\r\n", hireq);
+    sim_printf ("%%int ack consistency error, hireq=%X\r\n", hireq);
     return 0;
     }
 mask = 1u << (int_tab[grp].nbits - bit - 1);
@@ -952,7 +952,7 @@ int_arm[grp] &= ~mask;                                  /* clear armed */
 int_hiact = hireq;                                      /* now active */
 int_hireq = io_eval_int ();                             /* paranoia */
 if (int_hireq != NO_INT)
-    printf ("%%int ack consistency error, post iack req=%X\r\n", int_hireq);
+    sim_printf ("%%int ack consistency error, post iack req=%X\r\n", int_hireq);
 return int_tab[grp].vecbase + bit;
 }
 
@@ -966,7 +966,7 @@ if (hiact < NO_INT) {                                   /* intr active? */
     grp = INT_GETGRP (hiact);                           /* get grp, bit */
     bit = INT_GETBIT (hiact);
     if (bit >= int_tab[grp].nbits) {                    /* validate bit */
-        printf ("%%int release consistency error, hiact=%X\r\n", hiact);
+        sim_printf ("%%int release consistency error, hiact=%X\r\n", hiact);
         return 0;
         }
     mask = 1u << (int_tab[grp].nbits - bit - 1);
@@ -997,7 +997,7 @@ if (inum < NO_INT) {                                    /* valid? */
     grp = INT_GETGRP (inum);                            /* get grp, bit */
     bit = INT_GETBIT (inum);
     if (bit >= int_tab[grp].nbits) {                    /* validate bit */
-        printf ("%%intreq set/clear consistency error, inum=%X\r\n", inum);
+        sim_printf ("%%intreq set/clear consistency error, inum=%X\r\n", inum);
         return;
         }
     mask = 1u << (int_tab[grp].nbits - bit - 1);
@@ -1018,7 +1018,7 @@ if (inum < NO_INT) {                                    /* valid? */
     grp = INT_GETGRP (inum);                            /* get grp, bit */
     bit = INT_GETBIT (inum);
     if (bit >= int_tab[grp].nbits) {                    /* validate bit */
-        printf ("%%intarm set/clear consistency error, inum=%X\r\n", inum);
+        sim_printf ("%%intarm set/clear consistency error, inum=%X\r\n", inum);
         return;
         }
     mask = 1u << (int_tab[grp].nbits - bit - 1);
@@ -1052,7 +1052,7 @@ if (op == OP_RD) {                                      /* read direct? */
         }
     else if (QCPU_S89 && (fnc == 0x045)) {              /* S89 only */
         if (rn)
-            R[rn] = s9_marg & 0x00C00000 |              /* <8,9> = margins */
+            R[rn] = (s9_marg & 0x00C00000) |            /* <8,9> = margins */
                 (QCPU_S9? 0x00100000: 0x00200000);      /* S8 sets 10, S9 11 */            
         }
     else if (QCPU_S89 && (fnc == 0x049)) {              /* S89 only */
@@ -1290,26 +1290,17 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         if ((ch >= chan_num) ||
             (dev >= CHAN_N_DEV) ||
             (dio >= DIO_N_MOD)) {
-            printf ("%s: invalid device address, chan = %d, dev = %X, dio = %X\n",
-                sim_dname (dptr), ch, DVA_GETDEV (dibp->dva), dio);
-            if (sim_log)
-                fprintf (sim_log, "%s: invalid device address, chan = %d, dev = %X, dio = %X\n",
+            sim_printf ("%s: invalid device address, chan = %d, dev = %X, dio = %X\n",
                     sim_dname (dptr), ch, DVA_GETDEV (dibp->dva), dio);
             return SCPE_STOP;
             }
         if ((dibp->disp != NULL) && (chan[ch].disp[dev] != NULL)) {
-            printf ("%s: device address conflict, chan = %d, dev = %X\n",
-                sim_dname (dptr), ch, DVA_GETDEV (dibp->dva));
-            if (sim_log)
-                fprintf (sim_log, "%s: device address conflict, chan = %d, dev = %X\n",
+            sim_printf ("%s: device address conflict, chan = %d, dev = %X\n",
                     sim_dname (dptr), ch, DVA_GETDEV (dibp->dva));
             return SCPE_STOP;
             }
         if ((dibp->dio_disp != NULL) && (dio_disp[dio] != NULL)) {
-            printf ("%s: direct I/O address conflict, dio = %X\n",
-                sim_dname (dptr), dio);
-            if (sim_log)
-                fprintf (sim_log, "%s: direct I/O address conflict, dio = %X\n",
+            sim_printf ("%s: direct I/O address conflict, dio = %X\n",
                     sim_dname (dptr), dio);
             return SCPE_STOP;
             }
@@ -1326,7 +1317,7 @@ return SCPE_OK;
 
 /* Set/show external interrupt blocks */
 
-t_stat io_set_eiblks (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_eiblks (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 lnt;
 t_stat r;
@@ -1341,7 +1332,7 @@ io_set_eimax (lnt);
 return SCPE_OK;
 }
 
-t_stat io_show_eiblks (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_eiblks (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "eiblks=%d", ei_bmax);
 return SCPE_OK;
@@ -1377,7 +1368,7 @@ return;
 
 /* Set or show number of channels */
 
-t_stat io_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_nchan (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, num;
 t_stat r;
@@ -1397,7 +1388,7 @@ for (i = 0; i < CHAN_N_CHAN; i++) {
 return SCPE_OK;
 }
 
-t_stat io_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_nchan (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "channels=%d", chan_num);
 return SCPE_OK;
@@ -1405,7 +1396,7 @@ return SCPE_OK;
 
 /* Set or show device channel assignment */
 
-t_stat io_set_dvc (UNIT* uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_dvc (UNIT* uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 num;
 DEVICE *dptr;
@@ -1423,7 +1414,7 @@ dibp->dva = (dibp->dva & ~DVA_CHAN) | (num << DVA_V_CHAN);
 return SCPE_OK;
 }
 
-t_stat io_show_dvc (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_dvc (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 dib_t *dibp;
@@ -1437,7 +1428,7 @@ return SCPE_OK;
 
 /* Set or show device address */
 
-t_stat io_set_dva (UNIT* uptr, int32 val, char *cptr, void *desc)
+t_stat io_set_dva (UNIT* uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 num;
 DEVICE *dptr;
@@ -1458,7 +1449,7 @@ else dibp->dva = (dibp->dva & ~DVA_DEVSU) | ((num & DVA_M_DEVSU) << DVA_V_DEVSU)
 return SCPE_OK;
 }
 
-t_stat io_show_dva (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_dva (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 dib_t *dibp;
@@ -1472,7 +1463,7 @@ return SCPE_OK;
 
 /* Show channel state */
 
-t_stat io_show_cst (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat io_show_cst (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 dib_t *dibp;
