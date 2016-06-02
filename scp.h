@@ -152,6 +152,7 @@ CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st);
 CONST char *get_glyph (const char *iptr, char *optr, char mchar);
 CONST char *get_glyph_nc (const char *iptr, char *optr, char mchar);
 CONST char *get_glyph_quoted (const char *iptr, char *optr, char mchar);
+CONST char *get_glyph_cmd (const char *iptr, char *optr);
 t_value get_uint (const char *cptr, uint32 radix, t_value max, t_stat *status);
 CONST char *get_range (DEVICE *dptr, CONST char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);

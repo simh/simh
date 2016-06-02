@@ -200,7 +200,7 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 {2      +RB_L,  RF,     WL,     0,      0,      0,      0},              /* MNEGF */
 {1,             RF,     0,      0,      0,      0,      0},              /* TSTF */
 {5,             RF,     RB,     RF,     WL,     WL,     0},              /* EMODF */
-{3      +RB_R0, RF,     RW,     AB,     0,      0,      0},              /* POLYF */
+{3      +RB_R3, RF,     RW,     AB,     0,      0,      0},              /* POLYF */
 {2      +RB_Q,  RF,     WQ,     0,      0,      0,      0},              /* CVTFD */
 {0,             0,      0,      0,      0,      0,      0},              /* reserved */
 {2      +RB_W,  RW,     WW,     0,      0,      0,      0},              /* ADAWI */
@@ -232,7 +232,7 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 {2      +RB_Q,  RD,     WQ,     0,      0,      0,      0},              /* MNEGD */
 {1,             RD,     0,      0,      0,      0,      0},              /* TSTD */
 {5,             RD,     RB,     RD,     WL,     WQ,     0},              /* EMODD */
-{3      +RB_R1, RD,     RW,     AB,     0,      0,      0},              /* POLYD */
+{3      +RB_R5, RD,     RW,     AB,     0,      0,      0},              /* POLYD */
 {2      +RB_L,  RD,     WL,     0,      0,      0,      0},              /* CVTDF */
 {0,             0,      0,      0,      0,      0,      0},              /* reserved */
 {3      +RB_L,  RB,     RL,     WL,     0,      0,      0},              /* ASHL */
@@ -456,7 +456,7 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 {2      +RB_Q,  RG,     WQ,     0,      0,      0,      0},              /* MNEGG */
 {1,             RG,     0,      0,      0,      0,      0},              /* TSTG */
 {5,             RG,     RW,     RG,     WL,     WQ,     0},              /* EMODG */
-{3      +RB_R1, RG,     RW,     AB,     0,      0,      0},              /* POLYG */
+{3      +RB_R5, RG,     RW,     AB,     0,      0,      0},              /* POLYG */
 {ODC(2) +RB_O,  RG,     WO,     0,      0,      0,      0},              /* CVTGH */
 {0,             0,      0,      0,      0,      0,      0},              /* reserved */
 {0,             0,      0,      0,      0,      0,      0},              /* reserved */
@@ -475,21 +475,21 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 {ODC(3) +RB_O,  RH,     RH,     WO,     0,      0,      0},              /* MULH3 */
 {ODC(2) +RB_O,  RH,     MO,     0,      0,      0,      0},              /* DIVH2 */
 {ODC(3) +RB_O,  RH,     RH,     WO,     0,      0,      0},              /* DIVH3 */
-{ODC(2) +RB_B,  RH,     WB,     0,      0,      0,      0},              /* CVTHB */
-{ODC(2) +RB_W,  RH,     WW,     0,      0,      0,      0},              /* CVTHW */
-{ODC(2) +RB_L,  RH,     WL,     0,      0,      0,      0},              /* CVTHL */
-{ODC(2) +RB_O,  RH,     WL,     0,      0,      0,      0},              /* CVTRHL */
+{ODC(2) +RB_OB, RH,     WB,     0,      0,      0,      0},              /* CVTHB */
+{ODC(2) +RB_OW, RH,     WW,     0,      0,      0,      0},              /* CVTHW */
+{ODC(2) +RB_OL, RH,     WL,     0,      0,      0,      0},              /* CVTHL */
+{ODC(2) +RB_OL, RH,     WL,     0,      0,      0,      0},              /* CVTRHL */
 {ODC(2) +RB_O,  RB,     WO,     0,      0,      0,      0},              /* CVTBH */
 {ODC(2) +RB_O,  RW,     WO,     0,      0,      0,      0},              /* CVTWH */
 {ODC(2) +RB_O,  RL,     WO,     0,      0,      0,      0},              /* CVTLH */
-{ODC(4),        RH,     RH,     MO,     BW,     0,      0},              /* ACBH */
+{ODC(4) +RB_O,  RH,     RH,     MO,     BW,     0,      0},              /* ACBH */
 {ODC(2) +RB_O,  RH,     RO,     0,      0,      0,      0},              /* MOVH */
 {ODC(2),        RH,     RH,     0,      0,      0,      0},              /* CMPH */
 {ODC(2) +RB_O,  RH,     WO,     0,      0,      0,      0},              /* MNEGH */
 {ODC(1),        RH,     0,      0,      0,      0,      0},              /* TSTH */
-{ODC(5),        RH,     RW,     RH,     WL,     WO,     0},              /* EMODH */
-{ODC(3) +RB_R3, RH,     RW,     AB,     0,      0,      0},              /* POLYH */
-{ODC(2) +RB_Q,  RH,     WQ,     0,      0,      0,      0},              /* CVTHG */
+{ODC(5) +RB_O,  RH,     RW,     RH,     WL,     WO,     0},              /* EMODH */
+{ODC(3) +RB_R5, RH,     RW,     AB,     0,      0,      0},              /* POLYH */
+{ODC(2) +RB_OQ, RH,     WQ,     0,      0,      0,      0},              /* CVTHG */
 {0,             0,      0,      0,      0,      0,      0},              /* reserved */
 {0,             0,      0,      0,      0,      0,      0},              /* reserved */
 {0,             0,      0,      0,      0,      0,      0},              /* reserved */
@@ -497,7 +497,7 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 {0,             0,      0,      0,      0,      0,      0},              /* reserved */
 {ODC(1) +RB_O,  WO,     0,      0,      0,      0,      0},              /* CLRO */
 {ODC(2) +RB_O,  RO,     RO,     0,      0,      0,      0},              /* MOVO */
-{ODC(2) +RB_L,  AO,     WL,     0,      0,      0,      0},              /* MOVAO*/
+{ODC(2) +RB_OL, AO,     WL,     0,      0,      0,      0},              /* MOVAO*/
 {ODC(1) +RB_SP, AO,     0,      0,      0,      0,      0},              /* PUSHAO*/
 {0,             0,      0,      0,      0,      0,      0},              /* 180-18F */
 {0,             0,      0,      0,      0,      0,      0},
@@ -617,8 +617,8 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 {0,             0,      0,      0,      0,      0,      0},
 {0,             0,      0,      0,      0,      0,      0},
 {0,             0,      0,      0,      0,      0,      0},
-{ODC(2) +RB_B,  RH,     WL,     0,      0,      0,      0},              /* CVTHF */
-{ODC(2) +RB_Q,  RH,     WQ,     0,      0,      0,      0},              /* CVTHD */
+{ODC(2) +RB_OL, RH,     WL,     0,      0,      0,      0},              /* CVTHF */
+{ODC(2) +RB_OQ, RH,     WQ,     0,      0,      0,      0},              /* CVTHD */
 {0,             0,      0,      0,      0,      0,      0},
 {0,             0,      0,      0,      0,      0,      0},
 {0,             0,      0,      0,      0,      0,      0},

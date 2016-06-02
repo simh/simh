@@ -491,7 +491,7 @@ MTAB xq_mod[] = {
     NULL, &show_addr, NULL, "Qbus address" },
   { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
     NULL, &show_vec, NULL,  "Interrupt vector" },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xq_setmac, &xq_showmac, NULL, "MAC address" },
   { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "ETH", NULL,
     NULL, &eth_show, NULL, "Display attachable devices" },
@@ -685,7 +685,7 @@ t_stat xq_setmac (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 
   if (!cptr) return SCPE_IERR;
   if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-  status = eth_mac_scan(&xq->var->mac, cptr);
+  status = eth_mac_scan_ex(&xq->var->mac, cptr, uptr);
   if (status != SCPE_OK)
     return status;
 
@@ -2538,6 +2538,12 @@ t_stat xq_reset(DEVICE* dptr)
 
   sim_debug(DBG_TRC, xq->dev, "xq_reset()\n");
 
+  /* One time only initializations */
+  if (!xq->var->initialized) {
+    xq->var->initialized = TRUE;
+    /* Set an initial MAC address in the DEC range */
+    xq_setmac (dptr->units, 0, "08:00:2B:00:00:00/24", NULL);
+    }
   /* calculate MAC checksum */
   xq_make_checksum(xq);
 
@@ -3171,11 +3177,28 @@ const char helpString[] =
     " A Valid MAC address is comprised of 6 pairs of hex digits delimited by\n"
     " dashes, colons or period characters.\n"
     "\n"
-    " The default MAC address for the XQ device is 08-00-2B-AA-BB-CC.  The\n"
-    " default MAC address for the XQB device is 08-00-2B-BB-CC-DD.\n"
+    " The default MAC address for the %D device is set to a value in the range\n"
+    " from 08-00-2B-00-00-00 thru 08-00-2B-FF-FF-FF.\n"
     "\n"
     " The SET MAC command must be done before the %D device is attached to a\n"
     " network.\n"
+    "4 Generated MAC\n"
+    " Support exists to provide a way to dynamically generate relatively\n"
+    " unique MAC addresses and to provide a way to save generated addresses\n"
+    " for subsequent reuse in later simulator invocations.\n"
+    "\n"
+    "+sim> SET XQ MAC=AA:BB:CC:DD:EE:FF{/bits}{>filespec}\n"
+    "\n"
+    " where:\n"
+    "+1.  All of the AA:BB:CC:DD:EE:FF values must be hex digits\n"
+    "+2.  bits is the number of bits which are to be taken from the\n"
+    "++  supplied MAC aa:bb:cc:dd:ee:ff with legal values from 16\n"
+    "++  to 48 and a default of 48 bits.\n"
+    "+3.  filespec specifies a file which contains the MAC address\n"
+    "++  to be used and if it doesn't exist an appropriate generated\n"
+    "++  address will be stored in this file and a subsequent SET MAC\n"
+    "++  invocation specifying the same file will use the value stored\n"
+    "++  in the file rather than generating a new MAC.\n"
     "3 Type\n"
     " The type of device being emulated can be changed with the following\n"
     " command:\n"

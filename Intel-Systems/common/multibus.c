@@ -48,19 +48,17 @@ t_stat multibus_svc(UNIT *uptr);
 t_stat multibus_reset(DEVICE *dptr);
 void set_irq(int32 int_num);
 void clr_irq(int32 int_num);
-int32 nulldev(int32 io, int32 data);
-int32 reg_dev(int32 (*routine)(int32, int32), int32 port);
+uint8 nulldev(t_bool io, uint8 data, uint8 devnum);
+uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint16 port, uint8 devnum);
 t_stat multibus_reset (DEVICE *dptr);
-int32 multibus_get_mbyte(int32 addr);
-int32 multibus_get_mword(int32 addr);
-void multibus_put_mbyte(int32 addr, int32 val);
-void multibus_put_mword(int32 addr, int32 val);
+uint8 multibus_get_mbyte(uint16 addr);
+void multibus_put_mbyte(uint16 addr, uint8 val);
 
 /* external function prototypes */
 
 extern t_stat SBC_reset(DEVICE *dptr);      /* reset the iSBC80/10 emulator */
-extern int32 isbc064_get_mbyte(int32 addr);
-extern void isbc064_put_mbyte(int32 addr, int32 val);
+extern uint8 isbc064_get_mbyte(uint16 addr);
+extern void isbc064_put_mbyte(uint16 addr, uint8 val);
 extern void set_cpuint(int32 int_num);
 extern t_stat SBC_reset (DEVICE *dptr);
 extern t_stat isbc064_reset (DEVICE *dptr);
@@ -99,7 +97,7 @@ DEVICE multibus_dev = {
     NULL,                       //modifiers
     1,                          //numunits 
     16,                         //aradix  
-    32,                         //awidth  
+    16,                         //awidth  
     1,                          //aincr  
     16,                         //dradix  
     8,                          //dwidth
@@ -163,10 +161,11 @@ void clr_irq(int32 int_num)
 
 /* This is the I/O configuration table.  There are 256 possible
 device addresses, if a device is plugged to a port it's routine
-address is here, 'nulldev' means no device is available
+address is here, 'nulldev' means no device has been registered.
 */
 struct idev {
-    int32 (*routine)(int32, int32);
+    uint8 (*routine)(t_bool io, uint8 data, uint8 devnum);
+    uint8 devnum;
 };
 
 struct idev dev_table[256] = {
@@ -236,7 +235,7 @@ struct idev dev_table[256] = {
 {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}          /* 0FCH */
 };
 
-int32 nulldev(int32 flag, int32 data)
+uint8 nulldev(t_bool flag, uint8 data, uint8 devnum)
 {
     SET_XACK(0);                        /* set no XACK */
     if (flag == 0)                      /* if we got here, no valid I/O device */
@@ -244,53 +243,35 @@ int32 nulldev(int32 flag, int32 data)
     return 0;
 }
 
-int32 reg_dev(int32 (*routine)(int32, int32), int32 port)
+uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint16 port, uint8 devnum)
 {
     if (dev_table[port].routine != &nulldev) {  /* port already assigned */
 //        sim_printf("Multibus: I/O Port %02X is already assigned\n", port);
     } else {
 //        sim_printf("Port %02X is assigned\n", port);
         dev_table[port].routine = routine;
+        dev_table[port].devnum = devnum;
     }
 	return 0;
 }
 
 /*  get a byte from memory */
 
-int32 multibus_get_mbyte(int32 addr)
+uint8 multibus_get_mbyte(uint16 addr)
 {
     SET_XACK(0);                        /* set no XACK */
 //    sim_printf("multibus_get_mbyte: Cleared XACK for %04X\n", addr); 
     return isbc064_get_mbyte(addr);
 }
 
-/*  get a word from memory */
-
-int32 multibus_get_mword(int32 addr)
-{
-    int32 val;
-
-    val = multibus_get_mbyte(addr);
-    val |= (multibus_get_mbyte(addr+1) << 8);
-    return val;
-}
-
 /*  put a byte to memory */
 
-void multibus_put_mbyte(int32 addr, int32 val)
+void multibus_put_mbyte(uint16 addr, uint8 val)
 {
     SET_XACK(0);                        /* set no XACK */
 //    sim_printf("multibus_put_mbyte: Cleared XACK for %04X\n", addr); 
     isbc064_put_mbyte(addr, val);
 //    sim_printf("multibus_put_mbyte: Done XACK=%dX\n", XACK); 
-}
-
-/*  put a word to memory */
-
-void multibus_put_mword(int32 addr, int32 val)
-{
-    multibus_put_mbyte(addr, val);
-    multibus_put_mbyte(addr+1, val << 8);
 }
 
 /* end of multibus.c */

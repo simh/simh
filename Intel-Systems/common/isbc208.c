@@ -26,7 +26,6 @@
     MODIFICATIONS:
 
         ?? ??? 11 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
         24 Apr 15 -- Modified to use simh_debug
 
     NOTES:
@@ -396,10 +395,11 @@
 
 #include "system_defs.h"
 
-#define UNIT_V_WPMODE    (UNIT_V_UF)     /* Write protect */
+#define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
 
 /* master status register definitions */
+
 #define RQM             0x80            /* Request for master */
 #define DIO             0x40            /* Data I/O Direction 0=W, 1=R */
 #define NDM             0x20            /* Non-DMA mode */
@@ -410,6 +410,7 @@
 #define D0B             0x01            /* FDD 0 busy */`
 
 /* status register 0 definitions */
+
 #define IC              0xC0            /* Interrupt code */
 #define IC_NORM         0x00            /* normal completion */
 #define IC_ABNORM       0x40            /* abnormal completion */
@@ -426,6 +427,7 @@
 #define US_3            0x03            /* Unit 3 */
 
 /* status register 1 definitions */
+
 #define EN              0x80            /* End of cylinder */
 #define DE              0x20            /* Data error */
 #define OR              0x10            /* Overrun */
@@ -434,6 +436,7 @@
 #define MA              0x01            /* Missing address mark */
 
 /* status register 2 definitions */
+
 #define CM              0x40            /* Control mark */
 #define DD              0x20            /* Data error in data field */
 #define WC              0x10            /* Wrong cylinder */
@@ -441,6 +444,7 @@
 #define MD              0x01            /* Missing address mark in data field */
 
 /* status register 3/fddst definitions */
+
 #define FT              0x80            /* Fault */
 #define WP              0x40            /* Write protect */
 #define RDY             0x20            /* Ready */
@@ -450,6 +454,7 @@
 //#define US              0x03            /* Unit selected */
 
 /* FDC command definitions */
+
 #define READTRK         0x02
 #define SPEC            0x03
 #define SENDRV          0x04
@@ -475,38 +480,39 @@ t_stat isbc208_reset (DEVICE *dptr);
 void isbc208_reset1 (void);
 t_stat isbc208_attach (UNIT *uptr, CONST char *cptr);
 t_stat isbc208_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-int32 isbc208_r0(int32 io, int32 data);
-int32 isbc208_r1(int32 io, int32 data);
-int32 isbc208_r2(int32 io, int32 data);
-int32 isbc208_r3(int32 io, int32 data);
-int32 isbc208_r4(int32 io, int32 data);
-int32 isbc208_r5(int32 io, int32 data);
-int32 isbc208_r6(int32 io, int32 data);
-int32 isbc208_r7(int32 io, int32 data);
-int32 isbc208_r8(int32 io, int32 data);
-int32 isbc208_r9(int32 io, int32 data);
-int32 isbc208_rA(int32 io, int32 data);
-int32 isbc208_rB(int32 io, int32 data);
-int32 isbc208_rC(int32 io, int32 data);
-int32 isbc208_rD(int32 io, int32 data);
-int32 isbc208_rE(int32 io, int32 data);
-int32 isbc208_rF(int32 io, int32 data);
-int32 isbc208_r10(int32 io, int32 data);
-int32 isbc208_r11(int32 io, int32 data);
-int32 isbc208_r12(int32 io, int32 data);
-int32 isbc208_r13(int32 io, int32 data);
-int32 isbc208_r14(int32 io, int32 data);
-int32 isbc208_r15(int32 io, int32 data);
+uint8 isbc208_r0(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r1(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r2(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r3(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r4(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r5(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r6(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r7(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r8(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r9(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_rA(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_rB(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_rC(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_rD(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_rE(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_rF(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r10(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r11(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r12(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r13(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r14(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r15(t_bool io, uint8 data, uint8 devnum);
 
 /* external function prototypes */
 
 extern void set_irq(int32 int_num);
 extern void clr_irq(int32 int_num);
-extern int32 reg_dev(int32 (*routine)(int32, int32), int32 port);
-extern void multibus_put_mbyte(int32 addr, int32 val);
-extern int32 multibus_get_mbyte(int32 addr);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16 port, uint8 devnum);
+extern void multibus_put_mbyte(uint16 addr, uint8 val);
+extern uint8 multibus_get_mbyte(uint16 addr);
 
 /* 8237 physical register definitions */
+
 uint16 i8237_r0;                        // 8237 ch 0 address register
 uint16 i8237_r1;                        // 8237 ch 0 count register
 uint16 i8237_r2;                        // 8237 ch 1 address register
@@ -521,9 +527,12 @@ uint8 i8237_rA;                         // 8237 mode register
 uint8 i8237_rB;                         // 8237 mask register
 uint8 i8237_rC;                         // 8237 request register
 uint8 i8237_rD;                         // 8237 first/last ff
+uint8 i8237_rE;                         // 8237 
+uint8 i8237_rF;                         // 8237 
 
 /* 8272 physical register definitions */ 
 /* 8272 command register stack*/
+
 uint8 i8272_w0;                         // MT+MFM+SK+command 
 uint8 i8272_w1;                         // HDS [HDS=H << 2] + DS1 + DS0
 uint8 i8272_w2;                         // cylinder # (0-XX)
@@ -535,6 +544,7 @@ uint8 i8272_w7;                         // Gap length
 uint8 i8272_w8;                         // Data length (when N=0, size to read or write)
 
 /* 8272 status register stack */
+
 uint8 i8272_msr;                        // main status                         
 uint8 i8272_r0;                         // ST 0                       
 uint8 i8272_r1;                         // ST 1
@@ -542,11 +552,13 @@ uint8 i8272_r2;                         // ST 2
 uint8 i8272_r3;                         // ST 3
 
 /* iSBC-208 physical register definitions */
+
 uint16 isbc208_sr;                      // isbc-208 segment register
 uint8 isbc208_i;                        // iSBC-208 interrupt register
 uint8 isbc208_a;                        // iSBC-208 auxillary port register
 
 /* data obtained from analyzing command registers/attached file length */
+
 int32 wsp = 0, rsp = 0;                 // indexes to write and read stacks (8272 data)
 int32 cyl;                              // current cylinder
 int32 hed;                              // current head [ h << 2]
@@ -580,6 +592,7 @@ int8 maxcyl[FDD_NUM] = {
 };
 
 /* isbc208 Standard SIMH Device Data Structures - 4 units */
+
 UNIT isbc208_unit[] = { 
     { UDATA (&isbc208_svc, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
     { UDATA (&isbc208_svc, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
@@ -682,10 +695,10 @@ t_stat isbc208_svc (UNIT *uptr)
     FILE *fp;
 
     if ((i8272_msr & CB) && cmd && (uptr->u6 == drv)) { /* execution phase */
-        sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: Entered execution phase\n");
+        sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: Entered execution phase\n");
         switch (cmd) {
         case READ:                  /* 0x06 */
-//                sim_printf("READ-e: fddst=%02X", fddst[uptr->u6]);
+//            sim_printf("READ-e: fddst=%02X", fddst[uptr->u6]);
             h = i8272_w3;           // h = 0 or 1 
             hed = i8272_w3 << 2;    // hed = 0 or 4 [h << 2] 
             sec = i8272_w4;         // sector number (1-XX)
@@ -694,24 +707,24 @@ t_stat isbc208_svc (UNIT *uptr)
             ssize = 128 << secn;    // size of sector (bytes)
             bpt = ssize * spt;      // bytes/track
             bpc = bpt * 2;          // bytes/cylinder
-//                sim_printf(" d=%d h=%d c=%d s=%d\n", drv, h, cyl, sec);
+//            sim_printf(" d=%d h=%d c=%d s=%d\n", drv, h, cyl, sec);
             sim_debug (DEBUG_flow, &isbc208_dev, 
-                "isbc208_svc: FDC read: h=%d, hed=%d, sec=%d, secn=%d, spt=%d, ssize=%04X, bpt=%04X, bpc=%04X\n",
+                "208_svc: FDC read: h=%d, hed=%d, sec=%d, secn=%d, spt=%d, ssize=%04X, bpt=%04X, bpc=%04X\n",
                     h, hed, sec, secn, spt, ssize, bpt, bpc);
             sim_debug (DEBUG_flow, &isbc208_dev, 
-                "isbc208_svc: FDC read: d=%d h=%d c=%d s=%d N=%d spt=%d fddst=%02X\n",
+                "208_svc: FDC read: d=%d h=%d c=%d s=%d N=%d spt=%d fddst=%02X\n",
                     drv, h, cyl, sec, secn, spt, fddst[uptr->u6]);
-            sim_debug (DEBUG_flow, &isbc208_dev, "\nFDC read of d=%d h=%d c=%d s=%d",
+            sim_debug (DEBUG_read, &isbc208_dev, "208_svc: FDC read of d=%d h=%d c=%d s=%d\n",
                     drv, h, cyl, sec);
             if ((fddst[uptr->u6] & RDY) == 0) { // drive not ready
                 i8272_r0 = IC_ABNORM + NR + hed + drv; /* command done - Not ready error*/
                 i8272_r3 = fddst[uptr->u6];
                 i8272_msr |= (RQM + DIO + CB); /* enter result phase */
-                sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC read: Not Ready\n"); 
+                sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: FDC read: Not Ready\n"); 
             } else {                // get image addr for this d, h, c, s    
                 imgadr = (cyl * bpc) + (h * bpt) + ((sec - 1) * ssize);
-                sim_debug (DEBUG_flow, &isbc208_dev, 
-                    "isbc208_svc: FDC read: DMA addr=%04X cnt=%04X imgadr=%04X\n", 
+                sim_debug (DEBUG_read, &isbc208_dev, 
+                    "208_svc: FDC read: DMA addr=%04X cnt=%04X imgadr=%04X\n", 
                         i8237_r0, i8237_r1, imgadr);
                 for (i=0; i<=i8237_r1; i++) { /* copy selected sector to memory */
                     data = *(isbc208_buf[uptr->u6] + (imgadr + i));
@@ -750,18 +763,20 @@ t_stat isbc208_svc (UNIT *uptr)
             bpt = ssize * spt;      // bytes/track
             bpc = bpt * 2;          // bytes/cylinder
             sim_debug (DEBUG_flow, &isbc208_dev, 
-                "isbc208_svc: FDC write: hed=%d, sec=%d, secn=%d, spt=%d, ssize=%04X, bpt=%04X, bpc=%04X\n",
+                "208_svc: FDC write: hed=%d, sec=%d, secn=%d, spt=%d, ssize=%04X, bpt=%04X, bpc=%04X\n",
                     hed, sec, secn, spt, ssize, bpt, bpc);
             sim_debug (DEBUG_flow, &isbc208_dev, 
-                "isbc208_svc: FDC write: d=%d h=%d c=%d s=%d N=%d spt=%d fddst=%02X\n",
+                "208_svc: FDC write: d=%d h=%d c=%d s=%d N=%d spt=%d fddst=%02X\n",
                     drv, h, cyl, sec, secn, spt, fddst[uptr->u6]);
+            sim_debug (DEBUG_write, &isbc208_dev, "208_svc: FDC write of d=%d h=%d c=%d s=%d\n",
+                    drv, h, cyl, sec);
             i8272_r1 = 0;           // clear ST1
             i8272_r2 = 0;           // clear ST2
             if ((fddst[uptr->u6] & RDY) == 0) {
                 i8272_r0 = IC_ABNORM + NR + hed + drv; /* Not ready error*/
                 i8272_r3 = fddst[uptr->u6];
                 i8272_msr |= (RQM + DIO + CB); /* enter result phase */
-                sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC write: Not Ready\n"); 
+                sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: FDC write: Not Ready\n"); 
 //                } else if (fddst[uptr->u6] & WP) {
 //                    i8272_r0 = IC_ABNORM + hed + drv; /* write protect error*/
 //                    i8272_r1 = NW;      // set not writable in ST1
@@ -769,11 +784,11 @@ t_stat isbc208_svc (UNIT *uptr)
 //                    i8272_msr |= (RQM + DIO + CB); /* enter result phase */
 //                    sim_printf("\nWrite Protected fddst[%d]=%02X\n", uptr->u6, fddst[uptr->u6]); 
 //                    if (isbc208_dev.dctrl & DEBUG_flow)
-//                        sim_printf("isbc208_svc: FDC write: Write Protected\n"); 
+//                        sim_printf("208_svc: FDC write: Write Protected\n"); 
             } else {                // get image addr for this d, h, c, s    
                 imgadr = (cyl * bpc) + (h * bpt) + ((sec - 1) * ssize);
-                sim_debug (DEBUG_flow, &isbc208_dev, 
-                    "isbc208_svc: FDC write: DMA adr=%04X cnt=%04X imgadr=%04X\n", 
+                sim_debug (DEBUG_write, &isbc208_dev, 
+                    "208_svc: FDC write: DMA adr=%04X cnt=%04X imgadr=%04X\n", 
                         i8237_r0, i8237_r1, imgadr);
                 for (i=0; i<=i8237_r1; i++) { /* copy selected memory to image */
                     data = multibus_get_mbyte(i8237_r0 + i);
@@ -803,12 +818,12 @@ t_stat isbc208_svc (UNIT *uptr)
             if ((fddst[uptr->u6] & RDY) == 0) {
                 i8272_r0 = IC_ABNORM + NR + hed + drv; /* Not ready error*/
                 i8272_msr |= (RQM + DIO + CB); /* enter result phase */
-                sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: Not Ready\n"); 
+                sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: Not Ready\n"); 
             } else if (fddst[uptr->u6] & WP) {
                 i8272_r0 = IC_ABNORM + hed + drv; /* write protect error*/
                 i8272_r3 = fddst[uptr->u6] + WP;
                 i8272_msr |= (RQM + DIO + CB); /* enter result phase */
-                sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: Write Protected\n"); 
+                sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: Write Protected\n"); 
             } else {
                 ;                   /* do nothing for now */
                 i8272_msr |= (RQM + DIO + CB); /* enter result phase */
@@ -825,7 +840,7 @@ t_stat isbc208_svc (UNIT *uptr)
             clr_irq(SBC208_INT);    /* clear interrupt */
             break;
         case SENDRV:                /* 0x04 */
-        sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC sense drive of disk=%d fddst=%02X\n",
+            sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: FDC sense drive: d=%d fddst=%02X\n",
             drv, fddst[uptr->u6]);
             i8272_msr |= (RQM + DIO + CB); /* enter result phase */
             i8272_r0 = hed + drv;   /* command done - no error */
@@ -836,12 +851,12 @@ t_stat isbc208_svc (UNIT *uptr)
             break;
         case HOME:                  /* 0x07 */
 //                sim_printf("HOME-e: fddst=%02X\n", fddst[uptr->u6]);
-            sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC home: disk=%d fddst=%02X\n",
+            sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: FDC home: d=%d fddst=%02X\n",
                 drv, fddst[uptr->u6]);
             if ((fddst[uptr->u6] & RDY) == 0) {
                 i8272_r0 = IC_ABNORM + NR + hed + drv; /* Not ready error*/
                 i8272_r3 = fddst[uptr->u6];
-                sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: Not Ready\n"); 
+                sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: Not Ready\n"); 
             } else {
                 cyl = 0;            /* now on cylinder 0 */
                 fddst[drv] |= T0;   /* set status flag */
@@ -862,7 +877,7 @@ t_stat isbc208_svc (UNIT *uptr)
             fddst[3] |= TS;
 //                sim_printf("SPEC-e: fddst[%d]=%02X\n", uptr->u6, fddst[uptr->u6]);
             sim_debug (DEBUG_flow, &isbc208_dev, 
-                "isbc208_svc: FDC specify SRT=%d ms HUT=%d ms HLT=%d ms \n", 
+                "208_svc: FDC specify: SRT=%d ms HUT=%d ms HLT=%d ms \n", 
                     16 - (drv >> 4), 16 * (drv & 0x0f), i8272_w2 & 0xfe);
             i8272_r0 = hed + drv;   /* command done - no error */
             i8272_r1 = 0;
@@ -877,7 +892,7 @@ t_stat isbc208_svc (UNIT *uptr)
             if ((fddst[uptr->u6] & RDY) == 0) {
                 i8272_r0 = IC_RC + NR + hed + drv; /* Not ready error*/
                 i8272_r3 = fddst[uptr->u6];
-                sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: Not Ready\n"); 
+                sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: Not Ready\n"); 
             } else {
                 i8272_w2 = cyl;     /* generate a valid address mark */
                 i8272_w3 = hed >> 2;
@@ -893,15 +908,15 @@ t_stat isbc208_svc (UNIT *uptr)
             break;
         case SEEK:                  /* 0x0F */
 //                sim_printf("SEEK-e: fddst=%02X\n", fddst[uptr->u6]);
-            sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC seek: disk=%d cyl=%d fddst=%02X\n",
+            sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: FDC seek: d=%d c=%d fddst=%02X\n",
                 drv, i8272_w2, fddst[uptr->u6]);
             if ((fddst[uptr->u6] & RDY) == 0) { /* Not ready? */
                 i8272_r0 = IC_ABNORM + NR + hed + drv; /* error*/
                 i8272_r3 = fddst[uptr->u6];
-                sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC seek: Not Ready\n"); 
+                sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: FDC seek: Not Ready\n"); 
             } else if (i8272_w2 >= maxcyl[uptr->u6]) {
                 i8272_r0 = IC_ABNORM + RDY + hed + drv; /* seek error*/
-                sim_debug (DEBUG_flow, &isbc208_dev, "isbc208_svc: FDC seek: Invalid Cylinder %d\n", i8272_w2); 
+                sim_debug (DEBUG_flow, &isbc208_dev, "208_svc: FDC seek: Invalid Cylinder %d\n", i8272_w2); 
             } else {
                 i8272_r0 |= SE + hed + drv; /* command done - no error */
                 cyl = i8272_w2;         /* new cylinder number */
@@ -933,15 +948,520 @@ t_stat isbc208_svc (UNIT *uptr)
         pcmd = cmd;                     /* save for result phase */
         cmd = 0;                        /* reset command */
         sim_debug (DEBUG_flow, &isbc208_dev, 
-            "isbc208_svc: Exit: RSLT0 msr=%02X ST0=%02X ST1=%02X ST2=%02X ST3=%02X\n",
+            "208_svc: Exit: msr=%02X ST0=%02X ST1=%02X ST2=%02X ST3=%02X\n",
                 i8272_msr, i8272_r0, i8272_r1, i8272_r2, i8272_r3); 
     }
     sim_activate (&isbc208_unit[uptr->u6], isbc208_unit[uptr->u6].wait);
     return SCPE_OK;
 }
 
+/* Reset routine */
+
+t_stat isbc208_reset (DEVICE *dptr)
+{
+    reg_dev(isbc208_r0, SBC208_BASE + 0, 0); 
+    reg_dev(isbc208_r1, SBC208_BASE + 1, 0); 
+    reg_dev(isbc208_r2, SBC208_BASE + 2, 0); 
+    reg_dev(isbc208_r3, SBC208_BASE + 3, 0); 
+    reg_dev(isbc208_r4, SBC208_BASE + 4, 0); 
+    reg_dev(isbc208_r5, SBC208_BASE + 5, 0); 
+    reg_dev(isbc208_r6, SBC208_BASE + 6, 0); 
+    reg_dev(isbc208_r7, SBC208_BASE + 7, 0); 
+    reg_dev(isbc208_r8, SBC208_BASE + 8, 0); 
+    reg_dev(isbc208_r9, SBC208_BASE + 9, 0); 
+    reg_dev(isbc208_rA, SBC208_BASE + 10, 0); 
+    reg_dev(isbc208_rB, SBC208_BASE + 11, 0); 
+    reg_dev(isbc208_rC, SBC208_BASE + 12, 0); 
+    reg_dev(isbc208_rD, SBC208_BASE + 13, 0); 
+    reg_dev(isbc208_rE, SBC208_BASE + 14, 0); 
+    reg_dev(isbc208_rF, SBC208_BASE + 15, 0); 
+    reg_dev(isbc208_r10, SBC208_BASE + 16, 0); 
+    reg_dev(isbc208_r11, SBC208_BASE + 17, 0); 
+    reg_dev(isbc208_r12, SBC208_BASE + 18, 0); 
+    reg_dev(isbc208_r13, SBC208_BASE + 19, 0); 
+    reg_dev(isbc208_r14, SBC208_BASE + 20, 0); 
+    reg_dev(isbc208_r15, SBC208_BASE + 21, 0); 
+    if ((isbc208_dev.flags & DEV_DIS) == 0) 
+        isbc208_reset1();
+    return SCPE_OK;
+}
+
+void isbc208_reset1 (void)
+{
+    int32 i;
+    UNIT *uptr;
+    static int flag = 1;
+
+    if (flag) sim_printf("iSBC 208: Initializing\n");
+    for (i = 0; i < FDD_NUM; i++) {     /* handle all units */
+        uptr = isbc208_dev.units + i;
+        if (uptr->capac == 0) {         /* if not configured */
+//            sim_printf("   SBC208%d: Not configured\n", i);
+//            if (flag) {
+//                sim_printf("      ALL: \"set isbc208 en\"\n");
+//                sim_printf("      EPROM: \"att isbc2080 <filename>\"\n");
+//                flag = 0;
+//            }
+            uptr->capac = 0;            /* initialize unit */
+            uptr->u3 = 0; 
+            uptr->u4 = 0;
+            uptr->u5 = 0;
+            uptr->u6 = i;               /* unit number - only set here! */
+            fddst[i] = WP + T0 + i;     /* initial drive status */
+            uptr->flags |= UNIT_WPMODE; /* set WP in unit flags */
+            sim_activate (&isbc208_unit[uptr->u6], isbc208_unit[uptr->u6].wait);
+        } else {
+            fddst[i] = RDY + WP + T0 + i; /* initial attach drive status */
+//            sim_printf("   SBC208%d: Configured, Attached to %s\n", i, uptr->filename);
+        }
+    }
+    i8237_r8 = 0;                       /* status */
+    i8237_r9 = 0;                       /* command */
+    i8237_rB = 0x0F;                    /* mask */
+    i8237_rC = 0;                       /* request */
+    i8237_rD = 0;                       /* first/last FF */
+    i8272_msr = RQM;                    /* 8272 ready for start of command */
+    rsp = wsp = 0;                      /* reset indexes */
+    cmd = 0;                            /* clear command */
+    if (flag) {
+        sim_printf("   8237 Reset\n");
+        sim_printf("   8272 Reset\n");
+    }
+    flag = 0;
+}
+
+/* isbc208 attach - attach an .IMG file to a FDD */
+
+t_stat isbc208_attach (UNIT *uptr, CONST char *cptr)
+{
+    t_stat r;
+    FILE *fp;
+    int32 i, c = 0;
+    long flen;
+
+    sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_attach: Entered with cptr=%s\n", cptr);
+    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
+        sim_printf("   isbc208_attach: Attach error\n");
+        return r;
+    }
+    fp = fopen(uptr->filename, "rb");
+    if (fp == NULL) {
+        sim_printf("   Unable to open disk img file %s\n", uptr->filename);
+        sim_printf("   No disk image loaded!!!\n");
+    } else {
+        sim_printf("iSBC 208: Attach\n");
+        fseek(fp, 0, SEEK_END);         /* size disk image */
+        flen = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        if (isbc208_buf[uptr->u6] == NULL) { /* no buffer allocated */
+            isbc208_buf[uptr->u6] = (uint8 *)malloc(flen);
+            if (isbc208_buf[uptr->u6] == NULL) {
+                sim_printf("   iSBC208_attach: Malloc error\n");
+                return SCPE_MEM;
+            }
+        }
+        uptr->capac = flen;
+        i = 0;
+        c = fgetc(fp);                  // copy disk image into buffer
+        while (c != EOF) {
+            *(isbc208_buf[uptr->u6] + i++) = c & 0xFF;
+            c = fgetc(fp);
+        }
+        fclose(fp);
+        fddst[uptr->u6] |= RDY;         /* set unit ready */
+        if (flen == 368640) {           /* 5" 360K DSDD */
+            maxcyl[uptr->u6] = 40;
+            fddst[uptr->u6] |= TS;      // two sided
+        }
+        else if (flen == 737280) {      /* 5" 720K DSQD / 3.5" 720K DSDD */
+            maxcyl[uptr->u6] = 80;
+            fddst[uptr->u6] |= TS;      // two sided
+        }
+        else if (flen == 1228800) {     /* 5" 1.2M DSHD */
+            maxcyl[uptr->u6] = 80;
+            fddst[uptr->u6] |= TS;      // two sided
+        }
+        else if (flen == 1474560) {     /* 3.5" 1.44M DSHD */
+            maxcyl[uptr->u6] = 80;
+            fddst[uptr->u6] |= TS;      // two sided
+        }
+        sim_printf("   Drive-%d: %d bytes of disk image %s loaded, fddst=%02X\n", 
+            uptr->u6, i, uptr->filename, fddst[uptr->u6]);
+    }
+    sim_debug (DEBUG_flow, &isbc208_dev, "   iSBC208_attach: Done\n");
+    return SCPE_OK;
+}
+
+/* isbc208 set mode = 8- or 16-bit data bus */
+/* always 8-bit mode for current simulators */
+
+t_stat isbc208_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_set_mode: Entered with val=%08XH uptr->flags=%08X\n", 
+        val, uptr->flags);
+    if (val & UNIT_WPMODE) {            /* write protect */
+        fddst[uptr->u6] |= WP;
+        uptr->flags |= val;
+    } else {                            /* read write */
+        fddst[uptr->u6] &= ~WP;
+        uptr->flags &= ~val;
+    }
+//    sim_printf("fddst[%d]=%02XH uptr->flags=%08X\n", uptr->u6, fddst[uptr->u6], uptr->flags);
+    sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_set_mode: Done\n");
+    return SCPE_OK;
+}
+
+/*  I/O instruction handlers, called from the CPU module when an
+    IN or OUT instruction is issued.
+
+    Each function is passed an 'io' flag, where 0 means a read from
+    the port, and 1 means a write to the port.  On input, the actual
+    input is passed as the return value, on output, 'data' is written
+    to the device.
+*/
+
+uint8 isbc208_r0(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current address CH 0 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r0(H) read as %04X\n", i8237_r0);
+            return (i8237_r0 >> 8);
+        } else {                        /* low byte */
+            i8237_rD++;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r0(L) read as %04X\n", i8237_r0);
+            return (i8237_r0 & 0xFF);
+        }
+    } else {                            /* write base & current address CH 0 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            i8237_r0 |= (data << 8);
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r0(H) set to %04X\n", i8237_r0);
+        } else {                        /* low byte */
+            i8237_rD++;
+            i8237_r0 = data & 0xFF;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r0(L) set to %04X\n", i8237_r0);
+        }
+        return 0;
+    }
+}
+
+uint8 isbc208_r1(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current word count CH 0 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r1(H) read as %04X\n", i8237_r1);
+            return (i8237_r1 >> 8);
+        } else {                        /* low byte */
+            i8237_rD++;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r1(L) read as %04X\n", i8237_r1);
+            return (i8237_r1 & 0xFF);
+        }
+    } else {                            /* write base & current address CH 0 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            i8237_r1 |= (data << 8);
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r1(H) set to %04X\n", i8237_r1);
+        } else {                        /* low byte */
+            i8237_rD++;
+            i8237_r1 = data & 0xFF;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r1(L) set to %04X\n", i8237_r1);
+        }
+        return 0;
+    }
+}
+
+uint8 isbc208_r2(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current address CH 1 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r2(H) read as %04X\n", i8237_r2);
+            return (i8237_r2 >> 8);
+        } else {                        /* low byte */
+            i8237_rD++;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r2(L) read as %04X\n", i8237_r2);
+            return (i8237_r2 & 0xFF);
+        }
+    } else {                            /* write base & current address CH 1 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            i8237_r2 |= (data << 8);
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r2(H) set to %04X\n", i8237_r2);
+        } else {                        /* low byte */
+            i8237_rD++;
+            i8237_r2 = data & 0xFF;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r2(L) set to %04X\n", i8237_r2);
+        }
+        return 0;
+    }
+}
+
+uint8 isbc208_r3(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current word count CH 1 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r3(H) read as %04X\n", i8237_r3);
+            return (i8237_r3 >> 8);
+        } else {                        /* low byte */
+            i8237_rD++;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r3(L) read as %04X\n", i8237_r3);
+            return (i8237_r3 & 0xFF);
+        }
+    } else {                            /* write base & current address CH 1 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            i8237_r3 |= (data << 8);
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r3(H) set to %04X\n", i8237_r3);
+        } else {                        /* low byte */
+            i8237_rD++;
+            i8237_r3 = data & 0xFF;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r3(L) set to %04X\n", i8237_r3);
+        }
+        return 0;
+    }
+}
+
+uint8 isbc208_r4(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current address CH 2 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r4(H) read as %04X\n", i8237_r4);
+            return (i8237_r4 >> 8);
+        } else {                        /* low byte */
+            i8237_rD++;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r4(L) read as %04X\n", i8237_r4);
+            return (i8237_r4 & 0xFF);
+        }
+    } else {                            /* write base & current address CH 2 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            i8237_r4 |= (data << 8);
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r4(H) set to %04X\n", i8237_r4);
+        } else {                        /* low byte */
+            i8237_rD++;
+            i8237_r4 = data & 0xFF;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r4(L) set to %04X\n", i8237_r4);
+        }
+        return 0;
+    }
+}
+
+uint8 isbc208_r5(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current word count CH 2 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r5(H) read as %04X\n", i8237_r5);
+            return (i8237_r5 >> 8);
+        } else {                        /* low byte */
+            i8237_rD++;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r5(L) read as %04X\n", i8237_r5);
+            return (i8237_r5 & 0xFF);
+        }
+    } else {                            /* write base & current address CH 2 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            i8237_r5 |= (data << 8);
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r5(H) set to %04X\n", i8237_r5);
+        } else {                        /* low byte */
+            i8237_rD++;
+            i8237_r5 = data & 0xFF;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r5(L) set to %04X\n", i8237_r5);
+        }
+        return 0;
+    }
+}
+
+uint8 isbc208_r6(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current address CH 3 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r6(H) read as %04X\n", i8237_r6);
+            return (i8237_r6 >> 8);
+        } else {                        /* low byte */
+            i8237_rD++;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r6(L) read as %04X\n", i8237_r6);
+            return (i8237_r6 & 0xFF);
+        }
+    } else {                            /* write base & current address CH 3 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            i8237_r6 |= (data << 8);
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r6(H) set to %04X\n", i8237_r6);
+        } else {                        /* low byte */
+            i8237_rD++;
+            i8237_r6 = data & 0xFF;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r6(L) set to %04X\n", i8237_r6);
+        }
+        return 0;
+    }
+}
+
+uint8 isbc208_r7(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current word count CH 3 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r7(H) read as %04X\n", i8237_r7);
+            return (i8237_r7 >> 8);
+        } else {                        /* low byte */
+            i8237_rD++;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r7(L) read as %04X\n", i8237_r7);
+            return (i8237_r7 & 0xFF);
+        }
+    } else {                            /* write base & current address CH 3 */
+        if (i8237_rD) {                 /* high byte */
+            i8237_rD = 0;
+            i8237_r7 |= (data << 8);
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r7(H) set to %04X\n", i8237_r7);
+        } else {                        /* low byte */
+            i8237_rD++;
+            i8237_r7 = data & 0xFF;
+            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r7(L) set to %04X\n", i8237_r7);
+        }
+        return 0;
+    }
+}
+
+uint8 isbc208_r8(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read status register */
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r8 (status) read as %02X\n", i8237_r8);
+        return (i8237_r8);
+    } else {                            /* write command register */
+        i8237_r9 = data & 0xFF;
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r9 (command) set to %02X\n", i8237_r9);
+        return 0;
+    }
+}
+
+uint8 isbc208_r9(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r9\n");
+        return 0;
+    } else {                            /* write request register */
+        i8237_rC = data & 0xFF;
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rC (request) set to %02X\n", i8237_rC);
+        return 0;
+    }
+}
+
+uint8 isbc208_rA(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rA\n");
+        return 0;
+    } else {                            /* write single mask register */
+        switch(data & 0x03) {
+        case 0:
+            if (data & 0x04)
+                i8237_rB |= 1;
+            else
+                i8237_rB &= ~1;
+            break;
+        case 1:
+            if (data & 0x04)
+                i8237_rB |= 2;
+            else
+                i8237_rB &= ~2;
+            break;
+        case 2:
+            if (data & 0x04)
+                i8237_rB |= 4;
+            else
+                i8237_rB &= ~4;
+            break;
+        case 3:
+            if (data & 0x04)
+                i8237_rB |= 8;
+            else
+                i8237_rB &= ~8;
+            break;
+        }
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rB (mask) set to %02X\n", i8237_rB);
+        return 0;
+    }
+}
+
+uint8 isbc208_rB(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rB\n");
+        return 0;
+    } else {                            /* write mode register */
+        i8237_rA = data & 0xFF;
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rA (mode) set to %02X\n", i8237_rA);
+        return 0;
+    }
+}
+
+uint8 isbc208_rC(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rC\n");
+        return 0;
+    } else {                            /* clear byte pointer FF */
+        i8237_rD = 0;
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rD (FF) cleared\n");
+        return 0;
+    }
+}
+
+uint8 isbc208_rD(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read temporary register */
+        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rD\n");
+        return 0;
+    } else {                            /* master clear */
+        isbc208_reset1();
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237 master clear\n");
+        return 0;
+    }
+}
+
+uint8 isbc208_rE(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rE\n");
+        return 0;
+    } else {                            /* clear mask register */
+        i8237_rB = 0;
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rB (mask) cleared\n");
+        return 0;
+    }
+}
+
+uint8 isbc208_rF(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rF\n");
+        return 0;
+    } else {                            /* write all mask register bits */
+        i8237_rB = data & 0x0F;
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rB (mask) set to %02X\n", i8237_rB);
+        return 0;
+    }
+}
+
+uint8 isbc208_r10(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read FDC status register */
+        sim_debug (DEBUG_reg, &isbc208_dev, "i8272_msr read as %02X\n", i8272_msr);
+        return i8272_msr;
+    } else { 
+        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal write to isbc208_r10\n");
+        return 0;
+    }
+}
+
 // read/write FDC data register
-int32 isbc208_r11(int32 io, int32 data)
+uint8 isbc208_r11(t_bool io, uint8 data, uint8 devnum)
 {
     if (io == 0) {                      /* read FDC data register */
         wsp = 0;                        /* clear write stack index */
@@ -1060,511 +1580,7 @@ int32 isbc208_r11(int32 io, int32 data)
     return 0;
 }
 
-/* Reset routine */
-
-t_stat isbc208_reset (DEVICE *dptr)
-{
-    reg_dev(isbc208_r0, SBC208_BASE + 0); 
-    reg_dev(isbc208_r1, SBC208_BASE + 1); 
-    reg_dev(isbc208_r2, SBC208_BASE + 2); 
-    reg_dev(isbc208_r3, SBC208_BASE + 3); 
-    reg_dev(isbc208_r4, SBC208_BASE + 4); 
-    reg_dev(isbc208_r5, SBC208_BASE + 5); 
-    reg_dev(isbc208_r6, SBC208_BASE + 6); 
-    reg_dev(isbc208_r7, SBC208_BASE + 7); 
-    reg_dev(isbc208_r8, SBC208_BASE + 8); 
-    reg_dev(isbc208_r9, SBC208_BASE + 9); 
-    reg_dev(isbc208_rA, SBC208_BASE + 10); 
-    reg_dev(isbc208_rB, SBC208_BASE + 11); 
-    reg_dev(isbc208_rC, SBC208_BASE + 12); 
-    reg_dev(isbc208_rD, SBC208_BASE + 13); 
-    reg_dev(isbc208_rE, SBC208_BASE + 14); 
-    reg_dev(isbc208_rF, SBC208_BASE + 15); 
-    reg_dev(isbc208_r10, SBC208_BASE + 16); 
-    reg_dev(isbc208_r11, SBC208_BASE + 17); 
-    reg_dev(isbc208_r12, SBC208_BASE + 18); 
-    reg_dev(isbc208_r13, SBC208_BASE + 19); 
-    reg_dev(isbc208_r14, SBC208_BASE + 20); 
-    reg_dev(isbc208_r15, SBC208_BASE + 21); 
-    if ((isbc208_dev.flags & DEV_DIS) == 0) 
-        isbc208_reset1();
-    return SCPE_OK;
-}
-
-void isbc208_reset1 (void)
-{
-    int32 i;
-    UNIT *uptr;
-    static int flag = 1;
-
-    if (flag) sim_printf("iSBC 208: Initializing\n");
-    for (i = 0; i < FDD_NUM; i++) {     /* handle all units */
-        uptr = isbc208_dev.units + i;
-        if (uptr->capac == 0) {         /* if not configured */
-//            sim_printf("   SBC208%d: Not configured\n", i);
-//            if (flag) {
-//                sim_printf("      ALL: \"set isbc208 en\"\n");
-//                sim_printf("      EPROM: \"att isbc2080 <filename>\"\n");
-//                flag = 0;
-//            }
-            uptr->capac = 0;            /* initialize unit */
-            uptr->u3 = 0; 
-            uptr->u4 = 0;
-            uptr->u5 = 0;
-            uptr->u6 = i;               /* unit number - only set here! */
-            fddst[i] = WP + T0 + i;     /* initial drive status */
-            uptr->flags |= UNIT_WPMODE; /* set WP in unit flags */
-            sim_activate (&isbc208_unit[uptr->u6], isbc208_unit[uptr->u6].wait);
-        } else {
-            fddst[i] = RDY + WP + T0 + i; /* initial attach drive status */
-//            sim_printf("   SBC208%d: Configured, Attached to %s\n", i, uptr->filename);
-        }
-    }
-    i8237_r8 = 0;                       /* status */
-    i8237_r9 = 0;                       /* command */
-    i8237_rB = 0x0F;                    /* mask */
-    i8237_rC = 0;                       /* request */
-    i8237_rD = 0;                       /* first/last FF */
-    i8272_msr = RQM;                    /* 8272 ready for start of command */
-    rsp = wsp = 0;                      /* reset indexes */
-    cmd = 0;                            /* clear command */
-    if (flag) {
-        sim_printf("   8237 Reset\n");
-        sim_printf("   8272 Reset\n");
-    }
-    flag = 0;
-}
-
-/* isbc208 attach - attach an .IMG file to a FDD */
-
-t_stat isbc208_attach (UNIT *uptr, CONST char *cptr)
-{
-    t_stat r;
-    FILE *fp;
-    int32 i, c = 0;
-    long flen;
-
-    sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_attach: Entered with cptr=%s\n", cptr);
-    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
-        sim_printf("   isbc208_attach: Attach error\n");
-        return r;
-    }
-    fp = fopen(uptr->filename, "rb");
-    if (fp == NULL) {
-        sim_printf("   Unable to open disk img file %s\n", uptr->filename);
-        sim_printf("   No disk image loaded!!!\n");
-    } else {
-        sim_printf("iSBC 208: Attach\n");
-        fseek(fp, 0, SEEK_END);         /* size disk image */
-        flen = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-        if (isbc208_buf[uptr->u6] == NULL) { /* no buffer allocated */
-            isbc208_buf[uptr->u6] = (uint8 *)malloc(flen);
-            if (isbc208_buf[uptr->u6] == NULL) {
-                sim_printf("   iSBC208_attach: Malloc error\n");
-                return SCPE_MEM;
-            }
-        }
-        uptr->capac = flen;
-        i = 0;
-        c = fgetc(fp);                  // copy disk image into buffer
-        while (c != EOF) {
-            *(isbc208_buf[uptr->u6] + i++) = c & 0xFF;
-            c = fgetc(fp);
-        }
-        fclose(fp);
-        fddst[uptr->u6] |= RDY;         /* set unit ready */
-        if (flen == 368640) {           /* 5" 360K DSDD */
-            maxcyl[uptr->u6] = 40;
-            fddst[uptr->u6] |= TS;      // two sided
-        }
-        else if (flen == 737280) {      /* 5" 720K DSQD / 3.5" 720K DSDD */
-            maxcyl[uptr->u6] = 80;
-            fddst[uptr->u6] |= TS;      // two sided
-        }
-        else if (flen == 1228800) {     /* 5" 1.2M DSHD */
-            maxcyl[uptr->u6] = 80;
-            fddst[uptr->u6] |= TS;      // two sided
-        }
-        else if (flen == 1474560) {     /* 3.5" 1.44M DSHD */
-            maxcyl[uptr->u6] = 80;
-            fddst[uptr->u6] |= TS;      // two sided
-        }
-        sim_printf("   Drive-%d: %d bytes of disk image %s loaded, fddst=%02X\n", 
-            uptr->u6, i, uptr->filename, fddst[uptr->u6]);
-    }
-    sim_debug (DEBUG_flow, &isbc208_dev, "   iSBC208_attach: Done\n");
-    return SCPE_OK;
-}
-
-/* isbc208 set mode = 8- or 16-bit data bus */
-
-t_stat isbc208_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-    sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_set_mode: Entered with val=%08XH uptr->flags=%08X\n", 
-        val, uptr->flags);
-    if (val & UNIT_WPMODE) {            /* write protect */
-        fddst[uptr->u6] |= WP;
-        uptr->flags |= val;
-    } else {                            /* read write */
-        fddst[uptr->u6] &= ~WP;
-        uptr->flags &= ~val;
-    }
-//    sim_printf("fddst[%d]=%02XH uptr->flags=%08X\n", uptr->u6, fddst[uptr->u6], uptr->flags);
-    sim_debug (DEBUG_flow, &isbc208_dev, "   isbc208_set_mode: Done\n");
-    return SCPE_OK;
-}
-
-/*  I/O instruction handlers, called from the CPU module when an
-    IN or OUT instruction is issued.
-
-    Each function is passed an 'io' flag, where 0 means a read from
-    the port, and 1 means a write to the port.  On input, the actual
-    input is passed as the return value, on output, 'data' is written
-    to the device.
-*/
-
-int32 isbc208_r0(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read current address CH 0 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r0(H) read as %04X\n", i8237_r0);
-            return (i8237_r0 >> 8);
-        } else {                        /* low byte */
-            i8237_rD++;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r0(L) read as %04X\n", i8237_r0);
-            return (i8237_r0 & 0xFF);
-        }
-    } else {                            /* write base & current address CH 0 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            i8237_r0 |= (data << 8);
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r0(H) set to %04X\n", i8237_r0);
-        } else {                        /* low byte */
-            i8237_rD++;
-            i8237_r0 = data & 0xFF;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r0(L) set to %04X\n", i8237_r0);
-        }
-        return 0;
-    }
-}
-
-int32 isbc208_r1(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read current word count CH 0 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r1(H) read as %04X\n", i8237_r1);
-            return (i8237_r1 >> 8);
-        } else {                        /* low byte */
-            i8237_rD++;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r1(L) read as %04X\n", i8237_r1);
-            return (i8237_r1 & 0xFF);
-        }
-    } else {                            /* write base & current address CH 0 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            i8237_r1 |= (data << 8);
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r1(H) set to %04X\n", i8237_r1);
-        } else {                        /* low byte */
-            i8237_rD++;
-            i8237_r1 = data & 0xFF;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r1(L) set to %04X\n", i8237_r1);
-        }
-        return 0;
-    }
-}
-
-int32 isbc208_r2(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read current address CH 1 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r2(H) read as %04X\n", i8237_r2);
-            return (i8237_r2 >> 8);
-        } else {                        /* low byte */
-            i8237_rD++;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r2(L) read as %04X\n", i8237_r2);
-            return (i8237_r2 & 0xFF);
-        }
-    } else {                            /* write base & current address CH 1 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            i8237_r2 |= (data << 8);
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r2(H) set to %04X\n", i8237_r2);
-        } else {                        /* low byte */
-            i8237_rD++;
-            i8237_r2 = data & 0xFF;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r2(L) set to %04X\n", i8237_r2);
-        }
-        return 0;
-    }
-}
-
-int32 isbc208_r3(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read current word count CH 1 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r3(H) read as %04X\n", i8237_r3);
-            return (i8237_r3 >> 8);
-        } else {                        /* low byte */
-            i8237_rD++;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r3(L) read as %04X\n", i8237_r3);
-            return (i8237_r3 & 0xFF);
-        }
-    } else {                            /* write base & current address CH 1 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            i8237_r3 |= (data << 8);
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r3(H) set to %04X\n", i8237_r3);
-        } else {                        /* low byte */
-            i8237_rD++;
-            i8237_r3 = data & 0xFF;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r3(L) set to %04X\n", i8237_r3);
-        }
-        return 0;
-    }
-}
-
-int32 isbc208_r4(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read current address CH 2 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r4(H) read as %04X\n", i8237_r4);
-            return (i8237_r4 >> 8);
-        } else {                        /* low byte */
-            i8237_rD++;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r4(L) read as %04X\n", i8237_r4);
-            return (i8237_r4 & 0xFF);
-        }
-    } else {                            /* write base & current address CH 2 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            i8237_r4 |= (data << 8);
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r4(H) set to %04X\n", i8237_r4);
-        } else {                        /* low byte */
-            i8237_rD++;
-            i8237_r4 = data & 0xFF;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r4(L) set to %04X\n", i8237_r4);
-        }
-        return 0;
-    }
-}
-
-int32 isbc208_r5(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read current word count CH 2 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r5(H) read as %04X\n", i8237_r5);
-            return (i8237_r5 >> 8);
-        } else {                        /* low byte */
-            i8237_rD++;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r5(L) read as %04X\n", i8237_r5);
-            return (i8237_r5 & 0xFF);
-        }
-    } else {                            /* write base & current address CH 2 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            i8237_r5 |= (data << 8);
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r5(H) set to %04X\n", i8237_r5);
-        } else {                        /* low byte */
-            i8237_rD++;
-            i8237_r5 = data & 0xFF;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r5(L) set to %04X\n", i8237_r5);
-        }
-        return 0;
-    }
-}
-
-int32 isbc208_r6(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read current address CH 3 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r6(H) read as %04X\n", i8237_r6);
-            return (i8237_r6 >> 8);
-        } else {                        /* low byte */
-            i8237_rD++;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r6(L) read as %04X\n", i8237_r6);
-            return (i8237_r6 & 0xFF);
-        }
-    } else {                            /* write base & current address CH 3 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            i8237_r6 |= (data << 8);
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r6(H) set to %04X\n", i8237_r6);
-        } else {                        /* low byte */
-            i8237_rD++;
-            i8237_r6 = data & 0xFF;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r6(L) set to %04X\n", i8237_r6);
-        }
-        return 0;
-    }
-}
-
-int32 isbc208_r7(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read current word count CH 3 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r7(H) read as %04X\n", i8237_r7);
-            return (i8237_r7 >> 8);
-        } else {                        /* low byte */
-            i8237_rD++;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r7(L) read as %04X\n", i8237_r7);
-            return (i8237_r7 & 0xFF);
-        }
-    } else {                            /* write base & current address CH 3 */
-        if (i8237_rD) {                 /* high byte */
-            i8237_rD = 0;
-            i8237_r7 |= (data << 8);
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r7(H) set to %04X\n", i8237_r7);
-        } else {                        /* low byte */
-            i8237_rD++;
-            i8237_r7 = data & 0xFF;
-            sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r7(L) set to %04X\n", i8237_r7);
-        }
-        return 0;
-    }
-}
-
-int32 isbc208_r8(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read status register */
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r8 (status) read as %02X\n", i8237_r8);
-        return (i8237_r8);
-    } else {                            /* write command register */
-        i8237_r9 = data & 0xFF;
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r9 (command) set to %02X\n", i8237_r9);
-        return 0;
-    }
-}
-
-int32 isbc208_r9(int32 io, int32 data)
-{
-    if (io == 0) {
-        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r9\n");
-        return 0;
-    } else {                            /* write request register */
-        i8237_rC = data & 0xFF;
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rC (request) set to %02X\n", i8237_rC);
-        return 0;
-    }
-}
-
-int32 isbc208_rA(int32 io, int32 data)
-{
-    if (io == 0) {
-        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rA\n");
-        return 0;
-    } else {                            /* write single mask register */
-        switch(data & 0x03) {
-        case 0:
-            if (data & 0x04)
-                i8237_rB |= 1;
-            else
-                i8237_rB &= ~1;
-            break;
-        case 1:
-            if (data & 0x04)
-                i8237_rB |= 2;
-            else
-                i8237_rB &= ~2;
-            break;
-        case 2:
-            if (data & 0x04)
-                i8237_rB |= 4;
-            else
-                i8237_rB &= ~4;
-            break;
-        case 3:
-            if (data & 0x04)
-                i8237_rB |= 8;
-            else
-                i8237_rB &= ~8;
-            break;
-        }
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rB (mask) set to %02X\n", i8237_rB);
-        return 0;
-    }
-}
-
-int32 isbc208_rB(int32 io, int32 data)
-{
-    if (io == 0) {
-        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rB\n");
-        return 0;
-    } else {                            /* write mode register */
-        i8237_rA = data & 0xFF;
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rA (mode) set to %02X\n", i8237_rA);
-        return 0;
-    }
-}
-
-int32 isbc208_rC(int32 io, int32 data)
-{
-    if (io == 0) {
-        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rC\n");
-        return 0;
-    } else {                            /* clear byte pointer FF */
-        i8237_rD = 0;
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rD (FF) cleared\n");
-        return 0;
-    }
-}
-
-int32 isbc208_rD(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read temporary register */
-        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rD\n");
-        return 0;
-    } else {                            /* master clear */
-        isbc208_reset1();
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237 master clear\n");
-        return 0;
-    }
-}
-
-int32 isbc208_rE(int32 io, int32 data)
-{
-    if (io == 0) {
-        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rE\n");
-        return 0;
-    } else {                            /* clear mask register */
-        i8237_rB = 0;
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rB (mask) cleared\n");
-        return 0;
-    }
-}
-
-int32 isbc208_rF(int32 io, int32 data)
-{
-    if (io == 0) {
-        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rF\n");
-        return 0;
-    } else {                            /* write all mask register bits */
-        i8237_rB = data & 0x0F;
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8237_rB (mask) set to %02X\n", i8237_rB);
-        return 0;
-    }
-}
-
-int32 isbc208_r10(int32 io, int32 data)
-{
-    if (io == 0) {                      /* read FDC status register */
-        sim_debug (DEBUG_reg, &isbc208_dev, "i8272_msr read as %02X\n", i8272_msr);
-        return i8272_msr;
-    } else { 
-        sim_debug (DEBUG_reg, &isbc208_dev, "Illegal write to isbc208_r10\n");
-        return 0;
-    }
-}
-
-int32 isbc208_r12(int32 io, int32 data)
+uint8 isbc208_r12(t_bool io, uint8 data, uint8 devnum)
 {
     if (io == 0) {                      /* read interrupt status */
         sim_debug (DEBUG_reg, &isbc208_dev, "isbc208_r12 read as %02X\n", isbc208_i);
@@ -1576,7 +1592,7 @@ int32 isbc208_r12(int32 io, int32 data)
     }
 }
 
-int32 isbc208_r13(int32 io, int32 data)
+uint8 isbc208_r13(t_bool io, uint8 data, uint8 devnum)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r13\n");
@@ -1588,7 +1604,7 @@ int32 isbc208_r13(int32 io, int32 data)
     }
 }
 
-int32 isbc208_r14(int32 io, int32 data)
+uint8 isbc208_r14(t_bool io, uint8 data, uint8 devnum)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r14\n");
@@ -1600,7 +1616,7 @@ int32 isbc208_r14(int32 io, int32 data)
     }
 }
 
-int32 isbc208_r15(int32 io, int32 data)
+uint8 isbc208_r15(t_bool io, uint8 data, uint8 devnum)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r15\n");

@@ -30,6 +30,8 @@
 
 #### Beta SAGE-II and PDQ-3 simulators from Holger Veit
 
+#### Intel Systems 8010 and 8020 simulators from Bill Beech
+
 ### New Host Platform support - HP-UX and AIX
 
 ### Simulator Front Panel API
@@ -70,8 +72,8 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
         directly communicate to a remote device via UDP (i.e. a built-in HECnet bridge).
     XQ and XU devices (DEQNA, DELQA, DELQA-T, DEUNA and DELQA) devices can now 
         optionally throttle outgoing packets which is useful when communicating with
-        legacy systems on a local LAN which can easily get over run when packets
-        arrive too fast.
+        legacy systems (real hardware) on a local LAN which can easily get over run 
+        when packets arrive too fast.
     MicroVAX 3900 has QVSS (VCB01) board available.
     MicroVAX 3900 and MicroVAX II have SET CPU AUTOBOOT option
     MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer|VAXStation) command to change between system types
@@ -130,6 +132,7 @@ Host platforms which have libSDL available can leverage this functionality.
 	  older systems.  Throttling of simulated traffic delivered to the LAN 
 	  can be used to mitigate this problem.
 	* Reliable MAC address conflict detection.  
+	* Automatic unique default MAC address assignment.  
 
 #### Disk Extensions
     RAW Disk Access (including CDROM)

@@ -24,13 +24,45 @@
         in this Software without prior written authorization from William A. Beech.
 
     ?? ??? 10 - Original file.
-    16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
 */
 
 #include <stdio.h>
 #include <ctype.h>
-#include "isys8020_cfg.h"               /* Intel System 80/20 configuration */
 #include "sim_defs.h"		        /* simulator defns */
+
+/* set the base I/O address for the 8259 */
+#define I8259_BASE      0xD8
+#define I8259_NUM       1
+
+/* set the base I/O address for the 8255 */
+#define I8255_BASE_0    0xE4
+#define I8255_BASE_1    0xE8
+#define I8255_NUM       2
+
+/* set the base I/O address for the 8251 */
+#define I8251_BASE      0xEC
+#define I8251_NUM       1
+
+/* set the base and size for the EPROM on the iSBC 80/20 */
+#define ROM_BASE        0x0000
+#define ROM_SIZE        0x1000
+
+/* set the base and size for the RAM on the iSBC 80/20 */
+#define RAM_BASE        0x3C00
+#define RAM_SIZE        0x0400 
+
+/* set INTR for CPU */
+#define INTR            INT_1
+
+/* set the base I/O address for the iSBC 208 */
+#define	SBC208_BASE	0x40
+
+/* configure interrupt request line */
+#define SBC208_INT      INT_1
+
+/* set the base and size for the iSBC 064 */
+#define SBC064_BASE     0x0000
+#define SBC064_SIZE     0x10000
 
 /* multibus interrupt definitions */
 

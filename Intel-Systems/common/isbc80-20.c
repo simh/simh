@@ -23,61 +23,39 @@
         used in advertising or otherwise to promote the sale, use or other dealings
         in this Software without prior written authorization from William A. Beech.
 
-    NOTES:
-
         This software was written by Bill Beech, Dec 2010, to allow emulation of Multibus
         Computer Systems.
+
+    ?? ??? 10 - Original file.
 */
 
 #include "system_defs.h"
 
-/* set the base I/O address for the 8259 */
-#define I8259_BASE      0xD8
-
-/* set the base I/O address for the first 8255 */
-#define I8255_BASE_0    0xE4
-
-/* set the base I/O address for the second 8255 */
-#define I8255_BASE_1    0xE8
-
-/* set the base I/O address for the 8251 */
-#define I8251_BASE      0xEC
-
-/* set the base and size for the EPROM on the iSBC 80/20 */
-#define ROM_SIZE        0x1000
-
-/* set the base and size for the RAM on the iSBC 80/20 */
-#define RAM_BASE        0x3C00
-#define RAM_SIZE        0x0400 
-
-/* set INTR for CPU */
-#define INTR            INT_1
-
 /* function prototypes */
 
-int32 get_mbyte(int32 addr);
-int32 get_mword(int32 addr);
-void put_mbyte(int32 addr, int32 val);
-void put_mword(int32 addr, int32 val);
-t_stat i80_10_reset (DEVICE *dptr);
+uint8 get_mbyte(uint16 addr);
+uint16 get_mword(uint16 addr);
+void put_mbyte(uint16 addr, uint8 val);
+void put_mword(uint16 addr, uint16 val);
+t_stat SBC_reset (DEVICE *dptr);
 
 /* external function prototypes */
 
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
-extern int32 multibus_get_mbyte(int32 addr);
-extern void  multibus_put_mbyte(int32 addr, int32 val);
-extern int32 EPROM_get_mbyte(int32 addr);
-extern int32 RAM_get_mbyte(int32 addr);
-extern void RAM_put_mbyte(int32 addr, int32 val);
+extern uint8 multibus_get_mbyte(uint16 addr);
+extern void  multibus_put_mbyte(uint16 addr, uint8 val);
+extern uint8 EPROM_get_mbyte(uint16 addr);
+extern uint8 RAM_get_mbyte(uint16 addr);
+extern void RAM_put_mbyte(uint16 addr, uint8 val);
 extern UNIT i8255_unit;
 extern UNIT EPROM_unit;
 extern UNIT RAM_unit;
-extern t_stat i8251_reset (DEVICE *dptr, int32 base);
-extern t_stat i8255_reset (DEVICE *dptr, int32 base);
-extern t_stat i8259_reset (DEVICE *dptr, int32 base);
-extern t_stat pata_reset (DEVICE *dptr, int32 base);
-extern t_stat EPROM_reset (DEVICE *dptr, int32 size);
-extern t_stat RAM_reset (DEVICE *dptr, int32 base, int32 size);
+extern t_stat i8255_reset (DEVICE *dptr, uint16 base, uint8 devnum);
+extern t_stat i8251_reset (DEVICE *dptr, uint16 base, uint8 devnum);
+extern t_stat i8259_reset (DEVICE *dptr, uint16 base, uint8 devnum);
+extern t_stat pata_reset (DEVICE *dptr, uint16 base);
+extern t_stat EPROM_reset (DEVICE *dptr, uint16 size);
+extern t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
 
 /*  CPU reset routine 
     put here to cause a reset of the entire iSBC system */
@@ -86,10 +64,10 @@ t_stat SBC_reset (DEVICE *dptr)
 {    
     sim_printf("Initializing iSBC-80/20\n");
     i8080_reset(NULL);
-    i8259_reset(NULL, I8259_BASE);
-    i8255_reset(NULL, I8255_BASE_0);
-    i8255_reset(NULL, I8255_BASE_1);
-    i8251_reset(NULL, I8251_BASE);
+    i8259_reset(NULL, I8259_BASE, 0);
+    i8255_reset(NULL, I8255_BASE_0, 0);
+    i8255_reset(NULL, I8255_BASE_1, 1);
+    i8251_reset(NULL, I8251_BASE, 0);
     EPROM_reset(NULL, ROM_SIZE);
     RAM_reset(NULL, RAM_BASE, RAM_SIZE);
     return SCPE_OK;
@@ -97,10 +75,8 @@ t_stat SBC_reset (DEVICE *dptr)
 
 /*  get a byte from memory - handle RAM, ROM and Multibus memory */
 
-int32 get_mbyte(int32 addr)
+uint8 get_mbyte(uint16 addr)
 {
-    int32 val, org, len;
-
     /* if local EPROM handle it */
     if ((i8255_unit.u5 & 0x01) &&       /* EPROM enabled? */
         (addr >= EPROM_unit.u3) && (addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
@@ -115,9 +91,9 @@ int32 get_mbyte(int32 addr)
 
 /*  get a word from memory */
 
-int32 get_mword(int32 addr)
+uint16 get_mword(uint16 addr)
 {
-    int32 val;
+    uint16 val;
 
     val = get_mbyte(addr);
     val |= (get_mbyte(addr+1) << 8);
@@ -126,7 +102,7 @@ int32 get_mword(int32 addr)
 
 /*  put a byte to memory - handle RAM, ROM and Multibus memory */
 
-void put_mbyte(int32 addr, int32 val)
+void put_mbyte(uint16 addr, uint8 val)
 {
     /* if local EPROM handle it */
     if ((i8255_unit.u5 & 0x01) &&       /* EPROM enabled? */ 
@@ -144,9 +120,9 @@ void put_mbyte(int32 addr, int32 val)
 
 /*  put a word to memory */
 
-void put_mword(int32 addr, int32 val)
+void put_mword(uint16 addr, uint16 val)
 {
-    put_mbyte(addr, val);
+    put_mbyte(addr, val & 0xff);
     put_mbyte(addr+1, val >> 8);
 }
 
