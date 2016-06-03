@@ -38,11 +38,10 @@ extern int32 int_req, int_enable, dev_done, stop_inst;
 int32 lpt_err = 0;                                      /* error flag */
 int32 lpt_stopioe = 0;                                  /* stop on error */
 
-DEVICE lpt_dev;
 int32 lpt (int32 IR, int32 AC);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat lpt_detach (UNIT *uptr);
 
 /* LPT data structures
@@ -165,7 +164,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 

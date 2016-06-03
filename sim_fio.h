@@ -33,6 +33,10 @@
 #ifndef SIM_FIO_H_
 #define SIM_FIO_H_     0
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 #define FLIP_SIZE       (1 << 16)                       /* flip buf size */
 #define fxread(a,b,c,d)         sim_fread (a, b, c, d)
 #define fxwrite(a,b,c,d)        sim_fwrite (a, b, c, d)
@@ -56,14 +60,14 @@ int sim_fseeko (FILE *st, t_offset offset, int whence);
 int sim_set_fsize (FILE *fptr, t_addr size);
 int sim_set_fifo_nonblock (FILE *fptr);
 size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr);
-size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr);
+size_t sim_fwrite (const void *bptr, size_t size, size_t count, FILE *fptr);
 uint32 sim_fsize (FILE *fptr);
-uint32 sim_fsize_name (char *fname);
+uint32 sim_fsize_name (const char *fname);
 t_offset sim_ftell (FILE *st);
 t_offset sim_fsize_ex (FILE *fptr);
-t_offset sim_fsize_name_ex (char *fname);
+t_offset sim_fsize_name_ex (const char *fname);
 void sim_buf_swap_data (void *bptr, size_t size, size_t count);
-void sim_buf_copy_swapped (void *dptr, void *bptr, size_t size, size_t count);
+void sim_buf_copy_swapped (void *dptr, const void *bptr, size_t size, size_t count);
 typedef struct SHMEM SHMEM;
 t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr);
 void sim_shmem_close (SHMEM *shmem);
@@ -71,5 +75,9 @@ void sim_shmem_close (SHMEM *shmem);
 extern t_bool sim_taddr_64;         /* t_addr is > 32b and Large File Support available */
 extern t_bool sim_toffset_64;       /* Large File (>2GB) file I/O support */
 extern t_bool sim_end;              /* TRUE = little endian, FALSE = big endian */
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

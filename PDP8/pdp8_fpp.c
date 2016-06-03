@@ -167,7 +167,6 @@ uint32 fpp_last_lockbit = 0;                            /* last lockbit */
 static FPN fpp_zero = { 0, { 0, 0, 0, 0, 0 } };
 static FPN fpp_one = { 1, { 02000, 0, 0, 0, 0 } };
 
-DEVICE fpp_dev;
 int32 fpp55 (int32 IR, int32 AC);
 int32 fpp56 (int32 IR, int32 AC);
 void fpp_load_apt (uint32 apta);

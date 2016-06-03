@@ -40,11 +40,12 @@
 #define MAX_DSK_SIZE        (DSK_TRACSIZE * MAX_TRACKS)
 
 static t_stat fif_reset(DEVICE *dptr);
-static t_stat fif_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat fif_set_verbose(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static int32 fif_io(const int32 port, const int32 io, const int32 data);
+static const char* fif_description(DEVICE *dptr);
 
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint8 GetBYTEWrapper(const uint32 Addr);
@@ -81,7 +82,11 @@ static UNIT fif_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) }
 };
 
-#define FIF_NAME    "IMSAI FIF"
+#define FIF_NAME    "IMSAI"
+
+static const char* fif_description(DEVICE *dptr) {
+    return FIF_NAME;
+}
 
 static REG fif_reg[] = {
     { DRDATAD (DISK,         current_disk,   4,
@@ -113,7 +118,7 @@ DEVICE fif_dev = {
     NULL, NULL, &fif_reset,
     NULL, NULL, NULL,
     &fif_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, FIF_NAME
+    NULL, NULL, NULL, NULL, NULL, NULL, &fif_description
 };
 
 static void resetDSKWarningFlags(void) {
@@ -123,7 +128,7 @@ static void resetDSKWarningFlags(void) {
     warnDSK11 = 0;
 }
 
-static t_stat fif_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat fif_set_verbose(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     resetDSKWarningFlags();
     return SCPE_OK;
 }

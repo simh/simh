@@ -1,6 +1,6 @@
 /* hp2100_baci.c: HP 12966A buffered asynchronous communications interface simulator
 
-   Copyright (c) 2007-2014, J. David Bryan
+   Copyright (c) 2007-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    BACI         12966A BACI card
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -378,7 +379,7 @@ IOHANDLER baci_io;
 t_stat baci_term_svc (UNIT *uptr);
 t_stat baci_poll_svc (UNIT *uptr);
 t_stat baci_reset (DEVICE *dptr);
-t_stat baci_attach (UNIT *uptr, char *cptr);
+t_stat baci_attach (UNIT *uptr, CONST char *cptr);
 t_stat baci_detach (UNIT *uptr);
 
 
@@ -1049,7 +1050,7 @@ return SCPE_OK;
 
 /* Attach controller */
 
-t_stat baci_attach (UNIT *uptr, char *cptr)
+t_stat baci_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat status = SCPE_OK;
 

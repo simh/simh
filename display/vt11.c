@@ -135,18 +135,24 @@ static int vt11_dbit;
 
 #include <stdio.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
 #define DEVICE void
 
 #define DBG_CALL 1
 int vt11_debug;
 
 #if defined(VM_PDP11)
-extern void _sim_debug (int dbits, DEVICE* dptr, const char* fmt, ...);
+extern void _sim_debug (unsigned int dbits, DEVICE* dptr, const char* fmt, ...);
 
 #define DEBUGF(...) _sim_debug (vt11_dbit, vt11_dptr, ##  __VA_ARGS__)
 #else /* DEBUG_VT11 */
 #define DEBUGF(...) do {if (vt11_debug & DBG_CALL) { printf(##  __VA_ARGS__); fflush(stdout); };} while (0)
 #endif /* defined(DEBUG_VT11) || defined(VM_PDP11) */
+#if defined(__cplusplus)
+}
+#endif
 #else
 
 #define DEBUGF(...) 
@@ -249,7 +255,7 @@ static uint16 bdb = 0;                  /* Buffered Data Bits register;
 static unsigned char internal_stop = 0; /* 1 bit: stop display */
 static unsigned char mode_field = 0;    /* copy of control instr. bits 14-11 */
 #define graphic_mode stack[8]._mode     /* 4 bits: sets type for graphic data */
-enum mode { CHAR=0, SVECTOR, LVECTOR, POINT, GRAPHX, GRAPHY, RELPOINT, /* all */
+enum gmode { CHAR=0, SVECTOR, LVECTOR, POINT, GRAPHX, GRAPHY, RELPOINT, /* all */
             BSVECT, CIRCLE, ABSVECTOR   /* VS60 only */
 };
 
@@ -424,7 +430,7 @@ static struct frame
         {
         vt11word      _dpc;             /* Display Program Counter (even) */
         unsigned      _name;            /* (11-bit) name from display file */
-        enum mode     _mode;            /* 4 bits: sets type for graphic data */
+        enum gmode    _mode;            /* 4 bits: sets type for graphic data */
         unsigned char _vscale;          /* non-character scale factor * 4 */
         unsigned char _csi;             /* character scale index 0..3 */
         unsigned char _cscale;          /* character scale factor * 4 */
@@ -448,24 +454,24 @@ static struct frame
         enum scolor   _color;           /* scope display color (option) */
         unsigned char _zdata;           /* flag: display file has Z coords */
         unsigned char _depth;           /* flag: display Z using depth cue */
-        } stack[9] = { { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        } stack[9] = { { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
+                       { 0, 0, CHAR, 0, 0, 0, 0, 0, SOLID, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, GREEN, 0, 0 },
                        { 0, 0, CHAR, 4, 1, 4, 0, 4, SOLID, 0, 0, 0, 0,
-                         0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 },
+                         0, 0, 0, 0, 0, 0, 0, 0, 1, 0, GREEN, 0, 0 },
                      };
 
 #define char_scale      stack[8]._cscale /* character scale factor * 4 */
@@ -3158,7 +3164,7 @@ vt11_cycle(int us, int slowdown)
         case 5:                         /* Set Graphic Mode 0101 */
         case 6:                         /* Set Graphic Mode 0110 */
             DEBUGF("Set Graphic Mode %u", (unsigned)mode_field);
-            graphic_mode = mode_field;
+            graphic_mode = (enum gmode)mode_field;
             offset = 0;
             shift_out = 0;              /* seems to be right */
             if (TESTBIT(inst,10)) {
@@ -3174,7 +3180,7 @@ vt11_cycle(int us, int slowdown)
                 DEBUGF(" blink=%d", (int)blink_ena);
             }
             if (TESTBIT(inst,2)) {
-                line_type = GETFIELD(inst,1,0);
+                line_type = (enum linetype)GETFIELD(inst,1,0);
                 DEBUGF(" line_type=%d", (int)line_type);
             }
             DEBUGF("\r\n");
@@ -3412,7 +3418,7 @@ vt11_cycle(int us, int slowdown)
             } else {                            /* 11110: Load Status B */
                 DEBUGF("Load Status B");
                 if (VS60 && TESTBIT(inst,9)) {
-                    color = GETFIELD(inst,8,7);
+                    color = (enum scolor)GETFIELD(inst,8,7);
                     DEBUGF(" color=%d", (int)color);
                 }
                 if (TESTBIT(inst,6)) {

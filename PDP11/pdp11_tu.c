@@ -244,11 +244,11 @@ t_stat tu_mbrd (int32 *data, int32 PA, int32 fmtr);
 t_stat tu_mbwr (int32 data, int32 PA, int32 fmtr);
 t_stat tu_svc (UNIT *uptr);
 t_stat tu_reset (DEVICE *dptr);
-t_stat tu_attach (UNIT *uptr, char *cptr);
+t_stat tu_attach (UNIT *uptr, CONST char *cptr);
 t_stat tu_detach (UNIT *uptr);
 t_stat tu_boot (int32 unitno, DEVICE *dptr);
-t_stat tu_set_fmtr (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tu_set_fmtr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *tu_description (DEVICE *dptr);
 t_stat tu_go (int32 drv);
@@ -947,7 +947,7 @@ return auto_config(0, 0);
 
 /* Attach routine */
 
-t_stat tu_attach (UNIT *uptr, char *cptr)
+t_stat tu_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 drv = uptr - tu_dev.units, flg;
 t_stat r;
@@ -979,7 +979,7 @@ return sim_tape_detach (uptr);
 
 /* Set/show formatter type */
 
-t_stat tu_set_fmtr (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tu_set_fmtr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr = find_dev_from_unit (uptr);
 
@@ -993,7 +993,7 @@ else dptr->flags = dptr->flags & ~DEV_TM03;
 return SCPE_OK;
 }
 
-t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr = find_dev_from_unit (uptr);
 

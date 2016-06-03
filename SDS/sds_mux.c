@@ -120,11 +120,11 @@ t_stat mux (uint32 fnc, uint32 inst, uint32 *dat);
 t_stat muxi_svc (UNIT *uptr);
 t_stat muxo_svc (UNIT *uptr);
 t_stat mux_reset (DEVICE *dptr);
-t_stat mux_attach (UNIT *uptr, char *cptr);
+t_stat mux_attach (UNIT *uptr, CONST char *cptr);
 t_stat mux_detach (UNIT *uptr);
-t_stat mux_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat mux_show (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat mux_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat mux_summ (FILE *st, UNIT *uptr, int32 val, const void *desc);
+t_stat mux_show (FILE *st, UNIT *uptr, int32 val, const void *desc);
+t_stat mux_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void mux_reset_ln (int32 ln);
 void mux_scan_next (void);
 
@@ -479,7 +479,7 @@ return SCPE_OK;
 
 /* Attach master unit */
 
-t_stat mux_attach (UNIT *uptr, char *cptr)
+t_stat mux_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 int32 t;
@@ -508,7 +508,7 @@ return r;
 
 /* Change number of lines */
 
-t_stat mux_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mux_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;

@@ -322,7 +322,7 @@ typedef struct {
 #define MMC_M_CNT       0xFF
 #define MMC_CNT         (MMC_M_CNT << MMC_V_CNT)
 #define MMC_V_CS        9                               /* start of page */
-/*                                                      /* map 1: 2b locks, per model */
+                                                        /* map 1: 2b locks, per model */
 #define MMC_M_CS2       0xFC                            /* map 2: access controls */
 #define MMC_M_CS3       0x7FE                           /* map 3: 4b locks */
 #define MMC_M_CS4       0xFF                            /* map 4: 8b relocation */

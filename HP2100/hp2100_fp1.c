@@ -1,6 +1,6 @@
 /* hp2100_fp1.c: HP 1000 multiple-precision floating point routines
 
-   Copyright (c) 2005-2014, J. David Bryan
+   Copyright (c) 2005-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   16-May-16    JDB     Reformulated the definitions of op_mask
    24-Dec-14    JDB     Added casts for explicit downward conversions
                         Changed fp_ucom return from uint32 to uint16
    18-Mar-13    JDB     Changed type of mantissa masks array to to unsigned
@@ -326,12 +327,12 @@ static const uint32  op_bits[6]    = { IN_W_SMAGN,
                                        FP_W_TMANT + FP_W_MSIGN,
                                        FP_W_EMANT + FP_W_MSIGN };
 
-static const t_int64 op_mask[6]    = { ~(t_int64) 0 << IN_V_SNUM,
-                                       ~(t_int64) 0 << IN_V_DNUM,
-                                       ~(t_int64) 0 << FP_V_FNUM,
-                                       ~(t_int64) 0 << FP_V_XNUM,
-                                       ~(t_int64) 0 << FP_V_TNUM,
-                                       ~(t_int64) 0 << FP_V_ENUM };
+static const t_int64 op_mask[6]    = { ~(((t_int64) 1 << IN_V_SNUM) - 1),
+                                       ~(((t_int64) 1 << IN_V_DNUM) - 1),
+                                       ~(((t_int64) 1 << FP_V_FNUM) - 1),
+                                       ~(((t_int64) 1 << FP_V_XNUM) - 1),
+                                       ~(((t_int64) 1 << FP_V_TNUM) - 1),
+                                       ~(((t_int64) 1 << FP_V_ENUM) - 1) };
 
 static const uint32  int_p_max[2]  = { IN_M_SMAGN,
                                        IN_M_DMAGN };

@@ -74,7 +74,7 @@ static rtcdef_t rtc_tab[RTC_NUM_HZ] = {
 t_stat rtc_svc (UNIT *uptr);
 t_stat rtc_cntr_svc (UNIT *uptr);
 t_stat rtc_reset (DEVICE *dptr);
-t_stat rtc_show_events (FILE *of, UNIT *uptr, int32 val, void *desc);
+t_stat rtc_show_events (FILE *of, UNIT *uptr, int32 val, CONST void *desc);
 
 /* Clock data structures
 
@@ -184,7 +184,7 @@ return SCPE_OK;
 
 /* Set timer ticks */
 
-t_stat rtc_set_tps (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rtc_set_tps (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 newval, i;
 t_stat r;
@@ -211,7 +211,7 @@ return SCPE_ARG;
 
 /* Show timer ticks */
 
-t_stat rtc_show_tps (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat rtc_show_tps (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 idx;
 
@@ -252,7 +252,7 @@ return SCPE_OK;
 
 /* Show events */
 
-t_stat rtc_show_events (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat rtc_show_events (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 i;
 

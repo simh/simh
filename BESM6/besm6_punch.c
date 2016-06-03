@@ -75,7 +75,7 @@ MTAB fs_mod[] = {
 };
 
 t_stat fs_reset (DEVICE *dptr);
-t_stat fs_attach (UNIT *uptr, char *cptr);
+t_stat fs_attach (UNIT *uptr, CONST char *cptr);
 t_stat fs_detach (UNIT *uptr);
 
 DEVICE fs_dev = {
@@ -123,7 +123,7 @@ t_stat fs_reset (DEVICE *dptr)
  * Attaches a raw binary file by default,
  * with a -t switch attaches a prepared text file in UTF-8.
  */
-t_stat fs_attach (UNIT *u, char *cptr)
+t_stat fs_attach (UNIT *u, CONST char *cptr)
 {
     t_stat s;
     int num = u - fs_unit;

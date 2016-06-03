@@ -160,10 +160,10 @@ t_stat sage_raiseint(int level)
 #endif
        
 static t_stat sagedip_reset(DEVICE* dptr);
-static t_stat set_groupa(UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat show_groupa(FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat set_groupb(UNIT *uptr, int32 val, char *cptr, void *desc);
-static t_stat show_groupb(FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat set_groupa(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat show_groupa(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat set_groupb(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat show_groupb(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat u22_reset(I8255* chip);
 static t_stat u22_calla(I8255* chip,int rw);
 static t_stat u22_callb(I8255* chip,int rw);
@@ -226,7 +226,7 @@ static t_stat sagedip_reset(DEVICE* dptr)
     return u22.reset(&u22);
 }
 
-static t_stat set_gr(char* cptr, uint32* sw)
+static t_stat set_gr(const char* cptr, uint32* sw)
 {
     int i;
     char c;
@@ -245,17 +245,17 @@ static t_stat set_gr(char* cptr, uint32* sw)
     return SCPE_OK;
 }
 
-static t_stat set_groupa(UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat set_groupa(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     return set_gr(cptr,&groupa);
 }
 
-static t_stat set_groupb(UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat set_groupb(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     return set_gr(cptr,&groupb);
 }
 
-static t_stat show_gr(FILE* st, char* prefix, uint32 gr)
+static t_stat show_gr(FILE* st, const char* prefix, uint32 gr)
 {
     int i;
     fputs(prefix, st);
@@ -264,12 +264,12 @@ static t_stat show_gr(FILE* st, char* prefix, uint32 gr)
     return SCPE_OK;
 }
 
-static t_stat show_groupa(FILE *st, UNIT *uptr, int32 val, void *desc)
+static t_stat show_groupa(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     return show_gr(st, "GROUPA=", groupa);
 }
 
-static t_stat show_groupb(FILE *st, UNIT *uptr, int32 val, void *desc)
+static t_stat show_groupb(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     return show_gr(st, "GROUPB=", groupb);
 }
@@ -479,14 +479,18 @@ DEVICE sagetimer1_dev = {
     i8253_dt, NULL, NULL
 };
 
-static t_stat sagetimer1_reset(DEVICE* dptr) 
-{
-    t_stat rc;
-    if (!(rc = (dptr->flags & DEV_DIS) ?
-        del_iohandler(dptr->ctxt) :
-        add_iohandler(&sagetimer1_unit,dptr->ctxt,i8253_io)) != SCPE_OK) return rc;
-    return u75.reset(&u75);
-}
+    static t_stat sagetimer1_reset(DEVICE* dptr) 
+    {
+        t_stat rc;
+
+        if (dptr->flags & DEV_DIS)
+            rc = del_iohandler(dptr->ctxt);
+        else
+            rc = add_iohandler(&sagetimer1_unit,dptr->ctxt,i8253_io);
+        if (rc != SCPE_OK)
+            return rc;
+        return u75.reset(&u75);
+    }
 
 static t_stat timer1_svc(UNIT* uptr)
 {

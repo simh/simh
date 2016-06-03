@@ -26,6 +26,7 @@
 
    ATCD,ATCC    HP 30032B Asynchronous Terminal Controller
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    26-Aug-15    JDB     First release version
    31-Jul-15    JDB     Passes the terminal control diagnostic (D438A)
    11-Aug-14    JDB     Passes the terminal data diagnostic (D427A)
@@ -754,15 +755,15 @@ static uint8 cntl_param  [TERM_COUNT];          /* ES2/ES1/S2/S1 parameter RAM *
 static CNTLR_INTRF atcd_interface;
 static CNTLR_INTRF atcc_interface;
 
-static t_stat atc_set_endis   (UNIT *uptr, int32 value, char  *cptr, void *desc);
-static t_stat atc_set_mode    (UNIT *uptr, int32 value, char  *cptr, void *desc);
-static t_stat atc_show_mode   (FILE *st,   UNIT  *uptr, int32 value, void *desc);
-static t_stat atc_show_status (FILE *st,   UNIT  *uptr, int32 value, void *desc);
+static t_stat atc_set_endis   (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat atc_set_mode    (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat atc_show_mode   (FILE *st,   UNIT  *uptr, int32 value, CONST void *desc);
+static t_stat atc_show_status (FILE *st,   UNIT  *uptr, int32 value, CONST void *desc);
 
 static t_stat atcd_reset (DEVICE *dptr);
 static t_stat atcc_reset (DEVICE *dptr);
 
-static t_stat atcd_attach (UNIT *uptr, char *cptr);
+static t_stat atcd_attach (UNIT *uptr, CONST char *cptr);
 static t_stat atcd_detach (UNIT *uptr);
 
 
@@ -1550,7 +1551,7 @@ return IORETURN (outbound_signals, outbound_value);     /* return the outbound s
    as appropriate.
 */
 
-static t_stat atc_set_endis (UNIT *uptr, int32 value, char *cptr, void *desc)
+static t_stat atc_set_endis (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (value)                                              /* if this is an ENABLE request */
     if (atcd_dev.flags & DEV_DIS) {                     /*   then if the device is disabled */
@@ -1593,7 +1594,7 @@ return atcd_reset (&atcd_dev);                          /* reset the TDI and res
        the internal loopback connections from the send to the receive channels.
 */
 
-static t_stat atc_set_mode (UNIT *uptr, int32 value, char *cptr, void *desc)
+static t_stat atc_set_mode (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 DEVICE * const dptr = (DEVICE *) desc;                  /* a pointer to the device */
 
@@ -1634,9 +1635,9 @@ return SCPE_OK;
    the TCI.  The unit pointer is not used.
 */
 
-static t_stat atc_show_mode (FILE *st, UNIT *uptr, int32 value, void *desc)
+static t_stat atc_show_mode (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-DEVICE * const dptr = (DEVICE *) desc;                  /* a pointer to the device */
+const DEVICE * const dptr = (const DEVICE *) desc;      /* a pointer to the device */
 
 if (value == 0)                                         /* if this is the TDI */
     if (dptr->flags & DEV_REALTIME)                     /*   then if the real-time flag is set */
@@ -1661,7 +1662,7 @@ return SCPE_OK;
    and value parameters are not used.
 */
 
-static t_stat atc_show_status (FILE *st, UNIT *uptr, int32 value, void *desc)
+static t_stat atc_show_status (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
 if (poll_unit.flags & UNIT_ATT)                         /* if the poll unit is attached */
     fprintf (st, "attached to port %s, ",               /*   then report it */
@@ -1779,7 +1780,7 @@ return status;
    saved session via the RESTORE command.
 */
 
-static t_stat atcd_attach (UNIT *uptr, char *cptr)
+static t_stat atcd_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat status;
 

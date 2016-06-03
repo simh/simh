@@ -71,8 +71,8 @@ static SELCHAN_INFO selchan_info_data = { { 0x0, 0, 0xF0, 1 } };
 static SELCHAN_INFO *selchan_info = &selchan_info_data;
 int32 selchan_dma(uint8 *buf, uint32 len);
 
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
@@ -82,6 +82,7 @@ extern void PutByteDMA(const uint32 Addr, const uint32 Value);
 extern uint8 GetByteDMA(const uint32 Addr);
 
 static t_stat selchan_reset(DEVICE *selchan_dev);
+static const char* selchan_description(DEVICE *dptr);
 
 static int32 selchandev(const int32 port, const int32 io, const int32 data);
 
@@ -95,6 +96,10 @@ static REG selchan_reg[] = {
     { HRDATAD (DMA_ADDR, selchan_info_data.dma_addr, 24,    "DMA transfer address register"),   },
     { NULL }
 };
+
+static const char* selchan_description(DEVICE *dptr) {
+    return "Compupro Selector Channel";
+}
 
 static MTAB selchan_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "IOBASE", "IOBASE", &set_iobase, &show_iobase, NULL,
@@ -115,7 +120,7 @@ DEVICE selchan_dev = {
     NULL, NULL, &selchan_reset,
     NULL, NULL, NULL,
     &selchan_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    selchan_dt, NULL, "Compupro Selector Channel SELCHAN"
+    selchan_dt, NULL, NULL, NULL, NULL, NULL, &selchan_description
 };
 
 /* Reset routine */

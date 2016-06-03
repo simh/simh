@@ -122,7 +122,6 @@ extern int32 DE1_S; /* alternate DE register                        */
 extern int32 HL1_S; /* alternate HL register                        */
 extern int32 IFF_S; /* Interrupt Flip Flop                          */
 extern int32 IR_S;  /* Interrupt (upper) / Refresh (lower) register */
-extern int32 chiptype;
 
 #if !UNIX_PLATFORM
 extern void pollForCPUStop(void);

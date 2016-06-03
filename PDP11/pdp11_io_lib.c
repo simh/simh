@@ -66,7 +66,7 @@ static void build_vector_tab (void);
 
 /* Enable/disable autoconfiguration */
 
-t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr != NULL)
     return SCPE_ARG;
@@ -76,7 +76,7 @@ return auto_config (NULL, 0);
 
 /* Show autoconfiguration status */
 
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "autoconfiguration ");
 fprintf (st, autcon_enb? "enabled": "disabled");
@@ -85,7 +85,7 @@ return SCPE_OK;
 
 /* Change device address */
 
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -115,7 +115,7 @@ return SCPE_OK;
 
 /* Show device address */
 
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -156,7 +156,7 @@ return SCPE_OK;
 
 /* Set address floating */
 
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_addr_flt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 
@@ -172,7 +172,7 @@ return auto_config (NULL, 0);                           /* autoconfigure */
 
 /* Change device vector */
 
-t_stat set_vec (UNIT *uptr, int32 arg, char *cptr, void *desc)
+t_stat set_vec (UNIT *uptr, int32 arg, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -201,7 +201,7 @@ return SCPE_OK;
 
 /* Show device vector */
 
-t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
+t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -255,9 +255,9 @@ return SCPE_OK;
 
 /* Show vector for terminal multiplexor */
 
-t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 arg, void *desc)
+t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 arg, CONST void *desc)
 {
-TMXR *mp = (TMXR *) desc;
+const TMXR *mp = (const TMXR *) desc;
 
 if ((mp == NULL) || (arg == 0))
     return SCPE_IERR;
@@ -411,7 +411,7 @@ return SCPE_OK;
 
 /* Show IO space */
 
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 i, j;
 DEVICE *dptr;
@@ -827,7 +827,7 @@ extern UNIT cpu_unit;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
-uint32 j, k, jdis, vmask, amask;
+uint32 j, k, jena, vmask, amask;
 
 if (autcon_enb == 0)                                    /* enabled? */
     return SCPE_OK;
@@ -868,23 +868,23 @@ for (autp = auto_tab; autp->valid >= 0; autp++) {       /* loop thru table */
         ilvl = dibp->vloc / 32;
         ibit = dibp->vloc % 32;
         /* Identify how many devices earlier in the device list are 
-           disabled and use that info to determine fixed address assignments */
-        for (k=jdis=0; k<j; k++) {
+           enabled and use that info to determine fixed address assignments */
+        for (k=jena=0; k<j; k++) {
             DEVICE *kdptr = find_dev (autp->dnam[k]);
             
-            if ((kdptr == NULL) || (kdptr->flags & DEV_DIS))
-                ++jdis;
+            if (kdptr && (!(kdptr->flags & DEV_DIS)))
+                jena += ((DIB *)kdptr->ctxt)->numc ? ((DIB *)kdptr->ctxt)->numc : 1;
             }
-        if (autp->fixa[j-jdis])                         /* fixed csr avail? */
-            dibp->ba = IOPAGEBASE + autp->fixa[j-jdis]; /* use it */
+        if (autp->fixa[jena])                           /* fixed csr avail? */
+            dibp->ba = IOPAGEBASE + autp->fixa[jena];   /* use it */
         else {                                          /* no fixed left */
             dibp->ba = csr;                             /* set CSR */
             csr += (numc * autp->amod);                 /* next CSR */
             }                                           /* end else */
         if (autp->numv) {                               /* vec needed? */
-            if (autp->fixv[j-jdis]) {                   /* fixed vec avail? */
+            if (autp->fixv[jena]) {                     /* fixed vec avail? */
                 if (autp->numv > 0)
-                    dibp->vec = autp->fixv[j-jdis];     /* use it */
+                    dibp->vec = autp->fixv[jena];       /* use it */
                 }
             else {                                      /* no fixed left */
                 uint32 numv = abs (autp->numv);         /* get num vec */

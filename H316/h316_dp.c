@@ -195,7 +195,7 @@
 #define CAP_4720        (CYL_4720*SURF_4720*DP_TRKLEN)
 
 struct drvtyp {
-    char                *name;
+    const char          *name;
     uint32              numu;
     uint32              cyl;
     uint32              surf;
@@ -247,9 +247,9 @@ uint16 dpxb[DP_TRKLEN];                                 /* track buffer */
 int32 dpio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat dp_svc (UNIT *uptr);
 t_stat dp_reset (DEVICE *dptr);
-t_stat dp_attach (UNIT *uptr, char *cptr);
-t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dp_attach (UNIT *uptr, CONST char *cptr);
+t_stat dp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat dp_go (uint32 dma);
 t_stat dp_go1 (uint32 dat);
 t_stat dp_go2 (uint32 dat);
@@ -259,8 +259,8 @@ t_bool dp_findrec (uint32 addr);
 t_stat dp_wrwd (UNIT *uptr, uint32 dat);
 t_stat dp_wrdone (UNIT *uptr, uint32 flg);
 t_stat dp_done (uint32 req, uint32 f);
-t_stat dp_setformat (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dp_setformat (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* DP data structures
 
@@ -912,7 +912,7 @@ return SCPE_OK;
 
 /* Attach routine, test formating */
 
-t_stat dp_attach (UNIT *uptr, char *cptr)
+t_stat dp_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 r = attach_unit (uptr, cptr);
@@ -923,7 +923,7 @@ return dp_showformat (stdout, uptr, 0, NULL);
 
 /* Set controller type */
 
-t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 
@@ -940,7 +940,7 @@ return SCPE_OK;
 
 /* Show controller type */
 
-t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (dp_ctype >= DP_NUMTYP)
     return SCPE_IERR;
@@ -970,7 +970,7 @@ return SCPE_OK;
    per record.
 */
 
-t_stat dp_setformat (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_setformat (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 h, c, cntr, rptr;
 int32 i, nr, nw, inp;
@@ -1027,7 +1027,7 @@ return SCPE_OK;
 
 /* Show format */
 
-t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 c, h, rptr, rlnt, sec;
 uint32 minrec = DP_TRKLEN;

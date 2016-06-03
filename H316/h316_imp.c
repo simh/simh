@@ -62,10 +62,10 @@ extern int32 stop_inst;                 // needed by IOBADFNC()
 int32  imp_io      (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat imp_service (UNIT *uptr);
 t_stat imp_reset   (DEVICE *dptr);
-t_stat imp_show_station (FILE *st, UNIT *uptr, int32 val, void *dp);
-t_stat io_show_int (FILE *st, UNIT *uptr, int32 val, void *dp);
-t_stat imp_set_station (UNIT *uptr, int32 val, char *cptr, void *dp);
-t_stat io_set_int (UNIT *uptr, int32 val, char *cptr, void *dp);
+t_stat imp_show_station (FILE *st, UNIT *uptr, int32 val, CONST void *dp);
+t_stat io_show_int (FILE *st, UNIT *uptr, int32 val, CONST void *dp);
+t_stat imp_set_station (UNIT *uptr, int32 val, CONST char *cptr, void *dp);
+t_stat io_set_int (UNIT *uptr, int32 val, CONST char *cptr, void *dp);
 
 
 
@@ -172,14 +172,14 @@ t_stat imp_reset (DEVICE *dptr)
 ////////////////////////////////////////////////////////////////////////////////
 
 // Show the station number ...
-t_stat imp_show_station (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat imp_show_station (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
   fprintf(st,"station=%d", imp_station);
   return SCPE_OK;
 }
 
 // Set the station number ...
-t_stat imp_set_station (UNIT *uptr, int32 val, char *cptr, void *dp)
+t_stat imp_set_station (UNIT *uptr, int32 val, CONST char *cptr, void *dp)
 {
   uint32 newnum;  t_stat sts;
   if (cptr == NULL) return SCPE_ARG;

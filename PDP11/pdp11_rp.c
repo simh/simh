@@ -573,15 +573,15 @@ t_stat rp_mbrd (int32 *data, int32 ofs, int32 drv);
 t_stat rp_mbwr (int32 data, int32 ofs, int32 drv);
 t_stat rp_svc (UNIT *uptr);
 t_stat rp_reset (DEVICE *dptr);
-t_stat rp_attach (UNIT *uptr, char *cptr);
+t_stat rp_attach (UNIT *uptr, CONST char *cptr);
 t_stat rp_detach (UNIT *uptr);
 t_stat rp_boot (int32 unitno, DEVICE *dptr);
 void rp_set_er (int16 flg, int32 drv);
 void rp_clr_as (int32 mask);
-void rp_update_ds (int16 flg, int32 drv);
+void rp_update_ds (uint16 flg, int32 drv);
 t_stat rp_go (int32 drv);
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rp_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 rp_abort (void);
 t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *rp_description (DEVICE *dptr);
@@ -1302,7 +1302,7 @@ return;
 
 /* Drive status update */
 
-void rp_update_ds (int16 flag, int32 drv)
+void rp_update_ds (uint16 flag, int32 drv)
 {
 uint16 o_ds = rpds[drv];
 
@@ -1369,7 +1369,7 @@ return SCPE_OK;
 
 /* Device attach */
 
-t_stat rp_attach (UNIT *uptr, char *cptr)
+t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 drv, i, p;
 t_stat r;
@@ -1418,7 +1418,7 @@ return sim_disk_detach (uptr);
 
 /* Set size command validation routine */
 
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 dtype = GET_DTYPE (val);
 
@@ -1430,7 +1430,7 @@ return SCPE_OK;
 
 /* Set bad block routine */
 
-t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rp_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 return pdp11_bad_block (uptr, drv_tab[GET_DTYPE (uptr->flags)].sect, RP_NUMWD);
 }

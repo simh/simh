@@ -32,11 +32,11 @@
 
 static t_bool symtrace = TRUE;
 static void m68k_sim_init(void);
-static t_stat hdump_cmd(int32 arg,char* buf);
-static t_stat symset_cmd(int32 arg,char* buf);
-static t_stat symclr_cmd(int32 arg,char* buf);
-static t_stat symlist_cmd(int32 arg,char* buf);
-static t_stat symtrace_cmd(int32 arg,char* buf);
+static t_stat hdump_cmd(int32 arg, CONST char* buf);
+static t_stat symset_cmd(int32 arg, CONST char* buf);
+static t_stat symclr_cmd(int32 arg, CONST char* buf);
+static t_stat symlist_cmd(int32 arg, CONST char* buf);
+static t_stat symtrace_cmd(int32 arg, CONST char* buf);
 
 static CTAB m68k_sim_cmds[] = {
         {"STEP", &run_cmd, RU_STEP,
@@ -56,7 +56,7 @@ static CTAB m68k_sim_cmds[] = {
         {0,0,0,0}
 };
 
-void (*sim_vm_init)(void) = &m68k_sim_init;
+WEAK void (*sim_vm_init)(void) = &m68k_sim_init;
 
 typedef struct _symhash {
     struct _symhash* nnext;
@@ -145,7 +145,7 @@ static t_bool sym_enter(const char* name,t_addr val)
     e = (SYMHASH*)malloc(sizeof(SYMHASH));
     e->nnext = n;
     e->vnext = v;
-    e->name = malloc(strlen(name)+1);
+    e->name = (char *)malloc(strlen(name)+1);
     strcpy(e->name,name);
     e->val = val;
     symbyname[nhash].nnext = symbyval[vhash].vnext = e;
@@ -177,12 +177,15 @@ static t_bool sym_delete(const char* name)
     return FALSE;
 }
 
-static t_stat symset_cmd(int32 arg,char* buf)
+static t_stat symset_cmd(int32 arg, CONST char* buf)
 {
-    char *name,*vstr;
+    const char *name,*vstr;
+    char gbuf[2*CBUFSIZE];
     t_addr val;
 
-    if ((name = strtok(buf, "= ")) == 0) return SCPE_2FARG;
+    gbuf[sizeof(gbuf)-1] = '\0';
+    strncpy(gbuf, buf, sizeof(gbuf)-1);
+    if ((name = strtok(gbuf, "= ")) == 0) return SCPE_2FARG;
     if ((vstr = strtok(NULL, " \t\n")) == 0) return SCPE_2FARG;
     val = strtol(vstr, 0, 16);
     if (!sym_enter(name, val))
@@ -190,27 +193,34 @@ static t_stat symset_cmd(int32 arg,char* buf)
     return SCPE_OK;
 }
 
-static t_stat symclr_cmd(int32 arg,char* buf)
+static t_stat symclr_cmd(int32 arg, CONST char* buf)
 {
     char* token;
     if (buf[0] == '-' && buf[1]=='a') {
         sym_clearall();
         return SCPE_OK;
     } else {
-        token = strtok(buf," \t\n");
+        char gbuf[2*CBUFSIZE];
+
+        gbuf[sizeof(gbuf)-1] = '\0';
+        strncpy(gbuf, buf, sizeof(gbuf)-1);
+        token = strtok(gbuf," \t\n");
         if (!token) return SCPE_2FARG;
         return sym_delete(token) ? SCPE_OK : SCPE_ARG;
     }
 }
 
-static t_stat symlist_cmd(int32 arg,char* buf)
+static t_stat symlist_cmd(int32 arg, CONST char* buf)
 {
     int i;
     SYMHASH* n;
+    char gbuf[2*CBUFSIZE];
     char *name;
     t_bool found = FALSE;
     
-    name = strtok(buf," \t\n");
+    gbuf[sizeof(gbuf)-1] = '\0';
+    strncpy(gbuf, buf, sizeof(gbuf)-1);
+    name = strtok(gbuf," \t\n");
     if (name) {
         if (sym_lookupname(name,&n))
             printf("  %s = 0x%08x\n",n->name,n->val);
@@ -230,7 +240,7 @@ static t_stat symlist_cmd(int32 arg,char* buf)
     return SCPE_OK;
 }
 
-static t_stat symtrace_cmd(int32 arg,char* buf)
+static t_stat symtrace_cmd(int32 arg, CONST char* buf)
 {
     if (!*buf)
         symtrace = arg ? TRUE : FALSE;
@@ -250,10 +260,11 @@ static void putascii(uint32* buf)
     putchar('|');
 }
 
-static t_stat hdump_cmd(int32 arg, char* buf)
+static t_stat hdump_cmd(int32 arg, CONST char* buf)
 {
     int i;
     t_addr low, high, base, top;
+    char gbuf[2*CBUFSIZE];
     char *token;
     uint32 byte[16];
     t_bool ascii = FALSE;
@@ -266,7 +277,9 @@ static t_stat hdump_cmd(int32 arg, char* buf)
     }
     memset(byte,0,sizeof(uint32)*16);
     
-    token = strtok(buf,"- \t\n");
+    gbuf[sizeof(gbuf)-1] = '\0';
+    strncpy(gbuf, buf, sizeof(gbuf)-1);
+    token = strtok(gbuf,"- \t\n");
     if (!token) return SCPE_2FARG;
     low = strtol(token,0,16);
     token = strtok(NULL,"- \t\n");

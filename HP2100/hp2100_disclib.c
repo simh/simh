@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
    24-Dec-14    JDB     Added casts for explicit downward conversions
    27-Oct-14    JDB     Corrected the relative movement calculation in start_seek
@@ -1658,7 +1659,7 @@ else                                                    /* the phase is illegal,
    retained.
 */
 
-t_stat dl_attach (CVPTR cvptr, UNIT *uptr, char *cptr)
+t_stat dl_attach (CVPTR cvptr, UNIT *uptr, CONST char *cptr)
 {
 uint32 id, size;
 t_stat result;
@@ -1708,7 +1709,7 @@ return detach_unit (uptr);                              /*   and detach the unit
    the unit capacity is set to the size indicated.
 */
 
-t_stat dl_set_model (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat dl_set_model (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)                                 /* we cannot alter the disc model */
     return SCPE_ALATT;                                      /*   if the unit is attached */

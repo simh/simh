@@ -174,7 +174,7 @@ static t_stat kg_rd (int32 *, int32, int32);
 static t_stat kg_wr (int32, int32, int32);
 static t_stat kg_reset (DEVICE *);
 static void do_poly (int, t_bool);
-static t_stat set_units (UNIT *, int32, char *, void *);
+static t_stat set_units (UNIT *, int32, CONST char *, void *);
 t_stat kg_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *kg_description (DEVICE *dptr);
 
@@ -438,7 +438,7 @@ static void do_poly (int unit, t_bool step)
     }
 }
 
-static t_stat set_units (UNIT *u, int32 val, char *s, void *desc)
+static t_stat set_units (UNIT *u, int32 val, CONST char *s, void *desc)
 {
     uint32      i, units;
     t_stat      stat;

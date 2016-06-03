@@ -1,6 +1,6 @@
 /* hp_disclib.h: HP MAC/ICD disc controller simulator library definitions
 
-   Copyright (c) 2011-2012, J. David Bryan
+   Copyright (c) 2011-2016, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    07-May-12    JDB     Added end-of-track delay time as a controller variable
    02-May-12    JDB     First release
@@ -384,6 +385,6 @@ extern const char  *dl_phase_name  (CNTLR_PHASE phase);
 
 /* Disc library global VM routines */
 
-extern t_stat dl_attach    (CVPTR cvptr, UNIT  *uptr, char *cptr);
+extern t_stat dl_attach    (CVPTR cvptr, UNIT  *uptr, CONST char *cptr);
 extern t_stat dl_detach    (CVPTR cvptr, UNIT  *uptr);
-extern t_stat dl_set_model (UNIT  *uptr, int32 value, char *cptr, void *desc);
+extern t_stat dl_set_model (UNIT  *uptr, int32 value, CONST char *cptr, void *desc);

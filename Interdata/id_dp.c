@@ -156,14 +156,13 @@ int32 dp_rtime = 100;                                   /* rotate latency */
 int32 dp_wtime = 1;                                     /* word time */
 uint8 dp_tplte[(2 * DP_NUMDR) + 2];                     /* fix/rmv + ctrl + end */
 
-DEVICE dp_dev;
 uint32 dp (uint32 dev, uint32 op, uint32 dat);
 void dp_ini (t_bool dtpl);
 t_stat dp_svc (UNIT *uptr);
 t_stat dp_reset (DEVICE *dptr);
-t_stat dp_attach (UNIT *uptr, char *cptr);
+t_stat dp_attach (UNIT *uptr, CONST char *cptr);
 t_stat dp_detach (UNIT *uptr);
-t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat dp_rds (UNIT *uptr);
 t_stat dp_wds (UNIT *uptr);
 t_bool dp_dter (UNIT *uptr, uint32 first);
@@ -564,7 +563,7 @@ return SCPE_OK;
 
 /* Attach routine (with optional autosizing) */
 
-t_stat dp_attach (UNIT *uptr, char *cptr)
+t_stat dp_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 i, p;
 t_stat r;
@@ -603,7 +602,7 @@ return detach_unit (uptr);
 
 /* Set size command validation routine */
 
-t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;

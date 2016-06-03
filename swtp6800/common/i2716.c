@@ -53,7 +53,7 @@ extern  int32 get_base(void);
 
 /* function prototypes */
 
-t_stat i2716_attach (UNIT *uptr, char *cptr);
+t_stat i2716_attach (UNIT *uptr, CONST char *cptr);
 t_stat i2716_reset (DEVICE *dptr);
 int32 i2716_get_mbyte(int32 offset);
 
@@ -110,7 +110,7 @@ DEVICE i2716_dev = {
 /* i2716_attach - attach file to EPROM unit 
                   force EPROM reset at completion */
 
-t_stat i2716_attach (UNIT *uptr, char *cptr)
+t_stat i2716_attach (UNIT *uptr, CONST char *cptr)
 {
     int32 j, c;
     t_stat r;

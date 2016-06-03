@@ -94,7 +94,7 @@ t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
-t_stat ptr_attach (UNIT *uptr, char *cptr);
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr);
 
 /* Character translation tables */
 
@@ -434,7 +434,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat ptr_attach (UNIT *uptr, char *cptr)
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 ptr_leader = PTR_LEADER;                                /* set up leader */
 return attach_unit (uptr, cptr);

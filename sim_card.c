@@ -61,6 +61,8 @@
     The card module uses up7 to hold a buffer for the card being translated
     and the backward translation table. Which is generated from the table.
 */
+
+#if defined(USE_SIM_CARD)
 
 #include <ctype.h>
 #include "sim_defs.h"
@@ -332,7 +334,7 @@ const uint8        sim_parity_table[64] = {
 
 struct card_formats {
     uint32      mode;
-    char        *name;
+    const char  *name;
 };
 
 static struct card_formats fmts[] = {
@@ -459,7 +461,7 @@ sim_hol_to_ebcdic(uint16 hol) {
 
 
 
-static int cmpcard(char *p, char *s) {
+static int cmpcard(const char *p, const char *s) {
    int  i;
    if (p[0] != '~') 
         return 0;
@@ -904,7 +906,7 @@ sim_punch_card(UNIT * uptr, UNIT *stkuptr)
 }
 
 /* Set card format */
-t_stat sim_card_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sim_card_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     int f;
 
@@ -921,7 +923,7 @@ t_stat sim_card_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 /* Show card format */
 
-t_stat sim_card_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sim_card_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     int f;
 
@@ -937,7 +939,7 @@ t_stat sim_card_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc)
 
 
 t_stat
-sim_card_attach(UNIT * uptr, char *cptr)
+sim_card_attach(UNIT * uptr, CONST char *cptr)
 {
     t_stat              r;
     struct _card_data   *data;
@@ -1034,3 +1036,4 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
 }
 
 
+#endif /* USE_SIM_CARD */

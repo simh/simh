@@ -87,7 +87,7 @@ t_stat del_ioh(IOINFO* ioi) {
 /******************************************************************************
  * configuration
  *****************************************************************************/
-t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc) {
+t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
   DEVICE* dptr;
   DEVCTXT* ctxt;
   IOINFO* ioi;
@@ -108,7 +108,7 @@ t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc) {
   return SCPE_OK;
 }
 
-t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc) {
+t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc) {
   t_stat rc;
   DEVICE* dptr;
   DEVCTXT* ctxt;
@@ -124,7 +124,7 @@ t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc) {
   return rc;
 }
 
-t_stat set_iovec(UNIT *uptr, int32 val, char *cptr, void *desc) {
+t_stat set_iovec(UNIT *uptr, int32 val, CONST char *cptr, void *desc) {
   t_stat rc;
   DEVICE* dptr;
   DEVCTXT* ctxt;
@@ -140,7 +140,7 @@ t_stat set_iovec(UNIT *uptr, int32 val, char *cptr, void *desc) {
   return rc;
 }
 
-t_stat show_iovec(FILE *st, UNIT *uptr, int value, void *desc) {
+t_stat show_iovec(FILE *st, UNIT *uptr, int value, CONST void *desc) {
   DEVICE* dptr;
   DEVCTXT* ctxt;
   IOINFO* ioi;
@@ -159,7 +159,7 @@ t_stat show_iovec(FILE *st, UNIT *uptr, int value, void *desc) {
   return SCPE_OK;
 }
 
-t_stat set_ioprio(UNIT *uptr, int32 val, char *cptr, void *desc) {
+t_stat set_ioprio(UNIT *uptr, int32 val, CONST char *cptr, void *desc) {
   t_stat rc;
   DEVICE* dptr;
   DEVCTXT* ctxt;
@@ -175,7 +175,7 @@ t_stat set_ioprio(UNIT *uptr, int32 val, char *cptr, void *desc) {
   return rc;
 }
 
-t_stat show_ioprio(FILE *st, UNIT *uptr, int value, void *desc) {
+t_stat show_ioprio(FILE *st, UNIT *uptr, int value, CONST void *desc) {
   DEVICE* dptr;
   DEVCTXT* ctxt;
   IOINFO* ioi;
@@ -316,7 +316,7 @@ t_stat WriteB(t_addr base, t_addr boffset, uint16 data, uint32 dctrl)
   return Write(ea, 0, wdata, 0);
 }
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
   int32 mc;
   t_addr i;

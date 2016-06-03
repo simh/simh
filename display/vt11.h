@@ -34,10 +34,13 @@
  * from the authors.
  */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
 #ifndef SIM_DEFS_H_
 typedef unsigned short uint16;
-typedef long int32;
-typedef unsigned long uint32;
+typedef int int32;
+typedef unsigned int uint32;
 #endif /* SIM_DEFS_H_ */
 
 /*
@@ -135,3 +138,7 @@ extern void vt_stop_intr(void);         /* post a display-stop interrupt */
 extern void vt_lpen_intr(void);         /* post a surface-related interrupt */
 extern void vt_char_intr(void);         /* post a bad-char./timeout interrupt */
 extern void vt_name_intr(void);         /* post a name-match interrupt */
+
+#if defined(__cplusplus)
+}
+#endif

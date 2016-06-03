@@ -150,13 +150,13 @@ REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_30opt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_30opt_i (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_30opt_o (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_fill (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_exec (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_30opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_30opt_i (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_30opt_o (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_fill (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_exec (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_one_inst (uint32 opc, uint32 ir);
 uint32 Mul64 (uint32 a, uint32 b, uint32 *low);
 t_bool Div32 (uint32 dvd, uint32 dvr, uint32 *q);
@@ -641,7 +641,7 @@ return SCPE_OK;
 
 /* Validate option, must be LGP30 */
 
-t_stat cpu_set_30opt (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_30opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (Q_LGP21)
     return SCPE_ARG;
@@ -650,7 +650,7 @@ return SCPE_OK;
 
 /* Validate input option, must be LGP30 */
 
-t_stat cpu_set_30opt_i (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_30opt_i (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (Q_LGP21 || (cptr == NULL))
     return SCPE_ARG;
@@ -664,7 +664,7 @@ return SCPE_OK;
 
 /* Validate output option, must be LGP30 */
 
-t_stat cpu_set_30opt_o (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_30opt_o (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (Q_LGP21 || (cptr == NULL))
     return SCPE_ARG;
@@ -678,7 +678,7 @@ return SCPE_OK;
 
 /* Set CPU to LGP21 or LPG30 */
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val)
     uptr->flags = uptr->flags & ~(UNIT_IN4B|UNIT_INPT|UNIT_OUTPT);
@@ -687,7 +687,7 @@ return reset_all (0);
 
 /* Show CPU type and all options */
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fputs (Q_LGP21? "LGP-21": "LGP-30", st);
 if (uptr->flags & UNIT_TTSS_D)
@@ -726,7 +726,7 @@ return SCPE_OK;
 
 /* Execute */
 
-t_stat cpu_set_exec (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_exec (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 inst;
 t_stat r;
@@ -747,7 +747,7 @@ return r;
 
 /* Fill */
 
-t_stat cpu_set_fill (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_fill (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 inst;
 t_stat r;

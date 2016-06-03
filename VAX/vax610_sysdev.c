@@ -43,8 +43,8 @@
 /* MicroVAX I boot device definitions */
 
 struct boot_dev {
-    char                *devname;
-    char                *devalias;
+    const char          *devname;
+    const char          *devalias;
     int32               code;
     };
 
@@ -63,8 +63,8 @@ static struct boot_dev boot_tab[] = {
 
 t_stat sysd_reset (DEVICE *dptr);
 const char *sysd_description (DEVICE *dptr);
-t_stat vax610_boot (int32 flag, char *ptr);
-t_stat vax610_boot_parse (int32 flag, char *ptr);
+t_stat vax610_boot (int32 flag, CONST char *ptr);
+t_stat vax610_boot_parse (int32 flag, const char *ptr);
 
 extern int32 vc_mem_rd (int32 pa);
 extern void vc_mem_wr (int32 pa, int32 val, int32 lnt);
@@ -359,7 +359,7 @@ return;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax610_boot (int32 flag, char *ptr)
+t_stat vax610_boot (int32 flag, CONST char *ptr)
 {
 t_stat r;
 
@@ -377,10 +377,11 @@ return run_cmd (flag, "CPU");
 
 /* Parse boot command, set up registers - also used on reset */
 
-t_stat vax610_boot_parse (int32 flag, char *ptr)
+t_stat vax610_boot_parse (int32 flag, const char *ptr)
 {
 char gbuf[CBUFSIZE], dbuf[CBUFSIZE], rbuf[CBUFSIZE];
-char *slptr, *regptr;
+char *slptr;
+const char *regptr;
 int32 i, r5v, unitno;
 DEVICE *dptr;
 UNIT *uptr;
@@ -521,7 +522,7 @@ const char *sysd_description (DEVICE *dptr)
 return "system devices";
 }
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 char gbuf[CBUFSIZE];
 

@@ -26,6 +26,7 @@
 
    DS           13037D/13175D disc controller/interface
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
@@ -187,13 +188,13 @@ t_stat    ds_service_drive      (UNIT   *uptr);
 t_stat    ds_service_controller (UNIT   *uptr);
 t_stat    ds_service_timer      (UNIT   *uptr);
 t_stat    ds_reset              (DEVICE *dptr);
-t_stat    ds_attach             (UNIT   *uptr,  char   *cptr);
+t_stat    ds_attach             (UNIT   *uptr,  CONST char *cptr);
 t_stat    ds_detach             (UNIT   *uptr);
 t_stat    ds_boot               (int32  unitno, DEVICE *dptr);
 
 /* MAC disc global SCP routines */
 
-t_stat ds_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat ds_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 
 /* MAC disc local utility routines */
 
@@ -1033,7 +1034,7 @@ return SCPE_OK;
        changed, so polling the drives will have no effect.
 */
 
-t_stat ds_attach (UNIT *uptr, char *cptr)
+t_stat ds_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat result;
 
@@ -1196,7 +1197,7 @@ else
    status.
 */
 
-t_stat ds_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat ds_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const t_bool load = (value != UNIT_UNLOAD);             /* true if the heads are loading */
 

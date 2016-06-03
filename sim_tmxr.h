@@ -47,6 +47,10 @@
 #ifndef SIM_TMXR_H_
 #define SIM_TMXR_H_    0
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 #ifndef SIMH_SERHANDLE_DEFINED
 #define SIMH_SERHANDLE_DEFINED 0
 #if defined (_WIN32)                            /* Windows definitions */
@@ -234,10 +238,10 @@ t_stat tmxr_put_packet_ln (TMLN *lp, const uint8 *buf, size_t size);
 t_stat tmxr_put_packet_ln_ex (TMLN *lp, const uint8 *buf, size_t size, uint8 frame_byte);
 void tmxr_poll_tx (TMXR *mp);
 int32 tmxr_send_buffered_data (TMLN *lp);
-t_stat tmxr_open_master (TMXR *mp, char *cptr);
+t_stat tmxr_open_master (TMXR *mp, CONST char *cptr);
 t_stat tmxr_close_master (TMXR *mp);
 t_stat tmxr_connection_poll_interval (TMXR *mp, uint32 seconds);
-t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, char *cptr, t_bool async);
+t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, CONST char *cptr, t_bool async);
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
 t_stat tmxr_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 char *tmxr_line_attach_string(TMLN *lp);
@@ -248,8 +252,8 @@ t_stat tmxr_set_line_loopback (TMLN *lp, t_bool enable_loopback);
 t_bool tmxr_get_line_loopback (TMLN *lp);
 t_stat tmxr_set_line_halfduplex (TMLN *lp, t_bool enable_loopback);
 t_bool tmxr_get_line_halfduplex (TMLN *lp);
-t_stat tmxr_set_line_speed (TMLN *lp, const char *speed);
-t_stat tmxr_set_config_line (TMLN *lp, const char *config);
+t_stat tmxr_set_line_speed (TMLN *lp, CONST char *speed);
+t_stat tmxr_set_config_line (TMLN *lp, CONST char *config);
 t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll);
 t_stat tmxr_set_line_output_unit (TMXR *mp, int line, UNIT *uptr_poll);
 t_stat tmxr_set_console_units (UNIT *rxuptr, UNIT *txuptr);
@@ -259,22 +263,22 @@ void tmxr_msg (SOCKET sock, const char *msg);
 void tmxr_linemsg (TMLN *lp, const char *msg);
 void tmxr_linemsgf (TMLN *lp, const char *fmt, ...);
 void tmxr_linemsgvf (TMLN *lp, const char *fmt, va_list args);
-void tmxr_fconns (FILE *st, TMLN *lp, int32 ln);
-void tmxr_fstats (FILE *st, TMLN *lp, int32 ln);
-t_stat tmxr_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tmxr_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
-int32 tmxr_rqln (TMLN *lp);
-int32 tmxr_tqln (TMLN *lp);
-int32 tmxr_tpqln (TMLN *lp);
-t_bool tmxr_tpbusyln (TMLN *lp);
-t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
+void tmxr_fconns (FILE *st, const TMLN *lp, int32 ln);
+void tmxr_fstats (FILE *st, const TMLN *lp, int32 ln);
+t_stat tmxr_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tmxr_set_nolog (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat tmxr_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+int32 tmxr_rqln (const TMLN *lp);
+int32 tmxr_tqln (const TMLN *lp);
+int32 tmxr_tpqln (const TMLN *lp);
+t_bool tmxr_tpbusyln (const TMLN *lp);
+t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc);
 t_stat tmxr_activate (UNIT *uptr, int32 interval);
 t_stat tmxr_activate_after (UNIT *uptr, uint32 usecs_walltime);
 t_stat tmxr_activate_after_abs (UNIT *uptr, uint32 usecs_walltime);
@@ -313,5 +317,9 @@ void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsiz
 #define sim_clock_coschedule_tmr_abs tmxr_clock_coschedule_tmr_abs
 #endif
 
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif /* _SIM_TMXR_H_ */

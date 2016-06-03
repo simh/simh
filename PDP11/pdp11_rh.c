@@ -169,8 +169,8 @@ extern t_addr cpu_memsize;
 t_stat mba_reset (DEVICE *dptr);
 t_stat mba_rd (int32 *val, int32 pa, int32 access);
 t_stat mba_wr (int32 val, int32 pa, int32 access);
-t_stat mba_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat mba_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat mba_set_type (UNIT *uptr, int32 val, char *cptr, CONST void *desc);
+t_stat mba_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 mba0_inta (void);
 int32 mba1_inta (void);
 int32 mba2_inta (void);
@@ -592,7 +592,7 @@ massbus[mb].cs1 = (massbus[mb].cs1 & ~ CS1_UAE) |         /* update CS1 */
 return i;
 }
 
-int32 mba_wrbufW (uint32 mb, int32 bc, uint16 *buf)
+int32 mba_wrbufW (uint32 mb, int32 bc, const uint16 *buf)
 {
 int32 i, j, ba, mbc, pbc;
 uint32 pa;
@@ -870,7 +870,7 @@ if (!(dptr->flags & DEV_DIS))       /* Enabling? */
 
 /* Show Massbus adapter number */
 
-t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr = find_dev_from_unit (uptr);
 DIB *dibp;

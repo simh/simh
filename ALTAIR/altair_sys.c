@@ -153,7 +153,7 @@ int32 oplen[256] = {
    load starts at the current value of the PC.
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 i, addr = 0, cnt = 0;
 
@@ -234,7 +234,7 @@ return -(oplen[inst] - 1);
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, i = 0, j, r;
 char gbuf[CBUFSIZE];

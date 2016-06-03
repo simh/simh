@@ -187,10 +187,10 @@ int32 mi5_io (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat mi_rx_service (UNIT *uptr);
 void mi_rx_local (uint16 line, uint16 txnext, uint16 txcount);
 t_stat mi_reset (DEVICE *dptr);
-t_stat mi_attach (UNIT *uptr, char *cptr);
+t_stat mi_attach (UNIT *uptr, CONST char *cptr);
 t_stat mi_detach (UNIT *uptr);
-t_stat mi_set_loopback (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat mi_show_loopback (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat mi_set_loopback (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat mi_show_loopback (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 
 
@@ -678,7 +678,7 @@ t_stat mi_reset (DEVICE *dptr)
 }
 
 // Attach device ...
-t_stat mi_attach (UNIT *uptr, char *cptr)
+t_stat mi_attach (UNIT *uptr, CONST char *cptr)
 {
   //   simh calls this routine for (what else?) the ATTACH command.  There are
   // three distinct formats for ATTACH -
@@ -730,7 +730,7 @@ t_stat mi_detach (UNIT *uptr)
   return mi_reset(PDEVICE(line));
 }
 
-t_stat mi_set_loopback (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mi_set_loopback (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
   t_stat ret = SCPE_OK; uint16 line = uptr->mline;
 
@@ -752,7 +752,7 @@ t_stat mi_set_loopback (UNIT *uptr, int32 val, char *cptr, void *desc)
   return ret;
 }
 
-t_stat mi_show_loopback (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat mi_show_loopback (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
   uint16 line = uptr->mline;
 

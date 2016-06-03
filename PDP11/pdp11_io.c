@@ -326,7 +326,7 @@ else {                                                  /* physical */
     }
 }
 
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf)
 {
 uint32 alim, lim, ma;
 
@@ -367,7 +367,7 @@ else {                                                  /* physical */
     }
 }
 
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf)
 {
 uint32 alim, lim, ma;
 

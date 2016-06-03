@@ -67,13 +67,14 @@
 #define VERBOSE_MSG (1 << 5)
 
 extern uint32 PCX;
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
     int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern int32 find_unit_index(UNIT *uptr);
 
 static void MFDC_Command(uint8 cData);
+static const char* mfdc_description(DEVICE *dptr);
 
 #define MFDC_MAX_DRIVES 4
 #define JUMPER_W9       1   /* Not Installed (0) = 2MHz, Installed (1) = 4MHz. */
@@ -131,7 +132,7 @@ static SECTOR_FORMAT sdata;
 #define MFDC_CAPACITY           (77*16*MFDC_SECTOR_LEN) /* Default Micropolis Disk Capacity */
 
 static t_stat mfdc_reset(DEVICE *mfdc_dev);
-static t_stat mfdc_attach(UNIT *uptr, char *cptr);
+static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr);
 static t_stat mfdc_detach(UNIT *uptr);
 static uint8 MFDC_Read(const uint32 Addr);
 static uint8 MFDC_Write(const uint32 Addr, uint8 cData);
@@ -149,7 +150,11 @@ static REG mfdc_reg[] = {
     { NULL }
 };
 
-#define MDSK_NAME   "Micropolis FD Control MDSK"
+#define MDSK_NAME   "Micropolis FD Control"
+
+static const char* mfdc_description(DEVICE *dptr) {
+    return MDSK_NAME;
+}
 
 static MTAB mfdc_mod[] = {
     { MTAB_XTD|MTAB_VDV,            0,                  "MEMBASE",  "MEMBASE",
@@ -184,7 +189,7 @@ DEVICE mfdc_dev = {
     NULL, NULL, &mfdc_reset,
     NULL, &mfdc_attach, &mfdc_detach,
     &mfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    mfdc_dt, NULL, MDSK_NAME
+    mfdc_dt, NULL, NULL, NULL, NULL, NULL, &mfdc_description
 };
 
 /* Micropolis FD Control Boot ROM
@@ -233,7 +238,7 @@ static t_stat mfdc_reset(DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat mfdc_attach(UNIT *uptr, char *cptr)
+static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     unsigned int i = 0;

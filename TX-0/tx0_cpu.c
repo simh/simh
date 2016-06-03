@@ -285,13 +285,13 @@ int32 addr_mask = YMASK;
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 cpu_get_mode (void);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_ext (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_ext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat Read (void);
 t_stat Write (void);
 
@@ -420,7 +420,7 @@ typedef struct {
 INST_CTRS inst_ctr;
 
 
-void tx0_dump_regs(char *desc)
+void tx0_dump_regs(const char *desc)
 {
     TRACE_PRINT(TRACE_MSG, ("%s: AC=%06o, MAR=%05o, MBR=%06o, LR=%06o, XR=%05o\n", desc, AC, MAR, MBR, LR, XR));
 
@@ -809,7 +809,7 @@ t_stat sim_instr (void)
                         int32 BINDEC = (op & 020);
                         int32 device = op & 03;
                         int32 tape_ord = (op >> 2) & 03;
-                        char *tape_cmd[] = {"Backspace Tape", "Read/Select Tape", "Rewind Tape", "Write/Select Tape" };
+                        const char *tape_cmd[] = {"Backspace Tape", "Read/Select Tape", "Rewind Tape", "Write/Select Tape" };
 
                         TRACE_PRINT(ERROR_MSG, ("[%06o] TODO: SEL (magtape)\n", PC-1));
                         sim_printf("Device %d: CLRA=%d, BINDEC=%d: %s\n", device, CLRA, BINDEC, tape_cmd[tape_ord]);
@@ -1070,7 +1070,7 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     int32 mc = 0;
     uint32 i;
@@ -1087,7 +1087,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 /* Change CPU Mode (Normal, Test, Readin) */
 
-t_stat cpu_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     if (val == UNIT_MODE_TEST) {
         mode_tst = 1;
@@ -1106,13 +1106,13 @@ t_stat cpu_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 /* Set TX-0 with Extended Instruction Set */
 
-t_stat cpu_set_ext (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_ext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     sim_printf("Set CPU Extended Mode\n");
     return SCPE_OK;
 }
 
-t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     sim_printf("Set CPU Non-Extended Mode\n");
     return SCPE_OK;
@@ -1127,7 +1127,7 @@ int32 cpu_get_mode (void)
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1155,10 +1155,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 ov, pf, op, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
@@ -1208,10 +1208,10 @@ cpu_get_switches(void)
     return TAC;
 }
 
-t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
+t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     uint32 word;
     t_addr j, lo, hi, sz, sz_words;
-    const char *result;
+    CONST char *result;
 
     if (flag) { /* Dump to file. */
         result = get_range(NULL, cptr, &lo, &hi, 8, 0xFFFF, 0);

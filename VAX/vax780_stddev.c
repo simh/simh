@@ -234,7 +234,7 @@ const char *fl_description (DEVICE *dptr);
 t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-t_stat clk_attach (UNIT *uptr, char *cptr);
+t_stat clk_attach (UNIT *uptr, CONST char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
 t_stat fl_svc (UNIT *uptr);
@@ -734,7 +734,7 @@ return "time of year clock";
 
 /* CLK attach */
 
-t_stat clk_attach (UNIT *uptr, char *cptr)
+t_stat clk_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -963,7 +963,7 @@ t_stat fl_svc (UNIT *uptr)
 {
 int32 i, t;
 uint32 da;
-int8 *fbuf = uptr->filebuf;
+int8 *fbuf = (int8 *)uptr->filebuf;
 
 switch (fl_state) {                                     /* case on state */
 

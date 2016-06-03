@@ -57,7 +57,7 @@ int ws_lp_y = -1;
 
 static int xpixels, ypixels;
 static int pix_size = PIX_SIZE;
-static char *window_name;
+static const char *window_name;
 static uint32 *colors = NULL;
 static uint32 ncolors = 0, size_colors = 0;
 static uint32 *surface = NULL;
@@ -281,7 +281,7 @@ for (row=0; row<height; ++row) {
             }
         }
     }
-result = calloc (1, sizeof(*result));
+result = (CURSOR *)calloc (1, sizeof(*result));
 if (result) {
     result->data = data;
     result->mask = mask;
@@ -308,7 +308,7 @@ free (cursor);
 
 /* called from display layer on first display op */
 int
-ws_init(char *name, int xp, int yp, int colors, void *dptr)
+ws_init(const char *name, int xp, int yp, int colors, void *dptr)
 {
     int i;
     int ret;
@@ -318,10 +318,10 @@ ws_init(char *name, int xp, int yp, int colors, void *dptr)
     xpixels = xp;
     ypixels = yp;
     window_name = name;
-    surface = realloc (surface, xpixels*ypixels*sizeof(*surface));
+    surface = (uint32 *)realloc (surface, xpixels*ypixels*sizeof(*surface));
     for (i=0; i<xpixels*ypixels; i++)
         surface[i] = vid_mono_palette[0];
-    ret = (0 == vid_open (dptr, name, xp*pix_size, yp*pix_size, 0));
+    ret = (0 == vid_open ((DEVICE *)dptr, name, xp*pix_size, yp*pix_size, 0));
     if (ret)
         vid_set_cursor (1, arrow_cursor->width, arrow_cursor->height, arrow_cursor->data, arrow_cursor->mask, arrow_cursor->hot_x, arrow_cursor->hot_y);
     return ret;
@@ -346,7 +346,7 @@ ws_color_rgb(int r, int g, int b)
             return &colors[i];
         }
     if (ncolors == size_colors) {
-        colors = realloc (colors, (ncolors + 1000) * sizeof (*colors));
+        colors = (uint32 *)realloc (colors, (ncolors + 1000) * sizeof (*colors));
         size_colors += 1000;
         if (size_colors == 1000) {
             colors[0] = vid_mono_palette[0];
@@ -382,7 +382,7 @@ ws_display_point(int x, int y, void *color)
     y = ypixels - 1 - y;                /* invert y, top left origin */
 
     if (brush == NULL)
-        brush = ws_color_black ();
+        brush = (uint32 *)ws_color_black ();
     if (pix_size > 1) {
         int i, j;
         
@@ -408,15 +408,15 @@ vid_beep ();
 unsigned long
 os_elapsed(void)
 {
-static int new;
+static int tnew;
 unsigned long ret;
 static uint32 t[2];
 
-t[new] = sim_os_msec();
-if (t[!new] == 0)
+t[tnew] = sim_os_msec();
+if (t[!tnew] == 0)
     ret = ~0L;                      /* +INF */
 else
-    ret = (t[new] - t[!new]) * 1000;/* usecs */
-new = !new;                         /* Ecclesiastes III */
+    ret = (t[tnew] - t[!tnew]) * 1000;/* usecs */
+tnew = !tnew;                       /* Ecclesiastes III */
 return ret;
 }

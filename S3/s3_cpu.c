@@ -386,7 +386,7 @@ FILE *trace;
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr1);
 extern int32 pkb (int32 op, int32 m, int32 n, int32 data);
 extern int32 crd (int32 op, int32 m, int32 n, int32 data);
@@ -1807,7 +1807,7 @@ M[addr] = val & 0xff;
 return SCPE_OK;
 }
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;

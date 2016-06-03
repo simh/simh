@@ -289,11 +289,11 @@ sprintf (buf, "Memory controller %d", (int)(dptr-mctl_dev));
 return buf;
 }
 
-t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 struct {
     uint32 capacity;
-    char *option;
+    const char *option;
     } boards[] = {
         { 4096, "MS780-JD M8374 array"},
         { 1024, "MS780-FD M8373 array"},

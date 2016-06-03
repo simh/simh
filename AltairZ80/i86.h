@@ -215,7 +215,7 @@ struct  pc_env
 };
 
 /* GLOBAL */
-volatile int intr;
+extern volatile int intr;
 
 void halt_sys (PC_ENV *sys);
 void fetch_decode_modrm (PC_ENV *m, uint16 *mod, uint16 *regh, uint16 *regl);

@@ -197,10 +197,10 @@ void uba_adap_clr_int ();
 void uba_set_dpr (uint32 ua, t_bool wr);
 void uba_ubpdn (int32 time);
 t_bool uba_map_addr (uint32 ua, uint32 *ma);
-t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat uba_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat uba_show_virt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern int32 eval_int (void);
 extern t_stat build_dib_tab (void);
@@ -683,7 +683,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
 return 0;
 }
 
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf)
 {
 int32 i, j, pbc;
 uint32 ma, dat;
@@ -717,7 +717,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
 return 0;
 }
 
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf)
 {
 int32 i, j, pbc;
 uint32 ma, dat;
@@ -984,10 +984,10 @@ return SCPE_NXM;
 
 /* Show UBA virtual address */
 
-t_stat uba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat uba_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 uint32 ua, pa;
 
 if (cptr) {

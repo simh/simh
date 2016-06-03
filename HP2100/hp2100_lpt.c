@@ -1,6 +1,6 @@
 /* hp2100_lpt.c: HP 2100 12845B line printer simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    LPT          12845B 2607 line printer
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
@@ -112,8 +113,8 @@ IOHANDLER lptio;
 
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_restart (UNIT *uptr, int32 value, char *cptr, void *desc);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 
 /* LPT data structures
 
@@ -332,7 +333,7 @@ return SCPE_OK;
    original I/O request.
  */
 
-t_stat lpt_restart (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat lpt_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (lpt.control && !sim_is_active (uptr))
     sim_activate (uptr, 0);                             /* reschedule I/O */
@@ -342,7 +343,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 lpt_lcnt = 0;                                           /* top of form */
 lpt_restart (uptr, 0, NULL, NULL);                      /* restart I/O if hung */

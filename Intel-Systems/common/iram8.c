@@ -31,7 +31,9 @@
 
     NOTES:
 
-        These functions support a simulated i8111 or i8102 RAM devices on an iSBC-80/XX.
+        These functions support a simulated RAM devices on an iSBC-80/XX SBCs.
+        These functions also support bit 2 of 8255 number 1, port B, to enable/
+        disable the onboard RAM.
 */
 
 #include "system_defs.h"
@@ -41,11 +43,13 @@
 /* function prototypes */
 
 t_stat RAM_svc (UNIT *uptr);
-t_stat RAM_reset (DEVICE *dptr, int32 base, int32 size);
-int32 RAM_get_mbyte(int32 addr);
-void RAM_put_mbyte(int32 addr, int32 val);
+t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
+uint8 RAM_get_mbyte(uint16 addr);
+void RAM_put_mbyte(uint16 addr, uint8 val);
 
-extern UNIT i8255_unit;
+/* external function prototypes */
+
+extern UNIT i8255_unit[];
 extern uint8 xack;                         /* XACK signal */
 
 /* SIMH RAM Standard I/O Data Structures */
@@ -70,7 +74,7 @@ DEVICE RAM_dev = {
     NULL,               //modifiers
     1,                  //numunits
     16,                 //aradix
-    32,                 //awidth
+    16,                 //awidth
     1,                  //aincr
     16,                 //dradix
     8,                  //dwidth
@@ -95,7 +99,7 @@ DEVICE RAM_dev = {
 
 /* RAM reset */
 
-t_stat RAM_reset (DEVICE *dptr, int32 base, int32 size)
+t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size)
 {
     sim_debug (DEBUG_flow, &RAM_dev, "   RAM_reset: base=%04X size=%04X\n", base, size-1);
     if (RAM_unit.capac == 0) {          /* if undefined */
@@ -118,11 +122,11 @@ t_stat RAM_reset (DEVICE *dptr, int32 base, int32 size)
 
 /*  get a byte from memory */
 
-int32 RAM_get_mbyte(int32 addr)
+uint8 RAM_get_mbyte(uint16 addr)
 {
-    int32 val;
+    uint8 val;
 
-    if (i8255_unit.u5 & 0x02) {         /* enable RAM */
+    if (i8255_unit[0].u5 & 0x02) {         /* enable RAM */
         sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
         if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
             SET_XACK(1);                /* good memory address */
@@ -140,9 +144,9 @@ int32 RAM_get_mbyte(int32 addr)
 
 /*  put a byte to memory */
 
-void RAM_put_mbyte(int32 addr, int32 val)
+void RAM_put_mbyte(uint16 addr, uint8 val)
 {
-    if (i8255_unit.u5 & 0x02) {         /* enable RAM */
+    if (i8255_unit[0].u5 & 0x02) {         /* enable RAM */
         sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
         if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
             SET_XACK(1);                /* good memory address */

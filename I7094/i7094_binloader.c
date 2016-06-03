@@ -89,7 +89,7 @@ extern t_uint64 *M;
 extern uint32 PC;
 
 t_stat
-binloader (FILE *fd, char *file, int loadpt)
+binloader (FILE *fd, const char *file, int loadpt)
 {
 #ifdef DEBUGLOADER
    FILE *lfd;

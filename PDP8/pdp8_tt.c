@@ -54,7 +54,7 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTI data structures
 
@@ -273,7 +273,7 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
 tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;

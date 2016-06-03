@@ -30,7 +30,7 @@
 
 static t_stat sagehd_reset(DEVICE* dptr);
 static t_stat sagehd_boot(int32 unit_num,DEVICE* dptr);
-static t_stat sagehd_attach(UNIT* uptr, char* file);
+static t_stat sagehd_attach(UNIT* uptr, CONST char* file);
 static t_stat sagehd_detach(UNIT* uptr);
 
 
@@ -71,7 +71,7 @@ static t_stat sagehd_boot(int32 unit_num,DEVICE* dptr)
     return SCPE_OK;
 }
 
-static t_stat sagehd_attach(UNIT* uptr, char* file)
+static t_stat sagehd_attach(UNIT* uptr, CONST char* file)
 {
     printf("sagehd_attach\n");
     return SCPE_OK;

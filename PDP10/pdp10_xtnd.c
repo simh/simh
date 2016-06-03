@@ -138,9 +138,6 @@
 #define ED_SKPN         0600                            /* skip if N */
 #define ED_SKPA         0700                            /* skip always */
 
-extern d10 *ac_cur;                                     /* current AC block */
-extern const d10 bytemask[64];
-extern int32 flags;
 extern int32 rlog;
 extern jmp_buf save_env;
 

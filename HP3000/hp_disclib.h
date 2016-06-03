@@ -24,6 +24,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the authors.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    27-Jul-15    JDB     First revised release version
    21-Feb-15    JDB     Revised for new controller interface model
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
@@ -538,14 +539,14 @@ extern const char *dl_status_name (CNTLR_STATUS status);
 
 /* Disc library global SCP support routines */
 
-extern t_stat dl_attach (CVPTR cvptr, UNIT *uptr,  char *cptr);
+extern t_stat dl_attach (CVPTR cvptr, UNIT *uptr, CONST char *cptr);
 extern t_stat dl_detach (CVPTR cvptr, UNIT *uptr);
 
-extern t_stat dl_set_model   (UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat dl_set_protect (UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat dl_set_diag    (UNIT *uptr, int32 value, char *cptr, void *desc);
-extern t_stat dl_set_timing  (UNIT *uptr, int32 value, char *cptr, void *desc);
+extern t_stat dl_set_model   (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat dl_set_protect (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat dl_set_diag    (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+extern t_stat dl_set_timing  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 
-extern t_stat dl_show_protect (FILE *st, UNIT *uptr, int32 value, void *desc);
-extern t_stat dl_show_diag    (FILE *st, UNIT *uptr, int32 value, void *desc);
-extern t_stat dl_show_timing  (FILE *st, UNIT *uptr, int32 value, void *desc);
+extern t_stat dl_show_protect (FILE *st, UNIT *uptr, int32 value, CONST void *desc);
+extern t_stat dl_show_diag    (FILE *st, UNIT *uptr, int32 value, CONST void *desc);
+extern t_stat dl_show_timing  (FILE *st, UNIT *uptr, int32 value, CONST void *desc);

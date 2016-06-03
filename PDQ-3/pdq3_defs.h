@@ -291,7 +291,7 @@
 #define OP_AB    13
 
 typedef struct _optable { 
-  char* name;
+  const char* name;
   int16 flags;
 } OPTABLE;
 extern OPTABLE optable[];
@@ -367,7 +367,7 @@ extern t_stat con_binit();
 extern t_stat fdc_boot(int32 unitnum, DEVICE *dptr);
 extern t_stat fdc_read(t_addr ioaddr, uint16 *data);
 extern t_stat fdc_write(t_addr ioaddr, uint16 data);
-extern t_stat fdc_autoload();
+extern t_stat fdc_autoload(int unitnum);
 extern t_stat fdc_binit();
 extern t_stat tim_read(t_addr ioaddr, uint16 *data);
 extern t_stat tim_write(t_addr ioaddr, uint16 data);
@@ -399,11 +399,11 @@ typedef struct _devctxt {
 extern t_stat pdq3_ioinit();
 extern t_stat add_ioh(IOINFO* ioi);
 extern t_stat del_ioh(IOINFO* ioi);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iovec(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iovec(FILE *st, UNIT *uptr, int value, void *desc);
-extern t_stat set_ioprio(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_ioprio(FILE *st, UNIT *uptr, int value, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iovec(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iovec(FILE *st, UNIT *uptr, int value, CONST void *desc);
+extern t_stat set_ioprio(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_ioprio(FILE *st, UNIT *uptr, int value, CONST void *desc);
 
 #endif

@@ -429,7 +429,7 @@ static void draw_brz_static (int left, int top)
 /*
  * Closing the graphical window.
  */
-t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
+t_stat besm6_close_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
     if (! screen)
         return SCPE_NOTATT;
@@ -441,7 +441,7 @@ t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
     return SCPE_OK;
 }
 
-t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, void *dp)
+t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, CONST void *dp)
 {
     if (screen)
         fprintf(st, "Panel displayed");
@@ -459,7 +459,7 @@ static SDL_Texture *sdlTexture;
 /*
  * Initializing of the graphical window and the fonts.
  */
-t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
+t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
     if (screen)
         return SCPE_ALATT;
@@ -678,17 +678,17 @@ void besm6_draw_panel (int force)
 #endif /* SDL_MAJOR_VERSION */
 
 #else /* HAVE_LIBSDL */
-t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
+t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
     return sim_messagef(SCPE_OPENERR, "Need SDL and SDLttf libraries");
 }
 
-t_stat besm6_close_panel (UNIT *u, int32 val, char *cptr, void *desc)
+t_stat besm6_close_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
     return SCPE_NOTATT;
 }
 
-t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, void *dp)
+t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, CONST void *dp)
 {
     return SCPE_NOTATT;
 }

@@ -205,7 +205,7 @@ handle_exposure(w, d, e, b)
 }
 
 int
-ws_init(char *crtname,          /* crt type name */
+ws_init(const char *crtname,    /* crt type name */
     int xp, int yp,             /* screen size in pixels */
     int colors,                 /* colors to support (not used) */
     void *dptr)

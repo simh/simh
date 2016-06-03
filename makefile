@@ -151,7 +151,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         endif
       endif
     else
-      CC_STD = -std=gnu99
+      ifeq (,$(findstring ++,$(GCC)))
+        CC_STD = -std=gnu99
+      else
+        CPP_BUILD = 1
+      endif
     endif
   else
     ifeq (Apple,$(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
@@ -165,7 +169,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         CLANG_VERSION = $(word 4,$(COMPILER_NAME))
       endif
     endif
-    CC_STD = -std=c99
+    ifeq (,$(findstring ++,$(GCC)))
+      CC_STD = -std=c99
+    else
+      CPP_BUILD = 1
+    endif
   endif
   ifeq (git-repo,$(shell if $(TEST) -d ./.git; then echo git-repo; fi))
     ifeq (need-hooks,$(shell if $(TEST) ! -e ./.git/hooks/post-checkout; then echo need-hooks; fi))
@@ -755,7 +763,11 @@ else
   endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
-  CC_STD = -std=gnu99
+  ifeq (,$(findstring ++,$(GCC)))
+    CC_STD = -std=gnu99
+  else
+    CPP_BUILD = 1
+  endif
   LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (,$(PATH_SEPARATOR))
     PATH_SEPARATOR := ;
@@ -983,7 +995,7 @@ LDFLAGS := $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
 	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c sim_serial.c \
-	sim_video.c sim_imd.c
+	sim_video.c sim_imd.c sim_card.c
 
 DISPLAYD = display
   
@@ -1348,8 +1360,8 @@ SSEM_OPT = -I ${SSEMD}
 B5500D = B5500
 B5500 = ${B5500D}/b5500_cpu.c ${B5500D}/b5500_io.c ${B5500D}/b5500_sys.c \
 	${B5500D}/b5500_dk.c ${B5500D}/b5500_mt.c ${B5500D}/b5500_urec.c \
-	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c ${B5500D}/sim_card.c
-B5500_OPT = -I.. -DUSE_INT64 -DB5500
+	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c
+B5500_OPT = -I.. -DUSE_INT64 -DB5500 -DUSE_SIM_CARD
 
 ###
 ### Experimental simulators
@@ -1440,7 +1452,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
-	b5500
+	b5500 
 
 all : ${ALL}
 
@@ -1597,14 +1609,22 @@ ${BIN}h316${EXE} : ${H316} ${SIM}
 hp2100 : ${BIN}hp2100${EXE}
 
 ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info hp2100 can't be built using C++)
+endif
 
 hp3000 : ${BIN}hp3000${EXE}
 
 ${BIN}hp3000${EXE} : ${HP3000} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info hp3000 can't be built using C++)
+endif
 
 i1401 : ${BIN}i1401${EXE}
 
@@ -1627,6 +1647,7 @@ ${BIN}i7094${EXE} : ${I7094} ${SIM}
 ibm1130 : ${BIN}ibm1130${EXE}
 
 ${BIN}ibm1130${EXE} : ${IBM1130}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 ifneq ($(WIN32),)
 	windres ${IBM1130D}/ibm1130.rc $(BIN)ibm1130.o
@@ -1634,7 +1655,10 @@ ifneq ($(WIN32),)
 	del BIN\ibm1130.o
 else
 	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-endif  
+endif
+else
+	$(info ibm1130 can't be built using C++)
+endif
 
 s3 : ${BIN}s3${EXE}
 
@@ -1724,8 +1748,12 @@ ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 besm6 : ${BIN}besm6${EXE}
 
 ${BIN}besm6${EXE} : ${BESM6} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${BESM6} ${SIM} ${BESM6_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info besm6 can't be built using C++)
+endif
 
 sigma : ${BIN}sigma${EXE}
 

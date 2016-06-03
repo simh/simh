@@ -60,7 +60,6 @@ extern int32 tsc_enb;                                   /* enable */
 #define UNIT_V_SN699    (UNIT_V_UF + 0)                 /* SN 699 or above */
 #define UNIT_SN699      (1 << UNIT_V_SN699)
 
-DEVICE tsc_dev;
 int32 tsc (int32 IR, int32 AC);
 t_stat tsc_reset (DEVICE *dptr);
 

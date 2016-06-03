@@ -81,7 +81,7 @@
 /* VAX 8600 boot device definitions */
 
 struct boot_dev {
-    char                *name;
+    const char          *name;
     int32               code;
     int32               let;
     };
@@ -113,8 +113,8 @@ extern uint32 sbi_er;
 void uba_eval_int (void);
 t_stat abus_reset (DEVICE *dptr);
 const char *abus_description (DEVICE *dptr);
-t_stat vax860_boot (int32 flag, char *ptr);
-t_stat vax860_boot_parse (int32 flag, char *ptr);
+t_stat vax860_boot (int32 flag, CONST char *ptr);
+t_stat vax860_boot_parse (int32 flag, const char *ptr);
 void init_pamm (void);
 
 extern t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
@@ -233,13 +233,13 @@ for (i=0; i<32; i++)
     pamm[512+i] = PAMM_IOA0;
 }
 
-t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 int32 slot[32];
 int32 base[32];
 struct {
     int capacity;
-    char *option;
+    const char *option;
     } boards[] = {
         {  4, "MS86-B"}, 
         { 16, "MS86-C"},
@@ -681,7 +681,7 @@ return cc;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax860_boot (int32 flag, char *ptr)
+t_stat vax860_boot (int32 flag, CONST char *ptr)
 {
 t_stat r;
 
@@ -699,10 +699,11 @@ return run_cmd (flag, "CPU");
 
 /* Parse boot command, set up registers - also used on reset */
 
-t_stat vax860_boot_parse (int32 flag, char *ptr)
+t_stat vax860_boot_parse (int32 flag, const char *ptr)
 {
 char gbuf[CBUFSIZE];
-char *slptr, *regptr;
+char *slptr;
+const char *regptr;
 int32 i, r5v, unitno;
 DEVICE *dptr;
 UNIT *uptr;
@@ -825,7 +826,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
 return SCPE_OK;
 }
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr == NULL) return SCPE_ARG;
 if (strcmp(cptr, "8600") == 0) {

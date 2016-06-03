@@ -47,7 +47,6 @@ int32 ptp_ldr = 0;                                      /* no leader */
 int32 ptp_stopioe = 1;
 DSPT std_tplt[] = { { 1, 0 }, { 0, 0 }  };              /* template */
 
-DEVICE ptr_dev, ptp_dev;
 t_stat ptr (uint32 fnc, uint32 inst, uint32 *dat);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
@@ -66,7 +65,6 @@ t_stat tto_svc (UNIT *uptr);
 t_stat tto_reset (DEVICE *dptr);
 int8 ascii_to_sds(int8 ch);
 int8 sds_to_ascii(int8 ch);
-extern const int8 odd_par[64];
 
 /* PTR data structures
 

@@ -340,10 +340,10 @@ InstHistory *hst = NULL;                                /* inst history */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_1d (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_1d (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat Ea (int32 IR);
 t_stat Ea_ch (int32 IR, int32 *byte_num);
 int32 inc_bp (int32 bp);
@@ -1523,7 +1523,7 @@ return SCPE_OK;
 
 /* Device set/show SBS level */
 
-t_stat dev_set_sbs (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dev_set_sbs (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 *lvl = (int32 *) desc;
 int32 newlvl;
@@ -1538,9 +1538,9 @@ if (r != SCPE_OK)
 return SCPE_OK;
 }
 
-t_stat dev_show_sbs (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dev_show_sbs (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-int32 *lvl = (int32 *) desc;
+const int32 *lvl = (const int32 *) desc;
 
 if (lvl == NULL)
     return SCPE_IERR;
@@ -1602,7 +1602,7 @@ return SCPE_OK;
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -1621,7 +1621,7 @@ return SCPE_OK;
 
 /* Set PDP-1D */
 
-t_stat cpu_set_1d (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_1d (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uptr->flags |= UNIT_SBS|UNIT_MDV;
 return SCPE_OK;
@@ -1629,7 +1629,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1660,10 +1660,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 ov, pf, op, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;

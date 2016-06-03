@@ -40,13 +40,14 @@ extern uint32 PCX;
 #define NET_INIT_POLL_SERVER  16000
 #define NET_INIT_POLL_CLIENT  15000
 
-static t_stat net_attach    (UNIT *uptr, char *cptr);
+static t_stat net_attach    (UNIT *uptr, CONST char *cptr);
 static t_stat net_detach    (UNIT *uptr);
 static t_stat net_reset     (DEVICE *dptr);
 static t_stat net_svc       (UNIT *uptr);
-static t_stat set_net       (UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat set_net       (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 int32 netStatus             (const int32 port, const int32 io, const int32 data);
 int32 netData               (const int32 port, const int32 io, const int32 data);
+static const char* net_description(DEVICE *dptr);
 
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
@@ -88,6 +89,10 @@ static REG net_reg[] = {
     { NULL }
 };
 
+static const char* net_description(DEVICE *dptr) {
+    return "Network";
+}
+
 static MTAB net_mod[] = {
     { UNIT_SERVER, 0,           "CLIENT", "CLIENT", &set_net, NULL, NULL,
         "Sets machine to client mode"}, /* machine is a client   */
@@ -111,10 +116,10 @@ DEVICE net_dev = {
     NULL, NULL, &net_reset,
     NULL, &net_attach, &net_detach,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    net_dt, NULL, "Network NET"
+    net_dt, NULL, NULL, NULL, NULL, NULL, &net_description
 };
 
-static t_stat set_net(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat set_net(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     char temp[CBUFSIZE];
     if ((net_unit.flags & UNIT_ATT) && ((net_unit.flags & UNIT_SERVER) != (uint32)value)) {
         strncpy(temp, net_unit.filename, CBUFSIZE); /* save name for later attach */
@@ -149,7 +154,7 @@ static t_stat net_reset(DEVICE *dptr) {
     return SCPE_OK;
 }
 
-static t_stat net_attach(UNIT *uptr, char *cptr) {
+static t_stat net_attach(UNIT *uptr, CONST char *cptr) {
     uint32 i;
     char host[CBUFSIZE], port[CBUFSIZE];
 

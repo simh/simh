@@ -73,7 +73,7 @@ int get_dns_addr(struct in_addr *pdns_addr)
             GlobalFree(FixedInfo);
             FixedInfo = NULL;
         }
-        FixedInfo = GlobalAlloc(GPTR, BufLen);
+        FixedInfo = (FIXED_INFO *)GlobalAlloc(GPTR, BufLen);
     }
 
     if ((ret = GetNetworkParams(FixedInfo, &BufLen)) != ERROR_SUCCESS) {
@@ -204,7 +204,7 @@ Slirp *slirp_init(int restricted, struct in_addr vnetwork,
                   struct in_addr vnameserver, const char **vdnssearch,
                   void *opaque)
 {
-    Slirp *slirp = g_malloc0(sizeof(Slirp));
+    Slirp *slirp = (Slirp *)g_malloc0(sizeof(Slirp));
 
     slirp_init_once();
 
@@ -544,7 +544,7 @@ void slirp_pollfds_poll(GArray *pollfds, int select_error)
                         /* Connected */
                         so->so_state &= ~SS_ISFCONNECTING;
 
-                        ret = send(so->s, (const void *) &ret, 0, 0);
+                        ret = send(so->s, (const char *) &ret, 0, 0);
                         if (ret < 0) {
                             /* XXXXX Must fix, zero bytes is a NOP */
                             if (errno == EAGAIN || errno == EWOULDBLOCK ||
@@ -666,7 +666,7 @@ void slirp_pollfds_poll(GArray *pollfds, int select_error)
 
 static void arp_input(Slirp *slirp, const uint8_t *pkt, int pkt_len)
 {
-    struct arphdr *ah = (struct arphdr *)(pkt + ETH_HLEN);
+    const struct arphdr *ah = (const struct arphdr *)(pkt + ETH_HLEN);
     uint8_t arp_reply[max(ETH_HLEN + sizeof(struct arphdr), 64)];
     struct ethhdr *reh = (struct ethhdr *)arp_reply;
     struct arphdr *rah = (struct arphdr *)(arp_reply + ETH_HLEN);
@@ -731,7 +731,7 @@ void slirp_input(Slirp *slirp, const uint8_t *pkt, int pkt_len)
     if (pkt_len < ETH_HLEN)
         return;
 
-    proto = ntohs(*(uint16_t *)(pkt + 12));
+    proto = ntohs(*(const uint16_t *)(pkt + 12));
     switch(proto) {
     case ETH_P_ARP:
         arp_input(slirp, pkt, pkt_len);
@@ -888,11 +888,11 @@ int slirp_add_exec(Slirp *slirp, int do_pty, const void *args,
 ssize_t slirp_send(struct socket *so, const void *buf, size_t len, int flags)
 {
     if (so->s == -1 && so->extra) {
-        qemu_chr_fe_write(so->extra, buf, len);
+        qemu_chr_fe_write((CharDriverState*)so->extra, (const uint8_t *)buf, len);
         return len;
     }
 
-    return send(so->s, buf, len, flags);
+    return send(so->s, (const char *)buf, len, flags);
 }
 
 static struct socket *
@@ -1031,7 +1031,7 @@ static void slirp_bootp_save(QEMUFile *f, Slirp *slirp)
 
 static void slirp_state_save(QEMUFile *f, void *opaque)
 {
-    Slirp *slirp = opaque;
+    Slirp *slirp = (Slirp *)opaque;
     struct ex_list *ex_ptr;
 
     for (ex_ptr = slirp->exec_list; ex_ptr; ex_ptr = ex_ptr->ex_next)
@@ -1158,7 +1158,7 @@ static void slirp_bootp_load(QEMUFile *f, Slirp *slirp)
 
 static int slirp_state_load(QEMUFile *f, void *opaque, int version_id)
 {
-    Slirp *slirp = opaque;
+    Slirp *slirp = (Slirp *)opaque;
     struct ex_list *ex_ptr;
 
     while (qemu_get_byte(f)) {

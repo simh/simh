@@ -89,12 +89,12 @@ t_stat rtc_reset   (DEVICE *dptr);
 int32  wdt_io      (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat wdt_service (UNIT *uptr);
 t_stat wdt_reset   (DEVICE *dptr);
-t_stat rtc_set_interval (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rtc_show_interval (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat rtc_set_quantum(UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rtc_show_quantum (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat wdt_set_delay (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat wdt_show_delay (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rtc_set_interval (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rtc_show_interval (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat rtc_set_quantum(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rtc_show_quantum (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat wdt_set_delay (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat wdt_show_delay (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 
 
@@ -315,7 +315,7 @@ t_stat wdt_reset (DEVICE *dptr)
 ////////////////////////////////////////////////////////////////////////////////
 
 // Set/Show RTC interval ...
-t_stat rtc_set_interval (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rtc_set_interval (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
   uint32 newint, newtps;  t_stat ret;
   if (cptr == NULL) return SCPE_ARG;
@@ -329,14 +329,14 @@ t_stat rtc_set_interval (UNIT *uptr, int32 val, char *cptr, void *desc)
   return SCPE_OK;
 }
 
-t_stat rtc_show_interval (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rtc_show_interval (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
   fprintf(st,"interval=%d (us)", rtc_interval);
   return SCPE_OK;
 }
 
 // Set/Show RTC quantum ...
-t_stat rtc_set_quantum (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rtc_set_quantum (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
   uint32 newquant, newtps;  t_stat ret;
   if (cptr == NULL) return SCPE_ARG;
@@ -350,14 +350,14 @@ t_stat rtc_set_quantum (UNIT *uptr, int32 val, char *cptr, void *desc)
   return SCPE_OK;
 }
 
-t_stat rtc_show_quantum (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rtc_show_quantum (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
   fprintf(st,"quantum=%d (ticks)", rtc_quantum);
   return SCPE_OK;
 }
 
 // Set/Show WDT delay ...
-t_stat wdt_set_delay (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat wdt_set_delay (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
   uint32 newint;  t_stat ret;
   if (cptr == NULL) return SCPE_ARG;
@@ -372,7 +372,7 @@ t_stat wdt_set_delay (UNIT *uptr, int32 val, char *cptr, void *desc)
   return SCPE_OK;
 }
 
-t_stat wdt_show_delay (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat wdt_show_delay (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
   if (wdt_delay > 0)
     fprintf(st,"delay=%d (ms)", wdt_delay);

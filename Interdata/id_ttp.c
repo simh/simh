@@ -69,9 +69,9 @@ uint32 ttp (uint32 dev, uint32 op, uint32 dat);
 t_stat ttpi_svc (UNIT *uptr);
 t_stat ttpo_svc (UNIT *uptr);
 t_stat ttp_reset (DEVICE *dptr);
-t_stat ttp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ttp_set_break (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ttp_set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ttp_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttp_set_break (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttp_set_enbdis (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTP data structures */
 
@@ -253,7 +253,7 @@ return SCPE_OK;
 
 /* Make mode flags uniform */
 
-t_stat ttp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttp_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 ttp_unit[TTO].flags = (ttp_unit[TTO].flags & ~TT_MODE) | val;
 if (val == TT_MODE_7P)
@@ -264,7 +264,7 @@ return SCPE_OK;
 
 /* Set input break */
 
-t_stat ttp_set_break (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttp_set_break (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (ttp_dev.flags & DEV_DIS)
     return SCPE_NOFNC;
@@ -278,7 +278,7 @@ return SCPE_OK;
 
 /* Set enabled/disabled */
 
-t_stat ttp_set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttp_set_enbdis (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 extern DEVICE tt_dev;
 extern t_stat tt_reset (DEVICE *dptr);

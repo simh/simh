@@ -76,10 +76,10 @@ typedef struct {
 static DISK1A_INFO disk1a_info_data = { { 0x0, 512, 0xC0, 4 } };
 static DISK1A_INFO *disk1a_info = &disk1a_info_data;
 
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -93,8 +93,9 @@ extern uint32 PCX;      /* external view of PC  */
 
 static t_stat disk1a_reset(DEVICE *disk1a_dev);
 static t_stat disk1a_boot(int32 unitno, DEVICE *dptr);
-static t_stat disk1a_attach(UNIT *uptr, char *cptr);
+static t_stat disk1a_attach(UNIT *uptr, CONST char *cptr);
 static t_stat disk1a_detach(UNIT *uptr);
+static const char* disk1a_description(DEVICE *dptr);
 
 static int32 disk1adev(const int32 port, const int32 io, const int32 data);
 static int32 disk1arom(const int32 port, const int32 io, const int32 data);
@@ -123,7 +124,11 @@ static REG disk1a_reg[] = {
     { NULL }
 };
 
-#define DISK1A_NAME "Compupro Floppy Controller DISK1A"
+#define DISK1A_NAME "Compupro Floppy Controller"
+
+static const char* disk1a_description(DEVICE *dptr) {
+    return DISK1A_NAME;
+}
 
 static MTAB disk1a_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
@@ -153,7 +158,7 @@ DEVICE disk1a_dev = {
     NULL, NULL, &disk1a_reset,
     &disk1a_boot, &disk1a_attach, &disk1a_detach,
     &disk1a_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 9,
-    disk1a_dt, NULL, DISK1A_NAME
+    disk1a_dt, NULL, NULL, NULL, NULL, NULL, &disk1a_description
 };
 
 /* This is the DISK1A Boot ROM.
@@ -752,7 +757,7 @@ static t_stat disk1a_boot(int32 unitno, DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat disk1a_attach(UNIT *uptr, char *cptr)
+static t_stat disk1a_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     r = i8272_attach(uptr, cptr);

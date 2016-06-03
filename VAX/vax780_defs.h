@@ -172,7 +172,7 @@
                         { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size, NULL, NULL, "Set Memory to 64M bytes" },              \
                         { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" },            \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
-extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 #define CPU_MODEL_MODIFIERS                                                                     \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={780|785}",                     \
                           &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" }
@@ -429,20 +429,20 @@ extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
 int32 mba_rdbufW (uint32 mbus, int32 bc, uint16 *buf);
-int32 mba_wrbufW (uint32 mbus, int32 bc, uint16 *buf);
+int32 mba_wrbufW (uint32 mbus, int32 bc, const uint16 *buf);
 int32 mba_chbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_get_bc (uint32 mbus);
 void mba_upd_ata (uint32 mbus, uint32 val);
 void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
 void mba_set_enbdis (DEVICE *dptr);
-t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 void sbi_set_errcnf (void);
 

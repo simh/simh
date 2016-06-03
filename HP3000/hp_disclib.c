@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    27-Jul-15    JDB     First revised release version
    21-Feb-15    JDB     Revised for new controller interface model
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -2682,7 +2683,7 @@ else                                                    /* otherwise the status 
    unit.  If the attach was successful, the heads are loaded on the drive.
 */
 
-t_stat dl_attach (CVPTR cvptr, UNIT *uptr, char *cptr)
+t_stat dl_attach (CVPTR cvptr, UNIT *uptr, CONST char *cptr)
 {
 t_stat result;
 
@@ -2803,7 +2804,7 @@ return SCPE_OK;                                         /* return normal complet
        ensure that both protect bits are set so that all heads are protected.
 */
 
-t_stat dl_set_model (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat dl_set_model (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)                             /* if the unit is currently attached */
     return SCPE_ALATT;                                  /*   then the disc model cannot be changed */
@@ -2844,7 +2845,7 @@ return SCPE_OK;
    PROTECT, then both upper and lower heads are (un)protected.
 */
 
-t_stat dl_set_protect (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat dl_set_protect (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const uint32 model = uptr->flags & UNIT_MODEL;
 char gbuf [CBUFSIZE];
@@ -2897,7 +2898,7 @@ return SCPE_OK;
    bits set, indicating that the entire drive is protected.
 */
 
-t_stat dl_show_protect (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat dl_show_protect (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
 const uint32 model = uptr->flags & UNIT_MODEL;
 
@@ -2986,7 +2987,7 @@ return SCPE_OK;
        number of configurable entries is one less than the defined table size.
 */
 
-t_stat dl_set_diag (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat dl_set_diag (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 typedef struct {
     t_value  max;                               /* maximum allowed value */
@@ -3158,30 +3159,34 @@ return SCPE_OK;
        contained in a 32-bit unsigned array element.  To print it properly, we
        convert the latter to a 16-bit signed value and then sign-extend to "int"
        size for fprintf.
+
+    2. The explicit use of "const CNTLR_VARS *" is necessary to declare a
+       pointer to a constant structure.  Using "const CVPTR" declares a constant
+       pointer instead.
 */
 
-t_stat dl_show_diag (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat dl_show_diag (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-const CVPTR cvptr = (CVPTR) desc;
+const CNTLR_VARS *cvptr = (const CNTLR_VARS *) desc;    /* the controller pointer is supplied */
 DIAG_ENTRY *entry;
 
-if (cvptr->dop_base == NULL)                                /* if the table isn't defined */
-    return SCPE_NOFNC;                                      /*   then the command is illegal */
+if (cvptr->dop_base == NULL)                            /* if the table isn't defined */
+    return SCPE_NOFNC;                                  /*   then the command is illegal */
 
-else if (cvptr->dop == NULL) {                              /* otherwise if overrides are currently disabled */
-    fputs ("override disabled", st);                        /*   then report it */
+else if (cvptr->dop == NULL) {                          /* otherwise if overrides are currently disabled */
+    fputs ("override disabled", st);                    /*   then report it */
 
-    if (value > 0)                                          /* if we were invoked by a SHOW DIAG command */
-        fputc ('\n', st);                                   /*   then we must add the line terminator */
+    if (value > 0)                                      /* if we were invoked by a SHOW DIAG command */
+        fputc ('\n', st);                               /*   then we must add the line terminator */
     }
 
-else if (value < 0)                                         /* otherwise if we were invoked by a SHOW <dev> command */
-    fputs ("override enabled", st);                         /*   then print the table status instead of the details */
+else if (value < 0)                                     /* otherwise if we were invoked by a SHOW <dev> command */
+    fputs ("override enabled", st);                     /*   then print the table status instead of the details */
 
-else for (entry = cvptr->dop_base;                          /* otherwise print each table entry */
-          entry->cylinder != DL_OVEND && value > 0;         /*   until the end-of-table marker or count exhaustion */
+else for (entry = cvptr->dop_base;                      /* otherwise print each table entry */
+          entry->cylinder != DL_OVEND && value > 0;     /*   until the end-of-table marker or count exhaustion */
           entry++, value--) {
-    fprintf (st, "%3d  %1d  %2d  %*s  %c%c%c  %*s\n",       /* print the entry */
+    fprintf (st, "%3d  %1d  %2d  %*s  %c%c%c  %*s\n",   /* print the entry */
              entry->cylinder, entry->head, entry->sector,
              - OPCODE_LENGTH, dl_opcode_name (cvptr->type, entry->opcode),
              (entry->spd & CM_SPARE     ? 'S' : ' '),
@@ -3189,10 +3194,10 @@ else for (entry = cvptr->dop_base;                          /* otherwise print e
              (entry->spd & CM_DEFECTIVE ? 'D' : ' '),
              - STATUS_LENGTH, dl_status_name (entry->status));
 
-    if (entry->opcode == Request_Syndrome                   /* if the current entry is a syndrome request */
-      && entry->status == Correctable_Data_Error) {         /*   for a correctable data error */
-        entry++;                                            /*     then the next entry contains the values */
-        value = value - 1;                                  /* drop the entry count to account for it */
+    if (entry->opcode == Request_Syndrome               /* if the current entry is a syndrome request */
+      && entry->status == Correctable_Data_Error) {     /*   for a correctable data error */
+        entry++;                                        /*     then the next entry contains the values */
+        value = value - 1;                              /* drop the entry count to account for it */
 
         fprintf (st, "            %3d  %06o  %06o  %06o\n", /* print the displacement and syndrome values */
                  (int) INT16 (entry->spd),
@@ -3230,7 +3235,7 @@ return SCPE_OK;
    is common to every controller in the array.
 */
 
-t_stat dl_set_timing (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat dl_set_timing (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 CVPTR  cvptr = (CVPTR) desc;                            /* the controller pointer is supplied */
 const  DELAY_PROPS *dpptr;
@@ -3281,11 +3286,18 @@ return SCPE_OK;
    This display routine is called to show the timing mode for the disc
    subsystem.  The "value" parameter is unused; the "desc" parameter is a
    pointer to the controller.
+
+
+   Implementation notes:
+
+    1. The explicit use of "const CNTLR_VARS *" is necessary to declare a
+       pointer to a constant structure.  Using "const CVPTR" declares a constant
+       pointer instead.
 */
 
-t_stat dl_show_timing (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat dl_show_timing (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-CVPTR const cvptr = (CVPTR) desc;                       /* the controller pointer is supplied */
+const CNTLR_VARS *cvptr = (const CNTLR_VARS *) desc;    /* the controller pointer is supplied */
 
 if (cvptr->device->flags & DEV_REALTIME)                /* if the real time flag is set */
     fputs ("realistic timing", st);                     /*   then we're using realistic timing */

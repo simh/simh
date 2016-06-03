@@ -41,7 +41,7 @@
 #include <unistd.h>
 #endif
 
-t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     DEVICE* dptr;
     PNP_INFO* pnp;
@@ -69,7 +69,7 @@ t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc)
     return SCPE_OK;
 }
 
-t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     DEVICE *dptr;
     PNP_INFO *pnp;
@@ -82,7 +82,7 @@ t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc)
     return SCPE_OK;
 }
 
-t_stat m68k_set_cpu(UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat m68k_set_cpu(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     if (value < 0 || value > CPU_TYPE_68030)
         return SCPE_ARG;
@@ -93,9 +93,9 @@ t_stat m68k_set_cpu(UNIT *uptr, int32 value, char *cptr, void *desc)
     return SCPE_OK;
 }
 
-t_stat m68k_show_cpu(FILE* st,UNIT *uptr, int32 value, void *desc)
+t_stat m68k_show_cpu(FILE* st,UNIT *uptr, int32 value, CONST void *desc)
 {
-    fprintf(st,"TYPE=%s",(char*)desc);
+    fprintf(st,"TYPE=%s",(const char *)desc);
     return SCPE_OK;
 }
 
@@ -108,7 +108,7 @@ t_stat m68k_alloc_mem()
     return M == NULL ? SCPE_MEM : SCPE_OK;
 }
 
-t_stat m68k_set_size(UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat m68k_set_size(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     t_stat rc;
     uptr->capac = value;
@@ -116,24 +116,24 @@ t_stat m68k_set_size(UNIT *uptr, int32 value, char *cptr, void *desc)
     return SCPE_OK;
 }
 
-t_stat m68k_set_fpu(UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat m68k_set_fpu(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     uptr->flags |= value;
     return SCPE_OK;
 }
-t_stat m68k_set_nofpu(UNIT *uptr, int32 value, char *cptr, void *desc)
-{
-    uptr->flags |= value;
-    return SCPE_OK;
-}
-
-t_stat m68kcpu_set_flag(UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat m68k_set_nofpu(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     uptr->flags |= value;
     return SCPE_OK;
 }
 
-t_stat m68kcpu_set_noflag(UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat m68kcpu_set_flag(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+{
+    uptr->flags |= value;
+    return SCPE_OK;
+}
+
+t_stat m68kcpu_set_noflag(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     uptr->flags &= ~value;
     return SCPE_OK;
@@ -239,7 +239,7 @@ error:
     return SCPE_FMT;
 }
 
-t_stat sim_load(FILE* fptr, char* cptr, char* fnam, t_bool flag)
+t_stat sim_load(FILE* fptr, CONST char* cptr, CONST char* fnam, t_bool flag)
 {
     int i,len,rc;
     uint16 data;
@@ -403,7 +403,7 @@ static t_stat _fsym0(FILE* of,t_value inst,t_addr addr,t_value* rest)
     int bitnum= DATA_B(rest[0]);
     int ea    = EA_FIELD(inst);
     int eamod = EAMOD_FIELD(inst);
-    char* s = 0;
+    const char* s = 0;
 
     switch (inst & 000700) {
     case 000400:
@@ -472,7 +472,7 @@ static t_stat _fsym123(FILE* of,t_value inst,t_addr addr,t_value* rest,char w,in
     int rc, rc2;
     int eas = inst & 077;
     int eat = ((inst>>9)&7)|((inst&0700)>>3);
-    char *s = ((eat&070)==010) ? "movea" : "move";
+    const char *s = ((eat&070)==010) ? "movea" : "move";
     fprintf(of,"%s.%c ",s,w);
     rc = _fsymea(of,addr,eas,oplen,rest); ONERR_QUIT(); rc2 = rc;
     fputc(',',of);
@@ -480,10 +480,10 @@ static t_stat _fsym123(FILE* of,t_value inst,t_addr addr,t_value* rest,char w,in
     return rc2 + rc -1;
 }
 
-static char* moveregs[] = {
+static const char* moveregs[] = {
     "d0","d1","d2","d3","d4","d5","d6","d7","a0","a1","a2","a3","a4","a5","a6","a7"
 };
-static char* moveregsp[] = {
+static const char* moveregsp[] = {
     "a7","a6","a5","a4","a3","a2","a1","a0","d7","d6","d5","d4","d3","d2","d1","d0"
 };
 
@@ -499,7 +499,7 @@ static char* moveregsp[] = {
 static void _fsymregs(FILE* of, int regset,int ispredec)
 {
     int lo, hi, bit, sl, i;
-    char** regs = ispredec ? moveregsp : moveregs;
+    const char** regs = ispredec ? moveregsp : moveregs;
 
 //printf("regset=%x\n",regset);
     sl = 0;
@@ -519,7 +519,7 @@ static t_stat _fsym4(FILE* of,t_value inst,t_addr addr,t_value* rest)
     int eamod = EAMOD_FIELD(inst);
     char reg0 = REG0_CHAR(inst);
     int oplen = OPLEN_FIELD(inst);
-    char* s;
+    const char* s;
     
     switch (inst & 000700) {
     case 000600:
@@ -669,8 +669,8 @@ static t_stat _fsym4(FILE* of,t_value inst,t_addr addr,t_value* rest)
     }
 }
 
-static char* conds[] = { "ra","sr","hi","ls","cc","cs","ne","eq","vc","vs","pl","mi","ge","lt","gt","le" };
-static char* conds2[] = { "t", "f","hi","ls","cc","cs","ne","eq","vc","vs","pl","mi","ge","lt","gt","le" };
+static const char* conds[] = { "ra","sr","hi","ls","cc","cs","ne","eq","vc","vs","pl","mi","ge","lt","gt","le" };
+static const char* conds2[] = { "t", "f","hi","ls","cc","cs","ne","eq","vc","vs","pl","mi","ge","lt","gt","le" };
 
 static t_stat _fsym5(FILE* of,t_value inst,t_addr addr,t_value* rest)
 {
@@ -683,7 +683,7 @@ static t_stat _fsym5(FILE* of,t_value inst,t_addr addr,t_value* rest)
     t_addr a;
 
     if (oplen==3) {
-        char* cond = conds2[(inst>>8)&0xf];
+        const char* cond = conds2[(inst>>8)&0xf];
         if (eamod==010) {
             a = rest[0] & 0xffff;
             if (a & 0x8000) a |= 0xffff0000;
@@ -695,7 +695,7 @@ static t_stat _fsym5(FILE* of,t_value inst,t_addr addr,t_value* rest)
         }
     } else {
         int data = (inst>>9) & 07;
-        char *s = (inst & 0x0100) ? "subq" : "addq";
+        const char *s = (inst & 0x0100) ? "subq" : "addq";
 
         if (data==0) data = 8;
         fprintf(of,"%s.%c #%d,",s,bwl,data); rc = _fsymea(of,addr,ea,oplen,rest); ONERR_QUIT(); return rc-1;
@@ -704,7 +704,7 @@ static t_stat _fsym5(FILE* of,t_value inst,t_addr addr,t_value* rest)
 }
 static t_stat _fsym6(FILE* of,t_value inst,t_addr addr,t_value* rest)
 {
-    char* cond = conds[(inst>>8)&0xf];
+    const char* cond = conds[(inst>>8)&0xf];
     t_addr a = inst & 0xff;
     if (a) {
         if (a & 0x80) a |= 0xffffff00;
@@ -934,7 +934,7 @@ static t_stat _fsyme(FILE* of,t_value inst,t_addr addr,t_value* rest)
     int ea = EA_FIELD(inst);
     char reg9 = REG9_CHAR(inst);
     char reg0 = REG0_CHAR(inst);
-    char *s;
+    const char *s;
 
     switch (op) {
     case 0: s = "as"; break;

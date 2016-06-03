@@ -316,9 +316,9 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 GeteaB (int32 spec);
 int32 GeteaW (int32 spec);
 int32 relocR (int32 addr);
@@ -347,9 +347,9 @@ extern void fp11 (int32 IR);
 extern t_stat cis11 (int32 IR);
 extern t_stat fis11 (int32 IR);
 extern t_stat build_dib_tab (void);
-extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern t_stat iopageR (int32 *data, uint32 addr, int32 access);
 extern t_stat iopageW (int32 data, uint32 addr, int32 access);
 extern int32 calc_ints (int32 nipl, int32 trq);
@@ -3197,7 +3197,7 @@ return;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -3228,10 +3228,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 j, k, di, lnt, ir;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[HIST_ILNT];
 t_stat r;
 InstHistory *h;
@@ -3273,10 +3273,10 @@ return SCPE_OK;
 
 /* Virtual address translation */
 
-t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 uint32 va, pa;
 
 if (cptr) {

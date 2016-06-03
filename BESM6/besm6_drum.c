@@ -82,7 +82,7 @@ MTAB drum_mod[] = {
 };
 
 t_stat drum_reset (DEVICE *dptr);
-t_stat drum_attach (UNIT *uptr, char *cptr);
+t_stat drum_attach (UNIT *uptr, CONST char *cptr);
 t_stat drum_detach (UNIT *uptr);
 
 DEVICE drum_dev = {
@@ -107,7 +107,7 @@ t_stat drum_reset (DEVICE *dptr)
     return SCPE_OK;
 }
 
-t_stat drum_attach (UNIT *u, char *cptr)
+t_stat drum_attach (UNIT *u, CONST char *cptr)
 {
     t_stat s;
 

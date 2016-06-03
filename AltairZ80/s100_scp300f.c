@@ -75,10 +75,10 @@ typedef struct {
 static SCP300F_INFO scp300f_info_data = { { 0xFF800, SCP300F_ROM_SIZE, 0xF0, SCP300F_IO_SIZE } };
 static SCP300F_INFO *scp300f_info = &scp300f_info_data;
 
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
@@ -88,6 +88,7 @@ static t_stat scp300f_reset(DEVICE *scp300f_dev);
 
 static uint8 SCP300F_Read(const uint32 Addr);
 static uint8 SCP300F_Write(const uint32 Addr, uint8 cData);
+static const char* scp300f_description(DEVICE *dptr);
 
 static int32 scp300fdev(const int32 port, const int32 io, const int32 data);
 static int32 scp300f_mem(const int32 port, const int32 io, const int32 data);
@@ -102,6 +103,10 @@ static REG scp300f_reg[] = {
     { HRDATAD (SR, scp300f_sr, 8, "Sense switch register, 0=monitor prompt, 1=disk boot"), },
     { NULL }
 };
+
+static const char* scp300f_description(DEVICE *dptr) {
+    return "SCP Support Board";
+}
 
 static MTAB scp300f_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
@@ -126,7 +131,7 @@ DEVICE scp300f_dev = {
     NULL, NULL, &scp300f_reset,
     NULL, NULL, NULL,
     &scp300f_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    scp300f_dt, NULL, "SCP Support Board SCP300F"
+    scp300f_dt, NULL, NULL, NULL, NULL, NULL, &scp300f_description
 };
 
 /* Reset routine */

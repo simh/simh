@@ -58,10 +58,9 @@ DSPT lpt_tplt[] = {                                     /* template */
     { 0, 0 }
     };
 
-DEVICE lpt_dev;
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat lpt_crctl (UNIT *uptr, int32 ch);
 t_stat lpt_space (UNIT *uptr, int32 cnt);
 t_stat lpt_status (UNIT *uptr);
@@ -324,7 +323,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 lpt_ccp = 0;                                            /* top of form */
 return attach_unit (uptr, cptr);

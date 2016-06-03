@@ -61,8 +61,8 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ttx_setpar (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ttx_setmod (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttx_setpar (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTI data structures
 
@@ -261,14 +261,14 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttx_setmod (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~UNIT_DASHER) | val;
 tto_unit.flags = (tto_unit.flags & ~UNIT_DASHER) | val;
 return SCPE_OK;
 }
 
-t_stat ttx_setpar (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ttx_setpar (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~TT_PAR) | val;
 tto_unit.flags = (tto_unit.flags & ~TT_PAR) | val;

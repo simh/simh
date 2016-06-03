@@ -239,7 +239,7 @@ double besm6_to_ieee (t_value word)
 /*
  * Пропуск пробелов.
  */
-char *skip_spaces (char *p)
+CONST char *skip_spaces (CONST char *p)
 {
     for (;;) {
         if (*p == (char) 0xEF && p[1] == (char) 0xBB && p[2] == (char) 0xBF) {
@@ -259,7 +259,7 @@ char *skip_spaces (char *p)
  * Fetch Unicode symbol from UTF-8 string.
  * Advance string pointer.
  */
-int utf8_to_unicode (char **p)
+int utf8_to_unicode (CONST char **p)
 {
     int c1, c2, c3;
 
@@ -273,7 +273,7 @@ int utf8_to_unicode (char **p)
     return (c1 & 0x0f) << 12 | (c2 & 0x3f) << 6 | (c3 & 0x3f);
 }
 
-char *besm6_parse_octal (char *cptr, int *offset)
+char *besm6_parse_octal (const char *cptr, int *offset)
 {
     char *eptr;
 
@@ -283,7 +283,7 @@ char *besm6_parse_octal (char *cptr, int *offset)
     return eptr;
 }
 
-static char *get_alnum (char *iptr, char *optr)
+static CONST char *get_alnum (CONST char *iptr, char *optr)
 {
     while ((*iptr >= 'a' && *iptr<='z') ||
            (*iptr >= 'A' && *iptr<='Z') ||
@@ -298,7 +298,7 @@ static char *get_alnum (char *iptr, char *optr)
  * Parse single instruction (half word).
  * Allow mnemonics or octal code.
  */
-char *parse_instruction (char *cptr, uint32 *val)
+CONST char *parse_instruction (CONST char *cptr, uint32 *val)
 {
     int opcode, reg, addr, negate;
     char gbuf[CBUFSIZE];
@@ -391,7 +391,7 @@ char *parse_instruction (char *cptr, uint32 *val)
 /*
  * Instruction parse: two commands per word.
  */
-t_stat parse_instruction_word (char *cptr, t_value *val)
+t_stat parse_instruction_word (CONST char *cptr, t_value *val)
 {
     uint32 left, right;
 
@@ -535,7 +535,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
  * Outputs:
  *      status  = error status
  */
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     int32 i;
 
@@ -569,7 +569,8 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
  */
 t_stat besm6_read_line (FILE *input, int *type, t_value *val)
 {
-    char buf [512], *p;
+    char buf [512];
+    CONST char *p;
     int i, c;
   again:
     if (! fgets (buf, sizeof (buf), input)) {
@@ -685,7 +686,7 @@ t_stat besm6_load (FILE *input)
 /*
  * Dump memory to file.
  */
-t_stat besm6_dump (FILE *of, char *fnam)
+t_stat besm6_dump (FILE *of, const char *fnam)
 {
     int addr, last_addr = -1;
     t_value word;
@@ -728,7 +729,7 @@ t_stat besm6_dump (FILE *of, char *fnam)
 /*
  * Loader/dumper
  */
-t_stat sim_load (FILE *fi, char *cptr, char *fnam, int dump_flag)
+t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int dump_flag)
 {
     if (dump_flag)
         return besm6_dump (fi, fnam);

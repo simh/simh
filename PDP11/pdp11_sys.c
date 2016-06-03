@@ -238,7 +238,7 @@ const char *sim_stop_messages[] = {
    the PC at which to start the program.
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 c[6], d, i, cnt, csum;
 uint32 org;
@@ -932,7 +932,7 @@ switch (pflag) {                                        /* case on syntax */
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 bflag, cflag, d, i, j, reg, spec, n1, n2, disp, pflag;
 t_value by;

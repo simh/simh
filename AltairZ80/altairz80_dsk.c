@@ -163,7 +163,8 @@ int32 dsk11(const int32 port, const int32 io, const int32 data);
 int32 dsk12(const int32 port, const int32 io, const int32 data);
 static t_stat dsk_boot(int32 unitno, DEVICE *dptr);
 static t_stat dsk_reset(DEVICE *dptr);
-static t_stat dsk_attach(UNIT *uptr, char *cptr);
+static t_stat dsk_attach(UNIT *uptr, CONST char *cptr);
+static const char* dsk_description(DEVICE *dptr);
 
 extern UNIT cpu_unit;
 extern uint32 PCX;
@@ -333,7 +334,11 @@ static REG dsk_reg[] = {
     { NULL }
 };
 
-#define DSK_NAME    "Altair Floppy Disk DSK"
+#define DSK_NAME    "Altair Floppy Disk"
+
+static const char* dsk_description(DEVICE *dptr) {
+    return DSK_NAME;
+}
 
 static MTAB dsk_mod[] = {
     { UNIT_DSK_WLK,     0,                  "WRTENB",    "WRTENB",  NULL, NULL, NULL,
@@ -361,10 +366,10 @@ DEVICE dsk_dev = {
     NULL, NULL, &dsk_reset,
     &dsk_boot, &dsk_attach, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    dsk_dt, NULL, DSK_NAME
+    dsk_dt, NULL, NULL, NULL, NULL, NULL, &dsk_description
 };
 
-static char* selectInOut(const int32 io) {
+static const char* selectInOut(const int32 io) {
     return io == 0 ? "IN" : "OUT";
 }
 
@@ -394,7 +399,7 @@ static t_stat dsk_reset(DEVICE *dptr) {
 }
 /* dsk_attach - determine type of drive attached based on disk image size */
 
-static t_stat dsk_attach(UNIT *uptr, char *cptr) {
+static t_stat dsk_attach(UNIT *uptr, CONST char *cptr) {
     int32 thisUnitIndex;
     int32 imageSize;
     const t_stat r = attach_unit(uptr, cptr);           /* attach unit  */

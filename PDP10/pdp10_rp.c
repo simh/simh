@@ -370,12 +370,12 @@ int32 rp_inta (void);
 t_stat rp_svc (UNIT *uptr);
 t_stat rp_reset (DEVICE *dptr);
 t_stat rp_boot (int32 unitno, DEVICE *dptr);
-t_stat rp_attach (UNIT *uptr, char *cptr);
+t_stat rp_attach (UNIT *uptr, CONST char *cptr);
 t_stat rp_detach (UNIT *uptr);
 void set_rper (int16 flag, int32 drv);
 void update_rpcs (int32 flags, int32 drv);
 void rp_go (int32 drv, int32 fnc);
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* RP data structures
 
@@ -1150,7 +1150,7 @@ return SCPE_OK;
 
 /* Device attach */
 
-t_stat rp_attach (UNIT *uptr, char *cptr)
+t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 i, p;
 t_stat r;
@@ -1203,7 +1203,7 @@ return detach_unit (uptr);
 
 /* Set size command validation routine */
 
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 dtype = GET_DTYPE (val);
 

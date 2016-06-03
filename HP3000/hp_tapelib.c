@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    20-Nov-15    JDB     First release version
    24-Mar-13    JDB     Created tape controller common library from MS simulator
 
@@ -1279,7 +1280,7 @@ else                                                    /* otherwise */
        changed to avoid upsetting the state that was SAVEd.
 */
 
-t_stat tl_attach (CVPTR cvptr, UNIT *uptr, char *cptr)
+t_stat tl_attach (CVPTR cvptr, UNIT *uptr, CONST char *cptr)
 {
 const uint32 unit = uptr - cvptr->device->units;        /* the unit number */
 t_stat result;
@@ -1340,7 +1341,7 @@ return sim_tape_detach (uptr);                          /* detach the tape image
    tested in the "start_command" routine.
 */
 
-t_stat tl_set_timing (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat tl_set_timing (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 DEVICE *const dptr = ((CVPTR) desc)->device;            /* a pointer to the controlling device */
 
@@ -1361,7 +1362,7 @@ return SCPE_OK;
    verified before permitting the change.
 */
 
-t_stat tl_set_model (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat tl_set_model (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const CVPTR cvptr = (CVPTR) desc;                       /* the controller state structure pointer */
 const DRIVE_TYPE new_drive = GET_MODEL (value);         /* the new model ID */
@@ -1379,7 +1380,7 @@ return validate_drive (cvptr, uptr, new_drive, 0);      /* verify the model chan
    density setting is verified before permitting the change.
 */
 
-t_stat tl_set_density (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat tl_set_density (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const CVPTR cvptr = (CVPTR) desc;                       /* the controller state structure pointer */
 const DRIVE_TYPE model = GET_MODEL (uptr->flags);       /* the current drive model ID */
@@ -1424,7 +1425,7 @@ else                                                        /* otherwise a numer
    supplied.
 */
 
-t_stat tl_set_reelsize (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat tl_set_reelsize (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const uint32 tape_bpi = drive_props [PROP_INDEX (uptr)].bpi;    /* the tape unit density */
 int32  reel;
@@ -1489,11 +1490,18 @@ else {                                                  /* otherwise a size is s
 
    This display routine is called to show the timing mode for the tape
    controller.  The "desc" parameter is a pointer to the controller.
+
+
+   Implementation notes:
+
+    1. The explicit use of "const CNTLR_VARS *" is necessary to declare a
+       pointer to a constant structure.  Using "const CVPTR" declares a constant
+       pointer instead.
 */
 
-t_stat tl_show_timing (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat tl_show_timing (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-DEVICE *const dptr = ((CVPTR) desc)->device;            /* a pointer to the controlling device */
+DEVICE *const dptr = ((const CNTLR_VARS *) desc)->device;   /* a pointer to the controlling device */
 
 if (dptr->flags & DEV_REALTIME)                         /* if the real time flag is set */
     fputs ("realistic timing", st);                     /*   then we're using realistic timing */
@@ -1511,7 +1519,7 @@ return SCPE_OK;
    to the unit to be queried.
 */
 
-t_stat tl_show_density (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat tl_show_density (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
 fprintf (st, "%d bpi", drive_props [PROP_INDEX (uptr)].bpi);
 
@@ -1545,7 +1553,7 @@ return SCPE_OK;
        respectively, to provide multiplication by 2 ** <reel ID>.
 */
 
-t_stat tl_show_reelsize (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat tl_show_reelsize (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
 t_stat status = SCPE_OK;
 

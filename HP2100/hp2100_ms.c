@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
                         Added casts for explicit downward conversions
@@ -235,18 +236,18 @@ IOHANDLER mscio;
 
 t_stat msc_svc (UNIT *uptr);
 t_stat msc_reset (DEVICE *dptr);
-t_stat msc_attach (UNIT *uptr, char *cptr);
+t_stat msc_attach (UNIT *uptr, CONST char *cptr);
 t_stat msc_detach (UNIT *uptr);
-t_stat msc_online (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat msc_online (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 t_stat msc_boot (int32 unitno, DEVICE *dptr);
 t_stat ms_write_gap (UNIT *uptr);
 t_stat ms_map_err (UNIT *uptr, t_stat st);
-t_stat ms_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat ms_set_timing (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ms_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat ms_set_reelsize (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat ms_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat ms_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ms_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat ms_set_reelsize (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 void ms_config_timing (void);
 char *ms_cmd_name (uint32 cmd);
 t_stat ms_clear (void);
@@ -1061,7 +1062,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat msc_attach (UNIT *uptr, char *cptr)
+t_stat msc_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -1082,7 +1083,7 @@ return sim_tape_detach (uptr);                          /* detach unit */
 
 /* Online routine */
 
-t_stat msc_online (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat msc_online (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT) return SCPE_OK;
 else return SCPE_UNATT;
@@ -1101,7 +1102,7 @@ for (i = 0; i < (sizeof (timers) / sizeof (timers[0])); i++)
 
 /* Set controller timing */
 
-t_stat ms_set_timing (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ms_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if ((val < 0) || (val > 1) || (cptr != NULL)) return SCPE_ARG;
 ms_timing = val;
@@ -1111,7 +1112,7 @@ return SCPE_OK;
 
 /* Show controller timing */
 
-t_stat ms_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat ms_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (ms_timing) fputs ("fast timing", st);
 else fputs ("realistic timing", st);
@@ -1120,7 +1121,7 @@ return SCPE_OK;
 
 /* Set controller type */
 
-t_stat ms_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ms_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 
@@ -1139,7 +1140,7 @@ return SCPE_OK;
 
 /* Show controller type */
 
-t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (ms_ctype == A13183)
     fprintf (st, "13183A");
@@ -1153,7 +1154,7 @@ return SCPE_OK;
    val = 0 -> SET MSCn CAPACITY=n
    val = 1 -> SET MSCn REEL=n */
 
-t_stat ms_set_reelsize (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ms_set_reelsize (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 reel;
 t_stat status;
@@ -1198,7 +1199,7 @@ return SCPE_OK;
    val = 0 -> SHOW MSC or SHOW MSCn or SHOW MSCn CAPACITY
    val = 1 -> SHOW MSCn REEL */
 
-t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat status = SCPE_OK;
 

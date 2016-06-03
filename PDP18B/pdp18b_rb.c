@@ -91,11 +91,10 @@ int32 rb_time = 10;                                     /* inter-word time */
 int32 rb_burst = 1;                                     /* burst mode flag */
 int32 rb_stopioe = 1;                                   /* stop on error */
 
-DEVICE rb_dev;
 int32 rb71 (int32 dev, int32 pulse, int32 AC);
 t_stat rb_svc (UNIT *uptr);
 t_stat rb_reset (DEVICE *dptr);
-int32 rb_updsta (int32 new);
+int32 rb_updsta (int32 val);
 int32 rb_make_da (int32 dat);
 int32 rb_make_bcd (int32 dat);
 int32 rb_set_da (int32 dat, int32 old);
@@ -280,9 +279,9 @@ return SCPE_OK;
 
 /* Update status */
 
-int32 rb_updsta (int32 new)
+int32 rb_updsta (int32 val)
 {
-rb_sta = (rb_sta | new) & ~(RBS_ERR | RBS_MBZ);         /* clear err, mbz */
+rb_sta = (rb_sta | val) & ~(RBS_ERR | RBS_MBZ);         /* clear err, mbz */
 if (rb_sta & RBS_EFLGS)                                 /* error? */
     rb_sta = rb_sta | RBS_ERR;
 if (rb_sta & RBS_DON)                                   /* done? clear busy */

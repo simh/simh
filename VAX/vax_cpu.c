@@ -230,19 +230,6 @@
                         rh = arh
 
 
-#define HIST_MIN        64
-#define HIST_MAX        250000
-
-typedef struct {
-    double              time;
-    int32               iPC;
-    int32               PSL;
-    int32               opc;
-    uint8               inst[INST_SIZE];
-    uint32              opnd[OPND_SIZE];
-    uint32              res[6];
-    } InstHistory;
-
 uint32 *M = NULL;                                       /* memory */
 int32 R[16];                                            /* registers */
 int32 STK[5];                                           /* stack pointers */
@@ -320,12 +307,12 @@ t_stat cpu_reset (DEVICE *dptr);
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 t_stat cpu_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_idle (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 const char *cpu_description (DEVICE *dptr);
 int32 cpu_get_vsw (int32 sw);
 static SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
@@ -432,7 +419,7 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE={VMS|ULTRIX|ULTRIX-1.X|ULTRIXOLD|NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|QUASIJARUS|32V|ELN}{:n}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL,  "Disables idle detection" },
     MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP|MTAB_NC, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist, NULL, "Displays instruction history" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &cpu_show_virt, NULL, "show translation for address arg in KESU mode" },
@@ -460,7 +447,7 @@ DEVICE cpu_dev = {
     &cpu_description
     };
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "model=");
 return cpu_print_model (st);
@@ -603,32 +590,35 @@ for ( ;; ) {
 
     if (hst_lnt) {
         InstHistory *hlast = &hst[hst_p ? hst_p-1 : hst_lnt -1];
-        int res = (drom[hlast->opc][0] & DR_M_RESMASK) >> DR_V_RESMASK;
 
-        switch ((drom[hlast->opc][0] & DR_M_RESMASK) >> DR_V_RESMASK) {
-            case RB_O>>DR_V_RESMASK:
+        switch (DR_GETRES(drom[hlast->opc][0]) << DR_V_RESMASK) {
+            case RB_O:
+            case RB_OB:
+            case RB_OW:
+            case RB_OL:
+            case RB_OQ:
                 break;
-            case RB_Q>>DR_V_RESMASK:
+            case RB_Q:
                 hlast->res[1] = rh;
                 hlast->res[0] = r;
                 break;
-            case RB_B>>DR_V_RESMASK:
-            case RB_W>>DR_V_RESMASK:
-            case RB_L>>DR_V_RESMASK:
+            case RB_B:
+            case RB_W:
+            case RB_L:
                 hlast->res[0] = r;
                 break;
-            case RB_R5>>DR_V_RESMASK:
+            case RB_R5:
                 hlast->res[5] = R[5];
                 hlast->res[4] = R[4];
-            case RB_R3>>DR_V_RESMASK:
+            case RB_R3:
                 hlast->res[3] = R[3];
                 hlast->res[2] = R[2];
-            case RB_R1>>DR_V_RESMASK:
+            case RB_R1:
                 hlast->res[1] = R[1];
-            case RB_R0>>DR_V_RESMASK:
+            case RB_R0:
                 hlast->res[0] = R[0];
                 break;
-            case RB_SP>>DR_V_RESMASK:
+            case RB_SP:
                 hlast->res[0] = Read (SP, L_LONG, RA);
                 break;
             default:
@@ -1591,7 +1581,8 @@ for ( ;; ) {
         break;
 
     case CLRQ:
-        WRITE_Q (0, 0);                                 /* store result */
+        r = rh = 0;
+        WRITE_Q (r, rh);                                /* store result */
         CC_ZZ1P;                                        /* set cc's */
         break;
 
@@ -2279,7 +2270,7 @@ for ( ;; ) {
     case RSB:
         temp = Read (SP, L_LONG, RA);                   /* get top of stk */
         SP = SP + 4;                                    /* incr stk ptr */
-        JUMP (temp);
+        JUMP_ALWAYS (temp);
         if (sim_switches & SWMASK ('R')) {
             if (step_out_nest_level <= 0)
                 ABORT (SCPE_STEP);
@@ -2532,6 +2523,7 @@ for ( ;; ) {
         temp = op_ffs (r, op1);                         /* find first 1 */
         WRITE_L (op0 + temp);                           /* store result */
         cc = r? 0: CC_Z;                                /* set cc's */
+        r = op0 + temp;
         if ((cc == CC_Z) &&                             /* No set bits found? */
             (cpu_idle_mask & VAX_IDLE_ULT1X) &&         /* running Ultrix 1.X" */
             (PSL_GETIPL (PSL) == 0x0) &&                /*  at IPL 0? */
@@ -2546,6 +2538,7 @@ for ( ;; ) {
         temp = op_ffs (r, op1);                         /* find first 1 */
         WRITE_L (op0 + temp);                           /* store result */
         cc = r? 0: CC_Z;                                /* set cc's */
+        r = op0 + temp;
         break;
 
 /* Insert field instruction - insv src.rl,pos.rb,size.rl,base.wb
@@ -3101,7 +3094,8 @@ for ( ;; ) {
     case ADDH2: case ADDH3: case SUBH2: case SUBH3:
     case MULH2: case MULH3: case DIVH2: case DIVH3:
     case ACBH: case POLYH: case EMODH:
-        cc = op_octa (opnd, cc, opc, acc, spec, va);
+        cc = op_octa (opnd, cc, opc, acc, spec, va, 
+                      (hst_lnt ? &hst[hst_p ? hst_p-1 : hst_lnt -1] : NULL) );
         if (cc & LSIGN) {                               /* ACBH branch? */
             BRANCHW (brdisp);
             cc = cc & CC_MASK;                          /* mask off flag */
@@ -3319,7 +3313,7 @@ return SCPE_NXM;
 
 /* Memory allocation */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i, clim, uval = (uint32)val;
@@ -3346,10 +3340,10 @@ return SCPE_OK;
 
 /* Virtual address translation */
 
-t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 uint32 va, pa;
 int32 st;
 static const char *mm_str[] = {
@@ -3398,7 +3392,7 @@ return ACC_MASK (md);
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 char gbuf[CBUFSIZE];
@@ -3454,10 +3448,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_stat r;
 
 if (hst_lnt == 0)                                       /* enabled? */
@@ -3566,33 +3560,33 @@ for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
         break;
         }                                       /* end case */
     }                                           /* end for */
-if ((line == 0) && ((drom[h->opc][0] & DR_M_RESMASK) >> DR_V_RESMASK)) {
+if ((line == 0) && (DR_GETRES(drom[h->opc][0]))) {
     fprintf (st, " ->");
-    switch ((drom[h->opc][0] & DR_M_RESMASK) >> DR_V_RESMASK) {
-        case RB_O>>DR_V_RESMASK:
+    switch (DR_GETRES(drom[h->opc][0]) << DR_V_RESMASK) {
+        case RB_O:
             fprintf (st, " %08X %08X %08X %08X", h->res[0], h->res[1], h->res[2], h->res[3]);
             break;
-        case RB_Q>>DR_V_RESMASK:
+        case RB_Q:
             fprintf (st, " %08X %08X", h->res[0], h->res[1]);
             break;
-        case RB_B>>DR_V_RESMASK:
-        case RB_W>>DR_V_RESMASK:
-        case RB_L>>DR_V_RESMASK:
+        case RB_B:
+        case RB_W:
+        case RB_L:
             fprintf (st, " %08X", h->res[0]);
             break;
-        case RB_R5>>DR_V_RESMASK:
-        case RB_R3>>DR_V_RESMASK:
-        case RB_R1>>DR_V_RESMASK:
-        case RB_R0>>DR_V_RESMASK:
+        case RB_R5:
+        case RB_R3:
+        case RB_R1:
+        case RB_R0:
             if (1) {
                 static const int rcnts[] = {1, 2, 4, 6};
                 int i;
 
-                for (i = 0; i < rcnts[((drom[h->opc][0] & DR_M_RESMASK) - RB_R0) >> DR_V_RESMASK]; i++)
+                for (i = 0; i < rcnts[DR_GETRES(drom[h->opc][0]) - DR_GETRES(RB_R0)]; i++)
                     fprintf (st, " R%d:%08X", i, h->res[i]);
                 }
             break;
-        case RB_SP>>DR_V_RESMASK:
+        case RB_SP:
             fprintf (st, " SP: %08X", h->res[0]);
             break;
         default:
@@ -3630,7 +3624,7 @@ static struct os_idle os_tab[] = {
 
 /* Set and show idle */
 
-t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_idle (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i;
 char gbuf[CBUFSIZE];
@@ -3649,7 +3643,7 @@ if (cptr != NULL) {
 return sim_set_idle (uptr, val, cptr, desc);
 }
 
-t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (sim_idle_enab && (cpu_idle_type != 0))
     fprintf (st, "idle=%s, ", os_tab[cpu_idle_type - 1].name);
@@ -3683,7 +3677,6 @@ fprintf (st, "The ");cpu_print_model (st);fprintf (st, " CPU help\n\n");
 fprintf (st, "CPU options include the size of main memory.\n\n");
 if (dptr->modifiers) {
     MTAB *mptr;
-    extern t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++)
         if (mptr->valid == &cpu_set_size)

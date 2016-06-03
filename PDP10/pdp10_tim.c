@@ -145,7 +145,6 @@ extern d10 pcst;
 extern a10 pager_PC;
 extern int32 t20_idlelock;
 
-DEVICE tim_dev;
 static t_stat tcu_rd (int32 *data, int32 PA, int32 access);
 static t_stat tim_svc (UNIT *uptr);
 static t_stat tim_reset (DEVICE *dptr);
@@ -378,7 +377,7 @@ return SCPE_OK;
 
 /* Set timer parameters from CPU model */
 
-t_stat tim_set_mod (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tim_set_mod (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val & (UNIT_T20|UNIT_KLAD)) {
     clk_tps = TIM_TPS_T20;

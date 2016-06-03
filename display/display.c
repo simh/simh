@@ -98,7 +98,7 @@ struct color {
 
 struct display {
     enum display_type type;
-    char *name;
+    const char *name;
     struct color *color0, *color1;
     short xpoints, ypoints;
 };

@@ -108,7 +108,6 @@ int32 df_time = 10;                                     /* inter-word time */
 int32 df_burst = 1;                                     /* burst mode flag */
 int32 df_stopioe = 1;                                   /* stop on error */
 
-DEVICE df_dev;
 int32 df60 (int32 IR, int32 AC);
 int32 df61 (int32 IR, int32 AC);
 int32 df62 (int32 IR, int32 AC);
@@ -116,8 +115,8 @@ t_stat df_svc (UNIT *uptr);
 t_stat pcell_svc (UNIT *uptr);
 t_stat df_reset (DEVICE *dptr);
 t_stat df_boot (int32 unitno, DEVICE *dptr);
-t_stat df_attach (UNIT *uptr, char *cptr);
-t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat df_attach (UNIT *uptr, CONST char *cptr);
+t_stat df_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* DF32 data structures
 
@@ -353,7 +352,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat df_attach (UNIT *uptr, char *cptr)
+t_stat df_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 p, sz;
 uint32 ds_bytes = DF_DKSIZE * sizeof (int16);
@@ -371,7 +370,7 @@ return attach_unit (uptr, cptr);
 
 /* Change disk size */
 
-t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat df_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val < 0)
     return SCPE_IERR;

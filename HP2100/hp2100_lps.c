@@ -1,6 +1,6 @@
 /* hp2100_lps.c: HP 2100 12653A/2767 line printer simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    LPS          12653A 2767 line printer
                 12566B microcircuit interface with loopback diagnostic connector
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
@@ -210,12 +211,12 @@ IOHANDLER lpsio;
 
 t_stat lps_svc (UNIT *uptr);
 t_stat lps_reset (DEVICE *dptr);
-t_stat lps_restart (UNIT *uptr, int32 value, char *cptr, void *desc);
-t_stat lps_poweroff (UNIT *uptr, int32 value, char *cptr, void *desc);
-t_stat lps_poweron (UNIT *uptr, int32 value, char *cptr, void *desc);
-t_stat lps_attach (UNIT *uptr, char *cptr);
-t_stat lps_set_timing (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat lps_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+t_stat lps_poweroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+t_stat lps_poweron (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+t_stat lps_attach (UNIT *uptr, CONST char *cptr);
+t_stat lps_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* LPS data structures
 
@@ -537,7 +538,7 @@ return SCPE_OK;
    original I/O request.
  */
 
-t_stat lps_restart (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat lps_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (lps.control && !sim_is_active (uptr))
     sim_activate (uptr, 0);                             /* reschedule I/O */
@@ -546,7 +547,7 @@ return SCPE_OK;
 
 /* Printer power off */
 
-t_stat lps_poweroff (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat lps_poweroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 lps_power = LPS_OFF;                                    /* change state */
 if (DEBUG_PRS (lps_dev)) fputs (">>LPS set: Power state is OFF\n", sim_deb);
@@ -555,7 +556,7 @@ return SCPE_OK;
 
 /* Printer power on */
 
-t_stat lps_poweron (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat lps_poweron (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (lps_unit.flags & UNIT_DIAG) {                       /* diag mode? */
     lps_power = LPS_ON;                                 /* no delay */
@@ -575,7 +576,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lps_attach (UNIT *uptr, char *cptr)
+t_stat lps_attach (UNIT *uptr, CONST char *cptr)
 {
 lps_ccnt = lps_lcnt = 0;                                /* top of form */
 lps_restart (uptr, 0, NULL, NULL);                      /* restart I/O if hung */
@@ -587,7 +588,7 @@ return attach_unit (uptr, cptr);
    Realistic timing is factored, depending on CPU model, to account for the
    timing method employed by the diagnostic. */
 
-t_stat lps_set_timing (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat lps_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, factor = 1;
 
@@ -603,7 +604,7 @@ return SCPE_OK;
 
 /* Show printer timing */
 
-t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (lps_timing) fputs ("fast timing", st);
 else fputs ("realistic timing", st);

@@ -107,8 +107,8 @@ int32 wtc_csrc = 0;
 int32 wtc_csrd = 0;
 int32 wtc_mode = WTC_MODE_VMS;
 
-t_stat wtc_set (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat wtc_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat wtc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *wtc_description (DEVICE *dptr);
 t_stat wtc_reset (DEVICE *dptr);
@@ -149,7 +149,7 @@ DEVICE wtc_dev = {
     };
 
 /* Register names for Debug tracing */
-static char *wtc_regs[] =
+static const char *wtc_regs[] =
     {"SEC ", "SECA", "MIN ", "MINA", 
      "HR  ", "HRA ", "DOW ", "DOM ", 
      "MON ", "YEAR", "CSRA", "CSRB", 
@@ -294,13 +294,13 @@ if (sim_switches & SWMASK ('P')) {                      /* powerup? */
 return SCPE_OK;
 }
 
-t_stat wtc_set (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat wtc_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr != NULL) wtc_mode = strcmp(cptr, "STD");
 return SCPE_OK;
 }
 
-t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf(st, "time=%s", (wtc_mode ? "vms" :"std"));
 return SCPE_OK;

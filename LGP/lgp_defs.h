@@ -138,4 +138,9 @@ enum opcodes {
 uint32 Read (uint32 ea);
 void Write (uint32 ea, uint32 dat);
 
+/* Translation Tables */
+
+extern const int32 flex_to_ascii[128];
+extern const int32 ascii_to_flex[128];
+
 #endif

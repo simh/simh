@@ -44,7 +44,7 @@ extern REG cpu_reg[];
 extern unsigned char M[];
 extern int32 saved_PC, IAR[];
 extern unsigned char ebcdic_to_ascii[];
-char *parse_addr(char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype);
+CONST char *parse_addr(CONST char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype);
 
 int32 printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw);
@@ -225,7 +225,7 @@ char regname[15][8] =  {    "(P2IAR)",
    load starts at the current value of the P1IAR.
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 i, addr = 0, cnt = 0;
 
@@ -506,7 +506,7 @@ return -(oplen - 1);
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, i = 0, j, r, oplen, addtyp, saveaddr, vptr;
 char gbuf[CBUFSIZE];
@@ -928,7 +928,7 @@ switch (opcode[j].form) {                               /* Get operands based on
 return (-(oplen-1));
 }
 
-char *parse_addr(char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype)
+CONST char *parse_addr(CONST char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype)
 {
 int32 nybble = 0;
 char temp[32];

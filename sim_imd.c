@@ -339,7 +339,7 @@ t_stat diskClose(DISK_INFO **myDisk)
  *
  * If the IMD file already exists, the user will be given the option of overwriting it.
  */
-t_stat diskCreate(FILE *fileref, char *ctlr_comment)
+t_stat diskCreate(FILE *fileref, const char *ctlr_comment)
 {
     DISK_INFO *myDisk = NULL;
     char *comment;
@@ -361,7 +361,7 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
         }
     }
 
-    if((curptr = comment = calloc(1, MAX_COMMENT_LEN)) == 0) {
+    if((curptr = comment = (char *)calloc(1, MAX_COMMENT_LEN)) == 0) {
         sim_printf("Memory allocation failure.\n");
         return (SCPE_MEM);
     }
@@ -735,7 +735,7 @@ t_stat trackWrite(DISK_INFO *myDisk,
      * data with the fillbyte.
      */
     dataLen = sectorLen + 1;
-    sectorData = malloc(dataLen);
+    sectorData = (uint8 *)malloc(dataLen);
     memset(sectorData, fillbyte, dataLen);
     sectorData[0] = SECT_RECORD_NORM;
 

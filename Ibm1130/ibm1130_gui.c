@@ -128,7 +128,7 @@ t_stat console_reset (DEVICE *dptr)
 
 /* scp_panic - report fatal internal programming error */
 
-void scp_panic (char *msg)
+void scp_panic (const char *msg)
 {
 	fprintf(stderr, "%s\n", msg);
 	exit(1);

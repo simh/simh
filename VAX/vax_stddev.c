@@ -114,7 +114,7 @@ t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat clk_attach (UNIT *uptr, char *cptr);
+t_stat clk_attach (UNIT *uptr, CONST char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat todr_resync (void);
 const char *tti_description (DEVICE *dptr);
@@ -612,7 +612,7 @@ return "time of year clock";
 
 /* CLK attach */
 
-t_stat clk_attach (UNIT *uptr, char *cptr)
+t_stat clk_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

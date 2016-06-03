@@ -48,7 +48,7 @@ int32 sys_model = 0;
 /* VAX-11/730 boot device definitions */
 
 struct boot_dev {
-    char                *name;
+    const char          *name;
     int32               code;
     int32               let;
     };
@@ -72,8 +72,8 @@ extern int32 tmr_int, tti_int, tto_int, csi_int, cso_int;
 
 t_stat sysb_reset (DEVICE *dptr);
 const char *sysb_description (DEVICE *dptr);
-t_stat vax730_boot (int32 flag, char *ptr);
-t_stat vax730_boot_parse (int32 flag, char *ptr);
+t_stat vax730_boot (int32 flag, CONST char *ptr);
+t_stat vax730_boot_parse (int32 flag, const char *ptr);
 
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
@@ -466,7 +466,7 @@ return cc;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax730_boot (int32 flag, char *ptr)
+t_stat vax730_boot (int32 flag, CONST char *ptr)
 {
 t_stat r;
 
@@ -484,10 +484,11 @@ return run_cmd (flag, "CPU");
 
 /* Parse boot command, set up registers - also used on reset */
 
-t_stat vax730_boot_parse (int32 flag, char *ptr)
+t_stat vax730_boot_parse (int32 flag, const char *ptr)
 {
 char gbuf[CBUFSIZE];
-char *slptr, *regptr;
+char *slptr;
+const char *regptr;
 int32 i, r5v, unitno;
 DEVICE *dptr;
 UNIT *uptr;
@@ -577,7 +578,7 @@ return "system bus controller";
 
 /* Show nexus */
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;

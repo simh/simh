@@ -86,10 +86,10 @@ extern WD179X_INFO_PUB *wd179x_infop;
 static CROMFDC_INFO cromfdc_info_data = { { 0xC000, CROMFDC_ROM_SIZE, 0x3, 2 } };
 static CROMFDC_INFO *cromfdc_info = &cromfdc_info_data;
 
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -112,6 +112,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
 static int32 cromfdc_banksel(const int32 port, const int32 io, const int32 data);
 static int32 cromfdcrom(const int32 port, const int32 io, const int32 data);
 static int32 ccs2810_uart_status(const int32 port, const int32 io, const int32 data);
+static const char* cromfdc_description(DEVICE *dptr);
 
 static int32 dipswitch          = 0;    /* 5-position DIP switch on 64FDC card */
 static int32 bootstrap          = 0;    /* 0 for RDOS 2.52, 1 for RDOS 3.12. */
@@ -229,7 +230,11 @@ static REG cromfdc_reg[] = {
     { NULL }
 };
 
-#define CROMFDC_NAME    "Cromemco 4/16/64 FDC CROMFDC"
+#define CROMFDC_NAME    "Cromemco 4/16/64 FDC"
+
+static const char* cromfdc_description(DEVICE *dptr) {
+    return CROMFDC_NAME;
+}
 
 static MTAB cromfdc_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",
@@ -259,7 +264,7 @@ DEVICE cromfdc_dev = {
     NULL, NULL, &cromfdc_reset,
     &cromfdc_boot, &wd179x_attach, &wd179x_detach,
     &cromfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    cromfdc_dt, NULL, CROMFDC_NAME
+    cromfdc_dt, NULL, NULL, NULL, NULL, NULL, &cromfdc_description
 };
 
 /* This is the CROMFDC RDOS-II ROM.

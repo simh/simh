@@ -118,8 +118,8 @@ static int32 nsectors     = C20MB_NSECTORS;
 static int32 sectsize     = C20MB_SECTSIZE;
 
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern int32 selchan_dma(uint8 *buf, uint32 len);
@@ -131,8 +131,10 @@ extern void raise_ss1_interrupt(uint8 intnum);
 #define DISK2_CAPACITY          (C20MB_NTRACKS*C20MB_NHEADS*C20MB_NSECTORS*C20MB_SECTSIZE)   /* Default Disk Capacity */
 
 static t_stat disk2_reset(DEVICE *disk2_dev);
-static t_stat disk2_attach(UNIT *uptr, char *cptr);
+static t_stat disk2_attach(UNIT *uptr, CONST char *cptr);
 static t_stat disk2_detach(UNIT *uptr);
+static const char* disk2_description(DEVICE *dptr);
+
 static void raise_disk2_interrupt(void);
 
 static int32 disk2dev(const int32 port, const int32 io, const int32 data);
@@ -168,7 +170,11 @@ static REG disk2_reg[] = {
     { NULL }
 };
 
-#define DISK2_NAME  "Compupro Hard Disk Controller DISK2"
+#define DISK2_NAME  "Compupro Hard Disk Controller"
+
+static const char* disk2_description(DEVICE *dptr) {
+    return DISK2_NAME;
+}
 
 static MTAB disk2_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
@@ -201,7 +207,7 @@ DEVICE disk2_dev = {
     NULL, NULL, &disk2_reset,
     NULL, &disk2_attach, &disk2_detach,
     &disk2_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    disk2_dt, NULL, DISK2_NAME
+    disk2_dt, NULL, NULL, NULL, NULL, NULL, &disk2_description
 };
 
 /* Reset routine */
@@ -223,7 +229,7 @@ static t_stat disk2_reset(DEVICE *dptr)
 
 
 /* Attach routine */
-static t_stat disk2_attach(UNIT *uptr, char *cptr)
+static t_stat disk2_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r = SCPE_OK;
     DISK2_DRIVE_INFO *pDrive;

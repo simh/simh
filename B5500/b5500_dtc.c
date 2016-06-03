@@ -141,13 +141,15 @@
 
 t_stat              dtc_srv(UNIT *);
 t_stat              dtco_srv(UNIT *);
-t_stat              dtc_attach(UNIT *, char *);
+t_stat              dtc_attach(UNIT *, CONST char *);
 t_stat              dtc_detach(UNIT *);
 t_stat              dtc_reset(DEVICE *);
-t_stat              dtc_setnl (UNIT *, int32, char *, void *);
-t_stat              dtc_set_log (UNIT *, int32, char *, void *);
-t_stat              dtc_set_nolog (UNIT *, int32, char *, void *);
-t_stat              dtc_show_log (FILE *, UNIT *, int32, void *);
+t_stat              dtc_setnl (UNIT *, int32, CONST char *, void *);
+t_stat              dtc_set_log (UNIT *, int32, CONST char *, void *);
+t_stat              dtc_set_nolog (UNIT *, int32, CONST char *, void *);
+t_stat              dtc_show_log (FILE *, UNIT *, int32, CONST void *);
+t_stat              dtc_set_buf (UNIT *, int32, CONST char *, void *);
+t_stat              dtc_show_buf (FILE *, UNIT *, int32, CONST void *);
 t_stat              dtc_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 t_stat              dtc_help_attach (FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *dtc_description(DEVICE *);
@@ -162,6 +164,7 @@ uint8               dtc_lstatus[DTC_MLINES];                    /* Line status *
 uint16              dtc_bufptr[DTC_MLINES];                     /* Buffer pointer */
 uint16              dtc_bsize[DTC_MLINES];                      /* Buffer size */
 uint16              dtc_blimit[DTC_MLINES];                     /* Buffer size */
+int                 dtc_bufsize = DTC_BUFSIZ;
 
 
 MTAB                dtc_mod[] = {
@@ -175,12 +178,14 @@ MTAB                dtc_mod[] = {
         NULL, &tmxr_show_cstat, (void *) &dtc_desc, "Display multiplexer statistics" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
         &dtc_setnl, &tmxr_show_lines, (void *) &dtc_desc, "Display number of lines" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "BUFSIZE", "BUFSIZE=n",
+        &dtc_set_buf, &dtc_show_buf, (void *)&dtc_bufsize, "Set buffer size" },
     { MTAB_XTD|MTAB_VDV|MTAB_NC, 0, NULL, "LOG=n=file",
-        &dtc_set_log, NULL, &dtc_desc },
+        &dtc_set_log, NULL, (void *)&dtc_desc },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "NOLOG",
-        &dtc_set_nolog, NULL, &dtc_desc, "Disable logging on designated line" },
+        &dtc_set_nolog, NULL, (void *)&dtc_desc, "Disable logging on designated line" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "LOG", NULL,
-        NULL, &dtc_show_log, &dtc_desc, "Display logging for all lines" },
+        NULL, &dtc_show_log, (void *)&dtc_desc, "Display logging for all lines" },
     {0}
 };
 
@@ -282,8 +287,12 @@ t_stat dtc_srv(UNIT * uptr)
             sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm inqury found %d %d ",
                 line, buf);
             if (line != -1) {
-                chan_set_eof(chan);
-                sim_debug(DEBUG_DETAIL, &dtc_dev, " writerdy ");
+                if ((dtc_lstatus[line] & BufSMASK) == BufWriteRdy) {
+                     chan_set_eof(chan);
+                     sim_debug(DEBUG_DETAIL, &dtc_dev, " writerdy ");
+                } else {
+                     sim_debug(DEBUG_DETAIL, &dtc_dev, " idle ");
+                }
             } else if (buf != -1) {
                 chan_set_read(chan);
                 sim_debug(DEBUG_DETAIL, &dtc_dev, " readrdy ");
@@ -310,6 +319,9 @@ t_stat dtc_srv(UNIT * uptr)
                 case BufWriteRdy:
                       chan_set_eof(chan);
                       sim_debug(DEBUG_DETAIL, &dtc_dev, " writerdy ");
+                      break;
+                case BufIdle:
+                      sim_debug(DEBUG_DETAIL, &dtc_dev, " idle ");
                       break;
                 default:
                       chan_set_error(chan);
@@ -368,7 +380,6 @@ t_stat dtc_srv(UNIT * uptr)
         /* Ok to start filling */
         case BufIdle:
         case BufWriteRdy:
-                dtc_lstatus[line] = BufWrite;
                 dtc_bufptr[line] = 0;
                 dtc_bsize[line] = 0;
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm write start %d\n",
@@ -388,24 +399,31 @@ t_stat dtc_srv(UNIT * uptr)
                 if (dtc_lstatus[line] & BufAbnormal) {
                     chan_set_wcflg(chan);
                 }
-                dtc_lstatus[line] = BufOutBusy;
+                /* Empty write, clears flags */
+                if (dtc_bsize[line] == 0) {
+                    sim_debug(DEBUG_DETAIL, &dtc_dev, "empty\n");
+                    if ((dtc_lstatus[line] & BufSMASK) != BufIdle) {
+                        dtc_lstatus[line] = BufIRQ|BufIdle;
+                        IAR |= IRQ_12;
+                    }
                 /* Check if we filled up buffer */
-                if (dtc_bsize[line] >= dtc_blimit[line]) {
+                } else if (dtc_bsize[line] >= dtc_blimit[line]) {
+                     dtc_lstatus[line] = BufOutBusy;
                      chan_set_gm(chan);
                      sim_debug(DEBUG_DETAIL, &dtc_dev, "full ");
-                /* Empty write, clears flags */
-                } else if (dtc_bsize[line] == 0) {
-                    sim_debug(DEBUG_DETAIL, &dtc_dev, "empty\n");
-                    dtc_lstatus[line] = BufIdle;
                 } else {
-                     dtc_lstatus[line] |= BufGM;
+                     dtc_lstatus[line] = BufOutBusy|BufGM;
                      sim_debug(DEBUG_DETAIL, &dtc_dev, "gm ");
                 }
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "\n");
+                for (ttu = 1; line > 15; ttu++)
+                    line -= 15;
+                chan_set_wc(chan, (ttu << 5) | line);
                 chan_set_end(chan);
                 uptr->u5 = DTC_RDY;
                 return SCPE_OK;
         } else {
+              dtc_lstatus[line] = BufWrite;
               dtc_buf[line][dtc_bufptr[line]++] = ch & 077;
               sim_debug(DEBUG_DATA, &dtc_dev, "Datacomm write data %d %02o %d\n",
                           line, ch&077, dtc_bufptr[line]);
@@ -464,14 +482,18 @@ t_stat dtc_srv(UNIT * uptr)
                 if (dtc_lstatus[line] & BufAbnormal) 
                      chan_set_wcflg(chan);
                 if (dtc_ldsc[line].conn == 0)   /* connected? */
-                    dtc_lstatus[line] = BufNotReady;
+                    dtc_lstatus[line] = BufIRQ|BufNotReady;
                 else
-                    dtc_lstatus[line] = BufIdle;
+                    dtc_lstatus[line] = BufIRQ|BufIdle;
                 dtc_bsize[line] = 0;
-                chan_set_end(chan);
-                uptr->u5 = DTC_RDY;
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm read done %d\n",
                          line);
+                for (ttu = 1; line > 15; ttu++)
+                    line -= 15;
+                chan_set_wc(chan, (ttu << 5) | line);
+                chan_set_end(chan);
+                uptr->u5 = DTC_RDY;
+                IAR |= IRQ_12;
                 return SCPE_OK;
         } else {
              sim_debug(DEBUG_DATA, &dtc_dev, "Datacomm read data %d %02o %d\n",
@@ -495,7 +517,7 @@ dtco_srv(UNIT * uptr)
     sim_clock_coschedule(uptr, tmxr_poll);
     ln = tmxr_poll_conn(&dtc_desc);     /* look for connect */
     if (ln >= 0) {              /* got one? */
-        dtc_blimit[ln] = DTC_BUFSIZ-1;
+        dtc_blimit[ln] = dtc_bufsize-1;
         dtc_lstatus[ln] = BufIRQ|BufAbnormal|BufWriteRdy;
         IAR |= IRQ_12;
         sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm connect %d\n", ln);
@@ -559,6 +581,16 @@ dtco_srv(UNIT * uptr)
                                         "Datacomm recieve ENQ %d\n", ln);
                        t = 0;
                        break;
+                 case '\003':   /* ^B send STX */
+                       dtc_lstatus[ln] &= ~BufSMASK;
+                       dtc_lstatus[ln] |= BufIRQ|BufReadRdy|BufAbnormal;
+                       dtc_buf[ln][0] = 0;
+                       dtc_buf[ln][1] = 017;
+                       dtc_buf[ln][2] = 077;
+                       dtc_bsize[ln] = 1;
+                       IAR |= IRQ_12;
+                       t = 0;
+                       break;
                  case '}':
                        dtc_buf[ln][dtc_bufptr[ln]++] = 017;
                        dtc_lstatus[ln] |= BufAbnormal;
@@ -574,6 +606,7 @@ dtco_srv(UNIT * uptr)
                        dtc_bsize[ln] = dtc_bufptr[ln];
                        IAR |= IRQ_12;
                        t = 0;
+                       c1 = 0;
                        sim_debug(DEBUG_DETAIL, &dtc_dev,
                                  "Datacomm recieve %d return\n", ln);
                        break;
@@ -593,7 +626,7 @@ dtco_srv(UNIT * uptr)
                        }
                        c1 = 0;
                        sim_debug(DEBUG_DATA, &dtc_dev, 
-                                "Datacomm recieve %d backspace\n", ln);
+                                "Datacomm recieve %d backspace %d\n", ln, dtc_bufptr[ln]);
                        break;
                  case '?':
                        sim_debug(DEBUG_DATA, &dtc_dev, 
@@ -604,7 +637,8 @@ dtco_srv(UNIT * uptr)
                        break;
                  default:
                        sim_debug(DEBUG_DATA, &dtc_dev,
-                         "Datacomm recieve %d %02x %c %02o\n", ln, c, c, c1);
+                         "Datacomm recieve %d %02x %c %02o %d\n", ln, c, c, c1,
+                             dtc_bufptr[ln]);
                  }
                  if (t && c1) {
                    tmxr_putc_ln(&dtc_ldsc[ln], con_to_ascii[c1]);
@@ -695,7 +729,7 @@ dtc_reset(DEVICE *dptr) {
 
 /* Attach master unit */
 t_stat
-dtc_attach(UNIT * uptr, char *cptr)
+dtc_attach(UNIT * uptr, CONST char *cptr)
 {
     int                 i;
     t_stat              r;
@@ -731,7 +765,7 @@ dtc_detach(UNIT * uptr)
 
 /* SET LINES processor */
 
-t_stat dtc_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dtc_setnl (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     int32 newln, i, t;
     t_stat r;
@@ -764,27 +798,26 @@ t_stat dtc_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 /* SET LOG processor */
 
-t_stat dtc_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dtc_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    char *tptr;
     t_stat r;
+    char gbuf[CBUFSIZE];
     int32 ln;
 
     if (cptr == NULL)
         return SCPE_ARG;
-    tptr = strchr (cptr, '=');
-    if ((tptr == NULL) || (*tptr == 0))
+    cptr = get_glyph (cptr, gbuf, '=');
+    if ((cptr == NULL) || (*cptr == 0) || (gbuf[0] == 0))
         return SCPE_ARG;
-    *tptr++ = 0;
-    ln = (int32) get_uint (cptr, 10, dtc_desc.lines, &r);
+    ln = (int32) get_uint (gbuf, 10, dtc_desc.lines, &r);
     if ((r != SCPE_OK) || (ln >= dtc_desc.lines))
         return SCPE_ARG;
-    return tmxr_set_log (NULL, ln, tptr, desc);
+    return tmxr_set_log (NULL, ln, cptr, desc);
 }
 
 /* SET NOLOG processor */
 
-t_stat dtc_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dtc_set_nolog (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     t_stat r;
     int32 ln;
@@ -799,7 +832,7 @@ t_stat dtc_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 /* SHOW LOG processor */
 
-t_stat dtc_show_log (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dtc_show_log (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     int32 i;
 
@@ -811,10 +844,37 @@ t_stat dtc_show_log (FILE *st, UNIT *uptr, int32 val, void *desc)
     return SCPE_OK;
 }
 
+/* SET BUFFER processor */
+
+t_stat dtc_set_buf (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    t_stat r;
+    int32 bufsiz;
+
+    if (cptr == NULL)
+        return SCPE_ARG;
+    bufsiz = (int32) get_uint (cptr, 10, DTC_BUFSIZ, &r);
+    if ((r != SCPE_OK) || (bufsiz >= DTC_BUFSIZ))
+        return SCPE_ARG;
+    if (bufsiz > 0 && (bufsiz % 28) == 0) {
+        dtc_bufsize = bufsiz;
+        return SCPE_OK;
+    }
+    return SCPE_ARG;
+}
+
+/* SHOW BUFFER processor */
+
+t_stat dtc_show_buf (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    fprintf (st, "bufsize=%d ", dtc_bufsize);
+    return SCPE_OK;
+}
+
 /* Show summary processor */
 
 t_stat
-dtc_summ(FILE * st, UNIT * uptr, int32 val, void *desc)
+dtc_summ(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
 {
     uint32              i, t;
 
@@ -831,7 +891,7 @@ dtc_summ(FILE * st, UNIT * uptr, int32 val, void *desc)
 /* SHOW CONN/STAT processor */
 
 t_stat
-dtc_show(FILE * st, UNIT * uptr, int32 val, void *desc)
+dtc_show(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
 {
     int32               i, cc;
 
@@ -858,6 +918,11 @@ fprintf (st, "The B249 is a terminal multiplexor.  Up to %d lines are supported.
 fprintf (st, "The default number of lines is %d.  The number of lines can\n", DTC_MLINES);
 fprintf (st, "be changed with the command\n\n");
 fprintf (st, "   sim> SET %s LINES=n            set line count to n\n\n", dptr->name);
+fprintf (st, "The default buffer size for all lines can be set to a multiple of 28\n");
+fprintf (st, "to a max of %d characters. Changes will take effect when ", DTC_BUFSIZ);
+fprintf (st, "devices connect.\nThis number must match what MCP believes to be the ");
+fprintf (st, "buffer size.\n\n");
+fprintf (st, "   sim> SET %s BUFSIZE=n          set buffer size to n\n\n", dptr->name);
 fprintf (st, "The B249 supports logging on a per-line basis.  The command\n\n");
 fprintf (st, "   sim> SET %s LOG=n=filename\n\n", dptr->name);
 fprintf (st, "enables logging for the specified line(n) to the indicated file.  The command\n\n");

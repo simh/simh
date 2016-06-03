@@ -209,8 +209,8 @@ typedef struct {
 
 /* Function prototypes */
 
-t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_dev (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_dev (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 void cpu_set_bootpc (int32 pc);
 

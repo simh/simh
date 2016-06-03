@@ -134,8 +134,8 @@ typedef struct {
 
 static SECTOR_FORMAT sdata;
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -176,6 +176,7 @@ static void raise_i8272_interrupt(void);
 static int32 i8272dev(const int32 port, const int32 io, const int32 data);
 static t_stat i8272_reset(DEVICE *dptr);
 int32 find_unit_index (UNIT *uptr);
+static const char* i8272_description(DEVICE *dptr);
 
 I8272_INFO i8272_info_data = { { 0x0, 0, 0xC0, 2 } };
 I8272_INFO *i8272_info = &i8272_info_data;
@@ -189,7 +190,11 @@ static UNIT i8272_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, I8272_CAPACITY) }
 };
 
-#define I8272_NAME  "Intel/NEC(765) FDC Core I8272"
+#define I8272_NAME  "Intel/NEC(765) FDC Core"
+
+static const char* i8272_description(DEVICE *dptr) {
+    return I8272_NAME;
+}
 
 static MTAB i8272_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
@@ -223,7 +228,7 @@ DEVICE i8272_dev = {
     NULL, NULL, &i8272_reset,
     NULL, &i8272_attach, &i8272_detach,
     &i8272_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    i8272_dt, NULL, I8272_NAME
+    i8272_dt, NULL, NULL, NULL, NULL, NULL, &i8272_description
 };
 
 static uint8 I8272_Setup_Cmd(uint8 fdc_cmd);
@@ -274,7 +279,7 @@ int32 find_unit_index (UNIT *uptr)
 }
 
 /* Attach routine */
-t_stat i8272_attach(UNIT *uptr, char *cptr)
+t_stat i8272_attach(UNIT *uptr, CONST char *cptr)
 {
     char header[4];
     t_stat r;
@@ -456,7 +461,7 @@ uint8 I8272_Read(const uint32 Addr)
     return (cData);
 }
 
-static char *messages[0x20] = {
+static const char *messages[0x20] = {
 /*  0                           1                       2                       3                   */
     "Undefined Command 0x0","Undefined Command 0x1","Read Track",           "Specify",
 /*  4                           5                       6                       7                   */

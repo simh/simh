@@ -47,8 +47,8 @@ int32 tmxr_poll = 16000;                                /* term mux poll */
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* CLK data structures
 
@@ -171,7 +171,7 @@ return SCPE_OK;
 
 /* Set frequency */
 
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -183,7 +183,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;

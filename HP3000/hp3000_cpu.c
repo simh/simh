@@ -25,6 +25,7 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    11-Mar-16    JDB     Fixed byte EA calculations with negative indexes
    22-Dec-15    JDB     First release version
    01-Apr-15    JDB     First successful run of MPE-V/R through account login
@@ -934,13 +935,13 @@ static t_stat cpu_reset   (DEVICE  *dptr);
 static t_stat cpu_examine (t_value *eval_array, t_addr address, UNIT *uptr, int32 switches);
 static t_stat cpu_deposit (t_value value,       t_addr address, UNIT *uptr, int32 switches);
 
-static t_stat set_stops   (UNIT *uptr, int32 option,     char *cptr, void *desc);
-static t_stat set_size    (UNIT *uptr, int32 new_size,   char *cptr, void *desc);
-static t_stat set_model   (UNIT *uptr, int32 new_model,  char *cptr, void *desc);
-static t_stat set_option  (UNIT *uptr, int32 new_option, char *cptr, void *desc);
+static t_stat set_stops   (UNIT *uptr, int32 option,     CONST char *cptr, void *desc);
+static t_stat set_size    (UNIT *uptr, int32 new_size,   CONST char *cptr, void *desc);
+static t_stat set_model   (UNIT *uptr, int32 new_model,  CONST char *cptr, void *desc);
+static t_stat set_option  (UNIT *uptr, int32 new_option, CONST char *cptr, void *desc);
 
-static t_stat show_stops  (FILE *st, UNIT *uptr, int32 val, void *desc);
-static t_stat show_speed  (FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat show_stops  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat show_speed  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 
 /* CPU local utility routine declarations */
@@ -3286,7 +3287,7 @@ else {                                                  /* otherwise */
        execution only.
 */
 
-static t_stat set_stops (UNIT *uptr, int32 option, char *cptr, void *desc)
+static t_stat set_stops (UNIT *uptr, int32 option, CONST char *cptr, void *desc)
 {
 char gbuf [CBUFSIZE];
 uint32 stop;
@@ -3352,9 +3353,9 @@ return SCPE_OK;                                         /* the stops were succes
        explicitly zeroed.
 */
 
-static t_stat set_size (UNIT *uptr, int32 new_size, char *cptr, void *desc)
+static t_stat set_size (UNIT *uptr, int32 new_size, CONST char *cptr, void *desc)
 {
-static const char confirm [] = "Really truncate memory [N]?";
+static CONST char confirm [] = "Really truncate memory [N]?";
 
 const uint32 model = CPU_MODEL (uptr->flags);           /* the current CPU model index */
 uint32 address;
@@ -3399,7 +3400,7 @@ return SCPE_OK;                                         /* confirm that the chan
    initial CPU model.  The current memory size will be 0 when this call is made.
 */
 
-static t_stat set_model (UNIT *uptr, int32 new_model, char *cptr, void *desc)
+static t_stat set_model (UNIT *uptr, int32 new_model, CONST char *cptr, void *desc)
 {
 const uint32 new_index = CPU_MODEL (new_model);         /* the new index into the CPU features table */
 uint32 new_memsize;
@@ -3436,7 +3437,7 @@ return status;                                          /* return the validation
    rejected.
 */
 
-static t_stat set_option (UNIT *uptr, int32 new_option, char *cptr, void *desc)
+static t_stat set_option (UNIT *uptr, int32 new_option, CONST char *cptr, void *desc)
 {
 const uint32 model = CPU_MODEL (uptr->flags);           /* the current CPU model index */
 
@@ -3460,7 +3461,7 @@ else                                                    /* otherwise */
    newline to the output before returning.
 */
 
-static t_stat show_stops (FILE *st, UNIT *uptr, int32 val, void *desc)
+static t_stat show_stops (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 stop;
 t_bool need_spacer = FALSE;
@@ -3499,7 +3500,7 @@ return SCPE_OK;                                         /* report the success of
    (which suspends the normal fetch/execute instruction cycle).
 */
 
-static t_stat show_speed (FILE *st, UNIT *uptr, int32 val, void *desc)
+static t_stat show_speed (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "Simulation speed = %dx\n", cpu_speed);    /* display the current CPU speed */
 return SCPE_OK;                                         /*   and report success */

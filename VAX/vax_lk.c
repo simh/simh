@@ -50,7 +50,7 @@
 
 typedef struct {
     int8 group;
-    int8 code;
+    uint8 code;
 } LK_KEYDATA;
 
 LK_KEYDATA LK_KEY_UNKNOWN    = { 0, 0 };

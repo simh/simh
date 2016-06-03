@@ -136,7 +136,7 @@ static int tftp_send_oack(struct tftp_session *spt,
     memset(m->m_data, 0, m->m_size);
 
     m->m_data += IF_MAXLINKHDR;
-    tp = (void *)m->m_data;
+    tp = (struct tftp_t *)m->m_data;
     m->m_data += sizeof(struct udpiphdr);
 
     tp->tp_op = htons(TFTP_OACK);
@@ -177,7 +177,7 @@ static void tftp_send_error(struct tftp_session *spt,
   memset(m->m_data, 0, m->m_size);
 
   m->m_data += IF_MAXLINKHDR;
-  tp = (void *)m->m_data;
+  tp = (struct tftp_t *)m->m_data;
   m->m_data += sizeof(struct udpiphdr);
 
   tp->tp_op = htons(TFTP_ERROR);
@@ -216,7 +216,7 @@ static void tftp_send_next_block(struct tftp_session *spt,
   memset(m->m_data, 0, m->m_size);
 
   m->m_data += IF_MAXLINKHDR;
-  tp = (void *)m->m_data;
+  tp = (struct tftp_t *)m->m_data;
   m->m_data += sizeof(struct udpiphdr);
 
   tp->tp_op = htons(TFTP_DATA);
@@ -291,7 +291,7 @@ static void tftp_handle_rrq(Slirp *slirp, struct tftp_t *tp, int pktlen)
 
   /* prepend tftp_prefix */
   prefix_len = strlen(slirp->tftp_prefix);
-  spt->filename = g_malloc(prefix_len + TFTP_FILENAME_MAX + 2);
+  spt->filename = (char *)g_malloc(prefix_len + TFTP_FILENAME_MAX + 2);
   memcpy(spt->filename, slirp->tftp_prefix, prefix_len);
   spt->filename[prefix_len] = '/';
 

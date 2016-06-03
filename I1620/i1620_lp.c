@@ -57,7 +57,7 @@ int32 lpt_savctrl = 0;                                  /* saved spc ctrl */
 
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 void lpt_buf_init (void);
 t_stat lpt_num(uint32 pa, uint32 f1, t_bool dump);      /* tfm: length parameter removed, not needed */
 t_stat lpt_print (void);
@@ -356,7 +356,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 lpt_reset (&lpt_dev);
 return attach_unit (uptr, cptr);

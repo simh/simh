@@ -32,7 +32,7 @@
 #define UNIT_OFFLINE    (1 << UNIT_V_OFFLINE)
 
 static t_stat sagelp_reset(DEVICE* dptr);
-static t_stat sagelp_attach(UNIT *uptr, char *cptr);
+static t_stat sagelp_attach(UNIT *uptr, CONST char *cptr);
 static t_stat sagelp_detach(UNIT *uptr);
 static t_stat sagelp_output(UNIT *uptr);
 static t_stat u39_reset(I8255* chip);
@@ -202,7 +202,7 @@ static t_stat u39_reset(I8255* chip)
     return SCPE_OK;
 }
 
-static t_stat sagelp_attach (UNIT *uptr, char *cptr)
+static t_stat sagelp_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat rc;
     rc = attach_unit(uptr, cptr);

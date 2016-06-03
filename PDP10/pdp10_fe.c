@@ -49,7 +49,7 @@ t_stat fei_svc (UNIT *uptr);
 t_stat feo_svc (UNIT *uptr);
 static t_stat kaf_svc (UNIT *uptr);
 t_stat fe_reset (DEVICE *dptr);
-t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat fe_stop_os (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 a10 fe_xct = 0;
 uint32 fe_bootrh = 0;
 int32 fe_bootunit = -1;
@@ -307,7 +307,7 @@ return SCPE_OK;
 
 /* Stop operating system */
 
-t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat fe_stop_os (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 M[FE_SWITCH] = IOBA_RP;                                 /* tell OS to stop */
 return SCPE_OK;

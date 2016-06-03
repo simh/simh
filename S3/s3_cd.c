@@ -47,7 +47,7 @@ int32 s1sel, s2sel;
 char rbuf[CBUFSIZE];                                    /* > CDR_WIDTH */
 t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno, DEVICE *dptr);
-t_stat cdr_attach (UNIT *uptr, char *cptr);
+t_stat cdr_attach (UNIT *uptr, CONST char *cptr);
 t_stat cd_reset (DEVICE *dptr);
 t_stat read_card (int32 ilnt, int32 mod);
 t_stat punch_card (int32 ilnt, int32 mod);
@@ -430,7 +430,7 @@ return SCPE_OK;
 
 /* Card reader attach */
 
-t_stat cdr_attach (UNIT *uptr, char *cptr)
+t_stat cdr_attach (UNIT *uptr, CONST char *cptr)
 {
 carderr = lastcard = notready = 0;                      /* clear last card */
 return attach_unit (uptr, cptr);

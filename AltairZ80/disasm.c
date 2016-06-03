@@ -1176,7 +1176,7 @@ long disasm (unsigned char *data, char *output, int segsize, long offset)
 {
     struct itemplate **p, **best_p;
     int length, best_length = 0;
-    char *segover;
+    const char *segover;
     int rep, lock, asize, osize, i, slen, colon;
     unsigned char *origdata;
     int works;

@@ -70,7 +70,13 @@ typedef enum {
  *
  * Returns: the clock value in nanoseconds
  */
+#if defined(__cplusplus)
+extern "C" {
+#endif
 int64_t qemu_clock_get_ns(QEMUClockType type);
+#if defined(__cplusplus)
+}
+#endif
 
 /**
  * qemu_clock_get_ms;

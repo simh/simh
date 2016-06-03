@@ -140,7 +140,7 @@ t_stat pclk_rd (int32 *data, int32 PA, int32 access);
 t_stat pclk_wr (int32 data, int32 PA, int32 access);
 t_stat pclk_svc (UNIT *uptr);
 t_stat pclk_reset (DEVICE *dptr);
-t_stat pclk_set_line (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat pclk_set_line (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 const char *pclk_description (DEVICE *dptr);
 void pclk_tick (void);
 
@@ -313,7 +313,7 @@ return auto_config (0, 0);
 
 /* Set line frequency */
 
-t_stat pclk_set_line (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat pclk_set_line (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val == UNIT_LINE50HZ)
     rate[2] = 50;

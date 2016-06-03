@@ -76,7 +76,6 @@ int32 drm_wlk = 0;                                      /* write lock */
 int32 drm_time = 10;                                    /* inter-word time */
 int32 drm_stopioe = 1;                                  /* stop on error */
 
-DEVICE drm_dev;
 int32 drm60 (int32 dev, int32 pulse, int32 AC);
 int32 drm61 (int32 dev, int32 pulse, int32 AC);
 int32 drm62 (int32 dev, int32 pulse, int32 AC);
