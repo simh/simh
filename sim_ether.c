@@ -1392,7 +1392,7 @@ static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6
   p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))GetProcAddress(hDll, "PacketRequest");
 #else
   hDll = dlopen("packet.dll", RTLD_NOW);
-  p_PacketOpenAdapter = (LPADAPTER (*)(char *AdapterName))dlsym(hDll, "PacketOpenAdapter");
+  p_PacketOpenAdapter = (LPADAPTER (*)(const char *AdapterName))dlsym(hDll, "PacketOpenAdapter");
   p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))dlsym(hDll, "PacketCloseAdapter");
   p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))dlsym(hDll, "PacketRequest");
 #endif
@@ -1445,28 +1445,6 @@ static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6
   dlclose(hDll);
 #endif
   return ReturnValue;
-}
-
-static int _eth_get_system_id (char *buf, size_t buf_size)
-{
-  LONG status;
-  DWORD reglen, regtype;
-  HKEY reghnd;
-
-  memset (buf, 0, buf_size);
-  if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", 0, KEY_QUERY_VALUE|KEY_WOW64_64KEY, &reghnd)) != ERROR_SUCCESS)
-    return -1;
-  reglen = buf_size;
-  if ((status = RegQueryValueExA (reghnd, "MachineGuid", NULL, &regtype, buf, &reglen)) != ERROR_SUCCESS) {
-    RegCloseKey (reghnd);
-    return -1;
-    }
-  RegCloseKey (reghnd );
-  /* make sure value is the right type, bail if not acceptable */
-  if ((regtype != REG_SZ) || (reglen > buf_size))
-    return -1;
-  /* registry value seems OK */
-  return 0;
 }
 
 #endif  /* defined(_WIN32) || defined(__CYGWIN__) */
@@ -1636,7 +1614,31 @@ if (gethostuuid (uuid, &wait))
 uuid_unparse_lower(uuid, buf);
 return 0;
 }
-#elif !defined(_WIN32)
+
+#elif defined(_WIN32)
+static int _eth_get_system_id (char *buf, size_t buf_size)
+{
+  LONG status;
+  DWORD reglen, regtype;
+  HKEY reghnd;
+
+  memset (buf, 0, buf_size);
+  if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", 0, KEY_QUERY_VALUE|KEY_WOW64_64KEY, &reghnd)) != ERROR_SUCCESS)
+    return -1;
+  reglen = buf_size;
+  if ((status = RegQueryValueExA (reghnd, "MachineGuid", NULL, &regtype, buf, &reglen)) != ERROR_SUCCESS) {
+    RegCloseKey (reghnd);
+    return -1;
+    }
+  RegCloseKey (reghnd );
+  /* make sure value is the right type, bail if not acceptable */
+  if ((regtype != REG_SZ) || (reglen > buf_size))
+    return -1;
+  /* registry value seems OK */
+  return 0;
+}
+
+#else
 static int _eth_get_system_id (char *buf, size_t buf_size)
 {
 FILE *f;
