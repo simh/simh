@@ -6072,12 +6072,14 @@ if (warned)
 return r;
 }
 
-/* Run, go, cont, step commands
+/* Run, go, boot, cont, step, next commands
 
    ru[n] [new PC]       reset and start simulation
    go [new PC]          start simulation
    co[nt]               start simulation
    s[tep] [step limit]  start simulation for 'limit' instructions
+   next                 start simulation for 1 instruction 
+                        stepping over subroutine calls
    b[oot] device        bootstrap from device and start simulation
 
    switches:
@@ -6088,12 +6090,12 @@ return r;
 
 t_stat run_cmd (int32 flag, CONST char *cptr)
 {
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE] = "";
 CONST char *tptr;
 uint32 i, j;
 int32 sim_next;
 int32 unitno;
-t_value pcv;
+t_value pcv, orig_pcv;
 t_stat r;
 DEVICE *dptr;
 UNIT *uptr;
@@ -6101,21 +6103,49 @@ UNIT *uptr;
 GET_SWITCHES (cptr);                                    /* get switches */
 sim_step = 0;
 if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
+    orig_pcv = get_rval (sim_PC, 0);                    /* get current PC value */
     if (*cptr != 0) {                                   /* argument? */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
-        if (*cptr != 0)                                 /* should be end */
-            return SCPE_2MARG;
-        if (sim_vm_parse_addr)                          /* address parser? */
-            pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
-        else pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
-        if ((tptr == gbuf) || (*tptr != 0) ||           /* error? */
-            (pcv > width_mask[sim_PC->width]))
-            return SCPE_ARG;
-        put_rval (sim_PC, 0, pcv);
+        if (MATCH_CMD (gbuf, "UNTIL") != 0) {
+            if (sim_vm_parse_addr)                      /* address parser? */
+                pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
+            else pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
+            if ((tptr == gbuf) || (*tptr != 0) ||       /* error? */
+                (pcv > width_mask[sim_PC->width]))
+                return SCPE_ARG;
+            put_rval (sim_PC, 0, pcv);                  /* Save in PC */
+            }
         }
     if ((flag == RU_RUN) &&                             /* run? */
-        ((r = sim_run_boot_prep ()) != SCPE_OK))        /* reset sim */
+        ((r = sim_run_boot_prep ()) != SCPE_OK)) {      /* reset sim */
+        put_rval (sim_PC, 0, orig_pcv);                 /* restore original PC */
         return r;
+        }
+    if ((*cptr) || (MATCH_CMD (gbuf, "UNTIL") == 0)) {  /* should be end */
+        int32 saved_switches = sim_switches;
+
+        if (MATCH_CMD (gbuf, "UNTIL") != 0)
+            cptr = get_glyph (cptr, gbuf, 0);           /* get next glyph */
+        if (MATCH_CMD (gbuf, "UNTIL") != 0)
+            return sim_messagef (SCPE_2MARG, "Unexpected %s command argument: %s %s\n", 
+                                             (flag == RU_RUN) ? "RUN" : "GO", gbuf, cptr);
+        sim_switches = 0;
+        GET_SWITCHES (cptr);
+        if ((*cptr == '\'') || (*cptr == '"')) {        /* Expect UNTIL condition */
+            r = expect_cmd (1, cptr);
+            if (r != SCPE_OK)
+                return r;
+            }
+        else {                                          /* BREAK UNTIL condition */
+            if (sim_switches == 0)
+                sim_switches = sim_brk_dflt;
+            sim_switches |= BRK_TYP_TEMP;               /* make this a one-shot breakpoint */
+            r = ssh_break (NULL, cptr, SSH_ST);
+            if (r != SCPE_OK)
+                return sim_messagef (r, "Unable to establish breakpoint at: %s\n", cptr);
+            }
+        sim_switches = saved_switches;
+        }
     }
 
 else if ((flag == RU_STEP) ||
@@ -9075,7 +9105,7 @@ if ((bp = sim_brk_fnd (loc)) && (btyp & bp->typ)) {     /* in table, and type ma
     sim_brk_setact (bp->act);                           /* set up actions */
     res = btyp & bp->typ;                               /* set return value */
     if (bp->typ & BRK_TYP_TEMP)
-        sim_brk_clr (loc, btyp);                        /* delete one-shot breakpoint */
+        sim_brk_clr (loc, btyp | BRK_TYP_TEMP);         /* delete one-shot breakpoint */
     else {
         sim_brk_ploc[spc] = loc;                        /* save location */
         sim_brk_pend[spc] = TRUE;                       /* don't do twice */

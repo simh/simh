@@ -279,6 +279,10 @@ The EXPECT command now exists to provide a means of reacting to simulator output
     EXPECT                          React to output produced by a simulated system
     SEND                            Inject input to a simulated system's console
     SCREENSHOT                      Snapshot the current video display window
+    RUN UNTIL breakpoint            Establish the breakpoiunt specified and run until it is encountered
+    RUN UNTIL "output-string" ...   Establish the specified "output-string" as an EXPECT and run until it is encountered.
+    GO UNTIL breakpoint             Establish the breakpoiunt specified and go until it is encountered
+    GO UNTILE "output-string" ...   Establish the specified "output-string" as an EXPECT and go until it is encountered.
 
 #### Command Processing Enhancements
 
