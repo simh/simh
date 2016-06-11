@@ -419,6 +419,8 @@ SDL_Init (SDL_INIT_VIDEO);
 vid_main_thread_handle = SDL_CreateThread (main_thread , "simh-main", NULL);
 #endif
 
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
+
 vid_beep_setup (400, 660);
 
 while (1) {

@@ -2960,8 +2960,6 @@ t_bool              sim_tmxr_poll_running = FALSE;
 static void *
 _tmxr_poll(void *arg)
 {
-int sched_policy;
-struct sched_param sched_priority;
 struct timeval timeout;
 int timeout_usec;
 DEVICE *dptr = tmxr_open_devices[0]->dptr;
@@ -2973,9 +2971,7 @@ int wait_count = 0;
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_poll() - starting\n");
 
@@ -3180,8 +3176,6 @@ return NULL;
 static void *
 _tmxr_serial_poll(void *arg)
 {
-int sched_policy;
-struct sched_param sched_priority;
 int timeout_usec;
 DEVICE *dptr = tmxr_open_devices[0]->dptr;
 UNIT **units = NULL;
@@ -3192,9 +3186,7 @@ int wait_count = 0;
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_serial_poll() - starting\n");
 
@@ -3316,8 +3308,6 @@ static void *
 _tmxr_serial_line_poll(void *arg)
 {
 TMLN *lp = (TMLN *)arg;
-int sched_policy;
-struct sched_param sched_priority;
 DEVICE *dptr = tmxr_open_devices[0]->dptr;
 UNIT *uptr = (lp->uptr ? lp->uptr : lp->mp->uptr);
 DEVICE *d = find_dev_from_unit(uptr);
@@ -3326,9 +3316,7 @@ int wait_count = 0;
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_serial_line_poll() - starting\n");
 
@@ -3398,8 +3386,6 @@ return NULL;
 static void *
 _tmxr_serial_poll(void *arg)
 {
-int sched_policy;
-struct sched_param sched_priority;
 int timeout_usec;
 DEVICE *dptr = tmxr_open_devices[0]->dptr;
 TMLN **lines = NULL;
@@ -3408,9 +3394,6 @@ pthread_t *threads = NULL;
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
 sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_serial_poll() - starting\n");
 

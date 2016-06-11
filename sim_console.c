@@ -2156,17 +2156,13 @@ pthread_cond_t      sim_console_startup_cond;
 static void *
 _console_poll(void *arg)
 {
-int sched_policy;
-struct sched_param sched_priority;
 int wait_count = 0;
 DEVICE *d;
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - starting\n");
 
@@ -2529,7 +2525,7 @@ if (sim_log) {
     fflush (sim_log);
     _setmode (_fileno (sim_log), _O_BINARY);
     }
-SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+sim_os_set_thread_priority (PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
 
@@ -2539,7 +2535,7 @@ if (sim_log) {
     fflush (sim_log);
     _setmode (_fileno (sim_log), _O_TEXT);
     }
-SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
+sim_os_set_thread_priority (PRIORITY_NORMAL);
 if ((std_input) &&                                      /* If Not Background process? */
     (std_input != INVALID_HANDLE_VALUE) &&
     (!SetConsoleMode(std_input, saved_mode)))           /* Restore Normal mode */
@@ -2952,13 +2948,13 @@ if (ioctl (0, TIOCSETC, &runtchars) < 0)
     return SCPE_TTIERR;
 if (ioctl (0, TIOCSLTC, &runltchars) < 0)
     return SCPE_TTIERR;
-nice (10);                                              /* lower priority */
+sim_os_set_thread_priority (PRIORITY_BELOW_NORMAL)l     /* lower priority */
 return SCPE_OK;
 }
 
 static t_stat sim_os_ttcmd (void)
 {
-nice (-10);                                             /* restore priority */
+sim_os_set_thread_priority (PRIORITY_NORMAL);           /* restore priority */
 fcntl (0, F_SETFL, cmdfl);                              /* block mode */
 if (ioctl (0, TIOCSETP, &cmdtty) < 0)
     return SCPE_TTIERR;
@@ -3026,7 +3022,6 @@ return SCPE_OK;
 #include <unistd.h>
 
 struct termios cmdtty, runtty;
-static int prior_norm = 1;
 
 static t_stat sim_os_ttinit (void)
 {
@@ -3085,11 +3080,7 @@ runtty.c_cc[VINTR] = sim_int_char;                      /* in case changed */
 #endif
 if (tcsetattr (0, TCSAFLUSH, &runtty) < 0)
     return SCPE_TTIERR;
-if (prior_norm) {                                       /* at normal pri? */
-    errno =     0;
-    (void)nice (10);                                    /* try to lower pri */
-    prior_norm = errno;                                 /* if no error, done */
-    }
+sim_os_set_thread_priority (PRIORITY_BELOW_NORMAL);     /* try to lower pri */
 return SCPE_OK;
 }
 
@@ -3097,11 +3088,7 @@ static t_stat sim_os_ttcmd (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
-if (!prior_norm) {                                      /* priority down? */
-    errno =     0;
-    (void)nice (-10);                                   /* try to raise pri */
-    prior_norm = (errno == 0);                          /* if no error, done */
-    }
+sim_os_set_thread_priority (PRIORITY_NORMAL);           /* try to raise pri */
 if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0)
     return SCPE_TTIERR;
 return SCPE_OK;

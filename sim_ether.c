@@ -1689,8 +1689,6 @@ _eth_reader(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
 int status = 0;
-int sched_policy;
-struct sched_param sched_priority;
 int sel_ret = 0;
 int do_select = 0;
 SOCKET select_fd = 0;
@@ -1721,9 +1719,7 @@ sim_debug(dev->dbit, dev->dptr, "Reader Thread Starting\n");
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor 
    when this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 while (dev->handle) {
 #if defined (_WIN32)
@@ -1880,15 +1876,11 @@ _eth_writer(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
 ETH_WRITE_REQUEST *request;
-int sched_policy;
-struct sched_param sched_priority;
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which in general won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 

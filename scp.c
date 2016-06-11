@@ -7698,7 +7698,8 @@ if (double_quote_found && (!single_quote_found))
 *tptr++ = quote;
 while (size--) {
     switch (*iptr) {
-        case '\r':  *tptr++ = '\\'; *tptr++ = 'r'; break;
+        case '\r': 
+            *tptr++ = '\\'; *tptr++ = 'r'; break;
         case '\n':
             *tptr++ = '\\'; *tptr++ = 'n'; break;
         case '\f':

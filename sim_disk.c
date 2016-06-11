@@ -162,16 +162,12 @@ static void *
 _disk_io(void *arg)
 {
 UNIT* volatile uptr = (UNIT*)arg;
-int sched_policy;
-struct sched_param sched_priority;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution
    thread which in general won't be readily yielding the processor when
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug (ctx->dbit, ctx->dptr, "_disk_io(unit=%d) starting\n", (int)(uptr-ctx->dptr->units));
 
