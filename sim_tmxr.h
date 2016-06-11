@@ -65,7 +65,6 @@ typedef int SERHANDLE;
 #define TMXR_V_VALID    15
 #define TMXR_VALID      (1 << TMXR_V_VALID)
 #define TMXR_MAXBUF     256                             /* buffer size */
-#define TMXR_GUARD      12                              /* buffer guard */
 
 #define TMXR_DTR_DROP_TIME 500                          /* milliseconds to drop DTR for 'pseudo' modem control */
 #define TMXR_MODEM_RING_TIME 3                          /* seconds to wait for DTR for incoming connections */

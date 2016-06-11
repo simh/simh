@@ -439,6 +439,8 @@ static u_char mantra[] = {                  /* Telnet Option Negotiation Mantra 
     TN_IAC, TN_DO, TN_BIN
     };
 
+#define TMXR_GUARD  ((int32)(lp->serport ? 0 : sizeof(mantra)))/* buffer guard */
+
 /* Local routines */
 
 static void tmxr_add_to_open_list (TMXR* mux);
@@ -2027,7 +2029,7 @@ if ((lp->conn == FALSE) &&                              /* no conn & not buffere
     return SCPE_LOST;
     }
 tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
-#define TXBUF_AVAIL(lp) (lp->txbsz - tmxr_tqln (lp))
+#define TXBUF_AVAIL(lp) ((lp->serport ? 1: lp->txbsz) - tmxr_tqln (lp))
 #define TXBUF_CHAR(lp, c) {                               \
     lp->txb[lp->txbpi++] = (char)(c);                     \
     lp->txbpi %= lp->txbsz;                               \
