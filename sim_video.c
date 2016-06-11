@@ -58,6 +58,34 @@ char vid_release_key[64] = "Ctrl-Right-Shift";
 #include <SDL.h>
 #include <SDL_thread.h>
 
+static const char *key_names[] = 
+    {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", 
+     "0",   "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",    
+     "A",   "B",  "C",  "D",  "E",  "F",  "G",  "H",  "I",  "J", 
+     "K",   "L",  "M",  "N",  "O",  "P",  "Q",  "R",  "S",  "T", 
+     "U",   "V",  "W",  "X",  "Y",  "Z", 
+     "BACKQUOTE",   "MINUS",   "EQUALS", "LEFT_BRACKET", "RIGHT_BRACKET", 
+     "SEMICOLON", "SINGLE_QUOTE", "BACKSLASH", "LEFT_BACKSLASH", "COMMA", 
+     "PERIOD", "SLASH", "PRINT", "SCRL_LOCK", "PAUSE", "ESC", "BACKSPACE", 
+     "TAB", "ENTER", "SPACE", "INSERT", "DELETE", "HOME", "END", "PAGE_UP", 
+     "PAGE_DOWN", "UP", "DOWN", "LEFT", "RIGHT", "CAPS_LOCK", "NUM_LOCK", 
+     "ALT_L", "ALT_R", "CTRL_L", "CTRL_R", "SHIFT_L", "SHIFT_R", 
+     "WIN_L", "WIN_R", "MENU", "KP_ADD", "KP_SUBTRACT", "KP_END", "KP_DOWN", 
+     "KP_PAGE_DOWN", "KP_LEFT", "KP_RIGHT", "KP_HOME", "KP_UP", "KP_PAGE_UP", 
+     "KP_INSERT", "KP_DELETE", "KP_5", "KP_ENTER", "KP_MULTIPLY", "KP_DIVIDE"
+     };
+
+const char *vid_key_name (int32 key)
+{
+static char tmp_key_name[40];
+
+    if (key < sizeof(key_names)/sizeof(key_names[0]))
+        sprintf (tmp_key_name, "SIM_KEY_%s", key_names[key]);
+    else
+        sprintf (tmp_key_name, "UNKNOWN KEY: %d", key);
+    return tmp_key_name;
+}
+
 #if defined(HAVE_LIBPNG)
 /* From: https://github.com/driedfruit/SDL_SavePNG */
 
@@ -249,9 +277,9 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
 #define EVENT_SHOW       6                              /* show SDL capabilities */
 #define EVENT_OPEN       7                              /* vid_open request */
 #define EVENT_EXIT       8                              /* program exit */
-#define EVENT_SCREENSHOT 9                              /* show SDL capabilities */
+#define EVENT_SCREENSHOT 9                              /* produce screenshot of video window */
 #define EVENT_BEEP      10                              /* audio beep */
-#define MAX_EVENTS       20                             /* max events in queue */
+#define MAX_EVENTS      20                              /* max events in queue */
 
 typedef struct {
     SIM_KEY_EVENT events[MAX_EVENTS];
@@ -1149,23 +1177,21 @@ if (vid_mouse_captured) {
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_key_events.sem) == 0) {
-    sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event: State: %d, Keysym(scancode,sym): (%d,%d)\n", event->state, event->keysym.scancode, event->keysym.sym);
     if (vid_key_events.count < MAX_EVENTS) {
+        ev.key = vid_map_key (event->keysym.sym);
+        sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event: State: %s, Keysym(scancode,sym): (%d,%d) - %s\n", (event->state == SDL_PRESSED) ? "PRESSED" : "RELEASED", event->keysym.scancode, event->keysym.sym, vid_key_name(ev.key));
         if (event->state == SDL_PRESSED) {
 #if SDL_MAJOR_VERSION == 1
             if (!vid_key_state[event->keysym.sym]) {    /* Key was not down before */
                 vid_key_state[event->keysym.sym] = TRUE;
 #else
-            if (!vid_key_state[event->keysym.scancode]) {    /* Key was not down before */
+            if (!vid_key_state[event->keysym.scancode]) {/* Key was not down before */
                 vid_key_state[event->keysym.scancode] = TRUE;
 #endif
-                ev.key = vid_map_key (event->keysym.sym);
                 ev.state = SIM_KEYPRESS_DOWN;
                 }
-            else {
-                ev.key = vid_map_key (event->keysym.sym);
+            else
                 ev.state = SIM_KEYPRESS_REPEAT;
-                }
             }
         else {
 #if SDL_MAJOR_VERSION == 1
@@ -1173,7 +1199,6 @@ if (SDL_SemWait (vid_key_events.sem) == 0) {
 #else
             vid_key_state[event->keysym.scancode] = FALSE;
 #endif
-            ev.key = vid_map_key (event->keysym.sym);
             ev.state = SIM_KEYPRESS_UP;
             }
         vid_key_events.events[vid_key_events.tail++] = ev;
@@ -1182,7 +1207,7 @@ if (SDL_SemWait (vid_key_events.sem) == 0) {
             vid_key_events.tail = 0;
         }
     else {
-        sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event DISCARDED: State: %d, Keysym: Scancode: %d, Keysym: %d\n", event->state, event->keysym.scancode, event->keysym.sym);
+        sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event DISCARDED: State: %s, Keysym: Scancode: %d, Keysym: %d\n", (event->state == SDL_PRESSED) ? "PRESSED" : "RELEASED", event->keysym.scancode, event->keysym.sym);
         }
     if (SDL_SemPost (vid_key_events.sem))
         sim_printf ("%s: vid_key(): SDL_SemPost error: %s\n", sim_dname(vid_dev), SDL_GetError());
@@ -1214,7 +1239,7 @@ while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSE
     event->yrel += dev->yrel;
     event->x = dev->x;
     event->y = dev->y;
-    event->state ^= dev->state;
+    event->state = dev->state;
     sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: Additional Event Coalesced:pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d)\n", 
         dev->x, dev->y, dev->xrel, dev->yrel, (dev->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? 1 : 0, (dev->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 1 : 0, (dev->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 1 : 0);
     };
