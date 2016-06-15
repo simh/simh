@@ -2146,10 +2146,16 @@ if (!filename)
     return SCPE_MEM;
 #if SDL_MAJOR_VERSION == 1
 #if defined(HAVE_LIBPNG)
-sprintf (fullname, "%s.png", filename);
-stat = SDL_SavePNG(vid_image, fullname);
+if (!match_ext (filename, "bmp")) {
+    sprintf (fullname, "%s%s", filename, match_ext (filename, "png") ? "" : ".png");
+    stat = SDL_SavePNG(vid_image, fullname);
+    }
+else {
+    sprintf (fullname, "%s", filename);
+    stat = SDL_SaveBMP(vid_image, fullname);
+    }
 #else
-sprintf (fullname, "%s.bmp", filename);
+sprintf (fullname, "%s%s", filename, match_ext (filename, "bmp") ? "" : ".bmp");
 stat = SDL_SaveBMP(vid_image, fullname);
 #endif /* defined(HAVE_LIBPNG) */
 #else /* SDL_MAJOR_VERSION != 1 */
@@ -2158,10 +2164,16 @@ if (1) {
                                    SDL_CreateRGBSurface(0, vid_width, vid_height, 32, 0x0000ff00, 0x000ff000, 0xff000000, 0x000000ff) ;
     SDL_RenderReadPixels(vid_renderer, NULL, SDL_PIXELFORMAT_ARGB8888, sshot->pixels, sshot->pitch);
 #if defined(HAVE_LIBPNG)
-    sprintf (fullname, "%s.png", filename);
-    stat = SDL_SavePNG(sshot, fullname);
+    if (!match_ext (filename, "bmp")) {
+        sprintf (fullname, "%s%s", filename, match_ext (filename, "png") ? "" : ".png");
+        stat = SDL_SavePNG(sshot, fullname);
+        }
+    else {
+        sprintf (fullname, "%s", filename);
+        stat = SDL_SaveBMP(sshot, fullname);
+        }
 #else
-    sprintf (fullname, "%s.bmp", filename);
+    sprintf (fullname, "%s%s", filename, match_ext (filename, "bmp") ? "" : ".bmp");
     stat = SDL_SaveBMP(sshot, fullname);
 #endif /* defined(HAVE_LIBPNG) */
     SDL_FreeSurface(sshot);
