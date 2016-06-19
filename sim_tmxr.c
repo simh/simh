@@ -1502,7 +1502,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
         if (lp->serport)
             return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
         if ((lp->sock) || (lp->connecting)) {
-            if ((~before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
+            if ((before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
                 if (lp->sock)
                     tmxr_report_disconnection (lp);     /* report closure */
                 tmxr_reset_ln (lp);
@@ -1510,7 +1510,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
             }
         else {
             if ((lp->destination) &&                    /* Virtual Null Modem Cable */
-                ((bits_to_set ^ before_modem_bits) &    /* and DTR being Raised */
+                (bits_to_set & ~before_modem_bits &     /* and DTR being Raised */
                  TMXR_MDM_DTR)) {
                 char msg[512];
 
@@ -1523,7 +1523,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
     return SCPE_OK;
     }
 if ((lp->sock) || (lp->connecting)) {
-    if ((~before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
+    if ((before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
         if (lp->sock)
             tmxr_report_disconnection (lp);     /* report closure */
         tmxr_reset_ln (lp);
@@ -1531,7 +1531,7 @@ if ((lp->sock) || (lp->connecting)) {
     }
 if ((lp->serport) && (!lp->loopback))
     sim_control_serial (lp->serport, 0, 0, incoming_bits);
-return SCPE_IERR;
+return SCPE_INCOMP;
 }
 
 /* Enable or Disable loopback mode on a line
