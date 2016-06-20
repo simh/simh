@@ -1974,7 +1974,20 @@ if (!sim_quiet) {
     }
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
+if (*argv[0]) {                                         /* sim name arg? */
+    char *np;                                           /* "path.ini" */
 
+    strncpy (nbuf, argv[0], PATH_MAX + 1);              /* copy sim name */
+    if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
+        *np = 0;
+    np = strrchr (nbuf, '/');                           /* stript path and try again in cwd */
+    if (np == NULL)
+        np = strrchr (nbuf, '\\');                      /* windows path separator */
+    if (np == NULL)
+        np = strrchr (nbuf, ']');                       /* VMS path separator */
+    if (np != NULL)
+        setenv ("SIM_BIN_NAME", np, 1);                 /* Publish simulator binary name */
+    }
 sim_argv = argv;
 cptr = getenv("HOME");
 if (cptr == NULL) {
@@ -2006,12 +2019,8 @@ else if (*argv[0]) {                                    /* sim name arg? */
         if (np == NULL)
             np = strrchr (nbuf, ']');                   /* VMS path separator */
         if (np != NULL) {
-            char *sim_bin_name = np;                    /* Save name pointer */
-
             *np = '"';
             stat = do_cmd (-1, np) & ~SCPE_NOMESSAGE;   /* proc default cmd file */
-            np[strlen (np) - 4] = '\0';                 /* strip .ini" */
-            setenv ("SIM_BIN_NAME", sim_bin_name+1, 1); /* Publish simulator binary name */
             }
         }
     }
