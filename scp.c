@@ -1986,7 +1986,7 @@ if (*argv[0]) {                                         /* sim name arg? */
     if (np == NULL)
         np = strrchr (nbuf, ']');                       /* VMS path separator */
     if (np != NULL)
-        setenv ("SIM_BIN_NAME", np, 1);                 /* Publish simulator binary name */
+        setenv ("SIM_BIN_NAME", np+1, 1);               /* Publish simulator binary name */
     }
 sim_argv = argv;
 cptr = getenv("HOME");
