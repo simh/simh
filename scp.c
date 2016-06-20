@@ -2006,8 +2006,12 @@ else if (*argv[0]) {                                    /* sim name arg? */
         if (np == NULL)
             np = strrchr (nbuf, ']');                   /* VMS path separator */
         if (np != NULL) {
+            char *sim_bin_name = np;                    /* Save name pointer */
+
             *np = '"';
             stat = do_cmd (-1, np) & ~SCPE_NOMESSAGE;   /* proc default cmd file */
+            np[strlen (np) - 4] = '\0';                 /* strip .ini" */
+            setenv ("SIM_BIN_NAME", sim_bin_name+1, 1); /* Publish simulator binary name */
             }
         }
     }
