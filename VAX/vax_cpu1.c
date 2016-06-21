@@ -1507,9 +1507,9 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_SIRR:                                       /* SIRR */
-        if ((val > 0xF) || (val == 0))
-            RSVD_OPND_FAULT;
-        SISR = SISR | (1 << val);                       /* set bit in SISR */
+        val = val & 0xF;                                /* consider only 4b */
+        if (val != 0)                                   /* if not zero */
+            SISR = SISR | (1 << val);                   /* set bit in SISR */
         break;
 
     case MT_SISR:                                       /* SISR */
