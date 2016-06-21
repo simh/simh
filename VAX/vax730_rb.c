@@ -231,7 +231,7 @@ t_stat rb_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 DIB rb_dib = {
     IOBA_AUTO, IOLN_RB, &rb_rd16, &rb_wr16,
-    1, IVCL (RB), VEC_AUTO, { NULL } };
+    1, IVCL (RB), VEC_AUTO, { NULL }, IOLN_RB };
 
 UNIT rb_unit[] = {
     { UDATA (&rb_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
