@@ -760,6 +760,7 @@ void eth_zero(ETH_DEV* dev)
 }
 
 static char*   (*p_pcap_lib_version) (void);
+static char*   (*p_pcap_get_servicename) (void);
 
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
@@ -807,8 +808,12 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
       for (i=0; i<number; i++)
         fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
-  if (p_pcap_lib_version)
+  if (p_pcap_lib_version) {
     fprintf(st, "%s\n", p_pcap_lib_version());
+#if defined(_WIN32)
+    fprintf(st, "Windows Packet Capture Service Name: %s\n", p_pcap_get_servicename ? p_pcap_get_servicename() : "npf");
+#endif
+    }
   if (eth_open_device_count) {
     int i;
     char desc[ETH_DEV_DESC_MAX], *d;
@@ -1066,11 +1071,11 @@ extern "C" {
 
 /* Dynamic DLL load variables */
 #ifdef _WIN32
-static HINSTANCE hLib = 0;                      /* handle to DLL */
+static HINSTANCE hLib = NULL;               /* handle to DLL */
 #else
 static void *hLib = 0;                      /* handle to Library */
 #endif
-static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
+static int lib_loaded = 0;                  /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
 static const char* lib_name =
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
@@ -1127,13 +1132,38 @@ static void load_function(const char* function, _func* func_ptr) {
   }
 }
 
+static void try_load_function(const char* function, _func* func_ptr) {
+#ifdef _WIN32
+    *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
+#else
+    *func_ptr = (_func)((size_t)dlsym(hLib, function));
+#endif
+}
+
 /* load wpcap.dll as required */
 int load_pcap(void) {
   switch(lib_loaded) {
     case 0:                  /* not loaded */
             /* attempt to load DLL */
 #ifdef _WIN32
-      hLib = LoadLibraryA(lib_name);
+      if (1) {
+        BOOL(WINAPI *p_SetDllDirectory)(LPCTSTR);
+        UINT(WINAPI *p_GetSystemDirectory)(LPTSTR lpBuffer, UINT uSize);
+
+        p_SetDllDirectory = (BOOL(WINAPI *)(LPCTSTR)) GetProcAddress(GetModuleHandle("kernel32.dll"), "SetDllDirectoryA");
+        p_GetSystemDirectory = (UINT(WINAPI *)(LPTSTR, UINT)) GetProcAddress(GetModuleHandle("kernel32.dll"), "GetSystemDirectoryA");
+        if (p_SetDllDirectory && p_GetSystemDirectory) {
+          char npcap_path[512] = "";
+
+          if (p_GetSystemDirectory (npcap_path, sizeof(npcap_path) - 7))
+            strcat (npcap_path, "\\Npcap");
+          if (p_SetDllDirectory(npcap_path))
+            hLib = LoadLibraryA(lib_name);
+          p_SetDllDirectory (NULL);
+          }
+        if (hLib == NULL)
+          hLib = LoadLibraryA(lib_name);
+        }
 #else
       hLib = dlopen(lib_name, RTLD_NOW);
 #endif
@@ -1141,7 +1171,7 @@ int load_pcap(void) {
         /* failed to load DLL */
         sim_printf ("Eth: Failed to load %s\r\n", lib_name);
 #ifdef _WIN32
-        sim_printf ("Eth: You must install WinPcap 4.x to use networking\r\n");
+        sim_printf ("Eth: You must install Npcap or WinPcap 4.x to use networking\r\n");
 #else
         sim_printf ("Eth: You must install libpcap to use networking\r\n");
 #endif
@@ -1176,6 +1206,7 @@ int load_pcap(void) {
       load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
       load_function("pcap_setnonblock",  (_func *) &p_pcap_setnonblock);
       load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
+      try_load_function("pcap_get_servicename",(_func *) &p_pcap_get_servicename);
 
       if ((lib_loaded == 1) && (!eth_show_active)) {
         /* log successful load */
