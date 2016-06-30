@@ -200,7 +200,7 @@ t_stat uba_rdreg (int32 *val, int32 pa, int32 lnt)
 {
 int32 idx, ofs;
 
-if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
+if ((pa & 3) || (lnt < L_WORD)) {                       /* unaligned or not at least word? */
     sim_printf (">>UBA: invalid adapter read mask, pa = %X, lnt = %d\r\n", pa, lnt);
     /* FIXME: set appropriate error bits */
     return SCPE_OK;

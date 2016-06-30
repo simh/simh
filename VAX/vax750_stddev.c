@@ -134,6 +134,18 @@ static BITFIELD tx_buf_bits[] = {
 #define CLK_DELAY       5000                            /* 100 Hz */
 #define TMXR_MULT       1                               /* 100 Hz */
 
+static BITFIELD tmr_iccs_bits [] = {
+    BIT(RUN),                                   /* Run */
+    BITNCF(3),                                  /* unused */
+    BIT(XFR),                                   /* Transfer */
+    BIT(SGL),                                   /* Single */
+    BIT(IE),                                    /* Interrupt Enable */
+    BIT(DON),                                   /* Done */
+    BITNCF(23),                                 /* unused */
+    BIT(ERR),                                   /* Error */
+    ENDBITS
+    };
+
 /* TU58 definitions */
 
 #define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
@@ -301,14 +313,27 @@ DEVICE clk_dev = {
 UNIT tmr_unit = { UDATA (&tmr_svc, 0, 0) };                     /* timer */
 
 REG tmr_reg[] = {
-    { HRDATAD (ICCS,          tmr_iccs, 32, "interval timer control and status") },
-    { HRDATAD (ICR,            tmr_icr, 32, "interval count register") },
-    { HRDATAD (NICR,          tmr_nicr, 32, "next interval count register") },
-    { FLDATAD (INT,            tmr_int,  0, "interrupt request") },
-    { HRDATA  (INCR,           tmr_inc, 32), REG_HIDDEN },
-    { HRDATA  (SAVE,           tmr_sav, 32), REG_HIDDEN },
-    { FLDATA  (USE100HZ, tmr_use_100hz,  0), REG_HIDDEN },
+    { HRDATADF (ICCS,          tmr_iccs, 32, "interval timer control and status", tmr_iccs_bits) },
+    { HRDATAD  (ICR,            tmr_icr, 32, "interval count register") },
+    { HRDATAD  (NICR,          tmr_nicr, 32, "next interval count register") },
+    { FLDATAD  (INT,            tmr_int,  0, "interrupt request") },
+    { HRDATA   (INCR,           tmr_inc, 32), REG_HIDDEN },
+    { HRDATA   (SAVE,           tmr_sav, 32), REG_HIDDEN },
+    { FLDATA   (USE100HZ, tmr_use_100hz,  0), REG_HIDDEN },
     { NULL }
+    };
+
+#define TMR_DB_REG      0x01    /* Register Access */
+#define TMR_DB_TICK     0x02    /* Ticks */
+#define TMR_DB_SCHED    0x04    /* Scheduling */
+#define TMR_DB_INT      0x08    /* Interrupts */
+
+DEBTAB tmr_deb[] = {
+    { "REG",   TMR_DB_REG,      "Register Access"},
+    { "TICK",  TMR_DB_TICK,     "Ticks"},
+    { "SCHED", TMR_DB_SCHED,    "Ticks"},
+    { "INT",   TMR_DB_INT,      "Interrupts"},
+    { NULL, 0 }
     };
 
 DEVICE tmr_dev = {
@@ -316,7 +341,8 @@ DEVICE tmr_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &tmr_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_DEBUG, 0, 
+    tmr_deb, NULL, NULL, NULL, NULL, NULL, 
     &tmr_description
     };
 
@@ -627,11 +653,13 @@ return "console terminal output";
 
 int32 iccs_rd (void)
 {
+sim_debug (TMR_DB_REG, &tmr_dev, "iccs_rd() = 0x%08X\n", tmr_iccs & TMR_CSR_RD);
 return tmr_iccs & TMR_CSR_RD;
 }
 
 void iccs_wr (int32 val)
 {
+sim_debug_bits_hdr (TMR_DB_REG, &tmr_dev, "iccs_wr()", tmr_iccs_bits, val, val, TRUE);
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
     sim_cancel (&tmr_unit);                             /* cancel timer */
     tmr_use_100hz = 0;
@@ -654,8 +682,12 @@ else if (val & TMR_CSR_SGL) {                           /* single step? */
         tmr_icr = tmr_nicr;                             /* reload tir */
     }
 if ((tmr_iccs & (TMR_CSR_DON | TMR_CSR_IE)) !=          /* update int */
-    (TMR_CSR_DON | TMR_CSR_IE))
-    tmr_int = 0;
+    (TMR_CSR_DON | TMR_CSR_IE)) {
+    if (tmr_int) {
+        tmr_int = 0;
+        sim_debug (TMR_DB_INT, &tmr_dev, "iccs_wr() - INT=0\n");
+        }
+    }
 return;
 }
 
@@ -669,18 +701,22 @@ if (interp || (tmr_iccs & TMR_CSR_RUN)) {               /* interp, running? */
         delta = (uint32) ((((double) delta) * TMR_INC) / tmr_poll);
     if (delta >= tmr_inc)
         delta = tmr_inc - 1;
+    sim_debug (TMR_DB_REG, &tmr_dev, "icr_rd() = 0x%08X\n", tmr_icr + delta);
     return tmr_icr + delta;
     }
+sim_debug (TMR_DB_REG, &tmr_dev, "icr_rd() = 0x%08X\n", tmr_icr);
 return tmr_icr;
 }
 
 int32 nicr_rd (void)
 {
+sim_debug (TMR_DB_REG, &tmr_dev, "nicr_rd() = 0x%08X\n", tmr_nicr);
 return tmr_nicr;
 }
 
 void nicr_wr (int32 val)
 {
+sim_debug (TMR_DB_REG, &tmr_dev, "nicr_wr(0x%08X)\n", val);
 tmr_nicr = val;
 }
 
@@ -688,6 +724,7 @@ tmr_nicr = val;
 
 t_stat clk_svc (UNIT *uptr)
 {
+sim_debug (TMR_DB_TICK, &tmr_dev, "clk_svc()\n");
 tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
 sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
@@ -701,6 +738,7 @@ return SCPE_OK;
 
 t_stat tmr_svc (UNIT *uptr)
 {
+sim_debug (TMR_DB_TICK, &tmr_dev, "tmr_svc()\n");
 tmr_incr (tmr_inc);                                     /* incr timer */
 return SCPE_OK;
 }
@@ -720,8 +758,10 @@ if (new_icr < tmr_icr) {                                /* ovflo? */
         tmr_icr = tmr_nicr;                             /* reload */
         tmr_sched ();                                   /* reactivate */
         }
-    if (tmr_iccs & TMR_CSR_IE)                          /* ie? set int req */
+    if (tmr_iccs & TMR_CSR_IE) {                        /* ie? set int req */
         tmr_int = 1;
+        sim_debug (TMR_DB_INT, &tmr_dev, "tmr_incr() - INT=1\n");
+        }
     else tmr_int = 0;
     }
 else {
@@ -739,6 +779,7 @@ void tmr_sched (void)
 tmr_sav = sim_grtime ();                                /* save intvl base */
 tmr_inc = (~tmr_icr + 1);                               /* inc = interval */
 if (tmr_inc == 0) tmr_inc = 1;
+sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(0x%08X)\n", tmr_inc);
 if (tmr_inc < TMR_INC) {                                /* 100Hz multiple? */
     sim_activate (&tmr_unit, tmr_inc);                  /* schedule timer */
     tmr_use_100hz = 0;

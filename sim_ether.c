@@ -760,6 +760,7 @@ void eth_zero(ETH_DEV* dev)
 }
 
 static char*   (*p_pcap_lib_version) (void);
+static char*   (*p_pcap_get_servicename) (void);
 
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
@@ -807,8 +808,12 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
       for (i=0; i<number; i++)
         fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
-  if (p_pcap_lib_version)
+  if (p_pcap_lib_version) {
     fprintf(st, "%s\n", p_pcap_lib_version());
+#if defined(_WIN32)
+    fprintf(st, "Windows Packet Capture Service Name: %s\n", p_pcap_get_servicename ? p_pcap_get_servicename() : "npf");
+#endif
+    }
   if (eth_open_device_count) {
     int i;
     char desc[ETH_DEV_DESC_MAX], *d;
@@ -1066,11 +1071,11 @@ extern "C" {
 
 /* Dynamic DLL load variables */
 #ifdef _WIN32
-static HINSTANCE hLib = 0;                      /* handle to DLL */
+static HINSTANCE hLib = NULL;               /* handle to DLL */
 #else
 static void *hLib = 0;                      /* handle to Library */
 #endif
-static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
+static int lib_loaded = 0;                  /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
 static const char* lib_name =
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
@@ -1127,13 +1132,38 @@ static void load_function(const char* function, _func* func_ptr) {
   }
 }
 
+static void try_load_function(const char* function, _func* func_ptr) {
+#ifdef _WIN32
+    *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
+#else
+    *func_ptr = (_func)((size_t)dlsym(hLib, function));
+#endif
+}
+
 /* load wpcap.dll as required */
 int load_pcap(void) {
   switch(lib_loaded) {
     case 0:                  /* not loaded */
             /* attempt to load DLL */
 #ifdef _WIN32
-      hLib = LoadLibraryA(lib_name);
+      if (1) {
+        BOOL(WINAPI *p_SetDllDirectory)(LPCTSTR);
+        UINT(WINAPI *p_GetSystemDirectory)(LPTSTR lpBuffer, UINT uSize);
+
+        p_SetDllDirectory = (BOOL(WINAPI *)(LPCTSTR)) GetProcAddress(GetModuleHandle("kernel32.dll"), "SetDllDirectoryA");
+        p_GetSystemDirectory = (UINT(WINAPI *)(LPTSTR, UINT)) GetProcAddress(GetModuleHandle("kernel32.dll"), "GetSystemDirectoryA");
+        if (p_SetDllDirectory && p_GetSystemDirectory) {
+          char npcap_path[512] = "";
+
+          if (p_GetSystemDirectory (npcap_path, sizeof(npcap_path) - 7))
+            strcat (npcap_path, "\\Npcap");
+          if (p_SetDllDirectory(npcap_path))
+            hLib = LoadLibraryA(lib_name);
+          p_SetDllDirectory (NULL);
+          }
+        if (hLib == NULL)
+          hLib = LoadLibraryA(lib_name);
+        }
 #else
       hLib = dlopen(lib_name, RTLD_NOW);
 #endif
@@ -1141,7 +1171,7 @@ int load_pcap(void) {
         /* failed to load DLL */
         sim_printf ("Eth: Failed to load %s\r\n", lib_name);
 #ifdef _WIN32
-        sim_printf ("Eth: You must install WinPcap 4.x to use networking\r\n");
+        sim_printf ("Eth: You must install Npcap or WinPcap 4.x to use networking\r\n");
 #else
         sim_printf ("Eth: You must install libpcap to use networking\r\n");
 #endif
@@ -1176,6 +1206,7 @@ int load_pcap(void) {
       load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
       load_function("pcap_setnonblock",  (_func *) &p_pcap_setnonblock);
       load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
+      try_load_function("pcap_get_servicename",(_func *) &p_pcap_get_servicename);
 
       if ((lib_loaded == 1) && (!eth_show_active)) {
         /* log successful load */
@@ -1392,7 +1423,7 @@ static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6
   p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))GetProcAddress(hDll, "PacketRequest");
 #else
   hDll = dlopen("packet.dll", RTLD_NOW);
-  p_PacketOpenAdapter = (LPADAPTER (*)(char *AdapterName))dlsym(hDll, "PacketOpenAdapter");
+  p_PacketOpenAdapter = (LPADAPTER (*)(const char *AdapterName))dlsym(hDll, "PacketOpenAdapter");
   p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))dlsym(hDll, "PacketCloseAdapter");
   p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))dlsym(hDll, "PacketRequest");
 #endif
@@ -1445,28 +1476,6 @@ static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6
   dlclose(hDll);
 #endif
   return ReturnValue;
-}
-
-static int _eth_get_system_id (char *buf, size_t buf_size)
-{
-  LONG status;
-  DWORD reglen, regtype;
-  HKEY reghnd;
-
-  memset (buf, 0, buf_size);
-  if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", 0, KEY_QUERY_VALUE|KEY_WOW64_64KEY, &reghnd)) != ERROR_SUCCESS)
-    return -1;
-  reglen = buf_size;
-  if ((status = RegQueryValueExA (reghnd, "MachineGuid", NULL, &regtype, buf, &reglen)) != ERROR_SUCCESS) {
-    RegCloseKey (reghnd);
-    return -1;
-    }
-  RegCloseKey (reghnd );
-  /* make sure value is the right type, bail if not acceptable */
-  if ((regtype != REG_SZ) || (reglen > buf_size))
-    return -1;
-  /* registry value seems OK */
-  return 0;
 }
 
 #endif  /* defined(_WIN32) || defined(__CYGWIN__) */
@@ -1636,7 +1645,31 @@ if (gethostuuid (uuid, &wait))
 uuid_unparse_lower(uuid, buf);
 return 0;
 }
-#elif !defined(_WIN32)
+
+#elif defined(_WIN32)
+static int _eth_get_system_id (char *buf, size_t buf_size)
+{
+  LONG status;
+  DWORD reglen, regtype;
+  HKEY reghnd;
+
+  memset (buf, 0, buf_size);
+  if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", 0, KEY_QUERY_VALUE|KEY_WOW64_64KEY, &reghnd)) != ERROR_SUCCESS)
+    return -1;
+  reglen = buf_size;
+  if ((status = RegQueryValueExA (reghnd, "MachineGuid", NULL, &regtype, buf, &reglen)) != ERROR_SUCCESS) {
+    RegCloseKey (reghnd);
+    return -1;
+    }
+  RegCloseKey (reghnd );
+  /* make sure value is the right type, bail if not acceptable */
+  if ((regtype != REG_SZ) || (reglen > buf_size))
+    return -1;
+  /* registry value seems OK */
+  return 0;
+}
+
+#else
 static int _eth_get_system_id (char *buf, size_t buf_size)
 {
 FILE *f;
@@ -1687,8 +1720,6 @@ _eth_reader(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
 int status = 0;
-int sched_policy;
-struct sched_param sched_priority;
 int sel_ret = 0;
 int do_select = 0;
 SOCKET select_fd = 0;
@@ -1719,9 +1750,7 @@ sim_debug(dev->dbit, dev->dptr, "Reader Thread Starting\n");
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor 
    when this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 while (dev->handle) {
 #if defined (_WIN32)
@@ -1878,15 +1907,11 @@ _eth_writer(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
 ETH_WRITE_REQUEST *request;
-int sched_policy;
-struct sched_param sched_priority;
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which in general won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 
