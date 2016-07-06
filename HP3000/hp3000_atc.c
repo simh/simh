@@ -26,7 +26,11 @@
 
    ATCD,ATCC    HP 30032B Asynchronous Terminal Controller
 
+   26-Jun-16    JDB     Removed tmxr_set_modem_control_passthru call in atcc_reset
+   09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
+   16-May-16    JDB     Fixed interrupt mask setting
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    26-Aug-15    JDB     First release version
    31-Jul-15    JDB     Passes the terminal control diagnostic (D438A)
    11-Aug-14    JDB     Passes the terminal data diagnostic (D427A)
@@ -315,7 +319,7 @@
 #define NUL                 '\000'              /* null */
 #define ENQ                 '\005'              /* enquire */
 #define ACK                 '\006'              /* acknowledge */
-#define ASCII_MASK          000177              /* 7-bit ASCII character set mask */
+#define ASCII_MASK          000177u             /* 7-bit ASCII character set mask */
 
 #define GEN_ACK             (TMXR_VALID | SCPE_KFLAG | ACK) /* a generated ACK character */
 
@@ -330,14 +334,14 @@
 
 /* Debug flags */
 
-#define DEB_CSRW            (1 << 0)            /* trace command initiations and completions */
-#define DEB_XFER            (1 << 1)            /* trace data receptions and transmissions */
-#define DEB_IOB             (1 << 2)            /* trace I/O bus signals and data words */
-#define DEB_SERV            (1 << 3)            /* trace channel service scheduling calls */
-#define DEB_PSERV           (1 << 4)            /* trace poll service scheduling calls */
+#define DEB_CSRW            (1u << 0)           /* trace command initiations and completions */
+#define DEB_XFER            (1u << 1)           /* trace data receptions and transmissions */
+#define DEB_IOB             (1u << 2)           /* trace I/O bus signals and data words */
+#define DEB_SERV            (1u << 3)           /* trace channel service scheduling calls */
+#define DEB_PSERV           (1u << 4)           /* trace poll service scheduling calls */
 
 
-/* Per-unit state */
+/* Common per-unit multiplexer channel state variables */
 
 #define recv_time           u3                  /* realistic receive time in event ticks */
 #define send_time           u4                  /* realistic send time in event ticks */
@@ -349,8 +353,8 @@
 #define DEV_DIAG_SHIFT      (DEV_V_UF + 0)              /* diagnostic loopback */
 #define DEV_REALTIME_SHIFT  (DEV_V_UF + 1)              /* timing mode is realistic */
 
-#define DEV_DIAG            (1 << DEV_DIAG_SHIFT)       /* diagnostic mode flag */
-#define DEV_REALTIME        (1 << DEV_REALTIME_SHIFT)   /* realistic timing flag */
+#define DEV_DIAG            (1u << DEV_DIAG_SHIFT)      /* diagnostic mode flag */
+#define DEV_REALTIME        (1u << DEV_REALTIME_SHIFT)  /* realistic timing flag */
 
 
 /* Unit flags */
@@ -359,9 +363,9 @@
 #define UNIT_LOCALACK_SHIFT (TTUF_V_UF + 1)             /* local ACK mode */
 #define UNIT_MODEM_SHIFT    (TTUF_V_UF + 2)             /* modem control */
 
-#define UNIT_CAPSLOCK       (1 << UNIT_CAPSLOCK_SHIFT)  /* caps lock is down flag */
-#define UNIT_LOCALACK       (1 << UNIT_LOCALACK_SHIFT)  /* ENQ/ACK mode is local flag */
-#define UNIT_MODEM          (1 << UNIT_MODEM_SHIFT)     /* channel connects to a data set flag */
+#define UNIT_CAPSLOCK       (1u << UNIT_CAPSLOCK_SHIFT) /* caps lock is down flag */
+#define UNIT_LOCALACK       (1u << UNIT_LOCALACK_SHIFT) /* ENQ/ACK mode is local flag */
+#define UNIT_MODEM          (1u << UNIT_MODEM_SHIFT)    /* channel connects to a data set flag */
 
 
 /* Unit references */
@@ -388,11 +392,11 @@ typedef enum {
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define DCN_MR              0100000             /* (M) master reset */
-#define DCN_IRQ_RESET       0040000             /* (R) interrupt request reset */
-#define DCN_CHAN_MASK       0037000             /* channel number mask */
-#define DCN_ENABLE          0000002             /* (E) enable store of preceding data or parameter word */
-#define DCN_ACKN            0000001             /* (A) acknowledge interrupt */
+#define DCN_MR              0100000u            /* (M) master reset */
+#define DCN_IRQ_RESET       0040000u            /* (R) interrupt request reset */
+#define DCN_CHAN_MASK       0037000u            /* channel number mask */
+#define DCN_ENABLE          0000002u            /* (E) enable store of preceding data or parameter word */
+#define DCN_ACKN            0000001u            /* (A) acknowledge interrupt */
 
 #define DCN_CHAN_SHIFT      9                   /* channel number alignment shift */
 
@@ -429,13 +433,13 @@ static const BITSET_FORMAT tdi_control_format =         /* names, offset, direct
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define DST_DIO_OK          0040000             /* (D) direct I/O OK to use */
-#define DST_IRQ             0020000             /* (I) interrupt requested */
-#define DST_COMPLETE        0004000             /* (C) operation is complete and channel is ready to interrupt */
-#define DST_SEND_IRQ        0002000             /* (R) interrupt request is for character sent */
-#define DST_CHAR_LOST       0001000             /* (L) character was lost */
-#define DST_BREAK           0000400             /* (B) break occurred */
-#define DST_DIAGNOSE        0000000             /* status is from an auxiliary channel (not used on ATC) */
+#define DST_DIO_OK          0040000u            /* (D) direct I/O OK to use */
+#define DST_IRQ             0020000u            /* (I) interrupt requested */
+#define DST_COMPLETE        0004000u            /* (C) operation is complete and channel is ready to interrupt */
+#define DST_SEND_IRQ        0002000u            /* (R) interrupt request is for character sent */
+#define DST_CHAR_LOST       0001000u            /* (L) character was lost */
+#define DST_BREAK           0000400u            /* (B) break occurred */
+#define DST_DIAGNOSE        0000000u            /* status is from an auxiliary channel (not used on ATC) */
 
 #define DST_CHAN(n)         0                   /* position channel number for status (not used on ATC) */
 
@@ -480,14 +484,14 @@ static const BITSET_FORMAT tdi_status_format =          /* names, offset, direct
    the number of stop bits from the receive parameter word.
 */
 
-#define DPI_IS_PARAM        0100000             /* value is a parameter (always set) */
-#define DPI_IS_SEND         0040000             /* (R) value is a send parameter */
-#define DPI_ENABLE_IRQ      0020000             /* (I) enable interrupt requests */
-#define DPI_ENABLE_PARITY   0010000             /* (E) enable parity for send */
-#define DPI_ENABLE_ECHO     0010000             /* (E) enable echo for receive */
-#define DPI_DIAGNOSE        0004000             /* (D) connect to the auxiliary channels */
-#define DPI_SIZE_MASK       0003400             /* character size mask */
-#define DPI_RATE_MASK       0000377             /* baud rate mask */
+#define DPI_IS_PARAM        0100000u            /* value is a parameter (always set) */
+#define DPI_IS_SEND         0040000u            /* (R) value is a send parameter */
+#define DPI_ENABLE_IRQ      0020000u            /* (I) enable interrupt requests */
+#define DPI_ENABLE_PARITY   0010000u            /* (E) enable parity for send */
+#define DPI_ENABLE_ECHO     0010000u            /* (E) enable echo for receive */
+#define DPI_DIAGNOSE        0004000u            /* (D) connect to the auxiliary channels */
+#define DPI_SIZE_MASK       0003400u            /* character size mask */
+#define DPI_RATE_MASK       0000377u            /* baud rate mask */
 
 #define DPI_CHAR_CONFIG     (DPI_SIZE_MASK | DPI_RATE_MASK) /* character configuration data */
 
@@ -499,7 +503,7 @@ static const BITSET_FORMAT tdi_status_format =          /* names, offset, direct
 
 #define BAUD_RATE(p)        ((28800 / (DPI_BAUD_RATE (p) + 1) + 1) / 2)
 
-#define PAD_BITS(c)         (~((1 << bits_per_char [DPI_CHAR_SIZE (c)] - 2) - 1))
+#define PAD_BITS(c)         (~((1u << bits_per_char [DPI_CHAR_SIZE (c)] - 2) - 1))
 
 
 static const uint32 bits_per_char [8] = {       /* bits per character, indexed by DPI_CHAR_SIZE encoding */
@@ -525,10 +529,10 @@ static const BITSET_FORMAT tdi_parameter_format =       /* names, offset, direct
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define DDS_IS_SEND         0040000             /* value is a send data word (always set) */
-#define DDS_SYNC            0004000             /* (S) sync */
-#define DDS_DATA_MASK       0003777             /* data value mask */
-#define DDS_PARITY          0000200             /* data parity bit */
+#define DDS_IS_SEND         0040000u            /* value is a send data word (always set) */
+#define DDS_SYNC            0004000u            /* (S) sync */
+#define DDS_DATA_MASK       0003777u            /* data value mask */
+#define DDS_PARITY          0000200u            /* data parity bit */
 
 #define DDS_MARK            (DDS_SYNC | DDS_DATA_MASK)  /* all-mark character */
 
@@ -554,9 +558,9 @@ static const BITSET_FORMAT tdi_output_data_format =     /* names, offset, direct
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define DDR_CHAN_MASK       0174000             /* channel number mask */
-#define DDR_PARITY          0002000             /* (P) computed parity bit */
-#define DDR_DATA_MASK       0001777             /* data value mask */
+#define DDR_CHAN_MASK       0174000u            /* channel number mask */
+#define DDR_PARITY          0002000u            /* (P) computed parity bit */
+#define DDR_DATA_MASK       0001777u            /* data value mask */
 
 #define DDR_CHAN_SHIFT      11                  /* channel number alignment shift */
 #define DDR_DATA_SHIFT      0                   /* data alignment shift */
@@ -584,24 +588,24 @@ static const BITSET_FORMAT tdi_input_data_format =      /* names, offset, direct
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define CCN_MR              0100000             /* (M) master reset */
-#define CCN_IRQ_RESET       0040000             /* (R) interrupt request reset */
-#define CCN_SCAN            0020000             /* (S) scan enable */
-#define CCN_UPDATE          0010000             /* (U) update enable */
-#define CCN_CHAN_MASK       0007400             /* channel number mask */
-#define CCN_ECX_MASK        0000300             /* control output enable mask */
-#define CCN_EC2             0000200             /* (W) C2 output enable */
-#define CCN_EC1             0000100             /* (X) C1 output enable */
-#define CCN_CX_MASK         0000060             /* output mask */
-#define CCN_C2              0000040             /* (Q) C2 output [RTS] */
-#define CCN_C1              0000020             /* (T) C1 output [DTR] */
-#define CCN_STAT_MASK       0000017             /* status RAM mask */
-#define CCN_ESX_MASK        0000014             /* status interrupt enable mask */
-#define CCN_ES2             0000010             /* (Y) S2 interrupt enable */
-#define CCN_ES1             0000004             /* (Z) S1 interrupt enable */
-#define CCN_SX_MASK         0000003             /* status mask */
-#define CCN_S2              0000002             /* (C) S2 status [DCD]*/
-#define CCN_S1              0000001             /* (D) S1 status [DSR] */
+#define CCN_MR              0100000u            /* (M) master reset */
+#define CCN_IRQ_RESET       0040000u            /* (R) interrupt request reset */
+#define CCN_SCAN            0020000u            /* (S) scan enable */
+#define CCN_UPDATE          0010000u            /* (U) update enable */
+#define CCN_CHAN_MASK       0007400u            /* channel number mask */
+#define CCN_ECX_MASK        0000300u            /* control output enable mask */
+#define CCN_EC2             0000200u            /* (W) C2 output enable */
+#define CCN_EC1             0000100u            /* (X) C1 output enable */
+#define CCN_CX_MASK         0000060u            /* output mask */
+#define CCN_C2              0000040u            /* (Q) C2 output [RTS] */
+#define CCN_C1              0000020u            /* (T) C1 output [DTR] */
+#define CCN_STAT_MASK       0000017u            /* status RAM mask */
+#define CCN_ESX_MASK        0000014u            /* status interrupt enable mask */
+#define CCN_ES2             0000010u            /* (Y) S2 interrupt enable */
+#define CCN_ES1             0000004u            /* (Z) S1 interrupt enable */
+#define CCN_SX_MASK         0000003u            /* status mask */
+#define CCN_S2              0000002u            /* (C) S2 status [DCD]*/
+#define CCN_S1              0000001u            /* (D) S1 status [DSR] */
 
 #define CCN_CHAN_SHIFT      8                   /* channel number alignment shift */
 #define CCN_CX_SHIFT        4                   /* control alignment shift */
@@ -644,19 +648,19 @@ static const BITSET_FORMAT tci_control_format =         /* names, offset, direct
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define CST_DIO_OK          0040000             /* direct I/O OK to use (always set) */
-#define CST_IRQ             0020000             /* (I) interrupt request */
-#define CST_ON              0010000             /* (always set) */
-#define CST_CHAN_MASK       0007400             /* channel number mask */
-#define CST_IX_MASK         0000060             /* status interrupt mask */
-#define CST_I2              0000040             /* (J) S2 interrupt */
-#define CST_I1              0000020             /* (K) S1 interrupt */
-#define CST_ESX_MASK        0000014             /* status interrupt enable mask */
-#define CST_ES2             0000010             /* (Y) S2 interrupt enable */
-#define CST_ES1             0000004             /* (Z) S1 interrupt enable */
-#define CST_SX_MASK         0000003             /* status mask */
-#define CST_S2              0000002             /* (C) S2 status [DCD] */
-#define CST_S1              0000001             /* (D) S1 status [DSR] */
+#define CST_DIO_OK          0040000u            /* direct I/O OK to use (always set) */
+#define CST_IRQ             0020000u            /* (I) interrupt request */
+#define CST_ON              0010000u            /* (always set) */
+#define CST_CHAN_MASK       0007400u            /* channel number mask */
+#define CST_IX_MASK         0000060u            /* status interrupt mask */
+#define CST_I2              0000040u            /* (J) S2 interrupt */
+#define CST_I1              0000020u            /* (K) S1 interrupt */
+#define CST_ESX_MASK        0000014u            /* status interrupt enable mask */
+#define CST_ES2             0000010u            /* (Y) S2 interrupt enable */
+#define CST_ES1             0000004u            /* (Z) S1 interrupt enable */
+#define CST_SX_MASK         0000003u            /* status mask */
+#define CST_S2              0000002u            /* (C) S2 status [DCD] */
+#define CST_S1              0000001u            /* (D) S1 status [DSR] */
 
 #define CST_CHAN_SHIFT      8                   /* channel number alignment shift */
 #define CST_IX_SHIFT        4                   /* status interrupt alignment shift */
@@ -712,12 +716,12 @@ t_bool atc_is_polling = TRUE;                   /* TRUE if the ATC is polling fo
 
 /* TDI interface state */
 
-static uint16 tdi_control_word = 0;             /* control word */
-static uint16 tdi_status_word  = 0;             /* status word */
-static uint16 tdi_read_word    = 0;             /* read word */
-static uint16 tdi_write_word   = 0;             /* write word */
+static HP_WORD tdi_control_word = 0;            /* control word */
+static HP_WORD tdi_status_word  = 0;            /* status word */
+static HP_WORD tdi_read_word    = 0;            /* read word */
+static HP_WORD tdi_write_word   = 0;            /* write word */
 
-static FLIP_FLOP tdi_interrupt_mask = CLEAR;    /* interrupt mask flip-flop */
+static FLIP_FLOP tdi_interrupt_mask = SET;      /* interrupt mask flip-flop */
 static FLIP_FLOP tdi_data_flag      = CLEAR;    /* data flag */
 
 static int32 fast_data_time = FAST_IO_TIME;     /* fast receive/send time */
@@ -725,22 +729,22 @@ static int32 fast_data_time = FAST_IO_TIME;     /* fast receive/send time */
 
 /* TDI per-channel state */
 
-static uint16 recv_status [RECV_CHAN_COUNT];    /* receive status words */
-static uint16 recv_param  [RECV_CHAN_COUNT];    /* receive parameter words */
-static uint16 recv_buffer [RECV_CHAN_COUNT];    /* receive character buffers */
+static HP_WORD recv_status [RECV_CHAN_COUNT];   /* receive status words */
+static HP_WORD recv_param  [RECV_CHAN_COUNT];   /* receive parameter words */
+static HP_WORD recv_buffer [RECV_CHAN_COUNT];   /* receive character buffers */
 
-static uint16 send_status [SEND_CHAN_COUNT];    /* send status words */
-static uint16 send_param  [SEND_CHAN_COUNT];    /* send parameter words */
-static uint16 send_buffer [SEND_CHAN_COUNT];    /* send character buffers */
+static HP_WORD send_status [SEND_CHAN_COUNT];   /* send status words */
+static HP_WORD send_param  [SEND_CHAN_COUNT];   /* send parameter words */
+static HP_WORD send_buffer [SEND_CHAN_COUNT];   /* send character buffers */
 
 
 /* TCI interface state */
 
-static uint16 tci_control_word = 0;             /* control word */
-static uint16 tci_status_word  = 0;             /* status word */
-static uint32 tci_cntr         = 0;             /* channel counter */
+static HP_WORD tci_control_word = 0;            /* control word */
+static HP_WORD tci_status_word  = 0;            /* status word */
+static uint32  tci_cntr         = 0;            /* channel counter */
 
-static FLIP_FLOP tci_interrupt_mask = CLEAR;    /* interrupt mask flip-flop */
+static FLIP_FLOP tci_interrupt_mask = SET;      /* interrupt mask flip-flop */
 static FLIP_FLOP tci_scan           = CLEAR;    /* scanning enabled flip-flop */
 
 
@@ -773,15 +777,15 @@ static void tdi_set_interrupt (void);
 static void tdi_master_reset  (void);
 static void tci_master_reset  (void);
 
-static t_stat line_service  (UNIT  *uptr);
-static t_stat poll_service  (UNIT  *uptr);
-static t_stat activate_unit (UNIT  *uptr,    ACTIVATOR reason);
-static uint32 service_time  (uint16 control, ACTIVATOR reason);
-static void   store         (uint16 control, uint16 data);
-static void   receive       (int32  channel, int32 data, t_bool loopback);
-static void   diagnose      (uint16 control, int32 data);
-static void   scan_channels (int32  channel);
-static uint16 scan_status   (void);
+static t_stat  line_service  (UNIT    *uptr);
+static t_stat  poll_service  (UNIT    *uptr);
+static t_stat  activate_unit (UNIT    *uptr,   ACTIVATOR reason);
+static uint32  service_time  (HP_WORD control, ACTIVATOR reason);
+static void    store         (HP_WORD control, HP_WORD   data);
+static void    receive       (int32   channel, int32 data, t_bool loopback);
+static void    diagnose      (HP_WORD control, int32 data);
+static void    scan_channels (int32   channel);
+static HP_WORD scan_status   (void);
 
 
 /* ATC SCP data structures */
@@ -910,8 +914,8 @@ static UNIT atcc_unit [] = {                    /* a dummy unit to satisfy SCP r
    Implementation notes:
 
     1. The TCI control and status line register definitions use the VM-defined
-       FBDATA macro.  This macro defines a bit slice longitudinally through an
-       array.
+       FBDATA macro.  This macro defines a flag that is replicated in the same
+       bit position in each element of an array.
 */
 
 static REG atcd_reg [] = {
@@ -931,31 +935,31 @@ static REG atcd_reg [] = {
     { BRDATA (SPARM,  send_param,            8,    16,           SEND_CHAN_COUNT)                  },
     { BRDATA (SBUFR,  send_buffer,           8,    16,           SEND_CHAN_COUNT), REG_A           },
     { FLDATA (POLL,   atc_is_polling,                       0),                    REG_HRO         },
-    { SRDATA (DIB,    atcd_dib),                                                   REG_HRO         },
+    { SRDATA (DIB,    atcd_dib,                                                    REG_HRO)        },
 
     { NULL }
     };
 
 static REG atcc_reg [] = {
-/*    Macro   Name    Location             Width  Offset    Depth     Flags   */
-/*    ------  ------  -------------------  -----  ------  ----------  ------- */
-    { ORDATA (CNTL,   tci_control_word,     16),                      REG_FIT },
-    { ORDATA (STAT,   tci_status_word,      16),                      REG_FIT },
-    { DRDATA (CNTR,   tci_cntr,              4)                               },
-    { FLDATA (SCAN,   tci_scan,                      0)                       },
-    { FLDATA (MASK,   tci_interrupt_mask,            0)                       },
+/*    Macro   Name    Location             Width  Offset    Depth      Flags   */
+/*    ------  ------  -------------------  -----  ------  ----------  -------  */
+    { ORDATA (CNTL,   tci_control_word,     16),                      REG_FIT  },
+    { ORDATA (STAT,   tci_status_word,      16),                      REG_FIT  },
+    { DRDATA (CNTR,   tci_cntr,              4)                                },
+    { FLDATA (SCAN,   tci_scan,                      0)                        },
+    { FLDATA (MASK,   tci_interrupt_mask,            0)                        },
 
-    { FBDATA (C2,     cntl_status,                   5,   TERM_COUNT)         },
-    { FBDATA (C1,     cntl_status,                   4,   TERM_COUNT)         },
-    { FBDATA (S2,     cntl_status,                   1,   TERM_COUNT)         },
-    { FBDATA (S1,     cntl_status,                   0,   TERM_COUNT)         },
+    { FBDATA (C2,     cntl_status,                   5,   TERM_COUNT, PV_RZRO) },
+    { FBDATA (C1,     cntl_status,                   4,   TERM_COUNT, PV_RZRO) },
+    { FBDATA (S2,     cntl_status,                   1,   TERM_COUNT, PV_RZRO) },
+    { FBDATA (S1,     cntl_status,                   0,   TERM_COUNT, PV_RZRO) },
 
-    { FBDATA (ES2,    cntl_param,                    3,   TERM_COUNT)         },
-    { FBDATA (ES1,    cntl_param,                    2,   TERM_COUNT)         },
-    { FBDATA (MS2,    cntl_param,                    1,   TERM_COUNT)         },
-    { FBDATA (MS1,    cntl_param,                    0,   TERM_COUNT)         },
+    { FBDATA (ES2,    cntl_param,                    3,   TERM_COUNT, PV_RZRO) },
+    { FBDATA (ES1,    cntl_param,                    2,   TERM_COUNT, PV_RZRO) },
+    { FBDATA (MS2,    cntl_param,                    1,   TERM_COUNT, PV_RZRO) },
+    { FBDATA (MS1,    cntl_param,                    0,   TERM_COUNT, PV_RZRO) },
 
-    { SRDATA (DIB,    atcc_dib),                                      REG_HRO },
+    { SRDATA (DIB,    atcc_dib,                                       REG_HRO) },
 
     { NULL }
     };
@@ -1167,11 +1171,11 @@ DEVICE atcc_dev = {
        the request.
 */
 
-static SIGNALS_DATA atcd_interface (DIB *dibptr, INBOUND_SET inbound_signals, uint16 inbound_value)
+static SIGNALS_DATA atcd_interface (DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
 INBOUND_SIGNAL signal;
 INBOUND_SET    working_set      = inbound_signals;
-uint16         outbound_value   = 0;
+HP_WORD        outbound_value   = 0;
 OUTBOUND_SET   outbound_signals = NO_SIGNALS;
 
 dprintf (atcd_dev, DEB_IOB, "Received data %06o with signals %s\n",
@@ -1184,7 +1188,7 @@ while (working_set) {                                   /* while signals remain 
 
         case DCONTSTB:
             dprintf (atcd_dev, DEB_CSRW, (inbound_value & DCN_ENABLE
-                                           ? "Control is %s | channel %d\n"
+                                           ? "Control is %s | channel %u\n"
                                            : "Control is %s\n"),
                      fmt_bitset (inbound_value, tdi_control_format),
                      DCN_CHAN (inbound_value));
@@ -1221,7 +1225,7 @@ while (working_set) {                                   /* while signals remain 
             else                                        /*     to indicate */
                 tdi_status_word &= ~DST_COMPLETE;       /*       whether or not a channel has completed */
 
-            outbound_value = (uint16) tdi_status_word;  /* return the status word */
+            outbound_value = tdi_status_word;           /* return the status word */
 
             dprintf (atcd_dev, DEB_CSRW, "Status is %s\n",
                      fmt_bitset (outbound_value, tdi_status_format));
@@ -1233,7 +1237,7 @@ while (working_set) {                                   /* while signals remain 
 
             if (DPRINTING (atcd_dev, DEB_CSRW))
                 if (inbound_value & DPI_IS_PARAM)
-                    hp_debug (&atcd_dev, DEB_CSRW, "Parameter is %s%d bits | %d baud\n",
+                    hp_debug (&atcd_dev, DEB_CSRW, "Parameter is %s%u bits | %u baud\n",
                               fmt_bitset (inbound_value, tdi_parameter_format),
                               bits_per_char [DPI_CHAR_SIZE (inbound_value)],
                               BAUD_RATE (inbound_value));
@@ -1248,7 +1252,7 @@ while (working_set) {                                   /* while signals remain 
         case DREADSTB:
             outbound_value = tdi_read_word;             /* return the data word */
 
-            dprintf (atcd_dev, DEB_CSRW, "Input data is channel %d | %s%04o\n",
+            dprintf (atcd_dev, DEB_CSRW, "Input data is channel %u | %s%04o\n",
                      DDR_TO_CHAN (outbound_value),
                      fmt_bitset (outbound_value, tdi_input_data_format),
                      DDR_TO_DATA (outbound_value));
@@ -1282,8 +1286,11 @@ while (working_set) {                                   /* while signals remain 
 
 
         case DSETMASK:
-            tdi_interrupt_mask =                                    /* set the mask flip-flop */
-               D_FF (dibptr->interrupt_mask & inbound_value);       /*   from the mask bit and the mask value */
+            if (dibptr->interrupt_mask == INTMASK_E)                /* if the mask is always enabled */
+                tdi_interrupt_mask = SET;                           /*   then set the mask flip-flop */
+            else                                                    /* otherwise */
+                tdi_interrupt_mask = D_FF (dibptr->interrupt_mask   /*   set the mask flip-flop if the mask bit */
+                                           & inbound_value);        /*     is present in the mask value */
 
             if (tdi_interrupt_mask && dibptr->interrupt_request)    /* if the mask is enabled and a request is pending */
                 outbound_signals |= INTREQ;                         /*   then assert INTREQ */
@@ -1360,11 +1367,11 @@ return IORETURN (outbound_signals, outbound_value);     /* return the outbound s
        the request.
 */
 
-static SIGNALS_DATA atcc_interface (DIB *dibptr, INBOUND_SET inbound_signals, uint16 inbound_value)
+static SIGNALS_DATA atcc_interface (DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
 INBOUND_SIGNAL signal;
 INBOUND_SET    working_set      = inbound_signals;
-uint16         outbound_value   = 0;
+HP_WORD        outbound_value   = 0;
 OUTBOUND_SET   outbound_signals = NO_SIGNALS;
 int32          set_lines, clear_lines;
 
@@ -1379,7 +1386,7 @@ while (working_set) {                                   /* while signals remain 
         case DCONTSTB:
             tci_cntr = CCN_CHAN (inbound_value);        /* set the counter to the target channel */
 
-            dprintf (atcc_dev, DEB_CSRW, "Control is channel %d | %s\n",
+            dprintf (atcc_dev, DEB_CSRW, "Control is channel %u | %s\n",
                      tci_cntr, fmt_bitset (inbound_value, tci_control_format));
 
             tci_control_word = inbound_value;           /* save the control word */
@@ -1398,7 +1405,7 @@ while (working_set) {                                   /* while signals remain 
                                        & CCN_ECX (tci_control_word)     /*       that are enabled */
                                        & tci_control_word;              /*         in the control word */
 
-            dprintf (atcc_dev, DEB_XFER, "Channel %d line status is %s\n",
+            dprintf (atcc_dev, DEB_XFER, "Channel %u line status is %s\n",
                      tci_cntr, fmt_bitset (cntl_status [tci_cntr], tci_line_format));
 
             if (atcc_dev.flags & DEV_DIAG) {                /* if the interface is in diagnostic mode */
@@ -1406,7 +1413,7 @@ while (working_set) {                                   /* while signals remain 
                   cntl_status [tci_cntr ^ 1] & ~CCN_SX_MASK /*     back to the alternate channel */
                   | CCN_CX (cntl_status [tci_cntr]);        /*       from the selected channel */
 
-                dprintf (atcc_dev, DEB_XFER, "Channel %d line status is %s\n",
+                dprintf (atcc_dev, DEB_XFER, "Channel %u line status is %s\n",
                          tci_cntr ^ 1, fmt_bitset (cntl_status [tci_cntr ^ 1], tci_line_format));
                 }
 
@@ -1427,7 +1434,7 @@ while (working_set) {                                   /* while signals remain 
                         clear_lines |= TMXR_MDM_DTR;        /*     set it down */
 
                         if (cntl_status [tci_cntr] & DCD)    /* setting DTR down will disconnect the channel */
-                            dprintf (atcc_dev, DEB_CSRW, "Channel %d disconnected by DTR drop\n",
+                            dprintf (atcc_dev, DEB_CSRW, "Channel %u disconnected by DTR drop\n",
                                      tci_cntr);
                         }
 
@@ -1458,9 +1465,9 @@ while (working_set) {                                   /* while signals remain 
             if (dibptr->interrupt_request == SET)       /* reflect the interrupt request value */
                 tci_status_word |= CST_IRQ;             /*   in the status word */
 
-            outbound_value = (uint16) tci_status_word;  /* return the status word */
+            outbound_value = tci_status_word;           /* return the status word */
 
-            dprintf (atcc_dev, DEB_CSRW, "Status is channel %d | %s\n",
+            dprintf (atcc_dev, DEB_CSRW, "Status is channel %u | %s\n",
                      tci_cntr, fmt_bitset (outbound_value, tci_status_format));
             break;
 
@@ -1492,8 +1499,11 @@ while (working_set) {                                   /* while signals remain 
 
 
         case DSETMASK:
-            tci_interrupt_mask =                                    /* set the mask flip-flop */
-              D_FF (dibptr->interrupt_mask & inbound_value);        /*   from the mask bit and the mask value */
+            if (dibptr->interrupt_mask == INTMASK_E)                /* if the mask is always enabled */
+                tci_interrupt_mask = SET;                           /*   then set the mask flip-flop */
+            else                                                    /* otherwise */
+                tci_interrupt_mask = D_FF (dibptr->interrupt_mask   /*   set the mask flip-flop if the mask bit */
+                                           & inbound_value);        /*     is present in the mask value */
 
             if (tci_interrupt_mask && dibptr->interrupt_request)    /* if the mask is enabled and a request is pending */
                 outbound_signals |= INTREQ;                         /*   then assert INTREQ */
@@ -1733,8 +1743,8 @@ return SCPE_OK;
    simulation equivalent of the IORESET signal, which is asserted by the front
    panel LOAD and DUMP switches.
 
-   If a power-on reset (RESET -P) is being done, local modem control is
-   established, and DTR is set on all channels.  This is necessary so that
+   If a power-on reset (RESET -P) is being done, then local modem control is
+   established by setting DTR on all channels.  This is necessary so that
    channels not controlled by the TCI will be able to connect (TCI-controlled
    channels will have their DTR and RTS state set by the MPE TCI initialization
    routine).
@@ -1743,20 +1753,17 @@ return SCPE_OK;
 static t_stat atcc_reset (DEVICE *dptr)
 {
 uint32 channel;
-t_stat status = SCPE_OK;
 
 tci_master_reset ();                                        /* perform a master reset */
 
 if (sim_switches & SWMASK ('P')) {                          /* if this is a power-on reset */
-    status = tmxr_set_modem_control_passthru (&atcd_mdsc);  /*   then establish local modem control */
-
-    for (channel = 0; channel < TERM_COUNT; channel++)      /* for each terminal channel */
-        tmxr_set_get_modem_bits (&atcd_ldsc [channel],      /*   set the DTR line on */
-                                 TMXR_MDM_DTR,              /*     to allow non-TCI channels to connect */
+    for (channel = 0; channel < TERM_COUNT; channel++)      /*   then for each terminal channel */
+        tmxr_set_get_modem_bits (&atcd_ldsc [channel],      /*     set the DTR line on */
+                                 TMXR_MDM_DTR,              /*       to allow non-TCI channels to connect */
                                  0, NULL);
     }
 
-return status;
+return SCPE_OK;
 }
 
 
@@ -1885,7 +1892,7 @@ atcd_dib.interrupt_active  = CLEAR;                     /*   interrupt request *
 tdi_interrupt_mask = SET;                               /* set the interrupt mask */
 
 tdi_status_word = 0;                                    /* clear the status word */
-tdi_data_flag   = 0;                                    /*   and the data flag */
+tdi_data_flag   = CLEAR;                                /*   and the data flag */
 
 for (chan = FIRST_TERM; chan <= LAST_TERM; chan++) {    /* for each terminal channel */
     recv_buffer [chan] = 0;                             /*   clear the receive data buffer */
@@ -2030,9 +2037,9 @@ return;
 
 static t_stat line_service (UNIT *uptr)
 {
-const  int32 channel = uptr - line_unit;                    /* channel number */
+const  int32 channel = (int32) (uptr - line_unit);          /* the channel number */
 const  int32 alt_channel = channel ^ 1;                     /* alternate channel number for diagnostic mode */
-const  t_bool loopback = (atcd_dev.flags & DEV_DIAG) != 0;  /* device is set for diagnostic mode */
+const  t_bool loopback = (atcd_dev.flags & DEV_DIAG) != 0;  /* TRUE if device is set for diagnostic mode */
 int32  recv_data, send_data, char_data, cvtd_data;
 t_stat result = SCPE_OK;
 
@@ -2236,7 +2243,7 @@ if ((atcc_dev.flags & (DEV_DIAG | DEV_DIS)) == 0)       /* if we're not in diagn
 status = sim_poll_kbd ();                               /* poll the simulation console keyboard for input */
 
 if (status >= SCPE_KFLAG) {                             /* if a character was present */
-    recv_buffer [0] = (uint16) status;                  /*   then save it for processing */
+    recv_buffer [0] = (HP_WORD) status;                 /*   then save it for processing */
     status = SCPE_OK;                                   /*     and then clear the status */
 
     line_service (&line_unit [0]);                      /* run the system console's I/O service */
@@ -2278,7 +2285,7 @@ return status;                                          /* return the service st
 
 static t_stat activate_unit (UNIT *uptr, ACTIVATOR reason)
 {
-const int32 channel = uptr - line_unit;                 /* the channel number */
+const int32 channel = (int32) (uptr - line_unit);       /* the channel number */
 int32 delay = 0;
 
 if (atcd_dev.flags & (DEV_DIAG | DEV_REALTIME))         /* if either diagnostic or real-time mode is set */
@@ -2438,7 +2445,7 @@ return sim_activate (uptr, delay);                      /* activate the unit and
        "addition" of the receive overhead may actually be a subtraction.
 */
 
-static uint32 service_time (uint16 control, ACTIVATOR reason)
+static uint32 service_time (HP_WORD control, ACTIVATOR reason)
 {
 const  double recirc_time = 69.44;                                  /* microseconds per memory recirculation */
 const  uint32 recirc_per_bit = DPI_BAUD_RATE (control) + 1;         /* number of memory recirculations per bit */
@@ -2483,13 +2490,13 @@ return (uint32) (usec_per_char / USEC_PER_EVENT);       /* return the service ti
        from the parameter word.
 */
 
-static void store (uint16 control, uint16 data)
+static void store (HP_WORD control, HP_WORD data)
 {
 const uint32 channel = DCN_CHAN (control);              /* current channel number */
 
 if (data & DDS_IS_SEND)                                 /* if this is a send parameter or data */
     if (channel > LAST_TERM)                            /*   then report if the channel number is out of range */
-        dprintf (atcd_dev, DEB_CSRW, "Send channel %d invalid\n",
+        dprintf (atcd_dev, DEB_CSRW, "Send channel %u invalid\n",
                  channel);
 
     else if (data & DPI_IS_PARAM) {                     /* otherwise if this is a parameter store */
@@ -2497,7 +2504,7 @@ if (data & DDS_IS_SEND)                                 /* if this is a send par
         line_unit [channel].send_time =                 /*    and set the service time */
           service_time (data, Send);
 
-        dprintf (atcd_dev, DEB_CSRW, "Channel %d send parameter %06o stored\n",
+        dprintf (atcd_dev, DEB_CSRW, "Channel %u send parameter %06o stored\n",
                  channel, data);
         }
 
@@ -2508,7 +2515,7 @@ if (data & DDS_IS_SEND)                                 /* if this is a send par
 
         send_buffer [channel] = data;                   /* store it in the buffer */
 
-        dprintf (atcd_dev, DEB_CSRW, "Channel %d send data %06o stored\n",
+        dprintf (atcd_dev, DEB_CSRW, "Channel %u send data %06o stored\n",
                  channel, data);
 
         activate_unit (&line_unit [channel], Send);     /* schedule the transmission event */
@@ -2516,7 +2523,7 @@ if (data & DDS_IS_SEND)                                 /* if this is a send par
 
 else                                                    /* otherwise this is a receive parameter */
     if (channel >= RECV_CHAN_COUNT)                     /* report if the channel number is out of range */
-        dprintf (atcd_dev, DEB_CSRW, "Receive channel %d invalid\n",
+        dprintf (atcd_dev, DEB_CSRW, "Receive channel %u invalid\n",
                  channel);
 
     else if (data & DPI_IS_PARAM) {                     /* otherwise this is a parameter store */
@@ -2530,12 +2537,12 @@ else                                                    /* otherwise this is a r
               PAD_BITS (data);
             }
 
-        dprintf (atcd_dev, DEB_CSRW, "Channel %d receive parameter %06o stored\n",
+        dprintf (atcd_dev, DEB_CSRW, "Channel %u receive parameter %06o stored\n",
                  channel, data);
         }
 
     else                                                /* otherwise a data store to a receive channel is invalid */
-        dprintf (atcd_dev, DEB_CSRW, "Channel %d receive output data word %06o invalid\n",
+        dprintf (atcd_dev, DEB_CSRW, "Channel %u receive output data word %06o invalid\n",
                  channel, data);
 }
 
@@ -2605,11 +2612,11 @@ else {                                                  /* otherwise a normal ch
                  channel);
         }
 
-    recv_buffer [channel] = (uint16) (recv_data | pad);     /* save the character and padding in the buffer */
+    recv_buffer [channel] = recv_data | pad;            /* save the character and padding in the buffer */
 
-    if (loopback) {                                         /* if this channel has a loopback cable installed */
-        if (recv_param [channel] & DPI_ENABLE_ECHO) {       /*   and the channel has echo enabled */
-            recv_buffer [channel ^ 1] = (uint16) data;      /*     then send the data back to the other channel */
+    if (loopback) {                                     /* if this channel has a loopback cable installed */
+        if (recv_param [channel] & DPI_ENABLE_ECHO) {   /*   and the channel has echo enabled */
+            recv_buffer [channel ^ 1] = data;           /*     then send the data back to the other channel */
 
             activate_unit (&line_unit [channel ^ 1], Loop); /* schedule the reception */
 
@@ -2618,10 +2625,10 @@ else {                                                  /* otherwise a normal ch
             }
         }
 
-    else if (channel <= LAST_TERM) {                            /* otherwise if it's a receive channel */
-        if (line_unit [channel].flags & UNIT_CAPSLOCK) {        /*   then if caps lock is down */
-            recv_data = toupper (recv_data);                    /*     then convert to upper case if lower */
-            recv_buffer [channel] = (uint16) (recv_data | pad); /*       and replace the character in the buffer */
+    else if (channel <= LAST_TERM) {                        /* otherwise if it's a receive channel */
+        if (line_unit [channel].flags & UNIT_CAPSLOCK) {    /*   then if caps lock is down */
+            recv_data = toupper (recv_data);                /*     then convert to upper case if lower */
+            recv_buffer [channel] = recv_data | pad;        /*       and replace the character in the buffer */
             }
 
         if (recv_param [channel] & DPI_ENABLE_ECHO) {       /* if the channel has echo enabled */
@@ -2679,9 +2686,9 @@ return;
    character only if it is configured for the same baud rate and character size.
 */
 
-static void diagnose (uint16 control, int32 data)
+static void diagnose (HP_WORD control, int32 data)
 {
-const uint16 config = control & DPI_CHAR_CONFIG;            /* main channel character size and baud rate */
+const HP_WORD config = control & DPI_CHAR_CONFIG;           /* main channel character size and baud rate */
 int32 channel;
 
 for (channel = FIRST_AUX; channel <= LAST_AUX; channel++)   /* scan the auxiliary channels */
@@ -2812,10 +2819,10 @@ return;                                                     /* no channel has co
    pointing at the interrupting channel.
 */
 
-static uint16 scan_status (void)
+static HP_WORD scan_status (void)
 {
-uint32 chan_count;
-uint16 interrupts;
+uint32  chan_count;
+HP_WORD interrupts;
 
 if (tci_scan)                                               /* if the control interface is scanning */
     chan_count = TERM_COUNT;                                /*   then look at all of the channels */
@@ -2835,7 +2842,7 @@ while (chan_count > 0) {                                    /* scan the control 
 
             tci_scan = CLEAR;                               /* stop the scan at the current channel */
 
-            dprintf (atcc_dev, DEB_CSRW, "Channel %d interrupt requested\n",
+            dprintf (atcc_dev, DEB_CSRW, "Channel %u interrupt requested\n",
                                          tci_cntr);
             break;
             }

@@ -25,6 +25,9 @@
 
    CLK          HP 30135A System Clock/Fault Logging Interface
 
+   09-Jun-16    JDB     Clarified the IRQ FF set code in DRESETINT
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   21-Mar-16    JDB     Changed inbound_value and outbound_value types to HP_WORD
    08-Jun-15    JDB     First release version
    12-Aug-14    JDB     Passed the system clock diagnostic (D426A)
    05-Jul-14    JDB     Created
@@ -221,14 +224,14 @@ static const int32 scale [8] = {                /* prescaler counts per clock ti
 
 #define UNIT_CALTIME_SHIFT  (UNIT_V_UF + 0)     /* calibrated timing mode */
 
-#define UNIT_CALTIME        (1 << UNIT_CALTIME_SHIFT)
+#define UNIT_CALTIME        (1u << UNIT_CALTIME_SHIFT)
 
 
 /* Debug flags */
 
-#define DEB_CSRW            (1 << 0)            /* trace commands received and status returned */
-#define DEB_PSERV           (1 << 1)            /* trace unit service scheduling calls */
-#define DEB_IOB             (1 << 2)            /* trace I/O bus signals and data words exchanged */
+#define DEB_CSRW            (1u << 0)           /* trace commands received and status returned */
+#define DEB_PSERV           (1u << 1)           /* trace unit service scheduling calls */
+#define DEB_IOB             (1u << 2)           /* trace I/O bus signals and data words exchanged */
 
 
 /* Control word.
@@ -239,14 +242,14 @@ static const int32 scale [8] = {                /* prescaler counts per clock ti
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define CN_MR               0100000             /* (M) master reset (if bit 3 = 0) */
-#define CN_RATE_MASK        0160000             /* clock rate selector mask (if bit 3 = 1) */
-#define CN_RESET_LOAD_SEL   0010000             /* (E) select reset/load rate (0/1) */
-#define CN_IRQ_RESET_MASK   0003400             /* interrupt request reset selector mask */
-#define CN_COUNT_RESET      0000200             /* (C) reset count register after LR=CR interrupt */
-#define CN_LIMIT_COUNT_SEL  0000100             /* (L) select limit/count (0/1) register */
-#define CN_IRQ_RESET_ALL    0000040             /* (A) reset all interrupt requests */
-#define CN_IRQ_ENABLE       0000001             /* (I) enable clock interrupts */
+#define CN_MR               0100000u            /* (M) master reset (if bit 3 = 0) */
+#define CN_RATE_MASK        0160000u            /* clock rate selector mask (if bit 3 = 1) */
+#define CN_RESET_LOAD_SEL   0010000u            /* (E) select reset/load rate (0/1) */
+#define CN_IRQ_RESET_MASK   0003400u            /* interrupt request reset selector mask */
+#define CN_COUNT_RESET      0000200u            /* (C) reset count register after LR=CR interrupt */
+#define CN_LIMIT_COUNT_SEL  0000100u            /* (L) select limit/count (0/1) register */
+#define CN_IRQ_RESET_ALL    0000040u            /* (A) reset all interrupt requests */
+#define CN_IRQ_ENABLE       0000001u            /* (I) enable clock interrupts */
 
 #define CN_RATE_SHIFT       13                  /* clock rate alignment shift */
 #define CN_IRQ_RESET_SHIFT  8                   /* interrupt request reset alignment shift */
@@ -266,14 +269,14 @@ static const char *const rate_name [8] = {      /* clock rate selector names */
     };
 
 static const char *const irq_reset_name [8] = { /* IRQ reset selector names */
-    NULL,                                       /*   000 = none */
-    "reset LR = CR irq",                        /*   001 = LR equal CR */
-    "reset LR = CR overflow irq",               /*   010 = LR equal CR overflow */
-    "reset SIN irq",                            /*   011 = I/O system */
-    NULL,                                       /*   100 = unused */
-    NULL,                                       /*   101 = unused */
-    NULL,                                       /*   110 = unused */
-    NULL,                                       /*   111 = unused */
+    "",                                         /*   000 = none */
+    " | reset LR = CR irq",                     /*   001 = LR equal CR */
+    " | reset LR = CR overflow irq",            /*   010 = LR equal CR overflow */
+    " | reset SIN irq",                         /*   011 = I/O system */
+    "",                                         /*   100 = unused */
+    "",                                         /*   101 = unused */
+    "",                                         /*   110 = unused */
+    ""                                          /*   111 = unused */
     };
 
 static const BITSET_NAME control_names [] = {   /* Control word names */
@@ -307,13 +310,13 @@ static const BITSET_FORMAT control_format =     /* names, offset, direction, alt
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define ST_DIO_OK           0040000             /* (D) direct I/O OK to use */
-#define ST_RATE_MASK        0034000             /* clock rate mask */
-#define ST_LR_EQ_CR         0000040             /* (C) limit register = count register */
-#define ST_LR_EQ_CR_OVFL    0000020             /* (F) limit register = count register overflow */
-#define ST_SYSTEM_IRQ       0000004             /* (I) I/O system interrupt request */
-#define ST_LIMIT_COUNT_SEL  0000002             /* (L) limit/count (0/1) register selected */
-#define ST_COUNT_RESET      0000001             /* (R) count register is reset after LR=CR interrupt */
+#define ST_DIO_OK           0040000u            /* (D) direct I/O OK to use */
+#define ST_RATE_MASK        0034000u            /* clock rate mask */
+#define ST_LR_EQ_CR         0000040u            /* (C) limit register = count register */
+#define ST_LR_EQ_CR_OVFL    0000020u            /* (F) limit register = count register overflow */
+#define ST_SYSTEM_IRQ       0000004u            /* (I) I/O system interrupt request */
+#define ST_LIMIT_COUNT_SEL  0000002u            /* (L) limit/count (0/1) register selected */
+#define ST_COUNT_RESET      0000001u            /* (R) count register is reset after LR=CR interrupt */
 
 #define ST_RATE_SHIFT       11                  /* clock rate alignment shift */
 
@@ -349,12 +352,12 @@ static FLIP_FLOP system_irq    = CLEAR;         /* SIN interrupt request flip-fl
 static FLIP_FLOP limit_irq     = CLEAR;         /* limit = count interrupt request flip-flop */
 static FLIP_FLOP lost_tick_irq = CLEAR;         /* limit = count overflow interrupt request flip-flop */
 
-static uint32 control_word;                     /* control word */
-static uint32 status_word;                      /* status word */
-static uint32 count_register;                   /* counter register */
-static uint32 limit_register;                   /* limit register */
-static uint32 rate;                             /* clock rate */
-static uint32 prescaler;                        /* clock rate prescaler */
+static HP_WORD control_word;                    /* control word */
+static HP_WORD status_word;                     /* status word */
+static HP_WORD count_register;                  /* counter register */
+static HP_WORD limit_register;                  /* limit register */
+static uint32  rate;                            /* clock rate */
+static uint32  prescaler;                       /* clock rate prescaler */
 
 static uint32 increment     = 1;                /* count register increment */
 static t_bool coschedulable = FALSE;            /* TRUE if the clock can be coscheduled with PCLK */
@@ -395,21 +398,21 @@ static UNIT clk_unit = {
 /* Register list */
 
 static REG clk_reg [] = {
-/*    Macro   Name    Location         Width  Offset  Flags   */
-/*    ------  ------  ---------------  -----  ------  ------- */
-    { ORDATA (CNTL,   control_word,     16)                   },
-    { ORDATA (STAT,   status_word,      16)                   },
-    { ORDATA (COUNT,  count_register,   16)                   },
-    { ORDATA (LIMIT,  limit_register,   16)                   },
-    { ORDATA (RATE,   rate,              3)                   },
-    { FLDATA (SYSIRQ, system_irq,               0)            },
-    { FLDATA (LIMIRQ, limit_irq,                0)            },
-    { FLDATA (OVFIRQ, lost_tick_irq,            0)            },
-    { DRDATA (SCALE,  prescaler,        16),          REG_HRO },
-    { DRDATA (INCR,   increment,        16),          REG_HRO },
-    { FLDATA (COSOK,  coschedulable,            0),   REG_HRO },
-    { FLDATA (COSCH,  coscheduled,              0),   REG_HRO },
-    { SRDATA (DIB,    clk_dib),                       REG_HRO },
+/*    Macro   Name    Location         Width  Offset   Flags   */
+/*    ------  ------  ---------------  -----  ------  -------  */
+    { ORDATA (CNTL,   control_word,     16)                    },
+    { ORDATA (STAT,   status_word,      16)                    },
+    { ORDATA (COUNT,  count_register,   16)                    },
+    { ORDATA (LIMIT,  limit_register,   16)                    },
+    { ORDATA (RATE,   rate,              3)                    },
+    { FLDATA (SYSIRQ, system_irq,               0)             },
+    { FLDATA (LIMIRQ, limit_irq,                0)             },
+    { FLDATA (OVFIRQ, lost_tick_irq,            0)             },
+    { DRDATA (SCALE,  prescaler,        16),          REG_HRO  },
+    { DRDATA (INCR,   increment,        16),          REG_HRO  },
+    { FLDATA (COSOK,  coschedulable,            0),   REG_HRO  },
+    { FLDATA (COSCH,  coscheduled,              0),   REG_HRO  },
+    { SRDATA (DIB,    clk_dib,                        REG_HRO) },
     { NULL }
     };
 
@@ -543,11 +546,11 @@ return;
        rate name parameter without printing when the rate is not specified.
 */
 
-static SIGNALS_DATA clk_interface (DIB *dibptr, INBOUND_SET inbound_signals, uint16 inbound_value)
+static SIGNALS_DATA clk_interface (DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
 INBOUND_SIGNAL signal;
 INBOUND_SET    working_set      = inbound_signals;
-uint16         outbound_value   = 0;
+HP_WORD        outbound_value   = 0;
 OUTBOUND_SET   outbound_signals = NO_SIGNALS;
 
 dprintf (clk_dev, DEB_IOB, "Received data %06o with signals %s\n",
@@ -610,11 +613,12 @@ while (working_set) {
             if (dibptr->interrupt_active == CLEAR)      /* if no interrupt is active */
                 working_set |= DRESETINT;               /*   then recalculate interrupt requests */
 
-            dprintf (clk_dev, DEB_CSRW, (control_word & CN_RESET_LOAD_SEL
-                                           ? "Control is %s | %s rate\n"
-                                           : "Control is %s%.0s\n"),
+            dprintf (clk_dev, DEB_CSRW, (inbound_value & CN_RESET_LOAD_SEL
+                                           ? "Control is %s | %s rate%s\n"
+                                           : "Control is %s%.0s%s\n"),
                      fmt_bitset (inbound_value, control_format),
-                     rate_name [CN_RATE (inbound_value)]);
+                     rate_name [CN_RATE (inbound_value)],
+                     irq_reset_name [CN_RESET (inbound_value)]);
             break;
 
 
@@ -636,7 +640,7 @@ while (working_set) {
             if (control_word & CN_COUNT_RESET)          /* if the reset-after-interrupt selector is set */
                 status_word |= ST_COUNT_RESET;          /*   set the corresponding status bit */
 
-            outbound_value = (uint16) status_word;      /* return the status word */
+            outbound_value = status_word;               /* return the status word */
 
             dprintf (clk_dev, DEB_CSRW, "Status is %s%s rate\n",
                      fmt_bitset (outbound_value, status_format),
@@ -648,7 +652,7 @@ while (working_set) {
             clk_update_counter ();                          /* update the clock counter register */
             outbound_value = LOWER_WORD (count_register);   /*   and then read it */
 
-            dprintf (clk_dev, DEB_CSRW, "Count register value %d returned\n",
+            dprintf (clk_dev, DEB_CSRW, "Count register value %u returned\n",
                      count_register);
             break;
 
@@ -664,7 +668,7 @@ while (working_set) {
             else {                                      /* otherwise */
                 limit_register = inbound_value;         /*   set the limit register to the supplied value */
 
-                dprintf (clk_dev, DEB_CSRW, "Limit register value %d set\n",
+                dprintf (clk_dev, DEB_CSRW, "Limit register value %u set\n",
                          limit_register);
 
                 coschedulable = (ticks [rate] == 1000           /* the clock can be coscheduled if the rate */
@@ -684,9 +688,11 @@ while (working_set) {
         case DRESETINT:
             dibptr->interrupt_active  = CLEAR;          /* clear the Interrupt Active flip-flop */
 
-            dibptr->interrupt_request = system_irq      /* recalculate the interrupt request signal */
-              || control_word & CN_IRQ_ENABLE
-                && (limit_irq | lost_tick_irq);
+            if ((limit_irq == SET || lost_tick_irq == SET)  /* if the limit or lost tick flip-flops are set */
+              && control_word & CN_IRQ_ENABLE)              /*   and interrupts are enabled */
+                dibptr->interrupt_request = SET;            /*     then set the interrupt request flip-flop */
+            else                                            /* otherwise */
+                dibptr->interrupt_request = system_irq;     /*   request an interrupt if the system flip-flop is set */
 
             if (dibptr->interrupt_request)              /* if a request is pending */
                 outbound_signals |= INTREQ;             /*   then notify the IOP */
@@ -767,7 +773,7 @@ return IORETURN (outbound_signals, outbound_value);     /* return the outbound s
 
 static t_stat clk_service (UNIT *uptr)
 {
-dprintf (clk_dev, DEB_PSERV, "Service entered with counter %d increment %d limit %d\n",
+dprintf (clk_dev, DEB_PSERV, "Service entered with counter %u increment %u limit %u\n",
          count_register, increment, limit_register);
 
 prescaler = prescaler - 1;                              /* decrement the prescaler count */

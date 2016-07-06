@@ -25,6 +25,8 @@
    this Software without prior written authorization from the authors.
 
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   24-Mar-16    JDB     Added the DL_BUFFER type to define the disc buffer array
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    27-Jul-15    JDB     First revised release version
    21-Feb-15    JDB     Revised for new controller interface model
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
@@ -44,6 +46,15 @@
 
 
 
+/* Architectural constants.
+
+   The type of the disc buffer element is defined.  This must be a 16-bit array
+   for the file representation to be packed.
+*/
+
+typedef uint16              DL_BUFFER;          /* a buffer containing 16-bit disc data words */
+
+
 /* Program limits */
 
 #define DL_MAXDRIVE         7                   /* last valid drive number */
@@ -61,12 +72,12 @@
 
 /* Debug flags */
 
-#define DL_DEB_CMD          (1 << 0)            /* trace controller commands */
-#define DL_DEB_INCO         (1 << 1)            /* trace command initiations and completions */
-#define DL_DEB_STATE        (1 << 2)            /* trace command execution state changes */
-#define DL_DEB_SERV         (1 << 3)            /* trace unit service scheduling calls */
-#define DL_DEB_XFER         (1 << 4)            /* trace data reads and writes */
-#define DL_DEB_IOB          (1 << 5)            /* trace I/O bus signals and data words */
+#define DL_DEB_CMD          (1u << 0)           /* trace controller commands */
+#define DL_DEB_INCO         (1u << 1)           /* trace command initiations and completions */
+#define DL_DEB_STATE        (1u << 2)           /* trace command execution state changes */
+#define DL_DEB_SERV         (1u << 3)           /* trace unit service scheduling calls */
+#define DL_DEB_XFER         (1u << 4)           /* trace data reads and writes */
+#define DL_DEB_IOB          (1u << 5)           /* trace I/O bus signals and data words */
 #define DL_DEB_V_UF         6                   /* first free debug flag bit */
 
 
@@ -82,7 +93,7 @@
 
 #define DEV_REALTIME_SHIFT  (DEV_V_UF + 0)              /* bits 0-0: timing mode is realistic */
 
-#define DEV_REALTIME        (1 << DEV_REALTIME_SHIFT)   /* realistic timing flag */
+#define DEV_REALTIME        (1u << DEV_REALTIME_SHIFT)  /* realistic timing flag */
 
 
 /* Unit flags and accessors */
@@ -93,15 +104,15 @@
 #define UNIT_FMT_SHIFT      (UNIT_V_UF + 5)             /* bits 5-5: format enabled */
 #define DL_V_UF             (UNIT_V_UF + 6)             /* first free unit flag bit */
 
-#define UNIT_MODEL_MASK     0000003                     /* model ID mask */
-#define UNIT_PROT_MASK      0000003                     /* head protection mask */
+#define UNIT_MODEL_MASK     0000003u                    /* model ID mask */
+#define UNIT_PROT_MASK      0000003u                    /* head protection mask */
 
 #define UNIT_MODEL          (UNIT_MODEL_MASK << UNIT_MODEL_SHIFT)
 #define UNIT_PROT           (UNIT_PROT_MASK  << UNIT_PROT_SHIFT)
-#define UNIT_PROT_L         (1 << UNIT_PROT_SHIFT + 0)
-#define UNIT_PROT_U         (1 << UNIT_PROT_SHIFT + 1)
-#define UNIT_UNLOAD         (1 << UNIT_UNLOAD_SHIFT)
-#define UNIT_FMT            (1 << UNIT_FMT_SHIFT)
+#define UNIT_PROT_L         (1u << UNIT_PROT_SHIFT + 0)
+#define UNIT_PROT_U         (1u << UNIT_PROT_SHIFT + 1)
+#define UNIT_UNLOAD         (1u << UNIT_UNLOAD_SHIFT)
+#define UNIT_FMT            (1u << UNIT_FMT_SHIFT)
 
 #define UNIT_7905           (HP_7905 << UNIT_MODEL_SHIFT)
 #define UNIT_7906           (HP_7906 << UNIT_MODEL_SHIFT)
@@ -187,35 +198,35 @@ typedef enum {
 */
 
 typedef enum {                                  /* interface flags */
-    CLEARF  = 0000001,
-    CMRDY   = 0000002,
-    DTRDY   = 0000004,
-    EOD     = 0000010,
-    INTOK   = 0000020,
-    OVRUN   = 0000040,
-    XFRNG   = 0000100
+    CLEARF  = 0000001,                          /*   Clear Controller */
+    CMRDY   = 0000002,                          /*   Command Ready */
+    DTRDY   = 0000004,                          /*   Data Ready */
+    EOD     = 0000010,                          /*   End of Data */
+    INTOK   = 0000020,                          /*   Interrupt OK */
+    OVRUN   = 0000040,                          /*   Data Overrun */
+    XFRNG   = 0000100                           /*   Data Transfer No Good */
     } CNTLR_FLAG;
 
-#define NO_FLAGS        ((CNTLR_FLAG) 0)        /* no flags are asserted */
+#define NO_FLAGS            ((CNTLR_FLAG) 0)    /* no flags are asserted */
 
-typedef CNTLR_FLAG      CNTLR_FLAG_SET;         /* a set of CNTLR_FLAGs */
+typedef CNTLR_FLAG          CNTLR_FLAG_SET;     /* a set of CNTLR_FLAGs */
 
 
 typedef enum {                                  /* interface function bus orders */
-    BUSY        = 000000200000,
-    DSCIF       = 000000400000,
-    SELIF       = 000001000000,
-    IFIN        = 000002000000,
-    IFOUT       = 000004000000,
-    IFGTC       = 000010000000,
-    IFPRF       = 000020000000,
-    RQSRV       = 000040000000,
-    DVEND       = 000100000000,
-    SRTRY       = 000200000000,
-    STDFL       = 000400000000,
-    STINT       = 001000000000,
-    WRTIO       = 002000000000,
-    FREE        = 004000000000
+    BUSY        = 000000200000,                 /*   Set Interface Busy */
+    DSCIF       = 000000400000,                 /*   Disconnect Interface */
+    SELIF       = 000001000000,                 /*   Select Interface */
+    IFIN        = 000002000000,                 /*   Interface In */
+    IFOUT       = 000004000000,                 /*   Interface Out */
+    IFGTC       = 000010000000,                 /*   Interface Get Command */
+    IFPRF       = 000020000000,                 /*   Interface Prefetch Command */
+    RQSRV       = 000040000000,                 /*   Request Service */
+    DVEND       = 000100000000,                 /*   Device End */
+    SRTRY       = 000200000000,                 /*   Set Retry Counter */
+    STDFL       = 000400000000,                 /*   Set Data Flag */
+    STINT       = 001000000000,                 /*   Set Interrupt */
+    WRTIO       = 002000000000,                 /*   Write TIO Register */
+    FREE        = 004000000000                  /*   Set Interface Free */
     } CNTLR_IFN;
 
 #define NO_FUNCTIONS    ((CNTLR_IFN) 0)         /* no functions are asserted */
@@ -223,13 +234,13 @@ typedef enum {                                  /* interface function bus orders
 typedef CNTLR_IFN       CNTLR_IFN_SET;          /* a set of CNTLR_IFNs */
 
 
-typedef uint16 CNTLR_IBUS;                      /* the interface data bus */
+typedef HP_WORD         CNTLR_IBUS;             /* the interface data bus */
 
 #undef  NO_DATA                                 /* remove winsock definition */
-#define NO_DATA         (CNTLR_IBUS) 0          /* no data asserted */
+#define NO_DATA         ((CNTLR_IBUS) 0)        /* no data asserted */
 
 
-typedef uint32 CNTLR_IFN_IBUS;                  /* a combined interface function set and data bus value */
+typedef uint32          CNTLR_IFN_IBUS;         /* a combined interface function set and data bus value */
 
 
 /* Controller opcodes */
@@ -379,7 +390,7 @@ typedef struct {
     } DELAY_PROPS;
 
 #define DELAY_INIT(sk1,skf,scf,dxfr,isg,ovhd) \
-    0, 0, \
+    (CNTLR_TYPE) 0, (DRIVE_TYPE) 0, \
     (sk1), (skf), (scf), (dxfr), (isg), (ovhd)
 
 
@@ -400,16 +411,16 @@ typedef struct {
     uint32             sector;                  /* sector address */
     uint32             count;                   /* count of words transferred or to verify */
     uint32             poll_unit;               /* last unit polled for attention */
-    uint16            *buffer;                  /* data buffer pointer */
+    DL_BUFFER         *buffer;                  /* data buffer pointer */
     uint32             index;                   /* data buffer current index */
     uint32             length;                  /* data buffer valid length */
     DIAG_ENTRY        *dop_base;                /* pointer to the diagnostic override array */
-    DIAG_ENTRY        *dop;                     /* current diagnostic override entry pointer */
+    int32              dop_index;               /* current diagnostic override entry index */
     DELAY_PROPS       *fastptr;                 /* pointer to the FASTTIME delays */
     const DELAY_PROPS *dlyptr;                  /* current delay property pointer */
     } CNTLR_VARS;
 
-typedef CNTLR_VARS *CVPTR;                      /* pointer to a controller state variable structure */
+typedef CNTLR_VARS          *CVPTR;             /* pointer to a controller state variable structure */
 
 
 /* Controller state variable structure initialization.
@@ -418,7 +429,7 @@ typedef CNTLR_VARS *CVPTR;                      /* pointer to a controller state
 
      ctype  - the type of the controller (CNTLR_TYPE)
      dev    - the device on which the controller operates (DEVICE)
-     bufptr - a pointer to the data buffer (array of uint16)
+     bufptr - a pointer to the data buffer (array of DL_BUFFER)
      doa    - a pointer to the diagnostic override array (array of DIAG_ENTRY)
               or NULL if this facility is not used
      fast   - a pointer to the fast timing values (DELAY_PROPS)
@@ -429,52 +440,54 @@ typedef CNTLR_VARS *CVPTR;                      /* pointer to a controller state
           CLEAR, FALSE, \
           0, 0, 0, 0, 0, 0, 0, \
           (bufptr), 0, 0, \
-          (doa), NULL, \
+          (doa), -1, \
           &(fast), &(fast)
 
 
 /* Disc controller device register definitions.
+
+   These definitions should be included AFTER any interface-specific registers.
 
    The supplied parameters are:
 
      cntlr    - the controller state variable structure (CNTLR_VARS)
      units    - the unit array (array of UNIT)
      numunits - the number of units in the unit array
-     buffer   - the sector buffer (array of uint16)
+     buffer   - the sector buffer (array of DL_BUFFER)
      times    - the fast timing values structure (DELAY_PROPS)
-
-   These definitions should be included AFTER any interface-specific registers.
 
 
    Implementation notes:
 
-    1. The "CNTLR" register is present to ensure that the entire CNTLR_VARS
-       structure is saved and restored.
+    1. The CNTLR_VARS fields "type", "device", "buffer", "dop_base", "fastptr",
+       and "dlyptr" do not need to appear in the REG array, as "dlyptr" is reset
+       by the dl_attach routine during a RESTORE, and the others are static.
 
     2. The fast timing structure does not use the controller and drive type
-       fields, so they do not need to be SAVEd or RESTOREd, so they do not need
-       to appear in hidden registers.
+       fields, so they do not appear in hidden registers, as they need not be
+       SAVEd or RESTOREd.
 */
 
 #define DL_REGS(cntlr,units,numunits,buffer,times)  \
-/*    Macro   Name      Location            Radix  Width        Depth             Flags       */ \
-/*    ------  --------  ------------------  -----  -----  -----------------  ---------------- */ \
-    { ORDATA (OPCODE,   (cntlr).opcode,              5),                               REG_RO }, \
-    { ORDATA (CSTATS,   (cntlr).status,              5),                               REG_RO }, \
-    { DRDATA (CSTATE,   (cntlr).state,               2),                     PV_LEFT | REG_RO }, \
-    { FLDATA (EOC,      (cntlr).eoc,                 0)                                       }, \
-    { FLDATA (VERIFY,   (cntlr).verify,              0)                                       }, \
-    { ORDATA (SPDU,     (cntlr).spd_unit,           16)                                       }, \
-    { ORDATA (FLMASK,   (cntlr).file_mask,           4)                                       }, \
-    { DRDATA (CYL,      (cntlr).cylinder,           16),                     PV_LEFT          }, \
-    { DRDATA (HEAD,     (cntlr).head,                6),                     PV_LEFT          }, \
-    { DRDATA (SECTOR,   (cntlr).sector,              8),                     PV_LEFT          }, \
-    { DRDATA (COUNT,    (cntlr).count,              16),                     PV_LEFT          }, \
-    { BRDATA (SECBUF,   (buffer),             8,    16,   DL_BUFSIZE),       REG_A            }, \
-    { DRDATA (INDEX,    (cntlr).index,               8),                     PV_LEFT          }, \
-    { DRDATA (LENGTH,   (cntlr).length,              8),                     PV_LEFT          }, \
-    { SRDATA (CNTLR,    (cntlr)),                                                     REG_HRO }, \
-                                                                                                 \
+/*    Macro   Name      Location            Radix  Width        Depth              Flags        */ \
+/*    ------  --------  ------------------  -----  -----  -----------------  -----------------  */ \
+    { ORDATA (OPCODE,   (cntlr).opcode,              5),                               REG_RO   }, \
+    { ORDATA (CSTATS,   (cntlr).status,              5),                               REG_RO   }, \
+    { DRDATA (CSTATE,   (cntlr).state,               2),                     PV_LEFT | REG_RO   }, \
+    { FLDATA (EOC,      (cntlr).eoc,                 0)                                         }, \
+    { FLDATA (VERIFY,   (cntlr).verify,              0)                                         }, \
+    { ORDATA (SPDU,     (cntlr).spd_unit,           16)                                         }, \
+    { ORDATA (FLMASK,   (cntlr).file_mask,           4)                                         }, \
+    { DRDATA (CYL,      (cntlr).cylinder,           16),                     PV_LEFT            }, \
+    { DRDATA (HEAD,     (cntlr).head,                6),                     PV_LEFT            }, \
+    { DRDATA (SECTOR,   (cntlr).sector,              8),                     PV_LEFT            }, \
+    { DRDATA (COUNT,    (cntlr).count,              16),                     PV_LEFT            }, \
+    { BRDATA (SECBUF,   (buffer),             8,    16,   DL_BUFSIZE),       REG_A              }, \
+    { DRDATA (INDEX,    (cntlr).index,               8),                     PV_LEFT            }, \
+    { DRDATA (LENGTH,   (cntlr).length,              8),                     PV_LEFT            }, \
+    { DRDATA (POLLU,    (cntlr).poll_unit,           4),                               REG_HRO  }, \
+    { DRDATA (DOINDX,   (cntlr).dop_index,          16),                     PV_LEFT | REG_HRO  }, \
+                                                                                                   \
 /*    Macro   Name    Location                  Width       Flags       */ \
 /*    ------  ------  ------------------------  -----  ---------------- */ \
     { DRDATA (TTIME,  (times).seek_one,          24),  PV_LEFT | REG_NZ }, \

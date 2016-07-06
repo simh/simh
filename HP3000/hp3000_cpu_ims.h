@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   11-Jun-16    JDB     Bit mask constants are now unsigned
    05-Sep-15    JDB     First release version
    11-Dec-12    JDB     Created
 
@@ -98,13 +99,13 @@ typedef enum {
        identifies all four cases.
 */
 
-#define IOCW_DC             0100000             /* data chain */
-#define IOCW_SIO_MASK       0070000             /* general SIO order mask */
-#define IOCW_ORDER_MASK     0174000             /* fully decoded I/O order mask */
-#define IOCW_CNTL_MASK      0007777             /* control word mask */
-#define IOCW_WCNT_MASK      0007777             /* word count mask */
+#define IOCW_DC             0100000u            /* data chain */
+#define IOCW_SIO_MASK       0070000u            /* general SIO order mask */
+#define IOCW_ORDER_MASK     0174000u            /* fully decoded I/O order mask */
+#define IOCW_CNTL_MASK      0007777u            /* control word mask */
+#define IOCW_WCNT_MASK      0007777u            /* word count mask */
 
-#define IOAW_BANK_MASK      0000017             /* bank number mask */
+#define IOAW_BANK_MASK      0000017u            /* bank number mask */
 
 #define IOCW_ORDER_SHIFT    11                  /* I/O order alignment shift */
 #define IOCW_CNTL_SHIFT     0                   /* control word alignment shift */

@@ -25,7 +25,12 @@
 
    DS           HP 30229B Cartridge Disc Interface
 
+   09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   16-May-16    JDB     Fixed interrupt mask setting
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   24-Mar-16    JDB     Changed the buffer element type from uint16 to DL_BUFFER
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    21-Jul-15    JDB     First release version
    15-Jun-15    JDB     Passes the cartridge disc diagnostic (D419A)
    15-Feb-15    JDB     Created
@@ -237,7 +242,7 @@
 /* Debug flags (interface-specific) */
 
 #define DEB_IOB             DL_DEB_IOB                  /* trace I/O bus signals and data words */
-#define DEB_CSRW            (1 << DL_DEB_V_UF + 0)      /* trace control, status, read, and write commands */
+#define DEB_CSRW            (1u << DL_DEB_V_UF + 0)     /* trace control, status, read, and write commands */
 
 
 /* Control word.
@@ -252,13 +257,13 @@
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define CN_MR               0100000             /* (M) master reset */
-#define CN_RIN              0040000             /* (R) reset interrupt */
-#define CN_TEST             0020000             /* (T) test mode */
+#define CN_MR               0100000u            /* (M) master reset */
+#define CN_RIN              0040000u            /* (R) reset interrupt */
+#define CN_TEST             0020000u            /* (T) test mode */
 
-#define CN_WAIT             0000001             /* (W) wait for data */
+#define CN_WAIT             0000001u            /* (W) wait for data */
 
-#define CN_OPCODE_MASK      0017400             /* command word opcode mask */
+#define CN_OPCODE_MASK      0017400u            /* command word opcode mask */
 
 #define CN_OPCODE_SHIFT     8                   /* controller opcode alignment shift */
 
@@ -282,11 +287,11 @@ static const BITSET_FORMAT control_format =     /* names, offset, direction, alt
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define ST_SIO_OK           0100000             /* (S) SIO OK to use */
-#define ST_TEST             0040000             /* (T) test mode enabled */
-#define ST_INTREQ           0020000             /* (I) interrupt requested */
-#define ST_STATUS_MASK      0017400             /* encoded termination status mask */
-#define ST_UNIT_MASK        0000017             /* unit number mask */
+#define ST_SIO_OK           0100000u            /* (S) SIO OK to use */
+#define ST_TEST             0040000u            /* (T) test mode enabled */
+#define ST_INTREQ           0020000u            /* (I) interrupt requested */
+#define ST_STATUS_MASK      0017400u            /* encoded termination status mask */
+#define ST_UNIT_MASK        0000017u            /* unit number mask */
 
 #define ST_MASK             ~(ST_SIO_OK | ST_TEST | ST_INTREQ)
 
@@ -295,8 +300,8 @@ static const BITSET_FORMAT control_format =     /* names, offset, direction, alt
 
 #define ST_STATUS(n)        ((n) << ST_STATUS_SHIFT & ST_STATUS_MASK)
 
-#define ST_TO_UNIT(s)       (((s) & ST_UNIT_MASK)   >> ST_UNIT_SHIFT)
-#define ST_TO_STATUS(s)     (((s) & ST_STATUS_MASK) >> ST_STATUS_SHIFT)
+#define ST_TO_UNIT(s)       (((s) & ST_UNIT_MASK) >> ST_UNIT_SHIFT)
+#define ST_TO_STATUS(s)     (CNTLR_STATUS) (((s) & ST_STATUS_MASK) >> ST_STATUS_SHIFT)
 
 
 static const BITSET_NAME status_names [] = {    /* Status word names */
@@ -334,7 +339,7 @@ static FLIP_FLOP sio_busy       = CLEAR;        /* SIO busy flip-flop */
 static FLIP_FLOP device_sr      = CLEAR;        /* device service request flip-flop */
 static FLIP_FLOP input_xfer     = CLEAR;        /* input transfer flip-flop */
 static FLIP_FLOP output_xfer    = CLEAR;        /* output transfer flip-flop */
-static FLIP_FLOP interrupt_mask = CLEAR;        /* interrupt mask flip-flop */
+static FLIP_FLOP interrupt_mask = SET;          /* interrupt mask flip-flop */
 static FLIP_FLOP jump_met       = CLEAR;        /* jump met flip-flop */
 static FLIP_FLOP device_end     = CLEAR;        /* device end flip-flop */
 static FLIP_FLOP data_overrun   = CLEAR;        /* data overrun flip-flop */
@@ -342,12 +347,12 @@ static FLIP_FLOP end_of_data    = CLEAR;        /* end of data flip-flop */
 static FLIP_FLOP test_mode      = CLEAR;        /* test mode flip-flop */
 static FLIP_FLOP data_wait      = CLEAR;        /* wait flip-flop */
 
-static uint16         status_word    = 0;       /* status register */
-static uint16         buffer_word    = 0;       /* data buffer register */
-static uint16         retry_counter  = 0;       /* retry counter */
-static CNTLR_FLAG_SET flags          = 0;       /* disc controller interface flag set */
+static HP_WORD        status_word   = 0;        /* status register */
+static HP_WORD        buffer_word   = 0;        /* data buffer register */
+static HP_WORD        retry_counter = 0;        /* retry counter */
+static CNTLR_FLAG_SET flags         = NO_FLAGS; /* disc controller interface flag set */
 
-static uint16 buffer [DL_BUFSIZE];              /* command/status/sector buffer */
+static DL_BUFFER      buffer [DL_BUFSIZE];      /* command/status/sector buffer */
 
 DEVICE ds_dev;                                  /* incomplete device structure */
 
@@ -433,8 +438,8 @@ static REG ds_reg [] = {
     { ORDATA (STATUS, status_word,      16),                  REG_FIT | PV_RZRO },
     { DRDATA (RETRY,  retry_counter,     4),                  REG_FIT | PV_LEFT },
 
-    { SRDATA (DIAG,   overrides),                             REG_HRO           },
-    { SRDATA (DIB,    ds_dib),                                REG_HRO           },
+    { SRDATA (DIAG,   overrides,                              REG_HRO)          },
+    { SRDATA (DIB,    ds_dib,                                 REG_HRO)          },
 
     DL_REGS (mac_cntlr, ds_unit, UNIT_COUNT, buffer, fast_times),
 
@@ -581,11 +586,11 @@ DEVICE ds_dev = {
        the request.
 */
 
-static SIGNALS_DATA ds_interface (DIB *dibptr, INBOUND_SET inbound_signals, uint16 inbound_value)
+static SIGNALS_DATA ds_interface (DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
 INBOUND_SIGNAL signal;
 INBOUND_SET    working_set      = inbound_signals;
-uint16         outbound_value   = 0;
+HP_WORD        outbound_value   = 0;
 OUTBOUND_SET   outbound_signals = NO_SIGNALS;
 
 dprintf (ds_dev, DEB_IOB, "Received data %06o with signals %s\n",
@@ -614,8 +619,11 @@ while (working_set) {
 
 
         case DSETMASK:
-            interrupt_mask = (dibptr->interrupt_mask            /* set the mask flip-flop */
-                                & inbound_value) != 0;          /*   from the mask bit and the mask value */
+            if (dibptr->interrupt_mask == INTMASK_E)            /* if the mask is always enabled */
+                interrupt_mask = SET;                           /*   then set the mask flip-flop */
+            else                                                /* otherwise */
+                interrupt_mask = D_FF (dibptr->interrupt_mask   /*   set the mask flip-flop if the mask bit */
+                                       & inbound_value);        /*     is present in the mask value */
 
             if (interrupt_mask && dibptr->interrupt_request)    /* if the mask is enabled and a request is pending */
                 outbound_signals |= INTREQ;                     /*   then assert the INTREQ signal */
@@ -632,7 +640,7 @@ while (working_set) {
             if (inbound_value & CN_RIN)                 /* if the reset interrupt bit is set */
                 dibptr->interrupt_request = CLEAR;      /*   then clear the interrupt request */
 
-            test_mode = (inbound_value & CN_TEST) != 0; /* set the test mode flip-flop from the test bit */
+            test_mode = D_FF (inbound_value & CN_TEST); /* set the test mode flip-flop from the test bit */
             break;
 
 
@@ -649,7 +657,7 @@ while (working_set) {
             if (dibptr->interrupt_request == SET)       /* if an interrupt request is pending */
                 outbound_value |= ST_INTREQ;            /*   then add the IRQ status bit */
 
-            dprintf (ds_dev, DEB_CSRW, "Status is %s%s | unit %d\n",
+            dprintf (ds_dev, DEB_CSRW, "Status is %s%s | unit %u\n",
                      fmt_bitset (outbound_value, status_format),
                      dl_status_name (ST_TO_STATUS (outbound_value)),
                      ST_TO_UNIT (outbound_value));
@@ -715,7 +723,7 @@ while (working_set) {
 
 
         case PCMD1:
-            data_wait = inbound_value & CN_WAIT;        /* set the wait flip-flop from the supplied value */
+            data_wait = D_FF (inbound_value & CN_WAIT); /* set the wait flip-flop from the supplied value */
 
             if (data_wait == SET)                       /* if the wait flip-flip is set */
               flags |= DTRDY;                           /*   then the data ready flag is forced true */
@@ -797,7 +805,7 @@ while (working_set) {
             if (device_end == SET) {                        /* if the device end flip-flop is set */
                 outbound_signals |= DEVEND | CHANSR;        /*   then assert DEVEND and CHANSR to the channel */
 
-                device_end = input_xfer | output_xfer;      /* clear device end if the transfer has stopped */
+                device_end = D_FF (input_xfer | output_xfer);   /* clear device end if the transfer has stopped */
                 }
 
             else if (device_sr == SET || test_mode == SET)  /* if the interface requests service */
@@ -851,7 +859,7 @@ static t_stat ds_service (UNIT *uptr)
 dprintf (ds_dev, DL_DEB_SERV, (uptr == &ds_cntlr
                                  ? "Controller unit service entered\n"
                                  : "Unit %d service entered\n"),
-         uptr - &ds_unit [0]);
+         (int32) (uptr - &ds_unit [0]));
 
 call_controller (uptr);                                 /* call the controller */
 
@@ -1221,8 +1229,8 @@ else                                                    /* otherwise */
 
 
 do {                                                    /* call the controller potentially more than once */
-    result = dl_controller (&mac_cntlr, uptr,           /*   to start or continue a command */
-                            flag_set, buffer_word);
+    result =                                            /*   to start or continue a command */
+       dl_controller (&mac_cntlr, uptr, flag_set, (CNTLR_IBUS) buffer_word);
 
     command_set = DLIFN (result) & ~UNUSED_COMMANDS;    /* strip the commands we don't use as an efficiency */
 
@@ -1236,7 +1244,7 @@ do {                                                    /* call the controller p
                     data_overrun = SET;                 /*   then this input overruns it */
 
                 else {                                  /* otherwise the buffer is empty */
-                    device_sr = ! end_of_data;          /*   so request the next word unless EOT */
+                    device_sr = D_FF (! end_of_data);   /*   so request the next word unless EOT */
 
                     if ((input_xfer == CLEAR            /* if not configured to read */
                       || output_xfer == SET)            /*   or configured to write */

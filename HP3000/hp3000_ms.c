@@ -25,7 +25,12 @@
 
    MS           HP 30215A Magnetic Tape Controller Interface
 
+   09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   16-May-16    JDB     Fixed interrupt mask setting
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   24-Mar-16    JDB     Changed the buffer element type from uint8 to TL_BUFFER
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    10-Nov-15    JDB     First release version
    26-Oct-14    JDB     Passes the magnetic tape diagnostic (D433A)
    10-Feb-13    JDB     Created
@@ -265,7 +270,7 @@
 
 #define DEB_IOB             TL_DEB_IOB                  /* trace I/O bus signals and data words */
 #define DEB_SERV            TL_DEB_SERV                 /* trace unit service scheduling calls */
-#define DEB_CSRW            (1 << TL_DEB_V_UF + 0)      /* trace control, status, read, and write actions */
+#define DEB_CSRW            (1u << TL_DEB_V_UF + 0)     /* trace control, status, read, and write actions */
 
 
 /* Control word.
@@ -280,13 +285,13 @@
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define CN_MR               0100000             /* (M) master reset */
-#define CN_RIN              0040000             /* (R) reset interrupt */
-#define CN_UNIT_MASK        0001400             /* unit number mask */
-#define CN_RSVD_MASK        0000360             /* reserved mask */
-#define CN_CMD_MASK         0000017             /* command code mask */
+#define CN_MR               0100000u            /* (M) master reset */
+#define CN_RIN              0040000u            /* (R) reset interrupt */
+#define CN_UNIT_MASK        0001400u            /* unit number mask */
+#define CN_RSVD_MASK        0000360u            /* reserved mask */
+#define CN_CMD_MASK         0000017u            /* command code mask */
 
-#define CN_CMD_RDR          0000006             /* Read Record command */
+#define CN_CMD_RDR          0000006u            /* Read Record command */
 
 #define CN_UNIT_SHIFT       8                   /* unit number alignment shift */
 #define CN_CMD_SHIFT        0                   /* command code alignment shift */
@@ -320,19 +325,19 @@ static const BITSET_FORMAT control_format =     /* names, offset, direction, alt
        reporting the controller status.
  */
 
-#define ST_SIO_OK           0100000             /* (S) SIO OK to use */
-/*      ST_ODD_COUNT        0040000 */          /* (B) byte count is odd (supplied by hp_tapelib) */
-#define ST_INTREQ           0020000             /* (I) interrupt requested */
-#define ST_UNIT_MASK        0014000             /* unit selected mask */
-/*      ST_EOT              0002000 */          /* (E) end of tape (supplied by hp_tapelib) */
-/*      ST_PROTECTED        0001000 */          /* (P) write protected (supplied by hp_tapelib) */
-/*      ST_READY            0000400 */          /* (R) unit ready (supplied by hp_tapelib) */
-/*      ST_LOAD_POINT       0000200 */          /* (L) load point (supplied by hp_tapelib) */
-/*      ST_DENSITY_1600     0000100 */          /* (D) 1600 bpi density (supplied by hp_tapelib) */
-/*      ST_WRITE_STATUS     0000040 */          /* (W) write status (supplied by hp_tapelib) */
-/*      ST_TAPE_MARK        0000020 */          /* (M) tape mark (supplied by hp_tapelib) */
-#define ST_ERROR_MASK       0000016             /* encoded error field mask */
-/*      ST_7_TRACK          0000001 */          /* (T) 7-track unit (always off) */
+#define ST_SIO_OK           0100000u            /* (S) SIO OK to use */
+/*      ST_ODD_COUNT        0040000u */         /* (B) byte count is odd (supplied by hp_tapelib) */
+#define ST_INTREQ           0020000u            /* (I) interrupt requested */
+#define ST_UNIT_MASK        0014000u            /* unit selected mask */
+/*      ST_EOT              0002000u */         /* (E) end of tape (supplied by hp_tapelib) */
+/*      ST_PROTECTED        0001000u */         /* (P) write protected (supplied by hp_tapelib) */
+/*      ST_READY            0000400u */         /* (R) unit ready (supplied by hp_tapelib) */
+/*      ST_LOAD_POINT       0000200u */         /* (L) load point (supplied by hp_tapelib) */
+/*      ST_DENSITY_1600     0000100u */         /* (D) 1600 bpi density (supplied by hp_tapelib) */
+/*      ST_WRITE_STATUS     0000040u */         /* (W) write status (supplied by hp_tapelib) */
+/*      ST_TAPE_MARK        0000020u */         /* (M) tape mark (supplied by hp_tapelib) */
+#define ST_ERROR_MASK       0000016u            /* encoded error field mask */
+/*      ST_7_TRACK          0000001u */         /* (T) 7-track unit (always off) */
 
 #define ST_UNIT_SHIFT       11                  /* unit number alignment shift */
 #define ST_ERROR_SHIFT      1                   /* encoded error alignment shift */
@@ -345,14 +350,14 @@ static const BITSET_FORMAT control_format =     /* names, offset, direction, alt
 
 /* Error codes (complements of the values returned) */
 
-#define ST_UNITIRQ          0000016             /* unit interrupt */
-#define ST_XFER             0000014             /* transfer error */
-/*      ST_REJECT           0000012 */          /* command reject (supplied by hp_tapelib) */
-/*      ST_RUNAWAY          0000010 */          /* tape runaway (supplied by hp_tapelib) */
-/*      ST_TIMING           0000006 */          /* timing error (supplied by hp_tapelib) */
-/*      ST_PARITY           0000004 */          /* tape error (supplied by hp_tapelib) */
-/*      ST_RESERVED         0000002 */          /* (reserved) */
-/*      ST_NOERROR          0000000 */          /* no error */
+#define ST_UNITIRQ          0000016u            /* unit interrupt */
+#define ST_XFER             0000014u            /* transfer error */
+/*      ST_REJECT           0000012u */         /* command reject (supplied by hp_tapelib) */
+/*      ST_RUNAWAY          0000010u */         /* tape runaway (supplied by hp_tapelib) */
+/*      ST_TIMING           0000006u */         /* timing error (supplied by hp_tapelib) */
+/*      ST_PARITY           0000004u */         /* tape error (supplied by hp_tapelib) */
+/*      ST_RESERVED         0000002u */         /* (reserved) */
+/*      ST_NOERROR          0000000u */         /* no error */
 
 static const BITSET_NAME status_names [] = {    /* Status word names */
     "SIO OK",                                   /*   bit  0 */
@@ -434,17 +439,17 @@ static FLIP_FLOP channel_sr     = CLEAR;                /* channel service reque
 static FLIP_FLOP device_sr      = CLEAR;                /* device service request flip-flop */
 static FLIP_FLOP input_xfer     = CLEAR;                /* input transfer flip-flop */
 static FLIP_FLOP output_xfer    = CLEAR;                /* output transfer flip-flop */
-static FLIP_FLOP interrupt_mask = CLEAR;                /* interrupt mask flip-flop */
+static FLIP_FLOP interrupt_mask = SET;                  /* interrupt mask flip-flop */
 static FLIP_FLOP unit_interrupt = CLEAR;                /* unit ready flip-flop */
 static FLIP_FLOP device_end     = CLEAR;                /* device end flip-flop */
 static FLIP_FLOP xfer_error     = CLEAR;                /* transfer error flip-flop */
 
-static uint16         buffer_word    = 0;               /* data buffer word */
-static uint16         attention_unit = 0;               /* number of the unit requesting attention */
+static HP_WORD        buffer_word    = 0;               /* data buffer word */
+static HP_WORD        attention_unit = 0;               /* number of the unit requesting attention */
 static CNTLR_CLASS    command_class  = Class_Invalid;   /* current command classification */
 static CNTLR_FLAG_SET flags          = INTOK;           /* tape controller interface flag set */
 
-static uint8 buffer [TL_BUFSIZE];                       /* the tape record buffer */
+static TL_BUFFER buffer [TL_BUFSIZE];                   /* the tape record buffer */
 
 DEVICE ms_dev;                                          /* incomplete device structure */
 
@@ -497,22 +502,22 @@ static UNIT ms_unit [UNIT_COUNT] = {
 /* Register list */
 
 static REG ms_reg [] = {
-/*    Macro   Name    Location        Width  Offset            Flags           */
-/*    ------  ------  --------------  -----  ------  ------------------------- */
-    { FLDATA (SIOBSY, sio_busy,                0)                              },
-    { FLDATA (CHANSR, channel_sr,              0)                              },
-    { FLDATA (DEVSR,  device_sr,               0)                              },
-    { FLDATA (INXFR,  input_xfer,              0)                              },
-    { FLDATA (OUTXFR, output_xfer,             0)                              },
-    { FLDATA (INTMSK, interrupt_mask,          0)                              },
-    { FLDATA (UINTRP, unit_interrupt,          0)                              },
-    { FLDATA (DEVEND, device_end,              0)                              },
-    { FLDATA (XFRERR, xfer_error,              0)                              },
-    { ORDATA (BUFWRD, buffer_word,     16),          REG_A | REG_FIT | PV_RZRO },
-    { DRDATA (ATUNIT, attention_unit,  16),                  REG_FIT | PV_LEFT },
-    { DRDATA (CLASS,  command_class,    4),                            PV_LEFT },
-    { YRDATA (FLAGS,  flags,            8)                                     },
-    { SRDATA (DIB,    ms_dib),                       REG_HRO                   },
+/*    Macro   Name    Location        Width  Offset            Flags            */
+/*    ------  ------  --------------  -----  ------  -------------------------  */
+    { FLDATA (SIOBSY, sio_busy,                0)                               },
+    { FLDATA (CHANSR, channel_sr,              0)                               },
+    { FLDATA (DEVSR,  device_sr,               0)                               },
+    { FLDATA (INXFR,  input_xfer,              0)                               },
+    { FLDATA (OUTXFR, output_xfer,             0)                               },
+    { FLDATA (INTMSK, interrupt_mask,          0)                               },
+    { FLDATA (UINTRP, unit_interrupt,          0)                               },
+    { FLDATA (DEVEND, device_end,              0)                               },
+    { FLDATA (XFRERR, xfer_error,              0)                               },
+    { ORDATA (BUFWRD, buffer_word,     16),          REG_A | REG_FIT | PV_RZRO  },
+    { DRDATA (ATUNIT, attention_unit,  16),                  REG_FIT | PV_LEFT  },
+    { DRDATA (CLASS,  command_class,    4),                            PV_LEFT  },
+    { YRDATA (FLAGS,  flags,            8,                             PV_RZRO) },
+    { SRDATA (DIB,    ms_dib,                        REG_HRO)                   },
 
     TL_REGS (ms_cntlr, ms_unit, DRIVE_COUNT, buffer, fast_times),
 
@@ -679,12 +684,12 @@ DEVICE ms_dev = {
        JMPMET signal is asserted continuously when enabled by CHANSO.
 */
 
-static SIGNALS_DATA ms_interface (DIB *dibptr, INBOUND_SET inbound_signals, uint16 inbound_value)
+static SIGNALS_DATA ms_interface (DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
 CNTLR_OPCODE   opcode;
 INBOUND_SIGNAL signal;
 INBOUND_SET    working_set      = inbound_signals;
-uint16         outbound_value   = 0;
+HP_WORD        outbound_value   = 0;
 OUTBOUND_SET   outbound_signals = NO_SIGNALS;
 
 dprintf (ms_dev, DEB_IOB, "Received data %06o with signals %s\n",
@@ -737,10 +742,13 @@ while (working_set) {
 
 
         case DSETMASK:
-            interrupt_mask =                                    /* set the mask flip-flop */
-               D_FF (dibptr->interrupt_mask & inbound_value);   /*   from the mask bit and the mask value */
+            if (dibptr->interrupt_mask == INTMASK_E)            /* if the mask is always enabled */
+                interrupt_mask = SET;                           /*   then set the mask flip-flop */
+            else                                                /* otherwise */
+                interrupt_mask = D_FF (dibptr->interrupt_mask   /*   set the mask flip-flop if the mask bit */
+                                       & inbound_value);        /*     is present in the mask value */
 
-            if (interrupt_mask & dibptr->interrupt_request)     /* if the mask is enabled and a request is pending */
+            if (interrupt_mask && dibptr->interrupt_request)    /* if the mask is enabled and a request is pending */
                 outbound_signals |= INTREQ;                     /*   then assert the INTREQ signal */
             break;
 
@@ -786,7 +794,7 @@ while (working_set) {
             if (dibptr->interrupt_request)              /* if an interrupt request is pending */
                 outbound_value |= ST_INTREQ;            /*   then set the status bit */
 
-            dprintf (ms_dev, DEB_CSRW, "Status is %s%s | unit %d\n",
+            dprintf (ms_dev, DEB_CSRW, "Status is %s%s | unit %u\n",
                      fmt_bitset (outbound_value, status_format),
                      error_names [ST_TO_ERROR (outbound_value)],
                      ST_TO_UNIT (outbound_value));
@@ -879,9 +887,9 @@ while (working_set) {
                      inbound_value, tl_opcode_name (opcode));
 
             if ((inbound_value & CN_RSVD_MASK) != 0)    /* if the reserved bits aren't zero */
-                buffer_word = (uint16) Invalid_Opcode;  /*   then reject the command */
+                buffer_word = (HP_WORD) Invalid_Opcode; /*   then reject the command */
             else                                        /* otherwise */
-                buffer_word = (uint16) opcode;          /*   store the opcode in the data buffer register */
+                buffer_word = (HP_WORD) opcode;         /*   store the opcode in the data buffer register */
 
             flags |= CMRDY | CMXEQ;                     /* set the command ready and execute flags */
 
@@ -993,7 +1001,7 @@ static t_stat ms_service (UNIT *uptr)
 t_stat result;
 
 dprintf (ms_dev, DEB_SERV, "%s service entered\n",
-         tl_unit_name (uptr - ms_unit));
+         tl_unit_name ((int32) (uptr - ms_unit)));
 
 result = call_controller (uptr);                        /* call the controller */
 
@@ -1017,12 +1025,6 @@ return result;
 
 static t_stat ms_reset (DEVICE *dptr)
 {
-t_stat status;
-
-master_reset ();                                        /* perform a master reset */
-
-status = tl_reset (&ms_cntlr);                          /* reset the controller */
-
 if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on reset */
     fast_times.rewind_start = MS_REW_START;             /*   then reset the rewind initiation time, */
     fast_times.rewind_rate  = MS_REW_RATE;              /*     the rewind time per inch, */
@@ -1032,7 +1034,9 @@ if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on
     fast_times.overhead     = MS_OVERHEAD;              /*             and the controller execution overhead */
     }
 
-return status;                                          /* return the result of the reset */
+master_reset ();                                        /* perform a master reset */
+
+return tl_reset (&ms_cntlr);                            /* reset the controller and return the result */
 }
 
 
@@ -1261,7 +1265,7 @@ CNTLR_IFN      command;
 t_stat         status = SCPE_OK;
 
 result =                                                /* call the controller to start or continue a command */
-   tl_controller (&ms_cntlr, uptr, flags, buffer_word);
+   tl_controller (&ms_cntlr, uptr, flags, (CNTLR_IBUS) buffer_word);
 
 command_set = TLIFN (result) & ~UNUSED_COMMANDS;        /* strip the commands we don't use as an efficiency */
 

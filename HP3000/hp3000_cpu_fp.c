@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   11-Jun-16    JDB     Bit mask constants are now unsigned
    03-Feb-16    JDB     First release version
    25-Aug-15    JDB     Fixed FSUB zero subtrahend bug (from Norwin Malmberg)
    01-Apr-15    JDB     Passes the floating point tests in the CPU diagnostic (D420A1)
@@ -112,18 +113,18 @@
 #define MIN_EXPONENT        -256                /* the smallest representable exponent */
 #define MAX_EXPONENT        +255                /* the largest representable exponent */
 
-#define EXPONENT_MASK       0077700             /* the mask to isolate the exponent in the first word */
-#define MANTISSA_MASK       0000077             /* the mask to isolate the mantissa in the first word */
+#define EXPONENT_MASK       0077700u            /* the mask to isolate the exponent in the first word */
+#define MANTISSA_MASK       0000077u            /* the mask to isolate the mantissa in the first word */
 
 #define EXPONENT_SHIFT      6                   /* the exponent alignment shift */
 #define MANTISSA_SHIFT      0                   /* the mantissa alignment shift */
 
 #define UNPACKED_BITS       54                  /* the number of significant bits in the unpacked mantissa */
 
-#define IMPLIED_BIT         ((t_uint64) 1 << UNPACKED_BITS)     /* the implied MSB in the mantissa */
-#define CARRY_BIT           ((t_uint64) 1 << UNPACKED_BITS + 1) /* the carry from the MSB in the mantissa */
+#define IMPLIED_BIT         ((t_uint64) 1uL << UNPACKED_BITS)       /* the implied MSB in the mantissa */
+#define CARRY_BIT           ((t_uint64) 1uL << UNPACKED_BITS + 1)   /* the carry from the MSB in the mantissa */
 
-#define DELTA_ALIGNMENT     (D64_WIDTH - UNPACKED_BITS)         /* net shift to align the binary point */
+#define DELTA_ALIGNMENT     (D64_WIDTH - UNPACKED_BITS)             /* net shift to align the binary point */
 
 
 /* Floating-point accessors */
