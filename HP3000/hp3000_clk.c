@@ -25,6 +25,7 @@
 
    CLK          HP 30135A System Clock/Fault Logging Interface
 
+   08-Jul-16    JDB     Preset the unit wait field
    09-Jun-16    JDB     Clarified the IRQ FF set code in DRESETINT
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    21-Mar-16    JDB     Changed inbound_value and outbound_value types to HP_WORD
@@ -392,7 +393,7 @@ static DIB clk_dib = {
 /* Unit list */
 
 static UNIT clk_unit = {
-    UDATA (&clk_service, UNIT_IDLE | UNIT_CALTIME, 0)
+    UDATA (&clk_service, UNIT_IDLE | UNIT_CALTIME, 0), mS (1)
     };
 
 /* Register list */
