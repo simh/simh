@@ -5691,6 +5691,8 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
         WRITE_I (uptr->u6);
         WRITE_I (uptr->flags);                          /* [V2.10] flags */
         WRITE_I (uptr->dynflags);
+        WRITE_I (uptr->wait);
+        WRITE_I (uptr->buf);
         WRITE_I (uptr->capac);                          /* [V3.5] capacity */
         if (uptr->flags & UNIT_ATT) {
             fputs (uptr->filename, sfile);
@@ -5926,6 +5928,8 @@ for ( ;; ) {                                            /* device loop */
         READ_I (flg);                                   /* [V2.10+] unit flags */
         if (v40) {                                      /* [V4.0+] dynflags */
             READ_I (uptr->dynflags);
+            READ_I (uptr->wait);
+            READ_I (uptr->buf);
             }
         old_capac = uptr->capac;                        /* save current capacity */
         if (v35) {                                      /* [V3.5+] capacity */
