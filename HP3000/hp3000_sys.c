@@ -23,7 +23,14 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   21-Jun-16    JDB     Changed fprint_instruction mask type from t_value to uint32
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   16-May-16    JDB     Prefix in fprint_instruction is now a pointer-to-constant
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   20-Apr-16    JDB     Added implementation notes to "fmt_bitset"
+   14-Apr-16    JDB     Fixed INTMASK setting and display
+   24-Mar-16    JDB     Added the LP device
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    23-Nov-15    JDB     First release version
    11-Dec-12    JDB     Created
 
@@ -63,6 +70,7 @@ extern DEVICE scmb_dev [2];                     /* Selector Channel Maintenance 
 extern DEVICE atcd_dev;                         /* Asynchronous Terminal Controller TDI */
 extern DEVICE atcc_dev;                         /* Asynchronous Terminal Controller TCI */
 extern DEVICE clk_dev;                          /* System Clock */
+extern DEVICE lp_dev;                           /* Line Printer */
 extern DEVICE ds_dev;                           /* 79xx MAC Disc */
 extern DEVICE ms_dev;                           /* 7970 Magnetic Tape */
 
@@ -758,7 +766,7 @@ static t_stat hp_brk_cmd   (int32 arg, CONST char *buf);
 static void   fprint_value       (FILE *ofile, t_value val,  uint32 radix, uint32 width, uint32 format);
 static t_stat fprint_order       (FILE *ofile, t_value *val, uint32 radix);
 static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *instruction,
-                                  t_value mask, uint32 shift, uint32 radix);
+                                  uint32 mask, uint32 shift, uint32 radix);
 
 static t_stat parse_cpu          (CONST char *cptr, t_addr address, UNIT *uptr, t_value *value, int32 switches);
 
@@ -773,10 +781,10 @@ static APC_FLAGS parse_config = apcNone;        /* address parser configuration 
 
 /* System interface global data structures */
 
-#define E                   0400                /* parity bit for even parity */
-#define O                   0000                /* parity bit for odd parity */
+#define E                   0400u               /* parity bit for even parity */
+#define O                   0000u               /* parity bit for odd parity */
 
-const uint16 odd_parity [256] = {                       /* odd parity table */
+const HP_WORD odd_parity [256] = {                      /* odd parity table */
     E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /*   000-017 */
     O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /*   020-037 */
     O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /*   040-067 */
@@ -861,6 +869,7 @@ DEVICE *sim_devices [] = {                      /* an array of pointers to the s
     &scmb_dev [0], &scmb_dev [1],               /*   Selector Channel Maintenance Boards */
     &atcd_dev,     &atcc_dev,                   /*   Asynchronous Terminal Controller (TDI and TCI) */
     &clk_dev,                                   /*   System Clock */
+    &lp_dev,                                    /*   Line Printer */
     &ds_dev,                                    /*   7905/06/20/25 MAC Disc Interface */
     &ms_dev,                                    /*   7970B/E Magnetic Tape Interface */
     NULL                                        /* end of the device list */
@@ -1041,7 +1050,7 @@ uint32 radix_override;
 
 if (sw & SWMASK ('A') && (!is_reg || addr & REG_A))         /* if ASCII character display is requested and permitted */
     if (val [0] <= D8_SMAX) {                               /*     then if the value is a single character */
-        fputs (fmt_char (val [0]), ofile);                  /*       then format and print it */
+        fputs (fmt_char ((uint32) val [0]), ofile);         /*       then format and print it */
         return SCPE_OK;
         }
 
@@ -1212,8 +1221,8 @@ else                                                    /* otherwise */
    Implementation notes:
 
     1. For a numeric interrupt mask entry value <n>, the value stored in the DIB
-       is 2^<n>.  For mask entry values "D" and "E", the stored values are 0 and
-       0177777, respectively.
+       is 2 ^ <15 - n> to match the HP 3000 bit numbering.  For mask entry
+       values "D" and "E", the stored values are 0 and 0177777, respectively.
 
     2. The SCMB is the only device that may or may not have a service request
        number, depending on whether or not it is connected to the multiplexer
@@ -1252,8 +1261,8 @@ else                                                    /* otherwise a value is 
                 value = get_uint (cptr, INTMASK_BASE,       /*   parse the supplied numeric mask value */
                                   INTMASK_MAX, &status);
 
-                if (status == SCPE_OK)                      /* if it is valid */
-                    dibptr->interrupt_mask = 1 << value;    /*   then set the corresponding mask bit in the DIB */
+                if (status == SCPE_OK)                          /* if it is valid */
+                    dibptr->interrupt_mask = D16_SIGN >> value; /*   then set the corresponding mask bit in the DIB */
                 }
             break;
 
@@ -1308,8 +1317,8 @@ return status;                                          /* return the validation
    Implementation notes:
 
     1. For a numeric interrupt mask entry value <n>, the value stored in the DIB
-       is 2^<n>.  For mask entry values "D" and "E", the stored values are 0 and
-       0177777, respectively.
+       is 2 ^ <15 - n> to match the HP 3000 bit numbering.  For mask entry
+       values "D" and "E", the stored values are 0 and 0177777, respectively.
 */
 
 t_stat hp_show_dib (FILE *st, UNIT *uptr, int32 code, CONST void *desc)
@@ -1320,7 +1329,7 @@ uint32           mask, value;
 switch (code) {                                         /* display the requested value */
 
     case VAL_DEVNO:                                     /* show the device number */
-        fprintf (st, "DEVNO=%d", dibptr->device_number);
+        fprintf (st, "DEVNO=%u", dibptr->device_number);
         break;
 
     case VAL_INTMASK:                                   /* show the interrupt mask */
@@ -1335,22 +1344,22 @@ switch (code) {                                         /* display the requested
         else {                                          /* otherwise */
             mask = dibptr->interrupt_mask;              /*   display a specific mask value */
 
-            for (value = 0; !(mask & 1); value++)       /* count the number of mask bit shifts */
-                mask = mask >> 1;                       /*   until the correct one is found */
+            for (value = 0; !(mask & D16_SIGN); value++)    /* count the number of mask bit shifts */
+                mask = mask << 1;                           /*   until the correct one is found */
 
-            fprintf (st, "%d", value);                  /* display the mask bit number */
+            fprintf (st, "%u", value);                  /* display the mask bit number */
             }
         break;
 
     case VAL_INTPRI:                                    /* show the interrupt priority */
-        fprintf (st, "INTPRI=%d", dibptr->interrupt_priority);
+        fprintf (st, "INTPRI=%u", dibptr->interrupt_priority);
         break;
 
     case VAL_SRNO:                                          /* show the service request number */
         if (dibptr->service_request_number == SRNO_UNUSED)  /* if the current setting is "unused" */
             fprintf (st, "SRNO not used");                  /*   then report it */
         else                                                /* otherwise report the SR number */
-            fprintf (st, "SRNO=%d", dibptr->service_request_number);
+            fprintf (st, "SRNO=%u", dibptr->service_request_number);
         break;
 
     default:                                            /* if an illegal code was passed */
@@ -1502,7 +1511,7 @@ for (conf = Device; conf <= Service; conf++) {          /* check for conflicts f
             if (conflicts [val] > 1) {                  /* if a conflict is present for this value */
                 count = conflicts [val];                /*   then get the number of conflicting devices */
 
-                cprintf ("%s %d conflict (", conflict_label [conf], val);
+                cprintf ("%s %u conflict (", conflict_label [conf], val);
 
                 dev = 0;                                        /* search for the devices that conflict */
 
@@ -1784,6 +1793,20 @@ else {                                                  /* otherwise it's a prin
    Processing continues until there are no remaining significant bits (if no
    alternates are specified), or until there are no remaining names in the array
    (if alternates are specified).
+
+
+   Implementation notes:
+
+    1. The routine returns a pointer to a static buffer containing the printable
+       string, so it cannot be called more than once per trace line, unless the
+       buffer contents are copied upon return.  In particular, this type of
+       calling sequence:
+
+         dprintf (..., fmt_bitset (...), ..., fmt_bitset (...), ...);
+
+       ...will fail, as the buffer will be overwritten by the second call before
+       the result of the first call is printed.
+
 */
 
 const char *fmt_bitset (uint32 bitset, const BITSET_FORMAT bitfmt)
@@ -2042,7 +2065,7 @@ else if (reason == STOP_CDUMP) {                        /* otherwise if this is 
     }
 
 else if (reason == STOP_SYSHALT) {                      /* otherwise if this is a system halt stop */
-    fprintf (st, " %d", RA);                            /*   then print the halt reason */
+    fprintf (st, " %u", RA);                            /*   then print the halt reason */
     return TRUE;                                        /*     and return TRUE to append the program counter */
     }
 
@@ -2207,7 +2230,7 @@ static t_stat hp_cold_cmd (int32 arg, CONST char *buf)
 const char *cptr;
 char       gbuf [CBUFSIZE];
 t_stat     status;
-t_value    value;
+HP_WORD    value;
 
 if (*buf != '\0') {                                     /* if more characters exist on the command line */
     cptr = get_glyph (buf, gbuf, 0);                    /*   then get the next glyph */
@@ -2215,8 +2238,8 @@ if (*buf != '\0') {                                     /* if more characters ex
     if (*cptr != '\0')                                  /* if that does not exhaust the input */
         return SCPE_2MARG;                              /*   then report that there are too many arguments */
 
-    value = get_uint (gbuf, cpu_dev.dradix,             /* get the parameter value */
-                      D16_UMAX, &status);
+    value = (HP_WORD) get_uint (gbuf, cpu_dev.dradix,   /* get the parameter value */
+                                D16_UMAX, &status);
 
     if (status == SCPE_OK)                              /* if a valid number was present */
         SWCH = value;                                   /*   then set it into the switch register */
@@ -2224,7 +2247,7 @@ if (*buf != '\0') {                                     /* if more characters ex
         return status;                                  /*   return the error status */
     }
 
-cpu_front_panel (SWCH, arg);                            /* set up the cold load or dump microcode */
+cpu_front_panel (SWCH, (PANEL_TYPE) arg);               /* set up the cold load or dump microcode */
 
 return run_cmd (RU_RUN, "");                            /* reset and execute the halt-mode routine */
 }
@@ -2596,17 +2619,17 @@ static const char *const register_name [] = {   /* PSHR/SETR register names corr
     };
 
 static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *instruction,
-                                  t_value mask, uint32 shift, uint32 radix)
+                                  uint32 mask, uint32 shift, uint32 radix)
 {
-uint32  op_index, op_radix;
-int32   reg_index;
-t_bool  reg_first;
-t_value op_value;
-char    *prefix  = NULL;                                /* base register label to print before the operand */
-t_bool  index    = FALSE;                               /* TRUE if the instruction is indexed */
-t_bool  indirect = FALSE;                               /* TRUE if the instruction is indirect */
+uint32     op_index, op_radix;
+int32      reg_index;
+t_bool     reg_first;
+t_value    op_value;
+const char *prefix  = NULL;                             /* base register label to print before the operand */
+t_bool     index    = FALSE;                            /* TRUE if the instruction is indexed */
+t_bool     indirect = FALSE;                            /* TRUE if the instruction is indirect */
 
-op_index = (instruction [0] & mask) >> shift;           /* extract the opcode index */
+op_index = ((uint32) instruction [0] & mask) >> shift;  /* extract the opcode index */
 
 if (ops [op_index].mnemonic [0])                        /* if a primary entry is defined */
     fputs (ops [op_index].mnemonic, ofile);             /*   then print the mnemonic */

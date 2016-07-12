@@ -25,6 +25,10 @@
 
    SEL          HP 3000 Series III Selector Channel
 
+   30-Jun-16    JDB     Reestablish active_dib pointer during sel_initialize
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   16-May-16    JDB     abort_channel parameter is now a pointer-to-constant
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    23-Sep-15    JDB     First release version
    27-Jan-15    JDB     Passes the selector channel diagnostic (D429A)
    10-Feb-13    JDB     Created
@@ -327,8 +331,8 @@
 
 #define CYCLES_PER_EVENT    (uint32) (USEC_PER_EVENT * 1000 / NS_PER_CYCLE)
 
-#define CNTR_MASK           0007777             /* word counter count mask */
-#define CNTR_MAX            0007777             /* word counter maximum value */
+#define CNTR_MASK           0007777u            /* word counter count mask */
+#define CNTR_MAX            0007777u            /* word counter maximum value */
 
 
 typedef enum {                                  /* selector channel sequencer state */
@@ -367,10 +371,10 @@ static const char *const action_name [] = {     /* indexed by SEQ_STATE */
     1. Bit 0 is reserved for the memory data trace flag.
 */
 
-#define DEB_CSRW            (1 << 1)            /* trace channel command initiations and completions */
-#define DEB_PIO             (1 << 2)            /* trace programmed I/O commands */
-#define DEB_STATE           (1 << 3)            /* trace state changes */
-#define DEB_SR              (1 << 4)            /* trace service requests */
+#define DEB_CSRW            (1u << 1)           /* trace channel command initiations and completions */
+#define DEB_PIO             (1u << 2)           /* trace programmed I/O commands */
+#define DEB_STATE           (1u << 3)           /* trace state changes */
+#define DEB_SR              (1u << 4)           /* trace service requests */
 
 
 /* Channel global state */
@@ -384,6 +388,7 @@ t_bool sel_request = FALSE;                     /* TRUE if the channel sequencer
 static SEQ_STATE sequencer = Idle_Sequence;     /* the current sequencer execution state */
 static SIO_ORDER order;                         /* the current SIO order */
 static DIB      *active_dib;                    /* a pointer to the participating interface's DIB */
+static uint32    device_index;                  /* the index into the device table */
 static t_bool    prefetch_control;              /* TRUE if the IOCW should be prefetched */
 static t_bool    prefetch_address;              /* TRUE if the IOAW should be prefetched */
 
@@ -410,10 +415,10 @@ static t_stat sel_reset (DEVICE *dptr);
 
 /* Channel local utility routines */
 
-static void         end_channel       (DIB     *dibptr);
-static SIGNALS_DATA abort_channel     (char    *reason);
-static void         load_control      (HP_WORD *value);
-static void         load_address      (HP_WORD *value);
+static void         end_channel       (DIB        *dibptr);
+static SIGNALS_DATA abort_channel     (const char *reason);
+static void         load_control      (HP_WORD    *value);
+static void         load_address      (HP_WORD    *value);
 
 
 /* Channel SCP data structures */
@@ -428,30 +433,30 @@ static UNIT sel_unit = {
 /* Register list */
 
 static REG sel_reg [] = {
-/*    Macro   Name    Location         Width  Offset  Flags           */
-/*    ------  ------  ---------------  -----  ------  --------------- */
-    { FLDATA (IDLE,   sel_is_idle,              0)                    },
-    { FLDATA (SREQ,   sel_request,              0)                    },
-    { DRDATA (DEVNO,  device_number,     8),          PV_LEFT         },
-    { DRDATA (EXCESS, excess_cycles,    32),          PV_LEFT         },
-    { ORDATA (DIB,    active_dib,       32),          REG_HRO         },
+/*    Macro   Name    Location         Width  Offset  Flags             */
+/*    ------  ------  ---------------  -----  ------  ----------------- */
+    { FLDATA (IDLE,   sel_is_idle,              0)                      },
+    { FLDATA (SREQ,   sel_request,              0)                      },
+    { DRDATA (DEVNO,  device_number,     8),          PV_LEFT           },
+    { DRDATA (EXCESS, excess_cycles,    32),          PV_LEFT           },
+    { DRDATA (INDEX,  device_index,     32),          PV_LEFT | REG_HRO },
 
-    { DRDATA (SEQ,    sequencer,         3)                           },
-    { ORDATA (ORDER,  order,             4)                           },
-    { FLDATA (ROLOVR, rollover,                 0)                    },
-    { FLDATA (PFCNTL, prefetch_control,         0)                    },
-    { FLDATA (PFADDR, prefetch_address,         0)                    },
+    { DRDATA (SEQ,    sequencer,         3)                             },
+    { ORDATA (ORDER,  order,             4)                             },
+    { FLDATA (ROLOVR, rollover,                 0)                      },
+    { FLDATA (PFCNTL, prefetch_control,         0)                      },
+    { FLDATA (PFADDR, prefetch_address,         0)                      },
 
-    { ORDATA (BANK,   bank,              4),          PV_LEFT         },
-    { DRDATA (WCOUNT, word_count,       12)                           },
+    { ORDATA (BANK,   bank,              4),          PV_LEFT           },
+    { DRDATA (WCOUNT, word_count,       12)                             },
 
-    { ORDATA (PCNTR,  program_counter,  16),                  REG_FIT },
-    { ORDATA (CNTL,   control_word,     16),                  REG_FIT },
-    { ORDATA (CNBUF,  control_buffer,   16),                  REG_FIT },
-    { ORDATA (ADDR,   address_word,     16),                  REG_FIT },
-    { ORDATA (ADBUF,  address_buffer,   16),                  REG_FIT },
-    { ORDATA (INBUF,  input_buffer,     16),          REG_A | REG_FIT },
-    { ORDATA (OUTBUF, output_buffer,    16),          REG_A | REG_FIT },
+    { ORDATA (PCNTR,  program_counter,  16),                  REG_FIT   },
+    { ORDATA (CNTL,   control_word,     16),                  REG_FIT   },
+    { ORDATA (CNBUF,  control_buffer,   16),                  REG_FIT   },
+    { ORDATA (ADDR,   address_word,     16),                  REG_FIT   },
+    { ORDATA (ADBUF,  address_buffer,   16),                  REG_FIT   },
+    { ORDATA (INBUF,  input_buffer,     16),          REG_A | REG_FIT   },
+    { ORDATA (OUTBUF, output_buffer,    16),          REG_A | REG_FIT   },
 
     { NULL }
     };
@@ -509,7 +514,10 @@ DEVICE sel_dev = {
 
    Implementation notes:
 
-    1. In simulation, we allow the device number to be changed during a
+    1. The active DIB pointer is restored from the device context to support
+       resuming after a SAVE and RESTORE is performed.
+
+    2. In simulation, we allow the device number to be changed during a
        simulation stop, so this routine must recover it from the device.
        Normally, the device number register would be reset from the device
        number field in the DIB.  However, the SCMB may be spoofing the device
@@ -526,7 +534,9 @@ void sel_initialize (void)
 SIGNALS_DATA outbound;
 
 if (sel_is_idle == FALSE) {                                         /* if the channel is controlling a device */
-    outbound = active_dib->io_interface (active_dib, DEVNODB, 0);   /*   then see if it responds to DEVNODB */
+    active_dib = (DIB *) sim_devices [device_index]->ctxt;          /*   then restore the active DIB pointer */
+
+    outbound = active_dib->io_interface (active_dib, DEVNODB, 0);   /* see if the device responds to DEVNODB */
 
     if (IODATA (outbound) > 0)                          /* if it does (e.g., the SCMB) */
         device_number = IODATA (outbound) / 4;          /*   then use the returned device number */
@@ -568,7 +578,7 @@ return;
 void sel_assert_REQ (DIB *dibptr)
 {
 if (sel_is_idle) {                                      /* if the channel is idle then set it up */
-    dprintf (sel_dev, DEB_CSRW, "Device number %d asserted REQ for channel initialization\n",
+    dprintf (sel_dev, DEB_CSRW, "Device number %u asserted REQ for channel initialization\n",
              dibptr->device_number);
 
     sel_is_idle = FALSE;                                /* the channel is now busy */
@@ -581,6 +591,11 @@ if (sel_is_idle) {                                      /* if the channel is idl
     rollover = CLEAR;                                   /*   and the word count rollover flip-flop */
     excess_cycles = 0;                                  /* clear the excess cycle count */
 
+    device_index = 0;                                           /* find the device index */
+                                                                /*   corresponding to */
+    while ((DIB *) sim_devices [device_index]->ctxt != dibptr)  /*     the active DIB pointer */
+        device_index = device_index + 1;                        /*       to aid later restoration */
+
     active_dib = dibptr;                                /* save the interface's DIB pointer */
     device_number = dibptr->device_number;              /*   and set the device number register */
 
@@ -589,7 +604,7 @@ if (sel_is_idle) {                                      /* if the channel is idl
     }
 
 else {                                                  /* otherwise abort the transfer in progress */
-    dprintf (sel_dev, DEB_CSRW, "Device number %d asserted REQ for channel abort\n",
+    dprintf (sel_dev, DEB_CSRW, "Device number %u asserted REQ for channel abort\n",
              device_number);
 
     end_channel (dibptr);                               /* idle the channel */
@@ -616,7 +631,7 @@ return;
 
 void sel_assert_CHANSR (DIB *dibptr)
 {
-dprintf (sel_dev, DEB_SR, "Device number %d asserted CHANSR\n",
+dprintf (sel_dev, DEB_SR, "Device number %u asserted CHANSR\n",
          device_number);
 
 dibptr->service_request = TRUE;                         /* set the service request flag in the interface */
@@ -780,7 +795,7 @@ return;
 
 void sel_service (uint32 ticks_elapsed)
 {
-uint16       inbound_data, outbound_data;
+HP_WORD      inbound_data, outbound_data;
 INBOUND_SET  inbound_signals;
 SIGNALS_DATA outbound;
 int32        cycles;
@@ -888,7 +903,7 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
                                                      control_word);
 
                 if ((outbound & CHANACK) == NO_SIGNALS) {   /* if CHANACK was not returned */
-                    dprintf (sel_dev, DEB_SR, "Device number %d CHANACK timeout\n",
+                    dprintf (sel_dev, DEB_SR, "Device number %u CHANACK timeout\n",
                              device_number);
 
                     end_channel (active_dib);               /* terminate the channel program */
@@ -1267,7 +1282,7 @@ return;
    to complete the abort.
 */
 
-static SIGNALS_DATA abort_channel (char *reason)
+static SIGNALS_DATA abort_channel (const char *reason)
 {
 dprintf (sel_dev, DEB_CSRW, "Channel asserted XFERERROR for %s\n",
          reason);

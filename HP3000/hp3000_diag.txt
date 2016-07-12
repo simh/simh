@@ -1,6 +1,6 @@
                       SIMH/HP 3000 DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2016-02-09
+                             Last update: 2016-05-31
 
 
 The HP 32230 offline diagnostic suite has been run against the SIMH HP 3000
@@ -57,11 +57,12 @@ The results of the diagnostic runs are summarized below:
   PD433A    7970B/E Nine-Track Magnetic Tape         01.04  Partial
   PD434A    Synchronous Line Controller              01.03  No simulation
   PD434B    Asynchronous Line Controller             01.04  No simulation
-  PD435A    Universal Interface                      01.01  No simulation
+  PD435A    Universal Interface                      01.01  Passed
   PD438A    Terminal Control Interface               01.00  Passed
   PD439A    CALCOMP Plotter Interface                01.01  No simulation
   PD441A    COBOL-II A Firmware                      00.00  No simulation
   PD442A    COBOL-II B Firmware                      00.00  No simulation
+  PD466A    Online Line Printer Verifier             01.06  Passed
 
 The "Result" column indicates the level of success in passing the given
 diagnostic:
@@ -92,9 +93,9 @@ Each configuration below presumes that the target diagnostic has been cold
 loaded from the appropriate magnetic tape.
 
 
---------------------------------
-D420A - CPU Diagnostic Section 1
---------------------------------
+---------------------
+D420A - CPU Section 1
+---------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
@@ -154,9 +155,9 @@ TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
 
 
 
----------------------------------
-D420A1 - CPU Diagnostic Section 2
----------------------------------
+----------------------
+D420A1 - CPU Section 2
+----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
@@ -173,9 +174,9 @@ TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
 
 
 
----------------------------------
-D420A2 - CPU Diagnostic Section 3
----------------------------------
+----------------------
+D420A2 - CPU Section 3
+----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
@@ -202,9 +203,9 @@ TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
 
 
 
----------------------------------
-D420A3 - CPU Diagnostic Section 4
----------------------------------
+----------------------
+D420A3 - CPU Section 4
+----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
@@ -257,9 +258,9 @@ TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
 
 
 
----------------------------------
-D420A4 - CPU Diagnostic Section 5
----------------------------------
+----------------------
+D420A4 - CPU Section 5
+----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
@@ -276,113 +277,113 @@ TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
 
 
 
----------------------------------
-D420A5 - CPU Diagnostic Section 6
----------------------------------
+----------------------
+D420A5 - CPU Section 6
+----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010011 (SETR STATUS)
+TEST REPORT:    System halt 3, P: 010011 (SETR STATUS)
 
 TEST RESULT:    Passed.
 
 
 
----------------------------------
-D420A6 - CPU Diagnostic Section 7
----------------------------------
+----------------------
+D420A6 - CPU Section 7
+----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010011 (SETR STATUS)
+TEST REPORT:    System halt 33, P: 010011 (SETR STATUS)
 
 TEST RESULT:    Passed.
 
 
 
----------------------------------
-D420A7 - CPU Diagnostic Section 8
----------------------------------
+----------------------
+D420A7 - CPU Section 8
+----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010014 (PCAL 0)
+TEST REPORT:    System halt 13, P: 010014 (PCAL 0)
 
 TEST RESULT:    Passed.
 
 
 
----------------------------------
-D420A8 - CPU Diagnostic Section 9
----------------------------------
+----------------------
+D420A8 - CPU Section 9
+----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010016 (PCAL 0)
+TEST REPORT:    System halt 2, P: 010016 (PCAL 0)
 
 TEST RESULT:    Passed.
 
 
 
-----------------------------------
-D420A9 - CPU Diagnostic Section 10
-----------------------------------
+-----------------------
+D420A9 - CPU Section 10
+-----------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010052 (IXIT)
+TEST REPORT:    System halt 6, P: 010052 (IXIT)
 
 TEST RESULT:    Passed.
 
 
 
------------------------------------
-D420A10 - CPU Diagnostic Section 11
------------------------------------
+------------------------
+D420A10 - CPU Section 11
+------------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010011 (PSEB)
+TEST REPORT:    System halt 9, P: 010011 (PSEB)
 
 TEST RESULT:    Passed.
 
 
 
------------------------------------
-D420A11 - CPU Diagnostic Section 12
------------------------------------
+------------------------
+D420A11 - CPU Section 12
+------------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010005 (SETR STATUS)
+TEST REPORT:    System halt 1, P: 010005 (SETR STATUS)
 
 TEST RESULT:    Passed.
 
 
 
------------------------------------
-D420A12 - CPU Diagnostic Section 13
------------------------------------
+------------------------
+D420A12 - CPU Section 13
+------------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010010 (ADDS 0)
+TEST REPORT:    System halt 4, P: 010010 (ADDS 0)
 
 TEST RESULT:    Passed.
 
@@ -396,15 +397,15 @@ TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> go
 
-TEST REPORT:    System halt, P: 010003 (LDI 0)
+TEST REPORT:    System halt 4, P: 010003 (LDI 0)
 
 TEST RESULT:    Passed.
 
 
 
-------------------------------------------
-D419A - 7905A Disc Cartridge (interactive)
-------------------------------------------
+-----------------------------------------
+D419A - Cartridge Disc (user interaction)
+-----------------------------------------
 
 TESTED DEVICE:  DS (hp3000_ds.c)
 
@@ -582,9 +583,9 @@ TEST NOTES:     The diagnostic overrides supply the expected status returns for
 
 
 
---------------------------------------------
-D419A - 7905A Disc Cartridge (multiple unit)
---------------------------------------------
+--------------------------------------------------
+D419A - Cartridge Disc (multiple unit, short pass)
+--------------------------------------------------
 
 TESTED DEVICE:  DS (hp3000_ds.c)
 
@@ -665,9 +666,9 @@ TEST NOTES:     Section 1 is not selected to avoid specifying diagnostic
 
 
 
-----------------------
-D421A - Memory Pattern
-----------------------
+--------------------------
+D421 - Memory Pattern Test
+--------------------------
 
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
@@ -1128,9 +1129,9 @@ TEST RESULT:    Passed.
 
 
 
--------------------------------------------------------------
-D433A - 7970B/E Nine-Track Magnetic Tape (7970B, single unit)
--------------------------------------------------------------
+----------------------------------------------------
+D433A - 7970B Nine-Track Magnetic Tape (single unit)
+----------------------------------------------------
 
 TESTED DEVICE:  MS (hp3000_ms.c)
 
@@ -1153,8 +1154,8 @@ TEST REPORT:    [CR entered]
                       A'CR'-AUTO,  R'CR'-RESTART,
                       M'CR'-MANU,  'CR'-RESUME,   YOUR CODE? A
                 D015 PRESENT SECTION REGISTER:%077414 DO YOU WISH TO CHANGE?(YES/NO)YES
-                D015 UPDATE  SECTION REGISTER:%067414
-                D015 PRESENT SECTION REGISTER:%067414 DO YOU WISH TO CHANGE?(YES/NO)NO
+                D015 UPDATE  SECTION REGISTER:%067400
+                D015 PRESENT SECTION REGISTER:%067400 DO YOU WISH TO CHANGE?(YES/NO)NO
 
                 Q019 AUTO-PROCESS:  ENTER TAPE UNIT(B,E,NO) AT
                 Q020 DRIVE 0? B
@@ -1196,9 +1197,9 @@ TEST NOTES:     Section 3 (tape mark tests) is not selected, as the simulation
 
 
 
----------------------------------------------------------------
-D433A - 7970B/E Nine-Track Magnetic Tape (7970E, multiple unit)
----------------------------------------------------------------
+------------------------------------------------------
+D433A - 7970E Nine-Track Magnetic Tape (multiple unit)
+------------------------------------------------------
 
 TESTED DEVICE:  MS (hp3000_ms.c)
 
@@ -1223,7 +1224,9 @@ TEST REPORT:    [CR entered]
                 P005 TYPE FOLLOWING CONTROL
                       A'CR'-AUTO,  R'CR'-RESTART,
                       M'CR'-MANU,  'CR'-RESUME,   YOUR CODE? A
-                D015 PRESENT SECTION REGISTER:%077414 DO YOU WISH TO CHANGE?(YES/NO)NO
+                D015 PRESENT SECTION REGISTER:%077414 DO YOU WISH TO CHANGE?(YES/NO)YES
+                D015 UPDATE  SECTION REGISTER:%077400
+                D015 PRESENT SECTION REGISTER:%077400 DO YOU WISH TO CHANGE?(YES/NO)NO
 
                 Q019 AUTO-PROCESS:  ENTER TAPE UNIT(B,E,NO) AT
                 Q020 DRIVE 0? E
@@ -1264,9 +1267,9 @@ TEST RESULT:    Passed.
 
 
 
--------------------------------------------------------------
-D433A - 7970B/E Nine-Track Magnetic Tape (7970E, interactive)
--------------------------------------------------------------
+---------------------------------------------------------
+D433A - 7970E Nine-Track Magnetic Tape (user interaction)
+---------------------------------------------------------
 
 TESTED DEVICE:  MS (hp3000_ms.c)
 
@@ -1534,6 +1537,289 @@ TEST RESULT:    Passed.
 
 
 
+---------------------------
+D435A - Universal Interface
+---------------------------
+
+TESTED DEVICE:  LP (hp3000_lp.c)
+
+CONFIGURATION:  sim> set lp diagnostic,intmask=8
+                sim> set clk realtime
+                sim> go
+
+TEST REPORT:    D100  UNIV. INTERFACE TEST (HP D435A.01.01)
+                (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
+                ****************** WARNING ******************
+                this diagnostic has tests which will produce error
+                conditions on interface boards which have datecodes
+                PRIOR TO 1504.
+
+                Q110  DEVICE NUMBER? 14
+                Q112  INTERRUPT MASK? 8
+                Q113  NEGATIVE TRUE? NO
+                Q114  CHANGE INTERNAL SWITCH REGISTER? ? YES
+                P114  INTERNAL SWITCH REGISTER
+
+                Programmed halt, CIR: 030366 (HALT 6), P: 026015 (DDEL,DDEL)
+
+                sim> deposit SWCH 100111
+                sim> go
+
+                Q115  SECTION LIST?
+                Q116  READER-PUNCH INTERFACE ? NO
+                D102  END SECTION 0
+
+                D100  UNIV. INTERFACE TEST (HP D435A.01.01)
+                (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
+                ****************** WARNING ******************
+                this diagnostic has tests which will produce error
+                conditions on interface boards which have datecodes
+                PRIOR TO 1504.
+                P120  CONT6 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=10000
+                sim> go
+
+                P120  CONT7 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=01000
+                sim> go
+
+                P120  CONT8 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=00100
+                sim> go
+
+                P120  CONT9 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=00010
+                sim> go
+
+                P120  CONT10 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=00001
+                sim> go
+
+                P121  JUMPER J2W1 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000000001
+                sim> go
+
+                P121  JUMPER J2W2 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000000010
+                sim> go
+
+                P121  JUMPER J2W3 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000000100
+                sim> go
+
+                P121  JUMPER J2W4 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000001000
+                sim> go
+
+                P121  JUMPER J2W5 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000010000
+                sim> go
+
+                P121  JUMPER J2W6 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000100000
+                sim> go
+
+                P121  JUMPER J2W7 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0001000000
+                sim> go
+
+                P121  JUMPER J2W8 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0010000000
+                sim> go
+
+                P121  JUMPER J2W9 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0100000000
+                sim> go
+
+                P121  JUMPER J2W10 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=1000000000
+                sim> go
+
+                P122  DEVICE END ASSERTED
+
+                Programmed halt, CIR: 030371 (HALT 11), P: 021505 (DDEL,DDEL)
+
+                sim> assert LP DEVEND=1
+                sim> go
+
+                P124  BIT 0 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=100000
+                sim> go
+
+                P124  BIT 1 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=040000
+                sim> go
+
+                P124  BIT 2 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=020000
+                sim> go
+
+                P124  BIT 3 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=010000
+                sim> go
+
+                P124  BIT 4 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=004000
+                sim> go
+
+                P124  BIT 5 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=002000
+                sim> go
+
+                P124  BIT 6 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=001000
+                sim> go
+
+                P124  BIT 7 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000400
+                sim> go
+
+                P124  BIT 8 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000200
+                sim> go
+
+                P124  BIT 9 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000100
+                sim> go
+
+                P124  BIT 10 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000040
+                sim> go
+
+                P124  BIT 11 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000020
+                sim> go
+
+                P124  BIT 12 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000010
+                sim> go
+
+                P124  BIT 13 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000004
+                sim> go
+
+                P124  BIT 14 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000002
+                sim> go
+
+                P124  BIT 15 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000001
+                sim> go
+
+                D102  END SECTION 1
+                D102  END SECTION 2
+                D102  END SECTION 3
+                D102  END SECTION 4
+                D102  END SECTION 5
+                D102  END SECTION 6
+                D102  END SECTION 7
+                D102  END SECTION 8
+                D102  END SECTION 9
+                D102  END SECTION 10
+                P103  PASS 1
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010265 (DDEL,DDEL)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The interrupt mask number is changed from "E" (always enabled) to
+                a numeric value to allow the mask circuits to be tested.
+
+
+
 ----------------------------------
 D438A - Terminal Control Interface
 ----------------------------------
@@ -1560,5 +1846,58 @@ TEST REPORT:    Programmed halt, CIR: 030366 (HALT 6), P: 010670 (LRA P+4)
                 sim> go
 
                 Programmed halt, CIR: 030375 (HALT 15), P: 010225 (BR P+7)
+
+TEST RESULT:    Passed.
+
+
+
+------------------------------------
+D466A - Online Line Printer Verifier
+------------------------------------
+
+TESTED DEVICE:  LP (hp3000_lp.c)
+
+CONFIGURATION:  :STOPSPOOL 6
+                :RUN PD466A.HP32230.SUPPORT
+
+TEST REPORT:    D1 ONLINE LINE PRINTER VERIFIER (HP D466A.01.06)
+                (C) COPYRIGHT HEWLETT-PACKARD COMPANY 1978.
+                PRINTER MUST BE SET TO 6 LINES PER INCH
+                Q1 WHICH MODEL? 2607/08/10/13/14/17/18/19: 2617
+                Q2 64/96 CHARACTER SET?96
+                Q3 LOGICAL DEVICE ?6
+                Q4 FLAGS?
+                PRESS 'ON/OFF' LINE SWITCH 'ON' THEN 'OFF'
+                D7 PRESS 'CR' TO CONTINUE
+
+                [CTRL+E]
+
+                Simulation stopped, P: 071144 (PAUS 0)
+
+                sim> set lp offline
+                sim> go
+
+                19:44/3/LDEV #6 NOT READY
+                COMPUTER CONSOLE SHOULD PRINT 'IO/X:XX/LDEV# XXX NOT READY'
+                PRESS 'ON/OFF' SWITCH 'ON'
+                D7 PRESS 'CR' TO CONTINUE
+
+                [CTRL+E]
+
+                Simulation stopped, P: 071144 (PAUS 0)
+
+                sim> set lp online
+                sim> go
+
+                D6 END OF SECTION 1
+                D6 END OF SECTION 2
+                D6 END OF SECTION 3
+                D6 END OF SECTION 4
+                D6 END OF SECTION 5
+                D6 END OF SECTION 6
+                D6 END OF SECTION 7
+                LINE PRINTER VERIFIER TEST TERMINATED
+
+                END OF PROGRAM
 
 TEST RESULT:    Passed.

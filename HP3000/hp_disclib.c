@@ -24,7 +24,13 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   16-May-16    JDB     DRIVE_PROPS.name is now a pointer-to-constant
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   03-May-16    JDB     Added a trace to identify the unit requesting attention
+   24-Mar-16    JDB     Changed the buffer element type from uint16 to DL_BUFFER
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    27-Jul-15    JDB     First revised release version
    21-Feb-15    JDB     Revised for new controller interface model
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -391,7 +397,7 @@
 
 /* Unit flags accessor */
 
-#define GET_MODEL(f)        (((f) >> UNIT_MODEL_SHIFT) & UNIT_MODEL_MASK)
+#define GET_MODEL(f)        (DRIVE_TYPE) ((f) >> UNIT_MODEL_SHIFT & UNIT_MODEL_MASK)
 
 
 /* Controller clear types */
@@ -453,24 +459,24 @@ typedef enum {
    Form 6 is used by the Cold Load Read command.
 */
 
-#define CM_OPCODE_MASK      0017400             /* operation code mask */
-#define CM_UNIT_MASK        0000017             /* unit number mask */
+#define CM_OPCODE_MASK      0017400u            /* operation code mask */
+#define CM_UNIT_MASK        0000017u            /* unit number mask */
 
-#define CM_SPARE            0100000             /* spare track */
-#define CM_PROTECTED        0040000             /* protected track */
-#define CM_DEFECTIVE        0020000             /* defective track */
+#define CM_SPARE            0100000u            /* spare track */
+#define CM_PROTECTED        0040000u            /* protected track */
+#define CM_DEFECTIVE        0020000u            /* defective track */
 #define CM_SPD_MASK         (CM_SPARE | CM_PROTECTED | CM_DEFECTIVE)
 
-#define CM_RETRY_MASK       0000360             /* retry count mask */
-#define CM_FILE_MASK_MASK   0000017             /* file mask mask */
+#define CM_RETRY_MASK       0000360u            /* retry count mask */
+#define CM_FILE_MASK_MASK   0000017u            /* file mask mask */
 
-#define CM_DECR_SEEK        0000010             /* 0/1 = incremental/decremental seek */
-#define CM_SPARE_EN         0000004             /* sparing enabled */
-#define CM_CYL_MODE         0000002             /* 0/1 = surface/cylinder mode */
-#define CM_AUTO_SEEK_EN     0000001             /* auto-seek enabled */
+#define CM_DECR_SEEK        0000010u            /* 0/1 = incremental/decremental seek */
+#define CM_SPARE_EN         0000004u            /* sparing enabled */
+#define CM_CYL_MODE         0000002u            /* 0/1 = surface/cylinder mode */
+#define CM_AUTO_SEEK_EN     0000001u            /* auto-seek enabled */
 
-#define CM_HEAD_MASK        0000300             /* cold load read head mask */
-#define CM_SECTOR_MASK      0000077             /* cold load read sector mask */
+#define CM_HEAD_MASK        0000300u            /* cold load read head mask */
+#define CM_SECTOR_MASK      0000077u            /* cold load read sector mask */
 
 
 #define CM_OPCODE_SHIFT     8
@@ -485,7 +491,8 @@ typedef enum {
 
 #define CM_SPD(c)           ((c) & CM_SPD_MASK)
 
-#define CM_OPCODE(c)        (((c) & CM_OPCODE_MASK)    >> CM_OPCODE_SHIFT)
+#define CM_OPCODE(c)        (CNTLR_OPCODE) (((c) & CM_OPCODE_MASK) >> CM_OPCODE_SHIFT)
+
 #define CM_UNIT(c)          (((c) & CM_UNIT_MASK)      >> CM_UNIT_SHIFT)
 
 #define CM_RETRY(c)         (((c) & CM_RETRY_MASK)     >> CM_RETRY_SHIFT)
@@ -572,11 +579,11 @@ static const BITSET_FORMAT file_mask_format =       /* names, offset, direction,
      S = sign of cylinder offset
 */
 
-#define S1_SPARE            0100000             /* spare track */
-#define S1_PROTECTED        0040000             /* protected track */
-#define S1_DEFECTIVE        0020000             /* defective track */
-#define S1_STATUS_MASK      0017400             /* encoded termination status mask */
-#define S1_UNIT_MASK        0000017             /* unit number mask */
+#define S1_SPARE            0100000u            /* spare track */
+#define S1_PROTECTED        0040000u            /* protected track */
+#define S1_DEFECTIVE        0020000u            /* defective track */
+#define S1_STATUS_MASK      0017400u            /* encoded termination status mask */
+#define S1_UNIT_MASK        0000017u            /* unit number mask */
 
 #define S1_STATUS_SHIFT     8
 #define S1_UNIT_SHIFT       0
@@ -585,16 +592,16 @@ static const BITSET_FORMAT file_mask_format =       /* names, offset, direction,
 #define S1_UNIT(n)          ((n) << S1_UNIT_SHIFT   & S1_UNIT_MASK)
 
 
-#define S2_ERROR            0100000             /* any error */
-#define S2_DRIVE_TYPE_MASK  0017000             /* drive type mask */
-#define S2_ATTENTION        0000200             /* attention */
-#define S2_READ_ONLY        0000100             /* read-only */
-#define S2_FORMAT_EN        0000040             /* format enabled */
-#define S2_FAULT            0000020             /* drive fault */
-#define S2_FIRST_STATUS     0000010             /* first status */
-#define S2_SEEK_CHECK       0000004             /* seek check */
-#define S2_NOT_READY        0000002             /* not ready */
-#define S2_BUSY             0000001             /* drive busy */
+#define S2_ERROR            0100000u            /* any error */
+#define S2_DRIVE_TYPE_MASK  0017000u            /* drive type mask */
+#define S2_ATTENTION        0000200u            /* attention */
+#define S2_READ_ONLY        0000100u            /* read-only */
+#define S2_FORMAT_EN        0000040u            /* format enabled */
+#define S2_FAULT            0000020u            /* drive fault */
+#define S2_FIRST_STATUS     0000010u            /* first status */
+#define S2_SEEK_CHECK       0000004u            /* seek check */
+#define S2_NOT_READY        0000002u            /* not ready */
+#define S2_BUSY             0000001u            /* drive busy */
 
 #define S2_STOPS            (S2_FAULT \
                                | S2_SEEK_CHECK \
@@ -616,13 +623,13 @@ static const BITSET_FORMAT file_mask_format =       /* names, offset, direction,
 #define S2_TO_DRIVE_TYPE(n) (((n) & S2_DRIVE_TYPE_MASK) >> S2_DRIVE_TYPE_SHIFT)
 
 
-#define PIO_HEAD_MASK       0017400             /* head mask */
-#define PIO_SECTOR_MASK     0000377             /* sector mask */
+#define PIO_HEAD_MASK       0017400u            /* head mask */
+#define PIO_SECTOR_MASK     0000377u            /* sector mask */
 
-#define PI_ADV_CLOCK        0001000             /* advance clock */
-#define PI_DEL_CLOCK        0000400             /* delay clock */
-#define PI_NEG_OFFSET       0000200             /* 0/1 = positive/negative cylinder offset sign */
-#define PI_OFFSET_MASK      0000077             /* cylinder offset mask */
+#define PI_ADV_CLOCK        0001000u            /* advance clock */
+#define PI_DEL_CLOCK        0000400u            /* delay clock */
+#define PI_NEG_OFFSET       0000200u            /* 0/1 = positive/negative cylinder offset sign */
+#define PI_OFFSET_MASK      0000077u            /* cylinder offset mask */
 
 
 #define PIO_HEAD_SHIFT      8
@@ -724,13 +731,13 @@ static const BITSET_FORMAT offset_format =      /* names, offset, direction, alt
 */
 
 typedef struct {
-    char      *name;                            /* drive name */
-    uint32     sectors;                         /* sectors per head */
-    uint32     heads;                           /* heads per cylinder*/
-    uint32     cylinders;                       /* cylinders per drive */
-    uint32     words;                           /* words per drive */
-    uint32     remov_heads;                     /* number of removable-platter heads */
-    uint32     fixed_heads;                     /* number of fixed-platter heads */
+    const char  *name;                          /* drive name */
+    uint32      sectors;                        /* sectors per head */
+    uint32      heads;                          /* heads per cylinder*/
+    uint32      cylinders;                      /* cylinders per drive */
+    uint32      words;                          /* words per drive */
+    uint32      remov_heads;                    /* number of removable-platter heads */
+    uint32      fixed_heads;                    /* number of fixed-platter heads */
     } DRIVE_PROPS;
 
 static const DRIVE_PROPS drive_props [] = {     /* indexed by DRIVE_TYPE */
@@ -1276,12 +1283,12 @@ static void   idle_controller  (CVPTR cvptr);
 
 /* Disc library local utility routines */
 
-static void   set_address   (CVPTR cvptr, uint32    index);
-static void   wait_timer    (CVPTR cvptr, FLIP_FLOP action);
-static uint16 drive_status  (UNIT  *uptr);
-static t_stat activate_unit (CVPTR cvptr, UNIT *uptr);
-static void   set_rotation  (CVPTR cvptr, UNIT *uptr);
-static void   set_file_pos  (CVPTR cvptr, UNIT *uptr, uint32 model);
+static void    set_address   (CVPTR cvptr, uint32    index);
+static void    wait_timer    (CVPTR cvptr, FLIP_FLOP action);
+static HP_WORD drive_status  (UNIT  *uptr);
+static t_stat  activate_unit (CVPTR cvptr, UNIT *uptr);
+static void    set_rotation  (CVPTR cvptr, UNIT *uptr);
+static void    set_file_pos  (CVPTR cvptr, UNIT *uptr, uint32 model);
 
 
 
@@ -1519,7 +1526,8 @@ return outbound;
 
     6. ECC is not simulated, so the Request Syndrome command always returns zero
        values for the displacement and patterns and Uncorrectable Data Error for
-       the status, unless a diagnostic override is in effect.
+       the status.  Correctable Data Error status cannot occur unless a
+       diagnostic override is in effect.
 
     7. The Wakeup command references a drive unit but is scheduled on the
        controller unit because it may be issued while the drive is seeking.
@@ -1533,6 +1541,7 @@ int32 seek_wait_time;
 PRPTR props;
 CNTLR_IFN_IBUS outbound;
 char s1_buffer [256], s2_buffer [256];                  /* formatted bitset buffers for trace logging */
+DIAG_ENTRY *dop = NULL;
 
 wait_timer (cvptr, CLEAR);                              /* stop the command wait timer */
 
@@ -1566,21 +1575,24 @@ else {                                                  /* otherwise this is an 
       cvptr->device->units + cvptr->poll_unit;          /*       when the controller structure was initialized */
     }
 
-dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s command started\n",
+dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u %s command started\n",
           unit, opcode_name [cvptr->opcode]);
 
+if (cvptr->dop_index >= 0)                              /* if the diagnostic override table is defined */
+    dop = cvptr->dop_base + cvptr->dop_index;           /*   then point at the current entry */
 
-if (cvptr->dop                                          /* if the diagnostic override table is defined */
-  && cvptr->dop->cylinder == cvptr->cylinder            /*   and the cylinder, */
-  && cvptr->dop->head == cvptr->head                    /*     head, */
-  && cvptr->dop->sector == cvptr->sector                /*       sector, */
-  && cvptr->dop->opcode == cvptr->opcode) {             /*         and opcode values match the current values */
-    cvptr->spd_unit = cvptr->dop->spd | unit;           /*           then override the Spare/Protected/Defective */
-    cvptr->status = cvptr->dop->status;                 /*             and status values from the override entry */
+if (dop                                                 /* if the table entry exists */
+  && dop->cylinder == cvptr->cylinder                   /*   and the cylinder, */
+  && dop->head     == cvptr->head                       /*     head, */
+  && dop->sector   == cvptr->sector                     /*       sector, */
+  && dop->opcode   == cvptr->opcode)  {                 /*         and opcode values match the current values */
+    cvptr->spd_unit = dop->spd | unit;                  /*           then override the Spare/Protected/Defective */
+    cvptr->status   = dop->status;                      /*             and status values from the override entry */
 
-    cvptr->dop++;                                       /* point at the next table entry */
+    cvptr->dop_index++;                                 /* point at the  */
+    dop++;                                              /*   next table entry */
 
-    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d cylinder %d head %d sector %d diagnostic override\n",
+    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u cylinder %u head %u sector %u diagnostic override\n",
               unit, cvptr->cylinder, cvptr->head, cvptr->sector);
     }
 
@@ -1634,13 +1646,13 @@ else {                                                  /* otherwise the command
             if (start_seek (cvptr, duptr) == FALSE)             /* start the seek; if it failed */
                 set_completion (cvptr, cuptr, Status_2_Error);  /*   then set up the completion status */
 
-            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s from cylinder %d head %d sector %d\n",
+            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s from cylinder %u head %u sector %u\n",
                       unit, opcode_name [Cold_Load_Read], cvptr->cylinder, cvptr->head, cvptr->sector);
             break;                                              /* wait for seek completion */
 
 
         case Recalibrate:
-            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s to cylinder 0\n",
+            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s to cylinder 0\n",
                       unit, opcode_name [Recalibrate]);
 
             if (duptr->PHASE == Seek_Phase) {                   /* if the unit is currently seeking */
@@ -1649,7 +1661,7 @@ else {                                                  /* otherwise the command
                 sim_cancel (duptr);                             /* cancel the event to allow rescheduling */
                 duptr->PHASE = Idle_Phase;                      /*   and idle the drive so that the seek succeeds */
 
-                dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s command waiting for seek completion\n",
+                dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u %s command waiting for seek completion\n",
                           unit, opcode_name [Recalibrate]);
                 }
 
@@ -1667,7 +1679,7 @@ else {                                                  /* otherwise the command
 
 
         case Request_Status:
-            cvptr->buffer [0] = (uint16) (cvptr->spd_unit       /* set the Status-1 value */
+            cvptr->buffer [0] = (DL_BUFFER) (cvptr->spd_unit    /* set the Status-1 value */
                                   | S1_STATUS (cvptr->status)); /*   into the buffer */
 
             if (cvptr->type == MAC)                     /* if this a MAC controller */
@@ -1678,9 +1690,9 @@ else {                                                  /* otherwise the command
             else                                        /* otherwise it is not a MAC controller */
                 rptr = duptr;                           /*   so the referenced unit is the current unit */
 
-            cvptr->buffer [1] = drive_status (rptr);    /* set the Status-2 value into the buffer */
+            cvptr->buffer [1] = (DL_BUFFER) drive_status (rptr);    /* set the Status-2 value into the buffer */
 
-            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s returns %sunit %d | %s and %s%s | %s\n",
+            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s returns %sunit %u | %s and %s%s | %s\n",
                       unit, opcode_name [Request_Status],
                       strcpy (s1_buffer, fmt_bitset (cvptr->spd_unit, status_1_format)),
                       CM_UNIT (cvptr->spd_unit), dl_status_name (cvptr->status),
@@ -1706,9 +1718,9 @@ else {                                                  /* otherwise the command
 
             else                                                /* otherwise the drive is ready */
                 cvptr->buffer [0] =                             /*   so calculate the current sector address */
-                  (uint16) CURRENT_SECTOR (cvptr, duptr);
+                  (DL_BUFFER) CURRENT_SECTOR (cvptr, duptr);
 
-            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s returns sector %d\n",
+            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s returns sector %u\n",
                       unit, opcode_name [Request_Sector_Address], cvptr->buffer [0]);
             break;
 
@@ -1722,13 +1734,14 @@ else {                                                  /* otherwise the command
 
 
         case Request_Syndrome:
-            if (cvptr->status == Correctable_Data_Error) {          /* if we've been called with a correction override */
-                cvptr->buffer [3] = (uint16) cvptr->dop->spd;       /*   then load the displacement */
-                cvptr->buffer [4] = (uint16) cvptr->dop->cylinder;  /*     and three */
-                cvptr->buffer [5] = (uint16) cvptr->dop->head;      /*       syndrome words */
-                cvptr->buffer [6] = (uint16) cvptr->dop->sector;    /*         from the override entry */
+            if (cvptr->status == Correctable_Data_Error) {      /* if this is a correction override */
+                cvptr->buffer [3] = (DL_BUFFER) dop->spd;       /*   then load the displacement */
+                cvptr->buffer [4] = (DL_BUFFER) dop->cylinder;  /*     and three */
+                cvptr->buffer [5] = (DL_BUFFER) dop->head;      /*       syndrome words */
+                cvptr->buffer [6] = (DL_BUFFER) dop->sector;    /*         from the override entry */
 
-                cvptr->dop++;                                       /* point at the next entry */
+                cvptr->dop_index++;                             /* point at the  */
+                dop++;                                          /*   next table entry */
                 }
 
             else {                                          /* otherwise no correction data was supplied */
@@ -1741,12 +1754,12 @@ else {                                                  /* otherwise the command
                     cvptr->status = Uncorrectable_Data_Error;   /*   then presume that an uncorrectable error occurred */
                 }
 
-            cvptr->buffer [0] = (uint16) (cvptr->spd_unit       /* save the Status-1 value */
+            cvptr->buffer [0] = (DL_BUFFER) (cvptr->spd_unit    /* save the Status-1 value */
                                   | S1_STATUS (cvptr->status)); /*   in the buffer */
 
             set_address (cvptr, 1);                         /* save the CHS values in the buffer */
 
-            dpprintf (cvptr->device, DL_DEB_CMD, "%s returns %sunit %d | %s | cylinder %d head %d sector %d | "
+            dpprintf (cvptr->device, DL_DEB_CMD, "%s returns %sunit %u | %s | cylinder %u head %u sector %u | "
                                                  "syndrome %06o %06o %06o %06o\n",
                       opcode_name [Request_Syndrome], fmt_bitset (cvptr->spd_unit, status_1_format),
                       CM_UNIT (cvptr->spd_unit), dl_status_name (cvptr->status),
@@ -1765,7 +1778,7 @@ else {                                                  /* otherwise the command
 
             set_completion (cvptr, cuptr, Normal_Completion);   /* schedule the command completion */
 
-            dpprintf (cvptr->device, DL_DEB_CMD, "%s to %sretries %d\n",
+            dpprintf (cvptr->device, DL_DEB_CMD, "%s to %sretries %u\n",
                       opcode_name [Set_File_Mask], fmt_bitset (cvptr->file_mask, file_mask_format),
                       CM_RETRY (inbound_data));
             break;
@@ -1774,7 +1787,7 @@ else {                                                  /* otherwise the command
         case Request_Disc_Address:
             set_address (cvptr, 0);                     /* set the controller's CHS values into the buffer */
 
-            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s returns cylinder %d head %d sector %d\n",
+            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s returns cylinder %u head %u sector %u\n",
                       unit, opcode_name [Request_Disc_Address], cvptr->cylinder, cvptr->head, cvptr->sector);
             break;
 
@@ -1789,7 +1802,7 @@ else {                                                  /* otherwise the command
         case Wakeup:
             set_completion (cvptr, cuptr, Unit_Available);  /* schedule the command completion */
 
-            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s\n",
+            dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s\n",
                       unit, opcode_name [Wakeup]);
             break;
 
@@ -1812,7 +1825,7 @@ else {                                                  /* otherwise the command
         case Write:
         case Write_Full_Sector:
             if (duptr->PHASE == Seek_Phase)                 /* if the unit is currently seeking */
-                dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s command waiting for seek completion\n",
+                dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u %s command waiting for seek completion\n",
                           unit, opcode_name [cvptr->opcode]);
 
             else                                            /* otherwise the unit is idle */
@@ -1978,7 +1991,7 @@ return outbound;                                        /* return the data word 
 
    Implementation notes:
 
-    1. The "%.0d" print specification in the trace call absorbs the zero "unit"
+    1. The "%.0u" print specification in the trace call absorbs the zero "unit"
        value parameter without printing when the controller unit is specified.
 
     2. The Seek command does not check for Access Not Ready before issuing the
@@ -2040,10 +2053,11 @@ CNTLR_OPCODE opcode;
 CNTLR_PHASE phase;
 CNTLR_IFN_IBUS outbound;
 t_bool controller_service, controller_was_busy;
-uint32 unit, sector_count;
+int32 unit;
+uint32 sector_count;
 
 if (service_entry) {                                    /* if this is an event service entry */
-    unit = uptr - cvptr->device->units;                 /*   then get the unit number */
+    unit = (int32) (uptr - cvptr->device->units);       /*   then get the unit number */
 
     controller_service = (uptr == CNTLR_UPTR            /* set TRUE if the controller is being serviced */
                             && cvptr->type == MAC);
@@ -2091,7 +2105,7 @@ switch (phase) {                                        /* dispatch the phase */
 
             outbound = NO_FUNCTIONS;                    /* clear the function set for an idle return */
 
-            dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s command aborted with parameter wait timeout\n",
+            dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u %s command aborted with parameter wait timeout\n",
                       CM_UNIT (cvptr->spd_unit), opcode_name [opcode]);
             }
 
@@ -2115,7 +2129,8 @@ switch (phase) {                                        /* dispatch the phase */
 
             case Seek:                                          /* these commands receive parameters */
             case Address_Record:                                /*   from the interface */
-                cvptr->buffer [cvptr->index++] = inbound_data;  /* save the current one in the buffer */
+                cvptr->buffer [cvptr->index++] =                /* save the current one in the buffer */
+                   (DL_BUFFER) inbound_data;
                 cvptr->length = cvptr->length - 1;              /*   and drop the parameter count */
 
                 if (cvptr->length > 0)                          /* if another parameter is expected */
@@ -2129,7 +2144,7 @@ switch (phase) {                                        /* dispatch the phase */
                     if (opcode == Address_Record) {             /* if this is an Address Record command */
                         cvptr->eoc = CLEAR;                     /*   then clear the end-of-cylinder flag */
 
-                        dpprintf (cvptr->device, DL_DEB_CMD, "%s to cylinder %d head %d sector %d\n",
+                        dpprintf (cvptr->device, DL_DEB_CMD, "%s to cylinder %u head %u sector %u\n",
                                   opcode_name [Address_Record],
                                   cvptr->cylinder, cvptr->head, cvptr->sector);
 
@@ -2138,7 +2153,7 @@ switch (phase) {                                        /* dispatch the phase */
                         }
 
                     else {                                      /* otherwise it's a Seek command */
-                        dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s to cylinder %d head %d sector %d\n",
+                        dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s to cylinder %u head %u sector %u\n",
                                   CM_UNIT (cvptr->spd_unit), opcode_name [Seek],
                                   cvptr->cylinder, cvptr->head, cvptr->sector);
 
@@ -2165,7 +2180,7 @@ switch (phase) {                                        /* dispatch the phase */
 
                 cvptr->count = sector_count * WORDS_PER_SECTOR; /* convert to the number of words to verify */
 
-                dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s %d sector%s\n",
+                dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s %u sector%s\n",
                           CM_UNIT (cvptr->spd_unit), opcode_name [Verify],
                           sector_count, (sector_count == 1 ? "" : "s"));
 
@@ -2177,7 +2192,7 @@ switch (phase) {                                        /* dispatch the phase */
                 if (uptr->PHASE == Seek_Phase) {        /* if a seek is in progress, */
                     uptr->wait = NO_EVENT;              /*   then wait for it to complete */
 
-                    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s command waiting for seek completion\n",
+                    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u %s command waiting for seek completion\n",
                               CM_UNIT (cvptr->spd_unit), opcode_name [Verify]);
                     }
 
@@ -2187,11 +2202,11 @@ switch (phase) {                                        /* dispatch the phase */
 
 
             case Read_With_Offset:
-                dpprintf (cvptr->device, DL_DEB_CMD, "Unit %d %s using %soffset %+d\n",
+                dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s using %soffset %+d\n",
                           CM_UNIT (cvptr->spd_unit), opcode_name [Read_With_Offset],
                           fmt_bitset (inbound_data, offset_format),
                           (inbound_data & PI_NEG_OFFSET ? - (int) PI_OFFSET (inbound_data)
-                                                        :         PI_OFFSET (inbound_data)));
+                                                        :   (int) PI_OFFSET (inbound_data)));
 
                 wait_timer (cvptr, CLEAR);                  /* stop the parameter timer */
 
@@ -2201,7 +2216,7 @@ switch (phase) {                                        /* dispatch the phase */
                 if (uptr->PHASE == Seek_Phase) {            /* if a seek is in progress, */
                     uptr->wait = NO_EVENT;                  /*   then wait for it to complete */
 
-                    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s command waiting for seek completion\n",
+                    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u %s command waiting for seek completion\n",
                               CM_UNIT (cvptr->spd_unit), opcode_name [Read_With_Offset]);
                     }
 
@@ -2313,7 +2328,7 @@ switch (phase) {                                        /* dispatch the phase */
                     cvptr->count  = cvptr->count  + 1;              /* count the */
                     cvptr->length = cvptr->length - 1;              /*   transfer */
 
-                    dpprintf (cvptr->device, DL_DEB_XFER, "Unit %d %s word %d is %06o\n",
+                    dpprintf (cvptr->device, DL_DEB_XFER, "Unit %d %s word %u is %06o\n",
                               unit, opcode_name [opcode],
                               cvptr->count, DLIBUS (outbound));
                     }
@@ -2333,13 +2348,14 @@ switch (phase) {                                        /* dispatch the phase */
             case Write:
             case Write_Full_Sector:
             case Initialize:
-                if ((inbound_flags & EOD) == NO_FLAGS) {            /* if the transfer continues */
-                    cvptr->buffer [cvptr->index++] = inbound_data;  /*   then store the next word in the buffer */
+                if ((inbound_flags & EOD) == NO_FLAGS) {    /* if the transfer continues */
+                    cvptr->buffer [cvptr->index++] =        /*   then store the next word in the buffer */
+                       (DL_BUFFER) inbound_data;
 
-                    cvptr->count  = cvptr->count  + 1;              /* count the */
-                    cvptr->length = cvptr->length - 1;              /*   transfer */
+                    cvptr->count  = cvptr->count  + 1;      /* count the */
+                    cvptr->length = cvptr->length - 1;      /*   transfer */
 
-                    dpprintf (cvptr->device, DL_DEB_XFER, "Unit %d %s word %d is %06o\n",
+                    dpprintf (cvptr->device, DL_DEB_XFER, "Unit %d %s word %u is %06o\n",
                               unit, opcode_name [opcode],
                               cvptr->count, inbound_data);
                     }
@@ -2462,8 +2478,12 @@ for (unit = 0; unit <= DL_MAXDRIVE; unit++) {           /* check each unit in tu
 
     if (units [cvptr->poll_unit].STATUS & S2_ATTENTION) {   /* if the unit is requesting attention, */
         units [cvptr->poll_unit].STATUS &= ~S2_ATTENTION;   /*   clear the Attention status */
-        cvptr->spd_unit = cvptr->poll_unit;                 /* set the controller's unit number */
-        cvptr->status = Drive_Attention;                    /*   and status */
+
+        dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u requested attention\n",
+                  cvptr->poll_unit);
+
+        cvptr->spd_unit = cvptr->poll_unit;             /* set the controller's unit number */
+        cvptr->status = Drive_Attention;                /*   and status */
 
         cvptr->state = Wait_State;                      /* set the controller state to waiting */
         wait_timer (cvptr, SET);                        /* start the command wait timer */
@@ -2681,6 +2701,13 @@ else                                                    /* otherwise the status 
 
    The file specified by the supplied filename is attached to the indicated
    unit.  If the attach was successful, the heads are loaded on the drive.
+
+
+   Implementation notes:
+
+    1. The pointer to the appropriate event delay times is set in case we are
+       being called during a RESTORE command (the assignment is redundant
+       otherwise).
 */
 
 t_stat dl_attach (CVPTR cvptr, UNIT *uptr, CONST char *cptr)
@@ -2691,6 +2718,10 @@ result = attach_unit (uptr, cptr);                          /* attach the unit *
 
 if (result == SCPE_OK)                                      /* if the attach succeeded */
   result = dl_load_unload (cvptr, uptr, TRUE);              /*   then load the heads */
+
+dl_set_timing (cvptr->device->units,                        /* reestablish */
+               (cvptr->device->flags & DEV_REALTIME),       /*   the delay times */
+               NULL, (void *) cvptr);                       /*     pointer(s) */
 
 return result;                                              /* return the command result status */
 }
@@ -3023,7 +3054,7 @@ else if (value == 0)                                    /* otherwise if this is 
         return SCPE_2MARG;                              /*     then report an error */
 
     else {                                              /* otherwise the command is valid */
-        cvptr->dop = NULL;                              /*   so clear the current entry pointer */
+        cvptr->dop_index = -1;                          /*   so clear the current entry pointer */
         cvptr->dop_base->cylinder = DL_OVEND;           /*     and mark the first entry as the end */
         }
 
@@ -3031,7 +3062,7 @@ else if (cptr == NULL)                                  /* otherwise if DIAG is 
     if (cvptr->dop_base->cylinder == DL_OVEND)          /*   then if there are no entries in the table */
         return SCPE_MISVAL;                             /*     then one must be entered first */
     else                                                /*   otherwise */
-        cvptr->dop = cvptr->dop_base;                   /*     reset the current pointer to the first entry */
+        cvptr->dop_index = 0;                           /*     reset the current pointer to the first entry */
 
 else if (*cptr == '\0')                                 /* otherwise if there are no parameters */
     return SCPE_MISVAL;                                 /*   then report a missing value */
@@ -3123,7 +3154,7 @@ else {                                                  /* otherwise at least on
         entry++;                                        /* point at the next available entry */
         entry->cylinder = DL_OVEND;                     /*   and mark it as the end of the list */
 
-        cvptr->dop = cvptr->dop_base;                   /* reset the current pointer to the start of the list */
+        cvptr->dop_index = 0;                           /* reset the current pointer to the start of the list */
         }
     }
 
@@ -3173,7 +3204,7 @@ DIAG_ENTRY *entry;
 if (cvptr->dop_base == NULL)                            /* if the table isn't defined */
     return SCPE_NOFNC;                                  /*   then the command is illegal */
 
-else if (cvptr->dop == NULL) {                          /* otherwise if overrides are currently disabled */
+else if (cvptr->dop_index < 0) {                        /* otherwise if overrides are currently disabled */
     fputs ("override disabled", st);                    /*   then report it */
 
     if (value > 0)                                      /* if we were invoked by a SHOW DIAG command */
@@ -3213,12 +3244,12 @@ return SCPE_OK;
 
    This validation routine is called to set the timing mode for the disc
    subsystem.  As this is an extended MTAB call, the "uptr" parameter points to
-   the unit array of the device.  The "value" parameter is set to 1 to use
+   the unit array of the device.  The "value" parameter is set non-zero to use
    realistic timing and 0 to use fast timing.  For a MAC controller, the "desc"
    parameter is a pointer to the controller.  For ICD controllers, the "desc"
    parameter is a pointer to the first element of the controller array.  There
    must be one controller for each unit defined by the device associated with
-   the controllers.
+   the controllers.  The "cptr" parameter is not used.
 
    If fast timing is selected, the controller's timing pointer is set to the
    fast timing pointer supplied by the interface when the controller was
@@ -3239,7 +3270,7 @@ t_stat dl_set_timing (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 CVPTR  cvptr = (CVPTR) desc;                            /* the controller pointer is supplied */
 const  DELAY_PROPS *dpptr;
-int32  model;
+DRIVE_TYPE model;
 uint32 delay, cntlr_count;
 
 if (cvptr->type == MAC)                                 /* if this is a MAC controller */
@@ -3254,7 +3285,7 @@ while (cntlr_count--) {                                 /* set each controller's
 
         for (delay = 0; delay < DELAY_COUNT; delay++)   /* search for the correct set of times */
             if (dpptr->type == cvptr->type              /* if the controller types match */
-              && (dpptr->drive == HP_All                /*   and the drive times are identical */
+              && (dpptr->drive == HP_All                /*   and all drive times are the same */
               || dpptr->drive == model)) {              /*     or the drive types match as well */
                 cvptr->dlyptr = dpptr;                  /*       then use this set of times */
                 break;
@@ -3392,8 +3423,8 @@ else {                                                  /* otherwise */
 
 if (cmd_props [cvptr->opcode].transfer_size > 0)
     dpprintf (cvptr->device, DL_DEB_CMD, (cvptr->opcode == Initialize
-                                            ? "Unit %d Initialize %s for %d words (%d sector%s)\n"
-                                            : "Unit %d %s for %d words (%d sector%s)\n"),
+                                            ? "Unit %u Initialize %s for %u words (%u sector%s)\n"
+                                            : "Unit %u %s for %u words (%u sector%s)\n"),
               CM_UNIT (cvptr->spd_unit),
               (cvptr->opcode == Initialize
                  ? fmt_bitset (cvptr->spd_unit, initialize_format)
@@ -3402,7 +3433,7 @@ if (cmd_props [cvptr->opcode].transfer_size > 0)
               cvptr->count / cmd_props [cvptr->opcode].transfer_size + (cvptr->length > 0),
               (cvptr->count <= cmd_props [cvptr->opcode].transfer_size ? "" : "s"));
 
-dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s command completed with %s status\n",
+dpprintf (cvptr->device, DL_DEB_INCO, "Unit %u %s command completed with %s status\n",
           CM_UNIT (cvptr->spd_unit), opcode_name [cvptr->opcode],
           dl_status_name (cvptr->status));
 
@@ -3486,13 +3517,13 @@ else                                                    /* otherwise it's a norm
 if (position_sector (cvptr, uptr) == FALSE)             /* position the sector; if it was not */
     return FALSE;                                       /*   then a seek is in progress or an error occurred */
 
-dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s from cylinder %d head %d sector %d\n",
-          uptr - cvptr->device->units, opcode_name [opcode],
+dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s from cylinder %u head %u sector %u\n",
+          (int32) (uptr - cvptr->device->units), opcode_name [opcode],
           uptr->CYL, cvptr->head, cvptr->sector);
 
 count = sim_fread (cvptr->buffer + offset,              /* read the sector from the image */
-                   sizeof (uint16), WORDS_PER_SECTOR,   /*   into the sector buffer */
-                   uptr->fileref);
+                   sizeof (DL_BUFFER),                  /*   into the sector buffer */
+                   WORDS_PER_SECTOR, uptr->fileref);
 
 if (ferror (uptr->fileref)) {                           /* if a host file system error occurred */
     io_error (cvptr, uptr);                             /*   then report it to the simulation console */
@@ -3657,8 +3688,8 @@ else if (position_sector (cvptr, uptr) == TRUE) {       /* otherwise if position
     cvptr->length = cmd_props [opcode].transfer_size;   /*   then set the appropriate transfer length */
     cvptr->index = 0;                                   /*     and reset the data index */
 
-    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s to cylinder %d head %d sector %d\n",
-              uptr - cvptr->device->units, opcode_name [opcode],
+    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s to cylinder %u head %u sector %u\n",
+              (int32) (uptr - cvptr->device->units), opcode_name [opcode],
               uptr->CYL, cvptr->head, cvptr->sector);
 
     return TRUE;                                        /* the write was successfully started */
@@ -3708,7 +3739,7 @@ return FALSE;                                           /* otherwise an error oc
 static void end_write (CVPTR cvptr, UNIT *uptr, CNTLR_FLAG_SET flags)
 {
 uint32 count;
-uint16 pad;
+DL_BUFFER pad;
 const CNTLR_OPCODE opcode = (CNTLR_OPCODE) uptr->OPCODE;
 const uint32 offset = (opcode == Write_Full_Sector ? 3 : 0);
 
@@ -3727,7 +3758,7 @@ if (cvptr->index < WORDS_PER_SECTOR + offset) {         /* if a partial sector w
         cvptr->buffer [count] = pad;                    /* pad the sector buffer as needed */
     }
 
-sim_fwrite (cvptr->buffer + offset, sizeof (uint16),    /* write the sector to the file */
+sim_fwrite (cvptr->buffer + offset, sizeof (DL_BUFFER), /* write the sector to the file */
             WORDS_PER_SECTOR, uptr->fileref);
 
 if (ferror (uptr->fileref))                             /* if a host file system error occurred, then report it */
@@ -3810,7 +3841,7 @@ return;
 
 static t_bool position_sector (CVPTR cvptr, UNIT *uptr)
 {
-const uint32 model = GET_MODEL (uptr->flags);               /* get the drive model */
+const DRIVE_TYPE model = GET_MODEL (uptr->flags);           /* get the drive model */
 
 if (cvptr->status != Normal_Completion                      /* if a diagnostic override is present */
   && cvptr->status != Uncorrectable_Data_Error              /*   and it's not */
@@ -3826,8 +3857,8 @@ else if (cvptr->eoc == SET)                                     /* otherwise if 
 
         start_seek (cvptr, uptr);                               /* start the auto-seek */
 
-        dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s%s autoseek to cylinder %d head %d sector %d\n",
-                  uptr - cvptr->device->units, opcode_name [uptr->OPCODE],
+        dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s%s autoseek to cylinder %u head %u sector %u\n",
+                  (int32) (uptr - cvptr->device->units), opcode_name [uptr->OPCODE],
                   (uptr->STATUS & S2_SEEK_CHECK ? " seek check on" : ""),
                   cvptr->cylinder, cvptr->head, cvptr->sector);
 
@@ -3845,8 +3876,8 @@ else if (cvptr->verify                                      /* if address verifi
   && (uint32) uptr->CYL != cvptr->cylinder) {               /*   and the positioner is on the wrong cylinder */
     start_seek (cvptr, uptr);                               /*     then start a seek to the correct cylinder */
 
-    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s%s reseek to cylinder %d head %d sector %d\n",
-              uptr - cvptr->device->units, opcode_name [uptr->OPCODE],
+    dpprintf (cvptr->device, DL_DEB_INCO, "Unit %d %s%s reseek to cylinder %u head %u sector %u\n",
+              (int32) (uptr - cvptr->device->units), opcode_name [uptr->OPCODE],
               (uptr->STATUS & S2_SEEK_CHECK ? " seek check on" : ""),
               cvptr->cylinder, cvptr->head, cvptr->sector);
 
@@ -3911,7 +3942,7 @@ return FALSE;                                           /* positioning failed or
 
 static void next_sector (CVPTR cvptr, UNIT *uptr)
 {
-const uint32 model = GET_MODEL (uptr->flags);           /* get the disc model */
+const DRIVE_TYPE model = GET_MODEL (uptr->flags);       /* get the disc model */
 
 cvptr->sector = cvptr->sector + 1;                      /* increment the sector number */
 
@@ -3995,7 +4026,7 @@ static t_bool start_seek (CVPTR cvptr, UNIT *uptr)
 {
 int32 delta;
 uint32 target_cylinder;
-const uint32 model = GET_MODEL (uptr->flags);           /* get the drive model */
+const DRIVE_TYPE model = GET_MODEL (uptr->flags);       /* get the drive model */
 
 if (uptr->flags & UNIT_UNLOAD)                          /* if the heads are unloaded */
     return FALSE;                                       /*   then the seek fails as the drive was not ready */
@@ -4112,10 +4143,10 @@ return;
 static void set_address (CVPTR cvptr, uint32 index)
 {
 cvptr->buffer [index] =                                 /* update the cylinder if EOC is set */
-  (uint16) cvptr->cylinder + (cvptr->eoc == SET ? 1 : 0);
+  (DL_BUFFER) cvptr->cylinder + (cvptr->eoc == SET ? 1 : 0);
 
 cvptr->buffer [index + 1] =                             /* merge the head and sector */
-  (uint16) (PO_HEAD (cvptr->head) | PO_SECTOR (cvptr->sector));
+  (DL_BUFFER) (PO_HEAD (cvptr->head) | PO_SECTOR (cvptr->sector));
 
 return;
 }
@@ -4153,15 +4184,15 @@ return;
        respectively, when status is returned.
 */
 
-static uint16 drive_status (UNIT *uptr)
+static HP_WORD drive_status (UNIT *uptr)
 {
-uint16 status;
+HP_WORD status;
 
 if (uptr == NULL)                                       /* if the unit is invalid */
     return S2_ERROR | S2_NOT_READY;                     /*   then it does not respond */
 
 status =                                                /* start with the drive type and unit status */
-  (uint16) (S2_DRIVE_TYPE (GET_MODEL (uptr->flags)) | uptr->STATUS);
+  S2_DRIVE_TYPE (GET_MODEL (uptr->flags)) | uptr->STATUS;
 
 if (uptr->flags & UNIT_FMT)                             /* if the format switch is enabled */
     status |= S2_FORMAT_EN;                             /*   then set the Format status bit */
@@ -4190,14 +4221,14 @@ return status;                                          /* return the unit statu
 
    Implementation notes:
 
-    1. The "%.0d" print specification in the trace call absorbs the zero "unit"
+    1. The "%.0u" print specification in the trace call absorbs the zero "unit"
        value parameter without printing when the controller unit is specified.
 */
 
 static t_stat activate_unit (CVPTR cvptr, UNIT *uptr)
 {
 t_stat result;
-uint32 unit = uptr - cvptr->device->units;
+const int32 unit = (int32) (uptr - cvptr->device->units);   /* the unit number */
 
 dpprintf (cvptr->device, DL_DEB_SERV, (unit == CNTLR_UNIT
                                          ? "Controller unit%.0d %s %s phase delay %d service scheduled\n"
@@ -4292,7 +4323,7 @@ else                                                            /* otherwise the
               + cvptr->head - drive_props [model].remov_heads;  /*         by the size of the removable platter */
 
 uptr->pos = (track * drive_props [model].sectors + cvptr->sector)   /* set the byte offset in the file */
-              * WORDS_PER_SECTOR * sizeof (uint16);                 /*   of the CHS target sector */
+              * WORDS_PER_SECTOR * sizeof (DL_BUFFER);              /*   of the CHS target sector */
 
 return;
 }

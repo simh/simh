@@ -1,6 +1,6 @@
 /* hp2100_cpu6.c: HP 1000 RTE-6/VM OS instructions
 
-   Copyright (c) 2006-2014, J. David Bryan
+   Copyright (c) 2006-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU6         RTE-6/VM OS instructions
 
+   17-May-16    JDB     Set local variable instead of call parameter for .SIP test
    24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Mar-13    JDB     Use MP abort handler declaration in hp2100_cpu.h
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -380,7 +381,7 @@ t_stat cpu_rte_os (uint32 IR, uint32 intrq, uint32 iotrap)
 t_stat reason = SCPE_OK;
 OPS op;
 OP_PAT pattern;
-uint32 entry, count, cp, sa, da, i, ma, eqta;
+uint32 entry, count, cp, sa, da, i, ma, eqta, irq;
 uint16 vectors, save_area, priv_fence, eoreg, eqt, key;
 char test[6], target[6];
 jmp_buf mp_handler;
@@ -644,16 +645,16 @@ switch (entry) {                                        /* decode IR<3:0> */
 
     case 010:                                           /* .SIP  105350 (OP_N) */
         reason = iogrp (STF_0, iotrap);                 /* turn interrupt system on */
-        intrq = calc_int ();                            /* check for interrupt requests */
+        irq = calc_int ();                              /* check for interrupt requests */
         reason = iogrp (CLF_0, iotrap);                 /* turn interrupt system off */
 
-        if (intrq)                                      /* was interrupt pending? */
+        if (irq)                                        /* was interrupt pending? */
             PC = (PC + 1) & VAMASK;                     /* P+1 return for pending IRQ */
                                                         /* P+0 return for no pending IRQ */
         if (debug_print)                                /* debugging? */
             fprintf (sim_deb,                           /* print return registers */
                      ", CIR = %02o, return = P+%d",
-                     intrq, PC - (err_PC + 1));
+                     irq, PC - (err_PC + 1));
         break;
 
     case 011:                                           /* .YLD  105351 (OP_C) */

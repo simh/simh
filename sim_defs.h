@@ -717,6 +717,7 @@ struct BRKTAB {
 #define BRK_TYP_DYN_STEPOVER    (SWMASK ('Z'+1))
 #define BRK_TYP_DYN_USR         (SWMASK ('Z'+2))
 #define BRK_TYP_DYN_ALL         (BRK_TYP_DYN_USR|BRK_TYP_DYN_STEPOVER) /* Mask of All Dynamic types */
+#define BRK_TYP_TEMP            (SWMASK ('Z'+3))        /* Temporary (one-shot) */
     int32               cnt;                            /* proceed count */
     char                *act;                           /* action string */
     };

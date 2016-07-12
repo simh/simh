@@ -25,6 +25,8 @@
 
    IOP          HP 3000 Series III I/O Processor
 
+   30-Jun-16    JDB     Changed REG type of filter array to BRDATA
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    13-May-16    JDB     Modified for revised SCP API function parameter types
    28-Aug-15    JDB     First release version
    11-Dec-12    JDB     Created
@@ -191,10 +193,10 @@
     1. Bit 0 is reserved for the memory data trace flag.
 */
 
-#define DEB_DIO             (1 << 1)            /* trace direct I/O commands */
-#define DEB_IRQ             (1 << 2)            /* trace interrupt requests */
+#define DEB_DIO             (1u << 1)           /* trace direct I/O commands */
+#define DEB_IRQ             (1u << 2)           /* trace interrupt requests */
 
-#define FILTER(d)           (1 << (d) % 32 & filter [(d) / 32])
+#define FILTER(d)           (1u << (d) % 32 & filter [(d) / 32])
 
 
 /* IOP global data structures */
@@ -262,8 +264,8 @@ uint32 iop_interrupt_request_set = 0;           /* the set of interfaces request
 static uint32 IOA = 0;                          /* I/O Address Register */
 
 static uint32 interrupt_poll_set = 0;           /* the set of interfaces breaking the poll chain */
-static DIB *devs [DEVNO_MAX + 1];               /* index by device number for I/O instruction dispatch */
-static DIB *irqs [INTPRI_MAX + 1];              /* index by interrupt priority number for interrupt requests */
+static DIB    *devs [DEVNO_MAX + 1];            /* index by device number for I/O instruction dispatch */
+static DIB    *irqs [INTPRI_MAX + 1];           /* index by interrupt priority number for interrupt requests */
 
 static uint32 filter [4] = {                    /* filter bitmap for device numbers 0-127 */
     TRACE_ALL,
@@ -299,10 +301,10 @@ static UNIT iop_unit [] = {                     /* a dummy unit to satisfy SCP r
 */
 
 static REG iop_reg [] = {
-/*    Macro   Name    Location  Width  Flags   */
-/*    ------  ------  --------  -----  ------- */
-    { ORDATA (IOA,    IOA,        8),  REG_RO  },       /* I/O Address Register */
-    { SRDATA (FILTER, filter),         REG_HRO },
+/*    Macro   Name    Location  Radix  Width  Depth   Flags  */
+/*    ------  ------  --------  -----  -----  -----  ------- */
+    { ORDATA (IOA,    IOA,               8),         REG_RO  },
+    { BRDATA (FILTER, filter,     2,    32,     4),  REG_HRO },
     { NULL }
     };
 
@@ -530,7 +532,7 @@ if (outbound & INTACK) {                                /* if the interface ackn
     CPX1 |= cpx1_EXTINTR;                               /*     and tell the CPU */
 
     dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
-             "Device number %d acknowledged interrupt request at priority %d\n",
+             "Device number %u acknowledged interrupt request at priority %u\n",
              dibptr->device_number, ipn);
     }
 
@@ -539,7 +541,7 @@ else if (outbound & INTPOLLOUT) {                       /* otherwise if the inte
     interrupt_poll_set &= ~priority_mask;               /*     and the associated bit in the poll set */
 
     dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
-             "Device number %d canceled interrupt request at priority %d\n",
+             "Device number %u canceled interrupt request at priority %u\n",
              dibptr->device_number, ipn);
     }
 
@@ -615,7 +617,7 @@ if (io_cmd == ioSMSK) {                                     /* if the I/O order 
           && dibptr->interrupt_mask != INTMASK_UNUSED) {    /*   and uses the interrupt mask */
 
             dprintf (iop_dev, FILTER (devno) ? DEB_DIO : 0,
-                     "%s order sent to device number %d\n",
+                     "%s order sent to device number %u\n",
                      io_command_name [io_cmd], devno);
 
             outbound =
@@ -637,7 +639,7 @@ else {                                                      /* otherwise a devic
     device_number = device_number & DEVNO_MASK;             /* restrict the device number to 0-127 */
 
     dprintf (iop_dev, FILTER (device_number) ? DEB_DIO : 0,
-             "%s order sent to device number %d\n",
+             "%s order sent to device number %u\n",
              io_command_name [io_cmd], device_number);
 
     dibptr = devs [device_number];                          /* get the device information block pointer */
@@ -682,7 +684,7 @@ void iop_assert_INTREQ (DIB *dibptr)
 uint32 irq;
 
 dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
-         "Device number %d asserted INTREQ at priority %d\n",
+         "Device number %u asserted INTREQ at priority %u\n",
          dibptr->device_number, dibptr->interrupt_priority);
 
 if (dibptr->interrupt_priority != INTPRI_UNUSED) {      /* if the interrupt priority is valid */
@@ -743,7 +745,7 @@ if (value == 1) {                                       /* if we are setting the
     if ((cptr == NULL) || (*cptr == '\0'))              /*   then if a line range was not supplied */
         return SCPE_MISVAL;                             /*     then report a "Missing value" error */
 
-    mptr = malloc (strlen (cptr) + 2);                  /* allocate space for the string, a semicolon, and a NUL */
+    mptr = (char *) malloc (strlen (cptr) + 2);         /* allocate space for the string, a semicolon, and a NUL */
 
     if (mptr == NULL)                                   /* if the allocation failed */
         return SCPE_MEM;                                /*   report memory exhaustion */

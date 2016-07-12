@@ -24,7 +24,14 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   01-Jul-16    JDB     Changed tl_attach to reset the event delay times pointer
+   09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   16-May-16    JDB     TAPELIB_PROPERTIES.action is now a pointer-to-constant
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   03-May-16    JDB     Changed clear/attach/on/offline trace from INCO to CMD
+   24-Mar-16    JDB     Changed the buffer element type from uint8 to TL_BUFFER
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    20-Nov-15    JDB     First release version
    24-Mar-13    JDB     Created tape controller common library from MS simulator
 
@@ -338,7 +345,7 @@
 
 /* Unit flags accessor */
 
-#define GET_MODEL(f)        ((f) >> UNIT_MODEL_SHIFT & UNIT_MODEL_MASK)
+#define GET_MODEL(f)        (DRIVE_TYPE) ((f) >> UNIT_MODEL_SHIFT & UNIT_MODEL_MASK)
 
 
 /* Per-unit property flags and accessors.
@@ -378,10 +385,10 @@
 #define PROP_UNIT_SHIFT     10                  /* bits 12-10 */
 #define PROP_MODEL_SHIFT    13                  /* bits 15-13 */
 
-#define PROP_INDEX_MASK     ((1 << PROP_INDEX_WIDTH) - 1 << PROP_INDEX_SHIFT)
-#define PROP_REEL_MASK      ((1 << PROP_REEL_WIDTH)  - 1 << PROP_REEL_SHIFT)
-#define PROP_UNIT_MASK      ((1 << PROP_UNIT_WIDTH)  - 1 << PROP_UNIT_SHIFT)
-#define PROP_MODEL_MASK     ((1 << PROP_MODEL_WIDTH) - 1 << PROP_MODEL_SHIFT)
+#define PROP_INDEX_MASK     ((1u << PROP_INDEX_WIDTH) - 1 << PROP_INDEX_SHIFT)
+#define PROP_REEL_MASK      ((1u << PROP_REEL_WIDTH)  - 1 << PROP_REEL_SHIFT)
+#define PROP_UNIT_MASK      ((1u << PROP_UNIT_WIDTH)  - 1 << PROP_UNIT_SHIFT)
+#define PROP_MODEL_MASK     ((1u << PROP_MODEL_WIDTH) - 1 << PROP_MODEL_SHIFT)
 
 #define PROP_INDEX(u)       (((u)->PROP & PROP_INDEX_MASK) >> PROP_INDEX_SHIFT)
 #define PROP_REEL(u)        (((u)->PROP & PROP_REEL_MASK)  >> PROP_REEL_SHIFT)
@@ -758,9 +765,9 @@ typedef enum {
 
 
 typedef struct {
-    t_bool  gap_is_valid;                       /* call may involve an erase gap */
-    t_bool  data_is_valid;                      /* call may involve a data record */
-    char    *action;                            /* string describing the call action */
+    t_bool      gap_is_valid;                   /* call may involve an erase gap */
+    t_bool      data_is_valid;                  /* call may involve a data record */
+    const char  *action;                        /* string describing the call action */
     } TAPELIB_PROPERTIES;
 
 
@@ -911,7 +918,7 @@ return outbound;
 
 t_stat tl_onoffline (CVPTR cvptr, UNIT *uptr, t_bool online)
 {
-const uint32 unit = uptr - cvptr->device->units;        /* the unit number */
+const int32 unit = (int32) (uptr - cvptr->device->units);   /* the unit number */
 t_stat status = SCPE_OK;
 
 if (uptr->flags & UNIT_ATT) {                           /* if the unit is attached */
@@ -924,7 +931,7 @@ if (uptr->flags & UNIT_ATT) {                           /* if the unit is attach
             status = SCPE_INCOMP;                       /*   then it must be called to poll the drives */
         }
 
-    dpprintf (cvptr->device, TL_DEB_INCO, "Unit %d set %s\n",
+    dpprintf (cvptr->device, TL_DEB_CMD, "Unit %d set %s\n",
               unit, (online ? "online" : "offline"));
     }
 
@@ -985,7 +992,7 @@ return status;
        busy" status and the complement of the SL signal as "unit local" status.
 */
 
-uint16 tl_status (CVPTR cvptr)
+HP_WORD tl_status (CVPTR cvptr)
 {
 UNIT *const uptr = cvptr->device->units + cvptr->unit_selected; /* a pointer to the selected unit */
 uint32 status;
@@ -1131,7 +1138,7 @@ for (unit = 0; unit < cvptr->device->numunits; unit++) {    /* look for a write 
     if (remaining_time) {                                   /* if the unit is currently active */
         if (uptr->flags & UNIT_REWINDING)                   /*   then a clear does not affect a rewind in progress */
             dpprintf (cvptr->device, TL_DEB_INCO,
-                      "Unit %d controller clear allowed %s to continue\n",
+                      "Unit %u controller clear allowed %s to continue\n",
                       unit, opcode_names [uptr->OPCODE]);
 
         else {                                              /* but all other commands are aborted */
@@ -1147,7 +1154,7 @@ for (unit = 0; unit < cvptr->device->numunits; unit++) {    /* look for a write 
                 else                                                                /* otherwise */
                     reset_position = cvptr->initial_position + relative_position;   /*   move toward the EOT */
 
-                cvptr->gaplen -= relative_position;         /* reduce the gap length by the amount not traversed */
+                cvptr->gaplen -= (t_mtrlnt) relative_position;  /* reduce the gap length by the amount not traversed */
 
                 while (cvptr->gaplen > sizeof (t_mtrlnt)) {     /* align the reset position to a gap marker */
                     if (sim_fseek (uptr->fileref,               /* seek to the reset position */
@@ -1173,13 +1180,13 @@ for (unit = 0; unit < cvptr->device->numunits; unit++) {    /* look for a write 
                     };
 
                 dpprintf (cvptr->device, TL_DEB_INCO,
-                          "Unit %d controller clear stopped tape motion at position %d\n",
+                          "Unit %u controller clear stopped tape motion at position %" T_ADDR_FMT "u\n",
                           unit, uptr->pos);
                 }
 
             else                                            /* otherwise FASTTIME mode is selected */
                 dpprintf (cvptr->device, TL_DEB_INCO,
-                          "Unit %d controller clear aborted %s after partial completion\n",
+                          "Unit %u controller clear aborted %s after partial completion\n",
                           unit, opcode_names [uptr->OPCODE]);
 
             if (cmd_props [uptr->OPCODE].class == Class_Write   /* if the last command was a write */
@@ -1199,7 +1206,7 @@ for (unit = 0; unit < cvptr->device->numunits; unit++) {    /* look for a write 
 
         if (uptr->OPCODE != Clear_Controller)           /* report the abort only if this isn't a clear command */
             dpprintf (cvptr->device, TL_DEB_INCO,
-                      "Unit %d controller clear aborted %s after partial completion\n",
+                      "Unit %u controller clear aborted %s after partial completion\n",
                       unit, opcode_names [uptr->OPCODE]);
         }
     }
@@ -1211,7 +1218,7 @@ cvptr->unit_attention = 0;                              /* clear any pending uni
 if (cvptr->type == HP_30215)                            /* if this is the 3000 controller */
     cvptr->unit_selected = 0;                           /*   then a clear selects unit 0 */
 
-dpprintf (cvptr->device, TL_DEB_INCO, "Controller cleared\n");
+dpprintf (cvptr->device, TL_DEB_CMD, "Controller cleared\n");
 
 return;
 }
@@ -1242,7 +1249,7 @@ else                                                    /* otherwise */
    unit is invalid, an error string is returned.
 */
 
-const char *tl_unit_name (uint32 unit)
+const char *tl_unit_name (int32 unit)
 {
 if (unit <= TL_CNTLR_UNIT)                              /* if the unit number is valid */
     return unit_names [unit];                           /*   then return the unit designator */
@@ -1266,6 +1273,7 @@ else                                                    /* otherwise */
    polled automatically when the current command completes and the controller is
    idled.
 
+
    Implementation notes:
 
     1. The support library LOCKED and WRITEENABLED modifiers are not used to
@@ -1278,11 +1286,15 @@ else                                                    /* otherwise */
 
     2. If we are called during a RESTORE command, the unit's flags are not
        changed to avoid upsetting the state that was SAVEd.
+
+    3. The pointer to the appropriate event delay times is set in case we are
+       being called during a RESTORE command (the assignment is redundant
+       otherwise).
 */
 
 t_stat tl_attach (CVPTR cvptr, UNIT *uptr, CONST char *cptr)
 {
-const uint32 unit = uptr - cvptr->device->units;        /* the unit number */
+const int32 unit = (int32) (uptr - cvptr->device->units);   /* the unit number */
 t_stat result;
 
 result = sim_tape_attach (uptr, cptr);                  /* attach the tape image file to the unit */
@@ -1298,12 +1310,17 @@ if (result == SCPE_OK                                   /* if the attach was suc
 
     cvptr->unit_attention |= 1 << unit;                 /* drive attention sets on tape load */
 
-    dpprintf (cvptr->device, TL_DEB_INCO, "Unit %d tape loaded and set online\n",
+    dpprintf (cvptr->device, TL_DEB_CMD, "Unit %d tape loaded and set online\n",
               unit);
 
     if (cvptr->state == Idle_State)                     /* if the controller is idle */
         result = SCPE_INCOMP;                           /*   then it must be called to poll the drives */
     }
+
+if (cvptr->device->flags & DEV_REALTIME)                /* if realistic timing is selected */
+    cvptr->dlyptr = &real_times [PROP_INDEX (uptr)];    /*   then get the real times pointer for this drive */
+else                                                    /* otherwise optimized timing is selected */
+    cvptr->dlyptr = cvptr->fastptr;                     /*   so use the fast times pointer */
 
 return result;                                          /* return the result of the attach */
 }
@@ -1521,7 +1538,7 @@ return SCPE_OK;
 
 t_stat tl_show_density (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-fprintf (st, "%d bpi", drive_props [PROP_INDEX (uptr)].bpi);
+fprintf (st, "%u bpi", drive_props [PROP_INDEX (uptr)].bpi);
 
 return SCPE_OK;
 }
@@ -2018,6 +2035,10 @@ return outbound;                                        /* return the functions 
        the unit is online.  The status cannot be inferred from the command, as
        the user may have set the unit offline or online explicitly before the
        rewind completed.
+
+   18. The "%.0u" print specification in the trace call absorbs the zero
+       "length" value parameter without printing when the controller unit is
+       specified.
 */
 
 static CNTLR_IFN_IBUS continue_command (CVPTR cvptr, UNIT *uptr, CNTLR_FLAG_SET inbound_flags, CNTLR_IBUS inbound_data)
@@ -2025,15 +2046,15 @@ static CNTLR_IFN_IBUS continue_command (CVPTR cvptr, UNIT *uptr, CNTLR_FLAG_SET 
 const CNTLR_OPCODE opcode = (CNTLR_OPCODE) uptr->OPCODE;    /* the current command opcode */
 const CNTLR_PHASE  phase  = (CNTLR_PHASE)  uptr->PHASE;     /* the current command phase */
 const t_bool       service_entry = (phase > Wait_Phase);    /* TRUE if entered via unit service */
-uint32             unit;
-uint8              data_byte;
+int32              unit;
+TL_BUFFER          data_byte;
 t_mtrlnt           error_flag;
 BYTE_SELECTOR      selector;
 DRIVE_PROPS const  *pptr;
 CNTLR_IFN_IBUS     outbound = NO_ACTION;
 t_bool             complete = FALSE;
 
-unit = uptr - cvptr->device->units;                     /* get the unit number */
+unit = (int32) (uptr - cvptr->device->units);           /* get the unit number */
 
 dpprintf (cvptr->device, TL_DEB_STATE, "%s %s %s phase entered from %s\n",
           unit_names [unit], opcode_names [opcode], phase_names [phase],
@@ -2055,7 +2076,7 @@ switch (phase) {                                        /* dispatch the phase */
             uptr->OPCODE = Invalid_Opcode;              /*   so clear the controller command */
             uptr->PHASE = Idle_Phase;                   /*     and idle the unit */
 
-            unit = cvptr->unit_selected;                /* get the selected unit number */
+            unit = (int32) cvptr->unit_selected;        /* get the selected unit number */
             uptr = cvptr->device->units + unit;         /*   and unit pointer */
 
             uptr->PHASE = Start_Phase;                  /* set up the start phase */
@@ -2070,7 +2091,7 @@ switch (phase) {                                        /* dispatch the phase */
 
 
     case Start_Phase:
-        dpprintf (cvptr->device, TL_DEB_INCO, "Unit %d %s started at position %d\n",
+        dpprintf (cvptr->device, TL_DEB_INCO, "Unit %d %s started at position %" T_ADDR_FMT "u\n",
                   unit, opcode_names [opcode], uptr->pos);
 
         pptr = &drive_props [PROP_INDEX (uptr)];        /* get the drive property pointer */
@@ -2204,7 +2225,7 @@ switch (phase) {                                        /* dispatch the phase */
                     uptr->PHASE = Traverse_Phase;       /*   and proceed to the rewinding phase */
 
                     uptr->wait =                        /* base the traversal time on the current tape position */
-                       (uptr->pos * cvptr->dlyptr->rewind_rate) / pptr->bpi;
+                       (int32) ((uptr->pos * cvptr->dlyptr->rewind_rate) / pptr->bpi);
                     }
                 break;
 
@@ -2314,7 +2335,7 @@ switch (phase) {                                        /* dispatch the phase */
                         outbound =                              /*   then transfer one byte at a time */
                            cvptr->buffer [cvptr->index++];      /*     to the data register */
 
-                        dpprintf (cvptr->device, TL_DEB_XFER, "Unit %d %s byte %d is %03o\n",
+                        dpprintf (cvptr->device, TL_DEB_XFER, "Unit %d %s byte %u is %03o\n",
                                   unit, opcode_names [opcode],
                                   cvptr->index, outbound);
 
@@ -2329,7 +2350,7 @@ switch (phase) {                                        /* dispatch the phase */
                             outbound |=                         /*   then merge in the low byte */
                               cvptr->buffer [cvptr->index++];
 
-                        dpprintf (cvptr->device, TL_DEB_XFER, "Unit %d %s word %d is %06o\n",
+                        dpprintf (cvptr->device, TL_DEB_XFER, "Unit %d %s word %u is %06o\n",
                                   unit, opcode_names [opcode],
                                   (cvptr->index + 1) / 2, outbound);
 
@@ -2361,7 +2382,7 @@ switch (phase) {                                        /* dispatch the phase */
 
                         uptr->wait = cvptr->dlyptr->data_xfer;  /* schedule the next byte transfer */
 
-                        dpprintf (cvptr->device, TL_DEB_XFER, "Unit %d %s byte %d is %06o\n",
+                        dpprintf (cvptr->device, TL_DEB_XFER, "Unit %d %s byte %u is %06o\n",
                                   unit, opcode_names [opcode],
                                   cvptr->index, inbound_data);
                         }
@@ -2388,7 +2409,7 @@ switch (phase) {                                        /* dispatch the phase */
 
                         uptr->wait = 2 * cvptr->dlyptr->data_xfer;      /* schedule the next word transfer */
 
-                        dpprintf (cvptr->device, TL_DEB_XFER, "Unit %d %s word %d is %06o\n",
+                        dpprintf (cvptr->device, TL_DEB_XFER, "Unit %d %s word %u is %06o\n",
                                   unit, opcode_names [opcode],
                                   (cvptr->index + 1) / 2, inbound_data);
                         }
@@ -2536,8 +2557,8 @@ switch (phase) {                                        /* dispatch the phase */
 
             case Rewind:
             case Rewind_Offline:
-                if ((uptr->flags & UNIT_OFFLINE) == 0)  /* if the unit is online */
-                    cvptr->unit_attention |= 1 << unit; /*   then attention sets on rewind completion */
+                if ((uptr->flags & UNIT_OFFLINE) == 0)      /* if the unit is online */
+                    cvptr->unit_attention |= 1u << unit;    /*   then attention sets on rewind completion */
 
                 uptr->flags &= ~UNIT_REWINDING;         /* clear rewinding status */
 
@@ -2586,12 +2607,12 @@ if (uptr->wait != NO_EVENT)                             /* if the unit has been 
 
 if (complete) {                                         /* if the command is complete */
     dpprintf (cvptr->device, TL_DEB_INCO,               /*   then report the final tape position */
-              "Unit %d %s completed at position %d\n",
+              "Unit %d %s completed at position %" T_ADDR_FMT "u\n",
               unit, opcode_names [opcode], uptr->pos);
 
     dpprintf (cvptr->device, TL_DEB_CMD, (cvptr->length > 0
-                                            ? "Unit %d %s of %d-byte record %s\n"
-                                            : "Unit %d %s %.0d%s\n"),
+                                            ? "Unit %d %s of %u-byte record %s\n"
+                                            : "Unit %d %s %.0u%s\n"),
               unit, opcode_names [opcode], cvptr->length,
               status_name [cvptr->call_status]);
     }
@@ -2660,7 +2681,7 @@ while (cvptr->unit_attention)                           /* loop through the atte
     if (cvptr->unit_attention & 1 << unit) {            /*   looking for the first one set */
         cvptr->unit_attention &= ~(1 << unit);          /*     and then clear it */
 
-        dpprintf (cvptr->device, TL_DEB_INCO, "Unit %d requested attention\n",
+        dpprintf (cvptr->device, TL_DEB_INCO, "Unit %u requested attention\n",
                   unit);
 
         cvptr->unit_selected = unit;                    /* select the unit requesting attention */
@@ -2761,7 +2782,8 @@ return NO_ACTION;                                       /* no drives are request
 static CNTLR_IFN_IBUS call_tapelib (CVPTR cvptr, UNIT *uptr, TAPELIB_CALL lib_call, t_mtrlnt parameter)
 {
 t_bool         do_gap, do_data;
-uint32         unit, gap_inches, gap_tenths;
+int32          unit;
+uint32         gap_inches, gap_tenths;
 CNTLR_IFN_IBUS result = (CNTLR_IFN_IBUS) NO_FUNCTIONS;  /* the expected case */
 
 switch (lib_call) {                                     /* dispatch to the selected routine */
@@ -2806,10 +2828,10 @@ switch (lib_call) {                                     /* dispatch to the selec
     }
 
 
-if (cvptr->initial_position < uptr->pos)                    /* calculate the preliminary gap size */
-    cvptr->gaplen = uptr->pos - cvptr->initial_position;    /*   for either forward motion */
-else                                                        /*     or */
-    cvptr->gaplen = cvptr->initial_position - uptr->pos;    /*       for reverse motion */
+if (cvptr->initial_position < uptr->pos)                                /* calculate the preliminary gap size */
+    cvptr->gaplen = (t_mtrlnt) (uptr->pos - cvptr->initial_position);   /*   for either forward motion */
+else                                                                    /*     or */
+    cvptr->gaplen = (t_mtrlnt) (cvptr->initial_position - uptr->pos);   /*       for reverse motion */
 
 switch (cvptr->call_status) {                           /* dispatch on the call status */
 
@@ -2911,7 +2933,7 @@ switch (cvptr->call_status) {                           /* dispatch on the call 
 
 
 if (DPPRINTING (cvptr->device, TL_DEB_INCO)) {          /* if tracing is enabled */
-    unit = uptr - cvptr->device->units;                 /*   then get the unit number */
+    unit = (int32) (uptr - cvptr->device->units);       /*   then get the unit number */
 
     do_data =                                           /* TRUE if the data record length is valid and present */
        lib_props [lib_call].data_is_valid && cvptr->length > 0;
@@ -2928,7 +2950,7 @@ if (DPPRINTING (cvptr->device, TL_DEB_INCO)) {          /* if tracing is enabled
 
     if (do_gap && do_data)                              /* if both gap and data are present */
         hp_debug (cvptr->device, TL_DEB_INCO,           /*   then report both objects */
-                  "Unit %d %s call of %d.%d-inch erase gap and %d-word record %s\n",
+                  "Unit %d %s call of %u.%u-inch erase gap and %u-word record %s\n",
                   unit, lib_props [lib_call].action,
                   gap_inches, gap_tenths,               /*     using the movement calculated above */
                   (cvptr->length + 1) / 2,
@@ -2936,14 +2958,14 @@ if (DPPRINTING (cvptr->device, TL_DEB_INCO)) {          /* if tracing is enabled
 
     else if (do_data)                                   /* otherwise if data only are present */
         hp_debug (cvptr->device, TL_DEB_INCO,           /*   then report the record length */
-                  "Unit %d %s call of %d-word record %s\n",
+                  "Unit %d %s call of %u-word record %s\n",
                   unit, lib_props [lib_call].action,
                   (cvptr->length + 1) / 2,
                   status_name [cvptr->call_status]);
 
     else if (do_gap)                                    /* otherwise if motion only is present */
         hp_debug (cvptr->device, TL_DEB_INCO,           /*   then report it */
-                  "Unit %d %s call of %d.%d%s %s\n",
+                  "Unit %d %s call of %u.%u%s %s\n",
                   unit, lib_props [lib_call].action,
                   gap_inches, gap_tenths,
                   (lib_call == lib_rewind ? " inches" : "-inch erase gap"),
@@ -3002,17 +3024,13 @@ return SCP_STATUS (status);                             /*   with the appropriat
 
 static void reject_command (CVPTR cvptr, UNIT *uptr)
 {
-uint32 unit;
-
 if (uptr)                                               /* if a command is currently executing */
     uptr->PHASE = Idle_Phase;                           /*   then idle the tape drive */
 else                                                    /* otherwise a command is attempting to start */
     uptr = CNTLR_UPTR;                                  /*   so set up action on the controller unit */
 
-unit = uptr - cvptr->device->units;                     /* determine the unit number for tracing */
-
 dpprintf (cvptr->device, TL_DEB_CMD, "%s %s command rejected\n",
-          unit_names [unit], opcode_names [uptr->OPCODE]);
+          unit_names [uptr - cvptr->device->units], opcode_names [uptr->OPCODE]);
 
 cvptr->status = CST_REJECT;                             /* set the Command Reject status */
 cvptr->state = Error_State;
@@ -3067,8 +3085,8 @@ return;
 
 static void add_crcc_lrcc (CVPTR cvptr, CNTLR_OPCODE opcode)
 {
-uint32 index;
-uint16 byte, crc, lrc;
+uint32  index;
+HP_WORD byte, crc, lrc;
 
 crc = 0;                                                /* initialize the CRC  */
 lrc = 0;                                                /*   and LRC accumulators */
@@ -3126,10 +3144,9 @@ return;
 
 static void activate_unit (CVPTR cvptr, UNIT *uptr)
 {
-const uint32 unit = uptr - cvptr->device->units;        /* the unit number */
-
 dpprintf (cvptr->device, TL_DEB_STATE, "%s %s %s phase delay %d service scheduled\n",
-          unit_names [unit], opcode_names [uptr->OPCODE], phase_names [uptr->PHASE],
+          unit_names [uptr - cvptr->device->units],
+          opcode_names [uptr->OPCODE], phase_names [uptr->PHASE],
           uptr->wait);
 
 sim_activate (uptr, uptr->wait);                        /* activate the unit */

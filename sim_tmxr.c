@@ -439,6 +439,8 @@ static u_char mantra[] = {                  /* Telnet Option Negotiation Mantra 
     TN_IAC, TN_DO, TN_BIN
     };
 
+#define TMXR_GUARD  ((int32)(lp->serport ? 0 : sizeof(mantra)))/* buffer guard */
+
 /* Local routines */
 
 static void tmxr_add_to_open_list (TMXR* mux);
@@ -1500,7 +1502,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
         if (lp->serport)
             return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
         if ((lp->sock) || (lp->connecting)) {
-            if ((~before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
+            if ((before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
                 if (lp->sock)
                     tmxr_report_disconnection (lp);     /* report closure */
                 tmxr_reset_ln (lp);
@@ -1508,7 +1510,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
             }
         else {
             if ((lp->destination) &&                    /* Virtual Null Modem Cable */
-                ((bits_to_set ^ before_modem_bits) &    /* and DTR being Raised */
+                (bits_to_set & ~before_modem_bits &     /* and DTR being Raised */
                  TMXR_MDM_DTR)) {
                 char msg[512];
 
@@ -1521,7 +1523,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
     return SCPE_OK;
     }
 if ((lp->sock) || (lp->connecting)) {
-    if ((~before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
+    if ((before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
         if (lp->sock)
             tmxr_report_disconnection (lp);     /* report closure */
         tmxr_reset_ln (lp);
@@ -1529,7 +1531,7 @@ if ((lp->sock) || (lp->connecting)) {
     }
 if ((lp->serport) && (!lp->loopback))
     sim_control_serial (lp->serport, 0, 0, incoming_bits);
-return SCPE_IERR;
+return SCPE_INCOMP;
 }
 
 /* Enable or Disable loopback mode on a line
@@ -2027,7 +2029,7 @@ if ((lp->conn == FALSE) &&                              /* no conn & not buffere
     return SCPE_LOST;
     }
 tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
-#define TXBUF_AVAIL(lp) (lp->txbsz - tmxr_tqln (lp))
+#define TXBUF_AVAIL(lp) ((lp->serport ? 1: lp->txbsz) - tmxr_tqln (lp))
 #define TXBUF_CHAR(lp, c) {                               \
     lp->txb[lp->txbpi++] = (char)(c);                     \
     lp->txbpi %= lp->txbsz;                               \
@@ -2958,8 +2960,6 @@ t_bool              sim_tmxr_poll_running = FALSE;
 static void *
 _tmxr_poll(void *arg)
 {
-int sched_policy;
-struct sched_param sched_priority;
 struct timeval timeout;
 int timeout_usec;
 DEVICE *dptr = tmxr_open_devices[0]->dptr;
@@ -2971,9 +2971,7 @@ int wait_count = 0;
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_poll() - starting\n");
 
@@ -3178,8 +3176,6 @@ return NULL;
 static void *
 _tmxr_serial_poll(void *arg)
 {
-int sched_policy;
-struct sched_param sched_priority;
 int timeout_usec;
 DEVICE *dptr = tmxr_open_devices[0]->dptr;
 UNIT **units = NULL;
@@ -3190,9 +3186,7 @@ int wait_count = 0;
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_serial_poll() - starting\n");
 
@@ -3314,8 +3308,6 @@ static void *
 _tmxr_serial_line_poll(void *arg)
 {
 TMLN *lp = (TMLN *)arg;
-int sched_policy;
-struct sched_param sched_priority;
 DEVICE *dptr = tmxr_open_devices[0]->dptr;
 UNIT *uptr = (lp->uptr ? lp->uptr : lp->mp->uptr);
 DEVICE *d = find_dev_from_unit(uptr);
@@ -3324,9 +3316,7 @@ int wait_count = 0;
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_serial_line_poll() - starting\n");
 
@@ -3396,8 +3386,6 @@ return NULL;
 static void *
 _tmxr_serial_poll(void *arg)
 {
-int sched_policy;
-struct sched_param sched_priority;
 int timeout_usec;
 DEVICE *dptr = tmxr_open_devices[0]->dptr;
 TMLN **lines = NULL;
@@ -3406,9 +3394,6 @@ pthread_t *threads = NULL;
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
 sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_serial_poll() - starting\n");
 

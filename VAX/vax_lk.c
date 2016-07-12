@@ -305,6 +305,7 @@ if (lk_rbuf[0] & 1) {                                   /* peripheral command */
 
         case 0xA7:
             sim_debug (DBG_CMD, &lk_dev, "sound bell\n");
+            vid_beep ();
             break;
 
         case 0xC1:

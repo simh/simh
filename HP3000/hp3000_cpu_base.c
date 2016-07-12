@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   11-Jun-16    JDB     Bit mask constants are now unsigned
    13-Jan-16    JDB     First release version
    11-Dec-12    JDB     Created
 
@@ -76,13 +77,13 @@ extern DEVICE cpu_dev;                          /* Central Processing Unit */
 
 /* Program constants */
 
-#define SIO_OK              0100000             /* TIO bit 0 = SIO OK */
-#define DIO_OK              0040000             /* TIO bit 1 = DIO OK */
+#define SIO_OK              0100000u            /* TIO bit 0 = SIO OK */
+#define DIO_OK              0040000u            /* TIO bit 1 = DIO OK */
 
 #define NORM_BIT            (D48_SIGN >> 6)     /* triple normalizing examines bit 6 */
 #define NORM_MASK           (D48_MASK >> 6)     /* triple normalizing masks off bits 0-5 */
 
-#define TO_UPPERCASE(b)     ((b) & ~040)        /* alphabetic byte upshift */
+#define TO_UPPERCASE(b)     ((b) & ~040u)       /* alphabetic byte upshift */
 
 
 /* CPU base set global data structures */

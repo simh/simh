@@ -25,7 +25,11 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   16-May-16    JDB     ACCESS_PROPERTIES.name is now a pointer-to-constant
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   24-Mar-16    JDB     Changed memory word type from uint16 to MEMORY_WORD
+   21-Mar-16    JDB     Changed cpu_ccb_table type from uint16 to HP_WORD
    11-Mar-16    JDB     Fixed byte EA calculations with negative indexes
    22-Dec-15    JDB     First release version
    01-Apr-15    JDB     First successful run of MPE-V/R through account login
@@ -73,12 +77,12 @@
 
    Memory protection is accomplished by checking program, data, and stack
    accesses against segment base and limit registers, which can be set only by
-   MPE. Bounds violations cause automatic hardware traps to a handler routine
+   MPE.  Bounds violations cause automatic hardware traps to a handler routine
    within MPE.  Some violations may be permitted; for example, a Stack Overflow
    trap may cause MPE to allocate a larger stack and then restart the
    interrupted instruction.  Almost all memory references are position-
    independent, so moving segments to accommodate expansion requires only
-   resetting of the segment registers to point at the new location.  Code
+   resetting of the segment registers to point at the new locations.  Code
    segments are fully reentrant and shareable, and both code and data are
    virtual, as the hardware supports absent code and data segment traps.
 
@@ -737,7 +741,7 @@ HP_WORD CNTR   = 0;                             /* microcode counter */
    condition code appropriate for the supplied operand into the status word.
 */
 
-const uint16 cpu_ccb_table [256] = {
+const HP_WORD cpu_ccb_table [256] = {
     CFL, CFL, CFL, CFL, CFL, CFL, CFL, CFL,     /* NUL SOH STX ETX EOT ENQ ACK BEL */
     CFL, CFL, CFL, CFL, CFL, CFL, CFL, CFL,     /* BS  HT  LF  VT  FF  CR  SO  SI  */
     CFL, CFL, CFL, CFL, CFL, CFL, CFL, CFL,     /* DLE DC1 DC2 DC3 DC4 NAK SYN ETB */
@@ -781,7 +785,7 @@ uint32     cpu_stop_flags;                      /* the simulation stop flag set 
 EXEC_STATE cpu_micro_state   = halted;          /* the microcode execution state */
 t_bool     cpu_base_changed  = FALSE;           /* TRUE if any base register is changed */
 t_bool     cpu_is_calibrated = TRUE;            /* TRUE if the process clock is calibrated */
-UNIT      *cpu_pclk_uptr     = &cpu_unit;       /* a pointer to the process clock unit */
+UNIT      *cpu_pclk_uptr     = &cpu_unit;       /* a (constant) pointer to the process clock unit */
 
 
 /* CPU local state */
@@ -798,7 +802,7 @@ static uint32 pclk_increment = 1;               /* the process clock increment p
 
 #define MEMSIZE             (cpu_unit.capac)    /* the current memory size in 16-bit words */
 
-static uint16 *M = NULL;                        /* the pointer to the main memory allocation */
+static MEMORY_WORD *M = NULL;                   /* the pointer to the main memory allocation */
 
 
 /* Interrupt classification names */
@@ -900,11 +904,11 @@ static const struct FEATURE_TABLE cpu_features [] = {   /* features indexed by C
 /* Memory access classification table */
 
 typedef struct {
-    HP_WORD      *bank_ptr;                     /* a pointer to the bank register */
-    DEVICE       *device_ptr;                   /* a pointer to the accessing device */
-    uint32       debug_flag;                    /* the debug flag for tracing */
-    t_bool       irq;                           /* TRUE if an interrupt is requested on error */
-    char *const  name;                          /* the classification name */
+    HP_WORD     *bank_ptr;                      /* a pointer to the bank register */
+    DEVICE      *device_ptr;                    /* a pointer to the accessing device */
+    uint32      debug_flag;                     /* the debug flag for tracing */
+    t_bool      irq;                            /* TRUE if an interrupt is requested on error */
+    const char  *name;                          /* the classification name */
     } ACCESS_PROPERTIES;
 
 
@@ -1796,7 +1800,7 @@ else {                                                  /* otherwise the access 
         case absolute:
         case data:
         case stack:
-            M [address] = (uint16) value;               /* write the value to memory */
+            M [address] = (MEMORY_WORD) value;          /* write the value to memory */
             break;
 
 
@@ -1804,7 +1808,7 @@ else {                                                  /* otherwise the access 
             if (offset > SM && offset <= SM + SR && bank == SBANK)  /* if the offset is within the TOS */
                 TR [SM + SR - offset] = value;                      /*   then write the value to a TOS register */
             else                                                    /* otherwise */
-                M [address] = (uint16) value;                       /*   write the value to memory */
+                M [address] = (MEMORY_WORD) value;                  /*   write the value to memory */
             break;
 
 
@@ -1814,7 +1818,7 @@ else {                                                  /* otherwise the access 
                 TR [SM + SR - offset] = value;                      /*   then write the value to a TOS register */
 
             if (DL <= offset && offset <= SM + SR || PRIV)          /* if the offset is within bounds or is privileged */
-                M [address] = (uint16) value;                       /*   then write the value to memory */
+                M [address] = (MEMORY_WORD) value;                  /*   then write the value to memory */
             else                                                    /* otherwise */
                 MICRO_ABORT (trap_Bounds_Violation);                /*   trap for a bounds violation */
             break;
@@ -3167,7 +3171,8 @@ return SCPE_OK;                                         /* return the success of
 static t_stat cpu_reset (DEVICE *dptr)
 {
 if (M == NULL) {                                        /* if this is the first call after simulator start */
-    M = (uint16 *) calloc (PA_MAX, sizeof (uint16));    /*   then allocate the maximum amount of memory needed */
+    M = (MEMORY_WORD *) calloc (PA_MAX,                 /*   then allocate the maximum amount of memory needed */
+                                sizeof (MEMORY_WORD));
 
     if (M == NULL)                                      /* if the allocation failed */
         return SCPE_MEM;                                /*   then report the error and abort the simulation */
@@ -3410,7 +3415,7 @@ if (MEMSIZE == 0                                        /* if this is the initia
   || MEMSIZE > cpu_features [new_index].maxmem)         /*   or if the current memory size is unsupported */
     new_memsize = cpu_features [new_index].maxmem;      /*     then set the new size to the maximum supported size */
 else                                                    /* otherwise the current size is valid for the new model */
-    new_memsize = MEMSIZE;                              /*   so leave it unchanged */
+    new_memsize = (uint32) MEMSIZE;                     /*   so leave it unchanged */
 
 status = set_size (uptr, new_memsize, NULL, NULL);      /* set the new memory size */
 
@@ -3502,7 +3507,7 @@ return SCPE_OK;                                         /* report the success of
 
 static t_stat show_speed (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-fprintf (st, "Simulation speed = %dx\n", cpu_speed);    /* display the current CPU speed */
+fprintf (st, "Simulation speed = %ux\n", cpu_speed);    /* display the current CPU speed */
 return SCPE_OK;                                         /*   and report success */
 }
 

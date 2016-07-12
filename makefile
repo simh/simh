@@ -1206,7 +1206,7 @@ HP3000D = HP3000
 HP3000 = ${HP3000D}/hp_disclib.c ${HP3000D}/hp_tapelib.c ${HP3000D}/hp3000_atc.c \
 	${HP3000D}/hp3000_clk.c ${HP3000D}/hp3000_cpu.c ${HP3000D}/hp3000_cpu_base.c \
 	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_ds.c ${HP3000D}/hp3000_iop.c \
-	${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
+	${HP3000D}/hp3000_lp.c ${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
 	${HP3000D}/hp3000_scmb.c ${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
 HP3000_OPT = -I ${HP3000D}
 
