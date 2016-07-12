@@ -692,27 +692,6 @@ const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
   return NULL;
 }
 
-/* strncasecmp() is not available on all platforms */
-int eth_strncasecmp(const char* string1, const char* string2, size_t len)
-{
-  size_t i;
-  unsigned char s1, s2;
-
-  for (i=0; i<len; i++) {
-    s1 = string1[i];
-    s2 = string2[i];
-    if (islower (s1)) s1 = (unsigned char)toupper (s1);
-    if (islower (s2)) s2 = (unsigned char)toupper (s2);
-
-    if (s1 < s2)
-      return -1;
-    if (s1 > s2)
-      return 1;
-    if (s1 == 0) return 0;
-  }
-  return 0;
-}
-
 char* eth_getname_byname(const char* name, char* temp, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
@@ -724,7 +703,7 @@ char* eth_getname_byname(const char* name, char* temp, char *desc)
   n = strlen(name);
   for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (eth_strncasecmp(name, list[i].name, n) == 0)) {
+        (sim_strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].name); /* only case might be different */
       strcpy(desc, list[i].desc);
@@ -744,7 +723,7 @@ char* eth_getdesc_byname(char* name, char* temp)
   n = strlen(name);
   for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (eth_strncasecmp(name, list[i].name, n) == 0)) {
+        (sim_strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].desc);
     }

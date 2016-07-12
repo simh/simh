@@ -291,29 +291,6 @@ for (i=0; i<count; i++) {
 return NULL;
 }
 
-/* strncasecmp() is not available on all platforms */
-static int sim_serial_strncasecmp (char* string1, char* string2, size_t len)
-{
-size_t i;
-unsigned char s1, s2;
-
-for (i=0; i<len; i++) {
-    s1 = string1[i];
-    s2 = string2[i];
-    if (islower (s1))
-        s1 = (unsigned char)toupper (s1);
-    if (islower (s2))
-        s2 = (unsigned char)toupper (s2);
-    if (s1 < s2)
-        return -1;
-    if (s1 > s2)
-        return 1;
-    if (s1 == 0)
-        return 0;
-}
-return 0;
-}
-
 static char* sim_serial_getname_byname (char* name, char* temp)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
@@ -325,7 +302,7 @@ found = 0;
 n = strlen(name);
 for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (sim_serial_strncasecmp(name, list[i].name, n) == 0)) {
+        (sim_strncasecmp(name, list[i].name, n) == 0)) {
         found = 1;
         strcpy(temp, list[i].name); /* only case might be different */
         }
@@ -344,7 +321,7 @@ found = 0;
 n = strlen(name);
 for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (sim_serial_strncasecmp(name, list[i].name, n) == 0)) {
+        (sim_strncasecmp(name, list[i].name, n) == 0)) {
         found = 1;
         strcpy(temp, list[i].desc);
         }

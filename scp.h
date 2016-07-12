@@ -148,6 +148,7 @@ int sim_isprint (char c);
 int sim_isdigit (char c);
 int sim_isgraph (char c);
 int sim_isalnum (char c);
+int sim_strncasecmp (const char* string1, const char* string2, size_t len);
 CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st);
 CONST char *get_glyph (const char *iptr, char *optr, char mchar);
 CONST char *get_glyph_nc (const char *iptr, char *optr, char mchar);
