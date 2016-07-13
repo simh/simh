@@ -177,8 +177,8 @@ REG ptr_reg[] = {
 MTAB ptr_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &ptr_sbs },
-    { UNIT_ASCII, UNIT_ASCII, "ASCII", NULL },
-    { UNIT_ASCII, 0,          "FIODEC", NULL },
+    { UNIT_ASCII, UNIT_ASCII, "ASCII", "ASCII", NULL },
+    { UNIT_ASCII, 0,          "FIODEC", "FIODEC", NULL },
     { 0 }
     };
 
@@ -215,8 +215,8 @@ REG ptp_reg[] = {
 MTAB ptp_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &ptp_sbs },
-    { UNIT_ASCII, UNIT_ASCII, "ASCII", NULL },
-    { UNIT_ASCII, 0,          "FIODEC", NULL },
+    { UNIT_ASCII, UNIT_ASCII, "ASCII", "ASCII", NULL },
+    { UNIT_ASCII, 0,          "FIODEC", "FIODEC", NULL },
     { 0 }
     };
 
@@ -405,8 +405,10 @@ if (ptr_hold & CW) {                                    /* char waiting? */
     }
 else {
     for (;;) {                                          /* until valid char */
-        if ((c = getc (uptr->fileref)) == EOF)          /* get next char, EOF? */
+        if ((c = getc (uptr->fileref)) == EOF) {        /* get next char, EOF? */
+            ptr_leader = PTR_LEADER;                    /* set up for trailer */
             return FIODEC_STOP;                         /* return STOP */
+            }
         uptr->pos = uptr->pos + 1;                      /* count char */
         c = c & 0177;                                   /* cut to 7b */
         if (c == '\n')                                  /* NL -> CR */
@@ -531,11 +533,13 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if ((uptr->flags & UNIT_ASCII) != 0) {                  /* ASCII mode? */
     int32 c1 = uptr->buf & 077;
-    if (c1 == FIODEC_UC) {
+    if (uptr->buf == 0)                                 /* ignore nulls */
+        return SCPE_OK;
+    if (c1 == FIODEC_UC) {                              /* UC? absorb */
         ptp_uc = UC;
         return SCPE_OK;
         }
-    else if (c1 == FIODEC_LC) {
+    else if (c1 == FIODEC_LC) {                         /* LC? absorb */
         ptp_uc = 0;
         return SCPE_OK;
         }
