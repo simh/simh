@@ -178,8 +178,8 @@ REG ptr_reg[] = {
 MTAB ptr_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &ptr_sbs },
-    { UNIT_ASCII, UNIT_ASCII, "ASCII", "ASCII", NULL },
-    { UNIT_ASCII, 0,          "FIODEC", "FIODEC", NULL },
+    { UNIT_ASCII, UNIT_ASCII, "ASCII", NULL, NULL },
+    { UNIT_ASCII, 0,          "FIODEC", NULL, NULL },
     { 0 }
     };
 
@@ -216,8 +216,8 @@ REG ptp_reg[] = {
 MTAB ptp_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &ptp_sbs },
-    { UNIT_ASCII, UNIT_ASCII, "ASCII", "ASCII", NULL },
-    { UNIT_ASCII, 0,          "FIODEC", "FIODEC", NULL },
+    { UNIT_ASCII, UNIT_ASCII, "ASCII", NULL, NULL },
+    { UNIT_ASCII, 0,          "FIODEC", NULL, NULL },
     { 0 }
     };
 
