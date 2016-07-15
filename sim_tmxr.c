@@ -2393,6 +2393,10 @@ for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     if (lp->rxbpsfactor == 0.0)
         lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
     }
+mp->ring_sock = INVALID_SOCKET;
+free (mp->ring_ipad);
+mp->ring_ipad = NULL;
+mp->ring_start_time = 0;
 tmxr_debug_trace (mp, "tmxr_open_master()");
 while (*tptr) {
     line = nextline;
