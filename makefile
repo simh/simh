@@ -1335,7 +1335,7 @@ ISYS8010C = Intel-Systems/common
 ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 	${ISYS8010C}/i8251.c ${ISYS8010C}/i8255.c \
 	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
-	${ISYS8010C}/multibus.c ${ISYS8010C}/isbc80-10.c	\
+	${ISYS8010C}/multibus.c ${ISYS8010D}/isbc80-10.c \
 	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc208.c
 ISYS8010_OPT = -I ${ISYS8010D}
 
@@ -1345,10 +1345,53 @@ ISYS8020C = Intel-Systems/common
 ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
 	${ISYS8020C}/i8251.c ${ISYS8020C}/i8255.c \
 	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
-	${ISYS8020C}/multibus.c ${ISYS8020C}/isbc80-20.c	\
+	${ISYS8020C}/multibus.c ${ISYS8020D}/isbc80-20.c \
 	${ISYS8020C}/isbc064.c ${ISYS8020C}/isbc208.c \
 	${ISYS8020C}/i8259.c
 ISYS8020_OPT = -I ${ISYS8020D}
+
+
+ISYS8030D = Intel-Systems/isys8030
+ISYS8030C = Intel-Systems/common
+ISYS8030 = ${ISYS8030C}/i8080.c ${ISYS8030D}/isys8030_sys.c \
+	${ISYS8030C}/i8251.c ${ISYS8030C}/i8255.c \
+	${ISYS8030C}/i8259.c ${ISYS8030C}/i8253.c \
+	${ISYS8030C}/ieprom.c ${ISYS8030C}/iram8.c \
+	${ISYS8030C}/multibus.c ${ISYS8030D}/isbc80-30.c \
+	${ISYS8030C}/isbc064.c ${ISYS8030C}/isbc208.c
+ISYS8030_OPT = -I ${ISYS8030D}
+
+
+IMDS-225D = Intel-Systems/imds-225
+IMDS-225C = Intel-Systems/common
+IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
+	${IMDS-225C}/i8251.c ${IMDS-225C}/i8255.c \
+	${IMDS-225C}/i8259.c ${IMDS-225C}/i8253.c \
+	${IMDS-225C}/ipceprom.c ${IMDS-225C}/ipcram8.c \
+	${IMDS-225C}/ipcmultibus.c ${IMDS-225D}/ipc.c \
+	${IMDS-225C}/ipc-cont.c ${IMDS-225C}/ioc-cont.c \
+	${IMDS-225C}/zx200a.c
+IMDS-225_OPT = -I ${IMDS-225D}
+
+
+IBMPCD = IBMPC-Systems/ibmpc
+IBMPCC = IBMPC-Systems/common
+IBMPC = ${IBMPCC}/i8088.c ${IBMPCD}/ibmpc_sys.c \
+	${IBMPCC}/i8253.c ${IBMPCC}/i8259.c \
+	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
+	${IBMPCC}/pceprom.c ${IBMPCC}/pcram8.c \
+	${IBMPCC}/i8237.c ${IBMPCC}/pcbus.c
+IBMPC_OPT = -I ${IBMPCD}
+
+
+IBMPCXTD = IBMPC-Systems/ibmpcxt
+IBMPCXTC = IBMPC-Systems/common
+IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
+	${IBMPCXTC}/i8253.c ${IBMPCXTC}/i8259.c \
+	${IBMPCXTC}/i8255.c ${IBMPCXTD}/ibmpcxt.c \
+	${IBMPCXTC}/pceprom.c ${IBMPCXTC}/pcram8.c \
+	${IBMPCXTC}/pcbus.c ${IBMPCXTC}/i8237.c 
+IBMPCXT_OPT = -I ${IBMPCXTD}
 
 
 TX0D = TX-0
@@ -1468,7 +1511,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
-	b5500 
+	isys8030 b5500 imds-225 imbpc ibmpcxt
 
 all : ${ALL}
 
@@ -1736,7 +1779,6 @@ ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-
 isys8010: ${BIN}isys8010${EXE}
 
 ${BIN}isys8010${EXE} : ${ISYS8010} ${SIM} ${BUILD_ROMS}
@@ -1748,6 +1790,46 @@ isys8020: ${BIN}isys8020${EXE}
 ${BIN}isys8020${EXE} : ${ISYS8020} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8020} ${SIM} ${ISYS8020_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+isys8030: ${BIN}isys8030${EXE}
+
+${BIN}isys8030${EXE} : ${ISYS8030} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${ISYS8030} ${SIM} ${ISYS8030_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info isys8030 can't be built using C++)
+endif
+
+imds-225: ${BIN}imds-225${EXE}
+
+${BIN}imds-225${EXE} : ${IMDS-225} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${IMDS-225} ${SIM} ${IMDS-225_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info imds-225 can't be built using C++)
+endif
+
+ibmpc: ${BIN}ibmpc${EXE}
+
+${BIN}ibmpc${EXE} : ${IBMPC} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${IBMPC} ${SIM} ${IBMPC_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info ibmpc can't be built using C++)
+endif
+
+ibmpcxt: ${BIN}ibmpcxt${EXE}
+
+${BIN}ibmpcxt${EXE} : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${IBMPCXT} ${SIM} ${IBMPCXT_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info ibmpcxt can't be built using C++)
+endif
 
 tx-0 : ${BIN}tx-0${EXE}
 
