@@ -696,9 +696,14 @@ int32 i = lp->txbpr;
 if (lp->loopback)
     return loop_write (lp, &(lp->txb[i]), length);
 
-if (lp->serport)                                        /* serial port connection? */
-    return sim_write_serial (lp->serport, &(lp->txb[i]), length);
-
+if (lp->serport) {                                      /* serial port connection? */
+    if (sim_gtime () < lp->txnexttime)
+        return 0;
+    written = sim_write_serial (lp->serport, &(lp->txb[i]), length);
+    if (written > 0)
+        lp->txnexttime = floor (sim_gtime () + (lp->txdelta * sim_timer_inst_per_sec ()));
+    return written;
+    }
 else {                                                  /* Telnet connection */
     written = sim_write_sock (lp->sock, &(lp->txb[i]), length);
 
@@ -2347,6 +2352,9 @@ if (uptr)
     uptr->wait = lp->rxdelta;
 if (lp->rxbpsfactor == 0.0)
     lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
+lp->txbps = lp->rxbps;
+lp->txdelta = lp->rxdelta;
+lp->txnexttime = lp->rxnexttime;
 return SCPE_OK;
 }
 

@@ -171,6 +171,9 @@ struct tmln {
 #define TMXR_RX_BPS_UNIT_SCALE 1000000.0
     uint32              rxdelta;                        /* rcv inter character min time (usecs) */
     double              rxnexttime;                     /* min time for next receive character */
+    uint32              txbps;                          /* xmt bps speed (0 - unlimited) */
+    uint32              txdelta;                        /* xmt inter character min time (usecs) */
+    double              txnexttime;                     /* min time for next transmit character */
     uint8               *txpb;                          /* xmt packet buffer */
     uint32              txpbsize;                       /* xmt packet buffer size */
     uint32              txppsize;                       /* xmt packet packet size */
