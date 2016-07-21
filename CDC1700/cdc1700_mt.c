@@ -279,7 +279,7 @@ static uint16 smm17boot7[] = {
 #define MTSIZ           131072
 uint8 MTbuf[MTSIZ];
 t_mtrlnt MToffset, MTremain;
-enum  { MT_IDLE, MT_READING, MT_WRITING, MT_READTMO, MT_WRITETMO, MT_DSADONE } MTmode;
+static enum  { MT_IDLE, MT_READING, MT_WRITING, MT_READTMO, MT_WRITETMO, MT_DSADONE } MTmode;
 
 t_stat mt_svc(UNIT *);
 t_stat mt_reset(DEVICE *);
