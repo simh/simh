@@ -83,7 +83,7 @@ uint8 P[MAXMEMSIZE];
 
 t_uint64 Instructions;
 uint16 Preg, Areg, Qreg, Mreg, CAenable, OrigPreg, Pending, IOAreg, IOQreg;
-uint8 Pfault, Protected, lastP, Oflag, PARflag, INTflag, DEFERflag;
+uint8 Pfault, Protected, lastP, Oflag, INTflag, DEFERflag;
 
 t_bool ExecutionStarted = FALSE;
 uint16 CharAddrMode[16];
@@ -110,6 +110,8 @@ t_stat cpu_set_size(UNIT *, int32, CONST char *, void *);
 t_stat cpu_ex(t_value *, t_addr, UNIT *, int32);
 t_stat cpu_dep(t_value, t_addr, UNIT *uptr, int32 sw);
 
+t_stat cpu_help(FILE *, DEVICE *, UNIT *, int32, const char *);
+
 #define UNIT_V_STOPSW   (UNIT_V_UF + 1)         /* Selective STOP switch */
 #define UNIT_STOPSW     (1 << UNIT_V_STOPSW)
 #define UNIT_V_SKIPSW   (UNIT_V_UF + 2)         /* Selective SKIP switch */
@@ -123,7 +125,7 @@ t_stat cpu_dep(t_value, t_addr, UNIT *uptr, int32 sw);
 #define UNIT_V_MSIZE    (UNIT_V_UF + 6)         /* Memory size */
 #define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
 
-IO_DEVICE CPUdev = IODEV(NULL, "1704", CPU, 0, 0xFF, 0,
+IO_DEVICE CPUdev = IODEV(NULL, "1714", CPU, 0, 0xFF, 0,
                          NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
                          0, 0, 0, 0, 0, 0, 0, 0, NULL);
 
@@ -137,39 +139,53 @@ IO_DEVICE CPUdev = IODEV(NULL, "1704", CPU, 0, 0xFF, 0,
 UNIT cpu_unit = { UDATA(NULL, UNIT_FIX+UNIT_BINK, DEFAULTMEMSIZE) };
 
 REG cpu_reg[] = {
-  { HRDATA(P, Preg, 16) },
-  { HRDATA(A, Areg, 16) },
-  { HRDATA(Q, Qreg, 16) },
-  { HRDATA(M, Mreg, 16) },
-  { HRDATA(O, Oflag, 1) },
-  { HRDATA(CH, CAenable, 1) },
-  { HRDATA(PAR, PARflag, 1) },
-  { HRDATA(INT, INTflag, 1) },
-  { HRDATA(DEFER, DEFERflag, 1) },
-  { HRDATA(PENDING, Pending, 1) },
-  { HRDATA(PFAULT, Pfault, 1) },
+  { HRDATAD(P, Preg, 16, "Program address counter") },
+  { HRDATAD(A, Areg, 16, "Principal arithmetic register") },
+  { HRDATAD(Q, Qreg, 16, "Index register") },
+  { HRDATAD(M, Mreg, 16, "Interrupt mask register") },
+  { HRDATAD(O, Oflag, 1, "Overflow flag") },
+  { HRDATAD(CH, CAenable, 1, "Character addressing enable flag") },
+  { HRDATAD(INT, INTflag, 1, "Interrupt enable flag") },
+  { HRDATAD(DEFER, DEFERflag, 1, "Interrupt deferred flag") },
+  { HRDATAD(PENDING, Pending, 16, "Pending interrupt flags") },
+  { HRDATAD(PFAULT, Pfault, 1, "Protect fault pending flag") },
   { NULL }
 };
 
 MTAB cpu_mod[] = {
-  { UNIT_STOPSW, UNIT_STOPSW, "Selective Stop", "SSTOP", NULL },
-  { UNIT_STOPSW, 0, "No Selective Stop", "NOSSTOP", NULL },
-  { UNIT_SKIPSW, UNIT_SKIPSW, "Selective Skip", "SSKIP", NULL },
-  { UNIT_SKIPSW, 0, "No Selective Skip", "NOSSKIP", NULL },
-  { UNIT_MODE65K, UNIT_MODE65K, "65K Addressing Mode", "MODE65K", NULL },
-  { UNIT_MODE65K, 0, "32K Addressing Mode", "MODE32K", NULL },
-  { UNIT_CHAR, UNIT_CHAR, "Character Addressing", "CHAR", NULL },
-  { UNIT_CHAR, 0, "No Character Addressing", "NOCHAR", NULL },
-  { UNIT_PROT, UNIT_PROT, "Program Protect", "PROTECT", NULL },
-  { UNIT_PROT, 0, "", "NOPROTECT", NULL },
-  { UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
-  { UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
-  { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size },
-  { UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size },
+  { MTAB_XTD|MTAB_VDV, 0, "1714 CDC 1700 series CPU", NULL, NULL, NULL },
+  { UNIT_STOPSW, UNIT_STOPSW, "Selective Stop", "SSTOP",
+    NULL, NULL, NULL, "Enable Selective Stop" },
+  { UNIT_STOPSW, 0, "No Selective Stop", "NOSSTOP",
+    NULL, NULL, NULL, "Disable Selective Stop" },
+  { UNIT_SKIPSW, UNIT_SKIPSW, "Selective Skip", "SSKIP",
+    NULL, NULL, NULL, "Enable Selective Skip" },
+  { UNIT_SKIPSW, 0, "No Selective Skip", "NOSSKIP",
+    NULL, NULL, NULL, "Disable Selective Skip" },
+  { UNIT_MODE65K, UNIT_MODE65K, "65K Addressing Mode", "MODE65K",
+    NULL, NULL, NULL, "Enable 65K Indirect Addressing Mode" },
+  { UNIT_MODE65K, 0, "32K Addressing Mode", "MODE32K",
+    NULL, NULL, NULL, "Enable 32K Indirect Addressing Mode" },
+  { UNIT_CHAR, UNIT_CHAR, "Character Addressing", "CHAR",
+    NULL, NULL, NULL, "Enable Character Addressing Mode" },
+  { UNIT_CHAR, 0, "No Character Addressing", "NOCHAR",
+    NULL, NULL, NULL, "Disable Character Addressing Mode" },
+  { UNIT_PROT, UNIT_PROT, "Program Protect", "PROTECT",
+    NULL, NULL, NULL, "Enable Protect Mode Operation" },
+  { UNIT_PROT, 0, "", "NOPROTECT",
+    NULL, NULL, NULL, "Disable Protect Mode Operation" },
+  { UNIT_MSIZE, 4096, NULL, "4K",
+    &cpu_set_size, NULL, NULL, "Set Memory Size to 4KW" },
+  { UNIT_MSIZE, 8192, NULL, "8K",
+    &cpu_set_size, NULL, NULL, "Set Memory Size to 8KW" },
+  { UNIT_MSIZE, 16384, NULL, "16K",
+    &cpu_set_size, NULL, NULL, "Set Memory Size to 16KW" },
+  { UNIT_MSIZE, 32768, NULL, "32K",
+    &cpu_set_size, NULL, NULL, "Set Memory Size to 32KW" },
 #if MAXMEMSIZE > 32768
-  { UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size },
+  { UNIT_MSIZE, 65536, NULL, "64K",
+    &cpu_set_size, NULL, NULL, "Set Memory Size to 64KW" },
 #endif
-  { MTAB_XTD | MTAB_VDV, 0, "1714", NULL, NULL, NULL },
   { 0 }
 };
 
@@ -177,18 +193,18 @@ MTAB cpu_mod[] = {
   (DBG_DISASS | DBG_TRACE | DBG_TARGET | DBG_INPUT | DBG_OUTPUT | DBG_FULL)
 
 DEBTAB cpu_deb[] = {
-  { "DISASSEMBLE", DBG_DISASS },
-  { "IDISASSEMBLE", DBG_IDISASS },
-  { "INTERRUPT", DBG_INTR },
-  { "TRACE", DBG_TRACE },
-  { "ITRACE", DBG_ITRACE },
-  { "TARGET", DBG_TARGET },
-  { "INPUT", DBG_INPUT },
-  { "OUTPUT", DBG_OUTPUT },
-  { "IO", DBG_INPUT | DBG_OUTPUT },
-  { "INTLVL", DBG_INTLVL },
-  { "PROTECT", DBG_PROTECT },
-  { "MISSING", DBG_MISSING },
+  { "DISASSEMBLE",  DBG_DISASS,    "Disassemble instructions while tracing" },
+  { "IDISASSEMBLE", DBG_IDISASS,   "Disassemble while interrupts active" },
+  { "INTERRUPT",    DBG_INTR,      "Display interrupt entry/exit" },
+  { "TRACE",        DBG_TRACE,     "Trace instruction execution" },
+  { "ITRACE",       DBG_ITRACE,    "Trace while interrupts active" },
+  { "TARGET",       DBG_TARGET,    "Display target address of instructions" },
+  { "INPUT",        DBG_INPUT,     "Display INP instruction execution" },
+  { "OUTPUT",       DBG_OUTPUT,    "Display OUT instruction execution" },
+  { "IO",           DBG_INPUT | DBG_OUTPUT, "Display INP and OUT execution" },
+  { "INTLVL",       DBG_INTLVL,    "Add interrupt level to all displays" },
+  { "PROTECT",      DBG_PROTECT,   "Display protect faults" },
+  { "MISSING",      DBG_MISSING,   "Display info about missing devices" },
   { "FULL", DBG_ALL },
   { NULL }
 };
@@ -200,8 +216,7 @@ DEVICE cpu_dev = {
   NULL, NULL, NULL,
   &CPUdev,
   DEV_DEBUG | DEV_NOEQUIP, 0, cpu_deb,
-  NULL,
-  NULL
+  NULL, NULL, &cpu_help, NULL, NULL, NULL
 };
 
 /*
@@ -1545,4 +1560,77 @@ t_stat sim_instr(void)
         reason = SCPE_STOP;
   }
   return reason;
+}
+
+t_stat cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The %D device is a 1714 central processing unit.\n"
+    "1 Hardware Description\n"
+    " The 1714 can access up to 64KW of memory (4KW, 8KW, 16KW, 32KW and 64KW\n"
+    " are supported). A 1705 multi-level interrupt system with a direct\n"
+    " storage access bus and 3 1706-A buffered data channels are included.\n\n"
+    " The amount of memory available to the system can be changed with:\n\n"
+    "+sim> SET CPU nK\n\n"
+    " The original 1700 series CPU (the 1704) only allowed up to 32KW to be\n"
+    " attached to the CPU and indirect memory references would continue to\n"
+    " loop through memory if bit 15 of the target address was set. When 64KW\n"
+    " support was added indirect addressing was limited to a single level\n"
+    " so that the entire 16-bits of address could be used. The indirect\n"
+    " addressing mode may be changed by:\n\n"
+    "+sim> SET CPU MODE32K\n"
+    "+sim> SET CPU MODE65K\n\n"
+    " In 32KW addressing mode, the number of indirect address chaining\n"
+    " operations is limited to 10000 to avoid infinite loops.\n"
+    "2 Equipment Address\n"
+    " The CPU is not directly accessible via an equipment address but it does\n"
+    " reserve interrupt 0  (and therefore equipment address 0) for parity\n"
+    " errors (never detected by the simulator), protect faults and power fail\n"
+    " (not supported by the simulator).\n"
+    "2 $Registers\n"
+    "2 Front Panel Switches\n"
+    " The 1714 front panel includes a number of switches which control the\n"
+    " operation of the CPU. Note that selective stop and selective skip are\n"
+    " used extensively to control execution of the System Maintenance\n"
+    " Monitor.\n"
+    "3 Selective Stop\n"
+    " The selective stop switch controls how the 'Selective Stop' (SLS)\n"
+    " instruction executes. If the switch is off, SLS executes as a\n"
+    " no-operation. If the switch is on, SLS executes as a halt instruction.\n"
+    " Continuing after the halt causes the CPU to resume execution at the\n"
+    " instruction following the SLS.\n\n"
+    "+sim> SET CPU SSTOP\n"
+    "+sim> SET CPU NOSSTOP\n\n"
+    "3 Selective Skip\n"
+    " The selective skip switch controls how the SWS and SWN skip\n"
+    " instructions execute. SWS will skip if the switch is set and SWN will\n"
+    " skip if the switch is not set.\n\n"
+    "+sim> SET CPU SSKIP\n"
+    "+sim> SET CPU NOSSKIP\n\n"
+    "3 Protect\n"
+    " Each word of memory on the CDC 1700 series consists of 18-bits; 16-bits\n"
+    " of data/instruction, a parity bit (which is not implemented in the\n"
+    " simulator) and a program bit. If the protect switch is off, any program\n"
+    " may reference any word of memory. If the protect switch is on, there are\n"
+    " a set of rules which control how memory accesses work and when to\n"
+    " generate a program protect violation - see one of the 1700 reference\n"
+    " manuals on bitsavers.org for exact details. This means that the\n"
+    " operating system can be protected from modification by application\n"
+    " programs but there is no isolation between application programs.\n\n"
+    "+sim> SET CPU PROTECT\n"
+    "+sim> SET CPU NOPROTECT\n\n"
+    " The Simulator fully implements CPU protect mode allowing protected\n"
+    " operating systems such as MSOS 5 to execute. It does not implement\n"
+    " peripheral protect operation which allows unprotected applications to\n"
+    " directly access some unprotected peripherals.\n\n"
+    " Operating systems and other programs which run with the protect switch\n"
+    " on usually start up with the protect switch off, manipulate the\n"
+    " protect bits in memory (using the CPB/SPB instructions) and then ask\n"
+    " the operator to set the protect switch on.\n"
+    "1 Configuration\n"
+    " The CPU is configured with various simh SET commands.\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
 }

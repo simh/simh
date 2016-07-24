@@ -80,44 +80,6 @@ DEVICE *IOdev[16];
 devINTR *IOintr[16];
 
 /*
- * Display device debug status
- */
-t_stat show_debug(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-  DEVICE *dptr;
-  t_bool first = TRUE;
-  DEBTAB *tab;
-
-  if (uptr == NULL)
-    return SCPE_IERR;
-
-  dptr = find_dev_from_unit(uptr);
-  if (dptr == NULL)
-    return SCPE_IERR;
-
-  tab = dptr->debflags;
-  if (tab == NULL)
-    return SCPE_IERR;
-
-  fprintf(st, "Debug: ");
-  if (dptr->dctrl != 0) {
-    uint32 dctrl = dptr->dctrl;
-
-    while ((tab->name != NULL) && (dctrl != 0)) {
-      if ((dctrl & tab->mask) != 0) {
-        if (!first)
-          fprintf(st, ",");
-        fprintf(st, "%s", tab->name);
-        dctrl &= ~tab->mask;
-        first = FALSE;
-      }
-      tab++;
-    }
-  } else fprintf(st, "None");
-  return SCPE_OK;
-}
-
-/*
  * Display equipment/station address, buffered data channel and optional
  * additional information:
  *
@@ -137,7 +99,7 @@ t_stat show_addr(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_IERR;
 
   iod = (IO_DEVICE *)dptr->ctxt;
-  fprintf(st, "equip: 0x");
+  fprintf(st, "\n\tequip: 0x");
   fprint_val(st, (t_value)iod->iod_equip, DEV_RDX, 16, PV_LEFT);
   if (iod->iod_station != 0xFF) {
     fprintf(st, ", station: ");

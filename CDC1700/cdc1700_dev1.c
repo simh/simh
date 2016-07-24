@@ -46,7 +46,6 @@ extern void RaiseExternalInterrupt(DEVICE *);
 
 extern t_bool doDirectorFunc(DEVICE *, t_bool);
 
-extern t_stat show_debug(FILE *, UNIT *, int32, CONST void *);
 extern t_stat show_addr(FILE *, UNIT *, int32, CONST void *);
 
 extern t_stat set_stoponrej(UNIT *, int32, CONST char *, void *);
@@ -71,6 +70,8 @@ uint16 TTrebuild(void);
 t_bool TTreject(IO_DEVICE *, t_bool, uint8);
 enum IOstatus TTin(IO_DEVICE *, uint8);
 enum IOstatus TTout(IO_DEVICE *, uint8);
+
+t_stat tt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 /*
         1711-A/B, 1712-A Teletypewriter
@@ -189,29 +190,31 @@ uint8 tti_manualIntr = 0x7;
 UNIT tti_unit = { UDATA(&tti_svc, UNIT_IDLE+TT_MODE_KSR+TTUF_HDX, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
-  { HRDATA(MODE, TTdev.iod_rmode, 8) },
-  { HRDATA(FUNCTION, TTdev.FUNCTION, 16) },
-  { HRDATA(STATUS, TTdev.STATUS, 16) },
-  { HRDATA(IENABLE, TTIdev.IENABLE, 16) },
-  { HRDATA(INTRKEY, tti_manualIntr, 8) },
+  { HRDATAD(MODE, TTdev.iod_rmode, 1, "Read/Write mode (Read == TRUE)") },
+  { HRDATAD(FUNCTION, TTdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(STATUS, TTdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, TTIdev.IENABLE, 16, "Interrupts enabled") },
+  { HRDATAD(INTRKEY, tti_manualIntr, 8, "Manual interrupt keycode") },
   { NULL }
 };
 
 MTAB tti_mod[] = {
-  { TTUF_HDX, 0, "full duplex", "FDX", NULL },
-  { TTUF_HDX, TTUF_HDX, "half duplex", "HDX", NULL },
-  { MTAB_XTD | MTAB_VDV, 0, "1711-A", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL, NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
+  { MTAB_XTD | MTAB_VDV, 0, "1711-A Console Terminal (Input)" },
+  { TTUF_HDX, 0, "full duplex", "FDX",
+    NULL, NULL, NULL, "Set TT device to full duplex" },
+  { TTUF_HDX, TTUF_HDX, "half duplex", "HDX",
+    NULL, NULL, NULL, "Set TT device to half duplex" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL,
+    NULL, &show_addr, NULL, "Display equipment address" },
   { 0 }
 };
 
 DEBTAB tti_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "INTR", DBG_DINTR },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "INTR",        DBG_DINTR,      "Display device interrupt requests" },
+  { "LOCATION",    DBG_DLOC,       "Display address of I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DLOC },
   { NULL }
 };
@@ -223,8 +226,7 @@ DEVICE tti_dev = {
   NULL, NULL, NULL,
   &TTdev,
   DEV_DEBUG | DEV_NOEQUIP | DEV_INDEV, 0, tti_deb,
-  NULL,
-  NULL
+  NULL, NULL, &tt_help, NULL, NULL, NULL
 };
 
 /* TTO data structures
@@ -238,29 +240,31 @@ DEVICE tti_dev = {
 UNIT tto_unit = { UDATA(&tto_svc, TT_MODE_KSR+TTUF_HDX, 0), TT_OUT_WAIT };
 
 REG tto_reg[] = {
-  { HRDATA(MODE, TTdev.iod_rmode, 8) },
-  { HRDATA(FUNCTION, TTdev.FUNCTION, 16) },
-  { HRDATA(STATUS, TTdev.STATUS, 16) },
-  { HRDATA(IENABLE, TTOdev.IENABLE, 16) },
+  { HRDATAD(MODE, TTdev.iod_rmode, 1, "Read/Write mode (Read == TRUE)") },
+  { HRDATAD(FUNCTION, TTdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(STATUS, TTdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, TTOdev.IENABLE, 16, "Interrupts enabled") },
   { NULL }
 };
 
 MTAB tto_mod[] = {
-  { TTUF_HDX, 0, "full duplex", "FDX", NULL },
-  { TTUF_HDX, TTUF_HDX, "half duplex", "HDX", NULL },
-  { MTAB_XTD | MTAB_VDV, 0, "1711-A", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL, NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
+  { MTAB_XTD | MTAB_VDV, 0, "1711-A Console Terminal (Output)" },
+  { TTUF_HDX, 0, "full duplex", "FDX",
+    NULL, NULL, NULL, "Set TT device to full duplex" },
+  { TTUF_HDX, TTUF_HDX, "half duplex", "HDX",
+    NULL, NULL, NULL, "Set TT device to half duplex" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL,
+    NULL, &show_addr, NULL, "Display equipment address" },
   { 0 }
 };
 
 
 DEBTAB tto_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "INTR", DBG_DINTR },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display devide state changes" },
+  { "INTR",        DBG_DINTR,      "Display device interrupt requests" },
+  { "LOCATION",    DBG_DLOC,       "Display address for I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DLOC },
   { NULL }
 };
@@ -272,8 +276,7 @@ DEVICE tto_dev = {
   NULL, NULL, NULL,
   &TTdev,
   DEV_DEBUG | DEV_NOEQUIP | DEV_OUTDEV, 0, tto_deb,
-  NULL,
-  NULL
+  NULL, NULL, &tt_help, NULL, NULL, NULL
 };
 
 /*
@@ -751,6 +754,34 @@ enum IOstatus TTout(IO_DEVICE *iod, uint8 reg)
   return IO_REPLY;
 }
 
+t_stat tt_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The TTI/TTO device is a 1711-A teletype console. The device is\n"
+    " implemented as 2 seperate devices within the simulator; TTI for input\n"
+    " and TTO for output.\n"
+    "1 Hardware Description\n"
+    " The 1711-A consists of a teletype console terminal with an extra button\n"
+    " which is used to generate a 'manual interrupt'. By default, the\n"
+    " simulator uses the 'Control+G' combination to generate the interrupt.\n"
+    " This key combination may be changed by:\n\n"
+    "+sim> DEPOSIT TTI INTRKEY keycodeValue\n\n"
+    "2 Equipment Address\n"
+    " The console device is part of the low-speed package and, as such, is at\n"
+    " fixed equipment address 1, station 1.\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device. These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
+}
+
 t_stat ptr_svc(UNIT *);
 t_stat ptr_reset(DEVICE *);
 t_stat ptr_attach(UNIT *, CONST char *);
@@ -758,6 +789,8 @@ t_stat ptr_detach(UNIT *);
 
 enum IOstatus PTRin(IO_DEVICE *, uint8);
 enum IOstatus PTRout(IO_DEVICE *, uint8);
+
+t_stat ptr_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 /*
         1721-A/B/C/D, 1722-A/B Paper Tape Reader
@@ -837,28 +870,32 @@ UNIT ptr_unit = {
 };
 
 REG ptr_reg[] = {
-  { HRDATA(FUNCTION, PTRdev.FUNCTION, 16) },
-  { HRDATA(STATUS, PTRdev.STATUS, 16) },
-  { HRDATA(IENABLE, PTRdev.IENABLE, 16)},
+  { HRDATAD(FUNCTION, PTRdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(STATUS, PTRdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, PTRdev.IENABLE, 16, "Interrupts enabled") },
   { NULL }
 };
 
 MTAB ptr_mod[] = {
-  { MTAB_XTD | MTAB_VDV, 0, "1721-A", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT", NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT", &set_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT", &clr_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT", &set_protected, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT", &clear_protected, NULL, NULL },
+  { MTAB_XTD | MTAB_VDV, 0, "1721-A Paper Tape Reader" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL,
+    NULL, &show_addr, NULL, "Display equipment address" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT",
+    &set_stoponrej, NULL, NULL, "Stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT",
+    &clr_stoponrej, NULL, NULL, "Don't stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT",
+    &set_protected, NULL, NULL, "Device is protected (unimplemented)" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT",
+    &clear_protected, NULL, NULL, "Device is unprotected (unimplemented)" },
   { 0 }
 };
 
 DEBTAB ptr_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
+  { "TRACE",       DBG_DTRACE,     "Traced device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "LOCATION",    DBG_DLOC,       "Display address of I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejected" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DLOC },
   { NULL }
 };
@@ -869,7 +906,8 @@ DEVICE ptr_dev = {
   NULL, NULL, &ptr_reset,
   NULL, &ptr_attach, &ptr_detach,
   &PTRdev,
-  DEV_DEBUG | DEV_NOEQUIP | DEV_INDEV | DEV_PROTECT, 0, ptr_deb
+  DEV_DEBUG | DEV_NOEQUIP | DEV_INDEV | DEV_PROTECT, 0, ptr_deb,
+  NULL, NULL, &ptr_help, NULL, NULL, NULL
 };
 
 /*
@@ -1028,11 +1066,37 @@ enum IOstatus PTRout(IO_DEVICE *iod, uint8 reg)
   return IO_REPLY;
 }
 
+t_stat ptr_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The %D device is a 1721-A paper tape reader.\n"
+    "1 Hardware Description\n"
+    " The 1721-A consists of a controller and a physical paper tape reader.\n"
+    "2 Equipment Address\n"
+    " The paper tape reader is part of the low-speed package and, as such, is\n"
+    " at fixed equipment address 1, station 2.\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device. These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation. STATUS always\n"
+    " contains the current status of the device as it would be read by an\n"
+    " application program.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET and ATTACH commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
+}
+
 t_stat ptp_svc(UNIT *);
 t_stat ptp_reset(DEVICE *);
 
 enum IOstatus PTPin(IO_DEVICE *, uint8);
 enum IOstatus PTPout(IO_DEVICE *, uint8);
+
+t_stat ptp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 /*
         1723-A/B, 1724-A/B Paper Tape Punch
@@ -1113,28 +1177,32 @@ UNIT ptp_unit = {
 };
 
 REG ptp_reg[] = {
-  { HRDATA(FUNCTION, PTPdev.FUNCTION, 16) },
-  { HRDATA(STATUS, PTPdev.STATUS, 16) },
-  { HRDATA(IENABLE, PTPdev.IENABLE, 16)},
+  { HRDATAD(FUNCTION, PTPdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(STATUS, PTPdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, PTPdev.IENABLE, 16, "Interrupts enabled") },
   { NULL }
 };
 
 MTAB ptp_mod[] = {
-  { MTAB_XTD | MTAB_VDV, 0, "1723-A", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT", NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT",  &set_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT", &clr_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT", &set_protected, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT", &clear_protected, NULL, NULL },
+  { MTAB_XTD | MTAB_VDV, 0, "1723-A Paper Tape Punch" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL,
+    NULL, &show_addr, NULL, "Display equipment address" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT",
+    &set_stoponrej, NULL, NULL, "Stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT",
+    &clr_stoponrej, NULL, NULL, "Don't stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT",
+    &set_protected, NULL, NULL, "Device is protected (unimplemented)" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT",
+    &clear_protected, NULL, NULL, "Device is unprotected (unimplemented)" },
   { 0 }
 };
 
 DEBTAB ptp_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "LOCATION",    DBG_DLOC,       "Display address of I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DLOC },
   { NULL }
 };
@@ -1146,10 +1214,9 @@ DEVICE ptp_dev = {
   NULL, NULL, NULL,
   &PTPdev,
   DEV_DEBUG | DEV_NOEQUIP | DEV_OUTDEV | DEV_PROTECT, 0, ptp_deb,
-  NULL,
-  NULL
+  NULL, NULL, &ptp_help, NULL, NULL, NULL
 };
-
+ 
 /*
  * Dump the current internal state of the PTP device.
  */
@@ -1306,6 +1373,30 @@ enum IOstatus PTPout(IO_DEVICE *iod, uint8 reg)
   return IO_REPLY;
 }
 
+t_stat ptp_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The %D device is a 1723-A paper tape punch.\n"
+    "1 Hardware Description\n"
+    " The 1723-A consists of a controller and a physical paper tape punch.\n"
+    "2 Equipment Address\n"
+    " The paper tape reader is part of the low-speed package and, as such, is\n"
+    " at fixed equipment address 1, station 4.\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device. These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation. STATUS always\n"
+    " contains the current status of the device as it would be read by an\n"
+    " application program.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET and ATTACH commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
+}
+
 t_stat cdr_svc(UNIT *);
 t_stat cdr_reset(DEVICE *);
 
@@ -1382,26 +1473,28 @@ UNIT cdr_unit = {
 };
 
 REG cdr_reg[] = {
-  { HRDATA(FUNCTION, CDRdev.FUNCTION, 16) },
-  { HRDATA(STATUS, CDRdev.STATUS, 16) },
-  { HRDATA(IENABLE, CDRdev.IENABLE, 16)},
+  { HRDATAD(FUNCTION, CDRdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(STATUS, CDRdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, CDRdev.IENABLE, 16, "Interrupts enabled") },
   { NULL }
 };
 
 MTAB cdr_mod[] = {
-  { MTAB_XTD | MTAB_VDV, 0, "1729", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT", NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT", &set_protected, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT", &clear_protected, NULL, NULL },
+  { MTAB_XTD | MTAB_VDV, 0, "1729 Card Reader" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL,
+    NULL, &show_addr, NULL, "Display equipment address" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT",
+    &set_protected, NULL, NULL, "Device is protected (unimplemented)" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT",
+    &clear_protected, NULL, NULL, "Device is unprotected (unimplemented)" },
   { 0 }
 };
 
 DEBTAB cdr_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "LOCATION",    DBG_DLOC,       "Display address for I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DLOC },
   { NULL }
 };
@@ -1413,8 +1506,7 @@ DEVICE cdr_dev = {
   NULL, NULL, NULL,
   &CDRdev,
   DEV_DEBUG | DEV_NOEQUIP | DEV_INDEV | DEV_PROTECT, 0, cdr_deb,
-  NULL,
-  NULL
+  NULL, NULL, NULL, NULL, NULL, NULL
 };
 
 /* Unit service */

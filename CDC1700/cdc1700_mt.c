@@ -107,7 +107,6 @@ extern void loadBootstrap(uint16 *, int, uint16, uint16);
 
 extern t_stat checkReset(DEVICE *, uint8);
 
-extern t_stat show_debug(FILE *, UNIT *, int32, CONST void *);
 extern t_stat show_addr(FILE *, UNIT *, int32, CONST void *);
 
 extern t_stat set_protected(UNIT *, int32, CONST char *, void *);
@@ -296,6 +295,8 @@ enum IOstatus MTout(IO_DEVICE *, uint8);
 enum IOstatus MTBDCin(IO_DEVICE *, uint16 *, uint8);
 enum IOstatus MTBDCout(IO_DEVICE *, uint16 *, uint8);
 
+t_stat mt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
+
 /*
         1732-3 Magnetic Tape Controller
 
@@ -450,42 +451,49 @@ UNIT mt_unit[] = {
 };
 
 REG mt_reg_1732_A[] = {
-  { HRDATA(FUNCTION, MTdev.FUNCTION, 16) },
-  { HRDATA(STATUS, MTdev.STATUS, 16) },
-  { HRDATA(UNITSEL, MTdev.iod_writeR[2], 16) },
-  { HRDATA(STATUS2, MTdev.STATUS2, 16) },
-  { HRDATA(IENABLE, MTdev.IENABLE, 16) },
+  { HRDATAD(FUNCTION, MTdev.FUNCTION, 16, "Last director status issued") },
+  { HRDATAD(STATUS, MTdev.STATUS, 16, "Director status register") },
+  { HRDATAD(UNITSEL, MTdev.iod_writeR[2], 16, "Last Unit Select issued") },
+  { HRDATAD(STATUS2, MTdev.STATUS2, 16, "Transport status register") },
+  { HRDATAD(IENABLE, MTdev.IENABLE, 16, "Interrupts enabled") },
   { NULL }
 };
 
 REG mt_reg_1732_3[] = {
-  { HRDATA(FUNCTION, MTdev.FUNCTION, 16) },
-  { HRDATA(STATUS, MTdev.STATUS, 16) },
-  { HRDATA(UNITSEL, MTdev.iod_writeR[2], 16) },
-  { HRDATA(STATUS2, MTdev.STATUS2, 16) },
-  { HRDATA(IENABLE, MTdev.IENABLE, 16) },
-  { HRDATA(BUFFEREDIO, MTdev.BUFFEREDIO, 16) },
-  { HRDATA(CURADDRESS, MTdev.CURADDRESS, 16) },
-  { HRDATA(LASTADDRESS, MTdev.iod_LWA, 16) },
+  { HRDATAD(FUNCTION, MTdev.FUNCTION, 16, "Last director status issued") },
+  { HRDATAD(STATUS, MTdev.STATUS, 16, "Director status register") },
+  { HRDATAD(UNITSEL, MTdev.iod_writeR[2], 16, "Last Unit Select issued") },
+  { HRDATAD(STATUS2, MTdev.STATUS2, 16, "Transport status register") },
+  { HRDATAD(IENABLE, MTdev.IENABLE, 16, "Interrupts enabled") },
+  { HRDATAD(BUFFEREDIO, MTdev.BUFFEREDIO, 16, "Last Buffered I/O issued") },
+  { HRDATAD(CURADDRESS, MTdev.CURADDRESS, 16, "Current DSA address") },
+  { HRDATAD(LASTADDRESS, MTdev.iod_LWA, 16, "Last DSA address") },
   { NULL }
 };
 
 MTAB mt_mod[] = {
-  { MTUF_WLK, 0, "write enabled", "WRITEENABLED", &mt_vlock },
-  { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &mt_vlock },
-  { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT", &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY", &sim_tape_set_capac, &sim_tape_show_capac, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "TYPE", &mt_set_type, NULL, NULL,
-    "TYPE={1732-A|1732-3}" },
-  { MTAB_XTD|MTAB_VDV, 0, "TYPE", NULL, NULL, &mt_show_type, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL, NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "EQUIPMENT", &set_equipment, NULL, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, "TRANSPORT", NULL, NULL, &mt_show_transport, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT", &set_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT", &clr_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT", &set_protected, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT", &clear_protected, NULL, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "TYPE", "TYPE={1732-A|1732-3}",
+    &mt_set_type, &mt_show_type, NULL, "Set/Display magtape controller type" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT=hexAddress",
+    &set_equipment, &show_addr, NULL, "Set/Display equipment address" },
+  { MTUF_WLK, 0, "write enabled", "WRITEENABLED",
+    &mt_vlock, NULL, NULL, "Mark transport as write enabled" },
+  { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED",
+    &mt_vlock, NULL, NULL, "Mark transport as writed locked" },
+  { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+    &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, "Define tape format" },
+  { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+    &sim_tape_set_capac, &sim_tape_show_capac, NULL, "Specify tape capacity" },
+  { MTAB_XTD|MTAB_VUN, 0, "TRANSPORT", NULL,
+    NULL, &mt_show_transport, NULL, "Display type of tape transport" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT",
+    &set_stoponrej, NULL, NULL, "Stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT",
+    &clr_stoponrej, NULL, NULL, "Don't stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT",
+    &set_protected, NULL, NULL, "Device is protected (unimplemented)" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT",
+    &clear_protected, NULL, NULL, "Device is unprotected (unimplemented)" },
   { 0 }
 };
 
@@ -509,18 +517,18 @@ MTAB mt_mod[] = {
 #define DBG_SELECT      (1 << DBG_V_SELECT)
 
 DEBTAB mt_deb[] = {
-  { "STATE", DBG_DSTATE },
-  { "TRACE", DBG_DTRACE },
-  { "INTR", DBG_DINTR },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
-  { "OPS", DBG_OPS },
-  { "READ", DBG_READ },
-  { "RDATA", DBG_RDATA },
-  { "WDATA", DBG_WDATA },
-  { "MTIO", DBG_MTIO },
-  { "DENS", DBG_DENS },
-  { "SELECT", DBG_SELECT },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "INTR",        DBG_DINTR,      "Display device interrupt requests" },
+  { "LOCATION",    DBG_DLOC,       "Display address of I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
+  { "OPS",         DBG_OPS,        "Trace tape transport operations" },
+  { "READ",        DBG_READ,       "Dump read records" },
+  { "RDATA",       DBG_RDATA,      "Dump programmed I/O read data" },
+  { "WDATA",       DBG_WDATA,      "Dump programmed I/O write data" },
+  { "MTIO",        DBG_MTIO,       "Trace tape library routine calls" },
+  { "DENS",        DBG_DENS,       "Trace denisty select changes" },
+  { "SELECT",      DBG_SELECT,     "Trace transport select/de-select" },
   { NULL }
 };
 
@@ -532,8 +540,7 @@ DEVICE mt_dev = {
   &MTdev,
   DEV_DEBUG | DEV_TAPE | DEV_DISABLE | DEV_INDEV | DEV_OUTDEV | DEV_PROTECT,
   0, mt_deb,
-  NULL,
-  NULL
+  NULL, NULL, &mt_help, NULL, NULL, NULL
 };
 
 /* MT trace routine */
@@ -777,11 +784,11 @@ t_stat mt_show_type(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
   switch (MTdev.iod_type) {
     case DEVTYPE_1732_A:
-      fprintf(st, "1732-A");
+      fprintf(st, "1732-A Magnetic Tape Controller");
       break;
 
     case DEVTYPE_1732_3:
-      fprintf(st, "1733-3");
+      fprintf(st, "1733-3 Magnetic Tape Controller");
       break;
 
     default:
@@ -1970,4 +1977,44 @@ enum IOstatus MTBDCout(IO_DEVICE *iod, uint16 *data, uint8 reg)
       break;
   }
   return IO_REJECT;
+}
+
+t_stat mt_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The %D device is either a 1732-A or 1732-3 magtape controller.\n"
+    "1 Hardware Description\n"
+    " The %D device consists of either a 1732-A or 1732-3 controller along\n"
+    " with 4 tape transports. The type con controller present may be changed\n"
+    " by:\n\n"
+    "+sim> SET %D 1732-A\n"
+    "+sim> SET %D 1732-3\n\n"
+    " The first 3 transports (MT0, MT1, MT2) are 9-track drives and MT3 is a\n"
+    " 7-track drive. Each drive may be individually write-locked or\n"
+    " write-enabled with:\n\n"
+    "+sim> SET %U LOCKED\n"
+    "+sim> SET %U WRITEENABLED\n\n"
+    " The 1732-A controller can only perform I/O 1 or 2 bytes at a time. In\n"
+    " order to use DMA it must be coupled with a 1706-A. Due to the lack of\n"
+    " DMA it can only support 200, 556 and 800 BPI on 9-track transports.\n\n"
+    " The 1732-3 is a newer controller which has DMA capability built in. It\n"
+    " loses the ability to handle 200 BPI tape but adds the ability to access\n"
+    " 1600 BPI phase encoded tapes.\n"
+    "2 Equipment Address\n"
+    " Magtape controllers are typically set to equipment address 7. This\n"
+    " address may be changed by:\n\n"
+    "+sim> SET %D EQUIPMENT=hexValue\n\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device. These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation. STATUS and\n"
+    " STATUS2 always contains the current status of the device as it would be\n"
+    " read by an application program.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET and ATTACH commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
 }

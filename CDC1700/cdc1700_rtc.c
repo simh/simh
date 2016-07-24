@@ -37,7 +37,6 @@ extern char INTprefix[];
 
 extern t_stat checkReset(DEVICE *, uint8);
 
-extern t_stat show_debug(FILE *, UNIT *, int32, CONST void *);
 extern t_stat show_addr(FILE *, UNIT *, int32, CONST void *);
 
 extern t_stat set_equipment(UNIT *, int32, CONST char *, void *);
@@ -59,6 +58,8 @@ enum IOstatus RTCout(IO_DEVICE *, uint8);
 
 t_stat rtc_svc(UNIT *);
 t_stat rtc_reset(DEVICE *);
+
+t_stat rtc_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 /*
         10336-1 Real-Time Clock
@@ -161,25 +162,23 @@ UNIT rtc_unit = {
 };
 
 REG rtc_reg[] = {
-  { HRDATA(FUNCTION, RTCdev.FUNCTION, 16) },
-  { HRDATA(COUNTER, RTCdev.COUNTER, 16) },
-  { HRDATA(HOLDING, RTCdev.HOLDREG, 16) },
+  { HRDATAD(FUNCTION, RTCdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(COUNTER, RTCdev.COUNTER, 16, "Counter register") },
+  { HRDATAD(HOLDING, RTCdev.HOLDREG, 16, "Hold register") },
   { NULL }
 };
 
 MTAB rtc_mod[] = {
-  { MTAB_XTD|MTAB_VDV, 0, "10336-1", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "RATE", &rtc_set_rate, NULL, NULL,
-    "val={1usec|10usec|100usec|1msec|10msec|100msec|1second}" },
-  { MTAB_XTD|MTAB_VDV, 0, "RATE", NULL, NULL, &rtc_show_rate, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL, NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "EQUIPMENT", &set_equipment, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "10336-1 Real Time Clock" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT=hexAddress",
+    &set_equipment, &show_addr, NULL, "Display equipment address" },
+  { MTAB_XTD|MTAB_VDV, 0, "RATE", "RATE={1usec|10usec|100usec|1msec|10msec|100msec|1second}",
+    &rtc_set_rate, &rtc_show_rate, NULL, "Show timer tick interval" },
   { 0 }
 };
 
 DEBTAB rtc_deb[] = {
-  { "TRACE", DBG_DTRACE },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
   { NULL }
 };
 
@@ -190,8 +189,7 @@ DEVICE rtc_dev = {
   NULL, NULL, NULL,
   &RTCdev,
   DEV_DEBUG | DEV_DISABLE, 0, rtc_deb,
-  NULL,
-  NULL
+  NULL, NULL, &rtc_help, NULL, NULL, NULL
 };
 
 t_stat rtc_show_rate(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
@@ -338,4 +336,36 @@ enum IOstatus RTCout(IO_DEVICE *iod, uint8 reg)
       break;
   }
   return IO_REPLY;
+}
+
+t_stat rtc_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The %D device 10336-1 Real Time Clock.\n"
+    "1 Hardware Description\n"
+    " The 10336-1 is a Real Time Clock which can generate periodic interrupts\n"
+    " or measure elapsed time. The timer resolution is set via jumpers on the\n"
+    " physical hardware. For the simulator, the resolution can be changed by:\n\n"
+    "+sim> SET %D RATE=1usec\n"
+    "+sim> SET %D RATE=10usec\n"
+    "+sim> SET %D RATE=100usec\n"
+    "+sim> SET %D RATE=1msec\n"
+    "+sim> SET %D RATE=10msec\n"
+    "+sim> SET %D RATE=100msec\n"
+    "+sim> SET %D RATE=1second\n\n"
+    "2 Equipment Address\n"
+    " The %D device is set to equipment address 13. This address may be\n"
+    " changed by:\n\n"
+    "+sim> SET %D EQUIPMENT=hexValue\n\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device. These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
 }

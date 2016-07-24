@@ -46,8 +46,8 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
         sim> set lp type=1742
         sim> att lp MSOSinstall.lpt
         LP: creating new file
-        sim> att cd0 MSOS5.dsk
-        CD: creating new file
+        sim> att cdd0 MSOS5.dsk
+        CDD: creating new file
         sim> boot mt0
 
         MSOS 5.0 SYSTEM INITIALIZER 
@@ -548,7 +548,7 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
           POWERU
           INITIALIZATION COMPLETED - YOU MAY AUTOLOAD 
         Simulation stopped, P: 5914 (  18FF                    JMP*    $FF)
-        sim> autoload cd
+        sim> autoload cdd
         sim> run 0
 
 

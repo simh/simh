@@ -14,8 +14,9 @@ mostly from the early period of its release:
 
         device name     Hardware
 
-        CPU             1714 CPU with up to 32KW of memory in 4KW increments
-                        1705 Interrupt/Data channel option
+        CPU             1714 CPU with 4KW, 8KW, 16KW or 32KW of memory
+                        1705 Multi-Level Interrupt and Direct Storage Access
+                        Bus
 
                         Optional extensions:
 
@@ -70,7 +71,7 @@ mostly from the early period of its release:
 
                         [Equipment address: 0x3]
 
-        CD              1733-2 Cartridge disk pack controller. Supports up to
+        CDD             1733-2 Cartridge disk pack controller. Supports up to
                         4 cartridge disk drives. Each drive supports a fixed
                         and a removeable disk:
 
@@ -80,13 +81,13 @@ mostly from the early period of its release:
                         [Equipment address: 0x3]
 
 Notes:
-        DP and CD use the same equipment address so only 1 of them may be
-        enabled (default is for CD to be enabled).
+        DP and CDD use the same equipment address so only 1 of them may be
+        enabled (default is for CDD to be enabled).
 
         Both controllers use checkwords (CRC) for validating the consistency
         of the data stored on disk. The DP controller exports a single status
         bit indicating whether the checkword is valid or not (the simulator
-        always sets this to valid). The CD controller also exports a single
+        always sets this to valid). The CDD controller also exports a single
         status bit  which is handled in the same way as the DP controller.
         It also makes the actual checkword value available. The simulator
         always returns a checkword value of 0 so any attempt to verify the

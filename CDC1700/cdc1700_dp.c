@@ -45,7 +45,6 @@ extern void fw_IOintr(t_bool, DEVICE *, IO_DEVICE *, uint16, uint16, uint16, con
 
 extern t_stat checkReset(DEVICE *, uint8);
 
-extern t_stat show_debug(FILE *, UNIT *, int32, CONST void *);
 extern t_stat show_addr(FILE *, UNIT *, int32, CONST void *);
 
 extern t_stat set_protected(UNIT *, int32, CONST char *, void *);
@@ -134,8 +133,10 @@ enum IOstatus DPin(IO_DEVICE *, uint8);
 enum IOstatus DPout(IO_DEVICE *, uint8);
 t_bool DPintr(IO_DEVICE *);
 
+t_stat dp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
+
 /*
-        1738-A/B Disk Pack Controller
+        1738-B Disk Pack Controller
 
    Addresses
                                 Computer Instruction
@@ -257,38 +258,47 @@ UNIT dp_unit[] = {
 };
 
 REG dp_reg[] = {
-  { HRDATA(FUNCTION, DPdev.FUNCTION, 16) },
-  { HRDATA(STATUS, DPdev.STATUS, 16) },
-  { HRDATA(IENABLE, DPdev.IENABLE, 16) },
-  { HRDATA(ADDRSTATUS, DPdev.ADDRSTATUS, 16) },
+  { HRDATAD(FUNCTION, DPdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(STATUS, DPdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, DPdev.IENABLE, 16, "Interrupts enabled") },
+  { HRDATAD(ADDRSTATUS, DPdev.ADDRSTATUS, 16, "Address register status") },
   { NULL }
 };
 
 MTAB dp_mod[] = {
-  { MTAB_XTD|MTAB_VDV, 0, "1738-B", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL, NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "EQUIPMENT", &set_equipment, NULL, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, "DRIVE", NULL, NULL, &show_drive, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, NULL, "853", &set_dp853, NULL, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, NULL, "854", &set_dp854, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT", &set_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT", &clr_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL,"PROTECT", &set_protected, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT", &clear_protected, NULL, NULL},
-  { MTAB_XTD|MTAB_VDV, 0, "ADDRESSING", NULL, NULL, &show_addressing, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NORMAL", &set_normal, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "REVERSE", &set_reverse, NULL, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "1738-B Disk Pack Controller" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT=hexAddress",
+    &set_equipment, &show_addr, NULL, "Display equipment address" },
+  { MTAB_XTD|MTAB_VUN, 0, "DRIVE", NULL,
+    NULL, &show_drive, NULL, "Display type of drive (853 or 854" },
+  { MTAB_XTD|MTAB_VUN, 0, NULL, "853",
+    &set_dp853, NULL, NULL, "Set drive type to 853" },
+  { MTAB_XTD|MTAB_VUN, 0, NULL, "854",
+    &set_dp854, NULL, NULL, "Set drive type to 854" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT",
+    &set_stoponrej, NULL, NULL, "Stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT",
+    &clr_stoponrej, NULL, NULL, "Don't stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL,"PROTECT",
+    &set_protected, NULL, NULL, "Device is protected (unimplemented)" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT",
+    &clear_protected, NULL, NULL, "Device is unprotected (unimplemented)"},
+  { MTAB_XTD|MTAB_VDV, 0, "ADDRESSING", NULL,
+    NULL, &show_addressing, NULL, "Display disk addressing mode" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NORMAL",
+    &set_normal, NULL, NULL, "Normal addressing mode: drive 0 then 1" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "REVERSE",
+    &set_reverse, NULL, NULL, "Reverse addressing mode: drive 1 then 0" },
   { 0 }
 };
 
 DEBTAB dp_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "INTR", DBG_DINTR },
-  { "ERROR", DBG_DERROR },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "INTR",        DBG_DINTR,      "Display device interrupt requests" },
+  { "ERROR",       DBG_DERROR,     "Display device errors" },
+  { "LOCATION",    DBG_DLOC,       "Display address of I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DINTR | DBG_DERROR | DBG_DLOC },
   { NULL }
 };
@@ -302,8 +312,7 @@ DEVICE dp_dev = {
   DEV_DEBUG | DEV_DISK | DEV_DISABLE | \
   DEV_DIS | DEV_INDEV | DEV_OUTDEV | DEV_PROTECT,
   0, dp_deb,
-  NULL,
-  NULL
+  NULL, NULL, &dp_help, NULL, NULL, NULL
 };
 
 /*
@@ -1099,4 +1108,39 @@ t_stat DPautoload(void)
     return SCPE_OK;
   }
   return SCPE_UNATT;
+}
+
+t_stat dp_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The %D device is a 1738-B disk pack controller.\n"
+    "1 Hardware Description\n"
+    " The 1738-B consists of a controller with up to 2 attached disk drives.\n"
+    " The controller includes a jumper which controls which drive is\n"
+    " addressed as logical disk 0:\n\n"
+    "+sim> SET %D NORMAL\n"
+    "+sim> SET %D REVERSE\n\n"
+    " Each physical drive may be configured as a 853 or 854:\n\n"
+    "+853 drive: 1536000 words per drive\n"
+    "+854 drive: 3118080 words per drive\n\n"
+    " The configuration may be changed by:\n\n"
+    "+sim> SET %U 853\n"
+    "+sim> SET %U 854\n"
+    "2 Equipment Address\n"
+    " Disk controllers are typically set to equipment address 3. This address\n"
+    " may be changed by:\n\n"
+    "+sim> SET %D EQUIPMENT=hexValue\n\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device. These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation. STATUS always\n"
+    " contains the current status of the device as it would be read by an\n"
+    " application program.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET and ATTACH commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
 }

@@ -51,7 +51,6 @@ extern void rebuildPending(void);
 
 extern t_stat checkReset(DEVICE *, uint8);
 
-extern t_stat show_debug(FILE *, UNIT *, int32, CONST void *);
 extern t_stat show_addr(FILE *, UNIT *, int32, CONST void *);
 
 extern t_stat set_protected(UNIT *, int32, CONST char *, void *);
@@ -82,6 +81,8 @@ static t_stat show_addressing(FILE *, UNIT *, int32, CONST void *);
 
 t_stat set_cartfirst(UNIT *, int32, CONST char *, void *);
 t_stat set_fixedfirst(UNIT *, int32, CONST char *, void *);
+
+t_stat cd_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 /* Constants */
 
@@ -351,53 +352,61 @@ UNIT cd_unit[] = {
 };
 
 REG cd_reg[] = {
-  { HRDATA(FUNCTION, CDdev.FUNCTION, 16) },
-  { HRDATA(STATUS, CDdev.STATUS, 16) },
-  { HRDATA(IENABLE, CDdev.IENABLE, 16) },
+  { HRDATAD(FUNCTION, CDdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(STATUS, CDdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, CDdev.IENABLE, 16, "Interrupts enabled") },
   /*** more ***/
   { NULL }
 };
 
 MTAB cd_mod[] = {
-  { MTAB_XTD|MTAB_VDV, 0, "1733-2", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL, NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "EQUIPMENT", &set_equipment, NULL, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, "DRIVE", NULL, NULL, &show_drive, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, NULL, "856-2", &set_cd856_2, NULL, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, NULL, "856-4", &set_cd856_4, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT", &set_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT", &clr_stoponrej, NULL, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "1733-2 Cartridge Disk Drive Controller" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT=hexAddress",
+    &set_equipment, &show_addr, NULL, "Display equipment address" },
+  { MTAB_XTD|MTAB_VUN, 0, "DRIVE", NULL,
+    NULL, &show_drive, NULL, "Display type of drive (856-2 or 856-4)" },
+  { MTAB_XTD|MTAB_VUN, 0, NULL, "856-2",
+    &set_cd856_2, NULL, NULL, "Set drive type to 856-2" },
+  { MTAB_XTD|MTAB_VUN, 0, NULL, "856-4",
+    &set_cd856_4, NULL, NULL, "Set drive type to 856-4" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT",
+    &set_stoponrej, NULL, NULL, "Stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT",
+    &clr_stoponrej, NULL, NULL, "Don't stop simulation if I/O is rejected" },
   /*** should protect be per-unit? ***/
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT", &set_protected, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT", &clear_protected, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "ADDRESSING", NULL, NULL, &show_addressing, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "CARTFIRST", &set_cartfirst, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "FIXEDFIRST", &set_fixedfirst, NULL, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT",
+    &set_protected, NULL, NULL, "Device is protected (unimplemented)" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT",
+    &clear_protected, NULL, NULL, "Device is unprotected (unimplemented)"  },
+  { MTAB_XTD|MTAB_VDV, 0, "ADDRESSING", NULL,
+    NULL, &show_addressing, NULL, "Show disk addressing mode" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "CARTFIRST",
+    &set_cartfirst, NULL, NULL, "Set cartridge as logical disk 0" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "FIXEDFIRST",
+    &set_fixedfirst, NULL, NULL, "Set fixec disk as logical disk 0" },
   { 0 }
 };
 
 DEBTAB cd_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "INTR", DBG_DINTR },
-  { "ERROR", DBG_DERROR },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "INTR",        DBG_DINTR,      "Display device interrupt requests" },
+  { "ERROR",       DBG_DERROR,     "Display device errors" },
+  { "LOCATION",    DBG_DLOC,       "Display address for I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DINTR | DBG_DERROR | DBG_DLOC },
   { NULL }
 };
 
 DEVICE cd_dev = {
-  "CD", cd_unit, cd_reg, cd_mod,
+  "CDD", cd_unit, cd_reg, cd_mod,
   CD_NUMDR * 2, 10, 31, 1, 8, 8,
   NULL, NULL, &cd_reset,
   NULL, &cd_attach, &cd_detach,
   &CDdev,
   DEV_DEBUG | DEV_DISK | DEV_DISABLE | DEV_INDEV | DEV_OUTDEV | DEV_PROTECT,
   0, cd_deb,
-  NULL,
-  NULL
+  NULL, NULL, &cd_help, NULL, NULL, NULL
 };
 
 /*
@@ -1324,4 +1333,42 @@ t_stat CDautoload(void)
     return SCPE_OK;
   }
   return SCPE_UNATT;
+}
+
+t_stat cd_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The %D device is a 1733-2 cartridge disk drive controller.\n"
+    "1 Hardware Description\n"
+    " The 1733-2 consists of a controller with up to 4 attached disk drives.\n"
+    " Each drive consists of 2 logical disks; a removeable disk pack and a\n"
+    " fixed disk. The controller includes a jumper which controls which disk\n"
+    " is addressed as logical disk 0:\n\n"
+    "+sim> SET %D CARTFIRST\n"
+    "+sim> SET %D FIXEDFIRST\n\n"
+    " Each physical drive may be configured as a 856-2 or 856-4 and both the\n"
+    " fixed and removeable disks must be the same size.\n\n"
+    "+856-2 drive: 1130304 words per disk\n"
+    "+856-4 drive: 2271744 words per disk\n\n"
+    " The configuration may be changed by referencing either of the logical\n"
+    " disks present on a drive:\n\n"
+    "+sim> SET %U 856-2\n"
+    "+sim> SET %U 856-4\n\n"
+    "2 Equipment Address\n"
+    " Disk controllers are typically set to equipment address 3. This address\n"
+    " may be changed by:\n\n"
+    "+sim> SET %D EQUIPMENT=hexValue\n\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device. These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation. STATUS always\n"
+    " contains the current status of the device as it would be read by an\n"
+    " application program.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET and ATTACH commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
 }

@@ -53,8 +53,6 @@ extern enum IOstatus fw_doBDCIO(IO_DEVICE *, uint16 *, t_bool, uint8);
 extern uint16 LoadFromMem(uint16);
 extern t_bool IOStoreToMem(uint16, uint16, t_bool);
 
-extern t_stat show_debug(FILE *, UNIT *, int32, CONST void *);
-
 t_stat set_intr(UNIT *uptr, int32 val, CONST char *, void *);
 t_stat show_intr(FILE *, UNIT *, int32, CONST void *);
 t_stat show_target(FILE *, UNIT *, int32, CONST void *);
@@ -66,6 +64,8 @@ void DCstate(const char *, DEVICE *, IO_DEVICE *);
 t_bool DCreject(IO_DEVICE *, t_bool, uint8);
 enum IOstatus DCin(IO_DEVICE *, uint8);
 enum IOstatus DCout(IO_DEVICE *, uint8);
+
+t_stat dc_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 /*
         1706-A Buffered Data Channel
@@ -203,46 +203,46 @@ UNIT dcc_unit[] = {
 };
 
 REG dca_reg[] = {
-  { HRDATA(STATUS, DCAdev.iod_readR[2], 16) },
-  { HRDATA(CWA, DCAdev.iod_CWA, 16) },
-  { HRDATA(NEXT, DCAdev.iod_nextAddr, 16) },
-  { HRDATA(LWA, DCAdev.iod_LWA, 16) },
-  { HRDATA(IENABLE, DCAdev.IENABLE, 16) },
+  { HRDATAD(STATUS, DCAdev.iod_readR[2], 16, "1706 Status") },
+  { HRDATAD(CWA, DCAdev.iod_CWA, 16, "1706 Current Address") },
+  { HRDATAD(NEXT, DCAdev.iod_nextAddr, 16, "Next transfer address") },
+  { HRDATAD(LWA, DCAdev.iod_LWA, 16, "Last word address") },
+  { HRDATAD(IENABLE, DCAdev.IENABLE, 16, "Interrupt enabled") },
   { NULL }
 };
 
 REG dcb_reg[] = {
-  { HRDATA(STATUS, DCBdev.iod_readR[2], 16) },
-  { HRDATA(CWA, DCBdev.iod_CWA, 16) },
-  { HRDATA(NEXT, DCBdev.iod_nextAddr, 16) },
-  { HRDATA(LWA, DCBdev.iod_LWA, 16) },
-  { HRDATA(IENABLE, DCBdev.IENABLE, 16) },
+  { HRDATAD(STATUS, DCBdev.iod_readR[2], 16, "1706 Status") },
+  { HRDATAD(CWA, DCBdev.iod_CWA, 16, "1706 Current Address") },
+  { HRDATAD(NEXT, DCBdev.iod_nextAddr, 16, "Next transfer address") },
+  { HRDATAD(LWA, DCBdev.iod_LWA, 16, "Last word address") },
+  { HRDATAD(IENABLE, DCBdev.IENABLE, 16, "Interrupt enabled") },
   { NULL }
 };
 
 REG dcc_reg[] = {
-  { HRDATA(STATUS, DCCdev.iod_readR[2], 16) },
-  { HRDATA(CWA, DCCdev.iod_CWA, 16) },
-  { HRDATA(NEXT, DCCdev.iod_nextAddr, 16) },
-  { HRDATA(LWA, DCCdev.iod_LWA, 16) },
-  { HRDATA(IENABLE, DCCdev.IENABLE, 16) },
+  { HRDATAD(STATUS, DCCdev.iod_readR[2], 16, "1706 Status") },
+  { HRDATAD(CWA, DCCdev.iod_CWA, 16, "1706 Current Address") },
+  { HRDATAD(NEXT, DCCdev.iod_nextAddr, 16, "Next transfer address") },
+  { HRDATAD(LWA, DCCdev.iod_LWA, 16, "Last word address") },
+  { HRDATAD(IENABLE, DCCdev.IENABLE, 16, "Interrupt enabled") },
   { NULL }
 };
 
 MTAB dc_mod[] = {
-  { MTAB_XTD|MTAB_VDV, 0, "1706-A", NULL, NULL, NULL },
-  { MTAB_XTD|MTAB_VUN, 0, "TARGET", NULL, NULL, &show_target, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "INTERRUPT", &set_intr, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "INTERRUPT", NULL, NULL, &show_intr, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "1706-A Buffered Data Channel" },
+  { MTAB_XTD|MTAB_VDV, 0, "TARGET", NULL,
+    NULL, &show_target, NULL, "Display devices attached to the data channel" },
+  { MTAB_XTD|MTAB_VDV, 0, "INTERRUPT", "INTERRUPT=hexValue",
+    &set_intr, &show_intr, NULL, "Display data channel interrupt" },
   { 0 }
 };
 
 DEBTAB dc_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "INTR", DBG_DINTR },
-  { "LOCATION", DBG_DLOC },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "INTR",        DBG_DINTR,      "Display device interrupt requests" },
+  { "LOCATION",    DBG_DLOC,       "Display address for I/O instructions" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DINTR | DBG_DLOC },
   { NULL }
 };
@@ -254,12 +254,7 @@ DEVICE dca_dev = {
   NULL, NULL, NULL,
   &DCAdev,
   DEV_DEBUG | DEV_NOEQUIP | DEV_INDEV | DEV_OUTDEV, 0, dc_deb,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL
+  NULL, NULL, &dc_help, NULL, NULL, NULL
 };
 
 DEVICE dcb_dev = {
@@ -269,12 +264,7 @@ DEVICE dcb_dev = {
   NULL, NULL, NULL,
   &DCBdev,
   DEV_DEBUG | DEV_NOEQUIP | DEV_INDEV | DEV_OUTDEV, 0, dc_deb,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL
+  NULL, NULL, &dc_help, NULL, NULL, NULL
 };
 
 DEVICE dcc_dev = {
@@ -284,12 +274,7 @@ DEVICE dcc_dev = {
   NULL, NULL, NULL,
   &DCCdev,
   DEV_DEBUG | DEV_NOEQUIP | DEV_INDEV | DEV_OUTDEV, 0, dc_deb,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL
+  NULL, NULL, &dc_help, NULL, NULL, NULL
 };
 
 static DEVICE *dc_devices[IO_1706_MAX] = {
@@ -541,17 +526,17 @@ t_stat show_intr(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
  */
 t_stat show_target(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-  DEVICE *dptr;
   IO_DEVICE *iod;
 
   if (uptr == NULL)
     return SCPE_IERR;
 
-  iod = (IO_DEVICE *)uptr->up8;
-  dptr = iod->iod_indev;
+  if ((iod = (IO_DEVICE *)uptr->up8) != NULL) {
+    DEVICE *dptr = iod->iod_indev;
 
-  fprintf(st, "Target: %s (%s), Equip: %d",
-          sim_dname(dptr), iod->iod_model, iod->iod_equip);
+    fprintf(st, "\n\tTarget: %s (%s), Equip: %d",
+            sim_dname(dptr), iod->iod_model, iod->iod_equip);
+  }
   return SCPE_OK;
 }
 
@@ -792,4 +777,31 @@ uint16 dcINTR(void)
     result |= DCCdev.iod_interrupt;
 
   return result;
+}
+
+t_stat dc_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    " The %D device is a 1706-A buffered data channel.\n"
+    "1 Hardware Description\n"
+    " The 1706-A consists of a controller which can control up to 8 other\n"
+    " controllers to provide them with direct memory access. Up to 3\n"
+    " 1706-A's may be connected to the CPU. All 3 buffered data channels are\n"
+    " available in the simulator but only channel 1 (DCA) is connected to a\n"
+    " peripheral (the magtape controller) and only if that controller is\n"
+    " configured as a 1732-A. Unlike actual hardware, the simulator allows\n"
+    " access to the magtape controller either through the A/Q channel or\n"
+    " through a 1706-A.\n\n"
+    " By default, the simulator does not assign an interrupt to a 1706-A. An\n"
+    " interrupt may be assigned with the command:\n\n"
+    "+sim> SET %D INTERRUPT=hexValue\n"
+    "2 Equipment Address\n"
+    " Unlike most peripherals, buffered data channels use private addresses\n"
+    " outside the normal 1 - 15 address range.\n"
+    "2 $Registers\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
 }

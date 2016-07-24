@@ -78,7 +78,6 @@ extern t_bool doDirectorFunc(DEVICE *, t_bool);
 
 extern t_stat checkReset(DEVICE *, uint8);
 
-extern t_stat show_debug(FILE *, UNIT *, int32, CONST void *);
 extern t_stat show_addr(FILE *, UNIT *, int32, CONST void *);
 
 extern t_stat set_stoponrej(UNIT *, int32, CONST char *, void *);
@@ -104,6 +103,8 @@ enum IOstatus LPin(IO_DEVICE *, uint8);
 enum IOstatus LPout(IO_DEVICE *, uint8);
 
 uint8 LPbuf[COLUMNS];
+
+t_stat lp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 /*
         1740, 1742-30 Line Printer
@@ -218,31 +219,33 @@ UNIT lp_unit = {
 };
 
 REG lp_reg_1740[] = {
-  { HRDATA(FUNCTION, LPdev.FUNCTION, 16) },
-  { HRDATA(FUNCTION2, LPdev.FUNCTION2, 16) },
-  { HRDATA(STATUS, LPdev.STATUS, 16) },
-  { HRDATA(IENABLE, LPdev.IENABLE, 16) },
+  { HRDATAD(FUNCTION, LPdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(FUNCTION2, LPdev.FUNCTION2, 16, "Last VFC function issued") },
+  { HRDATAD(STATUS, LPdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, LPdev.IENABLE, 16, "Interrupts enabled") },
   { NULL }
 };
 
 REG lp_reg_1742[] = {
-  { HRDATA(FUNCTION, LPdev.FUNCTION, 16) },
-  { HRDATA(STATUS, LPdev.STATUS, 16) },
-  { HRDATA(IENABLE, LPdev.IENABLE, 16) },
+  { HRDATAD(FUNCTION, LPdev.FUNCTION, 16, "Last director function issued") },
+  { HRDATAD(STATUS, LPdev.STATUS, 16, "Director status register") },
+  { HRDATAD(IENABLE, LPdev.IENABLE, 16, "Interrupts enabled") },
   { NULL }
 };
 
 MTAB lp_mod[] = {
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "TYPE", &lp_set_type, NULL, NULL,
-    "TYPE={1740|1742}" },
-  { MTAB_XTD|MTAB_VDV, 0, "TYPE", NULL, NULL, &lp_show_type, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "EQUIPMENT", &set_equipment, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL, NULL, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "DEBUG", NULL, NULL, &show_debug, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT", &set_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT", &clr_stoponrej, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT", &set_protected, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT", &clear_protected, NULL, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "TYPE", "TYPE={1740|1742}",
+    &lp_set_type, &lp_show_type, NULL, "Display printer controller type" },
+  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT=hexAddress",
+    &set_equipment, &show_addr, NULL, "Display equipment address" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT",
+    &set_stoponrej, NULL, NULL, "Stop simulation if I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT",
+    &clr_stoponrej, NULL, NULL, "Don't stop simulation is I/O is rejected" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT",
+    &set_protected, NULL, NULL, "Device is protected (unimplemented)" },
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT",
+    &clear_protected, NULL, NULL, "Device is unprotected (unimplemented)" },
   { 0 }
 };
 
@@ -254,13 +257,13 @@ MTAB lp_mod[] = {
 #define DBG_CC          (1 << DBG_V_CC)
 
 DEBTAB lp_deb[] = {
-  { "TRACE", DBG_DTRACE },
-  { "STATE", DBG_DSTATE },
-  { "INTR", DBG_DINTR },
-  { "LOCATION", DBG_DLOC },
-  { "FIRSTREJ", DBG_DFIRSTREJ },
+  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
+  { "STATE",       DBG_DSTATE,     "Display device state changes" },
+  { "INTR",        DBG_DINTR,      "Display device interrupt requests" },
+  { "LOCATION",    DBG_DLOC,       "Display address of I/O instructions" },
+  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
+  { "CC",          DBG_CC,         "Display carriage control requests" },
   { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DINTR | DBG_DLOC },
-  { "CC", DBG_CC },
   { NULL }
 };
 
@@ -271,19 +274,18 @@ DEVICE lp_dev = {
   NULL, NULL, NULL,
   &LPdev,
   DEV_DEBUG | DEV_DISABLE | DEV_OUTDEV | DEV_PROTECT, 0, lp_deb,
-  NULL,
-  NULL
+  NULL, NULL, &lp_help, NULL, NULL, NULL
 };
 
 t_stat lp_show_type(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
   switch (LPdev.iod_type) {
     case DEVTYPE_1740:
-      fprintf(st, "1740");
+      fprintf(st, "1740 Line Printer Controller");
       break;
 
     case DEVTYPE_1742:
-      fprintf(st, "1742-30");
+      fprintf(st, "1742-30 Line Printer Controller");
       break;
 
     default:
@@ -652,3 +654,31 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
   return IO_REPLY;
 }
 
+t_stat lp_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  const char helpString[] =
+    /****************************************************************************/
+    " The %D device is either a 1740 or 1742 line printer controller.\n"
+    "1 Hardware Description\n"
+    " The %D device consists of either a 1740 or 1742 controller along with\n"
+    " a physical line printer. The type of controller present may be changed\n"
+    " by:\n\n"
+    "+sim> SET %D TYPE=1740\n"
+    "+sim> SET %D TYPE=1742\n\n"
+    "2 Equipment Address\n"
+    " Line printer controllers are typically set to equipment address 4. This\n"
+    " address may be changed by:\n\n"
+    "+sim> SET %D EQUIPMENT=hexValue\n\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device. These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation. STATUS always\n"
+    " contains the current status of the device as it would be read by an\n"
+    " application program.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET and ATTACH commands\n"
+    "2 $Set commands\n";
+
+  return scp_help(st, dptr, uptr, flag, helpString, cptr);
+}
