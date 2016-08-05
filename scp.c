@@ -5691,6 +5691,8 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
         WRITE_I (uptr->u6);
         WRITE_I (uptr->flags);                          /* [V2.10] flags */
         WRITE_I (uptr->dynflags);
+        WRITE_I (uptr->wait);
+        WRITE_I (uptr->buf);
         WRITE_I (uptr->capac);                          /* [V3.5] capacity */
         if (uptr->flags & UNIT_ATT) {
             fputs (uptr->filename, sfile);
@@ -5926,6 +5928,8 @@ for ( ;; ) {                                            /* device loop */
         READ_I (flg);                                   /* [V2.10+] unit flags */
         if (v40) {                                      /* [V4.0+] dynflags */
             READ_I (uptr->dynflags);
+            READ_I (uptr->wait);
+            READ_I (uptr->buf);
             }
         old_capac = uptr->capac;                        /* save current capacity */
         if (v35) {                                      /* [V3.5+] capacity */
@@ -7406,6 +7410,29 @@ return (c & 0x80) ? 0 : isgraph (c);
 int sim_isalnum (char c)
 {
 return (c & 0x80) ? 0 : isalnum (c);
+}
+
+/* strncasecmp() is not available on all platforms */
+int sim_strncasecmp (const char* string1, const char* string2, size_t len)
+{
+size_t i;
+unsigned char s1, s2;
+
+for (i=0; i<len; i++) {
+    s1 = (unsigned char)string1[i];
+    s2 = (unsigned char)string2[i];
+    if (sim_islower (s1))
+        s1 = (unsigned char)toupper (s1);
+    if (sim_islower (s2))
+        s2 = (unsigned char)toupper (s2);
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
+    if (s1 == 0)
+        return 0;
+    }
+return 0;
 }
 
 /* get_yn               yes/no question

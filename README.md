@@ -32,6 +32,8 @@
 
 #### Intel Systems 8010 and 8020 simulators from Bill Beech
 
+#### CDC 1700 simulator from John Forecast
+
 ### New Host Platform support - HP-UX and AIX
 
 ### Simulator Front Panel API

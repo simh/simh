@@ -1,0 +1,588 @@
+Installing MSOS 5 on the CDC 1700 Simulator
+===========================================
+
+1. Overview.
+
+        A Mass Storage Operating System Version 5 (MSOS 5) distribution tape
+which will run on the CDC 1700 Simulator is available from bitsaver.org as
+bits/CDC/1700_Cyber18/20100524/MSOS5_SL136.tap. At the time, CDC would have
+tailored a distribution tape for the customers specific hardware and this
+tape was built for a 64KW 1784 system used by Exxon. Not all of the
+peripherals included in the system are implemented on the simulator due to
+lack of documentation but enough are available to perform a basic
+installation.
+
+2. Installation
+
+        Installation of MSOS 5 occurs in 2 phases:
+
+        - Phase 1
+
+          In Phase 1, the distribution tape is booted and the initializer
+          lays down a skeleton system on the cartridge disk.
+
+        - Phase 2
+
+          In Phase 2, the skeleton system is booted from the cartridge disk
+          and the batch subsystem is started to read and process a sequence
+          of batch jobs to complete the installation.
+
+It is important that both phases are within the same execution of the CDC
+1700 Simulator since phase 1 leaves the tape correctly positioned at the
+start of the batch jobs for phase 2.
+
+        The device drivers built into this version of MSOS 5 use specific
+versions of the magtape and line printer controllers. The type of these
+controllers must be set before attaching host data files. If the controller
+types are not set correctly, phase 1 of the installation will complete
+successfully but the batch subsystem will refuse to start.
+
+Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
+
+        CDC1700 simulator V4.0-0 Beta        git commit id: 9d2079df
+        sim> set cpu mode65k,64k
+        sim> set mt type=1732-3
+        sim> att mt0 MSOS5_SL136.tap 
+        sim> set lp type=1742
+        sim> att lp MSOSinstall.lpt
+        LP: creating new file
+        sim> att cdd0 MSOS5.dsk
+        CDD: creating new file
+        sim> boot mt0
+
+        MSOS 5.0 SYSTEM INITIALIZER 
+        FWA OF CONTRL = 5000
+
+
+        DATE MM/DD/YY 
+        07/14/88  <============================ Enter date
+
+        Q
+        *I,3 <================================= Distribution media is tape
+        *I,3
+
+        Q
+        *V <=================================== Start installation
+        *V
+        *V
+        *S,SYSMON,$3031 
+        *S,SYSDAY,$3236 
+        *S,SYSYER,$3832 
+        *S,SYSLVL,$3230 
+        *V
+        *V       1700 MASS STORAGE OPERATING SYSTEM - VER 5.0 
+        *V
+        *V       EXXON DEVELOPMENT SYSTEM 
+        *V
+        *YM,LIBEDT,1
+        *YM,LOADSD,2
+        *YM,JOBENT,3
+        *YM,JOBPRO,4
+        *YM,PROTEC,5
+        *YM,JPLOAD,6
+        *YM,JPCHGE,7
+        *YM,JPT13,8 
+        *YM,JCRDV4,9
+        *YM,JLGOV4,10 
+        *YM,JPSTV4,11 
+        *YM,NAMEV4,12 
+        *YM,JPFLV4,13 
+        *YM,AFILV4,14 
+        *YM,RESTOR,15 
+        *YM,RCOVER,16 
+        *YM,BRKPT,17
+        *YM,ODEBUG,18 
+        *YM,SYSCOP,19 
+        *YM,SYSSEG,20 
+        *YM,MIPRO,21
+        *YM,TDFUNC,22 
+        *YM,EFSTOR,23 
+        *YM,EFLIST,24 
+        *YM,VERIFY,25 
+        *YM,SCMM17,26 
+        *YM,DUMMY1,27 
+        *YM,DUMMY2,28 
+        *YM,DUMMY3,29 
+        *YM,DUMMY4,30 
+        *YM,DUMMY5,31 
+        *YM,DUMMY6,32 
+        *YM,DUMMY7,33 
+        *YM,DUMMY8,34 
+        *YM,DUMMY9,35 
+        *YM,DUMMY0,36 
+        *S,N4,$0800 
+        *S,END0V4,$7FFF 
+        *S,BGNMON,$8000 
+        *S,MSIZV4,$FFFF 
+        *S,SECTOR,$5BFA 
+        * 
+        *L       SYSTEM DATA PROGRAM
+        CS7C17
+            SYSDAT    0000     EXXON DEVELOPMENT SYSTEM            SUMMARY-122
+        *L       SPACE REQUEST PROCESSOR
+            SPACE     1C21      DECK-ID M29  MSOS 5.0              SUMMARY-136
+        * 
+        *         SYSTEM CORE RESIDENT PROGRAMS
+        * 
+        *LP      MONITOR
+            NMONI     8000      DECK-ID M10  MSOS 5.0              SUMMARY-136
+            RDISP     804D      DECK-ID M23  MSOS 5.0              SUMMARY-110
+            RW        81FF      DECK-ID M09  MSOS 5.0              SUMMARY-110
+            T14       82AD      DECK-ID M26  MSOS 5.0              SUMMARY-110
+            T16       82BE      DECK-ID M04  MSOS 5.0              SUMMARY-110
+            PARAME    82C9      DECK-ID M03  MSOS 5.0              SUMMARY-110
+            COMMON    833A      DECK-ID M13  MSOS 5.0              SUMMARY-110
+            NIPROC    8361      DECK-ID M12  MSOS 5.0              SUMMARY-118
+            ALVOL     83F3      DECK-ID M16  MSOS 5.0              SUMMARY-110
+            OFVOL     8410      DECK-ID M15  MSOS 5.0              SUMMARY-110
+            ALCORE    841D      DECK-ID M17  MSOS 5.0              SUMMARY-110
+            DCORE     84CB      DECK-ID M19  MSOS 5.0              SUMMARY-110
+            PRTCDR    8634      DECK-ID M18  MSOS 5.0              SUMMARY-110
+            NFNR      884E      DECK-ID M21  MSOS 5.0              SUMMARY-141
+            NCMPRQ    88C7      DECK-ID M20  MSOS 5.0              SUMMARY-110
+            MAKQ      88F7      DECK-ID M08  MSOS 5.0              SUMMARY-110
+            ADEV      8925      DECK-ID M22  MSOS 5.0              SUMMARY-132
+            TMINT     8A98      DECK-ID M06  MSOS 5.0              SUMMARY-116
+            DTIMER    8B2A      DECK-ID M05  MSOS 5.0              SUMMARY-136
+            TOD       8B4D      DECK-ID M25  MSOS 5.0              SUMMARY-110
+            MINT      8B9C      DECK-ID M07  MSOS 5.0              SUMMARY-116
+            TRVEC     8CC6      DECK-ID M14  MSOS 5.0              SUMMARY-116
+        *LP      DEBUGGING / CHECKOUT 
+            SNAPOL    8D19      DECK-ID M02  MSOS 5.0              SUMMARY-110
+            DMP42X    8DD2      DECK-ID B17  PERIPH. DRIVERS 1.0B  SUMMARY-106
+            B17332    8EA1      DECK-ID B11  PERIPH. DRIVERS 1.0B  SUMMARY-106
+        *LP      FILE MANAGER 
+            FILMGR    8EF3      DECK-ID F01  FILE MANAGER 1.0      SUMMARY-124
+            RSPCV4    91DC      DECK-ID F02  FILE MANAGER          SUMMARY-116
+            SRHFIS    92CE      DECK-ID F03  FILE MANAGER          SUMMARY-110
+        *LP      CORE RESIDENT DRIVERS
+            EFDATA    94A0      DECK-ID M27  MSOS 5.0              SUMMARY-110
+            DUMMY     960D      DECK-ID M30  MSOS 5.0              SUMMARY-110
+            D1711     9630      DECK-ID B27  PERIPH. DRIVERS 1.0B  SUMMARY-106
+            D17332    97D8      DECK-ID B34  PERIPH. DRIVERS 1.0B  SUMMARY-119
+            D1752     9A77      DECK-ID A40  PERIPH. DRIVERS 1.0A  SUMMARY-106
+            DPSDSK    9C81      DECK-ID C90  PERIPH. DRIVERS 1.2C  SUMMARY-122
+            REWCK     9CB2      DECK-ID B78  PERIPH. DRIVERS 1.0B  SUMMARY-106
+            MMEXEC    9CCD      DECK-ID M01  MSOS 5.0              SUMMARY-132
+            D17432    9E60      DECK-ID B35  PERIPH. DRIVERS 1.0B  SUMMARY-115
+        *LP      REENTRANT FORTRAN RUNTIME LIBRARY
+            FORTR     A0A9      DECK-ID A01  FTN 3.3 RUNTIME       SUMMARY-102
+            Q8PRMR    A1ED      DECK-ID B01  FTN 3.3 RUNTIME       SUMMARY-102
+            PARABR    A217      DECK-ID B02  FTN 3.3 RUNTIME       SUMMARY-102
+            Q8F2IR    A228      DECK-ID B03  FTN 3.3 RUNTIME       SUMMARY-102
+            ABSR      A2D4      DECK-ID B04  FTN 3.3 RUNTIME       SUMMARY-102
+            SQRTFR    A2ED      DECK-ID B05  FTN 3.3 RUNTIME       SUMMARY-102
+            SIGNR     A348      DECK-ID B06  FTN 3.3 RUNTIME       SUMMARY-102
+            FXFLTR    A374      DECK-ID B07  FTN 3.3 RUNTIME       SUMMARY-102
+            EXPR      A3AC      DECK-ID B08  FTN 3.3 RUNTIME       SUMMARY-102
+            ALOGR     A44C      DECK-ID B09  FTN 3.3 RUNTIME       SUMMARY-102
+            TANHR     A4C3      DECK-ID B10  FTN 3.3 RUNTIME       SUMMARY-102
+            SNCSR     A52F      DECK-ID B11  FTN 3.3 RUNTIME       SUMMARY-102
+            ATANR     A5F9      DECK-ID B12  FTN 3.3 RUNTIME       SUMMARY-102
+            Q8QIOR    A697      DECK-ID C01  FTN 3.3 RUNTIME       SUMMARY-102
+            BINARR    A7FC      DECK-ID C02  FTN 3.3 RUNTIME       SUMMARY-102
+            IOCODR    A847      DECK-ID D01  FTN 3.3 RUNTIME       SUMMARY-102
+            INITLR    A87B      DECK-ID D02  FTN 3.3 RUNTIME       SUMMARY-102
+            RSTORR    A88A      DECK-ID D03  FTN 3.3 RUNTIME       SUMMARY-102
+            GETCHR    A89A      DECK-ID D04  FTN 3.3 RUNTIME       SUMMARY-102
+            IPACKR    A8B4      DECK-ID D05  FTN 3.3 RUNTIME       SUMMARY-102
+            UPDATR    A8F2      DECK-ID D06  FTN 3.3 RUNTIME       SUMMARY-102
+            DECPLR    A8FF      DECK-ID D07  FTN 3.3 RUNTIME       SUMMARY-102
+            INTGRR    A925      DECK-ID D08  FTN 3.3 RUNTIME       SUMMARY-102
+            SPACER    A952      DECK-ID D09  FTN 3.3 RUNTIME       SUMMARY-102
+            HOLR      A96A      DECK-ID D10  FTN 3.3 RUNTIME       SUMMARY-102
+            DCHXR     A9FE      DECK-ID D11  FTN 3.3 RUNTIME       SUMMARY-102
+            HXASCR    AA71      DECK-ID D12  FTN 3.3 RUNTIME       SUMMARY-102
+            AFMTOR    AAC4      DECK-ID D13  FTN 3.3 RUNTIME       SUMMARY-102
+            RFMTOR    AAEE      DECK-ID D14  FTN 3.3 RUNTIME       SUMMARY-102
+            AFMTIR    AB07      DECK-ID D15  FTN 3.3 RUNTIME       SUMMARY-102
+            RFMTIR    AB35      DECK-ID D16  FTN 3.3 RUNTIME       SUMMARY-102
+            ASCHXR    AB4C      DECK-ID D17  FTN 3.3 RUNTIME       SUMMARY-102
+            HXDCR     AB87      DECK-ID D18  FTN 3.3 RUNTIME       SUMMARY-102
+            FLOTIR    AC17      DECK-ID D19  FTN 3.3 RUNTIME       SUMMARY-102
+            FOUTR     AC61      DECK-ID D20  FTN 3.3 RUNTIME       SUMMARY-102
+            EOUTR     ACEB      DECK-ID D21  FTN 3.3 RUNTIME       SUMMARY-102
+            EWRITR    ADD3      DECK-ID D22  FTN 3.3 RUNTIME       SUMMARY-102
+            INTI1R    ADDF      DECK-ID D23  FTN 3.3 RUNTIME       SUMMARY-102
+            FORMTR    ADFC      DECK-ID D24  FTN 3.3 RUNTIME       SUMMARY-115
+            Q8QFIR    AFFD      DECK-ID D25  FTN 3.3 RUNTIME       SUMMARY-102
+            Q8QFLR    B017      DECK-ID D26  FTN 3.3 RUNTIME       SUMMARY-102
+            Q8QFXR    B046      DECK-ID D27  FTN 3.3 RUNTIME       SUMMARY-102
+            HEXAR     B07D      DECK-ID D28  FTN 3.3 RUNTIME       SUMMARY-102
+            HEXDR     B095      DECK-ID D29  FTN 3.3 RUNTIME       SUMMARY-102
+            ASCIIR    B0B2      DECK-ID D30  FTN 3.3 RUNTIME       SUMMARY-102
+            DECHXR    B0C7      DECK-ID D31  FTN 3.3 RUNTIME       SUMMARY-102
+            AFORMR    B0E7      DECK-ID D32  FTN 3.3 RUNTIME       SUMMARY-102
+            RFORMR    B103      DECK-ID D33  FTN 3.3 RUNTIME       SUMMARY-102
+            FLOTGR    B11F      DECK-ID D34  FTN 3.3 RUNTIME       SUMMARY-102
+            FLOTR     B13B      DECK-ID B14  FTN 3.3 RUNTIME       SUMMARY-112
+            COMFPR    B389      DECK-ID B15  FTN 3.3 RUNTIME       SUMMARY-102
+            SGDBLR    B49C      DECK-ID E01  FTN 3.3 RUNTIME       SUMMARY-102
+            Q8D2IR    B4B0      DECK-ID E02  FTN 3.3 RUNTIME       SUMMARY-102
+            DABSR     B542      DECK-ID E03  FTN 3.3 RUNTIME       SUMMARY-102
+            DSQRTR    B55E      DECK-ID E04  FTN 3.3 RUNTIME       SUMMARY-102
+            DSIGNR    B5DE      DECK-ID E05  FTN 3.3 RUNTIME       SUMMARY-102
+            DEXPR     B60B      DECK-ID E08  FTN 3.3 RUNTIME       SUMMARY-102
+            DLOGR     B6C7      DECK-ID E09  FTN 3.3 RUNTIME       SUMMARY-102
+            DSNCSR    B76D      DECK-ID E11  FTN 3.3 RUNTIME       SUMMARY-102
+            DATANR    B882      DECK-ID E12  FTN 3.3 RUNTIME       SUMMARY-132
+            Q8QDFR    B958      DECK-ID E14  FTN 3.3 RUNTIME       SUMMARY-102
+            DOUTR     B974      DECK-ID E15  FTN 3.3 RUNTIME       SUMMARY-102
+            DFLOTR    BA7E      DECK-ID E13  FTN 3.3 RUNTIME       SUMMARY-102
+            DRSTRR    BEDC      DECK-ID E10  FTN 3.3 RUNTIME       SUMMARY-102
+            NXTLOC    BF12      NEXT AVAILABLE LOCATION 
+        * 
+        *        SYSTEM MASS RESIDENT PROGRAMS
+        * 
+        *M              LIBEDT       1
+            LIBEDT    0203      DECK-ID M35  MSOS 5.0              SUMMARY-122
+        *M              LOADSD       2
+            LOAD1     0243      DECK-ID M36  MSOS 5.0              SUMMARY-110
+            BRNCH1    0236      DECK-ID M37  MSOS 5.0              SUMMARY-132
+            PG2KRD    0398      DECK-ID O69  MSOS 5.0              SUMMARY-116
+            LIDRV1    03C9      DECK-ID M38  MSOS 5.0              SUMMARY-110
+            LCDRV1    041A      DECK-ID M39  MSOS 5.0              SUMMARY-110
+            LMDRV1    0447      DECK-ID M40  MSOS 5.0              SUMMARY-110
+            LLDRV1    0466      DECK-ID M41  MSOS 5.0              SUMMARY-110
+            ADJOF1    0474      DECK-ID M42  MSOS 5.0              SUMMARY-110
+            CNVRT1    0480      DECK-ID M43  MSOS 5.0              SUMMARY-110
+            LSTOT1    0498      DECK-ID M44  MSOS 5.0              SUMMARY-110
+            LINK11    04EB      DECK-ID M45  MSOS 5.0              SUMMARY-110
+            LOADR1    052E      DECK-ID M46  MSOS 5.0              SUMMARY-116
+            NAMPR1    05A7      DECK-ID M47  MSOS 5.0              SUMMARY-110
+            RBDBZ1    0648      DECK-ID M48  MSOS 5.0              SUMMARY-110
+            ENTEX1    0741      DECK-ID M49  MSOS 5.0              SUMMARY-110
+            XFRPR1    0777      DECK-ID M50  MSOS 5.0              SUMMARY-110
+            STBASE    0788      DECK-ID M51  MSOS 5.0              SUMMARY-110
+            LNKENT    0870      DECK-ID M52  MSOS 5.0              SUMMARY-110
+            LNKCR1    088C      DECK-ID M53  MSOS 5.0              SUMMARY-110
+            PATCH     08CD      DECK-ID M54  MSOS 5.0              SUMMARY-110
+            TBSCH1    090F      DECK-ID M55  MSOS 5.0              SUMMARY-110
+            HASH      0957      DECK-ID M56  MSOS 5.0              SUMMARY-110
+            TBSTR1    096F      DECK-ID M57  MSOS 5.0              SUMMARY-110
+            PAGE      09C4      DECK-ID M58  MSOS 5.0              SUMMARY-136
+            PROGLD    0AB5      DECK-ID M59  MSOS 5.0              SUMMARY-110
+            SCAN1     0BB7      DECK-ID M60  MSOS 5.0              SUMMARY-110
+            CHPU1     0C7D      DECK-ID M61  MSOS 5.0              SUMMARY-110
+            ADJOV2    0C8A      DECK-ID M62  MSOS 5.0              SUMMARY-110
+            ADRPR1    0CA3      DECK-ID M63  MSOS 5.0              SUMMARY-110
+        *M              JOBENT       3
+            JOBENT    0266      DECK-ID M64  MSOS 5.0              SUMMARY-116
+            T11       0112      DECK-ID M65  MSOS 5.0              SUMMARY-110
+            T7        0149      DECK-ID M66  MSOS 5.0              SUMMARY-110
+            T5        026B      DECK-ID M67  MSOS 5.0              SUMMARY-110
+            T3        02C4      DECK-ID M68  MSOS 5.0              SUMMARY-110
+        *S,N1,P 
+        *M              JOBPRO       4
+            JOBPRO    026E      DECK-ID M69  MSOS 5.0              SUMMARY-132
+            ONE       023D      DECK-ID M70  MSOS 5.0              SUMMARY-110
+            TWO       0240      DECK-ID M71  MSOS 5.0              SUMMARY-110
+            THREE     0243      DECK-ID M72  MSOS 5.0              SUMMARY-110
+
+         * * *  U N P A T C H E D    E X T E R N A L S    * * * 
+          BATLST
+        *S,N2,P 
+        *M              PROTEC       5
+            UPROTK    0275      DECK-ID M73  MSOS 5.0              SUMMARY-115
+            JBKILL    044C      DECK-ID M75  MSOS 5.0              SUMMARY-110
+        *M              JPLOAD       6
+            JPLOAD    0282      DECK-ID M76  MSOS 5.0              SUMMARY-110
+        *M              JPCHGE       7
+            JPCHGE    0287      DECK-ID M77  MSOS 5.0              SUMMARY-110
+            ASCHEX    013E      DECK-ID M78  MSOS 5.0              SUMMARY-110
+        *M              JPT13        8
+            T13       028C      DECK-ID M79  MSOS 5.0              SUMMARY-110
+        *M              JCRDV4       9
+            JCRDV4    0291      DECK-ID M80  MSOS 5.0              SUMMARY-136
+        *M              JLGOV4      10
+            JLGOV4    0295      DECK-ID M81  MSOS 5.0              SUMMARY-110
+        *M              JPSTV4      11
+            JPSTV4    0298      DECK-ID M84  MSOS 5.0              SUMMARY-110
+        *M              NAMEV4      12
+            NAMEV4    029A      DECK-ID M85  MSOS 5.0              SUMMARY-110
+        *M              JPFLV4      13
+            JPFLV4    02A2      DECK-ID M82  MSOS 5.0              SUMMARY-110
+        *M              AFILV4      14
+            JPF2V4    02A9      DECK-ID M83  MSOS 5.0              SUMMARY-110
+        *M              RESTOR      15
+            RESTOR    02B3      DECK-ID M86  MSOS 5.0              SUMMARY-114
+        *M              RCOVER      16
+            RCOVER    02B6      DECK-ID M87  MSOS 5.0              SUMMARY-110
+            OUTSEL    0144      DECK-ID M88  MSOS 5.0              SUMMARY-110
+            RDMPV4    0189      DECK-ID M89  MSOS 5.0              SUMMARY-110
+            MASDMP    0249      DECK-ID M90  MSOS 5.0              SUMMARY-110
+        *M              BRKPT       17
+            BRKPT1    02BF      DECK-ID N01  MSOS 5.0              SUMMARY-110
+        *M              ODEBUG      18
+            ODBUG1    02CC      DECK-ID N07  MSOS 5.0              SUMMARY-116
+            GETREQ    0120      DECK-ID N08  MSOS 5.0              SUMMARY-110
+            LHXREQ    0240      DECK-ID N09  MSOS 5.0              SUMMARY-110
+            DPCREQ    0300      DECK-ID N10  MSOS 5.0              SUMMARY-132
+            SCNREQ    03C0      DECK-ID N11  MSOS 5.0              SUMMARY-116
+            SETREQ    0480      DECK-ID N12  MSOS 5.0              SUMMARY-110
+            MBCREQ    04E0      DECK-ID N13  MSOS 5.0              SUMMARY-110
+            SCHREQ    05A0      DECK-ID N14  MSOS 5.0              SUMMARY-116
+            SPEREQ    0660      DECK-ID N15  MSOS 5.0              SUMMARY-113
+            CPPREQ    06C0      DECK-ID N16  MSOS 5.0              SUMMARY-110
+            SPPREQ    0720      DECK-ID N17  MSOS 5.0              SUMMARY-110
+            ADHREQ    0780      DECK-ID N18  MSOS 5.0              SUMMARY-110
+            SBHREQ    07E0      DECK-ID N19  MSOS 5.0              SUMMARY-110
+            ALCREQ    0840      DECK-ID N20  MSOS 5.0              SUMMARY-116
+            RELREQ    0900      DECK-ID N21  MSOS 5.0              SUMMARY-110
+            DACREQ    0960      DECK-ID N22  MSOS 5.0              SUMMARY-116
+            PTHREQ    0A80      DECK-ID N23  MSOS 5.0              SUMMARY-116
+            MTRREQ    0BA0      DECK-ID N24  MSOS 5.0              SUMMARY-116
+            MSDREQ    0C00      DECK-ID N25  MSOS 5.0              SUMMARY-116
+            CLUREQ    0CC0      DECK-ID N26  MSOS 5.0              SUMMARY-110
+            WCDREQ    0D20      DECK-ID N27  MSOS 5.0              SUMMARY-116
+            LASREQ    0D80      DECK-ID N28  MSOS 5.0              SUMMARY-110
+            DASREQ    0EA0      DECK-ID N29  MSOS 5.0              SUMMARY-116
+            MLUREQ    0F60      DECK-ID N30  MSOS 5.0              SUMMARY-110
+            DPTREQ    0FC0      DECK-ID N31  MSOS 5.0              SUMMARY-116
+            SLDREQ    1080      DECK-ID N32  MSOS 5.0              SUMMARY-116
+            CWAREQ    10E0      DECK-ID N33  MSOS 5.0              SUMMARY-132
+            DMHREQ    1200      DECK-ID N34  MSOS 5.0              SUMMARY-116
+            SMNREQ    12C0      DECK-ID N35  MSOS 5.0              SUMMARY-116
+            SMPREQ    1440      DECK-ID N36  MSOS 5.0              SUMMARY-116
+            LSPREQ    1500      DECK-ID N37  MSOS 5.0              SUMMARY-116
+            DSPREQ    15C0      DECK-ID N38  MSOS 5.0              SUMMARY-116
+            DMSREQ    16E0      DECK-ID N39  MSOS 5.0              SUMMARY-116
+            LSOREQ    1860      DECK-ID N40  MSOS 5.0              SUMMARY-116
+            CCCREQ    1980      DECK-ID N41  MSOS 5.0              SUMMARY-116
+            CCMREQ    1AA0      DECK-ID N42  MSOS 5.0              SUMMARY-116
+            CMMREQ    1BC0      DECK-ID N43  MSOS 5.0              SUMMARY-116
+            MMMREQ    1CE0      DECK-ID N44  MSOS 5.0              SUMMARY-116
+            LICREQ    1E60      DECK-ID N45  MSOS 5.0              SUMMARY-118
+            LIOREQ    1FE0      DECK-ID N46  MSOS 5.0              SUMMARY-116
+            LAMREQ    2160      DECK-ID N47  MSOS 5.0              SUMMARY-116
+            DDPREQ    2280      DECK-ID N48  MSOS 5.0              SUMMARY-116
+            LDPREQ    23A0      DECK-ID N49  MSOS 5.0              SUMMARY-116
+            LDOREQ    24C0      DECK-ID N50  MSOS 5.0              SUMMARY-116
+            DMDREQ    2640      DECK-ID N51  MSOS 5.0              SUMMARY-116
+            WDKREQ    27C0      DECK-ID N52  MSOS 5.0              SUMMARY-116
+            LSTREQ    28E0      DECK-ID N53  MSOS 5.0              SUMMARY-116
+            PRINT     2A60      DECK-ID N54  MSOS 5.0              SUMMARY-116
+            GETFLD    2B20      DECK-ID N55  MSOS 5.0              SUMMARY-110
+            ASHX      2BE0      DECK-ID N56  MSOS 5.0              SUMMARY-110
+            DMPBUF    2C40      DECK-ID N57  MSOS 5.0              SUMMARY-116
+            ASCDEC    2D00      DECK-ID N58  MSOS 5.0              SUMMARY-110
+            HXAS      2D60      DECK-ID N59  MSOS 5.0              SUMMARY-110
+            DECDMP    2DC0      DECK-ID N60  MSOS 5.0              SUMMARY-116
+            FETMM     2E80      DECK-ID N61  MSOS 5.0              SUMMARY-132
+            PNTMD     2FA0      DECK-ID N62  MSOS 5.0              SUMMARY-116
+            MASOT     3060      DECK-ID N63  MSOS 5.0              SUMMARY-116
+            CONFM     3180      DECK-ID N64  MSOS 5.0              SUMMARY-116
+            GETINT    32A0      DECK-ID N65  MSOS 5.0              SUMMARY-116
+            FLCVSG    3360      DECK-ID N66  MSOS 5.0              SUMMARY-116
+            FLCVDB    3480      DECK-ID N67  MSOS 5.0              SUMMARY-116
+            NAMEMS    35A0      DECK-ID N68  MSOS 5.0              SUMMARY-110
+            DCONV     3A20      DECK-ID N69  MSOS 5.0              SUMMARY-110
+            LAZY2     3B40      DECK-ID N70  MSOS 5.0              SUMMARY-110
+            ODDFLT    3C00      DECK-ID N71  MSOS 5.0              SUMMARY-110
+            ODDFTN    3CC0      DECK-ID N72  MSOS 5.0              SUMMARY-110
+            ECONV     4080      DECK-ID N73  MSOS 5.0              SUMMARY-110
+            LAZY1     4140      DECK-ID N74  MSOS 5.0              SUMMARY-110
+            ODFLOT    4200      DECK-ID N75  MSOS 5.0              SUMMARY-110
+            ODFXFL    4440      DECK-ID N76  MSOS 5.0              SUMMARY-110
+        *M              SYSCOP      19
+            SYSCOP    0384      DECK-ID N77  MSOS 5.0              SUMMARY-110
+        *M              SYSSEG      20
+            CO1ST     0389      DECK-ID N78  MSOS 5.0              SUMMARY-110
+            CO2ND     04E0      DECK-ID N79  MSOS 5.0              SUMMARY-136
+            CO3RD     0D80      DECK-ID N80  MSOS 5.0              SUMMARY-110
+            COLAST    1500      DECK-ID N81  MSOS 5.0              SUMMARY-110
+        *M              MIPRO       21
+            MIPRO     03C2      DECK-ID N06  MSOS 5.0              SUMMARY-110
+
+         * * *  U N P A T C H E D    E X T E R N A L S    * * * 
+          CRIMPT
+          INDACS
+          TSUTIL
+        *M              TDFUNC      22
+            TDFUNC    03C9      DECK-ID O67  MSOS 5.0              SUMMARY-110
+        *M              EFSTOR      23
+            EFSTOR    03CD      DECK-ID N04  MSOS 5.0              SUMMARY-110
+        *M              EFLIST      24
+            EFLIST    03D2      DECK-ID N05  MSOS 5.0              SUMMARY-123
+        *M              VERIFY      25
+            VERFY1    03F0      DECK-ID O24  MSOS 5.0              SUMMARY-110
+        *M              SCMM17      26
+            SCMEXC    03F5      DECK-ID O54  MSOS 5.0              SUMMARY-117
+        *M              DUMMY1      27
+        *M              DUMMY2      28
+        *M              DUMMY3      29
+        *M              DUMMY4      30
+        *M              DUMMY5      31
+        *M              DUMMY6      32
+        *M              DUMMY7      33
+        *M              DUMMY8      34
+        *M              DUMMY9      35
+        *M              DUMMY0      36
+        * 
+        *        MASS RESIDENT DRIVERS
+        * 
+        *M              COSY DRIVER 
+            DCOSY     0405      DECK-ID M34  MSOS 5.0              SUMMARY-114
+            NXTLOC    02F0      NEXT AVAILABLE LOCATION 
+        *S,SCOSY,S
+        *S,LCOSY,P
+        *M              1732-3 616 MAG TAPE 
+            D17323    040D      DECK-ID B33  PERIPH. DRIVERS 1.0B  SUMMARY-114
+            D327TR    0442      DECK-ID B36  PERIPH. DRIVERS 1.0B  SUMMARY-106
+            NXTLOC    0565      NEXT AVAILABLE LOCATION 
+        *S,S17323,S 
+        *S,L17323,P 
+        *M              1732-3 616 MAG TAPE LONG RECORD 
+            D7323L    041C      DECK-ID B38  PERIPH. DRIVERS 1.0B  SUMMARY-114
+            NXTLOC    0539      NEXT AVAILABLE LOCATION 
+        *S,S7323L,S 
+        *S,L7323L,P 
+        *M              PSEUDO TAPE 
+            DPSUDO    042A      DECK-ID F04  FILE MANAGER          SUMMARY-114
+            NXTLOC    03CD      NEXT AVAILABLE LOCATION 
+        *S,SPSUDO,S 
+        *S,LPSUDO,P 
+        *M              1742-30/120 LINE PRINTER
+            D42312    0435      DECK-ID B37  PERIPH. DRIVERS 1.0B  SUMMARY-132
+            T5954     01AF      DECK-ID B77  PERIPH. DRIVERS 1.0B  SUMMARY-112
+            NXTLOC    023F      NEXT AVAILABLE LOCATION 
+        *S,S42312,S 
+        *S,L42312,P 
+        *M              1728-430 CARD READER/PUNCH - 026 FORMAT 
+            D1728     043B      DECK-ID A30  PERIPH. DRIVERS 1.0A  SUMMARY-106
+            CR026     03A2      DECK-ID A16  PERIPH. DRIVERS 1.0A  SUMMARY-106
+            CP026     03C2      DECK-ID A14  PERIPH. DRIVERS 1.0A  SUMMARY-106
+            NXTLOC    0402      NEXT AVAILABLE LOCATION 
+        *S,S1728,S
+        *S,L1728,P
+        *M              1728-430 CARD READER/PUNCH - 029 FORMAT 
+            D1728     0446      DECK-ID A30  PERIPH. DRIVERS 1.0A  SUMMARY-106
+            CR029     03A2      DECK-ID A17  PERIPH. DRIVERS 1.0A  SUMMARY-106
+            CP029     03C2      DECK-ID A15  PERIPH. DRIVERS 1.0A  SUMMARY-106
+            NXTLOC    0402      NEXT AVAILABLE LOCATION 
+        * 
+        *        MASS RESIDENT FILE MANAGER 
+        * 
+        *M
+            DEFFIL    0451      DECK-ID F05  FILE MANAGER          SUMMARY-116
+            FILSPC    0186      DECK-ID F06  FILE MANAGER          SUMMARY-110
+            RPEND     0233      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP01,S 
+        *M
+            RELFIL    0457      DECK-ID F08  FILE MANAGER          SUMMARY-110
+            RELSPC    0092      DECK-ID F09  FILE MANAGER          SUMMARY-110
+            RPEND     0141      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP02,S 
+        *M
+            DEFIDX    045B      DECK-ID F10  FILE MANAGER          SUMMARY-110
+            SQRTFM    0098      DECK-ID F11  FILE MANAGER          SUMMARY-110
+            FILSPC    00A8      DECK-ID F06  FILE MANAGER          SUMMARY-110
+            RPEND     0155      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP03,S 
+        *M
+            LOKFIL    045F      DECK-ID F12  FILE MANAGER          SUMMARY-110
+            RPEND     004D      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP04,S 
+        *M
+            UNLFIL    0460      DECK-ID F13  FILE MANAGER          SUMMARY-110
+            RPEND     003D      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP05,S 
+        *M
+            STOSEQ    0461      DECK-ID F14  FILE MANAGER          SUMMARY-110
+            FILSPC    00C6      DECK-ID F06  FILE MANAGER          SUMMARY-110
+            RPEND     0173      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP06,S 
+        *M
+            STODIR    0465      DECK-ID F15  FILE MANAGER          SUMMARY-110
+            RPEND     008D      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP07,S 
+        *M
+            STOIDX    0467      DECK-ID F20  FILE MANAGER          SUMMARY-110
+            HASHCD    0341      DECK-ID F16  FILE MANAGER          SUMMARY-110
+            GETKID    034C      DECK-ID F17  FILE MANAGER          SUMMARY-110
+            FILSPC    0373      DECK-ID F06  FILE MANAGER          SUMMARY-110
+            RPEND     0420      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP08,S 
+        *M
+            EDFDMY    0472      DECK-ID F27  FILE MANAGER          SUMMARY-116
+            FILSPC    0472      DECK-ID F06  FILE MANAGER          SUMMARY-110
+            RPEND     00AF      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMREDF,S 
+        *M
+            EDRDMY    0474      DECK-ID F28  FILE MANAGER          SUMMARY-116
+            RTNSPC    0474      DECK-ID F19  FILE MANAGER          SUMMARY-110
+            RPEND     00A2      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMREDR,S 
+        *M
+            RTVSEQ    0476      DECK-ID F18  FILE MANAGER          SUMMARY-110
+            RTNSPC    018B      DECK-ID F19  FILE MANAGER          SUMMARY-110
+            RPEND     022B      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP09,S 
+        *M
+            RTVDIR    047C      DECK-ID F21  FILE MANAGER          SUMMARY-110
+            RTNSPC    0115      DECK-ID F19  FILE MANAGER          SUMMARY-110
+            RPEND     01B5      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP10,S 
+        *M
+            RTVIDX    0481      DECK-ID F22  FILE MANAGER          SUMMARY-110
+            HASHCD    0258      DECK-ID F16  FILE MANAGER          SUMMARY-110
+            GETKID    0263      DECK-ID F17  FILE MANAGER          SUMMARY-110
+            RTNSPC    028A      DECK-ID F19  FILE MANAGER          SUMMARY-110
+            RPEND     032A      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP11,S 
+        *M
+            RTVIDO    048A      DECK-ID F23  FILE MANAGER          SUMMARY-118
+            GETKID    0260      DECK-ID F17  FILE MANAGER          SUMMARY-110
+            RTNSPC    0287      DECK-ID F19  FILE MANAGER          SUMMARY-110
+            RPEND     0327      DECK-ID F07  FILE MANAGER          SUMMARY-110
+        *S,FMRP12,S 
+        *M
+            FMDUMY    0493      DECK-ID F24  FILE MANAGER          SUMMARY-110
+        *S,FMREND,S 
+        *S,JFILV4,S     SPECIFY THE JOB FILE TABLE SPACE
+        *M,JFILV4+$40 
+        *T       END OF SYSTEM
+
+         * * *  U N P A T C H E D    E X T E R N A L S    * * * 
+          PARITY
+          POWERU
+          INITIALIZATION COMPLETED - YOU MAY AUTOLOAD 
+        Simulation stopped, P: 5914 (  18FF                    JMP*    $FF)
+        sim> autoload cdd
+        sim> run 0
+
+
+
+        MSOS 5.0--PSR LEVEL  120   01/26/82  
+
+ 
+        SET PROGRAM PROTECT  
+
+        Simulation stopped, P: 1E13 (  4CF0                    STQ*    ($F0))
+        sim> set cpu protect
+        sim> c
+
+
+        EXXON DEVELOPMENT SYSTEM 
+
+
+        65K MODE
+
+ 
+        CHECKING FILES -  OK
+
+
+        ENTER DATE/TIME  MMDDYYHHMM 
+
+        0714881208 <============================ Enter date/time
+        DATE: 14 JUL 88   TIME: 1208:00 
+        MI <==================================== ^G (Control + G)  for
+                                                 manual interrupt
+        *BATCH <================================ Start batch subsystem
+        *CTO,    MSOS 5.0 INSTALLATION COMPLETED - YOU MAY AUTOLOAD
+        Simulation stopped, P: 8592 (P 18FB                    JMP*    $FB)
+        sim> q
+        Goodbye
+
+
+Output from the batch jobs is sent to the line printer.

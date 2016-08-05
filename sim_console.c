@@ -1740,7 +1740,7 @@ t_stat sim_set_noserial (int32 flag, CONST char *cptr)
 {
 if (cptr && (*cptr != 0))                               /* too many arguments? */
     return SCPE_2MARG;
-if (sim_con_ldsc.serport == 0)                  /* ignore if already closed */
+if (sim_con_ldsc.serport == 0)                          /* ignore if already closed */
     return SCPE_OK;
 return tmxr_close_master (&sim_con_tmxr);               /* close master socket */
 }

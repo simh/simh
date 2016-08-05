@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2016-03-04
+                             Last update: 2016-07-28
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6934,5 +6934,85 @@
      RESOLUTION:  Rename "hp_disclib.c/h" in the HP2100 subdirectory to
      "hp2100_disclib.c/h" to indicate that it is HP2100-specific.  Alter
      "hp2100_ds.c" and "hp2100_di_da.c" to use the new include file name.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+271. PROBLEM:  The MPX device incorrectly reports a currently filling read
+     buffer as complete.
+
+     VERSION:  4.0-0
+
+     OBSERVATION:  Using Kermit to upload a file to RTE and specifying a packet
+     size larger than 254 bytes fails with transmission errors.  Uploads with
+     packet sizes under 254 bytes work properly.
+
+     CAUSE:  The 12792 multiplexer provides two 254-byte receive buffers per
+     line.  A single reception larger than 254 bytes returns "partial buffer"
+     status when the initial read terminates because of the buffer full
+     condition.  This informs RTE that the reception is incomplete and that it
+     should issue additional reads to obtain the remainder of the data.
+     Complete reception is indicated by the final read not returning "partial
+     buffer" status.
+
+     When Kermit sends a large packet, the multiplexer fills the first 254-byte
+     buffer, terminating on the buffer-full condition, and sends an unsolicited
+     interrupt to the CPU with "read buffer available" status.  In response, RTE
+     sends an "acknowledge" command to the multiplexer, which returns the
+     "partial buffer" status and the buffer length.  RTE then follows with a
+     "read buffer" command and prepares to receive the first buffer data.
+     Concurrently, the multiplexer begins filling the second 254-byte buffer.
+
+     RTE uses DCPC to transfer the data from the multiplexer, which is faster
+     than the incoming data rate.  Therefore, the transfer completes while the
+     second buffer is still filling.  On DCPC completion, the multiplexer checks
+     to see if the other receive buffer is complete, and if it is, issues
+     another unsolicited interrupt with "read buffer available" status.
+
+     The buffer completion check incorrectly returns TRUE if the buffer contains
+     received data.  It should return TRUE only if the buffer contains data and
+     it is not currently being filled.
+
+     For short reads, such as EDIT screen reads, the second buffer fill
+     completes before the first buffer DCPC transfer, and the returned "read
+     buffer available" status is appropriate.  For long reads, such as Kermit
+     transfers, the incorrect buffer check causes RTE to transfer data from the
+     second buffer while it is incomplete.  This leads to corrupted data and
+     Kermit transmission errors.
+
+     RESOLUTION:  Modify "mpx_cntl_svc" (hp2100_mpx.c) to indicate read buffer
+     availability only when filling is complete.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+272. PROBLEM:  An MPX binary read larger than 254 bytes never completes.
+
+     VERSION:  4.0-0.
+
+     OBSERVATION:  The MPX device may be configured to terminate a read on
+     reception of either a special character (e.g., CR) or a certain character
+     count.  Counts up to 64K bytes are permitted, and such reads will succeed
+     if the alternating buffers are concurrently transferred to the CPU before
+     filling completely.  However, while reads that specify character counts of
+     254 or less complete as expected, reads of more than 254 bytes never
+     complete.
+
+     CAUSE:  As each character is received, the current character count is
+     compared to the termination count, and the read completes if the counts are
+     equal.  However, the current character count is determined by the number of
+     characters in the current buffer and not the accumulated count of all
+     characters received.  As the read buffers are 254 bytes long, the current
+     count will never exceed 254.  Therefore, any read terminating on a count
+     greater than that will never complete.
+     
+     RESOLUTION:  Define a new "mpx_termcnt" array to hold the termination
+     counts for the eight lines, and reassign the "mpx_charcnt" array to hold
+     the current character counts.  Modify "exec_command" and "mpx_line_svc"
+     (hp2100_mpx.c) to set the termination count, compare it against the current
+     character count as characters are received, and terminate reception if
+     enabled and the values are equal.
 
      STATUS:  Fixed in version 4.0-0.

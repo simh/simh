@@ -1367,6 +1367,16 @@ B5500_OPT = -I.. -DUSE_INT64 -DB5500 -DUSE_SIM_CARD
 ### Experimental simulators
 ###
 
+CDC1700D = CDC1700
+CDC1700 = ${CDC1700D}/cdc1700_cpu.c ${CDC1700D}/cdc1700_dis.c \
+        ${CDC1700D}/cdc1700_io.c ${CDC1700D}/cdc1700_sys.c \
+        ${CDC1700D}/cdc1700_dev1.c ${CDC1700D}/cdc1700_mt.c \
+        ${CDC1700D}/cdc1700_dc.c ${CDC1700D}/cdc1700_iofw.c \
+        ${CDC1700D}/cdc1700_lp.c ${CDC1700D}/cdc1700_dp.c \
+        ${CDC1700D}/cdc1700_cd.c ${CDC1700D}/cdc1700_sym.c \
+        ${CDC1700D}/cdc1700_rtc.c
+CDC1700_OPT = -I ${CDC1700D}
+
 BESM6D = BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
@@ -1450,7 +1460,7 @@ PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
-	i7094 ibm1130 id16 id32 sds lgp h316 \
+	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
 	b5500 
 
@@ -1744,6 +1754,12 @@ ssem : ${BIN}ssem${EXE}
 ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+cdc1700 : ${BIN}cdc1700${EXE}
+
+${BIN}cdc1700${EXE} : ${CDC1700} ${SIM}
+	${MKDIRBIN}
+	${CC} ${CDC1700} ${SIM} ${CDC1700_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 
 besm6 : ${BIN}besm6${EXE}
 
