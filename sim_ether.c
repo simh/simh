@@ -739,7 +739,6 @@ void eth_zero(ETH_DEV* dev)
 }
 
 static char*   (*p_pcap_lib_version) (void);
-static char*   (*p_pcap_get_servicename) (void);
 
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
@@ -789,9 +788,6 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
     }
   if (p_pcap_lib_version) {
     fprintf(st, "%s\n", p_pcap_lib_version());
-#if defined(_WIN32)
-    fprintf(st, "Windows Packet Capture Service Name: %s\n", p_pcap_get_servicename ? p_pcap_get_servicename() : "npf");
-#endif
     }
   if (eth_open_device_count) {
     int i;
@@ -1185,7 +1181,6 @@ int load_pcap(void) {
       load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
       load_function("pcap_setnonblock",  (_func *) &p_pcap_setnonblock);
       load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
-      try_load_function("pcap_get_servicename",(_func *) &p_pcap_get_servicename);
 
       if ((lib_loaded == 1) && (!eth_show_active)) {
         /* log successful load */
