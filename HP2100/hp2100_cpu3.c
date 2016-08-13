@@ -1,6 +1,6 @@
 /* hp2100_cpu3.c: HP 2100/1000 FFP/DBI instructions
 
-   Copyright (c) 2005-2014, J. David Bryan
+   Copyright (c) 2005-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU3         Fast FORTRAN and Double Integer instructions
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
    09-May-12    JDB     Separated assignments from conditional expressions
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
@@ -212,7 +213,7 @@ else {                                                  /* F-Series */
             SR = 0102077;                               /* test passed code */
             AR = 0;                                     /* test clears A/B */
             BR = 0;
-            PC = (PC + 1) & VAMASK;                     /* P+2 return for firmware w/DBI */
+            PR = (PR + 1) & VAMASK;                     /* P+2 return for firmware w/DBI */
             return reason;
 
         case 003:                                       /* .DNG 105203 (OP_N) */
@@ -304,7 +305,7 @@ switch (entry) {                                        /* decode IR<4:0> */
             return stop_inst;                           /* trap if not */
 
         if (intrq) {                                    /* interrupt pending? */
-            PC = err_PC;                                /* restart instruction */
+            PR = err_PC;                                /* restart instruction */
             break;
             }
 
@@ -317,7 +318,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         i = 1;                                          /* params start at op[1] */
     XADD:                                               /* enter here from .XADD */
         if (intrq) {                                    /* interrupt pending? */
-            PC = err_PC;                                /* restart instruction */
+            PR = err_PC;                                /* restart instruction */
             break;
             }
 
@@ -329,7 +330,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         i = 1;                                          /* params start at op[1] */
     XSUB:                                               /* enter here from .XSUB */
         if (intrq) {                                    /* interrupt pending? */
-            PC = err_PC;                                /* restart instruction */
+            PR = err_PC;                                /* restart instruction */
             break;
             }
 
@@ -341,7 +342,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         i = 1;                                          /* params start at op[1] */
     XMPY:                                               /* enter here from .XMPY */
         if (intrq) {                                    /* interrupt pending? */
-            PC = err_PC;                                /* restart instruction */
+            PR = err_PC;                                /* restart instruction */
             break;
             }
 
@@ -353,7 +354,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         i = 1;                                          /* params start at op[1] */
      XDIV:                                              /* enter here from .XDIV */
         if (intrq) {                                    /* interrupt pending? */
-            PC = err_PC;                                /* restart instruction */
+            PR = err_PC;                                /* restart instruction */
             break;
             }
 
@@ -383,7 +384,7 @@ switch (entry) {                                        /* decode IR<4:0> */
             return stop_inst;                           /* trap if not */
 
         if (intrq) {                                    /* interrupt pending? */
-            PC = err_PC;                                /* restart instruction */
+            PR = err_PC;                                /* restart instruction */
             break;
             }
 
@@ -397,7 +398,7 @@ switch (entry) {                                        /* decode IR<4:0> */
             return stop_inst;                           /* trap if not */
 
         if (intrq) {                                    /* interrupt pending? */
-            PC = err_PC;                                /* restart instruction */
+            PR = err_PC;                                /* restart instruction */
             break;
             }
 
@@ -411,7 +412,7 @@ switch (entry) {                                        /* decode IR<4:0> */
 
     case 020:                                           /* .XFER 105220 (OP_N) */
         if (UNIT_CPU_TYPE == UNIT_TYPE_2100)
-            PC = (PC + 1) & VAMASK;                     /* 2100 .XFER returns to P+2 */
+            PR = (PR + 1) & VAMASK;                     /* 2100 .XFER returns to P+2 */
     XFER:                                               /* enter here from .DFER */
         sc = 3;                                         /* set count for 3-wd xfer */
         goto CFER;                                      /* do transfer */
@@ -420,20 +421,20 @@ switch (entry) {                                        /* decode IR<4:0> */
         if ((int16) op[1].word < 1)                     /* index < 1? */
             op[1].word = 1;                             /* reset min */
 
-        sa = PC + op[1].word - 1;                       /* point to jump target */
+        sa = PR + op[1].word - 1;                       /* point to jump target */
         if (sa >= op[0].word)                           /* must be <= last target */
             sa = op[0].word - 1;
 
         da = ReadW (sa);                                /* get jump target */
         reason = resolve (da, &MA, intrq);              /* resolve indirects */
         if (reason != SCPE_OK) {                        /* resolution failed? */
-            PC = err_PC;                                /* irq restarts instruction */
+            PR = err_PC;                                /* irq restarts instruction */
             break;
             }
 
         mp_dms_jmp (MA, 2);                             /* validate jump addr */
-        PCQ_ENTRY;                                      /* record last PC */
-        PC = MA;                                        /* jump */
+        PCQ_ENTRY;                                      /* record last P */
+        PR = MA;                                        /* jump */
         BR = op[0].word;                                /* (for 2100 FFP compat) */
         break;
 
@@ -446,7 +447,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         else {                                          /* 3-dim access */
             reason = cpu_ops (OP_KK, op2, intrq);       /* get 1st, 2nd ranges */
             if (reason != SCPE_OK) {                    /* evaluation failed? */
-                PC = err_PC;                            /* irq restarts instruction */
+                PR = err_PC;                            /* irq restarts instruction */
                 break;
                 }
             op[1].word = op[1].word +                   /* offset */
@@ -458,7 +459,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 023:                                           /* .ENTR 105223 (OP_A) */
-        MA = PC - 3;                                    /* get addr of entry point */
+        MA = PR - 3;                                    /* get addr of entry point */
     ENTR:                                               /* enter here from .ENTP */
         da = op[0].word;                                /* get addr of 1st formal */
         dc = MA - da;                                   /* get count of formals */
@@ -473,7 +474,7 @@ switch (entry) {                                        /* decode IR<4:0> */
             MA = ReadW (sa++);                          /* get addr of actual */
             reason = resolve (MA, &MA, intrq);          /* resolve indirect */
             if (reason != SCPE_OK) {                    /* resolution failed? */
-                PC = err_PC;                            /* irq restarts instruction */
+                PR = err_PC;                            /* irq restarts instruction */
                 break;
                 }
             WriteW (da++, MA);                          /* put addr into formal */
@@ -484,7 +485,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 024:                                           /* .ENTP 105224 (OP_A) */
-        MA = PC - 5;                                    /* get addr of entry point */
+        MA = PR - 5;                                    /* get addr of entry point */
         goto ENTR;
 
     case 025:                                           /* .PWR2 105225 (OP_RK) */
@@ -521,7 +522,7 @@ switch (entry) {                                        /* decode IR<4:0> */
             if (op[0].word && intrq) {                  /* more and intr? */
                 AR = (uint16) sa;                       /* restore A */
                 BR = (uint16) sb;                       /* restore B */
-                PC = err_PC;                            /* restart instruction */
+                PR = err_PC;                            /* restart instruction */
                 break;
                 }
             }
@@ -666,7 +667,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         XR = 2;                                         /* set revision */
         BR = 0377;                                      /* side effect of microcode */
         SR = 0102077;                                   /* set "pass" code */
-        PC = (PC + 1) & VAMASK;                         /* return to P+1 */
+        PR = (PR + 1) & VAMASK;                         /* return to P+1 */
         t = (AR << 16) | BR;                            /* set t for return */
         break;
 
@@ -746,9 +747,9 @@ switch (entry) {                                        /* decode IR<3:0> */
     case 004:                                           /* .DCO 105324 (OP_JD) */
         t = op[0].dword;                                /* copy for later store */
         if ((int32) op[0].dword < (int32) op[1].dword)
-            PC = (PC + 1) & VAMASK;                     /* < rtns to P+2 */
+            PR = (PR + 1) & VAMASK;                     /* < rtns to P+2 */
         else if ((int32) op[0].dword > (int32) op[1].dword)
-            PC = (PC + 2) & VAMASK;                     /* > rtns to P+3 */
+            PR = (PR + 2) & VAMASK;                     /* > rtns to P+3 */
         break;                                          /* = rtns to P+1 */
 
     case 005:                                           /* .DDI 105325 (OP_JD) */
@@ -796,7 +797,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         t = din.dword = din.dword + 1;                  /* increment value */
         WriteOp (op[0].word, din, in_d);                /* store it back */
         if (t == 0)
-            PC = (PC + 1) & VAMASK;                     /* skip if result zero */
+            PR = (PR + 1) & VAMASK;                     /* skip if result zero */
         break;
 
     case 013:                                           /* .DDS 105333 (OP_A) */
@@ -804,7 +805,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         t = din.dword = din.dword - 1;                  /* decrement value */
         WriteOp (op[0].word, din, in_d);                /* write it back */
         if (t == 0)
-            PC = (PC + 1) & VAMASK;                     /* skip if result zero */
+            PR = (PR + 1) & VAMASK;                     /* skip if result zero */
         break;
 
     case 014:                                           /* .DSBR 105334 (OP_JD) */

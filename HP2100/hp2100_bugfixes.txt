@@ -1,6 +1,6 @@
-                       HP 2100 SIMULATOR BUG FIX WRITEUPS
-                       ==================================
-                             Last update: 2016-07-28
+                             HP 2100 SIMULATOR FIXES
+                             =======================
+                             Last update: 2016-08-05
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -7007,12 +7007,112 @@
      characters received.  As the read buffers are 254 bytes long, the current
      count will never exceed 254.  Therefore, any read terminating on a count
      greater than that will never complete.
-     
+
      RESOLUTION:  Define a new "mpx_termcnt" array to hold the termination
      counts for the eight lines, and reassign the "mpx_charcnt" array to hold
      the current character counts.  Modify "exec_command" and "mpx_line_svc"
      (hp2100_mpx.c) to set the termination count, compare it against the current
      character count as characters are received, and terminate reception if
      enabled and the values are equal.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+273. ENHANCEMENT:  Burst-fill only the first of two MPX receive buffers in
+     FASTTIME mode.
+
+     VERSION:  4.0-0.
+
+     OBSERVATION:  When the 8-channel multiplexer is set for "optimized timing"
+     mode, buffered characters are transferred in blocks to and from the Telnet
+     connection.  That is, the line service routine will send or receive
+     characters as long as they are available.  This is more efficient than the
+     "realistic timing" mode, which sends or receives one character per service
+     invocation.  Effectively, this means that up to 508 characters (two buffers
+     of 254 bytes each) may be sent or received between one CPU instruction or
+     DCPC cycle and the next.  This works well for sending, but it can cause
+     buffer overflows when receiving.
+
+     Consider an application (such as Kermit) that receives large blocks of data
+     at high speed from a client.  The multiplexer is designed to handle this
+     condition by interrupting the CPU when the first buffer is filled and
+     filling the second buffer while the CPU is unloading data from the first.
+     In realistic mode at 19,200 baud, the CPU has approximately 800
+     instructions or DCPC cycles available per character received.  With a
+     second buffer of 254 bytes, the CPU has approximately 203,000 instructions
+     available to unload the first buffer after receiving the interrupt
+     notification.  Once started, the DCPC transfer takes no more than 508
+     instruction times, so the CPU can easily keep up with data arriving at the
+     maximum baud rate.
+
+     In fast timing mode, however, the first buffer burst-fills in a single CPU
+     instruction time, and, if available from the Telnet connection, the second
+     buffer fills in the next instruction time.  At that point, any additional
+     characters received will result in a buffer overflow condition.  The
+     problem is that the CPU has no time between the first burst and the second
+     to empty the first buffer.
+
+     RESOLUTION:  Modify "mpx_line_svc" (hp2100_mpx.c) to shift from burst
+     transfers to character-at-a-time transfers when a receive buffer is full
+     and awaiting unloading by the CPU.  This allows the CPU and DCPC time to
+     read the buffer contents into memory before the second multiplexer buffer
+     is full.  Once the completed buffer is freed, the service routine returns
+     to burst mode to fill the remainder of the other buffer, permitting the
+     efficiency of block transfers while avoiding buffer overruns with large
+     data transfers.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+274. PROBLEM:  A second connection to the BACI device leaves the client
+     unresponsive.
+
+     VERSION:  4.0-0.
+
+     OBSERVATION:  The BACI device supports a single terminal client connection.
+     If a second connection is attempted, the client connects but is otherwise
+     unresponsive.  It would be better if the client received the "All
+     connections busy" message that is reported by the terminal multiplexers
+     (MPX and MUX devices) when the number of connections is exceeded.
+
+     CAUSE:  The "baci_poll_svc" is calling the "tmxr_poll_conn" routine only if
+     the port is not connected.  The routine should be called unilaterally, so
+     that it will report an error and disconnect the client when all lines are
+     in use and another connection is attempted.
+
+     RESOLUTION:  Modify "baci_poll_svc" (hp2100_baci.c) to call
+     "tmxr_poll_conn" unilaterally, so that a second concurrent connection
+     attempt will be rejected with "All connections busy".
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+275. PROBLEM:  The exported program counter name (PC) clashes with other libraries.
+
+     VERSION:  4.0-0.
+
+     OBSERVATION:  In HP 21xx/1000 systems, the P register is the program
+     counter.  In keeping with the naming of the other register variables (e.g.,
+     for A register, B register, etc.) in the simulator, the variable used
+     should be named "PR".  However, for traditional reasons, the program
+     counter in SIMH is named "PC".
+
+     The main CPU module declares its hardware register variables as global, so
+     that they may be accessed by other CPU helper modules.  Unfortunately, the
+     "curses" library also declares the symbol "PC" as global, leading to
+     conflicts when it is loaded by SCP.  A workaround had been implemented that
+     renamed "PC" to "PC_Global" in the HP2100 simulator, but that meant that
+     the new name had to be used when debugging, which was awkward.
+
+     CAUSE:  A poor choice of global symbol names from the "termcap" library,
+     which was inherited by the "curses" library.
+
+     RESOLUTION:  Change the program counter variable name from "PC" to "PR"
+     (hp2100_cpu.c, hp2100_cpu1.c, hp2100_cpu2.c, hp2100_cpu3.c, hp2100_cpu4.c,
+     hp2100_cpu5.c, hp2100_cpu6.c, hp2100_cpu7.c, hp2100_dr.c, and hp2100_ipl.c)
+     to avoid a name clash and for register naming consistency.
 
      STATUS:  Fixed in version 4.0-0.

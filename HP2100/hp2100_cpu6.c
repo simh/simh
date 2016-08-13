@@ -25,6 +25,7 @@
 
    CPU6         RTE-6/VM OS instructions
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    17-May-16    JDB     Set local variable instead of call parameter for .SIP test
    24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Mar-13    JDB     Use MP abort handler declaration in hp2100_cpu.h
@@ -244,7 +245,7 @@ t_stat reason = SCPE_OK;
 
 save_area = ReadW (xsusp);                              /* addr of PABEO save area */
 
-WriteW (save_area + 0, PC);                             /* save P */
+WriteW (save_area + 0, PR);                             /* save P */
 WriteW (save_area + 1, AR);                             /* save A */
 WriteW (save_area + 2, BR);                             /* save B */
 WriteW (save_area + 3, (E << 15) & SIGN | O & 1);       /* save E and O */
@@ -288,13 +289,13 @@ return reason;
 static t_stat cpu_save_state (uint32 iotrap)
 {
 uint16 vectors;
-uint32 saved_PC, int_sys_off;
+uint32 saved_PR, int_sys_off;
 t_stat reason;
 
-saved_PC = PC;                                          /* save current PC */
+saved_PR = PR;                                          /* save current P register */
 reason = iogrp (SFS_0_C, iotrap);                       /* turn interrupt system off */
-int_sys_off = (PC == saved_PC);                         /* set flag if already off */
-PC = saved_PC;                                          /* restore PC in case it bumped */
+int_sys_off = (PR == saved_PR);                         /* set flag if already off */
+PR = saved_PR;                                          /* restore P in case it bumped */
 
 vectors = ReadW (vctr);                                 /* get address of vectors (in SMAP) */
 
@@ -433,7 +434,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             dms_ump = SMAP;                             /* set system map */
 
             vectors = ReadW (vctr);                     /* get address of vectors (in SMAP) */
-            PC = ReadW (vectors + mper_offset);         /* vector to $MPER for processing */
+            PR = ReadW (vectors + mper_offset);         /* vector to $MPER for processing */
             }
 
         else {                                          /* privileged call */
@@ -444,9 +445,9 @@ switch (entry) {                                        /* decode IR<3:0> */
                 save_area = ReadW (xsusp);              /* get addr of P save area */
 
                 if (dms_ump)                                /* user map current? */
-                    WriteWA (save_area, (PC - 2) & VAMASK); /* set point of suspension */
+                    WriteWA (save_area, (PR - 2) & VAMASK); /* set point of suspension */
                 else                                        /* system map current */
-                    WriteW (save_area, (PC - 2) & VAMASK);  /* set point of suspension */
+                    WriteW (save_area, (PR - 2) & VAMASK);  /* set point of suspension */
                 }
 
             WriteW (pvcn, (ReadW (pvcn) + 1) & DMASK);  /* increment priv nest counter */
@@ -454,7 +455,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         break;
 
     case 001:                                           /* $LIBX 105341 (OP_A) */
-        PC = ReadW (op[0].word);                        /* set P to return point */
+        PR = ReadW (op[0].word);                        /* set P to return point */
         count = (ReadW (pvcn) - 1) & DMASK;             /* decrement priv nest counter */
         WriteW (pvcn, count);                           /* write it back */
 
@@ -462,7 +463,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             dms_ump = SMAP;                             /* set system map */
             reason = cpu_save_regs (iotrap);            /* save registers */
             vectors = ReadW (vctr);                     /* get address of vectors */
-            PC = ReadW (vectors + lxnd_offset);         /* vector to $LXND for processing */
+            PR = ReadW (vectors + lxnd_offset);         /* vector to $LXND for processing */
             }
         break;
 
@@ -485,7 +486,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         } while ((BR > 0) && (eqt != 0));               /* loop until timeout or done */
 
         if (BR == 0)                                    /* which termination condition? */
-            PC = (PC + 1) & VAMASK;                     /* P+1 return for no timeout */
+            PR = (PR + 1) & VAMASK;                     /* P+1 return for no timeout */
 
         if (debug_print)                                /* debugging? */
             fprint_regs ("; result:",                   /* print return registers */
@@ -522,7 +523,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 AR = (key + 15) & DMASK;                /* A = addr of IDSEG [15] */
                 BR = key;                               /* B = addr of IDSEG [0] */
                 E = (uint32) ((test[5] >> 4) & 1);      /* E = short ID segment bit */
-                PC = (PC + 1) & VAMASK;                 /* P+1 for found return */
+                PR = (PR + 1) & VAMASK;                 /* P+1 for found return */
                 break;
                 }
 
@@ -537,24 +538,24 @@ switch (entry) {                                        /* decode IR<3:0> */
         break;
 
     case 004:                                           /* .STIO 105344 (OP_A) */
-        count = op[0].word - PC;                        /* get count of operands */
+        count = op[0].word - PR;                        /* get count of operands */
 
         if (debug_print)                                /* debugging? */
             fprintf (sim_deb,                           /* print registers on entry */
                      ", A = %06o, count = %d", AR, count);
 
         for (i = 0; i < count; i++) {
-            ma = ReadW (PC);                            /* get operand address */
+            ma = ReadW (PR);                            /* get operand address */
 
             reason = resolve (ma, &ma, intrq);          /* resolve indirect */
 
             if (reason != SCPE_OK) {                    /* resolution failed? */
-                PC = err_PC;                            /* IRQ restarts instruction */
+                PR = err_PC;                            /* IRQ restarts instruction */
                 break;
                 }
 
             WriteW (ma, ReadW (ma) & ~I_DEVMASK | AR);  /* set SC into instruction */
-            PC = (PC + 1) & VAMASK;                     /* bump to next */
+            PR = (PR + 1) & VAMASK;                     /* bump to next */
             }
         break;
 
@@ -566,7 +567,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             key = ReadW (BR);                           /* read a buffer word */
 
             if (key == AR) {                            /* does it match? */
-                PC = (PC + 1) & VAMASK;                 /* P+1 found return */
+                PR = (PR + 1) & VAMASK;                 /* P+1 found return */
                 break;
                 }
 
@@ -633,9 +634,9 @@ switch (entry) {                                        /* decode IR<3:0> */
             }
 
         if (AR == 0)                                    /* exhausted list? */
-            PC = (PC + 1) & VAMASK;                     /* P+1 arg not found */
+            PR = (PR + 1) & VAMASK;                     /* P+1 arg not found */
         else if ((AR & SIGN) == 0)                      /* good link? */
-            PC = (PC + 2) & VAMASK;                     /* P+2 arg found */
+            PR = (PR + 2) & VAMASK;                     /* P+2 arg found */
                                                         /* P+0 bad link */
         if (debug_print)                                /* debugging? */
             fprint_regs ("; result:",                   /* print return registers */
@@ -649,25 +650,25 @@ switch (entry) {                                        /* decode IR<3:0> */
         reason = iogrp (CLF_0, iotrap);                 /* turn interrupt system off */
 
         if (irq)                                        /* was interrupt pending? */
-            PC = (PC + 1) & VAMASK;                     /* P+1 return for pending IRQ */
+            PR = (PR + 1) & VAMASK;                     /* P+1 return for pending IRQ */
                                                         /* P+0 return for no pending IRQ */
         if (debug_print)                                /* debugging? */
             fprintf (sim_deb,                           /* print return registers */
                      ", CIR = %02o, return = P+%d",
-                     irq, PC - (err_PC + 1));
+                     irq, PR - (err_PC + 1));
         break;
 
     case 011:                                           /* .YLD  105351 (OP_C) */
-        PC = op[0].word;                                /* pick up point of resumption */
+        PR = op[0].word;                                /* pick up point of resumption */
         reason = iogrp (STF_0, iotrap);                 /* turn interrupt system on */
         ion_defer = 0;                                  /* kill defer so irq occurs immed */
         break;
 
     case 012:                                           /* .CPM  105352 (OP_KK) */
         if (INT16 (op[0].word) > INT16 (op[1].word))
-            PC = (PC + 2) & VAMASK;                     /* P+2 arg1 > arg2 */
+            PR = (PR + 2) & VAMASK;                     /* P+2 arg1 > arg2 */
         else if (INT16 (op[0].word) < INT16 (op[1].word))
-            PC = (PC + 1) & VAMASK;                     /* P+1 arg1 < arg2 */
+            PR = (PR + 1) & VAMASK;                     /* P+1 arg1 < arg2 */
                                                         /* P+0 arg1 = arg2 */
         if (debug_print)                                /* debugging? */
             fprint_regs (",", REG_P_REL, err_PC + 3);   /* print return registers */
@@ -698,7 +699,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             }
 
         else {                                          /* .ENTN instruction */
-            ma = (PC - 2) & VAMASK;                     /* get addr of entry point */
+            ma = (PR - 2) & VAMASK;                     /* get addr of entry point */
 
         ENTX:                                           /* enter here from .ENTC */
             reason = cpu_ops (OP_A, op, intrq);         /* get instruction operand */
@@ -719,7 +720,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 reason = resolve (ma, &ma, intrq);      /* resolve indirect */
 
                 if (reason != SCPE_OK) {                /* resolution failed? */
-                    PC = err_PC;                        /* irq restarts instruction */
+                    PR = err_PC;                        /* irq restarts instruction */
                     break;
                     }
 
@@ -738,13 +739,13 @@ switch (entry) {                                        /* decode IR<3:0> */
             vectors = ReadW (vctr);                     /* get address of vectors (in SMAP) */
 
             if (mp_viol & SIGN) {                       /* parity error? */
-                WriteW (vectors + cic_offset, PC);      /* save point of suspension in $CIC */
-                PC = ReadW (vectors + perr_offset);     /* vector to $PERR for processing */
+                WriteW (vectors + cic_offset, PR);      /* save point of suspension in $CIC */
+                PR = ReadW (vectors + perr_offset);     /* vector to $PERR for processing */
                 }
 
             else {                                      /* MP/DMS violation */
                 cpu_save_regs (iotrap);                 /* save CPU registers */
-                PC = ReadW (vectors + rqst_offset);     /* vector to $RQST for processing */
+                PR = ReadW (vectors + rqst_offset);     /* vector to $RQST for processing */
                 }
 
             if (debug_print) {                          /* debugging? */
@@ -763,7 +764,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             YR = 0000000;                               /* RPL switch (not implemented) */
             AR = 0000000;                               /* LDR [B] (not implemented) */
             SR = 0102077;                               /* test passed code */
-            PC = (PC + 1) & VAMASK;                     /* P+1 return for firmware OK */
+            PR = (PR + 1) & VAMASK;                     /* P+1 return for firmware OK */
 
             if ((cpu_dev.dctrl & DEB_OS) &&             /* OS debug flag set, */
                 (sim_deb == NULL))                      /* but debugging disabled? */
@@ -786,11 +787,11 @@ switch (entry) {                                        /* decode IR<3:0> */
             vectors = ReadW (vctr);                     /* get address of vectors (in SMAP) */
 
             if (INT16 (AR) < 0)                         /* negative (program ID)? */
-                PC = ReadW (vectors + sked_offset);     /* vector to $SKED for processing */
+                PR = ReadW (vectors + sked_offset);     /* vector to $SKED for processing */
             else if (AR > 0)                            /* positive (EQT address)? */
-                PC = ReadW (vectors + cic2_offset);     /* vector to $CIC2 for processing */
+                PR = ReadW (vectors + cic2_offset);     /* vector to $CIC2 for processing */
             else                                        /* zero (illegal interrupt) */
-                PC = ReadW (vectors + cic4_offset);     /* vector to $CIC4 for processing */
+                PR = ReadW (vectors + cic4_offset);     /* vector to $CIC4 for processing */
 
             if (debug_print)                            /* debugging? */
                 fprintf (sim_deb,                       /* print return registers */
@@ -799,7 +800,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             }
 
         else {                                          /* .ENTC instruction */
-            ma = (PC - 4) & VAMASK;                     /* get addr of entry point */
+            ma = (PR - 4) & VAMASK;                     /* get addr of entry point */
             goto ENTX;                                  /* continue with common processing */
             }
         break;
@@ -808,7 +809,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         if (iotrap) {                                   /* in trap cell? */
             reason = cpu_save_state (iotrap);           /* TBG interrupt */
             vectors = ReadW (vctr);                     /* get address of vectors (in SMAP) */
-            PC = ReadW (vectors + clck_offset);         /* vector to $CLCK for processing */
+            PR = ReadW (vectors + clck_offset);         /* vector to $CLCK for processing */
 
             if (debug_print)                            /* debugging? */
                 fprint_regs (",", REG_CIR, 0);          /* print interrupt source */

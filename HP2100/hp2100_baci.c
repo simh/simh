@@ -25,6 +25,7 @@
 
    BACI         12966A BACI card
 
+   02-Aug-16    JDB     "baci_poll_svc" now calls "tmxr_poll_conn" unilaterally
    13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
@@ -994,22 +995,24 @@ return status;
    scheduled.  It starts when the socket is attached and stops when the socket
    is detached.
 
-   As there is only one line, we only poll for a new connection when the line is
-   disconnected.
+
+   Implementation notes:
+
+    1. Even though there is only one line, we poll for new connections
+       unconditionally.  This is so that "tmxr_poll_conn" will report "All
+       connections busy" to a second Telnet connection.  Otherwise, the user's
+       client would connect but then would be silently unresponsive.
 */
 
 t_stat baci_poll_svc (UNIT *uptr)
 {
-if (baci_term.flags & UNIT_ATT) {                       /* attached to line? */
-    if ((baci_ldsc.conn == 0) &&                        /* line not connected? */
-        (tmxr_poll_conn (&baci_desc) >= 0))             /*   and new connection established? */
-        baci_ldsc.rcve = 1;                             /* enable line to receive */
+if (tmxr_poll_conn (&baci_desc) >= 0)                   /* if new connection is established */
+    baci_ldsc.rcve = 1;                                 /*   then enable line to receive */
 
-    tmxr_poll_rx (&baci_desc);                          /* poll for input */
+tmxr_poll_rx (&baci_desc);                              /* poll for input */
 
-    if (tmxr_rqln (&baci_ldsc))                         /* chars available? */
-        sim_activate (&baci_term, baci_term.wait);      /* activate I/O service */
-    }
+if (tmxr_rqln (&baci_ldsc))                             /* chars available? */
+    sim_activate (&baci_term, baci_term.wait);          /* activate I/O service */
 
 if (uptr->wait == POLL_FIRST)                           /* first poll? */
     uptr->wait = sync_poll (INITIAL);                   /* initial synchronization */
@@ -1063,17 +1066,19 @@ if (status == SCPE_OK) {
 return status;
 }
 
+
 /* Detach controller */
 
 t_stat baci_detach (UNIT *uptr)
 {
 t_stat status;
 
-status = tmxr_detach (&baci_desc, uptr);                /* detach socket */
 baci_ldsc.rcve = 0;                                     /* disable line reception */
 sim_cancel (&baci_poll);                                /* stop Telnet poll */
+status = tmxr_detach (&baci_desc, uptr);                /* detach socket */
 return status;
 }
+
 
 /* Local routines */
 

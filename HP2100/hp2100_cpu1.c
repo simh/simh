@@ -1,6 +1,6 @@
 /* hp2100_cpu1.c: HP 2100/1000 EAU simulator and UIG dispatcher
 
-   Copyright (c) 2005-2014, Robert M. Supnik
+   Copyright (c) 2005-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU1         Extended arithmetic and optional microcode dispatchers
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
    05-Apr-14    JDB     Corrected typo in comments for cpu_ops
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -236,7 +237,7 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
             if (UNIT_CPU_MODEL == UNIT_1000_M)          /* 1000 M-series? */
                 goto MPY;                               /* decode as MPY */
             BR = (BR + 1) & DMASK;                      /* increment B */
-            if (BR) PC = err_PC;                        /* if !=0, repeat */
+            if (BR) PR = err_PC;                        /* if !=0, repeat */
             break;
 
         case 004:                                       /* RRL 100100-100117 */
@@ -742,7 +743,7 @@ for (i = 0; i < OP_N_F; i++) {
     flags = pattern & OP_M_FLAGS;                       /* get operand pattern */
 
     if (flags >= OP_ADR) {                              /* address operand? */
-        reason = resolve (ReadW (PC), &MA, irq);        /* resolve indirects */
+        reason = resolve (ReadW (PR), &MA, irq);        /* resolve indirects */
         if (reason != SCPE_OK)                          /* resolution failed? */
             return reason;
         }
@@ -765,11 +766,11 @@ for (i = 0; i < OP_N_F; i++) {
             break;
 
         case OP_CON:                                    /* inline constant operand */
-            *op++ = ReadOp (PC, in_s);                  /* get value */
+            *op++ = ReadOp (PR, in_s);                  /* get value */
             break;
 
         case OP_VAR:                                    /* inline variable operand */
-            (*op++).word = (uint16) PC;                 /* get pointer to variable */
+            (*op++).word = (uint16) PR;                 /* get pointer to variable */
             break;
 
         case OP_ADR:                                    /* inline address operand */
@@ -805,7 +806,7 @@ for (i = 0; i < OP_N_F; i++) {
         }
 
     if (flags >= OP_CON)                                /* operand after instruction? */
-        PC = (PC + 1) & VAMASK;                         /* yes, so bump to next */
+        PR = (PR + 1) & VAMASK;                         /* yes, so bump to next */
     pattern = pattern >> OP_N_FLAGS;                    /* move next pattern into place */
     }
 return reason;
@@ -896,7 +897,7 @@ void fprint_regs (char *caption, uint32 regs, uint32 base)
 static uint32 ARX, BRX, PRL;                            /* static so addresses are constant */
 
 static const char *reg_names[] = { "CIR", "A", "B", "E", "X", "Y", "O", "P", "return" };
-static const uint32 *reg_ptrs[] = { &intaddr, &ARX, &BRX, &E, &XR, &YR, &O, &PC, &PRL };
+static const uint32 *reg_ptrs[] = { &intaddr, &ARX, &BRX, &E, &XR, &YR, &O, &PR, &PRL };
 static const char *formats[] = { "%02o", "%06o", "%06o", "%01o", "%06o", "%06o", "%01o", "%06o", "P+%d" };
 
 static char format[20] = " %s = ";                      /* base format string */
@@ -907,7 +908,7 @@ t_bool first = TRUE;                                    /* first-time through fl
 
 ARX = AR;                                               /* copy 16-bit value to static variable */
 BRX = BR;                                               /* copy 16-bit value to static variable */
-PRL = PC - base;                                        /* compute value in static variable */
+PRL = PR - base;                                        /* compute value in static variable */
 
 for (i = 0; i < REG_COUNT; i++) {
     if (regs & 1) {                                     /* register requested? */
