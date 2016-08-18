@@ -133,8 +133,10 @@ extern int32 int_req[IPL_HLVL];
 uint32 pclk_csr = 0;                                    /* control/status */
 uint32 pclk_csb = 0;                                    /* count set buffer */
 uint32 pclk_ctr = 0;                                    /* counter */
+static void pclk_set_ctr (uint32 val);
+static uint32 pclk_get_ctr (void);
 static uint32 rate[4] = { 100000, 10000, 60, 10 };      /* ticks per second */
-static uint32 xtim[4] = { 10, 100, 16667, 100000 };     /* nominal time delay */
+static uint32 xtim[4] = { 10, 100, 16667, 100000 };     /* nominal usec delay per inc/dec */
 
 t_stat pclk_rd (int32 *data, int32 PA, int32 access);
 t_stat pclk_wr (int32 data, int32 PA, int32 access);
@@ -143,7 +145,6 @@ t_stat pclk_reset (DEVICE *dptr);
 t_stat pclk_set_line (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat pclk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 const char *pclk_description (DEVICE *dptr);
-void pclk_tick (void);
 
 /* PCLK data structures
 
@@ -174,7 +175,6 @@ REG pclk_reg[] = {
     { FLDATA (RUN, pclk_csr, CSR_V_GO) },
     { BRDATA (TIME, xtim, 10, 32, 4), REG_NZ + PV_LEFT },
     { BRDATA (TPS, rate, 10, 32, 4), REG_NZ + PV_LEFT },
-    { DRDATA (CURTIM, pclk_unit.wait, 32), REG_HRO },
     { ORDATA (DEVADDR, pclk_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, pclk_dib.vec, 16), REG_HRO },
     { NULL }
@@ -218,7 +218,7 @@ switch ((PA >> 1) & 03) {
         break;
 
     case 02:                                            /* counter */
-        *data = pclk_ctr & DMASK;                       /* return counter */
+        *data = pclk_get_ctr () & DMASK;                /* return counter */
         break;
         }
 
@@ -236,21 +236,25 @@ switch ((PA >> 1) & 03) {
         pclk_csr = data & PCLKCSR_WRMASK;               /* clear and write */
         CLR_INT (PCLK);                                 /* clr intr */
         rv = CSR_GETRATE (pclk_csr);                    /* new rate */
-        pclk_unit.wait = xtim[rv];                      /* new delay */
         if ((pclk_csr & CSR_GO) == 0) {                 /* stopped? */
+            pclk_ctr = pclk_get_ctr ();                 /* save current value */
             sim_cancel (&pclk_unit);                    /* cancel */
-            if (data & CSR_FIX)                         /* fix? tick */
-                pclk_tick ();
+            if (data & CSR_FIX) {                       /* fix? tick */
+                pclk_ctr = DMASK & (pclk_ctr + (pclk_csr & CSR_UPDN)? 1 : -1);
+                if (pclk_ctr == 0)
+                    pclk_svc (&pclk_unit);
+                }
             }
         else if (((old_csr & CSR_GO) == 0) ||           /* run 0 -> 1? */
                  (rv != CSR_GETRATE (old_csr))) {       /* rate change? */
             sim_cancel (&pclk_unit);                    /* cancel */
-            sim_activate_after (&pclk_unit, xtim[rv]);  /* start clock */
+            pclk_set_ctr (pclk_csb);                    /* start clock */
             }
         break;
 
     case 01:                                            /* buffer */
-        pclk_csb = pclk_ctr = data;                     /* store ctr */
+        pclk_csb = data;                                /* store ctr */
+        pclk_set_ctr (data);
         pclk_csr = pclk_csr & ~(CSR_ERR | CSR_DONE);    /* clr err, done */
         CLR_INT (PCLK);                                 /* clr intr */
         break;
@@ -262,28 +266,37 @@ switch ((PA >> 1) & 03) {
 return SCPE_OK;
 }
 
-/* Clock tick (automatic or manual) */
-
-void pclk_tick (void)
+static void pclk_set_ctr (uint32 val)
 {
-if (pclk_csr & CSR_UPDN)                                /* up or down? */
-    pclk_ctr = (pclk_ctr + 1) & DMASK;                  /* 1 = up */
-else pclk_ctr = (pclk_ctr - 1) & DMASK;                 /* 0 = down */
-if (pclk_ctr == 0) {                                    /* reached zero? */
-    if (pclk_csr & CSR_DONE)                            /* done already set? */
-        pclk_csr = pclk_csr | CSR_ERR;                  /* set error */
-    else pclk_csr = pclk_csr | CSR_DONE;                /* else set done */
-    if (pclk_csr & CSR_IE)                              /* if IE, set int */
-        SET_INT (PCLK);
-    if (pclk_csr & CSR_MODE)                            /* if rpt, reload */
-        pclk_ctr = pclk_csb;
-    else {
-        pclk_csb = 0;                                   /* else clr ctr */
-        pclk_csr = pclk_csr & ~CSR_GO;                  /* and clr go */
-        }
+if ((pclk_csr & CSR_GO) == 0)                           /* stopped? */
+    pclk_ctr = val;                                     /* save */
+else {
+    uint32 delay = DMASK & ((pclk_csr & CSR_UPDN) ? (DMASK + 1 - val) : val);
+    int32 rv;
+
+    rv = CSR_GETRATE (pclk_csr);                        /* get rate */
+    sim_activate_after (&pclk_unit, xtim[rv] * delay);  /* schedule interrupt */
     }
-return;
 }
+
+static uint32 pclk_get_ctr (void)
+{
+uint32 val;
+int32 rv;
+
+if (!sim_is_active (&pclk_unit))
+    return pclk_ctr;
+
+rv = CSR_GETRATE (pclk_csr);                            /* get rate */
+val = (uint32)((sim_activate_time (&pclk_unit) / sim_timer_inst_per_sec ()) * (1000000 / xtim[rv]));
+val &= DMASK;
+if (pclk_csr & CSR_UPDN) 
+    val = DMASK + 1 - val;
+return val;
+}
+
+
+/* Clock tick (automatic or manual) */
 
 /* Clock service */
 
@@ -291,11 +304,19 @@ t_stat pclk_svc (UNIT *uptr)
 {
 int32 rv;
 
-pclk_tick ();                                           /* tick clock */
-if ((pclk_csr & CSR_GO) == 0)                           /* done? */
-    return SCPE_OK;
 rv = CSR_GETRATE (pclk_csr);                            /* get rate */
-sim_activate_after (&pclk_unit, xtim[rv]);
+if (pclk_csr & CSR_DONE)                                /* done already set? */
+    pclk_csr = pclk_csr | CSR_ERR;                      /* set error */
+else
+    pclk_csr = pclk_csr | CSR_DONE;                     /* else set done */
+if (pclk_csr & CSR_IE)                                  /* if IE, set int */
+    SET_INT (PCLK);
+if (pclk_csr & CSR_MODE)                                /* if rpt, reload */
+    pclk_set_ctr (pclk_csb);
+else {
+    pclk_csb = 0;                                       /* else clr ctr */
+    pclk_csr = pclk_csr & ~CSR_GO;                      /* and clr go */
+    }
 return SCPE_OK;
 }
 
@@ -308,7 +329,6 @@ pclk_csb = 0;
 pclk_ctr = 0;
 CLR_INT (PCLK);                                         /* clear int */
 sim_cancel (&pclk_unit);                                /* cancel */
-pclk_unit.wait = xtim[CSR_GETRATE (pclk_csr)];          /* reset delay */
 return auto_config (0, 0);
 }
 
