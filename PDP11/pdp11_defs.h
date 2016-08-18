@@ -478,7 +478,6 @@ typedef struct {
 /* Timers */
 
 #define TMR_CLK         0                               /* line clock */
-#define TMR_PCLK        1                               /* KW11P */
 
 /* IO parameters */
 

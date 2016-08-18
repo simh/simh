@@ -141,6 +141,7 @@ t_stat pclk_wr (int32 data, int32 PA, int32 access);
 t_stat pclk_svc (UNIT *uptr);
 t_stat pclk_reset (DEVICE *dptr);
 t_stat pclk_set_line (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat pclk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 const char *pclk_description (DEVICE *dptr);
 void pclk_tick (void);
 
@@ -180,8 +181,9 @@ REG pclk_reg[] = {
     };
 
 MTAB pclk_mod[] = {
-    { UNIT_LINE50HZ, UNIT_LINE50HZ, "50 Hz", "50HZ", &pclk_set_line },
-    { UNIT_LINE50HZ,             0, "60 Hz", "60HZ", &pclk_set_line },
+    { UNIT_LINE50HZ, UNIT_LINE50HZ, "50 Hz Line Frequency", "50HZ", &pclk_set_line },
+    { UNIT_LINE50HZ,             0, "60 Hz Line Frequency", "60HZ", &pclk_set_line },
+    { MTAB_XTD|MTAB_VDV,         0, "FREQUENCY",            NULL,   NULL, &pclk_show_freq, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
@@ -243,8 +245,7 @@ switch ((PA >> 1) & 03) {
         else if (((old_csr & CSR_GO) == 0) ||           /* run 0 -> 1? */
                  (rv != CSR_GETRATE (old_csr))) {       /* rate change? */
             sim_cancel (&pclk_unit);                    /* cancel */
-            sim_activate (&pclk_unit,                   /* start clock */
-                sim_rtcn_init (pclk_unit.wait, TMR_PCLK));
+            sim_activate_after (&pclk_unit, xtim[rv]);  /* start clock */
             }
         break;
 
@@ -294,7 +295,7 @@ pclk_tick ();                                           /* tick clock */
 if ((pclk_csr & CSR_GO) == 0)                           /* done? */
     return SCPE_OK;
 rv = CSR_GETRATE (pclk_csr);                            /* get rate */
-sim_activate (&pclk_unit, sim_rtcn_calb (rate[rv], TMR_PCLK));
+sim_activate_after (&pclk_unit, xtim[rv]);
 return SCPE_OK;
 }
 
@@ -307,7 +308,7 @@ pclk_csb = 0;
 pclk_ctr = 0;
 CLR_INT (PCLK);                                         /* clear int */
 sim_cancel (&pclk_unit);                                /* cancel */
-pclk_unit.wait = xtim[0];                               /* reset delay */
+pclk_unit.wait = xtim[CSR_GETRATE (pclk_csr)];          /* reset delay */
 return auto_config (0, 0);
 }
 
@@ -315,9 +316,22 @@ return auto_config (0, 0);
 
 t_stat pclk_set_line (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-if (val == UNIT_LINE50HZ)
+if (val == UNIT_LINE50HZ) {
     rate[2] = 50;
-else rate[2] = 60;
+    xtim[2] = 20000;
+    }
+else {
+    rate[2] = 60;
+    xtim[2] = 16667;
+    }
+return SCPE_OK;
+}
+
+t_stat pclk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+static const char *freqs[] = {"100K Hz", "10K Hz", "Line Freq", "External (10Hz)"};
+
+fprintf (st, "%s", freqs[CSR_GETRATE (pclk_csr)]);
 return SCPE_OK;
 }
 
