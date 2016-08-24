@@ -459,6 +459,7 @@ static t_stat set_units (UNIT *u, int32 val, CONST char *s, void *desc)
             kg_unit[i].flags |= UNIT_DIS;
     }
     kg_dev.numunits = units;
+    kg_dib.lnt = (IOLN_KG + 2) * units;
     kg_reset (&kg_dev);
     return (SCPE_OK);
 }
