@@ -859,9 +859,14 @@ while (reason == 0)  {
         continue;
         }
 
-    if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
-        reason = STOP_IBKPT;                            /* stop simulation */
-        continue;
+    if (sim_brk_summ) {                                 /* breakpoint? */
+        int32 pa = PC; /* FixMe */
+
+        if (sim_brk_test (PC, SWMASK ('E')) ||          /* Normal PC breakpoint? */
+            sim_brk_test (pa, SWMASK ('P'))) {          /* Physical Address breakpoint? */
+            reason = STOP_IBKPT;                        /* stop simulation */
+            continue;
+            }
         }
 
     if (update_MM) {                                    /* if mm not frozen */
@@ -3062,7 +3067,8 @@ if (M == NULL) {                    /* First time init */
     if (M == NULL)
         return SCPE_MEM;
     sim_set_pchar (0, "01000023640"); /* ESC, CR, LF, TAB, BS, BEL, ENQ */
-    sim_brk_types = sim_brk_dflt = SWMASK ('E');
+    sim_brk_dflt = SWMASK ('E');
+    sim_brk_types = sim_brk_dflt | SWMASK ('P');
     sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
     auto_config(NULL, 0);           /* do an initial auto configure */
     }
@@ -3091,12 +3097,17 @@ t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
 #define MAX_SUB_RETURN_SKIP 10
 static t_addr returns[MAX_SUB_RETURN_SKIP + 1] = {0};
 static t_bool caveats_displayed = FALSE;
+static int32 swmap[4] = {
+    SWMASK ('K') | SWMASK ('V'), SWMASK ('S') | SWMASK ('V'),
+    SWMASK ('U') | SWMASK ('V'), SWMASK ('U') | SWMASK ('V')
+    };
+int32 cm = ((PSW >> PSW_V_CM) & 03);
 
 if (!caveats_displayed) {
     caveats_displayed = TRUE;
     sim_printf ("%s", cpu_next_caveats);
     }
-if (SCPE_OK != get_aval (PC, &cpu_dev, &cpu_unit))      /* get data */
+if (SCPE_OK != get_aval (relocC(PC, swmap[cm]), &cpu_dev, &cpu_unit))/* get data */
     return FALSE;
 if ((sim_eval[0] & 0177000) == 0004000) {               /* JSR */
     int32 dst, dstspec;
