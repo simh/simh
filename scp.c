@@ -393,7 +393,6 @@ t_stat sim_brk_clrall (int32 sw);
 t_stat sim_brk_show (FILE *st, t_addr loc, int32 sw);
 t_stat sim_brk_showall (FILE *st, int32 sw);
 CONST char *sim_brk_getact (char *buf, int32 size);
-void sim_brk_npc (uint32 cnt);
 BRKTAB *sim_brk_new (t_addr loc);
 FILE *stdnul;
 
@@ -404,6 +403,7 @@ SCHTAB *get_asearch (CONST char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value *val, SCHTAB *schptr);
 static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char);
 int32 get_switches (const char *cptr);
+char *put_switches (char *buf, size_t bufsize, int32 sw);
 CONST char *get_sim_sw (CONST char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_value get_rval (REG *rptr, uint32 idx);
@@ -5053,7 +5053,7 @@ strncpy (abuf, cptr, sizeof(abuf)-1);
 cptr = abuf;
 if ((aptr = strchr (abuf, ';'))) {                      /* ;action? */
     if (flg != SSH_ST)                                  /* only on SET */
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", aptr);
     *aptr++ = 0;                                        /* separate strings */
     }
 if (*cptr == 0) {                                       /* no argument? */
@@ -5064,16 +5064,16 @@ while (*cptr) {
     cptr = get_glyph (cptr, gbuf, ',');
     tptr = get_range (dptr, gbuf, &lo, &hi, dptr->aradix, max, 0);
     if (tptr == NULL)
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid address specifier: %s\n", gbuf);
     if (*tptr == '[') {
         cnt = (int32) strtotv (tptr + 1, &t1ptr, 10);
         if ((tptr == t1ptr) || (*t1ptr != ']') || (flg != SSH_ST))
-            return SCPE_ARG;
+            return sim_messagef (SCPE_ARG, "Invalid repeat count specifier: %s\n", tptr + 1);
         tptr = t1ptr + 1;
         }
     else cnt = 0;
     if (*tptr != 0)
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Unexpected argument: %s\n", tptr);
     if ((lo == 0) && (hi == max)) {
         if (flg == SSH_CL)
             sim_brk_clrall (sim_switches);
@@ -6157,6 +6157,7 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
             if (sim_switches == 0)
                 sim_switches = sim_brk_dflt;
             sim_switches |= BRK_TYP_TEMP;               /* make this a one-shot breakpoint */
+            sim_brk_types |= BRK_TYP_TEMP;
             r = ssh_break (NULL, cptr, SSH_ST);
             if (r != SCPE_OK)
                 return sim_messagef (r, "Unable to establish breakpoint at: %s\n", cptr);
@@ -8120,6 +8121,35 @@ while (*cptr) {                                         /* loop through modifier
 return cptr;
 }
 
+/* put_switches         put switches into string
+
+   Inputs:
+        buf     =       pointer to string buffer
+        bufsize =       size of string buffer
+        sw      =       switch bit mask
+   Outputs:
+        buf     =       buffer with switches converted to text
+*/
+
+char *put_switches (char *buf, size_t bufsize, int32 sw)
+{
+char *optr = buf;
+size_t i = 0;
+int32 bit;
+
+memset (buf, 0, bufsize);
+if ((sw == 0) || (bufsize < 3))
+    return buf;
+--bufsize;                          /* leave room for terminating NUL */
+*optr++ = '-';
+for (bit=0; bit <= ('Z'-'A'); bit++)
+    if (sw & (1 << bit))
+        if ((size_t)(optr - buf) < bufsize)
+            *optr++ = 'A' + bit;
+return buf;
+}
+
+
 /* Match file extension
 
    Inputs:
@@ -8996,9 +9026,13 @@ t_stat sim_brk_set (t_addr loc, int32 sw, int32 ncnt, CONST char *act)
 {
 BRKTAB *bp;
 
-if (sw == 0) sw = sim_brk_dflt;
-if ((sim_brk_types & sw) == 0)
-    return SCPE_NOFNC;
+if ((sw == 0) || (sw == BRK_TYP_DYN_STEPOVER))
+    sw |= sim_brk_dflt;
+if (~sim_brk_types & sw) {
+    char gbuf[CBUFSIZE];
+
+    return sim_messagef (SCPE_NOFNC, "Unknown breakpoint type; %s\n", put_switches(gbuf, sizeof(gbuf), sw & ~sim_brk_types));
+    }
 if ((sw & BRK_TYP_DYN_ALL) && act)                      /* can't specify an action with a dynamic breakpoint */
     return SCPE_ARG;
 bp = sim_brk_fnd (loc);                                 /* present? */
@@ -9105,7 +9139,7 @@ if (sw & SWMASK ('C')) {
     else fprint_val (st, loc, dptr->aradix, dptr->awidth, PV_LEFT);
     }
 if (bp->cnt > 0)
-    fprintf (st, " [%d]", bp->cnt);
+    fprintf (st, "[%d]", bp->cnt);
 if (bp->act != NULL)
     fprintf (st, "; %s", bp->act);
 fprintf (st, "\n");

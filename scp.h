@@ -184,6 +184,7 @@ t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 BRKTAB *sim_brk_fnd (t_addr loc);
 uint32 sim_brk_test (t_addr bloc, uint32 btyp);
 void sim_brk_clrspc (uint32 spc);
+void sim_brk_npc (uint32 cnt);
 char *sim_brk_clract (void);
 void sim_brk_setact (const char *action);
 t_stat sim_send_input (SEND *snd, uint8 *data, size_t size, uint32 after, uint32 delay);
