@@ -746,6 +746,7 @@ while (reason == 0)  {
     int32 IR, srcspec, srcreg, dstspec, dstreg;
     int32 src, src2, dst, ea;
     int32 i, t, sign, oldrs, trapnum;
+    InstHistory *hst_ent;
 
     if (cpu_astop) {
         cpu_astop = 0;
@@ -902,6 +903,7 @@ while (reason == 0)  {
         if (hst_p >= hst_lnt)
             hst_p = 0;
         }
+    else hst_ent = NULL;
     PC = (PC + 2) & 0177777;                            /* incr PC, mod 65k */
     switch ((IR >> 12) & 017) {                         /* decode IR<15:12> */
 
