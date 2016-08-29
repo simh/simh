@@ -26,6 +26,7 @@
    DR           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -744,9 +745,9 @@ if (unitno != 0)                                        /* boot supported on dri
 if (ibl_copy (dr_rom, dev, IBL_S_NOCLR, IBL_S_NOSET))   /* copy the boot ROM to memory and configure */
     return SCPE_IERR;                                   /* return an internal error if the copy failed */
 
-WritePW (PC + IBL_DPC, dr_rom [IBL_DPC]);               /* restore overwritten word */
-WritePW (PC + IBL_END, dr_rom [IBL_END]);               /* restore overwritten word */
-PC = PC + BOOT_START;                                   /* correct starting address */
+WritePW (PR + IBL_DPC, dr_rom [IBL_DPC]);               /* restore overwritten word */
+WritePW (PR + IBL_END, dr_rom [IBL_END]);               /* restore overwritten word */
+PR = PR + BOOT_START;                                   /* correct starting address */
 
 return SCPE_OK;
 }

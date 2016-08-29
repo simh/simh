@@ -1,7 +1,7 @@
 /* hp2100_cpu5.c: HP 1000 RTE-6/VM VMA and RTE-IV EMA instructions
 
    Copyright (c) 2007-2008, Holger Veit
-   Copyright (c) 2006-2014, J. David Bryan
+   Copyright (c) 2006-2016, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    CPU5         RTE-6/VM and RTE-IV firmware option instructions
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
    17-Dec-12    JDB     Fixed cpu_vma_mapte to return FALSE if not a VMA program
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -190,18 +191,18 @@ uint32 eqt,mls,pnod,lstpg,fstpg,rotsz,lgpg,relpg,relbp,matloc,ptnpg,physpg,cnt,p
 eqt = ReadIO(xeqt,UMAP);                            /* get ID segment */
 mls = ReadIO(eqt+33,SMAP);                          /* get word33 of alternate map */
 if ((mls & 0x8000) == 0) {                          /* this is not an MLS prog! */
-    PC = err_PC;
+    PR = err_PC;
     if (debug)
-        fprintf(sim_deb,">>CPU VMA: cpu_vma_loc at P=%06o: not an MLS program\n", PC);
+        fprintf(sim_deb,">>CPU VMA: cpu_vma_loc at P=%06o: not an MLS program\n", PR);
     if (mp_control) MP_ABORT (eqt+33);              /* allow an MP abort */
     return STOP_HALT;                               /* FATAL error! */
     }
 
 pnod = mls & 01777;                                 /* get #pages of mem res nodes */
 if (pnod == 0) {                                    /* no pages? FATAL! */
-    PC = err_PC;
+    PR = err_PC;
     if (debug)
-        fprintf(sim_deb,">>CPU VMA: cpu_vma_loc at P=%06o: no mem resident pages\n", PC);
+        fprintf(sim_deb,">>CPU VMA: cpu_vma_loc at P=%06o: no mem resident pages\n", PR);
     if (mp_control) MP_ABORT (eqt+33);              /* allow an MP abort */
     return STOP_HALT;
     }
@@ -213,20 +214,20 @@ lgpg = op[0].word;
 
 /* lets do some consistency checks, CPU halt if they fail */
 if (lstpg < lgpg || lgpg < fstpg) {                 /* assert LSTPG >= LGPG# >= FSTPG */
-    PC = err_PC;
+    PR = err_PC;
     if (debug)
         fprintf(sim_deb,
-                ">>CPU VMA: $LOC at P=%06o: failed check LSTPG >= LGPG# >= FSTPG\n",PC);
+                ">>CPU VMA: $LOC at P=%06o: failed check LSTPG >= LGPG# >= FSTPG\n",PR);
     if (mp_control) MP_ABORT (eqt+22);              /* allow an MP abort */
     return STOP_HALT;
     }
 
 relpg = op[1].word;
 if (pnod < relpg || relpg < (rotsz+1)) {            /* assert #PNOD >= RELPG >= ROTSZ+1 */
-    PC = err_PC;
+    PR = err_PC;
     if (debug)
         fprintf(sim_deb,
-                ">>CPU VMA: $LOC at %06o: failed check #PNOD >= RELPG >= ROTSZ+1\n",PC);
+                ">>CPU VMA: $LOC at %06o: failed check #PNOD >= RELPG >= ROTSZ+1\n",PR);
     if (mp_control) MP_ABORT (eqt+22);              /* allow an MP abort */
     return STOP_HALT;
     }
@@ -234,10 +235,10 @@ if (pnod < relpg || relpg < (rotsz+1)) {            /* assert #PNOD >= RELPG >= 
 relbp = op[2].word;
 if (relbp != 0)                                     /* assert RELBP == 0 OR */
     if (pnod < relbp || relbp < (rotsz+1)) {        /* #PNOD >= RELBP >= ROTSZ+1 */
-        PC = err_PC;
+        PR = err_PC;
         if (debug)
             fprintf(sim_deb,
-                    ">>CPU VMA: $LOC at P=%06o: failed check: #PNOD >= RELBP >= ROTSZ+1\n",PC);
+                    ">>CPU VMA: $LOC at P=%06o: failed check: #PNOD >= RELBP >= ROTSZ+1\n",PR);
         if (mp_control) MP_ABORT (eqt+22);          /* allow an MP abort */
         return STOP_HALT;
     }
@@ -266,13 +267,13 @@ while (cnt != 0) {
 dms_wmap(32,relbp+ptnpg);                           /* map base page again */
 WriteW(op[3].word,op[4].word);                      /* path# we are going to */
 
-PC = (PC - 8) & DMASK;                              /* adjust PC to return address */
+PR = (PR - 8) & DMASK;                              /* adjust P to return address */
                                                     /* word before the $LOC microinstr. */
-PC = (ReadW(PC) - 1) & DMASK;                       /* but the call has to be rerun, */
+PR = (ReadW(PR) - 1) & DMASK;                       /* but the call has to be rerun, */
                                                     /* so must skip back to the original call */
                                                     /* which will now lead to the real routine */
 if (debug)
-    fprintf(sim_deb,">>CPU VMA: $LOC done: path#=%06o, P=%06o\n",op[4].word,PC);
+    fprintf(sim_deb,">>CPU VMA: $LOC done: path#=%06o, P=%06o\n",op[4].word,PR);
 return SCPE_OK;
 }
 
@@ -314,7 +315,7 @@ if (ReadIO(ema+1,UMAP) != 0104400) {
     return STOP_HALT;                               /* FATAL: no EMA/VMA! */
     }
 
-PC = (ema+1) & VAMASK;                              /* restart $EMA$ user code, */
+PR = (ema+1) & VAMASK;                              /* restart $EMA$ user code, */
                                                     /* will return to fault instruction */
 
 AR = (ptr >> 16) & DMASK;                           /* restore A, B */
@@ -323,7 +324,7 @@ E = 0;                                              /* enforce E = 0 */
 if (debug)
     fprintf(sim_deb,
             ">>CPU VMA: Call pg fault OS exit, AR=%06o BR=%06o P=%06o\n",
-            AR, BR, PC);
+            AR, BR, PR);
 return SCPE_OK;
 }
 
@@ -489,7 +490,7 @@ if (mapnm > 31) {                                   /* check for invalid map reg
     AR = 80;                                        /* error: corrupt EMA/VMA system */
     if (debug)
         fprintf(sim_deb, ">>CPU VMA: .PMAP invalid mapr: AR=80, exit P+1\n");
-    return SCPE_OK;                                 /* return exit PC+1 */
+    return SCPE_OK;                                 /* return exit P+1 */
     }
 
 ptr = (umapr << 16) | (pagid & DMASK);              /* build the ptr argument for vma_fault */
@@ -501,9 +502,9 @@ if (!cpu_vma_mapte(&pgpte)) {                       /* map the PTE */
             fprintf(sim_deb,
                     ">>CPU VMA: .PMAP pg fault&bit15: XR=%06o YR=%06o, exit P+1\n",
                     XR, YR);
-        return SCPE_OK;                             /* use PC+1 error exit */
+        return SCPE_OK;                             /* use P+1 error exit */
         }
-    return cpu_vma_fault(65535,ptemiss,-1,pgpte,ptr,PC-1,debug);  /* oops: fix PTE */
+    return cpu_vma_fault(65535,ptemiss,-1,pgpte,ptr,PR-1,debug);  /* oops: fix PTE */
     }
 
 /* PTE is successfully mapped to page31 and dmsmap[63] */
@@ -515,9 +516,9 @@ if (!cpu_vma_ptevl(pagid,&physpg)) {
             fprintf(sim_deb,
                     ">>CPU VMA: .PMAP pg map&bit15: XR=%06o YR=%06o, exit P+1\n",
                     XR, YR);
-        return SCPE_OK;                             /* use PC+1 error exit*/
+        return SCPE_OK;                             /* use P+1 error exit*/
         }
-    return cpu_vma_fault(pagid,page31,31,pgpte,ptr,PC-1,debug);   /* page not present */
+    return cpu_vma_fault(pagid,page31,31,pgpte,ptr,PR-1,debug);   /* page not present */
     }
 
 E = 1;
@@ -532,7 +533,7 @@ if (mapnm != 31)                                    /* unless already unmapped, 
 AR = (umapr + 1) & DMASK;                           /* increment mapr for next call */
 BR = (pagid + 1) & DMASK;                           /* increment pagid for next call */
 O = 0;                                              /* clear overflow */
-PC = (PC + 1) & VAMASK;                             /* normal PC+2 return */
+PR = (PR + 1) & VAMASK;                             /* normal P+2 return */
 if (debug)
     fprintf(sim_deb,">>CPU VMA: .PMAP map done: AR=%06o BR=%o6o exit P+2\n",AR,BR);
 return SCPE_OK;
@@ -656,7 +657,7 @@ uint16 t16;
 uint32 entry,t32,ndim;
 uint32 dtbl,atbl;                                   /* descriptor table ptr, actual args ptr */
 OP dop0,dop1;
-uint32 pcsave = (PC+1) & VAMASK;                    /* save PC to check for redo in imap/jmap */
+uint32 pcsave = (PR+1) & VAMASK;                    /* save P to check for redo in imap/jmap */
 t_bool debug = DEBUG_PRI (cpu_dev, DEB_VMA);
 
 entry = IR & 017;                                   /* mask to entry point */
@@ -693,7 +694,7 @@ switch (entry) {                                    /* decode IR<3:0> */
         XR = 3;                                     /* refer to src code 92084-18828 rev 3 */
         SR = 0102077;                               /* HLT 77 instruction */
         YR = 1;                                     /* ROMs correctly installed */
-        PC = (PC+1) & VAMASK;                       /* skip instr if VMA/EMA ROM installed */
+        PR = (PR+1) & VAMASK;                       /* skip instr if VMA/EMA ROM installed */
         break;
 
     case 003:                                       /* [swap] 105243 (OP_N) */
@@ -723,16 +724,16 @@ switch (entry) {                                    /* decode IR<3:0> */
 
     case 010:                                       /* .IMAP 105250 (OP_A) */
         dtbl = op[0].word;
-        atbl = PC;
+        atbl = PR;
         reason = cpu_vma_ijmar(in_s,dtbl,atbl,&ndim,intrq,debug);   /* calc the virt address to AB */
         if (reason)
             return reason;
         t32 = (AR << 16) | (BR & DMASK);
-        reason = cpu_vma_lbp(t32,0,PC-2,intrq,debug);
+        reason = cpu_vma_lbp(t32,0,PR-2,intrq,debug);
         if (reason)
             return reason;
-        if (PC==pcsave)
-            PC = (PC+ndim) & VAMASK;                /* adjust PC: skip ndim subscript words */
+        if (PR==pcsave)
+            PR = (PR+ndim) & VAMASK;                /* adjust P: skip ndim subscript words */
         break;
 
     case 011:                                       /* .IMAR 105251 (OP_A) */
@@ -743,16 +744,16 @@ switch (entry) {                                    /* decode IR<3:0> */
 
     case 012:                                       /* .JMAP 105252 (OP_A) */
         dtbl = op[0].word;
-        atbl = PC;
+        atbl = PR;
         reason = cpu_vma_ijmar(in_d,dtbl,atbl,&ndim,intrq,debug);   /* calc the virtual address to AB */
         if (reason)
             return reason;
         t32 = (AR << 16) | (BR & DMASK);
-        reason = cpu_vma_lbp(t32,0,PC-2,intrq,debug);
+        reason = cpu_vma_lbp(t32,0,PR-2,intrq,debug);
         if (reason)
             return reason;
-        if (PC==pcsave)
-            PC = (PC + ndim) & VAMASK;              /* adjust PC: skip ndim subscript dword ptr */
+        if (PR==pcsave)
+            PR = (PR + ndim) & VAMASK;              /* adjust P: skip ndim subscript dword ptr */
         break;
 
     case 013:                                       /* .JMAR 105253 (OP_A) */
@@ -765,23 +766,23 @@ switch (entry) {                                    /* decode IR<3:0> */
         dop0 = ReadOp(op[0].word,in_d);             /* get pointer from arg */
         dop1 = ReadOp(op[1].word,in_d);
         t32 = dop0.dword + dop1.dword;              /* add offset to it */
-        reason = cpu_vma_lbp(t32,0,PC-3,intrq,debug);
+        reason = cpu_vma_lbp(t32,0,PR-3,intrq,debug);
         break;
 
     case 015:                                       /* .LPX  105255 (OP_A) */
         t32 = (AR << 16) | (BR & DMASK);            /* pointer in AB */
         dop0 = ReadOp(op[0].word,in_d);
-        reason = cpu_vma_lbp(t32,dop0.dword,PC-2,intrq,debug);
+        reason = cpu_vma_lbp(t32,dop0.dword,PR-2,intrq,debug);
         break;
 
     case 016:                                       /* .LBPR 105256 (OP_A) */
         dop0 = ReadOp(op[0].word,in_d);             /* get the pointer */
-        reason = cpu_vma_lbp(dop0.dword,0,PC-2,intrq,debug);
+        reason = cpu_vma_lbp(dop0.dword,0,PR-2,intrq,debug);
         break;
 
     case 017:                                       /* .LBP  105257 (OP_N) */
         t32 = (AR << 16) | (BR & DMASK);
-        reason = cpu_vma_lbp(t32,0,PC-1,intrq,debug);
+        reason = cpu_vma_lbp(t32,0,PR-1,intrq,debug);
         break;
     }
 
@@ -1386,7 +1387,7 @@ if (pattern != OP_N) {
     }
 
 if (debug) {                                            /* debugging? */
-    fprintf (sim_deb, ">>CPU EMA: PC = %06o, IR = %06o (", err_PC,IR);    /* print preamble and IR */
+    fprintf (sim_deb, ">>CPU EMA: P = %06o, IR = %06o (", err_PC,IR);    /* print preamble and IR */
     fprint_sym (sim_deb, err_PC, (t_value *) &IR,       /* print instruction mnemonic */
                 NULL, SWMASK('M'));
     fputc (')', sim_deb);
@@ -1399,11 +1400,11 @@ switch (entry) {                                        /* decode IR<3:0> */
     case 000:                                           /* .EMIO 105240 (OP_A) */
         rtn = op[0].word;
         reason = cpu_ema_emio(&rtn, op[1].word,
-                              op[2].word, PC, debug);   /* handle the EMIO instruction */
-        PC = rtn;
+                              op[2].word, PR, debug);   /* handle the EMIO instruction */
+        PR = rtn;
         if (debug)
             fprintf (sim_deb, ">>CPU EMA: return .EMIO: AR = %06o, BR = %06o, rtn=%s\n",
-                     AR, BR, PC==op[0].word?"error":"good");
+                     AR, BR, PR==op[0].word?"error":"good");
         break;
 
     case 001:                                           /* .MMAP  105241 (OP_AKK) */
@@ -1426,11 +1427,11 @@ switch (entry) {                                        /* decode IR<3:0> */
     case 017:                                           /* .EMAP  105247 (OP_A) */
         rtn = op[0].word;                               /* error return */
         reason = cpu_ema_emap(&rtn, op[1].word,
-                              op[2].word, PC, debug);   /* handle the EMAP instruction */
-        PC = rtn;
+                              op[2].word, PR, debug);   /* handle the EMAP instruction */
+        PR = rtn;
         if (debug) {
             fprintf (sim_deb, ">>CPU EMA: return .EMAP: AR = %06o, BR = %06o, rtn=%s\n",
-                     AR, BR, PC==op[0].word?"error":"good");
+                     AR, BR, PR==op[0].word?"error":"good");
         }
         break;
 

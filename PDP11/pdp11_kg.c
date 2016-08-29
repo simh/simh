@@ -131,12 +131,6 @@ extern int32 R[];
 
 #define KG_SR_POLYMASK  (KGSR_M_CRCIC|KGSR_M_LRC|KGSR_M_16)
 
-/* Unit structure redefinitions */
-#define SR              u3
-#define BCC             u4
-#define DR              u5
-#define PULSCNT         u6
-
 #define POLY_LRC8       (0x0008)
 #define POLY_LRC16      (0x0080)
 #define POLY_CRC12      (0x0f01)
@@ -206,25 +200,22 @@ static DIB kg_dib = {
     0, 0, 0, { NULL }, IOLN_KG+2
 };
 
-static UNIT kg_unit[] = {
-    { UDATA (NULL, 0, 0) },
-    { UDATA (NULL, UNIT_DISABLE + UNIT_DIS, 0) },
-    { UDATA (NULL, UNIT_DISABLE + UNIT_DIS, 0) },
-    { UDATA (NULL, UNIT_DISABLE + UNIT_DIS, 0) },
-    { UDATA (NULL, UNIT_DISABLE + UNIT_DIS, 0) },
-    { UDATA (NULL, UNIT_DISABLE + UNIT_DIS, 0) },
-    { UDATA (NULL, UNIT_DISABLE + UNIT_DIS, 0) },
-    { UDATA (NULL, UNIT_DISABLE + UNIT_DIS, 0) },
-};
+static UNIT kg_unit[KG_UNITS];
 
 static const REG kg_reg[] = {
-    { URDATAD (SR,           kg_unit[0].SR, DEV_RDX, 16, 0, KG_UNITS, 0, "control and status register; R/W") },
-    { URDATAD (BCC,         kg_unit[0].BCC, DEV_RDX, 16, 0, KG_UNITS, 0, "result block check character; R/O") },
-    { URDATAD (DR,           kg_unit[0].DR, DEV_RDX, 16, 0, KG_UNITS, 0, "input data register; W/O") },
-    { URDATAD (PULSCNT, kg_unit[0].PULSCNT, DEV_RDX, 16, 0, KG_UNITS, 0, "polynomial cycle stage") },
-    { ORDATA (DEVADDR, kg_dib.ba, 32), REG_HRO },
+    { URDATAD (SR,           kg_unit[0].u3, DEV_RDX, 16, 0, KG_UNITS, 0, "control and status register; R/W") },
+    { URDATAD (BCC,          kg_unit[0].u4, DEV_RDX, 16, 0, KG_UNITS, 0, "result block check character; R/O") },
+    { URDATAD (DR,           kg_unit[0].u5, DEV_RDX, 16, 0, KG_UNITS, 0, "input data register; W/O") },
+    { URDATAD (PULSCNT,      kg_unit[0].u6, DEV_RDX, 16, 0, KG_UNITS, 0, "polynomial cycle stage") },
+    { ORDATA  (DEVADDR,          kg_dib.ba, 32), REG_HRO },
     { NULL }
 };
+
+/* Unit structure redefinitions */
+#define SR              u3
+#define BCC             u4
+#define DR              u5
+#define PULSCNT         u6
 
 static const MTAB kg_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", NULL,
@@ -386,6 +377,7 @@ static t_stat kg_reset (DEVICE *dptr)
         kg_unit[i].SR = KGSR_M_DONE;
         kg_unit[i].BCC = 0;
         kg_unit[i].PULSCNT = 0;
+        kg_unit[i].flags |= UNIT_DISABLE;       /* allow SET KGn DISABLE */
     }
     return auto_config(dptr->name, (dptr->flags & DEV_DIS) ? 0 : kg_dev.numunits);
 }
@@ -459,6 +451,7 @@ static t_stat set_units (UNIT *u, int32 val, CONST char *s, void *desc)
             kg_unit[i].flags |= UNIT_DIS;
     }
     kg_dev.numunits = units;
+    kg_dib.lnt = (IOLN_KG + 2) * units;
     kg_reset (&kg_dev);
     return (SCPE_OK);
 }

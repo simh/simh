@@ -2296,7 +2296,7 @@ cvptr->buffer [index] = (uint16) cvptr->cylinder            /* update the cylind
                           + (cvptr->eoc == SET ? 1 : 0);
 
 cvptr->buffer [index + 1] = SET_HEAD (cvptr)                /* merge the head and sector */
-                              | SET_SECTOR (cvptr);  
+                              | SET_SECTOR (cvptr);
 
 return;
 }

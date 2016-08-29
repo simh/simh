@@ -23,8 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Aug-16    JDB     Removed PC_Global renaming; P register is now "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
-   19-Jun-15    JDB     Conditionally use Global_PC for PC for version 4.0 and on
+   19-Jun-15    JDB     Conditionally use PC_Global for PC for version 4.0 and on
    30-Dec-14    JDB     Added S-register parameters to ibl_copy, more IBL constants
    28-Dec-14    JDB     Changed suppression from #pragma GCC to #pragma clang
    05-Feb-13    JDB     Added declaration for hp_fprint_stopped
@@ -83,10 +84,6 @@
 #include "sim_rev.h"
 #include "sim_defs.h"
 
-
-#if (SIM_MAJOR >= 4)
-  #define PC    PC_Global                       /* Rename to avoid namespace conflicts */
-#endif
 
 
 /* The following pragmas quell clang warnings that are on by default but should

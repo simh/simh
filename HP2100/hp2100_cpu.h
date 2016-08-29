@@ -1,6 +1,6 @@
 /* hp2100_cpu.h: HP 2100 CPU definitions
 
-   Copyright (c) 2005-2014, Robert M. Supnik
+   Copyright (c) 2005-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Mar-13    JDB     Added declarations for the MP abort handler and CPU registers
    14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
@@ -273,7 +274,7 @@
 #define BR              ABREG[1]                        /* B = reg 1 */
 
 extern uint16 ABREG[2];                                 /* A/B regs (use AR/BR) */
-extern uint32 PC;                                       /* P register */
+extern uint32 PR;                                       /* P register */
 extern uint32 SR;                                       /* S register */
 extern uint32 MR;                                       /* M register */
 extern uint32 TR;                                       /* T register */

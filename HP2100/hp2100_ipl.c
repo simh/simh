@@ -25,6 +25,7 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    14-Sep-15    JDB     Exposed "ipl_edtdelay" via a REG_HIDDEN to allow user tuning
                         Corrected typos in comments and strings
@@ -866,10 +867,10 @@ if (ibl_copy (ipl_rom, devi, IBL_S_CLR,                 /* copy the boot ROM to 
               IBL_SET_SC (devi) | devp))                /*   the S register accordingly */
     return SCPE_IERR;                                   /* return an internal error if the copy failed */
 
-WritePW (PC + MAX_BASE, (~PC + 1) & DMASK);             /* fix ups */
-WritePW (PC + IPL_PNTR, ipl_rom [IPL_PNTR] | PC);
-WritePW (PC + PTR_PNTR, ipl_rom [PTR_PNTR] | PC);
-WritePW (PC + IPL_DEVA, devi);
-WritePW (PC + PTR_DEVA, devp);
+WritePW (PR + MAX_BASE, (~PR + 1) & DMASK);             /* fix ups */
+WritePW (PR + IPL_PNTR, ipl_rom [IPL_PNTR] | PR);
+WritePW (PR + PTR_PNTR, ipl_rom [PTR_PNTR] | PR);
+WritePW (PR + IPL_DEVA, devi);
+WritePW (PR + PTR_DEVA, devp);
 return SCPE_OK;
 }

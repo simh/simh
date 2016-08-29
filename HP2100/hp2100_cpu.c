@@ -29,6 +29,7 @@
    DMA1,DMA2    12607B/12578A/12895A direct memory access controller
    DCPC1,DCPC2  12897B dual channel port controller
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    31-Dec-14    JDB     Corrected devdisp data parameters
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
@@ -183,7 +184,7 @@
 
    AR<15:0>             A register - addressable as location 0
    BR<15:0>             B register - addressable as location 1
-   PC<14:0>             P register - program counter
+   PR<14:0>             P register - program counter
    SR<15:0>             S register - switch register
    MR<14:0>             M register - memory address
    TR<15:0>             T register - memory data
@@ -234,9 +235,9 @@
    <15,10>      mode            action
 
    0,0  page zero direct        MA = IR<9:0>
-   0,1  current page direct     MA = PC<14:0>'IR,9:0>
+   0,1  current page direct     MA = PR<14:0>'IR,9:0>
    1,0  page zero indirect      MA = M[IR<9:0>]
-   1,1  current page indirect   MA = M[PC<14:10>'IR<9:0>]
+   1,1  current page indirect   MA = M[PR<14:10>'IR<9:0>]
 
    Memory reference instructions can access an address space of 32K words.
    An instruction can directly reference the first 1024 words of memory
@@ -517,7 +518,7 @@ static uint32 fwanxm = 0;                               /* first word addr of nx
 
 uint16 *M = NULL;                                       /* memory */
 uint16 ABREG[2];                                        /* A/B registers */
-uint32 PC = 0;                                          /* P register */
+uint32 PR = 0;                                          /* P register */
 uint32 SR = 0;                                          /* S register */
 uint32 MR = 0;                                          /* M register */
 uint32 TR = 0;                                          /* T register */
@@ -681,7 +682,7 @@ DIB cpu_dib = { &cpuio, CPU };
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, 0) };
 
 REG cpu_reg[] = {
-    { ORDATA (P, PC, 15) },
+    { ORDATA (P, PR, 15) },
     { ORDATA (A, AR, 16), REG_FIT },
     { ORDATA (B, BR, 16), REG_FIT },
     { ORDATA (M, MR, 15) },
@@ -1015,7 +1016,7 @@ DIB *dtab [64] = { &cpu_dib, &ovfl_dib };               /* init with immutable d
 
    This routine is the instruction decode routine for the HP 2100.  It is called
    from the simulator control program to execute instructions in simulated
-   memory, starting at the simulated PC.  It runs until 'reason' is set to a
+   memory, starting at the simulated PR.  It runs until 'reason' is set to a
    status other than SCPE_OK.
 */
 
@@ -1034,7 +1035,7 @@ int abortval;
 if (dev_conflict ())                                    /* check device assignment consistency */
     return SCPE_STOP;                                   /* conflict; stop execution */
 
-err_PC = PC = PC & VAMASK;                              /* load local PC */
+err_PC = PR = PR & VAMASK;                              /* load local P register */
 
 /* Restore I/O state */
 
@@ -1127,7 +1128,7 @@ intrq = calc_int ();                                    /* initial recalc of int
 while (reason == SCPE_OK) {                             /* loop until halted */
     uint32 IR, MA, absel, v1, t, skip;
 
-    err_PC = PC;                                        /* save PC for error recovery */
+    err_PC = PR;                                        /* save P for error recovery */
 
     if (sim_interval <= 0) {                            /* event timeout? */
         reason = sim_process_event ();                  /* process event service */
@@ -1284,7 +1285,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
         iotrap = 0;                                     /* not a trap cell instruction */
 
         if (sim_brk_summ &&                             /* any breakpoints? */
-            sim_brk_test (PC, SWMASK ('E') |            /* unconditional or */
+            sim_brk_test (PR, SWMASK ('E') |            /* unconditional or */
                               (dms_enb ?                /*   correct type for DMS state? */
                                 (dms_ump ?
                                   SWMASK ('U') : SWMASK ('S')) :
@@ -1294,10 +1295,10 @@ while (reason == SCPE_OK) {                             /* loop until halted */
             }
 
         if (mp_evrff)                                   /* violation register enabled */
-            mp_viol = PC;                               /* update with current PC */
+            mp_viol = PR;                               /* update with current P */
 
-        IR = ReadW (PC);                                /* fetch instr */
-        PC = (PC + 1) & VAMASK;
+        IR = ReadW (PR);                                /* fetch instr */
+        PR = (PR + 1) & VAMASK;
         ion_defer = FALSE;
         }
 
@@ -1359,9 +1360,9 @@ while (reason == SCPE_OK) {                             /* loop until halted */
 
         mp_dms_jmp (MA, jsb_plb);                       /* validate jump address */
 
-        WriteW (MA, PC);                                /* store PC */
+        WriteW (MA, PR);                                /* store P */
         PCQ_ENTRY;
-        PC = (MA + 1) & VAMASK;                         /* jump */
+        PR = (MA + 1) & VAMASK;                         /* jump */
         break;
 
     case 0040:case 0041:case 0042:case 0043:
@@ -1433,7 +1434,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
 
         mp_dms_jmp (MA, 0);                             /* validate jump addr */
         PCQ_ENTRY;
-        PC = MA;                                        /* jump */
+        PR = MA;                                        /* jump */
 
 /* Idle conditions by operating system:
 
@@ -1458,14 +1459,14 @@ while (reason == SCPE_OK) {                             /* loop until halted */
 */
 
         if ((sim_idle_enab) && (intrq == 0))                /* idle enabled w/o pending irq? */
-            if (((PC == err_PC) ||                          /* RTE through RTE-IVB */
-                 ((PC == (err_PC - 1)) &&                   /* RTE-6/VM */
-                  ((ReadW (PC) & I_MRG) == I_ISZ))) &&      /* RTE jump target */
+            if (((PR == err_PC) ||                          /* RTE through RTE-IVB */
+                 ((PR == (err_PC - 1)) &&                   /* RTE-6/VM */
+                  ((ReadW (PR) & I_MRG) == I_ISZ))) &&      /* RTE jump target */
                 (mp_fence == CLEAR) && (M [xeqt] == 0) &&   /* RTE idle indications */
                 (M [tbg] == clk_dib.select_code) ||         /* RTE verification */
 
-                (PC == (err_PC - 3)) &&                     /* DOS through DOS-III */
-                (ReadW (PC) == I_STF) &&                    /* DOS jump target */
+                (PR == (err_PC - 3)) &&                     /* DOS through DOS-III */
+                (ReadW (PR) == I_STF) &&                    /* DOS jump target */
                 (AR == 0177777) && (BR == 0177777) &&       /* DOS idle indication */
                 (M [m64] == 0177700) &&                     /* DOS verification */
                 (M [p64] == 0000100))                       /* DOS verification */
@@ -1498,7 +1499,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
         WriteW (MA, t);
 
         if (t == 0)
-            PC = (PC + 1) & VAMASK;
+            PR = (PR + 1) & VAMASK;
         break;
 
     case 0100:case 0101:case 0102:case 0103:
@@ -1553,7 +1554,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
             break;                                      /* stop execution */
 
         if (AR != ReadW (MA))
-            PC = (PC + 1) & VAMASK;
+            PR = (PR + 1) & VAMASK;
         break;
 
     case 0130:case 0131:case 0132:case 0133:
@@ -1566,7 +1567,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
             break;                                      /* stop execution */
 
         if (BR != ReadW (MA))
-            PC = (PC + 1) & VAMASK;
+            PR = (PR + 1) & VAMASK;
         break;
 
     case 0140:case 0141:case 0142:case 0143:
@@ -1702,7 +1703,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
             }                                           /* end if ~RSS */
 
         ABREG[absel] = (uint16) t;                      /* store result */
-        PC = (PC + skip) & VAMASK;                      /* add in skip */
+        PR = (PR + skip) & VAMASK;                      /* add in skip */
         break;                                          /* end if alter/skip */
 
 /* Shift instructions */
@@ -1715,7 +1716,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
             E = 0;
 
         if ((IR & 000010) && ((t & 1) == 0))            /* SLx */
-            PC = (PC + 1) & VAMASK;
+            PR = (PR + 1) & VAMASK;
 
         ABREG[absel] = (uint16) shift (t, IR & 00020, IR);  /* do second shift */
         break;                                              /* end if shift */
@@ -1756,7 +1757,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
         }
 
     else if (reason == NOTE_INDINT) {                   /* intr pend during indir? */
-        PC = err_PC;                                    /* back out of inst */
+        PR = err_PC;                                    /* back out of inst */
         reason = SCPE_OK;                               /* continue */
         }
     }                                                   /* end while */
@@ -1766,7 +1767,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
 if (iotrap && (reason == STOP_HALT))                    /* HLT in trap cell? */
     MR = intaddr;                                       /* M = interrupt address */
 else                                                    /* normal HLT */
-    MR = (PC - 1) & VAMASK;                             /* M = P - 1 */
+    MR = (PR - 1) & VAMASK;                             /* M = P - 1 */
 
 TR = ReadTAB (MR);                                      /* T = last word fetched */
 saved_MR = MR;                                          /* save for T cmd update */
@@ -1774,7 +1775,7 @@ saved_MR = MR;                                          /* save for T cmd update
 if (reason == STOP_HALT)                                /* programmed halt? */
     cpu_set_ldr (NULL, FALSE, NULL, NULL);              /* disable loader (after T is read) */
 else                                                    /* simulation stop */
-    PC = err_PC;                                        /* back out instruction */
+    PR = err_PC;                                        /* back out instruction */
 
 dms_upd_sr ();                                          /* update dms_sr */
 dms_upd_vr (MR);                                        /* update dms_vr */
@@ -1841,7 +1842,7 @@ uint32 MA;
 MA = IR & (I_IA | I_DISP);                              /* ind + disp */
 
 if (IR & I_CP)                                          /* current page? */
-    MA = ((PC - 1) & I_PAGENO) | MA;                    /* merge in page from PC */
+    MA = ((PR - 1) & I_PAGENO) | MA;                    /* merge in page from P */
 
 return resolve (MA, addr, irq);                         /* resolve indirects */
 }
@@ -1982,7 +1983,7 @@ iodata = IODATA (ioreturn);                             /* extract return data v
 
 if (((sop == soSFC) || (sop == soSFS)) &&               /* testing flag state? */
     ((IOSIGNAL) iodata == ioSKF))                       /*   and SKF asserted? */
-    PC = (PC + 1) & VAMASK;                             /* bump P to skip next instruction */
+    PR = (PR + 1) & VAMASK;                             /* bump P to skip next instruction */
 
 else if (sop == soLIX)                                  /* LIA/B instruction? */
     ABREG [ab] = iodata;                                /* load returned data */
@@ -2047,7 +2048,7 @@ t_bool calc_defer (void)
 uint16 IR;
 
 if (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX) {              /* 21xx series? */
-    IR = ReadW (PC);                                    /* prefetch next instr */
+    IR = ReadW (PR);                                    /* prefetch next instr */
 
     if (((IR & I_MRG & ~I_AB) != 0000000) &&            /* is MRG instruction? */
         ((IR & I_MRG_I)       != I_JSB_I) &&            /*   but not JSB,I? */
@@ -2760,12 +2761,12 @@ while (working_set) {
             if (UNIT_CPU_FAMILY == UNIT_FAMILY_1000) {  /* 1000 series? */
                 memset (M, 0, (uint32) MEMSIZE * 2);    /* zero allocated memory */
                 MR = 0077777;                           /* set M register */
-                PC = 0100000;                           /* set P register */
+                PR = 0100000;                           /* set P register */
                 }
 
             else {                                      /* 21xx series */
                 MR = 0;                                 /* clear M register */
-                PC = 0;                                 /* clear P register */
+                PR = 0;                                 /* clear P register */
                 }
             break;
 
@@ -3987,7 +3988,7 @@ return SCPE_OK;
 
 /* IBL boot ROM copy
 
-   - Use memory size to set the initial PC and base of the boot area
+   - Use memory size to set the initial P and base of the boot area
    - Copy boot ROM to memory, updating I/O instructions
    - Place 2s complement of boot base in last location
    - Modify S register as indicated
@@ -4007,7 +4008,7 @@ cpu_set_ldr (NULL, TRUE, NULL, NULL);                   /* enable loader (ignore
 if (dev < 010)                                          /* valid device? */
     return SCPE_ARG;
 
-PC = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;              /* start at mem top */
+PR = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;              /* start at mem top */
 
 for (i = 0; i < IBL_LNT; i++) {                         /* copy bootstrap */
     wd = rom[i];                                        /* get word */
@@ -4015,14 +4016,14 @@ for (i = 0; i < IBL_LNT; i++) {                         /* copy bootstrap */
     if (((wd & I_NMRMASK) == I_IO) &&                   /* IO instruction? */
         ((wd & I_DEVMASK) >= 010) &&                    /* dev >= 10? */
         (I_GETIOOP (wd) != soHLT))                      /* not a HALT? */
-        M[PC + i] = (wd + (dev - 010)) & DMASK;         /* change dev code */
+        M[PR + i] = (wd + (dev - 010)) & DMASK;         /* change dev code */
 
     else                                                /* leave unchanged */
-        M[PC + i] = wd;
+        M[PR + i] = wd;
     }
 
-M[PC + IBL_DPC] = (M[PC + IBL_DPC] + (dev - 010)) & DMASK;  /* patch DMA ctrl */
-M[PC + IBL_END] = (~PC + 1) & DMASK;                        /* fill in start of boot */
+M[PR + IBL_DPC] = (M[PR + IBL_DPC] + (dev - 010)) & DMASK;  /* patch DMA ctrl */
+M[PR + IBL_END] = (~PR + 1) & DMASK;                        /* fill in start of boot */
 
 SR = (SR & sr_clear) | sr_set;                          /* modify the S register as indicated */
 
