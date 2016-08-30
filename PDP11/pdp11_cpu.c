@@ -2928,7 +2928,7 @@ if (MMR0 & MMR0_MME) {                                  /* if mmgt */
     else if (sw & SWMASK ('P'))
         mode = (PSW >> PSW_V_PM) & 03;
     else mode = (PSW >> PSW_V_CM) & 03;
-    va = va | ((sw & SWMASK ('D'))? calc_ds (mode): calc_is (mode));
+    va = va | ((sw & SWMASK ('T'))? calc_ds (mode): calc_is (mode));
     apridx = (va >> VA_V_APF) & 077;                    /* index into APR */
     apr = APRFILE[apridx];                              /* with va<18:13> */
     dbn = va & VA_BN;                                   /* extr block num */
