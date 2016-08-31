@@ -9049,7 +9049,7 @@ if ((sim_brk_ins == sim_brk_ent) ||
         sim_brk_tab[i] = sim_brk_tab[i - 1];
     sim_brk_tab[sim_brk_ins] = NULL;
     }
-bp = calloc (1, sizeof (*bp));
+bp = (BRKTAB *)calloc (1, sizeof (*bp));
 bp->next = sim_brk_tab[sim_brk_ins];
 sim_brk_tab[sim_brk_ins] = bp;
 if (bp->next == NULL)
