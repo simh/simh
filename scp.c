@@ -393,7 +393,9 @@ t_stat sim_brk_clrall (int32 sw);
 t_stat sim_brk_show (FILE *st, t_addr loc, int32 sw);
 t_stat sim_brk_showall (FILE *st, int32 sw);
 CONST char *sim_brk_getact (char *buf, int32 size);
-BRKTAB *sim_brk_new (t_addr loc);
+BRKTAB *sim_brk_new (t_addr loc, uint32 btyp);
+char *sim_brk_clract (void);
+
 FILE *stdnul;
 
 /* Command support routines */
@@ -475,12 +477,10 @@ uint32 sim_brk_types = 0;
 uint32 sim_brk_dflt = 0;
 char *sim_brk_act[MAX_DO_NEST_LVL];
 char *sim_brk_act_buf[MAX_DO_NEST_LVL];
-BRKTAB *sim_brk_tab = NULL;
+BRKTAB **sim_brk_tab = NULL;
 int32 sim_brk_ent = 0;
 int32 sim_brk_lnt = 0;
 int32 sim_brk_ins = 0;
-t_bool sim_brk_pend[SIM_BKPT_N_SPC] = { FALSE };
-t_addr sim_brk_ploc[SIM_BKPT_N_SPC] = { 0 };
 int32 sim_quiet = 0;
 int32 sim_step = 0;
 static double sim_time;
@@ -4604,7 +4604,8 @@ t_stat r;
 
 if (cptr && (*cptr != 0))
     r = ssh_break (st, cptr, 1);  /* more? */
-else r = sim_brk_showall (st, sim_switches);
+else 
+    r = sim_brk_showall (st, sim_switches);
 return r;
 }
 
@@ -5045,7 +5046,7 @@ t_addr lo, hi, max = uptr->capac - 1;
 int32 cnt;
 
 if (sim_brk_types == 0)
-    return SCPE_NOFNC;
+    return sim_messagef (SCPE_NOFNC, "No breakpoint support in this simulator\n");
 if ((dptr == NULL) || (uptr == NULL))
     return SCPE_IERR;
 abuf[sizeof(abuf)-1] = '\0';
@@ -5077,9 +5078,11 @@ while (*cptr) {
     if ((lo == 0) && (hi == max)) {
         if (flg == SSH_CL)
             sim_brk_clrall (sim_switches);
-        else if (flg == SSH_SH)
-            sim_brk_showall (st, sim_switches);
-        else return SCPE_ARG;
+        else
+            if (flg == SSH_SH)
+                sim_brk_showall (st, sim_switches);
+            else
+                return SCPE_ARG;
         }
     else {
         for ( ; lo <= hi; lo = lo + 1) {
@@ -5094,6 +5097,8 @@ return SCPE_OK;
 
 t_stat ssh_break_one (FILE *st, int32 flg, t_addr lo, int32 cnt, CONST char *aptr)
 {
+if (!sim_brk_types)
+    return sim_messagef (SCPE_NOFNC, "No breakpoint support in this simulator\n");
 switch (flg) {
 
     case SSH_ST:
@@ -8917,7 +8922,7 @@ return cnt;
    instruction breakpoint capability.
 
    Breakpoints are stored in table sim_brk_tab, which is ordered by address for
-   efficient binary searching.  A breakpoint consists of a four entry structure:
+   efficient binary searching.  A breakpoint consists of a six entry structure:
 
         addr                    address of the breakpoint
         type                    types of breakpoints set on the address
@@ -8925,10 +8930,12 @@ return cnt;
         cnt                     number of iterations before breakp is taken
         action                  pointer command string to be executed
                                 when break is taken
+        next                    list of other breakpoints with the same addr specifier
+        time_fired              array of when this breakpoint was fired for each class
 
    sim_brk_summ is a summary of the types of breakpoints that are currently set (it
    is the bitwise OR of all the type fields).  A simulator need only check for
-   a breakpoint of type X if bit SWMASK('X') is set in sim_brk_sum.
+   a breakpoint of type X if bit SWMASK('X') is set in sim_brk_summ.
 
    The package contains the following public routines:
 
@@ -8948,10 +8955,25 @@ return cnt;
 
 t_stat sim_brk_init (void)
 {
+int32 i;
+
+for (i=0; i<sim_brk_lnt; i++) {
+    BRKTAB *bp = sim_brk_tab[i];
+
+    while (bp) {
+        BRKTAB *bpt = bp->next;
+
+        free (bp->act);
+        free (bp);
+        bp = bpt;
+        }
+    }
+memset (sim_brk_tab, 0, sim_brk_lnt*sizeof (BRKTAB*));
 sim_brk_lnt = SIM_BRK_INILNT;
-sim_brk_tab = (BRKTAB *) calloc (sim_brk_lnt, sizeof (BRKTAB));
+sim_brk_tab = (BRKTAB **) realloc (sim_brk_tab, sim_brk_lnt*sizeof (BRKTAB*));
 if (sim_brk_tab == NULL)
     return SCPE_MEM;
+memset (sim_brk_tab, 0, sim_brk_lnt*sizeof (BRKTAB*));
 sim_brk_ent = sim_brk_ins = 0;
 sim_brk_clract ();
 sim_brk_npc (0);
@@ -8973,9 +8995,11 @@ lo = 0;                                                 /* initial bounds */
 hi = sim_brk_ent - 1;
 do {
     p = (lo + hi) >> 1;                                 /* probe */
-    bp = sim_brk_tab + p;                               /* table addr */
-    if (loc == bp->addr)                                /* match? */
+    bp = sim_brk_tab[p];                                /* table addr */
+    if (loc == bp->addr) {                              /* match? */
+        sim_brk_ins = p;
         return bp;
+        }
     else if (loc < bp->addr)                            /* go down? p is upper */
         hi = p - 1;
     else lo = p + 1;                                    /* go up? p is lower */
@@ -8986,37 +9010,56 @@ else sim_brk_ins = p + 1;                               /* after last sch */
 return NULL;
 }
 
+BRKTAB *sim_brk_fnd_ex (t_addr loc, uint32 btyp, t_bool any_typ)
+{
+BRKTAB *bp = sim_brk_fnd (loc);
+
+while (bp) {
+    if (any_typ ? (bp->typ & btyp) : (bp->typ == btyp))
+        return bp;
+    bp = bp->next;
+    }
+return bp;
+}
+
 /* Insert a breakpoint */
 
-BRKTAB *sim_brk_new (t_addr loc)
+BRKTAB *sim_brk_new (t_addr loc, uint32 btyp)
 {
 int32 i, t;
-BRKTAB *bp, *newp;
+BRKTAB *bp, **newp;
 
 if (sim_brk_ins < 0)
     return NULL;
 if (sim_brk_ent >= sim_brk_lnt) {                       /* out of space? */
     t = sim_brk_lnt + SIM_BRK_INILNT;                   /* new size */
-    newp = (BRKTAB *) calloc (t, sizeof (BRKTAB));      /* new table */
+    newp = (BRKTAB **) calloc (t, sizeof (BRKTAB*));    /* new table */
     if (newp == NULL)                                   /* can't extend */
         return NULL;
-    for (i = 0; i < sim_brk_lnt; i++)                   /* copy table */
-        *(newp + i) = *(sim_brk_tab + i);
+    memcpy (newp, sim_brk_tab, sim_brk_lnt * sizeof (*sim_brk_tab));/* copy table */
+    memset (newp + sim_brk_lnt, 0, SIM_BRK_INILNT * sizeof (*newp));/* zero new entries */
     free (sim_brk_tab);                                 /* free old table */
     sim_brk_tab = newp;                                 /* new base, lnt */
     sim_brk_lnt = t;
     }
-if (sim_brk_ins != sim_brk_ent) {                       /* move needed? */
-    for (bp = sim_brk_tab + sim_brk_ent;
-         bp > sim_brk_tab + sim_brk_ins; bp--)
-        *bp = *(bp - 1);
+if ((sim_brk_ins == sim_brk_ent) ||
+    ((sim_brk_ins != sim_brk_ent) &&
+     (sim_brk_tab[sim_brk_ins]->addr != loc))) {        /* need to open a hole? */
+    for (i = sim_brk_ent; i > sim_brk_ins; --i)
+        sim_brk_tab[i] = sim_brk_tab[i - 1];
+    sim_brk_tab[sim_brk_ins] = NULL;
     }
-bp = sim_brk_tab + sim_brk_ins;
+bp = calloc (1, sizeof (*bp));
+bp->next = sim_brk_tab[sim_brk_ins];
+sim_brk_tab[sim_brk_ins] = bp;
+if (bp->next == NULL)
+    sim_brk_ent += 1;
 bp->addr = loc;
-bp->typ = 0;
+bp->typ = btyp;
 bp->cnt = 0;
 bp->act = NULL;
-sim_brk_ent = sim_brk_ent + 1;
+for (i = 0; i < SIM_BKPT_N_SPC; i++)
+    bp->time_fired[i] = -1.0;
 return bp;
 }
 
@@ -9035,12 +9078,17 @@ if (~sim_brk_types & sw) {
     }
 if ((sw & BRK_TYP_DYN_ALL) && act)                      /* can't specify an action with a dynamic breakpoint */
     return SCPE_ARG;
-bp = sim_brk_fnd (loc);                                 /* present? */
+bp = sim_brk_fnd (loc);                                 /* loc present? */
 if (!bp)                                                /* no, allocate */
-    bp = sim_brk_new (loc);
+    bp = sim_brk_new (loc, sw);
+else {
+    while (bp && (bp->typ != sw))
+        bp = bp->next;
+    if (!bp)
+        bp = sim_brk_new (loc, sw);
+    }
 if (!bp)                                                /* still no? mem err */
     return SCPE_MEM;
-bp->typ |= sw;                                          /* set type */
 bp->cnt = ncnt;                                         /* set count */
 if ((!(sw & BRK_TYP_DYN_ALL)) &&                        /* Not Dynamic and */
     (bp->act != NULL) && (act != NULL)) {               /* replace old action? */
@@ -9054,7 +9102,7 @@ if ((act != NULL) && (*act != 0)) {                     /* new action? */
     strncpy (newp, act, CBUFSIZE);                      /* copy action */
     bp->act = newp;                                     /* set pointer */
     }
-sim_brk_summ = sim_brk_summ | sw;
+sim_brk_summ = sim_brk_summ | (sw & ~BRK_TYP_TEMP);
 return SCPE_OK;
 }
 
@@ -9062,23 +9110,42 @@ return SCPE_OK;
 
 t_stat sim_brk_clr (t_addr loc, int32 sw)
 {
-BRKTAB *bp = sim_brk_fnd (loc);
+BRKTAB *bpl, *bp = sim_brk_fnd (loc);
+int32 i;
 
 if (!bp)                                                /* not there? ok */
     return SCPE_OK;
 if (sw == 0)
     sw = SIM_BRK_ALLTYP;
-bp->typ = bp->typ & ~sw;
-if (bp->typ)                                            /* clear all types? */
-    return SCPE_OK;
-if (bp->act != NULL)                                    /* deallocate action */
-    free (bp->act);
-for ( ; bp < (sim_brk_tab + sim_brk_ent - 1); bp++)     /* erase entry */
-    *bp = *(bp + 1);
-sim_brk_ent = sim_brk_ent - 1;                          /* decrement count */
+
+while (bp) {
+    if (bp->typ == (bp->typ & sw)) {
+        free (bp->act);                                 /* deallocate action */
+        if (bp == sim_brk_tab[sim_brk_ins])
+            bpl = sim_brk_tab[sim_brk_ins] = bp->next;
+        else
+            bpl->next = bp->next;
+        free (bp);
+        bp = bpl;
+        }
+    else {
+        bpl = bp;
+        bp = bp->next;
+        }
+    }
+if (sim_brk_tab[sim_brk_ins] == NULL) {                 /* erased entry */
+    sim_brk_ent = sim_brk_ent - 1;                      /* decrement count */
+    for (i = sim_brk_ins; i < sim_brk_ent; i++)         /* shuffle remaining entries */
+        sim_brk_tab[i] = sim_brk_tab[i+1];
+    }
 sim_brk_summ = 0;                                       /* recalc summary */
-for (bp = sim_brk_tab; bp < (sim_brk_tab + sim_brk_ent); bp++)
-    sim_brk_summ = sim_brk_summ | bp->typ;
+for (i = 0; i < sim_brk_ent; i++) {
+    bp = sim_brk_tab[i];
+    while (bp) {
+        sim_brk_summ |= (bp->typ & ~BRK_TYP_TEMP);
+        bp = bp->next;
+        }
+    }
 return SCPE_OK;
 }
 
@@ -9086,13 +9153,16 @@ return SCPE_OK;
 
 t_stat sim_brk_clrall (int32 sw)
 {
-BRKTAB *bp;
+int32 i;
 
-if (sw == 0) sw = SIM_BRK_ALLTYP;
-for (bp = sim_brk_tab; bp < (sim_brk_tab + sim_brk_ent); ) {
-    if (bp->typ & sw)
-        sim_brk_clr (bp->addr, sw);
-    else bp++;
+if (sw == 0)
+    sw = SIM_BRK_ALLTYP;
+for (i = 0; i < sim_brk_ent;) {
+    t_addr loc = sim_brk_tab[i]->addr;
+    sim_brk_clr (loc, sw);
+    if ((i < sim_brk_ent) && 
+        (loc == sim_brk_tab[i]->addr))
+        ++i;
     }
 return SCPE_OK;
 }
@@ -9101,7 +9171,7 @@ return SCPE_OK;
 
 t_stat sim_brk_show (FILE *st, t_addr loc, int32 sw)
 {
-BRKTAB *bp = sim_brk_fnd (loc);
+BRKTAB *bp = sim_brk_fnd_ex (loc, sw & (~SWMASK ('C')), FALSE);
 DEVICE *dptr;
 int32 i, any;
 
@@ -9150,13 +9220,60 @@ return SCPE_OK;
 
 t_stat sim_brk_showall (FILE *st, int32 sw)
 {
-BRKTAB *bp;
+int32 bit, mask, types;
+BRKTAB **bpt;
 
 if ((sw == 0) || (sw == SWMASK ('C')))
     sw = SIM_BRK_ALLTYP | ((sw == SWMASK ('C')) ? SWMASK ('C') : 0);
-for (bp = sim_brk_tab; bp < (sim_brk_tab + sim_brk_ent); bp++) {
-    if (bp->typ & sw)
-        sim_brk_show (st, bp->addr, sw);
+for (types=bit=0; bit <= ('Z'-'A'); bit++)
+    if (sim_brk_types & (1 << bit))
+        ++types;
+if ((!(sw & SWMASK ('C'))) && sim_brk_types && (types > 1)) {
+    fprintf (st, "Supported Breakpoint Types:");
+    for (bit=0; bit <= ('Z'-'A'); bit++)
+        if (sim_brk_types & (1 << bit))
+            fprintf (st, " -%c", 'A' + bit);
+    fprintf (st, "\n");
+    }
+if (((sw & sim_brk_types) != sim_brk_types) && (types > 1)) {
+    mask = (sw & sim_brk_types);
+    fprintf (st, "Displaying Breakpoint Types:");
+    for (bit=0; bit <= ('Z'-'A'); bit++)
+        if (mask & (1 << bit))
+            fprintf (st, " -%c", 'A' + bit);
+    fprintf (st, "\n");
+    }
+for (bpt = sim_brk_tab; bpt < (sim_brk_tab + sim_brk_ent); bpt++) {
+    BRKTAB *prev = NULL;
+    BRKTAB *cur = *bpt;
+    BRKTAB *next;
+    /* First reverse the list */
+    while (cur) {
+        next = cur->next;
+        cur->next = prev;
+        prev = cur;
+        cur = next;
+        }
+    /* save reversed list in the head pointer so lookups work */
+    *bpt = prev;
+    /* Walk the reversed list and print it in the order it was defined in */
+    cur = prev;
+    while (cur) {
+        if (cur->typ & sw)
+            sim_brk_show (st, cur->addr, cur->typ | ((sw & SWMASK ('C')) ? SWMASK ('C') : 0));
+        cur = cur->next;
+        }
+    /* reversing the list again */
+    cur = prev;
+    prev = NULL;
+    while (cur) {
+        next = cur->next;
+        cur->next = prev;
+        prev = cur;
+        cur = next;
+        }
+    /* restore original list */
+    *bpt = prev;
     }
 return SCPE_OK;
 }
@@ -9172,22 +9289,19 @@ uint32 res = 0;
 if (sim_brk_summ & BRK_TYP_DYN_ALL)
     btyp |= BRK_TYP_DYN_ALL;
 
-if ((bp = sim_brk_fnd (loc)) && (btyp & bp->typ)) {     /* in table, and type match? */
-    if ((sim_brk_pend[spc] && (loc == sim_brk_ploc[spc])) || /* previous location? */
-        (--bp->cnt > 0))                                /* count > 0? */
+if ((bp = sim_brk_fnd_ex (loc, btyp, TRUE))) {          /* in table, and type match? */
+    if (bp->time_fired[spc] == sim_gtime())             /* already taken?  */
+        return 0;
+    bp->time_fired[spc] = sim_time;                     /* remember match time */
+    if (--bp->cnt > 0)                                  /* count > 0? */
         return 0;
     bp->cnt = 0;                                        /* reset count */
     sim_brk_setact (bp->act);                           /* set up actions */
     res = btyp & bp->typ;                               /* set return value */
     if (bp->typ & BRK_TYP_TEMP)
-        sim_brk_clr (loc, btyp | BRK_TYP_TEMP);         /* delete one-shot breakpoint */
-    else {
-        sim_brk_ploc[spc] = loc;                        /* save location */
-        sim_brk_pend[spc] = TRUE;                       /* don't do twice */
-        }
+        sim_brk_clr (loc, bp->typ);                     /* delete one-shot breakpoint */
     return res;
     }
-sim_brk_pend[spc] = FALSE;
 return res;
 }
 
@@ -9243,26 +9357,33 @@ else
 
 void sim_brk_npc (uint32 cnt)
 {
-uint32 i;
+uint32 spc;
+BRKTAB **bpt, *bp;
 
 if ((cnt == 0) || (cnt > SIM_BKPT_N_SPC))
     cnt = SIM_BKPT_N_SPC;
-for (i = 0; i < cnt; i++) {
-    sim_brk_pend[i] = FALSE;
-    sim_brk_ploc[i] = 0;
+for (bpt = sim_brk_tab; bpt < (sim_brk_tab + sim_brk_ent); bpt++) {
+    for (bp = *bpt; bp; bp = bp->next) {
+        for (spc = 0; spc < cnt; spc++)
+            bp->time_fired[spc] = -1.0;
+        }
     }
-return;
 }
 
 /* Clear breakpoint space */
 
-void sim_brk_clrspc (uint32 spc)
+void sim_brk_clrspc (uint32 spc, uint32 btyp)
 {
+BRKTAB **bpt, *bp;
+
 if (spc < SIM_BKPT_N_SPC) {
-    sim_brk_pend[spc] = FALSE;
-    sim_brk_ploc[spc] = 0;
+    for (bpt = sim_brk_tab; bpt < (sim_brk_tab + sim_brk_ent); bpt++) {
+        for (bp = *bpt; bp; bp = bp->next) {
+            if (bp->typ & btyp)
+                bp->time_fired[spc] = -1.0;
+            }
+        }
     }
-return;
 }
 
 /* Expect package.  This code provides a mechanism to stop and control simulator

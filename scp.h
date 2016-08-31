@@ -183,9 +183,8 @@ SHTAB *find_shtab (SHTAB *tab, const char *gbuf);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 BRKTAB *sim_brk_fnd (t_addr loc);
 uint32 sim_brk_test (t_addr bloc, uint32 btyp);
-void sim_brk_clrspc (uint32 spc);
+void sim_brk_clrspc (uint32 spc, uint32 btyp);
 void sim_brk_npc (uint32 cnt);
-char *sim_brk_clract (void);
 void sim_brk_setact (const char *action);
 t_stat sim_send_input (SEND *snd, uint8 *data, size_t size, uint32 after, uint32 delay);
 t_stat sim_show_send_input (FILE *st, const SEND *snd);
@@ -273,8 +272,6 @@ extern volatile int32 stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
 extern uint32 sim_brk_dflt;
 extern uint32 sim_brk_summ;
-extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
-extern t_addr sim_brk_ploc[SIM_BKPT_N_SPC];
 extern FILE *stdnul;
 extern t_bool sim_asynch_enabled;
 
