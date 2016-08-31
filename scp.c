@@ -475,6 +475,8 @@ t_bool sim_processing_event = FALSE;
 uint32 sim_brk_summ = 0;
 uint32 sim_brk_types = 0;
 uint32 sim_brk_dflt = 0;
+uint32 sim_brk_match_type;
+t_addr sim_brk_match_addr;
 char *sim_brk_act[MAX_DO_NEST_LVL];
 char *sim_brk_act_buf[MAX_DO_NEST_LVL];
 BRKTAB **sim_brk_tab = NULL;
@@ -9284,7 +9286,6 @@ uint32 sim_brk_test (t_addr loc, uint32 btyp)
 {
 BRKTAB *bp;
 uint32 spc = (btyp >> SIM_BKPT_V_SPC) & (SIM_BKPT_N_SPC - 1);
-uint32 res = 0;
 
 if (sim_brk_summ & BRK_TYP_DYN_ALL)
     btyp |= BRK_TYP_DYN_ALL;
@@ -9297,12 +9298,13 @@ if ((bp = sim_brk_fnd_ex (loc, btyp, TRUE))) {          /* in table, and type ma
         return 0;
     bp->cnt = 0;                                        /* reset count */
     sim_brk_setact (bp->act);                           /* set up actions */
-    res = btyp & bp->typ;                               /* set return value */
+    sim_brk_match_type = btyp & bp->typ;                               /* set return value */
     if (bp->typ & BRK_TYP_TEMP)
         sim_brk_clr (loc, bp->typ);                     /* delete one-shot breakpoint */
-    return res;
+    sim_brk_match_addr = loc;
+    return sim_brk_match_type;
     }
-return res;
+return 0;
 }
 
 /* Get next pending action, if any */
