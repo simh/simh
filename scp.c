@@ -344,6 +344,7 @@ WEAK void (*sim_vm_init) (void);
 char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream) = NULL;
 void (*sim_vm_post) (t_bool from_scp) = NULL;
 CTAB *sim_vm_cmd = NULL;
+void (*sim_vm_sprint_addr) (char *buf, DEVICE *dptr, t_addr addr) = NULL;
 void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr) = NULL;
 t_addr (*sim_vm_parse_addr) (DEVICE *dptr, CONST char *cptr, CONST char **tptr) = NULL;
 t_value (*sim_vm_pc_value) (void) = NULL;
@@ -405,7 +406,6 @@ SCHTAB *get_asearch (CONST char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value *val, SCHTAB *schptr);
 static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char);
 int32 get_switches (const char *cptr);
-char *put_switches (char *buf, size_t bufsize, int32 sw);
 CONST char *get_sim_sw (CONST char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_value get_rval (REG *rptr, uint32 idx);
@@ -474,6 +474,7 @@ int32 sim_is_running = 0;
 t_bool sim_processing_event = FALSE;
 uint32 sim_brk_summ = 0;
 uint32 sim_brk_types = 0;
+BRKTYPTAB *sim_brk_type_desc = NULL;                  /* type descriptions */
 uint32 sim_brk_dflt = 0;
 uint32 sim_brk_match_type;
 t_addr sim_brk_match_addr;
@@ -8138,7 +8139,7 @@ return cptr;
         buf     =       buffer with switches converted to text
 */
 
-char *put_switches (char *buf, size_t bufsize, int32 sw)
+const char *put_switches (char *buf, size_t bufsize, uint32 sw)
 {
 char *optr = buf;
 size_t i = 0;
@@ -8537,6 +8538,7 @@ switch (format) {
     }
 if (!buffer)
     return strlen(dbuf+d);
+*buffer = '\0';
 if (width < strlen(dbuf+d))
     return SCPE_IOERR;
 strcpy(buffer, dbuf+d);
@@ -9386,6 +9388,33 @@ if (spc < SIM_BKPT_N_SPC) {
             }
         }
     }
+}
+
+const char *sim_brk_message(void)
+{
+static char msg[256];
+char addr[65];
+char buf[32];
+
+msg[0] = '\0';
+if (sim_vm_sprint_addr)
+    sim_vm_sprint_addr (addr, sim_dflt_dev, (t_value)sim_brk_match_addr);
+else sprint_val (addr, (t_value)sim_brk_match_addr, sim_dflt_dev->aradix, sim_dflt_dev->awidth, PV_LEFT);
+if (sim_brk_type_desc) {
+    BRKTYPTAB *brk = sim_brk_type_desc;
+
+    while (2 == strlen (put_switches (buf, sizeof(buf), brk->btyp))) {
+        if (brk->btyp == sim_brk_match_type) {
+            sprintf (msg, "%s: %s", brk->desc, addr);
+            break;
+            }
+        brk++;
+        }
+    }
+if (!msg[0])
+    sprintf (msg, "%s Breakpoint at: %o\n", put_switches (buf , sizeof(buf), sim_brk_match_type), sim_brk_match_addr);
+
+return msg;
 }
 
 /* Expect package.  This code provides a mechanism to stop and control simulator

@@ -419,6 +419,7 @@ typedef struct SHTAB SHTAB;
 typedef struct MTAB MTAB;
 typedef struct SCHTAB SCHTAB;
 typedef struct BRKTAB BRKTAB;
+typedef struct BRKTYPTAB BRKTYPTAB;
 typedef struct EXPTAB EXPTAB;
 typedef struct EXPECT EXPECT;
 typedef struct SEND SEND;
@@ -725,6 +726,14 @@ struct BRKTAB {
     double              time_fired[SIM_BKPT_N_SPC];     /* instruction count when match occurred */
     BRKTAB *next;                                       /* list with same address value */
     };
+
+/* Breakpoint table */
+
+struct BRKTYPTAB {
+    uint32      btyp;                                   /* type mask */
+    const char *desc;                                   /* description */
+    };
+#define BRKTYPE(typ,descrip) {SWMASK(typ), descrip}
 
 /* Expect rule */
 
