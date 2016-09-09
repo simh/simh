@@ -9014,12 +9014,13 @@ else sim_brk_ins = p + 1;                               /* after last sch */
 return NULL;
 }
 
-BRKTAB *sim_brk_fnd_ex (t_addr loc, uint32 btyp, t_bool any_typ)
+BRKTAB *sim_brk_fnd_ex (t_addr loc, uint32 btyp, t_bool any_typ, uint32 spc)
 {
 BRKTAB *bp = sim_brk_fnd (loc);
 
 while (bp) {
-    if (any_typ ? (bp->typ & btyp) : (bp->typ == btyp))
+    if (any_typ ? ((bp->typ & btyp) && (bp->time_fired[spc] != sim_gtime())) : 
+                  (bp->typ == btyp))
         return bp;
     bp = bp->next;
     }
@@ -9175,7 +9176,7 @@ return SCPE_OK;
 
 t_stat sim_brk_show (FILE *st, t_addr loc, int32 sw)
 {
-BRKTAB *bp = sim_brk_fnd_ex (loc, sw & (~SWMASK ('C')), FALSE);
+BRKTAB *bp = sim_brk_fnd_ex (loc, sw & (~SWMASK ('C')), FALSE, 0);
 DEVICE *dptr;
 int32 i, any;
 
@@ -9292,8 +9293,8 @@ uint32 spc = (btyp >> SIM_BKPT_V_SPC) & (SIM_BKPT_N_SPC - 1);
 if (sim_brk_summ & BRK_TYP_DYN_ALL)
     btyp |= BRK_TYP_DYN_ALL;
 
-if ((bp = sim_brk_fnd_ex (loc, btyp, TRUE))) {          /* in table, and type match? */
-    if (bp->time_fired[spc] == sim_gtime())             /* already taken?  */
+if ((bp = sim_brk_fnd_ex (loc, btyp, TRUE, spc))) {     /* in table, and type match? */
+    if (bp->time_fired[spc] == sim_time)                /* already taken?  */
         return 0;
     bp->time_fired[spc] = sim_time;                     /* remember match time */
     if (--bp->cnt > 0)                                  /* count > 0? */
