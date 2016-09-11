@@ -9413,7 +9413,7 @@ if (sim_brk_type_desc) {
         }
     }
 if (!msg[0])
-    sprintf (msg, "%s Breakpoint at: %o\n", put_switches (buf , sizeof(buf), sim_brk_match_type), sim_brk_match_addr);
+    sprintf (msg, "%s Breakpoint at: %s\n", put_switches (buf , sizeof(buf), sim_brk_match_type), addr);
 
 return msg;
 }
