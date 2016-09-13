@@ -233,14 +233,15 @@
 #define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define calc_is(md)     ((md) << VA_V_MODE)
 #define calc_ds(md)     (calc_is((md)) | ((MMR3 & dsmask[(md)])? VA_DS: 0))
-#define calc_MMR1(val)  ((MMR1)? (((val) << 8) | MMR1): (val))
+/* Register change tracking actually goes into variable reg_mods; from there
+   it is copied into MMR1 if that register is not currently locked.  */
+#define calc_MMR1(val)  ((reg_mods)? (((val) << 8) | reg_mods): (val))
 #define GET_SIGN_W(v)   (((v) >> 15) & 1)
 #define GET_SIGN_B(v)   (((v) >> 7) & 1)
 #define GET_Z(v)        ((v) == 0)
 #define JMP_PC(x)       PCQ_ENTRY; PC = (x)
 #define BRANCH_F(x)     PCQ_ENTRY; PC = (PC + (((x) + (x)) & 0377)) & 0177777
 #define BRANCH_B(x)     PCQ_ENTRY; PC = (PC + (((x) + (x)) | 0177400)) & 0177777
-#define last_pa         (cpu_unit.u4)                   /* auto save/rest */
 #define UNIT_V_MSIZE    (UNIT_V_UF + 0)                 /* dummy */
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 
@@ -306,6 +307,12 @@ int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };  /* dspace enables */
 t_addr cpu_memsize = INIMEMSIZE;                        /* last mem addr */
+int16 inst_pc;                                          /* PC of current instr */
+int32 inst_psw;                                         /* PSW at instr. start */
+int16 reg_mods;                                         /* reg deltas */
+int32 last_pa;                                          /* pa from ReadMW/ReadMB */
+int32 saved_sim_interval;                               /* saved at inst start */
+t_stat reason;                                          /* stop reason */
 
 extern int32 CPUERR, MAINT;
 extern CPUTAB cpu_tab[];
@@ -330,10 +337,14 @@ void reloc_abort (int32 err, int32 apridx);
 int32 ReadE (int32 addr);
 int32 ReadW (int32 addr);
 int32 ReadB (int32 addr);
+int32 ReadCW (int32 addr);
 int32 ReadMW (int32 addr);
 int32 ReadMB (int32 addr);
+int32 PReadW (int32 addr);
+int32 PReadB (int32 addr);
 void WriteW (int32 data, int32 addr);
 void WriteB (int32 data, int32 addr);
+void WriteCW (int32 data, int32 addr);
 void PWriteW (int32 data, int32 addr);
 void PWriteB (int32 data, int32 addr);
 void set_r_display (int32 rs, int32 cm);
@@ -655,6 +666,16 @@ DEVICE cpu_dev = {
     NULL, &cpu_set_size, NULL
     };
 
+BRKTYPTAB cpu_breakpoints [] = {
+    BRKTYPE('E',"Execute Instruction at Virtual Address"),
+    BRKTYPE('P',"Execute Instruction at Physical Address"),
+    BRKTYPE('R',"Read from Virtual Address"),
+    BRKTYPE('S',"Read from Physical Address"),
+    BRKTYPE('W',"Write to Virtual Address"),
+    BRKTYPE('X',"Write to Physical Address"),
+    { 0 }
+    };
+
 t_value pdp11_pc_value (void)
 {
 return (t_value)PC;
@@ -664,7 +685,6 @@ t_stat sim_instr (void)
 {
 int abortval, i;
 volatile int32 trapea;                                  /* used by setjmp */
-t_stat reason;
 InstHistory *hst_ent = NULL;
 
 sim_vm_pc_value = &pdp11_pc_value;
@@ -719,19 +739,50 @@ reason = 0;
 */
 
 abortval = setjmp (save_env);                           /* set abort hdlr */
-if (abortval != 0) {
-    trap_req = trap_req | abortval;                     /* or in trap flag */
-    if ((trapea > 0) && stop_vecabort)
-        reason = STOP_VECABORT;
-    if ((trapea < 0) &&                                 /* stack push abort? */
-        (CPUT (STOP_STKA) || stop_spabort))
-        reason = STOP_SPABORT;
-    if (trapea == ~MD_KER) {                            /* kernel stk abort? */
-        setTRAP (TRAP_RED);
-        setCPUERR (CPUE_RED);
-        STACKFILE[MD_KER] = 4;
-        if (cm == MD_KER)
-            SP = 4;
+if (abortval == ABRT_BKPT) {
+    /* Breakpoint encountered.  */
+    reason = STOP_IBKPT;
+    /* Print a message reporting the type and address if it is not a 
+       plain virtual PC (instruction execution) breakpoint.  */
+    if (sim_brk_match_type != BPT_PCVIR)
+        sim_messagef (reason, "\r\n%s", sim_brk_message());
+    /* Restore the PC and sim_interval. */
+    PC = inst_pc;
+    sim_interval = saved_sim_interval;
+    /* Restore PSW and the broken-out condition code values, provided
+       FPD is not currently set.  If it is, that means the instruction
+       is interruptible and breakpoints are treated as continuation
+       rather than replay.  */
+    if (!fpd) {
+        PSW = inst_psw;
+        put_PSW (inst_psw, 0);
+        }
+    /* Undo register changes. */
+    while (reg_mods) {
+        int rnum = reg_mods & 7;
+        int delta = (reg_mods >> 3) & 037;
+        reg_mods >>= 8;
+        if (delta & 020)                                /* negative delta */
+            delta = -(-delta & 037);                    /* get signed value */
+        if (rnum != 7)
+            R[rnum] -= delta;
+        }
+    }
+else {
+    if (abortval != 0) {
+        trap_req = trap_req | abortval;                 /* or in trap flag */
+        if ((trapea > 0) && stop_vecabort)
+            reason = STOP_VECABORT;
+        if ((trapea < 0) &&                             /* stack push abort? */
+            (CPUT (STOP_STKA) || stop_spabort))
+            reason = STOP_SPABORT;
+        if (trapea == ~MD_KER) {                        /* kernel stk abort? */
+            setTRAP (TRAP_RED);
+            setCPUERR (CPUE_RED);
+            STACKFILE[MD_KER] = 4;
+            if (cm == MD_KER)
+                SP = 4;
+            }
         }
     }
 
@@ -813,6 +864,11 @@ while (reason == 0)  {
    5. Push the old PC and PSW on the new stack
    6. Update SP, PSW, and PC
    7. If not stack overflow, check for stack overflow
+
+   If the reads in step 3, or the writes in step 5, match a data breakpoint,
+   the breakpoint status will be set but the interrupt actions will continue.
+   The breakpoint stop will occur at the beginning of the next instruction 
+   cycle.
 */
 
         wait_state = 0;                                 /* exit wait state */
@@ -824,12 +880,12 @@ while (reason == 0)  {
                 MMR2 = trapea;
             MMR0 = MMR0 & ~MMR0_IC;                     /* clear IC */
             }
-        src = ReadW (trapea | calc_ds (MD_KER));        /* new PC */
-        src2 = ReadW ((trapea + 2) | calc_ds (MD_KER)); /* new PSW */
+        src = ReadCW (trapea | calc_ds (MD_KER));       /* new PC */
+        src2 = ReadCW ((trapea + 2) | calc_ds (MD_KER)); /* new PSW */
         t = (src2 >> PSW_V_CM) & 03;                    /* new cm */
         trapea = ~t;                                    /* flag pushes */
-        WriteW (PSW, ((STACKFILE[t] - 2) & 0177777) | calc_ds (t));
-        WriteW (PC, ((STACKFILE[t] - 4) & 0177777) | calc_ds (t));
+        WriteCW (PSW, ((STACKFILE[t] - 2) & 0177777) | calc_ds (t));
+        WriteCW (PC, ((STACKFILE[t] - 4) & 0177777) | calc_ds (t));
         trapea = 0;                                     /* clear trap flag */
         src2 = (src2 & ~PSW_PM) | (cm << PSW_V_PM);     /* insert prv mode */
         put_PSW (src2, 0);                              /* call calc_is,ds */
@@ -860,14 +916,20 @@ while (reason == 0)  {
         continue;
         }
 
-    if (sim_brk_summ) {                                 /* breakpoint? */
-        int32 pa = PC; /* FixMe */
-
-        if (sim_brk_test (PC, SWMASK ('E')) ||          /* Normal PC breakpoint? */
-            sim_brk_test (pa, SWMASK ('P'))) {          /* Physical Address breakpoint? */
-            reason = STOP_IBKPT;                        /* stop simulation */
-            continue;
-            }
+    reg_mods = 0;
+    inst_pc = PC;
+    /* Save PSW also because condition codes need to be preserved.
+       We just save the whole PSW because that is sufficient (that
+       representation is up to date at this point).  If restoring is
+       needed, both the PSW and the components that need to be restored
+       are handled explicitly.  */
+    inst_psw = PSW;
+    saved_sim_interval = sim_interval;
+    if (BPT_SUMM_PC) {                                  /* possible breakpoint */
+        t_addr pa = relocR (PC | isenable);             /* relocate PC */
+        if (sim_brk_test (PC, BPT_PCVIR) ||             /* Normal PC breakpoint? */
+            sim_brk_test (pa, BPT_PCPHY))               /* Physical Address breakpoint? */
+            ABORT (ABRT_BKPT);                          /* stop simulation */
         }
 
     if (update_MM) {                                    /* if mm not frozen */
@@ -1145,8 +1207,9 @@ while (reason == 0)  {
                     ((dstspec & 070) == 020))           /* JSR (R)+? */
                     dst = R[dstspec & 07];              /* use post incr */
                 SP = (SP - 2) & 0177777;
+                reg_mods = calc_MMR1 (0366);
                 if (update_MM)
-                    MMR1 = calc_MMR1 (0366);
+                    MMR1 = reg_mods;
                 WriteW (R[srcspec], SP | dsenable);
                 if ((cm == MD_KER) && (SP < (STKLIM + STKL_Y)))
                     set_stack_trap (SP);
@@ -1344,8 +1407,9 @@ while (reason == 0)  {
                 Z = GET_Z (dst);
                 V = 0;
                 SP = (SP - 2) & 0177777;
+                reg_mods = calc_MMR1 (0366);
                 if (update_MM)
-                    MMR1 = calc_MMR1 (0366);
+                    MMR1 = reg_mods;
                 if (hst_ent)
                     hst_ent->dst = dst;
                 WriteW (dst, SP | dsenable);
@@ -1362,7 +1426,8 @@ while (reason == 0)  {
                 Z = GET_Z (dst);
                 V = 0;
                 SP = (SP + 2) & 0177777;
-                if (update_MM) MMR1 = 026;
+                reg_mods = 026;
+                if (update_MM) MMR1 = reg_mods;
                 if (hst_ent)
                     hst_ent->dst = dst;
                 if (dstreg) {
@@ -2133,8 +2198,9 @@ while (reason == 0)  {
                 Z = GET_Z (dst);
                 V = 0;
                 SP = (SP - 2) & 0177777;
+                reg_mods = calc_MMR1 (0366);
                 if (update_MM)
-                    MMR1 = calc_MMR1 (0366);
+                    MMR1 = reg_mods;
                 if (hst_ent)
                     hst_ent->dst = dst;
                 WriteW (dst, SP | dsenable);
@@ -2151,8 +2217,9 @@ while (reason == 0)  {
                 Z = GET_Z (dst);
                 V = 0;
                 SP = (SP + 2) & 0177777;
+                reg_mods = 026;
                 if (update_MM)
-                    MMR1 = 026;
+                    MMR1 = reg_mods;
                 if (hst_ent)
                     hst_ent->dst = dst;
                 if (dstreg) {
@@ -2402,29 +2469,33 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
 
     case 2:                                             /* (R)+ */
         R[reg] = ((adr = R[reg]) + 2) & 0177777;
+        reg_mods = calc_MMR1 (020 | reg);
         if (update_MM && (reg != 7))
-            MMR1 = calc_MMR1 (020 | reg);
+            MMR1 = reg_mods;
         return (adr | ds);
 
     case 3:                                             /* @(R)+ */
         R[reg] = ((adr = R[reg]) + 2) & 0177777;
+        reg_mods = calc_MMR1 (020 | reg);
         if (update_MM && (reg != 7))
-            MMR1 = calc_MMR1 (020 | reg);
+            MMR1 = reg_mods;
         adr = ReadW (adr | ds);
         return (adr | dsenable);
 
     case 4:                                             /* -(R) */
         adr = R[reg] = (R[reg] - 2) & 0177777;
+        reg_mods = calc_MMR1 (0360 | reg);
         if (update_MM && (reg != 7))
-            MMR1 = calc_MMR1 (0360 | reg);
+            MMR1 = reg_mods;
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
         return (adr | ds);
 
     case 5:                                             /* @-(R) */
         adr = R[reg] = (R[reg] - 2) & 0177777;
+        reg_mods = calc_MMR1 (0360 | reg);
         if (update_MM && (reg != 7))
-            MMR1 = calc_MMR1 (0360 | reg);
+            MMR1 = reg_mods;
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
         adr = ReadW (adr | ds);
@@ -2460,30 +2531,34 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
     case 2:                                                     /* (R)+ */
         delta = 1 + (reg >= 6);                         /* 2 if R6, PC */
         R[reg] = ((adr = R[reg]) + delta) & 0177777;
+        reg_mods = calc_MMR1 ((delta << 3) | reg);
         if (update_MM && (reg != 7))
-            MMR1 = calc_MMR1 ((delta << 3) | reg);
+            MMR1 = reg_mods;
         return (adr | ds);
 
     case 3:                                             /* @(R)+ */
         R[reg] = ((adr = R[reg]) + 2) & 0177777;
+        reg_mods = calc_MMR1 (020 | reg);
         if (update_MM && (reg != 7))
-            MMR1 = calc_MMR1 (020 | reg);
+            MMR1 = reg_mods;
         adr = ReadW (adr | ds);
         return (adr | dsenable);
 
     case 4:                                             /* -(R) */
         delta = 1 + (reg >= 6);                         /* 2 if R6, PC */
         adr = R[reg] = (R[reg] - delta) & 0177777;
+        reg_mods = calc_MMR1 ((((-delta) & 037) << 3) | reg);
         if (update_MM && (reg != 7))
-            MMR1 = calc_MMR1 ((((-delta) & 037) << 3) | reg);
+            MMR1 = reg_mods;
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
         return (adr | ds);
 
     case 5:                                             /* @-(R) */
         adr = R[reg] = (R[reg] - 2) & 0177777;
+        reg_mods = calc_MMR1 (0360 | reg);
         if (update_MM && (reg != 7))
-            MMR1 = calc_MMR1 (0360 | reg);
+            MMR1 = reg_mods;
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
         adr = ReadW (adr | ds);
@@ -2519,6 +2594,10 @@ if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     ABORT (TRAP_ODD);
     }
 pa = relocR (va);                                       /* relocate */
+if (BPT_SUMM_RD &&
+    (sim_brk_test (va & 0177777, BPT_RDVIR) ||
+     sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
+    ABORT (ABRT_BKPT);                                  /* stop simulation */
 if (ADDR_IS_MEM (pa))                                   /* memory address? */
     return (M[pa >> 1]);
 if ((pa < IOPAGEBASE) ||                                /* not I/O address */
@@ -2535,13 +2614,79 @@ return data;
 
 int32 ReadW (int32 va)
 {
-int32 pa, data;
+int32 pa;
 
 if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     setCPUERR (CPUE_ODD);
     ABORT (TRAP_ODD);
     }
 pa = relocR (va);                                       /* relocate */
+if (BPT_SUMM_RD &&
+    (sim_brk_test (va & 0177777, BPT_RDVIR) ||
+     sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
+    ABORT (ABRT_BKPT);                                  /* stop simulation */
+return PReadW (pa);
+}
+
+int32 ReadB (int32 va)
+{
+int32 pa;
+
+pa = relocR (va);                                       /* relocate */
+if (BPT_SUMM_RD &&
+    (sim_brk_test (va & 0177777, BPT_RDVIR) ||
+     sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
+    ABORT (ABRT_BKPT);                                  /* stop simulation */
+return PReadB (pa);
+}
+
+/* Read word with breakpoint check: if a data breakpoint is encountered,
+   set reason accordingly but don't do an ABORT.  This is used when we want
+   to break after doing the operation, used for interrupt processing.  */
+int32 ReadCW (int32 va)
+{
+int32 pa;
+
+if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
+    setCPUERR (CPUE_ODD);
+    ABORT (TRAP_ODD);
+    }
+pa = relocR (va);                                       /* relocate */
+if (BPT_SUMM_RD &&
+    (sim_brk_test (va & 0177777, BPT_RDVIR) ||
+     sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
+    reason = STOP_IBKPT;                                /* report that */
+return PReadW (pa);
+}
+
+int32 ReadMW (int32 va)
+{
+if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
+    setCPUERR (CPUE_ODD);
+    ABORT (TRAP_ODD);
+    }
+last_pa = relocW (va);                                  /* reloc, wrt chk */
+if (BPT_SUMM_RW &&
+    (sim_brk_test (va & 0177777, BPT_RWVIR) ||
+     sim_brk_test (last_pa, BPT_RWPHY)))                /* read or write breakpoint? */
+    ABORT (ABRT_BKPT);                                  /* stop simulation */
+return PReadW (last_pa);
+}
+
+int32 ReadMB (int32 va)
+{
+last_pa = relocW (va);                                  /* reloc, wrt chk */
+if (BPT_SUMM_RW &&
+    (sim_brk_test (va & 0177777, BPT_RWVIR) ||
+     sim_brk_test (last_pa, BPT_RWPHY)))                /* read or write breakpoint? */
+    ABORT (ABRT_BKPT);                                  /* stop simulation */
+return PReadB (last_pa);
+}
+
+int32 PReadW (int32 pa)
+{
+int32 data;
+
 if (ADDR_IS_MEM (pa))                                   /* memory address? */
     return (M[pa >> 1]);
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
@@ -2555,13 +2700,12 @@ if (iopageR (&data, pa, READ) != SCPE_OK) {             /* invalid I/O addr? */
 return data;
 }
 
-int32 ReadB (int32 va)
+int32 PReadB (int32 pa)
 {
-int32 pa, data;
+int32 data;
 
-pa = relocR (va);                                       /* relocate */
 if (ADDR_IS_MEM (pa))
-    return (va & 1? M[pa >> 1] >> 8: M[pa >> 1]) & 0377;
+    return (pa & 1? M[pa >> 1] >> 8: M[pa >> 1]) & 0377;
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
@@ -2570,47 +2714,7 @@ if (iopageR (&data, pa, READ) != SCPE_OK) {             /* invalid I/O addr? */
     setCPUERR (CPUE_TMO);
     ABORT (TRAP_NXM);
     }
-return ((va & 1)? data >> 8: data) & 0377;
-}
-
-int32 ReadMW (int32 va)
-{
-int32 data;
-
-if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
-    setCPUERR (CPUE_ODD);
-    ABORT (TRAP_ODD);
-    }
-last_pa = relocW (va);                                  /* reloc, wrt chk */
-if (ADDR_IS_MEM (last_pa))                              /* memory address? */
-    return (M[last_pa >> 1]);
-if (last_pa < IOPAGEBASE) {                             /* not I/O address? */
-    setCPUERR (CPUE_NXM);
-    ABORT (TRAP_NXM);
-    }
-if (iopageR (&data, last_pa, READ) != SCPE_OK) {        /* invalid I/O addr? */
-    setCPUERR (CPUE_TMO);
-    ABORT (TRAP_NXM);
-    }
-return data;
-}
-
-int32 ReadMB (int32 va)
-{
-int32 data;
-
-last_pa = relocW (va);                                  /* reloc, wrt chk */
-if (ADDR_IS_MEM (last_pa))
-    return (va & 1? M[last_pa >> 1] >> 8: M[last_pa >> 1]) & 0377;
-if (last_pa < IOPAGEBASE) {                             /* not I/O address? */
-    setCPUERR (CPUE_NXM);
-    ABORT (TRAP_NXM);
-    }
-if (iopageR (&data, last_pa, READ) != SCPE_OK) {        /* invalid I/O addr? */
-    setCPUERR (CPUE_TMO);
-    ABORT (TRAP_NXM);
-    }
-return ((va & 1)? data >> 8: data) & 0377;
+return ((pa & 1)? data >> 8: data) & 0377;
 }
 
 /* Write byte and word routines
@@ -2631,19 +2735,11 @@ if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     ABORT (TRAP_ODD);
     }
 pa = relocW (va);                                       /* relocate */
-if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
-    M[pa >> 1] = data;
-    return;
-    }
-if (pa < IOPAGEBASE) {                                  /* not I/O address? */
-    setCPUERR (CPUE_NXM);
-    ABORT (TRAP_NXM);
-    }
-if (iopageW (data, pa, WRITE) != SCPE_OK) {             /* invalid I/O addr? */
-    setCPUERR (CPUE_TMO);
-    ABORT (TRAP_NXM);
-    }
-return;
+if (BPT_SUMM_WR &&
+    (sim_brk_test (va & 0177777, BPT_WRVIR) ||
+     sim_brk_test (pa, BPT_WRPHY)))                     /* write breakpoint? */
+    ABORT (ABRT_BKPT);                                  /* stop simulation */
+PWriteW (data, pa);
 }
 
 void WriteB (int32 data, int32 va)
@@ -2651,21 +2747,30 @@ void WriteB (int32 data, int32 va)
 int32 pa;
 
 pa = relocW (va);                                       /* relocate */
-if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
-    if (va & 1)
-        M[pa >> 1] = (M[pa >> 1] & 0377) | (data << 8);
-    else M[pa >> 1] = (M[pa >> 1] & ~0377) | data;
-    return;
-    }             
-if (pa < IOPAGEBASE) {                                  /* not I/O address? */
-    setCPUERR (CPUE_NXM);
-    ABORT (TRAP_NXM);
+if (BPT_SUMM_WR &&
+    (sim_brk_test (va & 0177777, BPT_WRVIR) ||
+     sim_brk_test (pa, BPT_WRPHY)))                     /* write breakpoint? */
+    ABORT (ABRT_BKPT);                                  /* stop simulation */
+PWriteB (data, pa);
+}
+
+/* Write word with breakpoint check: if a data breakpoint is encountered,
+   set reason accordingly but don't do an ABORT.  This is used when we want
+   to break after doing the operation, used for interrupt processing.  */
+void WriteCW (int32 data, int32 va)
+{
+int32 pa;
+
+if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
+    setCPUERR (CPUE_ODD);
+    ABORT (TRAP_ODD);
     }
-if (iopageW (data, pa, WRITEB) != SCPE_OK) {            /* invalid I/O addr? */
-    setCPUERR (CPUE_TMO);
-    ABORT (TRAP_NXM);
-    }
-return;
+pa = relocW (va);                                       /* relocate */
+if (BPT_SUMM_WR &&
+    (sim_brk_test (va & 0177777, BPT_WRVIR) ||
+     sim_brk_test (pa, BPT_WRPHY)))                     /* write breakpoint? */
+    reason = STOP_IBKPT;                                /* report that */
+PWriteW (data, pa);
 }
 
 void PWriteW (int32 data, int32 pa)
@@ -3243,7 +3348,10 @@ if (M == NULL) {                    /* First time init */
         return SCPE_MEM;
     sim_set_pchar (0, "01000023640"); /* ESC, CR, LF, TAB, BS, BEL, ENQ */
     sim_brk_dflt = SWMASK ('E');
-    sim_brk_types = sim_brk_dflt | SWMASK ('P');
+    sim_brk_types = sim_brk_dflt|SWMASK ('P')|
+                    SWMASK ('R')|SWMASK ('S')|
+                    SWMASK ('W')|SWMASK ('X');
+    sim_brk_type_desc = cpu_breakpoints;
     sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
     auto_config(NULL, 0);           /* do an initial auto configure */
     }
