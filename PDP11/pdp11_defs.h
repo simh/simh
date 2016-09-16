@@ -429,6 +429,7 @@ typedef struct {
 #define TRAP_V_PWRFL    13                              /* power fail    24 */
 #define TRAP_V_FPE      14                              /* fpe          244 */
 #define TRAP_V_MAX      15                              /* intr = max trp # */
+#define ABRT_V_BKPT     16                              /* stop due to breakpt */
 #define TRAP_RED        (1u << TRAP_V_RED)
 #define TRAP_ODD        (1u << TRAP_V_ODD)
 #define TRAP_MME        (1u << TRAP_V_MME)
@@ -446,6 +447,7 @@ typedef struct {
 #define TRAP_FPE        (1u << TRAP_V_FPE)
 #define TRAP_INT        (1u << TRAP_V_MAX)
 #define TRAP_ALL        ((1u << TRAP_V_MAX) - 1)        /* all traps */
+#define ABRT_BKPT       (1u << ABRT_V_BKPT)
 
 #define VEC_RED         0004                            /* trap vectors */
 #define VEC_ODD         0004
@@ -801,6 +803,26 @@ typedef struct pdp_dib DIB;
 #define ABORT(val)      longjmp (save_env, (val))
 #define SP R[6]
 #define PC R[7]
+
+/* Codes for breakpoint support */
+#define BPT_PCVIR SWMASK('E')
+#define BPT_PCPHY SWMASK('P')
+#define BPT_RDVIR SWMASK('R')
+#define BPT_RDPHY SWMASK('S')
+#define BPT_WRVIR SWMASK('W')
+#define BPT_WRPHY SWMASK('X')
+/* We can test for two types of breakpoints in one sim_brk_test call,
+   which is useful when checking for read or write in the
+   read-modify-write routines.  */
+#define BPT_RWVIR (BPT_RDVIR | BPT_WRVIR)
+#define BPT_RWPHY (BPT_RDPHY | BPT_WRPHY)
+/* Macros to check sim_brk_summ.  We have enough different breakpoint
+   types that checking for the specific bits before doing sim_brk_test
+   is worth the extra few instructions.  */
+#define BPT_SUMM_PC (sim_brk_summ & (BPT_PCVIR | BPT_PCPHY))
+#define BPT_SUMM_RD (sim_brk_summ & (BPT_RDVIR | BPT_RDPHY))
+#define BPT_SUMM_WR (sim_brk_summ & (BPT_WRVIR | BPT_WRPHY))
+#define BPT_SUMM_RW (sim_brk_summ & (BPT_RWVIR | BPT_RWPHY))
 
 /* Function prototypes */
 

@@ -141,18 +141,27 @@ t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int flag)
 #define fprintf Fprintf
 #define fputs(_s,f) Fprintf(f,"%s",_s)
 #define fputc(_c,f) Fprintf(f,"%c",_c)
+void pdq3_sprint_addr (char *buf, DEVICE *dptr, t_addr addr)
+{
+  *buf = '\0';
+  if (ADDR_ISWORD(addr))
+    sprintf(buf,"$");
+  else if (ADDR_SEG(addr) == reg_segb)
+    sprintf(&buf[strlen(buf)],"#");
+  else {
+    sprint_val (&buf[strlen(buf)], ADDR_SEG(addr), dptr->dradix, dptr->dwidth, PV_LEFT);
+    sprintf(&buf[strlen(buf)],":");
+  }
+  sprint_val (&buf[strlen(buf)], ADDR_OFF(addr), dptr->dradix, dptr->dwidth, PV_LEFT);
+  return;
+}
+
 void pdq3_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
 {
-  if (ADDR_ISWORD(addr))
-    fprintf(st,"$");
-  else if (ADDR_SEG(addr) == reg_segb)
-    fprintf(st,"#");
-  else {
-    fprint_val (st, ADDR_SEG(addr), dptr->dradix, dptr->dwidth, PV_LEFT);
-    fprintf(st,":");
-  }
-  fprint_val (st, ADDR_OFF(addr), dptr->dradix, dptr->dwidth, PV_LEFT);
-  return;
+  char buf[65];
+
+  pdq3_sprint_addr (buf, dptr, addr);
+  fprintf(st,"%s", buf);
 }
 
 t_addr pdq3_parse_addr (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
@@ -182,6 +191,7 @@ t_addr pdq3_parse_addr (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
 
 void pdq3_vm_init (void)
 {
+  sim_vm_sprint_addr = &pdq3_sprint_addr;
   sim_vm_fprint_addr = &pdq3_fprint_addr;
   sim_vm_parse_addr = &pdq3_parse_addr;
   sim_vm_cmd = pdq3_cmds;

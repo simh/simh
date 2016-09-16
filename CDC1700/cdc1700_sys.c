@@ -124,7 +124,7 @@ static void postUpdate(t_bool from_scp)
 /*
  * Special address print routine for "Relative" display.
  */
-static void printAddress(FILE *st, DEVICE *dptr, t_addr addr)
+static void sprintAddress(char *buf, DEVICE *dptr, t_addr addr)
 {
   if ((dptr == sim_devices[0]) && ((sim_switches & SWMASK('R')) != 0)) {
     if (!RelValid) {
@@ -133,7 +133,15 @@ static void printAddress(FILE *st, DEVICE *dptr, t_addr addr)
     }
     addr -= RelBase;
   } 
-  fprint_val(st, addr, dptr->aradix, dptr->awidth, PV_RZRO);
+  sprint_val(buf, addr, dptr->aradix, dptr->awidth, PV_RZRO);
+}
+
+static void printAddress(FILE *st, DEVICE *dptr, t_addr addr)
+{
+  char buf[64];
+
+  sprintAddress(buf, dptr, addr);
+  fprintf (st, "%s", buf);
 }
 
 /*
@@ -141,6 +149,7 @@ static void printAddress(FILE *st, DEVICE *dptr, t_addr addr)
  */
 static void VMinit(void)
 {
+  sim_vm_sprint_addr = &sprintAddress;
   sim_vm_fprint_addr = &printAddress;
   sim_vm_post = &postUpdate;
   sim_vm_cmd = cdc1700_cmd;
