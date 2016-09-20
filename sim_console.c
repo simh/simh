@@ -2038,7 +2038,6 @@ int32 sim_tt_inpcvt (int32 c, uint32 mode)
 uint32 md = mode & TTUF_M_MODE;
 
 if (md != TTUF_MODE_8B) {
-    uint32 par_bit = 0;
     uint32 par_mode = (mode >> TTUF_W_MODE) & TTUF_M_PAR;
     static int32 nibble_even_parity = 0x699600;   /* bit array indicating the even parity for each index (offset by 8) */
 

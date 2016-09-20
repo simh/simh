@@ -8142,7 +8142,6 @@ return cptr;
 const char *put_switches (char *buf, size_t bufsize, uint32 sw)
 {
 char *optr = buf;
-size_t i = 0;
 int32 bit;
 
 memset (buf, 0, bufsize);
