@@ -25,6 +25,11 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   01-Sep-16    JDB     Add power fail/power restore support
+   23-Aug-16    JDB     Add module interrupt support
+   14-Jul-16    JDB     Implemented the cold dump process
+                        Changed "loading" EXEC_STATE to "waiting"
+   11-Jul-16    JDB     Change "cpu_unit" from a UNIT to an array of one UNIT
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    16-May-16    JDB     ACCESS_PROPERTIES.name is now a pointer-to-constant
    13-May-16    JDB     Modified for revised SCP API function parameter types
@@ -345,16 +350,16 @@
    When the simulator examines the bit patterns of instructions to execute, each
    will fall into one of four categories:
 
-     1. Defined (canonical) instruction encodings.
+    1. Defined (canonical) instruction encodings.
 
-     2. Undefined (non-canonical) instruction encodings, where reserved fields
-        are "don't care" bits (e.g., MOVE).
+    2. Undefined (non-canonical) instruction encodings, where reserved fields
+       are "don't care" bits (e.g., MOVE).
 
-     3. Undefined (non-canonical) instruction encodings, where reserved fields
-        are decoded (e.g., IXIT).
+    3. Undefined (non-canonical) instruction encodings, where reserved fields
+       are decoded (e.g., IXIT).
 
-     4. Unimplemented instruction encodings (e.g., stack opcode 072 or EADD with
-        no EIS installed).
+    4. Unimplemented instruction encodings (e.g., stack opcode 072 or EADD with
+       no EIS installed).
 
    When examining memory or register values in instruction-mnemonic form, the
    names of the canonical instructions in category 1 are displayed in uppercase,
@@ -690,6 +695,30 @@ extern DEVICE sel_dev;                          /* Selector Channel */
 
 #define UNIT_OPTS           (UNIT_EIS)                  /* the standard equipment feature set */
 
+#define CPU_IO_RESET        0                           /* reset CPU and all I/O devices */
+#define IO_RESET            1                           /* reset just the I/O devices */
+
+#define CNTL_BASE           8                           /* the radix for the cold dump control byte */
+#define CNTL_MAX            0377                        /* the maximum cold dump control byte value */
+
+#define SIO_JUMP            0000000u                    /* Jump unconditionally */
+#define SIO_SBANK           0014000u                    /* Set bank */
+#define SIO_ENDIN           0034000u                    /* End with interrupt */
+#define SIO_CNTL            0040000u                    /* Control */
+#define SIO_WRITE           0060000u                    /* Write 4096 words */
+#define SIO_READ            0077760u                    /* Read 16 words */
+
+#define MS_CN_GAP           0000005u                    /* Write Gap */
+#define MS_CN_WRR           0000004u                    /* Write Record */
+#define MS_CN_RST           0000011u                    /* Rewind and Reset */
+#define MS_CN_BSR           0000012u                    /* Backspace Record */
+#define MS_CN_WFM           0000015u                    /* Write File Mark */
+
+#define MS_ST_PROTECTED     0001000u                    /* write protected */
+#define MS_ST_READY         0000400u                    /* unit ready */
+
+#define MS_ST_MASK          (MS_ST_PROTECTED | MS_ST_READY)
+
 
 /* CPU global SCP data definitions */
 
@@ -723,6 +752,7 @@ HP_WORD STA    = 0;                             /* status register */
 HP_WORD SWCH   = 0;                             /* switch register */
 HP_WORD CPX1   = 0;                             /* run-mode interrupt flags register */
 HP_WORD CPX2   = 0;                             /* halt-mode interrupt flags register */
+HP_WORD MOD    = 0;                             /* module control register */
 HP_WORD PCLK   = 0;                             /* process clock register */
 HP_WORD CNTR   = 0;                             /* microcode counter */
 
@@ -779,13 +809,14 @@ const HP_WORD cpu_ccb_table [256] = {
 
 /* CPU global state */
 
-jmp_buf    cpu_save_env;                        /* the saved environment for microcode aborts */
-uint32     cpu_stop_flags;                      /* the simulation stop flag set */
+jmp_buf     cpu_save_env;                       /* the saved environment for microcode aborts */
+uint32      cpu_stop_flags;                     /* the simulation stop flag set */
 
-EXEC_STATE cpu_micro_state   = halted;          /* the microcode execution state */
-t_bool     cpu_base_changed  = FALSE;           /* TRUE if any base register is changed */
-t_bool     cpu_is_calibrated = TRUE;            /* TRUE if the process clock is calibrated */
-UNIT      *cpu_pclk_uptr     = &cpu_unit;       /* a (constant) pointer to the process clock unit */
+POWER_STATE cpu_power_state   = power_on;       /* the power supply state */
+EXEC_STATE  cpu_micro_state   = halted;         /* the microcode execution state */
+t_bool      cpu_base_changed  = FALSE;          /* TRUE if any base register is changed */
+t_bool      cpu_is_calibrated = TRUE;           /* TRUE if the process clock is calibrated */
+UNIT       *cpu_pclk_uptr     = &cpu_unit [0];  /* a (constant) pointer to the process clock unit */
 
 
 /* CPU local state */
@@ -793,6 +824,7 @@ UNIT      *cpu_pclk_uptr     = &cpu_unit;       /* a (constant) pointer to the p
 static uint32 sim_stops      = 0;               /* the current simulation stop flag settings */
 static uint32 cpu_speed      = 1;               /* the CPU speed, expressed as a multiplier of a real machine */
 static uint32 pclk_increment = 1;               /* the process clock increment per event service */
+static uint32 dump_control   = 0002006u;        /* the cold dump control word (default CNTL = 4, DEVNO = 6 */
 
 
 /* CPU local data structures */
@@ -800,9 +832,7 @@ static uint32 pclk_increment = 1;               /* the process clock increment p
 
 /* Main memory */
 
-#define MEMSIZE             (cpu_unit.capac)    /* the current memory size in 16-bit words */
-
-static MEMORY_WORD *M = NULL;                   /* the pointer to the main memory allocation */
+static MEMORY_WORD *M = NULL;                           /* the pointer to the main memory allocation */
 
 
 /* Interrupt classification names */
@@ -939,13 +969,16 @@ static t_stat cpu_reset   (DEVICE  *dptr);
 static t_stat cpu_examine (t_value *eval_array, t_addr address, UNIT *uptr, int32 switches);
 static t_stat cpu_deposit (t_value value,       t_addr address, UNIT *uptr, int32 switches);
 
-static t_stat set_stops   (UNIT *uptr, int32 option,     CONST char *cptr, void *desc);
-static t_stat set_size    (UNIT *uptr, int32 new_size,   CONST char *cptr, void *desc);
-static t_stat set_model   (UNIT *uptr, int32 new_model,  CONST char *cptr, void *desc);
-static t_stat set_option  (UNIT *uptr, int32 new_option, CONST char *cptr, void *desc);
+static t_stat set_stops  (UNIT *uptr, int32 option,     CONST char *cptr, void *desc);
+static t_stat set_dump   (UNIT *uptr, int32 option,     CONST char *cptr, void *desc);
+static t_stat set_size   (UNIT *uptr, int32 new_size,   CONST char *cptr, void *desc);
+static t_stat set_model  (UNIT *uptr, int32 new_model,  CONST char *cptr, void *desc);
+static t_stat set_option (UNIT *uptr, int32 new_option, CONST char *cptr, void *desc);
+static t_stat set_pfars  (UNIT *uptr, int32 setting,    CONST char *cptr, void *desc);
 
-static t_stat show_stops  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat show_speed  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat show_stops (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat show_dump  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat show_speed (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 
 /* CPU local utility routine declarations */
@@ -969,8 +1002,10 @@ static t_stat machine_instruction (void);
        size via the MEMSIZE macro, which references the "capac" field.
 */
 
-UNIT cpu_unit = {
-    UDATA (&cpu_service, UNIT_FIX | UNIT_BINK | UNIT_IDLE | UNIT_CALTIME, 0), PCLK_PERIOD * PCLK_MULTIPLIER
+#define UNIT_FLAGS          (UNIT_PFARS | UNIT_CALTIME)
+
+UNIT cpu_unit [] = {
+    { UDATA (&cpu_service, UNIT_FLAGS | UNIT_FIX | UNIT_BINK | UNIT_IDLE, 0), PCLK_PERIOD * PCLK_MULTIPLIER }
     };
 
 
@@ -998,37 +1033,39 @@ UNIT cpu_unit = {
 */
 
 static REG cpu_reg [] = {
-/*    Macro   Name    Location      Width           Flags           */
-/*    ------  ------  ------------  -----  ------------------------ */
-    { ORDATA (CIR,    CIR,           16),  REG_M | REG_RO | REG_FIT },  /* current instruction register */
-    { ORDATA (NIR,    NIR,           16),  REG_M | REG_RO | REG_FIT },  /* next instruction register */
-    { ORDATA (PB,     PB,            16),                   REG_FIT },  /* program base register */
-    { ORDATA (P,      P,             16),                   REG_FIT },  /* program counter register */
-    { ORDATA (PL,     PL,            16),                   REG_FIT },  /* program limit register */
-    { ORDATA (PBANK,  PBANK,          4),                   REG_FIT },  /* program segment bank register */
-    { ORDATA (DL,     DL,            16),                   REG_FIT },  /* data limit register */
-    { ORDATA (DB,     DB,            16),                   REG_FIT },  /* data base register */
-    { ORDATA (DBANK,  DBANK,          4),                   REG_FIT },  /* data segment bank register */
-    { ORDATA (Q,      Q,             16),                   REG_FIT },  /* stack marker register */
-    { ORDATA (SM,     SM,            16),                   REG_FIT },  /* stack memory register */
-    { ORDATA (SR,     SR,             3),                   REG_FIT },  /* stack register counter */
-    { ORDATA (Z,      Z,             16),                   REG_FIT },  /* stack limit register */
-    { ORDATA (SBANK,  SBANK,          4),                   REG_FIT },  /* stack segment bank register */
-    { ORDATA (RA,     TR [0],        16),  REG_A          | REG_FIT },  /* top of stack register */
-    { ORDATA (RB,     TR [1],        16),  REG_A          | REG_FIT },  /* top of stack - 1 register */
-    { ORDATA (RC,     TR [2],        16),  REG_A          | REG_FIT },  /* top of stack - 2 register */
-    { ORDATA (RD,     TR [3],        16),  REG_A          | REG_FIT },  /* top of stack - 3 register */
-    { ORDATA (X,      X,             16),  REG_A          | REG_FIT },  /* index register */
-    { ORDATA (STA,    STA,           16),  REG_S | REG_B  | REG_FIT },  /* status register */
-    { ORDATA (SWCH,   SWCH,          16),  REG_A          | REG_FIT },  /* switch register */
-    { ORDATA (CPX1,   CPX1,          16),  REG_B          | REG_FIT },  /* run-mode interrupt flags */
-    { ORDATA (CPX2,   CPX2,          16),  REG_B          | REG_FIT },  /* halt-mode interrupt flags */
-    { ORDATA (PCLK,   PCLK,          16),                   REG_FIT },  /* process clock register */
-    { ORDATA (CNTR,   CNTR,           6),         REG_HRO | REG_FIT },  /* microcode counter */
+/*    Macro   Name     Location      Radix  Width  Offset           Flags           */
+/*    ------  -------  ------------  -----  -----  ------  ------------------------ */
+    { ORDATA (CIR,     CIR,                  16),          REG_M | REG_RO | REG_FIT },  /* current instruction register */
+    { ORDATA (NIR,     NIR,                  16),          REG_M | REG_RO | REG_FIT },  /* next instruction register */
+    { ORDATA (PB,      PB,                   16),                           REG_FIT },  /* program base register */
+    { ORDATA (P,       P,                    16),                           REG_FIT },  /* program counter register */
+    { ORDATA (PL,      PL,                   16),                           REG_FIT },  /* program limit register */
+    { ORDATA (PBANK,   PBANK,                 4),                           REG_FIT },  /* program segment bank register */
+    { ORDATA (DL,      DL,                   16),                           REG_FIT },  /* data limit register */
+    { ORDATA (DB,      DB,                   16),                           REG_FIT },  /* data base register */
+    { ORDATA (DBANK,   DBANK,                 4),                           REG_FIT },  /* data segment bank register */
+    { ORDATA (Q,       Q,                    16),                           REG_FIT },  /* stack marker register */
+    { ORDATA (SM,      SM,                   16),                           REG_FIT },  /* stack memory register */
+    { ORDATA (SR,      SR,                    3),                           REG_FIT },  /* stack register counter */
+    { ORDATA (Z,       Z,                    16),                           REG_FIT },  /* stack limit register */
+    { ORDATA (SBANK,   SBANK,                 4),                           REG_FIT },  /* stack segment bank register */
+    { ORDATA (RA,      TR [0],               16),          REG_A          | REG_FIT },  /* top of stack register */
+    { ORDATA (RB,      TR [1],               16),          REG_A          | REG_FIT },  /* top of stack - 1 register */
+    { ORDATA (RC,      TR [2],               16),          REG_A          | REG_FIT },  /* top of stack - 2 register */
+    { ORDATA (RD,      TR [3],               16),          REG_A          | REG_FIT },  /* top of stack - 3 register */
+    { ORDATA (X,       X,                    16),          REG_A          | REG_FIT },  /* index register */
+    { ORDATA (STA,     STA,                  16),          REG_S | REG_B  | REG_FIT },  /* status register */
+    { ORDATA (SWCH,    SWCH,                 16),          REG_A          | REG_FIT },  /* switch register */
+    { ORDATA (CPX1,    CPX1,                 16),          REG_B          | REG_FIT },  /* run-mode interrupt flags */
+    { ORDATA (CPX2,    CPX2,                 16),          REG_B          | REG_FIT },  /* halt-mode interrupt flags */
+    { ORDATA (PCLK,    PCLK,                 16),                           REG_FIT },  /* process clock register */
+    { ORDATA (CNTR,    CNTR,                  6),                 REG_HRO | REG_FIT },  /* microcode counter */
+    { ORDATA (MOD,     MOD,                  16),                 REG_HRO | REG_FIT },  /* module control register */
 
-    { ORDATA (WRU,    sim_int_char,   8),         REG_HRO           },  /* SCP interrupt character */
-    { ORDATA (BRK,    sim_brk_char,   8),         REG_HRO           },  /* SCP break character */
-    { ORDATA (DEL,    sim_del_char,   8),         REG_HRO           },  /* SCP delete character */
+    { DRDATA (POWER,   cpu_power_state,       2),                 REG_HRO           },  /* system power supply state */
+    { ORDATA (WRU,     sim_int_char,          8),                 REG_HRO           },  /* SCP interrupt character */
+    { ORDATA (BRK,     sim_brk_char,          8),                 REG_HRO           },  /* SCP break character */
+    { ORDATA (DEL,     sim_del_char,          8),                 REG_HRO           },  /* SCP delete character */
 
     { NULL }
     };
@@ -1045,6 +1082,9 @@ static MTAB cpu_mod [] = {
     { UNIT_EIS,     UNIT_EIS,        "EIS",               NULL,         &set_option, NULL,    NULL       },
     { UNIT_EIS,     0,               "no EIS",            "NOEIS",      NULL,        NULL,    NULL       },
 
+    { UNIT_PFARS,     UNIT_PFARS,    "auto-restart",      "ARS",        &set_pfars,  NULL,    NULL       },
+    { UNIT_PFARS,              0,    "no auto-restart",   "NOARS",      &set_pfars,  NULL,    NULL       },
+
     { UNIT_CALTIME, UNIT_CALTIME,    "calibrated timing", "CALTIME",    NULL,        NULL,    NULL       },
     { UNIT_CALTIME,            0,    "realistic timing",  "REALTIME",   NULL,        NULL,    NULL       },
 
@@ -1059,8 +1099,13 @@ static MTAB cpu_mod [] = {
 
     { MTAB_XDV,                 0,      "IDLE",       "IDLE",       &sim_set_idle, &sim_show_idle, NULL       },
     { MTAB_XDV,                 0,      NULL,         "NOIDLE",     &sim_clr_idle, NULL,           NULL       },
+
+    { MTAB_XDV | MTAB_NMO,      0,      "DUMP",       "DUMPDEV",    &set_dump,     &show_dump,     NULL       },
+    { MTAB_XDV,                 1,      NULL,         "DUMPCTL",    &set_dump,     NULL,           NULL       },
+
     { MTAB_XDV | MTAB_NMO,      1,      "STOPS",      "STOP",       &set_stops,    &show_stops,    NULL       },
     { MTAB_XDV,                 0,      NULL,         "NOSTOP",     &set_stops,    NULL,           NULL       },
+
     { MTAB_XDV | MTAB_NMO,      0,      "SPEED",      NULL,         NULL,          &show_speed,    NULL       },
 
     { 0 }
@@ -1093,7 +1138,7 @@ static DEBTAB cpu_stop [] = {
 
 DEVICE cpu_dev = {
     "CPU",                                      /* device name */
-    &cpu_unit,                                  /* unit array */
+    cpu_unit,                                   /* unit array */
     cpu_reg,                                    /* register array */
     cpu_mod,                                    /* modifier array */
     1,                                          /* number of units */
@@ -1137,15 +1182,15 @@ DEVICE cpu_dev = {
    Execution is divided into four phases.
 
    First, the instruction prelude configures the simulation state to resume
-   execution.  This involves verifying that there are no device conflicts (e.g.,
-   two devices with the same device number), initializing the I/O processor and
-   channels, and setting the RUN switch if no other front panel switches are
-   pressed.  These actions accommodate reconfiguration of the I/O device
-   settings and program counter while the simulator was stopped.  The prelude
-   also responds to one command-line switch: if "-B" is specified, the current
-   set of simulation stop conditions is bypassed for the first instruction
-   executed.  This allows, e.g., a PAUS instruction to be bypassed or an
-   unimplemented instruction trap to be taken.
+   execution.  This involves verifying that system power is on and there are no
+   device conflicts (e.g., two devices with the same device number),
+   initializing the I/O processor and channels, and setting the RUN switch if no
+   other front panel switches are pressed.  These actions accommodate
+   reconfiguration of the I/O device settings and program counter while the
+   simulator was stopped.  The prelude also responds to one command-line switch:
+   if "-B" is specified, the current set of simulation stop conditions is
+   bypassed for the first instruction executed.  This allows, e.g., a PAUS
+   instruction to be bypassed or an unimplemented instruction trap to be taken.
 
    Second, the microcode abort mechanism is set up.  Microcode aborts utilize
    the "setjmp/longjmp" mechanism to transfer control out of the instruction
@@ -1185,8 +1230,8 @@ DEVICE cpu_dev = {
    The HP 3000 is a microcoded machine.  In hardware, the micromachine is always
    executing microinstructions, even when the CPU is "halted."  The halt/run
    state is simply a flip-flop setting, reflected in bit 15 of the CPX2
-   register, that determines whether the "halt-mode" or "run-mode" microprogram
-   is currently executing.
+   register and the RUN light on the front panel, that determines whether the
+   "halt-mode" or "run-mode" microprogram is currently executing.
 
    In simulation, the "cpu_micro_state" variable indicates the state of the
    micromachine, i.e., which section of the microcode it is executing, while
@@ -1195,7 +1240,7 @@ DEVICE cpu_dev = {
 
      - running : the run-mode fetch-and-execute microcode is executing
      - paused  : the run-mode PAUS instruction microcode is executing
-     - loading : the halt-mode COLD LOAD microcode is executing
+     - waiting : the halt-mode cold load or dump microcode is executing
      - halted  : the halt-mode front panel microcode is executing
 
    Simulation provides a variety of stop conditions that break instruction
@@ -1334,7 +1379,10 @@ if (sim_switches & SWMASK ('B'))                        /* if a simulation stop 
 else                                                    /* otherwise */
     cpu_stop_flags = sim_stops;                         /*   set the stops as indicated */
 
-if (hp_device_conflict ())                              /* if the check for device assignment consistency fails */
+if (cpu_power_state == power_off)                       /* if system power is off */
+    status = STOP_POWER;                                /*   then execution is not possible until restoration */
+
+else if (hp_device_conflict ())                         /* otherwise if device assignment is inconsistent */
     status = SCPE_STOP;                                 /*   then inhibit execution */
 
 else {                                                  /* otherwise */
@@ -1343,7 +1391,7 @@ else {                                                  /* otherwise */
     sel_initialize ();                                  /*       and the selector channel */
 
     if ((CPX2 & CPX2_IRQ_SET) == 0)                     /* if no halt-mode interrupt is present */
-        CPX2 |= cpx2_RUNSWCH;                           /*   then assume a RUN command */
+        CPX2 |= cpx2_RUNSWCH;                           /*   then assume a RUN command via STEP/CONT */
     }
 
 
@@ -1451,8 +1499,11 @@ if (abortval) {                                         /* if a microcode abort 
 
 
         case trap_Power_On:                             /* this trap executes on the ICS */
-            status = SCPE_INCOMP;                       /*   but is not implemented yet */
-            label = 0;                                  /* the trap handler is not called */
+            cpu_setup_ics_irq (irq_Trap, trap);         /*   so set it up */
+            cpu_power_state = power_on;                 /*     and return to the power-on state */
+
+            if (CPX2 & cpx2_INHPFARS)                   /* if auto-restart is inhibited */
+                status = STOP_ARSINH;                   /*   then exit and wait for a manual restart */
             break;
         }                                               /* all cases are handled */
 
@@ -1497,8 +1548,9 @@ while (status == SCPE_OK) {                             /* execute until simulat
         device = iop_poll ();                           /*       then poll to acknowledge the request */
 
     if (cpu_micro_state == running)                     /* if the micromachine is running */
-        if (CPX1 & CPX1_IRQ_SET)                        /*   then if a run-mode interrupt is pending */
-            cpu_run_mode_interrupt (device);            /*     then service it */
+        if (CPX1 & CPX1_IRQ_SET                         /*   then if a run-mode interrupt is pending */
+          && cpu_power_state != power_failing)          /*     and power is not currently failing */
+            cpu_run_mode_interrupt (device);            /*       then service it */
 
         else if (sim_brk_summ                               /* otherwise if a breakpoint exists */
           && sim_brk_test (TO_PA (PBANK, P - 1 & LA_MASK),  /*   at the next location */
@@ -1533,7 +1585,7 @@ while (status == SCPE_OK) {                             /* execute until simulat
 
             P = P + 1 & R_MASK;                         /* point to the following instruction */
 
-            if (DEBUG_PRI (cpu_dev, DEB_INSTR)) {           /* if instruction tracing is enabled */
+            if (DPRINTING (cpu_dev, DEB_INSTR)) {           /* if instruction tracing is enabled */
                 sim_eval [0] = CIR;                         /*   then save the instruction that will be executed */
                 sim_eval [1] = NIR;                         /*     and the following word for evaluation */
 
@@ -1584,10 +1636,236 @@ else if (cpu_micro_state == running)                    /* otherwise if it is ru
 
 cpu_micro_state = halted;                               /* halt the micromachine */
 
+if (cpu_power_state == power_failing                    /* if power is failing */
+  && status == STOP_HALT)                               /*   and we executed a HALT instruction */
+    cpu_power_state = power_off;                        /*     then power will be off when we return */
+
 dprintf (cpu_dev, cpu_dev.dctrl, BOV_FORMAT "simulation stop: %s\n",
          PBANK, P, STA, sim_error_text (status));
 
 return status;                                          /* return the reason for the stop */
+}
+
+
+/* Execute the LOAD and DUMP commands.
+
+   This command processing routine implements the cold load and cold dump
+   commands.  The syntax is:
+
+     LOAD { <control/devno> }
+     DUMP { <control/devno> }
+
+   The <control/devno> is a number that is deposited into the SWCH register
+   before invoking the CPU cold load or cold dump facility.  The CPU radix is
+   used to interpret the number; it defaults to octal.  If the number is
+   omitted, the SWCH register value is not altered before loading or dumping.
+
+   On entry, the "arg" parameter is "Cold_Load" for a LOAD command and
+   "Cold_Dump" for a DUMP command, and "buf" points at the remainder of the
+   command line.  If characters exist on the command line, they are parsed,
+   converted to a numeric value, and stored in the SWCH register.  Then the
+   CPU's cold load/dump routine is called to set up the CPU state.  Finally, the
+   CPU is started to begin the requested action.
+
+
+   Implementation notes:
+
+    1. The RUN command uses the RU_CONT argument instead of RU_RUN so that the
+       run_cmd SCP routine will not reset all devices before entering the
+       instruction executor.  The halt mode interrupt handlers for cold load and
+       cold dump reset the simulator as appropriate for their commands (i.e.,
+       the CPU and all I/O devices, or just the I/O devices, respectively).
+*/
+
+t_stat cpu_cold_cmd (int32 arg, CONST char *buf)
+{
+const char *cptr;
+char       gbuf [CBUFSIZE];
+t_stat     status;
+HP_WORD    value;
+
+if (*buf != '\0') {                                     /* if more characters exist on the command line */
+    cptr = get_glyph (buf, gbuf, 0);                    /*   then get the next glyph */
+
+    if (*cptr != '\0')                                  /* if that does not exhaust the input */
+        return SCPE_2MARG;                              /*   then report that there are too many arguments */
+
+    value = (HP_WORD) get_uint (gbuf, cpu_dev.dradix,   /* get the parameter value */
+                                D16_UMAX, &status);
+
+    if (status == SCPE_OK)                              /* if a valid number was present */
+        SWCH = value;                                   /*   then set it into the switch register */
+    else                                                /* otherwise */
+        return status;                                  /*   return the error status */
+    }
+
+else if (arg == Cold_Dump)                              /* otherwise if no dump value was given */
+    SWCH = dump_control;                                /*   then use the system control panel presets */
+
+cpu_front_panel (SWCH, (PANEL_TYPE) arg);               /* set up the cold load or dump microcode */
+
+return run_cmd (RU_CONT, buf);                          /* execute the halt-mode routine */
+}
+
+
+/* Execute the POWER commands.
+
+   This command processing routine is called to initiate a power failure or
+   power restoration.  The "cptr" parameter points to the power option keyword;
+   the "arg" parameter is not used.
+
+   The routine processes commands of the form:
+
+     POWER { FAIL | OFF | DOWN }
+     POWER { RESTORE | ON | UP }
+
+   In simulation, the "cpu_power_state" global variable indicates the current
+   state of system power.  The simulator starts in the power_on state.  The
+   POWER FAIL command moves from the power_on to the power_failing state if the
+   CPU is running, or to the power_off state if it is not.  Execution of a HALT
+   in the power_failing state moves to the power_off state.  The POWER RESTORE
+   command moves from the power_off to the power_returning state if the CPU is
+   running, or to the power_on state if it is not.  Execution of the power-on
+   trap moves from the power_returning to the power_on state.
+
+   The POWER FAIL and POWER RESTORE commands are only valid in the power_on and
+   power_off states, respectively; otherwise, they print "Command not allowed."
+
+   The four enumeration values model the states of the PON (power on) and PFW
+   (power-fail warning) hardware signals, as follows:
+
+     PON  PFW  State            Simulator Action
+     ---  ---  ---------------  ----------------------------
+      1    0   power on         executing normally
+      1    1   power failing    executing with cpx1_PFINTR
+      0    1   power off        will not execute
+      0    0   power returning  executing with trap_Power_On
+
+   In microcode, the power-fail routine writes the current value of the CPX2
+   register to the word following the last word of the ICS.  This value is used
+   by the power-on routine to decide if the CPU was running (cpx2_RUN bit is
+   set) or halted at the time of the power failure.  A power failure is
+   indicated by setting the cpx1_PFINTR bit in the CPX1 register; this causes an
+   interrupt to the power-failure routine in the operating system, which
+   performs an orderly shutdown followed by a programmed HALT to wait for power
+   to die.  When power is restored, the power-on trap (trap_Power_On) is set up,
+   and then, if the PF/ARS switch is in the "enable" position, the trap is
+   taken, which restarts the operating system and any I/O that was in progress
+   when power failed.  If the switch is in the "disable" position, the CPU
+   remains halted, and the trap is taken when the RUN button is pressed.
+
+   The POWER commands are entered at the SCP prompt.  If the machine was running
+   at the time of power failure, execution is resumed automatically to execute
+   the power-fail or power-restore OS routines.  If the machine was halted when
+   the POWER commands were entered, the machine remains halted -- just the power
+   state changes.
+
+
+   Implementation notes:
+
+    1. In hardware, when the power fail interrupt is serviced, the microcode
+       sets the PWR INH flip-flop, which locks out the RUN switch and inhibits
+       all other halt-mode (CPX2) and run-mode (CPX1) interrupts until the CPU
+       is reset.  This ensures that the software power-fail interrupt handler
+       executes unimpeded.  In simulation, a POWER FAIL command with the CPU
+       running sets the power-fail interrupt bit in the CPX1 register and
+       resumes execution in the power_on state.  When the interrupt is detected
+       by the "cpu_run_mode_interrupt" routine, the state is changed to
+       power_failing.  In this state, run-mode interrupts are not recognized.
+       Halt-mode interrupts need no special handling, as the power state is
+       changed to power_off when the CPU halts.  Therefore, the CPU is never in
+       a "halted-and-waiting-for-power-to-fade-away" state.
+
+    2. The RUN command uses the RU_CONT argument instead of RU_RUN so that the
+       run_cmd SCP routine will not reset all devices before entering the
+       instruction executor.  The halt-mode interrupt handlers for cold load and
+       cold dump reset the simulator as appropriate for their commands (i.e.,
+       the CPU and all I/O devices, or just the I/O devices, respectively).
+
+    3. In order to set up the power-on trap, this routine presses the RUN button
+       and continues the simulation.  After the trap is set up in the
+       "sim_instr" routine, the halt-mode interrupt handler checks the PF/ARS
+       switch and stops simulation if auto-restart is disabled.
+*/
+
+t_stat cpu_power_cmd (int32 arg, CONST char *cptr)
+{
+static CTAB options [] = {
+    { "FAIL",    NULL, power_failing   },
+    { "RESTORE", NULL, power_returning },
+    { "OFF",     NULL, power_failing   },
+    { "ON",      NULL, power_returning },
+    { "DOWN",    NULL, power_failing   },
+    { "UP",      NULL, power_returning },
+    { NULL }
+    };
+
+char    gbuf [CBUFSIZE];
+CTAB    *ctptr;
+HP_WORD zi, failure_cpx2;
+t_stat  status;
+
+if (cptr == NULL || *cptr == '\0')                      /* if there is no option word */
+    return SCPE_2FARG;                                  /*   then report a missing argument */
+
+cptr  = get_glyph (cptr, gbuf, 0);                      /* parse (and upshift) the option specified */
+ctptr = find_ctab (options, gbuf);                      /*   and look it up in the option table */
+
+if (ctptr == NULL)                                      /* if the option is not valid */
+    status = SCPE_ARG;                                  /*   then report a bad argument */
+
+else if (*cptr != '\0')                                 /* otherwise if something follows the option */
+    return SCPE_2MARG;                                  /*   then report too many arguments */
+
+else if (ctptr->arg == power_failing)                   /* otherwise if a power-fail option was given */
+    if (cpu_power_state != power_on)                    /*   but the CPU power is not on */
+        status = SCPE_NOFNC;                            /*     then the command is not allowed */
+
+    else {                                              /* otherwise the failure is valid */
+        iop_assert_PFWARN ();                           /*   so send a power-fail warning to all devices */
+
+        cpu_read_memory (absolute, ICS_Z, &zi);         /* get the ICS stack limit */
+        cpu_write_memory (absolute, zi + 1, CPX2);      /*   and save the CPX2 value in the following word */
+
+        if (CPX2 & cpx2_RUN) {                          /* if the CPU is currently running */
+            CPX1 |= cpx1_PFINTR;                        /*   then set the power-fail interrupt */
+            CPX2 |= cpx2_RUNSWCH;                       /*     and assume a RUN command */
+            status = run_cmd (RU_CONT, cptr);           /*       and continue execution */
+            }
+
+        else {                                          /* otherwise the CPU is currently halted */
+            cpu_power_state = power_off;                /*   so remain halted in the "power is off" state */
+            status = SCPE_OK;                           /*     and return command success */
+            }
+        }
+
+else if (ctptr->arg == power_returning)                 /* otherwise if a power-restoration option was given */
+    if (cpu_power_state != power_off)                   /*   but the CPU power is not off */
+        status = SCPE_NOFNC;                            /*     then the command is not allowed */
+
+    else {                                              /* otherwise the restoration is valid */
+        reset_all_p (0);                                /*   so reset all devices to their power on states */
+
+        cpu_read_memory (absolute, ICS_Z, &zi);             /* get the ICS stack limit */
+        cpu_read_memory (absolute, zi + 1, &failure_cpx2);  /*   and get the value of CPX2 at the time of failure */
+        cpu_write_memory (absolute, zi + 1, CPX2);          /*     and replace it with the current CPX2 value */
+
+        if (failure_cpx2 & cpx2_RUN) {                  /* if the CPU was running at the time of power failure */
+            cpu_power_state = power_returning;          /*   then move to the "power is returning" state */
+            CPX2 |= cpx2_RUNSWCH;                       /*     and assume a RUN command */
+            status = run_cmd (RU_CONT, cptr);           /*       and continue execution */
+            }
+
+        else {                                          /* otherwise the CPU was halted when power failed */
+            cpu_power_state = power_on;                 /*   so remain halted in the "power is on" state */
+            status = SCPE_OK;                           /*     and return command success */
+            }
+        }
+
+else                                                    /* otherwise a valid option has no handler */
+    status = SCPE_IERR;                                 /*   so report an internal error */
+
+return status;                                          /* return the operation status */
 }
 
 
@@ -1675,7 +1953,7 @@ else {                                                  /* otherwise the access 
         case program:
         case data:
         case stack:
-            *value = (HP_WORD) M [address];             /* unchecked access values comes from memory */
+            *value = (HP_WORD) M [address];             /* unchecked access values come from memory */
             break;
 
 
@@ -1895,7 +2173,7 @@ else                                                    /* otherwise the microma
 
 request_set = CPX1 & CPX1_IRQ_SET;                      /* get the set of active interrupt requests */
 
-if (request_set == cpx1_EXTINTR) {                      /* if only an external request present */
+if (request_set == cpx1_EXTINTR) {                      /* if only an external request is present */
     class = irq_External;                               /*   (the most common case) then set the class */
     parameter = device_number;                          /*     and set the parameter to the device number */
     }
@@ -1919,8 +2197,15 @@ else {                                                  /* otherwise scan for th
     else if (class == irq_External)                     /* otherwise if an external interrupt occurred */
         parameter = device_number;                      /*   then set the parameter to the device number */
 
-    else if (class == irq_Module)                       /* otherwise if the class is a module interrupt */
-        parameter = 0;                                  /*   then the parameter is the module number */
+    else if (class == irq_Module) {                     /* otherwise if the class is a module interrupt */
+        parameter = UPPER_BYTE (MOD);                   /*   then the parameter is the module number */
+        MOD = 0;                                        /* clear the register to prevent a second interrupt */
+        }
+
+    else if (class == irq_Power_Fail) {                 /* otherwise if a power fail interrupt occurred */
+        parameter = TO_LABEL (LABEL_IRQ, class);        /*   then the parameter is the label */
+        cpu_power_state = power_failing;                /*     and system power is now failing */
+        }
 
     else                                                /* otherwise the parameter */
         parameter = TO_LABEL (LABEL_IRQ, class);        /*   is the label */
@@ -1991,12 +2276,12 @@ void cpu_update_pclk (void)
 int32 elapsed, ticks;
 
 if (cpu_is_calibrated) {                                /* if the process clock is calibrated */
-    elapsed =                                           /*   then the elapsed time is the original wait time */
-       cpu_unit.wait - sim_activate_time (&cpu_unit);   /*     less the time remaining before the next service */
+    elapsed = cpu_unit [0].wait                         /*   then the elapsed time is the original wait time */
+                - sim_activate_time (&cpu_unit [0]);    /*     less the time remaining before the next service */
 
     ticks =                                             /* the adjustment is */
-       (elapsed * PCLK_MULTIPLIER) / cpu_unit.wait      /*   the elapsed fraction of the multiplier */
-       - (PCLK_MULTIPLIER - pclk_increment);            /*     less the amount of any adjustment already made */
+       (elapsed * PCLK_MULTIPLIER) / cpu_unit [0].wait  /*   the elapsed fraction of the multiplier */
+         - (PCLK_MULTIPLIER - pclk_increment);          /*     less the amount of any adjustment already made */
 
     PCLK = PCLK + ticks & R_MASK;                       /* update the process clock counter with rollover */
     pclk_increment = pclk_increment - ticks;            /*   and reduce the amount remaining to add at service */
@@ -2528,9 +2813,6 @@ return;
        an external interrupt is pending.  This is handled as an external
        interrupt but is classified differently so that the teardown and rebuild
        of the stack may be avoided to improve performance.
-
-    3. ICS interrupts other than external interrupts (e.g., parity errors) are
-       not currently generated or handled by the simulation.
 */
 
 void cpu_setup_irq_handler (IRQ_CLASS class, HP_WORD parameter)
@@ -2552,7 +2834,11 @@ if (class == irq_External || class == irq_IXIT) {       /* if entry is for an ex
 
 else if (class >= irq_System_Parity                     /* otherwise if entry is for */
   && class <= irq_Power_Fail) {                         /*   another ICS interrupt */
-    return;                                             /*     then.... [not handled yet] */
+    cpu_setup_ics_irq (class, 0);                       /*     then set it up on the ICS */
+
+    label = TO_LABEL (LABEL_IRQ, class);                /* form the label for the specified classification */
+
+    STA = STATUS_M;                                     /* clear status and enter privileged mode */
     }
 
 else {                                                  /* otherwise entry is for a non-ICS interrupt */
@@ -2642,9 +2928,10 @@ void cpu_setup_ics_irq (IRQ_CLASS class, TRAP_CLASS trap)
 {
 HP_WORD delta_q, stack_db;
 
-if (class != irq_Trap || trap != trap_Cold_Load) {      /* if this is not a cold load trap entry */
-    cpu_flush ();                                       /*   then flush the TOS registers to memory */
-    cpu_mark_stack ();                                  /*     and write a four-word stack marker */
+if (class != irq_Trap                                   /* if this is not  */
+  || trap != trap_Cold_Load && trap != trap_Power_On) { /*   a cold load or power on trap entry */
+    cpu_flush ();                                       /*     then flush the TOS registers to memory */
+    cpu_mark_stack ();                                  /*       and write a four-word stack marker */
 
     cpu_write_memory (stack, SM + 1 & LA_MASK, DBANK);  /* add DBANK and DB to the stack */
     cpu_write_memory (stack, SM + 2 & LA_MASK, DB);     /*   to form a six-word ICS marker */
@@ -2671,7 +2958,7 @@ else {                                                  /* otherwise execution i
                      &stack_db);
 
     cpu_write_memory (stack, Q - 6 & LA_MASK,           /* write the stack-DB-relative S value */
-                      SM + 2 - stack_db & DV_MASK);     /*   which is meaningless if this is a cold load */
+                      SM + 2 - stack_db & DV_MASK);     /*   which is meaningless for a cold load or power on */
 
     SR = 0;                                             /* invalidate the stack registers for a cold load */
     DL = D16_UMAX;                                      /*   and set the data limit */
@@ -3156,9 +3443,8 @@ return SCPE_OK;                                         /* return the success of
    If this is a power-on reset ("RESET -P"), the process clock calibrated timer
    is initialized, and any LOAD or DUMP request in progress is cleared.
 
-   The micromachine is halted, the process clock is scheduled, and, if a DUMP is
-   not in progress, several registers are cleared.  The register values are
-   preserved for a DUMP to record the state of the machine accurately.
+   The micromachine is halted, the process clock is scheduled, and several
+   registers are cleared.
 
 
    Implementation notes:
@@ -3178,7 +3464,7 @@ if (M == NULL) {                                        /* if this is the first 
         return SCPE_MEM;                                /*   then report the error and abort the simulation */
 
     else                                                /* otherwise the memory was allocated */
-        set_model (&cpu_unit, UNIT_SERIES_III,          /*   so establish the initial CPU model */
+        set_model (&cpu_unit [0], UNIT_SERIES_III,      /*   so establish the initial CPU model */
                    NULL, NULL);
 
     for (sim_PC = dptr->registers;                      /* find the P register entry */
@@ -3190,21 +3476,24 @@ if (M == NULL) {                                        /* if this is the first 
     }
 
 if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on reset */
-    sim_rtcn_init (cpu_unit.wait, TMR_PCLK);            /*   then initialize the process clock timer */
+    sim_rtcn_init (cpu_unit [0].wait, TMR_PCLK);        /*   then initialize the process clock timer */
     CPX2 &= ~(cpx2_LOADSWCH | cpx2_DUMPSWCH);           /*     and clear any cold load or dump request */
     }
 
 cpu_micro_state = halted;                               /* halt the micromachine */
-sim_activate_abs (&cpu_unit, cpu_unit.wait);            /*   and schedule the process clock */
+sim_activate_abs (&cpu_unit [0], cpu_unit [0].wait);    /*   and schedule the process clock */
 
-if (!(CPX2 & cpx2_DUMPSWCH)) {                          /* if the DUMP switch is inactive */
-    PCLK = 0;                                           /*   then clear the process clock counter */
-    CPX1 = 0;                                           /*     and all run-mode signals */
-    CPX2 &= ~(cpx2_RUN | cpx2_SYSHALT);                 /*       and the run and system halt flip-flops */
+PCLK = 0;                                               /* clear the process clock counter */
+CPX1 = 0;                                               /*   and all run-mode signals */
+CPX2 &= ~(cpx2_RUN | cpx2_SYSHALT);                     /*     and the run and system halt flip-flops */
 
-    CNTR = SR;                                          /* copy the stack register to the counter */
-    cpu_flush ();                                       /*   and flush the TOS registers to memory */
-    }
+if (cpu_unit [0].flags & UNIT_PFARS)                    /* if the PF/ARS switch position is ENBL */
+    CPX2 &= ~cpx2_INHPFARS;                             /*   then clear the auto-restart inhibit flag */
+else                                                    /* otherwise the position is DSBL */
+    CPX2 |= cpx2_INHPFARS;                              /*   so set the auto-restart inhibit flag */
+
+CNTR = SR;                                              /* copy the stack register to the counter */
+cpu_flush ();                                           /*   and flush the TOS registers to memory */
 
 return SCPE_OK;                                         /* indicate that the reset succeeded */
 }
@@ -3327,6 +3616,58 @@ else                                                    /* otherwise at least on
         }
 
 return SCPE_OK;                                         /* the stops were successfully processed */
+}
+
+
+/* Set the CPU cold dump configuration jumpers.
+
+   This validation routine is called to configure the set of jumpers on the
+   system control panel that preset the device number and control value for the
+   cold dump process.  The "option" parameter is 0 to set the device number
+   and 1 to set the control value.  The "cptr" parameter points to the first
+   character of the value to be set.  The unit and description pointers are not
+   used.
+
+   The routine processes commands of the form:
+
+     SET CPU DUMPDEV=<devno>
+     SET CPU DUMPCTL=<cntlval>
+
+   The device number is a decimal value between 3 and 127, and the control value
+   is an octal number between 0 and 377.  Values outside of these ranges are
+   rejected.
+*/
+
+static t_stat set_dump (UNIT *uptr, int32 option, CONST char *cptr, void *desc)
+{
+t_value value;
+t_stat  status = SCPE_OK;
+
+if (cptr == NULL || *cptr == '\0')                      /* if the expected value is missing */
+    status = SCPE_MISVAL;                               /*   then report the error */
+
+else if (option == 0) {                                 /* otherwise if a device number is present */
+    value = get_uint (cptr, DEVNO_BASE,                 /*   then parse the supplied value */
+                      DEVNO_MAX, &status);
+
+    if (status == SCPE_OK)                                  /* if it is valid */
+        if (value >= 3)                                     /*   and in the proper range */
+            dump_control = REPLACE_LOWER (dump_control,     /*     then set the new device number */
+                                          (uint32) value);  /*       into the dump control word */
+        else                                                /*   otherwise the device number */
+            status = SCPE_ARG;                              /*     is invalid */
+    }
+
+else {                                                  /* otherwise a control byte is present */
+    value = get_uint (cptr, CNTL_BASE,                  /*   so parse the supplied value */
+                      CNTL_MAX, &status);
+
+    if (status == SCPE_OK)                              /* if it is valid */
+        dump_control = REPLACE_UPPER (dump_control,     /*   then set the new control value */
+                                      (uint32) value);  /*     into the dump control word */
+    }
+
+return status;                                          /* return the operation status */
 }
 
 
@@ -3453,6 +3794,32 @@ else                                                    /* otherwise */
 }
 
 
+/* Change the power-fail auto-restart switch setting.
+
+   This validation routine is called to configure the PF/ARS switch that is
+   located behind the system control panel.  If set to the ENBL (enable)
+   position, the CPU will perform an auto-restart when power is restored after a
+   failure.  In the DSBL (disable) position, the CPU will remain halted after
+   power restoration; execution may be continued by pressing the RUN button.
+
+   In simulation, a SET CPU ARS command enables auto-restart, and SET CPU NOARS
+   disables auto-restart.  The "setting" parameter is set to the UNIT_ARS flag
+   in the former cast and to zero in the latter case.  The other parameters are
+   not used.  The routine reflects the ARS setting in "inhibit auto-restart" bit
+   of the CPX2 register.
+*/
+
+static t_stat set_pfars (UNIT *uptr, int32 setting, CONST char *cptr, void *desc)
+{
+if (setting == UNIT_PFARS)                              /* if the option is ARS */
+    CPX2 &= ~cpx2_INHPFARS;                             /*   then clear the auto-restart inhibit flag */
+else                                                    /* otherwise the option is NOARS */
+    CPX2 |= cpx2_INHPFARS;                              /*   so set the auto-restart inhibit flag */
+
+return SCPE_OK;                                         /* confirm the change */
+}
+
+
 /* Show the CPU simulation stop conditions.
 
    This display routine is called to show the set of CPU stop conditions.  The
@@ -3491,6 +3858,23 @@ else {                                                  /* otherwise at least on
 fputc ('\n', st);                                       /* add the trailing newline */
 
 return SCPE_OK;                                         /* report the success of the display */
+}
+
+
+/* Show the CPU cold dump configuration jumpers.
+
+   This display routine is called to show the device number and control byte
+   that are preset on the rear of the system control panel for the cold dump
+   process.  The "st" parameter is the open output stream.  The other parameters
+   are not used.
+*/
+
+static t_stat show_dump (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "Dump device = %u, dump control = %03o\n",
+         LOWER_BYTE (dump_control), UPPER_BYTE (dump_control));
+
+return SCPE_OK;
 }
 
 
@@ -3536,6 +3920,41 @@ return SCPE_OK;                                         /*   and report success 
    to the accumulator to ensure that a single step won't complete without
    executing an instruction.
 
+   If the DUMP switch is pressed, an I/O Reset is performed on all devices
+   except the CPU, which is skipped to preserve the register state.  The dump
+   device number is obtained from the SWCH register and tested to ensure that a
+   tape is mounted with a write ring and the unit is online.  Then the contents
+   of the CPU registers are written to the reserved memory area starting at
+   address 1400 octal in bank 0.  This is followed by two SIO programs.  The
+   main program at addresses 1430-1437 write 4K-word blocks of memory to the
+   dump device.  The error recovery program at addresses 1422-1427 is invoked
+   when a write fails.  It does a Backspace Record followed by a Write Gap to
+   skip the bad spot on the tape, and then the write is retried.
+
+   The DUMP switch remains set, so after each pass through the main execution
+   loop to run a channel cycle, this routine is reentered.  The "waiting" state
+   causes the second part of the process to check for device completion.  When
+   it occurs, the expected external interrupt is cleared, and if the dump is
+   complete, the DUMP switch is reset, the original SIO pointer in the DRT is
+   restored, and the micromachine is halted.  Otherwise, the SIO pointer is
+   read.  If it points at the end of the program, then the operation completed
+   normally.  In this case, the dump address is advanced, and, if all of memory
+   has been dumped, the SIO pointer is reset to the recovery program, and that
+   program is changed to finish up with Write File Mark and Rewind/Offline
+   commands.  Otherwise, the pointer is reset to the main program in preparation
+   for the next 4K write.  The SIO program is then restarted.
+
+   If SIO pointer failed to complete, the pointer is reset to point at the error
+   recovery program, and the memory address is unchanged; the same 4K write will
+   be performed once the recovery program runs.  If the recovery program fails,
+   the dump is terminated at that point with a failure indication.
+
+   During the dump operation, the CIR register is continually updated with the
+   current memory bank number.  If the dump runs to completion, CIR will contain
+   the number of 64K memory banks installed in the machine.  A value less than
+   the installed memory value indicates a dump failure.  Except for the CIR, the
+   machine state is restored, so that another dump may be attempted.
+
    If the LOAD switch is pressed, the cold load process begins by filling memory
    with HALT 10 instructions if SWCH register bit 8 is clear.  The cold load
    device number is obtained from the lower byte of the SWCH register.
@@ -3543,12 +3962,12 @@ return SCPE_OK;                                         /*   and report success 
    The first part of the cold load process clears the TOS and STA registers,
    stores the initial channel program in memory, and executes an SIO instruction
    to start the channel.  Once the device starts, interrupts are enabled, and
-   the micromachine state is set to "loading" in preparation for executing the
+   the micromachine state is set to "waiting" in preparation for executing the
    second part of the cold load process once the channel program ends.  The
    routine then exits to begin channel execution.
 
    The LOAD switch remains set, so after each pass through the main execution
-   loop to run a channel cycle, this routine is reentered.  The "loading" state
+   loop to run a channel cycle, this routine is reentered.  The "waiting" state
    causes the second part of the process to check for device completion.  The
    expected external interrupt is cleared, the LOAD switch is cleared, the
    micromachine state is set to "running", and the Cold Load trap is taken to
@@ -3566,25 +3985,26 @@ return SCPE_OK;                                         /*   and report success 
        instruction in the NIR will become the first instruction executed after
        the interrupt handler completes.
 
-    2. The cold load microcode is shared with the cold dump process.  The dump
-       process saves memory locations DRT + 0 through DRT + 3 in the TOS
+    2. The cold load microcode is shared with the cold dump process.  The Series
+       II dump process saves memory locations DRT + 0 through DRT + 3 in the TOS
        registers.  The load process uses the same microcode but does not perform
        the memory read, so the TOS registers are loaded with the previous
        contents of the OPND register, which is effectively a random value.  In
        simulation, the TOS registers are cleared.
 
-    3. The cold load microcode waits forever for an interrupt from the cold
-       load device.  If it doesn't occur, the microcode hangs until a system
-       reset is performed (it tests CPX1 bit 8 and does a JMP *-1 if the bit is
-       not set).  The simulation follows the microcode behavior.
+    3. The cold load and dump microcode waits forever for an interrupt from the
+       cold load device.  If it doesn't occur, the microcode hangs until a
+       system reset is performed (it tests CPX1 bit 8 and does a JMP *-1 if the
+       bit is not set).  The simulation follows the microcode behavior.
 
     4. Front panel diagnostics and direct I/O cold loading is not implemented.
 */
 
 static t_stat halt_mode_interrupt (HP_WORD device_number)
 {
-static HP_WORD cold_load_device;
-uint32 address;
+static HP_WORD cold_device, sio_pointer, status, offset, pointer;
+static uint32 address;
+static t_bool error_recovery;
 
 if (CPX2 & cpx2_RUNSWCH) {                              /* if the RUN switch is pressed */
     if (CPX2 & cpx2_SYSHALT) {                          /*   then if the System Halt flip-flop is set */
@@ -3608,18 +4028,181 @@ if (CPX2 & cpx2_RUNSWCH) {                              /* if the RUN switch is 
 
     cpu_micro_state = running;                          /* start the micromachine */
     sim_interval = sim_interval + 1;                    /* don't count this cycle against a STEP count */
+
+    if (cpu_power_state == power_returning) {           /* if power is returning after a failure */
+        if (CPX2 & cpx2_INHPFARS)                       /*   then if auto-restart is inhibited */
+            CPX2 &= ~cpx2_RUN;                          /*     then clear the Run flip-flop */
+
+        MICRO_ABORT (trap_Power_On);                    /* set up the trap to the power-on routine */
+        }
     }
 
 
 else if (CPX2 & cpx2_DUMPSWCH) {                        /* otherwise if the DUMP switch is pressed */
-    CPX2 &= ~CPX2_IRQ_SET;                              /*   then clear all switches */
-    return SCPE_INCOMP;                                 /*     and report that DUMP is not implemented yet */
+    if (cpu_micro_state != waiting) {                   /*   then if the dump is not in progress */
+        reset_all (IO_RESET);                           /*     then reset all I/O devices */
+
+        cold_device = LOWER_BYTE (SWCH) & DEVNO_MASK;   /* get the device number from the lower SWCH byte */
+
+        status = iop_direct_io (cold_device, ioTIO, 0); /* get the device status */
+
+        if ((status & MS_ST_MASK) != MS_ST_READY) {     /* if the tape is not ready and unprotected */
+            CPX2 &= ~cpx2_DUMPSWCH;                     /*   then clear the dump switch */
+
+            CIR = 0;                                    /* clear CIR to indicate a failure */
+            return STOP_CDUMP;                          /*   and terminate the dump */
+            }
+
+        cpu_read_memory (absolute, cold_device * 4,     /* get the original DRT pointer */
+                         &sio_pointer);
+
+        cpu_write_memory (absolute, 01400, 1);              /* set the machine ID to 1 for the Series III */
+        cpu_write_memory (absolute, 01401, sio_pointer);    /* store the original DRT pointer */
+        cpu_write_memory (absolute, 01402, SM);             /* store the stack pointer */
+        cpu_write_memory (absolute, 01403, 0);              /* store zeros for the scratch pad 1 */
+        cpu_write_memory (absolute, 01404, 0);              /*   and scratch pad 2 register values */
+        cpu_write_memory (absolute, 01405, DB);             /* store the data base */
+        cpu_write_memory (absolute, 01406, DBANK << 12      /* store DBANK in 0:4 */
+                                             | PBANK << 8   /*   and PBANK in 4:4 */
+                                             | SBANK);      /*     and SBANK in 12:4 */
+        cpu_write_memory (absolute, 01407, Z);              /* store the stack limit */
+        cpu_write_memory (absolute, 01410, DL);             /*   and the data limit */
+        cpu_write_memory (absolute, 01411, X);              /*   and the index register */
+        cpu_write_memory (absolute, 01412, Q);              /*   and the frame pointer */
+        cpu_write_memory (absolute, 01413, CIR);            /*   and the current instruction */
+        cpu_write_memory (absolute, 01414, PB);             /*   and the program base */
+        cpu_write_memory (absolute, 01415, PL);             /*   and the program limit */
+        cpu_write_memory (absolute, 01416, P);              /*   and the program counter */
+        cpu_write_memory (absolute, 01417, CPX1);           /* store the CPX1 register */
+        cpu_write_memory (absolute, 01420, STA);            /*   and the status register */
+        cpu_write_memory (absolute, 01421,                  /* store the lower byte of the CPX2 register */
+                          LOWER_WORD (CPX2 << 8             /*   in the upper byte of memory */
+                            | MEMSIZE / 65536));            /*     and the memory bank count in the lower byte */
+
+        cpu_write_memory (absolute, 01422, SIO_CNTL);           /* CONTRL 0,BSR */
+        cpu_write_memory (absolute, 01423, MS_CN_BSR);
+        cpu_write_memory (absolute, 01424, SIO_CNTL);           /* CONTRL 0,GAP */
+        cpu_write_memory (absolute, 01425, MS_CN_GAP);
+        cpu_write_memory (absolute, 01426, SIO_JUMP);           /* JUMP   001436 */
+        cpu_write_memory (absolute, 01427, 001436);
+
+        cpu_write_memory (absolute, 01430, SIO_SBANK);          /* SETBNK 0 */
+        cpu_write_memory (absolute, 01431, 000000);
+        cpu_write_memory (absolute, 01432, SIO_CNTL);           /* CONTRL 0,<SWCH-upper> */
+        cpu_write_memory (absolute, 01433, UPPER_BYTE (SWCH));
+        cpu_write_memory (absolute, 01434, SIO_WRITE);          /* WRITE  #4096,000000 */
+        cpu_write_memory (absolute, 01435, 000000);
+        cpu_write_memory (absolute, 01436, SIO_ENDIN);          /* ENDINT */
+        cpu_write_memory (absolute, 01437, 000000);
+
+        address = 0;                                    /* clear the address */
+        offset = 0;                                     /*   and memory offset counters */
+
+        CIR = 0;                                        /* clear the memory bank counter */
+
+        cpu_write_memory (absolute, cold_device * 4, 01430);    /* point the DRT at the cold dump program */
+        error_recovery = FALSE;
+
+        iop_direct_io (cold_device, ioSIO, 0);          /* start the device */
+
+        if (CPX1 & cpx1_IOTIMER)                        /* if the device did not respond */
+            MICRO_ABORT (trap_SysHalt_IO_Timeout);      /*   then a System Halt occurs */
+
+        else {                                          /* otherwise the device has started */
+            status = STA;                               /*   so save the original status register value */
+
+            STA = STATUS_I | STATUS_O;                  /* enable interrupts and set overflow */
+            cpu_micro_state = waiting;                  /*   and set the load-in-progress state */
+            }
+        }
+
+    else if (CPX1 & cpx1_EXTINTR) {                     /* otherwise if an external interrupt is pending */
+        CPX1 &= ~cpx1_EXTINTR;                          /*   then clear it */
+
+        iop_direct_io (device_number, ioRIN, 0);        /* reset the device interrupt */
+
+        if (device_number == cold_device)               /* if the expected device interrupted */
+            if (address >= MEMSIZE) {                   /*   then if all of memory has been dumped */
+                CPX2 &= ~cpx2_DUMPSWCH;                 /*   then reset the DUMP switch */
+
+                STA = status;                           /* restore the original status register value */
+
+                cpu_write_memory (absolute,             /* restore the */
+                                  cold_device * 4,      /*   original SIO pointer */
+                                  sio_pointer);         /*     to the DRT */
+
+                cpu_micro_state = halted;               /* clear the dump-in-progress state */
+                return STOP_CDUMP;                      /*   and report dump completion */
+                }
+
+            else {                                      /* otherwise the dump continues */
+                cpu_read_memory (absolute,              /* read the */
+                                 cold_device * 4,       /*   current SIO pointer address */
+                                 &pointer);             /*     from the DRT */
+
+                if (pointer == 01440) {                 /* if the SIO program completed normally */
+                    cpu_write_memory (absolute,         /*   then reset the pointer */
+                                      cold_device * 4,  /*     to the start */
+                                      001430);          /*       of the program */
+
+                    if (error_recovery)                 /* if this was a successful error recovery */
+                        error_recovery = FALSE;         /*   then clear the flag and keep the current address */
+
+                    else {                                  /* otherwise this was a successful write */
+                        address = address + 4096;           /*   so bump the memory address */
+                        offset = offset + 4096 & LA_MASK;   /*     and offset to the next 4K block */
+
+                        cpu_write_memory (absolute,         /* store the new write buffer address */
+                                          001435, offset);
+
+                        if (offset == 0) {                  /* if the offset wrapped around */
+                            CIR = CIR + 1;                  /*   then increment the bank number */
+                            cpu_write_memory (absolute,     /*     and store it as the SET BANK target */
+                                              001431, CIR);
+
+                            if (address >= MEMSIZE) {               /* if all of memory has been dumped */
+                                cpu_write_memory (absolute, 001423, /*   then change the error recovery program */
+                                                  MS_CN_WFM);       /*     to write a file mark */
+                                cpu_write_memory (absolute, 001425, /*       followed by */
+                                                  MS_CN_RST);       /*         a rewind/offline request */
+
+                                cpu_write_memory (absolute,         /* point at the recovery program */
+                                                  cold_device * 4,
+                                                  001422);
+                                }
+                            }
+                        }
+                    }
+
+                else if (error_recovery) {              /* otherwise if the recover program failed */
+                    CPX2 &= ~cpx2_DUMPSWCH;             /*   then reset the DUMP switch */
+
+                    STA = status;                       /* restore the original status register value */
+
+                    cpu_write_memory (absolute,         /* restore the */
+                                      cold_device * 4,  /*   original SIO pointer */
+                                      sio_pointer);     /*     to the DRT */
+
+                    cpu_micro_state = halted;           /* clear the dump-in-progress state */
+                    return STOP_CDUMP;                  /*   and report dump failure */
+                    }
+
+                else {                                  /* otherwise attempt error recovery */
+                    cpu_write_memory (absolute,         /*   by setting the SIO pointer */
+                                      cold_device * 4,  /*     to the backspace/write gap */
+                                      001422);          /*       program */
+
+                    error_recovery = TRUE;              /* indicate that recovery is in progress */
+                    }
+
+                iop_direct_io (cold_device, ioSIO, 0);  /* start the device */
+                }
+        }                                               /* otherwise wait for the cold dump device to interrupt */
     }
 
-
 else if (CPX2 & cpx2_LOADSWCH)                          /* otherwise if the LOAD switch is pressed */
-    if (cpu_micro_state != loading) {                   /*   then if the load is not in progress */
-        reset_all (0);                                  /*     then reset the CPU and all I/O devices */
+    if (cpu_micro_state != waiting) {                   /*   then if the load is not in progress */
+        reset_all (CPU_IO_RESET);                       /*     then reset the CPU and all I/O devices */
 
         if ((SWCH & 000200) == 0)                           /* if switch register bit 8 is clear */
             for (address = 0; address < MEMSIZE; address++) /*   then fill memory */
@@ -3627,14 +4210,14 @@ else if (CPX2 & cpx2_LOADSWCH)                          /* otherwise if the LOAD
 
         SBANK = 0;                                          /* set the stack bank to bank 0 */
 
-        cold_load_device = LOWER_BYTE (SWCH) & DEVNO_MASK;  /* get the device number from the lower SWCH byte */
+        cold_device = LOWER_BYTE (SWCH) & DEVNO_MASK;   /* get the device number from the lower SWCH byte */
 
-        if (cold_load_device < 3) {                     /* if the device number is between 0 and 2 */
+        if (cold_device < 3) {                          /* if the device number is between 0 and 2 */
             CPX2 &= ~cpx2_LOADSWCH;                     /*   then reset the LOAD switch */
             return SCPE_INCOMP;                         /*     and execute a front panel diagnostic */
             }
 
-        else if (cold_load_device > 63) {               /* otherwise if the device number is > 63 */
+        else if (cold_device > 63) {                    /* otherwise if the device number is > 63 */
             CPX2 &= ~cpx2_LOADSWCH;                     /*   then reset the LOAD switch */
             return SCPE_INCOMP;                         /*     and execute a direct I/O cold load */
             }
@@ -3648,25 +4231,25 @@ else if (CPX2 & cpx2_LOADSWCH)                          /* otherwise if the LOAD
             SR = 4;                                     /* mark the TOS registers as valid */
             STA = 0;                                    /*   and clear the status register */
 
-            cpu_write_memory (absolute, 01430, 014000);                 /* SETBNK 0 */
+            cpu_write_memory (absolute, 01430, SIO_SBANK);          /* SETBNK 0 */
             cpu_write_memory (absolute, 01431, 000000);
-            cpu_write_memory (absolute, 01432, 040000);                 /* CONTRL 0,<SWCH-upper> */
+            cpu_write_memory (absolute, 01432, SIO_CNTL);           /* CONTRL 0,<SWCH-upper> */
             cpu_write_memory (absolute, 01433, UPPER_BYTE (SWCH));
-            cpu_write_memory (absolute, 01434, 077760);                 /* READ   #16,001400 */
+            cpu_write_memory (absolute, 01434, SIO_READ);           /* READ   #16,001400 */
             cpu_write_memory (absolute, 01435, 001400);
-            cpu_write_memory (absolute, 01436, 000000);                 /* JUMP   001400 */
+            cpu_write_memory (absolute, 01436, SIO_JUMP);           /* JUMP   001400 */
             cpu_write_memory (absolute, 01437, 001400);
 
-            cpu_write_memory (absolute, cold_load_device * 4, 01430);   /* point the DRT to the cold load program */
+            cpu_write_memory (absolute, cold_device * 4, 01430);    /* point the DRT to the cold load program */
 
-            iop_direct_io (cold_load_device, ioSIO, 0); /* start the device */
+            iop_direct_io (cold_device, ioSIO, 0);      /* start the device */
 
             if (CPX1 & cpx1_IOTIMER)                    /* if the device did not respond */
                 MICRO_ABORT (trap_SysHalt_IO_Timeout);  /*   then a System Halt occurs */
 
             else {                                      /* otherwise the device has started */
                 STA = STATUS_I | STATUS_O;              /*   so enable interrupts and set overflow */
-                cpu_micro_state = loading;              /*     and set the load-in-progress state */
+                cpu_micro_state = waiting;              /*     and set the load-in-progress state */
                 }
             }
         }
@@ -3677,7 +4260,7 @@ else if (CPX2 & cpx2_LOADSWCH)                          /* otherwise if the LOAD
 
             iop_direct_io (device_number, ioRIN, 0);    /* reset the device interrupt */
 
-            if (device_number == cold_load_device) {    /* if the expected device interrupted */
+            if (device_number == cold_device) {         /* if the expected device interrupted */
                 CPX2 &= ~cpx2_LOADSWCH;                 /*   then reset the LOAD switch */
 
                 cpu_micro_state = running;              /* clear the load-in-progress state */

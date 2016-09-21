@@ -23,6 +23,9 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   01-Sep-16    JDB     Added the cpu_cold_cmd and cpu_power_cmd routines
+   15-Aug-16    JDB     Removed obsolete comment mentioning iop_read/write_memory
+   15-Jul-16    JDB     Corrected the IOCW_COUNT macro to return the correct value
    11-Jun-16    JDB     Bit mask constants are now unsigned
    05-Sep-15    JDB     First release version
    11-Dec-12    JDB     Created
@@ -92,7 +95,7 @@ typedef enum {
    Implementation notes:
 
     1. The IOCW_COUNT(w) macro sign-extends the 12-bit two's-complement word
-       count in the IOCW for the Read and Write orders.
+       count to a 16-bit value for the Return Residue order.
 
     2. The sioWRITE, sioWRITEC, sioREAD, and sioREADC enumeration constants must
        be contiguous and the final four values, so that a ">= sioWRITE" test
@@ -117,7 +120,7 @@ typedef enum {
 
 #define IOCW_CNTL(w)        (((w) & IOCW_CNTL_MASK) >> IOCW_CNTL_SHIFT)
 #define IOCW_WCNT(w)        (((w) & IOCW_WCNT_MASK) >> IOCW_WCNT_SHIFT)
-#define IOCW_COUNT(w)       (- (int32) (~(w) + 1 & IOCW_WCNT_MASK))
+#define IOCW_COUNT(w)       ((w) | ~IOCW_WCNT_MASK & D16_MASK)
 
 #define IOAW_BANK(w)        (((w) & IOAW_BANK_MASK) >> IOAW_BANK_SHIFT)
 
@@ -139,7 +142,16 @@ typedef enum {
     } SIO_ORDER;
 
 
-/* Global CPU routine declarations */
+/* Global CPU routine declarations.
+
+   cpu_cold_cmd     : process the LOAD and DUMP commands
+   cpu_power_cmd    : process the POWER commands
+   cpu_read_memory  : read a word from main memory
+   cpu_write_memory : write a word to main memory
+*/
+
+extern t_stat cpu_cold_cmd  (int32 arg, CONST char *buf);
+extern t_stat cpu_power_cmd (int32 arg, CONST char *buf);
 
 extern t_bool cpu_read_memory  (ACCESS_CLASS classification, uint32 offset, HP_WORD *value);
 extern t_bool cpu_write_memory (ACCESS_CLASS classification, uint32 offset, HP_WORD  value);
@@ -161,8 +173,6 @@ extern const char *const sio_order_name [];
 
    iop_initialize   : initialize the I/O processor
    iop_poll         : poll the interfaces for an active interrupt request
-   iop_read_memory  : read memory via the module control unit
-   iop_write_memory : write memory via the module control unit
    iop_direct_io    : dispatch an I/O command to an interface
 */
 

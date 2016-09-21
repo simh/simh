@@ -25,6 +25,8 @@
 
    IOP          HP 3000 Series III I/O Processor
 
+   03-Sep-16    JDB     Added "iop_assert_PFWARN" to warn devices of power loss
+   01-Aug-16    JDB     Added "iop_reset" to initialize the IOP
    30-Jun-16    JDB     Changed REG type of filter array to BRDATA
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    13-May-16    JDB     Modified for revised SCP API function parameter types
@@ -120,7 +122,7 @@
    memory.
 
    Direct I/O instructions are sent via the IOP Bus to all device interfaces.
-   When executing I/O instruc tions, the CPU microcode writes a 16-bit command
+   When executing I/O instructions, the CPU microcode writes a 16-bit command
    word to the IOP, which then places bits 5-7 of that word onto the IOP Bus as
    IOCMD0-2 as follows:
 
@@ -277,6 +279,7 @@ static uint32 filter [4] = {                    /* filter bitmap for device numb
 
 /* IOP local SCP support routines */
 
+static t_stat iop_reset       (DEVICE *dptr);
 static t_stat iop_set_filter  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat iop_show_filter (FILE *st,   UNIT  *uptr, int32 value, CONST void *desc);
 
@@ -342,7 +345,7 @@ DEVICE iop_dev = {
     DV_WIDTH,                                   /* data width */
     NULL,                                       /* examine routine */
     NULL,                                       /* deposit routine */
-    NULL,                                       /* reset routine */
+    &iop_reset,                                 /* reset routine */
     NULL,                                       /* boot routine */
     NULL,                                       /* attach routine */
     NULL,                                       /* detach routine */
@@ -372,6 +375,10 @@ DEVICE iop_dev = {
    flip-flop values in the device DIBs and clears the external interrupt flag if
    there are no devices with active interrupts (as the user may have set the
    flag or reset the interrupting device during a simulation stop).
+
+   The value of the IOA register is returned.  This is zero unless a device
+   requesting an interrupt has been acknowledged but not yet serviced, in which
+   case the value is the device number.
 */
 
 uint32 iop_initialize (void)
@@ -698,9 +705,74 @@ return;
 }
 
 
+/* Warn devices of an impending power failure.
+
+   This routine is called by the POWER FAIL command to send a warning
+   to all devices that power is about to fail.  It corresponds in hardware to
+   asserting the PFWARN signal.  Devices may process or ignore the signal as
+   appropriate.  If the device returns the INTREQ signal, an interrupt is
+   requested.
+*/
+
+void iop_assert_PFWARN (void)
+{
+uint32       devno;
+DIB          *dibptr;
+SIGNALS_DATA outbound;
+
+for (devno = 0; devno <= DEVNO_MAX; devno++) {          /* loop through the device number list */
+    dibptr = devs [devno];                              /*   and get the next device information block pointer */
+
+    if (dibptr != NULL) {                               /* if this device is defined */
+        outbound =                                      /*   then send the PFWARN signal to the device interface */
+          dibptr->io_interface (dibptr, PFWARN, 0);
+
+        if (outbound & INTREQ)                          /* if the device requested an interrupt */
+            iop_assert_INTREQ (dibptr);                 /*   then set it up */
+        }
+    }
+
+return;
+}
+
+
 
 /* IOP local SCP support routines */
 
+
+
+/* Device reset routine.
+
+   This routine is called for a RESET or RESET IOP command.  It is the
+   simulation equivalent of the IORESET signal, which is asserted by the front
+   panel LOAD and DUMP switches.
+
+
+   Implementation notes:
+
+    1. In hardware, IORESET clears flip-flops associated with the state machines
+       that implement the interrupt poll, SO/SI handshake, and multiplexer
+       channel access.  In simulation, these are all represented by function
+       calls and, as such, are atomic.  Therefore, the only state variable that
+       IORESET clears is the external interrupt flip-flop, which is implemented
+       as its respective bit in the CPX1 register rather than as a separate
+       variable.  Setting IOA to 0 and calling iop_initialize clears this bit;
+       it also sets up the devs array, which is used by the POWER FAIL command.
+
+    2. In hardware, IORESET also clears the IOP address parity error, system
+       parity error, and illegal address flip-flops.  However, these exist only
+       to assert XFERERROR to devices.  In simulation, XFERERROR is sent to a
+       device interface when the initiating condition is detected by the
+       multiplexer channel, so these are not represented by state variables.
+*/
+
+static t_stat iop_reset (DEVICE *dptr)
+{
+IOA = 0;                                                /* clear the I/O Address register and initialize */
+iop_initialize ();                                      /*   which clears the external interrupt flip-flop */
+
+return SCPE_OK;
+}
 
 
 /* Set the trace omission filter.

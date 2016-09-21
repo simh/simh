@@ -25,6 +25,10 @@
 
    LP           HP 30209A Line Printer Interface
 
+   12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
+   03-Sep-16    JDB     Added power-fail detection
+   08-Jul-16    JDB     Added REG entry to save the transfer unit wait field
+                        Extended "lp_show_vfu" to show the VFU channel definitions
    01-Jul-16    JDB     First release version
    27-Apr-16    JDB     Passes the On-Line HP Line Printers Verification (D466A)
    19-Apr-16    JDB     Passes the universal interface diagnostic (D435A)
@@ -391,6 +395,12 @@
        condition causes the printer to go offline at the completion of the
        current line.  In simulation, a DETACH is handled as a torn-paper
        condition.
+
+    5. Slewing in expanded mode is performed by appending CR LF pairs to the
+       character buffer and then writing the combined buffer to the printer
+       output file.  The size of the buffer must accommodate the largest print
+       line (136 characters) plus the largest possible slew (144 lines * 2
+       characters per line).
 */
 
 
@@ -1019,6 +1029,7 @@ static t_bool  device_end_in      = FALSE;      /* external DEV END signal state
 /* Diagnostic Hardware Assembly state */
 
 static HP_WORD dha_control_word = 0;            /* Diagnostic Hardware Assembly control word */
+static t_bool  power_warning    = FALSE;        /* PFWARN is not asserted to the DHA */
 
 
 /* Printer state */
@@ -1034,7 +1045,9 @@ static uint32 form_length;                      /* form length in lines */
 static uint8  buffer [BUFFER_SIZE];             /* character and paper advance buffer */
 static uint16 VFU [VFU_SIZE];                   /* vertical format unit tape */
 static char   vfu_title [LINE_SIZE];            /* descriptive title of the tape currently in the VFU */
-static REG    *vfu_reg;                         /* pointer to the VFU register entry */
+
+static int32  punched_char   = 'O';             /* character to display if VFU channel is punched */
+static int32  unpunched_char = '.';             /* character to display if VFU channel is not punched */
 
 static const DELAY_PROPS *dlyptr = &fast_times; /* pointer to the event delay times to use */
 
@@ -1126,21 +1139,7 @@ static UNIT lp_unit [] = {
 
    Implementation notes:
 
-    1. The VFU register displays the data currently held in the printer's
-       Vertical Format Unit.  For the convenience of the user, the register's
-       width and offset fields are changed with the printer model to reflect the
-       number of VFU channels available, and the depth field is changed by the
-       VFU load routine to reflect the number of lines defined for the current
-       form.  This allows an "EXAMINE LP VFU[ALL]" command to display the
-       current number of channels and lines.
-
-    2. The VFUREG register must immediately precede the VFU register.  The
-       location field is changed at power-on reset to point at the VFU register
-       entry.  This ensures that the full REG structure for the VFU register is
-       SAVEd and RESTOREd properly, which is necessary for the dynamic VFU
-       display to work (SAVE normally saves only a register's depth and value).
-
-    3. The DHA hardware buffers control word bits 6-10 to LEDs.  Inspection and
+    1. The DHA hardware buffers control word bits 6-10 to LEDs.  Inspection and
        user confirmation of the control word state is required by the interface
        diagnostic.  In simulation, bits 6-10 of the control word are presented
        as the CNLED register to allow an ASSERT command to test this subrange of
@@ -1148,61 +1147,62 @@ static UNIT lp_unit [] = {
 */
 
 static REG lp_reg [] = {
-/*    Macro   Name    Location                  Radix     Width      Offset      Depth            Flags       */
-/*    ------  ------  ------------------------  -----  ------------  ------  -------------  ----------------- */
-    { FLDATA (SIOBSY, sio_busy,                                        0)                                     },
-    { FLDATA (CHANSR, channel_sr,                                      0)                                     },
-    { FLDATA (DEVSR,  device_sr,                                       0)                                     },
-    { FLDATA (INXFR,  input_xfer,                                      0)                                     },
-    { FLDATA (OUTXFR, output_xfer,                                     0)                                     },
-    { FLDATA (RDXFR,  read_xfer,                                       0)                                     },
-    { FLDATA (WRXFR,  write_xfer,                                      0)                                     },
-    { FLDATA (INTMSK, interrupt_mask,                                  0)                                     },
+/*    Macro   Name    Location                  Radix     Width      Offset      Depth            Flags        */
+/*    ------  ------  ------------------------  -----  ------------  ------  -------------  ------------------ */
+    { FLDATA (SIOBSY, sio_busy,                                        0)                                      },
+    { FLDATA (CHANSR, channel_sr,                                      0)                                      },
+    { FLDATA (DEVSR,  device_sr,                                       0)                                      },
+    { FLDATA (INXFR,  input_xfer,                                      0)                                      },
+    { FLDATA (OUTXFR, output_xfer,                                     0)                                      },
+    { FLDATA (RDXFR,  read_xfer,                                       0)                                      },
+    { FLDATA (WRXFR,  write_xfer,                                      0)                                      },
+    { FLDATA (INTMSK, interrupt_mask,                                  0)                                      },
 
-    { FLDATA (DEVCMD, device_command,                                  0)                                     },
-    { FLDATA (DEVFLG, device_flag,                                     0)                                     },
-    { FLDATA (DEVEND, device_end,                                      0)                                     },
+    { FLDATA (DEVCMD, device_command,                                  0)                                      },
+    { FLDATA (DEVFLG, device_flag,                                     0)                                      },
+    { FLDATA (DEVEND, device_end,                                      0)                                      },
 
-    { DRDATA (SEQSTA, sequencer,                            8),                             PV_LEFT           },
-    { ORDATA (CNTL,   control_word,                        16),                             PV_RZRO           },
-    { ORDATA (ISTAT,  int_status_word,                     16),                             PV_RZRO           },
-    { ORDATA (DSTAT,  dev_status_word,                     16),                             PV_RZRO           },
-    { ORDATA (READ,   read_word,                           16),                             PV_RZRO | REG_A   },
-    { ORDATA (WRITE,  write_word,                          16),                             PV_RZRO | REG_A   },
-    { YRDATA (J2WX,   jumper_set,                          10,                              PV_RZRO)          },
+    { DRDATA (SEQSTA, sequencer,                            8),                             PV_LEFT            },
+    { ORDATA (CNTL,   control_word,                        16),                             PV_RZRO            },
+    { ORDATA (ISTAT,  int_status_word,                     16),                             PV_RZRO            },
+    { ORDATA (DSTAT,  dev_status_word,                     16),                             PV_RZRO            },
+    { ORDATA (READ,   read_word,                           16),                             PV_RZRO | REG_A    },
+    { ORDATA (WRITE,  write_word,                          16),                             PV_RZRO | REG_A    },
+    { YRDATA (J2WX,   jumper_set,                          10,                              PV_RZRO)           },
 
-    { ORDATA (DATOUT, data_out,                            16),                             PV_RZRO | REG_A   },
-    { ORDATA (DATIN,  data_in,                             16),                             PV_RZRO | REG_A   },
+    { ORDATA (DATOUT, data_out,                            16),                             PV_RZRO | REG_A    },
+    { ORDATA (DATIN,  data_in,                             16),                             PV_RZRO | REG_A    },
 
-    { FLDATA (DCOUT,  device_command_out,                              0)                                     },
-    { FLDATA (DFIN,   device_flag_in,                                  0)                                     },
-    { FLDATA (DENDIN, device_end_in,                                   0)                                     },
+    { FLDATA (DCOUT,  device_command_out,                              0)                                      },
+    { FLDATA (DFIN,   device_flag_in,                                  0)                                      },
+    { FLDATA (DENDIN, device_end_in,                                   0)                                      },
 
-    { SRDATA (DIB,    lp_dib,                                                               REG_HRO)          },
+      DIB_REGS (lp_dib),
 
+    { ORDATA (DIAGCN, dha_control_word,                    16),                             PV_RZRO            },
+    { GRDATA (CNLED,  control_word,               2,        5,         5),                  PV_RZRO            },
+    { FLDATA (PFWARN, power_warning,                                   0)                                      },
 
-    { ORDATA (DIAGCN, dha_control_word,                    16),                             PV_RZRO           },
-    { GRDATA (CNLED,  control_word,               2,        5,         5),                  PV_RZRO           },
+    { FLDATA (PFAULT, paper_fault,                                     0)                                      },
+    { FLDATA (TFAULT, tape_fault,                                      0)                                      },
+    { FLDATA (OLPEND, offline_pending,                                 0)                                      },
 
+    { DRDATA (PRLINE, current_line,                         8),                             PV_LEFT            },
+    { DRDATA (BUFIDX, buffer_index,                         8),                             PV_LEFT            },
+    { BRDATA (PRTBUF, buffer,                     8,        8,               BUFFER_SIZE),  PV_RZRO | REG_A    },
+    { ORDATA (OVPCHR, overprint_char,                       8),                             PV_RZRO | REG_A    },
 
-    { FLDATA (PFAULT, paper_fault,                                     0)                                     },
-    { FLDATA (TFAULT, tape_fault,                                      0)                                     },
-    { FLDATA (OLPEND, offline_pending,                                 0)                                     },
+    { DRDATA (FORMLN, form_length,                          8),                             PV_LEFT | REG_RO   },
+    { BRDATA (TITLE,  vfu_title,                  8,        8,                LINE_SIZE),             REG_HRO  },
+    { BRDATA (VFU,    VFU,                        2,    VFU_WIDTH,            VFU_SIZE),    PV_RZRO | REG_RO   },
+    { ORDATA (PCHR,   punched_char,                         8),                             PV_RZRO | REG_A    },
+    { ORDATA (UPCHR,  unpunched_char,                       8),                             PV_RZRO | REG_A    },
 
-    { DRDATA (PRLINE, current_line,                         8),                             PV_LEFT           },
-    { DRDATA (BUFIDX, buffer_index,                         8),                             PV_LEFT           },
-    { BRDATA (PRTBUF, buffer,                     8,        8,               BUFFER_SIZE),  PV_RZRO | REG_A   },
-    { ORDATA (OVPCHR, overprint_char,                       8),                             PV_RZRO | REG_A   },
-
-    { DRDATA (FORMLN, form_length,                          8),                             PV_LEFT | REG_RO  },
-    { BRDATA (TITLE,  vfu_title,                  8,        8,                LINE_SIZE),   REG_HRO           },
-    { SRDATA (VFUREG, lp_reg [0],                                                           REG_HRO)          },
-    { BRDATA (VFU,    VFU,                        2,    VFU_WIDTH,            VFU_SIZE),    PV_RZRO | REG_RO  },
-
-    { DRDATA (BTIME,  fast_times.buffer_load,              24),                             PV_LEFT | REG_NZ  },
-    { DRDATA (PTIME,  fast_times.print,                    24),                             PV_LEFT | REG_NZ  },
-    { DRDATA (STIME,  fast_times.advance,                  24),                             PV_LEFT | REG_NZ  },
-    { DRDATA (POS,    lp_unit [0].pos,                  T_ADDR_W),                          PV_LEFT           },
+    { DRDATA (BTIME,  fast_times.buffer_load,              24),                             PV_LEFT | REG_NZ   },
+    { DRDATA (PTIME,  fast_times.print,                    24),                             PV_LEFT | REG_NZ   },
+    { DRDATA (STIME,  fast_times.advance,                  24),                             PV_LEFT | REG_NZ   },
+    { DRDATA (POS,    lp_unit [0].pos,                  T_ADDR_W),                          PV_LEFT            },
+    { DRDATA (UWAIT,  lp_unit [0].wait,                    32),                             PV_LEFT | REG_HRO  },
 
     { NULL }
     };
@@ -1231,20 +1231,21 @@ static MTAB lp_mod [] = {
     { UNIT_EXPAND,  UNIT_EXPAND,  "expanded output", "EXPAND",     NULL,               NULL,    NULL       },
     { UNIT_EXPAND,  0,            "compact output",  "COMPACT",    NULL,               NULL,    NULL,      },
 
-/*    Entry Flags         Value        Print String  Match String  Validation    Display        Descriptor       */
-/*    ------------------  -----------  ------------  ------------  ------------  -------------  ---------------- */
-    { MTAB_XDV,           Fast_Time,   NULL,         "FASTTIME",   &lp_set_mode, NULL,          NULL             },
-    { MTAB_XDV,           Real_Time,   NULL,         "REALTIME",   &lp_set_mode, NULL,          NULL             },
-    { MTAB_XDV,           Printer,     NULL,         "PRINTER",    &lp_set_mode, NULL,          NULL             },
-    { MTAB_XDV,           Diagnostic,  NULL,         "DIAGNOSTIC", &lp_set_mode, NULL,          NULL             },
-    { MTAB_XDV,           0,           "MODES",      NULL,         NULL,         &lp_show_mode, NULL             },
+/*    Entry Flags          Value        Print String  Match String  Validation    Display        Descriptor       */
+/*    -------------------  -----------  ------------  ------------  ------------  -------------  ---------------- */
+    { MTAB_XDV,            Fast_Time,   NULL,         "FASTTIME",   &lp_set_mode, NULL,          NULL             },
+    { MTAB_XDV,            Real_Time,   NULL,         "REALTIME",   &lp_set_mode, NULL,          NULL             },
+    { MTAB_XDV,            Printer,     NULL,         "PRINTER",    &lp_set_mode, NULL,          NULL             },
+    { MTAB_XDV,            Diagnostic,  NULL,         "DIAGNOSTIC", &lp_set_mode, NULL,          NULL             },
+    { MTAB_XDV,            0,           "MODES",      NULL,         NULL,         &lp_show_mode, NULL             },
 
-    { MTAB_XDV,           VAL_DEVNO,   "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &lp_dib },
-    { MTAB_XDV,           VAL_INTMASK, "INTMASK",    "INTMASK",    &hp_set_dib,  &hp_show_dib,  (void *) &lp_dib },
-    { MTAB_XDV,           VAL_INTPRI,  "INTPRI",     "INTPRI",     &hp_set_dib,  &hp_show_dib,  (void *) &lp_dib },
-    { MTAB_XDV,           VAL_SRNO,    "SRNO",       "SRNO",       &hp_set_dib,  &hp_show_dib,  (void *) &lp_dib },
+    { MTAB_XDV,            VAL_DEVNO,   "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &lp_dib },
+    { MTAB_XDV,            VAL_INTMASK, "INTMASK",    "INTMASK",    &hp_set_dib,  &hp_show_dib,  (void *) &lp_dib },
+    { MTAB_XDV,            VAL_INTPRI,  "INTPRI",     "INTPRI",     &hp_set_dib,  &hp_show_dib,  (void *) &lp_dib },
+    { MTAB_XDV,            VAL_SRNO,    "SRNO",       "SRNO",       &hp_set_dib,  &hp_show_dib,  (void *) &lp_dib },
 
-    { MTAB_XDV | MTAB_NC, 0,           "VFU",        "VFU",        &lp_set_vfu,  &lp_show_vfu,  NULL             },
+    { MTAB_XDV | MTAB_NMO, 1,           "VFU",        NULL,         NULL,         &lp_show_vfu,  NULL             },
+    { MTAB_XDV | MTAB_NC,  0,           "VFU",        "VFU",        &lp_set_vfu,  &lp_show_vfu,  NULL             },
 
     { 0 }
     };
@@ -1343,7 +1344,10 @@ DEVICE lp_dev = {
     2. In hardware, the SETJMP signal is ignored, and the JMPMET signal is
        asserted continuously when enabled by CHANSO.
 
-    3. Sending a power fail warning to the device is not currently simulated.
+    3. In hardware, a power fail warning (PFWARN) is asserted continuously from
+       detection until power is lost.  In simulation, the "power_warning" flag
+       is set by a PFWARN assertion and is cleared by a power-on reset.  PFWARN
+       is used only by the DHA.
 */
 
 static SIGNALS_DATA ui_interface (DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
@@ -1622,7 +1626,8 @@ while (working_set) {
             break;
 
 
-        case PFWARN:                                    /* not currently simulated */
+        case PFWARN:
+            power_warning = TRUE;                       /* system power is in the process of failing */
             break;
 
 
@@ -2382,6 +2387,13 @@ return SCPE_OK;
 
     2. The DHA transfer service is called with a null pointer to update the
        potential change in the flag state.
+
+    3. Setting bit 2 of the DHA control word reflects the current state of the
+       PON and ~PFWARN signals in status bits 9 and 10, respectively.  Status 9
+       is always set, as PON is always active while the machine is operating.
+       Status 10 is normally set to indicate that PFWARN is denied.  However, if
+       the system power is failing, PFWARN is asserted from detection until
+       power is lost.
 */
 
 static OUTBOUND_SET diag_control (uint32 control_word)
@@ -2426,7 +2438,10 @@ if (control_word & CN_DHA_FN_ENABLE)                    /* if the decoder is ena
 
 
 if (dha_control_word & DHA_STAT_SEL) {                  /* if status follows master clear/power on/power fail */
-    new_status = ST_DHA_PON | ST_DHA_NOT_PF;            /*   then indicate that power is on and has not failed */
+    new_status = ST_DHA_PON;                            /*   then indicate that power is on */
+
+    if (power_warning == FALSE)                         /* if we have seen a PFWARN signal */
+        new_status |= ST_DHA_NOT_PF;                    /*   then indicate that power has not failed */
 
     if (dha_control_word & DHA_MR)                      /* if a master reset is requested */
         new_status |= ST_DHA_MR;                        /*   then indicate a master clear */
@@ -2535,20 +2550,14 @@ return outbound_signals;                                /* return INTREQ if any 
 
    Implementation notes:
 
-    1. Slewing in expanded mode is performed by appending CR LF pairs to the
-       character buffer and then writing the combined buffer to the file.  The
-       size of the buffer must accommodate the largest print line (136
-       characters) plus the largest possible slew (144 lines * 2 characters per
-       line) plus a trailing NUL.
-
-    2. Because attached files are opened in binary mode, newline translation
+    1. Because attached files are opened in binary mode, newline translation
        (i.e., from LF to CR LF) is not performed by the host system.  Therefore,
        we write explicit CR LF pairs to end lines, even in compact mode, as
        required for fidelity to HP peripherals.  If bare LFs are used by the
        host system, the printer output file must be postprocessed to remove the
        CRs.
 
-    3. Overprinting in expanded mode is simulated by merging the lines in the
+    2. Overprinting in expanded mode is simulated by merging the lines in the
        buffer.  A format command to suppress spacing resets the buffer index but
        saves the previous buffer length as a "high water mark" that will be
        extended if the overlaying line is longer.  This process may be repeated
@@ -2561,20 +2570,20 @@ return outbound_signals;                                /* return INTREQ if any 
        "overprint character" (which defaults to DEL, but can be changed by the
        user) replaces the character in the buffer.
 
-    4. Printers that support 12-channel VFUs treat the VFU format command as
+    3. Printers that support 12-channel VFUs treat the VFU format command as
        modulo 16.  Printers that support 8-channel VFUs treat the command as
        modulo 8.
 
-    5. As a convenience to the user, the printer output file is flushed when a
+    4. As a convenience to the user, the printer output file is flushed when a
        TOF operation is performed.
 
-    6. The user may examine the TFAULT and PFAULT registers to determine why the
+    5. The user may examine the TFAULT and PFAULT registers to determine why the
        printer went offline.
 
-    7. The transfer service may be called with a null pointer to update the
+    6. The transfer service may be called with a null pointer to update the
        potential change in the flag state.
 
-    8. If printing is attempted with the printer offline, this routine will be
+    7. If printing is attempted with the printer offline, this routine will be
        called with STROBE asserted (device_command_in TRUE) and DEMAND denied
        (device_flag_in TRUE).  The printer ignores STROBE if DEMAND is not
        asserted, so we simply return in this case.  This will hang the handshake
@@ -2648,9 +2657,6 @@ else if (device_flag_in == FALSE) {                     /* otherwise if STROBE h
             buffer_index++;                             /* increment the buffer index */
 
             uptr->wait = dlyptr->buffer_load;           /* schedule the buffer load delay */
-
-            dprintf (lp_dev, DEB_XFER, "Character %s sent to printer\n",
-                     fmt_char (data_byte));
             }
 
         else {                                          /* otherwise the buffer is full */
@@ -2678,13 +2684,13 @@ else if (device_flag_in == FALSE) {                     /* otherwise if STROBE h
             buffer [0] = data_byte;                     /* store the character */
             buffer_index = 1;                           /*   in the empty buffer */
 
-            dprintf (lp_dev, DEB_XFER, "Character %s sent to printer\n",
-                     fmt_char (data_byte));
-
             uptr->wait = dlyptr->print                  /* schedule the print delay */
                            + dlyptr->advance            /*   plus the paper advance delay */
                            + dlyptr->buffer_load;       /*   plus the buffer load delay */
             }
+
+        dprintf (lp_dev, DEB_XFER, "Character %s sent to printer\n",
+                 fmt_char (data_byte));
         }
 
     else {                                              /* otherwise this is a print format command */
@@ -3010,16 +3016,11 @@ return SCPE_OK;                                         /* the mode change succe
    This validation routine is called to set the model of the printer.  The
    "value" parameter is one of the UNIT_26nn constants that indicates the new
    model.  Validation isn't necessary, except to detect a model change and alter
-   the real-time delays and the VFU display width and offset fields accordingly.
+   the real-time delays accordingly.
 */
 
 static t_stat lp_set_model (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
-const PRINTER_TYPE model = GET_MODEL (value);           /* get the model associated with the value */
-
-vfu_reg->width  = print_props [model].vfu_channels;     /* set the number of VFU channels to display */
-vfu_reg->offset = VFU_WIDTH - vfu_reg->width;           /*   and the offset to the last channel */
-
 if (lp_dev.flags & DEV_REALTIME)                        /* if the printer is in real-time mode */
     dlyptr = &real_times [GET_MODEL (uptr->flags)];     /*   then use the times for the new model */
 
@@ -3145,17 +3146,61 @@ return SCPE_OK;
 
 /* Show the VFU tape.
 
-   This display routine is called to show the title of the tape currently loaded
-   in the printer's VFU.  The title is taken from the tape image file if a
-   custom tape is loaded.  Otherwise, the standard tape title is displayed.
+   This display routine is called to show the content of the tape currently
+   loaded in the printer's VFU.  The "value" parameter indicates how the routine
+   was called.  It is 0 if a SHOW LP command was given and 1 if a SHOW LP VFU
+   command was issued.  For the former, only the VFU title is displayed.  The
+   latter displays the VFU title, followed by a header labelling each of the
+   channel columns  and then one line for each line of the form consisting of
+   punch and no-punch characters, according to the VFU definition.
 
-   The output stream is passed in the "st" parameter, and the other parameters
-   are ignored.
+   The output stream is passed in the "st" parameter, and the "uptr" and "desc"
+   parameters are ignored.
+
+
+   Implementation notes:
+
+    1. Setting the string precision for the header lines trims them to the
+       appropriate number of channels.
 */
 
 static t_stat lp_show_vfu (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-fputs (vfu_title, st);                                  /* print the VFU title */
+static const char header_1 [] = " Ch 1 Ch 2 Ch 3 Ch 4 Ch 5 Ch 6 Ch 7 Ch 8 Ch 9 Ch10 Ch11 Ch12";
+static const char header_2 [] = " ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----";
+
+const PRINTER_TYPE model = GET_MODEL (uptr->flags);
+const uint32 channel_count = print_props [model].vfu_channels;
+uint32 chan, line, current_channel;
+
+if (value == 0)                                         /* if we're called for a summary display */
+    fputs (vfu_title, st);                              /*   then output only the VFU title */
+
+else {                                                      /* otherwise the full VFU definition is requested */
+    fprintf (st, "\n%s tape is loaded.\n\n", vfu_title);    /*   so start by displaying the VFU title */
+
+    fprintf (st, "Line %.*s\n", channel_count * 5, header_1);   /* display the */
+    fprintf (st, "---- %.*s\n", channel_count * 5, header_2);   /*   channel headers */
+
+    for (line = 1; line <= form_length; line++) {           /* loop through the VFU array */
+        fprintf (st, "%3d ", line);                         /* display the current form line number */
+
+        current_channel = VFU_CHANNEL_1;                    /* start with channel 1 */
+
+        for (chan = 1; chan <= channel_count; chan++) {     /* loop through the defined channels */
+            fputs ("    ", st);                             /* add some space */
+
+            if (VFU [line] & current_channel)               /* if the current channel is punched for this line */
+                fputc (punched_char, st);                   /*   then display a punched location */
+            else                                            /* otherwise */
+                fputc (unpunched_char, st);                 /*   display an unpunched location */
+
+            current_channel = current_channel >> 1;         /* move to the next channel */
+            }
+
+        fputc ('\n', st);                                   /* end the line */
+        }
+    }
 
 return SCPE_OK;
 }
@@ -3191,19 +3236,8 @@ return SCPE_OK;
    online).
 
    In addition, if a power-on reset (RESET -P) is done, the original FASTTIME
-   settings are restored, the pointer to the VFU register is determined, and the
-   standard VFU tape is loaded.
-
-
-   Implementation notes:
-
-    1. Setting the "vfu_reg" pointer at run time accommodates changes in the
-       register order automatically.  A fixed setting runs the risk of it not
-       being updated if a change in the register order is made.
-
-    2. The location field of the register entry preceding the VFU register is
-       changed to point at the VFU register.  This is required to preserve the
-       dynamic VFU register settings across a SAVE and RESTORE operation.
+   settings are restored, the standard VFU tape is loaded, and the power failure
+   warning is cleared.
 */
 
 static t_stat lp_reset (t_bool programmed_clear)
@@ -3217,18 +3251,9 @@ if (! programmed_clear && (sim_switches & SWMASK ('P'))) {  /* if this is a comm
     fast_times.print       = LP_PRINT;                      /*     the print and advance-one-line time, */
     fast_times.advance     = LP_ADVANCE;                    /*       and the slew additional lines time */
 
-    for (vfu_reg = lp_reg;                                  /* find the VFU register entry */
-         vfu_reg->loc != VFU && vfu_reg->loc != NULL;       /*   in the register array */
-         vfu_reg++);
-
-    if (vfu_reg == NULL)                                    /* if the VFU register entry is not present */
-        return SCPE_NXREG;                                  /*   then there is a serious problem! */
-    else                                                    /* otherwise */
-        (vfu_reg - 1)->loc = (void *) vfu_reg;              /*   point the prior entry's location at the VFU register */
-
     result = lp_load_vfu (xfer_uptr, NULL);                 /* load the standard VFU tape */
 
-    lp_set_model (NULL, xfer_unit.flags, NULL, NULL);       /* set the VFU register width and offset */
+    power_warning = FALSE;                                  /* clear the power failure warning */
     }
 
 buffer_index = 0;                                       /* clear the buffer without printing */
@@ -3436,7 +3461,7 @@ return TRUE;
      no-punch character  a single character representing a non-punched location
 
      title               an optional descriptive string printed by the SHOW LP
-                         VFU command ("custom VFU" is used by default)
+                         VFU command ("Custom VFU" is used by default)
 
    If the "VFU" line is missing or not of the correct form, then "Format error"
    status is returned, and the VFU tape is not changed.
@@ -3488,10 +3513,6 @@ return TRUE;
        logical OR of all of the other entries and is used during VFU format
        command processing to determine if a punch is present somewhere in a
        given channel.
-
-    2. The depth field of the VFU register is set to the form length so that an
-       EXAMINE LP VFU[ALL] command will display only the defined VFU.
-
 */
 
 static t_stat lp_load_vfu (UNIT *uptr, FILE *vf)
@@ -3504,7 +3525,7 @@ char               *bptr, *tptr;
 uint16             tape [VFU_SIZE] = { 0 };
 
 if (vf == NULL) {                                       /* if the standard VFU is requested */
-    strcpy (vfu_title, "standard VFU");                 /*   then set the title */
+    strcpy (vfu_title, "Standard VFU");                 /*   then set the title */
 
     tape [ 1] = VFU_CHANNEL_1;                          /* punch channel 1 for the top of form */
     tape [60] = VFU_CHANNEL_2 | VFU_CHANNEL_9;          /* punch channels 2 and 9 for the bottom of form */
@@ -3557,7 +3578,7 @@ else {                                                  /* otherwise load a cust
     if (tptr != NULL)                                   /* if it's present */
         strcpy (vfu_title, tptr);                       /*   then save the user's title */
     else                                                /* otherwise */
-        strcpy (vfu_title, "custom VFU");               /*   use a generic title */
+        strcpy (vfu_title, "Custom VFU");               /*   use a generic title */
 
 
     for (line = 1; line <= VFU_MAX; line++) {           /* load up to the maximum VFU tape length */
@@ -3609,8 +3630,6 @@ if (print_props [model].vfu_channels > 8) {             /* if the printer VFU ha
     }
 
 set_device_status (ST_VFU_9 | ST_VFU_12, vfu_status);   /* set the VFU status */
-
-vfu_reg->depth = form_length + 1;                       /* set the VFU display depth */
 
 return SCPE_OK;                                         /* the VFU was successfully loaded */
 }

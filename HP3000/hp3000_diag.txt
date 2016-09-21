@@ -1,13 +1,13 @@
                       SIMH/HP 3000 DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2016-05-31
+                             Last update: 2016-09-07
 
 
-The HP 32230 offline diagnostic suite has been run against the SIMH HP 3000
-simulation.  Diagnostic programs were obtained from two magnetic tapes: HP
-30000-11016 Rev. 1244 (CPU) and 30000-11017 Rev. 2640 (non-CPU).  For each
-diagnostic, the recommended standard tests were selected, plus any available
-optional tests that broadened the test coverage.
+The HP 32230 diagnostic suite has been run against the SIMH HP 3000 simulation.
+Diagnostic programs were obtained from two magnetic tapes: HP 30000-11016 Rev.
+1244 (CPU) and 30000-11017 Rev. 2640 (non-CPU).  For each diagnostic, the
+recommended standard tests were selected, plus any available optional tests that
+broadened the test coverage.
 
 Except where noted in the individual diagnostic reports, the test system
 configuration is the default SIMH configuration with these changes:
@@ -27,7 +27,7 @@ The results of the diagnostic runs are summarized below:
   PD420A    CPU Diagnostic Section 1                 01.00  Passed
   PD420A1   CPU Diagnostic Section 2                 01.00  Passed
   PD420A2   CPU Diagnostic Section 3                 01.01  Passed
-  PD420A3   CPU Diagnostic Section 4                 01.24  Partial
+  PD420A3   CPU Diagnostic Section 4                 01.24  Passed
   PD420A4   CPU Diagnostic Section 5                 01.00  Passed
   PD420A5   CPU Diagnostic Section 6                 01.00  Passed
   PD420A6   CPU Diagnostic Section 7                 01.00  Passed
@@ -188,7 +188,6 @@ TEST REPORT:    Programmed halt, CIR: 030375 (HALT 15), P: 010163 (ZERO,NOP)
 
 TEST RESULT:    Passed.
 
-
 TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
                 (2001) settings are preconfigured to simplify execution.
 
@@ -210,26 +209,28 @@ D420A3 - CPU Section 4
 TESTED DEVICE:  CPU (hp3000_cpu.c)
 
 CONFIGURATION:  sim> deposit 2000 000001
-                sim> deposit 2001 034160
-                sim> deposit 010550 120005
+                sim> deposit 2001 034170
                 sim> deposit 015761 051007
                 sim> set scmb enable
                 sim> set scmb mx
+                sim> set cpu stop=PAUSE
                 sim> go
 
-TEST REPORT:    Programmed halt, CIR: 030375 (HALT 15), P: 010630 (ZERO,NOP)
+TEST REPORT:    CPU paused, P: 021376 (PAUS 12)
 
-TEST RESULT:    Partially passed.
+                sim> set cpu nostop=PAUSE
+                sim> power fail
+
+                Programmed halt, CIR: 030374 (HALT 14), P: 011130 (EXIT 0)
+
+                sim> power restore
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010630 (ZERO,NOP)
+
+TEST RESULT:    Passed.
 
 TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
                 (2001) settings are preconfigured to simplify execution.
-
-                Step 17 (module interrupt tests) fails, as this feature is not
-                currently simulated.  The step is bypassed by changing the PCAL
-                instruction at location 010550 to an INCM DB+5 instruction.
-
-                Step 20 (power fail tests) is optional and is not selected, as
-                this feature is not currently simulated.
 
                 The "Stand-Alone HP 30003A/B CPU Diagnostic" manual
                 (30003-90001, April 1979) says that step 31 has been "eliminated
@@ -1901,3 +1902,6 @@ TEST REPORT:    D1 ONLINE LINE PRINTER VERIFIER (HP D466A.01.06)
                 END OF PROGRAM
 
 TEST RESULT:    Passed.
+
+TEST NOTES:     The test was run from the OPERATOR.SYS account on MPE-V/R
+                release E.01.00.

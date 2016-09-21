@@ -26,6 +26,9 @@
 
    ATCD,ATCC    HP 30032B Asynchronous Terminal Controller
 
+   16-Sep-16    JDB     Fixed atcd_detach to skip channel cancel if SIM_SW_REST
+   12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
+   20-Jul-16    JDB     Corrected poll_unit "wait" field initializer.
    26-Jun-16    JDB     Removed tmxr_set_modem_control_passthru call in atcc_reset
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
    16-May-16    JDB     Fixed interrupt mask setting
@@ -879,23 +882,23 @@ static DIB atcc_dib = {
 */
 
 static UNIT atcd_unit [UNIT_COUNT] = {
-    { UDATA (&line_service, TT_MODE_7P | UNIT_LOCALACK | UNIT_CAPSLOCK,  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0) },
-    { UDATA (&poll_service, UNIT_ATTABLE | UNIT_DIS | UNIT_IDLE, POLL_TIME) }  /* multiplexer poll unit */
+    { UDATA (&line_service, TT_MODE_7P | UNIT_LOCALACK | UNIT_CAPSLOCK,  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&line_service, TT_MODE_7B | UNIT_LOCALACK,                  0)            },
+    { UDATA (&poll_service, UNIT_ATTABLE | UNIT_DIS | UNIT_IDLE,         0), POLL_TIME }  /* multiplexer poll unit */
     };
 
 static UNIT atcc_unit [] = {                    /* a dummy unit to satisfy SCP requirements */
@@ -935,7 +938,8 @@ static REG atcd_reg [] = {
     { BRDATA (SPARM,  send_param,            8,    16,           SEND_CHAN_COUNT)                  },
     { BRDATA (SBUFR,  send_buffer,           8,    16,           SEND_CHAN_COUNT), REG_A           },
     { FLDATA (POLL,   atc_is_polling,                       0),                    REG_HRO         },
-    { SRDATA (DIB,    atcd_dib,                                                    REG_HRO)        },
+
+      DIB_REGS (atcd_dib),
 
     { NULL }
     };
@@ -959,7 +963,7 @@ static REG atcc_reg [] = {
     { FBDATA (MS2,    cntl_param,                    1,   TERM_COUNT, PV_RZRO) },
     { FBDATA (MS1,    cntl_param,                    0,   TERM_COUNT, PV_RZRO) },
 
-    { SRDATA (DIB,    atcc_dib,                                       REG_HRO) },
+      DIB_REGS (atcc_dib),
 
     { NULL }
     };
@@ -1810,14 +1814,17 @@ return status;
 
    Normally, this routine is called by the DETACH ATCD command, which is
    equivalent to DETACH ATCD0.  However, it may be called with other units in
-   two cases.
+   three cases.
 
    A DETACH ALL command will call us for unit 16 (the poll unit) if it is
-   attached.  Also, during simulator shutdown, we will be called for units 0-15
-   (detach_all in scp.c calls the detach routines of all units that do NOT have
-   UNIT_ATTABLE), as well as for unit 16 if it is attached.  In both cases, it
-   is imperative that we return SCPE_OK; otherwise any remaining device detaches
-   will not be performed.
+   attached.  A RESTORE command also will call us for unit 16 if it is attached.
+   In the latter case, the terminal channels will have already been rescheduled
+   as appropriate, so canceling them is skipped.  Also, during simulator
+   shutdown, we will be called for units 0-15 (detach_all in scp.c calls the
+   detach routines of all units that do NOT have UNIT_ATTABLE), as well as for
+   unit 16 if it is attached.  In all cases, it is imperative that we not reject
+   the request for unit 16; otherwise any remaining device detaches will not be
+   performed.
 */
 
 static t_stat atcd_detach (UNIT *uptr)
@@ -1825,13 +1832,14 @@ static t_stat atcd_detach (UNIT *uptr)
 uint32 channel;
 t_stat status = SCPE_OK;
 
-if (uptr == line_unit || uptr == &poll_unit) {              /* if we're detaching the base unit or poll unit */
-    status = tmxr_detach (&atcd_mdsc, &poll_unit);          /*   then detach the listening port */
+if (uptr == line_unit || uptr == &poll_unit) {                  /* if we're detaching the base unit or poll unit */
+    status = tmxr_detach (&atcd_mdsc, &poll_unit);              /*   then detach the listening port */
 
-    for (channel = 0; channel < TERM_COUNT; channel++) {    /* for each terminal channel */
-        atcd_ldsc [channel].rcve = FALSE;                   /*   disable reception */
-        sim_cancel (&line_unit [channel]);                  /*     and cancel any transfer in progress */
-        }
+    if ((sim_switches & SIM_SW_REST) == 0)                      /* if this is not a RESTORE call */
+        for (channel = 0; channel < TERM_COUNT; channel++) {    /*   then for each terminal channel */
+            atcd_ldsc [channel].rcve = FALSE;                   /*     disable reception */
+            sim_cancel (&line_unit [channel]);                  /*       and cancel any transfer in progress */
+            }
     }
 
 return status;

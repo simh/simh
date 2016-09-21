@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   12-Sep-16    JDB     Use the PCN_SERIES_II and PCN_SERIES_III constants
+   23-Aug-16    JDB     Implement the CMD instruction and module interrupts
    11-Jun-16    JDB     Bit mask constants are now unsigned
    13-Jan-16    JDB     First release version
    11-Dec-12    JDB     Created
@@ -2991,7 +2993,7 @@ switch (operation) {                                    /* dispatch the move or 
         break;
 
 
-    case 020:                                           /* MVBW (CCB; STUN, STOV, BNDV() */
+    case 020:                                           /* MVBW (CCB; STUN, STOV, BNDV) */
     case 021:
     case 022:
     case 023:
@@ -3417,10 +3419,10 @@ switch (operation) {                                    /* dispatch the move or 
                 cpu_push ();                                /* push the stack down */
 
                 if (UNIT_CPU_MODEL == UNIT_SERIES_II)       /* if the CPU is a Series II */
-                    RA = 1;                                 /*   then the CPU number is 1 */
+                    RA = PCN_SERIES_II;                     /*   then the CPU number is 1 */
 
                 else if (UNIT_CPU_MODEL == UNIT_SERIES_III) /* if the CPU is a Series III */
-                    RA = 2;                                 /*   then the CPU number is 2 */
+                    RA = PCN_SERIES_III;                    /*   then the CPU number is 2 */
 
                 else                                        /* if it's anything else */
                     status = SCPE_IERR;                     /*   then there's a problem! */
@@ -3631,6 +3633,21 @@ return status;                                          /* return the execution 
        simulation, and the UNDEF stop is active, a simulation stop will occur.
        If the stop is bypassed or not set, then the instruction will execute as
        though the reserved bits were zero.
+
+    3. The CMD instruction is simulated by assuming that the addressed module
+       will send a return message to the CPU, causing a module interrupt.  If
+       the module is the CPU, then the "return message" is the originating
+       message, including whatever MOP was specified.  Memory modules return a
+       no-operation MOP in response to a read or read/write ones MOP.  Sending a
+       read/write ones MOP to a Series II memory module sets the addressed
+       location to 177777 before the read value is returned.
+
+    4. The module interrupt signal is qualified by the I-bit of the status
+       register.  This is simulated by setting the cpx1_MODINTR bit in the CMD
+       executor if the I-bit is set, by clearing the cpx1_MODINTR bit in the SED
+       0 executor, and by setting the bit in the SED 1 executor if the MOD
+       register is non-zero (indicating a pending module interrupt that has not
+       been serviced).
 */
 
 static t_stat io_control (void)
@@ -3640,9 +3657,8 @@ static const uint8 preadjustment [16] = {       /* stack preadjustment, indexed 
     0, 1, 0, 1, 1, 2, 0, 0                      /*   RIO  WIO  TIO  CIO  CMD  SST  SIN  HALT */
     };
 
-uint32  operation;
-HP_WORD operand, address, offset;
-HP_WORD ics_q, delta_qi, disp_counter;
+uint32  operation, address, offset, module;
+HP_WORD operand, command, ics_q, delta_qi, disp_counter;
 t_stat  status = SCPE_OK;
 
 operation = IOCSUBOP (CIR);                             /* get the suboperation from the instruction */
@@ -3663,7 +3679,7 @@ switch (operation) {                                    /* dispatch the I/O or c
 
         else                                            /* otherwise */
             cpu_read_memory (absolute,                  /*   use the specified offset */
-                             offset + SGT_POINTER & LA_MASK,
+                             offset + SGT_POINTER,      /*     which cannot overflow */
                              &operand);
 
         if (NPRV)                                       /* if the mode is not privileged */
@@ -3701,11 +3717,17 @@ switch (operation) {                                    /* dispatch the I/O or c
           && cpu_stop_flags & SS_UNDEF)                 /*   and the undefined instruction stop is active */
             status = STOP_UNIMPL;                       /*     then stop the simulator */
 
-        else if (CIR & 1)                               /* otherwise if bit 15 of the instruction is 1 */
+        else if (CIR & 1) {                             /* otherwise if bit 15 of the instruction is 1 */
             STA |= STATUS_I;                            /*   then enable interrupts */
 
-        else                                            /* otherwise */
-            STA &= ~STATUS_I;                           /*   disable them */
+            if (MOD != 0)                               /* if a module interrupt is pending */
+                CPX1 |= cpx1_MODINTR;                   /*   then request it now */
+            }
+
+        else {                                          /* otherwise */
+            STA &= ~STATUS_I;                           /*   disable interrupts */
+            CPX1 &= ~cpx1_MODINTR;                      /*     and clear any indicated module interrupt */
+            }
         break;
 
 
@@ -3953,7 +3975,50 @@ switch (operation) {                                    /* dispatch the I/O or c
         if (NPRV)                                       /* if the mode is not privileged */
             MICRO_ABORT (trap_Privilege_Violation);     /*   then abort with a privilege violation */
 
-        status = STOP_UNIMPL;                           /* THIS INSTRUCTION IS NOT IMPLEMENTED YET! */
+        address = SM + SR - IO_K (CIR) & LA_MASK;           /* get the location of the command word */
+        cpu_read_memory (stack_checked, address, &command); /*   and read it from the stack */
+
+        module = CMD_TO (command);                      /* get the addressed (TO) module number */
+
+        if (module == MODULE_PORT_CNTLR                 /* if the selector channel port controller */
+          || module >= MODULE_UNDEFINED)                /*   or an undefined module is addressed */
+            CPX1 |= cpx1_CPUTIMER;                      /*     then a module timeout occurs */
+
+        else if (module == MODULE_CPU)                  /* otherwise if the CPU is addressing itself */
+            MOD = MOD_CPU_1                             /*   then set the MOD register */
+                    | TO_MOD_FROM (module)              /*     FROM field to the TO address */
+                    | TO_MOD_MOP (CMD_MOP (command));   /*       and include the MOP field value */
+
+        else if (UNIT_CPU_MODEL == UNIT_SERIES_II)      /* otherwise if a Series II memory module is addressed */
+            if (module >= MODULE_MEMORY_UPPER           /*   then if the upper module is addressed */
+              && MEMSIZE < 128 * 1024)                  /*     but it's not present */
+                CPX1 |= cpx1_CPUTIMER;                  /*       then it will not respond */
+
+            else {                                                  /* otherwise the module address is valid */
+                if (CMD_MOP (command) == MOP_READ_WRITE_ONES) {     /* if the operation is read/write ones */
+                    address = TO_PA (module, RA);                   /*   then get the bank and address */
+                    cpu_write_memory (absolute, address, D16_UMAX); /*     and set the addressed word to all one bits */
+                    }
+
+                MOD = MOD_CPU_1                         /* set the MOD register */
+                        | TO_MOD_FROM (module)          /*   FROM field to the TO address */
+                        | TO_MOD_MOP (MOP_NOP);         /*     and the module operation to NOP */
+                }
+
+        else if (UNIT_CPU_MODEL == UNIT_SERIES_III)     /* otherwise if a Series III memory module is addressed */
+            if (module >= MODULE_MEMORY_UPPER           /*   then if the upper module is addressed */
+              && MEMSIZE < 512 * 1024)                  /*     but it's not present */
+                CPX1 |= cpx1_CPUTIMER;                  /*       then it will not respond */
+
+            else                                        /* otherwise the module address is valid */
+                MOD = MOD_CPU_1                         /*   so set the MOD register */
+                        | TO_MOD_FROM (module)          /*     FROM field to the TO address */
+                        | TO_MOD_MOP (MOP_NOP);         /*       and the module operation to NOP */
+
+        if (MOD != 0 && STA & STATUS_I)                 /* if a module interrupt is indicated and enabled */
+            CPX1 |= cpx1_MODINTR;                       /*   then request it */
+
+        cpu_pop ();                                     /* delete the TOS */
         break;
 
 
@@ -3969,7 +4034,7 @@ switch (operation) {                                    /* dispatch the I/O or c
 
         else                                            /* otherwise */
             cpu_read_memory (absolute,                  /*   use the specified offset */
-                             offset + SGT_POINTER & LA_MASK,
+                             offset + SGT_POINTER,      /*     which cannot overflow */
                              &operand);
 
         if (NPRV)                                       /* if the mode is not privileged */

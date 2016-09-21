@@ -25,7 +25,9 @@
 
    CLK          HP 30135A System Clock/Fault Logging Interface
 
-   08-Jul-16    JDB     Preset the unit wait field
+   12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
+   11-Jul-16    JDB     Change "clk_unit" from a UNIT to an array of one UNIT
+   08-Jul-16    JDB     Added REG entry to save the unit wait field
    09-Jun-16    JDB     Clarified the IRQ FF set code in DRESETINT
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    21-Mar-16    JDB     Changed inbound_value and outbound_value types to HP_WORD
@@ -392,28 +394,32 @@ static DIB clk_dib = {
 
 /* Unit list */
 
-static UNIT clk_unit = {
-    UDATA (&clk_service, UNIT_IDLE | UNIT_CALTIME, 0), mS (1)
+static UNIT clk_unit [] = {
+    { UDATA (&clk_service, UNIT_IDLE | UNIT_CALTIME, 0) }
     };
 
 /* Register list */
 
 static REG clk_reg [] = {
-/*    Macro   Name    Location         Width  Offset   Flags   */
-/*    ------  ------  ---------------  -----  ------  -------  */
-    { ORDATA (CNTL,   control_word,     16)                    },
-    { ORDATA (STAT,   status_word,      16)                    },
-    { ORDATA (COUNT,  count_register,   16)                    },
-    { ORDATA (LIMIT,  limit_register,   16)                    },
-    { ORDATA (RATE,   rate,              3)                    },
-    { FLDATA (SYSIRQ, system_irq,               0)             },
-    { FLDATA (LIMIRQ, limit_irq,                0)             },
-    { FLDATA (OVFIRQ, lost_tick_irq,            0)             },
-    { DRDATA (SCALE,  prescaler,        16),          REG_HRO  },
-    { DRDATA (INCR,   increment,        16),          REG_HRO  },
-    { FLDATA (COSOK,  coschedulable,            0),   REG_HRO  },
-    { FLDATA (COSCH,  coscheduled,              0),   REG_HRO  },
-    { SRDATA (DIB,    clk_dib,                        REG_HRO) },
+/*    Macro   Name    Location           Width  Offset        Flags        */
+/*    ------  ------  -----------------  -----  ------  ------------------ */
+    { ORDATA (CNTL,   control_word,       16)                              },
+    { ORDATA (STAT,   status_word,        16)                              },
+    { ORDATA (COUNT,  count_register,     16)                              },
+    { ORDATA (LIMIT,  limit_register,     16)                              },
+    { ORDATA (RATE,   rate,                3)                              },
+    { FLDATA (SYSIRQ, system_irq,                 0)                       },
+    { FLDATA (LIMIRQ, limit_irq,                  0)                       },
+    { FLDATA (OVFIRQ, lost_tick_irq,              0)                       },
+
+    { DRDATA (SCALE,  prescaler,          16),                    REG_HRO  },
+    { DRDATA (INCR,   increment,          16),                    REG_HRO  },
+    { FLDATA (COSOK,  coschedulable,              0),             REG_HRO  },
+    { FLDATA (COSCH,  coscheduled,                0),             REG_HRO  },
+    { DRDATA (UWAIT,  clk_unit [0].wait,  32),          PV_LEFT | REG_HRO  },
+
+      DIB_REGS (clk_dib),
+
     { NULL }
     };
 
@@ -445,7 +451,7 @@ static DEBTAB clk_deb [] = {
 
 DEVICE clk_dev = {
     "CLK",                                      /* device name */
-    &clk_unit,                                  /* unit array */
+    clk_unit,                                   /* unit array */
     clk_reg,                                    /* register array */
     clk_mod,                                    /* modifier array */
     1,                                          /* number of units */
@@ -494,11 +500,11 @@ void clk_update_counter (void)
 int32 elapsed, ticks;
 
 if (coscheduled) {                                      /* if the clock is coscheduled, then adjust the count */
-    elapsed = clk_unit.wait                             /* the elapsed time is the original wait time */
-                - sim_activate_time (&clk_unit);        /*   less the time remaining before the next service */
+    elapsed = clk_unit [0].wait                         /* the elapsed time is the original wait time */
+                - sim_activate_time (&clk_unit [0]);    /*   less the time remaining before the next service */
 
-    ticks = (elapsed * CLK_MULTIPLIER) / clk_unit.wait  /* the adjustment is the elapsed fraction of the multiplier */
-              - (CLK_MULTIPLIER - increment);           /*   less the amount of any adjustment already made */
+    ticks = (elapsed * CLK_MULTIPLIER) / clk_unit [0].wait  /* the adjustment is the elapsed fraction of the multiplier */
+              - (CLK_MULTIPLIER - increment);               /*   less the amount of any adjustment already made */
 
     count_register = count_register + ticks & R_MASK;   /* update the clock counter with rollover */
     increment = increment - ticks;                      /*   and reduce the amount remaining to add at service */
@@ -568,17 +574,17 @@ while (working_set) {
             if (control_word & CN_RESET_LOAD_SEL) {     /* if the reset/load selector is set */
                 rate = CN_RATE (control_word);          /*   then load the clock rate */
 
-                if (clk_unit.flags & UNIT_CALTIME)      /* if in calibrated timing mode */
+                if (clk_unit [0].flags & UNIT_CALTIME)  /* if in calibrated timing mode */
                     prescaler = scale [rate];           /*   then set the prescaler */
                 else                                    /* otherwise */
                     prescaler = 1;                      /*   the prescaler isn't used */
 
-                sim_cancel (&clk_unit);                 /* changing the rate restarts the timing divider */
+                sim_cancel (&clk_unit [0]);             /* changing the rate restarts the timing divider */
 
-                if (rate > 0) {                             /* if the rate is valid */
-                    clk_unit.wait = delay [rate];           /*   then set the initial service delay */
-                    sim_rtcn_init (clk_unit.wait, TMR_CLK); /* initialize the clock */
-                    resync_clock ();                        /*   and reschedule the service */
+                if (rate > 0) {                                 /* if the rate is valid */
+                    clk_unit [0].wait = delay [rate];           /*   then set the initial service delay */
+                    sim_rtcn_init (clk_unit [0].wait, TMR_CLK); /* initialize the clock */
+                    resync_clock ();                            /*   and reschedule the service */
                     }
                 }
 
@@ -915,22 +921,22 @@ static void resync_clock (void)
 coschedulable = (ticks [rate] == 1000                   /* the clock can be coscheduled if the rate */
                   && limit_register == 100);            /*   is 1 msec and the limit is 100 ticks */
 
-if (clk_unit.flags & UNIT_CALTIME                       /* if the clock is in calibrated timing mode */
-  && coschedulable                                      /*   and may be coscheduled with the process clock */
-  && cpu_is_calibrated) {                               /*   and the process clock is calibrated */
-    clk_unit.wait = sim_activate_time (cpu_pclk_uptr);  /*   then synchronize with it */
-    coscheduled = TRUE;                                 /* the clock is coscheduled with the process clock */
+if (clk_unit [0].flags & UNIT_CALTIME                       /* if the clock is in calibrated timing mode */
+  && coschedulable                                          /*   and may be coscheduled with the process clock */
+  && cpu_is_calibrated) {                                   /*   and the process clock is calibrated */
+    clk_unit [0].wait = sim_activate_time (cpu_pclk_uptr);  /*     then synchronize with it */
+    coscheduled = TRUE;                                     /* the clock is coscheduled with the process clock */
     }
 
 else {                                                  /* otherwise */
-    clk_unit.wait = delay [rate];                       /*   set up an independent clock */
+    clk_unit [0].wait = delay [rate];                   /*   set up an independent clock */
     coscheduled = FALSE;                                /* the clock is not coscheduled with the process clock */
     }
 
 dprintf (clk_dev, DEB_PSERV, "Rate %s delay %d service rescheduled\n",
-         rate_name [rate], clk_unit.wait);
+         rate_name [rate], clk_unit [0].wait);
 
-sim_activate_abs (&clk_unit, clk_unit.wait);            /* restart the clock */
+sim_activate_abs (&clk_unit [0], clk_unit [0].wait);    /* restart the clock */
 
 return;
 }

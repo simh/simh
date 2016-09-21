@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   12-Sep-16    JDB     Added the DIB_REGS macro
+   02-Sep-16    JDB     Added the iop_assert_PFWARN routine
    11-Jun-16    JDB     Bit mask constants are now unsigned
    21-Mar-16    JDB     Changed type of inbound_value of CNTLR_INTRF to HP_WORD
    20-Jan-16    JDB     First release version
@@ -135,7 +137,7 @@ typedef enum {                                  /* --- source of signal --- */
     INTPOLLIN     = 000040000000,               /*   IOP interrupt poll */
     XFERERROR     = 000100000000,               /*   Multiplexer channel abort */
     CHANSO        = 000200000000,               /*   Channel service call to interface */
-    PFWARN        = 000400000000                /*   SET CPU POWERFAIL */
+    PFWARN        = 000400000000                /*   POWER FAIL command */
 /*                = 001000000000                     (available) */
 /*                = 002000000000                     (available) */
 /*                = 004000000000                     (available) */
@@ -269,6 +271,12 @@ typedef uint32              SIGNALS_DATA;       /* a combined outbound signal se
        could be smaller than the defined 32-bit sizes, but IA-32 processors
        execute instructions with 32-bit operands much faster than those with
        16- or 8-bit operands.
+
+    3. The DIB_REGS macro provides hidden register entries needed to save and
+       restore the state of a DIB.  Only the potentially variable fields are
+       referenced.  In particular, the "io_interface" field must not be saved,
+       as the address of the device's interface routine may change from version
+       to version of the simulator.
 */
 
 #define DEVNO_MAX           127                 /* the maximum device number */
@@ -312,6 +320,17 @@ struct dib {                                    /* the Device Information Block 
     t_bool      service_request;                /*   channel service has been requested */
     };
 
+#define DIB_REGS(dib) \
+/*    Macro   Name     Location                    Width   Flags   */ \
+/*    ------  -------  --------------------------  -----  -------  */ \
+    { DRDATA (DIBDN,   dib.device_number,           32),   REG_HRO }, \
+    { DRDATA (DIBSRN,  dib.service_request_number,  32),   REG_HRO }, \
+    { DRDATA (DIBPRI,  dib.interrupt_priority,      32),   REG_HRO }, \
+    { ORDATA (DIBMASK, dib.interrupt_mask,          32),   REG_HRO }, \
+    { ORDATA (DIBIRQ,  dib.interrupt_request,       32),   REG_HRO }, \
+    { ORDATA (DIBACT,  dib.interrupt_active,        32),   REG_HRO }, \
+    { ORDATA (DIBSR,   dib.service_request,         32),   REG_HRO }
+
 
 /* Calibrated timer numbers */
 
@@ -334,13 +353,14 @@ typedef enum {
 extern UNIT  *cpu_pclk_uptr;                            /* pointer to the process clock unit */
 extern t_bool cpu_is_calibrated;                        /* TRUE if the process clock is calibrated */
 
-extern void cpu_front_panel (HP_WORD    switch_reg,     /* set the front panel switches as directed */
+extern void cpu_front_panel (HP_WORD    switch_reg,     /* set the CPU front panel switches as directed */
                              PANEL_TYPE request);
 
 
 /* Global asynchronous signal assertion functions */
 
 extern void iop_assert_INTREQ (DIB *dib_pointer);       /* assert the interrupt request signal */
+extern void iop_assert_PFWARN (void);                   /* assert the power failure warning signal */
 
 extern void mpx_assert_REQ    (DIB *dib_pointer);       /* assert the multiplexer channel request signal */
 extern void mpx_assert_SRn    (DIB *dib_pointer);       /* assert the multiplexer channel service request signal */
