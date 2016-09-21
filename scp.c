@@ -7537,25 +7537,25 @@ else {
             *lo = (t_addr) strtotv (cptr, &tptr, rdx);
         if (cptr == tptr)                                   /* error? */
                 return NULL;
-        if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
-            cptr = tptr + 1;
-            if (dptr && sim_vm_parse_addr)                  /* get high */
-                *hi = sim_vm_parse_addr (dptr, cptr, &tptr);
-            else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
-            if (cptr == tptr)
-                return NULL;
-            if (*lo > *hi)
-                return NULL;
-            }
-        else if (*tptr == '/') {                            /* relative? */
-            cptr = tptr + 1;
-            *hi = (t_addr) strtotv (cptr, &tptr, rdx);      /* get high */
-            if ((cptr == tptr) || (*hi == 0))
-                return NULL;
-            *hi = *lo + *hi - 1;
-            }
-        else *hi = *lo;
         }
+    if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
+        cptr = tptr + 1;
+        if (dptr && sim_vm_parse_addr)                  /* get high */
+            *hi = sim_vm_parse_addr (dptr, cptr, &tptr);
+        else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
+        if (cptr == tptr)
+            return NULL;
+        if (*lo > *hi)
+            return NULL;
+        }
+    else if (*tptr == '/') {                            /* relative? */
+        cptr = tptr + 1;
+        *hi = (t_addr) strtotv (cptr, &tptr, rdx);      /* get high */
+        if ((cptr == tptr) || (*hi == 0))
+            return NULL;
+        *hi = *lo + *hi - 1;
+        }
+    else *hi = *lo;
     }
 if (term && (*tptr++ != term))
     return NULL;
