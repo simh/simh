@@ -4052,9 +4052,9 @@ fprintf (st, "If a simulated multiplexor devices can programmatically set a seri
 fprintf (st, "port line speed, the programmatically specified speed will take precidence\n");
 fprintf (st, "over any input speed specified on an attach command.\n");
 fprintf (st, "Some simulated systems run very much faster than the original system\n");
-fprintf (st, "which is being simulated.  To accomodate this, the speed specified may\n");
+fprintf (st, "which is being simulated.  To accommodate this, the speed specified may\n");
 fprintf (st, "include a factor which will increase the input data delivery rate by\n");
-fprintf (st, "the specified facctor.  A factor is specified with a speed value of the\n");
+fprintf (st, "the specified factor.  A factor is specified with a speed value of the\n");
 fprintf (st, "form \"speed*factor\".  Factor values can range from 1 thru 32.\n");
 fprintf (st, "Example:\n\n");
 fprintf (st, "   sim> ATTACH %s 1234,SPEED=2400\n", dptr->name);

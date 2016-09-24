@@ -967,6 +967,8 @@ static const char simh_help[] =
       "+set console BRK             specify console Break character\n"
       "+set console DEL             specify console delete character\n"
       "+set console PCHAR           specify console printable characters\n"
+      "+set console SPEED=speed{*factor}\n"
+      "++++++++                     specify console input data rate\n"
       "+set console TELNET=port     specify console telnet port\n"
       "+set console TELNET=LOG=log_file\n"
       "++++++++                     specify console telnet logging to the\n"
