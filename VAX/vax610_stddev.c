@@ -453,11 +453,10 @@ t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
 
-sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 clk_csr = 0;
 CLR_INT (CLK);
-t = sim_rtcn_init (clk_unit.wait, TMR_CLK);             /* init timer */
-sim_activate_abs (&clk_unit, t);                        /* activate unit */
+t = sim_rtcn_init_unit (&clk_unit, clk_unit.wait, TMR_CLK);/* init 100Hz timer */
+sim_activate_after (&clk_unit, 1000000/clk_tps);        /* activate 100Hz unit */
 tmr_poll = t;                                           /* set tmr poll */
 tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
 return SCPE_OK;
