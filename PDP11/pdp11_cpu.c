@@ -657,15 +657,6 @@ MTAB cpu_mod[] = {
     { 0 }
     };
 
-DEVICE cpu_dev = {
-    "CPU", &cpu_unit, cpu_reg, cpu_mod,
-    1, 8, 22, 2, 8, 16,
-    &cpu_ex, &cpu_dep, &cpu_reset,
-    NULL, NULL, NULL,
-    NULL, DEV_DYNM, 0,
-    NULL, &cpu_set_size, NULL
-    };
-
 BRKTYPTAB cpu_breakpoints [] = {
     BRKTYPE('E',"Execute Instruction at Virtual Address"),
     BRKTYPE('P',"Execute Instruction at Physical Address"),
@@ -674,6 +665,17 @@ BRKTYPTAB cpu_breakpoints [] = {
     BRKTYPE('W',"Write to Virtual Address"),
     BRKTYPE('X',"Write to Physical Address"),
     { 0 }
+    };
+
+DEVICE cpu_dev = {
+    "CPU", &cpu_unit, cpu_reg, cpu_mod,
+    1, 8, 22, 2, 8, 16,
+    &cpu_ex, &cpu_dep, &cpu_reset,
+    NULL, NULL, NULL,
+    NULL, DEV_DYNM, 0,
+    NULL, &cpu_set_size, NULL,
+    NULL, NULL, NULL, NULL,
+    cpu_breakpoints
     };
 
 t_value pdp11_pc_value (void)
