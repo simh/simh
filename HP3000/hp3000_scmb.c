@@ -25,6 +25,7 @@
 
    SCMB1,SCMB2  HP 30033A Selector Channel Maintenance Board
 
+   12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    11-Jun-16    JDB     Bit mask constants are now unsigned
    13-May-16    JDB     Modified for revised SCP API function parameter types
    21-Mar-16    JDB     Changed uint16 types to HP_WORD
@@ -462,7 +463,7 @@ static REG scmb1_reg [] = {
     { FLDATA (DEVEND, scmb [card1].device_end,             0)                       },
     { FLDATA (STOP,   scmb [card1].stop_transfer,          0)                       },
 
-    { SRDATA (DIB,    scmb_dib [card1],                                    REG_HRO) },
+      DIB_REGS (scmb_dib [card1]),
 
     { NULL }
     };
@@ -489,7 +490,7 @@ static REG scmb2_reg [] = {
     { FLDATA (DEVEND, scmb [card2].device_end,             0)                       },
     { FLDATA (STOP,   scmb [card2].stop_transfer,          0)                       },
 
-    { SRDATA (DIB,    scmb_dib [card1],                                    REG_HRO) },
+      DIB_REGS (scmb_dib [card2]),
 
     { NULL }
     };

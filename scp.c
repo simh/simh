@@ -493,6 +493,7 @@ volatile int32 stop_cpu = 0;
 static char **sim_argv;
 t_value *sim_eval = NULL;
 static t_value sim_last_val;
+static t_addr sim_last_addr;
 FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
@@ -967,6 +968,8 @@ static const char simh_help[] =
       "+set console BRK             specify console Break character\n"
       "+set console DEL             specify console delete character\n"
       "+set console PCHAR           specify console printable characters\n"
+      "+set console SPEED=speed{*factor}\n"
+      "++++++++                     specify console input data rate\n"
       "+set console TELNET=port     specify console telnet port\n"
       "+set console TELNET=LOG=log_file\n"
       "++++++++                     specify console telnet logging to the\n"
@@ -2431,6 +2434,40 @@ void fprint_show_help (FILE *st, DEVICE *dptr)
     fprint_show_help_ex (st, dptr, TRUE);
     }
 
+void fprint_brk_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
+{
+BRKTYPTAB *brkt = dptr->brk_types;
+char gbuf[CBUFSIZE];
+
+if (sim_brk_types == 0) {
+    if (!silent) {
+        fprintf (st, "Breakpoints are not supported in the %s simulator\n", sim_name);
+        if (dptr->help)
+            dptr->help (st, dptr, NULL, 0, NULL);
+        }
+    return;
+    }
+if (brkt == NULL) {
+    int i;
+
+    if (sim_brk_types & ~sim_brk_dflt) {
+        fprintf (st, "%s supports the following breakpoint types:\n", sim_dname (dptr));
+        for (i=0; i<26; i++) {
+            if (sim_brk_types & (1<<i))
+                fprintf (st, "  -%c\n", 'A'+i);
+            }
+        }
+    fprintf (st, "The default breakpoint type is: %s\n", put_switches (gbuf, sizeof(gbuf), sim_brk_dflt));
+    return;
+    }
+fprintf (st, "%s supports the following breakpoint types:\n", sim_dname (dptr));
+while (brkt->btyp) {
+    fprintf (st, "  %s     %s\n", put_switches (gbuf, sizeof(gbuf), brkt->btyp), brkt->desc);
+    ++brkt;
+    }
+fprintf (st, "The default breakpoint type is: %s\n", put_switches (gbuf, sizeof(gbuf), sim_brk_dflt));
+}
+
 t_stat help_dev_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 char gbuf[CBUFSIZE];
@@ -2458,6 +2495,10 @@ if (*cptr) {
             fprint_attach_help_ex (st, dptr, FALSE);
             return SCPE_OK;
             }
+        if (cmdp->action == &brk_cmd) {
+            fprint_brk_help_ex (st, dptr, FALSE);
+            return SCPE_OK;
+            }
         if (dptr->help)
             return dptr->help (st, dptr, uptr, flag, cptr);
         fprintf (st, "No %s help is available for the %s device\n", cmdp->name, dptr->name);
@@ -2483,6 +2524,7 @@ fprint_set_help_ex (st, dptr, TRUE);
 fprint_show_help_ex (st, dptr, TRUE);
 fprint_attach_help_ex (st, dptr, TRUE);
 fprint_reg_help_ex (st, dptr, TRUE);
+fprint_brk_help_ex (st, dptr, TRUE);
 return SCPE_OK;
 }
 
@@ -4355,13 +4397,10 @@ return;
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
 int32 vmaj = SIM_MAJOR, vmin = SIM_MINOR, vpat = SIM_PATCH, vdelt = SIM_DELTA;
-const char *cpp;
+const char *cpp = "";
+const char *build = "";
+const char *arch = "";
 
-#ifdef  __cplusplus
-cpp = "C++";
-#else
-cpp = "C";
-#endif
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
@@ -4403,6 +4442,11 @@ if (flag) {
     fprintf (st, "\n\t\tCompiler: clang %s", __clang_version__);
 #elif defined (_MSC_FULL_VER) && defined (_MSC_BUILD)
     fprintf (st, "\n\t\tCompiler: Microsoft Visual C++ %d.%02d.%05d.%02d", _MSC_FULL_VER/10000000, (_MSC_FULL_VER/100000)%100, _MSC_FULL_VER%100000, _MSC_BUILD);
+#if defined(_DEBUG)
+    build = " (Debug Build)";
+#else
+    build = " (Release Build)";
+#endif
 #elif defined (__DECC_VER)
     fprintf (st, "\n\t\tCompiler: DEC C %c%d.%d-%03d", ("T SV")[((__DECC_VER/10000)%10)-6], __DECC_VER/10000000, (__DECC_VER/100000)%100, __DECC_VER%10000);
 #elif defined (SIM_COMPILER)
@@ -4412,8 +4456,31 @@ if (flag) {
 #undef S_str
 #undef S_xstr
 #endif
+#if defined(__GNUC__)
+#if defined(__OPTIMIZE__)
+    build = " (Release Build)";
+#else
+    build = " (Debug Build)";
+#endif
+#endif
+#if defined(_M_X64) || defined(_M_AMD64) || defined(__amd64__) || defined(__x86_64__)
+    arch = " arch: x64";
+#elif defined(_M_IX86) || defined(__i386)
+    arch = " arch: x86";
+#elif defined(_M_ARM64) || defined(__aarch64_)
+    arch = " arch: ARM64";
+#elif defined(_M_ARM) || defined(__arm__)
+    arch = " arch: ARM";
+#elif defined(__ia64__) || defined(_M_IA64) || defined(__itanium__)
+    arch = " arch: IA-64";
+#endif
 #if defined (__DATE__) && defined (__TIME__)
-    fprintf (st, "\n\t\tSimulator Compiled as %s: %s at %s", cpp, __DATE__, __TIME__);
+#ifdef  __cplusplus
+    cpp = "C++";
+#else
+    cpp = "C";
+#endif
+    fprintf (st, "\n\t\tSimulator Compiled as %s%s%s on %s at %s", cpp, arch, build, __DATE__, __TIME__);
 #endif
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
@@ -7526,37 +7593,48 @@ if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) {    /* ALL? */
     *hi = max;
     }
 else {
-    if (strncmp (cptr, "$", strlen ("$")) == 0) {           /* $? */
-        tptr = cptr + strlen ("$");
-        *hi = *lo = (t_addr)sim_last_val;
+    if ((strncmp (cptr, ".", strlen (".")) == 0) &&             /* .? */
+        ((cptr[1] == '\0') || 
+         (cptr[1] == '-')  || 
+         (cptr[1] == ':')  || 
+         (cptr[1] == '/'))) {
+        tptr = cptr + strlen (".");
+        *lo = *hi = sim_last_addr;
         }
     else {
-        if (dptr && sim_vm_parse_addr)                      /* get low */
-            *lo = sim_vm_parse_addr (dptr, cptr, &tptr);
-        else
-            *lo = (t_addr) strtotv (cptr, &tptr, rdx);
-        if (cptr == tptr)                                   /* error? */
-                return NULL;
-        if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
-            cptr = tptr + 1;
-            if (dptr && sim_vm_parse_addr)                  /* get high */
-                *hi = sim_vm_parse_addr (dptr, cptr, &tptr);
-            else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
-            if (cptr == tptr)
-                return NULL;
-            if (*lo > *hi)
-                return NULL;
+        if (strncmp (cptr, "$", strlen ("$")) == 0) {           /* $? */
+            tptr = cptr + strlen ("$");
+            *hi = *lo = (t_addr)sim_last_val;
             }
-        else if (*tptr == '/') {                            /* relative? */
-            cptr = tptr + 1;
-            *hi = (t_addr) strtotv (cptr, &tptr, rdx);      /* get high */
-            if ((cptr == tptr) || (*hi == 0))
-                return NULL;
-            *hi = *lo + *hi - 1;
+        else {
+            if (dptr && sim_vm_parse_addr)                      /* get low */
+                *lo = sim_vm_parse_addr (dptr, cptr, &tptr);
+            else
+                *lo = (t_addr) strtotv (cptr, &tptr, rdx);
+            if (cptr == tptr)                                   /* error? */
+                    return NULL;
             }
-        else *hi = *lo;
         }
+    if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
+        cptr = tptr + 1;
+        if (dptr && sim_vm_parse_addr)                  /* get high */
+            *hi = sim_vm_parse_addr (dptr, cptr, &tptr);
+        else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
+        if (cptr == tptr)
+            return NULL;
+        if (*lo > *hi)
+            return NULL;
+        }
+    else if (*tptr == '/') {                            /* relative? */
+        cptr = tptr + 1;
+        *hi = (t_addr) strtotv (cptr, &tptr, rdx);      /* get high */
+        if ((cptr == tptr) || (*hi == 0))
+            return NULL;
+        *hi = *lo + *hi - 1;
+        }
+    else *hi = *lo;
     }
+sim_last_addr = *hi;
 if (term && (*tptr++ != term))
     return NULL;
 return tptr;
@@ -8142,7 +8220,6 @@ return cptr;
 const char *put_switches (char *buf, size_t bufsize, uint32 sw)
 {
 char *optr = buf;
-size_t i = 0;
 int32 bit;
 
 memset (buf, 0, bufsize);
@@ -9413,7 +9490,7 @@ if (sim_brk_type_desc) {
         }
     }
 if (!msg[0])
-    sprintf (msg, "%s Breakpoint at: %s\n", put_switches (buf , sizeof(buf), sim_brk_match_type), addr);
+    sprintf (msg, "%s Breakpoint at: %s\n", put_switches (buf, sizeof(buf), sim_brk_match_type), addr);
 
 return msg;
 }
@@ -9468,6 +9545,7 @@ t_stat sim_set_expect (EXPECT *exp, CONST char *cptr)
 char gbuf[CBUFSIZE];
 CONST char *tptr;
 CONST char *c1ptr;
+t_bool after_set = FALSE;
 uint32 after = exp->after;
 int32 cnt = 0;
 t_stat r;
@@ -9487,13 +9565,14 @@ if ((!strncmp(gbuf, "HALTAFTER=", 10)) && (gbuf[10])) {
     after = (uint32)get_uint (&gbuf[10], 10, 100000000, &r);
     if (r != SCPE_OK)
         return sim_messagef (SCPE_ARG, "Invalid Halt After Value\n");
+    after_set = TRUE;
     cptr = tptr;
     }
 if ((*cptr != '"') && (*cptr != '\''))
     return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
 cptr = get_glyph_quoted (cptr, gbuf, 0);
 
-return sim_exp_set (exp, gbuf, cnt, (after ? after : exp->after), sim_switches, cptr);
+return sim_exp_set (exp, gbuf, cnt, (after_set ? after : exp->after), sim_switches, cptr);
 }
 
 /* Clear expect */

@@ -471,7 +471,6 @@ return clk_dib.vec;
 
 t_stat clk_reset (DEVICE *dptr)
 {
-sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 if (CPUT (HAS_LTCR))                                    /* reg there? */
     clk_fie = clk_fnxm = 0;
 else {
@@ -481,8 +480,8 @@ else {
 clk_tps = clk_default;                                  /* set default tps */
 clk_csr = CSR_DONE;                                     /* set done */
 CLR_INT (CLK);
-sim_rtcn_init (clk_unit.wait, TMR_CLK);                 /* init line clock */
-sim_activate (&clk_unit, clk_unit.wait);                /* activate unit */
+tmr_poll = sim_rtcn_init_unit (&clk_unit, clk_unit.wait, TMR_CLK);/* init line clock */
+sim_activate_after (&clk_unit, 1000000/clk_tps);        /* activate unit */
 tmr_poll = clk_unit.wait;                               /* set timer poll */
 tmxr_poll = clk_unit.wait;                              /* set mux poll */
 return SCPE_OK;

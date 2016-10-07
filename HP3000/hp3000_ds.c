@@ -25,6 +25,7 @@
 
    DS           HP 30229B Cartridge Disc Interface
 
+   12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    16-May-16    JDB     Fixed interrupt mask setting
@@ -439,9 +440,10 @@ static REG ds_reg [] = {
     { DRDATA (RETRY,  retry_counter,     4),                  REG_FIT | PV_LEFT },
 
     { SRDATA (DIAG,   overrides,                              REG_HRO)          },
-    { SRDATA (DIB,    ds_dib,                                 REG_HRO)          },
 
-    DL_REGS (mac_cntlr, ds_unit, UNIT_COUNT, buffer, fast_times),
+      DIB_REGS (ds_dib),
+
+      DL_REGS (mac_cntlr, ds_unit, UNIT_COUNT, buffer, fast_times),
 
     { NULL }
     };

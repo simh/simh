@@ -25,6 +25,7 @@
 
    MS           HP 30215A Magnetic Tape Controller Interface
 
+   12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    16-May-16    JDB     Fixed interrupt mask setting
@@ -517,9 +518,10 @@ static REG ms_reg [] = {
     { DRDATA (ATUNIT, attention_unit,  16),                  REG_FIT | PV_LEFT  },
     { DRDATA (CLASS,  command_class,    4),                            PV_LEFT  },
     { YRDATA (FLAGS,  flags,            8,                             PV_RZRO) },
-    { SRDATA (DIB,    ms_dib,                        REG_HRO)                   },
 
-    TL_REGS (ms_cntlr, ms_unit, DRIVE_COUNT, buffer, fast_times),
+      DIB_REGS (ms_dib),
+
+      TL_REGS (ms_cntlr, ms_unit, DRIVE_COUNT, buffer, fast_times),
 
     { NULL }
     };

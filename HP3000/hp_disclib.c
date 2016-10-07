@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   03-Aug-16    JDB     "fmt_bitset" now allows multiple concurrent calls
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    16-May-16    JDB     DRIVE_PROPS.name is now a pointer-to-constant
@@ -1540,7 +1541,6 @@ uint32 unit;
 int32 seek_wait_time;
 PRPTR props;
 CNTLR_IFN_IBUS outbound;
-char s1_buffer [256], s2_buffer [256];                  /* formatted bitset buffers for trace logging */
 DIAG_ENTRY *dop = NULL;
 
 wait_timer (cvptr, CLEAR);                              /* stop the command wait timer */
@@ -1694,11 +1694,11 @@ else {                                                  /* otherwise the command
 
             dpprintf (cvptr->device, DL_DEB_CMD, "Unit %u %s returns %sunit %u | %s and %s%s | %s\n",
                       unit, opcode_name [Request_Status],
-                      strcpy (s1_buffer, fmt_bitset (cvptr->spd_unit, status_1_format)),
+                      fmt_bitset (cvptr->spd_unit, status_1_format),
                       CM_UNIT (cvptr->spd_unit), dl_status_name (cvptr->status),
                       (cvptr->buffer [1] & S2_ERROR ? "error | " : ""),
                       drive_props [S2_TO_DRIVE_TYPE (cvptr->buffer [1])].name,
-                      strcpy (s2_buffer, fmt_bitset (cvptr->buffer [1], status_2_format)));
+                      fmt_bitset (cvptr->buffer [1], status_2_format));
 
             if (rptr)                                   /* if the referenced unit is valid */
                 rptr->STATUS &= ~S2_FIRST_STATUS;       /*   then clear the First Status bit */

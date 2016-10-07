@@ -25,6 +25,7 @@
 
    SEL          HP 3000 Series III Selector Channel
 
+   11-Jul-16    JDB     Change "sel_unit" from a UNIT to an array of one UNIT
    30-Jun-16    JDB     Reestablish active_dib pointer during sel_initialize
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    16-May-16    JDB     abort_channel parameter is now a pointer-to-constant
@@ -426,8 +427,8 @@ static void         load_address      (HP_WORD    *value);
 
 /* Unit list */
 
-static UNIT sel_unit = {
-    UDATA (&sel_timer, 0, 0), SR_WAIT_TIMER
+static UNIT sel_unit [] = {
+    { UDATA (&sel_timer, 0, 0), SR_WAIT_TIMER }
     };
 
 /* Register list */
@@ -476,7 +477,7 @@ static DEBTAB sel_deb [] = {
 
 DEVICE sel_dev = {
     "SEL",                                      /* device name */
-    &sel_unit,                                  /* unit array */
+    sel_unit,                                   /* unit array */
     sel_reg,                                    /* register array */
     NULL,                                       /* modifier array */
     1,                                          /* number of units */
@@ -608,7 +609,7 @@ else {                                                  /* otherwise abort the t
              device_number);
 
     end_channel (dibptr);                               /* idle the channel */
-    sim_cancel (&sel_unit);                             /*   and cancel the CHANSR timer */
+    sim_cancel (&sel_unit [0]);                         /*   and cancel the CHANSR timer */
     }
 
 return;
@@ -817,7 +818,7 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
 
 
         case Fetch_Sequence:
-            sim_cancel (&sel_unit);                     /* cancel the CHANSR timer */
+            sim_cancel (&sel_unit [0]);                 /* cancel the CHANSR timer */
 
             load_control (&control_word);               /* load the IOCW */
             load_address (&address_word);               /*   and the IOAW */
@@ -963,8 +964,8 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
                     prefetch_control = FALSE;                   /* prefetching is not used */
                     prefetch_address = FALSE;                   /*   for the Control order */
 
-                    sim_activate (&sel_unit, sel_unit.wait);    /* start the SR timer */
-                    sequencer = Wait_Sequence;                  /*   and check for a timeout */
+                    sim_activate (&sel_unit [0], sel_unit [0].wait);    /* start the SR timer */
+                    sequencer = Wait_Sequence;                          /*   and check for a timeout */
                     break;
 
                 case sioWRITE:
@@ -972,8 +973,8 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
                     prefetch_control = (order == sioWRITEC);    /* enable prefetching */
                     prefetch_address = (order == sioWRITEC);    /*   if the order is chained */
 
-                    sim_activate (&sel_unit, sel_unit.wait);    /* start the SR timer */
-                    sequencer = Wait_Sequence;                  /*   and check for a timeout */
+                    sim_activate (&sel_unit [0], sel_unit [0].wait);    /* start the SR timer */
+                    sequencer = Wait_Sequence;                          /*   and check for a timeout */
                     break;
 
                 case sioREAD:
@@ -987,8 +988,8 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
                         prefetch_control = FALSE;               /* mark the job done */
                         }
 
-                    sim_activate (&sel_unit, sel_unit.wait);    /* start the SR timer */
-                    sequencer = Wait_Sequence;                  /*   and check for a timeout */
+                    sim_activate (&sel_unit [0], sel_unit [0].wait);    /* start the SR timer */
+                    sequencer = Wait_Sequence;                          /*   and check for a timeout */
                     break;
                 }                                               /* end switch */
 
@@ -997,7 +998,7 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
 
 
         case Wait_Sequence:
-            sim_cancel (&sel_unit);                     /* cancel the SR timer */
+            sim_cancel (&sel_unit [0]);                 /* cancel the SR timer */
 
             sequencer = Transfer_Sequence;              /* continue with the transfer sequence */
 
@@ -1071,9 +1072,9 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
                     prefetch_address = FALSE;               /* mark the job done */
                     }
 
-            if (order == sioCNTL) {                         /* if this is a Control order */
-                sim_activate (&sel_unit, sel_unit.wait);    /*   then start the SR timer */
-                sequencer = Fetch_Sequence;                 /*     and the next state is Fetch */
+            if (order == sioCNTL) {                                 /* if this is a Control order */
+                sim_activate (&sel_unit [0], sel_unit [0].wait);    /*   then start the SR timer */
+                sequencer = Fetch_Sequence;                         /*     and the next state is Fetch */
                 }
 
             else {                                              /* otherwise it's a Write or Read (Chained) order */
@@ -1173,7 +1174,7 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
             active_dib->service_request = FALSE;        /*     clear the current service request */
 
     else                                                /* otherwise the channel has stopped */
-        sim_cancel (&sel_unit);                         /*   so cancel the CHANSR timer */
+        sim_cancel (&sel_unit [0]);                     /*   so cancel the CHANSR timer */
 
     }                                                   /* end while */
 

@@ -23,6 +23,12 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   12-Sep-16    JDB     Added the PCN_SERIES_II and PCN_SERIES_III constants
+   02-Sep-16    JDB     Added the POWER_STATE enumeration type, the UNIT_PFARS
+                        flag, and the "cpu_power_state" external declaration
+   24-Aug-16    JDB     Fixed the UNIT_CPU_MODEL test macro
+   23-Aug-16    JDB     Added the MOD (module control) register
+   12-Jul-16    JDB     Renamed "loading" EXEC_STATE to "waiting"
    21-Mar-16    JDB     Changed cpu_ccb_table type from uint16 to HP_WORD
    14-Feb-16    JDB     First release version
    11-Dec-12    JDB     Created
@@ -73,6 +79,7 @@ typedef uint16              MEMORY_WORD;        /* HP 16-bit memory word represe
 #define UNIT_MODEL_SHIFT    (UNIT_V_UF + 0)     /* the CPU model (1 bit) */
 #define UNIT_EIS_SHIFT      (UNIT_V_UF + 1)     /* the Extended Instruction Set firmware option */
 #define UNIT_CALTIME_SHIFT  (UNIT_V_UF + 2)     /* the process clock timing mode */
+#define UNIT_PFARS_SHIFT    (UNIT_V_UF + 3)     /* the power-fail auto-restart mode */
 
 #define UNIT_MODEL_MASK     0000001u            /* model ID mask */
 
@@ -82,10 +89,13 @@ typedef uint16              MEMORY_WORD;        /* HP 16-bit memory word represe
 #define UNIT_SERIES_II      (1u << UNIT_MODEL_SHIFT)    /* the CPU is a Series II */
 #define UNIT_EIS            (1u << UNIT_EIS_SHIFT)      /* the Extended Instruction Set is installed */
 #define UNIT_CALTIME        (1u << UNIT_CALTIME_SHIFT)  /* the process clock is calibrated to wall time */
+#define UNIT_PFARS          (1u << UNIT_PFARS_SHIFT)    /* the system will auto-restart after a power failure */
 
-#define UNIT_CPU_MODEL      (cpu_unit.flags & UNIT_MODEL_MASK)
+#define UNIT_CPU_MODEL      (cpu_unit [0].flags & UNIT_MODEL)
 
 #define CPU_MODEL(f)        ((f) >> UNIT_MODEL_SHIFT & UNIT_MODEL_MASK)
+
+#define MEMSIZE             (cpu_unit [0].capac)        /* the current memory size in 16-bit words */
 
 
 /* CPU debug flags */
@@ -108,12 +118,41 @@ typedef uint16              MEMORY_WORD;        /* HP 16-bit memory word represe
 #define SS_BYPASSED         (1u << 31)          /* stops are bypassed for this instruction */
 
 
+/* System power state.
+
+   The HP 3000 power supply uses two signals to indicate its state: PON (power
+   on) and PFW (power-fail warning).  PON is asserted when the DC power levels
+   are within their operating ranges.  PFW is asserted when AC power is lost.
+   When a power failure occurs, PFW will be asserted at least three milliseconds
+   before PON is denied.  When power is restored, PFW denies immediately, but
+   PON does not assert until the DC output voltages have stabilized, and the
+   machine is ready to resume execution.
+
+   In simulation, the four states of these two signals are modeled with
+   enumeration constants, as follows:
+
+     PON  PFW  State            Simulator Action
+     ---  ---  ---------------  ----------------------------
+      1    0   power on         executing normally
+      1    1   power failing    executing with cpx1_PFINTR
+      0    1   power off        will not execute
+      0    0   power returning  executing with trap_Power_On
+*/
+
+typedef enum {
+    power_on,
+    power_failing,
+    power_off,
+    power_returning
+    } POWER_STATE;
+
+
 /* Micromachine execution state */
 
 typedef enum {
     running,                                    /* the micromachine is running */
     paused,                                     /* a PAUS instruction has been executed */
-    loading,                                    /* a COLD LOAD is in progress */
+    waiting,                                    /* a cold load or dump is in progress */
     halted                                      /* a programmed or front panel HALT has been executed */
     } EXEC_STATE;
 
@@ -201,7 +240,7 @@ typedef enum {
     cpx2_DECRADDR = 0000040u,                   /* decrement address */
 /*  cpx2_UNUSED   = 0000020u,                      unused, always 0 */
 /*  cpx2_UNUSED   = 0000010u,                      unused, always 0 */
-    cpx2_INHPFARS = 0000004u,                   /* inhibit power fail autorestart */
+    cpx2_INHPFARS = 0000004u,                   /* inhibit power-fail auto-restart */
     cpx2_SYSHALT  = 0000002u,                   /* system halt */
     cpx2_RUN      = 0000001u                    /* run flip-flop */
     } CPX2FLAG;
@@ -297,7 +336,7 @@ typedef enum {
     trap_DS_Absent           = 042,    /* ucode   Absent Data Segment       */
     trap_Power_On            = 043,    /*  hdwe   Power On                  */
     trap_Cold_Load           = 044,    /* ucode   Cold Load                 */
-    trap_System_Halt         = 045,    /* ucode   System Halt               */
+    trap_System_Halt         = 045     /* ucode   System Halt               */
     } TRAP_CLASS;
 
 #define trap_Integer_Overflow       TO_DWORD (001, trap_User)
@@ -330,6 +369,50 @@ typedef enum {
 
 #define MICRO_ABORT(t)      longjmp (cpu_save_env, (t))
 #define MICRO_ABORTP(t,p)   longjmp (cpu_save_env, TO_DWORD ((p),(t)))
+
+
+/* Central Data Bus module definitions */
+
+#define MODULE_MEMORY_LOWER     0               /* lower memory MCL address */
+#define MODULE_MEMORY_UPPER     2               /* upper memory MCL address */
+#define MODULE_MEMORY           3               /* upper bound of MCL addresses */
+#define MODULE_PORT_CNTLR       4               /* selector channel port controller address */
+#define MODULE_CPU              5               /* CPU MCU address */
+#define MODULE_UNDEFINED        6               /* addresses 6-7 are unused */
+
+#define MOP_NOP                 0               /* module operation 00 = no operation */
+#define MOP_WRITE               1               /* module operation 01 = write */
+#define MOP_READ                2               /* module operation 10 = read */
+#define MOP_READ_WRITE_ONES     3               /* module operation 11 = read/write ones */
+
+
+/* Module control register accessors.
+
+   The module control register, MOD, has this format:
+
+       0 | 1   2   3 | 4   5   6 | 7   8   9 |10  11  12 |13  14  15
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0   0 |  MOP  | 0 |   FROM    | 0   0   0   0 | B | A | 0   0 |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     MOP  = module operation
+     FROM = source module address
+     B    = this CPU is CPU #2
+     A    = this CPU is CPU #1
+*/
+
+#define MOD_MOP_MASK        0030000u            /* MOD register MOP field mask */
+#define MOD_FROM_MASK       0003400u            /* MOD register FROM field mask */
+#define MOD_CPU_2           0000010u            /* CPU number 2 MCU */
+#define MOD_CPU_1           0000004u            /* CPU number 1 MCU */
+
+#define MOD_MOP_SHIFT       12                  /* MOD register MOP field alignment shift */
+#define MOD_FROM_SHIFT      8                   /* MOD register FROM field alignment shift */
+
+#define TO_MOD_MOP(v)       ((v) << MOD_MOP_SHIFT  & MOD_MOP_MASK)
+#define TO_MOD_FROM(v)      ((v) << MOD_FROM_SHIFT & MOD_FROM_MASK)
 
 
 /* Status register accessors.
@@ -840,6 +923,15 @@ typedef enum {
 #define TBX                 0054000u            /* test and branch, limit in X */
 #define MTBX                0056000u            /* modify, test and branch, limit in X */
 
+#define CMD_TO_MASK         0000007u            /* CMD command word TO field mask */
+#define CMD_MOP_MASK        0000060u            /* CMD command word MOP field mask */
+
+#define CMD_TO_SHIFT        0                   /* CMD command word TO field alignment shift */
+#define CMD_MOP_SHIFT       4                   /* CMD command word MOP field alignment shift */
+
+#define CMD_TO(v)           (((v) & CMD_TO_MASK)  >> CMD_TO_SHIFT)
+#define CMD_MOP(v)          (((v) & CMD_MOP_MASK) >> CMD_MOP_SHIFT)
+
 
 /* PSHR/SETR instruction accessors */
 
@@ -856,6 +948,12 @@ typedef enum {
 #define PSR_S               0000001u            /* Stack pointer */
 
 #define PSR_PRIV            (PSR_SBANK | PSR_DB_DBANK | PSR_DL | PSR_Z)
+
+
+/* PCN instruction result values */
+
+#define PCN_SERIES_II       1                   /* CPU number for the Series II */
+#define PCN_SERIES_III      2                   /* CPU number for the Series III */
 
 
 /* Reserved memory addresses */
@@ -952,6 +1050,7 @@ extern HP_WORD STA;                             /* Status Register */
 extern HP_WORD SWCH;                            /* Switch Register */
 extern HP_WORD CPX1;                            /* Run-Mode Interrupt Flags Register */
 extern HP_WORD CPX2;                            /* Halt-Mode Interrupt Flags Register */
+extern HP_WORD MOD;                             /* Module Control Register */
 extern HP_WORD PCLK;                            /* Process Clock Register */
 extern HP_WORD CNTR;                            /* Microcode Counter */
 
@@ -966,11 +1065,12 @@ extern HP_WORD CNTR;                            /* Microcode Counter */
 
 /* CPU state */
 
-extern jmp_buf    cpu_save_env;                 /* saved environment for microcode aborts */
-extern EXEC_STATE cpu_micro_state;              /* micromachine execution state */
-extern uint32     cpu_stop_flags;               /* set of simulation stop flags */
-extern t_bool     cpu_base_changed;             /* TRUE if any base register has been changed */
-extern UNIT       cpu_unit;                     /* CPU unit structure (needed for memory size) */
+extern jmp_buf     cpu_save_env;                /* saved environment for microcode aborts */
+extern POWER_STATE cpu_power_state;             /* power supply state */
+extern EXEC_STATE  cpu_micro_state;             /* micromachine execution state */
+extern uint32      cpu_stop_flags;              /* set of simulation stop flags */
+extern t_bool      cpu_base_changed;            /* TRUE if any base register has been changed */
+extern UNIT        cpu_unit [];                 /* CPU unit array (needed for memory size) */
 
 
 /* Condition Code B mapping table */

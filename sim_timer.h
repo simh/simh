@@ -131,6 +131,7 @@ void sim_stop_timer_services (void);
 t_stat sim_timer_change_asynch (void);
 t_stat sim_timer_activate_after (UNIT *uptr, uint32 usec_delay);
 t_stat sim_register_clock_unit (UNIT *uptr);
+t_stat sim_register_clock_unit_tmr (UNIT *uptr, int32 tmr);
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
 t_stat sim_clock_coschedule_abs (UNIT *uptr, int32 interval);
 t_stat sim_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval);

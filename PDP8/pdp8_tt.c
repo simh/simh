@@ -95,6 +95,8 @@ DEVICE tti_dev = {
     &tti_dib, 0
     };
 
+uint32 tti_buftime;                                     /* time input character arrived */
+
 /* TTO data structures
 
    tto_dev      TTO device descriptor
@@ -179,13 +181,15 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
-if (dev_done & INT_TTI)                                 /* prior character still pending? */
+if ((dev_done & INT_TTI) &&                             /* prior character still pending and < 500ms? */
+    ((sim_os_msec () - tti_buftime) < 500))
     return SCPE_OK;
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
     uptr->buf = 0;
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
+tti_buftime = sim_os_msec ();
 uptr->pos = uptr->pos + 1;
 dev_done = dev_done | INT_TTI;                          /* set done */
 int_req = INT_UPDATE;                                   /* update interrupts */

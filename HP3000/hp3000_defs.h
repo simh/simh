@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   03-Sep-16    JDB     Added the STOP_POWER and STOP_ARSINH codes
    13-May-16    JDB     Modified for revised SCP API function parameter types
    21-Mar-16    JDB     Changed uint16 types to HP_WORD
    19-Mar-16    JDB     Added UNDEFs for the additional register macros
@@ -306,6 +307,8 @@
 #define STOP_INFLOOP        7                   /* infinite loop stop */
 #define STOP_CLOAD          8                   /* cold load complete */
 #define STOP_CDUMP          9                   /* cold dump complete */
+#define STOP_ARSINH         10                  /* auto-restart inhibited */
+#define STOP_POWER          11                  /* power is off */
 
 
 /* Modifier validation identifiers */
@@ -585,7 +588,7 @@ typedef enum {                                  /* trailing separator */
     append_bar                                  /*   append a trailing separator */
     } BITSET_BAR;
 
-typedef const char *const   BITSET_NAME;        /* a bit name string pointer */
+typedef const char *const BITSET_NAME;          /* a bit name string pointer */
 
 typedef struct {                                /* bit set format descriptor */
     uint32            name_count;               /*   count of bit names */

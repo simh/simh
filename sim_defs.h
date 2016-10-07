@@ -467,6 +467,7 @@ struct DEVICE {
                                                         /* attach help */
     void *help_ctx;                                     /* Context available to help routines */
     const char          *(*description)(DEVICE *dptr);  /* Device Description */
+    BRKTYPTAB           *brk_types;                     /* Breakpoint types */
     };
 
 /* Device flags */

@@ -25,6 +25,8 @@
 
    MPX          HP 3000 Series III Multiplexer Channel
 
+   12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
+   15-Jul-16    JDB     Fixed the word count display for DREADSTB trace
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
    07-Jun-16    JDB     Corrected ACKSR assertion in State A for chained orders
    16-May-16    JDB     abort_channel parameter is now a pointer-to-constant
@@ -732,7 +734,7 @@ static REG mpx_reg [] = {
     { ORDATA (CTRREG, cntr_reg,              16),               REG_FIT | REG_HRO  },
     { ORDATA (ADRREG, addr_reg,              16),               REG_FIT | REG_HRO  },
 
-    { SRDATA (DIB,    mpx_dib,                                            REG_HRO) },
+      DIB_REGS (mpx_dib),
 
     { NULL }
     };
@@ -1737,7 +1739,7 @@ while (working_set) {
                 dprintf (mpx_dev, DEB_CSRW, "Order register value %02o (%s) "
                                             "and counter register value %d returned\n",
                          order_reg & ORDER_MASK, sio_order_name [IOCW_ORDER (outbound_value)],
-                         IOCW_COUNT (outbound_value));
+                         SEXT (IOCW_COUNT (outbound_value)));
                 }
 
             if (control_word & CN_ADDR_RAM) {               /* if the address register is selected */
