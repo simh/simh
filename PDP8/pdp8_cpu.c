@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   18-Sep-16    RMS     Added alternate dispatch table for non-contiguous devices
    17-Sep-13    RMS     Fixed boot in wrong field problem (Dave Gesswein)
    28-Apr-07    RMS     Removed clock initialization
    30-Oct-06    RMS     Added idle and infinite loop detection
@@ -229,6 +230,7 @@ int32 tsc_ir = 0;                                       /* TSC8-75 IR */
 int32 tsc_pc = 0;                                       /* TSC8-75 PC */
 int32 tsc_cdf = 0;                                      /* TSC8-75 CDF flag */
 int32 tsc_enb = 0;                                      /* TSC8-75 enabled */
+int32 cpu_astop = 0;                                    /* address stop */
 int16 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
@@ -337,6 +339,12 @@ reason = 0;
 /* Main instruction fetch/decode loop */
 
 while (reason == 0) {                                   /* loop until halted */
+
+    if (cpu_astop != 0) {
+        cpu_astop = 0;
+        reason = SCPE_STOP;
+        break;
+        }
 
     if (sim_interval <= 0) {                            /* check clock queue */
         if ((reason = sim_process_event ()))
@@ -1496,16 +1504,31 @@ for (i = 0; i < ((uint32) sizeof (std_dev)); i++)       /* std entries */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* add devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* enabled? */
-        for (j = 0; j < dibp->num; j++) {               /* loop thru disp */
-            if (dibp->dsp[j]) {                         /* any dispatch? */
-                if (dev_tab[dibp->dev + j]) {           /* already filled? */
-                    sim_printf ("%s device number conflict at %02o\n",
-                                sim_dname (dptr), dibp->dev + j);
-                    return TRUE;
-                    }
-                dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
-                }                                       /* end if dsp */
-            }                                           /* end for j */
+        if (dibp->dsp_tbl) {                            /* dispatch table? */
+            DIB_DSP *dspp = dibp->dsp_tbl;              /* set ptr */
+            for (j = 0; j < dibp->num; j++, dspp++) {   /* loop thru tbl */
+                if (dspp->dsp) {                        /* any dispatch? */
+                    if (dev_tab[dspp->dev]) {           /* already filled? */
+                        sim_printf ("%s device number conflict at %02o\n",
+                            sim_dname (dptr), dibp->dev + j);
+                        return TRUE;
+                        }
+                    dev_tab[dspp->dev] = dspp->dsp;     /* fill */
+                    }                                   /* end if dsp */
+                }                                       /* end for j */
+            }                                           /* end if dsp_tbl */
+        else {                                          /* inline dispatches */
+            for (j = 0; j < dibp->num; j++) {           /* loop thru disp */
+                if (dibp->dsp[j]) {                     /* any dispatch? */
+                    if (dev_tab[dibp->dev + j]) {       /* already filled? */
+                        sim_printf ("%s device number conflict at %02o\n",
+                            sim_dname (dptr), dibp->dev + j);
+                        return TRUE;
+                        }
+                    dev_tab[dibp->dev + j] = dibp->dsp[j]; /* fill */
+                    }                                   /* end if dsp */
+                }                                       /* end for j */
+            }                                           /* end else */
         }                                               /* end if enb */
     }                                                   /* end for i */
 return FALSE;
