@@ -584,7 +584,6 @@ int32 sim_instr (void)
         if (sim_interval <= 0) {        /* check clock queue */
             if (reason = sim_process_event ()) break;
         }
-        sim_interval--;                 /* countdown clock */
 
         if (int_req > 0) {              /* interrupt? */
         /* 8088 interrupts not implemented yet. */
@@ -596,6 +595,7 @@ int32 sim_instr (void)
             break;
         }
 
+        sim_interval--;                 /* countdown clock */
         PCX = IP;
         IR = OP = fetch_byte(0);        /* fetch instruction */
 

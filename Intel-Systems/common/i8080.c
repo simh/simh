@@ -416,7 +416,6 @@ int32 sim_instr (void)
             if ((reason = sim_process_event()))
                 break;
         }
-        sim_interval--;                 /* countdown clock */
 
         if (int_req > 0) {              /* interrupt? */
 //            sim_printf("\ni8080: int_req=%04X IM=%04X", int_req, IM);
@@ -460,6 +459,7 @@ int32 sim_instr (void)
             break;
         }
 
+        sim_interval--;                 /* countdown clock */
         PCX = PC;
 
 //        fprintf(fpd, "%04X\n", PC);
