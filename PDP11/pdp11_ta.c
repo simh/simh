@@ -1,6 +1,6 @@
 /* pdp11_ta.c: PDP-11 cassette tape simulator
 
-   Copyright (c) 2007-2013, Robert M Supnik
+   Copyright (c) 2007-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ta           TA11/TU60 cassette tape
    
+   10-Oct-16    RMS     Fixed bad register definitions (Mark Pizzolato)
    23-Oct-13    RMS     Revised for new boot setup routine
    06-Jun-13    RMS     Reset must set RDY (Ian Hammond)
                         Added CAPS-11 bootstrap (Ian Hammond)
@@ -171,8 +172,8 @@ REG ta_reg[] = {
     { DRDATA (STIME, ta_stime, 24), PV_LEFT + REG_NZ },
     { DRDATA (CTIME, ta_ctime, 24), PV_LEFT + REG_NZ },
     { FLDATA (STOP_IOE, ta_stopioe, 0) },
-    { URDATA (UFNC, ta_unit[0].FNC, 8, 5, 0, TA_NUMDR, 0), REG_HRO },
-    { URDATA (UST, ta_unit[0].UST, 8, 2, 0, TA_NUMDR, 0), REG_HRO },
+    { URDATA (UFNC, ta_unit[0].FNC, 8, 5, 0, TA_NUMDR, REG_HRO) },
+    { URDATA (UST, ta_unit[0].UST, 8, 2, 0, TA_NUMDR, REG_HRO) },
     { URDATA (POS, ta_unit[0].pos, 10, T_ADDR_W, 0,
               TA_NUMDR, PV_LEFT | REG_RO) },
     { ORDATA (DEVADDR, ta_dib.ba, 32), REG_HRO },
