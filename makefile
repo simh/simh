@@ -517,9 +517,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           $(info *** Info *** Install the development components of libSDL or libSDL2)
           $(info *** Info *** packaged for your operating system distribution for)
           $(info *** Info *** your Linux system:)
-          $(info *** Info ***        # apt-get install libsdl2-dev)
+          $(info *** Info ***        $$ sudo apt-get install libsdl2-dev)
           $(info *** Info ***    or)
-          $(info *** Info ***        # apt-get install libsdl-dev)
+          $(info *** Info ***        $$ sudo apt-get install libsdl-dev)
         else
           $(info *** Info *** Install the development components of libSDL packaged by your)
           $(info *** Info *** operating system distribution and rebuild your simulator to)
@@ -649,7 +649,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
           $(info *** Warning *** should install the libpcap development components for)
           $(info *** Warning *** for your Linux system:)
-          $(info *** Warning ***        # apt-get install libpcap-dev)
+          $(info *** Warning ***        $$ sudo apt-get install libpcap-dev)
         else
           $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
           $(info *** Warning *** regarding the needed libpcap development components for your)
@@ -700,7 +700,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
             $(info *** Info *** should install the vde2 package to provide this)
             $(info *** Info *** functionality for your $(OSNAME) system:)
-            $(info *** Info ***        # apt-get install vde2)
+            ifneq (,$(shell apt list 2>/dev/null| grep libvdeplug-dev))
+              $(info *** Info ***        $$ sudo apt-get install libvdeplug-dev)
+            else
+              $(info *** Info ***        $$ sudo apt-get install vde2)
+            endif
           else
             $(info *** Info *** should read 0readme_ethernet.txt and follow the instructions)
             $(info *** Info *** regarding the needed libvdeplug components for your $(OSNAME))
@@ -1405,21 +1409,21 @@ ifneq (,$(BESM6_BUILD))
             $(info ***)
         endif
     endif
-endif
-ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
-    $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
-    $(info ***)
-    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
-else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
-    $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
-    $(info ***)
-    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
-else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
-    $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
-    $(info ***)
-    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
-else
-    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
+      $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
+      $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+  else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
+      $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+  else
+      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  endif
 endif
 
 ###
