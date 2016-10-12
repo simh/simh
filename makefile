@@ -331,7 +331,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             ifeq (X11R7,$(shell if $(TEST) -d /usr/X11R7/lib; then echo X11R7; fi))
               LIBPATH += /usr/X11R7/lib
               INCPATH += /usr/X11R7/include
-              OS_LDFLAGS += -L/usr/X11R7/lib -R/usr/X11R7/lib
+              OS_LDFLAGS += -L/usr/X11R7/lib -Wl,-R/usr/X11R7/lib
               OS_CCDEFS += -I/usr/X11R7/include
             endif
             ifeq (/usr/local/lib,$(findstring /usr/local/lib,$(LIBPATH)))
