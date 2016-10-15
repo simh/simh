@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -74,7 +74,7 @@ REG tti_reg[] = {
     { FLDATAD (ENABLE, int_enable, INT_V_TTI, "interrupt enable flag") },
     { FLDATAD (INT, int_req, INT_V_TTI, "interrupt pending flag") },
     { DRDATAD (POS, tti_unit.pos, T_ADDR_W, "number of characters input"), PV_LEFT },
-    { DRDATAD (TIME, tti_unit.wait, 24, "input polling interval                                                          (if 0, the keyboard is polled synchronously with the clock)"), PV_LEFT },
+    { DRDATAD (TIME, tti_unit.wait, 24, "input polling interval (if 0, the keyboard is polled synchronously with the clock)"), PV_LEFT+REG_NZ },
     { NULL }
     };
 
@@ -94,6 +94,8 @@ DEVICE tti_dev = {
     NULL, NULL, NULL,
     &tti_dib, 0
     };
+
+uint32 tti_buftime;                                     /* time input character arrived */
 
 /* TTO data structures
 
@@ -179,13 +181,15 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
-if (dev_done & INT_TTI)                                 /* prior character still pending? */
+if ((dev_done & INT_TTI) &&                             /* prior character still pending and < 500ms? */
+    ((sim_os_msec () - tti_buftime) < 500))
     return SCPE_OK;
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
     uptr->buf = 0;
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
+tti_buftime = sim_os_msec ();
 uptr->pos = uptr->pos + 1;
 dev_done = dev_done | INT_TTI;                          /* set done */
 int_req = INT_UPDATE;                                   /* update interrupts */

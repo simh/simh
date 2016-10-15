@@ -227,6 +227,7 @@ extern int32 R[8];
 extern int32 STKLIM;
 extern int32 cm, isenable, dsenable, MMR0, MMR1;
 extern fpac_t FR[6];
+extern int32 last_pa;
 
 fpac_t zero_fac = { 0, 0 };
 fpac_t one_fac = { 1, 0 };
@@ -263,8 +264,11 @@ void frac_mulfp11 (fpac_t *src1, fpac_t *src2);
 int32 roundfp11 (fpac_t *src);
 int32 round_and_pack (fpac_t *fac, int32 exp, fpac_t *frac, int r);
 
+extern int32 relocW (int32 addr);
 extern int32 ReadW (int32 addr);
+extern int32 ReadMW (int32 addr);
 extern void WriteW (int32 data, int32 addr);
+extern void PWriteW (int32 data, int32 addr);
 extern void set_stack_trap (int32 adr);
 
 /* Set up for instruction decode and execution */
@@ -800,10 +804,29 @@ return TRUE;
 
 void WriteI (int32 data, int32 VA, int32 spec, int32 len)
 {
-WriteW ((data >> 16) & 0177777, VA);
-if ((len == WORD) || (spec == 027))
+int32 pa, pa2;
+    
+if ((len == WORD) || (spec == 027)) {
+    WriteW ((data >> 16) & 0177777, VA);
     return;
-WriteW (data & 0177777, (VA & ~0177777) | ((VA + 2) & 0177777));
+    }
+
+/* Check both word addresses for breakpoints, and only then
+   do the writes.  */
+if ((VA & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
+    setCPUERR (CPUE_ODD);
+    ABORT (TRAP_ODD);
+    }
+pa = relocW (VA);                                       /* relocate */
+pa2 = relocW ((VA & ~0177777) | ((VA + 2) & 0177777));
+if (BPT_SUMM_WR &&
+    (sim_brk_test (VA & 0177777, BPT_WRVIR) ||
+     sim_brk_test (pa, BPT_WRPHY) ||
+     sim_brk_test ((VA + 2) & 0177777, BPT_WRVIR) ||
+     sim_brk_test (pa2, BPT_WRPHY)))                    /* write breakpoint? */
+    ABORT (ABRT_BKPT);                                  /* stop simulation */
+PWriteW ((data >> 16) & 0177777, pa);
+PWriteW (data & 0177777, pa2);
 return;
 }
 
@@ -819,21 +842,55 @@ return;
 
 void WriteFP (fpac_t *fptr, int32 VA, int32 spec, int32 len)
 {
-int32 exta;
+int32 exta, pa, pa2, pa3, pa4;
 
 if (spec <= 07) {
     F_STORE_P (len == QUAD, fptr, FR[spec]);
     return;
     }
-WriteW ((fptr->h >> FP_V_F0) & 0177777, VA);
-if (spec == 027)
+if (spec == 027) {
+    WriteW ((fptr->h >> FP_V_F0) & 0177777, VA);
     return;
+    }
+
+/* Check all word addresses for breakpoints, and only then
+   do the writes.  */
+if ((VA & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
+    setCPUERR (CPUE_ODD);
+    ABORT (TRAP_ODD);
+    }
 exta = VA & ~0177777;
-WriteW ((fptr->h >> FP_V_F1) & 0177777, exta | ((VA + 2) & 0177777));
+pa = relocW (VA);                                       /* relocate */
+pa2 = relocW (exta | ((VA + 2) & 0177777));
+if (len == LONG) {
+    if (BPT_SUMM_WR &&
+        (sim_brk_test (VA & 0177777, BPT_WRVIR) ||
+         sim_brk_test (pa, BPT_WRPHY) ||
+         sim_brk_test ((VA + 2) & 0177777, BPT_WRVIR) ||
+         sim_brk_test (pa2, BPT_WRPHY)))                /* write breakpoint? */
+        ABORT (ABRT_BKPT);                              /* stop simulation */
+    }
+else {
+    pa3 = relocW (exta | ((VA + 4) & 0177777));
+    pa4 = relocW (exta | ((VA + 6) & 0177777));
+    if (BPT_SUMM_WR &&
+        (sim_brk_test (VA & 0177777, BPT_WRVIR) ||
+         sim_brk_test (pa, BPT_WRPHY) ||
+         sim_brk_test ((VA + 2) & 0177777, BPT_WRVIR) ||
+         sim_brk_test (pa2, BPT_WRPHY) ||
+         sim_brk_test ((VA + 4) & 0177777, BPT_WRVIR) ||
+         sim_brk_test (pa3, BPT_WRPHY) ||
+         sim_brk_test ((VA + 6) & 0177777, BPT_WRVIR) ||
+         sim_brk_test (pa4, BPT_WRPHY)))                /* write breakpoint? */
+        ABORT (ABRT_BKPT);                              /* stop simulation */
+    }
+
+PWriteW ((fptr->h >> FP_V_F0) & 0177777, pa);
+PWriteW ((fptr->h >> FP_V_F1) & 0177777, pa2);
 if (len == LONG)
     return;
-WriteW ((fptr->l >> FP_V_F2) & 0177777, exta | ((VA + 4) & 0177777));
-WriteW ((fptr->l >> FP_V_F3) & 0177777, exta | ((VA + 6) & 0177777));
+PWriteW ((fptr->l >> FP_V_F2) & 0177777, pa3);
+PWriteW ((fptr->l >> FP_V_F3) & 0177777, pa4);
 return;
 }
 
@@ -841,7 +898,7 @@ return;
 
 t_stat fis11 (int32 IR)
 {
-int32 reg, exta;
+    int32 reg, exta, pa, pa2;
 fpac_t fac, fsrc;
 
 reg = IR & 07;                                          /* isolate reg */
@@ -859,8 +916,13 @@ FPS = FPS_IU|FPS_IV;                                    /* trap ovf,unf */
 fsrc.h = (ReadW (exta | R[reg]) << FP_V_F0) |
     (ReadW (exta | ((R[reg] + 2) & 0177777)) << FP_V_F1);
 fsrc.l = 0;
-fac.h = (ReadW (exta | ((R[reg] + 4) & 0177777)) << FP_V_F0) |
-    (ReadW (exta | ((R[reg] + 6) & 0177777)) << FP_V_F1);
+/* Note that we do ReadMW here, because those two memory locations will
+   be written later with the result.  This also ensures we'll take write
+   breakpoints at this stage (before writing anything) if applicable.  */
+fac.h = ReadMW (exta | ((R[reg] + 4) & 0177777)) << FP_V_F0;
+pa = last_pa;
+fac.h |= ReadMW (exta | ((R[reg] + 6) & 0177777)) << FP_V_F1;
+pa2 = last_pa;
 fac.l = 0;
 if (GET_SIGN (fsrc.h) && (GET_EXP (fsrc.h) == 0))       /* clean 0's */
     fsrc.h = fsrc.l = 0;
@@ -895,8 +957,8 @@ switch ((IR >> 3) & 3) {                                /* case IR<5:3> */
         }
 
 if (FEC == 0) {                                         /* no err? */
-    WriteW ((fac.h >> FP_V_F0) & 0177777, exta | ((R[reg] + 4) & 0177777));
-    WriteW ((fac.h >> FP_V_F1) & 0177777, exta | ((R[reg] + 6) & 0177777));
+    PWriteW ((fac.h >> FP_V_F0) & 0177777, pa);
+    PWriteW ((fac.h >> FP_V_F1) & 0177777, pa2);
     R[reg] = (R[reg] + 4) & 0177777;                    /* pop stack */
     N = (GET_SIGN (fac.h) != 0);                        /* set N,Z */
     Z = (fac.h == 0);

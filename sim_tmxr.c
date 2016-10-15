@@ -439,7 +439,7 @@ static u_char mantra[] = {                  /* Telnet Option Negotiation Mantra 
     TN_IAC, TN_DO, TN_BIN
     };
 
-#define TMXR_GUARD  ((int32)(lp->serport ? 0 : sizeof(mantra)))/* buffer guard */
+#define TMXR_GUARD  ((int32)(lp->serport ? 1 : sizeof(mantra)))/* buffer guard */
 
 /* Local routines */
 
@@ -696,9 +696,14 @@ int32 i = lp->txbpr;
 if (lp->loopback)
     return loop_write (lp, &(lp->txb[i]), length);
 
-if (lp->serport)                                        /* serial port connection? */
-    return sim_write_serial (lp->serport, &(lp->txb[i]), length);
-
+if (lp->serport) {                                      /* serial port connection? */
+    if (sim_gtime () < lp->txnexttime)
+        return 0;
+    written = sim_write_serial (lp->serport, &(lp->txb[i]), length);
+    if (written > 0)
+        lp->txnexttime = floor (sim_gtime () + (lp->txdelta * sim_timer_inst_per_sec ()));
+    return written;
+    }
 else {                                                  /* Telnet connection */
     written = sim_write_sock (lp->sock, &(lp->txb[i]), length);
 
@@ -2029,7 +2034,7 @@ if ((lp->conn == FALSE) &&                              /* no conn & not buffere
     return SCPE_LOST;
     }
 tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
-#define TXBUF_AVAIL(lp) ((lp->serport ? 1: lp->txbsz) - tmxr_tqln (lp))
+#define TXBUF_AVAIL(lp) ((lp->serport ? 2: lp->txbsz) - tmxr_tqln (lp))
 #define TXBUF_CHAR(lp, c) {                               \
     lp->txb[lp->txbpi++] = (char)(c);                     \
     lp->txbpi %= lp->txbsz;                               \
@@ -2347,6 +2352,9 @@ if (uptr)
     uptr->wait = lp->rxdelta;
 if (lp->rxbpsfactor == 0.0)
     lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
+lp->txbps = lp->rxbps;
+lp->txdelta = lp->rxdelta;
+lp->txnexttime = lp->rxnexttime;
 return SCPE_OK;
 }
 
@@ -2385,6 +2393,10 @@ for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     if (lp->rxbpsfactor == 0.0)
         lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
     }
+mp->ring_sock = INVALID_SOCKET;
+free (mp->ring_ipad);
+mp->ring_ipad = NULL;
+mp->ring_start_time = 0;
 tmxr_debug_trace (mp, "tmxr_open_master()");
 while (*tptr) {
     line = nextline;
@@ -4040,9 +4052,9 @@ fprintf (st, "If a simulated multiplexor devices can programmatically set a seri
 fprintf (st, "port line speed, the programmatically specified speed will take precidence\n");
 fprintf (st, "over any input speed specified on an attach command.\n");
 fprintf (st, "Some simulated systems run very much faster than the original system\n");
-fprintf (st, "which is being simulated.  To accomodate this, the speed specified may\n");
+fprintf (st, "which is being simulated.  To accommodate this, the speed specified may\n");
 fprintf (st, "include a factor which will increase the input data delivery rate by\n");
-fprintf (st, "the specified facctor.  A factor is specified with a speed value of the\n");
+fprintf (st, "the specified factor.  A factor is specified with a speed value of the\n");
 fprintf (st, "form \"speed*factor\".  Factor values can range from 1 thru 32.\n");
 fprintf (st, "Example:\n\n");
 fprintf (st, "   sim> ATTACH %s 1234,SPEED=2400\n", dptr->name);

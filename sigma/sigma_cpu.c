@@ -472,6 +472,7 @@ while (reason == 0) {                                   /* loop until stop */
         if (sim_brk_summ &&
             sim_brk_test (PC, SWMASK ('E'))) {          /* breakpoint? */
             reason = STOP_IBKPT;                        /* stop simulation */
+            sim_interval++;                             /* don't count non-executed instruction */
             break;
             }
         if (PSW_QRX9 && (PC & PSW1_XA))                 /* S9 real ext && ext? */

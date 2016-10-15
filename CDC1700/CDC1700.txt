@@ -1,0 +1,199 @@
+CDC 1700 Simulator
+==================
+
+1. Overview.
+
+        The CDC 1700 was a 16-bit mini-computer produced by the Control Data
+Corporation with deliveries beginning in May 1966.
+
+
+2. Hardware
+
+        This simulator provides support for a subset of available peripherals,
+mostly from the early period of its release:
+
+        device name     Hardware
+
+        CPU             1714 CPU with 4KW, 8KW, 16KW or 32KW of memory
+                        1705 Multi-Level Interrupt and Direct Storage Access
+                        Bus
+
+                        Optional extensions:
+
+                             64KW of memory with indirect addressing changes
+                             Character addressing option
+
+        RTC             10336-1 Real-time clock
+                        Default tick interval is 10mSec, can be changed with
+                        "set rtc rate=<rate>" command, where <rate> is
+                        {1usec|10usec|100usec|1msec|10msec|100msec|1second}.
+                        [ Equipment address: 0xD]
+
+        DCA             Data channels providing DMA access to non-DMA
+        DCB             peripherals. The configuration is currently fixed
+        DCC             with DCA providing access to the magtape controller
+                        if it is configured as a 1732-A.
+
+        TTI             1711-A Half-duplex console terminal.
+        TTO             [Equipment address: 0x1, Station address: 1]
+
+        PTR             1721-A Paper tape reader
+                        [Equipment address: 0x1, Station address: 2]
+
+        PTP             1723-A Paper tape punch
+                        [Equipment address: 0x1, Station address: 4]
+
+        MT              1732-A or 1732-3 Magtape controller, 3 9-track drives
+                        (MT0 - MT2) and 1 7-track drive (MT3). The type of
+                        the controller may be chaged using the command
+                        "set mt type={1732-a|1732-3}". The 1732-A controller
+                        supports 200, 556 and 800 BPI on the 9 track drives
+                        and allows DMA access via a 1706 Buffered Data
+                        Channel (device DCA). The 1733-3 controller supports
+                        556, 800 and 1600 BPI on the 9 track drives and
+                        includes DSA (DMA) access built into the controller.
+                        Access via a 1706 Buffered Data Channel is not
+                        available.
+                        [Equipment address: 0x7]
+
+        LP              1740 or 1742-30 Line printer (Upper case only). The
+                        type of the printer may be changed with the command
+                        "set lp type={1740|1742}; The 1742-30 is compatible
+                        with the 1742-120 but not allow the print train
+                        configuration to be loaded by software.
+                        [Equipment address: 0x4]
+
+        DP              1738-B Disk pack controller. Supports up to 2
+                        disk pack drives:
+
+                             853 drive - 3072000 bytes
+                             854 drive - 6236160 bytes
+
+                        [Equipment address: 0x3]
+
+        CDD             1733-2 Cartridge disk pack controller. Supports up to
+                        4 cartridge disk drives. Each drive supports a fixed
+                        and a removeable disk:
+
+                             856-2 drive - 2260608 bytes
+                             856-4 drive - 4543488 bytes
+
+                        [Equipment address: 0x3]
+
+Notes:
+        DP and CDD use the same equipment address so only 1 of them may be
+        enabled (default is for CDD to be enabled).
+
+        Both controllers use checkwords (CRC) for validating the consistency
+        of the data stored on disk. The DP controller exports a single status
+        bit indicating whether the checkword is valid or not (the simulator
+        always sets this to valid). The CDD controller also exports a single
+        status bit  which is handled in the same way as the DP controller.
+        It also makes the actual checkword value available. The simulator
+        always returns a checkword value of 0 so any attempt to verify the
+        checkword (such as some diagnostics) will fail.
+
+
+3. Loading Software
+
+        The simulator implements 2 mechanisms for loading software which
+follow the hardware mechanisms provided by the real hardware:
+
+       - Magtape bootstraps toggled in through the front panel
+       - Autoload mechanism for disk drives
+
+3.1 Magtape bootstraps
+
+        Software may be loaded from a magtape drive by using the SIMH command
+"boot mtx" (currently only drive 0 is supported) which loads an appropriate
+bootstrap into memory. This bootstrap loads the next record from the tape and
+starts execution of the loaded code.
+
+3.1.1 Default bootstrap
+
+        The default bootstrap is used for loading operating system distribution
+tapes and is loaded at location 0. Register A is set according to the amount
+os memory installed in the system:
+
+        - 0x5000 if 32KW or greater is installed
+        - 0x4000 if 24KW or 28KW is installed
+        - 0x2000 if less than 24KW is installed
+
+3.1.2 SMM17 bootstrap
+
+        SMM17 is the System Maintenance Monitor and uses a tailored bootstrap
+which is loaded into the highest addressed 4KW module installed in the system.
+The following switches may be used with the "boot" command for special
+handling:
+
+        -S load the SMM17 bootstrap rather than the default bootstrap
+        -D configure the SMM17 bootstrap to use Buffered Data Channel #1
+           to access the magtape controller
+
+3.2 Disk autoload
+
+        The autoload mechanism loads track 0 from logical drive 0 of a disk
+controller to memory location 0, it does not start execution of the loaded
+code (some of the diagnostics code relies on this). Both DP and CD controllers
+support the autoload command ("autoload dp" or "autoload cd") which is
+normally followed by a "run 0" command to start execution of the loaded code.
+
+4. Operating The Simulator
+
+4.1 CPU
+
+        The control panel of a physical CDC 1700 system has a number of
+switches which control the operation of the CPU. In the simulator, these
+switches can be turned on and off with the commands "set cpu xxx" and
+"set cpu noxxx". By default, all the switches are off.
+
+4.1.1 Selective Stop (set cpu sstop/nosstop)
+
+        The Selective Stop switch controls how the "Selective Stop (SLS)"
+instruction executes. If the switch is Off, SLS executes as a no-operation.
+If the switch is On, SLS executes as a halt instruction. Continuing after
+the halt causes the CPU to execute the instruction following SLS.
+
+4.1.2 Selective Skip (set cpu sskip/nosskip)
+
+        The Selective Skip switch controls how the SWS and SWN skip
+instruction execute. SWS will skip if the switch is set and SWN will skip if
+the switch is not set. Both the Selective Stop and Selective Skip switches
+are used extensively to control execution of the System Maintenance Monitor.
+
+4.1.3 Protect (set cpu protect/noprotect)
+
+        Each word of memory on the CDC 1700 series consists of 18-bits; 16-bits
+of data/instructions, a parity bit (which is not implemented in the simulator)
+and a program protect bit. If the Protect switch is Off, any program may
+reference any word of memory. If the Protect switch is On, there are a set of
+rules which control how memory accesses work and when to generate a program
+protect violation - see one of the 1700 reference manuals on bitsavers.org for
+exact details.
+
+        The simulator fully implements CPU protect mode allowing protected
+operating systems such as MSOS 5 to execute. It does not support peripheral
+protect operation which allows unprotected programs to directly access
+some unprotected peripherals.
+
+        Operating systems and other programs which run with the Protect
+switch on usually start up with the Protect switch off, manipulate the
+protect bits in memory (using the CPB/SPB instructions) and then ask the
+operator to set the Protect switch on.
+
+4.2 Teletype
+
+        The console teletype on some of the earlier models of the CDC 1700
+series had a "Manual Interrupt" button so that the operator could get the
+attention of the operating system. Later models used a display terminal and
+used the "Control+G" key conbination to generate a Manual Interrupt. The
+Simulator follows this convention of using the "Control+G" key combination.
+The actual key combination may be changed by issuing the command
+"deposit tti intrkey xx" where xx is desired key code in hex.
+
+
+5. Software
+
+        There is some software available at bitsavers.org in the
+bits/CDC/1700_Cyber18 directory, see CDC1700_Diagnostics.txt and
+CDC1700_MSOS.txt for more details.

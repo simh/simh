@@ -257,7 +257,7 @@ void besm6_add (t_value val, int negate_acc, int negate_val)
  * non-restoring division
  */
 #define ABS(x) ((x) < 0 ? -x : x)
-#define INT64(x) ((x) & BIT41 ? (-1LL << 40) | (x) : x)
+#define INT64(x) ((x) & BIT41 ? (0xFFFFFFFFFFFFFFFFLL << 40) | (x) : x)
 static alureg_t nrdiv (alureg_t n, alureg_t d)
 {
     t_int64 nn, dd, q, res;

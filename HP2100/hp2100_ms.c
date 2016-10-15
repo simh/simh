@@ -1314,7 +1314,7 @@ if (unitno != 0)                                        /* boot supported on dri
     return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
 
 if (ibl_copy (ms_rom, dev, IBL_OPT,                     /* copy the boot ROM to memory and configure */
-              IBL_MS | IBL_SET_SC (dev)))               /*   the S register accordingly */   
+              IBL_MS | IBL_SET_SC (dev)))               /*   the S register accordingly */
     return SCPE_IERR;                                   /* return an internal error if the copy failed */
 
 if ((sim_switches & SWMASK ('S')) && AR)                /* if -S is specified and the A register is non-zero */

@@ -1,6 +1,6 @@
 /* vax_cmode.c: VAX compatibility mode
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    On a full VAX, this module implements PDP-11 compatibility mode.
    On a subset VAX, this module forces a fault if REI attempts to set PSL<cm>.
 
+   14-Jul-16    RMS     Updated PSL check (found by EVKAE 6.2)
    28-May-08    RMS     Inlined physical memory routines
    25-Jan-08    RMS     Fixed declaration (Mark Pizzolato)
    03-May-06    RMS     Fixed omission of SXT
@@ -63,7 +64,7 @@ void WrRegW (int32 val, int32 rn);
 
 t_bool BadCmPSL (int32 newpsl)
 {
-if ((newpsl & (PSL_FPD|PSL_IS|PSL_CUR|PSL_PRV|PSL_IPL)) !=
+if ((newpsl & (PSL_FPD|PSL_IS|PSL_CUR|PSL_PRV|PSL_IPL|PSW_DV|PSW_FU|PSW_IV)) !=
     ((USER << PSL_V_CUR) | (USER << PSL_V_PRV)))
     return TRUE;
 else return FALSE;

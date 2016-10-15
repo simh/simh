@@ -34,6 +34,11 @@
 extern "C" {
 #endif
 
+#ifndef SIMH_SERHANDLE_DEFINED
+#define SIMH_SERHANDLE_DEFINED 0
+typedef struct SERPORT *SERHANDLE;
+#endif /* SERHANDLE_DEFINED */
+
 #if defined (_WIN32)                        /* Windows definitions */
 
 /* We need the basic Win32 definitions, but including "windows.h" also includes
@@ -47,7 +52,7 @@ extern "C" {
 #endif
 #include <windows.h>
 #if !defined(INVALID_HANDLE)
-#define INVALID_HANDLE  INVALID_HANDLE_VALUE
+#define INVALID_HANDLE  (SERHANDLE)INVALID_HANDLE_VALUE
 #endif /* !defined(INVALID_HANDLE) */
 
 #elif defined (__unix__) || defined (__APPLE__) || defined (__hpux) /* UNIX definitions */
@@ -61,30 +66,21 @@ extern "C" {
 #include <sys/ioctl.h>
 
 #if !defined(INVALID_HANDLE)
-#define INVALID_HANDLE  -1
+#define INVALID_HANDLE  ((SERHANDLE)(void *)-1)
 #endif /* !defined(INVALID_HANDLE) */
 
 #elif defined (VMS)                             /* VMS definitions */
 #if !defined(INVALID_HANDLE)
-#define INVALID_HANDLE  (uint32)(-1)
+#define INVALID_HANDLE  ((SERHANDLE)(void *)-1)
 #endif /* !defined(INVALID_HANDLE) */
 
 #else                                           /* Non-implemented definitions */
 
 #if !defined(INVALID_HANDLE)
-#define INVALID_HANDLE  -1
+#define INVALID_HANDLE  ((SERHANDLE)(void *)-1)
 #endif /* !defined(INVALID_HANDLE) */
 
 #endif  /* OS variants */
-
-#ifndef SIMH_SERHANDLE_DEFINED
-#define SIMH_SERHANDLE_DEFINED 0
-#if defined (_WIN32)                            /* Windows definitions */
-typedef void *SERHANDLE;
-#else                                           /* all other platforms */
-typedef int SERHANDLE;
-#endif
-#endif /* SERHANDLE_DEFINED */
 
 
 /* Common definitions */

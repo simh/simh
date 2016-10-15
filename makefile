@@ -331,7 +331,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             ifeq (X11R7,$(shell if $(TEST) -d /usr/X11R7/lib; then echo X11R7; fi))
               LIBPATH += /usr/X11R7/lib
               INCPATH += /usr/X11R7/include
-              OS_LDFLAGS += -L/usr/X11R7/lib -R/usr/X11R7/lib
+              OS_LDFLAGS += -L/usr/X11R7/lib -Wl,-R/usr/X11R7/lib
               OS_CCDEFS += -I/usr/X11R7/include
             endif
             ifeq (/usr/local/lib,$(findstring /usr/local/lib,$(LIBPATH)))
@@ -480,7 +480,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
         DISPLAYVT = ${DISPLAYD}/vt11.c
         DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-        $(info using libSDL2: $(call find_include,SDL2/SDL))
+        $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
         ifeq (Darwin,$(OSTYPE))
           VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
         endif
@@ -517,9 +517,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           $(info *** Info *** Install the development components of libSDL or libSDL2)
           $(info *** Info *** packaged for your operating system distribution for)
           $(info *** Info *** your Linux system:)
-          $(info *** Info ***        # apt-get install libsdl2-dev)
+          $(info *** Info ***        $$ sudo apt-get install libsdl2-dev)
           $(info *** Info ***    or)
-          $(info *** Info ***        # apt-get install libsdl-dev)
+          $(info *** Info ***        $$ sudo apt-get install libsdl-dev)
         else
           $(info *** Info *** Install the development components of libSDL packaged by your)
           $(info *** Info *** operating system distribution and rebuild your simulator to)
@@ -649,7 +649,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
           $(info *** Warning *** should install the libpcap development components for)
           $(info *** Warning *** for your Linux system:)
-          $(info *** Warning ***        # apt-get install libpcap-dev)
+          $(info *** Warning ***        $$ sudo apt-get install libpcap-dev)
         else
           $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
           $(info *** Warning *** regarding the needed libpcap development components for your)
@@ -700,7 +700,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
             $(info *** Info *** should install the vde2 package to provide this)
             $(info *** Info *** functionality for your $(OSNAME) system:)
-            $(info *** Info ***        # apt-get install vde2)
+            ifneq (,$(shell apt list 2>/dev/null| grep libvdeplug-dev))
+              $(info *** Info ***        $$ sudo apt-get install libvdeplug-dev)
+            else
+              $(info *** Info ***        $$ sudo apt-get install vde2)
+            endif
           else
             $(info *** Info *** should read 0readme_ethernet.txt and follow the instructions)
             $(info *** Info *** regarding the needed libvdeplug components for your $(OSNAME))
@@ -1206,7 +1210,7 @@ HP3000D = HP3000
 HP3000 = ${HP3000D}/hp_disclib.c ${HP3000D}/hp_tapelib.c ${HP3000D}/hp3000_atc.c \
 	${HP3000D}/hp3000_clk.c ${HP3000D}/hp3000_cpu.c ${HP3000D}/hp3000_cpu_base.c \
 	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_ds.c ${HP3000D}/hp3000_iop.c \
-	${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
+	${HP3000D}/hp3000_lp.c ${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
 	${HP3000D}/hp3000_scmb.c ${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
 HP3000_OPT = -I ${HP3000D}
 
@@ -1331,7 +1335,7 @@ ISYS8010C = Intel-Systems/common
 ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 	${ISYS8010C}/i8251.c ${ISYS8010C}/i8255.c \
 	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
-	${ISYS8010C}/multibus.c ${ISYS8010C}/isbc80-10.c	\
+	${ISYS8010C}/multibus.c ${ISYS8010D}/isbc80-10.c \
 	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc208.c
 ISYS8010_OPT = -I ${ISYS8010D}
 
@@ -1341,10 +1345,53 @@ ISYS8020C = Intel-Systems/common
 ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
 	${ISYS8020C}/i8251.c ${ISYS8020C}/i8255.c \
 	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
-	${ISYS8020C}/multibus.c ${ISYS8020C}/isbc80-20.c	\
+	${ISYS8020C}/multibus.c ${ISYS8020D}/isbc80-20.c \
 	${ISYS8020C}/isbc064.c ${ISYS8020C}/isbc208.c \
 	${ISYS8020C}/i8259.c
 ISYS8020_OPT = -I ${ISYS8020D}
+
+
+ISYS8030D = Intel-Systems/isys8030
+ISYS8030C = Intel-Systems/common
+ISYS8030 = ${ISYS8030C}/i8080.c ${ISYS8030D}/isys8030_sys.c \
+	${ISYS8030C}/i8251.c ${ISYS8030C}/i8255.c \
+	${ISYS8030C}/i8259.c ${ISYS8030C}/i8253.c \
+	${ISYS8030C}/ieprom.c ${ISYS8030C}/iram8.c \
+	${ISYS8030C}/multibus.c ${ISYS8030D}/isbc80-30.c \
+	${ISYS8030C}/isbc064.c ${ISYS8030C}/isbc208.c
+ISYS8030_OPT = -I ${ISYS8030D}
+
+
+IMDS-225D = Intel-Systems/imds-225
+IMDS-225C = Intel-Systems/common
+IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
+	${IMDS-225C}/i8251.c ${IMDS-225C}/i8255.c \
+	${IMDS-225C}/i8259.c ${IMDS-225C}/i8253.c \
+	${IMDS-225C}/ipceprom.c ${IMDS-225C}/ipcram8.c \
+	${IMDS-225C}/ipcmultibus.c ${IMDS-225D}/ipc.c \
+	${IMDS-225C}/ipc-cont.c ${IMDS-225C}/ioc-cont.c \
+	${IMDS-225C}/zx200a.c
+IMDS-225_OPT = -I ${IMDS-225D}
+
+
+IBMPCD = IBMPC-Systems/ibmpc
+IBMPCC = IBMPC-Systems/common
+IBMPC = ${IBMPCC}/i8088.c ${IBMPCD}/ibmpc_sys.c \
+	${IBMPCC}/i8253.c ${IBMPCC}/i8259.c \
+	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
+	${IBMPCC}/pceprom.c ${IBMPCC}/pcram8.c \
+	${IBMPCC}/i8237.c ${IBMPCC}/pcbus.c
+IBMPC_OPT = -I ${IBMPCD}
+
+
+IBMPCXTD = IBMPC-Systems/ibmpcxt
+IBMPCXTC = IBMPC-Systems/common
+IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
+	${IBMPCXTC}/i8253.c ${IBMPCXTC}/i8259.c \
+	${IBMPCXTC}/i8255.c ${IBMPCXTD}/ibmpcxt.c \
+	${IBMPCXTC}/pceprom.c ${IBMPCXTC}/pcram8.c \
+	${IBMPCXTC}/pcbus.c ${IBMPCXTC}/i8237.c 
+IBMPCXT_OPT = -I ${IBMPCXTD}
 
 
 TX0D = TX-0
@@ -1367,14 +1414,24 @@ B5500_OPT = -I.. -DUSE_INT64 -DB5500 -DUSE_SIM_CARD
 ### Experimental simulators
 ###
 
+CDC1700D = CDC1700
+CDC1700 = ${CDC1700D}/cdc1700_cpu.c ${CDC1700D}/cdc1700_dis.c \
+        ${CDC1700D}/cdc1700_io.c ${CDC1700D}/cdc1700_sys.c \
+        ${CDC1700D}/cdc1700_dev1.c ${CDC1700D}/cdc1700_mt.c \
+        ${CDC1700D}/cdc1700_dc.c ${CDC1700D}/cdc1700_iofw.c \
+        ${CDC1700D}/cdc1700_lp.c ${CDC1700D}/cdc1700_dp.c \
+        ${CDC1700D}/cdc1700_cd.c ${CDC1700D}/cdc1700_sym.c \
+        ${CDC1700D}/cdc1700_rtc.c
+CDC1700_OPT = -I ${CDC1700D}
+
 BESM6D = BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
         ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
         ${BESM6D}/besm6_punch.c
 
-ifneq (,$(and ${VIDEO_LDFLAGS}, $(BESM6_BUILD)))
-    ifeq (,${FONTFILE})
+ifneq (,$(BESM6_BUILD))
+    ifneq (,$(and ${VIDEO_LDFLAGS}, $(or $(and $(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)), $(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))))
         FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions C:/Windows/Fonts
         FONTPATH := $(dir $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/.)))
         FONTNAME += DejaVuSans.ttf LucidaSansRegular.ttf FreeSans.ttf AppleGothic.ttf tahoma.ttf
@@ -1395,19 +1452,21 @@ ifneq (,$(and ${VIDEO_LDFLAGS}, $(BESM6_BUILD)))
             $(info ***)
         endif
     endif
-endif
-ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}))
-    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
-else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
-    $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
-    $(info ***)
-    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
-else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
-    $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
-    $(info ***)
-    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
-else
-    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
+      $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
+      $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+  else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
+      $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+  else
+      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  endif
 endif
 
 ###
@@ -1450,9 +1509,9 @@ PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
-	i7094 ibm1130 id16 id32 sds lgp h316 \
+	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
-	b5500 
+	b5500
 
 all : ${ALL}
 
@@ -1720,7 +1779,6 @@ ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-
 isys8010: ${BIN}isys8010${EXE}
 
 ${BIN}isys8010${EXE} : ${ISYS8010} ${SIM} ${BUILD_ROMS}
@@ -1733,6 +1791,46 @@ ${BIN}isys8020${EXE} : ${ISYS8020} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8020} ${SIM} ${ISYS8020_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
+isys8030: ${BIN}isys8030${EXE}
+
+${BIN}isys8030${EXE} : ${ISYS8030} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${ISYS8030} ${SIM} ${ISYS8030_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info isys8030 can't be built using C++)
+endif
+
+imds-225: ${BIN}imds-225${EXE}
+
+${BIN}imds-225${EXE} : ${IMDS-225} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${IMDS-225} ${SIM} ${IMDS-225_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info imds-225 can't be built using C++)
+endif
+
+ibmpc: ${BIN}ibmpc${EXE}
+
+${BIN}ibmpc${EXE} : ${IBMPC} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${IBMPC} ${SIM} ${IBMPC_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info ibmpc can't be built using C++)
+endif
+
+ibmpcxt: ${BIN}ibmpcxt${EXE}
+
+${BIN}ibmpcxt${EXE} : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${IBMPCXT} ${SIM} ${IBMPCXT_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info ibmpcxt can't be built using C++)
+endif
+
 tx-0 : ${BIN}tx-0${EXE}
 
 ${BIN}tx-0${EXE} : ${TX0} ${SIM}
@@ -1744,6 +1842,12 @@ ssem : ${BIN}ssem${EXE}
 ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+cdc1700 : ${BIN}cdc1700${EXE}
+
+${BIN}cdc1700${EXE} : ${CDC1700} ${SIM}
+	${MKDIRBIN}
+	${CC} ${CDC1700} ${SIM} ${CDC1700_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 
 besm6 : ${BIN}besm6${EXE}
 

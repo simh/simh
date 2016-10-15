@@ -301,8 +301,8 @@ typedef uint32          t_addr;
 
 /* Breakpoint spaces definitions */
 
-#define SIM_BKPT_N_SPC  16                              /* max number spaces */
-#define SIM_BKPT_V_SPC  28                              /* location in arg */
+#define SIM_BKPT_N_SPC  (1 << (32 - SIM_BKPT_V_SPC))    /* max number spaces */
+#define SIM_BKPT_V_SPC  (BRK_TYP_MAX + 1)               /* location in arg */
 
 /* Extended switch definitions (bits >= 26) */
 
@@ -419,6 +419,7 @@ typedef struct SHTAB SHTAB;
 typedef struct MTAB MTAB;
 typedef struct SCHTAB SCHTAB;
 typedef struct BRKTAB BRKTAB;
+typedef struct BRKTYPTAB BRKTYPTAB;
 typedef struct EXPTAB EXPTAB;
 typedef struct EXPECT EXPECT;
 typedef struct SEND SEND;
@@ -466,6 +467,7 @@ struct DEVICE {
                                                         /* attach help */
     void *help_ctx;                                     /* Context available to help routines */
     const char          *(*description)(DEVICE *dptr);  /* Device Description */
+    BRKTYPTAB           *brk_types;                     /* Breakpoint types */
     };
 
 /* Device flags */
@@ -714,13 +716,25 @@ struct SCHTAB {
 struct BRKTAB {
     t_addr              addr;                           /* address */
     uint32              typ;                            /* mask of types */
+#define BRK_TYP_USR_TYPES       ((1 << ('Z'-'A'+1)) - 1)/* all types A-Z */
 #define BRK_TYP_DYN_STEPOVER    (SWMASK ('Z'+1))
 #define BRK_TYP_DYN_USR         (SWMASK ('Z'+2))
 #define BRK_TYP_DYN_ALL         (BRK_TYP_DYN_USR|BRK_TYP_DYN_STEPOVER) /* Mask of All Dynamic types */
 #define BRK_TYP_TEMP            (SWMASK ('Z'+3))        /* Temporary (one-shot) */
+#define BRK_TYP_MAX             (('Z'-'A')+3)           /* Maximum breakpoint type */
     int32               cnt;                            /* proceed count */
     char                *act;                           /* action string */
+    double              time_fired[SIM_BKPT_N_SPC];     /* instruction count when match occurred */
+    BRKTAB *next;                                       /* list with same address value */
     };
+
+/* Breakpoint table */
+
+struct BRKTYPTAB {
+    uint32      btyp;                                   /* type mask */
+    const char *desc;                                   /* description */
+    };
+#define BRKTYPE(typ,descrip) {SWMASK(typ), descrip}
 
 /* Expect rule */
 

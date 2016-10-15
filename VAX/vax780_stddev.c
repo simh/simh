@@ -734,9 +734,8 @@ if (SCPE_OK == sim_activate_after (&tmr_unit, usecs))
 
 t_stat clk_reset (DEVICE *dptr)
 {
-sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
-tmr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);      /* init 100Hz timer */
-sim_activate (&clk_unit, tmr_poll);                     /* activate 100Hz unit */
+tmr_poll = sim_rtcn_init_unit (&clk_unit, clk_unit.wait, TMR_CLK);/* init 100Hz timer */
+sim_activate_after (&clk_unit, 1000000/clk_tps);        /* activate 100Hz unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is initialized */
     clk_unit.filebuf = calloc(sizeof(TOY), 1);

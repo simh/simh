@@ -584,7 +584,7 @@ void besm6_draw_panel (int force)
 /*
  * Initializing of the graphical window and the fonts.
  */
-t_stat besm6_init_panel (UNIT *u, int32 val, char *cptr, void *desc)
+t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
     if (screen)
         return SCPE_ALATT;

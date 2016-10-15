@@ -692,27 +692,6 @@ const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
   return NULL;
 }
 
-/* strncasecmp() is not available on all platforms */
-int eth_strncasecmp(const char* string1, const char* string2, size_t len)
-{
-  size_t i;
-  unsigned char s1, s2;
-
-  for (i=0; i<len; i++) {
-    s1 = string1[i];
-    s2 = string2[i];
-    if (islower (s1)) s1 = (unsigned char)toupper (s1);
-    if (islower (s2)) s2 = (unsigned char)toupper (s2);
-
-    if (s1 < s2)
-      return -1;
-    if (s1 > s2)
-      return 1;
-    if (s1 == 0) return 0;
-  }
-  return 0;
-}
-
 char* eth_getname_byname(const char* name, char* temp, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
@@ -724,7 +703,7 @@ char* eth_getname_byname(const char* name, char* temp, char *desc)
   n = strlen(name);
   for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (eth_strncasecmp(name, list[i].name, n) == 0)) {
+        (sim_strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].name); /* only case might be different */
       strcpy(desc, list[i].desc);
@@ -744,7 +723,7 @@ char* eth_getdesc_byname(char* name, char* temp)
   n = strlen(name);
   for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (eth_strncasecmp(name, list[i].name, n) == 0)) {
+        (sim_strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].desc);
     }
@@ -760,7 +739,6 @@ void eth_zero(ETH_DEV* dev)
 }
 
 static char*   (*p_pcap_lib_version) (void);
-static char*   (*p_pcap_get_servicename) (void);
 
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
@@ -810,9 +788,6 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
     }
   if (p_pcap_lib_version) {
     fprintf(st, "%s\n", p_pcap_lib_version());
-#if defined(_WIN32)
-    fprintf(st, "Windows Packet Capture Service Name: %s\n", p_pcap_get_servicename ? p_pcap_get_servicename() : "npf");
-#endif
     }
   if (eth_open_device_count) {
     int i;
@@ -1206,7 +1181,6 @@ int load_pcap(void) {
       load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
       load_function("pcap_setnonblock",  (_func *) &p_pcap_setnonblock);
       load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
-      try_load_function("pcap_get_servicename",(_func *) &p_pcap_get_servicename);
 
       if ((lib_loaded == 1) && (!eth_show_active)) {
         /* log successful load */

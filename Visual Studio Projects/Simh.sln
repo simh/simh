@@ -228,6 +228,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HP3000", "HP3000.vcproj", "
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CDC1700", "CDC1700.vcproj", "{2D532F83-02F3-4169-9778-23E52D951FDE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -418,6 +423,10 @@ Global
 		{B3E35063-CB41-4F77-BFCA-49BB316B0EDB}.Debug|Win32.Build.0 = Debug|Win32
 		{B3E35063-CB41-4F77-BFCA-49BB316B0EDB}.Release|Win32.ActiveCfg = Release|Win32
 		{B3E35063-CB41-4F77-BFCA-49BB316B0EDB}.Release|Win32.Build.0 = Release|Win32
+		{2D532F83-02F3-4169-9778-23E52D951FDE}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2D532F83-02F3-4169-9778-23E52D951FDE}.Debug|Win32.Build.0 = Debug|Win32
+		{2D532F83-02F3-4169-9778-23E52D951FDE}.Release|Win32.ActiveCfg = Release|Win32
+		{2D532F83-02F3-4169-9778-23E52D951FDE}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -452,6 +452,7 @@ while (reason == 0) {                                   /* loop until halted */
                         reason = STOP_UBKPT;            /* stop simulation */
                         break;
                     }
+                sim_interval++;                         /* don't count non-executed instruction */
                 break;
                 }
             }

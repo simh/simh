@@ -360,8 +360,8 @@ MTAB ts_mod[] = {
         &sim_tape_set_capac, &sim_tape_show_capac, NULL, "Set/Display capacity" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004,     "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV, 0,                 "VECTOR", NULL,
-        NULL, &show_vec, NULL, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0,       "VECTOR", "VECTOR",
+        &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 

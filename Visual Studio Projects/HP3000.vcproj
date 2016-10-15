@@ -217,6 +217,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\HP3000\hp3000_lp.c"
+				>
+			</File>
+			<File
 				RelativePath="..\HP3000\hp3000_mpx.c"
 				>
 			</File>

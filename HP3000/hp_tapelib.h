@@ -25,6 +25,8 @@
    this Software without prior written authorization from the authors.
 
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   24-Mar-16    JDB     Added the TL_BUFFER type to define the tape buffer array
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    11-Nov-15    JDB     First release version
    24-Mar-13    JDB     Created tape controller common library from MS simulator
 
@@ -42,6 +44,15 @@
 
 
 
+/* Architectural constants.
+
+   The type of the tape buffer element is defined.  This must be an 8-bit array
+   for compatibility with the simulator tape support library (sim_tape).
+*/
+
+typedef uint8               TL_BUFFER;          /* a buffer containing 8-bit tape data words */
+
+
 /* Program limits */
 
 #define TL_MAXDRIVE         3                   /* last valid drive number */
@@ -54,12 +65,12 @@
 
 /* Debug flags */
 
-#define TL_DEB_CMD          (1 << 0)            /* trace controller commands */
-#define TL_DEB_INCO         (1 << 1)            /* trace command initiations and completions */
-#define TL_DEB_STATE        (1 << 2)            /* trace command execution state changes */
-#define TL_DEB_SERV         (1 << 3)            /* trace unit service scheduling calls */
-#define TL_DEB_XFER         (1 << 4)            /* trace data reads and writes */
-#define TL_DEB_IOB          (1 << 5)            /* trace I/O bus signals and data words */
+#define TL_DEB_CMD          (1u << 0)           /* trace controller commands */
+#define TL_DEB_INCO         (1u << 1)           /* trace command initiations and completions */
+#define TL_DEB_STATE        (1u << 2)           /* trace command execution state changes */
+#define TL_DEB_SERV         (1u << 3)           /* trace unit service scheduling calls */
+#define TL_DEB_XFER         (1u << 4)           /* trace data reads and writes */
+#define TL_DEB_IOB          (1u << 5)           /* trace I/O bus signals and data words */
 #define TL_DEB_V_UF         6                   /* first free debug flag bit */
 
 
@@ -109,11 +120,11 @@
 
 #define TL_UNIT_V_UF        (MTUF_V_UF + 5)             /* first free unit flag bit */
 
-#define UNIT_MODEL_MASK     0000007                     /* model ID mask */
+#define UNIT_MODEL_MASK     0000007u                    /* model ID mask */
 
 #define UNIT_MODEL          (UNIT_MODEL_MASK << UNIT_MODEL_SHIFT)
-#define UNIT_OFFLINE        (1 << UNIT_OFFLINE_SHIFT)
-#define UNIT_REWINDING      (1 << UNIT_REW_SHIFT)
+#define UNIT_OFFLINE        (1u << UNIT_OFFLINE_SHIFT)
+#define UNIT_REWINDING      (1u << UNIT_REW_SHIFT)
 
 #define UNIT_7970B          (HP_7970B << UNIT_MODEL_SHIFT)
 #define UNIT_7970E          (HP_7970E << UNIT_MODEL_SHIFT)
@@ -216,7 +227,7 @@ typedef enum {                                  /* interface function bus orders
 typedef CNTLR_IFN       CNTLR_IFN_SET;          /* a set of CNTLR_IFNs */
 
 
-typedef uint16 CNTLR_IBUS;                      /* the interface data bus */
+typedef HP_WORD CNTLR_IBUS;                     /* the interface data bus */
 
 #undef  NO_DATA                                 /* remove winsock definition */
 #define NO_DATA         (CNTLR_IBUS) 0          /* no data asserted */
@@ -344,7 +355,7 @@ typedef struct {
           (rstart), (rrate), (rstop), (bot), (ir), (dxfr), (ovhd)
 
 
-/* Tape controller state variable structure */
+/* Tape controller state */
 
 typedef struct {
     CNTLR_TYPE        type;                     /* controller type */
@@ -353,7 +364,7 @@ typedef struct {
     uint32            status;                   /* controller status */
     uint32            unit_selected;            /* unit number currently selected */
     uint32            unit_attention;           /* bitmap of units needing attention */
-    uint8             *buffer;                  /* data buffer pointer */
+    TL_BUFFER         *buffer;                  /* data buffer pointer */
     t_stat            call_status;              /* simulator tape support library call status */
     t_mtrlnt          length;                   /* data buffer valid length */
     t_mtrlnt          index;                    /* data buffer current index */
@@ -372,7 +383,7 @@ typedef CNTLR_VARS *CVPTR;                      /* a pointer to a controller sta
 
      ctype  - the type of the controller (CNTLR_TYPE)
      dev    - the device on which the controller operates (DEVICE)
-     bufptr - a pointer to the data buffer (array of uint8)
+     bufptr - a pointer to the data buffer (array of TL_BUFFER)
      fast   - a pointer to the fast timing values (DELAY_PROPS)
 */
 
@@ -391,31 +402,31 @@ typedef CNTLR_VARS *CVPTR;                      /* a pointer to a controller sta
      cntlr    -- the controller state variable structure (CNTLR_VARS)
      units    -- the unit array (array of UNIT)
      numunits -- the number of tape drive units
-     buffer   -- the buffer array (array of uint8)
+     buffer   -- the buffer array (array of TL_BUFFER)
      times    -- the structure containing the fast delay time values (DELAY_PROPS)
 
 
    Implementation notes:
 
-    1. The "CNTLR" register is present to ensure that the entire CNTLR_VARS
-       structure is saved and restored.
+    1. The CNTLR_VARS fields "type", "device", "buffer", "fastptr", and "dlyptr"
+       do not need to appear in the REG array, as "dlyptr" is reset by the
+       tl_attach routine during a RESTORE, and the others are static.
 */
 
 #define TL_REGS(cntlr,units,numunits,buffer,times)  \
-/*    Macro   Name    Location                  Radix   Width        Depth             Flags        */ \
-/*    ------  ------  ------------------------  -----  --------  ---------------  ----------------- */ \
-    { DRDATA (CSTATE, (cntlr).state,                      4),                     PV_LEFT | REG_RO  }, \
-    { ORDATA (STATUS, (cntlr).status,                    16),                               REG_RO  }, \
-    { DRDATA (USEL,   (cntlr).unit_selected,              4),                     PV_LEFT | REG_RO  }, \
-    { YRDATA (UATTN,  (cntlr).unit_attention,             4)                                        }, \
-    { BRDATA (RECBUF, (buffer),                   8,      8,       TL_BUFSIZE),   REG_A             }, \
-    { DRDATA (LIBSTA, (cntlr).call_status,               16),                     PV_LEFT           }, \
-    { DRDATA (LENGTH, (cntlr).length,                    24),                     PV_LEFT           }, \
-    { DRDATA (INDEX,  (cntlr).index,                     24),                     PV_LEFT           }, \
-    { DRDATA (GAPLEN, (cntlr).gaplen,                    32),                     PV_LEFT           }, \
-    { DRDATA (INPOS,  (cntlr).initial_position,        T_ADDR_W),                 PV_LEFT           }, \
-    { SRDATA (CNTLR,  (cntlr)),                                                             REG_HRO }, \
-                                                                                                       \
+/*    Macro   Name    Location                  Radix   Width        Depth             Flags         */ \
+/*    ------  ------  ------------------------  -----  --------  ---------------  -----------------  */ \
+    { DRDATA (CSTATE, (cntlr).state,                      4),                     PV_LEFT | REG_RO   }, \
+    { ORDATA (STATUS, (cntlr).status,                    16),                               REG_RO   }, \
+    { DRDATA (USEL,   (cntlr).unit_selected,              4),                     PV_LEFT | REG_RO   }, \
+    { YRDATA (UATTN,  (cntlr).unit_attention,             4,                      PV_RZRO)           }, \
+    { BRDATA (RECBUF, (buffer),                   8,      8,       TL_BUFSIZE),   REG_A              }, \
+    { DRDATA (LIBSTA, (cntlr).call_status,               16),                     PV_LEFT            }, \
+    { DRDATA (LENGTH, (cntlr).length,                    24),                     PV_LEFT            }, \
+    { DRDATA (INDEX,  (cntlr).index,                     24),                     PV_LEFT            }, \
+    { DRDATA (GAPLEN, (cntlr).gaplen,                    32),                     PV_LEFT            }, \
+    { DRDATA (INPOS,  (cntlr).initial_position,        T_ADDR_W),                 PV_LEFT            }, \
+                                                                                                        \
 /*    Macro   Name     Location              Width       Flags       */ \
 /*    ------  -------  --------------------  -----  ---------------- */ \
     { DRDATA (RSTART,  (times).rewind_start,  24),  PV_LEFT | REG_NZ }, \
@@ -462,17 +473,17 @@ typedef CNTLR_VARS *CVPTR;                      /* a pointer to a controller sta
 
 /* Selectable drive type flags */
 
-#define TL_7970B        (1 << HP_7970B)
-#define TL_7970E        (1 << HP_7970E)
-#define TL_7974         (1 << HP_7974)
-#define TL_7978         (1 << HP_7978)
+#define TL_7970B        (1u << HP_7970B)
+#define TL_7970E        (1u << HP_7970E)
+#define TL_7974         (1u << HP_7974)
+#define TL_7978         (1u << HP_7978)
 
 /* Selectable drive density flags */
 
 #define TL_FIXED        0
-#define TL_800          (1 << MT_DENS_800)
-#define TL_1600         (1 << MT_DENS_1600)
-#define TL_6250         (1 << MT_DENS_6250)
+#define TL_800          (1u << MT_DENS_800)
+#define TL_1600         (1u << MT_DENS_1600)
+#define TL_6250         (1u << MT_DENS_6250)
 
 #define IFTYPE(t,s)     (TL_##t & (s) ? #t : NULL), \
                         (TL_##t & (s) ? #t : NULL)
@@ -514,14 +525,14 @@ typedef CNTLR_VARS *CVPTR;                      /* a pointer to a controller sta
 extern CNTLR_IFN_IBUS tl_controller (CVPTR cvptr, UNIT *uptr, CNTLR_FLAG_SET flags, CNTLR_IBUS data);
 extern t_stat         tl_onoffline  (CVPTR cvptr, UNIT *uptr, t_bool online);
 
-extern uint16 tl_status (CVPTR cvptr);
-extern t_stat tl_reset  (CVPTR cvptr);
-extern void   tl_clear  (CVPTR cvptr);
+extern HP_WORD tl_status (CVPTR cvptr);
+extern t_stat  tl_reset  (CVPTR cvptr);
+extern void    tl_clear  (CVPTR cvptr);
 
 /* Tape library global utility routines */
 
 extern const char *tl_opcode_name (CNTLR_OPCODE opcode);
-extern const char *tl_unit_name   (uint32       unit);
+extern const char *tl_unit_name   (int32        unit);
 
 /* Tape library global SCP support routines */
 

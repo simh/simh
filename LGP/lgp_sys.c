@@ -226,14 +226,21 @@ static const char hex_decode[] = "0123456789FGJKQW";
 #define fputs(_s,f) Fprintf(f,"%s",_s)
 #define fputc(_c,f) Fprintf(f,"%c",_c)
 
-void lgp_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
+void lgp_sprint_addr (char *buf, DEVICE *dptr, t_addr addr)
 {
 if ((dptr == sim_devices[0]) &&
     ((sim_switches & SWMASK ('T')) ||
     ((cpu_unit.flags & UNIT_TTSS_D) && !(sim_switches & SWMASK ('N')))))
-    fprintf (st, "%02d%02d", addr >> 6, addr & SCMASK_30);
-else fprint_val (st, addr, dptr->aradix, dptr->awidth, PV_LEFT);
-return;
+    sprintf (buf, "%02d%02d", addr >> 6, addr & SCMASK_30);
+else sprint_val (buf, addr, dptr->aradix, dptr->awidth, PV_LEFT);
+}
+
+void lgp_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
+{
+char buf[64];
+
+lgp_sprint_addr (buf, dptr, addr);
+fprintf (st, "%s", buf);
 }
 
 t_addr lgp_parse_addr (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
@@ -256,6 +263,7 @@ return ea;
 
 void lgp_vm_init (void)
 {
+sim_vm_sprint_addr = &lgp_sprint_addr;
 sim_vm_fprint_addr = &lgp_fprint_addr;
 sim_vm_parse_addr = &lgp_parse_addr;
 return;

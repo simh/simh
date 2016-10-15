@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2015, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@
    tti          keyboard
    tto          teleprinter
 
+   13-Jul-16    RMS     Added Expensive Typewriter ribbon color support
+   18-May-16    RMS     Added FIODEC-to-ASCII mode for paper tape punch
    28-Mar-15    RMS     Revised to use sim_printf
    21-Mar-12    RMS     Fixed unitialized variable in tto_svc (Michael Bloom)
    21-Dec-06    RMS     Added 16-channel sequence break support
@@ -55,8 +57,12 @@
 #include "sim_tmxr.h"
 
 #define FIODEC_STOP     013                             /* stop code */
-#define FIODEC_UC       074
-#define FIODEC_LC       072
+#define FIODEC_BLACK    034                             /* TTY black ribbon */
+#define FIODEC_RED      035                             /* TTY red ribbon */
+#define FIODEC_UC       074                             /* upper case */
+#define FIODEC_LC       072                             /* lower case */
+#define FIODEC_CR       077                             /* carriage return */
+
 #define UC_V            6                               /* upper case */
 #define UC              (1 << UC_V)
 #define BOTH            (1 << (UC_V + 1))               /* both cases */
@@ -64,12 +70,15 @@
 #define TT_WIDTH        077
 #define UNIT_V_ASCII    (UNIT_V_UF + 0)                 /* ASCII/binary mode */
 #define UNIT_ASCII      (1 << UNIT_V_ASCII)
+#define UNIT_V_ET       (UNIT_V_UF + 1)                 /* expensive typewriter mode */
+#define UNIT_ET         (1 << UNIT_V_ET)
 #define PTR_LEADER      20                              /* ASCII leader chars */
 
 int32 ptr_state = 0;
 int32 ptr_wait = 0;
 int32 ptr_stopioe = 0;
 int32 ptr_uc = 0;                                       /* upper/lower case */
+int32 ptp_uc = 0;
 int32 ptr_hold = 0;                                     /* holding buffer */
 int32 ptr_leader = PTR_LEADER;                          /* leader count */
 int32 ptr_sbs = 0;                                      /* SBS level */
@@ -79,6 +88,7 @@ int32 tti_hold = 0;                                     /* tti hold buf */
 int32 tti_sbs = 0;                                      /* SBS level */
 int32 tty_buf = 0;                                      /* tty buffer */
 int32 tty_uc = 0;                                       /* tty uc/lc */
+int32 tty_ribbon = FIODEC_BLACK;                        /* ribbon color */
 int32 tto_sbs = 0;
 
 extern int32 ios, ioh, cpls, iosta;
@@ -95,18 +105,19 @@ t_stat ptp_reset (DEVICE *dptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 t_stat ptr_attach (UNIT *uptr, CONST char *cptr);
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr);
 
 /* Character translation tables */
 
 int32 fiodec_to_ascii[128] = {
     ' ', '1', '2', '3', '4', '5', '6', '7',             /* lower case */
-    '8', '9', 0, 0, 0, 0, 0, 0,
+    '8', '9', 0, '\f', 0, 0, 0, 0,
     '0', '/', 's', 't', 'u', 'v', 'w', 'x',
     'y', 'z', 0, ',', 0, 0, '\t', 0,
     '@', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
     'q', 'r', 0, 0, '-', ')', '\\', '(',
     0, 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-    'h', 'i', '{', '.', '}', '\b', 0, '\r',
+    'h', 'i', 0, '.', 0, '\b', 0, '\n',
     ' ', '"', '\'', '~', '#', '!', '&', '<',            /* upper case */
     '>', '^', 0, 0, 0, 0, 0, 0,
     '`', '?', 'S', 'T', 'U', 'V', 'W', 'X',
@@ -114,12 +125,12 @@ int32 fiodec_to_ascii[128] = {
     '_', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
     'Q', 'R', 0, 0, '+', ']', '|', '[',
     0, 'A', 'B', 'C', 'D', 'E', 'F', 'G',
-    'H', 'I', '{', '*', '}', '\b', 0, '\r'
+    'H', 'I', 0, '*', 0, '\b', 0, '\n'
     };
 
 int32 ascii_to_fiodec[128] = {
     0, 0, 0, 0, 0, 0, 0, 0,
-    BOTH+075, BOTH+036, 0, 0, 0, BOTH+077, 0, 0,
+    BOTH+075, BOTH+036, 0, 0, BOTH+FIODEC_STOP, BOTH+FIODEC_CR, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     BOTH+0, UC+005, UC+001, UC+004, 0, 0, UC+006, UC+002,
@@ -167,8 +178,8 @@ REG ptr_reg[] = {
 MTAB ptr_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &ptr_sbs },
-    { UNIT_ASCII, UNIT_ASCII, "ASCII", "ASCII", NULL },
-    { UNIT_ASCII, 0,          "FIODEC", "FIODEC", NULL },
+    { UNIT_ASCII, UNIT_ASCII, "ASCII", NULL, NULL },
+    { UNIT_ASCII, 0,          "FIODEC", NULL, NULL },
     { 0 }
     };
 
@@ -205,6 +216,8 @@ REG ptp_reg[] = {
 MTAB ptp_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &ptp_sbs },
+    { UNIT_ASCII, UNIT_ASCII, "ASCII", NULL, NULL },
+    { UNIT_ASCII, 0,          "FIODEC", NULL, NULL },
     { 0 }
     };
 
@@ -212,7 +225,7 @@ DEVICE ptp_dev = {
     "PTP", &ptp_unit, ptp_reg, ptp_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptp_reset,
-    NULL, NULL, NULL,
+    NULL, &ptp_attach, NULL,
     NULL, 0
     };
 
@@ -267,12 +280,15 @@ REG tto_reg[] = {
     { DRDATAD (POS, tto_unit.pos, T_ADDR_W, "number of characters output"), PV_LEFT },
     { DRDATAD (TIME, tto_unit.wait, 24, "time from I/O initiation interrupt"), PV_LEFT },
     { DRDATA (SBSLVL, tto_sbs, 4), REG_HRO },
+    { ORDATA (RIBBON, tty_ribbon, 6), REG_HRO },
     { NULL }
     };
 
 MTAB tto_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &tto_sbs },
+    { UNIT_ET, UNIT_ET, "Expensive Typewriter mode", "ET", NULL },
+    { UNIT_ET, UNIT_ET, "normal mode", "NOET", NULL },
     { 0 }
     };
 
@@ -390,8 +406,10 @@ if (ptr_hold & CW) {                                    /* char waiting? */
     }
 else {
     for (;;) {                                          /* until valid char */
-        if ((c = getc (uptr->fileref)) == EOF)          /* get next char, EOF? */
+        if ((c = getc (uptr->fileref)) == EOF) {        /* get next char, EOF? */
+            ptr_leader = PTR_LEADER;                    /* set up for trailer */
             return FIODEC_STOP;                         /* return STOP */
+            }
         uptr->pos = uptr->pos + 1;                      /* count char */
         c = c & 0177;                                   /* cut to 7b */
         if (c == '\n')                                  /* NL -> CR */
@@ -437,6 +455,9 @@ return SCPE_OK;
 t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 ptr_leader = PTR_LEADER;                                /* set up leader */
+if (sim_switches & SWMASK ('A'))
+    uptr->flags = uptr->flags | UNIT_ASCII;
+else uptr->flags = uptr->flags & ~UNIT_ASCII;
 return attach_unit (uptr, cptr);
 }
 
@@ -501,6 +522,8 @@ return dat;
 
 t_stat ptp_svc (UNIT *uptr)
 {
+int32 c;
+
 if (cpls & CPLS_PTP) {                                  /* completion pulse? */
     ios = 1;                                            /* restart */
     cpls = cpls & ~CPLS_PTP;
@@ -509,7 +532,28 @@ iosta = iosta | IOS_PTP;                                /* set flag */
 dev_req_int (ptp_sbs);                                  /* req interrupt */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
-if (putc (uptr->buf, uptr->fileref) == EOF) {           /* I/O error? */
+if ((uptr->flags & UNIT_ASCII) != 0) {                  /* ASCII mode? */
+    int32 c1 = uptr->buf & 077;
+    if (uptr->buf == 0)                                 /* ignore nulls */
+        return SCPE_OK;
+    if (c1 == FIODEC_UC) {                              /* UC? absorb */
+        ptp_uc = UC;
+        return SCPE_OK;
+        }
+    else if (c1 == FIODEC_LC) {                         /* LC? absorb */
+        ptp_uc = 0;
+        return SCPE_OK;
+        }
+    else c = fiodec_to_ascii[c1 | ptp_uc];
+    if (c == 0)
+        return SCPE_OK;
+    if (c == '\n') {                                    /* new line? */
+        putc ('\r', uptr->fileref);                     /* cr first */
+        uptr->pos = uptr->pos + 1;
+        }
+    }
+else c = uptr->buf;        
+if (putc (c, uptr->fileref) == EOF) {                   /* I/O error? */
     sim_perror ("PTP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
@@ -523,10 +567,21 @@ return SCPE_OK;
 t_stat ptp_reset (DEVICE *dptr)
 {
 ptp_unit.buf = 0;                                       /* clear state */
+ptp_uc = 0;
 cpls = cpls & ~CPLS_PTP;
 iosta = iosta & ~IOS_PTP;                               /* clear flag */
 sim_cancel (&ptp_unit);                                 /* deactivate unit */
 return SCPE_OK;
+}
+
+/* Attach routine */
+
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
+{
+if (sim_switches & SWMASK ('A'))
+    uptr->flags = uptr->flags | UNIT_ASCII;
+else uptr->flags = uptr->flags & ~UNIT_ASCII;
+return attach_unit (uptr, cptr);
 }
 
 /* Typewriter IOT routines */
@@ -592,24 +647,39 @@ uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 
+void tto_puts (const char *cptr)
+{
+int32 c;
+
+while ((c = *cptr++) != 0)
+    sim_putchar (c);
+return;
+}
+
 t_stat tto_svc (UNIT *uptr)
 {
 t_stat r;
+int32 c;
+static const char *red_str = "[red]\r\n";
+static const char *black_str = "[black]\r\n";
 
 if (tty_buf == FIODEC_UC)                               /* upper case? */
     tty_uc = UC;
 else if (tty_buf == FIODEC_LC)                          /* lower case? */
     tty_uc = 0;
+else if (((uptr->flags & UNIT_ET) != 0) &&              /* ET ribbon chg? */
+    ((tty_buf == FIODEC_BLACK) || (tty_buf == FIODEC_RED)) &&
+    (tty_buf != tty_ribbon)) {
+    tto_puts ((tty_buf == FIODEC_RED)? red_str: black_str);
+    tty_ribbon = tty_buf;
+    }
+else if (tty_buf == FIODEC_CR)
+    tto_puts ("\r\n");
 else {
-    int32 c;
     c = fiodec_to_ascii[tty_buf | tty_uc];              /* translate */
-    if (c && ((r = sim_putchar_s (c)) != SCPE_OK)) {    /* output; error? */
+    if ((c != 0) && ((r = sim_putchar_s (c)) != SCPE_OK)) { /* output; error? */
         sim_activate (uptr, uptr->wait);                /* retry */
         return ((r == SCPE_STALL)? SCPE_OK: r);
-        }
-    if (c == '\r') {                                    /* cr? add lf */
-        sim_putchar ('\n');
-        uptr->pos = uptr->pos + 1;
         }
     }
 if (cpls & CPLS_TTO) {                                  /* completion pulse? */
@@ -628,6 +698,7 @@ t_stat tty_reset (DEVICE *dptr)
 {
 tmxr_set_console_units (&tti_unit, &tto_unit);
 tty_buf = 0;                                            /* clear buffer */
+tty_ribbon = FIODEC_BLACK;                              /* start black */
 tty_uc = 0;                                             /* clear case */
 tti_hold = 0;                                           /* clear hold buf */
 cpls = cpls & ~CPLS_TTO;

@@ -25,7 +25,10 @@
 
    SCMB1,SCMB2  HP 30033A Selector Channel Maintenance Board
 
+   12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
+   11-Jun-16    JDB     Bit mask constants are now unsigned
    13-May-16    JDB     Modified for revised SCP API function parameter types
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    21-Sep-15    JDB     First release version
    27-Jan-15    JDB     Passes the selector channel diagnostic (D429A)
    12-Jan-15    JDB     Passes the SCMB diagnostic (D429A)
@@ -87,7 +90,7 @@
      N = enable special device number
      T = terminate on terminal count
      C = terminate on compare failure
-     L = enable clear interface on terminate
+     L = enable device end/clear interface (0/1) on terminate
 
    Load:
      00 = load the IOAW into the control word
@@ -205,7 +208,7 @@
 
 #define UNIT_W1_SHIFT       (UNIT_V_UF + 0)     /* jumper W1 */
 
-#define UNIT_W1_SEL         (1 << UNIT_W1_SHIFT)
+#define UNIT_W1_SEL         (1u << UNIT_W1_SHIFT)
 
 #define MPX_BUS(card)       ((scmb_unit [card].flags & UNIT_W1_SEL) == 0)
 #define SEL_BUS(card)       ((scmb_unit [card].flags & UNIT_W1_SEL) != 0)
@@ -213,10 +216,10 @@
 
 /* Debug flags */
 
-#define DEB_CSRW            (1 << 0)            /* trace commands received and status returned */
-#define DEB_XFER            (1 << 1)            /* trace channel data reads and writes */
-#define DEB_SERV            (1 << 2)            /* trace unit service scheduling calls */
-#define DEB_IOB             (1 << 3)            /* trace I/O bus signals and data words */
+#define DEB_CSRW            (1u << 0)           /* trace commands received and status returned */
+#define DEB_XFER            (1u << 1)           /* trace channel data reads and writes */
+#define DEB_SERV            (1u << 2)           /* trace unit service scheduling calls */
+#define DEB_IOB             (1u << 3)           /* trace I/O bus signals and data words */
 
 
 /* Control word.
@@ -227,19 +230,19 @@
    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 */
 
-#define CN_MR               0100000             /* M = master reset */
-#define CN_IRQ_RESET        0040000             /* R = interrupt reset */
-#define CN_JMPMET           0020000             /* J = set jump met */
-#define CN_DEVEND           0010000             /* V = device end */
-#define CN_NOACK            0004000             /* A = inhibit channel acknowledge */
-#define CN_NOSR             0002000             /* S = inhibit service request */
-#define CN_LOAD_MASK        0001400             /* load operation mask */
-#define CN_HSREQ            0000200             /* H = high speed service request */
-#define CN_DEVNO            0000100             /* N = special device number */
-#define CN_TERM_COUNT       0000040             /* T = terminate on count */
-#define CN_TERM_COMP        0000020             /* C = terminate on miscompare */
-#define CN_CLEAR_IF         0000010             /* L = clear interface */
-#define CN_CNTR_MASK        0000007             /* counter operation mask */
+#define CN_MR               0100000u            /* M = master reset */
+#define CN_IRQ_RESET        0040000u            /* R = interrupt reset */
+#define CN_JMPMET           0020000u            /* J = set jump met */
+#define CN_DEVEND           0010000u            /* V = set device end */
+#define CN_NOACK            0004000u            /* A = inhibit channel acknowledge */
+#define CN_NOSR             0002000u            /* S = inhibit service request */
+#define CN_LOAD_MASK        0001400u            /* load operation mask */
+#define CN_HSREQ            0000200u            /* H = high speed service request */
+#define CN_DEVNO            0000100u            /* N = special device number */
+#define CN_TERM_COUNT       0000040u            /* T = terminate on count */
+#define CN_TERM_COMP        0000020u            /* C = terminate on miscompare */
+#define CN_CLEAR_IF         0000010u            /* L = clear interface */
+#define CN_CNTR_MASK        0000007u            /* counter operation mask */
 
 #define CN_LOAD_SHIFT       8                   /* load operation alignment shift */
 #define CN_CNTR_SHIFT       0                   /* counter operation alignment shift */
@@ -280,23 +283,23 @@ static const char *const count_names [8] = {    /* indexed by CNTR_OP */
     "count PWRITESTB",                          /*   100 = count PWRITESTB */
     "count TOGGLEOUTXFER",                      /*   101 = count TOGGLEOUTXFER */
     "count EOT",                                /*   110 = count EOT */
-    "count CHANSO",                             /*   111 = count CHANSO */
+    "count CHANSO"                              /*   111 = count CHANSO */
     };
 
-static const BITSET_NAME control_names [] = {   /* Control word names */
-    "master reset",                             /*   bit  0 */
-    "reset interrupt",                          /*   bit  1 */
-    "set JMPMET",                               /*   bit  2 */
-    "set DEVEND",                               /*   bit  3 */
-    "inhibit CHANACK",                          /*   bit  4 */
-    "inhibit SR",                               /*   bit  5 */
-    NULL,                                       /*   bit  6 */
-    NULL,                                       /*   bit  7 */
-    "high speed",                               /*   bit  8 */
-    "send DEVNO",                               /*   bit  9 */
-    "end on count",                             /*   bit 10 */
-    "end on miscompare",                        /*   bit 11 */
-    "\1clear interface\0device end",            /*   bit 12 */
+static const BITSET_NAME control_names [] = {           /* Control word names */
+    "master reset",                                     /*   bit  0 */
+    "reset interrupt",                                  /*   bit  1 */
+    "set JMPMET",                                       /*   bit  2 */
+    "set DEVEND",                                       /*   bit  3 */
+    "inhibit CHANACK",                                  /*   bit  4 */
+    "inhibit SR",                                       /*   bit  5 */
+    NULL,                                               /*   bit  6 */
+    NULL,                                               /*   bit  7 */
+    "high speed",                                       /*   bit  8 */
+    "send DEVNO",                                       /*   bit  9 */
+    "end on count",                                     /*   bit 10 */
+    "end on miscompare",                                /*   bit 11 */
+    "\1end with clear interface\0end with device end"   /*   bit 12 */
     };
 
 static const BITSET_FORMAT control_format =     /* names, offset, direction, alternates, bar */
@@ -315,19 +318,19 @@ static const BITSET_FORMAT control_format =     /* names, offset, direction, alt
    manual has the correct assignments.
 */
 
-#define ST_SIO_OK           0100000             /* S = SIO OK to use */
-#define ST_DIO_OK           0040000             /* D = direct I/O OK to use (always 1) */
-#define ST_INTREQ           0020000             /* R = interrupt requested */
-#define ST_INTACT           0010000             /* A = interrupt active */
-#define ST_XFERERR          0004000             /* X = transfer error is asserted */
-#define ST_SIOENABLED       0002000             /* N = SIO enabled is asserted */
-#define ST_DEVEND           0001000             /* V = device end is asserted */
-#define ST_EOT              0000400             /* E = end of transfer is asserted */
-#define ST_END_MISCMP       0000200             /* C = end on miscompare occurred */
-#define ST_END_COUNT        0000100             /* T = end on terminal count occurred */
-#define ST_INXFER           0000040             /* I = input transfer is asserted */
-#define ST_OUTXFER          0000020             /* O = output transfer is asserted  */
-#define ST_CLEAR_IF         0000010             /* L = clear interface is asserted */
+#define ST_SIO_OK           0100000u            /* S = SIO OK to use */
+#define ST_DIO_OK           0040000u            /* D = direct I/O OK to use (always 1) */
+#define ST_INTREQ           0020000u            /* R = interrupt requested */
+#define ST_INTACT           0010000u            /* A = interrupt active */
+#define ST_XFERERR          0004000u            /* X = transfer error is asserted */
+#define ST_SIOENABLED       0002000u            /* N = SIO enabled is asserted */
+#define ST_DEVEND           0001000u            /* V = device end is asserted */
+#define ST_EOT              0000400u            /* E = end of transfer is asserted */
+#define ST_END_MISCMP       0000200u            /* C = end on miscompare occurred */
+#define ST_END_COUNT        0000100u            /* T = end on terminal count occurred */
+#define ST_INXFER           0000040u            /* I = input transfer is asserted */
+#define ST_OUTXFER          0000020u            /* O = output transfer is asserted  */
+#define ST_CLEAR_IF         0000010u            /* L = clear interface is asserted */
 
 #define END_CONDITION       (ST_END_MISCMP | ST_END_COUNT)
 
@@ -359,11 +362,11 @@ typedef enum {
     } CARD_ID;
 
 typedef struct {
-    uint16 control_word;                        /* control word register */
-    uint16 status_word;                         /* status word register */
-    uint16 counter;                             /* counter/buffer register */
-    uint16 flags;                               /* status flags */
-    uint32 saved_srn;                           /* saved SR number */
+    HP_WORD control_word;                       /* control word register */
+    HP_WORD status_word;                        /* status word register */
+    HP_WORD counter;                            /* counter/buffer register */
+    HP_WORD flags;                              /* status flags */
+    uint32  saved_srn;                          /* saved SR number */
 
     FLIP_FLOP sio_busy;                         /* SIO busy flip-flop */
     FLIP_FLOP channel_sr;                       /* channel service request flip-flop */
@@ -439,55 +442,55 @@ static UNIT scmb_unit [] = {
 /* Register lists */
 
 static REG scmb1_reg [] = {
-/*    Macro   Name    Location                    Width  Offset  Flags             */
-/*    ------  ------  --------------------------  -----  ------  ----------------- */
-    { ORDATA (CNTL,   scmb [card1].control_word,   16),          REG_FIT           },
-    { ORDATA (STAT,   scmb [card1].status_word,    16),          REG_FIT           },
-    { ORDATA (CNTR,   scmb [card1].counter,        16),          REG_FIT           },
-    { ORDATA (SRSAVE, scmb [card1].saved_srn,       8),                    REG_HRO },
+/*    Macro   Name    Location                    Width  Offset        Flags        */
+/*    ------  ------  --------------------------  -----  ------  -----------------  */
+    { ORDATA (CNTL,   scmb [card1].control_word,   16),          REG_FIT            },
+    { ORDATA (STAT,   scmb [card1].status_word,    16),          REG_FIT            },
+    { ORDATA (CNTR,   scmb [card1].counter,        16),          REG_FIT            },
+    { ORDATA (SRSAVE, scmb [card1].saved_srn,       8),                    REG_HRO  },
 
-    { FLDATA (SIOBSY, scmb [card1].sio_busy,               0)                      },
-    { FLDATA (CHANSR, scmb [card1].channel_sr,             0)                      },
-    { FLDATA (DEVSR,  scmb [card1].device_sr,              0)                      },
-    { FLDATA (INXFR,  scmb [card1].input_xfer,             0)                      },
-    { FLDATA (OUTXFR, scmb [card1].output_xfer,            0)                      },
+    { FLDATA (SIOBSY, scmb [card1].sio_busy,               0)                       },
+    { FLDATA (CHANSR, scmb [card1].channel_sr,             0)                       },
+    { FLDATA (DEVSR,  scmb [card1].device_sr,              0)                       },
+    { FLDATA (INXFR,  scmb [card1].input_xfer,             0)                       },
+    { FLDATA (OUTXFR, scmb [card1].output_xfer,            0)                       },
 
-    { FLDATA (JMPMET, scmb [card1].jump_met,               0)                      },
-    { FLDATA (XFRERR, scmb [card1].flags,                 11)                      },
-    { FLDATA (EOT,    scmb [card1].flags,                  8)                      },
-    { FLDATA (TRMCNT, scmb [card1].flags,                  6)                      },
-    { FLDATA (MISCMP, scmb [card1].flags,                  7)                      },
-    { FLDATA (DEVEND, scmb [card1].device_end,             0)                      },
-    { FLDATA (STOP,   scmb [card1].stop_transfer,          0)                      },
+    { FLDATA (JMPMET, scmb [card1].jump_met,               0)                       },
+    { FLDATA (XFRERR, scmb [card1].flags,                 11)                       },
+    { FLDATA (EOT,    scmb [card1].flags,                  8)                       },
+    { FLDATA (TRMCNT, scmb [card1].flags,                  6)                       },
+    { FLDATA (MISCMP, scmb [card1].flags,                  7)                       },
+    { FLDATA (DEVEND, scmb [card1].device_end,             0)                       },
+    { FLDATA (STOP,   scmb [card1].stop_transfer,          0)                       },
 
-    { SRDATA (DIB,    scmb_dib [card1]),                                   REG_HRO },
+      DIB_REGS (scmb_dib [card1]),
 
     { NULL }
     };
 
 static REG scmb2_reg [] = {
-/*    Macro   Name    Location                    Width  Offset  Flags             */
-/*    ------  ------  --------------------------  -----  ------  ----------------- */
-    { ORDATA (CNTL,   scmb [card2].control_word,   16),          REG_FIT           },
-    { ORDATA (STAT,   scmb [card2].status_word,    16),          REG_FIT           },
-    { ORDATA (CNTR,   scmb [card2].counter,        16),          REG_FIT           },
-    { ORDATA (SRSAVE, scmb [card2].saved_srn,       8),                    REG_HRO },
+/*    Macro   Name    Location                    Width  Offset        Flags        */
+/*    ------  ------  --------------------------  -----  ------  -----------------  */
+    { ORDATA (CNTL,   scmb [card2].control_word,   16),          REG_FIT            },
+    { ORDATA (STAT,   scmb [card2].status_word,    16),          REG_FIT            },
+    { ORDATA (CNTR,   scmb [card2].counter,        16),          REG_FIT            },
+    { ORDATA (SRSAVE, scmb [card2].saved_srn,       8),                    REG_HRO  },
 
-    { FLDATA (SIOBSY, scmb [card2].sio_busy,               0)                      },
-    { FLDATA (CHANSR, scmb [card2].channel_sr,             0)                      },
-    { FLDATA (DEVSR,  scmb [card2].device_sr,              0)                      },
-    { FLDATA (INXFR,  scmb [card2].input_xfer,             0)                      },
-    { FLDATA (OUTXFR, scmb [card2].output_xfer,            0)                      },
+    { FLDATA (SIOBSY, scmb [card2].sio_busy,               0)                       },
+    { FLDATA (CHANSR, scmb [card2].channel_sr,             0)                       },
+    { FLDATA (DEVSR,  scmb [card2].device_sr,              0)                       },
+    { FLDATA (INXFR,  scmb [card2].input_xfer,             0)                       },
+    { FLDATA (OUTXFR, scmb [card2].output_xfer,            0)                       },
 
-    { FLDATA (JMPMET, scmb [card2].jump_met,               0)                      },
-    { FLDATA (XFRERR, scmb [card2].flags,                 11)                      },
-    { FLDATA (EOT,    scmb [card2].flags,                  8)                      },
-    { FLDATA (TRMCNT, scmb [card2].flags,                  6)                      },
-    { FLDATA (MISCMP, scmb [card2].flags,                  7)                      },
-    { FLDATA (DEVEND, scmb [card2].device_end,             0)                      },
-    { FLDATA (STOP,   scmb [card2].stop_transfer,          0)                      },
+    { FLDATA (JMPMET, scmb [card2].jump_met,               0)                       },
+    { FLDATA (XFRERR, scmb [card2].flags,                 11)                       },
+    { FLDATA (EOT,    scmb [card2].flags,                  8)                       },
+    { FLDATA (TRMCNT, scmb [card2].flags,                  6)                       },
+    { FLDATA (MISCMP, scmb [card2].flags,                  7)                       },
+    { FLDATA (DEVEND, scmb [card2].device_end,             0)                       },
+    { FLDATA (STOP,   scmb [card2].stop_transfer,          0)                       },
 
-    { SRDATA (DIB,    scmb_dib [card1]),                                   REG_HRO },
+      DIB_REGS (scmb_dib [card2]),
 
     { NULL }
     };
@@ -694,15 +697,15 @@ DEVICE scmb_dev [] = {
        use the DIB field to obtain the device number.
 */
 
-static SIGNALS_DATA scmb_interface (DIB *dibptr, INBOUND_SET inbound_signals, uint16 inbound_value)
+static SIGNALS_DATA scmb_interface (DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
 const CARD_ID card = (CARD_ID) (dibptr->card_index);    /* the ID number of the card */
 LOAD_OP        load_operation;
 FLIP_FLOP      assert_sr;
-uint16         saved_devno;
+HP_WORD        saved_devno;
 INBOUND_SIGNAL signal;
 INBOUND_SET    working_set      = inbound_signals;
-uint16         outbound_value   = 0;
+HP_WORD        outbound_value   = 0;
 OUTBOUND_SET   outbound_signals = NO_SIGNALS;
 
 dprintf (scmb_dev [card], DEB_IOB, "Received data %06o with signals %s\n",
@@ -875,7 +878,7 @@ while (working_set) {                                   /* while there are signa
                 scmb [card].flags &= ~ST_EOT;                   /*   then clear the EOT flag */
 
                 scmb [card].device_end =                        /* set or clear device end status depending on */
-                  (scmb [card].control_word & CN_DEVEND) != 0;  /*   whether an immediate device end is enabled */
+                  D_FF (scmb [card].control_word & CN_DEVEND);  /*   whether an immediate device end is enabled */
                 }
 
             scmb [card].device_sr = SET;                        /* preset the device SR flip-flop */
@@ -892,7 +895,7 @@ while (working_set) {                                   /* while there are signa
                 scmb [card].flags &= ~ST_EOT;                   /*   then clear the EOT flag */
 
                 scmb [card].device_end =                        /* set or clear device end status depending on */
-                  (scmb [card].control_word & CN_DEVEND) != 0;  /*   whether an immediate device end is enabled */
+                  D_FF (scmb [card].control_word & CN_DEVEND);  /*   whether an immediate device end is enabled */
                 }
 
             scmb [card].device_sr = SET;                        /* preset the device SR flip-flop */
@@ -1029,19 +1032,20 @@ if (scmb [card].flags & END_CONDITION)                  /* if a termination cond
         outbound_signals |= INTREQ;                     /*   and request the interrupt */
         }
 
-if (scmb [card].control_word & CN_HSREQ)                        /* if high-speed requests are enabled */
-    assert_sr = scmb [card].channel_sr | scmb [card].device_sr; /*   then assert SR immediately if indicated */
+if (scmb [card].control_word & CN_HSREQ)                /* if high-speed requests are enabled */
+    assert_sr = D_FF (scmb [card].channel_sr            /*   then assert SR immediately if indicated */
+                      | scmb [card].device_sr);
 
-else {                                                      /* otherwise assert SR immediately */
-    assert_sr = scmb [card].channel_sr;                     /*   only if the channel is requesting service */
+else {                                                  /* otherwise assert SR immediately */
+    assert_sr = scmb [card].channel_sr;                 /*   only if the channel is requesting service */
 
-    if ((! assert_sr & scmb [card].device_sr)               /* if a delayed device SR assertion is requested */
-      && (MPX_BUS (card) || outbound_signals & CHANACK)     /*   and we're on the MPX bus or CHANACK is not inhibited */
-      && (scmb [card].control_word & CN_NOSR) == 0) {       /*     and channel service is not inhibited */
-        sim_activate (&scmb_unit [card],                    /*       then schedule SR assertion in 5 microseconds */
+    if ((! assert_sr & scmb [card].device_sr)           /* if a delayed device SR assertion is requested */
+      && (MPX_BUS (card) || outbound_signals & CHANACK) /*   and we're on the MPX bus or CHANACK is not inhibited */
+      && (scmb [card].control_word & CN_NOSR) == 0) {   /*     and channel service is not inhibited */
+        sim_activate (&scmb_unit [card],                /*       then schedule SR assertion in 5 microseconds */
                       scmb_unit [card].wait);
 
-        dprintf (scmb_dev [card], DEB_SERV, "Delay %d SR service scheduled\n",
+        dprintf (scmb_dev [card], DEB_SERV, "Delay %u SR service scheduled\n",
                  scmb_unit [card].wait);
         }
     }

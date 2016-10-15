@@ -861,7 +861,6 @@ fprintf (st, "   RQn        to boot from rqn\n");
 fprintf (st, "   RQBn       to boot from rqbn\n");
 fprintf (st, "   RQCn       to boot from rqcn\n");
 fprintf (st, "   RQDn       to boot from rqdn\n");
-fprintf (st, "   TQn        to boot from tqn\n");
 fprintf (st, "   CS         to boot from console RL\n\n");
 return SCPE_OK;
 }

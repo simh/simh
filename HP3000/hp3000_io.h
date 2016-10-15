@@ -23,6 +23,10 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   12-Sep-16    JDB     Added the DIB_REGS macro
+   02-Sep-16    JDB     Added the iop_assert_PFWARN routine
+   11-Jun-16    JDB     Bit mask constants are now unsigned
+   21-Mar-16    JDB     Changed type of inbound_value of CNTLR_INTRF to HP_WORD
    20-Jan-16    JDB     First release version
    11-Dec-12    JDB     Created
 
@@ -133,7 +137,7 @@ typedef enum {                                  /* --- source of signal --- */
     INTPOLLIN     = 000040000000,               /*   IOP interrupt poll */
     XFERERROR     = 000100000000,               /*   Multiplexer channel abort */
     CHANSO        = 000200000000,               /*   Channel service call to interface */
-    PFWARN        = 000400000000                /*   SET CPU POWERFAIL */
+    PFWARN        = 000400000000                /*   POWER FAIL command */
 /*                = 001000000000                     (available) */
 /*                = 002000000000                     (available) */
 /*                = 004000000000                     (available) */
@@ -141,7 +145,7 @@ typedef enum {                                  /* --- source of signal --- */
 /*                = 020000000000                     (available) */
     } INBOUND_SIGNAL;
 
-typedef INBOUND_SIGNAL INBOUND_SET;             /* a set of INBOUND_SIGNALs */
+typedef INBOUND_SIGNAL      INBOUND_SET;        /* a set of INBOUND_SIGNALs */
 
 
 typedef enum {                                  /* --- destination of signal --- */
@@ -163,10 +167,10 @@ typedef enum {                                  /* --- destination of signal ---
 /*               = 020000000000                      (available) */
     } OUTBOUND_SIGNAL;
 
-typedef OUTBOUND_SIGNAL OUTBOUND_SET;           /* a set of OUTBOUND_SIGNALs */
+typedef OUTBOUND_SIGNAL     OUTBOUND_SET;       /* a set of OUTBOUND_SIGNALs */
 
 
-typedef uint32 SIGNALS_DATA;                    /* a combined outbound signal set and data value */
+typedef uint32              SIGNALS_DATA;       /* a combined outbound signal set and data value */
 
 
 /* I/O macros.
@@ -224,11 +228,11 @@ typedef uint32 SIGNALS_DATA;                    /* a combined outbound signal se
 #define IOPRIORITY(P)       ((P) & ~(P) + 1)
 
 #define IONEXTSIG(S)        ((INBOUND_SIGNAL) IOPRIORITY (S))
-#define IOCLEARSIG(S,L)     S ^= (L)
+#define IOCLEARSIG(S,L)     S = (INBOUND_SIGNAL) ((S) ^ (L))
 
 #define IORETURN(S,D)       ((SIGNALS_DATA) ((S) & ~D16_MASK | (D) & D16_MASK))
 #define IOSIGNALS(C)        ((OUTBOUND_SET) ((C) & ~D16_MASK))
-#define IODATA(C)           ((uint16) ((C) & D16_MASK))
+#define IODATA(C)           ((HP_WORD) ((C) & D16_MASK))
 
 
 /* I/O structures.
@@ -267,36 +271,42 @@ typedef uint32 SIGNALS_DATA;                    /* a combined outbound signal se
        could be smaller than the defined 32-bit sizes, but IA-32 processors
        execute instructions with 32-bit operands much faster than those with
        16- or 8-bit operands.
+
+    3. The DIB_REGS macro provides hidden register entries needed to save and
+       restore the state of a DIB.  Only the potentially variable fields are
+       referenced.  In particular, the "io_interface" field must not be saved,
+       as the address of the device's interface routine may change from version
+       to version of the simulator.
 */
 
 #define DEVNO_MAX           127                 /* the maximum device number */
-#define DEVNO_MASK          0177                /* the mask for the device number */
+#define DEVNO_MASK          0177u               /* the mask for the device number */
 #define DEVNO_BASE          10                  /* the radix for the device number */
 #define DEVNO_UNUSED        D32_UMAX            /* the unused device number indicator */
 
 #define INTMASK_MAX         15                  /* the maximum interrupt mask number */
-#define INTMASK_MASK        017                 /* the mask for the interrupt mask number */
+#define INTMASK_MASK        017u                /* the mask for the interrupt mask number */
 #define INTMASK_BASE        10                  /* the radix for the interrupt mask number */
-#define INTMASK_D           0000000             /* the interrupt mask disabled always value */
-#define INTMASK_E           0177777             /* the interrupt mask enabled always value */
+#define INTMASK_D           0000000u            /* the interrupt mask disabled always value */
+#define INTMASK_E           0177777u            /* the interrupt mask enabled always value */
 #define INTMASK_UNUSED      D32_UMAX            /* the unused interrupt mask indicator */
 
 #define INTPRI_MAX          31                  /* the maximum interrupt priority */
-#define INTPRI_MASK         037                 /* the mask for the interrupt priority */
+#define INTPRI_MASK         037u                /* the mask for the interrupt priority */
 #define INTPRI_BASE         10                  /* the radix for the interrupt priority */
 #define INTPRI_UNUSED       D32_UMAX            /* the unused interrupt priority indicator */
 
 #define SRNO_MAX            15                  /* the maximum service request number */
-#define SRNO_MASK           017                 /* the mask for the service request number */
+#define SRNO_MASK           017u                /* the mask for the service request number */
 #define SRNO_BASE           10                  /* the radix for the service request number */
 #define SRNO_UNUSED         D32_UMAX            /* the unused service request number indicator */
 
-typedef struct dib DIB;                         /* an incomplete definition */
+typedef struct dib          DIB;                /* an incomplete definition */
 
 typedef SIGNALS_DATA CNTLR_INTRF                /* the I/O device controller interface function prototype */
     (DIB         *dibptr,                       /*   a pointer to the device information block */
      INBOUND_SET inbound_signals,               /*   a set of inbound signals */
-     uint16      inbound_value);                /*   a 16-bit inbound value */
+     HP_WORD     inbound_value);                /*   a 16-bit inbound value */
 
 struct dib {                                    /* the Device Information Block */
     CNTLR_INTRF *io_interface;                  /*   the controller I/O interface function pointer */
@@ -309,6 +319,17 @@ struct dib {                                    /* the Device Information Block 
     FLIP_FLOP   interrupt_active;               /*   an interrupt is active */
     t_bool      service_request;                /*   channel service has been requested */
     };
+
+#define DIB_REGS(dib) \
+/*    Macro   Name     Location                    Width   Flags   */ \
+/*    ------  -------  --------------------------  -----  -------  */ \
+    { DRDATA (DIBDN,   dib.device_number,           32),   REG_HRO }, \
+    { DRDATA (DIBSRN,  dib.service_request_number,  32),   REG_HRO }, \
+    { DRDATA (DIBPRI,  dib.interrupt_priority,      32),   REG_HRO }, \
+    { ORDATA (DIBMASK, dib.interrupt_mask,          32),   REG_HRO }, \
+    { ORDATA (DIBIRQ,  dib.interrupt_request,       32),   REG_HRO }, \
+    { ORDATA (DIBACT,  dib.interrupt_active,        32),   REG_HRO }, \
+    { ORDATA (DIBSR,   dib.service_request,         32),   REG_HRO }
 
 
 /* Calibrated timer numbers */
@@ -332,13 +353,14 @@ typedef enum {
 extern UNIT  *cpu_pclk_uptr;                            /* pointer to the process clock unit */
 extern t_bool cpu_is_calibrated;                        /* TRUE if the process clock is calibrated */
 
-extern void cpu_front_panel (HP_WORD    switch_reg,     /* set the front panel switches as directed */
+extern void cpu_front_panel (HP_WORD    switch_reg,     /* set the CPU front panel switches as directed */
                              PANEL_TYPE request);
 
 
 /* Global asynchronous signal assertion functions */
 
 extern void iop_assert_INTREQ (DIB *dib_pointer);       /* assert the interrupt request signal */
+extern void iop_assert_PFWARN (void);                   /* assert the power failure warning signal */
 
 extern void mpx_assert_REQ    (DIB *dib_pointer);       /* assert the multiplexer channel request signal */
 extern void mpx_assert_SRn    (DIB *dib_pointer);       /* assert the multiplexer channel service request signal */
