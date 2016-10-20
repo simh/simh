@@ -172,7 +172,7 @@ DEVICE mt_dev = {
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     &mt_boot, &sim_tape_attach, &sim_tape_detach,
-    NULL, DEV_DEBUG
+    NULL, DEV_DEBUG | DEV_TAPE
     };
 
 /* Function routine
