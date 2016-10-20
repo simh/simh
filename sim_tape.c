@@ -439,7 +439,11 @@ fflush (uptr->fileref);
 
 t_stat sim_tape_attach (UNIT *uptr, CONST char *cptr)
 {
-return sim_tape_attach_ex (uptr, cptr, 0, 0);
+DEVICE *dptr;
+
+if ((dptr = find_dev_from_unit (uptr)) == NULL)
+    return SCPE_NOATT;
+return sim_tape_attach_ex (uptr, cptr, (dptr->flags & DEV_DEBUG) ? 0xFFFFFFFF : 0, 0);
 }
 
 t_stat sim_tape_attach_ex (UNIT *uptr, const char *cptr, uint32 dbit, int completion_delay)
