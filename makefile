@@ -812,9 +812,13 @@ else
   ifneq (,$(VIDEO_USEFUL))
     SDL_INCLUDE = $(word 1,$(shell dir /b /s ..\windows-build\libSDL\SDL.h))
     ifeq (SDL.h,$(findstring SDL.h,$(SDL_INCLUDE)))
-      VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(abspath $(dir $(SDL_INCLUDE)))
+      $(info using libSDL2: $(abspath $(SDL_INCLUDE)))
+      VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(abspath $(dir $(SDL_INCLUDE)))
       VIDEO_LDFLAGS  += -lSDL2 -L$(abspath $(dir $(SDL_INCLUDE))\..\lib)
       VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
+      DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+      DISPLAYVT = ${DISPLAYD}/vt11.c
+      DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
     else
       $(info ***********************************************************************)
       $(info ***********************************************************************)
