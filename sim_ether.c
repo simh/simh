@@ -1628,6 +1628,9 @@ static int _eth_get_system_id (char *buf, size_t buf_size)
   HKEY reghnd;
 
   memset (buf, 0, buf_size);
+#ifndef KEY_WOW64_64KEY
+#define KEY_WOW64_64KEY         (0x0100)
+#endif
   if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", 0, KEY_QUERY_VALUE|KEY_WOW64_64KEY, &reghnd)) != ERROR_SUCCESS)
     return -1;
   reglen = buf_size;
