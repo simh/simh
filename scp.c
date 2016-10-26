@@ -4628,7 +4628,7 @@ else {
                 if ((dptr = find_dev_from_unit (uptr)) != NULL) {
                     fprintf (st, "  %s", sim_dname (dptr));
                     if (dptr->numunits > 1)
-                        fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+                        fprintf (st, " at %d%s\n", accum + uptr->time, (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
                     }
                 else
                     fprintf (st, "  Unknown");
