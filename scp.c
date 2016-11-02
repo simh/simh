@@ -2440,7 +2440,7 @@ BRKTYPTAB *brkt = dptr->brk_types;
 char gbuf[CBUFSIZE];
 
 if (sim_brk_types == 0) {
-    if (!silent) {
+    if ((dptr != sim_dflt_dev) && (!silent)) {
         fprintf (st, "Breakpoints are not supported in the %s simulator\n", sim_name);
         if (dptr->help)
             dptr->help (st, dptr, NULL, 0, NULL);
@@ -2450,14 +2450,16 @@ if (sim_brk_types == 0) {
 if (brkt == NULL) {
     int i;
 
-    if (sim_brk_types & ~sim_brk_dflt) {
-        fprintf (st, "%s supports the following breakpoint types:\n", sim_dname (dptr));
-        for (i=0; i<26; i++) {
-            if (sim_brk_types & (1<<i))
-                fprintf (st, "  -%c\n", 'A'+i);
+    if (dptr == sim_dflt_dev) {
+        if (sim_brk_types & ~sim_brk_dflt) {
+            fprintf (st, "%s supports the following breakpoint types:\n", sim_dname (dptr));
+            for (i=0; i<26; i++) {
+                if (sim_brk_types & (1<<i))
+                    fprintf (st, "  -%c\n", 'A'+i);
+                }
             }
+        fprintf (st, "The default breakpoint type is: %s\n", put_switches (gbuf, sizeof(gbuf), sim_brk_dflt));
         }
-    fprintf (st, "The default breakpoint type is: %s\n", put_switches (gbuf, sizeof(gbuf), sim_brk_dflt));
     return;
     }
 fprintf (st, "%s supports the following breakpoint types:\n", sim_dname (dptr));
