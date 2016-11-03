@@ -4627,14 +4627,13 @@ else {
             if (uptr == &sim_expect_unit)
                 fprintf (st, "  Expect fired");
             else
-                if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+                if ((dptr = find_dev_from_unit (uptr)) != NULL)
                     fprintf (st, "  %s", sim_dname (dptr));
-                    if (dptr->numunits > 1)
-                        fprintf (st, " at %d%s\n", accum + uptr->time, (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
-                    }
                 else
                     fprintf (st, "  Unknown");
-        fprintf (st, " at %d\n", accum + uptr->time);
+        fprintf (st, " at %d (%.0f usecs) %s\n", accum + uptr->time, 
+                                                ((accum + uptr->time)*1000000.0)/sim_timer_inst_per_sec (), 
+                                                (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
         accum = accum + uptr->time;
         }
     }
