@@ -228,6 +228,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
+#include <math.h>
 #if defined(_WIN32)
 #include <direct.h>
 #include <io.h>
@@ -4617,6 +4618,8 @@ if (sim_clock_queue == QUEUE_LIST_END)
     fprintf (st, "%s event queue empty, time = %.0f, executing %.0f instructios/sec\n",
              sim_name, sim_time, sim_timer_inst_per_sec ());
 else {
+    const char *tim;
+
     fprintf (st, "%s event queue status, time = %.0f, executing %.0f instructions/sec\n",
              sim_name, sim_time, sim_timer_inst_per_sec ());
     accum = 0;
@@ -4627,13 +4630,17 @@ else {
             if (uptr == &sim_expect_unit)
                 fprintf (st, "  Expect fired");
             else
-                if ((dptr = find_dev_from_unit (uptr)) != NULL)
+                if ((dptr = find_dev_from_unit (uptr)) != NULL) {
                     fprintf (st, "  %s", sim_dname (dptr));
+                    if (dptr->numunits > 1)
+                        fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+                    }
                 else
                     fprintf (st, "  Unknown");
-        fprintf (st, " at %d (%.0f usecs) %s\n", accum + uptr->time, 
-                                                ((accum + uptr->time)*1000000.0)/sim_timer_inst_per_sec (), 
-                                                (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
+        tim = sim_fmt_secs((accum + uptr->time)/sim_timer_inst_per_sec ());
+        fprintf (st, " at %d%s%s%s%s\n", accum + uptr->time, 
+                                        (*tim) ? " (" : "", tim, (*tim) ? ")" : "",
+                                        (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
         accum = accum + uptr->time;
         }
     }
@@ -8655,6 +8662,67 @@ if (sim_deb && (sim_deb != stdout))
     if (fputs (dbuf, sim_deb) == EOF)
         return SCPE_IOERR;
 return SCPE_OK;
+}
+
+const char *sim_fmt_secs (double seconds)
+{
+static char buf[60];
+char frac[16] = "";
+char *sign = "";
+double val = seconds;
+double days, hours, mins, secs, msecs, usecs;
+
+if (val == 0.0)
+    return "";
+if (val < 0.0) {
+    sign = "-";
+    val = -val;
+    }
+days = floor (val / (24.0*60.0*60.0));
+val -= (days * 24.0*60.0*60.0);
+hours = floor (val / (60.0*60.0));
+val -= (hours * 60.0 * 60.0);
+mins = floor (val / 60.0);
+val -= (mins * 60.0);
+secs = floor (val);
+val -= secs;
+val *= 1000.0;
+msecs = floor (val);
+val -= msecs;
+val *= 1000.0;
+usecs = floor (val+0.5);
+if (usecs == 1000.0) {
+    usecs = 0.0;
+    msecs += 1;
+    }
+if ((msecs > 0.0) || (usecs > 0.0)) {
+    sprintf (frac, ".%03.0f%03.0f", msecs, usecs);
+    while (frac[strlen (frac) - 1] == '0')
+        frac[strlen (frac) - 1] = '\0';
+    if (strlen (frac) == 1)
+        frac[0] = '\0';
+    }
+if (days > 0)
+    sprintf (buf, "%s%.0f %02.0f:%02.0f:%02.0f%s days", sign, days, hours, mins, secs, frac);
+else
+    if (hours > 0)
+        sprintf (buf, "%s.0f:%02.0f:%02.0f%s hours", sign, hours, mins, secs, frac);
+    else
+        if (mins > 0)
+            sprintf (buf, "%s%.0f:%02.0f%s minutes", sign, mins, secs, frac);
+        else
+            if (secs > 0)
+                sprintf (buf, "%s%.0f%s seconds", sign, secs, frac);
+            else
+                if (msecs > 0) {
+                    if (usecs > 0)
+                        sprintf (buf, "%s%.0f%03.0f usecs", sign, msecs, usecs);
+                    else
+                        sprintf (buf, "%s%.0f msecs", sign, msecs);
+                    }
+                else
+                    sprintf (buf, "%s%.0f usecs", sign, usecs);
+return buf;
 }
 
 /* Event queue package
