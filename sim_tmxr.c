@@ -4037,11 +4037,11 @@ else {
     }
 if (single_line) {          /* Single Line Multiplexer */
     fprintf (st, "The input data rate for the %s device can be controlled by\n", dptr->name);
-    fprintf (st, "specifying SPEED=nnn on the the ATTACH command.\n");
+    fprintf (st, "specifying SPEED=nnn{*fac} on the the ATTACH command.\n");
     }
 else {
     fprintf (st, "The input data rate for all lines or a particular line of a the %s\n", dptr->name);
-    fprintf (st, "device can be controlled by specifying SPEED=nnn on the the ATTACH command.\n");
+    fprintf (st, "device can be controlled by specifying SPEED=nnn{*fac} on the ATTACH command.\n");
     }
 fprintf (st, "SPEED values can be any one of:\n\n");
 fprintf (st, "    0 50 75 110 134 150 300 600 1200 1800 2000 2400\n");

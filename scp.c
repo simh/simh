@@ -992,6 +992,7 @@ static const char simh_help[] =
       "++++++++                     specified destination {STDOUT,STDERR,DEBUG\n"
       "++++++++                     or filename)\n"
       "+set console NOLOG           disable console logging\n"
+      "+set console SPEED=nn{*fac}  specifies the maximum console port input rate\n"
        /***************** 80 character line width template *************************/
 #define HLP_SET_REMOTE "*Commands SET REMOTE"
       "3Remote\n"
