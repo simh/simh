@@ -8706,7 +8706,7 @@ if (days > 0)
     sprintf (buf, "%s%.0f %02.0f:%02.0f:%02.0f%s days", sign, days, hours, mins, secs, frac);
 else
     if (hours > 0)
-        sprintf (buf, "%s.0f:%02.0f:%02.0f%s hours", sign, hours, mins, secs, frac);
+        sprintf (buf, "%s%.0f:%02.0f:%02.0f%s hours", sign, hours, mins, secs, frac);
     else
         if (mins > 0)
             sprintf (buf, "%s%.0f:%02.0f%s minutes", sign, mins, secs, frac);
