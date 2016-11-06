@@ -332,8 +332,9 @@ t_stat sim_instr (void)
             reason = STOP_IBKPT;        /* stop simulation */
             break;
         }
-        IR = OP = fetch_byte(0);        /* fetch instruction */
+
         sim_interval--;
+        IR = OP = fetch_byte(0);        /* fetch instruction */
 
         /* The Big Instruction Decode Switch */
 

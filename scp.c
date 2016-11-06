@@ -228,6 +228,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
+#include <math.h>
 #if defined(_WIN32)
 #include <direct.h>
 #include <io.h>
@@ -991,6 +992,7 @@ static const char simh_help[] =
       "++++++++                     specified destination {STDOUT,STDERR,DEBUG\n"
       "++++++++                     or filename)\n"
       "+set console NOLOG           disable console logging\n"
+      "+set console SPEED=nn{*fac}  specifies the maximum console port input rate\n"
        /***************** 80 character line width template *************************/
 #define HLP_SET_REMOTE "*Commands SET REMOTE"
       "3Remote\n"
@@ -2440,7 +2442,7 @@ BRKTYPTAB *brkt = dptr->brk_types;
 char gbuf[CBUFSIZE];
 
 if (sim_brk_types == 0) {
-    if (!silent) {
+    if ((dptr != sim_dflt_dev) && (!silent)) {
         fprintf (st, "Breakpoints are not supported in the %s simulator\n", sim_name);
         if (dptr->help)
             dptr->help (st, dptr, NULL, 0, NULL);
@@ -2450,14 +2452,16 @@ if (sim_brk_types == 0) {
 if (brkt == NULL) {
     int i;
 
-    if (sim_brk_types & ~sim_brk_dflt) {
-        fprintf (st, "%s supports the following breakpoint types:\n", sim_dname (dptr));
-        for (i=0; i<26; i++) {
-            if (sim_brk_types & (1<<i))
-                fprintf (st, "  -%c\n", 'A'+i);
+    if (dptr == sim_dflt_dev) {
+        if (sim_brk_types & ~sim_brk_dflt) {
+            fprintf (st, "%s supports the following breakpoint types:\n", sim_dname (dptr));
+            for (i=0; i<26; i++) {
+                if (sim_brk_types & (1<<i))
+                    fprintf (st, "  -%c\n", 'A'+i);
+                }
             }
+        fprintf (st, "The default breakpoint type is: %s\n", put_switches (gbuf, sizeof(gbuf), sim_brk_dflt));
         }
-    fprintf (st, "The default breakpoint type is: %s\n", put_switches (gbuf, sizeof(gbuf), sim_brk_dflt));
     return;
     }
 fprintf (st, "%s supports the following breakpoint types:\n", sim_dname (dptr));
@@ -4615,6 +4619,8 @@ if (sim_clock_queue == QUEUE_LIST_END)
     fprintf (st, "%s event queue empty, time = %.0f, executing %.0f instructios/sec\n",
              sim_name, sim_time, sim_timer_inst_per_sec ());
 else {
+    const char *tim;
+
     fprintf (st, "%s event queue status, time = %.0f, executing %.0f instructions/sec\n",
              sim_name, sim_time, sim_timer_inst_per_sec ());
     accum = 0;
@@ -4632,7 +4638,10 @@ else {
                     }
                 else
                     fprintf (st, "  Unknown");
-        fprintf (st, " at %d\n", accum + uptr->time);
+        tim = sim_fmt_secs((accum + uptr->time)/sim_timer_inst_per_sec ());
+        fprintf (st, " at %d%s%s%s%s\n", accum + uptr->time, 
+                                        (*tim) ? " (" : "", tim, (*tim) ? ")" : "",
+                                        (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
         accum = accum + uptr->time;
         }
     }
@@ -8654,6 +8663,67 @@ if (sim_deb && (sim_deb != stdout))
     if (fputs (dbuf, sim_deb) == EOF)
         return SCPE_IOERR;
 return SCPE_OK;
+}
+
+const char *sim_fmt_secs (double seconds)
+{
+static char buf[60];
+char frac[16] = "";
+char *sign = "";
+double val = seconds;
+double days, hours, mins, secs, msecs, usecs;
+
+if (val == 0.0)
+    return "";
+if (val < 0.0) {
+    sign = "-";
+    val = -val;
+    }
+days = floor (val / (24.0*60.0*60.0));
+val -= (days * 24.0*60.0*60.0);
+hours = floor (val / (60.0*60.0));
+val -= (hours * 60.0 * 60.0);
+mins = floor (val / 60.0);
+val -= (mins * 60.0);
+secs = floor (val);
+val -= secs;
+val *= 1000.0;
+msecs = floor (val);
+val -= msecs;
+val *= 1000.0;
+usecs = floor (val+0.5);
+if (usecs == 1000.0) {
+    usecs = 0.0;
+    msecs += 1;
+    }
+if ((msecs > 0.0) || (usecs > 0.0)) {
+    sprintf (frac, ".%03.0f%03.0f", msecs, usecs);
+    while (frac[strlen (frac) - 1] == '0')
+        frac[strlen (frac) - 1] = '\0';
+    if (strlen (frac) == 1)
+        frac[0] = '\0';
+    }
+if (days > 0)
+    sprintf (buf, "%s%.0f %02.0f:%02.0f:%02.0f%s days", sign, days, hours, mins, secs, frac);
+else
+    if (hours > 0)
+        sprintf (buf, "%s%.0f:%02.0f:%02.0f%s hours", sign, hours, mins, secs, frac);
+    else
+        if (mins > 0)
+            sprintf (buf, "%s%.0f:%02.0f%s minutes", sign, mins, secs, frac);
+        else
+            if (secs > 0)
+                sprintf (buf, "%s%.0f%s seconds", sign, secs, frac);
+            else
+                if (msecs > 0) {
+                    if (usecs > 0)
+                        sprintf (buf, "%s%.0f%03.0f usecs", sign, msecs, usecs);
+                    else
+                        sprintf (buf, "%s%.0f msecs", sign, msecs);
+                    }
+                else
+                    sprintf (buf, "%s%.0f usecs", sign, usecs);
+return buf;
 }
 
 /* Event queue package

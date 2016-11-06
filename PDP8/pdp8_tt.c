@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -74,7 +74,7 @@ REG tti_reg[] = {
     { FLDATAD (ENABLE, int_enable, INT_V_TTI, "interrupt enable flag") },
     { FLDATAD (INT, int_req, INT_V_TTI, "interrupt pending flag") },
     { DRDATAD (POS, tti_unit.pos, T_ADDR_W, "number of characters input"), PV_LEFT },
-    { DRDATAD (TIME, tti_unit.wait, 24, "input polling interval                                                          (if 0, the keyboard is polled synchronously with the clock)"), PV_LEFT },
+    { DRDATAD (TIME, tti_unit.wait, 24, "input polling interval (if 0, the keyboard is polled synchronously with the clock)"), PV_LEFT+REG_NZ },
     { NULL }
     };
 

@@ -843,10 +843,10 @@ uint32 clock_start, clock_last, clock_now;
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_init()\n");
 for (i=0; i<SIM_NTIMERS; i++) {
     sim_timer_units[i].action = &sim_timer_tick_svc;
-    sim_timer_units[i].flags = UNIT_DIS;
+    sim_timer_units[i].flags = UNIT_DIS | UNIT_IDLE;
     }
 sim_timer_units[SIM_NTIMERS].action = &sim_throt_svc;
-sim_timer_units[SIM_NTIMERS].flags = UNIT_DIS;
+sim_timer_units[SIM_NTIMERS].flags = UNIT_DIS | UNIT_IDLE;
 sim_register_internal_device (&sim_timer_dev);
 sim_idle_enab = FALSE;                                  /* init idle off */
 sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
@@ -1552,7 +1552,7 @@ for (i = 0; i < SIM_NTIMERS; i++)
 if (i == SIM_NTIMERS) {     /* No clocks have signed in. */
     /* setup internal clock */
     sim_timer_units[SIM_NTIMERS+1].action = &sim_timer_clock_tick_svc;
-    sim_timer_units[SIM_NTIMERS+1].flags = UNIT_DIS;
+    sim_timer_units[SIM_NTIMERS+1].flags = UNIT_DIS | UNIT_IDLE;
     }
 if (sim_timer_units[SIM_NTIMERS+1].action == &sim_timer_clock_tick_svc) {
     /* actual clock reset */
