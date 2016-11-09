@@ -74,6 +74,7 @@ int tty_active [TTY_MAX+1], tty_sym [TTY_MAX+1];
 int tty_typed [TTY_MAX+1], tty_instate [TTY_MAX+1];
 time_t tty_last_time [TTY_MAX+1];
 int tty_idle_count [TTY_MAX+1];
+int tty_freq = 300;
 
 uint32 vt_sending, vt_receiving;
 uint32 tt_sending, tt_receiving;
@@ -177,11 +178,11 @@ t_stat tty_reset (DEVICE *dptr)
      * and the device is always ready. */
     /* Forcing a ready interrupt. */
     PRP |= CONS_CAN_PRINT[0] | CONS_CAN_PRINT[1];
-    //return sim_activate_after (tty_unit, 1000*MSEC/300);
+    //return sim_activate_after (tty_unit, 1000*MSEC/tty_freq);
     return sim_clock_coschedule (tty_unit, tmr_poll);
 }
 
-/* Bit 19 of GRP, should be 300 Hz */
+/* Bit 19 of GRP, should be 'tty_freq' Hz */
 t_stat vt_clk (UNIT * this)
 {
     int num;
@@ -246,7 +247,7 @@ t_stat vt_clk (UNIT * this)
     /* Polling sockets for transmission. */
     tmxr_poll_tx (&tty_desc);
     /* If the TTY system is not idle, schedule the next interrupt
-     * by instruction count using the target interrupt rate of 300 Hz;
+     * by instruction count using the target interrupt rate of tty_freq Hz;
      * otherwise we can wait for a roughly equivalent wallclock time period,
      * e.g. until the next 250 Hz wallclock interrupt, but making sure 
      * that the model time interval between GRP_SERIAL interrupts 
@@ -254,10 +255,10 @@ t_stat vt_clk (UNIT * this)
      * Using sim_activate_after() would be more straightforward (no need for a check
      * as the host is faster than the target), but likely less efficient for idling.
      */
-    if (vt_is_idle() && sim_activate_time(clocks) > 1000*MSEC/300)
+    if (vt_is_idle() && sim_activate_time(clocks) > 1000*MSEC/tty_freq)
         return sim_clock_coschedule (this, tmr_poll);
     else
-        return sim_activate(this, 1000*MSEC/300);
+        return sim_activate(this, 1000*MSEC/tty_freq);
 }
 
 t_stat tty_setmode (UNIT *u, int32 val, CONST char *cptr, void *desc)
@@ -369,6 +370,18 @@ t_stat tty_detach (UNIT *u)
     return tmxr_detach (&tty_desc, &tty_unit[0]);
 }
 
+t_stat tty_setfreq(UNIT *up, int32 v, CONST char *cp, void *dp) {
+    int freq;
+    if (cp) freq = atoi(cp); else return SCPE_MISVAL;
+    if (freq <= 0) return SCPE_ARG;
+    tty_freq = freq;
+    return SCPE_OK;
+}
+
+t_stat tty_showfreq(FILE *f, UNIT *up, int32 v, CONST void *dp) {
+    fprintf(f, "%d Hz", tty_freq);
+    return SCPE_OK;
+}
 /*
  * TTY control:
  * set ttyN unicode     - selecting UTF-8 encoding
@@ -404,6 +417,8 @@ MTAB tty_mod[] = {
       "DESTRBS" },
     { TTY_BSPACE_MASK, TTY_AUTHENTIC_BSPACE, NULL,
       "AUTHBS" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "TTY frequency",
+      "FREQ", &tty_setfreq, &tty_showfreq, NULL },
     { MTAB_XTD | MTAB_VDV, 1, NULL,
       "DISCONNECT", &tmxr_dscln, NULL, (void*) &tty_desc },
     { UNIT_ATT, UNIT_ATT, "connections",
