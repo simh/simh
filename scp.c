@@ -6316,8 +6316,12 @@ else if (flag == RU_BOOT) {                             /* boot */
         return r;
     }
 
-else if (flag != RU_CONT)                               /* must be cont */
-    return SCPE_IERR;
+else 
+    if (flag != RU_CONT)                                /* must be cont */
+        return SCPE_IERR;
+    else                                                /* CONTINUE command */
+        if (*cptr != 0)                                 /* should be end (no arguments allowed) */
+            return sim_messagef (SCPE_2MARG, "CONTINUE command takes no arguments\n");
 
 if (sim_switches & SIM_SW_HIDE)                         /* Setup only for Remote Console Mode */
     return SCPE_OK;
