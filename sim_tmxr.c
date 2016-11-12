@@ -802,7 +802,7 @@ else if (uptr) {                                        /* implied line form? */
     }
 
 else if (cptr == NULL)                                  /* named line form, parameter supplied? */
-    code = SCPE_MISVAL;                                    /* no, so report missing */
+    code = SCPE_MISVAL;                                 /* no, so report missing */
 
 else {
     ln = get_uint (cptr, 10, mp->lines - 1, &code);     /* get line number */
@@ -2131,7 +2131,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
         continue;
     nbytes = tmxr_send_buffered_data (lp);              /* buffered bytes */
     if (nbytes == 0) {                                  /* buf empty? enab line */
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
         UNIT *ruptr = lp->uptr ? lp->uptr : lp->mp->uptr;
         if ((ruptr->dynflags & UNIT_TM_POLL) &&
             sim_asynch_enabled &&
@@ -2957,7 +2957,7 @@ return SCPE_OK;
 static TMXR **tmxr_open_devices = NULL;
 static int tmxr_open_device_count = 0;
 
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 pthread_t           sim_tmxr_poll_thread;          /* Polling Thread Id */
 #if defined(_WIN32) || defined(VMS)
 pthread_t           sim_tmxr_serial_poll_thread;   /* Serial Polling Thread Id */
@@ -3455,11 +3455,11 @@ return NULL;
 }
 #endif /* VMS */
 
-#endif /* defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX) */
+#endif /* defined(SIM_ASYNCH_MUX) */
 
 t_stat tmxr_start_poll (void)
 {
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 pthread_mutex_lock (&sim_tmxr_poll_lock);
 if ((tmxr_open_device_count > 0) && 
     sim_asynch_enabled           && 
@@ -3483,7 +3483,7 @@ return SCPE_OK;
 
 t_stat tmxr_stop_poll (void)
 {
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 pthread_mutex_lock (&sim_tmxr_poll_lock);
 if (sim_tmxr_poll_running) {
     pthread_cond_signal (&sim_tmxr_poll_cond);
@@ -3516,7 +3516,7 @@ static void tmxr_add_to_open_list (TMXR* mux)
 int i;
 t_bool found = FALSE;
 
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 pthread_mutex_lock (&sim_tmxr_poll_lock);
 #endif
 for (i=0; i<tmxr_open_device_count; ++i)
@@ -3531,7 +3531,7 @@ if (!found) {
         if (0 == mux->ldsc[i].send.delay)
             mux->ldsc[i].send.delay = SEND_DEFAULT_DELAY;
     }
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 pthread_mutex_unlock (&sim_tmxr_poll_lock);
 if ((tmxr_open_device_count == 1) && (sim_asynch_enabled))
     tmxr_start_poll ();
@@ -3542,7 +3542,7 @@ static void _tmxr_remove_from_open_list (TMXR* mux)
 {
 int i, j;
 
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 tmxr_stop_poll ();
 pthread_mutex_lock (&sim_tmxr_poll_lock);
 #endif
@@ -3553,7 +3553,7 @@ for (i=0; i<tmxr_open_device_count; ++i)
         --tmxr_open_device_count;
         break;
         }
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 pthread_mutex_unlock (&sim_tmxr_poll_lock);
 #endif
 }
@@ -3630,7 +3630,7 @@ if ((mp->lines > 1) ||
      (mp->ldsc[0].serport == 0)))
     uptr->dynflags = uptr->dynflags | UNIT_ATTMULT;     /* allow multiple attach commands */
 
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 if (!async || (uptr->flags & TMUF_NOASYNCH))            /* if asynch disabled */
     uptr->dynflags |= TMUF_NOASYNCH;                    /* tag as no asynch */
 #else
@@ -3849,7 +3849,7 @@ return SCPE_OK;
 
 t_stat tmxr_activate (UNIT *uptr, int32 interval)
 {
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
     return _sim_activate (uptr, interval);
@@ -3862,7 +3862,7 @@ return _sim_activate (uptr, interval);
 
 t_stat tmxr_activate_after (UNIT *uptr, uint32 usecs_walltime)
 {
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
     return _sim_activate_after (uptr, usecs_walltime);
@@ -3875,7 +3875,7 @@ return _sim_activate_after (uptr, usecs_walltime);
 
 t_stat tmxr_activate_after_abs (UNIT *uptr, uint32 usecs_walltime)
 {
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
     return _sim_activate_after_abs (uptr, usecs_walltime);
@@ -3904,7 +3904,7 @@ t_stat tmxr_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
 {
 TMXR *mp = (TMXR *)uptr->tmxr;
 
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+#if defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
     return sim_clock_coschedule (uptr, tmr, interval);
