@@ -8669,7 +8669,7 @@ const char *sim_fmt_secs (double seconds)
 {
 static char buf[60];
 char frac[16] = "";
-char *sign = "";
+const char *sign = "";
 double val = seconds;
 double days, hours, mins, secs, msecs, usecs;
 
@@ -8704,25 +8704,27 @@ if ((msecs > 0.0) || (usecs > 0.0)) {
         frac[0] = '\0';
     }
 if (days > 0)
-    sprintf (buf, "%s%.0f %02.0f:%02.0f:%02.0f%s days", sign, days, hours, mins, secs, frac);
+    sprintf (buf, "%s%.0f %02.0f:%02.0f:%02.0f%s day", sign, days, hours, mins, secs, frac);
 else
     if (hours > 0)
-        sprintf (buf, "%s%.0f:%02.0f:%02.0f%s hours", sign, hours, mins, secs, frac);
+        sprintf (buf, "%s%.0f:%02.0f:%02.0f%s hour", sign, hours, mins, secs, frac);
     else
         if (mins > 0)
-            sprintf (buf, "%s%.0f:%02.0f%s minutes", sign, mins, secs, frac);
+            sprintf (buf, "%s%.0f:%02.0f%s minute", sign, mins, secs, frac);
         else
             if (secs > 0)
-                sprintf (buf, "%s%.0f%s seconds", sign, secs, frac);
+                sprintf (buf, "%s%.0f%s second", sign, secs, frac);
             else
                 if (msecs > 0) {
                     if (usecs > 0)
-                        sprintf (buf, "%s%.0f%03.0f usecs", sign, msecs, usecs);
+                        sprintf (buf, "%s%.0f.%s msec", sign, msecs, frac+4);
                     else
-                        sprintf (buf, "%s%.0f msecs", sign, msecs);
+                        sprintf (buf, "%s%.0f msec", sign, msecs);
                     }
                 else
-                    sprintf (buf, "%s%.0f usecs", sign, usecs);
+                    sprintf (buf, "%s%.0f usec", sign, usecs);
+if (0 != strncmp ("1 ", buf, 2))
+    strcpy (&buf[strlen (buf)], "s");
 return buf;
 }
 
