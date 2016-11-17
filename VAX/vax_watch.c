@@ -162,11 +162,13 @@ int32 wtc_rd (int32 pa)
 int32 rg = (pa >> 1) & 0xF;
 int32 val = 0;
 time_t curr;
+struct timespec now;
 static int mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 struct tm *ctm = NULL;
 
 if (rg < 10) {                                          /* time reg? */
-    curr = time (NULL);                                 /* get curr time */
+    sim_rtcn_get_time (&now, TMR_CLK);
+    curr = now.tv_sec;                                  /* get curr time */
     if (curr == (time_t) -1)                            /* error? */
         return 0;
     ctm = localtime (&curr);                            /* decompose */
@@ -296,7 +298,8 @@ return SCPE_OK;
 
 t_stat wtc_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-if (cptr != NULL) wtc_mode = strcmp(cptr, "STD");
+if (cptr != NULL)
+    wtc_mode = ((strcmp(cptr, "STD") != 0) ? WTC_MODE_VMS : WTC_MODE_STD);
 return SCPE_OK;
 }
 

@@ -299,6 +299,8 @@ void iccs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0)
     CLR_INT (CLK);
+if (data & CSR_DONE)                                    /* Interrupt Acked? */
+    sim_rtcn_tick_ack (20, TMR_CLK);                    /* Let timers know */
 clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
 return;
 }
@@ -484,7 +486,7 @@ if (0 == todr_reg) {                                    /* clock running? */
    in the 32bit TODR.  This is the 33bit value 0x100000000/100 to get seconds */
 #define TOY_MAX_SECS (0x40000000/25)
 
-clock_gettime(CLOCK_REALTIME, &now);                    /* get curr time */
+sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
 base.tv_sec = toy->toy_gmtbase;
 base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
 sim_timespec_diff (&val, &now, &base);
@@ -507,8 +509,7 @@ struct timespec now, val, base;
 /* Save the GMT time when set value was 0 to record the base for future 
    read operations in "battery backed-up" state */
 
-if (-1 == clock_gettime(CLOCK_REALTIME, &now))          /* get curr time */
-    return;                                             /* error? */
+sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
 val.tv_sec = ((uint32)data) / 100;
 val.tv_nsec = (((uint32)data) % 100) * 10000000;
 sim_timespec_diff (&base, &now, &val);                  /* base = now - data */

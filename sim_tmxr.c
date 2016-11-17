@@ -3903,11 +3903,12 @@ return tmxr_clock_coschedule_tmr (uptr, 0, interval);
 t_stat tmxr_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 interval)
 {
 TMXR *mp = (TMXR *)uptr->tmxr;
+int32 ticks = (interval + (sim_rtcn_tick_size (tmr)/2))/sim_rtcn_tick_size (tmr);/* Convert to ticks */
 
 #if defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
-    return sim_clock_coschedule (uptr, tmr, interval);
+    return sim_clock_coschedule (uptr, tmr, ticks);
     }
 return SCPE_OK;
 #else
@@ -3937,7 +3938,7 @@ if (mp) {
         }
     }
 sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after interval %d instructions\n", sim_uname (uptr), interval);
-return sim_clock_coschedule_tmr (uptr, tmr, interval);
+return sim_clock_coschedule_tmr (uptr, tmr, ticks);
 #endif
 }
 

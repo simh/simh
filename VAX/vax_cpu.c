@@ -428,12 +428,12 @@ MTAB cpu_mod[] = {
     };
 
 DEBTAB cpu_deb[] = {
-    { "INTEXC",    LOG_CPU_I },
-    { "REI",       LOG_CPU_R },
-    { "CONTEXT",   LOG_CPU_P },
-    { "EVENT",     SIM_DBG_EVENT },
-    { "ACTIVATE",  SIM_DBG_ACTIVATE },
-    { "ASYNCH",    SIM_DBG_AIO_QUEUE },
+    { "INTEXC",    LOG_CPU_I,         "interrupt and exception activities" },
+    { "REI",       LOG_CPU_R,         "REI activities" },
+    { "CONTEXT",   LOG_CPU_P,         "context switching activities" },
+    { "EVENT",     SIM_DBG_EVENT,     "event dispatch activities" },
+    { "ACTIVATE",  SIM_DBG_ACTIVATE,  "queue insertion activities" },
+    { "ASYNCH",    SIM_DBG_AIO_QUEUE, "asynch queue activities" },
     { NULL, 0 }
     };
 

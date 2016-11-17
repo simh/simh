@@ -281,6 +281,10 @@ extern t_addr sim_brk_match_addr;
 extern BRKTYPTAB *sim_brk_type_desc;                      /* type descriptions */
 extern FILE *stdnul;
 extern t_bool sim_asynch_enabled;
+#if defined(SIM_ASYNCH_IO)
+int sim_aio_update_queue (void);
+void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time);
+#endif
 
 /* VM interface */
 

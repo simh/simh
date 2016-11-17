@@ -467,7 +467,7 @@ if (ctx->asynch_io) {
     }
 uptr->a_check_completion = _disk_completion_dispatch;
 uptr->a_is_active = _disk_is_active;
-uptr->a_cancel = _disk_cancel;
+uptr->cancel = _disk_cancel;
 return SCPE_OK;
 #endif
 }

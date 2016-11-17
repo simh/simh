@@ -666,6 +666,8 @@ if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
     if (tmr_iccs & TMR_CSR_RUN)                         /* run 1 -> 0? */
         tmr_icr = icr_rd (TRUE);                        /* update itr */
     }
+if (val & CSR_DONE)                                     /* Interrupt Acked? */
+    sim_rtcn_tick_ack (20, TMR_CLK);                    /* Let timers know */
 tmr_iccs = tmr_iccs & ~(val & TMR_CSR_W1C);             /* W1C csr */
 tmr_iccs = (tmr_iccs & ~TMR_CSR_WR) |                   /* new r/w */
     (val & TMR_CSR_WR);
@@ -895,7 +897,7 @@ int32 todr_rd (void)
 TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec base, now, val;
 
-clock_gettime(CLOCK_REALTIME, &now);                    /* get curr time */
+sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
 base.tv_sec = toy->toy_gmtbase;
 base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
 sim_timespec_diff (&val, &now, &base);
@@ -911,8 +913,7 @@ struct timespec now, val, base;
 /* Save the GMT time when set value was 0 to record the base for future 
    read operations in "battery backed-up" state */
 
-if (-1 == clock_gettime(CLOCK_REALTIME, &now))          /* get curr time */
-    return;                                             /* error? */
+sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
 val.tv_sec = ((uint32)data) / 100;
 val.tv_nsec = (((uint32)data) % 100) * 10000000;
 sim_timespec_diff (&base, &now, &val);                  /* base = now - data */

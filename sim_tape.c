@@ -388,7 +388,7 @@ if (ctx->asynch_io) {
     }
 uptr->a_check_completion = _tape_completion_dispatch;
 uptr->a_is_active = _tape_is_active;
-uptr->a_cancel = _tape_cancel;
+uptr->cancel = _tape_cancel;
 return SCPE_OK;
 #endif
 }

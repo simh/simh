@@ -121,6 +121,20 @@ Host platforms which have libSDL available can leverage this functionality.
       Asynchronous support exists for console I/O and most multiplexer 
       devices.  (Still experimental - not currently by default)
 
+#### Clock/Timer Enhancements
+    * Asynchronhous clocks ticks exist to better support modern processors 
+      that have variable clock speeds.  The initial clock calibration model 
+      presumed a constant simulated instruction execution rate.  
+      Modern processors have variable processor speeds which breaks this 
+      key assumption.  
+    * Strategies to make up for missed clock ticks are now available
+      (independent of asynchronous tick generation).  These strategies
+      generate catch-up clock ticks to keep the simulator passage of 
+      time consistent with wall clock time.  Simulator time while idling 
+      or throttling is now consistent.  Reasonable idling behavior is 
+      now possible without requiring that the host system clock tick be
+      10ms or less.
+
 #### Ethernet Transport Enhancements
 	* UDP packet transport.  Direct simulator connections to HECnet can be 
 	  made without running a local packet bridge program.

@@ -328,12 +328,65 @@ pthread_cond_t sim_tmxr_poll_cond  = PTHREAD_COND_INITIALIZER;
 int32 sim_tmxr_poll_count;
 pthread_t sim_asynch_main_threadid;
 UNIT * volatile sim_asynch_queue;
-UNIT * volatile sim_wallclock_queue;
-UNIT * volatile sim_wallclock_entry;
 t_bool sim_asynch_enabled = TRUE;
 int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
 int32 sim_asynch_inst_latency = 20;   /* assume 5 mip simulator */
+
+int sim_aio_update_queue (void)
+{
+int migrated = 0;
+
+if (AIO_QUEUE_VAL != QUEUE_LIST_END) {  /* List !Empty */
+    UNIT *q, *uptr;
+    int32 a_event_time;
+    do
+        q = AIO_QUEUE_VAL;
+        while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));  /* Grab current queue */
+    while (q != QUEUE_LIST_END) {       /* List !Empty */
+        sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Migrating Asynch event for %s after %d instructions\n", sim_uname(q), q->a_event_time);
+        ++migrated;
+        uptr = q;
+        q = q->a_next;
+        uptr->a_next = NULL;        /* hygiene */
+        if (uptr->a_activate_call != &sim_activate_notbefore) {
+            a_event_time = uptr->a_event_time-((sim_asynch_inst_latency+1)/2);
+            if (a_event_time < 0)
+                a_event_time = 0;
+            }
+        else
+            a_event_time = uptr->a_event_time;
+        uptr->a_activate_call (uptr, a_event_time);
+        if (uptr->a_check_completion) {
+            sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Calling Completion Check for asynch event on %s\n", sim_uname(uptr));
+            uptr->a_check_completion (uptr);
+            }
+        }
+    }
+return migrated;
+}
+
+void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time)
+{
+sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch event for %s after %d instructions\n", sim_uname(uptr), event_time);
+if (uptr->a_next) {
+    uptr->a_activate_call = sim_activate_abs;
+    }
+else {
+    UNIT *q;
+    uptr->a_event_time = event_time;
+    uptr->a_activate_call = caller;
+    do {
+        q = AIO_QUEUE_VAL;
+        uptr->a_next = q;                               /* Mark as on list */
+        } while (q != AIO_QUEUE_SET(uptr, q));
+    }
+sim_asynch_check = 0;                             /* try to force check */
+if (sim_idle_wait) {
+    sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(uptr), event_time);
+    pthread_cond_signal (&sim_asynch_wake);
+    }
+}
 #else
 t_bool sim_asynch_enabled = FALSE;
 #endif
