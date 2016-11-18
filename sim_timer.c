@@ -89,6 +89,9 @@
 #ifndef MIN
 #define MIN(a,b)  (((a) < (b)) ? (a) : (b))
 #endif
+#ifndef MAX
+#define MAX(a,b)  (((a) > (b)) ? (a) : (b))
+#endif
 
 //#define MS_MIN_GRANULARITY 20
 #define MS_MIN_GRANULARITY 1
@@ -2194,7 +2197,7 @@ if (tmr == SIM_INTERNAL_CLK)
     tmr = SIM_NTIMERS;
 else {
     if ((tmr < 0) || (tmr >= SIM_NTIMERS))
-        return sim_activate (uptr, ticks * 10000);
+        return sim_activate (uptr, MAX(1, ticks) * 10000);
     }
 if (NULL == sim_clock_unit[tmr])
     return sim_activate (uptr, ticks * (rtc_currd[tmr] ? rtc_currd[tmr] : _tick_size ()));
