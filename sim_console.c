@@ -1233,7 +1233,7 @@ if (sim_rem_master_mode) {
     t_stat stat_nomessage;
 
     sim_printf ("Command input starting on Master Remote Console Session\n");
-    stat = sim_run_boot_prep ();
+    stat = sim_run_boot_prep (0);
     sim_rem_master_was_enabled = TRUE;
     while (sim_rem_master_mode) {
         sim_rem_single_mode[0] = FALSE;
