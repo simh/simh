@@ -9093,7 +9093,8 @@ for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
         if (sim_interval > 0)
             accum = accum + sim_interval;
         }
-    else accum = accum + cptr->time;
+    else
+        accum = accum + cptr->time;
     if (cptr == uptr)
         return accum + 1;
     }
@@ -10294,6 +10295,8 @@ int32 offset = 0;
 
 if (dptr->debflags == 0)
     return debtab_none;
+
+dbits &= dptr->dctrl;                           /* Look for just the bits tha matched */
 
 /* Find matching words for bitmask */
 
