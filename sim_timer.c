@@ -748,7 +748,6 @@ return sim_rtcn_init_unit (NULL, time, tmr);
 
 int32 sim_rtcn_init_unit (UNIT *uptr, int32 time, int32 tmr)
 {
-sim_debug (DBG_CAL, &sim_timer_dev, "_sim_rtcn_init_unit(unit=%s, time=%d, tmr=%d)\n", sim_uname(uptr), time, tmr);
 if (time == 0)
     time = 1;
 if (tmr == SIM_INTERNAL_CLK)
@@ -766,6 +765,7 @@ if (rtc_currd[tmr])
     time = rtc_currd[tmr];
 if (!uptr)
     uptr = sim_clock_unit[tmr];
+sim_debug (DBG_CAL, &sim_timer_dev, "_sim_rtcn_init_unit(unit=%s, time=%d, tmr=%d)\n", sim_uname(uptr), time, tmr);
 if (uptr) {
     if (!sim_clock_unit[tmr]) {
         sim_clock_unit[tmr] = uptr;
@@ -1837,14 +1837,10 @@ while (sim_asynch_timer && sim_is_running) {
         uptr->a_next = NULL;                            /* hygiene */
 
         clock_gettime(CLOCK_REALTIME, &stop_time);
-        if (1 != sim_timespec_compare (&due_time, &stop_time)) {
+        if (1 != sim_timespec_compare (&due_time, &stop_time))
             inst_delay = 0;
-            uptr->a_last_fired_time = _timespec_to_double(&stop_time);
-            }
-        else {
+        else
             inst_delay = (int32)(inst_per_sec*(_timespec_to_double(&due_time)-_timespec_to_double(&stop_time)));
-            uptr->a_last_fired_time = uptr->a_due_time;
-            }
         sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - slept %.0fms - activating(%s,%d)\n", 
                    1000.0*(_timespec_to_double (&stop_time)-_timespec_to_double (&start_time)), sim_uname(uptr), inst_delay);
         sim_activate (uptr, inst_delay);
@@ -1989,18 +1985,16 @@ if (sim_timer_thread_running) {
     /* Any wallclock queued events are now migrated to the normal event queue */
     while (sim_wallclock_queue != QUEUE_LIST_END) {
         UNIT *uptr = sim_wallclock_queue;
-        double d_due_delta = uptr->a_due_time - sim_timenow_double ();
+        double inst_delay_d = uptr->a_due_gtime - sim_gtime ();
         int32 inst_delay;
-        double inst_delay_d;
 
         uptr->cancel (uptr);
-        if (d_due_delta < 0.0)
-            d_due_delta = 0.0;
-        inst_delay_d = sim_timer_inst_per_sec () * d_due_delta;
+        if (inst_delay_d < 0.0)
+            inst_delay_d = 0.0;
         /* Bound delay to avoid overflow.  */
         /* Long delays are usually canceled before they expire */
-        if (inst_delay_d > (double)0x7fffffff)
-            inst_delay_d = (double)0x7fffffff;
+        if (inst_delay_d > (double)0x7FFFFFFF)
+            inst_delay_d = (double)0x7FFFFFFF;
         inst_delay = (int32)inst_delay_d;
         if ((inst_delay == 0) && (inst_delay_d != 0.0))
             inst_delay = 1;     /* Minimum non-zero delay is 1 instruction */
@@ -2074,42 +2068,9 @@ if ((sim_calb_tmr == -1) ||                             /* if No timer initializ
 if (1) {
     double d_now = sim_timenow_double ();
 
-    /* Determine if this is a clock tick like invocation 
-       or an occasional measured device delay */
-    if ((uptr->a_usec_delay == usec_delay) &&
-        (uptr->a_due_time != 0.0)) {
-        double d_delay = ((double)usec_delay)/1000000.0;
-
-        uptr->a_due_time += d_delay;
-        if (uptr->a_due_time < (d_now + d_delay*0.1)) { /* Accumulate lost time */
-            uptr->a_skew += (d_now + d_delay*0.1) - uptr->a_due_time;
-            uptr->a_due_time = d_now + d_delay/10.0;
-            if (uptr->a_skew > 30.0) { /* Gap too big? */
-                uptr->a_usec_delay = usec_delay;
-                uptr->a_skew = uptr->a_last_fired_time = 0.0;
-                uptr->a_due_time = d_now + (double)(usec_delay)/1000000.0;
-                }
-            if (fabs (uptr->a_skew) > fabs (rtc_clock_skew_max[sim_calb_tmr]))
-                rtc_clock_skew_max[sim_calb_tmr] = uptr->a_skew;
-            }
-        else {
-            if (uptr->a_skew > 0.0) { /* Lost time to make up? */
-                if (uptr->a_skew > d_delay*0.9) {
-                    uptr->a_skew -= d_delay*0.9;
-                    uptr->a_due_time -= d_delay*0.9;
-                    }
-                else {
-                    uptr->a_due_time -= uptr->a_skew;
-                    uptr->a_skew = 0.0;
-                    }
-                }
-            }
-        }
-    else {
-        uptr->a_usec_delay = usec_delay;
-        uptr->a_skew = uptr->a_last_fired_time = 0.0;
-        uptr->a_due_time = d_now + (double)(usec_delay)/1000000.0;
-        }
+    uptr->a_usec_delay = usec_delay;
+    uptr->a_due_time = d_now + (double)(usec_delay)/1000000.0;
+    uptr->a_due_gtime = sim_gtime () + (sim_timer_inst_per_sec () * (double)(usec_delay)/1000000.0);
     uptr->time = usec_delay;
     uptr->cancel = &_sim_wallclock_cancel;              /* bind cleanup method */
     uptr->a_is_active = &_sim_wallclock_is_active;
@@ -2311,7 +2272,7 @@ if (uptr->a_next) {
             }
         }
     if (uptr->a_next == NULL) {
-        uptr->a_due_time = uptr->a_skew = uptr->a_last_fired_time = uptr->a_usec_delay = 0;
+        uptr->a_due_time = uptr->a_due_gtime = uptr->a_usec_delay = 0;
         uptr->cancel = NULL;
         uptr->a_is_active = NULL;
         if (tmr < SIM_NTIMERS) {                        /* Timer Unit? */
@@ -2326,24 +2287,13 @@ pthread_mutex_unlock (&sim_timer_lock);
 int32 sim_timer_activate_time (UNIT *uptr)
 {
 UNIT *cptr;
-double inst_per_sec = sim_timer_inst_per_sec ();
 double d_result;
+int32 tmr;
 
-pthread_mutex_lock (&sim_timer_lock);
-if (uptr == sim_wallclock_entry) {
-    d_result = ((uptr)->a_due_time - sim_timenow_double())*inst_per_sec;
-    if (d_result < 0.0)
-        d_result = 0.0;
-    if (d_result > (double)0x7FFFFFFE)
-        d_result = (double)0x7FFFFFFE;
-    pthread_mutex_unlock (&sim_timer_lock);
-    return ((int32)d_result) + 1;
-    }
-for (cptr = sim_wallclock_queue;
-     cptr != QUEUE_LIST_END;
-     cptr = cptr->a_next)
-    if (uptr == cptr) {
-        d_result = ((uptr)->a_due_time - sim_timenow_double())*inst_per_sec;
+if (uptr->a_is_active == &_sim_wallclock_is_active) {
+    pthread_mutex_lock (&sim_timer_lock);
+    if (uptr == sim_wallclock_entry) {
+        d_result = uptr->a_due_gtime - sim_gtime ();
         if (d_result < 0.0)
             d_result = 0.0;
         if (d_result > (double)0x7FFFFFFE)
@@ -2351,9 +2301,25 @@ for (cptr = sim_wallclock_queue;
         pthread_mutex_unlock (&sim_timer_lock);
         return ((int32)d_result) + 1;
         }
-pthread_mutex_unlock (&sim_timer_lock);
+    for (cptr = sim_wallclock_queue;
+         cptr != QUEUE_LIST_END;
+         cptr = cptr->a_next)
+        if (uptr == cptr) {
+            d_result = uptr->a_due_gtime - sim_gtime ();
+            if (d_result < 0.0)
+                d_result = 0.0;
+            if (d_result > (double)0x7FFFFFFE)
+                d_result = (double)0x7FFFFFFE;
+            pthread_mutex_unlock (&sim_timer_lock);
+            return ((int32)d_result) + 1;
+            }
+    pthread_mutex_unlock (&sim_timer_lock);
+    }
 if (uptr->a_next)
     return uptr->a_event_time + 1;
+for (tmr=0; tmr<SIM_NTIMERS; tmr++)
+    if (sim_clock_unit[tmr] == uptr)
+        return sim_activate_time (&sim_timer_units[tmr]);
 return -1;                                          /* Not found. */    
 }
 

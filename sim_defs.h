@@ -555,8 +555,7 @@ struct UNIT {
                                                         /* waiting for this unit */
     /* Asynchronous Timer control */
     double              a_due_time;                     /* due time for timer event */
-    double              a_skew;                         /* accumulated skew being corrected */
-    double              a_last_fired_time;              /* time last event fired */
+    double              a_due_gtime;                    /* due time (in instructions) for timer event */
     int32               a_usec_delay;                   /* time delay for timer event */
 #endif
     };
