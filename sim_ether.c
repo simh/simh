@@ -661,6 +661,11 @@ const char* eth_getname(int number, char* name, char *desc)
 
   if ((number < 0) || (count <= number))
       return NULL;
+  if (list[number].eth_api != ETH_API_PCAP) {
+    sim_printf ("Eth: Pcap capable device not found.  You may need to run as root\n");
+    return NULL;
+    }
+
   strcpy(name, list[number].name);
   strcpy(desc, list[number].desc);
   return name;
@@ -3819,6 +3824,7 @@ for (i=0; i<used; ++i) {
   conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
   if (NULL != conn)
     datalink = pcap_datalink(conn), pcap_close(conn);
+  list[i].eth_api = ETH_API_PCAP;
 #endif
   if ((NULL == conn) || (datalink != DLT_EN10MB)) {
     for (j=i; j<used-1; ++j)
@@ -3877,6 +3883,7 @@ if (used < max) {
   sprintf(list[used].name, "%s", "tap:tapN");
 #endif
   sprintf(list[used].desc, "%s", "Integrated Tun/Tap support");
+  list[used].eth_api = ETH_API_TAP;
   ++used;
   }
 #endif
@@ -3884,6 +3891,7 @@ if (used < max) {
 if (used < max) {
   sprintf(list[used].name, "%s", "vde:device");
   sprintf(list[used].desc, "%s", "Integrated VDE support");
+  list[used].eth_api = ETH_API_VDE;
   ++used;
   }
 #endif
@@ -3891,6 +3899,7 @@ if (used < max) {
 if (used < max) {
   sprintf(list[used].name, "%s", "nat:{optional-nat-parameters}");
   sprintf(list[used].desc, "%s", "Integrated NAT (SLiRP) support");
+  list[used].eth_api = ETH_API_NAT;
   ++used;
   }
 #endif
@@ -3898,6 +3907,7 @@ if (used < max) {
 if (used < max) {
   sprintf(list[used].name, "%s", "udp:sourceport:remotehost:remoteport");
   sprintf(list[used].desc, "%s", "Integrated UDP bridge support");
+  list[used].eth_api = ETH_API_UDP;
   ++used;
   }
 
