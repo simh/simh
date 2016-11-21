@@ -25,7 +25,7 @@
 
    tim          timer subsystem
 
-   10-Nov-16    ***     Fix wallclock issue for 50 Hz systems (R. Voorhorst)
+   10-Nov-16    R.V     Fix wallclock issue for 50 Hz systems (R. Voorhorst)
    18-Apr-12    RMS     Removed absolute scheduling on reset
    18-Jun-07    RMS     Added UNIT_IDLE flag
    03-Nov-06    RMS     Rewritten to support idling
@@ -292,7 +292,7 @@ tim_new_period = new_interval & ~TIM_HWRE_MASK;
 if (new_interval & TIM_HWRE_MASK) tim_new_period += 010000;
     
 /* clk_tps is the new number of clocks ticks per second */
-clk_tps = (int32) round((double)TIM_HW_FREQ /(double)tim_new_period);
+clk_tps = (int32) ceil(((double)TIM_HW_FREQ /(double)tim_new_period) - 0.5);
    
 /* tmxr is polled every tim_mult clks.  Compute the divisor matching the target. */
 tim_mult = (clk_tps <= TIM_TMXR_FREQ) ? 1 : (clk_tps / TIM_TMXR_FREQ) ;
