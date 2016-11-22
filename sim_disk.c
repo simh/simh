@@ -1040,6 +1040,8 @@ else
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
         if (NULL == (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) {
+            if (errno == EINVAL)                        /* VHD but broken */
+                return SCPE_OPENERR;
             open_function = sim_fopen;
             size_function = sim_fsize_ex;
             break;
@@ -2881,24 +2883,38 @@ if ((sDynamic) &&
                              strncpy (CheckPath+strlen(CheckPath), ParentName, sizeof (CheckPath)-(strlen (CheckPath)+1));
                         }
                 VhdPathToHostPath (CheckPath, CheckPath, sizeof (CheckPath));
-                if ((0 == GetVHDFooter(CheckPath,
-                                       &sParentFooter,
-                                       NULL,
-                                       NULL,
-                                       &ParentModificationTime,
-                                       NULL,
-                                       0)) &&
-                    (0 == memcmp (sDynamic->ParentUniqueID, sParentFooter.UniqueID, sizeof (sParentFooter.UniqueID))) &&
-                    ((sDynamic->ParentTimeStamp == ParentModificationTime) ||
-                     ((NtoHl(sDynamic->ParentTimeStamp)-NtoHl(ParentModificationTime)) == 3600) ||
-                     (sim_switches & SWMASK ('O')))) {
-                    strncpy (szParentVHDPath, CheckPath, ParentVHDPathSize);
+                if (0 == GetVHDFooter(CheckPath,
+                                      &sParentFooter,
+                                      NULL,
+                                      NULL,
+                                      &ParentModificationTime,
+                                      NULL,
+                                      0)) {
+                    if ((0 == memcmp (sDynamic->ParentUniqueID, sParentFooter.UniqueID, sizeof (sParentFooter.UniqueID))) &&
+                        ((sDynamic->ParentTimeStamp == ParentModificationTime) ||
+                         ((NtoHl(sDynamic->ParentTimeStamp)-NtoHl(ParentModificationTime)) == 3600) ||
+                         (sim_switches & SWMASK ('O'))))
+                         strncpy (szParentVHDPath, CheckPath, ParentVHDPathSize);
+                    else {
+                        sim_printf ("Error Invalid Parent VHD '%s' for Differencing VHD: %s\n", CheckPath, szVHDPath);
+                        Return = EINVAL;                /* File Corrupt/Invalid */
+                        }
                     break;
+                    }
+                else {
+                    struct stat statb;
+
+                    if (0 == stat (CheckPath, &statb)) {
+                        sim_printf ("Parent VHD '%s' corrupt for Differencing VHD: %s\n", CheckPath, szVHDPath);
+                        Return = EINVAL;                /* File Corrupt/Invalid */
+                        break;
+                        }
                     }
                 }
             if (!*szParentVHDPath) {
-                Return = EINVAL;                        /* File Corrupt */
-                sim_printf ("Error Invalid Parent VHD for Differencing VHD\n");
+                if (Return != EINVAL)                   /* File Not Corrupt? */
+                    sim_printf ("Missing Parent VHD for Differencing VHD: %s\n", szVHDPath);
+                Return = EINVAL;
                 }
             }
         }
