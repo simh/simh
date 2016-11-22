@@ -595,7 +595,8 @@ struct UNIT {
 #define UNIT_TM_POLL    0000002         /* TMXR Polling unit */
 #define UNIT_NO_FIO     0000004         /* fileref is NOT a FILE * */
 #define UNIT_DISK_CHK   0000010         /* disk data debug checking (sim_disk) */
-#define UNIT_V_DF_TAPE  4               /* Bit offset for Tape Density reservation */
+#define UNIT_TMR_UNIT   0000020         /* Unit registered as a calibrated timer */
+#define UNIT_V_DF_TAPE  5               /* Bit offset for Tape Density reservation */
 #define UNIT_S_DF_TAPE  3               /* Bits Reserved for Tape Density */
 
 struct BITFIELD {

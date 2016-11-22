@@ -3849,6 +3849,8 @@ return SCPE_OK;
 
 t_stat tmxr_activate (UNIT *uptr, int32 interval)
 {
+if (uptr->dynflags & UNIT_TMR_UNIT)
+    return sim_timer_activate (uptr, interval);
 #if defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {

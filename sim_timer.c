@@ -2033,6 +2033,12 @@ if (0 == inst_per_sec)
 return inst_per_sec;
 }
 
+t_stat sim_timer_activate (UNIT *uptr, int32 interval)
+{
+AIO_VALIDATE;
+return sim_timer_activate_after (uptr, (uint32)((interval * 1000000.0) / sim_timer_inst_per_sec ()));
+}
+
 t_stat sim_timer_activate_after (UNIT *uptr, uint32 usec_delay)
 {
 int inst_delay, tmr;
@@ -2109,6 +2115,7 @@ t_stat sim_register_clock_unit_tmr (UNIT *uptr, int32 tmr)
 if (NULL == sim_clock_unit[tmr])
     sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;
 sim_clock_unit[tmr] = uptr;
+uptr->dynflags |= UNIT_TMR_UNIT;
 sim_timer_units[tmr].flags = (sim_clock_unit[tmr] ? 0 : UNIT_DIS | UNIT_IDLE);
 sim_tick_units[tmr].flags = (sim_clock_unit[tmr] ? 0 : UNIT_DIS);
 return SCPE_OK;

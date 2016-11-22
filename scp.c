@@ -8899,6 +8899,8 @@ return reason;
 
 t_stat sim_activate (UNIT *uptr, int32 event_time)
 {
+if (uptr->dynflags & UNIT_TMR_UNIT)
+    return sim_timer_activate (uptr, event_time);
 return _sim_activate (uptr, event_time);
 }
 
