@@ -992,6 +992,10 @@ if (sim_os_sleep_min_ms != sim_os_sleep_inc_ms)
 fprintf (st, "Host Clock Resolution:         %d ms\n", sim_os_clock_resoluton_ms);
 if (sim_idle_enab)
     fprintf (st, "Time before Idling starts:     %d seconds\n", sim_idle_stable);
+fprintf (st, "Execution Rate:                %.0f instructios/sec\n", sim_timer_inst_per_sec ());
+fprintf (st, "Calibrated Timer:              %s\n", (sim_calb_tmr == -1) ? "Undetermined" : 
+                                                    ((sim_calb_tmr == SIM_NTIMERS) ? "Internal Timer" : 
+                                                    (sim_clock_unit[sim_calb_tmr] ? sim_uname(sim_clock_unit[sim_calb_tmr]) : "")));
 fprintf (st, "\n");
 for (tmr=clocks=0; tmr<=SIM_NTIMERS; ++tmr) {
     if (0 == rtc_initd[tmr])
@@ -1001,14 +1005,18 @@ for (tmr=clocks=0; tmr<=SIM_NTIMERS; ++tmr) {
         ++clocks;
         fprintf (st, "%s clock device is %s\n", sim_name, sim_uname(sim_clock_unit[tmr]));
         }
+    else {
+        if (tmr == SIM_NTIMERS)
+            fprintf (st, "Internal Calibrated Timer\n");
+        }
 
     fprintf (st, "%s%sTimer %d:\n", sim_asynch_timer ? "Asynchronous " : "", rtc_hz[tmr] ? "Calibrated " : "Uncalibrated ", tmr);
     if (rtc_hz[tmr]) {
-        fprintf (st, "  Running at:               %d hz\n", rtc_hz[tmr]);
+        fprintf (st, "  Running at:               %d Hz\n", rtc_hz[tmr]);
         fprintf (st, "  Tick Size:                %s\n", sim_fmt_secs (rtc_clock_tick_size[tmr]));
         fprintf (st, "  Ticks in current second:  %d\n",   rtc_ticks[tmr]);
         }
-    fprintf (st, "  Seconds Running:          %u\n",   rtc_elapsed[tmr]);
+    fprintf (st, "  Seconds Running:          %u (%s)\n",   rtc_elapsed[tmr], sim_fmt_secs ((double)rtc_elapsed[tmr]));
     fprintf (st, "  Calibrations:             %u\n",   rtc_calibrations[tmr]);
     if (rtc_gtime[tmr])
         fprintf (st, "  Instruction Time:         %.0f\n", rtc_gtime[tmr]);
@@ -1992,6 +2000,7 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
             }
         }
     }
+rtc_hz[SIM_NTIMERS] = 0;                    /* Make sure Internal Timer is stopped */
 #if defined(SIM_ASYNCH_CLOCKS)
 pthread_mutex_lock (&sim_timer_lock);
 if (sim_timer_thread_running) {
