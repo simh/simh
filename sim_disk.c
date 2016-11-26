@@ -1040,7 +1040,7 @@ else
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
         if (NULL == (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) {
-            if (errno == EINVAL)                        /* VHD but broken */
+            if (errno == EBADF)                        /* VHD but broken */
                 return SCPE_OPENERR;
             open_function = sim_fopen;
             size_function = sim_fsize_ex;
@@ -2906,7 +2906,7 @@ if ((sDynamic) &&
 
                     if (0 == stat (CheckPath, &statb)) {
                         sim_printf ("Parent VHD '%s' corrupt for Differencing VHD: %s\n", CheckPath, szVHDPath);
-                        Return = EINVAL;                /* File Corrupt/Invalid */
+                        Return = EBADF;                /* File Corrupt/Invalid */
                         break;
                         }
                     }
@@ -2914,7 +2914,7 @@ if ((sDynamic) &&
             if (!*szParentVHDPath) {
                 if (Return != EINVAL)                   /* File Not Corrupt? */
                     sim_printf ("Missing Parent VHD for Differencing VHD: %s\n", szVHDPath);
-                Return = EINVAL;
+                Return = EBADF;
                 }
             }
         }
