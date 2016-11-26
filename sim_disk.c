@@ -3048,7 +3048,7 @@ static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess
                     memcpy (hVHD->Dynamic.ParentUniqueID, ParentFooter.UniqueID, sizeof (ParentFooter.UniqueID));
                     hVHD->Dynamic.ParentTimeStamp = ParentModifiedTimeStamp;
                     hVHD->Dynamic.Checksum = 0;
-                    hVHD->Dynamic.Checksum = CalculateVhdFooterChecksum (&hVHD->Dynamic, sizeof(hVHD->Dynamic));
+                    hVHD->Dynamic.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Dynamic, sizeof(hVHD->Dynamic)));
                     NeedUpdate = TRUE;
                     }
                 }
