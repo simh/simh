@@ -1926,6 +1926,7 @@ if ((tmr == newtmr) &&
 if (sim_calb_tmr == SIM_NTIMERS) {      /* was old the internal timer? */
     sim_debug (DBG_TRC, &sim_timer_dev, "_rtcn_configure_calibrated_clock() - Stopping Internal Calibrated Timer, New Timer = %d (%dHz)\n", tmr, rtc_hz[tmr]);
     rtc_initd[SIM_NTIMERS] = 0;
+    rtc_hz[SIM_NTIMERS] = 0;
     sim_cancel (&SIM_INTERNAL_UNIT);
     /* Migrate any coscheduled devices to the standard queue and they will requeue themselves */
     while (sim_clock_cosched_queue[SIM_NTIMERS] != QUEUE_LIST_END) {
