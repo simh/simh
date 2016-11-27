@@ -2213,7 +2213,7 @@ if (ea & APR_SENB)                                      /* set enables? */
 if (ea & APR_CENB)                                      /* clear enables? */
     apr_enb = apr_enb & ~bits;
 if (ea & APR_CFLG) {                                    /* clear flags? */
-    if ((bits & APRF_TIM) && (apr_flg & APRF_TIM)
+    if ((bits & APRF_TIM) && (apr_flg & APRF_TIM))
         sim_rtcn_tick_ack (30, 0);
     apr_flg = apr_flg & ~bits;
     }
