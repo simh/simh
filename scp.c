@@ -8781,7 +8781,7 @@ if ((msecs > 0.0) || (usecs > 0.0)) {
         frac[0] = '\0';
     }
 if (days > 0)
-    sprintf (buf, "%s%.0f %02.0f:%02.0f:%02.0f%s day", sign, days, hours, mins, secs, frac);
+    sprintf (buf, "%s%.0f day%s %02.0f:%02.0f:%02.0f%s hour%s", sign, days, (days != 1)? "s" : "", hours, mins, secs, frac, (days == 1) ? "s" : "");
 else
     if (hours > 0)
         sprintf (buf, "%s%.0f:%02.0f:%02.0f%s hour", sign, hours, mins, secs, frac);
