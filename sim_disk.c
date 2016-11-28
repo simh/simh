@@ -1394,6 +1394,7 @@ fprintf (st, "                disk)\n");
 fprintf (st, "    -M          Merge a Differencing VHD into its parent VHD disk\n");
 fprintf (st, "    -O          Override consistency checks when attaching differencing disks\n");
 fprintf (st, "                which have unexpected parent disk GUID or timestamps\n\n");
+fprintf (st, "    -U          Fix inconsistencies which are overridden by the -O switch\n");
 fprintf (st, "    -Y          Answer Yes to prompt to overwrite last track (on disk create)\n");
 fprintf (st, "    -N          Answer No to prompt to overwrite last track (on disk create)\n");
 fprintf (st, "Examples:\n");
@@ -3044,7 +3045,8 @@ static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess
         if ((0 != memcmp (hVHD->Dynamic.ParentUniqueID, ParentFooter.UniqueID, sizeof (ParentFooter.UniqueID))) || 
             (ParentModifiedTimeStamp != hVHD->Dynamic.ParentTimeStamp)) {
             if (sim_switches & SWMASK ('O')) {                      /* OVERRIDE consistency checks? */
-                if (strchr (DesiredAccess, '+')) {                  /* open for write/update? */
+                if ((sim_switches & SWMASK ('U')) &&                /* FIX (UPDATE) consistency checks AND */
+                    (strchr (DesiredAccess, '+'))) {                /* open for write/update? */
                     memcpy (hVHD->Dynamic.ParentUniqueID, ParentFooter.UniqueID, sizeof (ParentFooter.UniqueID));
                     hVHD->Dynamic.ParentTimeStamp = ParentModifiedTimeStamp;
                     hVHD->Dynamic.Checksum = 0;
