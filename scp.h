@@ -169,6 +169,7 @@ t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt
 t_stat sprint_val (char *buf, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 t_stat sim_print_val (t_value val, uint32 radix, uint32 width, uint32 format);
 const char *sim_fmt_secs (double seconds);
+const char *sprint_capac (DEVICE *dptr, UNIT *uptr);
 char *read_line (char *cptr, int32 size, FILE *stream);
 void fprint_reg_help (FILE *st, DEVICE *dptr);
 void fprint_set_help (FILE *st, DEVICE *dptr);

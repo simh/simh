@@ -4420,12 +4420,13 @@ if (toks || (flag < 0) || (flag > 1))
 return SCPE_OK;
 }
 
-void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr)
+const char *sprint_capac (DEVICE *dptr, UNIT *uptr)
 {
+static char capac_buf[((CHAR_BIT * sizeof (t_value) * 4 + 3)/3) + 8];
 t_addr kval = (uptr->flags & UNIT_BINK)? 1024: 1000;
 t_addr mval;
 t_addr psize = uptr->capac;
-char scale, width;
+char *scale, *width;
 
 if (sim_switches & SWMASK ('B'))
     kval = 1024;
@@ -4435,23 +4436,27 @@ if (dptr->flags & DEV_SECTORS) {
     mval = mval / 512;
     }
 if ((dptr->dwidth / dptr->aincr) > 8)
-    width = 'W';
-else width = 'B';
+    width = "W";
+else 
+    width = "B";
 if (uptr->capac < (kval * 10))
-    scale = 0;
+    scale = "";
 else if (uptr->capac < (mval * 10)) {
-    scale = 'K';
+    scale = "K";
     psize = psize / kval;
     }
 else {
-    scale = 'M';
+    scale = "M";
     psize = psize / mval;
     }
-fprint_val (st, (t_value) psize, 10, T_ADDR_W, PV_LEFT);
-if (scale)
-    fputc (scale, st);
-fputc (width, st);
-return;
+sprint_val (capac_buf, (t_value) psize, 10, T_ADDR_W, PV_LEFT);
+sprintf (&capac_buf[strlen (capac_buf)], "%s%s", scale, width);
+return capac_buf;
+}
+
+void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr)
+{
+fprintf (st, "%s", sprint_capac (dptr, uptr));
 }
 
 /* Show <global name> processors  */
