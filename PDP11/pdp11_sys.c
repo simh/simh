@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Mar-16    RMS     Added UC15 support
    02-Sep-13    RMS     Added third Massbus, RS03/RS04
    29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Nov-08    RMS     Moved I/O support routines to I/O library
@@ -104,6 +105,7 @@ extern DEVICE xq_dev, xqb_dev;
 extern DEVICE xu_dev, xub_dev;
 extern DEVICE ke_dev;
 extern DEVICE kg_dev;
+extern DEVICE uca_dev, ucb_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;
@@ -128,6 +130,7 @@ int32 sim_emax = 4;
 DEVICE *sim_devices[] = {
     &cpu_dev,
     &sys_dev,
+#if !defined (UC15)
     &mba_dev[0],
     &mba_dev[1],
     &mba_dev[2],
@@ -168,8 +171,18 @@ DEVICE *sim_devices[] = {
     &xqb_dev,
     &xu_dev,
     &xub_dev,
-    &ke_dev,
     &kg_dev,
+    &ke_dev,
+#else
+    &clk_dev,
+    &tti_dev,
+    &tto_dev,
+    &cr_dev,
+    &lpt_dev,
+    &rk_dev,
+    &uca_dev,
+    &ucb_dev,
+#endif
     NULL
     };
 
@@ -249,11 +262,9 @@ do {                                                    /* block loop */
         if ((d = getc (fileref)) == EOF)                /* data char */
             return SCPE_FMT;
         csum = csum + d;                                /* add into csum */
-        if (org >= MEMSIZE)                             /* invalid addr? */
+        if (!ADDR_IS_MEM (org))                         /* invalid addr? */
             return SCPE_NXM;
-        M[org >> 1] = (org & 1)?                        /* store data */
-            (M[org >> 1] & 0377) | (uint16)(d << 8):
-            (M[org >> 1] & 0177400) | (uint16)d;
+        WrMemB (org, ((uint16) d));
         org = (org + 1) & 0177777;                      /* inc origin */
         }
     if ((d = getc (fileref)) == EOF)                    /* get csum */
