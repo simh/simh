@@ -27,6 +27,7 @@
    and John Wilson in resolving questions about the PDP-11
 
    06-Jan-17    RMS     Moved CR11/CD11 to BR6 (Mark Pizzolato)
+   10-Mar-16    RMS     Added UC15 support
    30-Dec-15    RMS     Added NOBVT option
    23-Oct-13    RMS     Added cpu_set_boot prototype
    02-Sep-13    RMS     Added third Massbus adapter and RS drive
@@ -97,7 +98,6 @@
 #define VASIZE          0200000                         /* 2**16 */
 #define VAMASK          (VASIZE - 1)                    /* 2**16 - 1 */
 #define MEMSIZE64K      0200000                         /* 2**16 */
-#define INIMEMSIZE      001000000                       /* 2**18 */
 #define UNIMEMSIZE      001000000                       /* 2**18 */
 #define UNIMASK         (UNIMEMSIZE - 1)                /* 2**18 - 1 */
 #define IOPAGEBASE      017760000                       /* 2**22 - 2**13 */
@@ -106,7 +106,6 @@
 #define MAXMEMSIZE      020000000                       /* 2**22 */
 #define PAMASK          (MAXMEMSIZE - 1)                /* 2**22 - 1 */
 #define MEMSIZE         (cpu_unit.capac)
-#define ADDR_IS_MEM(x)  (((t_addr) (x)) < cpu_memsize)  /* use only in sim! */
 #define DMASK           0177777
 #define BMASK           0377
 
@@ -543,6 +542,25 @@ typedef struct pdp_dib DIB;
 
 #define IOBA_CTL        (IOPAGEBASE + 017520)           /* board ctrl */
 #define IOLN_CTL        010
+
+/* I/O page layout - XUB, RQB,RQC,RQD float based on number of DZ's */
+
+#define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
+#define IOLN_DZ         010
+#define IOBA_XUB        (IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
+#define IOLN_XUB        010
+#define IOBA_RQB        (IOPAGEBASE + 000334 + (020 * (DZ_MUXES / 2)))
+#define IOLN_RQB        004
+#define IOBA_RQC        (IOBA_RQB + IOLN_RQB)
+#define IOLN_RQC        004
+#define IOBA_RQD        (IOBA_RQC + IOLN_RQC)
+#define IOLN_RQD        004
+#define IOBA_VH         (IOPAGEBASE + 000440)           /* DHQ11 */
+#define IOLN_VH         020
+#define IOBA_UCA        (IOPAGEBASE + 007770)           /* UC15 DR11 #1 */
+#define IOLN_UCA        006
+#define IOBA_UCB        (IOPAGEBASE + 007760)           /* UC15 DR11 #2 */
+#define IOLN_UCB        006
 #define IOBA_UBM        (IOPAGEBASE + 010200)           /* Unibus map */
 #define IOLN_UBM        (UBM_LNT_LW * sizeof (int32))
 #define IOBA_MMR3       (IOPAGEBASE + 012516)           /* MMR3 */
@@ -590,6 +608,7 @@ typedef struct pdp_dib DIB;
 #define IPL_HMIN        4                               /* lowest IO int level */
 
 #define INT_V_PIR7      0                               /* BR7 */
+#define INT_V_UCA       1
 
 #define INT_V_PIR6      0                               /* BR6 */
 #define INT_V_CLK       1
@@ -623,6 +642,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_DUPTX     22
 #define INT_V_KMCA      23
 #define INT_V_KMCB      24
+#define INT_V_UCB       25
 
 #define INT_V_PIR4      0                               /* BR4 */
 #define INT_V_TTI       1
@@ -652,6 +672,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_PIR1      0                               /* BR1 */
 
 #define INT_PIR7        (1u << INT_V_PIR7)
+#define INT_UCB         (1u << INT_V_UCB)
 #define INT_PIR6        (1u << INT_V_PIR6)
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_PCLK        (1u << INT_V_PCLK)
@@ -682,6 +703,7 @@ typedef struct pdp_dib DIB;
 #define INT_KMCB        (1u << INT_V_KMCB)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_UCA         (1u << INT_V_UCA)
 #define INT_PIR4        (1u << INT_V_PIR4)
 #define INT_TTI         (1u << INT_V_TTI)
 #define INT_TTO         (1u << INT_V_TTO)
@@ -714,7 +736,8 @@ typedef struct pdp_dib DIB;
 #define INT_INTERNAL2   (INT_PIR2)
 #define INT_INTERNAL1   (INT_PIR1)
 
-#define IPL_CLK         6                               /* int pri levels */
+#define IPL_UCB         7                               /* int pri levels */
+#define IPL_CLK         6
 #define IPL_PCLK        6
 #define IPL_DTA         6
 #define IPL_TA          6
@@ -743,6 +766,7 @@ typedef struct pdp_dib DIB;
 #define IPL_KMCB        5
 #define IPL_DUPRX       5
 #define IPL_DUPTX       5
+#define IPL_UCA         5
 #define IPL_PTR         4
 #define IPL_PTP         4
 #define IPL_TTI         4
@@ -779,6 +803,40 @@ typedef struct pdp_dib DIB;
 #define VEC_PIRQ        0240
 #define VEC_TTI         0060
 #define VEC_TTO         0064
+#define VEC_PTR         0070
+#define VEC_PTP         0074
+#define VEC_CLK         0100
+#define VEC_PCLK        0104
+#define VEC_XQ          0120
+#define VEC_XU          0120
+#define VEC_RQ          0154
+#define VEC_RL          0160
+#define VEC_LPT         0200
+#define VEC_RF          0204
+#define VEC_RS          0204
+#define VEC_HK          0210
+#define VEC_RC          0210
+#define VEC_RK          0220
+#define VEC_DTA         0214
+#define VEC_TM          0224
+#define VEC_TS          0224
+#define VEC_TU          0224
+#define VEC_CR          0230
+#define VEC_RP          0254
+#define VEC_TQ          0260
+#define VEC_TA          0260
+#define VEC_RX          0264
+#define VEC_RY          0264
+#define VEC_DLI         0300
+#define VEC_DLO         0304
+#define VEC_DCI         0300
+#define VEC_DCO         0304
+#define VEC_DZRX        0300
+#define VEC_DZTX        0304
+#define VEC_VHRX        0310
+#define VEC_VHTX        0314
+#define VEC_UCA         0300
+#define VEC_UCB         0310
 
 /* Interrupt macros */
 
@@ -849,5 +907,40 @@ t_stat build_dib_tab (void);
 void cpu_set_boot (int32 pc);
 
 #include "pdp11_io_lib.h"
+
+#if defined (UC15)                                      /* UC15 */
+#define INIMODEL        MOD_1105
+#define INIOPTNS        SOP_1105
+#define INIMEMSIZE      00040000                       /* 16KB */
+#define ADDR_IS_MEM(x)  (((uint32) (x)) < uc15_memsize)
+
+#define RdMemW(pa)      uc15_RdMemW (pa)
+#define RdMemB(pa)      uc15_RdMemB (pa)
+#define WrMemW(pa,d)    uc15_WrMemW (pa, d)
+#define WrMemB(pa, d)   uc15_WrMemB (pa, d)
+
+uint32 uc15_memsize;
+int32 uc15_RdMemW (int32 pa);
+int32 uc15_RdMemB (int32 pa);
+void uc15_WrMemW (int32 pa, int32 d);
+void uc15_WrMemB (int32 pa, int32 d);
+int32 Map_Read18 (uint32 ba, int32 bc, uint32 *buf);
+int32 Map_Write18 (uint32 ba, int32 bc, uint32 *buf);
+
+#else                                                   /* PDP-11 */
+
+#define INIMODEL        MOD_1173
+#define INIOPTNS        SOP_1173
+#define INIMEMSIZE      001000000                       /* 2**18 */
+#define ADDR_IS_MEM(x)  (((t_addr) (x)) < MEMSIZE)
+
+#define RdMemW(pa)      (M[(pa) >> 1])
+#define RdMemB(pa)      ((((pa) & 1)? M[(pa) >> 1] >> 8: M[(pa) >> 1]) & 0377)
+#define WrMemW(pa,d)    M[(pa) >> 1] = (d)
+#define WrMemB(pa,d)    M[(pa) >> 1] = ((pa) & 1)? \
+                            ((M[(pa) >> 1] & 0377) | (((d) & 0377) << 8)): \
+                            ((M[(pa) >> 1] & ~0377) | ((d) & 0377))
+
+#endif
 
 #endif
