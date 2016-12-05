@@ -1,7 +1,4 @@
-/*  system_80_20_cfg.h: Intel System 80/20 simulator definitions
-
-    This file holds the configuration for the System 80/20 
-    boards I/O and Memory.
+/*  sys-8010_sys.c: multibus system interface
 
     Copyright (c) 2010, William A. Beech
 
@@ -26,16 +23,62 @@
     used in advertising or otherwise to promote the sale, use or other dealings
     in this Software without prior written authorization from William A. Beech.
 
-    16 Dec 12 - Original file
+    ?? ??? 10 - Original file.
+    16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
 */
 
-/* set the base I/O address for the iSBC 208 */
-#define	SBC208_BASE	0x40
+#include "system_defs.h"
 
-/* configure interrupt request line */
-#define SBC208_INT      INT_1
+extern DEVICE i8080_dev;
+extern REG i8080_reg[];
+extern DEVICE i8251_dev;
+extern DEVICE i8253_dev;
+extern DEVICE i8255_dev;
+extern DEVICE i8259_dev;
+extern DEVICE EPROM_dev;
+extern DEVICE RAM_dev;
+extern DEVICE multibus_dev;
+extern DEVICE isbc201_dev;
+extern DEVICE isbc202_dev;
+extern DEVICE isbc064_dev;
 
-/* set the base and size for the iSBC 064 */
-#define SBC064_BASE     0x0000
-#define SBC064_SIZE     0x10000
+/* SCP data structures
+
+   sim_name             simulator name string
+   sim_PC               pointer to saved PC register descriptor
+   sim_emax             number of words needed for examine
+   sim_devices          array of pointers to simulated devices
+   sim_stop_messages    array of pointers to stop messages
+*/
+
+char sim_name[] = "Intel System 80/24";
+
+REG *sim_PC = &i8080_reg[0];
+
+int32 sim_emax = 4;
+
+DEVICE *sim_devices[] = {
+    &i8080_dev,
+    &i8251_dev,
+    &i8253_dev,
+    &i8255_dev,
+    &i8259_dev,
+    &EPROM_dev,
+    &RAM_dev,
+    &multibus_dev,
+    &isbc064_dev,
+    &isbc201_dev,
+    &isbc202_dev,
+    NULL
+};
+
+const char *sim_stop_messages[] = {
+    "Unknown error",
+    "Unknown I/O Instruction",
+    "HALT instruction",
+    "Breakpoint",
+    "Invalid Opcode",
+    "Invalid Memory",
+    "XACK Error"
+};
 

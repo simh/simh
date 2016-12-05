@@ -24,20 +24,21 @@
     in this Software without prior written authorization from William A. Beech.
 
     ?? ??? 10 - Original file.
-    16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
 */
 
 #include "system_defs.h"
 
 extern DEVICE i8080_dev;
 extern REG i8080_reg[];
-extern DEVICE i8259_dev;
 extern DEVICE i8251_dev;
+extern DEVICE i8253_dev;
 extern DEVICE i8255_dev;
+extern DEVICE i8259_dev;
 extern DEVICE EPROM_dev;
 extern DEVICE RAM_dev;
 extern DEVICE multibus_dev;
-extern DEVICE isbc208_dev;
+extern DEVICE isbc201_dev;
+extern DEVICE isbc202_dev;
 extern DEVICE isbc064_dev;
 
 /* SCP data structures
@@ -49,7 +50,7 @@ extern DEVICE isbc064_dev;
    sim_stop_messages    array of pointers to stop messages
 */
 
-char sim_name[] = "Intel System 80/20";
+char sim_name[] = "Intel System 80/10";
 
 REG *sim_PC = &i8080_reg[0];
 
@@ -57,14 +58,16 @@ int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
     &i8080_dev,
+    &i8251_dev,
+    &i8253_dev,
+    &i8255_dev,
+    &i8259_dev,
     &EPROM_dev,
     &RAM_dev,
-    &i8259_dev,
-    &i8251_dev,
-    &i8255_dev,
     &multibus_dev,
     &isbc064_dev,
-    &isbc208_dev,
+    &isbc201_dev,
+    &isbc202_dev,
     NULL
 };
 
