@@ -473,41 +473,44 @@
 
 #define FDD_NUM          4
 
+int32 sbc208_devnum = 0;                 //actual number of 8255 instances + 1
+uint16 sbc208_port[4];                   //base port registered to each instance
+
 /* internal function prototypes */
 
 t_stat isbc208_svc (UNIT *uptr);
-t_stat isbc208_reset (DEVICE *dptr);
+t_stat isbc208_reset (DEVICE *dptr, uint16 base);
 void isbc208_reset1 (void);
 t_stat isbc208_attach (UNIT *uptr, CONST char *cptr);
 t_stat isbc208_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-uint8 isbc208_r0(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r1(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r2(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r3(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r4(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r5(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r6(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r7(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r8(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r9(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_rA(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_rB(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_rC(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_rD(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_rE(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_rF(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r10(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r11(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r12(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r13(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r14(t_bool io, uint8 data, uint8 devnum);
-uint8 isbc208_r15(t_bool io, uint8 data, uint8 devnum);
+uint8 isbc208_r0(t_bool io, uint8 data);
+uint8 isbc208_r1(t_bool io, uint8 data);
+uint8 isbc208_r2(t_bool io, uint8 data);
+uint8 isbc208_r3(t_bool io, uint8 data);
+uint8 isbc208_r4(t_bool io, uint8 data);
+uint8 isbc208_r5(t_bool io, uint8 data);
+uint8 isbc208_r6(t_bool io, uint8 data);
+uint8 isbc208_r7(t_bool io, uint8 data);
+uint8 isbc208_r8(t_bool io, uint8 data);
+uint8 isbc208_r9(t_bool io, uint8 data);
+uint8 isbc208_rA(t_bool io, uint8 data);
+uint8 isbc208_rB(t_bool io, uint8 data);
+uint8 isbc208_rC(t_bool io, uint8 data);
+uint8 isbc208_rD(t_bool io, uint8 data);
+uint8 isbc208_rE(t_bool io, uint8 data);
+uint8 isbc208_rF(t_bool io, uint8 data);
+uint8 isbc208_r10(t_bool io, uint8 data);
+uint8 isbc208_r11(t_bool io, uint8 data);
+uint8 isbc208_r12(t_bool io, uint8 data);
+uint8 isbc208_r13(t_bool io, uint8 data);
+uint8 isbc208_r14(t_bool io, uint8 data);
+uint8 isbc208_r15(t_bool io, uint8 data);
 
 /* external function prototypes */
 
 extern void set_irq(int32 int_num);
 extern void clr_irq(int32 int_num);
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16 port, uint8 devnum);
+extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
 extern void multibus_put_mbyte(uint16 addr, uint8 val);
 extern uint8 multibus_get_mbyte(uint16 addr);
 
@@ -669,14 +672,15 @@ DEVICE isbc208_dev = {
     8,                          //dwidth
     NULL,                       //examine  
     NULL,                       //deposit  
-    &isbc208_reset,             //deposit 
+//    &isbc208_reset,             //deposit 
+    NULL,                       //deposit
     NULL,                       //boot
     &isbc208_attach,            //attach  
     NULL,                       //detach
     NULL,                       //ctxt     
     DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
-    0,                          //dctrl 
-//    DEBUG_flow + DEBUG_read + DEBUG_write,              //dctrl 
+//    0,                          //dctrl 
+    DEBUG_flow + DEBUG_read + DEBUG_write,              //dctrl 
     isbc208_debug,              //debflags
     NULL,                       //msize
     NULL                        //lname
@@ -957,32 +961,43 @@ t_stat isbc208_svc (UNIT *uptr)
 
 /* Reset routine */
 
-t_stat isbc208_reset (DEVICE *dptr)
+t_stat isbc208_reset (DEVICE *dptr, uint16 base)
 {
-    reg_dev(isbc208_r0, SBC208_BASE + 0, 0); 
-    reg_dev(isbc208_r1, SBC208_BASE + 1, 0); 
-    reg_dev(isbc208_r2, SBC208_BASE + 2, 0); 
-    reg_dev(isbc208_r3, SBC208_BASE + 3, 0); 
-    reg_dev(isbc208_r4, SBC208_BASE + 4, 0); 
-    reg_dev(isbc208_r5, SBC208_BASE + 5, 0); 
-    reg_dev(isbc208_r6, SBC208_BASE + 6, 0); 
-    reg_dev(isbc208_r7, SBC208_BASE + 7, 0); 
-    reg_dev(isbc208_r8, SBC208_BASE + 8, 0); 
-    reg_dev(isbc208_r9, SBC208_BASE + 9, 0); 
-    reg_dev(isbc208_rA, SBC208_BASE + 10, 0); 
-    reg_dev(isbc208_rB, SBC208_BASE + 11, 0); 
-    reg_dev(isbc208_rC, SBC208_BASE + 12, 0); 
-    reg_dev(isbc208_rD, SBC208_BASE + 13, 0); 
-    reg_dev(isbc208_rE, SBC208_BASE + 14, 0); 
-    reg_dev(isbc208_rF, SBC208_BASE + 15, 0); 
-    reg_dev(isbc208_r10, SBC208_BASE + 16, 0); 
-    reg_dev(isbc208_r11, SBC208_BASE + 17, 0); 
-    reg_dev(isbc208_r12, SBC208_BASE + 18, 0); 
-    reg_dev(isbc208_r13, SBC208_BASE + 19, 0); 
-    reg_dev(isbc208_r14, SBC208_BASE + 20, 0); 
-    reg_dev(isbc208_r15, SBC208_BASE + 21, 0); 
-    if ((isbc208_dev.flags & DEV_DIS) == 0) 
-        isbc208_reset1();
+    if (sbc208_devnum > SBC208_NUM) {
+        sim_printf("sbc208_reset: too many devices!\n");
+        return SCPE_MEM;
+    }
+    if (SBC202_NUM) {
+        sim_printf("   SBC208-%d: Hardware Reset\n", sbc208_devnum);
+        sim_printf("   SBC208-%d: Registered at %04X\n", sbc208_devnum, base);
+        sbc208_port[sbc208_devnum] = reg_dev(isbc208_r0, SBC208_BASE + 0, sbc208_devnum); 
+        reg_dev(isbc208_r1, SBC208_BASE + 1, sbc208_devnum); 
+        reg_dev(isbc208_r2, SBC208_BASE + 2, sbc208_devnum); 
+        reg_dev(isbc208_r3, SBC208_BASE + 3, sbc208_devnum); 
+        reg_dev(isbc208_r4, SBC208_BASE + 4, sbc208_devnum); 
+        reg_dev(isbc208_r5, SBC208_BASE + 5, sbc208_devnum); 
+        reg_dev(isbc208_r6, SBC208_BASE + 6, sbc208_devnum); 
+        reg_dev(isbc208_r7, SBC208_BASE + 7, sbc208_devnum); 
+        reg_dev(isbc208_r8, SBC208_BASE + 8, sbc208_devnum); 
+        reg_dev(isbc208_r9, SBC208_BASE + 9, sbc208_devnum); 
+        reg_dev(isbc208_rA, SBC208_BASE + 10, sbc208_devnum); 
+        reg_dev(isbc208_rB, SBC208_BASE + 11, sbc208_devnum); 
+        reg_dev(isbc208_rC, SBC208_BASE + 12, sbc208_devnum); 
+        reg_dev(isbc208_rD, SBC208_BASE + 13, sbc208_devnum); 
+        reg_dev(isbc208_rE, SBC208_BASE + 14, sbc208_devnum); 
+        reg_dev(isbc208_rF, SBC208_BASE + 15, sbc208_devnum); 
+        reg_dev(isbc208_r10, SBC208_BASE + 16, sbc208_devnum); 
+        reg_dev(isbc208_r11, SBC208_BASE + 17, sbc208_devnum); 
+        reg_dev(isbc208_r12, SBC208_BASE + 18, sbc208_devnum); 
+        reg_dev(isbc208_r13, SBC208_BASE + 19, sbc208_devnum); 
+        reg_dev(isbc208_r14, SBC208_BASE + 20, sbc208_devnum); 
+        reg_dev(isbc208_r15, SBC208_BASE + 21, sbc208_devnum); 
+        if ((isbc208_dev.flags & DEV_DIS) == 0) 
+            isbc208_reset1();
+        sbc208_devnum++;
+    } else {
+        sim_printf("   No isbc208 installed\n");
+    }
     return SCPE_OK;
 }
 
@@ -1023,6 +1038,7 @@ void isbc208_reset1 (void)
     i8272_msr = RQM;                    /* 8272 ready for start of command */
     rsp = wsp = 0;                      /* reset indexes */
     cmd = 0;                            /* clear command */
+    sim_printf("   SBC208-%d: Software Reset\n", sbc208_devnum);
     if (flag) {
         sim_printf("   8237 Reset\n");
         sim_printf("   8272 Reset\n");
@@ -1120,7 +1136,7 @@ t_stat isbc208_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     to the device.
 */
 
-uint8 isbc208_r0(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r0(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read current address CH 0 */
         if (i8237_rD) {                 /* high byte */
@@ -1146,7 +1162,7 @@ uint8 isbc208_r0(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r1(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r1(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read current word count CH 0 */
         if (i8237_rD) {                 /* high byte */
@@ -1172,7 +1188,7 @@ uint8 isbc208_r1(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r2(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r2(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read current address CH 1 */
         if (i8237_rD) {                 /* high byte */
@@ -1198,7 +1214,7 @@ uint8 isbc208_r2(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r3(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r3(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read current word count CH 1 */
         if (i8237_rD) {                 /* high byte */
@@ -1224,7 +1240,7 @@ uint8 isbc208_r3(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r4(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r4(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read current address CH 2 */
         if (i8237_rD) {                 /* high byte */
@@ -1250,7 +1266,7 @@ uint8 isbc208_r4(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r5(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r5(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read current word count CH 2 */
         if (i8237_rD) {                 /* high byte */
@@ -1276,7 +1292,7 @@ uint8 isbc208_r5(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r6(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r6(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read current address CH 3 */
         if (i8237_rD) {                 /* high byte */
@@ -1302,7 +1318,7 @@ uint8 isbc208_r6(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r7(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r7(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read current word count CH 3 */
         if (i8237_rD) {                 /* high byte */
@@ -1328,7 +1344,7 @@ uint8 isbc208_r7(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r8(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r8(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read status register */
         sim_debug (DEBUG_reg, &isbc208_dev, "i8237_r8 (status) read as %02X\n", i8237_r8);
@@ -1340,7 +1356,7 @@ uint8 isbc208_r8(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r9(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r9(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r9\n");
@@ -1352,7 +1368,7 @@ uint8 isbc208_r9(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_rA(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_rA(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rA\n");
@@ -1389,7 +1405,7 @@ uint8 isbc208_rA(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_rB(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_rB(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rB\n");
@@ -1401,7 +1417,7 @@ uint8 isbc208_rB(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_rC(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_rC(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rC\n");
@@ -1413,7 +1429,7 @@ uint8 isbc208_rC(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_rD(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_rD(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read temporary register */
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rD\n");
@@ -1425,7 +1441,7 @@ uint8 isbc208_rD(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_rE(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_rE(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rE\n");
@@ -1437,7 +1453,7 @@ uint8 isbc208_rE(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_rF(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_rF(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_rF\n");
@@ -1449,7 +1465,7 @@ uint8 isbc208_rF(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r10(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r10(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read FDC status register */
         sim_debug (DEBUG_reg, &isbc208_dev, "i8272_msr read as %02X\n", i8272_msr);
@@ -1461,7 +1477,7 @@ uint8 isbc208_r10(t_bool io, uint8 data, uint8 devnum)
 }
 
 // read/write FDC data register
-uint8 isbc208_r11(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r11(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read FDC data register */
         wsp = 0;                        /* clear write stack index */
@@ -1580,7 +1596,7 @@ uint8 isbc208_r11(t_bool io, uint8 data, uint8 devnum)
     return 0;
 }
 
-uint8 isbc208_r12(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r12(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read interrupt status */
         sim_debug (DEBUG_reg, &isbc208_dev, "isbc208_r12 read as %02X\n", isbc208_i);
@@ -1592,7 +1608,7 @@ uint8 isbc208_r12(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r13(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r13(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r13\n");
@@ -1604,7 +1620,7 @@ uint8 isbc208_r13(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r14(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r14(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r14\n");
@@ -1616,7 +1632,7 @@ uint8 isbc208_r14(t_bool io, uint8 data, uint8 devnum)
     }
 }
 
-uint8 isbc208_r15(t_bool io, uint8 data, uint8 devnum)
+uint8 isbc208_r15(t_bool io, uint8 data)
 {
     if (io == 0) {
         sim_debug (DEBUG_reg, &isbc208_dev, "Illegal read of isbc208_r15\n");

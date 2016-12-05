@@ -48,23 +48,32 @@ t_stat multibus_svc(UNIT *uptr);
 t_stat multibus_reset(DEVICE *dptr);
 void set_irq(int32 int_num);
 void clr_irq(int32 int_num);
-uint8 nulldev(t_bool io, uint8 data, uint8 devnum);
-uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint16 port, uint8 devnum);
+uint8 nulldev(t_bool io, uint8 data);
+extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
 t_stat multibus_reset (DEVICE *dptr);
 uint8 multibus_get_mbyte(uint16 addr);
+uint16 multibus_get_mword(uint16 addr);
 void multibus_put_mbyte(uint16 addr, uint8 val);
+void multibus_put_mword(uint16 addr, uint16 val);
 
 /* external function prototypes */
 
 extern t_stat SBC_reset(DEVICE *dptr);      /* reset the IPC simulator */
 extern void set_cpuint(int32 int_num);
 extern UNIT zx200a_unit;
-extern t_stat zx200a_reset(DEVICE *dptr, uint16 base, uint8 devnum);
+extern t_stat zx200a_reset(DEVICE *dptr, uint16 base);
+extern t_stat isbc201_reset (DEVICE *dptr, uint16);
+extern t_stat isbc202_reset (DEVICE *dptr, uint16);
+extern uint8 RAM_get_mbyte(uint16 addr);
+extern void RAM_put_mbyte(uint16 addr, uint8 val);
 
 /* external globals */
 
 extern uint8 xack;                          /* XACK signal */
 extern int32 int_req;                       /* i8080 INT signal */
+extern int32 isbc201_fdcnum;
+extern int32 isbc202_fdcnum;
+extern int32 zx200a_fdcnum;
 
 /* multibus Standard SIMH Device Data Structures */
 
@@ -139,9 +148,14 @@ t_stat multibus_svc(UNIT *uptr)
 t_stat multibus_reset(DEVICE *dptr)
 {
     SBC_reset(NULL); 
-    zx200a_reset(NULL, ZX200A_BASE_DD, 0);
-    zx200a_reset(NULL, ZX200A_BASE_SD, 0);
     sim_printf("   Multibus: Reset\n");
+    zx200a_fdcnum = 0;
+    zx200a_reset(NULL, ZX200A_BASE_DD);
+    zx200a_reset(NULL, ZX200A_BASE_SD);
+    isbc201_fdcnum = 0;
+    isbc201_reset(NULL, SBC201_BASE); 
+    isbc202_fdcnum = 0;
+    isbc202_reset(NULL, SBC202_BASE); 
     sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
     return SCPE_OK;
 }
@@ -163,7 +177,7 @@ device addresses, if a device is plugged to a port it's routine
 address is here, 'nulldev' means no device has been registered.
 */
 struct idev {
-    uint8 (*routine)(t_bool io, uint8 data, uint8 devnum);
+    uint8 (*routine)(t_bool io, uint8 data);
     uint8 devnum;
 };
 
@@ -234,7 +248,7 @@ struct idev dev_table[256] = {
 {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}          /* 0FCH */
 };
 
-uint8 nulldev(t_bool flag, uint8 data, uint8 devnum)
+uint8 nulldev(t_bool flag, uint8 data)
 {
     SET_XACK(0);                        /* set no XACK */
     if (flag == 0)                      /* if we got here, no valid I/O device */
@@ -242,16 +256,54 @@ uint8 nulldev(t_bool flag, uint8 data, uint8 devnum)
     return 0;
 }
 
-uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint16 port, uint8 devnum)
+uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port, uint8 devnum)
 {
     if (dev_table[port].routine != &nulldev) {  /* port already assigned */
-//        sim_printf("Multibus: I/O Port %02X is already assigned\n", port);
+        sim_printf("Multibus: I/O Port %04X is already assigned\n", port);
     } else {
-//        sim_printf("Port %02X is assigned\n", port);
+        sim_printf("Port %04X is assigned\n", port);
         dev_table[port].routine = routine;
         dev_table[port].devnum = devnum;
     }
 	return 0;
+}
+
+/*  get a byte from memory */
+
+uint8 multibus_get_mbyte(uint16 addr)
+{
+    SET_XACK(0);                        /* set no XACK */
+//    sim_printf("multibus_get_mbyte: Cleared XACK for %04X\n", addr); 
+    return RAM_get_mbyte(addr);
+}
+
+/*  get a word from memory */
+
+uint16 multibus_get_mword(uint16 addr)
+{
+    uint16 val;
+
+    val = multibus_get_mbyte(addr);
+    val |= (multibus_get_mbyte(addr+1) << 8);
+    return val;
+}
+
+/*  put a byte to memory */
+
+void multibus_put_mbyte(uint16 addr, uint8 val)
+{
+    SET_XACK(0);                        /* set no XACK */
+//    sim_printf("multibus_put_mbyte: Cleared XACK for %04X\n", addr); 
+    RAM_put_mbyte(addr, val);
+//    sim_printf("multibus_put_mbyte: Done XACK=%dX\n", XACK); 
+}
+
+/*  put a word to memory */
+
+void multibus_put_mword(uint16 addr, uint16 val)
+{
+    multibus_put_mbyte(addr, val & 0xff);
+    multibus_put_mbyte(addr+1, val >> 8);
 }
 
 /* end of ipcmultibus.c */

@@ -1,4 +1,4 @@
-/*  iEPROM.c: Intel EPROM simulator for 8-bit SBCs
+/*  ipcEPROM.c: Intel EPROM simulator for 8-bit SBCs
 
     Copyright (c) 2010, William A. Beech
 
@@ -40,8 +40,6 @@
 
 #include "system_defs.h"
 
-#define SET_XACK(VAL)       (xack = VAL)
-
 /* function prototypes */
 
 t_stat EPROM_attach (UNIT *uptr, CONST char *cptr);
@@ -51,6 +49,7 @@ uint8 EPROM_get_mbyte(uint16 addr);
 /* external function prototypes */
 
 extern uint8 xack;						/* XACK signal */
+extern UNIT ipc_cont_unit[];
 
 /* SIMH EPROM Standard I/O Data Structures */
 
@@ -184,4 +183,4 @@ uint8 EPROM_get_mbyte(uint16 addr)
     return 0xFF;
 }
 
-/* end of iEPROM.c */
+/* end of ipcEPROM.c */

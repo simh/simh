@@ -40,8 +40,6 @@
 
 #include "system_defs.h"
 
-#define SET_XACK(VAL)       (xack = VAL)
-
 /* function prototypes */
 
 t_stat EPROM_attach (UNIT *uptr, CONST char *cptr);
@@ -50,8 +48,8 @@ uint8 EPROM_get_mbyte(uint16 addr);
 
 /* external function prototypes */
 
-extern UNIT i8255_unit[];
-extern uint8 xack;						/* XACK signal */
+extern uint8 i8255_C[4];                    //port c byte I/O
+extern uint8 xack;			    /* XACK signal */
 
 /* SIMH EPROM Standard I/O Data Structures */
 
@@ -90,7 +88,8 @@ DEVICE EPROM_dev = {
     NULL,               //detach
     NULL,               //ctxt
     DEV_DEBUG,          //flags
-    0,                  //dctrl
+    DEBUG_flow + DEBUG_read + DEBUG_write,              //dctrl 
+//    0,                  //dctrl
     EPROM_debug,        //debflags
     NULL,               //msize
     NULL                //lname
@@ -142,7 +141,8 @@ t_stat EPROM_attach (UNIT *uptr, CONST char *cptr)
     }
     sim_debug (DEBUG_read, &EPROM_dev, "\tClose file\n");
     fclose(fp);
-    sim_printf("EPROM: %d bytes of ROM image %s loaded\n", j, EPROM_unit.filename);
+    sim_printf("   EPROM: Configured %d bytes, Attached to %s\n",
+        EPROM_unit.capac, EPROM_unit.filename);
     sim_debug (DEBUG_flow, &EPROM_dev, "EPROM_attach: Done\n");
     return SCPE_OK;
 }
@@ -151,16 +151,14 @@ t_stat EPROM_attach (UNIT *uptr, CONST char *cptr)
 
 t_stat EPROM_reset (DEVICE *dptr, uint16 size)
 {
-//    sim_debug (DEBUG_flow, &EPROM_dev, "   EPROM_reset: base=0000 size=%04X\n", size);
+    sim_debug (DEBUG_flow, &EPROM_dev, "   EPROM_reset: base=0000 size=%04X\n", size);
     if ((EPROM_unit.flags & UNIT_ATT) == 0) { /* if unattached */
         EPROM_unit.capac = size;           /* set EPROM size to 0 */
+        sim_printf("   EPROM: Configured, Not attached\n");
         sim_debug (DEBUG_flow, &EPROM_dev, "Done1\n");
-//        sim_printf("   EPROM: Available [%04X-%04XH]\n", 
-//            0, EPROM_unit.capac - 1);
-        return SCPE_OK;
-        }
-    if ((EPROM_unit.flags & UNIT_ATT) == 0) {
-        sim_printf("EPROM: No file attached\n");
+    } else {
+        sim_printf("   EPROM: Configured %d bytes, Attached to %s\n",
+            EPROM_unit.capac, EPROM_unit.filename);
     }
     sim_debug (DEBUG_flow, &EPROM_dev, "Done2\n");
     return SCPE_OK;
@@ -172,20 +170,17 @@ uint8 EPROM_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if (i8255_unit[0].u5 & 0x01) {         /* EPROM enabled */
-        sim_debug (DEBUG_read, &EPROM_dev, "EPROM_get_mbyte: addr=%04X\n", addr);
-        if (addr < EPROM_unit.capac) {
-            SET_XACK(1);                /* good memory address */
-            sim_debug (DEBUG_xack, &EPROM_dev, "EPROM_get_mbyte: Set XACK for %04X\n", addr); 
-            val = *((uint8 *)EPROM_unit.filebuf + addr);
-            sim_debug (DEBUG_read, &EPROM_dev, " val=%04X\n", val);
-            return (val & 0xFF);
-        }
+    sim_debug (DEBUG_read, &EPROM_dev, "EPROM_get_mbyte: addr=%04X\n", addr);
+    if (addr < EPROM_unit.capac) {
+        SET_XACK(1);                /* good memory address */
+        sim_debug (DEBUG_xack, &EPROM_dev, "EPROM_get_mbyte: Set XACK for %04X\n", addr); 
+        val = *((uint8 *)EPROM_unit.filebuf + addr);
+        sim_debug (DEBUG_read, &EPROM_dev, " val=%04X\n", val);
+        return (val & 0xFF);
+    } else {
         sim_debug (DEBUG_read, &EPROM_dev, " Out of range\n");
-        return 0xFF;
+        return 0;
     }
-    sim_debug (DEBUG_read, &EPROM_dev, " EPROM Disabled\n");
-    return 0xFF;
 }
 
 /* end of iEPROM.c */

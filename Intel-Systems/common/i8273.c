@@ -159,7 +159,7 @@ DEBTAB i8273_debug[] = {
 };
 
 DEVICE i8273_dev = {
-    "8273",             //name
+    "I8273",             //name
     &i8273_unit,        //units
     i8273_reg,          //registers
     i8273_mod,          //modifiers
