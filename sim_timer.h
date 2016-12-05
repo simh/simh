@@ -76,7 +76,7 @@ int clock_gettime(int clock_id, struct timespec *tp);
 #define SIM_NTIMERS     8                           /* # timers */
 #define SIM_TMAX        500                         /* max timer makeup */
 
-#define SIM_INITIAL_IPS 50000                       /* uncalibrated assumption */
+#define SIM_INITIAL_IPS 500000                      /* uncalibrated assumption */
                                                     /* about instructions per second */
 
 #define SIM_IDLE_CAL    10                          /* ms to calibrate */
