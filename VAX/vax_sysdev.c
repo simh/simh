@@ -1509,26 +1509,24 @@ switch (rg) {
 
 /* Programmable timers
 
-   The SSC timers, which increment at 1Mhz, cannot be accurately
-   simulated due to the overhead that would be required for 1M
+   The SSC timers, which increment at 1Mhz, cannot be simulated 
+   with ticks due to the overhead that would be required for 1M
    clock events per second.  Instead, a gross hack is used.  When
    a timer is started, the clock interval is inspected.
 
-   if (int < 0 and small) then testing timer, count instructions.
-        Small is determined by when the requested interval is less
-        than the size of a 100hz system clock tick.
-   if (int >= 0 or large) then counting a real interval, schedule
-        clock events at 100Hz using calibrated line clock delay
-        and when the remaining time value gets small enough, behave
-        like the small case above.
+   if (smaller than when the next clock tick will occur) then 
+        explicitly delay the interval number of usecs which is
+        determined from the instruction execution rate of the 
+        calibrated clock.
+   if (interval will occur after the next clock tick) then, schedule
+        events to coinside with the clock tick consume the interval
+        at the clock tick rate, and when the remaining time value 
+        gets small enough, behave like the small case above.
 
    If the interval register is read, then its value between events
    is interpolated using the current instruction count versus the
    count when the most recent event started, the result is scaled
-   to the calibrated system clock, unless the interval being timed
-   is less than a calibrated system clock tick (or the calibrated 
-   clock is running very slowly) at which time the result will be 
-   the elapsed instruction count.
+   to the calibrated system clock.
 
    The powerup TOY Test sometimes fails its tolerance test.  This was
    due to varying system load causing varying calibration values to be
@@ -1543,16 +1541,11 @@ switch (rg) {
 
 int32 tmr_tir_rd (int32 tmr, t_bool interp)
 {
-uint32 delta;
+uint32 delta_usecs;
 
 if (interp || (tmr_csr[tmr] & TMR_CSR_RUN)) {           /* interp, running? */
-    delta = sim_grtime () - tmr_sav[tmr];               /* delta inst */
-    if ((tmr_inc[tmr] == TMR_INC) &&                    /* scale large int */
-        (tmr_poll > TMR_INC))
-        delta = (uint32) ((((double) delta) * TMR_INC) / tmr_poll);
-    if (delta >= tmr_inc[tmr])
-        delta = tmr_inc[tmr] - 1;
-    return tmr_tir[tmr] + delta;
+    delta_usecs = (uint32)((sim_grtime () - tmr_sav[tmr]) / sim_timer_inst_per_sec ());
+    return tmr_tir[tmr] + delta_usecs;
     }
 
 sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X, %s\n", tmr, tmr_tir[tmr], interp ? "Interpolated" : "");
@@ -1653,20 +1646,17 @@ void tmr_sched (int32 tmr)
 {
 int32 clk_time = sim_activate_time (&clk_unit) - 1;
 int32 tmr_time;
+double tmr_time_d;
 
 tmr_sav[tmr] = sim_grtime ();                           /* save intvl base */
-if (tmr_tir[tmr] > (0xFFFFFFFFu - TMR_INC)) {           /* short interval? */
-    tmr_inc[tmr] = (~tmr_tir[tmr] + 1);                 /* inc = interval */
-    tmr_time = tmr_inc[tmr];
-    }
-else {
-    tmr_inc[tmr] = TMR_INC;                             /* usec/interval */
-    tmr_time = tmr_poll;
-    }
-if (tmr_time == 0)
-    tmr_time = 1;
+tmr_inc[tmr] = (~tmr_tir[tmr] + 1);                     /* inc = interval */
+tmr_time_d = (tmr_inc[tmr] * sim_timer_inst_per_sec ()) / 1000000.0;
+if ((tmr_time_d == 0.0) || (tmr_time_d > (double)0x7FFFFFFF))
+    tmr_time = 0x7FFFFFFF;
+else
+    tmr_time = (int32)tmr_time_d;
 sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - tmr_sav=%u, tmr_inc=%u, clk_time=%d, tmr_time=%d, tmr_poll=%d\n", tmr, tmr_sav[tmr], tmr_inc[tmr], clk_time, tmr_time, tmr_poll);
-if ((tmr_inc[tmr] == TMR_INC) && (tmr_time > clk_time)) {
+if (tmr_time > clk_time) {
 
 /* Align scheduled event to be identical to the event for the next clock
    tick.  This lets us always see a consistent calibrated value, both for
@@ -1674,9 +1664,9 @@ if ((tmr_inc[tmr] == TMR_INC) && (tmr_time > clk_time)) {
    may happen in tmr_tir_rd ().  This presumes that sim_activate will
    queue the interval timer behind the event for the clock tick. */
 
-    tmr_inc[tmr] = (uint32) (((double) clk_time * TMR_INC) / tmr_poll);
+    tmr_inc[tmr] = (uint32) (((double) clk_time/sim_timer_inst_per_sec ())*1000000.0);
     tmr_time = clk_time;
-    sim_clock_coschedule (&sysd_unit[tmr], tmr_time);
+    sim_clock_coschedule_tmr (&sysd_unit[tmr], TMR_CLK, tmr_time);
     }
 else
     sim_activate (&sysd_unit[tmr], tmr_time);
