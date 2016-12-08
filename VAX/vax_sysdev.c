@@ -246,7 +246,6 @@ int32 tmr_csr[2] = { 0 };                               /* SSC timers */
 uint32 tmr_tir[2] = { 0 };                              /* curr interval */
 uint32 tmr_tnir[2] = { 0 };                             /* next interval */
 int32 tmr_tivr[2] = { 0 };                              /* vector */
-uint32 tmr_inc[2] = { 0 };                              /* tir increment */
 uint32 tmr_sav[2] = { 0 };                              /* saved inst cnt */
 int32 ssc_adsm[2] = { 0 };                              /* addr strobes */
 int32 ssc_adsk[2] = { 0 };
@@ -480,13 +479,11 @@ REG sysd_reg[] = {
     { HRDATAD (TIR0,   tmr_tir[0],  32, "SSC timer 0 interval register") },
     { HRDATAD (TNIR0,  tmr_tnir[0], 32, "SSC timer 0 next interval register") },
     { HRDATAD (TIVEC0, tmr_tivr[0],  9, "SSC timer 0 interrupt vector register") },
-    { HRDATAD (TINC0,  tmr_inc[0],  32, "SSC timer 0 tir increment") },
     { HRDATAD (TSAV0,  tmr_sav[0],  32, "SSC timer 0 saved inst cnt") },
     { HRDATAD (TCSR1,  tmr_csr[1],  32, "SSC timer 1 control/status register") },
     { HRDATAD (TIR1,   tmr_tir[1],  32, "SSC timer 1 interval register") },
     { HRDATAD (TNIR1,  tmr_tnir[1], 32, "SSC timer 1 next interval register") },
     { HRDATAD (TIVEC1, tmr_tivr[1],  9, "SSC timer 1 interrupt vector register") },
-    { HRDATAD (TINC1,  tmr_inc[1],  32, "SSC timer 1 tir increment") },
     { HRDATAD (TSAV1,  tmr_sav[1],  32, "SSC timer 1  saved inst cnt") },
     { HRDATAD (ADSM0,  ssc_adsm[0], 32, "SSC address match 0 address") },
     { HRDATAD (ADSK0,  ssc_adsk[0], 32, "SSC address match 0 mask") },
@@ -1544,7 +1541,8 @@ int32 tmr_tir_rd (int32 tmr, t_bool interp)
 uint32 delta_usecs;
 
 if (interp || (tmr_csr[tmr] & TMR_CSR_RUN)) {           /* interp, running? */
-    delta_usecs = (uint32)((sim_grtime () - tmr_sav[tmr]) / sim_timer_inst_per_sec ());
+    delta_usecs = (uint32)(((sim_grtime () - tmr_sav[tmr]) * 1000000.0) / sim_timer_inst_per_sec ());
+    sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X, %s\n", tmr, tmr_tir[tmr] + delta_usecs, interp ? "Interpolated" : ((tmr_csr[tmr] & TMR_CSR_RUN) ? " while running" : ""));
     return tmr_tir[tmr] + delta_usecs;
     }
 
@@ -1602,8 +1600,10 @@ if ((tmr_csr[tmr] & (TMR_CSR_DON | TMR_CSR_IE)) !=      /* update int */
 t_stat tmr_svc (UNIT *uptr)
 {
 int32 tmr = uptr - sysd_dev.units;                      /* get timer # */
+uint32 delta_usecs;
 
-tmr_incr (tmr, tmr_inc[tmr]);                           /* incr timer */
+delta_usecs = (uint32)(((sim_grtime () - tmr_sav[tmr]) * 1000000.0) / sim_timer_inst_per_sec ());
+tmr_incr (tmr, delta_usecs);                            /* incr timer */
 return SCPE_OK;
 }
 
@@ -1649,13 +1649,12 @@ int32 tmr_time;
 double tmr_time_d;
 
 tmr_sav[tmr] = sim_grtime ();                           /* save intvl base */
-tmr_inc[tmr] = (~tmr_tir[tmr] + 1);                     /* inc = interval */
-tmr_time_d = (tmr_inc[tmr] * sim_timer_inst_per_sec ()) / 1000000.0;
+tmr_time_d = ((~tmr_tir[tmr] + 1) * sim_timer_inst_per_sec ()) / 1000000.0;
 if ((tmr_time_d == 0.0) || (tmr_time_d > (double)0x7FFFFFFF))
     tmr_time = 0x7FFFFFFF;
 else
     tmr_time = (int32)tmr_time_d;
-sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - tmr_sav=%u, tmr_inc=%u, clk_time=%d, tmr_time=%d, tmr_poll=%d\n", tmr, tmr_sav[tmr], tmr_inc[tmr], clk_time, tmr_time, tmr_poll);
+sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - tmr_sav=%u, clk_time=%d, tmr_time=%d, tmr_poll=%d\n", tmr, tmr_sav[tmr], clk_time, tmr_time, tmr_poll);
 if (tmr_time > clk_time) {
 
 /* Align scheduled event to be identical to the event for the next clock
@@ -1664,7 +1663,6 @@ if (tmr_time > clk_time) {
    may happen in tmr_tir_rd ().  This presumes that sim_activate will
    queue the interval timer behind the event for the clock tick. */
 
-    tmr_inc[tmr] = (uint32) (((double) clk_time/sim_timer_inst_per_sec ())*1000000.0);
     tmr_time = clk_time;
     sim_clock_coschedule_tmr (&sysd_unit[tmr], TMR_CLK, tmr_time);
     }
@@ -1800,7 +1798,7 @@ int32 i;
 if (sim_switches & SWMASK ('P')) sysd_powerup ();       /* powerup? */
 for (i = 0; i < 2; i++) {
     tmr_csr[i] = tmr_tnir[i] = tmr_tir[i] = 0;
-    tmr_inc[i] = tmr_sav[i] = 0;
+    tmr_sav[i] = 0;
     sim_cancel (&sysd_unit[i]);
     }
 csi_csr = 0;
