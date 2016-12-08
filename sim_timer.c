@@ -1309,7 +1309,7 @@ DEVICE sim_timer_dev = {
     NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
 
 DEVICE sim_throttle_dev = {
-    "THROTTLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1};
+    "THROT-TLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1};
 
 
 /* sim_idle - idle simulator until next event or for specified interval
