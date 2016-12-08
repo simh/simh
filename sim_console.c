@@ -147,6 +147,7 @@ static t_stat sim_os_ttclose (void);
 static t_bool sim_os_ttisatty (void);
 
 static t_stat sim_set_rem_telnet (int32 flag, CONST char *cptr);
+static t_stat sim_set_rem_bufsize (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_connections (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_timeout (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_master (int32 flag, CONST char *cptr);
@@ -281,6 +282,7 @@ static CTAB set_con_tab[] = {
 static CTAB set_rem_con_tab[] = {
     { "CONNECTIONS", &sim_set_rem_connections, 0 },
     { "TELNET", &sim_set_rem_telnet, 1 },
+    { "BUFFERSIZE", &sim_set_rem_bufsize, 1 },
     { "NOTELNET", &sim_set_rem_telnet, 0 },
     { "TIMEOUT", &sim_set_rem_timeout, 0 },
     { "MASTER", &sim_set_rem_master, 1 },
@@ -471,8 +473,10 @@ if (sim_rem_read_timeout)
     fprintf (st, "Remote Console Input automatically continues after %d seconds\n", sim_rem_read_timeout);
 if (!sim_rem_con_tmxr.master)
     fprintf (st, "Remote Console Command input is disabled\n");
-else
+else {
     fprintf (st, "Remote Console Command Input listening on TCP port: %s\n", sim_rem_con_unit[0].filename);
+    fprintf (st, "Remote Console Per Command Output buffer size:      %d bytes\n", sim_rem_con_tmxr.buffered);
+    }
 for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
     lp = &sim_rem_con_tmxr.ldsc[i];
     if (!lp->conn)
@@ -1126,7 +1130,7 @@ if (flag) {
             sim_set_rem_telnet (0, NULL);               /* close first */
         if (sim_rem_con_tmxr.lines == 0)                /* Ir no connection limit set */
             sim_set_rem_connections (0, "1");           /* use 1 */
-        sim_rem_con_tmxr.buffered = 1400;               /* Use big enough buffers */
+        sim_rem_con_tmxr.buffered = 8192;               /* Use big enough buffers */
         sim_register_internal_device (&sim_remote_console);
         r = tmxr_attach (&sim_rem_con_tmxr, &sim_rem_con_unit[0], cptr);/* open master socket */
         if (r == SCPE_OK)
@@ -1200,6 +1204,23 @@ if (sim_rem_active_number >= 0)
 else
     sim_rem_read_timeout = timeout;
 return SCPE_OK;
+}
+
+static t_stat sim_set_rem_bufsize (int32 flag, CONST char *cptr)
+{
+char cmdbuf[CBUFSIZE];
+int32 bufsize;
+t_stat r;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+bufsize = (int32) get_uint (cptr, 10, 32768, &r);
+if (r != SCPE_OK)
+    return r;
+if (bufsize < 1400)
+    return sim_messagef (SCPE_ARG, "%d is too small.  Minimum size is 1400\n", bufsize);
+sprintf(cmdbuf, "BUFFERED=%d", bufsize);
+return tmxr_open_master (&sim_rem_con_tmxr, cmdbuf);    /* open master socket */
 }
 
 /* Enable or disable Remote Console master mode */
