@@ -212,6 +212,7 @@ int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
 struct todr_battery_info {
     uint32 toy_gmtbase;                                 /* GMT base of set value */
     uint32 toy_gmtbasemsec;                             /* The milliseconds of the set value */
+    uint32 toy_endian_plus2;                            /* 2 -> Big Endian, 3 -> Little Endian, invalid otherwise */
     };
 typedef struct todr_battery_info TOY;
 
@@ -590,7 +591,7 @@ int32 line = uptr - tti_dev.units;
 switch (line) {
 
     case ID_CT:                                         /* console terminal */
-        sim_clock_coschedule (uptr, tmxr_poll);         /* continue poll */
+        sim_clock_coschedule_tmr (uptr, TMR_CLK, tmxr_poll);/* continue poll */
         if ((tti_csr & CSR_DONE) &&                     /* input still pending and < 500ms? */
             ((sim_os_msec () - tti_buftime) < 500))
              return SCPE_OK;
@@ -910,6 +911,20 @@ const char *clk_description (DEVICE *dptr)
 return "time of year clock";
 }
 
+static uint32 sim_byteswap32 (uint32 data)
+{
+uint8 *bdata = (uint8 *)&data;
+uint8 tmp;
+
+tmp = bdata[0];
+bdata[0] = bdata[3];
+bdata[3] = tmp;
+tmp = bdata[1];
+bdata[1] = bdata[2];
+bdata[2] = tmp;
+return data;
+}
+
 /* CLK attach */
 
 t_stat clk_attach (UNIT *uptr, CONST char *cptr)
@@ -921,8 +936,21 @@ memset (uptr->filebuf, 0, (size_t)uptr->capac);
 r = attach_unit (uptr, cptr);
 if (r != SCPE_OK)
     uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
-else
+else {
+    TOY *toy = (TOY *)uptr->filebuf;
+
     uptr->hwmark = (uint32) uptr->capac;
+    if ((toy->toy_endian_plus2 < 2) || (toy->toy_endian_plus2 > 3))
+        memset (uptr->filebuf, 0, (size_t)uptr->capac);
+    else {
+        if (toy->toy_endian_plus2 != sim_end + 2) {     /* wrong endian? */
+            toy->toy_gmtbase = sim_byteswap32 (toy->toy_gmtbase);
+            toy->toy_gmtbasemsec = sim_byteswap32 (toy->toy_gmtbasemsec);
+            }
+        }
+    toy->toy_endian_plus2 = sim_end + 2;
+    todr_resync ();
+    }
 return r;
 }
 
@@ -976,8 +1004,8 @@ void todr_wr (int32 data)
 TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec now, val, base;
 
-/* Save the GMT time when set value was 0 to record the base for future 
-   read operations in "battery backed-up" state */
+/* Save the GMT time when set value was 0 to record the base for 
+   future read operations in "battery backed-up" state */
 
 sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
 val.tv_sec = ((uint32)data) / 100;
