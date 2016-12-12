@@ -303,19 +303,18 @@ The EXPECT command now exists to provide a means of reacting to simulator output
 #### Command Processing Enhancements
 
 ##### Environment variable insertion
-Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_YYYY%, %DATE_YY%, %DATE_YC%, %DATE_MM%, %DATE_DD%, %DATE_D%, %DATE_WYYYY%, %DATE_WW%, %TIME_HH%, %TIME_MM%, %TIME_SS%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
-Command Aliases
+Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_YYYY%, %DATE_YY%, %DATE_YC%, %DATE_MM%, %DATE_MMM%, %DATE_MONTH%, %DATE_DD%, %DATE_D%, %DATE_WYYYY%, %DATE_WW%, %TIME_HH%, %TIME_MM%, %TIME_SS%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
 
    Token "%0" expands to the command file name. 
    Token %n (n being a single digit) expands to the n'th argument
-   Tonen %* expands to the whole set of arguments (%1 ... %9)
+   Token %* expands to the whole set of arguments (%1 ... %9)
 
    The input sequence "\%" represents a literal "%", and "\\" represents a
    literal "\".  All other character combinations are rendered literally.
 
    Omitted parameters result in null-string substitutions.
 
-   A Tokens preceeded and followed by % characters are expanded as environment
+   Tokens preceeded and followed by % characters are expanded as environment
    variables, and if an environment variable isn't found then it can be one of 
    several special variables: 
    
@@ -329,6 +328,7 @@ Command Aliases
           %DATE_YY%           yy          (00-99)
           %DATE_MM%           mm          (01-12)
           %DATE_MMM%          mmm         (JAN-DEC)
+          %DATE_MONTH%        month       (January-December)
           %DATE_DD%           dd          (01-31)
           %DATE_WW%           ww          (01-53)     ISO 8601 week number
           %DATE_WYYYY%        yyyy        (0000-9999) ISO 8601 week year number

@@ -3225,8 +3225,12 @@ for (; *ip && (op < oend); ) {
                         strftime (rbuf, sizeof(rbuf), "%m", tmnow);
                         ap = rbuf;
                         }
-                    else if (!strcmp ("DATE_MMM", gbuf)) {/* Month number (01-12) */
+                    else if (!strcmp ("DATE_MMM", gbuf)) {/* abbreviated Month name */
                         strftime (rbuf, sizeof(rbuf), "%b", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("DATE_MONTH", gbuf)) {/* full Month name */
+                        strftime (rbuf, sizeof(rbuf), "%B", tmnow);
                         ap = rbuf;
                         }
                     else if (!strcmp ("DATE_DD", gbuf)) {/* Day of Month (01-31) */
