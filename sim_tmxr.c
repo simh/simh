@@ -3891,13 +3891,17 @@ return _sim_activate_after_abs (uptr, usecs_walltime);
 
 t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval)
 {
-return tmxr_clock_coschedule_tmr (uptr, 0, interval);
+int32 ticks = (interval + (sim_rtcn_tick_size (0)/2))/sim_rtcn_tick_size (0);/* Convert to ticks */
+
+return tmxr_clock_coschedule_tmr (uptr, 0, ticks);
 }
 
 t_stat tmxr_clock_coschedule_abs (UNIT *uptr, int32 interval)
 {
+int32 ticks = (interval + (sim_rtcn_tick_size (0)/2))/sim_rtcn_tick_size (0);/* Convert to ticks */
+
 sim_cancel (uptr);
-return tmxr_clock_coschedule_tmr (uptr, 0, interval);
+return tmxr_clock_coschedule_tmr (uptr, 0, ticks);
 }
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
