@@ -591,7 +591,7 @@ int32 line = uptr - tti_dev.units;
 switch (line) {
 
     case ID_CT:                                         /* console terminal */
-        sim_clock_coschedule_tmr (uptr, TMR_CLK, tmxr_poll);/* continue poll */
+        sim_clock_coschedule_tmr (uptr, TMR_CLK, TMXR_MULT);/* continue poll */
         if ((tti_csr & CSR_DONE) &&                     /* input still pending and < 500ms? */
             ((sim_os_msec () - tti_buftime) < 500))
              return SCPE_OK;
