@@ -1184,7 +1184,7 @@ for (tmr=0; tmr<=SIM_NTIMERS; ++tmr) {
             else
                 fprintf (st, "  Unknown");
             if (accum > 0)
-                fprintf (st, " after %d ticks", accum);
+                fprintf (st, " after %d tick%s", accum, (accum > 1) ? "s" : "");
             fprintf (st, "\n");
             accum = accum + uptr->time;
             }
@@ -1702,7 +1702,7 @@ rtc_calib_tick_time[tmr] += rtc_clock_tick_size[tmr];
  * non-success status, while co-schedule activities might, so they are 
  * queued to run from sim_process_event
  */
-sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_tick_svc - scheduling %s\n", sim_uname (sim_clock_unit[tmr]));
+sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_tick_svc - scheduling %s - cosched interval: %d\n", sim_uname (sim_clock_unit[tmr]), sim_cosched_interval[tmr]);
 if (sim_clock_unit[tmr]->action == NULL)
     return SCPE_IERR;
 stat = sim_clock_unit[tmr]->action (sim_clock_unit[tmr]);
@@ -1719,18 +1719,19 @@ if (stat == SCPE_OK) {
             rtc_clock_skew_max[tmr] = skew;
         }
     while ((sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) &&
-           (sim_cosched_interval[tmr] < sim_clock_cosched_queue[tmr]->time)) {
+           (sim_cosched_interval[tmr] <= 0)) {
         UNIT *cptr = sim_clock_cosched_queue[tmr];
         sim_clock_cosched_queue[tmr] = cptr->next;
         cptr->next = NULL;
         cptr->cancel = NULL;
-        sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_tick_svc(tmr=%d) - coactivating %s\n", tmr, sim_uname (cptr));
+        cptr->time = 0;
+        if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END)
+            sim_cosched_interval[tmr] = sim_clock_cosched_queue[tmr]->time;
+        else
+            sim_cosched_interval[tmr]  = 0;
+        sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_tick_svc(tmr=%d) - coactivating %s - cosched interval: %d\n", tmr, sim_uname (cptr), sim_cosched_interval[tmr]);
         _sim_activate (cptr, 0);
         }
-    if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END)
-        sim_cosched_interval[tmr] = sim_clock_cosched_queue[tmr]->time;
-    else
-        sim_cosched_interval[tmr]  = 0;
     }
 sim_timer_activate_after (uptr, 1000000/rtc_hz[tmr]);
 return stat;
@@ -2009,13 +2010,8 @@ if (sim_calb_tmr == SIM_NTIMERS) {      /* was old the internal timer? */
     rtc_initd[SIM_NTIMERS] = 0;
     rtc_hz[SIM_NTIMERS] = 0;
     sim_cancel (&SIM_INTERNAL_UNIT);
-    /* Migrate any coscheduled devices to the standard queue and they will requeue themselves */
-    while (sim_clock_cosched_queue[SIM_NTIMERS] != QUEUE_LIST_END) {
-        UNIT *uptr = sim_clock_cosched_queue[SIM_NTIMERS];
-
-        _sim_coschedule_cancel (uptr);
-        _sim_activate (uptr, 1);
-        }
+    sim_cancel (&sim_timer_units[SIM_NTIMERS]);
+    sim_register_clock_unit_tmr (NULL, SIM_INTERNAL_CLK);
     }
 else {
     sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock() - Changing Calibrated Timer from %d (%dHz) to %d (%dHz)\n", sim_calb_tmr, rtc_hz[sim_calb_tmr], tmr, rtc_hz[tmr]);
@@ -2071,7 +2067,7 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
         /* Stop clock assist unit and make sure the clock unit has a tick queued */
         sim_cancel (&sim_timer_units[tmr]);
         if (rtc_hz[tmr])
-            sim_activate (sim_clock_unit[tmr], rtc_currd[tmr]);
+            _sim_activate (sim_clock_unit[tmr], rtc_currd[tmr]);
         /* Move coscheduled units to the standard event queue */
         accum = 1;
         while (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) {
@@ -2087,6 +2083,7 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
         }
     }
 sim_cancel (&SIM_INTERNAL_UNIT);                    /* Make sure Internal Timer is stopped */
+sim_cancel (&sim_timer_units[SIM_NTIMERS]);
 sim_calb_tmr_last = sim_calb_tmr;                   /* Save calibrated timer value for display */
 sim_inst_per_sec_last = sim_timer_inst_per_sec ();  /* Save execution rate for display */
 sim_calb_tmr = -1;
@@ -2178,6 +2175,13 @@ if (inst_delay_d > (double)0x7fffffff)
 inst_delay = (int32)inst_delay_d;
 if ((inst_delay == 0) && (usec_delay != 0))
     inst_delay = 1;     /* Minimum non-zero delay is 1 instruction */
+if ((sim_calb_tmr != -1) &&                             /* calibrated timer available? */
+    (inst_delay > 2*rtc_currd[sim_calb_tmr]) &&         /* delay > 2 * calibrated timer's ticks */
+    (uptr->flags & UNIT_IDLE)) {                        /* idleable unit? */
+    sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after() - coscheduling %s with calibrated timer after %d instructions (%d usecs)\n", 
+               sim_uname(uptr), inst_delay, usec_delay);
+    return sim_clock_coschedule (uptr, inst_delay);     /* coschedule with the calibrated timer */
+    }
 #if defined(SIM_ASYNCH_CLOCKS)
 if ((sim_calb_tmr == -1) ||                             /* if No timer initialized */
     (inst_delay < rtc_currd[sim_calb_tmr]) ||           /*    or sooner than next clock tick? */
@@ -2235,6 +2239,7 @@ else {
         return SCPE_IERR;
     }
 if (NULL == uptr) {                         /* deregistering? */
+    /* Migrate any coscheduled devices to the standard queue and they will requeue themselves */
     while (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) {
         UNIT *uptr = sim_clock_cosched_queue[tmr];
 
@@ -2255,7 +2260,7 @@ return SCPE_OK;
 /* Default timer is 0, otherwise use a calibrated one if it exists */
 static int32 _default_tmr ()
 {
-return (rtc_currd[0] ? 0 : ((sim_calb_tmr != -1) ? rtc_currd[sim_calb_tmr] : 0));
+return (rtc_currd[0] ? 0 : ((sim_calb_tmr != -1) ? sim_calb_tmr : 0));
 }
 
 static int32 _tick_size ()
