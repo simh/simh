@@ -56,6 +56,8 @@
 
 #include "vax_defs.h"
 
+#include <math.h>
+
 #ifdef DONT_USE_INTERNAL_ROM
 #define BOOT_CODE_FILENAME "ka655x.bin"
 #else /* !DONT_USE_INTERNAL_ROM */
@@ -1653,7 +1655,7 @@ tmr_time_d = ((~tmr_tir[tmr] + 1) * sim_timer_inst_per_sec ()) / 1000000.0;
 if ((tmr_time_d == 0.0) || (tmr_time_d > (double)0x7FFFFFFF))
     tmr_time = 0x7FFFFFFF;
 else
-    tmr_time = (int32)tmr_time_d;
+    tmr_time = (int32)ceil(tmr_time_d);
 sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - tmr_sav=%u, clk_time=%d, tmr_time=%d, tmr_poll=%d\n", tmr, tmr_sav[tmr], clk_time, tmr_time, tmr_poll);
 if (tmr_time > clk_time) {
 
@@ -1664,7 +1666,7 @@ if (tmr_time > clk_time) {
    queue the interval timer behind the event for the clock tick. */
 
     tmr_time = clk_time;
-    sim_clock_coschedule_tmr (&sysd_unit[tmr], TMR_CLK, tmr_time);
+    sim_clock_coschedule_tmr (&sysd_unit[tmr], TMR_CLK, 1);
     }
 else
     sim_activate (&sysd_unit[tmr], tmr_time);
