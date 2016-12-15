@@ -1001,16 +1001,6 @@ extern int32 sim_asynch_inst_latency;
     if ((uptr)->cancel)                                           \
         (uptr)->cancel (uptr)
 #endif /* !defined(AIO_CANCEL) */
-#if defined(SIM_ASYNCH_CLOCKS)
-#define AIO_RETURN_TIME(uptr)                                     \
-    do {                                                          \
-        int32 rtime = sim_timer_activate_time (uptr);             \
-        if (rtime >= 0)                                           \
-            return rtime;                                         \
-       } while (0)
-#else
-#define AIO_RETURN_TIME(uptr) (void)0
-#endif
 #define AIO_EVENT_BEGIN(uptr)                                     \
     do {                                                          \
         int __was_poll = uptr->dynflags & UNIT_TM_POLL
@@ -1186,7 +1176,6 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_LOCK
 #define AIO_UNLOCK
 #define AIO_CLEANUP
-#define AIO_RETURN_TIME(uptr)
 #define AIO_EVENT_BEGIN(uptr)
 #define AIO_EVENT_COMPLETE(uptr, reason)
 #define AIO_IS_ACTIVE(uptr) FALSE

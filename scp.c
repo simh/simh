@@ -8825,6 +8825,27 @@ if (0 != strncmp ("1 ", buf, 2))
 return buf;
 }
 
+const char *sim_fmt_numeric (double number)
+{
+static char buf[60];
+char tmpbuf[60];
+size_t len;
+uint32 c;
+char *p;
+
+sprintf (tmpbuf, "%.0f", number);
+len = strlen (tmpbuf);
+for (c=0, p=buf; c < len; c++) {
+    if ((c > 0) && 
+        (sim_isdigit (tmpbuf[c])) && 
+        (0 == ((len - c) % 3)))
+        *(p++) = ',';
+    *(p++) = tmpbuf[c];
+    }
+*p = '\0';
+return buf;
+}
+
 /* Event queue package
 
         sim_activate            add entry to event queue
@@ -9100,7 +9121,7 @@ t_bool sim_is_active (UNIT *uptr)
 {
 AIO_VALIDATE;
 AIO_UPDATE_QUEUE;
-return (((uptr->next) || AIO_IS_ACTIVE(uptr)) ? TRUE : FALSE);
+return (((uptr->next) || AIO_IS_ACTIVE(uptr) || ((uptr->dynflags & UNIT_TMR_UNIT) ? sim_timer_is_active (uptr) : FALSE)) ? TRUE : FALSE);
 }
 
 /* sim_activate_time - return activation time
@@ -9114,10 +9135,13 @@ return (((uptr->next) || AIO_IS_ACTIVE(uptr)) ? TRUE : FALSE);
 int32 sim_activate_time (UNIT *uptr)
 {
 UNIT *cptr;
-int32 accum = 0;
+int32 accum;
 
 AIO_VALIDATE;
-AIO_RETURN_TIME(uptr);
+accum = sim_timer_activate_time (uptr);             \
+if (accum >= 0)                                           \
+    return accum;                                         \
+accum = 0;
 for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {
         if (sim_interval > 0)

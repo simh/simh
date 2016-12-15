@@ -87,7 +87,7 @@ int clock_gettime(int clock_id, struct timespec *tp);
 #define SIM_THROT_WINIT     1000                    /* cycles to skip */
 #define SIM_THROT_WST       10000                   /* initial wait */
 #define SIM_THROT_WMUL      4                       /* multiplier */
-#define SIM_THROT_WMIN      100                     /* min wait */
+#define SIM_THROT_WMIN      50                      /* min wait */
 #define SIM_THROT_DRIFT_PCT 5                       /* drift percentage for recalibrate */
 #define SIM_THROT_MSMIN     10                      /* min for measurement */
 #define SIM_THROT_NONE      0                       /* throttle parameters */
@@ -95,6 +95,9 @@ int clock_gettime(int clock_id, struct timespec *tp);
 #define SIM_THROT_KCYC      2                       /* KiloCycles Per Sec */
 #define SIM_THROT_PCT       3                       /* Max Percent of host CPU */
 #define SIM_THROT_SPC       4                       /* Specific periodic Delay */
+#define SIM_THROT_STATE_INIT      0                 /* Starting */
+#define SIM_THROT_STATE_TIME      1                 /* Checking Time */
+#define SIM_THROT_STATE_THROTTLE  2                 /* Throttling  */
 
 #define TIMER_DBG_IDLE  0x001                       /* Debug Flag for Idle Debugging */
 #define TIMER_DBG_QUEUE 0x002                       /* Debug Flag for Asynch Queue Debugging */
@@ -132,6 +135,7 @@ t_stat sim_timer_change_asynch (void);
 t_stat sim_timer_activate (UNIT *uptr, int32 interval);
 t_stat sim_timer_activate_after (UNIT *uptr, uint32 usec_delay);
 int32 sim_timer_activate_time (UNIT *uptr);
+t_bool sim_timer_is_active (UNIT *uptr);
 t_stat sim_register_clock_unit (UNIT *uptr);
 t_stat sim_register_clock_unit_tmr (UNIT *uptr, int32 tmr);
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
