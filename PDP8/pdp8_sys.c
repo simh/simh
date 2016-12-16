@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Dec-16    RMS     Added PKSTF (Dave Gesswein)
    17-Sep-13    RMS     Fixed recognition of initial field change (Dave Gesswein)
    24-Mar-09    RMS     Added link to FPP
    24-Jun-08    RMS     Fixed bug in new rim loader (Don North)
@@ -305,7 +306,7 @@ static const char *opcode[] = {
  "DCEA",         "DEAL", "DEAC",
  "DFSE", "DFSC", "DISK", "DMAC",
  "DCXA", "DXAL", "DXAC",
- "PSKF", "PCLF", "PSKE",                                /* LPT */
+ "PKSTF", "PSKF", "PCLF", "PSKE",                                /* LPT */
  "PSTB", "PSIE", "PCLF PSTB", "PCIE",
  "LWCR", "CWCR", "LCAR",                                /* MT */
  "CCAR", "LCMR", "LFGR", "LDBR",
@@ -368,7 +369,7 @@ static const int32 opc_val[] = {
  06774+I_IOA+AMB_TD, 06775+I_IOA+AMB_TD, 06776+I_IOA+AMB_TD, 06777+I_IOA+AMB_TD,
  06530+I_NPN, 06531+I_NPN, 06532+I_NPN, 06533+I_NPN,    /* AD */
  06534+I_NPN, 06535+I_NPN, 06536+I_NPN, 06537+I_NPN,
- 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
+ 06660+I_NPN, 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
  06611+I_NPN, 06612+I_NPN, 06615+I_NPN, 06616+I_NPN,
  06611+I_NPN,              06615+I_NPN, 06616+I_NPN,
  06621+I_NPN, 06622+I_NPN, 06623+I_NPN, 06626+I_NPN,

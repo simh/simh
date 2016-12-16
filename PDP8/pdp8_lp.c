@@ -1,6 +1,6 @@
 /* pdp8_lp.c: PDP-8 line printer simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -90,7 +90,8 @@ DEVICE lpt_dev = {
 int32 lpt (int32 IR, int32 AC)
 {
 switch (IR & 07) {                                      /* decode IR<9:11> */
-    case 0:
+
+    case 0:                                             /* PKSTF */
         dev_done = dev_done | INT_LPT;                  /* set flag */
         int_req = INT_UPDATE;                           /* update interrupts */
         return AC;
