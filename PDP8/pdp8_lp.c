@@ -91,8 +91,8 @@ int32 lpt (int32 IR, int32 AC)
 {
 switch (IR & 07) {                                      /* decode IR<9:11> */
     case 0:
-        dev_done = dev_done | INT_LPT;                  /* set flag /
-        int_req = INT_UPDATE;                           / update interrupts */
+        dev_done = dev_done | INT_LPT;                  /* set flag */
+        int_req = INT_UPDATE;                           /* update interrupts */
         return AC;
 
     case 1:                                             /* PSKF */
