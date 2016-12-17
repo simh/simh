@@ -1013,11 +1013,9 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     sim_timer_units[tmr].action = &sim_timer_tick_svc;
     sim_timer_units[tmr].flags = UNIT_DIS | UNIT_IDLE;
     }
-SIM_INTERNAL_UNIT.flags = UNIT_DIS | UNIT_IDLE;
+SIM_INTERNAL_UNIT.flags = UNIT_IDLE;
 sim_register_internal_device (&sim_timer_dev);
 sim_throttle_unit.action = &sim_throt_svc;
-sim_throttle_unit.flags = UNIT_DIS;
-sim_register_internal_device (&sim_throttle_dev);
 sim_register_clock_unit_tmr (&SIM_INTERNAL_UNIT, SIM_INTERNAL_CLK);
 sim_idle_enab = FALSE;                                  /* init idle off */
 sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
@@ -1564,6 +1562,7 @@ else {
             }
         }
     }
+sim_register_internal_device (&sim_throttle_dev);
 sim_throt_cps = SIM_INITIAL_IPS;    /* Initial value while correct one is determined */
 return SCPE_OK;
 }
@@ -2066,7 +2065,7 @@ if (tmr == SIM_NTIMERS) {                   /* None found? */
         sim_calb_tmr = SIM_NTIMERS;
         sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock() - Starting Internal Calibrated Timer at %dHz\n", sim_int_clk_tps);
         SIM_INTERNAL_UNIT.action = &sim_timer_clock_tick_svc;
-        SIM_INTERNAL_UNIT.flags = UNIT_DIS | UNIT_IDLE;
+        SIM_INTERNAL_UNIT.flags = UNIT_IDLE;
         sim_activate_abs (&SIM_INTERNAL_UNIT, 0);
         sim_rtcn_init_unit (&SIM_INTERNAL_UNIT, (CLK_INIT*CLK_TPS)/sim_int_clk_tps, SIM_INTERNAL_CLK);
         }
@@ -2334,7 +2333,8 @@ if (NULL == sim_clock_unit[tmr])
     sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;
 sim_clock_unit[tmr] = uptr;
 uptr->dynflags |= UNIT_TMR_UNIT;
-sim_timer_units[tmr].flags = UNIT_DIS | (sim_clock_unit[tmr] ? UNIT_IDLE : 0);
+sim_timer_units[tmr].flags = ((tmr == SIM_NTIMERS) ? 0 : UNIT_DIS) | 
+                             (sim_clock_unit[tmr] ? UNIT_IDLE : 0);
 return SCPE_OK;
 }
 

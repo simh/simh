@@ -403,7 +403,7 @@ t_stat sim_rem_con_data_svc (UNIT *uptr);               /* remote console connec
 t_stat sim_rem_con_reset (DEVICE *dptr);                /* remote console reset routine */
 UNIT sim_rem_con_unit[2] = {
     { UDATA (&sim_rem_con_poll_svc, UNIT_IDLE, 0)  },   /* remote console connection polling unit */
-    { UDATA (&sim_rem_con_data_svc, UNIT_IDLE, 0)  }};  /* console data handling unit */
+    { UDATA (&sim_rem_con_data_svc, UNIT_IDLE|UNIT_DIS, 0)  }};  /* console data handling unit */
 
 DEBTAB sim_rem_con_debug[] = {
   {"TRC",    DBG_TRC},
