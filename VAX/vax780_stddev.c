@@ -251,7 +251,7 @@ t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
 t_stat fl_svc (UNIT *uptr);
 t_stat fl_reset (DEVICE *dptr);
-int32 icr_rd ();
+int32 icr_rd (void);
 void tmr_sched (uint32 incr);
 t_stat todr_resync (void);
 t_stat fl_wr_txdb (int32 data);
@@ -453,10 +453,11 @@ void rxcs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0)
     tti_int = 0;
-else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-    tti_int = 1;
+else {
+    if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
+        tti_int = 1;
+    }
 tti_csr = (tti_csr & ~RXCS_WR) | (data & RXCS_WR);
-return;
 }
 
 int32 rxdb_rd (void)
@@ -481,10 +482,11 @@ void txcs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0)
     tto_int = 0;
-else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-    tto_int = 1;
+else {
+    if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
+        tto_int = 1;
+    }
 tto_csr = (tto_csr & ~TXCS_WR) | (data & TXCS_WR);
-return;
 }
 
 void txdb_wr (int32 data)
@@ -494,8 +496,8 @@ tto_csr = tto_csr & ~CSR_DONE;                          /* clear flag */
 tto_int = 0;                                            /* clear int */
 if (tto_buf & TXDB_SEL)                                 /* floppy? */
     fl_wr_txdb (tto_buf);
-else sim_activate (&tto_unit, tto_unit.wait);           /* no, console */
-return;
+else
+    sim_activate (&tto_unit, tto_unit.wait);           /* no, console */
 }
 
 /* Terminal input service (poll for character) */
@@ -513,7 +515,8 @@ if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
     tti_buf = RXDB_ERR | RXDB_FRM;
-else tti_buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+else
+    tti_buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
 tti_buftime = sim_os_msec ();
 uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
@@ -602,10 +605,8 @@ return "console terminal output";
 
    The architected VAX timer, which increments at 1Mhz, cannot be
    accurately simulated due to the overhead that would be required
-   for 1M clock events per second.  Instead, a hidden calibrated
-   100Hz timer is run (because that's what VMS expects), and 1Mhz
-   intervals are derived from the calibrated instruction execution 
-   rate.
+   for 1M clock events per second.  Instead 1Mhz intervals are 
+   derived from the calibrated instruction execution rate.
 
    If the interval register is read, then its value between events
    is interpolated relative to the elapsed instruction count.
@@ -667,10 +668,9 @@ if ((tmr_iccs & (TMR_CSR_DON | TMR_CSR_IE)) !=          /* update int */
         sim_debug (TMR_DB_INT, &tmr_dev, "iccs_wr() - INT=0\n");
         }
     }
-return;
 }
 
-int32 icr_rd ()
+int32 icr_rd (void)
 {
 int32 result;
 
@@ -732,7 +732,7 @@ if (SCPE_OK == sim_activate_after (&tmr_unit, usecs))
     tmr_sav = sim_grtime();                             /* Save interval base time */
 }
 
-/* 100Hz clock reset */
+/* 100Hz TODR reset */
 
 t_stat clk_reset (DEVICE *dptr)
 {
@@ -1072,7 +1072,8 @@ switch (fl_state) {                                     /* case on state */
                 tti_int = 1;      
             fl_state = FL_EMPTY;                        /* go empty */
             }
-        else fl_state = FL_DONE;                        /* error? cmd done */
+        else
+            fl_state = FL_DONE;                        /* error? cmd done */
         sim_activate (uptr, fl_xwait);                  /* schedule next */
         break;
 
@@ -1167,7 +1168,6 @@ if ((tti_csr & CSR_DONE) == 0) {                        /* input idle? */
     }
 tti_buf = FL_CPROT;                                     /* status */
 fl_state = FL_IDLE;                                     /* floppy idle */
-return;
 }
 
 /* Reset */

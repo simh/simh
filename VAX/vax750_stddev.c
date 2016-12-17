@@ -175,7 +175,6 @@ uint32 tmr_nicr = 0;                                    /* next interval */
 uint32 tmr_inc = 0;                                     /* timer increment */
 int32 tmr_sav = 0;                                      /* timer save */
 int32 tmr_int = 0;                                      /* interrupt */
-int32 tmr_use_100hz = 1;                                /* use 100Hz for timer */
 int32 clk_tps = 100;                                    /* ticks/second */
 int32 tmxr_poll = CLK_DELAY * TMXR_MULT;                /* term mux poll */
 int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
@@ -190,7 +189,6 @@ int32 td_regval;                                        /* temp location used in
 
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
-t_stat clk_svc (UNIT *uptr);
 t_stat tmr_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
@@ -207,9 +205,9 @@ t_stat tmr_reset (DEVICE *dptr);
 const char *tmr_description (DEVICE *dptr);
 t_stat td_reset (DEVICE *dptr);
 const char *td_description (DEVICE *dptr);
-int32 icr_rd (t_bool interp);
+int32 icr_rd (void);
 void tmr_incr (uint32 inc);
-void tmr_sched (void);
+void tmr_sched (uint32 incr);
 t_stat todr_resync (void);
 t_stat txdb_misc_wr (int32 data);
 
@@ -288,12 +286,12 @@ DEVICE tto_dev = {
 
 /* TODR and TMR data structures */
 
-UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE+UNIT_FIX, sizeof(TOY)), CLK_DELAY };/* 100Hz */
+UNIT clk_unit = { UDATA (NULL, UNIT_IDLE+UNIT_FIX, sizeof(TOY))};
 
 REG clk_reg[] = {
     { DRDATAD (TIME,                   clk_unit.wait,  24, "initial poll interval"), REG_NZ + PV_LEFT },
     { DRDATAD (POLL,                        tmr_poll,  24, "calibrated poll interval"), REG_NZ + PV_LEFT + REG_HRO },
-    { DRDATAD (TPS,                          clk_tps,   8, "ticks per second (100)"), REG_NZ + PV_LEFT },
+    { DRDATAD (TPS,                          clk_tps,   8, "ticks per second"), REG_NZ + PV_LEFT },
 #if defined (SIM_ASYNCH_IO)
     { DRDATAD (ASYNCH,            sim_asynch_enabled,   1, "asynch I/O enabled flag"), PV_LEFT },
     { DRDATAD (LATENCY,           sim_asynch_latency,  32, "desired asynch interrupt latency"), PV_LEFT },
@@ -320,7 +318,6 @@ REG tmr_reg[] = {
     { FLDATAD  (INT,            tmr_int,  0, "interrupt request") },
     { HRDATA   (INCR,           tmr_inc, 32), REG_HIDDEN },
     { HRDATA   (SAVE,           tmr_sav, 32), REG_HIDDEN },
-    { FLDATA   (USE100HZ, tmr_use_100hz,  0), REG_HIDDEN },
     { NULL }
     };
 
@@ -328,12 +325,14 @@ REG tmr_reg[] = {
 #define TMR_DB_TICK     0x02    /* Ticks */
 #define TMR_DB_SCHED    0x04    /* Scheduling */
 #define TMR_DB_INT      0x08    /* Interrupts */
+#define TMR_DB_TODR     0x10    /* TODR */
 
 DEBTAB tmr_deb[] = {
     { "REG",   TMR_DB_REG,      "Register Access"},
     { "TICK",  TMR_DB_TICK,     "Ticks"},
     { "SCHED", TMR_DB_SCHED,    "Ticks"},
     { "INT",   TMR_DB_INT,      "Interrupts"},
+    { "TODR",  TMR_DB_TODR,     "TODR activities"},
     { NULL, 0 }
     };
 
@@ -484,10 +483,11 @@ void rxcs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0)
     tti_int = 0;
-else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-    tti_int = 1;
+else {
+    if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
+        tti_int = 1;
+    }
 tti_csr = (tti_csr & ~RXCS_WR) | (data & RXCS_WR);
-return;
 }
 
 int32 rxdb_rd (void)
@@ -512,10 +512,11 @@ void txcs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0)
     tto_int = 0;
-else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-    tto_int = 1;
+else {
+    if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
+        tto_int = 1;
+    }
 tto_csr = (tto_csr & ~TXCS_WR) | (data & TXCS_WR);
-return;
 }
 
 void txdb_wr (int32 data)
@@ -525,8 +526,8 @@ tto_csr = tto_csr & ~CSR_DONE;                          /* clear flag */
 tto_int = 0;                                            /* clear int */
 if (tto_buf & TXDB_SEL)                                 /* console? */
     txdb_misc_wr (tto_buf);
-else sim_activate (&tto_unit, tto_unit.wait);           /* no, console terminal */
-return;
+else
+    sim_activate (&tto_unit, tto_unit.wait);           /* no, console terminal */
 }
 
 /* Terminal input service (poll for character) */
@@ -535,7 +536,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_clock_coschedule_tmr (uptr, TMR_CLK, TMXR_MULT);    /* continue poll */
+sim_clock_coschedule (uptr, TMXR_MULT);                 /* continue poll */
 
 if ((tti_csr & CSR_DONE) &&                             /* input still pending and < 500ms? */
     ((sim_os_msec () - tti_buftime) < 500))
@@ -544,7 +545,8 @@ if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
     tti_buf = RXDB_ERR | RXDB_FRM;
-else tti_buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+else
+    tti_buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
 tti_buftime = sim_os_msec ();
 uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
@@ -561,7 +563,7 @@ tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_buf = 0;
 tti_csr = 0;
 tti_int = 0;
-sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
+sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
@@ -633,23 +635,11 @@ return "console terminal output";
 
    The architected VAX timer, which increments at 1Mhz, cannot be
    accurately simulated due to the overhead that would be required
-   for 1M clock events per second.  Instead, a hidden calibrated
-   100Hz timer is run (because that's what VMS expects), and a
-   hack is used for the interval timer.
-
-   When the timer is started, the timer interval is inspected.
-
-   if the interval is >= 10msec, then the 100Hz timer drives the
-        next interval
-   if the interval is < 10mec, then count instructions
+   for 1M clock events per second.  Instead 1Mhz intervals are 
+   derived from the calibrated instruction execution rate.
 
    If the interval register is read, then its value between events
-   is interpolated using the current instruction count versus the
-   count when the most recent event started, the result is scaled
-   to the calibrated system clock, unless the interval being timed
-   is less than a calibrated system clock tick (or the calibrated 
-   clock is running very slowly) at which time the result will be 
-   the elapsed instruction count.
+   is interpolated relative to the elapsed instruction count.
 */
 
 int32 iccs_rd (void)
@@ -660,29 +650,46 @@ return tmr_iccs & TMR_CSR_RD;
 
 void iccs_wr (int32 val)
 {
-sim_debug_bits_hdr (TMR_DB_REG, &tmr_dev, "iccs_wr()", tmr_iccs_bits, val, val, TRUE);
+sim_debug_bits_hdr (TMR_DB_REG, &tmr_dev, "iccs_wr()", tmr_iccs_bits, tmr_iccs, val, TRUE);
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
     sim_cancel (&tmr_unit);                             /* cancel timer */
-    tmr_use_100hz = 0;
-    if (tmr_iccs & TMR_CSR_RUN)                         /* run 1 -> 0? */
-        tmr_icr = icr_rd (TRUE);                        /* update itr */
+    if (tmr_iccs & TMR_CSR_RUN) {                       /* run 1 -> 0? */
+        tmr_icr = icr_rd ();                            /* update itr */
+        sim_rtcn_calb (0, TMR_CLK);                     /* stop timer */
+        }
     }
 if (val & CSR_DONE)                                     /* Interrupt Acked? */
     sim_rtcn_tick_ack (20, TMR_CLK);                    /* Let timers know */
 tmr_iccs = tmr_iccs & ~(val & TMR_CSR_W1C);             /* W1C csr */
 tmr_iccs = (tmr_iccs & ~TMR_CSR_WR) |                   /* new r/w */
     (val & TMR_CSR_WR);
-if (val & TMR_CSR_XFR) tmr_icr = tmr_nicr;              /* xfr set? */
+if (val & TMR_CSR_XFR)                                  /* xfr set? */
+    tmr_icr = tmr_nicr;
 if (val & TMR_CSR_RUN)  {                               /* run? */
     if (val & TMR_CSR_XFR)                              /* new tir? */
         sim_cancel (&tmr_unit);                         /* stop prev */
-    if (!sim_is_active (&tmr_unit))                     /* not running? */
-        tmr_sched ();                                   /* activate */
+    if (!sim_is_active (&tmr_unit)) {                   /* not running? */
+        sim_rtcn_init_unit (&tmr_unit, CLK_DELAY, TMR_CLK);  /* init timer */
+        tmr_sched (tmr_icr);                            /* activate */
+        }
     }
-else if (val & TMR_CSR_SGL) {                           /* single step? */
-    tmr_incr (1);                                       /* incr tmr */
-    if (tmr_icr == 0)                                   /* if ovflo, */
-        tmr_icr = tmr_nicr;                             /* reload tir */
+else {
+    if (val & TMR_CSR_XFR)                              /* xfr set? */
+        tmr_icr = tmr_nicr;
+    if (val & TMR_CSR_SGL) {                            /* single step? */
+        tmr_icr = tmr_icr + 1;                          /* incr tmr */
+        if (tmr_icr == 0) {                             /* if ovflo, */
+            if (tmr_iccs & TMR_CSR_DON)                 /* done? set err */
+                tmr_iccs = tmr_iccs | TMR_CSR_ERR;
+            else
+                tmr_iccs = tmr_iccs | TMR_CSR_DON;      /* set done */
+            if (tmr_iccs & TMR_CSR_IE) {                /* ie? */
+                tmr_int = 1;                            /* set int req */
+                sim_debug (TMR_DB_INT, &tmr_dev, "tmr_incr() - INT=1\n");
+                }
+            tmr_icr = tmr_nicr;                         /* reload tir */
+            }
+        }
     }
 if ((tmr_iccs & (TMR_CSR_DON | TMR_CSR_IE)) !=          /* update int */
     (TMR_CSR_DON | TMR_CSR_IE)) {
@@ -691,24 +698,20 @@ if ((tmr_iccs & (TMR_CSR_DON | TMR_CSR_IE)) !=          /* update int */
         sim_debug (TMR_DB_INT, &tmr_dev, "iccs_wr() - INT=0\n");
         }
     }
-return;
 }
 
-int32 icr_rd (t_bool interp)
+int32 icr_rd (void)
 {
-uint32 delta;
+int32 result;
 
-if (interp || (tmr_iccs & TMR_CSR_RUN)) {               /* interp, running? */
-    delta = sim_grtime () - tmr_sav;                    /* delta inst */
-    if (tmr_use_100hz && (tmr_poll > TMR_INC))          /* scale large int */
-        delta = (uint32) ((((double) delta) * TMR_INC) / tmr_poll);
-    if (delta >= tmr_inc)
-        delta = tmr_inc - 1;
-    sim_debug (TMR_DB_REG, &tmr_dev, "icr_rd() = 0x%08X\n", tmr_icr + delta);
-    return tmr_icr + delta;
+if (tmr_iccs & TMR_CSR_RUN) {                           /* running? */
+    uint32 delta = sim_grtime() - tmr_sav;
+    result = (int32)(tmr_nicr + (uint32)((1000000.0 * delta) / sim_timer_inst_per_sec ()));
     }
-sim_debug (TMR_DB_REG, &tmr_dev, "icr_rd() = 0x%08X\n", tmr_icr);
-return tmr_icr;
+else
+    result = (int32)tmr_icr;
+sim_debug (TMR_DB_REG, &tmr_dev, "icr_rd() = 0x%08X%s\n", result, (tmr_iccs & TMR_CSR_RUN) ? " - interpolated" : "");
+return result;
 }
 
 int32 nicr_rd (void)
@@ -723,87 +726,52 @@ sim_debug (TMR_DB_REG, &tmr_dev, "nicr_wr(0x%08X)\n", val);
 tmr_nicr = val;
 }
 
-/* 100Hz base clock unit service */
-
-t_stat clk_svc (UNIT *uptr)
-{
-sim_debug (TMR_DB_TICK, &tmr_dev, "clk_svc()\n");
-tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
-sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
-tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
-AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);            /* set interrrupt latency */
-if ((tmr_iccs & TMR_CSR_RUN) && tmr_use_100hz)          /* timer on, std intvl? */
-    tmr_incr (TMR_INC);                                 /* do timer service */
-return SCPE_OK;
-}
-
 /* Interval timer unit service */
 
 t_stat tmr_svc (UNIT *uptr)
 {
 sim_debug (TMR_DB_TICK, &tmr_dev, "tmr_svc()\n");
-tmr_incr (tmr_inc);                                     /* incr timer */
+tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
+if (tmr_iccs & TMR_CSR_DON)                         /* done? set err */
+    tmr_iccs = tmr_iccs | TMR_CSR_ERR;
+else
+    tmr_iccs = tmr_iccs | TMR_CSR_DON;              /* set done */
+if (tmr_iccs & TMR_CSR_RUN)                         /* run? */
+    tmr_sched (tmr_nicr);                           /* reactivate */
+if (tmr_iccs & TMR_CSR_IE) {                        /* ie? set int req */
+    tmr_int = 1;
+    sim_debug (TMR_DB_INT, &tmr_dev, "tmr_svc() - INT=1\n");
+    }
+else
+    tmr_int = 0;
+AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);            /* set interrrupt latency */
 return SCPE_OK;
-}
-
-/* Timer increment */
-
-void tmr_incr (uint32 inc)
-{
-uint32 new_icr = (tmr_icr + inc) & LMASK;               /* add incr */
-
-if (new_icr < tmr_icr) {                                /* ovflo? */
-    tmr_icr = 0;                                        /* now 0 */
-    if (tmr_iccs & TMR_CSR_DON)                         /* done? set err */
-        tmr_iccs = tmr_iccs | TMR_CSR_ERR;
-    else tmr_iccs = tmr_iccs | TMR_CSR_DON;             /* set done */
-    if (tmr_iccs & TMR_CSR_RUN) {                       /* run? */
-        tmr_icr = tmr_nicr;                             /* reload */
-        tmr_sched ();                                   /* reactivate */
-        }
-    if (tmr_iccs & TMR_CSR_IE) {                        /* ie? set int req */
-        tmr_int = 1;
-        sim_debug (TMR_DB_INT, &tmr_dev, "tmr_incr() - INT=1\n");
-        }
-    else tmr_int = 0;
-    }
-else {
-    tmr_icr = new_icr;                                  /* no, update icr */
-    if (tmr_iccs & TMR_CSR_RUN)                         /* still running? */
-        tmr_sched ();                                   /* reactivate */
-    }
-return;
 }
 
 /* Timer scheduling */
 
-void tmr_sched (void)
+void tmr_sched (uint32 nicr)
 {
-tmr_sav = sim_grtime ();                                /* save intvl base */
-tmr_inc = (~tmr_icr + 1);                               /* inc = interval */
-if (tmr_inc == 0) tmr_inc = 1;
-sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(0x%08X)\n", tmr_inc);
-if (tmr_inc < TMR_INC) {                                /* 100Hz multiple? */
-    sim_activate (&tmr_unit, tmr_inc);                  /* schedule timer */
-    tmr_use_100hz = 0;
-    }
-else tmr_use_100hz = 1;                                 /* let clk handle */
-return;
+uint32 usecs = (nicr) ? (~nicr + 1) : 0xFFFFFFFF;
+
+clk_tps = 1000000 / usecs;
+
+sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(nicr=0x%08X-usecs=0x%08X) - tps=%d\n", nicr, usecs, clk_tps);
+tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);
+if (SCPE_OK == sim_activate_after (&tmr_unit, usecs))
+    tmr_sav = sim_grtime();                             /* Save interval base time */
 }
 
-/* 100Hz clock reset */
+/* 100Hz TODR reset */
 
 t_stat clk_reset (DEVICE *dptr)
 {
-tmr_poll = sim_rtcn_init_unit (&clk_unit, clk_unit.wait, TMR_CLK);/* init 100Hz timer */
-sim_activate_after (&clk_unit, 1000000/clk_tps);        /* activate 100Hz unit */
-tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is initialized */
     clk_unit.filebuf = calloc(sizeof(TOY), 1);
     if (clk_unit.filebuf == NULL)
         return SCPE_MEM;
-    todr_resync ();
     }
+todr_resync ();
 return SCPE_OK;
 }
 
@@ -903,13 +871,12 @@ return r;
 
 t_stat tmr_reset (DEVICE *dptr)
 {
+tmr_poll = sim_rtcn_init_unit (&tmr_unit, CLK_DELAY, TMR_CLK);  /* init timer */
+tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 tmr_iccs = 0;
-tmr_icr = 0;
 tmr_nicr = 0;
 tmr_int = 0;
-tmr_use_100hz = 1;
 sim_cancel (&tmr_unit);                                 /* cancel timer */
-todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
 }
 
@@ -936,7 +903,7 @@ sim_timespec_diff (&val, &now, &base);
 
 if ((val.tv_sec >= TOY_MAX_SECS) || (!toy->toy_gmtbase))/* todr overflowed? */
     return 0;                                           /* stop counting */
-
+sim_debug (TMR_DB_TODR, &tmr_dev, "todr_rd() - TODR=0x%X\n", (int32)(val.tv_sec*100 + val.tv_nsec/10000000));
 return (int32)(val.tv_sec*100 + val.tv_nsec/10000000);  /* 100hz Clock Ticks */
 }
 
@@ -946,6 +913,7 @@ void todr_wr (int32 data)
 TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec now, val, base;
 
+sim_debug (TMR_DB_TODR, &tmr_dev, "todr_wr(0x%X)\n", data);
 if (data) {
     /* Save the GMT time when set value was not 0 to record the base for 
        future read operations in "battery backed-up" state */
