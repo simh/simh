@@ -175,7 +175,10 @@ int32 sim_del_char = 0177;
 
 static t_stat sim_con_poll_svc (UNIT *uptr);                /* console connection poll routine */
 static t_stat sim_con_reset (DEVICE *dptr);                 /* console reset routine */
-UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, 0, 0)  };   /* console connection unit */
+static t_stat sim_con_attach (UNIT *uptr, CONST char *ptr); /* console attach routine (save,restore) */
+static t_stat sim_con_detach (UNIT *uptr);                  /* console detach routine (save,restore) */
+
+UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, UNIT_ATTABLE, 0)  };/* console connection unit */
 /* debugging bitmaps */
 #define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
@@ -211,7 +214,7 @@ static MTAB sim_con_mod[] = {
 DEVICE sim_con_telnet = {
     "CON-TEL", &sim_con_unit, sim_con_reg, sim_con_mod, 
     1, 0, 0, 0, 0, 0, 
-    NULL, NULL, sim_con_reset, NULL, NULL, NULL, 
+    NULL, NULL, sim_con_reset, NULL, sim_con_attach, sim_con_detach, 
     NULL, DEV_DEBUG, 0, sim_con_debug};
 TMLN sim_con_ldsc = { 0 };                                          /* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console line mux */
@@ -253,6 +256,17 @@ static t_stat sim_con_reset (DEVICE *dptr)
 return sim_con_poll_svc (&dptr->units[0]);              /* establish polling as needed */
 }
 
+/* Console Attach/Detach - only used indirectly in restore */
+
+static t_stat sim_con_attach (UNIT *uptr, CONST char *ptr)
+{
+return tmxr_attach (&sim_con_tmxr, &sim_con_unit, ptr);
+}
+
+static t_stat sim_con_detach (UNIT *uptr)
+{
+return sim_set_notelnet (0, NULL);
+}
 
 /* Set/show data structures */
 
