@@ -123,6 +123,9 @@
     }                                                       \
 }
 
+/* increase R by val */
+#define INCR(val) IR_S = (IR_S & ~0x7f) | ((IR_S + (val)) & 0x7f)
+
 extern int32 sio0s      (const int32 port, const int32 io, const int32 data);
 extern int32 sio0d      (const int32 port, const int32 io, const int32 data);
 extern int32 sio1s      (const int32 port, const int32 io, const int32 data);
@@ -294,7 +297,7 @@ REG cpu_reg[] = {
     }, /* 13 */
     { GRDATAD (IFF,     IFF_S, 2, 2, 0,         "Z80 Interrupt Flip Flop register")
     }, /*  6 */
-    { FLDATAD (IR,      IR_S,               8,  "8Z80 Interrupt (upper) / Refresh (lower) register")
+    { HRDATAD (IR,      IR_S,               16,  "Z80 Interrupt (upper) / Refresh (lower) register")
     }, /*  7 */
 
     // 8086 registers
@@ -2173,6 +2176,7 @@ static t_stat sim_instr_mmu (void) {
         }
 
         PCX = PC;
+        INCR(1);
 
         switch(RAM_PP(PC)) {
 
@@ -3550,6 +3554,8 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
+                
+                INCR(1);
                 adr = HL;
                 switch ((op = GetBYTE(PC)) & 7) {
 
@@ -3857,6 +3863,8 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
+
+                INCR(1);
                 switch (RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IX,BC */
@@ -4683,6 +4691,8 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
+                
+                INCR(1);
                 switch (RAM_PP(PC)) {
 
                     case 0x40:      /* IN B,(C) */
@@ -5144,6 +5154,7 @@ static t_stat sim_instr_mmu (void) {
                             BC = 0x10000;
                         do {
                             tStates += 21;
+                            INCR(2);
                             CHECK_BREAK_TWO_BYTES(HL, DE);
                             acu = RAM_PP(HL);
                             PUT_BYTE_PP(DE, acu);
@@ -5160,6 +5171,7 @@ static t_stat sim_instr_mmu (void) {
                             BC = 0x10000;
                         do {
                             tStates += 21;
+                            INCR(1);
                             CHECK_BREAK_BYTE(HL);
                             temp = RAM_PP(HL);
                             op = --BC != 0;
@@ -5181,6 +5193,7 @@ static t_stat sim_instr_mmu (void) {
                             temp = 0x100;
                         do {
                             tStates += 21;
+                            INCR(1);
                             CHECK_BREAK_BYTE(HL);
                             acu = in(LOW_REGISTER(BC));
                             PutBYTE(HL, acu);
@@ -5198,6 +5211,7 @@ static t_stat sim_instr_mmu (void) {
                             temp = 0x100;
                         do {
                             tStates += 21;
+                            INCR(1);
                             CHECK_BREAK_BYTE(HL);
                             acu = GetBYTE(HL);
                             out(LOW_REGISTER(BC), acu);
@@ -5215,6 +5229,7 @@ static t_stat sim_instr_mmu (void) {
                             BC = 0x10000;
                         do {
                             tStates += 21;
+                            INCR(2);
                             CHECK_BREAK_TWO_BYTES(HL, DE);
                             acu = RAM_MM(HL);
                             PUT_BYTE_MM(DE, acu);
@@ -5231,6 +5246,7 @@ static t_stat sim_instr_mmu (void) {
                             BC = 0x10000;
                         do {
                             tStates += 21;
+                            INCR(1);
                             CHECK_BREAK_BYTE(HL);
                             temp = RAM_MM(HL);
                             op = --BC != 0;
@@ -5252,6 +5268,7 @@ static t_stat sim_instr_mmu (void) {
                             temp = 0x100;
                         do {
                             tStates += 21;
+                            INCR(1);
                             CHECK_BREAK_BYTE(HL);
                             acu = in(LOW_REGISTER(BC));
                             PutBYTE(HL, acu);
@@ -5269,6 +5286,7 @@ static t_stat sim_instr_mmu (void) {
                             temp = 0x100;
                         do {
                             tStates += 21;
+                            INCR(1);
                             CHECK_BREAK_BYTE(HL);
                             acu = GetBYTE(HL);
                             out(LOW_REGISTER(BC), acu);
@@ -5388,6 +5406,8 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
+                
+                INCR(1);
                 switch (RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IY,BC */
