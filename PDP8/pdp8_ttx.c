@@ -144,16 +144,11 @@ REG ttix_reg[] = {
     };
 
 MTAB ttix_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
-      &ttx_vlines, &tmxr_show_lines, (void *) &ttx_desc },
-    { UNIT_ATT, UNIT_ATT, "summary", NULL,
-      NULL, &tmxr_show_summ, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &tmxr_show_cstat, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &tmxr_show_cstat, (void *) &ttx_desc },
+    { MTAB_VDV,            0,       "LINES",      "LINES", &ttx_vlines,  &tmxr_show_lines, (void *) &ttx_desc },
+    { UNIT_ATT,     UNIT_ATT,     "SUMMARY",         NULL, NULL,         &tmxr_show_summ,  (void *) &ttx_desc },
+    { MTAB_VDV,            1,          NULL, "DISCONNECT", &tmxr_dscln,  NULL,             (void *) &ttx_desc },
+    { MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS",         NULL, NULL,         &tmxr_show_cstat, (void *) &ttx_desc },
+    { MTAB_VDV | MTAB_NMO, 0, "STATISTICS",          NULL, NULL,         &tmxr_show_cstat, (void *) &ttx_desc },
     { 0 }
     };
 

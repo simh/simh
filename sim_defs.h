@@ -398,7 +398,7 @@ typedef uint32          t_addr;
 
 /* String match - at least one character required */
 
-#define MATCH_CMD(ptr,cmd) ((NULL == (ptr)) || (!*(ptr)) || strncmp ((ptr), (cmd), strlen (ptr)))
+#define MATCH_CMD(ptr,cmd) ((NULL == (ptr)) || (!*(ptr)) || sim_strncasecmp ((ptr), (cmd), strlen (ptr)))
 
 /* End of Linked List/Queue value                           */
 /* Chosen for 2 reasons:                                    */
