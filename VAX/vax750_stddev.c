@@ -536,7 +536,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_clock_coschedule (uptr, TMXR_MULT);                 /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 
 if ((tti_csr & CSR_DONE) &&                             /* input still pending and < 500ms? */
     ((sim_os_msec () - tti_buftime) < 500))
