@@ -1313,14 +1313,24 @@ MTAB sim_timer_mod[] = {
 
 static t_stat sim_timer_clock_reset (DEVICE *dptr);
 
+static const char *sim_timer_description (DEVICE *dptr)
+{
+return "Internal Timer facilities";
+}
+
+static const char *sim_throttle_description (DEVICE *dptr)
+{
+return "Internal Throttle facility";
+}
+
 DEVICE sim_timer_dev = {
-    "TIMER", sim_timer_units, sim_timer_reg, sim_timer_mod, 
+    "INT-TMR", sim_timer_units, sim_timer_reg, sim_timer_mod, 
     SIM_NTIMERS+1, 0, 0, 0, 0, 0, 
     NULL, NULL, &sim_timer_clock_reset, NULL, NULL, NULL, 
     NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
 
 DEVICE sim_throttle_dev = {
-    "THROT-TLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1};
+    "INT-THR", &sim_throttle_unit, sim_throttle_reg};
 
 
 /* SET CLOCK command */
@@ -2104,6 +2114,8 @@ static t_stat sim_timer_clock_reset (DEVICE *dptr)
 {
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_clock_reset()\n");
 _rtcn_configure_calibrated_clock (sim_calb_tmr);
+sim_timer_dev.description = &sim_timer_description;
+sim_throttle_dev.description = &sim_throttle_description;
 if (sim_switches & SWMASK ('P')) {
     sim_cancel (&SIM_INTERNAL_UNIT);
     sim_calb_tmr = -1;

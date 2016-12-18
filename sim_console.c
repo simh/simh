@@ -211,11 +211,17 @@ static MTAB sim_con_mod[] = {
   { 0 },
 };
 
+static const char *sim_con_telnet_description (DEVICE *dptr)
+{
+return "Console telnet support";
+}
+
 DEVICE sim_con_telnet = {
     "CON-TEL", &sim_con_unit, sim_con_reg, sim_con_mod, 
     1, 0, 0, 0, 0, 0, 
     NULL, NULL, sim_con_reset, NULL, sim_con_attach, sim_con_detach, 
-    NULL, DEV_DEBUG, 0, sim_con_debug};
+    NULL, DEV_DEBUG, 0, sim_con_debug,
+    NULL, NULL, NULL, NULL, NULL, sim_con_telnet_description};
 TMLN sim_con_ldsc = { 0 };                                          /* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console line mux */
 
@@ -416,11 +422,17 @@ MTAB sim_rem_con_mod[] = {
   { 0 },
 };
 
+static const char *sim_rem_con_description (DEVICE *dptr)
+{
+return "Remote Console Facility";
+}
+
 DEVICE sim_remote_console = {
     "REM-CON", sim_rem_con_unit, NULL, sim_rem_con_mod, 
     2, 0, 0, 0, 0, 0, 
     NULL, NULL, sim_rem_con_reset, NULL, NULL, NULL, 
-    NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_rem_con_debug};
+    NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_rem_con_debug,
+    NULL, NULL, NULL, NULL, NULL, sim_rem_con_description};
 #define MAX_REMOTE_SESSIONS 40          /* Arbitrary Session Limit */
 static int32 *sim_rem_buf_size = NULL;
 static int32 *sim_rem_buf_ptr = NULL;
