@@ -185,17 +185,19 @@ UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, UNIT_ATTABLE, 0)  };/* console c
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 #define DBG_RET  TMXR_DBG_RET                           /* display Returned Received Data */
 #define DBG_ASY  TMXR_DBG_ASY                           /* asynchronous thread activity */
+#define DBG_CON  TMXR_DBG_CON                           /* display connection activity */
 #define DBG_EXP  0x00000001                             /* Expect match activity */
 #define DBG_SND  0x00000002                             /* Send (Inject) data activity */
 
 static DEBTAB sim_con_debug[] = {
-  {"TRC",    DBG_TRC},
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
-  {"RET",    DBG_RET},
-  {"ASY",    DBG_ASY},
-  {"EXP",    DBG_EXP},
-  {"SND",    DBG_SND},
+  {"TRC",    DBG_TRC, "routine calls"},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"RET",    DBG_RET, "Returned Received Data"},
+  {"ASY",    DBG_ASY, "asynchronous activity"},
+  {"CON",    DBG_CON, "connection activity"},
+  {"EXP",    DBG_EXP, "Expect match activity"},
+  {"SND",    DBG_SND, "Send (Inject) data activity"},
   {0}
 };
 
@@ -412,9 +414,10 @@ UNIT sim_rem_con_unit[2] = {
     { UDATA (&sim_rem_con_data_svc, UNIT_IDLE|UNIT_DIS, 0)  }};  /* console data handling unit */
 
 DEBTAB sim_rem_con_debug[] = {
-  {"TRC",    DBG_TRC},
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
+  {"TRC",    DBG_TRC, "routine calls"},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"CON",    DBG_CON, "connection activity"},
   {0}
 };
 
