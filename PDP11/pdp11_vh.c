@@ -316,24 +316,28 @@ static TMXR vh_desc = { VH_MUXES * VH_LINES_ALLOC, 0, 0, vh_ldsc };
 static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 
 /* debugging bitmaps */
-#define DBG_REG  0x0001                                 /* trace read/write registers */
-#define DBG_INT  0x0002                                 /* display interrupt activities */
-#define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
-#define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
-#define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
-#define DBG_CON  TMXR_DBG_CON                           /* display connection activities */
-#define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
-#define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
+#define DBG_REG     0x0001                              /* trace read/write registers */
+#define DBG_INT     0x0002                              /* display interrupt activities */
+#define DBG_TIM     0x0004                              /* display timing activities */
+#define DBG_TIMTRC  0x0008                              /* display trace timing activities */
+#define DBG_XMT     TMXR_DBG_XMT                        /* display Transmitted Data */
+#define DBG_RCV     TMXR_DBG_RCV                        /* display Received Data */
+#define DBG_MDM     TMXR_DBG_MDM                        /* display Modem Signals */
+#define DBG_CON     TMXR_DBG_CON                        /* display connection activities */
+#define DBG_TRC     TMXR_DBG_TRC                        /* display trace routine calls */
+#define DBG_ASY     TMXR_DBG_ASY                        /* display Asynchronous Activities */
 
 DEBTAB vh_debug[] = {
-  {"REG",    DBG_REG, "read/write registers"},
-  {"INT",    DBG_INT, "interrupt activities"},
-  {"XMT",    DBG_XMT, "Transmitted Data"},
-  {"RCV",    DBG_RCV, "Received Data"},
-  {"MDM",    DBG_MDM, "Modem Signals"},
-  {"CON",    DBG_CON, "connection activities"},
-  {"TRC",    DBG_TRC, "trace routine calls"},
-  {"ASY",    DBG_ASY, "Asynchronous Activities"},
+  {"REG",    DBG_REG,    "read/write registers"},
+  {"INT",    DBG_INT,    "interrupt activities"},
+  {"TIM",    DBG_TIM,    "timing activities"},
+  {"TIMTRC", DBG_TIMTRC, "trace timing activities"},
+  {"XMT",    DBG_XMT,    "Transmitted Data"},
+  {"RCV",    DBG_RCV,    "Received Data"},
+  {"MDM",    DBG_MDM,    "Modem Signals"},
+  {"CON",    DBG_CON,    "connection activities"},
+  {"TRC",    DBG_TRC,    "trace routine calls"},
+  {"ASY",    DBG_ASY,    "Asynchronous Activities"},
   {0}
 };
 
@@ -385,6 +389,7 @@ static UNIT vh_unit[VH_MUXES+1] = {
 };
 
 static UNIT *vh_timer_unit;
+static UNIT *vh_poll_unit = &vh_unit[0];
 
 static const REG vh_reg[] = {
     { BRDATAD (CSR,         vh_csr, DEV_RDX, 16, VH_MUXES, "control/status register, boards 0 to 3") },
@@ -615,8 +620,10 @@ override:
                 ; /* nothing, infinite timeout */
             else if (vh_timer[vh] == 1)
                 vh_set_rxint (vh);
-            else if (vh_timeo[vh] == 0)
+            else if (vh_timeo[vh] == 0) {
                 vh_timeo[vh] = MS2SIMH (vh_timer[vh]) + 1;
+                sim_debug (DBG_TIM, &vh_dev, "Timeout set vh=%d, timeout=%d\n", vh, vh_timeo[vh]); 
+                }
         } else {
             /* Interrupt on transition _from_ an empty FIFO */
             if (rbuf_idx[vh] == 1)
@@ -681,7 +688,7 @@ static int32 fifo_get ( int32   vh  )
     }
     /* Reschedule the next poll preceisely so that the 
        programmed input speed is observed. */
-    sim_clock_coschedule_abs (&vh_unit[0], tmxr_poll);
+    sim_clock_coschedule_abs (vh_poll_unit, tmxr_poll);
     return (data & 0177777);
 }
 /* TX Q manipulation */
@@ -926,9 +933,10 @@ static t_stat vh_wr (   int32   ldata,
             if ((vh_unit[vh].flags & UNIT_MODEDHU) && (data & CSR_SKIP))
                 data &= ~CSR_MASTER_RESET;
             if (vh == 0) /* Only start unit service on the first unit.  Units are polled there */
-                sim_clock_coschedule (&vh_unit[0], tmxr_poll);
+                sim_clock_coschedule (vh_poll_unit, tmxr_poll);
             vh_mcount[vh] = MS2SIMH (1200); /* 1.2 seconds */
-            sim_clock_coschedule (&vh_unit[vh_dev.numunits-1], tmxr_poll);
+            sim_clock_coschedule (vh_timer_unit, tmxr_poll);
+            sim_debug (DBG_TIM, &vh_dev, "vh_wr() - Master Reset Timeout set vh=%d, timeout=%d\n", vh, vh_mcount[vh]); 
         }
         if ((data & CSR_RXIE) == 0)
             vh_clr_rxint (vh);
@@ -942,8 +950,10 @@ static t_stat vh_wr (   int32   ldata,
                     ;
                 else if (vh_timer[vh] == 1)
                     vh_set_rxint (vh);
-                else if (vh_timeo[vh] == 0)
+                else if (vh_timeo[vh] == 0) {
                     vh_timeo[vh] = MS2SIMH (vh_timer[vh]) + 1;
+                    sim_debug (DBG_TIM, &vh_dev, "vh_wr() - Timeout set vh=%d, timeout=%d\n", vh, vh_timeo[vh]); 
+                    }
             } else {
                 vh_set_rxint (vh);
             }
@@ -1225,15 +1235,17 @@ static t_stat vh_timersvc (  UNIT    *uptr   )
 {
     int32   vh;
 
-    sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_timersvc()\n");
+    sim_debug(DBG_TIMTRC, find_dev_from_unit(uptr), "vh_timersvc()\n");
 
     /* scan all DHU-mode muxes for RX FIFO timeout */
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
         if (vh_unit[vh].flags & UNIT_MODEDHU) {
             if (vh_timeo[vh] && (vh_csr[vh] & CSR_RXIE)) {
                 vh_timeo[vh] -= 1;
-                if ((vh_timeo[vh] == 0) && rbuf_idx[vh])
+                if ((vh_timeo[vh] == 0) && rbuf_idx[vh]) {
                     vh_set_rxint (vh);
+                    sim_debug (DBG_TIM, &vh_dev, "vh_timersvc() - vh=%d, RX FIFO Timeout\n", vh); 
+                }
             }
         }
     }
@@ -1242,8 +1254,10 @@ static t_stat vh_timersvc (  UNIT    *uptr   )
         if (vh_csr[vh] & CSR_MASTER_RESET) {
             if (vh_mcount[vh] != 0)
                 vh_mcount[vh] -= 1;
-            else
+            else {
                 vh_clear (vh, FALSE);
+                sim_debug (DBG_TIM, &vh_dev, "vh_timersvc() - vh=%d, Master Reset Complete\n", vh); 
+            }
         }
     }
     sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
@@ -1397,7 +1411,7 @@ static t_stat vh_reset (    DEVICE  *dptr   )
     vh_dev.numunits = (vh_desc.lines / VH_LINES) + 1;
     vh_timer_unit = &vh_unit[vh_dev.numunits-1];
     vh_timer_unit->action = &vh_timersvc;
-    vh_timer_unit->flags = UNIT_DIS;
+    vh_timer_unit->flags = UNIT_DIS | UNIT_IDLE;
     for (i = 0; i < vh_desc.lines/VH_LINES; i++) {
         /* if Unibus, force DHU mode */
         if (UNIBUS)
@@ -1408,7 +1422,8 @@ static t_stat vh_reset (    DEVICE  *dptr   )
     vh_rxi = vh_txi = 0;
     CLR_INT (VHRX);
     CLR_INT (VHTX);
-    sim_cancel (&vh_unit[0]);
+    sim_cancel (vh_poll_unit);
+    sim_cancel (vh_timer_unit);
     vh_dib.lnt = (vh_desc.lines / VH_LINES) * IOLN_VH;      /* set length */
     return (auto_config (dptr->name, (dptr->flags & DEV_DIS) ? 0 : vh_desc.lines/VH_LINES));
 }
@@ -1417,7 +1432,7 @@ static t_stat vh_reset (    DEVICE  *dptr   )
 static t_stat vh_attach (   UNIT    *uptr,
                 CONST char    *cptr   )
 {
-    if (uptr == &vh_unit[0])
+    if (uptr == vh_poll_unit)
         return (tmxr_attach (&vh_desc, uptr, cptr));
     return (SCPE_NOATT);
 }
