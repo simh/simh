@@ -299,6 +299,7 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
             }
         if ((data & CSR_GO) && (rx_state == IDLE)) {    /* new function? */
             rx_csr = data & (RXCS_IE + RXCS_DRV + RXCS_FUNC);
+            rx_esr = rx_esr & ~RXES_ID;                 /* clear power-on state */
             drv = ((rx_csr & RXCS_DRV)? 1: 0);          /* reselect drive */
             rx_bptr = 0;                                /* clear buf pointer */
             switch (RXCS_GETFNC (data)) {               /* case on func */
@@ -326,6 +327,9 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
                 }                                       /* end switch func */
             return SCPE_OK;
             }                                           /* end if GO */
+        else if (data == 0) {
+            rx_dbr = 0;                                 /* per ZRXBF0 line 918 */
+            }
         if ((data & RXCS_IE) == 0)
             CLR_INT (RX);
         else if ((rx_csr & (RXCS_DONE + RXCS_IE)) == RXCS_DONE)
