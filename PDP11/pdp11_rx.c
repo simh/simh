@@ -106,6 +106,24 @@
 #define RXES_DD         0100                            /* deleted data */
 #define RXES_DRDY       0200                            /* drive ready */
 
+#define RXEC_0HOME      0010    /* Drive 0 failed to see home on Initialize. */
+#define RXEC_1HOME      0020    /* Drive 1 failed to see home on Initialize. */
+#define RXEC_HOMEOUT    0030    /* Found home when stepping out 10 tracks for INIT. */
+#define RXEC_TRACK77    0040    /* Tried to access a track greater than 77. */
+#define RXEC_SEEKERR    0050    /* Home was found before desired track was reached. */
+#define RXEC_SELFDIAG   0060    /* Self-diagnostic error. */
+#define RXEC_SECTERR    0070    /* Desired sector could not be found after looking at 52 headers (2 revolutions). */
+#define RXEC_WP         0100    /* Write protect error. */
+#define RXEC_SEPCLOCK   0110    /* More than 40us and no SEP clock seen. */
+#define RXEC_PREAMBLE   0120    /* A preamble could not be found. */
+#define RXEC_IOMARK     0130    /* Preamble found but no I/O mark foudn within allowable time span. */
+#define RXEC_CRCHEAD    0140    /* CRC error on what we thought was a header. */
+#define RXEC_TRACKADR   0150    /* The header track address of a good header does not compare with the desired track. */
+#define RXEC_IDAM       0160    /* Too many tries for an IDAM (identifies header). */
+#define RXEC_DAM        0170    /* Data AM not found in allotted time. */
+#define RXEC_CRCDATA    0200    /* CRC error on reading the sector from the disk. No code appears in the ERREG. */
+#define RXEC_PARITY     0210    /* All parity errors. */
+
 #define TRACK u3                                        /* current track */
 #define CALC_DA(t,s) (((t) * RX_NUMSC) + ((s) - 1)) * RX_NUMBY
 
@@ -198,12 +216,31 @@ MTAB rx_mod[] = {
     { 0 }
     };
 
+/* debugging bitmaps */
+#define DBG_TRC  0x0001                                 /* trace routine calls */
+#define DBG_INI  0x0002                                 /* display setup/init sequence info */
+#define DBG_REG  0x0004                                 /* trace read/write registers */
+#define DBG_REQ  0x0008                                 /* display transfer requests */
+#define DBG_DSK  0x0010                                 /* display sim_disk activities */
+#define DBG_DAT  0x0020                                 /* display transfer data */
+
+DEBTAB rx_debug[] = {
+  {"TRACE",  DBG_TRC, "trace routine calls"},
+  {"INIT",   DBG_INI, "display setup/init sequence info"},
+  {"REG",    DBG_REG, "trace read/write registers"},
+  {"REQ",    DBG_REQ, "display transfer requests"},
+  {"DISK",   DBG_DSK, "display sim_disk activities"},
+  {"DATA",   DBG_DAT, "display transfer data"},
+  {0}
+};
+
 DEVICE rx_dev = {
     "RX", rx_unit, rx_reg, rx_mod,
     RX_NUMDR, 8, 20, 1, 8, 8,
     NULL, NULL, &rx_reset,
     &rx_boot, NULL, NULL,
-    &rx_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS
+    &rx_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+	0, rx_debug
     };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
@@ -230,12 +267,16 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
         break;
         }                                               /* end switch PA */
 
+sim_debug(DBG_REG, &rx_dev, "R @ PA=%06o, access=%d == %06o\n", PA, access, *data);
+
 return SCPE_OK;
 }
 
 t_stat rx_wr (int32 data, int32 PA, int32 access)
 {
 int32 drv;
+
+sim_debug(DBG_REG, &rx_dev, "W @ PA=%06o, access=%d <- %06o\n", PA, access, data);
 
 switch ((PA >> 1) & 1) {                                /* decode PA<1> */
 
@@ -336,6 +377,10 @@ uint32 da;
 int8 *fbuf = (int8 *) uptr->filebuf;
 
 func = RXCS_GETFNC (rx_csr);                            /* get function */
+
+sim_debug(DBG_TRC, &rx_dev, "rx_svc: func %03o state %d RXDB %06o RXCS %06o bptr %d track %d sector %d\n", 
+	func, rx_state, rx_dbr, rx_csr, rx_bptr, rx_track, rx_sector);
+
 switch (rx_state) {                                     /* case on state */
 
     case IDLE:                                          /* idle */
@@ -374,16 +419,16 @@ switch (rx_state) {                                     /* case on state */
 
     case RWXFR:
         if ((uptr->flags & UNIT_BUF) == 0) {            /* not buffered? */
-            rx_done (0, 0110);                          /* done, error */
+            rx_done (0, RXEC_SEPCLOCK);                 /* done, error */
             return IORETURN (rx_stopioe, SCPE_UNATT);
             }
         if (rx_track >= RX_NUMTR) {                     /* bad track? */
-            rx_done (0, 0040);                          /* done, error */
+            rx_done (0, RXEC_TRACK77);                  /* done, error */
             break;
             }
         uptr->TRACK = rx_track;                         /* now on track */
         if ((rx_sector == 0) || (rx_sector > RX_NUMSC)) { /* bad sect? */
-            rx_done (0, 0070);                          /* done, error */
+            rx_done (0, RXEC_SECTERR);                  /* done, error */
             break;
             }
         da = CALC_DA (rx_track, rx_sector);             /* get disk address */
@@ -395,7 +440,7 @@ switch (rx_state) {                                     /* case on state */
             }
         else {
             if (uptr->flags & UNIT_WPRT) {              /* write and locked? */
-                rx_done (RXES_WLK, 0100);               /* done, error */
+                rx_done (RXES_WLK, RXEC_WP);            /* done, error */
                 break;
                 }
             for (i = 0; i < RX_NUMBY; i++)              /* write */
@@ -419,7 +464,7 @@ switch (rx_state) {                                     /* case on state */
         rx_unit[0].TRACK = 1;                           /* drive 0 to trk 1 */
         rx_unit[1].TRACK = 0;                           /* drive 1 to trk 0 */
         if ((rx_unit[0].flags & UNIT_BUF) == 0) {       /* not buffered? */
-            rx_done (RXES_ID, 0010);                    /* init done, error */
+            rx_done (RXES_ID, RXEC_0HOME);              /* init done, error */
             break;
             }
         da = CALC_DA (1, 1);                            /* track 1, sector 1 */
@@ -427,7 +472,7 @@ switch (rx_state) {                                     /* case on state */
             rx_buf[i] = fbuf[da + i];
         rx_done (RXES_ID, 0);                           /* set done */
         if ((rx_unit[1].flags & UNIT_ATT) == 0)
-            rx_ecode = 0020;
+            rx_ecode = RXEC_1HOME;
         break;
         }                                               /* end case state */
 
@@ -475,7 +520,7 @@ else if (rx_unit[0].flags & UNIT_BUF)  {                /* attached? */
     rx_state = INIT_COMPLETE;                           /* yes, sched init */
     sim_activate (&rx_unit[0], rx_swait * abs (1 - rx_unit[0].TRACK));
     }
-else rx_done (0, 0010);                                 /* no, error */
+else rx_done (0, RXEC_0HOME);                           /* no, error */
 return auto_config (0, 0);                              /* run autoconfig */
 }
 
