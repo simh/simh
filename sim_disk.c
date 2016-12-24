@@ -239,7 +239,7 @@ if (ctx) {
 return FALSE;
 }
 
-static void _disk_cancel (UNIT *uptr)
+static t_bool _disk_cancel (UNIT *uptr)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
@@ -252,6 +252,7 @@ if (ctx) {
         pthread_mutex_unlock (&ctx->io_lock);
         }
     }
+return FALSE;
 }
 #else
 #define AIO_CALLSETUP

@@ -683,8 +683,8 @@ static double _timespec_to_double (struct timespec *time);
 static void _double_to_timespec (struct timespec *time, double dtime);
 static t_bool _rtcn_tick_catchup_check (int32 tmr, int32 time);
 static void _rtcn_configure_calibrated_clock (int32 newtmr);
-static void _sim_coschedule_cancel(UNIT *uptr);
-static void _sim_wallclock_cancel (UNIT *uptr);
+static t_bool _sim_coschedule_cancel(UNIT *uptr);
+static t_bool _sim_wallclock_cancel (UNIT *uptr);
 static t_bool _sim_wallclock_is_active (UNIT *uptr);
 t_stat sim_timer_show_idle_mode (FILE* st, UNIT* uptr, int32 val, CONST void *  desc);
 
@@ -1762,7 +1762,7 @@ rtc_calib_tick_time[tmr] += rtc_clock_tick_size[tmr];
  * non-success status, while co-schedule activities might, so they are 
  * queued to run from sim_process_event
  */
-sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_tick_svc - scheduling %s - cosched interval: %d\n", sim_uname (sim_clock_unit[tmr]), sim_cosched_interval[tmr]);
+sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_tick_svc(tmr=%d) - scheduling %s - cosched interval: %d\n", tmr, sim_uname (sim_clock_unit[tmr]), sim_cosched_interval[tmr]);
 if (sim_clock_unit[tmr]->action == NULL)
     return SCPE_IERR;
 stat = sim_clock_unit[tmr]->action (sim_clock_unit[tmr]);
@@ -2171,6 +2171,7 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
             accum += cptr->time;
             _sim_activate (cptr, accum*rtc_currd[tmr]);
             }
+        sim_cosched_interval[tmr] = 0;
         }
     }
 sim_cancel (&SIM_INTERNAL_UNIT);                    /* Make sure Internal Timer is stopped */
@@ -2416,7 +2417,7 @@ else {
     for (cptr = sim_clock_cosched_queue[tmr]; cptr != QUEUE_LIST_END; cptr = cptr->next) {
         if (ticks < (accum + cptr->time))
             break;
-        accum = accum + cptr->time;
+        accum += cptr->time;
         prvptr = cptr;
         }
     if (prvptr == NULL) {
@@ -2443,7 +2444,7 @@ return sim_clock_coschedule_tmr (uptr, tmr, ticks);
 }
 
 /* Cancel a unit on the coschedule queue */
-static void _sim_coschedule_cancel (UNIT *uptr)
+static t_bool _sim_coschedule_cancel (UNIT *uptr)
 {
 AIO_UPDATE_QUEUE;
 if (uptr->next) {                           /* On a queue? */
@@ -2474,11 +2475,12 @@ if (uptr->next) {                           /* On a queue? */
                 if (nptr != QUEUE_LIST_END)
                     nptr->time += uptr->time;
                 sim_debug (DBG_QUE, &sim_timer_dev, "Canceled Clock Coscheduled Event for %s\n", sim_uname(uptr));
-                return;
+                return TRUE;
                 }
             }
         }
     }
+return FALSE;
 }
 
 t_bool sim_timer_is_active (UNIT *uptr)
@@ -2495,9 +2497,10 @@ return FALSE;
 }
 
 #if defined(SIM_ASYNCH_CLOCKS)
-static void _sim_wallclock_cancel (UNIT *uptr)
+static t_bool _sim_wallclock_cancel (UNIT *uptr)
 {
 int32 tmr;
+t_bool b_return = FALSE;
 
 AIO_UPDATE_QUEUE;
 pthread_mutex_lock (&sim_timer_lock);
@@ -2542,9 +2545,11 @@ if (uptr->a_next) {
             sim_clock_unit[tmr]->cancel = NULL;
             sim_clock_unit[tmr]->a_is_active = NULL;
             }
+        b_return = TRUE;
         }
     }
 pthread_mutex_unlock (&sim_timer_lock);
+return b_return;
 }
 
 static t_bool _sim_wallclock_is_active (UNIT *uptr)
