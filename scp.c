@@ -4722,7 +4722,7 @@ else {
                     }
                 else
                     fprintf (st, "  Unknown");
-        tim = sim_fmt_secs((accum + uptr->time)/sim_timer_inst_per_sec ());
+        tim = sim_fmt_secs(((accum + uptr->time) / sim_timer_inst_per_sec ()) + (uptr->usecs_remaining / 1000000.0));
         fprintf (st, " at %d%s%s%s%s\n", accum + uptr->time, 
                                         (*tim) ? " (" : "", tim, (*tim) ? ")" : "",
                                         (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
@@ -8914,10 +8914,14 @@ do {
         sim_interval = noqueue_time = NOQUEUE_WAIT;
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Event for %s\n", sim_uname (uptr));
     AIO_EVENT_BEGIN(uptr);
-    if (uptr->action != NULL)
-        reason = uptr->action (uptr);
-    else
-        reason = SCPE_OK;
+    if (uptr->usecs_remaining)
+        reason = sim_timer_activate_after_d (uptr, uptr->usecs_remaining);
+    else {
+        if (uptr->action != NULL)
+            reason = uptr->action (uptr);
+        else
+            reason = SCPE_OK;
+        }
     AIO_EVENT_COMPLETE(uptr, reason);
     } while ((reason == SCPE_OK) && 
              (sim_interval <= 0) && 
@@ -9078,6 +9082,8 @@ UNIT *cptr, *nptr;
 AIO_VALIDATE;
 if ((uptr->cancel) && uptr->cancel (uptr))
     return SCPE_OK;
+if (uptr->dynflags & UNIT_TMR_UNIT)
+    sim_timer_cancel (uptr);
 AIO_CANCEL(uptr);
 AIO_UPDATE_QUEUE;
 if (sim_clock_queue == QUEUE_LIST_END)
@@ -9146,9 +9152,9 @@ UNIT *cptr;
 int32 accum;
 
 AIO_VALIDATE;
-accum = sim_timer_activate_time (uptr);             \
-if (accum >= 0)                                           \
-    return accum;                                         \
+accum = sim_timer_activate_time (uptr);
+if (accum >= 0)
+    return accum;
 accum = 0;
 for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {

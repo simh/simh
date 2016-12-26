@@ -542,6 +542,7 @@ struct UNIT {
     void                *up8;                           /* device specific */
     void                *tmxr;                          /* TMXR linkage */
     t_bool              (*cancel)(UNIT *);
+    double              usecs_remaining;                /* time balance for long delays */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(UNIT *);
     t_bool              (*a_is_active)(UNIT *);
@@ -556,7 +557,7 @@ struct UNIT {
     /* Asynchronous Timer control */
     double              a_due_time;                     /* due time for timer event */
     double              a_due_gtime;                    /* due time (in instructions) for timer event */
-    int32               a_usec_delay;                   /* time delay for timer event */
+    double              a_usec_delay;                   /* time delay for timer event */
 #endif
     };
 
