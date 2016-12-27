@@ -84,7 +84,7 @@ Some sample things to run:
 	do job csort
 
 * List the monitor system disk's contents
-        ibm1130 
+        ibm1130
 	do job list
 
 * Look into the files "job", "roots.job" and "csort.job" and "list.job"
@@ -145,7 +145,7 @@ sample usage
 --------------------------------------------------------------------------
 
 ibm1130
-	starts SIMH-based simulator. 
+	starts SIMH-based simulator.
         Optional command line arguments: -q quiet mode, -g no GUI
 
 	Enhancements:
@@ -169,7 +169,7 @@ ibm1130
                 deletes the named file
 
         * VIEW filename
-                displays the named file with "notepad." (Windows only). 
+                displays the named file with "notepad." (Windows only).
 
 --------------------------------------------------------------------------
 asm1130 -l program.asm
@@ -192,6 +192,6 @@ Note: the DMS disk is built with the Windows batch file "mkdms.bat".
 
 Subnote: DMS cannot be built with the 1130's native assembler.
 
-	
+
 --------------------------------------------------------------------------
 check www.ibm1130.org for updates...

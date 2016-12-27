@@ -62,9 +62,3 @@ Bugs Found and Fixed During Simulator Debug
 66. CPU: Not all PSE and MSE variants are trapped in user mode.
 67. CPU: Storage nullification mask not recalculated at all points needed;
     replaced with macro.
-
-
-
-
-
-

@@ -116,7 +116,7 @@ int32 nulldev(int32 io, int32 data)
     MB_mod        Mother Board modifiers list
 */
 
-UNIT MB_unit = { 
+UNIT MB_unit = {
     UDATA (NULL, 0, 0)
 };
 
@@ -324,4 +324,3 @@ void MB_put_mword(int32 addr, int32 val)
 }
 
 /* end of mp-b2.c */
-

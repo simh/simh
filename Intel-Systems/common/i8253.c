@@ -61,11 +61,11 @@ uint8 i8253c(t_bool io, uint8 data);
 /* i8253 Standard I/O Data Structures */
 /* up to 4 i8253 devices */
 
-UNIT i8253_unit[] = { 
-    { UDATA (&i8253_svc, 0, 0), 20 }, 
-    { UDATA (&i8253_svc, 0, 0), 20 }, 
-    { UDATA (&i8253_svc, 0, 0), 20 }, 
-    { UDATA (&i8253_svc, 0, 0), 20 } 
+UNIT i8253_unit[] = {
+    { UDATA (&i8253_svc, 0, 0), 20 },
+    { UDATA (&i8253_svc, 0, 0), 20 },
+    { UDATA (&i8253_svc, 0, 0), 20 },
+    { UDATA (&i8253_svc, 0, 0), 20 }
 };
 
 REG i8253_reg[] = {
@@ -143,10 +143,10 @@ t_stat i8253_reset (DEVICE *dptr, uint16 baseport)
     sim_printf("   8253-%d: Reset\n", i8253_devnum);
     sim_printf("   8253-%d: Registered at %04X\n", i8253_devnum, baseport);
     i8253_port[i8253_devnum] = baseport;
-    reg_dev(i8253t0, baseport, i8253_devnum); 
-    reg_dev(i8253t1, baseport + 1, i8253_devnum); 
-    reg_dev(i8253t2, baseport + 2, i8253_devnum); 
-    reg_dev(i8253c, baseport + 3, i8253_devnum); 
+    reg_dev(i8253t0, baseport, i8253_devnum);
+    reg_dev(i8253t1, baseport + 1, i8253_devnum);
+    reg_dev(i8253t2, baseport + 2, i8253_devnum);
+    reg_dev(i8253c, baseport + 3, i8253_devnum);
     i8253_unit[i8253_devnum].u3 = 0;        /* status */
     i8253_unit[i8253_devnum].u4 = 0;        /* mode instruction */
     i8253_unit[i8253_devnum].u5 = 0;        /* command instruction */

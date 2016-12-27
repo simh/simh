@@ -53,7 +53,7 @@ a minimum of 24K.
 			trusted with real Z80 software]
 	SET CPU ITRAP	Causes the simulator to halt if an invalid 8080
 			Opcode is detected.
-	SET CPU NOITRAP	Does not stop on an invalid Opcode.  This is 
+	SET CPU NOITRAP	Does not stop on an invalid Opcode.  This is
 			how the real 8080 works.
 	SET CPU 4K
 	SET CPU 8K
@@ -76,7 +76,7 @@ is alot nicer, it will halt but send you back to the simulator command line.
 CPU Registers include the following:
 
 	name	size	comments
-	
+
 	PC	16	The Program Counter
 	A	8	The accumulator
 	BC	16	The BC register pair.  Register B is the high
@@ -108,7 +108,7 @@ We follow this standard in the Simulator.
 	The simulator directs I/O to/from the first port to the screen. The
 second port reads from an attachable "tape reader" file on input, and writes
 to an attachable "punch file" on output.  These files are considered a
-simple stream of 8-bit bytes.  
+simple stream of 8-bit bytes.
 
 2.3 The 88-DISK controller.
 
@@ -134,7 +134,7 @@ the details of how they work, but we'll give you a few hints.
 
 3.1 CP/M Version 2.2
 
-	This version is my own port of the standard CP/M to the Altair. 
+	This version is my own port of the standard CP/M to the Altair.
 There were some "official" versions but I don't have them.  None were
 endorsed or sold by MITS to my knowledge, however.
 	To boot CP/M:
@@ -152,7 +152,7 @@ DIR than DIR.  ASM will assemble .ASM files to Hex, LOAD will "load" them to
 binary format (.COM).  ED is a simple editor, #A command will bring the
 source file to the buffer, T command will "type" lines, L will move lines,
 E exits the editor.  20L20T will move down 20 lines, and type 20.  Very
-DECish.  DDT is the debugger, SUBMIT is a batch-type command processor. 
+DECish.  DDT is the debugger, SUBMIT is a batch-type command processor.
 A sample batch file that will assemble and write out the bootable CP/M
 image (on drive A) is "SYSGEN.SUB".  To run it, type "SUBMIT SYSGEN".
 
@@ -199,13 +199,8 @@ to CP/M.  To boot:
 	HOW MANY RANDOM FILES? 2 [return]
 
 	056769 BYTES AVAILABLE
-	DOS MONITOR VER 1.0	
+	DOS MONITOR VER 1.0
 	COPYRIGHT 1977 BY MITS INC
 	.mnt 0
 
 	.dir 0
-
-
-
-
-

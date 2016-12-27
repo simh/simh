@@ -61,7 +61,7 @@
    A<0:7>               Accumulator
    BC<0:15>             BC Register Pair
    DE<0:15>             DE Register Pair
-   HL<0:15>             HL Register Pair 
+   HL<0:15>             HL Register Pair
    PSW<0:7>             Program Status Word (Flags)
    PC<0:15>             Program counter
    SP<0:15>             Stack Pointer
@@ -126,7 +126,7 @@
 #define ZF      0x40
 #define SF      0x80
 
-/* Macros to handle the flags in the PSW 
+/* Macros to handle the flags in the PSW
     8080 has bit #1 always set.  This is (not well) documented  behavior. */
 #define PSW_ALWAYS_ON       (0x02)        /* for 8080 */
 #define PSW_MSK (CF|PF|AF|ZF|SF)
@@ -272,28 +272,28 @@ DEVICE i8080_dev = {
     i8080_reg,                          //registers
     i8080_mod,                          //modifiers
     1,                                  //numunits
-    16,                                 //aradix 
-    16,                                 //awidth 
-    1,                                  //aincr 
-    16,                                 //dradix 
+    16,                                 //aradix
+    16,                                 //awidth
+    1,                                  //aincr
+    16,                                 //dradix
     8,                                  //dwidth
-    &i8080_ex,                          //examine 
-    &i8080_dep,                         //deposit 
+    &i8080_ex,                          //examine
+    &i8080_dep,                         //deposit
 //    &i8080_reset,                       //reset
     NULL,                       //reset
     NULL,                               //boot
-    NULL,                               //attach 
+    NULL,                               //attach
     NULL,                               //detach
     NULL,                               //ctxt
-    DEV_DEBUG,                          //flags 
-    0,                                  //dctrl 
+    DEV_DEBUG,                          //flags
+    0,                                  //dctrl
     i8080_debug,                        //debflags
     NULL,                               //msize
     NULL                                //lname
 };
 
 /* tables for the disassembler */
-const char *opcode[] = {                      
+const char *opcode[] = {
 "NOP", "LXI B,", "STAX B", "INX B",             /* 0x00 */
 "INR B", "DCR B", "MVI B,", "RLC",
 "???", "DAD B", "LDAX B", "DCX B",
@@ -404,7 +404,7 @@ int32 sim_instr (void)
     while (reason == 0) {               /* loop until halted */
 
 //        if (PC == 0x1000) {             /* turn on debugging */
-//            i8080_dev.dctrl = DEBUG_asm + DEBUG_reg; 
+//            i8080_dev.dctrl = DEBUG_asm + DEBUG_reg;
 //            reason = STOP_HALT;
 //        }
         if (i8080_dev.dctrl & DEBUG_reg) {
@@ -442,7 +442,7 @@ int32 sim_instr (void)
                         PC = 0x0038;
                         int_req &= ~INT_R;
                     }
-                } 
+                }
             } else {                    /* 8080 */
                 if (IM & IE) {          /* enabled? */
                     push_word(PC);      /* do an RST 7 */
@@ -905,7 +905,7 @@ int32 sim_instr (void)
 //            sim_printf("\n%04X\tOUT\t%02X\t;devnum=%d", PC - 1, DAR, dev_table[DAR].devnum);
             break;
 
-        default:                    /* undefined opcode */ 
+        default:                    /* undefined opcode */
             if (i8080_unit.flags & UNIT_OPSTOP) {
                 reason = STOP_OPCODE;
                 PC--;
@@ -933,7 +933,7 @@ void dumpregs(void)
 {
     sim_printf("  A=%02X BC=%04X DE=%04X HL=%04X SP=%04X IM=%02X XACK=%d\n",
     A, BC, DE, HL, SP, IM, xack);
-    sim_printf("    CF=%d ZF=%d AF=%d SF=%d PF=%d\n", 
+    sim_printf("    CF=%d ZF=%d AF=%d SF=%d PF=%d\n",
     GET_FLAG(CF) ? 1 : 0,
     GET_FLAG(ZF) ? 1 : 0,
     GET_FLAG(AF) ? 1 : 0,
@@ -1263,9 +1263,9 @@ t_stat i8080_reset (DEVICE *dptr)
 
 t_stat i8080_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-    if (addr >= MEMSIZE) 
+    if (addr >= MEMSIZE)
         return SCPE_NXM;
-    if (vptr != NULL) 
+    if (vptr != NULL)
         *vptr = get_mbyte(addr);
     return SCPE_OK;
 }
@@ -1274,14 +1274,14 @@ t_stat i8080_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 
 t_stat i8080_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-    if (addr >= MEMSIZE) 
+    if (addr >= MEMSIZE)
         return SCPE_NXM;
     put_mbyte(addr, val);
     return SCPE_OK;
 }
 
 /* This is the binary loader.  The input file is considered to be
-   a string of literal bytes with no special format. The load 
+   a string of literal bytes with no special format. The load
    starts at the current value of the PC.
 */
 

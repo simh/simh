@@ -31,12 +31,12 @@
         an emulated PATA IDE Hard Disk Drive.
 
         All I/O is via programmed I/O.  The i8255 has a control port (PIOS)
-        and three data ports (PIOA, PIOB, and PIOC).    
+        and three data ports (PIOA, PIOB, and PIOC).
 
-        The simulated device supports a select from I/O space and two address lines. 
+        The simulated device supports a select from I/O space and two address lines.
         The data ports are at the lower addresses and the control port is at
         the highest.
-        
+
         A write to the control port can configure the device:
 
         Control Word
@@ -48,7 +48,7 @@
             D0  Port C (lower) 1-Input, 0-Output
             D1  Port B 1-Input, 0-Output
             D2  Mode Selection  0-Mode 0, 1-Mode 1
-                                
+
             Group A
             D3  Port C (upper) 1-Input, 0-Output
             D4  Port A 1-Input, 0-Output
@@ -63,11 +63,11 @@
             Bit Set - D7=0, D3:1 select port C bit, D0 1=set, 0=reset
 
         A read to the data ports gets the current port value, a write
-        to the data ports writes the character to the device. 
+        to the data ports writes the character to the device.
 
         The Second 8255 on the iSBC 80/10 is used to connect to the IDE PATA
         Hard Disk Drive.  Pins are defined as shown below:
-        
+
             PA[0..7] High data byte
             PB[0..7] Low data byte
             PC[0..2] Register select
@@ -196,11 +196,10 @@ t_stat pata_reset (DEVICE *dptr, int32 base)
     pata_unit[0].u4 = 0xFF;         /* Port A */
     pata_unit[0].u5 = 0xFF;         /* Port B */
     pata_unit[0].u6 = 0xFF;         /* Port C */
-    reg_dev(pataa, base); 
-    reg_dev(patab, base + 1); 
-    reg_dev(patac, base + 2); 
-    reg_dev(patas, base + 3); 
+    reg_dev(pataa, base);
+    reg_dev(patab, base + 1);
+    reg_dev(patac, base + 2);
+    reg_dev(patas, base + 3);
     sim_printf("   PATA: Reset\n");
     return SCPE_OK;
 }
-

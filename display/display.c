@@ -131,21 +131,21 @@ static struct color color_red = { pred, ELEMENTS(pred), 100000 };
 static struct display displays[] = {
    /*
      * TX-0
-     * 
+     *
      *
      * Unknown manufacturer
-     * 
-     * 12" tube, 
+     *
+     * 12" tube,
      * maximum dot size ???
      * 50us point plot time (20,000 points/sec)
      * P17 Phosphor??? Two phosphor layers:
      * fast blue (.05s half life), and slow green (.2s half life)
-     * 
-     * 
+     *
+     *
      */
     { DIS_TX0, "MIT TX-0", &color_p17, NULL, 512, 512 },
 
-    
+
     /*
      * Type 30
      * PDP-1/4/5/8/9/10 "Precision CRT" display system
@@ -545,7 +545,7 @@ display_delay(int t, int slowdown)
 #endif /* DEBUG_DELAY defined */
             }
         }
-    else 
+    else
         if ((elapsed < MINELAPSED) || (slowdown && (delay < MINDELAY))) {
             /* too little elapsed time passed, or delta very small */
             int gain = delay_check>>GAINSHIFT;
@@ -696,8 +696,8 @@ intensify(int x,            /* 0..xpixels */
 
     /* EXP: doesn't work... yet */
     /* if "recently" drawn, same or brighter, same color, make even brighter */
-    if (p->ttl >= MAXTTL*2/3 && 
-        level >= p->level && 
+    if (p->ttl >= MAXTTL*2/3 &&
+        level >= p->level &&
         p->color == color &&
         level < MAXLEVEL)
         level++;
@@ -998,7 +998,7 @@ display_scale(void)
  * asdf kl;'
  * just where PDP-1 spacewar expects them!
  * key mappings same as MIT Media Lab Java PDP-1 simulator
- * 
+ *
  */
 unsigned long spacewar_switches = 0;
 

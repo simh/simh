@@ -25,7 +25,7 @@
 
     NOTES:
 
-        This software was written by Bill Beech, 24 Jan 13, to allow emulation of 
+        This software was written by Bill Beech, 24 Jan 13, to allow emulation of
         more complex Computer Systems.
 
         This program simulates up to 4 i8259 devices.
@@ -155,8 +155,8 @@ t_stat i8259_reset (DEVICE *dptr, uint16 base)
         sim_printf("i8259_reset: too many devices!\n");
         return SCPE_MEM;
     }
-    i8259_port[i8259_devnum] = reg_dev(i8259a, base); 
-    reg_dev(i8259b, base + 1); 
+    i8259_port[i8259_devnum] = reg_dev(i8259a, base);
+    reg_dev(i8259b, base + 1);
     i8259_unit[i8259_devnum].u3 = 0x00; /* IRR */
     i8259_unit[i8259_devnum].u4 = 0x00; /* ISR */
     i8259_unit[i8259_devnum].u5 = 0x00; /* IMR */

@@ -24,7 +24,7 @@
     in this Software without prior written authorization from William A. Beech.
 
     These functions support a simulated RAM device in low memory on an iSBC.  These
-    SBCs do not have the capability to switch off this RAM.  In most cases a portion 
+    SBCs do not have the capability to switch off this RAM.  In most cases a portion
     of the RAM is dual-ported so it also appears in the multibus memory map at
     a configurable location.
 
@@ -71,24 +71,24 @@ DEBTAB RAM_debug[] = {
 
 DEVICE RAM_dev = {
     "RAM",              //name
-    &RAM_unit,          //units 
-    NULL,               //registers 
+    &RAM_unit,          //units
+    NULL,               //registers
     RAM_mod,            //modifiers
     1,                  //numunits
-    16,                 //aradix 
-    32,                 //awidth 
-    1,                  //aincr 
-    16,                 //dradix 
+    16,                 //aradix
+    32,                 //awidth
+    1,                  //aincr
+    16,                 //dradix
     8,                  //dwidth
-    NULL,               //examine 
-    NULL,               //deposit 
+    NULL,               //examine
+    NULL,               //deposit
     &RAM_reset,         //reset
     NULL,               //boot
-    NULL,               //attach 
+    NULL,               //attach
     NULL,               //detach
-    NULL,               //ctxt                
-    DEV_DEBUG,          //flags 
-    0,                  //dctrl 
+    NULL,               //ctxt
+    DEV_DEBUG,          //flags
+    0,                  //dctrl
     RAM_debug,          //debflags
     NULL,               //msize
     NULL                //lname
@@ -111,7 +111,7 @@ t_stat RAM_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
             sim_printf("RAM_set_size: Size error\n");
         return SCPE_ARG;
     }
-    RAM_unit.capac = 0x4000 * val;                      /* set size */  
+    RAM_unit.capac = 0x4000 * val;                      /* set size */
     RAM_unit.u3 = 0x0000;                               /* base is 0 */
     RAM_unit.u4 = val;                                  /* save val */
     if (RAM_buf) {                                      /* if changed, allocate new buffer */
@@ -139,12 +139,12 @@ t_stat RAM_reset (DEVICE *dptr)
         RAM_unit.u3 = 0;
         RAM_unit.u4 = 1;
     }
-    sim_printf("   RAM: Initializing [%04X-%04XH]\n", 
+    sim_printf("   RAM: Initializing [%04X-%04XH]\n",
         RAM_unit.u3,
         RAM_unit.u3 + RAM_unit.capac - 1);
     if (RAM_buf == NULL) {                              /* no buffer allocated */
         RAM_buf = malloc(RAM_unit.capac);
-        if (RAM_buf == NULL) { 
+        if (RAM_buf == NULL) {
             if (RAM_dev.dctrl & DEBUG_flow)
                 sim_printf("RAM_reset: Malloc error\n");
             return SCPE_MEM;

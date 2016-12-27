@@ -182,7 +182,7 @@ DEVICE f2_dev = {
 int32 dsk1 (int32 op, int32 m, int32 n, int32 data)
 {
     int32 r;
-    
+
     r = dsk(0, op, m, n, data);
     return (r);
 }
@@ -190,7 +190,7 @@ int32 dsk1 (int32 op, int32 m, int32 n, int32 data)
 int32 dsk2 (int32 op, int32 m, int32 n, int32 data)
 {
     int32 r;
-    
+
     r = dsk(1, op, m, n, data);
     return (r);
 }
@@ -202,7 +202,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
     int32 iodata, i, j, u, sect, nsects, addr, r, c, res;
     int32 F, C, S, N, usave;
     UNIT *uptr;
-    
+
     u = m;
     if (disk == 1) u += 2;
     F = GetMem(DCAR[disk]+0);                           /* Flag bits */
@@ -261,22 +261,22 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                         diskerr[disk] |= 0x0100;
                         if (debug_reg & 0x02)
                             fprintf(trace, "==> Seek Past End of Disk\n");
-                    }   
+                    }
 
-                    /*sim_activate(uptr, uptr -> wait);*/               
-                    sim_activate(uptr, 1);              
-                    
+                    /*sim_activate(uptr, uptr -> wait);*/
+                    sim_activate(uptr, 1);
+
                     /* Seek arms are the same for both disks on a drive:
                        update the other arm */
-                            
-                    usave = uptr -> u3;     
+
+                    usave = uptr -> u3;
                     if (u == 0) uptr = f1_dev.units;
                     if (u == 1) uptr = r1_dev.units;
                     if (u == 2) uptr = f2_dev.units;
                     if (u == 3) uptr = r2_dev.units;
-                    uptr -> u3 = usave;     
-                            
-                    seekbusy[disk] = 1; 
+                    uptr -> u3 = usave;
+
+                    seekbusy[disk] = 1;
                     iodata = SCPE_OK;
                     break;
 
@@ -292,7 +292,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                                 if (r != 1 || uptr->u3 != C) {
                                     diskerr[disk] |= 0x0800;
                                     break;
-                                }   
+                                }
                                 for (j = 0; j < DSK_SECTSIZE; j++) {
                                     PutMem(addr, dbuf[j]);
                                     addr++;
@@ -334,7 +334,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                             if (RIDsect[disk] > 23)
                                 RIDsect[disk] = 32;
                             if (RIDsect[disk] > 55)
-                                RIDsect[disk] = 0;  
+                                RIDsect[disk] = 0;
                             break;
                         case 2:                         /* Read Diagnostic */
                             iodata = STOP_INVDEV;
@@ -348,7 +348,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                                 if (r != 1 || uptr->u3 != C) {
                                     diskerr[disk] |= 0x0800;
                                     break;
-                                }   
+                                }
                                 if (sect == 55) {       /* HJS MODS */
                                     S = sect;
                                     N = nsects - i - 2;
@@ -371,10 +371,10 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                             PutMem(DCAR[disk]+3, N);
                             /*sim_activate(uptr, uptr -> wait);*/
                             sim_activate(uptr, 1);
-                            break;      
+                            break;
                         default:
                             return STOP_INVDEV;
-                    }                               
+                    }
                     break;
                 case 0x02:                              /* Write */
                     switch (data) {
@@ -391,7 +391,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                                 if (r != 1 || uptr->u3 != C) {
                                     diskerr[disk] |= 0x0400;
                                     break;
-                                }   
+                                }
                                 if (sect == 55) {   /* HJS MODS */
                                     S = sect;
                                     N = nsects - i - 2;
@@ -433,7 +433,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                                 if (r != 1) {
                                     diskerr[disk] |= 0x0400;
                                     break;
-                                }   
+                                }
                                 if (sect == 55) {
                                     S = sect;
                                     N = nsects - i - 2;
@@ -459,7 +459,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                             break;
                         default:
                             return STOP_INVDEV;
-                    }                               
+                    }
                     break;
                 case 0x03:                              /* Scan */
                     sect = (S >> 2) & 0x3F;
@@ -471,14 +471,14 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                             diskerr[disk] |= 0x0800;
                             break;
                         }
-                        res = 0;    
+                        res = 0;
                         for (j = 0; j < DSK_SECTSIZE; j++) {
                             c = GetMem(addr);
                             if (j != 0xff) {
                                 if (dbuf[i] < c)
                                     res = 1;
                                 if (dbuf[i] > c)
-                                    res = 3;    
+                                    res = 3;
                             }
                             addr++;
                         }
@@ -514,7 +514,7 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
             return iodata;
 
         /* LIO 5444 */
-        case 1:     
+        case 1:
             if ((uptr->flags & UNIT_ATT) == 0)
                 return SCPE_UNATT;
             switch (n) {
@@ -547,14 +547,14 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                 case 0x04:
                     if (found[disk])
                         iodata = 1;
-                    break;          
+                    break;
                 default:
                     return (STOP_INVDEV << 16);
-            }                       
+            }
             return ((SCPE_OK << 16) | iodata);
 
         /* SNS 5444 */
-        case 3: 
+        case 3:
             if ((uptr->flags & UNIT_ATT) == 0)
                 return SCPE_UNATT << 16;
             iodata = 0;
@@ -570,25 +570,25 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                     if (seekbusy[disk])
                         iodata |= 0x0010;
                     if (uptr -> u3 == 0)
-                        iodata |= 0x0040;       
+                        iodata |= 0x0040;
                     break;
                 case 0x03:
                     iodata = 0;
-                    break;  
+                    break;
                 case 0x04:
                     iodata = DDAR[disk];
                     break;
                 case 0x06:
                     iodata = DCAR[disk];
-                    break;  
+                    break;
                 default:
                     return (STOP_INVDEV << 16);
             }
-            iodata |= ((SCPE_OK << 16) & 0xffff0000);       
+            iodata |= ((SCPE_OK << 16) & 0xffff0000);
             return (iodata);
 
         /* APL 5444 */
-        case 4: 
+        case 4:
             if ((uptr->flags & UNIT_ATT) == 0)
                 return SCPE_UNATT << 16;
             iodata = 0;
@@ -602,16 +602,16 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
                 case 0x02:                              /* Busy */
                     if (sim_is_active (uptr))
                         iodata = 1;
-                    break;  
+                    break;
                 default:
                     return (STOP_INVDEV << 16);
-            }                       
+            }
             return ((SCPE_OK << 16) | iodata);
         default:
             break;
     }
     sim_printf (">>DSK%d non-existent function %d\n", disk, op);
-    return SCPE_OK;                     
+    return SCPE_OK;
 }
 
 /* Disk unit service.  If a stacker select is active, copy to the

@@ -1,4 +1,4 @@
-/* b5500_defs.h: Burroughs 5500 simulator definitions 
+/* b5500_defs.h: Burroughs 5500 simulator definitions
 
    Copyright (c) 2016, Richard Cornwell
 
@@ -127,49 +127,49 @@ extern t_stat      fprint_sym(FILE *, t_addr, t_value *, UNIT *, int32);
 extern int32       tmxr_poll;
 
 /* Generic devices common to all */
-extern DEVICE      cpu_dev; 
-extern UNIT        cpu_unit[]; 
+extern DEVICE      cpu_dev;
+extern UNIT        cpu_unit[];
 extern REG         cpu_reg[];
-extern DEVICE      chan_dev; 
+extern DEVICE      chan_dev;
 
 /* Global device definitions */
 #if (NUM_DEVS_CDR > 0) | (NUM_DEVS_CDP > 0)
-extern DEVICE       cdr_dev; 
+extern DEVICE       cdr_dev;
 extern t_stat       card_cmd(uint16, uint16, uint8, uint16 *);
 #endif
 
 #if (NUM_DEVS_CDP > 0)
-extern DEVICE       cdp_dev; 
+extern DEVICE       cdp_dev;
 #endif
 
 #if (NUM_DEVS_LPR > 0)
-extern DEVICE       lpr_dev; 
+extern DEVICE       lpr_dev;
 extern t_stat       lpr_cmd(uint16, uint16, uint8, uint16 *);
 #endif
 
 #if (NUM_DEVS_CON > 0)
-extern DEVICE       con_dev; 
+extern DEVICE       con_dev;
 extern t_stat       con_cmd(uint16, uint16, uint8, uint16 *);
 #endif
 
 #if (NUM_DEVS_DTC > 0)
-extern DEVICE      dtc_dev; 
+extern DEVICE      dtc_dev;
 extern t_stat      dtc_cmd(uint16, uint16, uint8, uint16 *);
 #endif
 
-#if (NUM_DEVS_DR > 0)   
-extern DEVICE      drm_dev; 
+#if (NUM_DEVS_DR > 0)
+extern DEVICE      drm_dev;
 extern t_stat      drm_cmd(uint16, uint16, uint8, uint16 *, uint8);
 #endif
 
 #if (NUM_DEVS_DSK > 0)
-extern DEVICE      dsk_dev; 
+extern DEVICE      dsk_dev;
 extern t_stat      dsk_cmd(uint16, uint16, uint8, uint16 *);
-extern DEVICE      esu_dev; 
+extern DEVICE      esu_dev;
 #endif
 
-#if (NUM_DEVS_MT > 0) 
-extern DEVICE      mt_dev; 
+#if (NUM_DEVS_MT > 0)
+extern DEVICE      mt_dev;
 extern t_stat      mt_cmd(uint16, uint16, uint8, uint16 *);
 #endif  /* NUM_DEVS_MT */
 
@@ -494,7 +494,7 @@ extern t_stat      mt_cmd(uint16, uint16, uint8, uint16 *);
 #define SSALF           00000010000000000LL
 #define SVARF           00000000100000000LL
 #define SCWMF           00000000000100000LL
-#define FFIELD          00000007777700000LL     
+#define FFIELD          00000007777700000LL
 #define FFIELD_V        15
 #define REPFLD          00000770000000000LL
 #define REPFLD_V        30
@@ -503,7 +503,7 @@ extern t_stat      mt_cmd(uint16, uint16, uint8, uint16 *);
 #define PROGF           00400000000000000LL
 #define RGH             00340700000000000LL     /* Return Control Word +FFIELD and CORE */
 #define RGH_V           33
-#define RKV             00034070000000000LL    
+#define RKV             00034070000000000LL
 #define RKV_V           30
 #define RL              00003000000000000LL     /* Save L register */
 #define RL_V            36
@@ -511,7 +511,7 @@ extern t_stat      mt_cmd(uint16, uint16, uint8, uint16 *);
 #define HMASK           00007777770000000LL
 #define DEV_DRUM_RD     01000000000000000LL
 #define DEVMASK         00760000000000000LL
-#define D_MASK          00777777777777777LL     
+#define D_MASK          00777777777777777LL
 #define DEV_V           40
 #define DEV_WC          00017770000000000LL
 #define DEV_WC_V        30
@@ -535,9 +535,9 @@ extern t_stat      mt_cmd(uint16, uint16, uint8, uint16 *);
 #define DEV_EOF         00000000004000000LL     /* D21 */
 #define DEV_MEMERR      00000000010000000LL     /* D22 */
 #define DEV_RESULT      00000000037700000LL
-#define DEV_EOT         01000100001000000LL     
-#define DEV_BOT         01000200001000000LL     
-#define DEV_BLANK       01000400001000000LL     
+#define DEV_EOT         01000100001000000LL
+#define DEV_BOT         01000200001000000LL
+#define DEV_BLANK       01000400001000000LL
 
 #define DRUM1_DEV       004                     /* 00100  (4) */
 #define DSK1_DEV        006                     /* 00110  (6) */

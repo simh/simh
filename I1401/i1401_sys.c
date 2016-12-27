@@ -98,7 +98,7 @@ const char *sim_stop_messages[] = {
     "HALT instruction",
     "Invalid MT unit number",
     "Invalid MT record length",
-    "Write to locked MT unit",  
+    "Write to locked MT unit",
     "Skip to unpunched CCT channel",
     "Card reader empty",
     "Address register wrap",

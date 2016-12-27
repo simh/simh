@@ -229,9 +229,9 @@ REG tm_reg[] = {
     };
 
 MTAB tm_mod[] = {
-    { MTUF_WLK,        0, "write enabled", "WRITEENABLED", 
+    { MTUF_WLK,        0, "write enabled", "WRITEENABLED",
         &tm_vlock, NULL, NULL, "Write enable tape drive" },
-    { MTUF_WLK, MTUF_WLK, "write locked",  "LOCKED", 
+    { MTUF_WLK, MTUF_WLK, "write locked",  "LOCKED",
         &tm_vlock, NULL, NULL, "Write lock tape drive"  },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0,       "FORMAT", "FORMAT",
         &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, "Set/Display tape format (SIMH, E11, TPC, P7B)" },
@@ -251,7 +251,7 @@ DEVICE tm_dev = {
     &tm_boot, &tm_attach, &tm_detach,
     &tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | DEV_TAPE, 0,
     NULL, NULL, NULL, &tm_help, NULL, NULL,
-    &tm_description 
+    &tm_description
     };
 
 /* I/O dispatch routines, I/O addresses 17772520 - 17772532
@@ -643,7 +643,7 @@ t_stat tm_vlock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 u = uptr - tm_dev.units;
 
-if ((uptr->flags & UNIT_ATT) && 
+if ((uptr->flags & UNIT_ATT) &&
     (val || sim_tape_wrp (uptr)))
     uptr->USTAT = uptr->USTAT | STA_WLK;
 else uptr->USTAT = uptr->USTAT & ~STA_WLK;
@@ -733,7 +733,7 @@ M[BOOT_UNIT >> 1] = (uint16)unitno;
 M[BOOT_CSR >> 1] = (tm_dib.ba & DMASK) + 06;
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
-} 
+}
 
 t_stat tm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
@@ -767,7 +767,7 @@ fprintf (st, "%s", text);
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);
-text2 = 
+text2 =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
 "\n"
 " It is critically important to maintain certain timing relationships\n"

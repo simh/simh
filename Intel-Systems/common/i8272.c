@@ -67,7 +67,7 @@ uint16 i8272_port[4];               //base port assigned to each 8251 instance
 /* i8251 Standard I/O Data Structures */
 /* up to 1 i8251 devices */
 
-UNIT i8272_unit[4] = { 
+UNIT i8272_unit[4] = {
     { UDATA (&i8272_svc, 0, 0), KBD_POLL_WAIT },
     { UDATA (&i8272_svc, 0, 0), KBD_POLL_WAIT },
     { UDATA (&i8272_svc, 0, 0), KBD_POLL_WAIT },
@@ -144,7 +144,7 @@ t_stat i8272_svc(UNIT *uptr)
     return SCPE_OK;
 }
 
-/* Reset routine */ 
+/* Reset routine */
 
 t_stat i8272_reset(DEVICE *dptr, uint16 base)
 {
@@ -154,8 +154,8 @@ t_stat i8272_reset(DEVICE *dptr, uint16 base)
     }
     i8272_reset1(i8272_devnum);
     sim_printf("   8251-%d: Registered at %03X\n", i8272_devnum, base);
-    i8272_port[i8272_devnum] = reg_dev(i8251d, base); 
-    reg_dev(i8251s, base + 1); 
+    i8272_port[i8272_devnum] = reg_dev(i8251d, base);
+    reg_dev(i8251s, base + 1);
     i8272_unit[i8272_devnum].u6 = i8272_devnum;
     sim_activate(&i8272_unit[i8272_devnum], i8272_unit[i8272_devnum].wait); /* activate unit */
     i8272_devnum++;

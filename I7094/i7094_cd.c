@@ -208,7 +208,7 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
 switch (cdr_sta) {                                      /* case on state */
 
     case CDS_INIT:                                      /* initial state */
-        for (i = 0; i < CD_BINLNT; i++)                 /* clear bin buf */ 
+        for (i = 0; i < CD_BINLNT; i++)                 /* clear bin buf */
              cdr_bbuf[i] = 0;
         for (i = 0; i < ((2 * CD_CHRLNT) + 2); i++)     /* clear char buf */
             cdr_cbuf[i] = ' ';

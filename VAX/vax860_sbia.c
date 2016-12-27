@@ -117,7 +117,7 @@ DEVICE sbia_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &sbia_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
     &sbia_description
     };
 
@@ -162,7 +162,7 @@ int32 sbia_rd (int32 pa, int32 lnt)
 
     default:                                            /* Anything else is not impl */
         return 0;
-   
+
     }
 }
 

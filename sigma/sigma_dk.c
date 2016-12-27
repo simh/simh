@@ -277,7 +277,7 @@ switch (dk_cmd) {
             return SCPE_OK;
             }
         break;                                          /* seek done */
-        
+
     case DKS_SENSE:                                     /* sense */
         c[0] = ((dk_ad >> 8) & 0x7F) | ((uptr->flags & UNIT_RO)? 0x80: 0);
         c[1] = dk_ad & 0xFF;                            /* address */
@@ -340,7 +340,7 @@ switch (dk_cmd) {
                 return SCPE_OK;
                 }
             da = da + ((++i % 4) == 0);                 /* every 4th byte */
-            }        
+            }
         if (dk_end_sec (uptr, i, DK_WDSC * 4, st))      /* transfer done? */
             return SCPE_OK;                             /* err or cont */
         break;
@@ -367,7 +367,7 @@ sim_activate (uptr, chan_ctl_time);
 return SCPE_OK;
 }
 
-/* Common read/write sector end routine 
+/* Common read/write sector end routine
 
    case 1 - more to transfer, not end disk - reschedule, return TRUE
    case 2 - more to transfer, end disk - uend, return TRUE

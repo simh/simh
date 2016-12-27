@@ -246,7 +246,7 @@ typedef struct {
 #define INT_V_TMR0      15                              /* SSC timers */
 #define INT_V_TMR1      16
 #define INT_V_VHRX      17                              /* DHQ11 */
-#define INT_V_VHTX      18 
+#define INT_V_VHTX      18
 #define INT_V_QDSS      19                              /* QDSS */
 #define INT_V_CR        20
 #define INT_V_QVSS      21                              /* QVSS */

@@ -140,7 +140,7 @@ extern uint32 cpu_opt;
 #define  TC6            (6 << TSSR_V_TC)                /* pos lost */
 #define  TC7            (7 << TSSR_V_TC)                /* fatal err */
 #define TSSR_MBZ        0060060
-#define GET_TC(x)       (((x) >> TSSR_V_TC) & TSSR_M_TC)        
+#define GET_TC(x)       (((x) >> TSSR_V_TC) & TSSR_M_TC)
 
 #define TSDBX_M_XA      017                             /* ext addr */
 #define TSDBX_BOOT      0000200                         /* boot */
@@ -350,9 +350,9 @@ REG ts_reg[] = {
     };
 
 MTAB ts_mod[] = {
-    { MTUF_WLK,         0, "write enabled",  "WRITEENABLED", 
+    { MTUF_WLK,         0, "write enabled",  "WRITEENABLED",
         NULL, NULL, NULL, "Write enable tape drive" },
-    { MTUF_WLK,  MTUF_WLK, "write locked",   "LOCKED", 
+    { MTUF_WLK,  MTUF_WLK, "write locked",   "LOCKED",
         NULL, NULL, NULL, "Write lock tape drive"  },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0,       "FORMAT", "FORMAT",
         &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, "Set/Display tape format (SIMH, E11, TPC, P7B)" },
@@ -387,7 +387,7 @@ DEVICE ts_dev = {
     NULL, NULL, &ts_reset,
     &ts_boot, &ts_attach, &ts_detach,
     &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE, 0,
-    ts_debug, NULL, NULL, &ts_help, NULL, NULL, 
+    ts_debug, NULL, NULL, &ts_help, NULL, NULL,
     &ts_description
     };
 
@@ -878,7 +878,7 @@ switch (fnc) {                                          /* case on func */
 
         case 00:                                        /* fwd */
             st0 = ts_readf (uptr, cmdlnt);              /* read */
-            break; 
+            break;
 
         case 01:                                        /* back */
             st0 = ts_readr (uptr, cmdlnt);              /* read */
@@ -1181,7 +1181,7 @@ M[BOOT_CSR1 >> 1] = (ts_dib.ba & DMASK) + 02;
 cpu_set_boot (BOOT_START);
 return SCPE_OK;
 }
- 
+
 #else
 
 t_stat ts_boot (int32 unitno, DEVICE *dptr)

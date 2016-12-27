@@ -39,11 +39,10 @@ extern DEVICE rom_dev;
 
 char sim_name[] = "Alpha";
 
-DEVICE *sim_devices[] = { 
+DEVICE *sim_devices[] = {
     &cpu_dev,
     &tlb_dev,
     &ev5pal_dev,
     &rom_dev,
     NULL
     };
-

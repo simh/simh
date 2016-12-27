@@ -9,7 +9,7 @@ History (partial):
 		interrupt occurs between the XIO SENSE and WAIT instructions.
 		This bug is hit frequently if the delay time is set to
 		100 instructions. 10 worked reliably, but is really not realistic,
- 		and 200 may not be adequate in all cases, but we'll try 200 for now.
+		and 200 may not be adequate in all cases, but we'll try 200 for now.
 
 2003-11-00	Updated GUI to allow drag and drop to simulated card
 		reader, tear-off from simulated printer

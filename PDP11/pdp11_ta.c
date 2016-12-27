@@ -24,7 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    ta           TA11/TU60 cassette tape
-   
+
    23-Oct-13    RMS     Revised for new boot setup routine
    06-Jun-13    RMS     Reset must set RDY (Ian Hammond)
                         Added CAPS-11 bootstrap (Ian Hammond)
@@ -184,9 +184,9 @@ REG ta_reg[] = {
     };
 
 MTAB ta_mod[] = {
-    { MTUF_WLK,        0, "write enabled", "WRITEENABLED", 
+    { MTUF_WLK,        0, "write enabled", "WRITEENABLED",
         NULL, NULL, NULL, "Write enable tape drive" },
-    { MTUF_WLK, MTUF_WLK, "write locked",  "LOCKED", 
+    { MTUF_WLK, MTUF_WLK, "write locked",  "LOCKED",
         NULL, NULL, NULL, "Write lock tape drive"  },
 //    { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
 //      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
@@ -206,7 +206,7 @@ DEVICE ta_dev = {
     &ta_boot, &ta_attach, &ta_detach,
     &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_UBUS | DEV_TAPE, 0,
     NULL, NULL, NULL, &ta_help, NULL, NULL,
-    &ta_description 
+    &ta_description
     };
 
 /* I/O dispatch routines, I/O addresses 17777500 - 17777503
@@ -447,7 +447,7 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     default:                                            /* never get here! */
-        return SCPE_IERR;        
+        return SCPE_IERR;
         }                                               /* end case */
 
 ta_cs |= TACS_RDY;                                      /* set ready */

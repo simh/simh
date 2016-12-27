@@ -386,9 +386,9 @@ REG rk_reg[] = {
     };
 
 MTAB rk_mod[] = {
-    { UNIT_HWLK,        0, "write enabled", "WRITEENABLED", 
+    { UNIT_HWLK,        0, "write enabled", "WRITEENABLED",
         NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_HWLK, UNIT_HWLK, "write locked",  "LOCKED", 
+    { UNIT_HWLK, UNIT_HWLK, "write locked",  "LOCKED",
         NULL, NULL, NULL, "Write lock disk drive"  },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
@@ -404,7 +404,7 @@ DEVICE rk_dev = {
     &rk_boot, NULL, NULL,
     &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | RK_DIS, 0,
     rk_deb, NULL, NULL, &rk_help, NULL, NULL,
-    &rk_description 
+    &rk_description
     };
 
 /* I/O dispatch routine, I/O addresses 17777400 - 17777416

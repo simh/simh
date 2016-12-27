@@ -104,7 +104,7 @@ t_stat i8259_write(I8259* chip,int addr,uint32 value)
     } else {
         if (value & I8259_ICW1) { /* state initialization sequence */
             TRACE_PRINT2(DBG_PIC_WR,"WR ICW1 addr=%d data=0x%x",addr,value);
-            chip->icw1 = value; 
+            chip->icw1 = value;
             chip->state = 1;
             chip->rmode = 0;
             chip->prio = 7;
@@ -135,7 +135,7 @@ t_stat i8259_write(I8259* chip,int addr,uint32 value)
                         bit = bit << 1; if (bit==0x100) bit = 1;
                     }
                     chip->isr &= ~bit; break;
-                    if ((value & I8259_OCW2_MODE) == 0xa0) { 
+                    if ((value & I8259_OCW2_MODE) == 0xa0) {
                         chip->prio = 7 - i + chip->prio; if (chip->prio>7) chip->prio -= 8;
                     }
                     break;
@@ -212,11 +212,11 @@ t_stat i8259_raiseint(I8259* chip,int level)
     if (chip->imr & bit) return SCPE_OK; /* inhibited */
     chip->isr = (chip->isr | bit) & 0xff; /* request this interrupt level */
 
-    /* bit7=prio7 => bitN = prioN   
+    /* bit7=prio7 => bitN = prioN
        bit7=prio6 => bitN = prioN-1
        ...
        bit7=prio0 => bitN = prioN-7
-    */   
+    */
     isr = (chip->isr<<8) | chip->isr; /* simple rotation */
     isr = isr << (7-level); /* shift level bit into bit 15 */
     myprio = chip->prio - 7 + level; if (myprio < 0) myprio += 8;

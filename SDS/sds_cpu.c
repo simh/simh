@@ -435,7 +435,7 @@ while (reason == 0) {                                   /* loop until halted */
                                      SWMASK ('E') | SWMASK ('U')};
             uint32 btyp;
 
-            btyp = sim_brk_test (P, bmask[cpu_mode]); 
+            btyp = sim_brk_test (P, bmask[cpu_mode]);
             if (btyp) {
                 if (btyp & SWMASK ('E'))                /* unqualified breakpoint? */
                     reason = STOP_IBKPT;                /* stop simulation */
@@ -486,7 +486,7 @@ while (reason == 0) {                                   /* loop until halted */
             mon_usr_trap = 0;
             if (hst_lnt)
                 inst_hist (tinst, save_P, HIST_TRP);
-            
+
             /* Use previously recorded trap address if memory acccess trap.
                Will differ from save_P if trapped instruction was a branch.
                See page 17 of 940 reference manual for additional info.
@@ -1598,7 +1598,7 @@ else
 switch (op_case) {
     case Next_BadOp:
         break;
-    case Next_BRM:  
+    case Next_BRM:
         *return_p++ = (P + 1) & VA_MASK;
         *return_p++ = (P + 2) & VA_MASK;
         *return_p++ = (P + 3) & VA_MASK;
@@ -1626,11 +1626,11 @@ switch (op_case) {
         if (atomic || forward)
             *return_p++ = (P + 1) & VA_MASK;
         break;
-    case Next_POP:  
+    case Next_POP:
         if (atomic)
             *return_p++ = 0100 + I_GETOP(inst);
         /* -- fall through to Next_Skip case -- */
-    case Next_Skip: 
+    case Next_Skip:
         *return_p++ = (P + 1) & VA_MASK;
         *return_p++ = (P + 2) & VA_MASK;
         break;

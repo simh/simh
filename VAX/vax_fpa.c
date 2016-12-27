@@ -1429,7 +1429,7 @@ return rpackg (&a, rh);                                 /* round and pack */
 int32 op_mulf (int32 *opnd)
 {
 UFP a, b;
-    
+
 unpackf (opnd[0], &a);                                  /* F format */
 unpackf (opnd[1], &b);
 vax_fmul (&a, &b, 0, FD_BIAS, 0, 0);                    /* do multiply */
@@ -1439,7 +1439,7 @@ return rpackfd (&a, NULL);                              /* round and pack */
 int32 op_muld (int32 *opnd, int32 *rh)
 {
 UFP a, b;
-    
+
 unpackd (opnd[0], opnd[1], &a);                         /* D format */
 unpackd (opnd[2], opnd[3], &b);
 vax_fmul (&a, &b, 1, FD_BIAS, 0, 0);                    /* do multiply */

@@ -110,7 +110,7 @@ DEVICE mctl_dev = {
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
     &mctl_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mctl_deb, NULL, NULL, NULL, NULL, NULL, 
+    mctl_deb, NULL, NULL, NULL, NULL, NULL,
     &mctl_description
     };
 
@@ -204,7 +204,7 @@ struct {
     uint32 capacity;
     const char *option;
     } boards[] = {
-        {  1, "MS730-CA M8750"}, 
+        {  1, "MS730-CA M8750"},
         {  0, NULL}};
 int32 bd;
 

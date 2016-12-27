@@ -88,7 +88,7 @@ DEVICE EPROM_dev = {
     NULL,               //detach
     NULL,               //ctxt
     DEV_DEBUG,          //flags
-    DEBUG_flow + DEBUG_read + DEBUG_write,              //dctrl 
+    DEBUG_flow + DEBUG_read + DEBUG_write,              //dctrl
 //    0,                  //dctrl
     EPROM_debug,        //debflags
     NULL,               //msize
@@ -173,7 +173,7 @@ uint8 EPROM_get_mbyte(uint16 addr)
     sim_debug (DEBUG_read, &EPROM_dev, "EPROM_get_mbyte: addr=%04X\n", addr);
     if (addr < EPROM_unit.capac) {
         SET_XACK(1);                /* good memory address */
-        sim_debug (DEBUG_xack, &EPROM_dev, "EPROM_get_mbyte: Set XACK for %04X\n", addr); 
+        sim_debug (DEBUG_xack, &EPROM_dev, "EPROM_get_mbyte: Set XACK for %04X\n", addr);
         val = *((uint8 *)EPROM_unit.filebuf + addr);
         sim_debug (DEBUG_read, &EPROM_dev, " val=%04X\n", val);
         return (val & 0xFF);

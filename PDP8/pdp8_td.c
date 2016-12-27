@@ -252,7 +252,7 @@ REG td_reg[] = {
 
 MTAB td_mod[] = {
     { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
+    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
     { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
@@ -385,7 +385,7 @@ if ((prev_mving && !new_mving) ||                       /* stop from moving? */
     return FALSE;
     }
 
-return FALSE;   
+return FALSE;
 }
 
 /* Update DECtape position
@@ -514,7 +514,7 @@ switch (mot) {                                          /* case on motion */
    the current data nibble (3b) is shifted into the data register.  If
    writing, the current mark track bit is shifted into the mark track
    register, the top nibble from the data register is written to tape, and
-   the data register is shifted up.  The complexity here comes from 
+   the data register is shifted up.  The complexity here comes from
    synthesizing the mark track, based on tape position, and the header data. */
 
 sim_activate (uptr, td_ltime);                          /* sched next line */
@@ -539,7 +539,7 @@ else if (uptr->pos < ((uint32) DTU_FWDEZ (uptr))) {     /* data zone? */
     int32 blkno = DT_LIN2BL (uptr->pos, uptr);          /* block # */
     int32 lineno = DT_LIN2OF (uptr->pos, uptr);         /* line # within block */
     if (lineno < DT_HTLIN) {                            /* header? */
-        if ((td_cmd & TDC_RW) == 0)                     /* read? */                     
+        if ((td_cmd & TDC_RW) == 0)                     /* read? */
             datb = td_header (uptr, blkno, lineno);     /* get nibble */
         }
     else if (lineno < (DTU_LPERB (uptr) - DT_HTLIN)) {  /* data? */
@@ -686,7 +686,7 @@ for (i = 0; i < DT_NUMDR; i++) {                        /* stop all activity */
          }
     else {
         sim_cancel (uptr);                              /* sim reset */
-        uptr->STATE = 0;  
+        uptr->STATE = 0;
         uptr->LASTT = sim_grtime ();
         }
     }
@@ -696,7 +696,7 @@ td_csum = 0;
 return SCPE_OK;
 }
 
-/* Bootstrap routine - OS/8 only 
+/* Bootstrap routine - OS/8 only
 
    1) Read reverse until reverse end zone (mark track is complement obverse)
    2) Read forward until mark track code 031.  This is a composite code from
@@ -952,4 +952,3 @@ else if (uptr->pos < ((uint32) DTU_FWDEZ (uptr))) {     /* data zone? */
 else fprintf (st, "Forward end zone\n");                /* fwd end zone */
 return SCPE_OK;
 }
-

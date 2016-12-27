@@ -65,10 +65,10 @@
             Invalid mamory address (if MTRAP is set on CPU)
 
        2. Interrupts.
-          There are 4 types of interrupt, and in effect they do a 
+          There are 4 types of interrupt, and in effect they do a
           hardware CALL instruction to one of 4 possible high memory addresses.
 
-       3. Non-existent memory.  
+       3. Non-existent memory.
             On the SWTP 6800, reads to non-existent memory
             return 0FFH, and writes are ignored.
 */
@@ -414,7 +414,7 @@ t_stat sim_instr (void)
                 DAR = (A >> 4) & 0x0F;
                 if (DAR > 9 || get_flag(CF)) {
                     DAR += 6;
-                    if (get_flag(CF)) 
+                    if (get_flag(CF))
                         DAR++;
                     A &= 0x0F;
                     A |= (DAR << 4);
@@ -572,7 +572,7 @@ t_stat sim_instr (void)
                 COND_SET_FLAG(A & 0x01,CF);
                 lo = A & 0x80;
                 A = (A >> 1) & 0xFF;
-                A |= lo; 
+                A |= lo;
                 COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
                 COND_SET_FLAG_V(get_flag(NF) ^ get_flag(CF));
@@ -656,7 +656,7 @@ t_stat sim_instr (void)
                 COND_SET_FLAG(B & 0x01,CF);
                 lo = B & 0x80;
                 B = (B >> 1) & 0xFF;
-                B |= lo; 
+                B |= lo;
                 COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
                 COND_SET_FLAG_V(get_flag(NF) ^ get_flag(CF));
@@ -1852,7 +1852,7 @@ int32 get_indir_val(void)
 int32 get_indir_addr(void)
 {
     int32 temp;
-    
+
     temp = (fetch_byte(1) + IX) & ADDRMASK;
     return temp;
 }
@@ -1921,7 +1921,7 @@ t_stat m6800_reset (DEVICE *dptr)
 
 
 /* This is the dumper/loader. This command uses the -h to signify a
-    hex dump/load vice a binary one.  If no address is given to load, it 
+    hex dump/load vice a binary one.  If no address is given to load, it
     takes the address from the hex record or the current PC for binary.
 */
 
@@ -1935,7 +1935,7 @@ t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
         CPU_BD_put_mbyte(addr, i);
         addr++;
         cnt++;
-    }                                   // end while 
+    }                                   // end while
     printf ("%d Bytes loaded.\n", cnt);
     return (SCPE_OK);
 }
@@ -1996,7 +1996,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
         else if (inst1 == 0x70 || inst1 == 0xb0 || inst1 == 0xF0) // ext operand
             fprintf(of, " $%02X%02X", val[1], val[2]);
         return (-(oplen[inst] - 1));
-    } else 
+    } else
         return SCPE_ARG;
 }
 

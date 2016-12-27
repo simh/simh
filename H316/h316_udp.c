@@ -36,8 +36,8 @@
    OVERVIEW
 
    This module emulates low level communications between two virtual modems
-   using UDP packets over the modern network connections.  It's used by both 
-   the IMP modem interface and the host interface modules to implement IMP to 
+   using UDP packets over the modern network connections.  It's used by both
+   the IMP modem interface and the host interface modules to implement IMP to
    IMP and IMP to HOST connections.
 
    TCP vs UDP
@@ -92,7 +92,7 @@
    There are other issues with UDP - it doesn't guarantee packet order, so the
    sending IMP might transmit packets 1, 2 and 3 and the receiving IMP will get
    1, 3 then 2.  THAT would never happen with a real modem and we have to shield
-   the IMP code from any such eventuality.  Also, with UDP packets can be 
+   the IMP code from any such eventuality.  Also, with UDP packets can be
    duplicated so the receiving IMP might see 1, 2, 2, 3 (or even 1, 3, 2, 1!).
    Again, a modem would never do that and we have to prevent it from happening.
    Both cases are easily dealt with by adding a sequence number to the header
@@ -101,13 +101,13 @@
    retransmitting them in its own time.
 
    One more thing about UDP - there is no way to tell whether a connection is
-   established or not and for that matter there is no "connection" at all 
+   established or not and for that matter there is no "connection" at all
    (that's why it's a "connectionless" protocol, after all!).  We simply send
    packets out and there's no way to know whether anybody is hearing them. The
    real IMP modem hardware had no carrier detect or other dataset control
    functions, so it was identical in that respect. An IMP sent messages out the
    modem and, unless it received a message back, it had no way to know whether
-   the IMP on the other end was hearing them.  
+   the IMP on the other end was hearing them.
 
 
    INTERFACE
@@ -147,11 +147,11 @@
 #define MAXDATA      16384      // longest possible IMP packet (in H316 words)
 
 // UDP connection data structure ...
-//   One of these blocks is allocated for every simulated modem link. 
+//   One of these blocks is allocated for every simulated modem link.
 struct _UDP_LINK {
   t_bool  used;                 // TRUE if this UDP_LINK is in use
   char    rhostport[64];        // Remote host:port
-  char    lport[64];            // Local port 
+  char    lport[64];            // Local port
   uint32  rxsequence;           // next message sequence number for receive
   uint32  txsequence;           // next message sequence number for transmit
   DEVICE  *dptr;                // Device associated with link
@@ -241,7 +241,7 @@ t_stat udp_parse_remote (int32 link, const char *premote)
   if (udp_links[link].lport[0] == '\0')
     strcpy (udp_links[link].lport, port);
 
-  if ((strcmp (udp_links[link].lport, port) == 0) && 
+  if ((strcmp (udp_links[link].lport, port) == 0) &&
       (strcmp ("localhost", host) == 0))
     fprintf(stderr,"WARNING - use different transmit and receive ports!\n");
 

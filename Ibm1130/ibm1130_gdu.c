@@ -631,7 +631,7 @@ static void draw_characters (void)
 			if (w & 0x0008) {
 				didstroke = TRUE;
 				DrawLine(x1, y1, x0, y0);
-			} 
+			}
 		}
 
 		if (dospace) {
@@ -645,7 +645,7 @@ static void draw_characters (void)
 
 	if (didstroke && mouse_present && (gdu_unit.flags & UNIT_DETECTS_ENABLED)) {
 		if (xmouse >= (gdu_x - ci->xoff/2) && xmouse <= (gdu_x + ci->xoff/2) &&
-	    	    ymouse >= (gdu_y - ci->yoff/2) && ymouse <= (gdu_y + ci->yoff/2))
+		    ymouse >= (gdu_y - ci->yoff/2) && ymouse <= (gdu_y + ci->yoff/2))
 			SETBIT(gdu_dsw, GDU_DSW_DETECT_STATUS);
 	}
 }
@@ -916,18 +916,18 @@ static void gdu_WM_SIZING (HWND hWnd, WPARAM fwSide, LPRECT r)
         case WMSZ_RIGHT:
         case WMSZ_BOTTOMLEFT:
         case WMSZ_BOTTOMRIGHT:
-        	r->bottom = r->right - r->left - 2*INDWIDTH + r->top;
-        	break;
+		r->bottom = r->right - r->left - 2*INDWIDTH + r->top;
+		break;
 
         case WMSZ_TOP:
         case WMSZ_BOTTOM:
         case WMSZ_TOPRIGHT:
-        	r->right  = r->bottom - r->top + r->left + 2*INDWIDTH;
-        	break;
+		r->right  = r->bottom - r->top + r->left + 2*INDWIDTH;
+		break;
 
         case WMSZ_TOPLEFT:
-        	r->left   = r->top - r->bottom + r->right - 2*INDWIDTH;
-        	break;
+		r->left   = r->top - r->bottom + r->right - 2*INDWIDTH;
+		break;
 	}
 }
 
@@ -1112,7 +1112,7 @@ static DWORD WINAPI GDUPump (LPVOID arg)
 
 	ShowWindow(hwGDU, SW_SHOWNOACTIVATE);			/* display it */
 	UpdateWindow(hwGDU);
-	
+
 	while (GetMessage(&msg, hwGDU, 0, 0)) {			/* message pump - this basically loops forevermore */
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);

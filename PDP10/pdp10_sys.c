@@ -80,7 +80,7 @@ REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 1;
 
-DEVICE *sim_devices[] = { 
+DEVICE *sim_devices[] = {
     &cpu_dev,
     &pag_dev,
     &tim_dev,
@@ -404,7 +404,7 @@ return SCPE_FMT;
 static const d10 masks[] = {
  INT64_C(0777000000000), INT64_C(0777740000000),
  INT64_C(0700340000000), INT64_C(0777777777777)
- }; 
+ };
 
 static const char *opcode[] = {
 "XCTR", "XCTI",                                         /* ITS only */
@@ -433,7 +433,7 @@ static const char *opcode[] = {
 "MUUO60", "MUUO61", "MUUO62", "MUUO63", "MUUO64", "MUUO65", "MUUO66", "MUUO67",
 "MUUO70", "MUUO71", "MUUO72", "MUUO73", "MUUO74", "MUUO75", "MUUO76", "MUUO77",
 
-"UJEN",         "GFAD", "GFSB", "JSYS", "ADJSP", "GFMP", "GFDV ", 
+"UJEN",         "GFAD", "GFSB", "JSYS", "ADJSP", "GFMP", "GFDV ",
 "DFAD", "DFSB", "DFMP", "DFDV", "DADD", "DSUB", "DMUL", "DDIV",
 "DMOVE", "DMOVN", "FIX", "EXTEND", "DMOVEM", "DMOVNM", "FIXR", "FLTR",
 "UFA", "DFN", "FSC", "ADJBP", "ILDB", "LDB", "IDPB", "DPB",
@@ -447,7 +447,7 @@ static const char *opcode[] = {
 "IMUL", "IMULI", "IMULM", "IMULB", "MUL", "MULI", "MULM", "MULB",
 "IDIV", "IDIVI", "IDIVM", "IDIVB", "DIV", "DIVI", "DIVM", "DIVB",
 "ASH", "ROT", "LSH", "JFFO", "ASHC", "ROTC", "LSHC", "CIRC",
-"EXCH", "BLT", "AOBJP", "AOBJN", "JRST", "JFCL", "XCT", "MAP", 
+"EXCH", "BLT", "AOBJP", "AOBJN", "JRST", "JFCL", "XCT", "MAP",
 "PUSHJ", "PUSH", "POP", "POPJ", "JSR", "JSP", "JSA", "JRA",
 "ADD", "ADDI", "ADDM", "ADDB", "SUB", "SUBI", "SUBM", "SUBB",
 
@@ -460,16 +460,16 @@ static const char *opcode[] = {
 "SOJ", "SOJL", "SOJE", "SOJLE", "SOJA", "SOJGE", "SOJN", "SOJG",
 "SOS", "SOSL", "SOSE", "SOSLE", "SOSA", "SOSGE", "SOSN", "SOSG",
 
-"SETZ", "SETZI", "SETZM", "SETZB", "AND", "ANDI", "ANDM", "ANDB", 
+"SETZ", "SETZI", "SETZM", "SETZB", "AND", "ANDI", "ANDM", "ANDB",
 "ANDCA", "ANDCAI", "ANDCAM", "ANDCAB", "SETM", "SETMI", "SETMM", "SETMB",
 "ANDCM", "ANDCMI", "ANDCMM", "ANDCMB", "SETA", "SETAI", "SETAM", "SETAB",
-"XOR", "XORI", "XORM", "XORB", "IOR", "IORI", "IORM", "IORB",  
-"ANDCB", "ANDCBI", "ANDCBM", "ANDCBB", "EQV", "EQVI", "EQVM", "EQVB", 
+"XOR", "XORI", "XORM", "XORB", "IOR", "IORI", "IORM", "IORB",
+"ANDCB", "ANDCBI", "ANDCBM", "ANDCBB", "EQV", "EQVI", "EQVM", "EQVB",
 "SETCA", "SETCAI", "SETCAM", "SETCAB", "ORCA", "ORCAI", "ORCAM", "ORCAB",
 "SETCM", "SETCMI", "SETCMM", "SETCMB", "ORCM", "ORCMI", "ORCMM", "ORCMB",
 "ORCB", "ORCBI", "ORCBM", "ORCBB", "SETO", "SETOI", "SETOM", "SETOB",
 
-"HLL", "HLLI", "HLLM", "HLLS", "HRL", "HRLI", "HRLM", "HRLS", 
+"HLL", "HLLI", "HLLM", "HLLS", "HRL", "HRLI", "HRLM", "HRLS",
 "HLLZ", "HLLZI", "HLLZM", "HLLZS", "HRLZ", "HRLZI", "HRLZM", "HRLZS",
 "HLLO", "HLLOI", "HLLOM", "HLLOS", "HRLO", "HRLOI", "HRLOM", "HRLOS",
 "HLLE", "HLLEI", "HLLEM", "HLLES", "HRLE", "HRLEI", "HRLEM", "HRLES",
@@ -491,7 +491,7 @@ static const char *opcode[] = {
 "TIOE", "TION", "RDIO", "WRIO",
 "BSIO", "BCIO", "BLTBU", "BLTUB",
 "TIOEB", "TIONB", "RDIOB", "WRIOB",
-"BSIOB", "BCIOB", 
+"BSIOB", "BCIOB",
 
 "BLKI", "DATAI", "BLKO", "DATAO",                       /* classic I/O */
 "CONO",  "CONI", "CONSZ", "CONSO",
@@ -521,7 +521,7 @@ static const d10 opc_val[] = {
  INT64_C(0702100000000)+I_OP+I_ITS, INT64_C(0702140000000)+I_OP+I_ITS, INT64_C(0702340000000)+I_OP+I_ITS,
  INT64_C(0702400000000)+I_OP+I_ITS, INT64_C(0702440000000)+I_OP+I_ITS,
  INT64_C(0702500000000)+I_OP+I_ITS, INT64_C(0702540000000)+I_OP+I_ITS, INT64_C(0702740000000)+I_OP+I_ITS,
- 
+
  INT64_C(0254040000000)+I_OP, INT64_C(0254100000000)+I_OP,
  INT64_C(0254200000000)+I_OP, INT64_C(0254240000000)+I_OP, INT64_C(0254300000000)+I_OP, INT64_C(0254340000000)+I_OP,
  INT64_C(0254500000000)+I_OP, INT64_C(0254600000000)+I_OP, INT64_C(0254640000000)+I_OP, INT64_C(0133000000000)+I_OP,
@@ -667,7 +667,7 @@ static const d10 opc_val[] = {
  INT64_C(0400000000000)+I_AC, INT64_C(0401000000000)+I_AC, INT64_C(0402000000000)+I_AC, INT64_C(0403000000000)+I_AC,
  INT64_C(0434000000000)+I_AC, INT64_C(0435000000000)+I_AC, INT64_C(0436000000000)+I_AC, INT64_C(0437000000000)+I_AC,
  INT64_C(0415000000000)+I_AC, INT64_C(0501000000000)+I_AC,
- 
+
                      INT64_C(0001000000000)+I_AC, INT64_C(0002000000000)+I_AC, INT64_C(0003000000000)+I_AC,
  INT64_C(0004000000000)+I_AC, INT64_C(0005000000000)+I_AC, INT64_C(0006000000000)+I_AC, INT64_C(0007000000000)+I_AC,
  INT64_C(0010000000000)+I_AC, INT64_C(0011000000000)+I_AC, INT64_C(0012000000000)+I_AC, INT64_C(0013000000000)+I_AC,
@@ -720,7 +720,7 @@ if (sw & SWMASK ('C')) {                                /* character? */
     for (i = 30; i >= 0; i = i - 6) {
         c = (int32) ((inst >> i) & 077);
         fprintf (of, "%c", SIXTOASC (c));
-        }    
+        }
     return SCPE_OK;
     }
 if (sw & SWMASK ('P')) {                                /* packed? */
@@ -792,7 +792,7 @@ CONST char *tptr;
 if (*cptr == '@') {
     ind = INST_IND;
     cptr++;
-    }   
+    }
 if (*cptr == '+')
     cptr++;
 else if (*cptr == '-') {

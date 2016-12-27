@@ -109,7 +109,7 @@ const int32 ascii_to_flex[128] = {
     041, 072, 015, 075, 055, 051, 037, 076,
     047, 011, 001, -1 , 014, -1 , 036, 077
     };
-    
+
 static const uint8 flex_inp_valid[64] = {
     1, 1, 1, 1, 0, 1, 1, 1,
     0, 1, 1, 1, 0, 1, 1, 1,
@@ -212,7 +212,7 @@ MTAB tto_mod[] = {
 DEVICE tto_dev = {
     "TTO", tto_unit, tto_reg, tto_mod,
     2, 10, 31, 1, 16, 7,
-    NULL, NULL, &tto_reset, 
+    NULL, NULL, &tto_reset,
     NULL, &tap_attach, NULL
     };
 
@@ -316,7 +316,7 @@ switch (dev) {                                          /* case on device */
         break;
         }
 return;
-}           
+}
 
 t_stat op_i (uint32 dev, uint32 ch, uint32 sh4)
 {

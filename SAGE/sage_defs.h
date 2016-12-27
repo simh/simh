@@ -123,30 +123,29 @@ extern I8272 u21;
 /* winchester board: not yet */
 #define S2651d              0xffc401                    /* aux serial 4 */
 #define S2651d_DATA         (S2651d+0)                  /* RW data port aux 4 */
-#define S2651d_STATUS       (S2651d+2)                  /* R status aux 4 */ 
-#define S2651d_MODE         (S2651d+4)                  /* W mode aux 4 */  
-#define S2651d_CTRL         (S2651d+6)                  /* W mode aux 4 */  
+#define S2651d_STATUS       (S2651d+2)                  /* R status aux 4 */
+#define S2651d_MODE         (S2651d+4)                  /* W mode aux 4 */
+#define S2651d_CTRL         (S2651d+6)                  /* W mode aux 4 */
 
 #define S2651c              0xffc441                    /* aux serial 3 */
 #define S2651c_DATA         (S2651c+0)                  /* RW data port aux 3 */
-#define S2651c_STATUS       (S2651c+2)                  /* R status aux 3 */ 
-#define S2651c_MODE         (S2651c+4)                  /* W mode aux 3 */  
-#define S2651c_CTRL         (S2651c+6)                  /* W mode aux 3 */  
+#define S2651c_STATUS       (S2651c+2)                  /* R status aux 3 */
+#define S2651c_MODE         (S2651c+4)                  /* W mode aux 3 */
+#define S2651c_CTRL         (S2651c+6)                  /* W mode aux 3 */
 
 #define S2651b              0xffc481                    /* aux serial 2 */
 #define S2651b_DATA         (S2651b+0)                  /* RW data port aux 2 */
-#define S2651b_STATUS       (S2651b+2)                  /* R status aux 2 */ 
-#define S2651b_MODE         (S2651b+4)                  /* W mode aux 2 */  
-#define S2651b_CTRL         (S2651b+6)                  /* W mode aux 2 */  
+#define S2651b_STATUS       (S2651b+2)                  /* R status aux 2 */
+#define S2651b_MODE         (S2651b+4)                  /* W mode aux 2 */
+#define S2651b_CTRL         (S2651b+6)                  /* W mode aux 2 */
 
 #define S2651a              0xff4c1                     /* aux serial 1 */
 #define S2651a_DATA         (S2651a+0)                  /* RW data port aux 1 */
-#define S2651a_STATUS       (S2651a+2)                  /* R status aux 1 */ 
-#define S2651a_MODE         (S2651a+4)                  /* W mode aux 1 */  
-#define S2651a_CTRL         (S2651a+6)                  /* W mode aux 1 */  
+#define S2651a_STATUS       (S2651a+2)                  /* R status aux 1 */
+#define S2651a_MODE         (S2651a+4)                  /* W mode aux 1 */
+#define S2651a_CTRL         (S2651a+6)                  /* W mode aux 1 */
 
 /* must be included at the end */
 #include "m68k_cpu.h"
 
 #endif
-

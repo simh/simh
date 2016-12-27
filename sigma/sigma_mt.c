@@ -188,7 +188,7 @@ REG mt_reg[] = {
 
 MTAB mt_mod[] = {
     { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
@@ -392,7 +392,7 @@ switch (cmd) {                                          /* case on command */
             sim_activate (uptr, mt_time);               /* continue thread */
             return SCPE_OK;
             }
-        if (((st == CHS_ZBC) ^ (mt_bptr == mt_blim)) && /* length err? */ 
+        if (((st == CHS_ZBC) ^ (mt_bptr == mt_blim)) && /* length err? */
               chan_set_chf (mt_dib.dva, CHF_LNTE))      /* uend taken? */
             return SCPE_OK;                             /* finished */
         break;                                          /* normal end */

@@ -32,7 +32,7 @@
 
 /***********************************************************************************
  * 8259-5 interrupt controller
- * 
+ *
  * IRQ output hardwired to Interrupt Priority Level 1 in the Sage
  * Level 2: from external bus (wired to HDC board, AUX devices)
  * Level 3: from external bus
@@ -40,7 +40,7 @@
  * Level 5: Console Uart U67 Receiver Interrupt
  * Level 6: FDI floppy controller
  * Level 7: nonmaskable RAM parity error (not possible in simh)
- * 
+ *
  * hardwired inputs:
  * IR0 = Output 2 of U74 real time clock
  * IR1 = Modem Uart U58 Receiver Interrupt
@@ -50,14 +50,14 @@
  * IR5 = LP Port Acknowledge U39/U38
  * IR6 = Output 0 of U74 real time clock
  * IR7 = Output C2 of U39
- *  
- * Notes: 
+ *
+ * Notes:
  *  INTA- is hardwired to VCC, so vectoring is not possible
  *  SP- is hardwired to VCC, so buffered mode is not possible, and device is a master.
  *  CAS0-2 lines are open, no need to handle
  *  UCSD bios and boot prom do not program the PIC for rotating priorities,
  *  so effectively prio is always 7.
- * 
+ *
  **********************************************************************************/
 extern DEVICE sagepic_dev;
 static t_stat sagepic_reset(DEVICE* dptr);
@@ -95,7 +95,7 @@ DEVICE sagepic_dev = {
     i8259_dt, NULL, NULL
 };
 
-static t_stat sagepic_reset(DEVICE* dptr) 
+static t_stat sagepic_reset(DEVICE* dptr)
 {
     t_stat rc;
     if ((rc = (dptr->flags & DEV_DIS) ?
@@ -111,15 +111,15 @@ t_stat sage_raiseint(int level)
 
 /******************************************************************************************************
  * DIP switches at the back panel.
- * 
+ *
  * In the technical manual, switches are layed out 12345678 left to right,
  * but here seen as two HEX digits 8765 4321, i.e. 0xc0 is bit 8 and bit 7 set on
- * 
+ *
  * a "d" (down) means switch is off or "0", and a "u" (up) means switch is on or "1"
- * 
+ *
  * Note that programatically dip switches are port a and b of the onboard 8255 U22
  * which also through port c serves part of the FDC signals
- * 
+ *
  * group-a:
  * 8 7 6 5 4 3 2 1
  * | | | | | d d d--- 19,2K baud
@@ -139,7 +139,7 @@ t_stat sage_raiseint(int level)
  * | d--------------- 96 tpi drive
  * | u--------------- 48 tpi drive
  * x----------------- reserved
- * 
+ *
  * group-b:
  * 8 7 6 5 4 3 2 1
  * | | | +-+-+-+-+--- device talk and listen address
@@ -158,7 +158,7 @@ t_stat sage_raiseint(int level)
        uint32 groupa = 0xe7;    /* used by cons device, 19k2, no parity, boot winchester 0 */
        uint32 groupb = 0xf8;    /* used by ieee device */
 #endif
-       
+
 static t_stat sagedip_reset(DEVICE* dptr);
 static t_stat set_groupa(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static t_stat show_groupa(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -171,8 +171,8 @@ static t_stat u22_callc(I8255* chip,int rw);
 static t_stat u22_ckmode(I8255* chip,uint32 data);
 
 extern DEVICE sagedip_dev;
-static I8255 u22 = { 
-        { 0,0,U22_ADDR,8,2 }, 
+static I8255 u22 = {
+        { 0,0,U22_ADDR,8,2 },
         &sagedip_dev,i8255_write,i8255_read,u22_reset,u22_calla,u22_callb,u22_callc,u22_ckmode
 };
 uint32* u22_portc = &u22.portc; /* this is used in the FD device as well, but whole 8255 is handled here */
@@ -214,7 +214,7 @@ DEVICE sagedip_dev = {
     sagedip_dt, NULL, NULL
 };
 
-static t_stat sagedip_reset(DEVICE* dptr) 
+static t_stat sagedip_reset(DEVICE* dptr)
 {
     t_stat rc;
 
@@ -353,7 +353,7 @@ static t_stat u22_ckmode(I8255* chip, uint32 data)
      * d2=0 -- group b mode 0: basic I/O
      * d1=1 -- portb = input
      * d0=0 -- portc lower = output
-     */ 
+     */
     TRACE_PRINT1(DBG_PP_MODE,"WR Mode: 0x%x",data);
     if (data != 0x92) {
         printf("u22_ckmode: unsupported ctrl=0x%02x\n",data);
@@ -373,28 +373,28 @@ static t_stat u22_ckmode(I8255* chip, uint32 data)
  *         +->|Timer1 C2|---> Baud ser1
  *            +---------+
  *            +---------+    +---------+
- * 64kHz---+->|Timer1 C0|--->|Timer2 C0|--> PIC IR6   
+ * 64kHz---+->|Timer1 C0|--->|Timer2 C0|--> PIC IR6
  *         |  |div 64000|    |mode0    |
  *         |  +---------+    +---------+
  *         |  +---------+    +---------+
- *         +->|Timer2 C1|--->|Timer2 C2|--> PIC IR0  
+ *         +->|Timer2 C1|--->|Timer2 C2|--> PIC IR0
  *            |         |    |         |
  *            +---------+    +---------+
- * 
+ *
  * NOT UNITS: Timer1 C1 and C2 are programmed in mode 2 as clock dividers for the USARTs
  * In this emulation we allow programming them, but since they don't produce interrupts,
  * their work is ignored.
- * 
+ *
  * Timer1 C0 and timer2 C0 form a clock divider which produces an interrupt at PIC level 6
  * Likewise, timer2 C1 and timer2 C2 form a clock divider which produces an interrupt at PIC level 0
- * 
+ *
  * Typically, the first one in cascade is programmed in mode 2, the second one in mode 0.
- * Timer1 C0 is explicitly programmed as a divider by 64k, so that it feeds timer2 C0 
+ * Timer1 C0 is explicitly programmed as a divider by 64k, so that it feeds timer2 C0
  * with a 1Hz clock.
- * 
+ *
  * The way the timers are hardwired makes certain mode settings impossible: all GATE
  * inputs are set to VCC, so MODE1 and MODE5 are impossible, and MODE4 becomes a
- * variant of MODE0. MODE3 is used by the baudrate generators. The timers may run in 
+ * variant of MODE0. MODE3 is used by the baudrate generators. The timers may run in
  * 8 bit mode, but analysis of existing BIOS code (BOOT PROM and UCSD BIOS) uncovered
  * they are used in 16 bit mode only.
  * So, this implementation only contains the most likely usages, and the other ones have
@@ -432,7 +432,7 @@ UNIT sagetimer2_unit = {
 
 static I8253 u74 = { {0,0,U74_ADDR,8,2},
     &sagetimer2_dev,&sagetimer2_unit,i8253_reset,u74_ckmode,
-    { { 0, }, { u74_call1, }, { 0, } } 
+    { { 0, }, { u74_call1, }, { 0, } }
 };
 
 /* timer 1 */
@@ -442,7 +442,7 @@ UNIT sagetimer1_unit = {
 
 static I8253 u75 = { {0,0,U75_ADDR,8,2},
     &sagetimer1_dev,&sagetimer1_unit,i8253_reset,u75_ckmode,
-    { { u75_call0, }, { 0, }, { 0, } } 
+    { { u75_call0, }, { 0, }, { 0, } }
 };
 
 REG sagetimer1_reg[] = {
@@ -479,7 +479,7 @@ DEVICE sagetimer1_dev = {
     i8253_dt, NULL, NULL
 };
 
-    static t_stat sagetimer1_reset(DEVICE* dptr) 
+    static t_stat sagetimer1_reset(DEVICE* dptr)
     {
         t_stat rc;
 
@@ -497,7 +497,7 @@ static t_stat timer1_svc(UNIT* uptr)
     int32 wait;
     I8253CNTR* t1c0 = &u75.cntr[0];
     I8253CNTR* t2c0 = &u74.cntr[0];
-    
+
 //  fprintf(sim_deb,"TIMER1: timer1_svc called T1C0=%d T2C0=%d\n",t1c0->count,t2c0->count);
     /* we call this service 64000 times a second to decrement counter T1C0.
      * When T1C0 reaches 0, it will decrement T2C0 */
@@ -580,7 +580,7 @@ DEVICE sagetimer2_dev = {
     i8253_dt, NULL, NULL
 };
 
-static t_stat sagetimer2_reset(DEVICE* dptr) 
+static t_stat sagetimer2_reset(DEVICE* dptr)
 {
     t_stat rc;
     if ((rc = (dptr->flags & DEV_DIS) ?

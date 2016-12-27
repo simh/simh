@@ -102,7 +102,7 @@ unsigned char by, *sptr, *dptr;
 if (sim_end || (count == 0) || (size == sizeof (char)))
     return;
 for (j = 0, dptr = sptr = (unsigned char *) bptr;       /* loop on items */
-     j < count; j++) { 
+     j < count; j++) {
     for (k = (int32)(size - 1); k >= (((int32) size + 1) / 2); k--) {
         by = *sptr;                                     /* swap end-for-end */
         *sptr++ = *(dptr + k);
@@ -334,9 +334,9 @@ return (t_offset)(ftello64 (st));
 
 /* Apple OS/X */
 
-#if defined (__APPLE__) || defined (__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__CYGWIN__) 
+#if defined (__APPLE__) || defined (__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__CYGWIN__)
 #define S_SIM_IO_FSEEK_EXT_ 1
-int sim_fseeko (FILE *st, t_offset xpos, int origin) 
+int sim_fseeko (FILE *st, t_offset xpos, int origin)
 {
 return fseeko (st, (off_t)xpos, origin);
 }

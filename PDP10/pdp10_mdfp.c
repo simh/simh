@@ -723,7 +723,7 @@ r->flo = 0;
 if (r->sign) {
     r->exp = r->exp ^ FP_M_EXP;                         /* 1s comp exp */
     if (sgn) {                                          /* signed frac? */
-        if (r->fhi)                                     /* extend sign */ 
+        if (r->fhi)                                     /* extend sign */
             r->fhi = r->fhi | FP_UCRY;
         else {
             r->exp = r->exp + 1;
@@ -743,7 +743,7 @@ return;
 }
 
 /* Normalize and optionally round floating point operand */
- 
+
 void fnorm (UFP *a, t_int64 rnd)
 {
 int32 i;

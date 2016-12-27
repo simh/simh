@@ -1,4 +1,4 @@
-/* pdq3_defs.h: PDQ3 simulator definitions 
+/* pdq3_defs.h: PDQ3 simulator definitions
 
    Work derived from Copyright (c) 2004-2012, Robert M. Supnik
    Copyright (c) 2013 Holger Veit
@@ -20,10 +20,10 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the names of Robert M Supnik and Holger Veit 
+   Except as contained in this notice, the names of Robert M Supnik and Holger Veit
    shall not be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik and Holger Veit.
-   
+
    20131103 hv INT_CONR/CONT assignments incorrect in docs, must be swapped
    20141003 hv recommended warnings from VC++ and gcc added
 */
@@ -39,7 +39,7 @@
 #define MSCW_SZ 4                           /* size of MSCW */
 #define REAL_SZ 2                           /* size of real number (REAL*4) */
 #define BSET_SZ 4080                        /* usable size of set in bits */
-#define ISET_SZ 255                         /* size of set in words */ 
+#define ISET_SZ 255                         /* size of set in words */
 #define WORD_SZ 16                          /* size of machine word in bits */
 
 #define OFF_SEGBASE 0                       /* offsets into SIB entry */
@@ -124,7 +124,7 @@
 #define INT_QBUS30 30
 #define INT_QBUS31 31
 
-/* common unit user-defined attributes */ 
+/* common unit user-defined attributes */
 #define u_unitno u3
 
 /* Memory */
@@ -290,7 +290,7 @@
 #define OP_SW    12
 #define OP_AB    13
 
-typedef struct _optable { 
+typedef struct _optable {
   const char* name;
   int16 flags;
 } OPTABLE;

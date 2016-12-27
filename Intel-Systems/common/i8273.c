@@ -30,12 +30,12 @@
     selectable for each port from 110 to 9600.
 
     All I/O is via programmed I/O.  The i8273 has a status port
-    and a data port.    
+    and a data port.
 
-    The simulated device does not support synchronous mode.  The simulated device 
-    supports a select from I/O space and one address line.  The data port is at the 
+    The simulated device does not support synchronous mode.  The simulated device
+    supports a select from I/O space and one address line.  The data port is at the
     lower address and the status/command port is at the higher.
-    
+
     A write to the status port can select some options for the device:
 
     Asynchronous Mode Instruction
@@ -52,7 +52,7 @@
         Character Length
         L2  0       1       0       1
         L1  0       0       1       1
-            5       6       7       8  
+            5       6       7       8
             bits    bits    bits    bits
 
         EP - A 1 in this bit position selects even parity.
@@ -95,8 +95,8 @@
         DSR - A 1 in this bit position signals *DSR is at zero.
 
     A read to the data port gets the buffered character, a write
-    to the data port writes the character to the device.  
-    
+    to the data port writes the character to the device.
+
 */
 
 #include <stdio.h>
@@ -106,7 +106,7 @@
 #define UNIT_V_ANSI (UNIT_V_UF + 0)                     /* ANSI mode */
 #define UNIT_ANSI   (1 << UNIT_V_ANSI)
 
-uint8   
+uint8
     wr0 = 0,                            /* command register */
     wr1 = 0,                            /* enable register */
     wr2 = 0,                            /* CH A mode register */
@@ -164,20 +164,20 @@ DEVICE i8273_dev = {
     i8273_reg,          //registers
     i8273_mod,          //modifiers
     1,                  //numunits
-    16,                 //aradix 
-    32,                 //awidth 
-    1,                  //aincr 
-    16,                 //dradix 
+    16,                 //aradix
+    32,                 //awidth
+    1,                  //aincr
+    16,                 //dradix
     8,                  //dwidth
-    NULL,               //examine 
-    NULL,               //deposit 
+    NULL,               //examine
+    NULL,               //deposit
     i8273_reset,        //reset
     NULL,               //boot
-    NULL,               //attach 
+    NULL,               //attach
     NULL,               //detach
-    NULL,               //ctxt                
-    DEV_DEBUG,          //flags 
-    0,                  //dctrl 
+    NULL,               //ctxt
+    DEV_DEBUG,          //flags
+    0,                  //dctrl
     i8273_debug,        //debflags
     NULL,               //msize
     NULL                //lname
@@ -249,4 +249,3 @@ int32 i8273d(int32 io, int32 data)
     }
     return 0;
 }
-

@@ -234,7 +234,7 @@ MTAB ttox_mod[] = {
 DEVICE ttox_dev = {
     "TTOX", ttox_unit, ttox_reg, ttox_mod,
     TTX_MAXL, 10, 31, 1, 8, 8,
-    NULL, NULL, &ttx_reset, 
+    NULL, NULL, &ttx_reset,
     NULL, NULL, NULL,
     NULL, DEV_DISABLE | DEV_DEBUG,
     0, ttx_debug
@@ -538,9 +538,8 @@ else
 
 fprintf(st, "devno=");
 for (i = 0; i < ttx_lines; i++) {
-    fprintf(st, "%02o%s", ttx_dsp[i*2+dev_offset].dev, i < ttx_lines-1 ? 
+    fprintf(st, "%02o%s", ttx_dsp[i*2+dev_offset].dev, i < ttx_lines-1 ?
          "," : "");
 }
 return SCPE_OK;
 }
-

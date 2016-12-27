@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   15-Oct-12    MP      Added definitions needed to detect possible tcp 
+   15-Oct-12    MP      Added definitions needed to detect possible tcp
                         connect failures
    25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
    22-Jun-10    RMS     Fixed types in sim_accept_conn (from Mark Pizzolato)
@@ -280,13 +280,13 @@ if (service) {
     }
 
 if (hostname) {
-    if ((0xffffffff != (ipaddr.s_addr = inet_addr(hostname))) || 
+    if ((0xffffffff != (ipaddr.s_addr = inet_addr(hostname))) ||
         (0 == strcmp("255.255.255.255", hostname))) {
         fixed[0] = &ipaddr;
         fixed[1] = NULL;
         }
     else {
-        if ((0xffffffff != (ipaddr.s_addr = inet_addr(hostname))) || 
+        if ((0xffffffff != (ipaddr.s_addr = inet_addr(hostname))) ||
             (0 == strcmp("255.255.255.255", hostname))) {
             fixed[0] = &ipaddr;
             fixed[1] = NULL;
@@ -503,14 +503,14 @@ int load_ws2(void) {
 
 /* OS independent routines
 
-   sim_parse_addr       parse a hostname/ipaddress from port and apply defaults and 
+   sim_parse_addr       parse a hostname/ipaddress from port and apply defaults and
                         optionally validate an address match
 */
 
 /* sim_parse_addr       host:port
 
    Presumption is that the input, if it doesn't contain a ':' character is a port specifier.
-   If the host field contains one or more colon characters (i.e. it is an IPv6 address), 
+   If the host field contains one or more colon characters (i.e. it is an IPv6 address),
    the IPv6 address MUST be enclosed in square bracket characters (i.e. Domain Literal format)
 
    Inputs:
@@ -527,10 +527,10 @@ int load_ws2(void) {
    Outputs:
         host    =       pointer to buffer for IP address (may be NULL), 0 = none
         port    =       pointer to buffer for IP port (may be NULL), 0 = none
-        result  =       status (0 on complete success or -1 if 
-                        parsing can't happen due to bad syntax, a value is 
-                        out of range, a result can't fit into a result buffer, 
-                        a service name doesn't exist, or a validation name 
+        result  =       status (0 on complete success or -1 if
+                        parsing can't happen due to bad syntax, a value is
+                        out of range, a result can't fit into a result buffer,
+                        a service name doesn't exist, or a validation name
                         doesn't match the parsed host)
 */
 
@@ -649,9 +649,9 @@ if (validate_addr) {
         }
     if (status != 0) {
         /* be generous and allow successful validations against variations of localhost addresses */
-        if (((0 == strcmp("127.0.0.1", hostp)) && 
+        if (((0 == strcmp("127.0.0.1", hostp)) &&
              (0 == strcmp("::1", validate_addr))) ||
-            ((0 == strcmp("127.0.0.1", validate_addr)) && 
+            ((0 == strcmp("127.0.0.1", validate_addr)) &&
              (0 == strcmp("::1", hostp))))
             status = 0;
         }
@@ -665,7 +665,7 @@ return 0;
 /* sim_parse_addr_ex    localport:host:port
 
    Presumption is that the input, if it doesn't contain a ':' character is a port specifier.
-   If the host field contains one or more colon characters (i.e. it is an IPv6 address), 
+   If the host field contains one or more colon characters (i.e. it is an IPv6 address),
    the IPv6 address MUST be enclosed in square bracket characters (i.e. Domain Literal format)
 
         llll:w.x.y.z:rrrr
@@ -690,10 +690,10 @@ return 0;
         port    =       pointer to buffer for IP port (may be NULL), 0 = none
         localport
                 =       pointer to buffer for local IP port (may be NULL), 0 = none
-        result  =       status (SCPE_OK on complete success or SCPE_ARG if 
-                        parsing can't happen due to bad syntax, a value is 
-                        out of range, a result can't fit into a result buffer, 
-                        a service name doesn't exist, or a validation name 
+        result  =       status (SCPE_OK on complete success or SCPE_ARG if
+                        parsing can't happen due to bad syntax, a value is
+                        out of range, a result can't fit into a result buffer,
+                        a service name doesn't exist, or a validation name
                         doesn't match the parsed host)
 */
 int sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, char *localport, size_t localport_len, const char *default_port)
@@ -720,11 +720,11 @@ void sim_init_sock (void)
 {
 #if defined (_WIN32)
 int err;
-WORD wVersionRequested; 
-WSADATA wsaData; 
+WORD wVersionRequested;
+WSADATA wsaData;
 wVersionRequested = MAKEWORD (2, 2);
 
-err = WSAStartup (wVersionRequested, &wsaData);         /* start Winsock */ 
+err = WSAStartup (wVersionRequested, &wsaData);         /* start Winsock */
 if (err != 0)
     sim_printf ("Winsock: startup error %d\n", err);
 #if defined(AF_INET6)
@@ -837,9 +837,9 @@ return newsock;
 }
 
 /*
-   Some platforms and/or network stacks have varying support for listening on 
-   an IPv6 socket and receiving connections from both IPv4 and IPv6 client 
-   connections.  This is known as IPv4-Mapped.  Some platforms claim such 
+   Some platforms and/or network stacks have varying support for listening on
+   an IPv6 socket and receiving connections from both IPv4 and IPv6 client
+   connections.  This is known as IPv4-Mapped.  Some platforms claim such
    support (i.e. some Windows versions), but it doesn't work in all cases.
 */
 
@@ -871,7 +871,7 @@ if (p_getaddrinfo(host[0] ? host : NULL, port[0] ? port : NULL, &hints, &result)
 preferred = result;
 #ifdef IPV6_V6ONLY
 /*
-    When we can create a dual stack socket, be sure to find the IPv6 addrinfo 
+    When we can create a dual stack socket, be sure to find the IPv6 addrinfo
     to bind to.
 */
 for (; preferred != NULL; preferred = preferred->ai_next) {
@@ -1011,7 +1011,7 @@ if (!(opt_flags & SIM_SOCK_OPT_DATAGRAM)) {
 
     /* enable TCP Keep Alives */
     sta = setsockopt (newsock, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
-    if (sta == -1) 
+    if (sta == -1)
         return sim_err_sock (newsock, "setsockopt KEEPALIVE");
     }
 sta = connect (newsock, result->ai_addr, result->ai_addrlen);
@@ -1051,8 +1051,8 @@ socklen_t size;
      (defined (__ALPHA) && defined (__unix__)) || \
      defined (__hpux)
 int size;
-#else 
-size_t size; 
+#else
+size_t size;
 #endif
 SOCKET newsock;
 struct sockaddr_storage clientname;
@@ -1094,7 +1094,7 @@ if ((opt_flags & SIM_SOCK_OPT_NODELAY)) {
 
 /* enable TCP Keep Alives */
 sta = setsockopt (newsock, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
-if (sta == -1) 
+if (sta == -1)
     return sim_err_sock (newsock, "setsockopt KEEPALIVE");
 
 return newsock;
@@ -1117,8 +1117,8 @@ socklen_t peernamesize = (socklen_t)sizeof(peername);
      (defined (__ALPHA) && defined (__unix__)) || \
      defined (__hpux)
 int peernamesize = (int)sizeof(peername);
-#else 
-size_t peernamesize = sizeof(peername); 
+#else
+size_t peernamesize = sizeof(peername);
 #endif
 
 memset (&zero, 0, sizeof(zero));
@@ -1153,8 +1153,8 @@ socklen_t size = (socklen_t)addrsize;
      (defined (__ALPHA) && defined (__unix__)) || \
      defined (__hpux)
 int size = (int)addrsize;
-#else 
-size_t size = addrsize; 
+#else
+size_t size = addrsize;
 #endif
 int ret = 0;
 
@@ -1189,9 +1189,9 @@ socklen_t peernamesize = (socklen_t)sizeof(peername);
      defined (__hpux)
 int socknamesize = (int)sizeof(sockname);
 int peernamesize = (int)sizeof(peername);
-#else 
-size_t socknamesize = sizeof(sockname); 
-size_t peernamesize = sizeof(peername); 
+#else
+size_t socknamesize = sizeof(sockname);
+size_t peernamesize = sizeof(peername);
 #endif
 char hostbuf[NI_MAXHOST+1];
 char portbuf[NI_MAXSERV+1];

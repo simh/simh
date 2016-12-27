@@ -77,7 +77,7 @@ munch(void) {
     static long io = 0, v = 0;
     long ac;
     int x, y;
-    
+
     ac = test_switches;
     ac += v;                            /* add v */
     if (ac & ~0777777) {

@@ -62,11 +62,11 @@ extern t_stat ipc_cont_reset(DEVICE *dptr, uint16 base, uint8 devnum);
 extern t_stat ioc_cont_reset(DEVICE *dptr, uint16 base, uint8 devnum);
 extern uint32 saved_PC;                    /* program counter */
 
-/*  CPU reset routine 
+/*  CPU reset routine
     put here to cause a reset of the entire IPC system */
 
 t_stat SBC_reset (DEVICE *dptr)
-{    
+{
     sim_printf("Initializing MDS-225\n");
     i8080_reset(NULL);
     i8251_reset(NULL, I8251_BASE_0, 0);
@@ -120,7 +120,7 @@ void put_mbyte(uint16 addr, uint8 val)
     if (addr >= 0xF800) {               //monitor ROM - always there
         sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, saved_PC);
         return;
-    } 
+    }
     if ((addr < 0x1000) && ((ipc_cont_unit.u3 & 0x01) == 0)) { //startup
         sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, saved_PC);
         return;

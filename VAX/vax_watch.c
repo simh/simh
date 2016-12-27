@@ -24,7 +24,7 @@
    in this Software without prior written authorization from the author.
 
    wtc          Watch chip
-   
+
    08-Nov-2012  MB      First version
 
    This file covers the watch chip (MC146818) which is used by several VAX
@@ -89,8 +89,8 @@ BITFIELD wtc_value_bits[] = {
     ENDBITS
 };
 BITFIELD* wtc_bitdefs[] = {wtc_value_bits, wtc_value_bits, wtc_value_bits, wtc_value_bits,
-                           wtc_value_bits, wtc_value_bits, wtc_value_bits, wtc_value_bits, 
-                           wtc_value_bits, wtc_value_bits, wtc_csra_bits,  wtc_csrb_bits, 
+                           wtc_value_bits, wtc_value_bits, wtc_value_bits, wtc_value_bits,
+                           wtc_value_bits, wtc_value_bits, wtc_csra_bits,  wtc_csrb_bits,
                            wtc_csrc_bits,  wtc_csrd_bits,  wtc_value_bits, wtc_value_bits};
 
 #define WTC_MODE_STD    0
@@ -150,9 +150,9 @@ DEVICE wtc_dev = {
 
 /* Register names for Debug tracing */
 static const char *wtc_regs[] =
-    {"SEC ", "SECA", "MIN ", "MINA", 
-     "HR  ", "HRA ", "DOW ", "DOM ", 
-     "MON ", "YEAR", "CSRA", "CSRB", 
+    {"SEC ", "SECA", "MIN ", "MINA",
+     "HR  ", "HRA ", "DOW ", "DOM ",
+     "MON ", "YEAR", "CSRA", "CSRB",
      "CSRC", "CSRD" };
 
 

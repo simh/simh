@@ -393,7 +393,7 @@ sim_activate (uptr, chan_ctl_time);
 return SCPE_OK;
 }
 
-/* Common read/write sector end routine 
+/* Common read/write sector end routine
 
    case 1 - more to transfer, not end disk - reschedule, return TRUE
    case 2 - more to transfer, end disk - uend, return TRUE
@@ -426,7 +426,7 @@ st = DVS_AUTO;                                          /* flags */
 if (sim_is_active (&rad_unit[un]))                      /* active => busy */
     st |= DVS_DBUSY;
 else if ((rad_unit[un].flags & UNIT_ATT) == 0)          /* not att => offl */
-    st |= DVS_DOFFL;                                 
+    st |= DVS_DOFFL;
 for (i = 0; i < RAD_NUMDR; i++) {                       /* loop thru units */
     if (sim_is_active (&rad_unit[i])) {                 /* active? */
         st |= (DVS_CBUSY |(CC2 << DVT_V_CC));           /* ctrl is busy */

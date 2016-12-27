@@ -38,12 +38,12 @@
         selectable for each port from 110 to 9600.
 
         All I/O is via programmed I/O.  The i8251 has a status port
-        and a data port.    
+        and a data port.
 
-        The simulated device does not support synchronous mode.  The simulated device 
-        supports a select from I/O space and one address line.  The data port is at the 
+        The simulated device does not support synchronous mode.  The simulated device
+        supports a select from I/O space and one address line.  The data port is at the
         lower address and the status/command port is at the higher.
-        
+
         A write to the status port can select some options for the device:
 
         Asynchronous Mode Instruction
@@ -61,7 +61,7 @@
             Character Length
             L2  0       1       0       1
             L1  0       0       1       1
-                5       6       7       8  
+                5       6       7       8
                 bits    bits    bits    bits
 
             EP - A 1 in this bit position selects even parity.
@@ -106,7 +106,7 @@
             DSR - A 1 in this bit position signals *DSR is at zero.
 
         A read from the data port gets the typed character, a write
-        to the data port writes the character to the device.  
+        to the data port writes the character to the device.
 */
 
 #include "system_defs.h"
@@ -142,7 +142,7 @@ uint16 i8251_port[4];               //base port assigned to each 8251 instance
 /* i8251 Standard I/O Data Structures */
 /* up to 1 i8251 devices */
 
-UNIT i8251_unit = { 
+UNIT i8251_unit = {
     { UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT },
     { UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT },
     { UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT },
@@ -242,8 +242,8 @@ t_stat i8251_reset (DEVICE *dptr, uint16 base)
         sim_printf("8251_reset: too many devices!\n");
         return 0;
     }
-    i8251_port[i8251_devnum] = reg_dev(i8251d, base); 
-    reg_dev(i8251s, base + 1); 
+    i8251_port[i8251_devnum] = reg_dev(i8251d, base);
+    reg_dev(i8251s, base + 1);
     i8251_reset1(i8251_devnum);
     sim_printf("   8251-%d: Registered at %04X\n", i8251_devnum, base);
     sim_activate (&i8251_unit[i8251_devnum], i8251_unit[i8251_devnum].wait); /* activate unit */

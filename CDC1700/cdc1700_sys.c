@@ -132,7 +132,7 @@ static void sprintAddress(char *buf, DEVICE *dptr, t_addr addr)
       RelValid = TRUE;
     }
     addr -= RelBase;
-  } 
+  }
   sprint_val(buf, addr, dptr->aradix, dptr->awidth, PV_RZRO);
 }
 

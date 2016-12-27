@@ -131,7 +131,7 @@ CTAB vax_cmd[] = {
 #define CACR_V_DPAR     24                              /* data parity */
 #define CACR_FIXED      0x00000040                      /* fixed bits */
 #define CACR_CPE        0x00000020                      /* parity err W1C */
-#define CACR_CEN        0x00000010                      /* enable */                    
+#define CACR_CEN        0x00000010                      /* enable */
 #define CACR_DPE        0x00000004                      /* disable par NI */
 #define CACR_WWP        0x00000002                      /* write wrong par NI */
 #define CACR_DIAG       0x00000001                      /* diag mode */
@@ -349,7 +349,7 @@ DEVICE rom_dev = {
     1, 16, ROMAWIDTH, 4, 16, 32,
     &rom_ex, &rom_dep, &rom_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, &rom_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &rom_help, NULL, NULL,
     &rom_description
     };
 
@@ -372,7 +372,7 @@ DEVICE nvr_dev = {
     1, 16, NVRAWIDTH, 4, 16, 32,
     &nvr_ex, &nvr_dep, &nvr_reset,
     NULL, &nvr_attach, &nvr_detach,
-    NULL, 0, 0, NULL, NULL, NULL, &nvr_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &nvr_help, NULL, NULL,
     &nvr_description
     };
 
@@ -518,7 +518,7 @@ DEVICE sysd_dev = {
     2, 16, 16, 1, 16, 8,
     NULL, NULL, &sysd_reset,
     NULL, NULL, NULL,
-    &sysd_dib, DEV_DEBUG, 0, sysd_debug, NULL, NULL, &sysd_help, NULL, NULL, 
+    &sysd_dib, DEV_DEBUG, 0, sysd_debug, NULL, NULL, &sysd_help, NULL, NULL,
     &sysd_description
     };
 
@@ -533,10 +533,10 @@ DEVICE sysd_dev = {
    into instruction based timing loops. As the host platform gets
    much faster than the original VAX, the assumptions embedded in
    these code loops are no longer valid.
-   
+
    Code has been added to the ROM implementation to limit CPU speed
    to about 500K instructions per second.  This heads off any future
-   issues with the embedded timing loops.  
+   issues with the embedded timing loops.
 */
 
 int32 rom_swapb(int32 val)
@@ -572,7 +572,7 @@ if (rom_delay == 0) {
 
         for (i = 0; i < c; i++)
             rom_loopval |= (rom_loopval + ts) ^ rom_swapb (rom_swapb (rom_loopval + ts));
-        te = sim_os_msec (); 
+        te = sim_os_msec ();
         if ((te - ts) < 50)                         /* sample big enough? */
             continue;
         if (rom_delay < (rom_loopval + (c / (te - ts) / 1000) + 1))
@@ -1108,7 +1108,7 @@ struct reglink *p;
 
 for (p = &regtable[0]; p->low != 0; p++) {
     if ((pa >= p->low) && (pa < p->high) && p->write) {
-        p->write (pa, val, lnt);  
+        p->write (pa, val, lnt);
         return;
         }
     }
@@ -1508,18 +1508,18 @@ switch (rg) {
 
 /* Programmable timers
 
-   The SSC timers, which increment at 1Mhz, cannot be simulated 
+   The SSC timers, which increment at 1Mhz, cannot be simulated
    with ticks due to the overhead that would be required for 1M
    clock events per second.  Instead, a gross hack is used.  When
    a timer is started, the clock interval is inspected.
 
-   if (smaller than when the next clock tick will occur) then 
+   if (smaller than when the next clock tick will occur) then
         explicitly delay the interval number of usecs which is
-        determined from the instruction execution rate of the 
+        determined from the instruction execution rate of the
         calibrated clock.
    if (interval will occur after the next clock tick) then, schedule
         events to coinside with the clock tick consume the interval
-        at the clock tick rate, and when the remaining time value 
+        at the clock tick rate, and when the remaining time value
         gets small enough, behave like the small case above.
 
    If the interval register is read, then its value between events
@@ -1631,7 +1631,7 @@ if (new_tir < tmr_tir[tmr]) {                           /* ovflo? */
         sim_debug (DBG_INT, &sysd_dev, "tmr_csr_wr(tmr=%d) - SET_INT\n", tmr);
         if (tmr)
             SET_INT (TMR1);
-        else 
+        else
             SET_INT (TMR0);
         }
     }

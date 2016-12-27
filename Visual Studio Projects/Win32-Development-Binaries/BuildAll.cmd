@@ -1,12 +1,12 @@
 rem
-rem  This script will build all the simulators in the current branch 
+rem  This script will build all the simulators in the current branch
 rem  (presumed to be master) and package the resulting windows binaries
-rem  into a zip file which will be named for the revision, build date and 
+rem  into a zip file which will be named for the revision, build date and
 rem  git commit id.  The resulting zip file will be pushed to the github
 rem  Win32-Development-Binaries repository for public access.
 rem
 rem  We're using a github repository for this purpose since github no longer
-rem  supports a Download files facility since some folks were using it to 
+rem  supports a Download files facility since some folks were using it to
 rem  contain large binary files.  The typical set of simh windows binaries
 rem  is under 10MB in size and the plan is to delete and recreate the whole
 rem  Win32-Development-Binaries repository at least every few months.
@@ -24,11 +24,11 @@ rem  the repository name text box.  Then enter "Current Windows Binaries" in
 rem  the Description text box and click on the green "Create repository" button.
 rem
 rem  This procedure depends on:
-rem     - Visual Studio 2008 (Express) tools to compile the desired 
+rem     - Visual Studio 2008 (Express) tools to compile the desired
 rem       simulators.  The compiler and its related pieces
 rem       must be installed in the windows %ProgramFiles% directory.
 rem     - git.exe (installed as part of GitExtensions)
-rem     - git credentials available which have write access to the 
+rem     - git credentials available which have write access to the
 rem       github simh/Win32-Development-Binaries repository.
 rem     - 7-Zip (7z.exe) to package the compiled simulators into
 rem       a zip file.
@@ -53,10 +53,10 @@ echo **** ERROR **** Invalid argument
 echo.
 echo Usage: %0 {reset}
 echo.
-echo   invoking with the parameter "reset" (no quotes) will clean out 
+echo   invoking with the parameter "reset" (no quotes) will clean out
 echo   the local repository and push a newly create repo to github.
 echo   This should be done AFTER the github one is deleted and recreated.
-echo   See the comments at the beginning of %0 for complete 
+echo   See the comments at the beginning of %0 for complete
 echo   instructions about how to setup the github repo.
 exit /B 1
 :ArgOK
@@ -78,7 +78,7 @@ echo **** ERROR **** Visual Studio 2008 is unavailable
 exit /B 1
 :VS2008Found
 call "%VS90COMNTOOLS%\..\..\VC\bin\vcvars32.bat"
-rem  If later versions of Visual Studio are also installed, there can be some confusion about 
+rem  If later versions of Visual Studio are also installed, there can be some confusion about
 rem  where the Windows SDK is located.
 call :WhereInInclude winsock2.h > NUL 2>&1
 if %ERRORLEVEL% equ 0 goto VSOK

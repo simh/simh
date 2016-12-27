@@ -151,7 +151,7 @@ BITFIELD dz_rbuf_bits[] = {
 };
 
 const char *dz_charsizes[] = {"5", "6", "7", "8"};
-const char *dz_baudrates[] = {"50", "75", "110", "134.5", "150", "300", "600", "1200", 
+const char *dz_baudrates[] = {"50", "75", "110", "134.5", "150", "300", "600", "1200",
                         "1800", "2000", "2400", "3600", "4800", "7200", "9600", "19200"};
 const char *dz_parity[] = {"N", "E", "N", "O"};
 const char *dz_stopbits[] = {"1", "2", "1", "1.5"};
@@ -370,7 +370,7 @@ DEVICE dz_dev = {
 /* Register names for Debug tracing */
 static const char *dz_rd_regs[] =
     {"CSR ", "RBUF", "TCR ", "MSR " };
-static const char *dz_wr_regs[] = 
+static const char *dz_wr_regs[] =
     {"CSR ", "LPR ", "TCR ", "TDR "};
 
 /* IO dispatch routines, I/O addresses 177601x0 - 177601x7 */
@@ -398,7 +398,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             tmxr_poll_rx (&dz_desc);                    /* poll input */
             dz_update_rcvi ();                          /* update rx intr */
             if (dz_rbuf[dz]) {
-                /* Rechedule the next poll preceisely so that 
+                /* Rechedule the next poll preceisely so that
                    the programmed input speed is observed. */
                 sim_clock_coschedule_abs (dz_unit, tmxr_poll);
                 }
@@ -419,7 +419,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             int line;
             int32 modem_bits;
             TMLN *lp;
-            
+
             line = (dz * DZ_LINES) + i;
             lp = &dz_ldsc[line];                    /* get line desc */
             tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
@@ -501,7 +501,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             data = (PA & 1)?                            /* byte? merge */
                     (dz_tcr[dz] & 0377) | (data << 8):
                     (dz_tcr[dz] & ~0377) | data;
-        if (dz_mctl && 
+        if (dz_mctl &&
             ((access != WRITEB) || (PA & 1))) {         /* modem ctl (DTR)? */
             int32 changed = data ^ dz_tcr[dz];
 

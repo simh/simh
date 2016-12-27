@@ -42,7 +42,7 @@ void putS2(FILE* out, int addr, unsigned char* data, int n)
   fprintf(out, "%02X" CRLF, (~csum) & 0xff);
 }
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
   FILE *e,*out;
   int c,i;
@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
     fprintf(stderr, "Could not open %s\n", argv[2]);
     exit(1);
   }
-  
+
   size = 0;
   do {
     if ((c = fgetc(e)) == EOF) break;
@@ -92,4 +92,3 @@ int main(int argc, char* argv[])
   fclose(out);
   exit(0);
 }
-

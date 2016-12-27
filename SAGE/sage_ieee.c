@@ -53,7 +53,7 @@ DEVICE sageieee_dev = {
     NULL, NULL, NULL
 };
 
-static t_stat sageieee_reset(DEVICE* dptr) 
+static t_stat sageieee_reset(DEVICE* dptr)
 {
     printf("sageieee_reset\n");
     return SCPE_OK;

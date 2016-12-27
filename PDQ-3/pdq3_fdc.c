@@ -20,7 +20,7 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the names of Robert M Supnik and Holger Veit 
+   Except as contained in this notice, the names of Robert M Supnik and Holger Veit
    shall not be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik and Holger Veit.
 
@@ -50,8 +50,8 @@
 #define FDC_BIT_STEP15   0x03
 #define FDC_BIT_UPDATE   0x10
 #define FDC_BIT_MULTI    0x10
-#define FDC_BIT_SIDESEL  0x08  
-#define FDC_BIT_SIDECMP  0x02  
+#define FDC_BIT_SIDESEL  0x08
+#define FDC_BIT_SIDECMP  0x02
 #define FDC_BIT_DATAMARK 0x01
 #define FDC_BIT_INTIMM   0x08
 #define FDC_BIT_INTIDX   0x04
@@ -280,11 +280,11 @@ t_stat fdc_attach(UNIT *uptr, CONST char *cptr) {
 
   sim_cancel(uptr);
   if ((rc=attach_unit(uptr,cptr)) != SCPE_OK) return rc;
-       
+
   fdc_drv[i].dr_unit = uptr;
   uptr->capac = sim_fsize(uptr->fileref);
   fdc_drv[i].dr_ready = 0;
-  
+
   if (uptr->capac > 0) {
     fgets(header, 4, uptr->fileref);
     if (strncmp(header, "IMD", 3) != 0) {
@@ -310,33 +310,33 @@ t_stat fdc_attach(UNIT *uptr, CONST char *cptr) {
     return SCPE_OPENERR;
   }
   fdc_drv[i].dr_ready = 1;
-  
+
   /* handle force interrupt to wait for disk change */
   if (isbitset(fdc_intpending,0x01)) {
     dma_reqinterrupt();
     clrbit(reg_fdc_status,FDC_ST1_BUSY);
     clrbit(fdc_intpending,0x01);
   }
-  
+
   return SCPE_OK;
 }
 
 t_stat fdc_detach(UNIT *uptr) {
   t_stat rc;
   int i = uptr->u_unitno;
-  
+
   sim_debug(DBG_FD_IMD, &fdc_dev, DBG_PCFORMAT1 "Detach FDC drive %d\n", DBG_PC, i);
   sim_cancel(uptr);
   rc = diskClose(&fdc_drv[i].dr_imd);
   fdc_drv[i].dr_ready = 0;
-  
+
   /* handle force interrupt to wait for disk change */
   if (isbitset(fdc_intpending,0x02)) {
     cpu_raiseInt(INT_DMAFD);
     clrbit(reg_fdc_status,FDC_ST1_BUSY);
     clrbit(fdc_intpending,0x02);
   }
-  
+
   if (rc != SCPE_OK) return rc;
   return detach_unit(uptr);  /* detach unit */
 }
@@ -354,7 +354,7 @@ static t_stat fdc_stop(UNIT *uptr) {
 }
 
 static void fdc_update_rdonly(DRVDATA *curdrv) {
-  /* read only drive? */  
+  /* read only drive? */
   if (isbitset(curdrv->dr_unit->flags,UNIT_RO))
     setbit(reg_fdc_status,FDC_ST1_WRTPROT);
   else
@@ -369,11 +369,11 @@ t_bool fdc_driveready(DRVDATA *curdrv) {
     reg_fdc_cmd = FDC_IDLECMD;
     return FALSE;
   }
-  
+
   /* drive is ready */
   clrbit(reg_fdc_status,FDC_ST1_NOTREADY);
 
-  /* read only drive? */  
+  /* read only drive? */
   fdc_update_rdonly(curdrv);
   return TRUE;
 }
@@ -422,7 +422,7 @@ static void dma_interrupt(int bit) {
 static t_bool dma_abort(t_bool fromfinish) {
   clrbit(reg_dma_status,DMA_ST_BUSY);
   clrbit(reg_dma_ctrl,DMA_CTRL_RUN);
-  
+
   /* if autoload was finished, finally start the CPU.
    * note: autoload will read the first track, and then fail at end of track with an error */
   if (dma_isautoload) {
@@ -465,23 +465,23 @@ static t_bool dma_transfer_to_ram(uint8 *buf, int bufsize) {
   t_addr tstart = _reg_dma_addr/2;
   int cnt = _reg_dma_cnt ^ 0xffff;
   int xfersz = bufsize > cnt ? cnt : bufsize;
-  
+
   sim_debug(DBG_FD_DMA, &fdc_dev, DBG_PCFORMAT2 "Transfer to RAM $%x...$%x\n",
     DBG_PC, _reg_dma_addr/2,(_reg_dma_addr + xfersz - 1)/2);
   for (i=0; i<xfersz; i += 16) {
     sim_debug(DBG_FD_DMA2, &fdc_dev, DBG_PCFORMAT1 "$%04x: %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x\n",
-      DBG_PC, tstart, buf[i+0],buf[i+1], buf[i+2],buf[i+3], buf[i+4],buf[i+5], buf[i+6],buf[i+7], 
+      DBG_PC, tstart, buf[i+0],buf[i+1], buf[i+2],buf[i+3], buf[i+4],buf[i+5], buf[i+6],buf[i+7],
       buf[i+8],buf[i+9], buf[i+10],buf[i+11], buf[i+12],buf[i+13], buf[i+14],buf[i+15]);
     tstart += 8;
   }
-  
+
   if (isbitclr(reg_dma_ctrl,DMA_CTRL_IOM))
     sim_printf("Warning: wrong IOM direction for DMA transfer to RAM\n");
-  
+
   for (i=0; i<bufsize; i++) {
     data = buf[i];
 //    sim_printf("addr=%04x data=%02x\n",_reg_dma_addr, data);
-    
+
     if (WriteB(0, _reg_dma_addr++, data, FALSE) != SCPE_OK) {
       (void)dma_abort(FALSE);
       setbit(reg_dma_status,DMA_ST_TOI);
@@ -496,7 +496,7 @@ static t_bool dma_transfer_to_ram(uint8 *buf, int bufsize) {
     dma_finish();
     rc = FALSE;
   }
-  
+
   dma_fix_regs();
   return rc;
 }
@@ -509,13 +509,13 @@ static t_bool dma_transfer_from_ram(uint8 *buf, int bufsize) {
   uint32 tstart = _reg_dma_addr/2;
   int cnt = _reg_dma_cnt ^ 0xffff;
   int xfersz = bufsize > cnt ? cnt : bufsize;
-  
+
   sim_debug(DBG_FD_DMA, &fdc_dev, DBG_PCFORMAT2 "Transfer from RAM $%x...$%x\n",
     DBG_PC, _reg_dma_addr/2, (_reg_dma_addr + xfersz - 1)/2);
 
   if (isbitset(reg_dma_ctrl,DMA_CTRL_IOM))
     sim_printf("Warning: wrong IOM direction for DMA transfer from RAM\n");
-  
+
   for (i=0; i<bufsize; i++) {
     if (ReadB(0, _reg_dma_addr++, &data, FALSE)) {
       (void)dma_abort(FALSE);
@@ -530,11 +530,11 @@ static t_bool dma_transfer_from_ram(uint8 *buf, int bufsize) {
   }
   for (i=0; i<xfersz; i += 16) {
     sim_debug(DBG_FD_DMA2, &fdc_dev, DBG_PCFORMAT1 "$%04x: %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x\n",
-      DBG_PC, tstart, buf[i+0],buf[i+1], buf[i+2],buf[i+3], buf[i+4],buf[i+5], buf[i+6],buf[i+7], 
+      DBG_PC, tstart, buf[i+0],buf[i+1], buf[i+2],buf[i+3], buf[i+4],buf[i+5], buf[i+6],buf[i+7],
       buf[i+8],buf[i+9], buf[i+10],buf[i+11], buf[i+12],buf[i+13], buf[i+14],buf[i+15]);
     tstart += 8;
   }
-  
+
   if (_reg_dma_cnt == 0) { /* all data done? */
     dma_finish();
     rc = FALSE;
@@ -547,7 +547,7 @@ static t_bool dma_transfer_from_ram(uint8 *buf, int bufsize) {
 /* return true if read satisfied, false if error */
 static t_bool fdc_readsec(DRVDATA *curdrv) {
   uint32 flags;
-  
+
   /* does sector exist? */
   if (sectSeek(curdrv->dr_imd, curdrv->dr_trk, curdrv->dr_head)) {
     setbit(reg_fdc_status,FDC_ST2_RECNOTFND);
@@ -582,15 +582,15 @@ static t_bool fdc_readsec(DRVDATA *curdrv) {
 
 static t_bool fdc_writesec(DRVDATA *curdrv) {
   uint32 flags;
-  
+
   /* write protect? */
   if (imdIsWriteLocked(curdrv->dr_imd)) {
     dma_abort(FALSE);
     setbit(reg_fdc_status,FDC_ST2_WRTPROT);
     return FALSE;
   }
-   
-  /* is sector available? */    
+
+  /* is sector available? */
   if (sectSeek(curdrv->dr_imd, curdrv->dr_trk, curdrv->dr_head)) {
     setbit(reg_fdc_status,FDC_ST2_RECNOTFND);
     return FALSE;
@@ -623,7 +623,7 @@ static t_bool fdc_writesec(DRVDATA *curdrv) {
     curdrv->dr_sec++;
     reg_fdc_sector++;
   }
-  
+
   /* now finished */
   return TRUE;
 }
@@ -647,8 +647,8 @@ static t_stat fdc_set_notready(uint8 cmd)
   case FDC_STEPOUT_U:
     setbit(reg_fdc_status,FDC_ST1_SEEKERROR);
     break;
- 
-  case FDC_READSEC_M: 
+
+  case FDC_READSEC_M:
   case FDC_READSEC: /* type II: read a sector via DMA */
     setbit(reg_fdc_status,FDC_ST2_CRCERROR);
     break;
@@ -677,11 +677,11 @@ t_stat fdc_svc(UNIT *uptr) {
 
   sim_debug(DBG_FD_SVC,&fdc_dev, DBG_PCFORMAT2 "Calling FDC_SVC for unit=%x cmd=%x\n",
     DBG_PC, fdc_selected, reg_fdc_cmd);
-  
+
   if (reg_fdc_cmd == FDC_IDLECMD) return SCPE_OK;
 
   if (!rdy) return fdc_set_notready(reg_fdc_cmd & FDC_CMDMASK);
-  
+
   um_flg = isbitset(reg_fdc_cmd,FDC_BIT_UPDATE);
   switch (reg_fdc_cmd & FDC_CMDMASK) {
   case FDC_RESTORE:
@@ -717,8 +717,8 @@ t_stat fdc_svc(UNIT *uptr) {
     if (fdc_stepin(curdrv, um_flg)) break;
     fdc_clr_st1_error();
     break;
- 
-  case FDC_READSEC_M: 
+
+  case FDC_READSEC_M:
   case FDC_READSEC: /* type II: read a sector via DMA */
     if (!fdc_readsec(curdrv) || fdc_rwerror()) {
       dma_abort(TRUE);
@@ -739,7 +739,7 @@ t_stat fdc_svc(UNIT *uptr) {
   default:
     sim_printf("fdc_svc: Fix me - command not yet implemented: cmd=0x%x\n", reg_fdc_cmd);
   }
-       
+
   clrbit(reg_fdc_status,FDC_ST1_BUSY);
   reg_fdc_cmd = FDC_IDLECMD;
   return SCPE_OK;
@@ -748,7 +748,7 @@ t_stat fdc_svc(UNIT *uptr) {
 t_stat fdc_binit() {
   fdc_selected = -1;
   fdc_intpending = 0;
-  
+
   /* reset FDC registers */
   reg_fdc_cmd = FDC_IDLECMD;  /* invalid command, used as idle marker */
   reg_fdc_status = 0;
@@ -761,7 +761,7 @@ t_stat fdc_binit() {
   reg_dma_ctrl = DMA_CTRL_AECE | DMA_CTRL_HBUS | DMA_CTRL_IOM;
   reg_dma_status = DMA_ST_AECE | DMA_ST_HBUS | DMA_ST_IOM;
   _reg_dma_cnt = 0x0001;
-  /* hack: initialize boot code to load ad 0x2000(word address). 
+  /* hack: initialize boot code to load ad 0x2000(word address).
     * However, DMA is based on byte addresses, so multiply with 2 */
   _reg_dma_addr = reg_dmabase*2;
   reg_dma_id = 0;
@@ -800,7 +800,7 @@ static DRVDATA *fdc_select() {
   else if (isbitset(reg_fdc_drvsel,FDC_SEL_UNIT2)) fdc_selected = 2;
   else if (isbitset(reg_fdc_drvsel,FDC_SEL_UNIT3)) fdc_selected = 3;
   else fdc_selected = -1;
- 
+
   if (fdc_selected >= 0)  {
     curdrv = &fdc_drv[fdc_selected];
 
@@ -860,12 +860,12 @@ static void debug_fdccmd(uint16 cmd) {
       if (cmd & FDC_BIT_INTR2N) strcat(buf,"+R2N");
     }
   strcat(buf,"]");
-  sim_debug(DBG_FD_CMD, &fdc_dev, DBG_PCFORMAT2 "Command: %s\n", DBG_PC,buf);  
+  sim_debug(DBG_FD_CMD, &fdc_dev, DBG_PCFORMAT2 "Command: %s\n", DBG_PC,buf);
 }
 
 static t_stat fdc_docmd(uint16 data) {
   UNIT *uptr;
-  DRVDATA *curdrv = fdc_select(); 
+  DRVDATA *curdrv = fdc_select();
   if (curdrv== NULL) return SCPE_IOERR;
 
   debug_fdccmd(data);
@@ -875,7 +875,7 @@ static t_stat fdc_docmd(uint16 data) {
     sim_debug(DBG_FD_CMD,&fdc_dev, DBG_PCFORMAT2 "fdc_docmd: drive not ready\n", DBG_PC);
     return SCPE_OK;
   }
-  
+
   reg_fdc_cmd = data & 0xff;
   switch (data & FDC_CMDMASK) {
   /* type I commands */
@@ -889,7 +889,7 @@ static t_stat fdc_docmd(uint16 data) {
   case FDC_STEPOUT_U:
     setbit(reg_fdc_status, FDC_ST1_BUSY);
     return fdc_start(uptr,FDC_WAIT_STEP);
-    
+
   /* type II commands */
   case FDC_READSEC:
   case FDC_READSEC_M:
@@ -902,12 +902,12 @@ static t_stat fdc_docmd(uint16 data) {
     setbit(reg_fdc_status, FDC_ST2_BUSY);
     return fdc_start(uptr,FDC_WAIT_WRITE);
 
-  /* type III commands */ 
+  /* type III commands */
   default:
     sim_printf("fdc_docmd: Fix me - command not yet implemented: cmd=0x%x\n", reg_fdc_cmd);
     setbit(reg_fdc_status, FDC_ST2_BUSY);
     return SCPE_NOFNC;
-    
+
   /* type IV command */
    case FDC_FORCEINT:
      if (isbitset(data,0x01)) { /* int on transition from not-ready to ready */
@@ -934,7 +934,7 @@ void dma_docmd(uint16 data) {
   reg_dma_ctrl = data & 0xff;
   reg_dma_status &= 0x8f;
   reg_dma_status |= (reg_dma_ctrl & 0x70);
-  
+
   if (isbitset(reg_dma_ctrl,DMA_CTRL_RUN))
     setbit(reg_dma_status,DMA_ST_BUSY);
 }
@@ -963,7 +963,7 @@ static t_bool fd_reg16bit[] = {
 
 t_stat fdc_write(t_addr ioaddr, uint16 data) {
   int io = ioaddr & 15;
-  sim_debug(DBG_FD_WRITE, &fdc_dev, DBG_PCFORMAT0 "%s write %04x to IO=$%04x\n", 
+  sim_debug(DBG_FD_WRITE, &fdc_dev, DBG_PCFORMAT0 "%s write %04x to IO=$%04x\n",
     DBG_PC, fd_reg16bit[io] ? "Byte":"Word", data, ioaddr);
   switch (io) {
   case 4: /* cmd + drvsel */
@@ -1040,7 +1040,7 @@ t_stat fdc_read(t_addr ioaddr, uint16 *data) {
     *data = reg_fdc_data;
     break;
   case 8: /* read nothing */
-    *data = 0; 
+    *data = 0;
     break;
   case 9:
     *data = reg_dma_status;
@@ -1157,7 +1157,7 @@ t_stat pdq3_diskFormat(DISK_INFO *myDisk) {
     if((trackWrite(myDisk, 0, 0, 26, 128, sector_map, IMD_MODE_500K_FM, 0xE5, &flags)) != 0) {
       sim_printf("PDQ3_IMD: Error formatting track %d\n", i);
       return SCPE_IOERR;
-    }    
+    }
     sim_printf(".");
 
     /* format the remaining tracks as 26 sectors with 256 bytes */

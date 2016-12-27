@@ -44,7 +44,7 @@
    30-Sep-01    RMS     Moved CS1<5:0> into drives
    28-Sep-01    RMS     Fixed interrupt handling for SC/ATA
    23-Aug-01    RMS     Added read/write header stubs for ITS
-                        (found by Mirian Crzig Lennox) 
+                        (found by Mirian Crzig Lennox)
    13-Jul-01    RMS     Changed fread call to fxread (found by Peter Schorn)
    14-May-01    RMS     Added check for unattached drive
 
@@ -473,7 +473,7 @@ MTAB rp_mod[] = {
     { (UNIT_AUTO+UNIT_DTYPE), (RM03_DTYPE << UNIT_V_DTYPE),
       NULL, "RM03", &rp_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (RP04_DTYPE << UNIT_V_DTYPE),
-      NULL, "RP04", &rp_set_size }, 
+      NULL, "RP04", &rp_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (RM80_DTYPE << UNIT_V_DTYPE),
       NULL, "RM80", &rp_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (RP06_DTYPE << UNIT_V_DTYPE),
@@ -665,7 +665,7 @@ switch (j) {                                            /* decode PA<5:1> */
                 else rp_go (drv, uptr->FUNC);
                 }
             }
-        break;  
+        break;
 
     case 001:                                           /* RPWC */
         if (access == WRITEB)
@@ -905,7 +905,7 @@ switch (uptr->FUNC) {                                   /* case on function */
     case FNC_RETURN:                                    /* return to centerline */
         rpds[drv] = (rpds[drv] & ~DS_OF) | DS_ATA;      /* clear offset, set attn */
         update_rpcs (CS1_SC, drv);
-        break;  
+        break;
 
     case FNC_UNLOAD:                                    /* unload */
         rp_detach (uptr);                               /* detach unit */

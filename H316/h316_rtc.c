@@ -35,7 +35,7 @@
    by BBN just for those devices.  The IMP/TIP RTC is NOT the same as the
    official Honeywell real time clock option, H316-12.  When emulating an IMP
    or TIP, this RTC device must be enabled and the standard simh H316 CLK
-   device must be disabled.  
+   device must be disabled.
 
    The IMP and TIP also had a watch dog timer which, if ever allowed to time
    out, would cause a non-maskable interrupt via location 62(8) - this is the

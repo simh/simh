@@ -182,7 +182,7 @@ static const int32 masks[] = {
    MR (06-xxxx-rr)
    RM (rr-xxxx-06)
    JC (rr-xxxx-03)
-   RR 
+   RR
 */
 
 static const char *opcode[] = {
@@ -330,7 +330,7 @@ return;
         *of     =       output stream
         addr    =       current PC
         *val    =       pointer to data
-        *uptr   =       pointer to unit 
+        *uptr   =       pointer to unit
         sw      =       switches
    Outputs:
         return  =       status code

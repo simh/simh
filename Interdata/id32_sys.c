@@ -507,7 +507,7 @@ if ((*cptr == 'R') || (*cptr == 'r')) {                 /* R? */
 if ((*cptr >= '0') && (*cptr <= '9')) {
     reg = *cptr++ - '0';
     if ((*cptr >= '0') && (*cptr <= '9'))
-        reg = (reg * 10) + (*cptr - '0'); 
+        reg = (reg * 10) + (*cptr - '0');
     else --cptr;
     if (reg > 0xF)
         return -1;
@@ -528,7 +528,7 @@ return reg;
   Inputs:
         *cptr   =       pointer to input string
         *imm    =       pointer to output value
-        *inst   =       pointer to instruction 
+        *inst   =       pointer to instruction
         max     =       max value
   Outputs:
         sta     =       status
@@ -717,7 +717,7 @@ switch (j) {                                            /* case on class */
             return SCPE_ARG;
         rx2 = 0;                                        /* assume no 2nd */
         if (*tptr == '(') {                             /* index? */
-            if ((r2 = get_reg (tptr + 1, &tptr, R_R)) < 0) 
+            if ((r2 = get_reg (tptr + 1, &tptr, R_R)) < 0)
                 return SCPE_ARG;
             inst = inst | r2;                           /* or in R2 */
             if (*tptr == ',') {                         /* 2nd index? */
@@ -762,7 +762,7 @@ switch (j) {                                            /* case on class */
         val[0] = inst;
         val[1] = (t >> 16) & DMASK16;
         val[2] = t & DMASK16;
-        return -5;      
+        return -5;
 
     case I_V_SB: case I_V_SX:                           /* short branches */
         r = get_addr (gbuf, &tptr, &t, addr);           /* get addr */

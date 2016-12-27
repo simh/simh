@@ -314,7 +314,7 @@ uint16 xq_bootrom_deqna[2048] = {
     0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,  /* 0FF0 (0007760) */
     };
 #if 0
-/* This ROM image was produced by assembling the INIQNA.MAC file.  
+/* This ROM image was produced by assembling the INIQNA.MAC file.
    It was used to debug the DEQNA citizenship test. Since the INIQNA.MAC source
    does not contain a MOP boot, this isn't a useful boot ROM image.  */
 uint16 xq_bootrom_deqna_iniqna[2048] = {
@@ -579,7 +579,7 @@ uint16 xq_bootrom_deqna_iniqna[2048] = {
 /*
   Bootrom code is from merging of the DELQA (M7516) rom image files:
              23-334e5.bin
-         and 23-335e5.bin, 
+         and 23-335e5.bin,
          offset (0x5000 - 050000), for 4096. bytes.
 */
 uint16 xq_bootrom_delqa[2048] = {
@@ -845,7 +845,7 @@ uint16 xq_bootrom_delqa[2048] = {
   Bootrom code is from merging of the DELQA-Plus aka Turbo DELQA (M7516-YM)
   rom image files:
              23-365e5.bin
-         and 23-366e5.bin, 
+         and 23-366e5.bin,
          offset (0x5000 - 050000), for 4096. bytes.
 */
 uint16 xq_bootrom_delqat[2048] = {
@@ -1130,13 +1130,13 @@ MAINTAINER:    DIAGNOSTIC ENGINEERING
 
 4.1     PRIMARY BOOT PROCESS
 
-The primary boot, resident in the host, normally checks for the existence 
-of the device it is going to boot from, boots 512. bytes from the device, 
+The primary boot, resident in the host, normally checks for the existence
+of the device it is going to boot from, boots 512. bytes from the device,
 verifies the operation, sets parameters and transfers to the "booted" code.
 
 A suggested method for "checking" for a QNA is as follows:
 
-        Write a "2" (a module reset) into the QNA's CSR at location 
+        Write a "2" (a module reset) into the QNA's CSR at location
         17774456 or 17774476.
 
         Read back the CSR and compare against an octal 000062.
@@ -1147,7 +1147,7 @@ A suggested method for "checking" for a QNA is as follows:
 
         Write a "0" back into the CSR to "reset" the reset bit.
 
-If a QNA is present and it is to be used for the boot the first thing 
+If a QNA is present and it is to be used for the boot the first thing
 then:
 
         A descriptor for a 256. word "receive" is validated in the QNA.
@@ -1168,27 +1168,27 @@ then:
         Checked the receive descriptor for nominal states.
 
         The Data transfer is verified.
-                                
+
         If the QNA primary boot code detects a failure at this point the
         host boot is re-entered.
 
-        Transfer is made to the first location of the freshly loaded 
+        Transfer is made to the first location of the freshly loaded
         portion of the QNA BD ROM.
 
                 R1 contains the I/O Page address of the QNA (174440)
 
-                R0 contains a "000000" if the DECnet boot resident on the 
-                QNA is to be used. 
+                R0 contains a "000000" if the DECnet boot resident on the
+                QNA is to be used.
                                 - or -
-                If R0 is greater than "000777" an effective JMP (R0) is 
+                If R0 is greater than "000777" an effective JMP (R0) is
                 executed in lieu of the DECnet boot.
 
 
-                Location 12 contains a "000000" if the EPB is to halt when 
+                Location 12 contains a "000000" if the EPB is to halt when
                 an error is detected.
                                 - or -
                 If loaction 12 is greater than "000000" an effective JMP @12
-                is executed in lieu of a "HALT".                
+                is executed in lieu of a "HALT".
 
 4.1.1   EXPECTED VALUES FOR VERIFICATION
 
@@ -1205,7 +1205,7 @@ descriptor.
 
       x - don't care bits
 
-Next the actual data transfer is verified by checking the first three bytes 
+Next the actual data transfer is verified by checking the first three bytes
 of the data transferred for standard values. These first locations and their
 expected contents are:
 
@@ -1224,11 +1224,11 @@ expected contents are:
 Below is an example of how a primary boot could be implemented on a typical
 PDP-11 based host.
 
-Upon entry R0 is coded to indicate which QNA is to be used for the boot. 
-The first 32K bytes of the host memory is assumed to be mapped 1 to 1 
+Upon entry R0 is coded to indicate which QNA is to be used for the boot.
+The first 32K bytes of the host memory is assumed to be mapped 1 to 1
 physical to logical. The I/O page is mapped to the last 4K.
 
-Assume settings for R0 as follows:      
+Assume settings for R0 as follows:
 
         R0 - Contains a "4" for QNA#1 @ 174440
              Contains a "5" for QNA#2 @ 174460
@@ -1276,7 +1276,7 @@ static const uint16 boot_rom[] = {
     0005061, 0000016,          // 0136         clr     16(r1)          ; Final reset to complete operation
 
     0012704, 0004014,          // 0142         mov     #<DESC+14>,r4
-    0042714, 0037777,          // 0146         bic     #037777,(r4)    ; check if last status word was updated 
+    0042714, 0037777,          // 0146         bic     #037777,(r4)    ; check if last status word was updated
     0022714, 0140000,          // 0152         cmp     #140000,(r4)    ;
     0001014,                   // 0156         bne     90$             ;
 

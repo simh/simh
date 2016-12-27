@@ -30,7 +30,7 @@
     NOTES:
 
         This controller will mount 4 DD disk images on drives :F0: thru :F3: addressed
-        at ports 078H to 07FH.  It also will mount 2 SD disk images on :F4: and :F5: 
+        at ports 078H to 07FH.  It also will mount 2 SD disk images on :F4: and :F5:
         addressed at ports 088H to 08FH.  These are on physical drives :F0: and :F1:.
 
     Registers:
@@ -227,10 +227,10 @@ typedef    struct    {                  //FDC definition
 FDCDEF    zx200a[4];                    //indexed by the isbc-202 instance number
 
 UNIT zx200a_unit[] = {
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 } 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 },
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 },
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 },
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }
 };
 
 REG zx200a_reg[] = {
@@ -292,11 +292,11 @@ DEVICE zx200a_dev = {
 //    &zx200a_reset,       //reset
     NULL,       //reset
     NULL,               //boot
-    &zx200a_attach,     //attach  
+    &zx200a_attach,     //attach
     NULL,               //detach
     NULL,               //ctxt
-    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
-    DEBUG_flow + DEBUG_read + DEBUG_write, //dctrl 
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags
+    DEBUG_flow + DEBUG_read + DEBUG_write, //dctrl
     zx200a_debug,      //debflags
     NULL,               //msize
     NULL                //lname
@@ -317,11 +317,11 @@ t_stat zx200a_reset(DEVICE *dptr, uint16 base)
         sim_printf("   ZX200A-%d: Hardware Reset\n", zx200a_fdcnum);
         sim_printf("   ZX200A-%d: Registered at %04X\n", zx200a_fdcnum, base);
         zx200a[zx200a_fdcnum].baseport = base;
-        reg_dev(zx200a0, base, zx200a_fdcnum); 
-        reg_dev(zx200a1, base + 1, zx200a_fdcnum); 
-        reg_dev(zx200a2, base + 2, zx200a_fdcnum); 
-        reg_dev(zx200a3, base + 3, zx200a_fdcnum); 
-        reg_dev(zx200a7, base + 7, zx200a_fdcnum); 
+        reg_dev(zx200a0, base, zx200a_fdcnum);
+        reg_dev(zx200a1, base + 1, zx200a_fdcnum);
+        reg_dev(zx200a2, base + 2, zx200a_fdcnum);
+        reg_dev(zx200a3, base + 3, zx200a_fdcnum);
+        reg_dev(zx200a7, base + 7, zx200a_fdcnum);
         zx200a_unit[zx200a_fdcnum].u3 = 0x00; /* ipc reset */
         zx200a_reset1(zx200a_fdcnum);
         zx200a_fdcnum++;
@@ -384,7 +384,7 @@ t_stat zx200a_attach (UNIT *uptr, CONST char *cptr)
     uint8 fdcnum, fddnum;
 
     sim_debug (DEBUG_flow, &zx200a_dev, "   zx200a_attach: Entered with cptr=%s\n", cptr);
-    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
+    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
         sim_printf("   zx200a_attach: Attach error\n");
         return r;
     }
@@ -456,7 +456,7 @@ t_stat zx200a_attach (UNIT *uptr, CONST char *cptr)
 
 t_stat zx200a_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-//    sim_debug (DEBUG_flow, &zx200a_dev, "   zx200a_set_mode: Entered with val=%08XH uptr->flags=%08X\n", 
+//    sim_debug (DEBUG_flow, &zx200a_dev, "   zx200a_set_mode: Entered with val=%08XH uptr->flags=%08X\n",
 //        val, uptr->flags);
     if (val & UNIT_WPMODE) {            /* write protect */
         uptr->flags |= val;
@@ -506,7 +506,7 @@ uint8 zx200a1(t_bool io, uint8 data)
             zx200a[fdcnum].intff = 0;      //clear interrupt FF
             zx200a[fdcnum].stat &= ~FDCINT;
             if (DEBUG)
-                sim_printf("\n   ZX-200A1-%d: returned rtype=%02X intff=%02X status=%02X", 
+                sim_printf("\n   ZX-200A1-%d: returned rtype=%02X intff=%02X status=%02X",
                     fdcnum, zx200a[fdcnum].rtype, zx200a[fdcnum].intff, zx200a[fdcnum].stat);
             return zx200a[fdcnum].rtype;
         } else {                            /* write control port */
@@ -587,7 +587,7 @@ void zx200a_diskio(uint8 fdcnum)
     uint32 i;
     UNIT *uptr;
     FILE *fp;
-    //parse the IOPB 
+    //parse the IOPB
     cw = multibus_get_mbyte(zx200a[fdcnum].iopb);
     di = multibus_get_mbyte(zx200a[fdcnum].iopb + 1);
     nr = multibus_get_mbyte(zx200a[fdcnum].iopb + 2);

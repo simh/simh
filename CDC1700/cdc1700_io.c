@@ -57,7 +57,7 @@ static const char *status[] = {
 
 /*
  * The I/O sub-system uses the Q-register to provide controller addressing:
- * 
+ *
  *       15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
  *      +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
  *      |       W      |     E     |       Command      |
@@ -332,7 +332,7 @@ enum IOstatus doIO(t_bool output, DEVICE **device)
     case 0x01:
       dev = &tti_dev;
       break;
-      
+
     case 0x02:
       dev = &ptr_dev;
       break;
@@ -344,7 +344,7 @@ enum IOstatus doIO(t_bool output, DEVICE **device)
     case 0x06:
       dev = &cdr_dev;
       break;
-      
+
     default:
       return IO_INTERNALREJECT;
     }
@@ -470,7 +470,7 @@ enum IOstatus doIO(t_bool output, DEVICE **device)
             (*iod->iod_state)("after", dev, iod);
         }
         if (output)
-          fprintf(DBGOUT, "%s[%s: => %s]\r\n", 
+          fprintf(DBGOUT, "%s[%s: => %s]\r\n",
                   INTprefix, name, status[result]);
         else fprintf(DBGOUT, "%s[%s: => %s, A: %04X]\r\n",
                      INTprefix, name, status[result], Areg);
@@ -520,7 +520,7 @@ void buildIOtable(void)
 
       IOdev[iod->iod_equip] = dptr;
       IOcall[iod->iod_equip] = fw_doIO;
-      IOintr[iod->iod_equip] = 
+      IOintr[iod->iod_equip] =
         iod->iod_raised != NULL ? iod->iod_raised : deviceINTR;
     }
   }

@@ -73,7 +73,7 @@ void g_log (const gchar *log_domain, GLogLevelFlags log_level, const gchar *form
 #define g_new(struct_type, n_structs) g_malloc (sizeof(struct_type) * n_structs)
 
 
-#define g_array_append_val(array, data) g_array_append_vals (array, &data, 1) 
+#define g_array_append_val(array, data) g_array_append_vals (array, &data, 1)
 #define g_array_new(zero_terminated, clear, element_size) g_array_sized_new(zero_terminated, clear, element_size, 0)
 
 GArray *

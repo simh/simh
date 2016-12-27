@@ -330,7 +330,7 @@ if (ln >= 0) {                                          /* got one? */
     else pas_sta[ln] = pas_sta[ln] & ~STA_CROF;         /* just answer */
     if (pas_rarm[ln])                                   /* interrupt */
         SET_INT (v_PAS + ln + ln);
-    pas_ldsc[ln].rcve = 1;                              /* rcv enabled */ 
+    pas_ldsc[ln].rcve = 1;                              /* rcv enabled */
     }
 tmxr_poll_rx (&pas_desc);                               /* poll for input */
 for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */

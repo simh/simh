@@ -173,27 +173,27 @@ DEVICE abus_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &abus_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
     &abus_description
     };
 
-/* 
+/*
 The 8600/8650 systems can have a max of 260MB of physical memory.
-There are three different memory boards that exists: 4MB, 16MB, and 64MB. 
+There are three different memory boards that exists: 4MB, 16MB, and 64MB.
 In addition, you can mix different boards.
 The rule is to put large boards first, and smaller boards later.
-The 16MB and 64MB boards are stacked and thus take up two backplane slots 
+The 16MB and 64MB boards are stacked and thus take up two backplane slots
 in the backplane, while the 4MB board only takes up one slot.
-There are 8 slots in the memory backplane. You start by putting boards in 
-slot 0, going to slot 7. The boards taking up two slots actually use slot n, 
-while covering slot n-1. That means that the board in slot 0 does not cover 
+There are 8 slots in the memory backplane. You start by putting boards in
+slot 0, going to slot 7. The boards taking up two slots actually use slot n,
+while covering slot n-1. That means that the board in slot 0 does not cover
 up any other slot.
 If you are using 16MB boards, the max memory is 68MB.
 Slot 0,2,4 and 6 will have 16MB boards. And then you can place a 4MB board in slot 7.
 Same story with the 64MB boards.
 
-The system architecture reserves 512MB of address space for memory, so the 
-simulated memory can be expanded up to 512MB using 2 256MB memory boards which 
+The system architecture reserves 512MB of address space for memory, so the
+simulated memory can be expanded up to 512MB using 2 256MB memory boards which
 never existed but are easy to simulate.  We call these fictional boards MS86-E
 
 The logic here fills as many slots as possible with memory boards to describe
@@ -241,13 +241,13 @@ struct {
     int capacity;
     const char *option;
     } boards[] = {
-        {  4, "MS86-B"}, 
+        {  4, "MS86-B"},
         { 16, "MS86-C"},
         { 64, "MS86-D"},
         {256, "MS86-E (board never existed)"},  /* Fake 256MB board */
         {  0, NULL}};
 int32 i, j;
-  
+
 for (i=0; i<32; i++)
     slot[i] = base[i] = 0;
 
@@ -467,7 +467,7 @@ switch (rg) {
     case MT_EHSR:                                       /* EHSR */
         val = ehsr & EHSR_VMSE;
         break;
-        
+
     case MT_CSWP:                                       /* CSWP */
         val = cswp & 0xF;
         break;
@@ -542,7 +542,7 @@ switch (rg) {
     case MT_CSWP:                                       /* CSWP */
         cswp = val & 0xF;
         break;
-        
+
     case MT_MERG:                                       /* MERG (not impl) */
         break;
 
@@ -584,7 +584,7 @@ if (ADDR_IS_REG (pa)) {                                 /* reg space? */
     }
 MACH_CHECK (MCHK_RD_F);                                 /* machine check */
 return 0;
-} 
+}
 
 /* WriteReg - write register space
 
@@ -666,7 +666,7 @@ return cc;
 int32 con_halt (int32 code, int32 cc)
 {
 if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
-    (vax860_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
+    (vax860_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */
     (reset_all (0) != SCPE_OK) ||                       /* reset the world */
     (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
     ABORT (STOP_BOOT);                                  /* any error? */
@@ -736,7 +736,7 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     if (r != SCPE_OK)
         return r;
     }
-else 
+else
     if (*regptr == '/') {
         r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
         if (r != SCPE_OK)

@@ -31,7 +31,7 @@
    31-Oct-04    RMS     Fixed URFST to mask low 9b of fraction
                         Fixed exception PC setting
    10-Apr-04    RMS     JEA is 15b not 18b
- 
+
    The FP15 instruction format is:
 
      0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17
@@ -498,7 +498,7 @@ fmq.hi = fmq.lo = 0;                                    /* clear FMQ */
 if (a->sign ^ b->sign ^ sub)                            /* eff subtract? */
     dp_sub (a, b);
 else {
-    dp_add (a, b);                                      /* no, add */   
+    dp_add (a, b);                                      /* no, add */
     if (a->hi & UFP_FH_CARRY) {                         /* carry out? */
         a->hi = a->hi & UFP_FH_MASK;                    /* mask to 35b */
         return FP_OVF;                                  /* overflow */
@@ -529,7 +529,7 @@ return FP_OK;
    - If divisor normalized but dividend not, result is zero
    - If divisor not normalized, normalize and count shifts
    - Do fraction divide for number of shifts, +1, steps
-   
+
    Note that dp_lsh_1 returns a 72b result; the last right shift
    guarantees a 71b remainder.  The quotient cannot exceed 71b */
 
@@ -721,7 +721,7 @@ int32 dp_cmp (UFP *a, UFP *b)
 {
 if (a->hi < b->hi)
     return -1;
-if (a->hi > b->hi) 
+if (a->hi > b->hi)
     return +1;
 if (a->lo < b->lo)
     return -1;
@@ -750,7 +750,7 @@ for (i = 0; i < 35; i++) {                              /* 35 iterations */
         dp_add (a, b);
     dp_rsh_1 (a, &fmq);                                 /* rsh a'FMQ */
     }
-return;         
+return;
 }
 
 /* Double (quad) precision left shift - returns 72b (143b) result */
@@ -895,7 +895,7 @@ if (Write (ma, mb, WR))                                 /* store */
 PC = (ma + 1) & IAMASK;                                 /* new PC */
 return SCPE_OK;
 }
-    
+
 /* Reset routine */
 
 t_stat fp15_reset (DEVICE *dptr)

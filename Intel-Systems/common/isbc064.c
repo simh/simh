@@ -101,7 +101,7 @@ t_stat isbc064_reset (DEVICE *dptr)
         isbc064_unit.capac = SBC064_SIZE;
         isbc064_unit.u3 = SBC064_BASE;
         sim_printf("Initializing iSBC-064 RAM Board\n");
-        sim_printf("   Available[%04X-%04XH]\n", 
+        sim_printf("   Available[%04X-%04XH]\n",
             isbc064_unit.u3,
             isbc064_unit.u3 + isbc064_unit.capac - 1);
     }
@@ -129,7 +129,7 @@ uint8 isbc064_get_mbyte(uint16 addr)
         sim_debug (DEBUG_read, &isbc064_dev, "isbc064_get_mbyte: org=%04X, len=%04X\n", org, len);
         if ((addr >= org) && (addr < (org + len))) {
             SET_XACK(1);                /* good memory address */
-            sim_debug (DEBUG_xack, &isbc064_dev, "isbc064_get_mbyte: Set XACK for %04X\n", addr); 
+            sim_debug (DEBUG_xack, &isbc064_dev, "isbc064_get_mbyte: Set XACK for %04X\n", addr);
             val = *((uint8 *)isbc064_unit.filebuf + (addr - org));
             sim_debug (DEBUG_read, &isbc064_dev, " val=%04X\n", val);
 //            sim_printf ("isbc064_get_mbyte: addr=%04X, val=%02X\n", addr, val);
@@ -158,9 +158,9 @@ void isbc064_put_mbyte(uint16 addr, uint8 val)
         sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: org=%04X, len=%04X\n", org, len);
         if ((addr >= org) && (addr < (org + len))) {
             SET_XACK(1);                /* good memory address */
-            sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Set XACK for %04X\n", addr); 
+            sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Set XACK for %04X\n", addr);
             *((uint8 *)isbc064_unit.filebuf + (addr - org)) = val & 0xFF;
-            sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Return\n"); 
+            sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Return\n");
             return;
         } else {
             sim_debug (DEBUG_write, &isbc064_dev, "isbc064_put_mbyte: Out of range\n");

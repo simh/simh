@@ -139,7 +139,7 @@ extern uint32 cpu_opt;
 #define PUT_UAE(x,n)    (((x) & ~ CS1_UAE) | (((n) << CS1_V_UAE) & CS1_UAE))
 
 static const char *hk_funcs[] = {
-    "NOP", "PACK", "DCLR", "UNLOAD", "START", "RECAL", "OFFSET", "SEEK", 
+    "NOP", "PACK", "DCLR", "UNLOAD", "START", "RECAL", "OFFSET", "SEEK",
     "READ", "WRITE", "READH", "WRITEH", "WCHK"};
 
 BITFIELD hk_cs1_bits[] = {
@@ -408,7 +408,7 @@ BITFIELD hk_ec2_bits[] = {
 #define A0_VV           0000100                         /* vol valid */
 #define A0_RDY          0000200                         /* drive ready */
 #define A0_DT           0000400                         /* drive type */
-#define A0_FMT          0001000                         /* format NI */ 
+#define A0_FMT          0001000                         /* format NI */
 #define A0_OF           0002000                         /* offset mode */
 #define A0_WRL          0004000                         /* write lock */
 #define A0_SPO          0010000                         /* spindle on */
@@ -647,11 +647,11 @@ REG hk_reg[] = {
     };
 
 MTAB hk_mod[] = {
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
+    { UNIT_WLK,        0, "write enabled", "WRITEENABLED",
         NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
+    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED",
         NULL, NULL, NULL, "Write lock disk drive"  },
-    { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
+    { UNIT_DUMMY,      0, NULL,            "BADBLOCK",
         &hk_set_bad, NULL, NULL, "write bad block table on last track" },
     { (UNIT_DTYPE+UNIT_ATT), UNIT_RK06 + UNIT_ATT,
       "RK06", NULL, NULL },
@@ -664,10 +664,10 @@ MTAB hk_mod[] = {
     { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL},
     { UNIT_AUTO,            UNIT_AUTO, NULL,       "AUTOSIZE",
         NULL, NULL, NULL, "set type based on file size at ATTACH" },
-    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK06, NULL, "RK06", 
-        &hk_set_size, NULL, NULL, "Set type to RK06" }, 
-    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK07, NULL, "RK07", 
-        &hk_set_size, NULL, NULL, "Set type to RK07" }, 
+    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK06, NULL, "RK06",
+        &hk_set_size, NULL, NULL, "Set type to RK06" },
+    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK07, NULL, "RK07",
+        &hk_set_size, NULL, NULL, "Set type to RK07" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,    0, "VECTOR", "VECTOR",
@@ -833,7 +833,7 @@ switch (j) {                                            /* decode PA<4:1> */
         if (((data & CS1_GO) != 0) && ((hkcs1 & CS1_ERR) == 0))
             hk_go (drv);                                /* go & ~err? */
         new_val = hkcs1;
-        break;  
+        break;
 
     case 001:                                           /* HKWC */
         old_val = hkwc;
@@ -990,7 +990,7 @@ switch (fnc) {                                          /* case on function */
         break;
 
     case FNC_DCLR:                                      /* drive clear */
-        hkds[drv] &= ~DS_ATA;                           /* clr ATA */        
+        hkds[drv] &= ~DS_ATA;                           /* clr ATA */
         hker[drv] = 0;                                  /* clr err */
         if (dte)                                        /* drive type err? */
             hk_err (CS1_ERR|CS1_DONE, 0, ER_DTY, drv);
@@ -1088,7 +1088,7 @@ switch (fnc) {                                          /* case on function */
             hk_off[drv] = hkof & AS_OF;                 /* save offset */
             sim_activate (uptr, hk_min2wait);           /* wait for compl */
             update_hkcs (CS1_DONE, drv);                /* done */
-            }           
+            }
         break;
 
     case FNC_RECAL:                                     /* recalibrate */
@@ -1105,7 +1105,7 @@ switch (fnc) {                                          /* case on function */
             t = abs (hk_dif[drv]) * hk_swait;           /* |cyl diff| */
             if (t < hk_min2wait)                        /* min time */
                 t = hk_min2wait;
-            uptr->CYL = dc;                             /* save cyl */          
+            uptr->CYL = dc;                             /* save cyl */
             sim_activate (uptr, t);                     /* schedule */
             update_hkcs (CS1_DONE, drv);                /* done */
             }
@@ -1188,7 +1188,7 @@ switch (fnc) {                                          /* case on function */
                 ba = ba + (wc << 1);                    /* adv ba */
                 }
             }                                           /* end if read */
-        else {                                          /* wchk */                  
+        else {                                          /* wchk */
             i = fxread (hkxb, sizeof (uint16), wc, uptr->fileref);
             err = ferror (uptr->fileref);
             for ( ; i < wc; i++)                        /* fill buf */
@@ -1326,7 +1326,7 @@ void hk_err (int32 cs1e, int32 cs2e, int32 drve, int32 drv)
 sim_debug (HKDEB_TRC, &hk_dev, "hk_err(drv=%d, cs1e=%d, cs2e=%d, drve=%d)\n", drv, cs1e, cs2e, drve);
 hker[drv] = hker[drv] | drve;                           /* set drv error */
 hkcs2 = hkcs2 | cs2e;                                   /* set cs2 err */
-if ((cs1e & CS1_ERR) != 0)                              /* set combined err? */                              
+if ((cs1e & CS1_ERR) != 0)                              /* set combined err? */
     hkei = 1;                                           /* then set EI */
 if ((cs1e & CS1_DONE) != 0)                             /* set done? */
     update_hkcs (CS1_ERR|CS1_DONE, drv);                /* stop now */

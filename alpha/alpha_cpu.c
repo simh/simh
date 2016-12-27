@@ -764,7 +764,7 @@ while (reason == 0) {
         rc = I_GETRC (ir);                              /* get rc */
         if (ir & I_ILIT) rbv = I_GETLIT8 (ir);          /* literal? rbv = lit */
         else rbv = R[rb];                               /* no, rbv = R[rb] */
-        fnc = I_GETIFNC (ir);                           /* get function */                              
+        fnc = I_GETIFNC (ir);                           /* get function */
         switch (fnc) {                                  /* case on function */
 
         case 0x00:                                      /* ADDL */
@@ -887,7 +887,7 @@ while (reason == 0) {
         rc = I_GETRC (ir);                              /* get rc */
         if (ir & I_ILIT) rbv = I_GETLIT8 (ir);          /* literal? rbv = lit */
         else rbv = R[rb];                               /* no, rbv = R[rb] */
-        fnc = I_GETIFNC (ir);                           /* get function */                              
+        fnc = I_GETIFNC (ir);                           /* get function */
         switch (fnc) {                                  /* case on function */
 
         case 0x00:                                      /* AND */
@@ -976,7 +976,7 @@ while (reason == 0) {
         rc = I_GETRC (ir);                              /* get rc */
         if (ir & I_ILIT) rbv = I_GETLIT8 (ir);          /* literal? rbv = lit */
         else rbv = R[rb];                               /* no, rbv = R[rb] */
-        fnc = I_GETIFNC (ir);                           /* get function */                              
+        fnc = I_GETIFNC (ir);                           /* get function */
         switch (fnc) {                                  /* case on function */
 
         case 0x02:                                      /* MSKBL */
@@ -1123,7 +1123,7 @@ while (reason == 0) {
         rc = I_GETRC (ir);                              /* get rc */
         if (ir & I_ILIT) rbv = I_GETLIT8 (ir);          /* literal? rbv = lit */
         else rbv = R[rb];                               /* no, rbv = R[rb] */
-        fnc = I_GETIFNC (ir);                           /* get function */                              
+        fnc = I_GETIFNC (ir);                           /* get function */
         switch (fnc) {                                  /* case on function */
 
         case 0x00:                                      /* MULL */
@@ -1355,7 +1355,7 @@ while (reason == 0) {
         rc = I_GETRC (ir);                              /* get rc */
         if (ir & I_ILIT) rbv = I_GETLIT8 (ir);          /* literal? rbv = lit */
         else rbv = R[rb];                               /* no, rbv = R[rb] */
-        fnc = I_GETIFNC (ir);                           /* get function */      
+        fnc = I_GETIFNC (ir);                           /* get function */
         switch (fnc) {                                  /* case on function */
 
         case 0x00:                                      /* SEXTB */

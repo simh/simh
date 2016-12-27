@@ -29,35 +29,35 @@
 
    18-Apr-12    RMS     Revised TTI to use clock coscheduling and
                         remove IORESET bug
-   13-Jan-12    MP      Normalized the saved format of the TODR persistent 
+   13-Jan-12    MP      Normalized the saved format of the TODR persistent
                         file so that it may be moved around from one platform
-                        to another along with other simulator state files 
+                        to another along with other simulator state files
                         (disk & tape images, save/restore files, etc.)
-   28-Sep-11    MP      Generalized setting TODR for all OSes.  
-                        Unbound the TODR value from the 100hz clock tick 
-                        interrupt.  TODR now behaves like the original 
-                        battery backed-up clock and runs with the wall 
+   28-Sep-11    MP      Generalized setting TODR for all OSes.
+                        Unbound the TODR value from the 100hz clock tick
+                        interrupt.  TODR now behaves like the original
+                        battery backed-up clock and runs with the wall
                         clock, not the simulated instruction clock
                         (except when running ROM diagnostics).
                         Two operational modes are available:
-                        - Default VMS mode, which is similar to the previous 
-                          behavior in that without initializing the TODR it 
+                        - Default VMS mode, which is similar to the previous
+                          behavior in that without initializing the TODR it
                           would default to the value VMS would set it to if
                           VMS knew the correct time.  This would be correct
                           almost all the time unless a VMS disk hadn't been
-                          booted from for more than a year.  This mode 
-                          produces strange time results for non VMS OSes on 
+                          booted from for more than a year.  This mode
+                          produces strange time results for non VMS OSes on
                           each system boot.
                         - OS Agnostic mode.  This mode behaves precisely like
-                          the VAX780 TODR and works correctly for all OSes.  
-                          This mode is enabled by attaching the TODR to a 
-                          battery backup state file for the TOY clock 
-                          (i.e. sim> attach TODR TOY_CLOCK).  When operating 
+                          the VAX780 TODR and works correctly for all OSes.
+                          This mode is enabled by attaching the TODR to a
+                          battery backup state file for the TOY clock
+                          (i.e. sim> attach TODR TOY_CLOCK).  When operating
                           in OS Agnostic mode, the TODR will initially start
                           counting from 0 and be adjusted differently when an
-                          OS specifically writes to the TODR.  On the first OS 
-                          boot with an attached TODR VMS will prompt to set 
-                          the time unless the SYSGEN parameter TIMEPROMPTWAIT 
+                          OS specifically writes to the TODR.  On the first OS
+                          boot with an attached TODR VMS will prompt to set
+                          the time unless the SYSGEN parameter TIMEPROMPTWAIT
                           is set to 0.
    05-Jan-11    MP      Added Asynch I/O support
    17-Aug-08    RMS     Resync TODR on any clock reset
@@ -163,7 +163,7 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    &tti_dib, 0, 0, NULL, NULL, NULL, &tti_help, NULL, NULL, 
+    &tti_dib, 0, 0, NULL, NULL, NULL, &tti_help, NULL, NULL,
     &tti_description
     };
 
@@ -203,7 +203,7 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    &tto_dib, 0, 0, NULL, NULL, NULL, &tto_help, NULL, NULL, 
+    &tto_dib, 0, 0, NULL, NULL, NULL, &tto_help, NULL, NULL,
     &tto_description
     };
 
@@ -254,8 +254,8 @@ DEVICE clk_dev = {
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    &clk_dib, DEV_DEBUG, 0, clk_debug, 
-    NULL, NULL, &clk_help, NULL, NULL, 
+    &clk_dib, DEV_DEBUG, 0, clk_debug,
+    NULL, NULL, &clk_help, NULL, NULL,
     &clk_description
     };
 
@@ -484,7 +484,7 @@ if (0 == todr_reg) {                                    /* clock running? */
     return todr_reg;
     }
 
-/* Maximum number of seconds which can be represented as 10ms ticks 
+/* Maximum number of seconds which can be represented as 10ms ticks
    in the 32bit TODR.  This is the 33bit value 0x100000000/100 to get seconds */
 #define TOY_MAX_SECS (0x40000000/25)
 
@@ -510,7 +510,7 @@ struct timespec now, val, base;
 
 if (data) {
     todr_blow = 0;
-    /* Save the GMT time when set value is not 0 to record the base for 
+    /* Save the GMT time when set value is not 0 to record the base for
        future read operations in "battery backed-up" state */
 
     sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
@@ -671,4 +671,3 @@ if ((uptr->flags & UNIT_ATT) == 0)
     uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
 return r;
 }
-

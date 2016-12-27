@@ -185,7 +185,7 @@ switch (op) {                                           /* case IO op */
 
     case IO_RH:                                         /* read halfword */
         pic_rdp = 0;                                    /* clr ptr */
-        return pic_rd_cic ();   
+        return pic_rd_cic ();
 
     case IO_RD:                                         /* read */
         t = pic_rd_cic ();                              /* get cic */
@@ -289,7 +289,7 @@ else {
 sim_activate (&pic_unit, t);                            /* activate */
 return;
 }
-            
+
 /* Read (interpolated) current interval */
 
 uint32 pic_rd_cic (void)
@@ -391,4 +391,3 @@ t_stat lfc_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 fprintf (st, (lfc_tps == 100)? "50Hz": "60Hz");
 return SCPE_OK;
 }
-

@@ -161,7 +161,7 @@ typedef struct {
                             reason = STOP_WRAP; \
                             break; \
                             }
-                    
+
 #define PP(x)           x = x + 1; \
                         if (ADDR_ERR (x)) { \
                             x = BA + (x % MAXMEMSIZE); \
@@ -461,7 +461,7 @@ static const int32 col_table[64] = {
    Also used for multiplying two decimal digits, converted back to BCD,
    with carry forward
 */
-    
+
 static const int32 sum_table[100] = {
     BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
     BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
@@ -706,7 +706,7 @@ CHECK_LENGTH:
         fprint_sym (sim_deb, saved_IS, sim_eval, &cpu_unit, SWMASK('M'));
         fprintf (sim_deb, "\n" );
         }
-    switch (op) {                                       /* case on opcode */    
+    switch (op) {                                       /* case on opcode */
 
 /* Move/load character instructions                     A check B check
 
@@ -813,7 +813,7 @@ CHECK_LENGTH:
             else qzero = 1;
             } while (BS < bsave);
         PP (BS);                                        /* BS end is B+1 */
-        break;  
+        break;
 
     case OP_MN:                                         /* move numeric */
         M[BS] = (M[BS] & ~DIGIT) | (M[AS] & DIGIT);     /* move digit */
@@ -1104,7 +1104,7 @@ CHECK_LENGTH:
             break;
         reason = read_card (ilnt, D);                   /* read card */
         r1 = punch_card (ilnt, D);                      /* punch card */
-        BS = CDP_BUF + CDP_WIDTH;  
+        BS = CDP_BUF + CDP_WIDTH;
         if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
             BRANCH;
             }
@@ -1191,7 +1191,7 @@ CHECK_LENGTH:
         3       right to left, extended print end only
 
    The first A field character is masked to its digit part, all others
-   are copied intact            
+   are copied intact
 
    Instruction lengths:
 
@@ -1217,7 +1217,7 @@ CHECK_LENGTH:
         *       in status or !epe, skip B; else, set qaster, repl with A
         $       in status or !epe, skip B; else, set qdollar, repl with A
         0       in right status or body, if !qzero, set A WM; set qzero, repl with A
-                else, if !qzero, skip B; else, if (!B WM) set B WM 
+                else, if !qzero, skip B; else, if (!B WM) set B WM
         blank   in right status or body, repl with A; else, skip B
         C,R,-   in status, blank B; else, skip B
         ,       in status, blank B, else, skip B
@@ -1354,7 +1354,7 @@ CHECK_LENGTH:
             M[BS] = qaster? BCD_ASTER: BCD_BLANK;
         BS--;
         }                                               /* end for */
-    break;                                              /* done at last! */     
+    break;                                              /* done at last! */
 
 /* Multiply.  Comments from the PDP-10 based simulator by Len Fehskens.
 
@@ -1423,7 +1423,7 @@ CHECK_LENGTH:
     M[lowprd] = M[lowprd] | ZONE;                       /* assume + */
     if (sign)                                           /* if minus, B only */
         M[lowprd] = M[lowprd] & ~ABIT;
-    break;      
+    break;
 
 /* Divide.  Comments from the PDP-10 based simulator by Len Fehskens.
 
@@ -1490,7 +1490,7 @@ CHECK_LENGTH:
 
 /* Divide loop - done with subroutines to keep the code clean.
    In the loop,
-        
+
    asave =      low order divisor (constant)
    bsave =      low order subdividend (increments)
    qs   =       current quotient digit (increments)

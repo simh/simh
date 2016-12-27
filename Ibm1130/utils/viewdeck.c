@@ -226,7 +226,7 @@ int hollerith_to_ascii (unsigned short h)
 {
 	int i;
 
- 	h &= 0xFFF0;
+	h &= 0xFFF0;
 
 	for (i = 0; i < sizeof(cardcode_029) / sizeof(CPCODE); i++)
 		if (cardcode_029[i].hollerith == h)
@@ -240,4 +240,3 @@ void bail (char *msg)
 	fprintf(stderr, "%s\n", msg);
 	exit(1);
 }
-

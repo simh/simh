@@ -381,9 +381,9 @@ REG dt_reg[] = {
     };
 
 MTAB dt_mod[] = {
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
+    { UNIT_WLK,        0, "write enabled", "WRITEENABLED",
         NULL, NULL, NULL, "Write enable tape drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
+    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED",
         NULL, NULL, NULL, "Write lock tape drive"  },
     { UNIT_8FMT + UNIT_11FMT,          0, "18b", NULL },
     { UNIT_8FMT + UNIT_11FMT,  UNIT_8FMT, "12b", NULL },
@@ -502,7 +502,7 @@ switch (j) {
 
     case 001:                                           /* TCCM */
         old_tccm = tccm;                                /* save prior */
-        if (access == WRITEB)                
+        if (access == WRITEB)
             data = (PA & 1)? ((tccm & 0377) | (data << 8)): ((tccm & ~0377) | data);
         if ((data & CSR_IE) == 0)                       /* clearing IE? */
             CLR_INT (DTA);                              /* clear intr */
@@ -548,7 +548,7 @@ switch (j) {
 
     case 003:                                           /* TCBA */
         tcba = data;                                    /* word write only! */
-        break;          
+        break;
 
     case 004:                                           /* TCDT */
         unum = CSR_GETUNIT (tccm);                      /* get drive */
@@ -652,7 +652,7 @@ if (prev_mot < DTS_ATSF) {                              /* not at speed? */
     }
 
 dt_newfnc (uptr, DTS_STA (DTS_ATSF | new_dir, new_fnc));/* state = fnc */
-return; 
+return;
 }
 
 /* Schedule new DECtape function
@@ -701,7 +701,7 @@ switch (fnc) {                                          /* case function */
         if (dir)
             newpos = DT_BLK2LN ((DT_QFEZ (uptr)? DTU_TSIZE (uptr): blk), uptr) -
                 DT_BLKLN - DT_WSIZE;
-        else newpos = DT_BLK2LN ((DT_QREZ (uptr)? 0: blk + 1), uptr) + 
+        else newpos = DT_BLK2LN ((DT_QREZ (uptr)? 0: blk + 1), uptr) +
                 DT_BLKLN + (DT_WSIZE - 1);
         if (DEBUG_PRI (dt_dev, LOG_MS))
             fprintf (sim_deb, ">>DT%d: searching %s\n", unum,
@@ -949,7 +949,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             DT_SETDONE;                                 /* set done */
             }
         else sim_activate (uptr, ((2 * DT_HTLIN) + DT_WSIZE) * dt_ltime);
-        break;                  
+        break;
 
 /* Write
 
@@ -991,7 +991,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             DT_SETDONE;
             }
         else sim_activate (uptr, ((2 * DT_HTLIN) + DT_WSIZE) * dt_ltime);
-        break;                  
+        break;
 
 /* Read all - read current header or data word */
 
@@ -1035,7 +1035,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (ba >= uptr->hwmark)
                 uptr->hwmark = ba + 1;
             }
-/*      else                                          *//* ignore hdr */ 
+/*      else                                          *//* ignore hdr */
         sim_activate (uptr, DT_WSIZE * dt_ltime);
         DT_SETDONE;                                     /* set done */
         break;
@@ -1166,7 +1166,7 @@ for (i = 0; i < DT_NUMDR; i++) {                        /* stop all activity */
         }
     else {
         sim_cancel (uptr);                              /* sim reset */
-        uptr->STATE = 0;  
+        uptr->STATE = 0;
         uptr->LASTT = sim_grtime ();
         }
     }
@@ -1367,7 +1367,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
                 break;
             }                                           /* end loop file */
         }                                               /* end if 12b */
-    else 
+    else
         if (uptr->flags & UNIT_11FMT) {                 /* 16b? */
             for (ba = 0; ba < uptr->hwmark; ) {         /* loop thru file */
                 for (k = 0; k < D18_BSIZE; k++)         /* loop blk */
@@ -1377,7 +1377,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
                     break;
                 }                                       /* end loop file */
             }                                           /* end if 16b */
-        else 
+        else
             fxwrite (uptr->filebuf, sizeof (uint32),    /* write file */
                      uptr->hwmark, uptr->fileref);
     if (ferror (uptr->fileref))
@@ -1547,7 +1547,7 @@ fprintf (st, "%s", text);
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);
-text2 = 
+text2 =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
 "\n"
 " It is critically important to maintain certain timing relationships\n"

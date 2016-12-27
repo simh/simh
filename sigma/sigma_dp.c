@@ -478,7 +478,7 @@ MTAB dp_mod[] = {
     { (UNIT_AUTO+UNIT_DTYPE), (DP_7242 << UNIT_V_DTYPE),
       NULL, "7242", &dp_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (DP_7261 << UNIT_V_DTYPE),
-      NULL, "7261", &dp_set_size }, 
+      NULL, "7261", &dp_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (DP_7271 << UNIT_V_DTYPE),
       NULL, "7271", &dp_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (DP_3288 << UNIT_V_DTYPE),
@@ -805,7 +805,7 @@ switch (uptr->UCMD) {
                 chan_uen (dva);                         /* force uend */
                 return SCPE_OK;
                 }
-            }        
+            }
         if (dp_end_sec (uptr, i, DP_WDSC * 4, st))      /* transfer done? */
             return SCPE_OK;                             /* err or cont */
         break;
@@ -890,7 +890,7 @@ if (uptr->UCMD != DSC_SEEK) {                           /* int? */
 return SCPE_OK;
 }
 
-/* Common read/write sector end routine 
+/* Common read/write sector end routine
 
    case 1 - more to transfer, not end cylinder - reschedule, return TRUE
    case 2 - more to transfer, end cylinder - uend, return TRUE

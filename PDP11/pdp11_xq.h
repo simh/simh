@@ -31,9 +31,9 @@
   03-Mar-08  MP   Added DELQA-T (aka DELQA Plus) device emulation support.
   06-Feb-08  MP   Added dropped frame statistics to record when the receiver discards
                   received packets due to the receiver being disabled, or due to the
-                  XQ device's packet receive queue being full.  Also removed the 
+                  XQ device's packet receive queue being full.  Also removed the
                   filter statistic counter since there was no code which ever set it.
-  29-Jan-08  MP   Dynamically determine the timer polling rate based on the 
+  29-Jan-08  MP   Dynamically determine the timer polling rate based on the
                   calibrated tmr_poll and clk_tps values of the simulator.
   23-Jan-08  MP   Added debugging support to display packet headers and packet data
   07-Jul-05  RMS  Removed extraneous externs

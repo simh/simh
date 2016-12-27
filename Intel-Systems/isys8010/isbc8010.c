@@ -45,7 +45,7 @@ void put_mword(uint16 addr, uint16 val);
 t_stat SBC_reset (DEVICE *dptr);
 
 /* external globals */
- 
+
 extern uint8 i8255_C[4];                    //port C byte I/O
 
 /* external function prototypes */
@@ -68,7 +68,7 @@ extern t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
 /*  SBC reset routine */
 
 t_stat SBC_reset (DEVICE *dptr)
-{    
+{
     sim_printf("Initializing iSBC-80/10 SBC\n   Onboard Devices:\n");
     i8080_reset (NULL);
     i8251_devnum = 0;

@@ -316,7 +316,7 @@ if (lpt_svcst & LPT_SVCSH) {                            /* shuttling? */
     if (lpt_crpos == 0) {                               /* done shuttling? */
         for (i = LPT_WIDTH - 1; i >= 0; i--)  {         /* backscan for blanks */
             if (lpt_buf[i] != ' ')
-                break; 
+                break;
             }
         lpt_buf[i + 1] = 0;
         fputs (lpt_buf, uptr->fileref);                 /* output buf */

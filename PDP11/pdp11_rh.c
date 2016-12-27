@@ -321,7 +321,7 @@ DEVICE mba_dev[] = {
     NULL, NULL, NULL,
     &mba0_dib, DEV_DEBUG | DEV_UBUS | DEV_QBUS, 0,
     NULL, NULL, NULL, &rh_help, NULL, NULL,
-    &rh_description 
+    &rh_description
     },
     {
     "RHB", &mba1_unit, mba1_reg, mba1_mod,
@@ -330,7 +330,7 @@ DEVICE mba_dev[] = {
     NULL, NULL, NULL,
     &mba1_dib, DEV_DEBUG | DEV_UBUS | DEV_QBUS, 0,
     NULL, NULL, NULL, &rh_help, NULL, NULL,
-    &rh_description 
+    &rh_description
     },
     {
     "RHC", &mba2_unit, mba2_reg, mba2_mod,
@@ -339,7 +339,7 @@ DEVICE mba_dev[] = {
     NULL, NULL, NULL,
     &mba2_dib, DEV_DEBUG | DEV_UBUS | DEV_QBUS, 0,
     NULL, NULL, NULL, &rh_help, NULL, NULL,
-    &rh_description 
+    &rh_description
     }
     };
 
@@ -364,7 +364,7 @@ if (ofs & EXT) {                                        /* external? */
         mba_set_cs2 (CS2_NED, mb);
     else if (r == MBE_NXR)                              /* nx reg? */
         return SCPE_NXM;
-    return SCPE_OK; 
+    return SCPE_OK;
     }
 
 switch (ofs) {                                          /* case on reg */
@@ -433,7 +433,7 @@ if (ofs & EXT) {                                        /* external? */
         return SCPE_NXM;
     mba_upd_cs1 (0, 0, mb);                             /* update status */
     return SCPE_OK;
-    } 
+    }
 
 cs1f = 0;                                               /* no int on cs1 upd */
 switch (ofs) {                                          /* case on reg */
@@ -479,7 +479,7 @@ switch (ofs) {                                          /* case on reg */
             (massbus[mb].cs1 & CS1_IE);
         massbus[mb].bae = (massbus[mb].bae & ~CS1_M_UAE) | /* update BAE */
             ((massbus[mb].cs1 >> CS1_V_UAE) & CS1_M_UAE);
-        break;  
+        break;
 
     case WC_OF:                                         /* WC */
         if (access == WRITEB)
@@ -1016,13 +1016,13 @@ else {
     int i;
 
     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru devs */
-        if (!(dptr->flags & DEV_DIS) && 
+        if (!(dptr->flags & DEV_DIS) &&
             (dptr->flags & DEV_MBUS) &&
             ((DIB *)dptr->ctxt)->ba == mb)
             break;
         }
     }
-sprintf (buf, "RH70/RH11 Massbus adapter%s%s%s", 
+sprintf (buf, "RH70/RH11 Massbus adapter%s%s%s",
                dptr ? " (for " : "", dptr ? dptr->name : "", dptr ? ")" : "");
 return buf;
 }

@@ -887,7 +887,7 @@ while (reason == 0) {                                   /* loop until halted */
 
    Multiply and divide step and hardware multiply are exact implementations.
    Hardware divide is a 2's complement analog to the actual hardware.
-*/   
+*/
 
     case 026:                                           /* MUL */
         if ((reason = Ea (IR)))                         /* MA <- eff addr */
@@ -1020,7 +1020,7 @@ while (reason == 0) {                                   /* loop until halted */
 
         case 007:                                       /* SCL */
             t = (AC & SIGN)? DMASK: 0;
-            AC = (AC & SIGN) | ((AC << sc) & 0377777) | 
+            AC = (AC & SIGN) | ((AC << sc) & 0377777) |
                 (IO >> (18 - sc));
             IO = ((IO << sc) | (t >> (18 - sc))) & DMASK;
             break;

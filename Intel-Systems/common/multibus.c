@@ -72,12 +72,12 @@ extern int32 isbc202_fdcnum;
 
 /* multibus Standard SIMH Device Data Structures */
 
-UNIT multibus_unit = { 
-    UDATA (&multibus_svc, 0, 0), 20 
+UNIT multibus_unit = {
+    UDATA (&multibus_svc, 0, 0), 20
 };
 
-REG multibus_reg[] = { 
-    { HRDATA (MBIRQ, mbirq, 32) }, 
+REG multibus_reg[] = {
+    { HRDATA (MBIRQ, mbirq, 32) },
     { HRDATA (XACK, xack, 8) }
 };
 
@@ -92,25 +92,25 @@ DEBTAB multibus_debug[] = {
 };
 
 DEVICE multibus_dev = {
-    "MBIRQ",                    //name 
-    &multibus_unit,             //units 
-    multibus_reg,               //registers 
+    "MBIRQ",                    //name
+    &multibus_unit,             //units
+    multibus_reg,               //registers
     NULL,                       //modifiers
-    1,                          //numunits 
-    16,                         //aradix  
-    16,                         //awidth  
-    1,                          //aincr  
-    16,                         //dradix  
+    1,                          //numunits
+    16,                         //aradix
+    16,                         //awidth
+    1,                          //aincr
+    16,                         //dradix
     8,                          //dwidth
-    NULL,                       //examine  
-    NULL,                       //deposit  
-    &multibus_reset,            //reset 
+    NULL,                       //examine
+    NULL,                       //deposit
+    &multibus_reset,            //reset
     NULL,                       //boot
-    NULL,                       //attach  
+    NULL,                       //attach
     NULL,                       //detach
-    NULL,                       //ctxt     
-    DEV_DEBUG,                  //flags 
-    0,                          //dctrl 
+    NULL,                       //ctxt
+    DEV_DEBUG,                  //flags
+    0,                          //dctrl
     multibus_debug,             //debflags
     NULL,                       //msize
     NULL                        //lname
@@ -140,13 +140,13 @@ t_stat multibus_svc(UNIT *uptr)
 
 t_stat multibus_reset(DEVICE *dptr)
 {
-    SBC_reset(NULL); 
+    SBC_reset(NULL);
     sim_printf("Initializing Multibus Boards\n   Multibus Boards:\n");
     isbc064_reset(NULL);
     isbc201_fdcnum = 0;
-    isbc201_reset(NULL, SBC201_BASE); 
+    isbc201_reset(NULL, SBC201_BASE);
     isbc202_fdcnum = 0;
-    isbc202_reset(NULL, SBC202_BASE); 
+    isbc202_reset(NULL, SBC202_BASE);
     sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
     return SCPE_OK;
 }
@@ -268,7 +268,7 @@ uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port, uint8 devnum
 uint8 multibus_get_mbyte(uint16 addr)
 {
     SET_XACK(0);                        /* set no XACK */
-//    sim_printf("multibus_get_mbyte: Cleared XACK for %04X\n", addr); 
+//    sim_printf("multibus_get_mbyte: Cleared XACK for %04X\n", addr);
     return isbc064_get_mbyte(addr);
 }
 
@@ -288,9 +288,9 @@ uint16 multibus_get_mword(uint16 addr)
 void multibus_put_mbyte(uint16 addr, uint8 val)
 {
     SET_XACK(0);                        /* set no XACK */
-//    sim_printf("multibus_put_mbyte: Cleared XACK for %04X\n", addr); 
+//    sim_printf("multibus_put_mbyte: Cleared XACK for %04X\n", addr);
     isbc064_put_mbyte(addr, val);
-//    sim_printf("multibus_put_mbyte: Done XACK=%dX\n", XACK); 
+//    sim_printf("multibus_put_mbyte: Done XACK=%dX\n", XACK);
 }
 
 /*  put a word to memory */
@@ -302,4 +302,3 @@ void multibus_put_mword(uint16 addr, uint16 val)
 }
 
 /* end of multibus.c */
-

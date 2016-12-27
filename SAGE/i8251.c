@@ -73,7 +73,7 @@ t_stat i8251_write(I8251* chip,int port,uint32 value)
     } else { /* control port */
         switch (chip->init) {
         case 0: /* expect mode word */
-            chip->mode = value; 
+            chip->mode = value;
             TRACE_PRINT1(DBG_UART_WR,"WR MODE = 0x%02x",value);
             chip->init = (value & I8251_MODE_BAUD)==I8251_MODE_SYNC ? 1 : 3;
             bits = (chip->mode & I8251_AMODE_BITS) >> 2;

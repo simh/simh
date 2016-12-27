@@ -23,7 +23,7 @@
 
 #include "b5500_defs.h"
 
-#if (NUM_DEVS_DR > 0) 
+#if (NUM_DEVS_DR > 0)
 
 #define UNIT_DR         UNIT_ATTABLE | UNIT_DISABLE | UNIT_FIX | \
                         UNIT_BUFABLE | UNIT_MUSTBUF
@@ -94,11 +94,11 @@ t_stat drm_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc, uint8 rd_flg)
     }
 
     /* Check if drive is ready to recieve a command */
-    if ((uptr->u5 & DR_RDY) == 0) 
+    if ((uptr->u5 & DR_RDY) == 0)
         return SCPE_BUSY;
 
     uptr->u5 = chan;
-    if (rd_flg) 
+    if (rd_flg)
         uptr->u5 |= DR_RD;
     else
         uptr->u5 |= DR_WR;
@@ -108,15 +108,15 @@ t_stat drm_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc, uint8 rd_flg)
     sim_activate(uptr, 100);
     return SCPE_OK;
 }
-        
+
 
 /* Handle processing disk controller commands */
 t_stat drm_srv(UNIT * uptr)
 {
     int                 chan = uptr->u5 & DR_CHAN;
     uint8               *ch = &(((uint8 *)uptr->filebuf)[uptr->u4]);
-    
- 
+
+
     /* Process for each unit */
     if (uptr->u5 & DR_RD) {
         /* Transfer one Character */
@@ -178,11 +178,11 @@ drm_attach(UNIT * uptr, CONST char *file)
 
     if ((r = attach_unit(uptr, file)) != SCPE_OK)
         return r;
-    uptr->u5 |= DR_RDY; 
+    uptr->u5 |= DR_RDY;
     uptr->hwmark = uptr->capac;
-    if (u) 
+    if (u)
         iostatus |= DRUM2_FLAG;
-    else 
+    else
         iostatus |= DRUM1_FLAG;
     return SCPE_OK;
 }
@@ -195,9 +195,9 @@ drm_detach(UNIT * uptr)
     if ((r = detach_unit(uptr)) != SCPE_OK)
         return r;
     uptr->u5 = 0;
-    if (u) 
+    if (u)
         iostatus &= ~DRUM2_FLAG;
-    else 
+    else
         iostatus &= ~DRUM1_FLAG;
     return SCPE_OK;
 }
@@ -206,7 +206,7 @@ t_stat
 set_drum(UNIT * uptr, int32 val, CONST char *cptr, void *desc) {
     if ((uptr->flags & AUXMEM) == 0)
         return SCPE_OK;
-    if (uptr->flags & UNIT_ATT) 
+    if (uptr->flags & UNIT_ATT)
         drm_detach(uptr);
     uptr->flags |= UNIT_ATTABLE;
     return SCPE_OK;
@@ -218,19 +218,19 @@ set_auxmem(UNIT * uptr, int32 val, CONST char *cptr, void *desc) {
 
     if (uptr->flags & AUXMEM)
         return SCPE_OK;
-    if (uptr->flags & UNIT_ATT) 
+    if (uptr->flags & UNIT_ATT)
         detach_unit(uptr);
     uptr->flags &= ~UNIT_ATTABLE;
     if (uptr->filebuf == 0) {
         uptr->filebuf = calloc(uptr->capac, 8);
         uptr->flags |= UNIT_BUF;
     }
-    uptr->u5 = DR_RDY; 
-    if (u) 
+    uptr->u5 = DR_RDY;
+    if (u)
         iostatus |= DRUM2_FLAG;
-    else 
+    else
         iostatus |= DRUM1_FLAG;
-    
+
     return SCPE_OK;
 }
 
@@ -248,11 +248,11 @@ drm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
   fprint_set_help (st, dptr) ;
   fprint_show_help (st, dptr) ;
   return SCPE_OK;
-} 
+}
 
 const char *
 drm_description (DEVICE *dptr)
-{ 
+{
    return "B430 Magnetic Drum or B6500 memory module";
 }
 #endif

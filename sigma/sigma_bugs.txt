@@ -132,18 +132,3 @@ Diagnostic Notes
 11. RTC paper tape, clocks must be 500Mhz, reports clocks as "too slow" due
    to faster simulation speed.
    Runs correctly with SET THROTTLE 500K.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

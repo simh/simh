@@ -155,7 +155,7 @@
 
    In theory, each drive can be a different type. The size field in
    each unit selects the drive capacity for each drive and thus the
-   drive type.  
+   drive type.
 */
 
 uint16 rscs1[RS_NUMDR] = { 0 };                         /* control/status 1 */
@@ -249,7 +249,7 @@ MTAB rs_mod[] = {
     { (UNIT_AUTO|UNIT_DTYPE), (RS03_DTYPE << UNIT_V_DTYPE),
       NULL, "RS03", &rs_set_size, NULL, NULL, "Set drive type RS03" },
     { (UNIT_AUTO|UNIT_DTYPE), (RS04_DTYPE << UNIT_V_DTYPE),
-      NULL, "RS04", &rs_set_size, NULL, NULL, "Set drive type RS04" }, 
+      NULL, "RS04", &rs_set_size, NULL, NULL, "Set drive type RS04" },
     { 0 }
     };
 
@@ -348,7 +348,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
         rscs1[drv] = data & CS1_RW;
         if (data & CS1_GO)                              /* start op */
             return rs_go (drv);
-        break;  
+        break;
 
     case RS_DA_OF:                                      /* RSDA */
         rsda[drv] = (uint16)data;
@@ -467,7 +467,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
 rsds[drv] = (rsds[drv] & ~DS_PIP) | DS_RDY;             /* change drive status */
 
 switch (fnc) {                                          /* case on function */
- 
+
     case FNC_SEARCH:                                    /* search */
         rs_update_ds (DS_ATA, drv);
         break;

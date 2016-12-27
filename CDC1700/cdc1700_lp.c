@@ -143,7 +143,7 @@ t_stat lp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
   Director Function 2 (1740 only)
 
-    15  14  13          10   9   8   7   6   5   4   3   2   1   0 
+    15  14  13          10   9   8   7   6   5   4   3   2   1   0
    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
    | X |   | X | X | X | X |   |   |   |   |   |   |   |   |   |   |
    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -485,7 +485,7 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
            */
           if (LPdev.iod_LPccpend) {
             const char *ccontrol = "\n";
-            
+
             if ((lp_dev.dctrl & DBG_CC) != 0)
               fprintf(DBGOUT, "%s[LP: CC: 0x%02X]\r\n", INTprefix, Areg);
 
@@ -523,7 +523,7 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
             sim_activate(&lp_unit, LP_CC_WAIT);
             break;
           }
-          
+
           /*
            * Put non-control characters in the print buffer.
            */
@@ -532,7 +532,7 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
         }
 
         fw_IOunderwayData(&LPdev, 0);
-        
+
         LPdev.iod_LPstate = IODP_LPCHARWAIT;
         sim_activate(&lp_unit, lp_unit.wait);
       }
@@ -566,7 +566,7 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
           if (iod->iod_LPcolumn != 0) {
             if ((lp_unit.flags & UNIT_ATT) != 0) {
               int i;
-              
+
               for (i = 0; i < iod->iod_LPcolumn; i++) {
                 if (putc(buffer[i], lp_unit.fileref) == EOF) {
                   perror("LP I/O error");

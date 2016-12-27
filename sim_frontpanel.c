@@ -28,11 +28,11 @@
    03-Apr-15    MP      Added logic to pass simulator startup messages in
                         panel error text if the connection to the simulator
                         shuts down while it is starting.
-   04-Apr-15    MP      Added mount and dismount routines to connect and 
+   04-Apr-15    MP      Added mount and dismount routines to connect and
                         disconnect removable media
 
    This module provides interface between a front panel application and a simh
-   simulator.  Facilities provide ways to gather information from and to 
+   simulator.  Facilities provide ways to gather information from and to
    observe and control the state of a simulator.
 
 */
@@ -221,12 +221,12 @@ if (p && p->Debug && (dbits & p->debug)) {
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     sprintf (timestamp, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
-    
+
     va_start (arglist, bufsize);
     vsnprintf (obuf, obufsize - 1, fmt, arglist);
     va_end (arglist);
 
-    
+
     for (i=0; i<bufsize; ++i) {
         switch ((unsigned char)buf[i]) {
             case TN_CR:
@@ -468,7 +468,7 @@ int i;
 for (i=0; i<panel_count; i++) {
     if (panels[i] == p) {
         int j;
-        for (j=i+1; j<panel_count; j++) 
+        for (j=i+1; j<panel_count; j++)
             panels[j-1] = panels[j];
         --panel_count;
         if (panel_count == 0) {
@@ -540,7 +540,7 @@ else {
             }
         else
             break;
-        
+
         }
     if (stat (sim_config, &statb) < 0) {
         sim_panel_set_error ("Can't stat simulator configuration '%s': %s", sim_config, strerror(errno));
@@ -886,7 +886,7 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error ("Invalid Panel");
     return -1;
     }
-regs = (REG *)_panel_malloc ((1 + panel->reg_count)*sizeof(*regs)); 
+regs = (REG *)_panel_malloc ((1 + panel->reg_count)*sizeof(*regs));
 if (regs == NULL) {
     panel->State = Error;
     return -1;
@@ -1059,9 +1059,9 @@ return 0;
 }
 
 int
-sim_panel_set_display_callback (PANEL *panel, 
-                                PANEL_DISPLAY_PCALLBACK callback, 
-                                void *context, 
+sim_panel_set_display_callback (PANEL *panel,
+                                PANEL_DISPLAY_PCALLBACK callback,
+                                void *context,
                                 int callbacks_per_second)
 {
 if (!panel) {
@@ -1169,7 +1169,7 @@ if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
     }
-    
+
 if (5 != _panel_send (panel, "STEP\r", 5))
     return -1;
 panel->State = Run;
@@ -1191,7 +1191,7 @@ if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
     }
-    
+
 if (_panel_sendf (panel, 1, NULL, "BREAK %s\r", condition))
     return -1;
 return 0;
@@ -1212,7 +1212,7 @@ if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
     }
-    
+
 if (_panel_sendf (panel, 1, NULL, "NOBREAK %s\r", condition))
     return -1;
 return 0;
@@ -1233,7 +1233,7 @@ if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
     }
-    
+
 if (_panel_sendf (panel, 1, NULL, "EXPECT %s\r", condition))
     return -1;
 return 0;
@@ -1254,7 +1254,7 @@ if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
     return -1;
     }
-    
+
 if (_panel_sendf (panel, 1, NULL, "NOEXPECT %s\r", condition))
     return -1;
 return 0;
@@ -1272,7 +1272,7 @@ return 0;
  */
 
 int
-sim_panel_gen_examine (PANEL *panel, 
+sim_panel_gen_examine (PANEL *panel,
                        const char *name_or_addr,
                        size_t size,
                        void *value)
@@ -1314,12 +1314,12 @@ return 0;
         name_or_addr the name the simulator knows this register by
         size         the size (in local storage) of the buffer which
                      contains the data to be deposited into the simulator
-        value        a pointer to the buffer which contains the data to 
+        value        a pointer to the buffer which contains the data to
                      be deposited into the simulator
  */
 
 int
-sim_panel_gen_deposit (PANEL *panel, 
+sim_panel_gen_deposit (PANEL *panel,
                        const char *name_or_addr,
                        size_t size,
                        const void *value)
@@ -1347,7 +1347,7 @@ return 0;
 
    sim_panel_mem_examine
 
-        addr_size    the size (in local storage) of the buffer which 
+        addr_size    the size (in local storage) of the buffer which
                      contains the memory address of the data to be examined
                      in the simulator
         addr         a pointer to the buffer containing the memory address
@@ -1359,7 +1359,7 @@ return 0;
  */
 
 int
-sim_panel_mem_examine (PANEL *panel, 
+sim_panel_mem_examine (PANEL *panel,
                        size_t addr_size,
                        const void *addr,
                        size_t value_size,
@@ -1403,7 +1403,7 @@ return 0;
 
    sim_panel_mem_deposit
 
-        addr_size    the size (in local storage) of the buffer which 
+        addr_size    the size (in local storage) of the buffer which
                      contains the memory address of the data to be deposited
                      into the simulator
         addr         a pointer to the buffer containing the memory address
@@ -1415,7 +1415,7 @@ return 0;
  */
 
  int
-sim_panel_mem_deposit (PANEL *panel, 
+sim_panel_mem_deposit (PANEL *panel,
                        size_t addr_size,
                        const void *addr,
                        size_t value_size,
@@ -1449,8 +1449,8 @@ return 0;
 
         name        the name of a simulator register or a memory address
                     which is to receive a new value
-        value       the new value in character string form.  The string 
-                    must be in the native/natural radix that the simulator 
+        value       the new value in character string form.  The string
+                    must be in the native/natural radix that the simulator
                     uses when referencing that register
 
  */
@@ -1560,8 +1560,8 @@ struct sched_param sched_priority;
 char buf[4096];
 int buf_data = 0;
 
-/* 
-   Boost Priority for this response processing thread to quickly digest 
+/*
+   Boost Priority for this response processing thread to quickly digest
    arriving data.
  */
 pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
@@ -1691,7 +1691,7 @@ while ((p->sock != INVALID_SOCKET) &&
 
                         if (end)
                             end_index = (size_t)atoi (end + 1);
-                        if (strcmp (e, " same as above")) 
+                        if (strcmp (e, " same as above"))
                             p->array_element_data = strtoull (e, NULL, 16);
                         while (array_index <= end_index) {
                             if (little_endian)
@@ -1795,8 +1795,8 @@ char *buf = NULL;
 size_t buf_data = 0;
 unsigned int callback_count = 0;
 
-/* 
-   Boost Priority for timer thread so it doesn't compete 
+/*
+   Boost Priority for timer thread so it doesn't compete
    with compute bound activities.
  */
 pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
@@ -1809,7 +1809,7 @@ pthread_mutex_unlock (&p->io_lock);
 pthread_cond_signal (&p->startup_cond);   /* Signal we're ready to go */
 msleep (100);
 pthread_mutex_lock (&p->io_lock);
-while ((p->sock != INVALID_SOCKET) && 
+while ((p->sock != INVALID_SOCKET) &&
        (p->callbacks_per_second) &&
        (p->State != Error)) {
     int rate = p->callbacks_per_second;

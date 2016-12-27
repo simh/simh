@@ -1,5 +1,5 @@
 /* m68k_mem.c: memory handling for m68k_cpu
-  
+
    Copyright (c) 2009, Holger Veit
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -54,7 +54,7 @@ int     m68k_dma = 0;
 t_stat m68k_set_mmu(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     uptr->flags |= value;
-    
+
     /* TODO initialize the MMU */
     TranslateAddr = &m68k_translateaddr;
     return SCPE_OK;
@@ -71,16 +71,16 @@ t_stat m68k_set_nommu(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 #endif
 
 /* I/O dispatcher
- * 
+ *
  * I/O devices are implemented this way:
- * a unit will register its own I/O addresses together with its handler 
- * in a hash which allows simple translation of physical addresses 
+ * a unit will register its own I/O addresses together with its handler
+ * in a hash which allows simple translation of physical addresses
  * into units in the ReadPx/WritePx routines.
  * These routines call the iohandler entry on memory mapped read/write.
  * The handler has the option to enqueue an event for its unit for
  * asynchronous callback, e.g. interrupt processing
  */
-t_stat m68k_ioinit() 
+t_stat m68k_ioinit()
 {
     if (iohash == NULL) {
         iohash = (IOHANDLER**)calloc(IOHASHSIZE,sizeof(IOHANDLER*));
@@ -95,7 +95,7 @@ t_stat add_iohandler(UNIT* u,void* ctxt,
     PNP_INFO* pnp = (PNP_INFO*)ctxt;
     IOHANDLER* ioh;
     uint32 i,k;
-    
+
     if (!pnp) return SCPE_IERR;
     for (k=i=0; i<pnp->io_size; i+=pnp->io_incr,k++) {
         t_addr p = (pnp->io_base+i) & addrmask;
@@ -103,7 +103,7 @@ t_stat add_iohandler(UNIT* u,void* ctxt,
         ioh = iohash[idx];
         while (ioh != NULL && ioh->port != p) ioh = ioh->next;
         if (ioh) continue; /* already registered */
-        
+
 //      printf("Register IO for address %x offset=%d\n",p,k);
         ioh = (IOHANDLER*)malloc(sizeof(IOHANDLER));
         if (ioh == NULL) return SCPE_MEM;
@@ -121,7 +121,7 @@ t_stat del_iohandler(void* ctxt)
 {
     uint32 i;
     PNP_INFO* pnp = (PNP_INFO*)ctxt;
-    
+
     if (!pnp) return SCPE_IERR;
     for (i=0; i<pnp->io_size; i += pnp->io_incr) {
         t_addr p = (pnp->io_base+i) & addrmask;
@@ -145,7 +145,7 @@ t_stat del_iohandler(void* ctxt)
  * TranslateAddr is a user-supplied function, to be set into the function pointer,
  * which converts an address and other data (e.g. rw, fcode) provided by the CPU
  * into the real physical address. This is basically the MMU.
- * 
+ *
  * TranslateAddr returns SCPE_OK for valid translation
  *                       SIM_ISIO if I/O dispatch is required; ioh contains pointer to iohandler
  *                       STOP_ERRADDR if address is invalid
@@ -181,12 +181,12 @@ t_stat m68k_mem(t_addr addr,uint8** mem)
 t_stat (*TranslateAddr)(t_addr in,t_addr* out,IOHANDLER** ioh,int rw,int fc,int dma) = &m68k_translateaddr;
 t_stat (*Mem)(t_addr addr,uint8** mem) = &m68k_mem;
 
-/* memory access routines 
+/* memory access routines
  * The Motorola CPU is big endian, whereas others like the i386 is
  * little endian. The memory uses the natural order of the emulating CPU.
  *
  * addressing uses all bits but LSB to access the memory cell
- * 
+ *
  * Memorybits 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00
  *            ------68K Byte0-(MSB)-- ---68K Byte1-----------
  *            ------68K Byte2-------- ---68K Byte3-(LSB)-----
@@ -257,7 +257,7 @@ t_stat ReadPL(t_addr a, uint32* val)
 t_stat WritePB(t_addr a, uint32 val)
 {
     uint8* mem;
-    
+
     t_stat rc = Mem(a&addrmask,&mem);
     switch (rc) {
     default:
@@ -319,7 +319,7 @@ t_stat ReadVB(t_addr a, uint32* val)
         /* note this is a hack to persuade memory testing code that there is no memory:
          * writing to such an address is a bit bucket,
          * and reading from it will return some arbitrary value.
-         * 
+         *
          * SIM_NOMEM has to be defined for systems without a strict memory handling that will
          * result in reading out anything without trapping a memory fault
          */

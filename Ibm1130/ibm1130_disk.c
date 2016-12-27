@@ -18,7 +18,7 @@ commands may NOT be accurate. This should probably be fixed.
  *
  * 19-Dec-05	We no longer issue an operation complete interrupt if an INITR, INITW
  *				or CONTROL operation is attemped on a drive that is not online. DATA_ERROR
- *				is now only indicated in the DSW when	
+ *				is now only indicated in the DSW when
  *
  * 02-Nov-04	Addes -s option to boot to leave switches alone.
  * 15-jun-03	moved actual read on XIO read to end of time interval,
@@ -164,17 +164,17 @@ static struct tag_dsk_action { 				/* stores data needed for pending IO activity
  * device status word:
  *
  * 0 data error, occurs when:
- *		1. A modulo 4 error is detected during a read, read-check, or write operation. 
- *		2. The disk storage is in a read or write mode at the leading edge of a sector pulse. 
+ *		1. A modulo 4 error is detected during a read, read-check, or write operation.
+ *		2. The disk storage is in a read or write mode at the leading edge of a sector pulse.
  *		3. A seek-incomplete signal is received from the 2311.
- *		4. A write select error has occurred in the disk storage drive. 
+ *		4. A write select error has occurred in the disk storage drive.
  *		5. The power unsafe latch is set in the attachment.
  *		Conditions 1, 2, and 3 are turned off by a sense device command with modifier bit 15
  *		set to 1. Conditions 4 and 5 are turned off by powering the drive off and back on.
  * 1 operation complete
  * 2 not ready, occurs when disk not ready or busy or disabled or off-line or
  *		power unsafe latch set. Also included in the disk not ready is the write select error,
- *		which can be a result of power unsafe or write select. 
+ *		which can be a result of power unsafe or write select.
  * 3 disk busy
  * 4 carriage home (on cyl 0)
  * 15-16: number of next sector spinning into position.
@@ -308,7 +308,7 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 					fseek(uptr->fileref, newpos, SEEK_SET);
 					dsk_lastio[drv] = IO_WRITE;
 				}
-						
+
 				fxwrite(buf, 2, DSK_NUMWD, uptr->fileref);
 				uptr->pos = newpos + 2*DSK_NUMWD;
 			}
@@ -390,7 +390,7 @@ static t_stat dsk_svc (UNIT *uptr)
 	int16 buf[DSK_NUMWD];
 	uint32 newpos;						/* changed from t_addr to uint32 in anticipation of simh 64-bit development */
 	int32 iocc_addr;
-	
+
 	if (uptr->FUNC == DSK_FUNC_IDLE)					/* service function called with no activity? not good, but ignore */
 		return SCPE_OK;
 
@@ -453,11 +453,11 @@ static t_stat dsk_svc (UNIT *uptr)
 				tracesector(0, nwords, iocc_addr & mem_mask, uptr->CYL*8 + sec);
 #endif
 			break;
-		
+
 		default:
 			fprintf(stderr, "Unexpected FUNC %x in dsk_svc(%d)\n", uptr->FUNC, drv);
 			break;
-			
+
 	}
 
 	uptr->FUNC = DSK_FUNC_IDLE;			/* we're done with this operation */
@@ -630,7 +630,7 @@ const char * saywhere (int addr)
 	for (i = 0; i < nseg; i++) {
 		if (addr >= mseg[i].addr && addr < (mseg[i].addr+mseg[i].len)) {
 			sprintf(buf, "/%04x = /%04x + /%x in ", addr, mseg[i].addr - mseg[i].offset, addr-mseg[i].addr + mseg[i].offset);
-			if (mseg[i].phid > 0) 
+			if (mseg[i].phid > 0)
 				sprintf(buf+strlen(buf), "phase %02x (%s)", mseg[i].phid, mseg[i].name);
 			else
 				sprintf(buf+strlen(buf), "%s", mseg[i].name);
@@ -725,7 +725,7 @@ static void savesector (int addr, int offset, int len, int phid, const char *nam
 
 	if (! trace_dms)
 		return;
-	
+
 	addr++;												/* first word is sector address, so account for that */
 	len--;
 
@@ -867,7 +867,7 @@ static t_stat fdump_cmd (int32 flags, CONST char *cptr)
 		if (stype == 0x5000) {							/* error record */
 			printf(" (err %d)", M[addr+1]);
 		}
-		
+
 		if (stype == 0x0800)
 			break;
 

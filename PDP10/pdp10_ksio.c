@@ -113,7 +113,7 @@ int32 autcon_enb = 1;                                   /* auto configure enable
 
 static int iocmap[IO_N_UBA] = {                         /* map I/O ext to UBA # */
  -1, 0, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
- }; 
+ };
 
 static const int32 ubabr76[UBANUM] = {
     INT_UB1 & (INT_IPL7 | INT_IPL6), INT_UB3 & (INT_IPL7 | INT_IPL6)
@@ -490,7 +490,7 @@ for (i = 0; (dibp = dib_tab[i]); i++ ) {
         dibp->wr (data, ba, access);
         pi_eval ();
         return SCPE_OK;
-        } 
+        }
     }
 return SCPE_NXM;
 }
@@ -566,7 +566,7 @@ return pa10;
  * of the adjacent word is written, and preserved otherwise.
  *
  * Unibus addressing does not change with 18-bit transfers; they are
- * accounted for as 2 bytes.  <0:1> are bits <17:16> of word 0; 
+ * accounted for as 2 bytes.  <0:1> are bits <17:16> of word 0;
  * <18:19> are bits <17:16> of word 1.
  *
  * Normal writes assume that DMA will access sequential Unibus addresses.
@@ -583,7 +583,7 @@ return pa10;
  * the byte as indicated above.  Bits <10:2> are the offset within
  * the PDP10 page; thus Unibus addressing assumes 4 bytes/PDP10 word.
  *
- * 9 bits = 512 words/PDP10 page = 2048 bytes / Unibus page 
+ * 9 bits = 512 words/PDP10 page = 2048 bytes / Unibus page
  *
  * Bits 16:11 select a UBA mapping register, which indicates whether
  * PDP10 memory at that address is accessible, and if so, provides
@@ -592,7 +592,7 @@ return pa10;
  * Unibus addresses with bit 17 set do not map PDP10 memory.  The
  * high end is reserved for Unibus IO space.  The rest is used for
  * UBA maintenance modes (not simulated).
- * 
+ *
  * IO space accesses may have side effects in the device; an aligned
  * read of two bytes is NOT equivalent to two one byte reads of the
  * same addresses.
@@ -1486,11 +1486,11 @@ for (i=0; i<wc; i++)
 
     sprintf (octal, "%07o: %06o,,%06o", pa_start+i, (int)((d>>V_WORD0)&M_WORD18),
                                                     (int)((d>>V_WORD1)&M_WORD18));
-    sprintf (words, "0x%05X: %04X,,%04X", pa_start+i, (int)((d>>V_WORD0)&M_WORD), 
+    sprintf (words, "0x%05X: %04X,,%04X", pa_start+i, (int)((d>>V_WORD0)&M_WORD),
                                                       (int)((d>>V_WORD1)&M_WORD));
-    sprintf (bytes, "%02X %02X %02X %02X", (int)(((d&~M_BYTE0)>>V_BYTE0)&M_BYTE), 
-                                           (int)(((d&~M_BYTE1)>>V_BYTE1)&M_BYTE), 
-                                           (int)(((d&~M_BYTE2)>>V_BYTE2)&M_BYTE), 
+    sprintf (bytes, "%02X %02X %02X %02X", (int)(((d&~M_BYTE0)>>V_BYTE0)&M_BYTE),
+                                           (int)(((d&~M_BYTE1)>>V_BYTE1)&M_BYTE),
+                                           (int)(((d&~M_BYTE2)>>V_BYTE2)&M_BYTE),
                                            (int)(((d&~M_BYTE3)>>V_BYTE3)&M_BYTE));
     strcpy (ascii, "'.....'");
     for (j=1; j<=5; j++)
@@ -1883,7 +1883,7 @@ for (i = j = 0; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
             dib_tab[j++] = dibp;                        /* add DIB to dib_tab */
             if (j >= DIB_MAX)                           /* too many? */
                 return SCPE_IERR;
-            }   
+            }
         }                                               /* end if enabled */
     }                                                   /* end for */
 for (i = 0; (dibp = std_dib[i]) != NULL; i++) {         /* loop thru std */
@@ -1954,14 +1954,14 @@ return SCPE_OK;
 
 /* Autoconfiguration
 
-   The below table describes the fixed addresses for the currently 
-   supported Unibus devices which are shared between the PDP11/VAX 
+   The below table describes the fixed addresses for the currently
+   supported Unibus devices which are shared between the PDP11/VAX
    Unibus and the PDP10.  This list isn't likely to change, but if
    need be, it can be extended to include as many devices as necessary.
-   The full 'real' auto configuration table which describes both 
+   The full 'real' auto configuration table which describes both
    devices with static addresses and addresses(and vectors) in floating
-   address space is #ifdef'd out below.  These addresses have been 
-   used historically in the PDP10 simulator so their fixed addresses 
+   address space is #ifdef'd out below.  These addresses have been
+   used historically in the PDP10 simulator so their fixed addresses
    are retained for consistency with OS configurations which
    expect them to be using these fixed address and vectors.
 
@@ -1986,100 +1986,100 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
 #ifdef VM_PDP10
     { { "DZ" },          1,  2,  0, 0,
         {0000010}, {0340} },                             /* DZ11 - Fixed addresses and vectors in simulator */
-    { { "RY" },          1,  1,  8, 4, 
+    { { "RY" },          1,  1,  8, 4,
         {0017170}, {0264} },                             /* RX11/RX211 - Fixed address and vector in simulator */
-    { { "CR" },          1,  1,  0, 0, 
+    { { "CR" },          1,  1,  0, 0,
         {0017160}, {0230} },                             /* CR11 - fx CSR, fx VEC */
-    { { "PTR" },         1,  1,  0, 0, 
+    { { "PTR" },         1,  1,  0, 0,
         {0017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
-    { { "PTP" },         1,  1,  0, 0, 
+    { { "PTP" },         1,  1,  0, 0,
         {0017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
-    { { "XU", "XUB" },   1,  1,  8, 4, 
+    { { "XU", "XUB" },   1,  1,  8, 4,
         {014510}, {0120} },                              /* DEUNA */
-    { { "DUP" },         1,  2,  0, 0, 
+    { { "DUP" },         1,  2,  0, 0,
         {0000300}, {0570} },                             /* DUP11 bit sync - fx CSR, fx VEC */
-    { { "KDP" },         1,  2,  0, 0, 
+    { { "KDP" },         1,  2,  0, 0,
         {0000540}, {0540} },                             /* KMC11-A comm IOP-DUP ucode - fx CSR, fx VEC */
-    { { "DMR" },         1,  2,  0, 0, 
+    { { "DMR" },         1,  2,  0, 0,
         {0004000}, {0610} },                             /* DMR11 comm - fx CSR, fx VEC */
 #else
-    { { "QBA" },         1,  0,  0, 0, 
+    { { "QBA" },         1,  0,  0, 0,
         {017500} },                                     /* doorbell - fx CSR, no VEC */
-    { { "MCTL" },        1,  0,  0, 0, 
+    { { "MCTL" },        1,  0,  0, 0,
         {012100} },                                     /* MSV11-P - fx CSR, no VEC */
-    { { "KE" },          1,  0,  0, 0, 
+    { { "KE" },          1,  0,  0, 0,
         {017300} },                                     /* KE11-A - fx CSR, no VEC */
-    { { "KG" },          1,  0,  0, 0, 
+    { { "KG" },          1,  0,  0, 0,
         {010700} },                                     /* KG11-A - fx CSR, no VEC */
-    { { "RHA", "RHB" },  1,  1,  0, 0, 
+    { { "RHA", "RHB" },  1,  1,  0, 0,
         {016700, 012440}, {0254, 0224} },               /* RH11/RH70 - fx CSR, fx VEC */
-    { { "CLK" },         1,  1,  0, 0, 
+    { { "CLK" },         1,  1,  0, 0,
         {017546}, {0100} },                             /* KW11L - fx CSR, fx VEC */
-    { { "PCLK" },        1,  1,  0, 0, 
+    { { "PCLK" },        1,  1,  0, 0,
         {012540}, {0104} },                             /* KW11P - fx CSR, fx VEC */
-    { { "PTR" },         1,  1,  0, 0, 
+    { { "PTR" },         1,  1,  0, 0,
         {017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
-    { { "PTP" },         1,  1,  0, 0, 
+    { { "PTP" },         1,  1,  0, 0,
         {017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
-    { { "RK" },          1,  1,  0, 0, 
+    { { "RK" },          1,  1,  0, 0,
         {017400}, {0220} },                             /* RK11 - fx CSR, fx VEC */
-    { { "TM" },          1,  1,  0, 0, 
+    { { "TM" },          1,  1,  0, 0,
         {012520}, {0224} },                             /* TM11 - fx CSR, fx VEC */
-    { { "RC" },          1,  1,  0, 0, 
+    { { "RC" },          1,  1,  0, 0,
         {017440}, {0210} },                             /* RC11 - fx CSR, fx VEC */
-    { { "RF" },          1,  1,  0, 0, 
+    { { "RF" },          1,  1,  0, 0,
         {017460}, {0204} },                             /* RF11 - fx CSR, fx VEC */
-    { { "CR" },          1,  1,  0, 0, 
+    { { "CR" },          1,  1,  0, 0,
         {017160}, {0230} },                             /* CR11 - fx CSR, fx VEC */
-    { { "HK" },          1,  1,  0, 0, 
+    { { "HK" },          1,  1,  0, 0,
         {017440}, {0210} },                             /* RK611 - fx CSR, fx VEC */
-    { { "LPT" },         1,  1,  0, 0, 
-        {017514, 004004, 004014, 004024, 004034}, 
+    { { "LPT" },         1,  1,  0, 0,
+        {017514, 004004, 004014, 004024, 004034},
         {0200,     0170,   0174,   0270,   0274} },     /* LP11 - fx CSR, fx VEC */
-    { { "RB" },          1,  1,  0, 0, 
+    { { "RB" },          1,  1,  0, 0,
         {015606}, {0250} },                             /* RB730 - fx CSR, fx VEC */
-    { { "RL" },          1,  1,  0, 0, 
+    { { "RL" },          1,  1,  0, 0,
         {014400}, {0160} },                             /* RL11 - fx CSR, fx VEC */
-    { { "RL" },          1,  1,  0, 0, 
+    { { "RL" },          1,  1,  0, 0,
         {014400}, {0160} },                             /* RL11 - fx CSR, fx VEC */
-    { { "DCI" },         1,  2,  0, 8, 
-        {014000, 014010, 014020, 014030, 
-         014040, 014050, 014060, 014070, 
-         014100, 014110, 014120, 014130, 
-         014140, 014150, 014160, 014170, 
-         014200, 014210, 014220, 014230, 
+    { { "DCI" },         1,  2,  0, 8,
+        {014000, 014010, 014020, 014030,
+         014040, 014050, 014060, 014070,
+         014100, 014110, 014120, 014130,
+         014140, 014150, 014160, 014170,
+         014200, 014210, 014220, 014230,
          014240, 014250, 014260, 014270,
-         014300, 014310, 014320, 014330, 
+         014300, 014310, 014320, 014330,
          014340, 014350, 014360, 014370} },             /* DC11 - fx CSRs */
-    { { NULL },          1,  2,  0, 8, 
-        {016500, 016510, 016520, 016530, 
+    { { NULL },          1,  2,  0, 8,
+        {016500, 016510, 016520, 016530,
          016540, 016550, 016560, 016570,
          016600, 016610, 016620, 016630,
          016640, 016650, 016660, 016670} },             /* TU58 - fx CSRs */
-    { { NULL },          1,  1,  0, 4, 
-        {015200, 015210, 015220, 015230, 
+    { { NULL },          1,  1,  0, 4,
+        {015200, 015210, 015220, 015230,
          015240, 015250, 015260, 015270,
          015300, 015310, 015320, 015330,
          015340, 015350, 015360, 015370} },             /* DN11 - fx CSRs */
-    { { NULL },          1,  1,  0, 4, 
-        {010500, 010510, 010520, 010530, 
-         010540, 010550, 010560, 010570, 
-         010600, 010610, 010620, 010630, 
+    { { NULL },          1,  1,  0, 4,
+        {010500, 010510, 010520, 010530,
+         010540, 010550, 010560, 010570,
+         010600, 010610, 010620, 010630,
          010640, 010650, 010660, 010670} },             /* DM11B - fx CSRs */
-    { { NULL },          1,  2,  0, 8, 
-        {007600, 007570, 007560, 007550, 
+    { { NULL },          1,  2,  0, 8,
+        {007600, 007570, 007560, 007550,
          007540, 007530, 007520, 007510,
          007500, 007470, 007460, 007450,
          007440, 007430, 007420, 007410} },             /* DR11C - fx CSRs */
-    { { NULL },          1,  1,  0, 8, 
-        {012600, 012604, 012610, 012614, 
+    { { NULL },          1,  1,  0, 8,
+        {012600, 012604, 012610, 012614,
          012620, 012624, 012620, 012624} },             /* PR611 - fx CSRs */
-    { { NULL },          1,  1,  0, 8, 
-        {017420, 017422, 017424, 017426, 
+    { { NULL },          1,  1,  0, 8,
+        {017420, 017422, 017424, 017426,
          017430, 017432, 017434, 017436} },             /* DT11 - fx CSRs */
     { { NULL },          1,  2,  0, 8,
       {016200, 016240} },                               /* DX11 */
-    { { "DLI" },         1,  2,  0, 8, 
+    { { "DLI" },         1,  2,  0, 8,
         {016500, 016510, 016520, 016530,
          016540, 016550, 016560, 016570,
          016600, 016610, 016620, 016630,
@@ -2099,7 +2099,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  3,  0, 8,
       {015000, 015040, 015100, 015140, }},              /* DV11 */
     { { NULL },          1,  2,  8, 8 },                /* LK11A */
-    { { "DMC0", "DMC1", "DMC2", "DMC3" }, 
+    { { "DMC0", "DMC1", "DMC2", "DMC3" },
                          1,  2,  8, 8 },                /* DMC11 */
     { { "DZ" },          1,  2,  8, 8 },                /* DZ11 */
     { { NULL },          1,  2,  8, 8 },                /* KMC11 */
@@ -2107,9 +2107,9 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  2,  8, 8 },                /* VMV21 */
     { { NULL },          1,  2, 16, 8 },                /* VMV31 */
     { { NULL },          1,  2,  8, 8 },                /* DWR70 */
-    { { "RL", "RLB"},    1,  1,  8, 4, 
+    { { "RL", "RLB"},    1,  1,  8, 4,
         {014400}, {0160} },                             /* RL11 */
-    { { "TS", "TSB", "TSC", "TSD"}, 
+    { { "TS", "TSB", "TSC", "TSD"},
                          1,  1,  0, 4,                  /* TS11 */
         {012520, 012524, 012530, 012534},
         {0224} },
@@ -2117,20 +2117,20 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {010460} },                                     /* LPA11K */
     { { NULL },          1,  2,  8, 8 },                /* KW11C */
     { { NULL },          1,  1,  8, 8 },                /* reserved */
-    { { "RX", "RY" },    1,  1,  8, 4, 
+    { { "RX", "RY" },    1,  1,  8, 4,
         {017170} , {0264} },                            /* RX11/RX211 */
     { { NULL },          1,  1,  8, 4 },                /* DR11W */
-    { { NULL },          1,  1,  8, 4, 
+    { { NULL },          1,  1,  8, 4,
         {012410, 012410}, {0124} },                     /* DR11B - fx CSRs,vec */
     { { "DMP" },         1,  2,  8, 8 },                /* DMP11 */
     { { NULL },          1,  2,  8, 8 },                /* DPV11 */
     { { NULL },          1,  2,  8, 8 },                /* ISB11 */
     { { NULL },          1,  2, 16, 8 },                /* DMV11 */
-    { { "XU", "XUB" },   1,  1,  8, 4, 
+    { { "XU", "XUB" },   1,  1,  8, 4,
         {014510}, {0120} },                             /* DEUNA */
     { { "XQ", "XQB" },   1, -1,  0, 4,
         {014440, 014460, 014520, 014540}, {0120} },     /* DEQNA */
-    { { "RQ", "RQB", "RQC", "RQD" }, 
+    { { "RQ", "RQB", "RQC", "RQD" },
                          1, -1,  4, 4,                  /* RQDX3 */
         {012150}, {0154} },
     { { NULL },          1,  8, 32, 4 },                /* DMF32 */
@@ -2138,7 +2138,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  2,  0, 8,
         {004200, 004240, 004300, 004340} },             /* PLC11 */
     { { NULL },          1,  1, 16, 4 },                /* VS100 */
-    { { "TQ", "TQB" },   1, -1,  4, 4, 
+    { { "TQ", "TQB" },   1, -1,  4, 4,
         {014500}, {0260} },                             /* TQK50 */
     { { NULL },          1,  2, 16, 8 },                /* KMV11 */
     { { NULL },          1,  2,  0, 8,
@@ -2152,31 +2152,31 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {017340}, {0214} },                             /* TC11 */
     { { "TA" },          1,  1,  0, 0,
         {017500}, {0260} },                             /* TA11 */
-    { { NULL },          1,  2, 64, 8, 
+    { { NULL },          1,  2, 64, 8,
         {017200} },                                     /* QVSS - fx CSR */
     { { NULL },          1,  1,  8, 4 },                /* VS31 */
     { { NULL },          1,  1,  0, 4,
         {016200} },                                     /* LNV11 - fx CSR */
     { { NULL },          1,  1, 16, 4 },                /* LNV21/QPSS */
-    { { NULL },          1,  1,  8, 4, 
+    { { NULL },          1,  1,  8, 4,
         {012570} },                                     /* QTA - fx CSR */
     { { NULL },          1,  1,  8, 4 },                /* DSV11 */
     { { NULL },          1,  2,  8, 8 },                /* CSAM */
     { { NULL },          1,  2,  8, 8 },                /* ADV11C */
-    { { NULL },          1,  0,  8, 8, 
+    { { NULL },          1,  0,  8, 8,
         {010440} },                                     /* AAV11/AAV11C */
-    { { NULL },          1,  2,  8, 8, 
+    { { NULL },          1,  2,  8, 8,
         {016400}, {0140} },                             /* AXV11C - fx CSR,vec */
-    { { NULL },          1,  2,  4, 8, 
+    { { NULL },          1,  2,  4, 8,
         {010420} },                                     /* KWV11C - fx CSR */
-    { { NULL },          1,  2,  8, 8, 
+    { { NULL },          1,  2,  8, 8,
         {016410} },                                     /* ADV11D - fx CSR */
-    { { NULL },          1,  2,  8, 8, 
+    { { NULL },          1,  2,  8, 8,
         {016420} },                                     /* AAV11D - fx CSR */
     { { "QDSS" },        1,  3,  0, 16,
-        {017400, 017402, 017404, 017406, 
+        {017400, 017402, 017404, 017406,
          017410, 017412, 017414, 017416} },             /* VCB02 - QDSS - fx CSR */
-    { { NULL },          1, 16,  0, 4, 
+    { { NULL },          1, 16,  0, 4,
         {004160, 004140, 004120} },                     /* DRV11J - fx CSR */
     { { NULL },          1,  2, 16, 8 },                /* DRQ3B */
     { { NULL },          1,  1,  8, 4 },                /* VSV24 */
@@ -2204,7 +2204,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL }, -1 }                                    /* end table */
 };
 
-#if !defined(DEV_NEXUS) 
+#if !defined(DEV_NEXUS)
 #if defined(DEV_MBUS)
 #define DEV_NEXUS DEV_MBUS
 #else
@@ -2291,4 +2291,3 @@ if (dptr == NULL)
     return SCPE_IERR;
 return auto_config (NULL, 0);                           /* autoconfigure */
 }
-

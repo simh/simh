@@ -92,7 +92,7 @@ if (((portstr = strchr (ipaddrstr, ':')) == NULL) || (*(portstr+1) == 0)) {
 
 sscanf (gbuf, "%d", &lport);
 sscanf (portstr, "%d", &port);
-if (ipaddrstr) 
+if (ipaddrstr)
     inaddr = inet_addr (ipaddrstr);
 
 if (!inaddr) {
@@ -122,7 +122,7 @@ host_addr.s_addr = htonl(INADDR_ANY);
 if (head) {
     ret = _do_redirects (slirp, head->next);
     if (slirp_add_hostfwd (slirp, head->is_udp, host_addr, head->lport, head->inaddr, head->port) < 0) {
-        sim_printf("Can't establish redirector for: redir %s   =%d:%s:%d\n", 
+        sim_printf("Can't establish redirector for: redir %s   =%d:%s:%d\n",
                    tcpudp[head->is_udp], head->lport, inet_ntoa(head->inaddr), head->port);
         ++ret;
         }
@@ -236,7 +236,7 @@ while (*tptr && !err) {
         if (cptr && *cptr) {
             int count = 0;
             char *name;
-           
+
             slirp->dns_search = g_strdup (cptr);
             name = slirp->dns_search;
             do {
@@ -322,9 +322,9 @@ if ((slirp->vdhcp_start.s_addr == 0) && slirp->dhcpmgmt)
     slirp->vdhcp_start.s_addr = htonl(ntohl(slirp->vnetwork.s_addr) | 15);
 if (slirp->vnameserver.s_addr == 0)
     slirp->vnameserver.s_addr = htonl(ntohl(slirp->vnetwork.s_addr) | 3);
-slirp->slirp = slirp_init (0, slirp->vnetwork, slirp->vnetmask, slirp->vgateway, 
-                           NULL, slirp->tftp_path, slirp->boot_file, 
-                           slirp->vdhcp_start, slirp->vnameserver, 
+slirp->slirp = slirp_init (0, slirp->vnetwork, slirp->vnetmask, slirp->vgateway,
+                           NULL, slirp->tftp_path, slirp->boot_file,
+                           slirp->vdhcp_start, slirp->vnameserver,
                            (const char **)(slirp->dns_search_domains), (void *)slirp);
 
 if (_do_redirects (slirp->slirp, slirp->rtcp)) {
@@ -351,7 +351,7 @@ else {
     g_array_append_val(slirp->gpollfds, pfd);
     slirp->dbit = dbit;
     slirp->dptr = dptr;
-    
+
     sim_slirp_show(slirp, stdout);
     if (sim_log && (sim_log != stdout))
         sim_slirp_show(slirp, sim_log);
@@ -401,7 +401,7 @@ g_free (slirp);
 
 t_stat sim_slirp_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-fprintf (st, "%s", 
+fprintf (st, "%s",
 "NAT options:\n"
 "    DHCP{=dhcp_start_address}           Enables DHCP server and specifies\n"
 "                                        guest LAN DHCP start IP address\n"
@@ -510,7 +510,7 @@ if (slirp->boot_file)
     fprintf (st, "        dhcp bootfile =%s\n", slirp->boot_file);
 if (slirp->dns_search_domains) {
     char **domains = slirp->dns_search_domains;
-    
+
     fprintf (st, "        DNS domains   =");
     while (*domains) {
         fprintf (st, "%s%s", (domains != slirp->dns_search_domains) ? ", " : "", *domains);
@@ -651,4 +651,3 @@ pthread_mutex_unlock (&slirp->write_buffer_lock);
 slirp_pollfds_poll(slirp->gpollfds, 0);
 
 }
-

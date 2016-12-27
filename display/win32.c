@@ -246,11 +246,11 @@ ws_init2(void) {
     wc.hbrBackground    = black_brush;
     wc.lpszMenuName     = APP_MENU;
     wc.cbClsExtra       = 0;
-    wc.cbWndExtra       = 0; 
+    wc.cbWndExtra       = 0;
     /* WNDCLASSEX/RegisterClassEx include hIconSm (small icon) */
     RegisterClass(&wc);
 
-    /* 
+    /*
      * WS_OVERLAPPEDWINDOW=>
      *  WS_OVERLAPPED, WS_CAPTION, WS_SYSMENU, WS_THICKFRAME,
      *  WS_MINIMIZEBOX, WS_MAXIMIZEBOX
@@ -381,7 +381,7 @@ ws_display_point(int x, int y, void *color)
     FillRect(dc, &r, brush);
     ReleaseDC(static_wh, dc);
 }
-  
+
 void
 ws_sync(void) {
     /* noop */

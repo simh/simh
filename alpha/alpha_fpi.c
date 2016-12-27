@@ -433,14 +433,14 @@ else if (ftpb != UFT_ZERO) {                            /* s2 != 0? */
 return ieee_rpack (&a, ir, dp);                         /* round and pack */
 }
 
-/* IEEE floating multiply 
+/* IEEE floating multiply
 
    - Take care of NaNs and infinites
    - Test for zero operands (fast exit)
    - 64b x 64b fraction multiply, yielding 128b result
    - Normalize (at most 1 bit)
    - Insert "sticky" bit in low order fraction, for rounding
-   
+
    Because IEEE fractions have a range of [1,2), the result can have a range
    of [1,4).  Results in the range of [1,2) appear to be denormalized by one
    place, when in fact they are correct.  Results in the range of [2,4) appear
@@ -480,7 +480,7 @@ return ieee_rpack (&a, ir, dp);                         /* round and pack */
    - Check for zero cases
    - Divide fractions (55b to develop a rounding bit)
    - Set sticky bit if remainder non-zero
-   
+
    Because IEEE fractions have a range of [1,2), the result can have a range
    of (.5,2).  Results in the range of [1,2) are correct.  Results in the
    range of (.5,1) need to be normalized by one place. */
@@ -611,7 +611,7 @@ return;
    - Inexact (set if there are any rounding bits, regardless of rounding)
    - Overflow (result is infinite if rounded, max if not)
    - Underflow (no denorms!)
-   
+
    Underflow handling is particularly complicated
    - Result is always 0
    - UNF and INE are always set in FPCR

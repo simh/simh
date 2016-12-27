@@ -145,7 +145,7 @@ ws_poll(int *valp, int maxus)
 
     if (SCPE_OK == vid_poll_mouse (&mev)) {
         unsigned char old_lp_sw = display_lp_sw;
-        
+
         if ((display_lp_sw = mev.b1_state)) {
             ws_lp_x = mev.x_pos;
             ws_lp_y = (ypixels - 1) - mev.y_pos; /* range 0 - (ypixels-1) */
@@ -241,7 +241,7 @@ CURSOR *result = NULL;
 int width, height, colors, cpp;
 int hot_x = 0, hot_y = 0;
 
-if (4 > sscanf(image[0], "%d %d %d %d %d %d", 
+if (4 > sscanf(image[0], "%d %d %d %d %d %d",
                &width, &height, &colors, &cpp, &hot_x, &hot_y))
     return result;
 if ((cpp != 1) || (0 != width%8) || (colors != 3))
@@ -312,7 +312,7 @@ ws_init(const char *name, int xp, int yp, int colors, void *dptr)
 {
     int i;
     int ret;
-    
+
     arrow_cursor = ws_create_cursor (arrow);
     cross_cursor = ws_create_cursor (cross);
     xpixels = xp;
@@ -339,7 +339,7 @@ void *
 ws_color_rgb(int r, int g, int b)
 {
     uint32 color, i;
-    
+
     color = sim_end ? (0xFF000000 | ((r & 0xFF00) << 8) | (g & 0xFF00) | ((b & 0xFF00) >> 8)) : (0x000000FF | (r  & 0xFF00) | ((g & 0xFF00) << 8) | ((b & 0xFF00) << 16));
     for (i=0; i<ncolors; i++) {
         if (colors[i] == color)
@@ -385,7 +385,7 @@ ws_display_point(int x, int y, void *color)
         brush = (uint32 *)ws_color_black ();
     if (pix_size > 1) {
         int i, j;
-        
+
         for (i=0; i<pix_size; i++)
             for (j=0; j<pix_size; j++)
                 surface[(y + i)*xpixels + x + j] = *brush;
@@ -393,7 +393,7 @@ ws_display_point(int x, int y, void *color)
     else
         surface[y*xpixels + x] = *brush;
 }
-  
+
 void
 ws_sync(void) {
     vid_draw (0, 0, xpixels, ypixels, surface);

@@ -71,7 +71,7 @@ extern t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
 /*  SBC reset routine */
 
 t_stat SBC_reset (DEVICE *dptr)
-{    
+{
     sim_printf("Initializing iSBC-80/24:\n");
     i8080_reset (NULL);
     i8251_devnum = 0;

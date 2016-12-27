@@ -1,11 +1,12 @@
-*.jpg binary
-*.png binary
-*.sln binary
-*.vcproj binary
-*.exe binary
-*.lda binary
-*.bin binary
-*.imd binary
-*.rim binary
+*.jpg binary -diff
+*.png binary -diff
+*.sln binary -diff
+*.vcproj binary -diff
+*.exe binary -diff
+*.lda binary -diff
+*.bin binary -diff
+*.imd binary -diff
+*.rim binary -diff
+*.doc binary -diff
 sim_rev.h export-subst
 

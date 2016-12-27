@@ -32,10 +32,10 @@
    OVERVIEW
 
    This module implements the IMP pseudo device - this hack takes care of two
-   custom devices in the IMP hardware - device 041, which implements task 
+   custom devices in the IMP hardware - device 041, which implements task
    switching and the RDIMPN instruction, and device 42, which implements the
    AMIMLC ("am I a multiline controller") instruction. This module also contains
-   a few miscellaneous routines which are used by the IMP support in general.  
+   a few miscellaneous routines which are used by the IMP support in general.
 
    IMP state is maintained in a set of state variables:
 

@@ -15,4 +15,3 @@ att petr bin_newMouse_3-22-66.bin
 ; Start in "Erase Wall" mode
 d tac 400014
 boot petr
-

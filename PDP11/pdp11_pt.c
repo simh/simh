@@ -216,7 +216,7 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
             ptr_csr = (ptr_csr & ~CSR_DONE) | CSR_BUSY;
             CLR_INT (PTR);
             if (ptr_unit.flags & UNIT_ATT)              /* data to read? */
-                sim_activate (&ptr_unit, ptr_unit.wait);  
+                sim_activate (&ptr_unit, ptr_unit.wait);
             else sim_activate (&ptr_unit, 0);           /* error if not */
             }
         ptr_csr = (ptr_csr & ~PTRCSR_RW) | (data & PTRCSR_RW);

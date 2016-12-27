@@ -220,7 +220,7 @@ if (lpxb[0]) {                                          /* any char left? */
         clearerr (uptr->fileref);
         r = SCPE_IOERR;
         }
-    }   
+    }
 lpt_bptr = 0;                                           /* reset buffer */
 for (i = 0; i < LPT_WIDTH; i++)
     lpxb[i] = ' ';

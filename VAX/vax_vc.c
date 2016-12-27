@@ -344,7 +344,7 @@ DEVICE vc_dev = {
     NULL, NULL, &vc_reset,
     NULL, NULL, &vc_detach,
     &vc_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG, 0,
-    vc_debug, NULL, NULL, &vc_help, NULL, NULL, 
+    vc_debug, NULL, NULL, &vc_help, NULL, NULL,
     &vc_description
     };
 
@@ -448,7 +448,7 @@ switch (rg) {
 
     case 6:                                             /* ICDR */
         switch ((vc_intc.mode & ICM_M_RP) >> ICM_V_RP) {
-        
+
             case 0:                                     /* ISR */
                 *data = vc_intc.isr;
                 break;
@@ -493,7 +493,7 @@ switch (rg) {
     case 27:                                            /* UART tx/rx buf B */
         *data = ua2681_rd (&vc_uart, (rg - 16));
         break;
-    
+
     default:                                            /* Spares */
         break;
         }                                               /* end switch PA */
@@ -564,21 +564,21 @@ switch (rg) {
             vc_intc.imr = data & 0xFFFF;
         else if (vc_intc.ptr == 9)                      /* ACR */
             vc_intc.acr = data & 0xFFFF;
-        else  
-            /* 
-               Masking the vector with 0x1FC is probably storing 
-               one more bit than the original hardware did.  
-               Doing this allows a maximal simulated hardware 
-               configuration use a reasonable vector where real 
-               hardware could never be assembled with that many 
+        else
+            /*
+               Masking the vector with 0x1FC is probably storing
+               one more bit than the original hardware did.
+               Doing this allows a maximal simulated hardware
+               configuration use a reasonable vector where real
+               hardware could never be assembled with that many
                devices.
              */
-            vc_intc.vec[vc_intc.ptr] = data & 0x1FC;    /* Vector */ 
+            vc_intc.vec[vc_intc.ptr] = data & 0x1FC;    /* Vector */
         break;
 
     case 7:                                             /* ICSR */
         switch ((data >> 4) & 0xF) {
-        
+
             case 0:                                     /* Reset */
                 vc_intc.imr = 0xFF;
                 vc_intc.irr = 0;
@@ -635,7 +635,7 @@ switch (rg) {
             case 11:                                    /* Preselect IMR */
                 vc_intc.ptr = 8;
                 break;
-            
+
             case 12:                                    /* Preselect ACR */
                 vc_intc.ptr = 9;
                 break;
@@ -657,7 +657,7 @@ switch (rg) {
     case 27:                                            /* UART tx/rx buf B (mouse) */
         ua2681_wr (&vc_uart, (rg - 16), data);
         break;
-    
+
     default:                                            /* Spares */
         break;
         }
@@ -755,7 +755,7 @@ memset (data, 0, sizeof(data));
 memset (mask, 0, sizeof(mask));
 for (i=0; i<16*16; i++) {
     if (func) {     /* OR */
-        if (cur_bits[i]) { 
+        if (cur_bits[i]) {
             /* White */
             d = 0; m = 1;
             }
@@ -765,7 +765,7 @@ for (i=0; i<16*16; i++) {
             }
         }
     else {          /* AND */
-        if (cur_bits[i]) { 
+        if (cur_bits[i]) {
             /* Black */
             d = 1; m = 1;
             }
@@ -944,7 +944,7 @@ lines = 0;
 for (ln = 0; ln < VC_YSIZE; ln++) {
     if ((vc_map[ln] & VCMAP_VLD) == 0) {                /* line invalid? */
         off = vc_map[ln] * 32;                          /* get video buf offset */
-        for (col = 0; col < VC_XSIZE; col++)  
+        for (col = 0; col < VC_XSIZE; col++)
             vc_lines[ln*VC_XSIZE + col] = vid_mono_palette[(vc_buf[off + (col >> 5)] >> (col & 0x1F)) & 1];
                                                         /* 1bpp to 32bpp */
         if (CUR_V &&                                    /* cursor visible && need to draw cursor? */

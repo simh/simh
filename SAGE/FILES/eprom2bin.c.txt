@@ -7,7 +7,7 @@
 #define BASE 0xfe0000
 #define RECLEN 32
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
   FILE *e,*o,*out;
   int c,i;
@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
     fprintf(stderr, "Could not open %s\n", argv[3]);
     exit(1);
   }
-  
+
   size = 0;
   while (!feof(e)) {
     if ((c = fgetc(e)) == EOF) break;
@@ -58,4 +58,3 @@ int main(int argc, char* argv[])
   fclose(out);
   exit(0);
 }
-

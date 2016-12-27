@@ -77,7 +77,7 @@ static unsigned char intensity;         /* 3 bits */
 static unsigned char lp_ena;            /* 1 bit */
 
 /* kept signed for raster violation checking */
-static short xpos, ypos;                /* 10 bits, signed */       
+static short xpos, ypos;                /* 10 bits, signed */
 static unsigned char sequence;          /* 2 bits */
 
 /* XXX make defines public for 340_cycle return */
@@ -455,7 +455,7 @@ ipoint(int i, int n, unsigned char byte)
     return 0;
 }
 
-/* 
+/*
  * 342 character generator - first 64 characters (from manual)
  */
 static const unsigned char chars[64][5] = {

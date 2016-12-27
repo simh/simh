@@ -53,7 +53,7 @@
 
 /* set the base and size for the RAM on the iSBC 80/20 */
 #define RAM_BASE        0x3C00
-#define RAM_SIZE        0x0400 
+#define RAM_SIZE        0x0400
 #define RAM_DISABLE     1
 
 /* set INTR for CPU */
@@ -131,4 +131,3 @@
 #define STOP_IO 	5                           /* I/O error */
 #define STOP_MEM 	6                           /* Memory error */
 #define STOP_XACK 	7                           /* XACK error */
-

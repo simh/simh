@@ -40,7 +40,7 @@ DEPOSIT -m 11 HLT
 DEPOSIT P 10
 
 ; Tell the world ...
-echo 
+echo
 echo Here are the DMC pointers before sending -
 ex 32:33
 echo
@@ -57,5 +57,3 @@ go
 echo
 echo Here are the DMC pointers after sending ...
 ex 32:33
-
-

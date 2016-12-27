@@ -310,7 +310,7 @@ DEVICE tti_dev = {
     4, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, &tti_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &tti_help, NULL, NULL,
     &tti_description
     };
 
@@ -352,7 +352,7 @@ DEVICE tto_dev = {
     4, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, &tto_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &tto_help, NULL, NULL,
     &tto_description
     };
 
@@ -377,7 +377,7 @@ DEVICE clk_dev = {
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    NULL, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL,
     &clk_description
     };
 
@@ -413,8 +413,8 @@ DEVICE tmr_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &tmr_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DEBUG, 0, 
-    tmr_deb, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_DEBUG, 0,
+    tmr_deb, NULL, NULL, NULL, NULL, NULL,
     &tmr_description
     };
 
@@ -447,7 +447,7 @@ DEVICE rlcs_dev = {
     1, 10, 24, 1, 16, 16,
     NULL, NULL, &rlcs_reset,
     NULL, &rlcs_attach, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
     &rlcs_description
     };
 
@@ -539,7 +539,7 @@ if ((dest >= ID_CT) && (dest <= ID_LC)) {               /* valid line? */
     tto_int = 0;                                        /* clear int */
     tto_unit[dest].buf = data & WMASK;
     tto_unit[dest].RDY = 0;
-    sim_activate (&tto_unit[dest], 
+    sim_activate (&tto_unit[dest],
                   ((dest == ID_LC) && (data == LC_FNCBT)) ? 0 : tto_unit[dest].wait);/* activate unit */
     }
 }
@@ -740,7 +740,7 @@ return "console terminal output";
 
    The architected VAX timer, which increments at 1Mhz, cannot be
    accurately simulated due to the overhead that would be required
-   for 1M clock events per second.  Instead 1Mhz intervals are 
+   for 1M clock events per second.  Instead 1Mhz intervals are
    derived from the calibrated instruction execution rate.
 
    If the interval register is read, then its value between events
@@ -1008,7 +1008,7 @@ void todr_wr (int32 data)
 TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec now, val, base;
 
-/* Save the GMT time when set value was 0 to record the base for 
+/* Save the GMT time when set value was 0 to record the base for
    future read operations in "battery backed-up" state */
 
 sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
@@ -1072,13 +1072,13 @@ else switch (lc_fnc) {                                  /* idle, case */
     case LC_FNCBT:                                      /* boot cpu */
         con_halt (0, 0);                                /* set up reboot */
         break;
-        
+
     case LC_FNCCW:                                      /* clear warm start flag */
         break;
-        
+
     case LC_FNCCS:                                      /* clear cold start flag */
         break;
-        
+
     case LC_FNCMV:                                      /* microcode version */
         lc_buf[2] = LC_FNCMV;
         lc_buf[1] = VER_UCODE & 0xFF;                   /* low byte */

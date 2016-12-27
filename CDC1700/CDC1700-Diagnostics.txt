@@ -72,7 +72,7 @@ that SMM uses a private bootstrap and we have to load that into the simulator
 by hand (User input to SMM17 is marked with "<==="):
 
         CDC1700 simulator V4.0-0 Beta        git commit id: 9d2079df
-        sim> attach mt0 SYSTEM17_SMM_DIAGS.TAP 
+        sim> attach mt0 SYSTEM17_SMM_DIAGS.TAP
         sim> do -v CDC1700/smm32KMTboot
         CDC1700/smm32KMTboot-6> echo Loading SMM17 MT bootstrap (32KW)
         Loading SMM17 MT bootstrap (32KW)
@@ -83,32 +83,32 @@ by hand (User input to SMM17 is marked with "<==="):
         CDC1700/smm32KMTboot-11> set dca interrupt=F
         CDC1700/smm32KMTboot-12> boot -S mt0
 
-        PROGRAM PROTECT NOT SET PROTECTED TEST NOT RUN 
+        PROGRAM PROTECT NOT SET PROTECTED TEST NOT RUN
 
         SMM17  VERSION 4.0  CP2F
-        COPYRIGHT CONTROL DATA CORP. 1974 
+        COPYRIGHT CONTROL DATA CORP. 1974
 
 
 
-        BUILD TEST LIST 
+        BUILD TEST LIST
         0000 /  0000?  0101 <==================== High byte is test # (COM)
                                                   Low byte is repetition count
-        0000 /  0000?  
+        0000 /  0000?
 
 
-        COM001  COMMAND TEST. 
-         IA = 0A00,  FC = 01 CP2F,   VERSION 4.0  
+        COM001  COMMAND TEST.
+         IA = 0A00,  FC = 01 CP2F,   VERSION 4.0
 
         0121 /  020D?  <========================= Return to keep defaults
 
         0044 /  0BB8?  <=========================
 
 
-         A1    Q1    A2    Q2   
-        0121  020D  0044  0BB8  
+         A1    Q1    A2    Q2
+        0121  020D  0044  0BB8
 
-        0124  020D  0001  0A17  
-        0124 /  020D?  
+        0124  020D  0001  0A17
+        0124 /  020D?
         Simulation stopped, P: 0837 (P 0DFE                    INQ     $FE)
 
 If a test terminates with A1 containing xxy4 (where xx is the test # and

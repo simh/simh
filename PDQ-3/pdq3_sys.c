@@ -20,7 +20,7 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the names of Robert M Supnik and Holger Veit 
+   Except as contained in this notice, the names of Robert M Supnik and Holger Veit
    shall not be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik and Holger Veit.
 
@@ -88,7 +88,7 @@ CTAB pdq3_cmds[] = {
   { "VSTACK", &pdq3_cmd_exstack, 0, "Display last N elements of stack. Top is where SP points to" },
   { "VMSCW", &pdq3_cmd_exmscw, 0, "Display current MSCW" },
   { "VTIB", &pdq3_cmd_extib, 0, "Display current TIB" },
-  { "VSEG", &pdq3_cmd_exseg, 0, "Display a segment table entry" },  
+  { "VSEG", &pdq3_cmd_exseg, 0, "Display a segment table entry" },
   { "VCALL", &pdq3_cmd_calltree, 0, "Display the call tree" },
   { "NAME", &pdq3_cmd_namealias, 0, "Define a name" },
   { NULL, NULL, 0, NULL }
@@ -103,7 +103,7 @@ t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int flag)
   int c1, c2, i;
   if (flag == 1) /* don't dump */
     return SCPE_ARG;
-  /* this assumes a HDT style ROM, where the first 2 bytes refer to the 
+  /* this assumes a HDT style ROM, where the first 2 bytes refer to the
    * actual word start of the ROM, e.g. with PDQ-3 the HDT ROM has 0xf401
    * as the first word, so it will load at word address 0xf400, and 0xfc68
    * will be preset to 0xf401
@@ -178,13 +178,13 @@ t_addr pdq3_parse_addr (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
     get_glyph (cptr, gbuf, 0);
     if (!strncmp(gbuf,"SEGB",4)) {
       seg = reg_segb; *tptr = cptr+4;
-    } else 
+    } else
       seg = strtotv(cptr, tptr, dptr->aradix);
     if (*tptr[0] == ':') {
       cptr = *tptr + 1;
       off = strtotv(cptr, tptr, dptr->aradix);
       return MAKE_BADDR(seg,off);
-    } else 
+    } else
       return MAKE_WADDR(seg);
   }
 }
@@ -234,14 +234,14 @@ static t_stat pdq3_cmd_exseg(int32 arg, CONST char *buf)
   uint16 segnum, segptr;
   CONST char* next;
   FILE* fd = stdout; /* XXX */
-  
+
   if (reg_ssv < 0x2030 || reg_ssv > 0xf000) {
     fprintf(fd, "Cannot list segments in bootloader: incomplete tables\n");
     return SCPE_NXM;
   }
-  
+
   if ((rc=Read(reg_ssv, -1, &nsegs, 0)) != SCPE_OK) return rc;
-  
+
   if (buf[0]) {
     segnum = pdq3_parse_addr(&cpu_dev, buf, &next);
     fprintf(fd, "Segment $%02x\n", segnum);
@@ -262,7 +262,7 @@ static t_stat pdq3_cmd_calltree(int32 arg, CONST char *buf) {
 
 static t_stat pdq3_cmd_namealias(int32 arg, CONST char *buf) {
   char* name, *alias, gbuf[2*CBUFSIZE];
-  
+
   if (buf[0]==0)
     return dbg_listalias(stdout);
 
@@ -395,11 +395,11 @@ OPTABLE optable[] = {
 /*e6*/  { "IND",    OP_B },        { "INC",    OP_B },
 };
 
-static uint16 UB(t_value arg) 
+static uint16 UB(t_value arg)
 {
   return arg & 0xff;
 }
-static uint16 DB(t_value arg) 
+static uint16 DB(t_value arg)
 {
   return UB(arg);
 }
@@ -437,7 +437,7 @@ static uint16 B(t_value arg1, t_value arg2, int* sz) {
 t_stat print_hd(FILE *of, t_value val, t_bool hexdec, t_bool isbyte)
 {
   uint16 data = isbyte ? (val & 0xff) : (val & 0xffff);
-     
+
   if (hexdec)
     fprintf(of,"%0xh",data);
   else
@@ -483,19 +483,19 @@ t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val,
     case OP_DBB:
       arg1 = DB(val[1]);
       arg2 = B(val[2],val[3], &sz); size = sz+1;
-      print_hd(of, arg1, hexdec, TRUE); fputc(',',of); 
+      print_hd(of, arg1, hexdec, TRUE); fputc(',',of);
       print_hd(of, arg2, hexdec, FALSE);
       break;
     case OP_UBB:
       arg1 = UB(val[1]);
       arg2 = B(val[2],val[3], &sz); size = sz+1;
-      print_hd(of, arg1, hexdec, TRUE); fputc(',',of); 
+      print_hd(of, arg1, hexdec, TRUE); fputc(',',of);
       print_hd(of, arg2, hexdec, FALSE);
       break;
     case OP_BUB:
       arg1 = B(val[1],val[2], &sz); size = sz+1;
       arg2 = UB(val[sz+1]);
-      print_hd(of, arg1, hexdec, FALSE); fputc(',',of); 
+      print_hd(of, arg1, hexdec, FALSE); fputc(',',of);
       print_hd(of, arg2, hexdec, TRUE);
       break;
     case OP_SB:
@@ -509,21 +509,21 @@ t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val,
     case OP_DBUB:
       size = 2; arg1 = DB(val[1]);
       arg2 = UB(val[2]);
-      print_hd(of, arg1, hexdec, TRUE); fputc(',',of); 
+      print_hd(of, arg1, hexdec, TRUE); fputc(',',of);
       print_hd(of, arg2, hexdec, TRUE);
       break;
     case OP_UBUB:
       size = 2; arg1 = UB(val[1]);
       arg2 = UB(val[2]);
-      print_hd(of, arg1, hexdec, TRUE); fputc(',',of); 
+      print_hd(of, arg1, hexdec, TRUE); fputc(',',of);
       print_hd(of, arg2, hexdec, TRUE);
       break;
     case OP_UBDBUB:
       size  = 3; arg1 = UB(val[1]);
       arg2 = DB(val[2]);
       arg3 = UB(val[3]);
-      print_hd(of, arg1, hexdec, TRUE); fputc(',',of); 
-      print_hd(of, arg2, hexdec, TRUE); fputc(',',of); 
+      print_hd(of, arg1, hexdec, TRUE); fputc(',',of);
+      print_hd(of, arg2, hexdec, TRUE); fputc(',',of);
       print_hd(of, arg3, hexdec, TRUE);
       break;
     case OP_DB:
@@ -543,7 +543,7 @@ t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val,
         *of     =       output stream
         addr    =       current PC
         *val    =       pointer to data
-        *uptr   =       pointer to unit 
+        *uptr   =       pointer to unit
         sw      =       switches
    Outputs:
         return  =       status code
@@ -554,7 +554,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
   t_addr off;
   T_FLCVT t;
   int ch;
-  
+
   if (sw & SWMASK('M') && !ADDR_ISWORD(addr)) {
     return fprint_sym_m(of, addr, val, uptr, sw);
   }
@@ -583,18 +583,18 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     if (ADDR_ISWORD(addr)) {
       fprint_val(of, val[0], cpu_dev.dradix, 16, PV_RZRO);
       off = ADDR_OFF(addr);
-      if (off > (t_addr)(reg_bp+MSCW_SZ-1)) 
+      if (off > (t_addr)(reg_bp+MSCW_SZ-1))
         fprintf(of," (GLOBAL+%d)", off - reg_bp - MSCW_SZ + 1);
-      else if (off >= reg_mp && off <= (t_addr)(reg_mp+OFFB_MSSEG)) 
+      else if (off >= reg_mp && off <= (t_addr)(reg_mp+OFFB_MSSEG))
         fprintf(of," (MP+%d)", off - reg_mp);
-      else if (off > (t_addr)(reg_mp+MSCW_SZ-1)) 
+      else if (off > (t_addr)(reg_mp+MSCW_SZ-1))
         fprintf(of," (LOCAL+%d)", off - reg_mp - MSCW_SZ + 1);
-      else if (off >= reg_sp && off < reg_spupr) 
+      else if (off >= reg_sp && off < reg_spupr)
         fprintf(of," (SP+%d)", off - reg_sp);
     } else {
       fprint_val(of, val[0], cpu_dev.dradix, 8, PV_RZRO);
       fprint_val(of, val[1], cpu_dev.dradix, 8, PV_RZRO);
-    }    
+    }
     return SCPE_OK;
   }
   if (sw & SWMASK('F')) { /* as FLOAT */

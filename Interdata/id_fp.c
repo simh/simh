@@ -40,7 +40,7 @@
    when loaded.
 
    Interdata has 8 floating point registers, F0, F2, ... , FE.  In floating
-   point instructions, the low order bit of the register number is ignored. 
+   point instructions, the low order bit of the register number is ignored.
 
    On floating point overflow, the exponent and fraction are set to 1's.
    On floating point underflow, the exponent and fraction are set to 0's.
@@ -81,7 +81,7 @@ struct ufp {                                            /* unpacked fp */
 /* Double precision fraction add/subtract/compare */
 
 #define FR_ADD(d,s)     d.l = (d.l + s.l) & DMASK32; \
-                        d.h = (d.h + s.h + (d.l < s.l)) & DMASK32           
+                        d.h = (d.h + s.h + (d.l < s.l)) & DMASK32
 
 #define FR_SUB(d,s)     d.h = (d.h - s.h - (d.l < s.l)) & DMASK32; \
                         d.l = (d.l - s.l) & DMASK32

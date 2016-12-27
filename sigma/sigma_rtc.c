@@ -52,7 +52,7 @@ uint16 rtc_tps[RTC_NUM_CNTRS] = {
 
 /* Frequency descriptors.  The base clock runs at 500Hz.  To get submultiples,
    an event uses a tick counter.  If the frequency is not an even submultiple, the
-   event can specify an "extra" counter.  Every "extra" ticks of the event counter, 
+   event can specify an "extra" counter.  Every "extra" ticks of the event counter,
    the event counter is increased by one.  Thus, 60Hz counts as 8-8-9, providing
    3 clock ticks for every 25 base timer ticks. */
 

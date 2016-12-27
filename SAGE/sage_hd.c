@@ -59,7 +59,7 @@ DEVICE sagehd_dev = {
     NULL, NULL, NULL
 };
 
-static t_stat sagehd_reset(DEVICE* dptr) 
+static t_stat sagehd_reset(DEVICE* dptr)
 {
     printf("sagehd_reset\n");
     return SCPE_OK;

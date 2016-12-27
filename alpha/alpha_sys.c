@@ -127,7 +127,7 @@ return SCPE_OK;
 #define C_PCM           CL_NO | CL_VMS | CL_UNIX | CL_NT
 #define C_PVM           CL_NO | CL_VMS
 #define C_PUN           CL_NO | CL_UNIX
-#define C_PNT           CL_NO | CL_NT   
+#define C_PNT           CL_NO | CL_NT
 #define C_BR            CL_BR | FL_RA | FL_BDP
 #define C_MR            CL_MR | FL_RA | FL_RB | FL_RBI | FL_MDP
 #define C_FE            CL_MO | FL_RB | FL_RBI
@@ -816,4 +816,3 @@ reg = (int32) get_uint (cptr, 10, 31, &r);
 if (r != SCPE_OK) return -1;
 return reg;
 }
-

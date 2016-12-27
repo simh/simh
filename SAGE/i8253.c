@@ -42,7 +42,7 @@ static const char* rltype[] = { "latch","8bitL","8bitH", "16bit" };
 t_stat i8253_write(I8253* chip, int addr, uint32 value)
 {
     I8253CNTR* cntr;
-    t_stat rc; 
+    t_stat rc;
     int num;
 
     if (addr==3) { /* mode reg */
@@ -140,4 +140,3 @@ t_stat i8253_io(IOHANDLER* ioh,uint32* value,uint32 rw,uint32 mask)
     I8253* chip = (I8253*)ioh->ctxt;
     return rw==MEM_WRITE ? i8253_write(chip,port,*value) : i8253_read(chip,port,value);
 }
-

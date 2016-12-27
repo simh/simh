@@ -104,8 +104,8 @@ t_stat ioc_cont_reset(DEVICE *dptr, uint16 baseport)
 {
     sim_printf("   ioc_cont[%d]: Reset\n", 0);
     sim_printf("   ioc_cont[%d]: Registered at %04X\n", 0, baseport);
-    reg_dev(ioc_cont, baseport, 0); 
-    reg_dev(ioc_cont, baseport + 1, 0); 
+    reg_dev(ioc_cont, baseport, 0);
+    reg_dev(ioc_cont, baseport + 1, 0);
     ioc_cont_unit[0].u3 = 0x00; /* ipc reset */
     return SCPE_OK;
 }

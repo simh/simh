@@ -25,8 +25,8 @@
 
    05-Feb-15    MP      Initial implementation
 
-   This module demonstrates the use of the interface between a front panel 
-   application and a simh simulator.  Facilities provide ways to gather 
+   This module demonstrates the use of the interface between a front panel
+   application and a simh simulator.  Facilities provide ways to gather
    information from and to observe and control the state of a simulator.
 
 */
@@ -45,14 +45,14 @@
 #else
 #include <unistd.h>
 #endif
-const char *sim_path = 
+const char *sim_path =
 #if defined(_WIN32)
             "vax.exe";
 #else
             "vax";
 #endif
 
-const char *sim_config = 
+const char *sim_config =
             "VAX-PANEL.ini";
 
 /* Registers visible on the Front Panel */

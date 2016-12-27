@@ -64,7 +64,7 @@ static SERMUX sio_mux = {
         &sio_unit[SIOPOLL]   /*poll unit*/
 };
 
-static I8251 u58 = { 
+static I8251 u58 = {
         {0,0,U58_ADDR,4,2},
         &sagesio_dev,NULL,NULL,i8251_reset,
         &sio_txint,&sio_rxint,
@@ -106,7 +106,7 @@ static t_stat sioterm_svc(UNIT* uptr)
     SERMUX* mux = chip->mux;
     t_stat rc;
     int ch = chip->obuf;
-    
+
     /* suppress NUL bytes after CR LF */
     switch (ch) {
     case 0x0d:
@@ -118,9 +118,9 @@ static t_stat sioterm_svc(UNIT* uptr)
     default:
         chip->crlf = 0;
     }
-    
+
     /* TODO? sim_tt_outcvt */
-    
+
     /* attached to a telnet port? */
     if (mux->poll->flags & UNIT_ATT) {
         if ((rc=tmxr_putc_ln(&mux->ldsc, ch & chip->bitmask)) != SCPE_OK) {
@@ -151,9 +151,9 @@ static t_stat siopoll_svc(UNIT* uptr)
     DEVICE* dptr = find_dev_from_unit(uptr);
     I8251* chip = (I8251*)dptr->ctxt;
     SERMUX* mux = chip->mux;
-    
+
     sim_activate(uptr, uptr->wait); /* restart it again */
-    
+
     /* network attached? */
     if (mux->poll->flags & UNIT_ATT) {
         if (tmxr_poll_conn(&mux->desc) >= 0) /* new connection? */
@@ -166,7 +166,7 @@ static t_stat siopoll_svc(UNIT* uptr)
         c &= 0xff; /* extract character */
     } else
         return SCPE_OK;
-        
+
     if (!(chip->cmd & I8251_CMD_RXE)) { /* ignore data if receiver not enabled */
         chip->status &= ~I8251_ST_RXRDY;
         return SCPE_OK;
@@ -187,12 +187,12 @@ static t_stat siopoll_svc(UNIT* uptr)
     return sio_rxint(chip);
 }
 
-static t_stat sio_reset(DEVICE* dptr) 
+static t_stat sio_reset(DEVICE* dptr)
 {
     t_stat rc;
     I8251* chip = (I8251*)dptr->ctxt;
     SERMUX* mux = chip->mux;
-    
+
     if ((rc = (dptr->flags & DEV_DIS) ?
         del_iohandler(chip) :
         add_iohandler(mux->poll,chip,i8251_io)) != SCPE_OK) return rc;
@@ -300,23 +300,23 @@ DEVICE sagecons_dev = {
     i8251_dt, NULL, NULL
 };
 
-static t_stat cons_reset(DEVICE* dptr) 
+static t_stat cons_reset(DEVICE* dptr)
 {
     t_stat rc;
     int32 wait;
     I8251* chip = (I8251*)dptr->ctxt;
     SERMUX* mux = chip->mux;
-    
+
     if ((rc = (dptr->flags & DEV_DIS) ?
         del_iohandler(chip) :
         add_iohandler(mux->poll,chip,&i8251_io)) != SCPE_OK) return rc;
 
     u57.reset(&u57);
-    
+
     /* initialize POLL timer */
     wait = mux->poll->wait = CONS_POLL_WAIT;
     sim_rtcn_init(wait, TMR_CONS);
-    
+
     u57.oob = TRUE; /* this is the console */
     sim_activate(mux->poll, wait);
     sim_cancel(mux->term);
@@ -352,12 +352,12 @@ static t_stat conspoll_svc(UNIT* uptr)
         c = kbdc; /* use char polled from keyboard instead */
         if (c < SCPE_KFLAG) return c;       /* ignore data if not valid */
     }
-    
+
     if (!(chip->cmd & I8251_CMD_RXE)) { /* ignore data if receiver not enabled */
         chip->status &= ~I8251_ST_RXRDY;
         return SCPE_OK;
     }
-    
+
     /* got char */
     if (c & SCPE_BREAK) {   /* a break? */
         c = 0;
@@ -381,7 +381,7 @@ static t_stat consterm_svc(UNIT* uptr)
     t_stat rc;
 
     int ch = chip->obuf;
-    
+
     /* suppress NUL bytes after CR LF */
     switch (ch) {
     case 0x0d:
@@ -393,9 +393,9 @@ static t_stat consterm_svc(UNIT* uptr)
     default:
         chip->crlf = 0;
     }
-    
+
     /* TODO? sim_tt_outcvt */
-    
+
     /* attached to a telnet port? */
     if (mux->poll->flags & UNIT_ATT) {
         if ((rc=tmxr_putc_ln(&mux->ldsc, ch & chip->bitmask)) != SCPE_OK) {

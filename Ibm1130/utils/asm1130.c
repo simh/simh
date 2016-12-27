@@ -25,7 +25,7 @@
 //							  Doesn't affect operation, but these are used as indicators
 //							  in the IBM one-card diagnostic programs.
 //							  Also -- should mention that the .IPL directive was
-//							  removed some time ago. To create bootable cards, 
+//							  removed some time ago. To create bootable cards,
 //							  use -b flag to create binary output, and post-process the
 //							  binary output with program "mkboot"
 //		   1.11 - 2004May22 - Added CMP, DCM, and DECS instructions for 1800,
@@ -109,7 +109,7 @@
 //
 // Notes:
 // We assume that the computer on which the assembler runs uses ANSI floating point.
-// Also, the assembly of floating point values may be incorrect on non-Intel 
+// Also, the assembly of floating point values may be incorrect on non-Intel
 // architectures, this needs to be investigated.
 //
 // org_advanced tells whether * in an expression refers to the address AFTER the
@@ -153,7 +153,7 @@
    int strcmpi  (char *a, char *b);
 #endif
 
-#define FIX_ATS	
+#define FIX_ATS
 
 #define DMSVERSION "V2M12"				/* required 5 characters on sector break card col 67-71 */
 
@@ -314,7 +314,7 @@ char opfield[256];								// extracted operand field from source line
 char dmsversion[12] = DMSVERSION;				// version number for SBRK cards
 const char whitespace[] = " \t";				// whitespace
 
-int ascii_to_ebcdic_table[128] = 
+int ascii_to_ebcdic_table[128] =
 {
 //
 	0x00,0x01,0x02,0x03,0x37,0x2d,0x2e,0x2f, 0x16,0x05,0x25,0x0b,0x0c,0x0d,0x0e,0x0f,
@@ -334,7 +334,7 @@ int ascii_to_ebcdic_table[128] =
 	0x97,0x98,0x99,0xa2,0xa3,0xa4,0xa5,0xa6, 0xa7,0xa8,0xa9,0xc0,0x4f,0xd0,0xa1,0x07,
 };
 
-int ascii_to_1403_table[128] = 
+int ascii_to_1403_table[128] =
 { /*  00   01   02   03   04   05   06   07    08   09   0a   0b   0c   0d   0e  0f  */
 	0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f, 0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,
 	0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f, 0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,
@@ -404,7 +404,7 @@ int main (int argc, char **argv)
 
 	init(argc, argv);							// initialize, process flags
 
-	startpass(1);								// first pass, process files 
+	startpass(1);								// first pass, process files
 
 	for (i = 1; i < argc; i++)
 		if (*argv[i] != '-')
@@ -428,7 +428,7 @@ int main (int argc, char **argv)
 		if (pta >= 0)							// write start address to the load file
 			fprintf(fout, "=%04x" ENDLINE, pta & 0xFFFF);
 	}
-	else 
+	else
 		bincard_endcard();
 
 	if (flist) {
@@ -445,7 +445,7 @@ int main (int argc, char **argv)
 			fprintf(flist, "in this assembly\n");
 		}
 		else
-			fprintf(flist, "\nThere were no errors in this assembly\n"); 
+			fprintf(flist, "\nThere were no errors in this assembly\n");
 	}
 
 	if (flist) {								// finish the listing
@@ -506,7 +506,7 @@ void flag (char *arg)
 			case 'x':							// print cross reference table
 				do_xref = TRUE;
 				break;
-			
+
 			case 's':							// print symbol table
 				do_syms = TRUE;
 				break;
@@ -728,7 +728,7 @@ void xref_list (void)
 			}
 			fprintf(flist, " %4d", x->lno);
 			n++;
-		} 
+		}
 		putc('\n', flist);
 	}
 }
@@ -741,7 +741,7 @@ void xref_list (void)
 void listhdr (void)
 {
 	time_t t;
-	
+
 	time(&t);
 	fprintf(flist, "%s -- %s -- %s\n", VERSION, dmsversion, ctime(&t));
 }
@@ -850,19 +850,19 @@ void add_xref (PSYMBOL s, BOOL definition)
 // get_symbol - get a symbol value, defining if necessary
 // ---------------------------------------------------------------------------------
 
-int get_symbol (char *name) 
+int get_symbol (char *name)
 {
 	PSYMBOL s;
 
 	s = lookup_symbol(name, TRUE);			// lookup, define if necessary
-	
+
 	if (pass == 2)							// should be defined by now
 		if (! s->defined)
 			asm_error("Symbol '%s' is undefined", name);
 
 	add_xref(s, FALSE);						// note the reference
 
-	return s->value;			
+	return s->value;
 }
 
 // ---------------------------------------------------------------------------------
@@ -871,7 +871,7 @@ int get_symbol (char *name)
 // that.
 // ---------------------------------------------------------------------------------
 
-void set_symbol (char *name, int value, int known, RELOC relative) 
+void set_symbol (char *name, int value, int known, RELOC relative)
 {
 	PSYMBOL s;
 	char *at;
@@ -887,7 +887,7 @@ void set_symbol (char *name, int value, int known, RELOC relative)
 #endif
 
 	s = lookup_symbol(name, TRUE);
-	
+
 	if (s->defined == S_DEFINED)			// once defined, it should not change
 		if (s->value != value)
 			asm_error("Symbol '%s' %s", name, (s->pass == pass) ? "is multiply defined" : "changed between passes");
@@ -1022,7 +1022,7 @@ void setw (int pos, int word, RELOC relative)
 {
 	char tok[10], *p;
 	int i;
-	
+
 	if (flist == NULL || ! list_on)
 		return;
 
@@ -1346,16 +1346,16 @@ struct tag_op ops[] = {
 	"BOSC",	0x4840, bsc_op, ALL,        NONE,	0,		// is BOSC always long form? No.
 	"SKP",	0x4800, bsc_op,	NONE,		NONE,	0,		// alias for BSC one word version
 
-	"B",	0x4800, b_op,   ALL,		NONE,	0,		// alias for MDX or BSC L 
-	"BC",	0x4802, std_op, ALL,		L,		0,		// alias for BSC L 
-	"BN",	0x4828, std_op, ALL,		L,		0,		// alias for BSC L 
-	"BNN",	0x4810, std_op, ALL,		L,		0,		// alias for BSC L 
-	"BNP",	0x4808, std_op, ALL,		L,		0,		// alias for BSC L 
-	"BNZ",	0x4820, std_op, ALL,		L,		0,		// alias for BSC L 
-	"BO",	0x4801, std_op, ALL,		L,		0,		// alias for BSC L 
-	"BOD",	0x4840, std_op, ALL,		L,		0,		// alias for BSC L 
-	"BP",	0x4830, std_op, ALL,		L,		0,		// alias for BSC L 
-	"BZ",	0x4818, std_op, ALL,	L,		0,		// alias for BSC L 
+	"B",	0x4800, b_op,   ALL,		NONE,	0,		// alias for MDX or BSC L
+	"BC",	0x4802, std_op, ALL,		L,		0,		// alias for BSC L
+	"BN",	0x4828, std_op, ALL,		L,		0,		// alias for BSC L
+	"BNN",	0x4810, std_op, ALL,		L,		0,		// alias for BSC L
+	"BNP",	0x4808, std_op, ALL,		L,		0,		// alias for BSC L
+	"BNZ",	0x4820, std_op, ALL,		L,		0,		// alias for BSC L
+	"BO",	0x4801, std_op, ALL,		L,		0,		// alias for BSC L
+	"BOD",	0x4840, std_op, ALL,		L,		0,		// alias for BSC L
+	"BP",	0x4830, std_op, ALL,		L,		0,		// alias for BSC L
+	"BZ",	0x4818, std_op, ALL,	L,		0,		// alias for BSC L
 
 	"RTE",	0x18C0, shf_op, IDX X, 		X,		0,		// shift family
 	"SLA",	0x1000, shf_op, IDX X,  	X,		0,
@@ -1409,7 +1409,7 @@ BOOL controlcard (char *line)
 		do_list = list_on = TRUE;
 		return TRUE;
 	}
-	
+
 	if (strnicmp(line, "*XREF", 5) == 0) {
 		do_xref = TRUE;
 		return TRUE;
@@ -1442,10 +1442,10 @@ void stuff (char *buf, char *tok, int maxchars)
 {
 	while (*tok) {
 		*buf++ = *tok++;
-		
+
 		if (maxchars)
 			if (--maxchars <= 0)
-				break;	
+				break;
 	}
 }
 
@@ -1527,7 +1527,7 @@ void bincard_writecard (char *sbrk_text)
 		for (j = 66; j < 71; j++)	// be sure input columns 67..71 are nonblank (have version number)
 			if (sbrk_text[j] <= ' ')
 				break;
-		
+
 		if (j < 71)					// sbrk card didn't have the info, stuff in current release
 			for (j = 0; j < 5; j++)
 				sbrk_text[66+j] = dmsversion[j];
@@ -1556,7 +1556,7 @@ void bincard_writecard (char *sbrk_text)
 
 	for (i = 0; i < 8; i++)
 		binout[j++] = ascii_to_hollerith(ident[i]);
-	
+
 	fxwrite(binout, sizeof(binout[0]), 80, fout);		// write card image
 }
 
@@ -1630,13 +1630,13 @@ void bincard_endcard (void)
 	bincard_writecard(NULL);
 }
 
-// bincard_typecard - write the program type 
+// bincard_typecard - write the program type
 
 void bincard_typecard (void)
 {
 	int i;
 
-	if (! bincard_first) 
+	if (! bincard_first)
 		return;
 
 	bincard_first = FALSE;
@@ -1810,7 +1810,7 @@ void parse_line (char *line)
 		tabformat = TRUE;							// this is a tab-formatted file
 
 		for (c = line; *c && *c <= ' '; c++)	// find first nonblank
-		 	;
+			;
 
 		if (*c == '*' || ! *c)					// ignore as a comment
 			return;
@@ -1893,9 +1893,9 @@ BOOL get_line (char *buf, int nbuf, BOOL onelevel)
 
 	if (ended)								// we hit the END command
 		return FALSE;
-	
+
 	// if macro active, return line from macro buffer, otherwise read from file
-	// do not pop end-of-macro if onelevel is TRUE 
+	// do not pop end-of-macro if onelevel is TRUE
 
 	if ((retval = fgets(buf, nbuf, fin)) == NULL)
 		return FALSE;
@@ -1909,7 +1909,7 @@ BOOL get_line (char *buf, int nbuf, BOOL onelevel)
 // ---------------------------------------------------------------------------------
 
 void proc (char *fname)
-{																											    	
+{
 	char line[256], *c;
 	int i;
 
@@ -2134,7 +2134,7 @@ void startpass (int n)
 // ---------------------------------------------------------------------------------
 
 void x_dc (struct tag_op *op, char *label, char *mods, char *arg)
-{	
+{
 	EXPR expr;
 //	char *tok;
 
@@ -2165,7 +2165,7 @@ void x_dc (struct tag_op *op, char *label, char *mods, char *arg)
 // ---------------------------------------------------------------------------------
 
 // wd[0]: 8 unused bits | characteristic (=	exponent+128)
-// wd[1]: sign + 15 msb of mantissa in 2's complement 
+// wd[1]: sign + 15 msb of mantissa in 2's complement
 // wd[2]: 16 lsb of mantissa
 
 // NOTE: these are wrong with Fixed point numbers
@@ -2363,7 +2363,7 @@ void getDconstant (char *tok, unsigned short *wd)
 // ---------------------------------------------------------------------------------
 
 void x_dec (struct tag_op *op, char *label, char *mods, char *arg)
-{	
+{
 	unsigned short wd[2];
 
 	org_advanced = 2;					// assume * means address after this location, since it's +1 for dc?
@@ -2392,7 +2392,7 @@ void x_dec (struct tag_op *op, char *label, char *mods, char *arg)
 // ---------------------------------------------------------------------------------
 
 void x_decs (struct tag_op *op, char *label, char *mods, char *arg)
-{	
+{
 	unsigned short wd[2];
 
 	org_advanced = 1;					// assume * means address after this location
@@ -2410,7 +2410,7 @@ void x_decs (struct tag_op *op, char *label, char *mods, char *arg)
 // ---------------------------------------------------------------------------------
 
 void x_xflc (struct tag_op *op, char *label, char *mods, char *arg)
-{	
+{
 	char *tok, *b;
 	double d;
 	int bexp, fixed;
@@ -2450,7 +2450,7 @@ void x_xflc (struct tag_op *op, char *label, char *mods, char *arg)
 // ---------------------------------------------------------------------------------
 
 void x_equ (struct tag_op *op, char *label, char *mods, char *arg)
-{	
+{
 	EXPR expr;
 
 	org_advanced = FALSE;				// * means this address, not incremented
@@ -2766,7 +2766,7 @@ void x_dsa  (struct tag_op *op, char *label, char *mods, char *arg)
 		asm_error("DSA missing filename");
 	}
 	else {
-		namecode(words, arg);					
+		namecode(words, arg);
 		writetwo();
 		writew(words[0], CALL);				// special relocation bits here 3 and 1
 		writew(words[1], RELATIVE);
@@ -2790,7 +2790,7 @@ void x_link (struct tag_op *op, char *label, char *mods, char *arg)
 		format_line(nline, label, "CALL", "", "$LINK", "");
 		parse_line(nline);
 
-		namecode(words, arg);					
+		namecode(words, arg);
 		writew(words[0], ABSOLUTE);					// special relocation bits here 3 and 1
 		writew(words[1], ABSOLUTE);
 	}
@@ -3088,7 +3088,7 @@ badcode:				asm_error("Invalid ' escape for selected printer");
 					if (dmes_cs != CODESET_CONSOLE) goto badcode;
 					stuff_dmes(0x03, -rpt);		// line feed
 					break;
-				
+
 				default:
 					asm_error("Invalid ' escape in DMES");
 					*c = '\0';
@@ -3165,7 +3165,7 @@ void stuff_dmes (int ch, int rpt)
 				break;
 		}
 	}
-			
+
 	while (--rpt >= 0) {				// pack them into words, output when we have two
 		if (dmes_nc == 0) {
 			dmes_wd = (nch & 0xFF) << 8;
@@ -3226,7 +3226,7 @@ void x_dn (struct tag_op *op, char *label, char *mods, char *arg)
 	if (*label)								// define label
 		set_symbol(label, org, TRUE, relocate);
 
-	namecode(words, arg);					
+	namecode(words, arg);
 
 	writew(words[0], ABSOLUTE);
 	writew(words[1], ABSOLUTE);
@@ -3337,7 +3337,7 @@ void x_spac (struct tag_op *op, char *label, char *mods, char *arg)
 
 	line_error = TRUE;			// don't print the statement
 
-	while (--expr.value >= 0) 
+	while (--expr.value >= 0)
 		putc('\n', flist);
 }
 
@@ -3397,7 +3397,7 @@ void std_op (struct tag_op *op, char *label, char *mods, char *arg)
 		set_symbol(label, org, TRUE, relocate);
 
 	if (*arg && ! (op->flags & NO_ARGS)) {			// get value argument
-		if (getexpr(arg, FALSE, &expr) == S_DEFINED) 
+		if (getexpr(arg, FALSE, &expr) == S_DEFINED)
 			val_ok = TRUE;
 	}
 	else {
@@ -3462,7 +3462,7 @@ void mdx_op (struct tag_op *op, char *label, char *mods, char *arg)
 				incr.value = 0;
 				incr.relative = ABSOLUTE;
 			}
-			else 
+			else
 				getexpr(tok, FALSE, &incr);
 
 			if (incr.value < -128 || incr.value > 127)			// displacement style (fixed in ver 1.08)
@@ -3509,7 +3509,7 @@ void b_op (struct tag_op *op, char *label, char *mods, char *arg)
 	static struct tag_op *mdx = NULL;
 
 	if (strchr(mods, 'L') || strchr(mods, 'I')) {
-		bsi_op(op, label, mods, arg);	
+		bsi_op(op, label, mods, arg);
 		return;
 	}
 
@@ -3706,7 +3706,7 @@ void x_aif (struct tag_op *op, char *label, char *mods, char *arg)
 	arg++;											// skip the paren
 
 	// normally whitespace is never found in the arg string (see tabtok and coltok).
-	// However, spaces inside parens are permitted. 
+	// However, spaces inside parens are permitted.
 
 	if ((tok = strtok(arg, whitespace)) == NULL) {
 		asm_error("AIF missing first expression");
@@ -3773,7 +3773,7 @@ void x_aifb (struct tag_op *op, char *label, char *mods, char *arg)
 }
 
 // ---------------------------------------------------------------------------------
-// x_ago 
+// x_ago
 // ---------------------------------------------------------------------------------
 
 void x_ago  (struct tag_op *op, char *label, char *mods, char *arg)
@@ -3837,7 +3837,7 @@ int    c_esc      (int c);
 void   exprerr    (int n);
 void   a1130_expr (EXPR *ap);
 void   a1130_term (EXPR *ap);
-					
+
 char	ctype[128] = {			// character types
 /*^0ABCDEFG */	ILL,	ILL,	ILL,	ILL,	ILL,	ILL,	ILL,	ILL,
 /*^HIJKLMNO */	ILL,	SPACE,	SPACE,	ILL,	SPACE,	SPACE,	ILL,	ILL,
@@ -3994,7 +3994,7 @@ void a1130_term (EXPR *ap)
 		a1130_term(ap);
 	}
 	else if (c == '-') {				/* unary - */
-	 	a1130_term(ap);
+		a1130_term(ap);
 		ap->value = - ap->value;
 	}
 	else if (c == '/') {				/* / starts a hex constant */
@@ -4397,7 +4397,7 @@ void exprerr (int n)
 	longjmp(exprjmp, 1);
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * upcase - force a string to uppercase (ASCII)
  * ------------------------------------------------------------------------ */
 
@@ -4408,12 +4408,12 @@ char *upcase (char *str)
 	for (s = str; *s; s++) {
 		if (*s >= 'a' && *s <= 'z')
 			*s -= 32;
-	} 
+	}
 
 	return str;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * hollerith table for IPL card ident field
  * ------------------------------------------------------------------------ */
 
@@ -4501,7 +4501,7 @@ int ascii_to_hollerith (int ch)
 	return 0;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * detab - replace tabs with spaces for listing files
  * ------------------------------------------------------------------------ */
 
@@ -4526,7 +4526,7 @@ char *detab (char *instr)
 
 		instr++;
 	}
-	
+
 	*out = '\0';
 
 	return outstr;
@@ -4582,4 +4582,3 @@ int strcmpi (char *a, char *b)
 }
 
 #endif
-

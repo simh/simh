@@ -51,7 +51,7 @@ t_stat lpt_puts (const char *buf);
 extern void inq_puts (const char *buf);
 
 const char *pch_table_old[4] = {
-    bcd_to_ascii_old, bcd_to_ascii_old, bcd_to_pca, bcd_to_pch 
+    bcd_to_ascii_old, bcd_to_ascii_old, bcd_to_pca, bcd_to_pch
     };
 const char *pch_table[4] = {
     bcd_to_ascii_a, bcd_to_ascii_h, bcd_to_pca, bcd_to_pch
@@ -140,7 +140,7 @@ for (i = LPT_WIDTH - 1; (i >= 0) && (lbuf[i] == ' '); i--)
 if ((r = lpt_puts (lbuf)) != SCPE_OK)                   /* write line */
     return r;                                           /* error? */
 if (lines)                                              /* cc action? do it */
-    r = space (lines, lflag); 
+    r = space (lines, lflag);
 else if (sup == 0)                                      /* default? 1 line */
     r = space (1, FALSE);
 else r = lpt_puts ("\r");                               /* sup -> overprint */
@@ -207,7 +207,7 @@ return SCPE_OK;
 }
 
 /* Space routine - space or skip n lines
-   
+
    Inputs:
         count   =       number of lines to space or skip
         sflag   =       skip (TRUE) or space (FALSE)

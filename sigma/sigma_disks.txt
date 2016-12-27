@@ -16,7 +16,7 @@ T3281/T3282		15 / 815 / 19 / 11			16 byte		170335
 T3281/T3283		15 / 815 / 19 / 17			16 byte		263245
 T3281/T3286		15 / 555 / 30 / 17 (16?)		16 byte
 T3281/T3286F		15 / 555 / 60 / 17 (16?)		16 byte
-T3281/T3288		15 / 822 / 5 / 17			16 byte		69870	
+T3281/T3288		15 / 822 / 5 / 17			16 byte		69870
 
 header format		7240				726X/727X/T3281
 
@@ -189,5 +189,3 @@ operational status byte (AIO)
 11	channel end intr
 12	unusual end intr
 13-15	0
-
-

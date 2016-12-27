@@ -53,7 +53,7 @@
     PC<0:31>            program counter
    int_req[n]<0:31>     interrupt requests
    int_enb[n]<0:31>     interrupt enables
-   
+
    The Interdata 32b systems have seven instruction formats: register to
    register, short format, register and memory (three formats), and register
    and immediate (two formats).  The formats are:
@@ -821,7 +821,7 @@ while (reason == 0) {                                   /* loop until halted */
             hst_p = 0;
         }
     if (qevent & EV_MAC)                                /* MAC abort on fetch? */
-        continue; 
+        continue;
     switch (op) {                                       /* case on opcode */
 
 /* Load/store instructions */
@@ -1309,7 +1309,7 @@ while (reason == 0) {                                   /* loop until halted */
             if (quos & SIGN32)                          /* res -? neg quo */
                 t = NEG (t);
             if (R[r1] & SIGN32)                         /* adj rem sign */
-                rslt = NEG (rslt); 
+                rslt = NEG (rslt);
             if (t && ((t ^ quos) & SIGN32)) {           /* res sign wrong? */
                 if (PSW & PSW_AFI)                      /* if enabled, */
                     cc = exception (AFIPSW, cc, 0);     /* exception */
@@ -1424,7 +1424,7 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
 /* Miscellaneous */
-    
+
     case 0xE1:                                          /* SVC - RX */
         PCQ_ENTRY;                                      /* effective branch */
         t = BUILD_PSW (cc);                             /* save PSW */
@@ -1492,7 +1492,7 @@ while (reason == 0) {                                   /* loop until halted */
         cc = newPSW (R[r2]);                            /* load new PSW */
         if (PSW & PSW_SQI)                              /* test for q */
             cc = testsysq (cc);
-        break;  
+        break;
 
     case 0x64:                                          /* ATL - RX */
     case 0x65:                                          /* ABL - RX */
@@ -1639,7 +1639,7 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
 /* Block I/O instructions
-        
+
    On a real Interdata system, the block I/O instructions can't be
    interrupted or stopped.  To model this behavior, while allowing
    the instructions to go back through fetch for I/O processing and
@@ -1999,7 +1999,7 @@ switch (op) {
         break;
 
     case IO_WD:                                         /* write */
-        if (drpos < 4) 
+        if (drpos < 4)
             DR = (DR & ~(DMASK8 << (drpos * 8))) | (dat << (drpos * 8));
         else if (drpos == 4)
             DRX = dat;
@@ -2016,7 +2016,7 @@ switch (op) {
         }
 
 return 0;
-}       
+}
 
 /* Relocation and protection */
 
@@ -2062,7 +2062,7 @@ off = VA_GETOFF (va);                                   /* get offset */
 mapr = ReadF ((base + (seg << 2)) & VAMASK, rel);       /* get seg reg */
 lim = GET_SRL (mapr);                                   /* get limit */
 if (off >= lim)                                         /* limit viol? */
-    return CC_C; 
+    return CC_C;
 if ((mapr & SR_PRS) == 0)                               /* not present? */
     return CC_V;
 *pa = off + (mapr & SRF_MASK);                          /* translate */

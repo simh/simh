@@ -54,7 +54,7 @@ munch.rim
             space bar clears all switches.
 
 	assembled with '-r' option, so it can be "loaded" directly:
-	
+
 	PDP-1 simulator V4.0
 	sim> set dpy enable
 	sim> load munch.rim

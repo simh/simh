@@ -1,4 +1,4 @@
-/* lgp_defs.h: LGP simulator definitions 
+/* lgp_defs.h: LGP simulator definitions
 
    Copyright (c) 2004-2010, Robert M. Supnik
 

@@ -35,7 +35,7 @@
         file only emulates the minimum DC-4 functionality to interface with
         the virtual disk file.
 
-        The floppy controller is interfaced to the CPU by use of 5 memory 
+        The floppy controller is interfaced to the CPU by use of 5 memory
         addreses.  These are SS-30 slot numbers 5 and 6 (0x8014-0x801B).
 
         Address     Mode    Function
@@ -67,7 +67,7 @@
         | M | S | X | X | X | X | Device|
         +---+---+---+---+---+---+---+---+
 
-        M = If this bit is 1, the one-shot is triggered/retriggered to 
+        M = If this bit is 1, the one-shot is triggered/retriggered to
             start/keep the motors on.
         S = Side select. If set, side one is selected otherwise side zero
             is selected.
@@ -81,7 +81,7 @@
         +---+---+---+---+---+---+---+---+
 
         B - When 1, the controller is busy.
-        D - When 1, index mark detected (type I) or data request - read data 
+        D - When 1, index mark detected (type I) or data request - read data
             ready/write data empty (type II or III).
         H - When 1, track 0 (type I) or lost data (type II or III).
         C - When 1, crc error detected.
@@ -378,7 +378,7 @@ int32 fdcdrv(int32 io, int32 data)
     if (io) {                           /* write to DC-4 drive register */
         sim_debug (DEBUG_write, &dsk_dev, "\nfdcdrv: Drive selected %d cur_dsk=%d",
             data & 0x03, cur_dsk);
-        if (cur_dsk == (data & 0x03)) 
+        if (cur_dsk == (data & 0x03))
             return 0;                   /* already selected */
         cur_dsk = data & 0x03;          /* only 2 drive select bits */
         sim_debug (DEBUG_write, &dsk_dev, "\nfdcdrv: Drive set to %d", cur_dsk);
@@ -416,7 +416,7 @@ int32 fdccmd(int32 io, int32 data)
 {
     static int32 val = 0, val1 = NOTRDY;
     static long pos;
- 
+
     if ((dsk_unit[cur_dsk].flags & UNIT_ATT) == 0) { /* not attached */
         dsk_unit[cur_dsk].u3 |= NOTRDY; /* set not ready flag */
         sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Drive %d is not attached", cur_dsk);
@@ -428,7 +428,7 @@ int32 fdccmd(int32 io, int32 data)
         switch(data) {
             case 0x8C:                  /* read command */
             case 0x9C:
-                sim_debug (DEBUG_read, &dsk_dev, "\nfdccmd: Read of disk %d, track %d, sector %d", 
+                sim_debug (DEBUG_read, &dsk_dev, "\nfdccmd: Read of disk %d, track %d, sector %d",
                         cur_dsk, dsk_unit[cur_dsk].u4, dsk_unit[cur_dsk].u5);
                 pos = trksiz * dsk_unit[cur_dsk].u4; /* calculate file offset */
                 pos += SECSIZ * (dsk_unit[cur_dsk].u5 - 1);

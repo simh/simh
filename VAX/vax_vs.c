@@ -112,7 +112,7 @@ DEVICE vs_dev = {
     NULL, NULL, &vs_reset,
     NULL, NULL, NULL,
     NULL, DEV_DIS | DEV_DEBUG, 0,
-    vs_debug, NULL, NULL, NULL, NULL, NULL, 
+    vs_debug, NULL, NULL, NULL, NULL, NULL,
     &vs_description
     };
 

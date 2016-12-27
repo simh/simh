@@ -380,7 +380,7 @@ t_stat mt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
      |   Storage Parity Error (1733-3 only)
      Protect Fault (1733-3 only)
 
-  Director Status 2 
+  Director Status 2
 
     15                       9   8   7   6   5   4   3   2   1   0
    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -1512,7 +1512,7 @@ t_bool MTreject(IO_DEVICE *iod, t_bool output, uint8 reg)
             return ((iod->STATUS & IO_1732_ACTIVE) != 0);
       }
       break;
-      
+
     case 2:
       if (output)
         return ((iod->STATUS & IO_1732_ACTIVE) != 0);
@@ -1822,7 +1822,7 @@ enum IOstatus MTout(IO_DEVICE *iod, uint8 reg)
             if ((mt_dev.dctrl & DBG_DENS) != 0) {
               DEVICE *dptr = find_dev_from_unit(uptr);
               int32 u = uptr - dptr->units;
-              
+
               fprintf(DBGOUT,
                       "MT%d: Density changed to %04X\r\n",
                       u, Areg & (IO_1732_1600 | IO_1732_556 | IO_1732_800));
@@ -1845,7 +1845,7 @@ enum IOstatus MTout(IO_DEVICE *iod, uint8 reg)
           if (MTdev.iod_unit != NULL) {
             DEVICE *dptr = find_dev_from_unit(uptr);
             int32 u = uptr - dptr->units;
-            
+
             fprintf(DBGOUT, "MT%d - Deselected\r\n", u);
           }
 
@@ -1859,7 +1859,7 @@ enum IOstatus MTout(IO_DEVICE *iod, uint8 reg)
         MTdev.iod_unit = NULL;
         MTdev.STATUS &= ~(IO_1732_STCINT | IO_1732_FMARK | IO_1732_EOT);
         fw_clearForced(&MTdev, IO_ST_READY);
-        
+
         uptr = &mt_unit[unit];
 
         if ((uptr->flags & UNIT_ATT) != 0) {

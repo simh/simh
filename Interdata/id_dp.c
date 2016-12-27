@@ -63,7 +63,7 @@
 
 /* Controller command */
 
-#define CMC_MASK        0xF                             
+#define CMC_MASK        0xF
 #define CMC_CLR         0x8                             /* reset */
 #define CMC_RD          0x1                             /* read */
 #define CMC_WR          0x2                             /* write */
@@ -95,7 +95,7 @@
 #define HS_HMASK        0x20                            /* head mask */
 #define HS_MASK         (HS_HMASK | HS_SMASK)
 #define GET_SEC(x)      ((x) & HS_SMASK)
-#define GET_SRF(x)      (((x) & HS_HMASK) >> HS_V_SRF) 
+#define GET_SRF(x)      (((x) & HS_HMASK) >> HS_V_SRF)
 
 #define GET_SA(p,cy,sf,sc,t) (((((((p)*drv_tab[t].cyl)+(cy))*drv_tab[t].surf)+(sf))* \
                         DP_NUMSC)+(sc))
@@ -233,7 +233,7 @@ MTAB dp_mod[] = {
     { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL, NULL },
     { UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
     { (UNIT_AUTO+UNIT_DTYPE), (TYPE_2315 << UNIT_V_DTYPE),
-      NULL, "2315", &dp_set_size }, 
+      NULL, "2315", &dp_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (TYPE_5440 << UNIT_V_DTYPE),
       NULL, "5440", &dp_set_size },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
@@ -354,7 +354,7 @@ switch (op) {                                           /* case IO op */
         if (t & SETD_EX)                                /* test for ex */
             t = t | STA_EX;
         return t;
- 
+
    case IO_OC:                                          /* command */
         if (DEBUG_PRS (dp_dev))
             fprintf (sim_deb, ">>DP%d OC = %02X, STA = %02X\n",
@@ -363,7 +363,7 @@ switch (op) {                                           /* case IO op */
         if (dat & CMD_SK)                               /* seek? get cyl */
             t = dp_cyl;
         else if (dat & CMD_RST)                         /* rest? cyl 0 */
-            t = 0; 
+            t = 0;
         else break;                                     /* no action */
         diff = t - uptr->CYL;
         if (diff < 0)                                   /* ABS cyl diff */
@@ -420,12 +420,12 @@ switch (dp_cmd & 0x7) {                                 /* case on func */
                 return r;
             dp_1st = 0;
             sch_wrmem (dp_dib.sch, dpxb, DP_NUMBY);     /* write to memory */
-            if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */       
+            if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */
                 sim_activate (uptr, dp_rtime);          /* reschedule */
                 return SCPE_OK;
                 }
             break;                                      /* no, set done */
-            } 
+            }
         dp_sta = dp_sta | STC_DTE;                      /* can't work */
         break;
 
@@ -438,7 +438,7 @@ switch (dp_cmd & 0x7) {                                 /* case on func */
             if ((r = dp_wds (uptr)))                    /* write sec, err? */
                 return r;
             dp_1st = 0;
-            if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */       
+            if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */
                 sim_activate (uptr, dp_rtime);          /* reschedule */
                 return SCPE_OK;
                 }
@@ -506,7 +506,7 @@ if (dp_cyl != (uint32) uptr->CYL) {                     /* wrong cylinder? */
     else {
         dp_done (STC_ACF);                              /* error, done */
         return TRUE;
-        } 
+        }
     }
 if (sc >= DP_NUMSC) {                                   /* bad sector? */
     dp_done (STC_OVR);                                  /* error, done */
@@ -620,7 +620,7 @@ dp_tplte[0] = 0;                                        /* controller */
 for (u = 0, j = 1; u < DP_NUMDR; u++) {                 /* loop thru units */
     dev = (u + 1) * o_DP0;                              /* drive dev # */
     dp_tplte[j++] = dev;
-    if (dtpl && (GET_DTYPE (dp_unit[u].flags) == TYPE_5440)) 
+    if (dtpl && (GET_DTYPE (dp_unit[u].flags) == TYPE_5440))
         dp_tplte[j++] = dev + o_DPF;                    /* if fixed */
     }
 dp_tplte[j] = TPL_END;                                  /* end marker */

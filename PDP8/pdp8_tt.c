@@ -130,7 +130,7 @@ MTAB tto_mod[] = {
 DEVICE tto_dev = {
     "TTO", &tto_unit, tto_reg, tto_mod,
     1, 10, 31, 1, 8, 8,
-    NULL, NULL, &tto_reset, 
+    NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
     &tto_dib, 0
     };

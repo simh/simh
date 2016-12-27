@@ -35,8 +35,8 @@
                             sim_tape_sprecsr    - skip records rev
                             sim_tape_spfiler    - skip files rev
                             sim_tape_position   - general purpose position
-                        These routines correspond to natural tape operations 
-                        and will align better when physical tape support is 
+                        These routines correspond to natural tape operations
+                        and will align better when physical tape support is
                         included here.
    08-Jun-08    JDB     Fixed signed/unsigned warning in sim_tape_set_fmt
    23-Jan-07    JDB     Fixed backspace over gap at BOT
@@ -69,7 +69,7 @@
    sim_tape_wreomrw     erase remainder of tape & rewind
    sim_tape_wrgap       write erase gap
    sim_tape_sprecsf     space records forward
-   sim_tape_spfilef     space files forward 
+   sim_tape_spfilef     space files forward
    sim_tape_sprecsr     space records reverse
    sim_tape_spfiler     space files reverse
    sim_tape_position    generalized position
@@ -220,8 +220,8 @@ _tape_io(void *arg)
 UNIT* volatile uptr = (UNIT*)arg;
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
-    /* Boost Priority for this I/O thread vs the CPU instruction execution 
-       thread which in general won't be readily yielding the processor when 
+    /* Boost Priority for this I/O thread vs the CPU instruction execution
+       thread which in general won't be readily yielding the processor when
        this thread needs to run */
     sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
@@ -299,14 +299,14 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
     return NULL;
 }
 
-/* This routine is called in the context of the main simulator thread before 
-   processing events for any unit. It is only called when an asynchronous 
-   thread has called sim_activate() to activate a unit.  The job of this 
+/* This routine is called in the context of the main simulator thread before
+   processing events for any unit. It is only called when an asynchronous
+   thread has called sim_activate() to activate a unit.  The job of this
    routine is to put the unit in proper condition to digest what may have
    occurred in the asynchronous thread.
-   
-   Since tape processing only handles a single I/O at a time to a 
-   particular tape device, we have the opportunity to possibly detect 
+
+   Since tape processing only handles a single I/O at a time to a
+   particular tape device, we have the opportunity to possibly detect
    improper attempts to issue multiple concurrent I/O requests. */
 static void _tape_completion_dispatch (UNIT *uptr)
 {
@@ -420,7 +420,7 @@ return SCPE_OK;
 #endif
 }
 
-/* 
+/*
    This routine is called when the simulator stops and any time
    the asynch mode is changed (enabled or disabled)
 */
@@ -2244,11 +2244,11 @@ for (i=0; i<65535; i++) {
             sim_debug (MTSE_DBG_STR, dptr, "tpc_map: summary - %u %d byte record%s\n", countmap[i], (int)i, (countmap[i] > 1) ? "s" : "");
         }
     }
-if (((last_bc != 0xffff) && 
+if (((last_bc != 0xffff) &&
      (tpos > tape_size) &&
      (!had_double_tape_mark))    ||
     (!had_double_tape_mark)      ||
-    ((objc == countmap[0]) && 
+    ((objc == countmap[0]) &&
      (countmap[0] != 2))) {     /* Unreasonable format? */
     if (last_bc != 0xffff)
         sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR unexpected EOT byte count: %d\n", last_bc);
@@ -2352,7 +2352,7 @@ return SCPE_OK;
 
    Set the density of the specified tape unit either to the value supplied or to
    the value represented by the supplied character string.
-   
+
    If "desc" is NULL, then "val" must be set to one of the MT_DENS_* constants
    in sim_tape.h other than MT_DENS_NONE; the supplied value is used as the tape
    density, and the character string is ignored.  Otherwise, "desc" must point

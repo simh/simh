@@ -327,7 +327,7 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
         if (cdvec)
             cdvec |= (int_vec_set[ilvl][ibit] & ~3);
 #endif
-        cdhivec = cdvec + (cdibp->vnum * 4 * 
+        cdhivec = cdvec + (cdibp->vnum * 4 *
                            (cdibp->ulnt? cdibp->lnt/cdibp->ulnt:
                             (cdptr->numunits? cdptr->numunits: 1)));
         if (cdptr == dptr || !cdvec || !dibp->vnum) {
@@ -340,7 +340,7 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
         if (!cdname) {
             cdname = "CPU";
         }
-        return sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
+        return sim_messagef (SCPE_STOP, (DEV_RDX == 16) ?
                                         "Device %s interrupt vector conflict with %s at 0x%X\n" :
                                         "Device %s interrupt vector conflict with %s at 0%o\n",
                              sim_dname (dptr), cdname, (int)dibp->vec);
@@ -395,7 +395,7 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
         if (!cdname) {
             cdname = "CPU";
             }
-        return sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
+        return sim_messagef (SCPE_STOP, (DEV_RDX == 16) ?
                                         "Device %s address conflict with %s at 0x%X\n" :
                                         "Device %s address conflict with %s at 0%o\n",
                              sim_dname (dptr), cdname, (int)dibp->ba);
@@ -549,14 +549,14 @@ return SCPE_OK;
 
 /* Autoconfiguration
 
-   The table reflects the MicroVAX 3900 microcode, with one field 
+   The table reflects the MicroVAX 3900 microcode, with one field
    addition:
       a valid flag marking the end of the list when the value is -1
 
-   The table has been reviewed, extended and updated to reflect the 
+   The table has been reviewed, extended and updated to reflect the
    contents of the auto configure table in VMS sysgen (V5.5-2)
 
-   A minus number of vectors indicates a field that should be 
+   A minus number of vectors indicates a field that should be
    calculated but not placed in the DIB (RQ, TQ dynamic vectors)
 
    An amod value of 0 indicates that all addresses are FIXED
@@ -574,78 +574,78 @@ typedef struct {
     } AUTO_CON;
 
 AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
-    { { "QBA" },         1,  0,  0, 0, 
+    { { "QBA" },         1,  0,  0, 0,
         {017500} },                                     /* doorbell - fx CSR, no VEC */
-    { { "MCTL" },        1,  0,  0, 0, 
+    { { "MCTL" },        1,  0,  0, 0,
         {012100} },                                     /* MSV11-P/MSV11-Q - fx CSR, no VEC */
-    { { "KE" },          1,  0,  0, 0, 
+    { { "KE" },          1,  0,  0, 0,
         {017300} },                                     /* KE11-A - fx CSR, no VEC */
-    { { "KG" },          1,  0,  0, 0, 
+    { { "KG" },          1,  0,  0, 0,
         {010700} },                                     /* KG11-A - fx CSR, no VEC */
-    { { "RHA", "RHB", "RHC" },  1,  1,  0, 0, 
+    { { "RHA", "RHB", "RHC" },  1,  1,  0, 0,
         {016700, 012440, 012040}, {0254, 0224, 0204} }, /* RH11/RH70 - fx CSR, fx VEC */
-    { { "CLK" },         1,  1,  0, 0, 
+    { { "CLK" },         1,  1,  0, 0,
         {017546}, {0100} },                             /* KW11L - fx CSR, fx VEC */
-    { { "PCLK" },        1,  1,  0, 0, 
+    { { "PCLK" },        1,  1,  0, 0,
         {012540}, {0104} },                             /* KW11P - fx CSR, fx VEC */
-    { { "PTR" },         1,  1,  0, 0, 
+    { { "PTR" },         1,  1,  0, 0,
         {017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
-    { { "PTP" },         1,  1,  0, 0, 
+    { { "PTP" },         1,  1,  0, 0,
         {017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
-    { { "RK" },          1,  1,  0, 0, 
+    { { "RK" },          1,  1,  0, 0,
         {017400}, {0220} },                             /* RK11 - fx CSR, fx VEC */
-    { { "TM" },          1,  1,  0, 0, 
+    { { "TM" },          1,  1,  0, 0,
         {012520}, {0224} },                             /* TM11 - fx CSR, fx VEC */
-    { { "RC" },          1,  1,  0, 0, 
+    { { "RC" },          1,  1,  0, 0,
         {017440}, {0210} },                             /* RC11 - fx CSR, fx VEC */
-    { { "RF" },          1,  1,  0, 0, 
+    { { "RF" },          1,  1,  0, 0,
         {017460}, {0204} },                             /* RF11 - fx CSR, fx VEC */
-    { { "CR" },          1,  1,  0, 0, 
+    { { "CR" },          1,  1,  0, 0,
         {017160}, {0230} },                             /* CR11 - fx CSR, fx VEC */
-    { { "HK" },          1,  1,  0, 0, 
+    { { "HK" },          1,  1,  0, 0,
         {017440}, {0210} },                             /* RK611 - fx CSR, fx VEC */
-    { { "LPT" },         1,  1,  0, 0, 
-        {017514, 004004, 004014, 004024, 004034}, 
+    { { "LPT" },         1,  1,  0, 0,
+        {017514, 004004, 004014, 004024, 004034},
         {0200,     0170,   0174,   0270,   0274} },     /* LP11 - fx CSR, fx VEC */
-    { { "RB" },          1,  1,  0, 0, 
+    { { "RB" },          1,  1,  0, 0,
         {015606}, {0250} },                             /* RB730 - fx CSR, fx VEC */
-    { { "RL" },          1,  1,  0, 0, 
+    { { "RL" },          1,  1,  0, 0,
         {014400}, {0160} },                             /* RL11 - fx CSR, fx VEC */
-    { { "RL" },          1,  1,  0, 0, 
+    { { "RL" },          1,  1,  0, 0,
         {014400}, {0160} },                             /* RL11 - fx CSR, fx VEC */
-    { { "DCI" },         1,  2,  0, 8, 
-        {014000, 014010, 014020, 014030, 
-         014040, 014050, 014060, 014070, 
-         014100, 014110, 014120, 014130, 
-         014140, 014150, 014160, 014170, 
-         014200, 014210, 014220, 014230, 
+    { { "DCI" },         1,  2,  0, 8,
+        {014000, 014010, 014020, 014030,
+         014040, 014050, 014060, 014070,
+         014100, 014110, 014120, 014130,
+         014140, 014150, 014160, 014170,
+         014200, 014210, 014220, 014230,
          014240, 014250, 014260, 014270,
-         014300, 014310, 014320, 014330, 
+         014300, 014310, 014320, 014330,
          014340, 014350, 014360, 014370} },             /* DC11 - fx CSRs */
-    { { NULL },          1,  1,  0, 4, 
-        {015200, 015210, 015220, 015230, 
+    { { NULL },          1,  1,  0, 4,
+        {015200, 015210, 015220, 015230,
          015240, 015250, 015260, 015270,
          015300, 015310, 015320, 015330,
          015340, 015350, 015360, 015370} },             /* DN11 - fx CSRs */
-    { { NULL },          1,  1,  0, 4, 
-        {010500, 010510, 010520, 010530, 
-         010540, 010550, 010560, 010570, 
-         010600, 010610, 010620, 010630, 
+    { { NULL },          1,  1,  0, 4,
+        {010500, 010510, 010520, 010530,
+         010540, 010550, 010560, 010570,
+         010600, 010610, 010620, 010630,
          010640, 010650, 010660, 010670} },             /* DM11B - fx CSRs */
-    { { NULL },          1,  2,  0, 8, 
-        {007600, 007570, 007560, 007550, 
+    { { NULL },          1,  2,  0, 8,
+        {007600, 007570, 007560, 007550,
          007540, 007530, 007520, 007510,
          007500, 007470, 007460, 007450,
          007440, 007430, 007420, 007410} },             /* DR11C - fx CSRs */
-    { { NULL },          1,  1,  0, 8, 
-        {012600, 012604, 012610, 012614, 
+    { { NULL },          1,  1,  0, 8,
+        {012600, 012604, 012610, 012614,
          012620, 012624, 012620, 012624} },             /* PR611 - fx CSRs */
-    { { NULL },          1,  1,  0, 8, 
-        {017420, 017422, 017424, 017426, 
+    { { NULL },          1,  1,  0, 8,
+        {017420, 017422, 017424, 017426,
          017430, 017432, 017434, 017436} },             /* DT11 - fx CSRs */
     { { NULL },          1,  2,  0, 8,
       {016200, 016240} },                               /* DX11 */
-    { { "TDC", "DLI" },  1,  2,  0, 8, 
+    { { "TDC", "DLI" },  1,  2,  0, 8,
         {016500, 016510, 016520, 016530,
          016540, 016550, 016560, 016570,
          016600, 016610, 016620, 016630,
@@ -667,7 +667,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  3,  0, 8,
       {015000, 015040, 015100, 015140, }},              /* DV11 */
     { { NULL },          1,  2,  8, 8 },                /* LK11A */
-    { { "DMC" }, 
+    { { "DMC" },
                          1,  2,  8, 8 },                /* DMC11 */
     { { "DZ" },          1,  2,  8, 8 },                /* DZ11 */
     { { "KDP" },         1,  2,  8, 8 },                /* KMC11 */
@@ -675,9 +675,9 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  2,  8, 8 },                /* VMV21 */
     { { NULL },          1,  2, 16, 8 },                /* VMV31 */
     { { NULL },          1,  2,  8, 8 },                /* DWR70 */
-    { { "RL", "RLB"},    1,  1,  8, 4, 
+    { { "RL", "RLB"},    1,  1,  8, 4,
         {014400}, {0160} },                             /* RL11 */
-    { { "TS", "TSB", "TSC", "TSD"}, 
+    { { "TS", "TSB", "TSC", "TSD"},
                          1,  1,  0, 4,                  /* TS11 */
         {012520, 012524, 012530, 012534},
         {0224} },
@@ -685,20 +685,20 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {010460} },                                     /* LPA11K */
     { { NULL },          1,  2,  8, 8 },                /* KW11C */
     { { NULL },          1,  1,  8, 8 },                /* reserved */
-    { { "RX", "RY" },    1,  1,  8, 4, 
+    { { "RX", "RY" },    1,  1,  8, 4,
         {017170} , {0264} },                            /* RX11/RX211 */
     { { NULL },          1,  1,  8, 4 },                /* DR11W */
-    { { NULL },          1,  1,  8, 4, 
+    { { NULL },          1,  1,  8, 4,
         {012410, 012410}, {0124} },                     /* DR11B - fx CSRs,vec */
     { { "DMP" },         1,  2,  8, 8 },                /* DMP11 */
     { { "DPV" },         1,  2,  8, 8 },                /* DPV11 */
     { { NULL },          1,  2,  8, 8 },                /* ISB11 */
     { { NULL },          1,  2, 16, 8 },                /* DMV11 */
-    { { "XU", "XUB" },   1,  1,  8, 4, 
+    { { "XU", "XUB" },   1,  1,  8, 4,
         {014510}, {0120} },                             /* DEUNA */
     { { "XQ", "XQB" },   1, -1,  0, 4,
         {014440, 014460, 014520, 014540}, {0120} },     /* DEQNA */
-    { { "RQ", "RQB", "RQC", "RQD" }, 
+    { { "RQ", "RQB", "RQC", "RQD" },
                          1, -1,  4, 4,                  /* RQDX3 */
         {012150}, {0154} },
     { { NULL },          1,  8, 32, 4 },                /* DMF32 */
@@ -706,7 +706,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  2,  0, 8,
         {004200, 004240, 004300, 004340} },             /* PLC11 */
     { { NULL },          1,  1, 16, 4 },                /* VS100 */
-    { { "TQ", "TQB" },   1, -1,  4, 4, 
+    { { "TQ", "TQB" },   1, -1,  4, 4,
         {014500}, {0260} },                             /* TQK50 */
     { { NULL },          1,  2, 16, 8 },                /* KMV11 */
     { { NULL },          1,  2,  0, 8,
@@ -720,31 +720,31 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {017340}, {0214} },                             /* TC11 */
     { { "TA" },          1,  1,  0, 0,
         {017500}, {0260} },                             /* TA11 */
-    { { "QVSS" },        1,  2, 64, 8, 
+    { { "QVSS" },        1,  2, 64, 8,
         {017200} },                                     /* QVSS - fx CSR */
     { { NULL },          1,  1,  8, 4 },                /* VS31 */
     { { NULL },          1,  1,  0, 4,
         {016200} },                                     /* LNV11 - fx CSR */
     { { NULL },          1,  1, 16, 4 },                /* LNV21/QPSS */
-    { { NULL },          1,  1,  8, 4, 
+    { { NULL },          1,  1,  8, 4,
         {012570} },                                     /* QTA - fx CSR */
     { { NULL },          1,  1,  8, 4 },                /* DSV11 */
     { { NULL },          1,  2,  8, 8 },                /* CSAM */
     { { NULL },          1,  2,  8, 8 },                /* ADV11C */
-    { { NULL },          1,  0,  8, 8, 
+    { { NULL },          1,  0,  8, 8,
         {010440} },                                     /* AAV11/AAV11C */
-    { { NULL },          1,  2,  8, 8, 
+    { { NULL },          1,  2,  8, 8,
         {016400}, {0140} },                             /* AXV11C - fx CSR,vec */
-    { { NULL },          1,  2,  4, 8, 
+    { { NULL },          1,  2,  4, 8,
         {010420} },                                     /* KWV11C - fx CSR */
-    { { NULL },          1,  2,  8, 8, 
+    { { NULL },          1,  2,  8, 8,
         {016410} },                                     /* ADV11D - fx CSR */
-    { { NULL },          1,  2,  8, 8, 
+    { { NULL },          1,  2,  8, 8,
         {016420} },                                     /* AAV11D - fx CSR */
     { { "QDSS" },        1,  3,  0, 16,
-        {017400, 017402, 017404, 017406, 
+        {017400, 017402, 017404, 017406,
          017410, 017412, 017414, 017416} },             /* VCB02 - QDSS - fx CSR */
-    { { NULL },          1, 16,  0, 4, 
+    { { NULL },          1, 16,  0, 4,
         {004160, 004140, 004120} },                     /* DRV11J - fx CSR */
     { { NULL },          1,  2, 16, 8 },                /* DRQ3B */
     { { NULL },          1,  1,  8, 4 },                /* VSV24 */
@@ -771,7 +771,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },         -1 }                            /* end table */
 };
 
-#if !defined(DEV_NEXUS) 
+#if !defined(DEV_NEXUS)
 #if defined(DEV_MBUS)
 #define DEV_NEXUS DEV_MBUS
 #else
@@ -805,7 +805,7 @@ for (j = 0; (dptr = sim_devices[j]) != NULL; j++) {
 #if (VEC_SET != 0)
                 if (1) {
                     int v;
-                    
+
                     for (v=0; v<MAX(dibp->vnum, 1); v++)
                         int_vec_set[ilvl][ibit+v] = VEC_SET;
                     }
@@ -854,7 +854,7 @@ for (autp = auto_tab; autp->valid >= 0; autp++) {       /* loop thru table */
             continue;
         /* Sanity check that enabled devices can work on the current bus */
         if (!((UNIBUS && (dptr->flags & (DEV_UBUS | DEV_Q18))) ||
-             ((!UNIBUS) && ((dptr->flags & DEV_QBUS) || 
+             ((!UNIBUS) && ((dptr->flags & DEV_QBUS) ||
                             ((dptr->flags & DEV_Q18) && (MEMSIZE <= UNIMEMSIZE)))))) {
             dptr->flags |= DEV_DIS;
             if (sim_switches & SWMASK ('P'))
@@ -867,11 +867,11 @@ for (autp = auto_tab; autp->valid >= 0; autp++) {       /* loop thru table */
         numc = dibp->numc ? dibp->numc : 1;
         ilvl = dibp->vloc / 32;
         ibit = dibp->vloc % 32;
-        /* Identify how many devices earlier in the device list are 
+        /* Identify how many devices earlier in the device list are
            enabled and use that info to determine fixed address assignments */
         for (k=jena=0; k<j; k++) {
             DEVICE *kdptr = find_dev (autp->dnam[k]);
-            
+
             if (kdptr && (!(kdptr->flags & DEV_DIS)))
                 jena += ((DIB *)kdptr->ctxt)->numc ? ((DIB *)kdptr->ctxt)->numc : 1;
             }
@@ -905,9 +905,9 @@ return SCPE_OK;
 /* Factory bad block table creation routine
 
    This routine writes a DEC standard 144 compliant bad block table on the
-   last track of the specified unit as described in: 
+   last track of the specified unit as described in:
       EL-00144_B_DEC_STD_144_Disk_Standard_for_Recording_and_Handling_Bad_Sectors_Nov76.pdf
-   The bad block table consists of 10 repetitions of the same table, 
+   The bad block table consists of 10 repetitions of the same table,
    formatted as follows:
 
         words 0-1       pack id number

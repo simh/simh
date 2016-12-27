@@ -548,7 +548,7 @@ while (reason == 0) {                                   /* loop until halted */
         if (hst_p >= hst_lnt)
             hst_p = 0;
         hst[hst_p].vld = 1;
-        hst[hst_p].pc = PC;     
+        hst[hst_p].pc = PC;
         for (i = 0; i < INST_LEN; i++)
             hst[hst_p].inst[i] = M[(PC + i) % MEMSIZE];
         }
@@ -1076,7 +1076,7 @@ int32 d, d1;
 d = M[ad] & DIGIT;                                      /* get 1st digit */
 d1 = M[ADDR_A (ad, 1)] & DIGIT;                         /* get 2nd digit */
 if (BAD_DIGIT (d) || BAD_DIGIT (d1))                    /* bad? error */
-    return -1; 
+    return -1;
 return ((d * 10) + d1);                                 /* cvt to binary */
 }
 
@@ -1401,7 +1401,7 @@ if (comp && !cry && !ind[IN_EZ]) {                      /* recomp needed? */
         }
     M[dsv] = M[dsv] ^ FLAG;                             /* compl sign */
     *sta = ADD_SIGNC;                                   /* sign changed */
-    return SCPE_OK;     
+    return SCPE_OK;
     }                                                   /* end if recomp */
 if (ind[IN_EZ])                                         /* res = 0? clr HP */
     ind[IN_HP] = 0;
@@ -1470,7 +1470,7 @@ if (!src_f)                                             /* !src done? ovf */
 
 if (!cry && !ind[IN_EZ]) {                              /* recomp needed? */
     ind[IN_HP] = ind[IN_HP] ^ 1;                        /* flip indicator */
-    return SCPE_OK;     
+    return SCPE_OK;
     }                                                   /* end if recomp */
 if (ind[IN_EZ])                                         /* res = 0? clr HP */
     ind[IN_HP] = 0;
@@ -1500,7 +1500,7 @@ if (res & DIGIT)                                        /* nz? clr ind */
 return res & DIGIT;
 }
 
-/* Multiply routine 
+/* Multiply routine
 
    Inputs:
         mpc     =       multiplicand address
@@ -1715,11 +1715,11 @@ return SCPE_OK;
                  10 / -3 = -3 remainder  1
                 -10 /  3 = -3 remainder -1
                 -10 / -3 =  3 remainder -1
-  
+
             This preserves the relationship dd = q * dv + r.
 
    Our example continues as follows for steps 3 through 7:
-  
+
             3.  88 = _0_00_334567890, q_d = 89, c_d = 91
             4.  88 = _0_00034567890
             5.  88 = _0_40034567890
@@ -2027,7 +2027,7 @@ M[PROD_AREA + PROD_AREA_LEN - 1] |= sign;               /* set sign */
 return SCPE_OK;
 }
 
-/* Decimal to octal 
+/* Decimal to octal
 
    Inputs:
         d       =       destination address
@@ -2086,7 +2086,7 @@ for ( ;; ) {
     }
 if (*ez)                                                /* res = 0? clr HP */
     ind[IN_HP] = 0;
-M[d] = M[d] | sign;                                     /* set result sign */   
+M[d] = M[d] | sign;                                     /* set result sign */
 return SCPE_OK;
 }
 

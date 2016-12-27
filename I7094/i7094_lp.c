@@ -313,7 +313,7 @@ t_uint64 dat;
 
 pch = pch_table[GET_PCHAIN (lpt_unit.flags)];           /* get print chain */
 for (col = 0; col < (LPT_CHRLNT + 1); col++)            /* clear ascii buf */
-    lpt_cbuf[col] = ' '; 
+    lpt_cbuf[col] = ' ';
 for (col = 0; col < 72; col++) {                        /* proc 72 columns */
     colbin = 0;
     dat = bit_masks[35 - (col % 36)];                   /* mask for column */

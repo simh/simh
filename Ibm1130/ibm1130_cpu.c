@@ -19,18 +19,18 @@
    23-Jul-03 BLK	Prevented tti polling in CGI mode
    24-Nov-03 BLK	Fixed carry bit error in subtract and subtract double, found by Bob Flanders
    20-Oct-04 BLK	Changed "(unsigned int32)" to "(uint32)" to accomodate improved definitions of simh types
-   					Also commented out my echo command as it's now a standard simh command
+					Also commented out my echo command as it's now a standard simh command
    27-Nov-05 BLK    Added Arithmetic Factor Register support per Carl Claunch  (GUI only)
    06-Dec-06 BLK	Moved CGI stuff out of ibm1130_cpu.c
    01-May-07 BLK	Changed name of function xio_1142_card to xio_1442_card. Corrected list of
-   					devices in xio_devs[] (used in debugging only).
+					devices in xio_devs[] (used in debugging only).
    24-Mar-11 BLK	Got the real IBM 1130 diagnostics (yay!). Fixed two errors detected by the CPU diagnostics:
 					-- was not resetting overflow bit after testing with BSC short form
 					   (why did I think only the long form reset OV after testing?)
 					-- failed to detect numeric overflow in Divide instructions
 					Also fixed bug where simulator performed 2nd word fetch on Long mode instructions
-					on ops that don't have long mode, blowing out the SAR/SBR display that's important in the 
-					IBM diagnostics. The simulator was decrementing the IAR after the incorrect fetch, so the 
+					on ops that don't have long mode, blowing out the SAR/SBR display that's important in the
+					IBM diagnostics. The simulator was decrementing the IAR after the incorrect fetch, so the
 					instructions worked correctly, but, the GUI display was wrong.
 
 >> To do: verify actual operands stored in ARF, need to get this from state diagrams in the schematic set
@@ -38,7 +38,7 @@
    and storing the IAR.
 
    IBM 1800 support is just beginning. Mode set is done (SET CPU 1800 or SET CPU 1130).
-   Index registers are handled (1800 has real registers, 1130 uses core locations 1, 2 and 3 -- 
+   Index registers are handled (1800 has real registers, 1130 uses core locations 1, 2 and 3 --
       but does the 1800 make its hardware index registers appear in the address space?)
    Need to add: memory protect feature, more interrupt levels, GUI mods, IO device mods, timers, watchdog.
    Memory protect was interesting -- they borrowed one of the two parity bits. XIO(0) on 1800 is used for
@@ -84,7 +84,7 @@
 
    The IBM 1130 instruction formats are
 
-   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+	
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
    |  opcode      | F|  T  |                       |   general format
    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
@@ -95,7 +95,7 @@
    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
    |  opcode      | 1|  T  | I|     MODIFIER       |   long instruction
    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-   |                  ADDRESS                      |   
+   |                  ADDRESS                      |
    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
    opcode in MSBits
@@ -117,7 +117,7 @@
    In normal addressing mode, effective address (EA) is computed as follows:
 
    F = 0  T = 0         EA = IAR + DISPLACEMENT
-       0      1              IAR + DISPLACEMENT + M[1] 
+       0      1              IAR + DISPLACEMENT + M[1]
        0      2              IAR + DISPLACEMENT + M[2]
        0      3              IAR + DISPLACEMENT + M[3]
 
@@ -321,7 +321,7 @@ MTAB cpu_mod[] = {
 #ifdef ENABLE_1800_SUPPORT
 	{ UNIT_1800,          0, "1130", "1130", &cpu_set_type},
 	{ UNIT_1800,  UNIT_1800, "1800", "1800", &cpu_set_type},
-#endif	
+#endif
 	{ UNIT_TRACE, UNIT_TRACE_NONE,  "notrace",    "NOTRACE",    NULL},
 	{ UNIT_TRACE, UNIT_TRACE_IO,    "traceIO",    "TRACEIO",    NULL},
 	{ UNIT_TRACE, UNIT_TRACE_INSTR, "traceInstr", "TRACEINSTR", NULL},
@@ -334,7 +334,7 @@ DEVICE cpu_dev = {
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	NULL, cpu_attach, NULL};			/* attaching to CPU creates cpu log file */
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * Memory read/write -- save SAR and SBR on the way in and out
  *
  * (It can be helpful to set breakpoints on a = 1, 2, or 3 in these routines
@@ -358,7 +358,7 @@ void WriteW (int32 a, int32 d)
 	M[a & mem_mask] = (int16) d;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * read and write index registers. On the 1130, they're in core addresses 1, 2, 3.
  * on the 1800, they're separate registers
  * ------------------------------------------------------------------------ */
@@ -369,7 +369,7 @@ static uint16 ReadIndex (int32 tag)
 	if (is_1800)
 		return XR[tag-1];						/* 1800: fetch from register */
 #endif
-		
+
 	SAR = tag;									/* 1130: ordinary read from memory (like ReadW) */
 	SBR = (int32) M[(tag) & mem_mask];
 	return SBR;
@@ -389,7 +389,7 @@ static void WriteIndex (int32 tag, int32 d)
 	M[tag & mem_mask] = (int16) d;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * upcase - force a string to uppercase (ASCII)
  * ------------------------------------------------------------------------ */
 
@@ -400,12 +400,12 @@ char *upcase (char *str)
 	for (s = str; *s; s++) {
 		if (*s >= 'a' && *s <= 'z')
 			*s -= 32;
-	} 
+	}
 
 	return str;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * calc_ints - set appropriate bits in int_req if any interrupts are pending on given levels
  *
  * int_req:
@@ -646,7 +646,7 @@ t_stat sim_instr (void)
 				eaddr += ReadIndex(TAG);	/* add index register value */
 			if (INDIR)						/* if indirect addressing */
 				eaddr = ReadW(eaddr);		/* pick up referenced address */
-			
+
 			/* to do: the previous steps may lead to incorrect GUI SAR/SBR display if the instruction doesn't actually fetch anything. Check this. */
 		}
 		else {								/* short instruction, use displacement */
@@ -682,11 +682,11 @@ t_stat sim_instr (void)
 						sprintf(msg, "Unknown XIO op %x on device %02x (%s)", iocc_func, iocc_dev,  xio_devs[iocc_dev]);
 						xio_error(msg);
 						break;
-					
+
 					case XIO_SENSE_IRQ:				/* examine current Interrupt Level Status Word */
 						ACC = (ipl >= 0) ? ILSW[ipl] : 0;
 						break;
-					
+
 					default:						/* perform device-specific operation */
 						switch (iocc_dev) {
 							case 0x01:				/* console keyboard and printer */
@@ -886,7 +886,7 @@ t_stat sim_instr (void)
 			case 0x06:						/* --- WAIT --- */
 /* I am no longer doing the fetch if a long wait is encountered
  * The 1130 diagnostics use WAIT instructions with the F bit set in some display error codes.
- * (The wait instruction's opcode is displayed in the Storage Buffer Register on the console display, 
+ * (The wait instruction's opcode is displayed in the Storage Buffer Register on the console display,
  * since the last thing fetched was the instruction)
  */
 				wait_state = WAIT_OP;
@@ -1094,19 +1094,19 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x1c:						/* --- AND - Logical AND --- */
-				src = ReadW(eaddr); 
+				src = ReadW(eaddr);
 				ARFSET(src);
 				ACC &= src;
 				break;
 
 			case 0x1d:						/* --- OR - Logical OR --- */
-				src = ReadW(eaddr); 
+				src = ReadW(eaddr);
 				ARFSET(src);
 				ACC |= src;
 				break;
 
 			case 0x1e:						/* --- EOR - Logical Excl OR --- */
-				src = ReadW(eaddr); 
+				src = ReadW(eaddr);
 				ARFSET(src);
 				ACC ^= src;
 				break;
@@ -1194,7 +1194,7 @@ t_stat sim_instr (void)
 /*
  * simh_status_to_stopcode - convert a SCPE_xxx value from sim_process_event into a STOP_xxx code
  */
-						
+
 static int simh_status_to_stopcode (int status)
 {
 	return (status == SCPE_BREAK) ? STOP_BREAK     :
@@ -1202,7 +1202,7 @@ static int simh_status_to_stopcode (int status)
 		   (status == SCPE_STEP)  ? STOP_STEP      : STOP_OTHER;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * bsctest - perform standard set of condition tests. We return TRUE if any
  * of the condition bits specified in DSPLC test positive, FALSE if none are true.
  * If reset_V is TRUE, we reset the oVerflow flag after testing it.
@@ -1243,14 +1243,14 @@ static t_bool bsctest (int32 DSPLC, t_bool reset_V)
 	return FALSE;
 }
 
-/* ------------------------------------------------------------------------ 
- * exit_irq - pop interrupt stack as part of return from subroutine (BOSC) 
+/* ------------------------------------------------------------------------
+ * exit_irq - pop interrupt stack as part of return from subroutine (BOSC)
  * ------------------------------------------------------------------------ */
 
 static void exit_irq (void)
 {
 	int i, bit;
-	
+
 	GUI_BEGIN_CRITICAL_SECTION
 
 	if (ipl == 5 && tbit) {				/* if we are exiting an INT_RUN interrupt, clear it for the next instruction */
@@ -1284,11 +1284,11 @@ void break_simulation (t_stat stopreason)
 	reason = stopreason;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * SIMH required routines
  * ------------------------------------------------------------------------ */
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * Reset routine
  * ------------------------------------------------------------------------ */
 
@@ -1330,7 +1330,7 @@ t_stat cpu_reset (DEVICE *dptr)
 	return cpu_svc(&cpu_unit);			/* reset breakpoint */
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * Memory examine
  * ------------------------------------------------------------------------ */
 
@@ -1347,7 +1347,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 	return SCPE_NXM;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * Memory deposit
  * ------------------------------------------------------------------------ */
 
@@ -1360,7 +1360,7 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 	return SCPE_NXM;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * Breakpoint service
  * ------------------------------------------------------------------------ */
 
@@ -1373,7 +1373,7 @@ t_stat cpu_svc (UNIT *uptr)
 	return SCPE_OK;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * Memory allocation
  * ------------------------------------------------------------------------ */
 
@@ -1424,7 +1424,7 @@ t_stat cpu_set_type (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 	return SCPE_OK;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * IO function for console switches
  * ------------------------------------------------------------------------ */
 
@@ -1447,7 +1447,7 @@ void xio_1131_switches (int32 addr, int32 func, int32 modify)
 	}
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * Illegal IO operation.  Not yet sure what the actual CPU does in this case
  * ------------------------------------------------------------------------ */
 
@@ -1458,7 +1458,7 @@ void xio_error (const char *msg)
 		break_simulation(STOP_CRASH);
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * register_cmd - add a command to the extensible command table
  * ------------------------------------------------------------------------ */
 
@@ -1491,7 +1491,7 @@ t_stat register_cmd (const char *name, t_stat (*action)(int32 flag, CONST char *
 }
 
 #ifdef USE_MY_ECHO_CMD
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * echo_cmd - just echo the command line
  * ------------------------------------------------------------------------ */
 
@@ -1502,7 +1502,7 @@ static t_stat echo_cmd (int32 flag, CONST char *cptr)
 }
 #endif
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * sim_init - initialize simulator upon startup of scp, before reset
  * ------------------------------------------------------------------------ */
 
@@ -1532,7 +1532,7 @@ void sim_init (void)
 #endif
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * archive_backtrace - record a jump, skip, branch or whatever
  * ------------------------------------------------------------------------ */
 
@@ -1644,15 +1644,15 @@ void void_backtrace (int afrom, int ato)
  *
  *  IAR             ACC  EXT  (flt)    XR1  XR2  XR3 CVI      FAC      OPERATION
  * --------------- ---- ---- -------- ---- ---- ---- --- ------------- -----------------------
- * 002a       002a 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 4c80 BSC  I  ,0028   
- * 081d PAUSE+000d 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 7400 MDM  L  00f0,0 (0)   
- * 0820 PAUSE+0010 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 7201 MDX   2 0001   
- * 0821 PAUSE+0011 1234 5381  0.14222 00b3 0237 3f7e CV   1.04720e+000 6a03 STX   2 0003   
- * 0822 PAUSE+0012 1234 5381  0.14222 00b3 0237 3f7e CV   1.04720e+000 6600 LDX  L2 0231   
- * 0824 PAUSE+0014 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4c00 BSC  L  ,0237   
- * 0237 START+001d 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4480 BSI  I  ,3fff   
- * 082f FSIN +0001 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4356 BSI   3 0056   
- * 3fd5 ILS01+35dd 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4c00 BSC  L  ,08de   
+ * 002a       002a 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 4c80 BSC  I  ,0028
+ * 081d PAUSE+000d 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 7400 MDM  L  00f0,0 (0)
+ * 0820 PAUSE+0010 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 7201 MDX   2 0001
+ * 0821 PAUSE+0011 1234 5381  0.14222 00b3 0237 3f7e CV   1.04720e+000 6a03 STX   2 0003
+ * 0822 PAUSE+0012 1234 5381  0.14222 00b3 0237 3f7e CV   1.04720e+000 6600 LDX  L2 0231
+ * 0824 PAUSE+0014 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4c00 BSC  L  ,0237
+ * 0237 START+001d 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4480 BSI  I  ,3fff
+ * 082f FSIN +0001 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4356 BSI   3 0056
+ * 3fd5 ILS01+35dd 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4c00 BSC  L  ,08de
  *
  * IAR - instruction address register value, optionally including symbol and offset
  * ACC - accumulator
@@ -1696,7 +1696,7 @@ static t_stat cpu_attach (UNIT *uptr, CONST char *cptr)
 		free(s);
 	}
 	syms = NULL;
-		
+
 	if (sim_switches & SWMASK('M')) {		/* use a map file to display relative addresses */
 		cptr = get_glyph(cptr, mapfile, 0);
 		if (! *mapfile) {
@@ -1767,7 +1767,7 @@ static void trace_instruction (void)
 			syms ? "-----------" : "", log_fac ? "-------- " : "", log_fac ? "------------- " : "");
 	}
 
-	if (! log_fac)	
+	if (! log_fac)
 		facstr[0] = fltstr[0] = '\0';
 	else {
 		mant = ((ACC & 0xFFFF) << 16) | (EXT & 0xFFFF);
@@ -1820,7 +1820,7 @@ static void trace_instruction (void)
 		for (s = syms; s != NULL; s = s->next)
 			if (s->addr <= addr)
 				break;
-		
+
 		if (s == NULL)
 			fprintf(cpu_unit.fileref, "      %04x ", addr);
 		else

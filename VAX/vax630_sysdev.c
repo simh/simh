@@ -217,7 +217,7 @@ DEVICE rom_dev = {
     1, 16, ROMAWIDTH, 4, 16, 32,
     &rom_ex, &rom_dep, &rom_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, &rom_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &rom_help, NULL, NULL,
     &rom_description
     };
 
@@ -240,7 +240,7 @@ DEVICE nvr_dev = {
     1, 16, NVRAWIDTH, 4, 16, 32,
     &nvr_ex, &nvr_dep, &nvr_reset,
     NULL, &nvr_attach, &nvr_detach,
-    NULL, DEV_DEBUG, 0, nvr_debug, NULL, NULL, &nvr_help, NULL, NULL, 
+    NULL, DEV_DEBUG, 0, nvr_debug, NULL, NULL, &nvr_help, NULL, NULL,
     &nvr_description
     };
 
@@ -271,7 +271,7 @@ DEVICE sysd_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &sysd_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
     &sysd_description
     };
 
@@ -286,10 +286,10 @@ DEVICE sysd_dev = {
    into instruction based timing loops. As the host platform gets
    much faster than the original VAX, the assumptions embedded in
    these code loops are no longer valid.
-   
+
    Code has been added to the ROM implementation to limit CPU speed
    to about 500K instructions per second.  This heads off any future
-   issues with the embedded timing loops.  
+   issues with the embedded timing loops.
 */
 
 int32 rom_swapb(int32 val)
@@ -325,7 +325,7 @@ if (rom_delay == 0) {
 
         for (i = 0; i < c; i++)
             rom_loopval |= (rom_loopval + ts) ^ rom_swapb (rom_swapb (rom_loopval + ts));
-        te = sim_os_msec (); 
+        te = sim_os_msec ();
         if ((te - ts) < 50)                         /* sample big enough? */
             continue;
         if (rom_delay < (rom_loopval + (c / (te - ts) / 1000) + 1))
@@ -533,14 +533,14 @@ return SCPE_OK;
 
 /* Valid NVRAM contents are required for the Boot ROM to respect the
    watch chip's CSRD VRT bit.  This empty NVRAM image avoids inconsistent
-   ROM behavior the first time the NVR device is attached (to an empty 
+   ROM behavior the first time the NVR device is attached (to an empty
    file).  Attaching a already existing file will overwrite this initial
    contents with whatever the NVRAM file contains.  */
 uint8 nvr_empty_valid[NVRSIZE] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 
-    0x00, 0x00, 0x00, 0xFE, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 
-    0xFF, 0x00, 0x00, 0xFE, 0xFF, 0x00, 0x48, 0x45, 0x41, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00,
+    0x00, 0x00, 0x00, 0xFE, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE,
+    0xFF, 0x00, 0x00, 0xFE, 0xFF, 0x00, 0x48, 0x45, 0x41, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     };
 
 t_stat nvr_attach (UNIT *uptr, CONST char *cptr)
@@ -805,7 +805,7 @@ struct reglink *p;
 
 for (p = &regtable[0]; p->low != 0; p++) {
     if ((pa >= p->low) && (pa < p->high) && p->write) {
-        p->write (pa, val, lnt);  
+        p->write (pa, val, lnt);
         return;
         }
     }
@@ -1001,9 +1001,9 @@ return SCPE_OK;
 
 t_stat sysd_show_leds (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-fprintf (st, "leds=(%s,%s,%s,%s)", ka_bdr&8 ? "ON" : "OFF", 
-                                   ka_bdr&4 ? "ON" : "OFF", 
-                                   ka_bdr&2 ? "ON" : "OFF", 
+fprintf (st, "leds=(%s,%s,%s,%s)", ka_bdr&8 ? "ON" : "OFF",
+                                   ka_bdr&4 ? "ON" : "OFF",
+                                   ka_bdr&2 ? "ON" : "OFF",
                                    ka_bdr&1 ? "ON" : "OFF");
 return SCPE_OK;
 }
@@ -1108,8 +1108,8 @@ struct {
     } boards[] = {
         { 16, "MS630-CA"},
         {  4, "MS630-BB"},
-        {  2, "MS630-BA"}, 
-        {  1, "MS630-AA"}, 
+        {  2, "MS630-BA"},
+        {  1, "MS630-AA"},
         {  0, NULL}};
 int32 i;
 

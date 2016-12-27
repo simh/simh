@@ -316,7 +316,7 @@ else if ((c & ~(((lp_model == LP_7450)? 0x20: 0) | SPC_MASK)) == FMT_SPC) {
     for (i = 1; i <= c; i++) {                          /* look for BOF */
         if (CHP (CH_BOF, lp_cct[(lp_cctp + i) % lp_cctl]))
             return lp_skip (uptr, CH_TOF);              /* found, TOF */
-        }        
+        }
     return lp_space (uptr, c, FALSE);                   /* space */
     }
 else if ((c & ~CCH_MASK) == FMT_SKP)                    /* skip? */

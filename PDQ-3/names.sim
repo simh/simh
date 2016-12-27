@@ -143,7 +143,7 @@ name SERDRIVE:proc5 Ser_Clear
 name SERDRIVE:proc6 Ser_Power
 name SERDRIVE:proc7 Ser_Status
 name SERDRIVE:proc8 Ser_Term
-name STANDRIV:proc1 standriv_initunit 
+name STANDRIV:proc1 standriv_initunit
 name STANDRIV:proc2 Stan_Init
 name STANDRIV:proc3 Stan_Read
 name STANDRIV:proc4 Stan_Write
@@ -155,7 +155,7 @@ name SYSDRIVE:proc1 sysdrive_initunit
 name SYSDRIVE:proc2 Intr_Init
 name SYSDRIVE:proc3 Intr_Enable
 name SYSDRIVE:proc4 Enter_HDT
-name TM11DRIV:proc1 standriv_initunit 
+name TM11DRIV:proc1 standriv_initunit
 name TM11DRIV:proc2 TM_Init
 name TM11DRIV:proc3 TM_Read
 name TM11DRIV:proc4 TM_Write

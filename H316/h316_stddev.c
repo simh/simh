@@ -490,7 +490,7 @@ size_t i;
 
 for (i = 0; i < PBOOT_SIZE; i++)                        /* copy bootstrap */
     M[PBOOT_START + i] = pboot[i];
-PC = PBOOT_START;       
+PC = PBOOT_START;
 return SCPE_OK;
 }
 
@@ -899,7 +899,7 @@ switch (inst) {                                         /* case on opcode */
         // [RLA] documentation that supports this.  According to my manual,
         // [RLA] skip on memory parity error (SPS) is opcode 101200 and skip
         // [RLA] on no parity error (SPN) is 100200.  Neither of these look
-        // [RLA] like an SKS to device 20.  
+        // [RLA] like an SKS to device 20.
         //
         // [RLA]   In any case this code can't stay here since the clock can
         // [RLA] now be disabled.  It'll have to move to h316_cpu.c no matter

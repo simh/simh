@@ -25,11 +25,11 @@
 
     NOTES:
 
-        This software was written by Bill Beech, 24 Jan 13, to allow emulation of 
+        This software was written by Bill Beech, 24 Jan 13, to allow emulation of
         more complex Multibus Computer Systems.
 
-        This program simulates up to 2 i8259 devices.  It handles 1 i8259 
-        device on the iSBC 80/20 and iSBC 80/30 SBCs.  Other devices could be on 
+        This program simulates up to 2 i8259 devices.  It handles 1 i8259
+        device on the iSBC 80/20 and iSBC 80/30 SBCs.  Other devices could be on
         other multibus boards in the simulated system.
 */
 
@@ -146,8 +146,8 @@ t_stat i8259_reset (DEVICE *dptr, uint16 baseport)
     sim_printf("   8259-%d: Reset\n", i8259_devnum);
     sim_printf("   8259-%d: Registered at %04X\n", i8259_devnum, baseport);
     i8259_port[i8259_devnum] = baseport;
-    reg_dev(i8259a, baseport, i8259_devnum); 
-    reg_dev(i8259b, baseport + 1, i8259_devnum); 
+    reg_dev(i8259a, baseport, i8259_devnum);
+    reg_dev(i8259b, baseport + 1, i8259_devnum);
     i8259_unit[i8259_devnum].u3 = 0x00; /* IRR */
     i8259_unit[i8259_devnum].u4 = 0x00; /* ISR */
     i8259_unit[i8259_devnum].u5 = 0x00; /* IMR */

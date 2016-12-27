@@ -88,4 +88,3 @@ Simulation stopped, PC: 0007C8C4 (stop #2000)
 sim>quit
 Goodbye
 Debug output disabled
-

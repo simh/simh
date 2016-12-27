@@ -70,7 +70,7 @@
 
 /* Controller command */
 
-#define CMC_MASK        0x3F                            
+#define CMC_MASK        0x3F
 #define CMC_CLR         0x08                            /* reset */
 #define CMC_RD          0x01                            /* read */
 #define CMC_WR          0x02                            /* write */
@@ -310,11 +310,11 @@ MTAB idc_mod[] = {
     { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (TYPE_MSM330F << UNIT_V_DTYPE),
       "MSM330F", NULL, NULL },
     { (UNIT_AUTO+UNIT_DTYPE), (TYPE_MCCDD16 << UNIT_V_DTYPE),
-      NULL, "MCCDD16", &idc_set_size }, 
+      NULL, "MCCDD16", &idc_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (TYPE_MCCDD48 << UNIT_V_DTYPE),
-      NULL, "MCCDD48", &idc_set_size }, 
+      NULL, "MCCDD48", &idc_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (TYPE_MCCDD80 << UNIT_V_DTYPE),
-      NULL, "MCCDD80", &idc_set_size }, 
+      NULL, "MCCDD80", &idc_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (TYPE_MSM330F << UNIT_V_DTYPE),
       NULL, "MSM330F", &idc_set_size },
     { (UNIT_DTYPE+UNIT_ATT), (TYPE_MSM80 << UNIT_V_DTYPE) + UNIT_ATT,
@@ -578,7 +578,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
                 return r;
             idc_1st = 0;
             sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY);  /* write mem */
-            if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
+            if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;
                 }
@@ -596,7 +596,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
             if ((r = idc_wds (uptr)))                   /* write sec, err? */
                 return r;
             idc_1st = 0;
-            if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
+            if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;
                 }
@@ -614,7 +614,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
     case CMC_RRAM:                                      /* read RAM */
         if (sch_actv (idc_dib.sch, idc_dib.dno)) {      /* sch transfer? */
             sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY * 3);
-            if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
+            if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;
                 }
@@ -626,7 +626,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
     case CMC_WRAM:                                      /* write RAM */
         if (sch_actv (idc_dib.sch, idc_dib.dno)) {      /* sch transfer? */
             sch_rdmem (idc_dib.sch, idcxb, IDC_NUMBY * 3); /* read from mem */
-            if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
+            if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;
                 }

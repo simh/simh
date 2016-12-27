@@ -1020,7 +1020,7 @@ void getArgs( int argc, char *argv[] )
           fprintf( stderr, " -m -- output macro expansions\n" );
           fprintf( stderr, " -p -- output permanent symbols to file\n" );
           fprintf( stderr, " -r -- output RIM format file\n" );
-          fprintf( stderr, " -s -- output symbol punch tape to file\n" ); 
+          fprintf( stderr, " -s -- output symbol punch tape to file\n" );
           fprintf( stderr, " -S file -- read symbol punch tape\n" );
       fprintf( stderr, " -x -- output cross reference to file\n" );
           fflush( stderr );

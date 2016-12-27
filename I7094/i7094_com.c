@@ -32,7 +32,7 @@
    This module implements an abstract simulator for the IBM 7750 communications
    computer as used by the CTSS system.  The 7750 supports up to 112 lines;
    the simulator supports 33.  The 7750 can handle both high-speed lines, in
-   6b and 12b mode, and normal terminals, in 12b mode only; the simulator 
+   6b and 12b mode, and normal terminals, in 12b mode only; the simulator
    supports only terminals.  The 7750 can handle many different kinds of
    terminals; the simulator supports only a limited subset.
 
@@ -626,7 +626,7 @@ switch (com_sta) {                                      /* case on state */
 
 sim_activate (uptr, uptr->wait);
 return SCPE_OK;
-}       
+}
 
 /* Unit service - console receive - always running, even if device is not */
 
@@ -680,7 +680,7 @@ if (!com_enab)                                          /* not enabled? exit */
     return SCPE_OK;
 ln = tmxr_poll_conn (&com_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
-    com_ldsc[ln].rcve = 1;                              /* rcv enabled */ 
+    com_ldsc[ln].rcve = 1;                              /* rcv enabled */
     coml_unit[ln].CONN = 1;                             /* flag connected */
     coml_unit[ln].NEEDID = 1;                           /* need ID */
     coml_unit[ln].NOECHO = 0;                           /* echo enabled */
@@ -849,7 +849,7 @@ switch (c) {
 
     case 022:                                           /* DC2 */
         coml_unit[ln].NOECHO = 1;
-        return 0; 
+        return 0;
 
     case 024:                                           /* DC4 */
         coml_unit[ln].NOECHO = 0;

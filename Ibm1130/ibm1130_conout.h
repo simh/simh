@@ -1,4 +1,4 @@
-/* IBM1130 CONSOLE OUTPUT TO ASCII CONVERSION TABLE 
+/* IBM1130 CONSOLE OUTPUT TO ASCII CONVERSION TABLE
  *
  * (C) Copyright 2002, Brian Knittel.
  * You may freely use this program, but: it offered strictly on an AS-IS, AT YOUR OWN

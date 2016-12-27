@@ -30,7 +30,7 @@
     NOTES:
 
         This controller will mount 2 SD disk images on drives :F0: and :F1: addressed
-        at ports 088H to 08FH.  
+        at ports 088H to 08FH.
 
     Registers:
 
@@ -233,10 +233,10 @@ typedef    struct    {                  //FDC definition
 FDCDEF    fdc201[4];                    //indexed by the isbc-201 instance number
 
 UNIT isbc201_unit[] = {
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 } 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 },
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 },
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 },
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }
 };
 
 REG isbc201_reg[] = {
@@ -279,7 +279,7 @@ DEVICE isbc201_dev = {
     isbc201_unit,       //units
     isbc201_reg,        //registers
     isbc201_mod,        //modifiers
-    FDD_NUM,            //numunits 
+    FDD_NUM,            //numunits
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -289,11 +289,11 @@ DEVICE isbc201_dev = {
     NULL,               //deposit
     NULL,               //reset
     NULL,               //boot
-    &isbc201_attach,    //attach  
+    &isbc201_attach,    //attach
     NULL,               //detach
     NULL,               //ctxt
-    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
-    DEBUG_flow + DEBUG_read + DEBUG_write, //dctrl 
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags
+    DEBUG_flow + DEBUG_read + DEBUG_write, //dctrl
     isbc201_debug,      //debflags
     NULL,               //msize
     NULL                //lname
@@ -310,8 +310,8 @@ t_stat isbc201_reset(DEVICE *dptr, uint16 base)
         fdc201[isbc201_fdcnum].baseport = base;
         reg_dev(isbc2010, base, isbc201_fdcnum);         //read status
         reg_dev(isbc2011, base + 1, isbc201_fdcnum);     //read rslt type/write IOPB addr-l
-        reg_dev(isbc2012, base + 2, isbc201_fdcnum);     //write IOPB addr-h and start 
-        reg_dev(isbc2013, base + 3, isbc201_fdcnum);     //read rstl byte 
+        reg_dev(isbc2012, base + 2, isbc201_fdcnum);     //write IOPB addr-h and start
+        reg_dev(isbc2013, base + 3, isbc201_fdcnum);     //read rstl byte
         reg_dev(isbc2017 , base + 7, isbc201_fdcnum);     //write reset isbc202
         isbc201_reset1(isbc201_fdcnum);
         isbc201_fdcnum++;
@@ -368,7 +368,7 @@ t_stat isbc201_attach (UNIT *uptr, CONST char *cptr)
     uint8 fdcnum, fddnum;
 
     sim_debug (DEBUG_flow, &isbc201_dev, "   isbc201_attach: Entered with cptr=%s\n", cptr);
-    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
+    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
         sim_printf("   isbc201_attach: Attach error\n");
         return r;
     }
@@ -425,7 +425,7 @@ t_stat isbc201_attach (UNIT *uptr, CONST char *cptr)
 
 t_stat isbc201_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-//    sim_debug (DEBUG_flow, &isbc201_dev, "   isbc201_set_mode: Entered with val=%08XH uptr->flags=%08X\n", 
+//    sim_debug (DEBUG_flow, &isbc201_dev, "   isbc201_set_mode: Entered with val=%08XH uptr->flags=%08X\n",
 //        val, uptr->flags);
     if (val & UNIT_WPMODE) {            /* write protect */
         uptr->flags |= val;
@@ -460,7 +460,7 @@ uint8 isbc2010(t_bool io, uint8 data)
     if ((fdcnum = isbc201_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read ststus*/
             if (DEBUG)
-                sim_printf("\n   isbc201-%d: returned status=%02X", 
+                sim_printf("\n   isbc201-%d: returned status=%02X",
                     fdcnum, fdc201[fdcnum].stat);
             return fdc201[fdcnum].stat;
         }
@@ -477,7 +477,7 @@ uint8 isbc2011(t_bool io, uint8 data)
             fdc201[fdcnum].intff = 0;      //clear interrupt FF
             fdc201[fdcnum].stat &= ~FDCINT;
             if (DEBUG)
-                sim_printf("\n   isbc201-%d: returned rtype=%02X intff=%02X status=%02X", 
+                sim_printf("\n   isbc201-%d: returned rtype=%02X intff=%02X status=%02X",
                     fdcnum, fdc201[fdcnum].rtype, fdc201[fdcnum].intff, fdc201[fdcnum].stat);
             return fdc201[fdcnum].rtype;
         } else {                        /* write data port */
@@ -492,7 +492,7 @@ uint8 isbc2011(t_bool io, uint8 data)
 uint8 isbc2012(t_bool io, uint8 data)
 {
     uint8 fdcnum;
-    
+
     if ((fdcnum = isbc201_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read data port */
             ;

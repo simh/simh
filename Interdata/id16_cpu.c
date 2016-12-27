@@ -49,7 +49,7 @@
     PC<0:15>            program counter
    int_req[8]<0:31>     interrupt requests
    int_enb[8]<0:31>     interrupt enables
-   
+
    The Interdata 16b systems have four instruction formats: register to
    register, short format, register to memory, and register to storage.
    The formats are:
@@ -713,7 +713,7 @@ while (reason == 0) {                                   /* loop until halted */
             ea = (ir2 + R[r2]) & VAMASK;
         opnd = ReadH (ea);                              /* fetch operand */
         break;
-        
+
     default:
         return SCPE_IERR;
         }
@@ -1230,7 +1230,7 @@ while (reason == 0) {                                   /* loop until halted */
         break;
 
 /* Miscellaneous */
-    
+
     case 0xE1:                                          /* SVC - RX */
         PCQ_ENTRY;                                      /* save PC */
         WriteH (SVCAP, ea);                             /* save opnd */
@@ -1260,13 +1260,13 @@ while (reason == 0) {                                   /* loop until halted */
         cc = newPSW (R[r2]);                            /* load new PSW */
         if (PSW & PSW_SQI)                              /* test for q */
             cc = testsysq (cc);
-        break;  
+        break;
 
     case 0x73:                                          /* LPS - RXH */
         cc = newPSW (opnd);                             /* load new PSW */
         if (PSW & PSW_SQI)                              /* test for q */
             cc = testsysq (cc);
-        break;  
+        break;
 
     case 0x64:                                          /* ATL - RX */
     case 0x65:                                          /* ABL - RX */
@@ -1358,7 +1358,7 @@ case 0xDE:                                              /* OC - RX */
         if (DEV_ACC (dev)) {                            /* dev exist? */
             dev_tab[dev] (dev, IO_ADR, 0);              /* select */
             t = dev_tab[dev] (dev, IO_RD, 0);           /* get data */
-            cc = 0; 
+            cc = 0;
             }
         else {                                          /* no */
             t = 0;                                      /* read zero */
@@ -1387,7 +1387,7 @@ case 0xDE:                                              /* OC - RX */
             t = 0;                                      /* read zero */
             cc = CC_V;                                  /* set V */
             }
-        if (OP_TYPE (op) != OP_RR)                      /* RX or RR? */ 
+        if (OP_TYPE (op) != OP_RR)                      /* RX or RR? */
             WriteH (ea, t);
         else R[r2] = t;
         int_eval ();                                    /* re-eval intr */
@@ -1413,7 +1413,7 @@ case 0xDE:                                              /* OC - RX */
         break;
 
 /* Block I/O instructions
-        
+
    On a real Interdata system, the block I/O instructions can't be
    interrupted or stopped.  To model this behavior, while allowing
    the instructions to go back through fetch for I/O processing and
@@ -1470,7 +1470,7 @@ case 0xDE:                                              /* OC - RX */
                 cc = 0;
             else {                                      /* no, start I/O */
                 dev_tab[dev] (dev, IO_ADR, 0);          /* select dev */
-                dev_tab[dev] (dev, IO_OC, t);           /* start dev */ 
+                dev_tab[dev] (dev, IO_OC, t);           /* start dev */
                 blk_io.dfl = dev | BL_RD | BL_LZ;       /* set status block */
                 blk_io.cur = AL_BUF;
                 blk_io.end = ea;
@@ -1735,7 +1735,7 @@ switch (op) {
         break;
 
     case IO_WD:                                         /* write */
-        if (drpos < 4) 
+        if (drpos < 4)
              DR = (DR & ~(DMASK8 << (drpos * 8))) | (dat << (drpos * 8));
         else if (drpos == 4)
             DRX = dat;
@@ -1753,7 +1753,7 @@ switch (op) {
         }
 
 return 0;
-}       
+}
 
 /* Memory interface routines
 

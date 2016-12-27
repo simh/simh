@@ -40,26 +40,26 @@
                   the DMC11 to report DSR status.
                   Don't accept any data from the peer until a buffer has been
                   made available.
-  04-Aug-13  MP   Massive Rewrite/Restructure to implement the DDCMP wire 
-                  protocol for interoperation with other sync devices (DUP11, 
+  04-Aug-13  MP   Massive Rewrite/Restructure to implement the DDCMP wire
+                  protocol for interoperation with other sync devices (DUP11,
                   KDP, etc.)
 
   ------------------------------------------------------------------------------
 
 
-I/O is done through sockets so that the remote system can be on the same 
-host machine. The device starts polling for incoming connections when it 
-receives its first read buffer. The device opens the connection for writing 
+I/O is done through sockets so that the remote system can be on the same
+host machine. The device starts polling for incoming connections when it
+receives its first read buffer. The device opens the connection for writing
 when it receives the first write buffer.
 
-Transmit and receive buffers are added to their respective queues and the 
+Transmit and receive buffers are added to their respective queues and the
 polling method in dmc_poll_svc() checks for input and sends any output.
 
-Tested with two diagnostics. To run the diagnostics set the default 
-directory to SYS$MAINTENANCE, run ESSAA and then configure it for the 
+Tested with two diagnostics. To run the diagnostics set the default
+directory to SYS$MAINTENANCE, run ESSAA and then configure it for the
 DMC-11 with the following commands:
 
-The above commands can be put into a COM file in SYS$MAINTENANCE (works 
+The above commands can be put into a COM file in SYS$MAINTENANCE (works
 on VMS 3.0 but not 4.6, not sure why).
 
 ATT DW780 SBI DW0 3 4
@@ -68,14 +68,14 @@ SELECT XMA0
 (if putting these into a COM file to be executed by ESSAA add a "DS> " prefix)
 
 
-The first is EVDCA which takes no parameters. Invoke it with the command 
-R EVDCA. This diagnostic uses the DMC-11 loopback functionality and the 
-transmit port is not used when LU LOOP is enabled. Seems to work only under 
+The first is EVDCA which takes no parameters. Invoke it with the command
+R EVDCA. This diagnostic uses the DMC-11 loopback functionality and the
+transmit port is not used when LU LOOP is enabled. Seems to work only under
 later versions of VMS such as 4.6, does not work on 3.0.  It does not work
 under VMS 3.x since in that environment, no receive buffers are ever made
 available to the device while testing.
 
-The second is EVDMC, invoke this with the command R EVDMC. For this I used 
+The second is EVDMC, invoke this with the command R EVDMC. For this I used
 the following commands inside the diagnostic:
 
 RUN MODE=TRAN on one machine
@@ -87,7 +87,7 @@ SET TRANSMIT=CCITT/SIZE=25/COPY=5
 SET EXPECT=CCITT/SIZE=25/COPY=5
 RUN MODE=ACTIVE/LOOP=INT/STATUS/PASS=3
 
-You can add /PASS=n to the above commands to get the diagnostic to send and 
+You can add /PASS=n to the above commands to get the diagnostic to send and
 receive more buffers.
 
 The other test was to configure DECnet on VMS 4.6 and do SET HOST.
@@ -427,7 +427,7 @@ static const uint16 hi_speed_ucode[256] = {
     063170,
     063161
 };
-    
+
 /* Queue elements
  * A queue is a double-linked list of element headers.
  * The head of the queue is an element without a body.
@@ -553,59 +553,59 @@ typedef enum {
     } DDCMP_LinkState;
 
 typedef struct {
-    uint8 R;                /* number of the highest sequential data message received . 
+    uint8 R;                /* number of the highest sequential data message received .
                                Sent in the RESP field of data messages, ACK messages,
                                and NAK messages as acknowledgment to the other station. */
-    uint8 N;                /* Number of the highest sequential data message 
-                               transmitted.  Sent in the NUM field of REP 
-                               messages. N is the number assigned to the last 
-                               user transmit request which has been transmitted 
+    uint8 N;                /* Number of the highest sequential data message
+                               transmitted.  Sent in the NUM field of REP
+                               messages. N is the number assigned to the last
+                               user transmit request which has been transmitted
                                (sent in the NUM field of that data message).*/
     uint8 A;                /* Number of the highest sequential data message acknowledged.
-                               Received in the RESP field of data messages, ACK messages, 
+                               Received in the RESP field of data messages, ACK messages,
                                and NAK messages.*/
     uint8 T;                /* Number of the next data message to be transmitted.
-                               When sending new data messages T will have the 
+                               When sending new data messages T will have the
                                value N+l. When retransmitting T will be set back
                                to A+l and will advance to N+l.*/
-    uint8 X;                /* Number of the last data message that has been 
-                               transmitted.  When a new data message has been 
-                               completely transmitted X will have the value N. 
-                               When retransmitting and receiving acknowledgments 
-                               asynchronously with respect to transmission, X will 
+    uint8 X;                /* Number of the last data message that has been
+                               transmitted.  When a new data message has been
+                               completely transmitted X will have the value N.
+                               When retransmitting and receiving acknowledgments
+                               asynchronously with respect to transmission, X will
                                have some value less than or equal to N. */
     uint8 NAKed;            /* The value of R sent in the most recent NAK message.  This
                                is used to avoid sending additional NAKs when one has already
                                been sent while the remaining packets in the transmit pipeline
                                are still arriving. */
-    t_bool SACK;            /* Send ACK flag.  This flag is set when either R 
-                               is incremented, meaning a new sequential data 
-                               message has been received which requires an ACK 
-                               reply, or a REP message is received which requires 
-                               an ACK reply. The SACK flag is cleared when 
-                               sending either a DATA message with the latest RESP 
-                               field information, an ACK with the latest RESP 
+    t_bool SACK;            /* Send ACK flag.  This flag is set when either R
+                               is incremented, meaning a new sequential data
+                               message has been received which requires an ACK
+                               reply, or a REP message is received which requires
+                               an ACK reply. The SACK flag is cleared when
+                               sending either a DATA message with the latest RESP
+                               field information, an ACK with the latest RESP
                                field information, or when the SNAK flag is set. */
-                 /* 
-                    The SACK and SNAK flags are mutually exclusive. At most one 
-                    will be set at a given time. The events that set the SACK 
-                    flag, R is increment~d or a REP is received requiring an ACK, 
-                    also clear the SNAK flag. Similarly, the events that set the 
-                    SNAK flag, reasons for send ing a NAK (see 5.3.7), also clear 
-                    the SACK flag. Setting or clearing a flag that is already set 
-                    or cleared respectively has no effect. For the SNAK flag, a 
-                    reason variable (or field) is also maintained which is 
+                 /*
+                    The SACK and SNAK flags are mutually exclusive. At most one
+                    will be set at a given time. The events that set the SACK
+                    flag, R is increment~d or a REP is received requiring an ACK,
+                    also clear the SNAK flag. Similarly, the events that set the
+                    SNAK flag, reasons for send ing a NAK (see 5.3.7), also clear
+                    the SACK flag. Setting or clearing a flag that is already set
+                    or cleared respectively has no effect. For the SNAK flag, a
+                    reason variable (or field) is also maintained which is
                     overwritten with the latest NAK error reason.
-                    Whenever the SNAK flag is set the NAK reason variable is set 
+                    Whenever the SNAK flag is set the NAK reason variable is set
                     to the reason for the NAK. */
-    t_bool SNAK;            /* Send NAK flag.  This flag is set when a receive 
-                               error occurs that requires a NAK reply. It is 
-                               cleared when a NAK message is sent with the 
+    t_bool SNAK;            /* Send NAK flag.  This flag is set when a receive
+                               error occurs that requires a NAK reply. It is
+                               cleared when a NAK message is sent with the
                                latest RESP information, or when the SACK flag
                                is set.*/
-    t_bool SREP;            /* Send REP flag.  This flag is set when a reply 
-                               timer expires in the running state and a REP 
-                               should be sent. It is independent of the SACK 
+    t_bool SREP;            /* Send REP flag.  This flag is set when a reply
+                               timer expires in the running state and a REP
+                               should be sent. It is independent of the SACK
                                and SNAK flags.*/
     uint8 *rcv_pkt;         /* Current Rcvd Packet buffer */
     uint16 rcv_pkt_size;    /* Current Rcvd Packet size */
@@ -674,11 +674,11 @@ typedef struct dmc_controller {
     uint32 byte_wait;                           /* rcv/xmt byte delay */
     } CTLR;
 
-/* 
-    DDCMP implementation follows the DDCMP protocol specification documented in the 
+/*
+    DDCMP implementation follows the DDCMP protocol specification documented in the
     "DECNET DIGITAL NETWORK ARCHITECTURE Digital Data Communications Message Protocol"
     Version 4.0, March 1, 1978.
-    
+
     available on http://bitsavers.org/pdf/dec/decnet/AA-D599A-TC_DDCMP4.0_Mar78.pdf
 
  */
@@ -708,7 +708,7 @@ t_bool ddcmp_ALeRESPleN           (CTLR *controller);   /* (A <= RESP <= N) */
 t_bool ddcmp_RESPleAOrRESPgtN     (CTLR *controller);   /* (RESP <= A) OR (RESP > N) */
 t_bool ddcmp_TltNplus1            (CTLR *controller);   /* T < N + 1 */
 t_bool ddcmp_TeqNplus1            (CTLR *controller);   /* T == N + 1 */
-t_bool ddcmp_ReceiveMessageError  (CTLR *controller);   
+t_bool ddcmp_ReceiveMessageError  (CTLR *controller);
 t_bool ddcmp_NumEqR               (CTLR *controller);   /* (NUM == R) */
 t_bool ddcmp_NumNeR               (CTLR *controller);   /* (NUM != R) */
 t_bool ddcmp_TransmitterIdle      (CTLR *controller);
@@ -775,17 +775,17 @@ DDCMP_STATETABLE DDCMP_TABLE[] = {
                                                                     ddcmp_SendStrt,
                                                                     ddcmp_StopTimer}},
     { 2, Halt,        {ddcmp_UserMaintenanceMode}, Maintenance,    {ddcmp_ResetVariables}},
-    { 3, Halt,        {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables, 
+    { 3, Halt,        {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables,
                                                                     ddcmp_NotifyMaintRcvd}},
     { 4, IStart,      {ddcmp_TimerNotRunning},     IStart,         {ddcmp_StartTimer}},
     { 5, IStart,      {ddcmp_ReceiveStack},        Run,            {ddcmp_SetSACK,
                                                                     ddcmp_StopTimer}},
-    { 6, IStart,      {ddcmp_ReceiveStrt},         AStart,         {ddcmp_SendStack, 
+    { 6, IStart,      {ddcmp_ReceiveStrt},         AStart,         {ddcmp_SendStack,
                                                                     ddcmp_StartTimer}},
-    { 7, IStart,      {ddcmp_TimerExpired},        IStart,         {ddcmp_ResetVariables, 
-                                                                    ddcmp_SendStrt, 
+    { 7, IStart,      {ddcmp_TimerExpired},        IStart,         {ddcmp_ResetVariables,
+                                                                    ddcmp_SendStrt,
                                                                     ddcmp_StartTimer}},
-    { 8, IStart,      {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables, 
+    { 8, IStart,      {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables,
                                                                     ddcmp_NotifyMaintRcvd}},
     { 9, IStart,      {ddcmp_ReceiveMessageError}, IStart,         {ddcmp_Ignore}},
     {10, IStart,      {ddcmp_UserSendMessage,
@@ -794,18 +794,18 @@ DDCMP_STATETABLE DDCMP_TABLE[] = {
     {12, AStart,      {ddcmp_LineDisconnected},    Halt,           {ddcmp_StopTimer}},
     {13, AStart,      {ddcmp_ReceiveAck},          Run,            {ddcmp_StopTimer}},
     {14, AStart,      {ddcmp_ReceiveDataMsg},      Run,            {ddcmp_StopTimer}},
-    {15, AStart,      {ddcmp_ReceiveStack},        Run,            {ddcmp_SetSACK, 
+    {15, AStart,      {ddcmp_ReceiveStack},        Run,            {ddcmp_SetSACK,
                                                                     ddcmp_StopTimer}},
-    {16, AStart,      {ddcmp_TimerExpired},        AStart,         {ddcmp_SendStack, 
+    {16, AStart,      {ddcmp_TimerExpired},        AStart,         {ddcmp_SendStack,
                                                                     ddcmp_StartTimer}},
-    {17, AStart,      {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables, 
+    {17, AStart,      {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables,
                                                                     ddcmp_NotifyMaintRcvd}},
     {18, AStart,      {ddcmp_ReceiveMessageError}, AStart,         {ddcmp_Ignore}},
     {19, Run,         {ddcmp_LineDisconnected},    Halt,           {ddcmp_StopTimer,
                                                                     ddcmp_NotifyDisconnect,
                                                                     ddcmp_NotifyStartRcvd}},
     {20, Run,         {ddcmp_ReceiveStrt},         Halt,           {ddcmp_NotifyStartRcvd}},
-    {21, Run,         {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables, 
+    {21, Run,         {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables,
                                                                     ddcmp_NotifyMaintRcvd}},
     {22, Run,         {ddcmp_ReceiveStack},        Run,            {ddcmp_SetSACK}},
     {23, Run,         {ddcmp_ReceiveDataMsg,
@@ -817,57 +817,57 @@ DDCMP_STATETABLE DDCMP_TABLE[] = {
     {26, Run,         {ddcmp_ReceiveRep,
                        ddcmp_NumEqR},              Run,            {ddcmp_SetSACK}},
     {27, Run,         {ddcmp_ReceiveRep,
-                       ddcmp_NumNeR},              Run,            {ddcmp_SetSNAK, 
+                       ddcmp_NumNeR},              Run,            {ddcmp_SetSNAK,
                                                                     ddcmp_SetNAKreason3}},
     {28, Run,         {ddcmp_ReceiveDataMsg,
-                       ddcmp_ALtRESPleN},          Run,            {ddcmp_CompleteAckedTransmits, 
-                                                                    ddcmp_SetAeqRESP, 
-                                                                    ddcmp_IfTleAthenSetTeqAplus1, 
+                       ddcmp_ALtRESPleN},          Run,            {ddcmp_CompleteAckedTransmits,
+                                                                    ddcmp_SetAeqRESP,
+                                                                    ddcmp_IfTleAthenSetTeqAplus1,
                                                                     ddcmp_IfAgeXthenStopTimer}},
     {29, Run,         {ddcmp_ReceiveAck,
-                       ddcmp_ALtRESPleN},          Run,            {ddcmp_CompleteAckedTransmits, 
-                                                                    ddcmp_SetAeqRESP, 
-                                                                    ddcmp_IfTleAthenSetTeqAplus1, 
+                       ddcmp_ALtRESPleN},          Run,            {ddcmp_CompleteAckedTransmits,
+                                                                    ddcmp_SetAeqRESP,
+                                                                    ddcmp_IfTleAthenSetTeqAplus1,
                                                                     ddcmp_IfAgeXthenStopTimer}},
     {30, Run,         {ddcmp_ReceiveAck,
                        ddcmp_RESPleAOrRESPgtN},    Run,            {ddcmp_Ignore}},
     {31, Run,         {ddcmp_ReceiveDataMsg,
                        ddcmp_RESPleAOrRESPgtN},    Run,            {ddcmp_Ignore}},
     {32, Run,         {ddcmp_ReceiveNak,
-                       ddcmp_ALeRESPleN},          Run,            {ddcmp_CompleteAckedTransmits, 
-                                                                    ddcmp_SetAeqRESP, 
-                                                                    ddcmp_SetTequalAplus1, 
+                       ddcmp_ALeRESPleN},          Run,            {ddcmp_CompleteAckedTransmits,
+                                                                    ddcmp_SetAeqRESP,
+                                                                    ddcmp_SetTequalAplus1,
                                                                     ddcmp_StopTimer}},
     {33, Run,         {ddcmp_ReceiveNak,
                        ddcmp_RESPleAOrRESPgtN},    Run,            {ddcmp_Ignore}},
     {34, Run,         {ddcmp_TimerExpired},        Run,            {ddcmp_SetSREP}},
     {35, Run,         {ddcmp_TransmitterIdle,
-                       ddcmp_SNAKisSet},           Run,            {ddcmp_SendNak, 
+                       ddcmp_SNAKisSet},           Run,            {ddcmp_SendNak,
                                                                     ddcmp_ClearSNAK}},
     {36, Run,         {ddcmp_TransmitterIdle,
                        ddcmp_SNAKisClear,
-                       ddcmp_SREPisSet},           Run,            {ddcmp_SendRep, 
+                       ddcmp_SREPisSet},           Run,            {ddcmp_SendRep,
                                                                     ddcmp_ClearSREP}},
     {37, Run,         {ddcmp_TransmitterIdle,
                        ddcmp_SNAKisClear,
                        ddcmp_SREPisClear,
-                       ddcmp_TltNplus1},           Run,            {ddcmp_ReTransmitMessageT, 
-                                                                    ddcmp_IncrementT, 
+                       ddcmp_TltNplus1},           Run,            {ddcmp_ReTransmitMessageT,
+                                                                    ddcmp_IncrementT,
                                                                     ddcmp_ClearSACK}},
     {38, Run,         {ddcmp_UserSendMessage,
                        ddcmp_TeqNplus1,
                        ddcmp_TransmitterIdle,
                        ddcmp_SNAKisClear,
-                       ddcmp_SREPisClear},         Run,            {ddcmp_SendDataMessage, 
+                       ddcmp_SREPisClear},         Run,            {ddcmp_SendDataMessage,
                                                                     ddcmp_ClearSACK}},
     {39, Run,         {ddcmp_TransmitterIdle,
                        ddcmp_SNAKisClear,
                        ddcmp_SREPisClear,
                        ddcmp_SACKisSet,
-                       ddcmp_TeqNplus1},           Run,            {ddcmp_SendAck, 
+                       ddcmp_TeqNplus1},           Run,            {ddcmp_SendAck,
                                                                     ddcmp_ClearSACK}},
-    {40, Run,         {ddcmp_DataMessageSent},     Run,            {ddcmp_SetXSetNUM, 
-                                                                    ddcmp_IfAltXthenStartTimer, 
+    {40, Run,         {ddcmp_DataMessageSent},     Run,            {ddcmp_SetXSetNUM,
+                                                                    ddcmp_IfAltXthenStartTimer,
                                                                     ddcmp_IfAgeXthenStopTimer}},
     {41, Run,         {ddcmp_REPMessageSent},      Run,            {ddcmp_StartTimer}},
     {42, Maintenance, {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_GiveBufferToUser}},
@@ -1016,15 +1016,15 @@ char *controller_queue_state(CTLR *controller)
 {
 static char buf[512];
 
-sprintf (buf, "(ACKW:%d,XMT:%d,RCV:%d,CMPL:%d,FREE:%d) TOT:%d", 
-                    (int)controller->ack_wait_queue->count, 
-                    (int)controller->xmt_queue->count, 
-                    (int)controller->rcv_queue->count, 
-                    (int)controller->completion_queue->count, 
+sprintf (buf, "(ACKW:%d,XMT:%d,RCV:%d,CMPL:%d,FREE:%d) TOT:%d",
+                    (int)controller->ack_wait_queue->count,
+                    (int)controller->xmt_queue->count,
+                    (int)controller->rcv_queue->count,
+                    (int)controller->completion_queue->count,
                     (int)controller->free_queue->count,
                     (int)controller->ack_wait_queue->count+
                     (int)controller->xmt_queue->count+
-                    (int)controller->rcv_queue->count+ 
+                    (int)controller->rcv_queue->count+
                     (int)controller->completion_queue->count+
                     (int)controller->free_queue->count);
 return buf;
@@ -1313,11 +1313,11 @@ DIB dmp_dib = { IOBA_AUTO, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO
 DIB dmv_dib = { IOBA_AUTO, IOLN_DMV, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_ininta, &dmc_outinta }, IOLN_DMV};
 
 DEVICE dmc_dev =
-    { 
+    {
 #if defined (VM_PDP10)
     "DMR",
 #else
-    "DMC", 
+    "DMC",
 #endif
     dmc_units, dmc_reg, dmc_mod, 3, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL, NULL, &dmc_reset, NULL, &dmc_attach, &dmc_detach,
@@ -1325,11 +1325,11 @@ DEVICE dmc_dev =
     NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description };
 
 /*
-   We have two devices defined here (dmp_dev and dmv_dev) which have the 
+   We have two devices defined here (dmp_dev and dmv_dev) which have the
    same units.  This would normally never be allowed since two devices can't
-   actually share units.  This problem is avoided in this case since both 
-   devices start out as disabled and the logic in dmc_reset allows only 
-   one of these devices to be enabled at a time.  The DMP device is allowed 
+   actually share units.  This problem is avoided in this case since both
+   devices start out as disabled and the logic in dmc_reset allows only
+   one of these devices to be enabled at a time.  The DMP device is allowed
    on Unibus systems and the DMV device Qbus systems.
    This monkey business is necessary due to the fact that although both
    the DMP and DMV devices have almost the same functionality and almost
@@ -1483,7 +1483,7 @@ int32 dmc = (int32)(uptr-dptr->units);
 int32 *hunger = (dptr == &dmc_dev) ? &dmc_corruption[dmc] : &dmp_corruption[dmc];
 
 if (*hunger)
-    fprintf(st, "Corruption=%d milligulps (%.1f%% of messages processed)", 
+    fprintf(st, "Corruption=%d milligulps (%.1f%% of messages processed)",
              *hunger, ((double)*hunger)/10.0);
 else
     fprintf(st, "No Corruption");
@@ -1543,7 +1543,7 @@ if (dmc_is_attached(uptr))
 cptr = get_glyph (cptr, gbuf, 0);
 if (strcmp (gbuf,"DMC") == 0)
     controller->dev_type = DMC;
-else 
+else
     if (strcmp (gbuf,"DMR") == 0)
         controller->dev_type = DMR;
     else
@@ -1555,7 +1555,7 @@ return status;
 t_stat dmc_showstats (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
 CTLR *controller = dmc_get_controller_from_unit(uptr);
-    
+
 fprintf (st, "%s%d\n", controller->device->name, (int)(uptr-controller->device->units));
 
 tmxr_fstats (st, controller->line, -1);
@@ -1585,7 +1585,7 @@ if (detail) {
     size_t same;
 
     for (i=same=0; i<queue->count; ++i) {
-        if ((i == 0) || 
+        if ((i == 0) ||
             (0 != memcmp(((char *)buffer)+sizeof(QH), ((char *)(buffer->hdr.prev))+sizeof(QH), sizeof(*buffer)-sizeof(QH)))) {
             if (same > 0)
                 fprintf (st, "%s.queue[%d] thru %s.queue[%d] same as above\n", queue->name, (int)(i-same), queue->name, (int)(i-1));
@@ -1608,7 +1608,7 @@ if (detail) {
 
                 switch (msg[0]) {
                     case DDCMP_SOH:   /* Data Message */
-                        fprintf (st, "Data Message, Count: %d, Num: %d, Flags: %s, Resp: %d, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)|msg[1], msg[4], flag, msg[3], 
+                        fprintf (st, "Data Message, Count: %d, Num: %d, Flags: %s, Resp: %d, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)|msg[1], msg[4], flag, msg[3],
                                                     (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+((msg2 << 8)|msg[1]))) ? "OK" : "BAD");
                         break;
                     case DDCMP_ENQ:   /* Control Message */
@@ -1703,7 +1703,7 @@ t_stat status = SCPE_OK;
 uint32 *poll_interval = ((uint32 *)desc);
 uint32 newpoll;
 
-if (!cptr) 
+if (!cptr)
     return SCPE_IERR;
 newpoll = (int32) get_uint (cptr, 10, 1800, &status);
 if ((status != SCPE_OK) || (newpoll == (*poll_interval)))
@@ -2516,8 +2516,8 @@ dmc_set_rdyi(controller);
 
 void dmc_start_control_output_transfer(CTLR *controller)
 {
-if ((!controller->control_out) || 
-    (controller->transfer_state != Idle) || 
+if ((!controller->control_out) ||
+    (controller->transfer_state != Idle) ||
     (dmc_is_rdyo_set(controller)))
     return;
 sim_debug(DBG_INF, controller->device, "%s%d: Starting control output transfer: SEL6 = 0x%04X\n", controller->device->name, controller->index, controller->control_out->sel6);
@@ -2582,9 +2582,9 @@ if (dmc_is_attached(controller->unit)) {
     if (controller->transfer_state == Idle)
         dmc_start_transfer_buffer(controller);
     /* Execution of this routine normally is triggered by programatic access by the
-       simulated system's device driver to the device registers or the arrival of 
-       traffic from the network.  Network traffic is handled by the dmc_poll_svc 
-       which may call this routine as needed.  Direct polling here is extra overhead 
+       simulated system's device driver to the device registers or the arrival of
+       traffic from the network.  Network traffic is handled by the dmc_poll_svc
+       which may call this routine as needed.  Direct polling here is extra overhead
        and is only scheduled when needed.
      */
     if ((controller->completion_queue->count) ||    /* if completion queue not empty? */
@@ -2627,13 +2627,13 @@ for (dmc=active=attached=0; dmc < mp->lines; dmc++) {
         ++active;
     old_modem = *controller->modem;
     new_modem = dmc_get_modem (controller);
-    if ((old_modem & DMC_SEL4_M_CAR) && 
+    if ((old_modem & DMC_SEL4_M_CAR) &&
         (!(new_modem & DMC_SEL4_M_CAR))) {
         sim_debug(DBG_MDM, controller->device, "dmc_poll_svc(dmc=%d) - Connection State Change to %s\n", dmc, (new_modem & DMC_SEL4_M_CAR) ? "UP(ON)" : "DOWN(OFF)");
         ddcmp_dispatch (controller, 0);
         sim_clock_coschedule (controller->unit, tmxr_poll); /* wake up soon to finish processing */
         }
-    if ((lp->xmte && tmxr_tpbusyln(lp)) || 
+    if ((lp->xmte && tmxr_tpbusyln(lp)) ||
         (lp->xmte && controller->link.xmt_buffer) ||
         ddcmp_UserSendMessage(controller)) {
         if (tmxr_tpbusyln(lp)) {
@@ -2702,8 +2702,8 @@ return (controller->xmt_queue->count == 0);
 
 void dmc_buffer_queue_init_all(CTLR *controller)
 {
-size_t queue_size = (controller->dev_type == DMC) ? DMC_QUEUE_SIZE : 
-                                                    ((controller->dev_type == DMR) ? DMR_QUEUE_SIZE : 
+size_t queue_size = (controller->dev_type == DMC) ? DMC_QUEUE_SIZE :
+                                                    ((controller->dev_type == DMR) ? DMR_QUEUE_SIZE :
                                                                                         DMP_QUEUE_SIZE);
 queue_size *= 2;
 *controller->buffers = (BUFFER *)realloc(*controller->buffers, queue_size*sizeof(**controller->buffers));
@@ -2875,7 +2875,7 @@ dmc_process_command(controller); // check for any other transfers
 void dmc_process_input_transfer_completion(CTLR *controller)
 {
 if (dmc_is_dmc(controller)) {
-    if (dmc_is_run_set(controller) && 
+    if (dmc_is_run_set(controller) &&
         (!dmc_is_rqi_set(controller))) {
         /* Time to decode input command arguments */
         uint16 sel6 = *controller->csrs->sel6;
@@ -2918,10 +2918,10 @@ if (dmc_is_dmc(controller)) {
                 ddcmp_dispatch (controller, 0);
                 break;
             case DMC_C_TYPE_CNTL:
-                sim_debug(DBG_INF, controller->device, "%s%d: Control In Command Received(%s MODE%s%s)\n", 
+                sim_debug(DBG_INF, controller->device, "%s%d: Control In Command Received(%s MODE%s%s)\n",
                                                        controller->device->name, controller->index,
-                                                       (sel6&DMC_SEL6_M_MAINT) ? "MAINTENANCE" : "DDCMP", 
-                                                       (sel6&DMC_SEL6_M_HDX) ? ", Half Duples" : "", 
+                                                       (sel6&DMC_SEL6_M_MAINT) ? "MAINTENANCE" : "DDCMP",
+                                                       (sel6&DMC_SEL6_M_HDX) ? ", Half Duples" : "",
                                                        (sel6&DMC_SEL6_M_LONGSTRT) ? ", Long Start Timer" : "");
                 dmc_set_modem_dtr (controller);
                 controller->transfer_state = Idle;
@@ -2955,15 +2955,15 @@ else {  /* DMP */
 
             sim_debug(DBG_INF, controller->device, "%s%d: Completing Mode input transfer, %s %s\n", controller->device->name, controller->index, duplex, config);
             }
-        else 
+        else
             if (controller->transfer_type == DMP_C_TYPE_CNTL) {
                 sim_debug(DBG_WRN, controller->device, "%s%d: Control command (not processed yet)\n", controller->device->name, controller->index);
                 }
-            else 
+            else
                 if (controller->transfer_type == DMP_C_TYPE_RBACC) {
                     sim_debug(DBG_WRN, controller->device, "%s%d: Receive Buffer command (not processed yet)\n", controller->device->name, controller->index);
                     }
-                else 
+                else
                     if (controller->transfer_type == DMP_C_TYPE_XBACC) {
                         sim_debug(DBG_WRN, controller->device, "%s%d: Transmit Buffer command (not processed yet)\n", controller->device->name, controller->index);
                         }
@@ -2991,18 +2991,18 @@ static int Mod256Cmp(uint8 a, uint8 b, size_t queue_size)
 int ans;
 int abdiff = (int)b - (int)a;
 int badiff = (int)a - (int)b;
- 
+
 if (abdiff == 0)
     ans = 0;
-else 
+else
     if (abdiff < 0)
         ans = -1;
     else
         ans = 1;
- 
+
 if (abs(badiff) <= (int)queue_size)
     ans = -1 * ans;
- 
+
 return ans;
 }
 
@@ -3055,14 +3055,14 @@ controller->link.SNAK = FALSE;
 controller->link.SREP = FALSE;
 controller->link.state = Halt;
 controller->link.nak_reason = 0;
-/* Move any ack wait packets back to the transmit queue so they get 
+/* Move any ack wait packets back to the transmit queue so they get
    resent when the link is restored */
 while (controller->ack_wait_queue->count) {
     buffer = (BUFFER *)remqueue (controller->ack_wait_queue->hdr.prev);
     memset (buffer->transfer_buffer, 0, DDCMP_HEADER_SIZE);
     ASSURE (insqueue (&buffer->hdr, &controller->xmt_queue->hdr));
     }
-/* Also make sure that the transmit queue has no control packets in it 
+/* Also make sure that the transmit queue has no control packets in it
    and that any non transmit buffer(s) have zeroed headers so they will
    be properly constructed when the link comes up */
 buffer = (BUFFER *)controller->xmt_queue->hdr.next;
@@ -3245,7 +3245,7 @@ void ddcmp_CompleteAckedTransmits (CTLR *controller)
 BUFFER *buffer = dmc_buffer_queue_head(controller->ack_wait_queue);
 
 while (buffer != NULL) {
-    if ((!buffer->transfer_buffer) || 
+    if ((!buffer->transfer_buffer) ||
         (!controller->link.rcv_pkt) ||
         ddcmp_compare (buffer->transfer_buffer[DDCMP_NUM_OFFSET], GT, controller->link.rcv_pkt[DDCMP_RESP_OFFSET], controller))
         break;
@@ -3261,7 +3261,7 @@ size_t i;
 uint8 T = controller->link.T;
 
 for (i=0; i < controller->ack_wait_queue->count; ++i) {
-    if ((!buffer->transfer_buffer) || 
+    if ((!buffer->transfer_buffer) ||
         ddcmp_compare (buffer->transfer_buffer[DDCMP_NUM_OFFSET], NE, T, controller)) {
         buffer = (BUFFER *)buffer->hdr.next;
         continue;
@@ -3350,9 +3350,9 @@ return (controller->link.ScanningEvents & DDCMP_EVENT_TIMER);
 }
 t_bool ddcmp_ReceiveMaintMessage  (CTLR *controller)
 {
-return ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) && 
+return ((controller->link.ScanningEvents & DDCMP_EVENT_PKT_RCVD) &&
         controller->link.rcv_pkt &&
-        (controller->link.rcv_pkt[0] == DDCMP_DLE) && 
+        (controller->link.rcv_pkt[0] == DDCMP_DLE) &&
         (!ddcmp_ReceiveMessageError(controller)));
 }
 t_bool ddcmp_ReceiveAck           (CTLR *controller)
@@ -3512,7 +3512,7 @@ return (!(*controller->modem & DMC_SEL4_M_CAR));
 t_bool ddcmp_DataMessageSent      (CTLR *controller)
 {
 t_bool breturn = ((controller->link.ScanningEvents & DDCMP_EVENT_XMIT_DONE) &&
-                    controller->link.xmt_done_buffer && 
+                    controller->link.xmt_done_buffer &&
                     (controller->link.xmt_done_buffer->transfer_buffer[0] == DDCMP_SOH));
 if (breturn)
     return breturn;
@@ -3521,8 +3521,8 @@ return breturn;
 t_bool ddcmp_REPMessageSent       (CTLR *controller)
 {
 return ((controller->link.ScanningEvents & DDCMP_EVENT_XMIT_DONE) &&
-        controller->link.xmt_done_buffer && 
-        (controller->link.xmt_done_buffer->transfer_buffer[0] == DDCMP_ENQ) && 
+        controller->link.xmt_done_buffer &&
+        (controller->link.xmt_done_buffer->transfer_buffer[0] == DDCMP_ENQ) &&
         (controller->link.xmt_done_buffer->transfer_buffer[1] == DDCMP_CTL_REP));
 }
 
@@ -4028,4 +4028,3 @@ const char *dmp_description (DEVICE *dptr)
 return (UNIBUS) ? "DMP11 Synchronous network controller"
                 : "DMV11 Synchronous network controller";
 }
-

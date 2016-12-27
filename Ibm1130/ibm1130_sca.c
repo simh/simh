@@ -265,7 +265,7 @@ t_stat sca_set_baud (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 }
 
 /*********************************************************************************************
- * HANDY MACROS 
+ * HANDY MACROS
  *********************************************************************************************/
 
 #define in_bsc_mode()		    (sca_unit.flags  & UNIT_BISYNC)					/* TRUE if user selected BSC mode */
@@ -475,7 +475,7 @@ static t_stat sca_attach (UNIT *uptr, CONST char *cptr)
             return r;
 		if (sca_lsock == INVALID_SOCKET)
 			return SCPE_OPENERR;
-		
+
 		SETBIT(sca_unit.flags, UNIT_LISTEN);	/* note that we are listening, not yet connected */
 
 		sprintf(name, "(Listening on port %s)", sca_port);
@@ -521,12 +521,12 @@ static t_stat sca_attach (UNIT *uptr, CONST char *cptr)
 			return SCPE_OPENERR;
 		}
 	}
-	
+
 	/* set up socket connect or listen. on success, set UNIT_ATT.
 	 * If listen mode, set UNIT_LISTEN. sca_svc will poll for connection
 	 * If connect mode, set dsw SCA_DSW_READY to indicate connection is up
 	 */
-	
+
 	SETBIT(sca_unit.flags, UNIT_ATT);					/* record successful socket binding */
 
 	sca_state = SCA_STATE_IDLE;
@@ -564,7 +564,7 @@ static t_stat sca_detach (UNIT *uptr)
 		sim_close_sock(sca_lsock);
 		sca_lsock = INVALID_SOCKET;
 	}
-	
+
 	free(sca_unit.filename);
 	sca_unit.filename = NULL;
 
@@ -903,7 +903,7 @@ void xio_sca (int32 iocc_addr, int32 func, int32 modify)
 			printf("SCA WRT addr %04x (%04x) mod %02x\n", iocc_addr, M[iocc_addr & mem_mask], modify);
 #endif
 			if (modify & 0x01) {					/* bit 15 */
- 				/* clear audible alarm trigger */
+				/* clear audible alarm trigger */
 #if (DEBUG_SCA & DEBUG_SCA_XIO_WRITE)
 				printf("(clr audible alarm trigger)\n");
 #endif
@@ -924,7 +924,7 @@ void xio_sca (int32 iocc_addr, int32 func, int32 modify)
 				sichar = (uint8) (ReadW(iocc_addr) >> 8);
 				sca_nsyns = 0;						/* reset SYN suppression */
 			}
-			/* else? does presence of mod bit preclude sending a character? */ 
+			/* else? does presence of mod bit preclude sending a character? */
 			if ((modify & 0x07) == 0) {				/* no modifiers */
 				/* transmit character --
 				 * note: in write mode, failure to write soon enough after a write response interrupt causes a check
@@ -1015,7 +1015,7 @@ void xio_sca (int32 iocc_addr, int32 func, int32 modify)
 					if (! in_send_state())			/* also may cause a line turnaround */
 						sca_start_transmit(iocc_addr, 0);
 
-				 	sca_start_timer(TIMER_125S, sim_os_msec());
+					sca_start_timer(TIMER_125S, sim_os_msec());
 				}
 			}
 

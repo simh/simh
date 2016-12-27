@@ -72,7 +72,7 @@ DEVICE qba_dev = {
     1, 16, 4, 2, 16, 16,
     NULL, NULL, &qba_reset,
     NULL, NULL, NULL,
-    NULL, DEV_QBUS, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_QBUS, 0, NULL, NULL, NULL, NULL, NULL, NULL,
     &qba_description
     };
 

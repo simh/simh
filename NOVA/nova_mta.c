@@ -48,7 +48,7 @@
    18-Apr-01    RMS     Changed to rewind tape before boot
    10-Dec-00    RMS     Added Eclipse support (Charles Owen)
    15-Oct-00    RMS     Editorial changes
-   11-Nov-98    CEO     Removed clear of mta_ma on iopC 
+   11-Nov-98    CEO     Removed clear of mta_ma on iopC
    04-Oct-98    RMS     V2.4 magtape format
    18-Jan-97    RMS     V2.3 magtape format
    29-Jun-96    RMS     Added unit enable/disable support

@@ -19,9 +19,9 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the names of Robert M Supnik and 
+   Except as contained in this notice, the names of Robert M Supnik and
    Mark Pizzolato shall not be used in advertising or otherwise to promote
-   the sale, use or other dealings in this Software without prior written 
+   the sale, use or other dealings in this Software without prior written
    authorization from Robert M Supnik and Mark Pizzolato.
 
    25-Jan-11    MP      Initial Implemementation
@@ -68,7 +68,7 @@ typedef void (*DISK_PCALLBACK)(UNIT *unit, t_stat status);
 
 /* Prototypes */
 
-t_stat sim_disk_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, 
+t_stat sim_disk_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
                         uint32 debugbit, const char *drivetype, uint32 pdp11_tracksize, int completion_delay);
 t_stat sim_disk_detach (UNIT *uptr);
 t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);

@@ -312,48 +312,48 @@ static const REG rl_reg[] = {
 
 static const MTAB rl_mod[] = {
 #if defined (VM_PDP11)
-    { MTAB_XTD|MTAB_VDV, (DEV_RLV11|DEV_Q18), "",   "RLV11", 
+    { MTAB_XTD|MTAB_VDV, (DEV_RLV11|DEV_Q18), "",   "RLV11",
         &rl_set_ctrl, &rl_show_ctrl, NULL, "Set controller type RLV11" },
-    { MTAB_XTD|MTAB_VDV,                   0, NULL, "RLV12", 
+    { MTAB_XTD|MTAB_VDV,                   0, NULL, "RLV12",
         &rl_set_ctrl, NULL,          NULL, "Set controller type RLV12" },
 #endif
-    { UNIT_OFFL,         0, "on line",  "ONLINE", 
+    { UNIT_OFFL,         0, "on line",  "ONLINE",
         NULL, NULL, NULL, "Set unit online" },
-    { UNIT_OFFL, UNIT_OFFL, "off line", "OFFLINE", 
+    { UNIT_OFFL, UNIT_OFFL, "off line", "OFFLINE",
         NULL, NULL, NULL, "Set unit offline" },
     { UNIT_BRUSH,          0, NULL,          "NOBRUSH",
         NULL, NULL, NULL, "Disable brushes" },
     { UNIT_BRUSH, UNIT_BRUSH, "has brushes", "BRUSH",
         NULL, NULL, NULL, "Enable brushes" },
 
-    { MTAB_XTD|MTAB_VUN|MTAB_NMO, RLDS_CVO, "open",   "OPEN", 
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO, RLDS_CVO, "open",   "OPEN",
         &rl_set_cover, &rl_show_cover, NULL, "Drive cover" },
-    { MTAB_XTD|MTAB_VUN,                 0, NULL,     "CLOSED", 
+    { MTAB_XTD|MTAB_VUN,                 0, NULL,     "CLOSED",
         &rl_set_cover, NULL,           NULL, "Close drive cover" },
-    { MTAB_XTD|MTAB_VUN|MTAB_NMO,        0, "load",   "LOAD", 
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO,        0, "load",   "LOAD",
         &rl_set_load, &rl_show_load,   NULL, "Load drive" },
     { MTAB_XTD|MTAB_VUN,                 1, NULL,     "UNLOAD",
         &rl_set_load, NULL,            NULL, "Unload drive" },
-    { MTAB_XTD|MTAB_VUN|MTAB_NMO,        0, "DSTATE", NULL, 
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO,        0, "DSTATE", NULL,
         NULL, &rl_show_dstate, NULL, "Display drive state" },
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
+    { UNIT_WLK,        0, "write enabled", "WRITEENABLED",
         NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
+    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED",
         NULL, NULL, NULL, "Write lock disk drive"  },
-    { UNIT_DUMMY, 0, NULL, "BADBLOCK", 
+    { UNIT_DUMMY, 0, NULL, "BADBLOCK",
         &rl_set_bad, NULL, NULL, "Write bad block table on last track" },
     { (UNIT_RL02+UNIT_ATT), UNIT_ATT, "RL01", NULL, NULL },
     { (UNIT_RL02+UNIT_ATT), (UNIT_RL02+UNIT_ATT), "RL02", NULL, NULL },
-    { (UNIT_AUTO+UNIT_RL02+UNIT_ATT),         0, "RL01", NULL, 
+    { (UNIT_AUTO+UNIT_RL02+UNIT_ATT),         0, "RL01", NULL,
         NULL, NULL, NULL, "Set drive type RL01" },
-    { (UNIT_AUTO+UNIT_RL02+UNIT_ATT), UNIT_RL02, "RL02", NULL, 
+    { (UNIT_AUTO+UNIT_RL02+UNIT_ATT), UNIT_RL02, "RL02", NULL,
         NULL, NULL, NULL, "Set drive type RL02" },
     { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL,       NULL },
-    { UNIT_AUTO,            UNIT_AUTO, NULL,       "AUTOSIZE", 
+    { UNIT_AUTO,            UNIT_AUTO, NULL,       "AUTOSIZE",
         NULL, NULL, NULL, "set type based on file size at ATTACH" },
-    { (UNIT_AUTO+UNIT_RL02),         0, NULL, "RL01", 
+    { (UNIT_AUTO+UNIT_RL02),         0, NULL, "RL01",
         &rl_set_size, NULL, NULL, "Set drive type RL01" },
-    { (UNIT_AUTO+UNIT_RL02), UNIT_RL02, NULL, "RL02", 
+    { (UNIT_AUTO+UNIT_RL02), UNIT_RL02, NULL, "RL02",
         &rl_set_size, NULL, NULL, "Set drive type RL02"  },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
@@ -369,7 +369,7 @@ DEVICE rl_dev = {
     &rl_boot, &rl_attach, &rl_detach,
     &rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG, 0,
     NULL, NULL, NULL, &rl_help, NULL, NULL,
-    &rl_description 
+    &rl_description
     };
 
 /* Drive states */
@@ -477,7 +477,7 @@ bit is cleared by software.  If set, check for interrupts and return.
         if ((data & CSR_IE) == 0)
             CLR_INT (RL);
         else if ((rlcs & (CSR_DONE + CSR_IE)) == CSR_DONE)
-            SET_INT (RL);   
+            SET_INT (RL);
         return SCPE_OK;
         }
 
@@ -871,7 +871,7 @@ if (uptr->FNC == RLCS_RNOHDR) {
     da = GET_DA (rlda) * RL_NUMWD;                      /* get disk addr */
     maxwc = (RL_NUMSC - GET_SECT (rlda)) * RL_NUMWD;    /* max transfer */
 }
-    
+
 ma = (rlbae << 16) | rlba;                              /* get mem addr */
 wc = 0200000 - rlmp;                                    /* get true wc */
 

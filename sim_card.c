@@ -265,7 +265,7 @@ static uint16 ebcdic_to_hol[256] = {
  /*  098     0918  0928   0938    0948   0958   0968  0978 */
    0x203,  0x303, 0x283, 0x243, 0x223, 0x213, 0x20B, 0x207,
  /* TE0918   91    92     93      94     95     96     97   0x3x */
-   0xF03,  0x101, 0x081, 0x041, 0x021, 0x011, 0x009, 0x005, 
+   0xF03,  0x101, 0x081, 0x041, 0x021, 0x011, 0x009, 0x005,
  /*  98      918   928    938     948    958   968     978 */
    0x003,  0x103, 0x083, 0x043, 0x023, 0x013, 0x00B, 0x007,
  /*          T091  T092   T093   T094   T095   T096    T097  0x4x */
@@ -339,11 +339,11 @@ struct card_formats {
 
 static struct card_formats fmts[] = {
     {MODE_AUTO,  "AUTO"},
-    {MODE_BIN,   "BIN"}, 
-    {MODE_TEXT,  "TEXT"}, 
-    {MODE_BCD,   "BCD"}, 
-    {MODE_CBN,   "CBN"}, 
-    {MODE_EBCDIC,"EBCDIC"}, 
+    {MODE_BIN,   "BIN"},
+    {MODE_TEXT,  "TEXT"},
+    {MODE_BCD,   "BCD"},
+    {MODE_CBN,   "CBN"},
+    {MODE_EBCDIC,"EBCDIC"},
     {0, 0},
 };
 
@@ -357,7 +357,7 @@ sim_bcd_to_hol(uint8 bcd) {
 
     /* Handle space correctly */
     if (bcd == 0)               /* 0 to 82 punch */
-        return 0x82; 
+        return 0x82;
     if (bcd == 020)             /* 20 no punch */
         return 0;
 
@@ -440,7 +440,7 @@ sim_hol_to_bcd(uint16 hol) {
     }
 
     /* Any more columns punched? */
-    if ((hol & 0x1ff) != 0) 
+    if ((hol & 0x1ff) != 0)
          return 0x7f;
     return bcd;
 }
@@ -463,7 +463,7 @@ sim_hol_to_ebcdic(uint16 hol) {
 
 static int cmpcard(const char *p, const char *s) {
    int  i;
-   if (p[0] != '~') 
+   if (p[0] != '~')
         return 0;
    for(i = 0; i < 3; i++) {
         if (tolower(p[i+1]) != s[i])
@@ -515,7 +515,7 @@ sim_read_card(UNIT * uptr)
         if (!feof(uptr->fileref)) {
             len = sim_fread(&data->cbuff[0], 1, sizeof(data->cbuff), uptr->fileref);
             size = len;
-        } else 
+        } else
             len = size = 0;
         data->len = size;
     }
@@ -538,16 +538,16 @@ sim_read_card(UNIT * uptr)
         mode = MODE_TEXT;   /* Default is text */
 
         /* Check buffer to see if binary card in it. */
-        for (i = 0, temp = 0; i < 160; i+=2) 
+        for (i = 0, temp = 0; i < 160; i+=2)
             temp |= data->cbuff[i];
         /* Check if every other char < 16 & full buffer */
-        if (size == 160 && (temp & 0x0f) == 0) 
+        if (size == 160 && (temp & 0x0f) == 0)
             mode = MODE_BIN;        /* Probably binary */
         /* Check if maybe BCD or CBN */
         if (data->cbuff[0] & 0x80) {
             int     odd = 0;
             int     even = 0;
-    
+
             /* Clear record mark */
             data->cbuff[0] &= 0x7f;
             /* Check all chars for correct parity */
@@ -564,7 +564,7 @@ sim_read_card(UNIT * uptr)
            }
            /* Restore it */
            data->cbuff[0] |= 0x80;
-           if (i == 160 && odd == i) 
+           if (i == 160 && odd == i)
                mode = MODE_CBN;
            else if (i < 80 && even == i)
                mode = MODE_BCD;
@@ -576,7 +576,7 @@ sim_read_card(UNIT * uptr)
             sim_debug(DEBUG_CARD, dptr, "invalid mode\n\r");
             return SCPE_IOERR;
         }
-    } else 
+    } else
         mode = uptr->flags & UNIT_MODE;
 
     switch(mode) {
@@ -590,7 +590,7 @@ sim_read_card(UNIT * uptr)
                     data->image[col] = (data->image[col] << 3) |
                                          (data->cbuff[i] - '0');
                     j++;
-                } else if (data->cbuff[i] == '\n' || 
+                } else if (data->cbuff[i] == '\n' ||
                            data->cbuff[i] == '\r') {
                     break;
                 } else {
@@ -628,7 +628,7 @@ sim_read_card(UNIT * uptr)
                 case '~':               /* End of file mark */
                     if (col == 0) {
                         r = SCPE_EOF;
-                        break;  
+                        break;
                     }
                 default:
                     sim_debug(DEBUG_CARD, dptr, "%c", c);
@@ -667,7 +667,7 @@ sim_read_card(UNIT * uptr)
     case MODE_BIN:
         temp = 0;
         sim_debug(DEBUG_CARD, dptr, "bin\r\n");
-        if (size < 160) 
+        if (size < 160)
             return SCPE_IOERR;
         /* Move data to buffer */
         for (j = i = 0; i < 160;) {
@@ -676,7 +676,7 @@ sim_read_card(UNIT * uptr)
             data->image[j++] |= ((uint16)data->cbuff[i++]) << 4;
         }
         /* Check if format error */
-        if (temp & 0xF) 
+        if (temp & 0xF)
             r = SCPE_IOERR;
 
         break;
@@ -691,7 +691,7 @@ sim_read_card(UNIT * uptr)
 
         /* Clear record mark */
         data->cbuff[0] &= 0x7f;
-            
+
         /* Convert card and check for errors */
         for (j = i = 0; i < size;) {
             uint8       c;
@@ -726,7 +726,7 @@ sim_read_card(UNIT * uptr)
 
         /* Clear record mark */
         data->cbuff[0] &= 0x7f;
-            
+
         /* Convert text line into card image */
         for (col = 0, i = 0; col < 80 && i < size; i++) {
             if (data->cbuff[i] & 0x80)
@@ -772,12 +772,12 @@ sim_card_eof(UNIT *uptr)
         return 1;               /* attached? */
 
     data = (struct _card_data *)uptr->up7;
-        
+
     if (data->ptr > 0) {
         if ((data->ptr - data->len) == 0 && feof(uptr->fileref))
             return 1;
     } else {
-        if (feof(uptr->fileref)) 
+        if (feof(uptr->fileref))
            return 1;
     }
     return 0;
@@ -867,7 +867,7 @@ sim_punch_card(UNIT * uptr, UNIT *stkuptr)
             out[i*2+1] = col & 077;
         }
         /* Now set parity */
-        for (i = 0; i < 160; i++) 
+        for (i = 0; i < 160; i++)
             out[i] |= 0100 ^ sim_parity_table[(int)out[i]];
         out[0] |= 0x80;     /* Set record mark */
         i = 160;
@@ -966,7 +966,7 @@ sim_card_attach(UNIT * uptr, CONST char *cptr)
         data = (struct _card_data *)uptr->up7;
     }
 
-    for (i = 0; i < 4096; i++) 
+    for (i = 0; i < 4096; i++)
         hol_to_ebcdic[i] = 0x100;
     for (i = 0; i < 256; i++) {
         uint16     temp = ebcdic_to_hol[i];
@@ -1019,7 +1019,7 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
     if (0 == (uptr-dptr->units)) {
         if (dptr->numunits > 1) {
             uint32 i;
-    
+
             for (i=0; i < dptr->numunits; ++i)
                 if (dptr->units[i].flags & UNIT_ATTABLE)
                     fprintf (st, "  sim> ATTACH {switches} %s%d carddeck\n\n", dptr->name, i);

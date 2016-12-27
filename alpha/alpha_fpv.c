@@ -65,7 +65,7 @@ t_uint64 op_ldf (t_uint64 op)
 {
 uint32 exp = F_GETEXP (op);
 
-if (exp != 0) exp = exp + G_BIAS - F_BIAS;              /* zero? */     
+if (exp != 0) exp = exp + G_BIAS - F_BIAS;              /* zero? */
 return (((t_uint64) (op & F_SIGN))? FPR_SIGN: 0) |      /* finite non-zero */
     (((t_uint64) exp) << FPR_V_EXP) |
     (((t_uint64) SWAP_VAXF (op & ~(F_SIGN|F_EXP))) << F_V_FRAC);

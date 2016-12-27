@@ -193,13 +193,13 @@
       IMP uses these extended interrupts, however this was a standard H316 option
       and is in no way IMP specific.  Actually the H316 supported up to 48 extra
       interrupts, but it seems like overkill to implement them all.
-      
+
       In addition, dev_int[0] contains the interrupt enable and interrupt no
       defer flags.  If interrupt enable and interrupt no defer are set, and
       at least one interrupt request is pending, then an interrupt occurs.
       The order of flags in these variables corresponds to the order
       in the SMK instruction.
- 
+
    3. Non-existent memory.  On the H316/516, reads to non-existent memory
       return zero, and writes are ignored.  In the simulator, the
       largest possible memory is instantiated and initialized to zero.
@@ -625,7 +625,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
         MB = NEWA (Read (Y), PC);                       /* merge old PC */
         if ((reason = Write(Y, MB)))
-            break;                                      // [RLA] 
+            break;                                      // [RLA]
         PCQ_ENTRY;
         PC = NEWA (PC, Y + 1);                          /* set new PC */
         break;
@@ -773,7 +773,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
                 AR = (C << 15) | (dp << 14) | (pme << 13) | (sc & 077);
             else if (cpu_unit.flags & UNIT_HSA)         /* SCA */
                 AR = sc & 077;
-            else reason = stop_inst; 
+            else reason = stop_inst;
             }
         else if (MB & m10) {                            /* NRM */
             if (cpu_unit.flags & UNIT_HSA) {
@@ -883,7 +883,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
                 t1 = 16;
             C = ((SEXT (AR)) >> (t1 - 1)) & 1;          /* C = last out */
             AR = ((SEXT (AR)) >> t1) & DMASK;           /* arith right */
-            break; 
+            break;
 
         case 006:                                       /* ARR */
             t2 = t1 % 16;                               /* mod 16 */
@@ -1058,7 +1058,7 @@ return reason;
      (non-extend): pre-indexing
    - (extend): post-indexing
      (non-extend): indirect address/post-indexing resolution
- 
+
    In extend mode, address calculations are carried out to 16b
    and masked to 15b at exit.  In non-extend mode, address bits
    <1:2> are preserved by the NEWA macro; address bit <1> is
@@ -1199,20 +1199,20 @@ int32 sim_ota_2024 (int32 inst, int32 fnc, int32 dat, int32 dev)
   //
   //   Further, OTA 1020 is the OTK instruction which sets special CPU
   // flags (single or double precision HSA, extended addressing mode,
-  // the carry flag, etc).  
+  // the carry flag, etc).
   //
-  //   This routine implements these special OTKs as part of the CPU. 
+  //   This routine implements these special OTKs as part of the CPU.
   // That allows us to implement the extra interrupt masks needed by the
   // IMP, and it also allows the CLK device to be disabled without losing
   // the SMK or OTK instructions.  The clock was an option on the original
   // H316 and is not required to be present, and the IMP in particular
-  // needs it to be disabled. 
-  
+  // needs it to be disabled.
+
   // Although OTA 24 is reserved nothing we currently simulate uses it!
 
   if (dev == 024)
       return IOBADFNC (dat);
-  
+
   // Device code 20...
   switch (fnc) {
     case 000:  // SMK 020 - set standard interrupt mask
@@ -1317,7 +1317,7 @@ return dat;
         t2      CLATR   clear A register (due to azzzz)
                 EDAHS   enable D high to A high register (due to azzzz)
                 EDALS   enable D low to A low register (due to azzzz)
-                
+
         tlate, t3 as above
         }
 

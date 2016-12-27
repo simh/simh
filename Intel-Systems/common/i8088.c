@@ -17,9 +17,9 @@
     You should have received a copy of the GNU General Public License
     along with GDE; see the file COPYING.  If not, write to
     the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
-    
+
     This software was modified by Bill Beech, Mar 2011, from the software GDE
-    of Jim Hudgens as provided with the SIMH AltairZ80 emulation package. 
+    of Jim Hudgens as provided with the SIMH AltairZ80 emulation package.
     I modified it to allow emulation of Intel iSBC Single Board Computers.
 
     Copyright (c) 2011, William A. Beech
@@ -81,25 +81,25 @@
     15                    8  7                    0
     |--|--|--|--|OF|DF|IF|TF|SF|ZF|--|AF|--|PF|--|CF|
 
-    The 8088 is an 8-bit CPU, which uses 16-bit offset and segment registers 
+    The 8088 is an 8-bit CPU, which uses 16-bit offset and segment registers
     in combination with a dedicated adder to address up to 1MB of memory directly.
     The offset register is added to the segment register shifted left 4 places
     to obtain the 20-bit address.
 
-    The CPU utilizes two separate processing units - the Execution Unit (EU) and 
-    the Bus Interface Unit (BIU).  The EU executes instructions.  The BIU fetches 
-    instructions, reads operands and writes results.  The two units can operate 
-    independently of one another and are able, under most circumstances, to 
+    The CPU utilizes two separate processing units - the Execution Unit (EU) and
+    the Bus Interface Unit (BIU).  The EU executes instructions.  The BIU fetches
+    instructions, reads operands and writes results.  The two units can operate
+    independently of one another and are able, under most circumstances, to
     extensively overlap instruction fetch with execution.
 
-    The BIUs of the 8086 and 8088 are functionally identical, but are implemented 
-    differently to match the structure and performance characteristics of their 
+    The BIUs of the 8086 and 8088 are functionally identical, but are implemented
+    differently to match the structure and performance characteristics of their
     respective buses.
 
     The almost 300 instructions come in 1, 2, 3, 4, 5, 6 and 7-byte flavors.
 
-    This routine is the simulator for the 8088.  It is called from the 
-    simulator control program to execute instructions in simulated memory, 
+    This routine is the simulator for the 8088.  It is called from the
+    simulator control program to execute instructions in simulated memory,
     starting at the simulated IP. It runs until 'reason' is set non-zero.
 
     General notes:
@@ -116,12 +116,12 @@
         memory addresses.
 
     3. Non-existent memory.  On the 8088, reads to non-existent memory
-        return 0FFh, and writes are ignored. 
+        return 0FFh, and writes are ignored.
 
     Some algorithms were pulled from the GDE Dos/IP Emulator by Jim Hudgens
 
 */
-/* 
+/*
   This algorithm was pulled from the GDE Dos/IP Emulator by Jim Hudgens
 
 CARRY CHAIN CALCULATION.
@@ -188,14 +188,14 @@ BORROW CHAIN CALCULATION.
     Segment register selection and overrides are handled as follows:
         If there is a segment override, the register number is stored
         in seg_ovr. If there is no override, seg_ovr is zero.  Seg_ovr
-        is set to zero after each instruction except segment override 
+        is set to zero after each instruction except segment override
         instructions.
 
-        Get_ea sets the value of seg_reg to the override if present 
+        Get_ea sets the value of seg_reg to the override if present
         otherwise to the default value for the registers used in the
         effective address calculation.
 
-        The get/put_smword/byte routines use the register number in 
+        The get/put_smword/byte routines use the register number in
         seg_reg to obtain the segment value to calculate the absolute
         memory address for the operation.
  */
@@ -219,7 +219,7 @@ BORROW CHAIN CALCULATION.
 #define DF             0x0400
 #define OF             0x0800
 
-/* Macros to handle the flags in the PSW 
+/* Macros to handle the flags in the PSW
     8088 has top 4 bits of the flags set to 1
     also, bit#1 is set.  This is (not well) documented  behavior. */
 #define PSW_ALWAYS_ON       (0xF002)        /* for 8086 */
@@ -232,7 +232,7 @@ BORROW CHAIN CALCULATION.
     if (COND) SET_FLAG(FLAG); else CLR_FLAG(FLAG)
 
 /* union of byte and word registers */
-union   {                       
+union   {
     uint8   b[2];                           /* two bytes */
     uint16  w;                              /* one word */
 }   A, B, C, D;                             /* storage for AX, BX, CX and DX */
@@ -454,20 +454,20 @@ DEVICE i8088_dev = {
     i8088_reg,          //registers
     i8088_mod,          //modifiers
     1,                  //numunits
-    16,                 //aradix 
-    20,                 //awidth 
-    1,                  //aincr 
-    16,                 //dradix 
+    16,                 //aradix
+    20,                 //awidth
+    1,                  //aincr
+    16,                 //dradix
     8,                  //dwidth
-    &i8088_ex,          //examine 
-    &i8088_dep,         //deposit 
+    &i8088_ex,          //examine
+    &i8088_dep,         //deposit
     &i8088_reset,       //reset
     NULL,               //boot
-    NULL,               //attach 
+    NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    DEV_DEBUG,          //flags 
-    0,                  //dctrl 
+    DEV_DEBUG,          //flags
+    0,                  //dctrl
     i8088_debug,        //debflags
     NULL,               //msize
     NULL                //lname
@@ -480,19 +480,19 @@ int32 IP;
 static const char *opcode[] = {
 "ADD ", "ADD ", "ADD ", "ADD ",                 /* 0x00 */
 "ADD AL,", "ADD AX,", "PUSH ES", "POP ES",
-"OR ", "OR ", "OR ", "OR ", 
-"OR AL,", "OR AX,", "PUSH CS", "???", 
+"OR ", "OR ", "OR ", "OR ",
+"OR AL,", "OR AX,", "PUSH CS", "???",
 "ADC ", "ADC ", "ADC ", "ADC ",                 /* 0x10 */
 "ADC AL,", "ADC AX,", "PUSH SS", "RPOP SS",
-"SBB ", "SBB ", "SBB ", "SBB ", 
+"SBB ", "SBB ", "SBB ", "SBB ",
 "SBB AL,", "SBB AX,", "PUSH DS", "POP DS",
 "AND ", "AND ", "AND ", "AND ",                 /* 0x20 */
 "AND AL,", "AND AX,", "ES:", "DAA",
-"SUB ", "SUB ", "SUB ", "SUB ", 
+"SUB ", "SUB ", "SUB ", "SUB ",
 "SUB AL,", "SUB AX,", "CS:", "DAS",
 "XOR ", "XOR ", "XOR ", "XOR ",                 /* 0x30 */
 "XOR AL,", "XOR AX,", "SS:", "AAA",
-"CMP ", "CMP ", "CMP ", "CMP ", 
+"CMP ", "CMP ", "CMP ", "CMP ",
 "CMP AL,", "CMP AX,", "DS:", "AAS",
 "INC AX", "INC CX", "INC DX", "INC BX",         /* 0x40 */
 "INC SP", "INC BP", "INC SI", "INC DI",
@@ -532,8 +532,8 @@ static const char *opcode[] = {
 "INT 3", "INT ", "INTO", "IRET",
 " ", " ", " ", " ",                             /* 0xD0 */
 "AAM", "AAD", "???", "XLATB",
-"ESC ", "ESC ", "ESC ", "ESC ", 
-"ESC ", "ESC ", "ESC ", "ESC ", 
+"ESC ", "ESC ", "ESC ", "ESC ",
+"ESC ", "ESC ", "ESC ", "ESC ",
 "LOOPNZ ", "LOOPZ ", "LOOP", "JCXZ",            /* 0xE0 */
 "IN AL,", "IN AX,", "OUT ", "OUT ",
 "CALL ", "JMP ", "JMP ", "JMP ",
@@ -575,7 +575,7 @@ int32 sim_instr (void)
     /* Main instruction fetch/decode loop */
 
     while (reason == 0) {               /* loop until halted */
-        if (i8088_dev.dctrl & DEBUG_asm) 
+        if (i8088_dev.dctrl & DEBUG_asm)
             sim_printf("\n");
         if (i8088_dev.dctrl & DEBUG_reg) {
             sim_printf("Regs: AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X IP=%04X\n",
@@ -609,7 +609,7 @@ int32 sim_instr (void)
           takes care of all other opcodes */
 
         /* data transfer instructions */
-        
+
         /* arithmetic instructions */
 
         /* bit manipulation instructions */
@@ -1290,7 +1290,7 @@ int32 sim_instr (void)
             case 0x4F:                  /* DEC DI */
                 DI = dec_word(DI);
                 break;
- 
+
             case 0x50:                  /* PUSH AX */
                 push_word(AX);
                 break;
@@ -1828,16 +1828,16 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     switch(REG) {
-                        case 0:          /* MOV mem16, ES */ 
+                        case 0:          /* MOV mem16, ES */
                             put_smword(seg_reg, EA, ES);
                             break;
-                        case 1:          /* MOV mem16, CS */ 
+                        case 1:          /* MOV mem16, CS */
                             put_smword(seg_reg, EA, CS);
                             break;
-                        case 2:          /* MOV mem16, SS */ 
+                        case 2:          /* MOV mem16, SS */
                             put_smword(seg_reg, EA, SS);
                             break;
-                        case 3:          /* MOV mem16, DS */ 
+                        case 3:          /* MOV mem16, DS */
                             put_smword(seg_reg, EA, DS);
                             break;
                         default:        /* bad opcodes */
@@ -1847,16 +1847,16 @@ int32 sim_instr (void)
                     }
                 } else {
                     switch(REG) {
-                        case 0:          /* MOV reg16, ES */ 
+                        case 0:          /* MOV reg16, ES */
                             put_rword(RM, ES);
                             break;
-                        case 1:          /* MOV reg16, CS */ 
+                        case 1:          /* MOV reg16, CS */
                             put_rword(RM, CS);
                             break;
-                        case 2:          /* MOV reg16, SS */ 
+                        case 2:          /* MOV reg16, SS */
                             put_rword(RM, SS);
                             break;
-                        case 3:          /* MOV reg16, DS */ 
+                        case 3:          /* MOV reg16, DS */
                             put_rword(RM, DS);
                             break;
                         default:        /* bad opcodes */
@@ -1885,16 +1885,16 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     switch(REG) {
-                        case 0:          /* MOV ES, mem16 */ 
+                        case 0:          /* MOV ES, mem16 */
                             ES = get_smword(seg_reg, EA);
                             break;
-                        case 1:          /* MOV CS, mem16 */ 
+                        case 1:          /* MOV CS, mem16 */
                             CS = get_smword(seg_reg, EA);
                             break;
-                        case 2:          /* MOV SS, mem16 */ 
+                        case 2:          /* MOV SS, mem16 */
                             SS = get_smword(seg_reg, EA);
                             break;
-                        case 3:          /* MOV DS, mem16 */ 
+                        case 3:          /* MOV DS, mem16 */
                             DS = get_smword(seg_reg, EA);
                             break;
                         default:        /* bad opcodes */
@@ -1904,16 +1904,16 @@ int32 sim_instr (void)
                     }
                 } else {
                     switch(REG) {
-                        case 0:          /* MOV ES, reg16 */ 
+                        case 0:          /* MOV ES, reg16 */
                             ES = get_rword(RM);
                             break;
-                        case 1:          /* MOV CS, reg16 */ 
+                        case 1:          /* MOV CS, reg16 */
                             CS = get_rword(RM);
                             break;
-                        case 2:          /* MOV SS, reg16 */ 
+                        case 2:          /* MOV SS, reg16 */
                             SS = get_rword(RM);
                             break;
-                        case 3:          /* MOV DS, reg16 */ 
+                        case 3:          /* MOV DS, reg16 */
                             DS = get_rword(RM);
                             break;
                         default:        /* bad opcodes */
@@ -2318,7 +2318,7 @@ int32 sim_instr (void)
                 IP = pop_word();
                 break;
 
-            case 0xC4: 
+            case 0xC4:
                 MRR = fetch_byte(1);
                 get_mrr_dec(MRR, &MOD, &REG, &RM);
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
@@ -2334,7 +2334,7 @@ int32 sim_instr (void)
                 }
                 break;
 
-            case 0xC5: 
+            case 0xC5:
                 MRR = fetch_byte(1);
                 get_mrr_dec(MRR, &MOD, &REG, &RM);
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
@@ -2350,7 +2350,7 @@ int32 sim_instr (void)
                 }
                 break;
 
-            case 0xC6: 
+            case 0xC6:
                 MRR = fetch_byte(1);
                 get_mrr_dec(MRR, &MOD, &REG, &RM);
                 if (REG) {              /* has to be 0 */
@@ -2366,7 +2366,7 @@ int32 sim_instr (void)
                 }
                 break;
 
-            case 0xC7: 
+            case 0xC7:
                 MRR = fetch_byte(1);
                 get_mrr_dec(MRR, &MOD, &REG, &RM);
                 if (REG) {              /* has to be 0 */
@@ -2403,7 +2403,7 @@ int32 sim_instr (void)
                 push_word(CS);
                 push_word(IP);
                 CS = get_mword(14);
-                IP = get_mword(12); 
+                IP = get_mword(12);
                 break;
 
             case 0xCD:                  /* INT immed8 */
@@ -2414,7 +2414,7 @@ int32 sim_instr (void)
                 push_word(CS);
                 push_word(IP);
                 CS = get_mword((OFF * 4) + 2);
-                IP = get_mword(OFF * 4); 
+                IP = get_mword(OFF * 4);
                 break;
 
             case 0xCE:                  /* INTO */
@@ -2424,7 +2424,7 @@ int32 sim_instr (void)
                 push_word(CS);
                 push_word(IP);
                 CS = get_mword(18);
-                IP = get_mword(16); 
+                IP = get_mword(16);
                 break;
 
             case 0xCF:                  /* IRET */
@@ -3118,7 +3118,7 @@ int32 sim_instr (void)
                 break;
 
 
-            default: 
+            default:
 //                if (i8088_unit.flags & UNIT_OPSTOP) {
                     reason = STOP_OPCODE;
                     IP--;
@@ -3317,7 +3317,7 @@ uint32 get_ea(uint32 mrr)
                     set_segreg(SEG_DS);
                     break;
                 case 1:
-                    EA = BX + DI; 
+                    EA = BX + DI;
                     set_segreg(SEG_DS);
                     break;
                 case 2:
@@ -3355,7 +3355,7 @@ uint32 get_ea(uint32 mrr)
                     set_segreg(SEG_DS);
                     break;
                 case 1:
-                    EA = BX + DI + DISP; 
+                    EA = BX + DI + DISP;
                     set_segreg(SEG_DS);
                     break;
                 case 2:
@@ -3392,7 +3392,7 @@ uint32 get_ea(uint32 mrr)
                     set_segreg(SEG_DS);
                     break;
                 case 1:
-                    EA = BX + DI + DISP; 
+                    EA = BX + DI + DISP;
                     set_segreg(SEG_DS);
                     break;
                 case 2:
@@ -3424,7 +3424,7 @@ uint32 get_ea(uint32 mrr)
         case 3:             /* RM is register field */
             break;
     }
-    if (i8088_dev.dctrl & DEBUG_level1) 
+    if (i8088_dev.dctrl & DEBUG_level1)
         sim_printf("get_ea: MRR=%02X MOD=%02X REG=%02X R/M=%02X DISP=%04X EA=%04X\n",
             mrr, MOD, REG, RM, DISP, EA);
     return EA;
@@ -3438,7 +3438,7 @@ void get_mrr_dec(uint32 mrr, uint32 *mod, uint32 *reg, uint32 *rm)
     *rm = mrr & 0x7;
 }
 
-/* 
+/*
   Most of the primitive algorythms were pulled from the GDE Dos/IP Emulator by Jim Hudgens
 */
 
@@ -3615,7 +3615,7 @@ uint8 cmp_byte(uint8 d, uint8 s)
 /* cmp word primitive */
 uint16 cmp_word(uint16 d, uint16 s)
 {
-    register uint32 res; 
+    register uint32 res;
     register uint32 bc;
 
     res = d - s;
@@ -3995,7 +3995,7 @@ uint8 rcl_byte(uint8 d, uint8 s)
     register uint32  res, cnt, mask, cf;
 
     res = d;
-    if ((cnt = s % 9)) 
+    if ((cnt = s % 9))
     {
         cf =  (d >> (8-cnt)) & 0x1;
         res = (d << cnt) & 0xFF;
@@ -4162,7 +4162,7 @@ uint8 shl_byte(uint8 d, uint8 s)
         } else
             res = (uint8) d;
         if (cnt == 1)
-            CONDITIONAL_SET_FLAG((((res & 0x80) == 0x80) ^ 
+            CONDITIONAL_SET_FLAG((((res & 0x80) == 0x80) ^
                 (GET_FLAG( CF) != 0)), OF);
         else
             CLR_FLAG(OF);
@@ -4561,9 +4561,9 @@ t_stat i8088_reset (DEVICE *dptr)
 
 t_stat i8088_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-    if (addr >= MAXMEMSIZE20) 
+    if (addr >= MAXMEMSIZE20)
         return SCPE_NXM;
-    if (vptr != NULL) 
+    if (vptr != NULL)
         *vptr = get_mbyte(addr);
     return SCPE_OK;
 }
@@ -4572,14 +4572,14 @@ t_stat i8088_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 
 t_stat i8088_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-    if (addr >= MAXMEMSIZE20) 
+    if (addr >= MAXMEMSIZE20)
         return SCPE_NXM;
     put_mbyte(addr, val);
     return SCPE_OK;
 }
 
 /* This is the binary loader.  The input file is considered to be
-   a string of literal bytes with no special format. The load 
+   a string of literal bytes with no special format. The load
    starts at the current value of the PC.
 */
 

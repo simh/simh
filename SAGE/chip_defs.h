@@ -34,11 +34,11 @@
 
 /*****************************************************************************************
  * General implementation note:
- * 
+ *
  * Each chip device is implemented through a specific data structure, e.g. struct i8251
  * The address of this data structure MUST be passed to the device->ctxt variable.
  * The data structure MUST contain a PNP_INFO attribute at the beginning.
- * 
+ *
  * In case each unit of a complex device has an own chip, device->ctxt points to an array
  * of as much elements as there are units.
  * The device reset routine MUST call add_iohandler and del_iohandler depending on
@@ -47,7 +47,7 @@
  *
  *****************************************************************************************/
 
-/* set this to 0 to remove debug messages */ 
+/* set this to 0 to remove debug messages */
 #ifndef DBG_MSG
 #define DBG_MSG 1
 #endif
@@ -55,7 +55,7 @@
 /* generic debug tracing support */
 #if DBG_MSG==1
 
-#define ADDRESS_FORMAT      "[0x%08x]"  
+#define ADDRESS_FORMAT      "[0x%08x]"
 #if UNIX_PLATFORM
 #define NLP "\r\n"
 #else
@@ -322,7 +322,7 @@ typedef struct i8272 {
     t_stat (*reset)(struct i8272* chip);
     void   (*seldrv)(struct i8272* chip,int seldrv);
     void   (*irq)(struct i8272* chip,int delay);
-    
+
     I8272_STATE fdc_state;  /* internal state machine */
     uint32 fdc_dma_addr;/* DMA Transfer Address */
     uint8 fdc_msr;      /* 8272 Main Status Register */
@@ -342,7 +342,7 @@ typedef struct i8272 {
     int   fdc_nd_cnt;   /* read/write count in non-DMA mode, -1 if start read */
     uint8 fdc_sdata[I8272_MAX_SECTOR_SZ]; /* sector buffer */
     uint8 fdc_fault;    /* error code passed from some commands to sense_int */
-    
+
     uint8 cmd_cnt;      /* command read count */
     uint8 cmd[10];      /* Storage for current command */
     uint8 cmd_len;      /* FDC Command Length */

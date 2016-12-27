@@ -71,7 +71,7 @@
 #define ABORT_MCHK      (-SCB_MCHK)                     /* machine check */
 #define ABORT_RESIN     (-SCB_RESIN)                    /* rsvd instruction */
 #define ABORT_RESAD     (-SCB_RESAD)                    /* rsvd addr mode */
-#define ABORT_RESOP     (-SCB_RESOP)                    /* rsvd operand */      
+#define ABORT_RESOP     (-SCB_RESOP)                    /* rsvd operand */
 #define ABORT_CMODE     (-SCB_CMODE)                    /* comp mode fault */
 #define ABORT_ARITH     (-SCB_ARITH)                    /* arithmetic trap */
 #define ABORT_ACV       (-SCB_ACV)                      /* access violation */

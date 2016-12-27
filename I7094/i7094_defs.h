@@ -27,7 +27,7 @@
    Storey.  Tom Van Vleck, Stan Dunten, Jerry Saltzer, and other CTSS veterans
    helped to reconstruct the CTSS hardware RPQ's.  Dave Pitts gets special
    thanks for patiently coaching me through IBSYS debug.
-   
+
    25-Mar-11    RMS     Updated SDC mask based on 7230 documentation
    22-May-10    RMS     Added check for 64b addresses
 
@@ -199,7 +199,7 @@ typedef struct {
 #define I_9X            0x02                            /* 7090, 7094, CTSS */
 #define I_94            0x04                            /* 7094, CTSS */
 #define I_CT            0x08                            /* CTSS */
-#define I_MODEL         0x0F                            /* option mask */       
+#define I_MODEL         0x0F                            /* option mask */
 #define I_X             0x10                            /* indexed */
 #define I_N             0x20                            /* indirect */
 #define I_R             0x40                            /* read */

@@ -55,7 +55,7 @@
 #define VA_GETOFF(x)    (((uint32) (x)) & VA_M_OFF)
 #define VA_GETVPN(x)    (((uint32) ((x) >> VA_V_VPN)) & VA_M_VPN)
 #define VA_GETSEXT(x)   (((uint32) ((x) >> VA_V_SEXT)) & VA_M_SEXT)
-#define PHYS_ADDR(p,v)  ((((t_uint64) (p)) < VA_N_OFF) | VA_GETOFF (v)) 
+#define PHYS_ADDR(p,v)  ((((t_uint64) (p)) < VA_N_OFF) | VA_GETOFF (v))
 
 /* 43b and 32b superpages - present in all implementations */
 
@@ -425,4 +425,3 @@ TLBENT *dtlb_load (uint32 vpn, t_uint64 pte);
 t_uint64 dtlb_read (void);
 
 #endif
-

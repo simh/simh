@@ -234,7 +234,7 @@ for (r = 0, i = 1; bcd != 0; bcd = bcd >> 4) {          /* while nz */
     i = i * 10;
     }
 return r;
-}       
+}
 
 /* Unit service - disk is buffered in memory */
 

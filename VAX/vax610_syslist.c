@@ -59,7 +59,7 @@ extern DEVICE vc_dev;
 extern DEVICE lk_dev;
 extern DEVICE vs_dev;
 
-DEVICE *sim_devices[] = { 
+DEVICE *sim_devices[] = {
     &cpu_dev,
     &mctl_dev,
     &tlb_dev,
@@ -122,4 +122,3 @@ while ((i = Fgetc (fileref)) != EOF) {                   /* read byte stream */
     }
 return SCPE_OK;
 }
-

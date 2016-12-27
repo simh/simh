@@ -29,17 +29,17 @@
 
     NOTES:
 
-        These functions support a simulated 2704 to 2764 EPROMs device on an 8-bit 
+        These functions support a simulated 2704 to 2764 EPROMs device on an 8-bit
         computer system.  This device allows the attachment of the device to a binary file
         containing the EPROM code.
 
         These functions support emulation of 0 to 4 2716 EPROM  devices on a CPU board.
-        The byte get and put routines use an offset into the boot EPROM image to locate 
-        the proper byte.  This allows another device to set the base address for each 
-        EPROM.  
+        The byte get and put routines use an offset into the boot EPROM image to locate
+        the proper byte.  This allows another device to set the base address for each
+        EPROM.
 
-        This device uses a dynamically allocated buffer to hold each EPROM image.  
-        A call to BOOTROM_config will free the current buffer.  A call to 
+        This device uses a dynamically allocated buffer to hold each EPROM image.
+        A call to BOOTROM_config will free the current buffer.  A call to
         i2716_reset will allocate a new buffer of 2048 bytes.  A
         call to BOOTROM_attach will load the buffer with the EPROM image.
 */
@@ -59,7 +59,7 @@ int32 i2716_get_mbyte(int32 offset);
 
 /* SIMH EPROM Standard I/O Data Structures */
 
-UNIT i2716_unit[] = { 
+UNIT i2716_unit[] = {
     { UDATA (NULL,UNIT_ATTABLE+UNIT_ROABLE+UNIT_RO, 0), 0 },
     { UDATA (NULL,UNIT_ATTABLE+UNIT_ROABLE+UNIT_RO, 0), 0 },
     { UDATA (NULL,UNIT_ATTABLE+UNIT_ROABLE+UNIT_RO, 0), 0 },
@@ -107,7 +107,7 @@ DEVICE i2716_dev = {
 
 /* global variables */
 
-/* i2716_attach - attach file to EPROM unit 
+/* i2716_attach - attach file to EPROM unit
                   force EPROM reset at completion */
 
 t_stat i2716_attach (UNIT *uptr, CONST char *cptr)
@@ -172,7 +172,7 @@ t_stat i2716_reset (DEVICE *dptr)
 //            printf("i2716%d: Not enabled on MP-A2\n", i);
             continue;
         }
-//        printf("i2716%d: Initializing [%04X-%04XH]\n", 
+//        printf("i2716%d: Initializing [%04X-%04XH]\n",
 //            i, base+uptr->u3, base+uptr->u3 + uptr->capac);
 //        if ((uptr->flags & UNIT_ATT) == 0) {
 //            printf("i2716%d: No file attached\n", i);

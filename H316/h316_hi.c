@@ -31,7 +31,7 @@
    The host interface is one of the BBN engineered devices unique to the
    ARPAnet IMP.  This is the famous "1822" card which connected each IMP to a
    host computer - a DECSYSTEM-10, an SDS Sigma 7, an IBM 360/90, a CDC6600,
-   or any one of many other ARPAnet hosts.  The idea is to simulate this 
+   or any one of many other ARPAnet hosts.  The idea is to simulate this
    interface by using a TCP/UDP connection to another simh instance emulating
    the host machine and running the ARPAnet host software.
 

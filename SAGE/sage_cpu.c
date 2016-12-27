@@ -82,20 +82,20 @@ static t_stat sagecpu_set_bios(UNIT *uptr, int32 value, CONST char *cptr, void *
     if (cptr==NULL) return SCPE_ARG;
     if ((fp=fopen(cptr,"r"))==0) return SCPE_OPENERR;
     fclose(fp);
-    
+
     biosfile = (char *)realloc(biosfile, strlen(cptr)+1);
     strcpy(biosfile,cptr);
 
     /* enforce reload of BIOS code on next boot */
     if (ROM != 0) free(ROM);
     ROM = 0;
-    return SCPE_OK; 
+    return SCPE_OK;
 }
 
 static t_stat sagecpu_show_bios(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     fprintf(st, "BIOS=%s", biosfile);
-    return SCPE_OK; 
+    return SCPE_OK;
 }
 
 t_stat sagecpu_boot(int32 unitno,DEVICE* dptr)
@@ -103,7 +103,7 @@ t_stat sagecpu_boot(int32 unitno,DEVICE* dptr)
     t_stat rc;
 
     if (!ROM) return SCPE_IERR;
-    
+
     if (*ROM==0) {
         printf("Loading boot code from %s\n",biosfile);
         if ((rc = load_cmd(0,biosfile)) != SCPE_OK) return rc;
@@ -127,7 +127,7 @@ static void sage_trapcallback(DEVICE* dptr,int trapnum)
     }
 }
 
-static t_stat sagecpu_reset(DEVICE* dptr) 
+static t_stat sagecpu_reset(DEVICE* dptr)
 {
     t_stat rc;
 
@@ -150,7 +150,7 @@ static t_stat sagecpu_reset(DEVICE* dptr)
     rom_enable = TRUE;
 
     if ((rc=m68kcpu_reset(dptr)) != SCPE_OK) return rc;
-    
+
     /* redirect callbacks */
     m68kcpu_trapcallback = &sage_trapcallback;
 

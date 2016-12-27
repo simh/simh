@@ -133,7 +133,7 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         return AC;
 
     case 1:                                             /* RSF */
-        return (dev_done & INT_PTR)? IOT_SKP + AC: AC;  
+        return (dev_done & INT_PTR)? IOT_SKP + AC: AC;
 
     case 6:                                             /* RFC!RRB */
         sim_activate (&ptr_unit, ptr_unit.wait);

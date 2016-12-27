@@ -42,7 +42,7 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
         CDC1700 simulator V4.0-0 Beta        git commit id: 9d2079df
         sim> set cpu mode65k,64k
         sim> set mt type=1732-3
-        sim> att mt0 MSOS5_SL136.tap 
+        sim> att mt0 MSOS5_SL136.tap
         sim> set lp type=1742
         sim> att lp MSOSinstall.lpt
         LP: creating new file
@@ -50,11 +50,11 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
         CDD: creating new file
         sim> boot mt0
 
-        MSOS 5.0 SYSTEM INITIALIZER 
+        MSOS 5.0 SYSTEM INITIALIZER
         FWA OF CONTRL = 5000
 
 
-        DATE MM/DD/YY 
+        DATE MM/DD/YY
         07/14/88  <============================ Enter date
 
         Q
@@ -65,14 +65,14 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
         *V <=================================== Start installation
         *V
         *V
-        *S,SYSMON,$3031 
-        *S,SYSDAY,$3236 
-        *S,SYSYER,$3832 
-        *S,SYSLVL,$3230 
+        *S,SYSMON,$3031
+        *S,SYSDAY,$3236
+        *S,SYSYER,$3832
+        *S,SYSLVL,$3230
         *V
-        *V       1700 MASS STORAGE OPERATING SYSTEM - VER 5.0 
+        *V       1700 MASS STORAGE OPERATING SYSTEM - VER 5.0
         *V
-        *V       EXXON DEVELOPMENT SYSTEM 
+        *V       EXXON DEVELOPMENT SYSTEM
         *V
         *YM,LIBEDT,1
         *YM,LOADSD,2
@@ -81,49 +81,49 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
         *YM,PROTEC,5
         *YM,JPLOAD,6
         *YM,JPCHGE,7
-        *YM,JPT13,8 
+        *YM,JPT13,8
         *YM,JCRDV4,9
-        *YM,JLGOV4,10 
-        *YM,JPSTV4,11 
-        *YM,NAMEV4,12 
-        *YM,JPFLV4,13 
-        *YM,AFILV4,14 
-        *YM,RESTOR,15 
-        *YM,RCOVER,16 
+        *YM,JLGOV4,10
+        *YM,JPSTV4,11
+        *YM,NAMEV4,12
+        *YM,JPFLV4,13
+        *YM,AFILV4,14
+        *YM,RESTOR,15
+        *YM,RCOVER,16
         *YM,BRKPT,17
-        *YM,ODEBUG,18 
-        *YM,SYSCOP,19 
-        *YM,SYSSEG,20 
+        *YM,ODEBUG,18
+        *YM,SYSCOP,19
+        *YM,SYSSEG,20
         *YM,MIPRO,21
-        *YM,TDFUNC,22 
-        *YM,EFSTOR,23 
-        *YM,EFLIST,24 
-        *YM,VERIFY,25 
-        *YM,SCMM17,26 
-        *YM,DUMMY1,27 
-        *YM,DUMMY2,28 
-        *YM,DUMMY3,29 
-        *YM,DUMMY4,30 
-        *YM,DUMMY5,31 
-        *YM,DUMMY6,32 
-        *YM,DUMMY7,33 
-        *YM,DUMMY8,34 
-        *YM,DUMMY9,35 
-        *YM,DUMMY0,36 
-        *S,N4,$0800 
-        *S,END0V4,$7FFF 
-        *S,BGNMON,$8000 
-        *S,MSIZV4,$FFFF 
-        *S,SECTOR,$5BFA 
-        * 
+        *YM,TDFUNC,22
+        *YM,EFSTOR,23
+        *YM,EFLIST,24
+        *YM,VERIFY,25
+        *YM,SCMM17,26
+        *YM,DUMMY1,27
+        *YM,DUMMY2,28
+        *YM,DUMMY3,29
+        *YM,DUMMY4,30
+        *YM,DUMMY5,31
+        *YM,DUMMY6,32
+        *YM,DUMMY7,33
+        *YM,DUMMY8,34
+        *YM,DUMMY9,35
+        *YM,DUMMY0,36
+        *S,N4,$0800
+        *S,END0V4,$7FFF
+        *S,BGNMON,$8000
+        *S,MSIZV4,$FFFF
+        *S,SECTOR,$5BFA
+        *
         *L       SYSTEM DATA PROGRAM
         CS7C17
             SYSDAT    0000     EXXON DEVELOPMENT SYSTEM            SUMMARY-122
         *L       SPACE REQUEST PROCESSOR
             SPACE     1C21      DECK-ID M29  MSOS 5.0              SUMMARY-136
-        * 
+        *
         *         SYSTEM CORE RESIDENT PROGRAMS
-        * 
+        *
         *LP      MONITOR
             NMONI     8000      DECK-ID M10  MSOS 5.0              SUMMARY-136
             RDISP     804D      DECK-ID M23  MSOS 5.0              SUMMARY-110
@@ -147,11 +147,11 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
             TOD       8B4D      DECK-ID M25  MSOS 5.0              SUMMARY-110
             MINT      8B9C      DECK-ID M07  MSOS 5.0              SUMMARY-116
             TRVEC     8CC6      DECK-ID M14  MSOS 5.0              SUMMARY-116
-        *LP      DEBUGGING / CHECKOUT 
+        *LP      DEBUGGING / CHECKOUT
             SNAPOL    8D19      DECK-ID M02  MSOS 5.0              SUMMARY-110
             DMP42X    8DD2      DECK-ID B17  PERIPH. DRIVERS 1.0B  SUMMARY-106
             B17332    8EA1      DECK-ID B11  PERIPH. DRIVERS 1.0B  SUMMARY-106
-        *LP      FILE MANAGER 
+        *LP      FILE MANAGER
             FILMGR    8EF3      DECK-ID F01  FILE MANAGER 1.0      SUMMARY-124
             RSPCV4    91DC      DECK-ID F02  FILE MANAGER          SUMMARY-116
             SRHFIS    92CE      DECK-ID F03  FILE MANAGER          SUMMARY-110
@@ -230,10 +230,10 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
             DOUTR     B974      DECK-ID E15  FTN 3.3 RUNTIME       SUMMARY-102
             DFLOTR    BA7E      DECK-ID E13  FTN 3.3 RUNTIME       SUMMARY-102
             DRSTRR    BEDC      DECK-ID E10  FTN 3.3 RUNTIME       SUMMARY-102
-            NXTLOC    BF12      NEXT AVAILABLE LOCATION 
-        * 
+            NXTLOC    BF12      NEXT AVAILABLE LOCATION
+        *
         *        SYSTEM MASS RESIDENT PROGRAMS
-        * 
+        *
         *M              LIBEDT       1
             LIBEDT    0203      DECK-ID M35  MSOS 5.0              SUMMARY-122
         *M              LOADSD       2
@@ -272,16 +272,16 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
             T7        0149      DECK-ID M66  MSOS 5.0              SUMMARY-110
             T5        026B      DECK-ID M67  MSOS 5.0              SUMMARY-110
             T3        02C4      DECK-ID M68  MSOS 5.0              SUMMARY-110
-        *S,N1,P 
+        *S,N1,P
         *M              JOBPRO       4
             JOBPRO    026E      DECK-ID M69  MSOS 5.0              SUMMARY-132
             ONE       023D      DECK-ID M70  MSOS 5.0              SUMMARY-110
             TWO       0240      DECK-ID M71  MSOS 5.0              SUMMARY-110
             THREE     0243      DECK-ID M72  MSOS 5.0              SUMMARY-110
 
-         * * *  U N P A T C H E D    E X T E R N A L S    * * * 
+         * * *  U N P A T C H E D    E X T E R N A L S    * * *
           BATLST
-        *S,N2,P 
+        *S,N2,P
         *M              PROTEC       5
             UPROTK    0275      DECK-ID M73  MSOS 5.0              SUMMARY-115
             JBKILL    044C      DECK-ID M75  MSOS 5.0              SUMMARY-110
@@ -394,7 +394,7 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
         *M              MIPRO       21
             MIPRO     03C2      DECK-ID N06  MSOS 5.0              SUMMARY-110
 
-         * * *  U N P A T C H E D    E X T E R N A L S    * * * 
+         * * *  U N P A T C H E D    E X T E R N A L S    * * *
           CRIMPT
           INDACS
           TSUTIL
@@ -418,164 +418,164 @@ Sample installation run of MSOS 5 (user input to MSOS is marked with "<==="):
         *M              DUMMY8      34
         *M              DUMMY9      35
         *M              DUMMY0      36
-        * 
+        *
         *        MASS RESIDENT DRIVERS
-        * 
-        *M              COSY DRIVER 
+        *
+        *M              COSY DRIVER
             DCOSY     0405      DECK-ID M34  MSOS 5.0              SUMMARY-114
-            NXTLOC    02F0      NEXT AVAILABLE LOCATION 
+            NXTLOC    02F0      NEXT AVAILABLE LOCATION
         *S,SCOSY,S
         *S,LCOSY,P
-        *M              1732-3 616 MAG TAPE 
+        *M              1732-3 616 MAG TAPE
             D17323    040D      DECK-ID B33  PERIPH. DRIVERS 1.0B  SUMMARY-114
             D327TR    0442      DECK-ID B36  PERIPH. DRIVERS 1.0B  SUMMARY-106
-            NXTLOC    0565      NEXT AVAILABLE LOCATION 
-        *S,S17323,S 
-        *S,L17323,P 
-        *M              1732-3 616 MAG TAPE LONG RECORD 
+            NXTLOC    0565      NEXT AVAILABLE LOCATION
+        *S,S17323,S
+        *S,L17323,P
+        *M              1732-3 616 MAG TAPE LONG RECORD
             D7323L    041C      DECK-ID B38  PERIPH. DRIVERS 1.0B  SUMMARY-114
-            NXTLOC    0539      NEXT AVAILABLE LOCATION 
-        *S,S7323L,S 
-        *S,L7323L,P 
-        *M              PSEUDO TAPE 
+            NXTLOC    0539      NEXT AVAILABLE LOCATION
+        *S,S7323L,S
+        *S,L7323L,P
+        *M              PSEUDO TAPE
             DPSUDO    042A      DECK-ID F04  FILE MANAGER          SUMMARY-114
-            NXTLOC    03CD      NEXT AVAILABLE LOCATION 
-        *S,SPSUDO,S 
-        *S,LPSUDO,P 
+            NXTLOC    03CD      NEXT AVAILABLE LOCATION
+        *S,SPSUDO,S
+        *S,LPSUDO,P
         *M              1742-30/120 LINE PRINTER
             D42312    0435      DECK-ID B37  PERIPH. DRIVERS 1.0B  SUMMARY-132
             T5954     01AF      DECK-ID B77  PERIPH. DRIVERS 1.0B  SUMMARY-112
-            NXTLOC    023F      NEXT AVAILABLE LOCATION 
-        *S,S42312,S 
-        *S,L42312,P 
-        *M              1728-430 CARD READER/PUNCH - 026 FORMAT 
+            NXTLOC    023F      NEXT AVAILABLE LOCATION
+        *S,S42312,S
+        *S,L42312,P
+        *M              1728-430 CARD READER/PUNCH - 026 FORMAT
             D1728     043B      DECK-ID A30  PERIPH. DRIVERS 1.0A  SUMMARY-106
             CR026     03A2      DECK-ID A16  PERIPH. DRIVERS 1.0A  SUMMARY-106
             CP026     03C2      DECK-ID A14  PERIPH. DRIVERS 1.0A  SUMMARY-106
-            NXTLOC    0402      NEXT AVAILABLE LOCATION 
+            NXTLOC    0402      NEXT AVAILABLE LOCATION
         *S,S1728,S
         *S,L1728,P
-        *M              1728-430 CARD READER/PUNCH - 029 FORMAT 
+        *M              1728-430 CARD READER/PUNCH - 029 FORMAT
             D1728     0446      DECK-ID A30  PERIPH. DRIVERS 1.0A  SUMMARY-106
             CR029     03A2      DECK-ID A17  PERIPH. DRIVERS 1.0A  SUMMARY-106
             CP029     03C2      DECK-ID A15  PERIPH. DRIVERS 1.0A  SUMMARY-106
-            NXTLOC    0402      NEXT AVAILABLE LOCATION 
-        * 
-        *        MASS RESIDENT FILE MANAGER 
-        * 
+            NXTLOC    0402      NEXT AVAILABLE LOCATION
+        *
+        *        MASS RESIDENT FILE MANAGER
+        *
         *M
             DEFFIL    0451      DECK-ID F05  FILE MANAGER          SUMMARY-116
             FILSPC    0186      DECK-ID F06  FILE MANAGER          SUMMARY-110
             RPEND     0233      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP01,S 
+        *S,FMRP01,S
         *M
             RELFIL    0457      DECK-ID F08  FILE MANAGER          SUMMARY-110
             RELSPC    0092      DECK-ID F09  FILE MANAGER          SUMMARY-110
             RPEND     0141      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP02,S 
+        *S,FMRP02,S
         *M
             DEFIDX    045B      DECK-ID F10  FILE MANAGER          SUMMARY-110
             SQRTFM    0098      DECK-ID F11  FILE MANAGER          SUMMARY-110
             FILSPC    00A8      DECK-ID F06  FILE MANAGER          SUMMARY-110
             RPEND     0155      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP03,S 
+        *S,FMRP03,S
         *M
             LOKFIL    045F      DECK-ID F12  FILE MANAGER          SUMMARY-110
             RPEND     004D      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP04,S 
+        *S,FMRP04,S
         *M
             UNLFIL    0460      DECK-ID F13  FILE MANAGER          SUMMARY-110
             RPEND     003D      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP05,S 
+        *S,FMRP05,S
         *M
             STOSEQ    0461      DECK-ID F14  FILE MANAGER          SUMMARY-110
             FILSPC    00C6      DECK-ID F06  FILE MANAGER          SUMMARY-110
             RPEND     0173      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP06,S 
+        *S,FMRP06,S
         *M
             STODIR    0465      DECK-ID F15  FILE MANAGER          SUMMARY-110
             RPEND     008D      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP07,S 
+        *S,FMRP07,S
         *M
             STOIDX    0467      DECK-ID F20  FILE MANAGER          SUMMARY-110
             HASHCD    0341      DECK-ID F16  FILE MANAGER          SUMMARY-110
             GETKID    034C      DECK-ID F17  FILE MANAGER          SUMMARY-110
             FILSPC    0373      DECK-ID F06  FILE MANAGER          SUMMARY-110
             RPEND     0420      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP08,S 
+        *S,FMRP08,S
         *M
             EDFDMY    0472      DECK-ID F27  FILE MANAGER          SUMMARY-116
             FILSPC    0472      DECK-ID F06  FILE MANAGER          SUMMARY-110
             RPEND     00AF      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMREDF,S 
+        *S,FMREDF,S
         *M
             EDRDMY    0474      DECK-ID F28  FILE MANAGER          SUMMARY-116
             RTNSPC    0474      DECK-ID F19  FILE MANAGER          SUMMARY-110
             RPEND     00A2      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMREDR,S 
+        *S,FMREDR,S
         *M
             RTVSEQ    0476      DECK-ID F18  FILE MANAGER          SUMMARY-110
             RTNSPC    018B      DECK-ID F19  FILE MANAGER          SUMMARY-110
             RPEND     022B      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP09,S 
+        *S,FMRP09,S
         *M
             RTVDIR    047C      DECK-ID F21  FILE MANAGER          SUMMARY-110
             RTNSPC    0115      DECK-ID F19  FILE MANAGER          SUMMARY-110
             RPEND     01B5      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP10,S 
+        *S,FMRP10,S
         *M
             RTVIDX    0481      DECK-ID F22  FILE MANAGER          SUMMARY-110
             HASHCD    0258      DECK-ID F16  FILE MANAGER          SUMMARY-110
             GETKID    0263      DECK-ID F17  FILE MANAGER          SUMMARY-110
             RTNSPC    028A      DECK-ID F19  FILE MANAGER          SUMMARY-110
             RPEND     032A      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP11,S 
+        *S,FMRP11,S
         *M
             RTVIDO    048A      DECK-ID F23  FILE MANAGER          SUMMARY-118
             GETKID    0260      DECK-ID F17  FILE MANAGER          SUMMARY-110
             RTNSPC    0287      DECK-ID F19  FILE MANAGER          SUMMARY-110
             RPEND     0327      DECK-ID F07  FILE MANAGER          SUMMARY-110
-        *S,FMRP12,S 
+        *S,FMRP12,S
         *M
             FMDUMY    0493      DECK-ID F24  FILE MANAGER          SUMMARY-110
-        *S,FMREND,S 
+        *S,FMREND,S
         *S,JFILV4,S     SPECIFY THE JOB FILE TABLE SPACE
-        *M,JFILV4+$40 
+        *M,JFILV4+$40
         *T       END OF SYSTEM
 
-         * * *  U N P A T C H E D    E X T E R N A L S    * * * 
+         * * *  U N P A T C H E D    E X T E R N A L S    * * *
           PARITY
           POWERU
-          INITIALIZATION COMPLETED - YOU MAY AUTOLOAD 
+          INITIALIZATION COMPLETED - YOU MAY AUTOLOAD
         Simulation stopped, P: 5914 (  18FF                    JMP*    $FF)
         sim> autoload cdd
         sim> run 0
 
 
 
-        MSOS 5.0--PSR LEVEL  120   01/26/82  
+        MSOS 5.0--PSR LEVEL  120   01/26/82
 
- 
-        SET PROGRAM PROTECT  
+
+        SET PROGRAM PROTECT
 
         Simulation stopped, P: 1E13 (  4CF0                    STQ*    ($F0))
         sim> set cpu protect
         sim> c
 
 
-        EXXON DEVELOPMENT SYSTEM 
+        EXXON DEVELOPMENT SYSTEM
 
 
         65K MODE
 
- 
+
         CHECKING FILES -  OK
 
 
-        ENTER DATE/TIME  MMDDYYHHMM 
+        ENTER DATE/TIME  MMDDYYHHMM
 
         0714881208 <============================ Enter date/time
-        DATE: 14 JUL 88   TIME: 1208:00 
+        DATE: 14 JUL 88   TIME: 1208:00
         MI <==================================== ^G (Control + G)  for
                                                  manual interrupt
         *BATCH <================================ Start batch subsystem

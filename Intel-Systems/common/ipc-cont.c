@@ -98,7 +98,7 @@ t_stat ipc_cont_reset(DEVICE *dptr, uint16 baseport)
 {
     sim_printf("   ipc_cont[%d]: Reset\n", 0);
     sim_printf("   ipc_cont[%d]: Registered at %04X\n", 0, baseport);
-    reg_dev(ipc_cont, baseport, 0); 
+    reg_dev(ipc_cont, baseport, 0);
     ipc_cont_unit[0].u3 = 0x00; /* ipc reset */
     return SCPE_OK;
 }
@@ -112,11 +112,11 @@ t_stat ipc_cont_reset(DEVICE *dptr, uint16 baseport)
 uint8 ipc_cont(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read status port */
-        sim_printf("   ipc_cont: read data=%02X ipc_cont_unit[%d].u3=%02X\n", 
+        sim_printf("   ipc_cont: read data=%02X ipc_cont_unit[%d].u3=%02X\n",
             ipc_cont_unit[0].u3, 0, ipc_cont_unit[0].u3);
         return ipc_cont_unit[0].u3;
     } else {                            /* write control port */
-        //this simulates an 74LS259 register 
+        //this simulates an 74LS259 register
         //d0-d2 address the reg(in reverse order!), d3 is the data to be latched (inverted)
         switch(data & 0x07) {
             case 5:                     //interrupt enable 8085 INTR

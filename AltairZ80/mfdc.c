@@ -510,7 +510,7 @@ static uint8 MFDC_Read(const uint32 Addr)
                  * necessary. MZOS computes the checksum differently than all
                  * other VG software, so this allows MZOS disks to work
                  */
-                sdata.u.checksum = checksum & 0xFF; 
+                sdata.u.checksum = checksum & 0xFF;
 #endif
 /*              DBG_PRINT(("Checksum=%x" NLP, sdata.u.checksum)); */
                 mfdc_info->read_in_progress = TRUE;

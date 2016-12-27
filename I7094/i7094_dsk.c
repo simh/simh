@@ -605,7 +605,7 @@ else if (bcd[OP1] == 8) {                               /* cmd = 8x? */
     case DSKC_THA:                                      /* track home addr */
         if (trk != (uint32) dsk_unit[u].TRK)            /* on track? */
             return dsk_uend (ch, DSKS_NRCF);
-        break;    
+        break;
 
     default:
         return dsk_uend (ch, DSKS_INVC);                /* invalid opcode */

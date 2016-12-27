@@ -80,7 +80,7 @@
 *   12/28/04   DGP   Changed for new object formats.
 *   02/14/05   DGP   Detect IBSYSSYM for EOF.
 *   06/09/06   DGP   Make simh callable.
-*   
+*
 ***********************************************************************/
 
 #include "i7094_defs.h"

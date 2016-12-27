@@ -106,7 +106,7 @@ t_stat fp_pack (FPA *fp)
 int32 e;
 uint32 i, mad;
 
-e = (fp->exp >= 0)? fp->exp: -fp->exp;                  /* get |exp| */                                 
+e = (fp->exp >= 0)? fp->exp: -fp->exp;                  /* get |exp| */
 if (e > FP_EMAX) {                                      /* too big? */
     ind[IN_EXPCHK] = 1;                                 /* set indicator */
     if (fp->exp < 0)                                    /* underflow? */
@@ -252,8 +252,8 @@ if (r != SCPE_OK)                                       /* error? */
 dif = dfp.exp - sfp.exp;                                /* exp difference */
 
 if (sfp.zero || (dif >= ((int32) dfp.lnt))) {           /* src = 0, or too small? */
-    if (dfp.zero)                                       /* res = dst, zero? */      
-        return fp_zero (&dfp);    
+    if (dfp.zero)                                       /* res = dst, zero? */
+        return fp_zero (&dfp);
     ind[IN_EZ] = 0;                                     /* res nz, set EZ, HP */
     ind[IN_HP] = (dfp.sign == 0);
     return SCPE_OK;
@@ -416,7 +416,7 @@ do {
         return STOP_FWRAP;
     } while ((t & FLAG) == 0);                          /* until dst flag */
 return SCPE_OK;
-} 
+}
 
 /* Floating shift left - note that dst is addr of high order digit */
 

@@ -291,7 +291,7 @@ DEVICE uba_dev = {
     &uba_ex, &uba_dep, &uba_reset,
     NULL, NULL, NULL,
     &uba_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    uba_deb, NULL, NULL, &uba_help, NULL, NULL, 
+    uba_deb, NULL, NULL, &uba_help, NULL, NULL,
     &uba_description
     };
 
@@ -892,7 +892,7 @@ if (((flg & UBACR_SUEFIE) && (uba_sr & UBA_SUEFIE_SR)) ||
     ((flg & UBACR_USEFIE) && (uba_sr & UBA_USEFIE_SR)) ||
     ((flg & UBACR_CNFIE) && (uba_cr & UBA_CNFIE_CR))) {
     uba_int = 1;
-    if (DEBUG_PRI (uba_dev, UBA_DEB_ERR)) fprintf (sim_deb, 
+    if (DEBUG_PRI (uba_dev, UBA_DEB_ERR)) fprintf (sim_deb,
         ">>UBA: adapter int req, sr = %X, cr = %X\n", uba_sr, uba_cr);
     }
 return;

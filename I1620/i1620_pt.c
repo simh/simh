@@ -175,7 +175,7 @@ const int8 alp_to_ptp[256] = {
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
  0x70,   -1,   -1, 0x5B, 0x4C,   -1,   -1,   -1,        /* 10 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
- 0x40, 0x31,   -1, 0x3B, 0x2C,   -1,   -1,   -1,        /* 20 */ 
+ 0x40, 0x31,   -1, 0x3B, 0x2C,   -1,   -1,   -1,        /* 20 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1, 0x0B, 0x1C,   -1,   -1,   -1,        /* 30 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
@@ -203,7 +203,7 @@ const int8 alp_to_ptp[256] = {
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* F0 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1
- }; 
+ };
 
 /* Paper tape reader IO routine
 
@@ -265,7 +265,7 @@ switch (op) {                                           /* case on op */
             M[pa - 1] = (M[pa - 1] & FLAG) | ((mc >> 4) & DIGIT);
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
-        break;  
+        break;
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
@@ -308,7 +308,7 @@ switch (op) {                                           /* case on op */
                 (((ptc >> 4) & 06) | ((ptc >> 3) & 1));
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
-        break;  
+        break;
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
@@ -409,7 +409,7 @@ switch (op) {                                           /* decode op */
                 return r;
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
-        break;          
+        break;
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
@@ -444,7 +444,7 @@ switch (op) {                                           /* decode op */
                 return r;
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
-        break;          
+        break;
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
@@ -470,7 +470,7 @@ for (i = 0; i < MEMSIZE; i++) {                         /* stop runaway */
     ptc = num_to_ptp[d];                                /* translate digit */
     if (ptc < 0) {                                      /* bad char? */
         ind[IN_WRCHK] = 1;                              /* write check */
-        CRETIOE(io_stop, STOP_INVCHR);                                  
+        CRETIOE(io_stop, STOP_INVCHR);
         }
     r = ptp_write(ptc);                                 /* write char */
     if (r != SCPE_OK)                                   /* error? */

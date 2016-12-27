@@ -37,18 +37,18 @@
    in some ways similar to the 360, but to save cost the instruction set is
    much smaller and the I/O channel system greatly simplified.  There is no
    compatibilty between the two systems.
-   
+
    The original System/3 had two models, 6 and 10, and these came in two
    configurations:  card system and disk system.  The unique feature of
    the /3 was the use of 96-column cards, although traditional 80-column
    cards were supprted also via attachment of a 1442 reader/punch.
-   System/3 is a batch-oriented system, controlled by an operating 
+   System/3 is a batch-oriented system, controlled by an operating
    system known as SCP (System Control Program), with it's own job control
    language known as OCL (simpler and more logical than the JCL used on
    the mainframes).  Original models did not support multiprogramming
    or any form of interactivity. (There was a hardware dual-program
    facility available on the model 10 at the high end).
-   
+
    The line grew throughout the 1970s, overlapping the low end of the 360
    line with the introduction of the model 15.  The 15 (and later larger
    variations of the model 12) broke the 64K limit designed in the original
@@ -56,16 +56,16 @@
    bytes.  The model 15 added a system of storage protection and allowed
    multiprogramming in up to 3 partitions.  Communications were added to
    allow support of multiple 3270 terminals and the models 12 and 15 broke
-   the batch orientation and facilitated interactive use via the CCP 
+   the batch orientation and facilitated interactive use via the CCP
    (communications control program).  The System/3 was effectively replaced
    by the much easier to manage and use System/34 and System/36 at the
    low and middle of the range, and by System/370 or System/38 at the
    high end.
-   
+
    This simulator implements the model 10 and model 15.  Models 4, 6,
    8, and 12 are not supported (these were technical variations on the
    design which offered no functionality not present on either 10 or 15).
-   
+
    The System/3 is a byte-oriented machine with a data path of 8 bits
    in all models, and an address width of 16 bits.
 
@@ -79,87 +79,87 @@
    IAR [0:9]<0:15>      Instruction Address Register (p1, p2, plus 1 for each interrupt)
    ARR [0:9]<0:15>      Address Recall Register (p1, p2, plus 1 for each interrupt)
                         (The P2 IAR & ARR are used for the Dual Program feature)
-   
+
    Instruction formats follow the same basic pattern:  a 1-byte opcode, a
    1-byte "Q byte", and one or two addresses following in a format defined
    by the first 4 bits of the opcode:
-   
+
            Op Code                    Q Byte                   Address(es)
-   
+
      0  1  2  3  4  5  6  7      0  1  2  3  4  5  6  7
-   +--+--+--+--+--+--+--+--+   +--+--+--+--+--+--+--+--+   +--+--+--+--+--+--+--... 
-   | A 1 | A 2 | operation |   | (defined by operation)|   | Format based on A1, A2  
    +--+--+--+--+--+--+--+--+   +--+--+--+--+--+--+--+--+   +--+--+--+--+--+--+--...
-                 
+   | A 1 | A 2 | operation |   | (defined by operation)|   | Format based on A1, A2
+   +--+--+--+--+--+--+--+--+   +--+--+--+--+--+--+--+--+   +--+--+--+--+--+--+--...
+
          { --- } <---------------- Bits 00 = Operand 2 specified by 2-byte direct addr
                                    Bits 01 = Operand 2 is 1-byte displacement + XR1
                                    Bits 10 = Operand 2 is 1-byte displacement + XR2
                                    Bits 11 = Operand 2 is not used
-                                   
+
    { --- } <---------------------- Bits 00 = Operand 1 specified by 2-byte direct addr
                                    Bits 01 = Operand 1 is 1-byte displacement + XR1
                                    Bits 10 = Operand 1 is 1-byte displacement + XR2
                                    Bits 11 = Operand 1 is not used
-   
+
    Instructions come in 3 basic formats, of varying lengths which are determined
    by the top 4 bits of opcode defined above.  Minimum instruction length is 3 bytes,
    maximum is 6.
-   
+
    1) Command Format (Bits 0-3 are 1111):
-   
+
    +------------+  +------------+   +------------+
    |   Opcode   |  |   Q-byte   |   |   R-byte   +
    +------------+  +------------+   +------------+
-   
+
         (The meaning of Q-byte and R-byte defined by the operation)
-        
-        
+
+
    2) One Address Instructions (either bits 0-1 or bits 2-3 are 01):
-   
+
 
         Direct Addressing Format:
-      
+
    +------------+  +------------+  +-----------+----------+
    |   Opcode   |  |   Q-byte   |  |    MSB    +   LSB    +
    +------------+  +------------+  +-----------+----------+
 
         Base-Displacement Format:
-   
+
    +------------+  +------------+  +------------+
    |   Opcode   |  |   Q-byte   |  |displacement+
    +------------+  +------------+  +------------+
-                
+
         Opcodes are 0011xxxx or 1100xxxx.
-        
+
         Q-byte can be:  1) An immediate operand
                         2) A mask
                         3) A branch condition
                         4) A data selection
-                        
+
    2) Two Address Instructions (neither bits 0-1 nor bits 2-3 are both 11):
-   
+
         Operand 1 Address Direct (opcodes 0001 or 0010):
-   
+
    +------------+  +------------+  +----------+----------+  +------------+
    |   Opcode   |  |   Q-byte   |  |   MSB    +   LSB    +  |displacement|
    +------------+  +------------+  +----------+----------+  +------------+
-   
+
         Operand 2 Address Direct (opcodes 0100 or 1000):
-   
-   +------------+  +------------+  +------------+  +----------+----------+  
-   |   Opcode   |  |   Q-byte   |  |displacement|  |   MSB    +   LSB    +  
+
    +------------+  +------------+  +------------+  +----------+----------+
-   
+   |   Opcode   |  |   Q-byte   |  |displacement|  |   MSB    +   LSB    +
+   +------------+  +------------+  +------------+  +----------+----------+
+
         Both Addresses Direct (opcode 0000):
-   
-   +------------+  +------------+  +----------+----------+  +-----------+----------+ 
-   |   Opcode   |  |   Q-byte   |  |   MSB    +   LSB    +  +   MSB     +   LSB    + 
+
    +------------+  +------------+  +----------+----------+  +-----------+----------+
-   
+   |   Opcode   |  |   Q-byte   |  |   MSB    +   LSB    +  +   MSB     +   LSB    +
+   +------------+  +------------+  +----------+----------+  +-----------+----------+
+
         Both Addresses Displacement (opcodes 0101, 0110, 1001, or 1010):
 
-   +------------+  +------------+  +------------+  +------------+ 
-   |   Opcode   |  |   Q-byte   |  |displacement|  |displacement|  
+   +------------+  +------------+  +------------+  +------------+
+   |   Opcode   |  |   Q-byte   |  |displacement|  |displacement|
    +------------+  +------------+  +------------+  +------------+
 
 
@@ -168,11 +168,11 @@ Assembler Mnemonic Format
 
    The assembler format contains the same elements as the machine language operation,
 but not always in the same format.  The operation code frequently specifies both
-the opcode and the Q byte, and the top nybble of the opcode is determined by 
+the opcode and the Q byte, and the top nybble of the opcode is determined by
 the format of the addresses.
 
    Addresses take two forms:  the direct address in hex, or a relative address
-specified thusly:  (byte,XRx)  where 'byte' is a 1-byte offset, and XRx is 
+specified thusly:  (byte,XRx)  where 'byte' is a 1-byte offset, and XRx is
 either XR1 or XR2 for the two index registers.  Use these formats when
 'address' is indicated below:
 
@@ -182,7 +182,7 @@ either XR1 or XR2 for the two index registers.  Use these formats when
         P1IAR   IAR for Program Level 1
         P2IAR   IAR for Program Level 2
         PSR             Program Status Register
-                                0x01 - Equal    
+                                0x01 - Equal
                                 0x02 - Low
                                 0x04 - High
                                 0x08 - Decimal overflow
@@ -193,20 +193,20 @@ either XR1 or XR2 for the two index registers.  Use these formats when
         XR1             Index Register 1
         XR2     Index Register 2
         IARx    IAR for the interrupt level x (x = 0 thru 7)
-           
+
    All other operands mentioned below are single-byte hex, except for the
 length (len) operand of the two-address instructions, which is a decimal length
 in the range 1-256.
-   
+
    No-address formats:
    ------------------
-   
+
    HPL hex,hex          Halt Program Level, the operands are the Q and R bytes
-   
-   
+
+
    One-address formats:
    -------------------
-   
+
    A reg,address        Add to register
    CLI address,byte     Compare Logical Immediate
    MVI address,byte     Move Immediate
@@ -219,9 +219,9 @@ in the range 1-256.
    LA reg,address       Load Address
    JC address,cond      Jump on Condition
    BC address,cond      Branch on Condition
-   
+
    These operations do not specify a qbyte, it is implicit in the opcode:
-   
+
    B address            Unconditional branch to address
    BE address           Branch Equal
    BNE address          Branch Not Equal
@@ -242,14 +242,14 @@ in the range 1-256.
    BNOZ address         Branch No Overflow Zoned
    BNOL address         Branch No Overflow Logical
    NOPB address         No - never jump
-   
+
    (substitute J for B above for a set of Jumps -- 1-byte operand (not 2),
     always jumps forward up to 255 bytes. In this case, 'address' cannot be
-    less than the current address, nor greater than the current address + 255)  
-   
+    less than the current address, nor greater than the current address + 255)
+
    Two-address formats (first address is destination, len is decimal 1-256):
    -------------------
-   
+
    MVC address,address,len      Move Characters
    CLC address,address,len      Compare Logical Characters
    ALC address,address,len      Add Logical Characters
@@ -258,40 +258,40 @@ in the range 1-256.
    ITC address,address,len      Insert and Test Characters
    AZ address,address,len       Add Zoned Decimal
    SZ address,address,len       Subtract Zoned Decimal
-   
+
    MNN address,address          Move Numeric to Numeric
    MNZ address,address          Move Numeric to Zone
    MZZ address,address          Move Zone to Zone
    MZN address,address          Move Zone to Numeric
-   
+
    I/O Format
    ----------
-   
+
    In the I/O format, there are always 3 fields:
-   
+
         da - Device Address 0-15 (decimal)
         m - Modifier 0-1
         n - Function 0-7
-        
-   The meaning of these is entirely defined by the device addressed.    
-        
+
+   The meaning of these is entirely defined by the device addressed.
+
    There may be an optional control byte, or an optional address (based on
 the type of instruction).
 
         SNS da,m,n,address              Sense I/O
         LIO da,m,n,address              Load I/O
         TIO da,m,n,address              Test I/O
-        
+
         SIO da,m,n,cc                   Start I/O -- cc is a control byte
-        
-        APL da,m,n                      Advance Program Level 
+
+        APL da,m,n                      Advance Program Level
 
 
 
-    --------------------------------------------- 
+    ---------------------------------------------
     Here is a handy opcode cross-reference table:
     ---------------------------------------------
-    
+
    |  x0  x1  x2  x3  x4  x5  x6  x7  x8  x9  xA  xB  xC  xD  xE  xF
 ---+------------------------------------------------------------------
 0x |  -   -   -   -  ZAZ  -   AZ  SZ MVX  -   ED ITC MVC CLC ALC SLC
@@ -313,7 +313,7 @@ Cx |  BC TIO  LA  -   -   -   -   -   -   -   -   -   -   -   -   -
 Dx |  BC TIO  LA  -   -   -   -   -   -   -   -   -   -   -   -   -
 Ex |  BC TIO  LA  -   -   -   -   -   -   -   -   -   -   -   -   -
 Fx | HPL APL  JC SIO  -   -   -   -   -   -   -   -   -   -   -   -
-    
+
 
    This routine is the instruction decode routine for System/3.
    It is called from the simulator control program to execute
@@ -330,7 +330,7 @@ Fx | HPL APL  JC SIO  -   -   -   -   -   -   -   -   -   -   -   -
         unknown I/O device and STOP_DEV flag set
         I/O error in I/O simulator
 
-   2. Interrupts. 
+   2. Interrupts.
 
       There are 8 levels of interrupt, each with it's own IAR (program
       counter).  When an interrupt occurs, execution begins at the
@@ -339,13 +339,13 @@ Fx | HPL APL  JC SIO  -   -   -   -   -   -   -   -   -   -   -   -
       level and a priority in hardware.  Interrupts are reset via
       an SIO instruction, when this happens, the program level
       IAR resumes control.
-      
+
       Interrupts are maintained in the global variable int_req,
       which is zero if no interrupts are pending, otherwise, the
       lower 16 bits represent devices, rightmost bit being device
       0.  Each device requesting an interrupt sets its bit on.
 
- 
+
    3. Non-existent memory.  On the System/3, any reference to non-existent
       memory (read or write) causes a program check and machine stop.
 
@@ -411,13 +411,13 @@ int32 PutMem(int32 addr, int32 data);
 /* System/3 supports only 16 unique device addresses! */
 
 struct ndev dev_table[16] = {
-    { 0, 0, &cpu },                                     /* Device 0: CPU control */ 
+    { 0, 0, &cpu },                                     /* Device 0: CPU control */
     { 1, 0, &pkb },                                     /* Device 1: 5471 console printer/keyboard */
     { 0, 0, &nulldev },
     { 0, 0, &nulldev },
     { 0, 0, &nulldev },
     { 0, 0, &crd },                                     /* Device 5: 1442 card reader/punch */
-    { 0, 0, &nulldev },                                 /* Device 6: 3410 Tape drives 1 & 2 */ 
+    { 0, 0, &nulldev },                                 /* Device 6: 3410 Tape drives 1 & 2 */
     { 0, 0, &nulldev },                                 /* Device 7: 3410 Tape drives 3 & 4 */
     { 0, 0, &nulldev },
     { 0, 0, &nulldev },
@@ -484,7 +484,7 @@ MTAB cpu_mod[] = {
     { UNIT_M15, UNIT_M15, "M15", "M15", NULL },
     { UNIT_M15, 0, "M10", "M10", NULL },
     { UNIT_DPF, UNIT_DPF, "DPF", "DPF", NULL },
-    { UNIT_DPF, 0, "NODPF", "NODPF", NULL }, 
+    { UNIT_DPF, 0, "NODPF", "NODPF", NULL },
     { UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
     { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size },
     { UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size },
@@ -533,7 +533,7 @@ if (int_req) {                                          /* interrupt? */
                 intdev = i;
                 intpri = priority[intlev];
             }
-        }                   
+        }
     }
     intmask = 1 << intdev;                              /* mask is interrupting dev bit */
     int_req = ~int_req & intmask;                       /* Turn off int_req for device */
@@ -552,7 +552,7 @@ if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) {  /* breakpoint? */
 if ((debug_reg == 0) && debug_flag == 1) {
     fclose(trace);
     debug_flag = 0;
-}   
+}
 if (debug_reg) {
     if (!debug_flag) {
         trace = fopen("trace.log", "w");
@@ -569,9 +569,9 @@ if (debug_reg & 0x01) {
     val[4] = GetMem(PC+4);
     val[5] = GetMem(PC+5);
     fprint_sym(trace, PC, (uint32 *) val, &cpu_unit, SWMASK('M'));
-    fprintf(trace, "\n");   
+    fprintf(trace, "\n");
 }
-    
+
 saved_PC = PC;
 opaddr = GetMem(PC) & 0xf0;                             /* fetch addressing mode */
 opcode = GetMem(PC) & 0x0f;                             /* fetch opcode */
@@ -581,7 +581,7 @@ sim_interval = sim_interval - 1;
 qbyte = GetMem(PC) & 0xff;                              /* fetch qbyte */
 PC = (PC + 1) & AMASK;
 
-if (opaddr == 0xf0) {                                   /* Is it command format? */ 
+if (opaddr == 0xf0) {                                   /* Is it command format? */
     rbyte = GetMem(PC) & 0xff;
     PC = (PC + 1) & AMASK;
     switch (opcode) {
@@ -591,7 +591,7 @@ if (opaddr == 0xf0) {                                   /* Is it command format?
                     display[i][j] = ' ';
                 }
             }
-                                                        /* First line */ 
+                                                        /* First line */
             if (qbyte & 0x04) display[0][2] = '_' ;
             if (rbyte & 0x04) display[0][6] = '_' ;
                                                         /* Second line */
@@ -623,26 +623,26 @@ if (opaddr == 0xf0) {                                   /* Is it command format?
             devm = (qbyte >> 3) & 0x01;
             devn = qbyte & 0x07;
             op1 = dev_table[devno].routine(4, devm, devn, rbyte);
-            if (op1 & 0x01) {       
+            if (op1 & 0x01) {
                 if (cpu_unit.flags & UNIT_DPF) {        /* Dual Programming? */
                     if (level == 8)                     /* Yes: switch program levels */
                         level = 9;
                         else
                         level = 8;
-                    PC = IAR[level];    
+                    PC = IAR[level];
                 } else {                                /* No: Loop on this inst */
                     PC = PC - 3;
-                }   
-            }   
+                }
+            }
             reason = (op1 >> 16) & 0xffff;
             break;
         case 0x02:                                      /* JC: Jump on Condition */
             if (condition(qbyte) == 1) {
                 PC = (PC + rbyte) & AMASK;
-            }   
+            }
             break;
         case 0x03:                                      /* SIO: Start I/O */
-            devno = (qbyte >> 4) & 0x0f;    
+            devno = (qbyte >> 4) & 0x0f;
             devm = (qbyte >> 3) & 0x01;
             devn = qbyte & 0x07;
             reason = dev_table[devno].routine(0, devm, devn, rbyte);
@@ -651,7 +651,7 @@ if (opaddr == 0xf0) {                                   /* Is it command format?
                 IAR[level] = PC;
                 level = int_savelevel;
                 PC = IAR[level];
-            }   
+            }
             break;
         default:
             reason = STOP_INVOP;
@@ -674,7 +674,7 @@ switch (addr1) {
         PC = (PC + 1) & AMASK;
         break;
     case 1:
-        BAR = GetMem(PC);   
+        BAR = GetMem(PC);
         BAR = (BAR + XR1) & AMASK;
         PC = (PC + 1) & AMASK;
         break;
@@ -697,7 +697,7 @@ switch (addr2) {
         PC = (PC + 1) & AMASK;
         break;
     case 1:
-        AAR = GetMem(PC);   
+        AAR = GetMem(PC);
         AAR = (AAR + XR1) & AMASK;
         PC = (PC + 1) & AMASK;
         break;
@@ -731,7 +731,7 @@ switch (opaddr) {
                 for (i = 0; i < (dlen1+1); i++) {
                     PutMem(op1, 0xf0);
                     op1--;
-                }   
+                }
                 r = add_zoned(BAR, dlen1+1, AAR, dlen2+1);
                 PSR &= 0xF8;                            /* HJS mod */
                 switch (r) {
@@ -746,7 +746,7 @@ switch (opaddr) {
                         break;
                     default:
                         break;
-                }                       
+                }
                 break;
             case 6:                                     /* AZ: Add Zoned */
                 dlen2 = qbyte & 0x0f;
@@ -769,7 +769,7 @@ switch (opaddr) {
                         break;
                     default:
                         break;
-                }                       
+                }
                 break;
             case 7:                                     /* SZ: Subtract Zoned */
                 dlen2 = qbyte & 0x0f;
@@ -792,7 +792,7 @@ switch (opaddr) {
                         break;
                     default:
                         break;
-                }                       
+                }
                 break;
             case 8:                                     /* MVX: Move Hex */
                 op1 = GetMem(BAR);
@@ -814,7 +814,7 @@ switch (opaddr) {
                         reason = STOP_INVQ;
                         break;
                 }
-                PutMem(BAR, op1);                   
+                PutMem(BAR, op1);
                 break;
             case 0xa:                                   /* ED: Edit */
                 zero = 1;
@@ -828,11 +828,11 @@ switch (opaddr) {
                     op2 = GetMem(AAR);
                     op1 = GetMem(BAR);
                     if (op1 == 0x20) {
-                        op2 |= 0xf0;    
+                        op2 |= 0xf0;
                         PutMem(BAR, op2);
                         AAR--;
                         if (op2 != 0xF0) zero = 0;
-                    }   
+                    }
                     BAR--;
                     qbyte--;
                 }
@@ -879,30 +879,30 @@ switch (opaddr) {
                 if (qbyte == -1)
                     PSR |= 0x01;
                 break;
-            case 0xe:                                   /* ALC: Add Logical Characters */   
+            case 0xe:                                   /* ALC: Add Logical Characters */
                 carry = 0;
                 zero = 1;
                 while (qbyte > -1) {
                     IR = GetMem(BAR) + GetMem(AAR) + carry;
-                    if (IR & 0x100) 
+                    if (IR & 0x100)
                         carry = 1;
                         else
                         carry = 0;
-                    if ((IR & 0xFF) != 0) zero = 0;     /* HJS mod */   
+                    if ((IR & 0xFF) != 0) zero = 0;     /* HJS mod */
                     PutMem(BAR,(IR & 0xFF));
                     BAR--;
                     AAR--;
                     qbyte--;
                 }
                 PSR &= 0xD8;
-                if (zero) 
+                if (zero)
                     PSR |= 0x01;                        /* Equal */
                 if (!zero && !carry)
                     PSR |= 0x02;                        /* Low */
                 if (!zero && carry)
                     PSR |= 0x04;                        /* High */
                 if (carry)
-                    PSR |= 0x20;                        /* Overflow */          
+                    PSR |= 0x20;                        /* Overflow */
                 break;
             case 0xf:                                   /* SLC: Subtract Logical Characters */
                 carry = 1;
@@ -1037,7 +1037,7 @@ switch (opaddr) {
                     default:
                         reason = STOP_INVQ;
                         break;
-                }               
+                }
                 break;
             case 5:                                     /* L: Load Register */
                 switch (qbyte) {
@@ -1119,7 +1119,7 @@ switch (opaddr) {
                     default:
                         reason = STOP_INVQ;
                         break;
-                }               
+                }
                 break;
             case 6:                                     /* A: Add to Register */
                 IR = GetMem(BAR) & 0x00ff;
@@ -1189,7 +1189,7 @@ switch (opaddr) {
                     default:
                         reason = STOP_INVQ;
                         break;
-                }               
+                }
                 PSR &= 0xD8;
                 if ((IR & 0xffff) == 0)
                     PSR |= 0x01;                        /* Zero */
@@ -1198,7 +1198,7 @@ switch (opaddr) {
                 if ((IR & 0xffff) != 0 && (IR & 0x10000))
                     PSR |= 0x04;                        /* High */
                 if ((IR & 0x10000))
-                    PSR |= 0x20;                        /* Bin overflow */  
+                    PSR |= 0x20;                        /* Bin overflow */
                 break;
             case 8:                                     /* TBN: Test Bits On */
                 IR = GetMem(BAR);
@@ -1231,11 +1231,11 @@ switch (opaddr) {
             default:
                 reason = STOP_INVOP;
                 break;
-        }               
+        }
         IAR[level] = PC;
         continue;
-        break;  
-    case 0xc0:              
+        break;
+    case 0xc0:
     case 0xd0:
     case 0xe0:
         switch (opcode) {
@@ -1245,7 +1245,7 @@ switch (opaddr) {
                     IR = ARR[level];
                     ARR[level] = PC & AMASK;
                     PC = IR;
-                }   
+                }
                 break;
             case 1:                                     /* TIO: Test I/O */
                 devno = (qbyte >> 4) & 0x0f;
@@ -1257,7 +1257,7 @@ switch (opaddr) {
                     IR = ARR[level];
                     ARR[level] = PC & AMASK;
                     PC = IR;
-                }   
+                }
                 reason = (op1 >> 16) & 0xffff;
                 break;
             case 2:                                     /* LA: Load Address */
@@ -1271,20 +1271,20 @@ switch (opaddr) {
                     default:
                         reason = STOP_INVQ;
                         break;
-                }               
-                break;      
+                }
+                break;
             default:
                 reason = STOP_INVOP;
                 break;
         }                                               /* switch (opcode) */
         IAR[level] = PC;
         continue;
-        
+
     default:
         reason = STOP_INVOP;
         break;
-}                                                       /* switch (opaddr) */                               
-                
+}                                                       /* switch (opaddr) */
+
 }                                                       /* end while (reason == 0) */
 
 /* Simulation halted */
@@ -1296,7 +1296,7 @@ return reason;
 /* On models 4-12, these memory functions could be inline, but
    on a model 15 with ATU address mapping must be performed so
    they are in functions here for future expansion.
-*/   
+*/
 
 /* Fetch a byte from memory */
 
@@ -1326,7 +1326,7 @@ static int32 condition(int32 qbyte)
         if (((qbyte & 0x3f) & PSR) == 0) r = 1;
     }
                                                         /* these bits reset by a test */
-    if (qbyte & 0x10)   
+    if (qbyte & 0x10)
         PSR &= 0xEF;                                    /* Reset test false if used */
     if (qbyte & 0x08)
         PSR &= 0xF7;                                    /* Reset decimal overflow if tested */
@@ -1338,17 +1338,17 @@ static int32 condition(int32 qbyte)
         r = 0;                                          /* no-op */
     if (t > 7 && t < 0x10 && (q == 7 || q == 0xf))
         r = 1;                                          /* Force branch */
-return (r);     
+return (r);
 }
 /* Given operand 1 and operand 2, compares the two and returns
    the System/3 condition register bits appropriately, given the
    condition register initial state in parameter 3
-*/   
+*/
 
 static int32 compare(int32 byte1, int32 byte2, int32 cond)
 {
     int32 r;
-    
+
     r = cond & 0xF8;                                    /* mask off all but unaffected bits 2,3,4 */
     if (byte1 == byte2)
         r |= 0x01;                                      /* set equal bit */
@@ -1356,7 +1356,7 @@ static int32 compare(int32 byte1, int32 byte2, int32 cond)
         r |= 0x02;                                      /* set less-than bit */
     if (byte1 > byte2)
         r |= 0x04;                                      /* set greater than bit */
-    return r;           
+    return r;
 }
 
 /*-------------------------------------------------------------------*/
@@ -1686,9 +1686,9 @@ int     h;                              /* Hexadecimal digit         */
 int     i, j;                           /* Array subscripts          */
 int     n;                              /* Significant digit counter */
 
-    if ((GetMem(addr) & 0xf0) == 0xD0) 
+    if ((GetMem(addr) & 0xf0) == 0xD0)
         *sign = -1;
-        else 
+        else
         *sign = 1;
     j = len;
     for (i = MAX_DECIMAL_DIGITS; i > -1; i--) {
@@ -1702,7 +1702,7 @@ int     n;                              /* Significant digit counter */
         result [i-1] = h;
         if (h > 0) n = i;
     }
-    *count = 32 - n;                
+    *count = 32 - n;
 
 }   /* end function load_decimal */
 
@@ -1734,13 +1734,13 @@ int     i, j, a;                        /* Array subscripts          */
             j--;
         } else {
             break;
-        }       
+        }
     }
     if (sign == -1) {
         PutMem(addr, (GetMem(addr) & 0x0f));
-        PutMem(addr, (GetMem(addr) | 0xf0)); 
+        PutMem(addr, (GetMem(addr) | 0xf0));
     }
-    
+
 }   /* end function store_decimal */
 
 /* CPU Device Control */
@@ -1748,7 +1748,7 @@ int     i, j, a;                        /* Array subscripts          */
 int32 cpu (int32 op, int32 m, int32 n, int32 data)
 {
     int32 iodata = 0;
-    
+
     switch (op) {
         case 0x00:                                      /* Start IO */
             return SCPE_OK;
@@ -1764,7 +1764,7 @@ int32 cpu (int32 op, int32 m, int32 n, int32 data)
             break;
         default:
             break;
-    }                                   
+    }
     return ((SCPE_OK << 16) | iodata);
 }
 
@@ -1774,7 +1774,7 @@ int32 cpu (int32 op, int32 m, int32 n, int32 data)
 
 int32 nulldev (int32 opcode, int32 m, int32 n, int32 data)
 {
-if (opcode == 1)    
+if (opcode == 1)
     return SCPE_OK;                                     /* Ok to LIO unconfigured devices? */
 return STOP_INVDEV;
 }

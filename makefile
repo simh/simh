@@ -18,38 +18,38 @@
 # In general, the logic below will detect and build with the available
 # features which the host build environment provides.
 #
-# Dynamic loading of libpcap is the preferred default behavior if pcap.h 
+# Dynamic loading of libpcap is the preferred default behavior if pcap.h
 # is available at build time.  Support to statically linking against libpcap
-# is deprecated and may be removed in the future.  Static linking against 
-# libpcap can be enabled if GNU make is invoked with USE_NETWORK=1 on the 
+# is deprecated and may be removed in the future.  Static linking against
+# libpcap can be enabled if GNU make is invoked with USE_NETWORK=1 on the
 # command line.
 #
-# Some platforms may not have vendor supplied libpcap available.  HP-UX is 
+# Some platforms may not have vendor supplied libpcap available.  HP-UX is
 # one such example.  The packages which are available for this platform
-# install include files and libraries in user specified directories.  In 
-# order for this makefile to locate where these components may have been 
-# installed, gmake should be invoked with LPATH=/usr/lib:/usr/local/lib 
+# install include files and libraries in user specified directories.  In
+# order for this makefile to locate where these components may have been
+# installed, gmake should be invoked with LPATH=/usr/lib:/usr/local/lib
 # defined (adjusted as needed depending on where they may be installed).
 #
 # The default build will build compiler optimized binaries.
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
 #
-# simh project support is provided for simulators that are built with 
-# dependent packages provided with the or by the operating system 
-# distribution OR for platforms where that isn't directly available (OS X) 
-# by packages from specific package management systems (MacPorts).  Users 
-# wanting to build simulators with locally build dependent packages or 
-# packages provided by an unsupported package management system can 
-# override where this procedure looks for include files and/or libraries.  
-# Overrides can be specified by define exported environment variables or 
-# GNU make command line arguments which specify INCLUDES and/or LIBRARIES.  
+# simh project support is provided for simulators that are built with
+# dependent packages provided with the or by the operating system
+# distribution OR for platforms where that isn't directly available (OS X)
+# by packages from specific package management systems (MacPorts).  Users
+# wanting to build simulators with locally build dependent packages or
+# packages provided by an unsupported package management system can
+# override where this procedure looks for include files and/or libraries.
+# Overrides can be specified by define exported environment variables or
+# GNU make command line arguments which specify INCLUDES and/or LIBRARIES.
 # Each of these, if specified, must be the complete list include directories
-# or library directories that should be used with each element separated by 
+# or library directories that should be used with each element separated by
 # colons. (i.e. INCLUDES=/usr/include/:/usr/local/include/:...)
 #
 # Some environments may have the LLVM (clang) compiler installed as
-# an alternate to gcc.  If you want to build with the clang compiler, 
+# an alternate to gcc.  If you want to build with the clang compiler,
 # invoke make with GCC=clang.
 #
 # Internal ROM support can be disabled if GNU make is invoked with
@@ -187,12 +187,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
-  LTO_EXCLUDE_VERSIONS = 
+  LTO_EXCLUDE_VERSIONS =
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
     OS_CCDEFS = -D_GNU_SOURCE
     ifeq (,$(NOASYNCH))
-      OS_CCDEFS += -DSIM_ASYNCH_IO 
+      OS_CCDEFS += -DSIM_ASYNCH_IO
     endif
     OS_LDFLAGS = -lm
   else # Non-Android Builds
@@ -383,7 +383,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifneq (,$(call find_lib,pthread))
       OS_CCDEFS += -DUSE_READER_THREAD
       ifeq (,$(NOASYNCH))
-        OS_CCDEFS += -DSIM_ASYNCH_IO 
+        OS_CCDEFS += -DSIM_ASYNCH_IO
       endif
       OS_LDFLAGS += -lpthread
       $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
@@ -393,7 +393,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifneq (,$(call find_lib,pthread))
         OS_CCDEFS += -DUSE_READER_THREAD
         ifeq (,$(NOASYNCH))
-          OS_CCDEFS += -DSIM_ASYNCH_IO 
+          OS_CCDEFS += -DSIM_ASYNCH_IO
         endif
         OS_LDFLAGS += -lpthread
         $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
@@ -401,12 +401,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         ifneq (,$(findstring Haiku,$(OSTYPE)))
           OS_CCDEFS += -DUSE_READER_THREAD
           ifeq (,$(NOASYNCH))
-            OS_CCDEFS += -DSIM_ASYNCH_IO 
+            OS_CCDEFS += -DSIM_ASYNCH_IO
           endif
           $(info using libpthread: $(call find_include,pthread))
         endif
       endif
-      LIBEXT = $(LIBEXTSAVE)        
+      LIBEXT = $(LIBEXTSAVE)
     endif
   endif
   # Find available RegEx library.  Prefer libpcreposix.
@@ -420,8 +420,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   else
-    # If libpcreposix isn't available, fall back to the local regex.h 
-    # Presume that the local regex support is available in the C runtime 
+    # If libpcreposix isn't available, fall back to the local regex.h
+    # Presume that the local regex support is available in the C runtime
     # without a specific reference to a library.  This may not be true on
     # some platforms.
     ifneq (,$(call find_include,regex))
@@ -458,7 +458,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OS_CCDEFS += -DHAVE_GLOB
   else
     ifneq (,$(call find_include,fnmatch))
-      OS_CCDEFS += -DHAVE_FNMATCH    
+      OS_CCDEFS += -DHAVE_FNMATCH
     endif
   endif
   ifneq (,$(call find_include,sys/mman))
@@ -584,7 +584,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
           $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
         endif
-        LIBEXT = $(LIBEXTSAVE)        
+        LIBEXT = $(LIBEXTSAVE)
       endif
     else
       # On non-Linux platforms, we'll still try to provide deprecated support for libpcap in /usr/local
@@ -784,14 +784,14 @@ else
   ifneq (,$(call find_include,pthread))
     PTHREADS_CCDEFS = -DUSE_READER_THREAD
     ifeq (,$(NOASYNCH))
-      PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
+      PTHREADS_CCDEFS += -DSIM_ASYNCH_IO
     endif
     PTHREADS_LDFLAGS = -lpthread
   else
     ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
       PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -D_POSIX_C_SOURCE -I../windows-build/pthreads/Pre-built.2/include
       ifeq (,$(NOASYNCH))
-        PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
+        PTHREADS_CCDEFS += -DSIM_ASYNCH_IO
       endif
       PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
     endif
@@ -912,10 +912,10 @@ else
     ifeq (Darwin,$(OSTYPE))
       CFLAGS_O += -O4 -fno-strict-overflow -flto -fwhole-program
     else
-      CFLAGS_O := -O2 -fno-strict-overflow 
+      CFLAGS_O := -O2 -fno-strict-overflow
     endif
   endif
-  LDFLAGS_O = 
+  LDFLAGS_O =
   GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
   ifneq (3,$(GCC_MAJOR_VERSION))
     ifeq (,$(GCC_OPTIMIZERS_CMD))
@@ -1002,7 +1002,7 @@ SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
 	sim_video.c sim_imd.c sim_card.c
 
 DISPLAYD = display
-  
+
 #
 # Emulator source files and compile time options
 #
@@ -1189,7 +1189,7 @@ H316D = H316
 H316 = ${H316D}/h316_stddev.c ${H316D}/h316_lp.c ${H316D}/h316_cpu.c \
 	${H316D}/h316_sys.c ${H316D}/h316_mt.c ${H316D}/h316_fhd.c \
 	${H316D}/h316_dp.c ${H316D}/h316_rtc.c ${H316D}/h316_imp.c \
-	${H316D}/h316_hi.c ${H316D}/h316_mi.c ${H316D}/h316_udp.c 
+	${H316D}/h316_hi.c ${H316D}/h316_mi.c ${H316D}/h316_udp.c
 H316_OPT = -I ${H316D} -D VM_IMPTIP
 
 
@@ -1248,7 +1248,7 @@ IBM1130 = ${IBM1130D}/ibm1130_cpu.c ${IBM1130D}/ibm1130_cr.c \
 IBM1130_OPT = -I ${IBM1130D}
 ifneq ($(WIN32),)
 IBM1130_OPT += -DGUI_SUPPORT -lgdi32
-endif  
+endif
 
 
 ID16D = Interdata
@@ -1407,7 +1407,7 @@ IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
 	${IBMPCXTC}/i8253.c ${IBMPCXTC}/i8259.c \
 	${IBMPCXTC}/i8255.c ${IBMPCXTD}/ibmpcxt.c \
 	${IBMPCXTC}/pceprom.c ${IBMPCXTC}/pcram8.c \
-	${IBMPCXTC}/pcbus.c ${IBMPCXTC}/i8237.c 
+	${IBMPCXTC}/pcbus.c ${IBMPCXTC}/i8237.c
 IBMPCXT_OPT = -I ${IBMPCXTD}
 
 
@@ -1472,7 +1472,7 @@ ifneq (,$(BESM6_BUILD))
   ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
       $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
       $(info ***)
-      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+      BESM6_OPT = -I ${BESM6D} -DUSE_INT64
   else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
       $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
       $(info ***)
@@ -1482,7 +1482,7 @@ ifneq (,$(BESM6_BUILD))
       $(info ***)
       BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
   else
-      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+      BESM6_OPT = -I ${BESM6D} -DUSE_INT64
   endif
 endif
 
@@ -1511,12 +1511,12 @@ SAGE = ${SAGED}/sage_cpu.c ${SAGED}/sage_sys.c ${SAGED}/sage_stddev.c \
     ${SAGED}/sage_cons.c ${SAGED}/sage_fd.c ${SAGED}/sage_lp.c \
     ${SAGED}/m68k_cpu.c ${SAGED}/m68k_mem.c ${SAGED}/m68k_scp.c \
     ${SAGED}/m68k_parse.tab.c ${SAGED}/m68k_sys.c \
-    ${SAGED}/i8251.c ${SAGED}/i8253.c ${SAGED}/i8255.c ${SAGED}/i8259.c ${SAGED}/i8272.c 
+    ${SAGED}/i8251.c ${SAGED}/i8253.c ${SAGED}/i8255.c ${SAGED}/i8259.c ${SAGED}/i8272.c
 SAGE_OPT = -I ${SAGED} -DHAVE_INT64 -DUSE_SIM_IMD
 
 PDQ3D = PDQ-3
 PDQ3 = ${PDQ3D}/pdq3_cpu.c ${PDQ3D}/pdq3_sys.c ${PDQ3D}/pdq3_stddev.c \
-    ${PDQ3D}/pdq3_mem.c ${PDQ3D}/pdq3_debug.c ${PDQ3D}/pdq3_fdc.c 
+    ${PDQ3D}/pdq3_mem.c ${PDQ3D}/pdq3_debug.c ${PDQ3D}/pdq3_fdc.c
 PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
 
 
@@ -1900,7 +1900,7 @@ ${BIN}pdq3${EXE} : ${PDQ3} ${SIM}
 
 b5500 : $(BIN)b5500$(EXE)
 
-${BIN}b5500${EXE} : ${B5500} ${SIM} 
+${BIN}b5500${EXE} : ${B5500} ${SIM}
 	${MKDIRBIN}
 	${CC} ${B5500} ${SIM} ${B5500_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
@@ -1911,4 +1911,3 @@ frontpaneltest : ${BIN}frontpaneltest${EXE}
 ${BIN}frontpaneltest${EXE} : frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c
 	${MKDIRBIN}
 	${CC} frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c $(CC_OUTSPEC) ${LDFLAGS}
-

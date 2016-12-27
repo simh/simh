@@ -18,7 +18,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -248,8 +248,8 @@ t_stat vt_clk (UNIT * this)
     /* If the TTY system is not idle, schedule the next interrupt
      * by instruction count using the target interrupt rate of 300 Hz;
      * otherwise we can wait for a roughly equivalent wallclock time period,
-     * e.g. until the next 250 Hz wallclock interrupt, but making sure 
-     * that the model time interval between GRP_SERIAL interrupts 
+     * e.g. until the next 250 Hz wallclock interrupt, but making sure
+     * that the model time interval between GRP_SERIAL interrupts
      * is never less than expected.
      * Using sim_activate_after() would be more straightforward (no need for a check
      * as the host is faster than the target), but likely less efficient for idling.
@@ -977,7 +977,7 @@ int vt_getc (int num)
         /* Пользователь отключился. */
         if (t->ipad) {
             besm6_debug ("*** tty%d: disconnecting %s",
-                         num, 
+                         num,
                          t->ipad);
             t->ipad = NULL;
         }
@@ -1021,7 +1021,7 @@ int vt_getc (int num)
         /* Console (keyboard) input. */
         c = sim_poll_kbd();
         if (c == SCPE_STOP) {
-            stop_cpu = 1;   /* just in case */ 
+            stop_cpu = 1;   /* just in case */
         }
         if (! (c & SCPE_KFLAG))
             return -1;
@@ -1171,7 +1171,7 @@ void vt_receive()
                 /* auto-enabling the interrupt just in case
                  * (seems to be unneeded as the interrupt is never disabled)
                  */
-                MGRP |= GRP_SERIAL;       
+                MGRP |= GRP_SERIAL;
                 vt_receiving |= mask;
             }
             break;
@@ -1200,7 +1200,7 @@ void vt_receive()
 }
 
 /*
- * Checking if all terminals are idle. 
+ * Checking if all terminals are idle.
  * SIMH should not enter idle mode until they are.
  */
 int vt_is_idle ()

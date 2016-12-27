@@ -6,9 +6,9 @@
  *
  * Module Description:
  *     Northstar MDS-A Single Density Disk Controller module for SIMH
- * 
+ *
  * Environment:
- *     User mode only 
+ *     User mode only
  *
  *************************************************************************/
 
@@ -111,7 +111,7 @@ static uint32 stepCleared = TRUE;   /* true when step bit has returned to zero *
 
 /* MDS-AD Controller Subcases */
 #define MDSA_READ_ROM0     0
-#define MDSA_READ_ROM1     1    
+#define MDSA_READ_ROM1     1
 #define MDSA_WRITE_DATA    2
 #define MDSA_CTLR_COMMAND  3
 
@@ -125,7 +125,7 @@ static uint32 stepCleared = TRUE;   /* true when step bit has returned to zero *
 #define MDSA_CMD_BEGIN_WR  1        /* start write */
 #define MDSA_CMD_STEP      2        /* load step bit from M0 */
 #define MDSA_CMD_INTR      3        /* load interrupt enable from M0 */
-#define MDSA_CMD_NOP       4        
+#define MDSA_CMD_NOP       4
 #define MDSA_CMD_RESET_SF  5        /* reset sector flag */
 #define MDSA_CMD_RESET     6        /* reset controller, raise heads, stop motors */
 #define MDSA_CMD_STEP_DIR  7        /* load step direction from M0, 1=in, 0=out */
@@ -203,7 +203,7 @@ DEVICE mdsa_dev = {
     MDSA_MAX_DRIVES, 10, 31, 1, MDSA_MAX_DRIVES, MDSA_MAX_DRIVES,
     NULL, NULL, &mdsa_reset,
     &mdsa_boot, &mdsa_attach, &mdsa_detach,
-    &mdsa_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG, 
+    &mdsa_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
     mdsa_dt, NULL, NULL, NULL, NULL, NULL, &mdsa_description
 };
 
@@ -355,7 +355,7 @@ static void showdata(int32 isRead) {
         if(((i+1) & 0xf) == 0)
             printf(NLP "\t");
     }
-    printf(NLP); 
+    printf(NLP);
 }
 
 static int checksum;
@@ -372,7 +372,7 @@ static uint8 MDSA_Read(const uint32 Addr)
     uint8 driveNum;
     MDSA_DRIVE_INFO *pDrive;
     int32 rtn;
-    
+
     cData = 0;
     pDrive = &mdsa_info->drive[mdsa_info->currentDrive];
     switch( (Addr & 0x300) >> 8 ) {
@@ -437,7 +437,7 @@ static uint8 MDSA_Read(const uint32 Addr)
                 if(mdsa_info->datacount == 0) {
                     sim_debug(RD_DATA_MSG, &mdsa_dev, "MDSA: " ADDRESS_FORMAT
                               " READ Start:  Drive: %d, Track=%d, Sector=%d\n",
-                              PCX, mdsa_info->currentDrive, pDrive->track, pDrive->sector);  
+                              PCX, mdsa_info->currentDrive, pDrive->track, pDrive->sector);
 
                     checksum = 0;
                     sec_offset = calculate_mdsa_sec_offset(pDrive->track, pDrive->sector);
@@ -453,7 +453,7 @@ static uint8 MDSA_Read(const uint32 Addr)
                         case IMAGE_TYPE_DSK:
                             if(pDrive->uptr->fileref == NULL) {
                                 printf(".fileref is NULL!" NLP);
-                            } 
+                            }
                             else {
                                 sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
                                 rtn = sim_fread(&sdata.u.data[0], 1, MDSA_SECTOR_LEN,
@@ -490,7 +490,7 @@ static uint8 MDSA_Read(const uint32 Addr)
                     DBG_PRINT(("MDSA: " ADDRESS_FORMAT
                         " READ-DATA[offset:%06x+%03x]=%02x" NLP,
                         PCX, sec_offset, mdsa_info->datacount, cData));
-                } 
+                }
                 else { /* checksum */
                     cData = checksum;
                     sim_debug(RD_DATA_MSG, &mdsa_dev, "MDSA: " ADDRESS_FORMAT
@@ -504,7 +504,7 @@ static uint8 MDSA_Read(const uint32 Addr)
 /* Not a read from disk, process the command field */
 
             else {
-                switch((Addr & 0x1c) >> 2) {                /* switch based on 3-bit command field */    
+                switch((Addr & 0x1c) >> 2) {                /* switch based on 3-bit command field */
                     case MDSA_CMD_DRIVE:                    /* select drive in M1, M0 */
                         driveNum = Addr & 0x03;             /* drive number in two lsbits */
                         if (driveNum == 0)                  /* force drive numbers to 1-3 */
@@ -513,7 +513,7 @@ static uint8 MDSA_Read(const uint32 Addr)
                         sim_debug(CMD_MSG, &mdsa_dev, "MDSA: " ADDRESS_FORMAT
                                     " CMD=Select Drive: Drive=%x\n", PCX, mdsa_info->currentDrive);
                         pDrive = &mdsa_info->drive[mdsa_info->currentDrive];
-                        mdsa_info->a_status.t0 = (pDrive->track == 0);    
+                        mdsa_info->a_status.t0 = (pDrive->track == 0);
                         break;
 
                     case MDSA_CMD_NOP:
@@ -561,7 +561,7 @@ static uint8 MDSA_Read(const uint32 Addr)
                         mdsa_info->stepState = Addr & 0x01;
                         sim_debug(CMD_MSG, &mdsa_dev, "MDSA: " ADDRESS_FORMAT
                                   " CMD=Set step flip-flop to %d\n", PCX, mdsa_info->stepState);
-       
+
                         if((mdsa_info->stepState == 1) && stepCleared) {
                             if(mdsa_info->stepDir == 0) {
                                 sim_debug(SEEK_MSG, &mdsa_dev, "MDSA: " ADDRESS_FORMAT
@@ -569,7 +569,7 @@ static uint8 MDSA_Read(const uint32 Addr)
                                         pDrive->track == 0 ? "[Warn: already at 0]" : "");
                                 if(pDrive->track > 0)
                                     pDrive->track--;
-                            } 
+                            }
                             else {
                                 sim_debug(SEEK_MSG, &mdsa_dev, "MDSA: " ADDRESS_FORMAT
                                      " Step in from track %d%s\n", PCX, pDrive->track,
@@ -611,7 +611,7 @@ static uint8 MDSA_Read(const uint32 Addr)
                 cData |= (mdsa_info->com_status.wi & 1) << 6;
                 cData |= (mdsa_info->com_status.mo & 1) << 4;
                 mdsa_info->b_status.sc = pDrive->sector;
-                
+
                 if (Addr & MDSA_B_STATUS) {     /* return B status register */
                     cData |= (mdsa_info->b_status.sc & 0x0f);
                     sim_debug(STATUS_MSG, &mdsa_dev, "MDSA: " ADDRESS_FORMAT

@@ -277,7 +277,7 @@ return ev5_palent (PC, PALO_CALLPR + off);
 
 /* EV5 evaluate interrupts - returns highest outstanding
    interrupt level about target ipl - plus nonmaskable flags
-   
+
    flag = 1: evaluate for real interrupt capability
    flag = 0: evaluate as though IPL = 0, normal mode */
 
@@ -449,7 +449,7 @@ switch (fnc) {
         res = itlb_read ();
         ev5_itb_pte_temp = (res & PFN_MASK) |
             ((res & PTE_ASM)? ITBR_PTE_ASM: 0) |
-            ((res & (PTE_KRE|PTE_ERE|PTE_SRE|PTE_URE)) << 
+            ((res & (PTE_KRE|PTE_ERE|PTE_SRE|PTE_URE)) <<
                 (ITBR_PTE_V_KRE - PTE_V_KRE)) |
             itbr_map_gh[PTE_GETGH (res)];
         res = 0;
@@ -609,7 +609,7 @@ switch (fnc) {
 
     case ITB_PTE:
         ev5_itb_pte = (val | PTE_V) & (PFN_MASK | ((t_uint64) (PTE_ASM | PTE_GH |
-                PTE_KRE | PTE_ERE | PTE_SRE | PTE_URE)));           
+                PTE_KRE | PTE_ERE | PTE_SRE | PTE_URE)));
         itlb_load (ev5_itb_tag, ev5_itb_pte);
         break;
 
@@ -885,7 +885,7 @@ switch (op) {
         fprintf (of, " R%d,%X", ra, inst & HW_LD_DSP);
         if (rb != 31) fprintf (of, "(R%d)", rb);
         break;
- 
+
    case OP_PAL1E:                                               /* HW_REI */
         fputs ("HW_REI", of);
         fprint_opt_ev5 (of, inst, rei_opt);
@@ -959,4 +959,3 @@ switch (I_GETOP (val)) {
 if (*cptr != 0) return SCPE_ARG;
 return -3;
 }
-

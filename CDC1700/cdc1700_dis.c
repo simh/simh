@@ -314,7 +314,7 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
           sprintf(buf, "[ => %04X%s %s {%04X}", taddr2, rel,
                   P[MEMADDR(taddr)] ? "(P)" : "",
                   LoadFromMem(taddr));
-        else sprintf(buf, "[ => %04X%s (B:%04X%s) %s {%04X}", 
+        else sprintf(buf, "[ => %04X%s (B:%04X%s) %s {%04X}",
                      taddr2, rel, base, rel,
                      P[MEMADDR(taddr)] ? "(P)" : "",
                      LoadFromMem(taddr));

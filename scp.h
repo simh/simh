@@ -23,7 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   05-Dec-10    MP      Added macro invocation of sim_debug 
+   05-Dec-10    MP      Added macro invocation of sim_debug
    09-Aug-06    JDB     Added assign_device and deassign_device
    14-Jul-06    RMS     Added sim_activate_abs
    06-Jan-06    RMS     Added fprint_stopped_gen
@@ -215,7 +215,7 @@ void sim_printf (const char *fmt, ...) GCC_FMT_ATTR(1, 2);
 void sim_perror (const char *msg);
 t_stat sim_messagef (t_stat stat, const char *fmt, ...) GCC_FMT_ATTR(2, 3);
 void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason);
-void sim_debug_bits_hdr (uint32 dbits, DEVICE* dptr, const char *header, 
+void sim_debug_bits_hdr (uint32 dbits, DEVICE* dptr, const char *header,
     BITFIELD* bitdefs, uint32 before, uint32 after, int terminate);
 void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate);

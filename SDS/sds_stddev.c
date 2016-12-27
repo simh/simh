@@ -565,7 +565,7 @@ switch (fnc) {                                          /* case function */
 
     case IO_WREOR:                                      /* write eor */
         break;
-    
+
     case IO_EOM1:                                       /* EOM mode 1*/
     case IO_READ:                                       /* read */
         CRETINS;                                        /* error */

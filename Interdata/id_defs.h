@@ -112,7 +112,7 @@ typedef struct {
 #define CC_L            0x1                             /* less than */
 #define CC_MASK         (CC_C | CC_V | CC_G | CC_L)
 
-#define PSW_WAIT        0x8000                          /* wait */      
+#define PSW_WAIT        0x8000                          /* wait */
 #define PSW_EXI         0x4000                          /* ext intr enable */
 #define PSW_MCI         0x2000                          /* machine check enable */
 #define PSW_AFI         0x1000                          /* arith fault enb */
@@ -428,7 +428,7 @@ typedef struct {
 /* MAC, 32b */
 
 #define P               0                               /* physical */
-#define VE              1                               /* virtual inst */              
+#define VE              1                               /* virtual inst */
 #define VR              2                               /* virtual read */
 #define VW              3                               /* virtual write */
 

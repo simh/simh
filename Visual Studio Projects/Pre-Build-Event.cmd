@@ -4,7 +4,7 @@ rem  simh projects.  Some of these funtions are optional and depend on the
 rem  needs of the project being built, and others are generic and are always
 rem  performed.
 rem
-rem  The optional activities are invoked by passing parameters to this 
+rem  The optional activities are invoked by passing parameters to this
 rem  procedure.  The parameters are:
 rem     ROM     To run the BuildROMs program prior to executing a project
 rem             build.  This program verifies that the include files containing
@@ -12,7 +12,7 @@ rem             ROM images are consistent with the ROM images from which they
 rem             are derived.
 rem     BUILD   To validate that the required dependent libraries and include
 rem             files are available in the directory ..\..\windows-build\
-rem             These libraries currently include winpcap and pthreads and 
+rem             These libraries currently include winpcap and pthreads and
 rem             optionally SDL and LIBPCRE.
 rem     LIBSDL  To validate that the required dependent SDL libraries and include
 rem             files are available in the directory ..\..\windows-build\
@@ -29,13 +29,13 @@ rem         the current commit id is generated if git.exe is available in the
 rem         current path.
 rem       - performing the activities which make the git repository commit id
 rem         available in an include file during compiles.
-rem       - Converting Visual Studio Projects to a form which will produce 
-rem         binaries which run on Windows XP if the current build environment 
+rem       - Converting Visual Studio Projects to a form which will produce
+rem         binaries which run on Windows XP if the current build environment
 rem         supports it and the correct components are installed.
 rem         This activity is triggered by the first argument being the name
-rem         of a the current Visual Studio project file.  This argument MUST 
+rem         of a the current Visual Studio project file.  This argument MUST
 rem         only be provided on a single project which invokes this procedure
-rem         AND that project should be one which all other projects in a 
+rem         AND that project should be one which all other projects in a
 rem         solution are dependent on.
 rem
 rem
@@ -92,7 +92,7 @@ shift
 goto _done_project
 :_project_cleanup
 shift
-del PlatformToolset.fix 
+del PlatformToolset.fix
 :_done_project
 if exist PlatformToolset.fix echo error: Reload any changed projects and rebuild again,
 if exist PlatformToolset.fix exit /b 1
@@ -115,7 +115,7 @@ if not "%_arg%" == ""    set _X_%_arg%=%_arg%
 shift
 goto _next_arg
 :_done_args
-rem some arguments implicitly require BUILD to also be set to have 
+rem some arguments implicitly require BUILD to also be set to have
 rem any meaning.  These are LIBSDL, LIBPCRE and FINDFONT
 if not "%_X_FINDFONT%"  == "" set _X_BUILD=BUILD
 if not "%_X_LIBSDL%"    == "" set _X_BUILD=BUILD
@@ -145,7 +145,7 @@ if not exist ../../windows-build-windows-build goto _check_files
 rem This is a newly extracted windows-build.zip file with the
 rem top level directory named as it existed in the zip file.
 rem We rename that top level directory.  If a previous one already
-rem exists, that will be an older version, so we try to remove 
+rem exists, that will be an older version, so we try to remove
 rem that one first.
 if exist ..\..\windows-build rmdir /s /q ..\..\windows-build
 ren ..\..\windows-build-windows-build windows-build
@@ -259,7 +259,7 @@ popd
 :_SetId
 rem
 rem A race condition exists while creating the .git-commit-id.h file.
-rem This race can happen at the beginning of a parallel build where 
+rem This race can happen at the beginning of a parallel build where
 rem several projects can start execution at almost the same time.
 rem
 SET GIT_COMMIT_ID=
@@ -289,7 +289,7 @@ exit /B 0
 
 :FindVCVersion
 call :WhichInPath cl.exe _VC_CL_
-for /f "tokens=2-8 delims=\" %%a in ("%_VC_CL_%") do call :VCCheck _VC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e" "%%f" "%%g" 
+for /f "tokens=2-8 delims=\" %%a in ("%_VC_CL_%") do call :VCCheck _VC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e" "%%f" "%%g"
 for /f "delims=." %%a in ("%_VC_VER_NUM_%") do set %1=%%a
 set _VC_CL=
 exit /B 0

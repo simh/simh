@@ -64,7 +64,7 @@ extern DEVICE vs_dev;
 
 extern UNIT cpu_unit;
 
-DEVICE *sim_devices[] = { 
+DEVICE *sim_devices[] = {
     &cpu_dev,
     &tlb_dev,
     &rom_dev,
@@ -147,4 +147,3 @@ while ((i = Fgetc (fileref)) != EOF) {                   /* read byte stream */
     }
 return SCPE_OK;
 }
-

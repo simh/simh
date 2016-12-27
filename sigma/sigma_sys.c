@@ -276,7 +276,7 @@ static const uint32 opc_val[] = {
  0x78000000, IC_MRF,  0x79000000, IC_MRF,  0x7A000000, IC_MRF,  0x7B000000, IC_MRF,
  0x7C000000, IC_MNOR, 0x7D000000, IC_MRF,  0x7E000000, IC_MRF,  0x7F000000, IC_MRF,
  0xFFFFFFFF, 0
- }; 
+ };
 
 static const char *opcode[] = {
  "LFI",  "LCI",  "LF",   "LC",                          /* extended mmenomics */
@@ -437,7 +437,7 @@ for (i = 0; opc_val[i] < 0xFFFFFFFF; i = i + 2) {       /* loop thru ops */
                 else if (xr == IC_CTL)                  /* or control? */
                     fprintf (of, ",%X", rn);
                 }
-            } 
+            }
         return SCPE_OK;
         }
     }
@@ -580,7 +580,7 @@ for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
                 }
             if ((fl & IC_SGN) &&                        /* signed val? */
                 strchr ("+-", *cptr) &&                 /* with sign? */
-                (*cptr++ == '-'))                       /* and minus? */ 
+                (*cptr++ == '-'))                       /* and minus? */
                 sgn = 1;
             else sgn = 0;                               /* else + */
             cptr = get_glyph (cptr, gbuf, 0);           /* get rest */

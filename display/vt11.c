@@ -155,7 +155,7 @@ extern void _sim_debug (unsigned int dbits, DEVICE* dptr, const char* fmt, ...);
 #endif
 #else
 
-#define DEBUGF(...) 
+#define DEBUGF(...)
 
 #endif
 
@@ -1949,7 +1949,7 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
      *                  invis
      */
 
-    if (((tPLd > 0) && (tPEd < 0)) || 
+    if (((tPLd > 0) && (tPEd < 0)) ||
         ((tPLd < 0) && (tPEd > 0))) {
         if (tPLn * (long)tPEd > (long)tPEn * tPLd)
             return 0;                   /* invisible */
@@ -2558,7 +2558,7 @@ static const unsigned char stroke[] = {
      * The simulated character sizes are not exact at all scales, but there
      * is no really good way to fix this without spoiling the appearance.
      * char. scale      VS60 units      simulation units (pixel has size!)
-     *     1/2           5   x  7        5 x  7 
+     *     1/2           5   x  7        5 x  7
      *      1           10   x 14        9 x 13
      *     3/2          15   x 21       13 x 19
      *      2           20   x 28       17 x 25
@@ -2982,10 +2982,10 @@ character(int c)
                     vector2(1, dx, dy);
             } else                      /* invisible stroke, can do faster */
                 if (char_rotate) {
-                    xpos = xp - CSCALE(ynext);  
+                    xpos = xp - CSCALE(ynext);
                     ypos = yp + CSCALE(xnext);
                 } else {
-                    xpos = xp + CSCALE(xnext);  
+                    xpos = xp + CSCALE(xnext);
                     ypos = yp + CSCALE(ynext);
                 }
             xlast = xnext;

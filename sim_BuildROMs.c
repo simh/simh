@@ -58,13 +58,13 @@ struct ROM_File_Descriptor {
 
 #if defined(_WIN32)
 #include <sys/utime.h>
-#define utimbuf _utimbuf 
+#define utimbuf _utimbuf
 #define utime _utime
 #else
 #include <utime.h>
 #endif
 
-int sim_read_ROM_include(const char *include_filename, 
+int sim_read_ROM_include(const char *include_filename,
                          int *psize,
                          unsigned char **pROMData,
                          unsigned int *pchecksum,
@@ -198,7 +198,7 @@ return 1;
 int sim_make_ROM_include(const char *rom_filename,
                          int expected_size,
                          unsigned int expected_checksum,
-                         const char *include_filename, 
+                         const char *include_filename,
                          const char *rom_array_name,
                          const char *Comments)
 {
@@ -219,14 +219,14 @@ int defines_found;
 
 if (NULL == (rFile = fopen (rom_filename, "rb"))) {
     printf ("Error Opening ROM binary file '%s' for input: %s\n", rom_filename, strerror(errno));
-    if (0 != sim_read_ROM_include(include_filename, 
+    if (0 != sim_read_ROM_include(include_filename,
                                   &include_bytes,
                                   &include_ROMData,
                                   &include_checksum,
                                   &include_array_name,
                                   &defines_found))
         return -1;
-    c = ((include_checksum == expected_checksum) && 
+    c = ((include_checksum == expected_checksum) &&
          (include_bytes == expected_size) &&
          (0 == strcmp(include_array_name, rom_array_name)) &&
          defines_found);
@@ -274,13 +274,13 @@ if ((expected_checksum != 0) && (checksum != expected_checksum)) {
  * If the target include file already exists, determine if it contains the exact
  * data in the base ROM image.  If so, then we are already done
  */
-if (0 == sim_read_ROM_include(include_filename, 
+if (0 == sim_read_ROM_include(include_filename,
                               &include_bytes,
                               &include_ROMData,
                               &include_checksum,
                               &include_array_name,
                               &defines_found)) {
-    c = ((include_checksum == expected_checksum) && 
+    c = ((include_checksum == expected_checksum) &&
          (include_bytes == expected_size) &&
          (0 == strcmp (include_array_name, rom_array_name)) &&
          (0 == memcmp (include_ROMData, ROMData, include_bytes)) &&

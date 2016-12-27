@@ -14,7 +14,7 @@
 ;set fdc debug=cmd
 
 ;**** debugging of CPU: exceptions, tracing, memory read/write
-;**** opcode fetch, stack push/pull, concurrency 
+;**** opcode fetch, stack push/pull, concurrency
 ;set cpu exc
 ;set cpu debug=int
 ;set cpu debug=trace

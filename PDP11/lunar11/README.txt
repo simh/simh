@@ -13,7 +13,7 @@ it;
 
 	sim> ! Set CPU to a Unibus system type
 	sim> set cpu 11/70
-	sim> ! Enable DLI device so VT device autoconfigures 
+	sim> ! Enable DLI device so VT device autoconfigures
 	sim> ! with a starting vector of 320
 	sim> set dli enable
 	sim> set dli line=2
@@ -49,4 +49,3 @@ lunar.dag
 gtlem.mac
 	Does not match above binaries??
 	http://www.brouhaha.com/~eric/retrocomputing/dec/gt40/software/moonlander/gtlem.mac
-

@@ -3554,7 +3554,7 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
-                
+
                 INCR(1);
                 adr = HL;
                 switch ((op = GetBYTE(PC)) & 7) {
@@ -4691,7 +4691,7 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
-                
+
                 INCR(1);
                 switch (RAM_PP(PC)) {
 
@@ -5406,7 +5406,7 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
-                
+
                 INCR(1);
                 switch (RAM_PP(PC)) {
 

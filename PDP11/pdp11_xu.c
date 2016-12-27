@@ -400,7 +400,7 @@ t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   struct xu_stats* stats = &xu->var->stats;
 
   fprintf(st, "Ethernet statistics:\n");
-  fprintf(st, fmt, "Seconds since cleared:",   stats->secs); 
+  fprintf(st, fmt, "Seconds since cleared:",   stats->secs);
   fprintf(st, fmt, "Recv frames:",             stats->frecv);
   fprintf(st, fmt, "Recv dbytes:",             stats->rbytes);
   fprintf(st, fmt, "Xmit frames:",             stats->ftrans);
@@ -568,10 +568,10 @@ t_stat xu_process_loopback(CTLR* xu, ETH_PACK* pack)
   memcpy (&response, pack, sizeof(ETH_PACK));
   memcpy (physical_address, xu->var->setup.macs[0], sizeof(ETH_MAC));
 
-  /* The only packets we should be responding to are ones which 
-     we received due to them being directed to our physical MAC address, 
-     OR the Broadcast address OR to a Multicast address we're listening to 
-     (we may receive others if we're in promiscuous mode, but shouldn't 
+  /* The only packets we should be responding to are ones which
+     we received due to them being directed to our physical MAC address,
+     OR the Broadcast address OR to a Multicast address we're listening to
+     (we may receive others if we're in promiscuous mode, but shouldn't
      respond to them) */
   if ((0 == (pack->msg[0]&1)) &&           /* Multicast or Broadcast */
       (0 != memcmp(physical_address, pack->msg, sizeof(ETH_MAC))))
@@ -970,7 +970,7 @@ int32 xu_command(CTLR* xu)
       break;
 
     case FC_RRF:            /* read ring format */
-      if ((xu->var->pcb[1] & 1) || (xu->var->pcb[2] & 0374)) 
+      if ((xu->var->pcb[1] & 1) || (xu->var->pcb[2] & 0374))
         return PCSR0_PCEI;
       xu->var->udb[0] = xu->var->tdrb & 0177776;
       xu->var->udb[1] = (uint16)((xu->var->telen << 8) + ((xu->var->tdrb >> 16) & 3));
@@ -987,7 +987,7 @@ int32 xu_command(CTLR* xu)
       break;
 
     case FC_WRF:            /* write ring format */
-      if ((xu->var->pcb[1] & 1) || (xu->var->pcb[2] & 0374)) 
+      if ((xu->var->pcb[1] & 1) || (xu->var->pcb[2] & 0374))
         return PCSR0_PCEI;
       if ((xu->var->pcsr1 & PCSR1_STATE) == STATE_RUNNING)
         return PCSR0_PCEI;
@@ -1131,7 +1131,7 @@ int32 xu_command(CTLR* xu)
       udb[23] = mac_w[2];                 /* HA<47:32> */
       udb[24] = 0x64;                     /* dtype */
       udb[25] = (11 << 8) + 1;            /* dvalue + dlen */
-      
+
       /* transfer udb to host */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
       wstatus = Map_WriteW(udbb, 52, xu->var->udb);
@@ -1439,8 +1439,8 @@ void xu_process_transmit(CTLR* xu)
          runt = 1;
       }
 
-      /* As described in the DEUNA User Guide (Section 4.7), the DEUNA is responsible 
-         for inserting the appropriate source MAC address in the outgoing packet header, 
+      /* As described in the DEUNA User Guide (Section 4.7), the DEUNA is responsible
+         for inserting the appropriate source MAC address in the outgoing packet header,
          so we do that now. */
       memcpy(xu->var->write_buffer.msg+6, (uint8*)&xu->var->setup.macs[0], sizeof(ETH_MAC));
 
@@ -1493,7 +1493,7 @@ void xu_process_transmit(CTLR* xu)
 
     } /* if end-of-frame */
 
-    
+
     /* give buffer ownership back to host */
     xu->var->txhdr[2] &= ~TXR_OWN;
 
@@ -1574,7 +1574,7 @@ void xu_port_command (CTLR* xu)
     case CMD_START:         /* START */
       if (state == STATE_READY) {
         xu->var->pcsr1 &= ~PCSR1_STATE;
-        xu->var->pcsr1 |= STATE_RUNNING; 
+        xu->var->pcsr1 |= STATE_RUNNING;
         xu->var->pcsr0 |= PCSR0_DNI;
 
         /* reset ring pointers */
@@ -1927,5 +1927,3 @@ const char *xu_description (DEVICE *dptr)
 {
 return "DEUNA/DELUA Ethernet controller";
 }
-
-

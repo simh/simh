@@ -424,7 +424,7 @@ switch (j) {                                            /* case on class */
             else {
                 d = get_sint (gbuf, &sign, &r);
                 if (r != SCPE_OK) return SCPE_ARG;
-                if (sign == 0) val[0] = val[0] + d;  
+                if (sign == 0) val[0] = val[0] + d;
                 else if (sign < 0) val[0] = val[0] - d;
                 else val[0] = val[0] | d;
                 }

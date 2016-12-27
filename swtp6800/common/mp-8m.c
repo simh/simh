@@ -52,7 +52,7 @@ void mp_8m_put_mword(int32 addr, int32 val);
 
 /* isbc064 Standard I/O Data Structures */
 
-UNIT mp_8m_unit[] = { 
+UNIT mp_8m_unit[] = {
     { UDATA (NULL, UNIT_FIX+UNIT_BINK+UNIT_DISABLE, 0),0 },
     { UDATA (NULL, UNIT_FIX+UNIT_BINK+UNIT_DISABLE, 0),0 },
     { UDATA (NULL, UNIT_FIX+UNIT_BINK+UNIT_DISABLE, 0),0 },
@@ -61,7 +61,7 @@ UNIT mp_8m_unit[] = {
     { UDATA (NULL, UNIT_FIX+UNIT_BINK+UNIT_DISABLE, 0),0 }
 };
 
-MTAB mp_8m_mod[] = { 
+MTAB mp_8m_mod[] = {
     { 0 }
 };
 

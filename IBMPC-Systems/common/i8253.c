@@ -61,11 +61,11 @@ uint8 i8253c(t_bool io, uint8 data);
 /* i8253 Standard I/O Data Structures */
 /* up to 4 i8253 devices */
 
-UNIT i8253_unit[] = { 
-    { UDATA (&i8253_svc, 0, 0), 20 }, 
-    { UDATA (&i8253_svc, 0, 0), 20 }, 
-    { UDATA (&i8253_svc, 0, 0), 20 }, 
-    { UDATA (&i8253_svc, 0, 0), 20 } 
+UNIT i8253_unit[] = {
+    { UDATA (&i8253_svc, 0, 0), 20 },
+    { UDATA (&i8253_svc, 0, 0), 20 },
+    { UDATA (&i8253_svc, 0, 0), 20 },
+    { UDATA (&i8253_svc, 0, 0), 20 }
 };
 
 REG i8253_reg[] = {
@@ -142,10 +142,10 @@ t_stat i8253_reset (DEVICE *dptr, uint16 port)
         sim_printf("i8253_reset: too many devices!\n");
         return SCPE_MEM;
     }
-    i8253_port[i8253_devnum] = reg_dev(i8253t0, port); 
-    reg_dev(i8253t1, port + 1); 
-    reg_dev(i8253t2, port + 2); 
-    reg_dev(i8253c, port + 3); 
+    i8253_port[i8253_devnum] = reg_dev(i8253t0, port);
+    reg_dev(i8253t1, port + 1);
+    reg_dev(i8253t2, port + 2);
+    reg_dev(i8253c, port + 3);
     i8253_unit[i8253_devnum].u3 = 0;          /* status */
     i8253_unit[i8253_devnum].u4 = 0;                  /* mode instruction */
     i8253_unit[i8253_devnum].u5 = 0;                  /* command instruction */

@@ -35,7 +35,7 @@
    16-Apr-98    RMS     Fixed bugs in STEXP, STCfi, round/pack
    09-Apr-98    RMS     Fixed bug in LDEXP
    04-Apr-98    RMS     Fixed bug in MODf condition codes
-        
+
    This module simulates the PDP-11 floating point unit (FP11 series).
    It is called from the instruction decoder for opcodes 170000:177777.
 
@@ -444,7 +444,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
             }
         F_STORE (qdouble, fac, FR[ac]);
         FPS = setfcc (FPS, fac.h, newV);
-        break;      
+        break;
 
     case 012:                                           /* STEXP */
         dst = (GET_EXP (FR[ac].h) - FP_BIAS) & 0177777;
@@ -506,7 +506,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
             if (fsrc.l >= i_limit[leni == LONG][sign]) {
                 dst = 0;
                 C = 1;
-                }  
+                }
             else {
                 dst = fsrc.l;
                 if (sign)
@@ -780,7 +780,7 @@ else {
     exta = VA & ~0177777;
     fptr->h = (ReadW (VA) << FP_V_F0) |
         (ReadW (exta | ((VA + 2) & 0177777)) << FP_V_F1);
-    if (len == QUAD) fptr->l = 
+    if (len == QUAD) fptr->l =
         (ReadW (exta | ((VA + 4) & 0177777)) << FP_V_F2) |
         (ReadW (exta | ((VA + 6) & 0177777)) << FP_V_F3);
     else fptr->l = 0;
@@ -805,7 +805,7 @@ return TRUE;
 void WriteI (int32 data, int32 VA, int32 spec, int32 len)
 {
 int32 pa, pa2;
-    
+
 if ((len == WORD) || (spec == 027)) {
     WriteW ((data >> 16) & 0177777, VA);
     return;
@@ -903,7 +903,7 @@ fpac_t fac, fsrc;
 
 reg = IR & 07;                                          /* isolate reg */
 if (reg == 7)                                           /* choose I,D */
-    exta = isenable; 
+    exta = isenable;
 else exta = dsenable;
 if (IR & 000740) {                                      /* defined? */
     if (CPUT (CPUT_03))                                 /* 11/03 reads word */
@@ -1359,7 +1359,7 @@ int32 round_and_pack (fpac_t *facp, int32 exp, fpac_t *fracp, int r)
 fpac_t frac;
 
 frac = *fracp;                                          /* get fraction */
-if (r && ((FPS & FPS_T) == 0)) { 
+if (r && ((FPS & FPS_T) == 0)) {
     if (FPS & FPS_D) {
          F_ADD (dround_guard_fac, frac, frac);
          }

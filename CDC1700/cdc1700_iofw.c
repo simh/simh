@@ -241,7 +241,7 @@ enum IOstatus fw_doBDCIO(IO_DEVICE *iod, uint16 *data, t_bool output, uint8 reg)
   uint8 rej = (output ? iod->iod_rejmapW : iod->iod_rejmapR) & ~MASK_REGISTER1;
   DEVICE *dptr = iod->iod_indev;
   enum IOstatus status;
-  
+
   IOAreg = *data;
 
   /*
@@ -274,7 +274,7 @@ enum IOstatus fw_doBDCIO(IO_DEVICE *iod, uint16 *data, t_bool output, uint8 reg)
   } else {
     if ((iod->iod_readmap & (1 << reg)) != 0) {
       *data = iod->iod_readR[reg];
-      
+
       if ((dptr->dctrl & DBG_DSTATE) != 0)
         if (iod->iod_state != NULL)
           (*iod->iod_state)("after cached BDC I/O", dptr, iod);

@@ -35,7 +35,7 @@
             M6830, SWTBUG, or custom boot ROM at 0xE000 [bootrom.c].
             4 ea 2716 EPROMs at either 0xC000, 0xC800, 0xD000 and 0xD800 (LO_PROM)or
                 0xE000, 0xE800, 0xF000 and 0xF800 (HI_PROM) [eprom.c].
-            Interface to the SS-50 bus and the MP-B2 Mother Board for I/O 
+            Interface to the SS-50 bus and the MP-B2 Mother Board for I/O
                 and memory boards [mp-b2.c].
             Note: The file names of the emulator source programs for each device are
             contained in "[]".
@@ -139,20 +139,20 @@ DEVICE CPU_BD_dev = {
     CPU_BD_reg,                          //registers
     CPU_BD_mod,                          //modifiers
     1,                                  //numunits
-    16,                                 //aradix 
-    16,                                 //awidth 
-    1,                                  //aincr 
-    16,                                 //dradix 
+    16,                                 //aradix
+    16,                                 //awidth
+    1,                                  //aincr
+    16,                                 //dradix
     8,                                  //dwidth
-    NULL,                               //examine 
-    NULL,                               //deposit 
+    NULL,                               //examine
+    NULL,                               //deposit
     NULL,                               //reset
     NULL,                               //boot
-    NULL,                               //attach 
+    NULL,                               //attach
     NULL,                               //detach
     NULL,                               //ctxt
-    DEV_DEBUG,                          //flags 
-    0,                                  //dctrl 
+    DEV_DEBUG,                          //flags
+    0,                                  //dctrl
     CPU_BD_debug,                       /* debflags */
     NULL,                               //msize
     NULL                                //lname

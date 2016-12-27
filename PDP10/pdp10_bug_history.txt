@@ -25,4 +25,3 @@ Bugs Found and Fixed During Simulator Debug
 18. FIXR off by 1 in testing for lower limit to process
 19. Indirect loops and XCT loops should run indefinitely,
     test for interrupts on each memory reference
-

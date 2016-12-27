@@ -31,27 +31,27 @@
    24-Oct-12    MB      Added mapped transfers for VAX
    29-Jan-11    HUH     Added RC25, RCF25 and RA80 disks
                         Not all disk parameters set yet
-                        "KLESI" MSCP controller (3) / port (1) types for RC25 
+                        "KLESI" MSCP controller (3) / port (1) types for RC25
                         not yet implemented
-                        
-                        Remarks on the RC25 disk drives: 
+
+                        Remarks on the RC25 disk drives:
                         In "real" life the RC25 drives exist in pairs only,
                         one RC25 (removable) and one RCF25 (fixed) in one housing.
-                        The removable platter has always got an even drive number 
-                        (e.g. "0"), the fixed platter has always got the next (odd) 
-                        drive number (e.g. "1"). These two rules are not enforced 
+                        The removable platter has always got an even drive number
+                        (e.g. "0"), the fixed platter has always got the next (odd)
+                        drive number (e.g. "1"). These two rules are not enforced
                         by the disk drive simulation.
    07-Mar-11    MP      Added working behaviors for removable device types.
-                        This allows physical CDROM's to come online and be 
+                        This allows physical CDROM's to come online and be
                         ejected.
    02-Mar-11    MP      Fixed missing information from save/restore which
-                        caused operations to not complete correctly after 
+                        caused operations to not complete correctly after
                         a restore until the OS reset the controller.
    02-Feb-11    MP      Added Autosize support to rq_attach
    28-Jan-11    MP      Adopted use of sim_disk disk I/O library
                          - added support for the multiple formats sim_disk
                            provides (SimH, RAW, and VHD)
-                         - adjusted to potentially leverage asynch I/O when 
+                         - adjusted to potentially leverage asynch I/O when
                            available
                          - Added differing detailed debug output via sim_debug
    14-Jan-09    JH      Added support for RD32 disc drive
@@ -250,7 +250,7 @@ struct rqpkt {
 /* The RQDX3 supports multiple disk drive types (x = not implemented):
 
    type sec     surf    cyl     tpg     gpc     RCT     LBNs
-        
+
    RX50 10      1       80      5       16      -       800
    RX33 15      2       80      2       1       -       2400
    RD51 18      4       306     4       1       36*4    21600
@@ -269,7 +269,7 @@ x  RA70 33(+1)  11      1507+   11      1       ?       547041
    RA80 31      14      546      ?      ?       ?       237212
    RA81 51(+1)  14      1258    14      1       2856    891072
    RA82 57(+1)  15      1435    15      1       3420    1216665
-   RA71 51(+1)  14      1921    14      1       1428    1367310         
+   RA71 51(+1)  14      1921    14      1       1428    1367310
    RA72 51(+1)  20      1921    20      1       2040    1953300
    RA90 69(+1)  13      2656    13      1       1794    2376153
    RA92 73(+1)  13      3101    13      1       949     2940951
@@ -968,9 +968,9 @@ REG rq_reg[] = {
     };
 
 MTAB rq_mod[] = {
-    { UNIT_WLK,                 0,  NULL, "WRITEENABLED", 
+    { UNIT_WLK,                 0,  NULL, "WRITEENABLED",
         &rq_set_wlk, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK,          UNIT_WLK,  NULL, "LOCKED", 
+    { UNIT_WLK,          UNIT_WLK,  NULL, "LOCKED",
         &rq_set_wlk, NULL, NULL, "Write lock disk drive"  },
     { MTAB_XTD|MTAB_VUN, 0, "WRITE", NULL,
       NULL, &rq_show_wlk, NULL,  "Display drive writelock status" },
@@ -1510,8 +1510,8 @@ if (cp->csta < CST_UP) {                                /* still init? */
             cp->perr = 0;
             }
         break;
-        }                                               /* end switch */  
-                      
+        }                                               /* end switch */
+
     return SCPE_OK;
     }                                                   /* end if */
 
@@ -1527,7 +1527,7 @@ if ((pkt == 0) && cp->pip) {                            /* polling? */
     if (!rq_getpkt (cp, &pkt))                          /* get host pkt */
         return SCPE_OK;
     if (pkt) {                                          /* got one? */
-        sim_debug (DBG_REQ, dptr, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X, lbn=%04X%04X\n", 
+        sim_debug (DBG_REQ, dptr, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X, lbn=%04X%04X\n",
                 cp->pak[pkt].d[CMD_OPC], rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f],
                 cp->pak[pkt].d[CMD_MOD], cp->pak[pkt].d[CMD_UN],
                 cp->pak[pkt].d[RW_BCH], cp->pak[pkt].d[RW_BCL],
@@ -1582,7 +1582,7 @@ for (i = 0; i < RQ_NUMDR; i++) {                        /* poll */
     nuptr->flags = nuptr->flags & ~UNIT_ATP;
     }
 if ((cp->hat > 0) && (--cp->hat == 0))                  /* host timeout? */
-    rq_fatal (cp, PE_HAT);                              /* fatal err */ 
+    rq_fatal (cp, PE_HAT);                              /* fatal err */
 return SCPE_OK;
 }
 
@@ -1860,7 +1860,7 @@ else {
 rq_putr (cp, pkt, cmd | OP_END, 0, sts, SCC_LNT, UQ_TYP_SEQ);
 return rq_putpkt (cp, pkt, TRUE);
 }
-    
+
 /* Set unit characteristics - defer if q'd commands */
 
 t_bool rq_suc (MSC *cp, uint16 pkt, t_bool q)
@@ -2180,7 +2180,7 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
     else {  /* OP_RD & OP_CMP */
         err = sim_disk_rdsect_a (uptr, bl, (uint8 *)uptr->rqxb, NULL, (tbc + RQ_NUMBY - 1) / RQ_NUMBY, rq_io_complete);
         }                                               /* end else read */
-    return SCPE_OK;                                     /* done for now until callback */    
+    return SCPE_OK;                                     /* done for now until callback */
     }
 else { /* Bottom End (After I/O processing) */
     uptr->io_complete = 0;
@@ -2195,7 +2195,7 @@ else { /* Bottom End (After I/O processing) */
             PUTP32 (pkt, RW_WBCL, bc - abc);            /* adj bc */
             PUTP32 (pkt, RW_WBAL, ba + abc);            /* adj ba */
             if (rq_hbe (cp, uptr))                      /* post err log */
-                rq_rw_end (cp, uptr, EF_LOG, ST_HST | SB_HST_NXM);  
+                rq_rw_end (cp, uptr, EF_LOG, ST_HST | SB_HST_NXM);
             return SCPE_OK;                             /* end else wr */
             }
         }
@@ -2207,7 +2207,7 @@ else { /* Bottom End (After I/O processing) */
                 PUTP32 (pkt, RW_WBCL, bc - (tbc - t));  /* adj bc */
                 PUTP32 (pkt, RW_WBAL, ba + (tbc - t));  /* adj ba */
                 if (rq_hbe (cp, uptr))                  /* post err log */
-                    rq_rw_end (cp, uptr, EF_LOG, ST_HST | SB_HST_NXM);      
+                    rq_rw_end (cp, uptr, EF_LOG, ST_HST | SB_HST_NXM);
                 return SCPE_OK;
                 }
             }
@@ -2505,7 +2505,7 @@ DEVICE *dptr = rq_devmap[cp->cnum];
 
 if (pkt == 0)                                           /* any packet? */
     return OK;
-sim_debug (DBG_REQ, dptr, "rsp=%04X, sts=%04X\n", 
+sim_debug (DBG_REQ, dptr, "rsp=%04X, sts=%04X\n",
                            cp->pak[pkt].d[RSP_OPF], cp->pak[pkt].d[RSP_STS]);
 if (!rq_getdesc (cp, &cp->rq, &desc))                   /* get rsp desc */
     return ERR;
@@ -2845,7 +2845,7 @@ if (r != SCPE_OK)
 uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_ATP);     /* clr onl, atn pend */
 uptr->uf = 0;                                           /* clr unit flgs */
 return SCPE_OK;
-} 
+}
 
 /* Device reset */
 
