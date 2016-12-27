@@ -344,7 +344,7 @@ static const int32 opc_val[] = {
  0720050+I_IOT, 0720051+I_IOT, 0720052+I_IOT, 0720053+I_NPN,
  0720054+I_NPN, 0720055+I_NPN, 0720056+I_NPN,
  0720074+I_NPN, 0724074+I_NPN, 0720033+I_NPN,
- 0720301+I_NPN, 0720401+I_NPN, 0720501+I_NPN, 0720601+I_NPN, 0720701+I_NPN, 
+ 0720301+I_NPN, 0720401+I_NPN, 0720501+I_NPN, 0720601+I_NPN, 0720701+I_NPN,
  0720061+I_NPN, 0722061+I_NPN, 0720062+I_NPN, 0722062+I_NPN, 0720063+I_NPN,
  0720161+I_NPN, 0721161+I_NPN, 0720162+I_NPN, 0721162+I_NPN,
  0720163+I_NPN, 0720164+I_NPN, 0721164+I_NPN,
@@ -658,7 +658,7 @@ switch (j) {                                            /* case on class */
                 if (r != SCPE_OK)
                     return SCPE_ARG;
                 if (sign == 0)
-                    val[0] = val[0] + d;  
+                    val[0] = val[0] + d;
                 else if (sign < 0)
                     val[0] = val[0] - d;
                 else val[0] = val[0] | d;

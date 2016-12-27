@@ -21,7 +21,7 @@ IOLIB_SRC = util_io.c
 #
 
 all : 	${BIN}asm1130 ${BIN}bindump ${BIN}checkdisk \
-	${BIN}diskview ${BIN}mkboot ${BIN}viewdeck 
+	${BIN}diskview ${BIN}mkboot ${BIN}viewdeck
 
 #
 # Individual builds
@@ -44,4 +44,3 @@ ${BIN}mkboot    : mkboot.c    ${IOLIB_DEP}
 
 ${BIN}viewdeck  : viewdeck.c  ${IOLIB_DEP}
 	${CC}     viewdeck.c  ${IOLIB_SRC} -o $@
-

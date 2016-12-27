@@ -356,7 +356,7 @@ t_stat dc_svc(UNIT *uptr)
              */
             iod->iod_svcstate = IO_BDC_DONE;
             sim_activate(uptr, DC_EOP_WAIT);
-            
+
             if ((dptr->dctrl & DBG_DSTATE) != 0)
               DCstate("dc_svc() - read complete", iod->iod_indev, iod);
 
@@ -408,10 +408,10 @@ t_stat dc_svc(UNIT *uptr)
              */
             iod->iod_svcstate = IO_BDC_DONE;
             sim_activate(uptr, DC_EOP_WAIT);
-            
+
             if ((dptr->dctrl & DBG_DSTATE) != 0)
               DCstate("dc_svc() - write complete", iod->iod_indev, iod);
-            
+
             return SCPE_OK;
           }
 
@@ -452,7 +452,7 @@ t_stat dc_svc(UNIT *uptr)
 
         if (ISENABLED(iod, IO_DIR_EOP) && (iod->iod_equip != 0)) {
           DEVICE *dptr = iod->iod_indev;
-          
+
           if ((dptr->dctrl & DBG_DINTR) != 0)
             fprintf(DBGOUT,
                     "%s%s - Generate EOP interrupt\r\n",

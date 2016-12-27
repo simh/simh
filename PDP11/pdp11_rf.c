@@ -386,7 +386,7 @@ do {
 rf_da = da & DMASK;                                     /* split da */
 rf_dae = (rf_dae & ~RFDAE_DAE) | ((rf_da >> 16) & RFDAE_DAE);
 rf_cma = ma & DMASK;                                    /* split ma */
-rf_cs = (rf_cs & ~RFCS_MEX) | ((ma >> (16 - RFCS_V_MEX)) & RFCS_MEX); 
+rf_cs = (rf_cs & ~RFCS_MEX) | ((ma >> (16 - RFCS_V_MEX)) & RFCS_MEX);
 if ((rf_wc != 0) && ((rf_cs & RFCS_ERR) == 0))          /* more to do? */
     sim_activate (&rf_unit, rf_time);                   /* sched next */
 else {
@@ -538,7 +538,7 @@ const char *const text =
 " last address on a track or surface has been used.\n";
 fprintf (st, "%s", text);
 fprint_set_help (st, dptr);
-text2 = 
+text2 =
 "\n"
 " The default is one platter.  The RF11 supports the BOOT command.  The\n"
 " RF11 is disabled at startup and is automatically disabled in a Qbus\n"
@@ -546,7 +546,7 @@ text2 =
 fprintf (st, "%s", text2);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);
-text3 = 
+text3 =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
 "\n"
 " The RF11 is a DMA device.  If BURST = 0, word transfers are scheduled\n"

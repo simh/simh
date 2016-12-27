@@ -147,7 +147,7 @@ t_stat EPROM_reset (DEVICE *dptr, uint32 base, uint32 size)
         EPROM_unit.capac = size;        /* set EPROM size */
         EPROM_unit.u3 = base;           /* set EPROM base addr */
         sim_debug (DEBUG_flow, &EPROM_dev, "Done1\n");
-        sim_printf("   EPROM: Available [%05X-%05XH]\n", 
+        sim_printf("   EPROM: Available [%05X-%05XH]\n",
             base, size);
         return SCPE_OK;
     } else

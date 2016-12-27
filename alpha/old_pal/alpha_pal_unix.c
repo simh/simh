@@ -662,7 +662,7 @@ t_uint64 vptea, l1ptea, l2ptea, l3ptea, l1pte, l2pte;
 uint32 vpte_vpn;
 TLBENT *vpte_p;
 
-vptea = unix_vptptr | (((t_uint64) (vpn & VA_M_VPN)) << 3); /* try virtual lookup */ 
+vptea = unix_vptptr | (((t_uint64) (vpn & VA_M_VPN)) << 3); /* try virtual lookup */
 vpte_vpn = VA_GETVPN (vptea);                           /* get vpte vpn */
 vpte_p = dtlb_lookup (vpte_vpn);                        /* get vpte tlb ptr */
 if (vpte_p && ((vpte_p->pte & (PTE_KRE|PTE_V)) == (PTE_KRE|PTE_V)))

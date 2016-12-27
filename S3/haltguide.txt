@@ -5,14 +5,14 @@
                            **********
 
 This following list is my own reformatting and rewording of the
-official IBM Halt Guide for the Model 8/10 SCP. 
+official IBM Halt Guide for the Model 8/10 SCP.
 
 The halts are those displayed on the message display unit.  The
 list is in alphabetical order for easy reference.
 
 When the system halts, the two 7-segment displays will display the
 halt as listed here, and the system console (or printer if the log
-device is the printer) will print the "SCP Message" below.  To 
+device is the printer) will print the "SCP Message" below.  To
 respond to the halt, deposit one of the valid response numbers
 (0 thru 3) into the SR, and then use the C command to continue.
 
@@ -90,7 +90,7 @@ Halt	SCP Message	Description
 1L	       0 23	Key changed during record update.  User error.
 			0=continue, do not update record.
 
-1P	       01	Forms in printer need positioning. 
+1P	       01	Forms in printer need positioning.
 
 1U		123	No record found on direct or indexed file.
 
@@ -106,7 +106,7 @@ Halt	SCP Message	Description
 
 23	          3	Disk Sort:  Unrecoverable error.
 
-25		  3 	Disk Sort:  Terminal errors in sort statements.		
+25		  3 	Disk Sort:  Terminal errors in sort statements.
 
 27	       0	Disk Sort: In debug mode, finished pass.
 
@@ -150,12 +150,12 @@ Halt	SCP Message	Description
 	UC32BD    3	FROM pack is a TO pack from an interrupted
 			COPYPACK run.
 	UC32BP	  3	Output pack is a $PCOPY output pack.
-			Must be initialized or reset by a RESET 
+			Must be initialized or reset by a RESET
 			statement to be used.
 	UC32DS    3	Packs FROM and TO are different sizes.
 
 33	UI33PU 0  3	Pack defective, cannot be initialized.
- 
+
 34	Ux34    1 3	Keyword in a utility control statement is invalid.
 
 35	UC35xx	1 3	Error in $COPY or $KCOPY control statement.
@@ -171,9 +171,9 @@ Halt	SCP Message	Description
 	UB38IP 01 3	PACKIN keyword pack not same as pack mounted.
 	UB38OP 01 3	PACKO keyword not same as pack mounted.
 
-3A	UC3Axx    3	Key out of sequence (DP), invalid high key (HK), 
+3A	UC3Axx    3	Key out of sequence (DP), invalid high key (HK),
 			out of space to copy file (XE), or disk I/O error.
-	
+
 3C	UC3CCS	  3	COPYFILE out of core.
 	UC3CNF	  3	Module not found, name is logged as R XXXXXX.
 
@@ -207,7 +207,7 @@ Halt	SCP Message	Description
 4J	DD4J	  3	All file specs have been checked and there were
 			errors.
 
-4L	DD4L	  3	Referenced file already allocated.	
+4L	DD4L	  3	Referenced file already allocated.
 
 4P	DD4P      3	Prgram/FILE statement mismatch.
 
@@ -282,7 +282,7 @@ Halt	SCP Message	Description
 	LM62SQ		Records are out of sequence.
 	LM62TP		Incorrect type record.
 
-63	LM63DE 0  3	Directory entry error.  Name can't be found or 
+63	LM63DE 0  3	Directory entry error.  Name can't be found or
 			attributes don't match, or attempt to remove
 			dir entry with MODIFY.
 
@@ -297,7 +297,7 @@ Halt	SCP Message	Description
 68	EL68DF 0  3	No room in library or directory.
 
 69	XX69HE    3	Disk I/O Error while using library.
-	 
+
 6A	LM6Axx  1 3	$MAINT has detected a syntax error on a control
 			statement.  xx gives a hint of what might be wrong.
 			AL: SOURCE or OBJECT missing or invalid
@@ -378,7 +378,7 @@ Halt	SCP Message	Description
 
 79	CR79     23	Continuation expected but not received.
 
-7A	CR7A      3	A second LOAD or CALL found before run, or a 
+7A	CR7A      3	A second LOAD or CALL found before run, or a
 			CALL in procedure overrides.
 
 7C	CR7C   0  3	// COMPILE found between jobs.
@@ -405,7 +405,7 @@ Halt	SCP Message	Description
 7-	CR7-   0	// PARTITION was read but system does not support
 			Dual Programming.
 
-7'			Error during tape processing. 
+7'			Error during tape processing.
 
 80	CR80   0	// DATE card has not been entered.
 
@@ -455,11 +455,11 @@ Halt	SCP Message	Description
 8-	CR8-   0  3	Logging requested but cannot be done.
 
 90	CR90   0	// PAUSE statement read.  Check printer or console
-			for instructions and continue.  PAUSE was outside 
+			for instructions and continue.  PAUSE was outside
 			LOAD and RUN.
 
 91	CR90   0	// PAUSE statement read.  Check printer or console
-			for instructions and continue.  PAUSE was inside 
+			for instructions and continue.  PAUSE was inside
 			LOAD and RUN.
 
 92	CR92     23	COMPILE already recieved for this job.
@@ -518,7 +518,7 @@ A2	CRA2xx	 23	Parameter error on FILE statement.
 			05 RETAIN, 06 DATE, 07 RECORDS, 08 TRACKS,
 			09 LOCATION, AS ASCII, BL BLKL, CV CONVERT,
 			DF DEFER, DN DENSITY, EN END, PT PARITY,
-			RC RECL, RF RECFM, RL REEL, SP SPLIT, 
+			RC RECL, RF RECFM, RL REEL, SP SPLIT,
 			TN TRANSLATE.
 
 A3	CRA3xx	 23	Missing Parameter on FILE statement, xx =
@@ -661,7 +661,7 @@ J0-J9	        123	Record with specified match field out of sequence.
 			otherwise indicates the file statement number.
 
 JA	CIJA      3	Trying to laod a program that requires or allows
-			inquiry while another inquiry program is running 
+			inquiry while another inquiry program is running
 			in the other level.
 
 JC	CIJCxx	  3	Program cannot be run for this reason (xx):
@@ -674,7 +674,7 @@ JC	CIJCxx	  3	Program cannot be run for this reason (xx):
 JE	CIJE   0  3	Level 1 partition too small.
 
 JF	CIJF	  3	Attempt to start inquiry program but keyboard
-			in use.	
+			in use.
 
 JH	CIJF	  3	Attempt to start program which allows interrupts in
 			level 2.
@@ -695,7 +695,7 @@ J-	          3	Attempt to run a CCP program, but CCP not running.
 J'	       01 3	Inquiry request is completed, interrupted program
 			can now resume.
 
-L0-L9	        123	RPG.  Unidentified record, 2nd digit gives file 
+L0-L9	        123	RPG.  Unidentified record, 2nd digit gives file
 			statement number in source program 1-9, 0 means
 			greater than 9.  Can also occur if record is out
 			of sequence.
@@ -719,17 +719,17 @@ LU	CILU    123	Pack name requested but wrong pack mounted.  1:
 			retry after mounting correct pack.
 
 LY	CILYxx	 23	Attempt to allocate space that isn't available.
-			xx=02 means space not available in split cylinder 
+			xx=02 means space not available in split cylinder
 			area.
 
-L	LML CP 01 3	$MAINT detected attempt to modify a program on 	
+L	LML CP 01 3	$MAINT detected attempt to modify a program on
 			a pack with an active checkpoint.
 
 L-	CIL-      3	Attempt to add a split cylinder to a split cyl
 			file while other level is fiddling with a split
 			cylinder file.
 
-L'	CIl'     23	Trying to allocate a split cylinder file before 
+L'	CIl'     23	Trying to allocate a split cylinder file before
 			allocating the first split cylinder file in a group.
 
 P1-P8			Printer hardware errors, should not occur in sim.
@@ -746,7 +746,7 @@ PU	CIPU      3	Duplicate file names in the FILE statements.
 PY	CIPY01	  3	ISAM file requires at least 2 tracks.
 	CIPY02    3	ISAM file can't be split cylinder.
 
-P'	CIP'xx   23	Too many scratch or work files.  
+P'	CIP'xx   23	Too many scratch or work files.
 
 U0-U9	       0123	RPG. Unidentified record in file, 2nd digit of
 			halt is file statement in RPG source, 0= greater
@@ -781,7 +781,7 @@ UY	CIUY      3	File is a System/3 BASIC file which must be unique.
 
 U	CIU	  3	Existing file: TRACKS/RECORDS or LOCATION mismatch.
 
-U-			General CCP halt.  Press start to see subhalt. 
+U-			General CCP halt.  Press start to see subhalt.
 			Refer to CCP manual for more info.
 
 U'	CIU'	  23	VTOC is full, or more than 2 multivolume files per
@@ -823,7 +823,7 @@ YH	CRYH   0  3	Cards are being punched, but card read from
 	RC 2 1    3	PROCEDURE or DATA division not found.
 	RC 2 3    3	Program has more than 65535 statements (!)
 	RC 2 4	  3	Source name on COMPILE statement not found
-	
+
  3	R  3XX 0  3	COBOL Stop literal.  XX is user-specified.
 			0 continues program 3 cancels.
 
@@ -853,7 +853,7 @@ YH	CRYH   0  3	Cards are being punched, but card read from
 
  L	DD L   0  3	Records with duplicate keys have been loaded
 			into ISAM file.  Each dup key is logged followed
-			by blank P halt.  0: continue.  Index will 
+			by blank P halt.  0: continue.  Index will
 			contain duplicate keys.  3: cancel, file is
 			not usable, reload it.
 
@@ -877,7 +877,7 @@ YH	CRYH   0  3	Cards are being punched, but card read from
 -3	DD-3XX  123	Multivolume load sequence error.
 
 -4	DD-4XX 0123	Warning that one or more volumes are about to be
-			bypassed.  
+			bypassed.
 
 -5	DD-5XX  123	Multivolume file not found.  1: mount correct pack.
 
@@ -886,7 +886,7 @@ YH	CRYH   0  3	Cards are being punched, but card read from
 -7	DD-7XX  1 3	-A halt and option 1 taken.  But the pack referenced
 			does not match pack name.
 
--8	DD-8XX    3	Multivolume file referenced but file isn't	
+-8	DD-8XX    3	Multivolume file referenced but file isn't
 			multivolume.
 
 -9	DD-9XX    3	Add to a multivolumen file, but last pack not
@@ -898,7 +898,7 @@ YH	CRYH   0  3	Cards are being punched, but card read from
 			volume mounts.
 
 -E	DD-EXX  123	Next volume cannot be processed, because the
-			location is not available or space is not available	
+			location is not available or space is not available
 			or there are scratch files on the pack.
 
 -F	DD-Fxx	123	Finished a volume, next cannot be processed, mount

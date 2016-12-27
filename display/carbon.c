@@ -170,7 +170,7 @@ int ws_init (   const char *crtname,    /* crt type name */
                 { kEventClassWindow, kEventWindowActivated},
         };
         static const EventTypeSpec      kdEvent[] = {
-                { kEventClassKeyboard, kEventRawKeyDown }, 
+                { kEventClassKeyboard, kEventRawKeyDown },
                 { kEventClassKeyboard, kEventRawKeyRepeat },
                 { kEventClassKeyboard, kEventRawKeyUp},
         };

@@ -250,7 +250,7 @@ lo = 0;                                                 /* initial bounds */
 hi = ITLB_SIZE - 1;
 do {
     p = (lo + hi) >> 1;                                 /* probe */
-    if ((itlb_asn == itlb[p].asn) && 
+    if ((itlb_asn == itlb[p].asn) &&
         (((vpn ^ itlb[p].tag) &
          ~((uint32) itlb[p].gh_mask)) == 0)) {          /* match to TLB? */
         i_mini_tlb.tag = vpn;
@@ -278,7 +278,7 @@ lo = 0;                                                 /* initial bounds */
 hi = DTLB_SIZE - 1;
 do {
     p = (lo + hi) >> 1;                                 /* probe */
-    if ((dtlb_asn == dtlb[p].asn) && 
+    if ((dtlb_asn == dtlb[p].asn) &&
         (((vpn ^ dtlb[p].tag) &
          ~((uint32) dtlb[p].gh_mask)) == 0)) {          /* match to TLB? */
         d_mini_tlb.tag = vpn;
@@ -400,7 +400,7 @@ for (i = 0; i < ITLB_SIZE; i++) {
 tlb_inval (&i_mini_tlb);
 ITLB_SORT;
 return;
-} 
+}
 
 void dtlb_set_asn (uint32 asn)
 {
@@ -563,4 +563,3 @@ do {
 
 return SCPE_OK;
 }
-

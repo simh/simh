@@ -151,7 +151,7 @@ static t_stat ptp_svc (UNIT *uptr)
 		CLRBIT(ptr_dsw, PTR1134_DSW_PUNCH_NOT_READY);
 	else
 		SETBIT(ptr_dsw, PTR1134_DSW_PUNCH_NOT_READY);
-	
+
 	SETBIT(ptr_dsw, PTR1134_DSW_PUNCH_RESPONSE);			/* indicate punch complete */
 
 	SETBIT(ILSW[4], ILSW_4_1134_TAPE);						/* initiate interrupt */

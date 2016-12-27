@@ -111,8 +111,8 @@ DEVICE tty_dev = {
 
 /* Keyboard to numeric */
 
-/* The following constant is a list of valid 1620 numeric characters 
-   that can be entered from the keyboard. They are the digits 0-9, 
+/* The following constant is a list of valid 1620 numeric characters
+   that can be entered from the keyboard. They are the digits 0-9,
    record mark(|), numeric blank(@) and group mark(}). All others
    are cosidered invalid. When entering data, these characters may
    all be preceeded by tilde(~) or accent(`) to indicate that the
@@ -123,9 +123,9 @@ DEVICE tty_dev = {
                   ! for flagged RM, * for flagged numeric blank,
                   " for flagged GM.
 
-   These different methods of entering numeric data represent 
+   These different methods of entering numeric data represent
    compromises since there is no practical way to exactly emulate
-   the 1620 typewriter capability of entering a flag but not 
+   the 1620 typewriter capability of entering a flag but not
    spacing the carriage. Entering a flag symbol in front of a
    character is easier and sometimes more readable; using the
    letters j-r is useful if column alignment is important on
@@ -137,11 +137,11 @@ DEVICE tty_dev = {
     tti_position_to_internal[] are the matching internal codes
                                                      (Tom McBride)*/
 
-const char *tti_to_num = "0123456789|@}]jklmnopqr!*\"JKLMNOPQR";  
-const char tti_position_to_internal[35] = { 
+const char *tti_to_num = "0123456789|@}]jklmnopqr!*\"JKLMNOPQR";
+const char tti_position_to_internal[35] = {
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, REC_MARK, NUM_BLANK, GRP_MARK,
     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
-    FLG_REC_MARK, FLG_NUM_BLANK, FLG_GRP_MARK, 
+    FLG_REC_MARK, FLG_NUM_BLANK, FLG_GRP_MARK,
     0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19
 };
 
@@ -168,7 +168,7 @@ const int8 tti_to_alp[128] = {
 
 /* Numeric (digit) to typewriter */
 
-/* Digits with values of 11, 13 and 14 should never occur and will be typed as :'s 
+/* Digits with values of 11, 13 and 14 should never occur and will be typed as :'s
    if they ever do. These are really errors.            (Tom McBride)  */
 
 /* If flagged digits are being printed with preceeding ` characters only the first
@@ -223,7 +223,7 @@ const char alp_to_tto[256] = {
  };
 
 /* Terminal IO
- 
+
    - On input, parity errors cannot occur.
    - On input, release-start does NOT cause a record mark to be stored.
    - On output, invalid characters type an invalid character and set WRCHK.
@@ -291,7 +291,7 @@ switch (op) {                                           /* case on op */
             M[pa - 1] = (M[pa - 1] & FLAG) | ((ttc >> 4) & DIGIT);
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
-        break;  
+        break;
 
     case OP_DN:
         return tto_num (pa, 20000 - (pa % 20000), TRUE);/* dump numeric */
@@ -314,7 +314,7 @@ switch (op) {                                           /* case on op */
             tto_write (ttc & 0x7F);                     /* write */
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
-        break;          
+        break;
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
@@ -404,7 +404,7 @@ for (i = 0; i < MEMSIZE; i++) {                         /* (stop runaway) */
         if (d & FLAG)                                   /* flag? */
             tto_write ('`');                            /* write flag indicator */
         r = tto_write (num_to_tto[d & DIGIT]);          /* write the digit */
-        }                                                      
+        }
     if (r != SCPE_OK)                                   /* write error? */
         return r;
     PP (pa);                                            /* incr mem addr */

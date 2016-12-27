@@ -1053,7 +1053,7 @@ if (op == OP_RD) {                                      /* read direct? */
     else if (QCPU_S89 && (fnc == 0x045)) {              /* S89 only */
         if (rn)
             R[rn] = (s9_marg & 0x00C00000) |            /* <8,9> = margins */
-                (QCPU_S9? 0x00100000: 0x00200000);      /* S8 sets 10, S9 11 */            
+                (QCPU_S9? 0x00100000: 0x00200000);      /* S8 sets 10, S9 11 */
         }
     else if (QCPU_S89 && (fnc == 0x049)) {              /* S89 only */
         if (rn)                                         /* read snapshot */

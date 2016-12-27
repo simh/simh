@@ -1,4 +1,4 @@
-/* nova_defs.h: NOVA/Eclipse simulator definitions 
+/* nova_defs.h: NOVA/Eclipse simulator definitions
 
    Copyright (c) 1993-2012, Robert M. Supnik
 

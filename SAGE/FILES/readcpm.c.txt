@@ -20,7 +20,7 @@ typedef struct direntry {
 
 #define DIROFFSET 0x2000
 #define DIRBLKS   16
-#define BLKSTART  (DIROFFSET+DIRBLKS*128) 
+#define BLKSTART  (DIROFFSET+DIRBLKS*128)
 #define CLSTSIZE  2048
 
 typedef struct fileentry {
@@ -50,7 +50,7 @@ FENTRY* lookup(char* name, FENTRY* files)
 {
 	FENTRY* nul=0, *p = files;
 	int i;
-		
+
 	for (i = 0; i<64; i++) {
 		if (p->f_name[0]==0) {
 			if (nul==0) nul = p;
@@ -76,22 +76,22 @@ int main(int argc,char* argv[])
 	char name[30];
 	FENTRY files[64], *fe;
 	DIR* dir;
-	
+
 	if (argc != 2) {
 		fprintf(stderr,"Usage: %s cpmdisk.bin\n",argv[0]);
 		exit(1);
 	}
-	
+
 	for (i=0; i<64; i++) {
 		files[i].f_name[0] = 0;
 		files[i].f_fext = 0;
 		files[i].f_last = 0;
 		memset(files[i].f_blks,0,sizeof(u_short)*200);
 	}
-	
+
 	in = fopen(argv[1],"rb");
-	if (!in) { 
-		perror("open file"); 
+	if (!in) {
+		perror("open file");
 		exit(1);
 	}
 	fseek(in,DIROFFSET,0);
@@ -112,7 +112,7 @@ int main(int argc,char* argv[])
 			}
 		}
 	}
-	
+
 	for (i=0; i<64; i++) {
 		if (!files[i].f_name[0]) continue;
 		printf("File %s: (last=%d)\n",files[i].f_name,files[i].f_last%16);

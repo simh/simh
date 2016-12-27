@@ -6,7 +6,7 @@
    0.27 2005Mar08 - Added sca device
    0.26 2002Apr24 - Added !BREAK in card deck file to stop simulator
    0.25	2002Apr18 - Fixed some card reader problems. It starts the reader
-   					properly if you attach a deck while it's waiting to a read.
+					properly if you attach a deck while it's waiting to a read.
    0.24 2002Mar27 - Fixed BOSC bug; BOSC works in short instructions too
    0.23 2002Feb26 - Added @decklist feature for ATTACH CR.
    0.22 2002Feb26 - Replaced "strupr" with "upcase" for compatibility.
@@ -74,7 +74,7 @@ DEVICE *sim_devices[] = {
 const char *sim_stop_messages[] = {
 	"Unknown error",
 	"Wait",
-	"Invalid command", 
+	"Invalid command",
 	"Simulator breakpoint",
 	"Use of incomplete simulator function",
 	"Power off",
@@ -265,7 +265,7 @@ static const char *lsopcode[] = {"SLA ", "SLCA ", "SLT ", "SLC "};
 static const char *rsopcode[] = {"SRA ", "?188 ", "SRT ", "RTE "};
 static const char tagc[]      = " 123";
 
-static int ascii_to_ebcdic_table[128] = 
+static int ascii_to_ebcdic_table[128] =
 {
 	0x00,0x01,0x02,0x03,0x37,0x2d,0x2e,0x2f, 0x16,0x05,0x25,0x0b,0x0c,0x0d,0x0e,0x0f,
 	0x10,0x11,0x12,0x13,0x3c,0x3d,0x32,0x26, 0x18,0x19,0x3f,0x27,0x1c,0x1d,0x1e,0x1f,
@@ -301,7 +301,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
     char tst[12];
 
 /*  if (sw & SWMASK ('A')) {					// ASCII? not useful
- 		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
+		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
 		return SCPE_OK;
 	}
 */

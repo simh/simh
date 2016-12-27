@@ -57,11 +57,11 @@
 
 /* set the base and size for the RAM on the iSBC 80/10 */
 #define RAM_BASE        0xF000
-#define RAM_SIZE        0x1000 
+#define RAM_SIZE        0x1000
 #define RAM_DISABLE     0
 
 /* set INTR for CPU on the iSBC 80/10 */
-#define INTR            INT_1             
+#define INTR            INT_1
 
 //board definitions for the multibus
 /* set the base I/O address for the iSBC 201 */
@@ -135,4 +135,3 @@
 #define STOP_IO 	5                           /* I/O error */
 #define STOP_MEM 	6                           /* Memory error */
 #define STOP_XACK 	7                           /* XACK error */
-

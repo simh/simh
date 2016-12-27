@@ -369,7 +369,7 @@ else {                                                  /* receive */
     else CC = mux_ldsc[ln].rcve? CC4: CC3;
     }
 return 0;
-}    
+}
 
 /* Unit service - channel overhead */
 

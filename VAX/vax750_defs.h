@@ -185,7 +185,7 @@ extern t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, CONST void *
 #define REG_V_NEXUS     13                              /* nexus number */
 #define REG_M_NEXUS     0xF
 #define REG_V_OFS       2                               /* register number */
-#define REG_M_OFS       0x7FF   
+#define REG_M_OFS       0x7FF
 #define REGSIZE         (1u << REGAWIDTH)               /* REG length */
 #define REGBASE         0xF00000                        /* REG addr base */
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
@@ -256,7 +256,7 @@ extern t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, CONST void *
 
 #define DEV_RDX         16                              /* default device radix */
 
-/* Device information block 
+/* Device information block
 
    For Massbus devices,
         ba      =       Massbus number

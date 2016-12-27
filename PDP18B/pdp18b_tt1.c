@@ -94,7 +94,7 @@ t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
    ttix_mod     TTIx modifiers list
 */
 
-DIB ttix_dib = { 
+DIB ttix_dib = {
     DEV_TTO1, 8, NULL,
     { &ttox, &ttix, &ttox, &ttix, &ttox, &ttix, &ttox, &ttix }
     };
@@ -192,7 +192,7 @@ MTAB ttox_mod[] = {
 DEVICE tto1_dev = {
     "TTOX", ttox_unit, ttox_reg, ttox_mod,
     TTX_MAXL, 10, 31, 1, 8, 8,
-    NULL, NULL, &ttx_reset, 
+    NULL, NULL, &ttx_reset,
     NULL, NULL, NULL,
     NULL, DEV_DISABLE
     };
@@ -357,7 +357,7 @@ int32 rdno = ((dev - ttix_dib.dev) >> 1) & 3;
 #if defined (PDP15)                                     /* PDP-15? */
 int32 sub = (pulse >> 4) & 3;
 return (rdno * 4) + sub;                                /* use dev, subdev */
-#else                                                   /* others */                    
+#else                                                   /* others */
 return rdno;                                            /* use dev only */
 #endif
 }
@@ -460,5 +460,3 @@ else {
 ttx_lines = newln;
 return SCPE_OK;
 }
-
-

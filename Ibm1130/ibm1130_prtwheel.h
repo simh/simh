@@ -122,5 +122,3 @@ static struct tag_codewheel codewheel1403[] =
 };
 
 #define WHEELCHARS_1403 (sizeof(codewheel1403)/sizeof(codewheel1403[0]))
-
-

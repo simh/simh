@@ -30,29 +30,29 @@
    todr         TODR clock
    tmr          interval timer
 
-   28-Sep-11    MP      Generalized setting TODR for all OSes.  
-                        Unbound the TODR value from the 100hz clock tick 
-                        interrupt.  TODR now behaves like the original 
-                        battery backed-up clock and runs with the wall 
-                        clock, not the simulated instruction clock.  
+   28-Sep-11    MP      Generalized setting TODR for all OSes.
+                        Unbound the TODR value from the 100hz clock tick
+                        interrupt.  TODR now behaves like the original
+                        battery backed-up clock and runs with the wall
+                        clock, not the simulated instruction clock.
                         Two operational modes are available:
-                        - Default VMS mode, which is similar to the previous 
-                          behavior in that without initializing the TODR it 
+                        - Default VMS mode, which is similar to the previous
+                          behavior in that without initializing the TODR it
                           would default to the value VMS would set it to if
                           VMS knew the correct time.  This would be correct
                           almost all the time unless a VMS disk hadn't been
-                          booted from for more than a year.  This mode 
-                          produces strange time results for non VMS OSes on 
+                          booted from for more than a year.  This mode
+                          produces strange time results for non VMS OSes on
                           each system boot.
                         - OS Agnostic mode.  This mode behaves precisely like
-                          the VAX780 TODR and works correctly for all OSes.  
-                          This mode is enabled by attaching the TODR to a 
-                          battery backup state file for the TOY clock 
-                          (i.e. sim> attach TODR TOY_CLOCK).  When operating 
+                          the VAX780 TODR and works correctly for all OSes.
+                          This mode is enabled by attaching the TODR to a
+                          battery backup state file for the TOY clock
+                          (i.e. sim> attach TODR TOY_CLOCK).  When operating
                           in OS Agnostic mode, the TODR will initially start
                           counting from 0 and be adjusted differently when an
                           OS specifically writes to the TODR.  VMS will prompt
-                          to set the time on each boot unless the SYSGEN 
+                          to set the time on each boot unless the SYSGEN
                           parameter TIMEPROMPTWAIT is set to 0.
    29-Mar-2011  MB      First Version
 */
@@ -251,7 +251,7 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, &tti_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &tti_help, NULL, NULL,
     &tti_description
     };
 
@@ -287,7 +287,7 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, &tto_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &tto_help, NULL, NULL,
     &tto_description
     };
 
@@ -312,7 +312,7 @@ DEVICE clk_dev = {
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    NULL, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL,
     &clk_description
     };
 
@@ -348,8 +348,8 @@ DEVICE tmr_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &tmr_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DEBUG, 0, 
-    tmr_deb, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_DEBUG, 0,
+    tmr_deb, NULL, NULL, NULL, NULL, NULL,
     &tmr_description
     };
 
@@ -398,7 +398,7 @@ DEVICE td_dev = {
     2, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &td_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DEBUG, 0, td_deb, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_DEBUG, 0, td_deb, NULL, NULL, NULL, NULL, NULL,
     &td_description
     };
 
@@ -639,7 +639,7 @@ return "console terminal output";
 
    The architected VAX timer, which increments at 1Mhz, cannot be
    accurately simulated due to the overhead that would be required
-   for 1M clock events per second.  Instead 1Mhz intervals are 
+   for 1M clock events per second.  Instead 1Mhz intervals are
    derived from the calibrated instruction execution rate.
 
    If the interval register is read, then its value between events
@@ -908,7 +908,7 @@ void todr_wr (int32 data)
 TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec now, val, base;
 
-/* Save the GMT time when set value was 0 to record the base for future 
+/* Save the GMT time when set value was 0 to record the base for future
    read operations in "battery backed-up" state */
 
 sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
@@ -964,7 +964,7 @@ if (sel == TXDB_MISC) {                                 /* misc function? */
     case MISC_SWDN:
         ABORT (STOP_SWDN);
         break;
-    
+
     case MISC_BOOT:
         ABORT (STOP_BOOT);
         break;

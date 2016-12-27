@@ -220,7 +220,7 @@ static const REG kg_reg[] = {
 static const MTAB kg_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", NULL,
         NULL, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "UNITS=1..8", 
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "UNITS=1..8",
         &set_units, NULL, NULL, "Specify number of KG devices" },
     { 0 }
 };

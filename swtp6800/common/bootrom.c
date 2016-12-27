@@ -29,18 +29,18 @@
 
     NOTES:
 
-        These functions support a single simulated 2704 to 2764 EPROM device on 
+        These functions support a single simulated 2704 to 2764 EPROM device on
         an 8-bit computer system..  This device allows the buffer to be loaded from
         a binary file containing the emulated EPROM code.
 
-        These functions support a simulated 2704, 2708, 2716, 2732 or 2764 EPROM 
-        device on a CPU board.  The byte get and put routines use an offset into 
-        the boot EPROM image to locate the proper byte.  This allows another device 
+        These functions support a simulated 2704, 2708, 2716, 2732 or 2764 EPROM
+        device on a CPU board.  The byte get and put routines use an offset into
+        the boot EPROM image to locate the proper byte.  This allows another device
         to set the base address for the boot EPROM.  The device type is stored as
         a binary number in the first three unit flag bits.
 
-        This device uses a dynamically allocated buffer to hold the EPROM image.  
-        A call to BOOTROM_config will free the current buffer.  A call to 
+        This device uses a dynamically allocated buffer to hold the EPROM image.
+        A call to BOOTROM_config will free the current buffer.  A call to
         BOOTROM_reset will allocate a new buffer of BOOTROM_unit.capac bytes.  A
         call to BOOTROM_attach will load the buffer with the EPROM image.
 
@@ -193,7 +193,7 @@ t_stat BOOTROM_reset (DEVICE *dptr)
         sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_reset: Done1\n");
         return SCPE_OK;
         }                               /* if attached */
-//    printf("   EPROM: Initializing [%04X-%04XH]\n", 
+//    printf("   EPROM: Initializing [%04X-%04XH]\n",
 //        0xE000, 0xE000 + BOOTROM_unit.capac - 1);
     if (BOOTROM_unit.filebuf == NULL) { /* no buffer allocated */
         BOOTROM_unit.filebuf = calloc(1, BOOTROM_unit.capac); /* allocate EPROM buffer */

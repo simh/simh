@@ -180,7 +180,7 @@ DEVICE uba_dev = {
     &uba_ex, &uba_dep, &uba_reset,
     NULL, NULL, NULL,
     &uba_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    uba_deb, NULL, NULL, NULL, NULL, NULL, 
+    uba_deb, NULL, NULL, NULL, NULL, NULL,
     &uba_description
     };
 

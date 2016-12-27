@@ -298,7 +298,7 @@ void TTIstate(const char *where, DEVICE *dev, IO_DEVICE *iod)
   fprintf(DBGOUT,
           "%s[TTI %s: Func: %04X, Sta: %04X, Ena: %04X, Dly: %c%s]\r\n",
           INTprefix, where,
-          TTIdev.FUNCTION, TTIdev.STATUS, TTIdev.IENABLE, 
+          TTIdev.FUNCTION, TTIdev.STATUS, TTIdev.IENABLE,
           TTIdev.iod_indelay + '0', temp);
 }
 
@@ -655,7 +655,7 @@ t_bool TTreject(IO_DEVICE *iod, t_bool output, uint8 reg)
       /*
        * Select read/write mode must be set - reject if both are set.
        */
-      if ((func & (IO_1711_SREAD | IO_1711_SWRITE)) == 
+      if ((func & (IO_1711_SREAD | IO_1711_SWRITE)) ==
           (IO_1711_SREAD | IO_1711_SWRITE))
         return TRUE;
 
@@ -1216,7 +1216,7 @@ DEVICE ptp_dev = {
   DEV_DEBUG | DEV_NOEQUIP | DEV_OUTDEV | DEV_PROTECT, 0, ptp_deb,
   NULL, NULL, &ptp_help, NULL, NULL, NULL
 };
- 
+
 /*
  * Dump the current internal state of the PTP device.
  */

@@ -34,7 +34,7 @@ static TMXR t2741_tmxr = { 1, 0, 0, &t2741_ldsc };		/* line mux for telnet attac
 #define CODE_CIRCLEC		0x1F00
 #define CODE_CIRCLED		0x1600
 #define CODE_RETURN			0x5B00
-#define CODE_LINEFEED		0x3B00	
+#define CODE_LINEFEED		0x3B00
 #define CODE_ATTENTION		0x0001			/* pseudocode, never really returned as a received character */
 #define CODE_UNKNOWN		0x0000
 

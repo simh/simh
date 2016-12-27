@@ -79,7 +79,7 @@ static const char *opcode[] = {
   "LAM", "LAQ", "LAB", "CAM",
   "CAQ", "CAB", "INA", "ENA",
   "NOP", "ENQ", "INQ", "EXI",
-  "QRS", "ARS", "LRS", "QLS", 
+  "QRS", "ARS", "LRS", "QLS",
   "ALS", "LLS",
   NULL
 };

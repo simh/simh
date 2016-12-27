@@ -119,8 +119,8 @@ DEVICE tto_dev = {
     NULL, NULL, NULL,
     &tto_dib, 0
     };
-    
-    
+
+
 
 /* Terminal input: IOT routine */
 
@@ -159,7 +159,7 @@ tti_unit.buf = temp & 0177;
 /* --- BEGIN MODIFIED CODE --- */
 if (tti_unit.flags & UNIT_DASHER)                       /* translate input */
     translate_in();
-/* ---  END  MODIFIED CODE --- */                   
+/* ---  END  MODIFIED CODE --- */
 dev_busy = dev_busy & ~INT_TTI;                         /* clear busy */
 dev_done = dev_done | INT_TTI;                          /* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
@@ -178,13 +178,13 @@ int spec200 = 0;                                        /* signals next char is 
 void translate_in()
 {
     char rev = 0;
-    
+
     if (tti_unit.buf == '\r')
-        rev = '\n'; 
+        rev = '\n';
     if (tti_unit.buf == '\n')
-        rev = '\r'; 
+        rev = '\r';
     if (rev)
-        tti_unit.buf = rev; 
+        tti_unit.buf = rev;
 }
 
 /* --------------------  END  INSERTION -----------------------*/
@@ -240,11 +240,11 @@ c = tto_unit.buf & 0177;
 /* --- BEGIN MODIFIED CODE --- */
 if (tto_unit.flags & UNIT_DASHER) {
     if ((temp = translate_out(c)) != SCPE_OK) return temp;
-} else {    
+} else {
     if ((temp = sim_putchar (c)) != SCPE_OK) return temp;
     tto_unit.pos = tto_unit.pos + 1;
-}   
-/* ---  END  MODIFIED CODE --- */   
+}
+/* ---  END  MODIFIED CODE --- */
 return SCPE_OK;
 }
 
@@ -256,7 +256,7 @@ int32 translate_out(int32 c)
 {
     int32 temp;
     char outstr[32];
-    
+
     if (spec200 == 1) {                                 /* Special terminal control seq */
         spec200 = 0;
         switch (c) {
@@ -267,28 +267,28 @@ int32 translate_out(int32 c)
             case 'D':                                   /* Reverse video on */
                 return SCPE_OK;
             default:
-                return SCPE_OK;         
+                return SCPE_OK;
         }
     }
     if (curpos == 1) {                                  /* 2nd char of cursor position */
         col = c & 0x7f;
         curpos++;
         return (SCPE_OK);
-    }   
+    }
     if (curpos == 2) {                                  /* 3rd char of cursor position */
         row = c & 0x7f;
         curpos = 0;
         sprintf(outstr, "\033[%d;%dH", row+1, col+1);
         if ((temp = putseq(outstr)) != SCPE_OK) return temp;
         return (SCPE_OK);
-    }   
+    }
     switch (c) {                                        /* Single-char command or data */
         case 003:                                       /* Blink enable */
             break;
         case 004:                                       /* Blink disable */
             break;
         case 005:                                       /* Read cursor address */
-            break;  
+            break;
         case 010:                                       /* Cursor home */
             sprintf(outstr, "\033[1;1H");
             if ((temp = putseq(outstr)) != SCPE_OK) return temp;
@@ -351,7 +351,7 @@ int32 translate_out(int32 c)
                 col = 1;
                 row++;
                 if (row > 24) row = 1;
-            }   
+            }
             return (SCPE_OK);
         case 031:                                       /* Cursor left */
             sprintf(outstr, "\033[D");
@@ -362,7 +362,7 @@ int32 translate_out(int32 c)
                 col = 80;
                 row--;
                 if (row < 1) row = 24;
-            }   
+            }
             return (SCPE_OK);
         case 032:                                       /* Cursor down */
             sprintf(outstr, "\033[B");
@@ -380,7 +380,7 @@ int32 translate_out(int32 c)
             return (SCPE_OK);
         case 036:                                       /* Special sequence */
             spec200 = 1;
-            return SCPE_OK;             
+            return SCPE_OK;
         default:                                        /* ..A character of data */
             if ((temp = sim_putchar(c)) != SCPE_OK) return temp;
             tto_unit.pos += 1;
@@ -389,7 +389,7 @@ int32 translate_out(int32 c)
                 col = 1;
                 row++;
                 if (row > 24) row = 24;
-            }   
+            }
             return (SCPE_OK);
     }
     return SCPE_OK;
@@ -398,14 +398,14 @@ int32 translate_out(int32 c)
 int32 putseq(char *seq)
 {
     int i, len, temp;
-    
+
     len = strlen(seq);
     for (i = 0; i < len; i++) {
-        if ((temp = sim_putchar(seq[i])) != SCPE_OK) 
+        if ((temp = sim_putchar(seq[i])) != SCPE_OK)
              return temp;
         tto_unit.pos += 1;
     }
-    return SCPE_OK; 
+    return SCPE_OK;
 }
 
 /* --------------------  END  INSERTION -----------------------*/

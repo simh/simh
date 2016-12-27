@@ -26,9 +26,9 @@
    rp           RH/RP/RM moving head disks
 
    23-Oct-13    RMS     Revised for new boot setup routine
-   06-Mar-11    MP      Converted to using sim_disk library and refactored 
+   06-Mar-11    MP      Converted to using sim_disk library and refactored
                         for Asynch I/O.
-                        Set STIME value to default of 26 which allows VMS V4.x 
+                        Set STIME value to default of 26 which allows VMS V4.x
                         to boot.
    17-May-07    RMS     CS1 DVA resides in device, not MBA
    21-Nov-05    RMS     Enable/disable device also enables/disables Massbus adapter
@@ -445,7 +445,7 @@ BITFIELD *rp_reg_bits[] = {
     rp_er3_bits,
     rp_ec1_bits,
     rp_ec2_bits,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     rp_cs1_bits,
     rp_ds_bits,
     rp_er1_bits,
@@ -640,13 +640,13 @@ REG rp_reg[] = {
     };
 
 MTAB rp_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "MASSBUS", NULL, 
+    { MTAB_XTD|MTAB_VDV, 0, "MASSBUS", NULL,
         NULL, &mba_show_num, NULL, "Display Massbus number" },
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
+    { UNIT_WLK,        0, "write enabled", "WRITEENABLED",
         NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
+    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED",
         NULL, NULL, NULL, "Write lock disk drive"  },
-    { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
+    { UNIT_DUMMY,      0, NULL,            "BADBLOCK",
         &rp_set_bad, NULL, NULL, "write bad block table on last track" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
@@ -675,20 +675,20 @@ MTAB rp_mod[] = {
     { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP07_DTYPE << UNIT_V_DTYPE),
       "RP07", NULL, NULL },
     { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL, NULL },
-    { UNIT_AUTO,            UNIT_AUTO, NULL,       "AUTOSIZE", 
+    { UNIT_AUTO,            UNIT_AUTO, NULL,       "AUTOSIZE",
         NULL, NULL, NULL, "set type based on file size at ATTACH" },
     { (UNIT_AUTO+UNIT_DTYPE), (RM03_DTYPE << UNIT_V_DTYPE), NULL, "RM03",
-        &rp_set_size, NULL, NULL, "Set type to RM03" }, 
-    { (UNIT_AUTO+UNIT_DTYPE), (RP04_DTYPE << UNIT_V_DTYPE), NULL, "RP04", 
-        &rp_set_size, NULL, NULL, "Set type to RP04" }, 
+        &rp_set_size, NULL, NULL, "Set type to RM03" },
+    { (UNIT_AUTO+UNIT_DTYPE), (RP04_DTYPE << UNIT_V_DTYPE), NULL, "RP04",
+        &rp_set_size, NULL, NULL, "Set type to RP04" },
     { (UNIT_AUTO+UNIT_DTYPE), (RM80_DTYPE << UNIT_V_DTYPE), NULL, "RM80",
-        &rp_set_size, NULL, NULL, "Set type to RM80" }, 
+        &rp_set_size, NULL, NULL, "Set type to RM80" },
     { (UNIT_AUTO+UNIT_DTYPE), (RP06_DTYPE << UNIT_V_DTYPE), NULL, "RP06",
-        &rp_set_size, NULL, NULL, "Set type to RP06" }, 
+        &rp_set_size, NULL, NULL, "Set type to RP06" },
     { (UNIT_AUTO+UNIT_DTYPE), (RM05_DTYPE << UNIT_V_DTYPE), NULL, "RM05",
-        &rp_set_size, NULL, NULL, "Set type to RM05" }, 
+        &rp_set_size, NULL, NULL, "Set type to RM05" },
     { (UNIT_AUTO+UNIT_DTYPE), (RP07_DTYPE << UNIT_V_DTYPE), NULL, "RP07",
-        &rp_set_size, NULL, NULL, "Set type to RP07" }, 
+        &rp_set_size, NULL, NULL, "Set type to RP07" },
     { 0 }
     };
 
@@ -714,11 +714,11 @@ DEVICE rp_dev = {
     NULL, NULL, &rp_reset,
     &rp_boot, &rp_attach, &rp_detach,
     &rp_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_MBUS | DEV_DEBUG | DEV_DISK,
-    0, rp_debug, NULL, NULL, &rp_help, NULL, NULL, 
+    0, rp_debug, NULL, NULL, &rp_help, NULL, NULL,
     &rp_description
     };
 
-const char *rp_regnam[] = 
+const char *rp_regnam[] =
     {
     "RP_CS1",    /* 0 */
     "RP_DS",     /* 1 */
@@ -924,7 +924,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
         sim_debug_bits(DBG_REG, &rp_dev, rp_reg_bits[ofs], old_reg, rpcs1[drv], 1);
         if (data & CS1_GO)                              /* start op */
             return rp_go (drv);
-        break;  
+        break;
 
     case RP_DA_OF: case RM_DA_OF:                       /* RPDA */
         old_reg = rpds[drv];
@@ -1155,7 +1155,7 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
         case FNC_RETURN:                                /* return to centerline */
             rpds[drv] = rpds[drv] & ~DS_OFM;            /* clear offset, set attn */
             rp_update_ds (DS_ATA, drv);
-            break;  
+            break;
 
         case FNC_RECAL:                                 /* recalibrate */
         case FNC_SEARCH:                                /* search */
@@ -1376,8 +1376,8 @@ t_stat r;
 DEVICE *dptr = find_dev_from_unit (uptr);
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
-r = sim_disk_attach (uptr, cptr, RP_NUMWD * sizeof (uint16), 
-                     sizeof (uint16), TRUE, 0, 
+r = sim_disk_attach (uptr, cptr, RP_NUMWD * sizeof (uint16),
+                     sizeof (uint16), TRUE, 0,
                      drv_tab[GET_DTYPE (uptr->flags)].name, drv_tab[GET_DTYPE (uptr->flags)].sect, 0);
 if (r != SCPE_OK)                                       /* error? */
     return r;

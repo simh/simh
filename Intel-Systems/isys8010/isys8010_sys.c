@@ -77,4 +77,3 @@ const char *sim_stop_messages[] = {
     "Invalid Memory",
     "XACK Error"
 };
-

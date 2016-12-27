@@ -290,7 +290,7 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
     case 01:                                            /* dci buf */
         dci_clr_int (ln);
         *data = dci_buf[ln];
-        /* Rechedule the next poll preceisely so that 
+        /* Rechedule the next poll preceisely so that
            the programmed input speed is observed. */
         sim_clock_coschedule_abs (&dci_unit, tmxr_poll);
         return SCPE_OK;
@@ -680,6 +680,6 @@ return SCPE_OK;
 
 const char *dcx_description (DEVICE *dptr)
 {
-return (dptr == &dci_dev) ? "DC11 asynchronous line interface - receiver" 
+return (dptr == &dci_dev) ? "DC11 asynchronous line interface - receiver"
                           : "DC11 asynchronous line interface - transmitter";
 }

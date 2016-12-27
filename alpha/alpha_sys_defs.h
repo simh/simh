@@ -40,4 +40,3 @@
 #define ROMSIZE                 0x0000000004000000
 
 #endif
-

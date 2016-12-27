@@ -966,7 +966,7 @@ display_scale(void)
  * asdf kl;'
  * just where PDP-1 spacewar expects them!
  * key mappings same as MIT Media Lab Java PDP-1 simulator
- * 
+ *
  */
 unsigned long spacewar_switches = 0;
 

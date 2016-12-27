@@ -70,7 +70,7 @@
         - PROBER, PROBEW, REI
         - MTPR, MFPR
         - LDPCTX, SVPCTX
-        - (interrupt and exception routine) 
+        - (interrupt and exception routine)
 */
 
 #include "vax_defs.h"
@@ -279,7 +279,7 @@ return size;
 
         opnd[0]         =       argument (arg.rx)
         opnd[1]         =       procedure address (adr.ab)
-        flg             =       CALLG (0), CALLS (1)    
+        flg             =       CALLG (0), CALLS (1)
         acc             =       access mask
 
         These instructions implement a generalized procedure call and return facility.
@@ -289,7 +289,7 @@ return size;
 
         +---------------------------------------------------------------+
         |                 condition handler (initially 0)               |
-        +---+-+-+-----------------------+--------------------+----------+       
+        +---+-+-+-----------------------+--------------------+----------+
         |SPA|S|0|   entry mask<11:0>    |   saved PSW<15:5>  | 0 0 0 0 0|
         +---+-+-+-----------------------+--------------------+----------+
         |                           saved AP                            |
@@ -300,9 +300,9 @@ return size;
         +---------------------------------------------------------------+
         |                           saved R0 (...)                      |
         +---------------------------------------------------------------+
-                .                                               .       
-                .       (according to entry mask<11:0>)         .       
-                .                                               .       
+                .                                               .
+                .       (according to entry mask<11:0>)         .
+                .                                               .
         +---------------------------------------------------------------+
         |                           saved R11 (...)                     |
         +---------------+-----------------------------------------------+
@@ -1127,7 +1127,7 @@ if (ei > 0) {                                           /* if int, new IPL */
         newipl = ipl << PSL_V_IPL;                      /* otherwise, int IPL */
     PSL = newpsl | newipl;
     }
-else 
+else
     PSL = newpsl |                                      /* exc, old IPL/1F */
         ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
 sim_debug (LOG_CPU_I, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
@@ -1197,7 +1197,7 @@ Rule    SRM formulation                     Comment
  6      tmp<25:24> LEQ tmp<23:22>           tmp<cur_mode> LEQ tmp<prv_mode>
  7      tmp<20:16> LEQ PSL<20:16>           tmp<ipl> LEQ PSL<ipl>
  8      tmp<31,29:28,21,15:8> = 0           tmp<mbz> = 0
- 9      tmp<31> = 1 => tmp<cur_mode> = 3, tmp<prv_mode> = 3>, tmp<fpd,is,ipl,dv,fu,iv> = 0 
+ 9      tmp<31> = 1 => tmp<cur_mode> = 3, tmp<prv_mode> = 3>, tmp<fpd,is,ipl,dv,fu,iv> = 0
 */
 
 int32 op_rei (int32 acc)

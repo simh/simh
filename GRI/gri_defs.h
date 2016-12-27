@@ -1,4 +1,4 @@
-/* gri_defs.h: GRI-909 simulator definitions 
+/* gri_defs.h: GRI-909 simulator definitions
 
    Copyright (c) 2001-2015, Robert M. Supnik
 

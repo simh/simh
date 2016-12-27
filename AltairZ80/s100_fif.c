@@ -473,6 +473,3 @@ uint8 FTP(int32 BC, int32 DE)
 #endif /* ERNIES_FTP */
 
 /* end of the source */
-
-
-

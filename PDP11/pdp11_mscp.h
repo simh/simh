@@ -100,7 +100,7 @@
 #define CF_RPL          0x8000                          /* ctrl bad blk repl */
 #define CF_ATN          0x0080                          /* enb attention */
 #define CF_MSC          0x0040                          /* enb misc msgs */
-#define CF_OTH          0x0020                          /* enb othr host msgs */                
+#define CF_OTH          0x0020                          /* enb othr host msgs */
 #define CF_THS          0x0010                          /* enb this host msgs */
 #define CF_MSK          (CF_ATN|CF_MSC|CF_OTH|CF_THS)
 

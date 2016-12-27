@@ -153,7 +153,7 @@ REG dp_reg[] = {
 
 MTAB dp_mod[] = {
     { UNIT_WAE, 0, "write address disabled", "ADDROFF", NULL },
-    { UNIT_WAE, UNIT_WAE, "write address enabled", "ADDRON", NULL }, 
+    { UNIT_WAE, UNIT_WAE, "write address enabled", "ADDRON", NULL },
     { 0 }
     };
 
@@ -249,7 +249,7 @@ if (mod == BCD_W) {                                     /* write? */
         fnc = dp_lastf;                                 /* use last func */
         }
     else {
-        dp_lastf = fnc;                                 /* save func */         
+        dp_lastf = fnc;                                 /* save func */
         fnc = fnc + FNC_WOFF;                           /* change to write */
         }
     }
@@ -300,7 +300,7 @@ switch (fnc) {                                          /* case on function */
                 break;
             psec = dp_trkop (drv, sec) + ((psec + 1) % DP_NUMSC);
             }
-        break;                                          /* done, clean up */        
+        break;                                          /* done, clean up */
 
     case FNC_WRSCO:                                     /* write sec cnt ov */
         BS = dcf + DCF_CNT;                             /* set count back */
@@ -440,7 +440,7 @@ uint8 *ap = ((uint8 *) uptr->filebuf) + da;             /* buf ptr */
 
 for (i = 0; i < DP_ADDR; i++) {                         /* copy address */
     if (M[BS] == (WM | BCD_GRPMRK)) {                   /* premature GWM? */
-        dp_fill (uptr, da, DP_NUMCH - i);               /* fill, set err */ 
+        dp_fill (uptr, da, DP_NUMCH - i);               /* fill, set err */
         ind[IN_LNG] = ind[IN_DSK] = 1;                  /* error */
         return STOP_INVDLN;
         }
@@ -601,7 +601,7 @@ for ( ; len > 0; len--) {                               /* loop thru char */
     val = val / 10;
     }
 return;
-}       
+}
 
 /* Get and validate count */
 

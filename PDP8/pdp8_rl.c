@@ -409,7 +409,7 @@ uint32 ma;
 
 func = GET_FUNC (rlcsb);                                /* get function */
 if (func == RLCSB_GSTA) {                               /* get status? */
-    rlsi = uptr->STAT | 
+    rlsi = uptr->STAT |
         ((uptr->TRK & RLCSA_HD)? RLDS_HD: 0) |
         ((uptr->flags & UNIT_ATT)? RLDS_ATT: RLDS_UNATT);
     if (uptr->flags & UNIT_RL02)
@@ -450,7 +450,7 @@ if (((func != RLCSB_RNOHDR) && (GET_CYL (uptr->TRK) != GET_CYL (rlcsa)))
     rl_set_done (RLER_HDE | RLER_INCMP);                /* flag error */
     return SCPE_OK;
     }
-    
+
 ma = (GET_MEX (rlcsb) << 12) | rlma;                    /* get mem addr */
 da = GET_DA (rlcsa) * RL_NUMBY;                         /* get disk addr */
 wc = 010000 - rlwc;                                     /* get true wc */
@@ -485,7 +485,7 @@ if ((func >= RLCSB_READ) && (err == 0) &&               /* read (no hdr)? */
             j = j + 3;
             }
         else M[ma] = rlxb[j] |                          /* even wd 12b */
-            ((((uint16) rlxb[j + 1]) & 017) << 8);      
+            ((((uint16) rlxb[j + 1]) & 017) << 8);
         ma = (ma & 070000) + ((ma + 1) & 07777);
         }                                               /* end for */
     }                                                   /* end if wr */
@@ -670,7 +670,7 @@ static const uint16 boot_rom[] = {
     07325,                      /* 15, CLA STL IAC RAL  ; seek = 3 */
     04027,                      /* 16, JMS GO           ; do io */
     07332,                      /* 17, CLA STL RTR      ; dir in = 2000 */
-    06605,                      /* 20, RLSA             ; sector */             
+    06605,                      /* 20, RLSA             ; sector */
     01026,                      /* 21, TAD (-200)       ; one sector */
     06607,                      /* 22, RLWC             ; word cnt */
     07327,                      /* 23, CLA STL IAC RTL  ; read = 6*/

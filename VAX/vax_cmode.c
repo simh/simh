@@ -174,7 +174,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 010: case 011:                             /* BNE */
             if ((cc & CC_Z) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 012: case 013:                             /* BNE */
@@ -186,7 +186,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 014: case 015:                             /* BEQ */
             if (cc & CC_Z) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 016: case 017:                             /* BEQ */
@@ -198,7 +198,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 020: case 021:                             /* BGE */
             if (CC_XOR_NV (cc) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 022: case 023:                             /* BGE */
@@ -222,7 +222,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 030: case 031:                             /* BGT */
             if (((cc & CC_Z) || CC_XOR_NV (cc)) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 032: case 033:                             /* BGT */
@@ -234,7 +234,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 034: case 035:                             /* BLE */
             if ((cc & CC_Z) || CC_XOR_NV (cc)) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 036: case 037:                             /* BLE */
@@ -705,7 +705,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 000: case 001:                             /* BPL */
             if ((cc & CC_N) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 002: case 003:                             /* BPL */
@@ -717,7 +717,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 004: case 005:                             /* BMI */
             if (cc & CC_N) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 006: case 007:                             /* BMI */
@@ -729,7 +729,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 010: case 011:                             /* BHI */
             if ((cc & (CC_C | CC_Z)) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 012: case 013:                             /* BHI */
@@ -741,7 +741,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 014: case 015:                             /* BLOS */
             if (cc & (CC_C | CC_Z)) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 016: case 017:                             /* BLOS */
@@ -753,7 +753,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 020: case 021:                             /* BVC */
             if ((cc & CC_V) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 022: case 023:                             /* BVC */
@@ -765,7 +765,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 024: case 025:                             /* BVS */
             if (cc & CC_V) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 026: case 027:                             /* BVS */
@@ -777,19 +777,19 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         case 030: case 031:                             /* BCC */
             if ((cc & CC_C) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 032: case 033:                             /* BCC */
             if ((cc & CC_C) == 0) {
-                BRANCH_B (IR); 
+                BRANCH_B (IR);
                 }
             break;
 
         case 034: case 035:                             /* BCS */
             if (cc & CC_C) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 036: case 037:                             /* BCS */
@@ -843,7 +843,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
                 src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (src - 1) & BMASK;
-            if (dstreg) 
+            if (dstreg)
                 WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZP_B (dst);

@@ -337,7 +337,7 @@ MTAB cpu_mod[] = {
     { MTAB_XTD | MTAB_VDV, I_9X|I_94, NULL, "7094",
       &cpu_set_model, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, I_9X, NULL, "7090",
-      &cpu_set_model, NULL, NULL }, 
+      &cpu_set_model, NULL, NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
     { 0 }
@@ -683,7 +683,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
         oldPC = PC;                                     /* save current PC */
         }
 
-    else {      
+    else {
         if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) {  /* breakpoint? */
             reason = STOP_IBKPT;                        /* stop simulation */
             break;
@@ -733,7 +733,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
                 TrapXfr (TRAP_TRA_PC);                  /* trap */
                 }
             else PC = addr;                             /* branch */
-            break;      
+            break;
 
         case 02:                                        /* TIX */
             if (mode_ttrap)
@@ -745,7 +745,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
                     TrapXfr (TRAP_TRA_PC);
                 else PC = addr;                         /* branch */
                 }
-            break;      
+            break;
 
         case 03:                                        /* TXH */
             if (mode_ttrap)
@@ -775,7 +775,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
                     TrapXfr (TRAP_TRA_PC);
                 else PC = addr;                         /* branch */
                 }
-            break;      
+            break;
 
         case 07:                                        /* TXL */
             if (mode_ttrap)
@@ -1622,7 +1622,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 01400:                                     /* SBM */
             op_add (SR | SIGN);
             break;
-        
+
         case 01500:                                     /* CAL */
             AC = SR;
             break;
@@ -1774,7 +1774,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
 /* IO instructions */
 
         case 00022: case 00024: case 00026:             /* TRCx */
-        case 01022: case 01024: case 01026:     
+        case 01022: case 01024: case 01026:
             if (prot_trap (0))                          /* user mode? */
                 break;
             ch = ((op & 077) - 00022) | ((op >> 9) & 01);
@@ -1839,7 +1839,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
                     TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
-            break;      
+            break;
 
         case 01060: case 01061: case 01062: case 01063: /* TCNx */
         case 01064: case 01065: case 01066: case 01067:

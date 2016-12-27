@@ -333,7 +333,7 @@ MTAB dt_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &dt_sbs },
     { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
+    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
     { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
@@ -525,7 +525,7 @@ if (prev_mot < DTS_ATSF) {                              /* not at speed? */
     }
 
 dt_newfnc (uptr, DTS_STA (DTS_ATSF | new_dir, new_fnc));/* state = fnc */
-return; 
+return;
 }
 
 /* Schedule new DECtape function
@@ -928,7 +928,7 @@ if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_CSMWD - 1)) /* fwd csum */
 if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_BLKWD - 1)) /* rev blkno */
     return dt_comobv (blk);
 return 0;                                               /* all others */
-}  
+}
 
 /* Reset routine */
 
@@ -951,7 +951,7 @@ for (i = 0; i < DT_NUMDR; i++) {                        /* stop all drives */
         }
     else {
         sim_cancel (uptr);                              /* sim reset */
-        uptr->STATE = 0;  
+        uptr->STATE = 0;
         uptr->LASTT = sim_grtime ();
         }
     }

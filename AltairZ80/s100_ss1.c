@@ -667,4 +667,3 @@ static t_stat ss1_svc (UNIT *uptr)
 static int32 toBCD(const int32 x) {
     return (x / 10) * 16 + (x % 10);
 }
-

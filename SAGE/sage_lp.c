@@ -52,7 +52,7 @@ extern DEVICE sagelp_dev;
  *  B4 Printer BUSY flag
  *  B5 Printer PAPER flag
  *  B6 Printer SELECT flag (on/offline)
- *  B7 Printer FAULT flag 
+ *  B7 Printer FAULT flag
  * port C lower half output control for misc devices
  *  C0 Parity error reset
  *  C1 IEEE enable
@@ -65,7 +65,7 @@ extern DEVICE sagelp_dev;
  *  C7 modem Ringing/Carrier INT clear (MI)
  */
 
-static I8255 u39 = { 
+static I8255 u39 = {
         { 0,0,U39_ADDR,8,2},
         &sagelp_dev,
         i8255_write,i8255_read,u39_reset,u39_calla,u39_callb,u39_callc,u39_ckmode
@@ -110,13 +110,13 @@ DEVICE sagelp_dev = {
     sagelp_dt, NULL, NULL
 };
 
-t_stat sagelp_reset(DEVICE* dptr) 
+t_stat sagelp_reset(DEVICE* dptr)
 {
     t_stat rc;
     if ((rc = (dptr->flags & DEV_DIS) ? /* Disconnect I/O Ports */
         del_iohandler(dptr->ctxt) :
         add_iohandler(&sagelp_unit,dptr->ctxt,i8255_io)) != SCPE_OK) return rc;
-        
+
     return u39.reset(&u39);
 }
 
@@ -143,7 +143,7 @@ static t_stat u39_callb(I8255* chip, int rw)
             portb |= U39B_WP;
             TRACE_PRINT1(DBG_PP_RDB,"RD PortB: WP+=%d",(portb&U39B_WP)?1:0);
         }
-            
+
         /* propagate FDC interrupt */
         if (u21.irqflag) {
             portb |= U39B_FDI;
@@ -175,7 +175,7 @@ static t_stat u39_callc(I8255* chip,int rw)
 static t_stat u39_ckmode(I8255* chip,uint32 data)
 {
     TRACE_PRINT1(DBG_PP_MODE,"WR Mode: 0x%x",data);
-    
+
     /* BIOS initializes port A as input, later LP is initialized to output */
     if (!(data==0x82 || data==0x92)) {
         /* hardwired:
@@ -208,7 +208,7 @@ static t_stat sagelp_attach (UNIT *uptr, CONST char *cptr)
     rc = attach_unit(uptr, cptr);
     if ((sagelp_unit.flags & UNIT_ATT) == 0)
         u39.portb |= U39B_PAPER;    /* no paper */
-        
+
     return rc;
 }
 
@@ -224,7 +224,7 @@ static t_stat sagelp_output(UNIT *uptr)
         u39.portb |= U39B_PAPER;    /* unattached means: no paper */
         return SCPE_UNATT;
     } else if (uptr->flags & UNIT_OFFLINE) {
-        u39.portb &= ~U39B_SEL;     /* offline means: SEL = 0 */ 
+        u39.portb &= ~U39B_SEL;     /* offline means: SEL = 0 */
         return STOP_OFFLINE;
     }
     u39.portb &= ~U39B_PAPER;       /* has paper */

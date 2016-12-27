@@ -126,7 +126,7 @@ switch (op) {                                           /* case on opcode */
     case OP_DS:                                         /* decimal subtract */
     case OP_DA:                                         /* decimal add */
         ReadDecA (src1);                                /* read dec accum */
-        if ((tr = TestDstrValid (&src1)) != 0)          /* valid? */ 
+        if ((tr = TestDstrValid (&src1)) != 0)          /* valid? */
             return tr;
         if ((tr = ReadDstr (lnt, bva, &src2)) != 0)     /* read mem string */
             return tr;
@@ -154,7 +154,7 @@ switch (op) {                                           /* case on opcode */
 
     case OP_DC:                                         /* decimal compare */
         ReadDecA ( src1);                               /* read dec accum */
-        if ((tr = TestDstrValid (&src1)) != 0)          /* valid? */ 
+        if ((tr = TestDstrValid (&src1)) != 0)          /* valid? */
             return tr;
         if ((tr = ReadDstr (lnt, bva, &src2)) != 0)     /* read mem string */
             return tr;
@@ -189,7 +189,7 @@ switch (op) {                                           /* case on opcode */
    in the low-order digit of R15) and the partial product (to the right of
    the sign). Because the partial product may be negative, leading 0x99's
    may have been stripped and need to be restored.
-   
+
    The real Sigma's probably didn't run a validty test after separation of
    the partial product and multiplier, but it doesn't hurt, and prevents
    certain corner cases from causing errors. */
@@ -205,7 +205,7 @@ switch (op) {                                           /* case on opcode */
         if (!QCPU_5X0 &&                                /* S5-9? */
             (cis_test_int (&src1, &kint)))              /* interrupted? */
             cis_dm_int (&src1, &dst, kint);             /* restore */
-        else if ((tr = TestDstrValid (&src1)) != 0)     /* mpyr valid? */ 
+        else if ((tr = TestDstrValid (&src1)) != 0)     /* mpyr valid? */
              return tr;
         if (LntDstr (&src1) && LntDstr (&src2)) {       /* both opnds != 0? */
             dst.sign = src1.sign ^ src2.sign;           /* sign of result */
@@ -252,7 +252,7 @@ switch (op) {                                           /* case on opcode */
 /* Decimal divide overflow calculation - if the dividend has true length d,
    and the divisor true length r, then the quotient will have (d - r) or
    (d - r + 1) digits. Therefore, if (d - r) > 15, the quotient will not
-   fit. However, if (d - r) == 15, it may or may not fit, depending on 
+   fit. However, if (d - r) == 15, it may or may not fit, depending on
    whether the first subtract succeeds. Therefore, it's necessary to test
    after the divide to see if the quotient has one extra digit. */
 
@@ -270,7 +270,7 @@ switch (op) {                                           /* case on opcode */
             t = t - 1;
             }
         else {                                          /* normal start? */
-            if ((tr = TestDstrValid (&src1)) != 0)      /* divd valid? */ 
+            if ((tr = TestDstrValid (&src1)) != 0)      /* divd valid? */
                 return tr;
             ldivr = LntDstr (&src2);                    /* divr lnt */
             ldivd = LntDstr (&src1);                    /* divd lnt */
@@ -324,7 +324,7 @@ switch (op) {                                           /* case on opcode */
             sc = -31;
         if (sc < 0) {                                   /* right shift? */
             sc = -sc;                                   /* |shift| */
-            GenRshift (&dst, sc);                       /* do shift */    
+            GenRshift (&dst, sc);                       /* do shift */
             dst.val[0] = dst.val[0] & ~0xF;             /* clear sign */
             }                                           /* end right shift */
         else if (sc) {                                  /* left shift? */
@@ -449,7 +449,7 @@ if (ppneg) {                                            /* negative? */
         if (((dst->val[wd] >> sc) & 0xFF) != 0)
             break;
         dst->val[wd] |= (0x99 << sc);                   /* repl 00 with 99 */
-        }                                               /* end for */  
+        }                                               /* end for */
     }
 dst->val[0] &= ~0xF;                                    /* clear pp sign */
 return;
@@ -557,7 +557,7 @@ if (PSW1 & PSW1_DM)                                     /* if enabled, trap */
     return TR_DEC;
 return WSIGN;                                           /* otherwise, abort */
 }
-       
+
 /* Store decimal string
 
    Arguments:
@@ -823,7 +823,7 @@ if (sc) {
 if (sc1)
     c |= NibbleLshift (dsrc, sc1, 0);
 return (c? TRUE: FALSE);
-}               
+}
 
 /* Nibble shift right
 

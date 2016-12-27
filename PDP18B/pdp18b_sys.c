@@ -288,7 +288,7 @@ for (;;) {                                              /* word loop */
     if ((val = getword (fileref, &bits)) < 0)
         return SCPE_FMT;
     if (bits & 1) {                                     /* end of tape? */
-        if ((val & 0760000) == OP_JMP) PC = 
+        if ((val & 0760000) == OP_JMP) PC =
             ((origin - 1) & 060000) | (val & 017777);
         else if (val != OP_HLT)
             return SCPE_FMT;
@@ -323,7 +323,7 @@ if (*cptr != 0)                                         /* no arguments */
 do {
     val = getword (fileref, & bits);                    /* find end RIM */
     } while ((val >= 0) && ((bits & 1) == 0));
-if (val < 0)                                            /* no RIM? rewind */ 
+if (val < 0)                                            /* no RIM? rewind */
     rewind (fileref);
 for (;;) {                                              /* block loop */
     if ((val = getword (fileref, NULL)) < 0)
@@ -664,7 +664,7 @@ static const char *opcode[] = {
 #endif
 
  "LLK", "CLQ", "LSN", "OACQ", "ECLA",                   /* encode only masks */
- "CMQ", "OMQ", "OSC", 
+ "CMQ", "OMQ", "OSC",
  "CLA", "CLL", "CML", "CMA",
  "OAS", "HLT",
  NULL
@@ -689,7 +689,7 @@ static const int32 opc_val[] = {
  0640100+I_ESH, 0660100+I_ESH, 0640300+I_ESH, 0660300+I_ESH,
  0640400+I_ESH, 0660400+I_ESH, 0640500+I_ESH, 0660500+I_ESH,
  0640600+I_ESH, 0660600+I_ESH, 0640700+I_ESH, 0660700+I_ESH,
- 0640000+I_EST, 0640000+I_IOT, 
+ 0640000+I_EST, 0640000+I_IOT,
 
  0700001+I_NPI, 0700002+I_NPI, 0700042+I_NPI, 0700004+I_NPI, 0700044+I_NPI,
  0700101+I_NPI, 0700112+I_NPN, 0700102+I_NPI, 0700104+I_NPI, 0700144+I_NPI,
@@ -703,7 +703,7 @@ static const int32 opc_val[] = {
 #if defined (TYPE647)
  0706501+I_NPI, 0706502+I_NPI, 0706522+I_NPI, 0706542+I_NPI, 0706562+I_NPI,
  0706526+I_NPI, 0706546+I_NPI, 0706566+I_NPI,
- 0706601+I_NPI, 0706602+I_NPI, 0706622+I_NPI, 0706642+I_NPI, 0706662+I_NPI, 
+ 0706601+I_NPI, 0706602+I_NPI, 0706622+I_NPI, 0706642+I_NPI, 0706662+I_NPI,
  0706606+I_NPI, 0706626+I_NPI, 0706646+I_NPI,
 #endif
 #if defined (LP09)
@@ -734,17 +734,17 @@ static const int32 opc_val[] = {
 #endif
 #if defined (RP)
  0706301+I_NPI, 0706321+I_NPI, 0706341+I_NPI, 0706361+I_NPI,
- 0706312+I_NPN, 0706302+I_NPI, 0706332+I_NPN, 0706322+I_NPI, 
+ 0706312+I_NPN, 0706302+I_NPI, 0706332+I_NPN, 0706322+I_NPI,
  0706352+I_NPN, 0706342+I_NPI,
  0706304+I_NPI, 0706324+I_NPI, 0706344+I_NPI, 0706364+I_NPI,
  0706411+I_NPN, 0706401+I_NPI, 0706421+I_NPI,
- 0706412+I_NPN, 0706402+I_NPI, 0706432+I_NPN, 0706422+I_NPI, 
- 0706452+I_NPN, 0706442+I_NPI, 0706472+I_NPN, 0706462+I_NPI, 
+ 0706412+I_NPN, 0706402+I_NPI, 0706432+I_NPN, 0706422+I_NPI,
+ 0706452+I_NPN, 0706442+I_NPI, 0706472+I_NPN, 0706462+I_NPI,
  0706404+I_NPI, 0706424+I_NPI, 0706454+I_NPN, 0706444+I_NPI, 0706464+I_NPI,
-#endif 
+#endif
 #if defined (MTA)
  0707301+I_NPI, 0707321+I_NPI, 0707341+I_NPI, 0707312+I_NPN, 0707322+I_NPI,
- 0707352+I_NPN, 0707304+I_NPI, 0707324+I_NPI, 0707326+I_NPI, 
+ 0707352+I_NPN, 0707304+I_NPI, 0707324+I_NPI, 0707326+I_NPI,
 #endif
 #if defined (TYPE550)                                   /* Type 550 */
  0707501+I_NPI, 0707541+I_NPI, 0707512+I_NPN, 0707504+I_NPI,
@@ -1041,7 +1041,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
         case I_V_MRF:                                   /* mem ref */
 #if defined (PDP15)
             if (memm) {
-                disp = inst & B_DAMASK;  
+                disp = inst & B_DAMASK;
                 ma = (addr & (AMASK & ~B_DAMASK)) | disp;
                 }
             else {
@@ -1189,7 +1189,7 @@ if (sw & SWMASK ('U')) {                                /* Unix v0 ASCII? */
     val[0] = (((t_value) cptr[0] & 0177) << 9) |
              ((t_value) cptr[1] & 0177);
     return SCPE_OK;
-    } 
+    }
 #elif defined (PDP15)
 if (sw & SWMASK ('P')) {                                /* packed string? */
     if (cptr[0] == 0)                                   /* must have 1 char */
@@ -1281,7 +1281,7 @@ switch (j) {                                            /* case on class */
 
     case I_V_EMD:                                       /* or'able */
         val[0] = val[0] | ((opc_val[i] >> I_V_DC) & 077); /* default shift */
-    case I_V_EST: case I_V_ESH: 
+    case I_V_EST: case I_V_ESH:
     case I_V_NPN: case I_V_NPI:
     case I_V_IOT: case I_V_OPR:
         for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
@@ -1299,7 +1299,7 @@ switch (j) {                                            /* case on class */
                 if (r != SCPE_OK)
                     return SCPE_ARG;
                 if (sign > 0)
-                    val[0] = val[0] + d;  
+                    val[0] = val[0] + d;
                 else if (sign < 0)
                     val[0] = val[0] - d;
                 else val[0] = val[0] | d;

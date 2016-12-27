@@ -349,7 +349,7 @@ if (Q_ITS) {                                            /* ITS paging */
     acc = ITS_GETACC (pte);                             /* get access */
     pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
         ((mode & PTF_WR)? PF_ITS_WRITE: 0) | (acc << PF_ITS_V_ACC);
-    if ((acc != ITS_ACC_NO) && (!(mode & PTF_WR) || (acc == ITS_ACC_RW))) { 
+    if ((acc != ITS_ACC_NO) && (!(mode & PTF_WR) || (acc == ITS_ACC_RW))) {
         pte = pte & ~PTE_ITS_AGE;                       /* clear age */
         if (vpn & 1)
             WriteP (ptead, (ptewd & LMASK) | pte);
@@ -666,7 +666,7 @@ else {
     eptbl[vpn] = 0;                                     /* both page tables */
     }
 return FALSE;
-} 
+}
 
 t_bool wrebr (a10 ea, int32 prv)
 {

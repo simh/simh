@@ -1,4 +1,4 @@
-/* s3_defs.h: IBM System/3 simulator definitions 
+/* s3_defs.h: IBM System/3 simulator definitions
 
    Copyright (c) 2001-2005, Charles E. Owen
 
@@ -88,7 +88,7 @@ struct opdef {
                                                            8 - 2-address implict Q */
     int32   group;                                      /* Group Code:
                                                            0 - Command Format (0xFx)
-                                                           1 - 1-address A (0x<C,D,E>x) 
+                                                           1 - 1-address A (0x<C,D,E>x)
                                                            2 - 2-address (0x<0,1,2,4,5,6,8,9,A>x)
                                                            3 - 1-address B (0x<3,7,B>x) */
 };

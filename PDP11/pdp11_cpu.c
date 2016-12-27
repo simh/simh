@@ -744,7 +744,7 @@ abortval = setjmp (save_env);                           /* set abort hdlr */
 if (abortval == ABRT_BKPT) {
     /* Breakpoint encountered.  */
     reason = STOP_IBKPT;
-    /* Print a message reporting the type and address if it is not a 
+    /* Print a message reporting the type and address if it is not a
        plain virtual PC (instruction execution) breakpoint.  */
     if (sim_brk_match_type != BPT_PCVIR)
         sim_messagef (reason, "\r\n%s", sim_brk_message());
@@ -792,7 +792,7 @@ else {
 
    Check for traps or interrupts.  If trap, locate the vector and check
    for stop condition.  If interrupt, locate the vector.
-*/ 
+*/
 
 while (reason == 0)  {
 
@@ -869,7 +869,7 @@ while (reason == 0)  {
 
    If the reads in step 3, or the writes in step 5, match a data breakpoint,
    the breakpoint status will be set but the interrupt actions will continue.
-   The breakpoint stop will occur at the beginning of the next instruction 
+   The breakpoint stop will occur at the beginning of the next instruction
    cycle.
 */
 
@@ -1131,7 +1131,7 @@ while (reason == 0)  {
         case 010: case 011:                             /* BNE */
             if (Z == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 012: case 013:                             /* BNE */
@@ -1143,7 +1143,7 @@ while (reason == 0)  {
         case 014: case 015:                             /* BEQ */
             if (Z) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 016: case 017:                             /* BEQ */
@@ -1155,7 +1155,7 @@ while (reason == 0)  {
         case 020: case 021:                             /* BGE */
             if ((N ^ V) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 022: case 023:                             /* BGE */
@@ -1179,7 +1179,7 @@ while (reason == 0)  {
         case 030: case 031:                             /* BGT */
             if ((Z | (N ^ V)) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 032: case 033:                             /* BGT */
@@ -1189,7 +1189,7 @@ while (reason == 0)  {
         case 034: case 035:                             /* BLE */
             if (Z | (N ^ V)) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 036: case 037:                             /* BLE */
@@ -1876,7 +1876,7 @@ while (reason == 0)  {
         case 000: case 001:                             /* BPL */
             if (N == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 002: case 003:                             /* BPL */
@@ -1888,7 +1888,7 @@ while (reason == 0)  {
         case 004: case 005:                             /* BMI */
             if (N) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 006: case 007:                             /* BMI */
@@ -1900,7 +1900,7 @@ while (reason == 0)  {
         case 010: case 011:                             /* BHI */
             if ((C | Z) == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 012: case 013:                             /* BHI */
@@ -1912,7 +1912,7 @@ while (reason == 0)  {
         case 014: case 015:                             /* BLOS */
             if (C | Z) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 016: case 017:                             /* BLOS */
@@ -1924,7 +1924,7 @@ while (reason == 0)  {
         case 020: case 021:                             /* BVC */
             if (V == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 022: case 023:                             /* BVC */
@@ -1936,7 +1936,7 @@ while (reason == 0)  {
         case 024: case 025:                             /* BVS */
             if (V) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 026: case 027:                             /* BVS */
@@ -1948,7 +1948,7 @@ while (reason == 0)  {
         case 030: case 031:                             /* BCC */
             if (C == 0) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 032: case 033:                             /* BCC */
@@ -1960,7 +1960,7 @@ while (reason == 0)  {
         case 034: case 035:                             /* BCS */
             if (C) {
                 BRANCH_F (IR);
-                } 
+                }
             break;
 
         case 036: case 037:                             /* BCS */
@@ -2799,7 +2799,7 @@ if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
         M[pa >> 1] = (M[pa >> 1] & 0377) | (data << 8);
     else M[pa >> 1] = (M[pa >> 1] & ~0377) | data;
     return;
-    }             
+    }
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);

@@ -14,9 +14,9 @@
  *
  *	    are rearranged so that the input fields are placed in the appropriate columns
  *
- *		The label must start on the first character of the line. If there is no label, 
+ *		The label must start on the first character of the line. If there is no label,
  *		the first character(s) before the opcode must be whitespace. Following the opcode, there
- *		MUST be a tab character, followed by the format and tag. Following the format and tag 
+ *		MUST be a tab character, followed by the format and tag. Following the format and tag
  *		may be exactly one whitespace character, and then starts the argument.
  *
  *	    Input lines with * in column 1 and blank lines are turned into Assembler comments,
@@ -101,13 +101,13 @@ char* ExpandTabs(char*	p_szInbuf,						/* expand tabs .. input buffer */
 short	iI,													/* input position */
 		iO,													/* output position */
 		iT;													/* next tab stop */
-		
+
 char	cX;													/* character to test */
 
 	iI = 0;													/* init input position */
 	iO = 0;													/* init output position */
 	iT = 0;													/* init tab stop */
-	
+
 	while ((cX = *(p_szInbuf + iI))	!= 0)					/* while there are characters */
 	{
 		if (cX == '\t')										/* q. tab character? */
@@ -115,22 +115,22 @@ char	cX;													/* character to test */
 			while ((p_aiTabs[iT] <= iO + 1)					/* search for next valid stop .. */
 					&& (p_aiTabs[iT] != 0))					/* .. or end of table */
 				iT++;										/* .. go to next tab */
-				
+
 			if (p_aiTabs[iT] != 0)							/* q. end of tab array? */
 			{												/* a. no ..  */
 				while (iO < (p_aiTabs[iT] - 1))				/* fill to tab with blanks */
 						*(p_szOutbuf + iO++) = ' ';			/* .. put in a blank */
-						
+
 			}
 			else											/* Otherwise ... */
 				*(p_szOutbuf + iO++) = ' ';					/* .. Translate to blank */
-		}													
+		}
 		else												/* Otherwise .. not tab */
 			*(p_szOutbuf + iO++) = cX;						/* .. save the input char */
-			
+
 		iI++;												/* next input character */
 	}
-	
+
 	*(p_szOutbuf + iO) = 0;									/* end the string.. */
 	return p_szOutbuf;										/* .. return output area addr */
 }
@@ -185,10 +185,10 @@ size_t	iI;													/* work integer */
 	}
 
 	strncpy(pszLine, p_pszEdit, MAXLINE-1);					/* copy the line local */
-	
+
 	ExpandTabs(pszLine, pszWork, gaiAsmTabs);				/* expand the tabs */
 	strncpy(pszLine, pszWork, MAXLINE-1);					/* copy the line back */
-	
+
 	for (iI = strlen(pszLine); iI--;)						/* trim trailing whitespace */
 	{
 		if (*(pszLine + iI) <= ' ')							/* q. space or less? */
@@ -204,7 +204,7 @@ size_t	iI;													/* work integer */
 	}
 
 
-	/* TODO: Add code to process a strip switch 
+	/* TODO: Add code to process a strip switch
 	 * comment?
 	 */
 
@@ -212,7 +212,7 @@ size_t	iI;													/* work integer */
 	{														/* a. yes.. reorder tag/format */
 		memcpy(acTFWrk, pszLine + FMTOFFSET, 2);			/* get tag/format */
 		memset((pszLine + FMTOFFSET), ' ', 2);				/* .. blank 'em out */
-		
+
 		for (iI = 0; iI < 2; iI ++)
 			if (isalpha(acTFWrk[iI]))						/* q. alpha char? */
 				*(pszLine + FMTOFFSET) = acTFWrk[iI];		/* a. yes .. make it format */
@@ -221,7 +221,7 @@ size_t	iI;													/* work integer */
 	}
 
 	sprintf(gszOutput, AFORMAT, pszLine);					/* format the line */
-		
+
 	return gszOutput;										/* return formatted line */
 }
 
@@ -259,7 +259,7 @@ int		bContinue;											/* true if continue */
 	}
 
 	/*
-	 * TODO: Add code to process a strip switch 
+	 * TODO: Add code to process a strip switch
 	 * comment?
 	 */
 
@@ -271,7 +271,7 @@ int		bContinue;											/* true if continue */
 															/* continuation... */
 	bContinue = ((isdigit(*pszWork) && (*pszWork != '0'))	/* if first char non-zero digit */
 			|| (!isspace(*pszWork) && !isalpha(*pszWork))); /* .. or non-alpha non-blank */
-	
+
 	memset(gszArg, 0, MAXLINE);								/* .. and arguments */
 
 	strncpy(gszArg, pszWork, 75);							/* copy rest to argument */
@@ -279,7 +279,7 @@ int		bContinue;											/* true if continue */
 	sprintf(gszOutput, (bContinue) ? FCONTFMT : FFORMAT,	/* format the line */
 						gszLabel,							/* .. statement # */
 						gszArg);							/* .. code */
-		
+
 	return gszOutput;										/* return formatted line */
 }
 
@@ -311,10 +311,10 @@ char	pszWork[WORKSZ];									/* work buffer */
 		}
 		gaiPlainTabs[iI] = 0;								/* mark end of array */
 	}
-	
+
 	ExpandTabs(pszLine, pszWork, gaiPlainTabs);				/* expand the tabs */
 	strncpy(gszOutput, pszWork, MAXLINE-1);					/* copy the line back  */
-	
+
 	for (iI = strlen(gszOutput); iI--;)						/* look at each character */
 	{
 		if (*(gszOutput + iI) <= ' ')						/* q. space or less? */

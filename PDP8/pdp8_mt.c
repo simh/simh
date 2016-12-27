@@ -201,7 +201,7 @@ REG mt_reg[] = {
 
 MTAB mt_mod[] = {
     { MTUF_WLK, 0, "write enabled", "WRITEENABLED", &mt_vlock },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &mt_vlock }, 
+    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &mt_vlock },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",

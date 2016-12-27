@@ -3,14 +3,14 @@
 	CPU	5410 (Model 10) CPU with 64KB of memory.
 	PKB	5471 Printer/Keyboard console.
 	CDR	1442 Card Reader
-	CDP	1442 Card Punch	
-	CDP2	1442 2nd stacker	
+	CDP	1442 Card Punch
+	CDP2	1442 2nd stacker
 	LPT	1403 Line Printer
 	R1	5444 Top Drive (removeable)
 	F1	5444 Top Drive (fixed)
 	R2	5444 Bottom Drive (removeable)
 	F2	5444 Bottom Drive (fixed
- 
+
     The only CPU options are to set Model 15 mode (not implemented), DPF
 (Dual Programming Facility, not implemented), and the memory size 8K, 16K,
 32K, 48K, or 64K.
@@ -43,7 +43,7 @@
 	DEBUG		16	Debugging bits:
 				0x01: Write all instructions executed to
 					file trace.log.
-				0x02: Write details of all Disk I/O 
+				0x02: Write details of all Disk I/O
 					requests to trace.log.
 				0x80: Breakpoint on first character
 					written to 5471 printer.
@@ -61,7 +61,7 @@
 	RTNKEY:	ASCII value of key mapped to 5471 RETURN key
 	ENDKEY:	ASCII value of key mapped to 5471 END key
 	CANKEY:	ASCII value of key mapped to 5471 CANCEL key
-	
+
 
 2	1442 Card Reader.  This reader reads 80-column cards; the input
 	is usually an ASCII file which is translated to EBCDIC when read,
@@ -154,7 +154,7 @@
 	-m	display instruction mnemonics.
 	-a	display a 256-byte block of memory in both hex and ASCII.
 
-   	The symbolic  format contains the same elements as the machine
+	The symbolic  format contains the same elements as the machine
 	language operation, but not always in the same order.  The
 	operation code frequently specifies both the opcode and the Q byte,
 	and the top nybble of the opcode is determined by the format of the
@@ -162,12 +162,12 @@
 
 	Addresses take two forms:  the direct address in hex, or a relative
 	address specified thusly: (byte,XRx) where 'byte' is a 1-byte
-	offset, and XRx is either XR1 or XR2 for the two index registers. 
+	offset, and XRx is either XR1 or XR2 for the two index registers.
 	Use these formats when 'address' is indicated below:
 
-   	When 'reg' is mentioned, a mnemonic may be used for the register,
-   	thusly:
-	
+	When 'reg' is mentioned, a mnemonic may be used for the register,
+	thusly:
+
 	IAR	Instruction Address Register for the current program level
 	ARR	Address Recall Register for the current program level
 	P1IAR	IAR for Program Level 1
@@ -176,104 +176,104 @@
 	XR1	Index Register 1
 	XR2 	Index Register 2
 	IARx	IAR for the interrupt level x (x = 0 thru 7)
-	   
-   	All other operands mentioned below are single-byte hex, except for
+
+	All other operands mentioned below are single-byte hex, except for
 	the length (len) operand of the two-address instructions, which is a
 	decimal length in the range 1-256.
 
-        In operations where there is a source and a destination, the 
+        In operations where there is a source and a destination, the
 	destination is always operand 1, the source is operand 2.
-   
-   	No-address formats:
-   	------------------
-   
-   	HPL hex,hex		Halt Program Level, the operands are the
+
+	No-address formats:
+	------------------
+
+	HPL hex,hex		Halt Program Level, the operands are the
 				Q and R bytes.
-   
-   
-   	One-address formats:
-  	-------------------
-   
+
+
+	One-address formats:
+	-------------------
+
 	A reg,address        	Add to register
-   	CLI address,byte	Compare Logical Immediate
-   	MVI address,byte	Move Immediate
-   	TBF address,mask	Test Bits Off
-   	TBN address,mask	Test Bits On
-  	SBF address,mask	Set Bits Off
-   	SBN address,mask	Set Bits On
-   	ST reg,address		Store Register
-   	L reg,address		Load Register
-   	LA reg,address		Load Address (reg can only be XR1 or XR2)
-   	JC address,cond		Jump on Condition
-   	BC address,cond		Branch on Condition
-   
-   	These operations do not specify a qbyte, it is implicit in the
-   	opcode:
-   
-   	B address		Unconditional branch to address
-   	BE address		Branch Equal
-   	BNE address		Branch Not Equal
-   	BH address		Branch High
-   	BNH address		Branch Not High
-   	BL address		Branch Low
-   	BNL address		Branch Not Low
-   	BT address		Branch True
-   	BF address		Branch False
-   	BP address		Branch Plus
-   	BM address		Branch Minus
-   	BNP address		Branch Not Plus
-   	BNM address		Branch Not Minus
-   	BZ address		Branch Zero
-   	BNZ address		Branch Not Zero
-   	BOZ address		Branch Overflow Zoned
-   	BOL address		Branch Overflow Logical
-   	BNOZ address		Branch No Overflow Zoned
-   	BNOL address		Branch No Overflow Logical
-   	NOPB address		No - never branch
-   
-   	(substitute J for B above for a set of Jumps -- 1-byte operand (not
-    	2), always jumps forward up to 255 bytes from the address following
-    	the Jump instruction. In this case, 'address' cannot be less than
-    	the current address, nor greater than the current address + 255)
-   
-   	Two-address formats (first address is destination, len is decimal 1-256):
-   	-------------------
-   
-   	MVC address,address,len		Move Characters
-   	CLC address,address,len		Compare Logical Characters
-   	ALC address,address,len		Add Logical Characters
-   	SLC address,address,len		Subtract Logical Characters
-   	ED address,address,len		Edit
-   	ITC address,address,len		Insert and Test Characters
-   	AZ address,address,len		Add Zoned Decimal
-   	SZ address,address,len		Subtract Zoned Decimal
-   
-   	MNN address,address		Move Numeric to Numeric
-   	MNZ address,address		Move Numeric to Zone
-   	MZZ address,address		Move Zone to Zone
-   	MZN address,address		Move Zone to Numeric
-   
-   	I/O Format
-  	----------
-   
-   	In the I/O format, there are always 3 fields:
-   
-   	da - Device Address 0-15 (decimal)
-   	m - Modifier 0-1
-   	n - Function 0-7
-   	
-   	The meaning of these is entirely defined by the device addressed.	
-   	
-   	There may be an optional control byte, or an optional address (based
+	CLI address,byte	Compare Logical Immediate
+	MVI address,byte	Move Immediate
+	TBF address,mask	Test Bits Off
+	TBN address,mask	Test Bits On
+	SBF address,mask	Set Bits Off
+	SBN address,mask	Set Bits On
+	ST reg,address		Store Register
+	L reg,address		Load Register
+	LA reg,address		Load Address (reg can only be XR1 or XR2)
+	JC address,cond		Jump on Condition
+	BC address,cond		Branch on Condition
+
+	These operations do not specify a qbyte, it is implicit in the
+	opcode:
+
+	B address		Unconditional branch to address
+	BE address		Branch Equal
+	BNE address		Branch Not Equal
+	BH address		Branch High
+	BNH address		Branch Not High
+	BL address		Branch Low
+	BNL address		Branch Not Low
+	BT address		Branch True
+	BF address		Branch False
+	BP address		Branch Plus
+	BM address		Branch Minus
+	BNP address		Branch Not Plus
+	BNM address		Branch Not Minus
+	BZ address		Branch Zero
+	BNZ address		Branch Not Zero
+	BOZ address		Branch Overflow Zoned
+	BOL address		Branch Overflow Logical
+	BNOZ address		Branch No Overflow Zoned
+	BNOL address		Branch No Overflow Logical
+	NOPB address		No - never branch
+
+	(substitute J for B above for a set of Jumps -- 1-byte operand (not
+	2), always jumps forward up to 255 bytes from the address following
+	the Jump instruction. In this case, 'address' cannot be less than
+	the current address, nor greater than the current address + 255)
+
+	Two-address formats (first address is destination, len is decimal 1-256):
+	-------------------
+
+	MVC address,address,len		Move Characters
+	CLC address,address,len		Compare Logical Characters
+	ALC address,address,len		Add Logical Characters
+	SLC address,address,len		Subtract Logical Characters
+	ED address,address,len		Edit
+	ITC address,address,len		Insert and Test Characters
+	AZ address,address,len		Add Zoned Decimal
+	SZ address,address,len		Subtract Zoned Decimal
+
+	MNN address,address		Move Numeric to Numeric
+	MNZ address,address		Move Numeric to Zone
+	MZZ address,address		Move Zone to Zone
+	MZN address,address		Move Zone to Numeric
+
+	I/O Format
+	----------
+
+	In the I/O format, there are always 3 fields:
+
+	da - Device Address 0-15 (decimal)
+	m - Modifier 0-1
+	n - Function 0-7
+
+	The meaning of these is entirely defined by the device addressed.
+
+	There may be an optional control byte, or an optional address (based
 	on the type of instruction).
 
 	SNS da,m,n,address		Sense I/O
 	LIO da,m,n,address		Load I/O
 	TIO da,m,n,address		Test I/O
-	
+
 	SIO da,m,n,cc			Start I/O -- cc is a control byte
-	
-	APL da,m,n			Advance Program Level 
+
+	APL da,m,n			Advance Program Level
 
 
 8	Device Programming.
@@ -431,7 +431,7 @@
 			X'00':	Write Data
 			X'01':	Write Identifier (24 sectors with byte at
 					data address register)
-		
+
 		SIO 1d,s,3,XX	Scan. All 256 bytes in memory at data
 				address register are compared to disk
 				sectors on current track, except those
@@ -453,7 +453,7 @@
 		APL 1d,0,2	Loop if busy
 		APL 1d,0,4	Loop if scan found
 
-		SNS 1d,0,2,addr	Sense Status Bytes 0 and 1: (simulated 
+		SNS 1d,0,2,addr	Sense Status Bytes 0 and 1: (simulated
 				bits only are shown, otehrs are 0):
 				X'1000': equipment check
 				X'0800': data check
@@ -461,12 +461,8 @@
 				X'0100': Seek Check (past cyl 203)
 				X'0080': Scan equal Hit
 				X'0040': Cylinder 0
-				X'0020': End of Cylinder 
+				X'0020': End of Cylinder
 				X'0010': Seek Busy
 		SNS 1d,0,3,addr	Sense bytes 2 and 3 (0000 in this sim)
 		SNS 1d,0,4,addr	Sense Data Address Register
 		SNS 1d,0,6,addr	Sense Control Address Register
-
-
- 
-

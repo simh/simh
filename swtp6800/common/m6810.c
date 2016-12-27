@@ -30,7 +30,7 @@
     NOTES:
 
         These functions support a simulated m6810 RAM device on a CPU board.  The
-        byte get and put routines use an offset into the RAM image to locate the 
+        byte get and put routines use an offset into the RAM image to locate the
         proper byte.  This allows another device to set the base address for the
         M6810.
 */

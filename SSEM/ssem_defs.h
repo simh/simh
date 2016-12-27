@@ -1,8 +1,8 @@
 /* ssem_defs.h: Manchester University SSEM (Small Scale Experimental Machine)
-                          simulator definitions 
+                          simulator definitions
 
    Based on the SIMH package written by Robert M Supnik
- 
+
    Copyright (c) 2006-2013 Gerardo Ospina
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -49,8 +49,8 @@
 
 #define MMASK           0xFFFFFFFF                      /* memory mask */
 #define IMASK           0x0000E01F                      /* instruction mask */
-#define UMASK           0xFFFF1FE0                      /* unused bits mask */   
-#define SMASK           0x80000000                      /* sign mask */   
+#define UMASK           0xFFFF1FE0                      /* unused bits mask */
+#define SMASK           0x80000000                      /* sign mask */
 
 /* Instruction format */
 

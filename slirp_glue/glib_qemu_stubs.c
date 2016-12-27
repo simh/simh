@@ -281,12 +281,12 @@ gchar *result = ((array == NULL) || free_segment) ? NULL : array->data;
 
 if (array != NULL) {
     if (free_segment)
-        free (array->data); 
+        free (array->data);
     free (array);
     }
 return result;
 }
- 
+
 GArray *
 g_array_set_size (GArray *array,
                   guint length)
@@ -304,7 +304,7 @@ if (ar->_zero_terminated)
     memset (ar->data + (ar->len * ar->_element_size), 0, ar->_element_size);
 return array;
 }
-      
+
 GArray *
 g_array_append_vals (GArray *array,
                      gconstpointer data,

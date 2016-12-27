@@ -210,7 +210,7 @@ REG ct_reg[] = {
 
 MTAB ct_mod[] = {
     { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
 //    { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
 //      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", NULL,
@@ -476,7 +476,7 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     default:                                            /* never get here! */
-        return SCPE_IERR;        
+        return SCPE_IERR;
         }                                               /* end case */
 
 ct_updsta (uptr);                                       /* update status */

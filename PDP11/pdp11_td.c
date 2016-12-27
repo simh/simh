@@ -25,11 +25,11 @@
 
    td           TU58 DECtape
 
-   26-Jun-15    MP      Initial Unibus/Qbus implemention merged from 
+   26-Jun-15    MP      Initial Unibus/Qbus implemention merged from
                         vax730_stddev.c (done by Matt Burke) and pdp11_dl.c
                         Added support for multiple concurrent TU58 devices
                         This module implements the TU58 functionality for the
-                        VAX730 and VAX750 console devices as well as 
+                        VAX730 and VAX750 console devices as well as
                         Unibus/Qbus connected dual drive TU58s.
 
    PDP-11 TU58 DECtapes are represented in memory by fixed length buffer of 32b words.
@@ -172,7 +172,7 @@ bytes. Their definitions follow.
     12          Checksum - Low
     13          Checksum - High
 
-    0           Flag                    This byte is set to 00000010 to indicate 
+    0           Flag                    This byte is set to 00000010 to indicate
                                         that the packet is a Command packet.
     1           Message Byte Count      Number of bytes in the packet, excluding the four message delivery
                                         bytes. This is decimal 10 for all command packets.
@@ -243,7 +243,7 @@ shown in Table 3-3.
     0               Flag = 0000 0001
     1               Byte Count = M
     -----------------
-    2               First Data Byte 
+    2               First Data Byte
     3               Data
 
     M               Data
@@ -581,13 +581,13 @@ static const char *tdc_regnam[] =
 #define TD_POSITION     11                              /* position */
 
 static const char *td_states[] = {
-    "IDLE",     "READ",     "READ1",    "READ2", 
-    "WRITE",    "WRITE1",   "WRITE2",   "END", 
+    "IDLE",     "READ",     "READ1",    "READ2",
+    "WRITE",    "WRITE1",   "WRITE2",   "END",
     "END1",     "INIT",     "BOOTSTRAP","POSITION"
     };
 
 static const char *td_ops[] = {
-    "NOP", "INI",   "RD",  "WR", "004", "POS", "006", "DIA", 
+    "NOP", "INI",   "RD",  "WR", "004", "POS", "006", "DIA",
     "GST", "SST", "MRSP", "013", "014", "015", "016", "017",
     "020", "021",  "022", "023", "024", "025", "026", "027",
     "030", "031",  "032", "033", "034", "035", "036", "037",
@@ -841,9 +841,9 @@ static const char *reg_access[] = {"Read", "ReadC", "Write", "WriteC", "WriteB"}
 typedef t_stat (*reg_read_routine) (CTLR *ctlr, int32 *data);
 
 static reg_read_routine td_rd_regs[] = {
-    td_rd_i_csr, 
+    td_rd_i_csr,
     td_rd_i_buf,
-    td_rd_o_csr, 
+    td_rd_o_csr,
     td_rd_o_buf
     };
 
@@ -865,9 +865,9 @@ return (td_rd_regs[(PA >> 1) & 03])(&td_ctlr[ctlr], data);
 typedef t_stat (*reg_write_routine) (CTLR *ctlr, int32 data);
 
 static reg_write_routine td_wr_regs[] = {
-    td_wr_i_csr, 
+    td_wr_i_csr,
     td_wr_i_buf,
-    td_wr_o_csr, 
+    td_wr_o_csr,
     td_wr_o_buf
     };
 
@@ -958,7 +958,7 @@ switch (opcode) {
                 ctlr->offset = 0;
                 sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
                 break;
-               
+
             case TD_CMDRD:
                 ctlr->unitno = ctlr->ibuf[4];
                 ctlr->block = ((ctlr->ibuf[11] << 8) | ctlr->ibuf[10]);
@@ -967,7 +967,7 @@ switch (opcode) {
                 ctlr->offset = 0;
                 sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
                 break;
-               
+
             case TD_CMDWR:
                 ctlr->unitno = ctlr->ibuf[4];
                 ctlr->block = ((ctlr->ibuf[11] << 8) | ctlr->ibuf[10]);
@@ -976,7 +976,7 @@ switch (opcode) {
                 ctlr->offset = 0;
                 sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
                 break;
-               
+
             case TD_CMDPOS:
                 ctlr->unitno = ctlr->ibuf[4];
                 ctlr->block = ((ctlr->ibuf[11] << 8) | ctlr->ibuf[10]);
@@ -985,7 +985,7 @@ switch (opcode) {
                 ctlr->offset = 0;
                 sim_activate (ctlr->uptr+ctlr->unitno, td_ctime);/* sched command */
                 break;
-               
+
             case TD_CMDMRSP:
                 ctlr->rx_buf = TD_OPDAT;
                 ctlr->rx_csr |= CSR_DONE;               /* set input flag */
@@ -1071,7 +1071,7 @@ switch (ctlr->p_state) {                                /* case on state */
             sim_activate (uptr, td_stime * t);          /* schedule seek */
             break;
             }
-        else 
+        else
             ctlr->p_state = TD_END;
         sim_activate (uptr, td_xtime);                  /* schedule next */
         break;
@@ -1085,7 +1085,7 @@ switch (ctlr->p_state) {                                /* case on state */
             sim_activate (uptr, td_stime * t);          /* schedule seek */
             break;
             }
-        else 
+        else
             ctlr->p_state = TD_END;
         sim_activate (uptr, td_xtime);                  /* schedule next */
         break;
@@ -1094,11 +1094,11 @@ switch (ctlr->p_state) {                                /* case on state */
         da = (ctlr->block * 512) + ctlr->offset;        /* get tape address */
         if (ctlr->txsize > 128)                         /* Packet length */
             data_size = 128;
-        else 
+        else
             data_size = ctlr->txsize;
         ctlr->txsize = ctlr->txsize - data_size;
         ctlr->offset = ctlr->offset + data_size;
-        
+
         ctlr->obptr = 0;
         ctlr->obuf[ctlr->obptr++] = TD_OPDAT;           /* Data packet */
         ctlr->obuf[ctlr->obptr++] = data_size;          /* Data length */
@@ -1169,7 +1169,7 @@ switch (ctlr->p_state) {                                /* case on state */
             }
         sim_activate (uptr, td_xtime);                  /* schedule next */
         break;
-        
+
     case TD_BOOTSTRAP:                                  /* send data to host */
         if ((ctlr->rx_csr & CSR_DONE) == 0) {           /* prev data taken? */
             ctlr->rx_buf = ctlr->obuf[ctlr->obptr++];   /* get next byte */
@@ -1474,14 +1474,14 @@ if (newln == 0)
     return SCPE_ARG;
 if (newln < td_ctrls) {
     for (i = newln; i < td_ctrls; i++)
-        if ((td_unit[2*i].flags & UNIT_ATT) || 
+        if ((td_unit[2*i].flags & UNIT_ATT) ||
             (td_unit[2*i+1].flags & UNIT_ATT))
             return SCPE_ALATT;
     }
 td_ctrls = newln;
 td_dib.lnt = td_ctrls * td_dib.ulnt;            /* upd IO page lnt */
 /* Make sure that the number of TU58 controllers plus DL devices is 16 or less */
-if ((dli_dptr != NULL) && !(dli_dptr->flags & DEV_DIS) && 
+if ((dli_dptr != NULL) && !(dli_dptr->flags & DEV_DIS) &&
     ((((DIB *)dli_dptr->ctxt)->numc + td_ctrls) > 16)) { /* Too many? */
     dli_dptr->flags |= DEV_DIS;                 /* First disable DL devices */
     dli_dptr->reset (dli_dptr);                 /* Notify of the disable */

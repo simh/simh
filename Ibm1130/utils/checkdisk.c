@@ -36,7 +36,7 @@
 #include "util_io.h"
 
 #ifdef _WIN32
-#  include <io.h> 
+#  include <io.h>
 #else
 	long filelength (int fno);
 #   include <sys/types.h>
@@ -177,7 +177,7 @@ again:
 						nfixed++;
 						goto again;
 					}
-	
+
 					fprintf(stderr, "Failed after retry\n");
 					bail(baddisk);
 				}
@@ -231,7 +231,7 @@ void bail (char *msg)
 	exit(1);
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * lowcase - force a string to lower case (ASCII)
  * ------------------------------------------------------------------------ */
 
@@ -242,7 +242,7 @@ char *lowcase (char *str)
 	for (s = str; *s; s++) {
 		if (*s >= 'A' && *s <= 'Z')
 			*s += 32;
-	} 
+	}
 
 	return str;
 }
@@ -252,11 +252,10 @@ char *lowcase (char *str)
 long filelength (int fno)
 {
     struct stat sb;
-    
+
     if (fstat(fno, &sb) != 0)
 		return 0;
 
 	return (long) sb.st_size;
 }
 #endif
-

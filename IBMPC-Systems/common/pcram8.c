@@ -105,7 +105,7 @@ t_stat RAM_reset (DEVICE *dptr, uint32 base, uint32 size)
             return SCPE_MEM;
         }
     }
-    sim_printf("   RAM: Available [%05X-%05XH]\n", 
+    sim_printf("   RAM: Available [%05X-%05XH]\n",
         RAM_unit.u3,
         RAM_unit.u3 + RAM_unit.capac - 1);
     sim_debug (DEBUG_flow, &RAM_dev, "RAM_reset: Done\n");
@@ -122,7 +122,7 @@ uint8 RAM_get_mbyte(uint32 addr)
         sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
         if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
             val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
-            sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
+            sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val);
             return (val & 0xFF);
         }
         sim_debug (DEBUG_read, &RAM_dev, " Out of range\n");

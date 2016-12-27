@@ -524,7 +524,7 @@ switch (addr) {
 return SCPE_OK;
 }
 
-/* Floating add 
+/* Floating add
 
    Notes:
    - AC<Q,P> enter into the initial exponent comparison.  If either is set,
@@ -648,7 +648,7 @@ spill = fp_pack (&op1, quos, mqch);                     /* pack up */
 return (spill? (spill | TRAP_F_SGL): 0);                /* if spill, set SGL */
 }
 
-/* Double floating add 
+/* Double floating add
 
    Notes:
    - AC<Q,P> enter into the initial exponent comparison.  If either is set,
@@ -685,7 +685,7 @@ else {                                                  /* AC <= SR */
     if (((op2.ch - op1.ch) > 077) && (sr & B9))         /* early out */
         SI = FP_PACK36 (op2.s, op2.ch, FP_LOFRAC (MQ));
     else SI = FP_PACK36 (op2.s, op2.ch, FP_HIFRAC (op2.fr));
-    } 
+    }
 diff = op2.ch - op1.ch;                                 /* exp diff */
 if (diff) {                                             /* any shift? */
     if ((diff < 0) || (diff > 077))                     /* diff > 63? */
@@ -894,7 +894,7 @@ if (rem)
     *rem = dvd % dvr;
 return (dvd / dvr);
 }
-        
+
 /* Floating point normalize */
 
 void fp_norm (UFP *op)

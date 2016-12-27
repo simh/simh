@@ -217,8 +217,8 @@ static void update_lpcs (int32 flg);
 static void change_rdy (int32 setrdy, int32 clrrdy);
 static int16 evenbits (int16 value);
 static t_stat lp20_help (FILE *st, DEVICE *dptr,
-                            UNIT *uptr, int32 flag, const char *cptr); 
-static const char *lp20_description (DEVICE *dptr); 
+                            UNIT *uptr, int32 flag, const char *cptr);
+static const char *lp20_description (DEVICE *dptr);
 
 /* DEC standard VFU tape for 'optical' VFU default.
  * Note that this must be <= DV_SIZE as we copy it into the DAVFU.
@@ -618,14 +618,14 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
         break;
 
 /* DAVFU RAM load.  The DAVFU RAM is actually loaded in bytes, delimited by
-   a start (354 to 356) and stop (357) byte pair.  If the number of bytes 
+   a start (354 to 356) and stop (357) byte pair.  If the number of bytes
    loaded is odd, or no bytes are loaded, the DAVFU is invalid.
    Thus, with DVU load mode set in CSRA, there are three states:
    0) Inactive 2) Start code seen,even byte 3) Start code seen, odd byte.
    Normally, only a start or a stop code should be seen in (0), but any other
    code that is received is ignored.  A stop without a corresponding start is
    legal, and specified to reset the current line pointer to 0 without
-   modifying the content of the RAM.  
+   modifying the content of the RAM.
    The DAVFU is physically in the printer, so printers with an optical
    VFU see load data as normal data to be printed.  The LP20 logic inhibits
    the translation RAM in this mode, so any translation will not occur.
@@ -685,7 +685,7 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
             break;
             }
         txst = (TX_GETFL (lprdat) << 1) |               /* get state */
-            ((lpcsa & CSA_DELH)? 1: 0);                 /* plus delim hold */ 
+            ((lpcsa & CSA_DELH)? 1: 0);                 /* plus delim hold */
         if (lprdat & TX_DELH)
             lpcsa = lpcsa | CSA_DELH;
         else lpcsa = lpcsa & ~CSA_DELH;
@@ -765,7 +765,7 @@ else if (lppdat == 011) {                               /* TAB? simulate */
         rpt = 8;                                        /* adv to col 9 */
         }
     else rpt = 8 - (lpcolc & 07);                       /* else adv 1 to 8 */
-    }           
+    }
 else {
     if (lppdat < 040)                                   /* cvt non-prnt to spc */
         lppdat = ' ';
@@ -773,7 +773,7 @@ else {
         r = lp20_adv (1, TRUE);                         /* adv carriage */
     }
 for (i = 0; i < rpt; i++)
-    fputc (lppdat, lp20_unit->fileref); 
+    fputc (lppdat, lp20_unit->fileref);
 lp20_unit->pos = (t_addr)sim_ftell (lp20_unit->fileref);
 lpcolc = lpcolc + rpt;
 return r;
@@ -793,7 +793,7 @@ if (lpcsb & CSB_DVOF)
 /* This logic has changed because it did not account for the case of more than one TOF
  * occuring in the advance.  Consider a tape with odd/even pages, and a slew channel that
  * stops on the even.  If we slew from the bottom of the even, we will pass the TOF of the
- * odd page and stop on the odd; seeing a second TOF.  
+ * odd page and stop on the odd; seeing a second TOF.
  */
 
 lpcolc = 0;                                             /* reset col cntr */
@@ -908,9 +908,9 @@ return lp20_dib.vec;
 
 /* Simulator RESET
  * Note that this does not reset the printer's DAVFU or the
- * translation RAM, which survive system bootstraps.  
+ * translation RAM, which survive system bootstraps.
  * (SET VFUCLEAR will do that.)
- * 
+ *
  */
 
 t_stat lp20_reset (DEVICE *dptr)
@@ -951,7 +951,7 @@ return SCPE_OK;
 static t_stat lp20_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
-    
+
 reason = attach_unit (uptr, cptr);                      /* attach file */
 if (reason == SCPE_OK) {
     sim_fseek (uptr->fileref, 0, SEEK_END);
@@ -1093,7 +1093,7 @@ dvptr = dvlnt = 0;
 while (!feof(vfile)) {
     int32 line, hole;
     int c;
-        
+
     /* Discard comments */
     c = fgetc(vfile);
     if (c == EOF)
@@ -1198,7 +1198,7 @@ int l, c, sum;
 
 if (lpcsb & CSB_OVFU)
     fprintf (st, "Tape");
-else 
+else
     fprintf (st, "DAFVU");
 
 if (lpcsb & CSB_DVOF) {
@@ -1280,7 +1280,7 @@ return SCPE_OK;
 static t_stat lp20_help (FILE *st, DEVICE *dptr,
                             UNIT *uptr, int32 flag, const char *cptr)
 {
-fprintf (st, 
+fprintf (st,
          "The LP20 DMA line printer controller is a UNIBUS device developed by the 36-bit product line.\n"
          "The controller is used in the KS10, in PDP-11 based remote stations and in the KL10 console.\n"
          "Several models of line printer can be (and were) attached to the LP20; with the long lines\n"

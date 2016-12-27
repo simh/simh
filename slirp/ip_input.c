@@ -189,7 +189,7 @@ ip_input(struct mbuf *m)
 			m = dtom(slirp, ip);
 		} else
 			if (fp)
-		   	   ip_freef(slirp, fp);
+			   ip_freef(slirp, fp);
 
 	} else
 		ip->ip_len -= hlen;
@@ -533,7 +533,7 @@ typedef uint32_t n_time;
 			if (opt == IPOPT_SSRR) {
 #define	INA	struct in_ifaddr *
 #define	SA	struct sockaddr *
- 			    if ((ia = (INA)ifa_ifwithdstaddr((SA)&ipaddr)) == 0)
+			    if ((ia = (INA)ifa_ifwithdstaddr((SA)&ipaddr)) == 0)
 				ia = (INA)ifa_ifwithnet((SA)&ipaddr);
 			} else
 				ia = ip_rtaddr(ipaddr.sin_addr);
@@ -636,7 +636,7 @@ typedef uint32_t n_time;
 	}
 	return (0);
 bad:
- 	icmp_error(m, type, code, 0, 0);
+	icmp_error(m, type, code, 0, 0);
 
 	return (1);
 }

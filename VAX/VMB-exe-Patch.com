@@ -8,33 +8,33 @@ $ PATCH /ABSOLUTE /NEW_VERSION /OUTPUT=cp$exe:VMB.EXE cp$src:VMB_orig.EXE
 ! boot if Bit 3 of the parameter register (R5) was set when VMB was invoked.
 ! This Boot Block boot operation reads sector 0 into memory and starts
 ! execution at offset 2 of the data block in memory.
-! When portitions of VMB were migrated into ROM to support the earliest 
+! When portitions of VMB were migrated into ROM to support the earliest
 ! MicroVAX system (MicroVAX I) and all subsequent ROM based VMB versions
-! the concept of Boot Block booting was extended in these ROM VMB 
+! the concept of Boot Block booting was extended in these ROM VMB
 ! implementations.  The change in boot block booting functionality included
 ! several features:
-!   1) If a normal boot attempt to a device failed (due to VMB not being 
+!   1) If a normal boot attempt to a device failed (due to VMB not being
 !      able to locate a secondary bootstrap program), a boot block boot is
-!      automatically attempted.  If the Bit 3 of R5 was set, then the 
-!      initial search for a secondary boot block was avoided and a boot 
+!      automatically attempted.  If the Bit 3 of R5 was set, then the
+!      initial search for a secondary boot block was avoided and a boot
 !      block boot was immediately attempted.
 !   2) When performing a boot block boot, the sector 0 contents are examined
-!      and if these contents conform to the pattern defined for ROM based 
-!      (PRA0) booting, the ROM format Offset, Size, and Starting address 
+!      and if these contents conform to the pattern defined for ROM based
+!      (PRA0) booting, the ROM format Offset, Size, and Starting address
 !      information is used directly by VMB to load a program into memory
-!      and control is transferred to that program.  If the contents of 
+!      and control is transferred to that program.  If the contents of
 !      sector 0 do not fit the pattern required for ROM based booting, then
 !      the code in sector 0 is executed directly starting at offset 2,
 !      the same as was originally done with the non ROM based VMB versions.
-!      Note that this extended behavior allows sector 0 to contain very little 
+!      Note that this extended behavior allows sector 0 to contain very little
 !      information and quite possibly no actual boot code.
 ! Developers of alternate operating systems for VAX computers noticed the ROM
-! based boot block behavior and changed their installation media AND the disk 
-! structures to only provide the minimal boot information required on the 
+! based boot block behavior and changed their installation media AND the disk
+! structures to only provide the minimal boot information required on the
 ! systems with VMB installed in ROM.
 !
-! Since, when this active development of these alternate operating systems for 
-! VAX computers was happening, the vast majority of development and new system 
+! Since, when this active development of these alternate operating systems for
+! VAX computers was happening, the vast majority of development and new system
 ! deployments were to hardware which had ROM base VMB, no one noticed that
 ! older systems which booted with the non ROM based VMB could no longer boot
 ! from new install media or disks formatted with these operating systems.
@@ -42,7 +42,7 @@ $ PATCH /ABSOLUTE /NEW_VERSION /OUTPUT=cp$exe:VMB.EXE cp$src:VMB_orig.EXE
 ! This patch addeds the ROM based VMB boot block boot functionality to the
 ! original dynamically loaded VMB.EXE used by the older systems to boot.
 !
-! The patch overwrites some VMB code which exists to support NVAX(1302) and 
+! The patch overwrites some VMB code which exists to support NVAX(1302) and
 ! Neon-V(1701) systems.  If simh simulators for these systems are ever built
 ! an alternate location must be found to accomodate this extended logic
 !
@@ -139,7 +139,7 @@ dep /ins TRY_BBLOCK
 '	MOVL	B^8(R1),R9		' ! Get image size
 '	ADDL	B^0C(R1),R10		' ! Compute load address
 '	MOVL	B^10(R1),R5		' ! Compute transfer offset
-'	BRW	READIN_BOOT		' ! Boot block is valid, read file 
+'	BRW	READIN_BOOT		' ! Boot block is valid, read file
 
 'TRY_OLD_BBLOCK:BBS     #RPB$V_BBLOCK,B^RPB$L_BOOTR5(R11),OLD_BBLOCK_BOOT'
 '	BRW     NEWFIL_OPNERR           ' ! Report error

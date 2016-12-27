@@ -117,7 +117,7 @@ DEVICE fe_dev = {
    Note that the protocol has both ambiguity (interrupt to the KS10 may mean
    character printed, or input character available, or both) and lack of
    symmetry (the KS10 does not inform the front end that it has taken an
-   input character).  
+   input character).
 */
 
 /* Here is the definition of the communications area:
@@ -227,7 +227,7 @@ if (M[FE_KEEPA] & INT64_C(0020000000000)) {              /* KSRLD - "Forced" (ac
     sim_switches = oldsw;
 
     M[FE_KEEPA] &= ~INT64_C(0030000177777);             /* Clear KAF, RLD, KPALIV & reason
-                                                         * 8080 ucode actually clears HW 
+                                                         * 8080 ucode actually clears HW
                                                          * status too, but that's a bug. */
     M[FE_KEEPA] |= 02;                                  /* Reason = FORREL */
     fei_unit.buf = feo_unit.buf = 0;

@@ -365,7 +365,7 @@ if (src->h || (dbl && src->l)) {                        /* result != 0? */
             if (dbl) {                                  /* double prec? */
                 src->l = (src->l + 0x8) & UFP_FRLO;
                 src->h = src->h + (src->l < 0x8);
-                }     
+                }
             else src->h = src->h + 0x8;                 /* no, single */
             if (src->h & UFP_CARRY) {                   /* carry out? */
                 UFP_RSH_KP (src, 4);                    /* renormalize */
@@ -418,4 +418,3 @@ if (src->h || src->l) {                                 /* if non-zero */
     }
 return nsh;
 }
-

@@ -2,7 +2,7 @@
 
    Copyright (c) 2009,2010 Holger Veit
    Copyright (c) 2007-2008 Howard M. Harte http://www.hartetec.com
-   
+
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
    to deal in the Software without restriction, including without limitation
@@ -50,7 +50,7 @@
 #include "sim_imd.h"
 
 /* internal state machine:
- * 
+ *
  * fromstate   condition for transition  tostate       comment
  * ----------- ------------------------- ------------- ---------------------------------------------------
  * any         reset                     S_CMD         expect a command byte
@@ -148,7 +148,7 @@ DEBTAB i8272_dt[] = {
 };
 
 static const char* states[] = {
-    "invalid", "S_CMD", "S_CMDREAD", "S_EXEC", "S_DATAWRITE", "S_SECWRITE", 
+    "invalid", "S_CMD", "S_CMDREAD", "S_EXEC", "S_DATAWRITE", "S_SECWRITE",
     "S_SECREAD", "S_DATAREAD", "S_RESULT"
 };
 
@@ -179,7 +179,7 @@ static int8 resultsizes[] = {
 
 /* default routine to select the drive.
  * In principle, it just passes the US0/US1 bits into fdc_curdrv,
- * but the Sage FD does not use US0/US1 bits of FDC, for whatever reason... 
+ * but the Sage FD does not use US0/US1 bits of FDC, for whatever reason...
  */
 void i8272_seldrv(I8272* chip, int drvnum)
 {
@@ -327,7 +327,7 @@ static uint8 floorlog2(unsigned int n)
     return ((n == 0) ? (0xFF) : r); /* 0xFF is error return value */
 }
 
-static t_stat i8272_resultphase(I8272* chip,int delay) 
+static t_stat i8272_resultphase(I8272* chip,int delay)
 {
     uint8 cmd = chip->cmd[0] & 0x1f;
     chip->fdc_msr &= ~I8272_MSR_NON_DMA;
@@ -479,7 +479,7 @@ t_stat i8272_read(I8272* chip,int addr,uint32* value)
     t_stat rc;
     I8272_DRIVE_INFO* dip;
     if ((dip = &chip->drive[chip->fdc_curdrv]) == NULL) {
-        sim_printf("i8272_read: chip->drive returns NULL, fdc_curdrv=%d\n",chip->fdc_curdrv); 
+        sim_printf("i8272_read: chip->drive returns NULL, fdc_curdrv=%d\n",chip->fdc_curdrv);
         return SCPE_IERR;
     }
 
@@ -506,7 +506,7 @@ t_stat i8272_read(I8272* chip,int addr,uint32* value)
         default:
             sim_printf("Default case in i8272_read(FDC_MSR): state=%d\n",chip->fdc_state);
             return SCPE_IERR;
-        }            
+        }
         TRACE_PRINT1(DBG_FD_STATUS,"RD FDC MSR = 0x%02x",*value);
         return SCPE_OK;
 
@@ -533,7 +533,7 @@ t_stat i8272_read(I8272* chip,int addr,uint32* value)
                     TRACE_PRINT0(DBG_FD_STATUS,"Result phase complete.\n");
                     NEXTSTATE(S_CMD);
                 }
-                
+
 #if 0
                 else {
                     i8272_interrupt(chip,5);
@@ -581,7 +581,7 @@ static t_stat i8272_makeresult(I8272* chip, uint8 s0, uint8 s1, uint8 s2, uint8 
 static I8272_DRIVE_INFO* i8272_decodecmdbits(I8272* chip)
 {
     /* note this routine is also used in places where MT or SK bits are irrelevant.
-     * chip docs imply these bits to be set to 0 
+     * chip docs imply these bits to be set to 0
      */
     chip->fdc_mt = (chip->cmd[0] & 0x80) >> 7;
     chip->fdc_mfm = (chip->cmd[0] & 0x40) >> 6;
@@ -620,7 +620,7 @@ static t_stat i8272_format(I8272* chip)
     if ((dip = i8272_decodecmdbits(chip)) == NULL)
         return i8272_nodriveerror(chip,"Format",10);
 
-    track = dip->track;   
+    track = dip->track;
     chip->fdc_seek_end = track != chip->cmd[2] ? 1 : 0;
     chip->fdc_sec_len = chip->cmd[2];
     chip->fdc_secsz = I8272_SEC2SZ(chip->fdc_sec_len);
@@ -642,7 +642,7 @@ static t_stat i8272_format(I8272* chip)
     cnt = 0;
 
     i8272_makeresult(chip,
-            ((chip->fdc_hds & 1) << 2) | chip->fdc_curdrv, 
+            ((chip->fdc_hds & 1) << 2) | chip->fdc_curdrv,
             0, 0, track,
             chip->fdc_head,   /* AGN for now we cannot format with logicalHead */
             chip->fdc_sector, /* AGN ditto for logicalCyl */
@@ -681,14 +681,14 @@ static t_stat i8272_readid(I8272* chip)
         return i8272_nodriveerror(chip,"Readid",10);
 
     curtrk = &dip->imd->track[dip->track][hds];
-    
+
     /* Compute the i8272 "N" value from the sectorsize of this              */
     /* disk's current track - i.e. N = log2(sectsize) - log2(128)           */
     /* The calculation also works for non-standard format disk images with  */
     /* sectorsizes of 2048, 4096 and 8192 bytes                             */
     chip->fdc_sec_len = floorlog2(curtrk->sectsize) - 7; /* AGN fix to use fdc_hds (was fdc_head)*/
     chip->fdc_secsz = I8272_SEC2SZ(chip->fdc_sec_len);
-    
+
     /* HV we cycle the read sectors on each call of READID to emulator disk spinning */
     /* Sage BIOS need this to find the highest sector number. */
     /* This could be improved by adding some delay based */
@@ -780,7 +780,7 @@ static t_stat i8272_sensedrive(I8272* chip)
     st3 |= chip->fdc_curdrv;
     st3 |= track0 ? DRIVE_STATUS_TRACK0 : 0x00; /* Track 0 */
     i8272_makeresult(chip, st3, 0, 0, 0, 0, 0, 0);
-    
+
     TRACE_PRINT1(DBG_FD_CMD,"Sense Drive Status = 0x%02x", st3);
     return i8272_resultphase(chip,5);
 }
@@ -835,7 +835,7 @@ static t_bool i8272_secrw(I8272* chip,uint8 cmd)
     dip->track = chip->cmd[2];
     chip->fdc_head = chip->cmd[3] & 1; /* AGN mask to head 0 or 1 */
     curtrk = &dip->imd->track[dip->track][chip->fdc_head];
-    
+
     chip->fdc_sector = chip->cmd[4];
     chip->fdc_sec_len = chip->cmd[5];
     if(chip->fdc_sec_len > I8272_MAX_N) {
@@ -851,12 +851,12 @@ static t_bool i8272_secrw(I8272* chip,uint8 cmd)
 
     TRACE_PRINT(DBG_FD_CMD, (sim_deb,
         "CMD=0x%02x[%s]: Drive: %d, %s %s, C=%d. H=%d. S=%d, N=%d, EOT=%02x, GPL=%02x, DTL=%02x",
-        cmd, msgCMD, chip->fdc_curdrv, msgMT, msgMFM, 
+        cmd, msgCMD, chip->fdc_curdrv, msgMT, msgMFM,
         dip->track, chip->fdc_head, chip->fdc_sector,
         chip->fdc_sec_len, chip->fdc_eot, chip->fdc_gap, chip->fdc_dtl));
 
     i8272_makeresult(chip,
-            ((chip->fdc_hds & 1) << 2) | chip->fdc_curdrv | 0x40, 
+            ((chip->fdc_hds & 1) << 2) | chip->fdc_curdrv | 0x40,
             0, 0,
             curtrk->logicalCyl[chip->fdc_sector],  /* AGN logicalCyl */
             curtrk->logicalHead[chip->fdc_sector], /* AGN logicalHead */

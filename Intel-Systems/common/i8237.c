@@ -29,8 +29,8 @@
 
     NOTES:
 
-  
-        Default is none.  Since all channel registers in the i8237 are 16-bit, transfers 
+
+        Default is none.  Since all channel registers in the i8237 are 16-bit, transfers
         are done as two 8-bit operations, low- then high-byte.
 
         Port addressing is as follows (Port offset = 0):
@@ -66,29 +66,29 @@
 
         Read/Write DMAC Address Registers
 
-            Used to simultaneously load a channel's current-address register and base-address 
-            register with the memory address of the first byte to be transferred. (The Channel 
-            0 current/base address register must be loaded prior to initiating a diskette read 
+            Used to simultaneously load a channel's current-address register and base-address
+            register with the memory address of the first byte to be transferred. (The Channel
+            0 current/base address register must be loaded prior to initiating a diskette read
             or write operation.)  Since each channel's address registers are 16 bits in length
-            (64K address range), two "write address register" commands must be executed in 
+            (64K address range), two "write address register" commands must be executed in
             order to load the complete current/base address registers for any channel.
 
         Read/Write DMAC Word Count Registers
 
-            The Write DMAC Word Count Register command is used to simultaneously load a 
-            channel's current and base word-count registers with the number of bytes 
-            to be transferred during a subsequent DMA operation.  Since the word-count 
-            registers are 16-bits in length, two commands must be executed to load both 
+            The Write DMAC Word Count Register command is used to simultaneously load a
+            channel's current and base word-count registers with the number of bytes
+            to be transferred during a subsequent DMA operation.  Since the word-count
+            registers are 16-bits in length, two commands must be executed to load both
             halves of the registers.
 
         Write DMAC Command Register
 
-            The Write DMAC Command Register command loads an 8-bit byte into the 
-            DMAC's command register to define the operating characteristics of the 
-            DMAC. The functions of the individual bits in the command register are 
-            defined in the following diagram. Note that only two bits within the 
-            register are applicable to the controller; the remaining bits select 
-            functions that are not supported and, accordingly, must always be set 
+            The Write DMAC Command Register command loads an 8-bit byte into the
+            DMAC's command register to define the operating characteristics of the
+            DMAC. The functions of the individual bits in the command register are
+            defined in the following diagram. Note that only two bits within the
+            register are applicable to the controller; the remaining bits select
+            functions that are not supported and, accordingly, must always be set
             to zero.
 
               7   6   5   4   3   2   1   0
@@ -104,8 +104,8 @@
 
         Read DMAC Status Register Command
 
-            The Read DMAC Status Register command accesses an 8-bit status byte that 
-            identifies the DMA channels that have reached terminal count or that 
+            The Read DMAC Status Register command accesses an 8-bit status byte that
+            identifies the DMA channels that have reached terminal count or that
             have a pending DMA request.
 
               7   6   5   4   3   2   1   0
@@ -121,16 +121,16 @@
               +------------------------------ CHANNEL 3 DMA REQUEST
 
         Write DMAC Request Register
-          
-            The data byte associated with the Write DMAC Request Register command 
-            sets or resets a channel's associated request bit within the DMAC's 
+
+            The data byte associated with the Write DMAC Request Register command
+            sets or resets a channel's associated request bit within the DMAC's
             internal 4-bit request register.
 
               7   6   5   4   3   2   1   0
             +---+---+---+---+---+---+---+---+
             | X   X   X   X   X             |
             +---+---+---+---+---+---+---+---+
-                                  |   |   | 
+                                  |   |   |
                                   |   +---+-- 00 SELECT CHANNEL 0
                                   |           01 SELECT CHANNEL 1
                                   |           10 SELECT CHANNEL 2
@@ -141,14 +141,14 @@
 
         Set/Reset DMAC Mask Register
 
-            Prior to a DREQ-initiated DMA transfer, the channel's mask bit must 
-            be reset to enable recognition of the DREQ input. When the transfer 
-            is complete (terminal count reached or external EOP applied) and 
-            the channel is not programmed to autoinitialize, the channel's 
-            mask bit is automatically set (disabling DREQ) and must be reset 
-            prior to a subsequent DMA transfer. All four bits of the mask 
-            register are set (disabling the DREQ inputs) by a DMAC master 
-            clear or controller reset. Additionally, all four bits can be 
+            Prior to a DREQ-initiated DMA transfer, the channel's mask bit must
+            be reset to enable recognition of the DREQ input. When the transfer
+            is complete (terminal count reached or external EOP applied) and
+            the channel is not programmed to autoinitialize, the channel's
+            mask bit is automatically set (disabling DREQ) and must be reset
+            prior to a subsequent DMA transfer. All four bits of the mask
+            register are set (disabling the DREQ inputs) by a DMAC master
+            clear or controller reset. Additionally, all four bits can be
             set/reset by a single Write DMAC Mask Register command.
 
 
@@ -156,7 +156,7 @@
             +---+---+---+---+---+---+---+---+
             | X   X   X   X   X             |
             +---+---+---+---+---+---+---+---+
-                                  |   |   | 
+                                  |   |   |
                                   |   +---+-- 00 SELECT CHANNEL 0
                                   |           01 SELECT CHANNEL 1
                                   |           10 SELECT CHANNEL 2
@@ -167,10 +167,10 @@
 
         Write DMAC Mode Register
 
-            The Write DMAC Mode Register command is used to define the 
-            operating mode characteristics for each DMA channel. Each 
-            channel has an internal 6-bit mode register; the high-order 
-            six bits of the associated data byte are written into the 
+            The Write DMAC Mode Register command is used to define the
+            operating mode characteristics for each DMA channel. Each
+            channel has an internal 6-bit mode register; the high-order
+            six bits of the associated data byte are written into the
             mode register addressed by the two low-order bits.
 
 
@@ -187,7 +187,7 @@
               |   |   |   |   +---+---------- 00 VERIFY TRANSFER
               |   |   |   |                   01 WRITE TRANSFER
               |   |   |   |                   10 READ TRANSFER
-              |   |   |   |   
+              |   |   |   |
               |   |   |   +------------------ 0 AUTOINITIALIZE DISABLE
               |   |   |                       1 AUTOINITIALIZE ENABLE
               |   |   |
@@ -200,25 +200,25 @@
 
         Clear DMAC First/Last Flip-Flop
 
-                The Clear DMAC First/Last Flip-Flop command initializes 
-                the DMAC's internal first/last flip-flop so that the 
-                next byte written to or re~d from the 16-bit address 
-                or word-count registers is the low-order byte.  The 
-                flip-flop is toggled with each register access so that 
-                a second register read or write command accesses the 
+                The Clear DMAC First/Last Flip-Flop command initializes
+                the DMAC's internal first/last flip-flop so that the
+                next byte written to or re~d from the 16-bit address
+                or word-count registers is the low-order byte.  The
+                flip-flop is toggled with each register access so that
+                a second register read or write command accesses the
                 high-order byte.
 
         DMAC Master Clear
 
-            The DMAC Master Clear command clears the DMAC's command, status, 
-            request, and temporary registers to zero, initializes the 
-            first/last flip-flop, and sets the four channel mask bits in 
-            the mask register to disable all DMA requests (i.e., the DMAC 
+            The DMAC Master Clear command clears the DMAC's command, status,
+            request, and temporary registers to zero, initializes the
+            first/last flip-flop, and sets the four channel mask bits in
+            the mask register to disable all DMA requests (i.e., the DMAC
             is placed in an idle state).
 
         Write DMAC Mask Register
 
-            The Write DMAC Mask Register command allows all four bits of the 
+            The Write DMAC Mask Register command allows all four bits of the
             DMAC's mask register to be written with a single command.
 
               7   6   5   4   3   2   1   0
@@ -228,7 +228,7 @@
                               |   |       |
                               |   |       +-- 0 CLEAR CHANNEL 0 MASK BIT
                               |   |           1 SET CHANNEL 0 MASK BIT
-                              |   |    
+                              |   |
                               |   +---------- 0 CLEAR CHANNEL 2 MASK BIT
                               |               1 SET CHANNEL 2 MASK BIT
                               |
@@ -291,8 +291,8 @@ uint8 i8237_rA[4];                      // 8237 mode register
 uint8 i8237_rB[4];                      // 8237 mask register
 uint8 i8237_rC[4];                      // 8237 request register
 uint8 i8237_rD[4];                      // 8237 first/last ff
-uint8 i8237_rE[4];                      // 8237 
-uint8 i8237_rF[4];                      // 8237 
+uint8 i8237_rE[4];                      // 8237
+uint8 i8237_rF[4];                      // 8237
 
 /* i8237 physical register definitions */
 
@@ -347,27 +347,27 @@ DEBTAB i8237_debug[] = {
 };
 
 DEVICE i8237_dev = {
-    "I8237",                   //name 
-    i8237_unit,               //units 
-    i8237_reg,                //registers 
+    "I8237",                   //name
+    i8237_unit,               //units
+    i8237_reg,                //registers
     i8237_mod,                //modifiers
-    1,                    //numunits 
-    16,                         //aradix  
-    32,                         //awidth  
-    1,                          //aincr  
-    16,                         //dradix  
+    1,                    //numunits
+    16,                         //aradix
+    32,                         //awidth
+    1,                          //aincr
+    16,                         //dradix
     8,                          //dwidth
-    NULL,                       //examine  
-    NULL,                       //deposit  
-//    &i8237_reset,             //deposit 
+    NULL,                       //examine
+    NULL,                       //deposit
+//    &i8237_reset,             //deposit
     NULL,       //reset
     NULL,                       //boot
     NULL,               //attach
     NULL,                       //detach
-    NULL,                       //ctxt     
-    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
-    0,                          //dctrl 
-//    DEBUG_flow + DEBUG_read + DEBUG_write,              //dctrl 
+    NULL,                       //ctxt
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags
+    0,                          //dctrl
+//    DEBUG_flow + DEBUG_read + DEBUG_write,              //dctrl
     i8237_debug,              //debflags
     NULL,                       //msize
     NULL                        //lname
@@ -394,26 +394,26 @@ t_stat i8237_reset(DEVICE *dptr, uint16 base)
     }
     sim_printf("   8237 Reset\n");
     sim_printf("   8237: Registered at %03X\n", base);
-    i8237_port[i8237_devnum] = reg_dev(i8237_r0x, base); 
-    reg_dev(i8237_r1x, base + 1); 
-    reg_dev(i8237_r2x, base + 2); 
-    reg_dev(i8237_r3x, base + 3); 
-    reg_dev(i8237_r4x, base + 4); 
-    reg_dev(i8237_r5x, base + 5); 
-    reg_dev(i8237_r6x, base + 6); 
-    reg_dev(i8237_r7x, base + 7); 
-    reg_dev(i8237_r8x, base + 8); 
-    reg_dev(i8237_r9x, base + 9); 
-    reg_dev(i8237_rAx, base + 10); 
-    reg_dev(i8237_rBx, base + 11); 
-    reg_dev(i8237_rCx, base + 12); 
-    reg_dev(i8237_rDx, base + 13); 
-    reg_dev(i8237_rEx, base + 14); 
-    reg_dev(i8237_rFx, base + 15); 
+    i8237_port[i8237_devnum] = reg_dev(i8237_r0x, base);
+    reg_dev(i8237_r1x, base + 1);
+    reg_dev(i8237_r2x, base + 2);
+    reg_dev(i8237_r3x, base + 3);
+    reg_dev(i8237_r4x, base + 4);
+    reg_dev(i8237_r5x, base + 5);
+    reg_dev(i8237_r6x, base + 6);
+    reg_dev(i8237_r7x, base + 7);
+    reg_dev(i8237_r8x, base + 8);
+    reg_dev(i8237_r9x, base + 9);
+    reg_dev(i8237_rAx, base + 10);
+    reg_dev(i8237_rBx, base + 11);
+    reg_dev(i8237_rCx, base + 12);
+    reg_dev(i8237_rDx, base + 13);
+    reg_dev(i8237_rEx, base + 14);
+    reg_dev(i8237_rFx, base + 15);
     sim_printf("   8237 Reset\n");
     sim_printf("   8237: Registered at %03X\n", base);
     sim_activate (&i8237_unit[i8237_devnum], i8237_unit[i8237_devnum].wait); /* activate unit */
-    if ((i8237_dev.flags & DEV_DIS) == 0) 
+    if ((i8237_dev.flags & DEV_DIS) == 0)
         i8237_reset1(i8237_devnum);
     i8237_devnum++;
     return SCPE_OK;
@@ -438,7 +438,7 @@ void i8237_reset1(int32 devnum)
     uptr = i8237_dev[devnum].units;
     if (uptr->capac == 0) {         /* if not configured */
         uptr->capac = 0;            /* initialize unit */
-        uptr->u3 = 0; 
+        uptr->u3 = 0;
         uptr->u4 = 0;
         uptr->u5 = 0;
         uptr->u6 = i;               /* unit number - only set here! */

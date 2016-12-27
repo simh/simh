@@ -1,8 +1,8 @@
-/* ssem_cpu.c: Manchester University SSEM (Small Scale Experimental Machine) 
+/* ssem_cpu.c: Manchester University SSEM (Small Scale Experimental Machine)
                          CPU simulator
 
    Based on the SIMH package written by Robert M Supnik
- 
+
    Copyright (c) 2006-2013, Gerardo Ospina
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -28,7 +28,7 @@
 
    This is not a supported product, but the author welcomes bug reports and fixes.
    Mail to ngospina@gmail.com
-  
+
    cpu          SSEM CPU
 
    The system state for the SSEM is:
@@ -42,7 +42,7 @@
                         1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-   |                         |inst |                     |address  | 
+   |                         |inst |                     |address  |
    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
    SSEM instructions:
@@ -60,7 +60,7 @@
     The SSEM has 32 32b words of memory.
 
    This routine is the instruction decode routine for the SSEM.
-   It is called from the simulator control program to execute 
+   It is called from the simulator control program to execute
    instructions in simulated memory, starting at the simulated
    CI.  It runs until 'reason' is set non-zero.
 
@@ -141,7 +141,7 @@ do {
         if ((reason = sim_process_event ()))
             break;
         }
-    
+
     if (sim_brk_summ &&                                 /* breakpoint? */
         sim_brk_test (*C, SWMASK ('E'))) {
         reason = STOP_IBKPT;                            /* stop simulation */
@@ -152,7 +152,7 @@ do {
     *C = (*C + 1) & AMASK;
 
     /* Get present instruction */
-    C[1] = Read (*C);                                   
+    C[1] = Read (*C);
 
     Staticisor = C[1] & IMASK;                          /* get instruction */
     sim_interval = sim_interval - 1;
@@ -255,4 +255,3 @@ void Write (uint32 ea, uint32 dat)
 S[ea] = dat & MMASK;
 return;
 }
-

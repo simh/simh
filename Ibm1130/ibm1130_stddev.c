@@ -9,11 +9,11 @@
    2004.10.22 - Removed stub for xio_1134_papertape as it's now a supported device
 
    2003.11.23 - Fixed bug in new routine "quotefix" that made sim crash
-   			    for all non-Windows builds :(
+			    for all non-Windows builds :(
 
    2003.06.15 - added output translation code to accomodate APL font
-   				added input translation feature to assist emulation of 1130 console keyboard for APL
-   				changes to console input and output IO emulation, fixed bugs exposed by APL interpreter
+				added input translation feature to assist emulation of 1130 console keyboard for APL
+				changes to console input and output IO emulation, fixed bugs exposed by APL interpreter
 
    2002.09.13 - pulled 1132 printer out of this file into ibm1130_prt.c
 
@@ -30,7 +30,7 @@
  * The 1130 console printer used a Selectric typewriter element. The APL interpreter
  * used overprinting to construct some APL symbols, for example, a round O overstruck]
  * with | to get the greek phi. This doesn't accomodate a glass terminal! Instead,
- * modern APL fonts have separate character codes for the complex characters. 
+ * modern APL fonts have separate character codes for the complex characters.
  * To have APL\1130 output appear correctly, we have to do three things:
  *
  *		use simh's telnet feature to connect to the 1130 console stream
@@ -78,7 +78,7 @@
  *	8		(key above U)				-	-			Return
  *	9		(key above I)				/	/			Backspace
  *	-		(key above P)				^Q	INT REQ		ATTN
- *	Enter								-	-			Return 
+ *	Enter								-	-			Return
  *	backsp								/	/			Backspace
  */
 
@@ -117,7 +117,7 @@ extern int cgi;
 static int32 tti_dsw = 0;					/* device status words */
 static int32 tto_dsw = 0;
        int32 con_dsw = 0;
-					
+
 static unsigned char conout_map[256];		/* 1130 console code to ASCII translation. 0 = undefined, 0xFF = IGNR_ = no output */
 static unsigned char conin_map[256];		/* input mapping */
 static int  curcol = 0;						/* current typewriter element column, leftmost = 0 */
@@ -157,7 +157,7 @@ static const char * handle_map_overstrike_definition(char **pc);
 
 #define CSET_ASCII		(0u << UNIT_V_CSET)
 #define CSET_1130		(1u << UNIT_V_CSET)
-#define CSET_APL		(2u << UNIT_V_CSET)	
+#define CSET_APL		(2u << UNIT_V_CSET)
 #define CSET_MASK		(3u << UNIT_V_CSET)
 #define ENABLE_ANSI		(1u << UNIT_V_ANSI)
 
@@ -260,7 +260,7 @@ void xio_1131_console (int32 iocc_addr, int32 func, int32 modify)
 			tti_unit.buf = 0;							/* no key character yet */
 			break;
 
-		case XIO_READ:							   	
+		case XIO_READ:
 			WriteW(iocc_addr, tti_unit.buf);			/* return keycode */
 			CLRBIT(tti_dsw, TT_DSW_KEYBOARD_BUSY);		/* this ends selected mode */
 			keyboard_selected(FALSE);
@@ -303,7 +303,7 @@ static t_stat emit_conout_character (int ch)
 	t_stat status;
 
 #ifdef DEBUG_CONSOLE
-	printf("{%02x}", ch); 
+	printf("{%02x}", ch);
 #endif
 
 	if ((tto_unit.flags & CSET_MASK) == CSET_1130)	/* 1130 (binary) mode, write the raw 8-bit value */
@@ -313,7 +313,7 @@ static t_stat emit_conout_character (int ch)
 		/* red/black shift can be combined with another control */
 		/* if present, emit the color shift characters alone */
 
-		if (ch & COUT_CTRL_BLACK) {				
+		if (ch & COUT_CTRL_BLACK) {
 			if ((status = map_conout_character(COUT_IS_CTRL|COUT_CTRL_BLACK)) != SCPE_OK)
 				return status;
 		}
@@ -395,7 +395,7 @@ static t_stat tti_svc (UNIT *uptr)
 		return SCPE_OK;
 	}
 
-	if ((tti_unit.flags & CSET_MASK) == CSET_ASCII) 
+	if ((tti_unit.flags & CSET_MASK) == CSET_ASCII)
 		temp = ascii_to_conin[temp];
 
 	if (temp == 0)	{							/* ignore invalid characters (no mapping to 1130 input code) */
@@ -726,7 +726,7 @@ static void strsort (int n, unsigned char *s)
 		temp   = s[n];				/* put largest value at end of array */
 		s[n]   = s[big];
 		s[big] = temp;
-	}	
+	}
 }
 
 /* file format:
@@ -820,7 +820,7 @@ static void set_default_mapping (int32 flags)
 			for (i = NCONIN_TO_APL; --i >= 0; )
 				conin_map[conin_to_APL[i].in] = conin_to_APL[i].out;
 
-			memcpy(os_map, default_os_map, sizeof(default_os_map));			
+			memcpy(os_map, default_os_map, sizeof(default_os_map));
 			n_os_mappings = (sizeof(default_os_map) / sizeof(default_os_map[0]));
 			break;
 	}
@@ -875,7 +875,7 @@ static t_stat map_conout_character (int ch)
 	else if (n_os_mappings && ch != (unsigned char) IGNR_) {
 		if (curcol >= MAX_OUTPUT_COLUMNS)
 			map_conout_character('\x81');		/* precede with automatic carriage return/line feed, I guess */
-		
+
 		if (curcol > maxcol) {					/* first time in this column, no overstrike possible yet */
 			os_buf[curcol].nin = 0;
 			maxcol = curcol;
@@ -961,7 +961,7 @@ static t_stat font_cmd (int32 flag, CONST char *iptr)
 	}
 	else {
 		while (*cptr && (*cptr > ' '))				/* find terminating blank */
-	    	cptr++; 
+		cptr++;
 	}
 	*cptr = '\0';									/* terminate name */
 
@@ -994,7 +994,7 @@ static t_bool str_match (const char *str, const char *keyword)
 			return FALSE;
 	}
 
-	return *str <= ' ' || *str == ';';			/* success if the input string ended or is in whitespace or comment */ 
+	return *str <= ' ' || *str == ';';			/* success if the input string ended or is in whitespace or comment */
 }
 
 /* read_map_file - process definition lines in opened mapping file */
@@ -1119,7 +1119,7 @@ static const char * get_num_char (char **pc, unsigned char *out, int ndigits, in
 	return NULL;						/* no error */
 }
 
-/* get_characters - read character specification(s) from input string pointed to 
+/* get_characters - read character specification(s) from input string pointed to
  * by *pc. Results stored in outstr; up to nmax characters parsed. Actual number
  * found returned in *nout. Returns NULL on success or error message if syntax
  * error encountered. *pc is advanced to next whitespace or whatever followed input.
@@ -1183,7 +1183,7 @@ static const char * get_characters (char **pc, unsigned char *outstr, int nmax, 
 					if (BETWEEN(*c, '0', '7')) {	/* octal specification */
 						if ((errstr = get_num_char(&c, out, 3, 8, "bad octal character")) != NULL)
 							return errstr;
-						
+
 						out++;						/* advance out pointer */
 					}
 					else if (BETWEEN(*c, 'A', 'Z') || BETWEEN(*c, 'a', 'z'))

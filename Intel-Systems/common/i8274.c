@@ -25,19 +25,19 @@
 
     These functions support a simulated i8274 interface device on an iSBC.
     The device had two physical I/O ports which could be connected
-    to any serial I/O device that would connect to an RS232 interface.  
+    to any serial I/O device that would connect to an RS232 interface.
 
     All I/O is via programmed I/O.  The i8274 has a status port
-    and a data port.    
+    and a data port.
 
-    The simulated device does not support synchronous mode.  The simulated device 
-    supports a select from I/O space and two address lines.  The data port is at the 
+    The simulated device does not support synchronous mode.  The simulated device
+    supports a select from I/O space and two address lines.  The data port is at the
     lower address and the status/command port is at the higher address for each
     channel.
 
     Minimum simulation is provided for this device.  Channel A is used as a
     console port for the iSBC-88/45
-    
+
     A write to the status port can select some options for the device:
 
     Asynchronous Mode Instruction
@@ -54,7 +54,7 @@
         Character Length
         L2  0       1       0       1
         L1  0       0       1       1
-            5       6       7       8  
+            5       6       7       8
             bits    bits    bits    bits
 
         EP - A 1 in this bit position selects even parity.
@@ -97,8 +97,8 @@
         DSR - A 1 in this bit position signals *DSR is at zero.
 
     A read to the data port gets the buffered character, a write
-    to the data port writes the character to the device.  
-    
+    to the data port writes the character to the device.
+
 */
 
 #include <stdio.h>
@@ -194,20 +194,20 @@ DEVICE i8274_dev = {
     i8274_reg,          //registers
     i8274_mod,          //modifiers
     1,                  //numunits
-    16,                 //aradix 
-    32,                 //awidth 
-    1,                  //aincr 
-    16,                 //dradix 
+    16,                 //aradix
+    32,                 //awidth
+    1,                  //aincr
+    16,                 //dradix
     8,                  //dwidth
-    NULL,               //examine 
-    NULL,               //deposit 
+    NULL,               //examine
+    NULL,               //deposit
     i8274_reset,        //reset
     NULL,               //boot
-    NULL,               //attach 
+    NULL,               //attach
     NULL,               //detach
-    NULL,               //ctxt                
-    DEV_DEBUG,          //flags 
-    0,                  //dctrl 
+    NULL,               //ctxt
+    DEV_DEBUG,          //flags
+    0,                  //dctrl
     i8274_debug,        //debflags
     NULL,               //msize
     NULL                //lname

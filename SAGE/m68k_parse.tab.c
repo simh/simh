@@ -365,7 +365,7 @@
 #line 1 "m68k_parse.y"
 
 /* m68k_parse.c: line assembler for generic m68k_cpu
-  
+
    Copyright (c) 2009-2010 Holger Veit
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -1982,7 +1982,7 @@ yyparse ()
 #endif
 #endif
 {
-  
+
   int yystate;
   int yyn;
   int yyresult;
@@ -3239,13 +3239,13 @@ yyreduce:
 
   case 203:
 #line 387 "m68k_parse.y"
-    { int i,l=(yyvsp[(1) - (3)].reg),h=(yyvsp[(3) - (3)].reg); if (l>h) { l=(yyvsp[(3) - (3)].reg); h=(yyvsp[(1) - (3)].reg); } (yyval.mask).x = (yyval.mask).d = 0; 
+    { int i,l=(yyvsp[(1) - (3)].reg),h=(yyvsp[(3) - (3)].reg); if (l>h) { l=(yyvsp[(3) - (3)].reg); h=(yyvsp[(1) - (3)].reg); } (yyval.mask).x = (yyval.mask).d = 0;
                     for (i=l; i<=h; i++) { (yyval.mask).d |= movemx[i]; (yyval.mask).d |= movemd[i]; } ;}
     break;
 
   case 204:
 #line 389 "m68k_parse.y"
-    { int i,l=(yyvsp[(1) - (3)].reg),h=(yyvsp[(3) - (3)].reg); if (l>h) { l=(yyvsp[(3) - (3)].reg); h=(yyvsp[(1) - (3)].reg); } (yyval.mask).x = (yyval.mask).d = 0; 
+    { int i,l=(yyvsp[(1) - (3)].reg),h=(yyvsp[(3) - (3)].reg); if (l>h) { l=(yyvsp[(3) - (3)].reg); h=(yyvsp[(1) - (3)].reg); } (yyval.mask).x = (yyval.mask).d = 0;
                     for (i=l; i<=h; i++) { (yyval.mask).x |= movemx[i+8]; (yyval.mask).d |= movemd[i+8]; } ;}
     break;
 
@@ -3291,7 +3291,7 @@ yyreduce:
 
   case 268:
 #line 421 "m68k_parse.y"
-    { if ((yyvsp[(4) - (4)].wl)==0) { (yyval.ea).ea = 070; (yyval.ea).cnt = 1; (yyval.ea).arg[0] = (yyvsp[(2) - (4)].num); } 
+    { if ((yyvsp[(4) - (4)].wl)==0) { (yyval.ea).ea = 070; (yyval.ea).cnt = 1; (yyval.ea).arg[0] = (yyvsp[(2) - (4)].num); }
                           else {       (yyval.ea).ea = 071; (yyval.ea).cnt = 2; (yyval.ea).arg[0] = (yyvsp[(2) - (4)].num) >> 16; (yyval.ea).arg[1] = (yyvsp[(2) - (4)].num) & 0xffff; } ;}
     break;
 
@@ -3603,7 +3603,7 @@ static struct _optable ops[] = {
       { "a7",       A7 },       { "d0",     D0 },       { "d1",     D1 },       { "d2",     D2 },
       { "d3",       D3 },       { "d4",     D4 },       { "d5",     D5 },       { "d6",     D6 },
       { "d7",       D7 },       { "ccr",    CCR },      { "sr",     SR },       { "usp",    USP },
-      { "pc",       PC },       
+      { "pc",       PC },
       { 0,      0 }
 };
 
@@ -3639,7 +3639,7 @@ static int oplookup(const char* s)
       return 0;
 }
 
-static void init_ophash() 
+static void init_ophash()
 {
       struct _optable* op = ops;
       OPHASH* oph;
@@ -3661,12 +3661,12 @@ int yylex()
       char ident[30];
       char *p = ident;
       char c = yystream[0];
-      
+
       while (c != 0 && (c=='\t' || c==' ')) {
         c = *++yystream;
       }
       if (c==0) return EOF;
-      
+
       if (isalpha(c)) {
         while (isalnum(c) && (p-ident)<28) {
             *p++ = tolower(c); c = *++yystream;
@@ -3675,7 +3675,7 @@ int yylex()
         if (p>ident) { return oplookup(ident); }
         return EOF;
       } else if (isdigit(c)) {
-        *p++ = c; 
+        *p++ = c;
         if (yystream[1]=='x' || yystream[1]=='X') { *p++ = 'x'; yystream++; }
         c = *++yystream;
         while ((isdigit(c) || isxdigit(c)) && (p-ident)<28) {
@@ -3717,7 +3717,7 @@ static t_addr yyaddr;
 t_stat parse_sym(CONST char* c, t_addr a, UNIT* u, t_value* val, int32 sw)
 {
       char ch;
-      
+
       if (!ophash) init_ophash();
 
       yyvalptr = val;
@@ -3725,7 +3725,7 @@ t_stat parse_sym(CONST char* c, t_addr a, UNIT* u, t_value* val, int32 sw)
 
       yystream = c;
       yyerrc = 0;
-      
+
       ch = *yystream;
       while (ch != 0 && (ch=='\t' || ch==' ')) {
         ch = *++yystream;
@@ -3745,14 +3745,14 @@ t_stat parse_sym(CONST char* c, t_addr a, UNIT* u, t_value* val, int32 sw)
             return SCPE_OK;
         } else return SCPE_ARG;
       }
-      
+
       yyparse();
       printf("rc=%d\n",yyrc);
       if (yyerrc) return SCPE_ARG;
       return yyrc;
 }
 
-static int _genop(t_value arg) 
+static int _genop(t_value arg)
 {
 //  printf("_genop(%x)@%x\n",arg,(int)yyvalptr);
       *yyvalptr = arg;
@@ -3767,7 +3767,7 @@ static int _genea(struct _ea arg)
       return -(arg.cnt*2)-1;
 }
 
-static int _genbr(t_value arg,t_addr tgt,int len) 
+static int _genbr(t_value arg,t_addr tgt,int len)
 {
       t_addr a = tgt - yyaddr -2;
       if (len==1) {
@@ -3783,4 +3783,3 @@ static int _genbr(t_value arg,t_addr tgt,int len)
         return -1;
       }
 }
-

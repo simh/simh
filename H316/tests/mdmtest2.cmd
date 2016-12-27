@@ -34,7 +34,7 @@ DEPOSIT -m 13 HLT
 DEPOSIT P 10
 
 ; Tell the world ...
-echo 
+echo
 echo Here are the DMC pointers before receiving -
 ex 20:21
 

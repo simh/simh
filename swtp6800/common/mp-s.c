@@ -34,8 +34,8 @@
         serial port.  It provides 7 or 8-bit ASCII RS-232 interface to Terminals
         or 20 mA current loop interface to a model 33 or 37 Teletype.  It is not
         compatible with baudot Teletypes.  Baud rates from 110 to 1200 are
-        switch selectable from S! on the MP-S. The ACIA ports appear at all 
-        4 addresses.  This fact is used by SWTBUG to determine the presence of the 
+        switch selectable from S! on the MP-S. The ACIA ports appear at all
+        4 addresses.  This fact is used by SWTBUG to determine the presence of the
         MP-S vice MP-C serial card.  The ACIA interrupt request line can be connected
         to the IRQ or NMI interrupt lines by a jumper on the MP-S.
 
@@ -52,7 +52,7 @@
               on the data port and is ready to be read.
         TXE - A 1 in this bit means the port is ready to receive a character
               on the data port and transmit it out over the serial line.
-     
+
         A read to the data port gets the buffered character, a write
         to the data port writes the character to the device.
 */
@@ -229,7 +229,7 @@ int32 sio0s(int32 io, int32 data)
     if (io == 0) {                      // control register read
         if (ptr_flag) {                 // reader enabled?
             if ((ptr_unit.flags & UNIT_ATT) == 0) { // attached?
-                ptr_unit.u3 &= 0xFE;    // no, clear RXF flag 
+                ptr_unit.u3 &= 0xFE;    // no, clear RXF flag
                 ptr_flag = 0;           // clear reader flag
                 printf("Reader not attached to file\n");
             } else {                    // attached

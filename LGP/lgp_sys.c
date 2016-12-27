@@ -275,7 +275,7 @@ return;
         *of     =       output stream
         addr    =       current PC
         *val    =       pointer to data
-        *uptr   =       pointer to unit 
+        *uptr   =       pointer to unit
         sw      =       switches
    Outputs:
         return  =       status code
@@ -347,7 +347,7 @@ while (isspace (*cptr))                                 /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) {
     if ((uptr == NULL) || !(uptr->flags & UNIT_ATT))
         return SCPE_ARG;
-    if (uptr->flags & UNIT_FLEX) {                      /* Flex file? */        
+    if (uptr->flags & UNIT_FLEX) {                      /* Flex file? */
         c = ascii_to_flex[*cptr & 0x7F];                /* get Flex equiv */
         if (c < 0)
             return SCPE_ARG;
@@ -355,7 +355,7 @@ if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) {
         }
     else val[0] = *cptr & 0x7F;                         /* ASCII file */
     return SCPE_OK;
-    }   
+    }
 
 if (uptr && (uptr != &cpu_unit))                        /* must be CPU */
     return SCPE_ARG;

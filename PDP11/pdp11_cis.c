@@ -219,7 +219,7 @@ static int32 opntab[128][MAXOPN] = {
     {0, 0, 0, 0},                                       /* MOVRC */
     {0, 0, 0, 0},                                       /* MOVTC */
                   {0, 0, 0, 0},                         /* 033 */
-    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 034 - 037 */ 
+    {0, 0, 0, 0}, {0, 0, 0, 0},                         /* 034 - 037 */
     {0, 0, 0, 0}, {0, 0, 0, 0},
     {0, 0, 0, 0},                                       /* LOCC */
     {0, 0, 0, 0},                                       /* SKPC */
@@ -404,7 +404,7 @@ switch (op) {                                           /* case on opcode */
         R1:R3           =       0
         R4:R5           =       unchanged
 
-        Notes:   
+        Notes:
         - If either the source or destination lengths are zero,
           the move loops exit immediately.
         - If the source length does not exceed the destination
@@ -566,7 +566,7 @@ switch (op) {                                           /* case on opcode */
             R[rn] = (R[rn] + limit) & 0177777;
         return SCPE_OK;
 
-/* LOCC, SKPC, LOCCI, SKPCI 
+/* LOCC, SKPC, LOCCI, SKPCI
 
    Operands (LOCC, SKPC):
         R0, R1          =       source string descriptor
@@ -585,7 +585,7 @@ switch (op) {                                           /* case on opcode */
 
     case 0140: case 0141:                               /* inline */
         if (!fpd) {                                     /* FPD clear? */
-            WriteW (R[4], ((SP - 2) & 0177777) | dsenable); 
+            WriteW (R[4], ((SP - 2) & 0177777) | dsenable);
             SP = (SP - 2) & 0177777;                    /* push R4 */
             R[0] = A1LNT;                               /* args to registers */
             R[1] = A1ADR;
@@ -829,7 +829,7 @@ switch (op) {                                           /* case on opcode */
         C               =       0
 
    Registers (ADDN, ADDP, SUBN, SUBP only):
-        R0:R3           =       0       
+        R0:R3           =       0
 */
 
     case 050: case 051: case 070: case 071:
@@ -871,7 +871,7 @@ switch (op) {                                           /* case on opcode */
         C               =       0
 
    Registers (MULP only):
-        R0:R3           =       0       
+        R0:R3           =       0
 */
 
     case 074: case 0174:
@@ -909,7 +909,7 @@ switch (op) {                                           /* case on opcode */
         C               =       set if divide by zero
 
    Registers (DIVP only):
-        R0:R3           =       0       
+        R0:R3           =       0
 */
 
     case 075: case 0175:
@@ -991,7 +991,7 @@ switch (op) {                                           /* case on opcode */
         C               =       0
 
    Registers (ASHN, ASHP only):
-        R0:R1, R4       =       0 
+        R0:R1, R4       =       0
 */
 
     case 056: case 076: case 0156: case 0176:
@@ -1000,7 +1000,7 @@ switch (op) {                                           /* case on opcode */
         shift = GET_ASHLNT (A3LNT);                     /* get shift count */
         if (shift & ASHSGN) {                           /* right shift? */
             shift = (ASHLNT_M + 1 - shift);             /* !shift! */
-            WordRshift (&src1, shift / 8);              /* do word shifts */    
+            WordRshift (&src1, shift / 8);              /* do word shifts */
             NibbleRshift (&src1, shift % 8, 0);         /* do nibble shifts */
             t = GET_ASHRND (A3LNT);                     /* get rounding digit */
             if ((t + (src1.val[0] & 0xF)) > 9)          /* rounding needed? */
@@ -1120,7 +1120,7 @@ switch (op) {                                           /* case on opcode */
         C               =       0
 
    Registers (CVTLN, CVTLP only)
-        R2:R3           =       0       
+        R2:R3           =       0
 */
 
     case 057: case 077:
@@ -1190,8 +1190,8 @@ if (flag & PACKED) {                                    /* packed? */
             c = c & 0xF;
         if (c >= 0xA0)                                  /* check hi digit */
             c = c & 0xF;
-        if ((c & 0xF) >= 0xA)                           /* check lo digit */   
-            c = c & 0xF0; 
+        if ((c & 0xF) >= 0xA)                           /* check lo digit */
+            c = c & 0xF0;
         src->val[i / 4] = src->val[i / 4] | (c << ((i % 4) * 8));
         }                                               /* end for */
     if ((t == 0xB) || (t == 0xD))                       /* if -, set sign */
@@ -1218,7 +1218,7 @@ else {                                                  /* numeric */
     }                                                   /* end numeric */
 return TestDstr (src);                                  /* clean -0 */
 }
-       
+
 /* Store decimal string
 
    Arguments:
@@ -1291,7 +1291,7 @@ else {
             ((i == lnt) && (type == LO)))
             c = binover[dst->sign][c];                  /* get sign and digit */
         else c = c | 0x30;                              /* default */
-        WriteB (c, ((dscr[1] + lnt - i) & 0177777) |dsenable );    
+        WriteB (c, ((dscr[1] + lnt - i) & 0177777) |dsenable );
         }                                               /* end for */
     }                                                   /* end numeric */
 return;
@@ -1506,7 +1506,7 @@ if (sc) {
         }
     }
 return c;
-}               
+}
 
 /* Nibble shift decimal string right
 
@@ -1615,7 +1615,7 @@ else R[1] = R[2] = R[3] = 0;                            /* reg, clear R1 - R3 */
 fpd = 0;                                                /* instr done */
 return;
 }
-    
+
 /* Test for CIS mid-instruction interrupt */
 
 t_bool cis_int_test (int32 cycles, int32 oldpc, t_stat *st)

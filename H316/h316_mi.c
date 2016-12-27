@@ -585,19 +585,19 @@ int32 mi_io (uint16 line, int32 inst, int32 fnc, int32 dat, int32 dev)
       case 001:
         // MnUNXP - un-cross patch modem ...
         sim_debug(IMP_DBG_IOT,PDEVICE(line),"un-cross patch modem (PC=%06o)\n", PC-1);
-        PMIDB(line)->iloop = PMIDB(line)->lloop = FALSE;  
+        PMIDB(line)->iloop = PMIDB(line)->lloop = FALSE;
         udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, FALSE);
         return dat;
       case 002:
         // MnLXP - enable line cross patch ...
         sim_debug(IMP_DBG_IOT,PDEVICE(line),"enable line cross patch (PC=%06o)\n", PC-1);
-        PMIDB(line)->lloop = TRUE;  
+        PMIDB(line)->lloop = TRUE;
         udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, TRUE);
         PMIDB(line)->iloop = FALSE;  return dat;
       case 003:
         // MnIXP - enable interface cross patch ...
         sim_debug(IMP_DBG_IOT,PDEVICE(line),"enable interface cross patch (PC=%06o)\n", PC-1);
-        PMIDB(line)->iloop = TRUE;  PMIDB(line)->lloop = FALSE;  
+        PMIDB(line)->iloop = TRUE;  PMIDB(line)->lloop = FALSE;
         udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, FALSE);
         return dat;
       case 004:

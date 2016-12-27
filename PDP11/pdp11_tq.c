@@ -34,17 +34,17 @@
                         - adopted use of asynch I/O interfaces from sim_tape
                         - Added differing detailed debug output via sim_debug
    14-Jan-11    MP      Various fixes discovered while exploring Ultrix issue:
-                        - Set UNIT_SXC flag when a tape mark is encountered 
+                        - Set UNIT_SXC flag when a tape mark is encountered
                           during forward motion read operations.
-                        - Fixed logic which clears UNIT_SXC to check command 
+                        - Fixed logic which clears UNIT_SXC to check command
                           modifier.
                         - Added CMF_WR flag to tq_cmf entry for OP_WTM.
-                        - Made Non-immediate rewind positioning operations 
+                        - Made Non-immediate rewind positioning operations
                           take 2 seconds.
                         - Added UNIT_IDLE flag to tq units.
-                        - Fixed debug output of tape file positions when they 
+                        - Fixed debug output of tape file positions when they
                           are 64b.  Added more debug output after positioning
-                          operations.  Also, added textual display of the 
+                          operations.  Also, added textual display of the
                           command being performed (GUS,POS,RD,WR,etc@)
    18-Jun-07    RMS     Added UNIT_IDLE flag to timer thread
    16-Feb-06    RMS     Revised for new magtape capacity checking
@@ -174,7 +174,7 @@ struct tqpkt {
 #define TQ5_CMOD        9                               /* ctrl ID */
 #define TQ5_UMOD        3                               /* unit ID */
 #define TQ5_MED         0x6D68B032                      /* media ID */
-#define TQ5_CREV        ((1 << 8) | 5)                  /* ctrl revs */ 
+#define TQ5_CREV        ((1 << 8) | 5)                  /* ctrl revs */
 #define TQ5_FREV        0                               /* formatter revs */
 #define TQ5_UREV        0                               /* unit revs */
 #define TQ5_CAP         (94 * (1 << 20))                /* capacity */
@@ -185,7 +185,7 @@ struct tqpkt {
 #define TQ7_CMOD        14                              /* ctrl ID */
 #define TQ7_UMOD        14                              /* unit ID */
 #define TQ7_MED         0x6D68B046                      /* media ID */
-#define TQ7_CREV        ((1 << 8) | 5)                  /* ctrl revs */ 
+#define TQ7_CREV        ((1 << 8) | 5)                  /* ctrl revs */
 #define TQ7_FREV        0                               /* formatter revs */
 #define TQ7_UREV        0                               /* unit revs */
 #define TQ7_CAP         (300 * (1 << 20))               /* capacity */
@@ -196,7 +196,7 @@ struct tqpkt {
 #define TQ8_CMOD        5                               /* ctrl ID */
 #define TQ8_UMOD        2                               /* unit ID */
 #define TQ8_MED         0x6D695051                      /* media ID */
-#define TQ8_CREV        ((1 << 8) | 5)                  /* ctrl revs */ 
+#define TQ8_CREV        ((1 << 8) | 5)                  /* ctrl revs */
 #define TQ8_FREV        0                               /* formatter revs */
 #define TQ8_UREV        0                               /* unit revs */
 #define TQ8_CAP         (180 * (1 << 20))               /* capacity */
@@ -207,7 +207,7 @@ struct tqpkt {
 #define TQU_CMOD        9                               /* ctrl ID */
 #define TQU_UMOD        3                               /* unit ID */
 #define TQU_MED         0x6D68B032                      /* media ID */
-#define TQU_CREV        ((1 << 8) | 5)                  /* ctrl revs */ 
+#define TQU_CREV        ((1 << 8) | 5)                  /* ctrl revs */
 #define TQU_FREV        0                               /* formatter revs */
 #define TQU_UREV        0                               /* unit revs */
 #define TQU_CAP         (94 * (1 << 20))                /* capacity */
@@ -307,7 +307,7 @@ static uint32 tq_cmf[64] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                       /* 38-47 */
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0
-    };  
+    };
 
 static const char *tq_cmdname[] = {
     "",                                                 /*  0 */
@@ -472,9 +472,9 @@ REG tq_reg[] = {
     };
 
 MTAB tq_mod[] = {
-    { MTUF_WLK,         0, "write enabled",  "WRITEENABLED", 
+    { MTUF_WLK,         0, "write enabled",  "WRITEENABLED",
         NULL, NULL, NULL, "Write enable tape drive" },
-    { MTUF_WLK,  MTUF_WLK, "write locked",   "LOCKED", 
+    { MTUF_WLK,  MTUF_WLK, "write locked",   "LOCKED",
         NULL, NULL, NULL, "Write lock tape drive"  },
     { MTAB_XTD|MTAB_VDV,  TQ5_TYPE,           NULL,   "TK50",
         &tq_set_type, NULL, NULL, "Set TK50 Device Type" },
@@ -545,7 +545,7 @@ DEVICE tq_dev = {
     &tq_boot, &tq_attach, &tq_detach,
     &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE,
     0, tq_debug,
-    NULL, NULL, &tq_help, NULL, NULL, 
+    NULL, NULL, &tq_help, NULL, NULL,
     &tq_description
     };
 
@@ -723,7 +723,7 @@ if (tq_csta < CST_UP) {                                 /* still init? */
             tq_perr = 0;
             }
         break;
-        }                                               /* end switch */                        
+        }                                               /* end switch */
     return SCPE_OK;
     }                                                   /* end if */
 
@@ -742,14 +742,14 @@ if ((pkt == 0) && tq_pip) {                             /* polling? */
         UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
 
         if (up)
-            sim_debug (DBG_REQ, &tq_dev, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X, obj=%d, pos=0x%" T_ADDR_FMT "X\n", 
+            sim_debug (DBG_REQ, &tq_dev, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X, obj=%d, pos=0x%" T_ADDR_FMT "X\n",
                     tq_pkt[pkt].d[CMD_OPC], tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f],
                     tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN],
                     tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
                     tq_pkt[pkt].d[RW_BAH], tq_pkt[pkt].d[RW_BAL],
                     up->objp, up->pos);
         else
-            sim_debug (DBG_REQ, &tq_dev, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X\n", 
+            sim_debug (DBG_REQ, &tq_dev, "cmd=%04X(%3s), mod=%04X, unit=%d, bc=%04X%04X, ma=%04X%04X\n",
                     tq_pkt[pkt].d[CMD_OPC], tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f],
                     tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN],
                     tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
@@ -802,7 +802,7 @@ for (i = 0; i < TQ_NUMDR; i++) {                        /* poll */
     nuptr->flags = nuptr->flags & ~UNIT_ATP;
     }
 if ((tq_hat > 0) && (--tq_hat == 0))                    /* host timeout? */
-    tq_fatal (PE_HAT);                                  /* fatal err */ 
+    tq_fatal (PE_HAT);                                  /* fatal err */
 return SCPE_OK;
 }
 
@@ -1090,7 +1090,7 @@ else {
     }
 return tq_putpkt (pkt, TRUE);
 }
-    
+
 /* Set unit characteristics - defer if q'd commands */
 
 t_bool tq_suc (uint16 pkt)
@@ -1373,7 +1373,7 @@ switch (cmd) {                                          /* case on command */
             if ((t = Map_WriteB (ba, wbc, res->tqxb))) {/* store, nxm? */
                 PUTP32 (pkt, RW_BCL, wbc - t);          /* adj bc */
                 if (tq_hbe (uptr, ba + wbc - t))        /* post err log */
-                    tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, res->tbc);        
+                    tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, res->tbc);
                 return SCPE_OK;                         /* end if nxm */
                 }
             }                                           /* end if read */
@@ -1412,12 +1412,12 @@ switch (cmd) {                                          /* case on command */
             if ((t = Map_ReadB (ba, bc, res->tqxb))) {  /* fetch buf, nxm? */
                 PUTP32 (pkt, RW_BCL, 0);                /* no bytes xfer'd */
                 if (tq_hbe (uptr, ba + bc - t))         /* post err log */
-                    tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, bc);     
+                    tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, bc);
                 return SCPE_OK;                         /* end else wr */
                 }
             sim_tape_wrrecf_a (uptr, res->tqxb, bc, tq_io_complete); /* write rec fwd */
             return SCPE_OK;
-            } 
+            }
         if (res->io_status)
             return tq_mot_err (uptr, bc);               /* log, end */
         uptr->objp = uptr->objp + 1;                    /* upd obj pos */
@@ -1460,7 +1460,7 @@ switch (cmd) {                                          /* case on command */
                 uptr->flags = uptr->flags & ~(UNIT_TMK | UNIT_POL);
                 }
             sim_tape_position_a (uptr,
-                                 ((mdf & MD_RWD) ? MTPOS_M_REW : 0) | 
+                                 ((mdf & MD_RWD) ? MTPOS_M_REW : 0) |
                                  ((mdf & MD_REV) ? MTPOS_M_REV : 0) |
                                  ((mdf & MD_OBC) ? MTPOS_M_OBJ : 0) |
                                  (((mdf & MD_DLE) && !(mdf & MD_REV)) ? MTPOS_M_DLE : 0),
@@ -1470,7 +1470,7 @@ switch (cmd) {                                          /* case on command */
         res->sts = tq_map_status (uptr, res->io_status);
         if ((res->io_status != MTSE_OK) && (res->io_status != MTSE_TMK) && (res->io_status != MTSE_BOT) && (res->io_status != MTSE_LEOT))
             return tq_mot_err (uptr, 0);                /* log, end */
-        sim_debug (DBG_REQ, &tq_dev, "Position Done: mdf=0x%04X, nrec=%d, ntmk=%d, skrec=%d, sktmk=%d, skobj=%d\n", 
+        sim_debug (DBG_REQ, &tq_dev, "Position Done: mdf=0x%04X, nrec=%d, ntmk=%d, skrec=%d, sktmk=%d, skobj=%d\n",
                             mdf, nrec, ntmk, res->skrec, res->sktmk, res->objupd);
         if (mdf & MD_REV)
             uptr->objp = uptr->objp - res->objupd;
@@ -1822,11 +1822,11 @@ UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
 if (pkt == 0)                                           /* any packet? */
     return OK;
 if (up)
-    sim_debug (DBG_REQ, &tq_dev, "rsp=%04X, sts=%04X, rszl=%04X, obj=%d, pos=%" T_ADDR_FMT "d\n", 
+    sim_debug (DBG_REQ, &tq_dev, "rsp=%04X, sts=%04X, rszl=%04X, obj=%d, pos=%" T_ADDR_FMT "d\n",
                                tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS], tq_pkt[pkt].d[RW_RSZL],
                                up->objp, up->pos);
 else
-    sim_debug (DBG_REQ, &tq_dev, "rsp=%04X, sts=%04X\n", 
+    sim_debug (DBG_REQ, &tq_dev, "rsp=%04X, sts=%04X\n",
                                tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS]);
 if (!tq_getdesc (&tq_rq, &desc))                        /* get rsp desc */
     return ERR;
@@ -2049,7 +2049,7 @@ if (r != SCPE_OK)
 uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_ATP | UNIT_SXC | UNIT_POL | UNIT_TMK);
 uptr->uf = 0;                                           /* clr unit flgs */
 return SCPE_OK;
-} 
+}
 
 /* Device reset */
 

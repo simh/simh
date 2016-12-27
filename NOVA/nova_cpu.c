@@ -66,7 +66,7 @@
    AC[0:3]<0:15>        general registers
    C                    carry flag
    PC<0:14>             program counter
-   
+
    The NOVA has three instruction formats: memory reference, I/O transfer,
    and operate.  The memory reference format is:
 
@@ -218,7 +218,7 @@
       flags.  If ION and ION pending are set, and at least one interrupt
       request is pending, then an interrupt occurs.  Note that the 16b PIO
       mask must be mapped to the simulator's device bit mapping.
- 
+
    3. Non-existent memory.  On the NOVA, reads to non-existent memory
       return zero, and writes are ignored.  In the simulator, the
       largest possible memory is instantiated and initialized to zero.
@@ -755,7 +755,7 @@ while (reason == 0) {                                   /* loop until halted */
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
                         M[SP] = (C >> 1) | (AC[3] & AMASK);
-                    AC[3] = FP = SP & AMASK;  
+                    AC[3] = FP = SP & AMASK;
                     STK_CHECK (SP, 5);
                     }
                 else
@@ -825,7 +825,7 @@ while (reason == 0) {                                   /* loop until halted */
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
                         M[SP] = (C >> 1) | (AC[3] & AMASK);
-                    AC[3] = FP = SP & AMASK;  
+                    AC[3] = FP = SP & AMASK;
                     STK_CHECK (SP, 5);
                     }
                 break;
@@ -848,7 +848,7 @@ while (reason == 0) {                                   /* loop until halted */
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
                             M[SP] = (C >> 1) | (AC[3] & AMASK);
-                        AC[3] = FP = SP & AMASK;  
+                        AC[3] = FP = SP & AMASK;
                         STK_CHECK (SP, 5);
                         }
                     else if (pulse == iopC) {                /* retn */
@@ -1176,7 +1176,7 @@ return SCPE_OK;
  *      Program Load), and cost ~$400 USD (in 1970 - wow!) to load 32(10) words from
  *      a PROM to main (core) memory location 0 - 32.
  *    - This code is documented in various DG Nova programming manuals and was
- *      quite static (i.e. no revisions or updates to code were made). 
+ *      quite static (i.e. no revisions or updates to code were made).
  *    - switch register is used to determine device code and device type.
  *    - lower 6-bits of switch register determines device code (0-63.).
  *    - most significant bit determines if device is "low speed" or "high speed".
@@ -1389,7 +1389,7 @@ if ( hptr )
         (hptr->ac3 & 0xFFFF),
         ((hptr->carry) ? 1 : 0)
         ) ;
-    if ( cpu_unit.flags & UNIT_STK  /* Nova 3 or Nova 4 */ ) 
+    if ( cpu_unit.flags & UNIT_STK  /* Nova 3 or Nova 4 */ )
         {
         fprintf( fp, "%06o  %06o   ", SP, FP ) ;
         }

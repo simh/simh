@@ -305,4 +305,3 @@ if (ADDR_IS_MEM (pa)) M[pa >> 3] = dat;
 else WriteIO (pa, dat, L_QUAD);
 return;
 }
-

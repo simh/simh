@@ -26,13 +26,13 @@
    dup          DUP11 Unibus/DPV11 Qbus bit synchronous interface
 
    This module implements a bit synchronous interface to support DDCMP.  Other
-   synchronous protocols which may have been supported on the DUP11/DPV11 bit 
+   synchronous protocols which may have been supported on the DUP11/DPV11 bit
    synchronous interface are explicitly not supported.
 
-   Connections are modeled with a tcp session with connection management and 
+   Connections are modeled with a tcp session with connection management and
    I/O provided by the tmxr library.
 
-   The wire protocol implemented is native DDCMP WITHOUT the DDCMP SYNC 
+   The wire protocol implemented is native DDCMP WITHOUT the DDCMP SYNC
    characters both initially and between DDCMP packets.
 
    15-May-13    MP      Initial implementation
@@ -340,11 +340,11 @@ DIB dup_dib = {
 };
 
 static UNIT dup_unit_template = {
-    UDATA (&dup_svc, UNIT_ATTABLE|UNIT_IDLE, 0), 
+    UDATA (&dup_svc, UNIT_ATTABLE|UNIT_IDLE, 0),
     };
 
 static UNIT dup_poll_unit_template = {
-    UDATA (&dup_poll_svc, UNIT_DIS|UNIT_IDLE, 0), 
+    UDATA (&dup_poll_svc, UNIT_DIS|UNIT_IDLE, 0),
     };
 
 static UNIT dup_units[DUP_LINES+1];    /* One unit per line and a polling unit */
@@ -433,20 +433,20 @@ static DEBTAB dup_debug[] = {
 };
 
 /*
-   We have two devices defined here (dup_dev and dpv_dev) which have the 
+   We have two devices defined here (dup_dev and dpv_dev) which have the
    same units.  This would normally never be allowed since two devices can't
-   actually share units.  This problem is avoided in this case since both 
-   devices start out as disabled and the logic in dup_reset allows only 
-   one of these devices to be enabled at a time.  The DUP device is allowed 
+   actually share units.  This problem is avoided in this case since both
+   devices start out as disabled and the logic in dup_reset allows only
+   one of these devices to be enabled at a time.  The DUP device is allowed
    on Unibus systems and the DPV device Qbus systems.
    This monkey business is necessary due to the fact that although both
    the DUP and DPV devices have almost the same functionality and almost
    the same register programming interface, they are different enough that
    they fall in different priorities in the autoconfigure address and vector
    rules.
-   This 'shared' unit model therefore means we can't call the 
-   find_dev_from_unit api to uniquely determine the device structure.  
-   We define the DUPDPTR macro to return the active device pointer when 
+   This 'shared' unit model therefore means we can't call the
+   find_dev_from_unit api to uniquely determine the device structure.
+   We define the DUPDPTR macro to return the active device pointer when
    necessary.
  */
 DEVICE dup_dev = {
@@ -455,7 +455,7 @@ DEVICE dup_dev = {
     NULL, NULL, &dup_reset,
     NULL, &dup_attach, &dup_detach,
     &dup_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS | DEV_DEBUG | DEV_DONTAUTO, 0,
-    dup_debug, NULL, NULL, &dup_help, dup_help_attach, &dup_desc, 
+    dup_debug, NULL, NULL, &dup_help, dup_help_attach, &dup_desc,
     &dup_description
     };
 
@@ -465,7 +465,7 @@ DEVICE dpv_dev = {
     NULL, NULL, &dup_reset,
     NULL, &dup_attach, &dup_detach,
     &dup_dib, DEV_DIS | DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_DONTAUTO, 0,
-    dup_debug, NULL, NULL, &dup_help, dup_help_attach, &dup_desc, 
+    dup_debug, NULL, NULL, &dup_help, dup_help_attach, &dup_desc,
     &dup_description
     };
 
@@ -474,7 +474,7 @@ DEVICE dpv_dev = {
 /* Register names for Debug tracing */
 static const char *dup_rd_regs[] =
     {"RXCSR ", "RXDBUF", "TXCSR ", "TXDBUF" };
-static const char *dup_wr_regs[] = 
+static const char *dup_wr_regs[] =
     {"RXCSR ", "PARCSR", "TXCSR ", "TXDBUF"};
 
 
@@ -567,19 +567,19 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             if (dup_rxcsr[dup] & RXCSR_M_RXIE)
                 dup_set_rxint (dup);
             }
-        if ((dup_rxcsr[dup] & RXCSR_M_RCVEN) && 
+        if ((dup_rxcsr[dup] & RXCSR_M_RCVEN) &&
             (!(orig_val & RXCSR_M_RCVEN))) {            /* Upward transition of receiver enable */
             dup_rcv_byte (dup);                         /* start any pending receive */
             }
-        if ((!(dup_rxcsr[dup] & RXCSR_M_RCVEN)) && 
+        if ((!(dup_rxcsr[dup] & RXCSR_M_RCVEN)) &&
             (orig_val & RXCSR_M_RCVEN)) {               /* Downward transition of receiver enable */
             dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
             dup_rxcsr[dup] &= ~RXCSR_M_RXACT;
-            if ((dup_rcvpkinoff[dup] != 0) || 
+            if ((dup_rcvpkinoff[dup] != 0) ||
                 (dup_rcvpkbytes[dup] != 0))
                 dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
             }
-        if ((!(dup_rxcsr[dup] & RXCSR_M_RXIE)) && 
+        if ((!(dup_rxcsr[dup] & RXCSR_M_RXIE)) &&
             (orig_val & RXCSR_M_RXIE))                  /* Downward transition of receiver interrupt enable */
             dup_clr_rxint (dup);
         if ((dup_rxcsr[dup] & RXCSR_M_RXIE) && (dup_rxcsr[dup] & RXCSR_M_RXDONE))
@@ -611,20 +611,20 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
                     break;
                 }
             }
-        if ((dup_txcsr[dup] & TXCSR_M_TXACT) && 
-            (!(orig_val & TXCSR_M_TXACT))    && 
+        if ((dup_txcsr[dup] & TXCSR_M_TXACT) &&
+            (!(orig_val & TXCSR_M_TXACT))    &&
             (orig_val & TXCSR_M_TXDONE)) {
             dup_txcsr[dup] &= ~TXCSR_M_TXDONE;
             }
-        if ((!(dup_txcsr[dup] & TXCSR_M_SEND)) && 
+        if ((!(dup_txcsr[dup] & TXCSR_M_SEND)) &&
             (orig_val & TXCSR_M_SEND)) {
             dup_txcsr[dup] &= ~TXCSR_M_TXACT;
             dup_put_msg_bytes (dup, NULL, 0, FALSE, TRUE);
             }
         if ((dup_txcsr[dup] & TXCSR_M_HALFDUP) ^ (orig_val & TXCSR_M_HALFDUP))
             tmxr_set_line_halfduplex (dup_desc.ldsc+dup, dup_txcsr[dup] & TXCSR_M_HALFDUP);
-        if ((dup_txcsr[dup] & TXCSR_M_TXIE) && 
-            (!(orig_val & TXCSR_M_TXIE))    && 
+        if ((dup_txcsr[dup] & TXCSR_M_TXIE) &&
+            (!(orig_val & TXCSR_M_TXIE))    &&
             (dup_txcsr[dup] & TXCSR_M_TXDONE)) {
             dup_set_txint (dup);
             }
@@ -810,7 +810,7 @@ if ((dup < 0) || (dup >= dup_desc.lines) || (DUPDPTR->flags & DEV_DIS))
 orig_val = dup_rxcsr[dup];
 dup_rxcsr[dup] &= ~RXCSR_M_RCVEN;
 dup_rxcsr[dup] |= (state ? RXCSR_M_RCVEN : 0);
-if ((dup_rxcsr[dup] & RXCSR_M_RCVEN) && 
+if ((dup_rxcsr[dup] & RXCSR_M_RCVEN) &&
     (!(orig_val & RXCSR_M_RCVEN))) {            /* Upward transition of receiver enable */
     UNIT *uptr = dup_units + dup;
 
@@ -833,7 +833,7 @@ if (!protocol_DDCMP) {
 if (crc_inhibit) {
     return SCPE_ARG;                /* Must enable CRC for DDCMP */
     }
-/* These settings reflect how RSX operates a bare DUP when used for 
+/* These settings reflect how RSX operates a bare DUP when used for
    DECnet communications */
 dup_clear(dup, FALSE);
 dup_rxcsr[dup] |= RXCSR_M_STRSYN | RXCSR_M_RCVEN;
@@ -920,7 +920,7 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
         }
     breturn = TRUE;
     }
-sim_debug (DBG_TRC, DUPDPTR, "dup_put_msg_bytes(dup=%d, len=%d, start=%s, end=%s) %s\n", 
+sim_debug (DBG_TRC, DUPDPTR, "dup_put_msg_bytes(dup=%d, len=%d, start=%s, end=%s) %s\n",
            dup, (int)len, start ? "TRUE" : "FALSE", end ? "TRUE" : "FALSE", breturn ? "Good" : "Busy");
 if (breturn && (tmxr_tpbusyln (&dup_ldsc[dup]) || dup_xmtpkbytes[dup])) {
     if (dup_xmt_complete_callback[dup])
@@ -944,20 +944,20 @@ if ((dup_rcvpkinoff[dup] == 0) && (dup_rcvpkbytes[dup] != 0)) {
     *pbuf = &dup_rcvpacket[dup][0];
     *psize = dup_rcvpkbytes[dup];
     }
-sim_debug (DBG_TRC, DUPDPTR, "dup_get_packet(dup=%d, psize=%d)\n", 
+sim_debug (DBG_TRC, DUPDPTR, "dup_get_packet(dup=%d, psize=%d)\n",
            dup, (int)*psize);
 return SCPE_OK;
 }
 
 static t_stat dup_rcv_byte (int32 dup)
 {
-sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d) - %s, byte %d of %d\n", dup, 
+sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d) - %s, byte %d of %d\n", dup,
            (dup_rxcsr[dup] & RXCSR_M_RCVEN) ? "enabled" : "disabled",
            dup_rcvpkinoff[dup], dup_rcvpkbytes[dup]);
 if (!(dup_rxcsr[dup] & RXCSR_M_RCVEN) || (dup_rcvpkbytes[dup] == 0) || (dup_rxcsr[dup] & RXCSR_M_RXDONE))
     return SCPE_OK;
 if (dup_rcv_packet_data_callback[dup]) {
-    sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d, psize=%d) - Invoking Receive Data callback\n", 
+    sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d, psize=%d) - Invoking Receive Data callback\n",
                dup, (int)dup_rcvpkbytes[dup]);
     dup_rcv_packet_data_callback[dup](dup, dup_rcvpkbytes[dup]);
     return SCPE_OK;
@@ -967,7 +967,7 @@ dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
 dup_rxdbuf[dup] |= dup_rcvpacket[dup][dup_rcvpkinoff[dup]++];
 dup_rxcsr[dup] |= RXCSR_M_RXDONE;
-if (((dup_rcvpkinoff[dup] == 8) || 
+if (((dup_rcvpkinoff[dup] == 8) ||
      (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup])) &&
     (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
     dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;

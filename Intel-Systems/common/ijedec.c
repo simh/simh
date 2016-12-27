@@ -23,21 +23,21 @@
     used in advertising or otherwise to promote the sale, use or other dealings
     in this Software without prior written authorization from William A. Beech.
 
-    These functions support a simulated i2732 JEDEC device on an iSBC.  This 
+    These functions support a simulated i2732 JEDEC device on an iSBC.  This
     allows the attachment of the device to a binary file containing the JEDEC
     code.
 
-    Unit will support 8, 16 and 32 KB EPROMs as well as 8 and 16 KB static 
-    RAMs in the JEDEC sockets.  Units must be configured for 8KB for 8KB 
-    SRAM and 32KB for 32KB SRAM.  If configured for 16KB, SRAM cannot be 
-    configured.  Size is set by configuring the top JEDEC site for an EPROM.  
-    Size and spacing for the other JEDEC units is derived from the top JEDEC 
-    site configuration.  Changing the top JEDEC site will clear the 
+    Unit will support 8, 16 and 32 KB EPROMs as well as 8 and 16 KB static
+    RAMs in the JEDEC sockets.  Units must be configured for 8KB for 8KB
+    SRAM and 32KB for 32KB SRAM.  If configured for 16KB, SRAM cannot be
+    configured.  Size is set by configuring the top JEDEC site for an EPROM.
+    Size and spacing for the other JEDEC units is derived from the top JEDEC
+    site configuration.  Changing the top JEDEC site will clear the
     configuration of all other JEDEC sites. The JEDEC driver can be set for
     either 8- or 16bit data access.
-    
-    The top JEDEC site can only be configured to contain an EPROM.  
-    It contains the reset address for the 8088, 8086, 80188, 80186, 
+
+    The top JEDEC site can only be configured to contain an EPROM.
+    It contains the reset address for the 8088, 8086, 80188, 80186,
     and 80286.
 
     For illustration 8-bit mode - 4 Sites - configured for 8KB chips
@@ -74,7 +74,7 @@
     |        |              |        |
     | jedec3 | Only ROM     | jedec2 | Only ROM
     |        |              |        |
-    +--------+ 0xFC001      +--------+ 0xFC000 
+    +--------+ 0xFC001      +--------+ 0xFC000
 
     +--------+ 0xFBFFF      +--------+ 0xFBFFE
     |        |              |        |
@@ -156,20 +156,20 @@ DEVICE JEDEC_dev = {
     NULL,               //registers
     JEDEC_mod,          //modifiers
     JEDEC_NUM,          //numunits
-    16,                 //aradix 
-    32,                 //awidth 
-    1,                  //aincr 
-    16,                 //dradix 
+    16,                 //aradix
+    32,                 //awidth
+    1,                  //aincr
+    16,                 //dradix
     8,                  //dwidth
-    NULL,               //examine 
-    NULL,               //deposit 
+    NULL,               //examine
+    NULL,               //deposit
     &JEDEC_reset,       //reset
     NULL,               //boot
-    &JEDEC_attach,      //attach 
+    &JEDEC_attach,      //attach
     NULL,               //detach
     NULL,               //ctxt
-    DEV_DEBUG,          //flags 
-    0,                  //dctrl 
+    DEV_DEBUG,          //flags
+    0,                  //dctrl
     JEDEC_debug,        //debflags
     NULL,               //msize
     NULL                //lname
@@ -194,7 +194,7 @@ t_stat JEDEC_attach (UNIT *uptr, char *cptr)
 
     if (JEDEC_dev.dctrl & DEBUG_flow)
         sim_printf("\tJEDEC_attach: Entered with cptr=%s\n", cptr);
-    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
+    if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
         if (JEDEC_dev.dctrl & DEBUG_flow)
             sim_printf("\tJEDEC_attach: Error\n");
         return r;
@@ -381,7 +381,7 @@ t_stat JEDEC_reset (DEVICE *dptr)
             uptr->u6 = i;                   /* unit number - only set here! */
         }
         if (uptr->capac) {                  /* if configured */
-            sim_printf("   JEDEC%d: Initializing %2XKB %s [%04X-%04XH]\n", 
+            sim_printf("   JEDEC%d: Initializing %2XKB %s [%04X-%04XH]\n",
                 i,
                 uptr->capac / 0x400,
                 uptr->u5 ? "Ram" : "Rom",
@@ -425,7 +425,7 @@ t_stat JEDEC_reset (DEVICE *dptr)
 /*  I/O instruction handlers, called from the CPU module when an
     JEDEC memory read or write is issued.
 
-    Need to fix for hi/low memory operations 
+    Need to fix for hi/low memory operations
 */
 
 /*  get a byte from memory */

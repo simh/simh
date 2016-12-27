@@ -138,7 +138,7 @@ DEVICE mctl_dev = {
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
     &mctl_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mctl_deb, NULL, NULL, NULL, NULL, NULL, 
+    mctl_deb, NULL, NULL, NULL, NULL, NULL,
     &mctl_description
     };
 
@@ -266,7 +266,7 @@ struct {
     } boards[] = {
         { 4096, "MS750-JD M7199"},
         { 1024, "MS750-CA M8750"},
-        {  256, "MS750-AA M8728"}, 
+        {  256, "MS750-AA M8728"},
         {    0, NULL}};
 int32 i, bd;
 

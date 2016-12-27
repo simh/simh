@@ -180,7 +180,7 @@ static const char *ioname[DEV_MAX] = {
  NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
  NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
  };
- 
+
 static const int32 opc_val[] = {
  0000000+I_NPN, 0000005+I_NPN, 0000007+I_NPN,
  0000011+I_NPN, 0000013+I_NPN, 0000021+I_NPN,
@@ -253,7 +253,7 @@ return;
         *of     =       output stream
         addr    =       current PC
         *val    =       pointer to data
-        *uptr   =       pointer to unit 
+        *uptr   =       pointer to unit
         sw      =       switches
    Outputs:
         return  =       status code
@@ -321,7 +321,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             break;
 
         case I_V_SK0: case I_V_SK1:                     /* skips */
-            fprint_opr (of, inst & 0777, j);            /* print skips */       
+            fprint_opr (of, inst & 0777, j);            /* print skips */
             break;
             }                                           /* end case */
 

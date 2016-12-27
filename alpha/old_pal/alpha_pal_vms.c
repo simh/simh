@@ -1126,7 +1126,7 @@ if ((ar & M32) == (c & M32)) {                          /* single entry? */
 c = (SEXT_L_Q (c + h)) & M64;                           /* abs addr of c */
 if (Test (c + 4, cm_racc, NULL)) WriteQ (h, ar);        /* rtst c+4, rls if err */
 b = ReadL (c + 4);                                      /* b <- (c+4), flt ok */
-b = (SEXT_L_Q (b + c)) & M64;                           /* abs addr of b */             
+b = (SEXT_L_Q (b + c)) & M64;                           /* abs addr of b */
 if (b & 07) {                                           /* b quad aligned? */
     WriteQ (h, ar);                                     /* release interlock */
     ABORT (EXC_RSVO);                                   /* fault */
@@ -1155,7 +1155,7 @@ if ((ar & M32) == (c & M32)) {                          /* single entry? */
     }
 c = (SEXT_L_Q (c + h)) & M64;                           /* abs addr of c */
 b = ReadL (c + 4);                                      /* b <- (c+4) */
-b = (SEXT_L_Q (b) + c) & M64;                           /* abs addr of b */             
+b = (SEXT_L_Q (b) + c) & M64;                           /* abs addr of b */
 WriteL (b, (uint32) (h - b));                           /* (b) <- h-b */
 WriteL (h + 4, (uint32) (b - h));                       /* (h+4) <- b-h */
 WriteL (h, (uint32) ar);                                /* release interlock */
@@ -1186,7 +1186,7 @@ if (ar == c) {                                          /* single entry? */
 c = (c + h) & M64;                                      /* abs addr of c */
 if (Test (c + 8, cm_racc, NULL)) WriteQ (h, ar);        /* rtst c+8, rls if err */
 b = ReadQ (c + 8);                                      /* b <- (c+8), flt ok */
-b = (b + c) & M64;                                      /* abs addr of b */             
+b = (b + c) & M64;                                      /* abs addr of b */
 if (b & 0xF) {                                          /* b octa aligned? */
     WriteQ (h, ar);                                     /* release interlock */
     ABORT (EXC_RSVO);                                   /* fault */
@@ -1215,7 +1215,7 @@ if (ar == c) {                                          /* single entry? */
     }
 c = (c + h) & M64;                                      /* abs addr of c */
 b = ReadQ (c + 8);                                      /* b <- (c+8) */
-b = (b + c) & M64;                                      /* abs addr of b */             
+b = (b + c) & M64;                                      /* abs addr of b */
 WriteQ (b, (h - b) & M64);                              /* (b) <- h-b */
 WriteQ (h + 8, (b - h) & M64);                          /* (h+8) <- b-h */
 WriteQ (h, ar);                                         /* release interlock */
@@ -1330,7 +1330,7 @@ if (e == p) return -1;                                  /* queue empty? */
 ReadUna ((s + 4) & M64, L_LONG, cm_wacc);               /* wchk (s+4) */
 WriteUna (p, s, L_LONG, cm_wacc);                       /* (p) <- s */
 WriteUna ((s + 4) & M64, p, L_LONG, cm_wacc);           /* (s+4) <- p */
-return ((s == p)? 0: +1); 
+return ((s == p)? 0: +1);
 }
 
 t_int64 vms_remqueq (uint32 defer)
@@ -1350,7 +1350,7 @@ if (e == p) return -1;                                  /* queue empty? */
 ReadAccQ (s + 8, cm_wacc);                              /* wchk (s+8) */
 WriteQ (p, s);                                          /* (p) <- s */
 WriteQ (s + 8, p);                                      /* (s+8) <- p */
-return ((s == p)? 0: +1); 
+return ((s == p)? 0: +1);
 }
 
 /* Probe */

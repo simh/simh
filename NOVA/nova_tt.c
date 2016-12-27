@@ -206,7 +206,7 @@ return SCPE_OK;
 int32 tto (int32 pulse, int32 code, int32 AC)
 {
 if (code == ioDOA)
-    tto_unit.buf = AC & 0377; 
+    tto_unit.buf = AC & 0377;
 
 switch (pulse)
     {                                                   /* decode IR<8:9> */

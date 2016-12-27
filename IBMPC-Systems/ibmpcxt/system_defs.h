@@ -65,7 +65,7 @@
 #define RAM_SIZE        0x40000
 
 /* set INTR for CPU on the IBM PC XT */
-#define INT_R           INT_1  
+#define INT_R           INT_1
 
 /* xtbus interrupt definitions */
 
@@ -107,4 +107,3 @@
 #define STOP_OPCODE	4                           /* Invalid Opcode */
 #define STOP_IO 	5                           /* I/O error */
 #define STOP_MEM 	6                           /* Memory error */
-

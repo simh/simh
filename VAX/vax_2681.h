@@ -56,7 +56,7 @@ struct uart2681_t {
     };
 
 typedef struct uart2681_t UART2681;
-    
+
 void ua2681_wr (UART2681 *ctx, uint32 rg, uint32 data);
 uint32 ua2681_rd (UART2681 *ctx, uint32 rg);
 void ua2681_ip0_wr (UART2681 *ctx, uint32 set);

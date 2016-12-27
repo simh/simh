@@ -29,7 +29,7 @@
   This DEQNA/DELQA/DELQA-T simulation is based on:
     Digital DELQA Users Guide, Part# EK-DELQA-UG-002
     Digital DEQNA Users Guide, Part# EK-DEQNA-UG-001
-    Digital DELQA-Plus Addendum to DELQA Users Guide, Part# EK-DELQP-UG-001_Sep89.pdf 
+    Digital DELQA-Plus Addendum to DELQA Users Guide, Part# EK-DELQP-UG-001_Sep89.pdf
   These manuals can be found online at:
     http://www.bitsavers.org/pdf/dec/qbus
 
@@ -68,34 +68,34 @@
   Modification history:
 
   20-Apr-11  MP   Fixed missing information from save/restore which
-                  caused operations to not complete correctly after 
+                  caused operations to not complete correctly after
                   a restore until the OS reset the controller.
   09-Dec-10  MP   Added address conflict check during attach.
   06-Dec-10  MP   Fixed loopback processing to correctly handle forward packets.
-  29-Nov-10  MP   Fixed interrupt dispatch issue which caused delivered packets 
+  29-Nov-10  MP   Fixed interrupt dispatch issue which caused delivered packets
                   (in and out) to sometimes not interrupt the CPU after processing.
-  07-Mar-08  MP   Fixed the SCP visibile SA registers to always display the 
+  07-Mar-08  MP   Fixed the SCP visibile SA registers to always display the
                   ROM mac address, even after it is changed by SET XQ MAC=.
-  07-Mar-08  MP   Added changes so that the Console DELQA diagnostic (>>>TEST 82) 
+  07-Mar-08  MP   Added changes so that the Console DELQA diagnostic (>>>TEST 82)
                   will succeed.
   03-Mar-08  MP   Added DELQA-T (aka DELQA Plus) device emulation support.
   06-Feb-08  MP   Added dropped frame statistics to record when the receiver discards
                   received packets due to the receiver being disabled, or due to the
                   XQ device's packet receive queue being full.
                   Fixed bug in receive processing when we're not polling.  This could
-                  cause receive processing to never be activated again if we don't 
-                  read all available packets via eth_read each time we get the 
+                  cause receive processing to never be activated again if we don't
+                  read all available packets via eth_read each time we get the
                   opportunity.
   31-Jan-08  MP   Added the ability to Coalesce received packet interrupts.  This
-                  is enabled by SET XQ POLL=DELAY=nnn where nnn is a number of 
+                  is enabled by SET XQ POLL=DELAY=nnn where nnn is a number of
                   microseconds to delay the triggering of an interrupt when a packet
                   is received.
-  29-Jan-08  MP   Added SET XQ POLL=DISABLE (aka SET XQ POLL=0) to operate without 
+  29-Jan-08  MP   Added SET XQ POLL=DISABLE (aka SET XQ POLL=0) to operate without
                   polling for packet read completion.
   29-Jan-08  MP   Changed the sanity and id timer mechanisms to use a separate timer
                   unit so that transmit and recieve activities can be dealt with
                   by the normal xq_svc routine.
-                  Dynamically determine the timer polling rate based on the 
+                  Dynamically determine the timer polling rate based on the
                   calibrated tmr_poll and clk_tps values of the simulator.
   25-Jan-08  MP   Enabled the SET XQ POLL to be meaningful if the simulator currently
                   doesn't support idling.
@@ -103,7 +103,7 @@
                   all debug output goes to the same place.
   25-Jan-08  MP   Restored the call to xq_svc after all successful calls to eth_write
                   to allow receive processing to happen before the next event
-                  service time.  This must have been inadvertently commented out 
+                  service time.  This must have been inadvertently commented out
                   while other things were being tested.
   23-Jan-08  MP   Added debugging support to display packet headers and packet data
   18-Jun-07  RMS  Added UNIT_IDLE flag
@@ -132,10 +132,10 @@
                   - Fixed output format in show_xq_sanity to end in "\n"
                   - Added display of All Multicast and promiscuous to
                   xq_show_filters
-                  - The stuck in All Multicast or Promiscuous issue is 
-                  worse than previously thought.  See comments in 
-                  xq_process_setup.                  
-                  - Change xq_setmac to also allow ":" as a address 
+                  - The stuck in All Multicast or Promiscuous issue is
+                  worse than previously thought.  See comments in
+                  xq_process_setup.
+                  - Change xq_setmac to also allow ":" as a address
                   separator character, since sim_ether's eth_mac_fmt
                   formats them with this separator character.
                   - Changed xq_sw_reset to behave more like the set of
@@ -541,7 +541,7 @@ DEVICE xq_dev = {
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
-  0, xq_debug, NULL, NULL, &xq_help, NULL, NULL, 
+  0, xq_debug, NULL, NULL, &xq_help, NULL, NULL,
   &xq_description
 };
 
@@ -551,7 +551,7 @@ DEVICE xqb_dev = {
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
-  0, xq_debug, NULL, NULL, NULL, NULL, NULL, 
+  0, xq_debug, NULL, NULL, NULL, NULL, NULL,
   &xq_description
 };
 
@@ -974,8 +974,8 @@ t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
-  fprintf(st, "leds=(%s,%s,%s)", xq->var->setup.l1 ? "ON" : "OFF", 
-                                 xq->var->setup.l2 ? "ON" : "OFF", 
+  fprintf(st, "leds=(%s,%s,%s)", xq->var->setup.l1 ? "ON" : "OFF",
+                                 xq->var->setup.l2 ? "ON" : "OFF",
                                  xq->var->setup.l3 ? "ON" : "OFF");
   return SCPE_OK;
 }
@@ -1008,7 +1008,7 @@ void xq_write_callback (CTLR* xq, int status)
   uint16 write_failure[2] = {XQ_DSC_C};
   write_success[1] = TDR & 0x03FF; /* Does TDR get set on successful packets ?? */
   write_failure[1] = TDR & 0x03FF; /* TSW2<09:00> */
-  
+
   xq->var->stats.xmit += 1;
   /* update write status words */
   if (status == 0) { /* success */
@@ -1118,7 +1118,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     /* get receive bdl flags and descriptor bits from memory */
     rstatus = Map_ReadW (xq->var->rbdl_ba,     4, &xq->var->rbdl_buf[0]);
     if (rstatus) return xq_nxm_error(xq);
-    
+
     /* DEQNA stops processing if nothing in read queue */
     if ((xq->var->type == XQ_T_DEQNA) && (!xq->var->ReadQ.count)) break;
 
@@ -1170,13 +1170,13 @@ t_stat xq_process_rbdl(CTLR* xq)
       }
     if (xq->var->rbdl_buf[1] & XQ_DSC_L) b_length -= 1;
 
-    sim_debug(DBG_TRC, xq->dev, "Using receive descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n", 
+    sim_debug(DBG_TRC, xq->dev, "Using receive descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n",
                                               xq->var->rbdl_ba, xq->var->rbdl_buf[0], xq->var->rbdl_buf[1] & 0xFFC0, address, b_length, xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
 
     /* Examine the descriptor to try and determine if any prior contents haven't been 'digested' yet */
     if (((xq->var->rbdl_buf[4] & 0xC000) != 0x8000) ||
         ((xq->var->rbdl_buf[5] & 0xFF) == (((xq->var->rbdl_buf[5] >> 8) & 0xFF)))) {
-      sim_debug(DBG_TRC, xq->dev, "Undigested receive descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n", 
+      sim_debug(DBG_TRC, xq->dev, "Undigested receive descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n",
                                   xq->var->rbdl_ba, xq->var->rbdl_buf[0], xq->var->rbdl_buf[1] & 0xFFC0, address, b_length, xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
       }
 
@@ -1192,8 +1192,8 @@ t_stat xq_process_rbdl(CTLR* xq)
       rbl -= used;
       rbuf = &rbuf[used];
       } else {
-      /* there should be no need to adjust runt packets 
-         the physical layer (sim_ether) won't deliver any short packets 
+      /* there should be no need to adjust runt packets
+         the physical layer (sim_ether) won't deliver any short packets
          via eth_read, so the only short packets which get here are loopback
          packets sent by the host diagnostics (OR short setup packets) */
       if ((item->type == ETH_ITM_NORMAL) && (rbl < ETH_MIN_PACKET)) {
@@ -1221,7 +1221,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     if (rbl > b_length)
       rbl = b_length;
     item->packet.used += rbl;
-    
+
     /* send data to host */
     wstatus = Map_WriteB(address, rbl, rbuf);
     if (wstatus) return xq_nxm_error(xq);
@@ -1271,7 +1271,7 @@ t_stat xq_process_rbdl(CTLR* xq)
       }
     if (((~xq->var->csr & XQ_CSR_EL) &&
          (((uint16)((rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0)))) > ETH_MAX_PACKET)) ||
-        ((xq->var->csr & XQ_CSR_EL) && (item->type == ETH_ITM_LOOPBACK) && 
+        ((xq->var->csr & XQ_CSR_EL) && (item->type == ETH_ITM_LOOPBACK) &&
          (rbl >= XQ_LONG_PACKET)))
       xq->var->rbdl_buf[4] |= XQ_RST_LASTERR;   /* set Error bit (LONG) */
 
@@ -1279,7 +1279,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
     if (wstatus) return xq_nxm_error(xq);
 
-    sim_debug(DBG_TRC, xq->dev, "xq_process_rbdl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", 
+    sim_debug(DBG_TRC, xq->dev, "xq_process_rbdl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n",
         xq->var->rbdl_ba, address, b_length, (int)((uint16)(rbl + ((item->type == ETH_ITM_NORMAL) ? 60 : 0))), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
 
     /* remove packet from queue */
@@ -1382,29 +1382,29 @@ t_stat xq_process_setup(CTLR* xq)
     }
 
   /*
-     Under VMS the setup packet that is passed to turn promiscuous 
-     off after it has been on doesn't seem to follow the rules documented 
+     Under VMS the setup packet that is passed to turn promiscuous
+     off after it has been on doesn't seem to follow the rules documented
      in both the DEQNA and DELQA manuals.
-     These rules seem to say that setup packets less than 128 should only 
-     modify the address filter set and probably not the All-Multicast and 
-     Promiscuous modes, however, VMS V5-5 and V7.3 seem to send a 127 byte 
-     packet to turn this functionality off.  I'm not sure how real hardware 
-     behaves in this case, since the only consequence is extra interrupt 
-     load.  To realize and retain the benefits of the newly added BPF 
+     These rules seem to say that setup packets less than 128 should only
+     modify the address filter set and probably not the All-Multicast and
+     Promiscuous modes, however, VMS V5-5 and V7.3 seem to send a 127 byte
+     packet to turn this functionality off.  I'm not sure how real hardware
+     behaves in this case, since the only consequence is extra interrupt
+     load.  To realize and retain the benefits of the newly added BPF
      functionality in sim_ether, I've modified the logic implemented here
      to disable Promiscuous mode when a "small" setup packet is processed.
      I'm deliberately not modifying the All-Multicast mode the same way
-     since I don't have an observable case of its behavior.  These two 
+     since I don't have an observable case of its behavior.  These two
      different modes come from very different usage situations:
-        1) Promiscuous mode is usually entered for relatively short periods 
+        1) Promiscuous mode is usually entered for relatively short periods
            of time due to the needs of a specific application program which
            is doing some sort of management/monitoring function (i.e. tcpdump)
         2) All-Multicast mode is only entered by the OS Kernel Port Driver
-           when it happens to have clients (usually network stacks or service 
+           when it happens to have clients (usually network stacks or service
            programs) which as a group need to listen to more multicast ethernet
            addresses than the 12 (or so) which the hardware supports directly.
-     so, I believe that the All-Multicast mode, is first rarely used, and if 
-     it ever is used, once set, it will probably be set either forever or for 
+     so, I believe that the All-Multicast mode, is first rarely used, and if
+     it ever is used, once set, it will probably be set either forever or for
      long periods of time, and the additional interrupt processing load to
      deal with the distinctly lower multicast traffic set is clearly lower than
      that of the promiscuous mode.
@@ -1475,7 +1475,7 @@ t_stat xq_process_setup(CTLR* xq)
 
   The DELQA manual does not explicitly state whether or not multiple packets
   can be written in one transmit operation, so a maximum of 1 packet is assumed.
-  
+
   MP: Hmmm... Figure 3-1 on page 3-3 step 6 says that descriptors will be processed
   until the end of the list is found.
 
@@ -1657,7 +1657,7 @@ void xq_show_debug_bdl(CTLR* xq, uint32 bdl_ba)
     }
     if (bdl_buf[1] & XQ_DSC_L) b_length -= 1;
 
-    sim_debug(DBG_TRC, xq->dev, "    descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n", 
+    sim_debug(DBG_TRC, xq->dev, "    descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n",
                                               bdl_ba, bdl_buf[0], bdl_buf[1] & 0xFFC0, address, b_length, bdl_buf[4], bdl_buf[5]);
 
     bdl_ba += 12;
@@ -1797,7 +1797,7 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
     if (rbl > b_length)
       rbl = b_length;
     item->packet.used += rbl;
-    
+
     /* send data to host */
     status = Map_WriteB(address, rbl, rbuf);
     if (status != SCPE_OK)
@@ -1812,9 +1812,9 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       xq->var->rring[i].rmd0 |= XQ_RMD0_STP; /* Start of Packet */
     if (item->packet.used == (item->packet.len + ETH_CRC_SIZE))
       xq->var->rring[i].rmd0 |= XQ_RMD0_ENP; /* End of Packet */
-    
+
     if (xq->var->ReadQ.loss) {
-      xq->var->rring[i].rmd2 |= XQ_RMD2_MIS; 
+      xq->var->rring[i].rmd2 |= XQ_RMD2_MIS;
       sim_debug(DBG_RBL, xq->dev, "ReadQ overflow!\n");
       xq->var->stats.dropped += xq->var->ReadQ.loss;
       xq->var->ReadQ.loss = 0;          /* reset loss counter */
@@ -1957,7 +1957,7 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
   } else {
     /* There appears to be a bug in the VMS SCS/XQ driver when it uses chained
        buffers to transmit a packet.  It updates the transmit buffer ring in the
-       correct order (i.e. clearing the ownership on the last packet segment 
+       correct order (i.e. clearing the ownership on the last packet segment
        first), but it writes a transmit request to the ARQR register after adjusting
        the ownership of EACH buffer piece.  This results in us being awakened once
        and finding nothing to do.  We ignore this and the next write the ARQR will
@@ -1992,10 +1992,10 @@ t_stat xq_process_loopback(CTLR* xq, ETH_PACK* pack)
       else
         physical_address = &xq->var->mac;
 
-  /* The only packets we should be responding to are ones which 
-     we received due to them being directed to our physical MAC address, 
-     OR the Broadcast address OR to a Multicast address we're listening to 
-     (we may receive others if we're in promiscuous mode, but shouldn't 
+  /* The only packets we should be responding to are ones which
+     we received due to them being directed to our physical MAC address,
+     OR the Broadcast address OR to a Multicast address we're listening to
+     (we may receive others if we're in promiscuous mode, but shouldn't
      respond to them) */
   if ((0 == (pack->msg[0]&1)) &&           /* Multicast or Broadcast */
       (0 != memcmp(physical_address, pack->msg, sizeof(ETH_MAC))))
@@ -2129,7 +2129,7 @@ void xq_sw_reset(CTLR* xq)
   }
 
   /* Old DEQNA firmware also enabled interrupts and */
-  /* the Ultrix 1.X driver counts on that behavior */  
+  /* the Ultrix 1.X driver counts on that behavior */
   if ((xq->var->type == XQ_T_DEQNA) && xq->dib->vec && (ULTRIX1X))
     set_bits |= XQ_CSR_IE;
 
@@ -2172,7 +2172,7 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
 {
   uint16 save_var = xq->var->var;
   sim_debug(DBG_REG, xq->dev, "xq_wr_var(data=0x%04X)\n", data);
-  
+
   switch (xq->var->type) {
     case XQ_T_DEQNA:
       xq->var->var = (data & XQ_VEC_IV);
@@ -2259,7 +2259,7 @@ t_stat xq_process_bootrom (CTLR* xq)
       }
     }
   }
-  
+
   memset (&pack, 0, sizeof(pack));
   pack.len = bootrom_size;
   pack.used = 0;
@@ -2650,7 +2650,7 @@ t_stat xq_system_id (CTLR* xq, const ETH_MAC dest, uint16 receipt_id)
     }
 
   if (xq->var->type == XQ_T_DEQNA) /* DELQA-only function */
-    return SCPE_NOFNC;  
+    return SCPE_NOFNC;
 
   memset (&system_id, 0, sizeof(system_id));
   memcpy (&msg[0], dest, sizeof(ETH_MAC));
@@ -2782,7 +2782,7 @@ t_stat xq_tmrsvc(UNIT* uptr)
 }
 
 /*
-** service routine - used to delay receiver start by a few simulated 
+** service routine - used to delay receiver start by a few simulated
 **                   instructions
 */
 t_stat xq_startsvc(UNIT* uptr)
@@ -2798,7 +2798,7 @@ t_stat xq_startsvc(UNIT* uptr)
 }
 
 /*
-** service routine - used to delay receiption of loopback and setup packets by 
+** service routine - used to delay receiption of loopback and setup packets by
 **                   400 useconds like the real hardware
 */
 t_stat xq_receivesvc(UNIT* uptr)
@@ -3082,7 +3082,7 @@ void xq_debug_turbo_setup(CTLR* xq)
   sim_debug(DBG_SET, xq->dev, "%s: setup> set Physical MAC Address: %s\n", xq->dev->name, buffer);
 
   buffer[0] = '\0';
-  for (i = 0; i < sizeof(xq->var->init.hash_filter); i++) 
+  for (i = 0; i < sizeof(xq->var->init.hash_filter); i++)
     sprintf(&buffer[strlen(buffer)], "%02X ", xq->var->init.hash_filter[i]);
   sim_debug(DBG_SET, xq->dev, "%s: setup> set Multicast Hash: %s\n", xq->dev->name, buffer);
 
@@ -3091,21 +3091,21 @@ void xq_debug_turbo_setup(CTLR* xq)
   if (xq->var->init.options & XQ_IN_OP_INT) strcat(buffer, "INT ");
   sim_debug(DBG_SET, xq->dev, "%s: setup> set Options: %s\n", xq->dev->name, buffer);
 
-  sim_debug(DBG_SET, xq->dev, "%s: setup> set Vector: %d =0x%X\n", 
+  sim_debug(DBG_SET, xq->dev, "%s: setup> set Vector: %d =0x%X\n",
             xq->dev->name, xq->var->init.vector, xq->var->init.vector);
 
-  sim_debug(DBG_SET, xq->dev, "%s: setup> set Host Inactivity Timeout: %d seconds\n", 
+  sim_debug(DBG_SET, xq->dev, "%s: setup> set Host Inactivity Timeout: %d seconds\n",
             xq->dev->name, xq->var->init.hit_timeout);
 
   buffer[0] = '\0';
-  for (i = 0; i < sizeof(xq->var->init.bootpassword); i++) 
+  for (i = 0; i < sizeof(xq->var->init.bootpassword); i++)
     sprintf(&buffer[strlen(buffer)], "%02X ", xq->var->init.bootpassword[i]);
 
   sim_debug(DBG_SET, xq->dev, "%s: setup> set Boot Password: %s\n", xq->dev->name, buffer);
 
-  sim_debug(DBG_SET, xq->dev, "%s: setup> set Receive Ring Buffer Address:  %02X%04X\n", 
+  sim_debug(DBG_SET, xq->dev, "%s: setup> set Receive Ring Buffer Address:  %02X%04X\n",
             xq->dev->name, xq->var->init.rdra_h, xq->var->init.rdra_l);
-  sim_debug(DBG_SET, xq->dev, "%s: setup> set Transmit Ring Buffer Address: %02X%04X\n", 
+  sim_debug(DBG_SET, xq->dev, "%s: setup> set Transmit Ring Buffer Address: %02X%04X\n",
             xq->dev->name, xq->var->init.tdra_h, xq->var->init.tdra_l);
 }
 

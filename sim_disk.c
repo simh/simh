@@ -206,7 +206,7 @@ return NULL;
    thread has called sim_activate() to activate a unit.  The job of this
    routine is to put the unit in proper condition to digest what may have
    occurred in the asynchrconous thread.
-  
+
    Since disk processing only handles a single I/O at a time to a
    particular disk device (due to using stdio for the SimH Disk format
    and stdio doesn't have an atomic seek+(read|write) operation),
@@ -901,7 +901,7 @@ typedef struct _ODS2_FileHeader
 
 typedef union _ODS2_Retreval
     {
-        struct 
+        struct
             {
             unsigned fm2___fill   : 14;       /* type specific data               */
             unsigned fm2_v_format : 2;        /* format type code                 */
@@ -1003,19 +1003,19 @@ if (sim_disk_rdsect (uptr, 1, (uint8 *)&Home, NULL, 1))
     goto Return_Cleanup;
 CheckSum1 = ODS2Checksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum1)-((char *)&Home.hm2_l_homelbn))/2));
 CheckSum2 = ODS2Checksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum2)-((char *)&Home.hm2_l_homelbn))/2));
-if ((Home.hm2_l_homelbn == 0) || 
-    (Home.hm2_l_alhomelbn == 0) || 
-    (Home.hm2_l_altidxlbn == 0) || 
-    ((Home.hm2_b_struclev != 2) && (Home.hm2_b_struclev != 5)) || 
-    (Home.hm2_b_strucver == 0) || 
-    (Home.hm2_w_cluster == 0) || 
-    (Home.hm2_w_homevbn == 0) || 
-    (Home.hm2_w_alhomevbn == 0) || 
-    (Home.hm2_w_ibmapvbn == 0) || 
-    (Home.hm2_l_ibmaplbn == 0) || 
-    (Home.hm2_w_resfiles >= Home.hm2_l_maxfiles) || 
-    (Home.hm2_w_ibmapsize == 0) || 
-    (Home.hm2_w_resfiles < 5) || 
+if ((Home.hm2_l_homelbn == 0) ||
+    (Home.hm2_l_alhomelbn == 0) ||
+    (Home.hm2_l_altidxlbn == 0) ||
+    ((Home.hm2_b_struclev != 2) && (Home.hm2_b_struclev != 5)) ||
+    (Home.hm2_b_strucver == 0) ||
+    (Home.hm2_w_cluster == 0) ||
+    (Home.hm2_w_homevbn == 0) ||
+    (Home.hm2_w_alhomevbn == 0) ||
+    (Home.hm2_w_ibmapvbn == 0) ||
+    (Home.hm2_l_ibmaplbn == 0) ||
+    (Home.hm2_w_resfiles >= Home.hm2_l_maxfiles) ||
+    (Home.hm2_w_ibmapsize == 0) ||
+    (Home.hm2_w_resfiles < 5) ||
     (Home.hm2_w_checksum1 != CheckSum1) ||
     (Home.hm2_w_checksum2 != CheckSum2))
     goto Return_Cleanup;
@@ -1046,7 +1046,7 @@ if (sim_disk_rdsect (uptr, ScbLbn, (uint8 *)&Scb, NULL, 1))
 CheckSum1 = ODS2Checksum (&Scb, 255);
 if (CheckSum1 != *(((uint16 *)&Scb)+255)) /* Verify Checksum on Storage Control Block */
     goto Return_Cleanup;
-if ((Scb.scb_w_cluster != Home.hm2_w_cluster) || 
+if ((Scb.scb_w_cluster != Home.hm2_w_cluster) ||
     (Scb.scb_b_strucver != Home.hm2_b_strucver) ||
     (Scb.scb_b_struclev != Home.hm2_b_struclev))
     goto Return_Cleanup;
@@ -1509,7 +1509,7 @@ if (capac && (capac != (t_offset)-1)) {
         if ((filesystem_capac != (t_offset)-1) &&
             (filesystem_capac > capac))
             capac = filesystem_capac;
-        if ((capac > (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1))) || 
+        if ((capac > (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1))) ||
             (DKUF_F_STD != DK_GET_FMT (uptr)))
             uptr->capac = (t_addr)(capac/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
         }
@@ -1759,9 +1759,9 @@ return SCPE_OK;
 /* Factory bad block table creation routine
 
    This routine writes a DEC standard 144 compliant bad block table on the
-   last track of the specified unit as described in: 
+   last track of the specified unit as described in:
       EL-00144_B_DEC_STD_144_Disk_Standard_for_Recording_and_Handling_Bad_Sectors_Nov76.pdf
-   The bad block table consists of 10 repetitions of the same table, 
+   The bad block table consists of 10 repetitions of the same table,
    formatted as follows:
 
         words 0-1       pack id number
@@ -2032,9 +2032,9 @@ if (strchr (openmode, 'r'))
     DesiredAccess |= GENERIC_READ;
 if (strchr (openmode, 'w') || strchr (openmode, '+'))
     DesiredAccess |= GENERIC_WRITE;
-/* SCP Command Line parsing replaces \\ with \ presuming this is an 
+/* SCP Command Line parsing replaces \\ with \ presuming this is an
    escape sequence.  This only affecdts RAW device names and UNC paths.
-   We handle the RAW device name case here by prepending paths beginning 
+   We handle the RAW device name case here by prepending paths beginning
    with \.\ with an extra \. */
 if (!memcmp ("\\.\\", rawdevicename, 3)) {
     char *tmpname = (char *)malloc (2 + strlen (rawdevicename));
@@ -3287,7 +3287,7 @@ static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess
                                0);
         if (Status)
             goto Cleanup_Return;
-        if ((0 != memcmp (hVHD->Dynamic.ParentUniqueID, ParentFooter.UniqueID, sizeof (ParentFooter.UniqueID))) || 
+        if ((0 != memcmp (hVHD->Dynamic.ParentUniqueID, ParentFooter.UniqueID, sizeof (ParentFooter.UniqueID))) ||
             (ParentModifiedTimeStamp != hVHD->Dynamic.ParentTimeStamp)) {
             if (sim_switches & SWMASK ('O')) {                      /* OVERRIDE consistency checks? */
                 if ((sim_switches & SWMASK ('U')) &&                /* FIX (UPDATE) consistency checks AND */
@@ -4228,9 +4228,9 @@ while (sects) {
             goto Fatal_IO_Error;
         /* Since a large VHD can have a pretty large BAT, and we've only changed one longword bat entry
            in the current BAT, we write just the aligned sector which contains the updated BAT entry */
-        BATUpdateBufferAddress = (uint8 *)hVHD->BAT - (size_t)NtoHll(hVHD->Dynamic.TableOffset) + 
+        BATUpdateBufferAddress = (uint8 *)hVHD->BAT - (size_t)NtoHll(hVHD->Dynamic.TableOffset) +
             (size_t)((((size_t)&hVHD->BAT[BlockNumber]) - (size_t)hVHD->BAT + (size_t)NtoHll(hVHD->Dynamic.TableOffset)) & ~(VHD_DATA_BLOCK_ALIGNMENT-1));
-        /* If the starting of the BAT isn't on a VHD_DATA_BLOCK_ALIGNMENT boundary and we've just updated 
+        /* If the starting of the BAT isn't on a VHD_DATA_BLOCK_ALIGNMENT boundary and we've just updated
            a BAT entry early in the array, the buffer computed address might be before the start of the
            BAT table.  If so, only write the BAT data needed */
         if (BATUpdateBufferAddress < (uint8 *)hVHD->BAT) {

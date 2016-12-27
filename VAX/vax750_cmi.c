@@ -146,8 +146,8 @@ DEVICE cmi_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &cmi_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
-    &cmi_description 
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
+    &cmi_description
     };
 
 /* Special boot command, overrides regular boot */
@@ -331,11 +331,11 @@ switch (rg) {
     case MT_CSRS:                                       /* CSRS */
         val = csrs_rd ();
         break;
-        
+
     case MT_CSRD:                                       /* CSRD */
         val = csrd_rd ();
         break;
-        
+
     case MT_CSTS:                                       /* CSTS */
         val = csts_rd ();
         break;
@@ -405,11 +405,11 @@ switch (rg) {
     case MT_CSRS:                                       /* CSRS */
         csrs_wr (val);
         break;
-        
+
     case MT_CSTS:                                       /* CSTS */
         csts_wr (val);
         break;
-        
+
     case MT_CSTD:                                       /* CSTD */
         cstd_wr (val);
         break;
@@ -455,7 +455,7 @@ if (ADDR_IS_REG (pa)) {                                 /* reg space? */
 cmi_set_tmo ();                                         /* timeout */
 MACH_CHECK (MCHK_BPE);                                  /* machine check */
 return 0;
-} 
+}
 
 /* WriteReg - write register space
 
@@ -555,7 +555,7 @@ return cc;
 int32 con_halt (int32 code, int32 cc)
 {
 if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
-    (vax750_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
+    (vax750_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */
     (reset_all (0) != SCPE_OK) ||                       /* reset the world */
     (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
     ABORT (STOP_BOOT);                                  /* any error? */
@@ -687,7 +687,7 @@ if (gbuf[0]) {
             PC = 0xFA02 + 0x100*vax750_bootdev;
             }
         /* SCP device name specified use VMB to boot */
-        if ((unitno == -1) && 
+        if ((unitno == -1) &&
             (memcmp (gbuf, boot_tab[i].devname, strlen(boot_tab[i].devname)) == 0)) {
             DIB *dibp;
             uint32 ba;

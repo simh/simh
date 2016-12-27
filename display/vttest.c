@@ -1462,4 +1462,3 @@ vt_name_intr(void) {
     fflush(stdout);
     vt11_set_dpc((uint16)1);            /* resume */
 }
-

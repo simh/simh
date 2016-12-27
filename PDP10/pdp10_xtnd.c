@@ -180,7 +180,7 @@ static const d10 pwrs10[23][2] = {
 
 int xtend (int32 ac, int32 ea, int32 pflgs)
 {
-d10 b1, b2, ppi; 
+d10 b1, b2, ppi;
 d10 xinst, xoff = 0, digit, f1, f2, rs[2];
 d10 xflgs = 0;
 a10 e1 = 0, entad;
@@ -247,7 +247,7 @@ switch (xop) {                                          /* case on opcode */
         case XT_CMPSG:
             return (b1 > b2)? XT_SKIP: XT_NOSK;
             }
-        
+
         return XT_MUUO;
 
 /* Convert binary to decimal instructions - checked against KS10 ucode
@@ -349,7 +349,7 @@ switch (xop) {                                          /* case on opcode */
                 if (b1 < 0) {                           /* terminated? */
                     AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
                     if (TSTS (AC(p3)))
-                        AC(p4) = SETS (AC(p4));  
+                        AC(p4) = SETS (AC(p4));
                     return XT_NOSK;
                     }
                 if (xflgs & XT_SFLG)
@@ -359,7 +359,7 @@ switch (xop) {                                          /* case on opcode */
             AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
             if ((b1 < 0) || (b1 > 9)) {                 /* bad digit? done */
                 if (TSTS (AC(p3)))
-                    AC(p4) = SETS (AC(p4));      
+                    AC(p4) = SETS (AC(p4));
                 return XT_NOSK;
                 }
             AC(p4) = (AC(p4) * 10) + b1;                /* base * 10 + digit */
@@ -371,7 +371,7 @@ switch (xop) {                                          /* case on opcode */
             AC(p3) = (~AC(p3) + (AC(p4) == 0)) & DMASK;
             }
         if (TSTS (AC(p3)))
-            AC(p4) = SETS (AC(p4));      
+            AC(p4) = SETS (AC(p4));
         return XT_SKIP;
 
 /* String move instructions - checked against KS10 ucode
@@ -450,7 +450,7 @@ switch (xop) {                                          /* case on opcode */
                     if (xflgs & XT_SFLG)
                         b1 = b1 & XT_BYMASK;
                     else b1 = -1;
-                    }   
+                    }
                 }
             else b1 = f1;
             if (b1 >= 0) {                              /* valid byte? */
@@ -722,7 +722,7 @@ int32 p1 = ADDA (ac, 1);
 for (i = 0; i < cnt; i++) {
     if (i && (t = test_int ()))
         ABORT (t);
-    rlog = 0;                                           /* clear log */ 
+    rlog = 0;                                           /* clear log */
     incstorebp (fill, p1, pflgs);
     AC(ac) = (AC(ac) & XFLGMASK) | ((AC(ac) - 1) & XLNTMASK);
     }

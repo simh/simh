@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   Digital Data Communications Message Protocol - DDCMP support routines 
+   Digital Data Communications Message Protocol - DDCMP support routines
 
    29-May-13    MP      Initial implementation
 */
@@ -103,7 +103,7 @@ if (sim_deb && dptr && (reason & dptr->dctrl)) {
     sim_debug(reason, dptr, "%s  len: %d\n", txt, len);
     switch (msg[0]) {
         case DDCMP_SOH:   /* Data Message */
-            sim_debug (reason, dptr, "Data Message, Count: %d, Num: %d, Flags: %s, Resp: %d, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)|msg[1], msg[4], flag, msg[3], 
+            sim_debug (reason, dptr, "Data Message, Count: %d, Num: %d, Flags: %s, Resp: %d, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)|msg[1], msg[4], flag, msg[3],
                                         (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+((msg2 << 8)|msg[1]))) ? "OK" : "BAD");
             break;
         case DDCMP_ENQ:   /* Control Message */
@@ -136,7 +136,7 @@ if (sim_deb && dptr && (reason & dptr->dctrl)) {
                 }
             break;
         case DDCMP_DLE:   /* Maintenance Message */
-            sim_debug (reason, dptr, "Maintenance Message, Count: %d, Flags: %s, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)| msg[1], flag, 
+            sim_debug (reason, dptr, "Maintenance Message, Count: %d, Flags: %s, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)| msg[1], flag,
                                         (0 == ddcmp_crc16 (0, msg, DDCMP_HEADER_SIZE)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+DDCMP_HEADER_SIZE, 2+((msg2 << 8)| msg[1]))) ? "OK" : "BAD");
             break;
         }
@@ -212,7 +212,7 @@ rmax = (double)RAND_MAX;
 #endif
 if (msg[0] == DDCMP_ENQ) {
     int eat =  0 + (int) (2000.0 * (r / (rmax + 1.0)));
-    
+
     if (eat <= (trollHungerLevel * 2)) {    /* Hungry? */
         if (eat <= trollHungerLevel) {      /* Eat the packet */
             sprintf (msgbuf, "troll ate a %s control message\n", rx ? "RCV" : "XMT");
@@ -223,7 +223,7 @@ if (msg[0] == DDCMP_ENQ) {
         tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
         msg[6] ^= rx? 0114: 0154;           /* Eat the CRC */
         }
-    } 
+    }
 else {
     int eat =  0 + (int) (3000.0 * (r / (rmax + 1.0)));
 
@@ -237,7 +237,7 @@ else {
             sprintf (msgbuf, "troll bit a %s %s message\n", rx ? "RCV" : "XMT", (msg[0] == DDCMP_SOH)? "data" : "maintenance");
             tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
             msg[6] ^= rx? 0124: 0164;
-            } 
+            }
         else {                            /* DCRC */
             sprintf (msgbuf, "troll bit %s %s DCRC\n", (rx? "RCV" : "XMT"), ((msg[0] == DDCMP_SOH)? "data" : "maintenance"));
             tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
@@ -346,7 +346,7 @@ return SCPE_LOST;
    Implementation notea:
 
     1. If the line is not connected, SCPE_LOST is returned.
-    2. If prior packet transmission still in progress, SCPE_STALL is 
+    2. If prior packet transmission still in progress, SCPE_STALL is
        returned and no packet data is stored.  The caller must retry later.
 */
 static t_stat ddcmp_tmxr_put_packet_ln (TMLN *lp, const uint8 *buf, size_t size, int32 corruptrate)
@@ -374,7 +374,7 @@ else
 ddcmp_packet_trace (DDCMP_DBG_PXMT, lp->mp->dptr, msg, lp->txpb, lp->txppsize);
 if (!ddcmp_feedCorruptionTroll (lp, lp->txpb, FALSE, corruptrate)) {
     ++lp->txpcnt;
-    while ((lp->txppoffset < lp->txppsize) && 
+    while ((lp->txppoffset < lp->txppsize) &&
            (SCPE_OK == (r = tmxr_putc_ln (lp, lp->txpb[lp->txppoffset]))))
        ++lp->txppoffset;
     tmxr_send_buffered_data (lp);

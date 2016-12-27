@@ -201,28 +201,28 @@ DEVICE i8008_dev = {
     i8008_reg,                          //registers
     i8008_mod,                          //modifiers
     1,                                  //numunits
-    16,                                 //aradix 
-    16,                                 //awidth 
-    1,                                  //aincr 
-    16,                                 //dradix 
+    16,                                 //aradix
+    16,                                 //awidth
+    1,                                  //aincr
+    16,                                 //dradix
     8,                                  //dwidth
-    &i8008_ex,                          //examine 
-    &i8008_dep,                         //deposit 
+    &i8008_ex,                          //examine
+    &i8008_dep,                         //deposit
 //    &i8008_reset,                       //reset
     NULL,                               //reset
     NULL,                               //boot
-    NULL,                               //attach 
+    NULL,                               //attach
     NULL,                               //detach
     NULL,                               //ctxt
-    DEV_DEBUG,                          //flags 
-    0,                                  //dctrl 
+    DEV_DEBUG,                          //flags
+    0,                                  //dctrl
     i8008_debug,                        //debflags
     NULL,                               //msize
     NULL                                //lname
 };
 
 /* tables for the disassembler */
-char *opcode[] = {                      
+char *opcode[] = {
 "*HLT", "*HLT", "RLC", "RFC",           /* 0x00 */
 "ADI ", "RST 0", "LAI ,", "RET",
 "INB", "DCB", "RRC", "RFZ",
@@ -333,7 +333,7 @@ int32 sim_instr (void)
     while (reason == 0) {               /* loop until halted */
 
 //        if (PC == 0x1000) {             /* turn on debugging */
-//            i8008_dev.dctrl = DEBUG_asm + DEBUG_reg; 
+//            i8008_dev.dctrl = DEBUG_asm + DEBUG_reg;
 //            reason = STOP_HALT;
 //        }
         if (i8008_dev.dctrl & DEBUG_reg) {
@@ -1656,7 +1656,7 @@ int32 sim_instr (void)
             store_m(val);
             break;
 
-        default:                    /* undefined opcode */ 
+        default:                    /* undefined opcode */
             if (i8008_unit.flags & UNIT_OPSTOP) {
                 reason = STOP_OPCODE;
                 PC--;
@@ -1833,9 +1833,9 @@ t_stat i8008_reset (DEVICE *dptr)
 
 t_stat i8008_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-    if (addr >= MEMSIZE) 
+    if (addr >= MEMSIZE)
         return SCPE_NXM;
-    if (vptr != NULL) 
+    if (vptr != NULL)
         *vptr = get_mbyte(addr);
     return SCPE_OK;
 }
@@ -1844,14 +1844,14 @@ t_stat i8008_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 
 t_stat i8008_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-    if (addr >= MEMSIZE) 
+    if (addr >= MEMSIZE)
         return SCPE_NXM;
     put_mbyte(addr, val);
     return SCPE_OK;
 }
 
 /* This is the binary loader.  The input file is considered to be
-   a string of literal bytes with no special format. The load 
+   a string of literal bytes with no special format. The load
    starts at the current value of the PC.
 */
 

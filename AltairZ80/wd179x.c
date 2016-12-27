@@ -1146,4 +1146,3 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
 
     return 0;
 }
-

@@ -130,7 +130,7 @@ void process (char *nm)
 				strcpy(buf + (c-nm+1), fd.cFileName);
 				dump(buf);
 			}
-						
+
 		} while (FindNextFile(hFind, &fd));
 
 		FindClose(hFind);
@@ -255,7 +255,7 @@ void dump_phids (char *fname)
 		perror(fname);
 		return;
 	}
-	
+
 	printf("\n%s:\n", fname);
 
 	while (fxread(card, sizeof(card[0]), 80, fp) > 0) {
@@ -318,7 +318,7 @@ void dump_data (char *fname)
 		perror(fname);
 		return;
 	}
-	
+
 	printf("\n%s:\n", fname);
 
 	while (fxread(card, sizeof(card[0]), 80, fp) > 0) {
@@ -689,7 +689,7 @@ int hollerith_to_ascii (unsigned short h)
 {
 	int i;
 
- 	h &= 0xFFF0;
+	h &= 0xFFF0;
 
 	for (i = 0; i < sizeof(cardcode_029) / sizeof(CPCODE); i++)
 		if (cardcode_029[i].hollerith == h)
@@ -713,7 +713,7 @@ void trim (char *s)
 	nb[1] = '\0';
 }
 
-int ascii_to_ebcdic_table[128] = 
+int ascii_to_ebcdic_table[128] =
 {
 	0x00,0x01,0x02,0x03,0x37,0x2d,0x2e,0x2f, 0x16,0x05,0x25,0x0b,0x0c,0x0d,0x0e,0x0f,
 	0x10,0x11,0x12,0x13,0x3c,0x3d,0x32,0x26, 0x18,0x19,0x3f,0x27,0x1c,0x1d,0x1e,0x1f,
@@ -751,5 +751,3 @@ char *getname (unsigned short *ptr)
 	str[5] = '\0';
 	return str;
 }
-
-

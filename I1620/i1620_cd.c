@@ -113,17 +113,17 @@ DEVICE cdp_dev = {
    read and punch cards numerically (one 1620 storage location
    per card column) or alphabetically (two 1620 storage locations
    per card column). Even though a card might have contained any
-   possible character (digit, letter, special character), it 
-   could still be read numerically. In this case, some characters 
-   behaved the same as numbers or as record marks. The results 
-   are well defined in IBM documentation. 
+   possible character (digit, letter, special character), it
+   could still be read numerically. In this case, some characters
+   behaved the same as numbers or as record marks. The results
+   are well defined in IBM documentation.
 
    In order to make it possible to prepare card decks for input
-   using normal text editors, ASCII characters have been assigned 
+   using normal text editors, ASCII characters have been assigned
    to represent 1620 characters that could appear on cards. In most
    cases, this was easy since the letters, digits and punctuation
-   characters all have equivalent ASCII assignments. Five 1620 
-   characters do not have equivalent ASCII graphics and are 
+   characters all have equivalent ASCII assignments. Five 1620
+   characters do not have equivalent ASCII graphics and are
    assigned as follows:
 
      ]  is used to represent a flagged zero
@@ -132,14 +132,14 @@ DEVICE cdp_dev = {
      }  is used to represent a group mark
      "  is used to represent a flagged group mark
 
-   As a concession to some editors, ASCII nul, nl, tab, and lf 
+   As a concession to some editors, ASCII nul, nl, tab, and lf
    characters are accepted and converted to blanks. Also, for
    the same reason, lower case letters are treated the same as
    upper case on input. All other ASCII characters not in the
    1620 character set are treated as errors.
 
                                                 (Tom McBride)
-   
+
 */
 /* Card reader (ASCII) to numeric (one digit) */
 
@@ -164,8 +164,8 @@ const int8 cdr_to_num[128] = {
 
 /* Numeric (flag + digit) to card punch (ASCII) */
 
-/* Note that all valid digits produce different 
-   codes except that both numeric blanks and flagged 
+/* Note that all valid digits produce different
+   codes except that both numeric blanks and flagged
    numeric blanks both produce a blank column. (tfm) */
 
 const int8 num_to_cdp[32] = {
@@ -183,12 +183,12 @@ const int8 num_to_cdp[32] = {
    } reads as 0F (group mark)
    " reads as 5F (flagged group mark)
 
-   As a concession to some editors, ASCII nul, nl, tab, and lf 
+   As a concession to some editors, ASCII nul, nl, tab, and lf
    characters are accepted and converted to blanks. Also, for
    the same reason, lower case letters are treated the same as
    upper case on input. All other ASCII characters not in the
-   1620 character set are treated as errors.  
-   
+   1620 character set are treated as errors.
+
 */
 
 const int8 cdr_to_alp[128] = {
@@ -210,7 +210,7 @@ const int8 cdr_to_alp[128] = {
  0x67, 0x68, 0x69,   -1, 0x0A, 0x0F,   -1,   -1         /* xyz |}   */
  };
 
-/* Alphameric (two digits) to card punch (ASCII).  
+/* Alphameric (two digits) to card punch (ASCII).
 
    All 1620 compilers are know to punch numeric data
    (i.e. data that it knows will be read back using RNCD)
@@ -218,16 +218,16 @@ const int8 cdr_to_alp[128] = {
    alpha to ASCII translations that absolutely MUST work out right
    or otherwise we won't be able to load the object decks.
 
-     50 - punches as ] (flagged zero) 
+     50 - punches as ] (flagged zero)
      0A - punches as | (record mark)
      0F - punches as } (group mark)
 
-   If a program punches alphameric data that includes a flagged 
-   record mark or flagged group mark, they will be punched 
+   If a program punches alphameric data that includes a flagged
+   record mark or flagged group mark, they will be punched
    as below. No known IBM compiler punches any of these but
    some application programs do. The mapping of characters for
-   the card reader and punch is such that a card deck can be 
-   duplicated with a RACD, WACD loop. 
+   the card reader and punch is such that a card deck can be
+   duplicated with a RACD, WACD loop.
 
      5A - punches as ! (flagged record mark)
      5F - punches as " (flagged group mark)
@@ -236,7 +236,7 @@ const int8 cdr_to_alp[128] = {
 const int8 alp_to_cdp[256] = {
  ' ',  -1,  -1, '.', ')',  -1,  -1,  -1,                /* 00 */
   -1,  -1, '|',  -1,  -1,  -1,  -1, '}',
- '+',  -1,  -1, '$', '*',  -1,  -1,  -1,                /* 10 */ 
+ '+',  -1,  -1, '$', '*',  -1,  -1,  -1,                /* 10 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
  '-', '/',  -1, ',', '(',  -1,  -1,  -1,                /* 20 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
@@ -266,10 +266,10 @@ const int8 alp_to_cdp[256] = {
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,                /* F0 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1
- }; 
+ };
 
 /* Card reader IO routine
- 
+
    - Hard errors stop the operation and halt the system.
    - Invalid characters place a blank in memory and set RDCHK.
      If IO stop is set, the system halts at the end of the operation.
@@ -317,7 +317,7 @@ switch (op) {                                           /* case on op */
             M[pa - 1] = (M[pa - 1] & FLAG) | ((cdc >> 4) & DIGIT);
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
-        break;  
+        break;
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
@@ -362,7 +362,7 @@ if ((i = strlen (cdr_buf)) > 0) {                       /* anything at all? */
         cdr_buf[i-1] = 0;                               /* remove it */
         cdr_unit.pos = ftell (cdr_unit.fileref);        /* save position */
         if (fgetc (cdr_unit.fileref) != '\n')           /* next char not \n? */
-            fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET); /* then rewind */  
+            fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET); /* then rewind */
         }
     else {                                              /* line too long */
         ind[IN_RDCHK] = 1;
@@ -414,7 +414,7 @@ saved_PC = BOOT_START;
 return SCPE_OK;
 }
 
-/* Card punch IO routine 
+/* Card punch IO routine
 
    - Hard errors stop the operation and halt the system.
    - Invalid characters stop the operation and set WRCHK.
@@ -435,11 +435,11 @@ switch (op) {                                           /* decode op */
            zero is punched as a hypehen (-) instead of a flagged
            zero ([). Punching begins at the P address and continues until
            the last digit of the storage module containing the P address
-           has been punched. If the amount of data to be punched is an 
+           has been punched. If the amount of data to be punched is an
            exact multiple of 80, the operation ends there. If the last
            character of the module does not fill out the card, additional
            characters from the next higher addresses (addressing wraps to
-           back to zero if the operation started in the highest module) are 
+           back to zero if the operation started in the highest module) are
            used to fill out the card.                   (Tom McBride) */
 
         return cdp_num (pa,                             /* dump numeric */
@@ -449,7 +449,7 @@ switch (op) {                                           /* decode op */
     case OP_WN:
 
         /* WN always punches exactly 80 characters. If the highest address
-           in the machine is reached before the card is full, addressing 
+           in the machine is reached before the card is full, addressing
            wraps around to zero and continues. The PP function handles
            this correctly.                              (Tom McBride) */
 

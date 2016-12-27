@@ -19,10 +19,10 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the names of Robert M Supnik and Holger Veit 
+   Except as contained in this notice, the names of Robert M Supnik and Holger Veit
    shall not be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik and Holger Veit.
-   
+
    2013xxxx hv initial version (written up to the level to be tested against bootloader)
    20130826 hv fix problem in SPR(-1): taskswitch mustn't modify sp afterwards
    20130901 hv CXG didn't store correct callers seg# in MSCW
@@ -105,7 +105,7 @@ uint16 reg_romsize = 0; /* size of HDT boot ROM */
 
 /* possible hack to enforce DMA being initialized to 0x2000 (word address)
  * the boot code from Don Maslin's PDQ-3 floppy implies it is run from 0x2000 */
-uint32 reg_dmabase = 0x2000; 
+uint32 reg_dmabase = 0x2000;
 
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX+UNIT_BINK, MEMSIZE) };
 REG cpu_reg[] = {
@@ -113,7 +113,7 @@ REG cpu_reg[] = {
      refers to start of currently executed instruction. Refer to STATE to
      see actual IPC value */
   { HRDATA (PC,     PCX, 32), REG_RO|REG_HIDDEN },
-  
+
   { HRDATA (SEGB,   reg_segb, 16) },
   { HRDATA (IPC,    reg_ipc, 16) },
 
@@ -131,7 +131,7 @@ REG cpu_reg[] = {
   { HRDATA (_LSV,   reg_lsv, 16), REG_HIDDEN },
   { HRDATA (_SSR,   reg_ssr, 8), REG_HIDDEN },
   { HRDATA (_SES,   reg_ses, 8), REG_HIDDEN },
-  { HRDATA (_INT,   reg_intpending, 32), REG_HIDDEN }, 
+  { HRDATA (_INT,   reg_intpending, 32), REG_HIDDEN },
   { HRDATA (_FC68,  reg_fc68, 16 ), REG_RO|REG_HIDDEN },
   { HRDATA (_INITLOC,reg_dmabase, 17 ), REG_RO|REG_HIDDEN },
 
@@ -213,7 +213,7 @@ static uint16 GetSegbase(uint8 segno) {
 }
 
 /* get segment# from code segment:
- * this is the first byte of the proctbl at the end of the code segment 
+ * this is the first byte of the proctbl at the end of the code segment
  *(the second byte is the proc count) */
 static uint8 GetSegno() {
   uint16 data;
@@ -225,7 +225,7 @@ static uint8 GetSegno() {
 /* set SEGB and return address of proc tbl (optimization for segb + segb[0] ) */
 static uint16 SetSEGB(uint8 segno) {
   /* obtain pointer to SIB for segno */
-  uint16 sib = GetSIB(segno); 
+  uint16 sib = GetSIB(segno);
 
   /* set SEGB and get pointer to proc tbl */
   Read(sib, OFF_SEGBASE, &reg_segb, DBG_NONE);
@@ -236,7 +236,7 @@ static void AdjustRefCount(uint8 segno, int incr) {
   uint16 sib = GetSIB(segno);
   uint16 ref = Get(sib + OFF_SEGREFS);
   Put(sib + OFF_SEGREFS,  ref + incr);
-  //sim_printf("ref(%x) %s = %d\n",segno,incr>0 ? "increment":"decrement", ref+incr);  
+  //sim_printf("ref(%x) %s = %d\n",segno,incr>0 ? "increment":"decrement", ref+incr);
 }
 
 /* save CPU regs into TIB */
@@ -260,7 +260,7 @@ static void restore_from_tib() {
 }
 
 /* initialize registers for boot */
-void cpu_setRegs(uint16 newctp, uint16 newssv, uint16 newrq) 
+void cpu_setRegs(uint16 newctp, uint16 newssv, uint16 newrq)
 {
   reg_ctp = newctp;
   reg_ssv = newssv;
@@ -272,7 +272,7 @@ void cpu_setRegs(uint16 newctp, uint16 newssv, uint16 newrq)
   PCX = MAKE_BADDR(reg_segb,reg_ipc);
 }
 
-/* this is a dummy routine to ignore invalid writes to the ROM 
+/* this is a dummy routine to ignore invalid writes to the ROM
  * which occur during context switch from HDT to boot loader */
 static t_stat rom_ignore(t_addr ea, uint16 data) {
   return SCPE_OK;
@@ -281,7 +281,7 @@ static t_stat rom_ignore(t_addr ea, uint16 data) {
 /* this is the central point to explain the various methods of booting.
  * 1. boot from ROM:
  *    if (0xfc68) == 0 then try method 2
- *    else 
+ *    else
  *      MR := (0xfc68)
  *      CTP := (MR) -> set TIB
  *      SSV := (MR+1) -> segment dictionary pointer
@@ -325,7 +325,7 @@ t_stat cpu_boot(int32 unitnum, DEVICE *dptr) {
   } else {
     /* autoload the 1st track into meory at reg_dmabase */
     if ((rc = fdc_boot(0, &fdc_dev)) != SCPE_OK) return rc;
-  } 
+  }
   return SCPE_OK;
 }
 
@@ -346,7 +346,7 @@ t_stat cpu_reset (DEVICE *dptr) {
 //  sim_printf("CPU RESET\n");
   sim_brk_types = SWMASK('E')|SWMASK('R')|SWMASK('W');
   sim_brk_dflt = SWMASK('E');
-  
+
   /* initialize I/O system, and register standard IO handlers */
   pdq3_ioinit();
   add_ioh(((DEVCTXT*)dptr->ctxt)->ioi);
@@ -375,7 +375,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw) {
     if (off >= memorysize ||
         ReadEx(off, 0, &data) != SCPE_OK) return SCPE_IOERR;
   } else if (!ADDR_ISWORD(addr) || (sw & SWMASK('B'))) {
-    if ((seg*2 + off) >= (2*memorysize) || 
+    if ((seg*2 + off) >= (2*memorysize) ||
         ReadBEx(seg, off, &data) != SCPE_OK) return SCPE_IOERR;
   }
   if (vptr)
@@ -390,13 +390,13 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
   t_addr seg = ADDR_SEG(addr);
   if (seg==0) seg = NIL;
   addr = MAKE_BADDR(seg,off);
-  
+
   if (ADDR_ISWORD(addr) || (sw & SWMASK('W'))) {
-    if (off >= memorysize || 
+    if (off >= memorysize ||
         Write(off, 0, val, 0) != SCPE_OK) return SCPE_ARG;
   } else {
     if (!ADDR_ISWORD(addr) || (sw & SWMASK('B'))) {
-      if ((seg*2 + off) >= (2*memorysize) || 
+      if ((seg*2 + off) >= (2*memorysize) ||
           WriteB(seg, off, val, 0)) return SCPE_ARG;
     }
   }
@@ -492,7 +492,7 @@ void cpu_assertInt(int level, t_bool tf) {
   else
     clrbit(reg_intlatch, bit);
   sim_debug(DBG_CPU_INT2, &cpu_dev, DBG_PCFORMAT1 "%sssert Interrupt Level %d\n",
-            DBG_PC, tf?"A":"Dea", level);    
+            DBG_PC, tf?"A":"Dea", level);
 }
 
 t_stat cpu_raiseInt(int level) {
@@ -500,9 +500,9 @@ t_stat cpu_raiseInt(int level) {
     sim_printf("Implementation error: raiseInt with level>15! Need fix\n");
     exit(1);
   }
-  
+
   if (!cpu_isIntEnabled()) return STOP_ERRIO; /* interrupts disabled, or invalid vector */
-  
+
   cpu_assertInt(level, TRUE);
   return SCPE_OK;
 }
@@ -514,7 +514,7 @@ static void cpu_ackInt(int level) {
   /* disable SSR_INTEN */
   sim_debug(DBG_CPU_INT2, &cpu_dev, DBG_PCFORMAT1 "Ack interrupt level %d\n",
     DBG_PC, level);
-    
+
   clrbit(reg_ssr, SSR_INTEN);
 }
 
@@ -538,7 +538,7 @@ static t_stat cpu_processInt() {
   int level = getIntLevel(); /* obtain highest pending interupt */
   uint16 vector, sem;
   t_stat rc;
-  
+
   if (level == -1) return SCPE_OK; /* don't signal: spurious interrupt */
 
   vector = int_vectors[level];
@@ -683,7 +683,7 @@ static uint16 masks[] = {
 0x01ff, 0x03ff, 0x07ff, 0x0fff,
 0x1fff, 0x3fff, 0x7fff, 0xffff
 };
-/* to produce a mask for a bit field <start:nbits>, 
+/* to produce a mask for a bit field <start:nbits>,
  * e.g. <3:5> 0000000011111000 == 0x00f8
  */
 static uint16 GetMask(int lowbit,int nbits) {
@@ -702,11 +702,11 @@ static void DoCXG(uint8 segno, uint8 procno) {
   uint16 ptbl;
   uint8 osegno = (uint8)GetSegno(); /* obtain segment of caller to be set into MSCW */
   uint16 osegb = reg_segb;
-  
+
 //  sim_printf("CXG: seg=%d proc=%d, osegno=%d\n",segno,procno,osegno);
   ptbl = SetSEGB(segno); /* get ptbl of new segment */
   AdjustRefCount(segno,1);
-  
+
 //  sim_printf("CXG: ptbl=%x, reg_segb=%x\n",ptbl,reg_segb);
   reg_ipc = createMSCW(ptbl, procno, reg_bp, osegno, osegb); /* call new segment */
   sim_interval--;
@@ -716,7 +716,7 @@ static t_stat Raise(uint16 err) {
 
   /* HALT on Pascal Exception? */
   if (Q_PASEXC) return STOP_PASEXC;
-  
+
   /* push error code
    * attention: potential double fault: STKOVFL */
   if (err==PASERROR_STKOVFL)
@@ -724,7 +724,7 @@ static t_stat Raise(uint16 err) {
   else
     Push(err);
   sim_debug(DBG_CPU_INT, &cpu_dev, DBG_PCFORMAT2 "Raised Pascal Exception #%d\n",DBG_PC,err);
-  
+
   /* call OS trap handler
    * Note: if an exception occurs in boot loader (CHK instruction for CPU serial),
    * this goes to nirvana because HALTUNIT is not yet linked correctly */
@@ -745,7 +745,7 @@ static uint16 createMSCW(uint16 ptbl, uint8 procno, uint16 stat, uint8 segno, ui
   uint16 datasz = Get(reg_segb + procstart); /* word index */
   dbg_segtrack(reg_segb);
 //  sim_printf("createMSCW: ptbl=%x procno=%d stat=%x segno=%x\n",ptbl,procno,stat,segno);
-  
+
   if (reg_sp < reg_splow || (datasz+MSCW_SZ) > (reg_sp-reg_splow)) { /* verify enough space on stack */
 //    sim_printf("Stk overflow in mscw: sp=%x spl=%x ds=%d dsm=%d sp-spl=%d\n",reg_sp,reg_splow,datasz,datasz+MSCW_SZ, reg_sp-reg_splow);
     Raise(PASERROR_STKOVFL); return reg_ipc;
@@ -844,21 +844,21 @@ static t_stat DoSIGNAL(uint16 sem) {
   t_stat rc = SCPE_OK;
   uint16 qtask, qhead;
   uint16 wqaddr = sem + OFF_SEMWAITQ; /* address of wait queue */
-  
+
   uint16 count = Get(sem+OFF_SEMCOUNT); /* get count value from semaphore*/
   uint16 wait = Get(wqaddr); /* get top of wait queue */
-  
+
   sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "SIGNAL: Sem=$%x(count=%d wait=$%x)\n",
             DBG_PC,sem,count,wait);
   if (count == 0) {
     if (wait != NIL) { /* queue is not empty */
       qhead = deque(wait, &qtask); /* extract head of queue (qtask), and store tail back */
-      Put(wqaddr, qhead); 
+      Put(wqaddr, qhead);
 
       sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "SIGNAL: dequeued qtask=$%x\n",DBG_PC, qtask);
       reg_rq = enque(reg_rq, qtask); /* put qtask into rq queue */
       sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "SIGNAL: reg_rq=$%x, reg_ctp=$%x\n", DBG_PC, reg_rq, reg_ctp);
-      
+
       if (reg_ctp == NIL) { /* no current task (marker for int processing */
         sim_interval--; /* consume time */
         return taskswitch6(); /* and switch task */
@@ -879,7 +879,7 @@ static t_stat DoSIGNAL(uint16 sem) {
   Put(sem+OFF_SEMCOUNT,count+1);
   if (reg_ctp == NIL) { /* if no active task, get one from ready queue */
     sim_interval--;
-    return taskswitch6(); 
+    return taskswitch6();
   }
   reg_sp++;
   sim_interval--;
@@ -887,7 +887,7 @@ static t_stat DoSIGNAL(uint16 sem) {
 }
 
 static t_stat DoWAIT(uint16 sem) {
-  uint16 qhead; 
+  uint16 qhead;
   uint16 wqaddr = sem + OFF_SEMWAITQ;
   t_stat rc;
 
@@ -895,11 +895,11 @@ static t_stat DoWAIT(uint16 sem) {
   sim_debug(DBG_CPU_CONC, &cpu_dev, DBG_PCFORMAT1 "WAIT: Sem=$%04x(count=%d)\n",DBG_PC,sem, count);
   if (count == 0) {
 //    sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "WAIT: Semaphore %x has count 0: do a task switch\n",DBG_PC,sem);
-    
+
     qhead = enque(Get(wqaddr), reg_ctp); /* have current task wait on semaphore */
     Put(wqaddr, qhead);
 //    sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "WAIT: new qhead=%x\n",DBG_PC, qhead);
-    
+
     rc = taskswitch5(); /* save context in TIB, and switch to new task from ready queue */
     sim_interval--;
     sim_debug(DBG_CPU_CONC2, &cpu_dev, DBG_PCFORMAT0 "WAIT: DONE, switch to newTIB=$%04x\n",DBG_PC, reg_ctp);
@@ -938,15 +938,15 @@ static t_stat DoInstr(void) {
   if (sim_brk_summ && sim_brk_test(PCX, SWMASK('E'))) {
     return STOP_IBKPT;
   }
-  
+
   /* get opcode */
   opcode = UB();
-  
+
   if (dbg_check(opcode, DEBUG_PRE)) {
     reg_ipc = ADDR_OFF(PCX); /* restore PC for potential redo */
     return STOP_DBGPRE;
   }
-  
+
   switch (opcode) {
   case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05: case 0x06: case 0x07:
   case 0x08: case 0x09: case 0x0a: case 0x0b: case 0x0c: case 0x0d: case 0x0e: case 0x0f:
@@ -990,7 +990,7 @@ static t_stat DoInstr(void) {
     Push(Get(reg_bp + MSCW_SZ -1 + B()));
     break;
   case 0x86: /* LAO */
-    Push(reg_bp + MSCW_SZ -1 + B()); 
+    Push(reg_bp + MSCW_SZ -1 + B());
     break;
   case 0xa5: /* SRO */
     Put(reg_bp + MSCW_SZ -1 + B(),Pop());
@@ -1001,7 +1001,7 @@ static t_stat DoInstr(void) {
     break;
   case 0x88: /* LDA */
     reg_lm = TraverseMSstat(DB());
-    Push(reg_lm + MSCW_SZ -1 + B()); 
+    Push(reg_lm + MSCW_SZ -1 + B());
     break;
   case 0xa6: /* STR */
     reg_lm = TraverseMSstat(DB());
@@ -1025,7 +1025,7 @@ static t_stat DoInstr(void) {
     b = B(); ub1 = UB();
     src = reg_segb + b + ub1;
     for (i=1; i<=ub1; i++) Put(reg_sp-i,Get(src-i));
-    reg_sp -= ub1; 
+    reg_sp -= ub1;
     break;
   case 0xd0: /* LDM */
     ub1 = UB(); src = Pop() + ub1;
@@ -1038,7 +1038,7 @@ static t_stat DoInstr(void) {
     reg_sp += (ub1+1);
     break;
   case 0xa7: /* LDB */
-    b = Pop(); 
+    b = Pop();
     Push(Getb(Pop(), b));
     break;
   case 0xc8: /* STB */
@@ -1110,13 +1110,13 @@ static t_stat DoInstr(void) {
     Push(Tos());
     break;
   case 0xa2: /* ADI */
-    PushS(PopS() + Pop()); 
+    PushS(PopS() + Pop());
     break;
   case 0xa3: /* SBI */
-    ts1 = PopS(); PushS(PopS() - ts1); 
+    ts1 = PopS(); PushS(PopS() - ts1);
     break;
   case 0x8c: /* MPI */
-    PushS(Pop() * Pop()); 
+    PushS(Pop() * Pop());
     break;
   case 0x8d: /* DVI */
     ts1 = PopS(); if (ts1 == 0) { Raise(PASERROR_DIVZERO); break; }
@@ -1126,13 +1126,13 @@ static t_stat DoInstr(void) {
   case 0x8f: /* MODI */
     ts1 = PopS(); if (ts1 <= 0) { Raise(PASERROR_DIVZERO); /* XXX */ break; }
     ts2 = Pop() % ts1;
-    PushS(ts2); 
+    PushS(ts2);
     break;
   case 0xcb: /* CHK */
     t1 = Tos(); t2 = Pick(1); t3 = Pick(2);
     if (t2 <= t3 && t3 <= t1)
       reg_sp += 2;
-    else 
+    else
       Raise(PASERROR_VALRANGE);
     break;
   case 0xb0: /* EQUI */
@@ -1153,7 +1153,7 @@ static t_stat DoInstr(void) {
     break;
   case 0xcc: /* FLT */
     t1 = PopS();
-    PushF((float)t1); 
+    PushF((float)t1);
     break;
   case 0xbe: /* TNC */
     tf1 = PopF();
@@ -1161,7 +1161,7 @@ static t_stat DoInstr(void) {
     break;
   case 0xbf: /* RND */
     tf1 = PopF();
-    PushS((int16)(tf1+0.5)); 
+    PushS((int16)(tf1+0.5));
     break;
   case 0xe3: /* ABR */
     PushF((float)fabs(PopF()));
@@ -1194,13 +1194,13 @@ static t_stat DoInstr(void) {
     tf1 = PopF(); tf2 = PopF();
     t1 = tf2 <= tf1 ? 1 : 0;
     Push(t1);
-    break;  
+    break;
   case 0xcf: /* GEQREAL */
     tf1 = PopF(); tf2 = PopF();
     Push(tf2 >= tf1 ? 1 : 0);
     break;
   case 0xc6: /* DUP2 */
-    Push(Pick(1)); Push(Pick(1)); 
+    Push(Pick(1)); Push(Pick(1));
     break;
   case 0xc7: /* ADJ */
     ub1 = UB(); len0 = Tos(); src = reg_sp+1; dst = reg_sp + len0 - ub1 +1;
@@ -1271,7 +1271,7 @@ static t_stat DoInstr(void) {
       for (i=0; i<len0; i++) Put(dst+i,Get(dst+i) & Get(src+i));
       for (i=len0; i<len1; i++) Put(dst+i,0);
       reg_sp += (len0+1);
-    } else {      
+    } else {
       dst = reg_sp+ len0 + 2; src = reg_sp +1;
       for (i=0; i<len1; i++) Put(dst+i,Get(dst+i) & Get(src+i));
       reg_sp += (len0+1);
@@ -1309,12 +1309,12 @@ static t_stat DoInstr(void) {
       while (i < max1) {
         if (Get(src+i) != 0) break;
         i++;
-      } 
+      }
     } else if (len1 > len0) {
       while (i < max1) {
         if (Get(dst+i) != 0) break;
         i++;
-      }      
+      }
     }
     reg_sp += (len0+len1+1); Put(reg_sp,(i >= max1 ? 1 : 0));
     break;
@@ -1332,7 +1332,7 @@ static t_stat DoInstr(void) {
       while (i < max1) {
         if (Get(src+i) != 0) break;
         i++;
-      } 
+      }
     } else i = max1;
     reg_sp += (len0+len1+1); Put(reg_sp,(i >= max1 ? 1 : 0));
     break;
@@ -1350,7 +1350,7 @@ static t_stat DoInstr(void) {
       while (i < max1) {
         if (Get(src+i) != 0) break;
         i++;
-      } 
+      }
     } else i = max1;
     reg_sp += (len0+len1+1); Put(reg_sp,(i >= max1 ? 1 : 0));
     break;
@@ -1443,7 +1443,7 @@ static t_stat DoInstr(void) {
     AdjustRefCount(segno, 1);
     reg_ipc = createMSCW(ptbl, procno, reg_mp, osegno, osegb);
     reg_lm = reg_mp;
-    for (i=1; i<= db; i++) reg_lm = Get(reg_lm+OFF_MSSTAT);  
+    for (i=1; i<= db; i++) reg_lm = Get(reg_lm+OFF_MSSTAT);
     Put(reg_mp+OFF_MSSTAT,reg_lm); /* fix stat link */
     break;
   case 0x97: /* CPF */
@@ -1484,7 +1484,7 @@ static t_stat DoInstr(void) {
   case 0x9d: /* LPR */
     w = Tos();
     if (w >= 0)
-      save_to_tib(); 
+      save_to_tib();
     if (w == -3) Put(reg_sp, reg_rq);
     else if (w == -2) Put(reg_sp, reg_ssv);
     else if (w == -1) Put(reg_sp, reg_ctp);
@@ -1499,7 +1499,7 @@ static t_stat DoInstr(void) {
       reg_rq = t1;
     } else if (w == -2) {
       reg_ssv = t1;
-    } else if (w == -1) { 
+    } else if (w == -1) {
 //      sim_printf("SPR Taskswitch reg_ctp=%x\n",t1);
       reg_rq = t1;
       taskswitch5();
@@ -1534,7 +1534,7 @@ static t_stat DoInstr(void) {
 //    Raise(PASERROR_UNIMPL);
     return STOP_IMPL;
   }
-  
+
   if (rc != SCPE_OK) return rc;
 
   /* set new PCX */
@@ -1550,7 +1550,7 @@ static t_stat DoInstr(void) {
 t_stat sim_instr(void)
 {
   t_stat rc = SCPE_OK;
-  
+
   /* mandatory idling */
   sim_rtcn_init(TMR_IDLECNT, TMR_IDLE);
   sim_set_idle(&cpu_unit, 10, NULL, NULL);
@@ -1582,7 +1582,7 @@ t_stat sim_instr(void)
       sim_idle(TMR_IDLE, TRUE);
     }
 
-    /* process interrupts 
+    /* process interrupts
      * CPU latches interrupt request now, and after instr
      * execution, will process them. Note: this is a known bug in CPU, because
      * if the instruction disables interrupts, the interrupt is processed anyway */
@@ -1609,4 +1609,3 @@ static t_stat cpu_set_noflag(UNIT *uptr, int32 value, CONST char *cptr, void *de
   uptr->flags &= ~value;
   return SCPE_OK;
 }
-

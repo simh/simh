@@ -201,7 +201,7 @@ for (;;) {
             if (sections_read != 0) {
                 sim_printf ("%d sections sucessfully read\n\r", sections_read);
                 return SCPE_OK;
-                } 
+                }
             else
                 return SCPE_FMT;
             }
@@ -228,7 +228,7 @@ for (;;) {
         if (wd > 07777)                                 /* chan 7 set? */
             origin = wd & 07777;                        /* new origin */
         else {                                          /* no, data */
-            if ((field | origin) >= MEMSIZE) 
+            if ((field | origin) >= MEMSIZE)
                 return SCPE_NXM;
             M[field | origin] = wd;
             origin = (origin + 1) & 07777;
@@ -347,7 +347,7 @@ static const char *opcode[] = {
  NULL, NULL, NULL, NULL,                                /* decode only */
  NULL
  };
- 
+
 static const int32 opc_val[] = {
  06000+I_NPN, 06001+I_NPN, 06002+I_NPN, 06003+I_NPN,
  06004+I_NPN, 06005+I_NPN, 06006+I_NPN, 06007+I_NPN,
@@ -551,7 +551,7 @@ return sp;
         *of     =       output stream
         addr    =       current PC
         *val    =       pointer to data
-        *uptr   =       pointer to unit 
+        *uptr   =       pointer to unit
         sw      =       switches
    Outputs:
         return  =       status code
@@ -612,7 +612,7 @@ if (opc == 06) {                                        /* IOT? */
             }
         }
     }
-        
+
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
     if ((opc_val[i] & 077777) == (inst & masks[j])) {   /* match? */
@@ -652,7 +652,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             if (opcode[i])
                 fprintf (of, "%s", opcode[i]); /* skips */
             fprint_opr (of, inst & 0206, j, opcode[i] != NULL);
-            break;      
+            break;
 
         case I_V_OP3:                                   /* operate group 3 */
             sp = fprint_opr (of, inst & 0320, j, 0);
@@ -961,7 +961,7 @@ switch (j) {                                            /* case on class */
 
     case F_V_MR1D:
     case F_V_MR2D:
-        return SCPE_IERR;          
+        return SCPE_IERR;
         }                                               /* end case */
 
 if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */

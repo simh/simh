@@ -96,7 +96,7 @@ chan_reset(DEVICE * dptr)
         D[i] = 0;
         W[i] = 0;
         CC[i] = 0;
-        if (chan_unit[i].flags & UNIT_DIS) 
+        if (chan_unit[i].flags & UNIT_DIS)
            cstatus |= j;
         j <<= 1;
     }
@@ -111,21 +111,21 @@ chan_boot(t_uint64 desc)
     M[010] = 020;
     loading = 1;
     start_io();
-    return SCPE_OK;     
+    return SCPE_OK;
 }
 
-int 
+int
 find_chan() {
      int                i;
      int                chan;
-    
+
      i = 1;
      for(chan = 0; chan < NUM_CHAN; chan++) {
          if ((cstatus & i) == 0)
             break;
          i <<= 1;
      }
-    
+
      if (chan == NUM_CHAN) {
          return 0;
      }
@@ -157,7 +157,7 @@ chan_advance(int chan) {
     }
     W[chan] = M[addr];
     D[chan] &= ~CORE;
-    if (D[chan] & DEV_BACK) 
+    if (D[chan] & DEV_BACK)
          D[chan] |= (t_uint64)((addr - 1) & CORE);
     else
          D[chan] |= (t_uint64)((addr + 1) & CORE);
@@ -174,18 +174,18 @@ start_io() {
      uint16             cmd;
      uint16             wc;
      int                addr;
-    
+
      chan = find_chan();
 
      addr = M[010] & CORE;
-    
+
      if (chan == 0) {
          IAR |= IRQ_1;
          return;
      }
      chan--;
      i = 1 << chan;
-     sim_debug(DEBUG_DETAIL, &chan_dev, "strtio(%016llo %d)\n", M[addr], chan);   
+     sim_debug(DEBUG_DETAIL, &chan_dev, "strtio(%016llo %d)\n", M[addr], chan);
      D[chan] = M[addr] & D_MASK;
      CC[chan] = 0;
      W[chan] = 0;
@@ -208,7 +208,7 @@ start_io() {
         case DRUM2_DEV:
              r = drm_cmd(cmd, dev, chan, &wc, (uint8)((M[addr] & PRESENT)!=0));
              break;
-#endif 
+#endif
 
 #if (NUM_DEVS_CDR > 0) | (NUM_DEVS_CDP > 0)
         case CARD1_DEV:
@@ -223,9 +223,9 @@ start_io() {
              /* Need to pass word count to identify interrogates */
              r = dsk_cmd(cmd, dev, chan, &wc);
              break;
-#endif 
+#endif
 
-#if (NUM_DEVS_DTC > 0) 
+#if (NUM_DEVS_DTC > 0)
         case DTC_DEV:
              status[chan] = USEGM;
              /* Word count is TTU and BUF number */
@@ -235,15 +235,15 @@ start_io() {
              D[chan] &= ~(DEV_BIN|DEV_WCFLG);
              wc = 0;
              break;
-#endif 
+#endif
 
 #if (NUM_DEVS_LPR > 0)
         case PRT1_DEV:
         case PRT2_DEV:
              r = lpr_cmd(cmd, dev, chan, &wc);
              if (r == SCPE_OK)
-                 D[chan] &= ~DEV_BACK;  /* Clear this bit, since printer 
-                                           uses this to determine 120/132 
+                 D[chan] &= ~DEV_BACK;  /* Clear this bit, since printer
+                                           uses this to determine 120/132
                                            char line */
              break;
 #endif
@@ -258,7 +258,7 @@ start_io() {
              r = SCPE_UNATT;
              break;
         }
-    }   
+    }
     if (wc != 0) {
         D[chan] &= ~DEV_WC;
         D[chan] |= toWC(wc) | DEV_WCFLG;
@@ -290,7 +290,7 @@ chan_set_end(int chan) {
      if ((dev & 1) && (D[chan] & DEV_IORD)) {
         D[chan] &= ~((7LL)<<DEV_WC_V);
         /* If not data transfered, return zero code */
-        if ((D[chan] & DEV_BACK) != 0 && 
+        if ((D[chan] & DEV_BACK) != 0 &&
                 (status[chan] & EOR) != 0)
             D[chan] |= ((t_uint64)((7-CC[chan]) & 07)) << DEV_WC_V;
         else
@@ -298,11 +298,11 @@ chan_set_end(int chan) {
      }
 
      M[014+chan] = D[chan];
-     if (loading == 0) 
+     if (loading == 0)
         IAR |= IRQ_5 << chan;
      else
         loading = 0;
-     sim_debug(DEBUG_DETAIL, &chan_dev, "endio (%016llo %o)\n", D[chan], chan);   
+     sim_debug(DEBUG_DETAIL, &chan_dev, "endio (%016llo %o)\n", D[chan], chan);
 }
 
 void
@@ -364,7 +364,7 @@ chan_set_wrp(int chan) {
     D[chan] |= DEV_ERROR|DEV_MEMERR;
 }
 
-void 
+void
 chan_set_wc(int chan, uint16 wc) {
     D[chan] &= ~DEV_WC;
     D[chan] |= toWC(wc);
@@ -421,7 +421,7 @@ chan_set_wc(int chan, uint16 wc) {
         10 1101         10 1101
         10 1110         10 1110
         10 1111         10 1111
-        11 0000         01 0000  
+        11 0000         01 0000
         11 0001         01 0001
         11 0010         01 0010
         11 0011         01 0011
@@ -438,14 +438,14 @@ chan_set_wc(int chan, uint16 wc) {
         11 1110         01 1110
         11 1111         01 1111 */
 
-/* returns 1 when channel can take no more characters. 
+/* returns 1 when channel can take no more characters.
    A return of 1 indicates that the character was not
    processed.
 */
 int chan_write_char(int chan, uint8 *ch, int flags) {
         uint8   c;
 
-        if (status[chan] & EOR) 
+        if (status[chan] & EOR)
            return 1;
 
         if (D[chan] & DEV_INHTRF) {
@@ -456,9 +456,9 @@ int chan_write_char(int chan, uint8 *ch, int flags) {
         /* Check if first word */
         if (CC[chan] == 0) {
             uint16      wc = WC(D[chan]);
-                
+
             if (D[chan] & DEV_WCFLG && wc == 0) {
-                    sim_debug(DEBUG_DATA, &chan_dev, "zerowc(%d)\n", chan);   
+                    sim_debug(DEBUG_DATA, &chan_dev, "zerowc(%d)\n", chan);
                     status[chan] |= EOR;
                     return 1;
             }
@@ -469,7 +469,7 @@ int chan_write_char(int chan, uint8 *ch, int flags) {
         if ((D[chan] & DEV_BIN) == 0) {
                 /* Translate BCL to BCD */
                 uint8   cx = c & 060;
-        
+
                 c &= 017;
                 switch(c) {
                 case 0:
@@ -513,7 +513,7 @@ int chan_write_char(int chan, uint8 *ch, int flags) {
                 c |= cx ^ ((cx & 020)<<1);
         }
 
-        if (D[chan] & DEV_BACK) 
+        if (D[chan] & DEV_BACK)
             W[chan] |= ((t_uint64)c) << ((CC[chan]) * 6);
         else
             W[chan] |= ((t_uint64)c) << ((7 - CC[chan]) * 6);
@@ -521,12 +521,12 @@ int chan_write_char(int chan, uint8 *ch, int flags) {
 
         if (CC[chan] == 8) {
             uint16      addr = (uint16)(D[chan] & CORE);
-                
+
             M[addr] = W[chan];
-            sim_debug(DEBUG_DATA, &chan_dev, "write(%d, %05o, %016llo)\n", 
-                        chan, addr, W[chan]);   
-        
-            if (chan_advance(chan)) 
+            sim_debug(DEBUG_DATA, &chan_dev, "write(%d, %05o, %016llo)\n",
+                        chan, addr, W[chan]);
+
+            if (chan_advance(chan))
                 return 1;
             W[chan] = 0;
         }
@@ -536,7 +536,7 @@ int chan_write_char(int chan, uint8 *ch, int flags) {
                  if (D[chan] & DEV_BACK) {
                      int i = CC[chan];
                      W[chan] |= (t_uint64)037LL << ((CC[chan]) * 6);
-                     
+
                       while(i < 8) {
                           W[chan] |= (t_uint64)014LL << (i * 6);
                           i++;
@@ -546,14 +546,14 @@ int chan_write_char(int chan, uint8 *ch, int flags) {
                  }
                  CC[chan]++;
             }
-                
+
             /* Flush last word */
             if (CC[chan] != 0) {
                 uint16      addr = (uint16)(D[chan] & CORE);
 
                 M[addr] = W[chan];
                 sim_debug(DEBUG_DATA, &chan_dev, "writef(%d, %05o, %016llo)\n",
-                         chan, addr, W[chan]);   
+                         chan, addr, W[chan]);
                 (void)chan_advance(chan);
                 W[chan] = 0;
             }
@@ -572,7 +572,7 @@ int chan_read_char(int chan, uint8 *ch, int flags) {
         uint8   c;
         int     gm;
 
-        if (status[chan] & EOR) 
+        if (status[chan] & EOR)
            return 1;
 
         if (D[chan] & DEV_INHTRF) {
@@ -585,10 +585,10 @@ int chan_read_char(int chan, uint8 *ch, int flags) {
             if (chan_advance(chan))
                 return 1;
             sim_debug(DEBUG_DATA, &chan_dev, "read(%d, %05o, %016llo)\n", chan,
-                 addr, W[chan]);   
+                 addr, W[chan]);
         }
 
-        if (D[chan] & DEV_BACK) 
+        if (D[chan] & DEV_BACK)
             c = 077 & (W[chan] >> ((CC[chan]) * 6));
         else
             c = 077 & (W[chan] >> ((7 - CC[chan]) * 6));
@@ -645,8 +645,8 @@ int chan_read_char(int chan, uint8 *ch, int flags) {
         return 0;
 }
 
-/* Same as chan_read_char, however we do not check word count 
-   nor do we advance it. 
+/* Same as chan_read_char, however we do not check word count
+   nor do we advance it.
 */
 int chan_read_disk(int chan, uint8 *ch, int flags) {
         uint8   c;
@@ -657,7 +657,7 @@ int chan_read_disk(int chan, uint8 *ch, int flags) {
                 D[chan] |= DEV_MEMERR;
                 return 1;
             }
-                
+
             W[chan] = M[addr];
             D[chan] &= ~CORE;
             D[chan] |= (addr + 1) & CORE;
@@ -688,7 +688,7 @@ chan_advance_drum(int chan) {
         status[chan] |= EOR;
         return 1;
     }
-                
+
     W[chan] = M[addr];
     D[chan] &= ~CORE;
     D[chan] |= (addr + 1) & CORE;
@@ -696,20 +696,20 @@ chan_advance_drum(int chan) {
     return 0;
 }
 
-/* returns 1 when channel can take no more characters. 
+/* returns 1 when channel can take no more characters.
    A return of 1 indicates that the character was not
    processed.
 */
 int chan_write_drum(int chan, uint8 *ch, int flags) {
         uint8   c;
 
-        if (status[chan] & EOR) 
+        if (status[chan] & EOR)
            return 1;
 
         /* Check if first word */
         if (CC[chan] == 0) {
             uint16      wc = WC(D[chan]);
-                
+
             if (wc == 0) {
                     status[chan] |= EOR;
                     return 1;
@@ -725,9 +725,9 @@ int chan_write_drum(int chan, uint8 *ch, int flags) {
 
         if (CC[chan] == 8) {
             uint16      addr = (uint16)(D[chan] & CORE);
-                
+
             M[addr] = W[chan];
-            if (chan_advance_drum(chan)) 
+            if (chan_advance_drum(chan))
                 return 1;
         }
         if (flags) {
@@ -752,7 +752,7 @@ int chan_write_drum(int chan, uint8 *ch, int flags) {
 int chan_read_drum(int chan, uint8 *ch, int flags) {
         uint8   c;
 
-        if (status[chan] & EOR) 
+        if (status[chan] & EOR)
            return 1;
 
 
@@ -772,4 +772,3 @@ int chan_read_drum(int chan, uint8 *ch, int flags) {
         }
         return 0;
 }
-

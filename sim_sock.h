@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   15-Oct-12    MP      Added definitions needed to detect possible tcp 
+   15-Oct-12    MP      Added definitions needed to detect possible tcp
                         connect failures
    25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
    04-Jun-08    RMS     Addes sim_create_sock, for IBM 1130
@@ -68,7 +68,7 @@ extern "C" {
 
 #define WSAGetLastError()       errno                   /* Windows macros */
 #define WSASetLastError(err) errno = err
-#define closesocket     close 
+#define closesocket     close
 #define SOCKET          int
 #if defined(__hpux)
 #define WSAEWOULDBLOCK  EAGAIN
@@ -89,7 +89,7 @@ extern "C" {
 #endif
 #define WSAEACCES       EACCES
 #define WSAEINTR        EINTR
-#define INVALID_SOCKET  ((SOCKET)-1) 
+#define INVALID_SOCKET  ((SOCKET)-1)
 #define SOCKET_ERROR    -1
 #endif
 

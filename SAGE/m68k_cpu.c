@@ -32,7 +32,7 @@
    18-Jul-10    HV      Broken address calculation for AIDX and EA_W_RMW, wonder why this didn't pop up earlier.
    20-Jul-10    HV      Corrected ADDQ.W/SUBQ.W for EA_ADIR, EOR.[WL]
    23-Jul-10    HV      Broken C code sequence in lsl.l
-   23-Jul-10    HV      RTE didn't set/reset S bit 
+   23-Jul-10    HV      RTE didn't set/reset S bit
 */
 
 #include "m68k_cpu.h"
@@ -96,7 +96,7 @@ static t_addr addrmasks[] = {
 
 int16 cputype = CPU_TYPE_68000 >> UNIT_CPU_V_TYPE;
 
-/* CPU data structures 
+/* CPU data structures
  * m68kcpu_dev      CPU device descriptor
  * m68kcpu_unit     CPU unit descriptor
  * m68kcpu_reg      CPU register list
@@ -246,9 +246,9 @@ t_stat m68kcpu_peripheral_reset()
     DEVICE** devs = sim_devices;
     DEVICE* dptr;
     if (!devs) return SCPE_IERR;
-    
+
     while ((dptr = *devs) != NULL) {
-        if (dptr != cpudev_self) { 
+        if (dptr != cpudev_self) {
             ASSERT_OKRET(dptr->reset(dptr));
         }
         devs++;
@@ -270,12 +270,12 @@ static t_stat ReadICache(t_addr tpc)
     uint8* mem;
 
     ASSERT_OKRET(Mem((tpc+CACHE_SIZE-1)&addrmask,&mem));
-    
+
     /* 68000/08/10 do not like unaligned access */
     if (cputype < 3 && (tpc & 1)) return STOP_ERRADR;
-    
+
     for (i=CACHE_SIZE-1; i>=0; i--) {
-        cache_line[i] = *mem--; 
+        cache_line[i] = *mem--;
     }
 //  for (i=0; i<16; i++) printf("icache[%d]=0x%08x\n",i,cache_line[i]);
     return SCPE_OK;
@@ -286,7 +286,7 @@ static t_stat ReadInstr(t_addr pc,uint32* inst)
     t_stat rc;
     t_addr tpc;
     IOHANDLER* ioh;
-    
+
     if ((rc=TranslateAddr(pc & ~CACHE_MASK,&tpc,&ioh,MEM_READ,FALSE,FALSE)) != SCPE_OK)
         return rc==SIM_ISIO ? STOP_PCIO : rc;
     if (tpc != cache_pc) {
@@ -370,25 +370,25 @@ static void m68k_nocallback(DEVICE* dev,int trapnum)
 }
 
 /* reset and boot */
-t_stat m68kcpu_reset(DEVICE* dptr) 
+t_stat m68kcpu_reset(DEVICE* dptr)
 {
     t_stat rc;
     uint32 dummy;
-    
+
     cpudev_self = dptr;
 
     sim_brk_types = SWMASK('E')|SWMASK('R')|SWMASK('W');
     sim_brk_dflt = SWMASK('E');
-    
+
     addrmask = addrmasks[cputype];
 
     ASSERT_OKRET(m68k_alloc_mem());
     ASSERT_OKRET(m68k_ioinit());
 
     m68kcpu_trapcallback = &m68k_nocallback;
-    
+
     m68k_sublevel = 0;
-    
+
     /* TODO: 68010 VBR */
     ReadPL(0,&A7);
     ReadPL(4,&saved_PC);
@@ -1023,7 +1023,7 @@ t_stat ea_dst(uint32 eamod,uint32 eareg,uint32 val,int sz,t_addr* pc)
 static t_bool testcond(uint32 c)
 {
     int n,v;
-    
+
     switch (c) {
     case 0x0000: /*T*/
         return TRUE;
@@ -1051,10 +1051,10 @@ static t_bool testcond(uint32 c)
         return CCR_N;
     case 0x0c00: /*GE*/
         n = CCR_N; v = CCR_V;
-        return (n && v) || !(n || v); 
+        return (n && v) || !(n || v);
     case 0x0d00: /*LT*/
         n = CCR_N; v = CCR_V;
-        return (n && !v) || (!n && v); 
+        return (n && !v) || (!n && v);
     case 0x0e00: /*GT*/
         n = CCR_N; v = CCR_V;
         return !CCR_Z && (n || !v) && (!n || v);
@@ -1122,7 +1122,7 @@ t_stat m68k_gen_exception(int vecno,t_addr* pc)
     uint32 dummy;
     t_addr oldpc = *pc;
     char out[20];
-    
+
     /* @TODO VBR! */
     if (cputype<2) {
         ASSERT_OKRET(m68k_push32(*pc));
@@ -1307,13 +1307,13 @@ static t_stat m68k_divu_w(uint32 divdr,int32* reg, t_addr* pc)
         CLRF(FLAG_V|FLAG_C);
         *dst = COMBINE16(rem,quo);
     }
-    return SCPE_OK; 
+    return SCPE_OK;
 }
 
 static t_stat m68k_divs_w(uint32 divdr,int32* reg, t_addr* pc)
 {
     int32 quo,rem,div;
-    
+
     div = EXTW(divdr);
     if (div==0) return m68k_gen_exception(5,pc);
     if (*reg==0x80000000 && div==0xffffffff) {
@@ -1321,7 +1321,7 @@ static t_stat m68k_divs_w(uint32 divdr,int32* reg, t_addr* pc)
         *reg = 0;
         return SCPE_OK;
     }
-    
+
     quo = *reg / divdr;
     rem = (*reg % divdr)<<16;
     if (EXTW(quo) == quo) {
@@ -1361,7 +1361,7 @@ static t_stat m68k_stop(t_addr* pc)
     for (;;) {
         /* is there an interrupt above IPL (checked in raise_vectorint) ? */
         if (m68k_checkints(pc)) break;
-        
+
         /* loop until something is happening */
         if (sim_interval <= 0 && (rc=sim_process_event())) break;
         sim_interval--;
@@ -1380,7 +1380,7 @@ t_stat sim_instr()
     t_bool isbsr,iscond;
     uint16 tracet0;
     char out[20];
-    
+
     /* restore state */
     PC = saved_PC;
     rc = 0;
@@ -1389,7 +1389,7 @@ t_stat sim_instr()
     /* the big main loop */
     while (rc == SCPE_OK) {
         saved_PC = PC;
-        
+
         /* expired? */
         if (sim_interval <= 0) {
             if ((rc = sim_process_event())) break;
@@ -1399,16 +1399,16 @@ t_stat sim_instr()
             rc = STOP_IBKPT;
             break;
         }
-        
+
         /* opcode fetch */
         ASSERT_OK(ReadInstrInc(&PC,&IR));
         IFDEBUG(DBG_CPU_PC,fprintf(sim_deb,"DEBUG(PC): PC=%x IR=%x\n",PC-2,IR));
-        
+
         sim_interval--;
-        
+
         /* now decode instruction */
         switch (IR_1512) {
-        /*   15  14  13  12  11  10  9   8   7   6   5   4   3   2   1   0   
+        /*   15  14  13  12  11  10  9   8   7   6   5   4   3   2   1   0
          * +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
          * | 0   0   0   0 | Opcode    | 0 |Length | effective address     | addi,andi,cmpi,eori,ori,subi
          * +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -1428,14 +1428,14 @@ t_stat sim_instr()
 do_btstd:       SETZ32(DRY & bitmask[cnt+1]);
                 rc = SCPE_OK; break;
             case 0000420: case 0000430: case 0000440: case 0000450:
-            case 0000460: case 0000470: case 0001420: case 0001430: 
-            case 0001440: case 0001450: case 0001460: case 0001470: 
+            case 0000460: case 0000470: case 0001420: case 0001430:
+            case 0001440: case 0001450: case 0001460: case 0001470:
             case 0002420: case 0002430: case 0002440: case 0002450:
             case 0002460: case 0002470: case 0003420: case 0003430:
-            case 0003440: case 0003450: case 0003460: case 0003470: 
+            case 0003440: case 0003450: case 0003460: case 0003470:
             case 0004420: case 0004430: case 0004440: case 0004450:
             case 0004460: case 0004470: case 0005420: case 0005430:
-            case 0005440: case 0005450: case 0005460: case 0005470: 
+            case 0005440: case 0005450: case 0005460: case 0005470:
             case 0006420: case 0006430: case 0006440: case 0006450:
             case 0006460: case 0006470: case 0007420: case 0007430:
             case 0007440: case 0007450: case 0007460: case 0007470: /* btst d,ea */
@@ -1465,13 +1465,13 @@ do_bsetd:       reg = &DRY;
                 rc = SCPE_OK; break;
             case 0000720: case 0000730: case 0000740: case 0000750:
             case 0000760: case 0000770: case 0001720: case 0001730:
-            case 0001740: case 0001750: case 0001760: case 0001770: 
+            case 0001740: case 0001750: case 0001760: case 0001770:
             case 0002720: case 0002730: case 0002740: case 0002750:
             case 0002760: case 0002770: case 0003720: case 0003730:
-            case 0003740: case 0003750: case 0003760: case 0003770: 
+            case 0003740: case 0003750: case 0003760: case 0003770:
             case 0004720: case 0004730: case 0004740: case 0004750:
             case 0004760: case 0004770: case 0005720: case 0005730:
-            case 0005740: case 0005750: case 0005760: case 0005770: 
+            case 0005740: case 0005750: case 0005760: case 0005770:
             case 0006720: case 0006730: case 0006740: case 0006750:
             case 0006760: case 0006770: case 0007720: case 0007730:
             case 0007740: case 0007750: case 0007760: case 0007770: /* bset d,ea */
@@ -1486,7 +1486,7 @@ do_bsetd:       reg = &DRY;
                 src1 = bitmask[(IRE&7)+1];
 do_bset8:       SETZ8(res & src1);
                 rc = ea_dst_b_rmw(IR_EAMOD,IR_EAREG,res | src1); break;
-                
+
             case 0000500: case 0001500: case 0002500: case 0003500:
             case 0004500: case 0005500: case 0006500: case 0007500: /* bchg d,d */
                 cnt = DRX & 0x1f;
@@ -1501,13 +1501,13 @@ do_bchgd:       reg = &DRY;
                 rc = SCPE_OK; break;
             case 0000520: case 0000530: case 0000540: case 0000550:
             case 0000560: case 0000570: case 0001520: case 0001530:
-            case 0001540: case 0001550: case 0001560: case 0001570: 
+            case 0001540: case 0001550: case 0001560: case 0001570:
             case 0002520: case 0002530: case 0002540: case 0002550:
             case 0002560: case 0002570: case 0003520: case 0003530:
-            case 0003540: case 0003550: case 0003560: case 0003570: 
+            case 0003540: case 0003550: case 0003560: case 0003570:
             case 0004520: case 0004530: case 0004540: case 0004550:
             case 0004560: case 0004570: case 0005520: case 0005530:
-            case 0005540: case 0005550: case 0005560: case 0005570: 
+            case 0005540: case 0005550: case 0005560: case 0005570:
             case 0006520: case 0006530: case 0006540: case 0006550:
             case 0006560: case 0006570: case 0007520: case 0007530:
             case 0007540: case 0007550: case 0007560: case 0007570: /* bchg d,ea */
@@ -1524,7 +1524,7 @@ do_bchg8:       SETZ8(res & src1);
                 rc = ea_dst_b_rmw(IR_EAMOD,IR_EAREG,res ^ src1); break;
 
             case 0000600: case 0001600: case 0002600: case 0003600:
-            case 0004600: case 0005600: case 0006600: case 0007600: /* bclr d,d */ 
+            case 0004600: case 0005600: case 0006600: case 0007600: /* bclr d,d */
                 cnt = DRX & 0x1f;
                 src1 = bitmask[cnt+1];
                 goto do_bclrd;
@@ -1558,7 +1558,7 @@ do_bclrd:       reg = &DRY;
                 src1 = bitmask[(IRE&7)+1];
 do_bclr8:       SETZ8(res & src1);
                 rc = ea_dst_b_rmw(IR_EAMOD,IR_EAREG,res & ~src1); break;
-                
+
             case 0000410: case 0001410: case 0002410: case 0003410:
             case 0004410: case 0005410: case 0006410: case 0007410: /*movep.w m,r*/
                 ASSERT_OK(ea_src_l_nd(IR_EAMOD,IR_EAREG,&srca,&PC));
@@ -1594,7 +1594,7 @@ do_bclr8:       SETZ8(res & src1);
                 ASSERT_OK(WriteVB(srca+2,src1>>16));
                 ASSERT_OK(WriteVB(srca+4,src1>>8));
                 rc = WriteVB(srca+6,src1); break;
-            
+
             case 0000000: case 0000020: case 0000030: case 0000040:
             case 0000050: case 0000060: case 0000070: /*ori.b*/
                 ASSERT_OK(ReadInstrInc(&PC,&src2));
@@ -1667,7 +1667,7 @@ do_bclr8:       SETZ8(res & src1);
                 ASSERT_OK(ReadInstrInc(&PC,&src2));
                 ASSERT_OK(ea_src_b(IR_EAMOD,IR_EAREG,&src1,&PC));
                 res = m68k_sub8(src1,src2,0);
-                rc = IR_1103 < 0006000 ? ea_dst_b_rmw(IR_EAMOD,IR_EAREG,res) : SCPE_OK; 
+                rc = IR_1103 < 0006000 ? ea_dst_b_rmw(IR_EAMOD,IR_EAREG,res) : SCPE_OK;
                 break;
             case 0006100: case 0006120: case 0006130: case 0006140:
             case 0006150: case 0006160: case 0006170: /*cmpi.w*/
@@ -1676,7 +1676,7 @@ do_bclr8:       SETZ8(res & src1);
                 ASSERT_OK(ReadInstrInc(&PC,&src2));
                 ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&src1,&PC));
                 res = m68k_sub16(src1,src2,0,TRUE);
-                rc = IR_1103 < 0006000 ? ea_dst_w_rmw(IR_EAMOD,IR_EAREG,res) : SCPE_OK; 
+                rc = IR_1103 < 0006000 ? ea_dst_w_rmw(IR_EAMOD,IR_EAREG,res) : SCPE_OK;
                 break;
             case 0006200: case 0006220: case 0006230: case 0006240:
             case 0006250: case 0006260: case 0006270: /*cmpi.l*/
@@ -1685,7 +1685,7 @@ do_bclr8:       SETZ8(res & src1);
                 ASSERT_OK(ReadInstrLongInc(&PC,&src2));
                 ASSERT_OK(ea_src_l64(IR_EAMOD,IR_EAREG,&srcx1,&PC));
                 res = m68k_sub32(srcx1,(t_uint64)src2,0,TRUE);
-                rc = IR_1103 < 0006000 ? ea_dst_l_rmw(IR_EAMOD,IR_EAREG,res) : SCPE_OK; 
+                rc = IR_1103 < 0006000 ? ea_dst_l_rmw(IR_EAMOD,IR_EAREG,res) : SCPE_OK;
                 break;
 
             case 0003000: case 0003020: case 0003030: case 0003040:
@@ -1814,7 +1814,7 @@ do_bclr8:       SETZ8(res & src1);
                 *AREG(IR_REGX) = srca;
                 rc = SCPE_OK;
                 break;
-                
+
             case 000300: /*move from sr*/
                 rc = ea_dst_w(IR_EAMOD,IR_EAREG,SR,&PC);
                 break;
@@ -1903,7 +1903,7 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
             case 004000:  /*nbcd*/
                 rc = STOP_IMPL;
                 break;
-                
+
             case 004100: /*pea or swap*/
                 if (IR_0503==000) { /*swap*/
                     reg = &DRY;
@@ -1968,7 +1968,7 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
                 SETNZ32(src1);
                 CLRF(FLAG_V|FLAG_C);
                 break;
-                
+
             case 005300: /*tas or illegal*/
                 if (IR==045374) { /*illegal*/
                     rc = STOP_ERROP;
@@ -2041,7 +2041,7 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
                         rc = m68kcpu_peripheral_reset();
                         break;
                     case 000001: /*nop*/
-                        rc = SCPE_OK; 
+                        rc = SCPE_OK;
                         tracet0 = SR_T0;
                         break;
                     case 000002: /*stop*/
@@ -2258,7 +2258,7 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
             case 0000410: /*sbcd a*/
                 rc = STOP_IMPL; break;
             case 0000000: case 0000020: case 0000030: case 0000040:
-            case 0000050: case 0000060: case 0000070: /*or.b ->d*/  
+            case 0000050: case 0000060: case 0000070: /*or.b ->d*/
                 ASSERT_OK(ea_src_b(IR_EAMOD,IR_EAREG,&src1,&PC));
                 res = MASK_8L(src1 | DRX);
                 SETNZ8(res);
@@ -2266,7 +2266,7 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
                 rc = ea_dst_b(EA_DDIR,IR_REGX,res,&PC);
                 break;
             case 0000100: case 0000120: case 0000130: case 0000140:
-            case 0000150: case 0000160: case 0000170: /*or.w ->d*/  
+            case 0000150: case 0000160: case 0000170: /*or.w ->d*/
                 ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&src1,&PC));
                 res = MASK_16L(src1 | DRX);
                 SETNZ16(res);
@@ -2489,7 +2489,7 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
          * +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---*/
         case 0xc000:
             switch(IR_0803) {
-            case 0000300: case 0000310: case 0000320: case 0000330: 
+            case 0000300: case 0000310: case 0000320: case 0000330:
             case 0000340: case 0000350: case 0000360: case 0000370: /*mulu*/
                 ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&src1,&PC));
                 res = (uint16)MASK_16L(src1) * (uint16)MASK_16L(DRX);
@@ -2497,7 +2497,7 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
                 SETNZ32(res);
                 CLRF(FLAG_C|FLAG_V);
                 break;
-            case 0000700: case 0000710: case 0000720: case 0000730: 
+            case 0000700: case 0000710: case 0000720: case 0000730:
             case 0000740: case 0000750: case 0000760: case 0000770: /*muls*/
                 ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&src1,&PC));
                 sres = (int16)MASK_16L(src1) * (int16)MASK_16L(DRX);
@@ -2667,7 +2667,7 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
          * +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---*/
         case 0xe000:
             switch (IR_1103) {
-            case 000040: case 001040: case 002040: case 003040: 
+            case 000040: case 001040: case 002040: case 003040:
             case 004040: case 005040: case 006040: case 007040: /*asr.b r*/
                 cnt = DRX & 077;
                 goto do_asr8;
@@ -2678,7 +2678,7 @@ do_asr8:        reg = DR+IR_REGY;
                 res = src1 = MASK_8L(*reg);
                 if (cnt) {
                     if (cnt<8) {
-                        res >>= cnt; 
+                        res >>= cnt;
                         if (MASK_8SGN(src1)) res |= shmask8[cnt];
                         SETF(src1&bitmask[cnt],FLAG_C|FLAG_X);
                     } else {
@@ -2696,19 +2696,19 @@ do_asr8:        reg = DR+IR_REGY;
             case 000360: case 000370: /*asr*/
                 cnt = 1;
                 goto do_asr16;
-            case 000140: case 001140: case 002140: case 003140: 
+            case 000140: case 001140: case 002140: case 003140:
             case 004140: case 005140: case 006140: case 007140: /*asr.w r*/
                 cnt = DRX & 077;
                 IR = EA_DDIR | IR_REGY;
                 goto do_asr16;
-            case 000100: case 001100: case 002100: case 003100: 
+            case 000100: case 001100: case 002100: case 003100:
             case 004100: case 005100: case 006100: case 007100: /*asr.w #*/
                 cnt = quickarg[IR_REGX];
                 IR = EA_DDIR | IR_REGY;
 do_asr16:       ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&src1,&PC));
                 if (cnt) {
                     if (cnt<16) {
-                        res = src1 >> cnt; 
+                        res = src1 >> cnt;
                         if (MASK_16SGN(src1)) res |= shmask16[cnt];
                         SETF(src1&bitmask[cnt],FLAG_C|FLAG_X);
                     } else {
@@ -2725,18 +2725,18 @@ do_asr16:       ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&src1,&PC));
                 CLRF(FLAG_V);
                 break;
 
-            case 000240: case 001240: case 002240: case 003240: 
+            case 000240: case 001240: case 002240: case 003240:
             case 004240: case 005240: case 006240: case 007240: /*asr.l r*/
                 cnt = DRX & 077;
                 goto do_asr32;
-            case 000200: case 001200: case 002200: case 003200: 
+            case 000200: case 001200: case 002200: case 003200:
             case 004200: case 005200: case 006200: case 007200: /*asr.l #*/
                 cnt = quickarg[IR_REGX];
 do_asr32:       reg = DR+IR_REGY;
                 res = src1 = *reg;
                 if (cnt) {
                     if (cnt < 32) {
-                        res >>= cnt; 
+                        res >>= cnt;
                         if (MASK_32SGN(src1)) res |= shmask32[cnt];
                         SETF(src1&bitmask[cnt],FLAG_C|FLAG_X);
                     } else {
@@ -2749,11 +2749,11 @@ do_asr32:       reg = DR+IR_REGY;
                 CLRF(FLAG_V);
                 rc = SCPE_OK; break;
 
-            case 000440: case 001440: case 002440: case 003440: 
+            case 000440: case 001440: case 002440: case 003440:
             case 004440: case 005440: case 006440: case 007440: /*asl.b r*/
                 cnt = DRX & 077;
                 goto do_asl8;
-            case 000400: case 001400: case 002400: case 003400: 
+            case 000400: case 001400: case 002400: case 003400:
             case 004400: case 005400: case 006400: case 007400: /*asl.b #*/
                 cnt = quickarg[IR_REGX];
 do_asl8:        reg = DR+IR_REGY;
@@ -2773,7 +2773,7 @@ do_asl8:        reg = DR+IR_REGY;
                 } else CLRF(FLAG_C|FLAG_V);
                 SETNZ8(res);
                 rc = SCPE_OK; break;
-                
+
             case 000720: case 000730: case 000740: case 000750:
             case 000760: case 000770: /*asl*/
                 cnt = 1;
@@ -2811,7 +2811,7 @@ do_asl16:       ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&src1,&PC));
             case 004640: case 005640: case 006640: case 007640: /*asl.l r*/
                 cnt = DRX & 077;
                 goto do_asl32;
-            case 000600: case 001600: case 002600: case 003600: 
+            case 000600: case 001600: case 002600: case 003600:
             case 004600: case 005600: case 006600: case 007600: /*asl.l #*/
                 cnt = quickarg[IR_REGX];
 do_asl32:       reg = DR+IR_REGY;
@@ -2831,7 +2831,7 @@ do_asl32:       reg = DR+IR_REGY;
                 } else CLRF(FLAG_C|FLAG_V);
                 SETNZ32(res);
                 rc = SCPE_OK; break;
-            
+
             case 000050: case 001050: case 002050: case 003050:
             case 004050: case 005050: case 006050: case 007050: /*lsr.b r*/
                 cnt = DRX & 077;
@@ -2854,7 +2854,7 @@ do_lsr8:        reg = DR+IR_REGY;
                 CLRF(FLAG_V);
                 SETNZ8(res);
                 rc = SCPE_OK; break;
-                
+
             case 001320: case 001330: case 001340: case 001350:
             case 001360: case 001370: /*lsr*/
                 cnt = 1;
@@ -2914,7 +2914,7 @@ do_lsr32:       reg = DR+IR_REGY;
             case 004450: case 005450: case 006450: case 007450: /*lsl.b r*/
                 cnt = DRX & 077;
                 goto do_lsl8;
-            case 000410: case 001410: case 002410: case 003410: 
+            case 000410: case 001410: case 002410: case 003410:
             case 004410: case 005410: case 006410: case 007410: /*lsl.b #*/
                 cnt = quickarg[IR_REGX];
 do_lsl8:        reg = DR+IR_REGY;
@@ -2932,7 +2932,7 @@ do_lsl8:        reg = DR+IR_REGY;
                 SETNZ8(res);
                 CLRF(FLAG_V);
                 rc = SCPE_OK; break;
-            
+
             case 001720: case 001730: case 001740: case 001750:
             case 001760: case 001770: /*lsl*/
                 cnt = 1;
@@ -2991,7 +2991,7 @@ do_lsl32:       reg = DR+IR_REGY;
                 SETNZ32(res);
                 CLRF(FLAG_V);
                 break;
-            
+
             case 000060: case 001060: case 002060: case 003060:
             case 004060: case 005060: case 006060: case 007060: /*roxr.b r*/
                 cnt = DRX & 077;
@@ -3011,7 +3011,7 @@ do_roxr8:       reg = DR+IR_REGY;
                 SETNZ8(res);
                 CLRF(FLAG_V);
                 rc = SCPE_OK; break;
-                
+
             case 002320: case 002330: case 002340: case 002350:
             case 002360: case 002370: /*roxr*/
                 cnt = 1;
@@ -3059,7 +3059,7 @@ do_roxr32:      reg = DR+IR_REGY;
                 SETNZ32(resx);
                 CLRF(FLAG_V);
                 rc = SCPE_OK; break;
-            
+
             case 000460: case 001460: case 002460: case 003460:
             case 004460: case 005460: case 006460: case 007460: /*roxl.b r*/
                 cnt = DRX & 077;
@@ -3099,7 +3099,7 @@ do_roxl16:      ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&res,&PC));
                     if (CCR_X) res |= BIT16;
                     res = (res<<cnt) | (res>>(17-cnt));
                     SETF(MASK_17(res),FLAG_X|FLAG_C);
-                    rc = ea_dst_w_rmw(IR_EAMOD,IR_EAREG,res); 
+                    rc = ea_dst_w_rmw(IR_EAMOD,IR_EAREG,res);
                 } else {
                     SETF(CCR_X,FLAG_C);
                     rc = SCPE_OK;
@@ -3107,7 +3107,7 @@ do_roxl16:      ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&res,&PC));
                 SETNZ16(res);
                 CLRF(FLAG_V);
                 break;
-            
+
             case 000660: case 001660: case 002660: case 003660:
             case 004660: case 005660: case 006660: case 007660: /*roxl.l r*/
                 cnt = DRX & 077;
@@ -3127,7 +3127,7 @@ do_roxl32:      reg = DR+IR_REGY;
                 SETNZ32(resx);
                 CLRF(FLAG_V);
                 rc = SCPE_OK; break;
-            
+
             case 000070: case 001070: case 002070: case 003070:
             case 004070: case 005070: case 006070: case 007070: /*ror.b r*/
                 cnt = DRX & 077;
@@ -3214,7 +3214,7 @@ do_rol8:        reg = DR+IR_REGY;
                 SETNZ8(res);
                 CLRF(FLAG_V);
                 rc = SCPE_OK; break;
-                
+
             case 003720: case 003730: case 003740: case 003750:
             case 003760: case 003770: /*rol*/
                 cnt = 1;
@@ -3260,7 +3260,7 @@ do_rol32:       reg = DR+IR_REGY;
                 SETNZ32(resx);
                 CLRF(FLAG_V);
                 rc = SCPE_OK; break;
-            
+
             default:
                 rc = STOP_ERROP;
             }
@@ -3276,7 +3276,7 @@ do_rol32:       reg = DR+IR_REGY;
         default:
             rc = STOP_ERROP; break;
         }
-        
+
         /* handle tracing */
         if (tracet0 || SR_T1) {
             if (m68kcpu_unit->flags & UNIT_CPU_TRACE) {
@@ -3293,14 +3293,14 @@ do_rol32:       reg = DR+IR_REGY;
 
         /* handle interrupts (sets/resets intpending) */
         m68k_checkints(&PC);
-        
+
         /* handle STOP instr */
         if (rc==STOP_HALT) {
             if (m68kcpu_unit->flags & UNIT_CPU_STOP) {
                 PC -= 4; /* correct PC to point to STOP instr */
                 break;
             }
-            if ((rc = m68k_stop(&PC)) != SCPE_OK) 
+            if ((rc = m68k_stop(&PC)) != SCPE_OK)
                 break; /* does not return until interrupt occurs, will react to CTRL-E */
         }
     }

@@ -400,7 +400,7 @@ switch (fnc) {                                          /* case on function */
 if (uptr->FNC & FNC_STOPPING) {                         /* stopping? */
     uptr->FNC = FNC_STOP;                               /* fnc = STOP */
     sim_activate (uptr, fd_ctime);                      /* schedule */
-    }   
+    }
 fd_sta = fd_sta & ~STA_BSY;                             /* clear busy */
 if (fd_arm)                                             /* if armed, int */
     SET_INT (v_FD);

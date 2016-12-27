@@ -118,4 +118,3 @@
 #define STOP_IO 	5                           /* I/O error */
 #define STOP_MEM 	6                           /* Memory error */
 #define STOP_XACK 	7                           /* XACK error */
-

@@ -93,4 +93,3 @@ const char *sim_stop_messages[] = {
     "Invalid Opcode",
     "Invalid Memory",
 };
-

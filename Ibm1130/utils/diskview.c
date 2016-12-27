@@ -261,7 +261,7 @@ void dump_id (void)
 	pbf("      cold start pgm",buf+270, 8);
 }
 
-// EQUIVALENCES FOR DCOM PARAMETERS 
+// EQUIVALENCES FOR DCOM PARAMETERS
 #define NAME  4   // NAME OF PROGRAM/CORE LOAD
 #define DBCT  6   // BLOCK CT OF PROGRAM/CORE LOAD
 #define FCNT  7   // FILES SWITCH
@@ -472,7 +472,7 @@ void dump_slet (void)
 	}
 }
 
-int ascii_to_ebcdic_table[128] = 
+int ascii_to_ebcdic_table[128] =
 {
 	0x00,0x01,0x02,0x03,0x37,0x2d,0x2e,0x2f, 0x16,0x05,0x25,0x0b,0x0c,0x0d,0x0e,0x0f,
 	0x10,0x11,0x12,0x13,0x3c,0x3d,0x32,0x26, 0x18,0x19,0x3f,0x27,0x1c,0x1d,0x1e,0x1f,
@@ -594,7 +594,7 @@ char *trim (char *s)
 	return os;
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * lowcase - force a string to lowercase (ASCII)
  * ------------------------------------------------------------------------ */
 
@@ -605,8 +605,7 @@ char *lowcase (char *str)
 	for (s = str; *s; s++) {
 		if (*s >= 'A' && *s <= 'Z')
 			*s += 32;
-	} 
+	}
 
 	return str;
 }
-

@@ -2,7 +2,7 @@
 ; incrementing at the correct 100us interval.  It simply waits for the clock
 ; count to overflow (which takes 65535 * 100us or about 6.5 seconds) and then
 ; repeats for a total of 10 iterations.  If all is well, this loop should take
-; pretty close to 65 seconds to complete.  
+; pretty close to 65 seconds to complete.
 ;
 ;						RLA [15-Jun-13]
 echo
@@ -38,5 +38,3 @@ d -m 1015 177766
 d p 1000
 echo Start your stopwatch and at the same moment type "GO".
 echo The program should halt in exactly 65 seconds ...
-
-

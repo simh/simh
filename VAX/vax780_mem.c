@@ -144,7 +144,7 @@ DEVICE mctl_dev[] = {
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
     &mctl0_dib, DEV_NEXUS, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, NULL, NULL, NULL, NULL, NULL,
     &mctl_description
     },
     {
@@ -153,7 +153,7 @@ DEVICE mctl_dev[] = {
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
     &mctl1_dib, DEV_NEXUS, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, NULL, NULL, NULL, NULL, NULL,
     &mctl_description
     }
     };
@@ -175,7 +175,7 @@ ofs = NEXUS_GETOFS (pa);                                /* get offset */
 if (ofs >= MCRROM_OF) {                                 /* ROM? */
     *val = rom_lw[mctl][ofs - MCRROM_OF];               /* get lw */
     return SCPE_OK;
-    }   
+    }
 switch (ofs) {
 
     case MCRA_OF:                                       /* CR A */
@@ -269,7 +269,7 @@ t_bool extmem = MEMSIZE > MAXMEMSIZE;
 
 amb = (int32) (MEMSIZE / MCTL_NUM) >> 20;               /* array size MB */
 akb = (int32) (MEMSIZE / MCTL_NUM) >> 10;               /* array size KB */
-for (i = 0; i < MCTL_NUM; i++) {                        
+for (i = 0; i < MCTL_NUM; i++) {
     if (extmem)                                         /* Need MS780E? */
         mcr_a[i] = ((amb - 1) << MCRA_V_SIZE) | ((amb <= 16) ? MCRA_E_TYPE_64K : MCRA_E_TYPE_256K);
     else                                                /* Use MS780C */
@@ -297,8 +297,8 @@ struct {
     } boards[] = {
         { 4096, "MS780-JD M8374 array"},
         { 1024, "MS780-FD M8373 array"},
-        {  256, "MS780-C M8210 array"}, 
-        {   64, "MS780-C M8211 array"}, 
+        {  256, "MS780-C M8210 array"},
+        {   64, "MS780-C M8211 array"},
         {    0, NULL}};
 uint32 i, slot, bd;
 

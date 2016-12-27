@@ -2,7 +2,7 @@
                          simulator interface
 
    Based on the SIMH package written by Robert M Supnik
- 
+
    Copyright (c) 2006-2013 Gerardo Ospina
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -167,7 +167,7 @@ ssem_fprint_binary_number(of, op, 3);
 return SCPE_OK;
 }
 
-/* Utility routine 
+/* Utility routine
 
    prints instruction in the mnemomic style used in the 1998
    competition reference manual:
@@ -228,7 +228,7 @@ return SCPE_OK;
         *of     =       output stream
         addr    =       current PC
         *val    =       pointer to data
-        *uptr   =       pointer to unit 
+        *uptr   =       pointer to unit
         sw      =       switches
    Outputs:
         return  =       status code
@@ -254,7 +254,7 @@ return ssem_fprint_binary(of, inst, sw & SWMASK ('I') || sw & SWMASK ('M'));
 }
 
 static const char *opcode[] = {
-    "JMP", "JRP", "LDN", 
+    "JMP", "JRP", "LDN",
     "STO", "SUB", "",
     "CMP", "STOP",
     NULL
@@ -284,12 +284,12 @@ return SCPE_OK;
 
 /* Utility function
 
-   Parses mnemonic instruction. 
+   Parses mnemonic instruction.
 
    It accepts the mnemonics used in the 1998 competition reference
    manual:
    "The Manchester University Small Scale Experimental Machine
-    Programmer's Reference manual" 
+    Programmer's Reference manual"
     http://www.computer50.org/mark1/prog98/ssemref.html
 */
 

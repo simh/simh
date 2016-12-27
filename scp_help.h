@@ -82,7 +82,7 @@
  * For these cases, ?#, where # is a 1-based parameter number, can be used
  * to selectively include a topic.  If the specified parameter is TRUE
  * (a string with the value "T", "t" or '1'), the topic will be visible.
- * If the parameter is FALSE (NULL, or a string with any other value), 
+ * If the parameter is FALSE (NULL, or a string with any other value),
  * the topic will not be visible.
  *
  * If it can be determined at compile time whether the topic in question
@@ -105,7 +105,7 @@
  *     Hardware Description - The details of the hardware.  Feeds & speeds are OK here.
  *          Models          -   If the device was offered in distinct models, a subtopic for each.
  *          Registers       -   Register descriptions
- *            
+ *
  *     Configuration         - How to configure the device under SimH.  SET commands.
  *          Operating System -   If the device needs special configuration for a particular
  *                               OS, a subtopic for each such OS goes here.
@@ -149,7 +149,7 @@
  *                   UNIT *uptr, int flag, const char *help, char *cptr, ...)
  *
  *  If you need to pass the variable argument list from another routine, use:
- * 
+ *
  *  t_stat scp_vhelp (FILE *st, DEVICE *dptr,
  *                    UNIT *uptr, int flag, const char *help, char *cptr, va_list ap)
  *
@@ -173,7 +173,7 @@
  * to a string.)
  *
  * Lines beginning with ';' will be ignored.
- * 
+ *
  * Here is a worked-out example:
  *
 ;****************************************************************************
@@ -229,7 +229,7 @@
 2 Examples
   TBS
 1 Operation
-  Specify the host file to receive output using the 
+  Specify the host file to receive output using the
 +ATTACH WHIZBANG filespec
  command.
 1 Monitoring

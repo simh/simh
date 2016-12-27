@@ -441,7 +441,7 @@ while (reason == 0) {                                   /* loop until stop */
 
     if (int_hireq < NO_INT) {                           /* interrupt req? */
         uint32 sav_hi, vec, wd, op;
-        
+
         vec = io_ackn_int (sav_hi = int_hireq);         /* get vector */
         if (vec == 0) {                                 /* illegal vector? */
             reason = STOP_ILLVEC;                       /* something wrong */
@@ -623,7 +623,7 @@ switch (op) {
             return tr;
         if ((tr = ReadW (bva, &opnd, VR)) != 0)         /* read word */
             return tr;
-        res = (R[rn] & ~R[rn|1]) | (opnd & R[rn|1]);    /* load under mask */ 
+        res = (R[rn] & ~R[rn|1]) | (opnd & R[rn|1]);    /* load under mask */
         CC34_W (res);                                   /* set cc's */
         R[rn] = res;                                    /* store result */
         break;
@@ -989,7 +989,7 @@ switch (op) {
         res = (uint32) ((sop * sop1) & WMASK);          /* product */
         CC34_W (res);                                   /* set CC's */
         R[rn|1] = res;                                  /* store */
-        break;        
+        break;
 
     case OP_MW:                                         /* multiply word */
         if ((tr = Ea (IR, &bva, VR, WD)) != 0)          /* get eff addr */
@@ -1719,7 +1719,7 @@ switch (op) {
         if ((tr = Ea (IR, &bva, VR, WD)) != 0)          /* get eff addr */
             return tr;
         return fp (op, rn, bva);                        /* go process */
-        
+
     case OP_FAL:
     case OP_FSL:
     case OP_FML:
@@ -1762,7 +1762,7 @@ switch (op) {
         if ((tr = cis_ebs (rn, opnd)) & WSIGN)          /* process, abort? */
             return 0;
         else return tr;
- 
+
     default:                                            /* undefined inst */
         return (stop_op? STOP_ILLEG: TR_NXI);
        }
@@ -2037,7 +2037,7 @@ if (sc & SCSIGN) {                                      /* right? */
             R[rn|1] = opnd1;
             R[rn] = opnd;
             break;
- 
+
         case 0x6:                                       /* right search sgl */
             for (i = 0; (i < sc) && !(opnd & WSIGN); i++) {
                 opnd = ((opnd >> 1) | (opnd << 31)) & WMASK;

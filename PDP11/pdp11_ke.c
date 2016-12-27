@@ -101,13 +101,13 @@ DEVICE ke_dev = {
     NULL, NULL, NULL,
     &ke_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS, 0,
     NULL, NULL, NULL, &ke_help, NULL, NULL,
-    &ke_description 
+    &ke_description
     };
 
 /* KE read - reads are always 16b, to even addresses */
 
 t_stat ke_rd (int32 *data, int32 PA, int32 access)
-{  
+{
 switch (PA & 016) {                                     /* decode PA<3:1> */
 
     case KE_AC:                                         /* AC */
@@ -172,7 +172,7 @@ switch (PA & 017) {                                     /* decode PA<3:0> */
             ke_AC = (sign? ke_AC - data: ke_AC + data) & DMASK;
             ke_MQ = ((ke_MQ << 1) | sign) & DMASK;
             if (GET_SIGN_W (ke_AC ^ data) == 0)         /* 0 if signs match */
-                ke_SR |= KE_SR_C;            
+                ke_SR |= KE_SR_C;
             ke_SC = 15;                                 /* SC clocked once */
             ke_SR |= KE_SR_NXV;                         /* set overflow */
            }

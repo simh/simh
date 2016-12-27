@@ -408,7 +408,7 @@ for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
             }                                           /* end case */
 
         if (r2)
-            fprintf (of, "(R%d)", r2);  
+            fprintf (of, "(R%d)", r2);
         return -3;
         }                                               /* end if */
     }                                                   /* end for */
@@ -437,7 +437,7 @@ if ((*cptr == 'R') || (*cptr == 'r')) {                 /* R? */
 if ((*cptr >= '0') && (*cptr <= '9')) {
     reg = *cptr++ - '0';
     if ((*cptr >= '0') && (*cptr <= '9'))
-        reg = (reg * 10) + (*cptr - '0'); 
+        reg = (reg * 10) + (*cptr - '0');
     else --cptr;
     if (reg > 0xF)
         return -1;

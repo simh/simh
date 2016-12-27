@@ -19,10 +19,10 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the names of Robert M Supnik and Holger Veit 
+   Except as contained in this notice, the names of Robert M Supnik and Holger Veit
    shall not be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik and Holger Veit.
-   
+
    20130920 hv initial version, moved some code from pdq3_cpu.c
 */
 #include "pdq3_defs.h"
@@ -41,7 +41,7 @@ IOREAD ioreaders[IOSIZE];
 IOWRITE iowriters[IOSIZE];
 
 /* I/O devices are implemented this way:
- * a unit will register its own I/O addresses together with its handler 
+ * a unit will register its own I/O addresses together with its handler
  * in a hash which allows simple lookup of memory mapped I/O addresses
  */
 t_stat pdq3_ioinit() {
@@ -195,7 +195,7 @@ t_stat show_ioprio(FILE *st, UNIT *uptr, int value, CONST void *desc) {
 }
 
 /******************************************************************************
- * central memory handling 
+ * central memory handling
  *****************************************************************************/
 t_stat Read(t_addr base, t_addr woffset, uint16 *data, uint32 dctrl) {
   t_stat rc;
@@ -263,7 +263,7 @@ printf("write buserror %x at %x:%x\n",ea,reg_segb,reg_ipc);
   }
   if (dctrl & DBG_CPU_STACK)
     sim_debug(DBG_CPU_PUSH, &cpu_dev, DBG_PCFORMAT1 "Push %04x to SP=$%04x\n", DBG_PC, data, ea);
-  else 
+  else
     sim_debug(dctrl, &cpu_dev, DBG_PCFORMAT2 "Word write %04x to $%04x\n", DBG_PC, data, ea);
   return rc;
 }
@@ -277,7 +277,7 @@ t_stat ReadB(t_addr base, t_addr boffset, uint16 *data, uint32 dctrl)
     *data >>= 8;
   *data &= 0xff;
   if (dctrl & DBG_CPU_FETCH)
-    sim_debug(DBG_CPU_FETCH, &cpu_dev, DBG_PCFORMAT0 "Fetch %02x from SEGB:%04x\n", 
+    sim_debug(DBG_CPU_FETCH, &cpu_dev, DBG_PCFORMAT0 "Fetch %02x from SEGB:%04x\n",
       DBG_PC, *data, reg_ipc);
   else
     sim_debug(dctrl, &cpu_dev, DBG_PCFORMAT2 "Byte[%d] read %02x from $%04x\n",
@@ -323,7 +323,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
   if (val < 0 || val > 1)
     return SCPE_ARG;
-    
+
   val = val ? 65536 : 32768;
 
   for (mc = 0, i = val; i < memorysize; i++)
@@ -331,7 +331,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
   if (mc && !get_yn ("Really truncate memory [N]?", FALSE))
     return SCPE_OK;
-    
+
   memorysize = val;
   for (i = memorysize; i < MAXMEMSIZE; i++)
     M[i] = 0;
@@ -348,5 +348,3 @@ t_stat rom_write(t_addr ea, uint16 data) {
   M[ea] = data;
   return SCPE_OK;
 }
-
-

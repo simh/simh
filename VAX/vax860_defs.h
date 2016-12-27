@@ -220,7 +220,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define REG_V_NEXUS     13                              /* nexus number */
 #define REG_M_NEXUS     0xF
 #define REG_V_OFS       2                               /* register number */
-#define REG_M_OFS       0x7FF   
+#define REG_M_OFS       0x7FF
 #define REGSIZE         (1u << REGAWIDTH)               /* REG length */
 #define REGBASE         0x20000000                      /* REG addr base */
 #define NEXUSBASE       REGBASE                         /* NEXUS addr base */
@@ -300,7 +300,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 
 #define DEV_RDX         16                              /* default device radix */
 
-/* Device information block 
+/* Device information block
 
    For Massbus devices,
         ba      =       Massbus number

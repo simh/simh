@@ -12,10 +12,10 @@ int main(int argc,char* argv[])
 		fprintf(stderr,"Usage:\n\t%s txtfile binfile\n",argv[0]);
 		exit(1);
 	}
-	
+
 	in = fopen(argv[1],"r");
 	out = fopen(argv[2],"wb");
-	
+
 	while (!feof(in)) {
 		fgets(buf,100,in);
 		sscanf(buf,"%x: %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x",

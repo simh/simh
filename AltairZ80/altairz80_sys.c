@@ -527,7 +527,7 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw) {
 
         default:
             return SCPE_IERR;
-            
+
     }
     fprintf(of, "%s", disasm_result);
     return 1 - r;
@@ -933,4 +933,3 @@ t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     fprintf(st, "I/O=0x%02X-0x%02X", pnp->io_base, pnp->io_base+pnp->io_size-1);
     return SCPE_OK;
 }
-

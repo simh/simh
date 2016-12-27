@@ -908,4 +908,3 @@ Bugs Found and Fixed During Simulator Debug
 96. IDC: WD/WH use standard Interdata write pointers
 97. SELCH: GO preserves EXA and SSTA
 98. CPU: DH overflow checking broken
-

@@ -110,7 +110,7 @@ t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size)
             return SCPE_MEM;
         }
     }
-//    sim_printf("   RAM: Available [%04X-%04XH]\n", 
+//    sim_printf("   RAM: Available [%04X-%04XH]\n",
 //        RAM_unit.u3,
 //        RAM_unit.u3 + RAM_unit.capac - 1);
     sim_debug (DEBUG_flow, &RAM_dev, "RAM_reset: Done\n");
@@ -125,9 +125,9 @@ uint8 RAM_get_mbyte(uint16 addr)
 
     sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
     SET_XACK(1);                /* good memory address */
-    sim_debug (DEBUG_xack, &RAM_dev, "RAM_get_mbyte: Set XACK for %04X\n", addr); 
+    sim_debug (DEBUG_xack, &RAM_dev, "RAM_get_mbyte: Set XACK for %04X\n", addr);
     val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
-    sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
+    sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val);
     return (val & 0xFF);
 }
 
@@ -137,7 +137,7 @@ void RAM_put_mbyte(uint16 addr, uint8 val)
 {
     sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
     SET_XACK(1);                /* good memory address */
-    sim_debug (DEBUG_xack, &RAM_dev, "RAM_put_mbyte: Set XACK for %04X\n", addr);  
+    sim_debug (DEBUG_xack, &RAM_dev, "RAM_put_mbyte: Set XACK for %04X\n", addr);
     *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
     sim_debug (DEBUG_write, &RAM_dev, "\n");
 }

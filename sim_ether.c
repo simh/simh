@@ -66,23 +66,23 @@
   HP/UX                     ??
   Compaq Tru64 Unix         ??
   VMS                       Alpha/Itanium VMS only, needs VMS libpcap
-  
-  WinPcap is available from: 
+
+  WinPcap is available from:
                         http://winpcap.polito.it/
-  libpcap for VMS is available from: 
+  libpcap for VMS is available from:
                         http://simh.trailing-edge.com/sources/vms-pcap.zip
-  libpcap for other Unix platforms is available at: 
-        NOTE: As of the release of this version of sim_ether.c ALL current 
-              *nix platforms ship with a sufficiently new version of 
+  libpcap for other Unix platforms is available at:
+        NOTE: As of the release of this version of sim_ether.c ALL current
+              *nix platforms ship with a sufficiently new version of
               libpcap, and ALL provide a libpcap-dev package for developing
               libpcap based applications.  The OS vendor supplied version
               of libpcap AND the libpcap-dev components are preferred for
-              proper operation of both simh AND other applications on the 
+              proper operation of both simh AND other applications on the
               host system which use libpcap.
         Current Version:  http://www.tcpdump.org/daily/libpcap-current.tar.gz
         Released Version: http://www.tcpdump.org/release/
 
-        When necessary (see NOTE above about vendor supplied libpcap), 
+        When necessary (see NOTE above about vendor supplied libpcap),
         we've gotten the tarball, unpacked, built and installed it with:
             gzip -dc libpcap-current.tar.gz | tar xvf -
             cd libpcap-directory-name
@@ -91,74 +91,74 @@
             make install
         Note:  The "make install" step generally will have to be done as root.
         This will install libpcap in /usr/local/lib and /usr/local/include
-        The current simh makefile will do the right thing to locate and 
+        The current simh makefile will do the right thing to locate and
         reference the OS provided libpcap or the one just installed.
 
 
-  Note: Building for the platforms indicated above, with the indicated libpcap, 
-  should automatically leverage the appropriate mechanisms contained here.  
-  Things are structured so that it is likely to work for any other as yet 
-  untested platform.  If it works for you, please let the author know so we 
-  can update the table above.  If it doesn't work, then the following #define 
+  Note: Building for the platforms indicated above, with the indicated libpcap,
+  should automatically leverage the appropriate mechanisms contained here.
+  Things are structured so that it is likely to work for any other as yet
+  untested platform.  If it works for you, please let the author know so we
+  can update the table above.  If it doesn't work, then the following #define
   variables can influence the operation on an untested platform.
 
-  USE_BPF           - Determines if this code leverages a libpcap/WinPcap 
-                      provided bpf packet filtering facility.  All tested 
-                      environments have bpf facilities that work the way we 
-                      need them to.  However a new one might not.  undefine 
+  USE_BPF           - Determines if this code leverages a libpcap/WinPcap
+                      provided bpf packet filtering facility.  All tested
+                      environments have bpf facilities that work the way we
+                      need them to.  However a new one might not.  undefine
                       this variable to let this code do its own filtering.
-  USE_SETNONBLOCK   - Specifies whether the libpcap environment's non-blocking 
-                      semantics are to be leveraged.  This helps to manage the 
-                      varying behaviours of the kernel packet facilities 
+  USE_SETNONBLOCK   - Specifies whether the libpcap environment's non-blocking
+                      semantics are to be leveraged.  This helps to manage the
+                      varying behaviours of the kernel packet facilities
                       leveraged by libpcap.
-  USE_READER_THREAD - Specifies that packet reading should be done in the 
-                      context of a separate thread.  The Posix threading 
+  USE_READER_THREAD - Specifies that packet reading should be done in the
+                      context of a separate thread.  The Posix threading
                       APIs are used.  This option is less efficient than the
-                      default non-threaded approach, but it exists since some 
-                      platforms don't want to work with nonblocking libpcap 
-                      semantics.   OpenBSD and NetBSD either don't have pthread 
-                      APIs available, or they are too buggy to be useful. 
-                      Using the threaded approach may require special compile 
-                      and/or link time switches (i.e. -lpthread or -pthread, 
-                      etc.) Consult the documentation for your platform as 
+                      default non-threaded approach, but it exists since some
+                      platforms don't want to work with nonblocking libpcap
+                      semantics.   OpenBSD and NetBSD either don't have pthread
+                      APIs available, or they are too buggy to be useful.
+                      Using the threaded approach may require special compile
+                      and/or link time switches (i.e. -lpthread or -pthread,
+                      etc.) Consult the documentation for your platform as
                       needed.  Although this may be 'less efficient' than the
                       non-threaded approach, the efficiency is an overall system
-                      efficiency not necessarily a simulator efficiency.  This 
-                      means that work is removed from the thread executing 
+                      efficiency not necessarily a simulator efficiency.  This
+                      means that work is removed from the thread executing
                       simulated instructions so the simulated system will most
-                      likely run faster (given that modern host CPUs are 
+                      likely run faster (given that modern host CPUs are
                       multi-core and have someplace to do this work in parallel).
-  MUST_DO_SELECT    - Specifies that, when USE_READER_THREAD is active,  
-                      select() should be used to determine when available 
-                      packets are ready for reading.  Otherwise, we depend 
-                      on the libpcap/kernel packet timeout specified on 
-                      pcap_open_live.  If USE_READER_THREAD is not set, then 
+  MUST_DO_SELECT    - Specifies that, when USE_READER_THREAD is active,
+                      select() should be used to determine when available
+                      packets are ready for reading.  Otherwise, we depend
+                      on the libpcap/kernel packet timeout specified on
+                      pcap_open_live.  If USE_READER_THREAD is not set, then
                       MUST_DO_SELECT is irrelevant
-  HAVE_TAP_NETWORK  - Specifies that support for tap networking should be 
+  HAVE_TAP_NETWORK  - Specifies that support for tap networking should be
                       included.  This can be leveraged, along with OS bridging
-                      capabilities to share a single LAN interface.  This 
+                      capabilities to share a single LAN interface.  This
                       allows device names of the form tap:tap0 to be specified
-                      at open time.  This functionality is only useful/needed 
-                      on *nix platforms since native sharing of Windows NIC 
+                      at open time.  This functionality is only useful/needed
+                      on *nix platforms since native sharing of Windows NIC
                       devices works with no external magic.
-  HAVE_VDE_NETWORK  - Specifies that support for vde networking should be 
+  HAVE_VDE_NETWORK  - Specifies that support for vde networking should be
                       included.  This can be leveraged, along with OS bridging
                       capabilities to share a single LAN interface.  It also
-                      can allow a simulator to have useful networking 
-                      functionality when running without root access.  This 
-                      allows device names of the form vde:/tmp/switch to be 
-                      specified at open time.  This functionality is only 
-                      available on *nix platforms since the vde api isn't 
+                      can allow a simulator to have useful networking
+                      functionality when running without root access.  This
+                      allows device names of the form vde:/tmp/switch to be
+                      specified at open time.  This functionality is only
+                      available on *nix platforms since the vde api isn't
                       available on Windows.
-  HAVE_SLIRP_NETWORK- Specifies that support for SLiRP networking should be 
-                      included.  This can be leveraged to provide User Mode 
+  HAVE_SLIRP_NETWORK- Specifies that support for SLiRP networking should be
+                      included.  This can be leveraged to provide User Mode
                       IP NAT connectivity for simulators.
 
   NEED_PCAP_SENDPACKET
                     - Specifies that you are using an older version of libpcap
                       which doesn't provide a pcap_sendpacket API.
 
-  NOTE: Changing these defines is done in either sim_ether.h OR on the global 
+  NOTE: Changing these defines is done in either sim_ether.h OR on the global
         compiler command line which builds all of the modules included in a
         simulator.
 
@@ -167,9 +167,9 @@
   Modification history:
 
   30-Mar-12  MP   Added host NIC address determination on supported VMS platforms
-  01-Mar-12  MP   Made host NIC address determination on *nix platforms more 
+  01-Mar-12  MP   Made host NIC address determination on *nix platforms more
                   robust.
-  01-Mar-12  MP   Added host NIC address determination work when building 
+  01-Mar-12  MP   Added host NIC address determination work when building
                   under Cygwin
   01-Mar-12  AGN  Add conditionals for Cygwin dynamic loading of wpcap.dll
   01-Mar-12  AGN  Specify the full /usr/lib for dlopen under Apple Mac OS X.
@@ -177,78 +177,78 @@
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
   12-Aug-11  MP   Cleaned up payload length determination
-                  Fixed race condition detecting reflections when threaded 
+                  Fixed race condition detecting reflections when threaded
                   reading and writing is enabled
-  18-Apr-11  MP   Fixed race condition with self loopback packets in 
+  18-Apr-11  MP   Fixed race condition with self loopback packets in
                   multithreaded environments
-  09-Jan-11  MP   Fixed missing crc data when USE_READER_THREAD is defined and 
+  09-Jan-11  MP   Fixed missing crc data when USE_READER_THREAD is defined and
                   crc's are needed (only the pdp11_xu)
-  16-Dec-10  MP   added priority boost for read and write threads when 
+  16-Dec-10  MP   added priority boost for read and write threads when
                   USE_READER_THREAD does I/O in separate threads.  This helps
-                  throughput since it allows these I/O bound threads to preempt 
-                  the main thread (which is executing simulated instructions).                  
+                  throughput since it allows these I/O bound threads to preempt
+                  the main thread (which is executing simulated instructions).
   09-Dec-10  MP   allowed more flexible parsing of MAC address strings
   09-Dec-10  MP   Added support to determine if network address conflicts exist
   07-Dec-10  MP   Reworked DECnet self detection to the more general approach
                   of loopback self when a Physical Address is being set.
-  04-Dec-10  MP   Changed eth_write to do nonblocking writes when 
+  04-Dec-10  MP   Changed eth_write to do nonblocking writes when
                   USE_READER_THREAD is defined.
   20-Aug-10  TVO  Fix for Mac OSX 10.6
   17-Jun-10  MP   Fixed bug in the AUTODIN II hash filtering.
-  14-Jun-10  MP   Added support for integrated Tap networking interfaces on BSD 
+  14-Jun-10  MP   Added support for integrated Tap networking interfaces on BSD
                   platforms.
-  13-Jun-10  MP   Added support for integrated Tap networking interfaces on Linux 
+  13-Jun-10  MP   Added support for integrated Tap networking interfaces on Linux
                   platforms.
   31-May-10  MP   Added support for more TOE (TCP Offload Engine) features for IPv4
                   network traffic from the host and/or from hosts on the LAN.  These
                   new TOE features are: LSO (Large Send Offload) and Jumbo packet
                   fragmentation support.  These features allow a simulated network
-                  device to support traffic when a host leverages a NIC's Large 
-                  Send Offload capabilities to fregment and/or segment outgoing 
-                  network traffic.  Additionally a simulated network device can 
+                  device to support traffic when a host leverages a NIC's Large
+                  Send Offload capabilities to fregment and/or segment outgoing
+                  network traffic.  Additionally a simulated network device can
                   reasonably exist on a LAN which is configured to use Jumbo frames.
-  21-May-10  MP   Added functionality to fixup IP header checksums to accomodate 
+  21-May-10  MP   Added functionality to fixup IP header checksums to accomodate
                   packets from a host with a NIC which has TOE (TCP Offload Engine)
                   enabled which is expected to implement the checksum computations
                   in hardware.  Since we catch packets before they arrive at the
                   NIC the expected checksum insertions haven't been performed yet.
-                  This processing is only done for packets sent from the hoat to 
-                  the guest we're supporting.  In general this will be a relatively 
+                  This processing is only done for packets sent from the hoat to
+                  the guest we're supporting.  In general this will be a relatively
                   small number of packets so it is done for all IP frame packets
-                  coming from the hoat to the guest.  In order to make the 
+                  coming from the hoat to the guest.  In order to make the
                   determination of packets specifically arriving from the host we
                   need to know the hardware MAC address of the host NIC.  Currently
                   determining a NIC's MAC address is relatively easy on Windows.
-                  The non-windows code works on linux and may work on other *nix 
-                  platforms either as is or with slight modifications.  The code, 
-                  as implemented, only messes with this activity if the host 
+                  The non-windows code works on linux and may work on other *nix
+                  platforms either as is or with slight modifications.  The code,
+                  as implemented, only messes with this activity if the host
                   interface MAC address can be determined.
-  20-May-10  MP   Added general support to deal with receiving packets smaller 
+  20-May-10  MP   Added general support to deal with receiving packets smaller
                   than ETH_MIN_PACKET in length.  These come from packets
                   looped back by some bridging mechanism and need to be padded
-                  to the minimum frame size.  A real NIC won't pass us any 
+                  to the minimum frame size.  A real NIC won't pass us any
                   packets like that.  This fix belongs here since this layer
-                  is responsible for interfacing to they physical layer 
+                  is responsible for interfacing to they physical layer
                   devices, AND it belongs here to get CRC processing right.
   05-Mar-08  MP   Added optional multicast filtering support for doing
                   LANCE style AUTODIN II based hashed filtering.
   07-Feb-08  MP   Added eth_show_dev to display ethernet state
                   Changed the return value from eth_read to return whether
-                  or not a packet was read.  No existing callers used or 
+                  or not a packet was read.  No existing callers used or
                   checked constant return value that previously was being
                   supplied.
-  29-Jan-08  MP   Added eth_set_async to provide a mechanism (when 
-                  USE_READER_THREAD is enabled) to allow packet reception 
-                  to dynamically update the simulator event queue and 
-                  potentially avoid polling for I/O.  This provides a minimal 
-                  overhead (no polling) maximal responsiveness for network 
+  29-Jan-08  MP   Added eth_set_async to provide a mechanism (when
+                  USE_READER_THREAD is enabled) to allow packet reception
+                  to dynamically update the simulator event queue and
+                  potentially avoid polling for I/O.  This provides a minimal
+                  overhead (no polling) maximal responsiveness for network
                   activities.
   29-Jan-08  MP   Properly sequenced activities in eth_close to avoid a race
                   condition when USE_READER_THREAD is enabled.
   25-Jan-08  MP   Changed the following when USE_READER_THREAD is enabled:
-                  - Fixed bug when the simulated device doesn't need crc 
+                  - Fixed bug when the simulated device doesn't need crc
                     in packet data which is read.
-                  - Added call to pcap_setmintocopy to minimize packet 
+                  - Added call to pcap_setmintocopy to minimize packet
                     delivery latencies.
                   - Added ethq_destroy and used it to avoid a memory leak in
                     eth_close.
@@ -258,8 +258,8 @@
                   Fixed the bpf filter used when no traffic is to be matched.
                   Reworked eth_add_packet_crc32 implementation to avoid an
                   extra buffer copy while reading packets.
-                  Fixedup #ifdef's relating to USE_SHARED so that setting 
-                  USE_SHARED or USE_NETWORK will build a working network 
+                  Fixedup #ifdef's relating to USE_SHARED so that setting
+                  USE_SHARED or USE_NETWORK will build a working network
                   environment.
   23-Jan-08  MP   Reworked eth_packet_trace and eth_packet_trace_ex to allow
                   only output ethernet header+crc and provide a mechanism for
@@ -282,10 +282,10 @@
   25-Mar-04  MP   Revised comments and minor #defines to deal with updated
                   libpcap which now provides pcap_sendpacket on all platforms.
   04-Feb-04  MP   Returned success/fail status from eth_write to support
-                  determining if the current libpcap connection can successfully 
+                  determining if the current libpcap connection can successfully
                   write packets.
                   Added threaded approach to reading packets since
-                  this works better on some platforms (solaris intel) than the 
+                  this works better on some platforms (solaris intel) than the
                   inconsistently implemented non-blocking read approach.
   04-Feb-04  DTH  Converted ETH_DEBUG to sim_debug
   13-Jan-04  MP   tested and fixed on OpenBSD, NetBS and FreeBSD.
@@ -449,7 +449,7 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
       return sim_messagef (SCPE_ARG, "Invalid MAC address byte value: %02X\n", a[i]);
     else {
       uint32 mask, shift;
-    
+
       state.base_mac[i] = a[i];
       if (((i + 1) << 3) < state.bits)
           shift = 0;
@@ -940,7 +940,7 @@ t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
   fprintf (st, "This simulator was not built with ethernet device support\n");
   return SCPE_OK;
   }
-t_stat eth_check_address_conflict (ETH_DEV* dev, 
+t_stat eth_check_address_conflict (ETH_DEV* dev,
                                    ETH_MAC* const mac)
   {return SCPE_NOFNC;}
 t_stat eth_set_throttle (ETH_DEV* dev, uint32 time, uint32 burst, uint32 delay)
@@ -1010,9 +1010,9 @@ typedef void * pcap_t;  /* Pseudo Type to avoid compiler errors */
 
 #ifdef HAVE_TAP_NETWORK
 #if defined(__linux) || defined(__linux__)
-#include <sys/ioctl.h> 
-#include <net/if.h> 
-#include <linux/if_tun.h> 
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <linux/if_tun.h>
 #elif defined(HAVE_BSDTUNTAP)
 #include <sys/types.h>
 #include <net/if_types.h>
@@ -1066,7 +1066,7 @@ static const char* lib_name =
 #define __STR(tok) __STR_QUOTE(tok)
                           "libpcap." __STR(HAVE_DLOPEN);
 #endif
-static const char* no_pcap = 
+static const char* no_pcap =
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap load failure";
 #else
@@ -1372,9 +1372,9 @@ struct _PACKET_OID_DATA {
     uint32 Oid;                 ///< OID code. See the Microsoft DDK documentation or the file ntddndis.h
                                 ///< for a complete list of valid codes.
     uint32 Length;              ///< Length of the data field
-    uint8 Data[1];              ///< variable-lenght field that contains the information passed to or received 
+    uint8 Data[1];              ///< variable-lenght field that contains the information passed to or received
                                 ///< from the adapter.
-}; 
+};
 typedef struct _PACKET_OID_DATA PACKET_OID_DATA, *PPACKET_OID_DATA;
 typedef void **LPADAPTER;
 #define OID_802_3_CURRENT_ADDRESS               0x01010102 /* Extracted from ntddmdis.h */
@@ -1406,7 +1406,7 @@ static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6
   p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))dlsym(hDll, "PacketCloseAdapter");
   p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))dlsym(hDll, "PacketRequest");
 #endif
-  
+
   /* Open the selected adapter */
 
   lpAdapter =   p_PacketOpenAdapter(AdapterName);
@@ -1515,13 +1515,13 @@ static int pcap_mac_if_vms(const char *AdapterName, unsigned char MACAddress[6])
   Device.dsc$w_length = strlen(VMS_Device);
   if (!$VMS_STATUS_SUCCESS( sys$assign (&Device, &chan, 0, 0, 0) ))
     return -1;
-  status = sys$qiow (0, chan, IO$_SETMODE|IO$M_CTRL|IO$M_STARTUP, &iosb, 0, 0, 
+  status = sys$qiow (0, chan, IO$_SETMODE|IO$M_CTRL|IO$M_STARTUP, &iosb, 0, 0,
                      0, &setupdesc, 0, 0, 0, 0);
   if ((!$VMS_STATUS_SUCCESS(status)) || (!$VMS_STATUS_SUCCESS(iosb[0]))) {
     sys$dassgn(chan);
     return -1;
     }
-  status = sys$qiow (0, chan, IO$_SENSEMODE|IO$M_CTRL, &iosb, 0, 0, 
+  status = sys$qiow (0, chan, IO$_SENSEMODE|IO$M_CTRL, &iosb, 0, 0,
                      0, &chardesc, 0, 0, 0, 0);
   sys$dassgn(chan);
   if ((!$VMS_STATUS_SUCCESS(status)) || (!$VMS_STATUS_SUCCESS(iosb[0])))
@@ -1729,8 +1729,8 @@ switch (dev->eth_api) {
 
 sim_debug(dev->dbit, dev->dptr, "Reader Thread Starting\n");
 
-/* Boost Priority for this I/O thread vs the CPU instruction execution 
-   thread which, in general, won't be readily yielding the processor 
+/* Boost Priority for this I/O thread vs the CPU instruction execution
+   thread which, in general, won't be readily yielding the processor
    when this thread needs to run */
 sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
@@ -1753,7 +1753,7 @@ while (dev->handle) {
         {
         fd_set setl;
         struct timeval timeout;
-        
+
         FD_ZERO(&setl);
         FD_SET(select_fd, &setl);
         timeout.tv_sec = 0;
@@ -1763,7 +1763,7 @@ while (dev->handle) {
       }
     else
       sel_ret = 1;
-    if (sel_ret < 0 && errno != EINTR) 
+    if (sel_ret < 0 && errno != EINTR)
       break;
     }
   if (sel_ret > 0) {
@@ -1890,8 +1890,8 @@ _eth_writer(void *arg)
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
 ETH_WRITE_REQUEST *request;
 
-/* Boost Priority for this I/O thread vs the CPU instruction execution 
-   thread which in general won't be readily yielding the processor when 
+/* Boost Priority for this I/O thread vs the CPU instruction execution
+   thread which in general won't be readily yielding the processor when
    this thread needs to run */
 sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
@@ -2438,7 +2438,7 @@ if (!rand_initialized)
 return (rand() & 0xFF);
 }
 
-t_stat eth_check_address_conflict (ETH_DEV* dev, 
+t_stat eth_check_address_conflict (ETH_DEV* dev,
                                    ETH_MAC* const mac)
 {
 ETH_PACK send, recv;
@@ -2452,61 +2452,61 @@ eth_mac_fmt(mac, mac_string);
 sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %s\n", mac_string);
 
 /* The process of checking address conflicts is used in two ways:
-   1) to determine the behavior of the currently running packet 
-      delivery facility regarding whether it may receive copies 
-      of every packet sent (and how many). 
-   2) to verify if a MAC address which this facility is planning 
-      to use as the source address of packets is already in use 
-      by some other node on the local network 
-   Case #1, doesn't require (and explicitly doesn't want) any 
-   interaction or response from other systems on the LAN so 
-   therefore no considerations regarding switch packet forwarding 
-   are important.  Meanwhile, Case #2 does require responses from 
-   other components on the LAN to provide useful functionality. 
-   The original designers of this mechanism did this when essentially 
-   all LANs were single collision domains (i.e. ALL nodes which might 
+   1) to determine the behavior of the currently running packet
+      delivery facility regarding whether it may receive copies
+      of every packet sent (and how many).
+   2) to verify if a MAC address which this facility is planning
+      to use as the source address of packets is already in use
+      by some other node on the local network
+   Case #1, doesn't require (and explicitly doesn't want) any
+   interaction or response from other systems on the LAN so
+   therefore no considerations regarding switch packet forwarding
+   are important.  Meanwhile, Case #2 does require responses from
+   other components on the LAN to provide useful functionality.
+   The original designers of this mechanism did this when essentially
+   all LANs were single collision domains (i.e. ALL nodes which might
    be affected by an address conflict were physically present on a single
    Ethernet cable which might have been extended by a couple of repeaters).
-   Since that time, essentially no networks are single collision domains.  
-   Thick and thinwire Ethernet cables don't exist and very few networks 
-   even have hubs.  Today, essentially all LANs are deployed using one 
-   or more layers of network switches.  In a switched LAN environment, the 
-   switches on the LAN "learn" which ports on the LAN source traffic from 
-   which MAC addresses and then forward traffic destined for particular 
+   Since that time, essentially no networks are single collision domains.
+   Thick and thinwire Ethernet cables don't exist and very few networks
+   even have hubs.  Today, essentially all LANs are deployed using one
+   or more layers of network switches.  In a switched LAN environment, the
+   switches on the LAN "learn" which ports on the LAN source traffic from
+   which MAC addresses and then forward traffic destined for particular
    MAC address to the appropriate ports.  If a particular MAC address is
-   already in use somewhere on the LAN, then the switches "know" where 
-   it is.  The host based test using the loopback protocol is poorly 
+   already in use somewhere on the LAN, then the switches "know" where
+   it is.  The host based test using the loopback protocol is poorly
    designed to detect this condition.  This test is performed by the host
    first changing the device's Physical MAC address to the address which
    is to be tested, and then sending a loopback packet FROM AND TO this
    MAC address with a loopback reply to be sent by a system which may be
-   currently using the MAC address.  If no reply is received, then the 
+   currently using the MAC address.  If no reply is received, then the
    MAC address is presumed to be unused.  The sending of this packet will
    result in its delivery to the right system since the switch port/MAC
-   address tables know where to deliver packets destined to this MAC 
-   address, however the response it generates won't be delivered to the 
-   system performing the test since the switches on the LAN won't know 
-   about the local port being the right target for packets with this MAC 
-   address.  A better test design to detect these conflicts would be for 
+   address tables know where to deliver packets destined to this MAC
+   address, however the response it generates won't be delivered to the
+   system performing the test since the switches on the LAN won't know
+   about the local port being the right target for packets with this MAC
+   address.  A better test design to detect these conflicts would be for
    the testing system to send a loopback packet FROM the current physical
-   MAC address (BEFORE changing it) TO the MAC address being tested with 
-   the loopback response coming to the current physical MAC address of 
+   MAC address (BEFORE changing it) TO the MAC address being tested with
+   the loopback response coming to the current physical MAC address of
    the device.  If a response is received, then the address is in use and
-   the attempt to change the device's MAC address should fail.  Since we 
+   the attempt to change the device's MAC address should fail.  Since we
    can't change the software running in these simulators to implement this
-   better conflict detection approach, we can still "do the right thing" 
-   in the sim_ether layer.  We're already handling the loopback test 
-   packets specially since we always had to avoid receiving the packets 
-   which were being sent, but needed to allow for the incoming loopback 
+   better conflict detection approach, we can still "do the right thing"
+   in the sim_ether layer.  We're already handling the loopback test
+   packets specially since we always had to avoid receiving the packets
+   which were being sent, but needed to allow for the incoming loopback
    packets to be properly dealt with.  We can extend this current special
-   handling to change outgoing "loopback to self" packets to have source 
+   handling to change outgoing "loopback to self" packets to have source
    AND loopback destination addresses in the packets to be the host NIC's
-   physical address.  The switch network will already know the correct 
-   MAC/port relationship for the host NIC's physical address, so loopback 
+   physical address.  The switch network will already know the correct
+   MAC/port relationship for the host NIC's physical address, so loopback
    response packets will be delivered as needed.
 
-   Code in _eth_write and _eth_callback provide the special handling to 
-   perform the described loopback packet adjustments, and code in 
+   Code in _eth_write and _eth_callback provide the special handling to
+   perform the described loopback packet adjustments, and code in
    eth_filter_hash makes sure that the loopback response packets are received.
 
    */
@@ -2632,13 +2632,13 @@ dev->error_needs_reset = (((dev->transmit_packet_errors + dev->receive_packet_er
 #endif
 /* Limit errors to 1 per second (per invoking thread (reader and writer)) */
 sim_os_sleep (1);
-/* 
+/*
  When all of the threads which can reference this ETH_DEV object are
  simultaneously waiting in this routine, we have the potential to close
  and reopen the network connection.
- We do this after ETH_ERROR_REOPEN_THRESHOLD total errors have occurred.  
- In practice could be as frequently as once every ETH_ERROR_REOPEN_THRESHOLD/2 
- seconds, but normally would be about once every 1.5*ETH_ERROR_REOPEN_THRESHOLD 
+ We do this after ETH_ERROR_REOPEN_THRESHOLD total errors have occurred.
+ In practice could be as frequently as once every ETH_ERROR_REOPEN_THRESHOLD/2
+ seconds, but normally would be about once every 1.5*ETH_ERROR_REOPEN_THRESHOLD
  seconds (ONLY when the error condition exists).
  */
 #ifdef USE_READER_THREAD
@@ -2845,26 +2845,26 @@ for (i=0; i<count; ++i) {
   int key = 0x3f & (eth_crc32(0, MultiCastList[i], 6) >> 26);
 
   key ^= 0x3F;
-  printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X Key: %X, Byte: %X, Val: %X\n", 
-      MultiCastList[i][0], MultiCastList[i][1], MultiCastList[i][2], MultiCastList[i][3], MultiCastList[i][4], MultiCastList[i][5], 
+  printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X Key: %X, Byte: %X, Val: %X\n",
+      MultiCastList[i][0], MultiCastList[i][1], MultiCastList[i][2], MultiCastList[i][3], MultiCastList[i][4], MultiCastList[i][5],
       key, key>>3, (1 << (key&0x7)));
   lhash[key>>3] |= (1 << (key&0x7));
   }
 if (memcmp(hash, lhash, sizeof(lhash))) {
   printf("Inconsistent Computed Hash:\n");
-  printf("Should be: %02X %02X %02X %02X %02X %02X %02X %02X\n", 
-         hash[0], hash[1], hash[2], hash[3], 
+  printf("Should be: %02X %02X %02X %02X %02X %02X %02X %02X\n",
+         hash[0], hash[1], hash[2], hash[3],
          hash[4], hash[5], hash[6], hash[7]);
-  printf("Was:       %02X %02X %02X %02X %02X %02X %02X %02X\n", 
-         lhash[0], lhash[1], lhash[2], lhash[3], 
+  printf("Was:       %02X %02X %02X %02X %02X %02X %02X %02X\n",
+         lhash[0], lhash[1], lhash[2], lhash[3],
          lhash[4], lhash[5], lhash[6], lhash[7]);
   }
 else {
-  printf("Should be: %02X %02X %02X %02X %02X %02X %02X %02X\n", 
-         hash[0], hash[1], hash[2], hash[3], 
+  printf("Should be: %02X %02X %02X %02X %02X %02X %02X %02X\n",
+         hash[0], hash[1], hash[2], hash[3],
          hash[4], hash[5], hash[6], hash[7]);
-  printf("Was:       %02X %02X %02X %02X %02X %02X %02X %02X\n", 
-         lhash[0], lhash[1], lhash[2], lhash[3], 
+  printf("Was:       %02X %02X %02X %02X %02X %02X %02X %02X\n",
+         lhash[0], lhash[1], lhash[2], lhash[3],
          lhash[4], lhash[5], lhash[6], lhash[7]);
   }
 return 0;
@@ -2956,11 +2956,11 @@ struct TCPHeader {
 #define IPPROTO_ICMP            1               /* control message protocol */
 #endif
 
-static uint16 
-ip_checksum(uint16 *buffer, int size) 
+static uint16
+ip_checksum(uint16 *buffer, int size)
 {
 unsigned long cksum = 0;
-    
+
 /* Sum all the words together, adding the final byte if size is odd  */
 while (size > 1) {
   cksum += *buffer++;
@@ -2978,12 +2978,12 @@ if (size) {
 /* Do a little shuffling  */
 cksum = (cksum >> 16) + (cksum & 0xffff);
 cksum += (cksum >> 16);
-    
+
 /* Return the bitwise complement of the resulting mishmash  */
 return (uint16)(~cksum);
 }
 
-static uint16 
+static uint16
 pseudo_checksum(uint16 len, uint16 proto, uint16 *src_addr, uint16 *dest_addr, uint8 *buff)
 {
 uint32 sum;
@@ -3002,7 +3002,7 @@ sum = sum + htons(proto) + htons(len);
 /* Do a little shuffling  */
 sum = (sum >> 16) + (sum & 0xffff);
 sum += (sum >> 16);
-    
+
 /* Return the bitwise complement of the resulting mishmash  */
 return (uint16)(~sum);
 }
@@ -3089,8 +3089,8 @@ switch (IP->proto) {
   case IPPROTO_UDP:
   case IPPROTO_ICMP:
     ++dev->jumbo_fragmented;
-    /* When we're performing LSO (Large Send Offload), we're given a 
-       'template' header which may not include a value being populated 
+    /* When we're performing LSO (Large Send Offload), we're given a
+       'template' header which may not include a value being populated
        in the IP header length (which is only 16 bits).
        We process as payload everything which isn't known header data. */
     payload_len = (uint16)(len - (14 + IP_HLEN(IP)));
@@ -3116,8 +3116,8 @@ switch (IP->proto) {
            (i.e. we can use Wireshark to verify packet contents)
            we don't want to do this all the time for 2 reasons:
              1) sending through pcap involves kernel transitions and
-             2) if the current system reflects sent packets, the 
-                recieving side will receive and process 2 copies of 
+             2) if the current system reflects sent packets, the
+                recieving side will receive and process 2 copies of
                 any packets sent this way. */
         ETH_PACK pkt;
 
@@ -3143,8 +3143,8 @@ switch (IP->proto) {
     eth_packet_trace_ex (dev, ((u_char *)IP)-14, len, "Fragmenting Jumbo TCP segment", 1, dev->dbit);
     TCP = (struct TCPHeader *)(((char *)IP)+IP_HLEN(IP));
     orig_tcp_flags = ntohs(TCP->data_offset_and_flags);
-    /* When we're performing LSO (Large Send Offload), we're given a 
-       'template' header which may not include a value being populated 
+    /* When we're performing LSO (Large Send Offload), we're given a
+       'template' header which may not include a value being populated
        in the IP header length (which is only 16 bits).
        We process as payload everything which isn't known header data. */
     payload_len = (uint16)(len - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP)));
@@ -3170,8 +3170,8 @@ switch (IP->proto) {
            (i.e. we can use Wireshark to verify packet contents)
            we don't want to do this all the time for 2 reasons:
              1) sending through pcap involves kernel transitions and
-             2) if the current system reflects sent packets, the 
-                recieving side will receive and process 2 copies of 
+             2) if the current system reflects sent packets, the
+                recieving side will receive and process 2 copies of
                 any packets sent this way. */
         ETH_PACK pkt;
 
@@ -3277,16 +3277,16 @@ function = data[offset] | (data[offset+1] << 8);
 if (function != 2) /*forward*/
   return 0;
 
-/* The only packets we should be responding to are ones which 
-   we received due to them being directed to our physical MAC address, 
-   OR the Broadcast address OR to a Multicast address we're listening to 
-   (we may receive others if we're in promiscuous mode, but shouldn't 
+/* The only packets we should be responding to are ones which
+   we received due to them being directed to our physical MAC address,
+   OR the Broadcast address OR to a Multicast address we're listening to
+   (we may receive others if we're in promiscuous mode, but shouldn't
    respond to them) */
 if ((0 == (data[0]&1)) &&           /* Multicast or Broadcast */
     (0 != memcmp(dev->filter_address[0], data, sizeof(ETH_MAC))))
   return 0;
 
-/* Attempts to forward to multicast or broadcast addresses are explicitly 
+/* Attempts to forward to multicast or broadcast addresses are explicitly
    ignored by consuming the packet and doing nothing else */
 if (data[offset+2]&1)
   return 1;
@@ -3410,7 +3410,7 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
     return;
     }
   if (_eth_process_loopback(dev, data, header->len))
-    return;  
+    return;
 #if defined (USE_READER_THREAD)
   if (1) {
     int crc_len = 0;
@@ -3430,7 +3430,7 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
     /* but were presumed to be traversing a NIC which was going to handle that task */
     /* This must be done before any needed CRC calculation */
     _eth_fix_ip_xsum_offload(dev, (const u_char*)data, len);
-    
+
     if (dev->need_crc)
       crc_len = eth_get_packet_crc32_data(data, len, crc_data);
 
@@ -3587,7 +3587,7 @@ if (status < 0) {
     status = 1;
     ethq_remove(&dev->read_queue);
   }
-  pthread_mutex_unlock (&dev->lock);  
+  pthread_mutex_unlock (&dev->lock);
   if ((status) && (routine))
     routine(0);
 #endif
@@ -3598,13 +3598,13 @@ return status;
 t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                   ETH_BOOL all_multicast, ETH_BOOL promiscuous)
 {
-return eth_filter_hash(dev, addr_count, addresses, 
-                       all_multicast, promiscuous, 
+return eth_filter_hash(dev, addr_count, addresses,
+                       all_multicast, promiscuous,
                        NULL);
 }
 
 t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
-                       ETH_BOOL all_multicast, ETH_BOOL promiscuous, 
+                       ETH_BOOL all_multicast, ETH_BOOL promiscuous,
                        ETH_MULTIHASH* const hash)
 {
 int i;
@@ -3645,7 +3645,7 @@ dev->hash_filter = (hash != NULL);
 if (hash) {
   memcpy(dev->hash, hash, sizeof(*hash));
   sim_debug(dev->dbit, dev->dptr, "Multicast Hash: %02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\n",
-                                  dev->hash[0], dev->hash[1], dev->hash[2], dev->hash[3], 
+                                  dev->hash[0], dev->hash[1], dev->hash[2], dev->hash[3],
                                   dev->hash[4], dev->hash[5], dev->hash[6], dev->hash[7]);
   }
 
@@ -3683,9 +3683,9 @@ if (!dev->promiscuous) {
     sprintf(&buf[strlen(buf)], ")");
   }
 
-/* construct source filters - this prevents packets from being reflected back 
+/* construct source filters - this prevents packets from being reflected back
    by systems where WinPcap and libpcap cause packet reflections. Note that
-   some systems do not reflect packets at all. This *assumes* that the 
+   some systems do not reflect packets at all. This *assumes* that the
    simulated NIC will not send out packets with multicast source fields. */
 if ((addr_count > 0) && (dev->reflections > 0)) {
   if (strlen(buf) > 0)
@@ -3707,22 +3707,22 @@ if ((addr_count > 0) && (dev->reflections > 0)) {
   }
 if (strlen(buf) > 0)
   sprintf(&buf[strlen(buf)], ")");
-/* When changing the Physical Address on a LAN interface, VMS sends out a 
-   loopback packet with the source and destination addresses set to the same 
+/* When changing the Physical Address on a LAN interface, VMS sends out a
+   loopback packet with the source and destination addresses set to the same
    value as the Physical Address which is being setup.  This packet is
-   designed to find and help diagnose MAC address conflicts (which also 
-   include DECnet address conflicts). Normally, this packet would not be 
-   seen by the sender, only by the other machine that has the same Physical 
-   Address (or possibly DECnet address). If the ethernet subsystem is 
-   reflecting packets, the network startup will fail to start if it sees the 
-   reflected packet, since it thinks another system is using this Physical 
-   Address (or DECnet address). We have to let these packets through, so 
+   designed to find and help diagnose MAC address conflicts (which also
+   include DECnet address conflicts). Normally, this packet would not be
+   seen by the sender, only by the other machine that has the same Physical
+   Address (or possibly DECnet address). If the ethernet subsystem is
+   reflecting packets, the network startup will fail to start if it sees the
+   reflected packet, since it thinks another system is using this Physical
+   Address (or DECnet address). We have to let these packets through, so
    that if another machine has the same Physical Address (or DECnet address)
-   that we can detect it. Both eth_write() and _eth_callback() help by 
+   that we can detect it. Both eth_write() and _eth_callback() help by
    checking the reflection count - eth_write() adds the reflection count to
    dev->loopback_self_sent, and _eth_callback() check the value - if the
-   dev->loopback_self_sent count is zero, then the packet has come from 
-   another machine with the same address, and needs to be passed on to the 
+   dev->loopback_self_sent count is zero, then the packet has come from
+   another machine with the same address, and needs to be passed on to the
    simulated machine. */
 memset(dev->physical_addr, 0, sizeof(ETH_MAC));
 dev->loopback_self_sent = 0;
@@ -3748,8 +3748,8 @@ if ((0 == strlen(buf)) && (!dev->promiscuous)) /* Empty filter means match nothi
   strcpy(buf, "ether host fe:ff:ff:ff:ff:ff"); /* this should be a good match nothing filter */
 sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
 
-/* get netmask, which is a required argument for compiling.  The value, 
-   in our case isn't actually interesting since the filters we generate 
+/* get netmask, which is a required argument for compiling.  The value,
+   in our case isn't actually interesting since the filters we generate
    aren't referencing IP fields, networks or values */
 
 #ifdef USE_BPF
@@ -3794,8 +3794,8 @@ return SCPE_OK;
 }
 
 /*
-     The libpcap provided API pcap_findalldevs() on most platforms, will 
-     leverage the getifaddrs() API if it is available in preference to 
+     The libpcap provided API pcap_findalldevs() on most platforms, will
+     leverage the getifaddrs() API if it is available in preference to
      alternate platform specific methods of determining the interface list.
 
      A limitation of getifaddrs() is that it returns only interfaces which
@@ -3803,11 +3803,11 @@ return SCPE_OK;
      interfaces that we are interested in since a host may have dedicated
      interfaces for a simulator, which is otherwise unused by the host.
 
-     One could hand craft the the build of libpcap to specifically use 
-     alternate methods to implement pcap_findalldevs().  However, this can 
+     One could hand craft the the build of libpcap to specifically use
+     alternate methods to implement pcap_findalldevs().  However, this can
      get tricky, and would then result in a sort of deviant libpcap.
 
-     This routine exists to allow platform specific code to validate and/or 
+     This routine exists to allow platform specific code to validate and/or
      extend the set of available interfaces to include any that are not
      returned by pcap_findalldevs.
 
@@ -3857,7 +3857,7 @@ for (i=0; i<used; i++) {
       continue;
     reglen = sizeof(regval);
 
-    /* look for user-defined adapter name, bail if not found */  
+    /* look for user-defined adapter name, bail if not found */
     /* same comment about Windows XP x64 (above) using RegQueryValueEx */
     if ((status = RegQueryValueExA (reghnd, "Name", NULL, &regtype, regval, &reglen)) != ERROR_SUCCESS) {
       RegCloseKey (reghnd);

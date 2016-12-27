@@ -511,7 +511,7 @@ static const int32 opc_val[] = {
  0102170+I_RLM, 0122170+I_RLM, 0142170+I_RLM,
  0102270+I_LM,  0102370+I_2AC, 0102770+I_2AC,
  0103370+I_R, 0123370+I_R, 0143370+I_R,
- 0103770+I_RLI, 0123770+I_RLI, 0143770+I_RLI, 0163770+I_RLI, 
+ 0103770+I_RLI, 0123770+I_RLI, 0143770+I_RLI, 0163770+I_RLI,
 #endif
  0100000+I_RR, 0100020+I_RR, 0100040+I_RR, 0100060+I_RR,
  0100100+I_RR, 0100120+I_RR, 0100140+I_RR, 0100160+I_RR,
@@ -598,7 +598,7 @@ static const int32 opc_val[] = {
 #endif
  -1
  };
- 
+
 static const char *skip[] = {
  "SKP", "SZC", "SNC", "SZR", "SNR", "SEZ", "SBN",
  NULL
@@ -619,7 +619,7 @@ static const int32 dev_val[] = {
  002, 003,
 #endif
  010, 011, 012, 013, 014, 015, 016, 017,
- 020, 022, 024, 030, 033, 034, 
+ 020, 022, 024, 030, 033, 034,
  050, 051, 077,
  -1
  };
@@ -880,7 +880,7 @@ pflag = cflag & A_FL;                                   /* isolate flag */
 if (*cptr == '@') {                                     /* indirect? */
     val[0] = 1;
     cptr++;
-    }           
+    }
 if (*cptr == '.') {                                     /* relative? */
     pflag = pflag | A_PER;
     x = 1;                                              /* "index" is PC */
@@ -893,7 +893,7 @@ if (*cptr == '+') {                                     /* + sign? */
 else if (*cptr == '-') {                                /* - sign? */
     pflag = pflag | A_MI | A_SI;
     cptr++;
-    }   
+    }
 if (*cptr != 0) {                                       /* number? */
     cptr = get_glyph (cptr, gbuf, ',');                 /* get glyph */
     d = (int32) get_uint (gbuf, 8, AMASK, &r);
@@ -952,7 +952,7 @@ switch (pflag) {                                        /* case on flags */
 return cptr;
 }
 
-/* Parse two registers 
+/* Parse two registers
 
    Inputs:
         *cptr   =       input string
@@ -1173,7 +1173,7 @@ switch (j) {                                            /* case on class */
         cptr = get_2reg (cptr, ',', amd);               /* get 2 reg */
         if (cptr == NULL)
             return SCPE_ARG;
-        val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);    
+        val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);
         cptr = get_glyph (cptr, gbuf, 0);               /* get argument */
         d = (int32) get_uint (gbuf, 8, I_M_XOP, &r);
         if (r != SCPE_OK)

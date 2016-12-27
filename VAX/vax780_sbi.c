@@ -187,7 +187,7 @@ DEVICE sbi_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &sbi_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
     &sbi_description
     };
 
@@ -507,7 +507,7 @@ if (ADDR_IS_REG (pa)) {                                 /* reg space? */
 sbi_set_tmo (pa);                                       /* timeout */
 MACH_CHECK (MCHK_RD_F);                                 /* machine check */
 return 0;
-} 
+}
 
 /* WriteReg - write register space
 
@@ -603,7 +603,7 @@ return cc;
 int32 con_halt (int32 code, int32 cc)
 {
 if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
-    (vax780_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
+    (vax780_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */
     (reset_all (0) != SCPE_OK) ||                       /* reset the world */
     (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
     ABORT (STOP_BOOT);                                  /* any error? */
@@ -673,7 +673,7 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     if (r != SCPE_OK)
         return r;
     }
-else 
+else
     if (*regptr == '/') {
         r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
         if (r != SCPE_OK)

@@ -338,7 +338,7 @@ if (sw & SWMASK ('C')) {                                /* character? */
             fprintf (of, "%c", alp_to_cdp[c]);
         else fprintf (of, "<%02x>", c);
         return -1;
-        } 
+        }
     else fprintf (of, FMTASC (val[0] & 0177));
     return SCPE_OK;
     }

@@ -342,7 +342,7 @@ DEVICE mba_dev[] = {
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba0_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mba_deb, NULL, NULL, &mba_help, NULL, NULL, 
+    mba_deb, NULL, NULL, &mba_help, NULL, NULL,
     &mba_description
     },
     {
@@ -351,7 +351,7 @@ DEVICE mba_dev[] = {
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba1_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mba_deb, NULL, NULL, &mba_help, NULL, NULL, 
+    mba_deb, NULL, NULL, &mba_help, NULL, NULL,
     &mba_description
     }
     };
@@ -365,10 +365,10 @@ uint32 t;
 t_stat r;
 
 mb = NEXUS_GETNEX (pa) - TR_MBA0;                       /* get MBA */
-/* 
-   The VAX 750 Boot ROMs have code which makes Non longword references 
+/*
+   The VAX 750 Boot ROMs have code which makes Non longword references
    to MassBus register space.  This code works on real hardware so even
-   though such references had potentially undefined behavior, in the 
+   though such references had potentially undefined behavior, in the
    interest of closely modeling how hardware works we tolerate it here,
  */
 #if !defined(VAX_750)
@@ -440,7 +440,7 @@ switch (rtype) {                                        /* case on type */
             return SCPE_NXM;
         *val |= (mba_sr[mb] & ~WMASK);                  /* upper 16b from SR */
         sim_debug (MBA_DEB_RRD, &mba_dev[mb], "mba_rdreg(drv %d ext reg=%d, val=0x%X)\n", drv, ofs, *val);
-        break; 
+        break;
 
     case MBART_MAP:                                     /* map */
         ofs = MBA_INTOFS (pa);
@@ -564,9 +564,9 @@ switch (rtype) {                                        /* case on type */
             mba_upd_sr (MBASR_NFD, 0, mb);
         else if (r == MBE_NXR)                          /* nx reg? */
             return SCPE_NXM;
-        if (cs1dt && (r == SCPE_OK))                    /* did dt start? */     
+        if (cs1dt && (r == SCPE_OK))                    /* did dt start? */
             mba_sr[mb] = (mba_sr[mb] | MBASR_DTBUSY) & ~MBASR_W1C;
-        break; 
+        break;
 
     case MBART_MAP:                                     /* map */
         ofs = MBA_INTOFS (pa);
@@ -882,13 +882,13 @@ else {
     int i;
 
     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru devs */
-        if (!(dptr->flags & DEV_DIS) && 
+        if (!(dptr->flags & DEV_DIS) &&
             (dptr->flags & DEV_MBUS) &&
             ((DIB *)dptr->ctxt)->ba == mb)
             break;
         }
     }
-sprintf (buf, "Massbus adapter %d%s%s%s", mb, 
+sprintf (buf, "Massbus adapter %d%s%s%s", mb,
                dptr ? " (for " : "", dptr ? dptr->name : "", dptr ? ")" : "");
 return buf;
 }
@@ -985,4 +985,3 @@ if (dibp->ack[0])                                       /* set abort dispatch */
 mba_dev[idx].flags &= ~DEV_DIS;                         /* mark MBA enabled */
 return SCPE_OK;
 }
-

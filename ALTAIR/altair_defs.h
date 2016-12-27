@@ -39,4 +39,3 @@
 #define STOP_HALT       2                                /* HALT */
 #define STOP_IBKPT      3                                /* breakpoint */
 #define STOP_OPCODE     4
-

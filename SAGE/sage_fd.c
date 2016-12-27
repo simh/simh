@@ -80,7 +80,7 @@ static void sagefd_seldrv(I8272* chip,int drvnum)
     return;
 }
 
-static t_stat sagefd_reset(DEVICE* dptr) 
+static t_stat sagefd_reset(DEVICE* dptr)
 {
     t_stat rc;
     I8272* chip = (I8272*)dptr->ctxt;

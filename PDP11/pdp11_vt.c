@@ -62,8 +62,8 @@
 /*
  * run a VT11/VS60 cycle every this many PDP-11 "cycle" times;
  *
- * this includes phosphor aging and polling for events (mouse movement) 
- * every refresh_interval (determined internally while processing the 
+ * this includes phosphor aging and polling for events (mouse movement)
+ * every refresh_interval (determined internally while processing the
  * VT11/VS60 cycle).
  */
 #define VT11_DELAY 1
@@ -188,7 +188,7 @@ DEVICE vt_dev = {
     NULL, NULL, &vt_reset,
     &vt_boot, NULL, NULL,
     &vt_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG,
-    0, vt_deb, NULL, NULL, NULL, NULL, NULL, 
+    0, vt_deb, NULL, NULL, NULL, NULL, NULL,
     &vt_description
 };
 
@@ -224,24 +224,24 @@ t_stat
 vt_rd(int32 *data, int32 PA, int32 access)
 {
     t_stat stat = SCPE_OK;
-    
+
     switch (PA & 036) {
-    case 000:             *data = vt11_get_dpc(); break; 
-    case 002:             *data = vt11_get_mpr(); break; 
+    case 000:             *data = vt11_get_dpc(); break;
+    case 002:             *data = vt11_get_mpr(); break;
     case 004:             *data = vt11_get_xpr(); break;
     case 006:             *data = vt11_get_ypr(); break;
-    case 010:   if (VS60) *data = vt11_get_rr();  else stat = SCPE_NXM; break; 
-    case 012:   if (VS60) *data = vt11_get_spr(); else stat = SCPE_NXM; break; 
-    case 014:   if (VS60) *data = vt11_get_xor(); else stat = SCPE_NXM; break; 
-    case 016:   if (VS60) *data = vt11_get_yor(); else stat = SCPE_NXM; break; 
-    case 020:   if (VS60) *data = vt11_get_anr(); else stat = SCPE_NXM; break; 
-    case 022:   if (VS60) *data = vt11_get_scr(); else stat = SCPE_NXM; break; 
-    case 024:   if (VS60) *data = vt11_get_nr();  else stat = SCPE_NXM; break; 
-    case 026:   if (VS60) *data = vt11_get_sdr(); else stat = SCPE_NXM; break; 
-    case 030:   if (VS60) *data = vt11_get_str(); else stat = SCPE_NXM; break; 
-    case 032:   if (VS60) *data = vt11_get_sar(); else stat = SCPE_NXM; break; 
-    case 034:   if (VS60) *data = vt11_get_zpr(); else stat = SCPE_NXM; break; 
-    case 036:   if (VS60) *data = vt11_get_zor(); else stat = SCPE_NXM; break; 
+    case 010:   if (VS60) *data = vt11_get_rr();  else stat = SCPE_NXM; break;
+    case 012:   if (VS60) *data = vt11_get_spr(); else stat = SCPE_NXM; break;
+    case 014:   if (VS60) *data = vt11_get_xor(); else stat = SCPE_NXM; break;
+    case 016:   if (VS60) *data = vt11_get_yor(); else stat = SCPE_NXM; break;
+    case 020:   if (VS60) *data = vt11_get_anr(); else stat = SCPE_NXM; break;
+    case 022:   if (VS60) *data = vt11_get_scr(); else stat = SCPE_NXM; break;
+    case 024:   if (VS60) *data = vt11_get_nr();  else stat = SCPE_NXM; break;
+    case 026:   if (VS60) *data = vt11_get_sdr(); else stat = SCPE_NXM; break;
+    case 030:   if (VS60) *data = vt11_get_str(); else stat = SCPE_NXM; break;
+    case 032:   if (VS60) *data = vt11_get_sar(); else stat = SCPE_NXM; break;
+    case 034:   if (VS60) *data = vt11_get_zpr(); else stat = SCPE_NXM; break;
+    case 036:   if (VS60) *data = vt11_get_zor(); else stat = SCPE_NXM; break;
     default: stat = SCPE_NXM;
     }
     sim_debug (DEB_RRD, &vt_dev, "vt_rd(%s-PA=0%o,data=0x%X(0%o),access=%d)\n", vt_regnam[(PA & 036)>>1], (int)PA, (int)*data, (int)*data, (int)access);
@@ -252,7 +252,7 @@ t_stat
 vt_wr(int32 data, int32 PA, int32 access)
 {
     uint16 d = data & 0177777;          /* mask just in case */
-    
+
     sim_debug (DEB_RWR, &vt_dev, "vt_wr(%s-PA=0%o,data=0x%X(0%o),access=%d)\n", vt_regnam[(PA & 036)>>1], (int)PA, (int)data, (int)data, (int)access);
 
     switch (PA & 037) {
@@ -288,18 +288,18 @@ vt_wr(int32 data, int32 PA, int32 access)
     case 002:                     vt11_set_mpr(d); return SCPE_OK;
     case 004:                     vt11_set_xpr(d); return SCPE_OK;
     case 006:                     vt11_set_ypr(d); return SCPE_OK;
-    case 010:   if (!VS60) break; vt11_set_rr(d);  return SCPE_OK; 
-    case 012:   if (!VS60) break; vt11_set_spr(d); return SCPE_OK; 
-    case 014:   if (!VS60) break; vt11_set_xor(d); return SCPE_OK; 
-    case 016:   if (!VS60) break; vt11_set_yor(d); return SCPE_OK; 
-    case 020:   if (!VS60) break; vt11_set_anr(d); return SCPE_OK; 
-    case 022:   if (!VS60) break; vt11_set_scr(d); return SCPE_OK; 
+    case 010:   if (!VS60) break; vt11_set_rr(d);  return SCPE_OK;
+    case 012:   if (!VS60) break; vt11_set_spr(d); return SCPE_OK;
+    case 014:   if (!VS60) break; vt11_set_xor(d); return SCPE_OK;
+    case 016:   if (!VS60) break; vt11_set_yor(d); return SCPE_OK;
+    case 020:   if (!VS60) break; vt11_set_anr(d); return SCPE_OK;
+    case 022:   if (!VS60) break; vt11_set_scr(d); return SCPE_OK;
     case 024:   if (!VS60) break; vt11_set_nr(d);  return SCPE_OK;
     case 026:   if (!VS60) break; vt11_set_sdr(d); return SCPE_OK;
-    case 030:   if (!VS60) break; vt11_set_str(d); return SCPE_OK; 
-    case 032:   if (!VS60) break; vt11_set_sar(d); return SCPE_OK; 
+    case 030:   if (!VS60) break; vt11_set_str(d); return SCPE_OK;
+    case 032:   if (!VS60) break; vt11_set_sar(d); return SCPE_OK;
     case 034:   if (!VS60) break; vt11_set_zpr(d); return SCPE_OK;
-    case 036:   if (!VS60) break; vt11_set_zor(d); return SCPE_OK; 
+    case 036:   if (!VS60) break; vt11_set_zor(d); return SCPE_OK;
     }
     return SCPE_NXM;
 }
@@ -340,7 +340,7 @@ vt_reset(DEVICE *dptr)
 
 /*
  * GT4x/GT62 bootstrap (acts as remote terminal)
- * 
+ *
  */
 t_stat
 vt_boot(int32 unit, DEVICE *dptr)
@@ -349,7 +349,7 @@ vt_boot(int32 unit, DEVICE *dptr)
     char stability[32];
     extern int32 saved_PC;
     extern uint16 *M;
-    
+
     /* XXX  should do something like vt11_set_dpc(&appropriate_ROM_image) */
 
     /* Instead, since that won't be too useful.... */

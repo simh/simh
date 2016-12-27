@@ -270,4 +270,3 @@ static uint8 MDRIVEH_Write(const uint32 Addr, uint8 cData)
 
     return (result);
 }
-

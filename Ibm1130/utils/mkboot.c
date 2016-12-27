@@ -347,7 +347,7 @@ void show_data (unsigned short *buf)
 void loadcard (unsigned short *buf)
 {
 	int addr, n, i;
-	
+
 	addr = buf[0];
 	n = buf[2] & 0x00FF;
 
@@ -373,7 +373,7 @@ void loaddata (char *fname)
 		exit(1);
 	}
 
-	if (verbose)	
+	if (verbose)
 		printf("\n%s:\n", fname);
 
 	while (fxread(card, sizeof(card[0]), 80, fp) > 0) {
@@ -638,7 +638,7 @@ void corecard_endcard (void)
 	corecard_writecard(NULL);
 }
 
-/* ------------------------------------------------------------------------ 
+/* ------------------------------------------------------------------------
  * upcase - force a string to uppercase (ASCII)
  * ------------------------------------------------------------------------ */
 
@@ -649,7 +649,7 @@ char *upcase (char *str)
 	for (s = str; *s; s++) {
 		if (*s >= 'a' && *s <= 'z')
 			*s -= 32;
-	} 
+	}
 
 	return str;
 }

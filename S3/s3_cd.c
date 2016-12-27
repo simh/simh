@@ -52,7 +52,7 @@ t_stat cd_reset (DEVICE *dptr);
 t_stat read_card (int32 ilnt, int32 mod);
 t_stat punch_card (int32 ilnt, int32 mod);
 
-int32 DAR;                                              /* Data address register */                     
+int32 DAR;                                              /* Data address register */
 int32 LCR;                                              /* Length Count Register */
 int32 lastcard = 0;                                     /* Last card switch */
 int32 carderr = 0;                                      /* Error switch */
@@ -164,11 +164,11 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
                     break;
                 default:
                     break;
-            }                                       
+            }
             switch (n) {
                 case 0x00:                              /* Feed */
                     iodata = SCPE_OK;
-                    break;  
+                    break;
                 case 0x01:                              /* Read only */
                     if (cdr_ebcdic)
                         iodata = read_card(0, 1);
@@ -206,16 +206,16 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
                 case 0x00:                              /* Error */
                     if (carderr || pcherror || notready)
                         iodata = 1;
-                    if ((cdr_unit.flags & UNIT_ATT) == 0) 
+                    if ((cdr_unit.flags & UNIT_ATT) == 0)
                         iodata = 1;                     /* attached? */
                     break;
                 case 0x02:                              /* Busy */
-                    if (sim_is_active (&cdr_unit)) 
+                    if (sim_is_active (&cdr_unit))
                         iodata = 1;
-                    break;  
+                    break;
                 default:
                     return (STOP_INVDEV << 16);
-            }                       
+            }
             return ((SCPE_OK << 16) | iodata);
         case 3:                                         /* SNS 1442 */
             iodata = 0;
@@ -231,18 +231,18 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
                         iodata |= 0x40;
                     if (pcherror)
                         iodata |= 0x20;
-                    if ((cdr_unit.flags & UNIT_ATT) == 0) 
+                    if ((cdr_unit.flags & UNIT_ATT) == 0)
                         iodata |= 0x08;
                     if (notready)
-                        iodata |= 0x08; 
+                        iodata |= 0x08;
                     break;
                 case 0x04:
                     iodata = DAR;
-                    break;  
+                    break;
                 default:
                     return (STOP_INVDEV << 16);
             }
-            iodata |= ((SCPE_OK << 16) & 0xffff0000);        
+            iodata |= ((SCPE_OK << 16) & 0xffff0000);
             return (iodata);
         case 4:                                         /* APL 1442 */
             iodata = 0;
@@ -250,22 +250,22 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
                 case 0x00:                              /* Error */
                     if (carderr || pcherror || notready)
                         iodata = 1;
-                    if ((cdr_unit.flags & UNIT_ATT) == 0) 
+                    if ((cdr_unit.flags & UNIT_ATT) == 0)
                         iodata = 1;                     /* attached? */
                     break;
                 case 0x02:                              /* Busy */
-                    if (sim_is_active (&cdr_unit)) 
+                    if (sim_is_active (&cdr_unit))
                         iodata = 1;
-                    break;  
+                    break;
                 default:
                     return (STOP_INVDEV << 16);
-            }                       
+            }
             return ((SCPE_OK << 16) | iodata);
         default:
             break;
-    }                       
+    }
     sim_printf (">>CRD non-existent function %d\n", op);
-    return SCPE_OK;                     
+    return SCPE_OK;
 }
 
 /* Card read routine
@@ -281,7 +281,7 @@ t_stat r;
 if (sim_is_active (&cdr_unit)) {                        /* busy? */
     sim_cancel (&cdr_unit);                             /* cancel */
     if ((r = cdr_svc (&cdr_unit))) return r;            /* process */
-}   
+}
 
 if (((cdp_unit.flags & UNIT_ATT) != 0 ||
     (stack_unit[0].flags & UNIT_ATT) != 0) &&           /* Punch is attached and */
@@ -293,7 +293,7 @@ if (((cdp_unit.flags & UNIT_ATT) != 0 ||
         sim_activate (&cdr_unit, cdr_unit.wait);        /* activate */
         return SCPE_OK;
 }
-        
+
 if ((cdr_unit.flags & UNIT_ATT) == 0) return SCPE_UNATT; /* attached? */
 
 lastcard = carderr = notready = s1sel = s2sel = 0;      /* default stacker */
@@ -302,31 +302,31 @@ for (i = 0; i < CBUFSIZE; i++) rbuf[i] = 0x20;          /* clear buffer */
 if (mod) {
     for (i = 0; i < 80; i++) {
         rbuf[i] = fgetc(cdr_unit.fileref);              /* Read EBCDIC */
-    }   
-} else {    
+    }
+} else {
     fgets (rbuf, CBUFSIZE, cdr_unit.fileref);           /* read Ascii */
-}   
+}
 if (feof (cdr_unit.fileref)) {                          /* eof? */
     notready = 1;
     return STOP_NOCD;
-}       
+}
 if (ferror (cdr_unit.fileref)) {                        /* error? */
     sim_perror ("Card reader I/O error");
     clearerr (cdr_unit.fileref);
-    carderr = 1;  
+    carderr = 1;
     return SCPE_OK;  }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
 i = getc (cdr_unit.fileref);                            /* see if more */
 if (feof (cdr_unit.fileref)) lastcard = 1;              /* eof? set flag */
 fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);
-for (i = 0; i < 80; i++) {              
+for (i = 0; i < 80; i++) {
     if (mod == 0) {                                     /* If ASCII mode... */
         if (rbuf[i] == '\n' ||                          /* remove ASCII CR/LF */
             rbuf[i] == '\r' ||
             rbuf[i] == 0x00)
              rbuf[i] = ' ';
         rbuf[i] = ascii_to_ebcdic[rbuf[i]];             /* convert to EBCDIC */
-    }   
+    }
     PutMem(DAR, rbuf[i]);                               /* Copy to main memory */
     DAR++;
 }
@@ -374,7 +374,7 @@ if (s2sel) uptr = &stack_unit[0];                       /* stack 2? */
 else uptr = &cdp_unit;                                  /* normal output */
 if ((uptr -> flags & UNIT_ATT) == 0) {                  /* Attached? */
     notready = 1;
-    return SCPE_OK; 
+    return SCPE_OK;
 }
 pcherror = s1sel = notready = 0;                        /* clear flags */
 
@@ -385,7 +385,7 @@ for (i = 0; i < colcount; i++) {                        /* Fetch data */
         else
         pbuf[i] = ebcdic_to_ascii[GetMem(DAR)];
     DAR++;
-}   
+}
 for (i = CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--) pbuf[i] = 0;
 pbuf[CDP_WIDTH] = 0;                                    /* trailing null */
 if (!cdp_ebcdic) {
@@ -394,8 +394,8 @@ if (!cdp_ebcdic) {
 } else {
     for (i = 0; i < 80; i++) {
         fputc(pbuf[i], uptr -> fileref);
-    }   
-}   
+    }
+}
 if (ferror (uptr -> fileref)) {                         /* error? */
     sim_perror ("Card punch I/O error");
     clearerr (uptr -> fileref);

@@ -36,12 +36,12 @@
         to any parallel I/O device.
 
         All I/O is via programmed I/O.  The i8255 has a control port (PIOS)
-        and three data ports (PIOA, PIOB, and PIOC).    
+        and three data ports (PIOA, PIOB, and PIOC).
 
-        The simulated device supports a select from I/O space and two address lines. 
+        The simulated device supports a select from I/O space and two address lines.
         The data ports are at the lower addresses and the control port is at
         the highest.
-        
+
         A write to the control port can configure the device:
 
         Control Word
@@ -53,7 +53,7 @@
             D0  Port C (lower) 1-Input, 0-Output
             D1  Port B 1-Input, 0-Output
             D2  Mode Selection  0-Mode 0, 1-Mode 1
-                                
+
             Group A
             D3  Port C (upper) 1-Input, 0-Output
             D4  Port A 1-Input, 0-Output
@@ -68,10 +68,10 @@
             Bit Set - D7=0, D3:1 select port C bit, D0 1=set, 0=reset
 
         A read to the data ports gets the current port value, a write
-        to the data ports writes the character to the device.  
+        to the data ports writes the character to the device.
 
-        This program simulates up to 4 i8255 devices.  It handles 2 i8255 
-        devices on the iSBC 80/10 SBC.  Other devices could be on other 
+        This program simulates up to 4 i8255 devices.  It handles 2 i8255
+        devices on the iSBC 80/10 SBC.  Other devices could be on other
         multibus boards in the simulated system.
 */
 
@@ -112,7 +112,7 @@ UNIT i8255_unit[] = {
     { UDATA (0, 0, 0) },                /* i8255 0 */
     { UDATA (0, 0, 0) },                /* i8255 1 */
     { UDATA (0, 0, 0) },                /* i8255 2 */
-    { UDATA (0, 0, 0) }                 /* i8255 3 */ 
+    { UDATA (0, 0, 0) }                 /* i8255 3 */
 };
 
 REG i8255_reg[] = {
@@ -184,10 +184,10 @@ t_stat i8255_reset (DEVICE *dptr, uint16 baseport)
     sim_printf("   8255-%d: Reset\n", i8255_devnum);
     sim_printf("   8255-%d: Registered at %04X\n", i8255_devnum, baseport);
     i8255_port[i8255_devnum] = baseport;
-    reg_dev(i8255a, baseport, i8255_devnum); 
-    reg_dev(i8255b, baseport + 1, i8255_devnum); 
-    reg_dev(i8255c, baseport + 2, i8255_devnum); 
-    reg_dev(i8255s, baseport + 3, i8255_devnum); 
+    reg_dev(i8255a, baseport, i8255_devnum);
+    reg_dev(i8255b, baseport + 1, i8255_devnum);
+    reg_dev(i8255c, baseport + 2, i8255_devnum);
+    reg_dev(i8255s, baseport + 3, i8255_devnum);
     i8255_unit[i8255_devnum].u3 = 0x9B; /* control */
     i8255_A[i8255_devnum] = 0xFF; /* Port A */
     i8255_B[i8255_devnum] = 0xFF; /* Port B */

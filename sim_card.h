@@ -31,7 +31,7 @@
         Binary Card format:
                 Each record 160 characters.
                 First character   21012345
-                                  111 
+                                  111
                 Second characters 6789----
                 Top 4 bits of second character are 0.
                 It is unlikely that ascii text or BCD format

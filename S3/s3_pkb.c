@@ -156,7 +156,7 @@ int32 pkb (int32 op, int32 m, int32 n, int32 data)
                     pkb_unit.u3 &= ~KBD_INTKEY;
                     pkb_unit.u3 &= ~KBD_INTEND;
                     return RESET_INTERRUPT;
-                }   
+                }
             } else {                                    /* Printer */
                 if (data & 0x80) {                      /* start print bit */
                     if (debug_reg & 0x80)
@@ -170,7 +170,7 @@ int32 pkb (int32 op, int32 m, int32 n, int32 data)
                     sim_putchar('\n');
                     sim_putchar('\r');
                     pkb_unit.u3 |= PRT_INTREQ;
-                }   
+                }
                 pkb_unit.u3 &= 0xFFe;
                 if (data & 0x04)                        /* Print interrupt flag */
                     pkb_unit.u3 |= PRT_PRTINT;
@@ -180,7 +180,7 @@ int32 pkb (int32 op, int32 m, int32 n, int32 data)
                             pkb_unit.u3 &= ~PRT_INTREQ;
                         return RESET_INTERRUPT;
                     }
-                }   
+                }
             }
             return SCPE_OK;
         case 1:                                         /* LIO 5471 */
@@ -210,11 +210,11 @@ int32 pkb (int32 op, int32 m, int32 n, int32 data)
                     if (pkb_unit.buf == 0x03)           /* Cancel key */
                         iodata |= 0x20;
                     if (pkb_unit.buf == 0x0d)           /* End key */
-                        iodata |= 0x10;             
-                    iodata |= ((SCPE_OK << 16) & 0xffff0000);           
+                        iodata |= 0x10;
+                    iodata |= ((SCPE_OK << 16) & 0xffff0000);
                 } else {                                /* Sense bytes 2 & 3 */
-                    iodata = 0;                         /* Manual says CE use only */   
-                }   
+                    iodata = 0;                         /* Manual says CE use only */
+                }
             } else {                                    /* Printer Data */
                 if (n == 1) {                           /* Sense bytes 0 & 1 */
                     iodata = 0;
@@ -222,17 +222,17 @@ int32 pkb (int32 op, int32 m, int32 n, int32 data)
                         iodata |= 0x80;
                 } else {
                     iodata = 0;                         /* CE use only */
-                }   
+                }
             }
             iodata |= ((SCPE_OK << 16) & 0xffff0000);
-            return (iodata);            
+            return (iodata);
         case 4:                                         /* APL 5471 */
             return STOP_INVDEV;
         default:
             break;
-    }                       
+    }
     sim_printf (">>PKB non-existent function %d\n", op);
-    return SCPE_OK;                     
+    return SCPE_OK;
 }
 
 /* Unit service */
@@ -246,7 +246,7 @@ sim_activate (&pkb_unit, pkb_unit.wait);                /* continue poll */
 if (pkb_unit.u3 & PRT_INTREQ) {                         /* Printer Interrupt */
     int_req |= 2;
     return SCPE_OK;
-}   
+}
 
 /* Keyboard : handle input */
 
@@ -261,38 +261,38 @@ if (pkb_unit.u3 & KBD_REQINT) {
     }
 }
 if (islower(ac))
-    ac = toupper(ac);                
+    ac = toupper(ac);
 ec = ascii_to_ebcdic[ac];                               /* Translate */
 pkb_unit.buf = ec;                                      /* put in buf */
 pkb_unit.pos = pkb_unit.pos + 1;
 if (ac == key_end) {                                    /* End key */
-    if (pkb_unit.u3 & KBD_KEYINT) {     
+    if (pkb_unit.u3 & KBD_KEYINT) {
         pkb_unit.u3 |= KBD_INTEND;
         pkb_unit.buf = 0x0d;
         int_req |= 2;
-    }   
+    }
     return SCPE_OK;
 }
 if (ac == key_can) {                                    /* Cancel key */
-    if (pkb_unit.u3 & KBD_KEYINT) {     
+    if (pkb_unit.u3 & KBD_KEYINT) {
         pkb_unit.u3 |= KBD_INTEND;
         pkb_unit.buf = 0x03;
         int_req |= 2;
-    }   
+    }
     return SCPE_OK;
 }
 if (ac == key_rtn) {                                    /* Return key */
-    if (pkb_unit.u3 & KBD_KEYINT) {     
+    if (pkb_unit.u3 & KBD_KEYINT) {
         pkb_unit.u3 |= KBD_INTKEY;
         pkb_unit.buf = 0x12;
         int_req |= 2;
-    }   
+    }
     return SCPE_OK;
 }
 if (pkb_unit.u3 & KBD_KEYINT) {                         /* Key interupts enabled ? */
     int_req |= 2;                                       /* Device 1 Interrupt! */
     pkb_unit.u3 |= KBD_INTKEY;                          /* Set pending flag */
-}   
+}
 return SCPE_OK;
 }
 
@@ -301,7 +301,7 @@ return SCPE_OK;
 t_stat pkb_reset (DEVICE *dptr)
 {
 pkb_unit.buf = 0;
-int_req = int_req & ~0x02;                              /* reset interrupt */   
+int_req = int_req & ~0x02;                              /* reset interrupt */
 sim_activate (&pkb_unit, pkb_unit.wait);                /* activate unit */
 return SCPE_OK;
 }
@@ -310,4 +310,3 @@ t_stat pkb_setmod (UNIT *uptr, int32 value)
 {
 return SCPE_OK;
 }
-

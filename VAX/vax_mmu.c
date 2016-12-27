@@ -113,7 +113,7 @@ DEVICE tlb_dev = {
     "TLB", tlb_unit, tlb_reg, NULL,
     2, 16, VA_N_TBI * 2, 1, 16, 32,
     &tlb_ex, &tlb_dep, &tlb_reset,
-    NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
     &tlb_description
     };
 

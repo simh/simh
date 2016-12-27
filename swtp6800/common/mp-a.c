@@ -33,7 +33,7 @@
             M6800 processor [m6800.c].
             M6810 128 byte RAM at 0xA000 [m6810.c].
             M6830, SWTBUG, or custom boot ROM at 0xE000 [bootrom.c].
-            Interface to the SS-50 bus and the MP-B2 Mother Board for I/O 
+            Interface to the SS-50 bus and the MP-B2 Mother Board for I/O
                 and memory boards [mp-b2.c].
             Note: The file names of the emulator source programs for each device are
             contained in "[]".

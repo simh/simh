@@ -452,7 +452,7 @@ return 0;
 int32 int_chg (uint32 irq, int32 dat, int32 armdis)
 {
 int32 t = CMD_GETINT (dat);                             /* get int ctrl */
-    
+
 if (t == CMD_IENB) {                                    /* enable? */
     SET_ENB (irq);
     return 1;

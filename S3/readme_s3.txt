@@ -39,7 +39,7 @@
 	in the text file "userguide.txt".  This includes examples of using the
 	utility programs, and a tutorial guiding you thru a sysgen.
 
-	A nearly complete listing of all possible SCP halts is in the 
+	A nearly complete listing of all possible SCP halts is in the
 	document "haltguide.txt".
 
 	IMPORTANT NOTES:
@@ -50,14 +50,14 @@
 	can use CTRL/R to retype characters up until the error, then
 	type correctly.  Or simply retype the line. BACKSPACE DOES NOT
 	WORK with the SCP.
- 
+
 	2) While the simulator allows disk images to be independently
 	attached to any disk unit, on the real hardware R1 and F1 were on
 	a single spindle, and R2 and F2 likewise.  It is not possible using
 	SCP to attach R1 without attaching a disk image to F1 also, because
 	SCP will always look at F1 even when IPLed off R1.
 
-	The OS distributed with the simulator is version 16 of the Model 
+	The OS distributed with the simulator is version 16 of the Model
 	10 SCP.  This is sysgenned with support only for R1 and F1.  If you
 	do a sysgen to support R2 amd F2 also, you must have images attached
 	to all 4 disks when you IPL, because SCP looks at all drives when
@@ -72,7 +72,7 @@
 	This feature causes problems in the simulator, and as a result
 	if you punch cards from SCP, YOU MUST not have any file attached
 	to the CDR device.  Leaving this device unattached presents an
-	infinite supply of blank cards to SCP for punching.  
+	infinite supply of blank cards to SCP for punching.
 
 
  -- End of README_S3.txt --

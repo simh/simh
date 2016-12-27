@@ -135,9 +135,9 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
                     if (iodata == SCPE_OK)
                         iodata = carriage_control(4, data);
                     break;
-                default:        
+                default:
                     return STOP_INVDEV;
-            }                   
+            }
             return iodata;
         case 1:                                         /* LIO 1403 */
             switch (n) {
@@ -152,7 +152,7 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
                     break;
                 default:
                     return STOP_INVDEV;
-            }                   
+            }
             return SCPE_OK;
         case 2:                                         /* TIO 1403 */
             iodata = 0;
@@ -160,8 +160,8 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
                 case 0x00:                              /* Not ready/check */
                     if (lpterror)
                         iodata = 1;
-                    if ((lpt_unit.flags & UNIT_ATT) == 0) 
-                        iodata = 1; 
+                    if ((lpt_unit.flags & UNIT_ATT) == 0)
+                        iodata = 1;
                     break;
                 case 0x02:                              /* Buffer Busy */
                     iodata = 0;
@@ -173,9 +173,9 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
                     iodata = 0;
                     break;
                 default:
-                    return (STOP_INVDEV << 16);             
-            }       
-            return ((SCPE_OK << 16) | iodata);          
+                    return (STOP_INVDEV << 16);
+            }
+            return ((SCPE_OK << 16) | iodata);
         case 3:                                         /* SNS 1403 */
             switch (n) {
                 case 0x00:                              /* Line count */
@@ -191,20 +191,20 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
                     iodata = LPIAR;
                     break;
                 case 0x06:                              /* LPDAR */
-                    iodata = LPDAR; 
+                    iodata = LPDAR;
                     break;
                 default:
                     return (STOP_INVDEV << 16);
-            }           
-            return ((SCPE_OK << 16) | iodata);          
+            }
+            return ((SCPE_OK << 16) | iodata);
         case 4:                                         /* APL 1403 */
             iodata = 0;
-            return ((SCPE_OK << 16) | iodata);          
+            return ((SCPE_OK << 16) | iodata);
         default:
             break;
-    }                       
+    }
     sim_printf (">>LPT non-existent function %d\n", op);
-    return SCPE_OK;                     
+    return SCPE_OK;
 }
 
 
@@ -220,7 +220,7 @@ int32 i, t, lc;
 static char lbuf[LPT_WIDTH + 1];                        /* + null */
 
 if ((lpt_unit.flags & UNIT_ATT) == 0)
-     return SCPE_UNATT; 
+     return SCPE_UNATT;
 
 lpterror = 0;
 lc = LPDAR;                                             /* clear error */
@@ -263,7 +263,7 @@ t_stat carriage_control (int32 action, int32 mod)
 int32 i;
 
 if ((lpt_unit.flags & UNIT_ATT) == 0)
-     return SCPE_UNATT; 
+     return SCPE_UNATT;
 
 switch (action) {
 case 0:                                                 /* to channel now */
@@ -293,7 +293,7 @@ case 3:                                                 /* to channel after */
             return SCPE_OK;
         }
     }
-    return STOP_INVDEV;     
+    return STOP_INVDEV;
 case 4:                                                 /* To line # */
     if (mod < 2) {
         fputs ("\n\f", lpt_unit.fileref);               /* nl, ff */
@@ -302,20 +302,20 @@ case 4:                                                 /* To line # */
         if (mod <= linectr) {
             fputs ("\n\f", lpt_unit.fileref);
             linectr = 1;
-        }   
+        }
         while (1) {
             if (linectr == mod)
                 break;
             space(1, 0);
-        }       
-    }   
+        }
+    }
     return SCPE_OK;
-}          
+}
 return SCPE_OK;
 }
 
 /* Space routine - space or skip n lines
-   
+
    Inputs:
         count   =       number of lines to space or skip
         sflag   =       skip (TRUE) or space (FALSE)
@@ -337,7 +337,7 @@ lpt_unit.pos = ftell (lpt_unit.fileref);                /* update position */
 CC9 = CHP (9, cct[cctptr]) != 0;                        /* set indicators */
 CC12 = CHP (12, cct[cctptr]) != 0;
 linectr += count;
-if (linectr > LPFLR) 
+if (linectr > LPFLR)
     linectr -= LPFLR;
 return SCPE_OK;
 }

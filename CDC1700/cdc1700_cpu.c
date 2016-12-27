@@ -848,7 +848,7 @@ t_stat executeAnInstruction(void)
 
   if (((cpu_dev.dctrl & DBG_TRACE) != 0) ||
       (((cpu_dev.dctrl & DBG_ITRACE) != 0) && (INTlevel != 0))) {
-    fprintf(DBGOUT, 
+    fprintf(DBGOUT,
             "%sA:%04X Q:%04X I:%04X M:%04X Ovf:%d Pfault: %d Inst:%llu\r\n",
             INTprefix, Areg, Qreg, LoadFromMem(0xFF),
             Mreg, Oflag, Pfault, Instructions);
@@ -950,7 +950,7 @@ t_stat executeAnInstruction(void)
                   OrigPreg, Areg, LoadFromMem(0xFF), xxx, operand);
         }
       }
-      Areg = operand;      
+      Areg = operand;
       break;
 
     case OPC_EOR:
@@ -984,7 +984,7 @@ t_stat executeAnInstruction(void)
         operand = LoadFromMem(operand);
       Areg = doADD(Areg, operand);
       break;
-      
+
     case OPC_SPA:
       if ((status = getEffectiveAddr(OrigPreg, instr, &operand)) != SCPE_OK)
         return status;
@@ -1026,7 +1026,7 @@ t_stat executeAnInstruction(void)
         return status;
       StoreToMem(operand, Qreg);
       break;
-    
+
     case OPC_DVI:
       if ((status = getEffectiveAddr(OrigPreg, instr, &operand)) != SCPE_OK)
         return status;
@@ -1048,7 +1048,7 @@ t_stat executeAnInstruction(void)
         return status;
       Preg = operand;
       break;
-      
+
     case OPC_SPECIAL:
       switch (instr & OPC_SPECIALMASK) {
         case OPC_SLS:
@@ -1066,10 +1066,10 @@ t_stat executeAnInstruction(void)
               break;
 
             case OPC_SAN:
-              if (Areg != 0)    
+              if (Areg != 0)
                 Preg = doADDinternal(Preg, instr & OPC_SKIPCOUNT);
               break;
-              
+
             case OPC_SAP:
               if ((Areg & SIGN) == 0)
                 Preg = doADDinternal(Preg, instr & OPC_SKIPCOUNT);
@@ -1084,7 +1084,7 @@ t_stat executeAnInstruction(void)
               if (Qreg == 0)
                 Preg = doADDinternal(Preg, instr & OPC_SKIPCOUNT);
               break;
-              
+
             case OPC_SQN:
               if (Qreg != 0)
                 Preg = doADDinternal(Preg, instr & OPC_SKIPCOUNT);
@@ -1167,7 +1167,7 @@ t_stat executeAnInstruction(void)
                 fprintf(DBGOUT, "%sINP: ==> REPLY, A: %04X\r\n",
                         INTprefix, Areg);
               break;
-              
+
             case IO_REJECT:
               if ((cpu_dev.dctrl & DBG_INPUT) != 0)
                 if (!FirstRejSeen)
@@ -1341,7 +1341,7 @@ t_stat executeAnInstruction(void)
             }
 
             if ((cpu_dev.dctrl & DBG_INTR) != 0)
-              fprintf(DBGOUT, "%s<=== Interrupt %d exit [M: %04X]\r\n", 
+              fprintf(DBGOUT, "%s<=== Interrupt %d exit [M: %04X]\r\n",
                       INTprefix, (operand >> 2) & 0xF, Mreg);
 
             Preg = operand2 = LoadFromMem(INTERRUPT_BASE + operand);
@@ -1363,7 +1363,7 @@ t_stat executeAnInstruction(void)
 
         case OPC_INTER:
           /*
-           * Protection fault if the instruction is not protected and 
+           * Protection fault if the instruction is not protected and
            * modifies M
            */
           if ((cpu_unit.flags & UNIT_PROT) != 0) {
@@ -1494,7 +1494,7 @@ t_stat executeAnInstruction(void)
                   Areg = TRUNC16(temp32);
                   Qreg = TRUNC16(temp32 >> 16);
                   break;
-              
+
                 case OPC_QLS:
                   temp32 = Qreg;
                   for (i = 0; i < count; i++) {
@@ -1514,12 +1514,12 @@ t_stat executeAnInstruction(void)
                   }
                   Areg = TRUNC16(temp32);
                   break;
-                  
+
                 case OPC_LLS:
                   temp32 = (Qreg << 16) | Areg;
                   for (i = 0; i < count; i++) {
                     uint32 sign = temp32 & 0x80000000;
-                    
+
                     temp32 <<= 1;
                     if (sign)
                       temp32 |= 1;

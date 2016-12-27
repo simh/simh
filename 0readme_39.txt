@@ -1,8 +1,8 @@
 Notes For V3.9
 
 
-The makefile now works for all *nix platforms and with cygwin and MinGW32 
-on Windows.  It will automatically detect the availability of libpcap 
+The makefile now works for all *nix platforms and with cygwin and MinGW32
+on Windows.  It will automatically detect the availability of libpcap
 components and build network capable simulators if they are available.
 
 
@@ -39,7 +39,7 @@ components and build network capable simulators if they are available.
 1.1.5 IA64 VMS Ethernet Support
 
         - identified compiler version issues and added IA64 support (Matt Burke)
-        
+
 
 2. Bugs Fixed
 

@@ -66,7 +66,7 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 6;
 
 DEVICE *sim_devices[] = {
-    &cpu_dev, 
+    &cpu_dev,
     &pkb_dev,
     &cdr_dev,
     &cdp_dev,
@@ -93,7 +93,7 @@ const char *sim_stop_messages[] = {
 
 /* This is the opcode master defintion table.  Each possible opcode mnemonic
    is defined here, with enough information to translate to and from
-   symbolic to binary machine code.  
+   symbolic to binary machine code.
    First field is the opcode's mnemonic
    Second field is the hex of the right nybble of the binary opcode
    Third field is the Q code for those with implicit Q codes
@@ -118,7 +118,7 @@ const char *sim_stop_messages[] = {
         that resolve to the same binary machine instruction -- e.g. JE and
         JZ.  On input this is no problem, on output, define the one you
         want to appear first, the second will never appear on output.
-*/   
+*/
 
 int32 nopcode = 75;
 struct opdef opcode[75] = {
@@ -202,7 +202,7 @@ struct opdef opcode[75] = {
 int32 regcode[15] = {   0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01,
             0x80, 0xC0, 0xA0, 0x90, 0x88, 0x84, 0x82, 0x81
 };
-            
+
 char regname[15][8] =  {    "(P2IAR)",
                 "(P1IAR)",
                 "(IAR)",
@@ -218,7 +218,7 @@ char regname[15][8] =  {    "(P2IAR)",
                 "(IAR5)",
                 "(IAR6)",
                 "(IAR7)"
-};             
+};
 
 /* This is the binary loader.  The input file is considered to be
    a string of literal bytes with no special format. The
@@ -262,7 +262,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 {
     int32 r;
     char strg[256];
-    
+
     strcpy(strg, "");
     r = printf_sym(of, strg, addr, val, uptr, sw);
     if (sw & SWMASK ('A'))
@@ -290,7 +290,7 @@ if (sw & SWMASK ('A')) {
             c2 = ebcdic_to_ascii[blk[j]];
             if (c2 < 040 || c2 > 0177 || blk[j] == 07) {
                 blt[j] = '.';
-            } else {    
+            } else {
                 blt[j] = c2;
             }
         }
@@ -306,14 +306,14 @@ if (sw & SWMASK ('A')) {
                     blk[8], blk[9], blk[10], blk[11], blk[12], blk[13], blk[14], blk[15],
                     blt[0], blt[1], blt[2], blt[3], blt[4], blt[5], blt[6], blt[7],
                     blt[8], blt[9], blt[10], blt[11], blt[12], blt[13], blt[14], blt[15]);
-        }           
-    }       
+        }
+    }
     return SCPE_OK;  }
 if (sw & SWMASK ('C')) {
     c2 = ebcdic_to_ascii[c1];
     if (c2 < 040 || c2 > 0177) {
         sprintf(strg, "<%02X>", c1 & 0xff);
-    } else {    
+    } else {
         sprintf (strg, "%c", c2 & 0xff);
     }
     return SCPE_OK;  }
@@ -330,7 +330,7 @@ qbyte = val[1];
 if (group == 0x0f) {
     oplen = 3;
 } else {
-    oplen = 2;    
+    oplen = 2;
     if (len1 == 0) oplen += 2;
     if (len1 == 1 || len1 == 2) oplen++;
     if (len2 == 0) oplen += 2;
@@ -340,7 +340,7 @@ if (group == 0x0f) {
 /* Find which group it belongs to */
 
 switch (group) {
-    case 0x0f:  
+    case 0x0f:
         groupno = 0;
         break;
     case 0x0c:
@@ -356,7 +356,7 @@ switch (group) {
     default:
         groupno = 2;
         break;
-}                   
+}
 
 /* find the table entry */
 
@@ -368,7 +368,7 @@ for (i = 0; i < nopcode; i++) {
         if (opcode[i].group == groupno &&
             opcode[i].opmask == inst &&
             opcode[i].q == qbyte) break;
-        }       
+        }
 }
 
 /* print the opcode */
@@ -404,7 +404,7 @@ if (i >= nopcode) {
         default:
             baddr = 0;
             break;
-    }           
+    }
     switch (len2) {
         case 0:
             aaddr = ((val[vpos] << 8) & 0xff00) | (val[vpos + 1] & 0x00ff);
@@ -412,7 +412,7 @@ if (i >= nopcode) {
                 sprintf(boperand, "%04X", aaddr);
                 else
                 sprintf(aoperand, "%04X", aaddr);
-            break;  
+            break;
         case 1:
             aaddr = val[vpos] & 255;
             if (group == 0x0C || group == 0x0D || group == 0x0E)
@@ -430,11 +430,11 @@ if (i >= nopcode) {
         default:
             aaddr = 0;
             break;
-    }           
+    }
 
     /* Display the operands in the correct format */
 
-    da = (qbyte >> 4) & 0x0f;   
+    da = (qbyte >> 4) & 0x0f;
     m = (qbyte >> 3) & 0x01;
     n = (qbyte) & 0x07;
 
@@ -452,7 +452,7 @@ if (i >= nopcode) {
                     sprintf(bldaddr, "%s,%s", regname[i], boperand);
                 } else {
                     sprintf(bldaddr, "%02X,%s", qbyte, boperand);
-                }           
+                }
             } else {
                 sprintf(bldaddr, "%02X,%s", qbyte, boperand);
             }
@@ -465,11 +465,11 @@ if (i >= nopcode) {
         case 3:
             if (strcmp(opcode[i].op, "JC") == 0) {
                 sprintf(bldaddr, "%04X,%02X", addr+oplen+val[2], qbyte);
-            } else {    
+            } else {
                 sprintf(bldaddr, "%s,%02X", boperand, qbyte);
-            }   
+            }
             break;
-        case 4: 
+        case 4:
             sprintf(bldaddr, "%d,%d,%d", da, m, n);
             break;
         case 5:
@@ -482,14 +482,14 @@ if (i >= nopcode) {
             sprintf(bldaddr, "%04X", addr+oplen+val[2]);
             break;
         case 8:
-            sprintf(bldaddr, "%s", boperand);   
+            sprintf(bldaddr, "%s", boperand);
             break;
         default:
             sprintf(bldaddr, "%s,%s", boperand, aoperand);
             break;
-    }                                               
+    }
     sprintf(strg, "%s%s", bld, bldaddr);
-} 
+}
 
 return -(oplen - 1);
 }
@@ -586,17 +586,17 @@ switch (opcode[j].form) {                               /* Get operands based on
                     r = regcode[i];
                 } else {
                     return SCPE_ARG;
-                }       
-            }   
+                }
+            }
         } else {
             sscanf(gbuf, "%x", &r);
-        }   
+        }
         if (r > 255) return SCPE_ARG;
         val[1] = r;
         if (*cptr == ',') cptr++;
         cptr = parse_addr(cptr, gbuf, &addr, &addtyp);
         switch(addtyp) {
-            case 0: 
+            case 0:
                 val[2] = (addr >> 8) & 0x00ff;
                 val[3] = addr & 0xff;
                 oplen = 4;
@@ -605,12 +605,12 @@ switch (opcode[j].form) {                               /* Get operands based on
                     else
                     val[0] = 0x30 | opcode[j].opmask;
                 break;
-            case 1: 
+            case 1:
                 val[2] = addr & 0xff;
                 oplen = 3;
                 if (opcode[j].group == 1)
                     val[0] = 0xD0 | opcode[j].opmask;
-                    else 
+                    else
                     val[0] = 0x70 | opcode[j].opmask;
                 break;
             case 2:
@@ -624,20 +624,20 @@ switch (opcode[j].form) {                               /* Get operands based on
             default:
                 return SCPE_ARG;
                 break;
-        }               
+        }
         break;
     case 2:
         oplen = 2;
         cptr = parse_addr(cptr, gbuf, &addr, &addtyp);
         switch(addtyp) {
-            case 0: 
+            case 0:
                 val[2] = (addr >> 8) & 0xff;
                 val[3] = addr & 0xff;
                 oplen += 2;
                 vptr = 4;
                 val[0] = 0x00 | opcode[j].opmask;
                 break;
-            case 1: 
+            case 1:
                 val[2] = addr & 0xff;
                 oplen += 1;
                 vptr = 3;
@@ -656,12 +656,12 @@ switch (opcode[j].form) {                               /* Get operands based on
         if (*cptr == ',') cptr++;
         cptr = parse_addr(cptr, gbuf, &addr, &addtyp);
         switch(addtyp) {
-            case 0: 
+            case 0:
                 val[vptr] = (addr >> 8) & 0xff;
                 val[vptr+1] = addr & 0xff;
                 oplen += 2;
                 break;
-            case 1: 
+            case 1:
                 val[vptr] = addr & 0xff;
                 oplen += 1;
                 val[0] = 0x10 | val[0];
@@ -674,7 +674,7 @@ switch (opcode[j].form) {                               /* Get operands based on
             default:
                 return SCPE_ARG;
                 break;
-        }                   
+        }
         if (*cptr == ',') cptr++;
         cptr = get_glyph(cptr, gbuf, 0);
         sscanf(gbuf, "%d", &r);
@@ -701,7 +701,7 @@ switch (opcode[j].form) {                               /* Get operands based on
                     val[1] = r;
                     val[0] = 0xf0 | opcode[j].opmask;
                     oplen = 3;
-                    
+
                 } else {
                     val[2] = (addr >> 8) & 0x00ff;
                     val[3] = addr & 0xff;
@@ -710,9 +710,9 @@ switch (opcode[j].form) {                               /* Get operands based on
                         val[0] = 0xC0 | opcode[j].opmask;
                         else
                         val[0] = 0x30 | opcode[j].opmask;
-                }       
+                }
                 break;
-            case 1: 
+            case 1:
                 val[2] = addr & 0xff;
                 oplen = 3;
                 if (opcode[j].group == 1)
@@ -731,7 +731,7 @@ switch (opcode[j].form) {                               /* Get operands based on
             default:
                 return SCPE_ARG;
                 break;
-        }                   
+        }
         if (*cptr == ',') cptr++;
         cptr = get_glyph(cptr, gbuf, 0);
         sscanf(gbuf, "%x", &r);
@@ -801,7 +801,7 @@ switch (opcode[j].form) {                               /* Get operands based on
         if (*cptr == ',') cptr++;
         cptr = parse_addr(cptr, gbuf, &addr, &addtyp);
         switch(addtyp) {
-            case 0: 
+            case 0:
                 val[2] = (addr >> 8) & 0x00ff;
                 val[3] = addr & 0xff;
                 oplen = 4;
@@ -810,7 +810,7 @@ switch (opcode[j].form) {                               /* Get operands based on
                     else
                     val[0] = 0x30 | opcode[j].opmask;
                 break;
-            case 1: 
+            case 1:
                 val[2] = addr & 0xff;
                 oplen = 3;
                 if (opcode[j].group == 1)
@@ -829,7 +829,7 @@ switch (opcode[j].form) {                               /* Get operands based on
             default:
                 return SCPE_ARG;
                 break;
-        }                   
+        }
         break;
     case 7:
         if (*cptr == ',') cptr++;
@@ -841,18 +841,18 @@ switch (opcode[j].form) {                               /* Get operands based on
         val[0] = 0xf0 | opcode[j].opmask;
         oplen = 3;
         break;
-        
+
     case 8:
         if (*cptr == ',') cptr++;
         cptr = parse_addr(cptr, gbuf, &addr, &addtyp);
         switch(addtyp) {
-            case 0: 
+            case 0:
                 val[2] = (addr >> 8) & 0x00ff;
                 val[3] = addr & 0xff;
                 oplen = 4;
                 val[0] = 0xC0 | opcode[j].opmask;
                 break;
-            case 1: 
+            case 1:
                 val[2] = addr & 0xff;
                 oplen = 3;
                 val[0] = 0xD0 | opcode[j].opmask;
@@ -865,7 +865,7 @@ switch (opcode[j].form) {                               /* Get operands based on
             default:
                 return SCPE_ARG;
                 break;
-        }                   
+        }
         val[1] = opcode[j].q;
         break;
     case 9:
@@ -873,14 +873,14 @@ switch (opcode[j].form) {                               /* Get operands based on
         val[0] = 0;
         cptr = parse_addr(cptr, gbuf, &addr, &addtyp);
         switch(addtyp) {
-            case 0: 
+            case 0:
                 val[2] = (addr >> 8) & 0xff;
                 val[3] = addr & 0xff;
                 oplen += 2;
                 vptr = 4;
                 val[0] = 0x00 | opcode[j].opmask;
                 break;
-            case 1: 
+            case 1:
                 val[2] = addr & 0xff;
                 oplen += 1;
                 vptr = 3;
@@ -899,12 +899,12 @@ switch (opcode[j].form) {                               /* Get operands based on
         if (*cptr == ',') cptr++;
         cptr = parse_addr(cptr, gbuf, &addr, &addtyp);
         switch(addtyp) {
-            case 0: 
+            case 0:
                 val[vptr] = (addr >> 8) & 0xff;
                 val[vptr+1] = addr & 0xff;
                 oplen += 2;
                 break;
-            case 1: 
+            case 1:
                 val[vptr] = addr & 0xff;
                 oplen += 1;
                 val[0] = 0x10 | val[0];
@@ -917,7 +917,7 @@ switch (opcode[j].form) {                               /* Get operands based on
             default:
                 return SCPE_ARG;
                 break;
-        }                   
+        }
         val[1] = opcode[j].q;
         break;
     default:
@@ -946,9 +946,8 @@ if (gbuf[0] == '(') {                                   /* XR relative */
         nybble = 2;
 } else {                                                /* Direct */
     sscanf(gbuf, "%x", addr);
-    nybble = 0; 
+    nybble = 0;
 }
 *addrtype = nybble;
 return cptr;
 }
-

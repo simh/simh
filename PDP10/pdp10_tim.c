@@ -69,12 +69,12 @@
  * The timer merely sets the INTERVAL DONE flag in the APR flags.
  * Whether that actually causes an interrupt is controlled by the
  * APR interrupt enable for the flag and by the  PI system.
- * 
+ *
  * The flag is readable as an APR condition by RDAPR, and CONSO/Z APR,.
  * The flag is cleared by WRAPR 1b22!1b30 (clear, count done).
  *
  * The timebase is maintained with the 12 LSB zero in a workspace
- * register.  When read by the OS, the actual value of the 10 MSB of 
+ * register.  When read by the OS, the actual value of the 10 MSB of
  * the hardware counter is inserted into those bits, providing increased
  * resolution.  Although the system reference manual says otherwise, the
  * two LSB of the counter are read as zero by the microcode (DPM2), so
@@ -249,10 +249,10 @@ tim_incr_base (tempbase, incr);
  * that the counter is in a different clock domain from the microcode.
  * To make the domain crossing, the microcode reads the counter
  * until two consecutive values match.
- * 
- * Since the microcode cycle time is 300 nsec, the LSBs of the 
- * counter run too fast (244 nsec) for the strategy to work.  
- * Ignoring the two LSB ensures that the value can't change any 
+ *
+ * Since the microcode cycle time is 300 nsec, the LSBs of the
+ * counter run too fast (244 nsec) for the strategy to work.
+ * Ignoring the two LSB ensures that the value can't change any
  * faster than ~976 nsec, which guarantees a stable value can be
  * obtained in at most three attempts.
  */
@@ -302,7 +302,7 @@ static t_bool update_interval (d10 new_interval)
 {
 int32 old_clk_tps = clk_tps;
 /*
- * The value provided is in hardware clicks. For a frequency of 4.1 
+ * The value provided is in hardware clicks. For a frequency of 4.1
  * MHz, that means that dividing by 4096 (shifting 12 to the right) we get
  * the aproximate value in millisenconds. If any of rhe rightmost bits is
  * one, we add one unit (4096 ticks ). Reference:
@@ -311,7 +311,7 @@ int32 old_clk_tps = clk_tps;
  */
 tim_new_period = new_interval & ~TIM_HWRE_MASK;
 if (new_interval & TIM_HWRE_MASK) tim_new_period += 010000;
-    
+
 /* clk_tps is the new number of clocks ticks per second */
 clk_tps = (int32) ceil(((double)TIM_HW_FREQ /(double)tim_new_period) - 0.5);
 if (clk_tps != old_clk_tps)
@@ -319,13 +319,13 @@ if (clk_tps != old_clk_tps)
 
 /* tmxr is polled every tim_mult clks.  Compute the divisor matching the target. */
 tim_mult = (clk_tps <= TIM_TMXR_FREQ) ? 1 : (clk_tps / TIM_TMXR_FREQ) ;
-   
+
 /* Estimate instructions/tick for fixed timing - just for KLAD */
 tim_unit.wait = TIM_WAIT_IPS / clk_tps;
 tmxr_poll = tim_unit.wait * tim_mult;
 
 /* The next tim_svc will update the activation time.
- * 
+ *
  */
 return FALSE;
 }
@@ -409,7 +409,7 @@ t_stat tim_set_mod (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val & (UNIT_T20|UNIT_KLAD)) {
     clk_tps = TIM_TPS_T20;
-    update_interval(((d10)(1000*4096))/clk_tps); 
+    update_interval(((d10)(1000*4096))/clk_tps);
     tmr_poll = tim_unit.wait;
     uptr->flags = uptr->flags | UNIT_Y2K;
     }
@@ -443,7 +443,7 @@ t_stat st = SCPE_OK;
 curtim = time (NULL);                                   /* get time */
 tptr = localtime (&curtim);                             /* decompose */
 if (tptr == NULL)
-    return SCPE_NXM; 
+    return SCPE_NXM;
 if ((tptr->tm_year > 99) && !(tim_unit.flags & UNIT_Y2K))
     tptr->tm_year = 99;                                 /* Y2K prob? */
 

@@ -36,7 +36,7 @@
 #include "system_defs.h"
 
 int32   nmiflg = 0;                     //mask NMI off
-uint8   dmapagreg0, dmapagreg1, dmapagreg2, dmapagreg3; 
+uint8   dmapagreg0, dmapagreg1, dmapagreg2, dmapagreg3;
 extern uint16 port;                     //port called in dev_table[port]
 
 /* function prototypes */
@@ -75,7 +75,7 @@ extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16);
 /*  SBC reset routine */
 
 t_stat SBC_reset (DEVICE *dptr, uint16 base)
-{    
+{
     sim_printf("Initializing IBM PC:\n");
     i8088_reset (NULL);
     i8237_reset (NULL, I8237_BASE_0);
@@ -84,11 +84,11 @@ t_stat SBC_reset (DEVICE *dptr, uint16 base)
     i8259_reset (NULL, I8259_BASE_0);
     EPROM_reset (NULL, ROM_BASE, ROM_SIZE);
     RAM_reset (NULL, RAM_BASE, RAM_SIZE);
-    reg_dev(enbnmi, NMI_BASE); 
-    reg_dev(dmapag0, DMAPAG_BASE_0); 
-    reg_dev(dmapag1, DMAPAG_BASE_1); 
-    reg_dev(dmapag2, DMAPAG_BASE_2); 
-    reg_dev(dmapag3, DMAPAG_BASE_3); 
+    reg_dev(enbnmi, NMI_BASE);
+    reg_dev(dmapag0, DMAPAG_BASE_0);
+    reg_dev(dmapag1, DMAPAG_BASE_1);
+    reg_dev(dmapag2, DMAPAG_BASE_2);
+    reg_dev(dmapag3, DMAPAG_BASE_3);
     return SCPE_OK;
 }
 

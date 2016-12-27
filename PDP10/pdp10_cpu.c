@@ -374,7 +374,7 @@ REG cpu_reg[] = {
     { ORDATAD (DBR2, dbr2, PASIZE, "descriptor base register 2 (ITS)") },
     { ORDATAD (DBR3, dbr3, PASIZE, "descriptor base register 3 (ITS)") },
     { ORDATAD (DBR4, dbr4, PASIZE, "descriptor base register 4 (ITS)") },
-    { ORDATAD (PCST, pcst, 36, "ITS PC sampling register") }, 
+    { ORDATAD (PCST, pcst, 36, "ITS PC sampling register") },
     { ORDATAD (PIENB, pi_enb, 7, "PI levels enabled") },
     { FLDATAD (PION, pi_on, 0, "PI system enable") },
     { ORDATAD (PIACT, pi_act, 7, "PI levels active") },
@@ -421,7 +421,7 @@ DEVICE cpu_dev = {
     };
 
 /* Data arrays */
-    
+
 const int32 pi_l2bit[8] = {
  0, 0100, 0040, 0020, 0010, 0004, 0002, 0001
  };
@@ -480,7 +480,7 @@ static t_bool (*io702i[16])(a10, int32) = {
 #define JRST_U          1                               /* ok anywhere */
 #define JRST_E          2                               /* ok exec mode */
 #define JRST_UIO        3                               /* ok user I/O mode */
-    
+
 static t_stat jrst_tab[16] = {
     JRST_U, JRST_U, JRST_U, 0, JRST_E, JRST_U, JRST_E, JRST_E,
     JRST_UIO, 0, JRST_UIO, 0, JRST_E, JRST_U, 0, 0
@@ -734,11 +734,11 @@ if (sim_interval <= 0) {                                /* check clock queue */
    they are explicitly emulated here.  Note that the KS microcode does not
    perform an EA calc on interrupt instructions, which this emulation does.
    This is an implementation restriction of the KS.  The KS does not restrict
-   the CONSOLE EXECUTE function which is merged into this path in SimH.  
+   the CONSOLE EXECUTE function which is merged into this path in SimH.
 
-   On a keep-alive failure, the console (fe) forces the CPU 'XCT' the 
+   On a keep-alive failure, the console (fe) forces the CPU 'XCT' the
    instruction at exec 71.  This is close enough to an interrupt that it is
-   treated as one here.  TOPS-10 and TOPS-20 use JSR or XPCW, which are 
+   treated as one here.  TOPS-10 and TOPS-20 use JSR or XPCW, which are
    really the only sensible instructions, as diagnosing a KAF requires the
    PC/FLAGS of the fault.
    On a reload-request from the OS, the fe loads the bootstrap code and sets
@@ -814,7 +814,7 @@ if (qintr) {
         sim_interval--;
     continue;
     }                                                   /* end if interrupt */
-            
+
 /* Traps fetch and execute an instruction from the current mode process table.
    On the KS10, the fetch of the next instruction has started, and a page fail
    trap on the instruction fetch takes precedence over the trap.  During a trap,
@@ -845,7 +845,7 @@ else {
 /* Ready (at last) to get an instruction */
 
     inst = Read (pager_PC = PC, MM_CUR);                /* get instruction */
-    INCPC;  
+    INCPC;
     sim_interval = sim_interval - 1;
     }
 
@@ -1182,7 +1182,7 @@ case 0367:  SOJ; if (TG (AC(ac))) JUMP (ea);            /* SOJG */
                 else if ((ac == 2) && (ea == 3) &&      /* SOJG 2,3? */
                     !TSTF (F_USR) && Q_T20)             /* T20, mon mode? */
                     sim_idle (0, FALSE);                /* idle */
-                }                    
+                }
             break;
 case 0370:  SOS; break;                                 /* SOS */
 case 0371:  SOS; if (TL (mb)) INCPC; break;             /* SOSL */
@@ -1404,7 +1404,7 @@ case 0677:  TS_; T__N; T_O; break;                      /* TSON */
 /* I/O instructions (0700 - 0777)
 
    Only the defined I/O instructions have explicit case labels;
-   the rest default to unimplemented (monitor UUO).  Note that   
+   the rest default to unimplemented (monitor UUO).  Note that
    710-715 and 720-725 have different definitions under ITS and
    use normal effective addresses instead of the special address
    calculation required by TOPS-10 and TOPS-20.
@@ -1533,7 +1533,7 @@ case 0254:                                              /* JRST */
 
     case 014:                                           /* JRST 14 = SFM */
         Write (ea, XWD (flags, 0), MM_OPND);
-        break;  
+        break;
 
     case 015:                                           /* JRST 15 = XJRST */
         if (!T20PAG)                                    /* only in TOPS20 paging */
@@ -1594,7 +1594,7 @@ if (!TSTS (a | b)) {                                    /* cases 1,2 */
     return r;                                           /* case 1 */
     }
 if (!TSTS (r))                                          /* cases 3,5 */
-    SETF (F_C0 | F_C1); 
+    SETF (F_C0 | F_C1);
 return r;
 }
 
@@ -1673,7 +1673,7 @@ else if (!TSTS (r))                                     /* cases 3,5 */
 AC(ac) = r;
 AC(p1) = TSTS (r)? SETS (AC(p1)): CLRS (AC(p1));
 return;
-} 
+}
 
 /* Double subtract - see comments for single subtract */
 
@@ -1698,7 +1698,7 @@ else if (!TSTS (r))                                     /* cases 3,5 */
 AC(ac) = r;
 AC(p1) = (TSTS (r)? SETS (AC(p1)): CLRS (AC(p1))) & DMASK;
 return;
-} 
+}
 
 
 /* Logical shift combined */
@@ -1972,7 +1972,7 @@ Write (ba, wd & DMASK, MM_BSTK);
 return;
 }
 
-/* Adjust byte pointer - checked against KS10 ucode 
+/* Adjust byte pointer - checked against KS10 ucode
    The KS10 divide checks if the bytes per word = 0, which is a simpler
    formulation of the processor reference manual check.
 */
@@ -2003,7 +2003,7 @@ if (s) {
     p = (36 - ((int32) byadj) * s) - ((36 - p) % s);    /* new p */
     bp = (PUT_P (bp, p) & LMASK) | ((bp + wdadj) & RMASK);
     }
-AC(ac) = bp;            
+AC(ac) = bp;
 return;
 }
 
@@ -2173,7 +2173,7 @@ return;
    maskable but which interrupt on a single, selectable level
 
    Instructions for the arithmetic processor:
-        APRID                   read system id  
+        APRID                   read system id
         WRAPR (CONO APR)        write system flags
         RDAPR (CONI APR)        read system flags
         (CONSO APR)             test system flags

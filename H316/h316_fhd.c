@@ -41,7 +41,7 @@
 
 #define FH_NUMWD        1536                            /* words/track */
 #define FH_NUMTK        64                              /* tracks/surface */
-#define FH_WDPSF        (FH_NUMWD * FH_NUMTK)           /* words/surface */             
+#define FH_WDPSF        (FH_NUMWD * FH_NUMTK)           /* words/surface */
 #define FH_NUMSF        16                              /* surfaces/ctlr */
 #define UNIT_V_AUTO     (UNIT_V_UF + 0)                 /* autosize */
 #define UNIT_V_SF       (UNIT_V_UF + 1)                 /* #surfaces - 1 */
@@ -117,7 +117,7 @@ uint32 fhd_csword (uint32 cs, uint32 ch);
 
 DIB fhd_dib = { FHD, 1, IOBUS, IOBUS, INT_V_FHD, INT_V_NONE, &fhdio, 0 };
 
-UNIT fhd_unit = { 
+UNIT fhd_unit = {
     UDATA (&fhd_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
            FH_WDPSF)
     };

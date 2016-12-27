@@ -20,11 +20,11 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the names of Robert M Supnik and Holger Veit 
-   shall not be used in advertising or otherwise to promote the sale, use or 
+   Except as contained in this notice, the names of Robert M Supnik and Holger Veit
+   shall not be used in advertising or otherwise to promote the sale, use or
    other dealings in this Software without prior written authorization from
    Robert M Supnik and Holger Veit.
-   
+
    2013xxxx hv initial version
    20130902 hv added telnet multiplexer code
    20131020 hv fixed CON interrupt handling
@@ -47,7 +47,7 @@ static t_stat tim1_svc(UNIT* uptr);
 static t_stat tim2_svc(UNIT* uptr);
 
 /* CON USART registers */
-/* This is described as positive logic, and represents the 
+/* This is described as positive logic, and represents the
  * content of the corresponding registers.
  * However, the USART is connected to inverted DAL lines
  * and needs to be written to with the inverted value
@@ -155,7 +155,7 @@ DEVICE con_dev = {
 t_stat con_binit() {
   con_status = CONS_THRE;
   setbit(con_status, CONS_DSR);
-  
+
   con_ctrl1 = 0; /* no echo, receiver disabled, transmitter disabled */
   con_ctrl2 = 0; /* ASYNC mode, 8bits, Clock 1X */
   con_xmit = 0;
@@ -172,7 +172,7 @@ static t_stat con_reset(DEVICE* dptr)
   sim_rtcn_init (wait, TMR_CONPOLL); /* init poll timer */
 
   sim_cancel(con_tto); /* disable output service */
-  
+
   /* register/deregister I/O handlers */
   if (dptr->flags & DEV_DIS) {
     del_ioh(ctxt->ioi);
@@ -331,7 +331,7 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
     switch (con_ctrl2 & CONC2_CLENMASK) {
     case CONC2_CLEN5: data &= 0x1f; break;
     case CONC2_CLEN6: data &= 0x3f; break;
-    case CONC2_CLEN7: data &= 0x7f; 
+    case CONC2_CLEN7: data &= 0x7f;
       if (isbitset(con_ctrl1,CONC1_PE))
         data = set_parity(data, con_ctrl2 & CONC2_ODDEVN);
       break;
@@ -346,7 +346,7 @@ t_stat con_write(t_addr ioaddr, uint16 data) {
 //  RCVINTR();
   XMITINTR();
   DSRINTR();
-  
+
   sim_debug(DBG_CON_WRITE, &con_dev, DBG_PCFORMAT0 "Byte write %02x (pos logic) to $%04x\n", DBG_PC, data & 0xff, ioaddr);
   return SCPE_OK;
 }
@@ -372,7 +372,7 @@ t_stat con_read(t_addr ioaddr, uint16 *data) {
     cpu_assertInt(INT_CONR, FALSE);
   }
   sim_debug(DBG_CON_READ, &con_dev, DBG_PCFORMAT1 "Byte read %02x (pos logic) from $%04x\n", DBG_PC, *data & 0xff, ioaddr);
-  
+
   /* note usart has inverted bus, so returned data must be negated */
   *data = ~(*data);
   return SCPE_OK;
@@ -447,7 +447,7 @@ DEVICE tim_dev = {
   NULL        /*lname*/
 };
 
-t_stat tim_reset(DEVICE *dptr) 
+t_stat tim_reset(DEVICE *dptr)
 {
   DEVCTXT* ctxt = (DEVCTXT*)dptr->ctxt;
 
@@ -469,7 +469,7 @@ t_stat tim_read(t_addr ioaddr, uint16 *data)
    *data = 0xff;
   else {
     *data = (tim[n].hilo ? tim[n].cnt : (tim[n].cnt >> 8)) & 0xff;
-    sim_debug(DBG_TIM_READ, &tim_dev, DBG_PCFORMAT1 "Read %s timer%d: %02x\n", 
+    sim_debug(DBG_TIM_READ, &tim_dev, DBG_PCFORMAT1 "Read %s timer%d: %02x\n",
       DBG_PC, tim[n].hilo ? "high" : "low", n, *data);
     tim[n].hilo = ! tim[n].hilo;
   }
@@ -532,7 +532,7 @@ t_stat tim_write(t_addr ioaddr, uint16 data)
 }
 
 /* baud rate timer 0 is programmed in mode 2 - actually, this is ignored */
-static t_stat tim0_svc(UNIT* uptr) 
+static t_stat tim0_svc(UNIT* uptr)
 {
   int32 time = 1250000 / tim[0].preset;
   sim_activate(uptr, time);
@@ -541,14 +541,14 @@ static t_stat tim0_svc(UNIT* uptr)
 }
 
 /* system timer 1 is programmed in mode 2, causes interrupt each time it is 0 */
-static t_stat tim1_svc(UNIT* uptr) 
+static t_stat tim1_svc(UNIT* uptr)
 {
   int32 time = 1250000 / tim[0].preset;
   sim_debug(DBG_TIM_SVC, &tim_dev, DBG_PCFORMAT2 "Timer1: SVC call\n", DBG_PC);
   sim_activate(uptr, time);
   cpu_raiseInt(INT_TICK);
   reg_ssr |= SSR_TICK; /* notify TICK timer int occurred */
-  
+
   /* handle interval timer */
   if (tim[2].cnt > 0) tim[2].cnt--;
   if (tim[2].cnt == 0) {
@@ -558,7 +558,7 @@ static t_stat tim1_svc(UNIT* uptr)
       tim[2].cnt = tim[2].preset; /* restart timer */
     } /* otherwise single shot */
   }
-  return SCPE_OK; 
+  return SCPE_OK;
 }
 
 /* interval timer 2 is programmed in mode 0 (single shot) or 2 (rate generator)
@@ -568,4 +568,3 @@ static t_stat tim2_svc(UNIT* uptr)
   sim_debug(DBG_TIM_SVC, &tim_dev, DBG_PCFORMAT2 "Timer2: SVC call - should not occur\n", DBG_PC);
   return SCPE_OK;
 }
-

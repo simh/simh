@@ -30,7 +30,7 @@
    records to be extended beyond a sector boundary.  To accomodate this, the
    first word of each sector has 3 extra bits:
 
-   <26> =       end of chain flag       
+   <26> =       end of chain flag
    <25:24> =    4 - number of packets
 
    These values were chosen so that 000 = continue chain, full sector.
@@ -67,7 +67,7 @@
 #define DSK_M_PKT       03
 #define DSK_V_CHN       26
 #define DSK_GETPKT(x)   (4 - (((x) >> DSK_V_PKT) & DSK_M_PKT))
-#define DSK_ENDCHN(x)   ((x) & (1 << DSK_V_CHN))                
+#define DSK_ENDCHN(x)   ((x) & (1 << DSK_V_CHN))
 
 extern uint32 xfr_req;
 extern uint32 alert;
@@ -230,7 +230,7 @@ switch (fnc) {                                          /* case on function */
         CRETINS;
         }
 
-return SCPE_OK; 
+return SCPE_OK;
 }
 
 /* PIN routine - return disk address */

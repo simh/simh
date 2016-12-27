@@ -629,7 +629,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_PTP       4
 #define INT_V_LPT       5
 #define INT_V_VHRX      6
-#define INT_V_VHTX      7  
+#define INT_V_VHTX      7
 #define INT_V_CR        8
 #define INT_V_DLI       9
 #define INT_V_DLO       10

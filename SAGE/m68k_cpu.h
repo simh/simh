@@ -123,7 +123,7 @@ extern t_addr   saved_PC;
 /* IR 7-6 bits */
 #define SZ_BYTE 0
 #define SZ_WORD 1
-#define SZ_LONG 2 
+#define SZ_LONG 2
 #define SZ_SPEC 3
 
 /* functions to access memory

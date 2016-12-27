@@ -56,4 +56,3 @@ Copyright (c) 2005-2012, William Beech
 #define STOP_IBKPT  3       // breakpoint
 #define STOP_OPCODE 4       // invalid opcode
 #define STOP_MEMORY 5       // invalid memory address
-

@@ -213,7 +213,7 @@ DEVICE lk_dev = {
     NULL, NULL, &lk_reset,
     NULL, NULL, NULL,
     NULL, DEV_DIS | DEV_DEBUG, 0,
-    lk_debug, NULL, NULL, NULL, NULL, NULL, 
+    lk_debug, NULL, NULL, NULL, NULL, NULL,
     &lk_description
     };
 
@@ -609,7 +609,7 @@ switch (key) {
     case SIM_KEY_BACKSLASH:
         lk_key = LK_KEY_VBAR;
         break;
-    
+
     case SIM_KEY_LEFT_BACKSLASH:
     case SIM_KEY_COMMA:
         lk_key = LK_KEY_COMMA;
@@ -626,7 +626,7 @@ switch (key) {
     /* case SIM_KEY_PRINT: */
     /* case SIM_KEY_PAUSE: */
     /* case SIM_KEY_ESC: */
-    
+
     case SIM_KEY_BACKSPACE:
         lk_key = LK_KEY_DELETE;
         break;
@@ -805,7 +805,7 @@ switch (mode) {
             LK_SEND_CHAR (0xB4);
             }
         break;
-        
+
     case LK_MODE_DOWNUP:
         if (ev.state == SIM_KEYPRESS_DOWN) {
             lk_keysdown++;
@@ -821,7 +821,7 @@ switch (mode) {
                 }
             }
         break;
-    }            
+    }
 }
 
 const char *lk_description (DEVICE *dptr)

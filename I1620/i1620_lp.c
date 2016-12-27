@@ -147,7 +147,7 @@ const int8 alp_to_lpt[256] = {                          /* tfm: invalid codes 02
  };
 
 /* Line printer IO routine
- 
+
    - Hard errors halt the system.
    - Invalid characters print a blank, set the WRCHK and PRCHK
      flags, and halt the system if IO stop is set.
@@ -293,7 +293,7 @@ return STOP_CCT;                                        /* runaway channel */
 }
 
 /* Space routine - space or skip n lines
-   
+
    Inputs:
         count   =       number of lines to space or skip
         sflag   =       skip (TRUE) or space (FALSE)

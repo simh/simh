@@ -49,23 +49,23 @@
  *
  *  Notice that the WIDTH is 11" and the LENGTH can be anything up to 120'. And, the WIDTH
  *  was the plotter's Y direction, and the LENGTH was the plotter's X direction.
- * 
+ *
  *  The simulator creates a GIF image corresponding to a landscape mode sheet of paper. That is,
  *  the plotter's Y direction is the image's horizontal dimension, and the plotter's X direction
  *  is the image's vertical dimension. The WIDTH of the image is always 1100 pixels (11 inches at
- *  100 dpi), and the LENGTH (height) of the image can be set. The default is 800 pixels (8 
- *  inches at 100 dpi). A diagram of more than 8" in length (X direction) will span more than 
- *  one printed page in landscape mode. 
+ *  100 dpi), and the LENGTH (height) of the image can be set. The default is 800 pixels (8
+ *  inches at 100 dpi). A diagram of more than 8" in length (X direction) will span more than
+ *  one printed page in landscape mode.
  *
  *  When an 'att plot' command is issued a file is created based on the
  *  default or currently set values of paper length, pen position, pen color and pen width.
- *  
+ *
  *  When a 'det plot' command is issued, the plotter image will be
  *  written to the GIF that was created during the attach process. The
  *  image is not viewable until this point. (You could implement an EXAMINE PLOT command
  *  of some sort to write out an intermediate version of the image, but this is not currently
  *  implemented).
- *  
+ *
  *  The 'set plot' command can set pen width, paper length, pen color,
  *  current carriage X and Y coordinates, as discussed below. Paper length can be set
  *  to alter the default of 800 (8"); changes are ignored until
@@ -81,7 +81,7 @@
  *	+	compile both LIBGD and SIMH to use the static C runtime libraries, compile
  *		   LIBGD to a static library, and link LIBGD into ibm1130.exe (which is
  *		   what we do at IBM1130.org, so that gd is built into the version of ibm1130.exe
- *		   we distribute), or, 
+ *		   we distribute), or,
  *	+	Compile both LIBGD and IBM1130 to use the DLL version of the C runtime, and compile
  *		   GD to either a static library or a DLL, but, static is easier since you don't
  *		   need to copy LIBGD.DLL along with ibm1130.exe
@@ -90,7 +90,7 @@
  *
  * attach [-w] plot filename.gif
  *		Creates file filename.gif and attaches the plotter device to it.
- *      The file is empty at this point. The pen is raised. If the -w option is specified, and the 
+ *      The file is empty at this point. The pen is raised. If the -w option is specified, and the
  *		simulator does not draw on the plotter between attach and detach, the gif file will be deleted
  *		on detach. (This is useful for the the cgi version of the simulator).
  *
@@ -108,15 +108,15 @@
  *		Moves the pen up or down (onto the paper).
  *
  * set plot length NNN
- *		Sets the plot length (plotter X direction, GIF vertical dimension) to the NNN hundredths of 
- *		an inch. Default is 800. The plot width (plotter Y direction, GIF horizontal dimension) is always 
- *		1100 (11 inches). NOTE: Changing this setting has no affect on the current plot. It takes affect at 
+ *		Sets the plot length (plotter X direction, GIF vertical dimension) to the NNN hundredths of
+ *		an inch. Default is 800. The plot width (plotter Y direction, GIF horizontal dimension) is always
+ *		1100 (11 inches). NOTE: Changing this setting has no affect on the current plot. It takes affect at
  *		the next "attach plot" command.
  *
  * set plot xpos NNN
  * set plot ypos NNN
  *		Sets the pen x or y position to NNN hundredths of an inch.
- * 
+ *
  * (You cannot manually create a plot by issuing set plot pendown, xpos and ypos commands. The xpos and ypos
  *  settings only change the starting point for the simulated program).
  ***************************************************************************************/
@@ -246,11 +246,11 @@ MTAB plot_mod[] = {
      * then they will print the value twice for a 'show plot' command
      * therefore they are set to not display unless explicity requested
      * and the special dummy NOOP entry will cause the print of these values */
- 	{ MTAB_XTD | MTAB_VAL | MTAB_VUN | MTAB_VDV | MTAB_NMO,    2,
+	{ MTAB_XTD | MTAB_VAL | MTAB_VUN | MTAB_VDV | MTAB_NMO,    2,
              "length",	"LENGTH", &plot_set_length, &plot_show_nl, &plot_reg[5]},
- 	{ MTAB_XTD | MTAB_VAL | MTAB_VDV | MTAB_VUN | MTAB_NMO,     0,
+	{ MTAB_XTD | MTAB_VAL | MTAB_VDV | MTAB_VUN | MTAB_NMO,     0,
              "Xpos",	"XPOS", &plot_set_pos, &plot_show_nl, &plot_reg[2]},
- 	{ MTAB_XTD | MTAB_VAL | MTAB_VDV | MTAB_VUN | MTAB_NMO,     1,
+	{ MTAB_XTD | MTAB_VAL | MTAB_VDV | MTAB_VUN | MTAB_NMO,     1,
              "Ypos",	"YPOS", &plot_set_pos, &plot_show_nl, &plot_reg[3]},
 	{ 0 }  };
 
@@ -292,7 +292,7 @@ void xio_1627_plotter (int32 iocc_addr, int32 iocc_func, int32 iocc_mod)
 		case XIO_SENSE_DEV:											/* sense device status */
 			ACC = plot_dsw;											/* get current status */
 			if (iocc_mod & 0x01) {									/* reset interrupts */
-				CLRBIT(plot_dsw, PLOT1627_DSW_OP_COMPLETE); 
+				CLRBIT(plot_dsw, PLOT1627_DSW_OP_COMPLETE);
 				CLRBIT(ILSW[3], ILSW_3_1627_PLOTTER);
 			}
 			break;
@@ -432,8 +432,8 @@ static t_stat plot_attach (UNIT *uptr, CONST char *cptr)
     grey_pen   = gdImageColorAllocate(image,GREY);    		/* load up grey color */
 
     if ( (white_background == -1) || (black_pen == -1) ||
-    	 (red_pen    == -1) || (blue_pen == -1) || (green_pen == -1) ||
-       	 (purple_pen == -1) || (ltgrey_pen == -1) || (grey_pen == -1) ) {
+	 (red_pen    == -1) || (blue_pen == -1) || (green_pen == -1) ||
+	 (purple_pen == -1) || (ltgrey_pen == -1) || (grey_pen == -1) ) {
            if (IS_DEBUG) printf("problem allocating pen colors\n");
            return SCPE_MEM;
     }
@@ -568,7 +568,7 @@ static t_stat plot_detach (UNIT *uptr)
 		}
 		else
 			result = 0;				/* make it look like the write failed so we return error status */
-	
+
 		gdFree(buf);				/* free up the memory of GIF format */
 	}
 	else {							/* make a copy of the filename so we can delete it after detach */
@@ -614,7 +614,7 @@ static void process_cmd (void)
        need_update = FALSE;
     }
 
-   	/* will move pen one step or flip pen up or down */
+	/* will move pen one step or flip pen up or down */
     oldx = plot_xpos;
     oldy = plot_ypos;
 
@@ -676,7 +676,7 @@ static void process_cmd (void)
 	/* On the real plotter, y motions were physically restricted at the ends of travel.
 	 * We simulate this by clipping the plot_ypos value. Three +y movements at the right
 	 * end of travel followed by three -y movements will back up 3 positions, just as it would have on
-	 * the physical plotter. Without clipping, the pen would end up where it started, which 
+	 * the physical plotter. Without clipping, the pen would end up where it started, which
 	 * is incorrect. (Hopefully, good 1130 plotting software would never make this happen anyhow!)
 	 */
 
@@ -790,4 +790,3 @@ static t_stat plot_validate_change (UNIT *uptr, int32 set, CONST char *ptr, void
 }
 
 #endif /* ENABLE_PLOT_SUPPORT */
-

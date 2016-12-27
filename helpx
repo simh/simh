@@ -225,8 +225,8 @@ while( <STDIN> ) {
 		$help .= $string;
 		next;
 	    } elsif ($tok eq 'word' && $val =~ /^fprint_(set|show|reg)_help(?:_ex)?$/) {
-		my %alt = ( set  => "\$Set commands", 
-			    show => "\$Show commmands", 
+		my %alt = ( set  => "\$Set commands",
+			    show => "\$Show commmands",
 			    reg  => "\$Registers" );
 		$b .= "/* Use \"$alt{$1}\" topic instead:\n";
 		do {

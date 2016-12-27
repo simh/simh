@@ -427,7 +427,7 @@ REG dt_reg[] = {
 
 MTAB dt_mod[] = {
     { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
+    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
     { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
@@ -684,7 +684,7 @@ if (prev_mot < DTS_ATSF) {                              /* not at speed? */
     }
 
 dt_newfnc (uptr, DTS_STA (DTS_ATSF | new_dir, new_fnc));/* state = fnc */
-return; 
+return;
 }
 
 /* Schedule new DECtape function
@@ -973,7 +973,7 @@ switch (fnc) {                                          /* at speed, check fnc *
         if read dir != write dir, bits must be scrambled
         if wc overflow, next state is wc overflow
         if end of block, possibly set DTF, next state is start of block
-   Wc ovf, not start of block - 
+   Wc ovf, not start of block -
         if end of block, possibly set DTF, next state is start of block
    Wc ovf, start of block - if end of block reached, timing error,
         otherwise, continue to next word
@@ -1015,9 +1015,9 @@ switch (fnc) {                                          /* at speed, check fnc *
                 if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
                     dtsb = dtsb | DTB_DTF;              /* set DTF */
                 }
-            break;                      
+            break;
 
-        case DTO_WCO | DTO_SOB:                         /* next block */        
+        case DTO_WCO | DTO_SOB:                         /* next block */
             if (wrd == (dir? 0: DTU_BSIZE (uptr)))      /* end of block? */
                 dt_seterr (uptr, DTB_TIM);              /* timing error */
             else sim_activate (uptr, DT_WSIZE * dt_ltime);
@@ -1075,7 +1075,7 @@ switch (fnc) {                                          /* at speed, check fnc *
                 if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
                     dtsb = dtsb | DTB_DTF;              /* set DTF */
                 }
-            break;                      
+            break;
 
         case DTO_WCO | DTO_SOB:                         /* all done */
             dt_schedez (uptr, dir);                     /* sched end zone */
@@ -1359,7 +1359,7 @@ if (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1))  /* fwd csum */
 if (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_BLKWD - 1))  /* rev blkno */
     return dt_comobv (blk);
 return 0;                                               /* all others */
-}  
+}
 
 /* Reset routine */
 
@@ -1382,7 +1382,7 @@ for (i = 0; i < DT_NUMDR; i++) {                        /* stop all drives */
         }
     else {
         sim_cancel (uptr);                              /* sim reset */
-        uptr->STATE = 0;  
+        uptr->STATE = 0;
         uptr->LASTT = sim_grtime ();
         }
     }
@@ -1531,7 +1531,7 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
                     break;
                 }                                       /* end loop file */
             }                                           /* end if 16b */
-        else 
+        else
             fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */
                      uptr->hwmark, uptr->fileref);
     if (ferror (uptr->fileref))
