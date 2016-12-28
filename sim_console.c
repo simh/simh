@@ -219,7 +219,7 @@ return "Console telnet support";
 }
 
 DEVICE sim_con_telnet = {
-    "CON-TEL", &sim_con_unit, sim_con_reg, sim_con_mod, 
+    "CON-TELNET", &sim_con_unit, sim_con_reg, sim_con_mod, 
     1, 0, 0, 0, 0, 0, 
     NULL, NULL, sim_con_reset, NULL, sim_con_attach, sim_con_detach, 
     NULL, DEV_DEBUG, 0, sim_con_debug,

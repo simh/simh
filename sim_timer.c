@@ -749,8 +749,9 @@ static uint32 rtc_clock_calib_skip_idle[SIM_NTIMERS+1] = { 0 };/* Calibrations s
 static uint32 rtc_clock_calib_gap2big[SIM_NTIMERS+1] = { 0 };/* Calibrations skipped Gap Too Big */
 static uint32 rtc_clock_calib_backwards[SIM_NTIMERS+1] = { 0 };/* Calibrations skipped Clock Running Backwards */
 
-UNIT sim_timer_units[SIM_NTIMERS+1];                    /* one for each timer and one for an */
-                                                        /* internal clock if no clocks are registered */
+UNIT sim_timer_units[SIM_NTIMERS+1];                    /* Clock assist units                         */
+                                                        /* one for each timer and one for an internal */
+                                                        /* clock if no clocks are registered.         */
 UNIT sim_internal_timer_unit;                           /* Internal calibration timer */
 UNIT sim_throttle_unit;                                 /* one for throttle */
 
@@ -816,7 +817,7 @@ if (rtc_currd[tmr])
     time = rtc_currd[tmr];
 if (!uptr)
     uptr = sim_clock_unit[tmr];
-sim_debug (DBG_CAL, &sim_timer_dev, "_sim_rtcn_init_unit(unit=%s, time=%d, tmr=%d)\n", sim_uname(uptr), time, tmr);
+sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_init_unit(unit=%s, time=%d, tmr=%d)\n", sim_uname(uptr), time, tmr);
 if (uptr) {
     if (!sim_clock_unit[tmr])
         sim_register_clock_unit_tmr (uptr, tmr);
@@ -1014,7 +1015,7 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     sim_timer_units[tmr].flags = UNIT_DIS | UNIT_IDLE;
     }
 SIM_INTERNAL_UNIT.flags = UNIT_IDLE;
-sim_register_internal_device (&sim_timer_dev);
+sim_register_internal_device (&sim_timer_dev);          /* Register Clock Assist device */
 sim_throttle_unit.action = &sim_throt_svc;
 sim_register_clock_unit_tmr (&SIM_INTERNAL_UNIT, SIM_INTERNAL_CLK);
 sim_idle_enab = FALSE;                                  /* init idle off */
@@ -1321,22 +1322,33 @@ static t_stat sim_timer_clock_reset (DEVICE *dptr);
 
 static const char *sim_timer_description (DEVICE *dptr)
 {
-return "Internal Timer facilities";
+return "Clock Assist facilities";
+}
+
+static const char *sim_int_timer_description (DEVICE *dptr)
+{
+return "Internal Timer";
 }
 
 static const char *sim_throttle_description (DEVICE *dptr)
 {
-return "Internal Throttle facility";
+return "Throttle facility";
 }
 
 DEVICE sim_timer_dev = {
-    "INT-TMR", sim_timer_units, sim_timer_reg, sim_timer_mod, 
+    "INT-CLOCK", sim_timer_units, sim_timer_reg, sim_timer_mod, 
     SIM_NTIMERS+1, 0, 0, 0, 0, 0, 
     NULL, NULL, &sim_timer_clock_reset, NULL, NULL, NULL, 
     NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
 
+DEVICE sim_int_timer_dev = {
+    "INT-TIMER", &sim_internal_timer_unit, NULL, NULL, 
+    1, 0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_NOSAVE};
+
 DEVICE sim_throttle_dev = {
-    "INT-THR", &sim_throttle_unit, sim_throttle_reg};
+    "INT-THROTTLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1};
 
 
 /* SET CLOCK command */
@@ -1578,7 +1590,7 @@ else {
             }
         }
     }
-sim_register_internal_device (&sim_throttle_dev);
+sim_register_internal_device (&sim_throttle_dev);       /* Register Throttle Device */
 sim_throt_cps = SIM_INITIAL_IPS;    /* Initial value while correct one is determined */
 return SCPE_OK;
 }
@@ -2072,7 +2084,7 @@ if (tmr == SIM_NTIMERS) {                   /* None found? */
         if ((sim_calb_tmr != SIM_NTIMERS) &&/* non internal timer */
             (sim_calb_tmr != -1) &&         /* previously active? */
             (!rtc_hz[sim_calb_tmr])) {      /* now stopped? */
-            sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock() - Cleaning up stopped timer %s support\n", sim_uname(sim_clock_unit[sim_calb_tmr]));
+            sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock(newtmr=%d) - Cleaning up stopped timer %s support\n", newtmr, sim_uname(sim_clock_unit[sim_calb_tmr]));
             if (sim_clock_unit[sim_calb_tmr])
                 sim_cancel (sim_clock_unit[sim_calb_tmr]);
             sim_cancel (&sim_timer_units[sim_calb_tmr]);
@@ -2087,11 +2099,12 @@ if (tmr == SIM_NTIMERS) {                   /* None found? */
             }
         /* Start the internal timer */
         sim_calb_tmr = SIM_NTIMERS;
-        sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock() - Starting Internal Calibrated Timer at %dHz\n", sim_int_clk_tps);
+        sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock(newtmr=%d) - Starting Internal Calibrated Timer at %dHz\n", newtmr, sim_int_clk_tps);
         SIM_INTERNAL_UNIT.action = &sim_timer_clock_tick_svc;
         SIM_INTERNAL_UNIT.flags = UNIT_IDLE;
-        sim_activate_abs (&SIM_INTERNAL_UNIT, 0);
+        sim_register_internal_device (&sim_int_timer_dev);          /* Register Internal timer device */
         sim_rtcn_init_unit (&SIM_INTERNAL_UNIT, (CLK_INIT*CLK_TPS)/sim_int_clk_tps, SIM_INTERNAL_CLK);
+        sim_activate_abs (&SIM_INTERNAL_UNIT, 0);
         }
     return;
     }
@@ -2099,7 +2112,7 @@ if ((tmr == newtmr) &&
     (sim_calb_tmr == newtmr))               /* already set? */
     return;
 if (sim_calb_tmr == SIM_NTIMERS) {      /* was old the internal timer? */
-    sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock() - Stopping Internal Calibrated Timer, New Timer = %d (%dHz)\n", tmr, rtc_hz[tmr]);
+    sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock(newtmr=%d) - Stopping Internal Calibrated Timer, New Timer = %d (%dHz)\n", newtmr, tmr, rtc_hz[tmr]);
     rtc_initd[SIM_NTIMERS] = 0;
     rtc_hz[SIM_NTIMERS] = 0;
     sim_cancel (&SIM_INTERNAL_UNIT);
@@ -2118,7 +2131,7 @@ else {
             _sim_activate (uptr, 1);
             }
         }
-    sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock() - Changing Calibrated Timer from %d (%dHz) to %d (%dHz)\n", sim_calb_tmr, rtc_hz[sim_calb_tmr], tmr, rtc_hz[tmr]);
+    sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_configure_calibrated_clock(newtmr=%d) - Changing Calibrated Timer from %d (%dHz) to %d (%dHz)\n", newtmr, sim_calb_tmr, rtc_hz[sim_calb_tmr], tmr, rtc_hz[tmr]);
     sim_calb_tmr = tmr;
     }
 sim_calb_tmr = tmr;
@@ -2130,6 +2143,7 @@ sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_clock_reset()\n");
 _rtcn_configure_calibrated_clock (sim_calb_tmr);
 sim_timer_dev.description = &sim_timer_description;
 sim_throttle_dev.description = &sim_throttle_description;
+sim_int_timer_dev.description = &sim_int_timer_description;
 if (sim_switches & SWMASK ('P')) {
     sim_cancel (&SIM_INTERNAL_UNIT);
     sim_calb_tmr = -1;
@@ -2386,7 +2400,7 @@ t_stat sim_register_clock_unit_tmr (UNIT *uptr, int32 tmr)
 if (tmr == SIM_INTERNAL_CLK)
     tmr = SIM_NTIMERS;
 else {
-    if ((tmr < 0) || (tmr >= SIM_NTIMERS))
+    if ((tmr < 0) || (tmr > SIM_NTIMERS))
         return SCPE_IERR;
     }
 if (NULL == uptr) {                         /* deregistering? */
@@ -2398,7 +2412,12 @@ if (NULL == uptr) {                         /* deregistering? */
         _sim_coschedule_cancel (uptr);
         _sim_activate (uptr, 1);
         }
+    if (sim_clock_unit[tmr]) {
+        sim_cancel (sim_clock_unit[tmr]);
+        sim_clock_unit[tmr]->dynflags &= ~UNIT_TMR_UNIT;
+        }
     sim_clock_unit[tmr] = NULL;
+    sim_cancel (&sim_timer_units[tmr]);
     return SCPE_OK;
     }
 if (NULL == sim_clock_unit[tmr])
