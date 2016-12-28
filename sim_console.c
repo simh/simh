@@ -178,7 +178,9 @@ static t_stat sim_con_reset (DEVICE *dptr);                 /* console reset rou
 static t_stat sim_con_attach (UNIT *uptr, CONST char *ptr); /* console attach routine (save,restore) */
 static t_stat sim_con_detach (UNIT *uptr);                  /* console detach routine (save,restore) */
 
-UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, UNIT_ATTABLE, 0)  };/* console connection unit */
+UNIT sim_con_units[2] = { UDATA (&sim_con_poll_svc, UNIT_ATTABLE, 0) };  /* console connection unit */
+#define sim_con_unit sim_con_units[0]
+
 /* debugging bitmaps */
 #define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
@@ -219,8 +221,8 @@ return "Console telnet support";
 }
 
 DEVICE sim_con_telnet = {
-    "CON-TELNET", &sim_con_unit, sim_con_reg, sim_con_mod, 
-    1, 0, 0, 0, 0, 0, 
+    "CON-TELNET", sim_con_units, sim_con_reg, sim_con_mod, 
+    2, 0, 0, 0, 0, 0, 
     NULL, NULL, sim_con_reset, NULL, sim_con_attach, sim_con_detach, 
     NULL, DEV_DEBUG, 0, sim_con_debug,
     NULL, NULL, NULL, NULL, NULL, sim_con_telnet_description};
@@ -261,6 +263,7 @@ return SCPE_OK;
 
 static t_stat sim_con_reset (DEVICE *dptr)
 {
+dptr->units[1].flags = UNIT_DIS;
 return sim_con_poll_svc (&dptr->units[0]);              /* establish polling as needed */
 }
 
@@ -2658,24 +2661,67 @@ if ((std_input == NULL) ||                              /* No keyboard for */
 return (WAIT_OBJECT_0 == WaitForSingleObject (std_input, ms_timeout));
 }
 
-#define BELL_CHAR         7         /* Bell Character */
-#define BELL_INTERVAL_MS  500       /* No more than 2 Bell Characters Per Second */
+
+#define BELL_CHAR           7       /* Bell Character */
+#define BELL_INTERVAL_MS    500     /* No more than 2 Bell Characters Per Second */
+#define ESC_CHAR            033     /* Escape Character */
+#define CSI_CHAR            0233    /* Control Sequence Introducer */
+#define ESC_HOLD_USEC_DELAY 8000    /* Escape hold interval */
+#define ESC_HOLD_MAX        32      /* Maximum Escape hold buffer */
+
+static uint8 out_buf[ESC_HOLD_MAX]; /* Buffered characters pending output */
+static int32 out_ptr = 0;
+
+static t_stat sim_out_hold_svc (UNIT *uptr)
+{
+DWORD unused;
+
+WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+out_ptr = 0;
+return SCPE_OK;
+}
+
+#define out_hold_unit sim_con_units[1]
+
 static t_stat sim_os_putchar (int32 c)
 {
 DWORD unused;
+uint32 now;
 static uint32 last_bell_time;
 
 if (c != 0177) {
-    if (c == BELL_CHAR) {
-        uint32 now = sim_os_msec ();
-
-        if ((now - last_bell_time) > BELL_INTERVAL_MS) {
-            WriteConsoleA(std_output, &c, 1, &unused, NULL);
-            last_bell_time = now;
-            }
+    switch (c) {
+        case BELL_CHAR:
+            now = sim_os_msec ();
+            if ((now - last_bell_time) > BELL_INTERVAL_MS) {
+                WriteConsoleA(std_output, &c, 1, &unused, NULL);
+                last_bell_time = now;
+                }
+            break;
+        case CSI_CHAR:
+        case ESC_CHAR:
+            if (out_ptr) {
+                WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+                out_ptr = 0;
+                sim_cancel (&out_hold_unit);
+                }
+            out_buf[out_ptr++] = (uint8)c;
+            sim_activate_after (&out_hold_unit, ESC_HOLD_USEC_DELAY);
+            out_hold_unit.action = &sim_out_hold_svc;
+            break;
+        default:
+            if (out_ptr) {
+                if (out_ptr >= ESC_HOLD_MAX) {              /* Stop buffering if full */
+                    WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+                    out_ptr = 0;
+                    WriteConsoleA(std_output, &c, 1, &unused, NULL);
+                    }
+                else
+                    out_buf[out_ptr++] = (uint8)c;
+                }
+            else
+                WriteConsoleA(std_output, &c, 1, &unused, NULL);
         }
-    else
-        WriteConsoleA(std_output, &c, 1, &unused, NULL);
     }
 return SCPE_OK;
 }
@@ -3200,14 +3246,14 @@ return SCPE_OK;
    character string.  Escape targets @, A-Z, and [\]^_ form control characters
    000-037.
 */
-#define ESC_CHAR '~'
+#define ESCAPE_CHAR '~'
 
 static void decode (char *decoded, const char *encoded)
 {
 char c;
 
 while ((c = *decoded++ = *encoded++))                   /* copy the character */
-    if (c == ESC_CHAR) {                                /* does it start an escape? */
+    if (c == ESCAPE_CHAR) {                             /* does it start an escape? */
         if ((isalpha (*encoded)) ||                     /* is next character "A-Z" or "a-z"? */
             (*encoded == '@') ||                        /*   or "@"? */
             ((*encoded >= '[') && (*encoded <= '_')))   /*   or "[\]^_"? */
@@ -3215,7 +3261,7 @@ while ((c = *decoded++ = *encoded++))                   /* copy the character */
             *(decoded - 1) = *encoded++ & 037;          /* convert back to control character */
         else {
             if ((*encoded == '\0') ||                   /* single escape character at EOL? */
-                 (*encoded++ != ESC_CHAR))              /*   or not followed by another escape? */
+                 (*encoded++ != ESCAPE_CHAR))           /*   or not followed by another escape? */
                 decoded--;                              /* drop the encoding */
             }
         }
