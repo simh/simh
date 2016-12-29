@@ -398,7 +398,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             tmxr_poll_rx (&dz_desc);                    /* poll input */
             dz_update_rcvi ();                          /* update rx intr */
             if (dz_rbuf[dz]) {
-                /* Rechedule the next poll preceisely so that 
+                /* Reschedule the next poll preceisely so that the 
                    the programmed input speed is observed. */
                 sim_clock_coschedule_abs (dz_unit, tmxr_poll);
                 }

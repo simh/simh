@@ -162,11 +162,11 @@ MTAB ttix_mod[] = {
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 
 DEBTAB ttx_debug[] = {
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
-  {"RET",    DBG_RET},
-  {"CON",    DBG_CON},
-  {"TRC",    DBG_TRC},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"RET",    DBG_RET, "Returned Received Data"},
+  {"CON",    DBG_CON, "connection activities"},
+  {"TRC",    DBG_TRC, "trace routine calls"},
   {0}
 };
 
