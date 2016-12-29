@@ -291,7 +291,6 @@ UNIT clk_unit = { UDATA (NULL, UNIT_IDLE+UNIT_FIX, sizeof(TOY))};
 REG clk_reg[] = {
     { DRDATAD (TIME,                   clk_unit.wait,  24, "initial poll interval"), REG_NZ + PV_LEFT },
     { DRDATAD (POLL,                        tmr_poll,  24, "calibrated poll interval"), REG_NZ + PV_LEFT + REG_HRO },
-    { DRDATAD (TPS,                          clk_tps,   8, "ticks per second"), REG_NZ + PV_LEFT },
 #if defined (SIM_ASYNCH_IO)
     { DRDATAD (ASYNCH,            sim_asynch_enabled,   1, "asynch I/O enabled flag"), PV_LEFT },
     { DRDATAD (LATENCY,           sim_asynch_latency,  32, "desired asynch interrupt latency"), PV_LEFT },
@@ -316,6 +315,7 @@ REG tmr_reg[] = {
     { HRDATAD  (ICR,            tmr_icr, 32, "interval count register") },
     { HRDATAD  (NICR,          tmr_nicr, 32, "next interval count register") },
     { FLDATAD  (INT,            tmr_int,  0, "interrupt request") },
+    { DRDATAD  (TPS,            clk_tps,  8, "ticks per second"), REG_NZ + PV_LEFT },
     { HRDATA   (INCR,           tmr_inc, 32), REG_HIDDEN },
     { HRDATA   (SAVE,           tmr_sav, 32), REG_HIDDEN },
     { NULL }
@@ -330,7 +330,7 @@ REG tmr_reg[] = {
 DEBTAB tmr_deb[] = {
     { "REG",   TMR_DB_REG,      "Register Access"},
     { "TICK",  TMR_DB_TICK,     "Ticks"},
-    { "SCHED", TMR_DB_SCHED,    "Ticks"},
+    { "SCHED", TMR_DB_SCHED,    "Scheduling"},
     { "INT",   TMR_DB_INT,      "Interrupts"},
     { "TODR",  TMR_DB_TODR,     "TODR activities"},
     { NULL, 0 }
