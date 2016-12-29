@@ -319,7 +319,6 @@ static SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
 t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
 t_stat cpu_show_hist_records (FILE *st, t_bool do_header, int32 start, int32 count);
-t_stat cpu_idle_svc (UNIT *uptr);
 void cpu_idle (void);
 
 /* CPU data structures
@@ -331,7 +330,7 @@ void cpu_idle (void);
 */
 
 UNIT cpu_unit = {
-    UDATA (&cpu_idle_svc, UNIT_FIX|UNIT_BINK, INITMEMSIZE)
+    UDATA (NULL, UNIT_FIX|UNIT_BINK, INITMEMSIZE)
     };
 
 const char *psl_modes[] = {"K", "E", "S", "U"};
@@ -3176,20 +3175,11 @@ opnd[j++] = Read (va + 12, L_LONG, acc);
 return j;
 }
 
-/* Schedule idle before the next instruction */
+/* Idle before the next instruction */
 
 void cpu_idle (void)
 {
-sim_activate (&cpu_unit, 0);
-return;
-}
-
-/* Idle service */
-
-t_stat cpu_idle_svc (UNIT *uptr)
-{
-sim_idle (TMR_CLK, TRUE);
-return SCPE_OK;
+sim_idle (TMR_CLK, 1);
 }
 
 /* Reset */
