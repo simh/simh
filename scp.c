@@ -4723,9 +4723,14 @@ else {
                 else
                     fprintf (st, "  Unknown");
         tim = sim_fmt_secs(((accum + uptr->time) / sim_timer_inst_per_sec ()) + (uptr->usecs_remaining / 1000000.0));
-        fprintf (st, " at %d%s%s%s%s\n", accum + uptr->time, 
-                                        (*tim) ? " (" : "", tim, (*tim) ? ")" : "",
-                                        (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
+        if (uptr->usecs_remaining)
+            fprintf (st, " at %d plus %.0f usecs%s%s%s%s\n", accum + uptr->time, uptr->usecs_remaining,
+                                            (*tim) ? " (" : "", tim, (*tim) ? " total)" : "",
+                                            (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
+        else
+            fprintf (st, " at %d%s%s%s%s\n", accum + uptr->time, 
+                                            (*tim) ? " (" : "", tim, (*tim) ? ")" : "",
+                                            (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
         accum = accum + uptr->time;
         }
     }
