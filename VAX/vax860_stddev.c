@@ -215,7 +215,6 @@ int32 tmr_iccs = 0;                                     /* interval timer csr */
 uint32 tmr_icr = 0;                                     /* curr interval */
 uint32 tmr_nicr = 0;                                    /* next interval */
 uint32 tmr_inc = 0;                                     /* timer increment */
-int32 tmr_sav = 0;                                      /* timer save */
 int32 tmr_int = 0;                                      /* interrupt */
 int32 clk_tps = 100;                                    /* ticks/second */
 int32 tmxr_poll = CLK_DELAY * TMXR_MULT;                /* term mux poll */
@@ -389,7 +388,6 @@ REG tmr_reg[] = {
     { FLDATAD (INT,            tmr_int,  0, "interrupt request") },
     { DRDATAD (TPS,            clk_tps,  8, "ticks per second"), REG_NZ + PV_LEFT },
     { HRDATA  (INCR,           tmr_inc, 32), REG_HIDDEN },
-    { HRDATA  (SAVE,           tmr_sav, 32), REG_HIDDEN },
     { NULL }
     };
 
@@ -810,8 +808,9 @@ int32 icr_rd (void)
 int32 result;
 
 if (tmr_iccs & TMR_CSR_RUN) {                           /* running? */
-    uint32 delta = sim_grtime() - tmr_sav;
-    result = (int32)(tmr_nicr + (uint32)((1000000.0 * delta) / sim_timer_inst_per_sec ()));
+    uint32 usecs_remaining = (uint32)sim_activate_time_usecs (&tmr_unit);
+
+    result = (int32)(~usecs_remaining + 1);
     }
 else
     result = (int32)tmr_icr;
@@ -836,7 +835,7 @@ tmr_nicr = val;
 t_stat tmr_svc (UNIT *uptr)
 {
 sim_debug (TMR_DB_TICK, &tmr_dev, "tmr_svc()\n");
-tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
+tmxr_poll = tmr_poll * TMXR_MULT;                   /* set mux poll */
 if (tmr_iccs & TMR_CSR_DON)                         /* done? set err */
     tmr_iccs = tmr_iccs | TMR_CSR_ERR;
 else
@@ -863,8 +862,7 @@ clk_tps = 1000000 / usecs;
 
 sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(nicr=0x%08X-usecs=0x%08X) - tps=%d\n", nicr, usecs, clk_tps);
 tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);
-if (SCPE_OK == sim_activate_after (&tmr_unit, usecs))
-    tmr_sav = sim_grtime();                             /* Save interval base time */
+sim_activate_after (&tmr_unit, usecs);
 }
 
 /* 100Hz TODR reset */

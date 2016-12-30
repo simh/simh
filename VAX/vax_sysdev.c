@@ -248,7 +248,6 @@ int32 tmr_csr[2] = { 0 };                               /* SSC timers */
 uint32 tmr_tir[2] = { 0 };                              /* curr interval */
 uint32 tmr_tnir[2] = { 0 };                             /* next interval */
 int32 tmr_tivr[2] = { 0 };                              /* vector */
-uint32 tmr_sav[2] = { 0 };                              /* saved inst cnt */
 int32 ssc_adsm[2] = { 0 };                              /* addr strobes */
 int32 ssc_adsk[2] = { 0 };
 int32 cdg_dat[CDASIZE >> 2];                            /* cache data */
@@ -293,7 +292,7 @@ int32 cdg_rd (int32 pa);
 void cdg_wr (int32 pa, int32 val, int32 lnt);
 int32 ssc_rd (int32 pa);
 void ssc_wr (int32 pa, int32 val, int32 lnt);
-int32 tmr_tir_rd (int32 tmr, t_bool interp);
+int32 tmr_tir_rd (int32 tmr);
 void tmr_csr_wr (int32 tmr, int32 val);
 void tmr_sched (int32 tmr);
 void tmr_incr (int32 tmr, uint32 inc);
@@ -481,12 +480,10 @@ REG sysd_reg[] = {
     { HRDATAD (TIR0,   tmr_tir[0],  32, "SSC timer 0 interval register") },
     { HRDATAD (TNIR0,  tmr_tnir[0], 32, "SSC timer 0 next interval register") },
     { HRDATAD (TIVEC0, tmr_tivr[0],  9, "SSC timer 0 interrupt vector register") },
-    { HRDATAD (TSAV0,  tmr_sav[0],  32, "SSC timer 0 saved inst cnt") },
     { HRDATAD (TCSR1,  tmr_csr[1],  32, "SSC timer 1 control/status register") },
     { HRDATAD (TIR1,   tmr_tir[1],  32, "SSC timer 1 interval register") },
     { HRDATAD (TNIR1,  tmr_tnir[1], 32, "SSC timer 1 next interval register") },
     { HRDATAD (TIVEC1, tmr_tivr[1],  9, "SSC timer 1 interrupt vector register") },
-    { HRDATAD (TSAV1,  tmr_sav[1],  32, "SSC timer 1  saved inst cnt") },
     { HRDATAD (ADSM0,  ssc_adsm[0], 32, "SSC address match 0 address") },
     { HRDATAD (ADSK0,  ssc_adsk[0], 32, "SSC address match 0 mask") },
     { HRDATAD (ADSM1,  ssc_adsm[1], 32, "SSC address match 1 address") },
@@ -1356,7 +1353,7 @@ switch (rg) {
         return tmr_csr[0];
 
     case 0x41:                                          /* T0INT */
-        return tmr_tir_rd (0, FALSE);
+        return tmr_tir_rd (0);
 
     case 0x42:                                          /* T0NI */
         sim_debug (DBG_REGR, &sysd_dev, "tmr_tnir_rd(tmr=%d) - 0x%X\n", 0, tmr_tnir[0]);
@@ -1372,7 +1369,7 @@ switch (rg) {
         return tmr_csr[1];
 
     case 0x45:                                          /* T1INT */
-        return tmr_tir_rd (1, FALSE);
+        return tmr_tir_rd (1);
 
     case 0x46:                                          /* T1NI */
         sim_debug (DBG_REGR, &sysd_dev, "tmr_tnir_rd(tmr=%d) - 0x%X\n", 1, tmr_tnir[1]);
@@ -1479,8 +1476,8 @@ switch (rg) {
         break;
 
     case 0x46:                                          /* T1NI */
-        sim_debug (DBG_REGW, &sysd_dev, "tmr_tnir_wr(tmr=%d) - 0x%X\n", 1, tmr_tnir[1]);
         tmr_tnir[1] = val;
+        sim_debug (DBG_REGW, &sysd_dev, "tmr_tnir_wr(tmr=%d) - 0x%X\n", 1, tmr_tnir[1]);
         break;
 
     case 0x47:                                          /* T1VEC */
@@ -1510,22 +1507,7 @@ switch (rg) {
 
    The SSC timers, which increment at 1Mhz, cannot be simulated 
    with ticks due to the overhead that would be required for 1M
-   clock events per second.  Instead, a gross hack is used.  When
-   a timer is started, the clock interval is inspected.
-
-   if (smaller than when the next clock tick will occur) then 
-        explicitly delay the interval number of usecs which is
-        determined from the instruction execution rate of the 
-        calibrated clock.
-   if (interval will occur after the next clock tick) then, schedule
-        events to coinside with the clock tick consume the interval
-        at the clock tick rate, and when the remaining time value 
-        gets small enough, behave like the small case above.
-
-   If the interval register is read, then its value between events
-   is interpolated using the current instruction count versus the
-   count when the most recent event started, the result is scaled
-   to the calibrated system clock.
+   clock events per second.  
 
    The powerup TOY Test sometimes fails its tolerance test.  This was
    due to varying system load causing varying calibration values to be
@@ -1538,17 +1520,17 @@ switch (rg) {
    calibration factor.
 */
 
-int32 tmr_tir_rd (int32 tmr, t_bool interp)
+int32 tmr_tir_rd (int32 tmr)
 {
-uint32 delta_usecs;
+if (tmr_csr[tmr] & TMR_CSR_RUN) {           /* running? then interpolate */
+    uint32 usecs_remaining = (uint32)sim_activate_time_usecs (&sysd_dev.units[tmr]);
+    uint32 cur_tir = ~usecs_remaining + 1;
 
-if (interp || (tmr_csr[tmr] & TMR_CSR_RUN)) {           /* interp, running? */
-    delta_usecs = (uint32)(((sim_grtime () - tmr_sav[tmr]) * 1000000.0) / sim_timer_inst_per_sec ());
-    sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X, %s\n", tmr, tmr_tir[tmr] + delta_usecs, interp ? "Interpolated" : ((tmr_csr[tmr] & TMR_CSR_RUN) ? " while running" : ""));
-    return tmr_tir[tmr] + delta_usecs;
+    sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X, Interpolated while running\n", tmr, cur_tir);
+    return cur_tir;
     }
 
-sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X, %s\n", tmr, tmr_tir[tmr], interp ? "Interpolated" : "");
+sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X\n", tmr, tmr_tir[tmr]);
 
 return tmr_tir[tmr];
 }
@@ -1567,7 +1549,7 @@ sim_debug_bits_hdr (DBG_REGW, &sysd_dev, " ", tmr_csr_bits, val, val, 1);
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
     sim_cancel (&sysd_unit[tmr]);                       /* cancel timer */
     if (tmr_csr[tmr] & TMR_CSR_RUN)                     /* run 1 -> 0? */
-        tmr_tir[tmr] = tmr_tir_rd (tmr, TRUE);          /* update itr */
+        tmr_tir[tmr] = tmr_tir_rd (tmr);                /* update itr */
     }
 tmr_csr[tmr] = tmr_csr[tmr] & ~(val & TMR_CSR_W1C);     /* W1C csr */
 tmr_csr[tmr] = (tmr_csr[tmr] & ~TMR_CSR_RW) |           /* new r/w */
@@ -1602,9 +1584,8 @@ if ((tmr_csr[tmr] & (TMR_CSR_DON | TMR_CSR_IE)) !=      /* update int */
 t_stat tmr_svc (UNIT *uptr)
 {
 int32 tmr = uptr - sysd_dev.units;                      /* get timer # */
-uint32 delta_usecs;
+uint32 delta_usecs = ~tmr_tir[tmr] + 1;
 
-delta_usecs = (uint32)(((sim_grtime () - tmr_sav[tmr]) * 1000000.0) / sim_timer_inst_per_sec ());
 tmr_incr (tmr, delta_usecs);                            /* incr timer */
 return SCPE_OK;
 }
@@ -1646,30 +1627,9 @@ else {
 
 void tmr_sched (int32 tmr)
 {
-int32 clk_time = sim_activate_time (&clk_unit) - 1;
-int32 tmr_time;
-double tmr_time_d;
-
-tmr_sav[tmr] = sim_grtime ();                           /* save intvl base */
-tmr_time_d = ((~tmr_tir[tmr] + 1) * sim_timer_inst_per_sec ()) / 1000000.0;
-if ((tmr_time_d == 0.0) || (tmr_time_d > (double)0x7FFFFFFF))
-    tmr_time = 0x7FFFFFFF;
-else
-    tmr_time = (int32)ceil(tmr_time_d);
-sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - tmr_sav=%u, clk_time=%d, tmr_time=%d, tmr_poll=%d\n", tmr, tmr_sav[tmr], clk_time, tmr_time, tmr_poll);
-if (tmr_time > clk_time) {
-
-/* Align scheduled event to be identical to the event for the next clock
-   tick.  This lets us always see a consistent calibrated value, both for
-   this scheduling, AND for any query of the current timer register that
-   may happen in tmr_tir_rd ().  This presumes that sim_activate will
-   queue the interval timer behind the event for the clock tick. */
-
-    tmr_time = clk_time;
-    sim_clock_coschedule_tmr (&sysd_unit[tmr], TMR_CLK, 1);
-    }
-else
-    sim_activate (&sysd_unit[tmr], tmr_time);
+uint32 usecs_sched = tmr_tir[tmr] ? (~tmr_tir[tmr] + 1) : 0xFFFFFFFF;
+sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %u usecs\n", tmr, usecs_sched);
+sim_activate_after (&sysd_unit[tmr], usecs_sched);
 }
 
 int32 tmr0_inta (void)
@@ -1800,7 +1760,6 @@ int32 i;
 if (sim_switches & SWMASK ('P')) sysd_powerup ();       /* powerup? */
 for (i = 0; i < 2; i++) {
     tmr_csr[i] = tmr_tnir[i] = tmr_tir[i] = 0;
-    tmr_sav[i] = 0;
     sim_cancel (&sysd_unit[i]);
     }
 csi_csr = 0;
