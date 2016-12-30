@@ -274,6 +274,8 @@ else {
     uint32 delay = DMASK & ((pclk_csr & CSR_UPDN) ? (DMASK + 1 - val) : val);
     int32 rv;
 
+    if (delay == 0)
+        delay = DMASK + 1;
     rv = CSR_GETRATE (pclk_csr);                        /* get rate */
     sim_activate_after (&pclk_unit, xtim[rv] * delay);  /* schedule interrupt */
     }
@@ -288,7 +290,7 @@ if (!sim_is_active (&pclk_unit))
     return pclk_ctr;
 
 rv = CSR_GETRATE (pclk_csr);                            /* get rate */
-val = (uint32)((sim_activate_time (&pclk_unit) / sim_timer_inst_per_sec ()) * (1000000 / xtim[rv]));
+val = (uint32)((sim_activate_time_usecs (&pclk_unit) / xtim[rv]));
 val &= DMASK;
 if (pclk_csr & CSR_UPDN) 
     val = DMASK + 1 - val;
