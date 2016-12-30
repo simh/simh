@@ -9053,21 +9053,21 @@ else
         reason  =       result (SCPE_OK if ok)
 */
 
-t_stat sim_activate_after_abs (UNIT *uptr, uint32 event_time)
+t_stat sim_activate_after_abs (UNIT *uptr, uint32 usec_delay)
 {
-return _sim_activate_after_abs (uptr, event_time);
+return _sim_activate_after_abs (uptr, usec_delay);
 }
 
-t_stat sim_activate_after_abs_d (UNIT *uptr, double event_time)
+t_stat sim_activate_after_abs_d (UNIT *uptr, double usec_delay)
 {
-return _sim_activate_after_abs (uptr, event_time);
+return _sim_activate_after_abs (uptr, usec_delay);
 }
 
-t_stat _sim_activate_after_abs (UNIT *uptr, double event_time)
+t_stat _sim_activate_after_abs (UNIT *uptr, double usec_delay)
 {
 AIO_VALIDATE;                   /* Can't call asynchronously */
 sim_cancel (uptr);
-return _sim_activate_after (uptr, event_time);
+return _sim_activate_after (uptr, usec_delay);
 }
 
 t_stat sim_activate_after (UNIT *uptr, uint32 usec_delay)

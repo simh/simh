@@ -2338,6 +2338,7 @@ if ((sim_calb_tmr != -1) && (rtc_hz[sim_calb_tmr])) {       /* Calibrated Timer 
 if (inst_delay_d > (double)0x7fffffff)
     inst_delay_d = (double)0x7fffffff;              /* Bound delay to avoid overflow.  */
 inst_delay = (int32)inst_delay_d;
+uptr->usecs_remaining = 0.0;                        /* make sure there is no remnant here */
 #if defined(SIM_ASYNCH_CLOCKS)
 if ((sim_asynch_timer) &&
     (usec_delay > sim_idle_rate_ms*1000.0)) {
