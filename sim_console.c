@@ -147,6 +147,7 @@ static t_stat sim_os_ttclose (void);
 static t_bool sim_os_ttisatty (void);
 
 static t_stat sim_set_rem_telnet (int32 flag, CONST char *cptr);
+static t_stat sim_set_rem_bufsize (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_connections (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_timeout (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_master (int32 flag, CONST char *cptr);
@@ -174,24 +175,31 @@ int32 sim_del_char = 0177;
 
 static t_stat sim_con_poll_svc (UNIT *uptr);                /* console connection poll routine */
 static t_stat sim_con_reset (DEVICE *dptr);                 /* console reset routine */
-UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, 0, 0)  };   /* console connection unit */
+static t_stat sim_con_attach (UNIT *uptr, CONST char *ptr); /* console attach routine (save,restore) */
+static t_stat sim_con_detach (UNIT *uptr);                  /* console detach routine (save,restore) */
+
+UNIT sim_con_units[2] = { UDATA (&sim_con_poll_svc, UNIT_ATTABLE, 0) };  /* console connection unit */
+#define sim_con_unit sim_con_units[0]
+
 /* debugging bitmaps */
 #define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 #define DBG_RET  TMXR_DBG_RET                           /* display Returned Received Data */
 #define DBG_ASY  TMXR_DBG_ASY                           /* asynchronous thread activity */
+#define DBG_CON  TMXR_DBG_CON                           /* display connection activity */
 #define DBG_EXP  0x00000001                             /* Expect match activity */
 #define DBG_SND  0x00000002                             /* Send (Inject) data activity */
 
 static DEBTAB sim_con_debug[] = {
-  {"TRC",    DBG_TRC},
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
-  {"RET",    DBG_RET},
-  {"ASY",    DBG_ASY},
-  {"EXP",    DBG_EXP},
-  {"SND",    DBG_SND},
+  {"TRC",    DBG_TRC, "routine calls"},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"RET",    DBG_RET, "Returned Received Data"},
+  {"ASY",    DBG_ASY, "asynchronous activity"},
+  {"CON",    DBG_CON, "connection activity"},
+  {"EXP",    DBG_EXP, "Expect match activity"},
+  {"SND",    DBG_SND, "Send (Inject) data activity"},
   {0}
 };
 
@@ -207,11 +215,17 @@ static MTAB sim_con_mod[] = {
   { 0 },
 };
 
+static const char *sim_con_telnet_description (DEVICE *dptr)
+{
+return "Console telnet support";
+}
+
 DEVICE sim_con_telnet = {
-    "CON-TEL", &sim_con_unit, sim_con_reg, sim_con_mod, 
-    1, 0, 0, 0, 0, 0, 
-    NULL, NULL, sim_con_reset, NULL, NULL, NULL, 
-    NULL, DEV_DEBUG, 0, sim_con_debug};
+    "CON-TELNET", sim_con_units, sim_con_reg, sim_con_mod, 
+    2, 0, 0, 0, 0, 0, 
+    NULL, NULL, sim_con_reset, NULL, sim_con_attach, sim_con_detach, 
+    NULL, DEV_DEBUG, 0, sim_con_debug,
+    NULL, NULL, NULL, NULL, NULL, sim_con_telnet_description};
 TMLN sim_con_ldsc = { 0 };                                          /* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console line mux */
 
@@ -249,9 +263,21 @@ return SCPE_OK;
 
 static t_stat sim_con_reset (DEVICE *dptr)
 {
+dptr->units[1].flags = UNIT_DIS;
 return sim_con_poll_svc (&dptr->units[0]);              /* establish polling as needed */
 }
 
+/* Console Attach/Detach - only used indirectly in restore */
+
+static t_stat sim_con_attach (UNIT *uptr, CONST char *ptr)
+{
+return tmxr_attach (&sim_con_tmxr, &sim_con_unit, ptr);
+}
+
+static t_stat sim_con_detach (UNIT *uptr)
+{
+return sim_set_notelnet (0, NULL);
+}
 
 /* Set/show data structures */
 
@@ -281,6 +307,7 @@ static CTAB set_con_tab[] = {
 static CTAB set_rem_con_tab[] = {
     { "CONNECTIONS", &sim_set_rem_connections, 0 },
     { "TELNET", &sim_set_rem_telnet, 1 },
+    { "BUFFERSIZE", &sim_set_rem_bufsize, 1 },
     { "NOTELNET", &sim_set_rem_telnet, 0 },
     { "TIMEOUT", &sim_set_rem_timeout, 0 },
     { "MASTER", &sim_set_rem_master, 1 },
@@ -386,13 +413,14 @@ t_stat sim_rem_con_poll_svc (UNIT *uptr);               /* remote console connec
 t_stat sim_rem_con_data_svc (UNIT *uptr);               /* remote console connection data routine */
 t_stat sim_rem_con_reset (DEVICE *dptr);                /* remote console reset routine */
 UNIT sim_rem_con_unit[2] = {
-    { UDATA (&sim_rem_con_poll_svc, 0, 0)  },           /* remote console connection polling unit */
-    { UDATA (&sim_rem_con_data_svc, 0, 0)  }};          /* console data handling unit */
+    { UDATA (&sim_rem_con_poll_svc, UNIT_IDLE, 0)  },   /* remote console connection polling unit */
+    { UDATA (&sim_rem_con_data_svc, UNIT_IDLE|UNIT_DIS, 0)  }};  /* console data handling unit */
 
 DEBTAB sim_rem_con_debug[] = {
-  {"TRC",    DBG_TRC},
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
+  {"TRC",    DBG_TRC, "routine calls"},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"CON",    DBG_CON, "connection activity"},
   {0}
 };
 
@@ -400,11 +428,17 @@ MTAB sim_rem_con_mod[] = {
   { 0 },
 };
 
+static const char *sim_rem_con_description (DEVICE *dptr)
+{
+return "Remote Console Facility";
+}
+
 DEVICE sim_remote_console = {
     "REM-CON", sim_rem_con_unit, NULL, sim_rem_con_mod, 
     2, 0, 0, 0, 0, 0, 
     NULL, NULL, sim_rem_con_reset, NULL, NULL, NULL, 
-    NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_rem_con_debug};
+    NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_rem_con_debug,
+    NULL, NULL, NULL, NULL, NULL, sim_rem_con_description};
 #define MAX_REMOTE_SESSIONS 40          /* Arbitrary Session Limit */
 static int32 *sim_rem_buf_size = NULL;
 static int32 *sim_rem_buf_ptr = NULL;
@@ -471,8 +505,10 @@ if (sim_rem_read_timeout)
     fprintf (st, "Remote Console Input automatically continues after %d seconds\n", sim_rem_read_timeout);
 if (!sim_rem_con_tmxr.master)
     fprintf (st, "Remote Console Command input is disabled\n");
-else
+else {
     fprintf (st, "Remote Console Command Input listening on TCP port: %s\n", sim_rem_con_unit[0].filename);
+    fprintf (st, "Remote Console Per Command Output buffer size:      %d bytes\n", sim_rem_con_tmxr.buffered);
+    }
 for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
     lp = &sim_rem_con_tmxr.ldsc[i];
     if (!lp->conn)
@@ -1126,7 +1162,7 @@ if (flag) {
             sim_set_rem_telnet (0, NULL);               /* close first */
         if (sim_rem_con_tmxr.lines == 0)                /* Ir no connection limit set */
             sim_set_rem_connections (0, "1");           /* use 1 */
-        sim_rem_con_tmxr.buffered = 1400;               /* Use big enough buffers */
+        sim_rem_con_tmxr.buffered = 8192;               /* Use big enough buffers */
         sim_register_internal_device (&sim_remote_console);
         r = tmxr_attach (&sim_rem_con_tmxr, &sim_rem_con_unit[0], cptr);/* open master socket */
         if (r == SCPE_OK)
@@ -1202,6 +1238,23 @@ else
 return SCPE_OK;
 }
 
+static t_stat sim_set_rem_bufsize (int32 flag, CONST char *cptr)
+{
+char cmdbuf[CBUFSIZE];
+int32 bufsize;
+t_stat r;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+bufsize = (int32) get_uint (cptr, 10, 32768, &r);
+if (r != SCPE_OK)
+    return r;
+if (bufsize < 1400)
+    return sim_messagef (SCPE_ARG, "%d is too small.  Minimum size is 1400\n", bufsize);
+sprintf(cmdbuf, "BUFFERED=%d", bufsize);
+return tmxr_open_master (&sim_rem_con_tmxr, cmdbuf);    /* open master socket */
+}
+
 /* Enable or disable Remote Console master mode */
 
 /* In master mode, commands are subsequently processed from the
@@ -1233,7 +1286,7 @@ if (sim_rem_master_mode) {
     t_stat stat_nomessage;
 
     sim_printf ("Command input starting on Master Remote Console Session\n");
-    stat = sim_run_boot_prep ();
+    stat = sim_run_boot_prep (0);
     sim_rem_master_was_enabled = TRUE;
     while (sim_rem_master_mode) {
         sim_rem_single_mode[0] = FALSE;
@@ -2608,24 +2661,67 @@ if ((std_input == NULL) ||                              /* No keyboard for */
 return (WAIT_OBJECT_0 == WaitForSingleObject (std_input, ms_timeout));
 }
 
-#define BELL_CHAR         7         /* Bell Character */
-#define BELL_INTERVAL_MS  500       /* No more than 2 Bell Characters Per Second */
+
+#define BELL_CHAR           7       /* Bell Character */
+#define BELL_INTERVAL_MS    500     /* No more than 2 Bell Characters Per Second */
+#define ESC_CHAR            033     /* Escape Character */
+#define CSI_CHAR            0233    /* Control Sequence Introducer */
+#define ESC_HOLD_USEC_DELAY 8000    /* Escape hold interval */
+#define ESC_HOLD_MAX        32      /* Maximum Escape hold buffer */
+
+static uint8 out_buf[ESC_HOLD_MAX]; /* Buffered characters pending output */
+static int32 out_ptr = 0;
+
+static t_stat sim_out_hold_svc (UNIT *uptr)
+{
+DWORD unused;
+
+WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+out_ptr = 0;
+return SCPE_OK;
+}
+
+#define out_hold_unit sim_con_units[1]
+
 static t_stat sim_os_putchar (int32 c)
 {
 DWORD unused;
+uint32 now;
 static uint32 last_bell_time;
 
 if (c != 0177) {
-    if (c == BELL_CHAR) {
-        uint32 now = sim_os_msec ();
-
-        if ((now - last_bell_time) > BELL_INTERVAL_MS) {
-            WriteConsoleA(std_output, &c, 1, &unused, NULL);
-            last_bell_time = now;
-            }
+    switch (c) {
+        case BELL_CHAR:
+            now = sim_os_msec ();
+            if ((now - last_bell_time) > BELL_INTERVAL_MS) {
+                WriteConsoleA(std_output, &c, 1, &unused, NULL);
+                last_bell_time = now;
+                }
+            break;
+        case CSI_CHAR:
+        case ESC_CHAR:
+            if (out_ptr) {
+                WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+                out_ptr = 0;
+                sim_cancel (&out_hold_unit);
+                }
+            out_buf[out_ptr++] = (uint8)c;
+            sim_activate_after (&out_hold_unit, ESC_HOLD_USEC_DELAY);
+            out_hold_unit.action = &sim_out_hold_svc;
+            break;
+        default:
+            if (out_ptr) {
+                if (out_ptr >= ESC_HOLD_MAX) {              /* Stop buffering if full */
+                    WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+                    out_ptr = 0;
+                    WriteConsoleA(std_output, &c, 1, &unused, NULL);
+                    }
+                else
+                    out_buf[out_ptr++] = (uint8)c;
+                }
+            else
+                WriteConsoleA(std_output, &c, 1, &unused, NULL);
         }
-    else
-        WriteConsoleA(std_output, &c, 1, &unused, NULL);
     }
 return SCPE_OK;
 }
@@ -3150,14 +3246,14 @@ return SCPE_OK;
    character string.  Escape targets @, A-Z, and [\]^_ form control characters
    000-037.
 */
-#define ESC_CHAR '~'
+#define ESCAPE_CHAR '~'
 
 static void decode (char *decoded, const char *encoded)
 {
 char c;
 
 while ((c = *decoded++ = *encoded++))                   /* copy the character */
-    if (c == ESC_CHAR) {                                /* does it start an escape? */
+    if (c == ESCAPE_CHAR) {                             /* does it start an escape? */
         if ((isalpha (*encoded)) ||                     /* is next character "A-Z" or "a-z"? */
             (*encoded == '@') ||                        /*   or "@"? */
             ((*encoded >= '[') && (*encoded <= '_')))   /*   or "[\]^_"? */
@@ -3165,7 +3261,7 @@ while ((c = *decoded++ = *encoded++))                   /* copy the character */
             *(decoded - 1) = *encoded++ & 037;          /* convert back to control character */
         else {
             if ((*encoded == '\0') ||                   /* single escape character at EOL? */
-                 (*encoded++ != ESC_CHAR))              /*   or not followed by another escape? */
+                 (*encoded++ != ESCAPE_CHAR))           /*   or not followed by another escape? */
                 decoded--;                              /* drop the encoding */
             }
         }

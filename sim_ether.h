@@ -229,6 +229,7 @@ struct eth_queue {
 struct eth_list {
   char    name[ETH_DEV_NAME_MAX];
   char    desc[ETH_DEV_DESC_MAX];
+  int     eth_api;
 };
 
 typedef int ETH_BOOL;

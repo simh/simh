@@ -36,12 +36,12 @@
 
 /* function prototypes */
 
-uint8 ioc_cont(t_bool io, uint8 data, uint8 devnum);    /* ioc_cont*/
-t_stat ioc_cont_reset (DEVICE *dptr, uint16 base, uint8 devnum);
+uint8 ioc_cont(t_bool io, uint8 data);    /* ioc_cont*/
+t_stat ioc_cont_reset (DEVICE *dptr, uint16 baseport);
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16 port, uint8 devnum);
+extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
 extern uint32 saved_PC;                    /* program counter */
 
 /* globals */
@@ -98,28 +98,28 @@ DEVICE ioc_cont_dev = {
     IN or OUT instruction is issued.
 */
 
-/* IOC control port functions */
-
-uint8 ioc_cont(t_bool io, uint8 data, uint8 devnum)
-{
-    if (io == 0) {                      /* read status port */
-        sim_printf("   ioc_cont: read data=%02X port=%02X returned 0x00 from PC=%04X\n", data, devnum, saved_PC);
-        return 0x00;
-    } else {                            /* write control port */
-        sim_printf("   ioc_cont: data=%02X port=%02X\n", data, devnum);
-    }
-}
-
 /* Reset routine */
 
-t_stat ioc_cont_reset(DEVICE *dptr, uint16 base, uint8 devnum)
+t_stat ioc_cont_reset(DEVICE *dptr, uint16 baseport)
 {
-    reg_dev(ioc_cont, base, devnum); 
-    reg_dev(ioc_cont, base + 1, devnum); 
-    ioc_cont_unit[devnum].u3 = 0x00; /* ipc reset */
-    sim_printf("   ioc_cont[%d]: Reset\n", devnum);
-    sim_printf("   ioc_cont[%d]: Registered at %04X\n", devnum, base);
+    sim_printf("   ioc_cont[%d]: Reset\n", 0);
+    sim_printf("   ioc_cont[%d]: Registered at %04X\n", 0, baseport);
+    reg_dev(ioc_cont, baseport, 0); 
+    reg_dev(ioc_cont, baseport + 1, 0); 
+    ioc_cont_unit[0].u3 = 0x00; /* ipc reset */
     return SCPE_OK;
+}
+
+/* IOC control port functions */
+
+uint8 ioc_cont(t_bool io, uint8 data)
+{
+    if (io == 0) {                      /* read status port */
+        sim_printf("   ioc_cont: read data=%02X port=%02X returned 0x00 from PC=%04X\n", data, 0, saved_PC);
+        return 0x00;
+    } else {                            /* write control port */
+        sim_printf("   ioc_cont: data=%02X port=%02X\n", data, 0);
+    }
 }
 
 /* end of ioc-cont.c */

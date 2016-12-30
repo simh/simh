@@ -122,13 +122,16 @@ t_stat _sim_activate (UNIT *uptr, int32 interval);
 t_stat sim_activate_abs (UNIT *uptr, int32 interval);
 t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
 t_stat sim_activate_after (UNIT *uptr, uint32 usecs_walltime);
-t_stat _sim_activate_after (UNIT *uptr, uint32 usecs_walltime);
+t_stat sim_activate_after_d (UNIT *uptr, double usecs_walltime);
+t_stat _sim_activate_after (UNIT *uptr, double usecs_walltime);
 t_stat sim_activate_after_abs (UNIT *uptr, uint32 usecs_walltime);
-t_stat _sim_activate_after_abs (UNIT *uptr, uint32 usecs_walltime);
+t_stat sim_activate_after_abs_d (UNIT *uptr, double usecs_walltime);
+t_stat _sim_activate_after_abs (UNIT *uptr, double usecs_walltime);
 t_stat sim_cancel (UNIT *uptr);
 t_bool sim_is_active (UNIT *uptr);
 int32 sim_activate_time (UNIT *uptr);
-t_stat sim_run_boot_prep (void);
+double sim_activate_time_usecs (UNIT *uptr);
+t_stat sim_run_boot_prep (int32 flag);
 double sim_gtime (void);
 uint32 sim_grtime (void);
 int32 sim_qcount (void);
@@ -169,6 +172,8 @@ t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt
 t_stat sprint_val (char *buf, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 t_stat sim_print_val (t_value val, uint32 radix, uint32 width, uint32 format);
 const char *sim_fmt_secs (double seconds);
+const char *sim_fmt_numeric (double number);
+const char *sprint_capac (DEVICE *dptr, UNIT *uptr);
 char *read_line (char *cptr, int32 size, FILE *stream);
 void fprint_reg_help (FILE *st, DEVICE *dptr);
 void fprint_set_help (FILE *st, DEVICE *dptr);
@@ -281,6 +286,10 @@ extern t_addr sim_brk_match_addr;
 extern BRKTYPTAB *sim_brk_type_desc;                      /* type descriptions */
 extern FILE *stdnul;
 extern t_bool sim_asynch_enabled;
+#if defined(SIM_ASYNCH_IO)
+int sim_aio_update_queue (void);
+void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time);
+#endif
 
 /* VM interface */
 

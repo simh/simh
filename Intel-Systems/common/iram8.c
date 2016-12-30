@@ -38,19 +38,16 @@
 
 #include "system_defs.h"
 
-#define SET_XACK(VAL)       (xack = VAL)
-
 /* function prototypes */
 
-t_stat RAM_svc (UNIT *uptr);
 t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
 uint8 RAM_get_mbyte(uint16 addr);
 void RAM_put_mbyte(uint16 addr, uint8 val);
 
 /* external function prototypes */
 
-extern UNIT i8255_unit[];
-extern uint8 xack;                         /* XACK signal */
+extern uint8 i8255_B[4];                    //port B byte I/O
+extern uint8 xack;                          /* XACK signal */
 
 /* SIMH RAM Standard I/O Data Structures */
 
@@ -93,8 +90,6 @@ DEVICE RAM_dev = {
     NULL                //lname
 };
 
-/* global variables */
-
 /* RAM functions */
 
 /* RAM reset */
@@ -113,9 +108,9 @@ t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size)
             return SCPE_MEM;
         }
     }
-//    sim_printf("   RAM: Available [%04X-%04XH]\n", 
-//        RAM_unit.u3,
-//        RAM_unit.u3 + RAM_unit.capac - 1);
+    sim_printf("   RAM: Available [%04X-%04XH]\n", 
+        RAM_unit.u3,
+        RAM_unit.u3 + RAM_unit.capac - 1);
     sim_debug (DEBUG_flow, &RAM_dev, "RAM_reset: Done\n");
     return SCPE_OK;
 }
@@ -126,39 +121,34 @@ uint8 RAM_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if (i8255_unit[0].u5 & 0x02) {         /* enable RAM */
-        sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
-        if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
-            SET_XACK(1);                /* good memory address */
-            sim_debug (DEBUG_xack, &RAM_dev, "RAM_get_mbyte: Set XACK for %04X\n", addr); 
-            val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
-            sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
-            return (val & 0xFF);
-        }
+    sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
+    if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
+        SET_XACK(1);                /* good memory address */
+        sim_debug (DEBUG_xack, &RAM_dev, "RAM_get_mbyte: Set XACK for %04X\n", addr); 
+        val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
+        sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
+        return (val & 0xFF);
+    } else {
         sim_debug (DEBUG_read, &RAM_dev, " Out of range\n");
         return 0xFF;
     }
-    sim_debug (DEBUG_read, &RAM_dev, " RAM disabled\n");
-    return 0xFF;
 }
 
 /*  put a byte to memory */
 
 void RAM_put_mbyte(uint16 addr, uint8 val)
 {
-    if (i8255_unit[0].u5 & 0x02) {         /* enable RAM */
-        sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
-        if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
-            SET_XACK(1);                /* good memory address */
-            sim_debug (DEBUG_xack, &RAM_dev, "RAM_put_mbyte: Set XACK for %04X\n", addr);  
-            *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
-            sim_debug (DEBUG_write, &RAM_dev, "\n");
-            return;
-        }
+    sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
+    if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
+        SET_XACK(1);                /* good memory address */
+        sim_debug (DEBUG_xack, &RAM_dev, "RAM_put_mbyte: Set XACK for %04X\n", addr);  
+        *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
+        sim_debug (DEBUG_write, &RAM_dev, "\n");
+        return;
+    } else {
         sim_debug (DEBUG_write, &RAM_dev, " Out of range\n");
         return;
     }
-    sim_debug (DEBUG_write, &RAM_dev, " RAM disabled\n");
 }
 
 /* end of iRAM8.c */

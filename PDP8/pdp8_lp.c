@@ -1,6 +1,6 @@
 /* pdp8_lp.c: PDP-8 line printer simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          LP8E line printer
 
+   16-Dec-16    DJG     Added IOT 6660 to allow WPS WS78 3.4 to print
    19-Jan-07    RMS     Added UNIT_TEXT
    25-Apr-03    RMS     Revised for extended file support
    04-Oct-02    RMS     Added DIB, enable/disable, device number support
@@ -89,6 +90,11 @@ DEVICE lpt_dev = {
 int32 lpt (int32 IR, int32 AC)
 {
 switch (IR & 07) {                                      /* decode IR<9:11> */
+
+    case 0:                                             /* PKSTF */
+        dev_done = dev_done | INT_LPT;                  /* set flag */
+        int_req = INT_UPDATE;                           /* update interrupts */
+        return AC;
 
     case 1:                                             /* PSKF */
         return (dev_done & INT_LPT)? IOT_SKP + AC: AC;

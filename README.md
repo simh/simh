@@ -121,6 +121,20 @@ Host platforms which have libSDL available can leverage this functionality.
       Asynchronous support exists for console I/O and most multiplexer 
       devices.  (Still experimental - not currently by default)
 
+#### Clock/Timer Enhancements
+    * Asynchronhous clocks ticks exist to better support modern processors 
+      that have variable clock speeds.  The initial clock calibration model 
+      presumed a constant simulated instruction execution rate.  
+      Modern processors have variable processor speeds which breaks this 
+      key assumption.  
+    * Strategies to make up for missed clock ticks are now available
+      (independent of asynchronous tick generation).  These strategies
+      generate catch-up clock ticks to keep the simulator passage of 
+      time consistent with wall clock time.  Simulator time while idling 
+      or throttling is now consistent.  Reasonable idling behavior is 
+      now possible without requiring that the host system clock tick be
+      10ms or less.
+
 #### Ethernet Transport Enhancements
 	* UDP packet transport.  Direct simulator connections to HECnet can be 
 	  made without running a local packet bridge program.
@@ -289,19 +303,18 @@ The EXPECT command now exists to provide a means of reacting to simulator output
 #### Command Processing Enhancements
 
 ##### Environment variable insertion
-Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_YYYY%, %DATE_YY%, %DATE_YC%, %DATE_MM%, %DATE_DD%, %DATE_D%, %DATE_WYYYY%, %DATE_WW%, %TIME_HH%, %TIME_MM%, %TIME_SS%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
-Command Aliases
+Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_YYYY%, %DATE_YY%, %DATE_YC%, %DATE_MM%, %DATE_MMM%, %DATE_MONTH%, %DATE_DD%, %DATE_D%, %DATE_WYYYY%, %DATE_WW%, %TIME_HH%, %TIME_MM%, %TIME_SS%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
 
    Token "%0" expands to the command file name. 
    Token %n (n being a single digit) expands to the n'th argument
-   Tonen %* expands to the whole set of arguments (%1 ... %9)
+   Token %* expands to the whole set of arguments (%1 ... %9)
 
    The input sequence "\%" represents a literal "%", and "\\" represents a
    literal "\".  All other character combinations are rendered literally.
 
    Omitted parameters result in null-string substitutions.
 
-   A Tokens preceeded and followed by % characters are expanded as environment
+   Tokens preceeded and followed by % characters are expanded as environment
    variables, and if an environment variable isn't found then it can be one of 
    several special variables: 
    
@@ -315,6 +328,7 @@ Command Aliases
           %DATE_YY%           yy          (00-99)
           %DATE_MM%           mm          (01-12)
           %DATE_MMM%          mmm         (JAN-DEC)
+          %DATE_MONTH%        month       (January-December)
           %DATE_DD%           dd          (01-31)
           %DATE_WW%           ww          (01-53)     ISO 8601 week number
           %DATE_WYYYY%        yyyy        (0000-9999) ISO 8601 week year number

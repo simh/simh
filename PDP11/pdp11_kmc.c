@@ -536,6 +536,35 @@ static UNIT tx_units[MAX_ACTIVE][KMC_UNITS]; /* Line 0 is primary unit.  txup re
 
 static UNIT rx_units[MAX_ACTIVE][KMC_UNITS];    /* Secondary unit, used for RX.  rxup references */
 
+DEVICE kmc_int_rxdev = {
+    "KDP-RX", rx_units[0], 
+    NULL,                                       /* Register decode tables */
+    NULL,                                       /* Modifier table */
+    INITIAL_KMCS,                               /* Number of units */
+    KMC_RDX,                                    /* Address radix */
+    13,                                         /* Address width: 18 - <17:13> are 1s, omits UBA */
+    1,                                          /* Address increment */
+    KMC_RDX,                                    /* Data radix */
+    8,                                          /* Data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* Deposit routine */
+    NULL,                                       /* reset routine */
+    NULL,                                       /* boot routine */
+    NULL,                                       /* attach routine */
+    NULL,                                       /* detach routine */
+    NULL,                                       /* context */
+    DEV_NOSAVE,                                 /* Flags */
+    0,                                          /* debug control */
+    NULL,                                       /* debug flag table */
+    NULL,                                       /* memory size routine */
+    NULL,                                       /* logical name */
+    NULL,                                       /* help routine */
+    NULL,                                       /* attach help routine */
+    NULL,                                       /* help context */
+    &kmc_description                            /* Device description routine */
+};
+
+
 /* Timers - in usec */
 
 #define TXSTART_DELAY  (10)                     /* TX BUFFER IN to TX start */
@@ -738,8 +767,12 @@ static t_stat kmc_reset(DEVICE* dptr) {
             memset (dram, 0xdd, sizeof dram);
             gflags |= FLG_INIT;
             gflags &= ~FLG_UCINI;
+            sim_register_internal_device (&kmc_int_rxdev);
         }
     }
+
+    kmc_int_rxdev.flags &= ~DEV_DIS;                    /* Make internal RX device */
+    kmc_int_rxdev.flags |= (kmc_dev.flags & DEV_DIS);   /* enable/disable track KDP device */
 
     return auto_config (dptr->name, ((dptr->flags & DEV_DIS)? 0: dptr->numunits));  /* auto config */
 }
@@ -3072,5 +3105,8 @@ static t_stat kmc_help (FILE *st, DEVICE *dptr,
  * Conventionally last function in the file.
  */
 static const char *kmc_description (DEVICE *dptr) {
-    return "KMC11-A Synchronous line controller supporting only COMM IOP/DUP microcode";
+    if (dptr == &kmc_dev)
+        return "KMC11-A Synchronous line controller supporting only COMM IOP/DUP microcode";
+    else
+        return "KMC pseudo device for receive units";
 }

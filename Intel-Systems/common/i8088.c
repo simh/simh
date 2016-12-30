@@ -449,7 +449,7 @@ DEBTAB i8088_debug[] = {
 };
 
 DEVICE i8088_dev = {
-    "CPU",             //name
+    "I8088",             //name
     &i8088_unit,        //units
     i8088_reg,          //registers
     i8088_mod,          //modifiers

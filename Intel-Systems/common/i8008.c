@@ -196,7 +196,7 @@ DEBTAB i8008_debug[] = {
 };
 
 DEVICE i8008_dev = {
-    "CPU",                              //name
+    "I8008",                              //name
     &i8008_unit,                        //units
     i8008_reg,                          //registers
     i8008_mod,                          //modifiers

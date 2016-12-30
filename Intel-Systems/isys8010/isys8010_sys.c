@@ -36,7 +36,8 @@ extern DEVICE i8255_dev;
 extern DEVICE EPROM_dev;
 extern DEVICE RAM_dev;
 extern DEVICE multibus_dev;
-extern DEVICE isbc208_dev;
+extern DEVICE isbc201_dev;
+extern DEVICE isbc202_dev;
 extern DEVICE isbc064_dev;
 
 /* SCP data structures
@@ -62,7 +63,8 @@ DEVICE *sim_devices[] = {
     &i8255_dev,
     &multibus_dev,
     &isbc064_dev,
-    &isbc208_dev,
+    &isbc201_dev,
+    &isbc202_dev,
     NULL
 };
 

@@ -29,19 +29,18 @@
 
     NOTES:
 
-
 */
 
 #include "system_defs.h"                /* system header in system dir */
 
 /* function prototypes */
 
-uint8 ipc_cont(t_bool io, uint8 data, uint8 devnum);    /* ipc_cont*/
-t_stat ipc_cont_reset (DEVICE *dptr, uint16 base, uint8 devnum);
+uint8 ipc_cont(t_bool io, uint8 data);    /* ipc_cont*/
+t_stat ipc_cont_reset (DEVICE *dptr, uint16 baseport);
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16 port, uint8 devnum);
+extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
 
 /* globals */
 
@@ -93,68 +92,69 @@ DEVICE ipc_cont_dev = {
     NULL                //lname
 };
 
+/* Reset routine */
+
+t_stat ipc_cont_reset(DEVICE *dptr, uint16 baseport)
+{
+    sim_printf("   ipc_cont[%d]: Reset\n", 0);
+    sim_printf("   ipc_cont[%d]: Registered at %04X\n", 0, baseport);
+    reg_dev(ipc_cont, baseport, 0); 
+    ipc_cont_unit[0].u3 = 0x00; /* ipc reset */
+    return SCPE_OK;
+}
+
 /*  I/O instruction handlers, called from the CPU module when an
     IN or OUT instruction is issued.
 */
 
 /* IPC control port functions */
 
-uint8 ipc_cont(t_bool io, uint8 data, uint8 devnum)
+uint8 ipc_cont(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read status port */
-        sim_printf("   ipc_cont: read data=%02X port=%02X returned 0xFF\n", ipc_cont_unit[devnum].u3, devnum);
-        return ipc_cont_unit[devnum].u3;
+        sim_printf("   ipc_cont: read data=%02X ipc_cont_unit[%d].u3=%02X\n", 
+            ipc_cont_unit[0].u3, 0, ipc_cont_unit[0].u3);
+        return ipc_cont_unit[0].u3;
     } else {                            /* write control port */
-        //this simulates an 74ls259 register 
-        //d0-d2 address the reg(in reverse order!), d3 is the data to be latched
+        //this simulates an 74LS259 register 
+        //d0-d2 address the reg(in reverse order!), d3 is the data to be latched (inverted)
         switch(data & 0x07) {
-            case 5:                     //interrupt enable
-                if(data & 0x08)         //bit high
-                    ipc_cont_unit[0].u3 |= 0x10;
-                else                    //bit low
+            case 5:                     //interrupt enable 8085 INTR
+                if(data & 0x08)         //bit low
+                    ipc_cont_unit[0].u3 &= 0xBF;
+                else                    //bit high
+                    ipc_cont_unit[0].u3 |= 0x20;
+                break;
+            case 4:                     //*selboot ROM @ 0E800h
+                if(data & 0x08)         //bit low
                     ipc_cont_unit[0].u3 &= 0xEF;
+                else                    //bit high
+                    ipc_cont_unit[0].u3 |= 0x10;
                 break;
-            case 4:                     //*selboot
-                if(data & 0x08)         //bit high
-                    ipc_cont_unit[0].u3 |= 0x08;
-                else                    //bit low
-                    ipc_cont_unit[0].u3 &= 0xF7;
-                break;
-            case 2:                     //*startup
-                if(data & 0x08)         //bit high
-                    ipc_cont_unit[0].u3 |= 0x04;
-                else                    //bit low
+            case 2:                     //*startup ROM @ 00000h
+                if(data & 0x08)         //bit low
                     ipc_cont_unit[0].u3 &= 0xFB;
+                else                    //bit high
+                    ipc_cont_unit[0].u3 |= 0x04;
                 break;
-            case 1:                     //over ride
-                if(data & 0x08)         //bit high
-                    ipc_cont_unit[0].u3 |= 0x02;
-                else                    //bit low
+            case 1:                     //override inhibit other multibus users
+                if(data & 0x08)         //bit low
                     ipc_cont_unit[0].u3 &= 0xFD;
+                else                    //bit high
+                    ipc_cont_unit[0].u3 |= 0x02;
                 break;
             case 0:                     //aux prom enable
-                if(data & 0x08)         //bit high
-                    ipc_cont_unit[0].u3 |= 0x01;
-                else                    //bit low
+                if(data & 0x08)         //bit low
                     ipc_cont_unit[0].u3 &= 0xFE;
+                else                    //bit high
+                    ipc_cont_unit[0].u3 |= 0x01;
                 break;
             default:
                 break;
         }
-        sim_printf("   ipc_cont: data=%02X ipc_cont[%d]=%02X\n", data, devnum, ipc_cont_unit[0].u3);
+        sim_printf("   ipc_cont: write data=%02X ipc_cont_unit[%d].u3=%02X\n", data, 0, ipc_cont_unit[0].u3);
     }
     return 0;
-}
-
-/* Reset routine */
-
-t_stat ipc_cont_reset(DEVICE *dptr, uint16 base, uint8 devnum)
-{
-    reg_dev(ipc_cont, base, devnum); 
-    ipc_cont_unit[devnum].u3 = 0x00; /* ipc reset */
-    sim_printf("   ipc_cont[%d]: Reset\n", devnum);
-    sim_printf("   ipc_cont[%d]: Registered at %04X\n", devnum, base);
-    return SCPE_OK;
 }
 
 /* end of ipc-cont.c */

@@ -194,7 +194,6 @@ int32 stop_op0 = 0;                                     /* stop on 0 */
 int32 rlog = 0;                                         /* extend fixup log */
 int32 ind_max = 0;                                      /* nested ind limit */
 int32 xct_max = 0;                                      /* nested XCT limit */
-int32 t20_idlelock = 0;                                 /* TOPS-20 idle lock */
 a10 pcq[PCQ_SIZE] = { 0 };                              /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
@@ -650,7 +649,6 @@ rlog = 0;                                               /* not in extend */
 pi_eval ();                                             /* eval pi system */
 if (!Q_ITS)                                             /* ~ITS, clr 1-proc */
     its_1pr = 0;
-t20_idlelock = 0;                                       /* clr T20 idle lock */
 
 /* Abort handling
 
@@ -1153,7 +1151,7 @@ case 0341:  AOJ; if (TL (AC(ac))) JUMP (ea); break;     /* AOJL */
 case 0342:  AOJ; if (TE (AC(ac))) JUMP (ea); break;     /* AOJE */
 case 0343:  AOJ; if (TLE (AC(ac))) JUMP (ea); break;    /* AOJLE */
 case 0344:  AOJ; JUMP(ea);                              /* AOJA */
-            if (Q_ITS && Q_IDLE &&                      /* ITS idle? */
+            if (Q_ITS &&                                /* ITS idle? */
                 TSTF (F_USR) && (pager_PC == 017) &&    /* user mode, loc 17? */
                 (ac == 0) && (ea == 017))               /* AOJA 0,17? */
                 sim_idle (0, FALSE);
@@ -1177,19 +1175,13 @@ case 0364:  SOJ; JUMP(ea); break;                       /* SOJA */
 case 0365:  SOJ; if (TGE (AC(ac))) JUMP (ea); break;    /* SOJGE */
 case 0366:  SOJ; if (TN (AC(ac))) JUMP (ea); break;     /* SOJN */
 case 0367:  SOJ; if (TG (AC(ac))) JUMP (ea);            /* SOJG */
-            if ((ea == pager_PC) && Q_IDLE) {           /* to self, idle enab? */
-                extern int32 tmr_poll;
+            if (ea == pager_PC) {                       /* to self? */
                 if ((ac == 6) && (ea == 1) &&           /* SOJG 6,1? */
                     TSTF (F_USR) && Q_T10)              /* T10, user mode? */
-                    sim_idle (0, FALSE);
-                else if (!t20_idlelock &&               /* interlock off? */
-                    (ac == 2) && (ea == 3) &&           /* SOJG 2,3? */
-                    !TSTF (F_USR) && Q_T20 &&           /* T20, mon mode? */
-                    (sim_interval > (tmr_poll >> 1))) { /* >= half clock? */
-                    t20_idlelock = 1;                   /* set interlock */
-                    if (sim_os_ms_sleep (1))            /* sleep 1ms */
-                        sim_interval = 0;               /* if ok, sched event */
-                    }
+                    sim_idle (0, FALSE);                /* idle */
+                else if ((ac == 2) && (ea == 3) &&      /* SOJG 2,3? */
+                    !TSTF (F_USR) && Q_T20)             /* T20, mon mode? */
+                    sim_idle (0, FALSE);                /* idle */
                 }                    
             break;
 case 0370:  SOS; break;                                 /* SOS */
@@ -2212,8 +2204,11 @@ if (ea & APR_SENB)                                      /* set enables? */
     apr_enb = apr_enb | bits;
 if (ea & APR_CENB)                                      /* clear enables? */
     apr_enb = apr_enb & ~bits;
-if (ea & APR_CFLG)                                      /* clear flags? */
+if (ea & APR_CFLG) {                                    /* clear flags? */
+    if ((bits & APRF_TIM) && (apr_flg & APRF_TIM))
+        sim_rtcn_tick_ack (30, 0);
     apr_flg = apr_flg & ~bits;
+    }
 if (ea & APR_SFLG)                                      /* set flags? */
     apr_flg = apr_flg | bits;
 if (apr_flg & APRF_ITC) {                               /* interrupt console? */

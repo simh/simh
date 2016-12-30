@@ -26,7 +26,7 @@
     MODIFICATIONS:
 
         ?? ??? 10 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+        16 Dec 12 - Modified to use isbc_80_10.cfg file to set baseport and size.
         24 Apr 15 -- Modified to use simh_debug
 
     NOTES:
@@ -111,6 +111,10 @@
 
 #include "system_defs.h"
 
+/* external globals */
+
+extern uint16 port;                     //port called in dev_table[port]
+
 #define UNIT_V_ANSI (UNIT_V_UF + 0)     /* ANSI mode */
 #define UNIT_ANSI   (1 << UNIT_V_ANSI)
 
@@ -119,14 +123,22 @@
 #define TXE         0x04
 #define SD          0x40
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint8);
+/* external function prototypes */
+
+extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
+
+/* globals */
+
+int32 i8251_devnum = 0;                 //actual number of 8251 instances + 1
+uint16 i8251_port[4];                   //baseport port registered to each instance
 
 /* function prototypes */
 
 t_stat i8251_svc (UNIT *uptr);
-t_stat i8251_reset (DEVICE *dptr, uint16 base, uint8 devnum);
-uint8 i8251s(t_bool io, uint8 data, uint8 devnum);
-uint8 i8251d(t_bool io, uint8 data, uint8 devnum);
+t_stat i8251_reset (DEVICE *dptr, uint16 baseport);
+uint8 i8251_get_dn(void);
+uint8 i8251s(t_bool io, uint8 data);
+uint8 i8251d(t_bool io, uint8 data);
 void i8251_reset1(uint8 devnum);
 
 /* i8251 Standard I/O Data Structures */
@@ -164,20 +176,20 @@ MTAB i8251_mod[] = {
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE i8251_dev = {
-    "8251",             //name
+    "I8251",            //name
     &i8251_unit,        //units
     i8251_reg,          //registers
     i8251_mod,          //modifiers
     1,                  //numunits
     16,                 //aradix
-    16,                  //awidth
+    16,                 //awidth
     1,                  //aincr
     16,                 //dradix
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
 //    &i8251_reset,       //reset
-    NULL,       //reset
+    NULL,               //reset
     NULL,               //boot
     NULL,               //attach
     NULL,               //detach
@@ -211,63 +223,21 @@ t_stat i8251_svc (UNIT *uptr)
 
 /* Reset routine */
 
-t_stat i8251_reset (DEVICE *dptr, uint16 base, uint8 devnum)
+t_stat i8251_reset (DEVICE *dptr, uint16 baseport)
 {
-    if (devnum >= I8251_NUM) {
-        sim_printf("8251_reset: Illegal Device Number %d\n", devnum);
+    if (i8251_devnum >= I8251_NUM) {
+        sim_printf("8251_reset: Illegal Device Number %d\n", i8251_devnum);
         return 0;
     }
-    reg_dev(i8251d, base, devnum); 
-    reg_dev(i8251s, base + 1, devnum); 
-    reg_dev(i8251d, base + 2, devnum); 
-    reg_dev(i8251s, base + 3, devnum); 
-    i8251_reset1(devnum);
-    sim_printf("   8251-%d: Registered at %04X\n", devnum, base);
+    sim_printf("   8251-%d: Hardware Reset\n", i8251_devnum);
+    sim_printf("   8251-%d: Registered at %04X\n", i8251_devnum, baseport);
+    i8251_port[i8251_devnum] = baseport;
+    reg_dev(i8251d, baseport, i8251_devnum); 
+    reg_dev(i8251s, baseport + 1, i8251_devnum); 
+    i8251_reset1(i8251_devnum);
     sim_activate (&i8251_unit, i8251_unit.wait); /* activate unit */
+    i8251_devnum++;
     return SCPE_OK;
-}
-
-/*  I/O instruction handlers, called from the CPU module when an
-    IN or OUT instruction is issued.
-*/
-
-uint8 i8251s(t_bool io, uint8 data, uint8 devnum)
-{
-    if (devnum >= I8251_NUM) {
-        sim_printf("8251s: Illegal Device Number %d\n", devnum);
-        return 0;
-    }
-//    sim_printf("\nio=%d data=%04X\n", io, data);
-    if (io == 0) {                      /* read status port */
-        return i8251_unit.u3;
-    } else {                            /* write status port */
-        if (i8251_unit.u6) {            /* if mode, set cmd */
-            i8251_unit.u5 = data;
-            sim_printf("   8251-%d: Command Instruction=%02X\n", devnum, data);
-            if (data & SD)              /* reset port! */
-                i8251_reset1(devnum);
-        } else {                        /* set mode */
-            i8251_unit.u4 = data;
-            sim_printf("   8251-%d: Mode Instruction=%02X\n", devnum, data);
-            i8251_unit.u6 = 1;          /* set cmd received */
-        }
-        return (0);
-    }
-}
-
-uint8 i8251d(t_bool io, uint8 data, uint8 devnum)
-{
-    if (devnum >= I8251_NUM) {
-        sim_printf("8251d: Illegal Device Number %d\n", devnum);
-        return 0;
-    }
-    if (io == 0) {                      /* read data port */
-        i8251_unit.u3 &= ~RXR;
-        return (i8251_unit.buf);
-    } else {                            /* write data port */
-        sim_putchar(data);
-    }
-    return 0;
 }
 
 void i8251_reset1(uint8 devnum)
@@ -278,7 +248,61 @@ void i8251_reset1(uint8 devnum)
     i8251_unit.u6 = 0;
     i8251_unit.buf = 0;
     i8251_unit.pos = 0;
-    sim_printf("   8251-%d: Reset\n", devnum);
+    sim_printf("   8251-%d: Software Reset\n", devnum);
+}
+
+uint8 i8251_get_dn(void)
+{
+    int i;
+
+    for (i=0; i<I8251_NUM; i++)
+        if (port >= i8251_port[i] && port <= i8251_port[i] + 1)
+            return i;
+    sim_printf("i8251_get_dn: port %04X not in 8251 device table\n", port);
+    return 0xFF;
+}
+
+/*  I/O instruction handlers, called from the CPU module when an
+    IN or OUT instruction is issued.
+*/
+
+uint8 i8251s(t_bool io, uint8 data)
+{
+    uint8 devnum;
+
+    if ((devnum = i8251_get_dn()) != 0xFF) {
+    //    sim_printf("\nio=%d data=%04X\n", io, data);
+        if (io == 0) {                      /* read status port */
+            return i8251_unit.u3;
+        } else {                            /* write status port */
+            if (i8251_unit.u6) {            /* if mode, set cmd */
+                i8251_unit.u5 = data;
+                sim_printf("   8251-%d: Command Instruction=%02X\n", devnum, data);
+                if (data & SD)              /* reset port! */
+                    i8251_reset1(devnum);
+            } else {                        /* set mode */
+                i8251_unit.u4 = data;
+                sim_printf("   8251-%d: Mode Instruction=%02X\n", devnum, data);
+                i8251_unit.u6 = 1;          /* set cmd received */
+            }
+        }
+    }
+    return 0;
+}
+
+uint8 i8251d(t_bool io, uint8 data)
+{
+    uint8 devnum;
+
+    if ((devnum = i8251_get_dn()) != 0xFF) {
+        if (io == 0) {                      /* read data port */
+            i8251_unit.u3 &= ~RXR;
+            return (i8251_unit.buf);
+        } else {                            /* write data port */
+            sim_putchar(data);
+        }
+    }
+    return 0;
 }
 
 /* end of i8251.c */

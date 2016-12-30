@@ -273,7 +273,7 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
         *data = dli_buf[ln] & DLIBUF_RD;
         dli_csr[ln] &= ~CSR_DONE;                       /* clr rcv done */
         dli_clr_int (ln, DLI_RCI);                      /* clr rcv int req */
-        /* Rechedule the next poll preceisely so that 
+        /* Reschedule the next poll preceisely so that 
            the programmed input speed is observed. */
         sim_clock_coschedule_abs (&dli_unit, tmxr_poll);
         break;

@@ -290,7 +290,7 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
     case 01:                                            /* dci buf */
         dci_clr_int (ln);
         *data = dci_buf[ln];
-        /* Rechedule the next poll preceisely so that 
+        /* Reschedule the next poll preceisely so that the 
            the programmed input speed is observed. */
         sim_clock_coschedule_abs (&dci_unit, tmxr_poll);
         return SCPE_OK;

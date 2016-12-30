@@ -140,7 +140,6 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 #define Q_ITS           (cpu_unit.flags & UNIT_ITS)
 #define Q_T20           (cpu_unit.flags & UNIT_T20)
 #define Q_KLAD          (cpu_unit.flags & UNIT_KLAD)
-#define Q_IDLE          (sim_idle_enab)
 
 /* Architectural constants */
 

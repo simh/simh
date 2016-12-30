@@ -335,7 +335,7 @@ if (ctx) {
 return FALSE;
 }
 
-static void _tape_cancel (UNIT *uptr)
+static t_bool _tape_cancel (UNIT *uptr)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
@@ -348,6 +348,7 @@ if (ctx) {
         pthread_mutex_unlock (&ctx->io_lock);
         }
     }
+return FALSE;
 }
 #else
 #define AIO_CALLSETUP                                                       \
@@ -388,7 +389,7 @@ if (ctx->asynch_io) {
     }
 uptr->a_check_completion = _tape_completion_dispatch;
 uptr->a_is_active = _tape_is_active;
-uptr->a_cancel = _tape_cancel;
+uptr->cancel = _tape_cancel;
 return SCPE_OK;
 #endif
 }

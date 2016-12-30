@@ -90,6 +90,7 @@ t_stat ttx_attach (UNIT *uptr, CONST char *cptr);
 t_stat ttx_detach (UNIT *uptr);
 void ttx_reset_ln (int32 i);
 t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttx_show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 #define TTIX_SET_DONE(ln)       ttx_new_flags (ttix_done | (1u << (ln)), ttox_done, ttx_enbl)
 #define TTIX_CLR_DONE(ln)       ttx_new_flags (ttix_done & ~(1u << (ln)), ttox_done, ttx_enbl)
@@ -144,16 +145,12 @@ REG ttix_reg[] = {
     };
 
 MTAB ttix_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
-      &ttx_vlines, &tmxr_show_lines, (void *) &ttx_desc },
-    { UNIT_ATT, UNIT_ATT, "summary", NULL,
-      NULL, &tmxr_show_summ, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &tmxr_show_cstat, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &tmxr_show_cstat, (void *) &ttx_desc },
+    { MTAB_VDV,            0,       "LINES",      "LINES", &ttx_vlines,  &tmxr_show_lines, (void *) &ttx_desc },
+    { MTAB_VDV,            0,      "DEVNO",          NULL, NULL,         &ttx_show_devno, (void *) &ttx_desc },
+    { UNIT_ATT,     UNIT_ATT,     "SUMMARY",         NULL, NULL,         &tmxr_show_summ,  (void *) &ttx_desc },
+    { MTAB_VDV,            1,          NULL, "DISCONNECT", &tmxr_dscln,  NULL,             (void *) &ttx_desc },
+    { MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS",         NULL, NULL,         &tmxr_show_cstat, (void *) &ttx_desc },
+    { MTAB_VDV | MTAB_NMO, 0, "STATISTICS",          NULL, NULL,         &tmxr_show_cstat, (void *) &ttx_desc },
     { 0 }
     };
 
@@ -165,11 +162,11 @@ MTAB ttix_mod[] = {
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 
 DEBTAB ttx_debug[] = {
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
-  {"RET",    DBG_RET},
-  {"CON",    DBG_CON},
-  {"TRC",    DBG_TRC},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"RET",    DBG_RET, "Returned Received Data"},
+  {"CON",    DBG_CON, "connection activities"},
+  {"TRC",    DBG_TRC, "trace routine calls"},
   {0}
 };
 
@@ -224,6 +221,7 @@ MTAB ttox_mod[] = {
     { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
     { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
+    { MTAB_VDV, 0, "DEVNO", NULL, NULL, &ttx_show_devno, &ttx_desc },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &ttx_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
@@ -520,3 +518,29 @@ ttx_lines = newln;
 ttx_dib.num = newln * 2;
 return SCPE_OK;
 }
+
+/* Show device numbers */
+t_stat ttx_show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+int32 i, dev_offset;
+DEVICE *dptr;
+
+if (uptr == NULL)
+    return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL)
+    return SCPE_IERR;
+/* Select correct devno entry for Input or Output device */
+if (dptr->name[2] == 'O')
+    dev_offset = 1;
+else
+    dev_offset = 0;
+
+fprintf(st, "devno=");
+for (i = 0; i < ttx_lines; i++) {
+    fprintf(st, "%02o%s", ttx_dsp[i*2+dev_offset].dev, i < ttx_lines-1 ? 
+         "," : "");
+}
+return SCPE_OK;
+}
+

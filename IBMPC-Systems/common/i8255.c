@@ -26,7 +26,7 @@
     MODIFICATIONS:
 
         ?? ??? 10 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+        16 Dec 12 - Modified to use isbc_80_10.cfg file to set baseport and size.
         24 Apr 15 -- Modified to use simh_debug
 
     NOTES:
@@ -83,7 +83,7 @@ extern uint16 port;                     //port called in dev_table[port]
 
 /* function prototypes */
 
-t_stat i8255_reset (DEVICE *dptr, uint16 base);
+t_stat i8255_reset (DEVICE *dptr, uint16 baseport);
 uint8 i8255_get_dn(void);
 uint8 i8255s(t_bool io, uint8 data);
 uint8 i8255a(t_bool io, uint8 data);
@@ -92,12 +92,12 @@ uint8 i8255c(t_bool io, uint8 data);
 
 /* external function prototypes */
 
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16);
+extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
 
 /* globals */
 
 int32 i8255_devnum = 0;                 //actual number of 8255 instances + 1
-uint16 i8255_port[4];                   //base port registered to each instance
+uint16 i8255_port[4];                   //baseport port registered to each instance
 
 /* these bytes represent the input and output to/from a port instance */
 
@@ -175,22 +175,23 @@ DEVICE i8255_dev = {
 
 /* Reset routine */
 
-t_stat i8255_reset (DEVICE *dptr, uint16 base)
+t_stat i8255_reset (DEVICE *dptr, uint16 baseport)
 {
     if (i8255_devnum > I8255_NUM) {
         sim_printf("i8255_reset: too many devices!\n");
         return SCPE_MEM;
     }
-    i8255_port[i8255_devnum] = reg_dev(i8255a, base); 
-    reg_dev(i8255b, base + 1); 
-    reg_dev(i8255c, base + 2); 
-    reg_dev(i8255s, base + 3); 
+    sim_printf("   8255-%d: Reset\n", i8255_devnum);
+    sim_printf("   8255-%d: Registered at %04X\n", i8255_devnum, baseport);
+    i8255_port[i8255_devnum] = baseport;
+    reg_dev(i8255a, baseport, i8255_devnum); 
+    reg_dev(i8255b, baseport + 1, i8255_devnum); 
+    reg_dev(i8255c, baseport + 2, i8255_devnum); 
+    reg_dev(i8255s, baseport + 3, i8255_devnum); 
     i8255_unit[i8255_devnum].u3 = 0x9B; /* control */
     i8255_A[i8255_devnum] = 0xFF; /* Port A */
     i8255_B[i8255_devnum] = 0xFF; /* Port B */
     i8255_C[i8255_devnum] = 0xFF; /* Port C */
-    sim_printf("   8255-%d: Reset\n", i8255_devnum);
-    sim_printf("   8255-%d: Registered at %03X\n", i8255_devnum, base);
     i8255_devnum++;
     return SCPE_OK;
 }
@@ -202,7 +203,7 @@ uint8 i8255_get_dn(void)
     for (i=0; i<I8255_NUM; i++)
         if (port >=i8255_port[i] && port <= i8255_port[i] + 3)
             return i;
-    sim_printf("i8255_get_dn: port %03X not in 8255 device table\n", port);
+    sim_printf("i8255_get_dn: port %04X not in 8255 device table\n", port);
     return 0xFF;
 }
 

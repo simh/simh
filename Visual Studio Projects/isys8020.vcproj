@@ -217,11 +217,19 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Intel-Systems\common\isbc201.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\isbc202.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Intel-Systems\common\isbc208.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\isys8020\isbc80-20.c"
+				RelativePath="..\Intel-Systems\isys8020\isbc8020.c"
 				>
 			</File>
 			<File
@@ -274,6 +282,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_video.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\zx200a.c"
 				>
 			</File>
 		</Filter>

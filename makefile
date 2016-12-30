@@ -331,7 +331,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             ifeq (X11R7,$(shell if $(TEST) -d /usr/X11R7/lib; then echo X11R7; fi))
               LIBPATH += /usr/X11R7/lib
               INCPATH += /usr/X11R7/include
-              OS_LDFLAGS += -L/usr/X11R7/lib -Wl,-R/usr/X11R7/lib
+              OS_LDFLAGS += -L/usr/X11R7/lib -R/usr/X11R7/lib
               OS_CCDEFS += -I/usr/X11R7/include
             endif
             ifeq (/usr/local/lib,$(findstring /usr/local/lib,$(LIBPATH)))
@@ -480,7 +480,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
         DISPLAYVT = ${DISPLAYD}/vt11.c
         DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-        $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
+        $(info using libSDL2: $(call find_include,SDL2/SDL))
         ifeq (Darwin,$(OSTYPE))
           VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
         endif
@@ -812,13 +812,9 @@ else
   ifneq (,$(VIDEO_USEFUL))
     SDL_INCLUDE = $(word 1,$(shell dir /b /s ..\windows-build\libSDL\SDL.h))
     ifeq (SDL.h,$(findstring SDL.h,$(SDL_INCLUDE)))
-      $(info using libSDL2: $(abspath $(SDL_INCLUDE)))
-      VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(abspath $(dir $(SDL_INCLUDE)))
+      VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(abspath $(dir $(SDL_INCLUDE)))
       VIDEO_LDFLAGS  += -lSDL2 -L$(abspath $(dir $(SDL_INCLUDE))\..\lib)
       VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
-      DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
-      DISPLAYVT = ${DISPLAYD}/vt11.c
-      DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
     else
       $(info ***********************************************************************)
       $(info ***********************************************************************)
@@ -1339,8 +1335,9 @@ ISYS8010C = Intel-Systems/common
 ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 	${ISYS8010C}/i8251.c ${ISYS8010C}/i8255.c \
 	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
-	${ISYS8010C}/multibus.c ${ISYS8010D}/isbc80-10.c \
-	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc208.c
+	${ISYS8010C}/multibus.c ${ISYS8010D}/isbc8010.c \
+	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc202.c \
+	${ISYS8010C}/isbc201.c ${ISYS8010C}/zx200a.c
 ISYS8010_OPT = -I ${ISYS8010D}
 
 
@@ -1349,10 +1346,24 @@ ISYS8020C = Intel-Systems/common
 ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
 	${ISYS8020C}/i8251.c ${ISYS8020C}/i8255.c \
 	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
-	${ISYS8020C}/multibus.c ${ISYS8020D}/isbc80-20.c \
-	${ISYS8020C}/isbc064.c ${ISYS8020C}/isbc208.c \
-	${ISYS8020C}/i8259.c
+	${ISYS8020C}/multibus.c ${ISYS8020D}/isbc8020.c \
+	${ISYS8020C}/isbc064.c ${ISYS8020C}/i8259.c \
+	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
+	${ISYS8010C}/zx200a.c
 ISYS8020_OPT = -I ${ISYS8020D}
+
+
+ISYS8024D = Intel-Systems/isys8024
+ISYS8024C = Intel-Systems/common
+ISYS8024 = ${ISYS8024C}/i8080.c ${ISYS8024D}/isys8024_sys.c \
+	${ISYS8024C}/i8251.c ${ISYS8024C}/i8253.c \
+	${ISYS8024C}/i8255.c ${ISYS8024C}/i8259.c \
+	${ISYS8024C}/ieprom.c ${ISYS8024C}/iram8.c \
+	${ISYS8024C}/multibus.c ${ISYS8024D}/isbc8024.c \
+	${ISYS8024C}/isbc064.c ${ISYS8024C}/isbc208.c \
+	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
+	${ISYS8010C}/zx200a.c
+ISYS8024_OPT = -I ${ISYS8024D}
 
 
 ISYS8030D = Intel-Systems/isys8030
@@ -1361,8 +1372,9 @@ ISYS8030 = ${ISYS8030C}/i8080.c ${ISYS8030D}/isys8030_sys.c \
 	${ISYS8030C}/i8251.c ${ISYS8030C}/i8255.c \
 	${ISYS8030C}/i8259.c ${ISYS8030C}/i8253.c \
 	${ISYS8030C}/ieprom.c ${ISYS8030C}/iram8.c \
-	${ISYS8030C}/multibus.c ${ISYS8030D}/isbc80-30.c \
-	${ISYS8030C}/isbc064.c ${ISYS8030C}/isbc208.c
+	${ISYS8030C}/multibus.c ${ISYS8030D}/isbc8030.c \
+	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
+	${ISYS8030C}/isbc064.c ${ISYS8010C}/zx200a.c
 ISYS8030_OPT = -I ${ISYS8030D}
 
 
@@ -1374,15 +1386,16 @@ IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
 	${IMDS-225C}/ipceprom.c ${IMDS-225C}/ipcram8.c \
 	${IMDS-225C}/ipcmultibus.c ${IMDS-225D}/ipc.c \
 	${IMDS-225C}/ipc-cont.c ${IMDS-225C}/ioc-cont.c \
+	${IMDS-225C}/isbc202.c ${IMDS-225C}/isbc201.c \
 	${IMDS-225C}/zx200a.c
 IMDS-225_OPT = -I ${IMDS-225D}
 
 
 IBMPCD = IBMPC-Systems/ibmpc
 IBMPCC = IBMPC-Systems/common
-IBMPC = ${IBMPCC}/i8088.c ${IBMPCD}/ibmpc_sys.c \
+IBMPC =	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
+	${IBMPCC}/i8088.c ${IBMPCD}/ibmpc_sys.c \
 	${IBMPCC}/i8253.c ${IBMPCC}/i8259.c \
-	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
 	${IBMPCC}/pceprom.c ${IBMPCC}/pcram8.c \
 	${IBMPCC}/i8237.c ${IBMPCC}/pcbus.c
 IBMPC_OPT = -I ${IBMPCD}
@@ -1400,7 +1413,7 @@ IBMPCXT_OPT = -I ${IBMPCXTD}
 
 TX0D = TX-0
 TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
-      ${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
+	${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
 TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
 
 
@@ -1514,8 +1527,8 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
-	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
-	b5500
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
+	isys8030 isys8024
 
 all : ${ALL}
 
@@ -1795,25 +1808,23 @@ ${BIN}isys8020${EXE} : ${ISYS8020} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8020} ${SIM} ${ISYS8020_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
+isys8024: ${BIN}isys8024${EXE}
+
+${BIN}isys8024${EXE} : ${ISYS8024} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${ISYS8024} ${SIM} ${ISYS8024_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
 isys8030: ${BIN}isys8030${EXE}
 
 ${BIN}isys8030${EXE} : ${ISYS8030} ${SIM} ${BUILD_ROMS}
-ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${ISYS8030} ${SIM} ${ISYS8030_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-else
-	$(info isys8030 can't be built using C++)
-endif
 
 imds-225: ${BIN}imds-225${EXE}
 
 ${BIN}imds-225${EXE} : ${IMDS-225} ${SIM} ${BUILD_ROMS}
-ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${IMDS-225} ${SIM} ${IMDS-225_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-else
-	$(info imds-225 can't be built using C++)
-endif
 
 ibmpc: ${BIN}ibmpc${EXE}
 

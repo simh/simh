@@ -32,11 +32,7 @@
 
 #define SET_XACK(VAL)       (xack = VAL)
 
-//chip definitions for the iSBC-80/30
-/* set the base I/O address for the 8253/8254 */
-#define I8041_BASE      0xDC
-#define I8041_NUM       1
-
+//chip definitions for the iSBC-80/10
 /* set the base I/O address and device count  for the 8251s */
 #define I8251_BASE      0xEC
 #define I8251_NUM       1
@@ -46,24 +42,25 @@
 #define I8253_NUM       1
 
 /* set the base I/O address and device count for the 8255s */
-#define I8255_BASE      0xE8
-#define I8255_NUM       1
+#define I8255_BASE_0    0xE4
+#define I8255_BASE_1    0xE8
+#define I8255_NUM       2
 
 /* set the base I/O address for the 8259 */
 #define I8259_BASE      0xDA
 #define I8259_NUM       1
 
-/* set the base and size for the EPROM on the iSBC 80/30 */
+/* set the base and size for the EPROM on the iSBC 80/10 */
 #define ROM_BASE        0x0000
 #define ROM_SIZE        0x1000
 #define ROM_DISABLE     1
 
-/* set the base and size for the RAM on the iSBC 80/30 */
+/* set the base and size for the RAM on the iSBC 80/10 */
 #define RAM_BASE        0xF000
 #define RAM_SIZE        0x1000 
 #define RAM_DISABLE     0
 
-/* set INTR for CPU on the iSBC 80/30 */
+/* set INTR for CPU on the iSBC 80/10 */
 #define INTR            INT_1             
 
 //board definitions for the multibus
