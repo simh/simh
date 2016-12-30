@@ -3867,11 +3867,11 @@ t_stat tmxr_activate_after (UNIT *uptr, uint32 usecs_walltime)
 #if defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
-    return _sim_activate_after (uptr, usecs_walltime);
+    return _sim_activate_after (uptr, (double)usecs_walltime);
     }
 return SCPE_OK;
 #else
-return _sim_activate_after (uptr, usecs_walltime);
+return _sim_activate_after (uptr, (double)usecs_walltime);
 #endif
 }
 
@@ -3880,11 +3880,11 @@ t_stat tmxr_activate_after_abs (UNIT *uptr, uint32 usecs_walltime)
 #if defined(SIM_ASYNCH_MUX)
 if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
-    return _sim_activate_after_abs (uptr, usecs_walltime);
+    return _sim_activate_after_abs (uptr, (double)usecs_walltime);
     }
 return SCPE_OK;
 #else
-return _sim_activate_after_abs (uptr, usecs_walltime);
+return _sim_activate_after_abs (uptr, (double)usecs_walltime);
 #endif
 }
 
