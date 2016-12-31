@@ -128,6 +128,45 @@
 #define CSR_M_RATE      03
 #define CSR_GETRATE(x)  (((x) >> CSR_V_RATE) & CSR_M_RATE)
 
+const char *pclk_rates[] = {"100kHz", "10kHz", "line", "10Hz"};
+
+BITFIELD pclk_csr_bits[] = {
+  BIT(GO),                                  /* go */
+  BITFNAM(RATE,2,pclk_rates),               /* rate select */
+  BIT(MODE),                                /* single/repeat */
+  BIT(UPDN),                                /* down/up */
+  BIT(FIX),                                 /* single tick */
+  BIT(IE),                                  /* interrupt enable */
+  BIT(DONE),                                /* done */
+  BITNCF(7),                                /* not used */
+  BIT(ERR),                                 /* error */
+  ENDBITS
+};
+
+/* BUF - 17772542 */
+
+BITFIELD pclk_buf_bits[] = {
+  BITFFMT(BUF,16,"%0o"),                    /* buf */
+  ENDBITS
+};
+
+/* CTR - 17772544 */
+
+BITFIELD pclk_ctr_bits[] = {
+  BITFFMT(CTR,16,"%0o"),                    /* ctr */
+  ENDBITS
+};
+
+/* NOTUSED - 17772546 */
+
+BITFIELD pclk_notused_bits[] = {
+  BITFFMT(NOTUSED,16,"%0o"),                /* not used */
+  ENDBITS
+};
+
+static BITFIELD* bitdefs[] = {pclk_csr_bits, pclk_buf_bits, pclk_ctr_bits, pclk_notused_bits};
+
+
 extern int32 int_req[IPL_HLVL];
 
 uint32 pclk_csr = 0;                                    /* control/status */
@@ -163,9 +202,9 @@ DIB pclk_dib = {
 UNIT pclk_unit = { UDATA (&pclk_svc, UNIT_IDLE, 0) };
 
 REG pclk_reg[] = {
-    { ORDATA (CSR, pclk_csr, 16) },
-    { ORDATA (CSB, pclk_csb, 16) },
-    { ORDATA (CNT, pclk_ctr, 16) },
+    { ORDATADF (CSR, pclk_csr, 16, "control/status register", pclk_csr_bits) },
+    { ORDATAD  (CSB, pclk_csb, 16, "count set buffer register") },
+    { ORDATAD  (CNT, pclk_ctr, 16, "counter register") },
     { FLDATA (INT, IREQ (PCLK), INT_V_PCLK) },
     { FLDATA (OVFL, pclk_csr, CSR_V_ERR) },
     { FLDATA (DONE, pclk_csr, CSR_V_DONE) },
@@ -191,15 +230,32 @@ MTAB pclk_mod[] = {
     { 0 }
     };
 
+#define DBG_REG      0x01    /* Register Access */
+#define DBG_TICK     0x02    /* Ticks */
+#define DBG_SCHED    0x04    /* Scheduling */
+#define DBG_INT      0x08    /* Interrupts */
+
+DEBTAB pclk_deb[] = {
+    { "REG",   DBG_REG,      "Register Access"},
+    { "TICK",  DBG_TICK,     "Ticks"},
+    { "SCHED", DBG_SCHED,    "Scheduling"},
+    { "INT",   DBG_INT,      "Interrupts"},
+    { NULL, 0 }
+    };
+
 DEVICE pclk_dev = {
     "PCLK", &pclk_unit, pclk_reg, pclk_mod,
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &pclk_reset,
     NULL, NULL, NULL,
-    &pclk_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS, 
-    0, NULL, NULL, NULL, NULL,
+    &pclk_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS, 
+    0, pclk_deb, NULL, NULL, NULL,
     NULL, NULL, &pclk_description,
     };
+
+/* Register names for Debug tracing */
+static const char *pclk_regs[] =
+    {"CSR ", "BUF ", "CTR ", "" };
 
 /* Clock I/O address routines */
 
@@ -210,6 +266,7 @@ switch ((PA >> 1) & 03) {
     case 00:                                            /* CSR */
         *data = pclk_csr & PCLKCSR_RDMASK;              /* return CSR */
         pclk_csr = pclk_csr & ~(CSR_ERR | CSR_DONE);    /* clr err, done */
+        sim_debug (DBG_INT, &pclk_dev, "pclk_rd(CSR) - INT=0\n");
         CLR_INT (PCLK);                                 /* clr intr */
         break;
 
@@ -222,6 +279,9 @@ switch ((PA >> 1) & 03) {
         break;
         }
 
+sim_debug(DBG_REG, &pclk_dev, "pclk_rd(PA=0x%08X [%s], access=%d, data=0x%X) ", PA, pclk_regs[(PA >> 1) & 03], access, *data);
+sim_debug_bits(DBG_REG, &pclk_dev, bitdefs[(PA >> 1) & 03], (uint32)(*data), (uint32)(*data), TRUE);
+
 return SCPE_OK;
 }
 
@@ -230,10 +290,14 @@ t_stat pclk_wr (int32 data, int32 PA, int32 access)
 int32 old_csr = pclk_csr;
 int32 rv;
 
+sim_debug(DBG_REG, &pclk_dev, "pclk_wr(PA=0x%08X [%s], access=%d, data=0x%X) ", PA, pclk_regs[(PA >> 1) & 03], access, data);
+sim_debug_bits(DBG_REG, &pclk_dev, bitdefs[(PA >> 1) & 03], (uint32)((PA & 1) ? data<<8 : data), (uint32)((PA & 1) ? data<<8 : data), TRUE);
 switch ((PA >> 1) & 03) {
 
     case 00:                                            /* CSR */
         pclk_csr = data & PCLKCSR_WRMASK;               /* clear and write */
+        if (pclk_csr & (CSR_ERR | CSR_DONE))
+            sim_debug (DBG_INT, &pclk_dev, "pclk_wr(%s) - INT=0\n", pclk_regs[(PA >> 1) & 03]);
         CLR_INT (PCLK);                                 /* clr intr */
         rv = CSR_GETRATE (pclk_csr);                    /* new rate */
         if ((pclk_csr & CSR_GO) == 0) {                 /* stopped? */
@@ -255,6 +319,8 @@ switch ((PA >> 1) & 03) {
     case 01:                                            /* buffer */
         pclk_csb = data;                                /* store ctr */
         pclk_set_ctr (data);
+        if (pclk_csr & (CSR_ERR | CSR_DONE))
+            sim_debug (DBG_INT, &pclk_dev, "pclk_wr(%s) - INT=0\n", pclk_regs[(PA >> 1) & 03]);
         pclk_csr = pclk_csr & ~(CSR_ERR | CSR_DONE);    /* clr err, done */
         CLR_INT (PCLK);                                 /* clr intr */
         break;
@@ -272,12 +338,15 @@ if ((pclk_csr & CSR_GO) == 0)                           /* stopped? */
     pclk_ctr = val;                                     /* save */
 else {
     uint32 delay = DMASK & ((pclk_csr & CSR_UPDN) ? (DMASK + 1 - val) : val);
+    uint32 usec_delay;
     int32 rv;
 
     if (delay == 0)
         delay = DMASK + 1;
     rv = CSR_GETRATE (pclk_csr);                        /* get rate */
-    sim_activate_after (&pclk_unit, xtim[rv] * delay);  /* schedule interrupt */
+    usec_delay = xtim[rv] * delay;
+    sim_debug (DBG_SCHED, &pclk_dev, "pclk_set_ctr(val=%0o) - delay=%d, rv=%d, xtim[rv]=%d, usecs=%u\n", val, delay, rv, xtim[rv], usec_delay);
+    sim_activate_after (&pclk_unit, usec_delay);  /* schedule interrupt */
     }
 }
 
@@ -306,13 +375,16 @@ t_stat pclk_svc (UNIT *uptr)
 {
 int32 rv;
 
+sim_debug (DBG_TICK, &pclk_dev, "pclk_svc()\n");
 rv = CSR_GETRATE (pclk_csr);                            /* get rate */
 if (pclk_csr & CSR_DONE)                                /* done already set? */
     pclk_csr = pclk_csr | CSR_ERR;                      /* set error */
 else
     pclk_csr = pclk_csr | CSR_DONE;                     /* else set done */
-if (pclk_csr & CSR_IE)                                  /* if IE, set int */
+if (pclk_csr & CSR_IE) {                                /* if IE, set int */
+    sim_debug (DBG_INT, &pclk_dev, "iccs_svc() - INT=1\n");
     SET_INT (PCLK);
+    }
 if (pclk_csr & CSR_MODE)                                /* if rpt, reload */
     pclk_set_ctr (pclk_csb);
 else {
@@ -354,6 +426,8 @@ t_stat pclk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 static const char *freqs[] = {"100K Hz", "10K Hz", "Line Freq", "External (10Hz)"};
 
 fprintf (st, "%s", freqs[CSR_GETRATE (pclk_csr)]);
+if (CSR_GETRATE (pclk_csr) == 2)
+    fprintf (st, " (%dHz)", rate[2]);
 return SCPE_OK;
 }
 
