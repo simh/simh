@@ -2021,6 +2021,8 @@ if (!sim_rem_master_mode) {
         if (c && sim_con_ldsc.rxbps)                        /* got something && rate limiting? */
             sim_con_ldsc.rxnexttime =                       /* compute next input time */
                 floor (sim_gtime () + ((sim_con_ldsc.rxdelta * sim_timer_inst_per_sec ())/sim_con_ldsc.rxbpsfactor));
+        if (c)
+            sim_debug (DBG_RCV, &sim_con_telnet, "sim_poll_kbd() returning: '%c' (0x%02X)\n", sim_isprint (c & 0xFF) ? c & 0xFF : '.', c);
         return c;                                           /* in-window */
         }
     if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */
@@ -2047,6 +2049,7 @@ if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);
+    sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x02X)\n", sim_isprint (c) ? c : '.', c);
     return sim_os_putchar (c);                          /* in-window version */
     }
 if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
