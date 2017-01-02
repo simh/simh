@@ -5,7 +5,7 @@ $
 $! The second part of the patch adds support for Extended Memory in the 
 $! simulator.  A simulated system can have up to 512MB of RAM.
 $!
-$ PATCH /ABSOLUTE /NEW_VERSION /OUTPUT=cp$exe:KA655.BIN cp$src:ka655_orig.BIN
+$ PATCH /ABSOLUTE /NEW_VERSION /OUTPUT=cp$exe:KA655x.BIN cp$src:ka655_orig.BIN
 ! CVAX Bootstrap Notes
 ! 
 ! [2004c87e] - de$read_script
@@ -44,6 +44,15 @@ Delete/Instruction 12A55 = 'BBC     #26,(R9),00012A5C'
 ! 
 ! 33. Test 52 [2004e656] - prog timer 0 - ok
 ! 32. Test 52 [2004e656] - prog timer 1 - ok
+!     Interval Timer Patch
+!     In operational environments, Test 52 subtests 17 and 20 have been observed
+!     to occasionally fail. Disable the timer portion of the interval timer tests.
+! Subsequent changes to vax_sysdev.c and scp timer services no longer require
+! this test to be disabled.
+!	2004e7c1/	brw 2004e870
+!Replace/Instruction 0e7c1 = 'MOVB    #10,B^76(R9)'
+!'BRW	0000E870'
+!Exit
 ! 31. Test 53 [2004e918] - toy clock - ok
 ! 30. Test C1 [2004f8f1] - SSC RAM - ok
 ! 29. Test 34 [2004d4a0] - ROM - checksum off due to other patches - patch
@@ -494,14 +503,6 @@ Exit
 ! 	2004db2e/	brw 2004dd8a
 Replace/Instruction 0db2e = 'MOVB    #17,B^76(R9)'
 'BRW	0DD8A'
-EXIT
-!
-! Interval Timer Patch
-! In operational environments, Test 82 subtests 17 and 20 have been observed
-! to ocaisionally fail. Disable the timer portion of the interval timer tests.
-!	2004e7c1/	brw 2004e870
-Replace/Instruction 0e7c1 = 'MOVB    #10,B^76(R9)'
-'BRW	0e870'
 EXIT
 !
 UPDATE
