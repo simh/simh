@@ -2049,7 +2049,7 @@ if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);
-    sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x02X)\n", sim_isprint (c) ? c : '.', c);
+    sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x%02X)\n", sim_isprint (c) ? c : '.', c);
     return sim_os_putchar (c);                          /* in-window version */
     }
 if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
@@ -2072,6 +2072,7 @@ if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);
+    sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x%02X)\n", sim_isprint (c) ? c : '.', c);
     return sim_os_putchar (c);                          /* in-window version */
     }
 if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
@@ -2526,7 +2527,14 @@ return SCPE_OK;
 #define RAW_MODE 0
 static HANDLE std_input;
 static HANDLE std_output;
-static DWORD saved_mode;
+static DWORD saved_input_mode;
+static DWORD saved_output_mode;
+#ifndef ENABLE_VIRTUAL_TERMINAL_INPUT
+#define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
+#endif
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
 
 /* Note: This routine catches all the potential events which some aspect 
          of the windows system can generate.  The CTRL_C_EVENT won't be 
@@ -2565,17 +2573,28 @@ std_input = GetStdHandle (STD_INPUT_HANDLE);
 std_output = GetStdHandle (STD_OUTPUT_HANDLE);
 if ((std_input) &&                                      /* Not Background process? */
     (std_input != INVALID_HANDLE_VALUE))
-    GetConsoleMode (std_input, &saved_mode);            /* Save Mode */
+    GetConsoleMode (std_input, &saved_input_mode);      /* Save Input Mode */
+if ((std_output) &&                                     /* Not Background process? */
+    (std_output != INVALID_HANDLE_VALUE))
+    GetConsoleMode (std_output, &saved_output_mode);    /* Save Output Mode */
 return SCPE_OK;
 }
 
 static t_stat sim_os_ttrun (void)
 {
 if ((std_input) &&                                      /* If Not Background process? */
-    (std_input != INVALID_HANDLE_VALUE) &&
-    (!GetConsoleMode(std_input, &saved_mode) ||         /* Set mode to RAW */
-     !SetConsoleMode(std_input, RAW_MODE)))
-    return SCPE_TTYERR;
+    (std_input != INVALID_HANDLE_VALUE)) {
+    if (!GetConsoleMode(std_input, &saved_input_mode))
+        return SCPE_TTYERR;
+    if ((!SetConsoleMode(std_input, ENABLE_VIRTUAL_TERMINAL_INPUT)) &&
+        (!SetConsoleMode(std_input, RAW_MODE)))
+        return SCPE_TTYERR;
+    }
+if ((std_output) &&                                     /* If Not Background process? */
+    (std_output != INVALID_HANDLE_VALUE)) {
+    if (GetConsoleMode(std_output, &saved_output_mode))
+        SetConsoleMode(std_output, ENABLE_VIRTUAL_TERMINAL_PROCESSING|ENABLE_PROCESSED_OUTPUT);
+    }
 if (sim_log) {
     fflush (sim_log);
     _setmode (_fileno (sim_log), _O_BINARY);
@@ -2593,7 +2612,11 @@ if (sim_log) {
 sim_os_set_thread_priority (PRIORITY_NORMAL);
 if ((std_input) &&                                      /* If Not Background process? */
     (std_input != INVALID_HANDLE_VALUE) &&
-    (!SetConsoleMode(std_input, saved_mode)))           /* Restore Normal mode */
+    (!SetConsoleMode(std_input, saved_input_mode)))     /* Restore Normal mode */
+    return SCPE_TTYERR;
+if ((std_output) &&                                     /* If Not Background process? */
+    (std_output != INVALID_HANDLE_VALUE) &&
+    (!SetConsoleMode(std_output, saved_output_mode)))   /* Restore Normal mode */
     return SCPE_TTYERR;
 return SCPE_OK;
 }
@@ -2669,6 +2692,7 @@ return (WAIT_OBJECT_0 == WaitForSingleObject (std_input, ms_timeout));
 #define BELL_INTERVAL_MS    500     /* No more than 2 Bell Characters Per Second */
 #define ESC_CHAR            033     /* Escape Character */
 #define CSI_CHAR            0233    /* Control Sequence Introducer */
+#define NUL_CHAR            0000    /* NUL character */
 #define ESC_HOLD_USEC_DELAY 8000    /* Escape hold interval */
 #define ESC_HOLD_MAX        32      /* Maximum Escape hold buffer */
 
@@ -2700,6 +2724,8 @@ if (c != 0177) {
                 WriteConsoleA(std_output, &c, 1, &unused, NULL);
                 last_bell_time = now;
                 }
+            break;
+        case NUL_CHAR:
             break;
         case CSI_CHAR:
         case ESC_CHAR:
