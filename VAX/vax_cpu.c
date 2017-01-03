@@ -2586,12 +2586,10 @@ for ( ;; ) {
     case HALT:
         if (PSL & PSL_CUR)                              /* not kern? rsvd inst */
             RSVD_INST_FAULT;
-        else if (cpu_unit.flags & UNIT_CONH)            /* halt to console? */
-            cc = con_halt (CON_HLTINS, cc);             /* enter firmware */
         else {
             /* allow potentially pending I/O (console output, 
-               or other devices) to complete before dropping 
-               back to scp */
+               or other devices) to complete before taking
+               the appropriate halt action */
             while ((sim_clock_queue != QUEUE_LIST_END) &&
                    ((sim_clock_queue->flags & UNIT_IDLE) == 0)) {
                 sim_interval = 0;
@@ -2600,7 +2598,10 @@ for ( ;; ) {
                     ABORT (temp);
                 SET_IRQL;                               /* update interrupts */
                 }
-            ABORT (STOP_HALT);                          /* halt to simulator */
+            if (cpu_unit.flags & UNIT_CONH)             /* halt to console? */
+                cc = con_halt (CON_HLTINS, cc);         /* enter firmware */
+            else
+                ABORT (STOP_HALT);                      /* halt to simulator */
             }
 
     case NOP:
