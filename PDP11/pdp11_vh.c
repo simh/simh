@@ -133,6 +133,21 @@ extern int32    tmxr_poll, clk_tps;
     (CSR_TXIE|CSR_RXIE|CSR_SKIP|CSR_M_IND_ADDR|CSR_MASTER_RESET)
 #define RESET_ABORT     (052525)
 
+BITFIELD vh_csr_bits[] = {
+  BITF(IND_ADDR,4),                         /* indirect address */
+  BIT(SKIP),                                /* Skip */
+  BIT(MASTER_RESET),                        /* Master Reset */
+  BIT(RXIE),                                /* Receive Interrupt Enable */
+  BIT(RX_DATA_AVAIL),                       /* Receive Data Available */
+  BITF(TX_LINE,4),                          /* Transmit Line */
+  BIT(TX_DMA_ERR),                          /* Transmit DMA Error */
+  BIT(DIAG_FAIL),                           /* Diagnostic Fail */
+  BIT(TXIE),                                /* Transmit Interrupt Enable */
+  BIT(TX_ACTION),                           /* Transmit Action */
+  ENDBITS
+};
+
+
 /* Receive Buffer (RBUF) */
 
 #define FIFO_SIZE       (256)
@@ -152,14 +167,38 @@ extern int32    tmxr_poll, clk_tps;
 #define XON         (021)
 #define XOFF            (023)
 
+BITFIELD vh_rbuf_bits[] = {
+  BITF(RX_CHAR,4),                          /* Receive Character */
+  BITF(RX_LINE,4),                          /* Receive Line */
+  BIT(PARITY_ERR),                          /* Parity Error */
+  BIT(FRAME_ERR),                           /* Frame Error */
+  BIT(OVERRUN_ERR),                         /* Overrun Error */
+  BIT(DATA_VALID),                          /* Data Valid */
+  ENDBITS
+};
+
 /* Transmit Character Register (TXCHAR) */
 
 #define TXCHAR_M_CHAR       (0377)
 #define TXCHAR_TX_DATA_VALID    (1 << 15)
 
+BITFIELD vh_txchar_bits[] = {
+  BITF(TX_CHAR,8),                          /* Receive Timer */
+  BITNCF(7),                                /* Not Used */
+  BIT(DATA_VALID),                          /* Data Valid */
+  ENDBITS
+};
+
 /* Receive Timer Register (RXTIMER) */
 
 #define RXTIMER_M_RX_TIMER  (0377)
+
+BITFIELD vh_rxtimer_bits[] = {
+  BITF(RX_TIMER,8),                         /* Receive Timer */
+  BITNCF(8),                                /* Not Used */
+  ENDBITS
+};
+
 
 /* Line-Parameter Register (LPR) */
 
@@ -202,6 +241,18 @@ static const char *vh_baudrates[] = {"50", "75", "110", "134.5", "150", "300", "
 static const char *vh_parity[] = {"N", "N", "E", "O"};
 static const char *vh_stopbits[] = {"1", "2", "1", "1.5"};
 
+BITFIELD vh_lpr_bits[] = {
+  BITNC,                                    /* Unused */
+  BITF(DIAG,2),                             /* Diagnostic Code */
+  BITFNAM(CHAR_LGTH,2,vh_charsizes),        /* Character Length */
+  BIT(PARITY_ENAB),                         /* Parity Enable */
+  BIT(EVEN_PARITY),                         /* Even Parity */
+  BIT(STOP_CODE),                           /* Stop Bits Code */
+  BITFNAM(RX_SPEED,4,vh_baudrates),         /* Receive Speed */
+  BITFNAM(TX_SPEED,4,vh_baudrates),         /* Transmit Speed */
+  ENDBITS
+};
+
 #define LPR_GETSPD(x)   vh_baudrates[((x) >> LPR_V_RX_SPEED) & LPR_M_RX_SPEED]
 #define LPR_GETCHARSIZE(x) vh_charsizes[((x) >> LPR_V_CHAR_LGTH) & LPR_M_CHAR_LGTH]
 #define LPR_GETPARITY(x) vh_parity[(((x) >> LPR_V_PARITY_ENAB) & 1) | (((x) >> (LPR_V_EVEN_PARITY-1)) & 2)]
@@ -216,15 +267,40 @@ static const char *vh_stopbits[] = {"1", "2", "1", "1.5"};
 #define STAT_RI         (1 << 13)   /* RI from modem */
 #define STAT_DSR        (1 << 15)   /* DSR from modem */
 
+BITFIELD vh_stat_bits[] = {
+  BITNCF(8),                                /* Not Used */
+  BIT(DHUID),                               /* DHU/DHV Id */
+  BIT(MDL),                                 /* Even Parity */
+  BITNC,                                    /* Not Used */
+  BIT(CTS),                                 /* CTS from modem */
+  BIT(DCD),                                 /* DCD from modem */
+  BIT(RI),                                  /* RI from modem */
+  BITNC,                                    /* Not Used */
+  BIT(DSR),                                 /* DSR from modem */
+  ENDBITS
+};
+
 /* FIFO Size Register (FIFOSIZE) */
 
 #define FIFOSIZE_M_SIZE     (0377)
+
+BITFIELD vh_fifosize_bits[] = {
+  BITF(FIFOSIZE,8),                         /* FIFO Size */
+  BITNCF(8),                                /* Not Used */
+  ENDBITS
+};
 
 /* FIFO Data Register (FIFODATA) */
 
 #define FIFODATA_W0     (0377)
 #define FIFODATA_V_W1       (8)
 #define FIFODATA_M_W1       (0377)
+
+BITFIELD vh_fifodata_bits[] = {
+  BITF(W0,8),                               /* Low Byte Character */
+  BITF(W1,8),                               /* High Byte Character */
+  ENDBITS
+};
 
 /* Line-Control Register (LNCTRL) */
 
@@ -240,7 +316,28 @@ static const char *vh_stopbits[] = {"1", "2", "1", "1.5"};
 #define LNCTRL_DTR      (1 << 9)    /* DTR to modem */
 #define LNCTRL_RTS      (1 << 12)   /* RTS to modem */
 
+BITFIELD vh_lnctrl_bits[] = {
+  BIT(TX_ABORT),                            /* Transmitter Abort */
+  BIT(IAUTO),                               /* Incoming Auto Flow Control */
+  BIT(RX_ENA),                              /* Receiver Enable  */
+  BIT(BREAK),                               /* Line BREAK (Space) */
+  BIT(OAUTO),                               /* Output Auto Flow Control */
+  BIT(FORCE_XOFF),                          /* Force XOFF */
+  BITF(MAINT,2),                            /* Maintenance Mode */
+  BIT(LINK_TYPE),                           /* modem/data leads only */
+  BIT(DTR),                                 /* Data Terminal Ready */
+  BITNCF(2),                                /* Unused */
+  BIT(RTS),                                 /* Request To Send */
+  BITNCF(3),                                /* Unused */
+  ENDBITS
+};
+
 /* Transmit Buffer Address Register Number 1 (TBUFFAD1) */
+
+BITFIELD vh_tbuffad1_bits[] = {
+  BITF(TBUFFAD1,16),                        /* Transmit Buffer Address Register */
+  ENDBITS
+};
 
 /* Transmit Buffer Address Register Number 2 (TBUFFAD2) */
 
@@ -248,7 +345,21 @@ static const char *vh_stopbits[] = {"1", "2", "1", "1.5"};
 #define TB2_TX_DMA_START    (1 << 7)
 #define TB2_TX_ENA      (1 << 15)
 
+BITFIELD vh_tbuffad2_bits[] = {
+  BITF(TBUFFAD,6),                          /* Transmit DMA Address */
+  BITNC,                                    /* Unused */
+  BIT(TX_DMA_START),                        /* Transmit DMA Start */
+  BITNCF(3),                                /* Unused */
+  BIT(TX_ENA),                              /* Transmit Enable */
+  ENDBITS
+};
+
 /* Transmit DMA Buffer Counter (TBUFFCT) */
+
+BITFIELD vh_tbuffct_bits[] = {
+  BITF(TBUFFCT,16),                         /* Transmit Character Count */
+  ENDBITS
+};
 
 /* Self-Test Error Codes */
 
@@ -316,10 +427,12 @@ static TMXR vh_desc = { VH_MUXES * VH_LINES_ALLOC, 0, 0, vh_ldsc };
 static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 
 /* debugging bitmaps */
-#define DBG_REG     0x0001                              /* trace read/write registers */
-#define DBG_INT     0x0002                              /* display interrupt activities */
-#define DBG_TIM     0x0004                              /* display timing activities */
-#define DBG_TIMTRC  0x0008                              /* display trace timing activities */
+#define DBG_RREG    0x0001                              /* trace read registers */
+#define DBG_WREG    0x0002                              /* trace write registers */
+#define DBG_REG     DBG_RREG|DBG_WREG                   /* trace read/write registers */
+#define DBG_INT     0x0004                              /* display interrupt activities */
+#define DBG_TIM     0x0008                              /* display timing activities */
+#define DBG_TIMTRC  0x0010                              /* display trace timing activities */
 #define DBG_XMT     TMXR_DBG_XMT                        /* display Transmitted Data */
 #define DBG_RCV     TMXR_DBG_RCV                        /* display Received Data */
 #define DBG_MDM     TMXR_DBG_MDM                        /* display Modem Signals */
@@ -328,6 +441,8 @@ static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 #define DBG_ASY     TMXR_DBG_ASY                        /* display Asynchronous Activities */
 
 DEBTAB vh_debug[] = {
+  {"RREG",   DBG_RREG,   "read registers"},
+  {"WREG",   DBG_WREG,   "write registers"},
   {"REG",    DBG_REG,    "read/write registers"},
   {"INT",    DBG_INT,    "interrupt activities"},
   {"TIM",    DBG_TIM,    "timing activities"},
@@ -826,6 +941,9 @@ static t_stat vh_rd (   int32   *data,
 {
     int32   vh = ((PA - vh_dib.ba) >> 4), line;
     TMLX    *lp;
+    static BITFIELD* bitdefs[] = {vh_csr_bits, vh_rbuf_bits, vh_lpr_bits, vh_stat_bits,
+                                  vh_lnctrl_bits, vh_tbuffad1_bits, vh_tbuffad1_bits, vh_tbuffct_bits};
+
 
     if (vh > VH_MAXMUX)                         /* validate mux number */
         return SCPE_IERR;
@@ -903,8 +1021,9 @@ fprintf (stderr, "\rtqln %d\n", 64 - tmxr_tqln (lp->tmln));
         break;
     }
 
-    sim_debug(DBG_REG, &vh_dev, "vh_rd(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, 
+    sim_debug(DBG_RREG, &vh_dev, "vh_rd(vh=%d, PA=0x%08X [%s], access=%d, data=0x%X) ", vh, PA, 
               ((vh_unit[vh].flags & UNIT_MODEDHU) ? vh_rd_dhu_regs : vh_rd_dhv_regs)[(PA >> 1) & 07], access, *data);
+    sim_debug_bits(DBG_RREG, &vh_dev, bitdefs[(PA >> 1) & 07], (uint32)(*data), (uint32)(*data), TRUE);
 
     return (SCPE_OK);
 }
@@ -916,12 +1035,15 @@ static t_stat vh_wr (   int32   ldata,
     int32   vh = ((PA - vh_dib.ba) >> 4), line;
     TMLX    *lp;
     uint16  data = (uint16)ldata;
+    static BITFIELD* bitdefs[] = {vh_csr_bits, vh_rbuf_bits, vh_lpr_bits, vh_stat_bits,
+                                  vh_lnctrl_bits, vh_tbuffad1_bits, vh_tbuffad1_bits, vh_tbuffct_bits};
 
     if (vh > VH_MAXMUX)                         /* validate mux number */
         return SCPE_IERR;
 
-    sim_debug(DBG_REG, &vh_dev, "vh_wr(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, 
+    sim_debug(DBG_WREG, &vh_dev, "vh_wr(vh=%d, PA=0x%08X [%s], access=%d, data=0x%X) ", vh, PA, 
               ((vh_unit[vh].flags & UNIT_MODEDHU) ? vh_wr_dhu_regs : vh_wr_dhv_regs)[(PA >> 1) & 07], access, data);
+    sim_debug_bits(DBG_WREG, &vh_dev, bitdefs[(PA >> 1) & 07], (uint32)((PA & 1) ? data<<8 : data), (uint32)((PA & 1) ? data<<8 : data), TRUE);
 
     switch ((PA >> 1) & 7) {   
     case 0:     /* CSR, but no read-modify-write */
@@ -1235,7 +1357,7 @@ static t_stat vh_timersvc (  UNIT    *uptr   )
 {
     int32   vh;
 
-    sim_debug(DBG_TIMTRC, find_dev_from_unit(uptr), "vh_timersvc()\n");
+    sim_debug(DBG_TIMTRC, &vh_dev, "vh_timersvc()\n");
 
     /* scan all DHU-mode muxes for RX FIFO timeout */
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
