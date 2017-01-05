@@ -72,6 +72,11 @@
                             event
    sim_timespec_diff        subtract two timespec values
    sim_timer_activate_after schedule unit for specific time
+   sim_timer_activate_time  determine activation time
+   sim_timer_activate_time_usecs determine activation time in usecs
+   sim_rom_read_with_delay  delay for default or specified delay
+   sim_get_rom_delay_factor get current or initialize 1usec delay factor
+   sim_set_rom_delay_factor set specific delay factor
 
 
    The calibration, idle, and throttle routines are OS-independent; the _os_
@@ -156,6 +161,7 @@ static uint32 sim_os_clock_resoluton_ms = 0;
 static uint32 sim_os_tick_hz = 0;
 static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
 static uint32 sim_idle_calib_pct = 0;
+static uint32 sim_rom_delay = 0;
 static uint32 sim_throt_ms_start = 0;
 static uint32 sim_throt_ms_stop = 0;
 static uint32 sim_throt_type = 0;
@@ -1023,6 +1029,7 @@ sim_throttle_unit.action = &sim_throt_svc;
 sim_register_clock_unit_tmr (&SIM_INTERNAL_UNIT, SIM_INTERNAL_CLK);
 sim_idle_enab = FALSE;                                  /* init idle off */
 sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
+sim_set_rom_delay_factor (sim_get_rom_delay_factor ()); /* initialize ROM delay factor */
 
 clock_last = clock_start = sim_os_msec ();
 sim_os_clock_resoluton_ms = 1000;
@@ -1235,6 +1242,7 @@ return SCPE_OK;
 
 REG sim_timer_reg[] = {
     { DRDATAD (IDLE_CYC_MS,      sim_idle_cyc_ms,        32, "Cycles Per Millisecond"), PV_RSPC|REG_RO},
+    { DRDATAD (ROM_DELAY,        sim_rom_delay,          32, "ROM memory reference delay"), PV_RSPC|REG_RO},
     { NULL }
     };
 
@@ -2778,4 +2786,77 @@ for (tmr=0; tmr<SIM_NTIMERS; tmr++)
     if (sim_clock_unit[tmr] == uptr)
         return (1000000.0 * sim_activate_time (&sim_timer_units[tmr])) / sim_timer_inst_per_sec ();
 return -1.0;                                          /* Not found. */    
+}
+
+/* read only memory delayed support
+
+   Some simulation activities need a 'regulated' memory access
+   time to meet timing assumptions in the code being executed.
+
+   The default calibration determines a way to limit activities
+   to 1Mhz for each call to sim_rom_read_with_delay().  If a 
+   simulator needs a different delay factor, the 1 Mhz initial 
+   value can be queried with sim_get_rom_delay_factor() and the 
+   result can be adjusted as nessary and the operating delay
+   can be set with sim_set_rom_delay_factor().
+*/
+
+SIM_NOINLINE static int32 _rom_swapb(int32 val)
+{
+return ((val << 24) & 0xff000000) | (( val << 8) & 0xff0000) |
+    ((val >> 8) & 0xff00) | ((val >> 24) & 0xff);
+}
+
+static volatile int32 rom_loopval = 0;
+
+SIM_NOINLINE int32 sim_rom_read_with_delay (int32 val)
+{
+uint32 i, l = sim_rom_delay;
+
+for (i = 0; i < l; i++)
+    rom_loopval |= (rom_loopval + val) ^ _rom_swapb (_rom_swapb (rom_loopval + val));
+return val + rom_loopval;
+}
+
+SIM_NOINLINE uint32 sim_get_rom_delay_factor (void)
+{
+/* Calibrate the loop delay factor at startup.
+   Do this 4 times and use the largest value computed. 
+   The goal here is to come up with a delay factor which will throttle
+   a 6 byte delay loop running from ROM address space to execute
+   1 instruction per usec */
+
+if (sim_rom_delay == 0) {
+    uint32 i, ts, te, c = 10000, samples = 0;
+    while (1) {
+        c = c * 2;
+        te = sim_os_msec();
+        while (te == (ts = sim_os_msec ()));            /* align on ms tick */
+
+/* This is merely a busy wait with some "work" that won't get optimized
+   away by a good compiler. loopval always is zero.  To avoid smart compilers,
+   the loopval variable is referenced in the function arguments so that the
+   function expression is not loop invariant.  It also must be referenced
+   by subsequent code to avoid the whole computation being eliminated. */
+
+        for (i = 0; i < c; i++)
+            rom_loopval |= (rom_loopval + ts) ^ _rom_swapb (_rom_swapb (rom_loopval + ts));
+        te = sim_os_msec (); 
+        if ((te - ts) < 50)                         /* sample big enough? */
+            continue;
+        if (sim_rom_delay < (rom_loopval + (c / (te - ts) / 1000) + 1))
+            sim_rom_delay = rom_loopval + (c / (te - ts) / 1000) + 1;
+        if (++samples >= 4)
+            break;
+        c = c / 2;
+        }
+    if (sim_rom_delay < 5)
+        sim_rom_delay = 5;
+    }
+return sim_rom_delay;
+}
+
+void sim_set_rom_delay_factor (uint32 delay)
+{
+sim_rom_delay = delay;
 }
