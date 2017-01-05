@@ -874,9 +874,8 @@ if (rtc_hz[tmr] != ticksper) {                          /* changing tick rate? *
         rtc_currd[tmr] = (int32)(sim_timer_inst_per_sec () / ticksper);
         }
     }
-if (ticksper == 0) {                                    /* running? */
+if (ticksper == 0)                                      /* running? */
     return 10000;
-    }
 if (sim_clock_unit[tmr] == NULL) {                      /* Not using TIMER units? */
     rtc_clock_ticks[tmr] += 1;
     rtc_calib_tick_time[tmr] += rtc_clock_tick_size[tmr];
@@ -2106,7 +2105,7 @@ if (tmr == SIM_NTIMERS) {                   /* None found? */
         SIM_INTERNAL_UNIT.flags = UNIT_IDLE;
         sim_register_internal_device (&sim_int_timer_dev);          /* Register Internal timer device */
         sim_rtcn_init_unit (&SIM_INTERNAL_UNIT, (CLK_INIT*CLK_TPS)/sim_int_clk_tps, SIM_INTERNAL_CLK);
-        sim_activate_abs (&SIM_INTERNAL_UNIT, 0);
+        SIM_INTERNAL_UNIT.action (&SIM_INTERNAL_UNIT);              /* Force tick to activate timer */
         }
     return;
     }
@@ -2718,6 +2717,14 @@ double sim_timer_activate_time_usecs (UNIT *uptr)
 {
 UNIT *cptr;
 int32 tmr;
+
+/* If this is a clock unit, we need to return the related clock assist unit instead */
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
+    if (sim_clock_unit[tmr] == uptr) {
+        uptr = &sim_timer_units[tmr];
+        break;
+        }
+    }
 
 #if defined(SIM_ASYNCH_CLOCKS)
 if (uptr->a_is_active == &_sim_wallclock_is_active) {
