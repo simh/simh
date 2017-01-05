@@ -252,7 +252,6 @@ t_bool tmr_inst[2] = { 0 };                             /* wait instructions vs 
 int32 ssc_adsm[2] = { 0 };                              /* addr strobes */
 int32 ssc_adsk[2] = { 0 };
 int32 cdg_dat[CDASIZE >> 2];                            /* cache data */
-static uint32 rom_delay = 0;
 
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
@@ -334,7 +333,6 @@ extern void cpu_idle (void);
 UNIT rom_unit = { UDATA (NULL, UNIT_FIX+UNIT_BINK, ROMSIZE) };
 
 REG rom_reg[] = {
-    { DRDATAD (DELAY, rom_delay, 32, "ROM access delay count"), PV_LEFT + REG_RO },
     { NULL }
     };
 
@@ -539,31 +537,15 @@ DEVICE sysd_dev = {
    issues with the embedded timing loops.  
 */
 
-int32 rom_swapb(int32 val)
+int32 rom_rd (int32 pa)
 {
-return ((val << 24) & 0xff000000) | (( val << 8) & 0xff0000) |
-    ((val >> 8) & 0xff00) | ((val >> 24) & 0xff);
-}
-
-volatile int32 rom_loopval = 0;
-
-int32 rom_read_delay (int32 val)
-{
-uint32 i, l = rom_delay;
+int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
+int32 val = rom[rg];
 
 if (rom_unit.flags & UNIT_NODELAY)
     return val;
 
-for (i = 0; i < l; i++)
-    rom_loopval |= (rom_loopval + val) ^ rom_swapb (rom_swapb (rom_loopval + val));
-return val + rom_loopval;
-}
-
-int32 rom_rd (int32 pa)
-{
-int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
-
-return rom_read_delay (rom[rg]);
+return sim_rom_read_with_delay (val);
 }
 
 void rom_wr_B (int32 pa, int32 val)
@@ -609,39 +591,6 @@ t_stat rom_reset (DEVICE *dptr)
 if (rom == NULL)
     rom = (uint32 *) calloc (ROMSIZE >> 2, sizeof (uint32));
 
-/* Calibrate the loop delay factor at startup.
-   Do this 4 times and use the largest value computed. 
-   The goal here is to come up with a delay factor which will throttle
-   a 6 byte delay loop running from ROM address space to execute
-   1 instruction per usec */
-
-if (rom_delay == 0) {
-    uint32 i, ts, te, c = 10000, samples = 0;
-    while (1) {
-        c = c * 2;
-        te = sim_os_msec();
-        while (te == (ts = sim_os_msec ()));            /* align on ms tick */
-
-/* This is merely a busy wait with some "work" that won't get optimized
-   away by a good compiler. loopval always is zero.  To avoid smart compilers,
-   the loopval variable is referenced in the function arguments so that the
-   function expression is not loop invariant.  It also must be referenced
-   by subsequent code to avoid the whole computation being eliminated. */
-
-        for (i = 0; i < c; i++)
-            rom_loopval |= (rom_loopval + ts) ^ rom_swapb (rom_swapb (rom_loopval + ts));
-        te = sim_os_msec (); 
-        if ((te - ts) < 50)                         /* sample big enough? */
-            continue;
-        if (rom_delay < (rom_loopval + (c / (te - ts) / 1000) + 1))
-            rom_delay = rom_loopval + (c / (te - ts) / 1000) + 1;
-        if (++samples >= 4)
-            break;
-        c = c / 2;
-        }
-    if (rom_delay < 5)
-        rom_delay = 5;
-    }
 if (rom == NULL)
     return SCPE_MEM;
 return SCPE_OK;
