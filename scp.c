@@ -4702,13 +4702,13 @@ int32 accum;
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_clock_queue == QUEUE_LIST_END)
-    fprintf (st, "%s event queue empty, time = %.0f, executing %.0f instructios/sec\n",
-             sim_name, sim_time, sim_timer_inst_per_sec ());
+    fprintf (st, "%s event queue empty, time = %.0f, executing %s instructios/sec\n",
+             sim_name, sim_time, sim_fmt_numeric (sim_timer_inst_per_sec ()));
 else {
     const char *tim;
 
-    fprintf (st, "%s event queue status, time = %.0f, executing %.0f instructions/sec\n",
-             sim_name, sim_time, sim_timer_inst_per_sec ());
+    fprintf (st, "%s event queue status, time = %.0f, executing %s instructions/sec\n",
+             sim_name, sim_time, sim_fmt_numeric (sim_timer_inst_per_sec ()));
     accum = 0;
     for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
         if (uptr == &sim_step_unit)

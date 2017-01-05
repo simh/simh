@@ -1064,7 +1064,7 @@ int tmr, clocks;
 struct timespec now;
 time_t time_t_now;
 int32 calb_tmr = (sim_calb_tmr == -1) ? sim_calb_tmr_last : sim_calb_tmr;
-double inst_per_sec = (sim_calb_tmr == -1) ? sim_inst_per_sec_last : sim_timer_inst_per_sec ();
+double inst_per_sec = sim_timer_inst_per_sec ();
 
 fprintf (st, "Minimum Host Sleep Time:       %d ms (%dHz)\n", sim_os_sleep_min_ms, sim_os_tick_hz);
 if (sim_os_sleep_min_ms != sim_os_sleep_inc_ms)
@@ -2270,7 +2270,7 @@ return SCPE_OK;
 
 double sim_timer_inst_per_sec (void)
 {
-double inst_per_sec = SIM_INITIAL_IPS;
+double inst_per_sec = sim_inst_per_sec_last;
 
 if (sim_calb_tmr == -1)
     return inst_per_sec;
