@@ -382,7 +382,7 @@ if (pclk_csr & CSR_DONE)                                /* done already set? */
 else
     pclk_csr = pclk_csr | CSR_DONE;                     /* else set done */
 if (pclk_csr & CSR_IE) {                                /* if IE, set int */
-    sim_debug (DBG_INT, &pclk_dev, "iccs_svc() - INT=1\n");
+    sim_debug (DBG_INT, &pclk_dev, "pclk_svc() - INT=1\n");
     SET_INT (PCLK);
     }
 if (pclk_csr & CSR_MODE)                                /* if rpt, reload */
@@ -398,6 +398,7 @@ return SCPE_OK;
 
 t_stat pclk_reset (DEVICE *dptr)
 {
+sim_debug(DBG_REG, &pclk_dev, "pclk_reset()\n");
 pclk_csr = 0;                                           /* clear reg */
 pclk_csb = 0;
 pclk_ctr = 0;
