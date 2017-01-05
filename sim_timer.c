@@ -2575,7 +2575,7 @@ int32 tmr;
 
 if (!(uptr->dynflags & UNIT_TMR_UNIT))
     return FALSE;
-for (tmr=0; tmr<SIM_NTIMERS; tmr++) {
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     if (sim_clock_unit[tmr] == uptr)
         return sim_is_active (&sim_timer_units[tmr]);
     }
