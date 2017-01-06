@@ -39,7 +39,7 @@
  *                                                                       *
  *************************************************************************/
 
-extern t_stat i8272_attach(UNIT *uptr, char *cptr);
+extern t_stat i8272_attach(UNIT *uptr, CONST char *cptr);
 extern t_stat i8272_detach(UNIT *uptr);
 extern uint8 I8272_Set_DMA(const uint32 dma_addr);
 extern uint8 I8272_Read(const uint32 Addr);

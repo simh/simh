@@ -8,6 +8,8 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
+#include "socket.h"
+
 struct ex_list {
 	int ex_pty;			/* Do we want a pty? */
 	struct in_addr ex_addr;		/* Server address */
@@ -47,7 +49,7 @@ struct emu_t {
 
 void slirp_insque(void *, void *);
 void slirp_remque(void *);
-int add_exec(struct ex_list **, int, char *, struct in_addr, int);
+int add_exec(struct ex_list **, int, const char *, struct in_addr, int);
 int fork_exec(struct socket *so, const char *ex, int do_pty);
 
 #endif

@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2012, Robert M Supnik
+   Copyright (c) 1998-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jul-16    RMS     Corrected REI rule 9
+   21-Jun-16    RMS     Removed reserved check on SIRR (Mark Pizzolato)
+   18-Feb-16    RMS     Changed variables in MxPR to unsigned
+   29-Mar-15    RMS     Added model-specific IPR max
    15-Mar-12    RMS     Fixed potential integer overflow in LDPCTX (Mark Pizzolato)
    25-Nov-11    RMS     Added VEC_QBUS test in interrupt handler
    23-Mar-11    RMS     Revised idle design (Mark Pizzolato)
@@ -81,8 +85,6 @@ static const uint8 rcnt[128] = {
  8,12,12,16,12,16,16,20,12,16,16,20,16,20,20,24,        /* 60 - 6F */
 12,16,16,20,16,20,20,24,16,20,20,24,20,24,24,28         /* 70 - 7F */
 };
-
-extern const uint32 byte_mask[33];
 
 extern int32 ReadIPR (int32 rg);
 extern void WriteIPR (int32 rg, int32 val);
@@ -410,7 +412,7 @@ if (spamask & CALL_S) {                                 /* CALLS? */
     }
 PSL = (PSL & ~(PSW_DV | PSW_FU | PSW_IV | PSW_T)) |     /* reset PSW */
     (spamask & (PSW_DV | PSW_FU | PSW_IV | PSW_T));
-JUMP (newpc);                                           /* set new PC */
+JUMP_ALWAYS(newpc);                                     /* set new PC */
 return spamask & (CC_MASK);                             /* return cc's */
 }
 
@@ -1134,7 +1136,7 @@ acc = ACC_MASK (KERN);                                  /* new mode is kernel */
 Write (SP - 4, oldpsl, L_LONG, WA);                     /* push old PSL */
 Write (SP - 8, PC, L_LONG, WA);                         /* push old PC */
 SP = SP - 8;                                            /* update stk ptr */
-JUMP (newpc & ~3);                                      /* change PC */
+JUMP_ALWAYS (newpc & ~3);                               /* change PC */
 in_ie = 0;                                              /* out of flows */
 return 0;
 }
@@ -1173,7 +1175,7 @@ Write (tsp - 4, PSL | cc, L_LONG, WA);                  /* push PSL */
 SP = tsp - 12;                                          /* set new stk */
 PSL = (mode << PSL_V_CUR) | (PSL & PSL_IPL) |           /* set new PSL */
     (cur << PSL_V_PRV);                                 /* IPL unchanged */
-JUMP (newpc & ~03);                                     /* set new PC */
+JUMP_ALWAYS (newpc & ~03);                              /* set new PC */
 return 0;                                               /* cc = 0 */
 }
 
@@ -1195,7 +1197,7 @@ Rule    SRM formulation                     Comment
  6      tmp<25:24> LEQ tmp<23:22>           tmp<cur_mode> LEQ tmp<prv_mode>
  7      tmp<20:16> LEQ PSL<20:16>           tmp<ipl> LEQ PSL<ipl>
  8      tmp<31,29:28,21,15:8> = 0           tmp<mbz> = 0
- 9      tmp<31> = 1 => tmp<cur_mode> = 3, tmp<prv_mode> = 3>, tmp<fpd,is,ipl> = 0 
+ 9      tmp<31> = 1 => tmp<cur_mode> = 3, tmp<prv_mode> = 3>, tmp<fpd,is,ipl,dv,fu,iv> = 0 
 */
 
 int32 op_rei (int32 acc)
@@ -1245,7 +1247,7 @@ else {
         SISR = SISR | SISR_2;
         }
     }
-JUMP (newpc);                                           /* set new PC */
+JUMP_ALWAYS (newpc);                                    /* set new PC */
 return newpsl & CC_MASK;                                /* set new cc */
 }
 
@@ -1509,9 +1511,9 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_SIRR:                                       /* SIRR */
-        if ((val > 0xF) || (val == 0))
-            RSVD_OPND_FAULT;
-        SISR = SISR | (1 << val);                       /* set bit in SISR */
+        val = val & 0xF;                                /* consider only 4b */
+        if (val != 0)                                   /* if not zero */
+            SISR = SISR | (1 << val);                   /* set bit in SISR */
         break;
 
     case MT_SISR:                                       /* SISR */
@@ -1547,7 +1549,7 @@ return cc;
 
 int32 op_mfpr (int32 *opnd)
 {
-int32 prn = opnd[0];
+uint32 prn = (uint32)opnd[0];
 int32 val;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */

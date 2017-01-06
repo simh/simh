@@ -369,14 +369,14 @@ extern UNIT cpu_unit;
 
 static t_stat cr_svc      (UNIT *uptr);
 static t_stat cr_reset    (DEVICE *dptr);
-static t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc);
-static t_stat cr_attach   (UNIT *uptr, char *cptr);
+static t_stat cr_set_code (UNIT *uptr, int32 match, CONST char *cptr, void *desc);
+static t_stat cr_attach   (UNIT *uptr, CONST char *cptr);
 static int32  guess_cr_code (void);
 static void	  feedcycle	  (t_bool load, t_bool punching);
 
 static t_stat cp_reset	  (DEVICE *dptr);
-static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc);
-static t_stat cp_attach   (UNIT *uptr, char *cptr);
+static t_stat cp_set_code (UNIT *uptr, int32 match, CONST char *cptr, void *desc);
+static t_stat cp_attach   (UNIT *uptr, CONST char *cptr);
 static t_stat cp_detach   (UNIT *uptr);
 
 static int16 cr_dsw  = 0;									/* device status word */
@@ -736,7 +736,7 @@ static int any_punched = 0;
 #define MAXARGS   10					/* max number of arguments to save */
 static char list_save[MAXARGS][MAXARGLEN], *list_arg[MAXARGLEN+1];
 static int list_nargs = 0;
-static char* (*tab_proc)(char* str, int width) = NULL;		/* tab reformatting routine	*/
+static const char* (*tab_proc)(char* str, int width) = NULL;		/* tab reformatting routine	*/
 static int tab_width = 8;
 
 static uint16 punchstation[80];
@@ -746,7 +746,7 @@ static enum {STATION_EMPTY, STATION_LOADED, STATION_READ, STATION_PUNCHED} punch
 static t_bool nextdeck (void);
 static void checkdeck (void);
 
-static t_stat pcr_attach(UNIT *uptr, char *devname);
+static t_stat pcr_attach(UNIT *uptr, CONST char *devname);
 static t_stat pcr_detach(UNIT *uptr);
 static t_stat pcr_svc(UNIT *uptr);
 static void   pcr_xio_sense(int modify);
@@ -806,7 +806,7 @@ t_stat set_active_cr_code (int match)
 	return SCPE_OK;
 }
 
-static t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
+static t_stat cr_set_code (UNIT *uptr, int32 match, CONST char *cptr, void *desc)
 {
 	if (match == CODE_AUTO)
 		match = guess_cr_code();
@@ -873,7 +873,7 @@ static int32 guess_cr_code (void)
 	return guess;
 }
 
-static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
+static t_stat cp_set_code (UNIT *uptr, int32 match, CONST char *cptr, void *desc)
 {
 	CPCODE *code;
 	int ncode;
@@ -890,7 +890,8 @@ static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
 t_stat load_cr_boot (int32 drvno, int switches)
 {
 	int i;
-	char *name, msg[80];
+	const char *name;
+    char msg[80];
 	t_bool expand;
 	uint16 word, *boot;
 	static uint16 dms_boot_data[] = {				/* DMSV2M12, already expanded to 16 bits */
@@ -1038,7 +1039,8 @@ char hollerith_to_ascii (uint16 hol)
 
 static void feedcycle (t_bool load, t_bool punching)
 {
-	char buf[84], *x, *result;
+	char buf[84], *x;
+    const char *result;
 	int i, nread, nwrite, ch;
 
 	/* write punched card if punch is attached to a file */
@@ -1543,13 +1545,16 @@ t_stat cr_rewind (void)
 	return SCPE_OK;
 }
 
-static t_stat cr_attach (UNIT *uptr, char *cptr)
+static t_stat cr_attach (UNIT *uptr, CONST char *iptr)
 {
 	t_stat rval;
 	t_bool use_decklist, old_quiet;
+        char gbuf[4*CBUFSIZE], *cptr = gbuf;
 	char *c, *arg, quote;
 
-	cr_detach(uptr);								/* detach file and possibly deck file */
+	gbuf[sizeof(gbuf)-1] = '\0';
+	strncpy(gbuf, iptr, sizeof(gbuf)-1);
+        cr_detach(uptr);								/* detach file and possibly deck file */
 
 	CLRBIT(uptr->flags, UNIT_SCRATCH|UNIT_QUIET|UNIT_DEBUG|UNIT_PHYSICAL|UNIT_LOWERCASE);	/* set options */
 
@@ -1624,7 +1629,7 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 
 	if (strcmp(cptr, "(stdin)") == 0 && ! use_decklist) {			/* standard input */
 		if (uptr->flags & UNIT_DIS) return SCPE_UDIS;		/* disabled? */
-		uptr->filename = calloc(CBUFSIZE, sizeof(char));
+		uptr->filename = (char *)calloc(CBUFSIZE, sizeof(char));
 		strcpy(uptr->filename, "(stdin)");
 	    uptr->fileref = stdin;
 		SETBIT(uptr->flags, UNIT_ATT);
@@ -1694,12 +1699,13 @@ t_stat cr_detach (UNIT *uptr)
 	return rval;
 }
 
-static t_stat cp_attach (UNIT *uptr, char *cptr)
+static t_stat cp_attach (UNIT *uptr, CONST char *cptr)
 {
+    char gbuf[2*CBUFSIZE];
 												/* if -d is specified turn on debugging (bit is in card reader UNIT) */
 	if (sim_switches & SWMASK('D')) SETBIT(cr_unit.flags, UNIT_DEBUG);
 
-	return attach_unit(uptr, quotefix(cptr));	/* fix quotes in filenames & attach */
+	return attach_unit(uptr, quotefix(cptr, gbuf));	/* fix quotes in filenames & attach */
 }
 
 static t_stat cp_detach   (UNIT *uptr)
@@ -1714,7 +1720,7 @@ static t_stat cp_detach   (UNIT *uptr)
 	return detach_unit(uptr);
 }
 
-static void op_done (UNIT *u, char *opname, t_bool issue_intr)
+static void op_done (UNIT *u, const char *opname, t_bool issue_intr)
 {
 	if (u->flags & UNIT_DEBUG)
 		DEBUG_PRINT("!CR %s Op Complete, card %d%s", opname, cr_count, issue_intr ? ", interrupt" : "");
@@ -2088,7 +2094,7 @@ void xio_1442_card (int32 addr, int32 func, int32 modify)
 
 	/* stub out the physical card reader routines */
 
-	static t_stat pcr_attach        (UNIT *uptr, char *devname) {return SCPE_ARG;}
+	static t_stat pcr_attach        (UNIT *uptr, CONST char *devname) {return SCPE_ARG;}
 	static t_stat pcr_detach        (UNIT *uptr)                {return detach_unit(uptr);}
 	static t_stat pcr_svc			(UNIT *uptr)                {return SCPE_OK;}
 	static void   pcr_xio_sense     (int modify) {}
@@ -2130,7 +2136,7 @@ static void  pcr_trigger_interrupt_0(void);
 static void  begin_pcr_critical_section (void);
 static void  end_pcr_critical_section (void);
 static void  pcr_set_dsw_from_status (BOOL post_pick);
-static t_stat pcr_open_controller (char *devname);
+static t_stat pcr_open_controller (const char *devname);
 
 static PCR_STATE pcr_state  = PCR_STATE_CLOSED;		/* current state of connection to physical card reader interface */
 static char 	 pcr_status = 0;					/* last status byte received from the interface */
@@ -2147,7 +2153,7 @@ static char		 lastcmd = '?';
 
 /* pcr_attach - perform attach function to physical card reader */
 
-static t_stat pcr_attach (UNIT *uptr, char *devname)
+static t_stat pcr_attach (UNIT *uptr, CONST char *devname)
 {
 	DWORD thread_id;
 	t_stat rval;
@@ -2181,7 +2187,7 @@ static t_stat pcr_attach (UNIT *uptr, char *devname)
 	}
 
 	SETBIT(uptr->flags, UNIT_PHYSICAL|UNIT_ATT);	/* mark device as attached */
-	uptr->filename = malloc(strlen(devname)+1);
+	uptr->filename = (char *)malloc(strlen(devname)+1);
 	strcpy(uptr->filename, devname);
 
 	return SCPE_OK;
@@ -2189,7 +2195,7 @@ static t_stat pcr_attach (UNIT *uptr, char *devname)
 
 /* pcr_open_controller - open the USB device's virtual COM port and configure the interface */
 
-static t_stat pcr_open_controller (char *devname)
+static t_stat pcr_open_controller (const char *devname)
 {
 	DCB dcb;
 	COMMTIMEOUTS cto;

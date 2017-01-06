@@ -52,6 +52,7 @@ struct uart2681_t {
     uint8       ipcr;
     uint8       oport;
     uint8       opcr;
+    uint8       acr;
     };
 
 typedef struct uart2681_t UART2681;

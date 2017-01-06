@@ -41,8 +41,8 @@
 
 typedef struct {
     int32 opr;
-    char *mnemonic;
-    char *desc;
+    const char *mnemonic;
+    const char *desc;
 } OPMAP;
 
 const OPMAP opmap_orig [] = {

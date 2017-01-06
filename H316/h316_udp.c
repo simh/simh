@@ -197,7 +197,7 @@ int32 udp_find_free_link (void)
   return NOLINK;
 }
 
-t_stat udp_parse_remote (int32 link, char *premote)
+t_stat udp_parse_remote (int32 link, const char *premote)
 {
   // This routine will parse a remote address string in any of these forms -
   //
@@ -255,7 +255,7 @@ t_stat udp_error (int32 link, const char *msg)
   return SCPE_IOERR;
 }
 
-t_stat udp_create (DEVICE *dptr, char *premote, int32 *pln)
+t_stat udp_create (DEVICE *dptr, const char *premote, int32 *pln)
 {
   //   Create a logical UDP link to the specified remote system.  The "remote"
   // string specifies both the remote host name or IP and a port number.  The

@@ -66,6 +66,7 @@
 #define STOP_BOOT       12                              /* reboot (780) */
 #define STOP_UNKNOWN    13                              /* unknown reason */
 #define STOP_UNKABO     14                              /* unknown abort */
+#define STOP_DTOFF      15                              /* DECtape off reel */
 #define ABORT_INTR      -1                              /* interrupt */
 #define ABORT_MCHK      (-SCB_MCHK)                     /* machine check */
 #define ABORT_RESIN     (-SCB_RESIN)                    /* rsvd instruction */
@@ -378,25 +379,30 @@ extern jmp_buf save_env;
 #define DR_F            0x80                            /* FPD ok flag */
 #define DR_NSPMASK      0x07                            /* #specifiers */
 #define DR_V_USPMASK    4
-#define DR_M_USPMASK    0x70                            /* #spec, sym_ */
+#define DR_M_USPMASK    0x07                            /* #spec, sym_ */
 #define DR_GETNSP(x)    ((x) & DR_NSPMASK)
 #define DR_GETUSP(x)    (((x) >> DR_V_USPMASK) & DR_M_USPMASK)
 
 /* Extra bits in the opcode flag word of the Decode ROM array only for history results */
 
 #define DR_V_RESMASK    8
-#define DR_M_RESMASK    0x0F00
+#define DR_M_RESMASK    0x000F
 #define RB_0    (0 << DR_V_RESMASK)     /* No Results */
 #define RB_B    (1 << DR_V_RESMASK)     /* Byte Result */
 #define RB_W    (2 << DR_V_RESMASK)     /* Word Result */
 #define RB_L    (3 << DR_V_RESMASK)     /* Long Result */
 #define RB_Q    (4 << DR_V_RESMASK)     /* Quad Result */
 #define RB_O    (5 << DR_V_RESMASK)     /* Octa Result */
-#define RB_R0   (6 << DR_V_RESMASK)     /* Reg  R0     */
-#define RB_R1   (7 << DR_V_RESMASK)     /* Regs R0-R1  */
-#define RB_R3   (8 << DR_V_RESMASK)     /* Regs R0-R3  */
-#define RB_R5   (9 << DR_V_RESMASK)     /* Regs R0-R5  */
-#define RB_SP  (10 << DR_V_RESMASK)     /* @SP         */
+#define RB_OB   (6 << DR_V_RESMASK)     /* Octa Byte Result */
+#define RB_OW   (7 << DR_V_RESMASK)     /* Octa Word Result */
+#define RB_OL   (8 << DR_V_RESMASK)     /* Octa Long Result */
+#define RB_OQ   (9 << DR_V_RESMASK)     /* Octa Quad Result */
+#define RB_R0  (10 << DR_V_RESMASK)     /* Reg  R0     */
+#define RB_R1  (11 << DR_V_RESMASK)     /* Regs R0-R1  */
+#define RB_R3  (12 << DR_V_RESMASK)     /* Regs R0-R3  */
+#define RB_R5  (13 << DR_V_RESMASK)     /* Regs R0-R5  */
+#define RB_SP  (14 << DR_V_RESMASK)     /* @SP         */
+#define DR_GETRES(x)    (((x) >> DR_V_RESMASK) & DR_M_RESMASK)
 
 /* Decode ROM: specifier entry */
 
@@ -610,6 +616,7 @@ enum opcodes {
 /* Instructions which have side effects (ACB, AOBLSS, BBSC, BBCS, etc.) can't be an idle loop so avoid the idle check */
 #define BRANCHB_ALWAYS(d)      do {PCQ_ENTRY; PC = PC + SXTB (d); FLUSH_ISTR; } while (0)
 #define BRANCHW_ALWAYS(d)      do {PCQ_ENTRY; PC = PC + SXTW (d); FLUSH_ISTR; } while (0)
+#define JUMP_ALWAYS(d)         do {PCQ_ENTRY; PC = (d);           FLUSH_ISTR; } while (0)
 /* Any basic branch instructions could be an idle loop */
 #define BRANCHB(d)      do {PCQ_ENTRY; PC = PC + SXTB (d); FLUSH_ISTR; CHECK_FOR_IDLE_LOOP; } while (0)
 #define BRANCHW(d)      do {PCQ_ENTRY; PC = PC + SXTW (d); FLUSH_ISTR; CHECK_FOR_IDLE_LOOP; } while (0)
@@ -754,9 +761,27 @@ enum opcodes {
 #define VAX_IDLE_QUAD       0x10
 #define VAX_IDLE_BSDNEW     0x20
 #define VAX_IDLE_SYSV       0x40
-#define VAX_IDLE_ELN        0x80    /* VAXELN */
+#define VAX_IDLE_ELN        0x40    /* VAXELN */
 extern uint32 cpu_idle_mask;                            /* idle mask */
 void cpu_idle (void);
+
+/* Instruction History */
+#define HIST_MIN        64
+#define HIST_MAX        250000
+
+#define OPND_SIZE       16
+#define INST_SIZE       52
+
+typedef struct {
+    double              time;
+    int32               iPC;
+    int32               PSL;
+    int32               opc;
+    uint8               inst[INST_SIZE];
+    uint32              opnd[OPND_SIZE];
+    uint32              res[6];
+    } InstHistory;
+
 
 /* CPU Register definitions */
 
@@ -848,11 +873,11 @@ extern void op_polyd (int32 *opnd, int32 acc);
 extern void op_polyg (int32 *opnd, int32 acc);
 
 /* vax_octa.c externals */
-extern int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va);
+extern int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va, InstHistory *hst);
 
 /* vax_cmode.c externals */
 extern int32 op_cmode (int32 cc);
-extern int32 BadCmPSL (int32 newpsl);
+extern t_bool BadCmPSL (int32 newpsl);
 
 /* vax_sys.c externals */
 extern const uint16 drom[NUM_INST][MAX_SPEC + 1];
@@ -892,9 +917,10 @@ extern void rom_wr_B (int32 pa, int32 val);
 
 extern t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset);
 extern t_stat cpu_print_model (FILE *st);
-extern t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 extern t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+extern const uint32 byte_mask[33];
 
 #endif                                                  /* _VAX_DEFS_H */

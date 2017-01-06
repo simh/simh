@@ -223,6 +223,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_rk.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_rl.c"
 				>
 			</File>
@@ -236,6 +240,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_ry.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_tc.c"
 				>
 			</File>
 			<File
@@ -271,6 +279,7 @@
 					<Tool
 						Name="VCCLCompilerTool"
 						PreprocessorDefinitions="HAVE_PTW32_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+						CompileAs="1"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -280,6 +289,7 @@
 						Name="VCCLCompilerTool"
 						WholeProgramOptimization="false"
 						PreprocessorDefinitions="HAVE_PTW32_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+						CompileAs="1"
 					/>
 				</FileConfiguration>
 			</File>

@@ -40,6 +40,7 @@ extern DEVICE mba_dev[MBA_NUM];
 extern DEVICE clk_dev;
 extern DEVICE tmr_dev;
 extern DEVICE tti_dev, tto_dev;
+extern DEVICE dt_dev;
 extern DEVICE td_dev;
 extern DEVICE tdc_dev;
 extern DEVICE cr_dev;
@@ -47,6 +48,7 @@ extern DEVICE lpt_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE rl_dev;
 extern DEVICE hk_dev;
+extern DEVICE rk_dev;
 extern DEVICE rp_dev;
 extern DEVICE ry_dev;
 extern DEVICE ts_dev;
@@ -69,6 +71,7 @@ DEVICE *sim_devices[] = {
     &tmr_dev,
     &tti_dev,
     &tto_dev,
+    &dt_dev,
     &td_dev,
     &tdc_dev,
     &dz_dev,
@@ -78,6 +81,7 @@ DEVICE *sim_devices[] = {
     &rp_dev,
     &rl_dev,
     &hk_dev,
+    &rk_dev,
     &rq_dev,
     &rqb_dev,
     &rqc_dev,
@@ -101,7 +105,7 @@ DEVICE *sim_devices[] = {
    -o           for memory, specify origin
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 t_stat r;
 int32 val;

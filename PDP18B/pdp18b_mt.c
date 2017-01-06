@@ -138,12 +138,11 @@ int32 mt_time = 10;                                     /* record latency */
 int32 mt_stopioe = 1;                                   /* stop on error */
 uint8 *mtxb = NULL;                                     /* transfer buffer */
 
-DEVICE mt_dev;
 int32 mt (int32 dev, int32 pulse, int32 dat);
 int32 mt_iors (void);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cptr);
+t_stat mt_attach (UNIT *uptr, CONST char *cptr);
 t_stat mt_detach (UNIT *uptr);
 int32 mt_updcsta (UNIT *uptr, int32 val);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
@@ -171,14 +170,14 @@ UNIT mt_unit[] = {
     };
 
 REG mt_reg[] = {
-    { ORDATA (STA, mt_sta, 18) },
-    { ORDATA (CMD, mt_cu, 18) },
-    { FLDATA (INT, int_hwre[API_MTA], INT_V_MTA) },
-    { FLDATA (STOP_IOE, mt_stopioe, 0) },
-    { DRDATA (TIME, mt_time, 24), PV_LEFT },
-    { URDATA (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0) },
-    { URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
-              MT_NUMDR, PV_LEFT | REG_RO) },
+    { ORDATAD (STA, mt_sta, 18, "main status") },
+    { ORDATAD (CMD, mt_cu, 18, "command") },
+    { FLDATAD (INT, int_hwre[API_MTA], INT_V_MTA, "interrupt pending flag") },
+    { FLDATAD (STOP_IOE, mt_stopioe, 0, "stop on I/O error") },
+    { DRDATAD (TIME, mt_time, 24, "record delay"), PV_LEFT },
+    { URDATAD (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0, "unit status, units 0 to 7") },
+    { URDATAD (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
+              MT_NUMDR, PV_LEFT | REG_RO, "position units 0 to 7") },
     { ORDATA (DEVNO, mt_dib.dev, 6), REG_HRO },
     { ORDATA (APIVEC, api_vec[API_MTA][INT_V_MTA], 6), REG_HRO },
     { NULL }
@@ -191,10 +190,9 @@ MTAB mt_mod[] = {
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "TCAPACITY", "TCAPACITY",
       &sim_tape_set_capac, &sim_tape_show_capac, NULL },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, "WC" },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
-    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &set_devno, &show_devno, NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, (void *)"WC" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, MT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, (void *)"CA" },
+    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno, NULL },
     { 0 }
     };
 
@@ -510,7 +508,7 @@ return (mt_sta & (STA_ERR | STA_DON))? IOS_MTA: 0;
 
 /* Attach routine */
 
-t_stat mt_attach (UNIT *uptr, char *cptr)
+t_stat mt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

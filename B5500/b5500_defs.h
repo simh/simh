@@ -73,7 +73,7 @@ typedef struct _opcode
 {
     uint16              op;
     uint8               type;
-    char               *name;
+    const char          *name;
 }
 t_opcode;
 

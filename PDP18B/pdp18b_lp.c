@@ -85,7 +85,6 @@ static const char *lp62_cc[] = {
     "\f"
     };
 
-DEVICE lp62_dev;
 int32 lp62_65 (int32 dev, int32 pulse, int32 dat);
 int32 lp62_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp62_iors (void);
@@ -106,17 +105,17 @@ UNIT lp62_unit = {
     };
 
 REG lp62_reg[] = {
-    { ORDATA (BUF, lp62_unit.buf, 8) },
-    { FLDATA (INT, int_hwre[API_LPT], INT_V_LPT) },
-    { FLDATA (DONE, int_hwre[API_LPT], INT_V_LPT) },
-    { FLDATA (SPC, int_hwre[API_LPTSPC], INT_V_LPTSPC) },
-    { DRDATA (BPTR, lp62_bp, 6) },
+    { ORDATAD (BUF, lp62_unit.buf, 8, "last data item processed") },
+    { FLDATAD (INT, int_hwre[API_LPT], INT_V_LPT, "interrupt pending flag") },
+    { FLDATAD (DONE, int_hwre[API_LPT], INT_V_LPT, "device done flag") },
+    { FLDATAD (SPC, int_hwre[API_LPTSPC], INT_V_LPTSPC, "spacing done flag") },
+    { DRDATAD (BPTR, lp62_bp, 6, "print buffer pointer") },
     { ORDATA (STATE, lp62_spc, 6), REG_HRO },
     { FLDATA (OVRPR, lp62_ovrpr, 0), REG_HRO },
-    { DRDATA (POS, lp62_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, lp62_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, lp62_stopioe, 0) },
-    { BRDATA (LBUF, lp62_buf, 8, 8, LP62_BSIZE) },
+    { DRDATAD (POS, lp62_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, lp62_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, lp62_stopioe, 0, "stop on I/O error") },
+    { BRDATAD (LBUF, lp62_buf, 8, 8, LP62_BSIZE, "line buffer") },
     { ORDATA (DEVNO, lp62_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -269,13 +268,12 @@ static const char *lp647_cc[] = {
     "\f"
     };
 
-DEVICE lp647_dev;
 int32 lp647_65 (int32 dev, int32 pulse, int32 dat);
 int32 lp647_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp647_iors (void);
 t_stat lp647_svc (UNIT *uptr);
 t_stat lp647_reset (DEVICE *dptr);
-t_stat lp647_attach (UNIT *uptr, char *cptr);
+t_stat lp647_attach (UNIT *uptr, CONST char *cptr);
 t_stat lp647_detach (UNIT *uptr);
 
 /* Type 647 LPT data structures
@@ -292,19 +290,19 @@ UNIT lp647_unit = {
     };
 
 REG lp647_reg[] = {
-    { ORDATA (BUF, lp647_unit.buf, 8) },
-    { FLDATA (INT, int_hwre[API_LPT], INT_V_LPT) },
-    { FLDATA (DONE, lp647_don, 0) },
+    { ORDATAD (BUF, lp647_unit.buf, 8, "last data item processed") },
+    { FLDATAD (INT, int_hwre[API_LPT], INT_V_LPT, "interrupt pending flag") },
+    { FLDATAD (DONE, lp647_don, 0, "device done flag") },
 #if defined (PDP9)
-    { FLDATA (ENABLE, lp647_ie, 0) },
+    { FLDATAD (ENABLE, lp647_ie, 0, "interrupt enable") },
 #endif
-    { FLDATA (ERR, lp647_err, 0) },
-    { DRDATA (BPTR, lp647_bp, 7) },
+    { FLDATAD (ERR, lp647_err, 0, "error flag") },
+    { DRDATAD (BPTR, lp647_bp, 7, "print buffer pointer") },
     { ORDATA (SCMD, lp647_iot, 6), REG_HRO },
-    { DRDATA (POS, lp647_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, lp647_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, lp647_stopioe, 0) },
-    { BRDATA (LBUF, lp647_buf, 8, 8, LP647_BSIZE) },
+    { DRDATAD (POS, lp647_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, lp647_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, lp647_stopioe, 0, "stop on I/O error") },
+    { BRDATAD (LBUF, lp647_buf, 8, 8, LP647_BSIZE, "line buffer") },
     { ORDATA (DEVNO, lp647_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -479,7 +477,7 @@ return (lp647_don? IOS_LPT: 0) | (lp647_err? IOS_LPT1: 0);
 
 /* Attach routine */
 
-t_stat lp647_attach (UNIT *uptr, char *cptr)
+t_stat lp647_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -508,13 +506,12 @@ int32 lp09_don = 0;                                     /* ready */
 int32 lp09_err = 0;                                     /* error */
 int32 lp09_ie = 1;                                      /* int enable */
 int32 lp09_stopioe = 0;
-DEVICE lp09_dev;
 
 int32 lp09_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp09_iors (void);
 t_stat lp09_svc (UNIT *uptr);
 t_stat lp09_reset (DEVICE *dptr);
-t_stat lp09_attach (UNIT *uptr, char *cptr);
+t_stat lp09_attach (UNIT *uptr, CONST char *cptr);
 t_stat lp09_detach (UNIT *uptr);
 
 /* LP09 LPT data structures
@@ -531,14 +528,14 @@ UNIT lp09_unit = {
     };
 
 REG lp09_reg[] = {
-    { ORDATA (BUF, lp09_unit.buf, 7) },
-    { FLDATA (INT, int_hwre[API_LPT], INT_V_LPT) },
-    { FLDATA (DONE, lp09_don, 0) },
-    { FLDATA (ENABLE, lp09_ie, 0) },
-    { FLDATA (ERR, lp09_err, 0) },
-    { DRDATA (POS, lp09_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, lp09_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, lp09_stopioe, 0) },
+    { ORDATAD (BUF, lp09_unit.buf, 7, "last data item processed") },
+    { FLDATAD (INT, int_hwre[API_LPT], INT_V_LPT, "interrupt pending flag") },
+    { FLDATAD (DONE, lp09_don, 0, "device done flag") },
+    { FLDATAD (ENABLE, lp09_ie, 0, "interrupt enable") },
+    { FLDATAD (ERR, lp09_err, 0, "error flag") },
+    { DRDATAD (POS, lp09_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, lp09_unit.wait, 24, "time from initiation to inturrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, lp09_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVNO, lp09_dib.dev, 6), REG_HRO },
     { ORDATA (APIVEC, api_vec[API_LPT][INT_V_LPT], 6), REG_HRO },
     { NULL }
@@ -644,7 +641,7 @@ return (lp09_don? IOS_LPT: 0);
 
 /* Attach routine */
 
-t_stat lp09_attach (UNIT *uptr, char *cptr)
+t_stat lp09_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -691,14 +688,13 @@ int32 lp15_lc = 0;
 int32 lp15_bp = 0;
 char lp15_buf[LP15_BSIZE + 1] = { 0 };
 
-DEVICE lp15_dev;
 int32 lp15_65 (int32 dev, int32 pulse, int32 dat);
 int32 lp15_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp15_iors (void);
 t_stat lp15_svc (UNIT *uptr);
 t_stat lp15_reset (DEVICE *dptr);
 
-int32 lp15_updsta (int32 new);
+int32 lp15_updsta (int32 New);
 
 /* LP15 LPT data structures
 
@@ -714,23 +710,23 @@ UNIT lp15_unit = {
     };
 
 REG lp15_reg[] = {
-    { ORDATA (STA, lp15_sta, 18) },
-    { FLDATA (INT, int_hwre[API_LPT], INT_V_LPT) },
-    { FLDATA (ENABLE, lp15_ie, 0) },
-    { DRDATA (LCNT, lp15_lc, 9) },
-    { DRDATA (BPTR, lp15_bp, 8) },
-    { FLDATA (MODE, lp15_mode, 0) },
-    { DRDATA (POS, lp15_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, lp15_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, lp15_stopioe, 0) },
-    { BRDATA (LBUF, lp15_buf, 8, 8, LP15_BSIZE) },
+    { ORDATAD (STA, lp15_sta, 18, "status register") },
+    { FLDATAD (INT, int_hwre[API_LPT], INT_V_LPT, "interrupt pending flag") },
+    { FLDATAD (ENABLE, lp15_ie, 0, "interrupt enable") },
+    { DRDATAD (LCNT, lp15_lc, 9, "line counter") },
+    { DRDATAD (BPTR, lp15_bp, 8, "print buffer pointer") },
+    { FLDATAD (MODE, lp15_mode, 0, "mode flag") },
+    { DRDATAD (POS, lp15_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, lp15_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, lp15_stopioe, 0, "stop on I/O error") },
+    { BRDATAD (LBUF, lp15_buf, 8, 8, LP15_BSIZE, "line buffer") },
     { ORDATA (DEVNO, lp15_dib.dev, 6), REG_HRO },
     { ORDATA (APIVEC, api_vec[API_LPT][INT_V_LPT], 6), REG_HRO },
     { NULL }
     };
 
 MTAB lp15_mod[] = {
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, LPT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, LPT_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, (void *)"CA" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
     };
@@ -856,9 +852,9 @@ return SCPE_OK;
 
 /* Update status */
 
-int32 lp15_updsta (int32 new)
+int32 lp15_updsta (int32 New)
 {
-lp15_sta = (lp15_sta | new) & ~(STA_CLR | STA_ERR | STA_BUSY);
+lp15_sta = (lp15_sta | New) & ~(STA_CLR | STA_ERR | STA_BUSY);
 if (lp15_sta & STA_EFLGS)                               /* update errors */
     lp15_sta = lp15_sta | STA_ERR;
 if (sim_is_active (&lp15_unit))

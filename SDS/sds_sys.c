@@ -1,6 +1,6 @@
 /* sds_sys.c: SDS 940 simulator interface
 
-   Copyright (c) 2001-2012, Robert M Supnik
+   Copyright (c) 2001-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-May-16    RMS     Fixed ascii-to-sds940 data (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declarations of CCT arrays (Mark Pizzolato)
 */
 
@@ -150,10 +151,10 @@ const int8 sds940_to_ascii[64] = {
      };
 
 const int8 ascii_to_sds940[128] = {
-     -1, 141, 142, 143, 144, 145, 146, 147,             /* 00 - 37 */
-     -1, 151, 152, 153, 154, 155,  -1,  -1,             
-     -1, 161, 162, 163, 164, 165, 166, 167,
-    170, 171, 172,  -1,  -1,  -1,  -1,  -1,
+      -1, 0141, 0142, 0143, 0144, 0145, 0146, 0147,     /* 00 - 37 */
+      -1, 0151, 0152, 0153, 0154, 0155,   -1,   -1,             
+      -1, 0161, 0162, 0163, 0164, 0165, 0166, 0167,
+    0170, 0171, 0172,   -1,   -1,   -1,   -1,   -1,
     000, 001, 002, 003, 004, 005, 006, 007,             /* 40 - 77 */
     010, 011, 012, 013, 014, 015, 016, 017,
     020, 021, 022, 023, 024, 025, 026, 027,
@@ -195,7 +196,8 @@ int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
 t_stat r;
 extern int32 lpt_ccl, lpt_ccp;
 extern uint8 lpt_cct[CCT_LNT];
-char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
+const char *cptr;
+char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 ptr = 0;
 for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
@@ -250,7 +252,7 @@ for (i = wd = 0; i < 4; ) {
 return wd;
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 i, wd, buf[8];
 int32 ldr = 1;
@@ -633,9 +635,10 @@ return SCPE_ARG;
         cptr  = updated pointer to input string
 */
 
-char *get_tag (char *cptr, t_value *tag)
+CONST char *get_tag (CONST char *cptr, t_value *tag)
 {
-char *tptr, gbuf[CBUFSIZE];
+CONST char *tptr;
+char gbuf[CBUFSIZE];
 t_stat r;
 
 tptr = get_glyph (cptr, gbuf, 0);                       /* get next field */
@@ -658,20 +661,17 @@ return cptr;                                            /* no change */
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, j, k, ch;
 t_value d, tag;
 t_stat r;
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], cbuf[2*CBUFSIZE];
 
 while (isspace (*cptr)) cptr++;
-for (i = 1; (i < 4) && (cptr[i] != 0); i++) {
-    if (cptr[i] == 0) {
-        for (j = i + 1; j <= 4; j++)
-            cptr[j] = 0;
-        }
-    }
+memset (cbuf, '\0', sizeof(cbuf));
+strncpy (cbuf, cptr, sizeof(cbuf)-5);
+cptr = cbuf;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;

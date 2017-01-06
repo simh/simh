@@ -115,7 +115,7 @@
    enumerates the available host serial ports
 
 
-   t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
+   t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, const void* desc)
    ---------------------------------
 
    displays the available host serial ports
@@ -291,29 +291,6 @@ for (i=0; i<count; i++) {
 return NULL;
 }
 
-/* strncasecmp() is not available on all platforms */
-static int sim_serial_strncasecmp (char* string1, char* string2, size_t len)
-{
-size_t i;
-unsigned char s1, s2;
-
-for (i=0; i<len; i++) {
-    s1 = string1[i];
-    s2 = string2[i];
-    if (islower (s1))
-        s1 = (unsigned char)toupper (s1);
-    if (islower (s2))
-        s2 = (unsigned char)toupper (s2);
-    if (s1 < s2)
-        return -1;
-    if (s1 > s2)
-        return 1;
-    if (s1 == 0)
-        return 0;
-}
-return 0;
-}
-
 static char* sim_serial_getname_byname (char* name, char* temp)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
@@ -325,7 +302,7 @@ found = 0;
 n = strlen(name);
 for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (sim_serial_strncasecmp(name, list[i].name, n) == 0)) {
+        (sim_strncasecmp(name, list[i].name, n) == 0)) {
         found = 1;
         strcpy(temp, list[i].name); /* only case might be different */
         }
@@ -344,7 +321,7 @@ found = 0;
 n = strlen(name);
 for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (sim_serial_strncasecmp(name, list[i].name, n) == 0)) {
+        (sim_strncasecmp(name, list[i].name, n) == 0)) {
         found = 1;
         strcpy(temp, list[i].desc);
         }
@@ -352,7 +329,7 @@ for (i=0; i<count && !found; i++) {
   return (found ? temp : NULL);
 }
 
-t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int number = sim_serial_devices(SER_MAX_DEVICE, list);
@@ -391,7 +368,7 @@ SERHANDLE sim_open_serial (char *name, TMLN *lp, t_stat *stat)
 char temp1[1024], devname [1024];
 char *savname = name;
 SERHANDLE port = INVALID_HANDLE;
-const char *config;
+CONST char *config;
 t_stat status;
 
 config = get_glyph_nc (name, devname, ';');             /* separate port name from optional config params */
@@ -415,7 +392,7 @@ if ((strlen(devname) <= 5)
     if (savname == NULL) {                              /* didn't translate */
         if (stat)
             *stat = SCPE_OPENERR;
-        return port;
+        return INVALID_HANDLE;
         }
     }
 else {
@@ -468,10 +445,10 @@ sim_close_os_serial (port);
 _serial_remove_from_open_list (port);
 }
 
-t_stat sim_config_serial  (SERHANDLE port, const char *sconfig)
+t_stat sim_config_serial  (SERHANDLE port, CONST char *sconfig)
 {
-const char *pptr;
-const char *sptr, *tptr;
+CONST char *pptr;
+CONST char *sptr, *tptr;
 SERCONFIG config = { 0 };
 t_bool arg_error = FALSE;
 t_stat r;
@@ -522,6 +499,14 @@ return r;
    is set to the OS internal name for the COM device.
 
 */
+
+struct SERPORT {
+    HANDLE hPort;
+    DWORD dwEvtMask;
+    OVERLAPPED oReadSync;
+    OVERLAPPED oWriteReady;
+    OVERLAPPED oWriteSync;
+    };
 
 static int sim_serial_os_devices (int max, SERIAL_LIST* list)
 {
@@ -583,6 +568,7 @@ return ports;
 
 static SERHANDLE sim_open_os_serial (char *name)
 {
+HANDLE hPort;
 SERHANDLE port;
 DCB dcb;
 COMMCONFIG commdefault;
@@ -599,10 +585,10 @@ if (!GetDefaultCommConfig (name, &commdefault, &commsize)) {    /* get default c
     return INVALID_HANDLE;                                      /* indicate bad port name */
     }
 
-port = CreateFile (name, GENERIC_READ | GENERIC_WRITE,  /* open the port */
-                   0, NULL, OPEN_EXISTING, 0, 0);
+hPort = CreateFile (name, GENERIC_READ | GENERIC_WRITE, /* open the port */
+                   0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
 
-if (port == INVALID_HANDLE_VALUE) {                     /* open failed? */
+if (hPort == INVALID_HANDLE_VALUE) {                    /* open failed? */
     error = GetLastError ();                            /* get error code */
 
     if ((error != ERROR_FILE_NOT_FOUND) &&              /* bad filename? */
@@ -612,13 +598,16 @@ if (port == INVALID_HANDLE_VALUE) {                     /* open failed? */
     return INVALID_HANDLE;                              /* indicate bad port name */
     }
 
-if (!GetCommState (port, &dcb)) {                       /* get the current comm parameters */
+port = (SERHANDLE)calloc (1, sizeof(*port));            /* instantiate the SERHANDLE */
+port->hPort = hPort;
+
+if (!GetCommState (port->hPort, &dcb)) {                /* get the current comm parameters */
     error = GetLastError ();                            /* function failed; get error */
 
     if (error != ERROR_INVALID_PARAMETER)               /* not a serial port name? */
         sim_error_serial ("GetCommState", (int) error); /* no, so report unexpected error */
 
-    CloseHandle (port);                                 /* close the port */
+    sim_close_os_serial (port);                         /* close port */
     return INVALID_HANDLE;                              /*   and indicate bad port name */
     }
 
@@ -631,10 +620,10 @@ dcb.fInX     = commdefault.dcb.fInX;
 
 dcb.fDtrControl = DTR_CONTROL_DISABLE;                  /* disable DTR initially until poll connects */
 
-if (!SetCommState (port, &dcb)) {                       /* configure the port with default parameters */
+if (!SetCommState (port->hPort, &dcb)) {                /* configure the port with default parameters */
     sim_error_serial ("SetCommState",                   /* function failed; report unexpected error */
                       (int) GetLastError ());
-    CloseHandle (port);                                 /* close port */
+    sim_close_os_serial (port);                         /* close port */
     return INVALID_HANDLE;                              /*   and indicate failure to caller */
     }
 
@@ -644,10 +633,52 @@ cto.ReadTotalTimeoutConstant    = 0;
 cto.WriteTotalTimeoutMultiplier = 0;
 cto.WriteTotalTimeoutConstant   = 0;
 
-if (!SetCommTimeouts (port, &cto)) {                    /* configure port timeouts */
+if (!SetCommTimeouts (port->hPort, &cto)) {             /* configure port timeouts */
     sim_error_serial ("SetCommTimeouts",                /* function failed; report unexpected error */
                       (int) GetLastError ());
-    CloseHandle (port);                                 /* close port */
+    sim_close_os_serial (port);                         /* close port */
+    return INVALID_HANDLE;                              /*   and indicate failure to caller */
+    }
+
+/* Create an event object for use by WaitCommEvent. */
+
+port->oWriteReady.hEvent = CreateEvent(NULL,            /* default security attributes */
+                                       TRUE,            /* manual-reset event */
+                                       TRUE,            /* signaled */
+                                       NULL);           /* no name */
+if (port->oWriteReady.hEvent == NULL) {
+    sim_error_serial ("CreateEvent",                    /* function failed; report unexpected error */
+                      (int) GetLastError ());
+    sim_close_os_serial (port);                         /* close port */
+    return INVALID_HANDLE;                              /*   and indicate failure to caller */
+    }
+
+port->oReadSync.hEvent = CreateEvent(NULL,              /* default security attributes */
+                                     TRUE,              /* manual-reset event */
+                                     FALSE,             /* not signaled */
+                                     NULL);             /* no name */
+if (port->oReadSync.hEvent == NULL) {
+    sim_error_serial ("CreateEvent",                    /* function failed; report unexpected error */
+                      (int) GetLastError ());
+    sim_close_os_serial (port);                         /* close port */
+    return INVALID_HANDLE;                              /*   and indicate failure to caller */
+    }
+
+port->oWriteSync.hEvent = CreateEvent(NULL,             /* default security attributes */
+                                      TRUE,             /* manual-reset event */
+                                      FALSE,            /* not signaled */
+                                      NULL);            /* no name */
+if (port->oWriteSync.hEvent == NULL) {
+    sim_error_serial ("CreateEvent",                    /* function failed; report unexpected error */
+                      (int) GetLastError ());
+    sim_close_os_serial (port);                         /* close port */
+    return INVALID_HANDLE;                              /*   and indicate failure to caller */
+    }
+
+if (!SetCommMask (port->hPort, EV_TXEMPTY)) {
+    sim_error_serial ("SetCommMask",                    /* function failed; report unexpected error */
+                      (int) GetLastError ());
+    sim_close_os_serial (port);                         /* close port */
     return INVALID_HANDLE;                              /*   and indicate failure to caller */
     }
 
@@ -688,7 +719,7 @@ DCB dcb;
 DWORD error;
 int32 i;
 
-if (!GetCommState (port, &dcb)) {                       /* get the current comm parameters */
+if (!GetCommState (port->hPort, &dcb)) {                /* get the current comm parameters */
     sim_error_serial ("GetCommState",                   /* function failed; report unexpected error */
                       (int) GetLastError ());
     return SCPE_IOERR;                                  /* return failure status */
@@ -719,7 +750,7 @@ else if (config.stopbits == 0)                          /* 0 implies 1.5 stop bi
 else
     return SCPE_ARG;                                    /* not a valid number of stop bits */
 
-if (!SetCommState (port, &dcb)) {                       /* set the configuration */
+if (!SetCommState (port->hPort, &dcb)) {                /* set the configuration */
     error = GetLastError ();                            /* check for error */
 
     if (error == ERROR_INVALID_PARAMETER)               /* invalid configuration? */
@@ -752,28 +783,28 @@ if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits
     (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
     return SCPE_ARG;
 if (bits_to_set&TMXR_MDM_DTR)
-    if (!EscapeCommFunction (port, SETDTR)) {
+    if (!EscapeCommFunction (port->hPort, SETDTR)) {
         sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
         return SCPE_IOERR;
         }
 if (bits_to_clear&TMXR_MDM_DTR)
-    if (!EscapeCommFunction (port, CLRDTR)) {
+    if (!EscapeCommFunction (port->hPort, CLRDTR)) {
         sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
         return SCPE_IOERR;
         }
 if (bits_to_set&TMXR_MDM_RTS)
-    if (!EscapeCommFunction (port, SETRTS)) {
+    if (!EscapeCommFunction (port->hPort, SETRTS)) {
         sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
         return SCPE_IOERR;
         }
 if (bits_to_clear&TMXR_MDM_RTS)
-    if (!EscapeCommFunction (port, CLRRTS)) {
+    if (!EscapeCommFunction (port->hPort, CLRRTS)) {
         sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
         return SCPE_IOERR;
         }
 if (incoming_bits) {
     DWORD ModemStat;
-    if (GetCommModemStatus (port, &ModemStat)) {
+    if (GetCommModemStatus (port->hPort, &ModemStat)) {
         sim_error_serial ("GetCommModemStatus", (int) GetLastError ());
         return SCPE_IOERR;
         }
@@ -813,14 +844,14 @@ DWORD commerrors;
 COMSTAT cs;
 char *bptr;
 
-if (!ClearCommError (port, &commerrors, &cs)) {         /* get the comm error flags  */
+if (!ClearCommError (port->hPort, &commerrors, &cs)) {  /* get the comm error flags  */
     sim_error_serial ("ClearCommError",                 /* function failed; report unexpected error */
                       (int) GetLastError ());
     return -1;                                          /* return failure to caller */
     }
 
-if (!ReadFile (port, (LPVOID) buffer,                   /* read any available characters */
-               (DWORD) count, &read, NULL)) {
+if (!ReadFile (port->hPort, (LPVOID) buffer,            /* read any available characters */
+               (DWORD) count, &read, &port->oReadSync)) {
     sim_error_serial ("ReadFile",                       /* function failed; report unexpected error */
                       (int) GetLastError ());
     return -1;                                          /* return failure to caller */
@@ -848,16 +879,22 @@ return read;                                            /* return the number of 
 
 int32 sim_write_serial (SERHANDLE port, char *buffer, int32 count)
 {
-DWORD written;
-
-if (!WriteFile (port, (LPVOID) buffer,                  /* write the buffer to the serial port */
-                (DWORD) count, &written, NULL)) {
-    sim_error_serial ("WriteFile",                      /* function failed; report unexpected error */
+if (WaitForSingleObject (port->oWriteReady.hEvent, 0) == WAIT_TIMEOUT)
+    return 0;
+if ((!WriteFile (port->hPort, (LPVOID) buffer,   /* write the buffer to the serial port */
+                 (DWORD) count, NULL, &port->oWriteSync)) &&
+    (GetLastError () != ERROR_IO_PENDING)) {
+    sim_error_serial ("WriteFile",              /* function failed; report unexpected error */
                       (int) GetLastError ());
-    return -1;                                          /* return failure to caller */
+    return -1;                                  /* return failure to caller */
     }
-else
-    return written;                                     /* return number of characters written */
+if ((!WaitCommEvent (port->hPort, &port->dwEvtMask, &port->oWriteReady)) &&
+    (GetLastError () != ERROR_IO_PENDING)) {
+    sim_error_serial ("WaitCommEvent",          /* function failed; report unexpected error */
+                      (int) GetLastError ());
+    return -1;                                  /* return failure to caller */
+    }
+return count;                                   /* return number of characters written/queued */
 }
 
 
@@ -868,13 +905,24 @@ else
 
 static void sim_close_os_serial (SERHANDLE port)
 {
-CloseHandle (port);                                     /* close the port */
-return;
+if (port->oWriteReady.hEvent)
+    CloseHandle (port->oWriteReady.hEvent);               /* close the event handle */
+if (port->oReadSync.hEvent)
+    CloseHandle (port->oReadSync.hEvent);               /* close the event handle */
+if (port->oWriteSync.hEvent)
+    CloseHandle (port->oWriteSync.hEvent);              /* close the event handle */
+if (port->hPort)
+    CloseHandle (port->hPort);                          /* close the port */
+free (port);
 }
 
 
 
 #elif defined (__unix__) || defined(__APPLE__) || defined(__hpux)
+
+struct SERPORT {
+    int port;
+    };
 
 #if defined(__linux) || defined(__linux__)
 #include <dirent.h>
@@ -1051,9 +1099,8 @@ static const tcflag_t l_clear = ISIG    |               /* enable signals */
                                 IEXTEN;                 /* enable extended functions */
 
 static const tcflag_t l_set   = 0;
-
-
-SERHANDLE port;
+int port;
+SERHANDLE serport;
 struct termios tio;
 
 port = open (name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
@@ -1115,7 +1162,9 @@ if (tcsetattr (port, TCSANOW, &tio)) {                  /* set the terminal attr
     return INVALID_HANDLE;                              /*   and return failure to caller */
     }
 
-return port;                                            /* return port fd for success */
+serport = (SERHANDLE)calloc (1, sizeof(*serport));
+serport->port = port;
+return serport;                                         /* return port fd for success */
 }
 
 
@@ -1154,7 +1203,7 @@ static const int32 baud_count = sizeof (baud_map) / sizeof (baud_map [0]);
 static const tcflag_t charsize_map [4] = { CS5, CS6, CS7, CS8 };
 
 
-if (tcgetattr (port, &tio)) {                           /* get the current configuration */
+if (tcgetattr (port->port, &tio)) {                     /* get the current configuration */
     sim_error_serial ("tcgetattr", errno);              /* function failed; report unexpected error */
     return SCPE_IOERR;                                  /* return failure status */
     }
@@ -1199,7 +1248,7 @@ else if (config.stopbits == 2)                          /* two stop bits? */
 else                                                    /* some other number? */
     return SCPE_ARG;                                    /* not a valid number of stop bits */
 
-if (tcsetattr (port, TCSAFLUSH, &tio)) {                /* set the new configuration */
+if (tcsetattr (port->port, TCSAFLUSH, &tio)) {          /* set the new configuration */
     sim_error_serial ("tcsetattr", errno);              /* function failed; report unexpected error */
     return SCPE_IERR;                                   /* return failure status */
     }
@@ -1231,7 +1280,7 @@ if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits
 if (bits_to_set) {
     bits = ((bits_to_set&TMXR_MDM_DTR) ? TIOCM_DTR : 0) |
            ((bits_to_set&TMXR_MDM_RTS) ? TIOCM_RTS : 0);
-    if (ioctl (port, TIOCMBIS, &bits)) {            /* set the desired bits */
+    if (ioctl (port->port, TIOCMBIS, &bits)) {      /* set the desired bits */
         sim_error_serial ("ioctl", errno);          /* report unexpected error */
         return SCPE_IOERR;                          /* return failure status */
         }
@@ -1239,13 +1288,13 @@ if (bits_to_set) {
 if (bits_to_clear) {
     bits = ((bits_to_clear&TMXR_MDM_DTR) ? TIOCM_DTR : 0) |
            ((bits_to_clear&TMXR_MDM_RTS) ? TIOCM_RTS : 0);
-    if (ioctl (port, TIOCMBIC, &bits)) {            /* clear the desired bits */
+    if (ioctl (port->port, TIOCMBIC, &bits)) {      /* clear the desired bits */
         sim_error_serial ("ioctl", errno);          /* report unexpected error */
         return SCPE_IOERR;                          /* return failure status */
         }
     }
 if (incoming_bits) {
-    if (ioctl (port, TIOCMGET, &bits)) {            /* get the modem bits */
+    if (ioctl (port->port, TIOCMGET, &bits)) {      /* get the modem bits */
         sim_error_serial ("ioctl", errno);          /* report unexpected error */
         return SCPE_IOERR;                          /* return failure status */
         }
@@ -1287,7 +1336,7 @@ int read_count;
 char *bptr, *cptr;
 int32 remaining;
 
-read_count = read (port, (void *) buffer, (size_t) count);  /* read from the serial port */
+read_count = read (port->port, (void *) buffer, (size_t) count);/* read from the serial port */
 
 if (read_count == -1)                                       /* read error? */
     if (errno == EAGAIN)                                    /* no characters available? */
@@ -1337,7 +1386,7 @@ int32 sim_write_serial (SERHANDLE port, char *buffer, int32 count)
 {
 int written;
 
-written = write (port, (void *) buffer, (size_t) count);    /* write the buffer to the serial port */
+written = write (port->port, (void *) buffer, (size_t) count);/* write the buffer to the serial port */
 
 if (written == -1) {
     if (errno == EWOULDBLOCK)
@@ -1361,8 +1410,8 @@ return (int32) written;                                     /* return number of 
 
 static void sim_close_os_serial (SERHANDLE port)
 {
-close (port);                                           /* close the port */
-return;
+close (port->port);                                           /* close the port */
+free (port);
 }
 
 
@@ -1407,6 +1456,11 @@ typedef struct {
     void *buffer_address;
     void *return_length_address;
     } ITEM;
+
+struct SERPORT {
+    uint32 port;
+    IOSB write_iosb;
+    };
 
 /* Enumerate the available serial ports.
 
@@ -1515,6 +1569,7 @@ ITEM items[] = { {sizeof (devclass), DVI$_DEVCLASS, &devclass, NULL},
                  {                0,             0,      NULL, NULL}};
 SENSE_BUF start_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
+SERHANDLE port;
 
 devnam.dsc$w_length = strlen (devnam.dsc$a_pointer);
 status = sys$assign (&devnam, &chan, 0, 0);
@@ -1542,7 +1597,10 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) {
     sys$dassgn (chan);
     return INVALID_HANDLE;
     }
-return chan;                                            /* return channel for success */
+port = (SERHANDLE)calloc (1, sizeof(*port));
+port->port = chan;
+port->write_iosb.status = 1;
+return port;                                            /* return channel for success */
 }
 
 
@@ -1579,7 +1637,7 @@ static const struct {
 
 static const int32 baud_count = sizeof (baud_map) / sizeof (baud_map [0]);
 
-status = sys$qiow (0, port, IO$_SENSEMODE, &iosb, 0, 0, &sense, sizeof(sense), 0, NULL, 0, 0);
+status = sys$qiow (0, port->port, IO$_SENSEMODE, &iosb, 0, 0, &sense, sizeof(sense), 0, NULL, 0, 0);
 if (status == SS$_NORMAL)
     status = iosb.status;
 if (status != SS$_NORMAL) {
@@ -1633,7 +1691,7 @@ switch (config.stopbits) {
         return SCPE_ARG;                                /* not a valid number of stop bits */
     }
 
-status = sys$qiow (0, port, IO$_SETMODE, &iosb, 0, 0,
+status = sys$qiow (0, port->port, IO$_SETMODE, &iosb, 0, 0,
     &sense, sizeof (sense), speed, 0, parity | charsize | stopbits, 0);
 if (status == SS$_NORMAL)
     status = iosb.status;
@@ -1674,7 +1732,7 @@ if (bits_to_clear)
     bits[0] |= (((bits_to_clear&TMXR_MDM_DTR) ? TT$M_DS_DTR : 0) |
                 ((bits_to_clear&TMXR_MDM_RTS) ? TT$M_DS_RTS : 0)) << 24;
 if (bits_to_set || bits_to_clear) {
-    status = sys$qiow (0, port, IO$_SETMODE|IO$M_SET_MODEM|IO$M_MAINT, &iosb, 0, 0,
+    status = sys$qiow (0, port->port, IO$_SETMODE|IO$M_SET_MODEM|IO$M_MAINT, &iosb, 0, 0,
                        bits, 0, 0, 0, 0, 0);
     if (status == SS$_NORMAL)
         status = iosb.status;
@@ -1686,7 +1744,7 @@ if (bits_to_set || bits_to_clear) {
 if (incoming_bits) {
     uint32 modem;
 
-    status = sys$qiow (0, port, IO$_SENSEMODE|IO$M_RD_MODEM, &iosb, 0, 0,
+    status = sys$qiow (0, port->port, IO$_SENSEMODE|IO$M_RD_MODEM, &iosb, 0, 0,
                        bits, 0, 0, 0, 0, 0);
     if (status == SS$_NORMAL)
         status = iosb.status;
@@ -1736,7 +1794,7 @@ unsigned char buf[4];
 IOSB iosb;
 SENSE_BUF sense;
 
-status = sys$qiow (0, port, IO$_SENSEMODE | IO$M_TYPEAHDCNT, &iosb,
+status = sys$qiow (0, port->port, IO$_SENSEMODE | IO$M_TYPEAHDCNT, &iosb,
     0, 0, &sense, 8, 0, term, 0, 0);
 if (status == SS$_NORMAL)
     status = iosb.status;
@@ -1746,7 +1804,7 @@ if (status != SS$_NORMAL) {
     }
 if (sense.sense_count == 0)                                 /* no characters available? */
     return 0;                                               /* return 0 to indicate */
-status = sys$qiow (0, port, IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO, 
+status = sys$qiow (0, port->port, IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO, 
                    &iosb, 0, 0, buffer, (count < sense.sense_count) ? count : sense.sense_count, 0, term, 0, 0);
 if (status == SS$_NORMAL)
     status = iosb.status;
@@ -1768,30 +1826,16 @@ return (int32)iosb.count;                                   /* return the number
 int32 sim_write_serial (SERHANDLE port, char *buffer, int32 count)
 {
 uint32 status;
-static uint32 term[2] = {0, 0};
-unsigned char buf[4];
-IOSB iosb;
-uint32 devsts = 0;
-#define UCB$M_BSY   0x100           /* Device I/O busy flag */
-ITEM items[] = { {sizeof (devsts), DVI$_STS, &devsts, NULL},
-                 {              0,        0,    NULL, NULL}};
 
-status = sys$getdviw (0, port, NULL, items, &iosb, NULL, 0, 0);
-if (status == SS$_NORMAL)
-    status = iosb.status;
-if (status != SS$_NORMAL) {
-    sim_error_serial ("write-GETDVI", status);          /* report unexpected error */
-    return -1;
-    }
-if (devsts & UCB$M_BSY)
-    return 0;                                           /* Would block */
-status = sys$qiow (0, port, IO$_WRITELBLK | IO$M_NOFORMAT,
-                   NULL, 0, 0, buffer, count, 0, 0, 0, 0);
+if (port->write_iosb.status == 0)           /* Prior write not done yet? */
+    return 0;
+status = sys$qio (0, port->port, IO$_WRITELBLK | IO$M_NOFORMAT,
+                  &port->write_iosb, 0, 0, buffer, count, 0, 0, 0, 0);
 if (status != SS$_NORMAL) {
     sim_error_serial ("write", status);                 /* report unexpected error */
     return -1;
     }
-return (int32)iosb.count;                               /* return number of characters written */
+return (int32)count;                                    /* return number of characters written */
 }
 
 
@@ -1802,10 +1846,9 @@ return (int32)iosb.count;                               /* return number of char
 
 static void sim_close_os_serial (SERHANDLE port)
 {
-sys$dassgn (port);                                      /* close the port */
-return;
+sys$dassgn (port->port);                                /* close the port */
+free (port);
 }
-
 
 #else
 
@@ -1862,7 +1905,6 @@ return -1;
 
 static void sim_close_os_serial (SERHANDLE port)
 {
-return;
 }
 
 

@@ -244,11 +244,11 @@ t_stat tu_mbrd (int32 *data, int32 PA, int32 fmtr);
 t_stat tu_mbwr (int32 data, int32 PA, int32 fmtr);
 t_stat tu_svc (UNIT *uptr);
 t_stat tu_reset (DEVICE *dptr);
-t_stat tu_attach (UNIT *uptr, char *cptr);
+t_stat tu_attach (UNIT *uptr, CONST char *cptr);
 t_stat tu_detach (UNIT *uptr);
 t_stat tu_boot (int32 unitno, DEVICE *dptr);
-t_stat tu_set_fmtr (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tu_set_fmtr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *tu_description (DEVICE *dptr);
 t_stat tu_go (int32 drv);
@@ -266,7 +266,7 @@ t_stat tu_map_err (int32 drv, t_stat st, t_bool qdt);
    tu_mod       TU modifier list
 */
 
-DIB tu_dib = { MBA_TU, 0, &tu_mbrd, &tu_mbwr,0, 0, 0, { &tu_abort } };
+DIB tu_dib = { MBA_AUTO, 0, &tu_mbrd, &tu_mbwr,0, 0, 0, { &tu_abort } };
 
 UNIT tu_unit[] = {
     { UDATA (&tu_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0) },
@@ -920,7 +920,7 @@ t_stat tu_reset (DEVICE *dptr)
 int32 u;
 UNIT *uptr;
 
-mba_set_enbdis (MBA_TU, tu_dev.flags & DEV_DIS);
+mba_set_enbdis (dptr);
 tucs1 = 0;
 tufc = 0;
 tuer = 0;
@@ -947,7 +947,7 @@ return auto_config(0, 0);
 
 /* Attach routine */
 
-t_stat tu_attach (UNIT *uptr, char *cptr)
+t_stat tu_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 drv = uptr - tu_dev.units, flg;
 t_stat r;
@@ -979,7 +979,7 @@ return sim_tape_detach (uptr);
 
 /* Set/show formatter type */
 
-t_stat tu_set_fmtr (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tu_set_fmtr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr = find_dev_from_unit (uptr);
 
@@ -993,7 +993,7 @@ else dptr->flags = dptr->flags & ~DEV_TM03;
 return SCPE_OK;
 }
 
-t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr = find_dev_from_unit (uptr);
 

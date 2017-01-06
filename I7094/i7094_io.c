@@ -53,7 +53,7 @@
 #define CHAINC(x)       (((x) & ~AMASK) | (((x) + 1) & AMASK))
 
 typedef struct {
-    char        *name;
+    const char  *name;
     uint32      flags;
     } DEV_CHAR;
 
@@ -91,9 +91,9 @@ extern DEVICE com_dev;
 
 t_stat ch_reset (DEVICE *dptr);
 t_stat ch6_svc (UNIT *uptr);
-t_stat ch_set_enable (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ch_set_disable (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ch_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat ch_set_enable (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ch_set_disable (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ch_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 DEVICE *ch_find_dev (uint32 ch, uint32 unit);
 t_stat ch6_sel (uint32 ch, uint32 sel, uint32 unit, uint32 sta);
 t_bool ch6_rd_putw (uint32 ch);
@@ -1770,7 +1770,7 @@ return SCPE_OK;
 
 /* Show channel type */
 
-t_stat ch_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat ch_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 
@@ -1787,7 +1787,7 @@ return SCPE_OK;
 
 /* Enable channel, assign device */
 
-t_stat ch_set_enable (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ch_set_enable (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr, *dptr1;
 char gbuf[CBUFSIZE];
@@ -1848,7 +1848,7 @@ return;
 
 /* Disable channel, deassign device */
 
-t_stat ch_set_disable (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ch_set_disable (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr, *dptr1;
 UNIT *uptr1;
@@ -1879,7 +1879,7 @@ return reset_all (0);
 
 /* Show channel that device is on (tapes, 7289, 7909 only) */
 
-t_stat ch_show_chan (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat ch_show_chan (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 uint32 i;

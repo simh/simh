@@ -69,7 +69,7 @@ t_stat tto_num (uint32 pa, uint32 len, t_bool dump);
 t_stat tto_write (uint32 c);
 t_stat tty_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
-t_stat tty_set_fixtabs (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tty_set_fixtabs (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTY data structures
 
@@ -480,7 +480,7 @@ return;
 
 /* Set tab stops at fixed modulus */
 
-t_stat tty_set_fixtabs (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_fixtabs (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 

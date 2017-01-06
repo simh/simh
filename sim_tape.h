@@ -34,6 +34,10 @@
 #ifndef SIM_TAPE_H_
 #define SIM_TAPE_H_    0
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 /* SIMH/E11 tape format */
 
 typedef uint32          t_mtrlnt;                       /* magtape rec lnt */
@@ -148,8 +152,8 @@ typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
 
 /* Prototypes */
 
-t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit, int completion_delay);
-t_stat sim_tape_attach (UNIT *uptr, char *cptr);
+t_stat sim_tape_attach_ex (UNIT *uptr, const char *cptr, uint32 dbit, int completion_delay);
+t_stat sim_tape_attach (UNIT *uptr, CONST char *cptr);
 t_stat sim_tape_detach (UNIT *uptr);
 t_stat sim_tape_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat sim_tape_rdrecf (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max);
@@ -190,13 +194,17 @@ t_stat sim_tape_reset (UNIT *uptr);
 t_bool sim_tape_bot (UNIT *uptr);
 t_bool sim_tape_wrp (UNIT *uptr);
 t_bool sim_tape_eot (UNIT *uptr);
-t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat sim_tape_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat sim_tape_set_dens (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sim_tape_show_dens (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat sim_tape_set_capac (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat sim_tape_set_dens (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_tape_show_dens (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat sim_tape_set_asynch (UNIT *uptr, int latency);
 t_stat sim_tape_clr_asynch (UNIT *uptr);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

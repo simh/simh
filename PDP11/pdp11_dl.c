@@ -97,9 +97,9 @@ t_stat dlx_wr (int32 data, int32 PA, int32 access);
 t_stat dlx_reset (DEVICE *dptr);
 t_stat dli_svc (UNIT *uptr);
 t_stat dlo_svc (UNIT *uptr);
-t_stat dlx_attach (UNIT *uptr, char *cptr);
+t_stat dlx_attach (UNIT *uptr, CONST char *cptr);
 t_stat dlx_detach (UNIT *uptr);
-t_stat dlx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dlx_set_lines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void dlx_enbdis (int32 dis);
 void dli_clr_int (int32 ln, uint32 wd);
 void dli_set_int (int32 ln, uint32 wd);
@@ -273,7 +273,7 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
         *data = dli_buf[ln] & DLIBUF_RD;
         dli_csr[ln] &= ~CSR_DONE;                       /* clr rcv done */
         dli_clr_int (ln, DLI_RCI);                      /* clr rcv int req */
-        /* Rechedule the next poll preceisely so that 
+        /* Reschedule the next poll preceisely so that 
            the programmed input speed is observed. */
         sim_clock_coschedule_abs (&dli_unit, tmxr_poll);
         break;
@@ -562,7 +562,7 @@ return;
 
 /* Attach master unit */
 
-t_stat dlx_attach (UNIT *uptr, char *cptr)
+t_stat dlx_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -635,7 +635,7 @@ return;
 
 /* Change number of lines */
 
-t_stat dlx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dlx_set_lines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;

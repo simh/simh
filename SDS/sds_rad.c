@@ -67,7 +67,6 @@ DSPT rad_tplt[] = {                                     /* template */
     { 0, 0 }
     };
 
-DEVICE rad_dev;
 t_stat rad_svc (UNIT *uptr);
 t_stat rad_reset (DEVICE *dptr);
 t_stat rad_boot (int32 unitno, DEVICE *dptr);
@@ -133,7 +132,7 @@ t_stat rad (uint32 fnc, uint32 inst, uint32 *dat)
 {
 int32 t, lun, new_ch;
 uint32 p;
-uint32 *fbuf = rad_unit.filebuf;
+uint32 *fbuf = (uint32 *)rad_unit.filebuf;
 
 switch (fnc) {                                          /* case function */
 
@@ -267,7 +266,7 @@ return SCPE_OK;
 t_stat rad_fill (int32 sba)
 {
 uint32 p = rad_da * RAD_NUMWD;
-uint32 *fbuf = rad_unit.filebuf;
+uint32 *fbuf = (uint32 *)rad_unit.filebuf;
 int32 wa = (sba + 1) >> 1;                              /* whole words */
 
 if (sba && (p < rad_unit.capac)) {                      /* fill needed? */

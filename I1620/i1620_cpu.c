@@ -140,14 +140,14 @@ uint8 ind[NUM_IND] = { 0 };                             /* indicators */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_opt1 (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_opt2 (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_save (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_table (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_opt1 (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_opt2 (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_save (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_table (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 int32 get_2d (uint32 ad);
 t_stat get_addr (uint32 alast, int32 lnt, t_bool indexok, uint32 *addr);
@@ -2140,7 +2140,7 @@ return SCPE_OK;
 
 /* Memory size change */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -2159,7 +2159,7 @@ return SCPE_OK;
 
 /* Model change */
 
-t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val)
     cpu_unit.flags = (cpu_unit.flags & (UNIT_SCP | UNIT_BCD | MII_OPT)) |
@@ -2170,7 +2170,7 @@ return SCPE_OK;
 
 /* Set/clear Model 1 option */
 
-t_stat cpu_set_opt1 (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_opt1 (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cpu_unit.flags & IF_MII) {
     sim_printf ("Feature is standard on 1620 Model 2\n");
@@ -2181,7 +2181,7 @@ return SCPE_OK;
 
 /* Set/clear Model 2 option */
 
-t_stat cpu_set_opt2 (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_opt2 (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (!(cpu_unit.flags & IF_MII)) {
     sim_printf ("Feature is not available on 1620 Model 1\n");
@@ -2192,7 +2192,7 @@ return SCPE_OK;
 
 /* Front panel save */
 
-t_stat cpu_set_save (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_save (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (saved_PC & 1)
     return SCPE_NOFNC;
@@ -2202,7 +2202,7 @@ return SCPE_OK;
 
 /* Set standard add/multiply tables */
 
-t_stat cpu_set_table (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_table (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i;
 
@@ -2217,7 +2217,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -2248,10 +2248,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[INST_LEN];
 t_stat r;
 InstHistory *h;

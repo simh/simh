@@ -68,7 +68,7 @@ int32 hi3_io (int32 inst, int32 fnc, int32 dat, int32 dev);
 int32 hi4_io (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat hi_service (UNIT *uptr);
 t_stat hi_reset (DEVICE *dptr);
-t_stat hi_attach (UNIT *uptr, char *cptr);
+t_stat hi_attach (UNIT *uptr, CONST char *cptr);
 t_stat hi_detach (UNIT *uptr);
 
 
@@ -303,7 +303,7 @@ t_stat hi_reset (DEVICE *dptr)
 }
 
 // Attach (connect) ...
-t_stat hi_attach (UNIT *uptr, char *cptr)
+t_stat hi_attach (UNIT *uptr, CONST char *cptr)
 {
   // simh calls this routine for (what else?) the ATTACH command.
   uint16 host = uptr->hline;

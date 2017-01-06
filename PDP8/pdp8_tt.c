@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -54,7 +54,7 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTI data structures
 
@@ -69,12 +69,12 @@ DIB tti_dib = { DEV_TTI, 1, { &tti } };
 UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_KSR, 0), SERIAL_IN_WAIT };
 
 REG tti_reg[] = {
-    { ORDATA (BUF, tti_unit.buf, 8) },
-    { FLDATA (DONE, dev_done, INT_V_TTI) },
-    { FLDATA (ENABLE, int_enable, INT_V_TTI) },
-    { FLDATA (INT, int_req, INT_V_TTI) },
-    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF, tti_unit.buf, 8, "last data item processed") },
+    { FLDATAD (DONE, dev_done, INT_V_TTI, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_TTI, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_TTI, "interrupt pending flag") },
+    { DRDATAD (POS, tti_unit.pos, T_ADDR_W, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME, tti_unit.wait, 24, "input polling interval (if 0, the keyboard is polled synchronously with the clock)"), PV_LEFT+REG_NZ },
     { NULL }
     };
 
@@ -95,6 +95,8 @@ DEVICE tti_dev = {
     &tti_dib, 0
     };
 
+uint32 tti_buftime;                                     /* time input character arrived */
+
 /* TTO data structures
 
    tto_dev      TTO device descriptor
@@ -107,12 +109,12 @@ DIB tto_dib = { DEV_TTO, 1, { &tto } };
 UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
-    { ORDATA (BUF, tto_unit.buf, 8) },
-    { FLDATA (DONE, dev_done, INT_V_TTO) },
-    { FLDATA (ENABLE, int_enable, INT_V_TTO) },
-    { FLDATA (INT, int_req, INT_V_TTO) },
-    { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF, tto_unit.buf, 8, "last date item processed") },
+    { FLDATAD (DONE, dev_done, INT_V_TTO, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_TTO, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_TTO, "interrupt pending flag") },
+    { DRDATAD (POS, tto_unit.pos, T_ADDR_W, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME, tto_unit.wait, 24, "time form I/O initiation to interrupt"), PV_LEFT },
     { NULL }
     };
 
@@ -179,13 +181,15 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
-if (dev_done & INT_TTI)                                 /* prior character still pending? */
+if ((dev_done & INT_TTI) &&                             /* prior character still pending and < 500ms? */
+    ((sim_os_msec () - tti_buftime) < 500))
     return SCPE_OK;
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
     uptr->buf = 0;
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
+tti_buftime = sim_os_msec ();
 uptr->pos = uptr->pos + 1;
 dev_done = dev_done | INT_TTI;                          /* set done */
 int_req = INT_UPDATE;                                   /* update interrupts */
@@ -273,7 +277,7 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
 tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;

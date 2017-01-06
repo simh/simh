@@ -77,10 +77,10 @@ typedef struct {
 static N8VEM_INFO n8vem_info_data = { { 0x0, 0x8000, 0x60, 32 } };
 static N8VEM_INFO *n8vem_info = &n8vem_info_data;
 
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
@@ -88,7 +88,7 @@ extern int32 find_unit_index (UNIT *uptr);
 
 static t_stat n8vem_reset(DEVICE *n8vem_dev);
 static t_stat n8vem_boot(int32 unitno, DEVICE *dptr);
-static t_stat n8vem_attach(UNIT *uptr, char *cptr);
+static t_stat n8vem_attach(UNIT *uptr, CONST char *cptr);
 static t_stat n8vem_detach(UNIT *uptr);
 
 static uint8 N8VEM_Read(const uint32 Addr);
@@ -103,6 +103,7 @@ static int32 n8vem_pio1a    = 0x00;     /* 8255 PIO1A IN Port */
 static int32 n8vem_pio1b    = 0x00;     /* 8255 PIO1B OUT Port */
 static int32 n8vem_pio1c    = 0x00;     /* 8255 PIO1C IN Port */
 static int32 n8vem_pio1ctrl = 0x00;     /* 8255 PIO1 Control Port */
+static const char* n8vem_description(DEVICE *dptr);
 
 #define N8VEM_ROM_SIZE  (1024 * 1024)
 #define N8VEM_RAM_SIZE  (512 * 1024)
@@ -133,7 +134,11 @@ static REG n8vem_reg[] = {
     { NULL }
 };
 
-#define N8VEM_NAME  "Single-Board Computer N8VEM"
+#define N8VEM_NAME  "Single-Board Computer"
+
+static const char* n8vem_description(DEVICE *dptr) {
+    return N8VEM_NAME;
+}
 
 static MTAB n8vem_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,  "MEMBASE",  "MEMBASE",  &set_membase, &show_membase,
@@ -158,7 +163,7 @@ DEVICE n8vem_dev = {
     NULL, NULL, &n8vem_reset,
     &n8vem_boot, &n8vem_attach, &n8vem_detach,
     &n8vem_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    n8vem_dt, NULL, "Single-Board Computer N8VEM"
+    n8vem_dt, NULL, NULL, NULL, NULL, NULL, &n8vem_description
 };
 
 /* Reset routine */
@@ -185,8 +190,8 @@ static t_stat n8vem_reset(DEVICE *dptr)
             return SCPE_ARG;
         }
 
-        n8vem_info->ram = calloc(1, (N8VEM_RAM_SIZE));
-        n8vem_info->rom = calloc(1, (N8VEM_ROM_SIZE));
+        n8vem_info->ram = (uint8 *)calloc(1, (N8VEM_RAM_SIZE));
+        n8vem_info->rom = (uint8 *)calloc(1, (N8VEM_ROM_SIZE));
 
         /* Clear the RAM and ROM mapping registers */
         n8vem_info->mpcl_ram = 0;
@@ -209,7 +214,7 @@ static t_stat n8vem_boot(int32 unitno, DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat n8vem_attach(UNIT *uptr, char *cptr)
+static t_stat n8vem_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     int32 i = 0, rtn;

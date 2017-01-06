@@ -28,6 +28,7 @@ Thumbs.db
 *.lib
 *.sbr
 *.bak
+*.save
 obj/
 [Rr]elease*/
 _ReSharper*/

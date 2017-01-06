@@ -94,7 +94,7 @@ char *vt_cptr [LINES_MAX+1];
 void tt_print();
 void consul_receive();
 t_stat vt_clk(UNIT *);
-extern char *get_sim_sw (char *cptr);
+extern const char *get_sim_sw (const char *cptr);
 extern int32 tmr_poll;                              /* calibrated clock timer poll */
 
 int attached_console;
@@ -260,7 +260,7 @@ t_stat vt_clk (UNIT * this)
         return sim_activate(this, 1000*MSEC/300);
 }
 
-t_stat tty_setmode (UNIT *u, int32 val, char *cptr, void *desc)
+t_stat tty_setmode (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
     int num = u - tty_unit;
     TMLN *t = &tty_line [num];
@@ -315,7 +315,7 @@ t_stat tty_setmode (UNIT *u, int32 val, char *cptr, void *desc)
  *      attach tty <port>
  * Where <port> is the port number for telnet, e.g. 4199.
  */
-t_stat tty_attach (UNIT *u, char *cptr)
+t_stat tty_attach (UNIT *u, CONST char *cptr)
 {
     int num = u - tty_unit;
     char gbuf[CBUFSIZE];
@@ -462,7 +462,7 @@ void vt_puts (int num, const char *s)
         return;
     if (t->rcve) {
         /* A telnet connection. */
-        tmxr_linemsg (t, (char*) s);
+        tmxr_linemsg (t, s);
     } else {
         /* Console output. */
         while (*s) sim_putchar(*s++);
@@ -686,12 +686,12 @@ static int unicode_to_koi7 (unsigned val)
 /*
  * Set command
  */
-static t_stat cmd_set (int32 num, char *cptr)
+static t_stat cmd_set (int32 num, CONST char *cptr)
 {
     char gbuf [CBUFSIZE];
     int len;
 
-    cptr = get_sim_sw (cptr);
+    cptr = (CONST char *)get_sim_sw (cptr);
     if (! cptr)
         return SCPE_INVSW;
     if (! *cptr)
@@ -734,14 +734,14 @@ static t_stat cmd_set (int32 num, char *cptr)
 /*
  * Show command
  */
-static t_stat cmd_show (int32 num, char *cptr)
+static t_stat cmd_show (int32 num, CONST char *cptr)
 {
     TMLN *t = &tty_line [num];
     char gbuf [CBUFSIZE];
     MTAB *m;
     int len;
 
-    cptr = get_sim_sw (cptr);
+    cptr = (CONST char *)get_sim_sw (cptr);
     if (! cptr)
         return SCPE_INVSW;
     if (! *cptr) {
@@ -779,12 +779,12 @@ static t_stat cmd_show (int32 num, char *cptr)
 /*
  * Exit command
  */
-static t_stat cmd_exit (int32 num, char *cptr)
+static t_stat cmd_exit (int32 num, CONST char *cptr)
 {
     return SCPE_EXIT;
 }
 
-static t_stat cmd_help (int32 num, char *cptr);
+static t_stat cmd_help (int32 num, CONST char *cptr);
 
 static CTAB cmd_table[] = {
     { "SET", &cmd_set, 0,
@@ -834,13 +834,13 @@ static CTAB *lookup_cmd (char *command)
 /*
  * Help command
  */
-static t_stat cmd_help (int32 num, char *cptr)
+static t_stat cmd_help (int32 num, CONST char *cptr)
 {
     TMLN *t = &tty_line [num];
     char gbuf [CBUFSIZE];
     CTAB *c;
 
-    cptr = get_sim_sw (cptr);
+    cptr = (CONST char *)get_sim_sw (cptr);
     if (! cptr)
         return SCPE_INVSW;
     if (! *cptr) {
@@ -868,7 +868,8 @@ static t_stat cmd_help (int32 num, char *cptr)
 void vt_cmd_exec (int num)
 {
     TMLN *t = &tty_line [num];
-    char *cptr, gbuf [CBUFSIZE];
+    char gbuf [CBUFSIZE];
+    CONST char *cptr;
     CTAB *cmdp;
     t_stat err;
     extern char *scp_errors[];

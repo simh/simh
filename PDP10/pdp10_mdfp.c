@@ -1,6 +1,6 @@
 /* pdp10_mdfp.c: PDP-10 multiply/divide and floating point simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-May-16    RMS     Fixed bug in DMUL carry (Mark Pizzolato)
    2-Apr-04     RMS     Fixed bug in floating point unpack
                         Fixed bug in FIXR (found by Phil Stone, fixed by
                         Chris Smith)
@@ -153,8 +154,6 @@ typedef struct {                                        /* unpacked fp number */
 #define UNEG(x)         ((~x) + 1)
 #define DUNEG(x)        x.flo = UNEG (x.flo); x.fhi = ~x.fhi + (x.flo == 0)
 
-extern d10 *ac_cur;                                     /* current AC block */
-extern int32 flags;                                     /* flags */
 void mul (d10 a, d10 b, d10 *rs);
 void funpack (d10 h, d10 l, UFP *r, t_bool sgn);
 void fnorm (UFP *r, t_int64 rnd);
@@ -320,7 +319,7 @@ for (i = 0; i < 71; i++) {                              /* 71 mpyer bits */
         }
     if (mpy[1] & 1) {                                   /* if mpy lo bit = 1 */
         AC(p1) = AC(p1) + mpc[1];
-        AC(ac) = AC(ac) + mpc[0] + (TSTS (AC(p1) != 0));
+        AC(ac) = AC(ac) + mpc[0] + (TSTS (AC(p1)) != 0);
         AC(p1) = CLRS (AC(p1));
         }
     }

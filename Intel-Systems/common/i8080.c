@@ -165,12 +165,13 @@ uint32 HL = 0;                          /* HL register pair */
 uint32 SP = 0;                          /* Stack pointer */
 uint32 saved_PC = 0;                    /* program counter */
 uint32 IM = 0;                          /* Interrupt Mask Register */
-uint32 xack = 0;                        /* XACK signal */
+uint8 xack = 0;                        /* XACK signal */
 uint32 int_req = 0;                     /* Interrupt request */
 
 int32 PCX;                              /* External view of PC */
 int32 PC;
 UNIT *uptr;
+uint32 port;                            //port used in any IN/OUT
 
 /* function prototypes */
 void    set_cpuint(int32 int_num);
@@ -197,16 +198,18 @@ t_stat  i8080_reset (DEVICE *dptr);
 /* external function prototypes */
 
 extern t_stat i8080_reset (DEVICE *dptr);
-extern int32 get_mbyte(int32 addr);
-extern int32 get_mword(int32 addr);
-extern void put_mbyte(int32 addr, int32 val);
-extern void put_mword(int32 addr, int32 val);
+extern uint8 get_mbyte(uint16 addr);
+extern uint16 get_mword(uint16 addr);
+extern void put_mbyte(uint16 addr, uint8 val);
+extern void put_mword(uint16 addr, uint16 val);
 extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 
 struct idev {
-    int32 (*routine)();
+    uint8 (*routine)(t_bool, uint8);
+    uint16 port;
+    uint8 devnum;
 };
 
 /* This is the I/O configuration table.  There are 256 possible
@@ -264,7 +267,7 @@ DEBTAB i8080_debug[] = {
 };
 
 DEVICE i8080_dev = {
-    "CPU",                              //name
+    "I8080",                            //name
     &i8080_unit,                        //units
     i8080_reg,                          //registers
     i8080_mod,                          //modifiers
@@ -290,7 +293,7 @@ DEVICE i8080_dev = {
 };
 
 /* tables for the disassembler */
-char *opcode[] = {                      
+const char *opcode[] = {                      
 "NOP", "LXI B,", "STAX B", "INX B",             /* 0x00 */
 "INR B", "DCR B", "MVI B,", "RLC",
 "???", "DAD B", "LDAX B", "DCX B",
@@ -392,12 +395,10 @@ int32 sim_instr (void)
     reason = 0;
 
     uptr = i8080_dev.units;
-    if (i8080_dev.dctrl & DEBUG_flow) { 
-        if (uptr->flags & UNIT_8085)
-            sim_printf("CPU = 8085\n");
-        else
-            sim_printf("CPU = 8080\n");
-    }
+    if (uptr->flags & UNIT_8085)
+        sim_printf("CPU = 8085\n");
+    else
+        sim_printf("CPU = 8080\n");
     /* Main instruction fetch/decode loop */
 
     while (reason == 0) {               /* loop until halted */
@@ -415,7 +416,6 @@ int32 sim_instr (void)
             if ((reason = sim_process_event()))
                 break;
         }
-        sim_interval--;                 /* countdown clock */
 
         if (int_req > 0) {              /* interrupt? */
 //            sim_printf("\ni8080: int_req=%04X IM=%04X", int_req, IM);
@@ -459,6 +459,7 @@ int32 sim_instr (void)
             break;
         }
 
+        sim_interval--;                 /* countdown clock */
         PCX = PC;
 
 //        fprintf(fpd, "%04X\n", PC);
@@ -471,9 +472,9 @@ int32 sim_instr (void)
         IR = OP = fetch_byte(0);        /* instruction fetch */
 
         if (GET_XACK(1) == 0) {         /* no XACK for instruction fetch */
-            reason = STOP_XACK;
-            sim_printf("Stopped for XACK-1 PC=%04X\n", --PC);
-            continue;
+//            reason = STOP_XACK;
+            sim_printf("Stopped for XACK-1 PC=%04X\n", PC);
+//            continue;
         }
 
         if (OP == 0x76) {               /* HLT Instruction*/
@@ -889,13 +890,19 @@ int32 sim_instr (void)
 
         case 0xDB:                  /* IN */
             DAR = fetch_byte(1);
+            port = DAR;
+            //A = dev_table[DAR].routine(0, 0, dev_table[DAR].devnum);
             A = dev_table[DAR].routine(0, 0);
             A &= BYTE_R;
+//            sim_printf("\n%04X\tIN\t%02X\t;devnum=%d", PC - 1, DAR, dev_table[DAR].devnum);
             break;
 
         case 0xD3:                  /* OUT */
             DAR = fetch_byte(1);
+            port = DAR;
+            //dev_table[DAR].routine(1, A, dev_table[DAR].devnum);
             dev_table[DAR].routine(1, A);
+//            sim_printf("\n%04X\tOUT\t%02X\t;devnum=%d", PC - 1, DAR, dev_table[DAR].devnum);
             break;
 
         default:                    /* undefined opcode */ 
@@ -906,12 +913,12 @@ int32 sim_instr (void)
             break;
         }
 loop_end:
-        if (GET_XACK(1) == 0) {         /* no XACK for instruction fetch */
-            reason = STOP_XACK;
-            sim_printf("Stopped for XACK-2 PC=%04X\n", --PC);
-            continue;
-        }
-
+//        if (GET_XACK(1) == 0) {     /* no XACK for instruction fetch */
+//            reason = STOP_XACK;
+//            sim_printf("Stopped for XACK-2 PC=%04X\n", PC);
+//            continue;
+//        }
+    ;
     }
 
 /* Simulation halted */
@@ -1278,7 +1285,7 @@ t_stat i8080_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
    starts at the current value of the PC.
 */
 
-int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+int32 sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
     int32 i, addr = 0, cnt = 0;
 
@@ -1293,7 +1300,7 @@ int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
     return (SCPE_OK);
 }
 
-/* Symbolic output
+/* Symbolic output - working
 
    Inputs:
         *of   = output stream
@@ -1326,17 +1333,17 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     inst = val[0];
     fprintf (of, "%s", opcode[inst]);
     if (oplen[inst] == 2) {
-        if (strchr(opcode[inst], ' ') != NULL)
-            fprintf (of, ",");
-        else fprintf (of, " ");
+//        if (strchr(opcode[inst], ' ') != NULL)
+//            fprintf (of, ",");
+//        else fprintf (of, " ");
         fprintf (of, "%02X", val[1]);
     }
     if (oplen[inst] == 3) {
         adr = val[1] & 0xFF;
         adr |= (val[2] << 8) & 0xff00;
-        if (strchr(opcode[inst], ' ') != NULL)
-            fprintf (of, ",");
-        else fprintf (of, " ");
+//        if (strchr(opcode[inst], ' ') != NULL)
+//            fprintf (of, ",");
+//        else fprintf (of, " ");
         fprintf (of, "%04X", adr);
     }
     return -(oplen[inst] - 1);
@@ -1354,7 +1361,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     int32 cflag, i = 0, j, r;
     char gbuf[CBUFSIZE];

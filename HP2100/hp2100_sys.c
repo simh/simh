@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2015, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    19-Jun-15    JDB     Conditionally use Fprintf function for version 4.x and on
    18-Jun-15    JDB     Added cast to int for isspace parameter
    24-Dec-14    JDB     Added casts to t_addr and t_value for 64-bit compatibility
@@ -67,7 +68,6 @@
 #include <ctype.h>
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include "sim_rev.h"
 
 
 #if (SIM_MAJOR >= 4)
@@ -208,7 +208,7 @@ if ((c2 = fgetc (fileref)) == EOF) return -1;
 return ((c1 & 0377) << 8) | (c2 & 0377);
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 origin, csum, zerocnt, count, word, i;
 
@@ -584,7 +584,7 @@ return SCPE_ARG;
                         -1 if error
 */
 
-static int32 get_addr (char *cptr)
+static int32 get_addr (CONST char *cptr)
 {
 int32 d;
 t_stat r;
@@ -614,11 +614,12 @@ return d;
         status  =       error status
 */
 
-t_stat parse_sym (char *iptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *iptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, d, i, j, k, clef, tbits;
 t_stat r, ret;
-char *cptr, gbuf[CBUFSIZE];
+CONST char *cptr;
+char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace ((int) *iptr)) iptr++;                   /* absorb spaces */
@@ -825,7 +826,7 @@ else {                                                  /* printable character *
 
 /* Set select code */
 
-t_stat hp_setsc (UNIT *uptr, int32 num, char *cptr, void *desc)
+t_stat hp_setsc (UNIT *uptr, int32 num, CONST char *cptr, void *desc)
 {
 DEVICE *dptr = (DEVICE *) desc;
 DIB *dibptr;
@@ -860,9 +861,9 @@ return SCPE_OK;
 
 /* Show select code */
 
-t_stat hp_showsc (FILE *st, UNIT *uptr, int32 num, void *desc)
+t_stat hp_showsc (FILE *st, UNIT *uptr, int32 num, CONST void *desc)
 {
-DEVICE *dptr = (DEVICE *) desc;
+const DEVICE *dptr = (const DEVICE *) desc;
 DIB *dibptr;
 int32 i;
 
@@ -885,7 +886,7 @@ return SCPE_OK;
 
 /* Set device number */
 
-t_stat hp_setdev (UNIT *uptr, int32 num, char *cptr, void *desc)
+t_stat hp_setdev (UNIT *uptr, int32 num, CONST char *cptr, void *desc)
 {
 return hp_setsc (uptr, num, cptr, desc);
 }
@@ -893,7 +894,7 @@ return hp_setsc (uptr, num, cptr, desc);
 
 /* Show device number */
 
-t_stat hp_showdev (FILE *st, UNIT *uptr, int32 num, void *desc)
+t_stat hp_showdev (FILE *st, UNIT *uptr, int32 num, CONST void *desc)
 {
 t_stat result;
 

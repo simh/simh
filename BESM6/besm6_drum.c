@@ -69,11 +69,11 @@ UNIT drum_unit [] = {
 };
 
 REG drum_reg[] = {
-    { "УС",     &drum_op,       8, 24, 0, 1 },
-    { "ЗОНА",   &drum_zone,     8, 10, 0, 1 },
-    { "СЕКТОР", &drum_sector,   8, 2,  0, 1 },
-    { "МОЗУ",   &drum_memory,   8, 15, 0, 1 },
-    { "СЧСЛОВ", &drum_nwords,   8, 11, 0, 1 },
+    { ORDATA   ( "УС",     drum_op,       24) },
+    { ORDATA   ( "ЗОНА",   drum_zone,     10) },
+    { ORDATA   ( "СЕКТОР", drum_sector,    2) },
+    { ORDATA   ( "МОЗУ",   drum_memory,   15) },
+    { ORDATA   ( "СЧСЛОВ", drum_nwords,   11) },
     { 0 }
 };
 
@@ -82,7 +82,7 @@ MTAB drum_mod[] = {
 };
 
 t_stat drum_reset (DEVICE *dptr);
-t_stat drum_attach (UNIT *uptr, char *cptr);
+t_stat drum_attach (UNIT *uptr, CONST char *cptr);
 t_stat drum_detach (UNIT *uptr);
 
 DEVICE drum_dev = {
@@ -107,7 +107,7 @@ t_stat drum_reset (DEVICE *dptr)
     return SCPE_OK;
 }
 
-t_stat drum_attach (UNIT *u, char *cptr)
+t_stat drum_attach (UNIT *u, CONST char *cptr)
 {
     t_stat s;
 

@@ -72,7 +72,7 @@
 
 #define SBIQC_MBZ       0xC0000007                      /* MBZ */
 
-uint32 nexus_req[NEXUS_HLVL];                           /* nexus int req */
+extern uint32 nexus_req[NEXUS_HLVL];                    /* nexus int req */
 uint32 sbi_fs = 0;                                      /* SBI fault status */
 uint32 sbi_sc = 0;                                      /* SBI silo comparator */
 uint32 sbi_mt = 0;                                      /* SBI maintenance */
@@ -298,7 +298,7 @@ return "SBI adapter";
 
 /* Show nexus */
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "nexus=%d, address=%X", val, NEXUSBASE + ((1 << REG_V_NEXUS) * val));
 return SCPE_OK;

@@ -101,11 +101,10 @@ static const uint8 bad_cmd[64] = {
     0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1
     };
 
-DEVICE mt_dev;
 uint32 mt (uint32 dev, uint32 op, uint32 dat);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cptr);
+t_stat mt_attach (UNIT *uptr, CONST char *cptr);
 t_stat mt_detach (UNIT *uptr);
 t_stat mt_boot (int32 unitno, DEVICE *dptr);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
@@ -483,7 +482,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat mt_attach (UNIT *uptr, char *cptr)
+t_stat mt_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 u = uptr - mt_dev.units;
 t_stat r;
@@ -527,8 +526,6 @@ static uint8 boot_rom[] = {
 
 t_stat mt_boot (int32 unitno, DEVICE *dptr)
 {
-extern uint32 PC, dec_flgs;
-extern uint16 decrom[];
 extern DIB sch_dib;
 uint32 sch_dev;
 

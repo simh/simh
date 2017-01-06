@@ -47,8 +47,8 @@ int32 tmxr_poll = 16000;                                /* term mux poll */
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* CLK data structures
 
@@ -62,10 +62,10 @@ DIB clk_dib = { DEV_CLK, 1, { &clk } };
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 16000 };
 
 REG clk_reg[] = {
-    { FLDATA (DONE, dev_done, INT_V_CLK) },
-    { FLDATA (ENABLE, int_enable, INT_V_CLK) },
-    { FLDATA (INT, int_req, INT_V_CLK) },
-    { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
+    { FLDATAD (DONE, dev_done, INT_V_CLK, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_CLK, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_CLK, "interrupt pending flag") },
+    { DRDATAD (TIME, clk_unit.wait, 24, "clock interval"), REG_NZ + PV_LEFT },
     { DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
     { NULL }
     };
@@ -141,12 +141,9 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
 
 t_stat clk_svc (UNIT *uptr)
 {
-int32 t;
-
 dev_done = dev_done | INT_CLK;                          /* set done */
 int_req = INT_UPDATE;                                   /* update interrupts */
-t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
-tmxr_poll = t;                                          /* set mux poll */
+tmxr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);           /* calibrate clock */
 sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 return SCPE_OK;
 }
@@ -155,23 +152,19 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
-int32 t;
-
-sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 dev_done = dev_done & ~INT_CLK;                         /* clear done, int */
 int_req = int_req & ~INT_CLK;
 int_enable = int_enable & ~INT_CLK;                     /* clear enable */
 if (!sim_is_running) {                                  /* RESET (not CAF)? */
-    t = sim_rtcn_init (clk_unit.wait, TMR_CLK);
-    sim_activate (&clk_unit, t);                        /* activate unit */
-    tmxr_poll = t;
+    tmxr_poll = sim_rtcn_init_unit (&clk_unit, clk_unit.wait, TMR_CLK);/* init 100Hz timer */
+    sim_activate_after (&clk_unit, 1000000/clk_tps);        /* activate 100Hz unit */
     }
 return SCPE_OK;
 }
 
 /* Set frequency */
 
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -183,7 +176,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;

@@ -573,15 +573,15 @@ t_stat rp_mbrd (int32 *data, int32 ofs, int32 drv);
 t_stat rp_mbwr (int32 data, int32 ofs, int32 drv);
 t_stat rp_svc (UNIT *uptr);
 t_stat rp_reset (DEVICE *dptr);
-t_stat rp_attach (UNIT *uptr, char *cptr);
+t_stat rp_attach (UNIT *uptr, CONST char *cptr);
 t_stat rp_detach (UNIT *uptr);
 t_stat rp_boot (int32 unitno, DEVICE *dptr);
 void rp_set_er (int16 flg, int32 drv);
 void rp_clr_as (int32 mask);
-void rp_update_ds (int16 flg, int32 drv);
+void rp_update_ds (uint16 flg, int32 drv);
 t_stat rp_go (int32 drv);
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rp_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 rp_abort (void);
 t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *rp_description (DEVICE *dptr);
@@ -595,7 +595,7 @@ const char *rp_description (DEVICE *dptr);
    rp_mod       RP modifier list
 */
 
-DIB rp_dib = { MBA_RP, 0, &rp_mbrd, &rp_mbwr, 0, 0, 0, { &rp_abort } };
+DIB rp_dib = { MBA_AUTO, 0, &rp_mbrd, &rp_mbwr, 0, 0, 0, { &rp_abort } };
 
 UNIT rp_unit[] = {
     { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
@@ -648,6 +648,8 @@ MTAB rp_mod[] = {
         NULL, NULL, NULL, "Write lock disk drive"  },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &rp_set_bad, NULL, NULL, "write bad block table on last track" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
+      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
     { (UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
       "RM03", NULL, NULL },
     { (UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
@@ -1300,7 +1302,7 @@ return;
 
 /* Drive status update */
 
-void rp_update_ds (int16 flag, int32 drv)
+void rp_update_ds (uint16 flag, int32 drv)
 {
 uint16 o_ds = rpds[drv];
 
@@ -1334,7 +1336,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, dptr, "rp_reset()\n");
 
-mba_set_enbdis (MBA_RP, dptr->flags & DEV_DIS);
+mba_set_enbdis (dptr);
 for (i = 0; i < RP_NUMDR; i++) {
     uptr = dptr->units + i;
     sim_cancel (uptr);
@@ -1367,7 +1369,7 @@ return SCPE_OK;
 
 /* Device attach */
 
-t_stat rp_attach (UNIT *uptr, char *cptr)
+t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 drv, i, p;
 t_stat r;
@@ -1416,7 +1418,7 @@ return sim_disk_detach (uptr);
 
 /* Set size command validation routine */
 
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 dtype = GET_DTYPE (val);
 
@@ -1428,7 +1430,7 @@ return SCPE_OK;
 
 /* Set bad block routine */
 
-t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rp_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 return pdp11_bad_block (uptr, drv_tab[GET_DTYPE (uptr->flags)].sect, RP_NUMWD);
 }

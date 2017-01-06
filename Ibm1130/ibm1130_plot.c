@@ -131,15 +131,15 @@
 
 static t_stat plot_svc    (UNIT *uptr);				/* activity routine */
 static t_stat plot_reset  (DEVICE *dptr);			/* reset of 1130 */
-static t_stat plot_attach (UNIT *uptr, char *cptr);	/* attach, loads plotter */
+static t_stat plot_attach (UNIT *uptr, CONST char *cptr);	/* attach, loads plotter */
 static t_stat plot_detach (UNIT *uptr);				/* detach and save image */
 static t_stat plot_examine (UNIT *uptr);			/* update file with current canvas */
 static t_stat plot_set_length (UNIT *uptr, int32 val, char * ptr, void *desc);	/* set paper length */
-static t_stat plot_set_pos (UNIT *uptr, int32 val, char * ptr, void *desc);		/* reset current X/Y position */
-static t_stat plot_show_vals(FILE *fp, UNIT *uptr, int32 val, void *descrip);	/* print x, y and length */
-static t_stat plot_show_nl(FILE *fp, UNIT *uptr, int32 val, void *descrip);  	/* overcome wacky simh behavior */
+static t_stat plot_set_pos (UNIT *uptr, int32 val, CONST char * ptr, void *desc);		/* reset current X/Y position */
+static t_stat plot_show_vals(FILE *fp, UNIT *uptr, int32 val, CONST void *descrip);	/* print x, y and length */
+static t_stat plot_show_nl(FILE *fp, UNIT *uptr, int32 val, CONST void *descrip);  	/* overcome wacky simh behavior */
 static void   update_pen(void);        				 /* will ensure pen action is correct when changes made */
-static t_stat plot_validate_change (UNIT *uptr, int32 val, char * ptr, void *desc); /* when set command issued */
+static t_stat plot_validate_change (UNIT *uptr, int32 val, CONST char * ptr, void *desc); /* when set command issued */
 static void   process_cmd(void);					/* does actual drawing for plotter */
 
 static int16 plot_dsw  = 0;							/* device status word */
@@ -387,7 +387,7 @@ static t_stat plot_reset (DEVICE *dptr)
 
 /* plot_attach - attach file to simulated plotter */
 
-static t_stat plot_attach (UNIT *uptr, char *cptr)
+static t_stat plot_attach (UNIT *uptr, CONST char *cptr)
 {
 	t_stat result;
 
@@ -711,7 +711,7 @@ static void process_cmd (void)
 
 /* plot_set_length - validate and store the length of the paper */
 
-static t_stat plot_set_length (UNIT *uptr, int32 set, char *ptr, void *desc)
+static t_stat plot_set_length (UNIT *uptr, int32 set, CONST char *ptr, void *desc)
 {
 	char *cptr;
 	int32 val;
@@ -737,7 +737,7 @@ static t_stat plot_set_length (UNIT *uptr, int32 set, char *ptr, void *desc)
 
 /* plot_set_pos - validate and store the new position of the carriage */
 
-static t_stat plot_set_pos (UNIT *uptr, int32 set, char *ptr, void *desc)
+static t_stat plot_set_pos (UNIT *uptr, int32 set, CONST char *ptr, void *desc)
 {
 	char *cptr;
 	int32 val;
@@ -760,7 +760,7 @@ static t_stat plot_set_pos (UNIT *uptr, int32 set, char *ptr, void *desc)
  * once for device and once for unit
  */
 
-static t_stat plot_show_vals (FILE *fp, UNIT *uptr, int32 val, void *descrip)
+static t_stat plot_show_vals (FILE *fp, UNIT *uptr, int32 val, CONST void *descrip)
 {
 	fprintf(fp, "length=%d, Xpos=%d, Ypos=%d",plot_xmax+1, plot_xpos,plot_ypos);
     return SCPE_OK;
@@ -769,7 +769,7 @@ static t_stat plot_show_vals (FILE *fp, UNIT *uptr, int32 val, void *descrip)
 /* routine to add a terminating NL character when 'show plot length'
  * or equivalent for xpos or ypos is issued, as simh will not append for us */
 
-static t_stat plot_show_nl(FILE *fp, UNIT *uptr, int32 val, void *descrip)
+static t_stat plot_show_nl(FILE *fp, UNIT *uptr, int32 val, CONST void *descrip)
 {
 	int32 disp;
 	char *label;
@@ -783,7 +783,7 @@ static t_stat plot_show_nl(FILE *fp, UNIT *uptr, int32 val, void *descrip)
 
 /* plot_validate_change - force the update_pen routine to be called after user changes pen setting */
 
-static t_stat plot_validate_change (UNIT *uptr, int32 set, char *ptr, void *desc)
+static t_stat plot_validate_change (UNIT *uptr, int32 set, CONST char *ptr, void *desc)
 {
 	need_update = TRUE;
 	return SCPE_OK;

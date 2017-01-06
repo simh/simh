@@ -246,20 +246,20 @@ t_stat rl_svc (UNIT *uptr);
 t_stat rl_reset (DEVICE *dptr);
 void rl_set_done (int32 error);
 t_stat rl_boot (int32 unitno, DEVICE *dptr);
-t_stat rl_attach (UNIT *uptr, char *cptr);
-t_stat rl_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rl_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rl_attach (UNIT *uptr, CONST char *cptr);
+t_stat rl_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rl_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static void rlv_maint (void);
 t_stat rl_detach (UNIT *uptr);
-t_stat rl_set_cover (UNIT *, int32, char *, void *);
-t_stat rl_show_cover (FILE *, UNIT *, int32, void *);
-t_stat rl_set_load (UNIT *, int32, char *, void *);
-t_stat rl_show_load (FILE *, UNIT *, int32, void *);
-t_stat rl_show_dstate (FILE *, UNIT *, int32, void *);
+t_stat rl_set_cover (UNIT *, int32, CONST char *, void *);
+t_stat rl_show_cover (FILE *, UNIT *, int32, CONST void *);
+t_stat rl_set_load (UNIT *, int32, CONST char *, void *);
+t_stat rl_show_load (FILE *, UNIT *, int32, CONST void *);
+t_stat rl_show_dstate (FILE *, UNIT *, int32, CONST void *);
 #if defined (VM_PDP11)
-t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rl_set_ctrl (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 #endif
-t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *rl_description (DEVICE *dptr);
 
@@ -363,7 +363,7 @@ static const MTAB rl_mod[] = {
     };
 
 DEVICE rl_dev = {
-    "RL", (UNIT *) &rl_unit, (REG *) rl_reg, (MTAB *) rl_mod,
+    "RL", (UNIT *) &rl_unit, (REG *)rl_reg, (MTAB *)rl_mod,
     RL_NUMDR, DEV_RDX, 24, 1, DEV_RDX, 16,
     NULL, NULL, &rl_reset,
     &rl_boot, &rl_attach, &rl_detach,
@@ -997,7 +997,7 @@ return auto_config (0, 0);
 
 /* Attach routine */
 
-t_stat rl_attach (UNIT *uptr, char *cptr)
+t_stat rl_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 p;
 t_stat r;
@@ -1042,7 +1042,7 @@ return (stat);
 
 /* Set size routine */
 
-t_stat rl_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rl_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
@@ -1052,12 +1052,12 @@ return SCPE_OK;
 
 /* Set bad block routine */
 
-t_stat rl_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rl_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 return pdp11_bad_block (uptr, RL_NUMSC, RL_NUMWD);
 }
 
-t_stat rl_set_cover (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rl_set_cover (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     /* allowed only if in LOAD state */
     if ((uptr->STAT & RLDS_M_STATE) != RLDS_LOAD)
@@ -1066,14 +1066,14 @@ t_stat rl_set_cover (UNIT *uptr, int32 val, char *cptr, void *desc)
     return (SCPE_OK);
 }
 
-t_stat rl_show_cover (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rl_show_cover (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     fprintf (st, "cover %s", (uptr->STAT & RLDS_CVO) ? "open" : "closed");
     return (SCPE_OK);
 }
 
 /* simulate the LOAD button on the drive */
-t_stat rl_set_load (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rl_set_load (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     if (val == 0) {                                     /* LOAD */
         if (uptr->STAT & RLDS_CVO)                      /* cover open? */
@@ -1095,14 +1095,14 @@ t_stat rl_set_load (UNIT *uptr, int32 val, char *cptr, void *desc)
     return (SCPE_OK);
 }
 
-t_stat rl_show_load (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rl_show_load (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     fprintf (st, "load %s",
         ((uptr->STAT & RLDS_M_STATE) != RLDS_LOAD) ? "set" : "reset");
     return (SCPE_OK);
 }
 
-t_stat rl_show_dstate (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rl_show_dstate (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     int32   cnt;
 
@@ -1131,7 +1131,7 @@ t_stat rl_show_dstate (FILE *st, UNIT *uptr, int32 val, void *desc)
 #if defined (VM_PDP11)
 
 /* Handle SET RL RLV12|RLV11 */
-t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rl_set_ctrl (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     if (UNIBUS)
         return (SCPE_NOFNC);
@@ -1144,7 +1144,7 @@ t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc)
 #endif
 
 /* SHOW RL will display the controller type */
-t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     const char *s = "RLV12";
 

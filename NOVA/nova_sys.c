@@ -174,7 +174,7 @@ internal state machine:
     8   process 'ignore' (error) block
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 data, csum, count, state, i;
 int32 origin;
@@ -861,7 +861,7 @@ return SCPE_ARG;
 #define A_SI    020                                     /* sign seen */
 #define A_MI    040                                     /* - seen */
 
-char *get_addr (char *cptr, t_addr addr, t_bool ext, int32 cflag, int32 *val)
+CONST char *get_addr (CONST char *cptr, t_addr addr, t_bool ext, int32 cflag, int32 *val)
 {
 int32 d, x, pflag;
 t_stat r;
@@ -963,7 +963,7 @@ return cptr;
                         NULL if error
 */
 
-char *get_2reg (char *cptr, char term, int32 *val)
+CONST char *get_2reg (CONST char *cptr, char term, int32 *val)
 {
 char gbuf[CBUFSIZE];
 t_stat r;
@@ -991,7 +991,7 @@ return cptr;
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, d, i, j, amd[3];
 t_stat r, rtn;

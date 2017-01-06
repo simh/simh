@@ -29,7 +29,7 @@
 #include "lgp_defs.h"
 #include <ctype.h>
 
-t_stat parse_sym_m (char *cptr, t_value *val, int32 sw);
+t_stat parse_sym_m (CONST char *cptr, t_value *val, int32 sw);
 void lgp_init (void);
 
 extern DEVICE cpu_dev;
@@ -40,7 +40,6 @@ extern REG cpu_reg[];
 extern uint32 M[];
 extern uint32 PC;
 extern uint32 ts_flag;
-extern int32 flex_to_ascii[128], ascii_to_flex[128];
 
 /* SCP data structures and interface routines
 
@@ -135,7 +134,7 @@ return SCPE_OK;
 
 /* Loader proper */
 
-t_stat sim_load (FILE *fi, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int flag)
 {
 uint32 wd, origin, amod, csum, cnt, tr, sc, ad, cmd;
 
@@ -227,17 +226,24 @@ static const char hex_decode[] = "0123456789FGJKQW";
 #define fputs(_s,f) Fprintf(f,"%s",_s)
 #define fputc(_c,f) Fprintf(f,"%c",_c)
 
-void lgp_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
+void lgp_sprint_addr (char *buf, DEVICE *dptr, t_addr addr)
 {
 if ((dptr == sim_devices[0]) &&
     ((sim_switches & SWMASK ('T')) ||
     ((cpu_unit.flags & UNIT_TTSS_D) && !(sim_switches & SWMASK ('N')))))
-    fprintf (st, "%02d%02d", addr >> 6, addr & SCMASK_30);
-else fprint_val (st, addr, dptr->aradix, dptr->awidth, PV_LEFT);
-return;
+    sprintf (buf, "%02d%02d", addr >> 6, addr & SCMASK_30);
+else sprint_val (buf, addr, dptr->aradix, dptr->awidth, PV_LEFT);
 }
 
-t_addr lgp_parse_addr (DEVICE *dptr, const char *cptr, const char **tptr)
+void lgp_fprint_addr (FILE *st, DEVICE *dptr, t_addr addr)
+{
+char buf[64];
+
+lgp_sprint_addr (buf, dptr, addr);
+fprintf (st, "%s", buf);
+}
+
+t_addr lgp_parse_addr (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
 {
 t_addr ad, ea;
 
@@ -257,6 +263,7 @@ return ea;
 
 void lgp_vm_init (void)
 {
+sim_vm_sprint_addr = &lgp_sprint_addr;
 sim_vm_fprint_addr = &lgp_fprint_addr;
 sim_vm_parse_addr = &lgp_parse_addr;
 return;
@@ -330,10 +337,10 @@ return SCPE_ARG;
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, c;
-char *tptr;
+const char *tptr;
 
 while (isspace (*cptr))                                 /* absorb spaces */
     cptr++;
@@ -376,10 +383,10 @@ return SCPE_ARG;
 
 /* Instruction parse */
 
-t_stat parse_sym_m (char *cptr, t_value *val, int32 sw)
+t_stat parse_sym_m (CONST char *cptr, t_value *val, int32 sw)
 {
 uint32 ea, sgn;
-const char *tptr;
+CONST char *tptr;
 char gbuf[CBUFSIZE];
 
 if (*cptr == '-') {

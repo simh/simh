@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   11-Jun-16    JDB     Bit mask constants are now unsigned
    21-Jan-16    JDB     First release version
    29-Mar-15    JDB     Created
 
@@ -35,10 +36,10 @@
 
 /* Program constants */
 
-#define SIGN_BIT            0100000
-#define EXPONENT_BITS       0077700
-#define ASSUMED_BIT         0000100
-#define FRACTION_BITS       0000077
+#define SIGN_BIT            0100000u
+#define EXPONENT_BITS       0077700u
+#define ASSUMED_BIT         0000100u
+#define FRACTION_BITS       0000077u
 
 
 /* Operand precisions:

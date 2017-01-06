@@ -474,8 +474,8 @@ return;
 
 int tlb_comp (const void *e1, const void *e2)
 {
-TLBENT *t1 = (TLBENT *) e1;
-TLBENT *t2 = (TLBENT *) e2;
+const TLBENT *t1 = (const TLBENT *) e1;
+const TLBENT *t2 = (const TLBENT *) e2;
 
 if (t1->asn > t2->asn) return +1;
 if (t1->asn < t2->asn) return -1;
@@ -532,13 +532,13 @@ return SCPE_OK;
 
 /* Show TLB entry or entries */
 
-t_stat cpu_show_tlb (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_tlb (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_addr lo, hi;
 uint32 lnt;
 TLBENT *tlbp;
 DEVICE *dptr;
-const char *cptr = (char *) desc;
+CONST char *cptr = (CONST char *) desc;
 
 lnt = (val)? DTLB_SIZE: ITLB_SIZE;
 dptr = find_dev_from_unit (uptr);

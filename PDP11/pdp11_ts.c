@@ -289,7 +289,7 @@ t_stat ts_rd (int32 *data, int32 PA, int32 access);
 t_stat ts_wr (int32 data, int32 PA, int32 access);
 t_stat ts_svc (UNIT *uptr);
 t_stat ts_reset (DEVICE *dptr);
-t_stat ts_attach (UNIT *uptr, char *cptr);
+t_stat ts_attach (UNIT *uptr, CONST char *cptr);
 t_stat ts_detach (UNIT *uptr);
 t_stat ts_boot (int32 unitno, DEVICE *dptr);
 int32 ts_updtssr (int32 t);
@@ -360,8 +360,8 @@ MTAB ts_mod[] = {
         &sim_tape_set_capac, &sim_tape_show_capac, NULL, "Set/Display capacity" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004,     "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV, 0,                 "VECTOR", NULL,
-        NULL, &show_vec, NULL, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0,       "VECTOR", "VECTOR",
+        &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -1080,7 +1080,7 @@ return auto_config (0, 0);
 
 /* Attach */
 
-t_stat ts_attach (UNIT *uptr, char *cptr)
+t_stat ts_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

@@ -217,7 +217,7 @@ DEBTAB m68kcpu_dt[] = {
     { NULL,     0              }
 };
 
-static char *condnames[] = {
+static const char *condnames[] = {
         "RA", "SR", "HI", "LS", "CC", "CS", "NE", "EQ", "VC", "VS", "PL", "MI", "GE", "LT", "GT", "LE"
 };
 

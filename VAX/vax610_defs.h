@@ -115,7 +115,7 @@
                         { UNIT_MSIZE, (1u << 21), NULL, "2M",   &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },  \
                         { UNIT_MSIZE, (1u << 22), NULL, "4M",   &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },  \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
-extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 
 /* Qbus I/O page */
 
@@ -341,8 +341,8 @@ extern int32 sys_model;
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
 /* Function prototypes for system-specific unaligned support */
 
@@ -351,7 +351,7 @@ int32 ReadRegU (uint32 pa, int32 lnt);
 void WriteIOU (uint32 pa, int32 val, int32 lnt);
 void WriteRegU (uint32 pa, int32 val, int32 lnt);
 
-t_stat cpu_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_show_leds (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 #include "pdp11_io_lib.h"
 

@@ -344,7 +344,7 @@ return SCPE_OK;
 
 /* Master loader */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 d10 data;
 int32 wc, fmt;
@@ -782,11 +782,11 @@ return SCPE_ARG;
         val     =       output value
 */
 
-t_value get_opnd (char *cptr, t_stat *status)
+t_value get_opnd (CONST char *cptr, t_stat *status)
 {
 int32 sign = 0;
 t_value val, xr = 0, ind = 0;
-const char *tptr;
+CONST char *tptr;
 
 *status = SCPE_ARG;                                     /* assume fail */
 if (*cptr == '@') {
@@ -804,14 +804,14 @@ if (val > 0777777)
     return 0;
 if (sign)
     val = (~val + 1) & 0777777;
-cptr = (char *)tptr;
+cptr = tptr;
 if (*cptr == '(') {
     cptr++;
     xr = strtotv (cptr, &tptr, 8);
     if ((cptr == tptr) || (*tptr != ')') ||
         (xr > AC_NUM) || (xr == 0))
         return 0;
-    cptr = (char *)++tptr;
+    cptr = ++tptr;
     }
 if (*cptr == 0)
     *status = SCPE_OK;
@@ -830,20 +830,17 @@ return (ind | (xr << 18) | val);
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, j;
 t_value ac, dev;
 t_stat r;
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], cbuf[2*CBUFSIZE];
 
 while (isspace (*cptr)) cptr++;
-for (i = 0; i < 6; i++) {
-    if (cptr[i] == 0) {
-        for (j = i + 1; j <= 6; j++) cptr[j] = 0;
-        break;
-        }
-    }
+memset (cbuf, '\0', sizeof(cbuf));
+strncpy (cbuf, cptr, sizeof(cbuf)-7);
+cptr = cbuf;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;

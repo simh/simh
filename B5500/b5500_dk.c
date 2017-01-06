@@ -64,13 +64,13 @@ t_stat              dsk_boot(int32, DEVICE *);
 t_stat              dsk_help (FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *dsk_description (DEVICE *);
 t_stat              esu_srv(UNIT *);
-t_stat              esu_attach(UNIT *, char *);
+t_stat              esu_attach(UNIT *, CONST char *);
 t_stat              esu_detach(UNIT *);
 t_stat              esu_help (FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *esu_description (DEVICE *);
 
 uint8               dsk_buffer[NUM_DEVS_DSK][DK_SEC_SIZE];
-t_stat              set_mod(UNIT *uptr, int32 val, char *cptr, 
+t_stat              set_mod(UNIT *uptr, int32 val, CONST char *cptr, 
                         void *desc);
 
 #define ESU_TYPE        UDATA(&esu_srv, UNIT_ATTABLE+UNIT_DISABLE+ \
@@ -437,7 +437,7 @@ t_stat esu_srv(UNIT * uptr)
 }
                 
 t_stat
-set_mod(UNIT *uptr, int32 val, char *cptr, void *desc) {
+set_mod(UNIT *uptr, int32 val, CONST char *cptr, void *desc) {
     if (uptr == NULL)   return SCPE_IERR;
     if (val == MODIB) 
         uptr->wait = DK_MAXSEGS2;
@@ -465,7 +465,7 @@ dsk_boot(int32 unit_num, DEVICE * dptr)
 
 
 t_stat
-esu_attach(UNIT * uptr, char *file)
+esu_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
     int                 u = uptr-esu_unit;

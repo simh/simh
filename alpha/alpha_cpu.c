@@ -199,10 +199,10 @@ t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_stat cpu_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc);
 t_stat cpu_fprint_one_inst (FILE *st, uint32 ir, t_uint64 pc, t_uint64 ra, t_uint64 rb);
 
 extern t_uint64 op_ldf (t_uint64 op);
@@ -211,8 +211,8 @@ extern t_uint64 op_lds (t_uint64 op);
 extern t_uint64 op_stf (t_uint64 op);
 extern t_uint64 op_stg (t_uint64 op);
 extern t_uint64 op_sts (t_uint64 op);
-extern t_uint64 vax_sqrt (uint32 ir, t_bool dp);
-extern t_uint64 ieee_sqrt (uint32 ir, t_bool dp);
+extern t_uint64 vax_sqrt (uint32 ir, uint32 dp);
+extern t_uint64 ieee_sqrt (uint32 ir, uint32 dp);
 extern void vax_fop (uint32 ir);
 extern void ieee_fop (uint32 ir);
 extern t_stat pal_19 (uint32 ir);
@@ -221,8 +221,8 @@ extern t_stat pal_1d (uint32 ir);
 extern t_stat pal_1e (uint32 ir);
 extern t_stat pal_1f (uint32 ir);
 extern t_uint64 trans_c (t_uint64 va);
-extern t_stat cpu_show_tlb (FILE *of, UNIT *uptr, int32 val, void *desc);
-extern t_stat pal_eval_intr (uint32 flag);
+extern t_stat cpu_show_tlb (FILE *of, UNIT *uptr, int32 val, CONST void *desc);
+extern uint32 pal_eval_intr (uint32 flag);
 extern t_stat pal_proc_excp (uint32 type);
 extern t_stat pal_proc_trap (uint32 type);
 extern t_stat pal_proc_intr (uint32 type);
@@ -1433,7 +1433,7 @@ while (reason == 0) {
 
         case 0x39:                                      /* MINSW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i++) {
+            for (i = 0, res = 0; i < 4; i++) {
                 s1 = SEXT_W_Q (R[ra] >> (i << 4));
                 s2 = SEXT_W_Q (rbv >> (i << 4));
                 res = res | (((s1 <= s2)? R[ra]: rbv) & word_mask[i]);
@@ -1451,7 +1451,7 @@ while (reason == 0) {
 
         case 0x3B:                                      /* MINUW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i++) {
+            for (i = 0, res = 0; i < 4; i++) {
                 s64 = R[ra] & word_mask[i];
                 t64 = rbv & word_mask[i];
                 res = res | ((s64 <= t64)? s64: t64);
@@ -1469,7 +1469,7 @@ while (reason == 0) {
 
         case 0x3D:                                      /* MAXUW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i++) {
+            for (i = 0, res = 0; i < 4; i++) {
                 s64 = R[ra] & word_mask[i];
                 t64 = rbv & word_mask[i];
                 res = res | ((s64 >= t64)? s64: t64);
@@ -1487,7 +1487,7 @@ while (reason == 0) {
 
         case 0x3F:                                      /* MAXSW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i++) {
+            for (i = 0, res = 0; i < 4; i++) {
                 s1 = SEXT_W_Q (R[ra] >> (i << 4));
                 s2 = SEXT_W_Q (rbv >> (i << 4));
                 res = res | (((s1 >= s2)? R[ra]: rbv) & word_mask[i]);
@@ -1701,7 +1701,7 @@ return SCPE_NXM;
 
 /* Memory allocation */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 t_uint64 mc = 0;
 uint32 i, clim;
@@ -1722,10 +1722,10 @@ return SCPE_OK;
 
 /* Show virtual address */
 
-t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_uint64 va, pa;
 
 if (cptr) {
@@ -1752,7 +1752,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, lnt;
 t_stat r;
@@ -1832,10 +1832,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_stat r;
 InstHistory *h;
 

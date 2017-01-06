@@ -62,13 +62,13 @@ UNIT ptr_unit = {
     };
 
 REG ptr_reg[] = {
-    { ORDATA (BUF, ptr_unit.buf, 8) },
-    { FLDATA (DONE, dev_done, INT_V_PTR) },
-    { FLDATA (ENABLE, int_enable, INT_V_PTR) },
-    { FLDATA (INT, int_req, INT_V_PTR) },
-    { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { ORDATAD (BUF, ptr_unit.buf, 8, "last data item processed") },
+    { FLDATAD (DONE, dev_done, INT_V_PTR, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_PTR, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_PTR, "interrupt pending flag") },
+    { DRDATAD (POS, ptr_unit.pos, T_ADDR_W, "position in the input file"), PV_LEFT },
+    { DRDATAD (TIME, ptr_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, ptr_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 
@@ -98,13 +98,13 @@ UNIT ptp_unit = {
     };
 
 REG ptp_reg[] = {
-    { ORDATA (BUF, ptp_unit.buf, 8) },
-    { FLDATA (DONE, dev_done, INT_V_PTP) },
-    { FLDATA (ENABLE, int_enable, INT_V_PTP) },
-    { FLDATA (INT, int_req, INT_V_PTP) },
-    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { ORDATAD (BUF, ptp_unit.buf, 8, "last data item processed") },
+    { FLDATAD (DONE, dev_done, INT_V_PTP, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_PTP, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_PTP, "interrupt pending flag") },
+    { DRDATAD (POS, ptp_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, ptp_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, ptp_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 

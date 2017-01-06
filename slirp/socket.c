@@ -65,7 +65,7 @@ sofree(struct socket *so)
   Slirp *slirp = so->slirp;
 
   if (so->so_emu==EMU_RSH && so->extra) {
-	sofree(so->extra);
+	sofree((struct socket *)so->extra);
 	so->extra=NULL;
   }
   if (so == slirp->tcp_last_so) {

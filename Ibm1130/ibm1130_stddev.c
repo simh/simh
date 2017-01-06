@@ -89,7 +89,7 @@
 
 /* ---------------------------------------------------------------------------- */
 
-static void badio (char *dev)
+static void badio (const char *dev)
 {
 /* the real 1130 just ignores attempts to use uninstalled devices. They get tested
  * at times, so it's best to just be quiet about this
@@ -138,18 +138,18 @@ static t_stat emit_conout_character(int ch);
 static t_stat map_conout_character(int ch);
 static void   reset_mapping (void);
 static void   set_conout_mapping(int32 flags);
-static t_stat validate_conout_mapping(UNIT *uptr, int32 match, char *cvptr, void *desc);
+static t_stat validate_conout_mapping(UNIT *uptr, int32 match, CONST char *cvptr, void *desc);
 static void   set_default_mapping(int32 flags);
 static void   finish_conout_mapping(int32 flags);
 static void   strsort (int n, unsigned char *s);		/* sorts an array of n characters */
 static int    os_map_comp (OS_MAP *a, OS_MAP *b);		/* compares two mapping entries */
-static t_stat font_cmd(int32 flag, char *cptr);			/* handles font command */
+static t_stat font_cmd(int32 flag, CONST char *cptr);			/* handles font command */
 static void   read_map_file(FILE *fd);					/* reads a font map file */
-static t_bool str_match(char *str, char *keyword);		/* keyword/string comparison */
-static char * handle_map_ansi_definition(char **pc);	/* input line parsers for map file sections */
-static char * handle_map_input_definition(char **pc);
-static char * handle_map_output_definition(char **pc);
-static char * handle_map_overstrike_definition(char **pc);
+static t_bool str_match(const char *str, const char *keyword);/* keyword/string comparison */
+static const char * handle_map_ansi_definition(char **pc);	/* input line parsers for map file sections */
+static const char * handle_map_input_definition(char **pc);
+static const char * handle_map_output_definition(char **pc);
+static const char * handle_map_overstrike_definition(char **pc);
 
 #define UNIT_V_CSET		(UNIT_V_UF + 0)		/* user flag: character set */
 #define UNIT_V_LOCKED	(UNIT_V_UF + 2)		/* user flag: keyboard locked */
@@ -443,31 +443,33 @@ static t_stat tti_reset (DEVICE *dptr)
 
 /* basic_attach - fix quotes in filename, then call standard unit attach routine */
 
-t_stat basic_attach (UNIT *uptr, char *cptr)
+t_stat basic_attach (UNIT *uptr, CONST char *cptr)
 {
-	return attach_unit(uptr, quotefix(cptr));	/* fix quotes in filenames & attach */
+    char gbuf[2*CBUFSIZE];
+
+	return attach_unit(uptr, quotefix(cptr, gbuf));	/* fix quotes in filenames & attach */
 }
 
 /* quotefix - strip off quotes around filename, if present */
 
-char * quotefix (char * cptr)
+CONST char * quotefix (CONST char *cptr, char * buf)
 {
-#ifdef WIN32									/* do this only for Windows builds, for the time being */
-	char *c;
-	int quote;
+    const char *c;
+    int quote;
 
-	if (*cptr == '"' || *cptr == '\'') {
-		quote = *cptr++;						/* remember quote and skip over it */
+    while (sim_isspace(*cptr))
+        ++cptr;
+    if (*cptr == '"' || *cptr == '\'') {
+        quote = *cptr++;                        /* remember quote and skip over it */
 
-		for (c = cptr; *c && *c != quote; c++)
-			;									/* find closing quote, or end of string */
+        cptr = buf;
+        for (c = cptr; *c && *c != quote; c++)
+            *buf++ = *c;                        /* find closing quote, or end of string */
 
-		if (*c)									/* terminate string at closing quote */
-			*c = '\0';
-	}
-
-#endif
-	return cptr;								/* return pointer to cleaned-up name */
+        if (*c)                                 /* terminate string at closing quote */
+            *buf = '\0';
+        }
+    return cptr;                                /* return pointer to cleaned-up name */
 }
 
 t_bool keyboard_is_busy (void)					/* return TRUE if keyboard is not expecting a character */
@@ -771,7 +773,7 @@ static void finish_conout_mapping (int32 flags)
 
 /* validate_conout_mapping - called when set command gets a new value */
 
-static t_stat validate_conout_mapping (UNIT *uptr, int32 match, char *cvptr, void *desc)
+static t_stat validate_conout_mapping (UNIT *uptr, int32 match, CONST char *cvptr, void *desc)
 {
 	set_conout_mapping(match);
 	return SCPE_OK;
@@ -938,11 +940,14 @@ static t_stat map_conout_character (int ch)
 
 /* font_cmd - parse a font mapping file. Sets input and output translations */
 
-static t_stat font_cmd (int32 flag, char *cptr)
+static t_stat font_cmd (int32 flag, CONST char *iptr)
 {
 	char *fname, quote;
+        char gbuf[4*CBUFSIZE], *cptr = gbuf;
 	FILE *fd;
 
+    gbuf[sizeof(gbuf)-1] = '\0';
+    strncpy(gbuf, iptr, sizeof(gbuf)-1);
 	while (*cptr && (*cptr <= ' ')) cptr++;			/* skip blanks */
 	if (! *cptr) return SCPE_2FARG;					/* argument missing */
 
@@ -974,7 +979,7 @@ static t_stat font_cmd (int32 flag, char *cptr)
 
 /* str_match - compare the string str to the keyword, case insensitive */
 
-static t_bool str_match (char *str, char *keyword)
+static t_bool str_match (const char *str, const char *keyword)
 {
 	char kch, sch;
 
@@ -996,7 +1001,8 @@ static t_bool str_match (char *str, char *keyword)
 
 static void read_map_file (FILE *fd)
 {
-	char str[256], *c, *errmsg;
+	char str[256], *c;
+    const char *errmsg;
 	int lineno = 0;
 	enum {SECT_UNDEFINED, SECT_DEFAULT, SECT_ANSI, SECT_INPUT, SECT_OUTPUT, SECT_OVERSTRIKE}
 		section = SECT_UNDEFINED;
@@ -1086,7 +1092,7 @@ static void read_map_file (FILE *fd)
  * may be incremented by the caller
  */
 
-static char * get_num_char (char **pc, unsigned char *out, int ndigits, int base, char *errmsg)
+static const char * get_num_char (char **pc, unsigned char *out, int ndigits, int base, const char *errmsg)
 {
 	int ch = 0, digit;
 	char *c = *pc;
@@ -1119,9 +1125,10 @@ static char * get_num_char (char **pc, unsigned char *out, int ndigits, int base
  * error encountered. *pc is advanced to next whitespace or whatever followed input.
  */
 
-static char * get_characters (char **pc, unsigned char *outstr, int nmax, int *nout)
+static const char * get_characters (char **pc, unsigned char *outstr, int nmax, int *nout)
 {
-	char *c = *pc, *errstr;
+	char *c = *pc;
+    const char *errstr;
 	unsigned char *out = outstr;
 
 	while (*c && *c <= ' ')					/* skip leading whitespace */
@@ -1218,10 +1225,10 @@ static char * get_characters (char **pc, unsigned char *outstr, int nmax, int *n
 
 /* handle_map_ansi_definition - process line in [ansi] section */
 
-static char * handle_map_ansi_definition (char **pc)
+static const char * handle_map_ansi_definition (char **pc)
 {
 	unsigned char *outstr;
-	char *errmsg;
+	const char *errmsg;
 	int n;
 
 	if (str_match(*pc, "black")) {							/* find which string we're setting */
@@ -1245,10 +1252,10 @@ static char * handle_map_ansi_definition (char **pc)
 
 /* handle_map_input_definition - process line in [input] section */
 
-static char * handle_map_input_definition (char **pc)
+static const char * handle_map_input_definition (char **pc)
 {
 	unsigned char cin, cout;
-	char *errmsg;
+	const char *errmsg;
 	int n;
 
 	if ((errmsg = get_characters(pc, &cin, 1, &n)) != NULL)	/* get input character */
@@ -1269,10 +1276,10 @@ static char * handle_map_input_definition (char **pc)
 
 /* handle_map_output_definition - process line in [output] section */
 
-static char * handle_map_output_definition (char **pc)
+static const char * handle_map_output_definition (char **pc)
 {
 	unsigned char cin, cout;
-	char *errmsg;
+	const char *errmsg;
 	int n;
 
 	if ((errmsg = get_characters(pc, &cin, 1, &n)) != NULL)	/* get input character */
@@ -1293,10 +1300,10 @@ static char * handle_map_output_definition (char **pc)
 
 /* handle_map_overstrike_definition - process line in [overstrike] section */
 
-static char * handle_map_overstrike_definition (char **pc)
+static const char * handle_map_overstrike_definition (char **pc)
 {
 	unsigned char ch, inlist[MAX_OS_CHARS];
-	char *errmsg;
+	const char *errmsg;
 	int nin;
 
 	if (n_os_mappings >= MAX_OS_MAPPINGS)					/* os_map is full, no more room */

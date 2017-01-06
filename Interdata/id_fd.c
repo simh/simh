@@ -132,7 +132,6 @@ static uint32 ctab[16] = {
     0, 0, 0, 0
     };
 
-DEVICE fd_dev;
 uint32 fd (uint32 dev, uint32 op, uint32 dat);
 t_stat fd_svc (UNIT *uptr);
 t_stat fd_reset (DEVICE *dptr);
@@ -516,9 +515,6 @@ static uint8 boot_rom[] = {
 
 t_stat fd_boot (int32 unitno, DEVICE *dptr)
 {
-extern uint32 PC, dec_flgs;
-extern uint16 decrom[];
-
 if (decrom[0xD5] & dec_flgs)                            /* AL defined? */
     return SCPE_NOFNC;
 IOWriteBlk (BOOT_START, BOOT_LEN, boot_rom);            /* copy boot */

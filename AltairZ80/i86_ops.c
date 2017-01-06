@@ -4118,7 +4118,7 @@ static void i86op_opcD3_word_RM_CL(PC_ENV *m)
    DECODE_CLEAR_SEGOVR(m);
 }
 
-static void sys_fatal(int error, char *fmt, ...)
+static void sys_fatal(int error, const char *fmt, ...)
 {
   va_list   p;
   va_start(p, fmt);

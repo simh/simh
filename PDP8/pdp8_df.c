@@ -108,7 +108,6 @@ int32 df_time = 10;                                     /* inter-word time */
 int32 df_burst = 1;                                     /* burst mode flag */
 int32 df_stopioe = 1;                                   /* stop on error */
 
-DEVICE df_dev;
 int32 df60 (int32 IR, int32 AC);
 int32 df61 (int32 IR, int32 AC);
 int32 df62 (int32 IR, int32 AC);
@@ -116,8 +115,8 @@ t_stat df_svc (UNIT *uptr);
 t_stat pcell_svc (UNIT *uptr);
 t_stat df_reset (DEVICE *dptr);
 t_stat df_boot (int32 unitno, DEVICE *dptr);
-t_stat df_attach (UNIT *uptr, char *cptr);
-t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat df_attach (UNIT *uptr, CONST char *cptr);
+t_stat df_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* DF32 data structures
 
@@ -135,16 +134,16 @@ UNIT df_unit = {
     };
 
 REG df_reg[] = {
-    { ORDATA (STA, df_sta, 12) },
-    { ORDATA (DA, df_da, 12) },
-    { ORDATA (WC, M[DF_WC], 12), REG_FIT },
-    { ORDATA (MA, M[DF_MA], 12), REG_FIT },
-    { FLDATA (DONE, df_done, 0) },
-    { FLDATA (INT, int_req, INT_V_DF) },
-    { ORDATA (WLS, df_wlk, 8) },
-    { DRDATA (TIME, df_time, 24), REG_NZ + PV_LEFT },
-    { FLDATA (BURST, df_burst, 0) },
-    { FLDATA (STOP_IOE, df_stopioe, 0) },
+    { ORDATAD (STA, df_sta, 12, "status, disk and memory address extension") },
+    { ORDATAD (DA, df_da, 12, "low order disk address") },
+    { ORDATAD (WC, M[DF_WC], 12, "word count (in memory)"), REG_FIT },
+    { ORDATAD (MA, M[DF_MA], 12, "memory address (in memory)"), REG_FIT },
+    { FLDATAD (DONE, df_done, 0, "device done flag") },
+    { FLDATAD (INT, int_req, INT_V_DF, "interrupt pending flag") },
+    { ORDATAD (WLS, df_wlk, 8, "write lock switches") },
+    { DRDATAD (TIME, df_time, 24, "rotational delay, per word"), REG_NZ + PV_LEFT },
+    { FLDATAD (BURST, df_burst, 0, "burst flag") },
+    { FLDATAD (STOP_IOE, df_stopioe, 0, "stop on I/O error") },
     { DRDATA (CAPAC, df_unit.capac, 18), REG_HRO },
     { ORDATA (DEVNUM, df_dib.dev, 6), REG_HRO },
     { NULL }
@@ -353,7 +352,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat df_attach (UNIT *uptr, char *cptr)
+t_stat df_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 p, sz;
 uint32 ds_bytes = DF_DKSIZE * sizeof (int16);
@@ -371,7 +370,7 @@ return attach_unit (uptr, cptr);
 
 /* Change disk size */
 
-t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat df_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val < 0)
     return SCPE_IERR;

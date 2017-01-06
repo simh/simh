@@ -486,12 +486,12 @@ static t_stat kmc_txService(UNIT * txup);
 static t_stat kmc_rxService(UNIT * rxup);
 
 #if KMC_UNITS > 1
-static t_stat kmc_setDeviceCount (UNIT *txup, int32 val, char *cptr, void *desc);
-static t_stat kmc_showDeviceCount (FILE *st, UNIT *txup, int32 val, void *desc);
+static t_stat kmc_setDeviceCount (UNIT *txup, int32 val, CONST char *cptr, void *desc);
+static t_stat kmc_showDeviceCount (FILE *st, UNIT *txup, int32 val, CONST void *desc);
 #endif
-static t_stat kmc_setLineSpeed (UNIT *txup, int32 val, char *cptr, void *desc);
-static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, void *desc);
-static t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v, void *dp);
+static t_stat kmc_setLineSpeed (UNIT *txup, int32 val, CONST char *cptr, void *desc);
+static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, CONST void *desc);
+static t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v, CONST void *dp);
 
 static t_stat kmc_help (FILE *st, DEVICE *dptr,
                         UNIT *uptr, int32 flag, const char *cptr); 
@@ -535,6 +535,35 @@ static UNIT tx_units[MAX_ACTIVE][KMC_UNITS]; /* Line 0 is primary unit.  txup re
 
 
 static UNIT rx_units[MAX_ACTIVE][KMC_UNITS];    /* Secondary unit, used for RX.  rxup references */
+
+DEVICE kmc_int_rxdev = {
+    "KDP-RX", rx_units[0], 
+    NULL,                                       /* Register decode tables */
+    NULL,                                       /* Modifier table */
+    INITIAL_KMCS,                               /* Number of units */
+    KMC_RDX,                                    /* Address radix */
+    13,                                         /* Address width: 18 - <17:13> are 1s, omits UBA */
+    1,                                          /* Address increment */
+    KMC_RDX,                                    /* Data radix */
+    8,                                          /* Data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* Deposit routine */
+    NULL,                                       /* reset routine */
+    NULL,                                       /* boot routine */
+    NULL,                                       /* attach routine */
+    NULL,                                       /* detach routine */
+    NULL,                                       /* context */
+    DEV_NOSAVE,                                 /* Flags */
+    0,                                          /* debug control */
+    NULL,                                       /* debug flag table */
+    NULL,                                       /* memory size routine */
+    NULL,                                       /* logical name */
+    NULL,                                       /* help routine */
+    NULL,                                       /* attach help routine */
+    NULL,                                       /* help context */
+    &kmc_description                            /* Device description routine */
+};
+
 
 /* Timers - in usec */
 
@@ -738,8 +767,12 @@ static t_stat kmc_reset(DEVICE* dptr) {
             memset (dram, 0xdd, sizeof dram);
             gflags |= FLG_INIT;
             gflags &= ~FLG_UCINI;
+            sim_register_internal_device (&kmc_int_rxdev);
         }
     }
+
+    kmc_int_rxdev.flags &= ~DEV_DIS;                    /* Make internal RX device */
+    kmc_int_rxdev.flags |= (kmc_dev.flags & DEV_DIS);   /* enable/disable track KDP device */
 
     return auto_config (dptr->name, ((dptr->flags & DEV_DIS)? 0: dptr->numunits));  /* auto config */
 }
@@ -2764,7 +2797,7 @@ static void *remqueue (QH *entry, int32 *count) {
  */
 
 #if KMC_UNITS > 1
-static t_stat kmc_setDeviceCount (UNIT *txup, int32 val, char *cptr, void *desc) {
+static t_stat kmc_setDeviceCount (UNIT *txup, int32 val, CONST char *cptr, void *desc) {
     int32 newln;
     uint32 dupidx;
     t_stat r;
@@ -2794,7 +2827,7 @@ static t_stat kmc_setDeviceCount (UNIT *txup, int32 val, char *cptr, void *desc)
 /* Report number of configured KMCs */
 
 #if KMC_UNITS > 1
-static t_stat kmc_showDeviceCount (FILE *st, UNIT *txup, int32 val, void *desc) {
+static t_stat kmc_showDeviceCount (FILE *st, UNIT *txup, int32 val, CONST void *desc) {
     DEVICE *dev = find_dev_from_unit(txup);
 
     if (dev->flags & DEV_DIS) {
@@ -2828,7 +2861,7 @@ static t_stat kmc_showDeviceCount (FILE *st, UNIT *txup, int32 val, void *desc) 
  * potential use of that DUP by a KMC.
  */
 
-static t_stat kmc_setLineSpeed (UNIT *txup, int32 val, char *cptr, void *desc) {
+static t_stat kmc_setLineSpeed (UNIT *txup, int32 val, CONST char *cptr, void *desc) {
     dupstate *d;
     int32 dupidx, newspeed;
     char gbuf[CBUFSIZE];
@@ -2859,7 +2892,7 @@ static t_stat kmc_setLineSpeed (UNIT *txup, int32 val, char *cptr, void *desc) {
     return SCPE_OK;
 }
 
-static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, void *desc) {
+static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, CONST void *desc) {
     int dupidx;
 
     fprintf (st, "DUP KMC Line   Speed\n"
@@ -2883,7 +2916,7 @@ static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, void *desc) {
 
 /* Show KMC status */
 
-t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v,  void *dp) {
+t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v,  CONST void *dp) {
     int32 k = up->unit_kmc;
     int32 line;
     t_bool first = TRUE;
@@ -3072,5 +3105,8 @@ static t_stat kmc_help (FILE *st, DEVICE *dptr,
  * Conventionally last function in the file.
  */
 static const char *kmc_description (DEVICE *dptr) {
-    return "KMC11-A Synchronous line controller supporting only COMM IOP/DUP microcode";
+    if (dptr == &kmc_dev)
+        return "KMC11-A Synchronous line controller supporting only COMM IOP/DUP microcode";
+    else
+        return "KMC pseudo device for receive units";
 }

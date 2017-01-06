@@ -32,8 +32,8 @@ static t_stat sagecpu_reset(DEVICE* dptr);
 static t_stat sagecpu_boot(int unit,DEVICE* dptr);
 static t_stat sage_translateaddr(t_addr in,t_addr* out, IOHANDLER** ioh,int rw,int fc,int dma);
 static t_stat sage_mem(t_addr addr,uint8** mem);
-static t_stat sagecpu_set_bios(UNIT *uptr, int32 value, char *cptr, void *desc);
-static t_stat sagecpu_show_bios(FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat sagecpu_set_bios(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat sagecpu_show_bios(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static uint8* ROM = 0;
 static int rom_enable = TRUE; /* LS74 U51 in CPU schematic */
 
@@ -45,11 +45,7 @@ extern t_addr AR[];
 
 
 #define MAX_ROMSIZE 16384
-#ifdef SAGE_IV
-char* biosfile = "sage-iv.hex";
-#else
-char* biosfile = "sage-ii.hex";
-#endif
+char* biosfile = NULL;
 
 static MTAB sagecpu_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,      "BIOS", "BIOS",  &sagecpu_set_bios, &sagecpu_show_bios  },
@@ -80,14 +76,14 @@ DEVICE sagecpu_dev = {
     sagecpu_dt, NULL, NULL
 };
 
-static t_stat sagecpu_set_bios(UNIT *uptr, int32 value, char *cptr, void *desc)
+static t_stat sagecpu_set_bios(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     FILE* fp;
     if (cptr==NULL) return SCPE_ARG;
     if ((fp=fopen(cptr,"r"))==0) return SCPE_OPENERR;
     fclose(fp);
     
-    biosfile = malloc(strlen(cptr)+1);
+    biosfile = (char *)realloc(biosfile, strlen(cptr)+1);
     strcpy(biosfile,cptr);
 
     /* enforce reload of BIOS code on next boot */
@@ -96,7 +92,7 @@ static t_stat sagecpu_set_bios(UNIT *uptr, int32 value, char *cptr, void *desc)
     return SCPE_OK; 
 }
 
-static t_stat sagecpu_show_bios(FILE *st, UNIT *uptr, int32 val, void *desc)
+static t_stat sagecpu_show_bios(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     fprintf(st, "BIOS=%s", biosfile);
     return SCPE_OK; 
@@ -142,6 +138,13 @@ static t_stat sagecpu_reset(DEVICE* dptr)
     /* redefine memory handlers */
     TranslateAddr = &sage_translateaddr;
     Mem = &sage_mem;
+
+    if (!biosfile)
+#ifdef SAGE_IV
+        sagecpu_set_bios(NULL, 0, "sage-iv.hex", NULL);
+#else
+        sagecpu_set_bios(NULL, 0, "sage-ii.hex", NULL);
+#endif
 
     if (!ROM) ROM = (uint8*)calloc(MAX_ROMSIZE,1);
     rom_enable = TRUE;

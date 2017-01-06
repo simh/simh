@@ -268,10 +268,10 @@ uint32 display (uint32 dev, uint32 op, uint32 dat);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_consint (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 void set_r_display (uint32 *rbase);
 
 extern t_bool devtab_init (void);
@@ -2310,7 +2310,7 @@ return SCPE_OK;
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 mc = 0;
 uint32 i;
@@ -2344,7 +2344,7 @@ return;
 
 /* Set console interrupt */
 
-t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_consint (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (PSW & PSW_EXI)
     SET_INT (v_DS);
@@ -2353,7 +2353,7 @@ return SCPE_OK;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, lnt;
 t_stat r;
@@ -2384,10 +2384,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 op, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_value sim_eval[3];
 t_stat r;
 InstHistory *h;

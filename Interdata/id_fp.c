@@ -115,7 +115,6 @@ struct ufp {                                            /* unpacked fp */
 extern uint32 *R;
 extern uint32 F[8];
 extern dpr_t D[8];
-extern uint16 decrom[];
 extern uint32 fp_in_hwre;
 extern uint32 ReadF (uint32 loc, uint32 rel);
 extern void WriteF (uint32 loc, uint32 dat, uint32 rel);
@@ -318,7 +317,7 @@ return StoreFPR (&fop1, op, r1, Q_RND_AS (op));         /* store result */
    - Double precision multiply generates 56b with no guard bits
 */
 
-int32 f_m (uint32 op, uint32 r1, uint32 r2, uint32 ea)
+uint32 f_m (uint32 op, uint32 r1, uint32 r2, uint32 ea)
 {
 struct ufp fop1, fop2;
 struct ufp res = { 0, 0, 0, 0 };
@@ -366,7 +365,7 @@ return StoreFPR (&res, op, r1, Q_RND (op));             /* store */
 
 /* Floating point divide - see overflow/underflow notes for multiply */
 
-int32 f_d (uint32 op, uint32 r1, uint32 r2, uint32 ea)
+uint32 f_d (uint32 op, uint32 r1, uint32 r2, uint32 ea)
 {
 struct ufp fop1, fop2;
 struct ufp quo = { 0, 0, 0, 0 };

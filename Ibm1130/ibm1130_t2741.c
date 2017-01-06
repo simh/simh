@@ -40,10 +40,10 @@ static TMXR t2741_tmxr = { 1, 0, 0, &t2741_ldsc };		/* line mux for telnet attac
 
 static t_stat t2741_svc      (UNIT *uptr);
 static t_stat t2741_reset    (DEVICE *dptr);
-static t_stat t2741_attach   (UNIT *uptr, char *cptr);
+static t_stat t2741_attach   (UNIT *uptr, CONST char *cptr);
 static t_stat t2741_detach   (UNIT *uptr);
 static uint16 ascii_to_t2741 (int ascii);
-static char * t2741_to_ascii (uint16 code);
+static const char * t2741_to_ascii (uint16 code);
 static void set_transmit_notready (void);
 
 static uint16 t2741_dsw    = T2741_DSW_TRANSMIT_NOT_READY;	/* device status word      */
@@ -208,7 +208,7 @@ static t_stat t2741_svc (UNIT *uptr)
 	return SCPE_OK;
 }
 
-static t_stat t2741_attach (UNIT *uptr, char *cptr)
+static t_stat t2741_attach (UNIT *uptr, CONST char *cptr)
 {
 	int rval;
 
@@ -355,7 +355,7 @@ static uint16 ascii_to_t2741 (int ascii)
 	return CODE_UNKNOWN;
 }
 
-static char * t2741_to_ascii (uint16 code)
+static const char * t2741_to_ascii (uint16 code)
 {
 	int i;
 	static char string[2] = {'?', '\0'};

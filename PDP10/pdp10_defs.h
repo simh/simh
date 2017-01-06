@@ -140,7 +140,6 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 #define Q_ITS           (cpu_unit.flags & UNIT_ITS)
 #define Q_T20           (cpu_unit.flags & UNIT_T20)
 #define Q_KLAD          (cpu_unit.flags & UNIT_KLAD)
-#define Q_IDLE          (sim_idle_enab)
 
 /* Architectural constants */
 
@@ -766,20 +765,24 @@ typedef struct pdp_dib DIB;
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_ReadW18 (uint32 ba, int32 bc, uint32 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteW18 (uint32 ba, int32 bc, uint32 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
+int32 Map_WriteW18 (uint32 ba, int32 bc, const uint32 *buf);
 void uba_debug_dma_in (uint32 ba, a10 pa_start, a10 pa_end);
 void uba_debug_dma_out (uint32 ba, a10 pa_start, a10 pa_end);
 void uba_debug_dma_nxm (const char *msg, a10 pa10, uint32 ba, int32 bc);
 
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat set_addr_flt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat set_vec (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_vec (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat auto_config (const char *name, int32 num);
 
+extern d10 *ac_cur;                                     /* current AC block */
+extern int32 flags;                                     /* flags */
+extern const int32 pi_l2bit[8];
+extern const d10 bytemask[64];
 
 #endif

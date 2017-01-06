@@ -23,6 +23,21 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   15-Sep-16    JDB     Modified "one_time_init" to set aux_cmds "message" field
+   03-Sep-16    JDB     Added the STOP_POWER and STOP_ARSINH messages
+   01-Sep-16    JDB     Moved the hp_cold_cmd routine to the CPU (as cpu_cold_cmd)
+                        Added the POWER command
+   03-Aug-16    JDB     Improved "fmt_char" and "fmt_bitset" to allow multiple calls
+   15-Jul-16    JDB     Fixed the word count display for SIO read/write orders
+   14-Jul-16    JDB     Improved the cold dump invocation
+   21-Jun-16    JDB     Changed fprint_instruction mask type from t_value to uint32
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   16-May-16    JDB     Prefix in fprint_instruction is now a pointer-to-constant
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   20-Apr-16    JDB     Added implementation notes to "fmt_bitset"
+   14-Apr-16    JDB     Fixed INTMASK setting and display
+   24-Mar-16    JDB     Added the LP device
+   21-Mar-16    JDB     Changed uint16 types to HP_WORD
    23-Nov-15    JDB     First release version
    11-Dec-12    JDB     Created
 
@@ -45,9 +60,6 @@
 #include <ctype.h>
 #include <stdarg.h>
 
-#include "sim_defs.h"
-#include "scp.h"
-
 #include "hp3000_defs.h"
 #include "hp3000_cpu.h"
 #include "hp3000_cpu_ims.h"
@@ -65,6 +77,7 @@ extern DEVICE scmb_dev [2];                     /* Selector Channel Maintenance 
 extern DEVICE atcd_dev;                         /* Asynchronous Terminal Controller TDI */
 extern DEVICE atcc_dev;                         /* Asynchronous Terminal Controller TCI */
 extern DEVICE clk_dev;                          /* System Clock */
+extern DEVICE lp_dev;                           /* Line Printer */
 extern DEVICE ds_dev;                           /* 79xx MAC Disc */
 extern DEVICE ms_dev;                           /* 7970 Magnetic Tape */
 
@@ -748,21 +761,20 @@ static const OP_TABLE mlb_ops = {
 static void   one_time_init  (void);
 static t_bool fprint_stopped (FILE   *st,   t_stat     reason);
 static void   fprint_addr    (FILE   *st,   DEVICE     *dptr, t_addr     addr);
-static t_addr parse_addr     (DEVICE *dptr, const char *cptr, const char **tptr);
+static t_addr parse_addr     (DEVICE *dptr, CONST char *cptr, CONST char **tptr);
 
-static t_stat hp_cold_cmd  (int32 arg, char *buf);
-static t_stat hp_exdep_cmd (int32 arg, char *buf);
-static t_stat hp_run_cmd   (int32 arg, char *buf);
-static t_stat hp_brk_cmd   (int32 arg, char *buf);
+static t_stat hp_exdep_cmd (int32 arg, CONST char *buf);
+static t_stat hp_run_cmd   (int32 arg, CONST char *buf);
+static t_stat hp_brk_cmd   (int32 arg, CONST char *buf);
 
 /* System interface local utility routines */
 
 static void   fprint_value       (FILE *ofile, t_value val,  uint32 radix, uint32 width, uint32 format);
 static t_stat fprint_order       (FILE *ofile, t_value *val, uint32 radix);
 static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *instruction,
-                                  t_value mask, uint32 shift, uint32 radix);
+                                  uint32 mask, uint32 shift, uint32 radix);
 
-static t_stat parse_cpu          (char *cptr, t_addr address, UNIT *uptr, t_value *value, int32 switches);
+static t_stat parse_cpu          (CONST char *cptr, t_addr address, UNIT *uptr, t_value *value, int32 switches);
 
 
 /* System interface state */
@@ -775,10 +787,10 @@ static APC_FLAGS parse_config = apcNone;        /* address parser configuration 
 
 /* System interface global data structures */
 
-#define E                   0400                /* parity bit for even parity */
-#define O                   0000                /* parity bit for odd parity */
+#define E                   0400u               /* parity bit for even parity */
+#define O                   0000u               /* parity bit for odd parity */
 
-const uint16 odd_parity [256] = {                       /* odd parity table */
+const HP_WORD odd_parity [256] = {                      /* odd parity table */
     E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /*   000-017 */
     O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /*   020-037 */
     O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /*   040-067 */
@@ -863,6 +875,7 @@ DEVICE *sim_devices [] = {                      /* an array of pointers to the s
     &scmb_dev [0], &scmb_dev [1],               /*   Selector Channel Maintenance Boards */
     &atcd_dev,     &atcc_dev,                   /*   Asynchronous Terminal Controller (TDI and TCI) */
     &clk_dev,                                   /*   System Clock */
+    &lp_dev,                                    /*   Line Printer */
     &ds_dev,                                    /*   7905/06/20/25 MAC Disc Interface */
     &ms_dev,                                    /*   7970B/E Magnetic Tape Interface */
     NULL                                        /* end of the device list */
@@ -881,7 +894,9 @@ const char *sim_stop_messages [] = {            /* an array of pointers to the s
     "Breakpoint",                               /*   STOP_BRKPNT */
     "Infinite loop",                            /*   STOP_INFLOOP */
     "Cold load complete",                       /*   STOP_CLOAD */
-    "Cold dump complete"                        /*   STOP_CDUMP */
+    "Cold dump complete",                       /*   STOP_CDUMP */
+    "Auto-restart disabled",                    /*   STOP_ARSINH */
+    "Power is off"                              /*   STOP_POWER */
     };
 
 
@@ -929,12 +944,19 @@ static CTAB aux_cmds [] = {
     { "IEXAMINE", &hp_exdep_cmd,  0,         NULL                                                 },
     { "DEPOSIT",  &hp_exdep_cmd,  0,         NULL                                                 },
     { "IDEPOSIT", &hp_exdep_cmd,  0,         NULL                                                 },
+
     { "RUN",      &hp_run_cmd,    0,         NULL                                                 },
     { "GO",       &hp_run_cmd,    0,         NULL                                                 },
+
     { "BREAK",    &hp_brk_cmd,    0,         NULL                                                 },
     { "NOBREAK",  &hp_brk_cmd,    0,         NULL                                                 },
-    { "LOAD",     &hp_cold_cmd,   Cold_Load, "l{oad} {cntlword}        cold load from a device\n" },
-    { "DUMP",     &hp_cold_cmd,   Cold_Dump, "du{mp} {cntlword}        cold dump to a device\n"   },
+
+    { "LOAD",     &cpu_cold_cmd,  Cold_Load, "l{oad} {cntlword}        cold load from a device\n" },
+    { "DUMP",     &cpu_cold_cmd,  Cold_Dump, "du{mp} {cntlword}        cold dump to a device\n"   },
+
+    { "POWER",    &cpu_power_cmd, 0,         "p{ower} f{ail}           fail the CPU power\n"
+                                             "p{ower} r{estore}        restore the CPU power\n"   },
+
     { NULL }
     };
 
@@ -961,7 +983,7 @@ static CTAB aux_cmds [] = {
    the SCP module.
 */
 
-t_stat sim_load (FILE *fptr, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fptr, CONST char *cptr, CONST char *fnam, int flag)
 {
 return SCPE_ARG;                                        /* return an error if called inadvertently */
 }
@@ -1043,7 +1065,7 @@ uint32 radix_override;
 
 if (sw & SWMASK ('A') && (!is_reg || addr & REG_A))         /* if ASCII character display is requested and permitted */
     if (val [0] <= D8_SMAX) {                               /*     then if the value is a single character */
-        fputs (fmt_char (val [0]), ofile);                  /*       then format and print it */
+        fputs (fmt_char ((uint32) val [0]), ofile);         /*       then format and print it */
         return SCPE_OK;
         }
 
@@ -1162,7 +1184,7 @@ else {                                                      /* otherwise display
        data radix values, rather than the disc's values.
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 while (isspace ((int) *cptr))                           /* skip over any leading spaces */
     cptr++;                                             /*   that are present in the line */
@@ -1214,8 +1236,8 @@ else                                                    /* otherwise */
    Implementation notes:
 
     1. For a numeric interrupt mask entry value <n>, the value stored in the DIB
-       is 2^<n>.  For mask entry values "D" and "E", the stored values are 0 and
-       0177777, respectively.
+       is 2 ^ <15 - n> to match the HP 3000 bit numbering.  For mask entry
+       values "D" and "E", the stored values are 0 and 0177777, respectively.
 
     2. The SCMB is the only device that may or may not have a service request
        number, depending on whether or not it is connected to the multiplexer
@@ -1223,7 +1245,7 @@ else                                                    /* otherwise */
        it may be changed.
 */
 
-t_stat hp_set_dib (UNIT *uptr, int32 code, char *cptr, void *desc)
+t_stat hp_set_dib (UNIT *uptr, int32 code, CONST char *cptr, void *desc)
 {
 DIB *const dibptr = (DIB *) desc;                       /* a pointer to the associated DIB */
 t_stat     status = SCPE_OK;
@@ -1254,8 +1276,8 @@ else                                                    /* otherwise a value is 
                 value = get_uint (cptr, INTMASK_BASE,       /*   parse the supplied numeric mask value */
                                   INTMASK_MAX, &status);
 
-                if (status == SCPE_OK)                      /* if it is valid */
-                    dibptr->interrupt_mask = 1 << value;    /*   then set the corresponding mask bit in the DIB */
+                if (status == SCPE_OK)                          /* if it is valid */
+                    dibptr->interrupt_mask = D16_SIGN >> value; /*   then set the corresponding mask bit in the DIB */
                 }
             break;
 
@@ -1310,19 +1332,19 @@ return status;                                          /* return the validation
    Implementation notes:
 
     1. For a numeric interrupt mask entry value <n>, the value stored in the DIB
-       is 2^<n>.  For mask entry values "D" and "E", the stored values are 0 and
-       0177777, respectively.
+       is 2 ^ <15 - n> to match the HP 3000 bit numbering.  For mask entry
+       values "D" and "E", the stored values are 0 and 0177777, respectively.
 */
 
-t_stat hp_show_dib (FILE *st, UNIT *uptr, int32 code, void *desc)
+t_stat hp_show_dib (FILE *st, UNIT *uptr, int32 code, CONST void *desc)
 {
-DIB *const dibptr = (DIB *) desc;                       /* a pointer to the associated DIB */
-uint32     mask, value;
+const DIB *const dibptr = (const DIB *) desc;           /* a pointer to the associated DIB */
+uint32           mask, value;
 
 switch (code) {                                         /* display the requested value */
 
     case VAL_DEVNO:                                     /* show the device number */
-        fprintf (st, "DEVNO=%d", dibptr->device_number);
+        fprintf (st, "DEVNO=%u", dibptr->device_number);
         break;
 
     case VAL_INTMASK:                                   /* show the interrupt mask */
@@ -1337,22 +1359,22 @@ switch (code) {                                         /* display the requested
         else {                                          /* otherwise */
             mask = dibptr->interrupt_mask;              /*   display a specific mask value */
 
-            for (value = 0; !(mask & 1); value++)       /* count the number of mask bit shifts */
-                mask = mask >> 1;                       /*   until the correct one is found */
+            for (value = 0; !(mask & D16_SIGN); value++)    /* count the number of mask bit shifts */
+                mask = mask << 1;                           /*   until the correct one is found */
 
-            fprintf (st, "%d", value);                  /* display the mask bit number */
+            fprintf (st, "%u", value);                  /* display the mask bit number */
             }
         break;
 
     case VAL_INTPRI:                                    /* show the interrupt priority */
-        fprintf (st, "INTPRI=%d", dibptr->interrupt_priority);
+        fprintf (st, "INTPRI=%u", dibptr->interrupt_priority);
         break;
 
     case VAL_SRNO:                                          /* show the service request number */
         if (dibptr->service_request_number == SRNO_UNUSED)  /* if the current setting is "unused" */
             fprintf (st, "SRNO not used");                  /*   then report it */
         else                                                /* otherwise report the SR number */
-            fprintf (st, "SRNO=%d", dibptr->service_request_number);
+            fprintf (st, "SRNO=%u", dibptr->service_request_number);
         break;
 
     default:                                            /* if an illegal code was passed */
@@ -1504,7 +1526,7 @@ for (conf = Device; conf <= Service; conf++) {          /* check for conflicts f
             if (conflicts [val] > 1) {                  /* if a conflict is present for this value */
                 count = conflicts [val];                /*   then get the number of conflicting devices */
 
-                cprintf ("%s %d conflict (", conflict_label [conf], val);
+                cprintf ("%s %u conflict (", conflict_label [conf], val);
 
                 dev = 0;                                        /* search for the devices that conflict */
 
@@ -1668,8 +1690,26 @@ return formatted;                                       /* return a pointer to t
 
    Implementation notes:
 
-    1. The longest string to be returned is a five-character escaped octal
-       string, consisting of a backslash, three digits, and a trailing NUL.
+    1. The longest string to be returned is a five-character escaped string
+       consisting of a backslash, three octal digits, and a trailing NUL.  The
+       end-of-buffer pointer has an allowance to ensure that the string will
+       fit.
+
+    2. The routine returns a pointer to a static buffer containing the printable
+       string.  To allow the routine to be called more than once per trace line,
+       the null-terminated format strings are concatenated in the buffer, and
+       each call returns a pointer that is offset into the buffer to point at
+       the latest formatted string.
+
+    3. There is no explicit buffer-free action.  Instead, newly formatted
+       strings are appended to the buffer until there is no more space
+       available.  At that point, the pointers are reset to the start of the
+       buffer.  In effect, this provides a circular buffer, as previously
+       formatted strings are overwritten by subsequent calls.
+
+    4. The buffer is sized to hold the maximum number of concurrent strings
+       needed for a single trace line.  If more concurrent strings are used, one
+       or more strings from the earliest calls will be overwritten.
 */
 
 const char *fmt_char (uint32 charval)
@@ -1680,7 +1720,10 @@ static const char *const control [] = {
     "DLE", "DC1", "DC2", "DC3", "DC4", "NAK", "SYN", "ETB",
     "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US"
     };
-static char printable [5];
+static char fmt_buffer [64];                                /* the return buffer */
+static char *freeptr = fmt_buffer;                          /* pointer to the first free character in the buffer */
+static char *endptr  = fmt_buffer + sizeof fmt_buffer - 5;  /* pointer to the end of the buffer (less allowance) */
+const  char *fmtptr;
 
 if (charval <= '\037')                                  /* if the value is an ASCII control character */
     return control [charval];                           /*   then return a readable representation */
@@ -1688,17 +1731,26 @@ if (charval <= '\037')                                  /* if the value is an AS
 else if (charval == '\177')                             /* otherwise if the value is the delete character */
     return "DEL";                                       /*   then return a readable representation */
 
-else if (charval > '\177') {                            /* otherwise if the value is beyond the printable range */
-    sprintf (printable, "\\%03o", charval & D8_MASK);   /*   then format the value */
-    return printable;                                   /*     as an escaped octal code */
-    }
+else {
+    if (freeptr > endptr)                               /* if there is not enough room left to append the string */
+        freeptr = fmt_buffer;                           /*   then reset to point at the start of the buffer */
 
-else {                                                  /* otherwise it's a printable character */
-    printable [0] = '\'';                               /*   so form a representation */
-    printable [1] = (char) charval;                     /*     containing the character */
-    printable [2] = '\'';                               /*       surrounded by single quotes */
-    printable [3] = '\0';
-    return printable;
+    fmtptr = freeptr;                                   /* initialize the return pointer */
+    *freeptr = '\0';                                    /*   and the format accumulator */
+
+    if (charval > '\177')                                   /* otherwise if the value is beyond the printable range */
+        freeptr = freeptr + sprintf (freeptr, "\\%03o",     /*   then format the value */
+                                     charval & D8_MASK);    /*     and update the free pointer */
+
+    else {                                              /* otherwise it's a printable character */
+        *freeptr++ = '\'';                              /*   so form a representation */
+        *freeptr++ = (char) charval;                    /*     containing the character */
+        *freeptr++ = '\'';                              /*       surrounded by single quotes */
+        *freeptr   = '\0';
+        }
+
+    freeptr = freeptr + 1;                              /* advance past the NUL terminator */
+    return fmtptr;                                      /*   and return the formatted string */
     }
 }
 
@@ -1786,21 +1838,48 @@ else {                                                  /* otherwise it's a prin
    Processing continues until there are no remaining significant bits (if no
    alternates are specified), or until there are no remaining names in the array
    (if alternates are specified).
+
+
+   Implementation notes:
+
+    1. The routine returns a pointer to a static buffer containing the printable
+       string.  To allow the routine to be called more than once per trace line,
+       the null-terminated format strings are concatenated in the buffer, and
+       each call returns a pointer that is offset into the buffer to point at
+       the latest formatted string.
+
+    2. There is no explicit buffer-free action.  Instead, newly formatted
+       strings are appended to the buffer until there is no more space
+       available.  At that point, the string currently being assembled is moved
+       to the start of the buffer, and the pointers are reset.  In effect, this
+       provides a circular buffer, as previously formatted strings are
+       overwritten by subsequent calls.
+
+    3. The buffer is sized to hold the maximum number of concurrent strings
+       needed for a single trace line.  If more concurrent strings are used, one
+       or more strings from the earliest calls will be overwritten.  If an
+       attempt is made to format a string larger than the buffer, an error
+       indication string is returned.
+
+    4. The location of the end of the buffer used to determine if the next name
+       will fit includes an allowance for two separators that might be placed on
+       either side of the name and a terminating NUL character.
 */
 
 const char *fmt_bitset (uint32 bitset, const BITSET_FORMAT bitfmt)
 {
-static char formatted_set [1024];                       /* the return buffer */
-
-const char *bnptr;
+static const char separator [] = " | ";                     /* the separator to use between names */
+static char fmt_buffer [1024];                              /* the return buffer */
+static char *freeptr = fmt_buffer;                          /* pointer to the first free character in the buffer */
+static char *endptr  = fmt_buffer + sizeof fmt_buffer       /* pointer to the end of the buffer */
+                         - 2 * (sizeof separator - 1) - 1;  /*   less allowance for two separators and a terminator */
+const  char *bnptr, *fmtptr;
 uint32 test_bit, index, bitmask;
-char   *fsptr = formatted_set;
+size_t name_length;
 
-*fsptr = '\0';                                          /* initialize the format accumulator */
-index = 0;                                              /*   and the name index */
+if (bitfmt.name_count < D32_WIDTH)                      /* if the name count is the less than the mask width */
+    bitmask = (1 << bitfmt.name_count) - 1;             /*   then create a mask for the name count specified */
 
-if (bitfmt.name_count < D32_WIDTH)                      /* if the bit count is the less than the mask variable width */
-    bitmask = (1 << bitfmt.name_count) - 1;             /*   then create a mask for the bit count specified */
 else                                                    /* otherwise use a predefined value for the mask */
     bitmask = D32_MASK;                                 /*   to prevent shifting the bit off the MSB end */
 
@@ -1813,8 +1892,13 @@ else                                                        /* otherwise */
     test_bit = 1 << bitfmt.offset;                          /*   create a test bit for the LSB */
 
 
-while ((bitfmt.alternate || bitset) && index < bitfmt.name_count) { /* while more bits and more names exist */
-    bnptr = bitfmt.names [index];                                   /*   point at the name for the current bit */
+fmtptr = freeptr;                                       /* initialize the return pointer */
+*freeptr = '\0';                                        /*   and the format accumulator */
+index = 0;                                              /*     and the name index */
+
+while ((bitfmt.alternate || bitset)                     /* while more bits */
+  && index < bitfmt.name_count) {                       /*   and more names exist */
+    bnptr = bitfmt.names [index];                       /*     point at the name for the current bit */
 
     if (bnptr)                                          /* if the name is defined */
         if (*bnptr == '\1')                             /*   then if this name has an alternate */
@@ -1828,10 +1912,25 @@ while ((bitfmt.alternate || bitset) && index < bitfmt.name_count) { /* while mor
                 bnptr = NULL;                           /*       then clear the name pointer */
 
     if (bnptr) {                                        /* if the name pointer is set */
-        if (formatted_set [0] != '\0')                  /*   then if it is not the first one added */
-            fsptr = strcat (fsptr, " | ");              /*     then add a separator to the string */
+        name_length = strlen (bnptr);                   /*   then get the length needed */
 
-        strcat (fsptr, bnptr);                          /* append the bit's mnemonic to the accumulator */
+        if (freeptr + name_length > endptr) {           /* if there is not enough room left to append the name */
+            strcpy (fmt_buffer, fmtptr);                /*   then move the partial string to the start of the buffer */
+
+            freeptr = fmt_buffer + (freeptr - fmtptr);  /* point at the new first free character location */
+            fmtptr = fmt_buffer;                        /*   and reset the return pointer */
+
+            if (freeptr + name_length > endptr)         /* if there is still not enough room left to append */
+                return "(buffer overflow)";             /*   then this call is requires a larger buffer! */
+            }
+
+        if (*fmtptr != '\0') {                          /* if this is not the first name added */
+            strcpy (freeptr, separator);                /*   then add a separator to the string */
+            freeptr = freeptr + strlen (separator);     /*     and move the free pointer */
+            }
+
+        strcpy (freeptr, bnptr);                        /* append the bit's mnemonic to the accumulator */
+        freeptr = freeptr + name_length;                /*   and move the free pointer */
         }
 
     if (bitfmt.direction == msb_first)                  /* if formatting is left-to-right */
@@ -1843,16 +1942,21 @@ while ((bitfmt.alternate || bitset) && index < bitfmt.name_count) { /* while mor
     }
 
 
-if (formatted_set [0] == '\0')                          /* if the set is empty */
+if (*fmtptr == '\0')                                    /* if no names were output */
     if (bitfmt.bar == append_bar)                       /*   then if concatenating with more information */
         return "";                                      /*     then return an empty string */
     else                                                /*   otherwise it's a standalone format */
         return "(none)";                                /*     so return a placeholder */
 
-else if (bitfmt.bar == append_bar)                      /* otherwise if a trailing separator is specified */
-    fsptr = strcat (fsptr, " | ");                      /*   then add it to the string */
+else if (bitfmt.bar == append_bar) {                    /* otherwise if a trailing separator is specified */
+    strcpy (freeptr, separator);                        /*   then add a separator to the string */
+    freeptr = freeptr + strlen (separator) + 1;         /*     and account for it plus the trailing NUL */
+    }
 
-return formatted_set;                                   /* return a pointer to the accumulator */
+else                                                    /* otherwise */
+    freeptr = freeptr + 1;                              /*   just account for the trailing NUL */
+
+return fmtptr;                                          /* return a pointer to the formatted string */
 }
 
 
@@ -1890,8 +1994,8 @@ return formatted_set;                                   /* return a pointer to t
        call parameters.
 */
 
-#define FLAG_SIZE           50                          /* sufficiently large to accommodate all flag names */
-#define FORMAT_SIZE         1000                        /* sufficiently large to accommodate all format strings */
+#define FLAG_SIZE           32                          /* sufficiently large to accommodate all flag names */
+#define FORMAT_SIZE         1024                        /* sufficiently large to accommodate all format strings */
 
 void hp_debug (DEVICE *dptr, uint32 flag, ...)
 {
@@ -1952,7 +2056,9 @@ return;
 
 static void one_time_init (void)
 {
-CTAB *systab, *auxtab = aux_cmds;
+CTAB *contab, *systab, *auxtab = aux_cmds;
+
+contab = find_cmd ("CONT");                             /* find the entry for the CONTINUE command */
 
 while (auxtab->name != NULL) {                          /* loop through the auxiliary command table */
     systab = find_cmd (auxtab->name);                   /* find the corresponding system command table entry */
@@ -1970,6 +2076,10 @@ while (auxtab->name != NULL) {                          /* loop through the auxi
         auxtab->help_base = systab->help_base;          /* fill in the help base and message fields */
         auxtab->message   = systab->message;            /*   as we never override them */
         }
+
+    if (auxtab->action == &cpu_cold_cmd                 /* if this is the LOAD or DUMP command entry */
+      || auxtab->action == &cpu_power_cmd)              /*   or the POWER command entry */
+        auxtab->message = contab->message;              /*     then set the execution completion message routine */
 
     auxtab++;                                           /* point at the next table entry */
     }
@@ -2040,11 +2150,12 @@ else if (reason == STOP_CDUMP) {                        /* otherwise if this is 
     fprint_val (st, CIR, cpu_dev.dradix,                /*     and the numeric value */
                 cpu_dev.dwidth, PV_RZRO);
 
-    return FALSE;                                       /* return FALSE to omit the program counter */
+    fputc ('\n', st);                                   /* append an end-of-line character */
+    return FALSE;                                       /*   and return FALSE to omit the program counter */
     }
 
 else if (reason == STOP_SYSHALT) {                      /* otherwise if this is a system halt stop */
-    fprintf (st, " %d", RA);                            /*   then print the halt reason */
+    fprintf (st, " %u", RA);                            /*   then print the halt reason */
     return TRUE;                                        /*     and return TRUE to append the program counter */
     }
 
@@ -2122,9 +2233,9 @@ return;
    only allows an implied offset from PBANK.
 */
 
-static t_addr parse_addr (DEVICE *dptr, const char *cptr, const char **tptr)
+static t_addr parse_addr (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
 {
-const char *sptr;
+CONST char *sptr;
 uint32     overrides;
 t_addr     bank;
 t_addr     address = 0;
@@ -2176,61 +2287,6 @@ return address;                                         /* return the linear add
 }
 
 
-/* Execute the LOAD and DUMP commands.
-
-   This routine implements the cold load and cold dump commands.  The syntax is:
-
-     LOAD { <control/devno> }
-     DUMP { <control/devno> }
-
-   The <control/devno> is a number that is deposited into the SWCH register
-   before invoking the CPU cold load or cold dump facility.  The CPU radix is
-   used to interpret the number; it defaults to octal.  If the number is
-   omitted, the SWCH register value is not altered before loading or dumping.
-
-   On entry, the "arg" parameter is "Cold_Load" for a LOAD command and
-   "Cold_Dump" for a DUMP command, and "buf" points at the remainder of the
-   command line.  If characters exist on the command line, they are parsed,
-   converted to a numeric value, and stored in the SWCH register.  Then the
-   CPU's cold load/dump routine is called to set up the CPU state.  Finally, the
-   CPU is started to begin the requested action.
-
-
-   Implementation notes:
-
-    1. The run command invocation prepares the simulator for execution, which
-       includes a CPU and I/O reset.  However, the cpu_reset routine does not
-       reset the CPU state if the cold dump switch is set.  This allows the
-       value of the CPX2 register to be saved as part of the dump.
-*/
-
-static t_stat hp_cold_cmd (int32 arg, char *buf)
-{
-char    *cptr, gbuf [CBUFSIZE];
-t_stat  status;
-t_value value;
-
-if (*buf != '\0') {                                     /* if more characters exist on the command line */
-    cptr = get_glyph (buf, gbuf, 0);                    /*   then get the next glyph */
-
-    if (*cptr != '\0')                                  /* if that does not exhaust the input */
-        return SCPE_2MARG;                              /*   then report that there are too many arguments */
-
-    value = get_uint (gbuf, cpu_dev.dradix,             /* get the parameter value */
-                      D16_UMAX, &status);
-
-    if (status == SCPE_OK)                              /* if a valid number was present */
-        SWCH = value;                                   /*   then set it into the switch register */
-    else                                                /* otherwise */
-        return status;                                  /*   return the error status */
-    }
-
-cpu_front_panel (SWCH, arg);                            /* set up the cold load or dump microcode */
-
-return run_cmd (RU_RUN, "");                            /* reset and execute the halt-mode routine */
-}
-
-
 /* Execute the EXAMINE, DEPOSIT, IEXAMINE, and IDEPOSIT commands.
 
    These commands are intercepted to configure address parsing.  The following
@@ -2245,7 +2301,7 @@ return run_cmd (RU_RUN, "");                            /* reset and execute the
    handler.
 */
 
-static t_stat hp_exdep_cmd (int32 arg, char *buf)
+static t_stat hp_exdep_cmd (int32 arg, CONST char *buf)
 {
 parse_config = apcBank_Offset |                         /* allow the <bank>.<offset> address form */
                apcBank_Override |                       /* allow bank override switches */
@@ -2278,7 +2334,7 @@ return exdep_cmd (arg, buf);                            /* return the result of 
        resident in memory.
 */
 
-static t_stat hp_run_cmd (int32 arg, char *buf)
+static t_stat hp_run_cmd (int32 arg, CONST char *buf)
 {
 parse_config = apcDefault_PBANK;                        /* set the default bank register to PBANK */
 
@@ -2309,7 +2365,7 @@ return run_cmd (RU_GO, buf);                            /* return the result of 
    routine to parse the offset.
 */
 
-static t_stat hp_brk_cmd (int32 arg, char *buf)
+static t_stat hp_brk_cmd (int32 arg, CONST char *buf)
 {
 static uint32 PC;
 static REG PR = { ORDATA (PP, PC, 32) };
@@ -2416,8 +2472,8 @@ return;
 
    Implementation notes:
 
-    1. The Return Residue value is printed as a positive number, even though
-       the value in memory is either negative or zero.
+    1. The Return Residue and Read/Write count values are printed as positive
+       numbers, even though the values in memory are negative.
 */
 
 static const char *const order_names [] = {             /* indexed by SIO_ORDER */
@@ -2457,7 +2513,7 @@ switch (order) {                                        /* dispatch operand prin
         break;
 
     case sioRTRES:                                      /* print the residue count */
-        fprint_value (ofile, - SEXT (ioaw),
+        fprint_value (ofile, NEG16 (ioaw),
                       (radix ? radix : 10),
                       DV_WIDTH, PV_LEFT);
         break;
@@ -2494,7 +2550,7 @@ switch (order) {                                        /* dispatch operand prin
     case sioWRITEC:
     case sioREAD:
     case sioREADC:                                      /* print the count and address */
-        fprint_value (ofile, - IOCW_COUNT (iocw),
+        fprint_value (ofile, NEG16 (IOCW_COUNT (iocw)),
                       (radix ? radix : 10), DV_WIDTH, PV_LEFT);
 
         fputc (',', ofile);
@@ -2597,17 +2653,17 @@ static const char *const register_name [] = {   /* PSHR/SETR register names corr
     };
 
 static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *instruction,
-                                  t_value mask, uint32 shift, uint32 radix)
+                                  uint32 mask, uint32 shift, uint32 radix)
 {
-uint32  op_index, op_radix;
-int32   reg_index;
-t_bool  reg_first;
-t_value op_value;
-char    *prefix  = NULL;                                /* base register label to print before the operand */
-t_bool  index    = FALSE;                               /* TRUE if the instruction is indexed */
-t_bool  indirect = FALSE;                               /* TRUE if the instruction is indirect */
+uint32     op_index, op_radix;
+int32      reg_index;
+t_bool     reg_first;
+t_value    op_value;
+const char *prefix  = NULL;                             /* base register label to print before the operand */
+t_bool     index    = FALSE;                            /* TRUE if the instruction is indexed */
+t_bool     indirect = FALSE;                            /* TRUE if the instruction is indirect */
 
-op_index = (instruction [0] & mask) >> shift;           /* extract the opcode index */
+op_index = ((uint32) instruction [0] & mask) >> shift;  /* extract the opcode index */
 
 if (ops [op_index].mnemonic [0])                        /* if a primary entry is defined */
     fputs (ops [op_index].mnemonic, ofile);             /*   then print the mnemonic */
@@ -2902,7 +2958,7 @@ return SCPE_OK;
 
 /* Parse a CPU instruction */
 
-static t_stat parse_cpu (char *cptr, t_addr address, UNIT *uptr, t_value *value, int32 switches)
+static t_stat parse_cpu (CONST char *cptr, t_addr address, UNIT *uptr, t_value *value, int32 switches)
 {
 return SCPE_ARG;                                        /* mnemonic support is not present in this release */
 }

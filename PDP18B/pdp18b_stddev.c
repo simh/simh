@@ -153,14 +153,14 @@ t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat ptr_attach (UNIT *uptr, char *cptr);
-t_stat ptp_attach (UNIT *uptr, char *cptr);
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr);
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_detach (UNIT *uptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 clk_task_upd (t_bool clr);
 
 extern int32 upd_iors (void);
@@ -177,14 +177,14 @@ DIB clk_dib = { 0, 0, &clk_iors, { NULL } };
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 16000 };
 
 REG clk_reg[] = {
-    { FLDATA (INT, int_hwre[API_CLK], INT_V_CLK) },
-    { FLDATA (DONE, int_hwre[API_CLK], INT_V_CLK) },
-    { FLDATA (ENABLE, clk_state, 0) },
+    { FLDATAD (INT, int_hwre[API_CLK], INT_V_CLK, "interrupt pending flag") },
+    { FLDATAD (DONE, int_hwre[API_CLK], INT_V_CLK, "device done flag") },
+    { FLDATAD (ENABLE, clk_state, 0, "clock enable") },
 #if defined (PDP15)
-    { ORDATA (TASKTIMER, clk_task_timer, 18) },
+    { ORDATAD (TASKTIMER, clk_task_timer, 18, "task timer") },
     { DRDATA (TASKLAST, clk_task_last, 32), REG_HRO },
 #endif
-    { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATAD (TIME, clk_unit.wait, 24, "clock frequency"), REG_NZ + PV_LEFT },
     { DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
     { ORDATA (APIVEC, api_vec[API_CLK][INT_V_CLK], 6), REG_HRO },
     { NULL }
@@ -224,16 +224,16 @@ UNIT ptr_unit = {
     };
 
 REG ptr_reg[] = {
-    { ORDATA (BUF, ptr_unit.buf, 18) },
-    { FLDATA (INT, int_hwre[API_PTR], INT_V_PTR) },
-    { FLDATA (DONE, int_hwre[API_PTR], INT_V_PTR) },
+    { ORDATAD (BUF, ptr_unit.buf, 18, "last data item processed") },
+    { FLDATAD (INT, int_hwre[API_PTR], INT_V_PTR, "interrupt pending flag") },
+    { FLDATAD (DONE, int_hwre[API_PTR], INT_V_PTR, "device done flag") },
 #if defined (IOS_PTRERR)
-    { FLDATA (ERR, ptr_err, 0) },
+    { FLDATAD (ERR, ptr_err, 0, "error flag") },
 #endif
     { ORDATA (STATE, ptr_state, 5), REG_HRO },
-    { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { DRDATAD (POS, ptr_unit.pos, T_ADDR_W, "position in the input file"), PV_LEFT },
+    { DRDATAD (TIME, ptr_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD(STOP_IOE, ptr_stopioe, 0, "stop on I/O error") },
     { ORDATA (APIVEC, api_vec[API_PTR][INT_V_PTR], 6), REG_HRO },
     { NULL }
     };
@@ -267,15 +267,15 @@ UNIT ptp_unit = {
     };
 
 REG ptp_reg[] = {
-    { ORDATA (BUF, ptp_unit.buf, 8) },
-    { FLDATA (INT, int_hwre[API_PTP], INT_V_PTP) },
-    { FLDATA (DONE, int_hwre[API_PTP], INT_V_PTP) },
+    { ORDATAD (BUF, ptp_unit.buf, 8, "last data item processed") },
+    { FLDATAD (INT, int_hwre[API_PTP], INT_V_PTP, "interrupt pending flag") },
+    { FLDATAD (DONE, int_hwre[API_PTP], INT_V_PTP, "device done flag") },
 #if defined (IOS_PTPERR)
-    { FLDATA (ERR, ptp_err, 0) },
+    { FLDATAD (ERR, ptp_err, 0, "error flag") },
 #endif
-    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { DRDATAD (POS, ptp_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, ptp_unit.wait, 24, "time from I/O initiation to inturrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, ptp_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 
@@ -323,17 +323,17 @@ DIB tti_dib = { DEV_TTI, 1, &tti_iors, { &tti } };
 UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE+TT_MODE_KSR+TTUF_HDX, 0), 0 };
 
 REG tti_reg[] = {
-    { ORDATA (BUF, tti_unit.buf, TTI_WIDTH) },
+    { ORDATAD (BUF, tti_unit.buf, TTI_WIDTH, "last data item processed") },
 #if defined (KSR28)
     { ORDATA (BUF2ND, tti_2nd, TTI_WIDTH), REG_HRO },
 #endif
-    { FLDATA (INT, int_hwre[API_TTI], INT_V_TTI) },
-    { FLDATA (DONE, int_hwre[API_TTI], INT_V_TTI) },
+    { FLDATAD (INT, int_hwre[API_TTI], INT_V_TTI, "interrupt pending flag") },
+    { FLDATAD (DONE, int_hwre[API_TTI], INT_V_TTI, "device done flag") },
 #if defined (PDP15)
     { FLDATA (FDPX, tti_fdpx, 0) },
 #endif
-    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { DRDATAD (POS, tti_unit.pos, T_ADDR_W, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME, tti_unit.wait, 24, "input polling interval                                                          (if 0, the keyboard is polled synchronously with line clock)"), PV_LEFT },
     { NULL }
     };
 
@@ -384,14 +384,14 @@ DIB tto_dib = { DEV_TTO, 1, &tto_iors, { &tto } };
 UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_KSR, 0), 1000 };
 
 REG tto_reg[] = {
-    { ORDATA (BUF, tto_unit.buf, TTO_WIDTH) },
+    { ORDATAD (BUF, tto_unit.buf, TTO_WIDTH, "last data item processed") },
 #if defined (KSR28)
     { FLDATA (SHIFT, tty_shift, 0), REG_HRO },
 #endif
-    { FLDATA (INT, int_hwre[API_TTO], INT_V_TTO) },
-    { FLDATA (DONE, int_hwre[API_TTO], INT_V_TTO) },
-    { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { FLDATAD (INT, int_hwre[API_TTO], INT_V_TTO, "interrupt pending flag") },
+    { FLDATAD (DONE, int_hwre[API_TTO], INT_V_TTO, "device done flag") },
+    { DRDATAD (POS, tto_unit.pos, T_ADDR_W, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME, tto_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
     { NULL }
     };
 
@@ -513,7 +513,7 @@ return SCPE_OK;
 
 /* Set frequency */
 
-t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -525,7 +525,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
@@ -647,7 +647,7 @@ return ((TST_INT (PTR)? IOS_PTR: 0)
 
 /* Attach routine */
 
-t_stat ptr_attach (UNIT *uptr, char *cptr)
+t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -965,7 +965,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat ptp_attach (UNIT *uptr, char *cptr)
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -1172,7 +1172,7 @@ return SCPE_OK;
 
 /* Set mode */
 
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~(TTUF_UNIX|TT_PAR|TT_MODE)) | val;
 tto_unit.flags = (tto_unit.flags & ~(TTUF_UNIX|TT_PAR|TT_MODE)) | val;

@@ -445,21 +445,19 @@ static HINSTANCE hLib = 0;                      /* handle to DLL */
 static void *hLib = NULL;                       /* handle to Library */
 #endif
 static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
-static char* lib_name = "Ws2_32.dll";
+static const char* lib_name = "Ws2_32.dll";
 
 /* load function pointer from DLL */
 typedef int (*_func)();
 
-static void load_function(char* function, _func* func_ptr) {
+static void load_function(const char* function, _func* func_ptr) {
 #ifdef _WIN32
     *func_ptr = (_func)GetProcAddress(hLib, function);
 #else
     *func_ptr = (_func)dlsym(hLib, function);
 #endif
     if (*func_ptr == 0) {
-    char* msg = "Sockets: Failed to find function '%s' in %s\r\n";
-
-    sim_printf (msg, function, lib_name);
+    sim_printf ("Sockets: Failed to find function '%s' in %s\r\n", function, lib_name);
     lib_loaded = 3;
   }
 }
@@ -476,9 +474,7 @@ int load_ws2(void) {
 #endif
       if (hLib == 0) {
         /* failed to load DLL */
-        char* msg  = "Sockets: Failed to load %s\r\n";
-
-        sim_printf (msg, lib_name);
+        sim_printf ("Sockets: Failed to load %s\r\n", lib_name);
         lib_loaded = 2;
         break;
       } else {
@@ -540,8 +536,9 @@ int load_ws2(void) {
 
 int sim_parse_addr (const char *cptr, char *host, size_t host_len, const char *default_host, char *port, size_t port_len, const char *default_port, const char *validate_addr)
 {
-char gbuf[CBUFSIZE];
-char *hostp, *portp;
+char gbuf[CBUFSIZE], default_pbuf[CBUFSIZE];
+const char *hostp;
+char *portp;
 char *endc;
 unsigned long portval;
 
@@ -560,6 +557,9 @@ if ((cptr == NULL) || (*cptr == 0)) {
     strcpy (port, default_port);
     return 0;
     }
+memset (default_pbuf, 0, sizeof(default_pbuf));
+if (default_port)
+    strncpy (default_pbuf, default_port, sizeof(default_pbuf)-1);
 gbuf[sizeof(gbuf)-1] = '\0';
 strncpy (gbuf, cptr, sizeof(gbuf)-1);
 hostp = gbuf;                                           /* default addr */
@@ -568,11 +568,11 @@ if ((portp = strrchr (gbuf, ':')) &&                    /* x:y? split */
     (NULL == strchr (portp, ']'))) {
     *portp++ = 0;
     if (*portp == '\0')
-        portp = (char *)default_port;
+        portp = default_pbuf;
     }
 else {                                                  /* No colon in input */
     portp = gbuf;                                       /* Input is the port specifier */
-    hostp = (char *)default_host;                       /* host is defaulted if provided */
+    hostp = (const char *)default_host;                 /* host is defaulted if provided */
     }
 if (portp != NULL) {
     portval = strtoul(portp, &endc, 10);
@@ -598,8 +598,8 @@ if (hostp != NULL) {
             return -1;                                  /* invalid domain literal */
         /* host may be the const default_host so move to temp buffer before modifying */
         strncpy(gbuf, hostp+1, sizeof(gbuf)-1);         /* remove brackets from domain literal host */
+        gbuf[strlen(gbuf)-1] = '\0';
         hostp = gbuf;
-        hostp[strlen(hostp)-1] = '\0';
         }
     }
 if (host) {                                             /* host wanted? */

@@ -102,14 +102,14 @@ extern UNIT tti1_unit, tto1_unit;
 #if defined (UC15)
 extern DEVICE dr15_dev;
 #endif
+#if defined (GRAPHICS2)
+extern DEVICE g2out_dev, g2in_dev;
+#endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern int32 *M;
 extern int32 memm;
 extern int32 PC;
-extern const char asc_to_baud[128];
-extern const char baud_to_asc[64];
-extern const char fio_to_asc[64];
 
 /* SCP data structures and interface routines
 
@@ -179,6 +179,9 @@ DEVICE *sim_devices[] = {
 #if defined (UC15)
     &dr15_dev,
 #endif
+#if defined (GRAPHICS2)
+    &g2out_dev, &g2in_dev,
+#endif
     NULL
     };
 
@@ -228,7 +231,7 @@ return word;
         jmp addr or hlt
 */
 
-t_stat rim_load_47 (FILE *fileref, char *cptr)
+t_stat rim_load_47 (FILE *fileref, const char *cptr)
 {
 int32 origin, val;
 
@@ -265,7 +268,7 @@ return SCPE_OK;                                         /* done */
         word to execute (bit 1 of last character set)
 */
 
-t_stat hri_load_7915 (FILE *fileref, char *cptr)
+t_stat hri_load_7915 (FILE *fileref, const char *cptr)
 {
 int32 bits, origin, val;
 char gbuf[CBUFSIZE];
@@ -311,7 +314,7 @@ return SCPE_OK;
         endblock/       origin (< 0)
 */
 
-t_stat bin_load_915 (FILE *fileref, char *cptr)
+t_stat bin_load_915 (FILE *fileref, const char *cptr)
 {
 int32 i, val, bits, origin, count, cksum;
 
@@ -353,7 +356,7 @@ return SCPE_OK;
 
 /* Binary loader, all formats */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 if (flag != 0)
     return SCPE_NOFNC;
@@ -1143,11 +1146,11 @@ return get_uint (cptr, 8, 0777777, status);
    Outputs:
         status  =       error status
 */
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 d, i, j, k, sign, damask, epcmask;
 t_stat r, sta = SCPE_OK;
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], cbuf[2*CBUFSIZE];
 t_bool cflag;
 DEVICE *dptr;
 
@@ -1159,12 +1162,9 @@ if (dptr == NULL)
 
 while (isspace (*cptr))
     cptr++;
-for (i = 1; (i < 5) && (cptr[i] != 0); i++) {
-    if (cptr[i] == 0) {
-        for (j = i + 1; j <= 5; j++)
-            cptr[j] = 0;
-        }
-    }
+memset (cbuf, '\0', sizeof(cbuf));
+strcpy (cbuf, cptr);
+cptr = cbuf;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;

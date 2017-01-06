@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    PT08/KL8JA terminal input/output
 
+   18-Sep-16    RMS     Expanded support to 16 terminals
    11-Oct-13    RMS     Poll TTIX immediately to pick up initial connect (Mark Pizzolato)
    18-Apr-12    RMS     Revised to use clock coscheduling
    19-Nov-08    RMS     Revised for common TMXR show routines
@@ -45,10 +46,15 @@
    30-Dec-01    RMS     Complete rebuild
    30-Nov-01    RMS     Added extended SET/SHOW support
 
-   This module implements four individual serial interfaces similar in function
+   This module implements 1-16 individual serial interfaces similar in function
    to the console.  These interfaces are mapped to Telnet based connections as
    though they were the four lines of a terminal multiplexor.  The connection
    polling mechanism is superimposed onto the keyboard of the first interface.
+
+   The done and enable flags are maintained locally, and only a master interrupt
+   request is maintained in global register dev_done. Because this is actually
+   an interrupt request flag, the corresponding bit in int_enable must always
+   be set to 1.
 */
 
 #include "pdp8_defs.h"
@@ -56,30 +62,45 @@
 #include "sim_tmxr.h"
 #include <ctype.h>
 
-#define TTX_LINES       4
-#define TTX_MASK        (TTX_LINES - 1)
+#define TTX_MAXL        16
+#define TTX_INIL        4
 
 #define TTX_GETLN(x)    (((x) >> 4) & TTX_MASK)
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
 extern int32 tmxr_poll;
 
-uint8 ttix_buf[TTX_LINES] = { 0 };                      /* input buffers */
-uint8 ttox_buf[TTX_LINES] = { 0 };                      /* output buffers */
-int32 ttx_tps = 100;                                    /* polls per second */
-TMLN ttx_ldsc[TTX_LINES] = { {0} };                     /* line descriptors */
-TMXR ttx_desc = { TTX_LINES, 0, 0, ttx_ldsc };          /* mux descriptor */
+uint32 ttix_done = 0;                                   /* input ready flags */
+uint32 ttox_done = 0;                                   /* output ready flags */
+uint32 ttx_enbl = 0;                                    /* intr enable flags */
+uint8 ttix_buf[TTX_MAXL] = { 0 };                       /* input buffers */
+uint8 ttox_buf[TTX_MAXL] = { 0 };                       /* output buffers */
+TMLN ttx_ldsc[TTX_MAXL] = { {0} };                      /* line descriptors */
+TMXR ttx_desc = { TTX_INIL, 0, 0, ttx_ldsc };           /* mux descriptor */
+#define ttx_lines	ttx_desc.lines
 
-DEVICE ttix_dev, ttox_dev;
 int32 ttix (int32 IR, int32 AC);
 int32 ttox (int32 IR, int32 AC);
 t_stat ttix_svc (UNIT *uptr);
-t_stat ttix_reset (DEVICE *dptr);
 t_stat ttox_svc (UNIT *uptr);
-t_stat ttox_reset (DEVICE *dptr);
-t_stat ttx_attach (UNIT *uptr, char *cptr);
+int32 ttx_getln (int32 inst);
+void ttx_new_flags (uint32 newi, uint32 newo, uint32 newe);
+t_stat ttx_reset (DEVICE *dptr);
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr);
 t_stat ttx_detach (UNIT *uptr);
-void ttx_enbdis (int32 dis);
+void ttx_reset_ln (int32 i);
+t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ttx_show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+
+#define TTIX_SET_DONE(ln)       ttx_new_flags (ttix_done | (1u << (ln)), ttox_done, ttx_enbl)
+#define TTIX_CLR_DONE(ln)       ttx_new_flags (ttix_done & ~(1u << (ln)), ttox_done, ttx_enbl)
+#define TTIX_TST_DONE(ln)       ((ttix_done & (1u << (ln))) != 0)
+#define TTOX_SET_DONE(ln)       ttx_new_flags (ttix_done, ttox_done | (1u << (ln)), ttx_enbl)
+#define TTOX_CLR_DONE(ln)       ttx_new_flags (ttix_done, ttox_done & ~(1u << (ln)), ttx_enbl)
+#define TTOX_TST_DONE(ln)       ((ttox_done & (1u << (ln))) != 0)
+#define TTX_SET_ENBL(ln)        ttx_new_flags (ttix_done, ttox_done, ttx_enbl | (1u << (ln)))
+#define TTX_CLR_ENBL(ln)        ttx_new_flags (ttix_done, ttox_done, ttx_enbl & ~(1u << (ln)))
+#define TTX_TST_ENBL(ln)        ((ttx_enbl & (1u << (ln))) != 0)
 
 /* TTIx data structures
 
@@ -89,33 +110,47 @@ void ttx_enbdis (int32 dis);
    ttix_mod     TTIx modifiers list
 */
 
-DIB ttix_dib = { DEV_KJ8, 8,
-             { &ttix, &ttox, &ttix, &ttox, &ttix, &ttox, &ttix, &ttox } };
+DIB_DSP ttx_dsp[TTX_MAXL * 2] = {
+    { DEV_TTI1,  &ttix }, { DEV_TTO1,  &ttox },
+    { DEV_TTI2,  &ttix }, { DEV_TTO2,  &ttox },
+    { DEV_TTI3,  &ttix }, { DEV_TTO3,  &ttox },
+    { DEV_TTI4,  &ttix }, { DEV_TTO4,  &ttox },
+    { DEV_TTI5,  &ttix }, { DEV_TTO5,  &ttox },
+    { DEV_TTI6,  &ttix }, { DEV_TTO6,  &ttox },
+    { DEV_TTI7,  &ttix }, { DEV_TTO7,  &ttox },
+    { DEV_TTI8,  &ttix }, { DEV_TTO8,  &ttox },
+    { DEV_TTI9,  &ttix }, { DEV_TTO9,  &ttox },
+    { DEV_TTI10, &ttix }, { DEV_TTO10, &ttox },
+    { DEV_TTI11, &ttix }, { DEV_TTO11, &ttox },
+    { DEV_TTI12, &ttix }, { DEV_TTO12, &ttox },
+    { DEV_TTI13, &ttix }, { DEV_TTO13, &ttox },
+    { DEV_TTI14, &ttix }, { DEV_TTO14, &ttox },
+    { DEV_TTI15, &ttix }, { DEV_TTO15, &ttox },
+    { DEV_TTI16, &ttix }, { DEV_TTO16, &ttox }
+    };
+
+DIB ttx_dib = { DEV_TTI1, TTX_INIL * 2, { &ttix, &ttox }, ttx_dsp };
 
 UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_IDLE|UNIT_ATTABLE, 0), SERIAL_IN_WAIT };
 
 REG ttix_reg[] = {
-    { BRDATA (BUF, ttix_buf, 8, 8, TTX_LINES) },
-    { GRDATA (DONE, dev_done, 8, TTX_LINES, INT_V_TTI1) },
-    { GRDATA (ENABLE, int_enable, 8, TTX_LINES, INT_V_TTI1) },
-    { GRDATA (INT, int_req, 8, TTX_LINES, INT_V_TTI1) },
-    { DRDATA (TIME, ttix_unit.wait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (TPS, ttx_tps, 10), REG_NZ + PV_LEFT },
-    { ORDATA (DEVNUM, ttix_dib.dev, 6), REG_HRO },
+    { BRDATAD (BUF, ttix_buf, 8, 8, TTX_MAXL, "input buffer, lines 0 to 15") },
+    { ORDATAD (DONE, ttix_done, TTX_MAXL, "device done flag (line 0 rightmost)") },
+    { ORDATAD (ENABLE, ttx_enbl, TTX_MAXL, "interrupt enable flag") },
+    { FLDATA  (SUMDONE, dev_done, INT_V_TTI1), REG_HRO },
+    { FLDATA  (SUMENABLE, int_enable, INT_V_TTI1), REG_HRO },
+    { DRDATAD (TIME, ttix_unit.wait, 24, "initial polling interval"), REG_NZ + PV_LEFT },
+    { DRDATA  (LINES, ttx_desc.lines, 6), REG_HRO },
     { NULL }
     };
 
 MTAB ttix_mod[] = {
-    { UNIT_ATT, UNIT_ATT, "summary", NULL,
-      NULL, &tmxr_show_summ, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &tmxr_show_cstat, (void *) &ttx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &tmxr_show_cstat, (void *) &ttx_desc },
-    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &set_dev, &show_dev, NULL },
+    { MTAB_VDV,            0,       "LINES",      "LINES", &ttx_vlines,  &tmxr_show_lines, (void *) &ttx_desc },
+    { MTAB_VDV,            0,      "DEVNO",          NULL, NULL,         &ttx_show_devno, (void *) &ttx_desc },
+    { UNIT_ATT,     UNIT_ATT,     "SUMMARY",         NULL, NULL,         &tmxr_show_summ,  (void *) &ttx_desc },
+    { MTAB_VDV,            1,          NULL, "DISCONNECT", &tmxr_dscln,  NULL,             (void *) &ttx_desc },
+    { MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS",         NULL, NULL,         &tmxr_show_cstat, (void *) &ttx_desc },
+    { MTAB_VDV | MTAB_NMO, 0, "STATISTICS",          NULL, NULL,         &tmxr_show_cstat, (void *) &ttx_desc },
     { 0 }
     };
 
@@ -127,20 +162,20 @@ MTAB ttix_mod[] = {
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 
 DEBTAB ttx_debug[] = {
-  {"XMT",    DBG_XMT},
-  {"RCV",    DBG_RCV},
-  {"RET",    DBG_RET},
-  {"CON",    DBG_CON},
-  {"TRC",    DBG_TRC},
+  {"XMT",    DBG_XMT, "Transmitted Data"},
+  {"RCV",    DBG_RCV, "Received Data"},
+  {"RET",    DBG_RET, "Returned Received Data"},
+  {"CON",    DBG_CON, "connection activities"},
+  {"TRC",    DBG_TRC, "trace routine calls"},
   {0}
 };
 
 DEVICE ttix_dev = {
     "TTIX", &ttix_unit, ttix_reg, ttix_mod,
     1, 10, 31, 1, 8, 8,
-    &tmxr_ex, &tmxr_dep, &ttix_reset,
+    &tmxr_ex, &tmxr_dep, &ttx_reset,
     NULL, &ttx_attach, &ttx_detach,
-    &ttix_dib, DEV_MUX | DEV_DISABLE | DEV_DEBUG,
+    &ttx_dib, DEV_MUX | DEV_DISABLE | DEV_DEBUG,
     0, ttx_debug
     };
 
@@ -155,16 +190,29 @@ UNIT ttox_unit[] = {
     { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
     { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
     { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT }
+    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC+UNIT_DIS, 0), SERIAL_OUT_WAIT }
     };
 
 REG ttox_reg[] = {
-    { BRDATA (BUF, ttox_buf, 8, 8, TTX_LINES) },
-    { GRDATA (DONE, dev_done, 8, TTX_LINES, INT_V_TTO1) },
-    { GRDATA (ENABLE, int_enable, 8, TTX_LINES, INT_V_TTO1) },
-    { GRDATA (INT, int_req, 8, TTX_LINES, INT_V_TTO1) },
-    { URDATA (TIME, ttox_unit[0].wait, 10, 24, 0,
-              TTX_LINES, PV_LEFT) },
+    { BRDATAD (BUF, ttox_buf, 8, 8, TTX_MAXL, "last data item processed, lines 0 to 3") },
+    { ORDATAD  (DONE, ttox_done, TTX_MAXL, "device done flag (line 0 rightmost)") },
+    { ORDATAD  (ENABLE, ttx_enbl, TTX_MAXL, "interrupt enable flag") },
+    { FLDATA  (SUMDONE, dev_done, INT_V_TTO1), REG_HRO },
+    { FLDATA  (SUMENABLE, int_enable, INT_V_TTO1), REG_HRO },
+    { URDATAD (TIME, ttox_unit[0].wait, 10, 24, 0,
+              TTX_MAXL, PV_LEFT, "line from I/O initiation to interrupt, lines 0 to 3") },
     { NULL }
     };
 
@@ -173,6 +221,7 @@ MTAB ttox_mod[] = {
     { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
     { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
+    { MTAB_VDV, 0, "DEVNO", NULL, NULL, &ttx_show_devno, &ttx_desc },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &ttx_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
@@ -184,8 +233,8 @@ MTAB ttox_mod[] = {
 
 DEVICE ttox_dev = {
     "TTOX", ttox_unit, ttox_reg, ttox_mod,
-    4, 10, 31, 1, 8, 8,
-    NULL, NULL, &ttox_reset, 
+    TTX_MAXL, 10, 31, 1, 8, 8,
+    NULL, NULL, &ttx_reset, 
     NULL, NULL, NULL,
     NULL, DEV_DISABLE | DEV_DEBUG,
     0, ttx_debug
@@ -196,23 +245,22 @@ DEVICE ttox_dev = {
 int32 ttix (int32 inst, int32 AC)
 {
 int32 pulse = inst & 07;                                /* IOT pulse */
-int32 ln = TTX_GETLN (inst);                            /* line # */
-int32 itti = (INT_TTI1 << ln);                          /* rx intr */
-int32 itto = (INT_TTO1 << ln);                          /* tx intr */
+int32 ln = ttx_getln (inst);                            /* line # */
+
+if (ln < 0)                                             /* bad line #? */
+    return (SCPE_IERR << IOT_V_REASON) | AC;
 
 switch (pulse) {                                        /* case IR<9:11> */
 
     case 0:                                             /* KCF */
-        dev_done = dev_done & ~itti;                    /* clear flag */
-        int_req = int_req & ~itti;
+        TTIX_CLR_DONE (ln);                             /* clear flag */
         break;
 
     case 1:                                             /* KSF */
-        return (dev_done & itti)? IOT_SKP + AC: AC;
+        return (TTIX_TST_DONE (ln))? IOT_SKP | AC: AC;
 
     case 2:                                             /* KCC */
-        dev_done = dev_done & ~itti;                    /* clear flag */
-        int_req = int_req & ~itti;
+        TTIX_CLR_DONE (ln);                             /* clear flag */
         sim_activate_abs (&ttix_unit, ttix_unit.wait);  /* check soon for more input */
         return 0;                                       /* clear AC */
 
@@ -221,19 +269,17 @@ switch (pulse) {                                        /* case IR<9:11> */
 
     case 5:                                             /* KIE */
         if (AC & 1)
-            int_enable = int_enable | (itti + itto);
-        else int_enable = int_enable & ~(itti + itto);
-        int_req = INT_UPDATE;                           /* update intr */
+            TTX_SET_ENBL (ln);
+        else TTX_CLR_ENBL (ln);
         break;
 
     case 6:                                             /* KRB */
-        dev_done = dev_done & ~itti;                    /* clear flag */
-        int_req = int_req & ~itti;
+        TTIX_CLR_DONE (ln);                             /* clear flag */
         sim_activate_abs (&ttix_unit, ttix_unit.wait);  /* check soon for more input */
         return ttix_buf[ln];                            /* return buf */
 
     default:
-        return (stop_inst << IOT_V_REASON) + AC;
+        return (stop_inst << IOT_V_REASON) | AC;
         }                                               /* end switch */
 
 return AC;
@@ -249,42 +295,21 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
-if (ln >= 0)                                            /* got one? rcv enb*/
-    ttx_ldsc[ln].rcve = 1;
+if (ln >= 0)                                            /* got one? */
+    ttx_ldsc[ln].rcve = 1;                              /* set rcv enable */
 tmxr_poll_rx (&ttx_desc);                               /* poll for input */
-for (ln = 0; ln < TTX_LINES; ln++) {                    /* loop thru lines */
+for (ln = 0; ln < ttx_lines; ln++) {                    /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
-        if (dev_done & (INT_TTI1 << ln))                /* Last character still pending? */
+        if (TTIX_TST_DONE (ln))                         /* last char still pending? */
             continue;
         if ((temp = tmxr_getc_ln (&ttx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
                 c = 0;
             else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags));
             ttix_buf[ln] = c;
-            dev_done = dev_done | (INT_TTI1 << ln);
-            int_req = INT_UPDATE;
+            TTIX_SET_DONE (ln);                         /* set flag */
             }
         }
-    }
-return SCPE_OK;
-}
-
-/* Reset routine */
-
-t_stat ttix_reset (DEVICE *dptr)
-{
-int32 ln, itto;
-
-ttx_enbdis (dptr->flags & DEV_DIS);                     /* sync enables */
-if (ttix_unit.flags & UNIT_ATT)                         /* if attached, */
-    sim_activate (&ttix_unit, tmxr_poll);               /* activate */
-else sim_cancel (&ttix_unit);                           /* else stop */
-for (ln = 0; ln < TTX_LINES; ln++) {                    /* for all lines */
-    ttix_buf[ln] = 0;                                   /* clear buf, */
-    itto = (INT_TTI1 << ln);                            /* interrupt */
-    dev_done = dev_done & ~itto;                        /* clr done, int */
-    int_req = int_req & ~itto;
-    int_enable = int_enable | itto;                     /* set enable */
     }
 return SCPE_OK;
 }
@@ -294,38 +319,39 @@ return SCPE_OK;
 int32 ttox (int32 inst, int32 AC)
 {
 int32 pulse = inst & 07;                                /* pulse */
-int32 ln = TTX_GETLN (inst);                            /* line # */
-int32 itti = (INT_TTI1 << ln);                          /* rx intr */
-int32 itto = (INT_TTO1 << ln);                          /* tx intr */
+int32 ln = ttx_getln (inst);                            /* line # */
+
+if (ln < 0)                                             /* bad line #? */
+    return (SCPE_IERR << IOT_V_REASON) | AC;
 
 switch (pulse) {                                        /* case IR<9:11> */
 
     case 0:                                             /* TLF */
-        dev_done = dev_done | itto;                     /* set flag */
-        int_req = INT_UPDATE;                           /* update intr */
+        TTOX_SET_DONE (ln);                             /* set flag */
         break;
 
     case 1:                                             /* TSF */
-        return (dev_done & itto)? IOT_SKP + AC: AC;
+        return (TTOX_TST_DONE (ln))? IOT_SKP | AC: AC;
 
     case 2:                                             /* TCF */
-        dev_done = dev_done & ~itto;                    /* clear flag */
-        int_req = int_req & ~itto;                      /* clear intr */
+        TTOX_CLR_DONE (ln);                             /* clear flag */
         break;
 
     case 5:                                             /* SPI */
-        return (int_req & (itti | itto))? IOT_SKP + AC: AC;
+        if ((TTIX_TST_DONE (ln) || TTOX_TST_DONE (ln))  /* either done set */
+            && TTX_TST_ENBL (ln))                       /* and enabled? */
+            return IOT_SKP | AC;
+        return AC;
 
     case 6:                                             /* TLS */
-        dev_done = dev_done & ~itto;                    /* clear flag */
-        int_req = int_req & ~itto;                      /* clear int req */
+        TTOX_CLR_DONE (ln);                             /* clear flag */
     case 4:                                             /* TPC */
         sim_activate (&ttox_unit[ln], ttox_unit[ln].wait); /* activate */
         ttox_buf[ln] = AC & 0377;                       /* load buffer */
         break;
 
    default:
-        return (stop_inst << IOT_V_REASON) + AC;
+        return (stop_inst << IOT_V_REASON) | AC;
         }                                               /* end switch */
 
 return AC;
@@ -351,32 +377,85 @@ if (ttx_ldsc[ln].conn) {                                /* connected? */
         return SCPE_OK;
         }
     }
-dev_done = dev_done | (INT_TTO1 << ln);                 /* set done */
-int_req = INT_UPDATE;                                   /* update intr */
+TTOX_SET_DONE (ln);                                     /* set done */
 return SCPE_OK;
+}
+
+/* Flag routine
+
+   Global dev_done is used as a master interrupt; therefore, global
+   int_enable must always be set
+*/
+
+void ttx_new_flags (uint32 newidone, uint32 newodone, uint32 newenbl)
+{
+ttix_done = newidone;
+ttox_done = newodone;
+ttx_enbl = newenbl;
+if ((ttix_done & ttx_enbl) != 0)
+    dev_done |= INT_TTI1;
+else dev_done &= ~INT_TTI1;
+if ((ttox_done & ttx_enbl) != 0)
+    dev_done |= INT_TTO1;
+else dev_done &= ~INT_TTO1;
+int_enable |= (INT_TTI1 | INT_TTO1);
+int_req = INT_UPDATE;
+return;
+}
+
+/* Compute relative line number, based on table of device numbers */
+
+int32 ttx_getln (int32 inst)
+{
+int32 i;
+int32 device = (inst >> 3) & 077;                       /* device = IR<3:8> */
+
+for (i = 0; i < (ttx_lines * 2); i++) {                 /* loop thru disp tbl */
+    if (device == ttx_dsp[i].dev)                       /* dev # match? */
+        return (i >> 1);                                /* return line # */
+    }
+return -1;
 }
 
 /* Reset routine */
 
-t_stat ttox_reset (DEVICE *dptr)
+t_stat ttx_reset (DEVICE *dptr)
 {
-int32 ln, itto;
+int32 ln;
 
-ttx_enbdis (dptr->flags & DEV_DIS);                     /* sync enables */
-for (ln = 0; ln < TTX_LINES; ln++) {                    /* for all lines */
-    ttox_buf[ln] = 0;                                   /* clear buf */
-    itto = (INT_TTO1 << ln);                            /* interrupt */
-    dev_done = dev_done & ~itto;                        /* clr done, int */
-    int_req = int_req & ~itto;
-    int_enable = int_enable | itto;                     /* set enable */
-    sim_cancel (&ttox_unit[ln]);                        /* deactivate */
+if (dptr->flags & DEV_DIS) {                            /* sync enables */
+    ttix_dev.flags |= DEV_DIS;
+    ttox_dev.flags |= DEV_DIS;
     }
+else {
+    ttix_dev.flags &= ~DEV_DIS;
+    ttox_dev.flags &= ~DEV_DIS;
+    }
+if (ttix_unit.flags & UNIT_ATT)                         /* if attached, */
+    sim_activate (&ttix_unit, tmxr_poll);               /* activate */
+else sim_cancel (&ttix_unit);                           /* else stop */
+for (ln = 0; ln < TTX_MAXL; ln++)                       /* for all lines */
+    ttx_reset_ln (ln);                                  /* reset line */
+int_enable |= (INT_TTI1 | INT_TTO1);                    /* set master enable */
 return SCPE_OK;
+}
+
+/* Reset line n */
+
+void ttx_reset_ln (int32 ln)
+{
+uint32 mask = (1u << ln);
+
+ttix_buf[ln] = 0;                                       /* clr buf */
+ttox_buf[ln] = 0;                                       /* clr done, set enbl */
+ttx_new_flags (ttix_done & ~mask, ttox_done & ~mask, ttx_enbl | mask);
+sim_cancel (&ttox_unit[ln]);                            /* stop output */
+return;
 }
 
 /* Attach master unit */
 
-t_stat ttx_attach (UNIT *uptr, char *cptr)
+t_stat ttx_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -395,23 +474,73 @@ int32 i;
 t_stat r;
 
 r = tmxr_detach (&ttx_desc, uptr);                      /* detach */
-for (i = 0; i < TTX_LINES; i++)                         /* all lines, */
+for (i = 0; i < TTX_MAXL; i++)                         /* all lines, */
     ttx_ldsc[i].rcve = 0;                               /* disable rcv */
 sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
 
-/* Enable/disable device */
+/* Change number of lines */
 
-void ttx_enbdis (int32 dis)
+t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-if (dis) {
-    ttix_dev.flags = ttix_dev.flags | DEV_DIS;
-    ttox_dev.flags = ttox_dev.flags | DEV_DIS;
+int32 newln, i, t;
+t_stat r;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+newln = get_uint (cptr, 10, TTX_MAXL, &r);
+if ((r != SCPE_OK) || (newln == ttx_lines))
+    return r;
+if (newln == 0)
+    return SCPE_ARG;
+if (newln < ttx_lines) {
+    for (i = newln, t = 0; i < ttx_lines; i++)
+        t = t | ttx_ldsc[i].conn;
+    if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
+        return SCPE_OK;
+    for (i = newln; i < ttx_lines; i++) {
+        if (ttx_ldsc[i].conn) {
+            tmxr_linemsg (&ttx_ldsc[i], "\r\nOperator disconnected line\r\n");
+            tmxr_reset_ln (&ttx_ldsc[i]);               /* reset line */
+            }
+        ttox_unit[i].flags |= UNIT_DIS;
+        ttx_reset_ln (i);
+        }
     }
 else {
-    ttix_dev.flags = ttix_dev.flags & ~DEV_DIS;
-    ttox_dev.flags = ttox_dev.flags & ~DEV_DIS;
+    for (i = ttx_lines; i < newln; i++) {
+        ttox_unit[i].flags &= ~UNIT_DIS;
+        ttx_reset_ln (i);
+        }
     }
-return;
+ttx_lines = newln;
+ttx_dib.num = newln * 2;
+return SCPE_OK;
 }
+
+/* Show device numbers */
+t_stat ttx_show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+int32 i, dev_offset;
+DEVICE *dptr;
+
+if (uptr == NULL)
+    return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL)
+    return SCPE_IERR;
+/* Select correct devno entry for Input or Output device */
+if (dptr->name[2] == 'O')
+    dev_offset = 1;
+else
+    dev_offset = 0;
+
+fprintf(st, "devno=");
+for (i = 0; i < ttx_lines; i++) {
+    fprintf(st, "%02o%s", ttx_dsp[i*2+dev_offset].dev, i < ttx_lines-1 ? 
+         "," : "");
+}
+return SCPE_OK;
+}
+

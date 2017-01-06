@@ -105,7 +105,7 @@ extern t_stat reason;						/* CPU execution loop control */
 #  endif
 #endif
 
-void debug_print(char *fmt, ...);
+void debug_print(const char *fmt, ...);
 
 /* ------------------------------------------------------------------------ */
 /* memory IO routines */
@@ -265,18 +265,17 @@ void xio_system7		(int32 addr, int32 func, int32 modify);				/* system/7 interpr
 void xio_1403_printer	(int32 addr, int32 func, int32 modify);				/* alternate high-speed printer */
 void xio_2250_display	(int32 addr, int32 func, int32 modify);				/* vector display processor */
 void xio_t2741_terminal (int32 addr, int32 func, int32 modify);				/* IO selectric via nonstandard serial interface for APL */
-void xio_error 			(char *msg);
+void xio_error 			(const char *msg);
 
-void   bail (char *msg);
+void   bail (const char *msg);
 t_stat load_cr_boot (int32 drv, int switches);
 t_stat cr_boot (int32 unitno, DEVICE *dptr);
 t_stat cr_rewind (void);
 t_stat cr_detach (UNIT *uptr);
 void   calc_ints (void);							/* recalculate interrupt bitmask */
-void   trace_io (char *fmt, ...);					/* debugging printout */
-void   trace_both (char *fmt, ...);					/* debugging printout */
-t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int arg, char *help);
-void   scp_panic (char *msg);						/* bail out of simulator */
+void   trace_io (const char *fmt, ...);				/* debugging printout */
+void   trace_both (const char *fmt, ...);			/* debugging printout */
+void   scp_panic (const char *msg);					/* bail out of simulator */
 char  *upcase(char *str);
 void   break_simulation (t_stat reason);			/* let a device halt the simulation */
 char   hollerith_to_ascii (uint16 hol);				/* for debugging use only */
@@ -286,9 +285,9 @@ void   stuff_cmd (char *cmd);
 t_bool stuff_and_wait (char *cmd, int timeout, int delay);
 void   update_gui (t_bool force);
 void   sim_init (void);
-t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int arg, char *help);
-t_stat basic_attach (UNIT *uptr, char *cptr);
-char * quotefix (char * cptr);
+t_stat register_cmd (const char *name, t_stat (*action)(int32 flag, CONST char *ptr), int arg, const char *help);
+t_stat basic_attach (UNIT *uptr, CONST char *cptr);
+CONST char * quotefix (CONST char *cptr, char * buf);
 
 /* GUI interface routines */
 t_bool keyboard_is_busy (void);

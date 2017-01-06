@@ -236,8 +236,8 @@ sim_panel_exec_step (PANEL *panel);
 
     When a front panel application wants to describe conditions that 
     should stop instruction execution an execution or an output
-    should be used.  To established or clear a breakpoint, one of 
-    the following routines should be called:  
+    breakpoint should be used.  To established or clear a breakpoint, 
+    one of the following routines should be called:  
     
     sim_panel_break_set          - Establish a simulation breakpoint
     sim_panel_break_clear        - Cancel/Delete a previously defined

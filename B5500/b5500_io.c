@@ -296,29 +296,7 @@ chan_set_end(int chan) {
         else
             D[chan] |= ((t_uint64)(CC[chan] & 07)) << DEV_WC_V;
      }
- 
-     /* Flush last buffer if short write */
-     if ((D[chan] & DEV_IORD) && CC[chan] != 0) {
-        uint16      addr = (uint16)(D[chan] & CORE);
 
-        if ((D[chan] & (DEV_BIN|DEV_WCFLG)) == 0) {
-             /* Insert group mark */
-             if (D[chan] & DEV_BACK) {
-                 W[chan] |= (t_uint64)037LL << ((CC[chan]) * 6);
-                 CC[chan]++;
-             } else {
-                 while(CC[chan] != 8) {
-                     W[chan] |= 037LL << ((7 - CC[chan]) * 6);
-                     CC[chan]++;
-                }
-             }
-        }
-
-        M[addr] = W[chan];
-        sim_debug(DEBUG_DATA, &chan_dev, "write(%d, %05o, %016llo)f\n",
-                 chan, addr, W[chan]);   
-        (void)chan_advance(chan);
-     }
      M[014+chan] = D[chan];
      if (loading == 0) 
         IAR |= IRQ_5 << chan;
@@ -550,6 +528,7 @@ int chan_write_char(int chan, uint8 *ch, int flags) {
         
             if (chan_advance(chan)) 
                 return 1;
+            W[chan] = 0;
         }
         if (flags) {
             if ((D[chan] & (DEV_BIN|DEV_WCFLG)) == 0) {
@@ -573,9 +552,10 @@ int chan_write_char(int chan, uint8 *ch, int flags) {
                 uint16      addr = (uint16)(D[chan] & CORE);
 
                 M[addr] = W[chan];
-                sim_debug(DEBUG_DATA, &chan_dev, "write(%d, %05o, %016llo)\n",
+                sim_debug(DEBUG_DATA, &chan_dev, "writef(%d, %05o, %016llo)\n",
                          chan, addr, W[chan]);   
                 (void)chan_advance(chan);
+                W[chan] = 0;
             }
             status[chan] |= EOR;
             return 1;

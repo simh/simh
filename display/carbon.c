@@ -148,7 +148,7 @@ static pascal OSStatus doKbdEvent (     EventHandlerCallRef     handlerRef,
         return (noErr);
 }
 
-int ws_init (   char    *crtname,       /* crt type name */
+int ws_init (   const char *crtname,    /* crt type name */
                 int     xp,             /* screen size in pixels */
                 int     yp,
                 int     colors,         /* colors to support (not used) */

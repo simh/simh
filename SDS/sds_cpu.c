@@ -199,10 +199,10 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat Ea (uint32 wd, uint32 *va);
 t_stat EaSh (uint32 wd, uint32 *va);
 t_stat Read (uint32 va, uint32 *dat);
@@ -221,8 +221,8 @@ void inst_hist (uint32 inst, uint32 pc, uint32 typ);
 t_stat rtc_inst (uint32 inst);
 t_stat rtc_svc (UNIT *uptr);
 t_stat rtc_reset (DEVICE *dptr);
-t_stat rtc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rtc_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern t_bool io_init (void);
 extern t_stat op_wyim (uint32 inst, uint32 *dat);
@@ -452,6 +452,7 @@ while (reason == 0) {                                   /* loop until halted */
                         reason = STOP_UBKPT;            /* stop simulation */
                         break;
                     }
+                sim_interval++;                         /* don't count non-executed instruction */
                 break;
                 }
             }
@@ -1682,7 +1683,7 @@ return SCPE_OK;
 
 /* Set memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -1701,7 +1702,7 @@ return SCPE_OK;
 
 /* Set system type (1 = Genie, 0 = standard) */
 
-t_stat cpu_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 extern t_stat drm_reset (DEVICE *dptr);
 extern DEVICE drm_dev, mux_dev, muxl_dev;
@@ -1779,7 +1780,7 @@ return SCPE_OK;
 
 /* Set frequency */
 
-t_stat rtc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rtc_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -1791,7 +1792,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (rtc_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
@@ -1818,7 +1819,7 @@ return;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1857,15 +1858,15 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 ov, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
-static char *cyc[] = { "   ", "   ", "INT", "TRP" };
-static char *modes = "NMU?";
+static const char *cyc[] = { "   ", "   ", "INT", "TRP" };
+static const char *modes = "NMU?";
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

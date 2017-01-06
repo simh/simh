@@ -204,13 +204,13 @@ t_stat m68k_hdsk_boot(const int32 unitno, DEVICE *dptr,
 void m68k_CPUToView(void) {
     uint32 reg;
     for (reg = M68K_REG_D0; reg <= M68K_REG_CPU_TYPE; reg++)
-        m68k_registers[reg] = m68k_get_reg(NULL, reg);
+        m68k_registers[reg] = m68k_get_reg(NULL, (m68k_register_t)reg);
 }
 
 void m68k_viewToCPU(void) {
     uint32 reg;
     for (reg = M68K_REG_D0; reg <= M68K_REG_CPU_TYPE; reg++)
-        m68k_set_reg(reg, m68k_registers[reg]);
+        m68k_set_reg((m68k_register_t)reg, m68k_registers[reg]);
 }
 
 t_stat sim_instr_m68k(void) {

@@ -194,7 +194,7 @@
                         { UNIT_MSIZE, (1u << 28) + (1u << 22), NULL, "260M", &cpu_set_size, NULL, NULL, "Set Memory to 260M bytes" },   \
                         { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size, NULL, NULL, "Set Memory to 512M bytes" },                \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
-extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 
 #define CPU_MODEL_MODIFIERS                                                                     \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={8600|8650}",                   \
@@ -341,6 +341,8 @@ typedef struct {
 
 /* Interrupt assignments; within each level, priority is right to left */
 
+#define INT_V_DTA       0                               /* BR6 */
+
 #define INT_V_DZRX      0                               /* BR5 */
 #define INT_V_DZTX      1
 #define INT_V_HK        2
@@ -354,6 +356,7 @@ typedef struct {
 #define INT_V_DMCTX     10
 #define INT_V_DUPRX     11
 #define INT_V_DUPTX     12
+#define INT_V_RK        13
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
@@ -364,6 +367,7 @@ typedef struct {
 #define INT_V_TDRX      6
 #define INT_V_TDTX      7
 
+#define INT_DTA         (1u << INT_V_DTA)
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
 #define INT_HK          (1u << INT_V_HK)
@@ -383,9 +387,11 @@ typedef struct {
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_RK          (1u << INT_V_RK)
 #define INT_TDRX        (1u << INT_V_TDRX)
 #define INT_TDTX        (1u << INT_V_TDTX)
 
+#define IPL_DTA         (0x16 - IPL_HMIN)
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
 #define IPL_HK          (0x15 - IPL_HMIN)
@@ -405,6 +411,7 @@ typedef struct {
 #define IPL_DMCTX       (0x15 - IPL_HMIN)
 #define IPL_DUPRX       (0x15 - IPL_HMIN)
 #define IPL_DUPTX       (0x15 - IPL_HMIN)
+#define IPL_RK          (0x15 - IPL_HMIN)
 #define IPL_TDRX        (0x14 - IPL_HMIN)
 #define IPL_TDTX        (0x14 - IPL_HMIN)
 
@@ -434,9 +441,8 @@ extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 /* Massbus definitions */
 
-#define MBA_RP          (TR_MBA0 - TR_MBA0)             /* MBA for RP */
-#define MBA_TU          (TR_MBA1 - TR_MBA0)             /* MBA for TU */
 #define MBA_RMASK       0x1F                            /* max 32 reg */
+#define MBA_AUTO        (uint32)0xFFFFFFFF              /* Unassigned MBA */
 #define MBE_NXD         1                               /* nx drive */
 #define MBE_NXR         2                               /* nx reg */
 #define MBE_GOE         3                               /* err on GO */
@@ -453,20 +459,20 @@ extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf);
 
 int32 mba_rdbufW (uint32 mbus, int32 bc, uint16 *buf);
-int32 mba_wrbufW (uint32 mbus, int32 bc, uint16 *buf);
+int32 mba_wrbufW (uint32 mbus, int32 bc, const uint16 *buf);
 int32 mba_chbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_get_bc (uint32 mbus);
 void mba_upd_ata (uint32 mbus, uint32 val);
 void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
-void mba_set_enbdis (uint32 mbus, t_bool dis);
-t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
+void mba_set_enbdis (DEVICE *dptr);
+t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
-t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 void sbi_set_errcnf (void);
 

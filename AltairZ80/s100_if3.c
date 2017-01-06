@@ -76,8 +76,8 @@ typedef struct {
 
 static IF3_INFO if3_info_data = { { 0x0, 0, 0x10, 8 } };
 
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
@@ -85,7 +85,7 @@ extern uint32 PCX;
 extern int32 sio0d(const int32 port, const int32 io, const int32 data);
 extern int32 sio0s(const int32 port, const int32 io, const int32 data);
 
-static t_stat set_if3_connect(UNIT *uptr, int32 val, char *cptr, void *desc);
+static t_stat set_if3_connect(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 static t_stat if3_reset(DEVICE *if3_dev);
 static t_stat if3_svc (UNIT *uptr);
@@ -93,6 +93,7 @@ static uint8 IF3_Read(const uint32 Addr);
 static uint8 IF3_Write(const uint32 Addr, uint8 cData);
 static int32 if3dev(const int32 port, const int32 io, const int32 data);
 static t_stat update_rx_tx_isr (UNIT *uptr);
+static const char* if3_description(DEVICE *dptr);
 
 static UNIT if3_unit[] = {
     { UDATA (&if3_svc, UNIT_FIX | UNIT_DISABLE | UNIT_ROABLE | UNIT_IF3_CONNECT, 0) },
@@ -118,7 +119,11 @@ static REG if3_reg[] = {
     { NULL }
 };
 
-#define IF3_NAME    "Compupro Interfacer 3 IF3"
+#define IF3_NAME    "Compupro Interfacer 3"
+
+static const char* if3_description(DEVICE *dptr) {
+    return IF3_NAME;
+}
 
 static MTAB if3_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,               "IOBASE",   "IOBASE",
@@ -146,10 +151,10 @@ DEVICE if3_dev = {
     NULL, NULL, &if3_reset,
     NULL, NULL, NULL,
     &if3_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    if3_dt, NULL, IF3_NAME
+    if3_dt, NULL, NULL, NULL, NULL, NULL, &if3_description
 };
 
-static t_stat set_if3_connect(UNIT *uptr, int32 val, char *cptr, void *desc)
+static t_stat set_if3_connect(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     if(uptr->flags & UNIT_DISABLE) {
         sim_debug(ERROR_MSG, &if3_dev, "IF3[%d]: not enabled.\n", uptr->u3);

@@ -124,15 +124,14 @@ int32 rf_time = 10;                                     /* inter-word time */
 int32 rf_burst = 1;                                     /* burst mode flag */
 int32 rf_stopioe = 1;                                   /* stop on error */
 
-DEVICE rf_dev;
 int32 rf70 (int32 dev, int32 pulse, int32 dat);
 int32 rf72 (int32 dev, int32 pulse, int32 dat);
 int32 rf_iors (void);
 t_stat rf_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
-int32 rf_updsta (int32 new);
-t_stat rf_attach (UNIT *uptr, char *cptr);
-t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+int32 rf_updsta (int32 news);
+t_stat rf_attach (UNIT *uptr, CONST char *cptr);
+t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* RF data structures
 
@@ -149,14 +148,14 @@ UNIT rf_unit = {
     };
 
 REG rf_reg[] = {
-    { ORDATA (STA, rf_sta, 18) },
-    { ORDATA (DA, rf_da, 22) },
-    { ORDATA (BUF, rf_dbuf, 18) },
-    { FLDATA (INT, int_hwre[API_RF], INT_V_RF) },
-    { BRDATA (WLK, rf_wlk, 8, 16, RF_NUMDK) },
-    { DRDATA (TIME, rf_time, 24), PV_LEFT + REG_NZ },
-    { FLDATA (BURST, rf_burst, 0) },
-    { FLDATA (STOP_IOE, rf_stopioe, 0) },
+    { ORDATAD (STA, rf_sta, 18, "status") },
+    { ORDATAD (DA, rf_da, 22, "current disk address") },
+    { ORDATAD (BUF, rf_dbuf, 18, "data buffer (diagnostic only)") },
+    { FLDATAD (INT, int_hwre[API_RF], INT_V_RF, "interrupt pending flag") },
+    { BRDATAD (WLK, rf_wlk, 8, 16, RF_NUMDK, "write lock switches for disks 0 to 7") },
+    { DRDATAD (TIME, rf_time, 24, "rotational delay per word"), PV_LEFT + REG_NZ },
+    { FLDATAD (BURST, rf_burst, 0, "burst flag") },
+    { FLDATAD (STOP_IOE, rf_stopioe, 0, "stop on I/O error") },
     { DRDATA (CAPAC, rf_unit.capac, 31), PV_LEFT + REG_HRO },
     { ORDATA (DEVNO, rf_dib.dev, 6), REG_HRO },
     { ORDATA (APIVEC, api_vec[API_RF][INT_V_RF], 6), REG_HRO },
@@ -173,8 +172,8 @@ MTAB rf_mod[] = {
     { UNIT_PLAT, (6 << UNIT_V_PLAT), NULL, "7P", &rf_set_size },
     { UNIT_PLAT, (7 << UNIT_V_PLAT), NULL, "8P", &rf_set_size },
     { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, RF_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, "WC" },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, RF_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, "CA" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, RF_WC, "WC", "WC", &set_3cyc_reg, &show_3cyc_reg, (void *)"WC" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, RF_CA, "CA", "CA", &set_3cyc_reg, &show_3cyc_reg, (void *)"CA" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
     };
@@ -346,7 +345,7 @@ return ((rf_sta & (RFS_ERR | RFS_DON))? IOS_RF: 0);
 
 /* Attach routine */
 
-t_stat rf_attach (UNIT *uptr, char *cptr)
+t_stat rf_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 p, sz;
 uint32 ds_bytes = RF_DKSIZE * sizeof (int32);
@@ -364,7 +363,7 @@ return attach_unit (uptr, cptr);
 
 /* Change disk size */
 
-t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val < 0)
     return SCPE_IERR;

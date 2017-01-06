@@ -154,51 +154,54 @@ t_value pult[11][8] = {
     },
 };
 
+#define ORDATAVM(nm,loc,wd) REGDATA(nm,(loc),8,wd,0,1,NULL,NULL,REG_VMIO,0,0)
+#define ORDATAH(nm,loc,wd) REGDATA(nm,(loc),8,wd,0,1,NULL,NULL,REG_HIDDEN,0,0)
+
 REG mmu_reg[] = {
-    { "БРЗ0",  &BRZ[0],     8, 50, 0, 1, NULL, NULL, REG_VMIO}, /* Буферные регистры записи */
-    { "БРЗ1",  &BRZ[1],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ2",  &BRZ[2],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ3",  &BRZ[3],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ4",  &BRZ[4],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ5",  &BRZ[5],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ6",  &BRZ[6],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРЗ7",  &BRZ[7],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БАЗ0",  &BAZ[0],     8, 16, 0, 1 },                      /* Буферные адреса записи */
-    { "БАЗ1",  &BAZ[1],     8, 16, 0, 1 },
-    { "БАЗ2",  &BAZ[2],     8, 16, 0, 1 },
-    { "БАЗ3",  &BAZ[3],     8, 16, 0, 1 },
-    { "БАЗ4",  &BAZ[4],     8, 16, 0, 1 },
-    { "БАЗ5",  &BAZ[5],     8, 16, 0, 1 },
-    { "БАЗ6",  &BAZ[6],     8, 16, 0, 1 },
-    { "БАЗ7",  &BAZ[7],     8, 16, 0, 1 },
-    { "ТАБСТ", &TABST,      8, 28, 0, 1, NULL, NULL, REG_HIDDEN },/* Таблица старшинства БРЗ */
-    { "ЗпТР",  &FLUSH,      8,  4, 0, 1, NULL, NULL, REG_HIDDEN },/* Признак выталкивания БРЗ */
-    { "Старш", &OLDEST,     8,  3, 0, 1 },                      /* Номер вытолкнутого БРЗ */
-    { "РП0",   &RP[0],      8, 48, 0, 1, NULL, NULL, REG_VMIO}, /* Регистры приписки, по 12 бит */
-    { "РП1",   &RP[1],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП2",   &RP[2],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП3",   &RP[3],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП4",   &RP[4],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП5",   &RP[5],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП6",   &RP[6],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РП7",   &RP[7],      8, 48, 0, 1, NULL, NULL, REG_VMIO},
-    { "РЗ",    &RZ,         8, 32, 0, 1 },                      /* Регистр защиты */
-    { "ТР1",   &pult[0][1], 8, 50, 0, 1, NULL, NULL, REG_VMIO}, /* Тумблерные регистры */
-    { "ТР2",   &pult[0][2], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР3",   &pult[0][3], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР4",   &pult[0][4], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР5",   &pult[0][5], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР6",   &pult[0][6], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "ТР7",   &pult[0][7], 8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРС0",  &BRS[0],     8, 50, 0, 1, NULL, NULL, REG_VMIO}, /* Буферные регистры слов */
-    { "БРС1",  &BRS[1],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРС2",  &BRS[2],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БРС3",  &BRS[3],     8, 50, 0, 1, NULL, NULL, REG_VMIO},
-    { "БАС0",  &BAS[0],     8, 16, 0, 1 },                      /* Буферные адреса слов */
-    { "БАС1",  &BAS[1],     8, 16, 0, 1 },
-    { "БАС2",  &BAS[2],     8, 16, 0, 1 },
-    { "БАС3",  &BAS[3],     8, 16, 0, 1 },
-    { "БРСст", &BRSLRU,     8,  6, 0, 1, NULL, NULL, REG_HIDDEN},
+    { ORDATAVM ( "БРЗ0",  BRZ[0],     50) },                      /* Буферные регистры записи */
+    { ORDATAVM ( "БРЗ1",  BRZ[1],     50) },
+    { ORDATAVM ( "БРЗ2",  BRZ[2],     50) },
+    { ORDATAVM ( "БРЗ3",  BRZ[3],     50) },
+    { ORDATAVM ( "БРЗ4",  BRZ[4],     50) },
+    { ORDATAVM ( "БРЗ5",  BRZ[5],     50) },
+    { ORDATAVM ( "БРЗ6",  BRZ[6],     50) },
+    { ORDATAVM ( "БРЗ7",  BRZ[7],     50) },
+    { ORDATA   ( "БАЗ0",  BAZ[0],     16) },                      /* Буферные адреса записи */
+    { ORDATA   ( "БАЗ1",  BAZ[1],     16) },
+    { ORDATA   ( "БАЗ2",  BAZ[2],     16) },
+    { ORDATA   ( "БАЗ3",  BAZ[3],     16) },
+    { ORDATA   ( "БАЗ4",  BAZ[4],     16) },
+    { ORDATA   ( "БАЗ5",  BAZ[5],     16) },
+    { ORDATA   ( "БАЗ6",  BAZ[6],     16) },
+    { ORDATA   ( "БАЗ7",  BAZ[7],     16) },
+    { ORDATAH  ( "ТАБСТ", TABST,      28) },                      /* Таблица старшинства БРЗ */
+    { ORDATAH  ( "ЗпТР",  FLUSH,       4) },                      /* Признак выталкивания БРЗ */
+    { ORDATA   ( "Старш", OLDEST,      3) },                      /* Номер вытолкнутого БРЗ */
+    { ORDATAVM ( "РП0",   RP[0],      48) },                      /* Регистры приписки, по 12 бит */
+    { ORDATAVM ( "РП1",   RP[1],      48) },
+    { ORDATAVM ( "РП2",   RP[2],      48) },
+    { ORDATAVM ( "РП3",   RP[3],      48) },
+    { ORDATAVM ( "РП4",   RP[4],      48) },
+    { ORDATAVM ( "РП5",   RP[5],      48) },
+    { ORDATAVM ( "РП6",   RP[6],      48) },
+    { ORDATAVM ( "РП7",   RP[7],      48) },
+    { ORDATA   ( "РЗ",    RZ,         32) },                      /* Регистр защиты */
+    { ORDATAVM ( "ТР1",   pult[0][1], 50) },                      /* Тумблерные регистры */
+    { ORDATAVM ( "ТР2",   pult[0][2], 50) },
+    { ORDATAVM ( "ТР3",   pult[0][3], 50) },
+    { ORDATAVM ( "ТР4",   pult[0][4], 50) },
+    { ORDATAVM ( "ТР5",   pult[0][5], 50) },
+    { ORDATAVM ( "ТР6",   pult[0][6], 50) },
+    { ORDATAVM ( "ТР7",   pult[0][7], 50) },
+    { ORDATAVM ( "БРС0",  BRS[0],     50) },                      /* Буферные регистры слов */
+    { ORDATAVM ( "БРС1",  BRS[1],     50) },
+    { ORDATAVM ( "БРС2",  BRS[2],     50) },
+    { ORDATAVM ( "БРС3",  BRS[3],     50) },
+    { ORDATA   ( "БАС0",  BAS[0],     16) },                      /* Буферные адреса слов */
+    { ORDATA   ( "БАС1",  BAS[1],     16) },
+    { ORDATA   ( "БАС2",  BAS[2],     16) },
+    { ORDATA   ( "БАС3",  BAS[3],     16) },
+    { ORDATA   ( "БРСст", BRSLRU,      6) },
     { 0 }
 };
 

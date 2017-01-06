@@ -370,12 +370,12 @@ int32 rp_inta (void);
 t_stat rp_svc (UNIT *uptr);
 t_stat rp_reset (DEVICE *dptr);
 t_stat rp_boot (int32 unitno, DEVICE *dptr);
-t_stat rp_attach (UNIT *uptr, char *cptr);
+t_stat rp_attach (UNIT *uptr, CONST char *cptr);
 t_stat rp_detach (UNIT *uptr);
 void set_rper (int16 flag, int32 drv);
 void update_rpcs (int32 flags, int32 drv);
 void rp_go (int32 drv, int32 fnc);
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* RP data structures
 
@@ -410,34 +410,34 @@ UNIT rp_unit[] = {
     };
 
 REG rp_reg[] = {
-    { ORDATA (RPCS1, rpcs1, 16) },
-    { ORDATA (RPWC, rpwc, 16) },
-    { ORDATA (RPBA, rpba, 16) },
-    { ORDATA (RPCS2, rpcs2, 16) },
-    { ORDATA (RPDB, rpdb, 16) },
-    { BRDATA (RPDA, rpda, 8, 16, RP_NUMDR) },
-    { BRDATA (RPDS, rpds, 8, 16, RP_NUMDR) },
-    { BRDATA (RPER1, rper1, 8, 16, RP_NUMDR) },
-    { BRDATA (RPHR, rmhr, 8, 16, RP_NUMDR) },
-    { BRDATA (RPOF, rpof, 8, 16, RP_NUMDR) },
-    { BRDATA (RPDC, rpdc, 8, 16, RP_NUMDR) },
-    { BRDATA (RPER2, rper2, 8, 16, RP_NUMDR) },
-    { BRDATA (RPER3, rper3, 8, 16, RP_NUMDR) },
-    { BRDATA (RPEC1, rpec1, 8, 16, RP_NUMDR) },
-    { BRDATA (RPEC2, rpec2, 8, 16, RP_NUMDR) },
-    { BRDATA (RMMR, rpmr, 8, 16, RP_NUMDR) },
-    { BRDATA (RMMR2, rmmr2, 8, 16, RP_NUMDR) },
-    { FLDATA (IFF, rpiff, 0) },
-    { FLDATA (INT, int_req, INT_V_RP) },
-    { FLDATA (SC, rpcs1, CSR_V_ERR) },
-    { FLDATA (DONE, rpcs1, CSR_V_DONE) },
-    { FLDATA (IE, rpcs1, CSR_V_IE) },
-    { DRDATA (STIME, rp_swait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (RTIME, rp_rwait, 24), REG_NZ + PV_LEFT },
+    { ORDATAD (RPCS1, rpcs1, 16, "control status 1") },
+    { ORDATAD (RPWC, rpwc, 16, "word count") },
+    { ORDATAD (RPBA, rpba, 16, "bus address") },
+    { ORDATAD (RPCS2, rpcs2, 16, "control status") },
+    { ORDATAD (RPDB, rpdb, 16, "data buffer") },
+    { BRDATAD (RPDA, rpda, 8, 16, RP_NUMDR, "desired surface, sector") },
+    { BRDATAD (RPDS, rpds, 8, 16, RP_NUMDR, "drive status, drives 0 to 7") },
+    { BRDATAD (RPER1, rper1, 8, 16, RP_NUMDR, "drive errors, drives 0 to 7") },
+    { BRDATAD (RPHR, rmhr, 8, 16, RP_NUMDR, "holding register, drives 0 to 7") },
+    { BRDATAD (RPOF, rpof, 8, 16, RP_NUMDR, "offset, drives 0 to 7") },
+    { BRDATAD (RPDC, rpdc, 8, 16, RP_NUMDR, "desired cylinder, drives 0 to 7") },
+    { BRDATAD (RPER2, rper2, 8, 16, RP_NUMDR, "error status 2, drives 0 to 7") },
+    { BRDATAD (RPER3, rper3, 8, 16, RP_NUMDR, "error status 3, drives 0 to 7") },
+    { BRDATAD (RPEC1, rpec1, 8, 16, RP_NUMDR, "ECC syndrome 1, drives 0 to 7") },
+    { BRDATAD (RPEC2, rpec2, 8, 16, RP_NUMDR, "ECC syndrome 2, drives 0 to 7") },
+    { BRDATAD (RMMR, rpmr, 8, 16, RP_NUMDR, "maintenance register, drives 0 to 7") },
+    { BRDATAD (RMMR2, rmmr2, 8, 16, RP_NUMDR, "maintenance register 2, drives 0 to 7") },
+    { FLDATAD (IFF, rpiff, 0, "transfer complete interrupt request flop") },
+    { FLDATAD (INT, int_req, INT_V_RP, "interrupt pending flag") },
+    { FLDATAD (SC, rpcs1, CSR_V_ERR, "special condition (CSR1<15>)") },
+    { FLDATAD (DONE, rpcs1, CSR_V_DONE, "device done flag (CSR1<7>)") },
+    { FLDATAD (IE, rpcs1, CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (STIME, rp_swait, 24, "seek time, per cylinder"), REG_NZ + PV_LEFT },
+    { DRDATAD (RTIME, rp_rwait, 24, "rotational delay"), REG_NZ + PV_LEFT },
     { URDATA (FNC, rp_unit[0].FUNC, 8, 5, 0, RP_NUMDR, REG_HRO) },
     { URDATA (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0,
               RP_NUMDR, PV_LEFT | REG_HRO) },
-    { FLDATA (STOP_IOE, rp_stopioe, 0) },
+    { FLDATAD (STOP_IOE, rp_stopioe, 0, "stop on I/O error") },
     { NULL }
     };
 
@@ -1150,7 +1150,7 @@ return SCPE_OK;
 
 /* Device attach */
 
-t_stat rp_attach (UNIT *uptr, char *cptr)
+t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 i, p;
 t_stat r;
@@ -1203,7 +1203,7 @@ return detach_unit (uptr);
 
 /* Set size command validation routine */
 
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 dtype = GET_DTYPE (val);
 

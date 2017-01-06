@@ -79,7 +79,7 @@ t_stat mt_chwr (uint32 ch, t_uint64 val, uint32 flags);
 t_stat mt_rec_end (UNIT *uptr);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cptr);
+t_stat mt_attach (UNIT *uptr, CONST char *cptr);
 t_stat mt_boot (int32 unitno, DEVICE *dptr);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
 
@@ -833,7 +833,7 @@ return SCPE_OK;                                         /* done */
 
 /* Magtape attach */
 
-t_stat mt_attach (UNIT *uptr, char *cptr)
+t_stat mt_attach (UNIT *uptr, CONST char *cptr)
 {
 uptr->flags = uptr->flags & ~MTUF_LDN;                  /* start as hi den */
 return sim_tape_attach (uptr, cptr);

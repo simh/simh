@@ -191,18 +191,18 @@ static uint g_cpu_ir;        /* instruction register */
 static uint g_cpu_type;
 
 /* used by ops like asr, ror, addq, etc */
-static uint g_3bit_qdata_table[8] = {8, 1, 2, 3, 4, 5, 6, 7};
+static const uint g_3bit_qdata_table[8] = {8, 1, 2, 3, 4, 5, 6, 7};
 
-static uint g_5bit_data_table[32] =
+static const uint g_5bit_data_table[32] =
 {
     32,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
 };
 
-static char* g_cc[16] =
+static const char* g_cc[16] =
 {"t", "f", "hi", "ls", "cc", "cs", "ne", "eq", "vc", "vs", "pl", "mi", "ge", "lt", "gt", "le"};
 
-static char* g_cpcc[64] =
+static const char* g_cpcc[64] =
 {/* 000    001    010    011    100    101    110    111 */
       "f",  "eq", "ogt", "oge", "olt", "ole", "ogl",  "or", /* 000 */
      "un", "ueq", "ugt", "uge", "ult", "ule",  "ne",   "t", /* 001 */
@@ -1754,8 +1754,8 @@ static void d68000_move_to_usp(void)
 static void d68010_movec(void)
 {
     uint extension;
-    char* reg_name;
-    char* processor;
+    const char* reg_name;
+    const char* processor;
     LIMIT_CPU_TYPES(M68010_PLUS);
     extension = read_imm_16();
 

@@ -1,6 +1,6 @@
 /* pdp11_tc.c: PDP-11 DECtape simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tc           TC11/TU56 DECtape
 
+   04-Dec-13    RMS     Revised to model TCCM correctly (Josh Dersch)
    23-Oct-13    RMS     Revised for new boot setup routine
    23-Jun-06    RMS     Fixed switch conflict in ATTACH
    10-Feb-06    RMS     READ sets extended data bits in TCST (Alan Frisbie)
@@ -105,7 +106,15 @@
    bit bucket.
 */
 
+#if defined (VM_VAX)                                    /* VAX version */
+#include "vax_defs.h"
+extern int32 int_req[IPL_HLVL];
+#define DMASK           0xFFFF
+
+#else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
+extern int32 int_req[IPL_HLVL];
+#endif
 
 #define DT_NUMDR        8                               /* #drives */
 #define DT_M_NUMDR      (DT_NUMDR - 1)
@@ -266,16 +275,12 @@
 #define LOG_RW          0x2
 #define LOG_BL          0x4
 
-#define DT_SETDONE      tccm = tccm | CSR_DONE; \
-                        if (tccm & CSR_IE) \
-                            SET_INT (DTA)
-#define DT_CLRDONE      tccm = tccm & ~CSR_DONE; \
-                        CLR_INT (DTA)
+#define DT_SETDONE      if ((tccm & (CSR_DONE|CSR_IE)) == CSR_IE) \
+                            SET_INT (DTA); \
+                        tccm = tccm | CSR_DONE
+#define DT_CLRDONE      CLR_INT (DTA); \
+                        tccm = tccm & ~CSR_DONE
 #define ABS(x)          (((x) < 0)? (-(x)): (x))
-
-extern uint16 *M;                                       /* memory */
-extern int32 int_req[IPL_HLVL];
-extern UNIT cpu_unit;
 
 int32 tcst = 0;                                         /* status */
 int32 tccm = 0;                                         /* command */
@@ -294,7 +299,7 @@ t_stat dt_wr (int32 data, int32 PA, int32 access);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_svcdone (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
-t_stat dt_attach (UNIT *uptr, char *cptr);
+t_stat dt_attach (UNIT *uptr, CONST char *cptr);
 void dt_flush (UNIT *uptr);
 t_stat dt_detach (UNIT *uptr);
 t_stat dt_boot (int32 unitno, DEVICE *dptr);
@@ -407,7 +412,14 @@ DEVICE dt_dev = {
     &dt_description
     };
 
-/* IO dispatch routines, I/O addresses 17777340 - 17777350 */
+/* IO dispatch routines, I/O addresses 17777340 - 17777350
+
+   Read hardware notes:
+
+   - While the TCCM error bit is a real flop, it is supposed to reflect
+     the OR of the TCST error bits at all time, so it is updated on read.
+   - A read of TCDT while the function is RALL clears DONE.
+*/
 
 t_stat dt_rd (int32 *data, int32 PA, int32 access)
 {
@@ -452,6 +464,28 @@ switch (j) {
 return SCPE_OK;
 }
 
+/* Write hardware notes:
+
+   - The TC11 behaves much more like a traditional DECtape controller
+     than a typical PDP11 peripheral. In particular, execution is
+     initiated/controlled by any write to TCCM, rather than setting
+     the GO (DO) bit. Unless the function is STOP or STOP ALL, writing
+     TCCM will put the selected tape in motion.
+   - Writing GO (DO) clears DONE (READY) and the error flops in TCST.
+   - Writing a 0 to ERROR clears the error flops in TCST. Because it
+     is write 0 to clear (later controllers used write 1 to clear),
+     the simulator has to know whether ERROR is actually written.
+   - STOP ALL ignores select errors. Every other function is rejected
+     if there is a select error.
+   - An illegal operation (setting ILO) will stop the selected tape.
+   - A write of TCDT while the function is RALL, WALL, or WTMK clears
+     DONE (READY). RALL should not be included, but it saved a gate
+     not to prevent it.
+   - Because DONE (READY) may not be clear when an operation completes
+     and DONE (READY) is set, the DT_SETDONE must test for DONE (READY)
+     not being already set.
+*/
+
 t_stat dt_wr (int32 data, int32 PA, int32 access)
 {
 int32 i, j, unum, old_tccm, fnc;
@@ -468,43 +502,45 @@ switch (j) {
 
     case 001:                                           /* TCCM */
         old_tccm = tccm;                                /* save prior */
-        if (access == WRITEB)
-            data = (PA & 1)? (tccm & 0377) | (data << 8): (tccm & ~0377) | data;
-        if ((data & CSR_IE) == 0)
-            CLR_INT (DTA);
-        else if ((((tccm & CSR_IE) == 0) && (tccm & CSR_DONE)) ||
-            (data & CSR_DONE)) SET_INT (DTA);
-        tccm = (tccm & ~CSR_RW) | (data & CSR_RW);
-        if ((data & CSR_GO) && (tccm & CSR_DONE)) {     /* new cmd? */
+        if (access == WRITEB)                
+            data = (PA & 1)? ((tccm & 0377) | (data << 8)): ((tccm & ~0377) | data);
+        if ((data & CSR_IE) == 0)                       /* clearing IE? */
+            CLR_INT (DTA);                              /* clear intr */
+        else if ((tccm & (CSR_DONE|CSR_IE)) == CSR_DONE) /* setting, DON'IE = DON? */
+            SET_INT (DTA);                              /* set intr */
+        tccm = (tccm & ~CSR_RW) | (data & CSR_RW);      /* merge data */
+        if ((data & CSR_GO) != 0) {                     /* GO (DO) set? */
             tcst = tcst & ~STA_ALLERR;                  /* clear errors */
-            tccm = tccm & ~(CSR_ERR | CSR_DONE);        /* clear done, err */
-            CLR_INT (DTA);                              /* clear int */
-            if ((old_tccm ^ tccm) & CSR_UNIT)
-                dt_deselect (old_tccm);
-            unum = CSR_GETUNIT (tccm);                  /* get drive */
-            fnc = CSR_GETFNC (tccm);                    /* get function */
-            if (fnc == FNC_STOP) {                      /* stop all? */
-                sim_activate (&dt_dev.units[DT_TIMER], dt_ctime);
-                for (i = 0; i < DT_NUMDR; i++)
-                    dt_stopunit (dt_dev.units + i);     /* stop unit */
-                break;
-                }
-            uptr = dt_dev.units + unum;
-            if (uptr->flags & UNIT_DIS)                 /* disabled? */
-                dt_seterr (uptr, STA_SEL);              /* select err */
-            if ((fnc == FNC_WMRK) ||                    /* write mark? */
-                ((fnc == FNC_WALL) && (uptr->flags & UNIT_WPRT)) ||
-                ((fnc == FNC_WRIT) && (uptr->flags & UNIT_WPRT)))
-                dt_seterr (uptr, STA_ILO);              /* illegal op */
-            if (!(tccm & CSR_ERR))
-                dt_newsa (tccm);
+            tccm = tccm & ~(CSR_ERR|CSR_DONE);          /* clear done, err flops */
             }
-        else if ((tccm & CSR_ERR) == 0) {               /* clear err? */
-            tcst = tcst & ~STA_RWERR;
-            if (tcst & STA_ALLERR)
-                tccm = tccm | CSR_ERR;
+        else if (((data & CSR_ERR) == 0) &&             /* error bit clear? */
+            ((access != WRITEB) || ((PA & 1) != 0))) {  /* not write low byte? */
+            tcst = tcst & ~STA_ALLERR;                  /* clear errors */
+            tccm = tccm & ~CSR_ERR;                     /* clear err flop */
             }
-        break;
+        if (((old_tccm ^ tccm) & CSR_UNIT) != 0)        /* unit change? */
+            dt_deselect (old_tccm);                     /* deselect all */
+        unum = CSR_GETUNIT (tccm);                      /* get drive */
+        fnc = CSR_GETFNC (tccm);                        /* get function */
+        if (fnc == FNC_STOP) {                          /* stop all? */
+            sim_activate (&dt_dev.units[DT_TIMER], dt_ctime); /* sched done */
+            for (i = 0; i < DT_NUMDR; i++)              /* loop thru units */
+                dt_stopunit (dt_dev.units + i);         /* stop unit */
+            break;
+            }
+        uptr = dt_dev.units + unum;
+        if (uptr->flags & UNIT_DIS)                     /* disabled? */
+            dt_seterr (uptr, STA_SEL);                  /* select err */
+        if ((fnc == FNC_WMRK) ||                        /* write mark? */
+            ((fnc == FNC_WALL) && (uptr->flags & UNIT_WPRT)) ||
+            ((fnc == FNC_WRIT) && (uptr->flags & UNIT_WPRT)))
+            dt_seterr (uptr, STA_ILO);                  /* illegal op */
+        if ((tccm & CSR_ERR) != 0) {                    /* error? */
+            dt_stopunit (uptr);                         /* stop the unit */
+            DT_SETDONE;                                 /* set done at once */
+            }
+         else dt_newsa (tccm);                          /* new function */
+         break;
 
     case 002:                                           /* TCWC */
         tcwc = data;                                    /* word write only! */
@@ -634,7 +670,7 @@ return;
 void dt_newfnc (UNIT *uptr, int32 newsta)
 {
 int32 fnc, dir, blk, unum, relpos, newpos;
-uint32 oldpos;
+t_addr oldpos;
 
 oldpos = uptr->pos;                                     /* save old pos */
 if (dt_setpos (uptr))                                   /* update pos */
@@ -645,7 +681,7 @@ dir = DTS_GETMOT (uptr->STATE) & DTS_DIR;
 unum = (int32) (uptr - dt_dev.units);
 if (oldpos == uptr->pos)
     uptr->pos = uptr->pos + (dir? -1: 1);
-blk = DT_LIN2BL (uptr->pos, uptr);
+blk = (int32)DT_LIN2BL (uptr->pos, uptr);
 
 if (dir? DT_QREZ (uptr): DT_QFEZ (uptr)) {              /* wrong ez? */
     dt_seterr (uptr, STA_END);                          /* set ez flag, stop */
@@ -791,7 +827,7 @@ else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
     detach_unit (uptr);                                 /* off reel? */
-    uptr->STATE = uptr->pos = 0;
+    uptr->STATE = 0, uptr->pos = 0;
     unum = (int32) (uptr - dt_dev.units);
     if ((unum == CSR_GETUNIT (tccm)) && (CSR_GETFNC (tccm) != FNC_STOP))
         dt_seterr (uptr, STA_SEL);                      /* error */
@@ -864,7 +900,7 @@ if (DT_QEZ (uptr)) {                                    /* in end zone? */
     dt_seterr (uptr, STA_END);                          /* end zone error */
     return SCPE_OK;
     }
-blk = DT_LIN2BL (uptr->pos, uptr);                      /* get block # */
+blk = (int32)DT_LIN2BL (uptr->pos, uptr);                      /* get block # */
 
 switch (fnc) {                                          /* at speed, check fnc */
 
@@ -876,7 +912,7 @@ switch (fnc) {                                          /* at speed, check fnc *
 
     case DTS_OFR:                                       /* off reel */
         detach_unit (uptr);                             /* must be deselected */
-        uptr->STATE = uptr->pos = 0;                    /* no visible action */
+        uptr->STATE = 0, uptr->pos = 0;                 /* no visible action */
         break;
 
 /* Read
@@ -1142,6 +1178,8 @@ return auto_config (0, 0);
 
 /* Device bootstrap */
 
+#if defined (VM_PDP11)
+
 #define BOOT_START      02000                           /* start */
 #define BOOT_ENTRY      (BOOT_START + 002)              /* entry */
 #define BOOT_UNIT       (BOOT_START + 010)              /* unit number */
@@ -1191,6 +1229,7 @@ static const uint16 boot_rom[] = {
 t_stat dt_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
+extern uint16 *M;                                       /* memory */
 
 dt_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++)
@@ -1201,6 +1240,15 @@ cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 
+#else
+
+t_stat dt_boot (int32 unitno, DEVICE *dptr)
+{
+return SCPE_NOFNC;
+}
+
+#endif
+
 /* Attach routine
 
    Determine 12b, 16b, or 18b/36b format
@@ -1210,7 +1258,7 @@ return SCPE_OK;
    If 18b/36b, read data into buffer
 */
 
-t_stat dt_attach (UNIT *uptr, char *cptr)
+t_stat dt_attach (UNIT *uptr, CONST char *cptr)
 {
 uint16 pdp8b[D8_NBSIZE];
 uint16 pdp11b[D18_BSIZE];
@@ -1235,7 +1283,7 @@ if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
         }
     }
 uptr->capac = DTU_CAPAC (uptr);                         /* set capacity */
-uptr->filebuf = calloc (uptr->capac, sizeof (uint32));
+uptr->filebuf = calloc ((size_t)uptr->capac, sizeof (uint32));
 if (uptr->filebuf == NULL) {                            /* can't alloc? */
     detach_unit (uptr);
     return SCPE_MEM;
@@ -1279,7 +1327,7 @@ else if (uptr->flags & UNIT_11FMT) {                    /* 16b? */
     uptr->hwmark = ba;
     }                                                   /* end elif */
 else uptr->hwmark = fxread (uptr->filebuf, sizeof (uint32),
-    uptr->capac, uptr->fileref);
+    (size_t)uptr->capac, uptr->fileref);
 uptr->flags = uptr->flags | UNIT_BUF;                   /* set buf flag */
 uptr->pos = DT_EZLIN;                                   /* beyond leader */
 uptr->LASTT = sim_grtime ();                            /* last pos update */
@@ -1352,7 +1400,7 @@ if (sim_is_active (uptr)) {                             /* active? cancel op */
         if (tccm & CSR_IE)
             SET_INT (DTA);
         }
-    uptr->STATE = uptr->pos = 0;
+    uptr->STATE = 0, uptr->pos = 0;
     }
 if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
     sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);

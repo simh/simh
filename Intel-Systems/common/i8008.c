@@ -196,7 +196,7 @@ DEBTAB i8008_debug[] = {
 };
 
 DEVICE i8008_dev = {
-    "CPU",                              //name
+    "I8008",                              //name
     &i8008_unit,                        //units
     i8008_reg,                          //registers
     i8008_mod,                          //modifiers
@@ -345,7 +345,6 @@ int32 sim_instr (void)
             if (reason = sim_process_event())
                 break;
         }
-        sim_interval--;                 /* countdown clock */
 
         if (int_req > 0) {              /* interrupt? */
 //            sim_printf("\ni8008: int_req=%04X", int_req);
@@ -365,6 +364,7 @@ int32 sim_instr (void)
             break;
         }
 
+        sim_interval--;                 /* countdown clock */
         PCX = PC;
 
         if (uptr->flags & UNIT_TRACE) {

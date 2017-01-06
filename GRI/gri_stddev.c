@@ -1,6 +1,6 @@
 /* gri_stddev.c: GRI-909 standard devices
 
-   Copyright (c) 2001-2015, Robert M Supnik
+   Copyright (c) 2001-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    hsp          S42-006 high speed punch
    rtc          real time clock
 
+   05-May-16    RMS     Fixed calling sequence inconsistencies (Mark Pizzolato)
    28-Mar-15    RMS     Revised to use sim_printf
    31-May-08    RMS     Fixed declarations (Peter Schorn)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
@@ -52,7 +53,7 @@ t_stat tti_svc (UNIT *uhsr);
 t_stat tto_svc (UNIT *uhsr);
 t_stat tti_reset (DEVICE *dhsr);
 t_stat tto_reset (DEVICE *dhsr);
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat hsr_svc (UNIT *uhsr);
 t_stat hsp_svc (UNIT *uhsr);
 t_stat hsr_reset (DEVICE *dhsr);
@@ -211,7 +212,7 @@ DEVICE rtc_dev = {
 
 /* Console terminal function processors */
 
-uint32 tty_rd (int32 src, int32 ea)
+uint32 tty_rd (uint32 src)
 {
 return tti_unit.buf;                                    /* return data */
 }
@@ -294,7 +295,7 @@ sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
 tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;
@@ -303,7 +304,7 @@ return SCPE_OK;
 
 /* High speed paper tape function processors */
 
-uint32 hsrp_rd (int32 src, int32 ea)
+uint32 hsrp_rd (uint32 src)
 {
 return hsr_unit.buf;                                    /* return data */
 }
@@ -391,7 +392,7 @@ return SCPE_OK;
 
 /* Clock function processors */
 
-t_stat rtc_fo (int32 op)
+t_stat rtc_fo (uint32 op)
 {
 if (op & RTC_OFF)                                       /* clock off? */
     sim_cancel (&rtc_unit);
@@ -402,7 +403,7 @@ if (op & RTC_OV)                                        /* clr ovflo? */
 return SCPE_OK;
 }
 
-uint32 rtc_sf (int32 op)
+uint32 rtc_sf (uint32 op)
 {
 if ((op & RTC_OV) && (dev_done & INT_RTC))
     return 1;

@@ -189,7 +189,7 @@ DEBTAB i8274_debug[] = {
 };
 
 DEVICE i8274_dev = {
-    "8274",             //name
+    "I8274",             //name
     &i8274_unit,        //units
     i8274_reg,          //registers
     i8274_mod,          //modifiers

@@ -64,8 +64,8 @@ struct acpu_t {
 #define LINEFEED_SYNC   1       /* Чтобы быстрее печатало; в жизни 20-25 мс/1.4 мс ~= 17 */
 
 REG printer_reg[] = {
-    { "Готов",  &READY, 2,  2, 18, 1 },
-    { "Прогон", &READY, 2,  2, 22, 1 },
+    { REGDATA ( "Готов",  READY, 2,  2, 18, 1, NULL, NULL, 0, 0, 0) },
+    { REGDATA ( "Прогон", READY, 2,  2, 22, 1, NULL, NULL, 0, 0, 0) },
     { 0 }
 };
 
@@ -74,7 +74,7 @@ MTAB printer_mod[] = {
 };
 
 t_stat printer_reset (DEVICE *dptr);
-t_stat printer_attach (UNIT *uptr, char *cptr);
+t_stat printer_attach (UNIT *uptr, CONST char *cptr);
 t_stat printer_detach (UNIT *uptr);
 
 DEVICE printer_dev = {
@@ -101,7 +101,7 @@ t_stat printer_reset (DEVICE *dptr)
     return SCPE_OK;
 }
 
-t_stat printer_attach (UNIT *u, char *cptr)
+t_stat printer_attach (UNIT *u, CONST char *cptr)
 {
     t_stat s;
     int num = u - printer_unit;

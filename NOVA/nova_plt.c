@@ -48,7 +48,6 @@ extern int32 int_req, dev_busy, dev_done, dev_disable;
 
 int32 plt_stopioe = 0;                                  /* stop on error */
 
-DEVICE plt_dev;
 int32 plt (int32 pulse, int32 code, int32 AC);
 t_stat plt_svc (UNIT *uptr);
 t_stat plt_reset (DEVICE *dptr);

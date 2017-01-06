@@ -431,7 +431,7 @@ extern int yylex();
 static int _genop(t_value arg);
 static int _genea(struct _ea arg);
 static int _genbr(t_value arg,t_value,int);
-static void yyerror(char* s);
+static void yyerror(CONST char* s);
 
 #define YYDEBUG 1
 
@@ -3557,14 +3557,14 @@ yyreturn:
 #line 440 "m68k_parse.y"
 
 
-static void yyerror(char* s)
+static void yyerror(CONST char* s)
 {
       /* do not emit anything, but set error flag */
       yyerrc = 1;
 }
 
 struct _optable {
-      char* mnem;
+      const char* mnem;
       int token;
 };
 
@@ -3654,7 +3654,7 @@ static void init_ophash()
       }
 }
 
-static char* yystream;
+static const char* yystream;
 
 int yylex()
 {
@@ -3714,7 +3714,7 @@ int yylex()
 static t_value *yyvalptr;
 static t_addr yyaddr;
 
-t_stat parse_sym(char* c, t_addr a, UNIT* u, t_value* val, int32 sw)
+t_stat parse_sym(CONST char* c, t_addr a, UNIT* u, t_value* val, int32 sw)
 {
       char ch;
       

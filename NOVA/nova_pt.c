@@ -1,6 +1,6 @@
 /* nova_pt.c: NOVA paper tape read/punch simulator
 
-   Copyright (c) 1993-2015, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    ptr          paper tape reader
    ptp          paper tape punch
 
+   13-May-16    RMS     Lengthened wait time for DCC BASIC timing error
    28-Mar-15    RMS     Revised to use sim_printf
    04-Jul-07    BKR     added PTR and PTP device DISABLE capability,
                         added 7B/8B support PTR and PTP (default is 8B),
@@ -79,8 +80,7 @@ t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 DIB ptr_dib = { DEV_PTR, INT_PTR, PI_PTR, &ptr };
 
 UNIT ptr_unit = {   /* 2007-May-30, bkr */
-    UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE+UNIT_8B, 0),
-            SERIAL_IN_WAIT
+    UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE+UNIT_8B, 0), 300
     };
 
 REG ptr_reg[] = {

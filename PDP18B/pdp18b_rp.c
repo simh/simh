@@ -162,15 +162,14 @@ int32 rp_stopioe = 1;                                   /* stop on error */
 int32 rp_swait = 10;                                    /* seek time */
 int32 rp_rwait = 10;                                    /* rotate time */
 
-DEVICE rp_dev;
 int32 rp63 (int32 dev, int32 pulse, int32 dat);
 int32 rp64 (int32 dev, int32 pulse, int32 dat);
 int32 rp_iors (void);
 t_stat rp_svc (UNIT *uptr);
 void rp_updsta (int32 newa, int32 newb);
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat rp_reset (DEVICE *dptr);
-t_stat rp_attach (UNIT *uptr, char *cptr);
+t_stat rp_attach (UNIT *uptr, CONST char *cptr);
 t_stat rp_detach (UNIT *uptr);
 
 /* RP15 data structures
@@ -195,16 +194,16 @@ UNIT rp_unit[] = {
     };
 
 REG rp_reg[] = {
-    { ORDATA (STA, rp_sta, 18) },
-    { ORDATA (STB, rp_stb, 18) },
-    { ORDATA (DA, rp_da, 18) },
-    { ORDATA (MA, rp_ma, 18) },
-    { ORDATA (WC, rp_wc, 18) },
-    { FLDATA (INT, int_hwre[API_RP], INT_V_RP) },
-    { FLDATA (BUSY, rp_busy, 0) },
-    { FLDATA (STOP_IOE, rp_stopioe, 0) },
-    { DRDATA (STIME, rp_swait, 24), PV_LEFT },
-    { DRDATA (RTIME, rp_rwait, 24), PV_LEFT },
+    { ORDATAD (STA, rp_sta, 18, "status A") },
+    { ORDATAD (STB, rp_stb, 18, "status B") },
+    { ORDATAD (DA, rp_da, 18, "disk address") },
+    { ORDATAD (MA, rp_ma, 18, "current memory address") },
+    { ORDATAD (WC, rp_wc, 18, "word count") },
+    { FLDATAD (INT, int_hwre[API_RP], INT_V_RP, "interrupt pending flag") },
+    { FLDATAD (BUSY, rp_busy, 0, "control busy flag") },
+    { FLDATAD (STOP_IOE, rp_stopioe, 0, "stop on I/O error") },
+    { DRDATAD (STIME, rp_swait, 24, "seek time per cylinder"), PV_LEFT },
+    { DRDATAD (RTIME, rp_rwait, 24, "rotational delay"), PV_LEFT },
     { ORDATA (DEVNO, rp_dib.dev, 6), REG_HRO },
     { ORDATA (APIVEC, api_vec[API_RP][INT_V_RP], 6), REG_HRO },
     { NULL }
@@ -525,7 +524,7 @@ return ((rp_sta & (STA_ERR | STA_DON)) ||  (rp_stb & STB_ATTN))? IOS_RP: 0;
 
 /* Attach unit */
 
-t_stat rp_attach (UNIT *uptr, char *cptr)
+t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
@@ -548,7 +547,7 @@ return reason;
 
 /* Set size routine */
 
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;

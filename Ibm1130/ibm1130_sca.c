@@ -142,7 +142,7 @@ typedef enum {				/*  ms     m = mode (0 = idle, 1 = send, 2 = receive), s = sub
 
 static t_stat sca_svc			(UNIT *uptr);				/* prototypes */
 static t_stat sca_reset			(DEVICE *dptr);
-static t_stat sca_attach		(UNIT *uptr, char *cptr);
+static t_stat sca_attach		(UNIT *uptr, CONST char *cptr);
 static t_stat sca_detach		(UNIT *uptr);
 static void sca_start_timer		(int n, int msec_now);
 static void sca_halt_timer		(int n);
@@ -202,7 +202,7 @@ static int    sca_rcvptr = 0;								/* index of next byte to take from rcvbuf *
 #define UNIT_AUTOANSWER	  (1u << UNIT_V_AUTOANSWER)
 #define UNIT_LISTEN		  (1u << UNIT_V_LISTEN)
 
-t_stat sca_set_baud (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat sca_set_baud (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 
 UNIT sca_unit = {														/* default settings */
 	UDATA (sca_svc, UNIT_ATTABLE|UNIT_BISYNC|UNIT_BAUD4800|UNIT_FULLDUPLEX, 0),
@@ -243,7 +243,7 @@ DEVICE sca_dev = {
  * sca_set_baud - set baud rate handler (SET SCA.BAUD nnn)
  *********************************************************************************************/
 
-t_stat sca_set_baud (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat sca_set_baud (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 	uint32 newbits;
 
@@ -275,15 +275,15 @@ t_stat sca_set_baud (UNIT *uptr, int32 value, char *cptr, void *desc)
  * mstring - allocate a copy of a string
  *********************************************************************************************/
 
-char *mstring (char *str)
+char *mstring (const char *str)
 {
 	int len;
 	char *m;
 
 	len = strlen(str)+1;
-	if ((m = malloc(len)) == NULL) {
+	if ((m = (char *)malloc(len)) == NULL) {
 		printf("Out of memory!");
-		return "?";				/* this will of course cause trouble if it's subsequently freed */
+		return (char *)"?";		/* this will of course cause trouble if it's subsequently freed */
 	}
 	strcpy(m, str);
 	return m;
@@ -447,7 +447,7 @@ static t_stat sca_reset (DEVICE *dptr)
  * sca_attach - attach the SCA device
  *********************************************************************************************/
 
-static t_stat sca_attach (UNIT *uptr, char *cptr)
+static t_stat sca_attach (UNIT *uptr, CONST char *cptr)
 {
     char host[CBUFSIZE], port[CBUFSIZE];
 	t_bool do_listen;

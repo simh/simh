@@ -64,9 +64,9 @@ char line[2][128];
 unsigned char FS[2];
 
 REG fs_reg[] = {
-    { "Готов", &READY, 2,  2, 14, 1 },
-    { "ФС1500-1", &FS[0], 8, 8,  0, 1 },
-    { "ФС1500-2", &FS[2], 8, 8,  0, 1 },
+    { REGDATA ( "Готов", READY, 2,  2, 14, 1, NULL, NULL, 0, 0, 0) },
+    { ORDATA  ( "ФС1500-1", FS[0], 8) },
+    { ORDATA  ( "ФС1500-2", FS[2], 8) },
     { 0 }
 };
 
@@ -75,7 +75,7 @@ MTAB fs_mod[] = {
 };
 
 t_stat fs_reset (DEVICE *dptr);
-t_stat fs_attach (UNIT *uptr, char *cptr);
+t_stat fs_attach (UNIT *uptr, CONST char *cptr);
 t_stat fs_detach (UNIT *uptr);
 
 DEVICE fs_dev = {
@@ -123,7 +123,7 @@ t_stat fs_reset (DEVICE *dptr)
  * Attaches a raw binary file by default,
  * with a -t switch attaches a prepared text file in UTF-8.
  */
-t_stat fs_attach (UNIT *u, char *cptr)
+t_stat fs_attach (UNIT *u, CONST char *cptr)
 {
     t_stat s;
     int num = u - fs_unit;

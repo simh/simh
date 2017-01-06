@@ -129,7 +129,7 @@ t_stat ta_rd (int32 *data, int32 PA, int32 access);
 t_stat ta_wr (int32 data, int32 PA, int32 access);
 t_stat ta_svc (UNIT *uptr);
 t_stat ta_reset (DEVICE *dptr);
-t_stat ta_attach (UNIT *uptr, char *cptr);
+t_stat ta_attach (UNIT *uptr, CONST char *cptr);
 t_stat ta_detach (UNIT *uptr);
 t_stat ta_boot (int32 unitno, DEVICE *dptr);
 void ta_go (void);
@@ -594,7 +594,7 @@ return auto_config (0, 0);
 
 /* Attach routine */
 
-t_stat ta_attach (UNIT *uptr, char *cptr)
+t_stat ta_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

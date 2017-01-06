@@ -81,9 +81,9 @@ uint8 sch_tplte[SCH_NUMCH + 1];                         /* dnum template */
 uint32 sch (uint32 dev, uint32 op, uint32 dat);
 void sch_ini (t_bool dtpl);
 t_stat sch_reset (DEVICE *dptr);
-t_stat sch_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat sch_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat sch_show_reg (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sch_set_nchan (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sch_show_nchan (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat sch_show_reg (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* Selector channel data structures
 
@@ -341,7 +341,7 @@ return SCPE_OK;
 
 /* Set number of channels */
 
-t_stat sch_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sch_set_nchan (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -372,7 +372,7 @@ return SCPE_OK;
 
 /* Show number of channels */
 
-t_stat sch_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sch_show_nchan (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "channels=%d", sch_max);
 return SCPE_OK;
@@ -380,7 +380,7 @@ return SCPE_OK;
 
 /* Show channel registers */
 
-t_stat sch_show_reg (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sch_show_reg (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (val < 0)
     return SCPE_IERR;
@@ -513,7 +513,7 @@ return cnt;
 
 /* Change selector channel for a device */
 
-t_stat set_sch (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_sch (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -539,7 +539,7 @@ return SCPE_OK;
 
 /* Show selector channel for a device */
 
-t_stat show_sch (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_sch (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -558,7 +558,7 @@ return SCPE_OK;
 
 /* Change device number for a device */
 
-t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_dev (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -586,7 +586,7 @@ return SCPE_OK;
 
 /* Show device number for a device */
 
-t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_dev (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;

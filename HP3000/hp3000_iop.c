@@ -25,6 +25,11 @@
 
    IOP          HP 3000 Series III I/O Processor
 
+   03-Sep-16    JDB     Added "iop_assert_PFWARN" to warn devices of power loss
+   01-Aug-16    JDB     Added "iop_reset" to initialize the IOP
+   30-Jun-16    JDB     Changed REG type of filter array to BRDATA
+   08-Jun-16    JDB     Corrected %d format to %u for unsigned values
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    28-Aug-15    JDB     First release version
    11-Dec-12    JDB     Created
 
@@ -117,7 +122,7 @@
    memory.
 
    Direct I/O instructions are sent via the IOP Bus to all device interfaces.
-   When executing I/O instruc tions, the CPU microcode writes a 16-bit command
+   When executing I/O instructions, the CPU microcode writes a 16-bit command
    word to the IOP, which then places bits 5-7 of that word onto the IOP Bus as
    IOCMD0-2 as follows:
 
@@ -190,10 +195,10 @@
     1. Bit 0 is reserved for the memory data trace flag.
 */
 
-#define DEB_DIO             (1 << 1)            /* trace direct I/O commands */
-#define DEB_IRQ             (1 << 2)            /* trace interrupt requests */
+#define DEB_DIO             (1u << 1)           /* trace direct I/O commands */
+#define DEB_IRQ             (1u << 2)           /* trace interrupt requests */
 
-#define FILTER(d)           (1 << (d) % 32 & filter [(d) / 32])
+#define FILTER(d)           (1u << (d) % 32 & filter [(d) / 32])
 
 
 /* IOP global data structures */
@@ -261,8 +266,8 @@ uint32 iop_interrupt_request_set = 0;           /* the set of interfaces request
 static uint32 IOA = 0;                          /* I/O Address Register */
 
 static uint32 interrupt_poll_set = 0;           /* the set of interfaces breaking the poll chain */
-static DIB *devs [DEVNO_MAX + 1];               /* index by device number for I/O instruction dispatch */
-static DIB *irqs [INTPRI_MAX + 1];              /* index by interrupt priority number for interrupt requests */
+static DIB    *devs [DEVNO_MAX + 1];            /* index by device number for I/O instruction dispatch */
+static DIB    *irqs [INTPRI_MAX + 1];           /* index by interrupt priority number for interrupt requests */
 
 static uint32 filter [4] = {                    /* filter bitmap for device numbers 0-127 */
     TRACE_ALL,
@@ -274,8 +279,9 @@ static uint32 filter [4] = {                    /* filter bitmap for device numb
 
 /* IOP local SCP support routines */
 
-static t_stat iop_set_filter  (UNIT *uptr, int32 value, char  *cptr, void *desc);
-static t_stat iop_show_filter (FILE *st,   UNIT  *uptr, int32 value, void *desc);
+static t_stat iop_reset       (DEVICE *dptr);
+static t_stat iop_set_filter  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat iop_show_filter (FILE *st,   UNIT  *uptr, int32 value, CONST void *desc);
 
 
 /* IOP SCP data structures */
@@ -298,10 +304,10 @@ static UNIT iop_unit [] = {                     /* a dummy unit to satisfy SCP r
 */
 
 static REG iop_reg [] = {
-/*    Macro   Name    Location  Width  Flags   */
-/*    ------  ------  --------  -----  ------- */
-    { ORDATA (IOA,    IOA,        8),  REG_RO  },       /* I/O Address Register */
-    { SRDATA (FILTER, filter),         REG_HRO },
+/*    Macro   Name    Location  Radix  Width  Depth   Flags  */
+/*    ------  ------  --------  -----  -----  -----  ------- */
+    { ORDATA (IOA,    IOA,               8),         REG_RO  },
+    { BRDATA (FILTER, filter,     2,    32,     4),  REG_HRO },
     { NULL }
     };
 
@@ -339,7 +345,7 @@ DEVICE iop_dev = {
     DV_WIDTH,                                   /* data width */
     NULL,                                       /* examine routine */
     NULL,                                       /* deposit routine */
-    NULL,                                       /* reset routine */
+    &iop_reset,                                 /* reset routine */
     NULL,                                       /* boot routine */
     NULL,                                       /* attach routine */
     NULL,                                       /* detach routine */
@@ -369,6 +375,10 @@ DEVICE iop_dev = {
    flip-flop values in the device DIBs and clears the external interrupt flag if
    there are no devices with active interrupts (as the user may have set the
    flag or reset the interrupting device during a simulation stop).
+
+   The value of the IOA register is returned.  This is zero unless a device
+   requesting an interrupt has been acknowledged but not yet serviced, in which
+   case the value is the device number.
 */
 
 uint32 iop_initialize (void)
@@ -529,7 +539,7 @@ if (outbound & INTACK) {                                /* if the interface ackn
     CPX1 |= cpx1_EXTINTR;                               /*     and tell the CPU */
 
     dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
-             "Device number %d acknowledged interrupt request at priority %d\n",
+             "Device number %u acknowledged interrupt request at priority %u\n",
              dibptr->device_number, ipn);
     }
 
@@ -538,7 +548,7 @@ else if (outbound & INTPOLLOUT) {                       /* otherwise if the inte
     interrupt_poll_set &= ~priority_mask;               /*     and the associated bit in the poll set */
 
     dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
-             "Device number %d canceled interrupt request at priority %d\n",
+             "Device number %u canceled interrupt request at priority %u\n",
              dibptr->device_number, ipn);
     }
 
@@ -614,7 +624,7 @@ if (io_cmd == ioSMSK) {                                     /* if the I/O order 
           && dibptr->interrupt_mask != INTMASK_UNUSED) {    /*   and uses the interrupt mask */
 
             dprintf (iop_dev, FILTER (devno) ? DEB_DIO : 0,
-                     "%s order sent to device number %d\n",
+                     "%s order sent to device number %u\n",
                      io_command_name [io_cmd], devno);
 
             outbound =
@@ -636,7 +646,7 @@ else {                                                      /* otherwise a devic
     device_number = device_number & DEVNO_MASK;             /* restrict the device number to 0-127 */
 
     dprintf (iop_dev, FILTER (device_number) ? DEB_DIO : 0,
-             "%s order sent to device number %d\n",
+             "%s order sent to device number %u\n",
              io_command_name [io_cmd], device_number);
 
     dibptr = devs [device_number];                          /* get the device information block pointer */
@@ -681,7 +691,7 @@ void iop_assert_INTREQ (DIB *dibptr)
 uint32 irq;
 
 dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
-         "Device number %d asserted INTREQ at priority %d\n",
+         "Device number %u asserted INTREQ at priority %u\n",
          dibptr->device_number, dibptr->interrupt_priority);
 
 if (dibptr->interrupt_priority != INTPRI_UNUSED) {      /* if the interrupt priority is valid */
@@ -695,9 +705,74 @@ return;
 }
 
 
+/* Warn devices of an impending power failure.
+
+   This routine is called by the POWER FAIL command to send a warning
+   to all devices that power is about to fail.  It corresponds in hardware to
+   asserting the PFWARN signal.  Devices may process or ignore the signal as
+   appropriate.  If the device returns the INTREQ signal, an interrupt is
+   requested.
+*/
+
+void iop_assert_PFWARN (void)
+{
+uint32       devno;
+DIB          *dibptr;
+SIGNALS_DATA outbound;
+
+for (devno = 0; devno <= DEVNO_MAX; devno++) {          /* loop through the device number list */
+    dibptr = devs [devno];                              /*   and get the next device information block pointer */
+
+    if (dibptr != NULL) {                               /* if this device is defined */
+        outbound =                                      /*   then send the PFWARN signal to the device interface */
+          dibptr->io_interface (dibptr, PFWARN, 0);
+
+        if (outbound & INTREQ)                          /* if the device requested an interrupt */
+            iop_assert_INTREQ (dibptr);                 /*   then set it up */
+        }
+    }
+
+return;
+}
+
+
 
 /* IOP local SCP support routines */
 
+
+
+/* Device reset routine.
+
+   This routine is called for a RESET or RESET IOP command.  It is the
+   simulation equivalent of the IORESET signal, which is asserted by the front
+   panel LOAD and DUMP switches.
+
+
+   Implementation notes:
+
+    1. In hardware, IORESET clears flip-flops associated with the state machines
+       that implement the interrupt poll, SO/SI handshake, and multiplexer
+       channel access.  In simulation, these are all represented by function
+       calls and, as such, are atomic.  Therefore, the only state variable that
+       IORESET clears is the external interrupt flip-flop, which is implemented
+       as its respective bit in the CPX1 register rather than as a separate
+       variable.  Setting IOA to 0 and calling iop_initialize clears this bit;
+       it also sets up the devs array, which is used by the POWER FAIL command.
+
+    2. In hardware, IORESET also clears the IOP address parity error, system
+       parity error, and illegal address flip-flops.  However, these exist only
+       to assert XFERERROR to devices.  In simulation, XFERERROR is sent to a
+       device interface when the initiating condition is detected by the
+       multiplexer channel, so these are not represented by state variables.
+*/
+
+static t_stat iop_reset (DEVICE *dptr)
+{
+IOA = 0;                                                /* clear the I/O Address register and initialize */
+iop_initialize ();                                      /*   which clears the external interrupt flip-flop */
+
+return SCPE_OK;
+}
 
 
 /* Set the trace omission filter.
@@ -730,29 +805,31 @@ return;
    disturbed.
 */
 
-static t_stat iop_set_filter (UNIT *uptr, int32 value, char *cptr, void *desc)
+static t_stat iop_set_filter (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
-const char  *sptr;
-char        *tptr;
-t_addr      dev, low, high;
-t_stat      result = SCPE_OK;
-uint32      new_filter [4] = { TRACE_ALL, TRACE_ALL, TRACE_ALL, TRACE_ALL };
+CONST char *tptr;
+char       *mptr;
+t_addr     dev, low, high;
+t_stat     result = SCPE_OK;
+uint32     new_filter [4] = { TRACE_ALL, TRACE_ALL, TRACE_ALL, TRACE_ALL };
 
 if (value == 1) {                                       /* if we are setting the filter */
     if ((cptr == NULL) || (*cptr == '\0'))              /*   then if a line range was not supplied */
         return SCPE_MISVAL;                             /*     then report a "Missing value" error */
 
-    tptr = cptr + strlen (cptr);                        /* append a semicolon */
-    *tptr++ = ';';                                      /*   to the command string */
-    *tptr = '\0';                                       /*     to make parsing easier for get_range */
+    mptr = (char *) malloc (strlen (cptr) + 2);         /* allocate space for the string, a semicolon, and a NUL */
 
-    sptr = cptr;                                        /* start at the character after the equals sign */
+    if (mptr == NULL)                                   /* if the allocation failed */
+        return SCPE_MEM;                                /*   report memory exhaustion */
 
-    while (*sptr) {                                     /* parse the command string until it is exhausted */
-        sptr = get_range (NULL, sptr, &low, &high,      /* get a semicolon-separated device number range */
+    strcpy (mptr, cptr);                                /* copy over the existing command string */
+    tptr = strcat (mptr, ";");                          /*   and append a semicolon to make parsing easier */
+
+    while (*tptr) {                                     /* parse the command string until it is exhausted */
+        tptr = get_range (NULL, tptr, &low, &high,      /* get a semicolon-separated device number range */
                           10, 127, ';');                /*   in radix 10 with a maximum value of 127 */
 
-        if (sptr == NULL || low > 127 || high > 127) {  /* if a parsing error occurred or a number was out of range */
+        if (tptr == NULL || low > 127 || high > 127) {  /* if a parsing error occurred or a number was out of range */
             result = SCPE_ARG;                          /*   then report an "Invalid argument" error */
             break;                                      /*     and quit at this point */
             }
@@ -760,6 +837,8 @@ if (value == 1) {                                       /* if we are setting the
         else for (dev = low; dev <= high; dev++)        /* otherwise loop through the range of device numbers */
             new_filter [dev / 32] &= ~(1 << dev % 32);  /*   and clear each corresponding bit in the array */
         }
+
+    free (mptr);                                        /* deallocate the temporary string */
     }
 
 else if (cptr != NULL)                                  /* otherwise we are clearing the filter */
@@ -788,7 +867,7 @@ return result;                                          /* return the result of 
    in the filter is encountered.
 */
 
-static t_stat iop_show_filter (FILE *st, UNIT *uptr, int32 value, void *desc)
+static t_stat iop_show_filter (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
 int32  group, low, high;
 uint32 test_filter;

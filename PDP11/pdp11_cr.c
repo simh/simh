@@ -446,19 +446,19 @@ t_stat cr_wr (int32, int32, int32);
 int32  cr_intac(void);
 t_stat cr_svc (UNIT *);
 t_stat cr_reset (DEVICE *);
-t_stat cr_attach (UNIT *, char *);
+t_stat cr_attach (UNIT *, CONST char *);
 t_stat cr_detach (UNIT *);
-t_stat cr_set_type (UNIT *, int32, char *, void *);
-t_stat cr_set_aieco (UNIT *, int32, char *, void *);
-t_stat cr_show_format (FILE *, UNIT *, int32, void *);
-t_stat cr_set_rate (UNIT *, int32, char *, void *);
-t_stat cr_show_rate (FILE *, UNIT *, int32, void *);
-t_stat cr_set_reset (UNIT *, int32, char *, void *);
-t_stat cr_set_stop (UNIT *, int32, char *, void *);
-t_stat cr_set_eof (UNIT *, int32, char *, void *);
-t_stat cr_show_eof (FILE *, UNIT *, int32, void *);
-t_stat cr_set_trans (UNIT *, int32, char*, void *);
-t_stat cr_show_trans (FILE *, UNIT *, int32, void *);
+t_stat cr_set_type (UNIT *, int32, CONST char *, void *);
+t_stat cr_set_aieco (UNIT *, int32, CONST char *, void *);
+t_stat cr_show_format (FILE *, UNIT *, int32, CONST void *);
+t_stat cr_set_rate (UNIT *, int32, CONST char *, void *);
+t_stat cr_show_rate (FILE *, UNIT *, int32, CONST void *);
+t_stat cr_set_reset (UNIT *, int32, CONST char *, void *);
+t_stat cr_set_stop (UNIT *, int32, CONST char *, void *);
+t_stat cr_set_eof (UNIT *, int32, CONST char *, void *);
+t_stat cr_show_eof (FILE *, UNIT *, int32, CONST void *);
+t_stat cr_set_trans (UNIT *, int32, CONST char*, void *);
+t_stat cr_show_trans (FILE *, UNIT *, int32, CONST void *);
 static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *cr_description (DEVICE *dptr);
 
@@ -567,7 +567,7 @@ static MTAB cr_mod[] = {
     { 0 }  };
 
 DEVICE cr_dev = {
-    "CR", &cr_unit, (REG *)  &cr_reg, (MTAB *) &cr_mod,
+    "CR", &cr_unit, (REG *)&cr_reg, (MTAB *)&cr_mod,
     1, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &cr_reset,
     NULL, &cr_attach, &cr_detach,
@@ -1501,7 +1501,7 @@ globals correctly.
 /* No bits should change, nor an interrupt should be asserted               */
 /* This is a change of behaviour respect to the previous code               */
 t_stat cr_attach (  UNIT    *uptr,
-                    char    *cptr    )
+                    CONST char    *cptr    )
 {
     t_stat        reason;
 
@@ -1535,7 +1535,7 @@ t_stat cr_detach (  UNIT    *uptr    )
 #if defined (CR11_OK) || defined (CD11_OK) || defined (CD20_OK)
 t_stat cr_set_type (    UNIT    *uptr,
                         int32   val,
-                        char    *cptr,
+                        CONST char    *cptr,
                         void    *desc    )
 {
     DEVICE *dptr = find_dev_from_unit (uptr);
@@ -1563,7 +1563,7 @@ t_stat cr_set_type (    UNIT    *uptr,
 #if defined (AIECO_OK)
 t_stat cr_set_aieco (    UNIT    *uptr,
                         int32   val,
-                        char    *cptr,
+                        CONST char    *cptr,
                         void    *desc    )
 {
     /* disallow eco change if currently attached or not CD20 */
@@ -1579,7 +1579,7 @@ t_stat cr_set_aieco (    UNIT    *uptr,
 t_stat cr_show_format ( FILE    *st,
                         UNIT    *uptr,
                         int32   val,
-                        void    *desc    )
+                        CONST void    *desc    )
 {
     fprintf (st, "%s format", cardFormat);
     return (SCPE_OK);
@@ -1587,7 +1587,7 @@ t_stat cr_show_format ( FILE    *st,
 
 t_stat cr_set_rate (    UNIT    *uptr,
                         int32   val,
-                        char    *cptr,
+                        CONST char    *cptr,
                         void    *desc    )
 {
     t_stat    status = SCPE_OK;
@@ -1614,7 +1614,7 @@ t_stat cr_set_rate (    UNIT    *uptr,
 t_stat cr_show_rate (   FILE    *st,
                         UNIT    *uptr,
                         int32   val,
-                        void    *desc    )
+                        CONST void    *desc    )
 {
     fprintf (st, "%d cards per minute", cpm);
     return (SCPE_OK);
@@ -1627,7 +1627,7 @@ t_stat cr_show_rate (   FILE    *st,
 
 t_stat cr_set_reset (   UNIT    *uptr,
                         int32   val,
-                        char    *cptr,
+                        CONST char    *cptr,
                         void    *desc    )
 {
     if (DEBUG_PRS (cr_dev))
@@ -1683,7 +1683,7 @@ t_stat cr_set_reset (   UNIT    *uptr,
 
 t_stat cr_set_stop (    UNIT    *uptr,
                         int32   val,
-                        char    *cptr,
+                        CONST char    *cptr,
                         void    *desc    )
 {
     if (DEBUG_PRS (cr_dev))
@@ -1704,7 +1704,7 @@ t_stat cr_set_stop (    UNIT    *uptr,
 
 t_stat cr_set_eof (    UNIT    *uptr,
                         int32   val,
-                        char    *cptr,
+                        CONST char    *cptr,
                         void    *desc    )
 {
     if (DEBUG_PRS (cr_dev))
@@ -1717,7 +1717,7 @@ t_stat cr_set_eof (    UNIT    *uptr,
 t_stat cr_show_eof ( FILE    *st,
                      UNIT    *uptr,
                      int32   val,
-                     void    *desc    )
+                     CONST void    *desc    )
 {
     fprintf (st, (eofPending? "EOF pending": "no EOF pending"));
     return (SCPE_OK);
@@ -1725,7 +1725,7 @@ t_stat cr_show_eof ( FILE    *st,
 
 t_stat cr_set_trans (   UNIT    *uptr,
                         int32   val,
-                        char    *cptr,
+                        CONST char    *cptr,
                         void    *desc    )
 {
     size_t  i;
@@ -1747,7 +1747,7 @@ t_stat cr_set_trans (   UNIT    *uptr,
 t_stat cr_show_trans (  FILE    *st,
                         UNIT    *uptr,
                         int32   val,
-                        void    *desc    )
+                        CONST void    *desc    )
 {
     size_t i;
 

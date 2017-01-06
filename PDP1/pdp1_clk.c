@@ -59,7 +59,7 @@ UNIT clk_unit = {
     };
 
 REG clk_reg[] = {
-    { ORDATA (CNTR, clk_cntr, 16) },
+    { ORDATAD (CNTR, clk_cntr, 16, "clock counter, 0-59999(base 10)") },
     { DRDATA (SBS32LVL, clk32ms_sbs, 4), REG_HRO },
     { DRDATA (SBS1MLVL, clk1min_sbs, 4), REG_HRO },
     { NULL }
@@ -118,9 +118,8 @@ t_stat clk_reset (DEVICE *dptr)
 {
 if (clk_dev.flags & DEV_DIS) sim_cancel (&clk_unit);    /* disabled? */
 else {
-    sim_register_clock_unit (&clk_unit);                /* declare clock unit */
-    tmxr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);
-    sim_activate_abs (&clk_unit, tmxr_poll);            /* activate unit */
+    tmxr_poll = sim_rtcn_init_unit (&clk_unit, clk_unit.wait, TMR_CLK);/* init timer */
+    sim_activate_after (&clk_unit, 1000000/CLK_TPS);    /* activate unit */
     }
 clk_cntr = 0;                                           /* clear counter */
 return SCPE_OK;

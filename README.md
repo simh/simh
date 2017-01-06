@@ -30,6 +30,10 @@
 
 #### Beta SAGE-II and PDQ-3 simulators from Holger Veit
 
+#### Intel Systems 8010 and 8020 simulators from Bill Beech
+
+#### CDC 1700 simulator from John Forecast
+
 ### New Host Platform support - HP-UX and AIX
 
 ### Simulator Front Panel API
@@ -70,8 +74,8 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
         directly communicate to a remote device via UDP (i.e. a built-in HECnet bridge).
     XQ and XU devices (DEQNA, DELQA, DELQA-T, DEUNA and DELQA) devices can now 
         optionally throttle outgoing packets which is useful when communicating with
-        legacy systems on a local LAN which can easily get over run when packets
-        arrive too fast.
+        legacy systems (real hardware) on a local LAN which can easily get over run 
+        when packets arrive too fast.
     MicroVAX 3900 has QVSS (VCB01) board available.
     MicroVAX 3900 and MicroVAX II have SET CPU AUTOBOOT option
     MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer|VAXStation) command to change between system types
@@ -117,6 +121,20 @@ Host platforms which have libSDL available can leverage this functionality.
       Asynchronous support exists for console I/O and most multiplexer 
       devices.  (Still experimental - not currently by default)
 
+#### Clock/Timer Enhancements
+    * Asynchronhous clocks ticks exist to better support modern processors 
+      that have variable clock speeds.  The initial clock calibration model 
+      presumed a constant simulated instruction execution rate.  
+      Modern processors have variable processor speeds which breaks this 
+      key assumption.  
+    * Strategies to make up for missed clock ticks are now available
+      (independent of asynchronous tick generation).  These strategies
+      generate catch-up clock ticks to keep the simulator passage of 
+      time consistent with wall clock time.  Simulator time while idling 
+      or throttling is now consistent.  Reasonable idling behavior is 
+      now possible without requiring that the host system clock tick be
+      10ms or less.
+
 #### Ethernet Transport Enhancements
 	* UDP packet transport.  Direct simulator connections to HECnet can be 
 	  made without running a local packet bridge program.
@@ -130,6 +148,7 @@ Host platforms which have libSDL available can leverage this functionality.
 	  older systems.  Throttling of simulated traffic delivered to the LAN 
 	  can be used to mitigate this problem.
 	* Reliable MAC address conflict detection.  
+	* Automatic unique default MAC address assignment.  
 
 #### Disk Extensions
     RAW Disk Access (including CDROM)
@@ -276,23 +295,26 @@ The EXPECT command now exists to provide a means of reacting to simulator output
     EXPECT                          React to output produced by a simulated system
     SEND                            Inject input to a simulated system's console
     SCREENSHOT                      Snapshot the current video display window
+    RUN UNTIL breakpoint            Establish the breakpoiunt specified and run until it is encountered
+    RUN UNTIL "output-string" ...   Establish the specified "output-string" as an EXPECT and run until it is encountered.
+    GO UNTIL breakpoint             Establish the breakpoiunt specified and go until it is encountered
+    GO UNTILE "output-string" ...   Establish the specified "output-string" as an EXPECT and go until it is encountered.
 
 #### Command Processing Enhancements
 
 ##### Environment variable insertion
-Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_YYYY%, %DATE_YY%, %DATE_YC%, %DATE_MM%, %DATE_DD%, %DATE_D%, %DATE_WYYYY%, %DATE_WW%, %TIME_HH%, %TIME_MM%, %TIME_SS%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
-Command Aliases
+Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_YYYY%, %DATE_YY%, %DATE_YC%, %DATE_MM%, %DATE_MMM%, %DATE_MONTH%, %DATE_DD%, %DATE_D%, %DATE_WYYYY%, %DATE_WW%, %TIME_HH%, %TIME_MM%, %TIME_SS%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
 
    Token "%0" expands to the command file name. 
    Token %n (n being a single digit) expands to the n'th argument
-   Tonen %* expands to the whole set of arguments (%1 ... %9)
+   Token %* expands to the whole set of arguments (%1 ... %9)
 
    The input sequence "\%" represents a literal "%", and "\\" represents a
    literal "\".  All other character combinations are rendered literally.
 
    Omitted parameters result in null-string substitutions.
 
-   A Tokens preceeded and followed by % characters are expanded as environment
+   Tokens preceeded and followed by % characters are expanded as environment
    variables, and if an environment variable isn't found then it can be one of 
    several special variables: 
    
@@ -306,6 +328,7 @@ Command Aliases
           %DATE_YY%           yy          (00-99)
           %DATE_MM%           mm          (01-12)
           %DATE_MMM%          mmm         (JAN-DEC)
+          %DATE_MONTH%        month       (January-December)
           %DATE_DD%           dd          (01-31)
           %DATE_WW%           ww          (01-53)     ISO 8601 week number
           %DATE_WYYYY%        yyyy        (0000-9999) ISO 8601 week year number
@@ -373,6 +396,27 @@ See the 0readme_ethernet.txt file for details about the required network compone
    $ make {simulator-name (i.e. vax)}
 
 The makefile provided requires GNU make, which is the default make facility for most systems these days.  Any host system which doesn't have GNU make available as the default make facility may have it installed as 'gmake'.  GNU make (gmake) is generally available an installation package for all current operating systems which have a package installation system.
+
+##### Build Dependencies
+
+Some simulators depend on external packages to provide the full scope of functionality they may be simulating.  These additional external packages may or may not be included in as part of the standard Operating System distributions.  
+
+###### OS X - Dependencies
+
+The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, these commands will install the required dependent packages:
+
+    # port install vde2
+    # port install libsdl2
+
+###### Linux - Dependencies
+
+Different Linux distributions have different package managment systems:
+
+Ubuntu:
+
+    # apt-get install libpcap-dev
+    # apt-get install vde2
+    # apt-get install libsdl2
 
 #### Windows
 

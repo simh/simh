@@ -48,7 +48,7 @@ int32 inq_char = 033;                                   /* request inq */
 t_stat inq_svc (UNIT *uptr);
 t_stat inq_reset (DEVICE *dptr);
 
-void inq_puts (char *cptr);
+void inq_puts (const char *cptr);
 
 /* INQ data structures
 
@@ -180,7 +180,7 @@ return SCPE_OK;
 
 /* Output multiple characters */
 
-void inq_puts (char *cptr)
+void inq_puts (const char *cptr)
 {
 if (cptr == NULL)
     return;

@@ -1,6 +1,6 @@
 /* pdp8_lp.c: PDP-8 line printer simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          LP8E line printer
 
+   16-Dec-16    DJG     Added IOT 6660 to allow WPS WS78 3.4 to print
    19-Jan-07    RMS     Added UNIT_TEXT
    25-Apr-03    RMS     Revised for extended file support
    04-Oct-02    RMS     Added DIB, enable/disable, device number support
@@ -38,11 +39,10 @@ extern int32 int_req, int_enable, dev_done, stop_inst;
 int32 lpt_err = 0;                                      /* error flag */
 int32 lpt_stopioe = 0;                                  /* stop on error */
 
-DEVICE lpt_dev;
 int32 lpt (int32 IR, int32 AC);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat lpt_detach (UNIT *uptr);
 
 /* LPT data structures
@@ -59,14 +59,14 @@ UNIT lpt_unit = {
     };
 
 REG lpt_reg[] = {
-    { ORDATA (BUF, lpt_unit.buf, 8) },
-    { FLDATA (ERR, lpt_err, 0) },
-    { FLDATA (DONE, dev_done, INT_V_LPT) },
-    { FLDATA (ENABLE, int_enable, INT_V_LPT) },
-    { FLDATA (INT, int_req, INT_V_LPT) },
-    { DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, lpt_stopioe, 0) },
+    { ORDATAD (BUF, lpt_unit.buf, 8,"last data item processed") },
+    { FLDATAD (ERR, lpt_err, 0, "error status flag") },
+    { FLDATAD (DONE, dev_done, INT_V_LPT, "device done flag") },
+    { FLDATAD (ENABLE, int_enable, INT_V_LPT, "interrupt enable flag") },
+    { FLDATAD (INT, int_req, INT_V_LPT, "interrupt pending flag") },
+    { DRDATAD (POS, lpt_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, lpt_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, lpt_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVNUM, lpt_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -90,6 +90,11 @@ DEVICE lpt_dev = {
 int32 lpt (int32 IR, int32 AC)
 {
 switch (IR & 07) {                                      /* decode IR<9:11> */
+
+    case 0:                                             /* PKSTF */
+        dev_done = dev_done | INT_LPT;                  /* set flag */
+        int_req = INT_UPDATE;                           /* update interrupts */
+        return AC;
 
     case 1:                                             /* PSKF */
         return (dev_done & INT_LPT)? IOT_SKP + AC: AC;
@@ -165,7 +170,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat lpt_attach (UNIT *uptr, char *cptr)
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 

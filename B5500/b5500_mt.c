@@ -80,7 +80,7 @@
 #define CLR_BUF(u)     u->hwmark = 0xFFFFFFFF
 
 t_stat              mt_srv(UNIT *);
-t_stat              mt_attach(UNIT *, char *);
+t_stat              mt_attach(UNIT *, CONST char *);
 t_stat              mt_detach(UNIT *);
 t_stat              mt_reset(DEVICE *);
 t_stat              mt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
@@ -123,9 +123,9 @@ UNIT                mt_unit[] = {
 };
 
 MTAB                mt_mod[] = {
-    {MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL, NULL,
+    {MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL, NULL, NULL,
      "Write ring in place"},
-    {MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL, NULL,
+    {MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL, NULL, NULL,
      "no Write ring in place"},
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL,
@@ -566,7 +566,7 @@ t_stat mt_srv(UNIT * uptr)
 
 
 t_stat
-mt_attach(UNIT * uptr, char *file)
+mt_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
 

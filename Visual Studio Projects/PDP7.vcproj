@@ -205,6 +205,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP18B\pdp18b_g2tty.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP18B\pdp18b_lp.c"
 				>
 			</File>

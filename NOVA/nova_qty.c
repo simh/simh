@@ -109,9 +109,9 @@
 extern int32    int_req, dev_busy, dev_done, dev_disable ;
 extern int32    tmxr_poll ;                             /* calibrated delay */
 
-t_stat  qty_setnl   ( UNIT * uptr, int32 val, char * cptr, void * desc ) ;
+t_stat  qty_setnl   ( UNIT * uptr, int32 val, CONST char * cptr, void * desc ) ;
 
-t_stat  qty_attach  ( UNIT * uptr, char * cptr ) ;
+t_stat  qty_attach  ( UNIT * uptr, CONST char * cptr ) ;
 t_stat  qty_detach  ( UNIT * uptr ) ;
 t_stat  qty_reset   ( DEVICE * dptr ) ;
 t_stat  qty_svc     ( UNIT * uptr ) ;
@@ -121,7 +121,7 @@ t_stat  alm_reset   ( DEVICE * dptr ) ;
 t_stat  alm_svc     ( UNIT * uptr ) ;
 int32   alm         ( int32 pulse, int32 code, int32 AC ) ;
 
-DEVICE  alm_dev ;
+extern DEVICE  alm_dev ;
 
 
 #define QTY_MAX     64                          /*  max number of QTY lines - hardware  */
@@ -473,7 +473,7 @@ int qty_update_status( DIB * dibp, TMXR * tmxr_desc )
     /*                            qty_attach                        */
     /*--------------------------------------------------------------*/
 
-t_stat qty_attach( UNIT * unitp, char * cptr )
+t_stat qty_attach( UNIT * unitp, CONST char * cptr )
     {
     t_stat  r ;
     int a ;
@@ -751,7 +751,7 @@ int32 qty( int32 pulse, int32 code, int32 AC )
     /*                             qty_setnl                        */
     /*--------------------------------------------------------------*/
 
-t_stat qty_setnl( UNIT * uptr, int32 val, char * cptr, void * desc )
+t_stat qty_setnl( UNIT * uptr, int32 val, CONST char * cptr, void * desc )
     {
     int32   newln, i, t ;
 

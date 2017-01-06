@@ -86,10 +86,10 @@ extern WD179X_INFO_PUB *wd179x_infop;
 static ADCS6_INFO adcs6_info_data = { { 0xF000, ADCS6_ROM_SIZE, 0x3, 2 } };
 static ADCS6_INFO *adcs6_info = &adcs6_info_data;
 
-extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -105,7 +105,7 @@ extern uint32 PCX;      /* external view of PC  */
 
 static t_stat adcs6_reset(DEVICE *adcs6_dev);
 static t_stat adcs6_boot(int32 unitno, DEVICE *dptr);
-static t_stat adcs6_attach(UNIT *uptr, char *cptr);
+static t_stat adcs6_attach(UNIT *uptr, CONST char *cptr);
 static t_stat adcs6_detach(UNIT *uptr);
 
 static int32 adcs6_dma(const int32 port, const int32 io, const int32 data);
@@ -113,6 +113,7 @@ static int32 adcs6_timer(const int32 port, const int32 io, const int32 data);
 static int32 adcs6_control(const int32 port, const int32 io, const int32 data);
 static int32 adcs6_banksel(const int32 port, const int32 io, const int32 data);
 static int32 adcs6rom(const int32 port, const int32 io, const int32 data);
+static const char* adcs6_description(DEVICE *dptr);
 
 static int32 dipswitch      = 0x00;     /* 5-position DIP switch on 64FDC card */
 
@@ -181,7 +182,11 @@ static REG adcs6_reg[] = {
     { NULL }
 };
 
-#define ADCS6_NAME  "ADC Super-Six ADCS6"
+#define ADCS6_NAME  "ADC Super-Six"
+
+static const char* adcs6_description(DEVICE *dptr) {
+    return ADCS6_NAME;
+}
 
 static MTAB adcs6_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",
@@ -211,7 +216,7 @@ DEVICE adcs6_dev = {
     NULL, NULL, &adcs6_reset,
     &adcs6_boot, &adcs6_attach, &adcs6_detach,
     &adcs6_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    adcs6_dt, NULL, ADCS6_NAME
+    adcs6_dt, NULL, NULL, NULL, NULL, NULL, &adcs6_description
 };
 
 /* This is the DIGITEX Monitor version 1.2.A -- 10/06/83
@@ -464,7 +469,7 @@ static t_stat adcs6_boot(int32 unitno, DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat adcs6_attach(UNIT *uptr, char *cptr)
+static t_stat adcs6_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     r = wd179x_attach(uptr, cptr);

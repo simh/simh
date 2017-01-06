@@ -346,14 +346,13 @@ int32 dkp_diagmode = 0;                                 /* diagnostic mode */
 
 int32 dkp_trace = 0 ;
 
-DEVICE dkp_dev;
 int32 dkp (int32 pulse, int32 code, int32 AC);
 t_stat dkp_svc (UNIT *uptr);
 t_stat dkp_reset (DEVICE *dptr);
 t_stat dkp_boot (int32 unitno, DEVICE *dptr);
-t_stat dkp_attach (UNIT *uptr, char *cptr);
+t_stat dkp_attach (UNIT *uptr, CONST char *cptr);
 t_stat dkp_go ( int32 pulse );
-t_stat dkp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dkp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* DKP data structures
 
@@ -515,9 +514,9 @@ dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 
 if ( DKP_TRACE(0) )
     {
-    static char * f[8] =
+    static const char * f[8] =
         { "NIO", "DIA", "DOA", "DIB", "DOB", "DIC", "DOC", "SKP" } ;
-    static char * s[4] =
+    static const char * s[4] =
         { " ", "S", "C", "P" } ;
 
         printf( "  [DKP  %s%s %06o ", f[code & 0x07], s[pulse & 0x03], (AC & 0xFFFF) ) ;
@@ -989,7 +988,7 @@ return SCPE_OK;
 
 /* Attach routine (with optional autosizing) */
 
-t_stat dkp_attach (UNIT *uptr, char *cptr)
+t_stat dkp_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 i, p;
 t_stat   r;
@@ -1012,7 +1011,7 @@ return SCPE_OK;
 
 /* Set size command validation routine */
 
-t_stat dkp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dkp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;

@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Dec-16    RMS     Added PKSTF (Dave Gesswein)
    17-Sep-13    RMS     Fixed recognition of initial field change (Dave Gesswein)
    24-Mar-09    RMS     Added link to FPP
    24-Jun-08    RMS     Fixed bug in new rim loader (Don North)
@@ -68,9 +69,9 @@ extern REG cpu_reg[];
 extern uint16 M[];
 
 t_stat fprint_sym_fpp (FILE *of, t_value *val);
-t_stat parse_sym_fpp (char *cptr, t_value *val);
-char *parse_field (char *cptr, uint32 max, uint32 *val, uint32 c);
-char *parse_fpp_xr (char *cptr, uint32 *xr, t_bool inc);
+t_stat parse_sym_fpp (CONST char *cptr, t_value *val);
+CONST char *parse_field (CONST char *cptr, uint32 max, uint32 *val, uint32 c);
+CONST char *parse_fpp_xr (CONST char *cptr, uint32 *xr, t_bool inc);
 int32 test_fpp_addr (uint32 ad, uint32 max);
 
 /* SCP data structures and interface routines
@@ -241,7 +242,7 @@ return SCPE_IERR;
 /* Binary loader
    Two loader formats are supported: RIM loader (-r) and BIN (-b) loader. */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 if ((*cptr != 0) || (flag != 0))
     return SCPE_ARG;
@@ -305,7 +306,7 @@ static const char *opcode[] = {
  "DCEA",         "DEAL", "DEAC",
  "DFSE", "DFSC", "DISK", "DMAC",
  "DCXA", "DXAL", "DXAC",
- "PSKF", "PCLF", "PSKE",                                /* LPT */
+ "PKSTF", "PSKF", "PCLF", "PSKE",                                /* LPT */
  "PSTB", "PSIE", "PCLF PSTB", "PCIE",
  "LWCR", "CWCR", "LCAR",                                /* MT */
  "CCAR", "LCMR", "LFGR", "LDBR",
@@ -368,7 +369,7 @@ static const int32 opc_val[] = {
  06774+I_IOA+AMB_TD, 06775+I_IOA+AMB_TD, 06776+I_IOA+AMB_TD, 06777+I_IOA+AMB_TD,
  06530+I_NPN, 06531+I_NPN, 06532+I_NPN, 06533+I_NPN,    /* AD */
  06534+I_NPN, 06535+I_NPN, 06536+I_NPN, 06537+I_NPN,
- 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
+ 06660+I_NPN, 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
  06611+I_NPN, 06612+I_NPN, 06615+I_NPN, 06616+I_NPN,
  06611+I_NPN,              06615+I_NPN, 06616+I_NPN,
  06621+I_NPN, 06622+I_NPN, 06623+I_NPN, 06626+I_NPN,
@@ -518,7 +519,7 @@ static const int32 fop_val[] = {
    Inputs:
         *of     =       output stream
         inst    =       mask bits
-        class   =       instruction class code
+        Class   =       instruction class code
         sp      =       space needed?
    Outputs:
         status  =       space needed
@@ -529,13 +530,13 @@ static const int32 fop_val[] = {
 #define fputs(_s,f) Fprintf(f,"%s",_s)
 #define fputc(_c,f) Fprintf(f,"%c",_c)
 
-int32 fprint_opr (FILE *of, int32 inst, int32 class, int32 sp)
+int32 fprint_opr (FILE *of, int32 inst, int32 Class, int32 sp)
 {
 int32 i, j;
 
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
-    if ((j == class) && (opc_val[i] & inst)) {          /* same class? */
+    if ((j == Class) && (opc_val[i] & inst)) {          /* same class? */
         inst = inst & ~opc_val[i];                      /* mask bit set? */
         fprintf (of, (sp? " %s": "%s"), opcode[i]);
         sp = 1;
@@ -678,7 +679,7 @@ return SCPE_ARG;
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 uint32 cflag, d, i, j, k;
 t_stat r;
@@ -868,7 +869,7 @@ return SCPE_ARG;
 
 /* FPP8 instruction parse */
 
-t_stat parse_sym_fpp (char *cptr, t_value *val)
+t_stat parse_sym_fpp (CONST char *cptr, t_value *val)
 {
 uint32 i, j, ad, xr;
 int32 broff, nwd;
@@ -969,7 +970,7 @@ return -nwd;
 
 /* Parse field */
 
-char *parse_field (char *cptr, uint32 max, uint32 *val, uint32 c)
+CONST char *parse_field (CONST char *cptr, uint32 max, uint32 *val, uint32 c)
 {
 char gbuf[CBUFSIZE];
 t_stat r;
@@ -983,7 +984,7 @@ return cptr;
 
 /* Parse index register */
 
-char *parse_fpp_xr (char *cptr, uint32 *xr, t_bool inc)
+CONST char *parse_fpp_xr (CONST char *cptr, uint32 *xr, t_bool inc)
 {
 char gbuf[CBUFSIZE];
 uint32 len;

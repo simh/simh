@@ -295,13 +295,13 @@ void m68k_set_context(void* dst);
  * You must provide a function pointer of the form:
  * void save_value(char* identifier, unsigned int value)
  */
-void m68k_save_context( void (*save_value)(char* identifier, unsigned int value));
+void m68k_save_context( void (*save_value)(const char* identifier, unsigned int value));
 
 /* Load a cpu context from disk.
  * You must provide a function pointer of the form:
  * unsigned int load_value(char* identifier)
  */
-void m68k_load_context(unsigned int (*load_value)(char* identifier));
+void m68k_load_context(unsigned int (*load_value)(const char* identifier));
 
 
 

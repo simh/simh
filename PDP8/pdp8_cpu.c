@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   18-Sep-16    RMS     Added alternate dispatch table for non-contiguous devices
    17-Sep-13    RMS     Fixed boot in wrong field problem (Dave Gesswein)
    28-Apr-07    RMS     Removed clock initialization
    30-Oct-06    RMS     Added idle and infinite loop detection
@@ -229,6 +230,7 @@ int32 tsc_ir = 0;                                       /* TSC8-75 IR */
 int32 tsc_pc = 0;                                       /* TSC8-75 PC */
 int32 tsc_cdf = 0;                                      /* TSC8-75 CDF flag */
 int32 tsc_enb = 0;                                      /* TSC8-75 enabled */
+int32 cpu_astop = 0;                                    /* address stop */
 int16 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
@@ -244,9 +246,9 @@ InstHistory *hst = NULL;                                /* instruction history *
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_bool build_dev_tab (void);
 
 /* CPU data structures
@@ -260,32 +262,32 @@ t_bool build_dev_tab (void);
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
-    { ORDATA (PC, saved_PC, 15) },
-    { ORDATA (AC, saved_LAC, 12) },
-    { FLDATA (L, saved_LAC, 12) },
-    { ORDATA (MQ, saved_MQ, 12) },
-    { ORDATA (SR, OSR, 12) },
-    { GRDATA (IF, saved_PC, 8, 3, 12) },
-    { GRDATA (DF, saved_DF, 8, 3, 12) },
-    { GRDATA (IB, IB, 8, 3, 12) },
-    { ORDATA (SF, SF, 7) },
-    { FLDATA (UB, UB, 0) },
-    { FLDATA (UF, UF, 0) },
-    { ORDATA (SC, SC, 5) },
-    { FLDATA (GTF, gtf, 0) },
-    { FLDATA (EMODE, emode, 0) },
-    { FLDATA (ION, int_req, INT_V_ION) },
-    { FLDATA (ION_DELAY, int_req, INT_V_NO_ION_PENDING) },
-    { FLDATA (CIF_DELAY, int_req, INT_V_NO_CIF_PENDING) },
-    { FLDATA (PWR_INT, int_req, INT_V_PWR) },
-    { FLDATA (UF_INT, int_req, INT_V_UF) },
-    { ORDATA (INT, int_req, INT_V_ION+1), REG_RO },
-    { ORDATA (DONE, dev_done, INT_V_DIRECT), REG_RO },
-    { ORDATA (ENABLE, int_enable, INT_V_DIRECT), REG_RO },
-    { BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO+REG_CIRC },
+    { ORDATAD (PC, saved_PC, 15, "program counter") },
+    { ORDATAD (AC, saved_LAC, 12, "accumulator") },
+    { FLDATAD (L, saved_LAC, 12, "link") },
+    { ORDATAD (MQ, saved_MQ, 12, "multiplier-quotient") },
+    { ORDATAD (SR, OSR, 12, "front panel switches") },
+    { GRDATAD (IF, saved_PC, 8, 3, 12, "instruction field") },
+    { GRDATAD (DF, saved_DF, 8, 3, 12, "data field") },
+    { GRDATAD (IB, IB, 8, 3, 12, "instruction field buffter") },
+    { ORDATAD (SF, SF, 7, "save field") },
+    { FLDATAD (UB, UB, 0, "user mode buffer") },
+    { FLDATAD (UF, UF, 0, "user mode flag") },
+    { ORDATAD (SC, SC, 5, "EAE shift counter") },
+    { FLDATAD (GTF, gtf, 0, "EAE greater than flag") },
+    { FLDATAD (EMODE, emode, 0, "EAE mode (0 = A, 1 = B)") },
+    { FLDATAD (ION, int_req, INT_V_ION, "interrupt enable") },
+    { FLDATAD (ION_DELAY, int_req, INT_V_NO_ION_PENDING, "interrupt enable delay for ION") },
+    { FLDATAD (CIF_DELAY, int_req, INT_V_NO_CIF_PENDING, "interrupt enable delay for CIF") },
+    { FLDATAD (PWR_INT, int_req, INT_V_PWR, "power fail interrupt") },
+    { FLDATAD (UF_INT, int_req, INT_V_UF, "user mode violation interrupt") },
+    { ORDATAD (INT, int_req, INT_V_ION+1, "interrupt pending flags"), REG_RO },
+    { ORDATAD (DONE, dev_done, INT_V_DIRECT, "device done flags"), REG_RO },
+    { ORDATAD (ENABLE, int_enable, INT_V_DIRECT, "device interrupt enable flags"), REG_RO },
+    { BRDATAD (PCQ, pcq, 8, 15, PCQ_SIZE, "PC prior to last JMP, JMS, or interrupt;                                        most recent PC change first"), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
-    { FLDATA (STOP_INST, stop_inst, 0) },
-    { ORDATA (WRU, sim_int_char, 8) },
+    { FLDATAD (STOP_INST, stop_inst, 0, "stop on undefined instruction") },
+    { ORDATAD (WRU, sim_int_char, 8, "interrupt character") },
     { NULL }
     };
 
@@ -337,6 +339,12 @@ reason = 0;
 /* Main instruction fetch/decode loop */
 
 while (reason == 0) {                                   /* loop until halted */
+
+    if (cpu_astop != 0) {
+        cpu_astop = 0;
+        reason = SCPE_STOP;
+        break;
+        }
 
     if (sim_interval <= 0) {                            /* check clock queue */
         if ((reason = sim_process_event ()))
@@ -1407,7 +1415,7 @@ return SCPE_OK;
 
 /* Memory size change */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -1426,7 +1434,7 @@ return SCPE_OK;
 
 /* Change device number for a device */
 
-t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_dev (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1452,7 +1460,7 @@ return SCPE_OK;
 
 /* Show device number for a device */
 
-t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat show_dev (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -1496,16 +1504,31 @@ for (i = 0; i < ((uint32) sizeof (std_dev)); i++)       /* std entries */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* add devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* enabled? */
-        for (j = 0; j < dibp->num; j++) {               /* loop thru disp */
-            if (dibp->dsp[j]) {                         /* any dispatch? */
-                if (dev_tab[dibp->dev + j]) {           /* already filled? */
-                    sim_printf ("%s device number conflict at %02o\n",
-                                sim_dname (dptr), dibp->dev + j);
-                    return TRUE;
-                    }
-                dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
-                }                                       /* end if dsp */
-            }                                           /* end for j */
+        if (dibp->dsp_tbl) {                            /* dispatch table? */
+            DIB_DSP *dspp = dibp->dsp_tbl;              /* set ptr */
+            for (j = 0; j < dibp->num; j++, dspp++) {   /* loop thru tbl */
+                if (dspp->dsp) {                        /* any dispatch? */
+                    if (dev_tab[dspp->dev]) {           /* already filled? */
+                        sim_printf ("%s device number conflict at %02o\n",
+                            sim_dname (dptr), dibp->dev + j);
+                        return TRUE;
+                        }
+                    dev_tab[dspp->dev] = dspp->dsp;     /* fill */
+                    }                                   /* end if dsp */
+                }                                       /* end for j */
+            }                                           /* end if dsp_tbl */
+        else {                                          /* inline dispatches */
+            for (j = 0; j < dibp->num; j++) {           /* loop thru disp */
+                if (dibp->dsp[j]) {                     /* any dispatch? */
+                    if (dev_tab[dibp->dev + j]) {       /* already filled? */
+                        sim_printf ("%s device number conflict at %02o\n",
+                            sim_dname (dptr), dibp->dev + j);
+                        return TRUE;
+                        }
+                    dev_tab[dibp->dev + j] = dibp->dsp[j]; /* fill */
+                    }                                   /* end if dsp */
+                }                                       /* end for j */
+            }                                           /* end else */
         }                                               /* end if enb */
     }                                                   /* end for i */
 return FALSE;
@@ -1513,7 +1536,7 @@ return FALSE;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1544,10 +1567,10 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 l, k, di, lnt;
-char *cptr = (char *) desc;
+const char *cptr = (const char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;

@@ -1,0 +1,280 @@
+Running Diagnostics on the CDC 1700 Simulator
+=============================================
+
+1. Overview
+
+        The diagnostics system (System Maintenance Monitor) is available from
+bitsavers.org as bits/CDC/1700_Cyber18/20100517/SYSTEM17_SMM_DIAGS.TAP. The
+simulator is able to boot this tape and has successfully run the following
+diagnostics with some caveats (for more detailed information see
+pdf/CDC/1700/SMM17 at bitsavers.org).
+
+        In some cases the diagnostics fail to run correctly on the simulator
+for various reasons:
+
+        - Some tests require hardware modifications or special cabling
+        - Some tests perform timing checks which are difficult to implement
+          in the simulator without further documentation or access to the
+          diagnostic source code
+        - Some tests check for features which are not implemented in the
+          simulator. E.G. The disk controllers write Checkwords (CRC) for each
+          sector written but the documentation does not specify the CRC
+          algorithm in sufficient detail to allow the simulator to correctly
+          simulate the feature.
+
+
+Partial listing from the maintenance monitor:
+
+FF QL1 12166  04EB      Quick Look 1 (basic instruction set test)
+                        Passed
+FE QL2 10196  095C      Quick Look 2 (more detailed instruction set test)
+                        Passed with and without protect mode enabled
+01 COM 12166  0990      Comprehensive instruction set test
+                        Passed
+03 PTP 12166  05B8      1723/77 Paper Tape Punch Test
+                        Passed (Interrupt + character mode)
+04 PTR 12166  03C8      1721/77 Paper Tape Reader Test
+                        Passed (Interrupt + Character mode)
+05 TTY 10226  093B      1711/1712/1713 Teletype Test
+                        Passed
+08 DP1 12166  0EE6      1738 Disk Pack Test
+                        Passed (Single/dual 854, overlapped seeks)
+0A BD1 10076  08BD      1706 Buffered Data Channel Test
+                        Passed (Need to use non-interrupt TTY output)
+0C LP1 11056  07E7      1740/1742/93x2 Line Printer Test
+                        Passed
+15 MT3 09306  0A96      1732 Magnetic Tape Test
+                        Passed sections 0 - 5. Section 6 fails
+1C CMD 12166  07C6      4KW Command Test
+                        Passed
+4B PET 12166  0C14      1732-2/1732-3 Magnetic Tape Test
+                        Passed in programmed I/O mode
+                        Failed in DMA mode
+91 RTC 10216  04DA      System 17 Real Time Clock Test
+                        Passed
+
+In addition the following tests were run but are not available on the above
+tape:
+
+7A MDC 10186  1CE9      1733-2 Multiple Drive Cartridge Disk Test
+                        Fails seek timing and checkword tests
+
+
+2. Running diagnostics
+
+        Detailed information on running the System Maintenance Monitor can be
+found at bitsavers.org in "pdf/cdc/1700/smm17". Here is a sample test run of
+the COMmand test (test 01), a CPU instruction test, using the default settings
+for running the test:
+
+Sample test run of the COMmand test (test 01), a CPU instruction test. Note
+that SMM uses a private bootstrap and we have to load that into the simulator
+by hand (User input to SMM17 is marked with "<==="):
+
+        CDC1700 simulator V4.0-0 Beta        git commit id: 9d2079df
+        sim> attach mt0 SYSTEM17_SMM_DIAGS.TAP 
+        sim> do -v CDC1700/smm32KMTboot
+        CDC1700/smm32KMTboot-6> echo Loading SMM17 MT bootstrap (32KW)
+        Loading SMM17 MT bootstrap (32KW)
+        CDC1700/smm32KMTboot-7> echo
+
+        CDC1700/smm32KMTboot-9> set cpu sstop
+        CDC1700/smm32KMTboot-10> set mt0 locked
+        CDC1700/smm32KMTboot-11> set dca interrupt=F
+        CDC1700/smm32KMTboot-12> boot -S mt0
+
+        PROGRAM PROTECT NOT SET PROTECTED TEST NOT RUN 
+
+        SMM17  VERSION 4.0  CP2F
+        COPYRIGHT CONTROL DATA CORP. 1974 
+
+
+
+        BUILD TEST LIST 
+        0000 /  0000?  0101 <==================== High byte is test # (COM)
+                                                  Low byte is repetition count
+        0000 /  0000?  
+
+
+        COM001  COMMAND TEST. 
+         IA = 0A00,  FC = 01 CP2F,   VERSION 4.0  
+
+        0121 /  020D?  <========================= Return to keep defaults
+
+        0044 /  0BB8?  <=========================
+
+
+         A1    Q1    A2    Q2   
+        0121  020D  0044  0BB8  
+
+        0124  020D  0001  0A17  
+        0124 /  020D?  
+        Simulation stopped, P: 0837 (P 0DFE                    INQ     $FE)
+
+If a test terminates with A1 containing xxy4 (where xx is the test # and
+y is the number of register pairs to be displayed) it was successful. If it
+terminates with A1 containing xxy8, the test failed and the remaining
+registers indicate what and where the failure occured (format is test
+dependent).
+
+
+3. Scripts for running SMM17
+
+        These scripts allow SMM17 to be run with various test features
+enabled. All of the scripts assume that a bootable SMM17 tape image is
+attached to mt0.
+
+3.1 Basic SMM17 boot sequence
+
+        echo Loading SMM17
+        echo
+        set cpu sstop
+        set mt0 locked
+        boot -S mt0
+
+3.2 Use Buffered Data Channel #1 for tape access
+
+        echo Loading SMM17 - Uses BDC #1
+        echo
+        set cpu sstop
+        set mt0 locked
+        set dca interrupt=F
+        boot -DS mt0
+
+3.3 Load MBS and use non-interrupt driven TTY output
+
+        echo Loading SMM17
+        echo   - MBS loaded
+        echo   - Non-interrupt driven TTY output
+        echo
+        set cpu sstop
+        set cpu sskip
+        set mt0 locked
+        boot -S mt0
+        c
+        d a 31E0
+        set cpu nosskip
+        set cpu nosstop
+        c
+
+
+4. Notes on specific diagnostic tests
+
+        MBS (Monitor Based Subroutine package) must be loaded for tests 0F
+        and 4B.
+
+        Test 0F (BD2, 1706/1716 Data Channel Test) requires a 7-track tape
+        for section 4 (relies on the controller masking the output to 6-bits).
+
+        Test 0F (BD2, 1706/1716 Data Channel Test) gets an error 0004 with
+        Q set to 001C! The problem seems to be related to returning 7-track
+        status in Director Status 2 (if I disable setting IO_ST2_7TRACK
+        everything works correctly for sections 2 and 4).
+
+        Test 4A (MTX, 1731/1732 Mag Tape Test) hangs while writing to the
+        TTY. The source listing (60411400C...) does not match the code
+        loaded from the magtape image.
+
+        Test 4B (PET, 1732-2/-3 Mag Tape subsystem test) can only be used if
+        the mag tape controller type is set to 1732-3. The test can access
+        the controller in 2 modes; programmed I/O which only works up to
+        800 BPI and DMA (called DSA) which works up to 1600 BPI. In programmed
+        I/O mode the tests complete successfully. In DSA mode, the test
+        fails during the first read from tape (writes work successfully) with
+        a timeout waiting for "end of operation". My current hypothesis is
+        that the controller asserts "end of operation" when all of the data
+        has been transferred to the CPU but delays generating an interrupt
+        until it has processed the CRC at the end of the block. I would need
+        to look at the test source listing before making any changes.
+
+        Test 7A (MDC, 1733-2 Cartridge Disk Controller) passes most test.
+        The seek timing test fails - I don't want to debug this without
+        source listings. The checkword test fails since we don't store the
+        checkword data in the emulated storage and it is not clear there
+        is sufficient documentation to be able to construct a valid checkword
+        on the fly.
+
+
+5. Directory listing of the SMM17 tape (with descriptions)
+
+BIN QL
+
+FF QL1 12166  04E8      Quick Look 1
+FE QL2 10196  095C      Quick Look 2
+FC DPC 09146  0685      Disk Call-up Program
+00 SMM 11046  10A3      System Maintenance Monitor
+01 COM 12166  0990      Command Test
+02 MY2 12166  0753      Memory Test
+03 PTP 12166  05B8      1723/77 Paper Tape Punch Test
+04 PTR 12166  03C8      1721/77 Paper Tape Reader Test
+05 TTY 10226  093B      1711/12/13 Teletype Test
+07 MT1 07046  0980      1731 Magnetic Tape Test
+08 DP1 12166  0EE6      1738 Disk Pack Test
+09 RPT 12166  023D      Random Protect Test
+0A BD1 10076  08BD      1706 Buffered Data Channel Test
+0B SC1 12166  0A2E      Satellite Coupler Test
+0C LP1 11056  07E7      1740/42/93X2 Line Printer Test
+0D CRP 10154  0C46      1728 Card Reader/Punch Test
+0E MT2 11036  0BCA      1731 Magnetic Tape Test
+0F BD2 10076  0A0B      1706/1716 Data Channel Test
+10 DTB 10154  08A4      1700/8000 - 8049-A, 211 Display Test
+11 DSC 04122  092F      1700 Data Set Controller Test
+12 MY1 10186  0834      Memory Test
+13 CR3 11056  0B46      1729-2/3 Card Reader Test
+14 MEM 07046  0612      Memory Test
+17 CR2 10154  0AE1      1726/405 Card Reader Test
+1C CMD 12166  07C6      4K Command Test
+1D DDT 07046  0BB1      1745-2 Display Test. Version 4.0
+1E MOS 07046  05AF      MOS Memory Test
+1F MTS 10206  053B      1731/32 Special Test
+20 DS1 11056  0989      1747 DSC Test
+23 LP5 10196  0F06      1742-120 Line Printer Test W/595-4 Train
+27 DP3 10154  1517      1700 Disk Subsystem Test
+2D UD3 08012  0971      3000 Channel Simulator Program Update
+30 RX1 09246  148E      1700/FF104/955 System Test
+31 LR1 09247  16C4      Unknown
+32 LDR 09096  0182      Unknown
+34 RX4 09166  12E9      Unknown
+35 OCR 12146  1727      1735/915 OCR035 Test
+36 AQM 11086  1327      DJ814A A/Q Communications Multiplexer (NUMOD) Test
+3B DMP 10154  01F9      Printer/TTY Dump
+3D SAS 08012  0EE6      3000 Channel Simulator Assembler
+3E EDT 12166  0805      17X4 Library Editing Routine
+40 DDC 11086  0B5B      1745/1746/211 Display Station Test
+42 CLK 08176  0994      10126 Interval Timer - Day Clock Test
+43 CTC 10216  1C90      1749 Communications Terminal Test
+4A MTX 10076  11A8      1731/1732 Mag Tape Test
+4B PET 12166  0C14      1732-2/1732-3 Magnetic Tape Test
+4C HOR 10233  0FC9      1500 Series Remote Peripheral Controller Diagnostic
+56 BC2 07155  15AC      SC17/1700 FR101 MEM/COM/IFP Test
+57 UD1 01303  0774      1700 Source/6000 TVC Update
+59 BC3 07155  0967      SC17/1700/FR101/FR113 Interface Test
+60 KEY 04016  0D8F      Cyberdata Key Entry Station Test
+61 RST 12146  0FD3      979 Reader/Sorter Test
+69 PAD 11086  0CCF      Punch the 1726/405 Test Deck
+6F DG4 02022  2340      1744/274 Digigraphic Test
+70 GT0 10154  0623      GPGT Troubleshooting Test
+71 GT1 10086  2880      GPGT DCI Test
+72 GT2 07155  2842      GPGT Display Quality Test
+73 GT3 10154  0C8B      GPGT Light Pen And Keyboard Test
+74 GT4 12112  0A25      GPGT Communications Test
+75 GT5 10154  0827      GPGT Communications Test (12 Bit Interface)
+76 GT6 10154  0C87      GPGT Specification Vertification Test
+78 CDD 07046  19AD      1739 Cartridge Disk Controller Test
+80 DRM 11086  2702      BG504 Drum Test
+81 CTR 07046  092C      FR117 Event Counter Subsystem Test
+83 DIO 11096  06F3      1553/54 1544/45 Digital Input/Output Subsystem Test
+84 DP5 07046  0F7C      1738 Quick Look Test
+86 ACC 07155  0A81      Asynchronous Communication Controller (DJ815-A) Test
+87 SCC 07155  0BCD      Synchronous Communication Controller (FJ606-A) Test
+88 CPC 10216  0E5C      1725-1 Card Punch Test
+89 BSC 11196  0CC3      Cyberdata Bisync Controller Test
+8A HFP 07046  1CDE      1781-a Hardware Floating Point Unit Test
+90 IOM 11096  0B8B      IOM Mother Unit Digital Input/Output Test
+91 RTC 10216  04DA      System 17 Real Time Clock Test
+92 PT1 10205  0617      1720-1 Paper Tape Punch Test
+93 PT2 10205  05B1      1720-1 Paper Tape Reader Test
+D0 CPY 07046  02CC      Tape To Tape Copy
+F0 CPV 10216  03FB      Card Punch Verify Utility
+FB REP 10216  14E2      Replace/Update 17X4 SMM Disk Library
+FD INS 10216  0965      Mass Storage Maintenance System Installation Program

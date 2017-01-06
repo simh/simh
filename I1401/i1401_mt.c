@@ -1,6 +1,6 @@
 /* i1401_mt.c: IBM 1401 magnetic tape simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           7-track magtape
 
+   20-Oct-16    RMS     Must call sim_tape_attach to use library (Mark Pizzolato)
    03-Sep-13    RMS     Read TMK does not write GM+WM to memory
    19-Mar-11    RMS     Restored lost edit to insert EOF in memory on read EOF
                         Reverted multiple tape indicator implementation
@@ -170,8 +171,8 @@ DEVICE mt_dev = {
     "MT", mt_unit, mt_reg, mt_mod,
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
-    &mt_boot, NULL, NULL,
-    NULL, DEV_DEBUG
+    &mt_boot, &sim_tape_attach, &sim_tape_detach,
+    NULL, DEV_DEBUG | DEV_TAPE
     };
 
 /* Function routine

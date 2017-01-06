@@ -133,11 +133,12 @@ typedef struct {
 
 static VFDHD_INFO vfdhd_info_data = { { 0x0, 0, 0xC0, 4 } };
 static VFDHD_INFO *vfdhd_info = &vfdhd_info_data;
+static const char* vfdhd_description(DEVICE *dptr);
 
 static SECTOR_FORMAT sdata;
 extern uint32 PCX;
-extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -146,7 +147,7 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define VFDHD_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
 
 static t_stat vfdhd_reset(DEVICE *vfdhd_dev);
-static t_stat vfdhd_attach(UNIT *uptr, char *cptr);
+static t_stat vfdhd_attach(UNIT *uptr, CONST char *cptr);
 static t_stat vfdhd_detach(UNIT *uptr);
 
 static int32 vfdhddev(const int32 port, const int32 io, const int32 data);
@@ -168,7 +169,11 @@ static REG vfdhd_reg[] = {
     { NULL }
 };
 
-#define VFDHD_NAME  "Vector Graphic FD-HD Controller VFDHD"
+#define VFDHD_NAME  "Vector Graphic FD-HD Controller"
+
+static const char* vfdhd_description(DEVICE *dptr) {
+    return VFDHD_NAME;
+}
 
 static MTAB vfdhd_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
@@ -200,7 +205,7 @@ DEVICE vfdhd_dev = {
     NULL, NULL, &vfdhd_reset,
     NULL, &vfdhd_attach, &vfdhd_detach,
     &vfdhd_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    vfdhd_dt, NULL, VFDHD_NAME
+    vfdhd_dt, NULL, NULL, NULL, NULL, NULL, &vfdhd_description
 };
 
 /* Reset routine */
@@ -222,7 +227,7 @@ static t_stat vfdhd_reset(DEVICE *dptr)
 
 
 /* Attach routine */
-static t_stat vfdhd_attach(UNIT *uptr, char *cptr)
+static t_stat vfdhd_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
     unsigned int i = 0;

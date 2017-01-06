@@ -1,6 +1,6 @@
 /* pdp8_defs.h: PDP-8 simulator definitions
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Sep-16    RMS     Added support for 16 additional terminals
    18-Sep-13    RMS     Added set_bootpc prototype
    18-Apr-12    RMS     Removed separate timer for additional terminals;
                         Added clock_cosched prototype
@@ -89,9 +90,15 @@
 #define DEV_MAX         64                              /* total devices */
 
 typedef struct {
+    uint32              dev;                            /* device number */
+    int32               (*dsp)(int32 IR, int32 dat);    /* dispatch */
+    } DIB_DSP;
+
+typedef struct {
     uint32              dev;                            /* base dev number */
     uint32              num;                            /* number of slots */
     int32               (*dsp[DEV_MAXBLK])(int32 IR, int32 dat);
+    DIB_DSP             *dsp_tbl;                       /* optional table */
     } DIB;
 
 /* Standard device numbers */
@@ -114,6 +121,41 @@ typedef struct {
 #define DEV_RX          075                             /* RX8E/RX28 */
 #define DEV_DTA         076                             /* TC08 */
 #define DEV_TD8E        077                             /* TD8E */
+
+/* Extra PTO8/KL8JA devices */
+
+#define DEV_TTI1        040
+#define DEV_TTO1        041
+#define DEV_TTI2        042
+#define DEV_TTO2        043
+#define DEV_TTI3        044
+#define DEV_TTO3        045
+#define DEV_TTI4        046
+#define DEV_TTO4        047
+#define DEV_TTI5        034
+#define DEV_TTO5        035
+#define DEV_TTI6        011
+#define DEV_TTO6        012
+#define DEV_TTI7        030
+#define DEV_TTO7        031
+#define DEV_TTI8        032
+#define DEV_TTO8        033
+#define DEV_TTI9        050
+#define DEV_TTO9        051
+#define DEV_TTI10       052
+#define DEV_TTO10       053
+#define DEV_TTI11       054
+#define DEV_TTO11       055                             /* conflict: FPP */
+#define DEV_TTI12       056                             /* conflict: FPP */
+#define DEV_TTO12       057
+#define DEV_TTI13       070                             /* conflict: CT, MT */
+#define DEV_TTO13       071
+#define DEV_TTI14       036                             /* conflict: TSC */
+#define DEV_TTO14       037
+#define DEV_TTI15       072
+#define DEV_TTO15       073
+#define DEV_TTI16       006
+#define DEV_TTO16       007
 
 /* Interrupt flags
 
@@ -145,13 +187,13 @@ typedef struct {
 #define INT_V_TTI       (INT_V_START+4)                 /* keyboard */
 #define INT_V_CLK       (INT_V_START+5)                 /* clock */
 #define INT_V_TTO1      (INT_V_START+6)                 /* tto1 */
-#define INT_V_TTO2      (INT_V_START+7)                 /* tto2 */
-#define INT_V_TTO3      (INT_V_START+8)                 /* tto3 */
-#define INT_V_TTO4      (INT_V_START+9)                 /* tto4 */
+//#define INT_V_TTO2      (INT_V_START+7)                 /* tto2 */
+//#define INT_V_TTO3      (INT_V_START+8)                 /* tto3 */
+//#define INT_V_TTO4      (INT_V_START+9)                 /* tto4 */
 #define INT_V_TTI1      (INT_V_START+10)                /* tti1 */
-#define INT_V_TTI2      (INT_V_START+11)                /* tti2 */
-#define INT_V_TTI3      (INT_V_START+12)                /* tti3 */
-#define INT_V_TTI4      (INT_V_START+13)                /* tti4 */
+//#define INT_V_TTI2      (INT_V_START+11)                /* tti2 */
+//#define INT_V_TTI3      (INT_V_START+12)                /* tti3 */
+//#define INT_V_TTI4      (INT_V_START+13)                /* tti4 */
 #define INT_V_DIRECT    (INT_V_START+14)                /* direct start */
 #define INT_V_RX        (INT_V_DIRECT+0)                /* RX8E */
 #define INT_V_RK        (INT_V_DIRECT+1)                /* RK8E */
@@ -177,13 +219,13 @@ typedef struct {
 #define INT_TTI         (1 << INT_V_TTI)
 #define INT_CLK         (1 << INT_V_CLK)
 #define INT_TTO1        (1 << INT_V_TTO1)
-#define INT_TTO2        (1 << INT_V_TTO2)
-#define INT_TTO3        (1 << INT_V_TTO3)
-#define INT_TTO4        (1 << INT_V_TTO4)
+//#define INT_TTO2        (1 << INT_V_TTO2)
+//#define INT_TTO3        (1 << INT_V_TTO3)
+//#define INT_TTO4        (1 << INT_V_TTO4)
 #define INT_TTI1        (1 << INT_V_TTI1)
-#define INT_TTI2        (1 << INT_V_TTI2)
-#define INT_TTI3        (1 << INT_V_TTI3)
-#define INT_TTI4        (1 << INT_V_TTI4)
+//#define INT_TTI2        (1 << INT_V_TTI2)
+//#define INT_TTI3        (1 << INT_V_TTI3)
+//#define INT_TTI4        (1 << INT_V_TTI4)
 #define INT_RX          (1 << INT_V_RX)
 #define INT_RK          (1 << INT_V_RK)
 #define INT_RF          (1 << INT_V_RF)
@@ -202,15 +244,14 @@ typedef struct {
 #define INT_DEV_ENABLE  ((1 << INT_V_DIRECT) - 1)       /* devices w/enables */
 #define INT_ALL         ((1 << INT_V_OVHD) - 1)         /* all interrupts */
 #define INT_INIT_ENABLE (INT_TTI+INT_TTO+INT_PTR+INT_PTP+INT_LPT) | \
-                        (INT_TTI1+INT_TTI2+INT_TTI3+INT_TTI4) | \
-                        (INT_TTO1+INT_TTO2+INT_TTO3+INT_TTO4)
+                        (INT_TTI1+INT_TTO1)
 #define INT_PENDING     (INT_ION+INT_NO_CIF_PENDING+INT_NO_ION_PENDING)
 #define INT_UPDATE      ((int_req & ~INT_DEV_ENABLE) | (dev_done & int_enable))
 
 /* Function prototypes */
 
-t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_dev (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_dev (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 void cpu_set_bootpc (int32 pc);
 

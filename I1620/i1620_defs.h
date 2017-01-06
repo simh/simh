@@ -232,4 +232,7 @@ enum opcodes {
     OP_BBT = 90, OP_BMK, OP_ORF, OP_ANDF, OP_CPLF,      /* 90 - 99 */
     OP_EORF, OP_OTD, OP_DTO };
 
+extern const int8 cdr_to_alp[128];
+extern const int8 alp_to_cdp[256];
+
 #endif

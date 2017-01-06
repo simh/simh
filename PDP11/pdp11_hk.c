@@ -559,7 +559,7 @@ t_stat hk_wr (int32 data, int32 PA, int32 access);
 t_stat hk_svc (UNIT *uptr);
 t_stat hk_reset (DEVICE *dptr);
 t_stat hk_boot (int32 unitno, DEVICE *dptr);
-t_stat hk_attach (UNIT *uptr, char *cptr);
+t_stat hk_attach (UNIT *uptr, CONST char *cptr);
 t_stat hk_detach (UNIT *uptr);
 int32 hk_inta (void);
 int32 hk_rdmr2 (int32 msg);
@@ -568,8 +568,8 @@ void update_hkcs (int32 flags, int32 drv);
 void update_hkds (int32 drv);
 void hk_err (int32 cs1e, int32 cs2e, int32 drve, int32 drv);
 void hk_go (int32 drv);
-t_stat hk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat hk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat hk_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *hk_description (DEVICE *dptr);
 
@@ -1483,7 +1483,7 @@ return auto_config (0, 0);
 
 /* Device attach */
 
-t_stat hk_attach (UNIT *uptr, char *cptr)
+t_stat hk_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 drv, p;
 t_stat r;
@@ -1549,7 +1549,7 @@ return detach_unit (uptr);
 
 /* Set size command validation routine */
 
-t_stat hk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat hk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
@@ -1559,7 +1559,7 @@ return SCPE_OK;
 
 /* Set bad block routine */
 
-t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat hk_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);
 }

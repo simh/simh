@@ -101,6 +101,9 @@
     }                                           \
 }
 
+/* increase R by val */
+#define INCR(val) IR_S = (IR_S & ~0x7f) | ((IR_S + (val)) & 0x7f)
+
 /* function prototypes */
 t_stat sim_instr_nommu(void);
 
@@ -122,7 +125,6 @@ extern int32 DE1_S; /* alternate DE register                        */
 extern int32 HL1_S; /* alternate HL register                        */
 extern int32 IFF_S; /* Interrupt Flip Flop                          */
 extern int32 IR_S;  /* Interrupt (upper) / Refresh (lower) register */
-extern int32 chiptype;
 
 #if !UNIX_PLATFORM
 extern void pollForCPUStop(void);
@@ -1033,6 +1035,7 @@ t_stat sim_instr_nommu(void) {
         }
 
         PCX = PC;
+        INCR(1);
         sim_interval--;
 
         switch(RAM_PP(PC)) {
@@ -2119,6 +2122,7 @@ t_stat sim_instr_nommu(void) {
 
             case 0xcb:      /* CB prefix */
                 CHECK_CPU_8080;
+                INCR(1);
                 adr = HL;
                 switch ((op = GET_BYTE(PC)) & 7) {
 
@@ -2355,6 +2359,7 @@ t_stat sim_instr_nommu(void) {
 
             case 0xdd:      /* DD prefix */
                 CHECK_CPU_8080;
+                INCR(1);
                 switch (RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IX,BC */
@@ -3021,6 +3026,7 @@ t_stat sim_instr_nommu(void) {
 
             case 0xed:      /* ED prefix */
                 CHECK_CPU_8080;
+                INCR(1);
                 switch (RAM_PP(PC)) {
 
                     case 0x40:      /* IN B,(C) */
@@ -3411,6 +3417,7 @@ t_stat sim_instr_nommu(void) {
                         if (BC == 0)
                             BC = 0x10000;
                         do {
+                            INCR(2);
                             acu = RAM_PP(HL);
                             PUT_BYTE_PP(DE, acu);
                         } while (--BC);
@@ -3424,6 +3431,7 @@ t_stat sim_instr_nommu(void) {
                         if (BC == 0)
                             BC = 0x10000;
                         do {
+                            INCR(1);
                             temp = RAM_PP(HL);
                             op = --BC != 0;
                             sum = acu - temp;
@@ -3442,6 +3450,7 @@ t_stat sim_instr_nommu(void) {
                         if (temp == 0)
                             temp = 0x100;
                         do {
+                            INCR(1);
                             acu = in(LOW_REGISTER(BC));
                             PUT_BYTE(HL, acu);
                             ++HL;
@@ -3456,6 +3465,7 @@ t_stat sim_instr_nommu(void) {
                         if (temp == 0)
                             temp = 0x100;
                         do {
+                            INCR(1);
                             acu = GET_BYTE(HL);
                             out(LOW_REGISTER(BC), acu);
                             ++HL;
@@ -3470,6 +3480,7 @@ t_stat sim_instr_nommu(void) {
                         if (BC == 0)
                             BC = 0x10000;
                         do {
+                            INCR(2);
                             acu = RAM_MM(HL);
                             PUT_BYTE_MM(DE, acu);
                         } while (--BC);
@@ -3483,6 +3494,7 @@ t_stat sim_instr_nommu(void) {
                         if (BC == 0)
                             BC = 0x10000;
                         do {
+                            INCR(1);
                             temp = RAM_MM(HL);
                             op = --BC != 0;
                             sum = acu - temp;
@@ -3501,6 +3513,7 @@ t_stat sim_instr_nommu(void) {
                         if (temp == 0)
                             temp = 0x100;
                         do {
+                            INCR(1);
                             acu = in(LOW_REGISTER(BC));
                             PUT_BYTE(HL, acu);
                             --HL;
@@ -3515,6 +3528,7 @@ t_stat sim_instr_nommu(void) {
                         if (temp == 0)
                             temp = 0x100;
                         do {
+                            INCR(1);
                             acu = GET_BYTE(HL);
                             out(LOW_REGISTER(BC), acu);
                             --HL;
@@ -3595,6 +3609,7 @@ t_stat sim_instr_nommu(void) {
 
             case 0xfd:      /* FD prefix */
                 CHECK_CPU_8080;
+                INCR(1);
                 switch (RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IY,BC */

@@ -35,9 +35,22 @@
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
 #
-# OSX and other environments may have the LLVM (clang) compiler 
-# installed.  If you want to build with the clang compiler, invoke
-# make with GCC=clang.
+# simh project support is provided for simulators that are built with 
+# dependent packages provided with the or by the operating system 
+# distribution OR for platforms where that isn't directly available (OS X) 
+# by packages from specific package management systems (MacPorts).  Users 
+# wanting to build simulators with locally build dependent packages or 
+# packages provided by an unsupported package management system can 
+# override where this procedure looks for include files and/or libraries.  
+# Overrides can be specified by define exported environment variables or 
+# GNU make command line arguments which specify INCLUDES and/or LIBRARIES.  
+# Each of these, if specified, must be the complete list include directories
+# or library directories that should be used with each element separated by 
+# colons. (i.e. INCLUDES=/usr/include/:/usr/local/include/:...)
+#
+# Some environments may have the LLVM (clang) compiler installed as
+# an alternate to gcc.  If you want to build with the clang compiler, 
+# invoke make with GCC=clang.
 #
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
@@ -66,8 +79,8 @@ ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
   VIDEO_USEFUL = true
   BESM6_BUILD = true
 endif
-# building the pdp11, or any vax simulator could use networking support
-ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
+# building the pdp11, pdp10, or any vax simulator could use networking support
+ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring pdp10,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
@@ -84,6 +97,7 @@ else
     BESM6_BUILD = true
   endif
 endif
+find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,$(PATH))),$(wildcard $(dir)/$(1))))))
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
 ifneq ($(findstring Windows,$(OS)),)
@@ -137,7 +151,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         endif
       endif
     else
-      CC_STD = -std=gnu99
+      ifeq (,$(findstring ++,$(GCC)))
+        CC_STD = -std=gnu99
+      else
+        CPP_BUILD = 1
+      endif
     endif
   else
     ifeq (Apple,$(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
@@ -151,7 +169,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         CLANG_VERSION = $(word 4,$(COMPILER_NAME))
       endif
     endif
-    CC_STD = -std=c99
+    ifeq (,$(findstring ++,$(GCC)))
+      CC_STD = -std=c99
+    else
+      CPP_BUILD = 1
+    endif
   endif
   ifeq (git-repo,$(shell if $(TEST) -d ./.git; then echo git-repo; fi))
     ifeq (need-hooks,$(shell if $(TEST) ! -e ./.git/hooks/post-checkout; then echo need-hooks; fi))
@@ -174,17 +196,41 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
     OS_LDFLAGS = -lm
   else # Non-Android Builds
-    INCPATH:=/usr/include
-    LIBPATH:=/usr/lib
+    ifeq (,$(INCLUDES)$(LIBRARIES))
+      INCPATH:=/usr/include
+      LIBPATH:=/usr/lib
+    else
+      $(info *** Warning ***)
+      ifeq (,$(INCLUDES))
+        INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
+      else
+        $(info *** Warning *** Unsupported build with INCLUDES defined as: $(INCLUDES))
+        INCPATH:=$(strip $(subst :, ,$(INCLUDES)))
+        UNSUPPORTED_BUILD := include
+      endif
+      ifeq (,$(LIBRARIES))
+        LIBPATH:=/usr/lib
+      else
+        $(info *** Warning *** Unsupported build with LIBRARIES defined as: $(LIBRARIES))
+        LIBPATH:=$(strip $(subst :, ,$(LIBRARIES)))
+        ifeq (include,$(UNSUPPORTED_BUILD))
+          UNSUPPORTED_BUILD := include+lib
+        else
+          UNSUPPORTED_BUILD := lib
+        endif
+      endif
+      $(info *** Warning ***)
+    endif
     OS_CCDEFS = -D_GNU_SOURCE
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
-    INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
-      INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+      ifneq (include,$(findstring include,$(UNSUPPORTED_BUILD)))
+        INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+      endif
       ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
         INCPATH += /opt/local/include
         OS_CCDEFS += -I/opt/local/include
@@ -199,12 +245,16 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     else
       ifeq (Linux,$(OSTYPE))
-        LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+        ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
+          LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+        endif
         LIBEXT = so
       else
         ifeq (SunOS,$(OSTYPE))
           OSNAME = Solaris
-          LIBPATH := $(shell LANG=C; crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
+            LIBPATH := $(shell LANG=C; crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          endif
           LIBEXT = so
           OS_LDFLAGS += -lsocket -lnsl
           ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
@@ -424,29 +474,29 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
     ifneq (,$(call find_include,SDL2/SDL))
       ifneq (,$(call find_lib,SDL2))
-        VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(dir $(call find_include,SDL2/SDL))
-        VIDEO_LDFLAGS += -lSDL2
+        VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(realpath $(dir $(call find_include,SDL2/SDL))../../bin/sdl2-config) --cflags`
+        VIDEO_LDFLAGS += `$(realpath $(dir $(call find_include,SDL2/SDL))../../bin/sdl2-config) --libs`
         VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
         DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
         DISPLAYVT = ${DISPLAYD}/vt11.c
         DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-        $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
+        $(info using libSDL2: $(call find_include,SDL2/SDL))
         ifeq (Darwin,$(OSTYPE))
-          VIDEO_LDFLAGS += -lobjc -framework cocoa -DSDL_MAIN_AVAILABLE
+          VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
         endif
       endif
     else
       ifneq (,$(call find_include,SDL/SDL))
         ifneq (,$(call find_lib,SDL))
-          VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(dir $(call find_include,SDL/SDL))
-          VIDEO_LDFLAGS += -lSDL
+          VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(realpath $(dir $(call find_include,SDL/SDL))../../bin/sdl-config) --cflags`
+          VIDEO_LDFLAGS += `$(realpath $(dir $(call find_include,SDL/SDL))../../bin/sdl-config) --libs`
           VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
           DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
           DISPLAYVT = ${DISPLAYD}/vt11.c
           DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-          $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
+          $(info using libSDL: $(call find_include,SDL/SDL))
           ifeq (Darwin,$(OSTYPE))
-            VIDEO_LDFLAGS += -lobjc -framework cocoa -DSDL_MAIN_AVAILABLE
+            VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
           endif
         endif
       endif
@@ -458,9 +508,24 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info *** Info ***)
       $(info *** Info *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
       $(info *** Info *** functionality if video support were available on your system.)
-      $(info *** Info *** Install the development components of libSDL packaged by your)
-      $(info *** Info *** operating system distribution and rebuild your simulator to)
-      $(info *** Info *** enable this extra functionality.)
+      ifeq (Darwin,$(OSTYPE))
+        $(info *** Info *** Install the MacPorts libSDL2 packaged to provide this)
+        $(info *** Info *** functionality for your OS X system:)
+        $(info *** Info ***       # port install libsdl2)
+	  else
+        ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
+          $(info *** Info *** Install the development components of libSDL or libSDL2)
+          $(info *** Info *** packaged for your operating system distribution for)
+          $(info *** Info *** your Linux system:)
+          $(info *** Info ***        $$ sudo apt-get install libsdl2-dev)
+          $(info *** Info ***    or)
+          $(info *** Info ***        $$ sudo apt-get install libsdl-dev)
+        else
+          $(info *** Info *** Install the development components of libSDL packaged by your)
+          $(info *** Info *** operating system distribution and rebuild your simulator to)
+          $(info *** Info *** enable this extra functionality.)
+        endif
+	  endif
       $(info *** Info ***)
     endif
   endif
@@ -581,9 +646,15 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         $(info *** Warning *** libpcap networking support)
         $(info *** Warning ***)
         $(info *** Warning *** To build simulator(s) with libpcap networking support you)
-        $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
-        $(info *** Warning *** regarding the needed libpcap development components for your)
-        $(info *** Warning *** $(OSTYPE) platform)
+        ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
+          $(info *** Warning *** should install the libpcap development components for)
+          $(info *** Warning *** for your Linux system:)
+          $(info *** Warning ***        $$ sudo apt-get install libpcap-dev)
+        else
+          $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
+          $(info *** Warning *** regarding the needed libpcap development components for your)
+          $(info *** Warning *** $(OSTYPE) platform)
+        endif
         $(info *** Warning ***)
       endif
     endif
@@ -616,13 +687,30 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           $(info *** Info *** minimal libpcap networking support)
           $(info *** Info ***)
         endif
+        $(info *** Info ***)
         $(info *** Info *** Simulators on your $(OSNAME) platform can also be built with)
         $(info *** Info *** extended LAN Ethernet networking support by using VDE Ethernet.)
         $(info *** Info ***)
         $(info *** Info *** To build simulator(s) with extended networking support you)
-        $(info *** Info *** should read 0readme_ethernet.txt and follow the instructions)
-        $(info *** Info *** regarding the needed libvdeplug components for your $(OSNAME))
-        $(info *** Info *** platform)
+        ifeq (Darwin,$(OSTYPE))
+          $(info *** Info *** should install the MacPorts vde2 package to provide this)
+          $(info *** Info *** functionality for your OS X system:)
+          $(info *** Info ***       # port install vde2)
+        else
+          ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
+            $(info *** Info *** should install the vde2 package to provide this)
+            $(info *** Info *** functionality for your $(OSNAME) system:)
+            ifneq (,$(shell apt list 2>/dev/null| grep libvdeplug-dev))
+              $(info *** Info ***        $$ sudo apt-get install libvdeplug-dev)
+            else
+              $(info *** Info ***        $$ sudo apt-get install vde2)
+            endif
+          else
+            $(info *** Info *** should read 0readme_ethernet.txt and follow the instructions)
+            $(info *** Info *** regarding the needed libvdeplug components for your $(OSNAME))
+            $(info *** Info *** platform)
+          endif
+        endif
         $(info *** Info ***)
       endif
     endif
@@ -679,7 +767,11 @@ else
   endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
-  CC_STD = -std=gnu99
+  ifeq (,$(findstring ++,$(GCC)))
+    CC_STD = -std=gnu99
+  else
+    CPP_BUILD = 1
+  endif
   LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (,$(PATH_SEPARATOR))
     PATH_SEPARATOR := ;
@@ -802,6 +894,9 @@ endif # Win32 (via MinGW)
 ifneq (,$(GIT_COMMIT_ID))
   CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=$(GIT_COMMIT_ID)
 endif
+ifneq (,$(UNSUPPORTED_BUILD))
+  CFLAGS_GIT += -DSIM_BUILD=Unsupported=$(UNSUPPORTED_BUILD)
+endif
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
   CFLAGS_O = -O0
@@ -809,7 +904,11 @@ ifneq ($(DEBUG),)
 else
   ifneq (clang,$(findstring clang,$(COMPILER_NAME)))
     CFLAGS_O = -O2
+    ifeq (Darwin,$(OSTYPE))
+      NO_LTO = 1
+    endif
   else
+    NO_LTO = 1
     ifeq (Darwin,$(OSTYPE))
       CFLAGS_O += -O4 -fno-strict-overflow -flto -fwhole-program
     else
@@ -900,7 +999,7 @@ LDFLAGS := $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
 	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c sim_serial.c \
-	sim_video.c sim_imd.c
+	sim_video.c sim_imd.c sim_card.c
 
 DISPLAYD = display
   
@@ -936,7 +1035,9 @@ PDP18BD = PDP18B
 PDP18B = ${PDP18BD}/pdp18b_dt.c ${PDP18BD}/pdp18b_drm.c ${PDP18BD}/pdp18b_cpu.c \
 	${PDP18BD}/pdp18b_lp.c ${PDP18BD}/pdp18b_mt.c ${PDP18BD}/pdp18b_rf.c \
 	${PDP18BD}/pdp18b_rp.c ${PDP18BD}/pdp18b_stddev.c ${PDP18BD}/pdp18b_sys.c \
-	${PDP18BD}/pdp18b_rb.c ${PDP18BD}/pdp18b_tt1.c ${PDP18BD}/pdp18b_fpp.c
+	${PDP18BD}/pdp18b_rb.c ${PDP18BD}/pdp18b_tt1.c ${PDP18BD}/pdp18b_fpp.c \
+	${PDP18BD}/pdp18b_g2tty.c
+
 PDP4_OPT = -DPDP4 -I ${PDP18BD}
 PDP7_OPT = -DPDP7 -I ${PDP18BD}
 PDP9_OPT = -DPDP9 -I ${PDP18BD}
@@ -1011,7 +1112,8 @@ VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c \
-	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_dup.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
+	${PDP11D}/pdp11_io_lib.c
 VAX730_OPT = -DVM_VAX -DVAX_730 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -1026,7 +1128,8 @@ VAX750 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c \
 	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_dup.c \
-	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
+	${PDP11D}/pdp11_io_lib.c
 VAX750_OPT = -DVM_VAX -DVAX_750 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -1041,7 +1144,8 @@ VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_hk.c \
 	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_dup.c \
-	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
+	${PDP11D}/pdp11_io_lib.c
 VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -1056,7 +1160,8 @@ VAX8600 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_hk.c \
 	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_dup.c \
-	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
+	${PDP11D}/pdp11_io_lib.c
 VAX8600_OPT = -DVM_VAX -DVAX_860 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -1068,7 +1173,7 @@ PDP10 = ${PDP10D}/pdp10_fe.c ${PDP11D}/pdp11_dz.c ${PDP10D}/pdp10_cpu.c \
 	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_dup.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_kmc.c \
 	${PDP11D}/pdp11_xu.c
-PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D}
+PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} ${NETWORK_OPT}
 
 
 PDP8D = PDP8
@@ -1106,7 +1211,7 @@ HP3000D = HP3000
 HP3000 = ${HP3000D}/hp_disclib.c ${HP3000D}/hp_tapelib.c ${HP3000D}/hp3000_atc.c \
 	${HP3000D}/hp3000_clk.c ${HP3000D}/hp3000_cpu.c ${HP3000D}/hp3000_cpu_base.c \
 	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_ds.c ${HP3000D}/hp3000_iop.c \
-	${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
+	${HP3000D}/hp3000_lp.c ${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
 	${HP3000D}/hp3000_scmb.c ${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
 HP3000_OPT = -I ${HP3000D}
 
@@ -1231,8 +1336,9 @@ ISYS8010C = Intel-Systems/common
 ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 	${ISYS8010C}/i8251.c ${ISYS8010C}/i8255.c \
 	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
-	${ISYS8010C}/multibus.c ${ISYS8010C}/isbc80-10.c	\
-	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc208.c
+	${ISYS8010C}/multibus.c ${ISYS8010D}/isbc8010.c \
+	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc202.c \
+	${ISYS8010C}/isbc201.c ${ISYS8010C}/zx200a.c
 ISYS8010_OPT = -I ${ISYS8010D}
 
 
@@ -1241,15 +1347,74 @@ ISYS8020C = Intel-Systems/common
 ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
 	${ISYS8020C}/i8251.c ${ISYS8020C}/i8255.c \
 	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
-	${ISYS8020C}/multibus.c ${ISYS8020C}/isbc80-20.c	\
-	${ISYS8020C}/isbc064.c ${ISYS8020C}/isbc208.c \
-	${ISYS8020C}/i8259.c
+	${ISYS8020C}/multibus.c ${ISYS8020D}/isbc8020.c \
+	${ISYS8020C}/isbc064.c ${ISYS8020C}/i8259.c \
+	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
+	${ISYS8010C}/zx200a.c
 ISYS8020_OPT = -I ${ISYS8020D}
+
+
+ISYS8024D = Intel-Systems/isys8024
+ISYS8024C = Intel-Systems/common
+ISYS8024 = ${ISYS8024C}/i8080.c ${ISYS8024D}/isys8024_sys.c \
+	${ISYS8024C}/i8251.c ${ISYS8024C}/i8253.c \
+	${ISYS8024C}/i8255.c ${ISYS8024C}/i8259.c \
+	${ISYS8024C}/ieprom.c ${ISYS8024C}/iram8.c \
+	${ISYS8024C}/multibus.c ${ISYS8024D}/isbc8024.c \
+	${ISYS8024C}/isbc064.c ${ISYS8024C}/isbc208.c \
+	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
+	${ISYS8010C}/zx200a.c
+ISYS8024_OPT = -I ${ISYS8024D}
+
+
+ISYS8030D = Intel-Systems/isys8030
+ISYS8030C = Intel-Systems/common
+ISYS8030 = ${ISYS8030C}/i8080.c ${ISYS8030D}/isys8030_sys.c \
+	${ISYS8030C}/i8251.c ${ISYS8030C}/i8255.c \
+	${ISYS8030C}/i8259.c ${ISYS8030C}/i8253.c \
+	${ISYS8030C}/ieprom.c ${ISYS8030C}/iram8.c \
+	${ISYS8030C}/multibus.c ${ISYS8030D}/isbc8030.c \
+	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
+	${ISYS8030C}/isbc064.c ${ISYS8010C}/zx200a.c
+ISYS8030_OPT = -I ${ISYS8030D}
+
+
+IMDS-225D = Intel-Systems/imds-225
+IMDS-225C = Intel-Systems/common
+IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
+	${IMDS-225C}/i8251.c ${IMDS-225C}/i8255.c \
+	${IMDS-225C}/i8259.c ${IMDS-225C}/i8253.c \
+	${IMDS-225C}/ipceprom.c ${IMDS-225C}/ipcram8.c \
+	${IMDS-225C}/ipcmultibus.c ${IMDS-225D}/ipc.c \
+	${IMDS-225C}/ipc-cont.c ${IMDS-225C}/ioc-cont.c \
+	${IMDS-225C}/isbc202.c ${IMDS-225C}/isbc201.c \
+	${IMDS-225C}/zx200a.c
+IMDS-225_OPT = -I ${IMDS-225D}
+
+
+IBMPCD = IBMPC-Systems/ibmpc
+IBMPCC = IBMPC-Systems/common
+IBMPC =	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
+	${IBMPCC}/i8088.c ${IBMPCD}/ibmpc_sys.c \
+	${IBMPCC}/i8253.c ${IBMPCC}/i8259.c \
+	${IBMPCC}/pceprom.c ${IBMPCC}/pcram8.c \
+	${IBMPCC}/i8237.c ${IBMPCC}/pcbus.c
+IBMPC_OPT = -I ${IBMPCD}
+
+
+IBMPCXTD = IBMPC-Systems/ibmpcxt
+IBMPCXTC = IBMPC-Systems/common
+IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
+	${IBMPCXTC}/i8253.c ${IBMPCXTC}/i8259.c \
+	${IBMPCXTC}/i8255.c ${IBMPCXTD}/ibmpcxt.c \
+	${IBMPCXTC}/pceprom.c ${IBMPCXTC}/pcram8.c \
+	${IBMPCXTC}/pcbus.c ${IBMPCXTC}/i8237.c 
+IBMPCXT_OPT = -I ${IBMPCXTD}
 
 
 TX0D = TX-0
 TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
-      ${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
+	${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
 TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
 
 
@@ -1260,12 +1425,22 @@ SSEM_OPT = -I ${SSEMD}
 B5500D = B5500
 B5500 = ${B5500D}/b5500_cpu.c ${B5500D}/b5500_io.c ${B5500D}/b5500_sys.c \
 	${B5500D}/b5500_dk.c ${B5500D}/b5500_mt.c ${B5500D}/b5500_urec.c \
-	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c ${B5500D}/sim_card.c
-B5500_OPT = -I.. -DUSE_INT64 -DB5500
+	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c
+B5500_OPT = -I.. -DUSE_INT64 -DB5500 -DUSE_SIM_CARD
 
 ###
 ### Experimental simulators
 ###
+
+CDC1700D = CDC1700
+CDC1700 = ${CDC1700D}/cdc1700_cpu.c ${CDC1700D}/cdc1700_dis.c \
+        ${CDC1700D}/cdc1700_io.c ${CDC1700D}/cdc1700_sys.c \
+        ${CDC1700D}/cdc1700_dev1.c ${CDC1700D}/cdc1700_mt.c \
+        ${CDC1700D}/cdc1700_dc.c ${CDC1700D}/cdc1700_iofw.c \
+        ${CDC1700D}/cdc1700_lp.c ${CDC1700D}/cdc1700_dp.c \
+        ${CDC1700D}/cdc1700_cd.c ${CDC1700D}/cdc1700_sym.c \
+        ${CDC1700D}/cdc1700_rtc.c
+CDC1700_OPT = -I ${CDC1700D}
 
 BESM6D = BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
@@ -1273,8 +1448,8 @@ BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
         ${BESM6D}/besm6_punch.c
 
-ifneq (,$(and ${VIDEO_LDFLAGS}, $(BESM6_BUILD)))
-    ifeq (,${FONTFILE})
+ifneq (,$(BESM6_BUILD))
+    ifneq (,$(and ${VIDEO_LDFLAGS}, $(or $(and $(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)), $(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))))
         FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions C:/Windows/Fonts
         FONTPATH := $(dir $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/.)))
         FONTNAME += DejaVuSans.ttf LucidaSansRegular.ttf FreeSans.ttf AppleGothic.ttf tahoma.ttf
@@ -1295,19 +1470,21 @@ ifneq (,$(and ${VIDEO_LDFLAGS}, $(BESM6_BUILD)))
             $(info ***)
         endif
     endif
-endif
-ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}))
-    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
-else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
-    $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
-    $(info ***)
-    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
-else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
-    $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
-    $(info ***)
-    BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
-else
-    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
+      $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  else ifneq (,$(and $(findstring SDL2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
+      $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+  else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
+      $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
+      $(info ***)
+      BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+  else
+      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+  endif
 endif
 
 ###
@@ -1350,9 +1527,9 @@ PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
-	i7094 ibm1130 id16 id32 sds lgp h316 \
-	swtp6800mp-a swtp6800mp-a2 tx-0 ssem isys8010 isys8020 \
-	b5500
+	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
+	isys8030 isys8024
 
 all : ${ALL}
 
@@ -1509,14 +1686,22 @@ ${BIN}h316${EXE} : ${H316} ${SIM}
 hp2100 : ${BIN}hp2100${EXE}
 
 ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info hp2100 can't be built using C++)
+endif
 
 hp3000 : ${BIN}hp3000${EXE}
 
 ${BIN}hp3000${EXE} : ${HP3000} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info hp3000 can't be built using C++)
+endif
 
 i1401 : ${BIN}i1401${EXE}
 
@@ -1539,6 +1724,7 @@ ${BIN}i7094${EXE} : ${I7094} ${SIM}
 ibm1130 : ${BIN}ibm1130${EXE}
 
 ${BIN}ibm1130${EXE} : ${IBM1130}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 ifneq ($(WIN32),)
 	windres ${IBM1130D}/ibm1130.rc $(BIN)ibm1130.o
@@ -1546,7 +1732,10 @@ ifneq ($(WIN32),)
 	del BIN\ibm1130.o
 else
 	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-endif  
+endif
+else
+	$(info ibm1130 can't be built using C++)
+endif
 
 s3 : ${BIN}s3${EXE}
 
@@ -1608,7 +1797,6 @@ ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-
 isys8010: ${BIN}isys8010${EXE}
 
 ${BIN}isys8010${EXE} : ${ISYS8010} ${SIM} ${BUILD_ROMS}
@@ -1620,6 +1808,44 @@ isys8020: ${BIN}isys8020${EXE}
 ${BIN}isys8020${EXE} : ${ISYS8020} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8020} ${SIM} ${ISYS8020_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+isys8024: ${BIN}isys8024${EXE}
+
+${BIN}isys8024${EXE} : ${ISYS8024} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${ISYS8024} ${SIM} ${ISYS8024_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+isys8030: ${BIN}isys8030${EXE}
+
+${BIN}isys8030${EXE} : ${ISYS8030} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${ISYS8030} ${SIM} ${ISYS8030_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+imds-225: ${BIN}imds-225${EXE}
+
+${BIN}imds-225${EXE} : ${IMDS-225} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${IMDS-225} ${SIM} ${IMDS-225_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+ibmpc: ${BIN}ibmpc${EXE}
+
+${BIN}ibmpc${EXE} : ${IBMPC} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${IBMPC} ${SIM} ${IBMPC_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info ibmpc can't be built using C++)
+endif
+
+ibmpcxt: ${BIN}ibmpcxt${EXE}
+
+${BIN}ibmpcxt${EXE} : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+	${MKDIRBIN}
+	${CC} ${IBMPCXT} ${SIM} ${IBMPCXT_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info ibmpcxt can't be built using C++)
+endif
 
 tx-0 : ${BIN}tx-0${EXE}
 
@@ -1633,11 +1859,21 @@ ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
+cdc1700 : ${BIN}cdc1700${EXE}
+
+${BIN}cdc1700${EXE} : ${CDC1700} ${SIM}
+	${MKDIRBIN}
+	${CC} ${CDC1700} ${SIM} ${CDC1700_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+
 besm6 : ${BIN}besm6${EXE}
 
 ${BIN}besm6${EXE} : ${BESM6} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${BESM6} ${SIM} ${BESM6_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info besm6 can't be built using C++)
+endif
 
 sigma : ${BIN}sigma${EXE}
 

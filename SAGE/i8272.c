@@ -87,8 +87,8 @@ int32 find_unit_index (UNIT *uptr);
 static void i8272_interrupt(I8272* chip,int delay);
 
 /* need to be implemented elsewhere */
-extern void PutByteDMA(const uint32 Addr, const uint32 Value);
-extern uint8 GetByteDMA(const uint32 Addr);
+extern void PutByteDMA(uint32 Addr, uint8 Value);
+extern uint8 GetByteDMA(uint32 Addr);
 
 #define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.            */
 #define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.              */
@@ -147,12 +147,12 @@ DEBTAB i8272_dt[] = {
     { NULL,     0 }
 };
 
-static char* states[] = {
+static const char* states[] = {
     "invalid", "S_CMD", "S_CMDREAD", "S_EXEC", "S_DATAWRITE", "S_SECWRITE", 
     "S_SECREAD", "S_DATAREAD", "S_RESULT"
 };
 
-static char* messages[] = {
+static const char* messages[] = {
     "Undefined Command 0x0", "Undefined Command 0x1", "Read Track",            "Specify",
     "Sense Drive Status",    "Write Data",            "Read Data",             "Recalibrate",
     "Sense Interrupt Status","Write Deleted Data",    "Read ID",               "Undefined Command 0xB",
@@ -204,7 +204,7 @@ int32 find_unit_index (UNIT *uptr)
 }
 
 /* Attach routine */
-t_stat i8272_attach(UNIT *uptr, char *cptr)
+t_stat i8272_attach(UNIT *uptr, CONST char *cptr)
 {
     char header[4];
     t_stat rc;

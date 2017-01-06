@@ -46,10 +46,26 @@
 #ifndef SIM_SOCK_H_
 #define SIM_SOCK_H_    0
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 #if defined (_WIN32)                                    /* Windows */
 #include <winsock2.h>
 
 #elif !defined (__OS2__) || defined (__EMX__)           /* VMS, Mac, Unix, OS/2 EMX */
+#include <sys/types.h>                                  /* for fcntl, getpid */
+#include <sys/socket.h>                                 /* for sockets */
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <netinet/in.h>                                 /* for sockaddr_in */
+#include <netinet/tcp.h>                                /* for TCP_NODELAY */
+#include <arpa/inet.h>                                  /* for inet_addr and inet_ntoa */
+#include <netdb.h>
+#include <sys/time.h>                                   /* for EMX */
+
 #define WSAGetLastError()       errno                   /* Windows macros */
 #define WSASetLastError(err) errno = err
 #define closesocket     close 
@@ -75,34 +91,15 @@
 #define WSAEINTR        EINTR
 #define INVALID_SOCKET  ((SOCKET)-1) 
 #define SOCKET_ERROR    -1
-#include <sys/types.h>                                  /* for fcntl, getpid */
-#include <sys/socket.h>                                 /* for sockets */
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <netinet/in.h>                                 /* for sockaddr_in */
-#include <netinet/tcp.h>                                /* for TCP_NODELAY */
-#include <arpa/inet.h>                                  /* for inet_addr and inet_ntoa */
-#include <netdb.h>
-#include <sys/time.h>                                   /* for EMX */
 #endif
 
 #if defined (VMS)                                       /* VMS unique */
 #include <ioctl.h>                                      /* for ioctl */
-#if !defined (timerclear)
-#define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
-#endif
 #if !defined (AI_NUMERICHOST)
 #define AI_NUMERICHOST 0
 #endif
 #if defined (__VAX)
 #define sockaddr_storage sockaddr
-#endif
-#endif
-#if defined(__EMX__)                                    /* OS/2 unique */
-#if !defined (timerclear)
-#define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
 #endif
 #endif
 
@@ -132,5 +129,9 @@ SOCKET sim_err_sock (SOCKET sock, const char *emsg);
 int sim_getnames_sock (SOCKET sock, char **socknamebuf, char **peernamebuf);
 void sim_init_sock (void);
 void sim_cleanup_sock (void);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

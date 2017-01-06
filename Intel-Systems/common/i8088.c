@@ -449,7 +449,7 @@ DEBTAB i8088_debug[] = {
 };
 
 DEVICE i8088_dev = {
-    "CPU",             //name
+    "I8088",             //name
     &i8088_unit,        //units
     i8088_reg,          //registers
     i8088_mod,          //modifiers
@@ -587,7 +587,6 @@ int32 sim_instr (void)
         if (sim_interval <= 0) {        /* check clock queue */
             if (reason = sim_process_event ()) break;
         }
-        sim_interval--;                 /* countdown clock */
 
         if (int_req > 0) {              /* interrupt? */
 
@@ -601,11 +600,9 @@ int32 sim_instr (void)
             break;
         }
 
-
+        sim_interval--;                 /* countdown clock */
         PCX = IP;
         IR = OP = fetch_byte(0);           /* fetch instruction */
-
-
 
         /* Handle below all operations which refer to registers or
           register pairs.  After that, a large switch statement

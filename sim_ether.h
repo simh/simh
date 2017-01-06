@@ -69,6 +69,10 @@
 #include "sim_defs.h"
 #include "sim_sock.h"
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 /* make common BSD code a bit easier to read in this file */
 /* OS/X seems to define and compile using one of these BSD types */
 #if defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__)
@@ -225,6 +229,7 @@ struct eth_queue {
 struct eth_list {
   char    name[ETH_DEV_NAME_MAX];
   char    desc[ETH_DEV_DESC_MAX];
+  int     eth_api;
 };
 
 typedef int ETH_BOOL;
@@ -235,6 +240,11 @@ typedef void (*ETH_PCALLBACK)(int status);
 typedef struct eth_list ETH_LIST;
 typedef struct eth_queue ETH_QUE;
 typedef struct eth_item ETH_ITEM;
+struct eth_write_request {
+  struct eth_write_request *next;
+  ETH_PACK packet;
+  };
+typedef struct eth_write_request ETH_WRITE_REQUEST;
 
 struct eth_device {
   char*         name;                                   /* name of ethernet device */
@@ -303,12 +313,9 @@ struct eth_device {
   pthread_mutex_t     writer_lock;
   pthread_mutex_t     self_lock;
   pthread_cond_t      writer_cond;
-  struct write_request {
-      struct write_request *next;
-      ETH_PACK packet;
-      } *write_requests;
+  ETH_WRITE_REQUEST *write_requests;
   int write_queue_peak;
-  struct write_request *write_buffers;
+  ETH_WRITE_REQUEST *write_buffers;
   t_stat write_status;
 #endif
 };
@@ -317,7 +324,7 @@ typedef struct eth_device  ETH_DEV;
 
 /* prototype declarations*/
 
-t_stat eth_open   (ETH_DEV* dev, char* name,            /* open ethernet interface */
+t_stat eth_open   (ETH_DEV* dev, const char* name,      /* open ethernet interface */
                    DEVICE* dptr, uint32 dbit);
 t_stat eth_close  (ETH_DEV* dev);                       /* close ethernet interface */
 t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -346,13 +353,15 @@ uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len); /* Compute Ethernet 
 void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, const char* txt); /* trace ethernet packet header+crc */
 void eth_packet_trace_ex (ETH_DEV* dev, const uint8 *msg, int len, const char* txt, int detail, uint32 reason); /* trace ethernet packet */
 t_stat eth_show (FILE* st, UNIT* uptr,                  /* show ethernet devices */
-                 int32 val, void* desc);
+                 int32 val, CONST void* desc);
 t_stat eth_show_devices (FILE* st, DEVICE *dptr,        /* show ethernet devices */
-                         UNIT* uptr, int32 val, char* desc);
+                         UNIT* uptr, int32 val, CONST char* desc);
 void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device state */
 
-void eth_mac_fmt      (ETH_MAC* add, char* buffer);     /* format ethernet mac address */
-t_stat eth_mac_scan (ETH_MAC* mac, char* strmac);       /* scan string for mac, put in mac */
+void eth_mac_fmt (ETH_MAC* const add, char* buffer);    /* format ethernet mac address */
+t_stat eth_mac_scan (ETH_MAC* mac, const char* strmac); /* scan string for mac, put in mac */
+t_stat eth_mac_scan_ex (ETH_MAC* mac,                   /* scan string for mac, put in mac */
+                        const char* strmac, UNIT *uptr);/* for specified unit */
 
 t_stat ethq_init (ETH_QUE* que, int max);               /* initialize FIFO queue */
 void ethq_clear  (ETH_QUE* que);                        /* clear FIFO queue */
@@ -365,5 +374,9 @@ void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO
 t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
 
 const char *eth_capabilities(void);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif                                                  /* _SIM_ETHER_H */

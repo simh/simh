@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Mar-16    PLB     Start GRAPHICS-2 support for PDP-7 UNIX
    10-Mar-16    RMS     Added 3-cycle databreak set/show routines
    26-Feb-16    RMS     Added RB09 to PDP-7 for Unix "v0" and RM09 to PDP-9
    13-Sep-15    RMS     Added DR15C
@@ -86,6 +87,7 @@
                                         Type 550/555 DECtape
                                         Type 24 serial drum
                                         RB09 fixed head disk (Unix V0 only)
+                                        Bell Labs GRAPHICS-2 (Unix V0 only)
 
    PDP9    32K  KE09A EAE               KSR-33 Teletype
                 KF09A auto pri intr     PC09A paper tape reader and punch
@@ -146,6 +148,7 @@
 #define TYPE550         0                               /* DECtape */
 #define DRM             0                               /* drum */
 #define RB              0                               /* fixed head disk */
+#define GRAPHICS2       0                               /* BTL display */
 #elif defined (PDP9)
 #define ADDRSIZE        15
 #define TYPE647         0                               /* sixbit printer */
@@ -290,6 +293,29 @@ typedef struct {
 #define DEV_RB          071                             /* RB09 */
 #define DEV_MT          073                             /* magtape */
 #define DEV_DTA         075                             /* dectape */
+
+#ifdef GRAPHICS2
+/* Bell Telephone Labs GRAPHICS-2 Display System ("as large as the PDP-7")
+ * Used by PDP-7 UNIX as a "Glass TTY"
+ */
+#define DEV_G2D1        005                             /* Display Ctrl 1 */
+#define DEV_G2D         006                             /* (Display Ctrl 2) */
+#define DEV_G2LP        007                             /* (Light Pen) */
+#define DEV_G2DS        010                             /* (Display Status) */
+#define DEV_G2D3        014                             /* (Display Ctrl 3) */
+#define DEV_G2D4        034                             /* (Display Ctrl 4) */
+
+#define DEV_G2UNK       042                             /* (???) */
+#define DEV_G2KB        043                             /* Keyboard */
+#define DEV_G2BB        044                             /* Button Box */
+#define DEV_G2IM        045                             /* (PDP7 int. mask) */
+
+/* PDP-7/9 to 201A Data Phone Interface
+ * (status bits retrieved with G2DS IOT)
+ * used for UNIX to GCOS Remote Job Entry
+ */
+#define DEV_DP          047                             /* (Data Phone) */
+#endif
 
 /* Interrupt system
 
@@ -437,6 +463,7 @@ typedef struct {
 #define INT_V_TTI       0                               /* console keyboard */
 #define INT_V_TTO       1                               /* console output */
 #define INT_V_PTP       2                               /* paper tape punch */
+#define INT_V_G2        3                               /* BTL GRAPHICS-2 */
 
 #define INT_TTI         (1 << INT_V_TTI)
 #define INT_TTO         (1 << INT_V_TTO)
@@ -445,6 +472,15 @@ typedef struct {
 #define API_TTI         4                               /* PI level */
 #define API_TTO         4
 #define API_PTP         4
+
+#ifdef GRAPHICS2
+/*
+ * A PDP-9 version existed,
+ * but we're only interested simulating a PDP-7 without API
+ */
+#define INT_G2          (1 << INT_V_G2)
+#define API_G2          4
+#endif
 
 /* Interrupt macros */
 
@@ -519,9 +555,14 @@ typedef struct {
 
 /* Function prototypes */
 
-t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_3cyc_reg (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_3cyc_reg (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_devno (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat set_3cyc_reg (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_3cyc_reg (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+
+/* Translation tables */
+extern const int32 asc_to_baud[128];
+extern const char baud_to_asc[64];
+extern const char fio_to_asc[64];
 
 #endif
