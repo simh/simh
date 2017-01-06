@@ -267,10 +267,13 @@ typedef uint32          t_addr;
 
 #if defined(_MSC_VER)
 #define SIM_INLINE _inline
+#define SIM_NOINLINE _declspec (noinline)
 #elif defined(__GNUC__)
 #define SIM_INLINE inline
+#define SIM_NOINLINE  __attribute__ ((noinline))
 #else
 #define SIM_INLINE 
+#define SIM_NOINLINE
 #endif
 
 /* Storage class modifier for weak link definition for sim_vm_init() */

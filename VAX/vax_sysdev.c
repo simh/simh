@@ -248,10 +248,10 @@ int32 tmr_csr[2] = { 0 };                               /* SSC timers */
 uint32 tmr_tir[2] = { 0 };                              /* curr interval */
 uint32 tmr_tnir[2] = { 0 };                             /* next interval */
 int32 tmr_tivr[2] = { 0 };                              /* vector */
+t_bool tmr_inst[2] = { 0 };                             /* wait instructions vs usecs */
 int32 ssc_adsm[2] = { 0 };                              /* addr strobes */
 int32 ssc_adsk[2] = { 0 };
 int32 cdg_dat[CDASIZE >> 2];                            /* cache data */
-static uint32 rom_delay = 0;
 
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
@@ -333,7 +333,6 @@ extern void cpu_idle (void);
 UNIT rom_unit = { UDATA (NULL, UNIT_FIX+UNIT_BINK, ROMSIZE) };
 
 REG rom_reg[] = {
-    { DRDATAD (DELAY, rom_delay, 32, "ROM access delay count"), PV_LEFT + REG_RO },
     { NULL }
     };
 
@@ -480,10 +479,12 @@ REG sysd_reg[] = {
     { HRDATAD (TIR0,   tmr_tir[0],  32, "SSC timer 0 interval register") },
     { HRDATAD (TNIR0,  tmr_tnir[0], 32, "SSC timer 0 next interval register") },
     { HRDATAD (TIVEC0, tmr_tivr[0],  9, "SSC timer 0 interrupt vector register") },
-    { HRDATAD (TCSR1,  tmr_csr[1],  32, "SSC timer 1 control/status register") },
+    { HRDATAD (TIVEC0, tmr_tivr[0],  9, "SSC timer 0 interrupt vector register") },
+    { FLDATAD (TINST0, tmr_inst[0],  0, "SSC timer 0 last wait instructions") },
     { HRDATAD (TIR1,   tmr_tir[1],  32, "SSC timer 1 interval register") },
     { HRDATAD (TNIR1,  tmr_tnir[1], 32, "SSC timer 1 next interval register") },
     { HRDATAD (TIVEC1, tmr_tivr[1],  9, "SSC timer 1 interrupt vector register") },
+    { FLDATAD (TINST1, tmr_inst[1],  0, "SSC timer 1 last wait instructions") },
     { HRDATAD (ADSM0,  ssc_adsm[0], 32, "SSC address match 0 address") },
     { HRDATAD (ADSK0,  ssc_adsk[0], 32, "SSC address match 0 mask") },
     { HRDATAD (ADSM1,  ssc_adsm[1], 32, "SSC address match 1 address") },
@@ -536,62 +537,15 @@ DEVICE sysd_dev = {
    issues with the embedded timing loops.  
 */
 
-int32 rom_swapb(int32 val)
+int32 rom_rd (int32 pa)
 {
-return ((val << 24) & 0xff000000) | (( val << 8) & 0xff0000) |
-    ((val >> 8) & 0xff00) | ((val >> 24) & 0xff);
-}
-
-volatile int32 rom_loopval = 0;
-
-int32 rom_read_delay (int32 val)
-{
-uint32 i, l = rom_delay;
+int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
+int32 val = rom[rg];
 
 if (rom_unit.flags & UNIT_NODELAY)
     return val;
 
-/* Calibrate the loop delay factor when first used.
-   Do this 4 times and use the largest value computed. */
-
-if (rom_delay == 0) {
-    uint32 ts, te, c = 10000, samples = 0;
-    while (1) {
-        c = c * 2;
-        te = sim_os_msec();
-        while (te == (ts = sim_os_msec ()));            /* align on ms tick */
-
-/* This is merely a busy wait with some "work" that won't get optimized
-   away by a good compiler. loopval always is zero.  To avoid smart compilers,
-   the loopval variable is referenced in the function arguments so that the
-   function expression is not loop invariant.  It also must be referenced
-   by subsequent code to avoid the whole computation being eliminated. */
-
-        for (i = 0; i < c; i++)
-            rom_loopval |= (rom_loopval + ts) ^ rom_swapb (rom_swapb (rom_loopval + ts));
-        te = sim_os_msec (); 
-        if ((te - ts) < 50)                         /* sample big enough? */
-            continue;
-        if (rom_delay < (rom_loopval + (c / (te - ts) / 1000) + 1))
-            rom_delay = rom_loopval + (c / (te - ts) / 1000) + 1;
-        if (++samples >= 4)
-            break;
-        c = c / 2;
-        }
-    if (rom_delay < 5)
-        rom_delay = 5;
-    }
-
-for (i = 0; i < l; i++)
-    rom_loopval |= (rom_loopval + val) ^ rom_swapb (rom_swapb (rom_loopval + val));
-return val + rom_loopval;
-}
-
-int32 rom_rd (int32 pa)
-{
-int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
-
-return rom_read_delay (rom[rg]);
+return sim_rom_read_with_delay (val);
 }
 
 void rom_wr_B (int32 pa, int32 val)
@@ -636,6 +590,7 @@ t_stat rom_reset (DEVICE *dptr)
 {
 if (rom == NULL)
     rom = (uint32 *) calloc (ROMSIZE >> 2, sizeof (uint32));
+
 if (rom == NULL)
     return SCPE_MEM;
 return SCPE_OK;
@@ -1509,7 +1464,7 @@ switch (rg) {
    with ticks due to the overhead that would be required for 1M
    clock events per second.  
 
-   The powerup TOY Test sometimes fails its tolerance test.  This was
+   The powerup TOY Test sometimes failed its tolerance test.  This was
    due to varying system load causing varying calibration values to be
    used at different times while referencing the TIR.  While timing long
    intervals, we now synchronize the stepping (and calibration) of the
@@ -1518,14 +1473,25 @@ switch (rg) {
    to measure the system clock), regardless of other load issues on the
    host system which might cause varying values of the system clock's
    calibration factor.
+
+   Various ROM activities, including testing the Interval Timers, presume
+   that ROM based code execute instructions at 1 instruction per usec.
+   To accommodate this, we not only throttle memory accesses to ROM space,
+   but we also use instruction based delays when the interval timers are
+   programmed from the ROM for short duration delays.
 */
 
 int32 tmr_tir_rd (int32 tmr)
 {
 if (tmr_csr[tmr] & TMR_CSR_RUN) {           /* running? then interpolate */
-    uint32 usecs_remaining = (uint32)sim_activate_time_usecs (&sysd_dev.units[tmr]);
-    uint32 cur_tir = ~usecs_remaining + 1;
+    uint32 usecs_remaining, cur_tir;
 
+    if ((ADDR_IS_ROM(fault_PC)) &&                  /* running from ROM and */
+        (tmr_inst[tmr]))                            /* waiting instructions? */
+        usecs_remaining = sim_activate_time (&sysd_dev.units[tmr]) - 1;
+    else
+        usecs_remaining = (uint32)sim_activate_time_usecs (&sysd_dev.units[tmr]);
+    cur_tir = ~usecs_remaining + 1;
     sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X, Interpolated while running\n", tmr, cur_tir);
     return cur_tir;
     }
@@ -1628,8 +1594,18 @@ else {
 void tmr_sched (int32 tmr)
 {
 uint32 usecs_sched = tmr_tir[tmr] ? (~tmr_tir[tmr] + 1) : 0xFFFFFFFF;
-sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %u usecs\n", tmr, usecs_sched);
-sim_activate_after (&sysd_unit[tmr], usecs_sched);
+
+if ((ADDR_IS_ROM(fault_PC)) &&                      /* running from ROM and */
+    (usecs_sched < TMR_INC)) {                      /* short delay? */
+    tmr_inst[tmr] = TRUE;                           /* wait for instructions */
+    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %u instructions\n", tmr, usecs_sched);
+    sim_activate (&sysd_unit[tmr], usecs_sched);
+    }
+else {
+    tmr_inst[tmr] = FALSE;
+    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %u usecs\n", tmr, usecs_sched);
+    sim_activate_after (&sysd_unit[tmr], usecs_sched);
+    }
 }
 
 int32 tmr0_inta (void)
@@ -1760,6 +1736,7 @@ int32 i;
 if (sim_switches & SWMASK ('P')) sysd_powerup ();       /* powerup? */
 for (i = 0; i < 2; i++) {
     tmr_csr[i] = tmr_tnir[i] = tmr_tir[i] = 0;
+    tmr_inst[i] = FALSE;
     sim_cancel (&sysd_unit[i]);
     }
 csi_csr = 0;

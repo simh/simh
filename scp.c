@@ -4702,13 +4702,13 @@ int32 accum;
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_clock_queue == QUEUE_LIST_END)
-    fprintf (st, "%s event queue empty, time = %.0f, executing %.0f instructios/sec\n",
-             sim_name, sim_time, sim_timer_inst_per_sec ());
+    fprintf (st, "%s event queue empty, time = %.0f, executing %s instructios/sec\n",
+             sim_name, sim_time, sim_fmt_numeric (sim_timer_inst_per_sec ()));
 else {
     const char *tim;
 
-    fprintf (st, "%s event queue status, time = %.0f, executing %.0f instructions/sec\n",
-             sim_name, sim_time, sim_timer_inst_per_sec ());
+    fprintf (st, "%s event queue status, time = %.0f, executing %s instructions/sec\n",
+             sim_name, sim_time, sim_fmt_numeric (sim_timer_inst_per_sec ()));
     accum = 0;
     for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
         if (uptr == &sim_step_unit)
@@ -9053,21 +9053,21 @@ else
         reason  =       result (SCPE_OK if ok)
 */
 
-t_stat sim_activate_after_abs (UNIT *uptr, uint32 event_time)
+t_stat sim_activate_after_abs (UNIT *uptr, uint32 usec_delay)
 {
-return _sim_activate_after_abs (uptr, event_time);
+return _sim_activate_after_abs (uptr, usec_delay);
 }
 
-t_stat sim_activate_after_abs_d (UNIT *uptr, double event_time)
+t_stat sim_activate_after_abs_d (UNIT *uptr, double usec_delay)
 {
-return _sim_activate_after_abs (uptr, event_time);
+return _sim_activate_after_abs (uptr, usec_delay);
 }
 
-t_stat _sim_activate_after_abs (UNIT *uptr, double event_time)
+t_stat _sim_activate_after_abs (UNIT *uptr, double usec_delay)
 {
 AIO_VALIDATE;                   /* Can't call asynchronously */
 sim_cancel (uptr);
-return _sim_activate_after (uptr, event_time);
+return _sim_activate_after (uptr, usec_delay);
 }
 
 t_stat sim_activate_after (UNIT *uptr, uint32 usec_delay)

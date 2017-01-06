@@ -921,7 +921,7 @@ switch (opcode) {
 
     case TD_OPDAT:
         if (ctlr->p_state != TD_WRITE1) {                   /* expecting data? */
-            sim_printf("TU58 protocol error 1\n");
+            sim_debug (TDDEB_ERR, ctlr->dptr, "td_process_packet() Opcode=%s(%d) - TU58 protocol error 1 - Not Expecting Data\n", opcode_name, opcode);
             return;
             }
         if (ctlr->ibptr < 2) {                              /* whole packet read? */
@@ -934,7 +934,7 @@ switch (opcode) {
 
     case TD_OPCMD:
         if (ctlr->p_state != TD_IDLE) {                     /* expecting command? */
-            sim_printf("TU58 protocol error 2\n");
+            sim_debug (TDDEB_ERR, ctlr->dptr, "td_process_packet() Opcode=%s(%d) - TU58 protocol error 2 - Not Expecting Command\n", opcode_name, opcode);
             return;
             }
         if (ctlr->ibptr < 2) {                              /* whole packet read? */
@@ -1021,6 +1021,10 @@ switch (opcode) {
             sim_debug (TDDEB_TRC, ctlr->dptr, "td_process_packet(OPBOO) Unit=%d\n", ctlr->ibuf[4]);
             ctlr->unitno = ctlr->ibuf[1];
             fbuf = (int8 *)ctlr->uptr[ctlr->unitno].filebuf;
+            if (fbuf == NULL) {                         /* attached? */
+                sim_debug (TDDEB_ERR, ctlr->dptr, "td_process_packet(OPBOO) Unit=%d - NOT ATTACHED\n", ctlr->ibuf[4]);
+                break;
+                }
             ctlr->block = 0;
             ctlr->txsize = 0;
             ctlr->p_state = TD_BOOTSTRAP;
@@ -1043,7 +1047,7 @@ switch (opcode) {
         break;
 
     default:
-        //sim_printf("TU58: Unknown opcode %d\n", opcode);
+        sim_debug (TDDEB_TRC, ctlr->dptr, "td_process_packet(%s) Unit=%d Unknown Opcode: %d\n", opcode_name, ctlr->ibuf[4], opcode);
         break;
     }
 }
