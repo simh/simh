@@ -222,7 +222,9 @@
 #include "sim_tape.h"
 #include "sim_ether.h"
 #include "sim_serial.h"
+#if defined(USE_SIM_VIDEO)
 #include "sim_video.h"
+#endif
 #include "sim_sock.h"
 #include "sim_frontpanel.h"
 #include <signal.h>
@@ -245,6 +247,7 @@
 
 #ifdef OPCON
 #include "PDP11/opcon.h"
+extern uint8 oc_active;
 #endif
 
 #ifndef MAX
@@ -1777,7 +1780,7 @@ ASSERT      failure have several different actions:
       " In most simulators, the SET <device> DISABLED command removes the\n"
       " specified device from the configuration.  A DISABLED device is invisible\n"
       " to running programs.  The device can still be RESET, but it cannot be\n"
-      " ATTAChed, DETACHed, or BOOTed.  SET <device> ENABLED restores a disabled\n"
+      " ATTAChed or DETACHed.  SET <device> ENABLED restores a disabled\n"
       " device to a configuration.\n\n"
       " Most multi-unit devices allow units to be enabled or disabled:\n\n"
       "++SET <unit> ENABLED\n"
@@ -2137,7 +2140,9 @@ detach_all (0, TRUE);                                   /* close files */
 sim_set_deboff (0, NULL);                               /* close debug */
 sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
+#ifdef US_SIM_VIDEO
 vid_close ();                                           /* close video */
+#endif
 sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
 sim_cleanup_sock ();                                    /* cleanup sockets */
@@ -2162,7 +2167,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
         }
 #ifdef OPCON
-    else cptr = oc_read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
+    else cptr = oc_read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prompt*/
 #else
     else cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
 #endif
@@ -2239,6 +2244,10 @@ return cmdp;
 
 t_stat exit_cmd (int32 flag, CONST char *cptr)
 {
+#ifdef OPCON
+if (oc_active)
+  oc_detach((UNIT *)0);
+#endif
 return SCPE_EXIT;
 }
 
@@ -4607,7 +4616,9 @@ if (flag) {
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
+#if defined(USE_SIM_VIDEO)
     fprintf (st, "\n\t\tSDL Video support: %s", vid_version());
+#endif
 #if defined (HAVE_PCREPOSIX_H)
     fprintf (st, "\n\t\tPCRE RegEx support for EXPECT commands");
 #elif defined (HAVE_REGEX_H)
@@ -6530,41 +6541,46 @@ do {
 #ifdef OPCON
         /* Set RUN light on or off, other leds too, depending on model */
       if (oc_halt_status() == TRUE) {
-        r = SCPE_STOP;
-        oc_toggle_clear();
-        switch (cpu_model) {
-          case MOD_1105: oc_port1(FSTS_RUN, 0);
-                         break;
-          case MOD_1120: oc_port1(FSTS_RUN, 0);
-                         break;
-          case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 1);
-                         oc_port1(FSTS_RUN, 0);
-                         break;
-          case MOD_1145: oc_port1(FSTS_RUN, 0);
-                         oc_port1(FSTS_1145_PAUSE, 1);
-                         break;
-          case MOD_1170: oc_port1(FSTS_RUN, 0);
-                         oc_port1(FSTS_1170_PAUSE, 1);
-                         break;
-          default      : break;
+	if (oc_active) {
+          r = SCPE_STOP;
+          oc_send_cmd('a');
+          switch (cpu_model) {
+            case MOD_1105: oc_port1(FSTS_RUN, 0);
+                           break;
+            case MOD_1120: oc_port1(FSTS_RUN, 0);
+                           break;
+            case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 1);
+                           oc_port1(FSTS_RUN, 0);
+                           break;
+            case MOD_1145: oc_port1(FSTS_RUN, 0);
+                           oc_port1(FSTS_1145_PAUSE, 1);
+                           break;
+            case MOD_1170: oc_port1(FSTS_RUN, 0);
+                           oc_port1(FSTS_1170_PAUSE, 1);
+                           break;
+            default      : break;
+            }
           }
-        }
+	}
       else  {
-        switch (cpu_model) {          case MOD_1105: oc_port1(FSTS_RUN, 1);
-                         break;
-          case MOD_1120: oc_port1(FSTS_RUN, 1);
-                         break;
-          case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 0);
-                         oc_port1(FSTS_RUN, 1);
-                         break;
-          case MOD_1145: oc_port1(FSTS_RUN, 1);
-                         oc_port1(FSTS_1145_PAUSE, 0);
-                         break;
-          case MOD_1170: oc_port1(FSTS_RUN, 1);
-                         oc_port1(FSTS_1170_PAUSE, 0);
-                         break;
-          default      : break;
-          }
+	if (oc_active) {
+          switch (cpu_model) {
+            case MOD_1105: oc_port1(FSTS_RUN, 1);
+                           break;
+            case MOD_1120: oc_port1(FSTS_RUN, 1);
+                           break;
+            case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 0);
+                           oc_port1(FSTS_RUN, 1);
+                           break;
+            case MOD_1145: oc_port1(FSTS_RUN, 1);
+                           oc_port1(FSTS_1145_PAUSE, 0);
+                           break;
+            case MOD_1170: oc_port1(FSTS_RUN, 1);
+                           oc_port1(FSTS_1170_PAUSE, 0);
+                           break;
+            default      : break;
+            }
+	  }
         r = sim_instr();
         }
 #else
