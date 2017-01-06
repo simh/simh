@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   06-Jan-17    RMS     Moved CR11/CD11 to BR6 (Mark Pizzolato)
    10-Mar-16    RMS     Added UC15 support
    30-Dec-15    RMS     Added NOBVT option
    23-Oct-13    RMS     Added cpu_set_boot prototype
@@ -35,14 +36,14 @@
    22-May-10    RMS     Added check for 64b definitions
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    16-May-08    RMS     Added KE11A, DC11 support
-   02-Feb-08    RMS     Fixed DMA memory address limit test (found by John Dundas)
-   25-Jan-08    RMS     Added RC11, KG11A support (from John Dundas)
+   02-Feb-08    RMS     Fixed DMA memory address limit test (John Dundas)
+   25-Jan-08    RMS     Added RC11, KG11A support (John Dundas)
    16-Dec-06    RMS     Added TA11 support
    29-Oct-06    RMS     Added clock coscheduling
    06-Jul-06    RMS     Added multiple KL11/DL11 support
    26-Jun-06    RMS     Added RF11 support
-   24-May-06    RMS     Added 11/44 DR support (from CIS diagnostic)
-   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
+   24-May-06    RMS     Added 11/44 DR support (CIS diagnostic)
+   17-May-06    RMS     Added CR11/CD11 support (John Dundas)
    30-Sep-04    RMS     Added Massbus support
                         Removed Map_Addr prototype
                         Removed map argument from Unibus routines
@@ -52,7 +53,7 @@
    22-Dec-03    RMS     Added second DEUNA/DELUA support
    18-Oct-03    RMS     Added DECtape off reel message
    19-May-03    RMS     Revised for new conditional compilation
-   05-Apr-03    RMS     Fixed bug in MMR1 update (found by Tim Stark)
+   05-Apr-03    RMS     Fixed bug in MMR1 update (Tim Stark)
    28-Feb-03    RMS     Added TM logging support
    19-Jan-03    RMS     Changed mode definitions for Apple Dev Kit conflict
    11-Nov-02    RMS     Changed log definitions to be VAX compatible
@@ -654,6 +655,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_PCLK      2
 #define INT_V_DTA       3
 #define INT_V_TA        4
+#define INT_V_CR        5
 
 #define INT_V_PIR5      0                               /* BR5 */
 #define INT_V_RK        1
@@ -684,7 +686,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_LPT       5
 #define INT_V_VHRX      6
 #define INT_V_VHTX      7  
-#define INT_V_CR        8
+// #define XXX             8                               /* former CR */
 #define INT_V_DLI       9
 #define INT_V_DLO       10
 #define INT_V_DCI       11
@@ -751,6 +753,7 @@ typedef struct pdp_dib DIB;
 #define IPL_PCLK        6
 #define IPL_DTA         6
 #define IPL_TA          6
+#define IPL_CR          6
 #define IPL_RK          5
 #define IPL_RL          5
 #define IPL_RX          5
@@ -777,7 +780,6 @@ typedef struct pdp_dib DIB;
 #define IPL_LPT         4
 #define IPL_VHRX        4
 #define IPL_VHTX        4
-#define IPL_CR          4
 #define IPL_DLI         4
 #define IPL_DLO         4
 #define IPL_DCI         4

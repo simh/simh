@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2015, Robert M Supnik
+   Copyright (c) 2004-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-Jan-17    RMS     Moved CR to BR6 (Mark Pizzolato)
    29-Mar-15    RMS     Added model specific IPR max
    16-Dec-14    RMS     Removed TQ boot code (780 VMB doesn't support tape boot)
    05-Sep-14    RMS     Fixed SBR test (found by Mark Pizzolato)
@@ -320,6 +321,8 @@ typedef struct {
 
 /* Interrupt assignments; within each level, priority is right to left */
 
+#define INT_V_CR        0                               /* BR6 */
+
 #define INT_V_DZRX      0                               /* BR5 */
 #define INT_V_DZTX      1
 #define INT_V_HK        2
@@ -333,8 +336,8 @@ typedef struct {
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
 #define INT_V_PTP       2
-#define INT_V_CR        3
 
+#define INT_CR          (1u << INT_V_CR)
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
 #define INT_HK          (1u << INT_V_HK)
@@ -347,8 +350,8 @@ typedef struct {
 #define INT_LPT         (1u << INT_V_LPT)
 #define INT_PTR         (1u << INT_V_PTR)
 #define INT_PTP         (1u << INT_V_PTP)
-#define INT_CR          (1u << INT_V_CR)
 
+#define IPL_CR          (0x16 - IPL_HMIN)
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
 #define IPL_HK          (0x15 - IPL_HMIN)
@@ -361,7 +364,6 @@ typedef struct {
 #define IPL_LPT         (0x14 - IPL_HMIN)
 #define IPL_PTR         (0x14 - IPL_HMIN)
 #define IPL_PTP         (0x14 - IPL_HMIN)
-#define IPL_CR          (0x14 - IPL_HMIN)
 
 /* Device vectors */
 
