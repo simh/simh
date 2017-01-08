@@ -364,7 +364,7 @@ void besm6_multiply (t_value val)
 
     acc.mantissa = l + ahi * bhi;
 
-    if (neg) {
+    if (neg && (acc.mantissa || mr)) {
         mr = (~mr & BITS40) + 1;
         acc.mantissa = ((~acc.mantissa & BITS40) + (mr >> 40))
             | BIT41 | BIT42;
