@@ -755,6 +755,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   else
     ifeq (,$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | grep 'Format:'))
       GIT_COMMIT_ID=$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | awk '{ print $$3 }')
+    else
+      ifeq (git-submodule,$(shell if $(TEST) -d ../.git; then echo git-submodule; fi))
+        ifeq (submodule,$(shell grep 'submodule "simh"' ../.gitmodules | awk 'BEGIN { FS = " " } ; { print $$1 }' | awk 'BEGIN { FS = "\[" } ; { print $$2 }'))
+          GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep simh | awk '{ print $$1 }')
+        endif
+      endif
     endif
   endif
 else
