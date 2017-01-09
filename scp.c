@@ -247,6 +247,7 @@
 
 #ifdef OPCON
 #include "PDP11/opcon.h"
+#ifndef USE_ASYNC_IO
 extern uint8 oc_active;
 #endif
 
@@ -2003,6 +2004,21 @@ int32 i, sw;
 t_bool lookswitch;
 t_stat stat;
 
+
+#if defined(USE_ASYNC_IO) && defined(OPCON)
+pthread_t oc_thread;
+const char *message="OC thread";
+int oc_end=0, oc_ret;
+
+if ((oc_ret = pthread_create( &oc_thread, NULL, oc_service, &oc_end)) != 0) {
+  fprintf(stderr, "Error creating OC thread, return code %d\n", oc_ret);
+  exit (EXIT_FAILURE);
+  }
+#ifdef OPCON_DEBUG
+printf("Created thread, return code %d\n", oc_ret);
+#endif
+#endif
+
 #if defined (__MWERKS__) && defined (macintosh)
 argc = ccommand (&argv);
 #endif
@@ -2148,6 +2164,13 @@ AIO_CLEANUP;                                            /* Asynch I/O */
 sim_cleanup_sock ();                                    /* cleanup sockets */
 fclose (stdnul);                                        /* close bit bucket file handle */
 free (targv);                                           /* release any argv copy that was made */
+
+#if defined(USE_ASYNC_IO) && defined(OPCON)
+  oc_end = 1;
+  if (pthread_join(oc_thread, NULL))
+    printf("\r\nError joining oc_thread.\r\n");
+#endif
+
 return 0;
 }
 
