@@ -234,8 +234,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CDC1700", "CDC1700.vcproj",
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isys8030", "isys8030.vcproj", "{4980F98D-7887-4272-B156-8E7C8AAA4F50}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isys8024", "isys8024.vcproj", "{ACCC3A24-56CD-4543-81F3-5F6A5E24F338}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

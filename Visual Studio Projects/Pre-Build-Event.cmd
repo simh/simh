@@ -123,8 +123,8 @@ if not "%_X_LIBPCRE%"   == "" set _X_BUILD=BUILD
 
 
 :_do_rom
-if "%_X_ROM%" == "" goto _done_rom
 pushd ..
+if "%_X_ROM%" == "" goto _done_rom
 SET _BLD=
 if exist BIN\NT\Win32-Debug\BuildROMs.exe SET _BLD=BIN\NT\Win32-Debug\BuildROMs.exe
 if exist BIN\NT\Win32-Release\BuildROMs.exe SET _BLD=BIN\NT\Win32-Release\BuildROMs.exe
@@ -136,8 +136,13 @@ if "%_BLD%" == "" echo ************************************************
 if "%_BLD%" == "" echo ************************************************
 if "%_BLD%" == "" exit 1
 %_BLD%
+if not errorlevel 1 goto _done_rom
+if not exist "BIN\NT\Win32-Release\BuildROMs.exe" exit 1
+del "BIN\NT\Win32-Release\BuildROMs.exe"
 popd
+goto _do_rom
 :_done_rom
+popd
 
 :_check_build
 if "%_X_BUILD%" == "" goto _done_build

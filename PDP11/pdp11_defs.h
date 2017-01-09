@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   06-Jan-17    RMS     Moved CR11/CD11 to BR6 (Mark Pizzolato)
    30-Dec-15    RMS     Added NOBVT option
    23-Oct-13    RMS     Added cpu_set_boot prototype
    02-Sep-13    RMS     Added third Massbus adapter and RS drive
@@ -595,6 +596,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_PCLK      2
 #define INT_V_DTA       3
 #define INT_V_TA        4
+#define INT_V_CR        5
 
 #define INT_V_PIR5      0                               /* BR5 */
 #define INT_V_RK        1
@@ -630,7 +632,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_LPT       5
 #define INT_V_VHRX      6
 #define INT_V_VHTX      7  
-#define INT_V_CR        8
+//#define XXXXXX          8                               /* former CR */
 #define INT_V_DLI       9
 #define INT_V_DLO       10
 #define INT_V_DCI       11
@@ -716,6 +718,7 @@ typedef struct pdp_dib DIB;
 #define IPL_PCLK        6
 #define IPL_DTA         6
 #define IPL_TA          6
+#define IPL_CR          6
 #define IPL_RK          5
 #define IPL_RL          5
 #define IPL_RX          5
@@ -747,7 +750,6 @@ typedef struct pdp_dib DIB;
 #define IPL_LPT         4
 #define IPL_VHRX        4
 #define IPL_VHTX        4
-#define IPL_CR          4
 #define IPL_DLI         4
 #define IPL_DLO         4
 #define IPL_DCI         4

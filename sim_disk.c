@@ -1509,7 +1509,7 @@ if (capac && (capac != (t_offset)-1)) {
         if ((filesystem_capac != (t_offset)-1) &&
             (filesystem_capac > capac))
             capac = filesystem_capac;
-        if ((capac > (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1))) || 
+        if ((capac != (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1))) || 
             (DKUF_F_STD != DK_GET_FMT (uptr)))
             uptr->capac = (t_addr)(capac/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
         }
