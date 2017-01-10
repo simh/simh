@@ -2357,7 +2357,7 @@ if ((sim_asynch_timer) &&
     uptr->a_due_gtime = sim_gtime () + (sim_timer_inst_per_sec () * (usec_delay / 1000000.0));
     uptr->cancel = &_sim_wallclock_cancel;              /* bind cleanup method */
     uptr->a_is_active = &_sim_wallclock_is_active;
-    if (tmr < SIM_NTIMERS) {                            /* Timer Unit? */
+    if (tmr <= SIM_NTIMERS) {                            /* Timer Unit? */
         sim_clock_unit[tmr]->cancel = &_sim_wallclock_cancel;
         sim_clock_unit[tmr]->a_is_active = &_sim_wallclock_is_active;
         }
@@ -2588,7 +2588,7 @@ int32 tmr;
 
 if (!(uptr->dynflags & UNIT_TMR_UNIT))
     return SCPE_IERR;
-for (tmr=0; tmr<SIM_NTIMERS; tmr++) {
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     if (sim_clock_unit[tmr] == uptr)
         return sim_cancel (&sim_timer_units[tmr]);
     }
@@ -2604,7 +2604,7 @@ t_bool b_return = FALSE;
 AIO_UPDATE_QUEUE;
 pthread_mutex_lock (&sim_timer_lock);
 /* If this is a clock unit, we need to cancel both this and the related timer unit */
-for (tmr=0; tmr<SIM_NTIMERS; tmr++)
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++)
     if (sim_clock_unit[tmr] == uptr) {
         uptr = &sim_timer_units[tmr];
         break;
@@ -2640,7 +2640,7 @@ if (uptr->a_next) {
         uptr->a_due_time = uptr->a_due_gtime = uptr->a_usec_delay = 0;
         uptr->cancel = NULL;
         uptr->a_is_active = NULL;
-        if (tmr < SIM_NTIMERS) {                        /* Timer Unit? */
+        if (tmr <= SIM_NTIMERS) {                        /* Timer Unit? */
             sim_clock_unit[tmr]->cancel = NULL;
             sim_clock_unit[tmr]->a_is_active = NULL;
             }
@@ -2658,7 +2658,7 @@ int32 tmr;
 if (uptr->a_next)
     return TRUE;
 /* If this is a clock unit, we need to examine the related timer unit instead */
-for (tmr=0; tmr<SIM_NTIMERS; tmr++)
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++)
     if (sim_clock_unit[tmr] == uptr)
         return (sim_timer_units[tmr].a_next != NULL);
 return FALSE;
@@ -2715,7 +2715,7 @@ if (uptr->cancel == &_sim_coschedule_cancel) {
             }
         }
     }
-for (tmr=0; tmr<SIM_NTIMERS; tmr++)
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++)
     if (sim_clock_unit[tmr] == uptr)
         return sim_activate_time (&sim_timer_units[tmr]);
 return -1;                                          /* Not found. */    
@@ -2743,10 +2743,8 @@ if (uptr->a_is_active == &_sim_wallclock_is_active) {
         d_result = uptr->a_due_gtime - sim_gtime ();
         if (d_result < 0.0)
             d_result = 0.0;
-        if (d_result > (double)0x7FFFFFFE)
-            d_result = (double)0x7FFFFFFE;
         pthread_mutex_unlock (&sim_timer_lock);
-        return (1000000.0 * (d_result / sim_timer_inst_per_sec ())) + 1;
+        return uptr->usecs_remaining + (1000000.0 * (d_result / sim_timer_inst_per_sec ())) + 1;
         }
     for (cptr = sim_wallclock_queue;
          cptr != QUEUE_LIST_END;
@@ -2755,15 +2753,13 @@ if (uptr->a_is_active == &_sim_wallclock_is_active) {
             d_result = uptr->a_due_gtime - sim_gtime ();
             if (d_result < 0.0)
                 d_result = 0.0;
-            if (d_result > (double)0x7FFFFFFE)
-                d_result = (double)0x7FFFFFFE;
             pthread_mutex_unlock (&sim_timer_lock);
-            return (1000000.0 * (d_result / sim_timer_inst_per_sec ())) + 1;
+            return uptr->usecs_remaining + (1000000.0 * (d_result / sim_timer_inst_per_sec ())) + 1;
             }
     pthread_mutex_unlock (&sim_timer_lock);
     }
 if (uptr->a_next)
-    return (1000000.0 * (uptr->a_event_time / sim_timer_inst_per_sec ())) + 1;
+    return uptr->usecs_remaining + (1000000.0 * (uptr->a_event_time / sim_timer_inst_per_sec ())) + 1;
 #endif /* defined(SIM_ASYNCH_CLOCKS) */
 
 if (uptr->cancel == &_sim_coschedule_cancel) {
@@ -2782,9 +2778,9 @@ if (uptr->cancel == &_sim_coschedule_cancel) {
             }
         }
     }
-for (tmr=0; tmr<SIM_NTIMERS; tmr++)
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++)
     if (sim_clock_unit[tmr] == uptr)
-        return (1000000.0 * sim_activate_time (&sim_timer_units[tmr])) / sim_timer_inst_per_sec ();
+        return sim_clock_unit[tmr]->usecs_remaining + (1000000.0 * sim_activate_time (&sim_timer_units[tmr])) / sim_timer_inst_per_sec ();
 return -1.0;                                          /* Not found. */    
 }
 
