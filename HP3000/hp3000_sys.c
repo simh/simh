@@ -23,9 +23,16 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   29-Dec-16    JDB     Changed the switch for STA format from -S to -T;
+                        changed the status mnemonic flag from REG_S to REG_T
+   28-Nov-16    JDB     hp_device_conflict accumulates names of active traces only
+                        Improved parse_addr error detection
+   26-Oct-16    JDB     Added "fprint_edit" to print EDIT subprogram mnemonics
+   27-Sep-16    JDB     Added COBOL firmware mnemonics
+                        Modified "fprint_instruction" to handle two-word instructions
    15-Sep-16    JDB     Modified "one_time_init" to set aux_cmds "message" field
    03-Sep-16    JDB     Added the STOP_POWER and STOP_ARSINH messages
-   01-Sep-16    JDB     Moved the hp_cold_cmd routine to the CPU (as cpu_cold_cmd)
+   01-Sep-16    JDB     Moved the "hp_cold_cmd" routine to the CPU (as "cpu_cold_cmd")
                         Added the POWER command
    03-Aug-16    JDB     Improved "fmt_char" and "fmt_bitset" to allow multiple calls
    15-Jul-16    JDB     Fixed the word count display for SIO read/write orders
@@ -63,13 +70,13 @@
 #include "hp3000_defs.h"
 #include "hp3000_cpu.h"
 #include "hp3000_cpu_ims.h"
+#include "hp3000_mem.h"
 #include "hp3000_io.h"
 
 
 
 /* External I/O data structures */
 
-extern DEVICE cpu_dev;                          /* Central Processing Unit */
 extern DEVICE iop_dev;                          /* I/O Processor */
 extern DEVICE mpx_dev;                          /* Multiplexer Channel */
 extern DEVICE sel_dev;                          /* Selector Channel */
@@ -124,11 +131,35 @@ typedef enum {
        right-justified in the instruction word, i.e., extend from bits n-15,
        unless otherwise noted.
 
-    2. Operand masks for signed values must include both signs and magnitudes.
+    2. Operands for one-word instructions are in the lower (first) word;
+       operands for two-word instructions are in the upper (second) word.
+
+    3. Operand masks for signed values must include both signs and magnitudes.
+
+    4. Operand masks are defined as the complements of the operand bits to make
+       it easier to see which bits will be cleared when the value is ANDed.  The
+       complements are calculated at compile-time and so impose no run-time
+       penalty.
+
+    5. The base set "move" instructions contain S-decrement fields that indicate
+       the counts of parameters to remove from the stack when the instructions
+       complete.  Certain "decimal arithmetic" instructions of the optional
+       Extended Instruction Set and certain "numeric conversion and load"
+       instructions of the optional COBOL II Extended Instruction Set contain
+       one or two S-decrement bits, but these encode the stack adjustment rather
+       than expressing the adjustment directly.
+
+       The SPL "ASMB" statement accepts the EIS instructions with the stack
+       adjustment given as the encoded value, e.g., CVAD 0 and CVAD 1 are
+       accepted, with the former deleting two words and the latter deleting four
+       words from the stack.  Therefore, all S-decrement operands are printed
+       and parsed as their direct field values, rather than decoding and
+       encoding the actual decrements.
 */
 
 typedef enum {
     opNone,                                     /* no operand */
+    opB15,                                      /* PB/DB base bit 15 */
     opU1,                                       /* unsigned value range 0-1 */
     opU1515,                                    /* unsigned value pair range 0-15 */
     opU63,                                      /* unsigned value range 0-63 */
@@ -141,8 +172,9 @@ typedef enum {
     opPS255,                                    /* P +/- displacement range 0-255 */
     opPU255,                                    /* P unsigned displacement range 0-255 */
     opPS255IX,                                  /* P +/- displacement range 0-255, indirect bit 5, index bit 4 */
-    opS,                                        /* S decrement bit 11 */
-    opSCS,                                      /* sign control bits 9-10, S decrement bit 11 */
+    opS11,                                      /* S decrement selection bit 11 */
+    opS15,                                      /* S decrement selection bit 15 */
+    opSCS3,                                     /* sign control bits 9-10, S decrement bit 11 */
     opSU2,                                      /* S decrement range 0-2 bits 10-11 */
     opSU3,                                      /* S decrement range 0-3 */
     opSU3B,                                     /* S decrement range 0-3, base bit 11 */
@@ -151,34 +183,46 @@ typedef enum {
     opSU15,                                     /* S decrement range 0-15 */
     opD255IX,                                   /* DB+/Q+/Q-/S- displacements, indirect bit 5, index bit 4 */
     opPD255IX,                                  /* P+/P-/DB+/Q+/Q-/S- displacements, indirect bit 5, index bit 4 */
-    opX                                         /* index bit 4 */
+    opX,                                        /* index bit 4 */
+
+    opB31,                                      /* second word: PB/DB base bit 15 */
+    opS31,                                      /* second word: S decrement selection bit 15 */
+    opCC7,                                      /* second word: condition code flags bits 13-15 */
+    opSCS4                                      /* second word: sign control bits 12-14, S decrement bit 15 */
     } OP_TYPE;
 
 static const t_value op_mask [] = {             /* operand masks, indexed by OP_TYPE */
-    0177777,                                    /*   opNone */
-    0177776,                                    /*   opU1 */
-    0177400,                                    /*   opU1515 */
-    0177700,                                    /*   opU63 */
-    0173700,                                    /*   opU63X */
-    0177400,                                    /*   opU255 */
-    0177760,                                    /*   opC15 */
-    0177400,                                    /*   opR255L */
-    0177400,                                    /*   opR255R */
-    0173700,                                    /*   opPS31I */
-    0177000,                                    /*   opPS255 */
-    0177400,                                    /*   opPU255 */
-    0171000,                                    /*   opPS255IX */
-    0177757,                                    /*   opS */
-    0177617,                                    /*   opSCS */
-    0177717,                                    /*   opSU2 */
-    0177774,                                    /*   opSU3 */
-    0177754,                                    /*   opSU3B */
-    0177740,                                    /*   opSU3NAS */
-    0177770,                                    /*   opSU7 */
-    0177760,                                    /*   opSU15 */
-    0171000,                                    /*   opD255IX */
-    0170000,                                    /*   opPD255IX */
-    0173777                                     /*   opX */
+    ~0000000u,                                  /*   opNone    */
+    ~0000001u,                                  /*   opB15     */
+    ~0000001u,                                  /*   opU1      */
+    ~0000377u,                                  /*   opU1515   */
+    ~0000077u,                                  /*   opU63     */
+    ~0004077u,                                  /*   opU63X    */
+    ~0000377u,                                  /*   opU255    */
+    ~0000017u,                                  /*   opC15     */
+    ~0000377u,                                  /*   opR255L   */
+    ~0000377u,                                  /*   opR255R   */
+    ~0004077u,                                  /*   opPS31I   */
+    ~0000777u,                                  /*   opPS255   */
+    ~0000377u,                                  /*   opPU255   */
+    ~0006777u,                                  /*   opPS255IX */
+    ~0000020u,                                  /*   opS11     */
+    ~0000001u,                                  /*   opS15     */
+    ~0000160u,                                  /*   opSCS3    */
+    ~0000060u,                                  /*   opSU2     */
+    ~0000003u,                                  /*   opSU3     */
+    ~0000023u,                                  /*   opSU3B    */
+    ~0000037u,                                  /*   opSU3NAS  */
+    ~0000007u,                                  /*   opSU7     */
+    ~0000017u,                                  /*   opSU15    */
+    ~0006777u,                                  /*   opD255IX  */
+    ~0007777u,                                  /*   opPD255IX */
+    ~0004000u,                                  /*   opX       */
+
+    ~TO_DWORD (0000001u, 0000000u),             /*   opB31     */
+    ~TO_DWORD (0000001u, 0000000u),             /*   opS31     */
+    ~TO_DWORD (0000007u, 0000000u),             /*   opCC7     */
+    ~TO_DWORD (0000017u, 0000000u)              /*   opSCS4    */
     };
 
 
@@ -201,18 +245,18 @@ static const t_value op_mask [] = {             /* operand masks, indexed by OP_
    the first (primary) part of the table contains the appropriate number of
    classification elements.  This allows rapid access to a specific instruction
    based on its bit pattern.  In this primary part, the reserved bits masks are
-   not used.
+   not defined or used.
 
-   If some instructions in a class have reserved bits, or if the sub-opcode
-   decoding is not regular, the second (secondary) part of the table contains
-   classification elements that specify reserved bits masks.  This part is
-   searched linearly.
+   If some instructions in a class have reserved bits, if the sub-opcode
+   decoding is not regular, or if the instruction requires two words to decode,
+   then the second (secondary) part of the table contains classification
+   elements that specify reserved bits masks.  This part is searched linearly.
 
    As an example, the stack instructions have bits 0-3 = 0.  The remaining
    twelve bits are broken into two six-bit fields.  Each field encodes one of 64
-   stack operations (actually, 63 operations, as one is reserved).  As the stack
-   operations are fully decoded, the table consists only of 64 primary elements,
-   corresponding one-for-one to the 64 operations.
+   stack operations (actually, 63 operations, as one is unassigned).  As the
+   stack operations are fully decoded, the table consists only of 64 primary
+   elements, corresponding one-for-one to the 64 operations.
 
    As as contrasting example, the shift and branch operations have bits 0-3 = 1
    and are fully decoded by bits 5-9, except for two instructions that have
@@ -237,6 +281,22 @@ static const t_value op_mask [] = {             /* operand masks, indexed by OP_
    range of opcodes that decode to the instruction; this entry presents the
    opcode mnemonic in lowercase as an indicator that it is not the canonical
    representation.
+
+   Two-word instructions are, by definition, never decoded by a primary opcode,
+   so they will always be found in the secondary entries of a classification
+   table with 32-bit opcode and reserved bits mask values.  The opcode value
+   contains the first word of the instruction in the lower half and the second
+   word in the upper half.  The lower half of the reserved bits mask value will
+   have all bits set, and the upper half will have all bits set except for those
+   corresponding to reserved bits in the second instruction word (if any).  A
+   two-word entry, therefore, may be identified by a mask value with a non-zero
+   upper half.
+
+   A secondary entry with a zero-length mnemonic may be used to match the first
+   word of a two-word instruction if none of the second words match earlier
+   entries.  This ensures that unimplemented two-word instructions are printed
+   as a two-word octal value rather than as a one-word octal value followed by
+   the mnemonic for a one-word instruction.
 
    The end of an operations table is indicated by a NULL mnemonic pointer.
 */
@@ -456,8 +516,12 @@ static const OP_TABLE sbb_ops = {
        IXIT = 0000, PCN = nnn0, LOCK = nn01, and UNLK = nn11, where n is any
        collective value other than 0.
 
-    2. By convention, SIMH simulators always decode all supported instructions,
-       regardless of whether or not they are enabled by currents CPU firmware
+    2. The secondary entry with the empty mnemonic ensures that an unimplemented
+       two-word instruction is printed as "020477,000001" (e.g.) rather than
+       "020477" followed by "NOP,DELB".
+
+    3. By convention, SIMH simulators always decode all supported instructions,
+       regardless of whether or not they are enabled by current CPU firmware
        configurations.  So the EIS, APL, and COBOL-II instructions are present
        in the table and are not conditional on the CPU options set.
 */
@@ -506,19 +570,40 @@ static const OP_TABLE msfifr_ops = {
     { "pcn",  0020360, opNone,   0177761 },     /* decodes bits 12-15 as nnn0 */
     { "UNLK", 0020363, opNone,   0177777 },
     { "unlk", 0020363, opNone,   0177763 },     /* decodes bits 12-15 as nn11 */
+
     { "EADD", 0020410, opNone,   0177777 },
     { "ESUB", 0020411, opNone,   0177777 },
     { "EMPY", 0020412, opNone,   0177777 },
     { "EDIV", 0020413, opNone,   0177777 },
     { "ENEG", 0020414, opNone,   0177777 },
     { "ECMP", 0020415, opNone,   0177777 },
+
+    { "ALGN", 0020460, opS15,    0177777 },
+    { "ABSN", 0020462, opS15,    0177777 },
+    { "EDIT", 0020470, opB15,    0177777 },
+    { "CMPS", 0020472, opB15,    0177777 },
+    { "XBR",  0020474, opNone,   0177777 },
+    { "PARC", 0020475, opNone,   0177777 },
+    { "ENDP", 0020476, opNone,   0177777 },
+
+    { "CMPT", TO_DWORD (0000006, 0020477), opB31,  D32_MASK },
+    { "TCCS", TO_DWORD (0000010, 0020477), opCC7,  D32_MASK },
+    { "CVND", TO_DWORD (0000020, 0020477), opSCS4, D32_MASK },
+    { "LDW",  TO_DWORD (0000040, 0020477), opS31,  D32_MASK },
+    { "LDDW", TO_DWORD (0000042, 0020477), opS31,  D32_MASK },
+    { "TR",   TO_DWORD (0000044, 0020477), opB31,  D32_MASK },
+    { "ABSD", TO_DWORD (0000046, 0020477), opS31,  D32_MASK },
+    { "NEGD", TO_DWORD (0000050, 0020477), opS31,  D32_MASK },
+    { "",     0020477, opNone,   0177777 },                     /* catch unimplemented two-word instructions */
+
     { "DMUL", 0020570, opNone,   0177777 },
     { "DDIV", 0020571, opNone,   0177777 },
+
     { "DMPY", 0020601, opNone,   0177617 },
-    { "CVAD", 0020602, opS,      0177637 },
-    { "CVDA", 0020603, opSCS,    0177777 },
-    { "CVBD", 0020604, opS,      0177637 },
-    { "CVDB", 0020605, opS,      0177637 },
+    { "CVAD", 0020602, opS11,    0177637 },
+    { "CVDA", 0020603, opSCS3,   0177777 },
+    { "CVBD", 0020604, opS11,    0177637 },
+    { "CVDB", 0020605, opS11,    0177637 },
     { "SLD",  0020606, opSU2,    0177677 },
     { "NSLD", 0020607, opSU2,    0177677 },
     { "SRD",  0020610, opSU2,    0177677 },
@@ -756,6 +841,102 @@ static const OP_TABLE mlb_ops = {
     };
 
 
+/* EDIT subprogram operations.
+
+   The EDIT instruction, part of the COBOL II Extended Instruction Set,
+   implements the COBOL "PICTURE" clause.  The formation of the edited string is
+   controlled by a subprogram whose address is pushed onto the stack.
+   Subprogram operations are encoded into variable-length sequences of bytes.
+   Each operation begins with an opcode of the form:
+
+       0   1   2   3   4   5   6   7
+     +---+---+---+---+---+---+---+---+
+     |    opcode     | imm. operand  |
+     +---+---+---+---+---+---+---+---+
+
+   Opcodes 0-16 directly decode to specific operations, and the lower half of
+   the first byte contains an immediate operand value from 1-15 or a zero value
+   that indicates that the immediate operand is contained in the next byte.
+   Opcode 17 is a prefix for the subopcode contained in the lower half of the
+   first byte in place of the immediate operand.  Opcode bytes are followed by
+   zero or more operand bytes, depending on the operation.
+
+   The opcodes and their assigned operations are:
+
+     Opcode  SubOp  Mnem  Movement  Operation
+     ------  -----  ----  --------  ---------------------------------------
+       00      -    MC     s => t   move characters
+       01      -    MA     s => t   move alphabetics
+       02      -    MN     s => t   move numerics
+       03      -    MNS    s => t   move numerics suppressed
+       04      -    MFL    s => t   move numerics with floating insertion
+       05      -    IC     c => t   insert character
+       06      -    ICS    c => t   insert character suppressed
+       07      -    ICI    p => t   insert characters immediate
+       10      -    ICSI   p => t   insert characters suppressed immediate
+       11      -    BRIS   (none)   branch if significance
+       12      -    SUFT   (none)   subtract from target
+       13      -    SUFS   (none)   subtract from source
+       14      -    ICP    c -> t   insert character punctuation
+       15      -    ICPS   c -> t   insert character punctuation suppressed
+       16      -    IS     p => t   insert character on sign
+       17     00    TE     (none)   terminate edit
+       17     01    ENDF   c -> t   end floating point insertion
+       17     02    SST1   (none)   set significance to 1
+       17     03    SST0   (none)   set significance to 0
+       17     04    MDWO   s -> t   move digit with overpunch
+       17     05    SFC    (none)   set fill character
+       17     06    SFLC   (none)   set float character
+       17     07    DFLC   (none)   define float character
+       17     10    SETC   (none)   set loop count
+       17     11    DBNZ   (none)   decrement loop count and branch
+
+   Where:
+
+     s  = source byte string operand
+     t  = target byte string operand
+     p  = program byte string operand
+     c  = character operand
+     -> = move 1 byte
+     => = move n bytes
+
+
+   Implementation notes:
+
+    1. The operation name table is indexed by the sum of the opcode and
+       subopcode, where the latter is zero if the opcode is not extended.  This
+       provides simple access to a single table.
+*/
+
+static const char *const edit_ops [] = {        /* EDIT operation names */
+    "MC",                                       /*   000 - move characters */
+    "MA",                                       /*   001 - move alphabetics */
+    "MN",                                       /*   002 - move numerics */
+    "MNS",                                      /*   003 - move numerics suppressed */
+    "MFL",                                      /*   004 - move numerics with floating insertion */
+    "IC",                                       /*   005 - insert character */
+    "ICS",                                      /*   006 - insert character suppressed */
+    "ICI",                                      /*   007 - insert characters immediate */
+    "ICSI",                                     /*   010 - insert characters suppressed immediate */
+    "BRIS",                                     /*   011 - branch if significance */
+    "SUFT",                                     /*   012 - subtract from target */
+    "SUFS",                                     /*   013 - subtract from source */
+    "ICP",                                      /*   014 - insert character punctuation */
+    "ICPS",                                     /*   015 - insert character punctuation suppressed */
+    "IS",                                       /*   016 - insert character on sign */
+    "TE",                                       /*   017 (017 + 000) - terminate edit */
+    "ENDF",                                     /*   020 (017 + 001) - end floating point insertion */
+    "SST1",                                     /*   021 (017 + 002) - set significance to 1 */
+    "SST0",                                     /*   022 (017 + 003) - set significance to 0 */
+    "MDWO",                                     /*   023 (017 + 004) - move digit with overpunch */
+    "SFC",                                      /*   024 (017 + 005) - set fill character */
+    "SFLC",                                     /*   025 (017 + 006) - set float character */
+    "DFLC",                                     /*   026 (017 + 007) - define float character */
+    "SETC",                                     /*   027 (017 + 010) - set loop count */
+    "DBNZ"                                      /*   030 (017 + 011) - decrement loop count and branch */
+    };
+
+
 /* System interface local SCP support routines */
 
 static void   one_time_init  (void);
@@ -771,7 +952,8 @@ static t_stat hp_brk_cmd   (int32 arg, CONST char *buf);
 
 static void   fprint_value       (FILE *ofile, t_value val,  uint32 radix, uint32 width, uint32 format);
 static t_stat fprint_order       (FILE *ofile, t_value *val, uint32 radix);
-static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *instruction,
+static t_stat fprint_subop       (FILE *ofile, t_value *val, uint32 radix, t_addr addr, int32 switches);
+static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *val,
                                   uint32 mask, uint32 shift, uint32 radix);
 
 static t_stat parse_cpu          (CONST char *cptr, t_addr address, UNIT *uptr, t_value *value, int32 switches);
@@ -1017,23 +1199,26 @@ return SCPE_ARG;                                        /* return an error if ca
    The following symbolic formats are supported by the listed switches:
 
      Switch   Interpretation
-     ------   -----------------------------------
-       -a     a single character in the low byte
+     ------   --------------------------------------------------
+       -a     a single character in the right-hand byte
        -b     a 16-bit binary value
        -c     a two-character packed string
+       -e     an EDIT instruction subprogram mnemonic
        -i     an I/O program instruction mnemonic
        -m     a CPU instruction mnemonic
        -s     a CPU status mnemonic
+
        -o     override numeric output to octal
        -d     override numeric output to decimal
        -h     override numeric output to hex
+       -r     begin EDIT interpretation with the right-hand byte
 
    Memory may be displayed in any format.  All registers may be overridden to
    display in octal, decimal, or hexadecimal numeric format.  Only registers
    marked with the REG_A flag may be displayed in any format.  Registers marked
    with REG_B may be displayed in binary format.  Registers marked with REG_M
    will default to CPU instruction mnemonic display.  Registers marked with
-   REG_S will default to CPU status mnemonic display.
+   REG_T will default to CPU status mnemonic display.
 
    When displaying mnemonics, operand values are displayed in a radix suitable
    to the type of the value.  Address values are displayed in the CPU's address
@@ -1098,18 +1283,21 @@ else {                                                      /* otherwise display
     if (sw & SWMASK ('I') && !is_reg)                       /* if I/O channel order memory display is requested */
         return fprint_order (ofile, val, radix_override);   /*   then format and print it */
 
+    else if (sw & SWMASK ('E') && !is_reg)                  /* otherwise if an EDIT subop memory display is requested */
+        return fprint_subop (ofile, val, radix_override, addr, sw);
+
     else if (sw & SWMASK ('M')                              /* otherwise if CPU instruction display is requested */
       && (!is_reg || addr & (REG_A | REG_M))                /*   and is permitted */
       || is_reg && addr & REG_M && radix_override == 0)     /* or if displaying a register that defaults to mnemonic */
         return fprint_cpu (ofile, val, radix_override, sw); /*   then format and print it */
 
-    else if (sw & SWMASK ('S')                              /* otherwise if status display is requested */
-      && (!is_reg || addr & (REG_A | REG_S))                /*   and is permitted */
-      || is_reg && addr & REG_S && radix_override == 0) {   /* or if displaying a register that defaults to status */
+    else if (sw & SWMASK ('T')                              /* otherwise if status display is requested */
+      && (!is_reg || addr & (REG_A | REG_T))                /*   and is permitted */
+      || is_reg && addr & REG_T && radix_override == 0) {   /* or if displaying a register that defaults to status */
         fputs (fmt_status ((uint32) val [0]), ofile);       /*   then format the status flags and condition code */
         fputc (' ', ofile);                                 /*     and add a separator */
 
-        fprint_value (ofile, val [0] & STATUS_CS_MASK,      /* print the code segment number */
+        fprint_value (ofile, STATUS_CS (val [0]),           /* print the code segment number */
                       (radix_override ? radix_override : cpu_dev.dradix),
                       STATUS_CS_WIDTH, PV_RZRO);
 
@@ -1389,168 +1577,6 @@ return SCPE_OK;                                         /* return the display re
 /* System interface global utility routines */
 
 
-/* Check for device conflicts.
-
-   The device information blocks (DIBs) for the set of enabled devices are
-   checked for consistency.  Each device number, interrupt priority number, and
-   service request number must be unique among the enabled devices.  These
-   requirements are checked as part of the instruction execution prelude; this
-   allows the user to exchange two device numbers (e.g.) simply by setting each
-   device to the other's device number.  If conflicts were enforced instead at
-   the time the numbers were entered, the first device would have to be set to
-   an unused number before the second could be set to the first device's number.
-
-   The routine begins by filling in a DIB value table from all of the device
-   DIBs to allow indexed access to the values to be checked.  Unused DIB values
-   and values corresponding to devices that have no DIBs or are disabled are set
-   to the corresponding UNUSED constants.
-
-   As part of the device scan, the sizes of the largest device name and debug
-   flag name among the devices enabled for debugging are accumulated for use in
-   printing debug tracing statements.
-
-   After the DIB value table is filled in, a conflict check is made for each
-   conflict type (i.e., device number, interrupt priority, or service request
-   number).  For each check, a conflict table is built, where each array element
-   is set to the count of devices that contain DIB values equal to the element
-   index.  For example, when processing device number values, conflict table
-   element 6 is set to the count of devices that have dibptr->device_number set
-   to 6.  If any conflict table element is set more than once, the "conflict_is"
-   variable is set to the type of conflict.
-
-   If any conflicts exist for the current type, the conflict table is scanned.
-   A conflict table element value (i.e., device count) greater than 1 indicates
-   a conflict.  For each such value, the DIB value table is scanned to find
-   matching values, and the device names associated with the matching values are
-   printed.
-
-   This routine returns TRUE if any conflicts exist and FALSE there are none.
-
-
-   Implementation notes:
-
-    1. When this routine is called, the console and optional log file have
-       already been put into "raw" output mode.  Therefore, newlines are not
-       translated to the correct line ends on systems that require it.  Before
-       reporting a conflict, "sim_ttcmd" is called to restore the console and
-       log file translation.  This is OK because a conflict will abort the run
-       and return to the command line anyway.
-
-    2. sim_dname is called instead of using dptr->name directly to ensure that
-       we pick up an assigned logical device name.
-*/
-
-t_bool hp_device_conflict (void)
-{
-typedef enum {                                          /* conflict types */
-    Device,                                             /*   device number conflict */
-    Interrupt,                                          /*   interrupt priority conflict */
-    Service,                                            /*   service request number conflict */
-    None                                                /*   no conflict */
-    } CONFLICT_TYPE;
-
-#define CONFLICT_COUNT      3                           /* the number of conflict types to check */
-
-static const uint32 max_number [CONFLICT_COUNT] = {     /* the last element index, in CONFLICT_TYPE order */
-    DEVNO_MAX,
-    INTPRI_MAX,
-    SRNO_MAX
-    };
-
-static const char *conflict_label [CONFLICT_COUNT] = {  /* the conflict names, in CONFLICT_TYPE order */
-    "Device number",
-    "Interrupt priority",
-    "Service request number"
-    };
-
-const DIB     *dibptr;
-const DEBTAB  *tptr;
-DEVICE        *dptr;
-size_t        name_length, flag_length;
-uint32        dev, val;
-CONFLICT_TYPE conf, conflict_is;
-int32         count;
-int32         dib_val   [DEVICE_COUNT] [CONFLICT_COUNT];
-int32         conflicts [DEVNO_MAX + 1];
-
-device_size = 0;                                        /* reset the device and flag name sizes */
-flag_size = 0;                                          /*   to those of the devices actively debugging */
-
-for (dev = 0; dev < DEVICE_COUNT; dev++) {              /* fill in the DIB value table */
-    dptr = (DEVICE *) sim_devices [dev];                /*   from the device table */
-    dibptr = (DIB *) dptr->ctxt;                        /*      and their associated DIBs */
-
-    if (dibptr && !(dptr->flags & DEV_DIS)) {                   /* if the DIB is defined and the device is enabled */
-        dib_val [dev] [Device]    = dibptr->device_number;      /*   then copy the values to the DIB table */
-        dib_val [dev] [Interrupt] = dibptr->interrupt_priority;
-        dib_val [dev] [Service]   = dibptr->service_request_number;
-        }
-
-    else {                                                      /* otherwise the device will not participate in I/O */
-        dib_val [dev] [Device]    = DEVNO_UNUSED;               /*   so set this table entry */
-        dib_val [dev] [Interrupt] = INTPRI_UNUSED;              /*     to the "unused" values */
-        dib_val [dev] [Service]   = SRNO_UNUSED;
-        }
-
-    if (sim_deb && dptr->dctrl) {                       /* if debugging is active for this device */
-        name_length = strlen (sim_dname (dptr));        /*   then get the length of the device name */
-
-        if (name_length > device_size)                  /* if it's greater than the current maximum */
-            device_size = name_length;                  /*   then reset the size */
-
-        if (dptr->debflags)                             /* if the device has a debug flags table */
-            for (tptr = dptr->debflags;                 /*   then scan the table */
-                 tptr->name != NULL; tptr++) {          /*     to check the length */
-                flag_length = strlen (tptr->name);      /*       of each flag name */
-
-                if (flag_length > flag_size)            /* if it's greater than the current maximum */
-                    flag_size = flag_length;            /*   then reset the size */
-                }
-        }
-    }
-
-conflict_is = None;                                     /* assume that no conflicts exist */
-
-for (conf = Device; conf <= Service; conf++) {          /* check for conflicts for each type */
-    memset (conflicts, 0, sizeof conflicts);            /* zero the conflict table for each check */
-
-    for (dev = 0; dev < DEVICE_COUNT; dev++)            /* populate the conflict table from the DIB value table */
-        if (dib_val [dev] [conf] >= 0)                  /* if this device has an assigned value */
-            if (++conflicts [dib_val [dev] [conf]] > 1) /*   then increment the count of references */
-                conflict_is = conf;                     /* if there is more than one reference, a conflict occurs */
-
-    if (conflict_is == conf) {                          /* if a conflict exists for this type */
-        sim_ttcmd ();                                   /*   then restore the console and log I/O mode */
-
-        for (val = 0; val <= max_number [conf]; val++)  /* search the conflict table for the next conflict */
-            if (conflicts [val] > 1) {                  /* if a conflict is present for this value */
-                count = conflicts [val];                /*   then get the number of conflicting devices */
-
-                cprintf ("%s %u conflict (", conflict_label [conf], val);
-
-                dev = 0;                                        /* search for the devices that conflict */
-
-                while (count > 0) {                             /* search the DIB value table */
-                    if (dib_val [dev] [conf] == (int32) val) {  /*   to find the conflicting entries */
-                        if (count < conflicts [val])            /*     and report them to the console */
-                            cputs (" and ");
-
-                        cputs (sim_dname ((DEVICE *) sim_devices [dev]));
-                        count = count - 1;
-                        }
-
-                    dev = dev + 1;
-                    }
-
-                cputs (")\n");
-                }
-        }
-    }
-
-return (conflict_is != None);                           /* return TRUE if any conflicts exist */
-}
-
-
 /* Print a CPU instruction in symbolic format.
 
    This routine is called to format and print an instruction in mnemonic form.
@@ -1640,6 +1666,312 @@ switch (SUBOP (val [0])) {                                  /* dispatch based on
     }
 
 return status;                                              /* return the consumption status */
+}
+
+
+/* Print an EDIT instruction subprogram operation in symbolic format.
+
+   This routine prints a single EDIT subprogram operation.  The opcode name is
+   obtained from the name table and printed, followed by the operands.
+
+   On entry, the "ofile" parameter is the opened output stream, "val" is NULL or
+   points to an array containing the first two words of the operation, "radix"
+   contains the desired operand radix or zero if the default radix is to be
+   used, and "byte_address" points at the first byte of the subprogram
+   operation.  The return value is the number of subprogram bytes used by the
+   operation.
+
+   This routine is called by the SCP "EXAMINE" command processor to display an
+   EDIT subprogram contained in memory in symbolic format.  It is also called
+   by the EDIT instruction executor when tracing memory operands.  In the former
+   case, the "EXAMINE" command has obtained two words from memory and placed
+   them in the array pointed to by the "val" parameter.  In the latter case,
+   "val" will be NULL, indicating that the array must be loaded explicitly.  In
+   either case, additional memory bytes are obtained as needed by the operation
+   decoder.
+
+   For each operation, the following type of operand and the number of bytes
+   required are listed below:
+
+     Opcode  SubOp  Mnem  Operand    Byte Count
+     ------  -----  ----  ---------  ----------
+       00      -    MC    ux            1-2
+       01      -    MA    ux            1-2
+       02      -    MN    ux            1-2
+       03      -    MNS   ux            1-2
+       04      -    MFL   ux            1-2
+       05      -    IC    ux,'c'        2-3
+       06      -    ICS   ux,'c'        2-3
+       07      -    ICI   ux,"s"       2-257
+       10      -    ICSI  ux,"s"       2-257
+       11      -    BRIS  sx            1-2
+       12      -    SUFT  sx            1-2
+       13      -    SUFS  sx            1-2
+       14      -    ICP   'p'            1
+       15      -    ICPS  'p'            1
+       16      -    IS    u,"s","s"     1-31
+       17     00    TE    (none)         1
+       17     01    ENDF  (none)         1
+       17     02    SST1  (none)         1
+       17     03    SST0  (none)         1
+       17     04    MDWO  (none)         1
+       17     05    SFC   'c'            2
+       17     06    SFLC  'p','p'        2
+       17     07    DFLC  'c','c'        3
+       17     10    SETC  ui             2
+       17     11    DBNZ  s              2
+
+   Where the operands are:
+
+     Operand  Meaning
+     -------  -----------------------------------------------
+     u        unsigned value 0 .. 15
+     ux       unsigned value 1 .. 15 or 0 .. 255 (extended)
+     ui       unsigned value 1 .. 256
+     s        signed value -128 .. +127
+     sx       signed value 1 .. 15 or -128 .. +127 (extended)
+     'p'      punctuation character value ' ' + 0 .. 15
+     'c'      character value 0 .. 255
+     "s"      string value of 0 .. 255 characters
+
+   Note that in only three cases must additional memory accesses be performed.
+
+
+   Implementation notes:
+
+    1. Operation decoding is simplified by translating the prefix opcode (17)
+       and subopcodes (00-11) into extended opcodes 17+0 to 17+11 (17-30).
+
+    2. Branch operation displacements are printed as positive to indicate a
+       forward jump and negative to indicate a backward jump.  The radix used is
+       the CPU's address radix, which is octal.
+
+    3. The Machine Instruction Set manual says that the DBNZ ("decrement loop
+       count and branch") operation adds the displacement operand.  However,
+       the microcode manual shows that the displacement is actually subtracted.
+       Therefore, we print the operand as a negative value to conform with the
+       hardware action.
+
+    4. A simple GET_BYTE macro is defined for easy access to the bytes contained
+       in the "val" array.  The macro also increments the byte address and
+       increments the word array pointer as needed.
+*/
+
+#define GET_BYTE(b) \
+          if (byte_address++ & 1) \
+              b = LOWER_BYTE (*val++); \
+          else \
+              b = UPPER_BYTE (*val)
+
+uint32 fprint_edit (FILE *ofile, t_value *val, uint32 radix, uint32 byte_address)
+{
+uint8   byte, opcode, operand;
+uint32  word_address, byte_count, disp_radix;
+t_value eval_array [2];
+
+if (radix == 0)                                         /* if the supplied radix is defaulted */
+    disp_radix = 10;                                    /*   then assume decimal numeric output */
+else                                                    /* otherwise */
+    disp_radix = radix;                                 /*   use the radix given */
+
+if (val == NULL) {                                      /* if the "val" array has not been loaded */
+    word_address = byte_address / 2;                    /*   then get the word address of the operation */
+
+    mem_examine (&eval_array [0], word_address,     NULL, 0);   /* load the two words */
+    mem_examine (&eval_array [1], word_address + 1, NULL, 0);   /*   containing the target operation */
+
+    val = eval_array;                                   /* point at the array containing the operation */
+    }
+
+GET_BYTE (byte);                                        /* get the opcode byte */
+byte_count = 1;                                         /*   and count it */
+
+opcode  = UPPER_HALF (byte);                            /* separate the opcode */
+operand = LOWER_HALF (byte);                            /*   and the immediate operand */
+
+if (operand == 0 && opcode <= EDIT_SUFS) {              /* if an extended immediate operand is indicated */
+    GET_BYTE (operand);                                 /*   then get it */
+    byte_count = 2;                                     /*     and count it */
+    }
+
+if (opcode == EDIT_EXOP)                                /* if the opcode is extended */
+    opcode = opcode + operand;                          /*   then translate it */
+
+if (opcode <= EDIT_DBNZ) {                              /* if the extended opcode is valid */
+    fputs (edit_ops [opcode], ofile);                   /*   then print the associated mnemonic */
+
+    if (opcode < EDIT_TE || opcode > EDIT_MDWO)         /* if the operation has an operand */
+        fputc (' ', ofile);                             /*   then add a space as a separator */
+    }
+
+switch (opcode) {                                       /* dispatch by the extended opcode */
+
+    case 000:                                           /* MC   - move characters */
+    case 001:                                           /* MA   - move alphabetics */
+    case 002:                                           /* MN   - move numerics */
+    case 003:                                           /* MNS  - move numerics suppressed */
+    case 004:                                           /* MFL  - move numerics with floating insertion */
+        fprint_value (ofile, operand, disp_radix,       /* print the character count */
+                      D8_WIDTH, PV_LEFT);
+        break;
+
+
+    case 005:                                           /* IC   - insert character */
+    case 006:                                           /* ICS  - insert character suppressed */
+        GET_BYTE (byte);                                /* get the insertion character */
+        byte_count = byte_count + 1;                    /*   and count it */
+
+        fprint_value (ofile, operand, disp_radix,       /* print the insertion count */
+                      D8_WIDTH, PV_LEFT);
+
+        fputc (',', ofile);                             /* add a separator */
+        fputs (fmt_char ((uint32) byte), ofile);        /*   and print the insertion character */
+        break;
+
+
+    case 007:                                           /* ICI  - insert characters immediate */
+    case 010:                                           /* ICSI - insert characters suppressed immediate */
+        fprint_value (ofile, operand, disp_radix,       /* print the character count */
+                      D8_WIDTH, PV_LEFT);
+
+        fputs (",\"", ofile);                                       /* add a separator and open the quotation */
+        fputs (fmt_byte_operand (byte_address, operand), ofile);    /* print the string operand */
+        fputc ('"', ofile);                                         /*   and close the quotation */
+
+        byte_count = byte_count + operand;              /* count the bytes */
+        break;
+
+
+    case 030:                                           /* DBNZ - decrement loop count and branch */
+        GET_BYTE (operand);                             /* get the signed branch displacement */
+        byte_count = byte_count + 1;                    /*   and count it */
+
+        if (operand == 0200) {                              /* if the operand is -128 */
+            fputc ('+', ofile);                             /*   then print a plus sign for display */
+            fprint_value (ofile, operand, cpu_dev.aradix,   /*     and the displacement */
+                          D8_WIDTH, PV_LEFT);               /*       in the CPU's address radix */
+            break;                                          /*         and we're done */
+            }
+
+        else                                            /* otherwise */
+            operand = NEG8 (operand);                   /*   negate the operand for display */
+
+    /* fall into the BRIS case */
+
+    case 011:                                           /* BRIS - branch if significance */
+        if (operand & D8_SIGN) {                        /* if the displacement is negative */
+            fputc ('-', ofile);                         /*   then print a minus sign */
+            operand = NEG8 (operand);                   /*     and make the value positive */
+            }
+
+        else                                            /* otherwise */
+            fputc ('+', ofile);                         /*   print a plus sign */
+
+        fprint_value (ofile, operand, cpu_dev.aradix,   /* print the displacement */
+                      D8_WIDTH, PV_LEFT);               /*   in the CPU's address radix */
+        break;
+
+
+    case 012:                                           /* SUFT - subtract from target */
+    case 013:                                           /* SUFS - subtract from source */
+        if (operand & D8_SIGN) {                        /* if the displacement is negative */
+            fputc ('-', ofile);                         /*   then print a minus sign */
+            operand = NEG8 (operand);                   /*     and make the value positive */
+            }
+
+        fprint_value (ofile, operand, disp_radix,       /* print the displacement */
+                      D8_WIDTH, PV_LEFT);
+        break;
+
+
+    case 014:                                               /* ICP  - insert character punctuation */
+    case 015:                                               /* ICPS - insert character punctuation suppressed */
+        fputs (fmt_char ((uint32) (operand + ' ')), ofile); /* print the punctuation character */
+        break;
+
+
+    case 016:                                           /* IS   - insert character on sign */
+        fprint_value (ofile, operand, disp_radix,       /* print the character count */
+                      D8_WIDTH, PV_LEFT);
+
+        fputs (",\"", ofile);                                       /* add a separator and open the quotation */
+        fputs (fmt_byte_operand (byte_address, operand), ofile);    /* print the string operand */
+
+        fputs ("\",\"", ofile);                                             /* close and open the second quotation */
+        fputs (fmt_byte_operand (byte_address + operand, operand), ofile);  /* print the string operand */
+        fputc ('"', ofile);                                                 /*   and close the quotation */
+
+        byte_count = byte_count + 2 * operand;          /* count the bytes */
+        break;
+
+
+    case 017:                                           /* TE   - terminate edit */
+    case 020:                                           /* ENDF - end floating point insertion */
+    case 021:                                           /* SST1 - set significance to 1 */
+    case 022:                                           /* SST0 - set significance to 0 */
+    case 023:                                           /* MDWO - move digit with overpunch */
+        break;                                          /* these opcodes have no operands */
+
+
+    case 024:                                           /* SFC  - set fill character */
+        GET_BYTE (byte);                                /* get the fill character */
+        byte_count = byte_count + 1;                    /*   and count it */
+
+        fputs (fmt_char ((uint32) byte), ofile);        /* print the fill character */
+        break;
+
+    case 025:                                           /* SFLC - set float character */
+        GET_BYTE (byte);                                /* get the float character */
+        byte_count = byte_count + 1;                    /*   and count it */
+
+        fputs (fmt_char ((uint32) (UPPER_HALF (byte) + ' ')), ofile);   /* print the positive float character */
+        fputc (',', ofile);                                             /*   and a separator */
+        fputs (fmt_char ((uint32) (LOWER_HALF (byte) + ' ')), ofile);   /*     and the negative float character */
+        break;
+
+
+    case 026:                                           /* DFLC - define float character */
+        GET_BYTE (byte);                                /* get the float character */
+
+        fputs (fmt_char ((uint32) byte), ofile);        /* print the positive float character */
+
+        GET_BYTE (byte);                                /* get the float character */
+        byte_count = byte_count + 2;                    /*   and count both characters */
+
+        fputc (',', ofile);                             /* print a separator */
+        fputs (fmt_char ((uint32) byte), ofile);        /*   and the negative float character */
+        break;
+
+
+    case 027:                                           /* SETC - set loop count */
+        GET_BYTE (byte);                                /* get the loop count */
+        byte_count = byte_count + 1;                    /*   and count it */
+
+        if (byte == 0)                                  /* if the count is zero */
+            fprint_value (ofile, 256, disp_radix,       /*   then the loop executes 256 times */
+                          D16_WIDTH, PV_LEFT);
+        else                                            /* otherwise */
+            fprint_value (ofile, byte, disp_radix,      /*   print the given loop count */
+                          D8_WIDTH, PV_LEFT);
+        break;
+
+
+    default:                                            /* the opcode is invalid */
+        if (radix == 0)                                 /* if the supplied radix is defaulted */
+            disp_radix = cpu_dev.dradix;                /*   then use the data radix */
+        else                                            /* otherwise */
+            disp_radix = radix;                         /*   use the radix given */
+
+        fprint_value (ofile, EDIT_EXOP, disp_radix,     /* print the extended opcode */
+                      D4_WIDTH, PV_RZRO);
+
+        fputc (',', ofile);                             /* print a separator */
+        fprint_value (ofile, opcode - EDIT_EXOP,        /*   and the invalid opcode in numeric form */
+                      disp_radix, D4_WIDTH, PV_RZRO);
+        break;
+    }
+
+return byte_count;                                      /* return the number of bytes used by the operation */
 }
 
 
@@ -2042,6 +2374,181 @@ return;
 }
 
 
+/* Check for device conflicts.
+
+   The device information blocks (DIBs) for the set of enabled devices are
+   checked for consistency.  Each device number, interrupt priority number, and
+   service request number must be unique among the enabled devices.  These
+   requirements are checked as part of the instruction execution prelude; this
+   allows the user to exchange two device numbers (e.g.) simply by setting each
+   device to the other's device number.  If conflicts were enforced instead at
+   the time the numbers were entered, the first device would have to be set to
+   an unused number before the second could be set to the first device's number.
+
+   The routine begins by filling in a DIB value table from all of the device
+   DIBs to allow indexed access to the values to be checked.  Unused DIB values
+   and values corresponding to devices that have no DIBs or are disabled are set
+   to the corresponding UNUSED constants.
+
+   As part of the device scan, the sizes of the largest device name and active
+   debug flag name among the devices enabled for debugging are accumulated for
+   use in aligning the debug tracing statements.
+
+   After the DIB value table is filled in, a conflict check is made for each
+   conflict type (i.e., device number, interrupt priority, or service request
+   number).  For each check, a conflict table is built, where each array element
+   is set to the count of devices that contain DIB values equal to the element
+   index.  For example, when processing device number values, conflict table
+   element 6 is set to the count of devices that have dibptr->device_number set
+   to 6.  If any conflict table element is set more than once, the "conflict_is"
+   variable is set to the type of conflict.
+
+   If any conflicts exist for the current type, the conflict table is scanned.
+   A conflict table element value (i.e., device count) greater than 1 indicates
+   a conflict.  For each such value, the DIB value table is scanned to find
+   matching values, and the device names associated with the matching values are
+   printed.
+
+   This routine returns TRUE if any conflicts exist and FALSE there are none.
+
+
+   Implementation notes:
+
+    1. When this routine is called, the console and optional log file have
+       already been put into "raw" output mode.  Therefore, newlines are not
+       translated to the correct line ends on systems that require it.  Before
+       reporting a conflict, "sim_ttcmd" is called to restore the console and
+       log file translation.  This is OK because a conflict will abort the run
+       and return to the command line anyway.
+
+    2. sim_dname is called instead of using dptr->name directly to ensure that
+       we pick up an assigned logical device name.
+
+    3. Only the names of active trace (debug) options are accumulated to produce
+       the most compact trace log.  However, if the CPU device's EXEC option is
+       enabled, then all of the CPU option names are accumulated, as EXEC
+       enables all trace options for a given instruction or instruction class.
+
+    4. Even though the routine is called only from the sim_instr routine in the
+       CPU simulator module, it must be located here to use the DEVICE_COUNT
+       constant to allocate the dib_val matrix.  If it were located in the CPU
+       module, the matrix would have to be allocated dynamically after a
+       run-time determination of the count of simulator devices.
+*/
+
+t_bool hp_device_conflict (void)
+{
+#define CONFLICT_COUNT      3                           /* the number of conflict types to check */
+
+typedef enum {                                          /* conflict types */
+    Device,                                             /*   device number conflict */
+    Interrupt,                                          /*   interrupt priority conflict */
+    Service,                                            /*   service request number conflict */
+    None                                                /*   no conflict */
+    } CONFLICT_TYPE;
+
+static const uint32 max_number [CONFLICT_COUNT] = {     /* the last element index, in CONFLICT_TYPE order */
+    DEVNO_MAX,
+    INTPRI_MAX,
+    SRNO_MAX
+    };
+
+static const char *conflict_label [CONFLICT_COUNT] = {  /* the conflict names, in CONFLICT_TYPE order */
+    "Device number",
+    "Interrupt priority",
+    "Service request number"
+    };
+
+const DIB     *dibptr;
+const DEBTAB  *tptr;
+DEVICE        *dptr;
+size_t        name_length, flag_length;
+uint32        dev, val;
+CONFLICT_TYPE conf, conflict_is;
+int32         count;
+int32         dib_val   [DEVICE_COUNT] [CONFLICT_COUNT];
+int32         conflicts [DEVNO_MAX + 1];
+
+device_size = 0;                                        /* reset the device and flag name sizes */
+flag_size = 0;                                          /*   to those of the devices actively debugging */
+
+for (dev = 0; dev < DEVICE_COUNT; dev++) {              /* fill in the DIB value table */
+    dptr = (DEVICE *) sim_devices [dev];                /*   from the device table */
+    dibptr = (DIB *) dptr->ctxt;                        /*      and their associated DIBs */
+
+    if (dibptr && !(dptr->flags & DEV_DIS)) {                   /* if the DIB is defined and the device is enabled */
+        dib_val [dev] [Device]    = dibptr->device_number;      /*   then copy the values to the DIB table */
+        dib_val [dev] [Interrupt] = dibptr->interrupt_priority;
+        dib_val [dev] [Service]   = dibptr->service_request_number;
+        }
+
+    else {                                                      /* otherwise the device will not participate in I/O */
+        dib_val [dev] [Device]    = DEVNO_UNUSED;               /*   so set this table entry */
+        dib_val [dev] [Interrupt] = INTPRI_UNUSED;              /*     to the "unused" values */
+        dib_val [dev] [Service]   = SRNO_UNUSED;
+        }
+
+    if (sim_deb && dptr->dctrl) {                       /* if debugging is active for this device */
+        name_length = strlen (sim_dname (dptr));        /*   then get the length of the device name */
+
+        if (name_length > device_size)                  /* if it's greater than the current maximum */
+            device_size = name_length;                  /*   then reset the size */
+
+        if (dptr->debflags)                             /* if the device has a debug flags table */
+            for (tptr = dptr->debflags;                 /*   then scan the table */
+                 tptr->name != NULL; tptr++)
+                if (dev == 0 && dptr->dctrl & DEB_EXEC  /* if the CPU device is tracing executions */
+                  || tptr->mask & dptr->dctrl) {        /*   or this debug option is active */
+                    flag_length = strlen (tptr->name);  /*     then get the flag name length */
+
+                    if (flag_length > flag_size)        /* if it's greater than the current maximum */
+                        flag_size = flag_length;        /*   then reset the size */
+                    }
+        }
+    }
+
+conflict_is = None;                                     /* assume that no conflicts exist */
+
+for (conf = Device; conf <= Service; conf++) {          /* check for conflicts for each type */
+    memset (conflicts, 0, sizeof conflicts);            /* zero the conflict table for each check */
+
+    for (dev = 0; dev < DEVICE_COUNT; dev++)            /* populate the conflict table from the DIB value table */
+        if (dib_val [dev] [conf] >= 0)                  /* if this device has an assigned value */
+            if (++conflicts [dib_val [dev] [conf]] > 1) /*   then increment the count of references */
+                conflict_is = conf;                     /* if there is more than one reference, a conflict occurs */
+
+    if (conflict_is == conf) {                          /* if a conflict exists for this type */
+        sim_ttcmd ();                                   /*   then restore the console and log I/O mode */
+
+        for (val = 0; val <= max_number [conf]; val++)  /* search the conflict table for the next conflict */
+            if (conflicts [val] > 1) {                  /* if a conflict is present for this value */
+                count = conflicts [val];                /*   then get the number of conflicting devices */
+
+                cprintf ("%s %u conflict (", conflict_label [conf], val);
+
+                dev = 0;                                        /* search for the devices that conflict */
+
+                while (count > 0) {                             /* search the DIB value table */
+                    if (dib_val [dev] [conf] == (int32) val) {  /*   to find the conflicting entries */
+                        if (count < conflicts [val])            /*     and report them to the console */
+                            cputs (" and ");
+
+                        cputs (sim_dname ((DEVICE *) sim_devices [dev]));
+                        count = count - 1;
+                        }
+
+                    dev = dev + 1;
+                    }
+
+                cputs (")\n");
+                }
+        }
+    }
+
+return (conflict_is != None);                           /* return TRUE if any conflicts exist */
+}
+
+
 
 /* System interface local SCP support routines */
 
@@ -2254,15 +2761,19 @@ else                                                            /* otherwise the
 
 if (cptr != *tptr)                                      /* if the parse succeeded */
     if (**tptr == '.')                                  /*   then if this a banked address */
-        if (! (parse_config & apcBank_Offset))          /*     but it is not allowed */
-            *tptr = cptr;                               /*       then report a parse error */
+        if (! (parse_config & apcBank_Offset)           /*     but it is not allowed */
+          || address > BA_MAX)                          /*       or the bank number is out of range */
+            *tptr = cptr;                               /*         then report a parse error */
 
         else {                                              /* otherwise the <bank>.<offset> form is allowed */
             sptr = *tptr + 1;                               /* point to the offset */
             bank = address;                                 /* save the first part as the bank address */
             address = strtotv (sptr, tptr, dptr->aradix);   /* parse the offset */
 
-            address = TO_PA (bank, address);                /* form the linear address */
+            if (address > LA_MAX)                           /* if the offset is too large */
+                *tptr = cptr;                               /*   then report a parse error */
+            else                                            /* otherwise it is in range */
+                address = TO_PA (bank, address);            /*   so form the linear address */
             }
 
     else if (address > LA_MAX)                          /* otherwise if the non-banked offset is too large */
@@ -2564,7 +3075,84 @@ return SCPE_OK_2_WORDS;                                 /* indicate that each in
 }
 
 
-/* Print a CPU instruction opcode and operand in symbolic format.
+/* Format and print an EDIT instruction subprogram operation in symbolic format.
+
+   This routine formats and prints a set of memory bytes as an EDIT subprogram
+   operation.  It is called when the "-E" command-line switch is included with a
+   memory display request.
+
+   On entry, the "ofile" parameter is the opened output stream, "val [*]"
+   contains the first two words of the operation, "radix" contains the desired
+   operand radix or zero if the default radix is to be used, "addr" points at
+   the memory word containing the first subprogram operation byte, and
+   "switches" contains the set of command-line switches supplied with the
+   command.  The return value is one more than the negative number of memory
+   words consumed by the print request (e.g., a one-word consumption returns
+   zero, a two-word consumption returns -1, etc.).
+
+   The routine is called to print a single memory word.  If the EXAMINE command
+   is given a memory range, the routine will be called multiple times, with
+   "val" pointing at an array containing the first two words of the range.
+
+   An operation may encompass from 1-257 bytes.  The operation is assumed to
+   begin in the upper byte of the first memory word unless the "-R" switch is
+   supplied, in which case the lower byte is assumed.  If "-R" is not used, and
+   the operation in the upper byte consumes only a single byte, the operation
+   (beginning) in the lower byte is also printed.
+
+   Full operations are always printed, so a single call on the routine prints
+   one or two operations and then returns the number of memory words consumed
+   (biased by 1).  If a range is being printed, this value determines the
+   address presented at the following call.
+
+   Before returning, the "R" switch is set or cleared to indicate whether the
+   next call in a range should start with the lower or upper byte of the word.
+
+
+   Implementation notes:
+
+    1. Within a single command, this routine may be called (via fprint_sym)
+       successively for the same address.  This will occur if console logging is
+       enabled.  The first call will be to write to the console, and then it
+       will be called again to write to the log file.  However, sim_switches is
+       updated after the first call in anticipation of additional calls for the
+       subsequent addresses in a range.  To avoid this, sim_switches is tested
+       only if the routine is NOT called for the log file; if it is, then the
+       previous setting of sim_switches is used.
+*/
+
+static t_stat fprint_subop (FILE *ofile, t_value *val, uint32 radix, t_addr addr, int32 switches)
+{
+static uint32 odd_byte = 0;
+uint32 byte_addr, bytes_used, total_bytes_used;
+
+if (ofile != sim_log)                                       /* if this is not a logging call */
+    odd_byte = (uint32) ((switches & SWMASK ('R')) != 0);   /*   then recalculate the odd-byte flag */
+
+total_bytes_used = odd_byte;                            /* initialize the bytes used accumulator */
+byte_addr = (uint32) addr * 2 + odd_byte;               /* form the initial byte address */
+
+do {
+    bytes_used = fprint_edit (ofile, val, radix, byte_addr);    /* format and print an operation */
+
+    byte_addr = byte_addr + bytes_used;                 /* point at the next operation */
+    total_bytes_used = total_bytes_used + bytes_used;   /*   and add the byte count to the accumulator */
+
+    if (total_bytes_used < 2)                           /* if a full word has not been consumed yet */
+        fputs ("\n\t\t", ofile);                        /*   then start a new line for the second operation */
+    }
+while (total_bytes_used < 2);                           /* continue until at least one word is consumed */
+
+if (byte_addr & 1)                                      /* if the next operation begins in the lower byte */
+    sim_switches |= SWMASK ('R');                       /*   then set the switch for the next call */
+else                                                    /* otherwise it begins in the upper byte */
+    sim_switches &= ~SWMASK ('R');                      /*   so clear the switch */
+
+return -(t_stat) (total_bytes_used / 2 - 1);            /* return the (biased) negative number of words consumed */
+}
+
+
+/* Print a CPU instruction and operand in symbolic format.
 
    This routine prints a CPU instruction and its operand, if any, using the
    mnemonics specified in the Machine Instruction Set and Systems Programming
@@ -2574,11 +3162,11 @@ return SCPE_OK_2_WORDS;                                 /* indicate that each in
    (if any).
 
    On entry, the "ofile" parameter is the opened output stream, "ops" is the
-   table of classifications containing the instruction, "instruction" is the
-   machine instruction to print, "mask" is the opcode mask to apply to get the
-   index bits, "shift" is the right-shift count to align the index, and "radix"
-   contains the desired operand radix or zero if the default radix is to be
-   used.
+   table of classifications containing the instruction, "val" contains the
+   word(s) of the machine instruction to print, "mask" is the opcode mask to
+   apply to get the index bits, "shift" is the right-shift count to align the
+   index, and "radix" contains the desired operand radix or zero if the default
+   radix is to be used.
 
    On exit, a status code is returned to the caller.  SCPE_OK status is returned
    if the print consumed a single-word value, or the negative number of extra
@@ -2589,8 +3177,10 @@ return SCPE_OK_2_WORDS;                                 /* indicate that each in
    The classification table consists of a set of entries that are indexed by
    opcode, followed optionally by a set of entries that are searched linearly.
    Empty mnemonics, i.e., "", are used in the indexed part to indicate that the
-   linear part must be searched.  A NULL mnemonic ends the array (this allows
-   string searches for parsing to fail without aborting).
+   linear part must be searched, and in the linear part to indicate a two-word
+   instruction whose second word did not match a defined entry.  A NULL mnemonic
+   ends the array (this allows string searches for parsing to fail without
+   aborting).
 
    The supplied instruction is ANDed with the "mask" parameter and then
    right-shifted by the "shift" parameter to produce an index into the "ops"
@@ -2600,8 +3190,7 @@ return SCPE_OK_2_WORDS;                                 /* indicate that each in
    instruction is masked to remove the operand and optionally the reserved bits,
    and the result is compared to the base opcode.  If it matches, the associated
    mnemonic is printed.  If the table is exhausted without a match, the
-   instruction is undefined, and it is printed in octal, regardless of the data
-   radix.
+   instruction is undefined, and SCPE_ARG is returned.
 
    For defined instructions, the operand, if any, is printed after the mnemonic.
    Operand values are printed in a radix suitable to the type of the value, as
@@ -2628,10 +3217,9 @@ return SCPE_OK_2_WORDS;                                 /* indicate that each in
 
     1. All instructions in the base set are single words.  However, some
        extension instructions, including instructions for later-series CPUs,
-       e.g., Series 33, use two or more words.  For example, the WIOC (write I/O
-       channel) instruction is the two-word sequence 020302 000003, and the SIOP
-       (start I/O program) sequence is 020302 000000.  Currently, this routine
-       is not set up to handle this.
+       e.g., the Series 33, use two words.  For example, the WIOC (write I/O
+       channel) instruction is the two-word sequence 020302,000003, and the SIOP
+       (start I/O program) sequence is 020302,000000.
 
     2. The operand type dispatch handlers either set up operand printing by
        assigning the prefix, indirect, and index values, or print the operand(s)
@@ -2639,6 +3227,15 @@ return SCPE_OK_2_WORDS;                                 /* indicate that each in
 
     3. Register flags for the PSHR and SETR instructions are printed using the
        SPL register names.
+
+    4. The "rsvd_mask" fields of secondary entries for one-word instructions
+       have the upper 16 bits of the values set to zero.  This masks off the
+       second instruction word, which is arbitrary, before comparison.
+
+    5. A secondary entry with a zero-length mnemonic is used to match the first
+       word of a two-word instruction when the second word fails to match any of
+       the earlier entries.  This causes the instruction to be printed as a pair
+       of numeric values.
 */
 
 static const char *const register_name [] = {   /* PSHR/SETR register names corresponding to bits 8-15 */
@@ -2652,40 +3249,82 @@ static const char *const register_name [] = {   /* PSHR/SETR register names corr
     "S"                                         /*   bit 15 */
     };
 
-static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *instruction,
+static const char *const cc_flags [] = {        /* TCCS condition code names corresponding to bits 13-15 */
+    " N",                                       /*   000 = never */
+    " L",                                       /*   001 = less than */
+    " E",                                       /*   010 = equal */
+    " LE",                                      /*   011 = less than or equal */
+    " G",                                       /*   100 = greater than */
+    " NE",                                      /*   101 = not equal */
+    " GE",                                      /*   110 = greater than or equal */
+    " A"                                        /*   111 = always */
+    };
+
+static const char *const sign_cntl [] = {       /* CVND sign control names corresponding to bits 12-14 */
+    " LS",                                      /*   000 = sign is leading separate */
+    " TS",                                      /*   001 = sign is trailing separate */
+    " LO",                                      /*   010 = sign is leading overpunch or unsigned */
+    " TO",                                      /*   011 = sign is trailing overpunch or unsigned */
+    " UN",                                      /*   100 = unsigned */
+    " UN",                                      /*   101 = unsigned */
+    " UN",                                      /*   110 = unsigned */
+    " UN"                                       /*   111 = unsigned */
+    };
+
+static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *val,
                                   uint32 mask, uint32 shift, uint32 radix)
 {
 uint32     op_index, op_radix;
 int32      reg_index;
 t_bool     reg_first;
-t_value    op_value;
-const char *prefix  = NULL;                             /* base register label to print before the operand */
+t_value    instruction, op_value;
+const char *prefix  = NULL;                             /* label to print before the operand */
 t_bool     index    = FALSE;                            /* TRUE if the instruction is indexed */
 t_bool     indirect = FALSE;                            /* TRUE if the instruction is indirect */
+t_stat     status   = SCPE_OK;                          /* result status */
 
-op_index = ((uint32) instruction [0] & mask) >> shift;  /* extract the opcode index */
+instruction = TO_DWORD (val [1], val [0]);              /* merge the two supplied values */
+
+op_index = ((uint32) instruction & mask) >> shift;      /* extract the opcode index */
 
 if (ops [op_index].mnemonic [0])                        /* if a primary entry is defined */
     fputs (ops [op_index].mnemonic, ofile);             /*   then print the mnemonic */
 
 else {                                                  /* otherwise search through the secondary entries */
-    for (op_index = (mask >> shift) + 1;                /* search the table starting after the primary entries */
-         ops [op_index].mnemonic != NULL;               /*   until the NULL entry at the end */
+    for (op_index = (mask >> shift) + 1;                /*   in the table starting after the primary entries */
+         ops [op_index].mnemonic != NULL;               /*     until the NULL entry at the end */
          op_index++)
         if (ops [op_index].opcode ==                    /* if the opcode in this table entry */
-          (instruction [0] & ops [op_index].rsvd_mask   /*   matches the instruction with the reserved bits */
-          & op_mask [ops [op_index].operand])) {        /*     and operand bits masked off */
-            fputs (ops [op_index].mnemonic, ofile);     /*       then print it */
-            break;                                      /*         and terminate the search */
-            }
+          (instruction & ops [op_index].rsvd_mask       /*   matches the instruction with the reserved bits */
+          & op_mask [ops [op_index].operand]))          /*     and operand bits masked off */
+            if (ops [op_index].mnemonic [0]) {          /*       then if the entry is defined */
+                fputs (ops [op_index].mnemonic, ofile); /*         then print it */
+                break;                                  /*           and terminate the search */
+                }
+
+            else {                                          /* otherwise this two-word instruction is unimplemented */
+                fprint_val (ofile, val [0], cpu_dev.dradix, /*   so print the first word */
+                            cpu_dev.dwidth, PV_RZRO);
+
+                fputc (',', ofile);                         /*     and a separator */
+
+                fprint_val (ofile, val [1], cpu_dev.dradix, /*       and the second word */
+                            cpu_dev.dwidth, PV_RZRO);
+
+                return SCPE_OK_2_WORDS;                     /* return success to indicate printing is complete */
+                }
 
     if (ops [op_index].mnemonic == NULL)                /* if the opcode was not found */
         return SCPE_ARG;                                /*   then return error status to print it in octal */
     }
 
 
-op_value =                                              /* mask the instruction to the operand value */
-   instruction [0] & ~op_mask [ops [op_index].operand];
+op_value = instruction & ~op_mask [ops [op_index].operand]; /* mask the instruction to the operand value */
+
+if (ops [op_index].rsvd_mask > D16_MASK) {              /* if this is a two-word instruction */
+    op_value = op_value >> D16_WIDTH;                   /*   then the operand is in the upper word */
+    status = SCPE_OK_2_WORDS;                           /*     and the routine will consume two words */
+    }
 
 op_radix = cpu_dev.aradix;                              /* assume that operand is an address */
 
@@ -2695,6 +3334,13 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
 
     case opNone:
         break;                                          /* no formatting needed */
+
+
+    /* condition code flags in bits 13-15 */
+
+    case opCC7:
+        fputs (cc_flags [op_value], ofile);             /* print the condition code flags */
+        break;
 
 
     /* unsigned value pair range 0-15 */
@@ -2715,7 +3361,7 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
     /* P +/- displacement range 0-31, indirect bit 4 */
 
     case opPS31I:
-        indirect = (instruction [0] & I_FLAG_BIT_4) != 0;       /* save the indirect condition */
+        indirect = (instruction & I_FLAG_BIT_4) != 0;           /* save the indirect condition */
         prefix = (op_value & DISPL_31_SIGN ? " P-" : " P+");    /* set the base register and sign label */
         op_value = op_value & DISPL_31_MASK;                    /*   and remove the sign from the displacement value */
         break;
@@ -2724,8 +3370,8 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
     /* P +/- displacement range 0-255, indirect bit 5, index bit 4 */
 
     case opPS255IX:
-        index = (instruction [0] & X_FLAG) != 0;            /* save the index condition */
-        indirect = (instruction [0] & I_FLAG_BIT_5) != 0;   /*   and the indirect condition */
+        index = (instruction & X_FLAG) != 0;            /* save the index condition */
+        indirect = (instruction & I_FLAG_BIT_5) != 0;   /*   and the indirect condition */
 
     /* fall into the P-relative displacement case */
 
@@ -2737,27 +3383,36 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
         break;
 
 
+    /* base bit 15 */
+
+    case opB15:
+    case opB31:
+        if (op_value == 0)                              /* if the base bit is 0 */
+            fputs (" PB", ofile);                       /*   then PB is the base register label */
+        break;
+
+
     /* S decrement range 0-3, base register bit 11 */
 
     case opSU3B:
-        prefix = (instruction [0] & DB_FLAG) ? " " : " PB,";    /* set the base register label */
-        op_value = op_value & ~op_mask [opSU3];                 /*   and remove the base flag from the S decrement value */
+        prefix = (instruction & DB_FLAG) ? " " : " PB,";    /* set the base register label */
+        op_value = op_value & ~op_mask [opSU3];             /*   and remove the base flag from the S decrement value */
         break;
 
 
     /* S decrement range 0-3, N/A/S bits 11-13 */
 
     case opSU3NAS:
-        if (instruction [0] & MVBW_CCF)                 /* if any flags are present */
+        if (instruction & MVBW_CCF)                     /* if any flags are present */
             fputc (' ', ofile);                         /*   then print a space as a separator */
 
-        if (instruction [0] & MVBW_A_FLAG)              /* if the alphabetic flag is present */
+        if (instruction & MVBW_A_FLAG)                  /* if the alphabetic flag is present */
             fputc ('A', ofile);                         /*   then print an "A" as the indicator */
 
-        if (instruction [0] & MVBW_N_FLAG)              /* if the numeric flag is present */
+        if (instruction & MVBW_N_FLAG)                  /* if the numeric flag is present */
             fputc ('N', ofile);                         /*   then print an "N" as the indicator */
 
-        if (instruction [0] & MVBW_S_FLAG)              /* if the upshift flag is present */
+        if (instruction & MVBW_S_FLAG)                  /* if the upshift flag is present */
             fputc ('S', ofile);                         /*   then print an "S" as the indicator */
 
         prefix = ",";                                   /* separate the value from the flags */
@@ -2816,12 +3471,12 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
     /* P+/P-/DB+/Q+/Q-/S- displacements, indirect bit 5, index bit 4 */
 
     case opPD255IX:
-        if ((instruction [0] & DISPL_P_FLAG) == 0) {                /* if this a P-relative displacement */
+        if ((instruction & DISPL_P_FLAG) == 0) {                    /* if this a P-relative displacement */
             prefix = (op_value & DISPL_255_SIGN ? " P-" : " P+");   /*   then set the base register and sign label */
             op_value = op_value & DISPL_255_MASK;                   /*     and remove the sign from the displacement value */
 
-            index = (instruction [0] & X_FLAG) != 0;                /* save the index condition */
-            indirect = (instruction [0] & I_FLAG_BIT_5) != 0;       /*   and the indirect condition */
+            index = (instruction & X_FLAG) != 0;            /* save the index condition */
+            indirect = (instruction & I_FLAG_BIT_5) != 0;   /*   and the indirect condition */
             break;
             }
 
@@ -2830,19 +3485,19 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
     /* DB+/Q+/Q-/S- displacements, indirect bit 5, index bit 4 */
 
     case opD255IX:
-        if ((instruction [0] & DISPL_DB_FLAG) == 0) {       /* if this a DB-relative displacement */
+        if ((instruction & DISPL_DB_FLAG) == 0) {           /* if this a DB-relative displacement */
             prefix = " DB+";                                /*   then set the base register label */
             op_value = op_value & DISPL_255_MASK;           /*     and remove the base flag from the displacement value */
             }
 
-        else if ((instruction [0] & DISPL_QPOS_FLAG) == 0) {    /* otherwise if this a positive Q-relative displacement */
-            prefix = " Q+";                                     /*   then set the base register label */
-            op_value = op_value & DISPL_127_MASK;               /*     and remove the base flag from the displacement value */
+        else if ((instruction & DISPL_QPOS_FLAG) == 0) {    /* otherwise if this a positive Q-relative displacement */
+            prefix = " Q+";                                 /*   then set the base register label */
+            op_value = op_value & DISPL_127_MASK;           /*     and remove the base flag from the displacement value */
             }
 
-        else if ((instruction [0] & DISPL_QNEG_FLAG) == 0) {    /* otherwise if this a negative Q-relative displacement */
-            prefix = " Q-";                                     /*   then set the base register label */
-            op_value = op_value & DISPL_63_MASK;                /*     and remove the base flag from the displacement value */
+        else if ((instruction & DISPL_QNEG_FLAG) == 0) {    /* otherwise if this a negative Q-relative displacement */
+            prefix = " Q-";                                 /*   then set the base register label */
+            op_value = op_value & DISPL_63_MASK;            /*     and remove the base flag from the displacement value */
             }
 
         else {                                              /* otherwise it must be a negative S-relative displacement */
@@ -2850,21 +3505,21 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
             op_value = op_value & DISPL_63_MASK;            /*     and remove the base flag from the displacement value */
             }
 
-        indirect = (instruction [0] & I_FLAG_BIT_5) != 0;   /* save the indirect condition */
+        indirect = (instruction & I_FLAG_BIT_5) != 0;       /* save the indirect condition */
 
     /* fall into the index case */
 
     /* index bit 4 */
 
     case opX:
-        index = (instruction [0] & X_FLAG) != 0;        /* save the index condition */
+        index = (instruction & X_FLAG) != 0;            /* save the index condition */
         break;
 
 
     /* unsigned value range 0-63, index bit 4 */
 
     case opU63X:
-        index = (instruction [0] & X_FLAG) != 0;        /* save the index condition */
+        index = (instruction & X_FLAG) != 0;            /* save the index condition */
         op_value = op_value & DISPL_63_MASK;            /*   and mask to the operand value */
 
     /* fall into the unsigned value case */
@@ -2879,13 +3534,13 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
 
     /* sign control bits 9-10, S decrement bit 11 */
 
-    case opSCS:
-        if (instruction [0] & NABS_FLAG) {              /* if the negative absolute flag is present */
+    case opSCS3:
+        if (instruction & NABS_FLAG) {                  /* if the negative absolute flag is present */
             fputs (" NABS", ofile);                     /*   then print "NABS" as the indicator */
             prefix = ",";                               /* we will need to separate the flag and value */
             }
 
-        else if (instruction [0] & ABS_FLAG) {          /* otherwise if the absolute flag is present */
+        else if (instruction & ABS_FLAG) {              /* otherwise if the absolute flag is present */
             fputs (" ABS", ofile);                      /*   then print "ABS" as the indicator */
             prefix = ",";                               /* we will need to separate the flag and value */
             }
@@ -2893,15 +3548,25 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
         else                                            /* otherwise neither flag is present */
             prefix = " ";                               /*   so just use a space to separate the value */
 
-        op_value = (op_value & ~op_mask [opS]) >> EIS_SDEC_SHIFT;   /* remove the flags from the S decrement value */
+        op_value = (op_value & ~op_mask [opS11]) >> EIS_SDEC_SHIFT; /* remove the flags from the S decrement value */
         op_radix = (radix ? radix : cpu_dev.dradix);                /*   and set the print radix */
+        break;
+
+
+    /* sign control bits 12-14, S decrement bit 15 */
+
+    case opSCS4:
+        fputs (sign_cntl [op_value >> CVND_SC_SHIFT], ofile);   /* print the sign-control mnemonic */
+
+        prefix = ",";                                   /* separate the flag and value */
+        op_value = op_value & CIS_SDEC_MASK;            /*   and remove the flags from the S decrement value */
         break;
 
 
     /* S decrement bit 11 */
     /* S decrement range 0-2 bits 10-11 */
 
-    case opS:
+    case opS11:
     case opSU2:
         op_value = op_value >> EIS_SDEC_SHIFT;          /* align the S decrement value */
 
@@ -2926,11 +3591,14 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
 
 
     /* P unsigned displacement range 0-255 */
+    /* S decrement range 0-1 */
     /* S decrement range 0-3 */
     /* S decrement range 0-7 */
     /* S decrement range 0-15 */
 
     case opPU255:
+    case opS15:
+    case opS31:
     case opSU3:
     case opSU7:
     case opSU15:
@@ -2952,7 +3620,7 @@ if (indirect)                                           /* add an indirect indic
 if (index)                                              /* add an index indicator */
     fputs (",X", ofile);                                /*   if specified by the instruction */
 
-return SCPE_OK;
+return status;                                          /* return the applicable status */
 }
 
 

@@ -25,6 +25,7 @@
 
    IOP          HP 3000 Series III I/O Processor
 
+   10-Oct-16    JDB     Renumbered debug flags to start at bit 0
    03-Sep-16    JDB     Added "iop_assert_PFWARN" to warn devices of power loss
    01-Aug-16    JDB     Added "iop_reset" to initialize the IOP
    30-Jun-16    JDB     Changed REG type of filter array to BRDATA
@@ -174,6 +175,7 @@
 #include "hp3000_cpu.h"
 #include "hp3000_cpu_ims.h"
 #include "hp3000_io.h"
+#include "hp3000_mem.h"
 
 
 
@@ -188,15 +190,10 @@
    the trace stream.  It returns the bit in the filter array corresponding to
    the device number.  If the bit is set, the trace will be generated;
    otherwise, it will be suppressed.
-
-
-   Implementation notes:
-
-    1. Bit 0 is reserved for the memory data trace flag.
 */
 
-#define DEB_DIO             (1u << 1)           /* trace direct I/O commands */
-#define DEB_IRQ             (1u << 2)           /* trace interrupt requests */
+#define DEB_DIO             (1u << 0)           /* trace direct I/O commands */
+#define DEB_IRQ             (1u << 1)           /* trace interrupt requests */
 
 #define FILTER(d)           (1u << (d) % 32 & filter [(d) / 32])
 

@@ -23,6 +23,15 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   07-Nov-16    JDB     Added SETR and SETR_X for SETR executor use;
+                        renamed cpu_byte_to_word_ea to cpu_byte_ea
+   03-Nov-16    JDB     Added LABEL_LOCAL for PARC/XBR/ENDP executor use
+   01-Nov-16    JDB     Added debug flag for per-instruction trace capability
+   22-Oct-16    JDB     Added "cpu_interrupt_pending" global from cpu_base.c
+   07-Oct-16    JDB     Added "cpu_dev" external so executors can trace instructions
+   28-Sep-16    JDB     Added CIS definitions
+   22-Sep-16    JDB     Added cpu_byte_to_word_ea, STATUS_CS macro
+   21-Sep-16    JDB     Added STATUS_CCI, UNIT_CIS, and the CIS dispatcher
    12-Sep-16    JDB     Added the PCN_SERIES_II and PCN_SERIES_III constants
    02-Sep-16    JDB     Added the POWER_STATE enumeration type, the UNIT_PFARS
                         flag, and the "cpu_power_state" external declaration
@@ -46,28 +55,6 @@
 
 
 
-/* Architectural constants.
-
-   The type used to represent a main memory word value is defined.  An array of
-   this type is used to simulate the CPU main memory.
-
-
-   Implementation notes:
-
-    1. The MEMORY_WORD type is a 16-bit unsigned type, corresponding with the
-       16-bit main memory in the HP 3000.  Unlike the general data type, which
-       is a 32-bit type for speed, main memory does not benefit from the faster
-       32-bit execution on IA-32 processors, as only one instruction in the
-       cpu_read_memory and cpu_write_memory routines has an operand override
-       that invokes the slower instruction fetch path.  There is a negligible
-       difference in the Memory Pattern Test diagnostic execution speeds for the
-       uint32 vs. uint16 definition, whereas the VM requirements are doubled for
-       the former.
-*/
-
-typedef uint16              MEMORY_WORD;        /* HP 16-bit memory word representation */
-
-
 /* Supported breakpoint switches */
 
 #define BP_EXEC             (SWMASK ('E'))      /* an execution breakpoint */
@@ -80,6 +67,7 @@ typedef uint16              MEMORY_WORD;        /* HP 16-bit memory word represe
 #define UNIT_EIS_SHIFT      (UNIT_V_UF + 1)     /* the Extended Instruction Set firmware option */
 #define UNIT_CALTIME_SHIFT  (UNIT_V_UF + 2)     /* the process clock timing mode */
 #define UNIT_PFARS_SHIFT    (UNIT_V_UF + 3)     /* the power-fail auto-restart mode */
+#define UNIT_CIS_SHIFT      (UNIT_V_UF + 4)     /* the COBOL II Extended Instruction Set firmware option */
 
 #define UNIT_MODEL_MASK     0000001u            /* model ID mask */
 
@@ -90,6 +78,7 @@ typedef uint16              MEMORY_WORD;        /* HP 16-bit memory word represe
 #define UNIT_EIS            (1u << UNIT_EIS_SHIFT)      /* the Extended Instruction Set is installed */
 #define UNIT_CALTIME        (1u << UNIT_CALTIME_SHIFT)  /* the process clock is calibrated to wall time */
 #define UNIT_PFARS          (1u << UNIT_PFARS_SHIFT)    /* the system will auto-restart after a power failure */
+#define UNIT_CIS            (1u << UNIT_CIS_SHIFT)      /* the COBOL II Extended Instruction Set is installed */
 
 #define UNIT_CPU_MODEL      (cpu_unit [0].flags & UNIT_MODEL)
 
@@ -100,11 +89,12 @@ typedef uint16              MEMORY_WORD;        /* HP 16-bit memory word represe
 
 /* CPU debug flags */
 
-#define DEB_MDATA           (1u << 0)           /* trace memory data accesses */
-#define DEB_INSTR           (1u << 1)           /* trace instruction execution */
-#define DEB_FETCH           (1u << 2)           /* trace instruction fetches */
-#define DEB_REG             (1u << 3)           /* trace register values */
-#define DEB_PSERV           (1u << 4)           /* trace PCLK service events */
+#define DEB_ALL             ~0u                 /* trace everything */
+
+#define DEB_INSTR           (1u << 0)           /* trace instructions */
+#define DEB_REG             (1u << 1)           /* trace register values */
+#define DEB_PSERV           (1u << 2)           /* trace PCLK service events */
+#define DEB_EXEC            (1u << 3)           /* trace matched instruction executions */
 
 #define BOV_FORMAT          "%02o.%06o  %06o  " /* bank-offset-value trace format string */
 
@@ -116,6 +106,13 @@ typedef uint16              MEMORY_WORD;        /* HP 16-bit memory word represe
 #define SS_UNDEF            (1u << 2)           /* stop on undefined instruction */
 #define SS_UNIMPL           (1u << 3)           /* stop on unimplemented instruction */
 #define SS_BYPASSED         (1u << 31)          /* stops are bypassed for this instruction */
+
+
+/* Memory access macros */
+
+#define cpu_read_memory(c,o,v)      mem_read  (&cpu_dev, c, o, v)
+#define cpu_write_memory(c,o,v)     mem_write (&cpu_dev, c, o, v)
+
 
 
 /* System power state.
@@ -155,38 +152,6 @@ typedef enum {
     waiting,                                    /* a cold load or dump is in progress */
     halted                                      /* a programmed or front panel HALT has been executed */
     } EXEC_STATE;
-
-
-/* Memory access classifications.
-
-   The access classification determines which bank register is used with the
-   supplied offset to access memory, and whether or not the access is bounds
-   checked.
-
-
-   Implementation notes:
-
-    1. The "_iop" and "_sel" classifications are identical.  The only difference
-       is which device's trace flag is checked to print debugging information.
-       All of the other classifications check the CPU's trace flags.
-*/
-
-typedef enum {
-    absolute_iop,                               /* absolute bank, IOP request */
-    dma_iop,                                    /* DMA channel bank, IOP request */
-    absolute_sel,                               /* absolute bank, selector channel request */
-    dma_sel,                                    /* DMA channel bank, selector channel request */
-    absolute,                                   /* absolute bank */
-    absolute_checked,                           /* absolute bank, bounds checked */
-    fetch,                                      /* program bank, instruction fetch */
-    fetch_checked,                              /* program bank, instruction fetch, bounds checked */
-    program,                                    /* program bank, data access */
-    program_checked,                            /* program bank, data access, bounds checked */
-    data,                                       /* data bank, data access */
-    data_checked,                               /* data bank, data access, bounds checked */
-    stack,                                      /* stack bank, data access */
-    stack_checked                               /* stack bank, data access, bounds checked */
-    } ACCESS_CLASS;
 
 
 /* CPX register flags.
@@ -435,9 +400,9 @@ typedef enum {
 
    Condition Code:
 
-     00 = CCL (less than)
-     01 = CCE (equal to)
-     10 = CCG (greater than)
+     00 = CCG (greater than)
+     01 = CCL (less than)
+     10 = CCE (equal to)
      11 = invalid
 */
 
@@ -451,12 +416,17 @@ typedef enum {
 #define STATUS_CCG          0000000u            /* condition code greater than */
 #define STATUS_CCL          0000400u            /* condition code less than */
 #define STATUS_CCE          0001000u            /* condition code equal to */
+#define STATUS_CCI          0001400u            /* condition code invalid */
 
 #define STATUS_CC_MASK      0001400u            /* condition code mask */
 #define STATUS_CC_SHIFT     8                   /* condition code alignment */
 
 #define STATUS_CS_MASK      0000377u            /* code segment mask */
+#define STATUS_CS_SHIFT     0                   /* code segment alignment */
 #define STATUS_CS_WIDTH     8                   /* code segment mask width */
+
+#define STATUS_CS(s)       (((s) & STATUS_CS_MASK) >> STATUS_CS_SHIFT)
+
 
 #define STATUS_OVTRAP       (STATUS_T | STATUS_O)
 #define STATUS_NPRV         (STATUS_T | STATUS_O | STATUS_C | STATUS_CC_MASK)
@@ -822,7 +792,7 @@ typedef enum {
 #define FMEXSUBOP(v)        BITS_12_15(v)       /* firmware extension suboperation accessor */
 
 
-/* Specific instruction accessors */
+/* General instruction accessors */
 
 #define IOOP_K_MASK         0000017u            /* I/O K-field mask */
 #define IOOP_K_SHIFT        0000000u            /* I/O K-field alignment shift */
@@ -876,18 +846,8 @@ typedef enum {
 #define SDEC2(v)            (((v) & SDEC2_MASK) >> SDEC_SHIFT)
 #define SDEC3(v)            (((v) & SDEC3_MASK) >> SDEC_SHIFT)
 
-#define DB_FLAG             0000020u            /* PB/DB base flag */
-
-#define MVBW_CCF            0000030u            /* MVBW condition code flags */
-#define MVBW_N_FLAG         0000020u            /* MVBW numeric flag */
-#define MVBW_A_FLAG         0000010u            /* MVBW alphabetic flag */
-#define MVBW_S_FLAG         0000004u            /* MVBW upshift flag */
-#define MVBW_CCF_SHIFT      6                   /* CCF alignment in MVBW instruction */
-
-#define NABS_FLAG           0000100u            /* CVDA negative absolute value flag */
-#define ABS_FLAG            0000040u            /* CVDA absolute value flag */
-
-#define EIS_SDEC_SHIFT      4                   /* EIS S-decrement alignment shift */
+#define DB_FLAG             0000020u            /* base set PB/DB base register flag */
+#define CIS_DB_FLAG         0000001u            /* CIS set PB/DB base register flag */
 
 
 /* Explicit instruction opcodes and accessors */
@@ -896,6 +856,8 @@ typedef enum {
 #define QASR                0015700u            /* quadruple arithmetic right shift */
 #define DMUL                0020570u            /* double integer multiply */
 #define DDIV                0020571u            /* double integer divide */
+#define SETR                0027400u            /* set registers (none) */
+#define SETR_X              0027404u            /* set registers (index) */
 #define SED_1               0030041u            /* set enable interrupt */
 #define HALT_10             0030370u            /* halt 10 */
 
@@ -932,6 +894,26 @@ typedef enum {
 #define CMD_TO(v)           (((v) & CMD_TO_MASK)  >> CMD_TO_SHIFT)
 #define CMD_MOP(v)          (((v) & CMD_MOP_MASK) >> CMD_MOP_SHIFT)
 
+#define MVBW_CCF            0000030u            /* MVBW condition code flags */
+#define MVBW_N_FLAG         0000020u            /* MVBW numeric flag */
+#define MVBW_A_FLAG         0000010u            /* MVBW alphabetic flag */
+#define MVBW_S_FLAG         0000004u            /* MVBW upshift flag */
+#define MVBW_CCF_SHIFT      6                   /* CCF alignment in MVBW instruction */
+
+#define NABS_FLAG           0000100u            /* CVDA negative absolute value flag */
+#define ABS_FLAG            0000040u            /* CVDA absolute value flag */
+
+#define CVND_SC_MASK        0000016u            /* CVND sign-control mask */
+#define CVND_SC_SHIFT       1                   /* CVND sign-control field alignment shift */
+
+#define EIS_SDEC_MASK       0000020u            /* EIS S-decrement mask */
+#define EIS_SDEC_SHIFT      4                   /* EIS S-decrement alignment shift */
+
+#define CIS_SDEC_MASK       0000001u            /* CIS S-decrement mask */
+#define CIS_SDEC_SHIFT      0                   /* CIS S-decrement alignment shift */
+
+#define TCCS_CCF_SHIFT      8                   /* CIS TCCS instruction CCF alignment */
+
 
 /* PSHR/SETR instruction accessors */
 
@@ -954,6 +936,16 @@ typedef enum {
 
 #define PCN_SERIES_II       1                   /* CPU number for the Series II */
 #define PCN_SERIES_III      2                   /* CPU number for the Series III */
+
+
+/* EDIT instruction subprogram operation values */
+
+#define EDIT_SUFS           013                 /* highest opcode with an extended immediate operand */
+#define EDIT_EXOP           017                 /* extended opcode prefix */
+
+#define EDIT_TE             (EDIT_EXOP + 000)   /* first extended opcode with no operand */
+#define EDIT_MDWO           (EDIT_EXOP + 004)   /* last extended opcode with no operand */
+#define EDIT_DBNZ           (EDIT_EXOP + 011)   /* last extended opcode */
 
 
 /* Reserved memory addresses */
@@ -1006,6 +998,7 @@ typedef enum {
 #define LABEL_STTN_SHIFT    8                   /* STT number alignment shift */
 #define LABEL_SEGMENT_SHIFT 0                   /* segment number alignment shift */
 
+#define LABEL_LOCAL         0000000u            /* local program label flag */
 #define LABEL_UNCALLABLE    0040000u            /* local program label uncallable flag */
 #define LABEL_ADDRESS_MASK  0037777u            /* local program label address mask */
 
@@ -1017,7 +1010,7 @@ typedef enum {
 #define LABEL_IRQ           (LABEL_EXTERNAL | ISR_SEGMENT)          /* label for interrupt requests */
 #define LABEL_STTN_MAX      (LABEL_STTN_MASK >> LABEL_STTN_SHIFT)   /* STT number maximum value */
 
-#define TO_LABEL(s,n)       ((s) | (n) << LABEL_STTN_SHIFT)
+#define TO_LABEL(s,n)       ((s) | (n) << LABEL_STTN_SHIFT)     /* s = segment number, n = STT number */
 
 
 /* Stack marker accessors */
@@ -1063,6 +1056,11 @@ extern HP_WORD CNTR;                            /* Microcode Counter */
 #define RD                  TR [3]
 
 
+/* CPU device */
+
+extern DEVICE cpu_dev;                          /* Central Processing Unit */
+
+
 /* CPU state */
 
 extern jmp_buf     cpu_save_env;                /* saved environment for microcode aborts */
@@ -1088,14 +1086,15 @@ extern void cpu_flush      (void);
 extern void cpu_adjust_sr  (uint32 target);
 extern void cpu_mark_stack (void);
 
-extern void cpu_ea (HP_WORD mode_disp, ACCESS_CLASS *classification, HP_WORD *offset, BYTE_SELECTOR *selector);
+extern void   cpu_ea      (HP_WORD mode_disp, ACCESS_CLASS *class, HP_WORD *offset, BYTE_SELECTOR *selector);
+extern uint32 cpu_byte_ea (ACCESS_CLASS class, uint32 byte_offset, uint32 block_length);
 
 extern void cpu_setup_irq_handler  (IRQ_CLASS class, HP_WORD parameter);
 extern void cpu_setup_ics_irq      (IRQ_CLASS class, TRAP_CLASS trap);
 extern void cpu_run_mode_interrupt (HP_WORD device_number);
 extern void cpu_setup_code_segment (HP_WORD label, HP_WORD* status, HP_WORD *entry_0);
 extern void cpu_setup_data_segment (HP_WORD segment_number, HP_WORD *bank, HP_WORD *address);
-extern void cpu_call_procedure     (HP_WORD label);
+extern void cpu_call_procedure     (HP_WORD label, HP_WORD offset);
 extern void cpu_exit_procedure     (HP_WORD new_q, HP_WORD new_sm, HP_WORD parameter);
 extern void cpu_start_dispatcher   (void);
 extern void cpu_update_pclk        (void);
@@ -1103,7 +1102,8 @@ extern void cpu_update_pclk        (void);
 
 /* Global CPU instruction execution routines */
 
-extern t_stat cpu_branch_short (t_bool check_loop);
+extern t_bool cpu_interrupt_pending (t_stat *status);
+extern t_stat cpu_branch_short      (t_bool check_loop);
 
 extern HP_WORD cpu_add_16 (HP_WORD augend,       HP_WORD addend);
 extern HP_WORD cpu_sub_16 (HP_WORD minuend,      HP_WORD subtrahend);
@@ -1113,3 +1113,4 @@ extern t_stat cpu_stack_op                      (void);
 extern t_stat cpu_shift_branch_bit_op           (void);
 extern t_stat cpu_move_spec_fw_imm_field_reg_op (void);
 extern t_stat cpu_io_cntl_prog_imm_mem_op       (void);
+extern t_stat cpu_cis_op                        (void);

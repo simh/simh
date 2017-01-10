@@ -25,6 +25,7 @@
 
    MPX          HP 3000 Series III Multiplexer Channel
 
+   24-Oct-16    JDB     Renamed SEXT macro to SEXT16
    12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    15-Jul-16    JDB     Fixed the word count display for DREADSTB trace
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
@@ -322,10 +323,21 @@
 
 
 #include "hp3000_defs.h"
-#include "hp3000_cpu.h"
 #include "hp3000_cpu_ims.h"
 #include "hp3000_io.h"
+#include "hp3000_mem.h"
 
+
+
+/* IOP device */
+
+extern DEVICE iop_dev;                          /* I/O Processor */
+
+
+/* Memory access macros */
+
+#define iop_read_memory(c,o,v)      mem_read  (&iop_dev, c, o, v)
+#define iop_write_memory(c,o,v)     mem_write (&iop_dev, c, o, v)
 
 
 /* Program constants.
@@ -1230,8 +1242,8 @@ while (cycles > 0) {                                    /* execute as long as cy
             else                                        /* otherwise */
                 inbound_signals = NO_SIGNALS;           /*   no acknowledgement is needed */
 
-            cpu_read_memory (absolute_iop, addr_reg, &iocw);    /* fetch the IOCW from memory */
-            cycles = cycles - CYCLES_PER_READ;                  /*   and count the memory access */
+            iop_read_memory (absolute, addr_reg, &iocw);    /* fetch the IOCW from memory */
+            cycles = cycles - CYCLES_PER_READ;              /*   and count the memory access */
 
             order_reg = IOCW_ORDER (iocw);              /* get the translated order from the IOCW */
 
@@ -1326,25 +1338,25 @@ while (cycles > 0) {                                    /* execute as long as cy
                     break;
                 }
 
-            if (store_ioaw == FALSE) {                              /* if a fetch is needed */
-                cpu_read_memory (absolute_iop, addr_reg, &ioaw);    /*   then load the IOAW from memory */
-                cycles = cycles - CYCLES_PER_READ;                  /*     and count the memory access */
+            if (store_ioaw == FALSE) {                          /* if a fetch is needed */
+                iop_read_memory (absolute, addr_reg, &ioaw);    /*   then load the IOAW from memory */
+                cycles = cycles - CYCLES_PER_READ;              /*     and count the memory access */
 
                 dprintf (mpx_dev, DEB_PIO, "Channel SR %u loaded IOAW %06o from address %06o\n",
                          srn, ioaw, addr_reg);
                 }
 
-            else                                                    /* otherwise provide a dummy value */
-                ioaw = 0;                                           /*   that will be overwritten */
+            else                                                /* otherwise provide a dummy value */
+                ioaw = 0;                                       /*   that will be overwritten */
 
-            if (inbound_signals)                                    /* if there are signals to assert */
-                outbound = dibptr->io_interface (dibptr,            /*   then pass them to the interface */
+            if (inbound_signals)                                /* if there are signals to assert */
+                outbound = dibptr->io_interface (dibptr,        /*   then pass them to the interface */
                                                  inbound_signals, ioaw);
 
-            if (store_ioaw == TRUE) {                               /* if a store is needed */
-                ioaw = IODATA (outbound);                           /*   then set the IOAW from the returned value */
-                cpu_write_memory (absolute_iop, addr_reg, ioaw);    /*     and store it in memory */
-                cycles = cycles - CYCLES_PER_WRITE;                 /* count the memory access */
+            if (store_ioaw == TRUE) {                           /* if a store is needed */
+                ioaw = IODATA (outbound);                       /*   then set the IOAW from the returned value */
+                iop_write_memory (absolute, addr_reg, ioaw);    /*     and store it in memory */
+                cycles = cycles - CYCLES_PER_WRITE;             /* count the memory access */
 
                 dprintf (mpx_dev, DEB_PIO, "Channel SR %u stored IOAW %06o to address %06o\n",
                          srn, ioaw, addr_reg);
@@ -1393,15 +1405,15 @@ while (cycles > 0) {                                    /* execute as long as cy
 
             outbound = dibptr->io_interface (dibptr, inbound_signals, 0);
 
-            if (sio_order != sioJUMP                                            /* if we're not completing */
-              && (sio_order != sioJUMPC || (outbound & JMPMET) == 0)) {         /*   a successful jump order */
-                cpu_read_memory (absolute_iop, IODATA (outbound), &addr_reg);   /*     then get the I/O program pointer */
-                cycles = cycles - CYCLES_PER_READ;                              /*       and count the memory access */
+            if (sio_order != sioJUMP                                        /* if we're not completing */
+              && (sio_order != sioJUMPC || (outbound & JMPMET) == 0)) {     /*   a successful jump order */
+                iop_read_memory (absolute, IODATA (outbound), &addr_reg);   /*     then get the I/O program pointer */
+                cycles = cycles - CYCLES_PER_READ;                          /*       and count the memory access */
                 }
 
-            cpu_write_memory (absolute_iop, IODATA (outbound),  /* write the updated program pointer */
-                              addr_reg + 2 & R_MASK);           /*   back to the DRT */
-            cycles = cycles - CYCLES_PER_WRITE;                 /*     and count the access */
+            iop_write_memory (absolute, IODATA (outbound),  /* write the updated program pointer */
+                              addr_reg + 2 & R_MASK);       /*   back to the DRT */
+            cycles = cycles - CYCLES_PER_WRITE;             /*     and count the access */
 
             break;
 
@@ -1409,9 +1421,9 @@ while (cycles > 0) {                                    /* execute as long as cy
         case State_D:
             inbound_data = 0;                                   /* assume there is no inbound data */
 
-            if (sio_order == sioSBANK) {                            /* if this is a Set Bank order */
-                cpu_read_memory (absolute_iop, addr_reg, &ioaw);    /*   then read the IOAW */
-                cycles = cycles - CYCLES_PER_READ;                  /*     and count the memory access */
+            if (sio_order == sioSBANK) {                        /* if this is a Set Bank order */
+                iop_read_memory (absolute, addr_reg, &ioaw);    /*   then read the IOAW */
+                cycles = cycles - CYCLES_PER_READ;              /*     and count the memory access */
 
                 dprintf (mpx_dev, DEB_PIO, "Channel SR %u loaded IOAW %06o from address %06o\n",
                          srn, ioaw, addr_reg);
@@ -1449,7 +1461,7 @@ while (cycles > 0) {                                    /* execute as long as cy
                     else                                        /*   otherwise */
                         inbound_signals |= EOT | TOGGLEOUTXFER; /*     assert EOT and end the transfer */
 
-                if (cpu_read_memory (dma_iop,                               /* read the word from memory */
+                if (iop_read_memory (dma,                                   /* read the word from memory */
                                      TO_PA (AUX_BANK (aux_reg), addr_reg),  /*   at the indicated bank and offset */
                                      &inbound_data))                        /* if the read succeeds */
                     cycles = cycles - CYCLES_PER_READ;                      /*   then count the memory access */
@@ -1467,10 +1479,10 @@ while (cycles > 0) {                                    /* execute as long as cy
             if (device_end == SET) {                            /* if the transfer was aborted by the interface */
                 outbound_data = IODATA (outbound);              /*   then it returned the DRT program pointer address */
 
-                cpu_read_memory (absolute_iop, outbound_data, &addr_reg);   /* do the I/O program pointer fetch here */
-                cpu_write_memory (absolute_iop, outbound_data,              /*   so we don't have to do State C */
+                iop_read_memory (absolute, outbound_data, &addr_reg);   /* do the I/O program pointer fetch here */
+                iop_write_memory (absolute, outbound_data,              /*   so we don't have to do State C */
                                   addr_reg + 2 & R_MASK);
-                cycles = cycles - CYCLES_PER_READ - CYCLES_PER_WRITE;       /* count the two memory accesses */
+                cycles = cycles - CYCLES_PER_READ - CYCLES_PER_WRITE;   /* count the two memory accesses */
 
                 if (cntr_reg == CNTR_MAX)                               /* if the word count is now exhausted */
                     if (order_reg & ORDER_DC)                           /*   then if the order is chained */
@@ -1498,7 +1510,7 @@ while (cycles > 0) {                                    /* execute as long as cy
 
             else {                                                              /* otherwise the transfer succeeded */
                 if (sio_order == sioREAD || sio_order == sioREADC)              /* if this is a Read or Read Chained order */
-                    if (cpu_write_memory (dma_iop,                              /*   then write the word to memory */
+                    if (iop_write_memory (dma,                                  /*   then write the word to memory */
                                           TO_PA (AUX_BANK (aux_reg), addr_reg), /*     at the indicated bank and offset */
                                           IODATA (outbound)))                   /* if the write succeeds */
                         cycles = cycles - CYCLES_PER_WRITE;                     /*   then count the memory access */
@@ -1739,7 +1751,7 @@ while (working_set) {
                 dprintf (mpx_dev, DEB_CSRW, "Order register value %02o (%s) "
                                             "and counter register value %d returned\n",
                          order_reg & ORDER_MASK, sio_order_name [IOCW_ORDER (outbound_value)],
-                         SEXT (IOCW_COUNT (outbound_value)));
+                         SEXT16 (IOCW_COUNT (outbound_value)));
                 }
 
             if (control_word & CN_ADDR_RAM) {               /* if the address register is selected */

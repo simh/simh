@@ -23,6 +23,10 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   29_Dec-16    JDB     Changed the status mnemonic flag from REG_S to REG_T
+   20-Nov-16    JDB     Added mapped memory access classes
+   24-Oct-16    JDB     Added half-byte definitions for CIS decoding
+   10-Oct-16    JDB     Moved ACCESS_CLASS definition here from hp3000_cpu.h
    03-Sep-16    JDB     Added the STOP_POWER and STOP_ARSINH codes
    13-May-16    JDB     Modified for revised SCP API function parameter types
    21-Mar-16    JDB     Changed uint16 types to HP_WORD
@@ -107,10 +111,6 @@
 
 
 
-#ifndef HP3000_DEFS_H_
-#define HP3000_DEFS_H_
-
-
 #include "sim_rev.h"
 #include "sim_defs.h"
 
@@ -150,7 +150,7 @@
 #define REG_A               (1u << REG_V_UF + 0)        /* permit any display */
 #define REG_B               (1u << REG_V_UF + 1)        /* permit binary display */
 #define REG_M               (1u << REG_V_UF + 2)        /* default to instruction mnemonic display */
-#define REG_S               (1u << REG_V_UF + 3)        /* default to status mnemonic display */
+#define REG_T               (1u << REG_V_UF + 3)        /* default to status mnemonic display */
 
 
 /* Register macros.
@@ -264,21 +264,24 @@
               printf (__VA_ARGS__); \
               if (sim_log) \
                   fprintf (sim_log, __VA_ARGS__); \
-          } while (0)
+              } \
+          while (0)
 
 #define cputs(str) \
           do { \
               fputs (str, stdout); \
               if (sim_log) \
                   fputs (str, sim_log); \
-          } while (0)
+              } \
+          while (0)
 
 #define cputc(ch) \
           do { \
               putc (ch); \
               if (sim_log) \
                   fputc (ch, sim_log); \
-          } while (0)
+              } \
+          while (0)
 
 
 /* Simulation stop codes.
@@ -396,6 +399,9 @@ typedef uint32              HP_WORD;                    /* HP 16-bit data word r
 
 #define R_MASK              0177777u                    /* 16-bit register mask */
 
+#define D4_WIDTH            4                           /* 4-bit data bit width */
+#define D4_MASK             0017u                       /* 4-bit data mask */
+
 #define D8_WIDTH            8                           /* 8-bit data bit width */
 #define D8_MASK             0377u                       /* 8-bit data mask */
 #define D8_UMAX             0377u                       /* 8-bit unsigned maximum value */
@@ -481,6 +487,67 @@ typedef uint32              HP_WORD;                    /* HP 16-bit data word r
 #define TO_OFFSET(p)        ((p) & LA_MASK)
 
 
+/* Memory access classifications.
+
+   The access classification determines which bank register is used with the
+   supplied offset to access memory, whether or not the access is bounds
+   checked, and whether or not the access is mapped to the TOS registers if the
+   address is between SM and SM + SR.
+
+   Bounds checking is optionally performed on program (including instruction
+   fetch), data, and stack accesses when not in privileged mode.  Absolute
+   addresses are always accessed in privileged mode, so bounds checking is never
+   performed.
+
+   If the memory address lies between SM and SM + SR within the stack bank, then
+   access to the TOS registers may be substituted for access to memory.
+   Register mapping is always performed on stack accesses, optionally performed
+   on absolute and data accesses, and is never performed on program (and fetch)
+   accesses.
+
+   To summarize bounds checking and TOS register mapping:
+
+               Bounds    TOS
+     Access    Check   Mapping
+     --------  ------  -------
+     absolute    N        O
+     fetch       O        N
+     program     O        N
+     data        O        O
+     stack       O        Y
+     dma         N        N
+
+
+   Implementation notes:
+
+    1. The enumeration values must be ordered such that the "checked" classes
+       are odd and differ from their corresponding "unchecked" classes only in
+       the LSBs.
+
+    2. There is no hardware DMA bank register.  The "dma" class exists only to
+       differentiate DMA memory accesses from CPU memory accesses when tracing.
+*/
+
+typedef enum {
+    absolute,                                   /* absolute bank */
+    absolute_mapped,                            /* absolute bank, TOS registers mapped */
+    fetch,                                      /* program bank, instruction fetch */
+    fetch_checked,                              /* program bank, instruction fetch, bounds checked */
+    program,                                    /* program bank, data access */
+    program_checked,                            /* program bank, data access, bounds checked */
+    data,                                       /* data bank, data access */
+    data_checked,                               /* data bank, data access, bounds checked */
+    data_mapped,                                /* data bank, data or TOS register access */
+    data_mapped_checked,                        /* data bank, data or TOS register access, bounds checked */
+    stack,                                      /* stack bank, data or TOS register access */
+    stack_checked,                              /* stack bank, data or TOS register access, bounds checked */
+    dma                                         /* DMA bank */
+    } ACCESS_CLASS;
+
+#define UNCHECKED(c)        ((c) & ~1u)         /* reclassify a request as unchecked */
+#define INVERT_CHECK(c)     ((c) ^ 1u)          /* convert checked to unchecked and vice versa */
+
+
 /* Portable conversions.
 
    SIMH is written with the assumption that the defined-size types (e.g.,
@@ -495,11 +562,13 @@ typedef uint32              HP_WORD;                    /* HP 16-bit data word r
 
    The conversions available are:
 
-     - SEXT  -- int16 sign-extended to int32
-     - NEG16 -- int16 negated
-     - NEG32 -- int32 negated
-     - INT16 -- uint16 to int16
-     - INT32 -- uint32 to int32
+     - SEXT8  -- int8 sign-extended to int32
+     - SEXT16 -- int16 sign-extended to int32
+     - NEG16  -- int8 negated
+     - NEG16  -- int16 negated
+     - NEG32  -- int32 negated
+     - INT16  -- uint16 to int16
+     - INT32  -- uint32 to int32
 
 
    Implementation notes:
@@ -508,13 +577,21 @@ typedef uint32              HP_WORD;                    /* HP 16-bit data word r
        before invoking.
 */
 
-#define SEXT(x)         (int32) ((x) & D16_SIGN ? (x) | ~D16_MASK : (x))
+#define SEXT8(x)        (int32) ((x) & D8_SIGN  ? (x) | ~D8_MASK  : (x))
+#define SEXT16(x)       (int32) ((x) & D16_SIGN ? (x) | ~D16_MASK : (x))
 
+#define NEG8(x)         ((~(x) + 1) & D8_MASK)
 #define NEG16(x)        ((~(x) + 1) & D16_MASK)
 #define NEG32(x)        ((~(x) + 1) & D32_MASK)
 
 #define INT16(u)        ((u) > D16_SMAX ? (-(int16) (D16_UMAX - (u)) - 1) : (int16) (u))
 #define INT32(u)        ((u) > D32_SMAX ? (-(int32) (D32_UMAX - (u)) - 1) : (int32) (u))
+
+
+/* Half-byte accessors */
+
+#define UPPER_HALF(b)       ((b) >> D4_WIDTH & D4_MASK)
+#define LOWER_HALF(b)       ((b) & D4_MASK)
 
 
 /* Byte accessors.
@@ -614,8 +691,8 @@ extern const BITSET_FORMAT inbound_format;      /* the inbound signal format str
 extern const BITSET_FORMAT outbound_format;     /* the outbound signal format structure */
 
 
-/* System interface global SCP support routines previously declared in scp.h */
-/*
+/* System interface global SCP support routines declared in scp.h
+
 extern t_stat sim_load   (FILE       *fptr,  CONST char *cptr, CONST char *fnam, int     flag);
 extern t_stat fprint_sym (FILE       *ofile, t_addr     addr,  t_value    *val,  UNIT    *uptr, int32 sw);
 extern t_stat parse_sym  (CONST char *cptr,  t_addr     addr,  UNIT       *uptr, t_value *val,  int32 sw);
@@ -629,14 +706,12 @@ extern t_stat hp_show_dib (FILE *st,   UNIT  *uptr, int32      code,  CONST void
 
 /* System interface global utility routines */
 
-extern t_bool hp_device_conflict (void);
-extern t_stat fprint_cpu         (FILE *ofile, t_value *val, uint32 radix, int32 switches);
+extern t_stat fprint_cpu  (FILE *ofile, t_value *val, uint32 radix, int32  switches);
+extern uint32 fprint_edit (FILE *ofile, t_value *val, uint32 radix, uint32 byte_address);
 
 extern const char *fmt_status (uint32 status);
 extern const char *fmt_char   (uint32 charval);
 extern const char *fmt_bitset (uint32 bitset, const BITSET_FORMAT bitfmt);
 
-extern void hp_debug (DEVICE *dptr, uint32 flag, ...);
-
-
-#endif
+extern void   hp_debug           (DEVICE *dptr, uint32 flag, ...);
+extern t_bool hp_device_conflict (void);

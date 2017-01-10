@@ -1,6 +1,6 @@
                            SIMH/HP 3000 RELEASE NOTES
                            ==========================
-                             Last update: 2016-09-20
+                             Last update: 2017-01-08
 
 
 This file documents the release history of the Hewlett-Packard 3000 simulator.
@@ -155,6 +155,149 @@ the MPE version used:
    file remains internally consistent.  A memory patch is impossible, but
    workarounds are to increase the code segment limit before running DPAN4 and
    to restore DPAN4.PUB.SYS from the FOS tape if it has been damaged.
+
+
+
+=====================
+Release 4, 2017-01-08
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+  - The HP 32234A COBOL II Extended Instruction Set firmware is now available.
+    The new SET CPU CIS option enables the firmware.
+
+  - Subprograms in memory associated with the EDIT instruction may be examined
+    symbolically with the -E switch.
+
+  - The new CPU "OPND" trace option traces memory byte operands.
+
+  - The new CPU "EXEC" trace option turns on full tracing for instructions
+    that match a value specified by the new "SET CPU EXEC=<match>{;<mask>}"
+    command.
+
+  - The diagnostics coverage is extended to the COBOL II firmware.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The MPE-V/R software kit has been updated to add the COBOL II runtime
+   routines to the system SL and COBOL example programs to the OPERATOR.SYS
+   account.  The startup command files also enable the COBOL II instruction set.
+
+ - New "hp3000_cpu_cis.c" and "hp3000_mem.c" modules have been added.
+
+ - For this release, checking for interrupts is not performed during execution
+   of the COBOL II EDIT, TR, CMPS, and CMPT instructions.  A future release will
+   add interruptibility to these instructions to comply with their hardware
+   behavior.
+
+ - The new OPND trace option does not currently trace byte operands for
+   instructions in the base set (e.g., MOVB or CMPB).  Operands for the
+   COBOL II firmware instructions are fully covered.
+
+ - The command-line switch for the EXAMINE command to request display in
+   status-register format has been changed from "-S" to "-T" to avoid conflict
+   with the "-S" switch used to indicate an address offset from SBANK.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  SETR prints a base register trace when values are not changed.
+
+     VERSION:  Release 3
+
+     OBSERVATION:  The SETR instruction may be used to change any combination of
+     the SBANK, DB, DL, Z, STA, X, Q, and SM register values.  If the REG trace
+     is active, the base register values will be printed after the instruction
+     completes.  This occurs whether or not the base register values were
+     actually changed.  In particular, the CPU diagnostic uses the SETR
+     instruction to flush the stack to memory without changing any base
+     registers.  The REG trace in this case is unnecessary.
+
+     CAUSE:  The "cpu_base_changed" flag is set unconditionally when the
+     instruction completes.  It should be set only if the SETR instruction
+     specifies one or more base registers to change.
+
+     RESOLUTION:  Modify "cpu_move_spec_fw_imm_field_reg_op" (hp3000_cpu_base.c)
+     to set the "cpu_base_changed" flag only if one or more base register change
+     bits are set in the instruction operand field.
+
+     STATUS:  Fixed in Release 4.
+
+
+  2. PROBLEM:  Invalid bank and offset values are accepted for address entry.
+
+     VERSION:  Release 3
+
+     OBSERVATION:  Bank-offset addresses with out-of-range the bank or offset
+     values, e.g., EXAMINE 30.0 and EXAMINE 0.1777777, are accepted without
+     complaint.  The bank value is taken modulo 20, and the higher order bits of
+     the offset value are merged into the bank number.  Values out of range
+     should be rejected with errors.
+
+     CAUSE:  Incomplete range verification.
+
+     RESOLUTION:  Modify "parse_addr" (hp3000_sys.c) to check the parsed bank
+     and offset values against their respective maximums and return an "Invalid
+     argument" error if either is exceeded.
+
+     STATUS:  Fixed in Release 4.
+
+
+  3. PROBLEM:  The "-S" (SBANK-offset) switch displays values in status-register
+     format.
+
+     VERSION:  Release 3
+
+     OBSERVATION:  The HP 3000 User's Manual states that adding the "-S" switch
+     to the EXAMINE command implies that the offset is from the bank number in
+     the SBANK register.  The example given, "EXAMINE -S <sbank-offset>", should
+     display the memory data value at the address <SBANK-number>.<offset> in
+     octal format.  Instead, it displays the value in status-register format.
+
+     CAUSE:  The "-S" switch is used for both SBANK and STA formats.  Section
+     2.1.3 says that -S means that "The implied bank number is obtained from
+     SBANK."  Section 2.1.2 says that -S means that "A CPU status mnemonic" is
+     being displayed.  For EXAMINE -S, the latter interpretation causes the
+     expected octal value to be displayed in status-register format.
+
+     RESOLUTION:  Modify "fprint_sym" (hp3000_sys.c) to use the "-T" switch to
+     designate status-register format.  Modify hp3000_sys.c, hp3000_cpu.c, and
+     hp3000_defs.h to rename the "REG_S" format indicator to "REG_T" for
+     consistency with the switch change.
+
+     STATUS:  Fixed in Release 4.
+
+
+  4. PROBLEM:  SCAL 0 and PCAL 0 instructions fail when a stack overflow occurs.
+
+     VERSION:  Release 3
+
+     OBSERVATION:  The SCAL 0 and PCAL 0 instructions transfer control via
+     subroutine or procedure calls, respectively, through program labels
+     residing on the top of the stack.  If a stack overflow occurs during
+     instruction execution, the stack overflow trap handler is called to enlarge
+     the stack, and the instruction is reexecuted.  However, the program label
+     has been lost, so control transfers to a random location.
+
+     CAUSE:  The instructions obtain the label and then delete the TOS, flush
+     the rest of the stack registers to memory, and then check that SM <= Z,
+     i.e., that the current top of the stack in memory does not exceed the
+     stack limit.  If SM > Z, a stack overflow has occurred, and the trap
+     handler is called.  However, the label has not been restored to the stack,
+     so when the instruction is reexecuted after the stack is enlarged, the
+     wrong value is pulled from the TOS.
+
+     RESOLUTION:  Modify "cpu_io_cntl_prog_imm_mem_op" SCAL and PCAL executors
+     (hp3000_cpu_base.c) to push the label back onto the stack before taking the
+     stack overflow trap.
+
+     STATUS:  Fixed in Release 4.
 
 
 

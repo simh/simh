@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   10-Oct-16    JDB     Moved cpu_read_memory, cpu_write_memory to hp3000_cpu.h
    01-Sep-16    JDB     Added the cpu_cold_cmd and cpu_power_cmd routines
    15-Aug-16    JDB     Removed obsolete comment mentioning iop_read/write_memory
    15-Jul-16    JDB     Corrected the IOCW_COUNT macro to return the correct value
@@ -146,15 +147,10 @@ typedef enum {
 
    cpu_cold_cmd     : process the LOAD and DUMP commands
    cpu_power_cmd    : process the POWER commands
-   cpu_read_memory  : read a word from main memory
-   cpu_write_memory : write a word to main memory
 */
 
 extern t_stat cpu_cold_cmd  (int32 arg, CONST char *buf);
 extern t_stat cpu_power_cmd (int32 arg, CONST char *buf);
-
-extern t_bool cpu_read_memory  (ACCESS_CLASS classification, uint32 offset, HP_WORD *value);
-extern t_bool cpu_write_memory (ACCESS_CLASS classification, uint32 offset, HP_WORD  value);
 
 
 /* Global SIO order structures.

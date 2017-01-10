@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion from "hp_tapelib.h"
    01-Jul-16    JDB     Changed tl_attach to reset the event delay times pointer
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
@@ -326,6 +327,7 @@
 
 
 
+#include "hp3000_defs.h"                        /* this must reflect the machine used */
 #include "hp_tapelib.h"
 
 

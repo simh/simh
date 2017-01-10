@@ -205,6 +205,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\HP3000\hp3000_cpu_cis.c"
+				>
+			</File>
+			<File
 				RelativePath="..\HP3000\hp3000_cpu_fp.c"
 				>
 			</File>
@@ -218,6 +222,10 @@
 			</File>
 			<File
 				RelativePath="..\HP3000\hp3000_lp.c"
+				>
+			</File>
+			<File
+				RelativePath="..\HP3000\hp3000_mem.c"
 				>
 			</File>
 			<File
@@ -315,6 +323,10 @@
 			</File>
 			<File
 				RelativePath="..\HP3000\hp3000_io.h"
+				>
+			</File>
+			<File
+				RelativePath="..\HP3000\hp3000_mem.h"
 				>
 			</File>
 			<File
