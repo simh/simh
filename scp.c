@@ -247,8 +247,6 @@
 
 #ifdef OPCON
 #include "PDP11/opcon.h"
-#ifndef USE_ASYNC_IO
-extern uint8 oc_active;
 #endif
 
 #ifndef MAX
@@ -2268,8 +2266,7 @@ return cmdp;
 t_stat exit_cmd (int32 flag, CONST char *cptr)
 {
 #ifdef OPCON
-if (oc_active)
-  oc_detach((UNIT *)0);
+oc_detach((UNIT *)0);
 #endif
 return SCPE_EXIT;
 }
@@ -6564,17 +6561,9 @@ do {
 #ifdef OPCON
         /* Set RUN light on or off, other leds too, depending on model */
       if (oc_halt_status() == TRUE) {
-	if (oc_active) {
           r = SCPE_STOP;
-          oc_send_cmd('a');
+          oc_toggle_clear();
           switch (cpu_model) {
-            case MOD_1105: oc_port1(FSTS_RUN, 0);
-                           break;
-            case MOD_1120: oc_port1(FSTS_RUN, 0);
-                           break;
-            case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 1);
-                           oc_port1(FSTS_RUN, 0);
-                           break;
             case MOD_1145: oc_port1(FSTS_RUN, 0);
                            oc_port1(FSTS_1145_PAUSE, 1);
                            break;
@@ -6583,18 +6572,9 @@ do {
                            break;
             default      : break;
             }
-          }
 	}
       else  {
-	if (oc_active) {
           switch (cpu_model) {
-            case MOD_1105: oc_port1(FSTS_RUN, 1);
-                           break;
-            case MOD_1120: oc_port1(FSTS_RUN, 1);
-                           break;
-            case MOD_1140: oc_port1(FSTS_1140_CONSOLE, 0);
-                           oc_port1(FSTS_RUN, 1);
-                           break;
             case MOD_1145: oc_port1(FSTS_RUN, 1);
                            oc_port1(FSTS_1145_PAUSE, 0);
                            break;
@@ -6603,7 +6583,6 @@ do {
                            break;
             default      : break;
             }
-	  }
         r = sim_instr();
         }
 #else

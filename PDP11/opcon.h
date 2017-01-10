@@ -37,11 +37,10 @@
 
 //#define DEBUG_OC 1 				/* enable/disable debug */
 
-#ifndef MOD_1105                
-#define MOD_1105	 2
-#define MOD_1120	 3
-#define MOD_1140	 8
+#ifndef MOD_1145                
 #define MOD_1145	10
+#endif
+#ifndef MOD_1170
 #define MOD_1170	12
 #endif
 
@@ -53,18 +52,6 @@
 #define SWR_00_07_PORT	     INP1	/* SWITCH REGISTER 7-0 */
 #define SWR_08_15_PORT	     INP2	/* SWITCH REGISTER 15-8 */
 #define SWR_16_22_PORT	     INP3	/* SWITCH REGISTER 16-22 */
-
-/* 11/05 switches / ports, etc. */
-#define SW_PL_1105	     0x80	/* key switch  bitfield */
-#define SW_HE_1105	     0x01	/* HALT bitfield */
-
-/* 11/20 switches / ports, etc. */
-#define SW_PL_1120	     0x80	/* key switch  bitfield */
-#define SW_HE_1120	     0x01	/* HALT bitfield */
-
-/* 11/40 switches / ports, etc. */
-#define SW_PL_1140	     0x80	/* key switch  bitfield */
-#define SW_HE_1140	     0x01	/* HALT bitfield */
 
 /* 11/45 switches / ports, etc. */
 #define SW_PL_1145	     0x80	/* key switch  bitfield */
@@ -144,38 +131,6 @@
 /* STAT_2_OUTPORT 11/45, 11/50 & 11/55  --> not used */
 
 
-/* STAT_1_OUTPORT 11/40 ( & 11/35) */
-/* out3  [2] |  RUN  |  PROC |  BUS  |       |       | USER  |CONSOLE|VIRTUAL*/
-#define FSTS_1140_RUN           0x80
-#define FSTS_1140_PROC	        0x40
-#define FSTS_1140_BUS	        0x20
-#define FSTS_1140_USER	        0x04
-#define FSTS_1140_CONSOLE	0x02
-#define FSTS_1140_VIRTUAL	0x01
-#define FSTS_1140_18BIT	        0x01
-
-/* STAT_2_OUTPORT 11/40  --> not used */
-
-/* STAT_1_OUTPORT 11/20 TBD! */
-/* out3  [2] |  RUN  | FETCH |  BUS  | EXEC  | SOURCE| DEST  | ADDR1 | ADDR2 |*/
-#define FSTS_1120_RUN           0x80
-#define FSTS_1120_PROC	        0x40
-#define FSTS_1120_BUS	        0x20
-#define FSTS_1120_EXEC          0x10
-#define FSTS_1120_SOURCE        0x08
-#define FSTS_1120_DEST   	0x04
-#define FSTS_1120_ADDR1  	0x02
-#define FSTS_1120_ADDR2	        0x01
-
-/* STAT_2_OUTPORT 11/20  --> not used */
-
-/* STAT_1_OUTPORT 11/05 ( & 11/10) TBD! */
-/* out3  [2] |  RUN  |       |       |       |       |       |       |       |*/
-#define FSTS_1105_RUN           0x80
-
-/* STAT_2_OUTPORT 11/05  --> not used */
-
-
 /* index values for data array */
 #define DISP_SHFR	0	/* data paths (shiftr); normal setting  */
 #define DISP_BR		1	/* read/write data                      */
@@ -197,32 +152,27 @@
 
 /* OC controlblock */
 struct oc_st {
-  t_bool key;			/* flag: panel key in POWER or LOCK pos. */
   t_bool first_exam;		/* flag: first EXAM action */
   t_bool first_dep;		/* flag: first DEP action */
   t_bool ind_addr;		/* flag: indirect data access */
   t_bool inv_addr;		/* flag: invalid address (out of range )*/
-  uint8  line[32];		/* serial line to use */
-  uint8	 cpu_model;		/* cpu model */
   uint32 act_addr;		/* used address for EXAM/DEP */
-  int32  MMR0;			/* MMU register 0 */
-  int32  MMR3;			/* MMU register 3 */
   uint8  HALT;			/* HALT switch modes */
   uint8  PORT1;			/* status register 1 */
   uint8  PORT2;			/* status register 2 */
-  uint8  OUT;			/* cmd from console task */
-  uint8  IN;			/* cmd to   console task */
-  uint8  ACK[3];		/* ack toggle data */
   uint32 A[10];			/* Address Mux array */
   uint16 D[5];			/* Data Mux array */
   uint8  S[5];			/* switches and toggles retrieved state */
   };
-typedef struct oc_st oc_st;
 
 #ifndef OPCON_SIMH
 
 /* defines & declarations for simh only part */
 extern uint32 cpu_model;
+extern struct oc_st oc_ctl;
+
+int pthread_create(pthread_t *a, const pthread_attr_t *b, void *(*c)(void*), void *d);
+int pthread_join(pthread_t a, void **d);
 
 /* function prototypes simh integration */
 
@@ -233,15 +183,18 @@ t_stat oc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat oc_reset (DEVICE *dptr);
 t_stat oc_show (FILE *st, UNIT *uptr, int32 flag, void *desc);
 t_stat oc_svc (UNIT *uptr);
+t_stat oc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat oc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 
 /* function prototypes OC */
-
+void  *oc_thread(void *oc_end);
 void   oc_clear_halt (void);
 uint16 oc_extract_data (void);
 uint32 oc_extract_address (void);
 t_bool oc_get_console (char *cptr);
 t_bool oc_get_halt (void);
-int    oc_get_swr (void);
+int    oc_get_rotary (void);
+int    oc_get_SWR (void);
 int    oc_halt_status (void);
 void   oc_mmu (void);
 void   oc_port1 (uint8 flag, t_bool action);
@@ -250,11 +203,15 @@ char  *oc_read_line_p (char *prompt, char *cptr, int32 size, FILE *stream);
 void   oc_ringprot (int value);
 void   oc_master (t_bool flag);
 t_bool oc_poll (int channel, int amount);
-void   oc_send_cmd (uint8 cmd);
-void   oc_send_ack (uint8 mask);
+void   oc_send_A (void);
+void   oc_send_AD (void);
+void   oc_send_ADS (void);
+void   oc_send_D (void);
+void   oc_send_status (void);
+void   oc_toggle_ack (uint8 mask);
+void   oc_toggle_clear (void);
 void   oc_wait (t_bool flag);
-t_stat oc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat oc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+
 #endif
 
 #endif /* OC_DEFS */

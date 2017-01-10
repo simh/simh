@@ -49,8 +49,6 @@
 
 #ifdef OPCON
 #include "opcon.h"
-extern oc_st *ocp;
-extern uint8 oc_active;
 #endif
 
 
@@ -316,18 +314,10 @@ DEVICE sys_dev = {
 t_stat SR_rd (int32 *data, int32 pa, int32 access)
 {
 #ifdef OPCON
-if (oc_active) {
-  switch(cpu_model) {
-    case MOD_1105 :
-    case MOD_1120 :
-    case MOD_1140 :
-    case MOD_1145 :
-    case MOD_1170 : oc_get_swr();
-                    SR = oc_extract_data();
-                    break;
-    default :       break; /* SR = 0? */
+if (cpu_model == MOD_1170) {
+    oc_get_SWR();
+    SR = oc_extract_data();
     }
-  }
 #endif
 
 *data = SR;
@@ -338,8 +328,7 @@ t_stat DR_wr (int32 data, int32 pa, int32 access)
 {
 DR = data;
 #ifdef OPCON
-if (oc_active)
-  ocp->D[DISP_DR] = (uint16)DR;
+oc_ctl.D[DISP_DR] = (uint16)DR;
 #endif
 
 return SCPE_OK;
@@ -498,8 +487,7 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
 #ifdef OPCON
     case 014:
         ODD_IGN(data);
-	if (oc_active)
-          ocp->D[DISP_FPP] = (uint16)(MBRK = data);
+        oc_ctl.D[DISP_FPP] = (uint16)(MBRK = data);
         return SCPE_OK;
 #endif
 
@@ -676,15 +664,13 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
 
     case 010:                                           /* low size */
 #ifdef OPCON
-	if (oc_active)
-          oc_port2(FSTS_1170_PARLO, 1);   /* technically : never called */
+        oc_port2(FSTS_1170_PARLO, 1);   /* technically : never called */
 #endif
         return SCPE_OK;
 
     case 011:                                           /* high size */
 #ifdef OPCON
-	if (oc_active)
-          oc_port2(FSTS_1170_PARHI, 1);   /* technically : never called */
+        oc_port2(FSTS_1170_PARHI, 1);   /* technically : never called */
 #endif
         return SCPE_OK;
 
@@ -696,8 +682,7 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
         ODD_IGN (data);
         MBRK = data & MBRK70_WR;
 #ifdef OPCON
-	if (oc_active)
-          ocp->D[DISP_FPP] = (uint16)(MBRK);
+        oc_ctl.D[DISP_FPP] = (uint16)(MBRK);
 #endif
         return SCPE_OK;
 

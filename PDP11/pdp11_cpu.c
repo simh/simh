@@ -229,8 +229,6 @@
 #include "pdp11_cpumod.h"
 #ifdef OPCON
 #include "opcon.h"
-extern oc_st *ocp;
-extern uint8 oc_active;
 #endif
 
 #define PCQ_SIZE        64                              /* must be 2**n */
@@ -746,41 +744,32 @@ reason = 0;
 */
 
 #ifdef OPCON
-if (oc_active) {
-  ocp->MMR0 = MMR0;
-  switch (cpu_model) {
-    case MOD_1105 : break;
-    case MOD_1120 : break;
-    case MOD_1140 : break;
-    case MOD_1145 : oc_port1(FSTS_1170_ADRSERR, 0);
-                    break;
-    case MOD_1170 : oc_port1(FSTS_1170_ADRSERR, 0);
-                    oc_port2(FSTS_1170_PARHI, 0);
-                    oc_port2(FSTS_1170_PARLO, 0);
-                    break;
-    default :       break;
-    }
-
-  abortval = setjmp (save_env);                           /* set abort hdlr */
-
-  switch (cpu_model) {            /* may be a trap, so handle it. */
-    case MOD_1105 : break;
-    case MOD_1120 : break;
-    case MOD_1140 : break;
-    case MOD_1145 : if ((abortval == TRAP_NXM) ||
-                        (abortval == TRAP_ODD) ||
-                        (abortval == TRAP_MME))
-                      oc_port1(FSTS_1145_ADRSERR, 1);
-                    break;
-    case MOD_1170 : if (abortval == TRAP_PAR)
-                      oc_port1(FSTS_1170_PARERR, 1);
-                    if ((abortval == TRAP_NXM) ||
-                        (abortval == TRAP_ODD) ||
-                        (abortval == TRAP_MME))
-                      oc_port1(FSTS_1170_ADRSERR, 1);
-                    break;
-    default :       break;
+switch (cpu_model) {
+  case MOD_1145 : oc_port1(FSTS_1145_ADRSERR, 0);
+                  break;
+  case MOD_1170 : oc_port1(FSTS_1170_ADRSERR, 0);
+                  oc_port2(FSTS_1170_PARHI, 0);
+                  oc_port2(FSTS_1170_PARLO, 0);
+                  break;
+  default :       break;
   }
+
+abortval = setjmp (save_env);                           /* set abort hdlr */
+
+switch (cpu_model) {            /* may be a trap, so handle it. */
+  case MOD_1145 : if ((abortval == TRAP_NXM) ||
+                      (abortval == TRAP_ODD) ||
+                      (abortval == TRAP_MME))
+                    oc_port1(FSTS_1145_ADRSERR, 1);
+                  break;
+  case MOD_1170 : if (abortval == TRAP_PAR)
+                    oc_port1(FSTS_1170_PARERR, 1);
+                  if ((abortval == TRAP_NXM) ||
+                      (abortval == TRAP_ODD) ||
+                      (abortval == TRAP_MME))
+                    oc_port1(FSTS_1170_ADRSERR, 1);
+                  break;
+  default :       break;
 }
 #else
 abortval = setjmp (save_env);                           /* set abort hdlr */
@@ -824,13 +813,11 @@ else {
             reason = STOP_SPABORT;
         if (trapea == ~MD_KER) {                        /* kernel stk abort? */
 #ifdef OPCON
-	if (oc_active) {
-          oc_mmu();
-          oc_ringprot(cm);
-          if (cpu_model == MOD_1170) {
-              oc_port1(FSTS_1170_ADRSERR, 1);
-            }
- 	  }
+        oc_mmu();
+        oc_ringprot(cm);
+        if (cpu_model == MOD_1170) {
+            oc_port1(FSTS_1170_ADRSERR, 1);
+          }
 #endif
             setTRAP (TRAP_RED);
             setCPUERR (CPUE_RED);
@@ -883,11 +870,6 @@ while (reason == 0)  {
         put_PIRQ (PIRQ);                                /* rewrite PIRQ */
         STKLIM = STKLIM & STKLIM_RW;                    /* clean up STKLIM */
         MMR0 = MMR0 | MMR0_IC;                          /* usually on */
-#ifdef OPCON
-        if (oc_active)
-          ocp->MMR0 = MMR0;
-#endif
-
         trap_req = calc_ints (ipl, trap_req);           /* recalc int req */
         continue;
         }                                               /* end if sim_interval */
@@ -931,22 +913,17 @@ while (reason == 0)  {
 */
 
 #ifdef OPCON
-	if (oc_active) {
-          oc_wait(0);
-          oc_master(TRUE);
-          switch (cpu_model) {
-            case MOD_1105 : break;
-            case MOD_1120 : break;
-            case MOD_1140 : break;
-            case MOD_1145 : oc_port1(FSTS_1145_ADRSERR, 0);
-                            oc_ringprot(cm);
-                            break;
-            case MOD_1170 : oc_port1(FSTS_1170_ADRSERR, 0);
-                            oc_ringprot(cm);
-                            break;
-            default :       break;
-            }
-	  }
+        oc_wait(0);
+        oc_master(TRUE);
+        switch (cpu_model) {
+          case MOD_1145 : oc_port1(FSTS_1145_ADRSERR, 0);
+                          oc_ringprot(cm);
+                          break;
+          case MOD_1170 : oc_port1(FSTS_1170_ADRSERR, 0);
+                          oc_ringprot(cm);
+                          break;
+          default :       break;
+          }
 #endif
 
         wait_state = 0;                                 /* exit wait state */
@@ -957,10 +934,6 @@ while (reason == 0)  {
             if (update_MM)                              /* save vector */
                 MMR2 = trapea;
             MMR0 = MMR0 & ~MMR0_IC;                     /* clear IC */
-#ifdef OPCON
-        if (oc_active)
-          ocp->MMR0 = MMR0;
-#endif
             }
         src = ReadCW (trapea | calc_ds (MD_KER));       /* new PC */
         src2 = ReadCW ((trapea + 2) | calc_ds (MD_KER)); /* new PSW */
@@ -986,10 +959,6 @@ while (reason == 0)  {
             (trapnum != TRAP_V_RED) && (trapnum != TRAP_V_YEL))
             set_stack_trap (SP);
         MMR0 = MMR0 | MMR0_IC;                          /* back to instr */
-#ifdef OPCON
-        if (oc_active)
-          ocp->MMR0 = MMR0;
-#endif
         continue;                                       /* end if traps */
         }
 
@@ -998,8 +967,7 @@ while (reason == 0)  {
     if (tbit)
         setTRAP (TRAP_TRC);
 #ifdef OPCON
-    if (oc_active)
-      oc_wait(wait_state);
+    oc_wait(wait_state);
 #endif
     if (wait_state) {                                   /* wait state? */
         sim_idle (TMR_CLK, TRUE);
@@ -1057,15 +1025,13 @@ while (reason == 0)  {
     PC = (PC + 2) & 0177777;                            /* incr PC, mod 65k */
 
 #ifdef OPCON
-    if (oc_active) {
-      ocp->A[ADDR_CONPA] = (uint32)PC;
-      ocp->D[DISP_SHFR] = (uint16)IR;
-      oc_ringprot(cm);
-      if (oc_halt_status())  {
-          stop_cpu = 1;
-          reason = SCPE_STOP;
-          }
-    }
+    oc_ctl.A[ADDR_CONPA] = (uint32)PC;
+    oc_ctl.D[DISP_SHFR] = (uint16)IR;
+    oc_ringprot(cm);
+    if (oc_halt_status())  {
+        stop_cpu = 1;
+        reason = SCPE_STOP;
+        }
 #endif
 
     switch ((IR >> 12) & 017) {                         /* decode IR<15:12> */
@@ -1085,8 +1051,7 @@ while (reason == 0)  {
                     (!CPUT (CPUT_J) || ((MAINT & MAINT_HTRAP) == 0)))
 #ifdef OPCON
                   {
-		    if (oc_active)
-                      ocp->D[DISP_SHFR] = (uint16)R[0];
+                    oc_ctl.D[DISP_SHFR] = (uint16)R[0];
                     reason = STOP_HALT;
                   }
 #else
@@ -1101,10 +1066,8 @@ while (reason == 0)  {
             case 1:                                     /* WAIT */
                 wait_state = 1;
 #ifdef OPCON
-		if (oc_active) {
-                  ocp->D[DISP_SHFR] = (uint16)R[0];
-                  oc_wait(1);
-		  }
+                oc_ctl.D[DISP_SHFR] = (uint16)R[0];
+                oc_wait(1);
 #endif
                 break;
             case 3:                                     /* BPT */
@@ -1124,13 +1087,9 @@ while (reason == 0)  {
                     for (i = 0; i < IPL_HLVL; i++)
                         int_req[i] = 0;
 #ifdef OPCON
-                    if (oc_active) {
-                      ocp->MMR0 = MMR0;
-                      ocp->MMR3 = MMR3;
-                      ocp->D[DISP_SHFR] = (uint16)R[0];
-                      oc_mmu();
-                      oc_ringprot(cm);
-                      }
+                    oc_ctl.D[DISP_SHFR] = (uint16)R[0];
+                    oc_mmu();
+                    oc_ringprot(cm);
 #endif
                     trap_req = trap_req & ~TRAP_INT;
                     dsenable = calc_ds (cm);
@@ -1192,8 +1151,7 @@ while (reason == 0)  {
                 JMP_PC (R[dstspec]);
                 R[dstspec] = ReadW (SP | dsenable);
 #ifdef OPCON
-		if (oc_active)
-                  ocp->D[DISP_SHFR] = (uint16)R[dstspec];
+                oc_ctl.D[DISP_SHFR] = (uint16)R[dstspec];
 #endif
                 if (dstspec != 6)
                     SP = (SP + 2) & 0177777;
@@ -1597,10 +1555,8 @@ while (reason == 0)  {
                 cm = MD_SUP;
                 tbit = 0;
 #ifdef OPCON
-		if (oc_active) {
-                  oc_mmu();
-                  oc_ringprot(cm);
-		  }
+                oc_mmu();
+                oc_ringprot(cm);
 #endif
                 isenable = calc_is (cm);
                 dsenable = calc_ds (cm);
@@ -1992,8 +1948,7 @@ while (reason == 0)  {
             if (CPUT (HAS_SXS)) {
                 R[srcspec] = (R[srcspec] - 1) & 0177777;
 #ifdef OPCON
-                if (oc_active)
-		  ocp->D[DISP_SHFR] = (uint16)R[srcspec];
+		oc_ctl.D[DISP_SHFR] = (uint16)R[srcspec];
 #endif
                 if (hst_ent)
                     hst_ent->dst = R[srcspec];
@@ -2345,10 +2300,8 @@ while (reason == 0)  {
                     hst_ent->dst = dst;
                 WriteW (dst, SP | dsenable);
 #ifdef OPCON
-		if (oc_active) {
-                  oc_mmu();
-                  oc_ringprot(cm);
-		  }
+                oc_mmu();
+                oc_ringprot(cm);
 #endif
                 if ((cm == MD_KER) && (SP < (STKLIM + STKL_Y)))
                     set_stack_trap (SP);
@@ -2552,27 +2505,25 @@ pcq_r->qptr = pcq_p;                                    /* update pc q ptr */
 set_r_display (rs, cm);
 
 #ifdef OPCON
-if (oc_active) {
         /* during HALT, general register R0 contents are displayed. */
-  oc_mmu();
-  oc_ringprot(cm);
-  oc_master(FALSE);
+oc_mmu();
+oc_ringprot(cm);
+oc_master(FALSE);
 
-  if ((reason == STOP_HALT) || (reason == STOP_WAIT) ||
-      (reason == SCPE_STOP) || (reason == STOP_VECABORT) ||
-      (reason == STOP_SPABORT) ) {
-      ocp->A[ADDR_CONPA] = (uint32)saved_PC;
-      ocp->D[DISP_SHFR] = (uint16)R[0];
-      }
-  else {
-        /*
-         * during Single Instruction operation, the Processor
-         * Status Word is displayed.
-         */
-      ocp->A[ADDR_CONPA] = (uint32)saved_PC;
-      ocp->D[DISP_SHFR] = (uint16)PSW;
-      }
-  }
+if ((reason == STOP_HALT) || (reason == STOP_WAIT) ||
+    (reason == SCPE_STOP) || (reason == STOP_VECABORT) ||
+    (reason == STOP_SPABORT) ) {
+    oc_ctl.A[ADDR_CONPA] = (uint32)saved_PC;
+    oc_ctl.D[DISP_SHFR] = (uint16)R[0];
+    }
+else {
+      /*
+       * during Single Instruction operation, the Processor
+       * Status Word is displayed.
+       */
+    oc_ctl.A[ADDR_CONPA] = (uint32)saved_PC;
+    oc_ctl.D[DISP_SHFR] = (uint16)PSW;
+    }
 #endif
 
 return reason;
@@ -2772,8 +2723,7 @@ if (BPT_SUMM_RD &&
 if (ADDR_IS_MEM (pa))                                   /* memory address? */
 #ifdef OPCON
     {
-    if (oc_active)
-      ocp->D[DISP_BR] = (uint16)M[pa >> 1];             /* memory address? */
+    oc_ctl.D[DISP_BR] = (uint16)M[pa >> 1];             /* memory address? */
     return (M[pa >> 1]);
     }
 #else
@@ -2870,8 +2820,7 @@ int32 data;
 if (ADDR_IS_MEM (pa))                                   /* memory address? */
 #ifdef OPCON
     {
-    if (oc_active)
-      ocp->D[DISP_BR] = (uint16)M[pa >> 1]; 
+    oc_ctl.D[DISP_BR] = (uint16)M[pa >> 1]; 
     return (M[pa >> 1]);
     }
 #else
@@ -2895,8 +2844,7 @@ int32 data;
 if (ADDR_IS_MEM (pa))
 #ifdef OPCON
     {
-      if (oc_active)
-        ocp->D[DISP_BR] = (uint16)M[pa >> 1];
+      oc_ctl.D[DISP_BR] = (uint16)M[pa >> 1];
       return (pa & 1? M[pa >> 1] >> 8: M[pa >> 1]) & 0377;
     }
 #else
@@ -2974,8 +2922,7 @@ void PWriteW (int32 data, int32 pa)
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     M[pa >> 1] = data;
 #ifdef OPCON
-    if (oc_active)
-      ocp->D[DISP_BR] = (uint16)data;
+    oc_ctl.D[DISP_BR] = (uint16)data;
 #endif
     return;
     }
@@ -2997,8 +2944,7 @@ if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
         M[pa >> 1] = (M[pa >> 1] & 0377) | (data << 8);
     else M[pa >> 1] = (M[pa >> 1] & ~0377) | data;
 #ifdef OPCON
-    if (oc_active)
-      ocp->D[DISP_BR] = (uint16)M[pa >> 1];
+    oc_ctl.D[DISP_BR] = (uint16)M[pa >> 1];
 #endif
     return;
     }             
@@ -3034,10 +2980,8 @@ int32 relocR (int32 va)
 int32 apridx, apr, pa;
 
 #ifdef OPCON
-if (oc_active) {
-  ocp->ind_addr = (t_bool)(va & VA_DS); // 1 -> 'D' space, 0 -> 'I' space
-  ocp->A[va >> VA_V_DS] = (uint32)(va & VAMASK);
-  }
+oc_ctl.ind_addr = (t_bool)(va & VA_DS); // 1 -> 'D' space, 0 -> 'I' space
+oc_ctl.A[va >> VA_V_DS] = (uint32)(va & VAMASK);
 #endif
 
 if (MMR0 & MMR0_MME) {                                  /* if mmgt */
@@ -3060,8 +3004,7 @@ else {
         pa = 017600000 | pa;
     }
 #ifdef OPCON
-if (oc_active)
-  ocp->A[ADDR_PRGPA] = (uint32)pa;
+oc_ctl.A[ADDR_PRGPA] = (uint32)pa;
 #endif
 return pa;
 }
@@ -3095,10 +3038,6 @@ switch (apr & PDR_ACF) {                                /* case on ACF */
                 if (update_MM)                          /* update MMR0 */
                     MMR0 = (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
                 MMR0 = MMR0 | MMR0_TRAP;                /* set trap flag */
-#ifdef OPCON
-                if (oc_active)
-                  ocp->MMR0 = MMR0;
-#endif
                 setTRAP (TRAP_MME);                     /* set trap */
                 }
             return;                                     /* continue op */
@@ -3131,10 +3070,6 @@ if (update_MM) MMR0 =                                   /* update MMR0 */
     (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
 APRFILE[apridx] = APRFILE[apridx] | PDR_A;              /* set A */
 MMR0 = MMR0 | err;                                      /* set aborts */
-#ifdef OPCON
-if (oc_active)
-  ocp->MMR0 = MMR0;
-#endif
 ABORT (TRAP_MME);                                       /* abort ref */
 return;
 }
@@ -3160,10 +3095,8 @@ int32 relocW (int32 va)
 int32 apridx, apr, pa;
 
 #ifdef OPCON
-if (oc_active) {
-  ocp->ind_addr = (t_bool)(va & VA_DS); // 1 -> 'D' space, 0 -> 'I' space
-  ocp->A[va >> VA_V_DS] = (uint32)(va & VAMASK);
-  }
+oc_ctl.ind_addr = (t_bool)(va & VA_DS); // 1 -> 'D' space, 0 -> 'I' space
+oc_ctl.A[va >> VA_V_DS] = (uint32)(va & VAMASK);
 #endif
 
 if (MMR0 & MMR0_MME) {                                  /* if mmgt */
@@ -3187,8 +3120,7 @@ else {
         pa = 017600000 | pa;
     }
 #ifdef OPCON
-if (oc_active)
-  ocp->A[ADDR_PRGPA] = (uint32)pa;
+oc_ctl.A[ADDR_PRGPA] = (uint32)pa;
 #endif
 return pa;
 }
@@ -3222,10 +3154,6 @@ switch (apr & PDR_ACF) {                                /* case on ACF */
                 if (update_MM)                          /* update MMR0 */
                     MMR0 = (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
                 MMR0 = MMR0 | MMR0_TRAP;                /* set trap flag */
-#ifdef OPCON
-                if (oc_active)
-                  ocp->MMR0 = MMR0;
-#endif
                 setTRAP (TRAP_MME);                     /* set trap */
                 }
             return;                                     /* continue op */
@@ -3293,8 +3221,7 @@ else {
         pa = 017600000 | pa;
     }
 #ifdef OPCON
-if (oc_active)
-  ocp->A[ADDR_PRGPA] = (uint32)pa;
+oc_ctl.A[ADDR_PRGPA] = (uint32)pa;
 #endif
 return pa;
 }
@@ -3336,8 +3263,7 @@ switch ((pa >> 1) & 3) {                                /* decode pa<2:1> */
 
     case 0:                                             /* DR */
 #ifdef OPCON
-        if (oc_active)
-	  ocp->D[DISP_DR] = (uint16)(data & cpu_tab[cpu_model].mm0);
+	oc_ctl.D[DISP_DR] = (uint16)(data & cpu_tab[cpu_model].mm0);
 #endif
         return SCPE_NXM;
 
@@ -3347,11 +3273,8 @@ switch ((pa >> 1) & 3) {                                /* decode pa<2:1> */
         data = data & cpu_tab[cpu_model].mm0;
         MMR0 = (MMR0 & ~MMR0_WR) | (data & MMR0_WR);
 #ifdef OPCON
-        if (oc_active) {
-	  ocp->MMR0 = MMR0;
-	  oc_mmu();
-          oc_ringprot(cm);
-	  }
+	oc_mmu();
+        oc_ringprot(cm);
 #endif
         return SCPE_OK;
 
@@ -3375,11 +3298,8 @@ cpu_bme = (MMR3 & MMR3_BME) && (cpu_opt & OPT_UBM);
 dsenable = calc_ds (cm);
 
 #ifdef OPCON
-if (oc_active) {
-  ocp->MMR3 = MMR3;
-  oc_mmu();
-  oc_ringprot(cm);
-  }
+oc_mmu();
+oc_ringprot(cm);
 #endif
 
 return SCPE_OK;
@@ -3492,10 +3412,8 @@ isenable = calc_is (cm);
 dsenable = calc_ds (cm);
 
 #ifdef OPCON
-if (oc_active) {
-  oc_mmu();
-  oc_ringprot(cm);
-  }
+oc_mmu();
+oc_ringprot(cm);
 #endif
 
 return SCPE_OK;
@@ -3614,16 +3532,14 @@ trap_req = 0;
 wait_state = 0;
 
 #ifdef OPCON
-if (oc_active) {
-  oc_master(TRUE);
-  oc_wait(FALSE);
-  oc_mmu();
-  oc_ringprot(cm);
-  if (cpu_model == MOD_1170) {
-      oc_port1(FSTS_1170_PARERR,  0);
-      oc_port1(FSTS_1170_ADRSERR, 0);
-      }
-  }
+oc_master(TRUE);
+oc_wait(FALSE);
+oc_mmu();
+oc_ringprot(cm);
+if (cpu_model == MOD_1170) {
+    oc_port1(FSTS_1170_PARERR,  0);
+    oc_port1(FSTS_1170_ADRSERR, 0);
+    }
 #endif
 
 if (M == NULL) {                    /* First time init */

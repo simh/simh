@@ -145,7 +145,7 @@ int oc_send_PORT(int oc_fd, oc_st *ocp)
 
   cmd[0] = 'F';
   cmd[1] = ocp->PORT1;
-  cmd[2] = ocp->PORT1;
+  cmd[2] = ocp->PORT2;
   write(oc_fd, cmd, 3);
 }
 

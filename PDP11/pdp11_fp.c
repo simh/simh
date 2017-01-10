@@ -97,8 +97,6 @@
 #include "pdp11_defs.h"
 #ifdef OPCON
 #include "opcon.h"
-extern oc_st *ocp;
-extern uint8 oc_active;
 #endif
 
 /* Floating point status register */
@@ -296,8 +294,7 @@ dstspec = IR & 077;
 qdouble = FPS & FPS_D;
 lenf = qdouble? QUAD: LONG;
 #ifdef OPCON
-if (oc_active)
-  ocp->D[DISP_FPP] = (uint16)FPS;
+oc_ctl.D[DISP_FPP] = (uint16)FPS;
 #endif
 
 switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
@@ -589,8 +586,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         }                                               /* end switch fop */
 
 #ifdef OPCON
-if (oc_active)
-  ocp->D[DISP_FPP] = (uint16)FPS;
+oc_ctl.D[DISP_FPP] = (uint16)FPS;
 #endif
 
 /* Now process any general register modification */
