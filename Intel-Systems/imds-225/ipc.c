@@ -52,34 +52,42 @@ extern UNIT EPROM_unit;
 extern UNIT RAM_unit;
 extern UNIT ipc_cont_unit;
 extern UNIT ioc_cont_unit;
-extern t_stat i8251_reset(DEVICE *dptr, uint16 base, uint8 devnum);
-extern t_stat i8253_reset(DEVICE *dptr, uint16 base, uint8 devnum);
-extern t_stat i8255_reset(DEVICE *dptr, uint16 base, uint8 devnum);
-extern t_stat i8259_reset(DEVICE *dptr, uint16 base, uint8 devnum);
+extern int32 i8251_devnum;
+extern t_stat i8251_reset(DEVICE *dptr, uint16 base);
+extern int32 i8253_devnum;
+extern t_stat i8253_reset(DEVICE *dptr, uint16 base);
+extern int32 i8255_devnum;
+extern t_stat i8255_reset(DEVICE *dptr, uint16 base);
+extern int32 i8259_devnum;
+extern t_stat i8259_reset(DEVICE *dptr, uint16 base);
 extern t_stat EPROM_reset(DEVICE *dptr, uint16 size);
 extern t_stat RAM_reset(DEVICE *dptr, uint16 base, uint16 size);
-extern t_stat ipc_cont_reset(DEVICE *dptr, uint16 base, uint8 devnum);
-extern t_stat ioc_cont_reset(DEVICE *dptr, uint16 base, uint8 devnum);
-extern uint32 saved_PC;                    /* program counter */
+extern t_stat ipc_cont_reset(DEVICE *dptr, uint16 base);
+extern t_stat ioc_cont_reset(DEVICE *dptr, uint16 base);
+extern uint32 PCX;                    /* program counter */
 
 /*  CPU reset routine 
     put here to cause a reset of the entire IPC system */
 
 t_stat SBC_reset (DEVICE *dptr)
 {    
-    sim_printf("Initializing MDS-225\n");
+    sim_printf("Initializing MDS-225\n   Onboard Devices:\n");
     i8080_reset(NULL);
-    i8251_reset(NULL, I8251_BASE_0, 0);
-    i8251_reset(NULL, I8251_BASE_1, 0);
-    i8253_reset(NULL, I8253_BASE, 0);
-    i8255_reset(NULL, I8255_BASE_0, 0);
-    i8255_reset(NULL, I8255_BASE_1, 1);
-    i8259_reset(NULL, I8259_BASE_0, 0);
-    i8259_reset(NULL, I8259_BASE_1, 1);
+    i8251_devnum = 0;
+    i8251_reset(NULL, I8251_BASE_0);
+    i8251_reset(NULL, I8251_BASE_1);
+    i8253_devnum = 0;
+    i8253_reset(NULL, I8253_BASE);
+    i8255_devnum = 0;
+    i8255_reset(NULL, I8255_BASE_0);
+    i8255_reset(NULL, I8255_BASE_1);
+    i8259_devnum = 0;
+    i8259_reset(NULL, I8259_BASE_0);
+    i8259_reset(NULL, I8259_BASE_1);
     EPROM_reset(NULL, ROM_SIZE);
     RAM_reset(NULL, RAM_BASE, RAM_SIZE);
-    ipc_cont_reset(NULL, ICONT_BASE, 0);
-    ioc_cont_reset(NULL, DBB_BASE, 0);
+    ipc_cont_reset(NULL, ICONT_BASE);
+    ioc_cont_reset(NULL, DBB_BASE);
     return SCPE_OK;
 }
 
@@ -88,15 +96,12 @@ t_stat SBC_reset (DEVICE *dptr)
 uint8 get_mbyte(uint16 addr)
 {
     if (addr >= 0xF800) {               //monitor ROM - always there
-//        sim_printf("get_mbyte: Monitor ROM ipc_cont=%02X\n", ipc_cont_unit.u3);
-        return EPROM_get_mbyte(addr - 0xF000);
+        return EPROM_get_mbyte(addr - 0xF000); //top half of EPROM
     }
-    if ((addr < 0x1000) && ((ipc_cont_unit.u3 & 0x01) == 0)) { //startup
-//        sim_printf("get_mbyte: Startup ROM ipc_cont=%02X\n", ipc_cont_unit.u3);
+    if ((addr < 0x1000) && ((ipc_cont_unit.u3 & 0x04) == 0)) { //startup
         return EPROM_get_mbyte(addr);
     }
-    if ((addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x04) == 0)) { //diagnostic ROM
-//        sim_printf("get_mbyte: Diagnostic ROM ipc_cont=%02X\n", ipc_cont_unit.u3);
+    if ((addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x10) == 0)) { //diagnostic ROM
         return EPROM_get_mbyte(addr - 0xE800);
     }
     return RAM_get_mbyte(addr);
@@ -118,15 +123,15 @@ uint16 get_mword(uint16 addr)
 void put_mbyte(uint16 addr, uint8 val)
 {
     if (addr >= 0xF800) {               //monitor ROM - always there
-        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, saved_PC);
+        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     } 
-    if ((addr < 0x1000) && ((ipc_cont_unit.u3 & 0x01) == 0)) { //startup
-        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, saved_PC);
+    if ((addr < 0x1000) && ((ipc_cont_unit.u3 & 0x04) == 0)) { //startup
+        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     }
-    if ((addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x04) == 0)) { //diagnostic ROM
-        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, saved_PC);
+    if ((addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x10) == 0)) { //diagnostic ROM
+        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     }
     RAM_put_mbyte(addr, val);

@@ -111,6 +111,8 @@
 
 #include "system_defs.h"
 
+#define  DEBUG   0
+
 /* external globals */
 
 extern uint16 port;                     //port called in dev_table[port]
@@ -226,11 +228,11 @@ t_stat i8251_svc (UNIT *uptr)
 t_stat i8251_reset (DEVICE *dptr, uint16 baseport)
 {
     if (i8251_devnum >= I8251_NUM) {
-        sim_printf("8251_reset: Illegal Device Number %d\n", i8251_devnum);
-        return 0;
+        sim_printf("i8251_reset: too many devices!\n");
+        return SCPE_MEM;
     }
-    sim_printf("   8251-%d: Hardware Reset\n", i8251_devnum);
-    sim_printf("   8251-%d: Registered at %04X\n", i8251_devnum, baseport);
+    sim_printf("      8251-%d: Hardware Reset\n", i8251_devnum);
+    sim_printf("      8251-%d: Registered at %04X\n", i8251_devnum, baseport);
     i8251_port[i8251_devnum] = baseport;
     reg_dev(i8251d, baseport, i8251_devnum); 
     reg_dev(i8251s, baseport + 1, i8251_devnum); 
@@ -248,7 +250,7 @@ void i8251_reset1(uint8 devnum)
     i8251_unit.u6 = 0;
     i8251_unit.buf = 0;
     i8251_unit.pos = 0;
-    sim_printf("   8251-%d: Software Reset\n", devnum);
+    sim_printf("      8251-%d: Software Reset\n", devnum);
 }
 
 uint8 i8251_get_dn(void)
@@ -277,12 +279,14 @@ uint8 i8251s(t_bool io, uint8 data)
         } else {                            /* write status port */
             if (i8251_unit.u6) {            /* if mode, set cmd */
                 i8251_unit.u5 = data;
-                sim_printf("   8251-%d: Command Instruction=%02X\n", devnum, data);
+                if (DEBUG)
+                    sim_printf("   8251-%d: Command Instruction=%02X\n", devnum, data);
                 if (data & SD)              /* reset port! */
                     i8251_reset1(devnum);
             } else {                        /* set mode */
                 i8251_unit.u4 = data;
-                sim_printf("   8251-%d: Mode Instruction=%02X\n", devnum, data);
+                if (DEBUG)
+                    sim_printf("   8251-%d: Mode Instruction=%02X\n", devnum, data);
                 i8251_unit.u6 = 1;          /* set cmd received */
             }
         }

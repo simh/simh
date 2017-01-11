@@ -205,8 +205,8 @@ BORROW CHAIN CALCULATION.
 
 #define UNIT_V_OPSTOP   (UNIT_V_UF)             /* Stop on Invalid OP? */
 #define UNIT_OPSTOP     (1 << UNIT_V_OPSTOP)
-#define UNIT_V_CHIP     (UNIT_V_UF+1)           /* 8088 or 8086 */
-#define UNIT_CHIP       (1 << UNIT_V_CHIP)
+#define UNIT_V_8088     (UNIT_V_UF+1)           /* 8088 or 8086 */
+#define UNIT_8088       (1 << UNIT_V_8088)
 
 /* Flag values to set proper positions in PSW */
 #define CF             0x0001
@@ -429,8 +429,8 @@ REG i8088_reg[] = {
 };
 
 MTAB i8088_mod[] = {
-    { UNIT_CHIP, UNIT_CHIP, "8086", "8086", NULL },
-    { UNIT_CHIP, 0, "8088", "8088", NULL },
+    { UNIT_8088, UNIT_8088, "8086", "8086", NULL },
+    { UNIT_8088, 0, "8088", "8088", NULL },
     { UNIT_OPSTOP, UNIT_OPSTOP, "ITRAP", "ITRAP", NULL },
     { UNIT_OPSTOP, 0, "NOITRAP", "NOITRAP", NULL },
     { 0 }
@@ -626,7 +626,7 @@ int32 sim_instr (void)
             case 0x00:                  /* ADD byte - REG = REG + (EA) */
                 MRR = fetch_byte(1);
                 get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */       /* based, indexed, or based indexed addressing */
+                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = add_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
                     put_rbyte(REG, VAL); /* store result */
@@ -1500,7 +1500,7 @@ int32 sim_instr (void)
                             VAL = add_byte(get_smbyte(seg_reg, EA), DATA);  /* ADD mem8, immed8 */
                             break;
                         case 1:
-                            VAL = or_byte(get_smbyte(seg_reg, EA), DATA);  /* OR mem8, immed8 */
+                            VAL = or_byte(get_smbyte(seg_reg, EA), DATA);   /* OR mem8, immed8 */
                             break;
                         case 2:
                             VAL = adc_byte(get_smbyte(seg_reg, EA), DATA);  /* ADC mem8, immed8 */
@@ -1996,7 +1996,7 @@ int32 sim_instr (void)
                 break;
 
             case 0x9A:                  /* CALL FAR proc */
-                OFF = fetch_word();  /* do operation */
+                OFF = fetch_word();     /* do operation */
                 SEG = fetch_word();
                 push_word(CS);
                 CS = SEG;
@@ -3133,8 +3133,7 @@ int32 sim_instr (void)
             }
     }
 
-/* Simulation halted */
-
+    /* Simulation halted */
     saved_PC = IP;
     return reason;
 }
@@ -3439,7 +3438,7 @@ void get_mrr_dec(uint32 mrr, uint32 *mod, uint32 *reg, uint32 *rm)
 }
 
 /* 
-  Most of the primitive algorythms were pulled from the GDE Dos/IP Emulator by Jim Hudgens
+  Most of the primitive algorithms were pulled from the GDE Dos/IP Emulator by Jim Hudgens
 */
 
 /* aad primitive */

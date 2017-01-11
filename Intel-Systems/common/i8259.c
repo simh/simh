@@ -35,6 +35,8 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
+#define  DEBUG   0
+
 /* function prototypes */
 
 uint8 i8259a(t_bool io, uint8 data);
@@ -140,8 +142,8 @@ DEVICE i8259_dev = {
 t_stat i8259_reset (DEVICE *dptr, uint16 baseport)
 {
     if (i8259_devnum >= I8259_NUM) {
-        sim_printf("8259_reset: Illegal Device Number %d\n", i8259_devnum);
-        return 0;
+        sim_printf("i8255_reset: too many devices!\n");
+        return SCPE_MEM;
     }
     sim_printf("   8259-%d: Reset\n", i8259_devnum);
     sim_printf("   8259-%d: Registered at %04X\n", i8259_devnum, baseport);
@@ -199,7 +201,8 @@ uint8 i8259a(t_bool io, uint8 data)
                     break;
                 }
             }
-            sim_printf("   8259-%d: A data = %02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8259-%d: A data = %02X\n", devnum, data);
             icw_num0++;             /* step ICW number */
         }
 //        i8259_dump(devnum);
@@ -238,7 +241,8 @@ uint8 i8259b(t_bool io, uint8 data)
                     break;
                 }
             }
-            sim_printf("   8259-%d: B data = %02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8259-%d: B data = %02X\n", devnum, data);
             icw_num1++;                     /* step ICW number */
         }
 //        i8259_dump(devnum);
