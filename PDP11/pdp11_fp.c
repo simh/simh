@@ -96,6 +96,7 @@
 
 #include "pdp11_defs.h"
 #ifdef OPCON
+#include "sim_tmxr.h"
 #include "opcon.h"
 #endif
 

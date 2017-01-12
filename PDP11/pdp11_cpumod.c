@@ -316,7 +316,7 @@ t_stat SR_rd (int32 *data, int32 pa, int32 access)
 #ifdef OPCON
 if (cpu_model == MOD_1170) {
     oc_get_SWR();
-    SR = oc_extract_data();
+    SR = oc_read_D();
     }
 #endif
 

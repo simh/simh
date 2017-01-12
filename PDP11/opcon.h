@@ -31,6 +31,8 @@
 
 #ifndef OC_DEFS
 #define OC_DEFS 1
+#include "sim_tmxr.h"
+
 /*
  * Implementation notes are found in doc/opcon_doc.txt
 */
@@ -150,7 +152,7 @@
 #define ADDR_PRGPA	8	/* Prog PA  */
 #define ADDR_CONPA	9	/* Cons PA  */
 
-/* OC controlblock */
+/* OC control block */
 struct oc_st {
   t_bool first_exam;		/* flag: first EXAM action */
   t_bool first_dep;		/* flag: first DEP action */
@@ -163,6 +165,10 @@ struct oc_st {
   uint32 A[10];			/* Address Mux array */
   uint16 D[5];			/* Data Mux array */
   uint8  S[5];			/* switches and toggles retrieved state */
+  };
+
+struct SERPORT {
+  int port;
   };
 
 #ifndef OPCON_SIMH
@@ -187,27 +193,27 @@ t_stat oc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat oc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 
 /* function prototypes OC */
-void  *oc_thread(void *oc_end);
 void   oc_clear_halt (void);
-uint16 oc_extract_data (void);
-uint32 oc_extract_address (void);
+int    oc_get_SWR (void);
 t_bool oc_get_console (char *cptr);
 t_bool oc_get_halt (void);
 int    oc_get_rotary (void);
-int    oc_get_SWR (void);
 int    oc_halt_status (void);
-void   oc_mmu (void);
+t_bool oc_poll (SERHANDLE port, int amount);
 void   oc_port1 (uint8 flag, t_bool action);
 void   oc_port2 (uint8 flag, t_bool action);
+uint32 oc_read_A (void);
+uint16 oc_read_D (void);
 char  *oc_read_line_p (char *prompt, char *cptr, int32 size, FILE *stream);
-void   oc_ringprot (int value);
-void   oc_master (t_bool flag);
-t_bool oc_poll (int channel, int amount);
+void  *oc_run_thread(void *oc_end);
 void   oc_send_A (void);
 void   oc_send_AD (void);
 void   oc_send_ADS (void);
 void   oc_send_D (void);
-void   oc_send_status (void);
+void   oc_send_S (void);
+void   oc_set_master (t_bool flag);
+void   oc_set_mmu (void);
+void   oc_set_ringprot (int value);
 void   oc_toggle_ack (uint8 mask);
 void   oc_toggle_clear (void);
 void   oc_wait (t_bool flag);

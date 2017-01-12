@@ -25,6 +25,7 @@
    or other dealings in this Software without prior written
    authorization from the Author or Authors.
 
+   11-jan-16	EG	Implement pthread, rename some functions
    14-Mar-14    EG      added rom address range check, changed interval
    10-Mar-14    EG      oc_get_console : add inv addr check 
                         oc_extract_address : address masking & inv addr flag
@@ -33,33 +34,36 @@
    10-Feb-14    EG      Rewrite, based on original realcons.c code.
 */
 
-/* 
+/* SIMH integration
  * oc_attach()			: attach device (initialize link)
  * oc_detach()			: detach device (close link)
- * oc_extract_address()		: extract address from swr data array
- * oc_extract_data()		: extract data from swr data array
+ * oc_help()			: Generic help
+ * oc_help_attach()		: Help for attach command
+ * oc_reset()			: device reset
+ * oc_show()			: show status of the device (link)
+ * oc_svc()			: service routine
+ *
+ * OPCON integration
+ *
+ * oc_get_SWR()			: get switch & knob settings from console
  * oc_get_console()		: get function command
  * oc_get_halt()		: check for HALT key down
  * oc_get_rotary()		: get rotary knob settings
- * oc_get_SWR()			: get switch & knob settings from console
- * oc_mmu()			: toggle mmu mapping mode (16/18/22 bit)
  * oc_poll()			: pool input channel for data ready
  * oc_port1()			: toggle bit on/off in port1 flagbyte
  * oc_port2()			: toggle bit on/off in port2 flagbyte
+ * oc_read_A()			: extract address from swr data array
+ * oc_read_D()			: extract data from swr data array
  * oc_read_line_p()		: get command (keyboard or console)
- * oc_reset()			: device reset
- * oc_ringprot()		: toggle ring protection bits (USK)
  * oc_send_A()			: send address data
  * oc_send_AD()			: combined send address & data
  * oc_send_ADS()		: send address/data/status
  * oc_send_S()			: send status data
- * oc_show()			: show status of the device (link)
- * oc_svc()			: service routine
- * oc_thread()			; service routing for the thread
+ * oc_set_mmu()			: toggle mmu mapping mode (16/18/22 bit)
+ * oc_set_ringprot()		: toggle ring protection bits (USK)
+ * oc_run_thread()			; service routing for the thread
  * oc_toggle_ack()		: acknoledge a state on the console processor
  * oc_toggle_clear()		: clear all states on the console processor
- * oc_help()			: Generic help
- * oc_help_attach()		: Help for attach command
  *
  * More information can be found in the doc/opcon_doc.txt file
  */
@@ -69,10 +73,9 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include "sim_defs.h"
-#include "sim_tmxr.h"
+#include "opcon.h"
 #include "scp.h"
 #include "pdp11_defs.h"
-#include "opcon.h"
 #include <ctype.h>
 
 #include <termio.h>
@@ -253,7 +256,7 @@ if ((tptr = strchr (cptr, '=')) == NULL)
     return SCPE_ARG;
 *tptr++;						/* skip '=' */
 
-if ((p = (SERHANDLE)sim_open_serial (tptr, NULL, &r)) != -1) {	/* port usable? */
+if ((p = sim_open_serial (tptr, NULL, &r)) != (SERHANDLE)-1) {	/* port usable? */
     sim_close_serial (p);
     if (r != SCPE_OK)
         return -1;
@@ -310,7 +313,7 @@ else
     if (!sim_quiet)
 	printf ("LOCK\n");
 
-if ((oc_ret = pthread_create(&oc_th, NULL, oc_thread, &oc_end)) != 0) {
+if ((oc_ret = pthread_create(&oc_th, NULL, oc_run_thread, &oc_end)) != 0) {
     fprintf(stderr, "Error creating OC thread, return code %d\n", oc_ret);
     tmxr_close_master (&oc_tmxr);	/* close the serial line too */
     return(-1);
@@ -485,102 +488,22 @@ char *oc_description (DEVICE *dptr)
 return "OC11 : Interface to operator console processor";
 }
 
-/*   ***   ***   ***   OPCON integration outines   ***   ***   ***   */
+/*   ***   ***   ***   ***   OPCON routines   ***   ***   ***   ***   */
 
 /*
- * Function : oc_thread
- * Note     : Service routine for the threading solution
- *            If HALT is set, this service does mostly sleep.
- * Returns  : 0 or 1
-*/
-void *oc_thread(void *oc_end)
-{
-uint8 c_swr = 0;
-
-while (*(int*)oc_end == 0) {
-    if (oc_ctl.HALT == 0) {		/* if 0, we are not interactive */
-        oc_send_ADS();
-        if (c_swr++ == 5) {			/* counter max reached? */
-            c_swr = 0;				/* reset it             */
-            oc_get_SWR();			/* get switch data      */
-            if (oc_ctl.S[1] & 0x4)		/* halt switch used?    */
-                oc_ctl.HALT = 2;		/* Yes, set it          */
-            }
-        }
-    }
-return(0);
-}
-
-/*
- * Function : oc_read_line_p()
- * Note     : Substitution for the 'read_line_p' function
- *	      A complete command can come from two sources: keyboard or
- *	      console. If a complete command is received from the operator
- *	      console, it is returned immediately. Keystrokes received from
- *	      the keyboard are stored until a 'CR' or 'LF' is received.
- *	      When either source has collected a complete command, this
- *	      function returns the pointer to the received string.
- * Returns  : Pointer to received string
+ * Function : oc_clear_halt()
+ * Note     : Clear the halt bit in the swr array & clear all toggles
+ * Returns  : Nothing
  */
-char *oc_read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
+void oc_clear_halt (void)
 {
-char *tptr = cptr, key_entry = 0, brk = 0;
-
-sim_debug (OCDEB_TRC, &oc_dev, "oc_read_line_p : called\n");
-
-if (prompt)
-    printf ("%s", sim_prompt); fflush(stdout);
-
-for (;;) {
-    oc_master (1);
-    if (oc_get_console (cptr) == TRUE) { /* poll console for data */
-        printf ("%s", cptr);
-        break;
-        }
-
-    if (oc_poll (0, 10000) == 1 &&		/* wait for data on keyboard */
-        sim_read_serial (0, &key_entry, 1, &brk) > 0) {
-        if (key_entry == '\b' && *tptr > *cptr) {	/* backspace */
-            *tptr--;
-            sim_write_serial (1, &key_entry, 1);	
-            sim_write_serial (1, " ", 1);
-            sim_write_serial (1, &key_entry, 1);
-            }
-        else {					/* regular character */
-            *tptr++ = key_entry;		/* store the character */
-            sim_write_serial (1, &key_entry, 1);/* echo the entry to crt */
-            if ((key_entry == '\n') || (key_entry == '\r'))
-                break;
-            }
-        }
-    } 	
-
-for (tptr = cptr; tptr < (cptr + size); tptr++) {	/* remove cr or nl */
-    if ((*tptr == '\n') || (*tptr == '\r') ||
-        (tptr == (cptr + size - 1))) {
-        *tptr = 0;
-        break;
-        }
-    }
-
-while (isspace (*cptr))
-    cptr++;			/* absorb spaces */
-
-if (*cptr == ';') {
-    if (sim_do_echo)		/* echo comments if -v */
-	printf ("%s> %s\n", do_position(), cptr);
-    if (sim_do_echo && sim_log)
-	fprintf (sim_log, "%s> %s\n", do_position(), cptr);
-    *cptr = 0;
-    }
-
-oc_master (0);
-if (oc_ctl.HALT == 1)		/* no stray mode flag */
-    stop_cpu = 1;
-
-return cptr;			/* points to begin of cmd or 0*/
+if (cpu_model = MOD_1145)
+  oc_ctl.S[INP4] = oc_ctl.S[INP4] & (~SW_HE_1145);
+else
+  oc_ctl.S[INP4] = oc_ctl.S[INP4] & (~SW_HE_1170);
+oc_toggle_clear ();
+oc_ctl.HALT = 0;
 }
-
 
 /*
  * Function : oc_get_console()
@@ -613,7 +536,7 @@ sim_debug (OCDEB_TRC, &oc_dev, "oc_get_console : called\n");
 if (!oc_ldsc.rcve)			/* console link configured / open? */
     return FALSE;
 
-if (oc_poll (oc_ldsc.serport, 10000) != 1 ||	/* wait 10 msec for input */
+if (oc_poll (oc_ldsc.serport, 10000) == (t_bool)FALSE ||	/* wait 10 msec for input */
     sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 || 
     c == 0)
     return FALSE;
@@ -677,7 +600,7 @@ switch (c) {
 		strcpy (cptr, ";no deposit in boot rom range\n");
 		}
 	    else {
-		D = oc_extract_data ();		/* get 'data' data */
+		D = oc_read_D ();		/* get 'data' data */
 		oc_ctl.first_exam = TRUE;
 		oc_ctl.first_dep = FALSE;
 		oc_send_AD();
@@ -694,7 +617,7 @@ switch (c) {
         oc_get_SWR ();	/* get actual switch settings */
 	oc_ctl.first_dep = TRUE;
 	oc_ctl.first_exam = TRUE;
-	oc_ctl.act_addr = oc_extract_address ();
+	oc_ctl.act_addr = oc_read_A ();
 	oc_send_A();
 	sprintf (cptr, ";load address %08o\n", oc_ctl.act_addr);
 	oc_toggle_ack (ACK_LOAD) ;
@@ -743,51 +666,131 @@ switch (c) {
 	break;
     }
 
-oc_send_status ();			/* update console status leds */
+if (oc_ctl.HALT)
+  oc_send_S ();				/* update console status leds */
+
 return TRUE;
 }
 
 /*
- * Function : oc_extract_address()
- * Note     : Get 3 bytes (up to 22 bit switche information as ADDRESS) and
- *            convert it into a 32 bit unsigned integer.
- * 	      A mask is applied for the target cpu address range.
- *            An address in the I/O page is an allowed range even if the
- *            memory is sized to a lower value
- * Returns  : Unsigned long containing the (masked) address switch data
+ * Function : oc_get_SWR()
+ * Note     : Send the Query command to the operator console 
+ *	      Then read the amount of bytes representing the status of all
+ *	      the switches on the operator console, stored in the array
+ *  	      "oc_ctl.S[]".
+ *  Returns : 0 or -1
  */
-uint32 oc_extract_address ()
+int oc_get_SWR (void)
 {
-uint32 A;
+char brk = 0;
+uint8 c = 'Q';
+uint32 K;
+int x;
 
-A = oc_ctl.S[SWR_16_22_PORT] * 65536 +
-    oc_ctl.S[SWR_08_15_PORT] * 256   +
-    oc_ctl.S[SWR_00_07_PORT];
+sim_debug (OCDEB_TRC, &oc_dev, "oc_get_SWR : called\n");
 
-oc_ctl.inv_addr = FALSE;
-if (cpu_model == MOD_1145) {		/* I/O page is not out of address range */
-  A &= 0x0003FFFF; 		/* max 256Kb */
-  if (A >= MEMSIZE && !(A > 0x3DFFF && A < 0x3FFFF) )
-    oc_ctl.inv_addr = TRUE;	
-  }
-else {
-  A &= 0x003FFFFF;       	/* max 4Mb */
-  if (A >= MEMSIZE && !(A > 0x3FDFFF && A < 0x3FFFFF))
-    oc_ctl.inv_addr = TRUE;	
+if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
+    printf("OC    : Error sending 'QUERY' command.\n");
+    return -1;
     }
 
-return A;
+	/* retrieve the input port data from the console processor */
+for (x = 0; x < QUERY_SWR_BYTES; x++) {
+    while (1) { if (oc_poll (oc_ldsc.serport, 1000) == (t_bool)TRUE) break; }
+    c = 0;
+    if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
+        	errno != EAGAIN && errno != EWOULDBLOCK)
+        return -1;
+    oc_ctl.S[x] = c;
+    }
+
+sim_debug (OCDEB_SWR, &oc_dev,
+	"oc_get_SWR : swreg bytes = 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+	oc_ctl.S[0], oc_ctl.S[1], oc_ctl.S[2], oc_ctl.S[3], oc_ctl.S[4]);
+
+return 0;
 }
 
 /*
- * Function : oc_extract_data()
- * Note     : Get 3 bytes (16 bit switches information as DATA) and convert it
- * 	      into a 16 bit unsigned integer
- * Returns  : Binary value of data switch settings 
+ * Function : oc_get_halt()
+ * Note     : Check non-blocking if the HALT/ENABLE switch is set to HALT.
+ *            If it is another command byte, only acknowledge it to the
+ *            console processor.
+ *	      also preempts the read queue as a side effect.
+ * Returns  : 0 - nothing
+ * 	      1 - set
  */
-uint16 oc_extract_data ()
+t_bool oc_get_halt (void)
 {
-return (oc_ctl.S[SWR_08_15_PORT] * 256 + oc_ctl.S[SWR_00_07_PORT]);
+char brk = 0;
+uint8 c = 0;
+
+sim_debug (OCDEB_TRC, &oc_dev, "oc_get_halt : called\n");
+
+if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 || c == 0)
+    return FALSE;
+
+sim_debug (OCDEB_HLT, &oc_dev, "oc_get_halt : got (%2X:%c)\n", c, c);
+
+if (c == 'H') {				/* HALT switch down? */
+    oc_ctl.HALT = 2;			/* flag it */
+    return TRUE;
+    }
+else {
+    if (strchr ("cdlsx", c) != NULL)     /* known toggle? -> clear */
+	oc_toggle_clear ();
+    }
+
+return FALSE;
+}
+
+/*
+ * Function : oc_get_rotary()
+ * Note     : Send the Rotary command to the operator console 
+ *	      Then read the byte representing the status of the 2 rotary knobs.
+ *  	      The result is stored in one of the "oc_ctl.S[]" fields matching
+ *            the positionof the 'Q' command.
+ *  	      This function only works for the 11/45 & 11/70
+ *  Returns : 0 or -1
+ */
+int oc_get_rotary (void)
+{
+char brk = 0;
+uint8 c = 'R';
+
+sim_debug (OCDEB_TRC, &oc_dev, "oc_get_rotary : called\n");
+
+if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
+    printf("OC    : Error sending 'ROTARY' command.\n");
+    return -1;
+    }
+
+while (1) { if (oc_poll (oc_ldsc.serport, 1000) == (t_bool)TRUE) break; }
+if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
+	errno != EAGAIN && errno != EWOULDBLOCK)
+    return -1;
+
+sim_debug (OCDEB_SWR, &oc_dev, "oc_get_rotary : byte = 0x%02X\n", c);
+
+if (cpu_model == MOD_1145)
+    oc_ctl.S[INP3] = (uint32)c;
+else
+    oc_ctl.S[INP5] = (uint32)c;
+
+return 0;
+}
+
+/*
+ * Function : oc_halt_status()
+ * Note     : Check the value of the oc_ctl.HALT variable
+ * Returns  : 0 - if halt mode = 0 or 1
+ *          : 1 - if halt mode = 2
+ */
+int oc_halt_status (void)
+{
+if (oc_ctl.HALT == 2) return(1);
+return(0);
+//return oc_ctl.HALT;
 }
 
 /*
@@ -817,76 +820,120 @@ else
 }
 
 /*
- * Function : oc_mmu()
- * Note     : Toggle the 16/18/22 bit on the console.
- * Returns  : Nothing
+ * Function : oc_read_A()
+ * Note     : Get 3 bytes (up to 22 bit switche information as ADDRESS) and
+ *            convert it into a 32 bit unsigned integer.
+ * 	      A mask is applied for the target cpu address range.
+ *            An address in the I/O page is an allowed range even if the
+ *            memory is sized to a lower value
+ * Returns  : Unsigned long containing the (masked) address switch data
  */
-void oc_mmu (void)
+uint32 oc_read_A ()
 {
-uint8 status, map = 16;
+uint32 A;
 
-if (cpu_model == MOD_1145)
-  return;
+A = oc_ctl.S[SWR_16_22_PORT] * 65536 +
+    oc_ctl.S[SWR_08_15_PORT] * 256   +
+    oc_ctl.S[SWR_00_07_PORT];
 
-oc_port2 (FSTS_1170_16BIT, 0);
-oc_port2 (FSTS_1170_18BIT, 0);
-oc_port2 (FSTS_1170_22BIT, 0);
-
-	/* determine mapping from current processor state */
-if (MMR0 & MMR0_MME) {
-  map = 18;
-  if (MMR3 & MMR3_M22E)
-    map = 22;
+oc_ctl.inv_addr = FALSE;
+if (cpu_model == MOD_1145) {		/* I/O page is not out of address range */
+  A &= 0x0003FFFF; 		/* max 256Kb */
+  if (A >= MEMSIZE && !(A > 0x3DFFF && A < 0x3FFFF) )
+    oc_ctl.inv_addr = TRUE;	
   }
+else {
+  A &= 0x003FFFFF;       	/* max 4Mb */
+  if (A >= MEMSIZE && !(A > 0x3FDFFF && A < 0x3FFFFF))
+    oc_ctl.inv_addr = TRUE;	
+    }
 
-switch (map) {
-  case 16 : oc_port2 (FSTS_1170_16BIT, 1); break;
-  case 18 : oc_port2 (FSTS_1170_18BIT, 1); break;
-  case 22 : oc_port2 (FSTS_1170_22BIT, 1); break;
-  }
+return A;
 }
 
 /*
- * Function : oc_ringprot()
- * Note     : Manage the ring protection leds on the console
- * 	      11/40 : *	      USER / VIRTUAL LED
- * 	      11/45 & 11/70 : KERNEL, SUPER and USER *LEDs* are coded in
- *                            2 bits on the console
- * 	      hardware, modes 
- * 	        "00" - KERNEL LED on
- * 	        "01" - SUPER LED on
- *              "11" - USER LED on
- *              "10" - illegal combination
- * Returns  : Nothing
+ * Function : oc_read_D()
+ * Note     : Get 3 bytes (16 bit switches information as DATA) and convert it
+ * 	      into a 16 bit unsigned integer
+ * Returns  : Binary value of data switch settings 
  */
-void oc_ringprot (int value)
+uint16 oc_read_D ()
 {
-uint8 status;
-
-status = oc_ctl.PORT1 | 0x03;
-if (value == MD_KER) status &= 0xFC;
-if (value == MD_SUP) status &= 0xFD;
-if (value == MD_USR) status &= 0xFF;
-oc_ctl.PORT1 = status;
+return (oc_ctl.S[SWR_08_15_PORT] * 256 + oc_ctl.S[SWR_00_07_PORT]);
 }
 
-/*   ***   ***   ***   OPCON communication routines   ***   ***   ***   */
-
 /*
- * Function : oc_send_S()
- * Note     : Send function/status for those LEDs to the console.
- * Returns  : Nothing
+ * Function : oc_read_line_p()
+ * Note     : Substitution for the 'read_line_p' function
+ *	      A complete command can come from two sources: keyboard or
+ *	      console. If a complete command is received from the operator
+ *	      console, it is returned immediately. Keystrokes received from
+ *	      the keyboard are stored until a 'CR' or 'LF' is received.
+ *	      When either source has collected a complete command, this
+ *	      function returns the pointer to the received string.
+ * Returns  : Pointer to received string
  */
-void oc_send_S(void)
+char *oc_read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
 {
-uint8 cmd[4];
+char *tptr = cptr, key_entry = 0, brk = 0;
+struct SERPORT cons0, cons1;
+SERHANDLE consp0 = &cons0, consp1 = &cons1;
+cons0.port=0;
+cons1.port=1;
+ 
+sim_debug (OCDEB_TRC, &oc_dev, "oc_read_line_p : called\n");
 
-cmd[0] = 'F';
-cmd[1] = oc_ctl.PORT1;
-cmd[2] = oc_ctl.PORT2;
+if (prompt)
+    printf ("%s", sim_prompt); fflush(stdout);
 
-if (sim_write_serial (oc_ldsc.serport, cmd, 3) != 3)
-    printf("OC    : Error sending STATUS to the console\n");
+for (;;) {
+    oc_set_master (1);
+    if (oc_get_console (cptr) == TRUE) { /* poll console for data */
+        printf ("%s", cptr);
+        break;
+        }
+
+    if (oc_poll (consp0, 10000) == (t_bool)TRUE &&		/* wait for data on keyboard */
+        sim_read_serial (consp0, &key_entry, 1, &brk) > 0) {
+        if (key_entry == '\b' && *tptr > *cptr) {	/* backspace */
+            *tptr--;
+            sim_write_serial (consp1, &key_entry, 1);	
+            sim_write_serial (consp1, " ", 1);
+            sim_write_serial (consp1, &key_entry, 1);
+            }
+        else {					/* regular character */
+            *tptr++ = key_entry;		/* store the character */
+            sim_write_serial (consp1, &key_entry, 1);/* echo the entry to crt */
+            if ((key_entry == '\n') || (key_entry == '\r'))
+                break;
+            }
+        }
+    } 	
+
+for (tptr = cptr; tptr < (cptr + size); tptr++) {	/* remove cr or nl */
+    if ((*tptr == '\n') || (*tptr == '\r') ||
+        (tptr == (cptr + size - 1))) {
+        *tptr = 0;
+        break;
+        }
+    }
+
+while (isspace (*cptr))
+    cptr++;			/* absorb spaces */
+
+if (*cptr == ';') {
+    if (sim_do_echo)		/* echo comments if -v */
+	printf ("%s> %s\n", do_position(), cptr);
+    if (sim_do_echo && sim_log)
+	fprintf (sim_log, "%s> %s\n", do_position(), cptr);
+    *cptr = 0;
+    }
+
+oc_set_master (0);
+if (oc_ctl.HALT == 1)		/* no stray mode flag */
+    stop_cpu = 1;
+
+return cptr;			/* points to begin of cmd or 0*/
 }
 
 /*
@@ -1019,111 +1066,111 @@ if ((r = sim_write_serial(oc_ldsc.serport, cmd, 8)) != 8)
 }
 
 /*
- * Function : oc_get_SWR()
- * Note     : Send the Query command to the operator console 
- *	      Then read the amount of bytes representing the status of all
- *	      the switches on the operator console, stored in the array
- *  	      "oc_ctl.S[]".
- *  Returns : 0 or -1
+ * Function : oc_send_S()
+ * Note     : Send function/status for those LEDs to the console.
+ * Returns  : Nothing
  */
-int oc_get_SWR (void)
+void oc_send_S(void)
 {
-char brk = 0;
-uint8 c = 'Q';
-uint32 K;
-int x;
+uint8 cmd[4];
 
-sim_debug (OCDEB_TRC, &oc_dev, "oc_get_SWR : called\n");
+cmd[0] = 'F';
+cmd[1] = oc_ctl.PORT1;
+cmd[2] = oc_ctl.PORT2;
 
-if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
-    printf("OC    : Error sending 'QUERY' command.\n");
-    return -1;
-    }
-
-	/* retrieve the input port data from the console processor */
-for (x = 0; x < QUERY_SWR_BYTES; x++) {
-    while (1) { if (oc_poll (oc_ldsc.serport, 1000) == 1) break; }
-    c = 0;
-    if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
-        	errno != EAGAIN && errno != EWOULDBLOCK)
-        return -1;
-    oc_ctl.S[x] = c;
-    }
-
-sim_debug (OCDEB_SWR, &oc_dev,
-	"oc_get_SWR : swreg bytes = 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-	oc_ctl.S[0], oc_ctl.S[1], oc_ctl.S[2], oc_ctl.S[3], oc_ctl.S[4]);
-
-return 0;
+if (sim_write_serial (oc_ldsc.serport, cmd, 3) != 3)
+    printf("OC    : Error sending STATUS to the console\n");
 }
 
 /*
- * Function : oc_get_rotary()
- * Note     : Send the Rotary command to the operator console 
- *	      Then read the byte representing the status of the 2 rotary knobs.
- *  	      The result is stored in one of the "oc_ctl.S[]" fields matching
- *            the positionof the 'Q' command.
- *  	      This function only works for the 11/45 & 11/70
- *  Returns : 0 or -1
+ * Function : oc_set_master()
+ * Note     : Set the status to be 'MASTER/PROC' or not.
+ *            Used to toggle the MASTER / PROC flag
+ * Returns  : Nothing
  */
-int oc_get_rotary (void)
+void oc_set_master (t_bool flag)
 {
-char brk = 0;
-uint8 c = 'R';
+if (cpu_model == MOD_1145) 
+  oc_port1 (FSTS_1145_MASTER, flag);
+else
+  oc_port1 (FSTS_1170_MASTER, flag);
+}
 
-sim_debug (OCDEB_TRC, &oc_dev, "oc_get_rotary : called\n");
-
-if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
-    printf("OC    : Error sending 'ROTARY' command.\n");
-    return -1;
-    }
-
-while (1) { if (oc_poll (oc_ldsc.serport, 1000) == 1) break; }
-if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
-	errno != EAGAIN && errno != EWOULDBLOCK)
-    return -1;
-
-sim_debug (OCDEB_SWR, &oc_dev, "oc_get_rotary : byte = 0x%02X\n", c);
+/*
+ * Function : oc_set_mmu()
+ * Note     : Toggle the 16/18/22 bit on the console.
+ * Returns  : Nothing
+ */
+void oc_set_mmu (void)
+{
+uint8 status, map = 16;
 
 if (cpu_model == MOD_1145)
-    oc_ctl.S[INP3] = (uint32)c;
-else
-    oc_ctl.S[INP5] = (uint32)c;
+  return;
 
-return 0;
+oc_port2 (FSTS_1170_16BIT, 0);
+oc_port2 (FSTS_1170_18BIT, 0);
+oc_port2 (FSTS_1170_22BIT, 0);
+
+	/* determine mapping from current processor state */
+if (MMR0 & MMR0_MME) {
+  map = 18;
+  if (MMR3 & MMR3_M22E)
+    map = 22;
+  }
+
+switch (map) {
+  case 16 : oc_port2 (FSTS_1170_16BIT, 1); break;
+  case 18 : oc_port2 (FSTS_1170_18BIT, 1); break;
+  case 22 : oc_port2 (FSTS_1170_22BIT, 1); break;
+  }
 }
 
 /*
- * Function : oc_get_halt()
- * Note     : Check non-blocking if the HALT/ENABLE switch is set to HALT.
- *            If it is another command byte, only acknowledge it to the
- *            console processor.
- *	      also preempts the read queue as a side effect.
- * Returns  : 0 - nothing
- * 	      1 - set
+ * Function : oc_set_ringprot()
+ * Note     : Manage the ring protection leds on the console
+ * 	      11/45 & 11/70 : KERNEL, SUPER and USER *LEDs* are coded in
+ *                            2 bits on the console
+ * 	      hardware, modes 
+ * 	        "00" - KERNEL LED on
+ * 	        "01" - SUPER LED on
+ *              "11" - USER LED on
+ *              "10" - illegal combination
+ * Returns  : Nothing
  */
-t_bool oc_get_halt (void)
+void oc_set_ringprot (int value)
 {
-char brk = 0;
-uint8 c = 0;
+uint8 status;
 
-sim_debug (OCDEB_TRC, &oc_dev, "oc_get_halt : called\n");
+status = oc_ctl.PORT1 | 0x03;
+if (value == MD_KER) status &= 0xFC;
+if (value == MD_SUP) status &= 0xFD;
+if (value == MD_USR) status &= 0xFF;
+oc_ctl.PORT1 = status;
+}
 
-if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 || c == 0)
-    return FALSE;
+/*
+ * Function : oc_run_thread
+ * Note     : Service routine for the threading solution
+ *            If HALT is set, this service does mostly sleep.
+ * Returns  : 0 or 1
+*/
+void *oc_run_thread(void *oc_end)
+{
+uint8 c_swr = 0;
 
-sim_debug (OCDEB_HLT, &oc_dev, "oc_get_halt : got (%2X:%c)\n", c, c);
-
-if (c == 'H') {				/* HALT switch down? */
-    oc_ctl.HALT = 2;			/* flag it */
-    return TRUE;
+while (*(int*)oc_end == 0) {
+    if (oc_ctl.HALT == 0) {		/* if 0, we are not interactive */
+        oc_send_ADS();
+        if (c_swr++ == 5) {			/* counter max reached? */
+            c_swr = 0;				/* reset it             */
+            oc_get_SWR();			/* get switch data      */
+            if (oc_ctl.S[1] & 0x4)		/* halt switch used?    */
+                oc_ctl.HALT = 2;		/* Yes, set it          */
+            }
+        }
     }
-else {
-    if (strchr ("cdlsx", c) != NULL)     /* known toggle? -> clear */
-	oc_toggle_clear ();
-    }
-
-return FALSE;
+return(0);
 }
 
 /*
@@ -1178,48 +1225,6 @@ if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1)
 }
 
 /*
- * Function : oc_halt_status()
- * Note     : Check the value of the oc_ctl.HALT variable
- * Returns  : 0 - if halt mode = 0 or 1
- *          : 1 - if halt mode = 2
- */
-int oc_halt_status (void)
-{
-if (oc_ctl.HALT == 2) return(1);
-return(0);
-//return oc_ctl.HALT;
-}
-
-/*
- * Function : oc_clear_halt()
- * Note     : Clear the halt bit in the swr array & clear all toggles
- * Returns  : Nothing
- */
-void oc_clear_halt (void)
-{
-if (cpu_model = MOD_1145)
-  oc_ctl.S[INP4] = oc_ctl.S[INP4] & (~SW_HE_1145);
-else
-  oc_ctl.S[INP4] = oc_ctl.S[INP4] & (~SW_HE_1170);
-oc_ctl.HALT = 0;
-oc_toggle_clear ();
-}
-
-/*
- * Function : oc_master()
- * Note     : Set the status to be 'MASTER/PROC' or not.
- *            Used to toggle the MASTER / PROC flag
- * Returns  : Nothing
- */
-void oc_master (t_bool flag)
-{
-if (cpu_model == MOD_1145) 
-  oc_port1 (FSTS_1145_MASTER, flag);
-else
-  oc_port1 (FSTS_1170_MASTER, flag);
-}
-
-/*
  * Function : oc_wait()
  * Note     : Set the status to be bus master or not.
  *            Used to toggle the master / proc flag
@@ -1256,7 +1261,7 @@ return FALSE;
 //#elif defined (__unix__) || (__linux) || (__solaris)
 #else 
 
-t_bool oc_poll (int channel, int p)
+t_bool oc_poll (SERHANDLE channel, int p)
 {
 fd_set s;
 struct timeval t;
@@ -1265,11 +1270,11 @@ t.tv_sec = 0;
 t.tv_usec = p;
 
 FD_ZERO (&s);
-FD_SET (channel, &s);
+FD_SET (channel->port, &s);
 
 select (FD_SETSIZE, &s, NULL, NULL, &t);
 
-if (FD_ISSET (channel, &s))
+if (FD_ISSET (channel->port, &s))
     return TRUE;
 
 return FALSE;

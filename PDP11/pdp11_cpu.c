@@ -813,8 +813,8 @@ else {
             reason = STOP_SPABORT;
         if (trapea == ~MD_KER) {                        /* kernel stk abort? */
 #ifdef OPCON
-        oc_mmu();
-        oc_ringprot(cm);
+        oc_set_mmu();
+        oc_set_ringprot(cm);
         if (cpu_model == MOD_1170) {
             oc_port1(FSTS_1170_ADRSERR, 1);
           }
@@ -914,13 +914,13 @@ while (reason == 0)  {
 
 #ifdef OPCON
         oc_wait(0);
-        oc_master(TRUE);
+        oc_set_master(TRUE);
         switch (cpu_model) {
           case MOD_1145 : oc_port1(FSTS_1145_ADRSERR, 0);
-                          oc_ringprot(cm);
+                          oc_set_ringprot(cm);
                           break;
           case MOD_1170 : oc_port1(FSTS_1170_ADRSERR, 0);
-                          oc_ringprot(cm);
+                          oc_set_ringprot(cm);
                           break;
           default :       break;
           }
@@ -1027,7 +1027,7 @@ while (reason == 0)  {
 #ifdef OPCON
     oc_ctl.A[ADDR_CONPA] = (uint32)PC;
     oc_ctl.D[DISP_SHFR] = (uint16)IR;
-    oc_ringprot(cm);
+    oc_set_ringprot(cm);
     if (oc_halt_status())  {
         stop_cpu = 1;
         reason = SCPE_STOP;
@@ -1088,8 +1088,8 @@ while (reason == 0)  {
                         int_req[i] = 0;
 #ifdef OPCON
                     oc_ctl.D[DISP_SHFR] = (uint16)R[0];
-                    oc_mmu();
-                    oc_ringprot(cm);
+                    oc_set_mmu();
+                    oc_set_ringprot(cm);
 #endif
                     trap_req = trap_req & ~TRAP_INT;
                     dsenable = calc_ds (cm);
@@ -1555,8 +1555,8 @@ while (reason == 0)  {
                 cm = MD_SUP;
                 tbit = 0;
 #ifdef OPCON
-                oc_mmu();
-                oc_ringprot(cm);
+                oc_set_mmu();
+                oc_set_ringprot(cm);
 #endif
                 isenable = calc_is (cm);
                 dsenable = calc_ds (cm);
@@ -2300,8 +2300,8 @@ while (reason == 0)  {
                     hst_ent->dst = dst;
                 WriteW (dst, SP | dsenable);
 #ifdef OPCON
-                oc_mmu();
-                oc_ringprot(cm);
+                oc_set_mmu();
+                oc_set_ringprot(cm);
 #endif
                 if ((cm == MD_KER) && (SP < (STKLIM + STKL_Y)))
                     set_stack_trap (SP);
@@ -2506,9 +2506,9 @@ set_r_display (rs, cm);
 
 #ifdef OPCON
         /* during HALT, general register R0 contents are displayed. */
-oc_mmu();
-oc_ringprot(cm);
-oc_master(FALSE);
+oc_set_mmu();
+oc_set_ringprot(cm);
+oc_set_master(FALSE);
 
 if ((reason == STOP_HALT) || (reason == STOP_WAIT) ||
     (reason == SCPE_STOP) || (reason == STOP_VECABORT) ||
@@ -3273,8 +3273,8 @@ switch ((pa >> 1) & 3) {                                /* decode pa<2:1> */
         data = data & cpu_tab[cpu_model].mm0;
         MMR0 = (MMR0 & ~MMR0_WR) | (data & MMR0_WR);
 #ifdef OPCON
-	oc_mmu();
-        oc_ringprot(cm);
+	oc_set_mmu();
+        oc_set_ringprot(cm);
 #endif
         return SCPE_OK;
 
@@ -3298,8 +3298,8 @@ cpu_bme = (MMR3 & MMR3_BME) && (cpu_opt & OPT_UBM);
 dsenable = calc_ds (cm);
 
 #ifdef OPCON
-oc_mmu();
-oc_ringprot(cm);
+oc_set_mmu();
+oc_set_ringprot(cm);
 #endif
 
 return SCPE_OK;
@@ -3412,8 +3412,8 @@ isenable = calc_is (cm);
 dsenable = calc_ds (cm);
 
 #ifdef OPCON
-oc_mmu();
-oc_ringprot(cm);
+oc_set_mmu();
+oc_set_ringprot(cm);
 #endif
 
 return SCPE_OK;
@@ -3532,10 +3532,10 @@ trap_req = 0;
 wait_state = 0;
 
 #ifdef OPCON
-oc_master(TRUE);
+oc_set_master(TRUE);
 oc_wait(FALSE);
-oc_mmu();
-oc_ringprot(cm);
+oc_set_mmu();
+oc_set_ringprot(cm);
 if (cpu_model == MOD_1170) {
     oc_port1(FSTS_1170_PARERR,  0);
     oc_port1(FSTS_1170_ADRSERR, 0);
