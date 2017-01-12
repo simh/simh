@@ -28,6 +28,7 @@
    TTY          12531C buffered teleprinter interface
    TBG          12539C time base generator
 
+   30-Dec-16    JDB     Modified the TTY to print if the punch is not attached
    13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -115,6 +116,7 @@
    by 10**3.  The clk_time values were chosen to allow the diagnostic to
    pass its clock calibration test.
 */
+
 
 #include "hp2100_defs.h"
 
@@ -204,7 +206,6 @@ t_stat tty_reset (DEVICE *dptr);
 t_stat tty_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat tty_set_alf (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat tto_out (int32 c);
-t_stat ttp_out (int32 c);
 
 IOHANDLER clkio;
 t_stat clk_svc (UNIT *uptr);
@@ -746,7 +747,36 @@ return SCPE_OK;
 }
 
 
-/* Terminal I/O signal handler */
+/* Terminal I/O signal handler.
+
+   Output Word Format:
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 1 | I | P | N | -   -   -   -   -   -   -   -   -   -   -   - | control
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0 | -   -   -   -   -   -   - |       output character        | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     I = set the interface to output/input mode (0/1)
+     P = enable the printer for output
+     N = enable the punch for output
+
+
+   Input Word Format:
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | B | -   -   -   -   -   -   - |        input character        |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     B = interface is idle/busy (0/1)
+
+*/
 
 uint32 ttyio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
@@ -895,28 +925,39 @@ uptr->wait = sim_rtcn_calb (POLL_RATE, TMR_POLL);       /* calibrate poll timer 
 sim_activate (uptr, uptr->wait);                        /* continue poll */
 
 tty_shin = 0377;                                        /* assume inactive */
+
 if (tty_lf) {                                           /* auto lf pending? */
     c = 012;                                            /* force lf */
     tty_lf = 0;
     }
+
 else {
-    if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;   /* no char or error? */
-    if (c & SCPE_BREAK) c = 0;                          /* break? */
-    else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+    c = sim_poll_kbd ();
+
+    if (c < SCPE_KFLAG)                                 /* no char or error? */
+        return c;
+
+    if (c & SCPE_BREAK)                                 /* break? */
+        c = 0;
+    else
+        c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+
     tty_lf = ((c & 0177) == 015) && (uptr->flags & UNIT_AUTOLF);
     }
+
 if (tty_mode & TM_KBD) {                                /* keyboard enabled? */
     tty_buf = c;                                        /* put char in buf */
     uptr->pos = uptr->pos + 1;
 
     ttyio (&tty_dib, ioENF, 0);                         /* set flag */
 
-    if (c) {
+    if (c)
         tto_out (c);                                    /* echo? */
-        return ttp_out (c);                             /* punch? */
-        }
     }
-else tty_shin = c;                                      /* no, char shifts in */
+
+else                                                    /* no, char shifts in */
+    tty_shin = c;
+
 return SCPE_OK;
 }
 
@@ -931,47 +972,86 @@ t_stat r;
 c = tty_buf;                                            /* get char */
 tty_buf = tty_shin;                                     /* shift in */
 tty_shin = 0377;                                        /* line inactive */
-if ((r = tto_out (c)) != SCPE_OK) {                     /* output; error? */
-    sim_activate (uptr, uptr->wait);                    /* retry */
-    return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
+
+r = tto_out (c);                                        /* output the character */
+
+if (r != SCPE_OK) {                                     /* if an error occurred */
+    sim_activate (uptr, uptr->wait);                    /*   then schedule a retry */
+    return (r == SCPE_STALL ? SCPE_OK : r);             /* report a stall as success */
     }
 
 ttyio (&tty_dib, ioENF, 0);                             /* set flag */
 
-return ttp_out (c);                                     /* punch if enabled */
+return SCPE_OK;
 }
 
+
+/* TTY output routine.
+
+   The 12531C Buffered Teleprinter Interface connects current-loop devices, such
+   as the HP 2752A (ASR33) and 2754A (ASR35) teleprinters, as well as EIA RS-232
+   devices, such as the HP 2749A (ASR33) teleprinter and HP 2600 terminal.  For
+   output, the control word sent to the interface may set the print flip-flop,
+   the punch flip-flop, or both flip-flops.  These flip-flops generate the PRINT
+   COMMAND and PUNCH COMMAND output signals, respectively.  Setting either one
+   enables data transmission.
+
+   Only the 2754A responds to the PRINT and PUNCH COMMAND signals.  All of the
+   other devices ignore these signals and respond only to the serial data out
+   signal.  (The paper tape punches on the 2749A and 2752A teleprinters must be
+   enabled manually at the console and operate concurrently with the printers.)
+
+   This routine simulates a 2754A if the punch unit (TTY unit 2) is attached and
+   a generic terminal when the unit is detached.  With the punch unit attached,
+   the punch flip-flop must be set to punch, and the print flip-flop must be set
+   to print.  These flip-flops, and therefore their respective operations, are
+   independent.  When the punch unit is detached, printing will occur if either
+   the print or punch flip-flop is set.  If neither flip-flop is set, no output
+   occurs.  Therefore, the logic is:
+
+     if punch-flip-flop and punch-attached
+       then punch character
+
+     if print-flip-flop or punch-flip-flop and not punch-attached
+       then print character
+
+   Certain HP programs, e.g., HP 2000F BASIC FOR DOS-M/DOS III, depend on the
+   2752A et. al. behavior.  The DOS and RTE teleprinter drivers support text and
+   binary output modes.  Text mode sets the print flip-flop, and binary mode
+   sets the punch flip-flop.  These programs use binary mode to write single
+   characters to the teleprinter and expect that they will be printed.  The
+   simulator follows this behavior.
+*/
 
 t_stat tto_out (int32 c)
 {
-t_stat r;
+t_stat r = SCPE_OK;
 
-if (tty_mode & TM_PRI) {                                /* printing? */
-    c = sim_tt_outcvt (c, TT_GET_MODE (tty_unit[TTO].flags));
-    if (c >= 0) {                                       /* valid? */
-        r = sim_putchar_s (c);                          /* output char */
-        if (r != SCPE_OK)
-            return r;
-        tty_unit[TTO].pos = tty_unit[TTO].pos + 1;
+if ((tty_mode & TM_PUN)                                 /* if punching is enabled */
+  && tty_unit [TTP].flags & UNIT_ATT)                   /*   and the punch is attached */
+    if (putc (c, tty_unit [TTP].fileref) == EOF) {      /*     then output the character; if it fails */
+        perror ("TTP I/O error");                       /*       then report an error */
+        clearerr (tty_unit [TTP].fileref);              /* clear the error */
+        r = SCPE_IOERR;                                 /*   and stop the simulator */
+        }
+
+    else                                                        /* otherwise the output succeeded */
+        tty_unit [TTP].pos = ftell (tty_unit [TTP].fileref);    /*   so update the file position */
+
+if ((tty_mode & TM_PRI)                                         /* if printing is enabled */
+  || (tty_mode & TM_PUN)                                        /*   or punching is enabled */
+  && (tty_unit [TTP].flags & UNIT_ATT) == 0) {                  /*     and the punch is not attached */
+    c = sim_tt_outcvt (c, TT_GET_MODE (tty_unit [TTO].flags));  /*       then convert the character */
+
+    if (c >= 0) {                                           /* if the character is valid */
+        r = sim_putchar_s (c);                              /*   then output it to the console */
+
+        if (r == SCPE_OK)                                   /* if the output succeeded */
+            tty_unit [TTO].pos = tty_unit [TTO].pos + 1;    /*   then update the file position */
         }
     }
-return SCPE_OK;
-}
 
-
-t_stat ttp_out (int32 c)
-{
-if (tty_mode & TM_PUN) {                                /* punching? */
-    if ((tty_unit[TTP].flags & UNIT_ATT) == 0)          /* attached? */
-        return IOERROR (ttp_stopioe, SCPE_UNATT);
-    if (putc (c, tty_unit[TTP].fileref) == EOF) {       /* output char */
-        perror ("TTP I/O error");
-        clearerr (tty_unit[TTP].fileref);
-        return SCPE_IOERR;
-        }
-    tty_unit[TTP].pos = ftell (tty_unit[TTP].fileref);
-    }
-return SCPE_OK;
+return r;                                               /* return the result */
 }
 
 

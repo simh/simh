@@ -23,9 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   DP           12557A 2871 disk subsystem
+   DP           12557A 2870 disk subsystem
                 13210A 7900 disk subsystem
 
+   09-Nov-16    JDB     Corrected disk subsystem model number from 2871 to 2870
    13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
