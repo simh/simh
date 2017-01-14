@@ -756,10 +756,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifeq (,$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | grep 'Format:'))
       GIT_COMMIT_ID=$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | awk '{ print $$3 }')
     else
-      ifeq (git-submodule,$(shell if $(TEST) -d ../.git; then echo git-submodule; fi))
-        ifeq (submodule,$(shell grep 'submodule "simh"' ../.gitmodules | awk 'BEGIN { FS = " " } ; { print $$1 }' | awk 'BEGIN { FS = "\[" } ; { print $$2 }'))
-          GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep simh | awk '{ print $$1 }')
-        endif
+      ifeq (git-submodule,$(if $(shell cd .. ; git rev-parse --git-dir 2>/dev/null),git-submodule))
+        GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep "$(notdir $(realpath .))" | awk '{ print $$1 }')
+      else
+        GIT_COMMIT_ID=undetermined-git-id
       endif
     endif
   endif
