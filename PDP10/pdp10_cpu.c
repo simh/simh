@@ -1,6 +1,6 @@
 /* pdp10_cpu.c: PDP-10 CPU simulator
 
-   Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 1993-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          KS10 central processor
 
+   14-Jan-17    RMS     Fixed bugs in 1-proceed
    09-Feb-16    RMS     Fixed nested indirects and executes (Tim Litt)
    25-Mar-12    RMS     Added missing parameters to prototypes (Mark Pizzolato)
    17-Jul-07    RMS     Fixed non-portable usage in SHOW HISTORY
@@ -1440,7 +1441,6 @@ case 0725:  IOA; io725 (AC(ac), ea); break;             /* BCIOB, IOWRBQ */
 
 default:
 MUUO:
-    its_2pr = 0;                                        /* clear trap */
     if (T20PAG) {                                       /* TOPS20 paging? */
         int32 tf = (op << (INST_V_OP - 18)) | (ac << (INST_V_AC - 18));
         WriteP (upta + UPT_MUUO, XWD (                  /* store flags,,op+ac */
@@ -1550,7 +1550,7 @@ if (its_2pr) {                                          /* 1-proc trap? */
         WriteP (upta + UPT_1PO, FLPC);                  /* wr old flgs, PC */
         mb = ReadP (upta + UPT_1PN);                    /* rd new flgs, PC */
         JUMP (mb);                                      /* set PC */
-        set_newflags (mb, TRUE);                        /* set new flags */
+        set_newflags (mb, FALSE);                       /* set new flags */
         }
     }                                                   /* end if 2-proc */
 }                                                       /* end for */
