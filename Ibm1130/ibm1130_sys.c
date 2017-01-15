@@ -289,11 +289,6 @@ static int ebcdic_to_ascii (int ch)
 	return '?';
 }
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 {
 	int32 ch, OP, F, TAG, INDIR, DSPLC, IR, eaddr;

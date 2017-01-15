@@ -905,11 +905,6 @@ static const int32 opc_val[] = {
         status  =       space needed?
 */
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 int32 fprint_opr (FILE *of, int32 inst, int32 clss, int32 sp)
 {
 int32 i, j;

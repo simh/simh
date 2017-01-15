@@ -289,11 +289,6 @@ static const struct fnc_op fop[] = {
 
 /* Print opcode field for FO, SF */
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 void fprint_op (FILE *of, uint32 inst, uint32 op)
 {
 int32 i, nfirst;

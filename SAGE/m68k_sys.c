@@ -301,11 +301,6 @@ const char *sim_stop_messages[] = {
 #define DATA_B(x) (x&0xff)
 #define DATA_W(x) (x&0xffff)
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 static t_stat _fsymea(FILE* of,t_addr addr,int ea, int oplen,t_value* rest) 
 {
     int eamod = EAMOD_FIELD(ea);

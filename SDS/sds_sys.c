@@ -475,8 +475,6 @@ static const char *chname[] = {
         inst    =       mask bits
 */
 
-#define fprintf Fprintf /* Use scp.c provided fprintf function */
-
 void fprint_reg (FILE *of, int32 inst)
 {
 int32 i, j, sp;

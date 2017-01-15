@@ -1,6 +1,7 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
    Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017       J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jan-17    JDB     Removed use of Fprintf functions for version 4.x and on
    30-Dec-16    JDB     Corrected parsing of memory reference instructions
    13-May-16    JDB     Modified for revised SCP API function parameter types
    19-Jun-15    JDB     Conditionally use Fprintf function for version 4.x and on
@@ -69,13 +71,6 @@
 #include <ctype.h>
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-
-
-#if (SIM_MAJOR >= 4)
-  #define fprintf       Fprintf
-  #define fputs(_s,_f)  Fprintf (_f, "%s", _s)
-  #define fputc(_c,_f)  Fprintf (_f, "%c", _c)
-#endif
 
 
 extern DEVICE mp_dev;

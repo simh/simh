@@ -117,11 +117,6 @@ if (flag == 1) return ssem_dump(fi);
 return ssem_load_dmp(fi);
 }
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 /* Utility routine - prints number in decimal */
 
 t_stat ssem_fprint_decimal (FILE *of, uint32 inst)

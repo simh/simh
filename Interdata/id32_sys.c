@@ -300,11 +300,6 @@ static const uint32 opc_val[] = {
 
 /* Print an RX specifier */
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 t_stat fprint_addr (FILE *of, t_addr addr, uint32 rx, uint32 ea1,
     uint32 ea2)
 {

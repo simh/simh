@@ -221,11 +221,6 @@ static const char opcode[] = "ZBYRIDNMPEUTHCAS";
 
 static const char hex_decode[] = "0123456789FGJKQW";
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 void lgp_sprint_addr (char *buf, DEVICE *dptr, t_addr addr)
 {
 if ((dptr == sim_devices[0]) &&

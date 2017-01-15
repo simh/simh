@@ -166,6 +166,10 @@ char *sim_encode_quoted_string (const uint8 *iptr, uint32 size);
 void fprint_buffer_string (FILE *st, const uint8 *buf, uint32 size);
 t_value strtotv (CONST char *cptr, CONST char **endptr, uint32 radix);
 int Fprintf (FILE *f, const char *fmt, ...) GCC_FMT_ATTR(2, 3);
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,_f) Fprintf(_f,"%s",_s)
+#define fputc(_c,_f) Fprintf(_f,"%c",_c)
 t_stat sim_set_memory_load_file (const unsigned char *data, size_t size);
 int Fgetc (FILE *f);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
