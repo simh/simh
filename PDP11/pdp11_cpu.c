@@ -745,11 +745,11 @@ reason = 0;
 
 #ifdef OPCON
 switch (cpu_model) {
-  case MOD_1145 : oc_port1(FSTS_1145_ADRSERR, 0);
+  case MOD_1145 : oc_set_port1(FSTS_1145_ADRSERR, 0);
                   break;
-  case MOD_1170 : oc_port1(FSTS_1170_ADRSERR, 0);
-                  oc_port2(FSTS_1170_PARHI, 0);
-                  oc_port2(FSTS_1170_PARLO, 0);
+  case MOD_1170 : oc_set_port1(FSTS_1170_ADRSERR, 0);
+                  oc_set_port2(FSTS_1170_PARHI, 0);
+                  oc_set_port2(FSTS_1170_PARLO, 0);
                   break;
   default :       break;
   }
@@ -760,14 +760,14 @@ switch (cpu_model) {            /* may be a trap, so handle it. */
   case MOD_1145 : if ((abortval == TRAP_NXM) ||
                       (abortval == TRAP_ODD) ||
                       (abortval == TRAP_MME))
-                    oc_port1(FSTS_1145_ADRSERR, 1);
+                    oc_set_port1(FSTS_1145_ADRSERR, 1);
                   break;
   case MOD_1170 : if (abortval == TRAP_PAR)
-                    oc_port1(FSTS_1170_PARERR, 1);
+                    oc_set_port1(FSTS_1170_PARERR, 1);
                   if ((abortval == TRAP_NXM) ||
                       (abortval == TRAP_ODD) ||
                       (abortval == TRAP_MME))
-                    oc_port1(FSTS_1170_ADRSERR, 1);
+                    oc_set_port1(FSTS_1170_ADRSERR, 1);
                   break;
   default :       break;
 }
@@ -816,7 +816,7 @@ else {
         oc_set_mmu();
         oc_set_ringprot(cm);
         if (cpu_model == MOD_1170) {
-            oc_port1(FSTS_1170_ADRSERR, 1);
+            oc_set_port1(FSTS_1170_ADRSERR, 1);
           }
 #endif
             setTRAP (TRAP_RED);
@@ -916,10 +916,10 @@ while (reason == 0)  {
         oc_wait(0);
         oc_set_master(TRUE);
         switch (cpu_model) {
-          case MOD_1145 : oc_port1(FSTS_1145_ADRSERR, 0);
+          case MOD_1145 : oc_set_port1(FSTS_1145_ADRSERR, 0);
                           oc_set_ringprot(cm);
                           break;
-          case MOD_1170 : oc_port1(FSTS_1170_ADRSERR, 0);
+          case MOD_1170 : oc_set_port1(FSTS_1170_ADRSERR, 0);
                           oc_set_ringprot(cm);
                           break;
           default :       break;
@@ -3537,8 +3537,8 @@ oc_wait(FALSE);
 oc_set_mmu();
 oc_set_ringprot(cm);
 if (cpu_model == MOD_1170) {
-    oc_port1(FSTS_1170_PARERR,  0);
-    oc_port1(FSTS_1170_ADRSERR, 0);
+    oc_set_port1(FSTS_1170_PARERR,  0);
+    oc_set_port1(FSTS_1170_ADRSERR, 0);
     }
 #endif
 

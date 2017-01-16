@@ -6544,22 +6544,22 @@ do {
           r = SCPE_STOP;
           oc_toggle_clear();
           switch (cpu_model) {
-            case MOD_1145: oc_port1(FSTS_RUN, 0);
-                           oc_port1(FSTS_1145_PAUSE, 1);
+            case MOD_1145: oc_set_port1(FSTS_RUN, 0);
+                           oc_set_port1(FSTS_1145_PAUSE, 1);
                            break;
-            case MOD_1170: oc_port1(FSTS_RUN, 0);
-                           oc_port1(FSTS_1170_PAUSE, 1);
+            case MOD_1170: oc_set_port1(FSTS_RUN, 0);
+                           oc_set_port1(FSTS_1170_PAUSE, 1);
                            break;
             default      : break;
             }
 	}
       else  {
           switch (cpu_model) {
-            case MOD_1145: oc_port1(FSTS_RUN, 1);
-                           oc_port1(FSTS_1145_PAUSE, 0);
+            case MOD_1145: oc_set_port1(FSTS_RUN, 1);
+                           oc_set_port1(FSTS_1145_PAUSE, 0);
                            break;
-            case MOD_1170: oc_port1(FSTS_RUN, 1);
-                           oc_port1(FSTS_1170_PAUSE, 0);
+            case MOD_1170: oc_set_port1(FSTS_RUN, 1);
+                           oc_set_port1(FSTS_1170_PAUSE, 0);
                            break;
             default      : break;
             }

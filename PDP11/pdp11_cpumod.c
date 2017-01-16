@@ -664,13 +664,13 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
 
     case 010:                                           /* low size */
 #ifdef OPCON
-        oc_port2(FSTS_1170_PARLO, 1);   /* technically : never called */
+        oc_set_port2(FSTS_1170_PARLO, 1);   /* technically : never called */
 #endif
         return SCPE_OK;
 
     case 011:                                           /* high size */
 #ifdef OPCON
-        oc_port2(FSTS_1170_PARHI, 1);   /* technically : never called */
+        oc_set_port2(FSTS_1170_PARHI, 1);   /* technically : never called */
 #endif
         return SCPE_OK;
 
