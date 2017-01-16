@@ -2047,8 +2047,14 @@ if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ 
     TXBUF_CHAR (lp, chr);                               /* buffer char & adv pointer */
     if ((!lp->txbfd) && (TXBUF_AVAIL (lp) <= TMXR_GUARD))/* near full? */
         lp->xmte = 0;                                   /* disable line */
-    if (lp->txlog)                                      /* log if available */
-        fputc (chr, lp->txlog);
+    if (lp->txlog) {                                    /* log if available */
+        extern TMLN *sim_oline;                         /* Make sure to avoid recursion */
+        TMLN *save_oline = sim_oline;                   /* when logging to a socket */
+
+        sim_oline = NULL;                               /* save output socket */
+        fputc (chr, lp->txlog);                         /* log to actual file */
+        sim_oline = save_oline;                         /* resture output socket */
+        }
     sim_exp_check (&lp->expect, chr);                   /* process expect rules as needed */
     return SCPE_OK;                                     /* char sent */
     }
