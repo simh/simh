@@ -1860,6 +1860,7 @@ else {
         *pref = NULL;
         return SCPE_OPENERR;
         }
+    setvbuf (*pf, NULL, _IOFBF, 65536);
     (*pref)->file = *pf;
     (*pref)->refcount = 1;                               /* need close */
     }
