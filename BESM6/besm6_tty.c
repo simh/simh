@@ -406,9 +406,9 @@ t_stat tty_setrate (UNIT *up, int32 v, CONST char *cp, void *dp) {
 t_stat tty_setturbo (UNIT *up, int32 v, CONST char *cp, void *dp) {
     if (!cp)
         return SCPE_MISVAL;
-    if (!strcasecmp(cp, "ON"))
+    if (!sim_strcasecmp(cp, "ON"))
         tty_turbo = 1;
-    else if (!strcasecmp(cp, "OFF"))
+    else if (!sim_strcasecmp(cp, "OFF"))
         tty_turbo = 0;
     else
         return SCPE_ARG;
