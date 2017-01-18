@@ -7644,6 +7644,33 @@ for (i=0; i<len; i++) {
 return 0;
 }
 
+/* strcasecmp() is not available on all platforms */
+int sim_strcasecmp (const char* string1, const char* string2)
+{
+size_t i = 0;
+unsigned char s1, s2;
+
+while (1) {
+    s1 = (unsigned char)string1[i];
+    s2 = (unsigned char)string2[i];
+    if (sim_islower (s1))
+        s1 = (unsigned char)toupper (s1);
+    if (sim_islower (s2))
+        s2 = (unsigned char)toupper (s2);
+    if (s1 == s2) {
+        if (s1 == 0)
+            return 0;
+        i++;
+        continue;
+        }
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
+    }
+return 0;
+}
+
 /* get_yn               yes/no question
 
    Inputs:
