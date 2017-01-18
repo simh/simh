@@ -25,13 +25,13 @@
    or other dealings in this Software without prior written
    authorization from the Author or Authors.
 
-   11-jan-16	EG	Implement pthread, rename some functions
-   14-Mar-14    EG      added rom address range check, changed interval
-   10-Mar-14    EG      oc_get_console : add inv addr check 
+   17-jan-17	EG	pthreading version, rename some functions
+   14-mar-14    EG      added rom address range check, changed interval
+   10-mar-14    EG      oc_get_console : add inv addr check 
                         oc_extract_address : address masking & inv addr flag
                         added function oc_get_rotary; fix load adrs cmd not -
                         to generate 'dep pc xxx'.
-   10-Feb-14    EG      Rewrite, based on original realcons.c code.
+   10-feb-14    EG      Rewrite, based on original realcons.c code.
 */
 
 /* SIMH integration
@@ -39,6 +39,7 @@
  * oc_detach()			: detach device (close link)
  * oc_help()			: Generic help
  * oc_help_attach()		: Help for attach command
+ * oc_read_line_p()		: get command (keyboard or console)
  * oc_reset()			: device reset
  * oc_show()			: show status of the device (link)
  * oc_svc()			: service routine
@@ -52,11 +53,11 @@
  * oc_poll()			: pool input channel for data ready
  * oc_read_A()			: extract address from swr data array
  * oc_read_D()			: extract data from swr data array
- * oc_read_line_p()		: get command (keyboard or console)
  * oc_send_A()			: send address data
  * oc_send_AD()			: combined send address & data
  * oc_send_ADS()		: send address/data/status
  * oc_send_S()			: send status data
+ * oc_set_master()		: toggle master mode
  * oc_set_mmu()			: toggle mmu mapping mode (16/18/22 bit)
  * oc_set_port1()		: toggle bit on/off in port1 flagbyte
  * oc_set_port2()		: toggle bit on/off in port2 flagbyte
@@ -77,9 +78,12 @@
 #include "scp.h"
 #include "pdp11_defs.h"
 #include <ctype.h>
-
 #include <termio.h>
 #include <sys/ioctl.h>
+
+#undef OC_ADDR
+#undef OC_DATA
+#undef OC_IA
 
 /* Declarations & references for required external routines & variables. */
 extern SERHANDLE sim_open_serial (char *name, TMLN *lp, t_stat *status);
@@ -88,13 +92,11 @@ extern char *do_position (void);
 extern int32 sim_read_serial(SERHANDLE port, char *bufp, int32 count,char *brk);
 extern int32 sim_write_serial (SERHANDLE port, char *bufp, int32 count);
 extern int32 sim_quiet;			/* Quiet output mode */
-extern int32 MMR0, MMR3;		/* MMU registers */
 extern UNIT cpu_unit;			/* configured memory size */
 extern int32 sim_do_echo;
+extern int32 MMR0, MMR3;		/* MMU registers */
 
 /* Defines */
-#define OC_INTERVAL	     1000	/* # of nanoseconds */
-
 #define INP1			0
 #define INP2			1
 #define INP3			2
@@ -114,13 +116,6 @@ extern int32 sim_do_echo;
 #define SW_PL_1170	     0x80	/* key switch bitfield */
 #define SW_HE_1170	     0x40	/* HALT bitfield */
 
-/* DISPLAY DATA rotary switch for 11/45 & 11/70 */
-#define DSPD_BUS_REG	     0x00	/* BUS REG */
-#define DSPD_DATA_PATHS	     0x01	/* DATA PATHS */
-#define DSPD_DISP_REG	     0x02	/* DISPLAY REGISTER */
-#define DSPD_MU_ADRS	     0x03	/* uADRS FPP/CPU */
-#define DSPD_MASK	     0x03	/* mask for DSPA range */
-
 /* DISPLAY ADDRESS rotary switch for 11/45 & 11/70 */
 #define DSPA_PROGPHY	     0x00	/* PROG PHY */
 #define DSPA_KERNEL_D	     0x01	/* KERNEL D */
@@ -131,6 +126,13 @@ extern int32 sim_do_echo;
 #define DSPA_USER_D	     0x06	/* USER D */
 #define DSPA_USER_I	     0x07	/* USER I */
 #define DSPA_MASK	     0x07	/* mask for DSPA range */
+
+/* DISPLAY DATA rotary switch for 11/45 & 11/70 */
+#define DSPD_BUS_REG	     0x00	/* BUS REG */
+#define DSPD_DATA_PATHS	     0x01	/* DATA PATHS */
+#define DSPD_DISP_REG	     0x02	/* DISPLAY REGISTER */
+#define DSPD_MU_ADRS	     0x03	/* uADRS FPP/CPU */
+#define DSPD_MASK	     0x03	/* mask for DSPA range */
 
 /* Ack_toggle flag definitions */
 #define ACK_DEPO	     0x40
@@ -158,10 +160,9 @@ extern int32 sim_do_echo;
 #define OCDEB_UPD	      100	/* address & data leds update */
 
 /* Global declarations for the OC device */
+OC_ST oc_ctl;				/* OC device control block */
 pthread_t oc_th;
-struct	  oc_st oc_ctl;			/* OC device control block */
-int	  oc_interactive = 1, oc_end = 0;
-
+int	  oc_end = 0;
 
 /* Debug flags & keywords for the OC device */
 DEBTAB oc_debug[] = {
@@ -232,7 +233,7 @@ TMXR oc_tmxr = { 1, 0, 0, &oc_ldsc, NULL, &oc_dev };
  * 	      anything at this point.
  * Returns  : SCPE_OK or -1
  */
-t_stat oc_attach (UNIT *uptr, char *cptr)
+t_stat oc_attach (UNIT *uptr, CONST char *cptr)
 {
 char *cmdp, *tptr;
 uint32 H, K;
@@ -376,7 +377,7 @@ return SCPE_OK;
  * Note	    : Show the status of the link
  * Returns  : SCPE_OK
  */
-t_stat oc_show (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat oc_show (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (oc_ldsc.rcve)
     fputs ("active\n", st);
@@ -392,9 +393,9 @@ return SCPE_OK;
  *            Processes 'help oc' (not 'help set oc')
  * Returns  : Nothing
  */
-t_stat oc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat oc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
-const char *const text =
+CONST char *const text =
 " OC11 Remote Operator Console processor link\n"
 "\n"
 " The OC11 is a pseudo driver and is an interface to the core-IO console\n"
@@ -417,9 +418,9 @@ return SCPE_OK;
  *            Processes 'help oc' (not 'help set oc')
  * Returns  : Nothing
  */
-t_stat oc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+t_stat oc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
-const char *const text =
+CONST char *const text =
 " OC device ATTACH help."
 "\n"
 " The OC driver uses a single serial port to send and receive commands"
@@ -473,8 +474,6 @@ const char *const text =
 ;
 
 fprintf (st, "%s", text);
-fprint_set_help (st, dptr);
-fprint_show_help (st, dptr);
 return SCPE_OK;
 }
 
@@ -483,7 +482,7 @@ return SCPE_OK;
  * Note     : Single line description
  * Returns  : Pointer to the text
  */
-char *oc_description (DEVICE *dptr)
+CONST char *oc_description (DEVICE *dptr)
 {
 return "OC11 : Interface to operator console processor";
 }
@@ -498,9 +497,9 @@ return "OC11 : Interface to operator console processor";
 void oc_clear_halt (void)
 {
 if (cpu_model = MOD_1145)
-  oc_ctl.S[INP4] = oc_ctl.S[INP4] & (~SW_HE_1145);
+    oc_ctl.S[INP4] = oc_ctl.S[INP4] & (~SW_HE_1145);
 else
-  oc_ctl.S[INP4] = oc_ctl.S[INP4] & (~SW_HE_1170);
+    oc_ctl.S[INP4] = oc_ctl.S[INP4] & (~SW_HE_1170);
 oc_toggle_clear ();
 oc_ctl.HALT = 0;
 }
@@ -561,9 +560,9 @@ switch (c) {
 	else {
 	    strcpy (cptr, "continue\n");
 	    if (cpu_model == MOD_1145)
-	      oc_set_port1 (FSTS_1145_ADRSERR, 0);
+	        oc_set_port1 (FSTS_1145_ADRSERR, 0);
 	    else
-	      oc_set_port1(FSTS_1170_ADRSERR, 0);
+	        oc_set_port1(FSTS_1170_ADRSERR, 0);
 	    oc_clear_halt ();
 	    }
 	break;
@@ -582,10 +581,10 @@ switch (c) {
 		}
 	    }
 	if (oc_ctl.inv_addr) {	/* above mem range? */
-	  if (cpu_model == MOD_1145)
-	    oc_set_port1 (FSTS_1145_ADRSERR, 1);
-	  else
-	    oc_set_port1 (FSTS_1170_ADRSERR, 1);
+	    if (cpu_model == MOD_1145)
+	        oc_set_port1 (FSTS_1145_ADRSERR, 1);
+	    else
+	        oc_set_port1 (FSTS_1170_ADRSERR, 1);
 	    strcpy (cptr, ";address out of defined range\n");
 	    }
 	else {	/* no deposits in boot rom address range or device roms */
@@ -603,7 +602,7 @@ switch (c) {
 		D = oc_read_D ();		/* get 'data' data */
 		oc_ctl.first_exam = TRUE;
 		oc_ctl.first_dep = FALSE;
-		oc_send_AD();
+		oc_send_AD ();
 		sprintf (cptr, "deposit %o %o\n", oc_ctl.act_addr, D);
 		}
 	    }
@@ -611,14 +610,14 @@ switch (c) {
 	break;
     case 'l' :					/* LOAD ADDRS */
 	if (cpu_model == MOD_1145) 	/* clear some flags */
-	  oc_set_port1 (FSTS_1145_ADRSERR, 0);
+	    oc_set_port1 (FSTS_1145_ADRSERR, 0);
 	else
-	  oc_set_port1 (FSTS_1170_ADRSERR, 0);
+	    oc_set_port1 (FSTS_1170_ADRSERR, 0);
         oc_get_SWR ();	/* get actual switch settings */
 	oc_ctl.first_dep = TRUE;
 	oc_ctl.first_exam = TRUE;
 	oc_ctl.act_addr = oc_read_A ();
-	oc_send_A();
+	oc_send_A ();
 	sprintf (cptr, ";load address %08o\n", oc_ctl.act_addr);
 	oc_toggle_ack (ACK_LOAD) ;
 	break;
@@ -648,9 +647,9 @@ switch (c) {
 	    }
 	if (oc_ctl.inv_addr) {
 	    if (cpu_model == MOD_1145)
-	      oc_set_port1 (FSTS_1145_ADRSERR, 1);
+	        oc_set_port1 (FSTS_1145_ADRSERR, 1);
 	    else
-	      oc_set_port1 (FSTS_1170_ADRSERR, 1);
+	        oc_set_port1 (FSTS_1170_ADRSERR, 1);
 	    strcpy (cptr, ";address out of defined range\n");
 	    }
 	else {
@@ -667,7 +666,7 @@ switch (c) {
     }
 
 if (oc_ctl.HALT)
-  oc_send_S ();				/* update console status leds */
+    oc_send_S ();			/* update console status leds */
 
 return TRUE;
 }
@@ -687,6 +686,9 @@ uint8 c = 'Q';
 uint32 K;
 int x;
 
+if (!oc_ldsc.rcve)
+  return 0;
+
 sim_debug (OCDEB_TRC, &oc_dev, "oc_get_SWR : called\n");
 
 if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
@@ -705,8 +707,8 @@ for (x = 0; x < QUERY_SWR_BYTES; x++) {
     }
 
 sim_debug (OCDEB_SWR, &oc_dev,
-	"oc_get_SWR : swreg bytes = 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-	oc_ctl.S[0], oc_ctl.S[1], oc_ctl.S[2], oc_ctl.S[3], oc_ctl.S[4]);
+    "oc_get_SWR : swreg bytes = 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+    oc_ctl.S[0], oc_ctl.S[1], oc_ctl.S[2], oc_ctl.S[3], oc_ctl.S[4]);
 
 return 0;
 }
@@ -767,7 +769,7 @@ if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
 
 while (1) { if (oc_poll (oc_ldsc.serport, 1000) == (t_bool)TRUE) break; }
 if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
-	errno != EAGAIN && errno != EWOULDBLOCK)
+        errno != EAGAIN && errno != EWOULDBLOCK)
     return -1;
 
 sim_debug (OCDEB_SWR, &oc_dev, "oc_get_rotary : byte = 0x%02X\n", c);
@@ -788,9 +790,9 @@ return 0;
  */
 int oc_halt_status (void)
 {
-if (oc_ctl.HALT == 2) return(1);
+if (oc_ctl.HALT == 2)
+    return(1);
 return(0);
-//return oc_ctl.HALT;
 }
 
 /*
@@ -800,6 +802,9 @@ return(0);
  */
 void oc_set_port1 (uint8 flag, t_bool action)
 {
+if (!oc_ldsc.rcve)
+    return;
+
 if (!action)
     oc_ctl.PORT1 = (oc_ctl.PORT1 & (~flag));
 else
@@ -813,6 +818,9 @@ else
  */
 void oc_set_port2 (uint8 flag, t_bool action)
 {
+if (!oc_ldsc.rcve)
+    return;
+
 if (!action)
     oc_ctl.PORT2 = (oc_ctl.PORT2 & (~flag));
 else
@@ -838,14 +846,14 @@ A = oc_ctl.S[SWR_16_22_PORT] * 65536 +
 
 oc_ctl.inv_addr = FALSE;
 if (cpu_model == MOD_1145) {		/* I/O page is not out of address range */
-  A &= 0x0003FFFF; 		/* max 256Kb */
-  if (A >= MEMSIZE && !(A > 0x3DFFF && A < 0x3FFFF) )
-    oc_ctl.inv_addr = TRUE;	
-  }
+    A &= 0x0003FFFF; 		/* max 256Kb */
+    if (A >= MEMSIZE && !(A > 0x3DFFF && A < 0x3FFFF) )
+      oc_ctl.inv_addr = TRUE;	
+    }
 else {
-  A &= 0x003FFFFF;       	/* max 4Mb */
-  if (A >= MEMSIZE && !(A > 0x3FDFFF && A < 0x3FFFFF))
-    oc_ctl.inv_addr = TRUE;	
+    A &= 0x003FFFFF;       	/* max 4Mb */
+    if (A >= MEMSIZE && !(A > 0x3FDFFF && A < 0x3FFFFF))
+      oc_ctl.inv_addr = TRUE;	
     }
 
 return A;
@@ -859,6 +867,9 @@ return A;
  */
 uint16 oc_read_D ()
 {
+if (!oc_ldsc.rcve)
+    return 0;
+
 return (oc_ctl.S[SWR_08_15_PORT] * 256 + oc_ctl.S[SWR_00_07_PORT]);
 }
 
@@ -887,7 +898,7 @@ if (prompt)
     printf ("%s", sim_prompt); fflush(stdout);
 
 for (;;) {
-    oc_set_master (1);
+    oc_set_master (TRUE);
     if (oc_get_console (cptr) == TRUE) { /* poll console for data */
         printf ("%s", cptr);
         break;
@@ -929,7 +940,7 @@ if (*cptr == ';') {
     *cptr = 0;
     }
 
-oc_set_master (0);
+oc_set_master (FALSE);
 if (oc_ctl.HALT == 1)		/* no stray mode flag */
     stop_cpu = 1;
 
@@ -1009,47 +1020,47 @@ uint16 D;
 int r;
 
 if (cpu_model == MOD_1145) {
-  switch ((oc_ctl.S[INP3] >> 4) & DSPA_MASK) {
-    case DSPA_PROGPHY : A = oc_ctl.A[ADDR_PRGPA]&0x3FFFF;break;
-    case DSPA_CONSPHY : A = oc_ctl.A[ADDR_CONPA]&0x3FFFF;break;
-    case DSPA_KERNEL_D: A = oc_ctl.A[ADDR_KERND]&0xFFFF; break;
-    case DSPA_KERNEL_I: A = oc_ctl.A[ADDR_KERNI]&0xFFFF; break;
-    case DSPA_SUPER_D : A = oc_ctl.A[ADDR_SUPRD]&0xFFFF; break;
-    case DSPA_SUPER_I : A = oc_ctl.A[ADDR_SUPRI]&0xFFFF; break;
-    case DSPA_USER_D  : A = oc_ctl.A[ADDR_USERD]&0xFFFF; break;
-    case DSPA_USER_I  : A = oc_ctl.A[ADDR_USERI]&0xFFFF; break;
-    }
-  switch ((oc_ctl.S[INP3] >> 2) & DSPD_MASK) {
-    case DSPD_DATA_PATHS : D = oc_ctl.D[DISP_SHFR]; break;
-    case DSPD_BUS_REG    : D = oc_ctl.D[DISP_BR];   break;
-    case DSPD_MU_ADRS    : D = oc_ctl.D[DISP_FPP];  break;
-    case DSPD_DISP_REG   : D = oc_ctl.D[DISP_DR];   break;
-    }
-  }
+    switch ((oc_ctl.S[INP3] >> 4) & DSPA_MASK) {
+        case DSPA_PROGPHY : A = oc_ctl.A[ADDR_PRGPA]&0x3FFFF;break;
+        case DSPA_CONSPHY : A = oc_ctl.A[ADDR_CONPA]&0x3FFFF;break;
+        case DSPA_KERNEL_D: A = oc_ctl.A[ADDR_KERND]&0xFFFF; break;
+        case DSPA_KERNEL_I: A = oc_ctl.A[ADDR_KERNI]&0xFFFF; break;
+        case DSPA_SUPER_D : A = oc_ctl.A[ADDR_SUPRD]&0xFFFF; break;
+        case DSPA_SUPER_I : A = oc_ctl.A[ADDR_SUPRI]&0xFFFF; break;
+        case DSPA_USER_D  : A = oc_ctl.A[ADDR_USERD]&0xFFFF; break;
+        case DSPA_USER_I  : A = oc_ctl.A[ADDR_USERI]&0xFFFF; break;
+        }
+      switch ((oc_ctl.S[INP3] >> 2) & DSPD_MASK) {
+        case DSPD_DATA_PATHS : D = oc_ctl.D[DISP_SHFR]; break;
+        case DSPD_BUS_REG    : D = oc_ctl.D[DISP_BR];   break;
+        case DSPD_MU_ADRS    : D = oc_ctl.D[DISP_FPP];  break;
+        case DSPD_DISP_REG   : D = oc_ctl.D[DISP_DR];   break;
+        }
+      }
 else {
-  switch (oc_ctl.S[INP5] & DSPA_MASK) {
-    case DSPA_PROGPHY : A = oc_ctl.A[ADDR_PRGPA]&0x3FFFFF;break;
-    case DSPA_CONSPHY : A = oc_ctl.A[ADDR_CONPA]&0x3FFFFF;break;
-    case DSPA_KERNEL_D: A = oc_ctl.A[ADDR_KERND]&0xFFFF; break;
-    case DSPA_KERNEL_I: A = oc_ctl.A[ADDR_KERNI]&0xFFFF; break;
-    case DSPA_SUPER_D : A = oc_ctl.A[ADDR_SUPRD]&0xFFFF; break;
-    case DSPA_SUPER_I : A = oc_ctl.A[ADDR_SUPRI]&0xFFFF; break;
-    case DSPA_USER_D  : A = oc_ctl.A[ADDR_USERD]&0xFFFF; break;
-    case DSPA_USER_I  : A = oc_ctl.A[ADDR_USERI]&0xFFFF; break;
+    switch (oc_ctl.S[INP5] & DSPA_MASK) {
+        case DSPA_PROGPHY : A = oc_ctl.A[ADDR_PRGPA]&0x3FFFFF;break;
+        case DSPA_CONSPHY : A = oc_ctl.A[ADDR_CONPA]&0x3FFFFF;break;
+        case DSPA_KERNEL_D: A = oc_ctl.A[ADDR_KERND]&0xFFFF; break;
+        case DSPA_KERNEL_I: A = oc_ctl.A[ADDR_KERNI]&0xFFFF; break;
+        case DSPA_SUPER_D : A = oc_ctl.A[ADDR_SUPRD]&0xFFFF; break;
+        case DSPA_SUPER_I : A = oc_ctl.A[ADDR_SUPRI]&0xFFFF; break;
+        case DSPA_USER_D  : A = oc_ctl.A[ADDR_USERD]&0xFFFF; break;
+        case DSPA_USER_I  : A = oc_ctl.A[ADDR_USERI]&0xFFFF; break;
+        }
+      switch ((oc_ctl.S[INP5] >> 3) & DSPD_MASK) {
+        case DSPD_DATA_PATHS : D = oc_ctl.D[DISP_SHFR]; break;
+        case DSPD_BUS_REG    : D = oc_ctl.D[DISP_BR];   break;
+        case DSPD_MU_ADRS    : D = oc_ctl.D[DISP_FPP];  break;
+        case DSPD_DISP_REG   : D = oc_ctl.D[DISP_DR];   break;
+        }
     }
-  switch ((oc_ctl.S[INP5] >> 3) & DSPD_MASK) {
-    case DSPD_DATA_PATHS : D = oc_ctl.D[DISP_SHFR]; break;
-    case DSPD_BUS_REG    : D = oc_ctl.D[DISP_BR];   break;
-    case DSPD_MU_ADRS    : D = oc_ctl.D[DISP_FPP];  break;
-    case DSPD_DISP_REG   : D = oc_ctl.D[DISP_DR];   break;
-    }
-  }
 
 if (MMR0 & MMR0_MME) {
-  mask = 0x03;
-  if (MMR3 & MMR3_M22E)
-    mask = 0x3F;
-  }
+    mask = 0x03;
+    if (MMR3 & MMR3_M22E)
+        mask = 0x3F;
+    }
 
 cmd[0] = 'U';
 cmd[1] = (uint8)((A >> 16) & 0xFF); /* & mask */
@@ -1091,8 +1102,8 @@ if (sim_write_serial (oc_ldsc.serport, cmd, 3) != 3)
 void oc_set_master (t_bool flag)
 {
 if (cpu_model == MOD_1145) 
-  oc_set_port1 (FSTS_1145_MASTER, flag);
-else
+    oc_set_port1 (FSTS_1145_MASTER, flag);
+  else
   oc_set_port1 (FSTS_1170_MASTER, flag);
 }
 
@@ -1105,8 +1116,8 @@ void oc_set_mmu (void)
 {
 uint8 status, map = 16;
 
-if (cpu_model == MOD_1145)
-  return;
+if (!oc_ldsc.rcve || cpu_model == MOD_1145)
+    return;
 
 oc_set_port2 (FSTS_1170_16BIT, 0);
 oc_set_port2 (FSTS_1170_18BIT, 0);
@@ -1114,16 +1125,16 @@ oc_set_port2 (FSTS_1170_22BIT, 0);
 
 	/* determine mapping from current processor state */
 if (MMR0 & MMR0_MME) {
-  map = 18;
-  if (MMR3 & MMR3_M22E)
-    map = 22;
-  }
+    map = 18;
+    if (MMR3 & MMR3_M22E)
+      map = 22;
+    }
 
 switch (map) {
-  case 16 : oc_set_port2 (FSTS_1170_16BIT, 1); break;
-  case 18 : oc_set_port2 (FSTS_1170_18BIT, 1); break;
-  case 22 : oc_set_port2 (FSTS_1170_22BIT, 1); break;
-  }
+    case 16 : oc_set_port2 (FSTS_1170_16BIT, 1); break;
+    case 18 : oc_set_port2 (FSTS_1170_18BIT, 1); break;
+    case 22 : oc_set_port2 (FSTS_1170_22BIT, 1); break;
+    }
 }
 
 /*
@@ -1233,13 +1244,13 @@ if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1)
 void oc_wait (t_bool flag)
 {
 if (cpu_model == MOD_1145) {
-  oc_set_port1 (FSTS_1145_PAUSE, !flag);
-  oc_set_port1 (FSTS_1145_RUN, flag);
-  }
+    oc_set_port1 (FSTS_1145_PAUSE, !flag);
+    oc_set_port1 (FSTS_1145_RUN, flag);
+    }
 else {
-  oc_set_port1 (FSTS_1170_PAUSE, !flag);
-  oc_set_port1 (FSTS_1170_RUN, flag);
-  }
+    oc_set_port1 (FSTS_1170_PAUSE, !flag);
+    oc_set_port1 (FSTS_1170_RUN, flag);
+    }
 }
 
 /*
