@@ -4,7 +4,7 @@ gcc -o /simh/bin/console PDP11/console.c -I . -I ./PDP11
 #
 gcc -std=c99 -U__STRICT_ANSI__ -finline-functions -fgcse-after-reload \
  -fpredictive-commoning -fipa-cp-clone -fno-unsafe-loop-optimizations \
- -fno-strict-overflow -DSIM_GIT_COMMIT_ID=000000001 -I . -I /usr/include/pcap \
+ -fno-strict-overflow -DSIM_GIT_COMMIT_ID=00000001 -I . -I /usr/include/pcap \
  -DSIM_COMPILER="GCC Version: 4.4.6" -D_GNU_SOURCE -DHAVE_DLOPEN=so \
  -DHAVE_GLOB  -DOPCON -DUSE_NETWORK -DHAVE_PCAP_NETWORK \
  PDP11/pdp11_fp.c PDP11/pdp11_cpu.c PDP11/pdp11_dz.c PDP11/pdp11_cis.c \

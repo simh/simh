@@ -68,55 +68,41 @@ int oc_send_ADP(int oc_fd, oc_st *ocp)
   uint32 A;
   uint16 D;
 
-  switch (ocp->cpu_model) {
-    case MOD_1105 :
-		D = ocp->D[DISP_SHFR];
-		A = ocp->A[ADDR_PRGPA] & 0xFFFF; 
-		break;
-    case MOD_1120 :
-		D = ocp->D[DISP_SHFR];
-		A = ocp->A[ADDR_PRGPA] & 0xFFFF; 
-		break;
-    case MOD_1140 :
-		D = ocp->D[DISP_SHFR];
-		A = ocp->A[ADDR_PRGPA] & 0x3FFFF;
-		break;
-    case MOD_1145 : 
-		switch ((ocp->S[INP3] >> 4) & DSPA_MASK) {
-		    case DSPA_PROGPHY : A = ocp->A[ADDR_PRGPA]&0x3FFFF;break;
-		    case DSPA_CONSPHY : A = ocp->A[ADDR_CONPA]&0x3FFFF;break;
-		    case DSPA_KERNEL_D: A = ocp->A[ADDR_KERND]&0xFFFF; break;
-		    case DSPA_KERNEL_I: A = ocp->A[ADDR_KERNI]&0xFFFF; break;
-		    case DSPA_SUPER_D : A = ocp->A[ADDR_SUPRD]&0xFFFF; break;
-		    case DSPA_SUPER_I : A = ocp->A[ADDR_SUPRI]&0xFFFF; break;
-		    case DSPA_USER_D  : A = ocp->A[ADDR_USERD]&0xFFFF; break;
-		    case DSPA_USER_I  : A = ocp->A[ADDR_USERI]&0xFFFF; break;
-		    }
-		switch ((ocp->S[INP3] >> 2) & DSPD_MASK) {
-		    case DSPD_DATA_PATHS : D = ocp->D[DISP_SHFR]; break;
-		    case DSPD_BUS_REG    : D = ocp->D[DISP_BR];   break;
-		    case DSPD_MU_ADRS    : D = ocp->D[DISP_FPP];  break;
-		    case DSPD_DISP_REG   : D = ocp->D[DISP_DR];   break;
-		    }
-		break;
-    case MOD_1170 :
-		switch (ocp->S[INP5] & DSPA_MASK) {
-		    case DSPA_PROGPHY : A = ocp->A[ADDR_PRGPA]&0x3FFFFF;break;
-		    case DSPA_CONSPHY : A = ocp->A[ADDR_CONPA]&0x3FFFFF;break;
-		    case DSPA_KERNEL_D: A = ocp->A[ADDR_KERND]&0xFFFF; break;
-		    case DSPA_KERNEL_I: A = ocp->A[ADDR_KERNI]&0xFFFF; break;
-		    case DSPA_SUPER_D : A = ocp->A[ADDR_SUPRD]&0xFFFF; break;
-		    case DSPA_SUPER_I : A = ocp->A[ADDR_SUPRI]&0xFFFF; break;
-		    case DSPA_USER_D  : A = ocp->A[ADDR_USERD]&0xFFFF; break;
-		    case DSPA_USER_I  : A = ocp->A[ADDR_USERI]&0xFFFF; break;
-		    }
-		switch ((ocp->S[INP5] >> 3) & DSPD_MASK) {
-		    case DSPD_DATA_PATHS : D = ocp->D[DISP_SHFR]; break;
-		    case DSPD_BUS_REG    : D = ocp->D[DISP_BR];   break;
-		    case DSPD_MU_ADRS    : D = ocp->D[DISP_FPP];  break;
-		    case DSPD_DISP_REG   : D = ocp->D[DISP_DR];   break;
-		    }
-		break;
+  if (ocp->cpu_model == MOD_1145) {
+    switch ((ocp->S[INP3] >> 4) & DSPA_MASK) {
+      case DSPA_PROGPHY : A = ocp->A[ADDR_PRGPA]&0x3FFFF;break;
+      case DSPA_CONSPHY : A = ocp->A[ADDR_CONPA]&0x3FFFF;break;
+      case DSPA_KERNEL_D: A = ocp->A[ADDR_KERND]&0xFFFF; break;
+      case DSPA_KERNEL_I: A = ocp->A[ADDR_KERNI]&0xFFFF; break;
+      case DSPA_SUPER_D : A = ocp->A[ADDR_SUPRD]&0xFFFF; break;
+      case DSPA_SUPER_I : A = ocp->A[ADDR_SUPRI]&0xFFFF; break;
+      case DSPA_USER_D  : A = ocp->A[ADDR_USERD]&0xFFFF; break;
+      case DSPA_USER_I  : A = ocp->A[ADDR_USERI]&0xFFFF; break;
+      }
+    switch ((ocp->S[INP3] >> 2) & DSPD_MASK) {
+      case DSPD_DATA_PATHS : D = ocp->D[DISP_SHFR]; break;
+      case DSPD_BUS_REG    : D = ocp->D[DISP_BR];   break;
+      case DSPD_MU_ADRS    : D = ocp->D[DISP_FPP];  break;
+      case DSPD_DISP_REG   : D = ocp->D[DISP_DR];   break;
+      }
+    }
+  else {
+    switch (ocp->S[INP5] & DSPA_MASK) {
+      case DSPA_PROGPHY : A = ocp->A[ADDR_PRGPA]&0x3FFFFF;break;
+      case DSPA_CONSPHY : A = ocp->A[ADDR_CONPA]&0x3FFFFF;break;
+      case DSPA_KERNEL_D: A = ocp->A[ADDR_KERND]&0xFFFF; break;
+      case DSPA_KERNEL_I: A = ocp->A[ADDR_KERNI]&0xFFFF; break;
+      case DSPA_SUPER_D : A = ocp->A[ADDR_SUPRD]&0xFFFF; break;
+      case DSPA_SUPER_I : A = ocp->A[ADDR_SUPRI]&0xFFFF; break;
+      case DSPA_USER_D  : A = ocp->A[ADDR_USERD]&0xFFFF; break;
+      case DSPA_USER_I  : A = ocp->A[ADDR_USERI]&0xFFFF; break;
+      }
+    switch ((ocp->S[INP5] >> 3) & DSPD_MASK) {
+      case DSPD_DATA_PATHS : D = ocp->D[DISP_SHFR]; break;
+      case DSPD_BUS_REG    : D = ocp->D[DISP_BR];   break;
+      case DSPD_MU_ADRS    : D = ocp->D[DISP_FPP];  break;
+      case DSPD_DISP_REG   : D = ocp->D[DISP_DR];   break;
+      }
     }
 
   if (ocp->MMR0 & MMR0_MME) {

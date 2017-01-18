@@ -328,7 +328,7 @@ t_stat DR_wr (int32 data, int32 pa, int32 access)
 {
 DR = data;
 #ifdef OPCON
-oc_ctl.D[DISP_DR] = (uint16)DR;
+OC_DATA[DISP_DR] = (uint16)DR;
 #endif
 
 return SCPE_OK;
@@ -487,7 +487,7 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
 #ifdef OPCON
     case 014:
         ODD_IGN(data);
-        oc_ctl.D[DISP_FPP] = (uint16)(MBRK = data);
+        OC_DATA[DISP_FPP] = (uint16)(MBRK = data);
         return SCPE_OK;
 #endif
 
@@ -682,7 +682,7 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
         ODD_IGN (data);
         MBRK = data & MBRK70_WR;
 #ifdef OPCON
-        oc_ctl.D[DISP_FPP] = (uint16)(MBRK);
+        OC_DATA[DISP_FPP] = (uint16)(MBRK);
 #endif
         return SCPE_OK;
 
