@@ -146,6 +146,7 @@ t_stat sim_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 ticks);
 t_stat sim_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 ticks);
 double sim_timer_inst_per_sec (void);
 int32 sim_rtcn_tick_size (int32 tmr);
+int32 sim_rtcn_calibrated_tmr (void);
 t_bool sim_timer_idle_capable (uint32 *host_ms_sleep_1, uint32 *host_tick_ms);
 #define PRIORITY_BELOW_NORMAL  -1
 #define PRIORITY_NORMAL         0
