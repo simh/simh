@@ -10483,7 +10483,7 @@ if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
         sim_timespec_diff (&time_now, &time_now, &sim_deb_basetime);
     if (sim_deb_switches & SWMASK ('T')) {
         time_t tnow = (time_t)time_now.tv_sec;
-        struct tm *now = gmtime(&tnow);
+        struct tm *now = localtime(&tnow);
 
         sprintf(tim_t, "%02d:%02d:%02d.%03d ", now->tm_hour, now->tm_min, now->tm_sec, (int)(time_now.tv_nsec/1000000));
         }
