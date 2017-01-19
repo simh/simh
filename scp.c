@@ -9204,15 +9204,11 @@ return (((uptr->next) || AIO_IS_ACTIVE(uptr) || ((uptr->dynflags & UNIT_TMR_UNIT
         result =        absolute activation time + 1, 0 if inactive
 */
 
-int32 sim_activate_time (UNIT *uptr)
+int32 _sim_activate_time (UNIT *uptr)
 {
 UNIT *cptr;
 int32 accum;
 
-AIO_VALIDATE;
-accum = sim_timer_activate_time (uptr);
-if (accum >= 0)
-    return accum;
 accum = 0;
 for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {
@@ -9225,6 +9221,17 @@ for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
         return accum + 1 + (int32)((uptr->usecs_remaining * sim_timer_inst_per_sec ()) / 1000000.0);
     }
 return 0;
+}
+
+int32 sim_activate_time (UNIT *uptr)
+{
+int32 accum;
+
+AIO_VALIDATE;
+accum = _sim_timer_activate_time (uptr);
+if (accum >= 0)
+    return accum;
+return _sim_activate_time (uptr);
 }
 
 double sim_activate_time_usecs (UNIT *uptr)

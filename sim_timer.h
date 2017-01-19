@@ -134,7 +134,7 @@ void sim_stop_timer_services (void);
 t_stat sim_timer_change_asynch (void);
 t_stat sim_timer_activate (UNIT *uptr, int32 interval);
 t_stat sim_timer_activate_after (UNIT *uptr, double usec_delay);
-int32 sim_timer_activate_time (UNIT *uptr);
+int32 _sim_timer_activate_time (UNIT *uptr);
 double sim_timer_activate_time_usecs (UNIT *uptr);
 t_bool sim_timer_is_active (UNIT *uptr);
 t_bool sim_timer_cancel (UNIT *uptr);
