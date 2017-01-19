@@ -755,11 +755,11 @@ void iccs_wr (int32 val)
 {
 sim_debug_bits_hdr (TMR_DB_REG, &tmr_dev, "iccs_wr()", tmr_iccs_bits, tmr_iccs, val, TRUE);
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
-    sim_cancel (&tmr_unit);                             /* cancel timer */
     if (tmr_iccs & TMR_CSR_RUN) {                       /* run 1 -> 0? */
         tmr_icr = icr_rd ();                            /* update itr */
         sim_rtcn_calb (0, TMR_CLK);                     /* stop timer */
         }
+    sim_cancel (&tmr_unit);                             /* cancel timer */
     }
 if (val & CSR_DONE)                                     /* Interrupt Acked? */
     sim_rtcn_tick_ack (20, TMR_CLK);                    /* Let timers know */
