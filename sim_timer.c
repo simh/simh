@@ -1780,7 +1780,7 @@ return SCPE_OK;
 /* Clock assist activites */
 t_stat sim_timer_tick_svc (UNIT *uptr)
 {
-int tmr = (int)(uptr-sim_timer_units);
+int32 tmr = (int32)(uptr-sim_timer_units);
 t_stat stat;
 
 rtc_clock_ticks[tmr] += 1;
@@ -1798,6 +1798,8 @@ if (sim_clock_unit[tmr]->action == NULL)
     return SCPE_IERR;
 stat = sim_clock_unit[tmr]->action (sim_clock_unit[tmr]);
 --sim_cosched_interval[tmr];                    /* Countdown ticks */
+if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END)
+    sim_clock_cosched_queue[tmr]->time = sim_cosched_interval[tmr];
 if ((stat == SCPE_OK)                               && 
     (sim_cosched_interval[tmr] <= 0)                &&
     (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END)) {
@@ -1817,10 +1819,13 @@ if ((stat == SCPE_OK)                               &&
         cptr->next = NULL;
         cptr->cancel = NULL;
         cptr->time = 0;
-        if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END)
+        if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) {
+            sim_clock_cosched_queue[tmr]->time += sim_cosched_interval[tmr];
             sim_cosched_interval[tmr] = sim_clock_cosched_queue[tmr]->time;
+            }
         else
             sim_cosched_interval[tmr]  = 0;
+        cptr->time = 0;
         sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_tick_svc(tmr=%d) - coactivating %s", tmr, sim_uname (cptr));
         if (cptr->usecs_remaining) {
             sim_debug (DBG_QUE, &sim_timer_dev, " remnant: %.0f - next %s after cosched interval: %d ticks\n", cptr->usecs_remaining, (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) ? sim_uname (sim_clock_cosched_queue[tmr]) : "", sim_cosched_interval[tmr]);
@@ -2528,7 +2533,8 @@ else {
     UNIT *cptr, *prvptr;
     int32 accum;
 
-    sim_debug (DBG_QUE, &sim_timer_dev, "sim_clock_coschedule_tmr(%s, tmr=%d, ticks=%d, hz=%d) - queueing for clock co-schedule\n", sim_uname (uptr), tmr, ticks, rtc_hz[tmr]);
+    if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END)
+        sim_clock_cosched_queue[tmr]->time = sim_cosched_interval[tmr];
     prvptr = NULL;
     accum = 0;
     for (cptr = sim_clock_cosched_queue[tmr]; cptr != QUEUE_LIST_END; cptr = cptr->next) {
@@ -2549,7 +2555,9 @@ else {
     if (cptr != QUEUE_LIST_END)
         cptr->time = cptr->time - uptr->time;
     uptr->cancel = &_sim_coschedule_cancel;             /* bind cleanup method */
-    sim_cosched_interval[tmr] = sim_clock_cosched_queue[tmr]->time;
+    if (uptr == sim_clock_cosched_queue[tmr])
+        sim_cosched_interval[tmr] = sim_clock_cosched_queue[tmr]->time;
+    sim_debug (DBG_QUE, &sim_timer_dev, "sim_clock_coschedule_tmr(%s, tmr=%d, ticks=%d, hz=%d) - queueing for clock co-schedule, interval now: %d\n", sim_uname (uptr), tmr, ticks, rtc_hz[tmr], sim_cosched_interval[tmr]);
     }
 return SCPE_OK;
 }
