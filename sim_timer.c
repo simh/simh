@@ -2781,7 +2781,7 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     }
 
 if (!sim_is_active (uptr)) {
-    sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_activate_time_usecs(%s) - not active\n", sim_uname (uptr), result);
+    sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_activate_time_usecs(%s) - not active\n", sim_uname (uptr));
     return result;
     }
 #if defined(SIM_ASYNCH_CLOCKS)
