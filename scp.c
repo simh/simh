@@ -6569,10 +6569,15 @@ printf ("\n");
 if (unechoed_cmdline && (r >= SCPE_BASE) && (r != SCPE_STEP) && (r != SCPE_STOP) && (r != SCPE_EXPECT))
     sim_printf("%s> %s\n", do_position(), unechoed_cmdline);
 fprint_stopped (stdout, r);                         /* print msg */
-if (sim_log && (sim_log != stdout))                 /* log if enabled */
+if ((!sim_oline) && ((sim_log && (sim_log != stdout))))/* log if enabled */
     fprint_stopped (sim_log, r);
-if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))/* debug if enabled */
+if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log)) {/* debug if enabled */
+    TMLN *saved_oline = sim_oline;
+
+    sim_oline = NULL;                               /* avoid potential debug to active socket */
     fprint_stopped (sim_deb, r);
+    sim_oline = saved_oline;                        /* restore original socket */
+    }
 }
 
 /* Common setup for RUN or BOOT */
@@ -8801,19 +8806,25 @@ t_stat sim_print_val (t_value val, uint32 radix,
     uint32 width, uint32 format)
 {
 char dbuf[MAX_WIDTH + 1];
+t_stat stat = SCPE_OK;
 
 if (width > MAX_WIDTH)
     width = MAX_WIDTH;
 sprint_val (dbuf, val, radix, width, format);
 if (fputs (dbuf, stdout) == EOF)
-    return SCPE_IOERR;
-if (sim_log && (sim_log != stdout))
+    stat = SCPE_IOERR;
+if ((!sim_oline) && ((sim_log && (sim_log != stdout))))
     if (fputs (dbuf, sim_log) == EOF)
-        return SCPE_IOERR;
-if (sim_deb && (sim_deb != stdout))
+        stat = SCPE_IOERR;
+if (sim_deb && (sim_deb != stdout)) {
+    TMLN *saved_oline = sim_oline;
+
+    sim_oline = NULL;                               /* avoid potential debug to active socket */
     if (fputs (dbuf, sim_deb) == EOF)
-        return SCPE_IOERR;
-return SCPE_OK;
+        stat = SCPE_IOERR;
+    sim_oline = saved_oline;                        /* restore original socket */
+    }
+return stat;
 }
 
 const char *sim_fmt_secs (double seconds)
@@ -10631,8 +10642,8 @@ else
     fprintf (stdout, "%s", buf);
 if ((!sim_oline) && (sim_log && (sim_log != stdout)))
     fprintf (sim_log, "%s", buf);
-if ((!sim_oline) && (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log)))
-    fprintf (sim_deb, "%s", buf);
+if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
+    fwrite (buf, 1, strlen (buf), sim_deb);
 
 if (buf != stackbuf)
     free (buf);
@@ -10686,8 +10697,13 @@ if (sim_do_ocptr[sim_do_depth]) {
     if (!sim_do_echo && !sim_quiet && !inhibit_message)
         sim_printf("%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
     else {
-        if (sim_deb)                        /* Always put context in debug output */
+        if (sim_deb) {                      /* Always put context in debug output */
+            TMLN *saved_oline = sim_oline;
+
+            sim_oline = NULL;               /* avoid potential debug to active socket */
             fprintf (sim_deb, "%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
+            sim_oline = saved_oline;        /* restore original socket */
+            }
         }
     }
 if (sim_is_running && !inhibit_message) {
@@ -10708,8 +10724,14 @@ else {
     }
 if ((!sim_oline) && (sim_log && (sim_log != stdout) && !inhibit_message))
     fprintf (sim_log, "%s", buf);
-if ((!sim_oline) && (sim_deb && (((sim_deb != stdout) && (sim_deb != sim_log)) || inhibit_message)))/* Always display messages in debug output */
+/* Always display messages in debug output */
+if (sim_deb && (((sim_deb != stdout) && (sim_deb != sim_log)) || inhibit_message)) {
+    TMLN *saved_oline = sim_oline;
+
+    sim_oline = NULL;                           /* avoid potential debug to active socket */
     fprintf (sim_deb, "%s", buf);
+    sim_oline = saved_oline;                    /* restore original socket */
+    }
 
 if (buf != stackbuf)
     free (buf);
@@ -10775,10 +10797,10 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
         if ('\n' == buf[i]) {
             if (i >= j) {
                 if ((i != j) || (i == 0)) {
-                    if (debug_unterm)
-                        fprintf (sim_deb, "%.*s\r\n", i-j, &buf[j]);
-                    else                                /* print prefix when required */
-                        fprintf (sim_deb, "%s%.*s\r\n", debug_prefix, i-j, &buf[j]);
+                    if (!debug_unterm)                  /* print prefix when required */
+                        fwrite (debug_prefix, 1, strlen (debug_prefix), sim_deb);
+                    fwrite (&buf[j], 1, i-j, sim_deb);
+                    fwrite ("\r\n", 1, 2, sim_deb);
                     }
                 debug_unterm = 0;
                 }
@@ -10786,10 +10808,9 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
             }
         }
     if (i > j) {
-        if (debug_unterm)
-            fprintf (sim_deb, "%.*s", i-j, &buf[j]);
-        else                                        /* print prefix when required */
-            fprintf (sim_deb, "%s%.*s", debug_prefix, i-j, &buf[j]);
+        if (!debug_unterm)                          /* print prefix when required */
+            fwrite (debug_prefix, 1, strlen (debug_prefix), sim_deb);
+        fwrite (&buf[j], 1, i-j, sim_deb);
         }
 
 /* Set unterminated flag for next time */
