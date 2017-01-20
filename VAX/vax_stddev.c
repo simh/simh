@@ -542,18 +542,21 @@ else {                                                  /* Not-Attached means */
     uint32 base;                                        /* behave like simh VMS default */
     time_t curr;
     struct tm *ctm;
+    struct timespec now;
 
-    curr = time (NULL);                                 /* get curr time */
+    sim_rtcn_get_time(&now, TMR_CLK);                   /* get curr time */
+    curr = (time_t)now.tv_sec;
     if (curr == (time_t) -1)                            /* error? */
         return SCPE_NOFNC;
     ctm = localtime (&curr);                            /* decompose */
     if (ctm == NULL)                                    /* error? */
         return SCPE_NOFNC;
     base = (((((ctm->tm_yday * 24) +                    /* sec since 1-Jan */
-               ctm->tm_hour) * 60) +
-             ctm->tm_min) * 60) +
-           ctm->tm_sec;
-    todr_wr ((base * 100) + 0x10000000);                /* use VMS form */
+            ctm->tm_hour) * 60) +
+            ctm->tm_min) * 60) +
+            ctm->tm_sec;
+    todr_wr ((base * 100) + 0x10000000 +                /* use VMS form */
+             (int32)(now.tv_nsec / 10000000));
     }
 return SCPE_OK;
 }

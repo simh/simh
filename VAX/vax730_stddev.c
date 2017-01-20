@@ -305,12 +305,19 @@ REG clk_reg[] = {
     { NULL }
     };
 
+#define TMR_DB_TODR     0x10    /* TODR */
+
+DEBTAB todr_deb[] = {
+    { "TODR",  TMR_DB_TODR,     "TODR activities"},
+    { NULL, 0 }
+    };
+
 DEVICE clk_dev = {
     "TODR", &clk_unit, clk_reg, NULL,
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    NULL, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL, 
+    NULL, DEV_DEBUG, 0, todr_deb, NULL, NULL, &clk_help, NULL, NULL, 
     &clk_description
     };
 
@@ -330,14 +337,12 @@ REG tmr_reg[] = {
 #define TMR_DB_TICK     0x02    /* Ticks */
 #define TMR_DB_SCHED    0x04    /* Scheduling */
 #define TMR_DB_INT      0x08    /* Interrupts */
-#define TMR_DB_TODR     0x10    /* TODR */
 
 DEBTAB tmr_deb[] = {
     { "REG",   TMR_DB_REG,      "Register Access"},
     { "TICK",  TMR_DB_TICK,     "Ticks"},
     { "SCHED", TMR_DB_SCHED,    "Scheduling"},
     { "INT",   TMR_DB_INT,      "Interrupts"},
-    { "TODR",  TMR_DB_TODR,     "TODR activities"},
     { NULL, 0 }
     };
 
@@ -922,7 +927,7 @@ sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
 base.tv_sec = toy->toy_gmtbase;
 base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
 sim_timespec_diff (&val, &now, &base);
-sim_debug (TMR_DB_TODR, &tmr_dev, "todr_rd() - TODR=0x%X - %s\n", (int32)(val.tv_sec*100 + val.tv_nsec/10000000), todr_fmt_vms_todr ((int32)(val.tv_sec*100 + val.tv_nsec/10000000)));
+sim_debug (TMR_DB_TODR, &clk_dev, "todr_rd() - TODR=0x%X - %s\n", (int32)(val.tv_sec*100 + val.tv_nsec/10000000), todr_fmt_vms_todr ((int32)(val.tv_sec*100 + val.tv_nsec/10000000)));
 return (int32)(val.tv_sec*100 + val.tv_nsec/10000000);  /* 100hz Clock Ticks */
 }
 
@@ -942,7 +947,7 @@ sim_timespec_diff (&base, &now, &val);                  /* base = now - data */
 toy->toy_gmtbase = (uint32)base.tv_sec;
 tbase = (time_t)base.tv_sec;
 toy->toy_gmtbasemsec = base.tv_nsec/1000000;
-sim_debug (TMR_DB_TODR, &tmr_dev, "todr_wr(0x%X) - %s - GMTBASE=%8.8s.%03d\n", data, todr_fmt_vms_todr (data), 11+ctime(&tbase), (int)(base.tv_nsec/1000000));
+sim_debug (TMR_DB_TODR, &clk_dev, "todr_wr(0x%X) - %s - GMTBASE=%8.8s.%03d\n", data, todr_fmt_vms_todr (data), 11+ctime(&tbase), (int)(base.tv_nsec/1000000));
 }
 
 t_stat todr_resync (void)
