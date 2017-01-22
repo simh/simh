@@ -31,10 +31,7 @@
 #include "sim_defs.h"		        /* simulator defns */
 
 #define IPC     0
-
-/* set the base for the zx-200a disk controller */
-#define ZX200A_BASE_DD  0x78
-#define ZX200A_BASE_SD  0x88
+#define SET_XACK(VAL)       (xack = VAL)
 
 /* set the base for the DBB ports */
 #define DBB_BASE        0xC0
@@ -64,10 +61,32 @@
 /* set the base and size for the EPROM on the MDS 225 */
 #define ROM_BASE        0x0000
 #define ROM_SIZE        0x1000
+#define ROM_DISABLE     1
 
 /* set the base and size for the RAM on the MDS 225 */
 #define RAM_BASE        0x0000
 #define RAM_SIZE        0xF800
+
+//board definitions for the multibus
+/* set the base I/O address for the iSBC 201 */
+#define	SBC201_BASE	0x88
+#define SBC201_INT      INT_1
+#define SBC201_NUM      0
+
+/* set the base I/O address for the iSBC 202 */
+#define	SBC202_BASE	0x78
+#define SBC202_INT      INT_1
+#define SBC202_NUM      1
+
+/* set the base I/O address for the iSBC 208 */
+#define	SBC208_BASE	0x40
+#define SBC208_INT      INT_1
+#define SBC208_NUM      0
+
+/* set the base for the zx-200a disk controller */
+#define ZX200A_BASE_DD  0x78
+#define ZX200A_BASE_SD  0x88
+#define ZX200A_NUM      0
 
 /* set INTR for CPU */
 #define INTR            INT_1

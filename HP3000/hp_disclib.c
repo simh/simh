@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion from "hp_disclib.h"
    03-Aug-16    JDB     "fmt_bitset" now allows multiple concurrent calls
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
@@ -372,21 +373,22 @@
 
 #include <math.h>
 
+#include "hp3000_defs.h"                        /* this must reflect the machine used */
 #include "hp_disclib.h"
 
 
 
 /* Program constants */
 
-#define CNTLR_UNIT          (DL_MAXDRIVE + 1)           /* controller unit number */
-#define MAX_UNIT            10                          /* last legal unit number */
+#define CNTLR_UNIT          (DL_MAXDRIVE + 1)   /* controller unit number */
+#define MAX_UNIT            10                  /* last legal unit number */
 
-#define WORDS_PER_SECTOR    128                         /* data words per sector */
+#define WORDS_PER_SECTOR    128                 /* data words per sector */
 
-#define UNTALK_DELAY        160                         /* ICD untalk delay (constant instruction count) */
-#define CNTLR_TIMEOUT       S (1.74)                    /* command and parameter wait timeout (1.74 seconds) */
+#define UNTALK_DELAY        160                 /* ICD untalk delay (constant instruction count) */
+#define CNTLR_TIMEOUT       S (1.74)            /* command and parameter wait timeout (1.74 seconds) */
 
-#define NO_EVENT            -1                          /* do not schedule an event */
+#define NO_EVENT            -1                  /* do not schedule an event */
 
 #define NO_ACTION           (CNTLR_IFN_IBUS) (NO_FUNCTIONS | NO_DATA)
 
@@ -404,9 +406,9 @@
 /* Controller clear types */
 
 typedef enum {
-    Hard_Clear,                                         /* power-on/preset hard clear */
-    Timeout_Clear,                                      /* command or parameter timeout clear */
-    Soft_Clear                                          /* programmed soft clear */
+    Hard_Clear,                                 /* power-on/preset hard clear */
+    Timeout_Clear,                              /* command or parameter timeout clear */
+    Soft_Clear                                  /* programmed soft clear */
     } CNTLR_CLEAR;
 
 

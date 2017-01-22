@@ -76,13 +76,14 @@
         07FH - Write - Reset diskette system.
 
     Operations:
-        Recalibrate -
-        Seek -
-        Format Track -
-        Write Data -
-        Write Deleted Data -
-        Read Data -
-        Verify CRC -
+        NOP - 0x00
+        Seek - 0x01
+        Format Track - 0x02
+        Recalibrate - 0x03
+        Read Data - 0x04
+        Verify CRC - 0x05
+        Write Data - 0x06
+        Write Deleted Data - 0x07
 
     IOPB - I/O Parameter Block
         Byte 0 - Channel Word
@@ -303,21 +304,21 @@ DEVICE isbc201_dev = {
 
 t_stat isbc201_reset(DEVICE *dptr, uint16 base)
 {
-    sim_printf("Initializing iSBC-201 FDC Board\n");
+    sim_printf("      iSBC-201 FDC Board");
     if (SBC201_NUM) {
-        sim_printf("   isbc201-%d: Hardware Reset\n", isbc201_fdcnum);
-        sim_printf("   isbc201-%d: Registered at %04X\n", isbc201_fdcnum, base);
+        sim_printf(" - Found\n");
+        sim_printf("         isbc201-%d: Hardware Reset\n", isbc201_fdcnum);
+        sim_printf("         isbc201-%d: Registered at %04X\n", isbc201_fdcnum, base);
         fdc201[isbc201_fdcnum].baseport = base;
         reg_dev(isbc2010, base, isbc201_fdcnum);         //read status
         reg_dev(isbc2011, base + 1, isbc201_fdcnum);     //read rslt type/write IOPB addr-l
         reg_dev(isbc2012, base + 2, isbc201_fdcnum);     //write IOPB addr-h and start 
         reg_dev(isbc2013, base + 3, isbc201_fdcnum);     //read rstl byte 
-        reg_dev(isbc2017 , base + 7, isbc201_fdcnum);     //write reset isbc202
+        reg_dev(isbc2017, base + 7, isbc201_fdcnum);     //write reset isbc202
         isbc201_reset1(isbc201_fdcnum);
         isbc201_fdcnum++;
-    } else {
-        sim_printf("   No isbc201 installed\n");
-    }
+    } else
+        sim_printf(" - Not Found\n");
     return SCPE_OK;
 }
 
@@ -328,7 +329,7 @@ void isbc201_reset1(uint8 fdcnum)
     int32 i;
     UNIT *uptr;
 
-    sim_printf("   isbc201-%d: Software Reset\n", fdcnum);
+    sim_printf("         isbc201-%d: Software Reset\n", fdcnum);
     fdc201[fdcnum].stat = 0;            //clear status
     for (i = 0; i < FDD_NUM; i++) {     /* handle all units */
         uptr = isbc201_dev.units + i;
@@ -339,7 +340,7 @@ void isbc201_reset1(uint8 fdcnum)
             uptr->u5 = fdcnum;          //fdc device number
             uptr->u6 = i;               //fdd unit number
             uptr->flags |= UNIT_WPMODE; /* set WP in unit flags */
-            sim_printf("   isbc201-%d: Configured, Status=%02X Not attached\n", i, fdc201[fdcnum].stat);
+            sim_printf("         isbc201-%d: Configured, Status=%02X Not attached\n", i, fdc201[fdcnum].stat);
         } else {
             switch(i){
                 case 0:
@@ -351,7 +352,7 @@ void isbc201_reset1(uint8 fdcnum)
                     fdc201[fdcnum].rbyte1 |= RB1RD1;
                     break;
             }
-            sim_printf("   isbc201-%d: Configured, Status=%02X Attached to %s\n",
+            sim_printf("         isbc201-%d: Configured, Status=%02X Attached to %s\n",
                 i, fdc201[fdcnum].stat, uptr->filename);
         }
     }
@@ -517,13 +518,16 @@ uint8 isbc2013(t_bool io, uint8 data)
             switch(fdc201[fdcnum].rtype) {
                 case 0x00:
                     rslt = fdc201[fdcnum].rbyte0;
+                    fdc201[fdcnum].rtype = 0x02; //reset error
                     break;
                 case 0x02:
                     rslt = fdc201[fdcnum].rbyte1;
+                    fdc201[fdcnum].rtype = 0x00; //set error
                     break;
             }
             if (DEBUG)
-                sim_printf("\n   isbc201-%d: returned result byte=%02X", fdcnum, rslt);
+                sim_printf("\n   isbc201-%d: 0x7B returned rtype=%02X result byte=%02X",
+                    fdcnum, fdc201[fdcnum].rtype, rslt);
             return rslt;
         } else {                        /* write data port */
             ; //stop diskette operation
@@ -598,6 +602,7 @@ void isbc201_diskio(uint8 fdcnum)
     }
     //check for address error
     if (
+        ((di & 0x07) != 0x03) ||
         (sa > fdc201[fdcnum].fdd[fddnum].maxsec) ||
         ((sa + nr) > (fdc201[fdcnum].fdd[fddnum].maxsec + 1)) ||
         (sa == 0) ||

@@ -1799,13 +1799,12 @@ t_stat fast_clk (UNIT * this)
 
     GRP |= GRP_TIMER;
 
-    if ((counter & 15) == 0) {
+    if ((counter & 3) == 0) {
         /*
          * The OS used the (undocumented, later addition)
          * slow clock interrupt to initiate servicing
-         * terminal I/O. Its frequency was reportedly 16 Hz;
-         * 64 ms is a good enough approximation. It can be sped up
-         * for faster console response (16 ms might be a good choice).
+         * terminal I/O. Its frequency was reportedly about 50-60 Hz;
+         * 16 ms is a good enough approximation.
          */
         GRP |= GRP_SLOW_CLK;
     }

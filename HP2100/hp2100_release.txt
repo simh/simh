@@ -1,0 +1,334 @@
+                           SIMH/HP 2100 RELEASE NOTES
+                           ==========================
+                             Last update: 2017-01-11
+
+
+This file documents the release history of the simulator for the Hewlett-Packard
+2114, 2115, 2116, 2100, 1000-M, 1000-E, and 1000-F machines.
+
+The SIMH project does not issue discrete releases.  Instead, the current
+simulator code base is available at:
+
+  https://github.com/simh/simh
+
+...and may be downloaded at any time.  A code snapshot is identified by the "git
+commit ID" that is displayed by the simulator welcome banner.
+
+Therefore, HP 2100 releases are simply documentation checkpoints that describe
+the changes that have occurred since the last checkpoint.  Generally, a release
+is written when one or more major changes have been incorporated.  Minor bug
+fixes will be available immediately from the repository but only noted as part
+of the next release document.
+
+
+
+===================
+General Information
+===================
+
+The simulator passes the HP 24396 offline diagnostic suite with some expected
+failures due to unimplemented features.  For example, the disc diagnostic
+error-correction logic tests and the tape diagnostic CRCC and LRCC tests fail,
+as these features are not supported.  However, all features that are required
+for operation of the supported HP operating systems pass their respective
+diagnostic tests.  See the accompanying "hp2100_diag.txt" file for details.
+
+The simulator has been tested with the following operating systems:
+
+ - 2000E, 2000F, and 2000/Access Time-Shared BASIC.
+
+ - DOS, DOS-M, and DOS-III.
+
+ - RTE-II, RTE-III, RTE-IVB, and RTE-6/VM.
+
+The user's manual for the simulator is provided in Microsoft Word format in the
+"doc" subdirectory of the code base snapshot downloaded from the github site.  A
+PDF version of the same manual is available at:
+
+  http://alum.mit.edu/www/jdbryan/hp2100_doc.pdf
+
+
+------------------
+Available Software
+------------------
+
+A preconfigured RTE-6/VM disc image containing the operating system, the MACRO
+assembler and Fortran 77 compiler, a selection of tape backup and restore
+programs (READT/WRITT, READR/SAVER, FC, TF, and FST), an example programs
+(/KENC/HELLO.FTN), and the Mystery Mansion game (MMM) is available from
+Bitsavers at:
+
+  http://www.bitsavers.org/bits/HP/tapes/rte-6vm/rte6200/
+
+The archive contains instructions and simulator command files that allow
+ready-to-run operation.
+
+The Computer History Museum has graciously arranged with HP to offer the HP 1000
+Software Collection with a sublicense for non-commercial use by private
+individuals.  The Collection is hosted by Bitsavers at:
+
+  http://www.bitsavers.org/bits/HP/HP_1000_software_collection/
+
+A preconfigured RTE-IVB disc image containing the operating system, the ASMB
+assembler and FORTRAN IV compiler, and the READR/SAVER and FC tape backup and
+restore programs is available from the HP Computer Museum at:
+
+  http://www.hpmuseum.net/display_item.php?sw=565
+
+The archive contains instructions and a simulator command file.
+
+QCTerm, an HP 700 terminal emulator for Microsoft Windows, is available from the
+HP Computer Museum at:
+
+  http://www.hpmuseum.net/display_item.php?sw=585
+
+Use of an HP terminal via a serial port or terminal emulator via Telnet enables
+more advanced screen editing features of the RTE operating systems.
+
+Manuals describing the operation of HP software are available from Bitsavers at:
+
+  http://www.bitsavers.org/pdf/hp/1000/
+  http://www.bitsavers.org/pdf/hp/2000TSB/
+  http://www.bitsavers.org/pdf/hp/21xx/
+
+...and from the HP Computer Museum at:
+
+  http://www.hpmuseum.net/collection_document.php
+
+
+----------------
+Year 2000 Issues
+----------------
+
+RTE-6/VM Revision 6200 is Y2K compliant, except for the READR and SAVER
+programs.  The errors are cosmetic only.
+
+RTE-IVB Revision 5010 is not Y2K compliant.  All of the failures are in
+subsystems; the operating itself (time-of-day clock) accommodates dates through
+2059.  All of the errors are cosmetic.  Typically, punctuation characters appear
+in the years, e.g., "19:0" for 2000.  The RTE-IVB software kit from the HP
+Computer Museum includes fixes for the affected modules to bring the system into
+compliance.
+
+All other HP operating systems are not Y2K compliant.
+
+
+-----------------------------
+Bugs in RTE-IVB Revision 5010
+-----------------------------
+
+Testing during simulator development revealed the presence of a bug in RTE-IVB
+Revision 5010:
+
+ - The $BALC module in the system library has a bug that causes memory
+   corruption.  This module is used by the ACCTS program and manifests itself by
+   printing gibberish after the "PLEASE LOG ON:" prompt.
+
+   Specifically, the internal MXEV routine performs a cross-store indirect via a
+   location in Table Area II (XSA $MAXI+0,I).  This fails because the indirect
+   chain is resolved in the user map, but TA II is not in the user map of
+   large-background programs, such as ACCTS.  Therefore, the location in the
+   user map corresponding to $MAXI in the system map is used as the pointer to
+   the location to store.
+
+   A corrected version of $BALC is present on cartridge GF of the disc image
+   supplied with the RTE-IVB software kit at the HP Computer Museum.
+
+
+
+======================
+Release 25, 2017-01-11
+======================
+
+This is the initial checkpoint release of the HP 2100 simulator, corresponding
+to the 25th set of changes to the 4.0 code base.  The following devices are
+currently simulated:
+
+  - 2114C CPU with up to 16 KW of memory
+  - 2115A CPU with up to 8 KW of memory
+  - 2116C CPU with up to 32 KW of memory
+  - 2100A CPU with up to 32 KW of memory
+  - 1000 M/E/F-Series CPU with up to 1024 KW of memory
+  - EAU, FP, IOP, DMS, FFP, DBI, VIS, and SIGNAL microcode extensions
+  - RTE-IV EMA or RTE-6/VM OS and VMA microcode extensions
+  - 12531C Buffered Teleprinter Interface with one 2752 Teleprinter
+  - 12539C Time Base Generator
+  - 12557A Disc Controller with four 2870 drives
+  - 12559C Magnetic Tape Controller with one 3030 drive
+  - 12565A Disc Controller with two 2883 drives
+  - 12566B Microcircuit Interface with a loopback connector
+  - 12578A Direct Memory Access Controller
+  - 12581A Memory Protect
+  - 12597A Duplex Register Interface with one 2748 Paper Tape Reader
+  - 12597A Duplex Register Interface with one 2895 Paper Tape Punch
+  - 12606B Fixed Head Disc Controller with one 2770/2771 drive
+  - 12607B Direct Memory Access Controller
+  - 12610B Drum Controller with one 2773/2774/2775 drive
+  - 12620A Privileged Interrupt Fence
+  - 12653A Printer Controller with one 2767 Line Printer
+  - 12792C 8-Channel Asynchronous Multiplexer
+  - 12821A Disc Interface with four 7906H/7920H/7925H drives
+  - 12845B Printer Controller with one 2607 Line Printer
+  - 12875A Interprocessor Link
+  - 12892B Memory Protect
+  - 12895A Direct Memory Access Controller
+  - 12897B Dual-Channel Port Controller
+  - 12920A 16-Channel Terminal Multiplexer
+  - 12936A Privileged Interrupt Fence
+  - 12966A Buffered Asynchronous Communications Interface
+  - 13037D Disc Controller with eight 7905/7906/7920/7925 drives
+  - 13181A Magnetic Tape Controller with four 7970B drives
+  - 13183A Magnetic Tape Controller with four 7970E drives
+  - 13210A Disc Controller with four 7900 drives
+
+The "HP 2100 Simulator User's Guide" manual describes the configuration and
+operation of each of these devices in detail.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - New bug fixes will now be listed in this file under the associated release
+   rather than in their previous location (hp2100_bugfixes.txt).
+
+ - Starting with the next release, the LOAD command will restrict its operation
+   to the addresses occupied by the bootstrap loaders, i.e., the last 64
+   locations in memory (up to 32K), unless forced by the addition of the "-F"
+   switch.  The LOAD command is not designed for general loading of absolute
+   binary files, as it does not initialize the A and B registers as some HP
+   software expects.  It is intended only to install bootstrap loaders.  The
+   BOOT PTR command is the proper simulation of the hardware absolute paper tape
+   loader.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  DPC device documentation uses the wrong disc drive model number.
+
+     VERSION:  Release 24.
+
+     OBSERVATION:  The comments in the hp2100_dpc.c source file and Section 2 of
+     the "HP2100 Simulator User's Guide" say that the DPC device supports the
+     2871 disc drive, while Section 2.6.1 of the User's Guide says that the
+     support is for the 2781 disc drive.  Neither of these model numbers is
+     correct.
+
+     Contemporaneous literature (e.g., the "2116B Computer Price List," dated
+     June 1970) states that the disc memory subsystem consists of the HP 2870A
+     Moving Head Disc, HP 2871A Disc Controller, HP 2881A Power Supply, and HP
+     2882A Cabinet.
+
+     CAUSE:  The controller model number is used instead of the drive model
+     number, while the "2781" number is a transposition of "2871."
+
+     RESOLUTION:  Modify the initial comments in the DPC device source file
+     (hp2100_dpc.c) and modify the sections of the HP2100 Simulator User's Guide
+     to use the correct disc drive model number (2870).
+
+     STATUS:  Fixed in Release 25.
+
+
+  2. PROBLEM:  The BOOT DRC command does not execute correctly.
+
+     VERSION:  Release 24.
+
+     OBSERVATION:  Attempting to boot DOS from a fixed-head disc or drum does
+     not work.  The CPU sits in a loop waiting for DMA to finish, but it never
+     does.
+
+     CAUSE:  The DMA control word in the DR device bootstrap is not configured
+     during BOOT DRC processing, so DMA is communicating with the wrong device.
+
+     RESOLUTION:  Modify "drc_boot" (hp2100_dr.c) to set the fixed disc/drum
+     select code into the DMA control word before returning.
+
+     STATUS:  Fixed in Release 25.
+
+
+  3. PROBLEM:  The valid command "DEPOSIT 2000 JMP 2001" is rejected.
+
+     VERSION:  Release 24.
+
+     OBSERVATION:  Regarding symbolic input, the HP2100 User's Manual says that
+     the "C" and "Z" flags, signifying a current-page or zero-page reference,
+     respectively, are not needed "...when entering [memory reference]
+     instructions into CPU memory; the simulator figures out from the target
+     address what mode to use."  While the valid command "DEPOSIT 1000 JMP 1001"
+     correctly enters a zero-page jump into memory, the valid command "DEPOSIT
+     2000 JMP 2001" does not enter a current-page jump.  Instead, an "Invalid
+     argument" error occurs.
+
+     CAUSE:  The "parse_sym" routine looks for the optional "C" or "Z" flag when
+     parsing memory reference instructions and sets a flag if either is
+     specified.  The test for a current-page reference is performed only if the
+     reference type was not explicitly specified.  However, the sense of the
+     test is reversed.
+
+     RESOLUTION:  Modify "parse_sym" (hp2100_sys.c) to correct the test for C/Z
+     option specification.
+
+     STATUS:  Fixed in Release 25.
+
+
+  4. PROBLEM:  The invalid command "DEPOSIT 2000 JMP C 2001" is accepted.
+
+     VERSION:  Release 24.
+
+     OBSERVATION:  Regarding symbolic input, the HP2100 User's Manual says that
+     "The address is an octal number in the range 0 - 77777; if C or Z is
+     specified, the address is a page offset in the range 0 - 1777."  However,
+     specifying a page offset > 1777 is accepted without complaint if it is
+     within the current page range.
+
+     CAUSE:  Error checking for memory reference instruction entry is
+     incomplete.
+
+     RESOLUTION:  Modify "parse_sym" (hp2100_sys.c) to ensure that the range
+     check is enforced if either C or Z is specified.
+
+     STATUS:  Fixed in Release 25.
+
+
+  5. PROBLEM:  Punched output does not appear on TTY devices lacking a paper
+     tape punch.
+
+     VERSION:  Release 24.
+
+     OBSERVATION:  Running the HP contributed library program "HP 2000F BASIC
+     for DOS-M/DOS III" does not produce any console output when using terminal
+     driver DVR00 as required by the program.  When using alternate terminal
+     driver DVR05, console output appears but console input does not work
+     properly.
+
+     CAUSE:  DOS-M and DOS-III support two modes of console I/O: ASCII mode and
+     binary mode.  ASCII mode appends carriage-return/line-feed characters on
+     output and strips them on input.  Binary mode sends and receives bytes
+     exactly as supplied.
+
+     DVR00 is required because DVR05 does not support the binary I/O mode
+     required by the program.  However, DVR00 assumes that a binary write is to
+     be directed to the console's paper tape punch rather than the console
+     printer and therefore sets the TTY interface's "punch flip-flop" instead of
+     the "print flip-flop" to accompany the text output.  The simulation of the
+     HP 12531 interface card associated with the TTY device discards output if
+     the punch flip-flop is set and the punch unit (TTY2) is not attached.
+
+     The problem occurs because only a connected HP 2754 teleprinter (a modified
+     Teletype ASR35) reacts to the print and punch flip-flop signals.  All other
+     supported terminal devices ignore the signals and print whatever output is
+     supplied (an HP 2752 -- a rebadged ASR33 -- has a manual control for the
+     punch, but the punch and printer operate together when the punch is on).
+     The 2000F BASIC program apparently was designed for use with one of these
+     other terminals, which print normally even though only the punch flip-flop
+     is set.
+
+     RESOLUTION:  Modify "tto_out" (hp2100_stddev.c) to honor the print and
+     punch flip-flop settings and separate the output as directed only if the
+     console punch unit is attached (simulating an HP 2754).  When the unit is
+     detached, all output is delivered to the console printer, regardless of the
+     flip-flop settings (simulating all other console devices).
+
+     STATUS:  Fixed in Release 25.

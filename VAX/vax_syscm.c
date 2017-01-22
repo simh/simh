@@ -201,11 +201,6 @@ static const char r50_to_asc[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ$._0123456789";
         count   =       -number of extra words retired
 */
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 int32 fprint_spec (FILE *of, t_addr addr, int32 spec, int32 nval)
 {
 int32 reg, mode;

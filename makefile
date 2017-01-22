@@ -756,10 +756,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifeq (,$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | grep 'Format:'))
       GIT_COMMIT_ID=$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | awk '{ print $$3 }')
     else
-      ifeq (git-submodule,$(shell if $(TEST) -d ../.git; then echo git-submodule; fi))
-        ifeq (submodule,$(shell grep 'submodule "simh"' ../.gitmodules | awk 'BEGIN { FS = " " } ; { print $$1 }' | awk 'BEGIN { FS = "\[" } ; { print $$2 }'))
-          GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep simh | awk '{ print $$1 }')
-        endif
+      ifeq (git-submodule,$(if $(shell cd .. ; git rev-parse --git-dir 2>/dev/null),git-submodule))
+        GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep "$(notdir $(realpath .))" | awk '{ print $$1 }')
+      else
+        GIT_COMMIT_ID=undetermined-git-id
       endif
     endif
   endif
@@ -1215,9 +1215,10 @@ HP2100_OPT = -DHAVE_INT64 -I ${HP2100D}
 HP3000D = HP3000
 HP3000 = ${HP3000D}/hp_disclib.c ${HP3000D}/hp_tapelib.c ${HP3000D}/hp3000_atc.c \
 	${HP3000D}/hp3000_clk.c ${HP3000D}/hp3000_cpu.c ${HP3000D}/hp3000_cpu_base.c \
-	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_ds.c ${HP3000D}/hp3000_iop.c \
-	${HP3000D}/hp3000_lp.c ${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c \
-	${HP3000D}/hp3000_scmb.c ${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
+	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_cpu_cis.c ${HP3000D}/hp3000_ds.c \
+	${HP3000D}/hp3000_iop.c ${HP3000D}/hp3000_lp.c ${HP3000D}/hp3000_mem.c \
+	${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c ${HP3000D}/hp3000_scmb.c \
+	${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
 HP3000_OPT = -I ${HP3000D}
 
 
@@ -1433,20 +1434,6 @@ B5500 = ${B5500D}/b5500_cpu.c ${B5500D}/b5500_io.c ${B5500D}/b5500_sys.c \
 	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c
 B5500_OPT = -I.. -DUSE_INT64 -DB5500 -DUSE_SIM_CARD
 
-###
-### Experimental simulators
-###
-
-CDC1700D = CDC1700
-CDC1700 = ${CDC1700D}/cdc1700_cpu.c ${CDC1700D}/cdc1700_dis.c \
-        ${CDC1700D}/cdc1700_io.c ${CDC1700D}/cdc1700_sys.c \
-        ${CDC1700D}/cdc1700_dev1.c ${CDC1700D}/cdc1700_mt.c \
-        ${CDC1700D}/cdc1700_dc.c ${CDC1700D}/cdc1700_iofw.c \
-        ${CDC1700D}/cdc1700_lp.c ${CDC1700D}/cdc1700_dp.c \
-        ${CDC1700D}/cdc1700_cd.c ${CDC1700D}/cdc1700_sym.c \
-        ${CDC1700D}/cdc1700_rtc.c
-CDC1700_OPT = -I ${CDC1700D}
-
 BESM6D = BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
@@ -1493,6 +1480,20 @@ ifneq (,$(BESM6_BUILD))
 endif
 
 ###
+### Experimental simulators
+###
+
+CDC1700D = CDC1700
+CDC1700 = ${CDC1700D}/cdc1700_cpu.c ${CDC1700D}/cdc1700_dis.c \
+        ${CDC1700D}/cdc1700_io.c ${CDC1700D}/cdc1700_sys.c \
+        ${CDC1700D}/cdc1700_dev1.c ${CDC1700D}/cdc1700_mt.c \
+        ${CDC1700D}/cdc1700_dc.c ${CDC1700D}/cdc1700_iofw.c \
+        ${CDC1700D}/cdc1700_lp.c ${CDC1700D}/cdc1700_dp.c \
+        ${CDC1700D}/cdc1700_cd.c ${CDC1700D}/cdc1700_sym.c \
+        ${CDC1700D}/cdc1700_rtc.c
+CDC1700_OPT = -I ${CDC1700D}
+
+###
 ### Unsupported/Incomplete simulators
 ###
 
@@ -1524,19 +1525,21 @@ PDQ3D = PDQ-3
 PDQ3 = ${PDQ3D}/pdq3_cpu.c ${PDQ3D}/pdq3_sys.c ${PDQ3D}/pdq3_stddev.c \
     ${PDQ3D}/pdq3_mem.c ${PDQ3D}/pdq3_debug.c ${PDQ3D}/pdq3_fdc.c 
 PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
-
-
 #
-# Build everything (not the unsupported/incomplete simulators)
+# Build everything (not the unsupported/incomplete or experimental simulators)
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
-	isys8030 isys8024
+	isys8030 isys8024 imds-225
 
 all : ${ALL}
+
+EXPERIMENTAL = cdc1700 
+
+experimental : $(EXPERIMENTAL)
 
 clean :
 ifeq ($(WIN32),)

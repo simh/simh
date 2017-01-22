@@ -1,6 +1,6 @@
                       SIMH/HP 3000 DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2016-09-07
+                             Last update: 2016-12-01
 
 
 The HP 32230 diagnostic suite has been run against the SIMH HP 3000 simulation.
@@ -60,8 +60,8 @@ The results of the diagnostic runs are summarized below:
   PD435A    Universal Interface                      01.01  Passed
   PD438A    Terminal Control Interface               01.00  Passed
   PD439A    CALCOMP Plotter Interface                01.01  No simulation
-  PD441A    COBOL-II A Firmware                      00.00  No simulation
-  PD442A    COBOL-II B Firmware                      00.00  No simulation
+  PD441A    COBOL-II A Firmware                      00.00  Passed
+  PD442A    COBOL-II B Firmware                      00.00  Passed
   PD466A    Online Line Printer Verifier             01.06  Passed
 
 The "Result" column indicates the level of success in passing the given
@@ -1548,7 +1548,9 @@ CONFIGURATION:  sim> set lp diagnostic,intmask=8
                 sim> set clk realtime
                 sim> go
 
-TEST REPORT:    D100  UNIV. INTERFACE TEST (HP D435A.01.01)
+TEST REPORT:    [CR entered]
+
+                D100  UNIV. INTERFACE TEST (HP D435A.01.01)
                 (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
                 ****************** WARNING ******************
                 this diagnostic has tests which will produce error
@@ -1847,6 +1849,239 @@ TEST REPORT:    Programmed halt, CIR: 030366 (HALT 6), P: 010670 (LRA P+4)
                 sim> go
 
                 Programmed halt, CIR: 030375 (HALT 15), P: 010225 (BR P+7)
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------
+D441A - COBOL-II A Firmware
+---------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> set cpu cis
+                sim> go
+
+TEST REPORT:    [CTRL+E]
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                [CR entered]
+
+                COBOLIIA F/W DIAG. (D441A.00.00)
+
+
+                TESTING MFL OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                MFL OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING MC'N OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                MCN OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING IC AND SUFT OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 IC OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 SUFT OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING MA'N OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 MA OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING  ICS AND SST0 AND SST1 OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 ICS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 SST0 OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 SST1 OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING ICI OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 ICI OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 BRIS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+                TESTING MN'N OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                MN OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING SFC AND ICSI OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                  SFC OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 ICSI OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING MNS OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                MNS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING DBNZ AND SETC OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 DBNZ OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 SETC OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING MDWO AND SUFS OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                MDWO OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                SUFS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING ICP OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                ICP OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING ICPS OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                ICPS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING "IS" OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                "IS" OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING "ENDF" OF EDIT
+
+                TESTING "SFLC" OF EDIT
+
+                TESTING "DFLC" OF EDIT
+
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                "ENDF" OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                "SFLC" OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                "DFLC" OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+                END OF PASS 0
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010330 (RSW)
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------
+D442A - COBOL-II B Firmware
+---------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> set cpu cis
+                sim> go
+
+TEST REPORT:    [CTRL+E]
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                [CR entered]
+
+                COBOLIIB FIRMWARE DIAGNOSTIC (D442A.00.00)
+
+
+                TESTING ABSD
+                ABSD PASSED ALL TESTS WITHOUT ERROR
+
+                TESTING ABSN
+                ABSN PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING XBR
+
+                XBR PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING NEGD
+                SDEC= 0
+
+                SDEC= 1
+
+                NEGD PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING PARC AND ENDP
+
+                I AM IN OUTER'BLOCK OF PARC
+                I AM IN PAR6
+                I AM IN OUTER'BLOCK OF PARC
+                PARC AND ENDP PASSED ALL TESTS WITHOUT ERROR
+
+
+
+                TESTING TR
+                TESTING DB TABLE ACCESS
+                TESTING PB TABLE ACCESS
+                TR PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING CVND
+                SDEC = 0
+
+                SDEC = 1
+
+                CVND PASSED ALL TESTS WITHOUT ERROR
+
+
+
+                TESTING CMPS
+                TESTING DB-TARGET ACCESS
+
+                TESTING PB-TARGET ACCESS
+
+                CMPS PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING CMPT
+                TESTING TRANSLATION TABLE IN PB
+
+                TESTING DB-TARGET ACCESS
+
+                TESTING PB-TARGET ACCESS
+
+                CMPT PASSED ALL TESTS WITHOUT ERRORS
+
+
+                TESTING TCCS
+                TCCS PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING LDW
+                SDEC=0
+                SDEC=1
+                TESTING LDDW
+                SDEC=0
+                SDEC=1
+                LDW AND LDWW PASSED ALL TESTS WITHOUT ERROR
+
+                TESTING ALGN
+                ALGN PASSED ALL TESTS WITHOUT ERROR
+
+                END OF PASS 0
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010315 (RSW)
 
 TEST RESULT:    Passed.
 

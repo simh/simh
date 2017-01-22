@@ -26,6 +26,7 @@
    DR           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   10-Nov-16    JDB     Modified the drc_boot routine to use the BBDL
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
@@ -704,36 +705,109 @@ else {
 return SCPE_OK;
 }
 
-/* Fixed head disk/drum bootstrap routine (disc subset of disc/paper tape loader) */
 
-#define BOOT_START      060
+/* Basic Binary Disc Loader.
 
-static const BOOT_ROM dr_rom = {                        /* padded to start at x7760 */
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0,
-    0020010,                    /*DMA 20000+DC */
-    0000000,                    /*    0 */
-    0107700,                    /*    CLC 0,C */
-    0063756,                    /*    LDA DMA           ; DMA ctrl */
-    0102606,                    /*    OTA 6 */
-    0002700,                    /*    CLA,CCE */
-    0102611,                    /*    OTA CC            ; trk = sec = 0 */
-    0001500,                    /*    ERA               ; A = 100000 */
-    0102602,                    /*    OTA 2             ; DMA in, addr */
-    0063777,                    /*    LDA M64 */
-    0102702,                    /*    STC 2 */
-    0102602,                    /*    OTA 2             ; DMA wc = -64 */
-    0103706,                    /*    STC 6,C           ; start DMA */
-    0067776,                    /*    LDB JSF           ; get JMP . */
-    0074077,                    /*    STB 77            ; in base page */
-    0102710,                    /*    STC DC            ; start disc */
-    0024077,                    /*JSF JMP 77            ; go wait */
-    0177700                     /*M64 -100 */
+   The Basic Binary Disc Loader (BBDL) contains two programs.  The program
+   starting at address x7700 loads absolute paper tapes into memory.  The
+   program starting at address x7760 loads a disc-resident bootstrap from the
+   277x fixed-head disc/drum.  Entering a BOOT DRC command loads the BBDL into
+   memory and executes the disc portion starting at x7760.  The bootstrap issues
+   a CLC 0,C to clear the disc track and sector address registers and then sets
+   up a 64-word read from track 0 sector 0 to memory locations 0-77 octal.  It
+   then stores a JMP * instruction in location 77, starts the read, and jumps to
+   location 77.  The JMP * causes the CPU to loop until the last word read from
+   the disc overlays location 77 which, typically, would be a JMP instruction to
+   the start of the disc-resident bootstrap.
+
+   In hardware, the BBDL was hand-configured for the disc and paper tape reader
+   select codes when it was installed on a given system.  Under simulation, we
+   treat it as a standard HP 1000 loader, even though it is not structured that
+   way, and so the ibl_copy mechanism used to load and configure it must be
+   augmented to account for the differences.
+
+
+   Implementaion notes:
+
+    1. The full BBDL is loaded into memory, even though only the disc portion
+       will be used.
+
+    2. For compatibility with the ibl_copy routine, the loader has been changed
+       from the standard HP version.  The device I/O instructions are modified
+       to address locations 10 and 11.
+*/
+
+static const BOOT_ROM dr_rom = {
+    0107700,                    /* ST2   CLC 0,C           START OF PAPER TAPE LOADER */
+    0002401,                    /*       CLA,RSS         */
+    0063726,                    /* CONT2 LDA CM21        */
+    0006700,                    /*       CLB,CCE         */
+    0017742,                    /*       JSB READ2       */
+    0007306,                    /* LEDR2 CMB,CCE,INB,SZB */
+    0027713,                    /*       JMP RECL2       */
+    0002006,                    /* EOTC2 INA,SZA         */
+    0027703,                    /*       JMP CONT2+1     */
+    0102077,                    /*       HLT 77B         */
+    0027700,                    /*       JMP ST2         */
+    0077754,                    /* RECL2 STB CNT2        */
+    0017742,                    /*       JSB READ2       */
+    0017742,                    /*       JSB READ2       */
+    0074000,                    /*       STB A           */
+    0077757,                    /*       STB ADR11       */
+    0067757,                    /* SUCID LDB ADR11       */
+    0047755,                    /*       ADB MAXAD       */
+    0002040,                    /*       SEZ             */
+    0027740,                    /*       JMP RESCU       */
+    0017742,                    /* LOAD2 JSB READ2       */
+    0040001,                    /*       ADA B           */
+    0177757,                    /* CM21  STB ADR11,I     */
+    0037757,                    /*       ISZ ADR11       */
+    0000040,                    /*       CLE             */
+    0037754,                    /*       ISZ CNT2        */
+    0027720,                    /*       JMP SUCID       */
+    0017742,                    /*       JSB READ2       */
+    0054000,                    /*       CPB A           */
+    0027702,                    /*       JMP CONT2       */
+    0102011,                    /*       HLT 11B         */
+    0027700,                    /*       JMP ST2         */
+    0102055,                    /* RESCU HLT 55B         */
+    0027700,                    /*       JMP ST2         */
+    0000000,                    /* READ2 NOP             */
+    0006600,                    /*       CLB,CME         */
+    0103710,                    /* RED2  STC PR,C        */
+    0102310,                    /*       SFS PR          */
+    0027745,                    /*       JMP *-1         */
+    0107410,                    /*       MIB PR,C        */
+    0002041,                    /*       SEZ,RSS         */
+    0127742,                    /*       JMP READ2,I     */
+    0005767,                    /*       BLF,CLE,BLF     */
+    0027744,                    /*       JMP RED2        */
+    0000000,                    /* CNT2  NOP             */
+    0000000,                    /* MAXAD NOP             */
+    0020000,                    /* CWORD ABS 20000B+DC   */
+    0000000,                    /* ADR11 NOP             */
+
+    0107700,                    /* DLDR  CLC 0,C           START OF FIXED DISC LOADER */
+    0063756,                    /*       LDA CWORD       */
+    0102606,                    /*       OTA 6           */
+    0002700,                    /*       CLA,CCE         */
+    0102611,                    /*       OTA CC          */
+    0001500,                    /*       ERA             */
+    0102602,                    /*       OTA 2           */
+    0063777,                    /*       LDA WRDCT       */
+    0102702,                    /*       STC 2           */
+    0102602,                    /*       OTA 2           */
+    0103706,                    /*       STC 6,C         */
+    0102710,                    /*       STC DC          */
+    0067776,                    /*       LDB JMP77       */
+    0074077,                    /*       STB 77B         */
+    0024077,                    /* JMP77 JMP 77B         */
+    0177700                     /* WRDCT OCT -100        */
     };
+
+#define BBDL_MAX_ADDR       0000055                     /* ROM index of the maximum address word */
+#define BBDL_DMA_CNTL       0000056                     /* ROM index of the DMA control word */
+#define BBDL_DISC_START     0000060                     /* ROM index of the disc loader */
 
 t_stat drc_boot (int32 unitno, DEVICE *dptr)
 {
@@ -745,9 +819,13 @@ if (unitno != 0)                                        /* boot supported on dri
 if (ibl_copy (dr_rom, dev, IBL_S_NOCLR, IBL_S_NOSET))   /* copy the boot ROM to memory and configure */
     return SCPE_IERR;                                   /* return an internal error if the copy failed */
 
-WritePW (PR + IBL_DPC, dr_rom [IBL_DPC]);               /* restore overwritten word */
-WritePW (PR + IBL_END, dr_rom [IBL_END]);               /* restore overwritten word */
-PR = PR + BOOT_START;                                   /* correct starting address */
+WritePW (PR + BBDL_MAX_ADDR, ReadPW (PR + IBL_END));        /* move the maximum address word */
+WritePW (PR + BBDL_DMA_CNTL, dr_rom [BBDL_DMA_CNTL] + dev); /* set up the DMA control word */
+
+WritePW (PR + IBL_DPC, dr_rom [IBL_DPC]);               /* restore the overwritten word */
+WritePW (PR + IBL_END, dr_rom [IBL_END]);               /* restore the overwritten word */
+
+PR = PR + BBDL_DISC_START;                              /* select the starting address */
 
 return SCPE_OK;
 }

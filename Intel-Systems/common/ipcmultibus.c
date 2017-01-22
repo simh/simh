@@ -151,7 +151,7 @@ t_stat multibus_reset(DEVICE *dptr)
     sim_printf("   Multibus: Reset\n");
     zx200a_fdcnum = 0;
     zx200a_reset(NULL, ZX200A_BASE_DD);
-    zx200a_reset(NULL, ZX200A_BASE_SD);
+//    zx200a_reset(NULL, ZX200A_BASE_SD);
     isbc201_fdcnum = 0;
     isbc201_reset(NULL, SBC201_BASE); 
     isbc202_fdcnum = 0;
@@ -251,8 +251,7 @@ struct idev dev_table[256] = {
 uint8 nulldev(t_bool flag, uint8 data)
 {
     SET_XACK(0);                        /* set no XACK */
-    if (flag == 0)                      /* if we got here, no valid I/O device */
-        return (0xFF);
+//    return 0xFF;
     return 0;
 }
 

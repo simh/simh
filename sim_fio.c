@@ -65,6 +65,12 @@ t_bool sim_end;                     /* TRUE = little endian, FALSE = big endian 
 t_bool sim_taddr_64;                /* t_addr is > 32b and Large File Support available */
 t_bool sim_toffset_64;              /* Large File (>2GB) file I/O Support available */
 
+#if defined(fprintf)                /* Make sure to only use the C rtl stream I/O routines */
+#undef fprintf
+#undef fputs
+#undef fputc
+#endif
+
 /* OS-independent, endian independent binary I/O package
 
    For consistency, all binary data read and written by the simulator

@@ -1,6 +1,6 @@
 /* pdp10_sys.c: PDP-10 simulator interface
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Jan-17    RMS     Fixed RIM loader to handle ITS and RIM10B formats
    04-Apr-11    RMS     Removed DEUNA/DELUA support - never implemented
    01-Feb-07    RMS     Added CD support
    22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
@@ -130,9 +131,9 @@ const char *sim_stop_messages[] = {
 #define EXE_PDV 01774                                   /* EXE ignored */
 #define EXE_END 01777                                   /* EXE end */
 
-/* RIM10 loader
+/* RIM10B loader
 
-   RIM10 format is a binary paper tape format (all data frames
+   RIM10B format is a binary paper tape format (all data frames
    are 200 or greater).  It consists of blocks containing
 
         -count,,origin-1
@@ -142,6 +143,30 @@ const char *sim_stop_messages[] = {
         checksum (includes IOWD)
         :
         JRST start
+
+   The checksum is the simple binary sum of all the words in
+   the block, including the IOWD.
+
+   ITS RIM format is a binary paper tape format (all data frames
+   are 200 or greater). It consists of blocks containing
+
+        -count,,origin
+        word
+        :
+        word
+        checksum (includes pseudo IOWD)
+        :
+        JRST start
+
+   The checksum is the simple binary sum of all the words in
+   the block, including the pseudo IOWD. The checksum is rotated
+   left by 1 before each new word is added in.
+
+   Both formats include the actual RIM loader as the first block.
+   It begins with a BLKI word: -count,,start-1. The count is 16(8)
+   for RIM10B and 17(8) for ITS RIM. On a real KA10 or KI10, this
+   twisty little program is loaded into the ACs and executed.
+   Here it is simply skipped.
 */
 
 d10 getrimw (FILE *fileref)
@@ -165,7 +190,25 @@ t_stat load_rim (FILE *fileref)
 {
 d10 count, cksm, data;
 a10 pa;
-int32 op;
+int32 op, i, ldrc;
+t_bool its_rim;
+extern d10 rot (d10 val, a10 ea);
+
+data = getrimw (fileref);                               /* get first word */
+if ((data < 0) || ((data & AMASK) != 0))                /* error? SA != 0? */
+    return SCPE_FMT;
+ldrc = (-((int32) LRZ (data))) & 0777777;               /* get loader count */
+if (ldrc == 016)                                        /* 16? RIM10B */
+    its_rim = FALSE;
+else if (ldrc == 017)                                   /* 17? ITS RIM */
+    its_rim = TRUE;
+else SCPE_FMT;                                          /* unknown */
+
+for (i = 0; i < ldrc; i++) {                            /* skip the loader */
+    data = getrimw (fileref);
+    if (data < 0)
+        return SCPE_FMT;
+    }
 
 for ( ;; ) {                                            /* loop until JRST */
     count = cksm = getrimw (fileref);                   /* get header */
@@ -176,14 +219,20 @@ for ( ;; ) {                                            /* loop until JRST */
             data = getrimw (fileref);                   /* get data wd */
             if (data < 0)
                 return SCPE_FMT;
-            cksm = cksm + data;                         /* add to cksm */
-            pa = ((a10) count + 1) & AMASK;             /* store */
+            if (its_rim) {                              /* ITS RIM? */
+                cksm = (rot (cksm, 1) + data) & DMASK;  /* add to rotated cksm */
+                pa = ((a10) count) & AMASK;             /* store */
+                }
+            else {                                      /* RIM10B */
+                cksm = (cksm + data) & DMASK;           /* add to cksm */
+                pa = ((a10) count + 1) & AMASK;         /* store */
+                }
             M[pa] = data;
             }                                           /* end for */
         data = getrimw (fileref);                       /* get cksm */
         if (data < 0)
             return SCPE_FMT;
-        if ((cksm + data) & DMASK)                      /* test cksm */
+        if (cksm != data)                               /* test cksm */
             return SCPE_CSUM;
         }                                               /* end if count */
     else {
@@ -368,8 +417,11 @@ else {
         return SCPE_FMT;
     if (LRZ (data) == EXE_DIR)                          /* EXE magic? */
         fmt = FMT_E;
-    else if (TSTS (data))                               /* SAV magic? */
-        fmt = FMT_S;
+    else if (TSTS (data)) {                             /* SAV/RIM magic? */
+        if ((data & AMASK) != 0)                        /* SAV has SA != 0 */
+           fmt = FMT_S;
+        else fmt = FMT_R;                               /* RIM has SA == 0 */
+        }
     fseek (fileref, 0, SEEK_SET);                       /* rewind */
     }
 
@@ -698,10 +750,6 @@ static const char *devnam[NUMDEV] = {
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
 #define SIXTOASC(x) ((x) + 040)
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)

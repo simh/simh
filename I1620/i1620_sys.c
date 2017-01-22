@@ -278,11 +278,6 @@ struct opc opcode[] = {
 
 /* Print an address from five characters */
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 void fprint_addr (FILE *of, int32 spc, t_value *dig, t_bool flg)
 {
 int32 i, idx;

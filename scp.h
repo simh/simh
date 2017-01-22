@@ -130,6 +130,7 @@ t_stat _sim_activate_after_abs (UNIT *uptr, double usecs_walltime);
 t_stat sim_cancel (UNIT *uptr);
 t_bool sim_is_active (UNIT *uptr);
 int32 sim_activate_time (UNIT *uptr);
+int32 _sim_activate_time (UNIT *uptr);
 double sim_activate_time_usecs (UNIT *uptr);
 t_stat sim_run_boot_prep (int32 flag);
 double sim_gtime (void);
@@ -152,6 +153,7 @@ int sim_isdigit (char c);
 int sim_isgraph (char c);
 int sim_isalnum (char c);
 int sim_strncasecmp (const char *string1, const char *string2, size_t len);
+int sim_strcasecmp (const char *string1, const char *string2);
 CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st);
 const char *put_switches (char *buf, size_t bufsize, uint32 sw);
 CONST char *get_glyph (const char *iptr, char *optr, char mchar);
@@ -166,6 +168,10 @@ char *sim_encode_quoted_string (const uint8 *iptr, uint32 size);
 void fprint_buffer_string (FILE *st, const uint8 *buf, uint32 size);
 t_value strtotv (CONST char *cptr, CONST char **endptr, uint32 radix);
 int Fprintf (FILE *f, const char *fmt, ...) GCC_FMT_ATTR(2, 3);
+/* Use scp.c provided fprintf function */
+#define fprintf Fprintf
+#define fputs(_s,_f) Fprintf(_f,"%s",_s)
+#define fputc(_c,_f) Fprintf(_f,"%c",_c)
 t_stat sim_set_memory_load_file (const unsigned char *data, size_t size);
 int Fgetc (FILE *f);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);

@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2014-12-18
+                             Last update: 2016-12-18
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -118,7 +118,7 @@ Part Number   DSN    Diagnostic Name                       Code  Vers.  Result
 20433-60001    --    HP 3030 Magnetic Tape Subsystem        --     -    Not tested
 22682-16017  177777  HP 2100 Fixed Head Disc/Drum (277x)   1612  3.3-0  Passed
 24197-60001    --    12875 Processor Interconnect Cable     B    3.7-1  Passed
-24203-60001    --    HP2100A Cartridge Disc Memory (2871)   A    3.3-0  Partial
+24203-60001    --    HP2100A Cartridge Disc Memory (2870)   A    3.3-0  Partial
 
 
 The following online diagnostics were run for devices not supported by the
@@ -3299,7 +3299,7 @@ TEST RESULT:    Passed.
 
 
 -----------------------------------------------------------------
-DSN (none) - HP2100A Cartridge Disc Memory (2871) (multiple unit)
+DSN (none) - HP2100A Cartridge Disc Memory (2870) (multiple unit)
 -----------------------------------------------------------------
 
 TESTED DEVICE:  DP (hp2100_dp.c)
@@ -3307,10 +3307,10 @@ TESTED DEVICE:  DP (hp2100_dp.c)
 BINARY TAPE:    24203-60001 Rev. A
 
 CONFIGURATION:  sim> set DPC 12557A
-                sim> attach DPC0 scratch.U0.2871.disc
-                sim> attach DPC1 scratch.U1.2871.disc
-                sim> attach DPC2 scratch.U2.2871.disc
-                sim> attach DPC3 scratch.U3.2871.disc
+                sim> attach DPC0 scratch.U0.2870.disc
+                sim> attach DPC1 scratch.U1.2870.disc
+                sim> attach DPC2 scratch.U2.2870.disc
+                sim> attach DPC3 scratch.U3.2870.disc
                 sim> deposit S 002211
                 sim> reset
                 sim> go 2
@@ -3370,7 +3370,7 @@ TEST NOTES:     Four passes are required to test all head/unit combinations.
 
 
 --------------------------------------------------------------------
-DSN (none) - HP2100A Cartridge Disc Memory (2871) (user interaction)
+DSN (none) - HP2100A Cartridge Disc Memory (2870) (user interaction)
 --------------------------------------------------------------------
 
 TESTED DEVICE:  DP (hp2100_dp.c)
@@ -3378,7 +3378,7 @@ TESTED DEVICE:  DP (hp2100_dp.c)
 BINARY TAPE:    24203-60001 Rev. A
 
 CONFIGURATION:  sim> set DPC 12557A
-                sim> attach DPC0 scratch.U0.2871.disc
+                sim> attach DPC0 scratch.U0.2870.disc
                 sim> deposit S 002211
                 sim> reset
                 sim> go 2

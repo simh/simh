@@ -61,11 +61,11 @@ uint8 i8251d(t_bool io, uint8 data);
 
 /* globals */
 
-int32 i8272_devnum = 0;             //initially, no 8251 instances
-uint16 i8272_port[4];               //base port assigned to each 8251 instance
+int32 i8272_devnum = 0;             //initially, no 8272 instances
+uint16 i8272_port[4];               //base port assigned to each 8272 instance
 
-/* i8251 Standard I/O Data Structures */
-/* up to 1 i8251 devices */
+/* i8272 Standard I/O Data Structures */
+/* up to 4 i8282 devices */
 
 UNIT i8272_unit[4] = { 
     { UDATA (&i8272_svc, 0, 0), KBD_POLL_WAIT },
@@ -101,20 +101,20 @@ MTAB i8272_mod[] = {
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE i8272_dev = {
-    "I8272",             //name
-    i8272_unit,        //units
+    "I8272",            //name
+    i8272_unit,         //units
     i8272_reg,          //registers
     i8272_mod,          //modifiers
     1,                  //numunits
     16,                 //aradix
-    16,                  //awidth
+    16,                 //awidth
     1,                  //aincr
     16,                 //dradix
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
 //    &i8272_reset,       //reset
-    NULL,       //reset
+    NULL,               //reset
     NULL,               //boot
     NULL,               //attach
     NULL,               //detach
@@ -128,7 +128,7 @@ DEVICE i8272_dev = {
 
 /* Service routines to handle simulator functions */
 
-/* i8272_svc - actually gets char & places in buffer */
+/* i8272_svc - actually does FDD read and write */
 
 t_stat i8272_svc(UNIT *uptr)
 {
@@ -225,4 +225,4 @@ uint8 i8251d(t_bool io, uint8 data)
     return 0;
 }
 
-/* end of i8251.c */
+/* end of i8272.c */

@@ -263,6 +263,7 @@ int32 ibufl, ibufh;                                     /* prefetch buf */
 int32 ibcnt, ppc;                                       /* prefetch ctl */
 uint32 cpu_idle_mask = VAX_IDLE_VMS;                    /* idle mask */
 uint32 cpu_idle_type = 1;                               /* default VMS */
+int32 extra_bytes;                                      /* bytes referenced by current string instruction */
 jmp_buf save_env;
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
@@ -702,7 +703,8 @@ for ( ;; ) {
         ABORT (STOP_IBKPT);                             /* stop simulation */
         }
 
-    sim_interval = sim_interval - 1;                    /* count instr */
+    sim_interval = sim_interval - (1 + (extra_bytes>>5));/* count instr */
+    extra_bytes = 0;                                    /* digest string count */
     GET_ISTR (opc, L_BYTE);                             /* get opcode */
     if (opc == 0xFD) {                                  /* 2 byte op? */
         GET_ISTR (opc, L_BYTE);                         /* get second byte */

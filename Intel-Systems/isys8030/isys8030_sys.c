@@ -39,6 +39,7 @@ extern DEVICE RAM_dev;
 extern DEVICE multibus_dev;
 extern DEVICE isbc201_dev;
 extern DEVICE isbc202_dev;
+extern DEVICE zx200a_dev;
 extern DEVICE isbc064_dev;
 
 /* SCP data structures
@@ -68,6 +69,7 @@ DEVICE *sim_devices[] = {
     &isbc064_dev,
     &isbc201_dev,
     &isbc202_dev,
+    &zx200a_dev,
     NULL
 };
 

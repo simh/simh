@@ -337,6 +337,7 @@ int sim_aio_update_queue (void)
 {
 int migrated = 0;
 
+AIO_ILOCK;
 if (AIO_QUEUE_VAL != QUEUE_LIST_END) {  /* List !Empty */
     UNIT *q, *uptr;
     int32 a_event_time;
@@ -356,18 +357,22 @@ if (AIO_QUEUE_VAL != QUEUE_LIST_END) {  /* List !Empty */
             }
         else
             a_event_time = uptr->a_event_time;
+        AIO_IUNLOCK;
         uptr->a_activate_call (uptr, a_event_time);
         if (uptr->a_check_completion) {
             sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Calling Completion Check for asynch event on %s\n", sim_uname(uptr));
             uptr->a_check_completion (uptr);
             }
+        AIO_ILOCK;
         }
     }
+AIO_IUNLOCK;
 return migrated;
 }
 
 void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time)
 {
+AIO_ILOCK;
 sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch event for %s after %d instructions\n", sim_uname(uptr), event_time);
 if (uptr->a_next) {
     uptr->a_activate_call = sim_activate_abs;
@@ -381,6 +386,7 @@ else {
         uptr->a_next = q;                               /* Mark as on list */
         } while (q != AIO_QUEUE_SET(uptr, q));
     }
+AIO_IUNLOCK;
 sim_asynch_check = 0;                             /* try to force check */
 if (sim_idle_wait) {
     sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(uptr), event_time);
@@ -3914,14 +3920,14 @@ if (1) {
         }
     }
 if (!sim_quiet)
-    printf ("Asynchronous I/O %sabled\n", sim_asynch_enabled ? "en" : "dis");
-if (sim_log)
+    fprintf (stdout, "Asynchronous I/O %sabled\n", sim_asynch_enabled ? "en" : "dis");
+if ((!sim_oline) && sim_log)
     fprintf (sim_log, "Asynchronous I/O %sabled\n", sim_asynch_enabled ? "en" : "dis");
 return SCPE_OK;
 #else
 if (!sim_quiet)
-    printf ("Asynchronous I/O is not available in this simulator\n");
-if (sim_log)
+    fprintf (stdout, "Asynchronous I/O is not available in this simulator\n");
+if ((!sim_oline) && sim_log)
     fprintf (sim_log, "Asynchronous I/O is not available in this simulator\n");
 return SCPE_NOFNC;
 #endif
@@ -4222,9 +4228,9 @@ if (sim_ofile) {                                        /* output file? */
     }
 else {
     r = show_cmd_fi (stdout, flag, cptr);               /* no, stdout, log */
-    if (sim_log && (sim_log != stdout))
+    if ((!sim_oline) && (sim_log && (sim_log != stdout)))
         show_cmd_fi (sim_log, flag, cptr);
-    if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
+    if ((!sim_oline) && (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log)))
         show_cmd_fi (sim_deb, flag, cptr);
     }
 return r;
@@ -6563,10 +6569,15 @@ printf ("\n");
 if (unechoed_cmdline && (r >= SCPE_BASE) && (r != SCPE_STEP) && (r != SCPE_STOP) && (r != SCPE_EXPECT))
     sim_printf("%s> %s\n", do_position(), unechoed_cmdline);
 fprint_stopped (stdout, r);                         /* print msg */
-if (sim_log && (sim_log != stdout))                 /* log if enabled */
+if ((!sim_oline) && ((sim_log && (sim_log != stdout))))/* log if enabled */
     fprint_stopped (sim_log, r);
-if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))/* debug if enabled */
+if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log)) {/* debug if enabled */
+    TMLN *saved_oline = sim_oline;
+
+    sim_oline = NULL;                               /* avoid potential debug to active socket */
     fprint_stopped (sim_deb, r);
+    sim_oline = saved_oline;                        /* restore original socket */
+    }
 }
 
 /* Common setup for RUN or BOOT */
@@ -6744,6 +6755,9 @@ for (gptr = gbuf, reason = SCPE_OK;
         sim_switches = sim_switches | SIM_SW_HIDE;
         reason = exdep_reg_loop (ofile, sim_schrptr, flag, cptr,
             lowr, --highr, 0, 0);
+        if ((!sim_oline) && (sim_log && (ofile == stdout)))
+            exdep_reg_loop (sim_log, sim_schrptr, EX_E, cptr,
+                lowr, --highr, 0, 0);
         continue;
         }
 
@@ -6771,6 +6785,9 @@ for (gptr = gbuf, reason = SCPE_OK;
             return SCPE_ARG;
         reason = exdep_reg_loop (ofile, sim_schrptr, flag, cptr,
             lowr, highr, (uint32) low, (uint32) high);
+        if ((!sim_oline) && (sim_log && (ofile == stdout)))
+            exdep_reg_loop (sim_log, sim_schrptr, EX_E, cptr,
+                lowr, highr, (uint32) low, (uint32) high);
         continue;
         }
 
@@ -6783,6 +6800,9 @@ for (gptr = gbuf, reason = SCPE_OK;
         return SCPE_ARG;
     reason = exdep_addr_loop (ofile, sim_schaptr, flag, cptr, low, high,
         sim_dfdev, sim_dfunit);
+    if ((!sim_oline) && (sim_log && (ofile == stdout)))
+        exdep_addr_loop (sim_log, sim_schaptr, EX_E, cptr, low, high,
+            sim_dfdev, sim_dfunit);
     }                                                   /* end for */
 if (sim_ofile)                                          /* close output file */
     fclose (sim_ofile);
@@ -6802,6 +6822,7 @@ t_stat reason;
 uint32 idx, val_start=lows;
 t_value val, last_val;
 REG *rptr;
+int32 saved_switches = sim_switches;
 
 if ((lowr == NULL) || (highr == NULL))
     return SCPE_IERR;
@@ -6816,6 +6837,7 @@ for (rptr = lowr; rptr <= highr; rptr++) {
         if (idx >= rptr->depth)
             return SCPE_SUB;
         val = get_rval (rptr, idx);
+        sim_switches = saved_switches;
         if (schptr && !test_search (&val, schptr))
             continue;
         if (flag == EX_E) {
@@ -6824,34 +6846,27 @@ for (rptr = lowr; rptr <= highr; rptr++) {
             if (idx > val_start+1) {
                 if (idx-1 == val_start+1) {
                     reason = ex_reg (ofile, val, flag, rptr, idx-1);
+                    sim_switches = saved_switches;
                     if (reason != SCPE_OK)
                         return reason;
-                    if (sim_log && (ofile == stdout))
-                        ex_reg (sim_log, val, flag, rptr, idx-1);
                     }
                 else {
-                    if (val_start+1 != idx-1) {
-                        Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
-                        if (sim_log && (ofile == stdout))
-                            Fprintf (sim_log, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
-                        }
-                    else {
-                        Fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
-                        if (sim_log && (ofile == stdout))
-                            Fprintf (sim_log, "%s[%d]: same as above\n", rptr->name, val_start+1);
-                        }
+                    if (val_start+1 != idx-1)
+                        fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                    else
+                        fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
                     }
                 }
             sim_last_val = last_val = val;
             val_start = idx;
             reason = ex_reg (ofile, val, flag, rptr, idx);
+            sim_switches = saved_switches;
             if (reason != SCPE_OK)
                 return reason;
-            if (sim_log && (ofile == stdout))
-                ex_reg (sim_log, val, flag, rptr, idx);
             }
         if (flag != EX_E) {
             reason = dep_reg (flag, cptr, rptr, idx);
+            sim_switches = saved_switches;
             if (reason != SCPE_OK)
                 return reason;
             }
@@ -6859,22 +6874,15 @@ for (rptr = lowr; rptr <= highr; rptr++) {
     if ((flag == EX_E) && (val_start != highs)) {
         if (highs == val_start+1) {
             reason = ex_reg (ofile, val, flag, rptr, highs);
+            sim_switches = saved_switches;
             if (reason != SCPE_OK)
                 return reason;
-            if (sim_log && (ofile == stdout))
-                ex_reg (sim_log, val, flag, rptr, highs);
             }
         else {
-            if (val_start+1 != highs) {
-                Fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
-                if (sim_log && (ofile == stdout))
-                    Fprintf (sim_log, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
-                }
-            else {
-                Fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
-                if (sim_log && (ofile == stdout))
-                    Fprintf (sim_log, "%s[%d]: same as above\n", rptr->name, val_start+1);
-                }
+            if (val_start+1 != highs)
+                fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
+            else
+                fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
             }
         }
     }
@@ -6886,6 +6894,7 @@ t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, const char *cpt
 {
 t_addr i, mask;
 t_stat reason;
+int32 saved_switches = sim_switches;
 
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
     return SCPE_UDIS;
@@ -6894,6 +6903,7 @@ if ((low > mask) || (high > mask) || (low > high))
     return SCPE_ARG;
 for (i = low; i <= high; ) {                            /* all paths must incr!! */
     reason = get_aval (i, dptr, uptr);                  /* get data */
+    sim_switches = saved_switches;
     if (reason != SCPE_OK)                              /* return if error */
         return reason;
     if (schptr && !test_search (sim_eval, schptr))
@@ -6901,14 +6911,15 @@ for (i = low; i <= high; ) {                            /* all paths must incr!!
     else {                                              /* no sch or success */
         if (flag != EX_D) {                             /* ex, ie, or id? */
             reason = ex_addr (ofile, flag, i, dptr, uptr);
+            sim_switches = saved_switches;
             if (reason > SCPE_OK)
                 return reason;
-            if (sim_log && (ofile == stdout))
-                ex_addr (sim_log, flag, i, dptr, uptr);
             }
-        else reason = 1 - dptr->aincr;                  /* no, dflt incr */
+        else
+            reason = 1 - dptr->aincr;                   /* no, dflt incr */
         if (flag != EX_E) {                             /* ie, id, or d? */
             reason = dep_addr (flag, cptr, i, dptr, uptr, reason);
+            sim_switches = saved_switches;
             if (reason > SCPE_OK)
                 return reason;
             }
@@ -6937,8 +6948,9 @@ int32 rdx;
 if (rptr == NULL)
     return SCPE_IERR;
 if (rptr->depth > 1)
-    Fprintf (ofile, "%s[%d]:\t", rptr->name, idx);
-else Fprintf (ofile, "%s:\t", rptr->name);
+    fprintf (ofile, "%s[%d]:\t", rptr->name, idx);
+else
+    fprintf (ofile, "%s:\t", rptr->name);
 if (!(flag & EX_E))
     return SCPE_OK;
 GET_RADIX (rdx, rptr->radix);
@@ -6949,13 +6961,14 @@ else if (!(rptr->flags & REG_VMFLAGS) ||
                  NULL, sim_switches | SIM_SW_REG) > 0)) {
         fprint_val (ofile, val, rdx, rptr->width, rptr->flags & REG_FMT);
         if (rptr->fields) {
-            Fprintf (ofile, "\t");
+            fprintf (ofile, "\t");
             fprint_fields (ofile, val, val, rptr->fields);
             }
         }
 if (flag & EX_I)
-    Fprintf (ofile, "\t");
-else Fprintf (ofile, "\n");
+    fprintf (ofile, "\t");
+else
+    fprintf (ofile, "\n");
 return SCPE_OK;
 }
 
@@ -7167,7 +7180,7 @@ int32 rdx;
 if (sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, dptr, addr);
 else fprint_val (ofile, addr, dptr->aradix, dptr->awidth, PV_LEFT);
-Fprintf (ofile, ":\t");
+fprintf (ofile, ":\t");
 if (!(flag & EX_E))
     return (1 - dptr->aincr);
 
@@ -7177,8 +7190,9 @@ if ((reason = fprint_sym (ofile, addr, sim_eval, uptr, sim_switches)) > 0) {
     reason = 1 - dptr->aincr;
     }
 if (flag & EX_I)
-    Fprintf (ofile, "\t");
-else Fprintf (ofile, "\n");
+    fprintf (ofile, "\t");
+else
+    fprintf (ofile, "\n");
 return reason;
 }
 
@@ -7631,6 +7645,33 @@ for (i=0; i<len; i++) {
         return 1;
     if (s1 == 0)
         return 0;
+    }
+return 0;
+}
+
+/* strcasecmp() is not available on all platforms */
+int sim_strcasecmp (const char* string1, const char* string2)
+{
+size_t i = 0;
+unsigned char s1, s2;
+
+while (1) {
+    s1 = (unsigned char)string1[i];
+    s2 = (unsigned char)string2[i];
+    if (sim_islower (s1))
+        s1 = (unsigned char)toupper (s1);
+    if (sim_islower (s2))
+        s2 = (unsigned char)toupper (s2);
+    if (s1 == s2) {
+        if (s1 == 0)
+            return 0;
+        i++;
+        continue;
+        }
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
     }
 return 0;
 }
@@ -8756,7 +8797,7 @@ if (!stream)
 if (width > MAX_WIDTH)
     width = MAX_WIDTH;
 sprint_val (dbuf, val, radix, width, format);
-if (Fprintf (stream, "%s", dbuf) < 0)
+if (fprintf (stream, "%s", dbuf) < 0)
     return SCPE_IOERR;
 return SCPE_OK;
 }
@@ -8765,19 +8806,25 @@ t_stat sim_print_val (t_value val, uint32 radix,
     uint32 width, uint32 format)
 {
 char dbuf[MAX_WIDTH + 1];
+t_stat stat = SCPE_OK;
 
 if (width > MAX_WIDTH)
     width = MAX_WIDTH;
 sprint_val (dbuf, val, radix, width, format);
 if (fputs (dbuf, stdout) == EOF)
-    return SCPE_IOERR;
-if (sim_log && (sim_log != stdout))
+    stat = SCPE_IOERR;
+if ((!sim_oline) && ((sim_log && (sim_log != stdout))))
     if (fputs (dbuf, sim_log) == EOF)
-        return SCPE_IOERR;
-if (sim_deb && (sim_deb != stdout))
+        stat = SCPE_IOERR;
+if (sim_deb && (sim_deb != stdout)) {
+    TMLN *saved_oline = sim_oline;
+
+    sim_oline = NULL;                               /* avoid potential debug to active socket */
     if (fputs (dbuf, sim_deb) == EOF)
-        return SCPE_IOERR;
-return SCPE_OK;
+        stat = SCPE_IOERR;
+    sim_oline = saved_oline;                        /* restore original socket */
+    }
+return stat;
 }
 
 const char *sim_fmt_secs (double seconds)
@@ -9168,15 +9215,11 @@ return (((uptr->next) || AIO_IS_ACTIVE(uptr) || ((uptr->dynflags & UNIT_TMR_UNIT
         result =        absolute activation time + 1, 0 if inactive
 */
 
-int32 sim_activate_time (UNIT *uptr)
+int32 _sim_activate_time (UNIT *uptr)
 {
 UNIT *cptr;
 int32 accum;
 
-AIO_VALIDATE;
-accum = sim_timer_activate_time (uptr);
-if (accum >= 0)
-    return accum;
 accum = 0;
 for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {
@@ -9189,6 +9232,17 @@ for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
         return accum + 1 + (int32)((uptr->usecs_remaining * sim_timer_inst_per_sec ()) / 1000000.0);
     }
 return 0;
+}
+
+int32 sim_activate_time (UNIT *uptr)
+{
+int32 accum;
+
+AIO_VALIDATE;
+accum = _sim_timer_activate_time (uptr);
+if (accum >= 0)
+    return accum;
+return _sim_activate_time (uptr);
 }
 
 double sim_activate_time_usecs (UNIT *uptr)
@@ -10440,7 +10494,7 @@ if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
         sim_timespec_diff (&time_now, &time_now, &sim_deb_basetime);
     if (sim_deb_switches & SWMASK ('T')) {
         time_t tnow = (time_t)time_now.tv_sec;
-        struct tm *now = gmtime(&tnow);
+        struct tm *now = localtime(&tnow);
 
         sprintf(tim_t, "%02d:%02d:%02d.%03d ", now->tm_hour, now->tm_min, now->tm_sec, (int)(time_now.tv_nsec/1000000));
         }
@@ -10483,7 +10537,7 @@ for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition
         continue;
     if ((bitdefs[i].width == 1) && (bitdefs[i].valuenames == NULL)) {
         int off = ((after >> bitdefs[i].offset) & 1) + (((before ^ after) >> bitdefs[i].offset) & 1) * 2;
-        Fprintf(stream, "%s%c ", bitdefs[i].name, debug_bstates[off]);
+        fprintf(stream, "%s%c ", bitdefs[i].name, debug_bstates[off]);
         }
     else {
         const char *delta = "";
@@ -10496,15 +10550,15 @@ for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition
         if (value > beforevalue)
             delta = "^";
         if (bitdefs[i].valuenames)
-            Fprintf(stream, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
+            fprintf(stream, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
         else
             if (bitdefs[i].format) {
-                Fprintf(stream, "%s=%s", bitdefs[i].name, delta);
-                Fprintf(stream, bitdefs[i].format, value);
-                Fprintf(stream, " ");
+                fprintf(stream, "%s=%s", bitdefs[i].name, delta);
+                fprintf(stream, bitdefs[i].format, value);
+                fprintf(stream, " ");
                 }
             else
-                Fprintf(stream, "%s=%s0x%X ", bitdefs[i].name, delta, value);
+                fprintf(stream, "%s=%s0x%X ", bitdefs[i].name, delta, value);
         }
     }
 }
@@ -10517,14 +10571,18 @@ void sim_debug_bits_hdr(uint32 dbits, DEVICE* dptr, const char *header,
     BITFIELD* bitdefs, uint32 before, uint32 after, int terminate)
 {
 if (sim_deb && dptr && (dptr->dctrl & dbits)) {
+    TMLN *saved_oline = sim_oline;
+
+    sim_oline = NULL;                                                   /* avoid potential debug to active socket */
     if (!debug_unterm)
-        fprintf(sim_deb, "%s", sim_debug_prefix(dbits, dptr));         /* print prefix if required */
+        fprintf(sim_deb, "%s", sim_debug_prefix(dbits, dptr));          /* print prefix if required */
     if (header)
         fprintf(sim_deb, "%s: ", header);
-    fprint_fields (sim_deb, (t_value)before, (t_value)after, bitdefs); /* print xlation, transition */
+    fprint_fields (sim_deb, (t_value)before, (t_value)after, bitdefs);  /* print xlation, transition */
     if (terminate)
         fprintf(sim_deb, "\r\n");
-    debug_unterm = terminate ? 0 : 1;                   /* set unterm for next */
+    debug_unterm = terminate ? 0 : 1;                                   /* set unterm for next */
+    sim_oline = saved_oline;                                            /* restore original socket */
     }
 }
 void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
@@ -10571,21 +10629,21 @@ while (1) {                                         /* format passed string, arg
 if (sim_is_running) {
     char *c, *remnant = buf;
 
-    while ((c = strchr(remnant, '\n'))) {
+    while ((c = strchr (remnant, '\n'))) {
         if ((c != buf) && (*(c - 1) != '\r'))
-            printf("%.*s\r\n", (int)(c-remnant), remnant);
+            fprintf (stdout, "%.*s\r\n", (int)(c-remnant), remnant);
         else
-            printf("%.*s\n", (int)(c-remnant), remnant);
+            fprintf (stdout, "%.*s\n", (int)(c-remnant), remnant);
         remnant = c + 1;
         }
-    printf("%s", remnant);
+    fprintf (stdout, "%s", remnant);
     }
 else
-    printf("%s", buf);
-if (sim_log && (sim_log != stdout))
+    fprintf (stdout, "%s", buf);
+if ((!sim_oline) && (sim_log && (sim_log != stdout)))
     fprintf (sim_log, "%s", buf);
 if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
-    fprintf (sim_deb, "%s", buf);
+    fwrite (buf, 1, strlen (buf), sim_deb);
 
 if (buf != stackbuf)
     free (buf);
@@ -10639,8 +10697,13 @@ if (sim_do_ocptr[sim_do_depth]) {
     if (!sim_do_echo && !sim_quiet && !inhibit_message)
         sim_printf("%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
     else {
-        if (sim_deb)                        /* Always put context in debug output */
+        if (sim_deb) {                      /* Always put context in debug output */
+            TMLN *saved_oline = sim_oline;
+
+            sim_oline = NULL;               /* avoid potential debug to active socket */
             fprintf (sim_deb, "%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
+            sim_oline = saved_oline;        /* restore original socket */
+            }
         }
     }
 if (sim_is_running && !inhibit_message) {
@@ -10648,21 +10711,27 @@ if (sim_is_running && !inhibit_message) {
 
     while ((c = strchr(remnant, '\n'))) {
         if ((c != buf) && (*(c - 1) != '\r'))
-            printf("%.*s\r\n", (int)(c-remnant), remnant);
+            fprintf (stdout, "%.*s\r\n", (int)(c-remnant), remnant);
         else
-            printf("%.*s\n", (int)(c-remnant), remnant);
+            fprintf (stdout, "%.*s\n", (int)(c-remnant), remnant);
         remnant = c + 1;
         }
-    printf("%s", remnant);
+    fprintf (stdout, "%s", remnant);
     }
 else {
     if (!inhibit_message)
-        printf("%s", buf);
+        fprintf (stdout, "%s", buf);
     }
-if (sim_log && (sim_log != stdout) && !inhibit_message)
+if ((!sim_oline) && (sim_log && (sim_log != stdout) && !inhibit_message))
     fprintf (sim_log, "%s", buf);
-if (sim_deb && (((sim_deb != stdout) && (sim_deb != sim_log)) || inhibit_message))/* Always display messages in debug output */
+/* Always display messages in debug output */
+if (sim_deb && (((sim_deb != stdout) && (sim_deb != sim_log)) || inhibit_message)) {
+    TMLN *saved_oline = sim_oline;
+
+    sim_oline = NULL;                           /* avoid potential debug to active socket */
     fprintf (sim_deb, "%s", buf);
+    sim_oline = saved_oline;                    /* restore original socket */
+    }
 
 if (buf != stackbuf)
     free (buf);
@@ -10685,7 +10754,7 @@ void _sim_debug (uint32 dbits, DEVICE* vdptr, const char* fmt, ...)
 {
 DEVICE *dptr = (DEVICE *)vdptr;
 if (sim_deb && dptr && (dptr->dctrl & dbits)) {
-
+    TMLN *saved_oline = sim_oline;
     char stackbuf[STACKBUFSIZE];
     int32 bufsize = sizeof(stackbuf);
     char *buf = stackbuf;
@@ -10693,6 +10762,7 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
     int32 i, j, len;
     const char* debug_prefix = sim_debug_prefix(dbits, dptr);   /* prefix to print if required */
 
+    sim_oline = NULL;                                   /* avoid potential debug to active socket */
     buf[bufsize-1] = '\0';
 
     while (1) {                                         /* format passed string, args */
@@ -10727,10 +10797,10 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
         if ('\n' == buf[i]) {
             if (i >= j) {
                 if ((i != j) || (i == 0)) {
-                    if (debug_unterm)
-                        fprintf (sim_deb, "%.*s\r\n", i-j, &buf[j]);
-                    else                                /* print prefix when required */
-                        fprintf (sim_deb, "%s%.*s\r\n", debug_prefix, i-j, &buf[j]);
+                    if (!debug_unterm)                  /* print prefix when required */
+                        fwrite (debug_prefix, 1, strlen (debug_prefix), sim_deb);
+                    fwrite (&buf[j], 1, i-j, sim_deb);
+                    fwrite ("\r\n", 1, 2, sim_deb);
                     }
                 debug_unterm = 0;
                 }
@@ -10738,10 +10808,9 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
             }
         }
     if (i > j) {
-        if (debug_unterm)
-            fprintf (sim_deb, "%.*s", i-j, &buf[j]);
-        else                                        /* print prefix when required */
-            fprintf (sim_deb, "%s%.*s", debug_prefix, i-j, &buf[j]);
+        if (!debug_unterm)                          /* print prefix when required */
+            fwrite (debug_prefix, 1, strlen (debug_prefix), sim_deb);
+        fwrite (&buf[j], 1, i-j, sim_deb);
         }
 
 /* Set unterminated flag for next time */
@@ -10749,6 +10818,7 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
     debug_unterm = len ? (((buf[len-1]=='\n')) ? 0 : 1) : debug_unterm;
     if (buf != stackbuf)
         free (buf);
+    sim_oline = saved_oline;                            /* restore original socket */
     }
 return;
 }

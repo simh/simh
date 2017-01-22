@@ -7,6 +7,7 @@
 #### Leonid Broukhis and Serge Vakulenko have implemented a simulator for the Soviet mainframe BESM-6 computer.
 
 #### Matt Burke has implemented new VAX model simulators:
+
     VAX/11 730
     VAX/11 750
     VAX 8600/8650
@@ -158,11 +159,16 @@ Host platforms which have libSDL available can leverage this functionality.
     Simulators which have boot commands which load constant files as part of 
     booting have those files imbedded into the simulator executable.  The 
     imbedded files are used if the normal boot file isn't found when the 
-    simulator boots.  Specific examples are:  VAX (MicroVAX 3900 - ka655x.bin), 
-    VAX8600 (VAX 8600 - vmb.exe), VAX780 (VAX 11/780 - vmb.exe), 
-    VAX750 (VAX 11/750 - vmb.exe, ka750_old.bin, ka750_new.bin), 
-    VAX730 (VAX 11/730 - vmb.exe), VAX610 (MicroVAX I - ka610.bin), 
-    VAX620 (rtVAX 1000 - ka620.bin), VAX630 (MicroVAX II - ka630.bin)
+    simulator boots.  Specific examples are:
+    
+		VAX (MicroVAX 3900 - ka655x.bin)
+		VAX8600 (VAX 8600 - vmb.exe)
+		VAX780 (VAX 11/780 - vmb.exe)
+		VAX750 (VAX 11/750 - vmb.exe, ka750_old.bin, ka750_new.bin), 
+		VAX730 (VAX 11/730 - vmb.exe)
+		VAX610 (MicroVAX I - ka610.bin)
+		VAX620 (rtVAX 1000 - ka620.bin)
+		VAX630 (MicroVAX II - ka630.bin)
 
 #### Control Flow
 
@@ -215,6 +221,7 @@ Error traps can be taken for any command which returns a status other than SCPE_
 ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL.  These values can be indicated by name or by their internal numeric value (not recommended).
 
 Interactions with ASSERT command and "DO -e":
+
     DO -e		is equivalent to SET ON, which by itself it equivalent 
                 to "SET ON; ON ERROR RETURN".
     ASSERT		failure have several different actions:
@@ -359,7 +366,8 @@ Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_
    untouched.
 
 ##### Command aliases
-   commands can be aliases with environment variables.  For example:
+
+Commands can be aliases with environment variables.  For example:
    
       sim> set env say=echo
       sim> say Hello there
@@ -422,7 +430,8 @@ Ubuntu:
 
 Compiling on windows is supported with recent versions of Microsoft Visual Studio (Standard or Express) and using GCC via the MinGW environment.  Things may also work under Cygwin, but that is not the preferred windows environment.  Not all features will be available as well as with either Visual Studio or MinGW.
 
-##### Required related files.  The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt
+##### Required related files.  
+The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt
 
 ##### Visual Studio (Standard or Express) 2008, 2010, 2012, 2013 or Visual Studio Community 2015
 

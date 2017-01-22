@@ -62,6 +62,7 @@ extern t_stat SBC_reset (DEVICE *dptr);
 extern t_stat isbc064_reset (DEVICE *dptr);
 extern t_stat isbc201_reset (DEVICE *dptr, uint16);
 extern t_stat isbc202_reset (DEVICE *dptr, uint16);
+extern t_stat zx200a_reset(DEVICE *dptr, uint16 base);
 
 /* external globals */
 
@@ -69,6 +70,7 @@ extern uint8 xack;                          /* XACK signal */
 extern int32 int_req;                       /* i8080 INT signal */
 extern int32 isbc201_fdcnum;
 extern int32 isbc202_fdcnum;
+extern int32 zx200a_fdcnum;
 
 /* multibus Standard SIMH Device Data Structures */
 
@@ -141,12 +143,15 @@ t_stat multibus_svc(UNIT *uptr)
 t_stat multibus_reset(DEVICE *dptr)
 {
     SBC_reset(NULL); 
-    sim_printf("Initializing Multibus Boards\n   Multibus Boards:\n");
+    sim_printf("Initializing The Multibus\n   Multibus Boards:\n");
     isbc064_reset(NULL);
     isbc201_fdcnum = 0;
     isbc201_reset(NULL, SBC201_BASE); 
     isbc202_fdcnum = 0;
     isbc202_reset(NULL, SBC202_BASE); 
+    zx200a_fdcnum = 0;
+    zx200a_reset(NULL, ZX200A_BASE_DD);
+    zx200a_reset(NULL, ZX200A_BASE_SD);
     sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
     return SCPE_OK;
 }
@@ -244,9 +249,7 @@ struct idev dev_table[256] = {
 uint8 nulldev(t_bool flag, uint8 data)
 {
     SET_XACK(0);                        /* set no XACK */
-//    if (flag == 0)                      /* if we got here, no valid I/O device */
-//        return (0xFF);
-    return 0;
+    return 0xFF;
 }
 
 //uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint16 port, uint8 devnum)
@@ -254,9 +257,9 @@ uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port, uint8 devnum
 {
     if (dev_table[port].routine != &nulldev) {  /* port already assigned */
         if (dev_table[port].routine != routine)
-            sim_printf("      I/O Port %04X is already assigned\n", port);
+            sim_printf("         I/O Port %04X is already assigned\n", port);
     } else {
-        sim_printf("      Port %04X is assigned to dev %04X\n", port, devnum);
+        sim_printf("         Port %04X is assigned to dev %04X\n", port, devnum);
         dev_table[port].routine = routine;
         dev_table[port].devnum = devnum;
     }

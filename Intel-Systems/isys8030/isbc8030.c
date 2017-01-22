@@ -1,4 +1,4 @@
-/*  iSBC80-30.c: Intel iSBC 80/30 Processor simulator
+/*  iSBC8030.c: Intel iSBC 80/30 SBC simulator
 
     Copyright (c) 2010, William A. Beech
 
@@ -144,4 +144,4 @@ void put_mword(uint16 addr, uint16 val)
     put_mbyte(addr+1, val >> 8);
 }
 
-/* end of iSBC80-30.c */
+/* end of iSBC8030.c */

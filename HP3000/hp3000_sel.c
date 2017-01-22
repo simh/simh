@@ -25,6 +25,8 @@
 
    SEL          HP 3000 Series III Selector Channel
 
+   10-Oct-16    JDB     Renumbered debug flags to start at 0
+                        Added port_read_memory, port_write_memory macros
    11-Jul-16    JDB     Change "sel_unit" from a UNIT to an array of one UNIT
    30-Jun-16    JDB     Reestablish active_dib pointer during sel_initialize
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
@@ -289,9 +291,9 @@
 
 
 #include "hp3000_defs.h"
-#include "hp3000_cpu.h"
 #include "hp3000_cpu_ims.h"
 #include "hp3000_io.h"
+#include "hp3000_mem.h"
 
 
 
@@ -364,18 +366,18 @@ static const char *const action_name [] = {     /* indexed by SEQ_STATE */
     };
 
 
-/* Debug flags.
+/* Debug flags */
+
+#define DEB_CSRW            (1u << 0)           /* trace channel command initiations and completions */
+#define DEB_PIO             (1u << 1)           /* trace programmed I/O commands */
+#define DEB_STATE           (1u << 2)           /* trace state changes */
+#define DEB_SR              (1u << 3)           /* trace service requests */
 
 
-   Implementation notes:
+/* Memory access macros */
 
-    1. Bit 0 is reserved for the memory data trace flag.
-*/
-
-#define DEB_CSRW            (1u << 1)           /* trace channel command initiations and completions */
-#define DEB_PIO             (1u << 2)           /* trace programmed I/O commands */
-#define DEB_STATE           (1u << 3)           /* trace state changes */
-#define DEB_SR              (1u << 4)           /* trace service requests */
+#define port_read_memory(c,o,v)      mem_read  (&sel_dev, c, o, v)
+#define port_write_memory(c,o,v)     mem_write (&sel_dev, c, o, v)
 
 
 /* Channel global state */
@@ -600,8 +602,8 @@ if (sel_is_idle) {                                      /* if the channel is idl
     active_dib = dibptr;                                /* save the interface's DIB pointer */
     device_number = dibptr->device_number;              /*   and set the device number register */
 
-    cpu_read_memory (absolute_sel, device_number * 4,   /* read the initial program counter from the DRT */
-                     &program_counter);
+    port_read_memory (absolute, device_number * 4,      /* read the initial program counter from the DRT */
+                      &program_counter);
     }
 
 else {                                                  /* otherwise abort the transfer in progress */
@@ -935,7 +937,7 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
                     outbound_data = IODATA (outbound);              /* get the status or residue to return */
                     return_address = program_counter - 1 & LA_MASK; /* point at the second of the program words */
 
-                    cpu_write_memory (absolute_sel, return_address, outbound_data); /* save the word */
+                    port_write_memory (absolute, return_address, outbound_data);    /* save the word */
                     cycles = cycles - CYCLES_PER_WRITE;                             /*   and count the access */
 
                     dprintf (sel_dev, DEB_PIO, "Channel stored IOAW %06o to address %06o\n",
@@ -1029,9 +1031,9 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
                 }
 
             else {                                                  /* otherwise it's a Write or Write Chained order */
-                if (cpu_read_memory (dma_sel,                       /* if the memory read */
-                                     TO_PA (bank, address_word),    /*   from the specified bank and offset */
-                                     &input_buffer)) {              /*     succeeds */
+                if (port_read_memory (dma,                          /* if the memory read */
+                                      TO_PA (bank, address_word),   /*   from the specified bank and offset */
+                                      &input_buffer)) {             /*     succeeds */
                     cycles = cycles - CYCLES_PER_READ;              /*       then count the access */
 
                     inbound_data = input_buffer;                    /* get the word to supply */
@@ -1098,9 +1100,9 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
                   || order == sioREADC) {               /*   and if this is a Read or Read Chained order */
                     output_buffer = IODATA (outbound);  /*     then pick up the returned data word */
 
-                    if (cpu_write_memory (dma_sel,                      /* if the memory write */
-                                          TO_PA (bank, address_word),   /*   to the specified bank and offset */
-                                          output_buffer))               /*     succeeds */
+                    if (port_write_memory (dma,                         /* if the memory write */
+                                           TO_PA (bank, address_word),  /*   to the specified bank and offset */
+                                           output_buffer))              /*     succeeds */
                         cycles = cycles - CYCLES_PER_WRITE;             /*       then count the access */
 
                     else {                                                  /* otherwise the memory write failed */
@@ -1264,8 +1266,8 @@ return SCPE_OK;
 
 static void end_channel (DIB *dibptr)
 {
-cpu_write_memory (absolute_sel, device_number * 4,      /* write the program counter back to the DRT */
-                  program_counter);
+port_write_memory (absolute, device_number * 4,         /* write the program counter back to the DRT */
+                   program_counter);
 
 dibptr->service_request = FALSE;                        /* clear any outstanding device service request */
 
@@ -1302,7 +1304,7 @@ return active_dib->io_interface (active_dib, XFERERROR | CHANSO, 0);    /* tell 
 
 static void load_control (HP_WORD *value)
 {
-cpu_read_memory (absolute_sel, program_counter, value); /* read the IOCW from memory */
+port_read_memory (absolute, program_counter, value);    /* read the IOCW from memory */
 
 dprintf (sel_dev, DEB_PIO, "Channel %s IOCW %06o (%s) from address %06o\n",
          action_name [sequencer], *value,
@@ -1324,7 +1326,7 @@ return;
 
 static void load_address (HP_WORD *value)
 {
-cpu_read_memory (absolute_sel, program_counter, value); /* read the IOAW from memory */
+port_read_memory (absolute, program_counter, value);    /* read the IOAW from memory */
 
 dprintf (sel_dev, DEB_PIO, "Channel %s IOAW %06o from address %06o\n",
          action_name [sequencer], *value, program_counter);

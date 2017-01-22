@@ -489,11 +489,6 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         status  =   error code
 */
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw) {
     char disasm_result[128];
     int32 ch = val[0] & 0x7f;

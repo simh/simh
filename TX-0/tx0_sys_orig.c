@@ -98,11 +98,6 @@ const OPMAP opmap_orig [] = {
     { 0000000, NULL, NULL }
 };
 
-/* Use scp.c provided fprintf function */
-#define fprintf Fprintf
-#define fputs(_s,f) Fprintf(f,"%s",_s)
-#define fputc(_c,f) Fprintf(f,"%c",_c)
-
 t_stat fprint_sym_orig (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {

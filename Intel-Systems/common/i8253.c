@@ -35,6 +35,8 @@
 
 #include "system_defs.h"
 
+#define  DEBUG   0
+
 /* external globals */
 
 extern uint16 port;                     //port called in dev_table[port]
@@ -179,13 +181,18 @@ uint8 i8253t0(t_bool io, uint8 data)
         if (io == 0) {                  /* read data port */
             return i8253_unit[devnum].u3;
         } else {                        /* write data port */
-            sim_printf("   8253-%d: Timer 0=%02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8253-%d: Timer 0=%02X\n", devnum, data);
             i8253_unit[devnum].u3 = data;
+            //sim_activate_after (&i8253_unit[devnum], );
             return 0;
         }
     }
     return 0;
 }
+
+//read routine:
+//sim_activate_time(&i8253_unit[devnum])/sim_inst_per_second()
 
 uint8 i8253t1(t_bool io, uint8 data)
 {
@@ -195,7 +202,8 @@ uint8 i8253t1(t_bool io, uint8 data)
         if (io == 0) {                  /* read data port */
             return i8253_unit[devnum].u4;
         } else {                        /* write data port */
-            sim_printf("   8253-%d: Timer 1=%02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8253-%d: Timer 1=%02X\n", devnum, data);
             i8253_unit[devnum].u4 = data;
             return 0;
         }
@@ -211,7 +219,8 @@ uint8 i8253t2(t_bool io, uint8 data)
         if (io == 0) {                  /* read data port */
             return i8253_unit[devnum].u5;
         } else {                        /* write data port */
-            sim_printf("   8253-%d: Timer 2=%02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8253-%d: Timer 2=%02X\n", devnum, data);
             i8253_unit[devnum].u5 = data;
             return 0;
         }
@@ -228,7 +237,8 @@ uint8 i8253c(t_bool io, uint8 data)
             return i8253_unit[devnum].u6;
         } else {                        /* write data port */
             i8253_unit[devnum].u6 = data;
-            sim_printf("   8253-%d: Mode Instruction=%02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8253-%d: Mode Instruction=%02X\n", devnum, data);
             return 0;
         }
     }

@@ -75,6 +75,12 @@ int tty_typed [TTY_MAX+1], tty_instate [TTY_MAX+1];
 time_t tty_last_time [TTY_MAX+1];
 int tty_idle_count [TTY_MAX+1];
 
+/* The serial interrupt generator frequency, common for all VT lines */
+int tty_rate = 300;
+
+/* Interrupt generator mode: 1 - model time, 0 - wallclock time */
+int tty_turbo = 1;
+
 uint32 vt_sending, vt_receiving;
 uint32 tt_sending, tt_receiving;
 
@@ -95,7 +101,6 @@ void tt_print();
 void consul_receive();
 t_stat vt_clk(UNIT *);
 extern const char *get_sim_sw (const char *cptr);
-extern int32 tmr_poll;                              /* calibrated clock timer poll */
 
 int attached_console;
 
@@ -177,11 +182,11 @@ t_stat tty_reset (DEVICE *dptr)
      * and the device is always ready. */
     /* Forcing a ready interrupt. */
     PRP |= CONS_CAN_PRINT[0] | CONS_CAN_PRINT[1];
-    //return sim_activate_after (tty_unit, 1000*MSEC/300);
-    return sim_clock_coschedule (tty_unit, tmr_poll);
+    // Schedule the very first TTY interrupt to match the next clock interrupt.
+    return sim_clock_coschedule (tty_unit, 0);
 }
 
-/* Bit 19 of GRP, should be 300 Hz */
+/* Bit 19 of GRP, should be <tty_rate> Hz */
 t_stat vt_clk (UNIT * this)
 {
     int num;
@@ -251,13 +256,17 @@ t_stat vt_clk (UNIT * this)
      * e.g. until the next 250 Hz wallclock interrupt, but making sure 
      * that the model time interval between GRP_SERIAL interrupts 
      * is never less than expected.
-     * Using sim_activate_after() would be more straightforward (no need for a check
-     * as the host is faster than the target), but likely less efficient for idling.
      */
-    if (vt_is_idle() && sim_activate_time(clocks) > 1000*MSEC/300)
-        return sim_clock_coschedule (this, tmr_poll);
-    else
-        return sim_activate(this, 1000*MSEC/300);
+    if (vt_is_idle()) {
+        /* When idle, slow down the TTY interrupts to match the clock interrupts. */
+        return sim_clock_coschedule (this, 0);
+    } else if (tty_turbo) {
+        /* In "turbo" mode, the TTY works at the model speed */
+        return sim_activate(this, 1000*MSEC/tty_rate);
+    } else {
+        /* In "non-turbo" mode, the TTY interrupts imitate the true feel of the speed */
+        return sim_activate_after(this, 1000*MSEC/tty_rate);
+    }
 }
 
 t_stat tty_setmode (UNIT *u, int32 val, CONST char *cptr, void *desc)
@@ -369,6 +378,43 @@ t_stat tty_detach (UNIT *u)
     return tmxr_detach (&tty_desc, &tty_unit[0]);
 }
 
+t_stat tty_showrate (FILE *f, UNIT *up, int32 v, CONST void *dp) {
+    fprintf(f, "%d Baud", tty_rate);
+    return SCPE_OK;
+}
+
+t_stat tty_showturbo (FILE *f, UNIT *up, int32 v, CONST void *dp) {
+    fprintf(f, tty_turbo ? "Turbo" : "Authentic feel");
+    return SCPE_OK;
+}
+
+t_stat tty_setrate (UNIT *up, int32 v, CONST char *cp, void *dp) {
+    int rate;
+    if (cp)
+        rate = atoi(cp);
+    else
+        return SCPE_MISVAL;
+    if (rate <= 0 || rate > 19200 || rate % 300 != 0)
+        return SCPE_ARG;
+    rate /= 300;
+    if ((rate-1) & rate)
+        return SCPE_ARG;
+    tty_rate = rate * 300;
+    return SCPE_OK;
+}
+
+t_stat tty_setturbo (UNIT *up, int32 v, CONST char *cp, void *dp) {
+    if (!cp)
+        return SCPE_MISVAL;
+    if (!sim_strcasecmp(cp, "ON"))
+        tty_turbo = 1;
+    else if (!sim_strcasecmp(cp, "OFF"))
+        tty_turbo = 0;
+    else
+        return SCPE_ARG;
+    return SCPE_OK;
+}
+
 /*
  * TTY control:
  * set ttyN unicode     - selecting UTF-8 encoding
@@ -381,6 +427,8 @@ t_stat tty_detach (UNIT *u)
  * set ttyN destrbs     - destructive (erasing) backspace
  * set ttyN authbs      - authentic backspace (cursor left)
  * set tty disconnect=N - forceful termination of a telnet connection
+ * set tty rate=N       - I/O rate in Hz
+ * set tty turbo={ON,OFF} - TTY interrupts use model time (on) or wallclock (0ff)
  * show tty             - showing modes and types
  * show tty connections - showing IP-addresses and connection times
  * show tty statistics  - showing TX/RX byte counts
@@ -404,8 +452,12 @@ MTAB tty_mod[] = {
       "DESTRBS" },
     { TTY_BSPACE_MASK, TTY_AUTHENTIC_BSPACE, NULL,
       "AUTHBS" },
-    { MTAB_XTD | MTAB_VDV, 1, NULL,
-      "DISCONNECT", &tmxr_dscln, NULL, (void*) &tty_desc },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, NULL,
+      "DISCONNECT", &tmxr_dscln, NULL, (void*) &tty_desc, "terminates telnet connection" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "RATE",
+      "RATE", &tty_setrate, &tty_showrate, NULL, "{300,600,1200,2400,4800,9600,19200}" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "TURBO",
+      "TURBO", &tty_setturbo, &tty_showturbo, NULL, "{ON, OFF}"},
     { UNIT_ATT, UNIT_ATT, "connections",
       NULL, NULL, &tmxr_show_summ, (void*) &tty_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS",

@@ -64,7 +64,7 @@
             bit 5 - write protect
             bit 6 - write error
             bit 7 - not ready
-            If result type is 10H
+            If result type is 02H
             bit 0 - zero
             bit 1 - zero
             bit 2 - zero
@@ -77,13 +77,14 @@
         07FH - Write - Reset diskette system.
 
     Operations:
-        Recalibrate -
-        Seek -
-        Format Track -
-        Write Data -
-        Write Deleted Data -
-        Read Data -
-        Verify CRC -
+        NOP - 0x00
+        Seek - 0x01
+        Format Track - 0x02
+        Recalibrate - 0x03
+        Read Data - 0x04
+        Verify CRC - 0x05
+        Write Data - 0x06
+        Write Deleted Data - 0x07
 
     IOPB - I/O Parameter Block
         Byte 0 - Channel Word
@@ -131,7 +132,7 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
-#define  DEBUG   1
+#define  DEBUG   0
 
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
@@ -312,10 +313,11 @@ DEVICE zx200a_dev = {
 
 t_stat zx200a_reset(DEVICE *dptr, uint16 base)
 {
-    sim_printf("Initializing ZX-200A FDC Board\n");
+    sim_printf("      ZX-200A FDC Board");
     if (ZX200A_NUM) {
-        sim_printf("   ZX200A-%d: Hardware Reset\n", zx200a_fdcnum);
-        sim_printf("   ZX200A-%d: Registered at %04X\n", zx200a_fdcnum, base);
+        sim_printf(" - Found on Port %02X\n", base);
+        sim_printf("      ZX200A-%d: Hardware Reset\n", zx200a_fdcnum);
+        sim_printf("      ZX200A-%d: Registered at %04X\n", zx200a_fdcnum, base);
         zx200a[zx200a_fdcnum].baseport = base;
         reg_dev(zx200a0, base, zx200a_fdcnum); 
         reg_dev(zx200a1, base + 1, zx200a_fdcnum); 
@@ -326,7 +328,7 @@ t_stat zx200a_reset(DEVICE *dptr, uint16 base)
         zx200a_reset1(zx200a_fdcnum);
         zx200a_fdcnum++;
     } else
-        sim_printf("   No ZX-200A installed\n");
+        sim_printf(" - Not Found on Port %02X\n", base);
     return SCPE_OK;
 }
 
@@ -335,7 +337,7 @@ void zx200a_reset1(uint8 fdcnum)
     int32 i;
     UNIT *uptr;
 
-    sim_printf("   ZX-200A-%d: Initializing\n", fdcnum);
+    sim_printf("         ZX-200A-%d: Initializing\n", fdcnum);
     zx200a[fdcnum].stat = 0;            //clear status
     for (i = 0; i < FDD_NUM; i++) {     /* handle all units */
         uptr = zx200a_dev.units + i;
@@ -347,7 +349,7 @@ void zx200a_reset1(uint8 fdcnum)
             uptr->u5 = fdcnum;          //fdc device number
             uptr->u6 = i;               /* unit number - only set here! */
             uptr->flags |= UNIT_WPMODE; /* set WP in unit flags */
-            sim_printf("   ZX-200A%d: Configured, Status=%02X Not attached\n", i, zx200a[fdcnum].stat);
+            sim_printf("         ZX-200A%d: Configured, Status=%02X Not attached\n", i, zx200a[fdcnum].stat);
         } else {
             switch(i){
                 case 0:
@@ -367,7 +369,7 @@ void zx200a_reset1(uint8 fdcnum)
                     zx200a[fdcnum].rbyte1 |= RB1RD3;
                     break;
             }
-            sim_printf("   ZX-200A%d: Configured, Status=%02X Attached to %s\n",
+            sim_printf("         ZX-200A%d: Configured, Status=%02X Attached to %s\n",
                 i, zx200a[fdcnum].stat, uptr->filename);
         }
     }
@@ -546,13 +548,16 @@ uint8 zx200a3(t_bool io, uint8 data)
             switch(zx200a[fdcnum].rtype) {
                 case 0x00:
                     rslt = zx200a[fdcnum].rbyte0;
+                    zx200a[fdcnum].rtype = 0x02; //reset error
                     break;
                 case 0x02:
                     rslt = zx200a[fdcnum].rbyte1;
+                    zx200a[fdcnum].rtype = 0x00; //set error
                     break;
             }
             if (DEBUG)
-                sim_printf("\n   zx200a-%d: returned result byte=%02X", fdcnum, rslt);
+                sim_printf("\n   zx200a-%d: 0x7B returned rtype=%02X result byte=%02X",
+                    fdcnum, zx200a[fdcnum].rtype, rslt);
             return rslt;
         } else {                        /* write data port */
             ; //stop diskette operation
@@ -645,6 +650,7 @@ void zx200a_diskio(uint8 fdcnum)
     }
     //check for address error
     if (
+        ((di & 0x07) != 0x03) ||
         (sa > zx200a[fdcnum].fdd[fddnum].maxsec) ||
         ((sa + nr) > (zx200a[fdcnum].fdd[fddnum].maxsec + 1)) ||
         (sa == 0) ||

@@ -2047,8 +2047,14 @@ if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ 
     TXBUF_CHAR (lp, chr);                               /* buffer char & adv pointer */
     if ((!lp->txbfd) && (TXBUF_AVAIL (lp) <= TMXR_GUARD))/* near full? */
         lp->xmte = 0;                                   /* disable line */
-    if (lp->txlog)                                      /* log if available */
-        fputc (chr, lp->txlog);
+    if (lp->txlog) {                                    /* log if available */
+        extern TMLN *sim_oline;                         /* Make sure to avoid recursion */
+        TMLN *save_oline = sim_oline;                   /* when logging to a socket */
+
+        sim_oline = NULL;                               /* save output socket */
+        fputc (chr, lp->txlog);                         /* log to actual file */
+        sim_oline = save_oline;                         /* resture output socket */
+        }
     sim_exp_check (&lp->expect, chr);                   /* process expect rules as needed */
     return SCPE_OK;                                     /* char sent */
     }
@@ -2598,9 +2604,7 @@ while (*tptr) {
                 else
                     strcpy (lp->txlogname, mp->logfiletmpl);
                 r = sim_open_logfile (lp->txlogname, TRUE, &lp->txlog, &lp->txlogref);
-                if (r == SCPE_OK)
-                    setvbuf (lp->txlog, NULL, _IOFBF, 65536);
-                else {
+                if (r != SCPE_OK) {
                     free (lp->txlogname);
                     lp->txlogname = NULL;
                     break;
@@ -3891,17 +3895,16 @@ return _sim_activate_after_abs (uptr, (double)usecs_walltime);
 
 t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval)
 {
-int32 ticks = (interval + (sim_rtcn_tick_size (0)/2))/sim_rtcn_tick_size (0);/* Convert to ticks */
+int32 tmr = sim_rtcn_calibrated_tmr ();
+int32 ticks = (interval + (sim_rtcn_tick_size (tmr)/2))/sim_rtcn_tick_size (tmr);/* Convert to ticks */
 
-return tmxr_clock_coschedule_tmr (uptr, 0, ticks);
+return tmxr_clock_coschedule_tmr (uptr, tmr, ticks);
 }
 
 t_stat tmxr_clock_coschedule_abs (UNIT *uptr, int32 interval)
 {
-int32 ticks = (interval + (sim_rtcn_tick_size (0)/2))/sim_rtcn_tick_size (0);/* Convert to ticks */
-
 sim_cancel (uptr);
-return tmxr_clock_coschedule_tmr (uptr, 0, ticks);
+return tmxr_clock_coschedule (uptr, interval);
 }
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))

@@ -35,8 +35,8 @@
         The device has threee physical 8-bit I/O ports which could be connected
         to any parallel I/O device.
 
-        All I/O is via programmed I/O.  The i8255 has a control port (PIOS)
-        and three data ports (PIOA, PIOB, and PIOC).    
+        All I/O is via programmed I/O.  The i8255 has a control port (i8255s)
+        and three data ports (i8255a, i8255b, and i8255c).    
 
         The simulated device supports a select from I/O space and two address lines. 
         The data ports are at the lower addresses and the control port is at
@@ -77,6 +77,8 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
+#define  DEBUG   0
+
 /* external globals */
 
 extern uint16 port;                     //port called in dev_table[port]
@@ -85,10 +87,10 @@ extern uint16 port;                     //port called in dev_table[port]
 
 t_stat i8255_reset (DEVICE *dptr, uint16 baseport);
 uint8 i8255_get_dn(void);
-uint8 i8255s(t_bool io, uint8 data);
 uint8 i8255a(t_bool io, uint8 data);
 uint8 i8255b(t_bool io, uint8 data);
 uint8 i8255c(t_bool io, uint8 data);
+uint8 i8255s(t_bool io, uint8 data);
 
 /* external function prototypes */
 
@@ -181,8 +183,8 @@ t_stat i8255_reset (DEVICE *dptr, uint16 baseport)
         sim_printf("i8255_reset: too many devices!\n");
         return SCPE_MEM;
     }
-    sim_printf("   8255-%d: Reset\n", i8255_devnum);
-    sim_printf("   8255-%d: Registered at %04X\n", i8255_devnum, baseport);
+    sim_printf("      8255-%d: Reset\n", i8255_devnum);
+    sim_printf("      8255-%d: Registered at %04X\n", i8255_devnum, baseport);
     i8255_port[i8255_devnum] = baseport;
     reg_dev(i8255a, baseport, i8255_devnum); 
     reg_dev(i8255b, baseport + 1, i8255_devnum); 
@@ -220,11 +222,12 @@ uint8 i8255s(t_bool io, uint8 data)
 
     if ((devnum = i8255_get_dn()) != 0xFF) {
         if (io == 0) {                      /* read status port */
-            return i8255_unit[devnum].u3;
+            return 0xFF;                    //undefined
         } else {                            /* write status port */
             if (data & 0x80) {              /* mode instruction */
                 i8255_unit[devnum].u3 = data;
-                sim_printf("   8255-%d: Mode Instruction=%02X\n", devnum, data);
+                if (DEBUG)
+                    sim_printf("   8255-%d: Mode Instruction=%02X\n", devnum, data);
                 if (data & 0x64)
                     sim_printf("   Mode 1 and 2 not yet implemented\n");
             } else {                        /* bit set */
@@ -250,7 +253,8 @@ uint8 i8255a(t_bool io, uint8 data)
             return (i8255_A[devnum]);
         } else {                            /* write data port */
             i8255_A[devnum] = data;
-            sim_printf("   8255-%d: Port A = %02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8255-%d: Port A = %02X\n", devnum, data);
         }
     }
     return 0;
@@ -265,7 +269,8 @@ uint8 i8255b(t_bool io, uint8 data)
             return (i8255_B[devnum]);
         } else {                            /* write data port */
             i8255_B[devnum] = data;
-            sim_printf("   8255-%d: Port B = %02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8255-%d: Port B = %02X\n", devnum, data);
         }
     }
     return 0;
@@ -280,7 +285,8 @@ uint8 i8255c(t_bool io, uint8 data)
             return (i8255_C[devnum]);
         } else {                            /* write data port */
             i8255_C[devnum] = data;
-            sim_printf("   8255-%d: Port C = %02X\n", devnum, data);
+            if (DEBUG)
+                sim_printf("   8255-%d: Port C = %02X\n", devnum, data);
         }
     }
     return 0;

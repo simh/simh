@@ -25,6 +25,13 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   29_Dec-16    JDB     Changed the status mnemonic flag from REG_S to REG_T
+   07-Nov-16    JDB     Renamed cpu_byte_to_word_ea to cpu_byte_ea
+   03-Nov-16    JDB     Added zero offsets to the cpu_call_procedure calls
+   01-Nov-16    JDB     Added per-instruction trace capability
+   24-Oct-16    JDB     Renamed SEXT macro to SEXT16
+   22-Sep-16    JDB     Moved byte_to_word_address from hp3000_cpu_base.c
+   21-Sep-16    JDB     Added CIS/NOCIS option
    01-Sep-16    JDB     Add power fail/power restore support
    23-Aug-16    JDB     Add module interrupt support
    14-Jul-16    JDB     Implemented the cold dump process
@@ -219,7 +226,7 @@
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | 0   0   1   0 | 0   0   0   1 |      firmware option op       |  Firmware
+     | 0   0   1   0 | 0   0   0   1 |  option set   | option subset |  Firmware
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -302,11 +309,19 @@
 
        0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | 0   0   1   0 | 0   0   0   1 | 0   1   1   1   1   0   0 | x |  DMUL/DDIV
+     | 0   0   1   0 | 0   0   0   1 | 0   1   1   1 | 1   0   0 | x |  DMUL/DDIV
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | 0   0   1   0 | 0   0   0   1 | 0   0   0   0   1 | ext fp op |  Extended FP
+     | 0   0   1   0 | 0   0   0   1 | 0   0   0   0 | 1 | ext fp op |  Extended FP
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0   0   1   0 | 0   0   0   1 | 0   0   0   1 |    APL op     |  APL
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 |   COBOL op    |  COBOL
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -370,6 +385,12 @@
    category 4 that correspond to supported firmware options are displayed in
    uppercase, regardless of whether or not the option is enabled.  Category 4
    encodings that do not correspond to instructions are displayed in octal.
+
+   All of the base set instructions are one word in length.  Most of the
+   firmware extension instructions occupy one word as well, although some are
+   two words long.  If the first word of a two-word instruction is valid but the
+   second is not, an Unimplemented Instruction trap will occur, with P pointing
+   to the location after the second word.
 
 
    The simulator provides four stop conditions related to instruction execution
@@ -543,6 +564,13 @@
    instruction that may alter the base registers, the program, data, and stack
    segment base registers are printed.
 
+   The OPND option traces operand values.  Some instructions that take memory
+   and register operands that are difficult to decode from DATA or REG traces
+   present the operand values in a higher-level format.  The memory bank and
+   address values are always those of the operands.  The operand data and value
+   presented are specific to the instruction; see the instruction executor
+   comments for details.
+
    The PSERV option traces process clock event service entries.  Each trace
    reports whether or not the CPU was executing on the Interrupt Control Stack
    when the process clock ticked.  Execution on the ICS implies that the
@@ -604,6 +632,14 @@
                   |    +-------------------- zero
                   +------------------------- octal bank (DBANK)
 
+     >>CPU  opnd: 00.135771  000000    DFLC '+','!'
+     >>CPU  opnd: 00.045071  000252    target fraction 3 length 6,"002222"
+                  ~~ ~~~~~~  ~~~~~~    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  |    |       |         |
+                  |    |       |         +-- operand-specific value
+                  |    |       +------------ operand-specific data
+                  |    +-------------------- octal address (effective address)
+                  +------------------------- octal bank (PBANK, DBANK, or SBANK)
 
      >>CPU pserv: Process clock service entered not on the ICS
 
@@ -676,14 +712,9 @@
 #include "hp3000_defs.h"
 #include "hp3000_cpu.h"
 #include "hp3000_cpu_ims.h"
+#include "hp3000_mem.h"
 #include "hp3000_io.h"
 
-
-
-/* External I/O data structures */
-
-extern DEVICE iop_dev;                          /* I/O Processor */
-extern DEVICE sel_dev;                          /* Selector Channel */
 
 
 /* Program constants */
@@ -724,7 +755,7 @@ extern DEVICE sel_dev;                          /* Selector Channel */
 
 DEVICE cpu_dev;                                 /* incomplete device structure */
 
-REG *sim_PC;                                    /* the pointer to the P register */
+REG *sim_PC = NULL;                             /* the pointer to the P register */
 
 
 /* CPU global data structures */
@@ -821,18 +852,16 @@ UNIT       *cpu_pclk_uptr     = &cpu_unit [0];  /* a (constant) pointer to the p
 
 /* CPU local state */
 
-static uint32 sim_stops      = 0;               /* the current simulation stop flag settings */
-static uint32 cpu_speed      = 1;               /* the CPU speed, expressed as a multiplier of a real machine */
-static uint32 pclk_increment = 1;               /* the process clock increment per event service */
-static uint32 dump_control   = 0002006u;        /* the cold dump control word (default CNTL = 4, DEVNO = 6 */
+static uint32  sim_stops      = 0;              /* the current simulation stop flag settings */
+static uint32  cpu_speed      = 1;              /* the CPU speed, expressed as a multiplier of a real machine */
+static uint32  pclk_increment = 1;              /* the process clock increment per event service */
+static uint32  dump_control   = 0002006u;       /* the cold dump control word (default CNTL = 4, DEVNO = 6 */
+static uint32  debug_save     = 0;              /* the current debug trace flag settings */
+static HP_WORD exec_mask      = 0;              /* the current instruction execution trace mask */
+static HP_WORD exec_match     = D16_UMAX;       /* the current instruction execution trace matching value */
 
 
 /* CPU local data structures */
-
-
-/* Main memory */
-
-static MEMORY_WORD *M = NULL;                           /* the pointer to the main memory allocation */
 
 
 /* Interrupt classification names */
@@ -923,7 +952,7 @@ struct FEATURE_TABLE {
 
 static const struct FEATURE_TABLE cpu_features [] = {   /* features indexed by CPU_MODEL */
   { 0,                                                  /*   UNIT_SERIES_III */
-    0,
+    UNIT_CIS,
     1024 * 1024 },
   { 0,                                                  /*   UNIT_SERIES_II */
     0,
@@ -931,45 +960,13 @@ static const struct FEATURE_TABLE cpu_features [] = {   /* features indexed by C
   };
 
 
-/* Memory access classification table */
-
-typedef struct {
-    HP_WORD     *bank_ptr;                      /* a pointer to the bank register */
-    DEVICE      *device_ptr;                    /* a pointer to the accessing device */
-    uint32      debug_flag;                     /* the debug flag for tracing */
-    t_bool      irq;                            /* TRUE if an interrupt is requested on error */
-    const char  *name;                          /* the classification name */
-    } ACCESS_PROPERTIES;
-
-
-static const ACCESS_PROPERTIES access [] = {    /* indexed by ACCESS_CLASS */
-/*    bank_ptr  device_ptr  debug_flag   irq    name                */
-/*    --------  ----------  ----------  ------  ------------------- */
-    {  NULL,    & iop_dev,  DEB_MDATA,  FALSE,  "absolute"          },  /* absolute_iop */
-    {  NULL,    & iop_dev,  DEB_MDATA,  FALSE,  "dma"               },  /* dma_iop */
-    {  NULL,    & sel_dev,  DEB_MDATA,  FALSE,  "absolute"          },  /* absolute_sel */
-    {  NULL,    & sel_dev,  DEB_MDATA,  FALSE,  "dma"               },  /* dma_sel */
-    {  NULL,    & cpu_dev,  DEB_MDATA,  TRUE,   "absolute"          },  /* absolute */
-    {  NULL,    & cpu_dev,  DEB_MDATA,  TRUE,   "absolute"          },  /* absolute_checked */
-    { & PBANK,  & cpu_dev,  DEB_FETCH,  TRUE,   "instruction fetch" },  /* fetch */
-    { & PBANK,  & cpu_dev,  DEB_FETCH,  TRUE,   "instruction fetch" },  /* fetch_checked */
-    { & PBANK,  & cpu_dev,  DEB_MDATA,  TRUE,   "program"           },  /* program */
-    { & PBANK,  & cpu_dev,  DEB_MDATA,  TRUE,   "program"           },  /* program_checked */
-    { & DBANK,  & cpu_dev,  DEB_MDATA,  TRUE,   "data"              },  /* data */
-    { & DBANK,  & cpu_dev,  DEB_MDATA,  TRUE,   "data"              },  /* data_checked */
-    { & SBANK,  & cpu_dev,  DEB_MDATA,  TRUE,   "stack"             },  /* stack */
-    { & SBANK,  & cpu_dev,  DEB_MDATA,  TRUE,   "stack"             }   /* stack_checked */
-    };
-
-
 /* CPU local SCP support routine declarations */
 
 static t_stat cpu_service (UNIT    *uptr);
 static t_stat cpu_reset   (DEVICE  *dptr);
-static t_stat cpu_examine (t_value *eval_array, t_addr address, UNIT *uptr, int32 switches);
-static t_stat cpu_deposit (t_value value,       t_addr address, UNIT *uptr, int32 switches);
 
 static t_stat set_stops  (UNIT *uptr, int32 option,     CONST char *cptr, void *desc);
+static t_stat set_exec   (UNIT *uptr, int32 option,     CONST char *cptr, void *desc);
 static t_stat set_dump   (UNIT *uptr, int32 option,     CONST char *cptr, void *desc);
 static t_stat set_size   (UNIT *uptr, int32 new_size,   CONST char *cptr, void *desc);
 static t_stat set_model  (UNIT *uptr, int32 new_model,  CONST char *cptr, void *desc);
@@ -977,6 +974,7 @@ static t_stat set_option (UNIT *uptr, int32 new_option, CONST char *cptr, void *
 static t_stat set_pfars  (UNIT *uptr, int32 setting,    CONST char *cptr, void *desc);
 
 static t_stat show_stops (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat show_exec  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat show_dump  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat show_speed (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
@@ -1018,7 +1016,7 @@ UNIT cpu_unit [] = {
      - REG_A  permits any display
      - REG_B  permits binary display
      - REG_M  defaults to CPU instruction mnemonic display
-     - REG_S  defaults to CPU status mnemonic display
+     - REG_T  defaults to CPU status mnemonic display
 
 
  Implementation notes:
@@ -1054,7 +1052,7 @@ static REG cpu_reg [] = {
     { ORDATA (RC,      TR [2],               16),          REG_A          | REG_FIT },  /* top of stack - 2 register */
     { ORDATA (RD,      TR [3],               16),          REG_A          | REG_FIT },  /* top of stack - 3 register */
     { ORDATA (X,       X,                    16),          REG_A          | REG_FIT },  /* index register */
-    { ORDATA (STA,     STA,                  16),          REG_S | REG_B  | REG_FIT },  /* status register */
+    { ORDATA (STA,     STA,                  16),          REG_T | REG_B  | REG_FIT },  /* status register */
     { ORDATA (SWCH,    SWCH,                 16),          REG_A          | REG_FIT },  /* switch register */
     { ORDATA (CPX1,    CPX1,                 16),          REG_B          | REG_FIT },  /* run-mode interrupt flags */
     { ORDATA (CPX2,    CPX2,                 16),          REG_B          | REG_FIT },  /* halt-mode interrupt flags */
@@ -1082,6 +1080,9 @@ static MTAB cpu_mod [] = {
     { UNIT_EIS,     UNIT_EIS,        "EIS",               NULL,         &set_option, NULL,    NULL       },
     { UNIT_EIS,     0,               "no EIS",            "NOEIS",      NULL,        NULL,    NULL       },
 
+    { UNIT_CIS,     UNIT_CIS,        "CIS",               "CIS",        &set_option, NULL,    NULL       },
+    { UNIT_CIS,     0,               "no CIS",            "NOCIS",      NULL,        NULL,    NULL       },
+
     { UNIT_PFARS,     UNIT_PFARS,    "auto-restart",      "ARS",        &set_pfars,  NULL,    NULL       },
     { UNIT_PFARS,              0,    "no auto-restart",   "NOARS",      &set_pfars,  NULL,    NULL       },
 
@@ -1106,6 +1107,9 @@ static MTAB cpu_mod [] = {
     { MTAB_XDV | MTAB_NMO,      1,      "STOPS",      "STOP",       &set_stops,    &show_stops,    NULL       },
     { MTAB_XDV,                 0,      NULL,         "NOSTOP",     &set_stops,    NULL,           NULL       },
 
+    { MTAB_XDV | MTAB_NMO,      1,      "EXEC",       "EXEC",       &set_exec,     &show_exec,     NULL       },
+    { MTAB_XDV,                 0,      NULL,         "NOEXEC",     &set_exec,     NULL,           NULL       },
+
     { MTAB_XDV | MTAB_NMO,      0,      "SPEED",      NULL,         NULL,          &show_speed,    NULL       },
 
     { 0 }
@@ -1115,12 +1119,14 @@ static MTAB cpu_mod [] = {
 /* Debugging trace list */
 
 static DEBTAB cpu_deb [] = {
-    { "INSTR", DEB_INSTR },                     /* instruction executions */
-    { "DATA",  DEB_MDATA },                     /* data accesses */
-    { "FETCH", DEB_FETCH },                     /* instruction fetches */
-    { "REG",   DEB_REG   },                     /* register values */
-    { "PSERV", DEB_PSERV },                     /* process clock service events */
-    { NULL,    0         }
+    { "INSTR", DEB_INSTR  },                    /* instructions */
+    { "DATA",  DEB_MDATA  },                    /* memory data accesses */
+    { "FETCH", DEB_MFETCH },                    /* memory instruction fetches */
+    { "REG",   DEB_REG    },                    /* register values */
+    { "OPND",  DEB_MOPND  },                    /* memory operand values */
+    { "EXEC",  DEB_EXEC   },                    /* instruction execution states */
+    { "PSERV", DEB_PSERV  },                    /* process clock service events */
+    { NULL,    0          }
     };
 
 /* Debugging stop list */
@@ -1147,8 +1153,8 @@ DEVICE cpu_dev = {
     1,                                          /* address increment */
     8,                                          /* data radix */
     16,                                         /* data width */
-    &cpu_examine,                               /* examine routine */
-    &cpu_deposit,                               /* deposit routine */
+    &mem_examine,                               /* examine routine */
+    &mem_deposit,                               /* deposit routine */
     &cpu_reset,                                 /* reset routine */
     NULL,                                       /* boot routine */
     NULL,                                       /* attach routine */
@@ -1354,6 +1360,20 @@ DEVICE cpu_dev = {
        call is dictated by the desire to report both the original trap and the
        System Halt trap, even though the placement results in the display of the
        incoming parameter value, rather than the stacked parameter value.
+
+    5. The execution trace (DEB_EXEC) match test is performed in two parts to
+       display the register values both before and after the instruction
+       execution.  Consequently, the enable test is done before the register
+       trace, and the disable test is done after.
+
+    6. The execution test (exec_test) is set FALSE even though execution tracing
+       is not specified.  This is done solely to reassure the compiler that the
+       value is not clobbered by a longjmp call.
+
+    7. The set of debug trace flags is restored in the postlude (and therefore
+       also saved in the instruction prelude) to ensure that a simulation stop
+       that occurs while an execution trace is in progress does not exit with
+       the flags set improperly.
 */
 
 t_stat sim_instr (void)
@@ -1369,10 +1389,13 @@ static const char *const stack_formats [] = {           /* stack register displa
 int        abortval;
 HP_WORD    label, parameter, device;
 TRAP_CLASS trap;
+t_bool     exec_test;
 t_stat     status = SCPE_OK;
 
 
 /* Instruction prelude */
+
+debug_save = cpu_dev.dctrl;                             /* save the current set of debug flags for later restoration */
 
 if (sim_switches & SWMASK ('B'))                        /* if a simulation stop bypass was requested */
     cpu_stop_flags = SS_BYPASSED;                       /*   then clear the stop flags for the first instruction */
@@ -1516,7 +1539,7 @@ if (abortval) {                                         /* if a microcode abort 
 
         X = CIR;                                        /* save the current instruction for restarting */
 
-        cpu_call_procedure (label);                     /* set up PB, P, PL, and STA to call the procedure */
+        cpu_call_procedure (label, 0);                  /* set up PB, P, PL, and STA to call the procedure */
 
         cpu_base_changed = TRUE;                        /* one or more base registers have changed */
         }
@@ -1559,22 +1582,51 @@ while (status == SCPE_OK) {                             /* execute until simulat
             sim_interval = sim_interval + 1;                /*         and don't count the cycle */
             }
 
-        else {                                          /* otherwise execute the next instruction */
-            if (DPRINTING (cpu_dev, DEB_REG)) {         /* if register tracing is enabled */
-                hp_debug (&cpu_dev, DEB_REG,            /*   then output the active TOS registers */
-                          stack_formats [SR],
-                          SBANK, SM, SR, RA, RB, RC, RD);
+        else {                                              /* otherwise execute the next instruction */
+            if (DPRINTING (cpu_dev, DEB_EXEC | DEB_REG)) {  /* if execution or register tracing is enabled */
+                if (cpu_dev.dctrl & DEB_EXEC)               /*   then if tracing execution */
+                    if (STA & STATUS_R)                     /*     then if the right-hand stack op is pending */
+                        exec_test =                         /*       then the execution test succeeds if */
+                           (CIR << STACKOP_A_SHIFT          /*         the right-hand stack op */
+                             & STACKOP_A_MASK               /*           matches the test criteria */
+                             & exec_mask) == exec_match;    /*             for the left-hand stack op value */
+                    else                                    /*     otherwise */
+                        exec_test =                         /*       then the execution test succeeds if */
+                           (NIR & exec_mask) == exec_match; /*         the next instruction matches the test criteria */
+                else                                        /*   otherwise */
+                    exec_test = FALSE;                      /*     there is no execution test */
 
-                fprintf (sim_deb, "X %06o, %s\n",       /* output the index and status registers */
-                         X, fmt_status (STA));
+                if (cpu_dev.dctrl & DEB_EXEC                /* if execution tracing is enabled */
+                  && cpu_dev.dctrl != DEB_ALL               /*   and is currently inactive */
+                  && exec_test) {                           /*     and the matching test succeeds */
+                    debug_save = cpu_dev.dctrl;             /*       then save the current trace flag set */
+                    cpu_dev.dctrl = DEB_ALL;                /*         and turn on full tracing */
+                    }
 
-                if (cpu_base_changed) {                 /* if the base registers have changed since last time */
-                    hp_debug (&cpu_dev, DEB_REG,        /*   then output the base registers */
-                              BOV_FORMAT "  PB %06o, PL %06o, DL %06o, DB %06o, Q %06o, Z %06o\n",
-                              DBANK, 0, STA & STATUS_CS_MASK,
-                              PB, PL, DL, DB, Q, Z);
+                if (cpu_dev.dctrl & DEB_REG) {              /* if register tracing is enabled */
+                    hp_debug (&cpu_dev, DEB_REG,            /*   then output the active TOS registers */
+                              stack_formats [SR],
+                              SBANK, SM, SR, RA, RB, RC, RD);
 
-                    cpu_base_changed = FALSE;           /* clear the base register change flag */
+                    fprintf (sim_deb, "X %06o, %s\n",       /* output the index and status registers */
+                             X, fmt_status (STA));
+
+                    if (cpu_base_changed) {                 /* if the base registers have been altered */
+                        hp_debug (&cpu_dev, DEB_REG,        /*   then output the base register values */
+                                  BOV_FORMAT "  PB %06o, PL %06o, DL %06o, DB %06o, Q %06o, Z %06o\n",
+                                  DBANK, 0, STATUS_CS (STA),
+                                  PB, PL, DL, DB, Q, Z);
+
+                        cpu_base_changed = FALSE;           /* clear the base registers changed flag */
+                        }
+                    }
+
+                if (cpu_dev.dctrl & DEB_EXEC                /* if execution tracing is enabled */
+                  && cpu_dev.dctrl == DEB_ALL               /*   and is currently active */
+                  && ! exec_test) {                         /*     and the matching test fails */
+                    cpu_dev.dctrl = debug_save;             /*       then restore the saved debug flag set */
+                    hp_debug (&cpu_dev, DEB_EXEC,           /*         and add a separator to the trace log */
+                              "*****************\n");
                     }
                 }
 
@@ -1592,7 +1644,7 @@ while (status == SCPE_OK) {                             /* execute until simulat
                 hp_debug (&cpu_dev, DEB_INSTR, BOV_FORMAT,  /* print the address and the instruction opcode */
                           PBANK, P - 2 & R_MASK, CIR);      /*   as an octal value */
 
-                if (fprint_cpu (sim_deb, sim_eval, 0, SIM_SW_STOP) != SCPE_OK)  /* print the mnemonic; if that fails */
+                if (fprint_cpu (sim_deb, sim_eval, 0, SIM_SW_STOP) == SCPE_ARG) /* print the mnemonic; if that fails */
                     fprint_val (sim_deb, sim_eval [0], cpu_dev.dradix,          /*   then print the numeric */
                                 cpu_dev.dwidth, PV_RZRO);                       /*     value again */
 
@@ -1621,6 +1673,8 @@ while (status == SCPE_OK) {                             /* execute until simulat
 
 
 /* Instruction postlude */
+
+cpu_dev.dctrl = debug_save;                             /* restore the flag set */
 
 cpu_update_pclk ();                                     /* update the process clock */
 clk_update_counter ();                                  /*   and system clock counters */
@@ -1871,253 +1925,6 @@ return status;                                          /* return the operation 
 
 
 /* CPU global utility routines */
-
-
-/* Read a word from memory.
-
-   Read and return a word from memory at the indicated offset and implied bank.
-   If the access succeeds, the routine returns TRUE.  If the accessed word is
-   outside of physical memory, the Illegal Address interrupt flag is set for
-   CPU accesses, the value is set to 0, and the routine returns FALSE.  If
-   access checking is requested, and the check fails, a Bounds Violation trap is
-   taken.
-
-   On entry, "offset" is a logical offset into the memory bank implied by the
-   access classification, except for absolute and DMA accesses, for which
-   "offset" is a physical address.  CPU access classifications other than fetch
-   may be checked or unchecked.  Checked accesses must specify locations within
-   the corresponding segments (PB <= ea <= PL for program, or DL <= ea <= S for
-   data or stack) unless the CPU in is privileged mode, and those that reference
-   the TOS locations return values from the TOS registers instead of memory.
-
-   For checked data and stack accesses, there are three cases, depending on the
-   effective address:
-
-     - EA >= DL and EA <= SM : read from memory
-
-     - EA > SM and EA <= SM + SR : read from a TOS register if bank = stack bank
-
-     - EA < DL or EA > SM + SR : trap if not privileged, else read from memory
-
-
-   Implementation notes:
-
-    1. The physical address is formed by merging the bank and offset without
-       masking either value to their respective register sizes.  Masking is not
-       necessary, as it was done when the bank registers were loaded, and it is
-       faster to avoid it.  Primarily, though, it is not done so that an invalid
-       bank register value (e.g., loaded from a corrupted stack) will generate
-       an illegal address interrupt and so will pinpoint the problem for
-       debugging.
-
-    2. In hardware, bounds checking is performed explicitly by microcode.  In
-       simulation, bounds checking is performed explicitly by employing the
-       "_checked" versions of the desired access classifications.
-
-    3. The "_iop" and "_sel" classifications serve only to select the correct
-       accessing device pointer and illegal address interrupt request state.
-*/
-
-t_bool cpu_read_memory (ACCESS_CLASS classification, uint32 offset, HP_WORD *value)
-{
-uint32 bank, address;
-
-if (access [classification].bank_ptr == NULL) {         /* if this is an absolute or DMA access */
-    address = offset;                                   /*   then the "offset" is already a physical address */
-    bank = TO_BANK (offset);                            /* separate the bank and offset */
-    offset = TO_OFFSET (offset);                        /*   in case tracing is active */
-    }
-
-else {                                                  /* otherwise the bank register is implied */
-    bank = *access [classification].bank_ptr;           /*   by the access classification */
-    address = bank << LA_WIDTH | offset;                /* form the physical address with the supplied offset */
-    }
-
-if (address >= MEMSIZE) {                               /* if this access is beyond the memory size */
-    if (access [classification].irq)                    /*   then if an interrupt is requested */
-        CPX1 |= cpx1_ILLADDR;                           /*     then set the Illegal Address interrupt */
-
-    *value = 0;                                         /* return a zero value */
-    return FALSE;                                       /*   and indicate failure to the caller */
-    }
-
-else {                                                  /* otherwise the access is within the memory range */
-    switch (classification) {                           /*   so dispatch on the access classification */
-
-        case absolute_iop:
-        case dma_iop:
-        case absolute_sel:
-        case dma_sel:
-        case absolute:
-        case fetch:
-        case program:
-        case data:
-        case stack:
-            *value = (HP_WORD) M [address];             /* unchecked access values come from memory */
-            break;
-
-
-        case absolute_checked:
-            if (offset > SM && offset <= SM + SR && bank == SBANK)  /* if the offset is within the TOS */
-                *value = TR [SM + SR - offset];                     /*   then the value comes from a TOS register */
-            else                                                    /* otherwise */
-                *value = (HP_WORD) M [address];                     /*   the value comes from memory */
-            break;
-
-
-        case fetch_checked:
-            if (PB <= offset && offset <= PL)           /* if the offset is within the program segment bounds */
-                *value = (HP_WORD) M [address];         /*   then the value comes from memory */
-            else                                        /* otherwise */
-                MICRO_ABORT (trap_Bounds_Violation);    /*   trap for a bounds violation */
-            break;
-
-
-        case program_checked:
-            if (PB <= offset && offset <= PL || PRIV)   /* if the offset is within bounds or is privileged */
-                *value = (HP_WORD) M [address];         /*   then the value comes from memory */
-            else                                        /* otherwise */
-                MICRO_ABORT (trap_Bounds_Violation);    /*   trap for a bounds violation */
-            break;
-
-
-        case data_checked:
-        case stack_checked:
-            if (offset > SM && offset <= SM + SR && bank == SBANK)  /* if the offset is within the TOS */
-                *value = TR [SM + SR - offset];                     /*   then the value comes from a TOS register */
-            else if (DL <= offset && offset <= SM + SR || PRIV)     /* if the offset is within bounds or is privileged */
-                *value = (HP_WORD) M [address];                     /*   then the value comes from memory */
-            else                                                    /* otherwise */
-                MICRO_ABORT (trap_Bounds_Violation);                /*   trap for a bounds violation */
-            break;
-        }                                               /* all cases are handled */
-
-    dpprintf (access [classification].device_ptr, access [classification].debug_flag,
-              BOV_FORMAT "  %s%s\n", bank, offset, *value,
-              access [classification].name,
-              access [classification].debug_flag == DEB_MDATA ? " read" : "");
-
-    return TRUE;                                        /* indicate success with the returned value stored */
-    }
-}
-
-
-/* Write a word to memory.
-
-   Write a word to memory at the indicated offset and implied bank.  If the
-   write succeeds, the routine returns TRUE.  If the accessed location is outside
-   of physical memory, the Illegal Address interrupt flag is set for CPU
-   accesses, the write is ignored, and the routine returns FALSE.  If access
-   checking is requested, and the check fails, a Bounds Violation trap is taken.
-
-   For checked data and stack accesses, there are three cases, depending on the
-   effective address:
-
-     - EA >= DL and EA <= SM + SR : write to memory
-
-     - EA > SM and EA <= SM + SR : write to a TOS register if bank = stack bank
-
-     - EA < DL or EA > SM + SR : trap if not privileged, else write to memory
-
-   Note that cases 1 and 2 together imply that a write to a TOS register also
-   writes through to the underlying memory.
-
-
-   Implementation notes:
-
-    1. The physical address is formed by merging the bank and offset without
-       masking either value to their respective register sizes.  Masking is not
-       necessary, as it was done when the bank registers were loaded, and it is
-       faster to avoid it.  Primarily, though, it is not done so that an invalid
-       bank register value (e.g., loaded from a corrupted stack) will generate
-       an illegal address interrupt and so will pinpoint the problem for
-       debugging.
-
-    2. In hardware, bounds checking is performed explicitly by microcode.  In
-       simulation, bounds checking is performed explicitly by employing the
-       "_checked" versions of the desired access classifications.
-
-    3. The Series II microcode shows that only the STOR and STD instructions
-       write through to memory when the effective address is in a TOS register.
-       However, in simulation, all (checked) stack and data writes will write
-       through.
-
-    4. The "_iop" and "_sel" classifications serve only to select the correct
-       accessing device pointer and illegal address interrupt request state.
-*/
-
-t_bool cpu_write_memory (ACCESS_CLASS classification, uint32 offset, HP_WORD value)
-{
-uint32 bank, address;
-
-if (access [classification].bank_ptr == NULL) {         /* if this is an absolute or DMA access */
-    address = offset;                                   /*   then "offset" is already a physical address */
-    bank = TO_BANK (offset);                            /* separate the bank and offset */
-    offset = TO_OFFSET (offset);                        /*   in case tracing is active */
-    }
-
-else {                                                  /* otherwise the bank register is implied */
-    bank = *access [classification].bank_ptr;           /*    by the access classification */
-    address = bank << LA_WIDTH | offset;                /* form the physical address with the supplied offset */
-    }
-
-if (address >= MEMSIZE) {                               /* if this access is beyond the memory size */
-    if (access [classification].irq)                    /*   then if an interrupt is requested */
-        CPX1 |= cpx1_ILLADDR;                           /*     then set the Illegal Address interrupt */
-
-    return FALSE;                                       /* indicate failure to the caller */
-    }
-
-else {                                                  /* otherwise the access is within the memory range */
-    switch (classification) {                           /*   so dispatch on the access classification */
-
-        case absolute_iop:
-        case dma_iop:
-        case absolute_sel:
-        case dma_sel:
-        case absolute:
-        case data:
-        case stack:
-            M [address] = (MEMORY_WORD) value;          /* write the value to memory */
-            break;
-
-
-        case absolute_checked:
-            if (offset > SM && offset <= SM + SR && bank == SBANK)  /* if the offset is within the TOS */
-                TR [SM + SR - offset] = value;                      /*   then write the value to a TOS register */
-            else                                                    /* otherwise */
-                M [address] = (MEMORY_WORD) value;                  /*   write the value to memory */
-            break;
-
-
-        case data_checked:
-        case stack_checked:
-            if (offset > SM && offset <= SM + SR && bank == SBANK)  /* if the offset is within the TOS */
-                TR [SM + SR - offset] = value;                      /*   then write the value to a TOS register */
-
-            if (DL <= offset && offset <= SM + SR || PRIV)          /* if the offset is within bounds or is privileged */
-                M [address] = (MEMORY_WORD) value;                  /*   then write the value to memory */
-            else                                                    /* otherwise */
-                MICRO_ABORT (trap_Bounds_Violation);                /*   trap for a bounds violation */
-            break;
-
-
-        case fetch:
-        case fetch_checked:
-        case program:
-        case program_checked:                           /* these classes cannot be used for writing */
-            CPX1 |= cpx1_ADDRPAR;                       /*   so set an Address Parity Error interrupt */
-            return FALSE;                               /*     and indicate failure to the caller */
-
-        }                                               /* all cases are handled */
-
-    dpprintf (access [classification].device_ptr, access [classification].debug_flag,
-              BOV_FORMAT "  %s write\n", bank, offset, value,
-              access [classification].name);
-
-    return TRUE;                                        /* indicate success with the value written */
-    }
-}
 
 
 /* Process a run-mode interrupt.
@@ -2677,6 +2484,11 @@ return;
     3. The System Reference Manual states that byte offsets are interpreted as
        negative if the effective address does not lie between DL and Z.
        However, the Series II microcode actually uses DL and S for the limits.
+
+    4. This routine calculates the effective address for the memory address
+       instructions.  These instructions always bounds-check their accesses, and
+       data and stack accesses are mapped to the TOS registers if the effective
+       address lies between SM and SM + SR within the stack bank.
 */
 
 void cpu_ea (HP_WORD mode_disp, ACCESS_CLASS *classification, HP_WORD *offset, BYTE_SELECTOR *selector)
@@ -2707,7 +2519,7 @@ switch ((mode_disp & MODE_MASK) >> MODE_SHIFT) {        /* dispatch on the addre
     case 012:
     case 013:                                           /* positive DB-relative displacement */
         base = DB + (mode_disp & DISPL_255_MASK);       /* add the displacement to the base */
-        class = data_checked;                           /*   and classify as a data reference */
+        class = data_mapped_checked;                    /*   and classify as a data reference */
         break;
 
     case 014:
@@ -2741,7 +2553,7 @@ else {                                                      /* otherwise the mod
 
     else if (class != program_checked) {                    /* otherwise if it is a data or stack reference */
         base = DB;                                          /*   then DB is the base for the displacement */
-        class = data_checked;                               /* reclassify as a data reference */
+        class = data_mapped_checked;                        /* reclassify as a data reference */
         }
                                                         /* otherwise, this is a program reference */
     }                                                   /*   which is self-referential */
@@ -2776,6 +2588,98 @@ else {                                                  /* otherwise an indexed 
 *classification = class;                                /*   return values */
 
 return;
+}
+
+
+/* Convert a data- or program-relative byte address to a word effective address.
+
+   The supplied byte offset from DB or PB is converted to a memory address,
+   bounds-checked if requested, and returned.  If the supplied block length is
+   not zero, the converted address is assumed to be the starting address of a
+   block, and an ending address, based on the block length, is calculated and
+   bounds-checked if requested.  If either address lies outside of the segment
+   associated with the access class, a Bounds Violation trap occurs, unless a
+   privileged data access is requested.
+
+   The "class" parameter indicates whether the offset is from DB or PB and
+   must be "data", "data_checked", "program", or "program_checked".  No other
+   access classes are supported.  In particular, "data_mapped" and
+   "data_mapped_checked" are not allowed, as callers of this routine never map
+   accesses to the TOS registers.
+
+   Byte offsets into data segments present problems, in that negative offsets
+   are permitted (to access the DL-to-DB area), but there are not enough bits to
+   represent all locations unambiguously in the potential -32K to +32K word
+   offset range.  Therefore, a byte offset with bit 0 = 1 can represent either a
+   positive or negative word offset from DB, depending on the interpretation.
+   The HP 3000 adopts the convention that if the address resulting from a
+   positive-offset interpretation does not fall within the DL-to-S range, then
+   32K is added to the address, effectively changing the interpretation from a
+   positive to a negative offset.  If this new address does not fall within the
+   DL-to-S range, a Bounds Violation trap occurs if the mode is non-privileged.
+
+   The reinterpretation as a negative offset is performed only if the CPU is not
+   in split-stack mode (where either DBANK is different from SBANK, or DB does
+   not lie between DL and Z), as extra data segments do not permit negative-DB
+   addressing.  Reinterpretation is also not used for code segments, as negative
+   offsets from PB are not permitted.
+
+
+   Implementation notes:
+
+    1. This routine implements the DBBC microcode subroutine.
+*/
+
+uint32 cpu_byte_ea (ACCESS_CLASS class, uint32 byte_offset, uint32 block_length)
+{
+uint32 starting_word, ending_word, increment;
+
+if (block_length & D16_SIGN)                            /* if the block length is negative */
+    increment = 0177777;                                /*   then the memory increment is negative also */
+else                                                    /* otherwise */
+    increment = 1;                                      /*   the increment is positive */
+
+if (class == program || class == program_checked) {     /* if this is a program access */
+    starting_word = PB + (byte_offset >> 1) & LA_MASK;  /*   then determine the starting word address */
+
+    if (class == program_checked                        /* if checking is requested */
+      && starting_word < PB || starting_word > PL)      /*   and the starting address is out of range */
+        MICRO_ABORT (trap_Bounds_Violation);            /*     then trap for a bounds violation */
+
+    if (block_length != 0) {                            /* if a block length was supplied */
+        ending_word =                                   /*   then determine the ending address */
+           starting_word + ((block_length - increment + (byte_offset & 1)) >> 1) & LA_MASK;
+
+        if (class == program_checked                    /* if checking is requested */
+          && ending_word < PB || ending_word > PL)      /*   and the ending address is out of range */
+            MICRO_ABORT (trap_Bounds_Violation);        /*     then trap for a bounds violation */
+        }
+    }
+
+else {                                                  /* otherwise this is a data address */
+    starting_word = DB + (byte_offset >> 1) & LA_MASK;  /*   so determine the starting word address */
+
+    if (DBANK == SBANK && DL <= DB && DB <= Z           /* if not in split-stack mode */
+      && (starting_word < DL || starting_word > SM)) {  /*   and the word address is out of range */
+        starting_word = starting_word ^ D16_SIGN;       /*     then add 32K and try again */
+
+        if (class == data_checked && NPRV                   /* if checking is requested and non-privileged */
+          && (starting_word < DL || starting_word > SM))    /*   and still out of range */
+            MICRO_ABORT (trap_Bounds_Violation);            /*     then trap for a bounds violation */
+        }
+
+    if (block_length != 0) {                            /* if a block length was supplied */
+        ending_word =                                   /*   then determine the ending word address */
+           starting_word + ((block_length - increment + (byte_offset & 1)) >> 1) & LA_MASK;
+
+        if (class == data_checked && NPRV               /* if checking is requested and non-privileged */
+          && (ending_word < DL || ending_word > SM))    /*   and the address is out of range */
+            MICRO_ABORT (trap_Bounds_Violation);        /*     then trap for a bounds violation */
+        }
+    }
+
+
+return starting_word;                                   /* return the starting word address */
 }
 
 
@@ -2858,7 +2762,7 @@ cpu_write_memory (stack, SM, parameter);                /*   and push the parame
 
 X = CIR;                                                /* save the CIR in the index register */
 
-cpu_call_procedure (label);                             /* set up to call the interrupt handling procedure */
+cpu_call_procedure (label, 0);                          /* set up to call the interrupt handling procedure */
 
 return;
 }
@@ -3120,7 +3024,8 @@ return;                                                 /*   before returning to
    interrupt and trap routines to set up the handler procedures.  On entry,
    "label" contains an external program label indicating the segment number and
    Segment Transfer Table entry number describing the procedure, or a local
-   program label indicating the starting address of the procedure.  On exit, the
+   program label indicating the starting address of the procedure, and "offset"
+   contains an offset to be added to the starting address.  On exit, the
    registers are set up for execution to resume with the first instruction of
    the procedure.
 
@@ -3139,13 +3044,17 @@ return;                                                 /*   before returning to
    the appropriate traps are taken.  If the STT entry contains a local label, it
    is used to set up the P register and NIR as above.
 
+   The "offset" parameter is used only by the XBR instruction executor.  The
+   PCAL executor and the interrupt handlers pass an offset of zero to begin
+   execution at the first instruction of the designated procedure.
+
 
    Implementation notes:
 
     1. This routine implements the microcode PCL3 and PCL5 subroutines.
 */
 
-void cpu_call_procedure (HP_WORD label)
+void cpu_call_procedure (HP_WORD label, HP_WORD offset)
 {
 HP_WORD new_status, new_label, new_p, cst_entry, stt_size, stt_entry;
 
@@ -3183,16 +3092,16 @@ if (label & LABEL_EXTERNAL) {                                   /* if the label 
         label = 0;                                      /*   then the starting address is PB */
     else                                                /* otherwise */
         label = new_label;                              /*   the PB offset is contained in the new label */
+
+    cpu_base_changed = TRUE;                            /* the program base registers have changed for tracing */
     }
 
-new_p = PB + (label & LABEL_ADDRESS_MASK);              /* get the procedure starting address */
+new_p = PB + (label + offset & LABEL_ADDRESS_MASK);     /* get the procedure starting address */
 
 cpu_read_memory (fetch_checked, new_p, &NIR);           /* check the bounds and get the next instruction */
 P = new_p + 1 & R_MASK;                                 /* the bounds are valid, so set the new P value */
 
 STA = new_status;                                       /* set the new status value */
-
-cpu_base_changed = TRUE;                                /* one or more base registers have changed for tracing */
 
 return;
 }
@@ -3281,7 +3190,7 @@ STA &= ~STATUS_I;                                       /* turn off external int
 
 cpu_read_memory (stack, Q - 3, &X);                     /* read the new X value from the stack marker */
 
-if ((new_status & STATUS_CS_MASK) != (STA & STATUS_CS_MASK)) {      /* if returning to a different segment */
+if (STATUS_CS (new_status) != STATUS_CS (STA)) {                    /* if returning to a different segment */
     cpu_setup_code_segment (new_status, &temp_status, &cst_entry);  /*   then set up the new segment */
 
     if (NPRV && (temp_status & STATUS_M))               /* if in user mode now and returning to a privileged segment */
@@ -3456,23 +3365,21 @@ return SCPE_OK;                                         /* return the success of
 
 static t_stat cpu_reset (DEVICE *dptr)
 {
-if (M == NULL) {                                        /* if this is the first call after simulator start */
-    M = (MEMORY_WORD *) calloc (PA_MAX,                 /*   then allocate the maximum amount of memory needed */
-                                sizeof (MEMORY_WORD));
-
-    if (M == NULL)                                      /* if the allocation failed */
-        return SCPE_MEM;                                /*   then report the error and abort the simulation */
-
-    else                                                /* otherwise the memory was allocated */
+if (sim_PC == NULL) {                                   /* if this is the first call after simulator start */
+    if (mem_initialize (PA_MAX)) {
         set_model (&cpu_unit [0], UNIT_SERIES_III,      /*   so establish the initial CPU model */
                    NULL, NULL);
 
-    for (sim_PC = dptr->registers;                      /* find the P register entry */
-         sim_PC->loc != &P && sim_PC->loc != NULL;      /*   in the register array */
-         sim_PC++);                                     /*     for the SCP interface */
+        for (sim_PC = dptr->registers;                      /* find the P register entry */
+             sim_PC->loc != &P && sim_PC->loc != NULL;      /*   in the register array */
+             sim_PC++);                                     /*     for the SCP interface */
 
-    if (sim_PC == NULL)                                 /* if the P register entry is not present */
-        return SCPE_NXREG;                              /*   then there is a serious problem! */
+        if (sim_PC == NULL)                                 /* if the P register entry is not present */
+            return SCPE_NXREG;                              /*   then there is a serious problem! */
+        }
+
+    else                                                /* otherwise memory initialization failed */
+        return SCPE_MEM;                                /*   so report the error and abort the simulation */
     }
 
 if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on reset */
@@ -3496,60 +3403,6 @@ CNTR = SR;                                              /* copy the stack regist
 cpu_flush ();                                           /*   and flush the TOS registers to memory */
 
 return SCPE_OK;                                         /* indicate that the reset succeeded */
-}
-
-
-/* Examine a memory location.
-
-   This routine is called by the SCP to examine memory.  The routine retrieves
-   the memory location indicated by "address" as modified by any "switches" that
-   were specified on the command line and returns the value in the first element
-   of "eval_array".
-
-   On entry, if "switches" includes SIM_SW_STOP, then "address" is an offset
-   from PBANK; otherwise, it is an absolute address.  If the supplied address is
-   beyond the current memory limit, "non-existent memory" status is returned.
-   Otherwise, the value is obtained from memory and returned in "eval_array."
-*/
-
-static t_stat cpu_examine (t_value *eval_array, t_addr address, UNIT *uptr, int32 switches)
-{
-if (switches & SIM_SW_STOP)                             /* if entry is for a simulator stop */
-    address = TO_PA (PBANK, address);                   /*   then form a PBANK-based physical address */
-
-if (address >= MEMSIZE)                                 /* if the address is beyond memory limits */
-    return SCPE_NXM;                                    /*   then return non-existent memory status */
-
-else if (eval_array == NULL)                            /* if the value pointer was not supplied */
-    return SCPE_IERR;                                   /*   then return internal error status */
-
-else {                                                  /* otherwise */
-    eval_array [0] = (t_value) M [address];             /*   store the return value */
-    return SCPE_OK;                                     /*     and return success */
-    }
-}
-
-
-/* Deposit to a memory location.
-
-   This routine is called by the SCP to deposit to memory.  The routine stores
-   the supplied "value" into memory at the "address" location.  If the supplied
-   address is beyond the current memory limit, "non-existent memory" status is
-   returned.
-
-   The presence of any "switches" supplied on the command line does not affect
-   the operation of the routine.
-*/
-
-static t_stat cpu_deposit (t_value value, t_addr address, UNIT *uptr, int32 switches)
-{
-if (address >= MEMSIZE)                                 /* if the address is beyond memory limits */
-    return SCPE_NXM;                                    /*   then return non-existent memory status */
-
-else {                                                  /* otherwise */
-    M [address] = value & DV_MASK;                      /*   store the supplied value into memory */
-    return SCPE_OK;                                     /*     and return success */
-    }
 }
 
 
@@ -3616,6 +3469,90 @@ else                                                    /* otherwise at least on
         }
 
 return SCPE_OK;                                         /* the stops were successfully processed */
+}
+
+
+/* Change the instruction execution trace criteria.
+
+   This validation routine is called to configure the criteria that select
+   instruction execution tracing.  The "option" parameter is 0 to clear and 1 to
+   set the criteria, and "cptr" points to the first character of the match value
+   to be set.  The unit and description pointers are not used.
+
+   The routine processes commands of the form:
+
+     SET CPU EXEC=<match>[;<mask>]
+     SET CPU NOEXEC
+
+   If the <mask> value is not supplied, a mask of 177777 octal is used.  The
+   values are entered in the current CPU data radix, which defaults to octal,
+   unless an override switch is present on the command line.
+*/
+
+static t_stat set_exec (UNIT *uptr, int32 option, CONST char *cptr, void *desc)
+{
+char   gbuf [CBUFSIZE];
+uint32 match, mask, radix;
+t_stat status;
+
+if (option == 0)                                        /* if this is a NOEXEC request */
+    if (cptr == NULL) {                                 /*   then if there are no arguments */
+        exec_match = D16_UMAX;                          /*     then set the match and mask values */
+        exec_mask  = 0;                                 /*       to prevent matching */
+        return SCPE_OK;                                 /*         and return success */
+        }
+
+    else                                                /*   otherwise there are extraneous characters */
+        return SCPE_2MARG;                              /*     so report that there are too many arguments */
+
+else if (cptr == NULL || *cptr == '\0')                 /* otherwise if the EXEC request supplies no arguments */
+    return SCPE_MISVAL;                                 /*   then report a missing value */
+
+else {                                                  /* otherwise at least one argument is present */
+    cptr = get_glyph (cptr, gbuf, ';');                 /*   so get the match argument */
+
+    if (sim_switches & SWMASK ('O'))                    /* if an octal override is present */
+        radix = 8;                                      /*   then parse the value in base 8 */
+    else if (sim_switches & SWMASK ('D'))               /* otherwise if a decimal override is present */
+        radix = 10;                                     /*   then parse the value in base 10 */
+    else if (sim_switches & SWMASK ('H'))               /* otherwise if a hex override is present */
+        radix = 16;                                     /*   then parse the value in base 16 */
+    else                                                /* otherwise */
+        radix = cpu_dev.dradix;                         /*   use the current CPU data radix */
+
+    match = (uint32) get_uint (gbuf, radix, D16_UMAX, &status); /* parse the match value */
+
+    if (status != SCPE_OK)                              /* if a parsing error occurred */
+        return status;                                  /*   then return the error status */
+
+    else if (*cptr == '\0') {                           /* otherwise if no more characters are present */
+        exec_match = match;                             /*   then set the match value */
+        exec_mask  = D16_MASK;                          /*     and default the mask value */
+        return SCPE_OK;                                 /*       and return success */
+        }
+
+    else {                                              /* otherwise another argument is present */
+        cptr = get_glyph (cptr, gbuf, ';');             /*   so get the mask argument */
+
+        mask = (uint32) get_uint (gbuf, radix, D16_UMAX, &status);  /* parse the mask value */
+
+        if (status != SCPE_OK)                          /* if a parsing error occurred */
+            return status;                              /*   then return the error status */
+
+        else if (*cptr == '\0')                         /* if no more characters are present */
+            if (mask == 0)                              /*   then if the mask value is zero */
+                return SCPE_ARG;                        /*     then the match will never succeed */
+
+            else {                                      /*   otherwise */
+                exec_match = match;                     /*     set the match value */
+                exec_mask  = mask;                      /*       and the mask value */
+                return SCPE_OK;                         /*         and return success */
+                }
+
+        else                                            /* otherwise extraneous characters are present */
+            return SCPE_2MARG;                          /*   so report that there are too many arguments */
+        }
+    }
 }
 
 
@@ -3704,18 +3641,14 @@ static t_stat set_size (UNIT *uptr, int32 new_size, CONST char *cptr, void *desc
 static CONST char confirm [] = "Really truncate memory [N]?";
 
 const uint32 model = CPU_MODEL (uptr->flags);           /* the current CPU model index */
-uint32 address;
 
 if ((uint32) new_size > cpu_features [model].maxmem)    /* if the new memory size is not supported on current model */
     return SCPE_NOFNC;                                  /*   then report the error */
 
-if (!(sim_switches & SWMASK ('F')))                         /* if truncation is not explicitly forced */
-    for (address = new_size; address < MEMSIZE; address++)  /*   then check the values in truncated memory, if any */
-        if (M [address] != 0)                               /* if this location is non-zero */
-            if (get_yn (confirm, FALSE) == FALSE)           /*   then if the user denies confirmation */
-                return SCPE_INCOMP;                         /*     then abort the command */
-            else                                            /*   otherwise we have explicit confirmation to proceed */
-                break;                                      /*     so checking is no longer necessary */
+if (!(sim_switches & SWMASK ('F'))                      /* if truncation is not explicitly forced */
+  && ! mem_is_empty (new_size)                          /*   and the truncated part is not empty */
+  && get_yn (confirm, FALSE) == FALSE)                  /*     and the user denies confirmation */
+    return SCPE_INCOMP;                                 /*       then abort the command */
 
 MEMSIZE = new_size;                                     /* set the new memory size */
 
@@ -3856,6 +3789,46 @@ else {                                                  /* otherwise at least on
         }
 
 fputc ('\n', st);                                       /* add the trailing newline */
+
+return SCPE_OK;                                         /* report the success of the display */
+}
+
+
+/* Show the instruction execution trace criteria.
+
+   This display routine is called to show the criteria that select instruction
+   execution tracing.  The "st" parameter is the open output stream.  The other
+   parameters are not used.
+
+   This routine services an extended modifier entry, so it must add the trailing
+   newline to the output before returning.
+*/
+
+static t_stat show_exec (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+uint32 radix;
+
+if (exec_mask == 0)                                     /* if the instruction is entirely masked */
+    fputs ("Execution trace disabled\n", st);           /*   then report that matching is disabled */
+
+else {                                                  /* otherwise */
+    if (sim_switches & SWMASK ('O'))                    /*   if an octal override is present */
+        radix = 8;                                      /*     then print the value in base 8 */
+    else if (sim_switches & SWMASK ('D'))               /*   otherwise if a decimal override is present */
+        radix = 10;                                     /*     then print the value in base 10 */
+    else if (sim_switches & SWMASK ('H'))               /*   otherwise if a hex override is present */
+        radix = 16;                                     /*     then print the value in base 16 */
+    else                                                /*   otherwise */
+        radix = cpu_dev.dradix;                         /*     use the current CPU data radix */
+
+    fputs ("Execution trace match = ", st);                         /* print the label */
+    fprint_val (st, exec_match, radix, cpu_dev.dwidth, PV_RZRO);    /*   and the match value */
+
+    fputs (", mask = ", st);                                        /* print a separator */
+    fprint_val (st, exec_mask, radix, cpu_dev.dwidth, PV_RZRO);     /*   and the mask value */
+
+    fputc ('\n', st);                                               /* tie off the line */
+    }
 
 return SCPE_OK;                                         /* report the success of the display */
 }
@@ -4204,11 +4177,10 @@ else if (CPX2 & cpx2_LOADSWCH)                          /* otherwise if the LOAD
     if (cpu_micro_state != waiting) {                   /*   then if the load is not in progress */
         reset_all (CPU_IO_RESET);                       /*     then reset the CPU and all I/O devices */
 
-        if ((SWCH & 000200) == 0)                           /* if switch register bit 8 is clear */
-            for (address = 0; address < MEMSIZE; address++) /*   then fill memory */
-                M [address] = HALT_10;                      /*     with HALT 10 instructions */
+        if ((SWCH & 000200) == 0)                       /* if switch register bit 8 is clear */
+            mem_fill (0, HALT_10);                      /*   then fill all of memory with HALT 10 instructions */
 
-        SBANK = 0;                                          /* set the stack bank to bank 0 */
+        SBANK = 0;                                      /* set the stack bank to bank 0 */
 
         cold_device = LOWER_BYTE (SWCH) & DEVNO_MASK;   /* get the device number from the lower SWCH byte */
 
@@ -4405,7 +4377,7 @@ switch (SUBOP (CIR)) {                                  /* dispatch on bits 0-3 
                     cpu_write_memory (data, offset, operand);   /*     to the control variable */
                     }
 
-                control = SEXT (operand);               /* sign-extend the control value */
+                control = SEXT16 (operand);             /* sign-extend the control value */
                 }
 
             else {                                      /* TBX or MTBX (none; STUN, BNDV) */
@@ -4414,10 +4386,10 @@ switch (SUBOP (CIR)) {                                  /* dispatch on bits 0-3 
                 if (opcode == MTBX)                     /* if the instruction is MTBX */
                     X = X + RB & R_MASK;                /*   then add the step size to the control variable */
 
-                control = SEXT (X);                     /* sign-extend the control value */
+                control = SEXT16 (X);                   /* sign-extend the control value */
                 }
 
-            limit = SEXT (RA);                          /* sign-extend the limit value */
+            limit = SEXT16 (RA);                        /* sign-extend the limit value */
 
             if (RB & D16_SIGN)                          /* if the step size is negative */
                 branch = control >= limit;              /*   then branch if the value is not below the limit */
@@ -4534,7 +4506,7 @@ switch (SUBOP (CIR)) {                                  /* dispatch on bits 0-3 
             P = offset + 1 & R_MASK;                        /*   and increment the program counter */
             }
 
-        else if (TO_CCF (STA) & (CIR << BCC_CCF_SHIFT)) /* otherwise if the BCC test succeeds */
+        else if (TO_CCF (STA) & CIR << BCC_CCF_SHIFT)   /* otherwise if the BCC test succeeds */
             status = cpu_branch_short (TRUE);           /*   then branch to the target address */
         break;                                          /* otherwise continue execution at P + 1 */
 

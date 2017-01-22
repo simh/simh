@@ -1,6 +1,6 @@
 /* hp3000_cpu_base.c: HP 3000 CPU base set instruction simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,15 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   08-Jan-17    JDB     Fixed bug in SCAL 0/PCAL 0 if a stack overflow occurs
+   07-Nov-16    JDB     SETR doesn't set cpu_base_changed if no register change;
+                        renamed cpu_byte_to_word_ea to cpu_byte_ea
+   03-Nov-16    JDB     Added zero offsets to the cpu_call_procedure calls
+   24-Oct-16    JDB     Renamed SEXT macro to SEXT16
+   22-Oct-16    JDB     Changed "interrupt_pending" to global for use by CIS
+   07-Oct-16    JDB     Moved "extern cpu_dev" to hp3000_cpu.h where it belongs
+   22-Sep-16    JDB     Moved byte_to_word_address to hp3000_cpu.c
+   21-Sep-16    JDB     Added the COBOL II Extended Instruction Set dispatcher
    12-Sep-16    JDB     Use the PCN_SERIES_II and PCN_SERIES_III constants
    23-Aug-16    JDB     Implement the CMD instruction and module interrupts
    11-Jun-16    JDB     Bit mask constants are now unsigned
@@ -69,12 +78,8 @@
 #include "hp3000_cpu.h"
 #include "hp3000_cpu_fp.h"
 #include "hp3000_cpu_ims.h"
+#include "hp3000_mem.h"
 
-
-
-/* External I/O data structures */
-
-extern DEVICE cpu_dev;                          /* Central Processing Unit */
 
 
 /* Program constants */
@@ -114,9 +119,7 @@ static void   shift_48_64          (HP_WORD opcode, SHIFT_TYPE shift, OPERAND_SI
 static void   check_stack_bounds   (HP_WORD new_value);
 static uint32 tcs_io               (IO_COMMAND command);
 static uint32 srw_io               (IO_COMMAND command, HP_WORD ready_flag);
-static t_bool interrupt_pending    (t_stat *status);
 static void   decrement_stack      (uint32 decrement);
-static uint32 byte_to_word_address (ACCESS_CLASS class, uint32 byte_offset, uint32 block_length);
 
 static t_stat move_words           (ACCESS_CLASS source_class, uint32 source_base,
                                     ACCESS_CLASS dest_class,   uint32 dest_base,
@@ -131,6 +134,80 @@ static t_stat io_control         (void);
 
 
 /* CPU base set global utility routines */
+
+
+/* Test for a pending interrupt.
+
+   This routine is called from within an executor for an interruptible
+   instruction to test for a pending interrupt.  It counts an event tick and
+   returns TRUE if the instruction should yield, either for an interrupt or for
+   an event error, or FALSE if the instruction should continue.
+
+   Instructions that potentially take a long time (e.g., MOVE, SCU, LLSH) test
+   for pending interrupts after each word or byte moved or scanned.  The design
+   of these instructions is such that an interrupt may be serviced and the
+   instruction resumed without disruption.  For example, the MOVE instruction
+   updates the source and target addresses and word count on the stack after
+   each word moved.  If the instruction is interrupted, the values on the stack
+   indicate where to resume after the interrupt handler completes.
+
+
+   Implementation notes:
+
+    1. The routine is essentially the same sequence as is performed at the top
+       of the instruction execution loop in the "sim_instr" routine.  The
+       differences are that this routine backs up P to rerun the instruction
+       after the interrupt is serviced, and the interrupt holdoff test necessary
+       for the SED instruction isn't done here, as this routine is not called by
+       the SED executor.
+
+    2. The event interval decrement that occurs in the main instruction loop
+       after each instruction execution is cancelled here if "sim_process_event"
+       returns an error code.  This is done so that a STEP command does not
+       decrement sim_interval twice.  Note that skipping the initial decrement
+       here does not help, as it's the sim_interval value AFTER the call to
+       sim_process_event that must be preserved.
+*/
+
+t_bool cpu_interrupt_pending (t_stat *status)
+{
+uint32 device_number = 0;
+
+sim_interval = sim_interval - 1;                        /* count the cycle */
+
+if (sim_interval <= 0) {                                /* if an event timeout expired */
+    *status = sim_process_event ();                     /*   then process the event service */
+
+    if (*status != SCPE_OK) {                           /* if the service failed */
+        P = P - 1 & R_MASK;                             /*   then back up to reenter the instruction */
+        sim_interval = sim_interval + 1;                /*     and cancel the instruction loop increment */
+
+        return TRUE;                                    /* abort the instruction and stop the simulator */
+        }
+    }
+
+else                                                    /* otherwise */
+    *status = SCPE_OK;                                  /*   indicate good status from the service */
+
+if (sel_request)                                        /* if a selector channel request is pending */
+    sel_service (1);                                    /*   then service it */
+
+if (mpx_request_set)                                    /* if a multiplexer channel request is pending */
+    mpx_service (1);                                    /*   then service it */
+
+if (iop_interrupt_request_set && STA & STATUS_I)        /* if a hardware interrupt request is pending and enabled */
+    device_number = iop_poll ();                        /*   then poll to acknowledge the request */
+
+if (CPX1 & CPX1_IRQ_SET) {                              /* if an interrupt is pending */
+    P = P - 1 & R_MASK;                                 /*   then back up to reenter the instruction */
+    cpu_run_mode_interrupt (device_number);             /*     and set up the service routine */
+
+    return TRUE;                                        /* abort the instruction */
+    }
+
+else                                                    /* otherwise */
+    return FALSE;                                       /*   continue with the current instruction */
+}
 
 
 /* Execute a short branch.
@@ -259,7 +336,7 @@ HP_WORD cpu_mpy_16 (HP_WORD multiplicand, HP_WORD multiplier)
 int32  product;
 uint32 check;
 
-product = SEXT (multiplicand) * SEXT (multiplier);      /* sign-extend the operands and multiply */
+product = SEXT16 (multiplicand) * SEXT16 (multiplier);  /* sign-extend the operands and multiply */
 
 check = (uint32) product & S16_OVFL_MASK;               /* check the top 17 bits and set overflow */
 SET_OVERFLOW (check != 0 && check != S16_OVFL_MASK);    /*   if they are not all zeros or all ones */
@@ -458,7 +535,7 @@ switch (operation) {                                    /* dispatch the stack op
 
 
     case 013:                                           /* MPYL (CCA, C, O; STUN, ARITH) */
-        product = SEXT (RA) * SEXT (RB);                /* sign-extend the 16-bit operands and multiply */
+        product = SEXT16 (RA) * SEXT16 (RB);            /* sign-extend the 16-bit operands and multiply */
 
         RB = UPPER_WORD (product);                      /* split the MSW */
         RA = LOWER_WORD (product);                      /*   and the LSW of the product */
@@ -474,7 +551,7 @@ switch (operation) {                                    /* dispatch the stack op
 
     case 014:                                           /* DIVL (CCA, O; STUN, ARITH) */
         dividend = INT32 (TO_DWORD (RC, RB));           /* convert the 32-bit dividend to a signed value */
-        divisor  = SEXT (RA);                           /*   and sign-extend the 16-bit divisor */
+        divisor  = SEXT16 (RA);                         /*   and sign-extend the 16-bit divisor */
 
         RB = RA;                                        /* delete the LSW from the stack now */
         cpu_pop ();                                     /*   to conform with the microcode */
@@ -482,7 +559,7 @@ switch (operation) {                                    /* dispatch the stack op
         if (RA == 0)                                    /* if dividing by zero */
             MICRO_ABORT (trap_Integer_Zero_Divide);     /*   then trap or set the overflow flag */
 
-        if (abs (divisor) <= abs (SEXT (RB)))           /* if the divisor is <= the MSW of the dividend */
+        if (abs (divisor) <= abs (SEXT16 (RB)))         /* if the divisor is <= the MSW of the dividend */
             SET_OVERFLOW (TRUE);                        /*   an overflow will occur on the division */
 
         else {                                          /* otherwise, the divisor might be large enough */
@@ -558,8 +635,8 @@ switch (operation) {                                    /* dispatch the stack op
         if (RA == 0)                                    /* if dividing by zero */
             MICRO_ABORT (trap_Integer_Zero_Divide);     /*   then trap or set the overflow flag */
 
-        dividend = SEXT (RB);                           /* sign-extend the 16-bit dividend */
-        divisor  = SEXT (RA);                           /*   and the 16-bit divisor */
+        dividend = SEXT16 (RB);                         /* sign-extend the 16-bit dividend */
+        divisor  = SEXT16 (RA);                         /*   and the 16-bit divisor */
 
         quotient  = dividend / divisor;                 /* form the 32-bit signed quotient */
         remainder = dividend % divisor;                 /*   and 32-bit signed remainder */
@@ -1142,10 +1219,10 @@ switch (operation) {                                    /* dispatch the shift/br
 
 
     case 026:                                           /* CPRB (CCE, CCL, CCG; STUN, BNDV) */
-        if (SEXT (X) < SEXT (RB))                       /* if X is less than the lower bound */
+        if (SEXT16 (X) < SEXT16 (RB))                   /* if X is less than the lower bound */
             SET_CCL;                                    /*   then set CCL and continue */
 
-        else if (SEXT (X) > SEXT (RA))                  /* otherwise if X is greater than the upper bound */
+        else if (SEXT16 (X) > SEXT16 (RA))              /* otherwise if X is greater than the upper bound */
             SET_CCG;                                    /*   then set CCG and continue */
 
         else {                                          /* otherwise lower bound <= X <= upper bound */
@@ -1349,7 +1426,7 @@ switch (operation) {                                    /* dispatch the operatio
         if (divisor == 0)                               /* if dividing by zero */
             MICRO_ABORT (trap_Integer_Zero_Divide);     /*   then trap or set the overflow flag */
 
-        RA = SEXT (RA) / divisor & R_MASK;              /* store the quotient (which cannot overflow) on the TOS */
+        RA = SEXT16 (RA) / divisor & R_MASK;            /* store the quotient (which cannot overflow) on the TOS */
         SET_CCA (RA, 0);                                /*   and set the condition code */
         break;
 
@@ -1549,7 +1626,7 @@ switch (operation) {                                    /* dispatch the operatio
         if (CIR & PSR_SBANK)                            /* if SBANK is to be set */
             SBANK = new_sbank & BA_MASK;                /*   then update the new value now */
 
-        cpu_base_changed = TRUE;                        /* this instruction changed the base registers */
+        cpu_base_changed = (CIR != SETR && CIR != SETR_X);  /* set the flag if the base registers changed */
         break;
      }                                                  /* all cases are handled  */
 
@@ -1656,8 +1733,14 @@ switch (operation) {                                    /* dispatch the operatio
 
         cpu_flush ();                                   /* flush the TOS registers to memory */
 
-        if (SM > Z)                                     /* if the stack limit was exceeded */
-            MICRO_ABORT (trap_Stack_Overflow);          /*   then trap for a stack overflow */
+        if (SM > Z) {                                   /* if the stack limit was exceeded */
+            if (field == 0) {                           /*   then if the label was on the TOS */
+                cpu_push ();                            /*     then push the stack down */
+                RA = label;                             /*       and restore the label to the TOS */
+                }
+
+            MICRO_ABORT (trap_Stack_Overflow);          /* trap for a stack overflow */
+            }
 
         if (label & LABEL_EXTERNAL)                     /* if the label is non-local */
             MICRO_ABORTP (trap_STT_Violation, STA);     /*   then trap for an STT violation */
@@ -1685,12 +1768,18 @@ switch (operation) {                                    /* dispatch the operatio
 
         cpu_flush ();                                   /* flush the TOS registers to memory */
 
-        if (SM > Z)                                     /* if the stack limit was exceeded */
-            MICRO_ABORT (trap_Stack_Overflow);          /*   then trap for a stack overflow */
+        if (SM > Z) {                                   /* if the stack limit was exceeded */
+            if (field == 0) {                           /*   then if the label was on the TOS */
+                cpu_push ();                            /*     then push the stack down */
+                RA = label;                             /*       and restore the label to the TOS */
+                }
+
+            MICRO_ABORT (trap_Stack_Overflow);          /* trap for a stack overflow */
+            }
 
         cpu_mark_stack ();                              /* write a stack marker */
 
-        cpu_call_procedure (label);                     /* set up PB, P, PL, and STA to call the procedure */
+        cpu_call_procedure (label, 0);                  /* set up PB, P, PL, and STA to call the procedure */
         break;
 
 
@@ -1702,7 +1791,7 @@ switch (operation) {                                    /* dispatch the operatio
 
         new_sm = Q - 4 - field & R_MASK;                /* compute the new stack pointer value */
 
-        cpu_read_memory (stack_checked, Q, &operand);   /* read the delta Q value from the stack marker */
+        cpu_read_memory (stack, Q, &operand);           /* read the delta Q value from the stack marker */
         new_q = Q - operand & R_MASK;                   /*  and determine the new Q value */
 
         cpu_exit_procedure (new_q, new_sm, field);      /* set up the return code segment and stack */
@@ -1755,7 +1844,7 @@ switch (operation) {                                    /* dispatch the operatio
             else                                        /*   otherwise */
                 label = LABEL_EXTERNAL                  /*     convert it to an external label */
                           | (field << LABEL_STTN_SHIFT) /*       by merging the STT number */
-                          | STA & STATUS_CS_MASK;       /*         with the currently executing segment number */
+                          | STATUS_CS (STA);            /*         with the currently executing segment number */
 
         cpu_push ();                                    /* push the stack down */
         RA = label;                                     /*   and store the label on the TOS */
@@ -2256,7 +2345,7 @@ if (NPRV)                                               /* if the mode is not pr
 
 address = SM + SR - IO_K (CIR) & LA_MASK;               /* get the location of the device number */
 
-cpu_read_memory (stack_checked, address, &device);      /* read it from the stack */
+cpu_read_memory (stack, address, &device);              /* read it from the stack or TOS registers */
 device = LOWER_BYTE (device);                           /*   and use only the lower byte of the value */
 
 result = iop_direct_io (device, command,                /* send the I/O order to the device */
@@ -2341,80 +2430,6 @@ else {                                                  /* otherwise the device 
 }
 
 
-/* Test for a pending interrupt.
-
-   This routine is called from within an executor for an interruptible
-   instruction to test for a pending interrupt.  It counts an event tick and
-   returns TRUE if the instruction should yield, either for an interrupt or for
-   an event error, or FALSE if the instruction should continue.
-
-   Instructions that potentially take a long time (e.g., MOVE, SCU, LLSH) test
-   for pending interrupts after each word or byte moved or scanned.  The design
-   of these instructions is such that an interrupt may be serviced and the
-   instruction resumed without disruption.  For example, the MOVE instruction
-   updates the source and target addresses and word count on the stack after
-   each word moved.  If the instruction is interrupted, the values on the stack
-   indicate where to resume after the interrupt handler completes.
-
-
-   Implementation notes:
-
-    1. The routine is essentially the same sequence as is performed at the top
-       of the instruction execution loop in the "sim_instr" routine.  The
-       differences are that this routine backs up P to rerun the instruction
-       after the interrupt is serviced, and the interrupt holdoff test necessary
-       for the SED instruction isn't done here, as this routine is not called by
-       the SED executor.
-
-    2. The event interval decrement that occurs in the main instruction loop
-       after each instruction execution is cancelled here if "sim_process_event"
-       returns an error code.  This is done so that a STEP command does not
-       decrement sim_interval twice.  Note that skipping the initial decrement
-       here does not help, as it's the sim_interval value AFTER the call to
-       sim_process_event that must be preserved.
-*/
-
-static t_bool interrupt_pending (t_stat *status)
-{
-uint32 device_number = 0;
-
-sim_interval = sim_interval - 1;                        /* count the cycle */
-
-if (sim_interval <= 0) {                                /* if an event timeout expired */
-    *status = sim_process_event ();                     /*   then process the event service */
-
-    if (*status != SCPE_OK) {                           /* if the service failed */
-        P = P - 1 & R_MASK;                             /*   then back up to reenter the instruction */
-        sim_interval = sim_interval + 1;                /*     and cancel the instruction loop increment */
-
-        return TRUE;                                    /* abort the instruction and stop the simulator */
-        }
-    }
-
-else                                                    /* otherwise */
-    *status = SCPE_OK;                                  /*   indicate good status from the service */
-
-if (sel_request)                                        /* if a selector channel request is pending */
-    sel_service (1);                                    /*   then service it */
-
-if (mpx_request_set)                                    /* if a multiplexer channel request is pending */
-    mpx_service (1);                                    /*   then service it */
-
-if (iop_interrupt_request_set && STA & STATUS_I)        /* if a hardware interrupt request is pending and enabled */
-    device_number = iop_poll ();                        /*   then poll to acknowledge the request */
-
-if (CPX1 & CPX1_IRQ_SET) {                              /* if an interrupt is pending */
-    P = P - 1 & R_MASK;                                 /*   then back up to reenter the instruction */
-    cpu_run_mode_interrupt (device_number);             /*     and set up the service routine */
-
-    return TRUE;                                        /* abort the instruction */
-    }
-
-else                                                    /* otherwise */
-    return FALSE;                                       /*   continue with the current instruction */
-}
-
-
 /* Decrement the stack pointer.
 
    Pop values from the stack until the stack pointer has been decremented by the
@@ -2439,87 +2454,6 @@ while (decrement > 0) {                                 /* decrement the stack p
     }
 
 return;
-}
-
-
-/* Convert a data- or program-relative byte address to a word address.
-
-   The supplied byte offset from DB or PB is converted to a memory address,
-   bounds-checked, and then returned.  If the supplied block length is not zero,
-   the converted address is assumed to be the starting address of a block, and
-   an ending address, based on the block length, is calculated and
-   bounds-checked.  If either address lies outside of the segment associated
-   with the access class, a Bounds Violation trap occurs, unless a privileged
-   data access is requested.
-
-   Byte offsets into data segments present problems, in that negative offsets
-   are permitted (to access the DL-to-DB area), but there are not enough bits to
-   represent all locations unambiguously in the potential -32K to +32K word
-   offset range.  Therefore, a byte offset with bit 0 = 1 can represent either a
-   positive or negative word offset from DB, depending on the interpretation.
-   The HP 3000 adopts the convention that if the address resulting from a
-   positive-offset interpretation does not fall within the DL-to-S range, then
-   32K is added to the address, effectively changing the interpretation from a
-   positive to a negative offset.  If this new address does not fall within the
-   DL-to-S range, a Bounds Violation trap occurs if the mode is non-privileged.
-
-   The reinterpretation as a negative offset is performed only if the CPU is not
-   in split-stack mode (where either DBANK is different from SBANK, or DB does
-   not lie between DL and Z), as extra data segments do not permit negative-DB
-   addressing.  Reinterpretation is also not used for code segments, as negative
-   offsets from PB are not permitted.
-
-
-   Implementation notes:
-
-    1. This routine implements the DBBC microcode subroutine.
-*/
-
-static uint32 byte_to_word_address (ACCESS_CLASS class, uint32 byte_offset, uint32 block_length)
-{
-uint32 starting_word, ending_word, increment;
-
-if (block_length & D16_SIGN)                            /* if the block length is negative */
-    increment = 0177777;                                /*   then the memory increment is negative also */
-else                                                    /* otherwise */
-    increment = 1;                                      /*   the increment is positive */
-
-if (class == data) {                                            /* if this is a data access */
-    starting_word = DB + (byte_offset >> 1) & LA_MASK;          /*   then determine the starting word address */
-
-    if (DBANK == SBANK && DL <= DB && DB <= Z                   /* if not in split-stack mode */
-      && (starting_word < DL || starting_word > SM)) {          /*   and the word address is out of range */
-        starting_word = starting_word ^ D16_SIGN;               /*     then add 32K and try again */
-
-        if (NPRV && (starting_word < DL || starting_word > SM)) /* if non-privileged and still out of range */
-            MICRO_ABORT (trap_Bounds_Violation);                /*   then trap for a bounds violation */
-        }
-
-    if (block_length != 0) {                                    /* if a block length was supplied */
-        ending_word =                                           /*   then determine the ending word address */
-           starting_word + ((block_length - increment + (byte_offset & 1)) >> 1) & LA_MASK;
-
-        if (NPRV && (ending_word < DL || ending_word > SM))     /* if non-privileged and the address is out of range */
-            MICRO_ABORT (trap_Bounds_Violation);                /*   then trap for a bounds violation */
-        }
-    }
-
-else {                                                  /* otherwise this is a program address */
-    starting_word = PB + (byte_offset >> 1) & LA_MASK;  /*   so determine the starting word address */
-
-    if (starting_word < PB || starting_word > PL)       /* if the starting address is out of range */
-        MICRO_ABORT (trap_Bounds_Violation);            /*   then trap for a bounds violation */
-
-    if (block_length != 0) {                            /* if a block length was supplied */
-        ending_word =                                   /*   then determine the ending address */
-           starting_word + ((block_length - increment + (byte_offset & 1)) >> 1) & LA_MASK;
-
-        if (ending_word < PB || ending_word > PL)       /* if the ending address is out of range */
-            MICRO_ABORT (trap_Bounds_Violation);        /*   then trap for a bounds violation */
-        }
-    }
-
-return starting_word;                                   /* return the starting word address */
 }
 
 
@@ -2602,7 +2536,7 @@ while (RA != 0) {                                       /* while there are words
     RB  = RB  + increment & R_MASK;                     /*   and the source */
     *RX = *RX + increment & R_MASK;                     /*     and destination offsets */
 
-    if (interrupt_pending (&status))                    /* if an interrupt is pending */
+    if (cpu_interrupt_pending (&status))                /* if an interrupt is pending */
         return status;                                  /*   then return with an interrupt set up or an error */
     }
 
@@ -2628,6 +2562,11 @@ return SCPE_OK;                                         /*   and return the succ
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   0 |  special op   | 0   0 | sp op |  Special
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Byte move and compare instructions that specify byte counts (e.g., MVB, CMPB)
+   bounds-check the starting and ending addresses to avoid checking each access
+   separately.  Instructions that do not (e.g., SCW, MVBW) must bounds-check
+   each access, as the counts are indeterminate.
 
 
    Implementation notes:
@@ -2788,13 +2727,17 @@ switch (operation) {                                    /* dispatch the move or 
             else                                        /*   otherwise */
                 increment = 1;                          /*     the increment is positive */
 
-            if (CIR & DB_FLAG)                          /* if the move is from the data segment */
-                class = data;                           /*   then classify as a data access */
-            else                                        /* otherwise the move is from the code segment */
-                class = program;                        /*   so classify as a program access */
+            if (CIR & DB_FLAG) {                                /* if the move is from the data segment */
+                class = data;                                   /*   then classify as a data access */
+                source = cpu_byte_ea (data_checked, RB, RA);    /*     and convert and check the byte address */
+                }
 
-            source = byte_to_word_address (class, RB, RA);  /* convert the source byte address and check bounds */
-            target = byte_to_word_address (data, RC, RA);   /* convert the target byte address and check bounds */
+            else {                                              /* otherwise the move is from the code segment */
+                class = program;                                /*   so classify as a program access */
+                source = cpu_byte_ea (program_checked, RB, RA); /*     and convert and check the byte address */
+                }
+
+            target = cpu_byte_ea (data_checked, RC, RA);    /* convert the target byte address and check the bounds */
 
             while (RA != 0) {                               /* while there are bytes to move */
                 cpu_read_memory (class, source, &operand);  /*   read a source word */
@@ -2823,7 +2766,7 @@ switch (operation) {                                    /* dispatch the move or 
                 RB = RB + increment & R_MASK;               /*   and the source */
                 RC = RC + increment & R_MASK;               /*     and destination offsets */
 
-                if (interrupt_pending (&status))            /* if an interrupt is pending */
+                if (cpu_interrupt_pending (&status))        /* if an interrupt is pending */
                     return status;                          /*   then return with an interrupt set up or an error */
                 }
             }
@@ -2872,13 +2815,13 @@ switch (operation) {                                    /* dispatch the move or 
         test_byte     = LOWER_BYTE (RA);                /* get the test byte */
         terminal_byte = UPPER_BYTE (RA);                /*   and the terminal byte */
 
-        source = byte_to_word_address (data, RB, 0);    /* convert the source byte address and check the bounds */
+        source = cpu_byte_ea (data_checked, RB, 0);     /* convert the source byte address and check the bounds */
 
         cpu_read_memory (data, source, &operand);       /* read the first word */
 
         while (TRUE) {
             if (RB & 1) {                               /* if the byte address is odd */
-                if (interrupt_pending (&status))        /*   then if an interrupt is pending */
+                if (cpu_interrupt_pending (&status))    /*   then if an interrupt is pending */
                     return status;                      /*     then return with an interrupt set up or an error */
 
                 byte = LOWER_BYTE (operand);            /* get the lower byte */
@@ -3000,8 +2943,8 @@ switch (operation) {                                    /* dispatch the move or 
         while (SR > 2)                                  /* if more than two TOS registers are valid */
             cpu_queue_down ();                          /*   then queue them down until exactly two are left */
 
-        source = byte_to_word_address (data, RA, 0);    /* convert the source */
-        target = byte_to_word_address (data, RB, 0);    /*   and target byte addresses and check the bounds */
+        source = cpu_byte_ea (data_checked, RA, 0);     /* convert the source and target */
+        target = cpu_byte_ea (data_checked, RB, 0);     /*   byte addresses and check the starting bounds */
 
         if (source > target) {                          /* if the source is closer to SM than the target */
             byte_count = (int32) (SM - source + 1) * 2; /*   then set the byte count from the source */
@@ -3057,7 +3000,7 @@ switch (operation) {                                    /* dispatch the move or 
             RA = RA + 1 & R_MASK;                       /*   and the source */
             RB = RB + 1 & R_MASK;                       /*     and destination offsets */
 
-            if (interrupt_pending (&status))            /* if an interrupt is pending */
+            if (cpu_interrupt_pending (&status))        /* if an interrupt is pending */
                 return status;                          /*   then return with an interrupt set up or an error */
             }
 
@@ -3080,13 +3023,17 @@ switch (operation) {                                    /* dispatch the move or 
             else                                        /*   otherwise */
                 increment = 1;                          /*     the increment is positive */
 
-            if (CIR & DB_FLAG)                          /* if the move is from the data segment */
-                class = data;                           /*   then classify as a data access */
-            else                                        /* otherwise the move is from the code segment */
-                class = program;                        /*   so classify as a program access */
+            if (CIR & DB_FLAG) {                                /* if the comparison is from the data segment */
+                class = data;                                   /*   then classify as a data access */
+                source = cpu_byte_ea (data_checked, RB, RA);    /*     and convert and check the byte address */
+                }
 
-            source = byte_to_word_address (class, RB, RA);  /* convert the source byte address and check bounds */
-            target = byte_to_word_address (data, RC, RA);   /* convert the target byte address and check bounds */
+            else {                                              /* otherwise the comparison is from the code segment */
+                class = program;                                /*   so classify as a program access */
+                source = cpu_byte_ea (program_checked, RB, RA); /*     and convert and check the byte address */
+                }
+
+            target = cpu_byte_ea (data_checked, RC, RA);    /* convert the target byte address and check the bounds */
 
             while (RA != 0) {                               /* while there are bytes to compare */
                 cpu_read_memory (class, source, &operand);  /*   read a source word */
@@ -3116,7 +3063,7 @@ switch (operation) {                                    /* dispatch the move or 
                 RB = RB + increment & R_MASK;               /*   and the source */
                 RC = RC + increment & R_MASK;               /*     and destination offsets */
 
-                if (interrupt_pending (&status))            /* if an interrupt is pending */
+                if (cpu_interrupt_pending (&status))        /* if an interrupt is pending */
                     return status;                          /*   then return with an interrupt set up or an error */
                 }
             }
@@ -3160,7 +3107,7 @@ switch (operation) {                                    /* dispatch the move or 
 
                 X = X - 1 & R_MASK;                     /* decrement the count */
 
-                if (interrupt_pending (&status))        /* if an interrupt is pending */
+                if (cpu_interrupt_pending (&status))    /* if an interrupt is pending */
                     return status;                      /*   then return with an interrupt set up or an error */
                 }
 
@@ -3182,14 +3129,14 @@ switch (operation) {                                    /* dispatch the move or 
         if (PRIV)                                       /* if the mode is privileged */
             if (CIR & 1) {                              /* PSTA (none; STUN, MODE) */
                 PREADJUST_SR (1);                       /* ensure a valid TOS register */
-                cpu_write_memory (absolute_checked,     /*   before writing the TOS to memory */
+                cpu_write_memory (absolute_mapped,      /*   before writing the TOS to memory */
                                   X, RA);               /*     at address X */
                 cpu_pop ();                             /*       and popping the stack */
                 }
 
             else {                                      /* PLDA (CCA; STOV, MODE) */
-                cpu_read_memory (absolute_checked,      /* read the value at address X */
-                                  X, &operand);
+                cpu_read_memory (absolute_mapped,       /* read the value at address X */
+                                 X, &operand);
                 cpu_push ();                            /* push the stack down */
                 RA = operand;                           /*   and store the value on the TOS */
 
@@ -3213,7 +3160,7 @@ switch (operation) {                                    /* dispatch the move or 
                     cpu_queue_down ();                  /*   then queue them down until exactly two are left */
 
                 address = TO_PA (RB, RA);               /* form the physical address */
-                cpu_read_memory (absolute_checked,      /*   and read the word from memory */
+                cpu_read_memory (absolute,              /*   and read the word from memory */
                                  address, &operand);
 
                 cpu_push ();                            /* push the stack down */
@@ -3230,7 +3177,7 @@ switch (operation) {                                    /* dispatch the move or 
                     cpu_queue_down ();                  /*   then queue them down until exactly three are left */
 
                 address = TO_PA (RC, RB);               /* form the physical address */
-                cpu_write_memory (absolute_checked,     /*   and write the word on the TOS to memory */
+                cpu_write_memory (absolute,             /*   and write the word on the TOS to memory */
                                   address, RA);
 
                 cpu_pop ();                             /* pop the TOS */
@@ -3242,15 +3189,14 @@ switch (operation) {                                    /* dispatch the move or 
                     cpu_queue_down ();                  /*   then queue them down until exactly two are left */
 
                 address = TO_PA (RB, RA);               /* form the physical address */
-                cpu_read_memory (absolute_checked,      /*   and read the MSW from memory */
+                cpu_read_memory (absolute,              /*   and read the MSW from memory */
                                  address, &operand);
 
                 cpu_push ();                            /* push the stack down */
                 RA = operand;                           /*   and store the MSW on the TOS */
 
                 address = TO_PA (RC, RB + 1 & LA_MASK); /* increment the physical address */
-
-                cpu_read_memory (absolute_checked,      /* read the LSW from memory */
+                cpu_read_memory (absolute,              /*   and read the LSW from memory */
                                  address, &operand);
 
                 cpu_push ();                            /* push the stack down again */
@@ -3264,12 +3210,11 @@ switch (operation) {                                    /* dispatch the move or 
                 PREADJUST_SR (4);                       /* ensure there are four valid TOS registers */
 
                 address = TO_PA (RD, RC);               /* form the physical address */
-                cpu_write_memory (absolute_checked,     /* write the MSW from the NOS to memory */
+                cpu_write_memory (absolute,             /* write the MSW from the NOS to memory */
                                   address, RB);
 
                 address = TO_PA (RD, RC + 1 & LA_MASK); /* increment the physical address */
-
-                cpu_write_memory (absolute_checked,     /* write the LSW on the TOS to memory */
+                cpu_write_memory (absolute,             /*   and write the LSW on the TOS to memory */
                                   address, RA);
 
                 cpu_pop ();                             /* pop the TOS */
@@ -3302,7 +3247,7 @@ switch (operation) {                                    /* dispatch the move or 
                 new_q  = 0;                                 /*   but the compiler doesn't realize this and so warns */
 
                 if (!disp_active) {                         /* if not called by the dispatcher to start a process */
-                    if ((STA & STATUS_CS_MASK) > 1) {       /*   then if an external interrupt was serviced  */
+                    if (STATUS_CS (STA) > 1) {              /*   then if an external interrupt was serviced  */
                         cpu_read_memory (stack,             /*     then get the device number (parameter) */
                                          Q + 3 & LA_MASK,
                                          &device);
@@ -3465,11 +3410,15 @@ return status;                                          /* return the execution 
 
        0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | 0   0   1   0 | 0   0   0   1 | 0   1   1   1   1   0   0 | x |  DMUL/DDIV
+     | 0   0   1   0 | 0   0   0   1 | 0   1   1   1 | 1   0   0 | x |  DMUL/DDIV
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | 0   0   1   0 | 0   0   0   1 | 0   0   0   0   1 | ext fp op |  Extended FP
+     | 0   0   1   0 | 0   0   0   1 | 0   0   0   0 | 1 | ext fp op |  Extended FP
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 |   COBOL op    |  COBOL
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -3491,19 +3440,16 @@ return status;                                          /* return the execution 
        W1      0000    020400-020417  Extended Instruction Set (Floating Point)
        W2      0001    020420-020437  32105A APL Instruction Set
        W3      0010    020440-020457
-       W4      0011    020460-020477  32234A COBOL II Instruction Set
+       W4      0011    020460-020477  32234A COBOL II Extended Instruction Set
        W5      0100    020500-020517
        W6      0101    020520-020537
        W7      0110    020540-020557
        --      0111    020560-020577  Base Set (DMUL/DDIV)
-       W8      1000    020600-020777  Extended Instruction Set (Decimal Arith)
+       W8      1xxx    020600-020777  Extended Instruction Set (Decimal Arith)
 
    The range occupied by the base set has no jumper and is hardwired as
-   "present".
-
-   In simulation, presence is determined by the settings of the CPU unit flags.
-   Currently, the only defined option flag is UNIT_EIS, although the EIS itself
-   has not been implemented.
+   "present".  In simulation, presence is determined by the settings of the CPU
+   unit flags.
 
 
    Implementation notes:
@@ -3524,6 +3470,14 @@ t_stat   status = SCPE_OK;
 operation = FIRMEXTOP (CIR);                            /* get the operation from the instruction */
 
 switch (operation) {                                    /* dispatch the operation */
+
+    case 003:                                           /* COBOL II Extended Instruction Set */
+        if (cpu_unit [0].flags & UNIT_CIS)              /* if the firmware is installed */
+            status = cpu_cis_op ();                     /*   then call the CIS dispatcher */
+        else                                            /* otherwise */
+            status = STOP_UNIMPL;                       /*   the instruction range decodes as unimplemented */
+        break;
+
 
     case 007:                                           /* base set */
         suboperation = FMEXSUBOP (CIR);                 /* get the suboperation from the instruction */
@@ -3915,11 +3869,11 @@ switch (operation) {                                    /* dispatch the I/O or c
     case 006:                                           /* XEQ (none; BNDV) */
         address = SM + SR - IO_K (CIR) & LA_MASK;       /* get the address of the target instruction */
 
-        if (address >= DB || PRIV) {                        /* if the address is not below DB or the mode is privileged */
-            cpu_read_memory (stack_checked, address, &NIR); /*   the read the word at S - K into the NIR */
+        if (address >= DB || PRIV) {                    /* if the address is not below DB or the mode is privileged */
+            cpu_read_memory (stack, address, &NIR);     /*   then read the word at S - K into the NIR */
 
-            P = P - 1 & R_MASK;                             /* decrement P so the instruction after XEQ is next */
-            sim_interval = sim_interval + 1;                /*   but don't count the XEQ against a STEP count */
+            P = P - 1 & R_MASK;                         /* decrement P so the instruction after XEQ is next */
+            sim_interval = sim_interval + 1;            /*   but don't count the XEQ against a STEP count */
             }
 
         else                                            /* otherwise the address is below DB and not privileged */
@@ -3975,8 +3929,8 @@ switch (operation) {                                    /* dispatch the I/O or c
         if (NPRV)                                       /* if the mode is not privileged */
             MICRO_ABORT (trap_Privilege_Violation);     /*   then abort with a privilege violation */
 
-        address = SM + SR - IO_K (CIR) & LA_MASK;           /* get the location of the command word */
-        cpu_read_memory (stack_checked, address, &command); /*   and read it from the stack */
+        address = SM + SR - IO_K (CIR) & LA_MASK;       /* get the location of the command word */
+        cpu_read_memory (stack, address, &command);     /*   and read it from the stack or TOS registers */
 
         module = CMD_TO (command);                      /* get the addressed (TO) module number */
 

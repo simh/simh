@@ -154,10 +154,10 @@ t_stat EPROM_reset (DEVICE *dptr, uint16 size)
     sim_debug (DEBUG_flow, &EPROM_dev, "   EPROM_reset: base=0000 size=%04X\n", size);
     if ((EPROM_unit.flags & UNIT_ATT) == 0) { /* if unattached */
         EPROM_unit.capac = size;           /* set EPROM size to 0 */
-        sim_printf("   EPROM: Configured, Not attached\n");
+        sim_printf("      EPROM: Configured, Not attached\n");
         sim_debug (DEBUG_flow, &EPROM_dev, "Done1\n");
     } else {
-        sim_printf("   EPROM: Configured %d bytes, Attached to %s\n",
+        sim_printf("      EPROM: Configured %d bytes, Attached to %s\n",
             EPROM_unit.capac, EPROM_unit.filename);
     }
     sim_debug (DEBUG_flow, &EPROM_dev, "Done2\n");

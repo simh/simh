@@ -1064,6 +1064,8 @@ extern int32 sim_asynch_inst_latency;
 #else
 #error "Implementation of function InterlockedCompareExchangePointer() is needed to build with USE_AIO_INTRINSICS"
 #endif
+#define AIO_ILOCK AIO_LOCK
+#define AIO_IUNLOCK AIO_UNLOCK
 #define AIO_QUEUE_VAL (UNIT *)(InterlockedCompareExchangePointer((void * volatile *)&sim_asynch_queue, (void *)sim_asynch_queue, NULL))
 #define AIO_QUEUE_SET(val, queue) (UNIT *)(InterlockedCompareExchangePointer((void * volatile *)&sim_asynch_queue, (void *)val, queue))
 #define AIO_UPDATE_QUEUE sim_aio_update_queue ()
@@ -1103,33 +1105,11 @@ extern int32 sim_asynch_inst_latency;
       pthread_mutex_destroy(&sim_tmxr_poll_lock);                 \
       pthread_cond_destroy(&sim_tmxr_poll_cond);                  \
       } while (0)
-#define AIO_UPDATE_QUEUE                                                         \
-    do {                                                                         \
-      UNIT *uptr;                                                                \
-      AIO_LOCK;                                                                  \
-      while (sim_asynch_queue != QUEUE_LIST_END) { /* List !Empty */             \
-        int32 a_event_time;                                                      \
-        uptr = sim_asynch_queue;                                                 \
-        sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Migrating Asynch event for %s after %d instructions\n", sim_uname(uptr), uptr->a_event_time);\
-        sim_asynch_queue = uptr->a_next;                                         \
-        uptr->a_next = NULL;            /* hygiene */                            \
-        if (uptr->a_activate_call != &sim_activate_notbefore) {                  \
-          a_event_time = uptr->a_event_time-((sim_asynch_inst_latency+1)/2);     \
-          if (a_event_time < 0)                                                  \
-            a_event_time = 0;                                                    \
-          }                                                                      \
-        else                                                                     \
-          a_event_time = uptr->a_event_time;                                     \
-        AIO_UNLOCK;                                                              \
-        uptr->a_activate_call (uptr, a_event_time);                              \
-        if (uptr->a_check_completion) {                                          \
-          sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Calling Completion Check for asynch event on %s\n", sim_uname(uptr));\
-          uptr->a_check_completion (uptr);                                       \
-          }                                                                      \
-        AIO_LOCK;                                                                \
-        }                                                                        \
-      AIO_UNLOCK;                                                                \
-      } while (0)
+#define AIO_ILOCK AIO_LOCK
+#define AIO_IUNLOCK AIO_UNLOCK
+#define AIO_QUEUE_VAL sim_asynch_queue
+#define AIO_QUEUE_SET(val, queue) (sim_asynch_queue = val)
+#define AIO_UPDATE_QUEUE sim_aio_update_queue ()
 #define AIO_ACTIVATE(caller, uptr, event_time)                         \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
       sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch event for %s after %d instructions\n", sim_uname(uptr), event_time);\

@@ -96,7 +96,7 @@ DEVICE RAM_dev = {
 
 t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size)
 {
-    sim_debug (DEBUG_flow, &RAM_dev, "   RAM_reset: base=%04X size=%04X\n", base, size-1);
+    sim_debug (DEBUG_flow, &RAM_dev, "      RAM_reset: base=%04X size=%04X\n", base, size-1);
     if (RAM_unit.capac == 0) {          /* if undefined */
         RAM_unit.capac = size;
         RAM_unit.u3 = base;
@@ -108,7 +108,7 @@ t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size)
             return SCPE_MEM;
         }
     }
-    sim_printf("   RAM: Available [%04X-%04XH]\n", 
+    sim_printf("      RAM: Available [%04X-%04XH]\n", 
         RAM_unit.u3,
         RAM_unit.u3 + RAM_unit.capac - 1);
     sim_debug (DEBUG_flow, &RAM_dev, "RAM_reset: Done\n");

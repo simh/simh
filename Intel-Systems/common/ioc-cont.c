@@ -34,9 +34,46 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
+#define DEBUG   0
+
+//dbb status flag bits
+#define OBF     1
+#define IBF     2
+#define F0      4
+#define CD      8
+
+//dbb command codes
+#define PACIFY  0x00    //Resets IOC and its devices
+#define ERESET  0x01    //Resets device-generated error (not used by standard devices)
+#define SYSTAT  0x02    //Returns subsystem status byte to master
+#define DSTAT   0x03    //Returns device status byte to master
+#define SRQDAK  0x04    //Enables input of device interrupt acknowledge mask from master
+#define SRQACK  0x05    //Clears IOC subsystem interrupt request
+#define SRQ     0x06    //Tests ability of IOC to forward an interrupt request to the master
+#define DECHO   0x07    //Tests ability of IOC to echo data byte sent by master
+#define CSMEM   0x08    //Requests IOC to checksum on-board ROM. Returns pass/fail
+#define TRAM    0x09    //Requests IOC to test on-board RAM. Returns pass/fail
+#define SINT    0x0A    //Enables specified device interrupt from IOC
+#define CRTC    0x10    //Requests data byte output to the CRT monitor
+#define CRTS    0x11    //Returns CRT status byte to master
+#define KEYC    0x12    //Requests data byte input from the keyboard
+#define KSTC    0x13    //Returns keyboard status byte to master
+#define WPBC    0x15    //Enables input of first of five bytes that define current diskette operation
+#define WPBCC   0x16    //Enables input of each of four bytes that follow WPBC
+#define WDBC    0x17    //Enables input of diskette write bytes from master
+#define RDBC    0x19    //Enables output of diskette read bytes to master
+#define RRSTS   0x1B    //Returns diskette result byte to master
+#define RDSTS   0x1C    //Returns diskette device status byte to master
+
+/* external globals */
+
+extern uint16   port;                   //port called in dev_table[port]
+extern int32    PCX;
+
 /* function prototypes */
 
-uint8 ioc_cont(t_bool io, uint8 data);    /* ioc_cont*/
+uint8 ioc_cont0(t_bool io, uint8 data);    /* ioc_cont*/
+uint8 ioc_cont1(t_bool io, uint8 data);    /* ioc_cont*/
 t_stat ioc_cont_reset (DEVICE *dptr, uint16 baseport);
 
 /* external function prototypes */
@@ -45,6 +82,11 @@ extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
 extern uint32 saved_PC;                    /* program counter */
 
 /* globals */
+
+uint8   dbb_stat;
+uint8   dbb_cmd;
+uint8   dbb_in;
+uint8   dbb_out;
 
 UNIT ioc_cont_unit[] = {
     { UDATA (0, 0, 0) },                /* ioc_cont*/
@@ -94,31 +136,97 @@ DEVICE ioc_cont_dev = {
     NULL                //lname
 };
 
-/*  I/O instruction handlers, called from the CPU module when an
-    IN or OUT instruction is issued.
-*/
-
 /* Reset routine */
 
 t_stat ioc_cont_reset(DEVICE *dptr, uint16 baseport)
 {
     sim_printf("   ioc_cont[%d]: Reset\n", 0);
     sim_printf("   ioc_cont[%d]: Registered at %04X\n", 0, baseport);
-    reg_dev(ioc_cont, baseport, 0); 
-    reg_dev(ioc_cont, baseport + 1, 0); 
-    ioc_cont_unit[0].u3 = 0x00; /* ipc reset */
+    reg_dev(ioc_cont0, baseport, 0); 
+    reg_dev(ioc_cont1, baseport + 1, 0); 
+    dbb_stat = 0x00;                /* clear DBB status */
     return SCPE_OK;
 }
 
+/*  I/O instruction handlers, called from the CPU module when an
+    IN or OUT instruction is issued.
+*/
+
 /* IOC control port functions */
 
-uint8 ioc_cont(t_bool io, uint8 data)
+uint8 ioc_cont0(t_bool io, uint8 data)
 {
+    if (io == 0) {                      /* read data port */
+        if (DEBUG)
+            sim_printf("   ioc_cont0: read data returned %02X PCX=%04X\n", dbb_out, PCX);
+        return dbb_out;
+    } else {                            /* write data port */
+        dbb_in = data;
+        dbb_stat |= IBF;
+        if (DEBUG)
+            sim_printf("   ioc_cont0: write data=%02X port=%02X PCX=%04X\n", dbb_in, port, PCX);
+        return 0;
+    }
+}
+
+uint8 ioc_cont1(t_bool io, uint8 data)
+{
+    int temp;
+
     if (io == 0) {                      /* read status port */
-        sim_printf("   ioc_cont: read data=%02X port=%02X returned 0x00 from PC=%04X\n", data, 0, saved_PC);
-        return 0x00;
-    } else {                            /* write control port */
-        sim_printf("   ioc_cont: data=%02X port=%02X\n", data, 0);
+        if ((dbb_stat & F0) && (dbb_stat & IBF)) {
+            temp = dbb_stat;
+            if (DEBUG)
+                sim_printf("   ioc_cont1: DBB status read 1 data=%02X PCX=%04X\n", dbb_stat, PCX);
+            dbb_stat &= ~IBF;           //reset IBF flag
+            return temp;
+        } 
+        if ((dbb_stat & F0) && (dbb_stat & OBF)) {
+            temp = dbb_stat;
+            if (DEBUG)
+                sim_printf("   ioc_cont1: DBB status read 2 data=%02X PCX=%04X\n", dbb_stat, PCX);
+            dbb_stat &= ~OBF;           //reset OBF flag
+            return temp;
+        } 
+        if (dbb_stat & F0) {
+            temp = dbb_stat;
+            if (DEBUG)
+                sim_printf("   ioc_cont1: DBB status read 3 data=%02X PCX=%04X\n", dbb_stat, PCX);
+            dbb_stat &= ~F0;            //reset F0 flag
+            return temp;
+        }
+//        if (DEBUG)
+//            sim_printf("   ioc_cont1: DBB status read 4 data=%02X PCX=%04X\n", dbb_stat, PCX);
+        return dbb_stat;
+    } else {                            /* write command port */
+        dbb_cmd = data;
+        switch(dbb_cmd){
+            case PACIFY:                //should delay 100 ms
+                dbb_stat = 0;
+                break;
+            case SYSTAT:
+                dbb_out = 0;
+                dbb_stat |= OBF;
+                dbb_stat &= ~CD;
+                break;
+            case CRTS:
+                dbb_out = 0;
+                dbb_stat |= F0;
+                break;
+            case KSTC:
+                dbb_out = 0;
+                dbb_stat |= F0;
+                break;
+            case RDSTS:
+                dbb_out = 0x80;         //not ready
+                dbb_stat |= (F0 | IBF);
+                break;
+            default:
+                sim_printf("   ioc_cont1: Unknown command %02X PCX=%04X\n", dbb_cmd, PCX);
+        }
+        if (DEBUG)
+            sim_printf("   ioc_cont1: DBB command write data=%02X PCX=%04X\n", dbb_cmd, PCX);
+        return 0;
     }
 }
 
