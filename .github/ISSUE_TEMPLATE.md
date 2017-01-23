@@ -17,5 +17,8 @@
 <!--- The simulator configuration file, and any other relatively small files can be attached to this issue now or after it is created -->
 
 - #### the expected behavior and the actual behavior
+<!--- Please provide the output the simulator produced when you experienced the problem -->
 
 - #### you may also need to provide specific pointers to data files that may be necessary to demonstrate the problem
+
+<!--- If you haven't already, please be sure that your full name is visible in your Github profile (no email address is needed) -->
