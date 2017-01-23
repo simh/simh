@@ -1251,6 +1251,9 @@ static const char simh_help[] =
 #define HLP_SHOW_ON             "*Commands SHOW"
 #define HLP_SHOW_SEND           "*Commands SHOW"
 #define HLP_SHOW_EXPECT         "*Commands SHOW"
+#ifdef OPCON
+#define HLP_SHOW_OC             "*Commands SHOW"
+#endif
 #define HLP_HELP                "*Commands HELP"
        /***************** 80 character line width template *************************/
       "2HELP\n"
@@ -1764,28 +1767,6 @@ ASSERT      failure have several different actions:
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
       " EXIT (synonyms QUIT and BYE) returns control to the operating system.\n"
-#ifdef OPCON
-#define HLP_SHOW_OC     "*Commands SHOW"
-      "2HELP\n"
-      "+h{elp}                      type this message\n"
-      "+h{elp} <command>            type help for command\n"
-      "+h{elp} <dev>                type help for device\n"
-      "+h{elp} <dev> attach         type help for device specific ATTACH command\n"
-      "+h{elp} <dev> set            type help for device specific SET commands\n"
-      "+h{elp} <dev> show           type help for device specific SHOW commands\n"
-      "+h{elp} <dev> <command>      type help for device specific <command> command\n"
-       /***************** 80 character line width template *************************/
-      "2Altering The Simulated Configuration\n"
-      " In most simulators, the SET <device> DISABLED command removes the\n"
-      " specified device from the configuration.  A DISABLED device is invisible\n"
-      " to running programs.  The device can still be RESET, but it cannot be\n"
-      " ATTAChed or DETACHed.  SET <device> ENABLED restores a disabled\n"
-      " device to a configuration.\n\n"
-      " Most multi-unit devices allow units to be enabled or disabled:\n\n"
-      "++SET <unit> ENABLED\n"
-      "++SET <unit> DISABLED\n\n"
-      " When a unit is disabled, it will not be displayed by SHOW DEVICE.\n\n"
-#endif
        /***************** 80 character line width template *************************/
 #define HLP_SCREENSHOT  "*Commands Screenshot_Video_Window"
       "2Screenshot Video Window\n"

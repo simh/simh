@@ -466,25 +466,6 @@ CONST char *const text =
 "\n"
 " Valid port numbers are from 0 thru 31\n"
 "\n"
-" An optional serial port configuration string may be present after the port\n"
-" name.  If present, it must be separated from the port name with a semicolon\n"
-" and has this form:\n"
-"\n"
-"   <rate>-<charsize><parity><stopbits>\n"
-"\n"
-" where:\n"
-"   rate     = communication rate in bits per second\n"
-"   charsize = character size in bits (5-8, including optional parity)\n"
-"   parity   = parity designator (N/E/O/M/S for no/even/odd/mark/space parity)\n"
-"   stopbits = number of stop bits (1, 1.5, or 2)\n"
-"\n"
-" As an example:\n"
-"\n"
-"   9600-8n1\n"
-" The supported rates, sizes, and parity options are host-specific. If\n"
-" a configuration string is not supplied, then the default of 9600-8N1\n"
-" is used.\n"
-"\n"
 " The connection configured for the OC device are unconfigured by:\n"
 "\n"
 "   sim> DETACH OC\n"
@@ -494,8 +475,6 @@ CONST char *const text =
 ;
 
 fprintf (st, "%s", text);
-fprint_set_help (st, dptr);
-fprint_show_help (st, dptr);
 return SCPE_OK;
 }
 

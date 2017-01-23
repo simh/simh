@@ -567,8 +567,6 @@ CONST char *const text =
 ;
 
 fprintf (st, "%s", text);
-fprint_set_help (st, dptr);
-fprint_show_help (st, dptr);
 return SCPE_OK;
 }
 
