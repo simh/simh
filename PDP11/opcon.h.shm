@@ -124,10 +124,12 @@ struct oc_st {
   uint8  ACK[3];		/* ack toggle data */
   };
 typedef struct oc_st oc_st;
-#define OC_ADDR ocp->A
-#define OC_DATA ocp->D
-#define OC_IA   ocp->ind_addr
-#define oc_toggle_clear() oc_send_cmd('a')
+#define OC_ADDR if (oc_active) ocp->A
+#define OC_DATA if (oc_active) ocp->D
+#define OC_IA   if (oc_active) ocp->ind_addr
+#define OC_MMR0 if (oc_active) ocp->MMR0 = MMR0
+#define OC_MMR3 if (oc_active) ocp->MMR3 = MMR3
+#define oc_toggle_clear() if (oc_active) oc_send_cmd('a')
 
 struct SERPORT {
   int port;

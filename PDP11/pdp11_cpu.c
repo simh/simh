@@ -721,6 +721,9 @@ dsenable = calc_ds (cm);
 put_PIRQ (PIRQ);                                        /* rewrite PIRQ */
 STKLIM = STKLIM & STKLIM_RW;                            /* clean up STKLIM */
 MMR0 = MMR0 | MMR0_IC;                                  /* usually on */
+#ifdef OPCON
+OC_MMR0;
+#endif
 
 trap_req = calc_ints (ipl, trap_req);                   /* upd int req */
 trapea = 0;
@@ -863,6 +866,9 @@ while (reason == 0)  {
         put_PIRQ (PIRQ);                                /* rewrite PIRQ */
         STKLIM = STKLIM & STKLIM_RW;                    /* clean up STKLIM */
         MMR0 = MMR0 | MMR0_IC;                          /* usually on */
+#ifdef OPCON
+        OC_MMR0;
+#endif
         trap_req = calc_ints (ipl, trap_req);           /* recalc int req */
         continue;
         }                                               /* end if sim_interval */
@@ -926,6 +932,9 @@ while (reason == 0)  {
             if (update_MM)                              /* save vector */
                 MMR2 = trapea;
             MMR0 = MMR0 & ~MMR0_IC;                     /* clear IC */
+#ifdef OPCON
+            OC_MMR0;
+#endif
             }
         src = ReadCW (trapea | calc_ds (MD_KER));       /* new PC */
         src2 = ReadCW ((trapea + 2) | calc_ds (MD_KER)); /* new PSW */
@@ -951,6 +960,9 @@ while (reason == 0)  {
             (trapnum != TRAP_V_RED) && (trapnum != TRAP_V_YEL))
             set_stack_trap (SP);
         MMR0 = MMR0 | MMR0_IC;                          /* back to instr */
+#ifdef OPCON
+        OC_MMR0;
+#endif
         continue;                                       /* end if traps */
         }
 
@@ -1075,6 +1087,10 @@ while (reason == 0)  {
                     STKLIM = 0;                         /* clear STKLIM */
                     MMR0 = 0;                           /* clear MMR0 */
                     MMR3 = 0;                           /* clear MMR3 */
+#ifdef OPCON
+                    OC_MMR0;
+                    OC_MMR3;
+#endif
                     cpu_bme = 0;                        /* (also clear bme) */
                     for (i = 0; i < IPL_HLVL; i++)
                         int_req[i] = 0;
@@ -3030,6 +3046,9 @@ switch (apr & PDR_ACF) {                                /* case on ACF */
                 if (update_MM)                          /* update MMR0 */
                     MMR0 = (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
                 MMR0 = MMR0 | MMR0_TRAP;                /* set trap flag */
+#ifdef OPCON
+                OC_MMR0;
+#endif
                 setTRAP (TRAP_MME);                     /* set trap */
                 }
             return;                                     /* continue op */
@@ -3062,6 +3081,9 @@ if (update_MM) MMR0 =                                   /* update MMR0 */
     (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
 APRFILE[apridx] = APRFILE[apridx] | PDR_A;              /* set A */
 MMR0 = MMR0 | err;                                      /* set aborts */
+#ifdef OPCON
+OC_MMR0;
+#endif
 ABORT (TRAP_MME);                                       /* abort ref */
 return;
 }
@@ -3146,6 +3168,9 @@ switch (apr & PDR_ACF) {                                /* case on ACF */
                 if (update_MM)                          /* update MMR0 */
                     MMR0 = (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
                 MMR0 = MMR0 | MMR0_TRAP;                /* set trap flag */
+#ifdef OPCON
+                OC_MMR0;
+#endif
                 setTRAP (TRAP_MME);                     /* set trap */
                 }
             return;                                     /* continue op */
@@ -3290,6 +3315,7 @@ cpu_bme = (MMR3 & MMR3_BME) && (cpu_opt & OPT_UBM);
 dsenable = calc_ds (cm);
 
 #ifdef OPCON
+OC_MMR3;
 oc_set_mmu();
 oc_set_ringprot(cm);
 #endif
@@ -3524,6 +3550,8 @@ trap_req = 0;
 wait_state = 0;
 
 #ifdef OPCON
+OC_MMR0;
+OC_MMR3;
 oc_set_master(TRUE);
 oc_wait(FALSE);
 oc_set_mmu();

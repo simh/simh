@@ -103,7 +103,7 @@
 #define ADDR_CONPA	9	/* Cons PA  */
 
 /* OC controlblock */
-struct oc_st {
+struct OC_ST {
   t_bool first_exam;		/* flag: first EXAM action */
   t_bool first_dep;		/* flag: first DEP action */
   t_bool ind_addr;		/* flag: indirect data access */
@@ -119,17 +119,19 @@ struct oc_st {
   uint8  c_upd;			/* update counter */
   uint8  c_rot;			/* rotation switch update counter */
   };
-typedef struct oc_st oc_st;
+typedef struct OC_ST OC_ST;
 #define OC_ADDR oc_ctl.A
 #define OC_DATA oc_ctl.D
 #define OC_IA   oc_ctl.ind_addr
+#define OC_MMR0
+#devine OC_MMR3
 
 struct SERPORT {
   int port;
   };
 
 extern uint32 cpu_model;
-extern struct oc_st oc_ctl;
+extern struct OC_ST oc_ctl;
 
 t_stat oc_attach (UNIT *uptr, CONST char *cptr);
 t_stat oc_detach (UNIT *uptr);

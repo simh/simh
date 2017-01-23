@@ -121,6 +121,8 @@ typedef struct OC_ST OC_ST;
 #define OC_ADDR oc_ctl.A
 #define OC_DATA oc_ctl.D
 #define OC_IA   oc_ctl.ind_addr
+#define OC_MMR0
+#define OC_MMR3
 
 struct SERPORT {
   int port;
