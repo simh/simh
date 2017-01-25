@@ -1,6 +1,6 @@
 /* hp3000_cpu.c: HP 3000 Central Processing Unit simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   19-Jan-17    JDB     Added comments describing the OPND and EXEC trace options
    29_Dec-16    JDB     Changed the status mnemonic flag from REG_S to REG_T
    07-Nov-16    JDB     Renamed cpu_byte_to_word_ea to cpu_byte_ea
    03-Nov-16    JDB     Added zero offsets to the cpu_call_procedure calls
@@ -509,11 +510,13 @@
    The trace options that may be specified are:
 
      Trace  Action
-     -----  ----------------------------------
-     INSTR  trace instruction executions
+     -----  -------------------------------------------
+     INSTR  trace instructions executed
      DATA   trace memory data accesses
      FETCH  trace memory instruction fetches
      REG    trace registers
+     OPND   trace memory operands
+     EXEC   trace matching instruction execution states
      PSERV  trace process clock service events
 
    A section of an example trace is:
@@ -564,12 +567,20 @@
    instruction that may alter the base registers, the program, data, and stack
    segment base registers are printed.
 
-   The OPND option traces operand values.  Some instructions that take memory
-   and register operands that are difficult to decode from DATA or REG traces
-   present the operand values in a higher-level format.  The memory bank and
-   address values are always those of the operands.  The operand data and value
-   presented are specific to the instruction; see the instruction executor
-   comments for details.
+   The OPND option traces memory byte operand values.  Some instructions take
+   memory and register operands that are difficult to decode from DATA or REG
+   traces.  This option presents these operands in a higher-level format.  The
+   memory bank and address values are always those of the operands.  The operand
+   data and values printed are specific to the instruction.  For example, the
+   ALGN instruction prints its source and target operands, digit counts, and
+   fraction counts, and the EDIT instruction displays its subprogram operations.
+
+   The EXEC option traces the execution of instructions that match
+   user-specified criteria.  When a match occurs, all CPU trace options are
+   turned on for the duration of the execution of the matched instruction.  The
+   prior trace settings are restored when a match fails.  This option allows
+   detailed tracing of specified instructions while minimizing the log file size
+   compared to a full instruction trace.
 
    The PSERV option traces process clock event service entries.  Each trace
    reports whether or not the CPU was executing on the Interrupt Control Stack
