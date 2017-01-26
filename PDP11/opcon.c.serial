@@ -55,13 +55,13 @@
  * oc_send_A()			: send address data
  * oc_send_AD()			: combined send address & data
  * oc_send_ADS()		: send address/data/status
- * oc_send_D()			: send data data
  * oc_send_S()			: send status data
  * oc_set_master()		: toggle master mode
  * oc_set_mmu()			: toggle mmu mapping mode (16/18/22 bit)
  * oc_set_port1()		: toggle bit on/off in port1 flagbyte
  * oc_set_port2()		: toggle bit on/off in port2 flagbyte
  * oc_set_ringprot()		: toggle ring protection bits (USK)
+ * oc_set_wait()		: toggle wait mode led
  * oc_toggle_ack()		: acknoledge a state on the console processor
  * oc_toggle_clear()		: clear all states on the console processor
  *
@@ -163,7 +163,7 @@ OC_ST oc_ctl;				/* OC device control block */
 
 /* Debug flags & keywords for the OC device */
 DEBTAB oc_debug[] = {
-    { "CON", OCDEB_CON },		/* used in  oc_get_console */
+    { "CON", OCDEB_CON },		/* used in oc_get_console */
     { "HLT", OCDEB_HLT },		/* used in oc_get_halt */
     { "STS", OCDEB_STS },		/* used in oc_send_S */
     { "SWR", OCDEB_SWR },		/* used in oc_get_SWR & oc_get_rotary */
@@ -308,7 +308,7 @@ else
     if (!sim_quiet)
 	printf ("LOCK\n");
 
-oc_send_ADS (0x002005, 0x2015);
+oc_send_AD (0x002801, 0x2017);
 oc_ctl.resched = sim_os_msec();		/* store initial timer value */
 
 return SCPE_OK;
@@ -352,32 +352,17 @@ return SCPE_OK;
  *            With a line speed of 9600 bits/s, roughly 800 characters per second
  *            can be transmitted (using the 8N1 setting).
  *
- *   MODE_1 is true
  *            the following actions are executed by the service call:
- *             - send data & address values         (6 bytes per call)
- *               OR
- *               every 5th call :
- *                - send address/data & status      (8 bytes per call)
- *                - check the 'HALT' switch setting (1 byte if set)
+ *             - send address, data & status        (8 bytes per call)
+ *               every 3rd call :
  *                - get rotary knobs settings	    (2 bytes per call)
- *
- *   MODE_1 is false
- *            the following actions are executed by the service call:
- *             - sending data,address & status values (8 bytes per call)
- *             - every 5th call :
- *               check the 'HALT' switch setting      (1 byte if set)
- *               get rotary knobs settings	      (2 bytes per call)
+ *                - check the 'HALT' switch setting (1 byte if set)
  *
  *            updates commence when the simulated processor is running again.
  *
  * Returns  : SCPE_OK
  */
-#define MODE_1
-#ifdef MODE_1
 #define OC_MINVAL 10
-#else
-# define OC_MINVAL 12
-#endif
 
 t_stat oc_svc (UNIT *uptr)
 {
@@ -397,68 +382,12 @@ if ((R - oc_ctl.resched) < OC_MINVAL) {		/* sufficient time passed by? */
     }
 oc_ctl.resched = R;			/* set as new marker */
 
-if (cpu_model == MOD_1145) {
-    oc_set_port1(FSTS_1145_INDDATA, oc_ctl.ind_addr);
-    switch ((oc_ctl.S[INP3] >> 4) & DSPA_MASK) {
-        case DSPA_PROGPHY : A = oc_ctl.A[ADDR_PRGPA]&0x3FFFF;break;
-        case DSPA_CONSPHY : A = oc_ctl.A[ADDR_CONPA]&0x3FFFF;break;
-        case DSPA_KERNEL_D: A = oc_ctl.A[ADDR_KERND]&0xFFFF; break;
-        case DSPA_KERNEL_I: A = oc_ctl.A[ADDR_KERNI]&0xFFFF; break;
-        case DSPA_SUPER_D : A = oc_ctl.A[ADDR_SUPRD]&0xFFFF; break;
-        case DSPA_SUPER_I : A = oc_ctl.A[ADDR_SUPRI]&0xFFFF; break;
-        case DSPA_USER_D  : A = oc_ctl.A[ADDR_USERD]&0xFFFF; break;
-        case DSPA_USER_I  : A = oc_ctl.A[ADDR_USERI]&0xFFFF; break;
-        }
-    switch ((oc_ctl.S[INP3] >> 2) & DSPD_MASK) {
-        case DSPD_DATA_PATHS : D = oc_ctl.D[DISP_SHFR]; break;
-        case DSPD_BUS_REG    : D = oc_ctl.D[DISP_BR];   break;
-        case DSPD_MU_ADRS    : D = oc_ctl.D[DISP_FPP];  break;
-        case DSPD_DISP_REG   : D = oc_ctl.D[DISP_DR];   break;
-        }
+oc_send_ADS ();
+if (oc_ctl.c_rot++ > 3) {		/* Rotary threshold reached? */
+    oc_ctl.c_rot = 0;
+    oc_get_rotary ();
+    oc_get_halt ();				/* check for HALT key */
     }
-else {
-    oc_set_port1(FSTS_1170_INDDATA, oc_ctl.ind_addr);
-    switch (oc_ctl.S[INP5] & DSPA_MASK) {
-        case DSPA_PROGPHY : A = oc_ctl.A[ADDR_PRGPA]&0x3FFFFF;break;
-        case DSPA_CONSPHY : A = oc_ctl.A[ADDR_CONPA]&0x3FFFFF;break;
-        case DSPA_KERNEL_D: A = oc_ctl.A[ADDR_KERND]&0xFFFF; break;
-        case DSPA_KERNEL_I: A = oc_ctl.A[ADDR_KERNI]&0xFFFF; break;
-        case DSPA_SUPER_D : A = oc_ctl.A[ADDR_SUPRD]&0xFFFF; break;
-        case DSPA_SUPER_I : A = oc_ctl.A[ADDR_SUPRI]&0xFFFF; break;
-        case DSPA_USER_D  : A = oc_ctl.A[ADDR_USERD]&0xFFFF; break;
-        case DSPA_USER_I  : A = oc_ctl.A[ADDR_USERI]&0xFFFF; break;
-        }
-    switch ((oc_ctl.S[INP5] >> 3) & DSPD_MASK) {
-        case DSPD_DATA_PATHS : D = oc_ctl.D[DISP_SHFR]; break;
-        case DSPD_BUS_REG    : D = oc_ctl.D[DISP_BR];   break;
-        case DSPD_MU_ADRS    : D = oc_ctl.D[DISP_FPP];  break;
-        case DSPD_DISP_REG   : D = oc_ctl.D[DISP_DR];   break;
-        }
-    }
-
-#ifdef MODE_1
-if (oc_ctl.c_upd++ > 4) {		/* Update threshold reached? */
-    oc_ctl.c_upd = 0;
-    oc_send_ADS (A, D);
-    if (oc_ctl.c_rot++ > 2) {		/* Rotary threshold reached? */
-	oc_ctl.c_rot = 0;
-        oc_get_rotary ();
-        }
-    oc_get_halt ();			/* check for HALT key */
-    }
-else 
-    oc_send_AD (A, D);
-#else
-oc_send_ADS (A, D);
-if (oc_ctl.c_upd++ > 4) {		/* Update threshold reached? */
-    oc_ctl.c_upd = 0;
-    if (oc_ctl.c_rot++ > 2) {		/* Rotary threshold reached? */
-	oc_ctl.c_rot = 0;
-        oc_get_rotary ();
-        }
-    oc_get_halt ();			/* check for HALT key */
-    }
-#endif
 
 sim_activate_after (uptr, OC_INTERVAL);		/* reschedule */
 
@@ -611,7 +540,7 @@ sim_debug (OCDEB_TRC, &oc_dev, "oc_get_console : called\n");
 if (!oc_ldsc.rcve)			/* console link configured / open? */
     return FALSE;
 
-if (oc_poll (oc_ldsc.serport, 10000) != 1 ||	/* wait 10 msec for input */
+if (oc_poll (oc_ldsc.serport, 10000) != (t_bool)TRUE ||	/* wait 10 msec for input */
     sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 || 
     c == 0)
     return FALSE;
@@ -856,9 +785,7 @@ switch (map) {
 /*
  * Function : oc_set_ringprot()
  * Note     : Manage the ring protection leds on the console
- * 	      11/40 : *	      USER / VIRTUAL LED
- * 	      11/45 & 11/70 : KERNEL, SUPER and USER *LEDs* are coded in
- *                            2 bits on the console
+ * 	      KERNEL, SUPER and USER *LEDs* are coded in 2 bits on the console
  * 	      hardware, modes 
  * 	        "00" - KERNEL LED on
  * 	        "01" - SUPER LED on
@@ -879,16 +806,15 @@ oc_ctl.PORT1 = status;
 
 /*
  * Function : oc_send_S()
- * Note     : Send 8 or 16 bit function/status for those LEDs to the console.
+ * Note     : Send 16 bit function/status for those LEDs to the console.
  * 	      This function keeps track of which LEDs are on/off and maintains
  * 	      their relation to prevent contradictions. For example, the LEDs
  * 	      "CONSOLE" and "RUN" are mutually exclusive.
- * 	      1 status byte for the 11/40, 2 for the 11/45 & 11/70
  * Returns  : Nothing
  */
 void oc_send_S ()
 {
-uint8 buf[4];
+uint8 cmd[4];
 
 if (!oc_ldsc.rcve)
     return;
@@ -896,11 +822,11 @@ if (!oc_ldsc.rcve)
 sim_debug(OCDEB_STS, &oc_dev, "oc_send_S : raw byte1 0x%X, byte2 : 0x%X\n",
         oc_ctl.PORT1, oc_ctl.PORT2);
 
-buf[0] = 'F';					/* cmd to use */
-buf[1] = oc_ctl.PORT1;
-buf[2] = oc_ctl.PORT2;
+cmd[0] = 'F';					/* cmd to use */
+cmd[1] = oc_ctl.PORT1;
+cmd[2] = oc_ctl.PORT2;
 
-if (sim_write_serial (oc_ldsc.serport, buf, 3) != 3)
+if (sim_write_serial (oc_ldsc.serport, cmd, 3) != 3)
     printf("OC    : Error sending STATUS to the console\n");
 }
 
@@ -912,9 +838,9 @@ if (sim_write_serial (oc_ldsc.serport, buf, 3) != 3)
  * 	      display shows the next instruction address.
  * Returns  : Nothing
  */
-void oc_send_A(uint32 A)
+void oc_send_A (uint32 A)
 {
-uint8 mask = 0, buf[4];
+uint8 mask = 0, cmd[4];
 int r;
 
 if (!oc_ldsc.rcve)
@@ -928,37 +854,13 @@ if (MMR0 & MMR0_MME) {
         mask = 0x3F;
     }
 
-buf[0] = 'A';
-buf[1] = (uint8)((A >> 16) & mask);
-buf[2] = (uint8)((A >>  8) & 0xFF);
-buf[3] = (uint8) (A & 0xFF);
+cmd[0] = 'A';
+cmd[1] = (uint8)((A >> 16) & mask);
+cmd[2] = (uint8)((A >>  8) & 0xFF);
+cmd[3] = (uint8) (A & 0xFF);
 
-if ((r = sim_write_serial(oc_ldsc.serport, buf, 4)) != 4)
+if ((r = sim_write_serial(oc_ldsc.serport, cmd, 4)) != 4)
     printf("OC    : Error sending ADDRESS to the console (e=%d, wr=%d)\n",
-	 errno, r);
-}
-
-/*
- * Function : oc_send_D()
- * Note     : Display current data on the operator console.
- * Returns  : Nothing
- */
-void oc_send_D(uint16 D)
-{
-uint8 buf[3];
-int r;
-
-if (!oc_ldsc.rcve)
-    return;
-
-sim_debug(OCDEB_TRC, &oc_dev, "oc_send_D : raw data : %04X\n", D);
-
-buf[0] = 'D';
-buf[1] = (uint8)((D >> 8) & 0xFF);
-buf[2] = (uint8) (D & 0xFF);
-
-if ((r = sim_write_serial(oc_ldsc.serport, buf, 3)) != 3)
-    printf("OC    : Error sending DATA to the console (e=%d, wr=%d)\n",
 	 errno, r);
 }
 
@@ -967,9 +869,9 @@ if ((r = sim_write_serial(oc_ldsc.serport, buf, 3)) != 3)
  * Note     : Display current address/data on the operator console.
  * Returns  : Nothing
  */
-void oc_send_AD(uint32 A, uint16 D)
+void oc_send_AD (uint32 A, uint16 D)
 {
-uint8 buf[7];
+uint8 cmd[7];
 int r;
 uint8 mask = 0;			/* 0x00 -> 16b, 0x03 -> 18b, 0x3F -> 22b */
 
@@ -984,14 +886,14 @@ if (MMR0 & MMR0_MME) {
         mask = 0x3F;
     }
 
-buf[0] = 'B';
-buf[1] = (uint8)((A >> 16) & mask); 
-buf[2] = (uint8)((A >>  8) & 0xFF);
-buf[3] = (uint8) (A & 0xFF);
-buf[4] = (uint8)((D >> 8) & 0xFF);
-buf[5] = (uint8) (D & 0xFF);
+cmd[0] = 'B';
+cmd[1] = (uint8)((A >> 16) & mask); 
+cmd[2] = (uint8)((A >>  8) & 0xFF);
+cmd[3] = (uint8) (A & 0xFF);
+cmd[4] = (uint8)((D >> 8) & 0xFF);
+cmd[5] = (uint8) (D & 0xFF);
 
-if ((r = sim_write_serial(oc_ldsc.serport, buf, 6)) != 6)
+if ((r = sim_write_serial(oc_ldsc.serport, cmd, 6)) != 6)
     printf("OC    : Error sending ADDRES & DATA to the console (e=%d, wr=%d)\n",
 	 errno, r);
 }
@@ -1001,14 +903,53 @@ if ((r = sim_write_serial(oc_ldsc.serport, buf, 6)) != 6)
  * Note     : Display current address/data/status on the operator console.
  * Returns  : Nothing
  */
-void oc_send_ADS(uint32 A, uint16 D)
+void oc_send_ADS (void)
 {
-uint8 buf[10];
+uint8 cmd[8];
 int r;
 uint8 mask = 0;
 
 if (!oc_ldsc.rcve)
     return;
+
+if (cpu_model == MOD_1145) {
+    oc_set_port1(FSTS_1145_INDDATA, oc_ctl.ind_addr);
+    switch ((oc_ctl.S[INP3] >> 4) & DSPA_MASK) {
+        case DSPA_PROGPHY : A = oc_ctl.A[ADDR_PRGPA]&0x3FFFF;break;
+        case DSPA_CONSPHY : A = oc_ctl.A[ADDR_CONPA]&0x3FFFF;break;
+        case DSPA_KERNEL_D: A = oc_ctl.A[ADDR_KERND]&0xFFFF; break;
+        case DSPA_KERNEL_I: A = oc_ctl.A[ADDR_KERNI]&0xFFFF; break;
+        case DSPA_SUPER_D : A = oc_ctl.A[ADDR_SUPRD]&0xFFFF; break;
+        case DSPA_SUPER_I : A = oc_ctl.A[ADDR_SUPRI]&0xFFFF; break;
+        case DSPA_USER_D  : A = oc_ctl.A[ADDR_USERD]&0xFFFF; break;
+        case DSPA_USER_I  : A = oc_ctl.A[ADDR_USERI]&0xFFFF; break;
+        }
+    switch ((oc_ctl.S[INP3] >> 2) & DSPD_MASK) {
+        case DSPD_DATA_PATHS : D = oc_ctl.D[DISP_SHFR]; break;
+        case DSPD_BUS_REG    : D = oc_ctl.D[DISP_BR];   break;
+        case DSPD_MU_ADRS    : D = oc_ctl.D[DISP_FPP];  break;
+        case DSPD_DISP_REG   : D = oc_ctl.D[DISP_DR];   break;
+        }
+    }
+else {
+    oc_set_port1(FSTS_1170_INDDATA, oc_ctl.ind_addr);
+    switch (oc_ctl.S[INP5] & DSPA_MASK) {
+        case DSPA_PROGPHY : A = oc_ctl.A[ADDR_PRGPA]&0x3FFFFF;break;
+        case DSPA_CONSPHY : A = oc_ctl.A[ADDR_CONPA]&0x3FFFFF;break;
+        case DSPA_KERNEL_D: A = oc_ctl.A[ADDR_KERND]&0xFFFF; break;
+        case DSPA_KERNEL_I: A = oc_ctl.A[ADDR_KERNI]&0xFFFF; break;
+        case DSPA_SUPER_D : A = oc_ctl.A[ADDR_SUPRD]&0xFFFF; break;
+        case DSPA_SUPER_I : A = oc_ctl.A[ADDR_SUPRI]&0xFFFF; break;
+        case DSPA_USER_D  : A = oc_ctl.A[ADDR_USERD]&0xFFFF; break;
+        case DSPA_USER_I  : A = oc_ctl.A[ADDR_USERI]&0xFFFF; break;
+        }
+    switch ((oc_ctl.S[INP5] >> 3) & DSPD_MASK) {
+        case DSPD_DATA_PATHS : D = oc_ctl.D[DISP_SHFR]; break;
+        case DSPD_BUS_REG    : D = oc_ctl.D[DISP_BR];   break;
+        case DSPD_MU_ADRS    : D = oc_ctl.D[DISP_FPP];  break;
+        case DSPD_DISP_REG   : D = oc_ctl.D[DISP_DR];   break;
+        }
+    }
 
 sim_debug(OCDEB_UPD, &oc_dev, "oc_send_ADS : A:0x%06X D:0x%04X\n", A, D);
 
@@ -1018,16 +959,16 @@ if (MMR0 & MMR0_MME) {
         mask = 0x3F;
     }
 
-buf[0] = 'U';
-buf[1] = (uint8)((A >> 16) & mask); 
-buf[2] = (uint8)((A >>  8) & 0xFF);
-buf[3] = (uint8) (A & 0xFF);
-buf[4] = (uint8)((D >>  8) & 0xFF);
-buf[5] = (uint8) (D & 0xFF);
-buf[6] = oc_ctl.PORT1;
-buf[7] = oc_ctl.PORT2;
+cmd[0] = 'U';
+cmd[1] = (uint8)((A >> 16) & mask); 
+cmd[2] = (uint8)((A >>  8) & 0xFF);
+cmd[3] = (uint8) (A & 0xFF);
+cmd[4] = (uint8)((D >>  8) & 0xFF);
+cmd[5] = (uint8) (D & 0xFF);
+cmd[6] = oc_ctl.PORT1;
+cmd[7] = oc_ctl.PORT2;
 
-if ((r = sim_write_serial(oc_ldsc.serport, buf, 8)) != 8)
+if ((r = sim_write_serial(oc_ldsc.serport, cmd, 8)) != 8)
     printf("OC    : Error sending ADDRESS/DATA & STATUS to the console (e=%d, wr=%d)\n",
 	 errno, r);
 }
@@ -1059,7 +1000,7 @@ if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
 
 	/* retrieve the input port data from the console processor */
 for (x = 0; x < QUERY_SWR_BYTES; x++) {
-    while (1) { if (oc_poll (oc_ldsc.serport, 1000) == 1) break; }
+    while (1) { if (oc_poll (oc_ldsc.serport, 1000) == (t_bool)TRUE) break; }
     c = 0;
     if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
         	errno != EAGAIN && errno != EWOULDBLOCK)
@@ -1098,7 +1039,7 @@ if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
     return -1;
     }
 
-while (1) { if (oc_poll (oc_ldsc.serport, 1000) == 1) break; }
+while (1) { if (oc_poll (oc_ldsc.serport, 1000) == (t_bool)TRUE) break; }
 if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
 	errno != EAGAIN && errno != EWOULDBLOCK)
     return -1;
@@ -1156,7 +1097,7 @@ return FALSE;
  */
 void oc_toggle_ack (uint8 mask)
 {
-uint8 buf[3];
+uint8 cmd[3];
 int r;
 char *msg;
 
@@ -1179,11 +1120,11 @@ sim_debug (OCDEB_TRC, &oc_dev, msg);
 /*
  * port number where toggles are defined  ** IMPLEMENTATION SPECIFIC
  */
-buf[0] = 'c';
-buf[1] = (uint8)(INP3 + 0x30);
-buf[2] = mask;
+cmd[0] = 'c';
+cmd[1] = (uint8)(INP3 + 0x30);
+cmd[2] = mask;
 
-if ((r = sim_write_serial (oc_ldsc.serport, buf, 3)) != 3)
+if ((r = sim_write_serial (oc_ldsc.serport, cmd, 3)) != 3)
     printf ("OC    : Error sending CLEAR_TOGGLE to the console (err=%d,r=%d)\n",
 	 errno, r);
 }
@@ -1237,7 +1178,7 @@ for (;;) {
         break;
         }
 
-    if (oc_poll (consp0, 10000) == 1 &&		/* wait for data on keyboard */
+    if (oc_poll (consp0, 10000) == (t_bool)TRUE &&	/* wait for data on keyboard */
         sim_read_serial (consp0, &key_entry, 1, &brk) > 0) {
         if (key_entry == '\b' && *tptr > *cptr) {	/* backspace */
             *tptr--;
@@ -1323,12 +1264,12 @@ else
 }
 
 /*
- * Function : oc_wait()
+ * Function : oc_set_wait()
  * Note     : Set the status to be bus master or not.
  *            Used to toggle the master / proc flag
  * Returns  : Nothing
  */
-void oc_wait (t_bool flag)
+void oc_set_wait (t_bool flag)
 {
 if (cpu_model == MOD_1145) {
     oc_set_port1 (FSTS_1145_PAUSE, !flag);

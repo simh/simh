@@ -57,6 +57,7 @@
  * oc_set_mmu()			: toggle mmu mapping mode (16/18/22 bit)
  * oc_set_port2()		: toggle bit on/off in port2 flagbyte
  * oc_set_ringprot()		: toggle ring protection bits (USK)
+ * oc_set_wait()		: toggle wait mode led
  *
  * More information can be found in the doc/opcon_doc.txt file
  */
@@ -156,7 +157,7 @@ oc_st	*ocp;				/* OC device control block */
 
 /* Debug flags & keywords for the OC device */
 DEBTAB oc_debug[] = {
-    { "CON", OCDEB_CON },		/* used in  oc_get_console */
+    { "CON", OCDEB_CON },		/* used in oc_get_console */
     { "HLT", OCDEB_HLT },		/* used in oc_get_halt */
     { "STS", OCDEB_STS },		/* used in oc_send_S (status) */
     { "SWR", OCDEB_SWR },		/* used in oc_get_SWR */
@@ -302,7 +303,7 @@ if (ocp->A[0] != 0) {
 /* now we are in business */
 oc_active = TRUE;					/* mark as available */
 
-oc_get_SWR ();				/* request console key state */
+oc_get_SWR ();					/* request console key state */
 
 if (cpu_model == MOD_1145) {			/* detect power & halt key position */
     K = ocp->S[INP3] & SW_PL_1145; 
@@ -901,14 +902,13 @@ if (prompt)
     printf ("%s", sim_prompt); fflush(stdout);
 
 for (;;) {
-    if (oc_active)
-      oc_set_master (TRUE);
+    oc_set_master (TRUE);
     if (oc_get_console (cptr) == TRUE) { /* poll console for data */
         printf ("%s", cptr);
         break;
         }
 
-    if (oc_poll (consp0, 10000) == 1 &&		/* wait for data on keyboard */
+    if (oc_poll (consp0, 10000) == (t_bool)TRUE &&	/* wait for data on keyboard */
         sim_read_serial (consp0, &key_entry, 1, &brk) > 0) {
         if (key_entry == '\b' && *tptr > *cptr) {	/* backspace */
             *tptr--;
@@ -991,6 +991,9 @@ oc_send_cmd('a');	/* clear all toggles */
  */
 void oc_set_master (t_bool flag)
 {
+if (!oc_active)
+    return;
+
 if (cpu_model == MOD_1145)
     oc_set_port1 (FSTS_1145_MASTER, flag);
 else
@@ -998,12 +1001,12 @@ else
 }
 
 /*
- * Function : oc_wait()
+ * Function : oc_set_wait()
  * Note     : Set the status to be bus master or not.
  *            Used to toggle the master / proc flag
  * Returns  : Nothing
  */
-void oc_wait (t_bool flag)
+void oc_set_wait (t_bool flag)
 {
 if (cpu_model == MOD_1145) {
     oc_set_port1 (FSTS_1145_PAUSE, !flag);

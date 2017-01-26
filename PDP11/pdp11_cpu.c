@@ -912,15 +912,15 @@ while (reason == 0)  {
 */
 
 #ifdef OPCON
-        oc_wait(0);
-        oc_set_master(TRUE);
+        oc_set_wait (FALSE);
+        oc_set_master (TRUE);
         if (cpu_model == MOD_1145) {
-            oc_set_port1(FSTS_1145_ADRSERR, 0);
-            oc_set_ringprot(cm);
+            oc_set_port1 (FSTS_1145_ADRSERR, 0);
+            oc_set_ringprot (cm);
             }
         else {
-            oc_set_port1(FSTS_1170_ADRSERR, 0);
-            oc_set_ringprot(cm);
+            oc_set_port1 (FSTS_1170_ADRSERR, 0);
+            oc_set_ringprot (cm);
             }
 #endif
 
@@ -971,7 +971,7 @@ while (reason == 0)  {
     if (tbit)
         setTRAP (TRAP_TRC);
 #ifdef OPCON
-    oc_wait(wait_state);
+    oc_set_wait (wait_state);
 #endif
     if (wait_state) {                                   /* wait state? */
         sim_idle (TMR_CLK, TRUE);
@@ -1071,7 +1071,7 @@ while (reason == 0)  {
                 wait_state = 1;
 #ifdef OPCON
                 OC_DATA[DISP_SHFR] = (uint16)R[0];
-                oc_wait(1);
+                oc_set_wait (TRUE);
 #endif
                 break;
             case 3:                                     /* BPT */
@@ -3552,13 +3552,13 @@ wait_state = 0;
 #ifdef OPCON
 OC_MMR0;
 OC_MMR3;
-oc_set_master(TRUE);
-oc_wait(FALSE);
-oc_set_mmu();
-oc_set_ringprot(cm);
+oc_set_master (TRUE);
+oc_set_wait (FALSE);
+oc_set_mmu ();
+oc_set_ringprot (cm);
 if (cpu_model == MOD_1170) {
-    oc_set_port1(FSTS_1170_PARERR,  0);
-    oc_set_port1(FSTS_1170_ADRSERR, 0);
+    oc_set_port1 (FSTS_1170_PARERR,  0);
+    oc_set_port1 (FSTS_1170_ADRSERR, 0);
     }
 #endif
 
