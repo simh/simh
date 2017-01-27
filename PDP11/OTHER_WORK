@@ -1,0 +1,8 @@
+possible other changes
+  pdp11_lp.c : allow for serial line (or par port?) specification so that a real printer
+	       can be used i.s.o a file on disk.
+
+  pdp11_cr.c : allow for serial line specification so that a card reader can be connected,
+               will also need code changes in other code of this file.
+
+

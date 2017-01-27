@@ -1,6 +1,6 @@
 /* opcon.c: Interface to a real operator console
  
-   Copyright (c) 2006-2015, Edward Groenenberg & Henk Gooijen
+   Copyright (c) 2006-2017, Edward Groenenberg & Henk Gooijen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,11 +25,12 @@
    or other dealings in this Software without prior written
    authorization from the Author or Authors.
 
+   27-jan-17    EG      merge serial & threading together (compile time switch)
    17-jan-17    EG      pthreading version, rename some functions
    14-mar-14    EG      added rom address range check, changed interval
    10-mar-14    EG      oc_get_console : add inv addr check 
                         oc_read_A : address masking & inv addr flag
-                        added function oc_get_rotary; fix load adrs cmd not -
+                        added function oc_get_RTR; fix load adrs cmd not -
                         to generate 'dep pc xxx'.
    10-feb-14    EG      Rewrite, based on original realcons.c code.
 */
@@ -45,13 +46,16 @@
  * oc_svc()			: service routine
  *
  * OPCON routines
+ * oc_clear_halt()		: clear halt mode
+ * oc_get_CON()			: get function command
+ * oc_get_HLT()			: get halt status (HALT key down)
+ * oc_get_RTR()			: get rotary knob settings
  * oc_get_SWR()			: get switch & knob settings from console
- * oc_get_console()		: get function command
- * oc_get_halt()		: check for HALT key down
- * oc_get_rotary()		: get rotary knob settings
+ * oc_halt_status()             : check halt mode status
  * oc_poll()			: pool input channel for data ready
  * oc_read_A()			: read address from swr data array
  * oc_read_D()			: read data from swr data array
+ * oc_run_thread()		: threading service routine 
  * oc_send_A()			: send address data
  * oc_send_AD()			: combined send address & data
  * oc_send_ADS()		: send address/data/status
@@ -62,7 +66,6 @@
  * oc_set_port2()		: toggle bit on/off in port2 flagbyte
  * oc_set_ringprot()		: toggle ring protection bits (USK)
  * oc_set_wait()		: toggle wait mode led
- * oc_run_thread()		: service routing for the thread
  * oc_toggle_ack()		: acknoledge a state on the console processor
  * oc_toggle_clear()		: clear all states on the console processor
  *
@@ -161,27 +164,31 @@ extern int32 MMR0, MMR3;		/* MMU registers */
 
 /* Global declarations for the OC device */
 OC_ST oc_ctl;				/* OC device control block */
+
+#ifdef OC_THREADING
 pthread_t oc_th;
 int	  oc_end = 0;
+#endif
 
 /* Debug flags & keywords for the OC device */
 DEBTAB oc_debug[] = {
-    { "CON", OCDEB_CON },		/* used in oc_get_console */
-    { "HLT", OCDEB_HLT },		/* used in oc_get_halt */
+    { "CON", OCDEB_CON },		/* used in oc_get_CON */
+    { "HLT", OCDEB_HLT },		/* used in oc_get_HLT */
     { "STS", OCDEB_STS },		/* used in oc_send_S */
-    { "SWR", OCDEB_SWR },		/* used in oc_get_SWR & oc_get_rotary */
+    { "SWR", OCDEB_SWR },		/* used in oc_get_SWR & oc_get_RTR */
     { "SVC", OCDEB_SVC },		/* used in oc_svc */
-    { "TRC", OCDEB_TRC },		/* used in all major call entry points */
+    { "TRC", OCDEB_TRC },		/* used in all several call entry points */
     { "UPD", OCDEB_UPD },		/* used in oc_send_AD & oc_send_ADS */
     { 0 }
     };
 
 /* UNIT definition */
-UNIT oc_unit = { UDATA (&oc_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_DIS, 0) };
+UNIT oc_unit = { UDATA (&oc_svc, UNIT_ATTABLE + UNIT_DISABLE + UNIT_DIS + UNIT_TEXT, 0) };
 
 /* Modifiers definitions */
 MTAB oc_mod[] = { 
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "STATUS", NULL,
+/*    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "STATUS", NULL, */
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO, 0, "STATUS", NULL,
         NULL, &oc_show, NULL, "Display console link status" },
     { 0 } 
     };	
@@ -239,19 +246,20 @@ char *cmdp, *tptr;
 uint32 H, K;
 t_stat r;
 SERHANDLE p;
+#ifdef OC_THREADING
 int oc_ret;
+#endif
 
 sim_debug (OCDEB_TRC, &oc_dev, "oc_attach : called\n");
 
-oc_ldsc.rcve = FALSE;					/* mark as available */
+oc_ldsc.rcve = FALSE;				/* mark as not available */
+if (cptr == NULL)
+    return SCPE_ARG;
 
 if (cpu_model != MOD_1145 && cpu_model != MOD_1170) {
     printf ("OC    : Only support for the 11/45 and 11/70 cpu model.\n");
     return SCPE_OK;
     }
-
-if (cptr == NULL)
-    return SCPE_ARG;
 
 if ((tptr = strchr (cptr, '=')) == NULL)
     return SCPE_ARG;
@@ -283,7 +291,7 @@ if (sim_write_serial (oc_ldsc.serport, cmdp, 2) != 2) {
     return -1;
     }
 
-oc_send_AD (0x002801, 0x2017);
+oc_send_AD (0x002801, 0x2017);		/* initial light on console */
 oc_get_SWR ();				/* request console key state */
 if (cpu_model == MOD_1145) {
     K = oc_ctl.S[INP3] & SW_PL_1145; 
@@ -315,11 +323,13 @@ else
     if (!sim_quiet)
 	printf ("LOCK\n");
 
+#ifdef OC_THREADING
 if ((oc_ret = pthread_create(&oc_th, NULL, oc_run_thread, &oc_end)) != 0) {
     fprintf(stderr, "Error creating OC thread, return code %d\n", oc_ret);
     tmxr_close_master (&oc_tmxr);	/* close the serial line too */
     return(-1);
     }
+#endif
 
 return SCPE_OK;
 }
@@ -336,12 +346,16 @@ t_stat r;
 if (!oc_ldsc.rcve || !oc_ldsc.serport)		/* return if already closed */
     return SCPE_OK;
 
+#ifdef OC_THREADING
 oc_end = 1;
-usleep(100);					/* allow oc_th to flush */
+usleep(250);					/* allow oc_th to flush */
+pthread_join(oc_th, NULL);		/* join, but ignore result      */
+#else
+sim_cancel(&oc_unit);
+#endif
+
 r = tmxr_detach (&oc_tmxr, uptr);		/* detach link          */
 oc_ldsc.rcve = FALSE;				/* clear receiver flag  */
-
-pthread_join(oc_th, NULL);		/* join, but ignore result      */
 
 return r;
 }
@@ -354,6 +368,9 @@ return r;
 t_stat oc_reset (DEVICE *dptr)
 {
 sim_debug (OCDEB_TRC, &oc_dev, "oc_reset : called\n");
+#ifndef OC_THREADING
+sim_activate_after (&oc_unit, OC_INTERVAL);     /* queue service routine */
+#endif
 return SCPE_OK;
 }
 
@@ -369,7 +386,29 @@ uint16 D;
 
 if (!oc_ldsc.rcve)			/* console link configured / open? */
     return FALSE;
-    
+
+#ifndef OC_THREADING
+sim_debug (OCDEB_TRC, &oc_dev, "oc_svc : called\n");
+
+R = sim_os_msec();
+sim_debug (OCDEB_SVC, &oc_dev, "oc_svc : delta = %d\n", R - oc_ctl.resched);
+
+if ((R - oc_ctl.resched) < OC_MINVAL) {         /* sufficient time passed by? */
+    sim_activate_after (uptr, OC_MINVAL);       /* reschedule */
+    return 0;
+    }
+oc_ctl.resched = R;                     /* set as new marker */
+
+oc_send_ADS ();
+if (oc_ctl.c_rot++ > 3) {		/* Rotary threshold reached? */
+    oc_ctl.c_rot = 0;
+    oc_get_RTR ();
+    oc_get_HLT ();			/* check for HALT key */
+    }
+
+sim_activate_after (uptr, OC_INTERVAL);         /* reschedule */
+
+#endif    
 return SCPE_OK;
 }
 
@@ -424,8 +463,8 @@ t_stat oc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST cha
 CONST char *const text =
 " OC device ATTACH help."
 "\n"
-" The OC driver uses a single serial port to send and receive commands"
-" and data to and from the console processor."
+" The OC driver uses a serial port to send and receive commands and"
+" data to and from the console processor."
 "\n"
 " The ATTACH command specifies which serial port to be used.\n"
 " A serial port may be specified as an operating system specific device name\n"
@@ -506,7 +545,7 @@ oc_ctl.HALT = 0;
 }
 
 /*
- * Function : oc_get_console()
+ * Function : oc_get_CON()
  * Note     : Poll the console link for a single byte command.
  * 	      It is processed and appropiate action is taken.
  *
@@ -524,14 +563,14 @@ oc_ctl.HALT = 0;
  * 		    exception (as with a real console) is the HALT switch
  *            TRUE  when a pseudo command is returned
  */
-t_bool oc_get_console (char *cptr)
+t_bool oc_get_CON (char *cptr)
 {
 char brk = 0;
 uint8 c = 0;
 uint16 D;
 uint32 A;
 
-sim_debug (OCDEB_TRC, &oc_dev, "oc_get_console : called\n");
+sim_debug (OCDEB_TRC, &oc_dev, "oc_get_CON : called\n");
 
 if (!oc_ldsc.rcve)			/* console link configured / open? */
     return FALSE;
@@ -541,7 +580,7 @@ if (oc_poll (oc_ldsc.serport, 10000) == (t_bool)FALSE ||	/* wait 10 msec for inp
     c == 0)
     return FALSE;
 
-sim_debug (OCDEB_CON, &oc_dev, "oc_get_console : byte = 0x%02X (%c)\n", c, c);
+sim_debug (OCDEB_CON, &oc_dev, "oc_get_CON : byte = 0x%02X (%c)\n", c, c);
 
 switch (c) {
     case 'H' :					/* HALT/ENABLE->HALT */
@@ -673,6 +712,81 @@ return TRUE;
 }
 
 /*
+ * Function : oc_get_HLT()
+ * Note     : Check non-blocking if the HALT/ENABLE switch is set to HALT.
+ *            If it is another command byte, only acknowledge it to the
+ *            console processor.
+ *	      also preempts the read queue as a side effect.
+ * Returns  : 0 - nothing
+ * 	      1 - set
+ */
+t_bool oc_get_HLT (void)
+{
+char brk = 0;
+uint8 c = 0;
+
+if (!oc_ldsc.rcve)
+    return FALSE;
+
+sim_debug (OCDEB_TRC, &oc_dev, "oc_get_HLT : called\n");
+
+if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 || c == 0)
+    return FALSE;
+
+sim_debug (OCDEB_HLT, &oc_dev, "oc_get_HLT : got (%2X:%c)\n", c, c);
+
+if (c == 'H') {				/* HALT switch down? */
+    oc_ctl.HALT = 2;			/* flag it */
+    return TRUE;
+    }
+else {
+    if (strchr ("cdlsx", c) != NULL)     /* known toggle? -> clear */
+	oc_toggle_clear ();
+    }
+
+return FALSE;
+}
+
+/*
+ * Function : oc_get_RTR()
+ * Note     : Send the Rotary command to the operator console 
+ *	      Then read the byte representing the status of the 2 rotary knobs.
+ *  	      The result is stored in one of the "oc_ctl.S[]" fields matching
+ *            the positionof the 'Q' command.
+ *  	      This function only works for the 11/45 & 11/70
+ *  Returns : 0 or -1
+ */
+int oc_get_RTR (void)
+{
+char brk = 0;
+uint8 c = 'R';
+
+if (!oc_ldsc.rcve)
+    return 0;
+
+sim_debug (OCDEB_TRC, &oc_dev, "oc_get_RTR : called\n");
+
+if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
+    printf("OC    : Error sending 'ROTARY' command.\n");
+    return -1;
+    }
+
+while (1) { if (oc_poll (oc_ldsc.serport, 1000) == (t_bool)TRUE) break; }
+if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
+        errno != EAGAIN && errno != EWOULDBLOCK)
+    return -1;
+
+sim_debug (OCDEB_SWR, &oc_dev, "oc_get_RTR : byte = 0x%02X\n", c);
+
+if (cpu_model == MOD_1145)
+    oc_ctl.S[INP3] = (uint32)c;
+else
+    oc_ctl.S[INP5] = (uint32)c;
+
+return 0;
+}
+
+/*
  * Function : oc_get_SWR()
  * Note     : Send the Query command to the operator console 
  *	      Then read the amount of bytes representing the status of all
@@ -710,81 +824,6 @@ for (x = 0; x < QUERY_SWR_BYTES; x++) {
 sim_debug (OCDEB_SWR, &oc_dev,
     "oc_get_SWR : swreg bytes = 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
     oc_ctl.S[0], oc_ctl.S[1], oc_ctl.S[2], oc_ctl.S[3], oc_ctl.S[4]);
-
-return 0;
-}
-
-/*
- * Function : oc_get_halt()
- * Note     : Check non-blocking if the HALT/ENABLE switch is set to HALT.
- *            If it is another command byte, only acknowledge it to the
- *            console processor.
- *	      also preempts the read queue as a side effect.
- * Returns  : 0 - nothing
- * 	      1 - set
- */
-t_bool oc_get_halt (void)
-{
-char brk = 0;
-uint8 c = 0;
-
-if (!oc_ldsc.rcve)
-    return FALSE;
-
-sim_debug (OCDEB_TRC, &oc_dev, "oc_get_halt : called\n");
-
-if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 || c == 0)
-    return FALSE;
-
-sim_debug (OCDEB_HLT, &oc_dev, "oc_get_halt : got (%2X:%c)\n", c, c);
-
-if (c == 'H') {				/* HALT switch down? */
-    oc_ctl.HALT = 2;			/* flag it */
-    return TRUE;
-    }
-else {
-    if (strchr ("cdlsx", c) != NULL)     /* known toggle? -> clear */
-	oc_toggle_clear ();
-    }
-
-return FALSE;
-}
-
-/*
- * Function : oc_get_rotary()
- * Note     : Send the Rotary command to the operator console 
- *	      Then read the byte representing the status of the 2 rotary knobs.
- *  	      The result is stored in one of the "oc_ctl.S[]" fields matching
- *            the positionof the 'Q' command.
- *  	      This function only works for the 11/45 & 11/70
- *  Returns : 0 or -1
- */
-int oc_get_rotary (void)
-{
-char brk = 0;
-uint8 c = 'R';
-
-if (!oc_ldsc.rcve)
-    return 0;
-
-sim_debug (OCDEB_TRC, &oc_dev, "oc_get_rotary : called\n");
-
-if (sim_write_serial (oc_ldsc.serport, &c, 1) != 1) {
-    printf("OC    : Error sending 'ROTARY' command.\n");
-    return -1;
-    }
-
-while (1) { if (oc_poll (oc_ldsc.serport, 1000) == (t_bool)TRUE) break; }
-if (sim_read_serial (oc_ldsc.serport, &c, 1, &brk) != 1 &&
-        errno != EAGAIN && errno != EWOULDBLOCK)
-    return -1;
-
-sim_debug (OCDEB_SWR, &oc_dev, "oc_get_rotary : byte = 0x%02X\n", c);
-
-if (cpu_model == MOD_1145)
-    oc_ctl.S[INP3] = (uint32)c;
-else
-    oc_ctl.S[INP5] = (uint32)c;
 
 return 0;
 }
@@ -868,8 +907,7 @@ return A;
 
 /*
  * Function : oc_read_D()
- * Note     : Get 3 bytes (16 bit switches information as DATA) and convert it
- * 	      into a 16 bit unsigned integer
+ * Note     : Convert the data bytes from the received array
  * Returns  : Binary value of data switch settings 
  */
 uint16 oc_read_D ()
@@ -906,7 +944,7 @@ if (prompt)
 
 for (;;) {
     oc_set_master (TRUE);
-    if (oc_get_console (cptr) == TRUE) { /* poll console for data */
+    if (oc_get_CON (cptr) == TRUE) { /* poll console for data */
         printf ("%s", cptr);
         break;
         }
@@ -969,6 +1007,8 @@ int r;
 
 if (!oc_ldsc.rcve)
     return;
+
+sim_debug(OCDEB_TRC, &oc_dev, "oc_send_A : raw address %06X\n", A);
 
 if (MMR0 & MMR0_MME) {
   mask = 0x03;
@@ -1074,6 +1114,8 @@ else {
         }
     }
 
+sim_debug(OCDEB_UPD, &oc_dev, "oc_send_ADS : A:0x%06X D:0x%04X\n", A, D);
+
 if (MMR0 & MMR0_MME) {
     mask = 0x03;
     if (MMR3 & MMR3_M22E)
@@ -1081,7 +1123,7 @@ if (MMR0 & MMR0_MME) {
     }
 
 cmd[0] = 'U';
-cmd[1] = (uint8)((A >> 16) & mask); /* & mask */
+cmd[1] = (uint8)((A >> 16) & mask);
 cmd[2] = (uint8)((A >>  8) & 0xFF);
 cmd[3] = (uint8) (A & 0xFF);
 cmd[4] = (uint8)((D >> 8) & 0xFF);
@@ -1103,7 +1145,13 @@ void oc_send_S (void)
 {
 uint8 cmd[4];
 
-cmd[0] = 'F';
+if (!oc_ldsc.rcve)
+    return;
+
+sim_debug(OCDEB_STS, &oc_dev, "oc_send_S : raw byte1 0x%X, byte2 : 0x%X\n",
+        oc_ctl.PORT1, oc_ctl.PORT2);
+
+cmd[0] = 'F';				/* cmd to use */
 cmd[1] = oc_ctl.PORT1;
 cmd[2] = oc_ctl.PORT2;
 
@@ -1158,8 +1206,7 @@ switch (map) {
 /*
  * Function : oc_set_ringprot()
  * Note     : Manage the ring protection leds on the console
- * 	      11/45 & 11/70 : KERNEL, SUPER and USER *LEDs* are coded in
- *                            2 bits on the console
+ * 	       KERNEL, SUPER and USER *LEDs* are coded in 2 bits on the console
  * 	      hardware, modes 
  * 	        "00" - KERNEL LED on
  * 	        "01" - SUPER LED on
@@ -1178,6 +1225,7 @@ if (value == MD_USR) status &= 0xFF;
 oc_ctl.PORT1 = status;
 }
 
+#ifdef OC_THREADING
 /*
  * Function : oc_run_thread
  * Note     : Service routine for the threading solution
@@ -1186,21 +1234,31 @@ oc_ctl.PORT1 = status;
 */
 void *oc_run_thread(void *oc_end)
 {
-uint8 c_swr = 0;
+uint8 c_cnt = 0;
+
+sim_debug (OCDEB_TRC, &oc_dev, "oc_run_thread : called\n");
 
 while (*(int*)oc_end == 0) {
     if (oc_ctl.HALT == 0) {		/* if 0, we are not interactive */
         oc_send_ADS ();
-        if (c_swr++ == 5) {			/* counter max reached? */
-            c_swr = 0;				/* reset it             */
-            oc_get_SWR();			/* get switch data      */
-            if (oc_ctl.S[1] & 0x4)		/* halt switch used?    */
-                oc_ctl.HALT = 2;		/* Yes, set it          */
-            }
+        switch(c_cnt++) {
+          default :
+          case  1 : oc_get_RTR ();
+          case  2 : break;
+          case  3 : oc_get_RTR ();
+          case  4 : break;
+          case  5 : oc_get_SWR ();
+          case  6 : break;
+          case  7 : oc_get_RTR (); break;
+          case  8 : c_cnt = 0; break;
+          }
+        if (oc_ctl.S[1] & 0x4)			/* halt switch used?    */
+            oc_ctl.HALT = 2;			/* Yes, set it          */
         }
     }
-return(0);
+return((void *)0);
 }
+#endif
 
 /*
  * Function : oc_toggle_ack()
@@ -1246,6 +1304,9 @@ if ((r = sim_write_serial (oc_ldsc.serport, cmd, 3)) != 3)
 void oc_toggle_clear (void)
 {
 uint8 c = 'i';
+
+if (!oc_ldsc.rcve)
+    return;
 
 sim_debug (OCDEB_TRC, &oc_dev, "oc_toggle_clear : called\n");
 

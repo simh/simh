@@ -1,10 +1,9 @@
 opcon : Interface to a real operator console
  
-Copyright (c) 2006-2015, Edward Groenenberg & Henk Gooijen
+Copyright (c) 2006-2017, Edward Groenenberg & Henk Gooijen
 
 The 'OC' (Operator Console) software is created to allow SIMH to communicate
-with an original operator console as used f.e. on the 11/05, the 11/20,
-the 11/40 the 11/45 and 11/70.
+with an original operator console for the 11/45 or 1170.
 Altough originally made for the PDP-11, this software can be used for any other
 simulated system using operator consoles, like an HP1000 to name one,
 maybe even an IBM 1130. It only requires interation in the sources for that
@@ -95,73 +94,6 @@ Mappings used for the PDP-11 consoles using the Core-IO I/O board :
    ----------|-------+-------+-------+-------+-------+-------+-------+-------|
 
 
-11/40 (11/35) : TBF
-   port   #  |   7   |   6   |   5   |   4   |   3   |   2   |   1   |   0   |
-   ----------|---------------------------------------------------------------|
-   out8  [7] |       |       |       |       |       |       |       |       |
-   out7  [6] |       |       |       |       |       |       |       |       |
-   out6  [5] |       |       |       |       |       |       |       |       |
-   out5  [4] |  RUN  |  PROC |  BUS  | USER  |CONSOLE|VIRTUAL|  A17  |  A16  |
-   out4  [3] |  A15  |  A14  |  A13  |  A12  |  A11  |  A10  |  A9   |  A8   |
-   out3  [2] |  A7   |  A6   |  A5   |  A4   |  A3   |  A2   |  A1   |  A0   |
-   out2  [1] |  D15  |  D14  |  D13  |  D12  |  D11  |  D10  |  D9   |  D8   |
-   out1  [0] |  D7   |  D6   |  D5   |  D4   |  D3   |  D2   |  D1   |  D0   |
-   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
-   in8   [7] |       |       |       |       |       |       |       |       |
-   in7   [6] |       |       |       |       |       |       |       |       |
-   in6   [5] |       |       |       |       |       |       |       |       |
-   in5   [4] |       |       |       |       |       |       |       |       |
-   in4   [3] |       |       |       |       |       |       |       | HALT  |
-   in3   [2] |PNLLOCK|  DEP  | START | CONT  | LOAD  | EXAM  | SWR17 | SWR16 |
-   in2   [1] | SWR15 | SWR14 | SWR13 | SWR12 | SWR11 | SWR10 | SWR9  | SWR8  |
-   in1   [0] | SWR7  | SWR6  | SWR5  | SWR4  | SWR3  | SWR2  | SWR1  | SWR0  |
-   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
-
-11/20 : TBF
-   port   #  |   7   |   6   |   5   |   4   |   3   |   2   |   1   |   0   |
-   ----------|---------------------------------------------------------------|
-   out8  [7] |       |       |       |       |       |       |       |       |
-   out7  [6] |       |       |       |       |       |       |       |       |
-   out6  [5] |  RUN  | FETCH |  BUS  | EXEC  | SOURC | DEST  | ADDR1 | ADDR2 |
-   out5  [4] |       |       |       |       |       |       |  A17  |  A16  |
-   out4  [3] |  A15  |  A14  |  A13  |  A12  |  A11  |  A10  |  A9   |  A8   |
-   out3  [2] |  A7   |  A6   |  A5   |  A4   |  A3   |  A2   |  A1   |  A0   |
-   out2  [1] |  D15  |  D14  |  D13  |  D12  |  D11  |  D10  |  D9   |  D8   |
-   out1  [0] |  D7   |  D6   |  D5   |  D4   |  D3   |  D2   |  D1   |  D0   |
-   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
-   in8   [7] |       |       |       |       |       |       |       |       |
-   in7   [6] |       |       |       |       |       |       |       |       |
-   in6   [5] |       |       |       |       |       |       |       |       |
-   in5   [4] |       |       |       |       |       |       |       |       |
-   in4   [3] |       |       |       |       |       |       | EXAM  | HALT  |
-   in3   [2] |PNLLOCK| START |SBUSCYC|  DEP  | CONT  | LOAD  | SWR17 | SWR16 |
-   in2   [1] | SWR15 | SWR14 | SWR13 | SWR12 | SWR11 | SWR10 | SWR9  | SWR8  |
-   in1   [0] | SWR7  | SWR6  | SWR5  | SWR4  | SWR3  | SWR2  | SWR1  | SWR0  |
-   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
-
-
-11/05 (11/10) : TBF
-   port   #  |   7   |   6   |   5   |   4   |   3   |   2   |   1   |   0   |
-   ----------|---------------------------------------------------------------|
-   out8  [7] |       |       |       |       |       |       |       |       |
-   out7  [6] |       |       |       |       |       |       |       |       |
-   out6  [5] |       |       |       |       |       |       |       |       |
-   out5  [4] |  RUN  |       |       |       |       |       |       |       |
-   out4  [3] |  A15  |  A14  |  A13  |  A12  |  A11  |  A10  |  A9   |  A8   |
-   out3  [2] |  A7   |  A6   |  A5   |  A4   |  A3   |  A2   |  A1   |  A0   |
-   out2  [1] |  D15  |  D14  |  D13  |  D12  |  D11  |  D10  |  D9   |  D8   |
-   out1  [0] |  D7   |  D6   |  D5   |  D4   |  D3   |  D2   |  D1   |  D0   |
-   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
-   in8   [7] |       |       |       |       |       |       |       |       |
-   in7   [6] |       |       |       |       |       |       |       |       |
-   in6   [5] |       |       |       |       |       |       |       |       |
-   in5   [4] |       |       |       |       |       |       |       |       |
-   in4   [3] |       |       |       |       |       |       |       |       |
-   in3   [2] |PNLLOCK| HALT  |  DEP  |       | CONT  | LOAD  | START | EXAM  |
-   in2   [1] | SWR15 | SWR14 | SWR13 | SWR12 | SWR11 | SWR10 | SWR9  | SWR8  |
-   in1   [0] | SWR7  | SWR6  | SWR5  | SWR4  | SWR3  | SWR2  | SWR1  | SWR0  |
-   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
-
 The core-IO board is a project from Henk Gooijen and Vince Slygstadt and was
 initially designed to be a simple microcontroller with a large amount of
 I/O ports. In this document it will be referred to as the PCP (PDP-11
@@ -210,33 +142,33 @@ oc_read_line_p  : This routine is a replacement for the read_line_p() routine
 		  routine for polling events from the PCP and looks for
 		  commands entered by hand in SIMH.
 
-oc_get_console  : This routine is handling the single byte commands sent from
+oc_get_CON      : This routine is handling the single byte commands sent from
 		  the PCP for interactive processing and converts them into
 		  SIMH commands. It is called only from oc_read_line_p.
 
-oc_get_halt	: This routine checks if an unsolicited command byte has been
+oc_get_HLT 	: This routine checks if an unsolicited command byte has been
 		  sent by the PCP. If it is a HALT command, the event is
 		  flagged in the oc_ctl controlblock. If not, a check is done
 		  for the other commands which are only acknowledged, no
 		  further action is done.
 
-oc_get_rotary	: This routine retrieves the byte containing the position
+oc_get_RTR   	: This routine retrieves the byte containing the position
 		  of the 2 rotary knobs on the 11/45 & 1170 console and stores
 		  the requested byte in the switch position array. It is
 		  basically a leightweight version of the oc_get_swr routine.
 
-oc_get_swr	: This routine queries the position of all the switches of the
+oc_get_SWR	: This routine queries the position of all the switches of the
 		  console. A command byte is sent, after which a series of
 		  bytes are returned.
 
-oc_mmu		: This routine sets the flags related to the use of memory of
+oc_set_mmu      : This routine sets the flags related to the use of memory of
 		  the supported CPU's.
 
-oc_port1	: This routine (and oc_port2) set or clear bit positions for
+oc_set_port1	: This routine (and oc_set_port2) set or clear bit positions for
 		  output port 1 (and 2) related to the status leds of the
 		  console.
 
-oc_ringprot	: This routine handles the ring protection modes of the
+oc_set_ringprot	: This routine handles the ring protection modes of the
 		  supported CPU's.
 
 oc_send_<xxxxx> : The oc_send_xxxxx routines send a command byte followed by
@@ -250,7 +182,7 @@ oc_toggle_ack	: This routine sends a command byte and 2 bytes containing
 
 oc_toggle_clear : This routine sends a 'clear all toggles' command to the PCP.
 
-oc_extract_<x>	: The oc_axtract_<x> rotines extract the address or data
+oc_read_<x>	: The oc_read_<x> routines extract the address or data
 		  value from the console switch register switches.
 
 oc_poll		: This routine polls the serial link for possible data waiting.
