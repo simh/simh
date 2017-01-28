@@ -36,6 +36,9 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -117,6 +120,9 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -126,7 +132,7 @@
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
-				WholeProgramOptimization="true"
+				WholeProgramOptimization="false"
 				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;"
 				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB"
 				StringPooling="true"

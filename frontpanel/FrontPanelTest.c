@@ -148,11 +148,10 @@ if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!str
 if ((f = fopen (sim_config, "w"))) {
     if (debug) {
         fprintf (f, "set verbose\n");
-        fprintf (f, "set log simulator.dbg\n");
-        fprintf (f, "set debug -n -a log\n");
+        fprintf (f, "set debug -n -a simulator.dbg\n");
         fprintf (f, "set cpu conhalt\n");
         fprintf (f, "set remote telnet=2226\n");
-        fprintf (f, "set rem-con debug=XMT;RCV\n");
+        fprintf (f, "set rem-con debug=XMT;RCV;MODE;REPEAT;CMD\n");
         fprintf (f, "set remote notelnet\n");
         }
     fprintf (f, "set cpu autoboot\n");
@@ -184,9 +183,8 @@ if (!panel) {
     }
 
 if (debug) {
-    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV);
+    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP);
     }
-
 tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
 
 if (!tape) {
@@ -313,7 +311,7 @@ if (sim_panel_get_registers (panel, NULL)) {
     printf ("Error getting register data: %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_set_display_callback (panel, &DisplayCallback, NULL, 5)) {
+if (sim_panel_set_display_callback_interval (panel, &DisplayCallback, NULL, 200000)) {
     printf ("Error setting automatic display callback: %s\n", sim_panel_get_error());
     goto Done;
     }
@@ -336,19 +334,27 @@ if (sim_panel_dismount (panel, "RL0")) {
     }
 remove ("TEST-RL.DSK");
 if (sim_panel_break_set (panel, "400")) {
-    printf ("Unexpected establishing a breakpoint: %s\n", sim_panel_get_error());
+    printf ("Unexpected error establishing a breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_break_clear (panel, "400")) {
-    printf ("Unexpected clearing a breakpoint: %s\n", sim_panel_get_error());
+    printf ("Unexpected error clearing a breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_break_output_set (panel, "\"32..31..30\"")) {
-    printf ("Unexpected establishing an output breakpoint: %s\n", sim_panel_get_error());
+    printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_break_output_clear (panel, "\"32..31..30\"")) {
-    printf ("Unexpected clearing an output breakpoint: %s\n", sim_panel_get_error());
+    printf ("Unexpected error clearing an output breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_break_output_set (panel, "-P \"Normal operation not possible.\"")) {
+    printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_break_output_set (panel, "-P \"Device? [XQA0]: \"")) {
+    printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
 sim_panel_clear_error ();

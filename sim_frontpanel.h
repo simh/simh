@@ -57,7 +57,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   2
+#define SIM_FRONTPANEL_VERSION   3
 
 /**
 
@@ -128,7 +128,7 @@ sim_panel_destroy (PANEL *panel);
    simulator.
 
    The registers that a particular frontpanel application mught need 
-   access to are described by the application by calling: 
+   access to are described by the application when it calls: 
    
    sim_panel_add_register
    sim_panel_add_register_array
@@ -175,10 +175,10 @@ sim_panel_add_register_indirect (PANEL *panel,
     
        1)  The values can be polled (when ever it is desired) by calling
            sim_panel_get_registers().
-       2)  The panel can call sim_panel_set_display_callback() to specify a
-           callback routine and a periodic rate that the callback routine
-           should be called.  The panel API will make a best effort to deliver
-           the current register state at the desired rate.
+       2)  The panel can call sim_panel_set_display_callback_interval() to 
+           specify a callback routine and a periodic rate that the callback 
+           routine should be called.  The panel API will make a best effort 
+           to deliver the current register state at the desired rate.
 
 
    Note 1: The buffers described in a panel's register set will be 
@@ -203,10 +203,10 @@ typedef void (*PANEL_DISPLAY_PCALLBACK)(PANEL *panel,
                                         void *context);
 
 int
-sim_panel_set_display_callback (PANEL *panel, 
-                                PANEL_DISPLAY_PCALLBACK callback, 
-                                void *context, 
-                                int callbacks_per_second);
+sim_panel_set_display_callback_interval (PANEL *panel, 
+                                         PANEL_DISPLAY_PCALLBACK callback, 
+                                         void *context, 
+                                         int usecs_between_callbacks);
 
 /**
 
@@ -450,6 +450,8 @@ sim_panel_set_debug_file (PANEL *panel, const char *debug_file);
 
 #define DBG_XMT         1   /* Transmit Data */
 #define DBG_RCV         2   /* Receive Data */
+#define DBG_REQ         4   /* Request Data */
+#define DBG_RSP         8   /* Response Data */
 
 void
 sim_panel_set_debug_mode (PANEL *panel, int debug_bits);

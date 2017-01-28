@@ -113,6 +113,7 @@ SEND *sim_cons_get_send (void);
 EXPECT *sim_cons_get_expect (void);
 t_stat sim_show_cons_send_input (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_set_noconsole_port (void);
+t_stat sim_set_stable_registers_state (void);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 c);
 t_stat sim_putchar_s (int32 c);
