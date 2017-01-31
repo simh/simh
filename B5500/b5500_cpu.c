@@ -19,6 +19,77 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+   The Burroughs 5500 was a unique machine, first introduced in 1961 as the
+   B5000. Later advanced to the B5500 (1964) adding disks and finally the B5700
+   (1971) adding solid state drum. It was the first computer to use the stack
+   as it's only means of accessing data. The machine could access at most
+   32k words of memory.
+
+   The machine used 48 bit numbers, all of which were considered to be floating
+   point numbers, integers were represented by a zero exponent. A word could
+   also be used to hold up to 8 6-bit characters.
+
+   The differences between the various models were minor. The 5500 added
+   the LLL, TUS, FBS and XRT instructions to improve performance of the OS. The
+   5700 added a core memory drum instead of spinning disk.
+
+   The 5500 series tagged memory to assist in controlling access.
+
+   The 5000 series did not have many programer accessible registers, all
+   operations were done on the stack. It had two modes of operation, character
+   and word mode.
+
+   A register 48 bits, held the top of stack.
+      AROF flag indicated whether A was full or not.
+   B register 48 bits, held the second element of the stack.
+      BROF flag indicated whether B was full or not.
+
+   S register 15 bits held a pointer to the top of stack in memory.
+   F register 15 bits held the Frame pointer.
+   R register 15 bits held a pointer to the per process procedures and
+        variables.
+   C register 15 bits together with the L register (2 bits) held the
+     pointer to the current executing sylable.
+
+   When in character mode the registers changed meaning a bit.
+
+   A held the Source word. GH two 3 bit registers held the character,bit
+      offset in the word.
+   B held the Destination word. KV two 3 bit registers held the
+      character and bit offset in the word.
+
+   The M register used to access memory held the address of the source
+     characters.
+   The S register held the address of the destination characters.
+   The R register held a count register refered to as TALLY.
+   The F register held the info need to return back to word mode.
+
+   The generic data word was: Flag = 0.
+
+                 11111111112222222222333333333344444444
+   0 1 2 345678 901234567890123456789012345678901234567
+  +-+-+-+------+---------------------------------------+
+  |F|M|E|Exp   | Mantissa                              |
+  |l|s|s|in    |                                       |
+  |a|i|i|octant|                                       |
+  |g|g|g|      |                                       |
+  | |n|n|      |                                       |
+  +-+-+-+------+---------------------------------------+
+
+  Also 8 6 bit characters could be used.
+
+  With the Flag bit 1 various data pointers could be constructed.
+
+                 11111111 112222222222333 333333344444444
+   0 1 2 345 678901234567 890123456789012 345678901234567
+  +-+-+-+---+------------+---------------+---------------+
+  |F|D|P|f  | Word count | F Field       | Address       |
+  |l|f|r|l  | R Field    |               |               |
+  |a|l|e|a  |            |               |               |
+  |g|a|s|g  |            |               |               |
+  | |g| |s  |            |               |               |
+  +-+-+-+---+------------+---------------+---------------+
+
 */
 
 #include "b5500_defs.h"
@@ -274,7 +345,7 @@ DEVICE              cpu_dev = {
     "CPU", cpu_unit, cpu_reg, cpu_mod,
     2, 8, 15, 1, 8, 48,
     &cpu_ex, &cpu_dep, &cpu_reset, NULL, NULL, NULL,
-    NULL, DEV_DEBUG, 0, dev_debug, 
+    NULL, DEV_DEBUG, 0, dev_debug,
     NULL, NULL, &cpu_help
 };
 
@@ -360,7 +431,7 @@ int memory_cycle(uint8 E) {
         uint16 addr = 0;
 
         sim_interval--;
-        if (E & 2) 
+        if (E & 2)
            addr = S;
         if (E & 4)
            addr = Ma;
@@ -380,7 +451,7 @@ int memory_cycle(uint8 E) {
             return 0;
         }
         if (E & 010) {
-            if (E & 1) 
+            if (E & 1)
                 M[addr] = B;
             else
                 M[addr] = A;
@@ -399,7 +470,7 @@ int memory_cycle(uint8 E) {
         return 0;
 }
 
-            
+
 /* Set registers based on MSCW */
 void set_via_MSCW(t_uint64 word) {
         F = FF(word);
@@ -408,7 +479,7 @@ void set_via_MSCW(t_uint64 word) {
         SALF = (word & SSALF) != 0;
 }
 
-/* Set registers based on RCW. 
+/* Set registers based on RCW.
    if no_set_lc is non-zero don't set LC from RCW.
    if no_bits is non-zero don't set GH and KV,
    return BROF flag  */
@@ -549,7 +620,7 @@ void save_tos() {
         A_valid();              /* Use A register since it is quicker */
         memory_cycle(014);
         AROF = 0;
-    }   
+    }
 }
 
 /* Enter a subroutine, flag true for descriptor, false for opdc */
@@ -600,9 +671,9 @@ int mkint() {
 
         /* Extract exponent */
         exp_b = (B & EXPO) >> EXPO_V;
-        if (exp_b == 0) 
+        if (exp_b == 0)
            return 0;
-        if (B & ESIGN) 
+        if (B & ESIGN)
            exp_b = -exp_b;
         if (B & MSIGN)
            f = 1;
@@ -624,7 +695,7 @@ int mkint() {
         } else {
             /* Now handle when exponent plus */
             while(exp_b > 0) {
-                if ((B & NORM) != 0) 
+                if ((B & NORM) != 0)
                     return 1;
                 B <<= 3;
                 exp_b--;
@@ -644,15 +715,15 @@ int indexWord() {
     if (A & WCOUNT) {
         B_valid_and_A();
         if (mkint()) {
-             if (NCSF) 
+             if (NCSF)
                  Q |= INT_OVER;
              return 1;
         }
         if (B & MSIGN && (B & MANT) != 0) {
-            if (NCSF) 
+            if (NCSF)
                 Q |= INDEX_ERROR;
             return 1;
-        } 
+        }
         if ((B & 01777) >= ((A & WCOUNT) >> WCOUNT_V)) {
             if (NCSF)
                 Q |= INDEX_ERROR;
@@ -681,7 +752,7 @@ void adjust_source() {
             GH = 0;
             next_addr(Ma);
         }
-    }           
+    }
 }
 
 /* Adjust destination bit pointers to point to char */
@@ -696,14 +767,14 @@ void adjust_dest() {
         KV = 0;
         next_addr(S);
         }
-    }           
+    }
 }
 
 /* Advance to next destination bit/char */
 void next_dest(int bit) {
-    if (bit) 
+    if (bit)
        KV += 1;
-    else 
+    else
        KV |= 7;
     if ((KV & 07) > 5) {
        KV &= 070;
@@ -741,7 +812,7 @@ void prev_dest(int bit) {
           BROF = 0;
           prev_addr(S);
           KV = 070;
-       } else 
+       } else
           KV -= 010;
     }
 }
@@ -756,9 +827,9 @@ void fill_dest() {
 
 /* Advance source to next bit/char */
 void next_src(int bit) {
-    if (bit) 
+    if (bit)
        GH += 1;
-    else 
+    else
        GH |= 7;
     if ((GH & 07) > 5) {
        GH &= 070;
@@ -808,7 +879,7 @@ void fill_src() {
 
 /* Fetch next program sylable */
 void next_prog() {
-    if (!PROF) 
+    if (!PROF)
         memory_cycle(020);
     T = (P >> ((3 - L) * 12)) & 07777;
     if ( L++ == 3) {
@@ -827,7 +898,7 @@ void initiate() {
     AROF = 0;
     memory_cycle(3);    /* Fetch IRCW from stack */
     prev_addr(S);
-    brflg = set_via_RCW(B, 0, 0);       
+    brflg = set_via_RCW(B, 0, 0);
     memory_cycle(3);    /* Fetch ICW from stack */
     prev_addr(S);
     set_via_ICW(B);
@@ -850,7 +921,7 @@ void initiate() {
         temp = S;
         S = FF(X);
         X = replF(X, temp);
-    } 
+    }
     NCSF = 1;
     PROF = 0;
     TROF = 0;
@@ -861,7 +932,7 @@ void storeInterrupt(int forced, int test) {
     int         f;
     t_uint64    temp;
 
-    if (forced || test) 
+    if (forced || test)
         NCSF = 0;
     f = BROF;
     if (CWMF) {
@@ -916,7 +987,7 @@ void storeInterrupt(int forced, int test) {
     MSFF = 0;
     SALF = 0;
     F = S;
-    if (forced || test) 
+    if (forced || test)
         CWMF = 0;
     PROF = 0;
     if (test) {
@@ -936,12 +1007,12 @@ void storeInterrupt(int forced, int test) {
            T = WMOP_ITI;
            TROF = 1;
         }
-    } 
+    }
 }
 
-/* Check if in idle loop. 
+/* Check if in idle loop.
    assume that current instruction is ITI */
-/* Typical idle loop for MCP is: 
+/* Typical idle loop for MCP is:
 
   -1   ITI                               0211
   +0   TUS                               2431
@@ -956,7 +1027,7 @@ void storeInterrupt(int forced, int test) {
 
 int check_idle() {
     static uint16  loop_data[7] = {
-          WMOP_TUS, WMOP_OPDC, WMOP_LOR, WMOP_OPDC, 
+          WMOP_TUS, WMOP_OPDC, WMOP_LOR, WMOP_OPDC,
           WMOP_NEQ, WMOP_LITC, WMOP_BBC };
     static uint16  loop_mask[7] = {
           07777,    00003,     07777,     00003,
@@ -968,10 +1039,10 @@ int check_idle() {
     int          i;
 
     /* Quick check to see if not correct location */
-    if (idle_addr != 0 && idle_addr != addr) 
+    if (idle_addr != 0 && idle_addr != addr)
        return 0;
     /* If address same, then idle loop */
-    if (idle_addr == addr)  
+    if (idle_addr == addr)
        return 1;
 
     /* Not set, see if this could be loop */
@@ -981,7 +1052,7 @@ int check_idle() {
         if ((word & loop_mask[i]) != loop_data[i])
             return 0;
         if (l == 0) {
-            addr++; 
+            addr++;
             l = 3 * 12;
             data = M[addr];
         } else {
@@ -999,7 +1070,7 @@ int check_idle() {
         return 1 if B = A.
         return 2 if B > A
         return 4 if B < A
-*/      
+*/
 uint8   compare() {
     int         sign_a, sign_b;
     int         exp_a, exp_b;
@@ -1018,19 +1089,19 @@ uint8   compare() {
     } else {
             /* Extract exponent */
         exp_a = (A & EXPO) >> EXPO_V;
-        if (A & ESIGN) 
+        if (A & ESIGN)
            exp_a = -exp_a;
-    } 
+    }
     if (mb == 0) {
         return (sign_a ? 4 : 2);
         } else {
         exp_b = (B & EXPO) >> EXPO_V;
-        if (B & ESIGN) 
+        if (B & ESIGN)
            exp_b = -exp_b;
     }
 
     /* If signs are different return differnce */
-    if (sign_a != sign_b) 
+    if (sign_a != sign_b)
             return (sign_b ? 2 : 4);
 
     /* Normalize both */
@@ -1065,9 +1136,9 @@ uint8   compare() {
     /* Ok, must be identical */
     return 1;
 }
-   
-/* Handle addition instruction. 
-   A & B valid. */ 
+
+/* Handle addition instruction.
+   A & B valid. */
 void add(int opcode) {
     int exp_a, exp_b;
     int sa, sb;
@@ -1080,7 +1151,7 @@ void add(int opcode) {
     X = 0;
     /* Check if Either argument already zero */
     if ((A & MANT) == 0) {
-       if ((B & MANT) == 0) 
+       if ((B & MANT) == 0)
           B = 0;
        return;
     }
@@ -1092,9 +1163,9 @@ void add(int opcode) {
     /* Extract exponent */
     exp_a = (A & EXPO) >> EXPO_V;
     exp_b = (B & EXPO) >> EXPO_V;
-    if (A & ESIGN) 
+    if (A & ESIGN)
        exp_a = -exp_a;
-    if (B & ESIGN) 
+    if (B & ESIGN)
        exp_b = -exp_b;
     /* Larger exponent to A */
     if (exp_b > exp_a) {
@@ -1130,7 +1201,7 @@ void add(int opcode) {
     if (sa) {   /* A is negative. */
        A ^= FWORD;
        A++;
-    } 
+    }
     if (sb) {   /* B is negative */
        X ^= MANT;
        B ^= FWORD;
@@ -1183,19 +1254,19 @@ void add(int opcode) {
         return;
     if (exp_b < 0) {    /* Handle underflow */
        if (exp_b < -64 && NCSF)
-            Q |= EXPO_UNDER; 
+            Q |= EXPO_UNDER;
        exp_b = ((-exp_b) & 077)|0100;
     } else {
        if (exp_b > 64 && NCSF)
            Q |= EXPO_OVER;
        exp_b &= 077;
     }
-    B = (B & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) | 
+    B = (B & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) |
         ((sb) ? MSIGN: 0);
 }
 
 /*
- * Perform a 40 bit multiply on A and B, result into B,X 
+ * Perform a 40 bit multiply on A and B, result into B,X
  */
 void mult_step(t_uint64 a, t_uint64 *b, t_uint64 *x) {
     t_uint64  u0,u1,v0,v1,t,w1,w2,w3,k;
@@ -1241,9 +1312,9 @@ void multiply() {
     /* Extract exponent */
     exp_a = (A & EXPO) >> EXPO_V;
     exp_b = (B & EXPO) >> EXPO_V;
-    if (A & ESIGN) 
+    if (A & ESIGN)
        exp_a = -exp_a;
-    if (B & ESIGN) 
+    if (B & ESIGN)
        exp_b = -exp_b;
     /* Extract signs, clear upper bits */
     f = (A & MSIGN) != 0;
@@ -1294,7 +1365,7 @@ void multiply() {
     if (exp_b < 0) {
         if (exp_b < -64) {
             if (NCSF)
-                Q |= EXPO_UNDER; 
+                Q |= EXPO_UNDER;
             B = 0;
         return;
         }
@@ -1305,12 +1376,12 @@ void multiply() {
                 Q |= EXPO_OVER;
        }
        exp_b &= 077;
-    } 
+    }
     /* Put the pieces back together */
     B = (B & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) | (f? MSIGN: 0);
 }
 
-    
+
 /* Do divide instruction */
 void divide(int op) {
     int exp_a, exp_b, q, sa, sb;
@@ -1322,23 +1393,23 @@ void divide(int op) {
 
     if ((A & MANT) == 0) {       /* if A mantissa is zero */
         if (NCSF)                 /* and we're in Normal State */
-            Q |= DIV_ZERO;    
+            Q |= DIV_ZERO;
         return;
-    } 
+    }
 
     if ((B & MANT) == 0) { /* otherwise, if B is zero, */
         A = B = 0;                /* result is all zeroes */
         return;
     }
- 
+
     /* Extract exponent */
     exp_a = (A & EXPO) >> EXPO_V;
     exp_b = (B & EXPO) >> EXPO_V;
-    if (A & ESIGN) 
+    if (A & ESIGN)
        exp_a = -exp_a;
-    if (B & ESIGN) 
+    if (B & ESIGN)
        exp_b = -exp_b;
-    
+
     /* Extract signs, clear upper bits */
     sb = (B & MSIGN) != 0;
     sa = (A & MSIGN) != 0;
@@ -1353,23 +1424,23 @@ void divide(int op) {
         B <<= 3;
         exp_b--;
     }
-    
+
     if (op != WMOP_DIV && exp_a > exp_b) { /* Divisor has greater magnitude */
          /* Quotent is < 1, so set result to zero */
          A = 0;
-         B = (op == WMOP_RDV)? (t & FWORD) : 0; 
+         B = (op == WMOP_RDV)? (t & FWORD) : 0;
          return;
     }
-    
+
     if (op != WMOP_RDV)
          sb ^= sa;      /* positive if signs are same, negative if different */
     X = 0;
     /* Now we step through the development of the quotient one octade at a time,
-       tallying the shifts in n until the high-order octade of X is non-zero 
+       tallying the shifts in n until the high-order octade of X is non-zero
        (i.e., normalized). The divisor is in ma and the dividend (which becomes
        the remainder) is in mb. Since the operands are normalized, this will
        take either 13 or 14 shifts. We do the X shift at the top of the loop so
-       that the 14th (rounding) digit will be available in q at the end. 
+       that the 14th (rounding) digit will be available in q at the end.
        The initial shift has no effect, as it operates using zero values for X
        and q. */
     do {
@@ -1378,13 +1449,13 @@ void divide(int op) {
             ++q;                /* bump the quotient digit */
             B -= A;             /* subtract divisor from reAinder */
         }
-        
+
         if (op == WMOP_DIV) {
             if ((X & NORM) != 0) {
                 break;          /* quotient has become normalized */
             } else {
                 B <<= 3;       /* shift the remainder left one octade */
-                X = (X<<3) + (t_uint64)q;  /* shift quotient digit into the 
+                X = (X<<3) + (t_uint64)q;  /* shift quotient digit into the
                                         working quotient */
                 --exp_b;
             }
@@ -1401,10 +1472,10 @@ void divide(int op) {
             }
         }
     } while (1);
-    
+
     if (op == WMOP_DIV) {
         exp_b -= exp_a - 1; /* compute the exponent, accounting for the shifts*/
-    
+
         /* Round the result (it's already normalized) */
         if (q >= 4) {       /* if high-order bit of last quotient digit is 1 */
            if (X < MANT) {  /* if the rounding would not cause overflow */
@@ -1415,7 +1486,7 @@ void divide(int op) {
         if (exp_a == exp_b) {
             exp_b = 0;              /* integer result developed */
         } else {
-            if (NCSF)               /* integer overflow result */ 
+            if (NCSF)               /* integer overflow result */
                Q |= INT_OVER;
             exp_b -= exp_a;
         }
@@ -1426,11 +1497,11 @@ void divide(int op) {
                 exp_b = sb = 0;    /* assure result will be all zeroes */
         } else {
             if (NCSF)              /* integer overflow result */
-                Q |= INT_OVER;  
+                Q |= INT_OVER;
             X = exp_b = sb = 0;    /* result in B will be all zeroes */
         }
     }
-    
+
     /* Check for exponent under/overflow */
     if (exp_b > 63) {
         exp_b &= 077;
@@ -1439,18 +1510,18 @@ void divide(int op) {
         }
     } else if (exp_b < 0) {
         if (exp_b < -63) {
-            if (NCSF) 
-                Q |= EXPO_UNDER;        
+            if (NCSF)
+                Q |= EXPO_UNDER;
         }
-        exp_b = ((-exp_b) & 077) | 0100;        
+        exp_b = ((-exp_b) & 077) | 0100;
     }
-    
+
     /* Put the pieces back together */
     B = (X & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) | (sb? MSIGN: 0);
 }
 
 
-/* Double precision addition. 
+/* Double precision addition.
    A & Y (not in real B5500) have operand 1.
    B & X have operand 2 */
 void double_add(int opcode) {
@@ -1474,9 +1545,9 @@ void double_add(int opcode) {
     /* Extract exponent */
     exp_a = (A & EXPO) >> EXPO_V;
     exp_b = (B & EXPO) >> EXPO_V;
-    if (A & ESIGN) 
+    if (A & ESIGN)
        exp_a = -exp_a;
-    if (B & ESIGN) 
+    if (B & ESIGN)
        exp_b = -exp_b;
     /* Larger exponent to A */
     if (exp_b > exp_a) {
@@ -1530,7 +1601,7 @@ void double_add(int opcode) {
             Y &= MANT;
         A++;
        }
-    } 
+    }
     if (sb) {   /* B is negative */
        X ^= MANT;
        B ^= FWORD;
@@ -1567,7 +1638,7 @@ void double_add(int opcode) {
        X >>= 3;
        exp_b++;
     }
-  
+
     if (ld >= 4 && X != MANT && B != MANT) {
        X++;
        if (X & EXPO) {
@@ -1588,19 +1659,19 @@ void double_add(int opcode) {
     X &= MANT;
     if (exp_b < 0) {    /* Handle underflow */
        if (exp_b < -64 && NCSF)
-        Q |= EXPO_UNDER; 
+        Q |= EXPO_UNDER;
        exp_b = ((-exp_b) & 077)|0100;
     } else {
        if (exp_b > 64 && NCSF)
         Q |= EXPO_OVER;
        exp_b &= 077;
     }
-    A = (B & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) | 
+    A = (B & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) |
         (sb ? MSIGN: 0);
     B = X;
 }
 
-/* Double precision multiply. 
+/* Double precision multiply.
    A & Y (not in real B5500) have operand 1.
    B & X have operand 2 */
 void double_mult() {
@@ -1622,9 +1693,9 @@ void double_mult() {
     /* Extract exponent */
     exp_a = (A & EXPO) >> EXPO_V;
     exp_b = (B & EXPO) >> EXPO_V;
-    if (A & ESIGN) 
+    if (A & ESIGN)
        exp_a = -exp_a;
-    if (B & ESIGN) 
+    if (B & ESIGN)
        exp_b = -exp_b;
     /* Extract signs, clear upper bits */
     f = (A & MSIGN) != 0;
@@ -1642,7 +1713,7 @@ void double_mult() {
         X &= MANT;
         exp_b--;
     }
-        
+
     for(ld = 0; (A & NORM) == 0 && ld < 13 ; ld++) {
         A <<= 3;
         A |= (Y >> 36) & 07;
@@ -1666,7 +1737,7 @@ void double_mult() {
     /* Add M7 to mx => M8 + m8 */
     /* Add M6 to m8 => M9(M8) + m9 */
     /*    M6 m6 = M4 * m3 */
-    mult_step(B, &Y, &m6);      /* Y = M6, m6 = m6 */ 
+    mult_step(B, &Y, &m6);      /* Y = M6, m6 = m6 */
     /*    M7 m7 = (M3 * m4) */
     mult_step(A, &X, &m7);      /* X = M7, m7 = m7 */
     m6 += m7;
@@ -1706,18 +1777,18 @@ void double_mult() {
 
     if (exp_b < 0) {    /* Handle underflow */
        if (exp_b < -64 && NCSF)
-            Q |= EXPO_UNDER; 
+            Q |= EXPO_UNDER;
        exp_b = ((-exp_b) & 077)|0100;
     } else {
        if (exp_b > 64 && NCSF)
            Q |= EXPO_OVER;
        exp_b &= 077;
     }
-    A = (A & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) | 
+    A = (A & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) |
         (f ? MSIGN: 0);
 }
 
-/* Double precision divide. 
+/* Double precision divide.
    A & Y (not in real B5500) have operand 1.
    B & X have operand 2 */
 void double_divide() {
@@ -1736,10 +1807,10 @@ void double_divide() {
     A = X;
     X = B;
     B = Q1;
-   
+
     /* Extract exponent */
     exp_a = (A & EXPO) >> EXPO_V;
-    if (A & ESIGN) 
+    if (A & ESIGN)
        exp_a = -exp_a;
     /* Extract signs, clear upper bits */
     f = (A & MSIGN) != 0;
@@ -1756,7 +1827,7 @@ void double_divide() {
 
     /* Extract B */
     exp_b = (B & EXPO) >> EXPO_V;
-    if (B & ESIGN) 
+    if (B & ESIGN)
        exp_b = -exp_b;
     f ^= ((B & MSIGN) != 0);
     B &= MANT;
@@ -1794,7 +1865,7 @@ void double_divide() {
             ++q;                /* bump the quotient digit */
             B -= A;             /* subtract divisor from reAinder */
         }
-        
+
         B <<= 3;            /* shift the remainder left one octade */
         X = (X<<3) + (t_uint64)q;  /* shift quotient digit into the
                                       working quotient */
@@ -1804,7 +1875,7 @@ void double_divide() {
 
     if (exp_b < 0) {    /* Handle underflow */
         if (exp_b < -64 && NCSF)
-            Q |= EXPO_UNDER; 
+            Q |= EXPO_UNDER;
         exp_b = ((-exp_b) & 077)|0100;
     } else {
         if (exp_b > 64 && NCSF)
@@ -1813,7 +1884,7 @@ void double_divide() {
     }
 
     /* Save Q1 in x R1 in B */
-    Q1 = (X & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) |    
+    Q1 = (X & MANT) | ((t_uint64)(exp_b & 0177) << EXPO_V) |
                         (f ? MSIGN: 0);
     X = 0;
     /* Now divide R1 by M3 resulting in q1, R2 */
@@ -1824,11 +1895,11 @@ void double_divide() {
             ++q;                /* bump the quotient digit */
             B -= A;             /* subtract divisor from reAinder */
         }
-        
+
         B <<= 3;            /* shift the remainder left one octade */
         X = (X<<3) + (t_uint64)q;  /* shift quotient digit into the
                          working quotient */
-    } 
+    }
 
     q1 = X;
     B = Y;
@@ -1842,18 +1913,18 @@ void double_divide() {
             ++q;                /* bump the quotient digit */
             B -= A;             /* subtract divisor from reAinder */
         }
-        
+
         B <<= 3;            /* shift the remainder left one octade */
         X = (X<<3) + (t_uint64)q;  /* shift quotient digit into the
                          working quotient */
-    } 
+    }
 
     if (X == 0) {
         A = Q1;
         B = q1;
     } else {
         /* Load in Q1,q1 into B */
-        A = 01157777777777777; 
+        A = 01157777777777777;
         Y = MANT ^ X;   /* Load q2 into A */
         B = Q1;
         X = q1;
@@ -1881,7 +1952,7 @@ void relativeAddr(int store) {
                Ma = R+7;
                memory_cycle(4);
                base = FF(A);
-          } else 
+          } else
                base = F;
           break;
 
@@ -1896,7 +1967,7 @@ void relativeAddr(int store) {
                Ma = R+7;
                memory_cycle(4);
                base = FF(A);
-          } else 
+          } else
                base = F;
           break;
        }
@@ -1963,7 +2034,7 @@ sim_instr(void)
         if (cpu_index == 0 && P2_run == 1) {
             cpu_index = 1;
             /* Check if interrupt pending. */
-            if (TROF == 0 && NCSF && ((Q != 0) || HLTF)) 
+            if (TROF == 0 && NCSF && ((Q != 0) || HLTF))
                 /* Force a SFI */
                 storeInterrupt(1,0);
         } else {
@@ -1971,14 +2042,13 @@ sim_instr(void)
 
             /* Check if interrupt pending. */
             if (TROF == 0 && NCSF && ((Q != 0) ||
-                                 (IAR != 0))) 
+                                 (IAR != 0)))
                 /* Force a SFI */
                 storeInterrupt(1,0);
         }
         if (TROF == 0)
             next_prog();
 
-        /* TODO: Add support to detect IDLE loop */
 crf_loop:
         opcode = T & 077;
         field = (T >> 6) & 077;
@@ -1995,7 +2065,7 @@ crf_loop:
             hst_p = (hst_p + 1);        /* next entry */
             if (hst_p >= hst_lnt) {
                     hst_p = 0;
-            } 
+            }
             hst[hst_p].c = (C) | HIST_PC;
             hst[hst_p].op = T;
             hst[hst_p].s = S;
@@ -2023,13 +2093,13 @@ crf_loop:
 
         /* Check if Character or Word Mode */
         if (CWMF) {
-            /* Character mode source word in A 
+            /* Character mode source word in A
                         addressed by M,G,H.
                               destination in B
                         addressed by S,K,V.
                 R = tally.
                 X = loop control.
-                F = return control word 
+                F = return control word
             */
             switch(opcode) {
             case CMOP_EXC:              /* EXIT char mode */
@@ -2040,7 +2110,7 @@ crf_loop:
                 AROF = 0;
                 memory_cycle(3);        /* Load B from S */
                 if ((B & FLAG) == 0) {
-                    if (NCSF) 
+                    if (NCSF)
                         Q |= FLAG_BIT;
                     break;
                 }
@@ -2120,7 +2190,7 @@ crf_loop:
                 AROF = 0;
                 if (A & FLAG) {
                     if ((A & PRESENT) == 0) {
-                        if (NCSF) 
+                        if (NCSF)
                             Q |= PRES_BIT;
                         break;
                     }
@@ -2132,14 +2202,14 @@ crf_loop:
                 break;
 
             case CMOP_RDA:      /* Recall Destination Address */
-                if (BROF) 
+                if (BROF)
                     memory_cycle(013);
                 S = (F - field) & CORE;
                 memory_cycle(3);
                 BROF = 0;
                 if (B & FLAG) {
                     if ((B & PRESENT) == 0) {
-                        if (NCSF) 
+                        if (NCSF)
                             Q |= PRES_BIT;
                         break;
                     }
@@ -2159,7 +2229,7 @@ crf_loop:
                 S = atemp;      /* Restore S */
                 if (B & FLAG) {
                     if ((B & PRESENT) == 0) {
-                        if (NCSF) 
+                        if (NCSF)
                             Q |= PRES_BIT;
                         break;
                     }
@@ -2211,7 +2281,7 @@ crf_loop:
                 GH = (uint8)((B >> 12) & 070);
                 Ma = CF(B);
                 break;
-                
+
             case CMOP_TDA:      /* Transfer Destination Address */
                 if (BROF)
                     memory_cycle(013);
@@ -2309,7 +2379,7 @@ crf_loop:
                 fill_src();
                 i = rank[(A >> bit_number[GH | 07]) & 077];
                 j = rank[field];
-                if (i == j) 
+                if (i == j)
                     f = 1;
                 else if (i < j)
                     f = 2;
@@ -2344,7 +2414,7 @@ crf_loop:
                      field--;
                      fill_dest();
                      temp = bit_mask[bit_number[KV]];
-                     if (opcode & 1) 
+                     if (opcode & 1)
                         B &= ~temp;
                      else
                         B |= temp;
@@ -2417,7 +2487,7 @@ crf_loop:
             case CMOP_JNC:      /* Jump Out Of Loop Conditional */
                 if (TFFF)
                    break;
-                
+
                 /* Fall through */
             case CMOP_JNS:      /* Jump out of loop unconditional */
                 /* Read Loop/Return control word */
@@ -2509,7 +2579,7 @@ crf_loop:
                     AROF = 0;
                 }
 
-                if (field == 0) 
+                if (field == 0)
                    break;
 
                 /* Load word into A */
@@ -2521,7 +2591,7 @@ crf_loop:
                 f = (A & MSIGN) != 0;
                 TFFF = 1;
                 A &= MANT;
-                if (A == 0) 
+                if (A == 0)
                     f = 0;
                 i = 39;
                 /* We loop over the bit in A and add one to B
@@ -2529,7 +2599,7 @@ crf_loop:
                    step we BCD double the number in B */
                 while(i > 0) {
                     /* Compute carry to next digit */
-                    temp = (B + 0x33333333LL) & 0x88888888LL; 
+                    temp = (B + 0x33333333LL) & 0x88888888LL;
                     B <<= 1;    /* Double it */
                     /* Add 6 from every digit that overflowed */
                     temp = (temp >> 1) | (temp >> 2);
@@ -2549,13 +2619,13 @@ crf_loop:
                 for(i = 8; i >= 0; i--) {
                     j = (A >> (i * 4)) & 0xF;
                     if (i >= field) {
-                        if (j != 0) 
+                        if (j != 0)
                             TFFF = 0;
                     } else {
                         fill_dest();
                         temp = 077LL << bit_number[KV | 07];
                         B &= ~temp;
-                        if (i == 0 && f) 
+                        if (i == 0 && f)
                             j |= 040;
                         B |= ((t_uint64)j) << bit_number[KV | 07];
                         BROF = 1;
@@ -2575,8 +2645,8 @@ crf_loop:
                    KV = 0;
                    next_addr(S);
                 }
-                
-                if (field == 0) 
+
+                if (field == 0)
                    break;
                 B = 0;
                 temp = 0;
@@ -2627,7 +2697,7 @@ crf_loop:
                 while(field > 0) {
                     fill_src();
                     fill_dest();
-                    if (f) {    
+                    if (f) {
                         i = (A >> bit_number[GH | 07]) & 077;
                         j = (B >> bit_number[KV | 07]) & 077;
                         if (i != j) {
@@ -2637,9 +2707,9 @@ crf_loop:
                                     /* Do numeric compare */
                                     i &= 017;
                                     j &= 017;
-                                    if (i != j) 
+                                    if (i != j)
                                         f = 0;  /* Different, so stop check */
-                                    if (i < j) 
+                                    if (i < j)
                                         TFFF = 0;
                                     break;
                             case CMOP_CEQ:      /* Compare Equal 60 */
@@ -2659,7 +2729,7 @@ crf_loop:
                     next_dest(0);
                     field--;
                 }
-                /* If F = 1, fields are equal. 
+                /* If F = 1, fields are equal.
                    If F = 0 and TFFF = 0 S < D.
                    If F = 0 and TFFF = 1 S > D.
                 */
@@ -2693,11 +2763,11 @@ crf_loop:
                 sub     1       1       1       0       1       0
                 */
                     f = (f & sd & ss & (!sub)) |
-                        (f & sd & (!ss) & (!sub))  |        
-                        ((!f) & (!TFFF) & sd) | 
+                        (f & sd & (!ss) & (!sub))  |
+                        ((!f) & (!TFFF) & sd) |
                         ((!f) & TFFF & (ss ^ (opcode == CMOP_FSU)));
                     c = 0;
-                    if (sub) {  
+                    if (sub) {
                         c = 1;
                         if (TFFF) { /* If S < D */
                             ss = 0;
@@ -2791,7 +2861,7 @@ crf_loop:
                 }
                 TROF = 0;
                 break;
-                
+
             case CMOP_TRN:      /* Transfer Numeric 75 */
             case CMOP_TRZ:      /* Transfer Zones 76 */
             case CMOP_TRS:      /* Transfer Source Characters 77 */
@@ -2877,7 +2947,7 @@ opdc:
                     if ((A & (DFLAG|PROGF)) == (DFLAG|PROGF)) {
                         enterSubr(0);
                     } else {
-                        if (indexWord()) 
+                        if (indexWord())
                            break;
                         memory_cycle(4);
                         if (NCSF && (A & FLAG))
@@ -2910,7 +2980,7 @@ desc:
                     if ((A & (DFLAG|PROGF)) == (DFLAG|PROGF)) {
                         enterSubr(1);
                     } else {
-                        if (indexWord()) 
+                        if (indexWord())
                            break;
                         A |= FLAG | PRESENT;
                     }
@@ -2981,10 +3051,10 @@ control:
                         } else if (IAR) {
                             uint16  x;
                             C = INTER_TIME;
-                            for(x = 1; (IAR & x) == 0; x <<= 1) 
+                            for(x = 1; (IAR & x) == 0; x <<= 1)
                                 C++;
                             /* Release the channel after we got it */
-                            if (C >= IO1_FINISH && C <= IO4_FINISH) 
+                            if (C >= IO1_FINISH && C <= IO4_FINISH)
                                 chan_release(C - IO1_FINISH);
                             IAR &= ~x;
                         } else if ((q_reg[0] & 0170) != 0) {
@@ -3013,7 +3083,7 @@ control:
                                  break;
                              if (sim_idle_enab) {
                              /* Check if possible idle loop */
-                                 if (check_idle()) 
+                                 if (check_idle())
                                     sim_idle (TMR_RTC, FALSE);
                              }
                              break;
@@ -3038,7 +3108,7 @@ control:
                         } else if (A & PRESENT) {
                             Ma = CF(A);
                         } else {
-                            if (NCSF) 
+                            if (NCSF)
                                 Q |= PRES_BIT;
                             break;
                         }
@@ -3107,7 +3177,7 @@ control:
                         sim_debug(DEBUG_DETAIL, &cpu_dev, "INIT P1\n\r");
                         initiate();
                         break;
-        
+
                 case VARIANT(WMOP_IP2): /* Initiate P2 */
                         if (NCSF)
                            break;
@@ -3198,7 +3268,7 @@ control:
                         AB_valid();
                         if (A & FLAG) {
                             if ((A & PRESENT) == 0) {
-                                if (NCSF) 
+                                if (NCSF)
                                     Q |= PRES_BIT;
                                 break;
                             }
@@ -3212,9 +3282,9 @@ control:
                             if ((B & EXPO) != 0) {
                                 /* Check if force to integer */
                                 if ((A & INTEGR) != 0 || (field & 040) != 0) {
-                                   if (mkint()) {       
+                                   if (mkint()) {
                                       /* Fail if not an integer */
-                                      if (NCSF) 
+                                      if (NCSF)
                                           Q |= INT_OVER;
                                       break;
                                    }
@@ -3231,7 +3301,7 @@ control:
                         A_valid();
                         if (A & FLAG) {
                             if ((A & PRESENT) == 0) {
-                                if (NCSF) 
+                                if (NCSF)
                                     Q |= PRES_BIT;
                                 break;
                             }
@@ -3262,13 +3332,13 @@ control:
                                 if ((i & 5) != 0) f = 1; break;
                         case VARIANT(WMOP_GTR):
                                 if (i == 4) f = 1; break;
-                        case VARIANT(WMOP_NEQ): 
+                        case VARIANT(WMOP_NEQ):
                                 if (i != 1) f = 1; break;
                         case VARIANT(WMOP_LEQ):
                                 if ((i & 3) != 0) f = 1; break;
                         case VARIANT(WMOP_LSS):
                                 if (i == 2) f = 1; break;
-                        case VARIANT(WMOP_EQL): 
+                        case VARIANT(WMOP_EQL):
                                 if (i == 1) f = 1; break;
                         }
                         B = f;
@@ -3318,7 +3388,7 @@ control:
                         } else if (AROF || BROF) {
                              if (AROF)
                                 B = A;
-                             else 
+                             else
                                 A = B;
                              AROF = BROF = 1;
                         } else {
@@ -3353,7 +3423,7 @@ control:
                             if ((A & PRESENT) == 0) {
                                 if (L == 0)     /* Back up to branch word */
                                     prev_addr(C);
-                                if (NCSF) 
+                                if (NCSF)
                                     Q |= PRES_BIT;
                                 if (field & 020)
                                    BROF = 1;
@@ -3383,7 +3453,7 @@ control:
                                    if (A & 1) {         /* N = 0 */
                                         if (L == 0) {
                                            C--; L = 3;
-                                        } else { 
+                                        } else {
                                            L--;
                                         }
                                    }
@@ -3436,7 +3506,7 @@ control:
                         B_valid();      /* Move result to B */
                         if (B & FLAG)
                            A = 0;
-                        else 
+                        else
                            A = 1;
                         AROF = 1;
                         break;
@@ -3484,17 +3554,17 @@ control:
                         BROF = 0;
                         PROF = 0;
                         break;
-                        
+
                 case VARIANT(WMOP_RTN): /* Return normal  02 */
                 case VARIANT(WMOP_RTS): /* Return Special 12 */
                         A_valid();
                         if (A & FLAG) {
                             if ((A & PRESENT) == 0) {
-                                if (NCSF) 
+                                if (NCSF)
                                     Q |= PRES_BIT;
                                 break;
                             }
-                        } 
+                        }
 
                         /* Fall through */
                 case VARIANT(WMOP_XIT): /* Exit  04 */
@@ -3527,7 +3597,7 @@ control:
                         }
                         BROF = 0;
                         if (field & 2) {        /* RTS and RTN */
-                            if (f) 
+                            if (f)
                                 goto desc;
                             else
                                 goto opdc;
@@ -3572,7 +3642,7 @@ control:
                                 SALF = 1;
                                 BROF = 0;
                                 break;
-                        case 3: 
+                        case 3:
                                 S = CF(B);
                                 BROF = 0;
                                 break;
@@ -3590,7 +3660,7 @@ control:
                         } while ((temp & EXPO) == 0);
                         A = FLAG | PRESENT | toC(Ma);
                         break;
-                            
+
                 case VARIANT(WMOP_CMN): /* Enter Character Mode In Line */
                         A_valid();      /* Make sure TOS is in A. */
                         AB_empty();     /* Force A&B to stack */
@@ -3608,7 +3678,7 @@ control:
                         X = toF(S);
                         if (B & FLAG) {
                             if ((B & PRESENT) == 0) {
-                                if (NCSF) 
+                                if (NCSF)
                                     Q |= PRES_BIT;
                                 break;
                             }
@@ -3618,7 +3688,7 @@ control:
                         }
                         S = CF(B);
                         break;
-                        
+
                 case VARIANT(WMOP_MKS): /* Mark Stack */
                         AB_empty();
                         B = MSCW;
@@ -3636,11 +3706,11 @@ control:
 
             case 0051:          /* Conditional bit field */
                 if ((field & 074) == 0) {       /* DEL Operator */
-                    if (AROF) 
+                    if (AROF)
                         AROF = 0;
                     else if (BROF)
                         BROF = 0;
-                    else 
+                    else
                         prev_addr(S);
                     break;
                 }
@@ -3672,7 +3742,7 @@ control:
                 else {          /* Set Variant */
                     VARF |= SALF;
                     SALF = 0;
-                } 
+                }
                 break;
 
             case WMOP_ISO:              /* Variable Field Isolate XX */
@@ -3712,7 +3782,7 @@ control:
                                 B |= bit_mask[bit_b];
                            break;
                      case WMOP_FCL:             /* Loop until unequal */
-                     case WMOP_FCE:             
+                     case WMOP_FCE:
                           bb = (bit_mask[bit_b] & B) != 0;
                           if (ba != bb) {
                              if (opcode == WMOP_FCL)
@@ -3762,7 +3832,7 @@ cpu_reset(DEVICE * dptr)
 {
     /* Reset CPU 2 first */
     cpu_index = 1;
-    C = 020; 
+    C = 020;
     S = F = R = T = 0;
     L = 0;
     A = B = X = P = 0;
@@ -3772,7 +3842,7 @@ cpu_reset(DEVICE * dptr)
     P2_run = 0;
     /* Reset CPU 1 now */
     cpu_index = 0;
-    C = 020; 
+    C = 020;
     S = F = R = T = IAR = 0;
     L = 0;
     A = B = X = P = 0;
@@ -3818,7 +3888,7 @@ cpu_dep(t_value val, t_addr addr, UNIT * uptr, int32 sw)
 }
 
 t_stat
-cpu_show_size(FILE *st, UNIT *uptr, int32 val, CONST void *desc) 
+cpu_show_size(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     fprintf(st, "%dK", MEMSIZE/1024);
     return SCPE_OK;
@@ -3944,7 +4014,7 @@ cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
             fputc(' ', st);
             fprint_val(st, h->op, 8, 12, PV_RZRO);
             fputc(' ', st);
-            print_opcode(st, h->op, 
+            print_opcode(st, h->op,
                 ((h->flags & F_CWMF) ? char_ops : word_ops));
             fputc(' ', st);
             fprint_val(st, h->iar, 8, 16, PV_RZRO);
@@ -3955,7 +4025,7 @@ cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
 }
 
 
-t_stat              cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr) 
+t_stat              cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
     fprintf(st, "B5500 CPU\n\n");
     fprintf(st, "The B5500 could support up to two CPU's the second CPU is disabled by\n");
