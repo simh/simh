@@ -38,7 +38,7 @@
 
 /* For Card reader, when set returns end of file at end of deck. */
 /* Reset after sent to system */
-#define MODE_EOF        (0x40 << UNIT_V_MODE)
+#define MODE_EOF        (0x40 << UNIT_V_CARD_MODE)
 
 
 
@@ -144,8 +144,8 @@ UNIT                cdr_unit[] = {
 
 MTAB                cdr_mod[] = {
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
-          &sim_card_set_fmt, &sim_card_show_fmt, NULL, 
-          "Sets card format"},    
+          &sim_card_set_fmt, &sim_card_show_fmt, NULL,
+          "Sets card format"},
     {MODE_EOF, MODE_EOF, "EOF", "EOF", NULL, NULL, NULL,
           "Causes EOF to be set when reader empty"},
     {0}
@@ -169,7 +169,7 @@ UNIT                cdp_unit[] = {
 MTAB                cdp_mod[] = {
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
           &sim_card_set_fmt, &sim_card_show_fmt, NULL,
-          "Sets card format"},    
+          "Sets card format"},
     {0}
 };
 
@@ -236,7 +236,7 @@ t_stat card_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
     UNIT        *uptr;
     int                 u;
 
-    if (dev == CARD1_DEV) 
+    if (dev == CARD1_DEV)
         u = 0;
     else if (dev == CARD2_DEV)
         u = 1;
@@ -245,13 +245,13 @@ t_stat card_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
     /* Check if card reader or card punch */
     if (cmd & URCSTA_READ) {
         uptr = &cdr_unit[u];
-        if ((uptr->flags & UNIT_ATT) == 0) 
+        if ((uptr->flags & UNIT_ATT) == 0)
             return SCPE_UNATT;
 
         /* Are we currently tranfering? */
         if (uptr->u5 & URCSTA_ACTIVE)
             return SCPE_BUSY;
-        
+
         /* Check if we ran out of cards */
         if (uptr->u5 & URCSTA_EOF) {
             /* If end of file, return to system */
@@ -265,7 +265,7 @@ t_stat card_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
             iostatus &= ~(CARD1_FLAG << u);
             return SCPE_UNATT;
         }
-            
+
         if (cmd & URCSTA_BINARY) {
             uptr->u5 |= URCSTA_BIN;
             *wc = 20;
@@ -282,11 +282,11 @@ t_stat card_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
         return SCPE_OK;
     } else {
         /* Talking to punch */
-        if (u != 0) 
+        if (u != 0)
              return SCPE_NXDEV;
         sim_debug(DEBUG_DETAIL, &cdr_dev, "cdp %d %d start\n", u, chan);
         uptr = &cdp_unit[0];
-        if ((uptr->flags & UNIT_ATT) == 0) 
+        if ((uptr->flags & UNIT_ATT) == 0)
             return SCPE_UNATT;
         if (uptr->u5 & URCSTA_ACTIVE)
              return SCPE_BUSY;
@@ -314,7 +314,7 @@ cdr_srv(UNIT *uptr) {
         uptr->u5 &= ~ URCSTA_EOF;
         return SCPE_OK;
     }
-        
+
 
     /* Check if new card requested. */
     if (uptr->u4 == 0 && uptr->u5 & URCSTA_ACTIVE &&
@@ -344,7 +344,7 @@ cdr_srv(UNIT *uptr) {
              uptr->u5 |= URCSTA_EOF;
              chan_set_end(chan);
              break;
-        case SCPE_OK:   
+        case SCPE_OK:
              uptr->u5 |= URCSTA_CARD;
              sim_activate(uptr, 500);
              break;
@@ -354,7 +354,7 @@ cdr_srv(UNIT *uptr) {
 
 
     /* Copy next column over */
-    if (uptr->u5 & URCSTA_CARD && 
+    if (uptr->u5 & URCSTA_CARD &&
         uptr->u4 <= ((uptr->u5 & URCSTA_BIN) ? 160 : 80)) {
         struct _card_data   *data;
         uint8                ch = 0;
@@ -363,7 +363,7 @@ cdr_srv(UNIT *uptr) {
         data = (struct _card_data *)uptr->up7;
 
         if (uptr->u5 & URCSTA_BIN) {
-            ch = (data->image[uptr->u4 >> 1] >> 
+            ch = (data->image[uptr->u4 >> 1] >>
                     ((uptr->u4 & 1)? 0 : 6)) & 077;
         } else {
             ch = sim_hol_to_bcd(data->image[uptr->u4]);
@@ -377,8 +377,8 @@ cdr_srv(UNIT *uptr) {
                                chan_set_parity(chan);
                         }
                         break;
-            case 0111:  
-                        ch = 0; 
+            case 0111:
+                        ch = 0;
                         /* Handle invalid punch */
                         chan_set_parity(chan);
                         break;  /* Translate ? to error*/
@@ -453,7 +453,7 @@ cdr_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
    fprintf (st, "    sim> SET CRn EOF\n");
    fprintf (st, "This flag is cleared each time a deck has been read, so it must be set\n");
    fprintf (st, "again after each deck. MCP does not require this to be set as long as\n");
-   fprintf (st, "the deck includes a ?END card\n"); 
+   fprintf (st, "the deck includes a ?END card\n");
    fprint_set_help(st, dptr);
    fprint_show_help(st, dptr);
    return SCPE_OK;
@@ -492,7 +492,7 @@ cdp_srv(UNIT *uptr) {
               case SCPE_IOERR:
                   chan_set_error(chan);
                   break;
-              case SCPE_OK:     
+              case SCPE_OK:
                   break;
               }
               uptr->u5 &= ~URCSTA_FULL;
@@ -537,7 +537,7 @@ cdp_attach(UNIT * uptr, CONST char *file)
 t_stat
 cdp_detach(UNIT * uptr)
 {
-    if (uptr->u5 & URCSTA_FULL) 
+    if (uptr->u5 & URCSTA_FULL)
         sim_punch_card(uptr, NULL);
     iostatus &= ~PUNCH_FLAG;
     return sim_card_detach(uptr);
@@ -568,7 +568,7 @@ cdp_description(DEVICE *dptr)
 
 #if NUM_DEVS_LPR > 0
 t_stat
-lpr_setlpp(UNIT *uptr, int32 val, CONST char *cptr, void *desc) 
+lpr_setlpp(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     int i;
     if (cptr == NULL)
@@ -619,10 +619,10 @@ print_line(UNIT * uptr, int unit)
         /* Scan each column */
         for (i = 0; i < uptr->u3; i++) {
             int                 bcd = lpr_data[unit].lbuff[i] & 077;
-    
+
             out[i] = con_to_ascii[bcd];
         }
-    
+
         /* Trim trailing spaces */
         for (--i; i > 0 && out[i] == ' '; i--) ;
         out[i+1] = '\0';
@@ -715,8 +715,8 @@ print_line(UNIT * uptr, int unit)
         sim_fwrite("\f", 1, 1, uptr->fileref);
         sim_fseek(uptr->fileref, 0, SEEK_CUR);
         sim_debug(DEBUG_DETAIL, &lpr_dev, "lpr %d page\n", unit);
-    }   
- 
+    }
+
 }
 
 
@@ -726,7 +726,7 @@ t_stat lpr_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
     UNIT                *uptr;
     int                 u;
 
-    if (dev == PRT1_DEV) 
+    if (dev == PRT1_DEV)
         u = 0;
     else if (dev == PRT2_DEV)
         u = 1;
@@ -738,16 +738,16 @@ t_stat lpr_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
     if (uptr->u5 & URCSTA_BUSY)
         return SCPE_BUSY;
 
-    if ((uptr->flags & UNIT_ATT) == 0) 
+    if ((uptr->flags & UNIT_ATT) == 0)
         return SCPE_UNATT;
-                
-    if (*wc == 0 && (cmd & URCSTA_INHIBIT) == 0) 
+
+    if (*wc == 0 && (cmd & URCSTA_INHIBIT) == 0)
         *wc = (cmd & URCSTA_DIRECT) ? 17 : 15;
 
     /* Remember not to drop the FULL */
     uptr->u5 &= ~((077 << URCSTA_CMD_V) | URCSTA_CHMASK);
     uptr->u5 |= URCSTA_BUSY|chan;
-    uptr->u5 |= (cmd & (URCSTA_SKIP|URCSTA_SINGLE|URCSTA_DOUBLE)) 
+    uptr->u5 |= (cmd & (URCSTA_SKIP|URCSTA_SINGLE|URCSTA_DOUBLE))
                 << URCSTA_CMD_V;
     uptr->u3 = 0;
     sim_debug(DEBUG_CMD, &lpr_dev, "%d: Cmd WRS %d %02o %o\n", u, chan,
@@ -781,7 +781,7 @@ lpr_srv(UNIT *uptr) {
             sim_activate(uptr, 20000);
             return SCPE_OK;
         } else {
-            sim_debug(DEBUG_DATA, &lpr_dev, "lpr %d: Char < %02o\n", u, 
+            sim_debug(DEBUG_DATA, &lpr_dev, "lpr %d: Char < %02o\n", u,
                         lpr_data[u].lbuff[uptr->u3]);
             uptr->u3++;
         }
@@ -809,7 +809,7 @@ t_stat
 lpr_detach(UNIT * uptr)
 {
     int                 u = (uptr - lpr_unit);
-    if (uptr->u5 & URCSTA_FULL) 
+    if (uptr->u5 & URCSTA_FULL)
         print_line(uptr, u);
     iostatus &= ~(PRT1_FLAG << u);
     return detach_unit(uptr);
@@ -854,10 +854,10 @@ lpr_description(DEVICE *dptr)
 
 
 #if NUM_DEVS_CON > 0
-/* 
+/*
  * Console printer routines.
  */
-t_stat 
+t_stat
 con_ini(DEVICE *dptr) {
      UNIT               *uptr = &con_unit[0];
      uptr->u5 = 0;
@@ -875,7 +875,7 @@ con_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
     /* Are we currently tranfering? */
     if (uptr->u5 & (URCSTA_READ|URCSTA_FILL|URCSTA_BUSY|URCSTA_INPUT))
         return SCPE_BUSY;
-    
+
     if (cmd & URCSTA_READ) {
         if (uptr->u5 & (URCSTA_INPUT|URCSTA_FILL))
             return SCPE_BUSY;
