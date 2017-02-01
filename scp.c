@@ -222,7 +222,9 @@
 #include "sim_tape.h"
 #include "sim_ether.h"
 #include "sim_serial.h"
+#if defined(USE_SIM_VIDEO)
 #include "sim_video.h"
+#endif
 #include "sim_sock.h"
 #include "sim_frontpanel.h"
 #include <signal.h>
@@ -241,6 +243,10 @@
 
 #if defined(HAVE_DLOPEN)                                /* Dynamic Readline support */
 #include <dlfcn.h>
+#endif
+
+#ifdef OPCON
+#include "PDP11/opcon.h"
 #endif
 
 #ifndef MAX
@@ -564,7 +570,11 @@ struct timespec sim_deb_basetime;                       /* debug timestamp relat
 char *sim_prompt = NULL;                                /* prompt string */
 static FILE *sim_gotofile;                              /* the currently open do file */
 static int32 sim_goto_line[MAX_DO_NEST_LVL+1];          /* the current line number in the currently open do file */
+#ifdef OPCON
+int32 sim_do_echo = 0;                                  /* the echo status of the currently open do file */
+#else
 static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
+#endif
 static int32 sim_show_message = 1;                      /* the message display status of the currently open do file */
 static int32 sim_on_inherit = 0;                        /* the inherit status of on state and conditions when executing do files */
 static int32 sim_do_depth = 0;
@@ -1248,6 +1258,9 @@ static const char simh_help[] =
 #define HLP_SHOW_ON             "*Commands SHOW"
 #define HLP_SHOW_SEND           "*Commands SHOW"
 #define HLP_SHOW_EXPECT         "*Commands SHOW"
+#ifdef OPCON
+#define HLP_SHOW_OC             "*Commands SHOW"
+#endif
 #define HLP_HELP                "*Commands HELP"
        /***************** 80 character line width template *************************/
       "2HELP\n"
@@ -1977,6 +1990,7 @@ int32 i, sw;
 t_bool lookswitch;
 t_stat stat;
 
+
 #if defined (__MWERKS__) && defined (macintosh)
 argc = ccommand (&argv);
 #endif
@@ -2114,12 +2128,15 @@ detach_all (0, TRUE);                                   /* close files */
 sim_set_deboff (0, NULL);                               /* close debug */
 sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
+#ifdef US_SIM_VIDEO
 vid_close ();                                           /* close video */
+#endif
 sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
 sim_cleanup_sock ();                                    /* cleanup sockets */
 fclose (stdnul);                                        /* close bit bucket file handle */
 free (targv);                                           /* release any argv copy that was made */
+
 return 0;
 }
 
@@ -2138,7 +2155,11 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         printf ("%s", sim_prompt);                      /* prompt */
         cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
         }
+#ifdef OPCON
+    else cptr = oc_read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prompt*/
+#else
     else cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
+#endif
     if (cptr == NULL) {                                 /* EOF? */
         if (sim_ttisatty()) continue;                   /* ignore tty EOF */
         else break;                                     /* otherwise exit */
@@ -2212,6 +2233,9 @@ return cmdp;
 
 t_stat exit_cmd (int32 flag, CONST char *cptr)
 {
+#ifdef OPCON
+oc_detach((UNIT *)0);
+#endif
 return SCPE_EXIT;
 }
 
@@ -2830,7 +2854,11 @@ t_stat do_cmd (int32 flag, CONST char *fcptr)
 return do_cmd_label (flag, fcptr, NULL);
 }
 
+#ifdef OPCON
+char *do_position(void)
+#else
 static char *do_position(void)
+#endif
 {
 static char cbuf[CBUFSIZE];
 
@@ -4576,7 +4604,9 @@ if (flag) {
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
+#if defined(USE_SIM_VIDEO)
     fprintf (st, "\n\t\tSDL Video support: %s", vid_version());
+#endif
 #if defined (HAVE_PCREPOSIX_H)
     fprintf (st, "\n\t\tPCRE RegEx support for EXPECT commands");
 #elif defined (HAVE_REGEX_H)
@@ -6318,7 +6348,11 @@ UNIT *uptr;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 sim_step = 0;
+#ifdef OPCON
+if (((flag == RU_RUN) || (flag == RU_GO)) && oc_halt_status() == FALSE){ /* run or go */
+#else
 if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
+#endif
     orig_pcv = get_rval (sim_PC, 0);                    /* get current PC value */
     if (*cptr != 0) {                                   /* argument? */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
@@ -6406,7 +6440,11 @@ else if (flag == RU_NEXT) {                             /* next */
     else
         sim_step = 1;
     }
+#ifdef OPCON
+else if (flag == RU_BOOT && oc_halt_status() == FALSE) {/* boot */
+#else
 else if (flag == RU_BOOT) {                             /* boot */
+#endif
     if (*cptr == 0)                                     /* must be more */
         return SCPE_2FARG;
     cptr = get_glyph (cptr, gbuf, 0);                   /* get next glyph */
@@ -6431,8 +6469,12 @@ else if (flag == RU_BOOT) {                             /* boot */
         return r;
     }
 
-else 
-    if (flag != RU_CONT)                                /* must be cont */
+else
+#ifdef OPCON
+    if ((flag != RU_CONT) && (oc_halt_status() == FALSE)) /* must be cont */
+#else
+    if (flag != RU_CONT)                               /* must be cont */
+#endif
         return SCPE_IERR;
     else                                                /* CONTINUE command */
         if (*cptr != 0)                                 /* should be end (no arguments allowed) */
@@ -6490,7 +6532,34 @@ do {
     t_addr *addrs;
 
     while (1) {
+#ifdef OPCON
+        /* Set RUN light on or off, other leds too, depending on model */
+      if (oc_halt_status() == TRUE) {
+          r = SCPE_STOP;
+          oc_toggle_clear();
+          if (cpu_model == MOD_1145) {
+              oc_set_port1(FSTS_RUN, 0);
+              oc_set_port1(FSTS_1145_PAUSE, 1);
+              }
+          else {
+              oc_set_port1(FSTS_RUN, 0);
+              oc_set_port1(FSTS_1170_PAUSE, 1);
+              }
+	}
+      else  {
+          if (cpu_model == MOD_1145) {
+              oc_set_port1(FSTS_RUN, 1);
+              oc_set_port1(FSTS_1145_PAUSE, 0);
+              }
+          else {
+              oc_set_port1(FSTS_RUN, 1);
+              oc_set_port1(FSTS_1170_PAUSE, 0);
+              }
+          r = sim_instr();
+        }
+#else
         r = sim_instr();
+#endif
         if (r != SCPE_REMOTE)
             break;
         sim_remote_process_command ();                  /* Process the command and resume processing */
@@ -7060,7 +7129,11 @@ if ((cptr == NULL) || (rptr == NULL))
 if (rptr->flags & REG_RO)
     return SCPE_RO;
 if (flag & EX_I) {
+#ifdef OPCON
+    cptr = oc_read_line_p (NULL, gbuf, sizeof(gbuf), stdin);
+#else
     cptr = read_line (gbuf, sizeof(gbuf), stdin);
+#endif
     if (sim_log)
         fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
@@ -7296,7 +7369,11 @@ char gbuf[CBUFSIZE];
 if (dptr == NULL)
     return SCPE_IERR;
 if (flag & EX_I) {
+#ifdef OPCON
+    cptr = oc_read_line_p (NULL, gbuf, sizeof(gbuf), stdin);
+#else
     cptr = read_line (gbuf, sizeof(gbuf), stdin);
+#endif
     if (sim_log)
         fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */

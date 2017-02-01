@@ -1,0 +1,307 @@
+opcon : Interface to a real operator console
+ 
+Copyright (c) 2006-2017, Edward Groenenberg & Henk Gooijen
+
+The 'OC' (Operator Console) software is created to allow SIMH to communicate
+with an original operator console for the 11/45 or 1170.
+Altough originally made for the PDP-11, this software can be used for any other
+simulated system using operator consoles, like an HP1000 to name one,
+maybe even an IBM 1130. It only requires interation in the sources for that
+specific simulation.
+
+2 files contain the OC code, and 6 files need additions which are compile time
+enabled to function properly. The files containing the OC code are opcon.c &
+opcon.h, and the modified files are :
+  scp.c          : for handling interactive & console commands
+  pdp11_cpu.c    : set OC address, data & states
+  pdp11_cpumod.c : to set system specific registers & OC variables
+  pdp11_fp.c     : to set FPP specific OC variables
+  pdp11_io.c     : to set CPU specific OC status flags
+  pdp11_sys.c    : contains the reference to the OC device unit structure
+
+
+Implementation notes :
+-------------------------------------------------------------------------------
+The physical PDP-11 console is connected through a serial communication port.
+SIMH has an extra command added with the following syntax:
+
+    attach oc connect=<ser>
+
+where <ser> is the name of a serial port or device string (as listed in
+'set serial') and tells SIMH that there is a console processor connected.
+
+Leds/lamps are updated on an event based interval, for the PDP-11 (and Core-I/O)
+board based console processor), this interval is 50 times per second.
+
+The command "detach oc" closes the serial port.
+The command "show oc status" gives the current status of the connection.
+
+When the OFF/POWER/LOCK panel keyswitch is in the 'POWER' position, the
+'LOAD ADRS', 'EXAM', 'DEP', 'CONT', ENABLE/HALT', 'SINST/S BUSCYCLE' and
+'START' switches do work and send a command character to the core-IO board
+(and to the OC driver). All of these switches, except the 'HALT/ENABLE' require
+an acknowledgement action from the OC driver, as multiple actions of these
+switches do not send the same command character unless acknowledged.
+The 'HALT/ENABLE' switch does always send a character, either 'H' when the
+switch is down or 'E' when up.
+
+Mappings used for the PDP-11 consoles using the Core-IO I/O board :
+(represents the wiring from the actual I/O port to a console signal wire)
+-------------------------------------------------------------------------------
+11/70
+   port   #  |   7   |   6   |   5   |   4   |   3   |   2   |   1   |   0   |
+   ----------|---------------------------------------------------------------|
+   out8  [7] |       |       |       |       |       |       |       |       |
+   out7  [6] |       |       |       | PARHI | PARLO | 22BIT | 18BIT | 16BIT |
+   out6  [5] |  RUN  | MASTER| PAUSE |ADRSERR| PARERR|INDDATA|MMR0[1]|MMR0[0]|
+   out5  [4] |       |       |  A21  |  A20  |  A19  |  A18  |  A17  |  A16  |
+   out4  [3] |  A15  |  A14  |  A13  |  A12  |  A11  |  A10  |  A9   |  A8   |
+   out3  [2] |  A7   |  A6   |  A5   |  A4   |  A3   |  A2   |  A1   |  A0   |
+   out2  [1] |  D15  |  D14  |  D13  |  D12  |  D11  |  D10  |  D9   |  D8   |
+   out1  [0] |  D7   |  D6   |  D5   |  D4   |  D3   |  D2   |  D1   |  D0   |
+   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
+   in8   [7] |       |       |       |       |       |       |       |       |
+   in7   [6] |       |       |       |       |       |       |       |       |
+   in6   [5] |       |       |       |       |       |       |       |       |
+   in5   [4] |PNLLOCK| HALT  |SBUSCYC|DSPD[1]|DSPD[0]|DSPA[2]|DSPA[1]|DSPA[0]|
+   in4   [3] |       |  DEP  |       |       | CONT  | LOAD  | START | EXAM  |
+   in3   [2] |       |       | SWR21 | SWR20 | SWR19 | SWR18 | SWR17 | SWR16 |
+   in2   [1] | SWR15 | SWR14 | SWR13 | SWR12 | SWR11 | SWR10 | SWR9  | SWR8  |
+   in1   [0] | SWR7  | SWR6  | SWR5  | SWR4  | SWR3  | SWR2  | SWR1  | SWR0  |
+   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
+
+
+11/45 (11/50, 11/55)
+   port   #  |   7   |   6   |   5   |   4   |   3   |   2   |   1   |   0   |
+   ----------|---------------------------------------------------------------|
+   out8  [7] |       |       |       |       |       |       |       |       |
+   out7  [6] |       |       |       |       |       |       |       |       |
+   out6  [5] |  RUN  | MASTER|ADRSERR| PAUSE |       |INDATA |MMR0[1]|MMR0[0]|
+   out5  [4] |       |       |       |       |       |       |  A17  |  A16  |
+   out4  [3] |  A15  |  A14  |  A13  |  A12  |  A11  |  A10  |  A9   |  A8   |
+   out3  [2] |  A7   |  A6   |  A5   |  A4   |  A3   |  A2   |  A1   |  A0   |
+   out2  [1] |  D15  |  D14  |  D13  |  D12  |  D11  |  D10  |  D9   |  D8   |
+   out1  [0] |  D7   |  D6   |  D5   |  D4   |  D3   |  D2   |  D1   |  D0   |
+   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
+   in8   [7] |       |       |       |       |       |       |       |       |
+   in7   [6] |       |       |       |       |       |       |       |       |
+   in6   [5] |       |       |       |       |       |       |       |       |
+   in5   [4] |       |       |       |       |       |       |       | HALT  |
+   in4   [3] |  DEP  |REGDEP | EXAM  |REGEXAM| START | LOAD  |SBUSCYC| CONT  |
+   in3   [2] |PNLLOCK|DSPA[2]|DSPA[1]|DSPA[0]|DSPD[1]|DSPD[1]| SWR17 | SWR16 |
+   in2   [1] | SWR15 | SWR14 | SWR13 | SWR12 | SWR11 | SWR10 | SWR9  | SWR8  |
+   in1   [0] | SWR7  | SWR6  | SWR5  | SWR4  | SWR3  | SWR2  | SWR1  | SWR0  |
+   ----------|-------+-------+-------+-------+-------+-------+-------+-------|
+
+
+The core-IO board is a project from Henk Gooijen and Vince Slygstadt and was
+initially designed to be a simple microcontroller with a large amount of
+I/O ports. In this document it will be referred to as the PCP (PDP-11
+Console Processor).
+
+The routines (SIMH interface) :
+
+oc_attach	: This routine handles the attachement command and does the
+		  initialisation of the serial link to the PCP.
+		  The opcon control block is initialised, a query command is
+		  sent n order to retrieve the current switch settings.
+
+oc_detach	: This routine dequeues the service routine and closes the
+		  serial link to the PCP.
+
+oc_reset	: This routine resets the driver and places the service
+		  routine on the timer queue for automatic scheduling.
+		  It is called from the SIMH software as part of a standard
+		  sequence of calls for any recognised (and activated) device.
+
+oc_svc		: This is the main service routine. The delta time determines
+		  if further action is required. If it is below the minimum
+		  waiting time, only a reschedule is executed.
+		  If the delta is more than the minimum, the address, data &
+		  status field information is sent to the PCP and the HALT
+		  switch setting is checked. The setting of the rotary switches
+		  are retrieved (11/45 & 1170 only) for proper display of
+		  the I & D space values.
+		  NOTE : initially, only an interval of 10 milliseconds was
+			 for the oc_svc routine to ensure that it would be
+			 called that interval. However, after a HALT followed
+			 by an ENABLE & continue command, the timer queue will
+			 have a burst of calls to the service routines and the
+			 serial link would get overloaded. Also the interval
+			 was not that reliable with regards to the accuracy of
+			 the intervals themselves.
+			 The oc_svc service routine now uses a 1 ms interval
+			 and only performs work if sufficient time has passed.
+
+oc_show		: This routine is called to display the state of the oc driver.
+
+The routines (OC driver) :
+
+oc_read_line_p  : This routine is a replacement for the read_line_p() routine
+		  in the scp.c source file. It calls the oc_get_console
+		  routine for polling events from the PCP and looks for
+		  commands entered by hand in SIMH.
+
+oc_get_CON      : This routine is handling the single byte commands sent from
+		  the PCP for interactive processing and converts them into
+		  SIMH commands. It is called only from oc_read_line_p.
+
+oc_get_HLT 	: This routine checks if an unsolicited command byte has been
+		  sent by the PCP. If it is a HALT command, the event is
+		  flagged in the oc_ctl controlblock. If not, a check is done
+		  for the other commands which are only acknowledged, no
+		  further action is done.
+
+oc_get_RTR   	: This routine retrieves the byte containing the position
+		  of the 2 rotary knobs on the 11/45 & 1170 console and stores
+		  the requested byte in the switch position array. It is
+		  basically a leightweight version of the oc_get_swr routine.
+
+oc_get_SWR	: This routine queries the position of all the switches of the
+		  console. A command byte is sent, after which a series of
+		  bytes are returned.
+
+oc_set_mmu      : This routine sets the flags related to the use of memory of
+		  the supported CPU's.
+
+oc_set_port1	: This routine (and oc_set_port2) set or clear bit positions for
+		  output port 1 (and 2) related to the status leds of the
+		  console.
+
+oc_set_ringprot	: This routine handles the ring protection modes of the
+		  supported CPU's.
+
+oc_send_<xxxxx> : The oc_send_xxxxx routines send a command byte followed by
+		  a series of data bytes to be displayed on the console LED's.
+
+oc_toggle_ack	: This routine sends a command byte and 2 bytes containing
+		  a bitmask for a toggle switch to be cleared. The PCP does
+		  send a single bytes of a toggle switch only once, until it
+		  is acknowledged, after which a new toggle switch byte can
+		  be sent.
+
+oc_toggle_clear : This routine sends a 'clear all toggles' command to the PCP.
+
+oc_read_<x>	: The oc_read_<x> routines extract the address or data
+		  value from the console switch register switches.
+
+oc_poll		: This routine polls the serial link for possible data waiting.
+		  In a way it is a reduced version of the tmxr poll routine.
+
+Conversion board.
+The conversion board is the board you have to make yourself. It's only function
+is to route the core-IO input & output lines to the operator console. There is
+no active components here, so no power is needed here. You are free to
+choose which I/O port is connected with the console led or switch, altough for
+easier compatibility it is recommended to use the default mapping.
+
+Arduino/BeagleBone/ etc.
+If you want to use a Beaglebone or Arduino device to control your operator
+console, please go ahead. As the cpu clock speed is probably higher than
+the core-IO unit, you could opt for a higher transmitting speed of the
+OC serial line to allow for an even more frequent display update. Do not
+forget to change the value of OC_INTERVAL or the delta counter to allow
+higher data rates to be send out. 
+
+
+11/70 registers in the I/O page (PDP 11/70 handbook)
+
+17 777 200  : Supervisor instruction PDR
+..
+17 777 216  : Supervisor instruction PDR
+
+17 777 220  : Supervisor data PDR
+..
+17 777 236  : Supervisor data PDR
+
+17 777 240  : Supervisor instruction PAR
+..
+17 777 256  : Supervisor instruction PAR
+
+17 777 260  : Supervisor data PAR
+..
+17 777 276  : Supervisor data PAR
+
+17 777 300  : Kernel instruction PDR
+..
+17 777 316  : Kernel instruction PDR
+
+17 777 320  : Kernel data PDR
+..
+17 777 336  : Kernel data PDR
+
+17 777 340  : Kernel instruction PAR
+..
+17 777 356  : Kernel instruction PAR
+
+17 777 360  : Kernel data PAR
+..
+17 777 376  : Kernel data PAR
+
+17 777 516  :  MMR3   register
+17 777 570  :  Switch register
+17 777 572  :  MMR0   register
+17 777 574  :  MMR1   register
+17 777 576  :  MMR2   register
+
+17 777 600  :  User instruction PDR's
+..
+17 777 616  :  User instruction PDR's
+
+17 777 620  :  User data PDR's
+..
+17 777 636  :  User data PDR's
+
+17 777 640  :  User instruction PAR's
+..
+17 777 656  :  User instruction PAR's
+
+17 777 660  :  User data PAR's
+..
+17 777 676  :  User data PAR's
+
+17 777 700  : reg 0 (set 0)
+17 777 701  : reg 1
+17 777 702  : reg 2
+17 777 703  : reg 3
+17 777 704  : reg 4
+17 777 705  : reg 5
+17 777 706  : reg 6 (SP, kernel mode)
+17 777 707  : reg 7 (program counter)
+
+17 777 710  : reg 0 (set 1)
+17 777 711  : reg 1
+17 777 712  : reg 2
+17 777 713  : reg 3
+17 777 714  : reg 4
+17 777 715  : reg 5
+17 777 716  : reg 6 (SP, supervisor mode)
+17 777 717  : reg 6 (SP, user mode)
+
+17 777 740  :  low error
+17 777 742  :  high error
+17 777 744  :  MEMERR register
+17 777 746  :  Cache Control register
+17 777 750  :  Maintenance register
+17 777 752  :  Hit/Miss register
+17 777 754  :  Cache data register
+17 777 756  : 
+17 777 760  :  lower size register
+17 777 762  :  upper size register
+17 777 764  :  ID register
+17 777 766  :  CPU Error register
+17 777 770  :  micro program register
+17 777 772  :  PIRQ register
+17 777 774  :  Stack Limit register
+17 777 776  :  processor status register
+
+RUN led   : on when executing instructions.
+PAUSE led : on when instruction is complete & waiting for UNIBUS
+            mastership
+MASTER    : on when mastering the Unibus.
+            off during DMA/NPR transfers
+DATA      : on when last memory reference was to 'D' address space
+            off when last memory reference was to 'I' address space
+	    (in the current cpu mode).
+
+

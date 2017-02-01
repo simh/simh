@@ -47,6 +47,11 @@
 #include "pdp11_cpumod.h"
 #include <time.h>
 
+#ifdef OPCON
+#include "opcon.h"
+#endif
+
+
 /* Byte write macros for system registers */
 
 #define ODD_IGN(cur) \
@@ -308,6 +313,13 @@ DEVICE sys_dev = {
 
 t_stat SR_rd (int32 *data, int32 pa, int32 access)
 {
+#ifdef OPCON
+if (cpu_model == MOD_1170) {
+    oc_get_SWR();
+    SR = oc_read_D();
+    }
+#endif
+
 *data = SR;
 return SCPE_OK;
 }
@@ -315,6 +327,10 @@ return SCPE_OK;
 t_stat DR_wr (int32 data, int32 pa, int32 access)
 {
 DR = data;
+#ifdef OPCON
+OC_DATA[DISP_DR] = (uint16)DR;
+#endif
+
 return SCPE_OK;
 }
 
@@ -467,6 +483,13 @@ return SCPE_NXM;                                        /* unimplemented */
 t_stat CPU45_wr (int32 data, int32 pa, int32 access)
 {
 switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
+
+#ifdef OPCON
+    case 014:
+        ODD_IGN(data);
+        OC_DATA[DISP_FPP] = (uint16)(MBRK = data);
+        return SCPE_OK;
+#endif
 
     case 015:                                           /* PIRQ */
         ODD_WO (data);
@@ -640,9 +663,15 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
         return SCPE_OK;
 
     case 010:                                           /* low size */
+#ifdef OPCON
+        oc_set_port2(FSTS_1170_PARLO, 1);   /* technically : never called */
+#endif
         return SCPE_OK;
 
     case 011:                                           /* high size */
+#ifdef OPCON
+        oc_set_port2(FSTS_1170_PARHI, 1);   /* technically : never called */
+#endif
         return SCPE_OK;
 
     case 013:                                           /* CPUERR */
@@ -652,6 +681,9 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
     case 014:                                           /* MBRK */
         ODD_IGN (data);
         MBRK = data & MBRK70_WR;
+#ifdef OPCON
+        OC_DATA[DISP_FPP] = (uint16)(MBRK);
+#endif
         return SCPE_OK;
 
     case 015:                                           /* PIRQ */

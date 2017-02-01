@@ -113,6 +113,9 @@ extern DEVICE dmc_dev;
 extern DEVICE dup_dev;
 extern DEVICE dpv_dev;
 extern DEVICE kmc_dev;
+#ifdef OPCON
+extern DEVICE oc_dev;
+#endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;
@@ -187,6 +190,9 @@ DEVICE *sim_devices[] = {
     &dup_dev,
     &dpv_dev,
     &kmc_dev,
+#ifdef OPCON
+    &oc_dev,
+#endif
     NULL
     };
 

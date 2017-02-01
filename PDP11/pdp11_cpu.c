@@ -227,6 +227,9 @@
 
 #include "pdp11_defs.h"
 #include "pdp11_cpumod.h"
+#ifdef OPCON
+#include "opcon.h"
+#endif
 
 #define PCQ_SIZE        64                              /* must be 2**n */
 #define PCQ_MASK        (PCQ_SIZE - 1)
@@ -718,6 +721,9 @@ dsenable = calc_ds (cm);
 put_PIRQ (PIRQ);                                        /* rewrite PIRQ */
 STKLIM = STKLIM & STKLIM_RW;                            /* clean up STKLIM */
 MMR0 = MMR0 | MMR0_IC;                                  /* usually on */
+#ifdef OPCON
+OC_MMR0;
+#endif
 
 trap_req = calc_ints (ipl, trap_req);                   /* upd int req */
 trapea = 0;
@@ -740,7 +746,30 @@ reason = 0;
    after setjmp, must be volatile or global.
 */
 
+#ifdef OPCON
+if (cpu_model == MOD_1145) {
+    oc_set_port1(FSTS_1145_ADRSERR, 0);
+    abortval = setjmp (save_env);                           /* set abort hdlr */
+    if ((abortval == TRAP_NXM) ||
+        (abortval == TRAP_ODD) ||
+        (abortval == TRAP_MME))
+        oc_set_port1(FSTS_1145_ADRSERR, 1);
+    }
+else {
+    oc_set_port1(FSTS_1170_ADRSERR, 0);
+    oc_set_port2(FSTS_1170_PARHI, 0);
+    oc_set_port2(FSTS_1170_PARLO, 0);
+    abortval = setjmp (save_env);                           /* set abort hdlr */
+    if (abortval == TRAP_PAR)
+        oc_set_port1(FSTS_1170_PARERR, 1);
+    if ((abortval == TRAP_NXM) ||
+        (abortval == TRAP_ODD) ||
+        (abortval == TRAP_MME))
+        oc_set_port1(FSTS_1170_ADRSERR, 1);
+    }
+#else
 abortval = setjmp (save_env);                           /* set abort hdlr */
+#endif
 if (abortval == ABRT_BKPT) {
     /* Breakpoint encountered.  */
     reason = STOP_IBKPT;
@@ -779,6 +808,13 @@ else {
             (CPUT (STOP_STKA) || stop_spabort))
             reason = STOP_SPABORT;
         if (trapea == ~MD_KER) {                        /* kernel stk abort? */
+#ifdef OPCON
+        oc_set_mmu();
+        oc_set_ringprot(cm);
+        if (cpu_model == MOD_1170) {
+            oc_set_port1(FSTS_1170_ADRSERR, 1);
+          }
+#endif
             setTRAP (TRAP_RED);
             setCPUERR (CPUE_RED);
             STACKFILE[MD_KER] = 4;
@@ -830,7 +866,9 @@ while (reason == 0)  {
         put_PIRQ (PIRQ);                                /* rewrite PIRQ */
         STKLIM = STKLIM & STKLIM_RW;                    /* clean up STKLIM */
         MMR0 = MMR0 | MMR0_IC;                          /* usually on */
-
+#ifdef OPCON
+        OC_MMR0;
+#endif
         trap_req = calc_ints (ipl, trap_req);           /* recalc int req */
         continue;
         }                                               /* end if sim_interval */
@@ -873,6 +911,19 @@ while (reason == 0)  {
    cycle.
 */
 
+#ifdef OPCON
+        oc_set_wait (FALSE);
+        oc_set_master (TRUE);
+        if (cpu_model == MOD_1145) {
+            oc_set_port1 (FSTS_1145_ADRSERR, 0);
+            oc_set_ringprot (cm);
+            }
+        else {
+            oc_set_port1 (FSTS_1170_ADRSERR, 0);
+            oc_set_ringprot (cm);
+            }
+#endif
+
         wait_state = 0;                                 /* exit wait state */
         STACKFILE[cm] = SP;
         PSW = get_PSW ();                               /* assemble PSW */
@@ -881,6 +932,9 @@ while (reason == 0)  {
             if (update_MM)                              /* save vector */
                 MMR2 = trapea;
             MMR0 = MMR0 & ~MMR0_IC;                     /* clear IC */
+#ifdef OPCON
+            OC_MMR0;
+#endif
             }
         src = ReadCW (trapea | calc_ds (MD_KER));       /* new PC */
         src2 = ReadCW ((trapea + 2) | calc_ds (MD_KER)); /* new PSW */
@@ -906,6 +960,9 @@ while (reason == 0)  {
             (trapnum != TRAP_V_RED) && (trapnum != TRAP_V_YEL))
             set_stack_trap (SP);
         MMR0 = MMR0 | MMR0_IC;                          /* back to instr */
+#ifdef OPCON
+        OC_MMR0;
+#endif
         continue;                                       /* end if traps */
         }
 
@@ -913,6 +970,9 @@ while (reason == 0)  {
 
     if (tbit)
         setTRAP (TRAP_TRC);
+#ifdef OPCON
+    oc_set_wait (wait_state);
+#endif
     if (wait_state) {                                   /* wait state? */
         sim_idle (TMR_CLK, TRUE);
         continue;
@@ -967,6 +1027,17 @@ while (reason == 0)  {
             hst_p = 0;
         }
     PC = (PC + 2) & 0177777;                            /* incr PC, mod 65k */
+
+#ifdef OPCON
+    OC_ADDR[ADDR_CONPA] = (uint32)PC;
+    OC_DATA[DISP_SHFR] = (uint16)IR;
+    oc_set_ringprot(cm);
+    if (oc_halt_status())  {
+        stop_cpu = 1;
+        reason = SCPE_STOP;
+        }
+#endif
+
     switch ((IR >> 12) & 017) {                         /* decode IR<15:12> */
 
 /* Opcode 0: no operands, specials, branches, JSR, SOPs */
@@ -982,7 +1053,14 @@ while (reason == 0)  {
             case 0:                                     /* HALT */
                 if ((cm == MD_KER) &&
                     (!CPUT (CPUT_J) || ((MAINT & MAINT_HTRAP) == 0)))
+#ifdef OPCON
+                  {
+                    OC_DATA[DISP_SHFR] = (uint16)R[0];
                     reason = STOP_HALT;
+                  }
+#else
+                    reason = STOP_HALT;
+#endif
                 else if (CPUT (HAS_HALT4)) {            /* priv trap? */
                     setTRAP (TRAP_PRV);
                     setCPUERR (CPUE_HALT);
@@ -991,6 +1069,10 @@ while (reason == 0)  {
                 break;
             case 1:                                     /* WAIT */
                 wait_state = 1;
+#ifdef OPCON
+                OC_DATA[DISP_SHFR] = (uint16)R[0];
+                oc_set_wait (TRUE);
+#endif
                 break;
             case 3:                                     /* BPT */
                 setTRAP (TRAP_BPT);
@@ -1005,9 +1087,18 @@ while (reason == 0)  {
                     STKLIM = 0;                         /* clear STKLIM */
                     MMR0 = 0;                           /* clear MMR0 */
                     MMR3 = 0;                           /* clear MMR3 */
+#ifdef OPCON
+                    OC_MMR0;
+                    OC_MMR3;
+#endif
                     cpu_bme = 0;                        /* (also clear bme) */
                     for (i = 0; i < IPL_HLVL; i++)
                         int_req[i] = 0;
+#ifdef OPCON
+                    OC_DATA[DISP_SHFR] = (uint16)R[0];
+                    oc_set_mmu();
+                    oc_set_ringprot(cm);
+#endif
                     trap_req = trap_req & ~TRAP_INT;
                     dsenable = calc_ds (cm);
                     }
@@ -1067,6 +1158,9 @@ while (reason == 0)  {
                     hst_ent->dst = R[dstspec];
                 JMP_PC (R[dstspec]);
                 R[dstspec] = ReadW (SP | dsenable);
+#ifdef OPCON
+                OC_DATA[DISP_SHFR] = (uint16)R[dstspec];
+#endif
                 if (dstspec != 6)
                     SP = (SP + 2) & 0177777;
                 break;
@@ -1468,6 +1562,10 @@ while (reason == 0)  {
                 pm = cm;
                 cm = MD_SUP;
                 tbit = 0;
+#ifdef OPCON
+                oc_set_mmu();
+                oc_set_ringprot(cm);
+#endif
                 isenable = calc_is (cm);
                 dsenable = calc_ds (cm);
                 PC = ReadW (010 | isenable);
@@ -1857,6 +1955,9 @@ while (reason == 0)  {
         case 7:                                         /* SOB */
             if (CPUT (HAS_SXS)) {
                 R[srcspec] = (R[srcspec] - 1) & 0177777;
+#ifdef OPCON
+		OC_DATA[DISP_SHFR] = (uint16)R[srcspec];
+#endif
                 if (hst_ent)
                     hst_ent->dst = R[srcspec];
                 if (R[srcspec]) {
@@ -2206,6 +2307,10 @@ while (reason == 0)  {
                 if (hst_ent)
                     hst_ent->dst = dst;
                 WriteW (dst, SP | dsenable);
+#ifdef OPCON
+                oc_set_mmu();
+                oc_set_ringprot(cm);
+#endif
                 if ((cm == MD_KER) && (SP < (STKLIM + STKL_Y)))
                     set_stack_trap (SP);
                 }
@@ -2406,6 +2511,29 @@ STACKFILE[cm] = SP;
 saved_PC = PC & 0177777;
 pcq_r->qptr = pcq_p;                                    /* update pc q ptr */
 set_r_display (rs, cm);
+
+#ifdef OPCON
+        /* during HALT, general register R0 contents are displayed. */
+oc_set_mmu();
+oc_set_ringprot(cm);
+oc_set_master(FALSE);
+
+if ((reason == STOP_HALT) || (reason == STOP_WAIT) ||
+    (reason == SCPE_STOP) || (reason == STOP_VECABORT) ||
+    (reason == STOP_SPABORT) ) {
+    OC_ADDR[ADDR_CONPA] = (uint32)saved_PC;
+    OC_DATA[DISP_SHFR] = (uint16)R[0];
+    }
+else {
+      /*
+       * during Single Instruction operation, the Processor
+       * Status Word is displayed.
+       */
+    OC_ADDR[ADDR_CONPA] = (uint32)saved_PC;
+    OC_DATA[DISP_SHFR] = (uint16)PSW;
+    }
+#endif
+
 return reason;
 }
 
@@ -2601,7 +2729,15 @@ if (BPT_SUMM_RD &&
      sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
 if (ADDR_IS_MEM (pa))                                   /* memory address? */
+#ifdef OPCON
+    {
+    OC_DATA[DISP_BR] = (uint16)M[pa >> 1];             /* memory address? */
     return (M[pa >> 1]);
+    }
+#else
+    return (M[pa >> 1]);
+#endif
+
 if ((pa < IOPAGEBASE) ||                                /* not I/O address */
     (CPUT (CPUT_J) && (pa >= IOBA_CPU))) {              /* or J11 int reg? */
         setCPUERR (CPUE_NXM);
@@ -2690,7 +2826,14 @@ int32 PReadW (int32 pa)
 int32 data;
 
 if (ADDR_IS_MEM (pa))                                   /* memory address? */
+#ifdef OPCON
+    {
+    OC_DATA[DISP_BR] = (uint16)M[pa >> 1]; 
     return (M[pa >> 1]);
+    }
+#else
+    return (M[pa >> 1]);
+#endif
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
@@ -2707,7 +2850,14 @@ int32 PReadB (int32 pa)
 int32 data;
 
 if (ADDR_IS_MEM (pa))
+#ifdef OPCON
+    {
+      OC_DATA[DISP_BR] = (uint16)M[pa >> 1];
+      return (pa & 1? M[pa >> 1] >> 8: M[pa >> 1]) & 0377;
+    }
+#else
     return (pa & 1? M[pa >> 1] >> 8: M[pa >> 1]) & 0377;
+#endif
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
@@ -2779,6 +2929,9 @@ void PWriteW (int32 data, int32 pa)
 {
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     M[pa >> 1] = data;
+#ifdef OPCON
+    OC_DATA[DISP_BR] = (uint16)data;
+#endif
     return;
     }
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
@@ -2798,6 +2951,9 @@ if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     if (pa & 1)
         M[pa >> 1] = (M[pa >> 1] & 0377) | (data << 8);
     else M[pa >> 1] = (M[pa >> 1] & ~0377) | data;
+#ifdef OPCON
+    OC_DATA[DISP_BR] = (uint16)M[pa >> 1];
+#endif
     return;
     }             
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
@@ -2831,6 +2987,11 @@ int32 relocR (int32 va)
 {
 int32 apridx, apr, pa;
 
+#ifdef OPCON
+OC_IA = (t_bool)(va & VA_DS); // 1 -> 'D' space, 0 -> 'I' space
+OC_ADDR[va >> VA_V_DS] = (uint32)(va & VAMASK);
+#endif
+
 if (MMR0 & MMR0_MME) {                                  /* if mmgt */
     apridx = (va >> VA_V_APF) & 077;                    /* index into APR */
     apr = APRFILE[apridx];                              /* with va<18:13> */
@@ -2850,6 +3011,9 @@ else {
     if (pa >= 0160000)
         pa = 017600000 | pa;
     }
+#ifdef OPCON
+OC_ADDR[ADDR_PRGPA] = (uint32)pa;
+#endif
 return pa;
 }
 
@@ -2882,6 +3046,9 @@ switch (apr & PDR_ACF) {                                /* case on ACF */
                 if (update_MM)                          /* update MMR0 */
                     MMR0 = (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
                 MMR0 = MMR0 | MMR0_TRAP;                /* set trap flag */
+#ifdef OPCON
+                OC_MMR0;
+#endif
                 setTRAP (TRAP_MME);                     /* set trap */
                 }
             return;                                     /* continue op */
@@ -2914,6 +3081,9 @@ if (update_MM) MMR0 =                                   /* update MMR0 */
     (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
 APRFILE[apridx] = APRFILE[apridx] | PDR_A;              /* set A */
 MMR0 = MMR0 | err;                                      /* set aborts */
+#ifdef OPCON
+OC_MMR0;
+#endif
 ABORT (TRAP_MME);                                       /* abort ref */
 return;
 }
@@ -2938,6 +3108,11 @@ int32 relocW (int32 va)
 {
 int32 apridx, apr, pa;
 
+#ifdef OPCON
+OC_IA = (t_bool)(va & VA_DS); // 1 -> 'D' space, 0 -> 'I' space
+OC_ADDR[va >> VA_V_DS] = (uint32)(va & VAMASK);
+#endif
+
 if (MMR0 & MMR0_MME) {                                  /* if mmgt */
     apridx = (va >> VA_V_APF) & 077;                    /* index into APR */
     apr = APRFILE[apridx];                              /* with va<18:13> */
@@ -2958,6 +3133,9 @@ else {
     if (pa >= 0160000)
         pa = 017600000 | pa;
     }
+#ifdef OPCON
+OC_ADDR[ADDR_PRGPA] = (uint32)pa;
+#endif
 return pa;
 }
 
@@ -2990,6 +3168,9 @@ switch (apr & PDR_ACF) {                                /* case on ACF */
                 if (update_MM)                          /* update MMR0 */
                     MMR0 = (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
                 MMR0 = MMR0 | MMR0_TRAP;                /* set trap flag */
+#ifdef OPCON
+                OC_MMR0;
+#endif
                 setTRAP (TRAP_MME);                     /* set trap */
                 }
             return;                                     /* continue op */
@@ -3056,6 +3237,9 @@ else {
     if (pa >= 0160000)
         pa = 017600000 | pa;
     }
+#ifdef OPCON
+OC_ADDR[ADDR_PRGPA] = (uint32)pa;
+#endif
 return pa;
 }
 
@@ -3095,6 +3279,9 @@ t_stat MMR012_wr (int32 data, int32 pa, int32 access)
 switch ((pa >> 1) & 3) {                                /* decode pa<2:1> */
 
     case 0:                                             /* DR */
+#ifdef OPCON
+	OC_DATA[DISP_DR] = (uint16)(data & cpu_tab[cpu_model].mm0);
+#endif
         return SCPE_NXM;
 
     case 1:                                             /* MMR0 */
@@ -3102,6 +3289,10 @@ switch ((pa >> 1) & 3) {                                /* decode pa<2:1> */
             data = (pa & 1)? (MMR0 & 0377) | (data << 8): (MMR0 & ~0377) | data;
         data = data & cpu_tab[cpu_model].mm0;
         MMR0 = (MMR0 & ~MMR0_WR) | (data & MMR0_WR);
+#ifdef OPCON
+	oc_set_mmu();
+        oc_set_ringprot(cm);
+#endif
         return SCPE_OK;
 
     default:                                            /* MMR1, MMR2 */
@@ -3122,6 +3313,13 @@ if (pa & 1)
 MMR3 = data & cpu_tab[cpu_model].mm3;
 cpu_bme = (MMR3 & MMR3_BME) && (cpu_opt & OPT_UBM);
 dsenable = calc_ds (cm);
+
+#ifdef OPCON
+OC_MMR3;
+oc_set_mmu();
+oc_set_ringprot(cm);
+#endif
+
 return SCPE_OK;
 }
 
@@ -3230,6 +3428,12 @@ if (rs != oldrs) {                                      /* switch reg set */
 SP = STACKFILE[cm];                                     /* switch SP */
 isenable = calc_is (cm);
 dsenable = calc_ds (cm);
+
+#ifdef OPCON
+oc_set_mmu();
+oc_set_ringprot(cm);
+#endif
+
 return SCPE_OK;
 }
 
@@ -3344,6 +3548,20 @@ MMR2 = 0;
 MMR3 = 0;
 trap_req = 0;
 wait_state = 0;
+
+#ifdef OPCON
+OC_MMR0;
+OC_MMR3;
+oc_set_master (TRUE);
+oc_set_wait (FALSE);
+oc_set_mmu ();
+oc_set_ringprot (cm);
+if (cpu_model == MOD_1170) {
+    oc_set_port1 (FSTS_1170_PARERR,  0);
+    oc_set_port1 (FSTS_1170_ADRSERR, 0);
+    }
+#endif
+
 if (M == NULL) {                    /* First time init */
     M = (uint16 *) calloc (MEMSIZE >> 1, sizeof (uint16));
     if (M == NULL)
