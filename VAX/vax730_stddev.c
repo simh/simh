@@ -762,7 +762,7 @@ void tmr_sched (uint32 nicr)
 {
 uint32 usecs = (nicr) ? (~nicr + 1) : 0xFFFFFFFF;
 
-clk_tps = 1000000 / usecs;
+clk_tps = (int32)((1000000.0 / usecs) + 0.5);
 
 sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(nicr=0x%08X-usecs=0x%08X) - tps=%d\n", nicr, usecs, clk_tps);
 tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);
