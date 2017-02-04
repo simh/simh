@@ -1,6 +1,6 @@
 /* pdp11_cr.c: CR/CM/CD-11/CD20 card reader simulator
 
-   Copyright (c) 2005-2010, John A. Dundas III
+   Copyright (c) 2005-2016, John A. Dundas III
    Portions derived from work by Douglas W. Jones, jones@cs.uiowa.edu
    Portions derived from work by Robert M Supnik
 
@@ -100,6 +100,7 @@
     ECOs (at least) for Data Buffer status and augmented image mode.
 
   Revision History:
+   14-Mar-16    RMS     Added UC15 support (CR11 only)
    23-Feb-13    JGP     Added DEC version of the 026 codepage
                         Fixed the handling of the CR11 error bits after
                         a control register write.
@@ -221,10 +222,12 @@ extern int32 int_req[IPL_HLVL];
 #define DFLT_DIS        (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
 #define DFLT_TYPE       (UNIT_CR11)                     /* Default, but changable */
 #define DFLT_CPM        285
+#define CR11_ONLY      (1)
+#if !defined (UC15)
+#define CD11_OK        (1)                              /* only on real PDP-11 */
 #define CD20_OK        (1)
 #define AIECO_OK       (1)                              /* Augmented Image ECO optional */
-#define CR11_OK        (1)
-#define CD11_OK        (1)
+#endif
 #endif
 
 /* **** No VM_xxx macros should be referenced after this line **** */
