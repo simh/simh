@@ -119,6 +119,8 @@ typedef struct {
     size_t size;
     int indirect;
     size_t element_count;
+    int *bits;
+    size_t bit_count;
     } REG;
 
 struct PANEL {
@@ -158,6 +160,8 @@ struct PANEL {
     int                     callback_thread_running;
     void                    *callback_context;
     int                     usecs_between_callbacks;
+    unsigned int            sample_frequency;
+    unsigned int            sample_depth;
     int                     debug;
     char                    *simulator_version;
     int                     radix;
@@ -175,6 +179,10 @@ static const char *register_repeat_stop = "repeat stop";
 static const char *register_repeat_stop_all = "repeat stop all";
 static const char *register_repeat_units = " usecs ";
 static const char *register_get_prefix = "show time";
+static const char *register_collect_prefix = "collect ";
+static const char *register_collect_mid1 = " samples every ";
+static const char *register_collect_mid2 = " cycles ";
+static const char *register_get_postfix = "sampleout";
 static const char *register_get_echo = "# REGISTERS-DONE";
 static const char *register_repeat_echo = "# REGISTERS-REPEAT-DONE";
 static const char *register_dev_echo = "# REGISTERS-FOR-DEVICE:";
@@ -374,18 +382,25 @@ _panel_sendf (PANEL *p, int *completion_status, char **response, const char *fmt
 static int
 _panel_register_query_string (PANEL *panel, char **buf, size_t *buf_size)
 {
-size_t i, j, buf_data, buf_needed = 0;
+size_t i, j, buf_data, buf_needed = 0, reg_count = 0, bit_reg_count = 0;
 const char *dev;
 
 pthread_mutex_lock (&panel->io_lock);
 buf_needed = 2 + strlen (register_get_prefix);  /* SHOW TIME */
 for (i=0; i<panel->reg_count; i++) {
-    buf_needed += 9 + strlen (panel->regs[i].name) + (panel->regs[i].device_name ? strlen (panel->regs[i].device_name) : 0);
-    if (panel->regs[i].element_count > 0)
-        buf_needed += 4 + 6 /* 6 digit register array index */;
-    if (panel->regs[i].indirect)
-        buf_needed += 12 + strlen (register_ind_echo) + strlen (panel->regs[i].name);
+    if (panel->regs[i].bits)
+        ++bit_reg_count;
+    else {
+        ++reg_count;
+        buf_needed += 9 + strlen (panel->regs[i].name) + (panel->regs[i].device_name ? strlen (panel->regs[i].device_name) : 0);
+        if (panel->regs[i].element_count > 0)
+            buf_needed += 4 + 6 /* 6 digit register array index */;
+        if (panel->regs[i].indirect)
+            buf_needed += 12 + strlen (register_ind_echo) + strlen (panel->regs[i].name);
+        }
     }
+if (bit_reg_count)
+    buf_needed += 2 + strlen (register_get_postfix);
 buf_needed += 10 + strlen (register_get_echo); /* # REGISTERS-DONE */
 if (buf_needed > *buf_size) {
     free (*buf);
@@ -398,13 +413,15 @@ if (buf_needed > *buf_size) {
     *buf_size = buf_needed;
     }
 buf_data = 0;
-sprintf (*buf + buf_data, "%s\r", register_get_prefix);
-buf_data += strlen (*buf + buf_data);
+if (reg_count) {
+    sprintf (*buf + buf_data, "%s\r", register_get_prefix);
+    buf_data += strlen (*buf + buf_data);
+    }
 dev = "";
 for (i=j=0; i<panel->reg_count; i++) {
     const char *reg_dev = panel->regs[i].device_name ? panel->regs[i].device_name : "";
 
-    if (panel->regs[i].indirect)
+    if ((panel->regs[i].indirect) || (panel->regs[i].bits))
         continue;
     if (strcmp (dev, reg_dev)) {/* devices are different */
         char *tbuf;
@@ -447,9 +464,15 @@ if (buf_data && ((*buf)[buf_data-1] != '\r')) {
 for (i=j=0; i<panel->reg_count; i++) {
     const char *reg_dev = panel->regs[i].device_name ? panel->regs[i].device_name : "";
 
-    if (!panel->regs[i].indirect)
+    if ((!panel->regs[i].indirect) || (panel->regs[i].bits))
         continue;
     sprintf (*buf + buf_data, "%s%s\rE -H %s %s,$\r", register_ind_echo, panel->regs[i].name, reg_dev, panel->regs[i].name);
+    buf_data += strlen (*buf + buf_data);
+    }
+if (bit_reg_count) {
+    strcpy (*buf + buf_data, register_get_postfix);
+    buf_data += strlen (*buf + buf_data);
+    strcpy (*buf + buf_data, "\r");
     buf_data += strlen (*buf + buf_data);
     }
 strcpy (*buf + buf_data, register_get_echo);
@@ -458,6 +481,53 @@ strcpy (*buf + buf_data, "\r");
 buf_data += strlen (*buf + buf_data);
 *buf_size = buf_data;
 pthread_mutex_unlock (&panel->io_lock);
+return 0;
+}
+
+static int
+_panel_establish_register_bits_collection (PANEL *panel)
+{
+size_t i, buf_data, buf_needed = 0, reg_count = 0, bit_reg_count = 0;
+int cmd_stat, bits_count = 0;
+char *buf, *response = NULL;
+
+pthread_mutex_lock (&panel->io_lock);
+for (i=0; i<panel->reg_count; i++) {
+    if (panel->regs[i].bits)
+        buf_needed += 9 + strlen (panel->regs[i].name) + (panel->regs[i].device_name ? strlen (panel->regs[i].device_name) : 0);
+    }
+buf = (char *)_panel_malloc (buf_needed);
+if (!buf) {
+    panel->State = Error;
+    pthread_mutex_unlock (&panel->io_lock);
+    return -1;
+    }
+*buf = '\0';
+buf_data = 0;
+for (i=0; i<panel->reg_count; i++) {
+    if (panel->regs[i].bits) {
+        ++bits_count;
+        sprintf (buf + buf_data, "%s%s", (bits_count != 1) ? "," : "", panel->regs[i].indirect ? "-I " : "");
+        buf_data += strlen (buf + buf_data);
+        if (panel->regs[i].device_name) {
+            sprintf (buf + buf_data, "%s ", panel->regs[i].device_name);
+            buf_data += strlen (buf + buf_data);
+            }
+        sprintf (buf + buf_data, "%s", panel->regs[i].name);
+        buf_data += strlen (buf + buf_data);
+        }
+    }
+pthread_mutex_unlock (&panel->io_lock);
+if (_panel_sendf (panel, &cmd_stat, &response, "%s%u%s%u%s%s\r", register_collect_prefix, panel->sample_depth, 
+                                                                 register_collect_mid1, panel->sample_frequency,
+                                                                 register_collect_mid2, buf)) {
+    sim_panel_set_error ("Error establishing bit data collection:%s", response);
+    free (response);
+    free (buf);
+    return -1;
+    }
+free (response);
+free (buf);
 return 0;
 }
 
@@ -927,7 +997,9 @@ _panel_add_register (PANEL *panel,
                      size_t size,
                      void *addr,
                      int indirect,
-                     size_t element_count)
+                     size_t element_count,
+                     int *bits,
+                     size_t bit_count)
 {
 REG *regs, *reg;
 char *response = NULL;
@@ -940,6 +1012,10 @@ if (!panel || (panel->State == Error)) {
     }
 if (panel->State == Run) {
     sim_panel_set_error ("Not Halted");
+    return -1;
+    }
+if ((bit_count != 0) && (panel->sample_depth == 0)) {
+    sim_panel_set_error ("sim_panel_set_sampling_parameters() must be called first");
     return -1;
     }
 regs = (REG *)_panel_malloc ((1 + panel->reg_count)*sizeof(*regs)); 
@@ -959,6 +1035,11 @@ if (reg->name == NULL) {
     }
 strcpy (reg->name, name);
 reg->indirect = indirect;
+reg->addr = addr;
+reg->size = size;
+reg->element_count = element_count;
+reg->bits = bits;
+reg->bit_count = bit_count;
 for (i=0; i<strlen (reg->name); i++) {
     if (islower (reg->name[i]))
         reg->name[i] = toupper (reg->name[i]);
@@ -992,7 +1073,9 @@ for (i=0; i<panel->reg_count; i++) {
         }
     sprintf (t1, "%s %s", regs[i].device_name ? regs[i].device_name : "", regs[i].name);
     sprintf (t2, "%s %s", reg->device_name ? reg->device_name : "", reg->name);
-    if ((!strcmp (t1, t2)) && (reg->indirect == regs[i].indirect)) {
+    if ((!strcmp (t1, t2)) && 
+        (reg->indirect == regs[i].indirect) && 
+        ((reg->bits == NULL) == (regs[i].bits == NULL))) {
         sim_panel_set_error ("Duplicate Register Declaration");
         free (t1);
         free (t2);
@@ -1004,9 +1087,6 @@ for (i=0; i<panel->reg_count; i++) {
     free (t1);
     free (t2);
     }
-reg->addr = addr;
-reg->size = size;
-reg->element_count = element_count;
 pthread_mutex_unlock (&panel->io_lock);
 /* Validate existence of requested register/array */
 if (_panel_sendf (panel, &cmd_stat, &response, "EXAMINE %s %s%s\r", device_name? device_name : "", name, (element_count > 0) ? "[0]" : "")) {
@@ -1050,6 +1130,11 @@ pthread_mutex_unlock (&panel->io_lock);
 /* Now build the register query string for the whole register list */
 if (_panel_register_query_string (panel, &panel->reg_query, &panel->reg_query_size))
     return -1;
+if (bits) {
+    memset (bits, 0, sizeof (*bits) * bit_count);
+    if (_panel_establish_register_bits_collection (panel))
+        return -1;
+    }
 return 0;
 }
 
@@ -1060,7 +1145,17 @@ sim_panel_add_register (PANEL *panel,
                         size_t size,
                         void *addr)
 {
-return _panel_add_register (panel, name, device_name, size, addr, 0, 0);
+return _panel_add_register (panel, name, device_name, size, addr, 0, 0, NULL, 0);
+}
+
+int
+sim_panel_add_register_bits (PANEL *panel,
+                             const char *name,
+                             const char *device_name,
+                             size_t bit_width,
+                             int *bits)
+{
+return _panel_add_register (panel, name, device_name, 0, NULL, 0, 0, bits, bit_width);
 }
 
 int
@@ -1071,7 +1166,7 @@ sim_panel_add_register_array (PANEL *panel,
                               size_t size,
                               void *addr)
 {
-return _panel_add_register (panel, name, device_name, size, addr, 0, element_count);
+return _panel_add_register (panel, name, device_name, size, addr, 0, element_count, NULL, 0);
 }
 
 
@@ -1082,7 +1177,17 @@ sim_panel_add_register_indirect (PANEL *panel,
                                  size_t size,
                                  void *addr)
 {
-return _panel_add_register (panel, name, device_name, size, addr, 1, 0);
+return _panel_add_register (panel, name, device_name, size, addr, 1, 0, NULL, 0);
+}
+
+int
+sim_panel_add_register_indirect_bits (PANEL *panel,
+                                      const char *name,
+                                      const char *device_name,
+                                      size_t bit_width,
+                                      int *bits)
+{
+return _panel_add_register (panel, name, device_name, 0, NULL, 1, 0, bits, bit_width);
 }
 
 static int
@@ -1162,6 +1267,24 @@ if ((usecs_between_callbacks == 0) && panel->usecs_between_callbacks) { /* Need 
     pthread_mutex_lock (&panel->io_lock);
     }
 pthread_mutex_unlock (&panel->io_lock);
+return 0;
+}
+
+int
+sim_panel_set_sampling_parameters (PANEL *panel,
+                                   unsigned int sample_frequency,
+                                   unsigned int sample_depth)
+{
+if (sample_frequency == 0) {
+    sim_panel_set_error ("Invalid sample frequency value: %u", sample_frequency);
+    return -1;
+    }
+if (sample_depth == 0) {
+    sim_panel_set_error ("Invalid sample depth value: %u", sample_depth);
+    return -1;
+    }
+panel->sample_frequency = sample_frequency;
+panel->sample_depth = sample_depth;
 return 0;
 }
 
@@ -1760,11 +1883,40 @@ while ((p->sock != INVALID_SOCKET) &&
         e = strchr (s, ':');
         if (e) {
             size_t i;
+            char smp_dev[32], smp_reg[32], smp_ind[32];
+            unsigned int bit;
 
             *e++ = '\0';
             if (!strcmp("Time", s)) {
                 p->simulation_time = strtoull (e, NULL, 10);
                 s = eol;
+                while (isspace(0xFF & (*s)))
+                    ++s;
+                continue;
+                }
+            if ((*s == '}') && 
+                (3 == sscanf (s, "}%s %s %s", smp_dev, smp_reg, smp_ind))) {   /* Register bit Sample Data? */
+                r = NULL;
+                for (i=0; i<p->reg_count; i++) {
+                    if (p->regs[i].bits == NULL)
+                        continue;
+                    if ((!strcmp (smp_reg, p->regs[i].name)) && 
+                        ((!p->device_name) || (!strcmp (smp_dev, p->device_name)))) {
+                        r = &p->regs[i];
+                        break;
+                        }
+                    }
+                if (r) {
+                    for (bit = 0; bit < r->bit_count; bit++) {
+                        int val = (int)strtol (e, &e, 10);
+                        r->bits[bit] = val;
+                        if (*e == ',')
+                            ++e;
+                        else
+                            break;
+                        }
+                    s = eol;
+                    }
                 while (isspace(0xFF & (*s)))
                     ++s;
                 continue;

@@ -43,7 +43,6 @@
          into the application.
       4) Use a simh simulator built from the same version of simh that the
          sim_frontpanel and sim_sock modules came from.
-
 */
 
 #ifndef SIM_FRONTPANEL_H_
@@ -57,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   3
+#define SIM_FRONTPANEL_VERSION   4
 
 /**
 
@@ -78,7 +77,6 @@ extern "C" {
     Note 2: - Configuration file specified should contain device setup 
               statements (enable, disable, CPU types and attach commands).
               It should not start a simulator running.
-
  */
 
 typedef struct PANEL PANEL;
@@ -101,8 +99,8 @@ sim_panel_start_simulator_debug (const char *sim_path,
 
         simulator_panel     the simulator panel to connect to
         device_name         the simulator's name for the device
-
  */
+
 PANEL *
 sim_panel_add_device_panel (PANEL *simulator_panel,
                             const char *device_name);
@@ -113,8 +111,8 @@ sim_panel_add_device_panel (PANEL *simulator_panel,
 
     Note: destroying a simulator panel will also destroy any 
           related sub panels
-
  */
+
 int
 sim_panel_destroy (PANEL *panel);
 
@@ -128,12 +126,14 @@ sim_panel_destroy (PANEL *panel);
    simulator.
 
    The registers that a particular frontpanel application mught need 
-   access to are described by the application when it calls: 
+   access to are specified by the application when it calls: 
    
    sim_panel_add_register
+   sim_panel_add_register_bits 
    sim_panel_add_register_array
 and
    sim_panel_add_register_indirect
+   sim_panel_add_register_indirect_bits
 
         name         the name the simulator knows this register by
         device_name  the device this register is part of.  Defaults to
@@ -144,14 +144,27 @@ and
                      receive the data in the simulator's register
         addr         a pointer to the location of the buffer which will 
                      be loaded with the data in the simulator's register
-
+        bit_width    the number of values to populate in the bits array
+        bits         an array of integers which is bit_width long that 
+                     will receive each bit's current accumulated value.
+                     The accumulated value will range from 0 thru the 
+                     the sample_depth specified when calling 
+                     sim_panel_set_sampling_parameters().
  */
+
 int
 sim_panel_add_register (PANEL *panel,
                         const char *name,
                         const char *device_name,
                         size_t size,
                         void *addr);
+
+int
+sim_panel_add_register_bits (PANEL *panel,
+                             const char *name,
+                             const char *device_name,
+                             size_t bit_width,
+                             int *bits);
 
 int
 sim_panel_add_register_array (PANEL *panel,
@@ -167,11 +180,19 @@ sim_panel_add_register_indirect (PANEL *panel,
                                  const char *device_name,
                                  size_t size,
                                  void *addr);
+
+int
+sim_panel_add_register_indirect_bits (PANEL *panel,
+                                      const char *name,
+                                      const char *device_name,
+                                      size_t bit_width,
+                                      int *bits);
+
 /**
 
     A panel application has a choice of two different methods of getting 
     the values contained in the set of registers it has declared interest in via
-    the sim_panel_add_register API.
+    the sim_panel_add_register APIs.
     
        1)  The values can be polled (when ever it is desired) by calling
            sim_panel_get_registers().
@@ -189,15 +210,11 @@ sim_panel_add_register_indirect (PANEL *panel,
            or frontpanel interactions with the simulator may be disrupted.  
            Setting a flag, signaling an event or posting a message are 
            reasonable activities to perform in a callback routine.
-
  */
+
 int
 sim_panel_get_registers (PANEL *panel, unsigned long long *simulation_time);
 
-/**
-
-
- */
 typedef void (*PANEL_DISPLAY_PCALLBACK)(PANEL *panel, 
                                         unsigned long long simulation_time,
                                         void *context);
@@ -210,6 +227,26 @@ sim_panel_set_display_callback_interval (PANEL *panel,
 
 /**
 
+    When a front panel application wants to get averaged bit sample
+    values, it must first declare the sampling parameters that will
+    be used while collecting the bit values.
+
+   sim_panel_set_sampling_parameters 
+
+        sample_frequency    cycles/instructions between sample captures
+        sample_depth        how many samples to accumulate in the rolling
+                            average for each bit sample.  Returned bit
+                            sample values will range from 0 thru this 
+                            value.
+ */
+
+int
+sim_panel_set_sampling_parameters (PANEL *panel,
+                                   unsigned int sample_frequency,
+                                   unsigned int sample_depth);
+
+/**
+
     When a front panel application needs to change the running
     state of a simulator one of the following routines should 
     be called:  
@@ -218,8 +255,8 @@ sim_panel_set_display_callback_interval (PANEL *panel,
     sim_panel_exec_boot     - Boot a simulator from a specific device
     sim_panel_exec_run      - Start/Resume a simulator running instructions
     sim_panel_exec_step     - Have a simulator execute a single step
-
  */
+
 int
 sim_panel_exec_halt (PANEL *panel);
 
@@ -249,7 +286,6 @@ sim_panel_exec_step (PANEL *panel);
     
     Note: Any breakpoint switches/flags must be located at the 
           beginning of the condition string
-
  */
 
 int
@@ -277,7 +313,6 @@ sim_panel_break_output_clear (PANEL *panel, const char *condition);
     sim_panel_mem_deposit        - Deposit to memory location
     sim_panel_set_register_value - Deposit to a register or memory 
                                    location
-
  */
 
 
@@ -359,6 +394,7 @@ sim_panel_mem_deposit (PANEL *panel,
                        const void *value);
 
 /**
+
    sim_panel_set_register_value
 
         name        the name of a simulator register or a memory address
@@ -366,7 +402,6 @@ sim_panel_mem_deposit (PANEL *panel,
         value       the new value in character string form.  The string 
                     must be in the native/natural radix that the simulator 
                     uses when referencing that register
-
  */
 int
 sim_panel_set_register_value (PANEL *panel,
@@ -375,24 +410,24 @@ sim_panel_set_register_value (PANEL *panel,
 
 /**
 
-    When a front panel application may needs to change the media
+    When a front panel application needs to change the media
     in a simulated removable media device one of the following 
     routines should be called:
 
     sim_panel_mount    - mounts the indicated media file on a device
     sim_panel_dismount - dismounts the currently mounted media file 
                          from a device
-
  */
 
 /**
+
    sim_panel_mount
 
         device      the name of a simulator device/unit
         switches    any switches appropriate for the desire attach
         path        the path on the local system to be attached
-
  */
+
 int
 sim_panel_mount (PANEL *panel,
                  const char *device,
@@ -400,11 +435,12 @@ sim_panel_mount (PANEL *panel,
                  const char *path);
 
 /**
+
    sim_panel_dismount
 
         device      the name of a simulator device/unit
-
  */
+
 int
 sim_panel_dismount (PANEL *panel,
                     const char *device);
@@ -430,7 +466,6 @@ sim_panel_get_state (PANEL *panel);
     
     sim_panel_get_error     - the details of the most recent error
     sim_panel_clear_error   - clears the error buffer
-
  */
 
 const char *sim_panel_get_error (void);
