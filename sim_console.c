@@ -429,10 +429,10 @@ t_stat sim_rem_con_poll_svc (UNIT *uptr);               /* remote console connec
 t_stat sim_rem_con_data_svc (UNIT *uptr);               /* remote console connection data routine */
 t_stat sim_rem_con_repeat_svc (UNIT *uptr);             /* remote auto repeat command console timing routine */
 t_stat sim_rem_con_reset (DEVICE *dptr);                /* remote console reset routine */
-UNIT sim_rem_con_unit[2+MAX_REMOTE_SESSIONS] = {
-    { UDATA (&sim_rem_con_poll_svc, UNIT_IDLE, 0)  },   /* remote console connection polling unit */
-    { UDATA (&sim_rem_con_data_svc, UNIT_IDLE|UNIT_DIS, 0)  }};  /* console data handling unit */
-
+#define rem_con_poll_unit (&sim_remote_console.units[0])
+#define rem_con_data_unit (&sim_remote_console.units[1])
+#define REM_CON_BASE_UNITS 2
+#define rem_con_repeat_units (&sim_remote_console.units[REM_CON_BASE_UNITS])
 #define DBG_MOD  0x00000004                             /* Remote Console Mode activities */
 #define DBG_REP  0x00000008                             /* Remote Console Repeat activities */
 #define DBG_CMD  0x00000010                             /* Remote Console Command activities */
@@ -458,30 +458,32 @@ return "Remote Console Facility";
 }
 
 DEVICE sim_remote_console = {
-    "REM-CON", sim_rem_con_unit, NULL, sim_rem_con_mod, 
-    2, 0, 0, 0, 0, 0, 
+    "REM-CON", NULL, NULL, sim_rem_con_mod, 
+    0, 0, 0, 0, 0, 0, 
     NULL, NULL, sim_rem_con_reset, NULL, NULL, NULL, 
     NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_rem_con_debug,
     NULL, NULL, NULL, NULL, NULL, sim_rem_con_description};
 
 typedef struct REMOTE REMOTE;
 struct REMOTE {
-    int32   buf_size;
-    int32   buf_ptr;
-    char    *buf;
-    char    *act_buf;
-    size_t  act_buf_size;
-    char    *act;
-    uint32  repeat_interval;
-    t_bool  repeat_pending;
-    char    *repeat_action;
-    t_bool  single_mode;
-    uint32  read_timeout;
-    int     line;
-    TMLN    *lp;
-    UNIT    *uptr;
+    int32           buf_size;
+    int32           buf_ptr;
+    char            *buf;
+    char            *act_buf;
+    size_t          act_buf_size;
+    char            *act;
+    t_bool          single_mode;
+    uint32          read_timeout;
+    int             line;
+    TMLN            *lp;
+    UNIT            *uptr;
+    uint32          repeat_interval;
+    t_bool          repeat_pending;
+    char            *repeat_action;
     };
 REMOTE *sim_rem_consoles = NULL;
+
+
 static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* remote console line mux */
 static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
 static uint32 *sim_rem_read_timeouts = NULL;/* per line read timeout (default from sim_rem_read_timeout) */
@@ -544,7 +546,7 @@ if (sim_rem_read_timeout)
 if (!sim_rem_con_tmxr.master)
     fprintf (st, "Remote Console Command input is disabled\n");
 else {
-    fprintf (st, "Remote Console Command Input listening on TCP port: %s\n", sim_rem_con_unit[0].filename);
+    fprintf (st, "Remote Console Command Input listening on TCP port: %s\n", rem_con_poll_unit->filename);
     fprintf (st, "Remote Console Per Command Output buffer size:      %d bytes\n", sim_rem_con_tmxr.buffered);
     }
 for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
@@ -796,8 +798,8 @@ if (stat != SCPE_OK)
 sim_last_cmd_stat = SCPE_BARE_STATUS(stat);
 if (!sim_processing_event) {
     sim_ttrun ();                               /* set console mode */
-    sim_cancel (&sim_rem_con_unit[1]);          /* force immediate activation of sim_rem_con_data_svc */
-    sim_activate (&sim_rem_con_unit[1], -1);
+    sim_cancel (rem_con_data_unit);             /* force immediate activation of sim_rem_con_data_svc */
+    sim_activate (rem_con_data_unit, -1);
     }
 sim_switches = saved_switches;                  /* restore original switches */
 }
@@ -1402,14 +1404,14 @@ else
 
 t_stat sim_rem_con_repeat_svc (UNIT *uptr)
 {
-int line = uptr - (sim_rem_con_unit + 2);
+int line = uptr - rem_con_repeat_units;
 REMOTE *rem = &sim_rem_consoles[line];
 
 sim_debug (DBG_REP, &sim_remote_console, "sim_rem_con_repeat_svc(line=%d) - interval=%d\n", line, rem->repeat_interval);
 if (rem->repeat_interval) {
     rem->repeat_pending = TRUE;
     sim_activate_after (uptr, rem->repeat_interval);        /* reschedule */
-    sim_activate_abs (&sim_rem_con_unit[1], -1);            /* wake up to process */
+    sim_activate_abs (rem_con_data_unit, -1);               /* wake up to process */
     }
 return SCPE_OK;
 }
@@ -1420,10 +1422,6 @@ if (sim_rem_con_tmxr.lines) {
     int32 i;
 
     sim_debug (DBG_REP, &sim_remote_console, "sim_rem_con_reset(lines=%d)\n", sim_rem_con_tmxr.lines);
-    for (i=0; i<MAX_REMOTE_SESSIONS; i++) {
-        sim_rem_con_unit[i + 2].flags = UNIT_DIS;
-        sim_rem_con_unit[i + 2].action = &sim_rem_con_repeat_svc;
-        }
     for (i=0; i<sim_rem_con_tmxr.lines; i++) {
         REMOTE *rem = &sim_rem_consoles[i];
 
@@ -1431,11 +1429,11 @@ if (sim_rem_con_tmxr.lines) {
             continue;
         sim_debug (DBG_REP, &sim_remote_console, "sim_rem_con_reset(line=%d, usecs=%d)\n", i, rem->repeat_interval);
         if (rem->repeat_interval)
-            sim_activate_after (sim_rem_con_unit + 2 + i, rem->repeat_interval);/* schedule */
+            sim_activate_after (rem_con_repeat_units + i, rem->repeat_interval);/* schedule */
         }
     if (i != sim_rem_con_tmxr.lines)
-        sim_activate_after (&dptr->units[1], 100000);       /* continue polling for open sessions */
-    return sim_rem_con_poll_svc (&dptr->units[0]);          /* establish polling as needed */
+        sim_activate_after (rem_con_data_unit, 100000);     /* continue polling for open sessions */
+    return sim_rem_con_poll_svc (rem_con_poll_unit);        /* establish polling for new sessions */
     }
 return SCPE_OK;
 }
@@ -1453,9 +1451,9 @@ if (flag) {
             sim_set_rem_connections (0, "1");               /* use 1 */
         sim_rem_con_tmxr.buffered = 8192;                   /* Use big enough buffers */
         sim_register_internal_device (&sim_remote_console);
-        r = tmxr_attach (&sim_rem_con_tmxr, &sim_rem_con_unit[0], cptr);/* open master socket */
+        r = tmxr_attach (&sim_rem_con_tmxr, rem_con_poll_unit, cptr);/* open master socket */
         if (r == SCPE_OK)
-            sim_activate_after(&sim_rem_con_unit[0], 1000000);/* check for connection in 1 second */
+            sim_activate_after(rem_con_poll_unit, 1000000);/* check for connection in 1 second */
         return r;
         }
     return SCPE_NOPARAM;
@@ -1464,7 +1462,7 @@ else {
     if (sim_rem_con_tmxr.master) {
         int32 i;
 
-        tmxr_detach (&sim_rem_con_tmxr, &sim_rem_con_unit[0]);
+        tmxr_detach (&sim_rem_con_tmxr, rem_con_poll_unit);
         for (i=0; i<sim_rem_con_tmxr.lines; i++) {
             REMOTE *rem = &sim_rem_consoles[i];
             free (rem->buf);
@@ -1492,25 +1490,39 @@ if (r != SCPE_OK)
     return r;
 if (sim_rem_con_tmxr.master)
     return SCPE_ALATT;
+if (sim_rem_con_tmxr.lines) {
+    sim_cancel (rem_con_poll_unit);
+    sim_cancel (rem_con_data_unit);
+    }
 for (i=0; i<sim_rem_con_tmxr.lines; i++) {
     rem = &sim_rem_consoles[i];
     free (rem->buf);
     free (rem->act_buf);
     free (rem->act);
     free (rem->repeat_action);
+    sim_cancel (&rem_con_repeat_units[i]);
     }
 sim_rem_con_tmxr.lines = lines;
 sim_rem_con_tmxr.ldsc = (TMLN *)realloc (sim_rem_con_tmxr.ldsc, sizeof(*sim_rem_con_tmxr.ldsc)*lines);
 memset (sim_rem_con_tmxr.ldsc, 0, sizeof(*sim_rem_con_tmxr.ldsc)*lines);
+sim_remote_console.units = (UNIT *)realloc (sim_remote_console.units, sizeof(*sim_remote_console.units)*(lines + REM_CON_BASE_UNITS));
+memset (sim_remote_console.units, 0, sizeof(*sim_remote_console.units)*(lines + REM_CON_BASE_UNITS));
+sim_remote_console.numunits = lines + REM_CON_BASE_UNITS;
+rem_con_poll_unit->action = &sim_rem_con_poll_svc;/* remote console connection polling unit */
+rem_con_poll_unit->flags |= UNIT_IDLE;
+rem_con_data_unit->action = &sim_rem_con_data_svc;/* console data handling unit */
+rem_con_data_unit->flags |= UNIT_IDLE|UNIT_DIS;
 sim_rem_consoles = (REMOTE *)realloc (sim_rem_consoles, sizeof(*sim_rem_consoles)*lines);
 memset (sim_rem_consoles, 0, sizeof(*sim_rem_consoles)*lines);
 sim_rem_command_buf = (char *)realloc (sim_rem_command_buf, 4*CBUFSIZE+1);
 memset (sim_rem_command_buf, 0, 4*CBUFSIZE+1);
-for (i=0; i<sim_rem_con_tmxr.lines; i++) {
+for (i=0; i<lines; i++) {
+    rem_con_repeat_units[i].flags = UNIT_DIS;
+    rem_con_repeat_units[i].action = &sim_rem_con_repeat_svc;
     rem = &sim_rem_consoles[i];
     rem->line = i;
     rem->lp = &sim_rem_con_tmxr.ldsc[i];
-    rem->uptr = &sim_rem_con_unit[i + 2];
+    rem->uptr = &rem_con_repeat_units[i];
     }
 return SCPE_OK;
 }
@@ -1584,8 +1596,8 @@ if (sim_rem_master_mode) {
     sim_rem_master_was_enabled = TRUE;
     while (sim_rem_master_mode) {
         sim_rem_consoles[0].single_mode = FALSE;
-        sim_cancel (&sim_rem_con_unit[1]);
-        sim_activate (&sim_rem_con_unit[1], -1);
+        sim_cancel (rem_con_data_unit);
+        sim_activate (rem_con_data_unit, -1);
         stat = run_cmd (RU_GO, "");
         if (stat != SCPE_TTMO) {
             stat_nomessage = stat & SCPE_NOMESSAGE;         /* extract possible message supression flag */
@@ -2205,7 +2217,7 @@ int32 c, trys = 0;
 
 if (sim_rem_master_mode) {
     for (;trys < sec; ++trys) {
-        sim_rem_con_poll_svc (&sim_rem_con_unit[0]);
+        sim_rem_con_poll_svc (rem_con_poll_unit);
         if (sim_rem_con_tmxr.ldsc[0].conn)
             break;
         if ((trys % 10) == 0) {                         /* Status every 10 sec */
