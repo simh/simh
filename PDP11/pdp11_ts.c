@@ -269,7 +269,6 @@ extern uint32 cpu_opt;
 #define MAX_PLNT        8                               /* max pkt length */
 
 extern int32 int_req[IPL_HLVL];
-extern UNIT cpu_unit;
 
 uint8 *tsxb = NULL;                                     /* xfer buffer */
 int32 tssr = 0;                                         /* status register */

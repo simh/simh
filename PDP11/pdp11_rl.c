@@ -95,8 +95,6 @@
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern uint32 cpu_opt;
-extern UNIT cpu_unit;
 #endif
 
 /* Constants */

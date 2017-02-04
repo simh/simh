@@ -823,7 +823,6 @@ t_stat auto_config (const char *name, int32 nctrl)
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
 uint32 vec = AUTO_VECBASE;
 int32 ilvl, ibit, numc;
-extern UNIT cpu_unit;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;

@@ -180,7 +180,13 @@
 #define CPUT(x)         ((cpu_type & (x)) != 0)
 #define CPUO(x)         ((cpu_opt & (x)) != 0)
 #define UNIBUS          (cpu_opt & BUS_U)
-extern uint32 cpu_model, cpu_type, cpu_opt;
+extern int32 cpu_bme;                                   /* bus map enable */
+extern uint32 cpu_model;                                /* CPU model */
+extern uint32 cpu_type;                                 /* model as bit mask */
+extern uint32 cpu_opt;                                  /* CPU options */
+
+extern DEVICE cpu_dev;
+extern UNIT cpu_unit;
 
 /* Feature sets
 
