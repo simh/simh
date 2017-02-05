@@ -980,7 +980,7 @@ ODS2Checksum (void *Buffer, uint16 WordCount)
     }
 
 
-static t_offset get_filesystem_size (UNIT *uptr)
+static t_offset get_ods_filesystem_size (UNIT *uptr)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1054,12 +1054,86 @@ if (!sim_quiet) {
     sim_printf ("%s%d: '%s' Contains ODS%d File system:\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename, Home.hm2_b_struclev);
     sim_printf ("%s%d: Volume Name: %12.12s ", sim_dname (dptr), (int)(uptr-dptr->units), Home.hm2_t_volname);
     sim_printf ("Format: %12.12s ", Home.hm2_t_format);
-    sim_printf ("SectorsInVolume: %d\n", Scb.scb_l_volsize);
+    sim_printf ("Sectors In Volume: %u\n", Scb.scb_l_volsize);
     }
 ret_val = ((t_offset)Scb.scb_l_volsize) * 512;
 
 Return_Cleanup:
 uptr->capac = saved_capac;
+return ret_val;
+}
+
+typedef struct ultrix_disklabel {
+    uint32  pt_magic;       /* magic no. indicating part. info exits */
+    uint32  pt_valid;       /* set by driver if pt is current */
+    struct  pt_info {
+        uint32  pi_nblocks; /* no. of sectors */
+        uint32  pi_blkoff;  /* block offset for start */
+        } pt_part[8];
+    } ultrix_disklabel;
+
+#define PT_MAGIC        0x032957        /* Partition magic number */
+#define PT_VALID        1               /* Indicates if struct is valid */
+
+static t_offset get_ultrix_filesystem_size (UNIT *uptr)
+{
+DEVICE *dptr;
+t_addr saved_capac;
+t_offset temp_capac = 512 * (t_offset)0xFFFFFFFFu;  /* Make sure we can access the largest sector */
+uint32 capac_factor;
+uint8 sector_buf[512];
+ultrix_disklabel *Label = (ultrix_disklabel *)(sector_buf + sizeof (sector_buf) - sizeof (ultrix_disklabel));
+t_offset ret_val = (t_offset)-1;
+int i;
+uint32 max_lbn = 0, max_lbn_partnum;
+
+if ((dptr = find_dev_from_unit (uptr)) == NULL)
+    return ret_val;
+capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
+saved_capac = uptr->capac;
+uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+if (sim_disk_rdsect (uptr, 31, sector_buf, NULL, 1))
+    goto Return_Cleanup;
+
+if ((Label->pt_magic != PT_MAGIC) || 
+    (Label->pt_valid != PT_VALID))
+    goto Return_Cleanup;
+
+for (i = 0; i < 8; i++) {
+    uint32 end_lbn = Label->pt_part[i].pi_blkoff + Label->pt_part[i].pi_nblocks;
+    if (end_lbn > max_lbn) {
+        max_lbn = end_lbn;
+        max_lbn_partnum = i;
+        }
+    }
+if (!sim_quiet) {
+    sim_printf ("%s%d: '%s' Contains Ultrix partitions\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
+    sim_printf ("Partition with highest sector: %c, Sectors On Disk: %u\n", 'a' + max_lbn_partnum, max_lbn);
+    }
+ret_val = ((t_offset)max_lbn) * 512;
+
+Return_Cleanup:
+uptr->capac = saved_capac;
+return ret_val;
+}
+
+typedef t_offset (*FILESYSTEM_CHECK)(UNIT *uptr);
+
+static t_offset get_filesystem_size (UNIT *uptr)
+{
+static FILESYSTEM_CHECK checks[] = {
+    &get_ods_filesystem_size,
+    &get_ultrix_filesystem_size,
+    NULL
+    };
+t_offset ret_val;
+int i;
+
+for (i = 0; checks[i] != NULL; i++) {
+    ret_val = checks[i] (uptr);
+    if (ret_val != (t_offset)-1)
+        break;
+    }
 return ret_val;
 }
 
