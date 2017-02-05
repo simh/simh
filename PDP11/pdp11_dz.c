@@ -62,17 +62,14 @@
 #include "pdp10_defs.h"
 #define RANK_DZ         0                               /* no autoconfig */
 #define DZ_8B_DFLT      0
-extern int32 int_req;
 
 #elif defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
 #define DZ_8B_DFLT      TT_MODE_8B
-extern int32 int_req[IPL_HLVL];
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 #define DZ_8B_DFLT      TT_MODE_8B
-extern int32 int_req[IPL_HLVL];
 #endif
 
 #include "sim_sock.h"

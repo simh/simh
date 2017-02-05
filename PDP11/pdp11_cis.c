@@ -175,7 +175,6 @@ static DSTR Dstr0 = { 0, {0, 0, 0, 0} };
 extern int32 isenable, dsenable;
 extern int32 N, Z, V, C, fpd, ipl;
 extern int32 R[8], trap_req;
-extern uint32 cpu_type;
 
 int32 ReadDstr (int32 *dscr, DSTR *dec, int32 flag);
 void WriteDstr (int32 *dscr, DSTR *dec, int32 flag);

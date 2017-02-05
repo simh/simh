@@ -60,9 +60,7 @@ extern DEVICE xu_dev;
 extern DEVICE dup_dev;
 extern DEVICE kmc_dev;
 extern DEVICE dmc_dev;
-extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern d10 *M;
 extern a10 saved_PC;
 
 /* SCP data structures and interface routines

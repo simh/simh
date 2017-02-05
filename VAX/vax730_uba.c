@@ -93,8 +93,6 @@ uint32 uba_fmer = 0;                                    /* failing map reg */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
-extern int32 autcon_enb;
-
 t_stat uba_reset (DEVICE *dptr);
 const char *uba_description (DEVICE *dptr);
 t_stat uba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);

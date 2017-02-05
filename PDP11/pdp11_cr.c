@@ -203,7 +203,6 @@
 
 #if defined (VM_PDP10)                                  /* PDP10 version */
 #include "pdp10_defs.h"
-extern int32 int_req;
 #define DFLT_DIS        (DEV_DIS)
 #define DFLT_TYPE       (UNIT_CD20)                    /* CD20 (CD11) only */
 #define CD20_ONLY       (1)
@@ -211,14 +210,12 @@ extern int32 int_req;
 #define AIECO_REQ       (1)                             /* Requires Augmented Image ECO */
 #elif defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
 #define DFLT_DIS        (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
 #define DFLT_TYPE       (UNIT_CR11)                     /* CR11 only */
 #define CR11_ONLY       (1)
 #define DFLT_CPM        285
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
 #define DFLT_DIS        (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
 #define DFLT_TYPE       (UNIT_CR11)                     /* Default, but changable */
 #define DFLT_CPM        285

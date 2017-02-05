@@ -81,7 +81,6 @@
  */
 #define CYCLE_US (MEMORY_CYCLE*(VT11_DELAY*2+1))
 
-extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
 
 t_stat vt_rd(int32 *data, int32 PA, int32 access);
@@ -348,7 +347,6 @@ vt_boot(int32 unit, DEVICE *dptr)
     t_stat r;
     char stability[32];
     extern int32 saved_PC;
-    extern uint16 *M;
     
     /* XXX  should do something like vt11_set_dpc(&appropriate_ROM_image) */
 

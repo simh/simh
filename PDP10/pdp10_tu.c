@@ -296,11 +296,8 @@
                             break; \
                             }
 
-extern d10 *M;                                          /* memory */
-extern int32 int_req;
 extern int32 ubmap[UBANUM][UMAP_MEMSIZE];               /* Unibus map */
 extern int32 ubcs[UBANUM];
-extern UNIT cpu_unit;
 
 int32 tucs1 = 0;                                        /* control/status 1 */
 int32 tuwc = 0;                                         /* word count */

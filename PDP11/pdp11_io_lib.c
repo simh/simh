@@ -37,7 +37,6 @@
 #include "sim_tmxr.h"
 #include "sim_ether.h"
 
-extern int32 autcon_enb;
 extern int32 int_vec[IPL_HLVL][32];
 #if !defined(VEC_SET)
 #define VEC_SET 0

@@ -525,8 +525,6 @@ BITFIELD *hk_reg_bits[] = {
 #define HKDEB_TRC       010                             /* trace */
 #define HKDEB_INT       020                             /* interrupts */
 
-extern int32 int_req[IPL_HLVL];
-
 uint16 *hkxb = NULL;                                    /* xfer buffer */
 int32 hkcs1 = 0;                                        /* control/status 1 */
 int32 hkwc = 0;                                         /* word count */
@@ -1565,8 +1563,6 @@ return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);
 }
 
 #if defined (VM_PDP11)
-
-extern uint16 *M;
 
 /* Device bootstrap - does not clear CSR when done */
 

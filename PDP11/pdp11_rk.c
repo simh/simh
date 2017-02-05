@@ -69,13 +69,11 @@
 
 #if defined (VM_VAX)                                    /* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
 #define DMASK           0xFFFF
 #define RK_DIS  DEV_DIS
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
 #define RK_DIS  0
 #endif
 
@@ -931,7 +929,6 @@ static const uint16 boot_rom[] = {
 t_stat rk_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;                                       /* memory */
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

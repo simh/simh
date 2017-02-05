@@ -330,11 +330,8 @@ struct drvtyp drv_tab[] = {
     { 0 }
     };
 
-extern d10 *M;                                          /* memory */
-extern int32 int_req;
 extern int32 ubmap[UBANUM][UMAP_MEMSIZE];               /* Unibus maps */
 extern int32 ubcs[UBANUM];
-extern UNIT cpu_unit;
 extern uint32 fe_bootrh;
 extern int32 fe_bootunit;
 

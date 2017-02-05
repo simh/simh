@@ -108,12 +108,10 @@
 
 #if defined (VM_VAX)                                    /* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
 #define DMASK           0xFFFF
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
 #endif
 
 #define DT_NUMDR        8                               /* #drives */
@@ -1229,7 +1227,6 @@ static const uint16 boot_rom[] = {
 t_stat dt_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;                                       /* memory */
 
 dt_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++)

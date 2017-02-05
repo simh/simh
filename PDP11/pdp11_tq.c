@@ -84,7 +84,6 @@
 #include "pdp11_defs.h"
 #define INIT_TYPE       TQ5_TYPE
 #define INIT_CAP        TQ5_CAP
-extern uint32 cpu_opt;
 #endif
 
 #include "pdp11_uqssp.h"
@@ -244,8 +243,6 @@ static struct drvtyp drv_tab[] = {
     };
 
 /* Data */
-
-extern int32 int_req[IPL_HLVL];
 
 uint32 tq_sa = 0;                                       /* status, addr */
 uint32 tq_saw = 0;                                      /* written data */
@@ -2210,7 +2207,6 @@ static const uint16 boot_rom[] = {
 t_stat tq_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

@@ -1472,7 +1472,6 @@ static const uint16 boot_rom[] = {
 t_stat rp_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;
 UNIT *uptr = dptr->units + unitno;
 
 for (i = 0; i < BOOT_LEN; i++)

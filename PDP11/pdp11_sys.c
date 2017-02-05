@@ -116,7 +116,6 @@ extern DEVICE dpv_dev;
 extern DEVICE kmc_dev;
 extern DEVICE uca_dev, ucb_dev;
 extern REG cpu_reg[];
-extern uint16 *M;
 extern int32 saved_PC;
 
 /* SCP data structures and interface routines

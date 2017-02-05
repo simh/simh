@@ -51,8 +51,6 @@
 
 #include "pdp11_defs.h"
 
-extern uint16 *M;
-extern int32 int_req[IPL_HLVL];
 extern int32 ub_map[UBM_LNT_LW];
 extern int32 trap_req, ipl;
 extern int32 uba_last;

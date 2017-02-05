@@ -167,8 +167,6 @@ BITFIELD pclk_notused_bits[] = {
 static BITFIELD* bitdefs[] = {pclk_csr_bits, pclk_buf_bits, pclk_ctr_bits, pclk_notused_bits};
 
 
-extern int32 int_req[IPL_HLVL];
-
 uint32 pclk_csr = 0;                                    /* control/status */
 uint32 pclk_csb = 0;                                    /* count set buffer */
 uint32 pclk_ctr = 0;                                    /* counter */

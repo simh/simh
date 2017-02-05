@@ -110,9 +110,6 @@
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
                         ((double) RF_NUMWD)))
 
-extern uint16 *M;
-extern int32 int_req[IPL_HLVL];
-
 uint32 rf_cs = 0;                                       /* status register */
 uint32 rf_cma = 0;
 uint32 rf_wc = 0;

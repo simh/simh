@@ -85,7 +85,6 @@ int32 toy_state = 0;
 uint8 toy_data[TOY_LNT] = { 0 };
 static int32 clk_tps_map[4] = { 60, 60, 50, 800 };
 
-extern uint16 *M;
 extern int32 R[8];
 extern int32 STKLIM, PIRQ;
 extern int32 clk_fie, clk_fnxm, clk_tps, clk_default;

@@ -923,5 +923,10 @@ extern t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc
 extern t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 extern t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 extern const uint32 byte_mask[33];
+extern int32 autcon_enb;                                /* autoconfig enable */
+extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
+extern uint32 *M;                                       /* Memory */
+extern DEVICE cpu_dev;                                  /* CPU */
+extern UNIT cpu_unit;                                   /* CPU */
 
 #endif                                                  /* _VAX_DEFS_H */

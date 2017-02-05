@@ -72,15 +72,11 @@
 #include "vax_defs.h"
 #define XQ_RDX          16
 #define XQ_WID          32
-extern int32 PSL;                                       /* PSL */
-extern int32 fault_PC;                                  /* fault PC */
-extern int32 int_req[IPL_HLVL];
 #define ULTRIX1X ((cpu_idle_mask&VAX_IDLE_ULT1X) && ((cpu_idle_mask & ~VAX_IDLE_ULT1X) == 0))
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 #define XQ_RDX          8
 #define XQ_WID          16
-extern int32 int_req[IPL_HLVL];
 #define ULTRIX1X 0
 #endif
 

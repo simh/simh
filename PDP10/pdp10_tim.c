@@ -140,9 +140,7 @@ int32 tmr_poll;                                         /* SimH instructions/clo
 int32 tmxr_poll;                                        /* SimH instructions/term mux poll */
 
 extern int32 apr_flg, pi_act;
-extern UNIT cpu_unit;
 extern d10 pcst;
-extern a10 pager_PC;
 
 static t_stat tcu_rd (int32 *data, int32 PA, int32 access);
 static t_stat tim_svc (UNIT *uptr);
@@ -150,11 +148,6 @@ static t_stat tim_reset (DEVICE *dptr);
 static t_bool update_interval (d10 new_interval);
 static void tim_incr_base (d10 *base, d10 incr);
 
-extern d10 Read (a10 ea, int32 prv);
-extern d10 ReadM (a10 ea, int32 prv);
-extern void Write (a10 ea, d10 val, int32 prv);
-extern void WriteP (a10 ea, d10 val);
-extern int32 pi_eval (void);
 extern t_stat wr_nop (int32 data, int32 PA, int32 access);
 
 /* TIM data structures

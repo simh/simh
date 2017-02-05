@@ -108,8 +108,6 @@
 #define UST_REV         (OP_REV)                        /* last op was rev */
 #define UST_GAP         01                              /* last op hit gap */
 
-extern int32 int_req[IPL_HLVL];
-
 uint32 ta_cs = 0;                                       /* control/status */
 uint32 ta_idb = 0;                                      /* input data buf */
 uint32 ta_odb = 0;                                      /* output data buf */
@@ -661,7 +659,6 @@ static const uint16 boot_rom[] = {
 t_stat ta_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

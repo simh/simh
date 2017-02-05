@@ -140,7 +140,6 @@
 #define ED_SKPA         0700                            /* skip always */
 
 extern int32 rlog;
-extern jmp_buf save_env;
 
 extern d10 Read (int32 ea, int32 prv);
 extern void Write (int32 ea, d10 val, int32 prv);

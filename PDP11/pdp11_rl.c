@@ -225,8 +225,6 @@
 
 #define RLBAE_IMP       (0000077)                       /* implemented */
 
-extern int32 int_req[IPL_HLVL];
-
 uint16 *rlxb = NULL;                                    /* xfer buffer */
 int32 rlcs = 0;                                         /* control/status */
 int32 rlba = 0;                                         /* memory address */
@@ -1209,7 +1207,6 @@ static const uint16 boot_rom[] = {
 t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

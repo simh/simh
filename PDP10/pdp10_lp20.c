@@ -171,8 +171,6 @@
 
 /* LPCSUM/LPPDAT (765516) */
 
-extern int32 int_req;
-
 static int32 lpcsa = 0;                                 /* control/status A */
 static int32 lpcsb = CSB_DVOF;                          /* control/status B */
 static int32 lpba = 0;                                  /* bus address */

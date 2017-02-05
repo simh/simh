@@ -114,7 +114,6 @@ extern int32 fault_PC;
 #define RQ_XTIME        500
 #define OLDPC           MMR2
 extern int32 MMR2;
-extern uint32 cpu_opt;
 #endif
 
 #if !defined (RQ_NUMCT)
@@ -751,8 +750,6 @@ static struct ctlrtyp ctlr_tab[] = {
     RQ_CTLR (KRU50),
     { 0 }
     };
-
-extern int32 int_req[IPL_HLVL];
 
 int32 rq_itime = 450;                                   /* init time, except */
 int32 rq_itime4 = 10;                                   /* stage 4 */
@@ -2994,7 +2991,6 @@ static const uint16 boot_rom[] = {
 t_stat rq_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;
 DIB *dibp = (DIB *) dptr->ctxt;
 
 for (i = 0; i < BOOT_LEN; i++)

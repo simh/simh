@@ -180,13 +180,6 @@
 #define CPUT(x)         ((cpu_type & (x)) != 0)
 #define CPUO(x)         ((cpu_opt & (x)) != 0)
 #define UNIBUS          (cpu_opt & BUS_U)
-extern int32 cpu_bme;                                   /* bus map enable */
-extern uint32 cpu_model;                                /* CPU model */
-extern uint32 cpu_type;                                 /* model as bit mask */
-extern uint32 cpu_opt;                                  /* CPU options */
-
-extern DEVICE cpu_dev;
-extern UNIT cpu_unit;
 
 /* Feature sets
 
@@ -867,6 +860,17 @@ t_stat build_dib_tab (void);
 void cpu_set_boot (int32 pc);
 
 #include "pdp11_io_lib.h"
+
+extern int32 cpu_bme;                                   /* bus map enable */
+extern uint32 cpu_model;                                /* CPU model */
+extern uint32 cpu_type;                                 /* model as bit mask */
+extern uint32 cpu_opt;                                  /* CPU options */
+extern int32 autcon_enb;                                /* autoconfig enable */
+extern int32 int_req[IPL_HLVL];                         /* interrupt requests */
+extern uint16 *M;                                       /* Memory */
+
+extern DEVICE cpu_dev;
+extern UNIT cpu_unit;
 
 #if defined (UC15)                                      /* UC15 */
 #define INIMODEL        MOD_1105

@@ -147,7 +147,6 @@
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
                         ((double) RC_NUMWD)))
 
-extern int32 int_req[IPL_HLVL];
 extern int32 R[];
 
 static uint32   rc_la = 0;                              /* look-ahead */
