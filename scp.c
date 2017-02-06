@@ -5809,7 +5809,7 @@ return sim_set_uname (uptr, uname);
 const char *sim_set_uname (UNIT *uptr, const char *uname)
 {
 free (uptr->uname);
-uptr->uname = strcpy ((char *)malloc (1 + strlen (uname)), uname);
+return uptr->uname = strcpy ((char *)malloc (1 + strlen (uname)), uname);
 }
 
 
