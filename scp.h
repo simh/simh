@@ -144,6 +144,7 @@ t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
 const char *sim_dname (DEVICE *dptr);
 const char *sim_uname (UNIT *dptr);
+const char *sim_set_uname (UNIT *uptr, const char *uname);
 t_stat get_yn (const char *ques, t_stat deflt);
 int sim_isspace (char c);
 int sim_islower (char c);

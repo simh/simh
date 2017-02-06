@@ -5791,16 +5791,27 @@ return (dptr ? (dptr->lname? dptr->lname: dptr->name) : "");
 
 const char *sim_uname (UNIT *uptr)
 {
-DEVICE *d = find_dev_from_unit(uptr);
-static AIO_TLS char uname[CBUFSIZE];
+DEVICE *d;
+char uname[CBUFSIZE];
 
+if (uptr->uname)
+    return uptr->uname;
+d = find_dev_from_unit(uptr);
 if (!d)
     return "";
 if (d->numunits == 1)
-    return sim_dname (d);
-sprintf (uname, "%s%d", sim_dname (d), (int)(uptr-d->units));
-return uname;
+    sprintf (uname, "%s", sim_dname (d));
+else
+    sprintf (uname, "%s%d", sim_dname (d), (int)(uptr-d->units));
+return sim_set_uname (uptr, uname);
 }
+
+const char *sim_set_uname (UNIT *uptr, const char *uname)
+{
+free (uptr->uname);
+uptr->uname = strcpy ((char *)malloc (1 + strlen (uname)), uname);
+}
+
 
 /* Save command
 

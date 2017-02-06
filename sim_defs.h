@@ -547,6 +547,7 @@ struct UNIT {
     void                *tmxr;                          /* TMXR linkage */
     t_bool              (*cancel)(UNIT *);
     double              usecs_remaining;                /* time balance for long delays */
+    char                *uname;                         /* Unit name */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(UNIT *);
     t_bool              (*a_is_active)(UNIT *);
