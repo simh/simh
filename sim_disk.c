@@ -839,7 +839,40 @@ return stat;
 }
 
 #pragma pack(push,1)
-typedef struct _ODS2_HomeBlock
+typedef struct _ODS1_HomeBlock
+    {
+    uint16  hm1_w_ibmapsize;
+    uint32  hm1_l_ibmaplbn;
+    uint16  hm1_w_maxfiles;
+    uint16  hm1_w_cluster;
+    uint16  hm1_w_devtype;
+    uint16  hm1_w_structlev;
+#define HM1_C_LEVEL1    0401
+#define HM1_C_LEVEL2    0402
+    uint8   hm1_t_volname[12];
+    uint8   hm1_b_fill_1[4];
+    uint16  hm1_w_volowner;
+    uint16  hm1_w_protect;
+    uint16  hm1_w_volchar;
+    uint16  hm1_w_fileprot;
+    uint8   hm1_b_fill_2[6];
+    uint8   hm1_b_window;
+    uint8   hm1_b_extend;
+    uint8   hm1_b_lru_lim;
+    uint8   hm1_b_fill_3[11];
+    uint16  hm1_w_checksum1;
+    uint8   hm1_t_credate[14];
+    uint8   hm1_b_fill_4[382];
+    uint32  hm1_l_serialnum;
+    uint8   hm1_b_fill_5[12];
+    uint8   hm1_t_volname2[12];
+    uint8   hm1_t_ownername[12];
+    uint8   hm1_t_format[12];
+    uint8   hm1_t_fill_6[2];
+    uint16  hm1_w_checksum2;
+    } ODS1_HomeBlock;
+
+    typedef struct _ODS2_HomeBlock
     {
     uint32 hm2_l_homelbn;
     uint32 hm2_l_alhomelbn;
@@ -883,6 +916,21 @@ typedef struct _ODS2_HomeBlock
     uint16 hm2_w_reserved2;
     uint16 hm2_w_checksum2;
     } ODS2_HomeBlock;
+
+typedef struct _ODS1_FileHeader
+    {
+    uint8   fh1_b_idoffset;
+    uint8   fh1_b_mpoffset;
+    uint16  fh1_w_fid_num;
+    uint16  fh1_w_fid_seq;
+    uint16  fh1_w_struclev;
+    uint16  fh1_w_fileowner;
+    uint16  fh1_w_fileprot;
+    uint16  fh1_w_filechar;
+    uint16  fh1_w_recattr;
+    uint8   fh1_b_fill_1[494];
+    uint16  fh1_w_checksum;
+    } ODS1_FileHeader;
 
 typedef struct _ODS2_FileHeader
     {
@@ -944,6 +992,41 @@ typedef union _ODS2_Retreval
             } fm2_r_map_bits3;
     } ODS2_Retreval;
 
+typedef struct _ODS1_Retreval
+    {
+    uint8   fm1_b_ex_segnum;
+    uint8   fm1_b_ex_rvn;
+    uint16  fm1_w_ex_filnum;
+    uint16  fm1_w_ex_filseq;
+    uint8   fm1_b_countsize;
+    uint8   fm1_b_lbnsize;
+    uint8   fm1_b_inuse;
+    uint8   fm1_b_avail;
+    union {
+        struct {
+            uint8 fm1_b_highlbn;
+            uint8 fm1_b_count;
+            uint16 fm1_w_lowlbn;
+            } fm1_s_fm1def1;
+        struct {
+            uint8 fm1_b_highlbn;
+            uint8 fm1_b_count;
+            uint16 fm1_w_lowlbn;
+            } fm1_s_fm1def2;
+        } fm1_pointers[4];
+    } ODS1_Retreval;
+
+typedef struct _ODS1_StorageControlBlock
+    {
+    uint8  scb_b_unused[3];
+    uint8  scb_b_bitmapblks;
+    struct _bitmapblk {
+        uint16 scb_w_freeblks;
+        uint16 scb_w_freeptr;
+        } scb_r_blocks[1];
+    } ODS1_SCB;
+
+
 typedef struct _ODS2_StorageControlBlock
     {
     uint8  scb_b_strucver;   /* 1 */
@@ -967,7 +1050,7 @@ typedef struct _ODS2_StorageControlBlock
 #pragma pack(pop)
 
 static uint16
-ODS2Checksum (void *Buffer, uint16 WordCount)
+ODSChecksum (void *Buffer, uint16 WordCount)
     {
     int i;
     uint16 Sum = 0;
@@ -980,7 +1063,7 @@ ODS2Checksum (void *Buffer, uint16 WordCount)
     }
 
 
-static t_offset get_ods_filesystem_size (UNIT *uptr)
+static t_offset get_ods2_filesystem_size (UNIT *uptr)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1001,8 +1084,8 @@ saved_capac = uptr->capac;
 uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
 if (sim_disk_rdsect (uptr, 1, (uint8 *)&Home, NULL, 1))
     goto Return_Cleanup;
-CheckSum1 = ODS2Checksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum1)-((char *)&Home.hm2_l_homelbn))/2));
-CheckSum2 = ODS2Checksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum2)-((char *)&Home.hm2_l_homelbn))/2));
+CheckSum1 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum1)-((char *)&Home.hm2_l_homelbn))/2));
+CheckSum2 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum2)-((char *)&Home.hm2_l_homelbn))/2));
 if ((Home.hm2_l_homelbn == 0) || 
     (Home.hm2_l_alhomelbn == 0) || 
     (Home.hm2_l_altidxlbn == 0) || 
@@ -1021,7 +1104,7 @@ if ((Home.hm2_l_homelbn == 0) ||
     goto Return_Cleanup;
 if (sim_disk_rdsect (uptr, Home.hm2_l_ibmaplbn+Home.hm2_w_ibmapsize+1, (uint8 *)&Header, NULL, 1))
     goto Return_Cleanup;
-CheckSum1 = ODS2Checksum (&Header, 255);
+CheckSum1 = ODSChecksum (&Header, 255);
 if (CheckSum1 != *(((uint16 *)&Header)+255)) /* Verify Checksum on BITMAP.SYS file header */
     goto Return_Cleanup;
 Retr = (ODS2_Retreval *)(((uint16*)(&Header))+Header.fh2_b_mpoffset);
@@ -1043,7 +1126,7 @@ switch (Retr->fm2_r_word0_bits.fm2_v_format)
 Retr = (ODS2_Retreval *)(((uint16 *)Retr)+Retr->fm2_r_word0_bits.fm2_v_format+1);
 if (sim_disk_rdsect (uptr, ScbLbn, (uint8 *)&Scb, NULL, 1))
     goto Return_Cleanup;
-CheckSum1 = ODS2Checksum (&Scb, 255);
+CheckSum1 = ODSChecksum (&Scb, 255);
 if (CheckSum1 != *(((uint16 *)&Scb)+255)) /* Verify Checksum on Storage Control Block */
     goto Return_Cleanup;
 if ((Scb.scb_w_cluster != Home.hm2_w_cluster) || 
@@ -1051,12 +1134,71 @@ if ((Scb.scb_w_cluster != Home.hm2_w_cluster) ||
     (Scb.scb_b_struclev != Home.hm2_b_struclev))
     goto Return_Cleanup;
 if (!sim_quiet) {
-    sim_printf ("%s%d: '%s' Contains ODS%d File system:\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename, Home.hm2_b_struclev);
+    sim_printf ("%s%d: '%s' Contains ODS%d File system\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename, Home.hm2_b_struclev);
     sim_printf ("%s%d: Volume Name: %12.12s ", sim_dname (dptr), (int)(uptr-dptr->units), Home.hm2_t_volname);
     sim_printf ("Format: %12.12s ", Home.hm2_t_format);
     sim_printf ("Sectors In Volume: %u\n", Scb.scb_l_volsize);
     }
 ret_val = ((t_offset)Scb.scb_l_volsize) * 512;
+
+Return_Cleanup:
+uptr->capac = saved_capac;
+return ret_val;
+}
+
+static t_offset get_ods1_filesystem_size (UNIT *uptr)
+{
+DEVICE *dptr;
+t_addr saved_capac;
+t_offset temp_capac = 512 * (t_offset)0xFFFFFFFFu;  /* Make sure we can access the largest sector */
+uint32 capac_factor;
+ODS1_HomeBlock Home;
+ODS1_FileHeader Header;
+ODS1_Retreval *Retr;
+uint8 scb_buf[512];
+ODS1_SCB *Scb = (ODS1_SCB *)scb_buf;
+uint16 CheckSum1, CheckSum2;
+uint32 ScbLbn;
+t_offset ret_val = (t_offset)-1;
+
+if ((dptr = find_dev_from_unit (uptr)) == NULL)
+    return ret_val;
+capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
+saved_capac = uptr->capac;
+uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+if (sim_disk_rdsect (uptr, 1, (uint8 *)&Home, NULL, 1))
+    goto Return_Cleanup;
+CheckSum1 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm1_w_checksum1)-((char *)&Home.hm1_w_ibmapsize))/2));
+CheckSum2 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm1_w_checksum2)-((char *)&Home.hm1_w_ibmapsize))/2));
+if ((Home.hm1_w_ibmapsize == 0) || 
+    (Home.hm1_l_ibmaplbn == 0) || 
+    (Home.hm1_w_maxfiles == 0) || 
+    (Home.hm1_w_cluster != 1) || 
+    ((Home.hm1_w_structlev != HM1_C_LEVEL1) && (Home.hm1_w_structlev != HM1_C_LEVEL2)) || 
+    (Home.hm1_l_ibmaplbn == 0) || 
+    (Home.hm1_w_checksum1 != CheckSum1) ||
+    (Home.hm1_w_checksum2 != CheckSum2))
+    goto Return_Cleanup;
+if (sim_disk_rdsect (uptr, ((Home.hm1_l_ibmaplbn << 16) + ((Home.hm1_l_ibmaplbn >> 16) & 0xFFFF)) + Home.hm1_w_ibmapsize + 1, (uint8 *)&Header, NULL, 1))
+    goto Return_Cleanup;
+CheckSum1 = ODSChecksum (&Header, 255);
+if (CheckSum1 != *(((uint16 *)&Header)+255)) /* Verify Checksum on BITMAP.SYS file header */
+    goto Return_Cleanup;
+
+Retr = (ODS1_Retreval *)(((uint16*)(&Header))+Header.fh1_b_mpoffset);
+ScbLbn = (Retr->fm1_pointers[0].fm1_s_fm1def1.fm1_b_highlbn<<16)+Retr->fm1_pointers[0].fm1_s_fm1def1.fm1_w_lowlbn;
+if (sim_disk_rdsect (uptr, ScbLbn, (uint8 *)Scb, NULL, 1))
+    goto Return_Cleanup;
+if (Scb->scb_b_bitmapblks < 127)
+    ret_val = (((t_offset)Scb->scb_r_blocks[Scb->scb_b_bitmapblks].scb_w_freeblks << 16) + Scb->scb_r_blocks[Scb->scb_b_bitmapblks].scb_w_freeptr) * 512;
+else
+    ret_val = (((t_offset)Scb->scb_r_blocks[0].scb_w_freeblks << 16) + Scb->scb_r_blocks[0].scb_w_freeptr) * 512;
+if (!sim_quiet) {
+    sim_printf ("%s%d: '%s' Contains an ODS1 File system\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
+    sim_printf ("%s%d: Volume Name: %12.12s ", sim_dname (dptr), (int)(uptr-dptr->units), Home.hm1_t_volname);
+    sim_printf ("Format: %12.12s ", Home.hm1_t_format);
+    sim_printf ("Sectors In Volume: %u\n", (uint32)(ret_val / 512));
+    }
 
 Return_Cleanup:
 uptr->capac = saved_capac;
@@ -1122,7 +1264,8 @@ typedef t_offset (*FILESYSTEM_CHECK)(UNIT *uptr);
 static t_offset get_filesystem_size (UNIT *uptr)
 {
 static FILESYSTEM_CHECK checks[] = {
-    &get_ods_filesystem_size,
+    &get_ods2_filesystem_size,
+    &get_ods1_filesystem_size,
     &get_ultrix_filesystem_size,
     NULL
     };
