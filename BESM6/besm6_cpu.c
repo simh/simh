@@ -76,11 +76,7 @@ extern const char *scp_errors[];
                         GRP_CHAN5_FREE | GRP_CHAN6_FREE |\
                         GRP_CHAN7_FREE )
 
-/* So far irrelevant as none of the devices -
- * punchcard I/O and punchtape output - had been implemented.
- */
 #define PRP_WIRED_BITS (PRP_UVVK1_END | PRP_UVVK2_END |\
-                        PRP_PCARD1_CHECK | PRP_PCARD2_CHECK |\
                         PRP_PCARD1_PUNCH | PRP_PCARD2_PUNCH |\
                         PRP_PTAPE1_PUNCH | PRP_PTAPE2_PUNCH )
 
@@ -285,6 +281,7 @@ DEVICE *sim_devices[] = {
     &clock_dev,
     &printer_dev,
     &fs_dev,
+    &pi_dev,
     &tty_dev,       /* терминалы - телетайпы, видеотоны, "Консулы" */
     0
 };
@@ -651,12 +648,16 @@ static void cmd_033 ()
 /*              besm6_debug(">>> гашение АС: %08o", (uint32) ACC & BITS(24));*/
         break;
     case 0154: case 0155:
-        /* TODO: управление выводом на перфокарты */
-        longjmp (cpu_halt, STOP_UNIMPLEMENTED);
+        /*
+         * Punchcard output: the two selected bits control the motor
+         * and the culling mechanism.
+         */
+        pi_control (Aex & 1, (uint32) ACC & 011);
         break;
-    case 0160: case 0167:
-        /* TODO: управление электромагнитами пробивки перфокарт */
-        longjmp (cpu_halt, STOP_UNIMPLEMENTED);
+    case 0160:  case 0161:  case 0162: case 0163:
+    case 0164:  case 0165:  case 0166: case 0167:
+        /* Punchcard output: activating the punching solenoids, 20 at a time. */
+        pi_write (Aex & 7, (uint32) ACC & BITS(20));
         break;
     case 0170: case 0171:
         /* TODO: пробивка строки на перфоленте */
@@ -742,6 +743,11 @@ static void cmd_033 ()
          * группами по 8 штук каждые несколько секунд. */
         ACC = 0;
         break;
+    case 04160: case 04161: case 04162: case 04163:
+    case 04164: case 04165: case 04166: case 04167:
+        /* Punchcard output: reading a punched line for checking, 20 bit at a time */
+        ACC = pi_read (Aex & 7);
+        break;
     case 04170: case 04171: case 04172: case 04173:
         /* TODO: считывание контрольного кода
          * строки перфоленты */
@@ -763,9 +769,6 @@ static void cmd_033 ()
              * окончания подвода зоны. Игнорируем. */
         } else if (04140 <= val && val <= 04157) {
             /* TODO: считывание строки перфокарты */
-            longjmp (cpu_halt, STOP_UNIMPLEMENTED);
-        } else if (04160 <= val && val <= 04167) {
-            /* TODO: контрольное считывание строки перфокарты */
             longjmp (cpu_halt, STOP_UNIMPLEMENTED);
         } else {
             /* Неиспользуемые адреса */

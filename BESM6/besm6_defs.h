@@ -146,6 +146,7 @@ extern DEVICE clock_dev;
 extern DEVICE printer_dev;
 extern DEVICE tty_dev;
 extern DEVICE fs_dev;
+extern DEVICE pi_dev;
 extern jmp_buf cpu_halt;
 
 /*
@@ -311,6 +312,12 @@ extern void mmu_setprotection (int idx, t_value word);
 extern void mmu_print_brz (void);
 
 /*
+ * Utility functions
+ */
+extern void gost_putc(unsigned char, FILE *);
+extern int odd_parity(unsigned char);
+
+/*
  * Выполнение обращения к барабану.
  */
 void drum (int ctlr, uint32 cmd);
@@ -347,6 +354,13 @@ int vt_is_idle (void);
  */
 void fs_control (int num, uint32 cmd);
 int fs_read (int num);
+
+/*
+ * Вывод на перфокарты.
+ */
+void pi_control (int num, uint32 cmd);
+void pi_write (int num, uint32 cmd);
+int pi_read (int num);
 
 /*
  * Отладочная выдача.

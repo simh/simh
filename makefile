@@ -1438,7 +1438,7 @@ BESM6D = BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
         ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
-        ${BESM6D}/besm6_punch.c
+        ${BESM6D}/besm6_punch.c ${BESM6D}/besm6_punchcard.c
 
 ifneq (,$(BESM6_BUILD))
     ifneq (,$(and ${VIDEO_LDFLAGS}, $(or $(and $(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)), $(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))))
