@@ -286,9 +286,9 @@ static t_bool sim_os_disk_isavailable_raw (FILE *f);
 static t_stat sim_os_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
 static t_stat sim_os_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable);
-static t_stat sim_disk_pdp11_bad_block (UNIT *uptr, int32 sec);
 static char *HostPathToVhdPath (const char *szHostPath, char *szVhdPath, size_t VhdPathSize);
 static char *VhdPathToHostPath (const char *szVhdPath, char *szHostPath, size_t HostPathSize);
+static t_offset get_filesystem_size (UNIT *uptr);
 
 struct sim_disk_fmt {
     const char          *name;                          /* name */
@@ -422,18 +422,28 @@ return (uptr->flags & DKUF_WRP)? TRUE: FALSE;
 
 t_offset sim_disk_size (UNIT *uptr)
 {
+t_offset physical_size, filesystem_size;
+t_bool saved_quiet = sim_quiet;
+
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
-        return sim_fsize_ex (uptr->fileref);
+        physical_size = sim_fsize_ex (uptr->fileref);
     case DKUF_F_VHD:                                    /* VHD format */
-        return sim_vhd_disk_size (uptr->fileref);
+        physical_size = sim_vhd_disk_size (uptr->fileref);
         break;
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
-        return sim_os_disk_size_raw (uptr->fileref);
+        physical_size = sim_os_disk_size_raw (uptr->fileref);
         break;
     default:
         return (t_offset)-1;
     }
+sim_quiet = TRUE;
+filesystem_size = get_filesystem_size (uptr);
+sim_quiet = saved_quiet;
+if ((filesystem_size == (t_offset)-1) ||
+    (filesystem_size < physical_size))
+    return physical_size;
+return filesystem_size;
 }
 
 /* Enable asynchronous operation */
@@ -1579,7 +1589,7 @@ if (storage_function)
 
 if ((created) && (!copied)) {
     t_stat r = SCPE_OK;
-    uint8 *secbuf = (uint8 *)calloc (1, ctx->sector_size);       /* alloc temp sector buf */
+    uint8 *secbuf = (uint8 *)calloc (128, ctx->sector_size);     /* alloc temp sector buf */
 
     /*
        On a newly created disk, we write a zero sector to the last and the
@@ -1594,11 +1604,19 @@ if ((created) && (!copied)) {
     */
     if (secbuf == NULL)
         r = SCPE_MEM;
-    if (r == SCPE_OK)
-        r = sim_disk_wrsect (uptr, (t_lba)(((((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)) - ctx->sector_size)/ctx->sector_size), secbuf, NULL, 1); /* Write Last Sector */
-    if (r == SCPE_OK)
-        r = sim_disk_wrsect (uptr, (t_lba)(0), secbuf, NULL, 1); /* Write First Sector */
+    if (r == SCPE_OK) { /* Write all blocks */
+        t_lba lba;
+        t_lba total_lbas = (t_lba)((((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1))/ctx->sector_size);
+
+        for (lba = 0; (r == SCPE_OK) && (lba < total_lbas); lba += 128) { 
+            t_seccnt sectors = ((lba + 128) <= total_lbas) ? 128 : total_lbas - lba;
+
+            r = sim_disk_wrsect (uptr, lba, secbuf, NULL, sectors);
+            }
+        }
     free (secbuf);
+    if (r == SCPE_OK)
+        uptr->io_flush (uptr);
     if (r != SCPE_OK) {
         sim_disk_detach (uptr);                         /* report error now */
         remove (cptr);                                  /* remove the create file */
@@ -1640,7 +1658,7 @@ if ((created) && (!copied)) {
             sim_printf ("%s%d: Initialized To Sector Address %dMB.  100%% complete.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000));
         }
     if (pdp11tracksize)
-        sim_disk_pdp11_bad_block (uptr, pdp11tracksize);
+        sim_disk_pdp11_bad_block (uptr, pdp11tracksize, sector_size/sizeof(uint16));
     }
 
 if (sim_switches & SWMASK ('K')) {
@@ -1989,20 +2007,21 @@ return SCPE_OK;
    Inputs:
         uptr    =       pointer to unit
         sec     =       number of sectors per surface
+        wds     =       number of words per sector
    Outputs:
         sta     =       status code
 */
 
-static t_stat sim_disk_pdp11_bad_block (UNIT *uptr, int32 sec)
+t_stat sim_disk_pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 int32 i;
 t_addr da;
-int32 wds = ctx->sector_size/sizeof (uint16);
 uint16 *buf;
 DEVICE *dptr;
 char *namebuf, *c;
 uint32 packid;
+t_stat stat = SCPE_OK;
 
 if ((sec < 2) || (wds < 16))
     return SCPE_ARG;
@@ -2033,12 +2052,14 @@ for (i = 4; i < wds; i++)
     buf[i] = 0177777u;
 da = (uptr->capac*((dptr->flags & DEV_SECTORS) ? 512 : 1)) - (sec * wds);
 for (i = 0; (i < sec) && (i < 10); i++, da += wds)
-    if (sim_disk_wrsect (uptr, (t_lba)(da/wds), (uint8 *)buf, NULL, 1)) {
-        free (buf);
-        return SCPE_IOERR;
+    if (ctx)
+        stat = sim_disk_wrsect (uptr, (t_lba)(da/wds), (uint8 *)buf, NULL, 1);
+    else {
+        if (wds != sim_fwrite (buf, sizeof (uint16), wds, uptr->fileref))
+            stat = SCPE_IOERR;
         }
 free (buf);
-return SCPE_OK;
+return stat;
 }
 
 void sim_disk_data_trace(UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason)
