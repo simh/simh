@@ -160,12 +160,6 @@ typedef struct {
 
 MBACTX massbus[MBA_NUM];
 
-extern uint32 cpu_opt;
-extern int32 cpu_bme;
-extern uint16 *M;
-extern int32 int_req[IPL_HLVL];
-extern t_addr cpu_memsize;
-
 t_stat mba_reset (DEVICE *dptr);
 t_stat mba_rd (int32 *val, int32 pa, int32 access);
 t_stat mba_wr (int32 val, int32 pa, int32 access);

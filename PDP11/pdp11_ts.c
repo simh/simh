@@ -99,7 +99,6 @@
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 #define TS_DIS          DEV_DIS                         /* off by default */
-extern uint32 cpu_opt;
 #endif
 
 #include "sim_tape.h"
@@ -267,9 +266,6 @@ extern uint32 cpu_opt;
 
 #define MAX(a,b)        (((a) >= (b))? (a): (b))
 #define MAX_PLNT        8                               /* max pkt length */
-
-extern int32 int_req[IPL_HLVL];
-extern UNIT cpu_unit;
 
 uint8 *tsxb = NULL;                                     /* xfer buffer */
 int32 tssr = 0;                                         /* status register */
@@ -1171,7 +1167,6 @@ static const uint16 boot_rom[] = {
 t_stat ts_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;
 
 sim_tape_rewind (&ts_unit);
 for (i = 0; i < BOOT_LEN; i++)

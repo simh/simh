@@ -68,6 +68,8 @@
 extern uint32 cpu_opt;
 #endif
 
+#include "sim_disk.h"
+
 #define HK_NUMDR        8                               /* #drives */
 #define HK_NUMCY6       411                             /* cyl/drive */
 #define HK_NUMCY7       815                             /* cyl/drive */
@@ -83,9 +85,9 @@ extern uint32 cpu_opt;
 /* Flags in the unit flags word */
 
 #define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
-#define UNIT_V_AUTO     (UNIT_V_UF + 2)                 /* autosize */
-#define UNIT_V_DUMMY    (UNIT_V_UF + 3)                 /* dummy flag */
+#define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
+#define UNIT_V_AUTO     (DKUF_V_UF + 1)                 /* autosize */
+#define UNIT_V_DUMMY    (DKUF_V_UF + 2)                 /* dummy flag */
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
 #define  UNIT_RK06      (0 << UNIT_V_DTYPE)
@@ -519,13 +521,12 @@ BITFIELD *hk_reg_bits[] = {
 
 /* Debug detail levels */
 
-#define HKDEB_OPS       001                             /* transactions */
-#define HKDEB_RRD       002                             /* reg reads */
-#define HKDEB_RWR       004                             /* reg writes */
-#define HKDEB_TRC       010                             /* trace */
-#define HKDEB_INT       020                             /* interrupts */
-
-extern int32 int_req[IPL_HLVL];
+#define HKDEB_OPS      0001                             /* transactions */
+#define HKDEB_RRD      0002                             /* reg reads */
+#define HKDEB_RWR      0004                             /* reg writes */
+#define HKDEB_TRC      0010                             /* trace */
+#define HKDEB_INT      0020                             /* interrupts */
+#define HKDEB_DAT      0040                             /* transfer data */
 
 uint16 *hkxb = NULL;                                    /* xfer buffer */
 int32 hkcs1 = 0;                                        /* control/status 1 */
@@ -653,6 +654,8 @@ MTAB hk_mod[] = {
         NULL, NULL, NULL, "Write lock disk drive"  },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &hk_set_bad, NULL, NULL, "write bad block table on last track" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
+      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
     { (UNIT_DTYPE+UNIT_ATT), UNIT_RK06 + UNIT_ATT,
       "RK06", NULL, NULL },
     { (UNIT_DTYPE+UNIT_ATT), UNIT_RK07 + UNIT_ATT,
@@ -681,6 +684,7 @@ DEBTAB hk_deb[] = {
     { "RWR",   HKDEB_RWR, "register writes" },
     { "INT",   HKDEB_INT, "interrupts" },
     { "TRACE", HKDEB_TRC, "trace" },
+    { "DATA",  HKDEB_DAT, "data transfer"},
     { NULL, 0 }
     };
 
@@ -689,7 +693,7 @@ DEVICE hk_dev = {
     HK_NUMDR, DEV_RDX, 24, 1, DEV_RDX, 16,
     NULL, NULL, &hk_reset,
     &hk_boot, &hk_attach, &hk_detach,
-    &hk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG, 0,
+    &hk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DISK | DEV_DEBUG, 0,
     hk_deb, NULL, NULL, &hk_help, NULL, NULL,
     &hk_description
     };
@@ -1056,10 +1060,13 @@ return;
 
 t_stat hk_svc (UNIT *uptr)
 {
-int32 i, t, dc, fnc, err;
+int32 i, t, dc, fnc;
+t_seccnt sectsread;
+t_stat err;
 int32 wc, awc, da;
 uint32 drv, ba;
 uint16 comp;
+DEVICE *dptr = find_dev_from_unit (uptr);
 
 drv = (uint32) (uptr - hk_dev.units);                   /* get drv number */
 fnc = uptr->FNC & CS1_M_FNC;                            /* get function */
@@ -1144,7 +1151,6 @@ switch (fnc) {                                          /* case on function */
                 }
             }
 
-        err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
         if (uptr->FNC == FNC_WRITE) {                   /* write? */
             if (hkcs2 & CS2_UAI) {                      /* no addr inc? */
                 if ((t = Map_ReadW (ba, 2, &comp))) {   /* get 1st wd */
@@ -1164,16 +1170,14 @@ switch (fnc) {                                          /* case on function */
             awc = (wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1);
             for (i = wc; i < awc; i++)                  /* fill buf */
                 hkxb[i] = 0;
-            if (wc && !err) {                           /* write buf */
-                fxwrite (hkxb, sizeof (uint16), awc, uptr->fileref);
-                err = ferror (uptr->fileref);
+            if (wc) {                           /* write buf */
+                sim_disk_data_trace (uptr, (uint8 *)hkxb, da/HK_NUMWD, awc, "sim_disk_wrsect", HKDEB_DAT & dptr->dctrl, HKDEB_OPS);
+                err = sim_disk_wrsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, NULL, awc/HK_NUMWD);
                 }
             }                                           /* end if wr */
         else if (uptr->FNC == FNC_READ) {               /* read? */
-            i = fxread (hkxb, sizeof (uint16), wc, uptr->fileref);
-            err = ferror (uptr->fileref);
-            for ( ; i < wc; i++)                        /* fill buf */
-                hkxb[i] = 0;
+            err = sim_disk_rdsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, &sectsread, wc/HK_NUMWD);
+            sim_disk_data_trace (uptr, (uint8 *)hkxb, da/HK_NUMWD, sectsread*HK_NUMWD*sizeof(*hkxb), "sim_disk_rdsect", HKDEB_DAT & dptr->dctrl, HKDEB_OPS);
             if (hkcs2 & CS2_UAI) {                      /* no addr inc? */
                 if ((t = Map_WriteW (ba, 2, &hkxb[wc - 1]))) {
                     wc = 0;                             /* NXM, no xfr */
@@ -1189,10 +1193,8 @@ switch (fnc) {                                          /* case on function */
                 }
             }                                           /* end if read */
         else {                                          /* wchk */                  
-            i = fxread (hkxb, sizeof (uint16), wc, uptr->fileref);
-            err = ferror (uptr->fileref);
-            for ( ; i < wc; i++)                        /* fill buf */
-                hkxb[i] = 0;
+            err = sim_disk_rdsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, &sectsread, wc/HK_NUMWD);
+            sim_disk_data_trace (uptr, (uint8 *)hkxb, da/HK_NUMWD, sectsread*HK_NUMWD*sizeof(*hkxb), "sim_disk_rdsect", HKDEB_DAT & dptr->dctrl, HKDEB_OPS);
             awc = wc;
             for (wc = 0; wc < awc; wc++) {              /* loop thru buf */
                 if (Map_ReadW (ba, 2, &comp)) {         /* read word */
@@ -1485,12 +1487,15 @@ return auto_config (0, 0);
 
 t_stat hk_attach (UNIT *uptr, CONST char *cptr)
 {
-uint32 drv, p;
+uint32 drv;
+t_offset p;
 t_stat r;
 int32 old_hkds;
 
 uptr->capac = HK_SIZE (uptr);
-r = attach_unit (uptr, cptr);                           /* attach unit */
+r = sim_disk_attach (uptr, cptr, HK_NUMWD * sizeof (uint16), 
+                     sizeof (uint16), TRUE, 0, 
+                     (uptr->capac == RK06_SIZE) ? "RK06" : "RK07", HK_NUMSC, 0);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 drv = (uint32) (uptr - hk_dev.units);                   /* get drv number */
@@ -1505,12 +1510,7 @@ uptr->CYL = 0;
 if ((old_hkds & DS_ATA) == 0)                           /* ATN transition? */
     update_hkcs (CS1_DI, drv);                          /* upd ctlr status */
 
-p = sim_fsize (uptr->fileref);                          /* get file size */
-if (p == 0) {                                           /* new disk image? */
-    if (uptr->flags & UNIT_RO)
-        return SCPE_OK;
-    return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);
-    }
+p = sim_disk_size (uptr);                               /* get file size */
 if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
     return SCPE_OK;
 if (p > (RK06_SIZE * sizeof (uint16))) {
@@ -1544,7 +1544,7 @@ if (sim_is_active (uptr)) {                             /* unit active? */
     }
 if ((old_hkds & DS_ATA) == 0)                           /* ATN transition? */
     update_hkcs (CS1_DI, drv);                          /* upd ctlr status */
-return detach_unit (uptr);
+return sim_disk_detach (uptr);
 }
 
 /* Set size command validation routine */
@@ -1565,8 +1565,6 @@ return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);
 }
 
 #if defined (VM_PDP11)
-
-extern uint16 *M;
 
 /* Device bootstrap - does not clear CSR when done */
 

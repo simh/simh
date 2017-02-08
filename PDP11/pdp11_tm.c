@@ -153,9 +153,6 @@
 
 #define RDL_CLK         0100000                         /* 10 Khz clock */
 
-extern uint16 *M;                                       /* memory */
-extern int32 int_req[IPL_HLVL];
-
 uint8 *tmxb = NULL;                                     /* xfer buffer */
 int32 tm_sta = 0;                                       /* status register */
 int32 tm_cmd = 0;                                       /* command register */

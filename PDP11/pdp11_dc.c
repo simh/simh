@@ -78,7 +78,6 @@
 #define DCOCSR_CTS      0000002                         /* clr to send (RO) */
 #define DCOCSR_MNT      0000004                         /* maint (RWNI) */
 
-extern int32 int_req[IPL_HLVL];
 extern int32 tmxr_poll;
 
 uint16 dci_csr[DCX_LINES] = { 0 };                      /* control/status */

@@ -72,9 +72,6 @@
 #define CLKCSR_RW       (CSR_IE)
 #define CLK_DELAY       16667
 
-extern int32 int_req[IPL_HLVL];
-extern uint32 cpu_type;
-
 int32 tti_csr = 0;                                      /* control/status */
 uint32 tti_buftime;                                     /* time input character arrived */
 int32 tto_csr = 0;                                      /* control/status */

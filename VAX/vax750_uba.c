@@ -98,7 +98,6 @@ uint32 uba_dpr[UBA_NDPATH] = { 0 };                     /* number data paths */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
-extern int32 autcon_enb;
 extern uint32 nexus_req[NEXUS_HLVL];
 
 t_stat uba_reset (DEVICE *dptr);

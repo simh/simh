@@ -144,6 +144,7 @@ t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
 const char *sim_dname (DEVICE *dptr);
 const char *sim_uname (UNIT *dptr);
+const char *sim_set_uname (UNIT *uptr, const char *uname);
 t_stat get_yn (const char *ques, t_stat deflt);
 int sim_isspace (char c);
 int sim_islower (char c);
@@ -195,6 +196,7 @@ CTAB *find_ctab (CTAB *tab, const char *gbuf);
 C1TAB *find_c1tab (C1TAB *tab, const char *gbuf);
 SHTAB *find_shtab (SHTAB *tab, const char *gbuf);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
+t_value get_rval (REG *rptr, uint32 idx);
 BRKTAB *sim_brk_fnd (t_addr loc);
 uint32 sim_brk_test (t_addr bloc, uint32 btyp);
 void sim_brk_clrspc (uint32 spc, uint32 btyp);
@@ -264,6 +266,8 @@ t_stat scp_vhelpFromFile (FILE *st, DEVICE *dptr,
 /* Global data */
 
 extern DEVICE *sim_dflt_dev;
+extern DEVICE *sim_dfdev;
+extern UNIT *sim_dfunit;
 extern int32 sim_interval;
 extern int32 sim_switches;
 extern int32 sim_quiet;

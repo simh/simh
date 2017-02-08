@@ -50,19 +50,16 @@
 #include "pdp10_defs.h"
 #define XU_RDX                    8
 #define XU_WID                   16
-extern int32 int_req;
 
 #elif defined (VM_VAX)                                                  /* VAX version */
 #include "vax_defs.h"
 #define XU_RDX                    16
 #define XU_WID                    32
-extern int32 int_req[IPL_HLVL];
 
 #else                                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 #define XU_RDX                     8
 #define XU_WID                    16
-extern int32 int_req[IPL_HLVL];
 #endif                                                  /* VM_PDP10 */
 
 #include "sim_ether.h"

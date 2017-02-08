@@ -1,6 +1,6 @@
                            SIMH/HP 3000 RELEASE NOTES
                            ==========================
-                             Last update: 2017-01-08
+                             Last update: 2017-01-23
 
 
 This file documents the release history of the Hewlett-Packard 3000 simulator.
@@ -11,13 +11,32 @@ simulator code base is available at:
   https://github.com/simh/simh
 
 ...and may be downloaded at any time.  A code snapshot is identified by the "git
-commit ID" that is displayed by the simulator welcome banner.
+commit ID" that is displayed in the simulator welcome banner.
 
 Therefore, HP 3000 releases are simply documentation checkpoints that describe
 the changes that have occurred since the last checkpoint.  Generally, a release
 is written when one or more major changes have been incorporated.  Minor bug
-fixes will be available immediately but only noted as part of the next release
-document.
+fixes will be available immediately from the repository but only noted as part
+of the next release document.
+
+
+
+===============================
+Reporting Bugs in the Simulator
+===============================
+
+If you find a bug in the HP 3000 simulator, please report it either to the SIMH
+issue tracker on github at:
+
+  https://github.com/simh/simh/issues
+
+...or to the SIMH mailing list; see:
+
+  http://mailman.trailing-edge.com/mailman/listinfo/simh
+
+...for subscribing information.  In either case, please include a console log
+that contains a reproducible test case that illustrates the problem.  See the
+"Recording Simulator Activities" section of the "SIMH User's Guide" for details.
 
 
 
@@ -58,15 +77,14 @@ PDF version of the same manual is available at:
 
 A preconfigured MPE-V/R disc image containing the Fundamental Operating Software
 (FOS), selected SUBSYS language processors (BASIC, BASICOMP, COBOL, COBOLII,
-FORTRAN, PASCAL, RPG, and SPL), and example programs is available from Bitsavers
-at:
+FORTRAN, PASCAL, RPG, and SPL), and example programs is available at:
 
-  http://www.bitsavers.org/bits/HP/HP_3000/
+  http://simh.trailing-edge.com/kits/mpe-vr-software-kit.zip
 
 The archive contains instructions and simulator command files that allow
 ready-to-run operation.
 
-Manuals describing MPE operation are also available from Bitsavers at:
+Manuals describing MPE operation are available from Bitsavers at:
 
   http://www.bitsavers.org/pdf/hp/3000/
 
@@ -187,6 +205,13 @@ Implementation Notes
    routines to the system SL and COBOL example programs to the OPERATOR.SYS
    account.  The startup command files also enable the COBOL II instruction set.
 
+ - If you are using a custom MPE configuration and want to run COBOL II
+   programs, you must perform a SYSDUMP/COLDSTART to replace the three existing
+   COBLIB segments in your SL.PUB.SYS with their COBOL II replacements.  The
+   U00U232A.USL.SYS and COB68LIB.PUB.SYS files on the disc image from the
+   software kit contain the replacement segments.  See Usage Note 6 in the
+   "readme.txt" file and the "mpe-3-sysdump.log" file in the kit for details.
+
  - New "hp3000_cpu_cis.c" and "hp3000_mem.c" modules have been added.
 
  - For this release, checking for interrupts is not performed during execution
@@ -285,7 +310,7 @@ Bugs Fixed
      the stack, and the instruction is reexecuted.  However, the program label
      has been lost, so control transfers to a random location.
 
-     CAUSE:  The instructions obtain the label and then delete the TOS, flush
+     CAUSE:  The instructions obtain the labels and then delete the TOS, flush
      the rest of the stack registers to memory, and then check that SM <= Z,
      i.e., that the current top of the stack in memory does not exceed the
      stack limit.  If SM > Z, a stack overflow has occurred, and the trap

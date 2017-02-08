@@ -1,6 +1,6 @@
 /* pdp11_rk.c: RK11/RKV11 cartridge disk simulator
 
-   Copyright (c) 1993-2009, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rk           RK11/RKV11/RK05 cartridge disk
 
+   12-Mar-16    RMS     Revised to support UC15 (18b IO)
    23-Oct-13    RMS     Revised for new boot setup routine
    20-Mar-09    RMS     Fixed bug in read header (Walter F Mueller)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -68,17 +69,31 @@
 
 #if defined (VM_VAX)                                    /* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
 #define DMASK           0xFFFF
 #define RK_DIS  DEV_DIS
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
 #define RK_DIS  0
 #endif
 
 /* Constants */
+
+#if defined (UC15)
+
+#define RKCONTR         uint32                          /* container format */
+#define RKWRDSZ         18                              /* word width */
+#define MAP_RDW(a,b,c)  Map_Read18 (a, b, c)
+#define MAP_WRW(a,b,c)  Map_Write18 (a, b, c)
+
+#else
+
+#define RKCONTR         uint16
+#define RKWRDSZ         16
+#define MAP_RDW(a,b,c)  Map_ReadW (a, b, c)
+#define MAP_WRW(a,b,c)  Map_WriteW (a, b, c)
+
+#endif
 
 #define RK_NUMWD        256                             /* words/sector */
 #define RK_NUMSC        12                              /* sectors/surface */
@@ -276,7 +291,9 @@ BITFIELD *rk_reg_bits[] = {
 #define RK_MIN          10
 #define MAX(x,y)        (((x) > (y))? (x): (y))
 
-uint16 *rkxb = NULL;                                    /* xfer buffer */
+extern int32 int_req[IPL_HLVL];
+
+RKCONTR *rkxb = NULL;                                   /* xfer buffer */
 int32 rkcs = 0;                                         /* control/status */
 int32 rkds = 0;                                         /* drive status */
 int32 rkba = 0;                                         /* memory address */
@@ -399,7 +416,7 @@ MTAB rk_mod[] = {
 
 DEVICE rk_dev = {
     "RK", rk_unit, rk_reg, rk_mod,
-    RK_NUMDR, 8, 24, 1, 8, 16,
+    RK_NUMDR, 8, 24, 1, 8, RKWRDSZ,
     NULL, NULL, &rk_reset,
     &rk_boot, NULL, NULL,
     &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | RK_DIS, 0,
@@ -629,7 +646,7 @@ t_stat rk_svc (UNIT *uptr)
 int32 i, drv, err, awc, wc, cma, cda, t;
 int32 da, cyl, track, sect;
 uint32 ma;
-uint16 comp;
+RKCONTR comp;
 
 drv = (int32) (uptr - rk_dev.units);                    /* get drv number */
 if (uptr->FUNC == RKCS_SEEK) {                          /* seek */
@@ -671,7 +688,7 @@ if ((da + wc) > (int32) uptr->capac) {                  /* overrun? */
     rker = rker | RKER_OVR;                             /* set overrun err */
     }
 
-err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+err = fseek (uptr->fileref, da * sizeof (RKCONTR), SEEK_SET);
 if (wc && (err == 0)) {                                 /* seek ok? */
     switch (uptr->FUNC) {                               /* case on function */
 
@@ -688,19 +705,19 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                 }                                       /* end for wc */
             }                                           /* end if format */
         else {                                          /* normal read */
-            i = fxread (rkxb, sizeof (int16), wc, uptr->fileref);
+            i = fxread (rkxb, sizeof (RKCONTR), wc, uptr->fileref);
             err = ferror (uptr->fileref);               /* read file */
             for ( ; i < wc; i++)                        /* fill buf */
                 rkxb[i] = 0;
             }
         if (rkcs & RKCS_INH) {                          /* incr inhibit? */
-            if ((t = Map_WriteW (ma, 2, &rkxb[wc - 1]))) {/* store last */
+            if ((t = MAP_WRW (ma, 2, &rkxb[wc - 1]))) { /* store last */
                 rker = rker | RKER_NXM;                 /* NXM? set flag */
                 wc = 0;                                 /* no transfer */
                 }
             }
         else {                                          /* normal store */
-            if ((t = Map_WriteW (ma, wc << 1, rkxb))) { /* store buf */
+            if ((t = MAP_WRW (ma, wc << 1, rkxb))) {    /* store buf */
                 rker = rker | RKER_NXM;                 /* NXM? set flag */
                 wc = wc - t;                            /* adj wd cnt */
                 }
@@ -709,7 +726,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
 
     case RKCS_WRITE:                                    /* write */
         if (rkcs & RKCS_INH) {                          /* incr inhibit? */
-            if ((t = Map_ReadW (ma, 2, &comp))) {       /* get 1st word */
+            if ((t = MAP_RDW (ma, 2, &comp))) {         /* get 1st word */
                 rker = rker | RKER_NXM;                 /* NXM? set flag */
                 wc = 0;                                 /* no transfer */
                 }
@@ -717,7 +734,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                 rkxb[i] = comp;
             }
         else {                                          /* normal fetch */
-            if ((t = Map_ReadW (ma, wc << 1, rkxb))) {  /* get buf */
+            if ((t = MAP_RDW (ma, wc << 1, rkxb))) {  /* get buf */
                 rker = rker | RKER_NXM;                 /* NXM? set flg */
                 wc = wc - t;                            /* adj wd cnt */
                 }
@@ -726,13 +743,13 @@ if (wc && (err == 0)) {                                 /* seek ok? */
             awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1); /* clr to */
             for (i = wc; i < awc; i++)                  /* end of blk */
                 rkxb[i] = 0;
-            fxwrite (rkxb, sizeof (int16), awc, uptr->fileref);
+            fxwrite (rkxb, sizeof (RKCONTR), awc, uptr->fileref);
             err = ferror (uptr->fileref);
             }
         break;                                          /* end write */
 
     case RKCS_WCHK:                                     /* write check */
-        i = fxread (rkxb, sizeof (int16), wc, uptr->fileref);
+        i = fxread (rkxb, sizeof (RKCONTR), wc, uptr->fileref);
         if ((err = ferror (uptr->fileref))) {           /* read error? */
             wc = 0;                                     /* no transfer */
             break;
@@ -741,7 +758,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
             rkxb[i] = 0;
         awc = wc;                                       /* save wc */
         for (wc = 0, cma = ma; wc < awc; wc++)  {       /* loop thru buf */
-            if (Map_ReadW (cma, 2, &comp)) {            /* mem wd */
+            if (MAP_RDW (cma, 2, &comp)) {              /* mem wd */
                 rker = rker | RKER_NXM;                 /* NXM? set flg */
                 break;
                 }
@@ -860,7 +877,7 @@ for (i = 0; i < RK_NUMDR; i++) {
     uptr->flags = uptr->flags & ~UNIT_SWLK;
     }
 if (rkxb == NULL)
-    rkxb = (uint16 *) calloc (RK_MAXFR, sizeof (uint16));
+    rkxb = (RKCONTR *) calloc (RK_MAXFR, sizeof (RKCONTR));
 if (rkxb == NULL)
     return SCPE_MEM;
 return auto_config (0, 0);
@@ -868,7 +885,14 @@ return auto_config (0, 0);
 
 /* Device bootstrap */
 
-#if defined (VM_PDP11)
+#if defined (UC15) || !defined (VM_PDP11)
+
+t_stat rk_boot (int32 unitno, DEVICE *dptr)
+{
+return SCPE_NOFNC;
+}
+
+#else
 
 #define BOOT_START      02000                           /* start */
 #define BOOT_ENTRY      (BOOT_START + 002)              /* entry */
@@ -905,7 +929,6 @@ static const uint16 boot_rom[] = {
 t_stat rk_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;                                       /* memory */
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
@@ -913,13 +936,6 @@ M[BOOT_UNIT >> 1] = unitno & RK_M_NUMDR;
 M[BOOT_CSR >> 1] = (rk_dib.ba & DMASK) + 012;
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
-}
-
-#else
-
-t_stat rk_boot (int32 unitno, DEVICE *dptr)
-{
-return SCPE_NOFNC;
 }
 
 #endif

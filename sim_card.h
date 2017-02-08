@@ -1,4 +1,4 @@
-/* Card read/punch routines for 7000 simulators.
+/* Generic Card read/punch routines for simulators.
 
    Copyright (c) 2005, Richard Cornwell
 
@@ -69,19 +69,20 @@ extern "C" {
 #define DEBUG_CARD      0x0000010       /* Show details */
 
 /* Flags for punch and reader. */
-#define UNIT_V_MODE     (UNIT_V_UF + 0)
-#define UNIT_MODE       (7 << UNIT_V_MODE)
-#define MODE_AUTO       (0 << UNIT_V_MODE)
-#define MODE_BIN        (1 << UNIT_V_MODE)
-#define MODE_TEXT       (2 << UNIT_V_MODE)
-#define MODE_BCD        (3 << UNIT_V_MODE)
-#define MODE_CBN        (4 << UNIT_V_MODE)
-#define MODE_EBCDIC     (5 << UNIT_V_MODE)
+#define UNIT_V_CARD_MODE  (UNIT_V_UF + 0)
+#define UNIT_CARD_MODE  (7 << UNIT_V_CARD_MODE)
+#define MODE_AUTO       (0 << UNIT_V_CARD_MODE)
+#define MODE_BIN        (1 << UNIT_V_CARD_MODE)
+#define MODE_TEXT       (2 << UNIT_V_CARD_MODE)
+#define MODE_BCD        (3 << UNIT_V_CARD_MODE)
+#define MODE_CBN        (4 << UNIT_V_CARD_MODE)
+#define MODE_EBCDIC     (5 << UNIT_V_CARD_MODE)
+#define MODE_OCTAL      (6 << UNIT_V_CARD_MODE)
 /* Allow lower case letters */
-#define MODE_LOWER      (8 << UNIT_V_MODE)
-#define MODE_026        (0x10 << UNIT_V_MODE)
-#define MODE_029        (0x20 << UNIT_V_MODE)
-#define MODE_CHAR       (0x30 << UNIT_V_MODE)
+#define MODE_LOWER      (8 << UNIT_V_CARD_MODE)
+#define MODE_026        (0x10 << UNIT_V_CARD_MODE)
+#define MODE_029        (0x20 << UNIT_V_CARD_MODE)
+#define MODE_CHAR       (0x30 << UNIT_V_CARD_MODE)
 
 
 struct _card_data
@@ -104,7 +105,7 @@ t_stat   sim_card_detach(UNIT *uptr);
 uint16   sim_bcd_to_hol(uint8 bcd);
 uint16   sim_ebcdic_to_hol(uint8 ebcdic);
 uint8    sim_hol_to_bcd(uint16 hol);
-uint8    sim_hol_to_ebbcd(uint16 hol);
+uint16   sim_hol_to_ebcdic(uint16 hol);
 
 /* Format control routines. */
 t_stat sim_card_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);

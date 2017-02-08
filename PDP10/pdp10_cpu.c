@@ -254,14 +254,6 @@ void set_ac_display (d10 *acbase);
 
 extern t_stat build_dib_tab (void);
 extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-extern d10 Read (a10 ea, int32 prv);                    /* read, read check */
-extern d10 ReadM (a10 ea, int32 prv);                   /* read, write check */
-extern d10 ReadE (a10 ea);                              /* read, exec */
-extern d10 ReadP (a10 ea);                              /* read, physical */
-extern void Write (a10 ea, d10 val, int32 prv);         /* write */
-extern void WriteE (a10 ea, d10 val);                   /* write, exec */
-extern void WriteP (a10 ea, d10 val);                   /* write, physical */
-extern t_bool AccViol (a10 ea, int32 prv, int32 mode);  /* access check */
 extern void set_dyn_ptrs (void);
 extern a10 conmap (a10 ea, int32 mode, int32 sw);
 extern void fe_intr ();

@@ -35,17 +35,14 @@
 #if defined (VM_PDP10)                                  /* PDP10 version */
 #include "pdp10_defs.h"
 #define PT_DIS          DEV_DIS
-extern int32 int_req;
 
 #elif defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
 #define PT_DIS          DEV_DIS
-extern int32 int_req[IPL_HLVL];
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 #define PT_DIS          0
-extern int32 int_req[IPL_HLVL];
 #endif
 
 #define PTRCSR_IMP      (CSR_ERR+CSR_BUSY+CSR_DONE+CSR_IE) /* paper tape reader */

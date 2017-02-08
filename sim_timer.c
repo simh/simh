@@ -1027,6 +1027,7 @@ sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_init()\n");
 for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     sim_timer_units[tmr].action = &sim_timer_tick_svc;
     sim_timer_units[tmr].flags = UNIT_DIS | UNIT_IDLE;
+    sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;
     }
 SIM_INTERNAL_UNIT.flags = UNIT_IDLE;
 sim_register_internal_device (&sim_timer_dev);          /* Register Clock Assist device */

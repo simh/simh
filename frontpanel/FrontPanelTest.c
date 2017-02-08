@@ -59,6 +59,10 @@ const char *sim_config =
 unsigned int PC, SP, FP, AP, PSL, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, atPC;
 unsigned int PCQ[32];
 
+int PSL_bits[32];
+int PC_bits[32];
+int PC_indirect_bits[32];
+
 int update_display = 1;
 
 static void
@@ -148,11 +152,10 @@ if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!str
 if ((f = fopen (sim_config, "w"))) {
     if (debug) {
         fprintf (f, "set verbose\n");
-        fprintf (f, "set log simulator.dbg\n");
-        fprintf (f, "set debug -n -a log\n");
+        fprintf (f, "set debug -n -a simulator.dbg\n");
         fprintf (f, "set cpu conhalt\n");
         fprintf (f, "set remote telnet=2226\n");
-        fprintf (f, "set rem-con debug=XMT;RCV\n");
+        fprintf (f, "set rem-con debug=XMT;RCV;MODE;REPEAT;CMD\n");
         fprintf (f, "set remote notelnet\n");
         }
     fprintf (f, "set cpu autoboot\n");
@@ -184,9 +187,8 @@ if (!panel) {
     }
 
 if (debug) {
-    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV);
+    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP);
     }
-
 tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
 
 if (!tape) {
@@ -313,7 +315,7 @@ if (sim_panel_get_registers (panel, NULL)) {
     printf ("Error getting register data: %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_set_display_callback (panel, &DisplayCallback, NULL, 5)) {
+if (sim_panel_set_display_callback_interval (panel, &DisplayCallback, NULL, 200000)) {
     printf ("Error setting automatic display callback: %s\n", sim_panel_get_error());
     goto Done;
     }
@@ -336,21 +338,58 @@ if (sim_panel_dismount (panel, "RL0")) {
     }
 remove ("TEST-RL.DSK");
 if (sim_panel_break_set (panel, "400")) {
-    printf ("Unexpected establishing a breakpoint: %s\n", sim_panel_get_error());
+    printf ("Unexpected error establishing a breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_break_clear (panel, "400")) {
-    printf ("Unexpected clearing a breakpoint: %s\n", sim_panel_get_error());
+    printf ("Unexpected error clearing a breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_break_output_set (panel, "\"32..31..30\"")) {
-    printf ("Unexpected establishing an output breakpoint: %s\n", sim_panel_get_error());
+    printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_break_output_clear (panel, "\"32..31..30\"")) {
-    printf ("Unexpected clearing an output breakpoint: %s\n", sim_panel_get_error());
+    printf ("Unexpected error clearing an output breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
+if (sim_panel_break_output_set (panel, "-P \"Normal operation not possible.\"")) {
+    printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_break_output_set (panel, "-P \"Device? [XQA0]: \"")) {
+    printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (!sim_panel_set_sampling_parameters (panel, 0, 199)) {
+    printf ("Unexpected success setting sampling parameters to 0, 199\n");
+    goto Done;
+    }
+if (!sim_panel_set_sampling_parameters (panel, 199, 0)) {
+    printf ("Unexpected success setting sampling parameters to 199, 0\n");
+    goto Done;
+    }
+if (!sim_panel_add_register_bits (panel, "PSL",  NULL, 32, PSL_bits)) {
+    printf ("Unexpected success setting PSL bits before setting sampling parameters\n");
+    goto Done;
+    }
+if (sim_panel_set_sampling_parameters (panel, 500, 100)) {
+    printf ("Unexpected error setting sampling parameters to 200, 100: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_add_register_indirect_bits (panel, "PC",  NULL, 32, PC_indirect_bits)) {
+    printf ("Error adding register 'PSL' bits: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_add_register_bits (panel, "PSL",  NULL, 32, PSL_bits)) {
+    printf ("Error adding register 'PSL' bits: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_add_register_bits (panel, "PC",  NULL, 32, PC_bits)) {
+    printf ("Error adding register 'PSL' bits: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+
 sim_panel_clear_error ();
 while (1) {
     size_t i;

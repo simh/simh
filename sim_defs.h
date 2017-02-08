@@ -428,6 +428,7 @@ typedef struct EXPECT EXPECT;
 typedef struct SEND SEND;
 typedef struct DEBTAB DEBTAB;
 typedef struct FILEREF FILEREF;
+typedef struct MEMFILE MEMFILE;
 typedef struct BITFIELD BITFIELD;
 
 typedef t_stat (*ACTIVATE_API)(UNIT *unit, int32 interval);
@@ -546,6 +547,7 @@ struct UNIT {
     void                *tmxr;                          /* TMXR linkage */
     t_bool              (*cancel)(UNIT *);
     double              usecs_remaining;                /* time balance for long delays */
+    char                *uname;                         /* Unit name */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(UNIT *);
     t_bool              (*a_is_active)(UNIT *);
@@ -806,13 +808,18 @@ struct DEBTAB {
 #define SIM_DBG_ACTIVATE    0x20000
 #define SIM_DBG_AIO_QUEUE   0x40000
 
-/* File Reference */
+/* Open File Reference */
 struct FILEREF {
     char                name[CBUFSIZE];                 /* file name */
     FILE                *file;                          /* file handle */
     int32               refcount;                       /* reference count */
     };
 
+struct MEMFILE {
+    char                *buf;                           /* buffered data */
+    size_t              size;                        /* size */
+    size_t              pos;                         /* data used */
+    };
 /* 
    The following macros exist to help populate structure contents
 

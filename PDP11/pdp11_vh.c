@@ -74,13 +74,10 @@ Rank:       32
 
 #if defined (VM_VAX)
 #include "vax_defs.h"
-extern int32    int_req[IPL_HLVL];
 #endif
 
 #if defined (VM_PDP11)
 #include "pdp11_defs.h"
-extern int32    int_req[IPL_HLVL];
-extern uint32    cpu_opt;
 #endif
 
 #include "sim_tmxr.h"

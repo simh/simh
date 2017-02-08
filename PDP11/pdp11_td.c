@@ -447,13 +447,11 @@ OP CODE 11 (Resened)
 
 */
 
-#if defined (VM_VAX)                                  /* VAX version */
+#if defined (VM_VAX)                                    /* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
 #endif
 
 #include "pdp11_td.h"
@@ -1588,7 +1586,6 @@ return td_reset_ctlr (ctlr);
 static t_stat td_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;                                       /* memory */
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

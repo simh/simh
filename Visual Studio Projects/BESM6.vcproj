@@ -221,6 +221,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\BESM6\besm6_punchcard.c"
+				>
+			</File>
+			<File
 				RelativePath="..\BESM6\besm6_sys.c"
 				>
 			</File>

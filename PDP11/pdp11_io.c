@@ -51,17 +51,9 @@
 
 #include "pdp11_defs.h"
 
-extern uint16 *M;
-extern int32 int_req[IPL_HLVL];
 extern int32 ub_map[UBM_LNT_LW];
-extern uint32 cpu_opt;
-extern int32 cpu_bme;
 extern int32 trap_req, ipl;
-extern int32 cpu_log;
-extern int32 autcon_enb;
 extern int32 uba_last;
-extern DEVICE cpu_dev;
-extern t_addr cpu_memsize;
 
 int32 calc_ints (int32 nipl, int32 trq);
 
@@ -264,9 +256,7 @@ if (cpu_bme) {                                          /* map enabled? */
         ma = Map_Addr (ba);                             /* map addr */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
             return (lim - ba);
-        if (ma & 1)                                     /* get byte */
-            *buf++ = (M[ma >> 1] >> 8) & 0377;
-        else *buf++ = M[ma >> 1] & 0377;
+        *buf++ = (uint8) RdMemB (ma);                   /* get byte */
         }
     return 0;
     }
@@ -274,12 +264,10 @@ else {                                                  /* physical */
     if (ADDR_IS_MEM (lim))                              /* end ok? */
         alim = lim;
     else if (ADDR_IS_MEM (ba))                          /* no, strt ok? */
-        alim = cpu_memsize;
+        alim = MEMSIZE;
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba++) {                          /* by bytes */
-        if (ba & 1)
-            *buf++ = (M[ba >> 1] >> 8) & 0377;          /* get byte */
-        else *buf++ = M[ba >> 1] & 0377;
+        *buf++ = (uint8) RdMemB (ba);                   /* get byte */
         }
     return (lim - alim);
     }
@@ -309,7 +297,7 @@ if (cpu_bme) {                                          /* map enabled? */
         ma = Map_Addr (ba);                             /* map addr */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
             return (lim - ba);
-        *buf++ = M[ma >> 1];
+        *buf++ = (uint16) RdMemW (ma);
         }
     return 0;
     }
@@ -317,10 +305,10 @@ else {                                                  /* physical */
     if (ADDR_IS_MEM (lim))                              /* end ok? */
         alim = lim;
     else if (ADDR_IS_MEM (ba))                          /* no, strt ok? */
-        alim = cpu_memsize;
+        alim = MEMSIZE;
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba = ba + 2) {                   /* by words */
-        *buf++ = M[ba >> 1];
+        *buf++ = (uint16) RdMemW (ba);
         }
     return (lim - alim);
     }
@@ -346,9 +334,7 @@ if (cpu_bme) {                                          /* map enabled? */
         ma = Map_Addr (ba);                             /* map addr */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
             return (lim - ba);
-        if (ma & 1) M[ma >> 1] = (M[ma >> 1] & 0377) |
-            ((uint16) *buf++ << 8);
-        else M[ma >> 1] = (M[ma >> 1] & ~0377) | *buf++;
+        WrMemB (ma, ((uint16) *buf++));
         }
     return 0;
     }
@@ -356,12 +342,10 @@ else {                                                  /* physical */
     if (ADDR_IS_MEM (lim))                              /* end ok? */
         alim = lim;
     else if (ADDR_IS_MEM (ba))                          /* no, strt ok? */
-        alim = cpu_memsize;
+        alim = MEMSIZE;
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba++) {                          /* by bytes */
-        if (ba & 1)
-            M[ba >> 1] = (M[ba >> 1] & 0377) | ((uint16) *buf++ << 8);
-        else M[ba >> 1] = (M[ba >> 1] & ~0377) | *buf++;
+        WrMemB (ba, ((uint16) *buf++));
         }
     return (lim - alim);
     }
@@ -389,7 +373,7 @@ if (cpu_bme) {                                          /* map enabled? */
         ma = Map_Addr (ba);                             /* map addr */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
             return (lim - ba);
-        M[ma >> 1] = *buf++;
+        WrMemW (ma, *buf++);
         }
     return 0;
     }
@@ -397,10 +381,10 @@ else {                                                  /* physical */
     if (ADDR_IS_MEM (lim))                              /* end ok? */
         alim = lim;
     else if (ADDR_IS_MEM (ba))                          /* no, strt ok? */
-        alim = cpu_memsize;
+        alim = MEMSIZE;
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba = ba + 2) {                   /* by words */
-        M[ba >> 1] = *buf++;
+        WrMemW (ba, *buf++);
         }
     return (lim - alim);
     }

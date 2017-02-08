@@ -77,7 +77,6 @@
 */
 
 #include "pdp10_defs.h"
-#include <setjmp.h>
 
 /* Page table (contains expanded pte's) */
 
@@ -95,19 +94,13 @@
 #define PF_OK           0                               /* pfail ok */
 #define PF_TR           1                               /* pfail trap */
 
-extern d10 *M;
 extern d10 acs[AC_NBLK * AC_NUM];
 extern d10 *ac_prv, *last_pa;
 extern a10 epta, upta;
-extern d10 pager_word;
-extern int32 apr_flg;
 extern d10 ebr, ubr, hsb;
 extern d10 spt, cst, cstm, pur;
 extern a10 dbr1, dbr2, dbr3, dbr4;
 extern d10 pcst, quant;
-extern t_bool paging;
-extern UNIT cpu_unit;
-extern jmp_buf save_env;
 extern int32 test_int (void);
 extern int32 pi_eval (void);
 

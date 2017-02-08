@@ -55,6 +55,9 @@
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
 #
+# The use of pthreads for various things can be disabled if GNU make is 
+# invoked with NOPTHREADS=1 on the command line.
+#
 # Asynchronous I/O support can be disabled if GNU make is invoked with
 # NOASYNCH=1 on the command line.
 #
@@ -379,17 +382,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OS_LDFLAGS += -lrt
     $(info using librt: $(call find_lib,rt))
   endif
-  ifneq (,$(call find_include,pthread))
-    ifneq (,$(call find_lib,pthread))
-      OS_CCDEFS += -DUSE_READER_THREAD
-      ifeq (,$(NOASYNCH))
-        OS_CCDEFS += -DSIM_ASYNCH_IO 
-      endif
-      OS_LDFLAGS += -lpthread
-      $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
-    else
-      LIBEXTSAVE := $(LIBEXT)
-      LIBEXT = a
+  ifneq (,$(NOPTHREADS))
+    OS_CCDEFS += -DDONT_USE_READER_THREAD
+  else
+    ifneq (,$(call find_include,pthread))
       ifneq (,$(call find_lib,pthread))
         OS_CCDEFS += -DUSE_READER_THREAD
         ifeq (,$(NOASYNCH))
@@ -398,15 +394,26 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         OS_LDFLAGS += -lpthread
         $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
       else
-        ifneq (,$(findstring Haiku,$(OSTYPE)))
+        LIBEXTSAVE := $(LIBEXT)
+        LIBEXT = a
+        ifneq (,$(call find_lib,pthread))
           OS_CCDEFS += -DUSE_READER_THREAD
           ifeq (,$(NOASYNCH))
             OS_CCDEFS += -DSIM_ASYNCH_IO 
           endif
-          $(info using libpthread: $(call find_include,pthread))
+          OS_LDFLAGS += -lpthread
+          $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
+        else
+          ifneq (,$(findstring Haiku,$(OSTYPE)))
+            OS_CCDEFS += -DUSE_READER_THREAD
+            ifeq (,$(NOASYNCH))
+              OS_CCDEFS += -DSIM_ASYNCH_IO 
+            endif
+            $(info using libpthread: $(call find_include,pthread))
+          endif
         endif
+        LIBEXT = $(LIBEXTSAVE)        
       endif
-      LIBEXT = $(LIBEXTSAVE)        
     endif
   endif
   # Find available RegEx library.  Prefer libpcreposix.
@@ -1438,7 +1445,7 @@ BESM6D = BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
         ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
-        ${BESM6D}/besm6_punch.c
+        ${BESM6D}/besm6_punch.c ${BESM6D}/besm6_punchcard.c
 
 ifneq (,$(BESM6_BUILD))
     ifneq (,$(and ${VIDEO_LDFLAGS}, $(or $(and $(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)), $(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))))

@@ -752,7 +752,6 @@ static t_uint64 normmask[6] = {
  0x7FFF800000000000, 0x7FFFFFFF80000000, 0x7FFFFFFFFFFFFFFF
  };
 static int32 normtab[7] = { 1, 2, 4, 8, 16, 32, 63 };
-extern a10 pager_PC;
 
 if (a->fhi & FP_UCRY) {                                 /* carry set? */
     sim_printf ("%%PDP-10 FP: carry bit set at normalization, PC = %o\n", pager_PC);

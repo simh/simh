@@ -49,6 +49,7 @@
 #endif
 
 #include "sim_defs.h"                                   /* simulator defns */
+#include <setjmp.h>
 
 #if defined(USE_ADDR64)
 #error "PDP-10 does not support 64b addresses!"
@@ -772,6 +773,15 @@ void uba_debug_dma_in (uint32 ba, a10 pa_start, a10 pa_end);
 void uba_debug_dma_out (uint32 ba, a10 pa_start, a10 pa_end);
 void uba_debug_dma_nxm (const char *msg, a10 pa10, uint32 ba, int32 bc);
 
+extern d10 Read (a10 ea, int32 prv);                    /* read, read check */
+extern d10 ReadM (a10 ea, int32 prv);                   /* read, write check */
+extern d10 ReadE (a10 ea);                              /* read, exec */
+extern d10 ReadP (a10 ea);                              /* read, physical */
+extern void Write (a10 ea, d10 val, int32 prv);         /* write */
+extern void WriteE (a10 ea, d10 val);                   /* write, exec */
+extern void WriteP (a10 ea, d10 val);                   /* write, physical */
+extern t_bool AccViol (a10 ea, int32 prv, int32 mode);  /* access check */
+
 t_stat set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat set_addr_flt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -784,5 +794,12 @@ extern d10 *ac_cur;                                     /* current AC block */
 extern int32 flags;                                     /* flags */
 extern const int32 pi_l2bit[8];
 extern const d10 bytemask[64];
+extern int32 int_req;
+extern d10 *M;                                          /* memory */
+extern a10 pager_PC;                                    /* pager: saved PC */
+extern d10 pager_word;                                  /* pager: error word */
+extern UNIT cpu_unit;
+extern int32 apr_flg;
+extern jmp_buf save_env;
 
 #endif

@@ -177,7 +177,6 @@ uint32 uba_aitime = 250;                                /* adapter init time */
 uint32 uba_uitime = 12250;                              /* Unibus init time */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
-extern int32 autcon_enb;
 extern uint32 nexus_req[NEXUS_HLVL];
 
 t_stat uba_svc (UNIT *uptr);

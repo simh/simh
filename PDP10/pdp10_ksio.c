@@ -149,11 +149,6 @@ static const int32 ubabr54[UBANUM] = {
 #define M_WORD0 (~INT64_C (0777777000000)) /* Clear word 0 + XX */
 #define M_WORD1 (~INT64_C (0000000777777)) /* Clear word 1 + XX */
 
-extern d10 *M;                                          /* main memory */
-extern d10 pager_word;
-extern UNIT cpu_unit;
-extern jmp_buf save_env;
-
 extern int32 pi_eval (void);
 
 t_stat ubmap_rd (int32 *data, int32 addr, int32 access);

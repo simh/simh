@@ -2389,6 +2389,7 @@ CONST char *tptr = cptr;
 t_bool nolog, notelnet, listennotelnet, modem_control, loopback, datagram, packet;
 TMLN *lp;
 t_stat r = SCPE_OK;
+t_bool not_quiet = (!sim_quiet) && (0 == (sim_switches & SWMASK ('Q')));
 
 if (*tptr == '\0')
     return SCPE_ARG;
@@ -2653,7 +2654,8 @@ while (*tptr) {
                 free (mp->port);
                 mp->port = NULL;
                 }
-            sim_printf ("Listening on port %s\n", listen);
+            if (not_quiet)
+                sim_printf ("Listening on port %s\n", listen);
             mp->port = (char *)realloc (mp->port, 1 + strlen (listen));
             strcpy (mp->port, listen);                      /* save port */
             mp->master = sock;                              /* save master socket */
@@ -2686,7 +2688,8 @@ while (*tptr) {
         if (loopback) {
             if (mp->lines > 1)
                 return sim_messagef (SCPE_ARG, "Ambiguous Loopback specification\n");
-            sim_printf ("Operating in loopback mode\n");
+            if (not_quiet)
+                sim_printf ("Operating in loopback mode\n");
             for (i = 0; i < mp->lines; i++) {
                 lp = mp->ldsc + i;
                 tmxr_set_line_loopback (lp, loopback);
@@ -2804,7 +2807,8 @@ while (*tptr) {
             if (sock == INVALID_SOCKET)                     /* open error */
                 return sim_messagef (SCPE_OPENERR, "Can't listen on port: %s\n", listen);
             _mux_detach_line (lp, TRUE, FALSE);
-            sim_printf ("Line %d Listening on port %s\n", line, listen);
+            if (not_quiet)
+                sim_printf ("Line %d Listening on port %s\n", line, listen);
             lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
             strcpy (lp->port, listen);                       /* save port */
             lp->master = sock;                              /* save master socket */
@@ -2862,7 +2866,8 @@ while (*tptr) {
             }
         if (loopback) {
             tmxr_set_line_loopback (lp, loopback);
-            sim_printf ("Line %d operating in loopback mode\n", line);
+            if (not_quiet)
+                sim_printf ("Line %d operating in loopback mode\n", line);
             }
         lp->modem_control = modem_control;
         if (speed[0] && (!datagram) && (!lp->serport))

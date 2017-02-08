@@ -95,9 +95,9 @@
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern uint32 cpu_opt;
-extern UNIT cpu_unit;
 #endif
+
+#include "sim_disk.h"
 
 /* Constants */
 
@@ -118,11 +118,11 @@ extern UNIT cpu_unit;
 /* Flags in the unit flags word */
 
 #define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* hwre write lock */
-#define UNIT_V_RL02     (UNIT_V_UF + 1)                 /* RL01 vs RL02 */
-#define UNIT_V_AUTO     (UNIT_V_UF + 2)                 /* autosize enable */
-#define UNIT_V_DUMMY    (UNIT_V_UF + 3)                 /* dummy flag, for SET BADBLOCK */
-#define UNIT_V_OFFL     (UNIT_V_UF + 4)                 /* unit off line */
-#define UNIT_V_BRUSH    (UNIT_V_UF + 5)                 /* unit has brushes */
+#define UNIT_V_RL02     (DKUF_V_UF + 0)                 /* RL01 vs RL02 */
+#define UNIT_V_AUTO     (DKUF_V_UF + 1)                 /* autosize enable */
+#define UNIT_V_DUMMY    (DKUF_V_UF + 2)                 /* dummy flag, for SET BADBLOCK */
+#define UNIT_V_OFFL     (DKUF_V_UF + 3)                 /* unit off line */
+#define UNIT_V_BRUSH    (DKUF_V_UF + 4)                 /* unit has brushes */
 #define UNIT_BRUSH      (1u << UNIT_V_BRUSH)
 #define UNIT_OFFL       (1u << UNIT_V_OFFL)
 #define UNIT_DUMMY      (1u << UNIT_V_DUMMY)
@@ -227,7 +227,28 @@ extern UNIT cpu_unit;
 
 #define RLBAE_IMP       (0000077)                       /* implemented */
 
-extern int32 int_req[IPL_HLVL];
+const char *rl_regnames[] = {
+    "RLCS",
+    "RLDA",
+    "RLBA",
+    "RLMP",
+    "RLBAE",
+    "",
+    "",
+    "",
+    };
+
+
+
+/* Debug detail levels */
+
+#define RLDEB_OPS      0001                             /* transactions */
+#define RLDEB_RRD      0002                             /* reg reads */
+#define RLDEB_RWR      0004                             /* reg writes */
+#define RLDEB_TRC      0010                             /* trace */
+#define RLDEB_INT      0020                             /* interrupts */
+#define RLDEB_DAT      0100                             /* transfer data */
+
 
 uint16 *rlxb = NULL;                                    /* xfer buffer */
 int32 rlcs = 0;                                         /* control/status */
@@ -342,6 +363,8 @@ static const MTAB rl_mod[] = {
         NULL, NULL, NULL, "Write lock disk drive"  },
     { UNIT_DUMMY, 0, NULL, "BADBLOCK", 
         &rl_set_bad, NULL, NULL, "Write bad block table on last track" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
+      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
     { (UNIT_RL02+UNIT_ATT), UNIT_ATT, "RL01", NULL, NULL },
     { (UNIT_RL02+UNIT_ATT), (UNIT_RL02+UNIT_ATT), "RL02", NULL, NULL },
     { (UNIT_AUTO+UNIT_RL02+UNIT_ATT),         0, "RL01", NULL, 
@@ -362,13 +385,23 @@ static const MTAB rl_mod[] = {
     { 0 }
     };
 
+DEBTAB rl_deb[] = {
+    { "OPS",   RLDEB_OPS, "transactions" },
+    { "RRD",   RLDEB_RRD, "register reads" },
+    { "RWR",   RLDEB_RWR, "register writes" },
+    { "INT",   RLDEB_INT, "interrupts" },
+    { "TRACE", RLDEB_TRC, "trace" },
+    { "DATA",  RLDEB_DAT, "data transfer"},
+    { NULL, 0 }
+    };
+
 DEVICE rl_dev = {
     "RL", (UNIT *) &rl_unit, (REG *)rl_reg, (MTAB *)rl_mod,
     RL_NUMDR, DEV_RDX, 24, 1, DEV_RDX, 16,
     NULL, NULL, &rl_reset,
     &rl_boot, &rl_attach, &rl_detach,
-    &rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG, 0,
-    NULL, NULL, NULL, &rl_help, NULL, NULL,
+    &rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DISK | DEV_DEBUG, 0,
+    rl_deb, NULL, NULL, &rl_help, NULL, NULL,
     &rl_description 
     };
 
@@ -422,8 +455,7 @@ errors.
     if (rlcs & RLCS_ALLERR)
         rlcs |= RLCS_ERR;
     *data = rlcs;
-    if (DEBUG_PRS (rl_dev))
-        fprintf (sim_deb, ">>RL rd: RLCS %06o\n", rlcs);
+    sim_debug (RLDEB_RRD, &rl_dev, ">>RL rd: RLCS %06o\n", rlcs);
     break;
 
     case 1:                                             /* RLBA */
@@ -450,6 +482,7 @@ errors.
         return (SCPE_NXM);
     }                                                   /* end switch */
 
+sim_debug (RLDEB_RRD, &rl_dev, ">>RL%d read: %s=0%o\n", GET_DRIVE (rlcs), rl_regnames[(PA >> 1) & 07], *data);
 return SCPE_OK;
 }
 
@@ -465,8 +498,7 @@ switch ((PA >> 1) & 07) {                               /* decode PA<2:1> */
         uptr = rl_dev.units + GET_DRIVE (data);         /* get new drive */
         if (access == WRITEB)
             data = (PA & 1)? (rlcs & 0377) | (data << 8): (rlcs & ~0377) | data;
-        if (DEBUG_PRS (rl_dev))
-            fprintf (sim_deb, ">>RL wr: RLCS %06o new %06o\n", rlcs, data);
+        sim_debug (RLDEB_RWR, &rl_dev, ">>RL wr: RLCS %06o new %06o\n", rlcs, data);
         rlcs = (rlcs & ~RLCS_RW) | (data & RLCS_RW);
         rlbae = (rlbae & ~RLCS_M_MEX) | ((rlcs >> RLCS_V_MEX) & RLCS_M_MEX);
 /*
@@ -525,8 +557,7 @@ max 17ms for 1 track seek w/head switch
             if (tim == 0)
                 tim++;
             tim *= rl_swait;
-            if (DEBUG_PRS (rl_dev))
-                fprintf (sim_deb, ">>RL SEEK: drv %d, dist %d, head sw %d, tim %d\n",
+            sim_debug (RLDEB_RWR, &rl_dev, ">>RL SEEK: drv %d, dist %d, head sw %d, tim %d\n",
                     (int32) (uptr - rl_dev.units),
                     abs (newc - curr), (rlda & RLDA_SK_HD), tim);
             uptr->FNC = RLCS_SEEK;
@@ -551,8 +582,7 @@ max 17ms for 1 track seek w/head switch
                 rl_set_done (RLCS_DRE | RLCS_INCMP);
             }
             rlmp2 = rlmp1 = rlmp;
-            if (DEBUG_PRS (rl_dev))
-                fprintf (sim_deb, ">>RL GSTA: rlds=%06o drv=%ld\n",
+            sim_debug (RLDEB_RWR, &rl_dev, ">>RL GSTA: rlds=%06o drv=%ld\n",
                     rlmp, (long)(uptr - rl_dev.units));
             rl_set_done (0);                        /* done */
             break;
@@ -589,24 +619,21 @@ says, bit 0 can be written and read (as 1) on an RLV12 (verified
         if (access == WRITEB)
             data = (PA & 1)? (rlba & 0377) | (data << 8): (rlba & ~0377) | data;
         rlba = data & (UNIBUS ? 0177776 : 0177777);
-        if (DEBUG_PRS (rl_dev))
-            fprintf (sim_deb, ">>RL wr: RLBA %06o\n", rlba);
+        sim_debug (RLDEB_RWR, &rl_dev, ">>RL wr: RLBA %06o\n", rlba);
         break;
 
     case 2:                                             /* RLDA */
         if (access == WRITEB)
             data = (PA & 1)? (rlda & 0377) | (data << 8): (rlda & ~0377) | data;
         rlda = data;
-        if (DEBUG_PRS (rl_dev))
-            fprintf (sim_deb, ">>RL wr: RLDA %06o\n", rlda);
+        sim_debug (RLDEB_RWR, &rl_dev, ">>RL wr: RLDA %06o\n", rlda);
         break;
 
     case 3:                                             /* RLMP */
         if (access == WRITEB)
             data = (PA & 1)? (rlmp & 0377) | (data << 8): (rlmp & ~0377) | data;
         rlmp = rlmp1 = rlmp2 = (uint16)data;
-        if (DEBUG_PRS (rl_dev))
-            fprintf (sim_deb, ">>RL wr: RLMP %06o\n", rlmp);
+        sim_debug (RLDEB_RWR, &rl_dev, ">>RL wr: RLMP %06o\n", rlmp);
         break;
 
     case 4:                                             /* RLBAE */
@@ -616,13 +643,12 @@ says, bit 0 can be written and read (as 1) on an RLV12 (verified
             return SCPE_OK;
         rlbae = data & RLBAE_IMP;
         rlcs = (rlcs & ~RLCS_MEX) | ((rlbae & RLCS_M_MEX) << RLCS_V_MEX);
-        if (DEBUG_PRS (rl_dev))
-            fprintf (sim_deb, ">>RL wr: RLBAE %06o\n", rlbae);
         break;
     default:
         return (SCPE_NXM);
         }                                               /* end switch */
 
+sim_debug (RLDEB_RWR, &rl_dev, ">>RL%d write: %s=0%o\n", GET_DRIVE (rlcs), rl_regnames[(PA >> 1) & 07], data);
 return SCPE_OK;
 }
 
@@ -657,8 +683,7 @@ static void rlv_maint (void)
     uint32  ma;
     uint16  w;
 
-    if (DEBUG_PRS (rl_dev))
-        fprintf (sim_deb, ">>RL maint: RLDA %06o\n", rlda);
+    sim_debug (RLDEB_OPS, &rl_dev, ">>RL maint: RLDA %06o\n", rlda);
     /* 1: check internal logic */
     rlda = (rlda & ~0377) | ((rlda + 1) & 0377);
 
@@ -668,8 +693,7 @@ static void rlv_maint (void)
     /* 3: check DMA transfers */
     ma = (rlbae << 16) | rlba;                          /* get mem addr */
     /* xfer 256 words to FIFO */
-    if (DEBUG_PRS (rl_dev))
-        fprintf (sim_deb, ">>RL maint: RLMP %06o\n", rlmp);
+    sim_debug (RLDEB_OPS, &rl_dev, ">>RL maint: RLMP %06o\n", rlmp);
     if (rlmp != 0177001) {                              /* must be exactly -511 */
         rlcs |= RLCS_ERR | RLCS_HDE;                    /* HNF error */
         return;
@@ -724,23 +748,22 @@ static void rlv_maint (void)
 
 t_stat rl_svc (UNIT *uptr)
 {
-int32 err, wc, maxwc, t;
+int32 wc, maxwc, t;
+t_stat err;
+t_seccnt sectsread;
 int32 i, da, awc;
 uint32 ma;
 uint16 comp;
+DEVICE *dptr = find_dev_from_unit (uptr);
 static const char * const funcname[] = {
     "NOP", "WCK", "GSTA", "SEEK",
     "RHDR", "WT", "RD", "RNOHDR", "SPECIAL",
 };
 
-if (DEBUG_PRS (rl_dev)) {
-    if (uptr->FNC == RLCS_SPECIAL)
-        fprintf (sim_deb, ">>RL svc: func=SPECIAL(%s) drv=%d\n",
-            state[uptr->STAT & RLDS_M_STATE], (int32) (uptr - rl_dev.units));
-    else
-        fprintf (sim_deb, ">>RL svc: func=%s drv=%d rlda=%06o\n",
-            funcname[uptr->FNC], (int32) (uptr - rl_dev.units), rlda);
-}
+if (uptr->FNC == RLCS_SPECIAL)
+    sim_debug (RLDEB_OPS, &rl_dev, ">>RL: svc: func=SPECIAL(%s) drv=%d\n", state[uptr->STAT & RLDS_M_STATE], (int32) (uptr - rl_dev.units));
+else
+    sim_debug (RLDEB_OPS, &rl_dev, ">>RL svc: func=%s drv=%d rlda=%06o\n", funcname[uptr->FNC], (int32) (uptr - rl_dev.units), rlda);
 
 /* really shouldn't happen... */
 if ((uptr->FNC == RLCS_GSTA) || (uptr->FNC == RLCS_NOP)) {
@@ -877,25 +900,20 @@ wc = 0200000 - rlmp;                                    /* get true wc */
 
 if (wc > maxwc)                                         /* track overrun? */
     wc = maxwc;
-err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
 
-if (DEBUG_PRS (rl_dev))
-    fprintf (sim_deb, ">>RL svc: cyl %d, sect %d, wc %d, maxwc %d, err %d\n",
-    GET_CYL (rlda), GET_SECT (rlda), wc, maxwc, err);
+sim_debug (RLDEB_OPS, &rl_dev, ">>RL svc: cyl %d, sect %d, wc %d, maxwc %d\n", GET_CYL (rlda), GET_SECT (rlda), wc, maxwc);
 
-    if ((uptr->FNC >= RLCS_READ) && (err == 0)) {       /* read (no hdr)? */
-        i = fxread (rlxb, sizeof (int16), wc, uptr->fileref);
-        err = ferror (uptr->fileref);
-        for ( ; i < wc; i++)                            /* fill buffer */
-            rlxb[i] = 0;
-        if ((t = Map_WriteW (ma, wc << 1, rlxb))) {     /* store buffer */
-            rlcs = rlcs | RLCS_ERR | RLCS_NXM;          /* nxm */
-            wc = wc - t;                                /* adjust wc */
-            }
-        }                                               /* end read */
+if (uptr->FNC >= RLCS_READ) {                           /* read (no hdr)? */
+    err = sim_disk_rdsect (uptr, da/RL_NUMWD, (uint8 *)rlxb, &sectsread, wc/RL_NUMWD);
+    sim_disk_data_trace (uptr, (uint8 *)rlxb, da/RL_NUMWD, sectsread*RL_NUMWD*sizeof(*rlxb), "sim_disk_rdsect", RLDEB_DAT & dptr->dctrl, RLDEB_OPS);
+    if ((t = Map_WriteW (ma, wc << 1, rlxb))) {         /* store buffer */
+        rlcs = rlcs | RLCS_ERR | RLCS_NXM;              /* nxm */
+        wc = wc - t;                                    /* adjust wc */
+        }
+    }                                               /* end read */
 
 else
-if ((uptr->FNC == RLCS_WRITE) && (err == 0)) {          /* write? */
+if (uptr->FNC == RLCS_WRITE) {                          /* write? */
     if ((t = Map_ReadW (ma, wc << 1, rlxb))) {          /* fetch buffer */
         rlcs = rlcs | RLCS_ERR | RLCS_NXM;              /* nxm */
         wc = wc - t;                                    /* adj xfer lnt */
@@ -904,17 +922,15 @@ if ((uptr->FNC == RLCS_WRITE) && (err == 0)) {          /* write? */
         awc = (wc + (RL_NUMWD - 1)) & ~(RL_NUMWD - 1);  /* clr to */
         for (i = wc; i < awc; i++)                      /* end of blk */
             rlxb[i] = 0;
-        fxwrite (rlxb, sizeof (int16), awc, uptr->fileref);
-        err = ferror (uptr->fileref);
+        sim_disk_data_trace (uptr, (uint8 *)rlxb, da/RL_NUMWD, awc, "sim_disk_wrsect", RLDEB_DAT & dptr->dctrl, RLDEB_OPS);
+        err = sim_disk_wrsect (uptr, da/RL_NUMWD, (uint8 *)rlxb, NULL, awc/RL_NUMWD);
         }
     }                                                   /* end write */
 
 else
-if ((uptr->FNC == RLCS_WCHK) && (err == 0)) {           /* write check? */
-    i = fxread (rlxb, sizeof (int16), wc, uptr->fileref);
-    err = ferror (uptr->fileref);
-    for ( ; i < wc; i++)                                /* fill buffer */
-        rlxb[i] = 0;
+if (uptr->FNC == RLCS_WCHK) {                           /* write check? */
+    err = sim_disk_rdsect (uptr, da/RL_NUMWD, (uint8 *)rlxb, &sectsread, wc/RL_NUMWD);
+    sim_disk_data_trace (uptr, (uint8 *)rlxb, da/RL_NUMWD, sectsread*RL_NUMWD*sizeof(*rlxb), "sim_disk_rdsect", RLDEB_DAT & dptr->dctrl, RLDEB_OPS);
     awc = wc;                                           /* save wc */
     for (wc = 0; (err == 0) && (wc < awc); wc++)  {     /* loop thru buf */
         if (Map_ReadW (ma + (wc << 1), 2, &comp)) {     /* mem wd */
@@ -999,11 +1015,13 @@ return auto_config (0, 0);
 
 t_stat rl_attach (UNIT *uptr, CONST char *cptr)
 {
-uint32 p;
+t_offset p;
 t_stat r;
 
 uptr->capac = (uptr->flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
-r = attach_unit (uptr, cptr);                           /* attach unit */
+r = sim_disk_attach (uptr, cptr, RL_NUMWD * sizeof (uint16), 
+                     sizeof (uint16), TRUE, 0, 
+                     (uptr->capac == RL02_SIZE) ? "RL02" : "RL01", RL_NUMSC, 0);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 /*
@@ -1012,11 +1030,7 @@ as if the load procedure had already executed.
 */
 uptr->TRK = 0;                                          /* cylinder 0 */
 uptr->STAT = RLDS_HDO | RLDS_BHO | RLDS_VCK | RLDS_LOCK; /* new volume */
-if ((p = sim_fsize (uptr->fileref)) == 0) {             /* new disk image? */
-    if (uptr->flags & UNIT_RO)                          /* if ro, done */
-        return SCPE_OK;
-    return pdp11_bad_block (uptr, RL_NUMSC, RL_NUMWD);
-    }
+p = sim_disk_size (uptr);                               /* get file size */
 if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
     return SCPE_OK;
 if (p > (RL01_SIZE * sizeof (int16))) {
@@ -1032,12 +1046,9 @@ return SCPE_OK;
 
 t_stat rl_detach (UNIT *uptr)
 {
-t_stat stat;
-
 sim_cancel (uptr);
-stat = detach_unit (uptr);
 uptr->STAT = RLDS_BHO | RLDS_LOAD;
-return (stat);
+return sim_disk_detach (uptr);
 }
 
 /* Set size routine */
@@ -1211,7 +1222,6 @@ static const uint16 boot_rom[] = {
 t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];

@@ -79,7 +79,6 @@
 #define DLOCSR_RD       (CSR_DONE|CSR_IE|DLOCSR_MNT|DLOCSR_XBR)
 #define DLOCSR_WR       (CSR_IE|DLOCSR_MNT|DLOCSR_XBR)
 
-extern int32 int_req[IPL_HLVL];
 extern int32 tmxr_poll;
 
 uint16 dli_csr[DLX_LINES] = { 0 };                      /* control/status */

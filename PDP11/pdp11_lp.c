@@ -51,8 +51,6 @@
 #define LPTCSR_IMP      (CSR_ERR + CSR_DONE + CSR_IE)   /* implemented */
 #define LPTCSR_RW       (CSR_IE)                        /* read/write */
 
-extern int32 int_req[IPL_HLVL];
-
 int32 lpt_csr = 0;                                      /* control/status */
 int32 lpt_stopioe = 0;                                  /* stop on error */
 

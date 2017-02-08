@@ -37,7 +37,6 @@
 #include "sim_tmxr.h"
 #include "sim_ether.h"
 
-extern int32 autcon_enb;
 extern int32 int_vec[IPL_HLVL][32];
 #if !defined(VEC_SET)
 #define VEC_SET 0
@@ -823,7 +822,6 @@ t_stat auto_config (const char *name, int32 nctrl)
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
 uint32 vec = AUTO_VECBASE;
 int32 ilvl, ibit, numc;
-extern UNIT cpu_unit;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
@@ -923,44 +921,9 @@ return SCPE_OK;
         sta     =       status code
 */
 
+#include "sim_disk.h"
+
 t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds)
 {
-int32 i;
-t_addr da;
-uint16 *buf;
-char *namebuf, *c;
-uint32 packid;
-
-if ((sec < 2) || (wds < 16))
-    return SCPE_ARG;
-if ((uptr->flags & UNIT_ATT) == 0)
-    return SCPE_UNATT;
-if (uptr->flags & UNIT_RO)
-    return SCPE_RO;
-if (!get_yn ("Overwrite last track? [N]", FALSE))
-    return SCPE_OK;
-da = (uptr->capac - (sec * wds)) * sizeof (uint16);
-if (sim_fseek (uptr->fileref, da, SEEK_SET))
-    return SCPE_IOERR;
-if ((buf = (uint16 *) malloc (wds * sizeof (uint16))) == NULL)
-    return SCPE_MEM;
-namebuf = uptr->filename;
-if ((c = strrchr (namebuf, '/')))
-    namebuf = c+1;
-if ((c = strrchr (namebuf, '\\')))
-    namebuf = c+1;
-if ((c = strrchr (namebuf, ']')))
-    namebuf = c+1;
-packid = eth_crc32(0, namebuf, strlen (namebuf));
-buf[0] = (uint16)packid;
-buf[1] = (uint16)(packid >> 16) & 0x7FFF;   /* Make sure MSB is clear */
-buf[2] = buf[3] = 0;
-for (i = 4; i < wds; i++)
-    buf[i] = 0177777u;
-for (i = 0; (i < sec) && (i < 10); i++)
-    sim_fwrite (buf, sizeof (uint16), wds, uptr->fileref);
-free (buf);
-if (ferror (uptr->fileref))
-    return SCPE_IOERR;
-return SCPE_OK;
+return sim_disk_pdp11_bad_block (uptr, sec, wds);
 }

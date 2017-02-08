@@ -1,5 +1,5 @@
 /*
- * besm6_punch.c: BESM-6 punchcard/punchtape devices
+ * besm6_punch.c: BESM-6 punchtape devices
  *
  * Copyright (c) 2009, Leonid Broukhis
  *
@@ -29,7 +29,6 @@
 #include "besm6_defs.h"
 
 t_stat fs_event (UNIT *u);
-t_stat uvvk_event (UNIT *u);
 
 UNIT fs_unit [] = {
     { UDATA (fs_event, UNIT_SEQ+UNIT_ATTABLE, 0) },

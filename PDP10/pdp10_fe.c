@@ -42,8 +42,6 @@
 #include "sim_tmxr.h"
 #define UNIT_DUMMY      (1 << UNIT_V_UF)
 
-extern d10 *M;
-extern int32 apr_flg;
 extern int32 tmxr_poll;
 t_stat fei_svc (UNIT *uptr);
 t_stat feo_svc (UNIT *uptr);

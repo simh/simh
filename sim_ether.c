@@ -969,7 +969,12 @@ static int _eth_get_system_id (char *buf, size_t buf_size)
 
 const char *eth_capabilities(void)
  {
- return "Ethernet Packet transports"
+#if defined (USE_READER_THREAD)
+ return "Threaded "
+#else
+ return "Polled "
+#endif
+     "Ethernet Packet transports"
 #if defined (HAVE_PCAP_NETWORK)
      ":PCAP"
 #endif
