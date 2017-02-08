@@ -1235,6 +1235,7 @@ static t_offset get_ultrix_filesystem_size (UNIT *uptr)
 {
 DEVICE *dptr;
 t_addr saved_capac;
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_offset temp_capac = 512 * (t_offset)0xFFFFFFFFu;  /* Make sure we can access the largest sector */
 uint32 capac_factor;
 uint8 sector_buf[512];
@@ -1248,7 +1249,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 saved_capac = uptr->capac;
 uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-if (sim_disk_rdsect (uptr, 31, sector_buf, NULL, 1))
+if (sim_disk_rdsect (uptr, 31 * (512 / ctx->sector_size), sector_buf, NULL, 512 / ctx->sector_size))
     goto Return_Cleanup;
 
 if ((Label->pt_magic != PT_MAGIC) || 
@@ -1619,8 +1620,6 @@ if ((created) && (!copied)) {
             }
         }
     free (secbuf);
-    if (r == SCPE_OK)
-        uptr->io_flush (uptr);
     if (r != SCPE_OK) {
         sim_disk_detach (uptr);                         /* report error now */
         remove (cptr);                                  /* remove the create file */
