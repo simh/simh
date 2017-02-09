@@ -399,7 +399,7 @@ int32 trap_clear[TRAP_V_MAX] = {                        /* trap clears */
 
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX|UNIT_BINK, INIMEMSIZE) };
 
-const char *psw_modes[] = {"K", "E", "S", "U"};
+const char *psw_modes[] = {"K", "S", "E", "U"};
 
 
 BITFIELD psw_bits[] = {
