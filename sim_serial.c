@@ -1421,6 +1421,7 @@ free (port);
 
 #if defined(__VAX)
 #define sys$assign SYS$ASSIGN
+#define sys$qio SYS$QIO
 #define sys$qiow SYS$QIOW
 #define sys$dassgn SYS$DASSGN
 #define sys$device_scan SYS$DEVICE_SCAN
