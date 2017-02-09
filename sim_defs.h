@@ -243,8 +243,15 @@ typedef uint32          t_addr;
 
 #if defined (_WIN32) /* Actually, a GCC issue */
 #define LL_FMT "I64"
+#define LL_TYPE long long
+#else
+#if defined (__VAX) /* No 64 bit ints on VAX */
+#define LL_FMT "l"
+#define LL_TYPE long
 #else
 #define LL_FMT "ll"
+#define LL_TYPE long long
+#endif
 #endif
 
 #if defined (VMS) && (defined (__ia64) || defined (__ALPHA))
