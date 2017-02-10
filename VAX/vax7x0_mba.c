@@ -863,8 +863,9 @@ return build_dib_tab();
 t_stat mba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Massbus Adapters (MBA0, MBA1)\n\n");
-fprintf (st, "The Massbus adapters (MBA0, MBA1) simulate RH780's.  MBA0 is assigned to the\n");
-fprintf (st, "RP disk drives, MBA1 to the TU tape drives.\n");
+fprintf (st, "The Massbus adapters (MBA0, MBA1) simulate RH780's.  RP disk drives get\n");
+fprintf (st, "assigned to MBA0 if it is enabled, and TU tape drives get assigned to\n");
+fprintf (st, "MBA1 if RP is enabled, and MBA0 otherwise.\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);
