@@ -542,7 +542,7 @@ typedef struct pdp_dib DIB;
 #define IOBA_UBM        (IOPAGEBASE + 010200)           /* Unibus map */
 #define IOLN_UBM        (UBM_LNT_LW * sizeof (int32))
 #define IOBA_RS         (IOPAGEBASE + 012040)           /* RHC: RS03/RS04 */
-#define IOLN_RS         040
+#define IOLN_RS         034
 #define IOBA_KG         (IOPAGEBASE + 010700)           /* KG11-A */
 #define IOLN_KG         006
 #define IOBA_RQ         (IOPAGEBASE + 012150)           /* RQDX3 */
