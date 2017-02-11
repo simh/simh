@@ -595,7 +595,9 @@ const char *rp_description (DEVICE *dptr);
    rp_mod       RP modifier list
 */
 
-DIB rp_dib = { MBA_AUTO, 0, &rp_mbrd, &rp_mbwr, 0, 0, 0, { &rp_abort } };
+#define IOLN_RP         054
+
+DIB rp_dib = { MBA_AUTO, IOLN_RP, &rp_mbrd, &rp_mbwr, 0, 0, 0, { &rp_abort } };
 
 UNIT rp_unit[] = {
     { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+

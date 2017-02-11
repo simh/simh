@@ -266,7 +266,8 @@ t_stat tu_map_err (int32 drv, t_stat st, t_bool qdt);
    tu_mod       TU modifier list
 */
 
-DIB tu_dib = { MBA_AUTO, 0, &tu_mbrd, &tu_mbwr,0, 0, 0, { &tu_abort } };
+#define IOLN_TU         040
+DIB tu_dib = { MBA_AUTO, IOLN_TU, &tu_mbrd, &tu_mbwr,0, 0, 0, { &tu_abort } };
 
 UNIT tu_unit[] = {
     { UDATA (&tu_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0) },
