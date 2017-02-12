@@ -440,7 +440,7 @@ return auto_config (0, 0);
 
 #define BOOT_START      02000                           /* start */
 #define BOOT_ENTRY      (BOOT_START + 002)              /* entry */
-#define BOOT_CSR        (BOOT_START + 032)              /* CSR */
+#define BOOT_CSR        (BOOT_START + 010)              /* CSR */
 #define BOOT_LEN        (sizeof (boot_rom) / sizeof (uint16))
 
 static const uint16 boot_rom[] = {
