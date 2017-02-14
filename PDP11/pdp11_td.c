@@ -1553,7 +1553,7 @@ return td_reset_ctlr (ctlr);
                         /* TBUF = 6 offset from CSR in R1                   */
                         /* BOOT_START:                                      */
     0012701, 0176500,   /*          MOV  #176500,R1  ; Set CSR              */
-    0012702, 0000000,   /*          MOV  #0,R0       ; Set Unit Number      */
+    0012700, 0000000,   /*          MOV  #0,R0       ; Set Unit Number      */
     0012706, BOOT_START,/*          MOV  #BOOT_START,SP ; Setup a Stack     */
     0005261, 0000004,   /*          INC  TCSR(R1)    ; Set BRK (Init)       */
     0005003,            /*          CLR  R3          ; data 000, 000        */
@@ -1590,7 +1590,7 @@ size_t i;
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & 1;
-M[BOOT_CSR >> 1] = (td_dib.ba & DMASK) + 000;
+M[BOOT_CSR >> 1] = (td_dib.ba & DMASK) + (unitno >> 1) * 010;
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
