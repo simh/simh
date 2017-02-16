@@ -90,6 +90,7 @@ t_stat set_default_cmd (int32 flg, CONST char *cptr);
 t_stat pwd_cmd (int32 flg, CONST char *cptr);
 t_stat dir_cmd (int32 flg, CONST char *cptr);
 t_stat type_cmd (int32 flg, CONST char *cptr);
+t_stat delete_cmd (int32 flg, CONST char *cptr);
 t_stat brk_cmd (int32 flag, CONST char *ptr);
 t_stat do_cmd (int32 flag, CONST char *ptr);
 t_stat goto_cmd (int32 flag, CONST char *ptr);
