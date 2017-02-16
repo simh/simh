@@ -1930,7 +1930,8 @@ for (i = 0; dib_tab[i] != NULL; i++) {                  /* print table */
     else {
         fprintf (st, "%03o", dib_tab[i]->vec);
         if (dib_tab[i]->vnum > 1)
-            fprintf (st, "-%03o", dib_tab[i]->vec + (4 * (dib_tab[i]->vnum - 1)));
+            fprintf(st, "-%03o", dib_tab[i]->vec + 4 * ((dib_tab[i]->vnum * 
+                                  dib_tab[i]->lnt / dib_tab[i]->ulnt) - 1));
         else
             fprintf (st, "    ");
         fprintf (st, "%1s", (dib_tab[i]->vnum >= AUTO_VECBASE)? "*": " ");
@@ -1941,8 +1942,8 @@ for (i = 0; dib_tab[i] != NULL; i++) {                  /* print table */
                             (dib_tab[i]->vloc<=19)? 5: 4);
     else
         fprintf (st, "   ");
-    fprintf (st, " %2u %s\n", (dib_tab[i]->ulnt? dib_tab[i]->lnt/dib_tab[i]->ulnt:
-                               (dptr? dptr->numunits: 1)), dptr? sim_dname (dptr): "CPU");
+    fprintf (st, " %2u %s\n", (dib_tab[i]->ulnt? dib_tab[i]->lnt/dib_tab[i]->ulnt: 1),
+                                dptr? sim_dname (dptr): "CPU");
     }
 return SCPE_OK;
 }
