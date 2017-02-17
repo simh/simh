@@ -648,34 +648,12 @@ static t_stat prt1403_svc(UNIT *uptr)
 	return SCPE_OK;
 }
 
-/* delete_cmd - SCP command to delete a file */
-
-static t_stat delete_cmd (int32 flag, CONST char *cptr)
-{
-	char gbuf[CBUFSIZE];
-	int status;
-
-	cptr = get_glyph (cptr, gbuf, 0);			/* get next glyph */
-	if (*gbuf == 0) return SCPE_2FARG;
-	if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
-
-	status = remove(gbuf);						/* delete the file */
-
-	if (status != 0 && errno != ENOENT)			/* print message if failed and file exists */
-		sim_perror(gbuf);
-
-	return SCPE_OK;
-}
-
 /* prt_reset - reset emulated printer */
 
 static t_stat prt_reset (DEVICE *dptr)
 {
 	UNIT *uptr = &prt_unit[0];
 	size_t i;
-
-/* add a DELETE filename command so we can be sure to have clean listings */
-	register_cmd("DELETE", &delete_cmd, 0, "del{ete} filename        remove file\n");
 
 	sim_cancel(uptr);
 
