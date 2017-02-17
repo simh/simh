@@ -1023,10 +1023,10 @@ static const char simh_help[] =
 #define HLP_CAT          "*Commands Displaying_Files CAT"
       "3CAT\n"
       "++CAT {file}                display a file contents\n"
-#define HLP_DEL          "*Commands Displaying_Files CAT"
-      "3DEL\n"
-      "++DEL {file}                deletes a file\n"
-#define HLP_RM          "*Commands Displaying_Files CAT"
+#define HLP_DELETE       "*Commands Removing_Files DEL"
+      "3DELETE\n"
+      "++DEL{ete} {file}           deletes a file\n"
+#define HLP_RM          "*Commands Removing_Files RM"
       "3RM\n"
       "++RM {file}                 deletes a file\n"
 #define HLP_SET         "*Commands SET"
@@ -1827,7 +1827,7 @@ static CTAB cmd_table[] = {
     { "LS",         &dir_cmd,       0,          HLP_LS },
     { "TYPE",       &type_cmd,      0,          HLP_TYPE },
     { "CAT",        &type_cmd,      0,          HLP_CAT },
-    { "DEL",        &delete_cmd,    0,          HLP_DEL },
+    { "DELETE",     &delete_cmd,    0,          HLP_DELETE },
     { "RM",         &delete_cmd,    0,          HLP_RM },
     { "SET",        &set_cmd,       0,          HLP_SET },
     { "SHOW",       &show_cmd,      0,          HLP_SHOW },
@@ -5232,7 +5232,7 @@ if ((!cptr) || (*cptr == 0))
 lbuf[sizeof(lbuf)-1] = '\0';
 strncpy (lbuf, cptr, sizeof(lbuf)-1);
 sim_trim_endspc(lbuf);
-if (!remove (lbuf))
+if (!unlink (lbuf))
     return SCPE_OK;
 return sim_messagef (SCPE_ARG, "%s\n", strerror (errno));
 }
