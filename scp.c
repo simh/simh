@@ -4986,28 +4986,30 @@ t_stat pwd_cmd (int32 flg, CONST char *cptr)
 return show_cmd (0, "DEFAULT");
 }
 
+typedef void (*DIR_ENTRY_CALLBACK)(const char *directory, 
+                                   const char *filename,
+                                   t_offset FileSize,
+                                   const struct stat *filestat,
+                                   void *context);
+
 #if defined (_WIN32)
 
-t_stat dir_cmd (int32 flg, CONST char *cptr)
+static t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
 {
 HANDLE hFind;
 WIN32_FIND_DATAA File;
 struct stat filestat;
 char WildName[PATH_MAX + 1];
 
-if (*cptr == '\0')
-    cptr = "./*";
 if ((!stat (cptr, &filestat)) && (filestat.st_mode & S_IFDIR)) {
     sprintf (WildName, "%s%c*", cptr, strchr (cptr, '/') ? '/' : '\\');
     cptr = WildName;
     }
 if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
-    t_int64 FileSize, TotalSize = 0;
-    int DirCount = 0, FileCount = 0;
+    t_int64 FileSize;
     char DirName[PATH_MAX + 1], FileName[PATH_MAX + 1];
     const char *c;
     char pathsep = '/';
-    struct tm *local;
 
     GetFullPathNameA(cptr, sizeof(DirName), DirName, (char **)&c);
     c = strrchr(DirName, pathsep);
@@ -5022,39 +5024,17 @@ if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
     else {
         getcwd(DirName, PATH_MAX);
         }
-    sim_printf (" Directory of %s\n\n", DirName);
+    sprintf (&DirName[strlen (DirName)], "%c", pathsep);
     do {
         FileSize = (((t_int64)(File.nFileSizeHigh)) << 32) | File.nFileSizeLow;
-        sprintf (FileName, "%s%c%s", DirName, pathsep, File.cFileName);
+        sprintf (FileName, "%s%s", DirName, File.cFileName);
         stat (FileName, &filestat);
-        local = localtime (&filestat.st_mtime);
-        sim_printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
-        if (filestat.st_mode & S_IFDIR) {
-            ++DirCount;
-            sim_printf ("   <DIR>         ");
-            }
-        else {
-            if (filestat.st_mode & S_IFREG) {
-                ++FileCount;
-                sim_print_val ((t_value) FileSize, 10, 17, PV_RCOMMA);
-                TotalSize += FileSize;
-                }
-            else {
-                sim_printf ("%17s", "");
-                }
-            }
-        sim_printf (" %s\n", File.cFileName);
+        entry (DirName, File.cFileName, FileSize, &filestat, context);
         } while (FindNextFile (hFind, &File));
-    sim_printf ("%16d File(s)", FileCount);
-    sim_print_val ((t_value) TotalSize, 10, 15, PV_RCOMMA);
-    sim_printf (" bytes\n");
-    sim_printf ("%16d Dir(s)\n", DirCount);
     FindClose (hFind);
     }
-else {
-    sim_printf ("Can't list files for %s\n", cptr);
+else
     return SCPE_ARG;
-    }
 return SCPE_OK;
 }
 
@@ -5069,7 +5049,7 @@ return SCPE_OK;
 #endif
 #endif /* defined (HAVE_GLOB) */
 
-t_stat dir_cmd (int32 flg, CONST char *cptr)
+static t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
 {
 #if defined (HAVE_GLOB)
 glob_t  paths;
@@ -5080,13 +5060,9 @@ struct stat filestat;
 char *c;
 char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
 
-if (*cptr == '\0')
-    strcpy (WildName, "./*");
-else
-    strcpy (WildName, cptr);
+strcpy (WildName, cptr);
 cptr = WildName;
-while (strlen(WildName) && sim_isspace(WildName[strlen(WildName)-1]))
-    WildName[strlen(WildName)-1] = '\0';
+sim_trim_endspc (WildName);
 if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
     strcat (WildName, "/*");
 if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
@@ -5097,8 +5073,7 @@ if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../"
 #endif
     strcat (WholeName, "/");
     strcat (WholeName, cptr);
-    while (strlen(WholeName) && sim_isspace(WholeName[strlen(WholeName)-1]))
-        WholeName[strlen(WholeName)-1] = '\0';
+    sim_trim_endspc (WholeName);
     }
 while ((c = strstr (WholeName, "/./")))
     strcpy (c + 1, c + 3);
@@ -5133,19 +5108,17 @@ dir = opendir(DirName[0] ? DirName : "/.");
 if (dir) {
     struct dirent *ent;
 #endif
-    t_offset FileSize, TotalSize = 0;
-    int DirCount = 0, FileCount = 0;
+    t_offset FileSize;
     char FileName[PATH_MAX + 1];
 #if defined (HAVE_FNMATCH)
     char *MatchName = 1 + strrchr (cptr, '/');;
 #endif
-    char *c;
+    char *p_name;
     struct tm *local;
 #if defined (HAVE_GLOB)
     size_t i;
 #endif
 
-    sim_printf (" Directory of %s\n\n", DirName[0] ? DirName : "/");
 #if defined (HAVE_GLOB)
     for (i=0; i<paths.gl_pathc; i++) {
         sprintf (FileName, "%s", paths.gl_pathv[i]);
@@ -5157,35 +5130,10 @@ if (dir) {
 #endif
         sprintf (FileName, "%s/%s", DirName, ent->d_name);
 #endif
+        p_name = FileName + strlen (DirName);
         stat (FileName, &filestat);
-        local = localtime (&filestat.st_mtime);
-        sim_printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
-        if (filestat.st_mode & S_IFDIR) {
-            ++DirCount;
-            sim_printf ("   <DIR>         ");
-            }
-        else {
-            if (filestat.st_mode & S_IFREG) {
-                ++FileCount;
-                FileSize = sim_fsize_name_ex (FileName);
-                sim_print_val ((t_value) FileSize, 10, 17, PV_RCOMMA);
-                TotalSize += FileSize;
-                }
-            else {
-                sim_printf ("%17s", "");
-                }
-            }
-        c = strrchr (FileName, '/');
-        sim_printf (" %s\n", c ? c + 1 : FileName);
-        }
-    if (FileCount) {
-        sim_printf ("%16d File(s)", FileCount);
-        sim_print_val ((t_value) TotalSize, 10, 15, PV_RCOMMA);
-        sim_printf (" bytes\n");
-        sim_printf ("%16d Dir(s)\n", DirCount);
-        }
-    else {
-        sim_printf ("File Not Found\n");
+        FileSize = (t_offset)((filestat.st_mode & S_IFDIR) ? 0 : sim_fsize_name_ex (FileName));
+        entry (DirName, p_name, FileSize, &filestat, context);
         }
 #if defined (HAVE_GLOB)
     globfree (&paths);
@@ -5193,14 +5141,119 @@ if (dir) {
     closedir (dir);
 #endif
     }
-else {
-    sim_printf ("Can't list files for %s\n", cptr);
+else
     return SCPE_ARG;
-    }
 return SCPE_OK;
 }
-
 #endif /* !defined(_WIN32) */
+
+typedef struct {
+    char LastDir[PATH_MAX + 1];
+    t_offset TotalBytes;
+    int TotalDirs;
+    int TotalFiles;
+    int DirChanges;
+    int DirCount;
+    int FileCount;
+    t_offset ByteCount;
+    } DIR_CTX;
+
+static void sim_dir_entry (const char *directory, 
+                        const char *filename,
+                        t_offset FileSize,
+                        const struct stat *filestat,
+                        void *context)
+{
+DIR_CTX *ctx = (DIR_CTX *)context;
+struct tm *local;
+
+if ((directory == NULL) || (filename == NULL)) {
+    if (ctx->DirChanges > 1)
+        sim_printf ("     Total Files Listed:\n");
+    if (ctx->DirChanges > 0) {
+        sim_printf ("%16d File(s) ", ctx->TotalFiles);
+        sim_print_val ((t_value) ctx->TotalBytes, 10, 17, PV_RCOMMA);
+        sim_printf (" bytes\n");
+        sim_printf ("%16d Dir(s)\n", ctx->TotalDirs);
+        }
+    return;
+    }
+if (strcmp (ctx->LastDir, directory)) {
+    if (ctx->DirCount || ctx->FileCount) {
+        sim_printf ("%16d File(s) ", ctx->FileCount);
+        sim_print_val ((t_value) ctx->ByteCount, 10, 17, PV_RCOMMA);
+        sim_printf (" bytes\n");
+        ctx->ByteCount = ctx->DirCount = ctx->FileCount = 0;
+        sim_printf ("%16d Dir(s)\n", ctx->DirCount);
+        }
+    ++ctx->DirChanges;
+    sim_printf (" Directory of %*.*s\n\n", strlen (directory) - 1, strlen (directory) - 1, directory);
+    strcpy (ctx->LastDir, directory);
+    }
+local = localtime (&filestat->st_mtime);
+sim_printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+if (filestat->st_mode & S_IFDIR) {
+    ++ctx->DirCount;
+    ++ctx->TotalDirs;
+    sim_printf ("   <DIR>         ");
+    }
+else {
+    if (filestat->st_mode & S_IFREG) {
+        ++ctx->FileCount;
+        ++ctx->TotalFiles;
+        sim_print_val ((t_value) FileSize, 10, 17, PV_RCOMMA);
+        ctx->ByteCount += FileSize;
+        ctx->TotalBytes += FileSize;
+        }
+    else {
+        sim_printf ("%17s", "");
+        }
+    }
+sim_printf (" %s\n", filename);
+}
+
+t_stat dir_cmd (int32 flg, CONST char *cptr)
+{
+DIR_CTX dir_state;
+t_stat stat;
+
+memset (&dir_state, 0, sizeof (dir_state));
+if (*cptr == '\0')
+    cptr = "./*";
+stat = sim_dir_scan (cptr, sim_dir_entry, &dir_state);
+sim_dir_entry (NULL, NULL, 0, NULL, &dir_state);    /* output summary */
+if (stat != SCPE_OK)
+    return sim_messagef (SCPE_ARG, "File Not Found\n");
+return stat;
+}
+
+
+typedef struct {
+    t_stat stat;
+    } TYPE_CTX;
+
+static void sim_type_entry (const char *directory, 
+                            const char *filename,
+                            t_offset FileSize,
+                            const struct stat *filestat,
+                            void *context)
+{
+TYPE_CTX *ctx = (TYPE_CTX *)context;
+char FullPath[PATH_MAX + 1];
+FILE *file;
+char lbuf[4*CBUFSIZE];
+
+sprintf (FullPath, "%s%s", directory, filename);
+
+file = sim_fopen (FullPath, "r");
+if (file == NULL)                           /* open failed? */
+    return;
+sim_printf ("\n%s\n\n", FullPath);
+lbuf[sizeof(lbuf)-1] = '\0';
+while (fgets (lbuf, sizeof(lbuf)-1, file))
+    sim_printf ("%s", lbuf);
+fclose (file);
+}
 
 
 t_stat type_cmd (int32 flg, CONST char *cptr)
@@ -5214,8 +5267,16 @@ lbuf[sizeof(lbuf)-1] = '\0';
 strncpy (lbuf, cptr, sizeof(lbuf)-1);
 sim_trim_endspc(lbuf);
 file = sim_fopen (lbuf, "r");
-if (file == NULL)                           /* open failed? */
-    return SCPE_OPENERR;
+if (file == NULL) {                         /* open failed? */
+    TYPE_CTX type_state;
+    t_stat stat;
+
+    memset (&type_state, 0, sizeof (type_state));
+    stat = sim_dir_scan (cptr, sim_type_entry, &type_state);
+    if (stat == SCPE_OK)
+        return SCPE_OK;
+    return sim_messagef (SCPE_OPENERR, "The system cannot find the file specified.\n");
+    }
 lbuf[sizeof(lbuf)-1] = '\0';
 while (fgets (lbuf, sizeof(lbuf)-1, file))
     sim_printf ("%s", lbuf);
@@ -5223,18 +5284,38 @@ fclose (file);
 return SCPE_OK;
 }
 
+typedef struct {
+    t_stat stat;
+    } DEL_CTX;
+
+static void sim_delete_entry (const char *directory, 
+                              const char *filename,
+                              t_offset FileSize,
+                              const struct stat *filestat,
+                              void *context)
+{
+DEL_CTX *ctx = (DEL_CTX *)context;
+char FullPath[PATH_MAX + 1];
+
+sprintf (FullPath, "%s%s", directory, filename);
+
+if (!unlink (FullPath))
+    return;
+ctx->stat = sim_messagef (SCPE_ARG, "%s\n", strerror (errno));
+}
+
 t_stat delete_cmd (int32 flg, CONST char *cptr)
 {
-char lbuf[4*CBUFSIZE];
+DEL_CTX del_state;
+t_stat stat;
 
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
-lbuf[sizeof(lbuf)-1] = '\0';
-strncpy (lbuf, cptr, sizeof(lbuf)-1);
-sim_trim_endspc(lbuf);
-if (!unlink (lbuf))
-    return SCPE_OK;
-return sim_messagef (SCPE_ARG, "%s\n", strerror (errno));
+memset (&del_state, 0, sizeof (del_state));
+stat = sim_dir_scan (cptr, sim_delete_entry, &del_state);
+if (stat == SCPE_OK)
+    return del_state.stat;
+return sim_messagef (SCPE_ARG, "No such file or directory: %s\n", cptr);
 }
 
 /* Breakpoint commands */
