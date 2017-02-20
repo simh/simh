@@ -849,7 +849,6 @@ if (dptr->flags & DEV_DIS) {        /* Disabling? */
     uint32 mb = dibp->ba;
 
     dibp->ba = MBA_AUTO;            /*   Flag unassigned */
-    dibp->ulnt = dibp->lnt = 0;
     mba_reset (&mba_dev[mb]);       /*   reset prior MBA */
     }
 build_dib_tab();
@@ -923,7 +922,7 @@ mbregW[idx] = dibp->wr;                                 /* set wr dispatch */
 mbabort[idx] = dibp->ack[0];                            /* set abort dispatch */
 mba_dev[idx].flags &= ~DEV_DIS;                         /* mark MBA enabled */
 ((DIB *)mba_dev[idx].ctxt)->lnt = dibp->lnt;
-((DIB *)mba_dev[idx].ctxt)->ulnt = dibp->lnt;
+((DIB *)mba_dev[idx].ctxt)->ulnt = dibp->ulnt;
 return build_ubus_tab (&mba_dev[idx], (DIB *)mba_dev[idx].ctxt);
 }
 
