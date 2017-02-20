@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   13-Feb-17    RMS     RESET clear L'AC, per schematics
    28-Jan-17    RMS     Renamed switch register variable to SR, per request
    18-Sep-16    RMS     Added alternate dispatch table for non-contiguous devices
    17-Sep-13    RMS     Fixed boot in wrong field problem (Dave Gesswein)
@@ -1372,6 +1373,7 @@ return reason;
 
 t_stat cpu_reset (DEVICE *dptr)
 {
+saved_LAC = 0;
 int_req = (int_req & ~INT_ION) | INT_NO_CIF_PENDING;
 saved_DF = IB = saved_PC & 070000;
 UF = UB = gtf = emode = 0;
