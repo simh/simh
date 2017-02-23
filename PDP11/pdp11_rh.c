@@ -184,8 +184,6 @@ static t_stat (*mbregR[MBA_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*mbregW[MBA_NUM])(int32 dat, int32 ad, int32 md);
 static int32 (*mbabort[MBA_NUM])(void);
 
-static int32 mba_active = 0;    /* Number of active MBA's */
-
 /* Unibus to register offset map */
 
 static int32 mba_mapofs[(MBA_OFSMASK + 1) >> 1] = {
@@ -892,7 +890,6 @@ for (i = mba_devs = 0; sim_devices[i] != NULL; i++) {
         mba_devs++;
         }
     }
-mba_active = 0;
 }
 
 /* Build dispatch tables */
@@ -900,13 +897,16 @@ mba_active = 0;
 t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp)
 {
 uint32 idx;
+static const char *mbus_devs[MBA_NUM+1] = {"RP", "TU", "RS", NULL};
 
 if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
     return SCPE_IERR;
-idx = mba_active++;
+for (idx = 0; mbus_devs[idx]; idx++)
+    if (!strcmp (dptr->name, mbus_devs[idx]))
+        break;
+if ((!mbus_devs[idx]) || (idx >= MBA_NUM))
+    return SCPE_IERR;
 dibp->ba = idx;                                         /* Mbus # */
-if (idx >= MBA_NUM)
-    return SCPE_STOP;
 if ((mbregR[idx] && dibp->rd &&                         /* conflict? */
     (mbregR[idx] != dibp->rd)) ||
     (mbregW[idx] && dibp->wr &&
@@ -924,50 +924,6 @@ mba_dev[idx].flags &= ~DEV_DIS;                         /* mark MBA enabled */
 ((DIB *)mba_dev[idx].ctxt)->lnt = dibp->lnt;
 ((DIB *)mba_dev[idx].ctxt)->ulnt = dibp->ulnt;
 return build_ubus_tab (&mba_dev[idx], (DIB *)mba_dev[idx].ctxt);
-}
-
-void fixup_mbus_tab (void)
-{
-uint32 idx, idy, active;
-DEVICE *dptr;
-DIB *dibp;
-static const char *mbus_devs[MBA_NUM+1] = {"RP", "TU", "RS", NULL};
-
-for (idx = active = 0; idx < MBA_NUM; idx++) {
-    dptr = find_dev (mbus_devs[idx]);
-    if (!dptr)
-        break;
-    if (dptr->flags & DEV_DIS)
-        continue;
-    dibp = (DIB *)dptr->ctxt;
-    if (dibp->ba != active) {
-        t_stat (*TmbregR)(int32 *dat, int32 ad, int32 md) = mbregR[active];
-        t_stat (*TmbregW)(int32 dat, int32 ad, int32 md) = mbregW[active];
-        int32 (*Tmbabort)(void) = mbabort[active];
-
-        mbregR[active] = mbregR[dibp->ba];
-        mbregW[active] = mbregW[dibp->ba];
-        mbabort[active] = mbabort[dibp->ba];;
-
-        mbregR[dibp->ba] = TmbregR;
-        mbregW[dibp->ba] = TmbregW;
-        mbabort[dibp->ba] = Tmbabort;;
-
-        for (idy = 1; idy < MBA_NUM; idy++) {
-            DEVICE *ydptr = find_dev (mbus_devs[idy]);
-            DIB *ydibp = (DIB *)ydptr->ctxt;
-
-            if (ydibp->ba != active)
-                continue;
-            ydibp->ba = dibp->ba;
-            dibp->ba = active;
-            break;
-            }
-        }
-    ((DIB *)mba_dev[dibp->ba].ctxt)->lnt = dibp->lnt;
-    ((DIB *)mba_dev[dibp->ba].ctxt)->ulnt = dibp->ulnt;
-    ++active;
-    }
 }
 
 t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
