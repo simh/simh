@@ -3072,7 +3072,7 @@ return pa;
    MMR0 17777572        read/write, certain bits unimplemented or read only
    MMR1 17777574        read only
    MMR2 17777576        read only
-   MMR3 17777516        read/write, certain bits unimplemented
+   MMR3 17772516        read/write, certain bits unimplemented
 */
 
 t_stat MMR012_rd (int32 *data, int32 pa, int32 access)
