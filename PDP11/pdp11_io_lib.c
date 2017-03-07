@@ -1,6 +1,6 @@
 /* pdp11_io_lib.c: Unibus/Qbus common support routines
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -204,7 +204,7 @@ t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
-uint32 vec, numvec, radix = DEV_RDX;
+uint32 vec, numvec, br_lvl, radix = DEV_RDX;
 
 if (uptr == NULL)
     return SCPE_IERR;
@@ -249,6 +249,10 @@ else {
     }
 if (vec >= ((VEC_SET | AUTO_VECBASE) & ~3))
     fprintf (st, "*");
+br_lvl = dibp->vloc / 32;
+if (br_lvl < 4)                                         /* VAXen do 0-3, others 4-7 */
+    br_lvl = br_lvl + 4;
+fprintf (st, ", BR%d", br_lvl);
 return SCPE_OK;
 }
 

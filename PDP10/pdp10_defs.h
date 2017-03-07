@@ -1,6 +1,6 @@
 /* pdp10_defs.h: PDP-10 simulator definitions
 
-   Copyright (c) 1993-2010, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Jan-17    RMS     Fixed CD11 definition (Mark Pizzolato)
+   30-Jun-13    RMS     Fixed IPL4 mask definition (Tim Litt)
    22-May-10    RMS     Added check for 64b addresses
    01-Feb-07    RMS     Added CD support
    29-Oct-06    RMS     Added clock coscheduling function
@@ -723,7 +725,7 @@ typedef struct pdp_dib DIB;
 #define INT_PTR         (1u << INT_V_PTR)
 #define INT_PTP         (1u << INT_V_PTP)
 #define INT_LP20        (1u << INT_V_LP20)
-#define INT_CR          (1u << INT_V_CR)
+#define INT_CR          (1u << INT_V_CD)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
 

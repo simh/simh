@@ -26,7 +26,8 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
-   06-Jan-17    RMS     Moved CR11/CD11 to BR6 (Mark Pizzolato)
+   10-Feb-17    RMS     Fixed RJS11 register block length (Mark Hill)
+   19-Jan-17    RMS     Moved CR11 to BR6, leaving CD11 at BR4 (Mark Pizzolato)
    10-Mar-16    RMS     Added UC15 support
    30-Dec-15    RMS     Added NOBVT option
    23-Oct-13    RMS     Added cpu_set_boot prototype
@@ -600,7 +601,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_PCLK      2
 #define INT_V_DTA       3
 #define INT_V_TA        4
-#define INT_V_CR        5
+#define INT_V_CR        5                               /* CR11 */
 
 #define INT_V_PIR5      0                               /* BR5 */
 #define INT_V_RK        1
@@ -637,7 +638,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_LPT       5
 #define INT_V_VHRX      6
 #define INT_V_VHTX      7  
-//#define XXXXXX          8                               /* former CR */
+#define INT_V_CD        8                               /* CD11 */
 #define INT_V_DLI       9
 #define INT_V_DLO       10
 #define INT_V_DCI       11
@@ -663,6 +664,7 @@ typedef struct pdp_dib DIB;
 #define INT_PCLK        (1u << INT_V_PCLK)
 #define INT_DTA         (1u << INT_V_DTA)
 #define INT_TA          (1u << INT_V_TA)
+#define INT_CR          (1u << INT_V_CR)
 #define INT_PIR5        (1u << INT_V_PIR5)
 #define INT_RK          (1u << INT_V_RK)
 #define INT_RL          (1u << INT_V_RL)
@@ -697,7 +699,7 @@ typedef struct pdp_dib DIB;
 #define INT_LPT         (1u << INT_V_LPT)
 #define INT_VHRX        (1u << INT_V_VHRX)
 #define INT_VHTX        (1u << INT_V_VHTX)
-#define INT_CR          (1u << INT_V_CR)
+#define INT_CD          (1u << INT_V_CD)
 #define INT_DLI         (1u << INT_V_DLI)
 #define INT_DLO         (1u << INT_V_DLO)
 #define INT_DCI         (1u << INT_V_DCI)
@@ -759,6 +761,7 @@ typedef struct pdp_dib DIB;
 #define IPL_LPT         4
 #define IPL_VHRX        4
 #define IPL_VHTX        4
+#define IPL_CD          4
 #define IPL_DLI         4
 #define IPL_DLO         4
 #define IPL_DCI         4

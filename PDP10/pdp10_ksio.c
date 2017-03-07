@@ -1,6 +1,6 @@
 /* pdp10_ksio.c: PDP-10 KS10 I/O subsystem simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    uba          Unibus adapters
 
+   7-Mar-17     RMS     Added BR level to vector display
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Jan-04    RMS     Added stub floating address routine
    12-Mar-03    RMS     Added logical name support
@@ -120,6 +121,9 @@ static const int32 ubabr76[UBANUM] = {
     };
 static const int32 ubabr54[UBANUM] = {
     INT_UB1 & (INT_IPL5 | INT_IPL4), INT_UB3 & (INT_IPL5 | INT_IPL4)
+    };
+static const uint32 iplmask[4] = {
+    INT_IPL4, INT_IPL5, INT_IPL6, INT_IPL7
     };
 
 /* Masks for Unibus quantities */
@@ -1781,7 +1785,7 @@ t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
-uint32 vec, numvec;
+uint32 i, j, vec, numvec, br_bit;
 
 if (uptr == NULL)
     return SCPE_IERR;
@@ -1804,6 +1808,14 @@ else {
     }
 if (vec >= AUTO_VECBASE)
     fprintf (st, "*");
+br_bit = 1u << dibp->vloc;
+for (i = 0, j = 4; i < 4; i++) {
+    if ((br_bit & iplmask[i]) != 0)
+        j = i;
+    }
+if (j >= 4)
+    fprintf (st, ", invalid BR level");
+else fprintf (st, ", BR%d", j + 4);
 return SCPE_OK;
 }
 
