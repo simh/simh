@@ -253,7 +253,7 @@ BITFIELD vh_lpr_bits[] = {
 #define LPR_GETSPD(x)   vh_baudrates[((x) >> LPR_V_RX_SPEED) & LPR_M_RX_SPEED]
 #define LPR_GETCHARSIZE(x) vh_charsizes[((x) >> LPR_V_CHAR_LGTH) & LPR_M_CHAR_LGTH]
 #define LPR_GETPARITY(x) vh_parity[(((x) >> LPR_V_PARITY_ENAB) & 1) | (((x) >> (LPR_V_EVEN_PARITY-1)) & 2)]
-#define LPR_GETSTOPBITS(x) vh_stopbits[(((x) >> LPR_V_STOP_CODE) & 1) + (((((x) >> LPR_V_CHAR_LGTH) & LPR_M_CHAR_LGTH) == 5) ? 2 : 0)]
+#define LPR_GETSTOPBITS(x) vh_stopbits[(((x) >> LPR_V_STOP_CODE) & 1) + (((((x) >> LPR_V_CHAR_LGTH) & LPR_M_CHAR_LGTH) == 0) ? 2 : 0)]
 
 /* Line-Status Register (STAT) */
 
