@@ -57,6 +57,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "swtp6800mp-a", "swtp6800mp-
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "swtp6800mp-a2", "swtp6800mp-a2.vcproj", "{A0BAF350-853E-4A8F-8435-B583E29FFACE}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sigma", "sigma.vcproj", "{7DDB6DF6-3837-4DE3-80D7-63181195021F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -171,6 +173,12 @@ Global
 		{0ABAF350-853E-4A8F-8435-B583E29FB78C}.Debug|Win32.Build.0 = Debug|Win32
 		{0ABAF350-853E-4A8F-8435-B583E29FB78C}.Release|Win32.ActiveCfg = Release|Win32
 		{0ABAF350-853E-4A8F-8435-B583E29FB78C}.Release|Win32.Build.0 = Release|Win32
+		{A0BAF350-853E-4A8F-8435-B583E29FFACE}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A0BAF350-853E-4A8F-8435-B583E29FFACE}.Release|Win32.ActiveCfg = Release|Win32
+		{7DDB6DF6-3837-4DE3-80D7-63181195021F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7DDB6DF6-3837-4DE3-80D7-63181195021F}.Debug|Win32.Build.0 = Debug|Win32
+		{7DDB6DF6-3837-4DE3-80D7-63181195021F}.Release|Win32.ActiveCfg = Release|Win32
+		{7DDB6DF6-3837-4DE3-80D7-63181195021F}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
