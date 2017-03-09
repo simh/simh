@@ -1,6 +1,6 @@
 /* sigma_io.c: XDS Sigma IO simulator
 
-   Copyright (c) 2007-2008, Robert M Supnik
+   Copyright (c) 2007-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   09-Mar-2017  RMS     Fixed unspecified return value in HIO (COVERITY)
 */
 
 #include "sigma_io_defs.h"
@@ -415,33 +417,22 @@ ad = bva >> 2;
 ch = DVA_GETCHAN (ad);                                  /* get chan, dev */
 dev = DVA_GETDEV (ad);
 subop = (ad >> 13) & 0x7;
-if (subop) {                                            /* extended fnc? */
+if (subop != 0) {                                       /* extended fnc? */
     if (!QCPU_S89_5X0 || (subop > 3))                   /* S9, 5X0 only */
         return (stop_op? STOP_ILLEG: 0);
-    if (ch >= chan_num) {                               /* valid channel? */
+    if (ch >= chan_num)                                 /* valid channel? */
         CC |= CC1|CC2;
-        return 0;
-        }
-    switch (subop) {
-
-    case 1:                                             /* reset channel */
-        chan_reset (&chan_dev[ch]);
-        break;
-
-    case 2: case 3:                                     /* poll processor */
-        if (rn)                                         /* NI */
-            R[rn] = 0;
-        break;
-        }
+    else if (subop == 1)                                /* chan reset? */
+        chan_reset (&chan_dev[ch]);                     /* no status */
+    else R[rn] = 0;                                     /* poll proc, NI */
+    return 0;
     }
-else {                                                  /* normal HIO */
-    if (!io_init_inst (rn, ad, ch, dev, 0)) {           /* valid inst? */
-        CC |= CC1|CC2;
-        return 0;
-        }
-    st = chan[ch].disp[dev] (OP_HIO, ad, &dvst);        /* halt IO */
-    CC |= io_set_status (rn, ch, dev, dvst, 0);         /* set status */
+if (!io_init_inst (rn, ad, ch, dev, 0)) {               /* valid inst? */
+    CC |= CC1|CC2;
+    return 0;
     }
+st = chan[ch].disp[dev] (OP_HIO, ad, &dvst);            /* halt IO */
+CC |= io_set_status (rn, ch, dev, dvst, 0);             /* set status */
 return st;
 }
 
@@ -1254,8 +1245,7 @@ dib_t *dibp = (dib_t *) dptr->ctxt;
 for (i = 0; i < MEMSIZE; i++)                           /* boot clrs mem */
     WritePW (i, 0);
 if ((dibp == NULL) ||
-    ((u != 0) &&
-    ((dibp->dva & DVA_MU) == 0)))
+    ((u != 0) && ((dibp->dva & DVA_MU) == 0)))
     return SCPE_ARG;
 for (i = 0; i < BOOT_LNT; i++)
     WritePW (BOOT_SA + i, boot_rom[i]);
