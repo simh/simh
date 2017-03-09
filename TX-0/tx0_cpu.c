@@ -1275,9 +1275,9 @@ Original Operate-class instruction micro orders for the 1956 TX-0 Instruction Se
 #define OOPR_DIS            0002000
 #define OOPR_R1C            0001000
 
-#define OOPR_SHF_MASK   0000300
+#define OOPR_SHF_MASK   0000600
 #define OOPR_SHR            0000400
-#define OOPR_CYR            0000300
+#define OOPR_CYR            0000600
 #define OOPR_MLR            0000200
 
 #define OOPR_PEN_MASK   0000104
