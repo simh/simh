@@ -341,9 +341,9 @@ AIO_ILOCK;
 if (AIO_QUEUE_VAL != QUEUE_LIST_END) {  /* List !Empty */
     UNIT *q, *uptr;
     int32 a_event_time;
-    do
+    do {                                /* Grab current queue */
         q = AIO_QUEUE_VAL;
-        while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));  /* Grab current queue */
+        } while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));
     while (q != QUEUE_LIST_END) {       /* List !Empty */
         sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Migrating Asynch event for %s after %d instructions\n", sim_uname(q), q->a_event_time);
         ++migrated;
@@ -4524,46 +4524,46 @@ if (flag) {
     t_bool idle_capable;
     uint32 os_ms_sleep_1, os_tick_size;
 
-    fprintf (st, "\n\tSimulator Framework Capabilities:");
-    fprintf (st, "\n\t\t%s", sim_si64);
-    fprintf (st, "\n\t\t%s", sim_sa64);
-    fprintf (st, "\n\t\t%s", eth_capabilities());
+    fprintf (st, "\n    Simulator Framework Capabilities:");
+    fprintf (st, "\n        %s", sim_si64);
+    fprintf (st, "\n        %s", sim_sa64);
+    fprintf (st, "\n        %s", eth_capabilities());
     idle_capable = sim_timer_idle_capable (&os_ms_sleep_1, &os_tick_size);
-    fprintf (st, "\n\t\tIdle/Throttling support is %savailable", idle_capable ? "" : "NOT ");
+    fprintf (st, "\n        Idle/Throttling support is %savailable", idle_capable ? "" : "NOT ");
     if (sim_disk_vhd_support())
-        fprintf (st, "\n\t\tVirtual Hard Disk (VHD) support");
+        fprintf (st, "\n        Virtual Hard Disk (VHD) support");
     if (sim_disk_raw_support())
-        fprintf (st, "\n\t\tRAW disk and CD/DVD ROM support");
+        fprintf (st, "\n        RAW disk and CD/DVD ROM support");
 #if defined (SIM_ASYNCH_IO)
-    fprintf (st, "\n\t\tAsynchronous I/O support");
+    fprintf (st, "\n        Asynchronous I/O support (%s)", AIO_QUEUE_MODE);
 #endif
 #if defined (SIM_ASYNCH_MUX)
-    fprintf (st, "\n\t\tAsynchronous Multiplexer support");
+    fprintf (st, "\n        Asynchronous Multiplexer support");
 #endif
 #if defined (SIM_ASYNCH_CLOCKS)
-    fprintf (st, "\n\t\tAsynchronous Clock support");
+    fprintf (st, "\n        Asynchronous Clock support");
 #endif
 #if defined (SIM_FRONTPANEL_VERSION)
-    fprintf (st, "\n\t\tFrontPanel API Version %d", SIM_FRONTPANEL_VERSION);
+    fprintf (st, "\n        FrontPanel API Version %d", SIM_FRONTPANEL_VERSION);
 #endif
-    fprintf (st, "\n\tHost Platform:");
+    fprintf (st, "\n    Host Platform:");
 #if defined (__GNUC__) && defined (__VERSION__)
-    fprintf (st, "\n\t\tCompiler: GCC %s", __VERSION__);
+    fprintf (st, "\n        Compiler: GCC %s", __VERSION__);
 #elif defined (__clang_version__)
-    fprintf (st, "\n\t\tCompiler: clang %s", __clang_version__);
+    fprintf (st, "\n        Compiler: clang %s", __clang_version__);
 #elif defined (_MSC_FULL_VER) && defined (_MSC_BUILD)
-    fprintf (st, "\n\t\tCompiler: Microsoft Visual C++ %d.%02d.%05d.%02d", _MSC_FULL_VER/10000000, (_MSC_FULL_VER/100000)%100, _MSC_FULL_VER%100000, _MSC_BUILD);
+    fprintf (st, "\n        Compiler: Microsoft Visual C++ %d.%02d.%05d.%02d", _MSC_FULL_VER/10000000, (_MSC_FULL_VER/100000)%100, _MSC_FULL_VER%100000, _MSC_BUILD);
 #if defined(_DEBUG)
     build = " (Debug Build)";
 #else
     build = " (Release Build)";
 #endif
 #elif defined (__DECC_VER)
-    fprintf (st, "\n\t\tCompiler: DEC C %c%d.%d-%03d", ("T SV")[((__DECC_VER/10000)%10)-6], __DECC_VER/10000000, (__DECC_VER/100000)%100, __DECC_VER%10000);
+    fprintf (st, "\n        Compiler: DEC C %c%d.%d-%03d", ("T SV")[((__DECC_VER/10000)%10)-6], __DECC_VER/10000000, (__DECC_VER/100000)%100, __DECC_VER%10000);
 #elif defined (SIM_COMPILER)
 #define S_xstr(a) S_str(a)
 #define S_str(a) #a
-    fprintf (st, "\n\t\tCompiler: %s", S_xstr(SIM_COMPILER));
+    fprintf (st, "\n        Compiler: %s", S_xstr(SIM_COMPILER));
 #undef S_str
 #undef S_xstr
 #endif
@@ -4591,21 +4591,21 @@ if (flag) {
 #else
     cpp = "C";
 #endif
-    fprintf (st, "\n\t\tSimulator Compiled as %s%s%s on %s at %s", cpp, arch, build, __DATE__, __TIME__);
+    fprintf (st, "\n        Simulator Compiled as %s%s%s on %s at %s", cpp, arch, build, __DATE__, __TIME__);
 #endif
-    fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
-    fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
-    fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
-    fprintf (st, "\n\t\tSDL Video support: %s", vid_version());
+    fprintf (st, "\n        Memory Access: %s Endian", sim_end ? "Little" : "Big");
+    fprintf (st, "\n        Memory Pointer Size: %d bits", (int)sizeof(dptr)*8);
+    fprintf (st, "\n        %s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
+    fprintf (st, "\n        SDL Video support: %s", vid_version());
 #if defined (HAVE_PCREPOSIX_H)
-    fprintf (st, "\n\t\tPCRE RegEx support for EXPECT commands");
+    fprintf (st, "\n        PCRE RegEx support for EXPECT commands");
 #elif defined (HAVE_REGEX_H)
-    fprintf (st, "\n\t\tRegEx support for EXPECT commands");
+    fprintf (st, "\n        RegEx support for EXPECT commands");
 #else
-    fprintf (st, "\n\t\tNo RegEx support for EXPECT commands");
+    fprintf (st, "\n        No RegEx support for EXPECT commands");
 #endif
-    fprintf (st, "\n\t\tOS clock resolution: %dms", os_tick_size);
-    fprintf (st, "\n\t\tTime taken by msleep(1): %dms", os_ms_sleep_1);
+    fprintf (st, "\n        OS clock resolution: %dms", os_tick_size);
+    fprintf (st, "\n        Time taken by msleep(1): %dms", os_ms_sleep_1);
 #if defined(__VMS)
     if (1) {
         char *arch = 
@@ -4616,7 +4616,7 @@ if (flag) {
 #else
             "VAX";
 #endif
-        fprintf (st, "\n\t\tOS: OpenVMS %s %s", arch, __VMS_VERSION);
+        fprintf (st, "\n        OS: OpenVMS %s %s", arch, __VMS_VERSION);
         }
 #elif defined(_WIN32)
     if (1) {
@@ -4638,9 +4638,9 @@ if (flag) {
                 } while (osversion[0] == '\0');
             _pclose (f);
             }
-        fprintf (st, "\n\t\tOS: %s", osversion);
-        fprintf (st, "\n\t\tArchitecture: %s%s%s, Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", procs);
-        fprintf (st, "\n\t\tProcessor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
+        fprintf (st, "\n        OS: %s", osversion);
+        fprintf (st, "\n        Architecture: %s%s%s, Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", procs);
+        fprintf (st, "\n        Processor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
         }
 #else
     if (1) {
@@ -4656,7 +4656,7 @@ if (flag) {
                 } while (osversion[0] == '\0');
             pclose (f);
             }
-        fprintf (st, "\n\t\tOS: %s", osversion);
+        fprintf (st, "\n        OS: %s", osversion);
         }
 #endif
     }
