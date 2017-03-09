@@ -5085,6 +5085,8 @@ if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../"
     strcat (WholeName, cptr);
     sim_trim_endspc (WholeName);
     }
+else
+    strcpy (WholeName, cptr);
 while ((c = strstr (WholeName, "/./")))
     strcpy (c + 1, c + 3);
 while ((c = strstr (WholeName, "//")))
@@ -5100,15 +5102,16 @@ while ((c = strstr (WholeName, "/../"))) {
     }
 c = strrchr (WholeName, '/');
 if (c) {
-    memcpy (DirName, WholeName, c-WholeName);
-    DirName[c-WholeName] = '\0';
+    memcpy (DirName, WholeName, 1+c-WholeName);
+    DirName[1+c-WholeName] = '\0';
     }
-else
+else {
 #if defined (VMS)
     getcwd (WholeName, PATH_MAX, 0);
 #else
     getcwd (WholeName, PATH_MAX);
 #endif
+    }
 cptr = WholeName;
 #if defined (HAVE_GLOB)
 memset (&paths, 0, sizeof(paths));
