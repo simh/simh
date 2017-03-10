@@ -675,8 +675,6 @@ if (dup_W6[dup])
     old_rxcsr_b_modem_bits = dup_rxcsr[dup] & RXCSR_B_MODEM_BITS;
 else
     old_rxcsr_b_modem_bits = 0;
-old_rxcsr_a_modem_bits = dup_rxcsr[dup] & RXCSR_A_MODEM_BITS;
-old_rxcsr_b_modem_bits = dup_rxcsr[dup] & RXCSR_B_MODEM_BITS;
 tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
 if (dup_W5[dup])
     new_rxcsr_a_modem_bits = (((modem_bits & TMXR_MDM_RNG) ? RXCSR_M_RING : 0) |
