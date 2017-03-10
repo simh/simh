@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   09-Mar-17    RMS     Fixed PCQ_ENTRY for interrupts (COVERITY)
    13-Feb-17    RMS     RESET clear L'AC, per schematics
    28-Jan-17    RMS     Renamed switch register variable to SR, per request
    18-Sep-16    RMS     Added alternate dispatch table for non-contiguous devices
@@ -195,7 +196,7 @@
 
 #define PCQ_SIZE        64                              /* must be 2**n */
 #define PCQ_MASK        (PCQ_SIZE - 1)
-#define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = MA
+#define PCQ_ENTRY(x)    pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = x
 #define UNIT_V_NOEAE    (UNIT_V_UF)                     /* EAE absent */
 #define UNIT_NOEAE      (1 << UNIT_V_NOEAE)
 #define UNIT_V_MSIZE    (UNIT_V_UF + 1)                 /* dummy mask */
@@ -356,8 +357,8 @@ while (reason == 0) {                                   /* loop until halted */
     if (int_req > INT_PENDING) {                        /* interrupt? */
         int_req = int_req & ~INT_ION;                   /* interrupts off */
         SF = (UF << 6) | (IF >> 9) | (DF >> 12);        /* form save field */
+        PCQ_ENTRY (IF | PC);                            /* save old PC with IF */
         IF = IB = DF = UF = UB = 0;                     /* clear mem ext */
-        PCQ_ENTRY;                                      /* save old PC */
         M[0] = PC;                                      /* save PC in 0 */
         PC = 1;                                         /* fetch next from 1 */
         }
@@ -570,7 +571,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
    as usual. */
 
     case 020:                                           /* JMS, dir, zero */
-        PCQ_ENTRY;
+        PCQ_ENTRY (MA);
         MA = IR & 0177;                                 /* dir addr, page zero */
         if (UF) {                                       /* user mode? */
             tsc_ir = IR;                                /* save instruction */
@@ -592,7 +593,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         break;
 
     case 021:                                           /* JMS, dir, curr */
-        PCQ_ENTRY;
+        PCQ_ENTRY (MA);
         MA = (MA & 007600) | (IR & 0177);               /* dir addr, curr page */
         if (UF) {                                       /* user mode? */
             tsc_ir = IR;                                /* save instruction */
@@ -614,7 +615,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         break;
 
     case 022:                                           /* JMS, indir, zero */
-        PCQ_ENTRY;
+        PCQ_ENTRY (MA);
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
         if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
             MA = M[MA];
@@ -639,7 +640,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         break;
 
     case 023:                                           /* JMS, indir, curr */
-        PCQ_ENTRY;
+        PCQ_ENTRY (MA);
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
         if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
             MA = M[MA];
@@ -672,7 +673,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
 
 
     case 024:                                           /* JMP, dir, zero */
-        PCQ_ENTRY;
+        PCQ_ENTRY (MA);
         MA = IR & 0177;                                 /* dir addr, page zero */
         if (UF) {                                       /* user mode? */
             tsc_ir = IR;                                /* save instruction */
@@ -691,7 +692,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
 /* If JMP direct, also check for idle (KSF/JMP *-1) and infinite loop */
 
     case 025:                                           /* JMP, dir, curr */
-        PCQ_ENTRY;
+        PCQ_ENTRY (MA);
         MA = (MA & 007600) | (IR & 0177);               /* dir addr, curr page */
         if (UF) {                                       /* user mode? */
             tsc_ir = IR;                                /* save instruction */
@@ -722,7 +723,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         break;
 
     case 026:                                           /* JMP, indir, zero */
-        PCQ_ENTRY;
+        PCQ_ENTRY (MA);
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
         if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
             MA = M[MA];
@@ -742,7 +743,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         break;
 
     case 027:                                           /* JMP, indir, curr */
-        PCQ_ENTRY;
+        PCQ_ENTRY (MA);
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
         if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
             MA = M[MA];
