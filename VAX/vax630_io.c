@@ -490,7 +490,7 @@ t_bool qba_map_addr (uint32 qa, uint32 *ma)
 {
 int32 qblk = (qa >> VA_V_VPN);                          /* Qbus blk */
 
-if (qblk <= QBNMAPR) {
+if (qblk < QBNMAPR) {
     int32 qmap = qb_map[qblk];
     if (qmap & QBMAP_VLD) {                             /* valid? */
         *ma = ((qmap & QBMAP_PAG) << VA_V_VPN) + VA_GETOFF (qa);
@@ -512,7 +512,7 @@ t_bool qba_map_addr_c (uint32 qa, uint32 *ma)
 {
 int32 qblk = (qa >> VA_V_VPN);                          /* Qbus blk */
 
-if (qblk <= QBNMAPR) {
+if (qblk < QBNMAPR) {
     int32 qmap = qb_map[qblk];
     if (qmap & QBMAP_VLD) {                             /* valid? */
         *ma = ((qmap & QBMAP_PAG) << VA_V_VPN) + VA_GETOFF (qa);
