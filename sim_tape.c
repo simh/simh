@@ -526,12 +526,15 @@ return SCPE_OK;
 
 t_stat sim_tape_detach (UNIT *uptr)
 {
-struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+struct tape_context *ctx;
 uint32 f = MT_GET_FMT (uptr);
 t_stat r;
 t_bool auto_format = FALSE;
 
-if ((ctx == NULL) || (uptr == NULL) || !(uptr->flags & UNIT_ATT))
+if (uptr == NULL)
+    return SCPE_IERR;
+ctx = (struct tape_context *)uptr->tape_ctx;
+if ((ctx == NULL) || !(uptr->flags & UNIT_ATT))
     return SCPE_IERR;
 
 if (uptr->io_flush)
@@ -2160,10 +2163,10 @@ t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 f;
 
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
 if (uptr == NULL)
     return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 if (cptr == NULL)
     return SCPE_ARG;
 for (f = 0; f < MTUF_N_FMT; f++) {
