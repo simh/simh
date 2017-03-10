@@ -850,7 +850,7 @@ if (mp->port)                                           /* copy port */
 if (mp->logfiletmpl[0])                                 /* logfile info */
     sprintf (growstring(&tptr, 7 + strlen (mp->logfiletmpl)), ",Log=%s", mp->logfiletmpl);
 while ((*tptr == ',') || (*tptr == ' '))
-    memcpy (tptr, tptr+1, strlen(tptr+1)+1);
+    memmove (tptr, tptr+1, strlen(tptr+1)+1);
 for (i=0; i<mp->lines; ++i) {
     char *lptr;
     lp = mp->ldsc + i;
@@ -863,7 +863,7 @@ for (i=0; i<mp->lines; ++i) {
     }
 if (mp->lines == 1)
     while ((*tptr == ',') || (*tptr == ' '))
-        memcpy (tptr, tptr+1, strlen(tptr+1)+1);
+        memmove (tptr, tptr+1, strlen(tptr+1)+1);
 if (*tptr == '\0') {
     free (tptr);
     tptr = NULL;
@@ -2509,14 +2509,14 @@ while (*tptr) {
             if (0 == MATCH_CMD (gbuf, "CONNECT")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return sim_messagef (SCPE_2FARG, "Missing Connect Specifier\n");
-                strcpy (destination, cptr);
+                strncpy (destination, cptr, sizeof(destination)-1);
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "SPEED")) {
                 if ((NULL == cptr) || ('\0' == *cptr) || 
                     (_tmln_speed_delta (cptr) < 0))
                     return sim_messagef (SCPE_ARG, "Invalid Speed Specifier: %s\n", (cptr ? cptr : ""));
-                strcpy (speed, cptr);
+                strncpy (speed, cptr, sizeof(speed)-1);
                 continue;
                 }
             cptr = get_glyph (gbuf, port, ';');
