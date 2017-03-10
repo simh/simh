@@ -2,7 +2,7 @@
  * besm6_mmu.c: BESM-6 fast write cache and TLB registers
  *（стойка БРУС)
  *
- * Copyright (c) 2009, Leonid Broukhis
+ * Copyright (c) 2009-2017, Leonid Broukhis
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -623,7 +623,7 @@ t_value mmu_prefetch (int addr, int actual)
         return 0;
     } else {
         /* Чтобы лампочки мигали */
-        i = addr & 3;
+        i = addr;
     }
 
     if (addr < 0100000) {
@@ -645,7 +645,7 @@ t_value mmu_prefetch (int addr, int actual)
         }
     } else
         val = memory[addr];
-    BRS[i] = val;
+    BRS[i & 3] = val;
     return val;
 }
 

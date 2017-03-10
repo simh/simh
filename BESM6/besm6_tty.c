@@ -1,7 +1,7 @@
 /*
  * besm6_tty.c: BESM-6 teletype device
  *
- * Copyright (c) 2009, Leo Broukhis
+ * Copyright (c) 2009-2017, Leo Broukhis
  * Copyright (c) 2009, Serge Vakulenko
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -72,8 +72,10 @@ char *  process (int sym)
 /* For serial lines */
 int tty_active [TTY_MAX+1], tty_sym [TTY_MAX+1];
 int tty_typed [TTY_MAX+1], tty_instate [TTY_MAX+1];
-time_t tty_last_time [TTY_MAX+1];
-int tty_idle_count [TTY_MAX+1];
+
+/* For all lines */
+time_t tty_last_time [LINES_MAX+1];
+int tty_idle_count [LINES_MAX+1];
 
 /* The serial interrupt generator frequency, common for all VT lines */
 int tty_rate = 300;
