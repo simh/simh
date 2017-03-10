@@ -839,8 +839,10 @@ if (autcon_enb == 0)                                    /* enabled? */
     return SCPE_OK;
 if (name) {                                             /* updating? */
     dptr = find_dev (name);
+    if (dptr == NULL)
+        return SCPE_ARG;
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
-    if ((nctrl < 0) || (dptr == NULL) || (dibp == NULL))
+    if ((nctrl < 0) || (dibp == NULL))
         return SCPE_ARG;
     dibp->numc = nctrl;
     }
