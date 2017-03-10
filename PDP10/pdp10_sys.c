@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Mar-17    RMS     Added mask on EXE repeat count (COVERITY)
    20-Jan-17    RMS     Fixed RIM loader to handle ITS and RIM10B formats
    04-Apr-11    RMS     Removed DEUNA/DELUA support - never implemented
    01-Feb-07    RMS     Added CD support
@@ -333,7 +334,7 @@ do {
     switch (bty) {                                      /* case type */
 
     case EXE_DIR:                                       /* directory */
-        if (ndir)                                       /* got one */
+        if (ndir != 0)                                  /* got one */
             return SCPE_FMT;
         ndir = fxread (dirbuf, sizeof (d10), bsz, fileref);
         if (ndir < bsz)                                 /* error */
@@ -367,7 +368,7 @@ do {
 for (i = 0; i < ndir; i = i + 2) {                      /* loop thru dir */
     fpage = (int32) (dirbuf[i] & RMASK);                /* file page */
     mpage = (int32) (dirbuf[i + 1] & RMASK);            /* memory page */
-    rpt = (int32) ((dirbuf[i + 1] >> 27) + 1);          /* repeat count */
+    rpt = ((int32) ((dirbuf[i + 1] >> 27) + 1)) & 0777; /* repeat count */
     for (j = 0; j < rpt; j++, mpage++) {                /* loop thru rpts */
         if (fpage) {                                    /* file pages? */
             fseek (fileref, (fpage << PAG_V_PN) * sizeof (d10), SEEK_SET);
@@ -385,7 +386,7 @@ for (i = 0; i < ndir; i = i + 2) {                      /* loop thru dir */
         }                                               /* end rpt */
     }                                                   /* end directory */
 if (entvec && entbuf[1])
-    saved_PC = (int32) entbuf[1] & RMASK;               /* start addr */
+    saved_PC = (int32) (entbuf[1] & RMASK);             /* start addr */
 return SCPE_OK;
 }
 
