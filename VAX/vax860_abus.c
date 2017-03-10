@@ -463,6 +463,7 @@ switch (rg) {
 
     case MT_MDCTL:                                      /* MDCTL */
         val = mdctl & MDCTL_RW;
+        break;
 
     case MT_EHSR:                                       /* EHSR */
         val = ehsr & EHSR_VMSE;
