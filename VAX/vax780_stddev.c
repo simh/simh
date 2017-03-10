@@ -1,6 +1,6 @@
 /* vax780_stddev.c: VAX 11/780 standard I/O devices
 
-   Copyright (c) 1998-2015, Robert M Supnik
+   Copyright (c) 1998-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    todr         TODR clock
    tmr          interval timer
 
+   09-Mar-17    RMS     Added missing break (COVERITY)
    03-Apr-15    RMS     TODR only increments if != 0
    18-Apr-12    RMS     Revised to use clock coscheduling
    21-Mar-11    RMS     Added reboot capability
@@ -227,7 +228,7 @@ REG tti_reg[] = {
     { FLDATA (DONE, tti_csr, CSR_V_DONE) },
     { FLDATA (IE, tti_csr, CSR_V_IE) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT + REG_NZ },
     { NULL }
     };
 
@@ -430,8 +431,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmr_poll)));
-                                                        /* continue poll */
+sim_activate (uptr, clk_cosched (tmr_poll));            /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
@@ -451,7 +451,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_buf = 0;
 tti_csr = 0;
 tti_int = 0;
-sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
+sim_activate (&tti_unit, tmr_poll);
 return SCPE_OK;
 }
 
@@ -791,6 +791,7 @@ else {
 
         case MISC_CLWS:
             comm_region[COMM_WRMS] = 0;
+            break;
 
         case MISC_CLCS:
             comm_region[COMM_CLDS] = 0;
