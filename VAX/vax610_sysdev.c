@@ -387,7 +387,9 @@ DEVICE *dptr;
 UNIT *uptr;
 t_stat r;
 
-if (ptr && (*ptr == '/')) {                             /* handle "BOOT /R5:n DEV" format */
+if (ptr == NULL)
+    return SCPE_ARG;
+if (*ptr == '/') {                                      /* handle "BOOT /R5:n DEV" format */
     ptr = get_glyph (ptr, rbuf, 0);                     /* get glyph */
     regptr = rbuf;
     ptr = get_glyph (ptr, gbuf, 0);                     /* get glyph */
