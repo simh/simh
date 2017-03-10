@@ -24,6 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    09-Mar-17    RMS     Added mask on EXE repeat count (COVERITY)
+                        Fixed word count test in EXE loader (COVERITY)
    20-Jan-17    RMS     Fixed RIM loader to handle ITS and RIM10B formats
    04-Apr-11    RMS     Removed DEUNA/DELUA support - never implemented
    01-Feb-07    RMS     Added CD support
@@ -328,7 +329,7 @@ do {
     if (wc == 0)                                        /* error? */
         return SCPE_FMT;
     bsz = (int32) ((data & RMASK) - 1);                 /* get count */
-    if (bsz <= 0)                                       /* zero? */
+    if (bsz < 0)                                        /* zero? */
         return SCPE_FMT;
     bty = (int32) LRZ (data);                           /* get type */
     switch (bty) {                                      /* case type */
@@ -341,8 +342,8 @@ do {
             return SCPE_FMT;
         break;
 
-    case EXE_PDV:                                       /* ??? */
-        fseek (fileref, bsz * sizeof (d10), SEEK_CUR);
+    case EXE_PDV:                                       /* optional */
+        fseek (fileref, bsz * sizeof (d10), SEEK_CUR);  /* skip data */
         break;
 
     case EXE_VEC:                                       /* entry vec */
