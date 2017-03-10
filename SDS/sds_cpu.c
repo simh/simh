@@ -1,6 +1,6 @@
 /* sds_cpu.c: SDS 940 CPU simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cpu          central processor
    rtc          real time clock
 
+   09-Mar-17    RMS     trap_P not set if mem mgt trap during fetch (COVERITY)
    28-Apr-07    RMS     Removed clock initialization
    29-Dec-06    RMS     Fixed breakpoint variable declarations
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -456,7 +457,8 @@ while (reason == 0) {                                   /* loop until halted */
                 break;
                 }
             }
-        reason = Read (save_P = P, &inst);              /* get instr */
+        trap_P = save_P = P;                            /* set backups for fetch */
+        reason = Read (P, &inst);                       /* get instr */
         P = (P + 1) & VA_MASK;                          /* incr PC */
         if (reason == SCPE_OK) {                        /* fetch ok? */
             ion_defer = 0;                              /* clear ion */
