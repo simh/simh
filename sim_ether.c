@@ -419,7 +419,7 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
   strncpy (state.sim, sim_name, sizeof(state.sim));
   getcwd (state.cwd, sizeof(state.cwd));
   if (uptr)
-    strncpy (state.uname, sim_uname (uptr), sizeof(state.uname));
+    strncpy (state.uname, sim_uname (uptr), sizeof(state.uname)-1);
   cptr = strchr (strmac, '>');
   if (cptr) {
     state.file[sizeof(state.file)-1] = '\0';
