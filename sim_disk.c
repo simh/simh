@@ -2071,13 +2071,13 @@ return stat;
 
 void sim_disk_data_trace(UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason)
 {
-struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+DEVICE *dptr = find_dev_from_unit (uptr);
 
-if (sim_deb && (ctx->dptr->dctrl & reason)) {
+if (sim_deb && (dptr->dctrl & reason)) {
     char pos[32];
 
     sprintf (pos, "lbn: %08X ", (unsigned int)lba);
-    sim_data_trace(ctx->dptr, uptr, (detail ? data : NULL), pos, len, txt, reason);
+    sim_data_trace(dptr, uptr, (detail ? data : NULL), pos, len, txt, reason);
     }
 }
 
