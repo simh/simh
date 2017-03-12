@@ -1073,7 +1073,7 @@ t_stat isbc208_attach (UNIT *uptr, CONST char *cptr)
             isbc208_buf[uptr->u6] = (uint8 *)malloc(flen);
             if (isbc208_buf[uptr->u6] == NULL) {
                 sim_printf("   iSBC208_attach: Malloc error\n");
-                free(fp);
+                fclose(fp);
                 return SCPE_MEM;
             }
         }
