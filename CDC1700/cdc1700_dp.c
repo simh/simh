@@ -623,7 +623,7 @@ void DPDiskIO(UNIT *uptr, uint16 iotype)
 {
   struct dpio_unit *iou = (struct dpio_unit *)uptr->up7;
   const char *error = "Unknown";
-  enum dpio_status status;
+  enum dpio_status status = DPIO_ADDRERR;
 
   switch (iotype) {
     case DP_WRITE:
