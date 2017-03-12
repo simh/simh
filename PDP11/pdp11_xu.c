@@ -557,9 +557,13 @@ t_stat xu_process_loopback(CTLR* xu, ETH_PACK* pack)
   ETH_MAC   physical_address;
   t_stat    status;
   int offset   = 16 + (pack->msg[14] | (pack->msg[15] << 8));
-  int function = pack->msg[offset] | (pack->msg[offset+1] << 8);
+  int function;
 
-  sim_debug(DBG_TRC, xu->dev, "xu_process_loopback()\n");
+  if (offset > ETH_MAX_PACKET - 8)
+      return SCPE_NOFNC;
+  function = pack->msg[offset] | (pack->msg[offset+1] << 8);
+
+  sim_debug(DBG_TRC, xu->dev, "xu_process_loopback(function=%d)\n", function);
 
   if (function != 2 /*forward*/)
     return SCPE_NOFNC;
@@ -1126,11 +1130,11 @@ int32 xu_command(CTLR* xu)
       udb[20] = 0x0700;                   /* hatype<07:00> + fval2 */
       udb[21] = 0x0600;                   /* halen + hatype<15:08> */
                                           /* built-in MAC address */
-      udb[21] = mac_w[0];                 /* HA<15:00> */
-      udb[22] = mac_w[1];                 /* HA<31:16> */
-      udb[23] = mac_w[2];                 /* HA<47:32> */
-      udb[24] = 0x64;                     /* dtype */
-      udb[25] = (11 << 8) + 1;            /* dvalue + dlen */
+      udb[22] = mac_w[0];                 /* HA<15:00> */
+      udb[23] = mac_w[1];                 /* HA<31:16> */
+      udb[24] = mac_w[2];                 /* HA<47:32> */
+      udb[25] = 0x64;                     /* dtype */
+      udb[26] = (11 << 8) + 1;            /* dvalue + dlen */
       
       /* transfer udb to host */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
@@ -1225,7 +1229,7 @@ void xu_process_receive(CTLR* xu)
     if (!(xu->var->rxhdr[2] & RXR_OWN)) {
       /* tell the host there are no more buffers */
       /* xu->var->pcsr0 |= PCSR0_RCBI; */ /* I don't think this is correct 08-dec-2005 dth */
-      sim_debug(DBG_TRC, xu->dev, "Stopping input processing - Not Owned receive descriptor=0x%X, slen=0x%04X(%d), segb=0x%04X, ", ba, slen, slen, segb);
+      sim_debug(DBG_TRC, xu->dev, "Stopping input processing - Not Owned receive descriptor=0x%X, ", ba);
       sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w2, xu->var->rxhdr[2], xu->var->rxhdr[2], 0);
       sim_debug_bits(DBG_TRC, xu->dev, xu_rdes_w3, xu->var->rxhdr[3], xu->var->rxhdr[3], 1);
       break;
