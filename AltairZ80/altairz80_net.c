@@ -122,7 +122,7 @@ DEVICE net_dev = {
 static t_stat set_net(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     char temp[CBUFSIZE];
     if ((net_unit.flags & UNIT_ATT) && ((net_unit.flags & UNIT_SERVER) != (uint32)value)) {
-        strncpy(temp, net_unit.filename, CBUFSIZE); /* save name for later attach */
+        strncpy(temp, net_unit.filename, CBUFSIZE - 1); /* save name for later attach */
         net_detach(&net_unit);
         net_unit.flags ^= UNIT_SERVER; /* now switch from client to server and vice versa */
         net_attach(uptr, temp);

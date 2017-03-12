@@ -1112,7 +1112,7 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
                                       " FORMAT T:%d/H:%d/N:%d=%d/L=%d[%d] Fill=0x%02x\n", PCX,
                                       pDrive->track, wd179x_info->fdc_head,
                                       wd179x_info->fdc_fmt_sector_count,
-                                      wd179x_info->fdc_sectormap[wd179x_info->fdc_fmt_sector_count],
+                                      wd179x_info->fdc_sectormap[wd179x_info->fdc_fmt_sector_count - 1],
                                       wd179x_info->fdc_dataindex, wd179x_info->fdc_sec_len, sdata.raw[0]);
 
                             wd179x_info->fdc_gap[1] = 0;

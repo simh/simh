@@ -546,36 +546,39 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
 
                 dataBuffer = (uint8 *)malloc(xfr_len);
 
-                sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
+                if(sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET) == 0) {
 
-                if(disk3_info->iopb[DISK3_IOPB_ARG1] == 1) { /* Read */
-                    rtn = sim_fread(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
+                    if(disk3_info->iopb[DISK3_IOPB_ARG1] == 1) { /* Read */
+                        rtn = sim_fread(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
 
-                    sim_debug(RD_DATA_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
-                              "  READ @0x%05x T:%04d/S:%04d/#:%d %s\n",
-                              disk3_info->sel_drive,
-                              PCX,
-                              disk3_info->dma_addr,
-                              pDrive->cur_track,
-                              pDrive->cur_sect,
-                              pDrive->xfr_nsects,
-                              rtn == (size_t)xfr_len ? "OK" : "NOK" );
+                        sim_debug(RD_DATA_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                                  "  READ @0x%05x T:%04d/S:%04d/#:%d %s\n",
+                                  disk3_info->sel_drive,
+                                  PCX,
+                                  disk3_info->dma_addr,
+                                  pDrive->cur_track,
+                                  pDrive->cur_sect,
+                                  pDrive->xfr_nsects,
+                                  rtn == (size_t)xfr_len ? "OK" : "NOK" );
 
 
-                    /* Perform DMA Transfer */
-                    for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
-                        PutByteDMA(disk3_info->dma_addr + xfr_count, dataBuffer[xfr_count]);
+                        /* Perform DMA Transfer */
+                        for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
+                            PutByteDMA(disk3_info->dma_addr + xfr_count, dataBuffer[xfr_count]);
+                        }
+                    } else { /* Write */
+                        sim_debug(WR_DATA_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                                  " WRITE @0x%05x T:%04d/S:%04d/#:%d\n", disk3_info->sel_drive, PCX, disk3_info->dma_addr, pDrive->cur_track, pDrive->cur_sect, pDrive->xfr_nsects );
+
+                        /* Perform DMA Transfer */
+                        for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
+                            dataBuffer[xfr_count] = GetByteDMA(disk3_info->dma_addr + xfr_count);
+                        }
+
+                        sim_fwrite(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
                     }
-                } else { /* Write */
-                    sim_debug(WR_DATA_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
-                              " WRITE @0x%05x T:%04d/S:%04d/#:%d\n", disk3_info->sel_drive, PCX, disk3_info->dma_addr, pDrive->cur_track, pDrive->cur_sect, pDrive->xfr_nsects );
-
-                    /* Perform DMA Transfer */
-                    for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
-                        dataBuffer[xfr_count] = GetByteDMA(disk3_info->dma_addr + xfr_count);
-                    }
-
-                    sim_fwrite(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
+                } else {
+                    sim_debug(ERROR_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT " READWRITE: sim_fseek error.\n", disk3_info->sel_drive, PCX);
                 }
 
                 free(dataBuffer);
@@ -623,8 +626,11 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 fmtBuffer = (uint8 *)malloc(data_len);
                 memset(fmtBuffer, disk3_info->iopb[DISK3_IOPB_ARG2], data_len);
 
-                sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
-                sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref);
+                if(sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET) == 0) {
+                    sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref);
+                } else {
+                    sim_debug(WR_DATA_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT " FORMAT: sim_fseek error.\n", disk3_info->sel_drive, PCX);
+                }
 
                 free(fmtBuffer);
 

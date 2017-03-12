@@ -499,9 +499,12 @@ static uint8 MDSAD_Read(const uint32 Addr)
                         if(pDrive->uptr->fileref == NULL) {
                             sim_printf(".fileref is NULL!" NLP);
                         } else {
-                            sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
-                            sim_fwrite(sdata.u.data, 1, MDSAD_SECTOR_LEN,
-                                (pDrive->uptr)->fileref);
+                            if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
+                                sim_fwrite(sdata.u.data, 1, MDSAD_SECTOR_LEN,
+                                           (pDrive->uptr)->fileref);
+                            } else {
+                                sim_printf("%s: sim_fseek error" NLP, __FUNCTION__);
+                            }
                         }
                         break;
                     case IMAGE_TYPE_CPT:
@@ -733,13 +736,17 @@ static uint8 MDSAD_Read(const uint32 Addr)
                                     if(pDrive->uptr->fileref == NULL) {
                                         sim_printf(".fileref is NULL!" NLP);
                                     } else {
-                                        sim_fseek((pDrive->uptr)->fileref,
-                                            sec_offset, SEEK_SET);
-                                        rtn = sim_fread(&sdata.u.data[0], 1, MDSAD_SECTOR_LEN,
-                                            (pDrive->uptr)->fileref);
-                                        if (rtn != MDSAD_SECTOR_LEN) {
+                                        if (sim_fseek((pDrive->uptr)->fileref,
+                                                      sec_offset, SEEK_SET) == 0) {
+                                            rtn = sim_fread(&sdata.u.data[0], 1, MDSAD_SECTOR_LEN,
+                                                            (pDrive->uptr)->fileref);
+                                            if (rtn != MDSAD_SECTOR_LEN) {
+                                                sim_debug(ERROR_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
+                                                          " READ: sim_fread error.\n", PCX);
+                                            }
+                                        } else {
                                             sim_debug(ERROR_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
-                                                      " READ: sim_fread error.\n", PCX);
+                                                      " READ: sim_fseek error.\n", PCX);
                                         }
                                     }
                                     break;
