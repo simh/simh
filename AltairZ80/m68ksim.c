@@ -373,7 +373,7 @@ unsigned int m68k_cpu_read_word(unsigned int address) {
         default:
             break;
     }
-    if (address > M68K_MAX_RAM) {
+    if (address > M68K_MAX_RAM-1) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
             sim_printf("M68K: 0x%08x Attempt to read word from non existing memory 0x%08x." NLP,
                    PCX, address);
@@ -391,7 +391,7 @@ unsigned int m68k_cpu_read_long(unsigned int address) {
         default:
             break;
     }
-    if (address > M68K_MAX_RAM) {
+    if (address > M68K_MAX_RAM-3) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
             sim_printf("M68K: 0x%08x Attempt to read long from non existing memory 0x%08x." NLP,
                    PCX, address);
@@ -433,7 +433,7 @@ void m68k_cpu_write_byte(unsigned int address, unsigned int value) {
 }
 
 void m68k_cpu_write_word(unsigned int address, unsigned int value) {
-    if (address > M68K_MAX_RAM) {
+    if (address > M68K_MAX_RAM-1) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
             sim_printf("M68K: 0x%08x Attempt to write word 0x%04x to non existing memory 0x%08x." NLP,
                    PCX, value & 0xffff, address);
@@ -483,7 +483,7 @@ void m68k_cpu_write_long(unsigned int address, unsigned int value) {
         default:
             break;
     }
-    if (address > M68K_MAX_RAM) {
+    if (address > M68K_MAX_RAM-3) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
             sim_printf("M68K: 0x%08x Attempt to write long 0x%08x to non existing memory 0x%08x." NLP,
                    PCX, value, address);
