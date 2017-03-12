@@ -137,6 +137,10 @@ static t_stat fw2_attach(UNIT *uptr, CONST char *cptr)
         }
     }
 
+    if (i == FW2_MAX_BOARDS) {
+        return (SCPE_IERR);
+    }
+
     fw2_info[i] = (FW2_INFO *)calloc(1, sizeof(FW2_INFO));
     fw2_info[i]->uptr = uptr;
     fw2_info[i]->uptr->u3 = baseaddr;

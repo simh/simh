@@ -3288,7 +3288,7 @@ unsigned int m68k_is_valid_instruction(unsigned int instruction, unsigned int cp
             if(g_instruction_table[instruction] == d68010_moves_32)
                 return 0;
             if(g_instruction_table[instruction] == d68010_rtd)
-                return 0;
+                return 0;   /* intentional fallthrough, older models have more invalid instructions */
         case M68K_CPU_TYPE_68010:
             if(g_instruction_table[instruction] == d68020_bcc_32)
                 return 0;
