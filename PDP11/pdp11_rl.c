@@ -749,7 +749,7 @@ static void rlv_maint (void)
 t_stat rl_svc (UNIT *uptr)
 {
 int32 wc, maxwc, t;
-t_stat err;
+t_stat err = 0;
 t_seccnt sectsread;
 int32 i, da, awc;
 uint32 ma;

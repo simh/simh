@@ -243,8 +243,15 @@ typedef uint32          t_addr;
 
 #if defined (_WIN32) /* Actually, a GCC issue */
 #define LL_FMT "I64"
+#define LL_TYPE long long
+#else
+#if defined (__VAX) /* No 64 bit ints on VAX */
+#define LL_FMT "l"
+#define LL_TYPE long
 #else
 #define LL_FMT "ll"
+#define LL_TYPE long long
+#endif
 #endif
 
 #if defined (VMS) && (defined (__ia64) || defined (__ALPHA))
@@ -370,9 +377,10 @@ typedef uint32          t_addr;
 #define SCPE_INVREM     (SCPE_BASE + 43)                /* invalid remote console command */
 #define SCPE_NOTATT     (SCPE_BASE + 44)                /* not attached */
 #define SCPE_EXPECT     (SCPE_BASE + 45)                /* expect matched */
-#define SCPE_REMOTE     (SCPE_BASE + 46)                /* remote console command */
+#define SCPE_AMBREG     (SCPE_BASE + 46)                /* ambiguous register */
+#define SCPE_REMOTE     (SCPE_BASE + 47)                /* remote console command */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 47)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 48)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x1000                          /* tti data flag */
 #define SCPE_BREAK      0x2000                          /* tti break flag */
 #define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
@@ -1042,7 +1050,7 @@ extern int32 sim_asynch_inst_latency;
 /* This approach uses intrinsics to manage access to the link list head     */
 /* sim_asynch_queue.  This implementation is a completely lock free design  */
 /* which avoids the potential ABA issues.                                   */
-#define AIO_QUEUE_MODE "Lock free asynchronous event queue access"
+#define AIO_QUEUE_MODE "Lock free asynchronous event queue"
 #define AIO_INIT                                                  \
     do {                                                          \
       int tmr;                                                    \
@@ -1074,7 +1082,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_ILOCK AIO_LOCK
 #define AIO_IUNLOCK AIO_UNLOCK
 #define AIO_QUEUE_VAL (UNIT *)(InterlockedCompareExchangePointer((void * volatile *)&sim_asynch_queue, (void *)sim_asynch_queue, NULL))
-#define AIO_QUEUE_SET(val, queue) (UNIT *)(InterlockedCompareExchangePointer((void * volatile *)&sim_asynch_queue, (void *)val, queue))
+#define AIO_QUEUE_SET(newval, oldval) (UNIT *)(InterlockedCompareExchangePointer((void * volatile *)&sim_asynch_queue, (void *)newval, oldval))
 #define AIO_UPDATE_QUEUE sim_aio_update_queue ()
 #define AIO_ACTIVATE(caller, uptr, event_time)                                   \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) {           \
@@ -1085,7 +1093,7 @@ extern int32 sim_asynch_inst_latency;
 /* This approach uses a pthread mutex to manage access to the link list     */
 /* head sim_asynch_queue.  It will always work, but may be slower than the  */
 /* lock free approach when using USE_AIO_INTRINSICS                         */
-#define AIO_QUEUE_MODE "Lock based asynchronous event queue access"
+#define AIO_QUEUE_MODE "Lock based asynchronous event queue"
 #define AIO_INIT                                                  \
     do {                                                          \
       int tmr;                                                    \
@@ -1115,7 +1123,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_ILOCK AIO_LOCK
 #define AIO_IUNLOCK AIO_UNLOCK
 #define AIO_QUEUE_VAL sim_asynch_queue
-#define AIO_QUEUE_SET(val, queue) (sim_asynch_queue = val)
+#define AIO_QUEUE_SET(newval, oldval) ((sim_asynch_queue = newval),oldval)
 #define AIO_UPDATE_QUEUE sim_aio_update_queue ()
 #define AIO_ACTIVATE(caller, uptr, event_time)                         \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \

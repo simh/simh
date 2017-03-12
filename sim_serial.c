@@ -188,7 +188,7 @@ serial_open_devices[serial_open_device_count-1].port = port;
 serial_open_devices[serial_open_device_count-1].line = line;
 strncpy(serial_open_devices[serial_open_device_count-1].name, name, sizeof(serial_open_devices[serial_open_device_count-1].name)-1);
 if (config)
-    strncpy(serial_open_devices[serial_open_device_count-1].config, config, sizeof(serial_open_devices[serial_open_device_count-1].config));
+    strncpy(serial_open_devices[serial_open_device_count-1].config, config, sizeof(serial_open_devices[serial_open_device_count-1].config)-1);
 return &serial_open_devices[serial_open_device_count-1];
 }
 
@@ -1421,6 +1421,7 @@ free (port);
 
 #if defined(__VAX)
 #define sys$assign SYS$ASSIGN
+#define sys$qio SYS$QIO
 #define sys$qiow SYS$QIOW
 #define sys$dassgn SYS$DASSGN
 #define sys$device_scan SYS$DEVICE_SCAN

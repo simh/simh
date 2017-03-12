@@ -428,10 +428,10 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         R[T1 - T] = '\0';
         printHex2(H, val[B++]);
         strcat(R, H);
-        strcat(R, T1 + 1);
+        strcat(R, T1 + 1); /* ok, since T1 is a short sub-string coming from one of the tables */
     }
     else
-        strcpy(R, T);
+        strcpy(R, T); /* ok, since T is a short string coming from one of the tables */
     if ( (P = strchr(R, '%')) ) {
         *P = C;
         if ( (P = strchr(P + 1, '%')) )

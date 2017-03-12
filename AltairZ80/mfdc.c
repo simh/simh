@@ -255,6 +255,9 @@ static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr)
     }
 
     i = find_unit_index(uptr);
+    if (i == -1) {
+        return (SCPE_IERR);
+    }
 
     /* Default for new file is DSK */
     uptr->u3 = IMAGE_TYPE_DSK;
@@ -474,8 +477,7 @@ static uint8 MFDC_Read(const uint32 Addr)
                     case IMAGE_TYPE_DSK:
                         if(pDrive->uptr->fileref == NULL) {
                             sim_printf(".fileref is NULL!" NLP);
-                        } else {
-                            sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                        } else if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
 #ifdef USE_VGI
                             rtn = sim_fread(sdata.raw, 1, MFDC_SECTOR_LEN, (pDrive->uptr)->fileref);
                             if (rtn != MFDC_SECTOR_LEN)
@@ -484,6 +486,8 @@ static uint8 MFDC_Read(const uint32 Addr)
                             if (rtn != 256)
 #endif /* USE_VGI */
                                 sim_printf("%s: sim_fread error. Result = %d." NLP, __FUNCTION__, rtn);
+                        } else {
+                            sim_printf("%s: sim_fseek error." NLP, __FUNCTION__);
                         }
                         break;
                     case IMAGE_TYPE_CPT:
@@ -601,13 +605,14 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                         case IMAGE_TYPE_DSK:
                             if(pDrive->uptr->fileref == NULL) {
                                 sim_printf(".fileref is NULL!" NLP);
-                            } else {
-                                sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                            } else if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
 #ifdef USE_VGI
                                 sim_fwrite(sdata.raw, 1, MFDC_SECTOR_LEN, (pDrive->uptr)->fileref);
 #else
                                 sim_fwrite(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
 #endif /* USE_VGI */
+                            } else {
+                                sim_printf("%s: sim_fseek error." NLP, __FUNCTION__);
                             }
                             break;
                         case IMAGE_TYPE_CPT:

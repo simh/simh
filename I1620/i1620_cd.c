@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   09-Mar-17    RMS     Guardbanded translation table lookups (COVERITY)
    31-Jan-15    TFM     Changes to translation tables (Tom McBride)
    10-Dec-13    RMS     Fixed WA card punch translations (Bob Armstrong)
                         Fixed card reader EOL processing (Bob Armstrong)
@@ -289,7 +290,7 @@ switch (op) {                                           /* case on op */
         if (r != SCPE_OK)                               /* error? */
             return r;
         for (i = 0; i < CD_LEN; i++) {                  /* transfer to mem */
-            cdc = cdr_to_num[cdr_buf[i]];               /* translate */
+            cdc = cdr_to_num[cdr_buf[i] & 0177];        /* translate */
             if (cdc < 0) {                              /* invalid? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
                 if (io_stop)                            /* set return status */
@@ -306,7 +307,7 @@ switch (op) {                                           /* case on op */
         if (r != SCPE_OK)                               /* error? */
             return r;
         for (i = 0; i < CD_LEN; i++) {                  /* transfer to mem */
-            cdc = cdr_to_alp[cdr_buf[i]];               /* translate */
+            cdc = cdr_to_alp[cdr_buf[i] & 0177];        /* translate */
             if (cdc < 0) {                              /* invalid? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
                 if (io_stop)                            /* set return status */

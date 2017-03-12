@@ -300,7 +300,7 @@ struct {
         {  256, "MS780-C M8210 array"}, 
         {   64, "MS780-C M8211 array"}, 
         {    0, NULL}};
-uint32 i, slot, bd;
+uint32 i, slot, bd = 0;
 
 for (i = 0; i < MCTL_NUM; i++) {
     uint32 baseaddr = ((mcr_b[i] & MCRB_SA) << 1);

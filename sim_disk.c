@@ -428,6 +428,7 @@ t_bool saved_quiet = sim_quiet;
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
         physical_size = sim_fsize_ex (uptr->fileref);
+        break;
     case DKUF_F_VHD:                                    /* VHD format */
         physical_size = sim_vhd_disk_size (uptr->fileref);
         break;
@@ -1242,7 +1243,7 @@ uint8 sector_buf[512];
 ultrix_disklabel *Label = (ultrix_disklabel *)(sector_buf + sizeof (sector_buf) - sizeof (ultrix_disklabel));
 t_offset ret_val = (t_offset)-1;
 int i;
-uint32 max_lbn = 0, max_lbn_partnum;
+uint32 max_lbn = 0, max_lbn_partnum = 0;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
@@ -1659,6 +1660,7 @@ if ((created) && (!copied)) {
             }
         if (!sim_quiet)
             sim_printf ("%s%d: Initialized To Sector Address %dMB.  100%% complete.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000));
+        free (init_buf);
         }
     if (pdp11tracksize)
         sim_disk_pdp11_bad_block (uptr, pdp11tracksize, sector_size/sizeof(uint16));
@@ -2034,8 +2036,6 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
 if (uptr->flags & UNIT_RO)
     return SCPE_RO;
-if (ctx->capac_factor != 2)                  /* Must be Word oriented Capacity */
-    return SCPE_IERR;
 if (!get_yn ("Overwrite last track? [N]", FALSE))
     return SCPE_OK;
 if ((buf = (uint16 *) malloc (wds * sizeof (uint16))) == NULL)
@@ -2054,10 +2054,14 @@ buf[2] = buf[3] = 0;
 for (i = 4; i < wds; i++)
     buf[i] = 0177777u;
 da = (uptr->capac*((dptr->flags & DEV_SECTORS) ? 512 : 1)) - (sec * wds);
-for (i = 0; (i < sec) && (i < 10); i++, da += wds)
+for (i = 0; (stat == SCPE_OK) && (i < sec) && (i < 10); i++, da += wds)
     if (ctx)
         stat = sim_disk_wrsect (uptr, (t_lba)(da/wds), (uint8 *)buf, NULL, 1);
     else {
+        if (sim_fseek (uptr->fileref, da, SEEK_SET)) {
+            stat = SCPE_IOERR;
+            break;
+            }
         if (wds != sim_fwrite (buf, sizeof (uint16), wds, uptr->fileref))
             stat = SCPE_IOERR;
         }
@@ -2067,13 +2071,13 @@ return stat;
 
 void sim_disk_data_trace(UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason)
 {
-struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+DEVICE *dptr = find_dev_from_unit (uptr);
 
-if (sim_deb && (ctx->dptr->dctrl & reason)) {
+if (sim_deb && (dptr->dctrl & reason)) {
     char pos[32];
 
     sprintf (pos, "lbn: %08X ", (unsigned int)lba);
-    sim_data_trace(ctx->dptr, uptr, (detail ? data : NULL), pos, len, txt, reason);
+    sim_data_trace(dptr, uptr, (detail ? data : NULL), pos, len, txt, reason);
     }
 }
 
@@ -3365,9 +3369,10 @@ if ((sDynamic) &&
                     if (0 == memcmp (sDynamic->ParentLocatorEntries[j].PlatformCode, "W2ru", 4)) {
                         const char *c;
 
-                        if ((c = strrchr (szVHDPath, '\\')))
-                             memcpy (CheckPath, szVHDPath, c-szVHDPath+1);
-                             strncpy (CheckPath+strlen(CheckPath), ParentName, sizeof (CheckPath)-(strlen (CheckPath)+1));
+                        if ((c = strrchr (szVHDPath, '\\'))) {
+                            memcpy (CheckPath, szVHDPath, c-szVHDPath+1);
+                            strncpy (CheckPath+strlen(CheckPath), ParentName, sizeof (CheckPath)-(strlen (CheckPath)+1));
+                            }
                         }
                 VhdPathToHostPath (CheckPath, CheckPath, sizeof (CheckPath));
                 if (0 == GetVHDFooter(CheckPath,
@@ -3988,7 +3993,7 @@ if ((szFileSpec[0] != '/') || (strchr (szFileSpec, ':')))
 else
     strncpy (szFullFileSpecBuffer, szFileSpec, BufferSize);
 if ((c = strstr (szFullFileSpecBuffer, "]/")))
-    memcpy (c+1, c+2, strlen(c+2)+1);
+    memmove (c+1, c+2, strlen(c+2)+1);
 memset (szFullFileSpecBuffer + strlen (szFullFileSpecBuffer), 0, BufferSize - strlen (szFullFileSpecBuffer));
 #endif
 }
@@ -4016,14 +4021,14 @@ if ((c = strrchr (szVhdPath, ']'))) {
 while ((c = strchr (szVhdPath, '/')))
     *c = '\\';
 for (c = strstr (szVhdPath, "\\.\\"); c; c = strstr (szVhdPath, "\\.\\"))
-    memcpy (c, c+2, strlen(c+2)+1);
+    memmove (c, c+2, strlen(c+2)+1);
 for (c = strstr (szVhdPath, "\\\\"); c; c = strstr (szVhdPath, "\\\\"))
-    memcpy (c, c+1, strlen(c+1)+1);
+    memmove (c, c+1, strlen(c+1)+1);
 while ((c = strstr (szVhdPath, "\\..\\"))) {
     *c = '\0';
     d = strrchr (szVhdPath, '\\');
     if (d)
-        memcpy (d, c+3, strlen(c+3)+1);
+        memmove (d, c+3, strlen(c+3)+1);
     else
         return d;
     }

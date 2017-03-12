@@ -134,7 +134,7 @@ int32 cur_sect[9] = {0, 0, 0, 0, 0, 0, 0, 0, 377};
 int32 cur_byte[9] = {0, 0, 0, 0, 0, 0, 0, 0, 377};
 int32 cur_flags[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-char dskbuf[137];                                       /* Data Buffer */
+char dskbuf[138];                                       /* Data Buffer */
 int32 dirty = 0;                                        /* 1 when buffer has unwritten data in it */
 UNIT *dptr;                                             /* fileref to write dirty buffer to */
 

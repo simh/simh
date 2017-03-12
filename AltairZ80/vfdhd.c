@@ -233,7 +233,7 @@ static t_stat vfdhd_attach(UNIT *uptr, CONST char *cptr)
     unsigned int i = 0;
 
     r = attach_unit(uptr, cptr);                        /* attach unit                          */
-    if ( r != SCPE_OK)                                  /* error?                               */
+    if(r != SCPE_OK)                /* error?                               */
         return r;
 
     /* Determine length of this disk */
@@ -247,6 +247,9 @@ static t_stat vfdhd_attach(UNIT *uptr, CONST char *cptr)
         if(vfdhd_dev.units[i].fileref == uptr->fileref) {
             break;
         }
+    }
+    if(i == VFDHD_MAX_DRIVES) {
+        return (SCPE_IERR);
     }
 
     if(uptr->capac > 0) {
@@ -330,6 +333,9 @@ static t_stat vfdhd_detach(UNIT *uptr)
         if(vfdhd_dev.units[i].fileref == uptr->fileref) {
             break;
         }
+    }
+    if(i == VFDHD_MAX_DRIVES) {
+        return (SCPE_IERR);
     }
 
     DBG_PRINT(("Detach VFDHD%d\n", i));
@@ -582,8 +588,7 @@ static void VFDHD_Command(void)
             case IMAGE_TYPE_DSK:
                 if(pDrive->uptr->fileref == NULL) {
                     sim_printf(".fileref is NULL!" NLP);
-                } else {
-                    sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                } else if(sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
                     rtn = sim_fread(&sdata.u.sync, 1, 274, /*VFDHD_SECTOR_LEN,*/ (pDrive->uptr)->fileref);
                     if (rtn != 274) {
                         sim_debug(ERROR_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " READ: sim_fread error.\n", PCX);
@@ -596,7 +601,8 @@ static void VFDHD_Command(void)
                     }
 
                     DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " READ: Sync found at offset %d" NLP, PCX, vfdhd_info->datacount));
-
+                } else {
+                    sim_debug(ERROR_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " READ: sim_fseek error.\n", PCX);
                 }
                 break;
             case IMAGE_TYPE_CPT:
@@ -641,17 +647,20 @@ static void VFDHD_Command(void)
                     sim_printf(".fileref is NULL!" NLP);
                 } else {
                     DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR drive=%d, track=%d, head=%d, sector=%d" NLP,
-                        PCX,
-                        vfdhd_info->sel_drive,
-                        pDrive->track,
-                        vfdhd_info->head,
-                        vfdhd_info->sector));
-                    sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                               PCX,
+                               vfdhd_info->sel_drive,
+                               pDrive->track,
+                               vfdhd_info->head,
+                               vfdhd_info->sector));
+                    if(sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
 #ifdef USE_VGI
-                    sim_fwrite(&sdata.u.sync, 1, VFDHD_SECTOR_LEN, (pDrive->uptr)->fileref);
+                        sim_fwrite(&sdata.u.sync, 1, VFDHD_SECTOR_LEN, (pDrive->uptr)->fileref);
 #else
-                    sim_fwrite(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
+                        sim_fwrite(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
 #endif /* USE_VGI */
+                    } else {
+                        sim_printf("%s: sim_fseek error" NLP, __FUNCTION__);
+                    }
                 }
                 break;
             case IMAGE_TYPE_CPT:

@@ -1,6 +1,6 @@
 /* pdp11_rf.c: RF11 fixed head disk simulator
 
-   Copyright (c) 2006-2013, Robert M Supnik
+   Copyright (c) 2006-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rf           RF11 fixed head disk
 
+   13-Feb-17    RMS     Fixed CSR address in boot code (Paul Koning)
    23-Oct-13    RMS     Revised for new boot setup routine
    03-Sep-13    RMS     Added explicit void * cast
    19-Mar-12    RMS     Fixed bug in updating mem addr extension (Peter Schorn)
@@ -440,13 +441,13 @@ return auto_config (0, 0);
 
 #define BOOT_START      02000                           /* start */
 #define BOOT_ENTRY      (BOOT_START + 002)              /* entry */
-#define BOOT_CSR        (BOOT_START + 032)              /* CSR */
+#define BOOT_CSR        (BOOT_START + 010)              /* CSR */
 #define BOOT_LEN        (sizeof (boot_rom) / sizeof (uint16))
 
 static const uint16 boot_rom[] = {
     0043113,                        /* "FD" */
     0012706, BOOT_START,            /* MOV #boot_start, SP */
-    0012701, 0177472,               /* MOV #RFDAE+2, R1     ; csr block */
+    0012701, 0177472,               /* MOV #RFCS+12, R1     ; csr block */
     0005041,                        /* CLR -(R1)            ; clear dae */
     0005041,                        /* CLR -(R1),           ; clear da */
     0005041,                        /* CLR -(R1),           ; clear cma */

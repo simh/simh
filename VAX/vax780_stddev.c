@@ -1036,6 +1036,7 @@ else {
 
         case MISC_CLWS:
             comm_region[COMM_WRMS] = 0;
+            break;
 
         case MISC_CLCS:
             comm_region[COMM_CLDS] = 0;

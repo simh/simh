@@ -1357,6 +1357,7 @@ static void setClockZSDOS(void) {
     newTime.tm_hour = fromBCD(GetBYTEWrapper(setClockZSDOSAdr + 3));
     newTime.tm_min  = fromBCD(GetBYTEWrapper(setClockZSDOSAdr + 4));
     newTime.tm_sec  = fromBCD(GetBYTEWrapper(setClockZSDOSAdr + 5));
+    newTime.tm_isdst = 0;
     ClockZSDOSDelta = mktime(&newTime) - time(NULL);
 }
 
@@ -1371,6 +1372,7 @@ static time_t mkCPM3Origin(void) {
     date.tm_hour    = 0;
     date.tm_min     = 0;
     date.tm_sec     = 0;
+    date.tm_isdst   = 0;
     return mktime(&date);
 }
 

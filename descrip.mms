@@ -276,9 +276,9 @@ PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
   @ 'MISS_SAY' "*** Error *** "
   @ 'MISS_SAY' "*** Error *** The vms-pcap.zip file can be downloaded from:"
   @ 'MISS_SAY' "*** Error *** "
-  @ 'MISS_SAY' "*** Error ***     https://github.com/markpizz/simh/downloads"
+  @ 'MISS_SAY' "*** Error ***     https://github.com/simh/simh/archive/vms-pcap.zip"
   @ 'MISS_SAY' "*** Error *** "
-  @ 'MISS_SAY' "*** Error *** Be sure to ""unzip -a vms-pcap"" to properly set the file attributes"
+  @ 'MISS_SAY' "*** Error *** Be sure to ""unzip -aa simh-vms-pcap.zip"" to properly set the file attributes"
   @ 'MISS_SAY' "*** Error *** "
   @ 'MISS_SAY' "*** Error *** The PCAP-VMS components are presumed (by this procedure) to be"
   @ 'MISS_SAY' "*** Error *** located in a directory at the same level as the directory"
@@ -957,7 +957,7 @@ ALL : ALTAIR ALTAIRZ80 CDC1700 ECLIPSE GRI LGP H316 HP2100 HP3000 I1401 I1620 \
 #
 # Else We Are On VAX And Build Everything EXCEPT the 64b simulators
 #
-ALL : ALTAIR ALTAIRZ80 CDC1700 GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
+ALL : ALTAIR GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
       NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 \
       VAX MICROVAX3900 MICROVAX1 RTVAX1000 MICROVAX2 VAX730 VAX750 VAX780 VAX8600 \
       SDS SWTP6800MP-A SWTP6800MP-A2 SSEM
@@ -1044,6 +1044,10 @@ $(ALTAIR_LIB) : $(ALTAIR_SOURCE)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+#
+# If Not On VAX, Build The AltairZ80 Library.
+#
+.IFDEF ALPHA_OR_IA64
 $(ALTAIRZ80_LIB1) : $(ALTAIRZ80_SOURCE1)
         $!
         $! Building The $(ALTAIRZ80_LIB1) Library.
@@ -1065,6 +1069,18 @@ $(ALTAIRZ80_LIB2) : $(ALTAIRZ80_SOURCE2)
              LIBRARY/CREATE $(MMS$TARGET)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# We Are On VAX And Due To The Use of INT64 We Can't Build It.
+#
+$(ALTAIRZ80_LIB1) :
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
+
+$(ALTAIRZ80_LIB2) :
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
+.ENDIF
 
 #
 # If Not On VAX, Build The Eclipse Library.
@@ -1444,6 +1460,10 @@ $(B5500_LIB) :
         $! $(MMS$TARGET) Library On VAX.
 .ENDIF
 
+#
+# If Not On VAX, Build The CDC 1700 Library.
+#
+.IFDEF ALPHA_OR_IA64
 $(CDC1700_LIB) : $(CDC1700_SOURCE)
         $!
         $! Building The $(CDC1700_LIB) Library.
@@ -1454,12 +1474,19 @@ $(CDC1700_LIB) : $(CDC1700_SOURCE)
              LIBRARY/CREATE $(MMS$TARGET)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# We Are On VAX And Due To The Use of INT64 We Can't Build It.
+#
+$(CDC1700_LIB) : 
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
+.ENDIF
 
 $(VAX_LIB1) : $(VAX_SOURCE1)
         $!
         $! Building The $(VAX_LIB1) Library.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX_OPTIONS)/OBJ=$(VAX_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1482,7 +1509,6 @@ $(VAX610_LIB1) : $(VAX610_SOURCE1)
         $!
         $! Building The $(VAX610_LIB1) Library.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX610_OPTIONS)/OBJ=$(VAX610_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1505,7 +1531,6 @@ $(VAX630_LIB1) : $(VAX630_SOURCE1)
         $!
         $! Building The $(VAX630_LIB1) Library.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX630_OPTIONS)/OBJ=$(VAX630_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1528,7 +1553,6 @@ $(VAX620_LIB1) : $(VAX620_SOURCE1)
         $!
         $! Building The $(VAX620_LIB1) Library.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX620_OPTIONS)/OBJ=$(VAX620_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1551,7 +1575,6 @@ $(VAX730_LIB1) : $(VAX730_SOURCE1)
         $!
         $! Building The $(VAX730_LIB1) Library.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX730_OPTIONS)/OBJ=$(VAX730_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1574,7 +1597,6 @@ $(VAX750_LIB1) : $(VAX750_SOURCE1)
         $!
         $! Building The $(VAX750_LIB1) Library.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX750_OPTIONS)/OBJ=$(VAX750_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1597,7 +1619,6 @@ $(VAX780_LIB1) : $(VAX780_SOURCE1)
         $!
         $! Building The $(VAX780_LIB1) Library.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX780_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1620,7 +1641,6 @@ $(VAX8600_LIB1) : $(VAX8600_SOURCE1)
         $!
         $! Building The $(VAX8600_LIB1) Library.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX8600_OPTIONS)/OBJ=$(VAX8600_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1690,8 +1710,21 @@ $(BIN_DIR)ALTAIR-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(ALTAIR_LIB)
                $(BLD_DIR)SCP.OBJ,$(ALTAIR_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+#
+# If Not On VAX, Build The AltairZ80 Simulator.
+#
+.IFDEF ALPHA_OR_IA64
 ALTAIRZ80 : $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE
         $! ALTAIRZ80 done
+.ELSE
+#
+# Else We Are On VAX And Tell The User We Can't Build On VAX
+# Due To The Use Of INT64.
+#
+ALTAIRZ80 : 
+        $! Sorry, Can't Build $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+.ENDIF
 
 $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(ALTAIRZ80_LIB1) $(ALTAIRZ80_LIB2)
         $!
@@ -1702,6 +1735,7 @@ $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(ALTAIRZ80_LIB
                $(BLD_DIR)SCP.OBJ,$(ALTAIRZ80_LIB1)/LIBRARY, -
                $(ALTAIRZ80_LIB2)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
 #
 # If Not On VAX, Build The Eclipse Simulator.
 #
@@ -2013,7 +2047,6 @@ $(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(SWTP6800MP
         $!
         $! Building The $(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE Simulator.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(SWTP6800MP_A_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(SWTP6800MP_A_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
@@ -2026,7 +2059,6 @@ $(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(SWTP6800M
         $!
         $! Building The $(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE Simulator.
         $!
-        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(SWTP6800MP_A2_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(SWTP6800MP_A2_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
@@ -2084,6 +2116,10 @@ B5500 :
 .ENDIF
 
 
+#
+# If Not On VAX, Build The Burroughs B5500 Simulator.
+#
+.IFDEF ALPHA_OR_IA64
 CDC1700 : $(BIN_DIR)CDC1700-$(ARCH).EXE
         $! CDC1700 done
 
@@ -2095,6 +2131,15 @@ $(BIN_DIR)CDC1700-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(CDC1700_LIB)
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)CDC1700-$(ARCH).EXE -
                  $(BLD_DIR)SCP.OBJ,$(CDC1700_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# Else We Are On VAX And Tell The User We Can't Build On VAX
+# Due To The Use Of INT64.
+#
+CDC1700 : 
+        $! Sorry, Can't Build $(BIN_DIR)CDC1700-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+.ENDIF
 
 VAX : MICROVAX3900
         $! MICROVAX3900 aka VAX done

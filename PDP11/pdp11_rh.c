@@ -184,8 +184,6 @@ static t_stat (*mbregR[MBA_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*mbregW[MBA_NUM])(int32 dat, int32 ad, int32 md);
 static int32 (*mbabort[MBA_NUM])(void);
 
-static int32 mba_active = 0;    /* Number of active MBA's */
-
 /* Unibus to register offset map */
 
 static int32 mba_mapofs[(MBA_OFSMASK + 1) >> 1] = {
@@ -202,11 +200,9 @@ static int32 mba_mapofs[(MBA_OFSMASK + 1) >> 1] = {
    mbax_reg     RHx register list
 */
 
-#define IOLN_RP         054
-
 DIB mba0_dib = {
-    IOBA_AUTO, IOLN_RP, &mba_rd, &mba_wr,
-    1, IVCL (RP), VEC_AUTO, { &mba0_inta }, IOLN_RP,
+    IOBA_AUTO, 0, &mba_rd, &mba_wr,
+    1, IVCL (RP), VEC_AUTO, { &mba0_inta }
     };
 
 UNIT mba0_unit = { UDATA (NULL, 0, 0) };
@@ -237,11 +233,9 @@ MTAB mba0_mod[] = {
     { 0 }
     };
 
-#define IOLN_TU         040
-
 DIB mba1_dib = {
-    IOBA_AUTO, IOLN_TU, &mba_rd, &mba_wr,
-    1, IVCL (TU), VEC_AUTO, { &mba1_inta }, IOLN_TU
+    IOBA_AUTO, 0, &mba_rd, &mba_wr,
+    1, IVCL (TU), VEC_AUTO, { &mba1_inta }
     };
 
 UNIT mba1_unit = { UDATA (NULL, 0, 0) };
@@ -272,11 +266,9 @@ MTAB mba1_mod[] = {
     { 0 }
     };
 
-#define IOLN_RS         040
-
 DIB mba2_dib = {
-    IOBA_AUTO, IOLN_RS, &mba_rd, &mba_wr,
-    1, IVCL (RS), VEC_AUTO, { &mba2_inta }, IOLN_RS
+    IOBA_AUTO, 0, &mba_rd, &mba_wr,
+    1, IVCL (RS), VEC_AUTO, { &mba2_inta }
     };
 
 UNIT mba2_unit = { UDATA (NULL, 0, 0) };
@@ -874,7 +866,7 @@ if (dptr == NULL)
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL)
     return SCPE_IERR;
-fprintf (st, "Massbus adapter %d", dibp->ba);
+fprintf (st, "Massbus adapter %d (RH%c)", dibp->ba, 'A' + dibp->ba);
 return SCPE_OK;
 }
 
@@ -898,7 +890,6 @@ for (i = mba_devs = 0; sim_devices[i] != NULL; i++) {
         mba_devs++;
         }
     }
-mba_active = 0;
 }
 
 /* Build dispatch tables */
@@ -906,13 +897,16 @@ mba_active = 0;
 t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp)
 {
 uint32 idx;
+static const char *mbus_devs[MBA_NUM+1] = {"RP", "TU", "RS", NULL};
 
 if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
     return SCPE_IERR;
-idx = mba_active++;
+for (idx = 0; mbus_devs[idx]; idx++)
+    if (!strcmp (dptr->name, mbus_devs[idx]))
+        break;
+if ((!mbus_devs[idx]) || (idx >= MBA_NUM))
+    return SCPE_IERR;
 dibp->ba = idx;                                         /* Mbus # */
-if (idx >= MBA_NUM)
-    return SCPE_STOP;
 if ((mbregR[idx] && dibp->rd &&                         /* conflict? */
     (mbregR[idx] != dibp->rd)) ||
     (mbregW[idx] && dibp->wr &&
@@ -923,56 +917,13 @@ if ((mbregR[idx] && dibp->rd &&                         /* conflict? */
                     sim_dname (dptr), dibp->ba);
         return SCPE_STOP;
         }
-if (dibp->rd)                                           /* set rd dispatch */
-    mbregR[idx] = dibp->rd;
-if (dibp->wr)                                           /* set wr dispatch */
-    mbregW[idx] = dibp->wr;
-if (dibp->ack[0])                                       /* set abort dispatch */
-    mbabort[idx] = dibp->ack[0];
+mbregR[idx] = dibp->rd;                                 /* set rd dispatch */
+mbregW[idx] = dibp->wr;                                 /* set wr dispatch */
+mbabort[idx] = dibp->ack[0];                            /* set abort dispatch */
 mba_dev[idx].flags &= ~DEV_DIS;                         /* mark MBA enabled */
+((DIB *)mba_dev[idx].ctxt)->lnt = dibp->lnt;
+((DIB *)mba_dev[idx].ctxt)->ulnt = dibp->ulnt;
 return build_ubus_tab (&mba_dev[idx], (DIB *)mba_dev[idx].ctxt);
-}
-
-void fixup_mbus_tab (void)
-{
-uint32 idx, idy, active;
-DEVICE *dptr;
-DIB *dibp;
-static const char *mbus_devs[MBA_NUM+1] = {"RP", "TU", "RS", NULL};
-
-for (idx = active = 0; idx < MBA_NUM; idx++) {
-    dptr = find_dev (mbus_devs[idx]);
-    if (!dptr)
-        break;
-    if (dptr->flags & DEV_DIS)
-        continue;
-    dibp = (DIB *)dptr->ctxt;
-    if (dibp->ba != active) {
-        t_stat (*TmbregR)(int32 *dat, int32 ad, int32 md) = mbregR[active];
-        t_stat (*TmbregW)(int32 dat, int32 ad, int32 md) = mbregW[active];
-        int32 (*Tmbabort)(void) = mbabort[active];
-
-        mbregR[active] = mbregR[dibp->ba];
-        mbregW[active] = mbregW[dibp->ba];
-        mbabort[active] = mbabort[dibp->ba];;
-
-        mbregR[dibp->ba] = TmbregR;
-        mbregW[dibp->ba] = TmbregW;
-        mbabort[dibp->ba] = Tmbabort;;
-
-        for (idy = 1; idy < MBA_NUM; idy++) {
-            DEVICE *ydptr = find_dev (mbus_devs[idy]);
-            DIB *ydibp = (DIB *)ydptr->ctxt;
-
-            if (ydibp->ba != active)
-                continue;
-            ydibp->ba = dibp->ba;
-            dibp->ba = active;
-            break;
-            }
-        }
-    ++active;
-    }
 }
 
 t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
@@ -981,15 +932,17 @@ const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
 " RH70/RH11 Massbus adapters (RHA, RHB, RHC)\n"
 "\n"
-" The RH70/RH11 Massbus adapters interface Massbus peripherals to the memory\n"
-" bus or Unibus of the CPU.  The simulator provides three Massbus adapters.\n"
-" The first, RHA, is configured for the RP family of disk drives.  The\n"
-" second, RHB, is configured for the TU family of tape controllers.  The\n"
-" third, RHC, is configured for the RS family of fixed head disks.  By\n"
-" default, RHA is enabled, and RHB and RHC are disabled.  In a Unibus system,\n"
-" the RH adapters implement 22b addressing for the 11/70 and 18b addressing\n"
-" for all other models.  In a Qbus system, the RH adapters always implement\n"
-" 22b addressing.\n"
+" The RH70/RH11 Massbus adapters interface Massbus peripherals to the\n"
+" memory bus or Unibus of the CPU.  The simulator provides three Massbus\n"
+" adapters.  These adapters (RHA, RHB, and RHC) are used by (in order):\n"
+"       1) the RP family of disk drives.\n"
+"       2) the TU family of tape controllers.\n"
+"       3) the RS family of fixed head disks.\n"
+" Depending on which of the RP, TU, and RS devices are enabled, will\n"
+" determine which adapter is assigned to which device.\n"
+" In a Unibus system, the RH adapters implement 22b addressing for the\n"
+" 11/70 and 18b addressing for all other models.  In a Qbus system, the\n"
+" RH adapters always implement 22b addressing.\n"
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
 "\n";
 fprintf (st, "%s", text);

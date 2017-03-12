@@ -1,6 +1,6 @@
 /* pdp11_cr.c: CR/CM/CD-11/CD20 card reader simulator
 
-   Copyright (c) 2005-2016, John A. Dundas III
+   Copyright (c) 2005-2017, John A. Dundas III
    Portions derived from work by Douglas W. Jones, jones@cs.uiowa.edu
    Portions derived from work by Robert M Supnik
 
@@ -100,6 +100,7 @@
     ECOs (at least) for Data Buffer status and augmented image mode.
 
   Revision History:
+   19-Jan-17    RMS     CR11 is BR6, CD11 is BR4
    14-Mar-16    RMS     Added UC15 support (CR11 only)
    23-Feb-13    JGP     Added DEC version of the 026 codepage
                         Fixed the handling of the CR11 error bits after
@@ -201,29 +202,41 @@
  * known software support, as this reduces user configuration errors/confusion.
  */
 
+
 #if defined (VM_PDP10)                                  /* PDP10 version */
 #include "pdp10_defs.h"
-#define DFLT_DIS        (DEV_DIS)
-#define DFLT_TYPE       (UNIT_CD20)                    /* CD20 (CD11) only */
-#define CD20_ONLY       (1)
+#define IPL_CD          (IPL_CR)                        /* use same for CD */
+#define INT_V_CD        (INT_V_CR)
+#define INT_CD          (INT_CR)
+#define DFLT_QB         (0)
+#define DFLT_TYPE       (UNIT_CD20)                     /* CD20 (CD11) only */
+#define DFLT_IVCL       (IVCL(CD))
 #define DFLT_CPM        1200
+#define CD20_ONLY       (1)
 #define AIECO_REQ       (1)                             /* Requires Augmented Image ECO */
 #elif defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
-#define DFLT_DIS        (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
+#define IPL_CD          (IPL_CR)                        /* use same for CD */
+#define INT_V_CD        (INT_V_CR)
+#define INT_CD          (INT_CR)
+#define DFLT_QB         (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
 #define DFLT_TYPE       (UNIT_CR11)                     /* CR11 only */
-#define CR11_ONLY       (1)
+#define DFLT_IVCL       (IVCL(CR))
 #define DFLT_CPM        285
+#define CR11_ONLY       (1)
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-#define DFLT_DIS        (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
+#define DFLT_QB         (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
 #define DFLT_TYPE       (UNIT_CR11)                     /* Default, but changable */
+#define DFLT_IVCL       (IVCL(CR))
 #define DFLT_CPM        285
-#define CR11_ONLY      (1)
-#if !defined (UC15)
-#define CD11_OK        (1)                              /* only on real PDP-11 */
-#define CD20_OK        (1)
-#define AIECO_OK       (1)                              /* Augmented Image ECO optional */
+#if defined (UC15)
+#define CR11_ONLY       (1)
+#else
+#define CR11_OK         (1)                             /* only on real PDP-11 */
+#define CD11_OK         (1)
+#define CD20_OK         (1)
+#define AIECO_OK        (1)                             /* Augmented Image ECO optional */
 #endif
 #endif
 
@@ -236,7 +249,7 @@
 #define I4C_H82         I4C ('H','8','2',' ')
 #define I4C_H40         I4C ('H','4','0',' ')
 
-#define    UNIT_V_TYPE      (UNIT_V_UF + 0) /* Bit-encoded 2-bit field */
+#define    UNIT_V_TYPE      (UNIT_V_UF + 0)             /* Bit-encoded 2-bit field */
 #define    UNIT_TYPE        (3u << UNIT_V_TYPE)
 #define    UNIT_CR11        (1u << UNIT_V_TYPE)
 #define    UNIT_CD20        (2u << UNIT_V_TYPE)
@@ -461,7 +474,8 @@ t_stat cr_set_trans (UNIT *, int32, CONST char*, void *);
 t_stat cr_show_trans (FILE *, UNIT *, int32, CONST void *);
 static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *cr_description (DEVICE *dptr);
-
+void cr_set_int (void);
+void cr_clr_int (void);
 
 /* CR data structures
 
@@ -475,7 +489,7 @@ const char *cr_description (DEVICE *dptr);
 #define IOLN_CR         010
 
 static DIB cr_dib = { IOBA_AUTO, IOLN_CR, &cr_rd, &cr_wr,
-        1, IVCL (CR), VEC_AUTO, { cr_intac } };
+        1, DFLT_IVCL, VEC_AUTO, { cr_intac } };
 
 static UNIT cr_unit = {
     UDATA (&cr_svc,
@@ -490,21 +504,23 @@ static const REG cr_reg[] = {
     { GRDATAD (CRB1,          crb1, DEV_RDX, 16, 0, "CR11 12-bit Hollerith character") },
     { GRDATAD (CRB2,          crb2, DEV_RDX, 16, 0, "CR11 8-bit compressed character") },
     { GRDATAD (CRM,            crm, DEV_RDX, 16, 0, "CR11 maintenance register") },
+    { FLDATA (INTCR,    IREQ (CR), INT_V_CR) },
 #endif
 #if defined (CD11_OK) || defined (CD11_ONLY) || defined (CD20_OK) || defined (CD20_ONLY)
     { GRDATAD (CDST,          cdst, DEV_RDX, 16, 0, "CD11 control/status register") },
     { GRDATAD (CDCC,          cdcc, DEV_RDX, 16, 0, "CD11 column count") },
     { GRDATAD (CDBA,          cdba, DEV_RDX, 16, 0, "CD11 current bus address") },
     { GRDATAD (CDDB,          cddb, DEV_RDX, 16, 0, "CD11 data buffer, 2nd status") },
+    { FLDATA (INTCD,    IREQ (CD), INT_V_CD) },
 #endif
     { GRDATAD (BLOWER, blowerState, DEV_RDX,  2, 0, "blower state value") },
-    { FLDATAD (INT,      IREQ (CR), INT_V_CR,       "interrupt pending flag") },
     { FLDATAD (ERR,            crs, CSR_V_ERR,      "error flag (CRS<15>)") },
     { FLDATAD (IE,             crs, CSR_V_IE,       "interrupt enable flag (CRS<6>)") },
     { DRDATAD (POS,    cr_unit.pos, T_ADDR_W,       "file position - do not alter"), PV_LEFT },
     { DRDATAD (TIME,  cr_unit.wait, 24,             "delay time between columns"), PV_LEFT },
-    { GRDATA  (DEVADDR,  cr_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA  (DEVVEC,  cr_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { GRDATA (DEVADDR,   cr_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA (DEVVEC,   cr_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { GRDATA (DEVVLOC, cr_dib.vloc, DEV_RDX, 16, 0), REG_HRO },
     { NULL }  };
 
 static char *translation_help = NULL;
@@ -571,7 +587,7 @@ DEVICE cr_dev = {
     1, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &cr_reset,
     NULL, &cr_attach, &cr_detach,
-    &cr_dib, DEV_DISABLE | DFLT_DIS | DEV_UBUS | DEV_DEBUG, 0,
+    &cr_dib, DEV_DISABLE | DEV_DIS | DFLT_QB | DEV_UBUS | DEV_DEBUG, 0,
     NULL, NULL, NULL, &cr_help, NULL, NULL,
     &cr_description
     };
@@ -1024,7 +1040,7 @@ t_stat cr_wr (  int32   data,
             if (access == WRITEB)
                 data = (crs & ~0377) | (data & 0377); 
             if (!(data & CSR_IE))
-                CLR_INT (CR);
+                cr_clr_int ();
             crs = (crs & ~CRCSR_RW) | (data & CRCSR_RW);
             /* Clear status bits after CSR load */
             crs &= ~(CSR_ERR | CRCSR_ONLINE | CRCSR_CRDDONE | CRCSR_TIMERR);
@@ -1041,7 +1057,7 @@ t_stat cr_wr (  int32   data,
                 if (curr_crs & (CRCSR_SUPPLY | CRCSR_RDCHK | CRCSR_OFFLINE)) {
                     crs |= CSR_ERR | (curr_crs & (CRCSR_SUPPLY | CRCSR_RDCHK |
                                                   CRCSR_OFFLINE));
-                    if (crs & CSR_IE) SET_INT(CR);
+                    if (crs & CSR_IE) cr_set_int ();
                 }
                 if (blowerState != BLOW_ON) {
                     blowerState = BLOW_START;
@@ -1059,7 +1075,7 @@ t_stat cr_wr (  int32   data,
                                   ((data & 0x00ff) | (cdst & 0xFF00));
 
             if (data & CDCSR_PWRCLR) {
-                CLR_INT (CR);
+                cr_clr_int ();
                 sim_cancel (&cr_unit);
                 cdcc = 0;
                 cdba = 0;
@@ -1111,9 +1127,9 @@ t_stat cr_wr (  int32   data,
                       |(data &  (CSR_ERR | CDCSR_RDRCHK | CDCSR_EOF | CDCSR_DATAERR | CDCSR_LATE | 
                                  CDCSR_NXM | CSR_IE | CDCSR_XBA17 | CDCSR_XBA16 | CDCSR_ONLINE | CDCSR_PACK));
             }
-            /* Apparently the hardware does not SET_INT if ready/online are already set.  If it did, TOPS-10's driver wouldn't work */
+            /* Apparently the hardware does not set int if ready/online are already set.  If it did, TOPS-10's driver wouldn't work */
             if (!(cdst & CSR_IE))
-                CLR_INT (CR);
+                cr_clr_int ();
 
             if (DEBUG_PRS (cr_dev))
                 fprintf (sim_deb, "cr_wr data %06o cdst %06o\n",
@@ -1205,7 +1221,7 @@ t_stat cr_svc ( UNIT    *uptr    )
 
     /* (almost) anything we do now will cause a CR (But not a CD) interrupt */
     if ((CR11_CTL(uptr)) && (crs & CSR_IE))
-       SET_INT (CR);
+       cr_set_int ();
     
     /* Unit not attached, or error status while idle */
     if (!(uptr->flags & UNIT_ATT) || (!(crs & CRCSR_BUSY) && ((CR11_CTL(uptr)?crs : cdst) & CSR_ERR))) {
@@ -1215,7 +1231,7 @@ t_stat cr_svc ( UNIT    *uptr    )
                 cddbs |= CDDB_STACK;
             }
             if (cdst & CSR_IE)
-                SET_INT (CR);
+                cr_set_int ();
         }
         return (SCPE_OK);
     }
@@ -1232,7 +1248,7 @@ t_stat cr_svc ( UNIT    *uptr    )
          /* Check CD11 error status that stops transfers */
         if (CD11_CTL(uptr) && (cdst & (CDCSR_LATE | CDCSR_NXM))) {
             cdst |= CSR_ERR | CDCSR_OFFLINE | CDCSR_RDY | CDCSR_RDRCHK;
-            SET_INT (CR);
+            cr_set_int ();
             return (SCPE_OK);
         }
 
@@ -1242,7 +1258,7 @@ t_stat cr_svc ( UNIT    *uptr    )
         /* If a CD11 gets this far, an interrupt is required.  If CDCC != 0,
          * continue reading the next card.
          */
-        SET_INT (CR);
+        cr_set_int ();
         if (cdcc == 0)
             return (SCPE_OK);
     }
@@ -1263,7 +1279,7 @@ readFault:
                 if (cdst & (CDCSR_RDRCHK | CDCSR_HOPPER))
                     cdst |= CSR_ERR | CDCSR_OFFLINE;
                 if (cdst & CSR_IE)
-                    SET_INT (CR);
+                    cr_set_int ();
 
             } else {
                 /*
@@ -1275,7 +1291,7 @@ readFault:
                 if (crs & (CRCSR_RDCHK | CRCSR_SUPPLY)) {
                     crs |= CSR_ERR | CRCSR_OFFLINE;
                     crs &= ~(CRCSR_ONLINE | CRCSR_BUSY | CRCSR_CRDDONE);
-                    CLR_INT(CR);
+                    cr_clr_int ();
                 }
             }
             sim_activate_after (uptr, spinDown);
@@ -1391,13 +1407,13 @@ incremented properly.  If this causes problems, I'll fix it.
              * If this is the last column, defer interrupt so end doesn't interrupt again.
              */
             if ((cdcc == 0) && (cdst & CSR_IE) && (currCol < colEnd))
-                SET_INT (CR);
+                cr_set_int ();
         }
     } else { /* CR11 */
         /* Handle EJECT bit: if set DO NOT assert COLRDY */
         /* nor interrupt                                 */
         if ((crs & CRCSR_EJECT)) {
-            CLR_INT (CR);
+            cr_clr_int ();
         } else {
             crs |= CRCSR_COLRDY;
         }
@@ -1483,6 +1499,7 @@ t_stat cr_reset (   DEVICE  *dptr    )
     }
     EOFcard = 0;
     CLR_INT (CR);
+    CLR_INT (CD);
     /* TBD: flush current card */
     /* init uptr->wait ? */
     return auto_config (dptr->name, 1);
@@ -1532,6 +1549,29 @@ t_stat cr_detach (  UNIT    *uptr    )
     return (detach_unit (uptr));
 }
 
+void cr_set_int (void)
+{
+if (CR11_CTL (&cr_unit)) {
+    SET_INT (CR);
+    }
+else {
+    SET_INT (CD);
+    }
+return;
+}
+
+void cr_clr_int (void)
+{
+if (CR11_CTL (&cr_unit)) {
+    CLR_INT (CR);
+    }
+else {
+    CLR_INT (CD);
+    }
+return;
+}
+
+
 #if defined (CR11_OK) || defined (CD11_OK) || defined (CD20_OK)
 t_stat cr_set_type (    UNIT    *uptr,
                         int32   val,
@@ -1539,11 +1579,16 @@ t_stat cr_set_type (    UNIT    *uptr,
                         void    *desc    )
 {
     DEVICE *dptr = find_dev_from_unit (uptr);
+    DIB *dibp;
 
     /* disallow type change if currently attached */
 
     if (uptr->flags & UNIT_ATT)
         return (SCPE_NOFNC);
+    if (dptr == NULL)
+        return SCPE_IERR;
+    if ((dibp = (DIB *) dptr->ctxt) == NULL)
+        return SCPE_IERR;
     if (val == UNIT_CR11) {
         dptr->flags |= DEV_QBUS;                    /* Can be a Qbus device - programmed I/O only */
     } else {                                        /* CD11/CD20 are 18bit DMA devices */
@@ -1555,6 +1600,7 @@ t_stat cr_set_type (    UNIT    *uptr,
     uptr->wait = (60 * 1000000) / (cpm * 80);       /* Time between columns in usec.
                                                      * Readers are rated in card/min for 80 column cards */
     transcodes[0].table = (val & UNIT_CD20)? o29_decascii_code : o29_code;
+    dibp->vloc = (val & UNIT_CR11)? IVCL (CR): IVCL (CD);
 
     return (SCPE_OK);
 }
@@ -1654,7 +1700,7 @@ t_stat cr_set_reset (   UNIT    *uptr,
 
     /* Assert interrupt if interrupts enabled     */
     if ((CR11_CTL(uptr)?crs : cdst) & CSR_IE) {
-        SET_INT (CR);
+        cr_set_int ();
         if (DEBUG_PRS (cr_dev))
             fprintf (sim_deb, "cr_set_reset setting interrupt\n");
     }
@@ -1693,7 +1739,7 @@ t_stat cr_set_stop (    UNIT    *uptr,
     cdst |= CSR_ERR | CDCSR_OFFLINE;
     /* CD11 does not appear to interrupt on STOP. */
     if (CR11_CTL(uptr) && (crs & CSR_IE))
-        SET_INT (CR);
+        cr_set_int ();
     if (blowerState != BLOW_OFF) {
         blowerState = BLOW_STOP;
     }

@@ -375,6 +375,8 @@
 #include <unistd.h>
 #endif
 
+#define MAX(a,b) (((a) > (b)) ? (a) : (b))
+
 /* Internal routines - forward declarations */
 static int _eth_get_system_id (char *buf, size_t buf_size);
 
@@ -417,10 +419,11 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
   strncpy (state.sim, sim_name, sizeof(state.sim));
   getcwd (state.cwd, sizeof(state.cwd));
   if (uptr)
-    strncpy (state.uname, sim_uname (uptr), sizeof(state.uname));
+    strncpy (state.uname, sim_uname (uptr), sizeof(state.uname)-1);
   cptr = strchr (strmac, '>');
   if (cptr) {
-    strncpy (state.file, cptr + 1, sizeof(state.file));
+    state.file[sizeof(state.file)-1] = '\0';
+    strncpy (state.file, cptr + 1, sizeof(state.file)-1);
     if ((f = fopen (state.file, "r"))) {
       filebuf[sizeof(filebuf)-1] = '\0';
       fgets (filebuf, sizeof(filebuf)-1, f);
@@ -904,7 +907,7 @@ void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, siz
   item->packet.len = len;
   item->packet.used = used;
   item->packet.crc_len = crc_len;
-  if (len <= sizeof (item->packet.msg)) {
+  if (MAX (len, crc_len) <= sizeof (item->packet.msg) - ETH_CRC_SIZE) {
     memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
     if (crc_data && (crc_len > len))
       memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);

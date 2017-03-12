@@ -405,6 +405,7 @@ t_stat zx200a_attach (UNIT *uptr, CONST char *cptr)
             zx200a[fdcnum].fdd[fddnum].buf = (uint8 *)malloc(flen);
             if (zx200a[fdcnum].fdd[fddnum].buf == NULL) {
                 sim_printf("   zx200a_attach: Malloc error\n");
+                fclose(fp);
                 return SCPE_MEM;
             }
         }

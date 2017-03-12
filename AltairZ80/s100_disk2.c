@@ -455,34 +455,38 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                       " READ_DATA: cyl=%d, track=%d\n", PCX, disk2_info->cyl, pDrive->track);
                             pDrive->track = disk2_info->cyl; /* update track */
                         }
-                        sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
-                        for(i=0;i<pDrive->nsectors;i++) {
-                            /* Read sector */
-                            rtn = sim_fread(sdata.raw, 1, (pDrive->sectsize + 3), (pDrive->uptr)->fileref);
-                            if (rtn != (size_t)(pDrive->sectsize + 3)) {
-                                sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
-                                          " READ_DATA: sim_fread error.\n", PCX);
-                            }
-                            if(sdata.u.header[2] == disk2_info->sector) {
-                                if(sdata.u.header[0] != disk2_info->cyl) { /*pDrive->track) { */
-                                    sim_printf("DISK2: " ADDRESS_FORMAT
-                                           " READ_DATA Incorrect header: track" NLP, PCX);
-                                    disk2_info->timeout = 1;
+                        if(sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET) == 0) {
+                            for(i=0;i<pDrive->nsectors;i++) {
+                                /* Read sector */
+                                rtn = sim_fread(sdata.raw, 1, (pDrive->sectsize + 3), (pDrive->uptr)->fileref);
+                                if (rtn != (size_t)(pDrive->sectsize + 3)) {
+                                    sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                              " READ_DATA: sim_fread error.\n", PCX);
                                 }
-                                if(sdata.u.header[1] != disk2_info->head) {
-                                    sim_printf("DISK2: " ADDRESS_FORMAT
-                                           " READ_DATA Incorrect header: head" NLP, PCX);
-                                    disk2_info->timeout = 1;
-                                }
+                                if(sdata.u.header[2] == disk2_info->sector) {
+                                    if(sdata.u.header[0] != disk2_info->cyl) { /*pDrive->track) { */
+                                        sim_printf("DISK2: " ADDRESS_FORMAT
+                                                   " READ_DATA Incorrect header: track" NLP, PCX);
+                                        disk2_info->timeout = 1;
+                                    }
+                                    if(sdata.u.header[1] != disk2_info->head) {
+                                        sim_printf("DISK2: " ADDRESS_FORMAT
+                                                   " READ_DATA Incorrect header: head" NLP, PCX);
+                                        disk2_info->timeout = 1;
+                                    }
 
-                                selchan_dma(sdata.u.data, pDrive->sectsize);
-                                break;
+                                    selchan_dma(sdata.u.data, pDrive->sectsize);
+                                    break;
+                                }
+                                if(i == pDrive->nsectors) {
+                                    sim_printf("DISK2: " ADDRESS_FORMAT
+                                               " Sector not found" NLP, PCX);
+                                    disk2_info->timeout = 1;
+                                }
                             }
-                            if(i == pDrive->nsectors) {
-                                sim_printf("DISK2: " ADDRESS_FORMAT
-                                       " Sector not found" NLP, PCX);
-                                disk2_info->timeout = 1;
-                            }
+                        } else {
+                            sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                      " READ_DATA: sim_fseek error.\n", PCX);
                         }
 
                         break;
@@ -498,41 +502,49 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                             pDrive->track = disk2_info->cyl; /* update track */
                        }
 
-                        sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
-                        for(i=0;i<pDrive->nsectors;i++) {
-                            /* Read sector */
-                            file_offset = ftell((pDrive->uptr)->fileref);
-                            rtn = sim_fread(sdata.raw, 1, 3, (pDrive->uptr)->fileref);
-                            if (rtn != 3) {
-                                sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
-                                          " WRITE_DATA: sim_fread error.\n", PCX);
-                            }
-                            if(sdata.u.header[2] == disk2_info->sector) {
-                                if(sdata.u.header[0] != disk2_info->cyl) {
-                                    sim_printf("DISK2: " ADDRESS_FORMAT
-                                           " WRITE_DATA Incorrect header: track" NLP, PCX);
-                                    disk2_info->timeout = 1;
+                        if(sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET) == 0) {
+                            for(i=0;i<pDrive->nsectors;i++) {
+                                /* Read sector */
+                                file_offset = ftell((pDrive->uptr)->fileref);
+                                rtn = sim_fread(sdata.raw, 1, 3, (pDrive->uptr)->fileref);
+                                if (rtn != 3) {
+                                    sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                              " WRITE_DATA: sim_fread error.\n", PCX);
                                 }
-                                if(sdata.u.header[1] != disk2_info->head) {
-                                    sim_printf("DISK2: " ADDRESS_FORMAT
-                                           " WRITE_DATA Incorrect header: head" NLP, PCX);
-                                    disk2_info->timeout = 1;
-                                }
+                                if(sdata.u.header[2] == disk2_info->sector) {
+                                    if(sdata.u.header[0] != disk2_info->cyl) {
+                                        sim_printf("DISK2: " ADDRESS_FORMAT
+                                                   " WRITE_DATA Incorrect header: track" NLP, PCX);
+                                        disk2_info->timeout = 1;
+                                    }
+                                    if(sdata.u.header[1] != disk2_info->head) {
+                                        sim_printf("DISK2: " ADDRESS_FORMAT
+                                                   " WRITE_DATA Incorrect header: head" NLP, PCX);
+                                        disk2_info->timeout = 1;
+                                    }
 
-                                selchan_dma(sdata.u.data, pDrive->sectsize);
-                                sim_fseek((pDrive->uptr)->fileref, file_offset+3, SEEK_SET);
-                                sim_fwrite(sdata.u.data, 1, (pDrive->sectsize), (pDrive->uptr)->fileref);
-                                break;
+                                    selchan_dma(sdata.u.data, pDrive->sectsize);
+                                    if(sim_fseek((pDrive->uptr)->fileref, file_offset+3, SEEK_SET) == 0) {
+                                        sim_fwrite(sdata.u.data, 1, (pDrive->sectsize), (pDrive->uptr)->fileref);
+                                    } else {
+                                        sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                                  " WRITE_DATA: sim_fseek error.\n", PCX);
+                                    }
+                                    break;
+                                }
+                                rtn = sim_fread(sdata.raw, 1, pDrive->sectsize, (pDrive->uptr)->fileref);
+                                if (rtn != (size_t)(pDrive->sectsize)) {
+                                    sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                              " WRITE_DATA: sim_fread error.\n", PCX);
+                                }
+                                if(i == pDrive->nsectors) {
+                                    sim_printf("DISK2: " ADDRESS_FORMAT " Sector not found" NLP, PCX);
+                                    disk2_info->timeout = 1;
+                                }
                             }
-                            rtn = sim_fread(sdata.raw, 1, pDrive->sectsize, (pDrive->uptr)->fileref);
-                            if (rtn != (size_t)(pDrive->sectsize)) {
-                                sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
-                                          " WRITE_DATA: sim_fread error.\n", PCX);
-                            }
-                            if(i == pDrive->nsectors) {
-                                sim_printf("DISK2: " ADDRESS_FORMAT " Sector not found" NLP, PCX);
-                                disk2_info->timeout = 1;
-                            }
+                        } else {
+                            sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                      " WRITE_DATA: sim_fseek error.\n", PCX);
                         }
                         break;
                     case DISK2_CMD_WRITE_HEADER:
@@ -544,8 +556,12 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
 
                         i = disk2_info->hdr_sector;
                         selchan_dma(sdata.raw, 3);
-                        sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * (pDrive->sectsize + 3) * pDrive->nsectors) + (i * (pDrive->sectsize + 3)), SEEK_SET);
-                        sim_fwrite(sdata.raw, 1, 3, (pDrive->uptr)->fileref);
+                        if(sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * (pDrive->sectsize + 3) * pDrive->nsectors) + (i * (pDrive->sectsize + 3)), SEEK_SET) == 0) {
+                            sim_fwrite(sdata.raw, 1, 3, (pDrive->uptr)->fileref);
+                        } else {
+                            sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                      " WRITE_HEADER Command: sim_fseek error.\n", PCX);
+                        }
 
                         disk2_info->hdr_sector++;
                         if(disk2_info->hdr_sector >= pDrive->nsectors) {
@@ -557,14 +573,18 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                         track_offset = pDrive->track * pDrive->nheads * pDrive->nsectors * (pDrive->sectsize + 3);
                         sim_debug(CMD_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
                                   " READ_HEADER Command\n", PCX);
-                        sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
-                        rtn = sim_fread(sdata.raw, 1, 3, (pDrive->uptr)->fileref);
-                        if (rtn != 3) {
+                        if(sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET) == 0) {
+                            rtn = sim_fread(sdata.raw, 1, 3, (pDrive->uptr)->fileref);
+                            if (rtn != 3) {
+                                sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                          " READ_HEADER: sim_fread error.\n", PCX);
+                            }
+                        } else {
                             sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
-                                      " READ_HEADER: sim_fread error.\n", PCX);
+                                      " READ_HEADER: sim_fseek error.\n", PCX);
                         }
                         selchan_dma(sdata.raw, 3);
-
+                        
                         break;
                     default:
                         sim_printf("DISK2: " ADDRESS_FORMAT " Unknown CMD=%d" NLP, PCX, disk2_info->ctl_op);

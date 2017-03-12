@@ -197,7 +197,9 @@ const char *rs_description (DEVICE *dptr);
    rs_mod       RS modifier list
 */
 
-DIB rs_dib = { MBA_AUTO, 0, &rs_mbrd, &rs_mbwr, 0, 0, 0, { &rs_abort } };
+#define IOLN_RS         034
+
+DIB rs_dib = { MBA_AUTO, IOLN_RS, &rs_mbrd, &rs_mbwr, 0, 0, 0, { &rs_abort } };
 
 UNIT rs_unit[] = {
     { UDATA (&rs_svc, UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_AUTO|

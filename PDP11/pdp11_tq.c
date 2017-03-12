@@ -725,10 +725,14 @@ if (tq_csta < CST_UP) {                                 /* still init? */
     }                                                   /* end if */
 
 for (i = 0; i < TQ_NUMDR; i++) {                        /* chk unit q's */
+    uint16 tpkt;
+
     nuptr = tq_dev.units + i;                           /* ptr to unit */
     if (nuptr->cpkt || (nuptr->pktq == 0))
         continue;
-    pkt = tq_deqh ((uint16 *)&nuptr->pktq);             /* get top of q */
+    tpkt = (uint16)nuptr->pktq;
+    pkt = tq_deqh (&tpkt);                              /* get top of q */
+    nuptr->pktq = tpkt;
     if (!tq_mscp (pkt, FALSE))                          /* process */
         return SCPE_OK;
     }
@@ -832,7 +836,10 @@ else {                                                  /* valid cmd */
     if ((uptr = tq_getucb (lu))) {                      /* valid unit? */
         if (q && (tq_cmf[cmd] & CMF_SEQ) &&             /* queueing, seq, */
             (uptr->cpkt || uptr->pktq)) {               /* and active? */
-            tq_enqt ((uint16 *)&uptr->pktq, pkt);       /* do later */
+            uint16 tpktq = (uint16)uptr->pktq;
+
+            tq_enqt (&tpktq, pkt);                      /* do later */
+            uptr->pktq = tpktq;
             return OK;
             }
 /*      if (tq_cmf[cmd] & MD_CDL)                     *//* clr cch lost? */

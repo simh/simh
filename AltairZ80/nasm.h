@@ -260,7 +260,7 @@ typedef struct extop {          /* extended operand */
 #define MAXPREFIX 4
 
 typedef struct {                /* an instruction itself */
-    char *label;                /* the label defined, or NULL */
+    /* char *label; not needed */               /* the label defined, or NULL */
     int prefixes[MAXPREFIX];    /* instruction prefixes, if any */
     int nprefix;                /* number of entries in above */
     int opcode;                 /* the opcode - not just the string */

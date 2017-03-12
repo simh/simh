@@ -632,7 +632,7 @@ t_stat xq_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw)
     else
       if (xq->var->type == XQ_T_DELQA_PLUS)
         bootrom = xq_bootrom_delqat;
-  if (addr <= sizeof(xq_bootrom_delqa)/2)
+  if ((bootrom) && (addr < sizeof(xq_bootrom_delqa)/2))
     *vptr = bootrom[addr];
   else
     *vptr = 0;
@@ -1348,7 +1348,7 @@ t_stat xq_process_mop(CTLR* xq)
     } /* switch */
 
     /* process next meb */
-    meb += sizeof(struct xq_meb);
+    meb += 1;
 
   } /* while */
   return SCPE_OK;
@@ -1975,9 +1975,13 @@ t_stat xq_process_loopback(CTLR* xq, ETH_PACK* pack)
   ETH_MAC   *physical_address;
   t_stat    status;
   int offset   = 16 + (pack->msg[14] | (pack->msg[15] << 8));
-  int function = pack->msg[offset] | (pack->msg[offset+1] << 8);
+  int function;
 
-  sim_debug(DBG_TRC, xq->dev, "xq_process_loopback()\n");
+  if (offset > ETH_MAX_PACKET - 8)
+      return SCPE_NOFNC;
+  function = pack->msg[offset] | (pack->msg[offset+1] << 8);
+
+  sim_debug(DBG_TRC, xq->dev, "xq_process_loopback(function=%d)\n", function);
 
   if (function != 2 /*forward*/)
     return SCPE_NOFNC;

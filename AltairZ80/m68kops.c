@@ -1993,6 +1993,7 @@ static opcode_handler_struct m68k_opcode_handler_table[] =
 void m68ki_build_opcode_table(void)
 {
     opcode_handler_struct *ostruct;
+    int cycle_cost;
     int instr;
     int i;
     int j;
@@ -2040,8 +2041,17 @@ void m68ki_build_opcode_table(void)
                 m68ki_instruction_jump_table[instr] = ostruct->opcode_handler;
                 for(k=0;k<NUM_CPU_TYPES;k++)
                     m68ki_cycles[k][instr] = ostruct->cycles[k];
+                // For all shift operations with known shift distance (encoded in instruction word), this is backported from MUSASHI Version 3.4
                 if((instr & 0xf000) == 0xe000 && (!(instr & 0x20)))
-                    m68ki_cycles[0][instr] = m68ki_cycles[1][instr] = ostruct->cycles[k] + ((((j-1)&7)+1)<<1);
+                {
+                    // On the 68000 and 68010 shift distance affect execution time.
+                    // Add the cycle cost of shifting; 2 times the shift distance
+                    cycle_cost = ((((i-1)&7)+1)<<1);
+                    m68ki_cycles[0][instr] += cycle_cost;
+                    m68ki_cycles[1][instr] += cycle_cost;
+                    // On the 68020 shift distance does not affect execution time
+                    m68ki_cycles[2][instr] += 0;
+                }
             }
         }
         ostruct++;

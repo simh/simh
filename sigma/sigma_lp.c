@@ -1,6 +1,6 @@
 /* sigma_lp.c: Sigma 7440/7450 line printer
 
-   Copyright (c) 2007-2008, Robert M. Supnik
+   Copyright (c) 2007-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    lp           7440/7445 or 7450 line printer
+
+   09-Mar-2017  RMS     Fixed unclosed file returns in CCT load (COVERITY)
 */
 
 #include "sigma_io_defs.h"
@@ -107,6 +109,7 @@ t_stat lp_attach (UNIT *uptr, CONST char *cptr);
 t_stat lp_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat lp_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat lp_load_cct (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat lp_read_cct (FILE *cfile);
 uint32 lp_fmt (UNIT *uptr);
 uint32 lp_skip (UNIT *uptr, uint32 ch);
 uint32 lp_space (UNIT *uptr, uint32 lines, t_bool skp);
@@ -466,19 +469,32 @@ lp_pass = 0;
 return attach_unit (uptr, cptr);
 }
 
-/* Set carriage control tape */
+/* Set handler for carriage control tape */
 
 t_stat lp_load_cct (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-uint32 col, rpt, ptr, mask;
-uint8 cctbuf[CCT_LNT];
-t_stat r;
-char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 FILE *cfile;
+t_stat r;
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_ARG;
+if ((cptr == NULL) || (*cptr == 0))
+    return SCPE_ARG;
 if ((cfile = fopen (cptr, "r")) == NULL)
     return SCPE_OPENERR;
+r = lp_read_cct (cfile);
+fclose (cfile);
+return r;
+}
+
+/* Read carriage control tape - used by SET and LOAD */
+
+t_stat lp_read_cct (FILE *cfile)
+{
+uint32 col, rpt, ptr, mask;
+uint8 cctbuf[CCT_LNT];
+const char *cptr;
+t_stat r;
+char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
+
 ptr = 0;
 for ( ; (cptr = fgets (cbuf, CBUFSIZE, cfile)) != NULL; ) {
     mask = 0;
@@ -508,7 +524,6 @@ lp_cctl = ptr;
 lp_cctp = 0;
 for (rpt = 0; rpt < lp_cctl; rpt++)
     lp_cct[rpt] = cctbuf[rpt];
-fclose (cfile);
 return SCPE_OK;
 }
 

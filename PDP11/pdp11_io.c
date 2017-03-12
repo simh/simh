@@ -418,6 +418,5 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
             }
         }                                               /* end if enabled */
     }                                                   /* end for */
-fixup_mbus_tab ();
 return SCPE_OK;
 }

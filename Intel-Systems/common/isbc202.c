@@ -401,6 +401,7 @@ t_stat isbc202_attach (UNIT *uptr, CONST char *cptr)
             fdc202[fdcnum].fdd[fddnum].buf = (uint8 *)malloc(flen);
             if (fdc202[fdcnum].fdd[fddnum].buf == NULL) {
                 sim_printf("   isbc202_attach: Malloc error\n");
+                fclose(fp);
                 return SCPE_MEM;
             }
         }

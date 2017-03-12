@@ -3530,7 +3530,7 @@ void ddcmp_dispatch(CTLR *controller, uint32 EventMask)
 {
 DDCMP_STATETABLE *table;
 int matched = 0;
-static const char *states[] = {"Halt", "IStart", "AStart", "Run", "Maintenance"};
+static const char *states[] = {"Halt", "IStart", "AStart", "Run", "Maintenance", "All"};
 
 if (controller->link.Scanning) {
     if (!controller->link.RecurseScan) {

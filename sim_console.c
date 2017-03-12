@@ -2972,8 +2972,12 @@ return sim_os_ttcmd ();
 
 t_stat sim_ttclose (void)
 {
-tmxr_shutdown ();
-return sim_os_ttclose ();
+t_stat r1 = tmxr_shutdown ();
+t_stat r2 = sim_os_ttclose ();
+
+if (r1 != SCPE_OK)
+    return r1;
+return r2;
 }
 
 t_bool sim_ttisatty (void)

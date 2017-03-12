@@ -173,7 +173,7 @@ static void pi_to_bytes(int unit, int card, unsigned char buf[120]) {
 static void pi_punch_binary(int unit, int card) {
     UNIT *u = &pi_unit[unit];
     FILE * f = u->fileref;
-    unsigned char buf[120];
+    static unsigned char buf[120];
     pi_to_bytes(unit, card, buf);
     fwrite(buf, 120, 1, f);
 }
@@ -226,7 +226,7 @@ static void pi_punch_visual(int unit, int card) {
 static void pi_punch_gost(int unit, int card) {
     UNIT *u = &pi_unit[unit];
     FILE * f = u->fileref;
-    unsigned char buf[120];
+    static unsigned char buf[120];
     int len;
     int cur;
     int zero_expected = 0;

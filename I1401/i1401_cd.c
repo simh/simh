@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 1993-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   09-Mar-17    RMS     Protect character conversions from gargage files (COVERITY)
    05-May-16    RMS     Fixed calling sequence inconsistency (Mark Pizzolato)
    28-Feb-15    RMS     Added read from console
    24-Mar-09    RMS     Fixed read stacker operation in column binary mode
@@ -251,12 +252,12 @@ if (r != SCPE_OK)                                       /* read error? */
 if (cbn) {                                              /* column binary? */
     for (i = 0; i < CDR_WIDTH; i++) {
         if (conv_old) {
-            c1 = ascii2bcd (cdr_buf[i]);
-            c2 = ascii2bcd (cdr_buf[CDR_WIDTH + i]);
+            c1 = ascii2bcd (cdr_buf[i] & 0177);
+            c2 = ascii2bcd (cdr_buf[CDR_WIDTH + i] & 0177);
             }
         else {
-            c1 = ascii2bcd (cdr_buf[2 * i]);
-            c2 = ascii2bcd (cdr_buf[(2 * i) + 1]);
+            c1 = ascii2bcd (cdr_buf[2 * i] & 0177);
+            c2 = ascii2bcd (cdr_buf[(2 * i) + 1] & 0177);
             }
         M[CD_CBUF1 + i] = (M[CD_CBUF1 + i] & WM) | c1;
         M[CD_CBUF2 + i] = (M[CD_CBUF2 + i] & WM) | c2;

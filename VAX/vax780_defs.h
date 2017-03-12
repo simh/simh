@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   06-Jan-17    RMS     Moved CR to BR6 (Mark Pizzolato)
+   19-Jan-17    RMS     Moved CR to BR6 (Mark Pizzolato)
    29-Mar-15    RMS     Added model specific IPR max
    16-Dec-14    RMS     Removed TQ boot code (780 VMB doesn't support tape boot)
    05-Sep-14    RMS     Fixed SBR test (found by Mark Pizzolato)
@@ -311,6 +311,7 @@ typedef struct {
 
 
 /* Interrupt assignments; within each level, priority is right to left */
+/* CD11 must be defined but is not allowed in the configuration */
 
 #define INT_V_DTA       0                               /* BR6 */
 #define INT_V_CR        1

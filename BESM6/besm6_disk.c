@@ -287,9 +287,10 @@ void disk_write (UNIT *u)
     if (disk_dev.dctrl)
         besm6_debug ("::: запись МД %o зона %04o память %05o-%05o",
                      c->dev, c->zone, c->memory, c->memory + 1023);
-    fseek (u->fileref, ZONE_SIZE * c->zone * 8, SEEK_SET);
-    sim_fwrite (c->sysdata, 8, 8, u->fileref);
-    sim_fwrite (&memory [c->memory], 8, 1024, u->fileref);
+    if (fseek (u->fileref, ZONE_SIZE * c->zone * 8, SEEK_SET) == 0) {
+        sim_fwrite (c->sysdata, 8, 8, u->fileref);
+        sim_fwrite (&memory [c->memory], 8, 1024, u->fileref);
+    }
     if (ferror (u->fileref))
         longjmp (cpu_halt, SCPE_IOERR);
 }
@@ -301,11 +302,14 @@ void disk_write_track (UNIT *u)
     if (disk_dev.dctrl)
         besm6_debug ("::: запись МД %o полузона %04o.%d память %05o-%05o",
                      c->dev, c->zone, c->track, c->memory, c->memory + 511);
-    fseek (u->fileref, (ZONE_SIZE*c->zone + 4*c->track) * 8, SEEK_SET);
-    sim_fwrite (c->sysdata + 4*c->track, 8, 4, u->fileref);
-    fseek (u->fileref, (8 + ZONE_SIZE*c->zone + 512*c->track) * 8,
-           SEEK_SET);
-    sim_fwrite (&memory [c->memory], 8, 512, u->fileref);
+    if (fseek (u->fileref, (ZONE_SIZE*c->zone + 4*c->track) * 8,
+               SEEK_SET) == 0) {
+        sim_fwrite (c->sysdata + 4*c->track, 8, 4, u->fileref);
+        if (fseek (u->fileref, (8 + ZONE_SIZE*c->zone + 512*c->track) * 8,
+                   SEEK_SET) == 0) {
+            sim_fwrite (&memory [c->memory], 8, 512, u->fileref);
+        }
+    }
     if (ferror (u->fileref))
         longjmp (cpu_halt, SCPE_IOERR);
 }
@@ -358,8 +362,8 @@ void disk_read (UNIT *u)
                      "::: чтение МД %o зона %04o служебные слова" :
                      "::: чтение МД %o зона %04o память %05o-%05o",
                      c->dev, c->zone, c->memory, c->memory + 1023);
-    fseek (u->fileref, ZONE_SIZE * c->zone * 8, SEEK_SET);
-    if (sim_fread (c->sysdata, 8, 8, u->fileref) != 8) {
+    if (fseek (u->fileref, ZONE_SIZE * c->zone * 8, SEEK_SET) != 0 ||
+        sim_fread (c->sysdata, 8, 8, u->fileref) != 8) {
         /* Чтение неинициализированного диска */
         disk_fail |= c->mask_fail;
         return;
@@ -395,16 +399,16 @@ void disk_read_track (UNIT *u)
                      "::: чтение МД %o полузона %04o.%d служебные слова" :
                      "::: чтение МД %o полузона %04o.%d память %05o-%05o",
                      c->dev, c->zone, c->track, c->memory, c->memory + 511);
-    fseek (u->fileref, (ZONE_SIZE*c->zone + 4*c->track) * 8, SEEK_SET);
-    if (sim_fread (c->sysdata + 4*c->track, 8, 4, u->fileref) != 4) {
+    if (fseek (u->fileref, (ZONE_SIZE*c->zone + 4*c->track) * 8, SEEK_SET) != 0 ||
+        sim_fread (c->sysdata + 4*c->track, 8, 4, u->fileref) != 4) {
         /* Чтение неинициализированного диска */
         disk_fail |= c->mask_fail;
         return;
     }
     if (! (c->op & DISK_READ_SYSDATA)) {
-        fseek (u->fileref, (8 + ZONE_SIZE*c->zone + 512*c->track) * 8,
-               SEEK_SET);
-        if (sim_fread (&memory [c->memory], 8, 512, u->fileref) != 512) {
+        if (fseek (u->fileref, (8 + ZONE_SIZE*c->zone + 512*c->track) * 8,
+                   SEEK_SET) != 0 ||
+            sim_fread (&memory [c->memory], 8, 512, u->fileref) != 512) {
             /* Чтение неинициализированного диска */
             disk_fail |= c->mask_fail;
             return;

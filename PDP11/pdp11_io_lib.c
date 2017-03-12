@@ -1,6 +1,6 @@
 /* pdp11_io_lib.c: Unibus/Qbus common support routines
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -204,7 +204,7 @@ t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
-uint32 vec, numvec, radix = DEV_RDX;
+uint32 vec, numvec, br_lvl, radix = DEV_RDX;
 
 if (uptr == NULL)
     return SCPE_IERR;
@@ -249,6 +249,10 @@ else {
     }
 if (vec >= ((VEC_SET | AUTO_VECBASE) & ~3))
     fprintf (st, "*");
+br_lvl = dibp->vloc / 32;
+if (br_lvl < 4)                                         /* VAXen do 0-3, others 4-7 */
+    br_lvl = br_lvl + 4;
+fprintf (st, ", BR%d", br_lvl);
 return SCPE_OK;
 }
 
@@ -581,8 +585,12 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {017300} },                                     /* KE11-A - fx CSR, no VEC */
     { { "KG" },          1,  0,  0, 0, 
         {010700} },                                     /* KG11-A - fx CSR, no VEC */
-    { { "RHA", "RHB", "RHC" },  1,  1,  0, 0, 
-        {016700, 012440, 012040}, {0254, 0224, 0204} }, /* RH11/RH70 - fx CSR, fx VEC */
+    { { "RHA" },         1,  1,  0, 0, 
+        {016700}, {0254} },                             /* RH11/RH70 - fx CSR, fx VEC */
+    { { "RHB" },         1,  1,  0, 0, 
+        {012440}, {0224} },                             /* RH11/RH70 - fx CSR, fx VEC */
+    { { "RHC" },  1,  1,  0, 0, 
+        {012040}, {0204} },                             /* RH11/RH70 - fx CSR, fx VEC */
     { { "CLK" },         1,  1,  0, 0, 
         {017546}, {0100} },                             /* KW11L - fx CSR, fx VEC */
     { { "PCLK" },        1,  1,  0, 0, 
@@ -831,8 +839,10 @@ if (autcon_enb == 0)                                    /* enabled? */
     return SCPE_OK;
 if (name) {                                             /* updating? */
     dptr = find_dev (name);
+    if (dptr == NULL)
+        return SCPE_ARG;
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
-    if ((nctrl < 0) || (dptr == NULL) || (dibp == NULL))
+    if ((nctrl < 0) || (dibp == NULL))
         return SCPE_ARG;
     dibp->numc = nctrl;
     }
