@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2016, Robert M Supnik
+   Copyright (c) 1998-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Mar-17    RMS     Annotated fall through in switch
    14-Jul-16    RMS     Corrected REI rule 9
    21-Jun-16    RMS     Removed reserved check on SIRR (Mark Pizzolato)
    18-Feb-16    RMS     Changed variables in MxPR to unsigned
@@ -1522,6 +1523,7 @@ switch (prn) {                                          /* case on reg # */
 
     case MT_MAPEN:                                      /* MAPEN */
         mapen = val & 1;
+        /* fall through */
     case MT_TBIA:                                       /* TBIA */
         zap_tb (1);                                     /* clr entire TLB */
         break;
