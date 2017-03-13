@@ -63,7 +63,7 @@
             bit 5 - write protect
             bit 6 - write error
             bit 7 - not ready
-            If result type is 02H
+            If result type is 02H and ready has changed
             bit 0 - zero
             bit 1 - zero
             bit 2 - zero
@@ -72,6 +72,7 @@
             bit 5 - drive 3 ready
             bit 6 - drive 0 ready
             bit 7 - drive 1 ready
+            else return 0
 
         07FH - Write - Reset diskette system.
 
@@ -125,14 +126,14 @@
 
         u3 -
         u4 -
-        u5 -
+        u5 - fdc number.
         u6 - fdd number.
 
 */
 
 #include "system_defs.h"                /* system header in system dir */
 
-#define  DEBUG   0
+#define DEBUG   0
 
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
@@ -222,6 +223,7 @@ typedef    struct    {                  //FDC definition
     uint16  baseport;                   //FDC base port
     uint16  iopb;                       //FDC IOPB
     uint8   stat;                       //FDC status
+    uint8   rdychg;                     //FDC ready change
     uint8   rtype;                      //FDC result type
     uint8   rbyte0;                     //FDC result byte for type 00
     uint8   rbyte1;                     //FDC result byte for type 10
@@ -351,18 +353,22 @@ void isbc202_reset1(uint8 fdcnum)
                 case 0:
                     fdc202[fdcnum].stat |= RDY0; //set FDD 0 ready
                     fdc202[fdcnum].rbyte1 |= RB1RD0;
+                    fdc202[fdcnum].rdychg = 0;
                     break;
                 case 1:
                     fdc202[fdcnum].stat |= RDY1; //set FDD 1 ready
                     fdc202[fdcnum].rbyte1 |= RB1RD1;
+                    fdc202[fdcnum].rdychg = 0;
                     break;
                 case 2:
                     fdc202[fdcnum].stat |= RDY2; //set FDD 2 ready
                     fdc202[fdcnum].rbyte1 |= RB1RD2;
+                    fdc202[fdcnum].rdychg = 0;
                     break;
                 case 3:
                     fdc202[fdcnum].stat |= RDY3; //set FDD 3 ready
                     fdc202[fdcnum].rbyte1 |= RB1RD3;
+                    fdc202[fdcnum].rdychg = 0;
                     break;
             }
             sim_printf("         SBC202%d: Configured, Status=%02X Attached to %s\n",
@@ -397,11 +403,14 @@ t_stat isbc202_attach (UNIT *uptr, CONST char *cptr)
         fseek(fp, 0, SEEK_END);         /* size disk image */
         flen = ftell(fp);
         fseek(fp, 0, SEEK_SET);
+        if (flen == -1) {
+            sim_printf("   isbc202_attach: File error\n");
+            return SCPE_IOERR;
+        } 
         if (fdc202[fdcnum].fdd[fddnum].buf == NULL) { /* no buffer allocated */
             fdc202[fdcnum].fdd[fddnum].buf = (uint8 *)malloc(flen);
             if (fdc202[fdcnum].fdd[fddnum].buf == NULL) {
                 sim_printf("   isbc202_attach: Malloc error\n");
-                fclose(fp);
                 return SCPE_MEM;
             }
         }
@@ -442,7 +451,6 @@ t_stat isbc202_attach (UNIT *uptr, CONST char *cptr)
             fdc202[fdcnum].fdd[fddnum].cyl = 0;
         } else
             sim_printf("   iSBC-202-%d: Not a DD disk image\n", fdcnum);
-
         sim_printf("   iSBC-202%d: Configured %d bytes, Attached to %s\n",
             fdcnum, uptr->capac, uptr->filename);
     }
@@ -469,7 +477,8 @@ uint8 isbc202_get_dn(void)
 {
     int i;
 
-    for (i=0; i<SBC202_NUM; i++)
+//    for (i=0; i<SBC202_NUM; i++)
+    for (i=0; i<=SBC202_NUM; i++)
         if (port >= fdc202[i].baseport && port <= fdc202[i].baseport + 7)
             return i;
     sim_printf("isbc202_get_dn: port %04X not in isbc202 device table\n", port);
@@ -485,7 +494,8 @@ uint8 isbc2020(t_bool io, uint8 data)
     if ((fdcnum = isbc202_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read ststus*/
             if (DEBUG)
-                sim_printf("\n   isbc202-%d: 0x78 returned status=%02X PCX=%04X", fdcnum, fdc202[fdcnum].stat, PCX);
+                sim_printf("\n   isbc202-%d: 0x78 returned status=%02X PCX=%04X", 
+					fdcnum, fdc202[fdcnum].stat, PCX);
             return fdc202[fdcnum].stat;
         }
     }
@@ -507,7 +517,8 @@ uint8 isbc2021(t_bool io, uint8 data)
         } else {                        /* write data port */
             fdc202[fdcnum].iopb = data;
             if (DEBUG)
-                sim_printf("\n   isbc202-%d: 0x79 IOPB low=%02X PCX=%04X", fdcnum, data, PCX);
+                sim_printf("\n   isbc202-%d: 0x79 IOPB low=%02X PCX=%04X", 
+                    fdcnum, data, PCX);
         }
     }
     return 0;
@@ -523,7 +534,8 @@ uint8 isbc2022(t_bool io, uint8 data)
         } else {                        /* write data port */
             fdc202[fdcnum].iopb |= (data << 8);
             if (DEBUG)
-                sim_printf("\n   isbc202-%d: 0x7A IOPB=%04X PCX=%04X", fdcnum, fdc202[fdcnum].iopb, PCX);
+                sim_printf("\n   isbc202-%d: 0x7A IOPB=%04X PCX=%04X", 
+		    fdcnum, fdc202[fdcnum].iopb, PCX);
             isbc202_diskio(fdcnum);
             if (fdc202[fdcnum].intff)
                 fdc202[fdcnum].stat |= FDCINT;
@@ -534,14 +546,28 @@ uint8 isbc2022(t_bool io, uint8 data)
 
 uint8 isbc2023(t_bool io, uint8 data)
 {
-    uint8 fdcnum, rslt;
+    uint8 fdcnum;
 
     if ((fdcnum = isbc202_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read data port */
-            if (DEBUG)
-                sim_printf("\n   isbc202-%d: 0x7B returned rtype=%02X result byte=%02X PCX=%04X",
-                    fdcnum, fdc202[fdcnum].rtype, rslt, PCX);
-            return rslt;
+	    if (fdc202[fdcnum].rtype == 0) {
+                if (DEBUG)
+                    sim_printf("\n   isbc202-%d: 0x7B returned rbyte0=%02X PCX=%04X",
+                        fdcnum, fdc202[fdcnum].rbyte0, PCX);
+                return fdc202[fdcnum].rbyte0;
+	    } else {
+                if (fdc202[fdcnum].rdychg) {
+                    if (DEBUG)
+                        sim_printf("\n   isbc202-%d: 0x7B returned rbyte1=%02X PCX=%04X",
+                            fdcnum, fdc202[fdcnum].rbyte1, PCX);
+                    return fdc202[fdcnum].rbyte1;
+                } else {
+                    if (DEBUG)
+                        sim_printf("\n   isbc202-%d: 0x7B returned rbytex=%02X PCX=%04X",
+                            fdcnum, 0, PCX);
+                    return 0;
+                }
+	    }
         } else {                        /* write data port */
             ; //stop diskette operation
         }
@@ -588,8 +614,8 @@ void isbc202_diskio(uint8 fdcnum)
             fdcnum, fdc202[fdcnum].iopb, fddnum, fdc202[fdcnum].stat);
         sim_printf("\n   isbc202-%d: cw=%02X di=%02X nr=%02X ta=%02X sa=%02X ba=%04X",
             fdcnum, cw, di, nr, ta, sa, ba);
-        sim_printf("\n   isbc202-%d: maxsec=%02X maxcyl=%02X",
-            fdcnum, fdc202[fdcnum].fdd[fddnum].maxsec, fdc202[fdcnum].fdd[fddnum].maxcyl);
+//        sim_printf("\n   isbc202-%d: maxsec=%02X maxcyl=%02X",
+//            fdcnum, fdc202[fdcnum].fdd[fddnum].maxsec, fdc202[fdcnum].fdd[fddnum].maxcyl);
     }
     //check for not ready
     switch(fddnum) {

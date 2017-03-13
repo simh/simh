@@ -64,7 +64,7 @@
             bit 5 - write protect
             bit 6 - write error
             bit 7 - not ready
-            If result type is 02H
+            If result type is 02H and ready has changed
             bit 0 - zero
             bit 1 - zero
             bit 2 - zero
@@ -73,6 +73,7 @@
             bit 5 - drive 3 ready
             bit 6 - drive 0 ready
             bit 7 - drive 1 ready
+            else return 0
 
         07FH - Write - Reset diskette system.
 
@@ -126,8 +127,14 @@
 
         u3 -
         u4 -
-        u5 -
+        u5 - fdc number.
         u6 - fdd number.
+
+    The ZX-200A appears to the multibus system as if there were an iSBC-201
+    installed addressed at 0x88-0x8f and an iSBC-202 installed addressed at 
+    0x78-0x7F.  The DD disks are drive 0 - 3.  The SD disks are mapped over
+    DD disks 0 - 1.  Thus drive 0 - 1 can be SD or DD, but not both.  Drive
+    2 - 3 are always DD.
 */
 
 #include "system_defs.h"                /* system header in system dir */
@@ -188,6 +195,7 @@ extern uint8 multibus_put_mword(uint16 addr, uint16 val);
 /* external globals */
 
 extern uint16 port;                     //port called in dev_table[port]
+extern int32    PCX;
 
 /* internal function prototypes */
 
@@ -204,12 +212,14 @@ void zx200a_diskio(uint8 fdcnum);
 
 /* globals */
 
-int32 zx200a_fdcnum = 0;               //actual number of SBC-202 instances + 1
+int32 zx200a_fdcnum = 0;                //actual number of ZX-200A instances + 1
 
 typedef    struct    {                  //FDD definition
     uint8   *buf;
     int     t0;
     int     rdy;
+    uint8   sec;
+    uint8   cyl;
     uint8   maxsec;
     uint8   maxcyl;
     }    FDDDEF;
@@ -218,6 +228,7 @@ typedef    struct    {                  //FDC definition
     uint16  baseport;                   //FDC base port
     uint16  iopb;                       //FDC IOPB
     uint8   stat;                       //FDC status
+    uint8   rdychg;                     //FDC ready change
     uint8   rtype;                      //FDC result type
     uint8   rbyte0;                     //FDC result byte for type 00
     uint8   rbyte1;                     //FDC result byte for type 10
@@ -278,11 +289,11 @@ DEBTAB zx200a_debug[] = {
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE zx200a_dev = {
-    "ZX200A",             //name
-    zx200a_unit,         //units
-    zx200a_reg,          //registers
-    NULL,               //modifiers
-    1,                  //numunits
+    "ZX200A",           //name
+    zx200a_unit,        //units
+    zx200a_reg,         //registers
+    zx200a_mod,         //modifiers
+    FDD_NUM,            //numunits
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -290,8 +301,7 @@ DEVICE zx200a_dev = {
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-//    &zx200a_reset,       //reset
-    NULL,       //reset
+    NULL,               //reset
     NULL,               //boot
     &zx200a_attach,     //attach  
     NULL,               //detach
@@ -324,13 +334,18 @@ t_stat zx200a_reset(DEVICE *dptr, uint16 base)
         reg_dev(zx200a2, base + 2, zx200a_fdcnum); 
         reg_dev(zx200a3, base + 3, zx200a_fdcnum); 
         reg_dev(zx200a7, base + 7, zx200a_fdcnum); 
-        zx200a_unit[zx200a_fdcnum].u3 = 0x00; /* ipc reset */
+        reg_dev(zx200a0, base+16, zx200a_fdcnum); 
+        reg_dev(zx200a1, base+16 + 1, zx200a_fdcnum); 
+        reg_dev(zx200a2, base+16 + 2, zx200a_fdcnum); 
+        reg_dev(zx200a3, base+16 + 3, zx200a_fdcnum); 
+        reg_dev(zx200a7, base+16 + 7, zx200a_fdcnum); 
         zx200a_reset1(zx200a_fdcnum);
         zx200a_fdcnum++;
     } else
         sim_printf(" - Not Found on Port %02X\n", base);
     return SCPE_OK;
 }
+/* Software reset routine */
 
 void zx200a_reset1(uint8 fdcnum)
 {
@@ -344,8 +359,6 @@ void zx200a_reset1(uint8 fdcnum)
         zx200a[fdcnum].stat |= FDCPRE | FDCDD; //set the FDC status
         zx200a[fdcnum].rtype = ROK;
         if (uptr->capac == 0) {         /* if not configured */
-            uptr->capac = 0;            /* initialize unit */
-            uptr->u4 = 0;
             uptr->u5 = fdcnum;          //fdc device number
             uptr->u6 = i;               /* unit number - only set here! */
             uptr->flags |= UNIT_WPMODE; /* set WP in unit flags */
@@ -355,18 +368,22 @@ void zx200a_reset1(uint8 fdcnum)
                 case 0:
                     zx200a[fdcnum].stat |= RDY0; //set FDD 0 ready
                     zx200a[fdcnum].rbyte1 |= RB1RD0;
+                    zx200a[fdcnum].rdychg = 0;
                     break;
                 case 1:
                     zx200a[fdcnum].stat |= RDY1; //set FDD 1 ready
                     zx200a[fdcnum].rbyte1 |= RB1RD1;
+                    zx200a[fdcnum].rdychg = 0;
                     break;
                 case 2:
                     zx200a[fdcnum].stat |= RDY2; //set FDD 2 ready
                     zx200a[fdcnum].rbyte1 |= RB1RD2;
+                    zx200a[fdcnum].rdychg = 0;
                     break;
                 case 3:
                     zx200a[fdcnum].stat |= RDY3; //set FDD 3 ready
                     zx200a[fdcnum].rbyte1 |= RB1RD3;
+                    zx200a[fdcnum].rdychg = 0;
                     break;
             }
             sim_printf("         ZX-200A%d: Configured, Status=%02X Attached to %s\n",
@@ -401,11 +418,14 @@ t_stat zx200a_attach (UNIT *uptr, CONST char *cptr)
         fseek(fp, 0, SEEK_END);         /* size disk image */
         flen = ftell(fp);
         fseek(fp, 0, SEEK_SET);
+        if (flen == -1) {
+            sim_printf("   zx200a_attach: File error\n");
+            return SCPE_IOERR;
+        } 
         if (zx200a[fdcnum].fdd[fddnum].buf == NULL) { /* no buffer allocated */
             zx200a[fdcnum].fdd[fddnum].buf = (uint8 *)malloc(flen);
             if (zx200a[fdcnum].fdd[fddnum].buf == NULL) {
                 sim_printf("   zx200a_attach: Malloc error\n");
-                fclose(fp);
                 return SCPE_MEM;
             }
         }
@@ -442,12 +462,16 @@ t_stat zx200a_attach (UNIT *uptr, CONST char *cptr)
         if (flen == 256256) {           /* 8" 256K SSSD */
             zx200a[fdcnum].fdd[fddnum].maxcyl = 77;
             zx200a[fdcnum].fdd[fddnum].maxsec = 26;
+            zx200a[fdcnum].fdd[fddnum].sec = 1;
+            zx200a[fdcnum].fdd[fddnum].cyl = 0;
         }
         else if (flen == 512512) {      /* 8" 512K SSDD */
             zx200a[fdcnum].fdd[fddnum].maxcyl = 77;
             zx200a[fdcnum].fdd[fddnum].maxsec = 52;
+            zx200a[fdcnum].fdd[fddnum].sec = 1;
+            zx200a[fdcnum].fdd[fddnum].cyl = 0;
         } else
-            sim_printf("   ZX-200A-%d: Not a known ISIS-II disk image\n", fdcnum);
+            sim_printf("   ZX-200A-%d: Not a known disk image\n", fdcnum);
         sim_printf("   ZX-200A-%d: Configured %d bytes, Attached to %s\n",
             fdcnum, uptr->capac, uptr->filename);
     }
@@ -475,7 +499,8 @@ uint8 zx200_get_dn(void)
     int i;
 
     for (i=0; i<ZX200A_NUM; i++)
-        if (port >= zx200a[i].baseport && port <= zx200a[i].baseport + 7)
+        if ((port >= zx200a[i].baseport && port <= zx200a[i].baseport + 7) ||
+            (port >= zx200a[i].baseport+16 && port <= zx200a[i].baseport+16 + 7))
             return i;
     sim_printf("zx200_get_dn: port %04X not in zx200 device table\n", port);
     return 0xFF;
@@ -493,7 +518,9 @@ uint8 zx200a0(t_bool io, uint8 data)
 
     if ((fdcnum = zx200_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read ststus*/
-//            sim_printf("\n   ZX200A-%d: returned status=%02X", fdcnum, zx200a[fdcnum].stat);
+            if (DEBUG)
+                sim_printf("\n   zx-200a0-%d: 0x78/88 returned status=%02X PCX=%04X", 
+					fdcnum, zx200a[fdcnum].stat, PCX);
             return zx200a[fdcnum].stat;
         }
     }
@@ -509,13 +536,14 @@ uint8 zx200a1(t_bool io, uint8 data)
             zx200a[fdcnum].intff = 0;      //clear interrupt FF
             zx200a[fdcnum].stat &= ~FDCINT;
             if (DEBUG)
-                sim_printf("\n   ZX-200A1-%d: returned rtype=%02X intff=%02X status=%02X", 
-                    fdcnum, zx200a[fdcnum].rtype, zx200a[fdcnum].intff, zx200a[fdcnum].stat);
+                sim_printf("\n   zx-200a1-%d: 0x79/89 returned rtype=%02X intff=%02X status=%02X PCX=%04X", 
+                    fdcnum, zx200a[fdcnum].rtype, zx200a[fdcnum].intff, zx200a[fdcnum].stat, PCX);
             return zx200a[fdcnum].rtype;
         } else {                            /* write control port */
             zx200a[fdcnum].iopb = data;
             if (DEBUG)
-                sim_printf("\n   ZX-200A1-%d: IOPB low=%02X", fdcnum, data);
+                sim_printf("\n   zx-200a1-%d: 0x79/88 IOPB low=%02X PCX=%04X", 
+                    fdcnum, data, PCX);
         }
     }
     return 0;
@@ -531,7 +559,8 @@ uint8 zx200a2(t_bool io, uint8 data)
         } else {                        /* write data port */
             zx200a[fdcnum].iopb |= (data << 8);
             if (DEBUG)
-                sim_printf("\n   zx200a-%d: IOPB=%04X", fdcnum, zx200a[fdcnum].iopb);
+                sim_printf("\n   zx-200a2-%d: 0x7A/8A IOPB=%04X PCX=%04X", 
+		    fdcnum, zx200a[fdcnum].iopb, PCX);
             zx200a_diskio(fdcnum);
             if (zx200a[fdcnum].intff)
                 zx200a[fdcnum].stat |= FDCINT;
@@ -542,24 +571,28 @@ uint8 zx200a2(t_bool io, uint8 data)
 
 uint8 zx200a3(t_bool io, uint8 data)
 {
-    uint8 fdcnum, rslt;
+    uint8 fdcnum;
 
     if ((fdcnum = zx200_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read data port */
-            switch(zx200a[fdcnum].rtype) {
-                case 0x00:
-                    rslt = zx200a[fdcnum].rbyte0;
-                    zx200a[fdcnum].rtype = 0x02; //reset error
-                    break;
-                case 0x02:
-                    rslt = zx200a[fdcnum].rbyte1;
-                    zx200a[fdcnum].rtype = 0x00; //set error
-                    break;
-            }
-            if (DEBUG)
-                sim_printf("\n   zx200a-%d: 0x7B returned rtype=%02X result byte=%02X",
-                    fdcnum, zx200a[fdcnum].rtype, rslt);
-            return rslt;
+	    if (zx200a[fdcnum].rtype == 0) {
+                if (DEBUG)
+                    sim_printf("\n   zx200a3-%d: 0x7B/8B returned rbyte0=%02X PCX=%04X",
+                        fdcnum, zx200a[fdcnum].rbyte0, PCX);
+                return zx200a[fdcnum].rbyte0;
+	    } else {
+                if (zx200a[fdcnum].rdychg) {
+                    if (DEBUG)
+                        sim_printf("\n   zx200a3-%d: 0x7B/8B returned rbyte1=%02X PCX=%04X",
+                            fdcnum, zx200a[fdcnum].rbyte1, PCX);
+                    return zx200a[fdcnum].rbyte1;
+                } else {
+                    if (DEBUG)
+                        sim_printf("\n   zx200a3-%d: 0x7B/8B returned rbytex=%02X PCX=%04X",
+                            fdcnum, 0, PCX);
+                    return 0;
+                }
+	    }
         } else {                        /* write data port */
             ; //stop diskette operation
         }
@@ -607,8 +640,8 @@ void zx200a_diskio(uint8 fdcnum)
             fdcnum, zx200a[fdcnum].iopb, fddnum, zx200a[fdcnum].stat);
         sim_printf("\n   zx200a-%d: cw=%02X di=%02X nr=%02X ta=%02X sa=%02X ba=%04X",
             fdcnum, cw, di, nr, ta, sa, ba);
-        sim_printf("\n   zx200a-%d: maxsec=%02X maxcyl=%02X",
-            fdcnum, zx200a[fdcnum].fdd[fddnum].maxsec, zx200a[fdcnum].fdd[fddnum].maxcyl);
+//        sim_printf("\n   zx200a-%d: maxsec=%02X maxcyl=%02X",
+//            fdcnum, zx200a[fdcnum].fdd[fddnum].maxsec, zx200a[fdcnum].fdd[fddnum].maxcyl);
     }
     //check for not ready
     switch(fddnum) {
@@ -651,12 +684,12 @@ void zx200a_diskio(uint8 fdcnum)
     }
     //check for address error
     if (
-        ((di & 0x07) != 0x03) ||
+        ((di & 0x07) != 0x03) && (
         (sa > zx200a[fdcnum].fdd[fddnum].maxsec) ||
         ((sa + nr) > (zx200a[fdcnum].fdd[fddnum].maxsec + 1)) ||
         (sa == 0) ||
         (ta > zx200a[fdcnum].fdd[fddnum].maxcyl)
-        ) {
+        )) {
             if (DEBUG)
                 sim_printf("\n   zx200a-%d: maxsec=%02X maxcyl=%02X",
                     fdcnum, zx200a[fdcnum].fdd[fddnum].maxsec, zx200a[fdcnum].fdd[fddnum].maxcyl);

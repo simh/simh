@@ -1258,7 +1258,7 @@ int32 sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 
 /* Symbolic output - working
    Inputs:
-        *of   = output stream
+        *of     =       output stream
         addr    =       current PC
         *val    =       pointer to values
         *uptr   =       pointer to unit

@@ -78,8 +78,8 @@
 #define SBC202_NUM      1
 
 /* set the base for the zx-200a disk controller */
-#define ZX200A_BASE_DD  0x78
-#define ZX200A_BASE_SD  0x88
+#define ZX200A_BASE     0x78
+#define ZX200A_INT      INT_1
 #define ZX200A_NUM      0
 
 /* set the base I/O address for the iSBC 208 */
