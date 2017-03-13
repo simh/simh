@@ -1,6 +1,6 @@
 /* h316_dp.c: Honeywell 4623, 4651, 4720 disk simulator
 
-   Copyright (c) 2003-2015, Robert M. Supnik
+   Copyright (c) 2003-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
                 4651 disk subsystem
                 4720 disk subsystem
 
+   13-Mar-17    RMS     Annotated intentional fall through in switch
    03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    04-Sep-05    RMS     Fixed missing return (Peter Schorn)
@@ -109,7 +110,7 @@
 #define STA_ANYER       0000002                         /* any error^ */
 #define STA_EOR         0000001                         /* end of record */
 #define STA_ALLERR      (STA_ADRER|STA_FMTER|STA_HNLER|STA_OFLER|STA_SEKER|\
-                     STA_WPRER|STA_UNSER|STA_DTRER)
+                         STA_WPRER|STA_UNSER|STA_DTRER)
 
 /* Functions */
 
@@ -471,7 +472,8 @@ switch (inst) {                                         /* case on opcode */
 
         case 011: case 012: case 013:                   /* !not seeking 0-6 */
         case 014: case 015: case 016: case 017:
-            u = fnc - 011;
+            u = fnc - 011;                              /* set u */
+            /* fall through */
         case 007:                                       /* !not seeking 7 */
             if (!sim_is_active (&dp_unit[u]) ||         /* quiescent? */
                 (dp_unit[u].FNC != (FNC_SEEK | FNC_2ND)))
